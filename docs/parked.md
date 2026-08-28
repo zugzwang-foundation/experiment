@@ -40,6 +40,120 @@ operator-owned `BETTER_AUTH_SECRET` check is now the head of the queue.*
 
 ---
 
+## RPLY-CLOSE — the reply lane's residue (2026-08-26)
+
+Seven rows out of RPLY-1/-2/-3, severity-labelled. **P1 is a live correctness
+bug on a shipped surface**, not polish; everything below it is accepted,
+routed, or cosmetic.
+
+⚠ **P1 is a SEQUENCE candidate and is deliberately NOT added to the table at
+the top of this file.** That ordering is founder-curated and adding to it is a
+ruling, not an edit. Flagged here so the omission is visible rather than
+silent.
+
+---
+
+### P1 · The market-arm position readout lies while a composer is open
+
+`SlotHeader` derives label, thumb, percent, TO-WIN unit **and the position
+readout** from one `side` prop where `side = openSide ?? side`, so with a
+composer open the readout compares the viewer's real holding against the
+**MIRRORED** pole — a viewer holding **Đ146 on NO is told they hold nothing**.
+
+**Correctness bug, not polish.** Display only: no ledger is touched, no write
+path is involved, and truth returns when the composer closes. That bounds the
+blast radius; it does not make the statement true while it is on screen, and
+it is the viewer's own money being misreported back to them.
+
+**The correct pattern already exists in the codebase.** `PositionStrip`
+decouples the two via a `composingSide` prop that drives label/percent/TO-WIN
+only, leaving the position readout bound to the column's own true pole
+(RPLY-2). This is a port **in the opposite direction** — the post arm was
+fixed and the market arm was not.
+
+⚠ **`header-mirror.test.ts:184` pins the falsehood as intended behaviour and
+must move with the fix. Expect it to red. That is not a regression** — it is
+`V-18` (a reconstruction does not merely omit, it can assert), and this row is
+one of that rule's two founding instances.
+
+**Trigger:** armed; next `SlotHeader.tsx` touch, or sooner if founder-ruled.
+**Estimate:** one session.
+**Canon:** `design-canon.md` §2's composer-open exception names this component
+as the wrong one, by name.
+
+---
+
+### P2 · `ci` is not a required check
+
+No branch protection on the repository, so every "checks passed" is
+**informational**. Detail and the dated measurement live in `CLAUDE.md` §5.13
+— not restated here, because a second copy drifts and whichever one a reader
+opens is the wrong one.
+
+**Trigger:** any decision that would lean on CI as a gate rather than a signal.
+
+---
+
+### P3 · `Đ BET` stops being reachable without scrolling below 600px / 580px viewport HEIGHT
+
+**ACCEPTED.** 600px on the post arm, 580px on the market arm — 50–70px below
+the tested floor. `column-scroll` takes the overflow, so the control stays
+**reachable**; it stops being reachable *without* scrolling. Measured at
+RPLY-3 across both arms and five heights.
+
+**Trigger:** only if a real device in that band is ruled in scope.
+
+---
+
+### P3 · The money row overflows its column below ~860px viewport WIDTH; `Đ BET` clips from ~800px
+
+**ACCEPTED.** Pre-existing, and **proven byte-identical to the pre-RPLY-2
+tree** — the money row's contents (comments stripped) and the grid track are
+the same 1705 characters and the same `grid-cols-[2fr_3fr]` declaration. It is
+behaviour that was restored deliberately along with the grid, not introduced.
+
+**Route to the responsive lane.**
+
+---
+
+### P3 · `min-h-48` is inert at narrow widths
+
+`ImageAttach`'s panel floor bounds HEIGHT, while the figure's `meet` scale is
+`min(w/200, h/250)` — so at a narrow enough column the artwork is
+**width**-limited and a height floor cannot bound it. Measured at 900px
+viewport width: width-limited at every height, scale 0.585.
+
+**Docket with the row above** — same lane, same cause.
+
+---
+
+### P3 · Reply-card parity gaps
+
+No download icon (canon §6 names it), no `KnowMore` mount in `PostCard`'s
+overlaid-gutter form, `LaneBadge` differs. **None is a defect** — the cards
+match in composition, which is what was ruled. One small task or none.
+
+---
+
+### P3 · Post-arm header ARIA grouping
+
+Two identically-rendered column headers with no grouping for a screen reader.
+The market arm uses a labelled `<fieldset>` for exactly this. **A11y lane.**
+
+---
+
+### P4 · `ImageAttach.tsx`'s `max-h-[308px]` calibration comment is stale — and dormant
+
+Stale since the footblock moved (the right column's baseline height changed
+underneath it), and **dormant**: measured, the cap never binds at any tested
+width, because the artwork is height- or width-limited well below 308px. Both
+halves matter — a comment that is merely stale invites a correction; one that
+is also dormant invites deleting the declaration, which is a different call.
+
+**Trigger:** next `ImageAttach.tsx` touch.
+
+---
+
 ## HTML-FINISH · MARKET DETAIL round 2 (R2) — the four visible placeholders
 
 **Parked:** strip or gate all four `/m/[slug]` placeholders before the **DP.2

@@ -48,13 +48,21 @@ export function PositionStrip({
 	 * below; `side` — the column's own true pole — is what the position
 	 * readout (`held`) keeps comparing against, unconditionally.
 	 *
-	 * ⚠ DIVERGES FROM `design-canon.md` §2 (the Reply surface entry), which
-	 * fixes this component's whole reason for being to "**Columns are FIXED
-	 * poles** … Column header = the side **price pill only**" — reported for
-	 * routing, NOT amended (that document is web-authored). The founder's
-	 * later ruling for THIS task overrides it for the hosting column only:
-	 * "when a composer opens, the headers must be the same as the side bet
-	 * being taken."
+	 * ⚠ THE GOVERNING RULE IS `design-canon.md` §2's **composer-open
+	 * exception** (the Reply surface entry), which is where the founder's
+	 * ruling now lives: "when a composer opens, the headers must be the same
+	 * as the side bet being taken." Canon carries the same split this
+	 * component implements — the hosting column's label, percent and TO-WIN
+	 * follow the side being bet; the position readout is excluded from the
+	 * mirroring because it is a fact about the viewer's holding on that
+	 * specific pole, and mirroring it prints a falsehood.
+	 * ⚠ This block used to read as a DIVERGENCE from canon, and did so
+	 * correctly: canon then said only "Columns are FIXED poles … Column header
+	 * = the side price pill only", and a component contradicting a
+	 * prescriptive document has to say so. RPLY-CLOSE amended canon, so the
+	 * divergence is discharged and the two clauses that recorded it are gone.
+	 * The ruling itself is kept verbatim above — canon is its source now,
+	 * not the document it departs from.
 	 */
 	composingSide?: Side | null;
 	pricing: { yes: string; no: string } | null;
