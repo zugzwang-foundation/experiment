@@ -63,30 +63,36 @@ const { mockGetSession, mockPrecommit, idemStore, mockLookupOrReserve } =
 			mockPrecommit: vi.fn(),
 			idemStore: store,
 			// Single-key-encoding-both-states machine (SPEC.2 §11): first call for a
-			// key → miss (caller MUST call release(response) to populate the store);
-			// a subsequent call with the same key+fingerprint → hit (verbatim replay).
-			mockLookupOrReserve: vi.fn(async (key: string, fingerprint: string) => {
-				const existing = store.get(key);
-				if (existing && existing.bodyFingerprint === fingerprint) {
-					return { kind: "hit", cachedResponse: existing };
-				}
-				return {
-					kind: "miss",
-					release: async (
-						response: {
-							status: number;
-							body: unknown;
-							bodyFingerprint: string;
-						} | null,
-					) => {
-						if (response === null) {
-							store.delete(key);
-							return;
-						}
-						store.set(key, response);
-					},
-				};
-			}),
+			// (userId, key) pair → miss (caller MUST call release(response) to
+			// populate the store); a subsequent call with the same key+fingerprint →
+			// hit (verbatim replay). User-scoped since ADR-0044 (S-7 G2) — mirrors
+			// the real `idempotencyLookupOrReserve(userId, key, bodyFingerprint)`
+			// signature.
+			mockLookupOrReserve: vi.fn(
+				async (userId: string, key: string, fingerprint: string) => {
+					const storeKey = `${userId}:${key}`;
+					const existing = store.get(storeKey);
+					if (existing && existing.bodyFingerprint === fingerprint) {
+						return { kind: "hit", cachedResponse: existing };
+					}
+					return {
+						kind: "miss",
+						release: async (
+							response: {
+								status: number;
+								body: unknown;
+								bodyFingerprint: string;
+							} | null,
+						) => {
+							if (response === null) {
+								store.delete(storeKey);
+								return;
+							}
+							store.set(storeKey, response);
+						},
+					};
+				},
+			),
 		};
 	});
 

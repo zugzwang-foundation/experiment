@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import type { DbClient } from "@/db";
 import { betReceipts } from "@/db/schema";
@@ -54,24 +54,38 @@ export function isDurableIdempotencyConflict(err: unknown): boolean {
  *     the original committed 200 body verbatim;
  *   - `{ kind: "mismatch" }` — receipt exists + fingerprint DIFFERS → the key was
  *     reused with a different body → 409 (NEVER cached — poison guard);
- *   - `null` — no receipt (proceed) OR a pre-check DB error (fail-OPEN, below).
+ *   - `null` — the SELECT ran cleanly and found no receipt for THIS
+ *     `(userId, idempotencyKey)` pair (proceed on the pre-check; on the post-tx
+ *     catch since ADR-0044 this is a genuine "not yours" — someone else's receipt
+ *     exists under this key, or [rare, pre-migration-0022] a legacy committed bet
+ *     carries no receipt at all);
+ *   - `{ kind: "unavailable" }` — the SELECT itself THREW (fail-OPEN, below).
+ *     Distinct from `null` on purpose (ADR-0044 HIGH-1): a transient DB error is
+ *     retryable and must never be reported to the client as "this key belongs to
+ *     someone else" — the two demand different wire outcomes at both call sites.
  */
 export type DurableReplay =
 	| { kind: "replay"; result: unknown }
 	| { kind: "mismatch" }
+	| { kind: "unavailable" }
 	| null;
 
 /**
- * Read the durable receipt for `idempotencyKey`. A plain SELECT on the top-level
- * client (the pre-check runs before any tx; the route catch runs after the failed
- * tx rolled back). On a DB error it FAILS OPEN (returns `null` + a
- * `durable_replay_precheck_failed` capture): the pre-check is an optimization +
- * moderation shield; correctness is backstopped by the tx-level unique (the 23505
- * catch), so a pre-check outage must degrade to normal execution, not a 5xx.
+ * Read the durable receipt for `(userId, idempotencyKey)`. User-scoped since
+ * ADR-0044 (S-7 G2) — a cross-user key collision no longer reads another user's
+ * receipt; it falls through to the caller's mismatch/not-found handling instead.
+ * A plain SELECT on the top-level client (the pre-check runs before any tx; the
+ * route catch runs after the failed tx rolled back). On a DB error it FAILS OPEN
+ * (returns `{ kind: "unavailable" }` + a `durable_replay_precheck_failed`
+ * capture): the pre-check is an optimization + moderation shield; correctness is
+ * backstopped by the tx-level unique (the 23505 catch), so a pre-check outage
+ * must degrade to normal execution, not a 5xx — and, at the post-tx catch, must
+ * NOT be reported as a hard key-reused refusal (ADR-0044 HIGH-1): both call
+ * sites discriminate `unavailable` from `null` explicitly.
  */
 export async function loadDurableReplay(
 	db: DbClient,
-	args: { idempotencyKey: string; bodyFingerprint: string },
+	args: { userId: string; idempotencyKey: string; bodyFingerprint: string },
 ): Promise<DurableReplay> {
 	try {
 		const rows = await db
@@ -80,7 +94,12 @@ export async function loadDurableReplay(
 				result: betReceipts.result,
 			})
 			.from(betReceipts)
-			.where(eq(betReceipts.idempotencyKey, args.idempotencyKey))
+			.where(
+				and(
+					eq(betReceipts.idempotencyKey, args.idempotencyKey),
+					eq(betReceipts.userId, args.userId),
+				),
+			)
 			.limit(1);
 		const row = rows[0];
 		if (row === undefined) {
@@ -94,6 +113,6 @@ export async function loadDurableReplay(
 		safeCaptureException(err, {
 			tags: { kind: "durable_replay_precheck_failed" },
 		});
-		return null;
+		return { kind: "unavailable" };
 	}
 }
