@@ -31,7 +31,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 // `link-account.mjs:17-30`, behind four disjuncts. Three of them reduce to
 // vendor constants read against an absent config (`accountLinking` is
 // unconfigured repo-wide) and CANNOT drift from our side; those are recorded
-// in ADR-0042 rather than tested, because building scaffolding to observe a
+// in ADR-0043 rather than tested, because building scaffolding to observe a
 // constant buys nothing.
 //
 // The fourth — `requireLocalEmailVerified && !dbUser.user.emailVerified`,

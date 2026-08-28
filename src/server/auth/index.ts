@@ -25,7 +25,7 @@ import {
 // Better Auth instance + plugins + databaseHooks + cookie config + UUIDv7
 // generateId override per SPEC.2 §8.10 single source of truth. Wires:
 //
-//   - drizzleAdapter with usePlural:true (Q11) + transaction:FALSE (ADR-0042 —
+//   - drizzleAdapter with usePlural:true (Q11) + transaction:FALSE (ADR-0043 —
 //     `true` deadlocked OAuth signup: it wrapped createOAuthUser in one
 //     adapter transaction holding one pooled connection, inside which the
 //     create.before hook checked out a SECOND connection from the same
@@ -337,7 +337,7 @@ export const auth = betterAuth({
 		provider: "pg",
 		schema,
 		usePlural: true,
-		// ⛔ Do not set to `true` — ADR-0042. It is a capability, not a state,
+		// ⛔ Do not set to `true` — ADR-0043. It is a capability, not a state,
 		// and the one path that invokes it (createOAuthUser) then nests a
 		// second pool checkout inside its own transaction.
 		transaction: false,
@@ -458,11 +458,11 @@ export const auth = betterAuth({
 				// ⚠ That own transaction is a SECOND connection checkout from
 				// the same pool as the caller. It is safe only because the
 				// adapter no longer opens one of its own (transaction:false,
-				// ADR-0042) — under transaction:true this nesting wedged the
+				// ADR-0043) — under transaction:true this nesting wedged the
 				// pool at exactly `max` concurrent signups. Do not reintroduce
 				// an outer transaction around this hook without reading S-3.
 				// The independent commit is also why a tuple can strand: that
-				// PRE-DATES ADR-0042 and is unchanged by it.
+				// PRE-DATES ADR-0043 and is unchanged by it.
 				before: async (user: Record<string, unknown>) => {
 					const tuple = await consumeIdentityPoolTuple(db);
 					if (!tuple) {

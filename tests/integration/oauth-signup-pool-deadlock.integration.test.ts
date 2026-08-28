@@ -191,7 +191,7 @@ if (POOL_MAX > 16) {
 	throw new Error(
 		`S-3 demonstration fires POOL_MAX concurrent signups; src/db/index.ts now reports ` +
 			`max: ${POOL_MAX}, above the practical ceiling of 16. Re-scope the demonstration ` +
-			"before trusting it. See docs/adr/0042.",
+			"before trusting it. See docs/adr/0043.",
 	);
 }
 const N = POOL_MAX;

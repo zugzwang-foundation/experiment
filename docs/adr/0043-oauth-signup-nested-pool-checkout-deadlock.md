@@ -1,4 +1,4 @@
-# ADR-0042 — OAuth signup nested pool checkout: drop the adapter transaction
+# ADR-0043 — OAuth signup nested pool checkout: drop the adapter transaction
 
 | | |
 |---|---|
@@ -463,7 +463,7 @@ supported configuration flag removes outright.
 
 ---
 
-*ADR-0042 ratifies dropping the Better Auth drizzle adapter's transaction
+*ADR-0043 ratifies dropping the Better Auth drizzle adapter's transaction
 capability so that OAuth signup no longer nests a second pool checkout inside
 its own transaction. The decision body and the constraints minted in §Decision
 Outcome are immutable; superseding requires a new ADR with a same-commit SPEC.2
