@@ -144,8 +144,8 @@ Everything lives under `src/components/art/warli/` and is imported by nothing.
 | `primitives/field.tsx` | `Tree` `Deer` `Bird` `Hut` (4) |
 | `primitives/props.tsx` | `Book` `Adze` `Spear` `Slate` `Vessel` `Lens` `Scales` `Sickle` `Staff` `Loom` `Post` `Tarpa` (12) |
 | `primitives/index.ts` | barrel + `PRIMITIVE_SPECS` registry |
-| `figures/figures.tsx` | the 16 figures, composed only from primitives |
-| `figures/index.ts` | `FIGURES`, `OPPOSED_PAIRS` |
+| `figures/body.tsx` | the ONE shared body — landed here rather than in `figures.tsx`, because what the sixteen share turned out to be the whole file |
+| `figures/index.tsx` | the 16 specs, `OPPOSED_PAIRS`, `ALL_FIGURES`, `Figure` (`.tsx`, not `.ts` — it renders) |
 | `geometry.ts` | pure ring math — no JSX, independently testable |
 | `ring.tsx` | the parametric ring renderer |
 | `hero.tsx` | `WarliHero` — two rings, CSS animation, pointer interaction |
@@ -153,9 +153,13 @@ Everything lives under `src/components/art/warli/` and is imported by nothing.
 
 **30 primitives**, inside the brief's 24–36.
 
-Guards, under `tests/unit/art/`:
-`ring-geometry.test.ts` · `no-raster-imports.test.ts` · `pole-token-abstinence.test.ts`
-· `warli-render.test.tsx`.
+Guards, under `tests/unit/art/` — **three files, not four.** `ring-geometry.test.ts`
+· `warli-render.test.tsx` · `art-layer-guards.test.ts`, the last consolidating what
+this plan listed as `no-raster-imports` and `pole-token-abstinence` plus the raw-hex,
+seal and unmounted checks. Every guard the plan named is present; they share a file
+because they share a file-reading harness and a comment-stripping decision, and
+splitting them would have meant maintaining that decision in four places — which is
+how two of them drift apart.
 
 ---
 

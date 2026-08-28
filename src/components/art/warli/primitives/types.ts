@@ -17,8 +17,12 @@
  * addressable; only the attribute carrying it changes.
  *
  * ⚠ NO COLOUR APPEARS IN ANY PRIMITIVE. Every stroke and fill is
- * `currentColor`, resolved once at the root `<svg>` from `text-ink`
- * (`color: var(--color-ink)`). One colour source, inherited down — which is
+ * `currentColor`, resolved once at the root `<svg>` by the component's own
+ * `.warli-root { color: var(--color-ink); }` rule — NOT by a `text-ink` class,
+ * which this said before and which is applied nowhere. The distinction has a
+ * consequence: because that rule lives in a stylesheet the component injects,
+ * a caller passing `className="text-n5"` cannot reliably override the colour.
+ * One colour source, inherited down — which is
  * also why `tests/unit/design/no-raw-hex-view-layer.test.ts` has nothing to
  * find here, and why the pole tokens `--color-yes` / `--color-no` are absent by
  * construction rather than by discipline.

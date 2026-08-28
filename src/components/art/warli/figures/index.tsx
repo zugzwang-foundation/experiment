@@ -80,9 +80,29 @@ const LISTENER_POSE: BodyPose = {
 	headCentre: { x: 2.5, y: -46.5 },
 };
 
+/**
+ * ⚠ THE CHILD'S HANDS ARE UNSCALED HERE, AND THAT IS THE WHOLE POINT.
+ *
+ * `BodyPose` is consumed INSIDE `<g transform="scale(k)">` (`body.tsx`), so
+ * every coordinate in it is in BODY space and the group scales it. `headCentre`
+ * was always left alone for exactly this reason; the hands were not, and the
+ * scale therefore landed on them twice.
+ *
+ * Measured on the rendered output before the fix: the child's hands were DRAWN
+ * at `(±7.688, −15.376)` while the ring engine attached the hand chain at
+ * `(±12.4, −24.8)` — a gap of **10.536 units, 29% of the child's own height**.
+ * Two visible consequences: its arms hung nearly straight down instead of
+ * reaching out like the other fifteen, and both link arcs terminated in mid-air
+ * beside a hand that was somewhere else.
+ *
+ * ⛔ AND THE COMMENT IN `figure()` BELOW USED TO ASSERT THE OPPOSITE — that
+ * scaling there "would apply it twice". It was the missing scale, not a second
+ * one. A confident comment pointing the wrong way is worse than none, because it
+ * tells the next reader the question has already been settled.
+ */
 const CHILD_POSE: BodyPose = {
-	handLeft: scalePoint(DEFAULT_POSE.handLeft, CHILD_SCALE),
-	handRight: scalePoint(DEFAULT_POSE.handRight, CHILD_SCALE),
+	handLeft: DEFAULT_POSE.handLeft,
+	handRight: DEFAULT_POSE.handRight,
 	headCentre: DEFAULT_POSE.headCentre,
 	scale: CHILD_SCALE,
 };
@@ -99,12 +119,14 @@ function figure(
 	return {
 		id: `warli-${id}`,
 		label,
+		// `box` and the hand anchors are FIGURE-space: what the ring engine sees
+		// after the body's own `<g transform="scale(k)">` has been applied. The
+		// pose is BODY-space. Both conversions therefore happen here, together,
+		// and a figure that scales its body without scaling its anchors hangs the
+		// chain off a point no hand occupies. See CHILD_POSE.
 		box: k === 1 ? FIGURE_BOX : scaleBox(FIGURE_BOX, k),
-		// The child's declared hands are ALREADY scaled in its pose, because the
-		// scale is applied inside the body's own `<g>`; re-scaling here would
-		// apply it twice and hang the chain off a point no hand occupies.
-		handLeft: pose.handLeft,
-		handRight: pose.handRight,
+		handLeft: k === 1 ? pose.handLeft : scalePoint(pose.handLeft, k),
+		handRight: k === 1 ? pose.handRight : scalePoint(pose.handRight, k),
 		pose,
 		prop,
 	};

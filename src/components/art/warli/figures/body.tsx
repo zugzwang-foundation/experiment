@@ -193,7 +193,7 @@ export function Body({
 		>
 			{dense ? (
 				<DotField
-					transform={`translate(0 ${4})`}
+					transform="translate(0 4)"
 					cols={5}
 					rows={2}
 					step={7}

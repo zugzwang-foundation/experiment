@@ -30,8 +30,15 @@
  * ⚠ HEX LITERALS ARE PERMITTED IN THE GENERATED FILE ONLY. It is not in the
  * view layer, it is not scanned by `tests/unit/design/no-raw-hex-view-layer.test.ts`,
  * and it must resolve its own tokens because there is no Tailwind to do it. The
- * values are transcribed from `src/app/globals.css`, which this task never
- * edits.
+ * five TOKEN values are transcribed byte-for-byte from `src/app/globals.css`,
+ * which this task never edits.
+ *
+ * ⚠ TWO VALUES ARE NOT TRANSCRIBED AND ARE NOT TOKENS: the guide-circle strokes
+ * are invented, and they are the only CHROMATIC colours anywhere in this task.
+ * That is deliberate — a dev guide drawn over monochrome artwork has to be
+ * distinguishable FROM the artwork, and a grey guide over a grey drawing helps
+ * nobody. Saying "transcribed from globals.css" without this note claimed a
+ * provenance two of the values do not have.
  */
 
 import { writeFileSync } from "node:fs";

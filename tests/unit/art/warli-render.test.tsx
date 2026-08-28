@@ -4,12 +4,15 @@ import { describe, expect, it } from "vitest";
 
 import {
 	ALL_FIGURES,
+	DEFAULT_POSE,
+	HAND_X,
 	INNER_FIGURES,
 	OPPOSED_PAIRS,
 	OUTER_FIGURES,
 } from "@/components/art/warli/figures";
 import { ringPlacements } from "@/components/art/warli/geometry";
 import {
+	currentRotationDeg,
 	nudgeFor,
 	PHASE_DEG,
 	R_INNER,
@@ -198,8 +201,16 @@ describe("warli hero — the argument, asserted", () => {
 		// Without this the rings orbit their own bounding boxes rather than the
 		// composition's centre — CSS defaults a transform origin to the box centre,
 		// and for a `<g>` that is wherever the drawing happens to sit.
-		expect(css.match(/transform-origin: 0 0;/g)).toHaveLength(2);
-		expect(css).toContain("animation-play-state: paused");
+		//
+		// ⚠ ASSERTED INSIDE ITS RULE, not as a count. A bare count over the whole
+		// stylesheet is positionally blind: it stays green if both declarations are
+		// moved into a rule where they do nothing. Same for the pause, which has to
+		// be inside the engaged selector to mean anything.
+		expect(css).toContain(".warli-spin {\n\ttransform-origin: 0 0;");
+		expect(css).toContain(".warli-nudge {\n\ttransform-origin: 0 0;");
+		expect(css).toContain(
+			'.warli-root[data-warli-engaged="true"] .warli-spin { animation-play-state: paused; }',
+		);
 	});
 
 	it("faces the two rings at each other, not the same way", () => {
@@ -280,6 +291,101 @@ describe("warli hero — the registers", () => {
 		expect(outerRing?.querySelector("[data-warli-ring-ground]")).toBeNull();
 	});
 
+	it("attaches the hand chain where the hand is actually DRAWN", () => {
+		// ⚠ MINTED BY A REAL DEFECT, and it is worth stating what it looked like,
+		// because it was invisible to every other assertion in this file.
+		//
+		// A figure's `pose` is BODY space — it is consumed inside the body's own
+		// `<g transform="scale(k)">`. A figure's declared hand anchors are FIGURE
+		// space, because the ring engine consumes them after that group. For the
+		// fifteen figures at k = 1 the two are identical, so nothing distinguishes
+		// them. For the child at k = 0.62 they are not, and its anchors were
+		// pre-scaled in the pose AND scaled again by the group: hands DRAWN at
+		// (±7.688, −15.376) while the chain attached at (±12.4, −24.8). A gap of
+		// 10.536 units — 29% of the child's height — with both link arcs ending in
+		// mid-air beside a hand that was somewhere else.
+		//
+		// Counting `<g>` elements cannot see this. Reading the drawn endpoint can.
+		const { container } = render(<WarliHero />);
+
+		for (const spec of ALL_FIGURES) {
+			const node = container.querySelector(`[data-warli-id="${spec.id}"]`);
+			const arms = node?.querySelector(
+				'[data-warli-arms="straight"], [data-warli-arms="bent"]',
+			);
+			const lines = [...(arms?.querySelectorAll("line") ?? [])];
+			if (lines.length === 0) {
+				throw new Error(`${spec.id} drew no arms`);
+			}
+			const k = spec.pose.scale ?? 1;
+			// The hand is the far end of the LAST segment of each arm: one segment
+			// per arm when straight, two when bent through an elbow.
+			const perArm = lines.length / 2;
+			const leftHand = lines[perArm - 1];
+			const rightHand = lines[lines.length - 1];
+			const drawn = (line: Element | undefined) => ({
+				x: Number(line?.getAttribute("x2")) * k,
+				y: Number(line?.getAttribute("y2")) * k,
+			});
+
+			expect(drawn(leftHand).x).toBeCloseTo(spec.handLeft.x, 6);
+			expect(drawn(leftHand).y).toBeCloseTo(spec.handLeft.y, 6);
+			expect(drawn(rightHand).x).toBeCloseTo(spec.handRight.x, 6);
+			expect(drawn(rightHand).y).toBeCloseTo(spec.handRight.y, 6);
+
+			// ⚠ CONSISTENCY IS NOT ENOUGH, and finding that out cost a surviving
+			// mutant. Pre-scaling the pose AND scaling the anchor keeps the two in
+			// perfect agreement — both land on −7.688 — while the arm is drawn 38%
+			// too short and the child stops being the same drawing as everyone
+			// else. The assertions above cannot see that, because they only ask
+			// whether the chain finds the hand.
+			//
+			// So: in BODY space every figure reaches the same distance out. That is
+			// the "sixteen bodies, one build" thesis expressed as a number, and it
+			// is what a scale applied in the wrong place destroys.
+			expect(Math.abs(spec.pose.handLeft.x)).toBeGreaterThanOrEqual(HAND_X - 1);
+			expect(Math.abs(spec.pose.handRight.x)).toBeGreaterThanOrEqual(
+				HAND_X - 1,
+			);
+		}
+
+		// And the child's FIGURE-space anchors are exactly the shared reach taken
+		// down by its own scale — stated once, so the relationship is pinned rather
+		// than inferred from the loop above.
+		const child = ALL_FIGURES.find((f) => f.label === "child");
+		const k = child?.pose.scale ?? 1;
+		expect(k).toBeLessThan(1);
+		expect(child?.handLeft.x).toBeCloseTo(DEFAULT_POSE.handLeft.x * k, 9);
+		expect(child?.handLeft.y).toBeCloseTo(DEFAULT_POSE.handLeft.y * k, 9);
+	});
+
+	it("places the field motifs where each register needs them", () => {
+		// ⚠ THE ONE MEASURED HOLE LEFT AFTER THE FIRST REVIEW. Flipping the dense
+		// lift's sign, or rotating the spare field by a half turn, both passed the
+		// entire suite — and the second of those is the exact defect `ring.tsx`
+		// records as having been made once already: the outer ring's landscape
+		// inherited the figures' facing and grew INTO the confrontation band, so
+		// the one place the eye should go was the busiest place in the drawing.
+		// A defect the source describes as previously made deserves a guard, not a
+		// paragraph.
+		//
+		// First interstitial angle is 45° (half a step past the 22.5° phase).
+		//   dense: lifted OUTWARD to 330 + 26 = 356 → (356·sin45, −356·cos45)
+		//   spare: on its baseline at 470          → (470·sin45, −470·cos45)
+		// and BOTH rotate by the bare angle — the spare field turns away from the
+		// gap, not with its figures.
+		const { container } = render(<WarliHero />);
+		const first = (ring: string) =>
+			container
+				.querySelector(
+					`[data-warli-ring="${ring}"] [data-warli-ring-field] > g`,
+				)
+				?.firstElementChild?.getAttribute("transform");
+
+		expect(first("inner")).toBe("translate(251.73 -251.73) rotate(45)");
+		expect(first("outer")).toBe("translate(332.3402 -332.3402) rotate(45)");
+	});
+
 	it("keeps every figure the same drawing — sixteen bodies, one build", () => {
 		// If a later change gives one figure its own construction, this reddens.
 		// The thesis is that everyone in the ring is the same shape and differs
@@ -327,18 +433,24 @@ describe("warli hero — the registers", () => {
 		// as happily against handlers that were never attached at all.
 		expect(svg.getAttribute("data-warli-engaged")).toBe("true");
 
-		// Centre (720, 500); pointer at 30° clockwise from twelve, r = 400:
-		//   (720 + 400·sin30, 500 − 400·cos30) = (920, 153.5898).
-		// The nearest pair rests at 22.5°, so both rings turn +7.5° to bring it
-		// under the pointer.
+		// Centre (720, 500); pointer straight UP, so the angle is exactly 0° with no
+		// trigonometry and therefore no floating-point error at all. The nearest
+		// pair rests at 22.5°, so both rings turn −22.5° to bring it under the
+		// pointer.
+		//
+		// ⚠ AN EARLIER VERSION USED 30° VIA (920, 153.5898), which computes to
+		// 29.999997° and lands 5e-4 below the `"7.499"` rounding boundary — about
+		// 0.0035 px of headroom on `clientY`. It passed, and it would have broken
+		// on any tidy-up of that literal. A test whose correctness depends on the
+		// fourth decimal of an input nobody thinks of as precise is a trap.
 		svg.dispatchEvent(
-			new MouseEvent("pointermove", { clientX: 920, clientY: 153.5898 }),
+			new MouseEvent("pointermove", { clientX: 720, clientY: 100 }),
 		);
 		expect(
 			[...container.querySelectorAll(".warli-nudge")].map((n) =>
 				(n as SVGGElement).style.getPropertyValue("--warli-nudge"),
 			),
-		).toEqual(["7.500deg", "7.500deg"]);
+		).toEqual(["-22.500deg", "-22.500deg"]);
 
 		svg.dispatchEvent(new MouseEvent("pointerleave"));
 		expect(svg.getAttribute("data-warli-engaged")).toBeNull();
@@ -368,12 +480,14 @@ describe("warli hero — the registers", () => {
 		//   toPointer = wrapSigned(90 − (22.5 + 0 + 90)) = −22.5
 		//   inner = −40 + (−22.5) = −62.5   outer = +40 + (−22.5) = 17.5
 		//
-		// ⚠ I FIRST WROTE 45 AND 22.5 HERE, and the test reddened. `Math.round(1.5)`
-		// is 2, not 1 — JavaScript rounds a half AWAY from zero for positives — so
-		// the snap goes to the NEXT figure, not the nearer-looking one. The code was
-		// right and my arithmetic was wrong, which is the direction a hand-computed
-		// expectation is supposed to fail in: it disagrees with the implementation
-		// until one of them is fixed, and it does not care which.
+		// ⚠ I FIRST WROTE 45 AND 22.5 HERE, and the test reddened. At settledAt = 0
+		// the figures rest at 22.5 / 67.5 / 112.5, so a pointer at 90° is EXACTLY
+		// 22.5° from both neighbours — a tie, broken by `Math.round`'s half-up rule
+		// (toward +∞, so `Math.round(-1.5)` is −1). It is not a snap past a nearer
+		// figure; there is no nearer figure. The code was right and my arithmetic
+		// was wrong, which is the direction a hand-computed expectation is supposed
+		// to fail in: it disagrees with the implementation until one of them is
+		// fixed, and it does not care which.
 		expect(
 			nudgeFor({ innerPhase: 40, outerPhase: -40, pointerDeg: 90 }),
 		).toEqual({ inner: -62.5, outer: 17.5 });
@@ -383,9 +497,13 @@ describe("warli hero — the registers", () => {
 			nudgeFor({ innerPhase: 12, outerPhase: 12, pointerDeg: 34.5 }),
 		).toEqual({ inner: 0, outer: 0 });
 
-		// The nudges always differ by exactly the misalignment, whatever else
-		// happens — that is what "equal and opposite" means, and it is the property
-		// a future change is most likely to break.
+		// The nudges always differ by exactly the misalignment. ⚠ BE HONEST ABOUT
+		// WHAT THIS CATCHES: `toPointer`, `nearest`, `phaseDeg` and `stepDeg` all
+		// cancel in the subtraction, so this is an algebraic identity of the two
+		// return lines and it can only fail if the ± symmetry itself breaks. It
+		// caught the split being made one-sided; it is blind to everything else in
+		// the function. The three literal cases above catch the rest, and removing
+		// `nearest` entirely reddens case 2, not this loop.
 		for (const [i, o, p] of [
 			[0, 0, 0],
 			[130, -130, 200],
@@ -394,6 +512,41 @@ describe("warli hero — the registers", () => {
 			const n = nudgeFor({ innerPhase: i, outerPhase: o, pointerDeg: p });
 			expect(n.inner - n.outer).toBeCloseTo(wrapSigned(o - i), 9);
 		}
+	});
+
+	it("reads a rotation back out of a computed matrix, and fails safe", () => {
+		// THE LAST UNTESTED LINK IN THE POINTER CHAIN. `nudgeFor` covers what
+		// happens after the ring phases are known; this is how they become known.
+		// Its regex, its `atan2(b, a)` and its three early returns could every one
+		// of them yield garbage in a real browser with the whole suite green,
+		// because nothing else exercises them.
+		const el = document.createElement("div");
+		document.body.appendChild(el);
+
+		// A CSS `rotate(θ)` serialises as matrix(cos, sin, −sin, cos, 0, 0), so a
+		// quarter turn is matrix(0, 1, −1, 0, 0, 0) — read back as +90°.
+		el.style.transform = "matrix(0, 1, -1, 0, 0, 0)";
+		expect(currentRotationDeg(el)).toBeCloseTo(90, 9);
+
+		el.style.transform = "matrix(-1, 0, 0, -1, 0, 0)";
+		expect(currentRotationDeg(el)).toBeCloseTo(180, 9);
+
+		// √2/2 both terms — an eighth turn, and a value with no exact float.
+		el.style.transform =
+			"matrix(0.7071067811865476, 0.7071067811865476, -0.7071067811865476, 0.7071067811865476, 0, 0)";
+		expect(currentRotationDeg(el)).toBeCloseTo(45, 9);
+
+		// FAILS SAFE, in all four ways it can be asked something meaningless. Zero
+		// is the right answer for every one: an unrotated ring.
+		expect(currentRotationDeg(null)).toBe(0);
+		el.style.transform = "none";
+		expect(currentRotationDeg(el)).toBe(0);
+		el.style.transform = "";
+		expect(currentRotationDeg(el)).toBe(0);
+		el.style.transform = "translate(3px, 4px)";
+		expect(currentRotationDeg(el)).toBe(0);
+
+		el.remove();
 	});
 
 	it("wraps a half turn to the LOWER end of the range", () => {

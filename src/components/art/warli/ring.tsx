@@ -16,6 +16,7 @@ import {
 	HandLink,
 	Hut,
 	Spiral,
+	Sun,
 	Tree,
 	WaterLine,
 	WEIGHT_DENSE,
@@ -78,9 +79,18 @@ type FieldMotif = (transform: string, weight: number) => ReactNode;
 /** Mid-band of the dense ring, so the marks sit among the figures, not under. */
 const DENSE_FIELD_LIFT = 26;
 
+/**
+ * ⚠ FOUR, NOT THREE, AND THE COUNT IS THE POINT. Three motifs over eight slots
+ * is not a cycle that distributes evenly — it runs Chauk·Spiral·Water twice and
+ * then stops mid-phrase, so Chauk appears three times, WaterLine twice, and the
+ * sequence breaks at the wrap. That is precisely the clustering the docblock
+ * above says a fixed cycle exists to prevent, committed by the fixed cycle.
+ * Four divides eight.
+ */
 const FIELD_DENSE: readonly FieldMotif[] = [
 	(t, w) => <Chauk transform={t} size={16} weight={w} />,
 	(t, w) => <Spiral transform={t} turns={2.5} radius={9} weight={w} />,
+	(t, w) => <Sun transform={t} radius={4} rayLength={4} rays={10} weight={w} />,
 	(t, w) => (
 		<WaterLine
 			transform={`${t} translate(-13 0)`}
@@ -152,11 +162,21 @@ export function Ring({
 	const cycle = dense ? FIELD_DENSE : FIELD_SPARE;
 	const weight = dense ? WEIGHT_DENSE : WEIGHT_SPARE;
 
-	// The comb run is a straight chord standing in for an arc. At this radius a
-	// 64-unit chord departs from the circle by under a third of a unit, which is
-	// a fifth of a line width — so bending it would cost path arithmetic to
-	// produce a difference nothing can see.
-	const combLength = 64;
+	// The comb run is a straight tangent standing in for an arc.
+	//
+	// ⚠ THIS COMMENT USED TO CITE THE WRONG NUMBERS, and the way it went wrong is
+	// worth keeping: it computed the departure from `CombBorderSegment`'s DEFAULT
+	// length (28) at the DEFAULT weight (1.6) — "under a third of a unit, a fifth
+	// of a line width" — while the call site overrides BOTH. At the values
+	// actually passed the departure was 330 − √(330² − 32²) = 1.555 units, or
+	// 1.7× the 0.9 line weight: five times the claimed figure, and a visible
+	// sliver at each end of every run.
+	//
+	// Shortened to 44, which is the honest fix rather than a corrected sentence:
+	//   330 − √(330² − 22²) = 0.734 units = 0.8× the line weight, sub-pixel at
+	// 1440. Bending it would cost path arithmetic for a difference below the
+	// stroke width.
+	const combLength = 44;
 
 	return (
 		<g data-warli-ring={name} data-warli-density={density}>

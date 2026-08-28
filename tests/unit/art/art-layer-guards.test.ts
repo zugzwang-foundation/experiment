@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -128,12 +128,62 @@ describe("art layer — the side poles are not decoration", () => {
 
 describe("art layer — it is sealed, and it is unmounted", () => {
 	it("imports nothing from outside its own directory (bar react)", () => {
-		const OUTWARD =
-			/from\s+["'](@\/(?!components\/art)[^"']+|\.\.\/\.\.\/[^"']+)["']/;
-		expect('import { db } from "@/db";').toMatch(OUTWARD); // positive control
-		const offenders = artCode
-			.filter((f) => OUTWARD.test(f.code))
-			.map((f) => `${f.file} → ${f.code.match(OUTWARD)?.[0]}`);
+		// ⚠ THIS WAS A DENYLIST AND IT LEAKED. It matched `@/…` and `../../…` and
+		// therefore could not see the import a contributor is most likely to add to
+		// an art layer: a BARE npm specifier. `framer-motion`, `clsx`, `d3` — all
+		// invisible. And `../../` is depth-dependent: from `primitives/` it is
+		// still INSIDE the art directory (a false positive waiting to happen) while
+		// from the art root a single `../` escapes it entirely (a false negative
+		// that was live).
+		//
+		// Inverted to an ALLOWLIST: every specifier must be `react`, or relative
+		// AND resolve to a path still under `src/components/art`. A denylist has to
+		// enumerate every way out; an allowlist has to enumerate the one way in.
+		const SPECIFIER = /(?:^|[^\w$])(?:from|import)\s*\(?\s*["']([^"']+)["']/g;
+		const ALLOWED_BARE = new Set(["react", "react/jsx-runtime"]);
+
+		const classify = (file: string, spec: string) => {
+			if (ALLOWED_BARE.has(spec)) {
+				return null;
+			}
+			if (!spec.startsWith(".")) {
+				return `${file} → bare specifier "${spec}"`;
+			}
+			const resolved = join(ROOT, dirname(file), spec);
+			return resolved.startsWith(join(ROOT, ART_DIR))
+				? null
+				: `${file} → escapes the art layer: "${spec}"`;
+		};
+
+		// POSITIVE CONTROLS: real ways out, all caught by the classifier.
+		expect(
+			classify("src/components/art/warli/hero.tsx", "@/db"),
+		).not.toBeNull();
+		expect(
+			classify("src/components/art/warli/hero.tsx", "framer-motion"),
+		).not.toBeNull();
+		// ⚠ DEPTH MATTERS, and writing this control taught me so: from `warli/`,
+		// `../shell/X` resolves to `art/shell/X` and is still INSIDE — my first
+		// version of this line asserted it escaped, and reddened. Two levels up
+		// from `warli/`, or ONE level up from a file sitting directly in `art/`,
+		// is what actually leaves. That depth-dependence is exactly why the old
+		// literal `../../` denylist was wrong in both directions.
+		expect(
+			classify("src/components/art/warli/hero.tsx", "../../shell/X"),
+		).not.toBeNull();
+		expect(classify("src/components/art/x.ts", "../shell/X")).not.toBeNull();
+		// …and the legitimate ones, so the classifier is not simply refusing all.
+		expect(classify("src/components/art/warli/hero.tsx", "react")).toBeNull();
+		expect(classify("src/components/art/warli/hero.tsx", "./ring")).toBeNull();
+		expect(
+			classify("src/components/art/warli/ring.tsx", "../primitives"),
+		).toBeNull();
+
+		const offenders = artCode.flatMap((f) =>
+			[...f.code.matchAll(SPECIFIER)]
+				.map((m) => classify(f.file, m[1] ?? ""))
+				.filter((hit): hit is string => hit !== null),
+		);
 		expect(offenders).toEqual([]);
 	});
 

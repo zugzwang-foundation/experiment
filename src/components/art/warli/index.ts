@@ -15,6 +15,7 @@ export {
 	R_OUTER,
 	VIEW_HEIGHT,
 	VIEW_WIDTH,
+	WARLI_CSS,
 	WarliHero,
 	type WarliHeroProps,
 } from "./hero";

@@ -17,9 +17,21 @@ import { Ring } from "./ring";
  *
  * ⚠ NOTHING HERE ANIMATES IN JAVASCRIPT. There is no `requestAnimationFrame`,
  * no interval and no state that changes per frame. Two `<g>` elements carry a
- * CSS animation; the compositor turns them. The sixteen figures underneath are
- * a fixed drawing computed once (`./ring.tsx`), so a frame costs a transform on
- * two layers rather than a re-layout of several hundred nodes.
+ * CSS animation, and the sixteen figures underneath are a fixed drawing computed
+ * once (`./ring.tsx`), so nothing re-lays-out per frame.
+ *
+ * ⚠ WHAT THIS DOCBLOCK NO LONGER CLAIMS: that the compositor promotes the two
+ * groups to their own layers. That sentence was here and was never measured.
+ * Blink has historically not layerised SVG sub-trees, nothing sets
+ * `will-change`, and the two animated groups hold 525 and 295 elements. So the
+ * honest statement is the one above — no per-frame layout — and the per-frame
+ * cost is a raster of two rotated groups, which is a different and unmeasured
+ * quantity. Naming a mechanism nobody measured is O-13's shape one register
+ * over. The frame trace is OWED; it could not be taken in this run because
+ * `requestAnimationFrame` does not fire in an automation tab.
+ *
+ * What WAS measured: a forced style + layout of the whole SVG costs 1.085 ms
+ * (mean of 20), which bounds the worst case where none of this is composited.
  */
 
 /** The frame. 1440 is the design width; 1000 is the smallest height that never
@@ -89,8 +101,17 @@ export const WARLI_CSS = `
 }
 `;
 
-/** Reads the rotation a CSS animation currently has an element at. */
-function currentRotationDeg(el: Element | null): number {
+/**
+ * Reads the rotation a CSS animation currently has an element at.
+ *
+ * ⚠ EXPORTED SO IT CAN BE TESTED. It is the bridge between CSS and `nudgeFor`:
+ * the animation knows where the rings are and will not say, so this parses it
+ * out of the computed matrix. Its regex, its `atan2(b, a)` extraction and its
+ * three early returns could all yield garbage in a real browser while every
+ * test stayed green, because a pure `nudgeFor` covers what happens AFTER the
+ * phases are read, not the reading.
+ */
+export function currentRotationDeg(el: Element | null): number {
 	if (el === null) {
 		return 0;
 	}
@@ -217,11 +238,32 @@ export function WarliHero({
 			outerPhase: number;
 		} | null = null;
 
+		/**
+		 * ⚠ THE RECT AND THE PHASE HAVE DIFFERENT LIFETIMES, and treating them as
+		 * one thing was a defect. The animation phase genuinely wants to be read
+		 * ONCE and frozen — that is the whole point of pausing. The rect does not:
+		 * it is viewport-relative, and a scroll or a resize while the pointer is
+		 * still inside invalidates it without firing `pointerleave`. The pointer
+		 * angle then points somewhere else and the rings align to the wrong pair.
+		 *
+		 * Re-reading the rect on `scroll`/`resize` costs one layout per scroll
+		 * frame, not one per pointer move, so the constraint that a MOVE runs no
+		 * layout is untouched.
+		 */
+		const readRect = () => {
+			if (frame === null) {
+				return;
+			}
+			const rect = root.getBoundingClientRect();
+			// The composition's centre is the viewBox centre, so this is exact
+			// whatever `preserveAspectRatio` does with letterboxing.
+			frame.centreX = rect.left + rect.width / 2;
+			frame.centreY = rect.top + rect.height / 2;
+		};
+
 		const engage = () => {
 			const rect = root.getBoundingClientRect();
 			frame = {
-				// The composition's centre is the viewBox centre, so this is exact
-				// whatever `preserveAspectRatio` does with letterboxing.
 				centreX: rect.left + rect.width / 2,
 				centreY: rect.top + rect.height / 2,
 				innerPhase: currentRotationDeg(innerSpinRef.current),
@@ -273,10 +315,14 @@ export function WarliHero({
 		root.addEventListener("pointerenter", engage, options);
 		root.addEventListener("pointermove", move, options);
 		root.addEventListener("pointerleave", release, options);
+		window.addEventListener("scroll", readRect, options);
+		window.addEventListener("resize", readRect, options);
 		return () => {
 			root.removeEventListener("pointerenter", engage);
 			root.removeEventListener("pointermove", move);
 			root.removeEventListener("pointerleave", release);
+			window.removeEventListener("scroll", readRect);
+			window.removeEventListener("resize", readRect);
 		};
 	}, []);
 

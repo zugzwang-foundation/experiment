@@ -80,12 +80,10 @@ export function DotField({
 	return (
 		<g data-warli-id={DOT_FIELD.id} transform={transform} className={className}>
 			{dots.map((dot) => (
-				<circle
+				<Dot
 					key={`${dot.x}:${dot.y}`}
-					cx={dot.x}
-					cy={dot.y}
 					r={r}
-					fill={STROKE}
+					transform={`translate(${dot.x} ${dot.y})`}
 				/>
 			))}
 		</g>
