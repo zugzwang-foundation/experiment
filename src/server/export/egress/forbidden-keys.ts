@@ -1,4 +1,4 @@
-import type { EventType } from "@/server/events/schemas";
+import type { EventType } from "@/server/events/event-types";
 
 /**
  * DATASET.1 — the declarative forbidden-key registry (brief §4 Slice 1).
@@ -155,6 +155,16 @@ export const FORBIDDEN_VALUE_CLASSES = [
 	"google-id",
 	"r2-object-key",
 	"admin-session-id",
+	// Not among brief §4 Slice 1's six, and each required by Appendix B:
+	"email", // B.1 STRIP, §19.4 row 1
+	// ⚠ The three below were added after `@code-reviewer` H-4. Each is a
+	// STRIP column that had no VALUE class, so the strongest assertion this
+	// layer can make — "this exact string, known to be in the source, is
+	// absent from the artifact" — had never been pointed at them. `users.name`
+	// is the participant's real Google display name.
+	"display-name", // B.1 `users.name` STRIP
+	"avatar-url", // B.1 `users.image` STRIP
+	"blocked-text", // B.10 `mod_actions.blocked_text` STRIP
 ] as const;
 
 export type ForbiddenValueClass = (typeof FORBIDDEN_VALUE_CLASSES)[number];

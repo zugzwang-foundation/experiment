@@ -57,6 +57,27 @@ import type { SourceRow } from "./strip";
  * The removal is *itself* research signal — `mod_actions` shipping means a
  * reader can see that a comment was removed, when, and under what reason.
  * What they cannot see is what it said, which is the point of removing it.
+ *
+ * ## ⚠ KNOWN LIMITATION — the image FK is recoverable by a second path
+ *
+ * `image_uploads_id` is withheld here so a reader cannot join straight to the
+ * upload row. But `image_upload.committed`'s payload carries `commentId`
+ * (`schemas.ts`, emitted at `bets/place.ts`), and §19.4.1 strips only
+ * `userId` and `key` from it — so the comment↔upload link survives in
+ * `events` and the withholding does not fully achieve its stated purpose
+ * (`@security-auditor` M-8).
+ *
+ * **Bounded, and stated rather than quietly accepted.** What a reader can
+ * recover is *that the removed comment had an image*, plus its content type,
+ * byte size and the uploader's pseudonym. The image itself stays unreachable:
+ * `image_uploads.r2_object_key` is STRIP (B.15) and `payload.key` is stripped
+ * per §19.4.1, so there is no path to the object.
+ *
+ * Not closed here because closing it means stripping `commentId` from
+ * `image_upload.*` payloads conditionally on a removal — a per-row payload
+ * rewrite driven by another table's state, which is a materially bigger
+ * mechanism than this masking, and one that changes what §19.4.1 says ships.
+ * That is a spec question, and this run does not author spec.
  */
 
 /** `mod_actions.reason` value that denotes a reactive content removal. */

@@ -1,4 +1,4 @@
-import type { EventType } from "@/server/events/schemas";
+import type { EventType } from "@/server/events/event-types";
 import { EgressContractGapError } from "@/server/export/egress/errors";
 import {
 	GLOBALLY_FORBIDDEN_PAYLOAD_KEYS,
@@ -7,7 +7,7 @@ import {
 } from "@/server/export/egress/forbidden-keys";
 
 import { maskRemovedComment } from "./removed";
-import { COLUMN_TREATMENTS } from "./treatments";
+import { treatmentsFor } from "./treatments";
 
 /**
  * DATASET.1 Slice 4 — the STRIP pipeline.
@@ -43,6 +43,25 @@ import { COLUMN_TREATMENTS } from "./treatments";
 export type SourceRow = Record<string, unknown>;
 
 /**
+ * Strip inputs the caller must supply.
+ *
+ * ⚠ **`removedCommentIds` is REQUIRED, and that is the whole point.** It was
+ * optional, defaulting to no masking — so `stripTable("comments", rows)`
+ * published every reactively-removed body and gave no signal
+ * (`@security-auditor` M-9). The build path passed it; any second caller — a
+ * v2 rebuild script, a partial re-export, a debug tool — would not have.
+ *
+ * SC-1's whole claim is that masking is a property of the CODE PATH, not of
+ * the caller's memory. A required argument is what makes forgetting it a
+ * compile error rather than a silent publication (O-1: structural beats
+ * procedural). Pass an empty set explicitly when a table genuinely has no
+ * removals — that is a statement, where omission was an accident.
+ */
+export interface StripOptions {
+	readonly removedCommentIds: ReadonlySet<string>;
+}
+
+/**
  * Tables whose `payload` JSONB is subject to the §19.4.1 per-event-type
  * rules, keyed on their own `event_type` column.
  *
@@ -59,6 +78,16 @@ export type SourceRow = Record<string, unknown>;
  * It stops being latent the moment the parked entry's recommended fix lands —
  * option (a) is a PROJECTION of `events` into `admin_events`, which would
  * deliver exactly these payloads into a table with no rules covering them.
+ *
+ * ⚠ **And when that lands, expect this to FAIL LOUDLY first, by design.**
+ * `admin_events.event_type` and `user_events.event_type` are `text`
+ * (open-extensible per §7.1), not the closed `EVENT_TYPES` set — so a
+ * projection introducing its own vocabulary (`admin.market_resolved`, which
+ * Appendix B.11 already names) hits `stripPayload`'s unknown-type throw. That
+ * is the correct direction: an unreviewed payload must not ship. But it means
+ * the projection task inherits a required step — extend §19.4.1 to cover the
+ * admin vocabulary — and finding that out via a build failure is better than
+ * finding it out via a published artifact (`@security-auditor` LOW).
  */
 export const PAYLOAD_BEARING_TABLES = new Set([
 	"events",
@@ -149,11 +178,9 @@ export function stripPayload(eventType: string, payload: unknown): unknown {
 export function stripRow(
 	table: string,
 	row: SourceRow,
-	opts: { removedCommentIds?: ReadonlySet<string> } = {},
+	opts: StripOptions,
 ): SourceRow {
-	const treatments = (
-		COLUMN_TREATMENTS as Record<string, Record<string, string>>
-	)[table];
+	const treatments = treatmentsFor(table);
 
 	if (treatments === undefined) {
 		throw new EgressContractGapError(
@@ -196,7 +223,7 @@ export function stripRow(
 export function stripTable(
 	table: string,
 	rows: readonly SourceRow[],
-	opts: { removedCommentIds?: ReadonlySet<string> } = {},
+	opts: StripOptions,
 ): SourceRow[] {
 	return rows.map((r) => stripRow(table, r, opts));
 }

@@ -1,6 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 
 /**
+ * ⚠ The mock target is `@/server/events/event-types`, NOT `…/schemas`.
+ *
+ * `EVENT_TYPES` was extracted out of `schemas.ts` so the operator script could
+ * run under plain `tsx` (AGENTS.md §7) instead of needing
+ * `--conditions=react-server`. `schemas.ts` re-exports it, so every import site
+ * kept working and `tsc` stayed green — but a `vi.mock` names a MODULE, and
+ * mocking the re-exporter no longer intercepts what `completeness.ts` reads.
+ *
+ * The result was four silently-passing-to-failing tests and, worse, a shape
+ * where a mock that intercepts nothing would have left the guard's only real
+ * control asserting against the unmocked truth. Caught by `@security-auditor`.
+ */
+
+/**
  * DATASET.1 Slice 2 — the STRIP-rule completeness guard, driven through its
  * REAL throwing path.
  *
@@ -24,9 +38,9 @@ import { describe, expect, it, vi } from "vitest";
  * `completeness.test.ts` and only the gap lives here.
  */
 
-vi.mock("@/server/events/schemas", async (importOriginal) => {
+vi.mock("@/server/events/event-types", async (importOriginal) => {
 	const actual =
-		await importOriginal<typeof import("@/server/events/schemas")>();
+		await importOriginal<typeof import("@/server/events/event-types")>();
 	return {
 		...actual,
 		// The defect, constructed: a 25th event type with no PAYLOAD_STRIP_KEYS

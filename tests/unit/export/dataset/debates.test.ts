@@ -13,6 +13,7 @@ import {
 	DIRTY_TABLE_ROWS,
 	FIXTURE_SECRET_VALUES,
 	FIXTURE_USER_IDS,
+	fixtureSecrets,
 } from "../../../_fixtures/dataset/dirty-source";
 
 /**
@@ -31,15 +32,7 @@ import {
  * What is genuinely new is the wiring and the egress pass over `.md` output.
  */
 
-const secrets: EgressSecrets = {
-	userIds: new Set(Object.values(FIXTURE_USER_IDS)),
-	ips: new Set(FIXTURE_SECRET_VALUES.ips),
-	userAgents: new Set(FIXTURE_SECRET_VALUES.userAgents),
-	googleIds: new Set(FIXTURE_SECRET_VALUES.googleIds),
-	r2ObjectKeys: new Set(FIXTURE_SECRET_VALUES.r2ObjectKeys.slice(0, 2)),
-	adminSessionIds: new Set(FIXTURE_SECRET_VALUES.adminSessionIds),
-	emails: new Set(FIXTURE_SECRET_VALUES.emails),
-};
+const secrets: EgressSecrets = fixtureSecrets();
 
 const GOLDEN_PATH = join(
 	process.cwd(),

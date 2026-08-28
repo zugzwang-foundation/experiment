@@ -11,10 +11,28 @@
  *
  * ⚠ The value scan is the stronger of the two and is the one the wall rests
  * on. A key scan can only reject identifiers it was told to look for under
- * names it was told to expect; a value scan rejects a known-secret string
- * wherever it surfaces, under any key, at any depth, in any format —
- * including interpolated mid-sentence into prose, which is exactly how a
- * `user_id` reaches a rendered `.md` file.
+ * names it was told to expect; a value scan rejects a known secret under any
+ * key, at any depth.
+ *
+ * ⚠ **But the two arms match differently, and an earlier version of this
+ * docblock claimed otherwise.** It said the value scan finds a secret
+ * *"in any format — including interpolated mid-sentence into prose"*. That is
+ * true of `scanText` (substring) and FALSE of `findValues` (whole-leaf
+ * equality), which is what the sixteen CSVs and all the JSONB go through.
+ * Measured by `@security-auditor` H-2: a `comments.body` containing another
+ * participant's id inside a sentence passes the CSV arm.
+ *
+ * The asymmetry is deliberate now that it is stated. `findValues` stays exact
+ * because a substring scan over every leaf of every row would match a
+ * six-character display name inside ordinary prose and abort the release —
+ * the denial-of-service `MIN_NEEDLE_LENGTH` and `FREE_TEXT_COLUMNS` exist to
+ * prevent. What the exact match is FOR is catching a value the transform
+ * failed to remove from a field it owns, and for that, equality is the right
+ * and sufficient test: a strip that half-worked leaves the whole value.
+ *
+ * A secret embedded in participant-authored free text is a different thing —
+ * self-disclosure, not a transform failure — and is handled by the advisory
+ * tier rather than by widening this matcher.
  */
 
 /** One (path, key, value) triple reached by `walk`. */

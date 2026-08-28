@@ -251,6 +251,24 @@ export const COLUMN_TREATMENTS = {
 
 export type TreatedTable = keyof typeof COLUMN_TREATMENTS;
 
+/**
+ * Per-column treatments for one table, or `undefined` if it has none.
+ *
+ * ⚠ Returns `ColumnTreatment`, not `string`. Callers previously reached the
+ * map through `COLUMN_TREATMENTS as Record<string, Record<string, string>>`,
+ * which widened the union at four `=== "STRIP"` / `=== "PSEUDO"` comparison
+ * sites and let a typo'd literal compare cleanly against nothing
+ * (`@code-reviewer` M-13). The `satisfies` on the declaration keeps the map
+ * honest; this keeps the READS honest, which is where the comparisons live.
+ */
+export function treatmentsFor(
+	table: string,
+): Readonly<Record<string, ColumnTreatment>> | undefined {
+	return (COLUMN_TREATMENTS as Record<string, Record<string, ColumnTreatment>>)[
+		table
+	];
+}
+
 /** Live column names per table, read from the drizzle schema at runtime. */
 export function liveColumns(): Readonly<Record<string, readonly string[]>> {
 	const out: Record<string, string[]> = {};

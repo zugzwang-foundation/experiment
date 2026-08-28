@@ -1,7 +1,7 @@
 import { EgressContractGapError } from "@/server/export/egress/errors";
 
 import type { SourceRow } from "./strip";
-import { COLUMN_TREATMENTS } from "./treatments";
+import { treatmentsFor } from "./treatments";
 
 /**
  * DATASET.1 Slice 5 — export-time JOIN pseudonymization (SPEC.2 §19.5).
@@ -240,9 +240,7 @@ export function pseudonymizeRow(
 ): SourceRow {
 	if (table === "users") return { ...row };
 
-	const treatments = (
-		COLUMN_TREATMENTS as Record<string, Record<string, string>>
-	)[table];
+	const treatments = treatmentsFor(table);
 	if (treatments === undefined) {
 		throw new EgressContractGapError(
 			`table: ${table}`,

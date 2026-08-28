@@ -3,10 +3,16 @@ import type { SourceRow } from "./strip";
 /**
  * DATASET.1 — the read seam between the pipeline and wherever rows come from.
  *
- * One interface, two implementations: the deliberately-dirty fixture (which
- * is what every guard runs against) and a live Postgres reader. The seam
- * exists so the pipeline can be exercised end-to-end, producing a real
- * manifest with real checksums, **without pointing anything at a database**.
+ * One interface, and — today — exactly ONE implementation: the deliberately
+ * dirty fixture that every guard runs against. The live Postgres reader is
+ * deliberately NOT written here; wiring it is the release task's, and it needs
+ * its own reviewer pass. (Corrected after `@code-reviewer`: this docblock said
+ * "two implementations", which would have had a reader looking for a database
+ * arm that does not exist.)
+ *
+ * The seam exists so the pipeline can be exercised end-to-end, producing a
+ * real manifest with real checksums, **without pointing anything at a
+ * database**.
  *
  * That is not only convenience. Brief §5's first wall forbids connecting to
  * production at all, and brief §3 rules the fixture over staging because a

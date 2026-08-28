@@ -6,29 +6,26 @@
  * pnpm dataset:build:fixture -- --out ./out
  * ```
  *
- * ## Why this runs under `tsx --conditions=react-server`
+ * ## Runs under plain `tsx`, and that took a change to earn
  *
  * The pipeline's first act is `assertStripRulesComplete()`, which reads the
- * **runtime** `EVENT_TYPES` array from `src/server/events/schemas.ts` — and
- * that module opens with `import "server-only"`, whose `default` export
- * condition is a bare `throw`. Under plain `tsx` the script dies on the
- * import before a line of it runs.
+ * **runtime** `EVENT_TYPES` array — not a scan of the source, because a naive
+ * scan of that file counts 64 against a true 24, and this project has already
+ * been bitten once by a comment inflating exactly that number.
  *
- * Reading the array at runtime is not incidental; it is the guard's whole
- * point (P3, and the V-register case where a source scan over that same file
- * counted 64 against a true 24). Re-declaring the list here to dodge the
- * import would give the completeness guard a second copy to agree with,
- * which is exactly the drift it exists to detect.
+ * That array used to live in `src/server/events/schemas.ts`, which opens with
+ * `import "server-only"` — so this script originally ran under
+ * `tsx --conditions=react-server`. AGENTS.md §7 forbids a `tsx` script
+ * delegating into that chain and reserves the flag to a single named control,
+ * so the first version of this file argued for a third category instead.
  *
- * AGENTS.md §7 says a `tsx` script must not delegate into the `@/db` →
- * `server-only` chain, and reserves `--conditions=react-server` narrowly. The
- * rule's stated reason is that a seeder or smoke check needs *a* database
- * connection and should inline its own rather than borrow the shipped
- * singleton and let it drift. **This script opens no connection at all** — it
- * reads a fixture and writes files. It touches the flag not to reach a
- * client, but because a pure constant it must read for correctness sits
- * behind a module marked server-only. Flagged in the DATASET.1 report rather
- * than assumed to be covered by the existing carve-out.
+ * `@code-reviewer` H-6 was right that the argument did not carry: §7 restricts
+ * the MECHANISM, and the purpose paragraph explains the restriction rather
+ * than licensing exceptions to it. The constant is now extracted to
+ * `src/server/events/event-types.ts`, which imports nothing — so the flag is
+ * gone rather than justified, `schemas.ts` re-exports both symbols so no
+ * existing import site moved, and the completeness guard still reads the one
+ * runtime array instead of a second copy.
  *
  * ⚠ There is no live-database source wired in. A `--source=db` arm is
  * deliberately absent: brief §5's first wall forbids production entirely, and

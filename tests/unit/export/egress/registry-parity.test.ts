@@ -140,8 +140,17 @@ describe("egress · every EgressSecrets field is consumed by the guards", () => 
 	// rather than passing vacuously forever.
 	const fields = Object.keys(emptySecrets());
 
-	it("there are seven classes, and the list is read from the shape", () => {
-		expect(fields).toHaveLength(7);
+	it("the class list is read from the SHAPE, and every class is consumed", () => {
+		// ⚠ Was `toHaveLength(7)`, a literal that went stale the moment
+		// `@code-reviewer` H-4 added `displayNames` / `avatarUrls` /
+		// `blockedTexts`. Pinning a count is not what makes this guard work —
+		// what makes it work is that every field in the shape is proven to be
+		// CONSUMED. The count is now derived, so adding a class extends the
+		// coverage instead of breaking the test.
+		expect(fields.length).toBeGreaterThanOrEqual(10);
+		expect(fields).toContain("displayNames");
+		expect(fields).toContain("avatarUrls");
+		expect(fields).toContain("blockedTexts");
 	});
 
 	it.each(
@@ -193,25 +202,18 @@ describe("egress · FORBIDDEN_VALUE_CLASSES names rules that actually fire", () 
 		// exactly the class names prefixed. That makes the declared list
 		// checkable against the real vocabulary with no hand-written mapping to
 		// go stale.
-		const secrets: EgressSecrets = {
-			userIds: new Set(["ZZ-CANARY-userIds"]),
-			ips: new Set(["ZZ-CANARY-ips"]),
-			userAgents: new Set(["ZZ-CANARY-userAgents"]),
-			googleIds: new Set(["ZZ-CANARY-googleIds"]),
-			r2ObjectKeys: new Set(["ZZ-CANARY-r2ObjectKeys"]),
-			adminSessionIds: new Set(["ZZ-CANARY-adminSessionIds"]),
-			emails: new Set(["ZZ-CANARY-emails"]),
-		};
+		// ⚠ Built by LOOPING the shape rather than listing the fields, so a
+		// new class added to `EgressSecrets` is picked up automatically. The
+		// hand-written literal this replaces went stale the moment three
+		// classes were added for `@code-reviewer` H-4 — which is the same
+		// drift this whole file exists to catch, reproduced inside it.
+		const canary = (field: string) => `ZZ-CANARY-${field}`;
+		const fields = Object.keys(emptySecrets()) as (keyof EgressSecrets)[];
+		const secrets = Object.fromEntries(
+			fields.map((f) => [f, new Set([canary(f)])]),
+		) as unknown as EgressSecrets;
 		const rows = [
-			{
-				a: "ZZ-CANARY-userIds",
-				b: "ZZ-CANARY-ips",
-				c: "ZZ-CANARY-userAgents",
-				d: "ZZ-CANARY-googleIds",
-				e: "ZZ-CANARY-r2ObjectKeys",
-				f: "ZZ-CANARY-adminSessionIds",
-				g: "ZZ-CANARY-emails",
-			},
+			Object.fromEntries(fields.map((f, i) => [`col${i}`, canary(f)])),
 		];
 
 		let fired: string[] = [];

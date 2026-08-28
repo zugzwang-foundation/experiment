@@ -1,4 +1,4 @@
-import { EVENT_TYPES, type EventType } from "@/server/events/schemas";
+import { EVENT_TYPES, type EventType } from "@/server/events/event-types";
 
 /**
  * DATASET.1 — the DIRTY fixture. Brief §3, and the whole of why it exists.
@@ -470,7 +470,28 @@ export const DIRTY_EVENT_ROWS: readonly DirtyEventRow[] = [
 		event_type,
 		aggregate_type: "market",
 		aggregate_id: MARKET_ID,
-		payload: { marketId: MARKET_ID },
+		// ⚠ `market.created` carries its REAL payload, including the nested
+		// `media[].key` that `schemas.ts` declares `.min(1)` — so every real
+		// market has one. This fixture modelled it as `{ marketId }` alone,
+		// and that omission hid a guaranteed build failure on the first live
+		// read: the deep key net rejected a key §19.4.1 explicitly SHIPs
+		// (`@security-auditor` H-1). A fixture simpler than production is a
+		// fixture that cannot see production's failures.
+		payload:
+			event_type === "market.created"
+				? {
+						marketId: MARKET_ID,
+						resolutionDeadline: AT,
+						media: [
+							{
+								key: `m/${MARKET_ID}/hero.webp`,
+								displayOrder: 0,
+								isDefault: true,
+							},
+						],
+						mediaVideoUrl: null,
+					}
+				: { marketId: MARKET_ID },
 		payload_version: 1,
 		metadata: dirtyMetadata({
 			userId: null,
@@ -796,3 +817,60 @@ export const DIRTY_TABLE_ROWS = {
 	],
 	events: DIRTY_EVENT_ROWS,
 } as const satisfies Record<string, readonly object[]>;
+
+/**
+ * The canonical `EgressSecrets` for this fixture.
+ *
+ * ⚠ Exported because the set was previously rebuilt by hand in four test
+ * files and two of them disagreed (`@test-writer` M-4): the unsliced version
+ * treated `market_media.r2_object_key` as a secret, and Appendix B.16 says
+ * that key SHIPS. Nothing fired only because no `market_media` row ever met
+ * that particular guard — and the day one did, the pressure would have been
+ * to loosen the guard rather than fix the set.
+ *
+ * Derived from the fixture rows themselves rather than from a second literal
+ * list, so it cannot drift from the data it describes.
+ */
+/** Non-empty strings only — see the note inside `fixtureSecrets`. */
+function strings(values: readonly unknown[]): Set<string> {
+	return new Set(
+		values.filter((v): v is string => typeof v === "string" && v !== ""),
+	);
+}
+
+export function fixtureSecrets(): {
+	userIds: Set<string>;
+	ips: Set<string>;
+	userAgents: Set<string>;
+	googleIds: Set<string>;
+	r2ObjectKeys: Set<string>;
+	adminSessionIds: Set<string>;
+	emails: Set<string>;
+	displayNames: Set<string>;
+	avatarUrls: Set<string>;
+	blockedTexts: Set<string>;
+} {
+	return {
+		userIds: new Set(Object.values(FIXTURE_USER_IDS)),
+		ips: new Set(FIXTURE_SECRET_VALUES.ips),
+		userAgents: new Set(FIXTURE_SECRET_VALUES.userAgents),
+		googleIds: new Set(FIXTURE_SECRET_VALUES.googleIds),
+		// ⚠ ONLY the two `u/<userId>/…` keys. The third is
+		// `m/<marketId>/hero.webp`, which Appendix B.16 SHIPS — it is
+		// operator-curated market context with no user id embedded, so it is
+		// not a secret and must not be treated as one.
+		r2ObjectKeys: new Set([R2_A, R2_B]),
+		adminSessionIds: new Set(FIXTURE_SECRET_VALUES.adminSessionIds),
+		emails: new Set(FIXTURE_SECRET_VALUES.emails),
+		// ⚠ The H2-erased participant has NULL name/image, so these are
+		// filtered rather than mapped straight through. That is not
+		// defensive tidying — a `null` in a secret set would be skipped by
+		// `findValues` anyway, but an EMPTY-STRING one would match every
+		// empty column in the export and drown every real hit.
+		displayNames: strings(DIRTY_TABLE_ROWS.users.map((u) => u.name)),
+		avatarUrls: strings(DIRTY_TABLE_ROWS.users.map((u) => u.image)),
+		blockedTexts: strings(
+			DIRTY_TABLE_ROWS.mod_actions.map((m) => m.blocked_text),
+		),
+	};
+}

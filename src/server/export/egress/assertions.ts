@@ -54,6 +54,92 @@ export interface EgressSecrets {
 	readonly adminSessionIds: ReadonlySet<string>;
 	/** Every `users.email` / `payload.email`. */
 	readonly emails: ReadonlySet<string>;
+	/**
+	 * Every `users.name` — the participant's REAL Google display name.
+	 *
+	 * ⚠ Added after `@code-reviewer` H-4. It is `STRIP` per Appendix B.1 and
+	 * the strip was correct, but no VALUE class covered it — so the layer's
+	 * whole strength (*"the string X does not appear anywhere, and X was
+	 * known to be in the source"*) had never been applied to the single most
+	 * identifying column in the dataset. A key-level `not.toHaveProperty`
+	 * cannot see a real name that reaches an artifact under another key, or
+	 * interpolated into a debate document.
+	 */
+	readonly displayNames: ReadonlySet<string>;
+	/** Every `users.image` — the Google avatar URL. STRIP per B.1. */
+	readonly avatarUrls: ReadonlySet<string>;
+	/**
+	 * Every `mod_actions.blocked_text` — the rejected comment body of a
+	 * gate-block. STRIP per B.10, and absent from §19.4's ten-column table.
+	 */
+	readonly blockedTexts: ReadonlySet<string>;
+}
+
+/**
+ * Minimum length for a value-scan needle.
+ *
+ * ⚠ **A short needle is a denial-of-service on the release build, not extra
+ * safety.** `users.name` is a participant's real Google display name and is a
+ * value class — so a participant named "Li", "Bo", "An" or "Max" makes their
+ * name a substring of ordinary English, and every debate export containing
+ * "Line 3" or "Maximum" fails. No attacker required; one such participant is
+ * enough, and the only fix reachable at 06:00 on release morning is to switch
+ * the class off entirely.
+ *
+ * Six characters is chosen because nothing shorter is a usable
+ * re-identification vector on its own, and everything the dataset genuinely
+ * must not leak — UUIDs, IPs, emails, user agents, R2 keys, session ids — is
+ * comfortably longer. Skipped needles are REPORTED (`skippedNeedles`) rather
+ * than silently dropped, because a guard that quietly stops covering a class
+ * is the failure this whole layer exists to prevent.
+ *
+ * (`@security-auditor` H-4.)
+ */
+export const MIN_NEEDLE_LENGTH = 6;
+
+/**
+ * Columns whose contents are PARTICIPANT-AUTHORED FREE TEXT.
+ *
+ * ⚠ A secret found here is **reported, never fatal**, and the distinction is
+ * the difference between a guard and a kill switch.
+ *
+ * The dataset's guarantee is about COLUMNS: §19.4 says the stripped column
+ * does not appear in the release. It does not, and cannot, promise that a
+ * given string appears nowhere in the corpus — because a participant can type
+ * anything into an argument, including a UUID, an email address, or their own
+ * real name.
+ *
+ * So a secret value surfacing in `comments.body` is self-disclosure or
+ * coincidence, not a transform failure; halting on it hands every participant
+ * a deterministic abort of a one-shot release. The same value surfacing in a
+ * column the transform was supposed to have cleaned IS a transform failure,
+ * and still halts.
+ *
+ * Measured attack this closes (`@security-auditor` H-4): post body *B* with a
+ * disallowed image → blocked, `mod_actions.blocked_text = B`; re-post *B*
+ * without the image → passes moderation → `comments.body === B` → the
+ * `blocked_text` value class fires on a legitimately published argument and
+ * the build dies.
+ */
+export const FREE_TEXT_COLUMNS = new Set([
+	"body",
+	"title",
+	"description",
+	"reason",
+	"resolution_note",
+	"blocked_text",
+]);
+
+/**
+ * Is this R2 object key operator-curated market media (`m/<marketId>/…`)?
+ *
+ * The `m/` namespace ships (Appendix B.16, §19.4.1's `market.created` row);
+ * the `u/` namespace never does, because SCAFFOLD.15 §Q9 embeds the user id in
+ * the path. Matching on the prefix rather than on the column name is what lets
+ * the same key NAME be safe in one place and a leak in another.
+ */
+export function isMarketMediaKey(value: unknown): boolean {
+	return typeof value === "string" && value.startsWith("m/");
 }
 
 /** An empty secret set — for callers with genuinely nothing to protect. */
@@ -66,6 +152,9 @@ export function emptySecrets(): EgressSecrets {
 		r2ObjectKeys: new Set(),
 		adminSessionIds: new Set(),
 		emails: new Set(),
+		displayNames: new Set(),
+		avatarUrls: new Set(),
+		blockedTexts: new Set(),
 	};
 }
 
@@ -78,6 +167,8 @@ export function emptySecrets(): EgressSecrets {
  */
 export class EgressGuard {
 	private readonly violations: EgressViolation[] = [];
+	private readonly warnings: EgressViolation[] = [];
+	private readonly skipped: { rule: string; length: number }[] = [];
 
 	constructor(private readonly secrets: EgressSecrets) {}
 
@@ -88,6 +179,21 @@ export class EgressGuard {
 	/** Everything found so far. Empty means every assertion passed. */
 	get findings(): readonly EgressViolation[] {
 		return this.violations;
+	}
+
+	/**
+	 * Non-fatal findings: a secret value inside participant-authored free
+	 * text, or a heuristic net that fired. Surfaced in the manifest so the
+	 * operator sees them without the build dying on content a participant
+	 * chose to write.
+	 */
+	get advisories(): readonly EgressViolation[] {
+		return this.warnings;
+	}
+
+	/** Needles too short to scan safely — reported, never silently dropped. */
+	get skippedNeedles(): readonly { rule: string; length: number }[] {
+		return this.skipped;
 	}
 
 	/** Throws `EgressViolationError` if anything was found. */
@@ -189,6 +295,39 @@ export class EgressGuard {
 		);
 	}
 
+	/** **No real display name.** `users.name`, STRIP per B.1. */
+	assertNoDisplayNames(artifact: string, rows: unknown): this {
+		return this.byValue(
+			artifact,
+			rows,
+			this.secrets.displayNames,
+			"no-display-name",
+			"a real display name",
+		);
+	}
+
+	/** **No Google avatar URL.** `users.image`, STRIP per B.1. */
+	assertNoAvatarUrls(artifact: string, rows: unknown): this {
+		return this.byValue(
+			artifact,
+			rows,
+			this.secrets.avatarUrls,
+			"no-avatar-url",
+			"a Google avatar URL",
+		);
+	}
+
+	/** **No gate-blocked body.** `mod_actions.blocked_text`, STRIP per B.10. */
+	assertNoBlockedTexts(artifact: string, rows: unknown): this {
+		return this.byValue(
+			artifact,
+			rows,
+			this.secrets.blockedTexts,
+			"no-blocked-text",
+			"a gate-blocked comment body",
+		);
+	}
+
 	// ── key-shaped nets ─────────────────────────────────────────────────
 
 	/**
@@ -220,6 +359,25 @@ export class EgressGuard {
 	 */
 	assertNoForbiddenPayloadKeys(artifact: string, rows: unknown): this {
 		for (const hit of findKeys(rows, GLOBALLY_FORBIDDEN_PAYLOAD_KEYS)) {
+			// ⚠ `key` is NAMESPACE-DEPENDENT and a blanket rule is wrong.
+			//
+			// `market.created.payload.media[].key` is a required field
+			// (`schemas.ts` — `.min(1)`), so EVERY market carries one, and
+			// §19.4.1 rules that `media[]` SHIPs. Those keys live in
+			// `m/<marketId>/`: operator-curated public context with no user id
+			// embedded (Appendix B.16 ships the same value as a column).
+			//
+			// An `u/<userId>/<uploadId>.<ext>` key is the opposite — SCAFFOLD.15
+			// §Q9 puts the user id inside the string, so it is a raw `users.id`
+			// carrier wearing a different name.
+			//
+			// This rejected BOTH until `@security-auditor` H-1 measured it: the
+			// build hard-failed on the first real `market.created` row, on a
+			// one-shot job, for a key the spec explicitly ships. The fixture
+			// modelled that payload as `{ marketId }` alone, so nothing on the
+			// branch could see it.
+			if (hit.key === "key" && isMarketMediaKey(hit.value)) continue;
+
 			this.add({
 				rule: "no-forbidden-payload-key",
 				artifact,
@@ -252,6 +410,13 @@ export class EgressGuard {
 				"an admin sessionId",
 			],
 			["no-email", this.secrets.emails, "an email"],
+			["no-display-name", this.secrets.displayNames, "a real display name"],
+			["no-avatar-url", this.secrets.avatarUrls, "a Google avatar URL"],
+			[
+				"no-blocked-text",
+				this.secrets.blockedTexts,
+				"a gate-blocked comment body",
+			],
 		];
 
 		for (const [rule, values, noun] of classes) {
@@ -280,11 +445,23 @@ export class EgressGuard {
 	assertNoBareUuidsInText(artifact: string, text: string): this {
 		for (const [i, line] of text.split("\n").entries()) {
 			for (const m of line.matchAll(UUID_RE_GLOBAL)) {
-				this.add({
-					rule: "no-bare-uuid-in-text",
+				// ⚠ ADVISORY, not fatal — and the downgrade is deliberate.
+				//
+				// This net only adds anything for a UUID the secret set did NOT
+				// collect; every real `users.id` is already covered by the exact
+				// scan above, which DOES halt. What remains in its blast radius
+				// is a participant typing a UUID into an argument — which aborts
+				// that market's export, on a one-shot job, for content the
+				// participant was entitled to write (`@security-auditor` H-4).
+				//
+				// So it keeps its job (surfacing an id whose provenance the
+				// guard cannot account for) without handing anyone a kill
+				// switch. The hard guarantee is the exact-value scan.
+				this.warnings.push({
+					rule: "bare-uuid-in-text",
 					artifact,
 					path: `line ${i + 1}`,
-					detail: `a bare UUID appears in rendered text (${m[0].slice(0, 8)}…)`,
+					detail: `a bare UUID appears in rendered text (${m[0].slice(0, 8)}…) — advisory`,
 				});
 			}
 		}
@@ -300,13 +477,32 @@ export class EgressGuard {
 		rule: string,
 		noun: string,
 	): this {
-		for (const hit of findValues(rows, values)) {
-			this.add({
+		const usable = new Set<string>();
+		for (const v of values) {
+			if (v.length >= MIN_NEEDLE_LENGTH) usable.add(v);
+			else this.skipped.push({ rule, length: v.length });
+		}
+
+		for (const hit of findValues(rows, usable)) {
+			const entry = {
 				rule,
 				artifact,
 				path: hit.path,
 				detail: `${noun} survived (key: ${hit.key ?? "—"})`,
-			});
+			};
+			// A hit inside participant-authored free text is self-disclosure,
+			// not a transform failure — reported, never fatal. See
+			// FREE_TEXT_COLUMNS for why halting there is a kill switch.
+			if (hit.key !== null && FREE_TEXT_COLUMNS.has(hit.key)) {
+				this.warnings.push({
+					...entry,
+					detail:
+						`${noun} appears in participant-authored free text ` +
+						`(${hit.key}) — reported, not fatal`,
+				});
+				continue;
+			}
+			this.add(entry);
 		}
 		return this;
 	}
@@ -322,8 +518,9 @@ export function assertTableClean(
 	rows: unknown,
 	secrets: EgressSecrets,
 	{ isUsersTable = false }: { isUsersTable?: boolean } = {},
-): void {
-	new EgressGuard(secrets)
+): readonly EgressViolation[] {
+	const guard = new EgressGuard(secrets);
+	guard
 		.assertNoRawUserIds(table, rows, { isUsersTable })
 		.assertNoIps(table, rows)
 		.assertNoUserAgents(table, rows)
@@ -331,9 +528,16 @@ export function assertTableClean(
 		.assertNoR2ObjectKeys(table, rows)
 		.assertNoAdminSessionIds(table, rows)
 		.assertNoEmails(table, rows)
+		.assertNoDisplayNames(table, rows)
+		.assertNoAvatarUrls(table, rows)
+		.assertNoBlockedTexts(table, rows)
 		.assertNoStrippedMetadataKeys(table, rows)
 		.assertNoForbiddenPayloadKeys(table, rows)
 		.assertClean();
+	// Advisories are RETURNED, not thrown — a secret inside participant
+	// free text is reported so the operator sees it, without handing any
+	// participant an abort switch on a one-shot release.
+	return guard.advisories;
 }
 
 /**
@@ -344,9 +548,11 @@ export function assertTextArtifactClean(
 	artifact: string,
 	text: string,
 	secrets: EgressSecrets,
-): void {
-	new EgressGuard(secrets)
+): readonly EgressViolation[] {
+	const guard = new EgressGuard(secrets);
+	guard
 		.assertTextClean(artifact, text)
 		.assertNoBareUuidsInText(artifact, text)
 		.assertClean();
+	return guard.advisories;
 }

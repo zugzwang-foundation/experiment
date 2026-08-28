@@ -41,12 +41,24 @@ export interface CsvArtifact {
 export function escapeField(value: unknown): string {
 	if (value === null || value === undefined) return "";
 
+	// ⚠ `Date` BEFORE the generic object branch. `JSON.stringify(new Date())`
+	// returns a string that already CONTAINS double quotes, which then trips
+	// the quote-escaping path below and doubles them — `2026-11-06T00:00:00Z`
+	// ships as `"""2026-11-06T00:00:00Z"""` and parses back with literal
+	// quotes inside the value.
+	//
+	// Latent while the only source is the fixture (all ISO strings), and live
+	// on the first row a drizzle reader returns: every shipped table has a
+	// `created_at`, and `timestamp({ withTimezone: true })` hands back a JS
+	// `Date`. So this fires on the release task's very first real read.
 	const s =
-		typeof value === "object"
-			? JSON.stringify(value)
-			: // ⚠ String(), never Number(). NUMERIC(38,18) arrives as a string
-				// and must leave as the same string.
-				String(value);
+		value instanceof Date
+			? value.toISOString()
+			: typeof value === "object"
+				? JSON.stringify(value)
+				: // ⚠ String(), never Number(). NUMERIC(38,18) arrives as a
+					// string and must leave as the same string.
+					String(value);
 
 	// Quote if the field contains a delimiter, a quote, or any newline.
 	// `\r` matters as much as `\n`: a bare CR inside an unquoted field
@@ -102,9 +114,21 @@ export function toCsv(
  * and a naive `split("\n").length` would report several rows for one comment.
  */
 export function countCsvRows(text: string): number {
-	let rows = 0;
+	if (text === "") return 0;
+
+	// ⚠ Counts RECORD TERMINATORS, not content. The obvious implementation —
+	// "did this line contain a non-empty character?" — under-counts a data
+	// line whose fields are all empty, which for a one-column table is the
+	// literal empty string between two newlines. That is a real row, and it
+	// is indistinguishable from a blank line by inspection; what distinguishes
+	// it is that a terminator preceded it.
+	//
+	// Unreachable through `buildDataset` today (every shipped table has five
+	// or more columns, so every data line contains commas) and it failed
+	// CLOSED through the row-count gate — but on a confusing error rather
+	// than the truth.
+	let terminators = 0;
 	let inQuotes = false;
-	let sawContent = false;
 
 	for (let i = 0; i < text.length; i++) {
 		const ch = text[i];
@@ -115,18 +139,14 @@ export function countCsvRows(text: string): number {
 				continue;
 			}
 			inQuotes = !inQuotes;
-			sawContent = true;
 			continue;
 		}
-		if (ch === "\n" && !inQuotes) {
-			if (sawContent) rows++;
-			sawContent = false;
-			continue;
-		}
-		if (ch !== "\r") sawContent = true;
+		if (ch === "\n" && !inQuotes) terminators++;
 	}
-	if (sawContent) rows++;
+
+	// A final record with no trailing newline still counts.
+	const unterminated = text.endsWith("\n") ? 0 : 1;
 
 	// Minus the header line.
-	return Math.max(0, rows - 1);
+	return Math.max(0, terminators + unterminated - 1);
 }

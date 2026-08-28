@@ -1,9 +1,14 @@
 import {
 	assertTableClean,
+	assertTextArtifactClean,
 	type EgressSecrets,
-	emptySecrets,
 } from "@/server/export/egress";
 import { assertStripRulesComplete } from "@/server/export/egress/completeness";
+import type { EgressViolation } from "@/server/export/egress/errors";
+import {
+	SHIPPED_METADATA_KEYS,
+	STRIPPED_METADATA_KEYS,
+} from "@/server/export/egress/forbidden-keys";
 
 import { type CsvArtifact, countCsvRows, toCsv } from "./csv";
 import {
@@ -14,13 +19,14 @@ import {
 import {
 	buildPseudonymMap,
 	type PseudonymMap,
+	pseudonymColumnName,
 	pseudonymizeTable,
 } from "./pseudonymize";
 import { removedCommentIds } from "./removed";
 import type { DatasetSource } from "./source";
 import { type SourceRow, stripTable } from "./strip";
-import { createTarGz, sha256, type TarEntry } from "./tar";
-import { assertTreatmentsComplete, COLUMN_TREATMENTS } from "./treatments";
+import { contentSha256, createTarGz, sha256, type TarEntry } from "./tar";
+import { assertTreatmentsComplete, treatmentsFor } from "./treatments";
 
 /**
  * DATASET.1 Slice 6 — the build orchestrator.
@@ -58,6 +64,17 @@ export interface DatasetManifest {
 	readonly tarball_sha256: string;
 	readonly tarball_size_bytes: number;
 	readonly pseudonymization: string;
+	/**
+	 * Non-table artifacts in the archive — today the `debates/*.md` class.
+	 * §19.1's "included file inventory" is the whole archive, not just the
+	 * tables.
+	 */
+	readonly extra_files: readonly {
+		readonly name: string;
+		readonly bytes: number;
+	}[];
+	/** sha256 of the UNCOMPRESSED tar — stable across zlib versions. */
+	readonly content_sha256: string;
 	readonly tables: readonly {
 		readonly name: string;
 		readonly file: string;
@@ -67,6 +84,8 @@ export interface DatasetManifest {
 		readonly metadata_fields_excluded?: readonly string[];
 	}[];
 	/** §19.3 rows that are NOT in the archive, and why. */
+	/** Non-fatal egress findings — see `FREE_TEXT_COLUMNS`. */
+	readonly advisories: readonly string[];
 	readonly withheld: readonly {
 		readonly name: string;
 		readonly reason: string;
@@ -108,6 +127,9 @@ export function harvestSecrets(
 		r2ObjectKeys: new Set<string>(),
 		adminSessionIds: new Set<string>(),
 		emails: new Set<string>(),
+		displayNames: new Set<string>(),
+		avatarUrls: new Set<string>(),
+		blockedTexts: new Set<string>(),
 	};
 
 	const add = (set: Set<string>, v: unknown) => {
@@ -120,6 +142,13 @@ export function harvestSecrets(
 		add(s.googleIds, row.google_id);
 		add(s.ips, row.tos_acceptance_ip);
 		add(s.userAgents, row.tos_acceptance_user_agent);
+		// ⚠ `users.name` is the participant's real Google display name and
+		// `users.image` their avatar URL — both STRIP per B.1, and until
+		// `@code-reviewer` H-4 neither had a value class, so the strongest
+		// assertion this layer can make had never been pointed at the most
+		// identifying column in the dataset.
+		add(s.displayNames, row.name);
+		add(s.avatarUrls, row.image);
 	}
 	for (const row of tables.image_uploads ?? []) {
 		add(s.r2ObjectKeys, row.r2_object_key);
@@ -128,6 +157,7 @@ export function harvestSecrets(
 	// §19.4's ten-column table does not name it; Appendix B.10 marks it STRIP.
 	for (const row of tables.mod_actions ?? []) {
 		add(s.r2ObjectKeys, row.image_r2_key);
+		add(s.blockedTexts, row.blocked_text);
 	}
 
 	// Audit payloads carry ips, user agents, session ids and google ids that
@@ -152,6 +182,36 @@ export function harvestSecrets(
 	}
 
 	return s;
+}
+
+/**
+ * The gate between the writer's count and an independent re-parse of the
+ * bytes it produced.
+ *
+ * ⚠ **Extracted so a control can DRIVE it.** Inline in `buildDataset` it was
+ * the one guard in this task that could not be made to fire: all 16 tables
+ * agree, so the test asserting `verifiedRowCount === rowCount` passed
+ * identically whether the gate worked, used `>=`, or had been deleted
+ * (`@code-reviewer` H-2). Every other contract check here — `compareInventory`,
+ * `compareTreatments`, `compareStripRules` — was already injectable for
+ * exactly this reason, and this one had been missed.
+ *
+ * That matters more than the average un-fired guard, because this IS the
+ * answer to brief §4 Slice 6's named wrong answer: *"manifest row counts
+ * computed from a different read than the one that wrote the files"*.
+ */
+export function assertCountsAgree(results: readonly TableResult[]): void {
+	for (const r of results) {
+		if (r.rowCount !== r.verifiedRowCount) {
+			throw new Error(
+				`row-count disagreement for ${r.table}: the writer counted ` +
+					`${r.rowCount}, re-parsing the emitted CSV found ` +
+					`${r.verifiedRowCount}. The manifest must describe the FILE, so ` +
+					"the build stops rather than publish a number that describes " +
+					"something else.",
+			);
+		}
+	}
 }
 
 /** The five metadata fields that ship, for the manifest's per-table entry. */
@@ -182,6 +242,10 @@ export async function buildDataset(opts: BuildOptions): Promise<BuildResult> {
 	// ── 4 · transform, guard, serialize ─────────────────────────────────
 	const artifacts: CsvArtifact[] = [];
 	const results: TableResult[] = [];
+	// Non-fatal findings — a secret value inside participant-authored free
+	// text, or a heuristic net firing. Surfaced in the manifest so the
+	// operator sees them, rather than dying on content a participant wrote.
+	const advisories: EgressViolation[] = [];
 
 	for (const table of tables) {
 		const transformed = pseudonymizeTable(
@@ -193,9 +257,11 @@ export async function buildDataset(opts: BuildOptions): Promise<BuildResult> {
 		);
 
 		// The guards run on exactly the rows about to be written.
-		assertTableClean(table, transformed, secrets, {
-			isUsersTable: table === "users",
-		});
+		advisories.push(
+			...assertTableClean(table, transformed, secrets, {
+				isUsersTable: table === "users",
+			}),
+		);
 
 		// Column order from the treatment map, not from row 0 — so an empty
 		// table still emits a correct header, and a table whose first row
@@ -219,24 +285,35 @@ export async function buildDataset(opts: BuildOptions): Promise<BuildResult> {
 	}
 
 	// ── 5 · the counts must agree, or the build fails ───────────────────
-	for (const r of results) {
-		if (r.rowCount !== r.verifiedRowCount) {
-			throw new Error(
-				`row-count disagreement for ${r.table}: the writer counted ` +
-					`${r.rowCount}, re-parsing the emitted CSV found ` +
-					`${r.verifiedRowCount}. The manifest must describe the FILE, so ` +
-					"the build stops rather than publish a number that describes " +
-					"something else.",
-			);
-		}
-	}
+	assertCountsAgree(results);
 
 	// ── 6 · archive + manifest ──────────────────────────────────────────
+	// ⚠ Every extra entry is guarded HERE, with the secrets THIS build
+	// harvested — not with a set the caller assembled separately.
+	//
+	// `extraEntries` previously reached the tarball with no guard at all
+	// (`@security-auditor` M-7). The `.md` arm's only protection was
+	// `debateEntries`, an OPTIONAL constructor the caller had to remember,
+	// taking an `EgressSecrets` the caller had to derive independently — so
+	// the archive's guarantee rested on a convention at a seam rather than on
+	// anything structural, and the two secret sets were never compared.
+	//
+	// Running it here makes the guarantee a property of the build: an entry
+	// cannot enter the archive without passing the same scan the tables did.
+	// `debateEntries` stays, because failing early with a per-slug message is
+	// friendlier — but it is no longer what makes the archive safe.
+	for (const entry of opts.extraEntries ?? []) {
+		advisories.push(
+			...assertTextArtifactClean(entry.name, entry.content, secrets),
+		);
+	}
+
 	const entries: TarEntry[] = [
 		...artifacts.map((a) => ({ name: a.filename, content: a.text })),
 		...(opts.extraEntries ?? []),
 	];
 	const tarball = createTarGz(entries);
+
 	const tarballName =
 		opts.tarballName ?? `zugzwang-experiment-${opts.releaseDate}.tar.gz`;
 
@@ -247,6 +324,14 @@ export async function buildDataset(opts: BuildOptions): Promise<BuildResult> {
 		license: "CC-BY-4.0",
 		tarball_name: tarballName,
 		tarball_sha256: sha256(tarball),
+		// ⚠ The hash that does not move. `tarball_sha256` verifies the bytes a
+		// reader downloaded; it is NOT a stable identifier for the DATA,
+		// because gzip's XFL/OS bytes are platform-derived and the deflate
+		// stream is not byte-stable across zlib versions. §19.1 contemplates a
+		// v2 rebuild against the same source state — rebuilt elsewhere that
+		// would change `tarball_sha256` for identical content, and someone
+		// would reasonably read the difference as data drift.
+		content_sha256: contentSha256(entries),
 		tarball_size_bytes: tarball.length,
 		pseudonymization:
 			"export-time JOIN; users.id → users.pseudonym for downstream FKs",
@@ -259,22 +344,46 @@ export async function buildDataset(opts: BuildOptions): Promise<BuildResult> {
 			column_set: r.columns,
 			...(METADATA_TABLES.has(r.table)
 				? {
-						metadata_fields_included: [
-							"request_id",
-							"flow_id",
-							"user_pseudonym",
-							"actor_id",
-							"idempotency_key",
-						],
-						metadata_fields_excluded: ["ip", "user_agent"],
+						// ⚠ DERIVED from the registries that actually drive the
+						// strip and the rename — never hand-copied literals.
+						// `@code-reviewer` H-5: hardcoding these reproduces the
+						// row-count defect one field over. Add a third key to
+						// STRIPPED_METADATA_KEYS and the strip changes while a
+						// literal manifest keeps describing the old shape, and a
+						// test asserting the same literal back still passes.
+						metadata_fields_included: SHIPPED_METADATA_KEYS.map((k) =>
+							k === "user_id" ? pseudonymColumnName(k) : k,
+						),
+						metadata_fields_excluded: [...STRIPPED_METADATA_KEYS],
 					}
 				: {}),
+		})),
+		// §19.1 requires the manifest name "the included file inventory", and
+		// `manifest.tables` covers only the CSVs. The debate documents are half
+		// the archive; without this a reader has no listing for them at all.
+		extra_files: (opts.extraEntries ?? []).map((e) => ({
+			name: e.name,
+			bytes: Buffer.byteLength(e.content, "utf8"),
 		})),
 		withheld: Object.entries(TABLE_INVENTORY)
 			.filter(([, e]) => e.status !== "SHIPPED")
 			.map(([name, e]) => ({ name, reason: `${e.status} — ${e.source}` })),
+		advisories: advisories.map((a) => `[${a.rule}] ${a.artifact} @ ${a.path}`),
 		notes: [
 			...(opts.notes ?? []),
+			// ⚠ DECLINED, and recorded rather than silently accepted
+			// (`@security-auditor` M-6). `comments.body` is unconstrained
+			// participant text and SHIPs per Appendix B.6, so a body beginning
+			// `=`, `+`, `-` or `@` is a spreadsheet formula when this file is
+			// opened in Excel or Sheets. The standard mitigation is to prefix
+			// such fields with an apostrophe — which ALTERS the argument text,
+			// and this is a research corpus whose whole value is that the
+			// arguments are verbatim. A dash-led bullet is ordinary prose.
+			// Documented for the reader instead of corrupting the data.
+			"⚠ comments.body is verbatim participant text and is NOT neutralised " +
+				"against spreadsheet formula injection. Do not open the CSVs " +
+				"directly in Excel / LibreOffice / Sheets; load them with a CSV " +
+				"parser (pandas, R, csv module), which is unaffected.",
 			...(removed.size > 0
 				? [
 						`${removed.size} comment(s) were reactively removed by ` +
@@ -298,9 +407,7 @@ export async function buildDataset(opts: BuildOptions): Promise<BuildResult> {
  * be indistinguishable from a failed export.
  */
 export function expectedColumns(table: string): readonly string[] {
-	const treatments = (
-		COLUMN_TREATMENTS as Record<string, Record<string, string>>
-	)[table];
+	const treatments = treatmentsFor(table);
 	if (!treatments) return [];
 
 	const out: string[] = [];
@@ -318,6 +425,3 @@ export function expectedColumns(table: string): readonly string[] {
 	}
 	return out;
 }
-
-/** An empty secret set — for a caller with genuinely nothing to protect. */
-export { emptySecrets };

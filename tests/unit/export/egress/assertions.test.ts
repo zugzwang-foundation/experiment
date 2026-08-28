@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-
+import { type SourceRow, stripTable } from "@/server/export/dataset/strip";
 import {
 	assertTableClean,
 	assertTextArtifactClean,
@@ -13,6 +13,7 @@ import {
 	DIRTY_EVENT_ROWS,
 	FIXTURE_SECRET_VALUES,
 	FIXTURE_USER_IDS,
+	fixtureSecrets,
 } from "../../../_fixtures/dataset/dirty-source";
 
 /**
@@ -31,15 +32,7 @@ import {
  * exercising the failing shape.
  */
 
-const secrets: EgressSecrets = {
-	userIds: new Set(Object.values(FIXTURE_USER_IDS)),
-	ips: new Set(FIXTURE_SECRET_VALUES.ips),
-	userAgents: new Set(FIXTURE_SECRET_VALUES.userAgents),
-	googleIds: new Set(FIXTURE_SECRET_VALUES.googleIds),
-	r2ObjectKeys: new Set(FIXTURE_SECRET_VALUES.r2ObjectKeys),
-	adminSessionIds: new Set(FIXTURE_SECRET_VALUES.adminSessionIds),
-	emails: new Set(FIXTURE_SECRET_VALUES.emails),
-};
+const secrets: EgressSecrets = fixtureSecrets();
 
 /** Rules that fired, deduped — the assertion surface every test reads. */
 function rulesFiredOn(rows: unknown): string[] {
@@ -206,11 +199,59 @@ describe("egress · key-shaped nets", () => {
 		// The cross-cutting net's whole reason for existing: `market.closed`
 		// has an empty strip rule, so a `key` arriving on it is covered by
 		// nothing per-type. This is the net that catches it.
+		//
+		// ⚠ A `u/` key — the namespace that embeds a user id. This test used
+		// an `m/` key and passed for the wrong reason until `@security-auditor`
+		// H-1 forced the namespace distinction.
 		const g = new EgressGuard(emptySecrets());
 		g.assertNoForbiddenPayloadKeys("events", [
-			{ event_type: "market.closed", payload: { key: "m/x/hero.webp" } },
+			{
+				event_type: "market.closed",
+				payload: { key: "u/0192f3a4-1111-7000-8000-00000000a001/x.webp" },
+			},
 		]);
 		expect(g.findings.map((f) => f.rule)).toContain("no-forbidden-payload-key");
+	});
+
+	it("PERMITS an m/<marketId>/ media key — §19.4.1 SHIPs it", () => {
+		// `market.created.payload.media[].key` is required on every market and
+		// §19.4.1 rules it SHIPs. Rejecting it hard-failed the build on the
+		// first real read, for a key the spec explicitly publishes.
+		const g = new EgressGuard(emptySecrets());
+		g.assertNoForbiddenPayloadKeys("events", [
+			{
+				event_type: "market.created",
+				payload: {
+					marketId: "0192f3a4-cccc-7000-8000-00000000m001",
+					media: [{ key: "m/0192f3a4-cccc-7000-8000-00000000m001/hero.webp" }],
+				},
+			},
+		]);
+		expect(g.findings).toHaveLength(0);
+	});
+
+	it("the REAL market.created row survives the full guard set", () => {
+		// The end-to-end version of the same claim, against the fixture's now
+		// production-shaped payload rather than a hand-built one.
+		const created = DIRTY_EVENT_ROWS.find(
+			(r) => r.event_type === "market.created",
+		);
+		expect(created?.payload).toHaveProperty("media");
+
+		// ⚠ Guarded on the STRIPPED row, which is what the pipeline actually
+		// writes. The raw fixture row carries dirty metadata by construction,
+		// so asserting cleanliness on it would be asserting that the fixture
+		// is clean — the opposite of what it is for.
+		expect(created).toBeDefined();
+		const [stripped] = stripTable("events", [created as SourceRow], {
+			removedCommentIds: new Set(),
+		});
+		const g = new EgressGuard(secrets);
+		g.assertNoForbiddenPayloadKeys("events", [stripped]);
+		expect(g.findings).toHaveLength(0);
+
+		// …and `media[].key` genuinely SURVIVED the strip, per §19.4.1.
+		expect(JSON.stringify(stripped)).toContain("hero.webp");
 	});
 
 	it("matches the key EXACTLY — `idempotency_key` is not `key`", () => {
@@ -305,7 +346,57 @@ describe("egress · rendered TEXT artifacts (the debate .md class)", () => {
 
 		const g = new EgressGuard(secrets);
 		g.assertNoBareUuidsInText("x.md", `posted by ${unknownId}`);
-		expect(g.findings.map((f) => f.rule)).toContain("no-bare-uuid-in-text");
+
+		// ⚠ ADVISORY, not a finding. Downgraded after `@security-auditor` H-4:
+		// a participant typing a UUID into an argument would otherwise abort
+		// that market's export on a one-shot release job, for content they
+		// were entitled to write. Every real `users.id` is still covered by
+		// the exact-value scan, which DOES halt.
+		expect(g.findings).toHaveLength(0);
+		expect(g.advisories.map((f) => f.rule)).toContain("bare-uuid-in-text");
+	});
+
+	it("a short display name cannot fire — needles below the floor are skipped", () => {
+		// `@security-auditor` H-4: one participant named "Li" made every
+		// debate export containing "Line 3" fail, with no attacker involved.
+		const shortName = { ...secrets, displayNames: new Set(["Li"]) };
+		const g = new EgressGuard(shortName);
+		g.assertNoDisplayNames("t", [{ body: "Line 3 opens in November" }]);
+
+		expect(g.findings).toHaveLength(0);
+		// …and the skip is REPORTED, never silent — a class that quietly
+		// stops covering anything is the failure this layer exists to stop.
+		expect(g.skippedNeedles.map((n) => n.rule)).toContain("no-display-name");
+	});
+
+	it("a secret inside participant-authored free text is REPORTED, not fatal", () => {
+		// The blocked_text collision: post B with a bad image → blocked and
+		// stored; re-post B without the image → passes → comments.body === B.
+		// Halting there hands any participant a kill switch on the release.
+		const g = new EgressGuard({
+			...secrets,
+			blockedTexts: new Set(["the rejected comment body, retained"]),
+		});
+		g.assertNoBlockedTexts("comments", [
+			{ body: "the rejected comment body, retained" },
+		]);
+
+		expect(g.findings).toHaveLength(0);
+		expect(g.advisories.map((f) => f.rule)).toContain("no-blocked-text");
+	});
+
+	it("the SAME value in a non-free-text column IS fatal", () => {
+		// The control that keeps the tiering honest. Free-text leniency must
+		// not become blanket leniency: a secret surfacing in a column the
+		// transform was supposed to clean is still a transform failure.
+		const g = new EgressGuard({
+			...secrets,
+			blockedTexts: new Set(["the rejected comment body, retained"]),
+		});
+		g.assertNoBlockedTexts("mod_actions", [
+			{ some_operational_column: "the rejected comment body, retained" },
+		]);
+		expect(g.findings.map((f) => f.rule)).toContain("no-blocked-text");
 	});
 });
 

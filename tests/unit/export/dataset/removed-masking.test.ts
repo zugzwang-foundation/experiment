@@ -156,7 +156,15 @@ describe("removed masking · THE WRONG ANSWER, constructed", () => {
 		// The mutation, written as a test rather than performed by hand: this
 		// is `stripTable` called exactly as the pipeline called it before the
 		// fix, and it demonstrates the leak rather than asserting it is gone.
-		const unmasked = stripTable("comments", DIRTY_TABLE_ROWS.comments);
+		// ⚠ An EMPTY set, passed EXPLICITLY. This argument used to be optional
+		// and defaulted to no masking, so this line could be written by
+		// accident anywhere and publish every removed body silently
+		// (`@security-auditor` M-9). It is now required — so demonstrating the
+		// leak takes a deliberate statement, which is exactly the difference
+		// between a guard and a default.
+		const unmasked = stripTable("comments", DIRTY_TABLE_ROWS.comments, {
+			removedCommentIds: new Set(),
+		});
 		expect(JSON.stringify(unmasked)).toContain("REMOVED-BODY-CANARY");
 
 		// …and with the set threaded through, it does not.

@@ -1,4 +1,4 @@
-import { EVENT_TYPES, type EventType } from "@/server/events/schemas";
+import { EVENT_TYPES, type EventType } from "@/server/events/event-types";
 
 import { EgressContractGapError } from "./errors";
 import { PAYLOAD_STRIP_KEYS } from "./forbidden-keys";

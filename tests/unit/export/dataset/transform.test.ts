@@ -24,6 +24,7 @@ import {
 	DIRTY_TABLE_ROWS,
 	FIXTURE_SECRET_VALUES,
 	FIXTURE_USER_IDS,
+	fixtureSecrets,
 	SYSTEM_SENTINEL,
 } from "../../../_fixtures/dataset/dirty-source";
 
@@ -37,29 +38,25 @@ import {
  * "it is gone" and "it was never there" are indistinguishable.
  */
 
-const secrets: EgressSecrets = {
-	userIds: new Set(Object.values(FIXTURE_USER_IDS)),
-	ips: new Set(FIXTURE_SECRET_VALUES.ips),
-	userAgents: new Set(FIXTURE_SECRET_VALUES.userAgents),
-	googleIds: new Set(FIXTURE_SECRET_VALUES.googleIds),
-	// ⚠ market_media's key SHIPS (B.16), so it is deliberately NOT a secret.
-	// Only the two `u/<userId>/…` keys are.
-	r2ObjectKeys: new Set(FIXTURE_SECRET_VALUES.r2ObjectKeys.slice(0, 2)),
-	adminSessionIds: new Set(FIXTURE_SECRET_VALUES.adminSessionIds),
-	emails: new Set(FIXTURE_SECRET_VALUES.emails),
-};
+const secrets: EgressSecrets = fixtureSecrets();
 
 const map = buildPseudonymMap(DIRTY_TABLE_ROWS.users);
 
 /** The full transform, in pipeline order: strip, then pseudonymize. */
 function transform(table: string, rows: readonly Record<string, unknown>[]) {
-	return pseudonymizeTable(table, stripTable(table, rows), map);
+	return pseudonymizeTable(
+		table,
+		stripTable(table, rows, { removedCommentIds: new Set() }),
+		map,
+	);
 }
 
 // ── Slice 4 · the five named strip guards ─────────────────────────────
 
 describe("Slice 4 · STRIP over events.payload — the five named guards", () => {
-	const stripped = stripTable("events", DIRTY_EVENT_ROWS);
+	const stripped = stripTable("events", DIRTY_EVENT_ROWS, {
+		removedCommentIds: new Set(),
+	});
 	const json = JSON.stringify(stripped);
 
 	const rowFor = (t: string) =>
@@ -187,7 +184,13 @@ describe("Slice 4 · strip semantics", () => {
 		// The rows are read once and fed to several passes; a mutating strip
 		// would make the result depend on pass ordering.
 		const before = JSON.stringify(DIRTY_EVENT_ROWS[0]);
-		stripRow("events", { ...DIRTY_EVENT_ROWS[0] });
+		stripRow(
+			"events",
+			{ ...DIRTY_EVENT_ROWS[0] },
+			{
+				removedCommentIds: new Set(),
+			},
+		);
 		expect(JSON.stringify(DIRTY_EVENT_ROWS[0])).toBe(before);
 	});
 
@@ -200,7 +203,9 @@ describe("Slice 4 · strip semantics", () => {
 	});
 
 	it("drops mod_actions.blocked_text and image_r2_key — §19.4 omits both", () => {
-		const [row] = stripTable("mod_actions", DIRTY_TABLE_ROWS.mod_actions);
+		const [row] = stripTable("mod_actions", DIRTY_TABLE_ROWS.mod_actions, {
+			removedCommentIds: new Set(),
+		});
 
 		// Control: the source carried both.
 		expect(DIRTY_TABLE_ROWS.mod_actions[0]).toHaveProperty("blocked_text");
@@ -211,7 +216,9 @@ describe("Slice 4 · strip semantics", () => {
 	});
 
 	it("drops the six users PII columns and KEEPS pfp_filename", () => {
-		const [amber] = stripTable("users", DIRTY_TABLE_ROWS.users);
+		const [amber] = stripTable("users", DIRTY_TABLE_ROWS.users, {
+			removedCommentIds: new Set(),
+		});
 
 		for (const c of [
 			"email",
@@ -233,8 +240,12 @@ describe("Slice 4 · strip semantics", () => {
 	});
 
 	it("keeps market_media.r2_object_key while dropping image_uploads'", () => {
-		const [mm] = stripTable("market_media", DIRTY_TABLE_ROWS.market_media);
-		const [iu] = stripTable("image_uploads", DIRTY_TABLE_ROWS.image_uploads);
+		const [mm] = stripTable("market_media", DIRTY_TABLE_ROWS.market_media, {
+			removedCommentIds: new Set(),
+		});
+		const [iu] = stripTable("image_uploads", DIRTY_TABLE_ROWS.image_uploads, {
+			removedCommentIds: new Set(),
+		});
 
 		expect(mm).toHaveProperty("r2_object_key");
 		expect(iu).not.toHaveProperty("r2_object_key");

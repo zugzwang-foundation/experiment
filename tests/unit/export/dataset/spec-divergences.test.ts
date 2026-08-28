@@ -87,7 +87,9 @@ describe("divergence 1 · user.tos_accepted payload.userId is STRIPPED", () => {
 	});
 
 	it("the stripped payload carries neither the KEY nor the VALUE", () => {
-		const stripped = stripTable("events", [sourceEvent("user.tos_accepted")]);
+		const stripped = stripTable("events", [sourceEvent("user.tos_accepted")], {
+			removedCommentIds: new Set(),
+		});
 		const payload = stripped[0]?.payload as Record<string, unknown>;
 
 		// The key, and — separately — the value, because a rename would defeat
@@ -136,7 +138,9 @@ describe("divergence 2 · the §19.4.1 payload rules apply to all THREE payload-
 	});
 
 	it("admin_events.payload loses sessionId and ip — key AND value", () => {
-		const [out] = stripTable("admin_events", DIRTY_TABLE_ROWS.admin_events);
+		const [out] = stripTable("admin_events", DIRTY_TABLE_ROWS.admin_events, {
+			removedCommentIds: new Set(),
+		});
 		const payload = out?.payload as Record<string, unknown>;
 
 		expect(payload).not.toHaveProperty("sessionId");
@@ -147,7 +151,9 @@ describe("divergence 2 · the §19.4.1 payload rules apply to all THREE payload-
 	});
 
 	it("user_events.payload loses ip while its research key survives", () => {
-		const [out] = stripTable("user_events", DIRTY_TABLE_ROWS.user_events);
+		const [out] = stripTable("user_events", DIRTY_TABLE_ROWS.user_events, {
+			removedCommentIds: new Set(),
+		});
 		const payload = out?.payload as Record<string, unknown>;
 
 		expect(payload).not.toHaveProperty("ip");
@@ -207,7 +213,9 @@ describe("strip + pseudonymize fail CLOSED on an unclassified table", () => {
 	};
 
 	it("stripRow THROWS rather than passing an unclassified table through", () => {
-		expect(() => stripRow("lots", lotsRow)).toThrow(EgressContractGapError);
+		expect(() =>
+			stripRow("lots", lotsRow, { removedCommentIds: new Set() }),
+		).toThrow(EgressContractGapError);
 	});
 
 	it("pseudonymizeRow THROWS on the same table", () => {
@@ -220,7 +228,7 @@ describe("strip + pseudonymize fail CLOSED on an unclassified table", () => {
 	it("the thrown message names the table and the missing authority", () => {
 		let message = "";
 		try {
-			stripRow("lots", lotsRow);
+			stripRow("lots", lotsRow, { removedCommentIds: new Set() });
 		} catch (e) {
 			message = (e as Error).message;
 		}
@@ -231,6 +239,8 @@ describe("strip + pseudonymize fail CLOSED on an unclassified table", () => {
 	it("POSITIVE CONTROL — a CLASSIFIED table with the same shape does not throw", () => {
 		// Proves the throw comes from the missing treatment block and not from
 		// the row's shape, which is otherwise indistinguishable.
-		expect(() => stripRow("positions", lotsRow)).not.toThrow();
+		expect(() =>
+			stripRow("positions", lotsRow, { removedCommentIds: new Set() }),
+		).not.toThrow();
 	});
 });

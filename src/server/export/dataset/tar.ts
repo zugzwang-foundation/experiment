@@ -47,7 +47,20 @@ const FIXED_MTIME = 0;
 
 function octal(value: number, width: number): string {
 	// ustar numeric fields are octal, NUL- or space-terminated.
-	return `${value.toString(8).padStart(width - 1, "0")}\0`;
+	const digits = value.toString(8);
+	if (digits.length > width - 1) {
+		// ⚠ Throws rather than clipping. `buf.write(s, off, width)` would
+		// silently drop the NUL terminator and corrupt the field, which for
+		// the size field means an archive that extracts as garbage. The
+		// 100-byte name limit one field over already throws loudly; this
+		// matches it rather than being the quiet one.
+		throw new Error(
+			`ustar numeric field overflow: ${value} needs ${digits.length} octal ` +
+				`digits, field holds ${width - 1}. (A single file at or above ` +
+				"8 GiB; ustar cannot represent it without a POSIX extension.)",
+		);
+	}
+	return `${digits.padStart(width - 1, "0")}\0`;
 }
 
 function header(name: string, size: number): Buffer {
@@ -94,9 +107,40 @@ function pad(size: number): Buffer {
 export function createTar(entries: readonly TarEntry[]): Buffer {
 	const parts: Buffer[] = [];
 
-	// Sorted by name, so the archive does not depend on the order tables
+	// ⚠ Duplicate names are REJECTED, not deduplicated or last-wins.
+	// `tar` will happily store two entries under one name; extraction yields
+	// the LATER one, silently. That is invisible to every other guard in this
+	// pipeline: the row-count gate runs before assembly, on the string that
+	// was never shipped, so the manifest would publish a count for a file the
+	// archive does not yield. `debateEntries` guards its own slugs; this is
+	// the place the two artifact classes actually meet, and it is where a
+	// `debates/x.md` colliding with a table CSV would have gone unnoticed.
+	const names = new Set<string>();
+	for (const entry of entries) {
+		if (names.has(entry.name)) {
+			throw new Error(
+				`duplicate tar entry name: ${entry.name}. Extraction would yield ` +
+					"only the later entry while the manifest describes the earlier — " +
+					"a mismatch no checksum reveals, because the archive is " +
+					"internally consistent and simply missing a file.",
+			);
+		}
+		names.add(entry.name);
+	}
+
+	// Sorted by name so the archive does not depend on the order tables
 	// happened to be exported in.
-	const sorted = [...entries].sort((a, b) => a.name.localeCompare(b.name));
+	//
+	// ⚠ Byte order, NOT `localeCompare`. This module pins uid, gid and mtime
+	// precisely to remove environment dependence, and `localeCompare` would
+	// have put the ambient ICU locale straight back in: measured, under
+	// `et-EE` "z" sorts before "t", and under `en-US` an uppercase name
+	// reorders against byte order. Today's names are all `[a-z0-9._/-]` so it
+	// agrees either way — which is exactly how it would have survived until
+	// the first artifact class that did not fit that set.
+	const sorted = [...entries].sort((a, b) =>
+		a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
+	);
 
 	for (const entry of sorted) {
 		const content = Buffer.from(entry.content, "utf8");
@@ -143,6 +187,30 @@ export function createTarGz(entries: readonly TarEntry[]): Buffer {
 		);
 	}
 	return gz;
+}
+
+/**
+ * ⚠ **The reproducibility guarantee stops at the tar layer, and saying so is
+ * the point.**
+ *
+ * `createTar` is a pure function of names and contents — every entropy-bearing
+ * header field is pinned, so the same input yields the same bytes on any
+ * machine, forever. The GZIP wrapper is not: the header's XFL and OS bytes are
+ * platform-derived (measured `0x13` here), and the deflate stream itself is
+ * not byte-stable across zlib versions, which have changed inside the Node
+ * majors this repo has run on.
+ *
+ * So `tarball_sha256` verifies *the bytes a reader downloaded*, which is what
+ * a checksum is for — but it is NOT a stable identifier for *the data*. §19.1
+ * contemplates a v2 rebuild against the same source state; rebuilt on another
+ * machine that would produce a different `tarball_sha256` for identical
+ * content, and someone would reasonably read the difference as data drift.
+ *
+ * This is the hash that does not move. Publishing both lets a reader answer
+ * "did I get the right bytes" and "is this the same dataset" separately.
+ */
+export function contentSha256(entries: readonly TarEntry[]): string {
+	return sha256(createTar(entries));
 }
 
 /** SHA-256 of a buffer, lowercase hex — the manifest's `tarball_sha256`. */

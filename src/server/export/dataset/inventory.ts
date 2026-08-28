@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { getTableName, is } from "drizzle-orm";
 import { PgTable } from "drizzle-orm/pg-core";
 
@@ -15,6 +18,16 @@ import { EgressContractGapError } from "@/server/export/egress/errors";
  * exclusion set:
  *
  *   · 16 SHIPPED · 5 NOT_SHIPPED · 1 UNDECIDED (`lots`) · 4 EXCLUDED entirely
+ *
+ * ⚠ **Only TWO of §19.3's four exclusions appear in the map below**, and that
+ * is a limitation rather than an omission. `watermark_state` and `cron_alarms`
+ * are created by raw SQL in `0007_pg_cron_jobs.sql` and are not drizzle tables
+ * at all — adding them here would make `compareInventory`'s `orphaned` check
+ * fire, because they are absent from the schema this map is compared against.
+ * The transcription cannot represent a §19.3 row that is not a `pgTable`, so
+ * the map holds `bet_receipts` and `bookmarks` and this note holds the other
+ * two. (Corrected after `@code-reviewer` M-11 — the docblock said four while
+ * the map declared two.)
  *
  * `lots` is the one that forces the shape. §19.3 row 22 refuses to place it,
  * in terms: ADR-0039 says *"whether lots are released alongside bets is a
@@ -215,11 +228,47 @@ export const TABLE_INVENTORY = {
 
 export type InventoriedTable = keyof typeof TABLE_INVENTORY;
 
-/** Every live `pgTable` name, read from the drizzle schema at runtime. */
+/**
+ * Every `pgTable("...")` name DECLARED anywhere under `src/db/schema/`, read
+ * from the source files rather than from the barrel.
+ *
+ * ⚠ **`liveTableNames()` alone is not sufficient, and `@code-reviewer` H-3
+ * measured why.** It enumerates `import * as schema from "@/db/schema"` — the
+ * BARREL. `drizzle.config.ts` sets `schema: "./src/db/schema"`, a DIRECTORY
+ * glob, so a new table declared in a new file that nobody adds to `index.ts`
+ * is generated into a migration and created in Postgres, while the inventory
+ * guard never sees it and passes. Measured: a probe table in a new file
+ * produced `0027_probe_shiny.sql` and `assertInventoryComplete()` returned
+ * clean.
+ *
+ * That defeats Slice 3's whole exit condition for an entire class of new
+ * table — and it fails in the *withholding* direction, silently omitting
+ * research data from the release.
+ *
+ * Scanned textually because the barrel is precisely what cannot be trusted
+ * here. Comments are stripped first: without that the scan matches the
+ * `pgTable(` written inside a docblock, which is the shape this project has
+ * recorded six times.
+ */
+export function declaredTableNames(schemaDir: string): readonly string[] {
+	const names: string[] = [];
+	for (const file of readdirSync(schemaDir)) {
+		if (!file.endsWith(".ts")) continue;
+		const src = readFileSync(join(schemaDir, file), "utf8")
+			.replace(/\/\*[\s\S]*?\*\//g, "")
+			.replace(/\/\/.*$/gm, "");
+		for (const m of src.matchAll(/pgTable\(\s*["'`]([a-zA-Z0-9_]+)["'`]/g)) {
+			if (m[1]) names.push(m[1]);
+		}
+	}
+	return names.sort();
+}
+
+/** Every live `pgTable` name, read from the drizzle schema barrel at runtime. */
 export function liveTableNames(): readonly string[] {
 	const names: string[] = [];
 	for (const value of Object.values(schema)) {
-		if (is(value as never, PgTable)) names.push(getTableName(value as never));
+		if (is(value, PgTable)) names.push(getTableName(value));
 	}
 	return names.sort();
 }
@@ -227,6 +276,12 @@ export function liveTableNames(): readonly string[] {
 export interface InventoryReport {
 	/** Live tables with no inventory entry. **The defect.** */
 	readonly unclassified: readonly string[];
+	/**
+	 * Tables declared under `src/db/schema/` but NOT exported from the
+	 * barrel — invisible to `liveTableNames()` yet created in Postgres by
+	 * drizzle-kit's directory glob (`@code-reviewer` H-3).
+	 */
+	readonly unexported: readonly string[];
 	/** Inventory entries naming a table that no longer exists. */
 	readonly orphaned: readonly string[];
 	readonly shipped: readonly string[];
@@ -247,6 +302,7 @@ export interface InventoryReport {
 export function compareInventory(
 	live: readonly string[],
 	inventory: Readonly<Record<string, InventoryEntry>>,
+	declared: readonly string[] = live,
 ): InventoryReport {
 	const known = new Set(Object.keys(inventory));
 	const liveSet = new Set(live);
@@ -256,7 +312,9 @@ export function compareInventory(
 			.map(([t]) => t)
 			.sort();
 
+	const liveNames = new Set(live);
 	return {
+		unexported: declared.filter((t) => !liveNames.has(t)).sort(),
 		unclassified: live.filter((t) => !known.has(t)).sort(),
 		orphaned: [...known].filter((t) => !liveSet.has(t)).sort(),
 		shipped: withStatus("SHIPPED"),
@@ -266,9 +324,18 @@ export function compareInventory(
 	};
 }
 
+/** The on-disk schema directory this repo's drizzle config globs. */
+export const SCHEMA_DIR = "src/db/schema";
+
 /** Compare the live schema against the §19.3 inventory. */
-export function verifyInventoryCoverage(): InventoryReport {
-	return compareInventory(liveTableNames(), TABLE_INVENTORY);
+export function verifyInventoryCoverage(
+	schemaDir: string = join(process.cwd(), SCHEMA_DIR),
+): InventoryReport {
+	return compareInventory(
+		liveTableNames(),
+		TABLE_INVENTORY,
+		declaredTableNames(schemaDir),
+	);
 }
 
 /**
@@ -291,6 +358,19 @@ export function assertInventoryComplete(): void {
 				`silently publishes an unreviewed table into a CC-BY-4.0 artifact ` +
 				`that cannot be withdrawn. Classify it in TABLE_INVENTORY and amend ` +
 				`SPEC.2 §19.3 + Appendix B in the same commit.`,
+		);
+	}
+
+	if (report.unexported.length > 0) {
+		throw new EgressContractGapError(
+			`schema tables: ${report.unexported.join(", ")}`,
+			`${report.unexported.length} table(s) are declared under ` +
+				`${SCHEMA_DIR}/ but not exported from its barrel. drizzle-kit ` +
+				"globs the DIRECTORY, so these are migrated into Postgres and " +
+				"exist — while every barrel-based check, including this " +
+				"inventory, is blind to them. The failure is silent and in the " +
+				"withholding direction: research data omitted from the release " +
+				"because nobody could see the table was there.",
 		);
 	}
 
