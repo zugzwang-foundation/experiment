@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -347,64 +347,62 @@ describe("debate height chain — CRIT-1's criterion disclosure", () => {
 		// guard is to write a correction that cannot name its subject. That is the
 		// substring-for-token defect this repo has now hit SIX times; the G-4 block
 		// in `criterion-disclosure.test.tsx` avoids it the same way.
-		for (const file of [HEADZONE, "src/components/debate/MarketHeader.tsx"]) {
+		// ⛔⛔ `VIEW` JOINED THIS LIST AT RESO-3 · CHANGE 6. It used to carry the
+		// POSITIVE control below — "it IS mounted, in the view that owns the
+		// container" — which was the right guard while the criterion was on the
+		// page. The founder has ruled it off the page again, so the same scan now
+		// asserts the same thing about all three files: no JSX site renders it.
+		for (const file of [
+			HEADZONE,
+			"src/components/debate/MarketHeader.tsx",
+			VIEW,
+		]) {
 			expect(read(file)).not.toMatch(/<CriterionDisclosure\b/);
 		}
-		// …and the positive control: it IS mounted, in the view that owns the
-		// container. Without this the negatives above pass on a component nobody
-		// renders at all.
-		expect(read(VIEW)).toContain("<CriterionDisclosure");
+		// ⛔ THE POSITIVE CONTROL IS NOW THE FILE'S CONTINUED EXISTENCE, and it is
+		// not decoration. With nothing rendering the component, every assertion
+		// above would pass just as well against a repo where the component had been
+		// DELETED — which is precisely the outcome CHANGE 6 rules against ("keep the
+		// component file, unrendered"). This is what makes the negatives mean
+		// "unrendered" rather than "gone".
+		expect(existsSync(join(ROOT, DISCLOSURE))).toBe(true);
+		expect(read(DISCLOSURE)).toMatch(/export function CriterionDisclosure\b/);
 	});
 
-	it("debate-height::the-disclosure-is-a-DIRECT-child-of-the-one-screen-container", () => {
+	it("debate-height::RESO-3-the-arena-does-not-pay-for-a-disclosure-it-no-longer-holds", () => {
+		// ⛔⛔ THIS REPLACES `the-disclosure-is-a-DIRECT-child-of-the-one-screen-
+		// container`, WHICH HAD NO SUBJECT LEFT. That test pinned the mount's DEPTH
+		// at three tabs, after a long fight to stop it being a false receipt — first
+		// an index window containing the whole ternary, then "after both arm
+		// headers", which a mount inside the market arm still satisfied. Depth was
+		// the class change that finally discriminated.
+		// ⇒ RESO-3 · CHANGE 6 removes the mount, so there is no depth to assert. The
+		// history above is kept because the NEXT person to mount something into this
+		// container will reach for a positional proxy, and this file is where they
+		// will look. The lesson outlived its assertion.
+		//
+		// ⚠ WHAT IS ASSERTED INSTEAD IS THE HEIGHT LEDGER, which is the reason this
+		// describe exists at all. `PageContainer` is a FIXED
+		// `h-[calc(100dvh-60px-2px)]` with `overflow-hidden`; the band is `shrink-0
+		// basis-[24.2dvh]` and the ARENA is the sole `flex-1`, so every direct child
+		// of the container is paid for by the arena and nothing else. The disclosure
+		// cost it 46.50px closed at 1440×777 (CRIT-1's own measurement, §3 of its
+		// log). With the mount gone the arena gets that back — measured in the
+		// browser and reported in the RESO-3 run notes, since jsdom resolves no
+		// `calc()`, no `dvh` and no flex.
+		// ⇒ What is checkable HERE is the structural precondition for that refund:
+		// the container's children are the band, the arena and the overlays, and the
+		// disclosure is not among them.
 		const source = read(VIEW);
-		// It must sit AFTER the market↔post ternary closes and BEFORE the overlays,
-		// which is what makes it a sibling of the arena rather than a child of
-		// either arm — and what makes one authoring site serve both arms.
-		// ⛔⛔ THE ANCHORS ARE THE TWO ARM HEADERS, NOT THE CONTAINER. This asserted
-		// `mount > indexOf("<PageContainer") && mount < indexOf("<PostPopup")` — a
-		// window that CONTAINS THE WHOLE TERNARY. Measured offsets in this file:
-		// PageContainer 21177 · ternary 23272 · PostFocusHeader 23566 ·
-		// MarketHeader 28029 · CriterionDisclosure 31462 · PostPopup 31523. Moving
-		// the mount inside the market arm — which drops the criterion from post
-		// focus, the ONE failure this placement exists to prevent — kept it green.
-		// It was a false receipt for the task's central decision (@code-reviewer).
-		// ⇒ Being after BOTH arm headers is what "after the ternary" actually means.
-		const mount = source.indexOf("<CriterionDisclosure");
-		const popup = source.indexOf("<PostPopup");
-		const marketArm = source.indexOf("<MarketHeader");
-		const postArm = source.indexOf("<PostFocusHeader");
-		for (const i of [mount, popup, marketArm, postArm]) {
-			expect(i).toBeGreaterThan(-1);
-		}
-		expect(mount).toBeGreaterThan(marketArm);
-		expect(mount).toBeGreaterThan(postArm);
-		expect(mount).toBeLessThan(popup);
-
-		// ⛔⛔ AND THE ORDERING ABOVE IS STILL NOT SUFFICIENT ON ITS OWN — measured.
-		// Re-running the un-fix (mount moved INSIDE the market arm) after tightening
-		// the window, the ordering assertions STILL PASSED: the market arm's JSX
-		// lives later in the file than BOTH arm headers, so "after both headers" is
-		// satisfied by a mount inside the second arm. Only the render test caught
-		// it. Recorded rather than quietly re-tightened, because the first fix for a
-		// false receipt was itself a weaker receipt.
-		// ⇒ WHAT DISCRIMINATES BETTER IS DEPTH, NOT ORDER. A direct child of
-		// `PageContainer` sits at THREE tabs; anything inside an arm fragment sits at
-		// five. Depth can express CONTAINMENT, which an index interval cannot, so it
-		// is a real class change rather than the same proxy in a costume.
-		// ⛔⛔ BUT IT IS STILL NOT THE RECEIPT FOR THE PLACEMENT DECISION, and an
-		// earlier version of this comment overclaimed that it was. Depth sees the
-		// JSX tree; it cannot see PROPS. This keeps it green while deleting the
-		// criterion from post focus:
-		//     <CriterionDisclosure description={selectedPost ? null : market.description} />
-		// — mounted at depth 3, ordering satisfied, and the component's own
-		// `if (!description) return null` makes it silent (@test-writer).
-		// ⇒ THE RECEIPT IS `criterion::both-arms-POST-FOCUS-arm-shows-the-full-
-		// criterion-too`, which mounts the real view and would red on exactly that.
-		// What lives here is a supporting structural check, and it is labelled as
-		// one.
-		const mountLine = source.slice(0, mount).split("\n").pop() ?? "";
-		expect(mountLine).toBe("\t\t\t");
+		expect(source).not.toMatch(/<CriterionDisclosure\b/);
+		// …and the arena is still the only thing allowed to absorb the difference.
+		// If a second `flex-1` ever appears among the container's children, the
+		// refund silently goes somewhere else and this describe's premise is void.
+		const containerChildren = [...source.matchAll(/^\t\t\t<(\w+)/gm)].map(
+			(m) => m[1],
+		);
+		expect(containerChildren.length).toBeGreaterThan(0); // the scan found something
+		expect(containerChildren).not.toContain("CriterionDisclosure");
 	});
 
 	it("debate-height::the-disclosure-does-not-grow-and-bounds-its-own-open-body", () => {

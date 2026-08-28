@@ -49,7 +49,7 @@ const MARKET: DebateMarketHeader = {
 	},
 };
 
-const KEYS = ["resolution", "resolver", "closes", "context"] as const;
+const KEYS = ["resolution", "resolver", "closes", "flavour"] as const;
 
 describe("RESO-1 — R-7, four blocks from one fixture", () => {
 	it("resolver-cards::G-3-renders-EXACTLY-four-blocks", () => {
@@ -64,8 +64,12 @@ describe("RESO-1 — R-7, four blocks from one fixture", () => {
 		expect(
 			container.querySelectorAll('[data-testid^="resolution-block-"]'),
 		).toHaveLength(
-			// four blocks + four glyphs + four labels + four value rows
-			16,
+			// ⚠ 16 → 20 AT RESO-3 · CHANGE 7, which added a SECOND value line to each
+			// block: four blocks + four glyphs + four labels + four value rows + four
+			// sub-value rows. The number is deliberately exact rather than a floor —
+			// a fifth element per block would be a different composition, and a
+			// `toBeGreaterThan` here would notice neither an addition nor a loss.
+			20,
 		);
 		for (const k of KEYS) {
 			expect(
@@ -168,7 +172,16 @@ describe("RESO-1 — R-7, four blocks from one fixture", () => {
 			container
 				.querySelector('[data-testid="resolver-cards"]')
 				?.getAttribute("class") ?? "";
-		expect(cls).toContain("min-h-[97px]");
+		// ⚠ THE NUMBER MOVED AT RESO-2 AND THE GUARD CAUGHT IT, which is the guard
+		// working. It pinned `min-h-[97px]`, derived from a block whose intrinsic
+		// content was padding 18 + square 44 + gap 8 + text group 26.25 = 96.25px.
+		// CHANGE 4 takes the square to 30px and the padding to 8px, so intrinsic is
+		// now 16 + label 14.25 + gap 6 + square 30 + gap 6 + value 11 = **83.25px**
+		// → floor 84. The floor is re-derived, never relaxed.
+		expect(cls).toContain("min-h-[84px]");
+		// ⛔ AND IT IS STILL A REAL FLOOR, not just some `min-h-*`. A guard that
+		// accepted any value would have passed the `min-h-0` this test exists for.
+		expect(cls).toMatch(/min-h-\[\d+px\]/);
 		// ⛔ And NOT the shape that disabled the backstop. `toContain` alone would
 		// pass on `min-h-0 min-h-[97px]`, where the cascade decides which wins.
 		expect(cls.split(/\s+/)).not.toContain("min-h-0");
@@ -227,14 +240,37 @@ describe("RESO-1 — R-7, four blocks from one fixture", () => {
 			for (const t of gc.split(/\s+/)) {
 				expect(t).not.toMatch(/^(h-|size-|min-h-|max-h-)/);
 			}
-			// Exactly one width declaration, so the square's one free length is
-			// unambiguous.
-			expect(gc.split(/\s+/).filter((t) => /^w-/.test(t))).toHaveLength(1);
+			// ⛔⛔ AND NO WIDTH EITHER, WHICH IS A REVERSAL OF THIS ASSERTION.
+			// It read "exactly one width declaration, so the square's one free length
+			// is unambiguous" and required `toHaveLength(1)` — correct while the
+			// square carried `w-[30px]` and derived its HEIGHT from the ratio.
+			// RESO-3 · CHANGE 7 inverts which length is free: the square now takes the
+			// block's inner height via `self-stretch` and derives its WIDTH from
+			// `aspect-square`. So a `w-*` token would be the over-determination this
+			// guard exists to catch, and requiring one would mandate the defect.
+			// ⇒ ZERO free lengths declared here; both come from the row.
+			for (const t of gc.split(/\s+/)) {
+				expect(t).not.toMatch(/^(w-|min-w-|max-w-)/);
+			}
+			// …and the two mechanisms that replace them, asserted by name. Without
+			// `self-stretch` the square inherits the row's `items-center` and collapses
+			// to its content height, which is ZERO for an empty span — a 0×0 square
+			// that jsdom cannot see and that `aspect-square` alone would not prevent.
+			expect(gc).toContain("self-stretch");
 
-			// The value row is EMPTY and unannounced — an empty announced row is
-			// noise while the label beside it already names the slot.
-			expect(value?.textContent).toBe("");
-			expect(value?.getAttribute("aria-hidden")).toBe("true");
+			// ⛔ BOTH value rows are EMPTY and unannounced — an empty announced row is
+			// noise while the label beside it already names the slot. The SUB-value row
+			// is RESO-3 · CHANGE 7's addition and is held to the same two properties,
+			// because a placeholder that acquires text is no longer a placeholder and
+			// nothing else in this file would notice.
+			const subvalue = container.querySelector(
+				`[data-testid="resolution-block-subvalue-${k}"]`,
+			);
+			expect(subvalue).not.toBeNull();
+			for (const row of [value, subvalue]) {
+				expect(row?.textContent).toBe("");
+				expect(row?.getAttribute("aria-hidden")).toBe("true");
+			}
 			expect(glyph?.getAttribute("aria-hidden")).toBe("true");
 		}
 	});
@@ -254,8 +290,8 @@ describe("RESO-1 — R-7, four blocks from one fixture", () => {
 		for (const [k, label] of [
 			["resolution", "Resolution"],
 			["resolver", "Resolver"],
-			["closes", "Closes"],
-			["context", "Context"],
+			["closes", "Closes on"],
+			["flavour", "Flavour"],
 		] as const) {
 			expect(
 				container.querySelector(`[data-testid="resolution-block-label-${k}"]`)
