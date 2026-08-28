@@ -21,7 +21,10 @@ import {
 import { logRequest } from "@/server/middleware/logging";
 import { checkOrigin } from "@/server/middleware/origin-allowlist";
 import { checkRateLimit, ipIdentifier } from "@/server/middleware/rate-limit";
-import { safeCaptureException } from "@/server/observability/safe-capture";
+import {
+	safeCaptureException,
+	safeCaptureMessage,
+} from "@/server/observability/safe-capture";
 import { PositionOversellError } from "@/server/positions/errors";
 import { isFrozen } from "@/server/system/is-frozen";
 import { toWireError } from "./errors";
@@ -238,15 +241,67 @@ export async function runBetEndpoint(
 	}
 
 	// 3. Idempotency cache lookup — MUST precede rate-limit (§3.1 ordering).
+	// User-scoped since ADR-0044 (S-7 G2) — a client can no longer address
+	// another user's cache slot.
 	const fingerprint = await computeBodyFingerprint(rawBody);
-	const idem = await idempotencyLookupOrReserve(idempotencyKey, fingerprint);
+	const idem = await idempotencyLookupOrReserve(
+		userId,
+		idempotencyKey,
+		fingerprint,
+	);
 	switch (idem.kind) {
-		case "hit":
+		case "hit": {
+			// DC-a, reinstated (ADR-0044 security-audit MEDIUM finding). The
+			// original R-D enumeration proved no *single request's* error paths
+			// can coexist with that same request's commit — true, but it does not
+			// cover the CROSS-REQUEST case: an earlier request commits and writes
+			// a receipt, Redis later loses that entry, a subsequent request under
+			// the same key gets a "miss", its own step-3.5 durable pre-check is
+			// ITSELF blind at that exact moment (`unavailable`, degrading to
+			// normal execution as designed), and that request terminates in a
+			// cached pre-tx non-2xx (429 / a moderation block) — leaving a cached
+			// error sitting beside an unrelated-but-real receipt under the same
+			// key. Before trusting a cached NON-2xx, check whether the ledger
+			// disagrees; a 2xx never needs this — if THIS request is what's being
+			// replayed, there is nothing else to consult.
+			//
+			// `!== 200`, not `>= 300` (code-review MEDIUM): `cachedResponse` comes
+			// off a bare `JSON.parse` at a trust boundary (cache.ts), so `status`
+			// is unvalidated. A malformed/missing value must fail toward CHECKING
+			// the receipt, not skipping the check — `undefined >= 300` is false
+			// (skips, the unsafe direction); `undefined !== 200` is true (checks,
+			// the safe one). Behaviorally identical on every status this codebase
+			// actually caches ({200,400,403,404,409,429} — enumerated, not
+			// assumed; see ADR-0044).
+			if (idem.cachedResponse.status !== 200) {
+				const replay = await loadDurableReplay(db, {
+					userId,
+					idempotencyKey,
+					bodyFingerprint: fingerprint,
+				});
+				if (replay?.kind === "replay") {
+					// This event means the two-failure state ADR-0044 calls "narrow,
+					// not attacker-inducible" actually occurred — Redis lost a
+					// completed entry AND a later pre-check was blind — and a stale
+					// rejection was about to mask a committed bet. Same "no silent
+					// backstop trips" rule as the cross-user collision alarm below
+					// (ADR-0044 HIGH-2 / CLAUDE.md O-3): this is the more significant
+					// of the two events (a masked commit was just prevented) and must
+					// not be the quiet one.
+					safeCaptureMessage("durable_idempotency_dc_a_recovered_stale_cache", {
+						level: "warning",
+						tags: { kind: "durable_idempotency_dc_a_recovered" },
+					});
+					const body = { ok: true, data: replay.result };
+					return jsonResponse(requestId, 200, body);
+				}
+			}
 			return jsonResponse(
 				requestId,
 				idem.cachedResponse.status,
 				idem.cachedResponse.body,
 			);
+		}
 		case "mismatch":
 			return jsonResponse(
 				requestId,
@@ -299,18 +354,24 @@ export async function runBetEndpoint(
 		// bet that already landed). Fail-OPEN inside loadDurableReplay: correctness
 		// is backstopped by the tx-level unique 23505 catch in the routes.
 		const replay = await loadDurableReplay(db, {
+			userId,
 			idempotencyKey,
 			bodyFingerprint: fingerprint,
 		});
-		if (replay !== null) {
-			if (replay.kind === "replay") {
-				// Receipt + fingerprint match → replay the ORIGINAL committed 200. Set
-				// `completed` so the finally PROMOTES the sentinel → Redis fast path
-				// repopulated.
-				const body = { ok: true, data: replay.result };
-				completed = { status: 200, body, bodyFingerprint: fingerprint };
-				return jsonResponse(requestId, 200, body);
-			}
+		// ADR-0044 HIGH-1: only `replay` and `mismatch` short-circuit here.
+		// `unavailable` (the SELECT itself threw, fail-OPEN) and `null` (this
+		// user genuinely has no receipt for this key yet) both fall through to
+		// normal execution — a pre-check outage must degrade to a real attempt,
+		// never to an early refusal.
+		if (replay?.kind === "replay") {
+			// Receipt + fingerprint match → replay the ORIGINAL committed 200. Set
+			// `completed` so the finally PROMOTES the sentinel → Redis fast path
+			// repopulated.
+			const body = { ok: true, data: replay.result };
+			completed = { status: 200, body, bodyFingerprint: fingerprint };
+			return jsonResponse(requestId, 200, body);
+		}
+		if (replay?.kind === "mismatch") {
 			// Receipt + fingerprint MISMATCH → 409, NEVER cached (caching under the
 			// key would poison the original body's rightful replay). `completed` stays
 			// null → the finally deletes the sentinel.

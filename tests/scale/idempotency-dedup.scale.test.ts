@@ -31,6 +31,23 @@ import { collide } from "./_harness/collide";
 // idempotencyKey: exactly one commits; the rest abort on the unique-violation
 // (23505) / SSI conflict. The hard exit gate must NOT depend on local Upstash.
 //
+// ⚠ S-7 (G2) — THE USER AXIS, AND WHY IT IS NOT ASSUMED AWAY HERE. Until S-7
+// this file drove every storm from ONE shared `userId`, which quietly encoded
+// "the identity of the submitter is irrelevant to dedup" as if it were settled.
+// It is only half settled, and the two halves now differ:
+//   · STORAGE (what this file asserts) is user-AGNOSTIC and stays so — the two
+//     uniques are on the key alone, S-7 fence 5.1 leaves them untouched, and the
+//     per-user-composite alternative (Design A) is ADR-0044's testnet successor.
+//     The second storm below pins that directly, so the property is asserted
+//     rather than inherited from a single-user setup.
+//   · THE REDIS CACHE + THE DURABLE REPLAY READ are user-SCOPED after G2, because
+//     an unscoped read answers one participant out of another's slot. That is a
+//     correctness property of the endpoint, not of a contention storm, and it is
+//     tested in the DEFAULT tree — `vitest.config.ts` excludes `tests/scale/**`
+//     from `vitest run`, `test:invariants` and `test:integration`, so a G2
+//     regression parked here would be invisible to every gate a PR actually runs.
+//     Its home is tests/integration/cross-user-idempotency.integration.test.ts.
+//
 // Q-3 OPTIONAL: the endpoint Redis SETNX path (the full `runBetEndpoint` stack)
 // is asserted ONLY when a test Upstash is configured (env probe); otherwise
 // `it.skip` + a logged note. The skip never fails the gate.
@@ -127,6 +144,41 @@ describe("scale — idempotency dedup (axis 7, Q-3)", () => {
 				[idempotencyKey],
 			),
 		).rejects.toThrow();
+	});
+
+	it("idempotency-dedup::exactly-one-spine-per-key-across-distinct-users", async () => {
+		// S-7 — the same storm, split across TWO identities. The storage backstop is
+		// on `idempotency_key` alone, so whose submit it was makes no difference:
+		// still exactly ONE committed spine, and every loser surfaces a documented
+		// terminal error. Asserting this here is what lets G2 scope the CACHE per
+		// user without anyone reading that as licence to scope the INDEX too — the
+		// index is what refuses the second participant's commit once the cache stops
+		// (wrongly) answering them out of the first participant's slot.
+		const marketId = await seedOpenMarketWithPool("synthetic-market-idem-2");
+		const userA = await seedUser("idem-user-a", "1000");
+		const userB = await seedUser("idem-user-b", "1000");
+		const idempotencyKey = uuidv7();
+		const degree = 16;
+		const factories = Array.from({ length: degree }, (_, i) =>
+			identicalPlaceTask({
+				userId: i % 2 === 0 ? userA : userB,
+				marketId,
+				idempotencyKey,
+			}),
+		);
+
+		const results = await collide(factories, { degree });
+
+		expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+		assertDocumentedRejections(results);
+
+		const betRows = await testDb
+			.select({ id: bets.id, userId: bets.userId })
+			.from(bets)
+			.where(eq(bets.idempotencyKey, idempotencyKey));
+		expect(betRows).toHaveLength(1);
+		// The one survivor belongs to exactly one of the two — never a merge of both.
+		expect([userA, userB]).toContain(betRows[0]?.userId);
 	});
 
 	// ── OPTIONAL: endpoint Redis SETNX path (Q-3) ───────────────────────────
