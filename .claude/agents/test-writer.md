@@ -60,7 +60,7 @@ For invariant tests:
 
 ### Fixtures
 
-Use the existing fixture patterns in the `_fixtures/` directory **nearest your subject** — `tests/db/_fixtures/`, `tests/db/identity-pool/_fixtures/`, `tests/scale/_fixtures/`, `tests/server/moderation/_fixtures/`, `tests/unit/debate-export/_fixtures/`. ⚠ **Do not create `tests/_fixtures/`.** This line named a shared top-level fixture directory that has never existed; a subagent told to use one would have minted it. Don't invent new fixture machinery unless the plan explicitly calls for it. If fixtures are insufficient for the test scenario, surface this back to the invoking session — don't expand fixture scope yourself.
+Use the existing fixture patterns in the `_fixtures/` directory **nearest your subject** — `tests/db/_fixtures/`, `tests/db/identity-pool/_fixtures/`, `tests/scale/_fixtures/`, `tests/server/moderation/_fixtures/`, `tests/unit/debate-export/_fixtures/`. ⚠ **Do not create `tests/_fixtures/`.** This line named a shared top-level fixture directory that **does not exist on `main` or at HEAD**; a subagent told to use one would have minted it. *(Scoped deliberately: an in-flight branch does add a `tests/_fixtures/dataset/` path, so "never existed" would be false — if that branch lands, re-read this line rather than trusting it.)* Don't invent new fixture machinery unless the plan explicitly calls for it. If fixtures are insufficient for the test scenario, surface this back to the invoking session — don't expand fixture scope yourself.
 
 ### Concurrency tests
 
