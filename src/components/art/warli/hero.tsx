@@ -340,9 +340,20 @@ export function WarliHero({
 			<title>{label}</title>
 			{/* A `<style>` tag is exactly where someone reaches for
 			    `dangerouslySetInnerHTML`, because the safe form is not obviously
-			    available. It is: a plain text child works, React escapes it, and
-			    `CSS` is a module-level constant with no interpolation, so no value
-			    from anywhere else can reach a stylesheet. */}
+			    available. It is: a plain text child works.
+
+			    ⚠ BUT NOT FOR THE REASON THIS COMMENT USED TO GIVE. It said "React
+			    escapes it", which is FALSE for `<style>` and was measured so.
+			    React's style handling is a targeted escape of the literal token
+			    `</style` (`escapeStyleTextContent` rewrites it to a CSS identifier
+			    escape) — it blocks the parser breakout and NOTHING else. Braces,
+			    `@import` and `url(…)` all pass through verbatim. Interpolating a
+			    non-constant here would be arbitrary CSS injection, and this is the
+			    line someone would read before deciding it was safe to.
+
+			    What actually holds: `WARLI_CSS` is a module-level `const` whose
+			    only interpolation is `${TURN_SECONDS}`, itself a numeric literal.
+			    The safety is the CONSTANT INPUT, not the sink. */}
 			<style>{WARLI_CSS}</style>
 
 			<g transform={`translate(${VIEW_WIDTH / 2} ${VIEW_HEIGHT / 2})`}>

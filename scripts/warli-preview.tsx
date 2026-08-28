@@ -66,6 +66,31 @@ if (out === undefined) {
 const art = renderToStaticMarkup(<WarliHero />);
 
 /**
+ * Escape a value on its way into raw HTML.
+ *
+ * ⚠ ONE VALUE IN THIS FILE IS NOT CONSTRAINED BY THE TYPE SYSTEM. Everything
+ * else interpolated into the document below is a number, a closed union, or
+ * React's own escaped output. `spec.label` is typed plain `string`, so the only
+ * thing keeping it inert is that all sixteen call sites happen to pass literals.
+ * That is a fact about today's data, not a property of the code, and this is a
+ * raw-concatenation sink outside React — so it gets escaped rather than trusted.
+ * Cheaper than narrowing the type, and it stays correct if the labels ever come
+ * from somewhere else.
+ */
+const esc = (value: string): string =>
+	value.replace(
+		/[&<>"']/g,
+		(ch) =>
+			({
+				"&": "&amp;",
+				"<": "&lt;",
+				">": "&gt;",
+				'"': "&quot;",
+				"'": "&#39;",
+			})[ch] ?? ch,
+	);
+
+/**
  * The plate: all sixteen drawn large, in their pairs.
  *
  * At hero scale a figure is 58 units tall and a held object is twelve, so the
@@ -90,7 +115,7 @@ const plate = [...INNER_FIGURES.keys()]
 				<svg viewBox="-26 -64 60 70" aria-hidden="true">${renderToStaticMarkup(
 					<Figure spec={spec} density={density} />,
 				)}</svg>
-				<figcaption>${spec.label}<small>${density}${spec.prop === "none" ? " · pose" : ` · ${spec.prop}`}</small></figcaption>
+				<figcaption>${esc(spec.label)}<small>${density}${spec.prop === "none" ? " · pose" : ` · ${esc(spec.prop)}`}</small></figcaption>
 			</figure>`;
 		return `<div class="plate-pair">${cell(inner, "dense")}${cell(outer, "spare")}</div>`;
 	})

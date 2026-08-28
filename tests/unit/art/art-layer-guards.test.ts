@@ -126,6 +126,50 @@ describe("art layer — the side poles are not decoration", () => {
 	});
 });
 
+describe("art layer — the injection sinks stay shut", () => {
+	// ⚠ MINTED BY THE SECURITY AUDIT, which found the layer clean on every one of
+	// these and then said the property was held by NOBODY. It was true by habit.
+	//
+	// `<foreignObject>` is the one to care about: it re-enters HTML parsing inside
+	// an SVG, and it is exactly what a contributor reaches for the first time they
+	// want real text in this drawing. The others are the standard SVG-XSS set.
+	const SINKS = [
+		"dangerouslySetInnerHTML",
+		"innerHTML",
+		"insertAdjacentHTML",
+		"document.write",
+		"<foreignObject",
+		"<script",
+		"<use",
+		"<image",
+		"xlink:href",
+		"srcDoc",
+	];
+
+	it("the sink patterns match their own sink (positive control)", () => {
+		const sample =
+			'<foreignObject><div dangerouslySetInnerHTML={{__html: x}}/></foreignObject><script src="x"/><use xlink:href="#y"/>';
+		for (const sink of [
+			"dangerouslySetInnerHTML",
+			"<foreignObject",
+			"<script",
+			"<use",
+			"xlink:href",
+		]) {
+			expect(sample).toContain(sink);
+		}
+	});
+
+	it("opens none of them anywhere under src/components/art", () => {
+		const offenders = artCode.flatMap((f) =>
+			SINKS.filter((sink) => f.code.includes(sink)).map(
+				(sink) => `${f.file} → ${sink}`,
+			),
+		);
+		expect(offenders).toEqual([]);
+	});
+});
+
 describe("art layer — it is sealed, and it is unmounted", () => {
 	it("imports nothing from outside its own directory (bar react)", () => {
 		// ⚠ THIS WAS A DENYLIST AND IT LEAKED. It matched `@/…` and `../../…` and
