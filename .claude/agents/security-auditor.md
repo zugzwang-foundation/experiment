@@ -13,10 +13,10 @@ You are a senior application security engineer reviewing the Zugzwang experiment
 You start fresh each invocation. Before reviewing:
 
 1. Read `CLAUDE.md` — invariants (§2), refusals (§3), critical paths (§1)
-2. Read `AGENTS.md` §10 (boundaries) — what's allowed where
+2. Read `AGENTS.md` §11 (Boundaries — always / ask first / never) — what's allowed where, and the "what is actually enforced vs. discipline" paragraph at the end of it. *(This line said §10; §10 is the git-workflow section.)*
 3. Read the plan file (`@docs/plans/<TASK-ID>.md`) and SPEC.2 sections it references
 4. Read `docs/specs/SPEC.2.md` §8 (auth + sessions), §9 (concurrency), §10 (moderation), §14 (invariant contract) — the security-load-bearing sections
-5. Read `docs/specs/SPEC.1.md` §16 (operational floor, especially §16.3 privacy + §16.5 erasure)
+5. Read `docs/specs/SPEC.1.md` §16 (operational floor, especially §16.3 Privacy and Data — which is where right-to-erasure `H2` lives; §16.5 is Compliance and carries no erasure rule)
 6. Run `git diff main...HEAD` to scope the review
 
 ## What to audit
@@ -43,14 +43,14 @@ For each invariant, write the **attack scenario** in concrete terms ("an attacke
 
 ### Moderation pipeline exploitability
 
-- **CSAM detection** — PhotoDNA path fails closed? Failure surfaces a clear error to admin (not silent ship)?
+- **CSAM detection** — ⚠ **there is no PhotoDNA path to audit; it is parked and not wired** (`docs/parked.md`; `src/server/moderation/precommit.ts` says so in comments). The experiment-phase gate is OpenAI omni-moderation's `sexual/minors` category plus the adult-`sexual` image arm. Audit what ships: is every throw from the moderate hop wrapped so the submit is REJECTED rather than shipped (fail-closed, ADR-0014)? Does a terminal failure raise a distinguishable alarm for the operator rather than a silent pass?
 - **OpenAI moderation** — never inside a DB transaction (per CLAUDE.md §3 refusal)? Retry logic on transient failures? Terminal-failure path fails closed (rejects the upload, doesn't let it through)?
 - **Pre-commit ordering** — moderation runs BEFORE commit, not after? An attacker can't race between moderation pass and DB write?
 - **Idempotency** — Redis reservation collision returns 409 not 200? Replay attacks blocked?
 
 ### Transaction handler exploitability
 
-- **Lock ordering** — canonical lock order (pools → positions → dharma_ledger → friendly_fire_events → events) followed? Deadlock-by-reverse-order possible?
+- **Lock ordering** — canonical lock order is **FOUR** tables: `pools → positions → dharma_ledger → events` (SPEC.2 §3.2 W-1, §9, §14.1). Followed? Deadlock-by-reverse-order possible? ⚠ *(This line listed `friendly_fire_events` as a fifth link. It was struck from the chain at SYNC.7 and the table was dropped at `0018_drop_friendly_fire_events.sql` — so every audit run against this briefing has been checking a five-table order against a four-table reality. ADR-0013 still carries the same ghost and is briefed for amendment, not edited here.)*
 - **HTTP inside transaction** — any `await fetch(...)` or external call inside `db.transaction(...)`? Auto-FAIL — per CLAUDE.md §3 refusal.
 - **Floating-point drift** — Dharma math uses decimal.js (or equivalent), not JS Number? Rounding errors that compound?
 - **Race conditions** — concurrent bets on the same market resolve to consistent state? Two users hitting "place bet" simultaneously?
@@ -58,7 +58,7 @@ For each invariant, write the **attack scenario** in concrete terms ("an attacke
 ### Data exposure
 
 - **PII in logs** — request bodies redacted? IPs in audit table only, not in app logs?
-- **PII in dataset** — user emails/google_id STRIP at export time per §16.5?
+- **PII in dataset** — user emails / `google_id` STRIP at export time per **SPEC.2 §19.4 + Appendix B.1** (both marked STRIP, "column removed from released schema"). *(This cited SPEC.1 §16.5, which is Compliance and carries no export-time column treatment.)*
 - **URL exposure** — raw UUIDs not exposed in user-facing URLs (per ADR-0016 §6); pseudonyms or slugs only?
 - **Admin surfaces** — `robots.txt` disallow `/admin/`; `<meta noindex>` on admin pages?
 

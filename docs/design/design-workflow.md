@@ -8,7 +8,7 @@
 >
 > **What this is NOT.** It is not the design *language* — that is `design-language.md` (the what: tokens, primitives, constraints). It is not the *handoff* contract — that is `design-handoff.md` (how a finished surface is delivered to Claude Code). It is not the *sequence* — that is the planner (which surface, in what order, with the paste-ready kickoff). This doc is referenced *by* the planner for the loop, and runs *alongside* the handoff doc as the produce-side of the same pipeline.
 >
-> **Grounding.** Procedures and gotchas are distilled from the Claude Design research in PK — primary: `Research_Report_v2.md` (high-fidelity operation); `Research_Report.md` (v1) remains background where v2 is silent, but is wireframe-framed — do not take fidelity-mode advice from it. Where a number is time-sensitive (usage metering), verify in the live dashboard before relying on it.
+> **Grounding.** Procedures and gotchas are distilled from the Claude Design research — primary: `Research_Report_v2.md` (high-fidelity operation), **committed in this repo at `docs/design/Research_Report_v2.md`** and listed among the living guides by `design-canon.md`; only `Research_Report.md` (v1) is PK-held. v1 remains background where v2 is silent, but is wireframe-framed — do not take fidelity-mode advice from it. Where a number is time-sensitive (usage metering), verify in the live dashboard before relying on it.
 >
 > **Realignment (2026-07-03).** The branding phase is defined by `ZUGZWANG-CD_branding-handoff-decision-record_v1_0.md` (CANON): brand the **existing published system** in CD (not a second system), land the **values** in the repo tokens, and have **CC build each surface from its locked mockup + branded tokens** (no separate CD production build). This updates §7 (seeding now historical; §7.4 branding path). Operating guide: `ZUGZWANG-CD_design-system-editing-manual_v1_0.md` (**held in project knowledge, not in this repo** — see `docs/parked.md` N1).
 
@@ -39,7 +39,7 @@ The same relay discipline as the core build, with Claude Design taking Claude Co
 > **State (2026-06-17).** **Phase L is COMPLETE for the four core surfaces** — Discovery · Market Detail · Reply · Profile (+ the Bookmark page) are **locked at integration-shell v1.0**. Two things differ from the original model and are now the standing pattern: (a) the per-surface stills were **stitched into one operable integration shell** (cross-surface nav lives in the shell), not kept as separate files; (b) the per-screen logs were **consolidated** into three by-type docs (see §2.1). The **DESIGN Wave-2** surfaces run this same lock loop and feed the consolidated docs directly. **Phase CD** (Claude Design production build) is the **handover** (`design-handoff.md`), still ahead.
 
 - **Phase L — lock.** ALL core surfaces are locked as HTML mockups first, one chat per surface, in tracker design-lane order (core surfaces now locked at v1.0 — see the state note above; Wave-2 follows in tracker-v14 order). Each lock chat runs steps A–C below and closes on the per-chat deliverable triple (§2.1).
-- **Phase CD — generate & refine.** Claude Design runs after every surface is locked: **Discovery first** (it remains the look-anchor; the seed kit is built from its approved CD surface — §7), then the rest on the published system. Steps D–G run here, per surface. Refine is batched; **handoffs stay per-surface** (`design-handoff.md`) because CC consumes them per build task.
+- **Phase CD — generate & refine.** ⚠ **SUPERSEDED 2026-07-03** by `ZUGZWANG-CD_branding-handoff-decision-record_v1_0.md` (CANON), decision 3, **Path B**: CC builds from the locked repo mockups (layout) + the branded token system (look); **no separate end-to-end CD production build is built or exported.** There is no Claude Design production build. Each surface is built by **CC from its locked Phase-L mockup + the branded repo tokens**, as per-surface build tasks under the full critical-path ritual, routed through `design-handoff.md`. *(The header's Realignment note said it "updates §7" and said nothing about §2, so this bullet survived uncorrected — the O-5 shape: an amendment recorded somewhere the reader does not reach first. The original text read: "Claude Design runs after every surface is locked: Discovery first … then the rest on the published system. Steps D–G run here, per surface.")* Refine is batched; **handoffs stay per-surface** because CC consumes them per build task.
 - At the end of Phase L, the per-screen **spec-change logs consolidate into one SPEC.1 amendment** (plan-then-execute ritual). No-code-before-spec holds for every field they introduce.
 
 Each surface follows this loop. **Discussion precedes all Claude Design action** — we do not explore via half-formed prompts; the prompt is fully planned before it is pasted.
@@ -62,11 +62,11 @@ Every lock chat closes on a **deliverable triple**, each discussed with and clos
 2. **The design motion log** (`docs/design/logs/DESIGN.N_<page>_motion-log.md`) — every motion intent for the surface, with timing, the data behind it, and the implementer. Policy: motion is **logged, not mocked**; **CC implements by default** at the build task; CD demos a motion only when its feel/timing is a design question the operator must see before sign-off.
 3. **The design spec-change log** (`docs/design/logs/DESIGN.N_<page>_spec-change-log.md`) — every design-driven spec change or read-model requirement, with spec touchpoints, ripples, and decision owner. These consolidate into **one SPEC.1 amendment** at the end of Phase L.
 
-Two riders on the triple (ratified 2026-06-05): the spec-change log carries a short **states section** (loading / error / thin-data — the launch-empty state is resolved product-wide by the pre-launch curation slate, cpmm.md §7.2); and every lock-chat close **updates the cross-surface copy register** (now `DESIGN-copy-register-consolidated.md`) so vocabulary stays identical across mockups.
+Two riders on the triple (ratified 2026-06-05): the spec-change log carries a short **states section** (loading / error / thin-data — the launch-empty state is resolved product-wide by the pre-launch curation slate, cpmm.md §7.2); and every lock-chat close **updates the cross-surface copy register** (now `design-canon.md` §6 — Copy canon, which absorbed `DESIGN-copy-register-consolidated.md`; that file is superseded and is not in this repo) so vocabulary stays identical across mockups.
 
 At the end of all lock chats, the union of the registers is everything Phase CD needs — and everything refine + handoff carry to CC.
 
-> **Consolidation update (2026-06-17).** The per-screen log model above is **retired in favour of three by-type consolidated docs** — `DESIGN-motion-consolidated.md`, `DESIGN-spec-changes-consolidated.md`, `DESIGN-copy-register-consolidated.md` — rebuilt from the locked v1.0 artifact and now canonical. **Wave-2 surface work updates those three directly** (against the v1.0 baseline), rather than minting separate per-screen logs that later consolidate. Lesson carried from the core consolidation: **build-and-verify the consolidated entry first; only then retire any source** (the delete-after-verify order was inverted once — recoverable only because v1.0 is ground truth).
+> **Consolidation update (2026-06-17) — ITSELF SUPERSEDED.** The per-screen log model above was first retired in favour of three by-type consolidated docs — `DESIGN-motion-consolidated.md`, `DESIGN-spec-changes-consolidated.md`, `DESIGN-copy-register-consolidated.md`. ⚠ **Those three are no longer canonical and none is in this repo.** `docs/design/design-canon.md` **absorbs all three**, reconciled against the 2026-07-02 rulings — motion into §5, copy into §6, spec deltas into §7 — and is the single consolidated record of the DESIGN phase; its own §374 lists all three by name as superseded. Read the canon, not these filenames. **Wave-2 surface work updates those three directly** (against the v1.0 baseline), rather than minting separate per-screen logs that later consolidate. Lesson carried from the core consolidation: **build-and-verify the consolidated entry first; only then retire any source** (the delete-after-verify order was inverted once — recoverable only because v1.0 is ground truth).
 
 ### §2.2 — Close checklists & ritual (the design-phase equivalent of the CC gates, ratified 2026-06-05)
 
@@ -166,9 +166,12 @@ CONSTRAINTS:
   responsive variants or breakpoints.
 - HOUSE-STYLE OVERRIDE — do NOT use: a warm/cream/parchment
   background, serif display type, a terracotta or any warm accent,
-  warm-tinted greys, or large border radii. Use instead: a white or
-  near-white true-neutral ground, the single neutral sans, no accent,
-  true-neutral greys, small-or-zero radii.
+  warm-tinted greys, or large border radii. Use instead: the **dark**
+  true-neutral ground (`--color-ground` `#181818`, BRIDGE era — the
+  light / near-white ground is **RETIRED**, `design-language.md` §1
+  constraint 9, and `src/app/globals.css` confirms the live token), the
+  single neutral sans (Geist, ratified FINAL), no accent, true-neutral
+  greys, small-or-zero radii.
 - This specification uses exact values only. Treat every stated value
   as binding; do not reinterpret through aesthetic adjectives.
 - [Once published:] Use the published "Zugzwang Monochrome" design

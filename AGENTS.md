@@ -13,7 +13,7 @@
 ## 1. Stack (live versions — from `package.json`)
 
 - **Runtime:** Node 24 (`mise.toml`). CI pins via `.nvmrc` (pinned to 24).
-- **Framework:** Next.js `16.2.4`, App Router, React `19.2.4`, TypeScript strict.
+- **Framework:** Next.js `16.3.2`, App Router, React `19.2.4`, TypeScript strict. *(Bumped 16.2.4 → 16.3.2 at S-4 Phase B: `cacheComponents` needs the `instant` segment option, which 16.2.4 silently ignored — see §5 Caching and `next.config.ts`.)*
 - **DB:** Postgres 17 on Supabase (ap-south-1, session pooler). Drizzle ORM `0.45`, `drizzle-kit 0.30`, `drizzle-zod 0.7`.
 - **Auth:** Better Auth `1.6.11` (Google OAuth + email-OTP via Resend + Cloudflare Turnstile). See §H/§7.
 - **Styling:** Tailwind v4 (CSS-first via `@theme`) + shadcn (`shadcn 4.7`, `radix-ui 1.4`, `tw-animate-css`).
@@ -23,7 +23,7 @@
 - **Email:** Resend `6.12`. **Canonical JSON:** `canonicalize 3.0`. **IDs:** `uuid 11`. **Validation:** `zod 3.25`.
 - **Observability:** Sentry (`@sentry/nextjs 10.53`) + PostHog (`posthog-js 1.376`, `posthog-node 5.35`). Two-vendor. **No Axiom.**
 - **Tooling:** `pnpm 10.33.2` (the `packageManager` field), Biome `2.4.13`, Lefthook `2.1.6`, `just`, `tsx 4.22`, Vitest `3`, fast-check `4.8.0`.
-- **Build-script approval:** `package.json` → `pnpm.onlyBuiltDependencies` (`esbuild`, `lefthook`, `sharp`). *(Not a `pnpm-workspace.yaml` allow-list.)*
+- **Build-script approval: TWO files carry it, and they do not agree.** `package.json` → `pnpm.onlyBuiltDependencies` = `esbuild`, `lefthook`, `sharp`. `pnpm-workspace.yaml` → `allowBuilds:` = `@sentry/cli: true`, `core-js: false`, `esbuild: true`, `lefthook: true`, `msw: false`, `protobufjs: true`, `sharp: true`. *(This line previously read "Not a `pnpm-workspace.yaml` allow-list" — that was true when written and is not now; the workspace file exists at the repo root and carries the wider list. Which one pnpm honours is version-dependent, so add a new build-script approval in BOTH or establish which wins before relying on either.)*
 - **Not installed yet:** Playwright / any E2E runner; `commitlint`.
 
 ---
@@ -33,6 +33,8 @@
 `just` is the task entry point; `set dotenv-load := true` sources `.env.local` for every recipe.
 
 ```bash
+just                  # = `just list` — print every recipe (the `default` recipe)
+just list             # just --list
 just setup            # mise install; pnpm install; lefthook install
 just dev              # next dev
 just build            # next build
@@ -76,19 +78,31 @@ experiment/
 │   │   │                           #   m/[slug]/export/route.ts     — debate .md export (ADR-0025)
 │   │   │                           #   m/[slug]/quote/route.ts      — CPMM quote read (UI-A2)
 │   │   │                           #   u/[pseudonym]/{page,loading,error}.tsx — PROFILE (UI-A5)
-│   │   │                           #   bookmarks/{page,loading,error}.tsx     — BOOKMARKS (UI-A6, ADR-0032)
+│   │   │                           #   _lib/session.ts              — the route group's viewer-session read
+│   │   │                           #   ⛔ NO bookmarks/ route. UI-A6 shipped it and
+│   │   │                           #   ADR-0040 UNWIRED it — the route, the read model
+│   │   │                           #   (src/server/bookmarks/) and the components are all
+│   │   │                           #   gone from disk. The `bookmarks` TABLE survives
+│   │   │                           #   (src/db/schema/bookmarks.ts, migration 0024).
 │   │   ├── api/                    # _smoke-error, auth/[...all], bets/{place,sell}, cron/{r2-orphan-sweep,close-due-markets,alarms-drain}, health, uploads/sign, visits
-│   │   ├── globals.css, layout.tsx, page.tsx
-│   ├── components/                 # bookmarks/ debate/ discovery/ profile/ shell/ ui/
+│   │   ├── globals.css, layout.tsx, not-found.tsx, global-error.tsx
+│   ├── components/                 # debate/ discovery/ onboarding/ profile/ shell/ ui/
 │   │                               #   debate/ gained five components at HTML-FINISH ·
 │   │                               #   MARKET DETAIL: HeadZone (the arm-scoped two-column
 │   │                               #   header frame), MarketMediaPanel, FocusMarketCard
 │   │                               #   (the post arm's rail — and the EXIT), ResolverCards
-│   │                               #   (the resolver + X-official PLACEHOLDER cards —
-│   │                               #   it rendered `null` until round 2's R2 reversed
-│   │                               #   OD-2; see docs/parked.md SEQUENCE #5, strip or
-│   │                               #   gate before the DP.2 promote), ScrollRail (the
-│   │                               #   rail — and, since R3, the auto-advance countdown)
+│   │                               #   (⚠ the NAME is now narrow and deliberately kept —
+│   │                               #   RESO-1 turned the two "resolver + X-official" cards
+│   │                               #   into FOUR evenly-placed vertical blocks from one
+│   │                               #   hardcoded fixture. Chrome and labels land; the DATA
+│   │                               #   fields are still empty because `markets` carries no
+│   │                               #   resolver/logo/source/handle column. It rendered
+│   │                               #   `null` until round 2's R2 reversed OD-2; see
+│   │                               #   docs/parked.md SEQUENCE #5, strip or gate before the
+│   │                               #   DP.2 promote), ScrollRail (the rail — and, since R3,
+│   │                               #   the auto-advance countdown). Since HTML-FINISH the
+│   │                               #   directory has ALSO gained CriterionDisclosure (CRIT-1),
+│   │                               #   DebatePoll, and chart/ (CHART-1, the price chart).
 │   │   └── ui/                     #   14 files, and they are NOT all shadcn. NINE shadcn
 │   │                               #   primitives: avatar, badge, button, card, dialog,
 │   │                               #   input, separator, skeleton, textarea. FIVE are
@@ -107,13 +121,15 @@ experiment/
 │   │   ├── index.ts                #   the drizzle client
 │   │   └── schema/                 #   14 files: _enums, audit, auth, bets, bookmarks, comments,
 │   │                               #   dharma, events, identity, image-uploads, index, lots, markets, system
-│   ├── lib/                        # auth-client, errors, utils, ranking{,.config,-decimal}, posthog/
-│   └── server/                     # server-side business logic — 29 dirs (measured at PHASE-0; the line read 26 and was stale by three)
+│   ├── lib/                        # auth-client, errors, utils, ranking{,.config,-decimal}, copy/, posthog/
+│   └── server/                     # server-side business logic — 28 dirs (re-measured at SYNC-5,
+│                                   #   2026-08-28: the line read 29 and had counted `bookmarks/`,
+│                                   #   which ADR-0040 deleted. Measure with `ls -d src/server/*/ | wc -l`.)
 │       ├── admin/                  # actor (assertAdminActor — the R-14.5 belt; ENGINE.14)
 │       ├── auth/                   # index, email-otp, session-gate, onboarding-ref, tos-*, logout
 │       │   └── admin/              # login, logout, validate (admin path)
-│       ├── bets/ bookmarks/ comments/ config/ cpmm/ debate-export/ debate-view/ dharma/ events/ github/ health/ idempotency/ identity-pool/ onboarding/
-│       ├── discovery/              # ← list.ts is the Discovery read model. THE PERF-1 SURFACE (docs/parked.md, GO-LIVE BLOCKER)
+│       ├── bets/ comments/ config/ cpmm/ debate-export/ debate-view/ dharma/ events/ github/ health/ idempotency/ identity-pool/ onboarding/
+│       ├── discovery/              # ← list.ts is the Discovery read model. PERF-1 was here and is CLOSED (see the callout below §3's tree) — no go-live blocker row remains
 │       ├── markets/                # transitions, errors + ENGINE.14: transaction (W-4), create, open, close (incl. the closeDueMarkets sweep)
 │       ├── lots/                   # ← LOTS-1 / ADR-0039. compute (the pure core: mintLot · sellFromLot · allocateProRata · sumLots), persist (the ONLY `lots` write path), errors, basis (Đa = Σ surviving_basis)
 │       ├── middleware/ moderation/ observability/ positions/ profile/ resolution/ storage/ system/ upstash/ visitors/
@@ -121,7 +137,13 @@ experiment/
 ├── docs/{adr,specs,logs,plans,…}
 ├── drizzle/migrations/             # generated + hand-written; append-only — DO NOT EDIT
 ├── scripts/                        # tsx operational scripts (seed, verify, migrate-staging, smoke)
-├── supabase/                       # branch/snippet scratch only — NO migrations dir (RLS out of scope, ADR-0019)
+├── supabase/                       # ⚠ NOT IN THE REPO. the `supabase/` entry in `.gitignore` ignores the whole
+│                                   #   directory; a fresh worktree has no `supabase/` at all
+│                                   #   (0 tracked files). It appears only where the Supabase
+│                                   #   CLI has written local branch/snippet scratch. There is
+│                                   #   no migrations dir and none is planned — RLS is out of
+│                                   #   scope (ADR-0019). If one is ever minted, `.gitignore`
+│                                   #   already says to add `!supabase/migrations/`.
 ├── biome.json, drizzle.config.ts, lefthook.yml, mise.toml, justfile,
 ├── next.config.ts, postcss.config.mjs, tsconfig.json, vitest.config.ts, vitest.scale.config.ts,
 │   vitest.staging.config.ts, vercel.json
@@ -135,7 +157,13 @@ experiment/
 | **Discovery** (the market list) | `(public)/page.tsx` | `src/server/discovery/list.ts` | UI-A4 |
 | Debate view | `(public)/m/[slug]/page.tsx` | `src/server/debate-view/` | DEBATE.4 · ADR-0034 |
 | Profile | `(public)/u/[pseudonym]/page.tsx` | `src/server/profile/` | UI-A5 |
-| Bookmarks | `(public)/bookmarks/page.tsx` | `src/server/bookmarks/` | UI-A6 · ADR-0032 |
+
+⛔ **Bookmarks is NOT a surface any more.** It shipped at UI-A6 (ADR-0032) and **ADR-0040
+unwired it**: `src/app/(public)/bookmarks/`, `src/server/bookmarks/` and
+`src/components/bookmarks/` are all absent from disk. What survives is the `bookmarks`
+TABLE (`src/db/schema/bookmarks.ts`, migration `0024_bookmarks`) — schema kept, surface
+withdrawn. This table previously listed Bookmarks as a live route; it did not, and a
+session planning against that row would have looked for three directories that are gone.
 
 > ⚠ **Discovery is built and PERF-1 is CLOSED.** The surface served in ~35 s because Vercel
 > functions ran in `iad1` against a Mumbai database — ADR-0006 ratified `bom1` and it had
@@ -188,7 +216,7 @@ const placeBetSchema = z.object({
 
 **Admin Route Handlers live under `src/app/(admin)/admin/...`** (URL `/admin/...`), **NEVER** `/api/admin/...` — the admin session cookie is scoped `Path=/admin`, so a handler under `/api/admin/...` never receives it and 401s the real admin. (Participant routes may live under `/api/...` because the participant cookie is `Path=/`.) Verified by MEDIA.1: the planned `/api/admin/markets/media/sign` was relocated to `/admin/markets/media/sign` for exactly this reason — a `cookies()` mock had masked the failure in the unit layer.
 
-**Caching.** `next.config.ts` is currently a Sentry wrapper + env injection only — **`cacheComponents` is NOT enabled** and no Turbopack flags are set. If `cacheComponents` is turned on later, fetches become uncached by default and you mark scopes with `'use cache'`, reading cookies/headers *outside* cached scopes. Until then, standard Next 16 caching applies.
+**Caching. ⚠ `cacheComponents` IS ENABLED** — the `cacheComponents` key in `next.config.ts`, landed at S-4 Phase B (ADR-0041). This line previously said it was NOT enabled and that the config was "a Sentry wrapper + env injection only"; both are now false and the difference changes how you write every route. With the flag on: Partial Prerendering is the default, `'use cache'` / `cacheLife` / `cacheTag` are available, and **cookies/headers must be read OUTSIDE a cached scope**. A segment not yet restructured for the framework's instant-navigation validation opts out with `instant = false` (this is why Next had to go to `16.3.2` — `16.2.4` silently ignored `instant`). `next.config.ts` also carries `agentRules: false` (the 16.3.x dev/build step otherwise appends a generated `agentRules` block to **this file** on every run) and `outputFileTracingIncludes` for `/api/health` (the migration files) and `/m/[slug]/export` (`public/zugzwang.md`). No Turbopack flags are set.
 
 **`params` / `searchParams` are Promises** (Next 15+). `const { id } = await params;`.
 
@@ -268,22 +296,25 @@ const placeBetSchema = z.object({
 tests/
 ├── _setup/        env.ts, server-only-shim.ts
 ├── db/            _fixtures/, identity-pool/, indexes/ (positions-market-id pg_indexes assert — the catalog-assertion mint, AUDIT-FIX-B7b), triggers/ (13 append-only specs, one per protected table — +bet-receipts-append-only, AUDIT-FIX-B3 — plus truncate-rejected.spec, plus lots-no-delete.spec: NOT an append-only spec — `lots` is Bucket C and the file's third test is a POSITIVE control proving `TRUNCATE bets CASCADE` still empties it)
-├── integration/   30 *.integration.test.ts (admin-moderation-audit-feed, alarms-drain, composer-image,
-│                  composer-place, composer-reply, composer-sell, debate-export, dharma-chain-drift-drain,
+├── integration/   36 *.integration.test.ts (admin-moderation-audit-feed, alarms-drain,
+│                  auth-dbl-1-first-login-session, composer-image, composer-place, composer-reply,
+│                  composer-sell, cross-user-idempotency, debate-export, dharma-chain-drift-drain,
 │                  dharma-ledger, email-otp-send, header-balance, header-portfolio, idempotency-cache — the
-│                  former idempotency suite, renamed — market-by-slug, market-quote, migration-drift,
-│                  nightly-drift-resolution, onboarded-login-session, orphan-sweep, positions, post-param,
-│                  precommit-moderate, rate-limit, resolution-conservation, sign-read, sign-upload,
-│                  signup-create-path, staging-reset-mechanism, upstash-lock, viewer-context)
-├── invariants/    10 specs — see the Invariant-tests bullet below
+│                  former idempotency suite, renamed — market-by-slug, market-media-selection, market-quote,
+│                  migration-drift, nightly-drift-resolution, oauth-orphan-fallback,
+│                  oauth-signup-pool-deadlock, onboarded-login-session, orphan-sweep, positions, post-param,
+│                  precommit-moderate, profile-statement-count, rate-limit, resolution-conservation,
+│                  sign-read, sign-upload, signup-create-path, staging-reset-mechanism, upstash-lock,
+│                  viewer-context)
+├── invariants/    12 specs — see the Invariant-tests bullet below
 ├── scale/         8 *.scale.test.ts (the ENGINE.10 Q-2 correctness-at-scale battery) + _fixtures/, _harness/ — opt-in only, see the Scale bullet below
 ├── staging/       OPERATIONAL RUNNERS, not tests — THREE runners (reset.staging.test.ts · generate.staging.test.ts · gates.staging.test.ts) + fixtures.ts (the literal fixture table) + _lib/ (target, client, read-client, write-guard, guards, reset, coverage, captured-identities). ADR-0035/0036, STAGING-PARITY Slices A–D. Points at the LIVE staging DB; opt-in only, see the Operational-runners bullet below
-├── server/        auth/ (incl. _probe-* + admin-login-result + email-otp-from-guard, AUDIT-FIX-B7b), bets/ (atomicity, concurrency, daily-credit, events-idempotency, idempotency-replay, moderation-outside-transaction, sell, subsequent-buy, validation + AUDIT-FIX-B3: sell-oversell, place-replay-durable, sell-replay-durable, release-failure, double-sell-chain), cron/ (close-due-markets — ENGINE.15, the first route-handler test convention), events/, identity/, middleware/, moderation/, resolution/ (happy-path, pro-rata, correction, void, concurrency, actor-assert), storage/ (incl. sign-route-envelope, AUDIT-FIX-B7b), admin/ (moderation/ + markets, pool-seed, resolution — each carries its ENGINE.15 wire-action blocks; + markets-media-sign-envelope, AUDIT-FIX-B7b), dharma/ (non-transferable)
-└── unit/          body-fingerprint, rate-limit-prefix, upstash-keys, upstash-redis-config (AUDIT-FIX-B7a — the A14 transport-bound config pins), idempotency-release (AUDIT-FIX-B3), bets/ (errors, floors, wire-envelope), cpmm/ (calculate + validate + vectors.test.ts + *.property.test.ts + _arbitraries.ts), markets/ (transitions.test.ts), positions/ (compute.test.ts), resolution/ (basis + basis.property), dharma/ (accrual, canonical, _probe-decimal-negzero, ledger, conservation, conservation-correction), staging/ (8 files — the guards that constrain the tests/staging/ runners WITHOUT touching a database: generator-no-direct-writes incl. the import allowlist, write-guard, runner-target, runner-gating, runner-isolation, reset-guard, guard-list-parity, fixture-table), design/ (**FOUR height chains** — discovery, profile, bookmarks, and `debate-height-chain.test.ts` added at HTML-FINISH · MARKET DETAIL; all four are SOURCE SCANS, because jsdom performs no layout)
+├── server/        21 dirs. auth/ (incl. _probe-* + admin-login-result + email-otp-from-guard, AUDIT-FIX-B7b), bets/ (atomicity, concurrency, daily-credit, events-idempotency, idempotency-replay, moderation-outside-transaction, sell, subsequent-buy, validation + AUDIT-FIX-B3: sell-oversell, place-replay-durable, sell-replay-durable, release-failure, double-sell-chain), cron/ (close-due-markets — ENGINE.15, the first route-handler test convention), events/, identity/, middleware/, moderation/ (+ _fixtures/), resolution/ (happy-path, pro-rata, correction, void, concurrency, actor-assert), storage/ (incl. sign-route-envelope, AUDIT-FIX-B7b), admin/ (moderation/ + markets, pool-seed, resolution — each carries its ENGINE.15 wire-action blocks; + markets-media-sign-envelope, AUDIT-FIX-B7b), dharma/ (non-transferable), and — undocumented here until SYNC-5 — comments/, debate-view/, discovery/, health/, lots/, markets/, observability/, profile/, system/, visitors/
+└── unit/          29 dirs. Loose: body-fingerprint, rate-limit-prefix, upstash-keys, upstash-redis-config (AUDIT-FIX-B7a — the A14 transport-bound config pins), idempotency-release (AUDIT-FIX-B3). Dirs: bets/ (errors, floors, wire-envelope), cpmm/ (calculate + validate + vectors.test.ts + *.property.test.ts + _arbitraries.ts), markets/ (transitions.test.ts), positions/ (compute.test.ts), resolution/ (basis + basis.property), dharma/ (accrual, canonical, _probe-decimal-negzero, ledger, conservation, conservation-correction), staging/ (8 files — the guards that constrain the tests/staging/ runners WITHOUT touching a database: generator-no-direct-writes incl. the import allowlist, write-guard, runner-target, runner-gating, runner-isolation, reset-guard, guard-list-parity, fixture-table), design/ (11 files, of which **THREE height chains** — `discovery-height-chain`, `profile-height-chain`, `debate-height-chain` (added at HTML-FINISH · MARKET DETAIL); all three are SOURCE SCANS, because jsdom performs no layout. ⚠ this line said FOUR and named a bookmarks chain — there has never been one on disk under this name, and ADR-0040 removed the surface it would have guarded), and — undocumented here until SYNC-5 — _support/, auth/, comments/, composer/, copy/, db/, debate/, debate-export/, debate-view/, discovery/, docs/, identity-pool/, lots/, middleware/, observability/, onboarding/, profile/, ranking/, shell/, storage/, ui/
 ```
 
 - **Unit** (no IO): pure functions in `src/lib/` and `src/server/<domain>/`. Happy path + ≥2 edges + the relevant invariant.
-- **Component / render** (jsdom, no IO): `jsdom` + `@testing-library/react`, enabled **per file** by a `// @vitest-environment jsdom` docblock on line 1 — **75** `*.test.tsx` files, mostly under `tests/unit/**/render/` plus `tests/server/admin/*.component.test.tsx`. **There is no `jest-dom`**, so `toBeInTheDocument()` / `toBeDisabled()` and that whole matcher set are UNAVAILABLE — assert against plain DOM (`getAttribute`, `textContent`, `querySelector`). Fake timers + `act()` for interval/effect behaviour; page visibility is exercised by stubbing `document.hidden` and dispatching `visibilitychange` (F-DEBATE-4). *Recorded at F-DEBATE-4 because this harness has existed since UI.0 and §9 never named it, so successive plans inherited a false "the UI cannot be tested" premise.*
+- **Component / render** (jsdom, no IO): `jsdom` + `@testing-library/react`, enabled **per file** by a `// @vitest-environment jsdom` docblock on line 1 — **79** `*.test.tsx` files, mostly under `tests/unit/**/render/` plus `tests/server/admin/*.component.test.tsx`. **There is no `jest-dom`**, so `toBeInTheDocument()` / `toBeDisabled()` and that whole matcher set are UNAVAILABLE — assert against plain DOM (`getAttribute`, `textContent`, `querySelector`). Fake timers + `act()` for interval/effect behaviour; page visibility is exercised by stubbing `document.hidden` and dispatching `visibilitychange` (F-DEBATE-4). *Recorded at F-DEBATE-4 because this harness has existed since UI.0 and §9 never named it, so successive plans inherited a false "the UI cannot be tested" premise.*
   - ⚠ **AN OUTSIDE-CLICK ASSERTION MUST YIELD TO THE TASK QUEUE BEFORE IT FIRES.** Radix's `DismissableLayer` arms its `pointerdown` listener inside a **`setTimeout(…, 0)`**, so a pointer event dispatched synchronously after `render()` reaches **no listener at all**. Make the test `async` and `await new Promise((r) => setTimeout(r, 0))` first. ⛔ **The failure mode is a false GREEN, not a red:** a *"the backdrop does NOT dismiss this"* assertion written without the yield passes against a listener that was never armed, certifying a guard it never exercised. **Always pair it with the opposite assertion in the dismissible context** — that control is the only thing proving the mechanism fires at all. Escape is unaffected and works synchronously (`fireEvent.keyDown(document, { key: "Escape" })`). *Minted at O1-DECK, where the paired control went red on the first run; without it the non-dismissible guard would have shipped green and empty.*
 - **Integration** (real test Postgres): any service-layer function that writes. Mandatory scenarios as the ENGINE lands — bet atomicity, Dharma reconciliation, side-freeze on comment, payout math, append-only enforcement.
 - **Scale** (opt-in, real test Postgres): `tests/scale/` is the correctness-at-scale battery (collision storms, hot-row contention, determinism under load — ENGINE.10 Q-2). It runs **only** via `pnpm test:scale` with its own `vitest.scale.config.ts`; the default config **excludes `tests/scale/**`** (`vitest.config.ts`), so a bare `vitest run` — local or CI — never picks it up.
@@ -295,11 +326,12 @@ tests/
   - **`pnpm staging:rebuild`** is the composite: reset → seed → generate → gates.
 - **Never mocked in a runner:** anything that writes a row or moves Dharma (ADR-0036 primitive 3). Only the HTTP/cookie shell may be — `next/headers`, `next/navigation`, `next/cache`, `verifyOnboardingRef`, `requireAdminSession`, `auth.api.getSession`. **`tests/unit/staging/generator-no-direct-writes.test.ts` pins an ALLOWLIST of the `@/server/**` entrypoints a runner may import**; adding a name to it is a decision, not an edit, and `@/server/events/insert` + `@/server/dharma/persist` are pinned as *not* ratified as its own positive control.
 - The default config **excludes `tests/staging/**`** exactly as it excludes `tests/scale/**`, so no bare `vitest run` — local, CI, or a subagent's — can reach a live database. Each runner additionally refuses to start unless the FIVE-guard contract passes (intent · target · environment · live connection · post-run verification — the G-5 intent token is the ADR-0035 Addendum's addition to primitive 6's four); the **write-capable** runners require the intent token, the read-only gates deliberately do not. Isolation is asserted by `tests/unit/staging/runner-isolation.test.ts`; the runners' gating shape by `runner-gating.test.ts`; the no-direct-writes rule behaviourally by `_lib/write-guard.ts` and textually by `generator-no-direct-writes.test.ts`; and the fixture table's own consistency — including the C3/C4 lane calibration, computed with the shipped pure `badgeFor` — by `fixture-table.test.ts`.
-- **Invariant tests** at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts` — 11 on disk:
+- **Invariant tests** at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts` — 12 on disk:
   - `I-APPEND-ONLY-001.resolutions-append-only` (INV-4) — `resolution_events` + `payout_events` reject UPDATE/DELETE post-INSERT at the storage layer.
   - `I-ATOMICITY-001.bet-comment-atomic` (INV-1) — one SERIALIZABLE W-1 tx wraps the full bet spine; if any write throws, every write rolls back (minted ENGINE.7).
   - `I-DAILY-ONCE-001.daily-credit-once-per-utc-day` — at most one `daily_allowance` ledger row per user per UTC day; storage backstop is the unique partial index `dharma_ledger_daily_allowance_day_uq` (minted ENGINE.12).
   - `I-GRANT-ONCE-001.initial-grant-once-per-user` — at most one `initial_grant` ledger row per user, EVER; storage backstop is the unique partial index `dharma_ledger_initial_grant_user_uq` (minted ENGINE.13).
+  - `I-IDEM-NOMASK-001.cached-non-2xx-never-masks-a-commit` — a SINGLE REQUEST's own cached non-2xx response never coexists with THAT SAME REQUEST's own committed transaction (five cases: rate-limit, validation, moderation, durable-mismatch, post-tx-mismatch). ⚠ Scope it narrowly: it does **not** cover the cross-request case (an earlier commit's receipt sitting beside a later request's genuinely-cached rejection) — that is `endpoint.ts`'s `case "hit"` durable consult, "DC-a", guarded by `tests/integration/cross-user-idempotency.integration.test.ts`. Green on the day it was written and correctly so: a `_probe-*`-posture regression guard, not a TDD driver (minted S-7 / ADR-0044).
   - `I-IDEM-ONCE-001.one-commit-per-idempotency-key` — at most one committed bet/sell per idempotency key; storage backstop is the unique index `bet_receipts_idempotency_key_uq` (fixture-bypass duplicate key → 23505; the route layer rides it via the durable pre-check + 23505 catch — minted AUDIT-FIX-B3 / ADR-0031).
   - `I-LOT-SUM-001.lot-shares-sum-to-position` — Σ `lots.surviving_shares` == `positions.quantity` per (user, market, side); the ADR-0039 R2 invariant-class rule. ⚠ It seeds its own rows into the local ephemeral Postgres and truncates after, so it proves the RULE and observes NO live environment — a live-DB Σ check is owed and belongs with the staging gates (minted LOTS-1 S4a).
   - `I-NO-OVERDRAFT-001.dharma-ledger-monotone` (INV-2) — `dharma_ledger` `balance_after >= 0`; no overdraft.
@@ -358,4 +390,4 @@ Biome + `tsc` run at Lefthook `pre-push` and in CI, which is real friction but n
 
 ---
 
-*Rebuilt at SYNC.8 (Jun 2, 2026) against the live repo at `27216fc` + SPEC.1 v1.9.0-draft + SPEC.2 + ADRs 0003–0031; descriptive drift reconciled at BC.1 (Jul 1, 2026) against `248e02f`; SPEC.1/SPEC.2 version citations reconciled at the SYNC sweep (Jul 7, 2026), then SYNC-LITE (Jul 16). **Reconciled against the live repo at SYNC-1 (Aug 8, 2026), `fecbaf3` — SPEC.1 1.0.29, SPEC.2 1.0.22, cpmm 2.1.0, ADRs 0001–0036 (34 files), migration head `0024_bookmarks`, `EVENT_TYPES` 24, 23 tables / 13 schema files.** **Counts re-measured at PHASE-0 (Aug 21, 2026): ADRs 0001–0039 (37 files), migration head `0026_lots_no_delete`, `EVENT_TYPES` still 24 (a lot rides its bet's events and mints none), 24 tables / 14 schema files, 11 invariant specs.** SYNC-1 corrected: the `(public)/` tree (Discovery / Profile / Bookmarks were all live and undocumented), the `src/server/` directory list (+`bookmarks`, `discovery`, `profile`, `visitors`), the `api/` list (+`visits`), `components/ui/` (+dialog, input, textarea), the integration count (20 → 30) and `*.test.tsx` count (26 → 30), the `just` recipe list (+`test-scale`), and the `Sonner` instruction (removed — not installed). Descriptive: tracks the repo, not the target. Follows the [agents.md](https://agents.md) standard. Maintained per `docs/maintenance.md`.*
+*Rebuilt at SYNC.8 (Jun 2, 2026) against the live repo at `27216fc` + SPEC.1 v1.9.0-draft + SPEC.2 + ADRs 0003–0031; descriptive drift reconciled at BC.1 (Jul 1, 2026) against `248e02f`; SPEC.1/SPEC.2 version citations reconciled at the SYNC sweep (Jul 7, 2026), then SYNC-LITE (Jul 16). **Reconciled against the live repo at SYNC-1 (Aug 8, 2026), `fecbaf3` — SPEC.1 1.0.29, SPEC.2 1.0.22, cpmm 2.1.0, ADRs 0001–0036 (34 files), migration head `0024_bookmarks`, `EVENT_TYPES` 24, 23 tables / 13 schema files.** **Counts re-measured at PHASE-0 (Aug 21, 2026): ADRs 0001–0039 (37 files), migration head `0026_lots_no_delete`, `EVENT_TYPES` still 24 (a lot rides its bet's events and mints none), 24 tables / 14 schema files, 11 invariant specs.** **Re-measured again at SYNC-5 (Aug 28, 2026) against `acb71cb`: SPEC.1 `1.0.41`, SPEC.2 `1.0.27`, cpmm `2.1.0`, ADRs 0001–0044 (42 ADRs + `_template.md`; 0002 and 0012 permanently unused; next free **0045**), migration head still `0026_lots_no_delete`, `EVENT_TYPES` still 24 (measured by RUNTIME import, not a regex), 24 tables / 14 schema files, **12** invariant specs, **36** integration tests, **79** `*.test.tsx`, **28** `src/server/` dirs, **37** `F-*.md` flow files. SYNC-5 corrected here: Next `16.2.4 → 16.3.2`; `cacheComponents` NOT-enabled → **enabled**; the `pnpm-workspace.yaml` allow-list parenthetical; the Bookmarks route/read-model/components rows (ADR-0040 unwired them — the TABLE survives); the `src/server/` dir count and list; the `components/` and `src/lib/` lists; the `tests/server/` and `tests/unit/` dir lists; `FOUR height chains` → THREE; the ResolverCards description (RESO-1); and the `discovery/` GO-LIVE BLOCKER note that contradicted the PERF-1-is-CLOSED callout twenty lines below it. SYNC-1 corrected: the `(public)/` tree (Discovery / Profile / Bookmarks were all live and undocumented), the `src/server/` directory list (+`bookmarks`, `discovery`, `profile`, `visitors`), the `api/` list (+`visits`), `components/ui/` (+dialog, input, textarea), the integration count (20 → 30) and `*.test.tsx` count (26 → 30), the `just` recipe list (+`test-scale`), and the `Sonner` instruction (removed — not installed). Descriptive: tracks the repo, not the target. Follows the [agents.md](https://agents.md) standard. Maintained per `docs/maintenance.md`.*

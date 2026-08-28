@@ -59,7 +59,17 @@ it is a **labelled placeholder** (JSDoc in `limits.ts` names the tuning owner pe
 | `IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN` | 10 | `limits.ts` · ADR-0015 D7 |
 | `RATE_LIMIT_PER_MARKET_PER_DAY` / `RATE_LIMIT_BURST_PER_MIN` | — (spec-only; whether reply-bets carry a per-market productive cap is itself deferred) | SPEC.1 §16.1 · SPEC.2 §4.6/§11 |
 | `AI_FLAG_THRESHOLD_TRACK_A_*` / `AI_FLAG_THRESHOLD_TRACK_B_*` | — (per-category; shipped gate is boolean category flags, no score floors, per SCAFFOLD.16 LD-3) | SPEC.1 §19 Q1/App-B · `docs/briefs/SCAFFOLD.16-…` |
-| RANKING lane constants: `k_lane`, `floor_lane` (per lane), `floor_split`, gravity `c`, `g`, `LATEST_INTERLEAVE_INTERVAL` | — (shape locked, numbers TBD; interleave design intent ≈ 10) | RANKING.md §12 · future `src/lib/ranking.config.ts` |
+| RANKING lane constants: `kLane`, `floorLane` (`n`/`D`/`lop`/`nPowB`), `floorSplit`, `latestInterleaveInterval` | **shipped as placeholders** in `DEFAULT_RANKING_CONFIG` — `3` / `5`·`200`·`0.5`·`3` / `6` / `10`; every value carries an inline "pre-tuning placeholder — NOT final; pins 2026-09-01" | RANKING.md §12 · `src/lib/ranking.config.ts` |
+| Gravity `c`, `g` (the §9 shared time-decay term) | — (spec-only; no `src/` constant) | RANKING.md §9 |
+
+> ⚠ **SYNC-5 correction, 2026-08-28 — the ONLY edit made to this pinned kit.** The row above
+> read *"— (shape locked, numbers TBD) | RANKING.md §12 · **future** `src/lib/ranking.config.ts`"*.
+> That was wrong **at this document's own pin**, not merely stale: `src/lib/ranking.config.ts`
+> was already on disk at `e28d4b6` (it landed at DEBATE.8, PR #155, well before the pin), with
+> `DEFAULT_RANKING_CONFIG` populated. Every other apparently-stale row in this kit describes the
+> repo correctly **as of `e28d4b6`** and is deliberately left untouched — a pinned snapshot that
+> is accurate at its pin is a true document. This one was false on the day it was written, which
+> is why it is the exception.
 
 ## 3 · PROVISIONAL-OPS — ratified values, HARDEN-tunable
 
