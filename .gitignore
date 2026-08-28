@@ -69,3 +69,7 @@ supabase/
 
 # === SYNC recon scratch (local-only; substance promoted into docs/logs/SYNC.2.md) ===
 docs/sync/
+
+# DATASET.1 — local pipeline output (never committed; the release
+# artifact is built at export time, not stored in the repo)
+dataset-out/

@@ -18,6 +18,7 @@
 		"db:seed:staging": "tsx scripts/seed-staging.ts",
 		"verify:r2-scope": "tsx scripts/verify-r2-scope.ts",
 		"smoke:staging": "tsx scripts/smoke-staging.ts",
+		"dataset:build:fixture": "tsx --conditions=react-server scripts/build-dataset.ts",
 		"verify:ranking:staging": "tsx scripts/verify-ranking-staging.ts",
 		"staging:reset": "doppler run --project zugzwang-experiment --config stg -- pnpm run staging:reset:exec",
 		"staging:reset:exec": "ZUGZWANG_STAGING_RESET_ACK=wipe-staging-i-mean-it vitest run --config vitest.staging.config.ts tests/staging/reset.staging.test.ts && pnpm run db:seed:staging",
