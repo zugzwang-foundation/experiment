@@ -105,6 +105,13 @@ export function dirtyMetadata(opts: {
 // ── one dirty events row per event type (brief §3, verbatim) ───────────
 
 export interface DirtyEventRow {
+	/**
+	 * Index signature so a fixture row is assignable to the pipeline's
+	 * `SourceRow` (`Record<string, unknown>`). The named fields below still
+	 * type-check; this only says the shape is an object with string keys,
+	 * which is what a row read from Postgres actually is.
+	 */
+	readonly [key: string]: unknown;
 	readonly event_id: string;
 	readonly event_type: EventType;
 	readonly aggregate_type: string;
