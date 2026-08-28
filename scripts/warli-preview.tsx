@@ -76,6 +76,12 @@ const art = renderToStaticMarkup(<WarliHero />);
  * raw-concatenation sink outside React — so it gets escaped rather than trusted.
  * Cheaper than narrowing the type, and it stays correct if the labels ever come
  * from somewhere else.
+ *
+ * ⚠ THE RULE IS "EVERYTHING RAW-INTERPOLATED HERE IS ESCAPED", not "only the
+ * unconstrained ones". `density` and `prop` are closed unions and do not need it.
+ * Escaping the `string` and not the unions would leave a reader deriving which
+ * values are constrained on every future edit — and getting that derivation
+ * wrong once is the whole bug. A uniform rule is greppable; a clever one is not.
  */
 const esc = (value: string): string =>
 	value.replace(
@@ -115,7 +121,7 @@ const plate = [...INNER_FIGURES.keys()]
 				<svg viewBox="-26 -64 60 70" aria-hidden="true">${renderToStaticMarkup(
 					<Figure spec={spec} density={density} />,
 				)}</svg>
-				<figcaption>${esc(spec.label)}<small>${density}${spec.prop === "none" ? " · pose" : ` · ${esc(spec.prop)}`}</small></figcaption>
+				<figcaption>${esc(spec.label)}<small>${esc(density)}${spec.prop === "none" ? " · pose" : ` · ${esc(spec.prop)}`}</small></figcaption>
 			</figure>`;
 		return `<div class="plate-pair">${cell(inner, "dense")}${cell(outer, "spare")}</div>`;
 	})

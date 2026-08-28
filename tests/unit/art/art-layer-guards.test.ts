@@ -133,6 +133,22 @@ describe("art layer — the injection sinks stay shut", () => {
 	// `<foreignObject>` is the one to care about: it re-enters HTML parsing inside
 	// an SVG, and it is exactly what a contributor reaches for the first time they
 	// want real text in this drawing. The others are the standard SVG-XSS set.
+	//
+	// ⚠ WHAT THIS GUARD CANNOT SEE, stated so it does not read as total. Matching
+	// is literal and case-sensitive, so all of these walk past it:
+	//
+	//   · `React.createElement("foreignObject", …)` — the non-JSX form, which is
+	//     also what any dynamic-tag construction compiles to. No `<foreignObject`
+	//     token ever appears.
+	//   · A sink assembled by concatenation or interpolation: `"<foreign" +
+	//     "Object"`, `` `<${tag}>` ``.
+	//   · Anything reached through a variable rather than written out.
+	//
+	//   ⛔ AND STRUCTURALLY, IT CAN NEVER SEE `<style`. `hero.tsx` legitimately
+	//     contains one, so the token cannot go in this list — which means a SECOND
+	//     `<style>` with an interpolated child, the exact sink the security audit
+	//     found a false comment beside, is invisible here by construction. That
+	//     one is closed by review, not by this file.
 	const SINKS = [
 		"dangerouslySetInnerHTML",
 		"innerHTML",
@@ -140,10 +156,19 @@ describe("art layer — the injection sinks stay shut", () => {
 		"document.write",
 		"<foreignObject",
 		"<script",
+		"<iframe",
+		"<object",
+		"<embed",
+		"<animate",
 		"<use",
 		"<image",
+		// Both spellings of the same attribute: the xlink namespace form, React's
+		// camelCase form, and the SVG2 bare `href` that has replaced them.
 		"xlink:href",
+		"xlinkHref",
 		"srcDoc",
+		"srcdoc",
+		"javascript:",
 	];
 
 	it("the sink patterns match their own sink (positive control)", () => {
@@ -167,6 +192,47 @@ describe("art layer — the injection sinks stay shut", () => {
 			),
 		);
 		expect(offenders).toEqual([]);
+	});
+
+	it("keeps the preview generator's one raw-HTML sink escaped", () => {
+		// ⚠ THE GENERATOR IS SCANNED BY NO GUARD IN THIS REPO — `ART_DIR` does not
+		// reach `scripts/`. So the file holding the ONLY raw-HTML concatenation and
+		// the ONLY `<script>` was unguarded, which means the escape fix that closed
+		// the audit's L-2 was itself held by nobody: exactly the shape L-3 was
+		// minted to end, one file over.
+		//
+		// The general sink list cannot be reused here — this file legitimately
+		// contains `<script`, `<style` and raw markup, because writing an HTML
+		// document is its whole job. What IS assertable is the specific property
+		// the fix established: nothing reaches that document unescaped.
+		const gen = stripComments(
+			readFileSync(join(ROOT, "scripts/warli-preview.tsx"), "utf8"),
+		);
+
+		// POSITIVE CONTROL: the escaped forms are present, so the search works.
+		expect(gen).toContain("${esc(spec.label)}");
+		expect(gen).toContain("${esc(density)}");
+
+		// …and the unescaped forms are absent. `spec.label` is typed plain
+		// `string`; the other two are closed unions and are escaped anyway, so the
+		// rule is uniform and greppable rather than requiring the reader to
+		// re-derive which values happen to be constrained.
+		for (const raw of ["${spec.label}", "${density}", "${spec.prop}"]) {
+			expect(gen).not.toContain(raw);
+		}
+
+		// And the generated document must not gain a live sink of its own.
+		for (const sink of [
+			"eval(",
+			"new Function",
+			"innerHTML",
+			"document.write",
+			"<foreignObject",
+			"<iframe",
+			"javascript:",
+		]) {
+			expect(gen).not.toContain(sink);
+		}
 	});
 });
 

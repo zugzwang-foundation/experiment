@@ -344,16 +344,24 @@ export function WarliHero({
 
 			    ⚠ BUT NOT FOR THE REASON THIS COMMENT USED TO GIVE. It said "React
 			    escapes it", which is FALSE for `<style>` and was measured so.
-			    React's style handling is a targeted escape of the literal token
-			    `</style` (`escapeStyleTextContent` rewrites it to a CSS identifier
-			    escape) — it blocks the parser breakout and NOTHING else. Braces,
-			    `@import` and `url(…)` all pass through verbatim. Interpolating a
-			    non-constant here would be arbitrary CSS injection, and this is the
-			    line someone would read before deciding it was safe to.
+			    React's whole style-child transform is `escapeStyleTextContent`,
+			    whose regex is `/(<\/|<)(s)(tyle)/gi` — it rewrites the tokens
+			    `<style` and `</style`, case-insensitively, into a CSS identifier
+			    escape. That blocks the raw-text parser breakout and NOTHING else.
+			    Braces, `@import` and `url(…)` all pass through verbatim, so
+			    interpolating a non-constant here would be arbitrary CSS injection —
+			    and this is the line someone reads before deciding it is safe to.
 
 			    What actually holds: `WARLI_CSS` is a module-level `const` whose
 			    only interpolation is `${TURN_SECONDS}`, itself a numeric literal.
-			    The safety is the CONSTANT INPUT, not the sink. */}
+			    The safety is the CONSTANT INPUT, not the sink.
+
+			    ⛔ AND DO NOT GIVE THIS ELEMENT A SECOND CHILD. React takes the
+			    style text as `children[0]` only when there are fewer than two
+			    children; with two or more it passes `null` and the element renders
+			    EMPTY. `<style>{WARLI_CSS}{EXTRA}</style>` would ship no stylesheet
+			    at all, throw nothing, and fail as rings that silently never turn —
+			    the same failure this file already exists to prevent once. */}
 			<style>{WARLI_CSS}</style>
 
 			<g transform={`translate(${VIEW_WIDTH / 2} ${VIEW_HEIGHT / 2})`}>
