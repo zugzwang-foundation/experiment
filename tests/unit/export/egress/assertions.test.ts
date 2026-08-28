@@ -139,6 +139,47 @@ describe("egress · the six named value guards", () => {
 		expect(rulesFiredOn(clean)).toEqual([]);
 	});
 
+	it("scans a shared object reference on EVERY row that holds it", () => {
+		// ⚠ Minted from `@test-writer` L-1, a real hole in the scanner. Cycle
+		// detection was a single WeakSet of every object ever visited, which
+		// also skips the SECOND reference to an object — not a cycle at all.
+		// A source that hoists one `metadata` const across rows (a natural
+		// thing to write) would have had every row after the first go
+		// unscanned while the guard reported success.
+		//
+		// Rows parsed from `postgres` are always fresh objects, so this could
+		// never have bitten in production — which is exactly what would have
+		// let it survive indefinitely.
+		const shared = { ip: FIXTURE_SECRET_VALUES.ips[0] };
+		const rows = [
+			{ id: "a", metadata: shared },
+			{ id: "b", metadata: shared },
+		];
+
+		const g = new EgressGuard(secrets);
+		g.assertNoIps("t", rows);
+
+		expect(g.findings).toHaveLength(2);
+		expect(g.findings.map((f) => f.path)).toEqual([
+			"[0].metadata.ip",
+			"[1].metadata.ip",
+		]);
+	});
+
+	it("still terminates on a genuine cycle", () => {
+		// The property the WeakSet was there for in the first place. A guard
+		// that infinite-loops fails open in the worst way: the build hangs,
+		// someone kills it, and the previous run's artifact ships.
+		const cyclic: Record<string, unknown> = {
+			ip: FIXTURE_SECRET_VALUES.ips[0],
+		};
+		cyclic.self = cyclic;
+
+		const g = new EgressGuard(secrets);
+		g.assertNoIps("t", [cyclic]);
+		expect(g.findings.length).toBeGreaterThanOrEqual(1);
+	});
+
 	it("finds the value under ANY key name, not just the expected one", () => {
 		// The reason the guards are value-based rather than key-based: a
 		// strip that renamed rather than removed would defeat a key guard.
@@ -242,6 +283,15 @@ describe("egress · rendered TEXT artifacts (the debate .md class)", () => {
 		expect(g.findings[0]?.detail).not.toContain(
 			FIXTURE_SECRET_VALUES.emails[0],
 		);
+		// ⚠ Pin the fingerprint FORM, not merely "not the whole value".
+		// Widening the slice to 20 would leak 20 of this email's 21
+		// characters into a CI log and still satisfy the assertion above.
+		expect(g.findings[0]?.detail).toContain(
+			`${FIXTURE_SECRET_VALUES.emails[0].slice(0, 8)}…`,
+		);
+		expect(g.findings[0]?.detail).not.toContain(
+			FIXTURE_SECRET_VALUES.emails[0].slice(0, 12),
+		);
 	});
 
 	it("POSITIVE CONTROL — the bare-UUID net fires on an id NOT in the secret set", () => {
@@ -299,6 +349,27 @@ describe("egress · assertTableClean / the dirty fixture end to end", () => {
 		} catch (e) {
 			caught = e as EgressViolationError;
 		}
-		expect(caught?.violations.length).toBeGreaterThan(20);
+		// Anchored to the fixture's own size rather than a magic number: a
+		// fixture edit that halves the violation count should not still pass.
+		//
+		// Every one of the 24 event rows carries `metadata.ip` +
+		// `metadata.user_agent`, so that is 2 × 24 = 48. The remaining 3 are
+		// PAYLOAD keys — `user.tos_accepted` carries both and
+		// `admin.signed_in` carries `ip` — because `findKeys` walks the whole
+		// row rather than only the `metadata` object.
+		//
+		// ⚠ Worth stating rather than rounding away: the rule is NAMED
+		// `no-stripped-metadata-key` and its net is wider than its name. That
+		// is the safe direction (an `ip` under any key is still an `ip`), but
+		// a future reader narrowing it to match its name would remove a real
+		// catch. Asserting the composition is what makes that visible.
+		const metadataHits =
+			caught?.violations.filter((v) => v.rule === "no-stripped-metadata-key") ??
+			[];
+		const inMetadata = metadataHits.filter((v) =>
+			v.path.includes(".metadata."),
+		).length;
+		expect(inMetadata).toBe(DIRTY_EVENT_ROWS.length * 2);
+		expect(metadataHits.length - inMetadata).toBe(3);
 	});
 });

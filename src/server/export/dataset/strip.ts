@@ -6,6 +6,7 @@ import {
 	STRIPPED_METADATA_KEYS,
 } from "@/server/export/egress/forbidden-keys";
 
+import { maskRemovedComment } from "./removed";
 import { COLUMN_TREATMENTS } from "./treatments";
 
 /**
@@ -145,7 +146,11 @@ export function stripPayload(eventType: string, payload: unknown): unknown {
  * the release. Re-nulling here would be a no-op; *stripping* here would delete
  * a column that ships.
  */
-export function stripRow(table: string, row: SourceRow): SourceRow {
+export function stripRow(
+	table: string,
+	row: SourceRow,
+	opts: { removedCommentIds?: ReadonlySet<string> } = {},
+): SourceRow {
 	const treatments = (
 		COLUMN_TREATMENTS as Record<string, Record<string, string>>
 	)[table];
@@ -158,8 +163,20 @@ export function stripRow(table: string, row: SourceRow): SourceRow {
 		);
 	}
 
+	// ⚠ Reactive-removal masking, BEFORE the column walk. Removal is
+	// read-side (a `content_removed` mod_actions row; no write to `comments`),
+	// so a read that does not intersect the removed set publishes the body —
+	// CLAUDE.md §5.14 SC-1. See `removed.ts` for why this withholds absent a
+	// ruling rather than shipping per Appendix B.6's bare SHIP.
+	const source =
+		table === "comments" &&
+		typeof row.id === "string" &&
+		opts.removedCommentIds?.has(row.id)
+			? maskRemovedComment(row)
+			: row;
+
 	const out: SourceRow = {};
-	for (const [col, value] of Object.entries(row)) {
+	for (const [col, value] of Object.entries(source)) {
 		if (treatments[col] === "STRIP") continue;
 
 		if (col === "metadata") {
@@ -167,7 +184,7 @@ export function stripRow(table: string, row: SourceRow): SourceRow {
 			continue;
 		}
 		if (col === "payload" && PAYLOAD_BEARING_TABLES.has(table)) {
-			out[col] = stripPayload(String(row.event_type), value);
+			out[col] = stripPayload(String(source.event_type), value);
 			continue;
 		}
 		out[col] = value;
@@ -179,8 +196,9 @@ export function stripRow(table: string, row: SourceRow): SourceRow {
 export function stripTable(
 	table: string,
 	rows: readonly SourceRow[],
+	opts: { removedCommentIds?: ReadonlySet<string> } = {},
 ): SourceRow[] {
-	return rows.map((r) => stripRow(table, r));
+	return rows.map((r) => stripRow(table, r, opts));
 }
 
 /**

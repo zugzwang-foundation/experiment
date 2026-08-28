@@ -137,6 +137,20 @@ const COMMENT_ID = "0192f3a4-eeee-7000-8000-00000000cm01";
 const UPLOAD_ID = "0192f3a4-ffff-7000-8000-00000000up01";
 const AT = "2026-10-01T12:00:00.000Z";
 
+/** A comment an admin reactively removed (ADR-0021). */
+export const REMOVED_COMMENT_ID = "0192f3a4-babe-7000-8000-00000000cm02";
+
+/**
+ * The removed comment's body, as a distinctive canary.
+ *
+ * ⚠ Deliberately a phrase that appears nowhere else in the fixture, the
+ * source, or ordinary prose — so that scanning the emitted archive for it is
+ * a decisive test. A generic body ("removed text") could plausibly collide
+ * with something else and make a passing scan meaningless.
+ */
+export const REMOVED_COMMENT_BODY =
+	"REMOVED-BODY-CANARY the moderator took this argument down for harassment";
+
 /**
  * **One row per `EVENT_TYPES` member — all 24.** Each carries every key its
  * §19.4.1 rule strips, plus a full dirty `metadata`.
@@ -576,6 +590,23 @@ export const DIRTY_TABLE_ROWS = {
 	],
 	comments: [
 		{
+			// ⚠ A REACTIVELY REMOVED comment. Removal is read-side — a
+			// `content_removed` mod_actions row and NO write to `comments` —
+			// so this row looks entirely ordinary here, which is exactly why a
+			// dataset read that does not intersect the removed set publishes
+			// it. The body is a distinctive canary so a value scan over the
+			// emitted bytes can prove it did not ship.
+			id: REMOVED_COMMENT_ID,
+			user_id: FIXTURE_USER_IDS.basalt,
+			market_id: MARKET_ID,
+			parent_comment_id: null,
+			body: REMOVED_COMMENT_BODY,
+			image_uploads_id: UPLOAD_ID,
+			side_at_post_time: "NO",
+			bet_id: null,
+			created_at: AT,
+		},
+		{
 			id: COMMENT_ID,
 			user_id: FIXTURE_USER_IDS.amber,
 			market_id: MARKET_ID,
@@ -641,6 +672,24 @@ export const DIRTY_TABLE_ROWS = {
 		},
 	],
 	mod_actions: [
+		{
+			// The reactive removal itself. `reason` and `target_comment_id`
+			// both SHIP (B.10) — which is what makes an unmasked comments read
+			// worse than a plain leak: the archive would carry a labelled
+			// index of precisely which bodies had been removed.
+			id: "0192f3a4-7b7b-7000-8000-00000000ma02",
+			target_user_id: FIXTURE_USER_IDS.basalt,
+			target_comment_id: REMOVED_COMMENT_ID,
+			target_bet_id: null,
+			target_market_id: MARKET_ID,
+			reason: "content_removed",
+			verdict: null,
+			categories: {},
+			blocked_text: null,
+			image_r2_key: null,
+			actor_id: ADMIN_SENTINEL,
+			created_at: AT,
+		},
 		{
 			id: "0192f3a4-6f6f-7000-8000-00000000ma01",
 			target_user_id: FIXTURE_USER_IDS.basalt,

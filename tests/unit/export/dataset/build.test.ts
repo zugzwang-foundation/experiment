@@ -6,7 +6,13 @@ import {
 	harvestSecrets,
 } from "@/server/export/dataset/build";
 import { countCsvRows, escapeField, toCsv } from "@/server/export/dataset/csv";
+import {
+	buildPseudonymMap,
+	pseudonymizeTable,
+} from "@/server/export/dataset/pseudonymize";
+import { removedCommentIds } from "@/server/export/dataset/removed";
 import { fixtureSource } from "@/server/export/dataset/source";
+import { stripTable } from "@/server/export/dataset/strip";
 import {
 	createTarGz,
 	GZIP_MTIME_OFFSET,
@@ -313,21 +319,75 @@ describe("build · secrets are harvested from SOURCE rows", () => {
 		expect(s.adminSessionIds.size).toBeGreaterThanOrEqual(2);
 	});
 
-	it("POSITIVE CONTROL — harvesting POST-transform yields an empty set", () => {
-		// The ordering trap, made visible. Harvesting after the strip
-		// collects what survived and asserts its absence — a tautology that
-		// passes on every input including a completely unstripped one.
-		return build().then((r) => {
-			const post: Record<string, unknown[]> = {};
-			for (const a of r.artifacts) {
-				post[a.filename.replace(".csv", "")] = [];
-			}
-			const s = harvestSecrets(post as never);
-			expect(s.emails.size).toBe(0);
-			expect(s.ips.size).toBe(0);
-			// …whereas the source harvest is populated. That difference is
-			// the whole reason `harvestSecrets` is called before the transform.
-			expect(harvestSecrets(DIRTY_TABLE_ROWS as never).emails.size).toBe(2);
-		});
+	it("POSITIVE CONTROL — harvesting POST-transform yields an EMPTY set", () => {
+		// ⚠ This test's first version was not a control at all, and the fault
+		// is worth keeping. It built its "post-transform" input as a record of
+		// EMPTY ARRAYS and then asserted the harvest was empty — which is true
+		// of every implementation, correct or broken, because there was
+		// nothing to harvest from. It proved `harvestSecrets({}) === {}`.
+		//
+		// The real control harvests from the ACTUAL transformed rows. Those
+		// rows are non-empty and structurally complete; they simply no longer
+		// carry secrets, because the transform removed them. That is what
+		// makes the emptiness meaningful — and it is exactly the tautology
+		// the pipeline would become if `harvestSecrets` ran after the strip.
+		const map = buildPseudonymMap(DIRTY_TABLE_ROWS.users);
+		const transformed: Record<string, unknown[]> = {};
+		for (const table of Object.keys(DIRTY_TABLE_ROWS)) {
+			transformed[table] = pseudonymizeTable(
+				table,
+				stripTable(
+					table,
+					DIRTY_TABLE_ROWS[table as keyof typeof DIRTY_TABLE_ROWS] as never,
+					{
+						removedCommentIds: removedCommentIds(DIRTY_TABLE_ROWS.mod_actions),
+					},
+				),
+				map,
+			);
+		}
+
+		// The rows really are there — without this, the assertions below are
+		// the same vacuous claim in a new costume.
+		expect((transformed.users as unknown[]).length).toBe(3);
+		expect((transformed.events as unknown[]).length).toBe(24);
+
+		const post = harvestSecrets(transformed as never);
+
+		// Three classes go to zero — nothing survived the strip to harvest.
+		expect(post.emails.size).toBe(0);
+		expect(post.ips.size).toBe(0);
+		expect(post.googleIds.size).toBe(0);
+		expect(post.userAgents.size).toBe(0);
+
+		// ⚠ Two classes are NON-empty, and writing this control is how that
+		// was discovered. Both are correct, and both sharpen the point:
+		//
+		//  · `userIds` still holds all three — because `users.id` is
+		//    preserved in the `users` table by design (§19.5's one
+		//    exemption). A post-transform harvest would therefore build a
+		//    secret set containing ids that legitimately ship, and then flag
+		//    `users.csv` as a violation of itself.
+		//  · `adminSessionIds` holds exactly one value: the REDACTION
+		//    SENTINEL. A post-transform harvest would treat the placeholder
+		//    as a secret and flag every row carrying it — a false positive
+		//    manufactured by the pipeline's own output.
+		//
+		// So harvesting late does not merely weaken the guards; it poisons
+		// them in both directions at once.
+		expect(post.userIds.size).toBe(3);
+		expect([...post.adminSessionIds]).toEqual(["[redacted-admin-session]"]);
+		for (const real of FIXTURE_SECRET_VALUES.adminSessionIds) {
+			expect(post.adminSessionIds.has(real)).toBe(false);
+		}
+
+		// …whereas the SOURCE harvest is populated. That difference is the
+		// whole reason `harvestSecrets` is called before the transform: run it
+		// after, and every guard downstream asserts the absence of a set that
+		// is empty by construction, passing on every input forever.
+		const pre = harvestSecrets(DIRTY_TABLE_ROWS as never);
+		expect(pre.emails.size).toBe(2);
+		expect(pre.ips.size).toBe(3);
+		expect(pre.adminSessionIds.size).toBeGreaterThanOrEqual(2);
 	});
 });

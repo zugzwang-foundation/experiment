@@ -16,6 +16,7 @@ import {
 	type PseudonymMap,
 	pseudonymizeTable,
 } from "./pseudonymize";
+import { removedCommentIds } from "./removed";
 import type { DatasetSource } from "./source";
 import { type SourceRow, stripTable } from "./strip";
 import { createTarGz, sha256, type TarEntry } from "./tar";
@@ -174,6 +175,10 @@ export async function buildDataset(opts: BuildOptions): Promise<BuildResult> {
 	const secrets = harvestSecrets(sourceRows);
 	const map: PseudonymMap = buildPseudonymMap(sourceRows.users ?? []);
 
+	// Derived from `mod_actions` rows already in hand — the same predicate
+	// `loadRemovedSet` uses, never a second idea of what removal means.
+	const removed = removedCommentIds(sourceRows.mod_actions ?? []);
+
 	// ── 4 · transform, guard, serialize ─────────────────────────────────
 	const artifacts: CsvArtifact[] = [];
 	const results: TableResult[] = [];
@@ -181,7 +186,9 @@ export async function buildDataset(opts: BuildOptions): Promise<BuildResult> {
 	for (const table of tables) {
 		const transformed = pseudonymizeTable(
 			table,
-			stripTable(table, sourceRows[table] ?? []),
+			stripTable(table, sourceRows[table] ?? [], {
+				removedCommentIds: removed,
+			}),
 			map,
 		);
 
@@ -266,7 +273,16 @@ export async function buildDataset(opts: BuildOptions): Promise<BuildResult> {
 		withheld: Object.entries(TABLE_INVENTORY)
 			.filter(([, e]) => e.status !== "SHIPPED")
 			.map(([name, e]) => ({ name, reason: `${e.status} — ${e.source}` })),
-		notes: opts.notes ?? [],
+		notes: [
+			...(opts.notes ?? []),
+			...(removed.size > 0
+				? [
+						`${removed.size} comment(s) were reactively removed by ` +
+							"moderation; their rows ship with the body and image FK " +
+							"withheld. mod_actions records that the removal happened.",
+					]
+				: []),
+		],
 	};
 
 	return { manifest, tarball, artifacts, results };

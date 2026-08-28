@@ -30,13 +30,22 @@ export interface WalkEntry {
  * Depth-first walk of any JSON-shaped value, yielding every node — objects,
  * arrays and leaves alike.
  *
- * Cycle-safe via a `WeakSet`: export rows come from `postgres` and are plain
- * JSON, but a guard that infinite-loops on a cycle fails open in the worst
- * possible way (the build hangs, someone kills it, and the artifact from the
- * previous run gets shipped).
+ * Cycle-safe, because a guard that infinite-loops fails open in the worst
+ * possible way: the build hangs, someone kills it, and the artifact from the
+ * previous run ships.
+ *
+ * ⚠ **Cycle detection tracks the ANCESTOR PATH, not every object ever seen.**
+ * The obvious implementation — one `WeakSet` of visited objects for the whole
+ * traversal — also skips the *second* reference to an object, which is not a
+ * cycle at all. A fixture or an in-memory source that hoists a shared
+ * `metadata` const into several rows is a completely natural thing to write,
+ * and under a global `WeakSet` every row after the first would go unscanned
+ * while the guard reported success. Rows parsed from `postgres` are always
+ * fresh objects, so this never bit in production — which is precisely what
+ * would have made it survive.
  */
 export function* walk(root: unknown, rootPath = ""): Generator<WalkEntry> {
-	const seen = new WeakSet<object>();
+	const ancestors = new Set<object>();
 
 	function* visit(
 		value: unknown,
@@ -46,19 +55,24 @@ export function* walk(root: unknown, rootPath = ""): Generator<WalkEntry> {
 		yield { path, key, value };
 
 		if (value === null || typeof value !== "object") return;
-		if (seen.has(value)) return;
-		seen.add(value);
+		// A true cycle: this object is its own ancestor.
+		if (ancestors.has(value)) return;
+		ancestors.add(value);
 
 		if (Array.isArray(value)) {
 			for (const [i, item] of value.entries()) {
 				yield* visit(item, `${path}[${i}]`, null);
 			}
+			ancestors.delete(value);
 			return;
 		}
 
 		for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
 			yield* visit(v, path === "" ? k : `${path}.${k}`, k);
 		}
+		// Leaving this subtree — it is no longer an ancestor, so a sibling
+		// holding the same reference is still scanned.
+		ancestors.delete(value);
 	}
 
 	yield* visit(root, rootPath, null);

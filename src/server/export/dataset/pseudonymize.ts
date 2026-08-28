@@ -28,6 +28,27 @@ import { COLUMN_TREATMENTS } from "./treatments";
  *      for every row including the sentinel ones, which mislabels the sentinel
  *      as a pseudonym.
  *
+ *      ⚠ **DIVERGENCE, and it is the fourth — flagged, not silent.** The rule
+ *      above follows Appendix **B.13** (`events`) and applies it uniformly.
+ *      Appendix **B.12** (`user_events`) says something different for the same
+ *      key: `metadata.actor_id` *"rewritten to `actor_pseudonym`"* — a rename
+ *      — and **B.11** (`admin_events`) says something different again, marking
+ *      `metadata.user_id` a plain `SHIP_KEY` with no rename at all. Three
+ *      appendix sections, three treatments, one JSONB key.
+ *
+ *      Uniform-per-B.13 is chosen because `user_events.metadata.actor_id` is
+ *      self-actor (it echoes `user_id`), so under B.12 the same identity would
+ *      arrive twice under two different key names in one object — and because
+ *      a per-table key name makes the three audit tables structurally
+ *      incomparable for no research gain.
+ *
+ *      **Nil impact today**, and that is why it is a comment rather than a
+ *      halt: `admin_events` and `user_events` both have ZERO writers, so both
+ *      ship empty. It becomes live the moment either gains one — which the
+ *      `ADMIN-EVENTS-WRITER` projection would do. **Needs a web-authored
+ *      ruling before that lands.** (Surfaced by `@test-writer` M-2; the plan's
+ *      §6 item 4 justified this from B.13 alone and had not read B.12.)
+ *
  *   3. **Nested JSONB rewrite.** `events.metadata.user_id` →
  *      `events.metadata.user_pseudonym`, inside the JSONB value. The brief
  *      names this as the path most likely to be missed, and it is: it is the
