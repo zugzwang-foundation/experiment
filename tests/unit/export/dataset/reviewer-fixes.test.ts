@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
 	assertCountsAgree,
 	buildDataset,
+	harvestSecrets,
 	type TableResult,
 } from "@/server/export/dataset/build";
 import { countCsvRows, escapeField, toCsv } from "@/server/export/dataset/csv";
@@ -21,6 +22,7 @@ import {
 } from "@/server/export/dataset/inventory";
 import { fixtureSource } from "@/server/export/dataset/source";
 import { contentSha256, createTar } from "@/server/export/dataset/tar";
+import { EgressGuard } from "@/server/export/egress";
 
 import {
 	DIRTY_TABLE_ROWS,
@@ -295,16 +297,115 @@ describe("H-4 · the three STRIP columns that had no VALUE guard", () => {
 		});
 	});
 
-	it("the three classes are guarded on the .md arm too", () => {
-		// `assertTextClean` keeps its own class list, so a class can be
-		// guarded on CSV and blind on Markdown — where a real name
-		// interpolated into prose is the likeliest way it would appear.
+	it("a real display name in a .md is an ADVISORY, not an abort", () => {
+		// ⚠ This test asserted a THROW, and that was the defect
+		// `@security-auditor` F-11 H-B found: it pinned as intended behaviour
+		// the very denial-of-service the CSV-arm fix had just closed. A
+		// display name is something a participant writes; halting on it hands
+		// anyone named "Li" an abort switch on the release.
+		const secrets = fixtureSecrets();
+		const entries = debateEntries(
+			[{ slug: "named", markdown: "# Debate\n\nby Amber Real Name\n" }],
+			secrets,
+		);
+		expect(entries).toHaveLength(1);
+	});
+
+	it("a MACHINE-GENERATED secret in a .md still aborts", () => {
+		// The control that keeps the tier honest. A user-agent string has no
+		// business in an argument, so one appearing is a serializer leak.
 		const secrets = fixtureSecrets();
 		expect(() =>
 			debateEntries(
-				[{ slug: "leaky", markdown: "# Debate\n\nby Amber Real Name\n" }],
+				[
+					{
+						slug: "leaky",
+						markdown: `# Debate\n\nUA: ${[...secrets.userAgents][0]}\n`,
+					},
+				],
 				secrets,
 			),
 		).toThrow(/egress_violation/);
+	});
+});
+
+describe("F-11 · the sentinel and tier corrections", () => {
+	it("H-A · `unknown` / `cron` are NOT harvested as secrets", () => {
+		// Six live emit sites write `ip: "unknown"`. Harvested, it becomes a
+		// secret — and `request_id` is `"unknown"` at those same sites and
+		// SHIPS, so the guard fires on a field that must survive and the
+		// release cannot build. Seven characters, so the length floor misses
+		// it; the fix has to be semantic.
+		const s = harvestSecrets(DIRTY_TABLE_ROWS as never);
+		expect(s.ips.has("unknown")).toBe(false);
+		expect(s.ips.has("cron")).toBe(false);
+		expect(s.userAgents.has("unknown")).toBe(false);
+		expect(s.userAgents.has("vercel-cron")).toBe(false);
+
+		// POSITIVE CONTROL — the fixture provably carries those rows, and the
+		// real addresses beside them are still harvested.
+		const sentinelRow = DIRTY_TABLE_ROWS.events.find(
+			(r) => (r.metadata as Record<string, unknown>).ip === "unknown",
+		);
+		expect(sentinelRow).toBeDefined();
+		expect(s.ips.has("203.0.113.7")).toBe(true);
+	});
+
+	it("H-A · the full build completes with sentinel rows present", () => {
+		// The end-to-end claim: this is what would have failed on 6 November.
+		return buildDataset({
+			source: fixtureSource("fixture", DIRTY_TABLE_ROWS as never),
+			releaseDate: "2026-11-06",
+		}).then((r) => {
+			const events = r.artifacts.find((a) => a.filename === "events.csv");
+			// `request_id: "unknown"` SHIPS, and shipping it is the point.
+			expect(events?.text).toContain("unknown");
+			expect(r.manifest.tables).toHaveLength(16);
+		});
+	});
+
+	it("H-C · blocked_text is FATAL on its own column, not an advisory", () => {
+		// Putting `blocked_text` in FREE_TEXT_COLUMNS disabled the value class
+		// on the one real column it was created to protect — if the STRIP were
+		// ever lost, the rejected body would ship with an advisory line and a
+		// zero exit code.
+		const g = new EgressGuard({
+			...fixtureSecrets(),
+			blockedTexts: new Set(["the rejected comment body, retained"]),
+		});
+		g.assertNoBlockedTexts("mod_actions", [
+			{ blocked_text: "the rejected comment body, retained" },
+		]);
+		expect(g.findings.map((f) => f.rule)).toContain("no-blocked-text");
+	});
+
+	it("H-C · a re-posted body in comments.body is STILL only an advisory", () => {
+		// The tier must keep its original job: the re-post attack it was built
+		// for only ever needed `body`.
+		const g = new EgressGuard({
+			...fixtureSecrets(),
+			blockedTexts: new Set(["the rejected comment body, retained"]),
+		});
+		g.assertNoBlockedTexts("comments", [
+			{ body: "the rejected comment body, retained" },
+		]);
+		expect(g.findings).toHaveLength(0);
+		expect(g.advisories.map((f) => f.rule)).toContain("no-blocked-text");
+	});
+
+	it("M-A · the manifest publishes advisory COUNTS, never row paths", () => {
+		// §19.7 serves this manifest publicly. A path like
+		// `[no-email] comments @ [412].body` is a machine-readable oracle
+		// binding a pseudonym to a confirmed real identity substring.
+		return buildDataset({
+			source: fixtureSource("fixture", DIRTY_TABLE_ROWS as never),
+			releaseDate: "2026-11-06",
+		}).then((r) => {
+			for (const line of r.manifest.advisories) {
+				expect(line).not.toMatch(/@|\[\d+\]/);
+				expect(line).toMatch(/^[a-z-]+: \d+$/);
+			}
+			expect(typeof r.manifest.skipped_needles).toBe("number");
+		});
 	});
 });

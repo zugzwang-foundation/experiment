@@ -520,6 +520,65 @@ if (missing.length > 0) {
 	);
 }
 
+/**
+ * Rows whose `metadata` carries the LITERAL PLACEHOLDERS the application
+ * writes when the real value is unavailable.
+ *
+ * ⚠ Not decoration — without these the fixture cannot fail the way production
+ * fails. Six live emit sites write `ip: "unknown"` / `user_agent: "unknown"`
+ * (`auth/logout.ts`, `auth/admin/logout.ts`, `auth/post-commit-events.ts` ×2,
+ * `auth/tos-accept.ts`, `moderation/consequences.ts`), and the orphan sweep
+ * writes `ip: "cron"` / `user_agent: "vercel-cron"`.
+ *
+ * Harvested naively, `"unknown"` becomes a secret — and `request_id` is ALSO
+ * `"unknown"` at those sites and SHIPS per §19.4, so the guard fires on a
+ * field that is supposed to survive and the release build cannot complete.
+ * `MIN_NEEDLE_LENGTH` does not save it: `"unknown"` is seven characters.
+ *
+ * Found by `@security-auditor` at the F-11 re-audit, and it is the SAME class
+ * as the `market.created` defect one commit earlier — a fixture modelling
+ * `metadata.ip` only ever as a real address. This is the control that would
+ * have caught both.
+ */
+export const SENTINEL_EVENT_ROWS: readonly DirtyEventRow[] = [
+	{
+		event_id: "0192f3a4-00ff-7000-8000-00000000se01",
+		event_type: "user.signed_out",
+		aggregate_type: "user",
+		aggregate_id: BASALT,
+		payload: { userId: BASALT },
+		payload_version: 1,
+		metadata: {
+			request_id: "unknown",
+			flow_id: "F-AUTH-5",
+			user_id: BASALT,
+			actor_id: BASALT,
+			idempotency_key: null,
+			ip: "unknown",
+			user_agent: "unknown",
+		},
+		created_at: AT,
+	},
+	{
+		event_id: "0192f3a4-00fe-7000-8000-00000000se02",
+		event_type: "image_upload.orphaned",
+		aggregate_type: "image_upload",
+		aggregate_id: UPLOAD_ID,
+		payload: { key: R2_B, uploadId: UPLOAD_ID },
+		payload_version: 1,
+		metadata: {
+			request_id: "unknown",
+			flow_id: "F-IMG-4",
+			user_id: null,
+			actor_id: SYSTEM_SENTINEL,
+			idempotency_key: null,
+			ip: "cron",
+			user_agent: "vercel-cron",
+		},
+		created_at: AT,
+	},
+];
+
 // ── the dirty TABLE rows (§19.3's 16 shipped tables) ───────────────────
 
 /**
@@ -815,7 +874,7 @@ export const DIRTY_TABLE_ROWS = {
 			created_at: AT,
 		},
 	],
-	events: DIRTY_EVENT_ROWS,
+	events: [...DIRTY_EVENT_ROWS, ...SENTINEL_EVENT_ROWS],
 } as const satisfies Record<string, readonly object[]>;
 
 /**

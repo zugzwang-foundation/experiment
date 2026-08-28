@@ -173,10 +173,37 @@ describe("egress · every EgressSecrets field is consumed by the guards", () => 
 		// asymmetry is exactly what this half catches.
 		const md = `# Debate\n\nsomething something ${canaryFor(field)} etc.\n`;
 
+		// ⚠ Asserts the class is CONSUMED on this arm, fatally or as an
+		// advisory — not that it throws.
+		//
+		// The text arm is tiered by machine-generated vs human-authorable
+		// (`assertions.ts`): a UUID / IP / user-agent / Google id / R2 key /
+		// session token in a debate document is a serializer leak and halts;
+		// an email, display name, avatar URL or previously-blocked body is
+		// something a participant wrote, and halting on it hands anyone named
+		// "Li" an abort switch on a one-shot release (`@security-auditor`
+		// F-11 H-B).
+		//
+		// Demanding a throw for every class would pin that denial-of-service
+		// as intended behaviour — which is exactly what the version of this
+		// assertion it replaces did. What must not regress is a class going
+		// UNSEEN, and that is what is asserted.
+		let threw = false;
+		let advisories: readonly { rule: string }[] = [];
+		try {
+			advisories = assertTextArtifactClean(
+				"d.md",
+				md,
+				secretsWithOnly(field),
+			).advisories;
+		} catch (e) {
+			threw = e instanceof EgressViolationError;
+		}
+
 		expect(
-			() => assertTextArtifactClean("d.md", md, secretsWithOnly(field)),
-			`${field} is guarded on CSV rows but not on rendered text`,
-		).toThrow(EgressViolationError);
+			threw || advisories.length > 0,
+			`${field} is guarded on CSV rows but is INVISIBLE on rendered text`,
+		).toBe(true);
 	});
 
 	it("POSITIVE CONTROL — the same rows pass when the class is empty", () => {
@@ -185,13 +212,14 @@ describe("egress · every EgressSecrets field is consumed by the guards", () => 
 		for (const field of fields) {
 			const rows = [{ id: "1", some_innocuous_column: canaryFor(field) }];
 			expect(() => assertTableClean("t", rows, emptySecrets())).not.toThrow();
-			expect(() =>
-				assertTextArtifactClean(
-					"d.md",
-					`# Debate\n\n${canaryFor(field)}\n`,
-					emptySecrets(),
-				),
-			).not.toThrow();
+			const out = assertTextArtifactClean(
+				"d.md",
+				`# Debate\n\n${canaryFor(field)}\n`,
+				emptySecrets(),
+			);
+			// Neither fatal NOR advisory — proves the signal above came from
+			// the secret set rather than from the canary's shape.
+			expect(out.advisories, `${field} advisory on an empty set`).toEqual([]);
 		}
 	});
 });

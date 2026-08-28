@@ -195,10 +195,17 @@ export function stripRow(
 	// so a read that does not intersect the removed set publishes the body —
 	// CLAUDE.md §5.14 SC-1. See `removed.ts` for why this withholds absent a
 	// ruling rather than shipping per Appendix B.6's bare SHIP.
+	// ⚠ `opts.removedCommentIds.has(…)`, NOT `?.has(…)`. The optional chain
+	// turned a missing set into `undefined` → falsy → no masking and NO
+	// ERROR, which sawed the brace off the belt: the required type is the
+	// compile-time guarantee, and this throw is the runtime one for any
+	// caller that reaches here through an `any` seam, a JSON-shaped options
+	// object, or a `tsx` script without full type coverage
+	// (`@security-auditor` F-11 M-C).
 	const source =
 		table === "comments" &&
 		typeof row.id === "string" &&
-		opts.removedCommentIds?.has(row.id)
+		opts.removedCommentIds.has(row.id)
 			? maskRemovedComment(row)
 			: row;
 

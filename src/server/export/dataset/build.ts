@@ -84,8 +84,17 @@ export interface DatasetManifest {
 		readonly metadata_fields_excluded?: readonly string[];
 	}[];
 	/** §19.3 rows that are NOT in the archive, and why. */
-	/** Non-fatal egress findings — see `FREE_TEXT_COLUMNS`. */
+	/**
+	 * Non-fatal egress findings, as per-rule COUNTS. Never per-row paths —
+	 * this manifest is published, and a path is a re-identification aid.
+	 */
 	readonly advisories: readonly string[];
+	/**
+	 * Needles too short to scan safely (`MIN_NEEDLE_LENGTH`). Non-zero means
+	 * a value class is not fully covered — reported so the gap is visible
+	 * rather than silent.
+	 */
+	readonly skipped_needles: number;
 	readonly withheld: readonly {
 		readonly name: string;
 		readonly reason: string;
@@ -108,6 +117,39 @@ export interface BuildOptions {
 	readonly extraEntries?: readonly TarEntry[];
 	readonly notes?: readonly string[];
 }
+
+/**
+ * Literal placeholders this codebase writes into `metadata.ip` and
+ * `metadata.user_agent` where the real value is not available.
+ *
+ * ⚠ **Excluding these is not tidiness; without it the release build cannot
+ * complete.** Six live emit sites write `ip: "unknown"` / `user_agent:
+ * "unknown"` (`auth/logout.ts`, `auth/admin/logout.ts`,
+ * `auth/post-commit-events.ts` ×2, `auth/tos-accept.ts`,
+ * `moderation/consequences.ts`) and the orphan sweep writes `ip: "cron"` /
+ * `user_agent: "vercel-cron"`. Harvested, `"unknown"` becomes a secret — and
+ * `request_id` is ALSO `"unknown"` at those sites and SHIPS per §19.4, so the
+ * value guard fires on a field that is supposed to survive. Every sign-out,
+ * ToS accept, moderation consequence and sweep row fails, and every debate
+ * document containing the ordinary English word "unknown" fails with them.
+ *
+ * Measured by `@security-auditor` at the F-11 re-audit — and it is the SAME
+ * class as the `market.created` defect one commit earlier: the fixture models
+ * `metadata.ip` as an RFC-5737 address and never as the sentinel the
+ * application actually writes, so nothing on the branch could see it. A
+ * fixture simpler than production cannot fail the way production fails, and
+ * that lesson had to be learned twice.
+ *
+ * `MIN_NEEDLE_LENGTH` does not cover this: `"unknown"` is seven characters.
+ * The fix has to be semantic, not dimensional.
+ */
+export const NON_SECRET_SENTINELS = new Set([
+	"unknown",
+	"cron",
+	"vercel-cron",
+	"system",
+	"admin-singleton",
+]);
 
 /**
  * Harvest every secret value from the SOURCE rows.
@@ -133,7 +175,9 @@ export function harvestSecrets(
 	};
 
 	const add = (set: Set<string>, v: unknown) => {
-		if (typeof v === "string" && v.trim() !== "") set.add(v);
+		if (typeof v !== "string" || v.trim() === "") return;
+		if (NON_SECRET_SENTINELS.has(v)) return;
+		set.add(v);
 	};
 
 	for (const row of tables.users ?? []) {
@@ -214,6 +258,19 @@ export function assertCountsAgree(results: readonly TableResult[]): void {
 	}
 }
 
+/** Per-rule counts — the publishable shape of the advisory tier. */
+function summarizeAdvisories(
+	advisories: readonly EgressViolation[],
+): readonly string[] {
+	const byRule = new Map<string, number>();
+	for (const a of advisories) {
+		byRule.set(a.rule, (byRule.get(a.rule) ?? 0) + 1);
+	}
+	return [...byRule.entries()]
+		.sort(([a], [b]) => (a < b ? -1 : 1))
+		.map(([rule, n]) => `${rule}: ${n}`);
+}
+
 /** The five metadata fields that ship, for the manifest's per-table entry. */
 const METADATA_TABLES = new Set(["events", "admin_events", "user_events"]);
 
@@ -246,6 +303,7 @@ export async function buildDataset(opts: BuildOptions): Promise<BuildResult> {
 	// text, or a heuristic net firing. Surfaced in the manifest so the
 	// operator sees them, rather than dying on content a participant wrote.
 	const advisories: EgressViolation[] = [];
+	const guardSkips: { rule: string; length: number }[] = [];
 
 	for (const table of tables) {
 		const transformed = pseudonymizeTable(
@@ -257,11 +315,11 @@ export async function buildDataset(opts: BuildOptions): Promise<BuildResult> {
 		);
 
 		// The guards run on exactly the rows about to be written.
-		advisories.push(
-			...assertTableClean(table, transformed, secrets, {
-				isUsersTable: table === "users",
-			}),
-		);
+		const outcome = assertTableClean(table, transformed, secrets, {
+			isUsersTable: table === "users",
+		});
+		advisories.push(...outcome.advisories);
+		guardSkips.push(...outcome.skipped);
 
 		// Column order from the treatment map, not from row 0 — so an empty
 		// table still emits a correct header, and a table whose first row
@@ -303,9 +361,9 @@ export async function buildDataset(opts: BuildOptions): Promise<BuildResult> {
 	// `debateEntries` stays, because failing early with a per-slug message is
 	// friendlier — but it is no longer what makes the archive safe.
 	for (const entry of opts.extraEntries ?? []) {
-		advisories.push(
-			...assertTextArtifactClean(entry.name, entry.content, secrets),
-		);
+		const outcome = assertTextArtifactClean(entry.name, entry.content, secrets);
+		advisories.push(...outcome.advisories);
+		guardSkips.push(...outcome.skipped);
 	}
 
 	const entries: TarEntry[] = [
@@ -368,7 +426,19 @@ export async function buildDataset(opts: BuildOptions): Promise<BuildResult> {
 		withheld: Object.entries(TABLE_INVENTORY)
 			.filter(([, e]) => e.status !== "SHIPPED")
 			.map(([name, e]) => ({ name, reason: `${e.status} — ${e.source}` })),
-		advisories: advisories.map((a) => `[${a.rule}] ${a.artifact} @ ${a.path}`),
+		// ⚠ COUNTS, never paths. An advisory path reads
+		// `[no-email] comments @ [412].body` — and §19.7 serves this manifest
+		// publicly. Published, that is a machine-readable oracle: take data
+		// row 413 of comments.csv, read the pseudonym beside it, and you have
+		// CONFIRMATION that a substring of that body is a real `users.name`
+		// or `users.email` from the source. That is a pseudonym↔identity
+		// binding aid the corpus otherwise withholds by design, manufactured
+		// by the privacy layer itself (`@security-auditor` F-11 M-A).
+		//
+		// The operator gets the paths on the build console, where they are
+		// useful and not published.
+		advisories: summarizeAdvisories(advisories),
+		skipped_needles: guardSkips.length,
 		notes: [
 			...(opts.notes ?? []),
 			// ⚠ DECLINED, and recorded rather than silently accepted

@@ -125,10 +125,27 @@ export const FREE_TEXT_COLUMNS = new Set([
 	"body",
 	"title",
 	"description",
-	"reason",
 	"resolution_note",
-	"blocked_text",
 ]);
+
+/**
+ * ⚠ **`blocked_text` and `reason` are deliberately NOT in that set**, and
+ * removing them is the correction to a fix that cut its own belt.
+ *
+ * `mod_actions.blocked_text` is a REAL COLUMN and is `STRIP` (B.10). Listing
+ * it as free text meant `assertNoBlockedTexts` could never fire fatally on
+ * the one column it exists to protect: if the treatments map ever lost that
+ * `STRIP`, the rejected body would ship in `mod_actions.csv` with an advisory
+ * line and a zero exit code (`@security-auditor` F-11 H-C).
+ *
+ * `reason` is likewise a real column on `mod_actions` and `resolution_events`
+ * — admin free text, not participant free text, and it ships by design.
+ * Downgrading hits under that key name would silence a transform failure on
+ * two shipped columns.
+ *
+ * The re-post attack the tier was built for only ever needed `body`, which is
+ * the column that actually holds a participant's argument.
+ */
 
 /**
  * Is this R2 object key operator-curated market media (`m/<marketId>/…`)?
@@ -398,35 +415,82 @@ export class EgressGuard {
 	 * and it is why the secret set is value-based rather than key-based.
 	 */
 	assertTextClean(artifact: string, text: string): this {
-		const classes: readonly [string, ReadonlySet<string>, string][] = [
-			["no-raw-user-id", this.secrets.userIds, "a raw users.id"],
-			["no-ip", this.secrets.ips, "an ip"],
-			["no-user-agent", this.secrets.userAgents, "a user_agent"],
-			["no-google-id", this.secrets.googleIds, "a google_id"],
-			["no-r2-object-key", this.secrets.r2ObjectKeys, "an R2 object key"],
+		// ⚠ The text arm is TIERED, and the line is not "participant-authored
+		// vs not" — the whole document is participant-authored. The line is
+		// **machine-generated identifier vs human-authorable string.**
+		//
+		// A UUID, an IP, a user-agent string, a Google id, an R2 object key or
+		// a session token has no reason to appear in an argument. The
+		// serializer provably cannot emit one — it consumes only the masked
+		// variants, whose removed forms carry no body or author field at all
+		// (debate-export.md §10.1) — so one appearing is a SERIALIZER LEAK and
+		// must halt.
+		//
+		// An email, a display name, an avatar URL or a previously-blocked body
+		// is something a participant can and does write into an argument.
+		// Halting there is the denial-of-service `@security-auditor` H-4 and
+		// F-11 H-B measured: one participant named "Li" failing every debate
+		// containing "Line".
+		//
+		// A first pass at this downgraded the ENTIRE arm, which went too far —
+		// it would have let a genuine serializer leak of a raw `users.id`
+		// through as an advisory. The tier is the point, not the downgrade.
+		const classes: readonly [string, ReadonlySet<string>, string, boolean][] = [
+			// ── machine-generated: a hit here is a SERIALIZER LEAK. FATAL. ──
+			["no-raw-user-id", this.secrets.userIds, "a raw users.id", true],
+			["no-ip", this.secrets.ips, "an ip", true],
+			["no-user-agent", this.secrets.userAgents, "a user_agent", true],
+			["no-google-id", this.secrets.googleIds, "a google_id", true],
+			["no-r2-object-key", this.secrets.r2ObjectKeys, "an R2 object key", true],
 			[
 				"no-admin-session-id",
 				this.secrets.adminSessionIds,
 				"an admin sessionId",
+				true,
 			],
-			["no-email", this.secrets.emails, "an email"],
-			["no-display-name", this.secrets.displayNames, "a real display name"],
-			["no-avatar-url", this.secrets.avatarUrls, "a Google avatar URL"],
+			// ── human-authorable: self-disclosure, not a defect. ADVISORY. ──
+			["no-email", this.secrets.emails, "an email", false],
+			["no-avatar-url", this.secrets.avatarUrls, "a Google avatar URL", false],
+			[
+				"no-display-name",
+				this.secrets.displayNames,
+				"a real display name",
+				false,
+			],
 			[
 				"no-blocked-text",
 				this.secrets.blockedTexts,
 				"a gate-blocked comment body",
+				false,
 			],
 		];
 
-		for (const [rule, values, noun] of classes) {
-			for (const hit of scanText(text, values)) {
-				this.add({
+		for (const [rule, values, noun, fatal] of classes) {
+			// ⚠ The SAME needle floor the CSV arm uses. This arm had neither
+			// the floor nor the free-text tier — and it is a substring
+			// matcher over a document that is participant prose end to end,
+			// which made it the ONLY arm the H-4 attacks still worked on
+			// (`@security-auditor` F-11 H-B). A display name of "Li" failed
+			// every debate containing the word "Line".
+			const usable = new Set<string>();
+			for (const v of values) {
+				if (v.length >= MIN_NEEDLE_LENGTH) usable.add(v);
+				else this.skipped.push({ rule, length: v.length });
+			}
+
+			for (const hit of scanText(text, usable)) {
+				const entry = {
 					rule,
 					artifact,
 					path: `line ${hit.line}`,
 					detail: `${noun} appears in rendered text (${hit.fingerprint})`,
-				});
+				};
+				if (fatal) this.add(entry);
+				else
+					this.warnings.push({
+						...entry,
+						detail: `${entry.detail} — advisory (participant-authorable)`,
+					});
 			}
 		}
 		return this;
@@ -509,6 +573,21 @@ export class EgressGuard {
 }
 
 /**
+ * What a guard run produced besides throwing.
+ *
+ * ⚠ `skipped` is carried out to the caller because the docblock on
+ * `MIN_NEEDLE_LENGTH` promises skipped needles are *"REPORTED rather than
+ * silently dropped, because a guard that quietly stops covering a class is
+ * the failure this whole layer exists to prevent"* — and until
+ * `@security-auditor` F-11 M-B, nothing outside a test ever read it. A
+ * guarantee with no reader is a sentence, not a mechanism.
+ */
+export interface GuardOutcome {
+	readonly advisories: readonly EgressViolation[];
+	readonly skipped: readonly { rule: string; length: number }[];
+}
+
+/**
  * Run every applicable guard over one exported TABLE and throw on any
  * violation. The single entry point a table writer calls — so that adding a
  * table cannot accidentally opt out of a guard by forgetting to call it.
@@ -518,7 +597,7 @@ export function assertTableClean(
 	rows: unknown,
 	secrets: EgressSecrets,
 	{ isUsersTable = false }: { isUsersTable?: boolean } = {},
-): readonly EgressViolation[] {
+): GuardOutcome {
 	const guard = new EgressGuard(secrets);
 	guard
 		.assertNoRawUserIds(table, rows, { isUsersTable })
@@ -537,7 +616,7 @@ export function assertTableClean(
 	// Advisories are RETURNED, not thrown — a secret inside participant
 	// free text is reported so the operator sees it, without handing any
 	// participant an abort switch on a one-shot release.
-	return guard.advisories;
+	return { advisories: guard.advisories, skipped: guard.skippedNeedles };
 }
 
 /**
@@ -548,11 +627,11 @@ export function assertTextArtifactClean(
 	artifact: string,
 	text: string,
 	secrets: EgressSecrets,
-): readonly EgressViolation[] {
+): GuardOutcome {
 	const guard = new EgressGuard(secrets);
 	guard
 		.assertTextClean(artifact, text)
 		.assertNoBareUuidsInText(artifact, text)
 		.assertClean();
-	return guard.advisories;
+	return { advisories: guard.advisories, skipped: guard.skippedNeedles };
 }

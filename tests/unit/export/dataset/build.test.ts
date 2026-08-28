@@ -350,7 +350,10 @@ describe("build · secrets are harvested from SOURCE rows", () => {
 		// The rows really are there — without this, the assertions below are
 		// the same vacuous claim in a new costume.
 		expect((transformed.users as unknown[]).length).toBe(3);
-		expect((transformed.events as unknown[]).length).toBe(24);
+		// 24 event types + the 2 SENTINEL rows (`ip: "unknown"` / `"cron"`),
+		// which the fixture carries so the harvest's sentinel exclusion has a
+		// control (`@security-auditor` F-11 H-A).
+		expect((transformed.events as unknown[]).length).toBe(26);
 
 		const post = harvestSecrets(transformed as never);
 

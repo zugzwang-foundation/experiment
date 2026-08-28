@@ -306,31 +306,62 @@ describe("egress · rendered TEXT artifacts (the debate .md class)", () => {
 		// rescue: a user_agent has no UUID shape, so only the value scan can
 		// see it. Without this, breaking `scanText` would leave four of the
 		// five text tests green.
+		//
+		// ⚠ A user_agent is MACHINE-GENERATED, so it stays FATAL on this arm.
+		// That is the tier: a participant has no reason to type a UA string
+		// into an argument, so one appearing is a serializer leak.
 		const leaked = `${md}\nUA: ${FIXTURE_SECRET_VALUES.userAgents[0]}`;
 		const g = new EgressGuard(secrets);
 		g.assertTextClean("m/metro/debate.md", leaked);
 		expect(g.findings.map((f) => f.rule)).toContain("no-user-agent");
 	});
 
+	it("a HUMAN-AUTHORABLE secret in prose is an advisory, not fatal", () => {
+		// The other half of the tier. An email is something a participant can
+		// and does write into an argument; halting there aborts a one-shot
+		// release for content they were entitled to write
+		// (`@security-auditor` F-11 H-B).
+		const leaked = `${md}\nreach me at ${FIXTURE_SECRET_VALUES.emails[0]}`;
+		const g = new EgressGuard(secrets);
+		g.assertTextClean("m/metro/debate.md", leaked);
+
+		expect(g.findings).toHaveLength(0);
+		expect(g.advisories.map((f) => f.rule)).toContain("no-email");
+	});
+
+	it("a short display name cannot abort a debate export", () => {
+		// F-11 H-B's measured attack: set your Google display name to "Li",
+		// and every debate document containing the word "Line" dies. The text
+		// arm had neither the needle floor nor the tier.
+		const g = new EgressGuard({ ...secrets, displayNames: new Set(["Li"]) });
+		g.assertTextClean("m/metro/debate.md", "Line 3 opens in November");
+
+		expect(g.findings).toHaveLength(0);
+		expect(g.skippedNeedles.map((n) => n.rule)).toContain("no-display-name");
+	});
+
 	it("reports the LINE, and never the leaked value itself", () => {
+		// ⚠ Reads the ADVISORY channel: an email in prose is human-authorable
+		// and no longer fatal. The redaction property is identical either way,
+		// and it is the property under test.
 		const leaked = `${md}\ncontact: ${FIXTURE_SECRET_VALUES.emails[0]}`;
 		const g = new EgressGuard(secrets);
 		g.assertTextClean("m/metro/debate.md", leaked);
 
-		expect(g.findings).toHaveLength(1);
-		expect(g.findings[0]?.path).toBe("line 6");
+		expect(g.advisories).toHaveLength(1);
+		expect(g.advisories[0]?.path).toBe("line 6");
 		// A violation report is itself an artifact. One that prints the
 		// leaked email into a CI log has moved the leak, not reported it.
-		expect(g.findings[0]?.detail).not.toContain(
+		expect(g.advisories[0]?.detail).not.toContain(
 			FIXTURE_SECRET_VALUES.emails[0],
 		);
 		// ⚠ Pin the fingerprint FORM, not merely "not the whole value".
 		// Widening the slice to 20 would leak 20 of this email's 21
 		// characters into a CI log and still satisfy the assertion above.
-		expect(g.findings[0]?.detail).toContain(
+		expect(g.advisories[0]?.detail).toContain(
 			`${FIXTURE_SECRET_VALUES.emails[0].slice(0, 8)}…`,
 		);
-		expect(g.findings[0]?.detail).not.toContain(
+		expect(g.advisories[0]?.detail).not.toContain(
 			FIXTURE_SECRET_VALUES.emails[0].slice(0, 12),
 		);
 	});
