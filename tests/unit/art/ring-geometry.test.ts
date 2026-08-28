@@ -198,16 +198,50 @@ describe("warli ring geometry — the field, and determinism", () => {
 		);
 	});
 
-	it("keeps the auth card clear of the inner ring — the plan's load-bearing number", () => {
-		// docs/plans/WARLI-1.md §3: the card is max-w-md (448) less px-4 either
-		// side = 416 wide, and about 480 tall, so its half-diagonal is
-		// √(208² + 240²). The inner radius exists to be larger than that number.
-		// If someone later shrinks R_INNER for composition, this is what says no.
-		const cardHalfDiagonal = Math.hypot(416 / 2, 480 / 2);
-		expect(cardHalfDiagonal).toBeCloseTo(317.6, 1);
-		expect(330).toBeGreaterThan(cardHalfDiagonal);
+	it("offsets the whole ring by the phase, computed by hand", () => {
+		// ⚠ EVERY OTHER PLACEMENT TEST IN THIS FILE USES PHASE 0, which cannot tell
+		// a working phase from an ignored one. At phase 45 on a four-ring the
+		// figures land on the diagonals: sin 45 = cos 45 = √2/2, so
+		// 100 · √2/2 = 70.7107.
+		//
+		// What it protects: if `phaseDeg` were dropped, figures would land at
+		// 0/45/90/… while `interstitialAngles` — which IS tested at 22.5 — still
+		// honoured it, so every field motif would land exactly on a figure, and a
+		// figure would sit at exact twelve o'clock, which the 22.5° resting phase
+		// exists to prevent.
+		const placements = ringPlacements({
+			centre: ORIGIN,
+			radius: 100,
+			count: 4,
+			phaseDeg: 45,
+			facing: "outward",
+		});
+		expect(placements.map((p) => p.angleDeg)).toEqual([45, 135, 225, 315]);
+		expect(placements.map((p) => p.foot)).toEqual([
+			{ x: 70.7107, y: -70.7107 },
+			{ x: 70.7107, y: 70.7107 },
+			{ x: -70.7107, y: 70.7107 },
+			{ x: -70.7107, y: -70.7107 },
+		]);
+	});
 
-		// And the outer ring must fit a 1000-tall frame from a centre at y=500.
-		expect(500 - 470).toBe(30);
+	it("emits the transform in APPLY order — translate, then rotate", () => {
+		// SVG composes left to right, so `rotate(90) translate(100 0)` puts the
+		// three-o'clock figure at SIX o'clock — while `ringLinks`, which models
+		// rotate-then-translate in JS, keeps drawing its chord at three. The result
+		// is sixteen figures scattered to the wrong hours around a hand chain
+		// floating where they used to be.
+		//
+		// The determinism check below compares this string to ITSELF and is
+		// structurally incapable of seeing that. This is the assertion that reads
+		// its content.
+		const [, three] = ringPlacements({
+			centre: ORIGIN,
+			radius: 100,
+			count: 4,
+			phaseDeg: 0,
+			facing: "outward",
+		});
+		expect(three?.transform).toBe("translate(100 0) rotate(90)");
 	});
 });

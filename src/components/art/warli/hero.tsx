@@ -116,10 +116,63 @@ function currentRotationDeg(el: Element | null): number {
 	return (Math.atan2(b, a) * 180) / Math.PI;
 }
 
-/** Wraps a angle into (−180, 180]. */
-function wrapSigned(deg: number): number {
+/**
+ * Wraps an angle into `[−180, 180)`.
+ *
+ * ⚠ THE HALF-OPEN END IS THE LOWER ONE: `wrapSigned(180)` returns **−180**, not
+ * 180. Measured, after this docblock claimed the opposite. It makes no
+ * behavioural difference — a half-turn misalignment resolves the same either way
+ * — but a range written the wrong way round is what a later off-by-one gets
+ * built on.
+ */
+export function wrapSigned(deg: number): number {
 	const m = (((deg + 180) % 360) + 360) % 360;
 	return m - 180;
+}
+
+/**
+ * The whole arithmetic of the pointer interaction, as a pure function.
+ *
+ * ⚠ IT IS EXPORTED AND SEPARATE BECAUSE IT COULD NOT OTHERWISE BE TESTED AT ALL.
+ * jsdom runs no animation, so `getComputedStyle(g).transform` there is `none` and
+ * both ring phases read as zero — which means `misalign` is always 0 and the
+ * equal-and-opposite split, the part that actually decides where the rings go,
+ * is never exercised by any test that drives the component. Pulling it out turns
+ * the interesting half into something with hand-checkable inputs and outputs.
+ *
+ * The two moves it makes:
+ *
+ *   1. **Close the gap between the rings.** The counter-rotation shifts every
+ *      pair by the SAME amount, so the two rings are misaligned by one angle, not
+ *      eight — and closing it for one pair closes it for all eight. Each ring
+ *      travels half the distance, which is what makes the gesture read as the
+ *      rings meeting rather than one of them chasing the other.
+ *   2. **Turn both together** by the same small extra, so the pair nearest the
+ *      pointer ends up under it. At most half a step, because `nearest` snaps to
+ *      the step grid first.
+ */
+export function nudgeFor({
+	innerPhase,
+	outerPhase,
+	pointerDeg,
+	phaseDeg = PHASE_DEG,
+	stepDeg = STEP_DEG,
+}: {
+	readonly innerPhase: number;
+	readonly outerPhase: number;
+	readonly pointerDeg: number;
+	readonly phaseDeg?: number;
+	readonly stepDeg?: number;
+}): { readonly inner: number; readonly outer: number } {
+	const misalign = wrapSigned(outerPhase - innerPhase);
+	const settledAt = innerPhase + misalign / 2;
+	const nearest =
+		Math.round((pointerDeg - phaseDeg - settledAt) / stepDeg) * stepDeg;
+	const toPointer = wrapSigned(pointerDeg - (phaseDeg + settledAt + nearest));
+	return {
+		inner: misalign / 2 + toPointer,
+		outer: -misalign / 2 + toPointer,
+	};
 }
 
 export type WarliHeroProps = {
@@ -186,31 +239,23 @@ export function WarliHero({
 			// Clock convention, matching the geometry module: 0° is up, clockwise.
 			const pointerDeg = (Math.atan2(dx, -dy) * 180) / Math.PI;
 
-			/**
-			 * The two rings are misaligned by the same amount at EVERY pair — the
-			 * counter-rotation shifts all eight equally — so bringing one pair
-			 * together brings all eight. Each ring travels half the distance, which
-			 * is what makes the gesture read as the rings meeting rather than as one
-			 * of them chasing the other.
-			 */
-			const misalign = wrapSigned(frame.outerPhase - frame.innerPhase);
-			const settledAt = frame.innerPhase + misalign / 2;
-
-			// Then both rings turn together by the same small extra amount, so the
-			// pair nearest the pointer ends up under it. At most half a step.
-			const nearest =
-				Math.round((pointerDeg - PHASE_DEG - settledAt) / STEP_DEG) * STEP_DEG;
-			const toPointer = wrapSigned(
-				pointerDeg - (PHASE_DEG + settledAt + nearest),
-			);
+			// All the arithmetic lives in `nudgeFor`, which is pure and tested
+			// against hand-computed values — including the non-zero-misalign case
+			// jsdom cannot produce. What is left here is reading the event and
+			// writing two custom properties: no layout, nothing to get wrong.
+			const nudge = nudgeFor({
+				innerPhase: frame.innerPhase,
+				outerPhase: frame.outerPhase,
+				pointerDeg,
+			});
 
 			innerNudgeRef.current?.style.setProperty(
 				"--warli-nudge",
-				`${(misalign / 2 + toPointer).toFixed(3)}deg`,
+				`${nudge.inner.toFixed(3)}deg`,
 			);
 			outerNudgeRef.current?.style.setProperty(
 				"--warli-nudge",
-				`${(-misalign / 2 + toPointer).toFixed(3)}deg`,
+				`${nudge.outer.toFixed(3)}deg`,
 			);
 		};
 
