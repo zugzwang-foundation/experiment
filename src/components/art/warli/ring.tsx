@@ -92,8 +92,22 @@ const FIELD_DENSE: readonly FieldMotif[] = [
 	),
 ];
 
+/**
+ * ⚠ THE SPARE FIELD GROWS AWAY FROM THE GAP, not with the figures.
+ *
+ * The outer ring's figures are turned a half turn so they face inward, at the
+ * band where the two rings confront each other. Applying that same half turn to
+ * the landscape put the trees and houses INSIDE that band, growing toward the
+ * centre — so the one place the eye is supposed to go was the most crowded
+ * place in the drawing, and the confrontation had to compete with a hut.
+ *
+ * Turning the field outward instead puts it in a clean fringe beyond the
+ * figures' feet and leaves the gap empty, which is what makes the gap read as a
+ * gap. Their heights are capped so that fringe never reaches the frame edge at
+ * any rotation phase: 470 + 26 = 496, inside 500.
+ */
 const FIELD_SPARE: readonly FieldMotif[] = [
-	(t, w) => <Tree transform={t} weight={w} />,
+	(t, w) => <Tree transform={t} height={26} spread={9} weight={w} />,
 	(t, w) => <Deer transform={t} weight={w} />,
 	(t, w) => <Hut transform={t} weight={w} />,
 	(t, w) => <Bird transform={t} weight={w} />,
@@ -173,16 +187,29 @@ export function Ring({
 			) : null}
 
 			<g data-warli-ring-links="">
-				{links.map((chord) => (
-					<HandLink
-						key={`${chord.from.x}:${chord.from.y}:${chord.to.x}:${chord.to.y}`}
-						x1={chord.from.x}
-						y1={chord.from.y}
-						x2={chord.to.x}
-						y2={chord.to.y}
-						weight={WEIGHT_SPARE}
-					/>
-				))}
+				{links.map((chord) => {
+					// The link bends along the circle the two hands sit on. Their radii
+					// can differ — the speaker's hand is raised, the child's are low —
+					// so the arc takes the mean, which is exact when they match and a
+					// gentle sweep when they do not.
+					const r1 = Math.hypot(
+						chord.from.x - centre.x,
+						chord.from.y - centre.y,
+					);
+					const r2 = Math.hypot(chord.to.x - centre.x, chord.to.y - centre.y);
+					return (
+						<HandLink
+							key={`${chord.from.x}:${chord.from.y}:${chord.to.x}:${chord.to.y}`}
+							x1={chord.from.x}
+							y1={chord.from.y}
+							x2={chord.to.x}
+							y2={chord.to.y}
+							arcRadius={Number(((r1 + r2) / 2).toFixed(2))}
+							sweep={1}
+							weight={WEIGHT_SPARE}
+						/>
+					);
+				})}
 			</g>
 
 			<g data-warli-ring-field="">
@@ -202,7 +229,15 @@ export function Ring({
 							: radius,
 						angle,
 					);
-					const rotation = facing === "outward" ? angle : angle + 180;
+					// The field turns AWAY from the gap: the dense ring's marks stay with
+					// its figures (they are centred ornaments and carry no up), while
+					// the spare ring's landscape grows outward into a fringe rather than
+					// inward into the confrontation band. See FIELD_SPARE.
+					const rotation = dense
+						? facing === "outward"
+							? angle
+							: angle + 180
+						: angle;
 					return (
 						<g key={`field-${angle}`}>
 							{motif(`translate(${at.x} ${at.y}) rotate(${rotation})`, weight)}

@@ -208,13 +208,29 @@ export const HAND_LINK: PrimitiveSpec = {
  * and this one line is where that is said.
  *
  * Drawn in RING space, not figure space — the caller passes two already-placed
- * hand points, so the link is a straight chord across the gap between them.
+ * hand points.
+ *
+ * ⚠ IT FOLLOWS THE RING, AND THE STRAIGHT VERSION WAS A REAL DEFECT. The first
+ * build joined the hands with a straight chord, which is the obvious reading of
+ * "a line between two hands" and is what a linked chain of eight actually is
+ * geometrically. On screen it was wrong: eight chords at this radius draw a
+ * hard OCTAGON, and the octagon became the subject — a bold polygon with the
+ * figures reduced to specks at its vertices. The piece is about a circle,
+ * because a circle is the shape of something that does not resolve, and a
+ * polygon is a shape with corners and sides and a decision at every vertex.
+ *
+ * Passing `arcRadius` bends the link along the ring instead, so the chain reads
+ * as a band and the figures stay the subject. Caught by looking at it; no
+ * assertion in this repo would have found it, which is the argument for the
+ * standalone preview being the deliverable rather than a nicety.
  */
 export function HandLink({
 	x1,
 	y1,
 	x2,
 	y2,
+	arcRadius,
+	sweep = 1,
 	transform,
 	className,
 	weight = WEIGHT_SPARE,
@@ -223,18 +239,32 @@ export function HandLink({
 	readonly y1: number;
 	readonly x2: number;
 	readonly y2: number;
+	/** Bend the link along a circle of this radius. Omit for a straight chord. */
+	readonly arcRadius?: number;
+	/** SVG arc sweep flag: 1 travels clockwise on screen. */
+	readonly sweep?: 0 | 1;
 }) {
 	return (
 		<g data-warli-id={HAND_LINK.id} transform={transform} className={className}>
-			<line
-				x1={x1}
-				y1={y1}
-				x2={x2}
-				y2={y2}
-				stroke={STROKE}
-				strokeWidth={weight}
-				strokeLinecap="round"
-			/>
+			{arcRadius === undefined ? (
+				<line
+					x1={x1}
+					y1={y1}
+					x2={x2}
+					y2={y2}
+					stroke={STROKE}
+					strokeWidth={weight}
+					strokeLinecap="round"
+				/>
+			) : (
+				<path
+					d={`M ${x1} ${y1} A ${arcRadius} ${arcRadius} 0 0 ${sweep} ${x2} ${y2}`}
+					fill="none"
+					stroke={STROKE}
+					strokeWidth={weight}
+					strokeLinecap="round"
+				/>
+			)}
 		</g>
 	);
 }
