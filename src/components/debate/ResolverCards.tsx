@@ -222,10 +222,12 @@ function ResolutionBlock({
 			// 30px chip that the label and value line stepped over rather than
 			// belonged to. Inflating the glyph is no longer the failure mode; it is
 			// the request. The image is the thing the block is built around, so it
-			// takes the height and the text sits beside it.
-			// ⚠ `items-center` — the two groups centre against each OTHER. The square
-			// opts out below (`self-stretch`) because it is sized BY the row rather
-			// than placed within it.
+			// sits first and the text beside it.
+			// ⚠ `items-center` CENTRES BOTH CHILDREN, and at RESO-4 that includes the
+			// square. It used to opt out with `self-stretch` because it was sized BY
+			// the row; it now declares its own 48px and is placed within the row like
+			// anything else. Corrected here rather than left to disagree with the
+			// element it describes twenty lines down.
 			// ⚠ `justify-between` IS GONE WITH THE COLUMN. It distributed three
 			// children down an unknown height; a row has two children whose widths are
 			// decided by `shrink-0` and `flex-1`, so there is nothing left to
@@ -239,23 +241,37 @@ function ResolutionBlock({
 			// changes only what is INSIDE.
 			className="flex min-h-0 min-w-0 items-center gap-2.5 rounded-(--r) px-[11px] py-2 [border:var(--hairline)]"
 		>
-			{/* ⛔ THE PLACEHOLDER TAKES THE BLOCK'S INNER HEIGHT AND STAYS 1:1.
-			    `self-stretch` overrides the row's `items-center` for this one child so
-			    it fills the content box top to bottom; `aspect-square` then derives the
-			    WIDTH from that height. ⚠ THAT IS WHY NO PIXEL SIZE IS DECLARED HERE:
-			    RESO-2 · CHANGE 4 already moved this number once (44px → 30px) and the
-			    block's height is `flex-1`'s to decide, so any literal would be a second
-			    length needing re-tuning every time the row's height moves — and it
-			    would be re-tuned by hand, or silently not at all. Derived, it cannot
-			    drift. At the shipped 95.99px block with `py-2` that is 79.99px square,
-			    up from 30px.
+			{/* ⛔⛔ THE SQUARE IS 48px BY DECLARATION, AND `self-stretch` IS GONE —
+			    RESO-4, AND A REVERSAL OF THE PARAGRAPH THAT STOOD HERE. That one
+			    argued for deriving the size: `self-stretch` took the block's inner
+			    height and `aspect-square` derived the width from it, so the square
+			    could never fall out of step with a row whose height had already been
+			    hand-tuned once. The reasoning was sound and the OUTCOME was not — at
+			    the shipped 162.43px block the derived square came out 77.99px, which
+			    with 22px of padding and the 10px gap left the text column 50.44px
+			    against labels needing 54 / 61 / 68 / 75px. ⛔ ALL FOUR CLIPPED.
+			    ⇒ The flaw was not the mechanism, it was WHICH LENGTH IT DERIVED FROM.
+			    Deriving the square from the block's HEIGHT let a height decision spend
+			    the WIDTH budget silently — the two are independent here, because block
+			    width comes from `grid-cols-4` over a row whose own width is fixed by
+			    the rail reservation. A declared width is what keeps the text column a
+			    thing somebody chose rather than a remainder.
+			    ⚠ 48px IS CHOSEN AGAINST THE LONGEST LABEL, NOT PICKED TO LOOK RIGHT:
+			    162.43 − 22 padding − 10 gap − 48 leaves 82.43px, and the longest label
+			    (`Resolution`, 75px) clears it with ~7px of headroom. Shrinking the
+			    square further would buy margin nobody needs; growing it past ~55px
+			    starts clipping again.
+			    ⚠ THE RATIO IS STILL STATED AS A RATIO. `aspect-square` + ONE length,
+			    never two — two equal literals are what a later edit desynchronises.
+			    Vertical centring now comes from the row's own `items-center`, which
+			    this child no longer opts out of.
 			    ⚠ `shrink-0` so a narrow block squeezes the TEXT, never the square. A
 			    squashed 1:1 placeholder stops being 1:1 without anything reporting it,
 			    which is the same failure RESO-1 guarded here for the same reason. */}
 			<span
 				aria-hidden="true"
 				data-testid={`resolution-block-glyph-${blockKey}`}
-				className="aspect-square shrink-0 self-stretch rounded-[var(--imgr)] bg-n1 [border:var(--hairline)]"
+				className="aspect-square w-[48px] shrink-0 rounded-[var(--imgr)] bg-n1 [border:var(--hairline)]"
 			/>
 			{/* The right-hand stack, centred as a GROUP against the square rather than
 			    each line centring itself.
@@ -267,25 +283,6 @@ function ResolutionBlock({
 			    first thing read. It was the first child of a column; it is now the
 			    first child of this stack, which is the same ruling expressed in the new
 			    geometry. The label STRINGS and the overline recipe are untouched. */}
-			{/* ⚠⚠ MEASURED, AND UNRESOLVED AT THIS WIDTH: ALL FOUR LABELS TRUNCATE.
-			    At the shipped 162.43px block the text column is 50.44px, and the four
-			    labels need 54 / 61 / 68 / 75px — every one of them clips. The square
-			    takes 77.99px of the 162.43 and the padding takes 22, which leaves the
-			    text less than a third of the block.
-			    ⛔ IT IS NOT FIXED HERE BECAUSE BLOCK WIDTH IS NOT THIS CHANGE'S TO SET
-			    — RESO-3 · CHANGE 7 rules the internals and says the width may not move.
-			    The width is RESO-2 · CHANGE 1's: the rail-width reservation in
-			    `HeadZone.tsx` holds the row at 673.73px so the blocks do not take the
-			    chart's space. Removing that one spacer takes each block to 252.43px and
-			    the text column to 140.44px, at which point all four labels fit
-			    unclipped — measured live on this build by hiding the spacer in the DOM.
-			    ⇒ 252px-per-block and "the blocks never take the rail's space" are
-			    MUTUALLY EXCLUSIVE at 1440: 4 × 252.43 + 3 gaps IS the full-bleed row.
-			    One of the two rulings has to give, and choosing between them is a
-			    founder call, not a shrink of the square or a smaller type step chosen
-			    here to make a number fit. Recorded at the site rather than in a report
-			    so whoever opens this file next sees the constraint before re-tuning
-			    anything (CLAUDE.md §8, O-5). */}
 			<span className="flex min-w-0 flex-1 flex-col justify-center gap-1">
 				<span
 					data-testid={`resolution-block-label-${blockKey}`}

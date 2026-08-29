@@ -240,23 +240,22 @@ describe("RESO-1 — R-7, four blocks from one fixture", () => {
 			for (const t of gc.split(/\s+/)) {
 				expect(t).not.toMatch(/^(h-|size-|min-h-|max-h-)/);
 			}
-			// ⛔⛔ AND NO WIDTH EITHER, WHICH IS A REVERSAL OF THIS ASSERTION.
-			// It read "exactly one width declaration, so the square's one free length
-			// is unambiguous" and required `toHaveLength(1)` — correct while the
-			// square carried `w-[30px]` and derived its HEIGHT from the ratio.
-			// RESO-3 · CHANGE 7 inverts which length is free: the square now takes the
-			// block's inner height via `self-stretch` and derives its WIDTH from
-			// `aspect-square`. So a `w-*` token would be the over-determination this
-			// guard exists to catch, and requiring one would mandate the defect.
-			// ⇒ ZERO free lengths declared here; both come from the row.
-			for (const t of gc.split(/\s+/)) {
-				expect(t).not.toMatch(/^(w-|min-w-|max-w-)/);
-			}
-			// …and the two mechanisms that replace them, asserted by name. Without
-			// `self-stretch` the square inherits the row's `items-center` and collapses
-			// to its content height, which is ZERO for an empty span — a 0×0 square
-			// that jsdom cannot see and that `aspect-square` alone would not prevent.
-			expect(gc).toContain("self-stretch");
+			// ⛔⛔ EXACTLY ONE WIDTH, AND NO `self-stretch` — RESO-4, and the second
+			// reversal this assertion has taken. It required one `w-*` while the square
+			// carried `w-[30px]`; RESO-3 · CHANGE 7 flipped it to require ZERO, because
+			// the square then took the block's inner height via `self-stretch` and
+			// derived its width from the ratio. That produced a 77.99px square and a
+			// 50.44px text column, and clipped all four labels.
+			// ⇒ RESO-4 declares the WIDTH again (48px) so the text column is chosen
+			// rather than left over. Both reversals are recorded because the pattern is
+			// the point: `aspect-square` plus EXACTLY ONE length is the invariant, and
+			// which length is free is a design decision that has now moved twice.
+			expect(gc.split(/\s+/).filter((x) => /^w-/.test(x))).toHaveLength(1);
+			// ⛔ AND `self-stretch` MUST BE GONE. Left beside a declared width it would
+			// re-derive the height from the row and silently over-determine the box —
+			// the square would stop being 48px the moment the row's height changed,
+			// which is exactly the coupling RESO-4 removes.
+			expect(gc).not.toContain("self-stretch");
 
 			// ⛔ BOTH value rows are EMPTY and unannounced — an empty announced row is
 			// noise while the label beside it already names the slot. The SUB-value row
