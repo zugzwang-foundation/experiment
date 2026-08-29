@@ -137,12 +137,18 @@ experiment/
 ├── docs/{adr,specs,logs,plans,…}
 ├── drizzle/migrations/             # generated + hand-written; append-only — DO NOT EDIT
 ├── scripts/                        # tsx operational scripts (seed, verify, migrate-staging, smoke)
-├── supabase/                       # ⚠ NOT IN THE REPO. the `supabase/` entry in `.gitignore` ignores the whole
-│                                   #   directory; a fresh worktree has no `supabase/` at all
-│                                   #   (0 tracked files). It appears only where the Supabase
-│                                   #   CLI has written local branch/snippet scratch. There is
-│                                   #   no migrations dir and none is planned — RLS is out of
-│                                   #   scope (ADR-0019). If one is ever minted, `.gitignore`
+├── supabase/                       # ⚠ NOT TRACKED — 0 files under version control
+│                                   #   (`git ls-files 'supabase/*'` → 0; control:
+│                                   #   `scripts/*` → 19). `.gitignore` ignores the whole
+│                                   #   directory, so a fresh clone or worktree has none of
+│                                   #   it — but the operator's working tree DOES: the
+│                                   #   Supabase CLI writes `.branches`, `.temp`, `snippets`
+│                                   #   there, exactly as `.gitignore`'s own comment predicts.
+│                                   #   ⚠ Do not read its absence in a worktree as absence —
+│                                   #   a worktree cannot see gitignored files, so that
+│                                   #   reading is unfalsifiable by construction. No
+│                                   #   migrations dir and none is planned — RLS is out of
+│                                   #   scope (ADR-0019); if one is ever minted, `.gitignore`
 │                                   #   already says to add `!supabase/migrations/`.
 ├── biome.json, drizzle.config.ts, lefthook.yml, mise.toml, justfile,
 ├── next.config.ts, postcss.config.mjs, tsconfig.json, vitest.config.ts, vitest.scale.config.ts,
