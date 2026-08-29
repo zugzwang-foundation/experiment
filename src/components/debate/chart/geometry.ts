@@ -272,10 +272,19 @@ export function fmtUtcDay(iso: string): string {
 	return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
 }
 
-/** ISO instant → x pixel over the market lifetime domain, FULL-BLEED:
- * `startMs` → 0, `endMs` → `VIEWBOX_W`. A degenerate domain (`startMs ===
- * endMs`, the single-point unbet market) collapses to the start edge (0) — a
- * FINITE value, never NaN; the component spans the flat line to `VIEWBOX_W`. */
+/** ISO instant → x pixel over the chart's domain, FULL-BLEED: `startMs` → 0,
+ * `endMs` → `VIEWBOX_W`. A degenerate domain (`startMs === endMs`) collapses to
+ * the start edge (0) — a FINITE value, never NaN; the component spans the flat
+ * line to `VIEWBOX_W`.
+ *
+ * ⚠ THE DOMAIN IS THE FIXED EXPERIMENT WINDOW SINCE CHART-3, not the market's
+ * lifetime, and this docblock said the latter. Two consequences for callers:
+ * the degenerate branch above is now unreachable from the shipped call sites
+ * (the window is a non-empty constant), and **the return value is NOT clamped**
+ * — an instant outside the window maps outside `0 … VIEWBOX_W` and is clipped
+ * by the viewBox. That is deliberate: clamping would place a point at a time it
+ * did not happen, and a price at the wrong time is a false statement about the
+ * market rather than a stale one. */
 export function xPx(iso: string, startMs: number, endMs: number): number {
 	const t = Date.parse(iso);
 	const frac = endMs === startMs ? 0 : (t - startMs) / (endMs - startMs);

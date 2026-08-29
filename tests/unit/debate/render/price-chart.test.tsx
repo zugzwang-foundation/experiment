@@ -39,6 +39,10 @@ import { MarketPriceChart } from "@/components/debate/chart/MarketPriceChart";
 import { MarketPriceChartCard } from "@/components/debate/chart/MarketPriceChartCard";
 import { MarketHeader } from "@/components/debate/MarketHeader";
 import type { DebateMarketHeader } from "@/components/debate/types";
+import {
+	MARKET_CHART_WINDOW_END,
+	MARKET_CHART_WINDOW_START,
+} from "@/server/config/limits";
 // UI.19 Slice 2 additive: the expanded-mode post-node type. TYPE-ONLY (erased) —
 // does not exist on the slice-1 price-chart module yet, so it drives no runtime
 // import; the RED below is the node MARKS not rendering (assertion), the RIGHT
@@ -194,29 +198,221 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		expect(byPrefix(container, "axis-x-label-")).toHaveLength(3);
 	});
 
-	it("collapsed-axis-labels-are-REAL-series-timestamps", () => {
-		// ⛔ SPEC.1 1.0.32's own constraint, asserted rather than trusted: the axis
-		// "introduces no new data … every timestamp it renders is already carried
-		// on `PricePoint.at`". The tempting implementation puts ticks at fixed
-		// 33.3%/66.6% fractions and labels them with an INTERPOLATED instant
-		// (`start + (end − start)/3`) — which for this fixture would print a
-		// Sep 16 and a Sep 18 that appear nowhere in the series. Every rendered day
-		// must be one of the three the series actually carries.
+	// ── CHART-3 · the axis is the fixed experiment window ──────────────────────
+	//
+	// SPEC.1 §17 rows proved below:
+	//   debate-view::price-chart-axis-spans-fixed-window
+	//   debate-view::price-chart-series-never-drawn-beyond-now
+	//
+	// ⛔ THIS BLOCK REPLACES `collapsed-axis-labels-are-REAL-series-timestamps`,
+	// which asserted the behaviour SPEC.1 1.0.42 §9 reverses. That guard pinned
+	// 1.0.32's constraint — the axis "introduces no new data … every timestamp it
+	// renders is already carried on `PricePoint.at`" — and it was right while the
+	// domain was the market's own lifetime, because then an interpolated label
+	// WAS a claim about the market's history. Against a constant window it is a
+	// calendar date, and anchoring to series points would give two markets on one
+	// window two different axes, defeating the ruling. The guard is REPLACED
+	// rather than deleted, and its §17 row with it, so the reversal is recorded
+	// where a reader looking for the old rule will find it.
+
+	/** The three days the fixed axis must print, derived from the constants the
+	 * component reads — so this file cannot drift from them — while the constant
+	 * VALUES are pinned separately, with literals, in
+	 * `tests/unit/config/chart-window.test.ts`. Deriving here and pinning there
+	 * is the split that keeps this test about the RULE and that one about the
+	 * NUMBERS; deriving in both would pin nothing. */
+	function expectedAxisDays(): {
+		first: string;
+		second: string;
+		end: string;
+	} {
+		const startMs = Date.parse(MARKET_CHART_WINDOW_START);
+		const endMs = Date.parse(MARKET_CHART_WINDOW_END);
+		const day = (ms: number) =>
+			new Date(ms).toLocaleDateString("en-US", {
+				month: "short",
+				day: "numeric",
+				timeZone: "UTC",
+			});
+		return {
+			first: day(startMs + (endMs - startMs) / 3),
+			second: day(startMs + ((endMs - startMs) * 2) / 3),
+			end: day(endMs),
+		};
+	}
+
+	it("collapsed-axis-labels-are-the-FIXED-WINDOW-not-the-series", () => {
 		const { container } = render(
 			<MarketPriceChartCard series={SERIES} onExpand={vi.fn()} isOpen={true} />,
 		);
-		const realDays = new Set(["Sep 15", "Sep 17", "Sep 20"]);
 		const rendered = byPrefix(container, "axis-x-label-").map(
 			(el) => el.textContent ?? "",
 		);
+		const want = expectedAxisDays();
+
 		expect(rendered).toHaveLength(3);
-		for (const day of rendered) {
-			expect(realDays.has(day), `${day} is not a PricePoint.at day`).toBe(true);
-		}
-		// The end label is the LAST point, always — it is the domain's right edge.
+		expect(rendered).toEqual([want.first, want.second, want.end]);
+
+		// ⛔ THE REJECTION, stated positively so it cannot pass vacuously. The
+		// fixture's own interior and terminal days are Sep 17 and Sep 20. Under
+		// the superseded rule the axis printed exactly those; under this one it
+		// must print neither, because neither is a third of the window.
+		expect(rendered).not.toContain("Sep 17");
+		expect(rendered).not.toContain("Sep 20");
 		expect(
 			container.querySelector('[data-testid="axis-x-label-end"]')?.textContent,
-		).toBe("Sep 20");
+		).toBe(want.end);
+	});
+
+	it("collapsed-axis-is-IDENTICAL-across-two-different-markets", () => {
+		// ⭐ THE PROPERTY THE FIXED WINDOW EXISTS TO BUY, and the one no
+		// single-render assertion can see: canon `C-CHART-1` clause 1 (amended
+		// CHART-3) rules that tick placement is computed "against a constant span
+		// rather than a per-market one, which makes every market's axis identical
+		// and two charts directly comparable." Two series that share no timestamp
+		// must produce byte-identical axis labels AND byte-identical tick x's.
+		const OTHER: PricePoint[] = [
+			{ at: "2026-10-01T00:00:00.000Z", yes: "0.200000000000000000" },
+			{ at: "2026-10-04T00:00:00.000Z", yes: "0.300000000000000000" },
+			{ at: "2026-10-11T00:00:00.000Z", yes: "0.250000000000000000" },
+		];
+		const read = (series: PricePoint[]) => {
+			const { container } = render(
+				<MarketPriceChartCard
+					series={series}
+					onExpand={vi.fn()}
+					isOpen={true}
+				/>,
+			);
+			const out = {
+				labels: byPrefix(container, "axis-x-label-").map(
+					(el) => el.textContent ?? "",
+				),
+				tickXs: byPrefix(container, "axis-x-tick-").map((el) =>
+					el.getAttribute("x1"),
+				),
+			};
+			cleanup();
+			return out;
+		};
+
+		const a = read(SERIES);
+		const b = read(OTHER);
+
+		// Non-vacuity: the axis rendered at all, on both.
+		expect(a.labels).toHaveLength(3);
+		expect(a.tickXs).toHaveLength(2);
+		expect(a.tickXs.every((x) => x !== null)).toBe(true);
+
+		expect(b.labels).toEqual(a.labels);
+		expect(b.tickXs).toEqual(a.tickXs);
+
+		// And the control that proves the two renders really were different: the
+		// LINES must differ, or the assertion above compares a chart with itself.
+		expect(SERIES[0].at).not.toBe(OTHER[0].at);
+	});
+
+	it("price-chart-series-never-drawn-beyond-now", () => {
+		// ⛔ THE MOST IMPORTANT CORRECTNESS GUARD IN THE AXIS CHANGE. The axis is
+		// fixed; the line is not. A series ending on Sep 20 must stop where Sep 20
+		// falls on the window — roughly a tenth of the way along — and must NOT be
+		// stretched to the axis end, because a flat tail to `MARKET_CHART_WINDOW_END`
+		// asserts a price at an instant that has not happened.
+		const { container } = render(
+			<MarketPriceChart series={SERIES} mode="expanded" isOpen={true} />,
+		);
+		const xs = (
+			container
+				.querySelector('[data-testid="line-yes"]')
+				?.getAttribute("points") ?? ""
+		)
+			.split(" ")
+			.filter((p) => p.length > 0)
+			.map((p) => Number(p.split(",")[0]));
+
+		// Non-vacuity: three points were read, and they advance.
+		expect(xs).toHaveLength(3);
+		expect(xs[0]).toBeLessThan(xs[1]);
+		expect(xs[1]).toBeLessThan(xs[2]);
+
+		// The assertion: the last drawn x is strictly inside the axis. Under the
+		// superseded lifetime domain it was exactly `VIEWBOX_W`, so this reddens
+		// against the old behaviour rather than passing either way.
+		expect(xs[2]).toBeLessThan(VIEWBOX_W);
+
+		// And quantitatively — Sep 15 → Sep 20 is 5 days of a window whose length
+		// the constants define, so the terminal x is that fraction of the plot.
+		const startMs = Date.parse(MARKET_CHART_WINDOW_START);
+		const endMs = Date.parse(MARKET_CHART_WINDOW_END);
+		const frac =
+			(Date.parse("2026-09-20T00:00:00.000Z") - startMs) / (endMs - startMs);
+		expect(xs[2]).toBeCloseTo(frac * VIEWBOX_W, 1);
+	});
+
+	it("terminal-dots-sit-at-the-LINE-end-not-the-AXIS-end", () => {
+		// ⛔ THE DEFECT THIS RUN INTRODUCED AND THEN FOUND, PINNED SO IT CANNOT
+		// COME BACK. `TerminalMarkers` hard-coded `cx = VIEWBOX_W`. That was
+		// CORRECT while the domain ended at the last point — the line's end WAS
+		// the right edge, so the two numbers were the same and the constant could
+		// not be wrong. The fixed axis separates them, and nothing in the suite
+		// noticed: every existing chart guard passed with two dots and a live
+		// pulse hanging in empty space at the far right of every market, attached
+		// to no line. A hard-coded coordinate that used to be right by coincidence
+		// is invisible exactly until the coincidence ends.
+		const { container } = render(
+			<MarketPriceChart series={SERIES} mode="collapsed" isOpen={true} />,
+		);
+
+		const lastLineX = (() => {
+			const pts = (
+				container
+					.querySelector('[data-testid="line-yes"]')
+					?.getAttribute("points") ?? ""
+			)
+				.split(" ")
+				.filter((p) => p.length > 0);
+			return Number(pts[pts.length - 1].split(",")[0]);
+		})();
+
+		// Non-vacuity: the line really stops short of the axis, so "dot at the
+		// line end" and "dot at the axis end" are DIFFERENT answers here. Without
+		// this the assertion below could pass against the old constant.
+		expect(lastLineX).toBeGreaterThan(0);
+		expect(lastLineX).toBeLessThan(VIEWBOX_W);
+
+		for (const id of [
+			"terminal-dot-yes",
+			"terminal-dot-no",
+			"terminal-pulse-yes",
+			"terminal-pulse-no",
+		]) {
+			const el = container.querySelector(`[data-testid="${id}"]`);
+			expect(el, `${id} missing`).not.toBeNull();
+			expect(Number(el?.getAttribute("cx")), `${id} cx`).toBe(lastLineX);
+		}
+	});
+
+	it("terminal-dots-DO-sit-at-the-axis-end-on-the-full-width-flat-line", () => {
+		// The other arm, and the reason the fix is a condition rather than a
+		// blanket move: `buildLine` draws a single-point series as a full-width
+		// flat line, so for that case the right edge genuinely IS where the line
+		// ends. A fix that moved the dots unconditionally would detach them here
+		// instead — the same defect, mirrored.
+		const { container } = render(
+			<MarketPriceChart series={SINGLE} mode="collapsed" isOpen={true} />,
+		);
+		const points = container
+			.querySelector('[data-testid="line-yes"]')
+			?.getAttribute("points");
+		expect(points).toContain(`${VIEWBOX_W},`);
+
+		expect(
+			Number(
+				container
+					.querySelector('[data-testid="terminal-dot-yes"]')
+					?.getAttribute("cx"),
+			),
+		).toBe(VIEWBOX_W);
 	});
 
 	it("collapsed-renders-NO-axis-on-a-degenerate-domain", () => {

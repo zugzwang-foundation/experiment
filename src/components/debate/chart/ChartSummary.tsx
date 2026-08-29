@@ -5,7 +5,20 @@ import { fmtUtcDay } from "./geometry";
 
 /**
  * The chart's accessible readout (SPEC.1 §9 · *Accessibility*) — opening price,
- * current price, and the two domain endpoints.
+ * current price, and the first and last instants **the series** covers.
+ *
+ * ⚠ THAT LAST CLAUSE READ "the two domain endpoints" AND IS NARROWED AT CHART-3,
+ * DELIBERATELY, BECAUSE THE TWO STOPPED BEING THE SAME THING. The axis is now
+ * the fixed experiment window, identical for every market; the series still
+ * ends where the data ends. This summary keeps naming the SERIES, and that is a
+ * choice rather than an oversight: a screen-reader user gains nothing from
+ * "Sep 15 to Nov 5" repeated on all eight markets, and would lose the one fact
+ * this sentence exists to carry — when this market actually moved. The `<svg>`
+ * is `aria-hidden`, so there is no second channel to recover it from.
+ * ⇒ SPEC.1 §9 *Accessibility* still says "the domain endpoints", which now reads
+ * as the window. **That wording is OWED a correction from the web lane** — it is
+ * flagged rather than edited here, because narrowing an accessibility contract
+ * is a ruling and this is an implementation file.
  *
  * ⛔ ONE COMPONENT, THREE SURFACES, AND THAT IS THE POINT. The collapsed card
  * and the expanded overlay carried this sentence as two byte-identical inline

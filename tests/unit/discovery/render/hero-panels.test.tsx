@@ -574,14 +574,22 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 //   discovery::hero-chart-time-scaled
 describe("discovery::hero-chart-time-scaled", () => {
 	/** Three points whose SPACING IN TIME is deliberately nothing like their
-	 * spacing in index: an hour, then nine hours. Under index spacing the middle
-	 * point lands at the midpoint of the plot; under time spacing it lands a
-	 * tenth of the way along. The two answers are 320 and 64 on a 640-wide
-	 * viewBox, so no rounding rule can confuse them. */
+	 * spacing in index: one day, then nine days. Under index spacing the middle
+	 * point lands at the midpoint of the drawn span; under time spacing it lands
+	 * a tenth of the way along. Those two answers differ by a factor of five, so
+	 * no rounding rule can confuse them.
+	 *
+	 * ⚠ THE GAPS WERE 1h AND 9h UNTIL CHART-3 AND ARE NOW 1d AND 9d — a fixture
+	 * change forced by the domain, not a weakening of the assertion. The ratio
+	 * that carries the property is identical (1 : 9); what changed is that the
+	 * axis is now the whole ~52-day experiment window instead of the series' own
+	 * span, so a ten-HOUR series drew inside ~5px of a 640-unit plot and the
+	 * rounding floor ate the very difference this test exists to see. Scaling the
+	 * fixture keeps the measurement above the noise. */
 	const UNEVEN: PricePoint[] = [
 		{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
-		{ at: "2026-09-15T01:00:00.000Z", yes: "0.600000000000000000" },
-		{ at: "2026-09-15T10:00:00.000Z", yes: "0.700000000000000000" },
+		{ at: "2026-09-16T00:00:00.000Z", yes: "0.600000000000000000" },
+		{ at: "2026-09-25T00:00:00.000Z", yes: "0.700000000000000000" },
 	];
 
 	/** The x coordinates of one polyline, in order. Read off the rendered
@@ -608,18 +616,27 @@ describe("discovery::hero-chart-time-scaled", () => {
 		const xs = xsOf(container, "line-yes");
 		expect(xs).toHaveLength(3);
 
-		// Endpoints anchor the domain either way — they are the control that the
-		// coordinates were read at all, not the assertion.
+		// The control that the coordinates were read at all. The fixture's first
+		// point sits exactly on `MARKET_CHART_WINDOW_START`, so it lands at 0 —
+		// which is a fact about the fixture, not about the domain rule.
 		expect(xs[0]).toBe(0);
-		expect(xs[2]).toBe(640);
+		expect(xs[2]).toBeGreaterThan(0);
 
-		// ⛔ THE ASSERTION. One hour into a ten-hour domain is a tenth of the way
-		// across: 64. The retired `PriceSparkline` would have answered 320 here,
-		// because it spaced by index — which is exactly the defect this row
-		// exists to reject, and why the fixture's gaps are 1h and 9h rather than
-		// anything evenly divisible.
-		expect(xs[1]).toBe(64);
-		expect(xs[1]).not.toBe(320);
+		// ⛔ CHART-3: `xs[2]` IS NO LONGER 640, AND THAT IS THE POINT. It used to
+		// be, because the domain ended at the last point; the axis is now the
+		// fixed experiment window, so a ten-day series occupies a tenth of it and
+		// the line stops where the data stops. Asserting the OLD 640 here would
+		// assert exactly the tail-stretching SPEC.1 §9 forbids.
+		expect(xs[2]).toBeLessThan(640);
+
+		// ⛔ THE ASSERTION, expressed as a RATIO so it survives the domain rather
+		// than encoding it. One day into a ten-day span is a tenth of the way
+		// across the DRAWN extent. The retired `PriceSparkline` spaced by index
+		// and would answer 0.5 — which is the defect this row exists to reject,
+		// and why the fixture's gaps are 1d and 9d rather than evenly divisible.
+		const drawnFraction = (xs[1] - xs[0]) / (xs[2] - xs[0]);
+		expect(drawnFraction).toBeCloseTo(0.1, 2);
+		expect(drawnFraction).not.toBeCloseTo(0.5, 1);
 	});
 
 	it("the NO line mirrors the YES line on the same time axis", () => {

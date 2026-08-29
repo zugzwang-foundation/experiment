@@ -242,6 +242,81 @@ export const MARKET_SERIES_MAX_POINTS = 256;
  * (milliseconds, not Dharma). */
 export const MARKET_SERIES_MIN_WINDOW_MS = 60000;
 
+// === CHART-3: the fixed experiment window (SPEC.1 1.0.42 §9 + §16.1) ======
+
+/** The §9 price chart's fixed X axis, as a pair of ISO instants. */
+export type ChartWindow = { readonly start: string; readonly end: string };
+
+/**
+ * ⚠ `end` is **23:45**, not 23:59 — it is the ratified `resolution_deadline`
+ * shared by all eight markets, and the same instant is trading close and
+ * settlement. A 23:59 axis would run fifteen minutes past the last instant at
+ * which anything can happen.
+ */
+const PRODUCTION_CHART_WINDOW: ChartWindow = {
+	start: "2026-09-15T00:00:00.000Z",
+	end: "2026-11-05T23:45:00.000Z",
+};
+
+/**
+ * ⚠ `start` is MEASURED, not chosen: the earliest `bet.placed` across staging's
+ * whole slate is `2026-08-21T05:29:29.430Z` (on `github-zugzwang-repo-stars`),
+ * floored to its UTC day. Read at CHART-3 against the live staging database,
+ * because a window narrower than the data silently clips real bets off the
+ * canvas and nothing reports it. The latest `bet.placed` at that reading was
+ * `2026-08-29T16:26:57.144Z`, comfortably inside `end`.
+ *
+ * ⛔ `end` EXPIRES ON 2026-09-10. After that instant `withLiveTail` appends a
+ * point at `now` that lies beyond the axis, and the viewBox clips it — the line
+ * will appear to stop at the right edge while the market is still trading. The
+ * clip is deliberate (drawing it AT the edge instead would put the live price at
+ * the wrong instant, which this codebase rejects on principle), so the fix is to
+ * move this value, not to clamp the geometry.
+ */
+const STAGING_CHART_WINDOW: ChartWindow = {
+	start: "2026-08-21T00:00:00.000Z",
+	end: "2026-09-10T23:45:00.000Z",
+};
+
+/**
+ * The whole environment branch, in one pure function, evaluated ONCE below.
+ *
+ * ⛔ THIS IS THE ONLY PLACE `ZUGZWANG_ENV` MAY DECIDE THE WINDOW. SPEC.1 §16.1:
+ * "Resolved from `ZUGZWANG_ENV` at the constants layer; **never branched on
+ * inside the derivation or the component.**" A conditional in the read path is
+ * how staging behaviour leaks into production — it survives review because each
+ * individual branch looks correct, and it fires only in the environment nobody
+ * is testing.
+ *
+ * `preview` takes the STAGING window because preview deployments read the
+ * staging database: given production's window, every preview chart would render
+ * as a line crushed against the left edge — broken-looking in precisely the
+ * surface used to review this change.
+ *
+ * Everything else — `prod`, the `"unknown"` fallback `next.config.ts` inlines
+ * into the browser bundle, and an unset var under `vitest` — takes PRODUCTION.
+ * That is the fail-safe direction: production is the only environment whose
+ * window is load-bearing, so an unrecognised value must not be able to serve it
+ * a fixture window.
+ */
+export function resolveChartWindow(env: string | undefined): ChartWindow {
+	return env === "staging" || env === "preview"
+		? STAGING_CHART_WINDOW
+		: PRODUCTION_CHART_WINDOW;
+}
+
+const CHART_WINDOW = resolveChartWindow(process.env.ZUGZWANG_ENV);
+
+/** Start of the §9 chart's fixed X axis (SPEC.1 §16.1). ISO, not ms — it is
+ * byte-comparable with the spec that pins it, and the one consumer already
+ * parses timestamps. */
+export const MARKET_CHART_WINDOW_START = CHART_WINDOW.start;
+
+/** End of the §9 chart's fixed X axis (SPEC.1 §16.1). ⚠ **The axis ends here;
+ * the series never does** — the line stops at the present instant, never at
+ * this value. */
+export const MARKET_CHART_WINDOW_END = CHART_WINDOW.end;
+
 // === UI.A5: Profile Dharma graph (SPEC.1 §23) =============================
 
 /** Profile graph-series downsample bound (UI-A5 §7 S2, OQ-4 B) — every served

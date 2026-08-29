@@ -1,5 +1,9 @@
 "use client";
 
+import {
+	MARKET_CHART_WINDOW_END,
+	MARKET_CHART_WINDOW_START,
+} from "@/server/config/limits";
 import type { ChartNode } from "@/server/debate-view/price-chart";
 import type { PricePoint } from "@/server/discovery/price-series";
 
@@ -35,9 +39,15 @@ import {
  */
 export type MarketPriceChartMode = "collapsed" | "expanded" | "hero";
 
-/** The market-detail price-chart SVG (SPEC.1 1.0.32 §9 / F-DEBATE-5) — two
+/** The market-detail price-chart SVG (SPEC.1 1.0.42 §9 / F-DEBATE-5) — two
  * complementary YES/NO probability lines mirrored about 50 % (design-language
- * §3.2), fixed Y 0–100 %, X spanning the market lifetime.
+ * §3.2), fixed Y 0–100 %, X spanning **the fixed experiment window**
+ * (`MARKET_CHART_WINDOW_START` → `_END`), identical for every market.
+ *
+ * ⚠ THAT LAST CLAUSE READ "X spanning the market lifetime" UNTIL CHART-3, and
+ * it is corrected rather than annotated. The lifetime domain gave every market
+ * its own axis, so two charts could not be compared — which is what a reader
+ * most wants to do when all eight markets resolve at the same instant.
  *
  * ⚠⚠ COLLAPSED NOW CARRIES A TIME AXIS — two interior ticks and three date
  * labels — and this sentence used to read "COLLAPSED renders the two lines only
@@ -47,8 +57,10 @@ export type MarketPriceChartMode = "collapsed" | "expanded" | "hero";
  * sparkline, and it is now the market's primary price surface in the header
  * rail, where a price series without a time axis is not readable. ⛔ COLLAPSED
  * STILL RENDERS NO NODES — only the axis half moved. EXPANDED is UNTOUCHED: the
- * two X endpoint labels (`market.opened` · last event), and interior ticks there
- * remain canon-owned and unbuilt.
+ * two X endpoint labels — ⚠ **the WINDOW's endpoints since CHART-3, no longer
+ * `market.opened` · last event**; they name the axis they sit on, and the axis
+ * stopped being the market's own span — and interior ticks there remain
+ * canon-owned and unbuilt.
  * Post nodes arrive in Slice 2. The SVG is `aria-hidden` on ALL THREE surfaces
  * and the accessible readout lives in the shared `ChartSummary` beside it —
  * collapsed card, expanded overlay and, since CHART-1, the Discovery hero. ⚠ It
@@ -88,9 +100,27 @@ export function MarketPriceChart({
 	 */
 	isOpen: boolean;
 }): React.JSX.Element {
-	const startMs = series.length > 0 ? Date.parse(series[0].at) : 0;
-	const endMs =
-		series.length > 0 ? Date.parse(series[series.length - 1].at) : 0;
+	// ⛔ THE AXIS IS FIXED AND THE LINE IS NOT (SPEC.1 1.0.42 §9, founder-ruled
+	// at CHART-3). These two used to be `series[0].at` and `series[last].at` —
+	// the market's own lifetime — which meant no two markets shared an axis and
+	// therefore no two charts could be compared. All eight resolve at one
+	// instant, so a shared window is what makes them readable side by side.
+	//
+	// ⚠ The SERIES is untouched by this. It still ends where the data ends —
+	// at `now` on an `Open` market (`withLiveTail`) and at the last event
+	// otherwise (**INV-4**) — so a market that has traded for one week of a
+	// seven-week window draws a line across the left portion of a wide chart.
+	// That is the true picture of a young market. Extending it to the axis end
+	// would assert a price at an instant that has not happened.
+	//
+	// ⚠ A point BEYOND `MARKET_CHART_WINDOW_END` is clipped by the viewBox and
+	// is deliberately NOT clamped onto the right edge: clamping would draw the
+	// live price at the wrong instant, which this codebase rejects twice in
+	// writing (`price-series.ts` `withLiveTail`, `price-chart.ts`
+	// `deriveMarketPriceChart`). Reachable on staging after its window end; the
+	// fix is to move the constant, not the geometry.
+	const startMs = Date.parse(MARKET_CHART_WINDOW_START);
+	const endMs = Date.parse(MARKET_CHART_WINDOW_END);
 
 	// The terminal YES price — the ONE value both the dots and the HTML labels
 	// read, so the two can never disagree about where the series ends. The
@@ -102,6 +132,27 @@ export function MarketPriceChart({
 			: series.length < 2 || endMs === startMs
 				? series[0].yes
 				: series[series.length - 1].yes;
+
+	// ⛔ THE TERMINAL X, AND WHY IT SUDDENLY NEEDS TO EXIST. `TerminalMarkers`
+	// hard-coded `cx = VIEWBOX_W`, which was not a shortcut: while the domain
+	// ended at the last point, the line's end WAS the right edge, so the two were
+	// the same number and the dot could not be wrong.
+	//
+	// The fixed axis separates them. A market that has traded for one week of a
+	// seven-week window ends its line a seventh of the way across, and a dot left
+	// at `VIEWBOX_W` would hang in empty space at the far right, attached to
+	// nothing — on every market, for most of the experiment, with the pulse
+	// advertising a live price at a coordinate carrying no line. The dots mark
+	// where the lines END, so they follow the lines.
+	//
+	// ⚠ The degenerate arm keeps `VIEWBOX_W` deliberately: `buildLine` draws that
+	// case as a full-width flat line, so the right edge genuinely is its end.
+	// Both arms answer the same question — "where does the drawn line stop?" —
+	// which is why they read the same condition `terminalYes` does.
+	const terminalX =
+		series.length === 0 || series.length < 2 || endMs === startMs
+			? VIEWBOX_W
+			: xPx(series[series.length - 1].at, startMs, endMs);
 
 	return (
 		/* ⛔ THE FRAME IS A FLEX ROW, AND THAT IS THE WHOLE LABEL FIX
@@ -248,7 +299,19 @@ export function MarketPriceChart({
 						<CollapsedAxis series={series} startMs={startMs} endMs={endMs} />
 					)}
 
-					{/* EXPANDED only — the two X endpoint labels (no interior ticks, §9). */}
+					{/* EXPANDED only — the two X endpoint labels (no interior ticks, §9).
+
+					    ⛔ THESE NAME THE AXIS, NOT THE SERIES, AND THAT CHANGED AT CHART-3.
+					    They read `series[0].at` and `series[last].at` while the domain WAS
+					    the series' own span, so label and position agreed by construction.
+					    Under a fixed window they no longer would: a market that opened
+					    three days ago plots its first point a fifth of the way along, and
+					    a label reading that date pinned to `x = 0` would place the market's
+					    first bet at the window's start — a false statement about when the
+					    market began trading, printed in the one place a reader goes to find
+					    out. SPEC.1 §9's rule is unchanged and is what settles it: "Axis
+					    labels are the domain endpoints." The domain moved; the labels
+					    follow it. */}
 					{mode === "expanded" && series.length > 0 && (
 						<>
 							<text
@@ -258,7 +321,7 @@ export function MarketPriceChart({
 								className="fill-n5 text-[10px]"
 								textAnchor="start"
 							>
-								{fmtUtcDay(series[0].at)}
+								{fmtUtcDay(MARKET_CHART_WINDOW_START)}
 							</text>
 							<text
 								data-testid="axis-x-end"
@@ -267,7 +330,7 @@ export function MarketPriceChart({
 								className="fill-n5 text-[10px]"
 								textAnchor="end"
 							>
-								{fmtUtcDay(series[series.length - 1].at)}
+								{fmtUtcDay(MARKET_CHART_WINDOW_END)}
 							</text>
 						</>
 					)}
@@ -345,7 +408,7 @@ export function MarketPriceChart({
 			    terminal marker must never do. Raised by `@code-reviewer` at the
 			    CHART-1 cascade. */}
 					{terminalYes !== null && (
-						<TerminalMarkers yes={terminalYes} isOpen={isOpen} />
+						<TerminalMarkers yes={terminalYes} cx={terminalX} isOpen={isOpen} />
 					)}
 				</svg>
 			</div>
@@ -376,9 +439,16 @@ export function MarketPriceChart({
  */
 function TerminalMarkers({
 	yes,
+	cx,
 	isOpen,
 }: {
 	yes: string;
+	/** Where the drawn line ENDS — `xPx` of the series' last point, or
+	 * `VIEWBOX_W` on the full-width degenerate line. ⛔ REQUIRED, NEVER
+	 * DEFAULTED: a default would be `VIEWBOX_W`, which is exactly the wrong
+	 * answer under the CHART-3 fixed axis and would be wrong SILENTLY, since a
+	 * dot at the right edge looks deliberate. */
+	cx: number;
 	isOpen: boolean;
 }): React.JSX.Element {
 	const yNo = yNoPx(yes);
@@ -389,7 +459,7 @@ function TerminalMarkers({
 				<>
 					<circle
 						data-testid="terminal-pulse-no"
-						cx={VIEWBOX_W}
+						cx={cx}
 						cy={yNo}
 						r={TERMINAL_DOT_R}
 						fill="var(--graph-no)"
@@ -398,7 +468,7 @@ function TerminalMarkers({
 					/>
 					<circle
 						data-testid="terminal-pulse-yes"
-						cx={VIEWBOX_W}
+						cx={cx}
 						cy={yYes}
 						r={TERMINAL_DOT_R}
 						fill="var(--graph-yes)"
@@ -409,14 +479,14 @@ function TerminalMarkers({
 			)}
 			<circle
 				data-testid="terminal-dot-no"
-				cx={VIEWBOX_W}
+				cx={cx}
 				cy={yNo}
 				r={TERMINAL_DOT_R}
 				fill="var(--graph-no)"
 			/>
 			<circle
 				data-testid="terminal-dot-yes"
-				cx={VIEWBOX_W}
+				cx={cx}
 				cy={yYes}
 				r={TERMINAL_DOT_R}
 				fill="var(--graph-yes)"
@@ -578,15 +648,33 @@ function lowerTop(pct: number): string {
  *
  * ⛔⛔ EVERY TIMESTAMP IT RENDERS IS A REAL `PricePoint.at`, AND THAT IS THE
  * RULING'S OWN CONSTRAINT: *"it introduces no new data and no new read — every
- * timestamp it renders is already carried on `PricePoint.at`."* So the ticks are
- * ANCHORED TO SERIES POINTS, not placed at fixed 33.3%/66.6% fractions with an
- * INTERPOLATED date under them. d5 does the latter, because d5's dates are demo
- * copy; interpolating `start + (end − start)/3` here would mint a timestamp the
- * series does not contain, which is exactly what the ruling forecloses.
- * ⇒ Each interior tick is the series point whose x lands nearest the third, the
- * tick sits at THAT point's own `xPx`, and the label under it is THAT point's
- * own day. Tick and label therefore always agree, and the axis cannot claim a
- * reading the data does not support.
+ * timestamp it renders is already carried on `PricePoint.at`."*
+ *
+ * ⛔ THAT CONSTRAINT PRODUCED THE OPPOSITE RULE UNTIL CHART-3, AND THE REVERSAL
+ * IS RATIFIED RATHER THAN INFERRED. The ticks used to be ANCHORED TO SERIES
+ * POINTS — each one the series point whose x landed nearest a third — precisely
+ * so the axis could not "mint a timestamp the series does not contain". That
+ * was right while the domain was the market's own lifetime, because then an
+ * interpolated date WAS a claim about the market's history. It is wrong against
+ * a fixed window, for two reasons that compound:
+ *
+ * 1. **It stops being an axis.** Two markets on the same window would carry
+ *    DIFFERENT tick dates, defeating the entire ruling — canon `C-CHART-1`
+ *    clause 1 (amended CHART-3) says tick placement is "computed against a
+ *    **constant** span rather than a per-market one, which makes every market's
+ *    axis identical and two charts directly comparable."
+ * 2. **It collapses.** A market three days into a seven-week window occupies
+ *    the leftmost ~6 % of the axis, so `nearestPoint` returns the SAME final
+ *    point for both thirds: two ticks stacked at one x under two identical
+ *    labels. On the production window that is the rendering for roughly the
+ *    experiment's first two and a half weeks — not an edge case, the opening.
+ *
+ * ⇒ Each interior tick now sits at a fixed third of the WINDOW and is labelled
+ * with that instant's own UTC day. This mints no claim about the market: the
+ * window is a constant this build already knows, so the label is a calendar
+ * date, not an interpolated observation. The 1.0.32 constraint is honoured in
+ * the sense that mattered — the axis still asserts nothing about the data that
+ * the data does not say, because it no longer speaks about the data at all.
  *
  * ⛔ NO AXIS ON A DEGENERATE DOMAIN. Fewer than two points, or `endMs ===
  * startMs` (the unbet market), is the flat-line case `buildLine` handles by
@@ -623,26 +711,23 @@ function CollapsedAxis({
 	if (series.length < 2 || endMs === startMs) {
 		return null;
 	}
-	// The two interior anchors: the series point whose x lands nearest each
-	// third. `nearestPoint` scans rather than indexes, because the series is
-	// downsampled by uniform INDEX stride while x is computed from TIME — the
-	// point at index n/3 can sit anywhere on the axis.
+	// The two interior anchors: a fixed third and two-thirds of the WINDOW.
+	// Both are instants on a constant span, so every market's axis carries the
+	// same two dates — which is the property the fixed window exists to buy.
 	const interior = [1 / 3, 2 / 3].map((f) =>
-		nearestPoint(series, startMs, endMs, f * VIEWBOX_W),
+		new Date(startMs + (endMs - startMs) * f).toISOString(),
 	);
-	const last = series[series.length - 1];
 
 	return (
 		<>
-			{interior.map((p, i) => (
+			{interior.map((at, i) => (
 				<line
 					// Index-keyed on purpose: these two are a FIXED PAIR of positions
-					// (first third, second third), not an identity-bearing list, and two
-					// points can legitimately resolve to the same `at`.
+					// (first third, second third), not an identity-bearing list.
 					key={`tick-${i === 0 ? "first" : "second"}`}
 					data-testid={`axis-x-tick-${i === 0 ? "first" : "second"}`}
-					x1={xPx(p.at, startMs, endMs)}
-					x2={xPx(p.at, startMs, endMs)}
+					x1={xPx(at, startMs, endMs)}
+					x2={xPx(at, startMs, endMs)}
 					y1={0}
 					y2={VIEWBOX_H}
 					stroke="var(--color-n2)"
@@ -651,20 +736,24 @@ function CollapsedAxis({
 					vectorEffect="non-scaling-stroke"
 				/>
 			))}
-			{interior.map((p, i) => (
+			{interior.map((at, i) => (
 				<text
 					key={`lab-${i === 0 ? "first" : "second"}`}
 					data-testid={`axis-x-label-${i === 0 ? "first" : "second"}`}
-					x={xPx(p.at, startMs, endMs)}
+					x={xPx(at, startMs, endMs)}
 					y={VIEWBOX_H - 8}
 					className="fill-n5 text-[10px]"
 					textAnchor="middle"
 				>
-					{fmtUtcDay(p.at)}
+					{fmtUtcDay(at)}
 				</text>
 			))}
 			{/* `.xlab.end` (`d5:499`) — right-anchored at the domain's end, so it
-			    cannot overflow the viewBox the way a centred label would. */}
+			    cannot overflow the viewBox the way a centred label would.
+			    ⚠ It names the WINDOW's end, not the series' — CHART-3. It sits at
+			    `x = VIEWBOX_W`, which under a fixed axis is the window's end and no
+			    longer the last event, so labelling it with the last event's day
+			    would print a date at a position that is not that date. */}
 			<text
 				data-testid="axis-x-label-end"
 				x={VIEWBOX_W}
@@ -672,39 +761,33 @@ function CollapsedAxis({
 				className="fill-n5 text-[10px]"
 				textAnchor="end"
 			>
-				{fmtUtcDay(last.at)}
+				{fmtUtcDay(new Date(endMs).toISOString())}
 			</text>
 		</>
 	);
 }
 
-/** The series point whose plotted x is closest to `targetX`. Pure display
- * selection over already-computed geometry — no money or price arithmetic. */
-function nearestPoint(
-	series: PricePoint[],
-	startMs: number,
-	endMs: number,
-	targetX: number,
-): PricePoint {
-	let best = series[0];
-	let bestGap = Number.POSITIVE_INFINITY;
-	for (const p of series) {
-		const gap = Math.abs(xPx(p.at, startMs, endMs) - targetX);
-		if (gap < bestGap) {
-			bestGap = gap;
-			best = p;
-		}
-	}
-	return best;
-}
-
 /** An SVG `points` string for one line. With fewer than two points OR a
- * degenerate domain (`startMs === endMs`, the unbet market), draws a FULL-WIDTH
- * FLAT LINE — the value duplicated at x = 0 and x = VIEWBOX_W (the
- * "duplicate at both ends" trick the retired `PriceSparkline` also used — that
- * component was DELETED at CHART-1 when the hero moved onto this one, so read
- * the name as history, not as a live reference; SPEC.1 §9 "flat line at the
- * opening price"). */
+ * degenerate domain (`startMs === endMs`), draws a FULL-WIDTH FLAT LINE — the
+ * value duplicated at x = 0 and x = VIEWBOX_W (the "duplicate at both ends"
+ * trick the retired `PriceSparkline` also used — that component was DELETED at
+ * CHART-1 when the hero moved onto this one, so read the name as history, not
+ * as a live reference; SPEC.1 §9 "flat line at the opening price").
+ *
+ * ⚠ SINCE CHART-3 THE SECOND CONDITION IS UNREACHABLE and the first is nearly
+ * so, which changes what this branch means without changing what it does. The
+ * domain is now a constant non-empty window, so `startMs === endMs` cannot
+ * happen; and an `Open` market always gains `withLiveTail`'s point at `now`, so
+ * a single-point series needs a **non-`Open` market that was never bet on**.
+ * The branch is KEPT because SPEC.1 §9 *Sparse and terminal states* pins it —
+ * "fewer than two points … renders a flat line at the opening price across the
+ * domain; there is no empty state" — and CHART-3 did not amend that paragraph.
+ * ⚠ Read after CHART-3, "across the domain" IS the fixed window, so the line
+ * for that one case spans the whole experiment. That reading is the spec's own
+ * and is deliberately not second-guessed here, but it is the one place where
+ * the fixed axis and the "never draw into time that has not happened" rule
+ * point in different directions, and it is flagged for a founder ruling rather
+ * than silently resolved. */
 function buildLine(
 	series: PricePoint[],
 	startMs: number,
