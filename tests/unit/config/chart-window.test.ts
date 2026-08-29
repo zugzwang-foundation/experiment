@@ -95,6 +95,66 @@ describe("chart-window::staging and preview share the fixture window", () => {
 		}
 	});
 
+	it("the PRODUCTION window contains every ratified market's resolution deadline", () => {
+		// ⛔ THE STAGING ARM IS TIED TO ITS DATA TWO TESTS DOWN; THE PRODUCTION ARM
+		// WAS TIED ONLY TO ITS OWN LITERALS. `2026-11-05T23:45:00Z` is the ratified
+		// `resolution_deadline` shared by all eight markets — but "shared by all
+		// eight" was an assertion in a docblock, not a measurement, and SPEC.1 §9
+		// explicitly permits a market to carry `23:59` instead.
+		//
+		// A market whose deadline sat past this constant would trade its final
+		// minutes off the right of the axis, with its terminal dot clipped out of
+		// the viewBox entirely — the market's most consequential moments, drawn
+		// nowhere, on the surface where stake is committed. Silent, because a
+		// clipped dot looks like a chart that simply ends.
+		const snapshot: {
+			markets: { slug: string; resolution_deadline: string }[];
+		} = JSON.parse(
+			readFileSync(
+				join(REPO_ROOT, "docs/data/staging-markets-snapshot.json"),
+				"utf8",
+			),
+		);
+		const slate = snapshot.markets;
+
+		// Non-vacuity: the slate was read, and it is the slate — eight markets,
+		// each carrying a deadline. A parse that yielded [] would satisfy the
+		// loop below without looking at anything. ⚠ This control has already
+		// earned itself once: the first version of this test read the file as a
+		// bare array, got `undefined`, and reddened here rather than passing
+		// vacuously over nothing.
+		expect(slate.length).toBe(8);
+		expect(slate.every((m) => typeof m.resolution_deadline === "string")).toBe(
+			true,
+		);
+
+		const windowEnd = Date.parse(resolveChartWindow("prod").end);
+		for (const m of slate) {
+			expect(
+				Date.parse(m.resolution_deadline),
+				`${m.slug} deadline ${m.resolution_deadline} falls outside the production axis`,
+			).toBeLessThanOrEqual(windowEnd);
+		}
+
+		// ⚠ AND THE MEASUREMENT THAT MAKES THIS GUARD WORTH ITS LINES. The
+		// deadline is NOT "shared by all eight markets" — that phrase reached
+		// SPEC.1 §16.1 from the CHART-3 brief and the slate contradicts it.
+		// SEVEN carry 2026-11-05T23:45Z; `oktoberfest-munich-beer-volume` carries
+		// 2026-10-04T21:59:00Z, a month earlier and not on the ratified instant.
+		//
+		// It changes nothing about the window — Oct 4 is comfortably inside it —
+		// but it means the fixed axis has a REAL production case from day one: a
+		// market that closes a month before the others and whose series then
+		// freezes (**INV-4**) while the axis keeps running to Nov 5. That is the
+		// "axis fixed, line not" rendering, in production, not a hypothetical.
+		const distinct = new Set(slate.map((m) => m.resolution_deadline));
+		expect(distinct.size).toBe(2);
+		expect(
+			slate.filter((m) => m.resolution_deadline === "2026-11-05T23:45:00.000Z")
+				.length,
+		).toBe(7);
+	});
+
 	it("starts no later than staging's earliest measured bet, so no real data is clipped", () => {
 		// ⛔ MEASURED, NOT CHOSEN. The earliest `bet.placed` across staging's whole
 		// slate at CHART-3 was 2026-08-21T05:29:29.430Z. A window that began after
@@ -243,6 +303,48 @@ describe("chart-window::the environment branch never leaves the constants layer"
 			strippedSource(rel).includes("ZUGZWANG_ENV"),
 		);
 		expect(offenders).toEqual([]);
+	});
+
+	it("finds NO file under src/server/ that branches on the environment, except the four that already own it", () => {
+		// ⛔ THE COMPONENT HALF IS DIRECTORY-SCOPED AND THE SERVER HALF WAS STILL
+		// A LIST — which is the same hole one directory over. A new derivation
+		// module (`src/server/debate-view/chart-window.ts`, say) that read
+		// `process.env.ZUGZWANG_ENV` and exported a per-env window would be on no
+		// list, under no component directory, and would never call
+		// `resolveChartWindow` — so not one assertion above would move, while the
+		// branch this whole design exists to contain had left the constants layer
+		// by the front door.
+		//
+		// ⇒ The server tree is scanned whole, against an ALLOWLIST OF THE FILES
+		// THAT LEGITIMATELY READ THE ENV TODAY. An allowlist is checkable in a way
+		// a denylist is not: adding a name is a visible decision, and every file
+		// not on it is covered without anyone remembering to add it.
+		//
+		// ⚠ The four incumbents have nothing to do with the chart — they key Redis
+		// namespaces, tag Sentry, guard the OTP sender and refuse a prod
+		// transaction-mode pool. They are listed so this guard stays about the
+		// WINDOW's branch rather than becoming a second, weaker rule about env
+		// reads in general.
+		const ALLOWED = [
+			"src/server/auth/email-otp.ts",
+			"src/server/config/limits.ts",
+			"src/server/upstash/keys.ts",
+			"src/server/visitors/counter.ts",
+		];
+		const server = walkSrc().filter((rel) => rel.startsWith("src/server/"));
+
+		// Non-vacuity: the walk really found the server tree.
+		expect(server.length).toBeGreaterThan(50);
+		expect(server).toContain("src/server/discovery/price-series.ts");
+		expect(server).toContain("src/server/debate-view/price-chart.ts");
+
+		const readers = server.filter((rel) =>
+			strippedSource(rel).includes("ZUGZWANG_ENV"),
+		);
+		// Positive control on the scan itself: the constants layer MUST show up,
+		// or the filter is matching nothing and the assertion is vacuous.
+		expect(readers).toContain("src/server/config/limits.ts");
+		expect(readers.sort()).toEqual(ALLOWED);
 	});
 
 	it("strips comments without eating the code it is meant to scan", () => {

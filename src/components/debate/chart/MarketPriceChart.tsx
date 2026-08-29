@@ -119,6 +119,14 @@ export function MarketPriceChart({
 	// writing (`price-series.ts` `withLiveTail`, `price-chart.ts`
 	// `deriveMarketPriceChart`). Reachable on staging after its window end; the
 	// fix is to move the constant, not the geometry.
+	//
+	// ⛔ AND THE CLIP TAKES MORE THAN THE LINE'S TAIL — this comment used to stop
+	// at "clipped", which reads as cosmetic. `terminalX` below follows the
+	// series, so once the last point is past the window BOTH terminal dots and
+	// BOTH pulses leave the canvas, while `TerminalLabels` keeps rendering in its
+	// HTML gutter: two colour-coded words naming two marks that are not there.
+	// Stated at full strength because a diagnosis that undersells its own symptom
+	// is how the symptom gets triaged as a style bug.
 	const startMs = Date.parse(MARKET_CHART_WINDOW_START);
 	const endMs = Date.parse(MARKET_CHART_WINDOW_END);
 

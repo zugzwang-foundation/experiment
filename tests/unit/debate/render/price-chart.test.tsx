@@ -572,6 +572,20 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		// flat line, so for that case the right edge genuinely IS where the line
 		// ends. A fix that moved the dots unconditionally would detach them here
 		// instead — the same defect, mirrored.
+		//
+		// ⛔ THIS GUARD PINS THE CURRENT BEHAVIOUR; IT DOES NOT ENDORSE IT, and the
+		// distinction is load-bearing. `@code-reviewer` established at the CHART-3
+		// cascade that the full-width flat line is itself owed a founder ruling:
+		// the ONLY reachable route to a single-point series is a NON-`Open` market
+		// with zero bets (an `Open` one always gains `withLiveTail`'s point at
+		// `now`), and for that market SPEC.1 §9 says in the very next sentence that
+		// "the domain ends at the last event and never advances (**INV-4**)". So a
+		// market that closed on Oct 1 currently paints a price out to Nov 5, which
+		// is the thing `price-chart-series-never-drawn-beyond-now` forbids two
+		// tests up. CHART-3 shipped the existing behaviour because changing it
+		// means inventing a rendering §9 does not specify — recorded as
+		// DELIBERATELY UNAMENDED in the §20 row. ⇒ **If that ruling comes back the
+		// other way, this test is expected to change with it.**
 		const { container } = render(
 			<MarketPriceChart series={SINGLE} mode="collapsed" isOpen={true} />,
 		);

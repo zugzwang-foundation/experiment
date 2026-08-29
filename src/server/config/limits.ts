@@ -266,12 +266,21 @@ const PRODUCTION_CHART_WINDOW: ChartWindow = {
  * canvas and nothing reports it. The latest `bet.placed` at that reading was
  * `2026-08-29T16:26:57.144Z`, comfortably inside `end`.
  *
- * ⛔ `end` EXPIRES ON 2026-09-10. After that instant `withLiveTail` appends a
- * point at `now` that lies beyond the axis, and the viewBox clips it — the line
- * will appear to stop at the right edge while the market is still trading. The
- * clip is deliberate (drawing it AT the edge instead would put the live price at
- * the wrong instant, which this codebase rejects on principle), so the fix is to
- * move this value, not to clamp the geometry.
+ * ⛔ `end` EXPIRES ON 2026-09-10, AND THE CONSEQUENCE IS LARGER THAN "THE LINE
+ * LOOKS SHORT" — this docblock said that and understated it. After that instant
+ * `withLiveTail` appends a point at `now` beyond the axis, so `xPx` returns a
+ * coordinate past `VIEWBOX_W` and the viewBox clips it. What is clipped is not
+ * only the line's last segment: `terminalX` follows the series, so **both
+ * terminal dots and both pulses leave the canvas entirely**, while
+ * `TerminalLabels` — HTML in a gutter, outside the SVG — keeps rendering. The
+ * result on every `Open` staging market is two colour-coded words naming two
+ * marks that are not drawn.
+ *
+ * The clip itself is deliberate: drawing the point AT the edge instead would put
+ * the live price at an instant it did not happen, which this codebase rejects on
+ * principle (`price-series.ts` `withLiveTail`, `price-chart.ts`
+ * `deriveMarketPriceChart`). ⇒ **The fix is to move this value, never to clamp
+ * the geometry**, and it is owed before 2026-09-10.
  */
 const STAGING_CHART_WINDOW: ChartWindow = {
 	start: "2026-08-21T00:00:00.000Z",
@@ -305,6 +314,18 @@ export function resolveChartWindow(env: string | undefined): ChartWindow {
 		: PRODUCTION_CHART_WINDOW;
 }
 
+/**
+ * ⚠ THE BROWSER'S COPY IS A BUILD-TIME SNAPSHOT, AND THAT IS NEW FOR THIS FILE.
+ * `next.config.ts` inlines `ZUGZWANG_ENV` into the client bundle, so this
+ * resolves once at build and ships as a literal; the server re-reads
+ * `process.env` per request. Every other client-visible constant in this module
+ * is environment-INDEPENDENT, so the two sides have never been able to disagree
+ * — these two can. Change `ZUGZWANG_ENV` in the Vercel dashboard without
+ * redeploying and SSR emits one window while hydration emits the other, which
+ * surfaces as a React hydration mismatch on `/m/[slug]` and Discovery rather
+ * than as a wrong chart. ⇒ **An env change requires a rebuild**, not just a
+ * variable edit. Raised by `@code-reviewer` at the CHART-3 cascade.
+ */
 const CHART_WINDOW = resolveChartWindow(process.env.ZUGZWANG_ENV);
 
 /** Start of the §9 chart's fixed X axis (SPEC.1 §16.1). ISO, not ms — it is

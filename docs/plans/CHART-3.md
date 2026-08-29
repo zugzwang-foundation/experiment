@@ -174,12 +174,29 @@ amendment for this; flagged for the web lane, not authored here.
 **#4 — the single-point (`series.length < 2`) flat line under a fixed axis.**
 *Chose:* **no change.** Keep the full-width flat line.
 *Rejected:* drawing the single point at its own `x` and no line.
-*Why:* SPEC.1 §9:527 pins it — "fewer than two points … renders a **flat line at the opening
-price across the domain**; there is **no empty state**" — and EDIT A does not amend that
-paragraph. Read after EDIT A, "across the domain" *is* the fixed window, so the spec's own
-words already govern the new behaviour and **the ruled outcome already holds** (OVN-O4).
-Pinned with a guard; no code changed. Note it is near-unreachable: an `Open` market always
-gains `withLiveTail`'s second point, so this needs a **non-`Open` market with zero bets**.
+*Why (as first reasoned):* SPEC.1 §9's *Sparse and terminal states* pins it — "fewer than two
+points … renders a **flat line at the opening price across the domain**; there is **no empty
+state**" — and EDIT A does not amend that paragraph, so "across the domain" simply *becomes*
+the fixed window and the ruled outcome already holds (OVN-O4).
+
+⛔ **THAT REASONING IS WRONG AND IS CORRECTED HERE RATHER THAN LEFT STANDING.
+`@code-reviewer` read the NEXT sentence of the same paragraph, which I did not:** *"On
+`Closed`, `Resolving`, `Resolved`, and `Voided` markets the chart renders the frozen history:
+**the domain ends at the last event and never advances (INV-4)**."* The first sentence scopes
+itself to *"a market **open** but unbet"* — a case CHART-1's `withLiveTail` made unreachable,
+because an `Open` market always gains a second point at `now`. **So the only reachable case is
+governed by the second sentence, and the second sentence says the opposite.** Concretely: a
+market opened Sep 20, never bet on, auto-closed Oct 1 renders a flat 50 % line from Sep 15 to
+**Nov 5**, with its terminal dots on Nov 5 — a price asserted across five weeks the market did
+not exist for. That contradicts this task's own ⛔ wall (*"never draw the line into time that
+has not happened"*) and the `::price-chart-series-never-drawn-beyond-now` row it minted.
+
+**The outcome is unchanged — no code shipped for it — and the reason is now different.** It is
+not "the ruled outcome already holds"; it is **"correcting it requires choosing a rendering for
+the sparse case that no document specifies, and §9 pins the current one."** ⇒ Recorded as
+DELIBERATELY UNAMENDED in the §20 row and **owed a founder ruling**, not resolved. The guard
+`terminal-dots-DO-sit-at-the-axis-end-on-the-full-width-flat-line` pins the CURRENT behaviour
+so a change to it is deliberate; it is not an endorsement of it.
 
 **#5 — `now` beyond the window end (staging, after 2026-09-10T23:45Z).**
 *Chose:* **do not clamp `xPx`.** Let the SVG viewBox clip, as it already does.
@@ -214,6 +231,16 @@ fail-safe direction: production is the only environment whose window is load-bea
 | `tests/unit/config/chart-window.test.ts` | **new** — the constants layer: resolution per env, no conditional downstream |
 | `tests/unit/debate/render/price-chart.test.tsx` | the domain guards — updated + new fixed-window / never-beyond-now assertions |
 | `tests/unit/debate/render/terminal-markers.test.tsx`, `chart-overlay-a11y.test.tsx` | inherited domain assumptions, updated if red |
+
+⚠ **Three files shipped that this map did not predict, added here rather than left stale** —
+§5.10's audit reads the file map, so a map that disagrees with the diff is what that audit
+reads against. (`@code-reviewer` LOW.)
+
+| File | Why it was not foreseen |
+|---|---|
+| `src/components/debate/chart/geometry.ts` | `xPx`'s docblock said "over the market lifetime domain" and described a degenerate branch that the fixed window makes unreachable. An O-5 correction, not a behaviour change. |
+| `src/components/debate/chart/ChartSummary.tsx` | its docblock claimed it names "the two domain endpoints"; it names the SERIES' endpoints, and after this change those are different things. Narrowed in place, behaviour untouched, and the §9 wording flagged as owed. |
+| `tests/unit/discovery/render/hero-panels.test.tsx` | the hero's time-scaling guard asserted `xs[2] === 640`, i.e. that the series reaches the axis end — the exact tail-stretching this task forbids. Re-expressed as a ratio, which is what it was always trying to measure. |
 
 **Not touched, deliberately:** `src/server/cpmm/**` (no write path, no curve math),
 `src/server/bets/**`, `geometry.ts`'s viewBox lock, `PriceBar`, anything CHART-2 shipped.
