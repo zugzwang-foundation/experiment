@@ -297,10 +297,24 @@ const STAGING_CHART_WINDOW: ChartWindow = {
  * individual branch looks correct, and it fires only in the environment nobody
  * is testing.
  *
- * `preview` takes the STAGING window because preview deployments read the
- * staging database: given production's window, every preview chart would render
- * as a line crushed against the left edge — broken-looking in precisely the
- * surface used to review this change.
+ * `preview` takes the STAGING window because anything pointed at the staging
+ * database needs staging's dates: given production's window, every such chart
+ * would render as a line crushed against the left edge.
+ *
+ * ⚠ MEASURED, AND IT INVERTS THE ASSUMPTION THAT PUT THAT ARM HERE. A Vercel
+ * Preview deployment reports `env: "staging"`, not `"preview"` — read off this
+ * branch's own preview at `/api/health` (`canary` matching the branch HEAD, so
+ * it was this build and not another session's). So the deployed preview lane
+ * already takes the staging window **through the `staging` arm**, and the
+ * `preview` arm covers only what actually sets that value: a LOCAL build, which
+ * AGENTS.md §2 instructs (`ZUGZWANG_ENV=preview just verify`), plus any future
+ * environment tagged that way. `preview` is in `VALID_ENVS` beside `prod` and
+ * `staging`, so the arm is not dead — but it is not the thing that makes
+ * previews work, and this docblock said it was.
+ *
+ * ⇒ Recorded rather than quietly corrected because `@code-reviewer` filed this
+ * as **NOT ESTABLISHED (O-13)** and the honest close is the reading, not a
+ * tidier sentence.
  *
  * Everything else — `prod`, the `"unknown"` fallback `next.config.ts` inlines
  * into the browser bundle, and an unset var under `vitest` — takes PRODUCTION.
