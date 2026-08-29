@@ -1,7 +1,7 @@
 /**
- * WARLI-1 slice 5 — emit the standalone preview.
+ * WARLI-2 slice 9 — emit the standalone preview.
  *
- *   pnpm tsx scripts/warli-preview.tsx ~/Downloads/zz_WARLI-1_preview_<UTC>.html
+ *   pnpm tsx scripts/warli-preview.tsx ~/Downloads/zz_WARLI-2_preview_<UTC>.html
  *
  * The preview is the DELIVERABLE of this task, because the component it
  * previews is mounted nowhere: the mount point is the auth surface, which is a
@@ -15,6 +15,16 @@
  * own exported `WARLI_CSS` — not a copy. If the preview and the shipped artwork
  * ever disagree about the drawing, this script is broken, not merely stale.
  *
+ * ⚠ THE PLATE IS THE POINT, NOT A NICETY. At hero scale a figure is 58 units in
+ * a 1440-unit frame — about twelve pixels — so the thing that distinguishes a
+ * scholar from a labourer is a handful of pixels across, and the faces are
+ * smaller than that. That is correct for the composition, which is meant to read
+ * as a crowd rather than as a census, and it makes every figure and every motif
+ * impossible to JUDGE. WARLI-1's single worst mistake was building this plate,
+ * glancing at it, and missing a figure whose arms were visibly broken for two
+ * hours. When you build an instrument specifically to see something, spend the
+ * minute actually reading it.
+ *
  * ⚠ ONE THING IS TRANSCRIBED RATHER THAN SHARED, and it is the honest weak
  * point: the pointer interaction. The component's copy lives in a React
  * `useEffect` and is TypeScript; the preview needs plain JS in a `<script>` tag
@@ -23,15 +33,15 @@
  * security review should refuse in an artwork — or emitting a second bundle,
  * which defeats "double-click it". So the ~40 lines are transcribed, the
  * duplication is stated at the top of the generated file, and the arithmetic
- * that actually decides the composition (`../src/components/art/warli/geometry.ts`)
- * is NOT duplicated, because that is the part a divergence would silently
- * corrupt.
+ * that actually decides the composition (`../src/components/art/warli/geometry.ts`,
+ * `../src/components/art/warli/scene.ts`) is NOT duplicated, because that is the
+ * part a divergence would silently corrupt.
  *
  * ⚠ HEX LITERALS ARE PERMITTED IN THE GENERATED FILE ONLY. It is not in the
  * view layer, it is not scanned by `tests/unit/design/no-raw-hex-view-layer.test.ts`,
  * and it must resolve its own tokens because there is no Tailwind to do it. The
- * five TOKEN values are transcribed byte-for-byte from `src/app/globals.css`,
- * which this task never edits.
+ * TOKEN values are transcribed byte-for-byte from `src/app/globals.css`, which
+ * this task never edits.
  *
  * ⚠ TWO VALUES ARE NOT TRANSCRIBED AND ARE NOT TOKENS: the guide-circle strokes
  * are invented, and they are the only CHROMATIC colours anywhere in this task.
@@ -44,8 +54,11 @@
 import { writeFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { MOTIF_RENDERERS } from "../src/components/art/warli/field-layer";
 import {
+	FIELD_FIGURES,
 	Figure,
+	type FigureSpec,
 	INNER_FIGURES,
 	OUTER_FIGURES,
 } from "../src/components/art/warli/figures";
@@ -57,6 +70,8 @@ import {
 	WARLI_CSS,
 	WarliHero,
 } from "../src/components/art/warli/hero";
+import { WEIGHT_SPARE } from "../src/components/art/warli/primitives";
+import { SCENE_MOTIFS } from "../src/components/art/warli/scene";
 
 const out = process.argv[2];
 if (out === undefined) {
@@ -71,7 +86,7 @@ const art = renderToStaticMarkup(<WarliHero />);
  * ⚠ ONE VALUE IN THIS FILE IS NOT CONSTRAINED BY THE TYPE SYSTEM. Everything
  * else interpolated into the document below is a number, a closed union, or
  * React's own escaped output. `spec.label` is typed plain `string`, so the only
- * thing keeping it inert is that all sixteen call sites happen to pass literals.
+ * thing keeping it inert is that all the call sites happen to pass literals.
  * That is a fact about today's data, not a property of the code, and this is a
  * raw-concatenation sink outside React — so it gets escaped rather than trusted.
  * Cheaper than narrowing the type, and it stays correct if the labels ever come
@@ -96,34 +111,47 @@ const esc = (value: string): string =>
 			})[ch] ?? ch,
 	);
 
-/**
- * The plate: all sixteen drawn large, in their pairs.
- *
- * At hero scale a figure is 58 units tall and a held object is twelve, so the
- * thing that distinguishes a scholar from a labourer is about ten pixels
- * across. That is fine on the ring — it is meant to read as a crowd, not as a
- * census — but it makes the figures impossible to JUDGE, and they are the part
- * most likely to be wrong. The plate exists so the operator can look at what
- * they are actually approving.
- */
-const plate = [...INNER_FIGURES.keys()]
+type Register = "solid" | "dense" | "spare";
+
+const cell = (spec: FigureSpec, density: Register) =>
+	`<figure class="plate-cell">
+		<svg viewBox="-30 -76 64 84" aria-hidden="true">${renderToStaticMarkup(
+			<Figure spec={spec} density={density} />,
+		)}</svg>
+		<figcaption>${esc(spec.label)}<small>${esc(density)}${spec.prop === "none" ? " · pose" : ` · ${esc(spec.prop)}`}${spec.face === undefined ? "" : " · FACED"}</small></figcaption>
+	</figure>`;
+
+/** The four oppositions, each as the pair that sits at 180° across the ring. */
+const pairPlate = [0, 1, 2, 3]
 	.map((i) => {
-		const inner = INNER_FIGURES[i];
-		const outer = OUTER_FIGURES[i];
-		if (inner === undefined || outer === undefined) {
+		const a = INNER_FIGURES[i];
+		const b = INNER_FIGURES[i + 4];
+		if (a === undefined || b === undefined) {
 			return "";
 		}
-		const cell = (
-			spec: (typeof INNER_FIGURES)[number],
-			density: "dense" | "spare",
-		) =>
-			`<figure class="plate-cell">
-				<svg viewBox="-26 -64 60 70" aria-hidden="true">${renderToStaticMarkup(
-					<Figure spec={spec} density={density} />,
-				)}</svg>
-				<figcaption>${esc(spec.label)}<small>${esc(density)}${spec.prop === "none" ? " · pose" : ` · ${esc(spec.prop)}`}</small></figcaption>
-			</figure>`;
-		return `<div class="plate-pair">${cell(inner, "dense")}${cell(outer, "spare")}</div>`;
+		return `<div class="plate-pair">${cell(a, "solid")}${cell(b, "solid")}</div>`;
+	})
+	.join("");
+
+const outerPlate = OUTER_FIGURES.map((spec) => cell(spec, "spare")).join("");
+
+const fieldPlate = FIELD_FIGURES.map((spec, i) =>
+	cell(spec, i % 2 === 0 ? "dense" : "spare"),
+).join("");
+
+/** Every motif the scene engine can place, once each, at a readable size. */
+const motifPlate = [...new Set(SCENE_MOTIFS)]
+	.map((kind) => {
+		const render = MOTIF_RENDERERS[kind];
+		if (render === undefined) {
+			return `<figure class="plate-cell motif"><svg viewBox="-24 -40 48 48"></svg><figcaption>${esc(kind)}<small>NO RENDERER</small></figcaption></figure>`;
+		}
+		return `<figure class="plate-cell motif">
+			<svg viewBox="-24 -42 48 50" aria-hidden="true">${renderToStaticMarkup(
+				<g>{render(7, WEIGHT_SPARE)}</g>,
+			)}</svg>
+			<figcaption>${esc(kind)}</figcaption>
+		</figure>`;
 	})
 	.join("");
 
@@ -136,7 +164,7 @@ const html = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WARLI-1 — interactive hero preview</title>
+<title>WARLI-2 — density, character and the legible debate</title>
 <!--
   GENERATED by scripts/warli-preview.tsx. Do not hand-edit; regenerate.
 
@@ -144,7 +172,7 @@ const html = `<!doctype html>
   The animation CSS is the component's own exported WARLI_CSS.
   The pointer interaction is TRANSCRIBED from the component's useEffect,
   because this file must run with no build step. It is the one part that can
-  drift. The geometry is not duplicated anywhere.
+  drift. The geometry and the scene placement are not duplicated anywhere.
 
   Hex literals appear here and only here: there is no Tailwind in this file to
   resolve --color-ink, so the tokens are declared inline, transcribed from
@@ -180,6 +208,9 @@ body {
 	border: 1px solid var(--color-n2);
 	border-radius: 6px;
 	background: var(--color-n0);
+	position: sticky;
+	top: 0;
+	z-index: 5;
 }
 .bar b { font-weight: 600; letter-spacing: .02em; }
 .bar span { color: var(--color-n5); }
@@ -238,10 +269,16 @@ html[data-guides="true"] .guides { opacity: 1; }
 html[data-reduced="true"] .warli-spin { animation: none; }
 html[data-reduced="true"] .warli-nudge { transition: none; transform: none; }
 
-/* The plate — the sixteen at a size they can be judged at. */
+/* The plate — every figure and every motif at a size they can be judged at. */
 .plate { width: min(1400px, 94vw); }
-.plate h2 { font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--color-n5); margin: 0 0 14px; }
-.plate-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.plate h2 {
+	font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+	color: var(--color-n5); margin: 26px 0 12px; padding-bottom: 6px;
+	border-bottom: 1px solid var(--color-n2);
+}
+.plate-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.plate-flow { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+.plate-motifs { display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; }
 .plate-pair {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
@@ -250,10 +287,14 @@ html[data-reduced="true"] .warli-nudge { transition: none; transform: none; }
 	background: var(--color-n0);
 	overflow: hidden;
 }
-.plate-cell { margin: 0; padding: 12px 6px 10px; text-align: center; color: var(--color-ink); }
-.plate-cell + .plate-cell { border-left: 1px solid var(--color-n2); }
-.plate-cell svg { width: 100%; height: 132px; display: block; overflow: visible; }
-.plate-cell figcaption { margin-top: 8px; font-size: 11px; letter-spacing: .04em; }
+.plate-flow .plate-cell, .plate-motifs .plate-cell {
+	border: 1px solid var(--color-n2); border-radius: 6px; background: var(--color-n0);
+}
+.plate-cell { margin: 0; padding: 10px 6px 8px; text-align: center; color: var(--color-ink); }
+.plate-pair .plate-cell + .plate-cell { border-left: 1px solid var(--color-n2); }
+.plate-cell svg { width: 100%; height: 128px; display: block; overflow: visible; }
+.plate-cell.motif svg { height: 84px; }
+.plate-cell figcaption { margin-top: 6px; font-size: 11px; letter-spacing: .03em; }
 .plate-cell small { display: block; color: var(--color-n5); font-size: 10px; }
 
 ${WARLI_CSS}
@@ -262,8 +303,8 @@ ${WARLI_CSS}
 <body>
 
 <div class="bar">
-	<b>WARLI-1</b>
-	<span>1440 × ${VIEW_HEIGHT} · inner r=${R_INNER} · outer r=${R_OUTER}</span>
+	<b>WARLI-2</b>
+	<span>${VIEW_WIDTH} × ${VIEW_HEIGHT} · inner r=${R_INNER} · outer r=${R_OUTER} · ${INNER_FIGURES.length} faced + ${OUTER_FIGURES.length} crowd + ${FIELD_FIGURES.length} field</span>
 	<button id="reduce" type="button" aria-pressed="false">prefers-reduced-motion: off</button>
 	<button id="guides" type="button" aria-pressed="false">guides: off</button>
 	<button id="zoom" type="button" aria-pressed="true">fit to window</button>
@@ -275,6 +316,7 @@ ${WARLI_CSS}
 		${art}
 		<svg class="guides" viewBox="0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}" aria-hidden="true">
 			<circle cx="${VIEW_WIDTH / 2}" cy="${VIEW_HEIGHT / 2}" r="${R_INNER}" fill="none" stroke="#4b8f8f" stroke-width="1" stroke-dasharray="6 6"/>
+			<circle cx="${VIEW_WIDTH / 2}" cy="${VIEW_HEIGHT / 2}" r="${R_OUTER}" fill="none" stroke="#4b8f8f" stroke-width="1" stroke-dasharray="6 6"/>
 			<circle cx="${VIEW_WIDTH / 2}" cy="${VIEW_HEIGHT / 2}" r="${Math.hypot(CARD_W / 2, CARD_H / 2).toFixed(2)}" fill="none" stroke="#8f6b4b" stroke-width="1" stroke-dasharray="3 5"/>
 		</svg>
 		<div class="card">
@@ -288,8 +330,17 @@ ${WARLI_CSS}
 </div>
 
 <section class="plate">
-	<h2>The eight oppositions — inner (dense) beside outer (spare)</h2>
-	<div class="plate-grid">${plate}</div>
+	<h2>The four oppositions — the eight FACED positions, each beside the one it sits opposite at 180°</h2>
+	<div class="plate-grid">${pairPlate}</div>
+
+	<h2>The outer ring — twelve, faceless, counter-rotating</h2>
+	<div class="plate-flow">${outerPlate}</div>
+
+	<h2>The static field — twenty-eight, at work, drawn in both open registers</h2>
+	<div class="plate-flow">${fieldPlate}</div>
+
+	<h2>The motif library — every kind the scene engine can place</h2>
+	<div class="plate-motifs">${motifPlate}</div>
 </section>
 
 <script>

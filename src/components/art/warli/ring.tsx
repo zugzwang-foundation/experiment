@@ -55,6 +55,19 @@ export type RingProps = {
 	readonly phaseDeg: number;
 	/** Marks this ring in the DOM, for tests and for the pointer handler. */
 	readonly name: string;
+	/**
+	 * Draw the interstitial field motifs between this ring's figures.
+	 *
+	 * ⚠ THE OUTER RING TURNS THIS OFF, AND THE REASON IS THE FRAME, NOT TASTE.
+	 * The spare field grows OUTWARD from the ring's baseline by up to 26 units,
+	 * and the outer ring's baseline is at 470 in a frame whose half-height is
+	 * 500 — so the fringe reached 496 and drew straight through the border. It
+	 * existed in the first place because the area outside the rings was empty;
+	 * WARLI-2's static field fills that far better and with actual scenery, so
+	 * the fringe is now solving a problem that no longer exists at the cost of
+	 * one that does.
+	 */
+	readonly showField?: boolean;
 };
 
 /**
@@ -131,6 +144,7 @@ export function Ring({
 	facing,
 	phaseDeg,
 	name,
+	showField = true,
 }: RingProps) {
 	const count = figures.length;
 	const placements = ringPlacements({
@@ -158,7 +172,14 @@ export function Ring({
 
 	const links = ringLinks(placements, handLeftOf, handRightOf, facing);
 	const fieldAngles = interstitialAngles(count, phaseDeg);
-	const dense = density === "dense";
+	// ⚠ `solid` COUNTS AS DENSE HERE. WARLI-2 split the old two-value register
+	// into three, and this line is the one place the ring cares: the ground
+	// treatment — the drawn baseline and its comb — belongs to the LOUD ring,
+	// whichever of the two loud registers it happens to be drawn in. Written as
+	// `=== "dense"` it silently dropped the inner ring's entire ground the moment
+	// the faced figures moved to `solid`, which reads as a missing circle rather
+	// than as a register change.
+	const dense = density === "dense" || density === "solid";
 	const cycle = dense ? FIELD_DENSE : FIELD_SPARE;
 	const weight = dense ? WEIGHT_DENSE : WEIGHT_SPARE;
 
@@ -233,7 +254,7 @@ export function Ring({
 			</g>
 
 			<g data-warli-ring-field="">
-				{fieldAngles.map((angle, i) => {
+				{(showField ? fieldAngles : []).map((angle, i) => {
 					const motif = cycle[i % cycle.length];
 					if (motif === undefined) {
 						return null;

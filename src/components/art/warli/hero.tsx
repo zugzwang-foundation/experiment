@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
+import { FieldLayer } from "./field-layer";
 import { INNER_FIGURES, OUTER_FIGURES } from "./figures";
 import { Ring } from "./ring";
 
@@ -82,6 +83,7 @@ const STEP_DEG = 360 / INNER_FIGURES.length;
  */
 export const WARLI_CSS = `
 .warli-root { color: var(--color-ink); }
+.warli-reserve { color: var(--color-ground); }
 .warli-spin {
 	transform-origin: 0 0;
 	animation: warli-turn var(--warli-turn, ${TURN_SECONDS}s) linear infinite;
@@ -364,6 +366,20 @@ export function WarliHero({
 			    the same failure this file already exists to prevent once. */}
 			<style>{WARLI_CSS}</style>
 
+			{/* ⚠ THE STATIC FIELD IS DRAWN FIRST, AND IT IS NOT INSIDE THE CENTRING
+			    TRANSFORM. It works in absolute frame coordinates because it is
+			    positioned against the FRAME — corners, edges, the border stack —
+			    while the rings are positioned against the CENTRE. Pushing the field
+			    through the same translate would have meant every scene coordinate
+			    carrying a −720/−500 offset for no benefit, and the border, whose
+			    whole job is to sit on the frame's own edges, would be expressed in
+			    a space the frame is not in.
+
+			    Drawn first because SVG has no z-index and this palette has no value
+			    scale, so paint order is the ONLY depth cue available. The world goes
+			    behind the argument. */}
+			<FieldLayer />
+
 			<g transform={`translate(${VIEW_WIDTH / 2} ${VIEW_HEIGHT / 2})`}>
 				<g ref={innerSpinRef} className="warli-spin" data-warli-spin="inner">
 					<g ref={innerNudgeRef} className="warli-nudge">
@@ -372,7 +388,7 @@ export function WarliHero({
 							centre={CENTRE}
 							radius={R_INNER}
 							figures={INNER_FIGURES}
-							density="dense"
+							density="solid"
 							facing="outward"
 							phaseDeg={PHASE_DEG}
 						/>
@@ -392,6 +408,7 @@ export function WarliHero({
 							density="spare"
 							facing="inward"
 							phaseDeg={PHASE_DEG}
+							showField={false}
 						/>
 					</g>
 				</g>

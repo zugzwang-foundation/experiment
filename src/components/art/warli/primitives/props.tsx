@@ -252,12 +252,19 @@ export function Scales({
 			<Run x1={-9} y1={3} x2={9} y2={3} seed={seed} weight={weight} />
 			{[-9, 9].map((x) => (
 				<g key={x}>
-					<Run x1={x} y1={3} x2={x} y2={8} seed={seed} weight={weight} />
+					<Run x1={x} y1={3} x2={x} y2={7} seed={seed} weight={weight} />
+					{/* ⚠ THE PANS ARE SHALLOW BOWLS, NOT DEEP VEES. The first version
+					    dropped them five units to a point, and on the plate the beam
+					    plus two sharp vees read as an arrow or a zigzag rather than as
+					    a balance. A pan is wider than it is deep — that ratio is the
+					    whole difference between a bowl and an arrowhead at twelve
+					    units, and it is the only cue available at this size. */}
 					<Shape
 						points={[
-							{ x: x - 4, y: 8 },
-							{ x, y: 13 },
-							{ x: x + 4, y: 8 },
+							{ x: x - 4.6, y: 7 },
+							{ x: x - 3, y: 11 },
+							{ x: x + 3, y: 11 },
+							{ x: x + 4.6, y: 7 },
 						]}
 						seed={seed + x}
 						weight={weight}
