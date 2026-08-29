@@ -558,10 +558,13 @@ describe("gate 2 · conservation", () => {
 
 describe("gate 3 · durable replay", () => {
 	it("G3.1 · every generated bet's receipt replays its committed result", async () => {
+		// S-7 G2 (ADR-0044): loadDurableReplay is user-scoped, so each row must
+		// carry its OWN user_id through — a receipt only replays for the user it
+		// belongs to.
 		const receipts = await gatesClient<
-			{ idempotency_key: string; body_fingerprint: string }[]
+			{ idempotency_key: string; body_fingerprint: string; user_id: string }[]
 		>`
-			SELECT idempotency_key, body_fingerprint FROM bet_receipts
+			SELECT idempotency_key, body_fingerprint, user_id FROM bet_receipts
 		`;
 		// Non-empty: a loop over zero receipts asserts nothing.
 		expect(receipts.length).toBeGreaterThan(0);
@@ -569,6 +572,7 @@ describe("gate 3 · durable replay", () => {
 		const failures: string[] = [];
 		for (const receipt of receipts) {
 			const replay = await loadDurableReplay(gatesDb, {
+				userId: receipt.user_id,
 				idempotencyKey: receipt.idempotency_key,
 				bodyFingerprint: receipt.body_fingerprint,
 			});
@@ -583,15 +587,53 @@ describe("gate 3 · durable replay", () => {
 		// POSITIVE CONTROL for the assertion above: it passes when every lookup
 		// returns "replay", which is also what a function that ignored its
 		// fingerprint argument would produce.
-		const [receipt] = await gatesClient<{ idempotency_key: string }[]>`
-			SELECT idempotency_key FROM bet_receipts LIMIT 1
+		// Same user, own key, wrong fingerprint — isolates the fingerprint check
+		// from user scoping (S-7 G2 / ADR-0044); the wrong user would return null,
+		// not "mismatch", which is a different assertion.
+		const [receipt] = await gatesClient<
+			{ idempotency_key: string; user_id: string }[]
+		>`
+			SELECT idempotency_key, user_id FROM bet_receipts LIMIT 1
 		`;
 		expect(receipt).toBeDefined();
 		const replay = await loadDurableReplay(gatesDb, {
+			userId: receipt?.user_id ?? "",
 			idempotencyKey: receipt?.idempotency_key ?? "",
 			bodyFingerprint: "a-fingerprint-that-was-never-written",
 		});
 		expect(replay?.kind).toBe("mismatch");
+	});
+
+	it("G3.1c · a receipt does not replay for a user who does not own it", async () => {
+		// THE MISSING NEGATIVE CONTROL for G3.1 (ADR-0044 code-review MEDIUM-4):
+		// G3.1 and G3.1b both pass identically against a `loadDurableReplay` that
+		// ignores `userId` entirely, because both feed it the receipt's own
+		// correct user. This is the control that actually exercises the WHERE
+		// clause's user filter: the correct key + correct fingerprint, under a
+		// user who does not own the row, must be "not found" — never "replay".
+		const [receipt] = await gatesClient<
+			{ idempotency_key: string; body_fingerprint: string; user_id: string }[]
+		>`
+			SELECT idempotency_key, body_fingerprint, user_id FROM bet_receipts LIMIT 1
+		`;
+		expect(receipt).toBeDefined();
+		const [otherUser] = await gatesClient<{ user_id: string }[]>`
+			SELECT DISTINCT user_id FROM bet_receipts
+			WHERE user_id != ${receipt?.user_id ?? ""}
+			LIMIT 1
+		`;
+		// Fall back to a well-formed UUID that owns no receipt if the staging set
+		// happens to carry only one user's receipts — the property under test
+		// (this id owns nothing under this key) holds either way.
+		const wrongUserId =
+			otherUser?.user_id ?? "00000000-0000-7000-8000-000000000000";
+
+		const replay = await loadDurableReplay(gatesDb, {
+			userId: wrongUserId,
+			idempotencyKey: receipt?.idempotency_key ?? "",
+			bodyFingerprint: receipt?.body_fingerprint ?? "",
+		});
+		expect(replay).toBeNull();
 	});
 
 	it("G3.2 · reports no durable idempotency conflicts across the set", async () => {

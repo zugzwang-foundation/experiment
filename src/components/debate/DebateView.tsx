@@ -9,7 +9,6 @@ import {
 } from "react";
 
 import { PageContainer } from "@/components/shell/PageContainer";
-
 import { AuthGateSlot } from "./composer/AuthGateSlot";
 import { BetComposer } from "./composer/BetComposer";
 import { deriveReplySide } from "./composer/gating";
@@ -718,6 +717,18 @@ export function DebateView({
 					</div>
 				</>
 			)}
+
+			{/* ⛔⛔ RESO-3 · CHANGE 6 — THE CRITERION DISCLOSURE IS NOT RENDERED, AND ITS
+			    COMPONENT IS DELIBERATELY STILL IN THE REPO. `CriterionDisclosure.tsx`
+			    is unrendered, not deleted, because restoring it is one line here and
+			    the founder ruling that removed it is a placement decision rather than a
+			    verdict on the component. Deleting the file would turn a one-line restore
+			    into a rebuild, and would throw away the measurement its docblock carries
+			    — that `hidden="until-found"` on a `<details>` body stops it ever opening.
+			    ⚠ The criterion therefore has NO on-page presence on `/m/[slug]` again.
+			    It reaches a participant only through the ADR-0025 `.md` export, exactly
+			    as it did between RESO-1 and CRIT-1. That is the founder's call and it is
+			    recorded here so the next reader does not "fix" it. */}
 
 			<PostPopup post={popupPost} onClose={() => setPopupPost(null)} />
 			<ReplyPopup reply={popupReply} onClose={() => setPopupReply(null)} />

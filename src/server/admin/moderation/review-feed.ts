@@ -14,6 +14,7 @@ import {
 import type { CategoryScore } from "@/server/admin/moderation/audit-view";
 import { READ_URL_TTL_SECONDS_MODERATION } from "@/server/config/limits";
 import { loadRemovedSet } from "@/server/debate-view/load-debate-view";
+import { DOWNSTREAM_ADMIN_FEED_FETCH } from "@/server/storage/read-url-memo";
 import { signRead } from "@/server/storage/sign-read";
 
 // UI.6 S3(a) — the live-content review-feed reader (F-ADMIN-4 partial;
@@ -202,7 +203,11 @@ export async function loadReviewFeed(
 					try {
 						imageUrlByComment.set(
 							r.id,
-							await signRead(key, READ_URL_TTL_SECONDS_MODERATION),
+							await signRead(
+								key,
+								READ_URL_TTL_SECONDS_MODERATION,
+								DOWNSTREAM_ADMIN_FEED_FETCH,
+							),
 						);
 					} catch {
 						// R2 unavailable for this object → degrade to no image.

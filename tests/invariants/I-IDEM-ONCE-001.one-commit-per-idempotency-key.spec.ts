@@ -16,6 +16,23 @@ import { truncateTables } from "../db/_fixtures/truncate";
 //        double-committing (the ENGINE.12 R3 mirror: never catch 23505 to
 //        "recover" silently; the route reads the receipt and replays instead).
 //
+// ⚠ THE TWO MECHANISMS ARE SCOPED DIFFERENTLY, AND SINCE S-7 (G2) DELIBERATELY
+// SO. Mechanism (i) — the Redis cache key and the durable REPLAY READ — is
+// scoped PER USER: the key is client-supplied, and a sell body carries no
+// user-identifying field, so an unscoped read answers one participant out of
+// another's slot (S-7 D-1; tests/integration/cross-user-idempotency.integration
+// .test.ts). Mechanism (ii), asserted below, stays GLOBALLY unique across all
+// users, all flows and all markets — S-7 fence 5.1 leaves both Postgres uniques
+// untouched, and the per-user-composite alternative (Design A) is recorded in
+// ADR-0044 as the testnet successor, not this stratum's change.
+//
+// That asymmetry is load-bearing rather than an oversight: it is exactly what
+// makes the post-G2 cross-user outcome a clean 409 `error_idempotency_key_reused`
+// at the route's 23505 catch. The second participant is no longer answered from
+// the first one's cache (the read is scoped), so they reach the transaction — and
+// the still-global unique below is what stops them committing under a key that is
+// already spent. Narrow the index and that refusal disappears.
+//
 // Fixture-bypass posture (SPEC.2 §6.6, the I-GRANT-ONCE-001 mirror): raw
 // `testClient.unsafe` INSERTs go straight past the application layer so the INDEX
 // is the only enforcement under test. The `betReceipts` drizzle table lands in the
@@ -74,13 +91,48 @@ describe("I-IDEM-ONCE-001: at most one commit per idempotency key", () => {
 
 		// A second row under the SAME idempotency_key (a race loser / Redis-lost
 		// retry that reached the tx) → the backstop index rejects with 23505. Even
-		// a DIFFERENT flow collides — the key is globally unique.
+		// a DIFFERENT flow collides: the index is on `idempotency_key` ALONE, so
+		// nothing about the row — not the flow, not the market, and (see the next
+		// test) not the user — narrows it.
 		await expect(
 			insertReceipt(userId, marketId, "shared-key", "sell"),
 		).rejects.toMatchObject({
 			code: "23505",
 			constraint_name: "bet_receipts_idempotency_key_uq",
 		});
+	});
+
+	it("one-commit-per-idempotency-key::backstop-rejects-duplicate-key-across-users", async () => {
+		// S-7 · the user axis, pinned so the header's scoping note above is
+		// falsifiable rather than prose. The route-layer REPLAY READ is per-user
+		// after G2; this storage backstop is NOT, and must not become so here —
+		// narrowing it to (user_id, idempotency_key) is Design A, deferred to
+		// testnet in ADR-0044. Two DIFFERENT users under one key still collide.
+		const alice = await seedUserAndMarket("alice");
+		const bob = await seedUserAndMarket("bob");
+
+		await insertReceipt(
+			alice.userId,
+			alice.marketId,
+			"cross-user-key",
+			"place",
+		);
+
+		// Different user, different market, different flow — the key alone decides.
+		await expect(
+			insertReceipt(bob.userId, bob.marketId, "cross-user-key", "sell"),
+		).rejects.toMatchObject({
+			code: "23505",
+			constraint_name: "bet_receipts_idempotency_key_uq",
+		});
+
+		// Exactly one commit survives under the key, and it is the first one.
+		const rows = await testClient.unsafe<Array<{ user_id: string }>>(
+			`SELECT user_id FROM bet_receipts WHERE idempotency_key = $1`,
+			["cross-user-key"],
+		);
+		expect(rows).toHaveLength(1);
+		expect(rows[0]?.user_id).toBe(alice.userId);
 	});
 
 	it("one-commit-per-idempotency-key::distinct-keys-are-unconstrained", async () => {

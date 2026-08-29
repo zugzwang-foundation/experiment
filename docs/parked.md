@@ -2641,6 +2641,28 @@ report from a client.
 **Expected next task.** An idempotency-scoping task. Evidence:
 `src/server/idempotency/cache.ts`; `src/db/schema/bets.ts`; ADR-0015; ADR-0031.
 
+**Disposition at S-7 (2026-08-27) — AMENDED, not discharged.** The conditional trigger fired
+(this is that idempotency-scoping task). Design B (ADR-0044) qualifies the Redis key, the
+durable-receipt read, and the 23505-catch outcome by `user_id` — zero migration, so the two
+Postgres uniques named above stay globally unqualified exactly as this row describes.
+
+Read against the two things this row named separately:
+
+- **The cross-user axis is no longer merely refuted — it is now server-enforced.** A client can
+  no longer address another user's cache slot, receipt, or reservation at all; the property this
+  row worried lived "entirely in code the server does not run" is now also enforced in code the
+  server does run. **This part of D-8 is closed.**
+- **The same-user cross-endpoint (flow) confusion this row named is untouched by S-7 and stays
+  open.** One key reused across `place` and `sell` still resolves to one slot; the second call
+  still meets the fingerprint `mismatch` arm and still returns a 409 pointing at the key rather
+  than at the mixing. Design A (re-qualifying the two uniques) was considered and rejected for
+  S-7's stratum (no live-reachable attack, no migration inside the freeze window) and is recorded
+  in ADR-0044 as the testnet successor — at which point the flow axis should be revisited
+  alongside it, since it touches the same two indexes.
+
+**This row is not closed.** Only the cross-user half of its finding is. The same-user
+cross-endpoint half — and Design A generally — is the next idempotency task's starting point.
+
 ---
 
 ## D-9 — migration prose vs O-5: a superseded R9 sentence sits in two files AGENTS.md §11 forbids editing

@@ -49,30 +49,37 @@ const {
 		mockRunBetTransaction: vi.fn(),
 		idemStore: store,
 		// Single-key-encoding-both-states machine (SPEC.2 §11): first call for a
-		// key → miss (caller MUST call release(response) to populate the store);
-		// subsequent calls with the same fingerprint → hit (replay).
-		mockLookupOrReserve: vi.fn(async (key: string, fingerprint: string) => {
-			const existing = store.get(key);
-			if (existing && existing.bodyFingerprint === fingerprint) {
-				return { kind: "hit", cachedResponse: existing };
-			}
-			return {
-				kind: "miss",
-				release: async (
-					response: {
-						status: number;
-						body: unknown;
-						bodyFingerprint: string;
-					} | null,
-				) => {
-					if (response === null) {
-						store.delete(key);
-						return;
-					}
-					store.set(key, response);
-				},
-			};
-		}),
+		// (userId, key) pair → miss (caller MUST call release(response) to
+		// populate the store); subsequent calls with the same fingerprint → hit
+		// (replay). User-scoped since ADR-0044 (S-7 G2) — mirrors the real
+		// `idempotencyLookupOrReserve(userId, key, bodyFingerprint)` signature so
+		// this stand-in keeps testing the route's step-3 short-circuit rather than
+		// silently degrading into a differently-keyed machine.
+		mockLookupOrReserve: vi.fn(
+			async (userId: string, key: string, fingerprint: string) => {
+				const storeKey = `${userId}:${key}`;
+				const existing = store.get(storeKey);
+				if (existing && existing.bodyFingerprint === fingerprint) {
+					return { kind: "hit", cachedResponse: existing };
+				}
+				return {
+					kind: "miss",
+					release: async (
+						response: {
+							status: number;
+							body: unknown;
+							bodyFingerprint: string;
+						} | null,
+					) => {
+						if (response === null) {
+							store.delete(storeKey);
+							return;
+						}
+						store.set(storeKey, response);
+					},
+				};
+			},
+		),
 	};
 });
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { buildBetMetadata, runBetEndpoint } from "@/server/bets/endpoint";
 import { InvalidRequestBodyError } from "@/server/bets/errors";
+import type { DurableReplay } from "@/server/bets/replay";
 import {
 	isDurableIdempotencyConflict,
 	loadDurableReplay,
@@ -12,6 +13,7 @@ import { runBetTransaction } from "@/server/bets/transaction";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { numericString } from "@/server/events/schemas";
 import { IDEMPOTENCY_ERROR_CODES } from "@/server/idempotency/types";
+import { safeCaptureException } from "@/server/observability/safe-capture";
 
 // POST /api/bets/sell — F-BET-3 (comment-free sell). Runs the §3.1 stack via
 // `runBetEndpoint`, MINUS moderation (sell carries no comment → skips step 6),
@@ -96,24 +98,64 @@ export async function POST(request: Request): Promise<Response> {
 		} catch (err) {
 			if (isDurableIdempotencyConflict(err)) {
 				const replay = await loadDurableReplay(db, {
+					userId: ctx.userId,
 					idempotencyKey: ctx.idempotencyKey,
 					bodyFingerprint: ctx.bodyFingerprint,
 				});
-				if (replay?.kind === "replay") {
-					return { status: 200, body: { ok: true, data: replay.result } };
-				}
-				if (replay?.kind === "mismatch") {
-					return {
-						status: 409,
-						body: {
-							ok: false,
-							error: {
-								code: IDEMPOTENCY_ERROR_CODES.KEY_REUSED,
-								message: "Idempotency-Key reused with a different body",
+				// Normalize `null` (no receipt for this user) into a discriminable
+				// member so the switch below can be exhaustiveness-checked — a
+				// `DurableReplay` arm added later without updating this switch is a
+				// compile error, not a silent 409 (code-review LOW / CLAUDE.md O-1:
+				// structural beats procedural).
+				const outcome: DurableReplay | { kind: "not_found" } = replay ?? {
+					kind: "not_found",
+				};
+				switch (outcome.kind) {
+					case "replay":
+						return { status: 200, body: { ok: true, data: outcome.result } };
+					case "unavailable":
+						// ADR-0044 HIGH-1: a transient DB error during the durable check
+						// (fail-OPEN inside loadDurableReplay) must NOT be reported as
+						// "this key belongs to someone else" — rethrow the ORIGINAL
+						// 23505 into the normal uncached-500 path. A retry under the
+						// same key re-attempts the check once the outage clears;
+						// endpoint.ts's outer catch already captures + alarms
+						// `error_internal`.
+						throw err;
+					case "mismatch":
+					case "not_found": {
+						// ADR-0044 (S-7 G2): `not_found` — the 23505 fired on a receipt
+						// that does not belong to this user, now that
+						// loadDurableReplay is user-scoped. This is the one condition
+						// ADR-0044 exists to handle (a genuine cross-user collision,
+						// or rarely on staging a pre-migration-0022 committed bet
+						// with no receipt) and must never be silent (ADR-0044 HIGH-2
+						// / CLAUDE.md O-3): alarm it distinctly from the far more
+						// common same-user fingerprint `mismatch`.
+						if (outcome.kind === "not_found") {
+							safeCaptureException(err, {
+								tags: { kind: "durable_idempotency_cross_user_collision" },
+							});
+						}
+						// Both mean "you may not replay this key" and get the same
+						// uncached 409 (poison guard — caching it would let a
+						// legitimate retry read a stale reused-key error for 24h).
+						return {
+							status: 409,
+							body: {
+								ok: false,
+								error: {
+									code: IDEMPOTENCY_ERROR_CODES.KEY_REUSED,
+									message: "Idempotency-Key reused with a different body",
+								},
 							},
-						},
-						noCache: true,
-					};
+							noCache: true,
+						};
+					}
+					default: {
+						const _exhaustive: never = outcome;
+						throw err;
+					}
 				}
 			}
 			throw err;

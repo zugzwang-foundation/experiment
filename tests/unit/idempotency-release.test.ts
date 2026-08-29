@@ -61,6 +61,10 @@ const COMPLETED = {
 	bodyFingerprint: "fp-release",
 };
 
+// S-7 G2 — idempotencyLookupOrReserve is now user-scoped (ADR-0044); this file
+// exercises the release mechanism only, so a single fixed identity suffices.
+const TEST_USER_ID = "01920000-0000-7000-8000-0000000000f2";
+
 beforeEach(() => {
 	mockRedis.set.mockReset();
 	mockRedis.get.mockReset();
@@ -76,7 +80,11 @@ afterEach(() => {
 /** Reserve a fresh key (SET NX wins → miss) and return its release + sentinel. */
 async function reserve(key: string, fingerprint: string) {
 	mockRedis.set.mockResolvedValueOnce("OK");
-	const result = await idempotencyLookupOrReserve(key, fingerprint);
+	const result = await idempotencyLookupOrReserve(
+		TEST_USER_ID,
+		key,
+		fingerprint,
+	);
 	if (result.kind !== "miss") {
 		throw new Error(`expected miss, got ${result.kind}`);
 	}
@@ -137,7 +145,7 @@ describe("idempotency release — guarded, ownership-checked, alarmed (A4)", () 
 			string[],
 			unknown[],
 		];
-		expect(keys).toEqual([getRedisKey("idem", "rel-null-del")]);
+		expect(keys).toEqual([getRedisKey("idem", TEST_USER_ID, "rel-null-del")]);
 		expect(argv).toContain(sentinelValue);
 	});
 
@@ -159,7 +167,7 @@ describe("idempotency release — guarded, ownership-checked, alarmed (A4)", () 
 			string[],
 			unknown[],
 		];
-		expect(keys).toEqual([getRedisKey("idem", "rel-promote")]);
+		expect(keys).toEqual([getRedisKey("idem", TEST_USER_ID, "rel-promote")]);
 		// Ownership: our own sentinel value is the compare operand.
 		expect(argv).toContain(sentinelValue);
 		// The completed payload is written verbatim (JSON.stringify).

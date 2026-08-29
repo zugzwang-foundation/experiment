@@ -286,3 +286,14 @@ export const PROFILE_GRAPH_Y_MAX = 10000;
  * call site and never inlined, so the HARDEN.6 tune is a one-line change.
  * Integer (milliseconds, not Dharma). */
 export const POLL_INTERVAL_MS_DEBATE_VIEW = 15000;
+
+// === HEADER-PORTFOLIO-CACHE: header PORTFOLIO figure cache-aside ===========
+
+/** TTL for the Redis cache-aside in front of `getHeaderPortfolio`
+ * (`getHeaderPortfolioCached`, `src/server/dharma/header-portfolio.ts`).
+ * Matches `POLL_INTERVAL_MS_DEBATE_VIEW` (15000 ms → 15 s) deliberately: that
+ * interval is already this product's accepted display-freshness bar (it's the
+ * cadence `/m/[slug]` re-renders this exact figure on), so this cache adds no
+ * staleness beyond what a viewer already experiences elsewhere. Seconds, not
+ * milliseconds — Upstash `SET ... EX` takes seconds. */
+export const HEADER_PORTFOLIO_CACHE_TTL_SECONDS = 15;

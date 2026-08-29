@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 //
 // State machine (per plan §F2 cache.ts pseudocode + Q4 resolution +
 // SCAFFOLD.8 LD-10 env-prefix):
-//   redisKey = getRedisKey("idem", key)  // e.g. `prod:idem:${key}`
+//   redisKey = getRedisKey("idem", TEST_USER_ID, key)  // e.g. `prod:idem:${TEST_USER_ID}:${key}`
 //   SET NX EX 30 → if 'OK' → kind:'miss' + release callback
 //                  else GET existing
 //                       if null → race-retry (recurse once)
@@ -99,6 +99,10 @@ import { getRedisKey } from "@/server/upstash/keys";
 // colon, so any colon-free suffix works).
 const FAKE_TOKEN = "0190b3a0-9999-7000-8000-000000000099";
 
+// S-7 G2 — idempotencyLookupOrReserve is now user-scoped (ADR-0044); every call
+// in this file needs a fixed user id. This file is substrate-only (mocked
+// Redis), so the identity is arbitrary and constant across all twelve cases.
+const TEST_USER_ID = "01920000-0000-7000-8000-0000000000f1";
 beforeEach(() => {
 	mockRedis.set.mockReset();
 	mockRedis.get.mockReset();
@@ -134,7 +138,11 @@ describe("idempotency cache state machine", () => {
 		mockRedis.set.mockResolvedValueOnce(null); // SET NX loses (key exists)
 		mockRedis.get.mockResolvedValueOnce(JSON.stringify(cachedResponse));
 
-		const result = await idempotencyLookupOrReserve(key, fingerprint);
+		const result = await idempotencyLookupOrReserve(
+			TEST_USER_ID,
+			key,
+			fingerprint,
+		);
 
 		expect(result.kind).toBe("hit");
 		if (result.kind === "hit") {
@@ -142,7 +150,9 @@ describe("idempotency cache state machine", () => {
 		}
 		// SET NX was the only write attempt; no further set fires on a hit.
 		expect(mockRedis.set).toHaveBeenCalledTimes(1);
-		expect(mockRedis.get).toHaveBeenCalledWith(getRedisKey("idem", key));
+		expect(mockRedis.get).toHaveBeenCalledWith(
+			getRedisKey("idem", TEST_USER_ID, key),
+		);
 		expect(mockRedis.del).not.toHaveBeenCalled();
 	});
 
@@ -164,7 +174,11 @@ describe("idempotency cache state machine", () => {
 		mockRedis.set.mockResolvedValueOnce("OK"); // SET NX wins
 		mockRedis.eval.mockResolvedValueOnce(1); // release-promotion compare-and-SET
 
-		const result = await idempotencyLookupOrReserve(key, fingerprint);
+		const result = await idempotencyLookupOrReserve(
+			TEST_USER_ID,
+			key,
+			fingerprint,
+		);
 
 		expect(result.kind).toBe("miss");
 		if (result.kind !== "miss") return;
@@ -174,7 +188,7 @@ describe("idempotency cache state machine", () => {
 		// token-tolerant, the prefix + fingerprint + TTL stay pinned).
 		expect(mockRedis.set).toHaveBeenNthCalledWith(
 			1,
-			getRedisKey("idem", key),
+			getRedisKey("idem", TEST_USER_ID, key),
 			expect.stringMatching(
 				new RegExp(`^${PENDING_SENTINEL_PREFIX}${fingerprint}:[0-9a-f-]{36}$`),
 			),
@@ -191,7 +205,7 @@ describe("idempotency cache state machine", () => {
 			string[],
 			unknown[],
 		];
-		expect(promoteKeys).toEqual([getRedisKey("idem", key)]);
+		expect(promoteKeys).toEqual([getRedisKey("idem", TEST_USER_ID, key)]);
 		expect(promoteArgv).toContain(JSON.stringify(completed));
 	});
 
@@ -214,7 +228,11 @@ describe("idempotency cache state machine", () => {
 		mockRedis.set.mockResolvedValueOnce(null);
 		mockRedis.get.mockResolvedValueOnce(JSON.stringify(cachedResponse));
 
-		const result = await idempotencyLookupOrReserve(key, fingerprintCall);
+		const result = await idempotencyLookupOrReserve(
+			TEST_USER_ID,
+			key,
+			fingerprintCall,
+		);
 
 		expect(result.kind).toBe("mismatch");
 		if (result.kind === "mismatch") {
@@ -242,7 +260,11 @@ describe("idempotency cache state machine", () => {
 		mockRedis.set.mockResolvedValueOnce(null);
 		mockRedis.get.mockResolvedValueOnce(sentinel);
 
-		const result = await idempotencyLookupOrReserve(key, fingerprint);
+		const result = await idempotencyLookupOrReserve(
+			TEST_USER_ID,
+			key,
+			fingerprint,
+		);
 
 		expect(result.kind).toBe("pending");
 		if (result.kind === "pending") {
@@ -272,7 +294,11 @@ describe("idempotency cache state machine", () => {
 		mockRedis.set.mockResolvedValueOnce(null);
 		mockRedis.get.mockResolvedValueOnce(sentinel);
 
-		const result = await idempotencyLookupOrReserve(key, fingerprintCall);
+		const result = await idempotencyLookupOrReserve(
+			TEST_USER_ID,
+			key,
+			fingerprintCall,
+		);
 
 		// Critical: NOT 'mismatch'. Pending arm returns 'pending' with the
 		// held fingerprint, regardless of caller fingerprint.
@@ -294,10 +320,10 @@ describe("idempotency cache state machine", () => {
 
 		mockRedis.set.mockResolvedValueOnce("OK");
 
-		await idempotencyLookupOrReserve(key, fingerprint);
+		await idempotencyLookupOrReserve(TEST_USER_ID, key, fingerprint);
 
 		expect(mockRedis.set).toHaveBeenCalledWith(
-			getRedisKey("idem", key),
+			getRedisKey("idem", TEST_USER_ID, key),
 			// A4: token-tolerant — the prefix + fingerprint + 30s TTL stay pinned.
 			expect.stringMatching(
 				new RegExp(`^${PENDING_SENTINEL_PREFIX}${fingerprint}:[0-9a-f-]{36}$`),
@@ -327,7 +353,11 @@ describe("idempotency cache state machine", () => {
 		mockRedis.set.mockResolvedValueOnce("OK"); // SET NX wins
 		mockRedis.eval.mockResolvedValueOnce(1); // release compare-and-SET
 
-		const result = await idempotencyLookupOrReserve(key, fingerprint);
+		const result = await idempotencyLookupOrReserve(
+			TEST_USER_ID,
+			key,
+			fingerprint,
+		);
 		expect(result.kind).toBe("miss");
 		if (result.kind !== "miss") return;
 
@@ -341,7 +371,7 @@ describe("idempotency cache state machine", () => {
 			string[],
 			unknown[],
 		];
-		expect(keys).toEqual([getRedisKey("idem", key)]);
+		expect(keys).toEqual([getRedisKey("idem", TEST_USER_ID, key)]);
 		expect(argv).toContain(JSON.stringify(completed));
 		const ttl = String(COMPLETED_TTL_SECONDS);
 		expect(
@@ -371,7 +401,11 @@ describe("idempotency cache state machine", () => {
 		// First call: miss + release PROMOTES the 429 via the ownership-checked eval.
 		mockRedis.set.mockResolvedValueOnce("OK"); // SET NX wins
 		mockRedis.eval.mockResolvedValueOnce(1); // release compare-and-SET
-		const first = await idempotencyLookupOrReserve(key, fingerprint);
+		const first = await idempotencyLookupOrReserve(
+			TEST_USER_ID,
+			key,
+			fingerprint,
+		);
 		expect(first.kind).toBe("miss");
 		if (first.kind !== "miss") return;
 		await first.release(errorResponse);
@@ -389,7 +423,11 @@ describe("idempotency cache state machine", () => {
 		// Second call: SET NX loses, GET returns the cached 429 envelope.
 		mockRedis.set.mockResolvedValueOnce(null);
 		mockRedis.get.mockResolvedValueOnce(JSON.stringify(errorResponse));
-		const second = await idempotencyLookupOrReserve(key, fingerprint);
+		const second = await idempotencyLookupOrReserve(
+			TEST_USER_ID,
+			key,
+			fingerprint,
+		);
 
 		expect(second.kind).toBe("hit");
 		if (second.kind === "hit") {
@@ -413,7 +451,11 @@ describe("idempotency cache state machine", () => {
 
 		mockRedis.set.mockRejectedValueOnce(networkError);
 
-		const result = await idempotencyLookupOrReserve(key, fingerprint);
+		const result = await idempotencyLookupOrReserve(
+			TEST_USER_ID,
+			key,
+			fingerprint,
+		);
 
 		expect(result.kind).toBe("unavailable");
 		if (result.kind === "unavailable") {
@@ -441,7 +483,11 @@ describe("idempotency cache state machine", () => {
 		mockRedis.set.mockResolvedValueOnce("OK"); // SET NX wins
 		mockRedis.eval.mockResolvedValueOnce(1); // release(null) compare-and-DEL
 
-		const result = await idempotencyLookupOrReserve(key, fingerprint);
+		const result = await idempotencyLookupOrReserve(
+			TEST_USER_ID,
+			key,
+			fingerprint,
+		);
 		expect(result.kind).toBe("miss");
 		if (result.kind !== "miss") return;
 
@@ -455,7 +501,7 @@ describe("idempotency cache state machine", () => {
 			string[],
 			unknown[],
 		];
-		expect(delKeys).toEqual([getRedisKey("idem", key)]);
+		expect(delKeys).toEqual([getRedisKey("idem", TEST_USER_ID, key)]);
 		expect(mockRedis.del).not.toHaveBeenCalled();
 		expect(mockRedis.set).toHaveBeenCalledTimes(1); // only the SET NX
 	});
@@ -477,7 +523,11 @@ describe("idempotency cache state machine", () => {
 		mockRedis.set.mockResolvedValueOnce("OK"); // SET NX
 		mockRedis.eval.mockResolvedValueOnce(1); // release-promotion compare-and-SET
 
-		const result = await idempotencyLookupOrReserve(key, fingerprint);
+		const result = await idempotencyLookupOrReserve(
+			TEST_USER_ID,
+			key,
+			fingerprint,
+		);
 		expect(result.kind).toBe("miss");
 		if (result.kind !== "miss") return;
 

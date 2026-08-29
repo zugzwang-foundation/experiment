@@ -9,7 +9,7 @@ import {
 	RESERVATION_TTL_SECONDS,
 } from "@/server/config/limits";
 import { moderate } from "@/server/moderation/openai";
-import { signRead } from "@/server/storage/sign-read";
+import { signReadSingleUse } from "@/server/storage/sign-read";
 import { getRedisKey } from "@/server/upstash/keys";
 import { redis } from "@/server/upstash/redis";
 
@@ -110,7 +110,10 @@ export async function precommitModerate(
 				);
 			}
 			try {
-				imageUrl = await signRead(imageR2Key, READ_URL_TTL_SECONDS_MODERATION);
+				imageUrl = await signReadSingleUse(
+					imageR2Key,
+					READ_URL_TTL_SECONDS_MODERATION,
+				);
 			} catch (err) {
 				throw new ModerationUnavailableError(err);
 			}

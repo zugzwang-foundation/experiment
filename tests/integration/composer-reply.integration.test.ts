@@ -107,7 +107,12 @@ vi.mock("@/server/upstash/redis", () => ({ redis: mockRedis }));
 vi.mock("@/server/moderation/openai", () => ({
 	moderate: mockOpenAiModerate,
 }));
-vi.mock("@/server/storage/sign-read", () => ({ signRead: mockSignRead }));
+vi.mock("@/server/storage/sign-read", () => ({
+	signRead: mockSignRead,
+	signReadSingleUse: vi.fn(
+		async (key: string) => `https://signed.example/${key}`,
+	),
+}));
 
 import { POST as placePOST } from "@/app/api/bets/place/route";
 import {

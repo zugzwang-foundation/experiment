@@ -4,7 +4,10 @@ import { GLOSSARY } from "@/lib/copy/glossary";
 import type { ChartNode } from "@/server/debate-view/price-chart";
 import type { PricePoint } from "@/server/discovery/price-series";
 
-import { MarketPriceChartHost } from "./chart/MarketPriceChartHost";
+import {
+	hasRenderableSeries,
+	MarketPriceChartHost,
+} from "./chart/MarketPriceChartHost";
 import { formatDharma } from "./format";
 import { HeadZone } from "./HeadZone";
 import { MarketMediaPanel } from "./MarketMediaPanel";
@@ -90,9 +93,19 @@ function LifecycleBadge({ status }: { status: DebateMarketHeader["status"] }) {
 }
 
 /**
- * The market-view header (DEBATE.4 §4): question = `markets.title`, resolution
- * criterion = `markets.description` (R-14.4) · lifecycle marker · the price bar
- * (`getPrices`) · the attrs (Đ staked · posts · replies). Composes into the
+ * The market-view header (DEBATE.4 §4): question = `markets.title` · lifecycle
+ * marker · the price bar (`getPrices`) · the attrs (Đ staked · posts · replies).
+ * ⚠ THIS LINE USED TO NAME `resolution criterion = markets.description
+ * (R-14.4)` AS A THING THIS HEADER RENDERS. It no longer does — RESO-1 · R-2
+ * removed the excerpt. ⚠ AND THE SENTENCE THAT REPLACED IT — "`description`
+ * reaches the participant only through the ADR-0025 `.md` export" — WAS TRUE FOR
+ * EXACTLY ONE TASK. CRIT-1 restores the criterion to `/m/[slug]` as a collapsed
+ * native disclosure mounted in `DebateView`, so it reaches the participant on the
+ * page again; it is simply no longer THIS component's row. Corrected here rather
+ * than left as a docblock describing a state that has moved on (doctrine §6.2) —
+ * and corrected with some feeling, because this very sentence exists BECAUSE
+ * RESO-1 fixed a docblock naming a row that had left the file. Leaving it stale
+ * would have reproduced, one revision later, the failure it was written to end. Composes into the
  * SHELL `(public)/layout.tsx` shell; the placeholder global header is left
  * untouched (superseded at UI.13). ⚠ The deferred D1 placeholder box was
  * REMOVED at POLISH.3 (PD-3-09 / OD-6) — it rendered a build-time note about
@@ -103,8 +116,12 @@ function LifecycleBadge({ status }: { status: DebateMarketHeader["status"] }) {
  * HTML-FINISH · MARKET DETAIL row 1 — THIS IS THE HEADZONE'S MARKET ARM, and it
  * is now rendered INSIDE the market↔post ternary rather than above it. Every
  * element below is a `vm` element in the mockup (`.question` · `.attrs` ·
- * `.criterion` · `.graph` · `.barrow f`); the post arm's `vp` set is
+ * `.rescards` · `.graph` · `.barrow f`); the post arm's `vp` set is
  * `PostFocusHeader`'s. The two are disjoint and they SWAP — see `HeadZone.tsx`.
+ * ⚠ `.criterion` LEFT THIS LIST AT RESO-1 · R-2. It is still a `vm` element in
+ * the mockup — d5 is unchanged — but it is no longer one this component
+ * renders, and a list of "every element below" that names one that is not below
+ * is the kind of faithfully-carried-forward falsehood doctrine §6.2 is about.
  *
  * ⇒ CONSEQUENCE, DECLARED: the lifecycle marker and `Download .md` become
  * MARKET-ARM ONLY, exactly like every other `vm` element beside them. ⛔ Neither
@@ -138,49 +155,84 @@ export function MarketHeader({
 	return (
 		<HeadZone
 			// HTML-FINISH · MARKET DETAIL row 4 — THE PRICE CHART IS THE RAIL'S
-			// content. The mockup's `.hright` holds exactly `.graph` + `.barrow f`
-			// in the market arm (`d5:1007`, `:1037`); the chart used to render in
-			// the left column between the criterion and the price bar, which put
-			// the market's shape INSIDE the reading column instead of beside it.
-			// ⚠ `null` WHEN THE SERIES READ FAILED, and that is the pre-existing
-			// contract, not a new one: a null `priceChart` is non-fatal and the
-			// rest of the header stands. It now also means NO RAIL — one column,
-			// never an empty 25% box (PD-3-09). `MarketPriceChartHost` itself
-			// still returns null for an empty series, so both null paths agree.
+			// content, and since RESO-1 it is the rail's ONLY content. The chart used
+			// to render in the left column between the criterion and the price bar,
+			// which put the market's shape INSIDE the reading column instead of
+			// beside it; that move stands.
+			// ⚠ THE SENTENCE "the mockup's `.hright` holds exactly `.graph` +
+			// `.barrow f` in the market arm (`d5:1007`, `:1037`)" USED TO STAND HERE
+			// AS THIS PROP'S JUSTIFICATION. It is still true OF d5 and is no longer
+			// true of this build: R-4 moves `.barrow` out. Recorded rather than
+			// deleted, because the divergence from the mockup is deliberate and a
+			// later reader comparing the two should find it named.
+			// ⚠ `null` WHEN THE SERIES READ FAILED is the pre-existing contract, not
+			// a new one: a null `priceChart` is non-fatal and the rest of the header
+			// stands. `MarketPriceChartHost` itself also returns null for an empty
+			// series, so both null paths agree.
+			// ⛔⛔ RESO-1 · R-4 — THE RAIL IS THE CHART, AND NOTHING ELSE. The price
+			// bar has moved into the reading column (see `left`), and the rail
+			// returns to `null` when there is no chart to put in it.
+			//
+			// ⚠⚠ THE `null` IS NOT TIDINESS — IT IS THE DEFECT R-4 WOULD OTHERWISE
+			// CREATE, AND IT IS MEASURED. This prop used to be a FRAGMENT, which is
+			// never `null`, and the block that stood here said so in terms: "THE RAIL
+			// IS NOW ALWAYS RENDERED on the market arm: `PriceBar` returns its
+			// 'Pricing unavailable' stub rather than null, so there is no market-arm
+			// state with an empty rail." That sentence was true only because the bar
+			// was in here. Take the bar out and leave the fragment, and every market
+			// with no chart renders a 340px column containing nothing — which is
+			// `PD-3-09` / `OD-6` verbatim, the ruling that deleted the deferred-work
+			// placeholder box from this very component.
+			// ⇒ AND IT IS NOT HYPOTHETICAL. Measured at RESO-1 recon against the base
+			// build: `market-price-chart-card` renders on ZERO of the eight staging
+			// markets — the fixtures are raw-INSERT rather than event-backed, so the
+			// price series is empty and `MarketPriceChartHost` returns null for all of
+			// them. On today's data the fragment version of this prop would have
+			// shipped an empty rail on EVERY market, not an edge case.
+			// ⚠ This restores the contract `HeadZone`'s own docblock describes ("A
+			// consumer with no rail content passes `null` and the surface is one
+			// column"), which the bar's arrival had quietly suspended.
+			//
+			// ⛔⛔ AND THE CONDITION IS `series.length`, NOT `priceChart != null` —
+			// THE FIRST VERSION OF THIS LINE TESTED THE WRONG NULL AND SHIPPED THE
+			// EXACT DEFECT THE PARAGRAPH ABOVE EXISTS TO PREVENT. Measured on the
+			// deployed RESO-1 preview at `38213de`: `headzone-right` present,
+			// 340×188, `innerHTML === ""` — an empty column on EVERY market.
+			// ⇒ THE MECHANISM, because it is subtle and it will recur. `priceChart`
+			// is NOT null on a market with no price history — the read model returns
+			// `{ series: [], nodes: [] }`, which is TRUTHY. The emptiness is decided
+			// one level DOWN, inside `MarketPriceChartHost`, which returns `null` for
+			// an empty series. So `priceChart ? <Host/> : null` hands `HeadZone` a
+			// non-null React element that renders NOTHING, and `HeadZone` — correctly,
+			// by its own contract — draws the column around it.
+			// ⇒ THE RAIL'S CONDITION IS NOW LITERALLY THE HOST'S OWN CONDITION —
+			// `hasRenderableSeries`, exported from the host for exactly this, so the
+			// two cannot drift. It was a HAND-COPY of that test first; @code-reviewer
+			// flagged that a second null path in the host would re-open the defect,
+			// and a copied condition is a proxy
+			// for it. Two components deciding "is there a chart?" by DIFFERENT tests
+			// is what produced the gap; the fix is to ask the same question, not to
+			// ask a different question more carefully.
+			// ⚠ AND THE UNIT GUARD COULD NOT SEE IT. It rendered `priceChart={null}`,
+			// a shape production never produces, so it was green throughout.
+			// `market-header.test.tsx` now also exercises `{ series: [], nodes: [] }`.
 			right={
-				<>
-					{priceChart ? (
-						<MarketPriceChartHost
-							series={priceChart.series}
-							nodes={priceChart.nodes}
-							// C-CHART-2 clause 1 (CHART-2) — the terminal pulse. READ
-							// from the market's own status, never assumed: this is the
-							// ONE surface where a non-`Open` market renders a chart at
-							// all (Discovery lists only `Open` ones), so it is the one
-							// place the frozen branch is reachable. A pulse on a
-							// `Closed`, `Resolving`, `Resolved` or `Voided` market
-							// asserts it is live, which is false where stake is
-							// committed and runs at INV-4 — the same reason
-							// `withLiveTail` reads `market.status` here and nowhere else.
-							isOpen={market.status === "Open"}
-						/>
-					) : null}
-					{/* HTML-FINISH · MARKET DETAIL row 7 — the price bar is the rail's
-					    second occupant, directly under the chart, exactly as `.hright`
-					    holds `.graph` then `.barrow f` (`d5:1007`, `:1037`). The bar and
-					    the chart above it read the SAME price, so standing them in one
-					    column is what lets a reader check one against the other.
-					    ⚠ THE RAIL IS NOW ALWAYS RENDERED on the market arm: `PriceBar`
-					    returns its "Pricing unavailable" stub rather than null, so there
-					    is no market-arm state with an empty rail. A null `priceChart`
-					    now means "no CHART in the rail", not "no rail".
-					    ✅ ROUND 2 · R7 — the bar is now the ONE-ROW `.barrow` d5 draws
-					    (`d5:1037-1041`) and its percent labels are LIVE (`.blab.click`,
-					    `pick('yes')` / `pick('no')`). `pick` is `undefined` on any
-					    consumer that has no viewer state, and the labels fall back to
-					    plain text. */}
-					<PriceBar pricing={market.pricing} size="detail" pick={pick} />
-				</>
+				priceChart && hasRenderableSeries(priceChart.series) ? (
+					<MarketPriceChartHost
+						series={priceChart.series}
+						nodes={priceChart.nodes}
+						// C-CHART-2 clause 1 (CHART-2) — the terminal pulse. READ
+						// from the market's own status, never assumed: this is the
+						// ONE surface where a non-`Open` market renders a chart at
+						// all (Discovery lists only `Open` ones), so it is the one
+						// place the frozen branch is reachable. A pulse on a
+						// `Closed`, `Resolving`, `Resolved` or `Voided` market
+						// asserts it is live, which is false where stake is
+						// committed and runs at INV-4 — the same reason
+						// `withLiveTail` reads `market.status` here and nowhere else.
+						isOpen={market.status === "Open"}
+					/>
+				) : null
 			}
 			left={
 				/* HTML-FINISH · MARKET DETAIL row 2 — `.hleft` IS A ROW (`d5:448`),
@@ -211,29 +263,43 @@ export function MarketHeader({
 					    (`DebateColumn`'s `.colwrap`, `d5:568`): the page never scrolls,
 					    and anything that does not fit scrolls INSIDE its own region.
 					    Nothing is clipped and nothing is deleted — the marker, the
-					    export and both resolver cards stay reachable.
-					    ✅ THE UNDERLYING SIZE IS NOW FIXED, and this block's previous
-					    "⛔ THIS IS NOT A FIX" note is discharged. `ResolverCards` is sized
-					    to d5's `.rescard` (71.8px → 56.3px) and this stack's gap drops
-					    from 12px to 5px, so the content fits the band AT REST and the
-					    `overflow-y-auto` above stops firing — it stays as the backstop for
-					    a long criterion, which is what it was for.
+					    export and all FOUR resolution blocks stay reachable (they were two
+					    resolver cards until RESO-1 · R-7).
+					    ⚠ THE PARAGRAPH THAT STOOD HERE IS SUPERSEDED BY RESO-1 AND IS KEPT
+					    AS THE RECORD. It read: "`ResolverCards` is sized to d5's `.rescard`
+					    (71.8px -> 56.3px) and this stack's gap drops from 12px to 5px, so
+					    the content fits the band AT REST and the `overflow-y-auto` above
+					    stops firing — it stays as the backstop for a long criterion, which
+					    is what it was for." ⇒ The block row is no longer sized to `.rescard`
+					    at all (R-8 makes it `flex-1`, measured 111.99px), and it cannot be
+					    a backstop "for a long criterion" because R-2 removed the criterion.
+					    ⇒ WHAT `overflow-y-auto` IS FOR NOW: the block row carries a MEASURED
+					    content floor (`min-h-[97px]`, see `ResolverCards.tsx`), so below a
+					    viewport height of ~715px the stack's content exceeds the band and
+					    THIS is what scrolls. Without that floor the row absorbed every
+					    shortfall by shrinking and each block clipped in silence — which is
+					    what shipped for one commit, and what @code-reviewer caught.
 
-					    ⛔⛔ 5px IS NOT d5's GAP, AND d5's GAP CANNOT FIT — the arithmetic,
-					    because the founder's target numbers predate Q-1. d5 spaces this
-					    stack 8 / 12 / 10 = **30px across THREE gaps** (`.attrs{margin-top:
-					    8px}`, `.criterion{margin-top:12px}`, `.rescards{margin-top:10px}`).
-					    Q-1 added a FOURTH child — the lifecycle marker + `.md` export row —
-					    which costs 20px of content plus a fourth gap.
-					    MEASURED on staging at `b983a5f`, with the resolver card already at
-					    d5's height: content sums to 167.1px before gaps, in a 188px band, so
-					    the whole gap budget is **20.9px across four gaps**. d5's own spacing
-					    would need 38px and lands at 205 — 17px over. A uniform 8px lands at
-					    197 (9 over); 6px at 189 (1 over); **5px at 185, the largest uniform
-					    gap that fits**, with 3px of slack for font-rendering variance.
-					    ⇒ Reported rather than smoothed over: this stack is TIGHTER than the
-					    mockup's, and it is tighter because the marker row is a build element
-					    d5 has no equivalent of. Moving that row is not this fence's. */}
+					    ⛔⛔ 5px IS NOT d5's GAP, AND THE ARITHMETIC THAT JUSTIFIED IT IS
+					    RE-DERIVED AT RESO-1 — the superseded version is recorded because
+					    the NUMBER did not move and the REASON did. It read: d5 spaces this
+					    stack 8 / 12 / 10 = 30px across THREE gaps; Q-1 added a FOURTH child
+					    (the lifecycle marker + `.md` export row); content sums to 167.1px
+					    before gaps in a 188px band, so the budget is 20.9px across FOUR
+					    gaps, and 5px was the largest uniform gap that fits.
+					    ⇒ EVERY TERM OF THAT IS NOW FALSE. R-3 merged the marker row INTO
+					    the attrs row, so the fourth child is gone; R-1/R-2 removed the
+					    criterion, so `.criterion` is not in this stack at all; and R-7's
+					    row is `flex-1`, so it has no fixed height to sum.
+					    ⇒ THE STACK IS NOW `h1 · mergedRow · priceBar · blockRow` — FOUR
+					    children, THREE gaps. Measured on the deployed preview at 1440x777:
+					    26.04 + 20 + 15 + 3x5 = 76.04px of fixed content and gaps, and the
+					    block row takes the remaining 111.99px of the 188.03px band.
+					    ⇒ 5px SURVIVES AS A COMPOSITION CHOICE, not as the output of a
+					    budget: the row that grows is the block row, so these gaps no longer
+					    compete with anything for space. Kept because changing it would be a
+					    spacing change nobody ruled, not because 20.9px still divides by
+					    four. */}
 					<div
 						data-testid="headzone-stack"
 						className="flex min-h-0 min-w-0 flex-1 flex-col gap-[5px] overflow-y-auto"
@@ -250,9 +316,16 @@ export function MarketHeader({
 							    with no in-place way to read the rest. `title` carries the
 							    full string for pointer users and the accessible name is
 							    unaffected (the text node is whole in the DOM); the ADR-0025
-							    `.md` export carries it in full. This follows the founder's
-							    own adoption of `.crittext`'s 2-line clamp one block down —
-							    the two rulings would otherwise contradict each other. */}
+							    `.md` export carries it in full. 
+							    ⚠ ITS STATED GROUND CHANGED AT RESO-1; THE TRUNCATION DID NOT.
+							    This read "This follows the founder's own adoption of
+							    `.crittext`'s 2-line clamp one block down — the two rulings
+							    would otherwise contradict each other." R-2 removed that clamp,
+							    so the coherence argument now cites a sibling ruling that is
+							    gone. The truncation stands on its own original ground instead —
+							    D5-02 / v0.9 ruled the market title to a single line with an
+							    ellipsis — and that ruling is untouched by RESO-1. Recorded
+							    rather than quietly re-justified. */}
 						{/* ⚠ `min-w-0 flex-1` — `.question` (`d5:463`) is a BLOCK filling
 							    `.hstack`, and `truncate` only ellipsises what it is given. As a
 							    shrink-to-fit flex item beside the badge cluster the heading
@@ -280,13 +353,18 @@ export function MarketHeader({
 						>
 							{market.title}
 						</h1>
-						{/* HTML-FINISH · MARKET DETAIL row 6 — THE ATTRS STRIP SITS BETWEEN
-					    THE QUESTION AND THE CRITERION. The mockup's `.hstack` orders its
-					    `vm` children `.question` → `.attrs` → `.criterion` → `.rescards`
+						{/* HTML-FINISH · MARKET DETAIL row 6 — THE ATTRS STRIP SITS DIRECTLY
+					    UNDER THE QUESTION. The mockup's `.hstack` orders its `vm` children
+					    `.question` -> `.attrs` -> `.criterion` -> `.rescards`
 					    (`d5:958-985`); this strip used to render LAST, below the chart and
-					    the price bar. Reading order is the whole substance of the row: the
-					    market's size is context for the question, and the criterion — the
-					    terms of the bet — is the thing you read last and most carefully.
+					    the price bar.
+					    ⚠ THIS BLOCK USED TO READ "…SITS BETWEEN THE QUESTION AND THE
+					    CRITERION … the criterion — the terms of the bet — is the thing you
+					    read last and most carefully." Both clauses died with RESO-1 · R-2:
+					    there is no criterion in this stack, so the strip sits between the
+					    question and the price bar. Reading order is still the substance of
+					    the row — the market's size is context for the question — but the
+					    thing you read last is now the block row, not the terms.
 					    ⛔ ORDER ONLY. The strip's own composition is untouched: the same
 					    three spans, the same `flex flex-wrap` container, the same spaced
 					    `Đ ` grammar and the same PD-3-08 plural rule, all still pinned by
@@ -305,109 +383,166 @@ export function MarketHeader({
 						    ⚠ THE PD-3-08 PLURAL RULE IS UNTOUCHED — same `noun()`, same
 						    three fields, same order. Only weight, colour and the
 						    separators change. */}
-						<div className="flex flex-wrap items-center gap-y-1 text-xs font-bold text-ink">
-							<InfoTip content={GLOSSARY.stakedMarket} asChild>
-								<span>Đ {formatDharma(market.totals.dharmaStaked)} staked</span>
-							</InfoTip>
-							<AttrSep />
-							<span>
-								{market.totals.postCount}{" "}
-								{noun(market.totals.postCount, "post", "posts")}
-							</span>
-							<AttrSep />
-							<span>
-								{market.totals.replyCount}{" "}
-								{noun(market.totals.replyCount, "reply", "replies")}
-							</span>
-						</div>
-						{/* ⚠⚠ Q-1 — THE LIFECYCLE MARKER AND THE `.md` EXPORT MOVE OFF THE
-						    QUESTION'S ROW, founder-ruled. They sat beside the `<h1>` as a
-						    `shrink-0` flex sibling and took 146px of it: measured at the
-						    pinned 1440×777 the heading was 528px against d5's 674px
-						    (36.6% vs 46.8%, −10.2pp) — the last region outside ±2pp, and
-						    the only one whose cause was build-only chrome rather than
-						    geometry. d5 has nothing in that row at all.
-						    ⛔ NEITHER IS DELETED, and both stay reachable: `Download .md`
-						    is the ADR-0025 export and the badge is the INV-4 read-only
-						    marker. They move one row down, below `.attrs`, and keep their
-						    own accessible names.
-						    ⚠ ORDER ONLY. Neither element's own composition changes — same
-						    `LifecycleBadge`, same anchor, same `download` attribute, same
-						    label. `market-header.test.tsx` asserts both by role and text,
-						    not by position, so the guard reads them unchanged. */}
-						<div className="flex flex-wrap items-center gap-2">
-							<LifecycleBadge status={market.status} />
-							{/* EXPORT.1 — native download of the debate `.md` (server-mediated
-							    GET); plain anchor, no client boundary, works signed-out. */}
-							<InfoTip content={GLOSSARY.downloadMd} asChild>
-								<a
-									download
-									href={`/m/${market.slug}/export`}
-									aria-label="Download this debate as Markdown"
-									className="text-muted-foreground text-xs underline-offset-2 hover:underline"
-								>
-									Download .md
-								</a>
-							</InfoTip>
-						</div>
-						{/* T1 — the RESOLUTION criterion block (`d5:974-977`, `.criterion` +
-					    `.overline`). The container is a TOP HAIRLINE RULE + padding
-					    (`d5:467`), NOT a boxed card; the 12px margin is carried by this
-					    stack's `gap-3`.
+						{/* ⚠⚠ RESO-1 · R-3 — THE META LINE AND THE ACTIONS ARE NOW ONE ROW,
+						    AND Q-1's RULING IS NARROWED RATHER THAN REVERSED. Q-1 moved the
+						    lifecycle marker and the `.md` export OFF the question's row,
+						    founder-ruled, because as `shrink-0` siblings of the `<h1>` they
+						    took 146px of it — the heading measured 528px against d5's 674px
+						    at the pinned 1440×777, the last region outside ±2pp and the only
+						    one whose cause was build-only chrome rather than geometry.
+						    ⇒ THAT REASON IS ABOUT THE QUESTION'S ROW, AND IT STILL HOLDS:
+						    they do not go back beside the `<h1>`. They join the ATTRS row,
+						    which is a short fixed-length strip with spare width to the right
+						    of it, so nothing here is competing with the heading for space.
+						    The row this vacates is what R-8's taller blocks absorb.
 
-					    ✅ HTML-FINISH · MARKET DETAIL row 10 — THE CLAMP IS ADOPTED, and
-					    the previous ruling is SUPERSEDED IN PLACE rather than deleted
-					    (O-4). This block used to read "⛔ NO CLAMP, AND THAT IS A RULING,
-					    NOT AN OMISSION (§17 H-T1(c))", on three grounds: (i) a bare clamp
-					    with no affordance is the defect class `PD-0-01`/`R4` was removing
-					    from post cards in that same PR; (ii) `U3` makes criteria long BY
-					    DESIGN; (iii) unclamped WAS the status quo, so adopting `d5:470-471`
-					    would be INTRODUCING a truncation of the bet terms.
-					    ⇒ The founder ruling of 2026-08-16 reverses it, and ground (i) is
-					    reversed with it — `R4` itself was overturned in the same ruling
-					    (row 24 returns the `+` glyph), so the coherence argument that
-					    grounded the no-clamp no longer holds.
+						    ⛔ `ml-auto` IS THE RIGHT-ALIGNMENT, NOT `justify-between`. The
+						    two are identical when both children are present and diverge
+						    when one is not: `justify-between` on a single surviving child
+						    pins it LEFT, so a future state with no actions would silently
+						    move the meta line nowhere and a future state with no meta line
+						    would slam the actions to the left edge. `ml-auto` on the actions
+						    means "as far right as there is room", which is the declaration
+						    the row actually wants and holds in both degenerate cases.
 
-					    ⚠ O-9 CHECKED, NOT ASSUMED. The superseded ruling cited `§17
-					    H-T1(c)`, and that section lives in `docs/plans/POLISH-3-PR-2.md`
-					    — a PLANNING document, not a spec. SPEC.1, design-language and
-					    design-canon were each read at HEAD and none of them says anything
-					    about clamping or truncating the resolution criterion. So this
-					    reverses a plan-doc ruling by founder ruling and contradicts NO
-					    live §-text — which is why it ships with no spec rider.
+						    ⚠ `items-center` — R-3 says vertically centred against the meta
+						    line, and the two are DIFFERENT HEIGHTS: the attrs strip measured
+						    16px and the badge row 20px, so the row's height is the badge's
+						    and the text must centre inside it rather than sit on its top
+						    edge. Baseline alignment would look right only while both happen
+						    to share a font size.
 
-					    ⚠ THE COST, RECORDED RATHER THAN SMOOTHED OVER: past two lines the
-					    terms of the bet are now unreadable ON THIS SURFACE, and this row
-					    adds no expander. "Criterion length treatment" remains docketed to
-					    `HEADER-3ZONE`, so the affordance is a decision that has been
-					    deferred, not one this row made. The full text still ships in the
-					    ADR-0025 `.md` export.
-
-					    ⚠ `line-clamp-2` is a COUNT — a composition declaration, not one of
-					    the four value classes this task may not take from the mockup.
-
-					    ⚠ LOCAL STYLES, NOT A PRESET (§17 H-T1(b)); the recipe is
-					    `.overline`'s (`d5:468-469`) and ONLY `.overline`'s. Ported BY TOKEN
-					    (`text-n4`), never the hex — Ruling A / H-HEX. */}
-						{market.description ? (
-							<div className="pt-2.5 [border-top:var(--hairline)]">
-								<div className="text-[9.5px] font-extrabold tracking-[.14em] text-n4 uppercase">
-									Resolution
-								</div>
-								{/* `.crittext` (`d5:470`) — `font-size:11px;line-height:1.5;
-								    color:var(--n6)`. It shipped at `text-sm` (14px), which is
-								    the same size as the body copy it is meant to sit under. */}
-								<p className="mt-[5px] line-clamp-2 text-[11px] leading-[1.5] text-muted-foreground">
-									{market.description}
-								</p>
+						    ⚠ NEITHER ELEMENT'S OWN COMPOSITION CHANGES — same `AttrSep`
+						    glyphs, same PD-3-08 plural rule, same `LifecycleBadge`, same
+						    anchor with its `download` attribute and accessible name. Only
+						    the two containers merge into one. `market-header.test.tsx`
+						    asserts both by text and role rather than by position, so those
+						    guards read this unchanged. */}
+						<div className="flex items-center gap-3">
+							{/* ⚠ `min-w-0` — this is the row's flexible child now, and without
+							    it a long attrs strip sets the row's automatic minimum and
+							    pushes the actions off the right edge instead of wrapping. */}
+							<div className="flex min-w-0 flex-wrap items-center gap-y-1 text-xs font-bold text-ink">
+								<InfoTip content={GLOSSARY.stakedMarket} asChild>
+									<span>
+										Đ {formatDharma(market.totals.dharmaStaked)} staked
+									</span>
+								</InfoTip>
+								<AttrSep />
+								<span>
+									{market.totals.postCount}{" "}
+									{noun(market.totals.postCount, "post", "posts")}
+								</span>
+								<AttrSep />
+								<span>
+									{market.totals.replyCount}{" "}
+									{noun(market.totals.replyCount, "reply", "replies")}
+								</span>
 							</div>
-						) : null}
-						{/* HTML-FINISH · MARKET DETAIL row 3 — `.rescards` (`d5:986`), the
-						    last `vm` child of `.hstack`, after the criterion. It renders
-						    NOTHING today and that is the ruling (OD-2), not an omission:
-						    `markets` carries no resolver name, logo, source or handle, and
-						    empty card chrome would reproduce PD-3-09 / OD-6 verbatim. The
-						    slot is real in the composition; see `ResolverCards.tsx`. */}
+							{/* `shrink-0` — the actions are fixed-content chrome; the meta line
+							    is what gives way when the row runs out of width. */}
+							<div className="ml-auto flex shrink-0 items-center gap-2">
+								<LifecycleBadge status={market.status} />
+								{/* EXPORT.1 — native download of the debate `.md` (server-mediated
+								    GET); plain anchor, no client boundary, works signed-out. */}
+								<InfoTip content={GLOSSARY.downloadMd} asChild>
+									<a
+										download
+										href={`/m/${market.slug}/export`}
+										aria-label="Download this debate as Markdown"
+										className="text-muted-foreground text-xs underline-offset-2 hover:underline"
+									>
+										Download .md
+									</a>
+								</InfoTip>
+							</div>
+						</div>
+						{/* ⛔⛔ RESO-1 · R-1 + R-2 — THE `RESOLUTION` SECTION LABEL AND THE
+						    CLAMPED CRITERION EXCERPT ARE GONE, AND THE RULING THAT PUT THEM
+						    HERE IS SUPERSEDED IN PLACE RATHER THAN LEFT STANDING (O-4).
+						    What stood here was `.criterion` (`d5:974-977`) — a top hairline
+						    rule, an `.overline` reading `Resolution`, and a `line-clamp-2`
+						    `<p>` holding `market.description`. Its own block recorded the
+						    2026-08-16 founder ruling that ADOPTED that clamp, over three
+						    earlier grounds for refusing it.
+
+						    ⇒ RESO-1 removes both. The section label sat above blocks that
+						    carry their own labels, so it named a section twice; and a
+						    two-line excerpt of the bet's terms is not a reading of them —
+						    it is an advertisement for a document you cannot open here,
+						    which is what made the clamp contentious in the first place.
+						    The block row below now carries a `Resolution` block of its own,
+						    which marks the slot without pretending to show the text.
+
+						    ⚠⚠ THE COST IS REAL, IT IS LARGER THAN THE ROW IT REMOVES, AND
+						    IT IS THE FOUNDER'S TO WEIGH — NOT THIS TASK'S. Measured at
+						    RESO-1 recon: `market.description` rendered in EXACTLY ONE place
+						    on `/m/[slug]`, and it was this `<p>`. Removing it left the
+						    pre-registered public resolution criterion with NO on-page
+						    presence on this surface at all.
+						    ✅ THAT COST IS NOW DISCHARGED, AND THE RULING CAME BACK. The
+						    founder ruled the criterion returns COLLAPSED, and CRIT-1 ships
+						    it: a native `<details>` disclosure, closed by default, carrying
+						    the complete untransformed text, mounted in `DebateView` as a
+						    sibling of the arena. So the sentence that stood here — "not
+						    clamped, not collapsed, absent" — named three states, and the
+						    middle one is what the surface now has.
+						    ⛔ DO NOT "restore" it HERE, and that half is UNCHANGED. The
+						    criterion's home is the disclosure below the band, not this
+						    header: the band is `shrink-0 basis-[24.2dvh]` and its interior
+						    budget is fully allocated, so anything re-added inside this stack
+						    comes straight back out of the four-block row. Re-adding it here
+						    would also give the surface TWO copies of the binding text.
+						    ⚠ What is discharged is the measure-and-report deferral, not the
+						    fence. See `docs/plans/CRIT-1.md`.
+						    ⚠ NO CLAMP SURVIVES THIS REMOVAL. `line-clamp-2` was a class on
+						    the element itself, not a shared helper, so it leaves with it —
+						    there is no orphaned clamp and no prop that existed only to feed
+						    one (`description` stays on `DebateMarketHeader` because the
+						    TYPE MIRRORS THE READ MODEL, which is the real reason — the
+						    ADR-0025 export reads its OWN server model in
+						    `server/debate-export/serialize.ts`, not this view model.
+						    ⚠ THE CLAUSE THAT FOLLOWED — "after R-2 no view component reads
+						    the field at all, so it crosses the RSC boundary unrendered" —
+						    IS NO LONGER TRUE: CRIT-1's `CriterionDisclosure`, mounted in
+						    `DebateView`, reads it. The field stopped being a dead wire and
+						    became load-bearing, which is exactly why keeping it on the type
+						    was right). */}
+						{/* ⛔⛔ RESO-1 · R-4 — THE PRICE BAR NOW LIVES HERE, IN THE READING
+						    COLUMN, DIRECTLY ABOVE THE BLOCK ROW. It was the rail's second
+						    occupant, under the chart, on the argument that "the bar and the
+						    chart above it read the SAME price, so standing them in one
+						    column is what lets a reader check one against the other."
+						    ⇒ That argument assumed there WAS a chart to check against.
+						    Measured at RESO-1 recon: there is one on none of the eight
+						    markets, so in practice the bar was a 15px strip alone at the top
+						    of a 188px column with 173px of empty ground beneath it. Moving
+						    it into the reading column puts the price next to the market's
+						    own text, and gives the chart the whole rail on the day a market
+						    has a series to draw.
+
+						    ⚠ MOVING THE CALL SITE IS NOT MOVING THE COMPONENT, and the
+						    distinction is why no extraction was needed here. `PriceBar` IS
+						    shared — Discovery's `MarketCard` and `HeroPanels` render it, as
+						    does the post arm's `FocusMarketCard` — but they render `card`
+						    and `hero`. `size="detail"` has exactly ONE call site in the
+						    repo and it is this line, so relocating this element reaches no
+						    other surface. Measured, not assumed: four call sites, one
+						    `detail`.
+
+						    ⚠ THE `pick` GATE TRAVELS UNCHANGED. Same object, same three
+						    conditions, same handler — a relocation that dropped `pick` would
+						    silently turn the live percent labels back into plain text, which
+						    reads as a styling regression rather than the lost affordance it
+						    would be. */}
+						<PriceBar pricing={market.pricing} size="detail" pick={pick} />
+						{/* RESO-1 · R-7 — `.rescards` (`d5:986`) is now the FOUR-block row
+						    and the LAST child of `.hstack`, directly under the price bar
+						    R-4 moved in above it. It used to sit after the criterion; the
+						    criterion is gone, so "after the criterion" is corrected here
+						    rather than left describing a neighbour that no longer exists.
+						    ⛔ The blocks still carry NO market data — see `ResolverCards.tsx`
+						    for why that half did not reverse. */}
 						<ResolverCards market={market} />
 					</div>
 				</div>
