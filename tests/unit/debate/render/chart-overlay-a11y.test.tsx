@@ -53,7 +53,12 @@ const noop = () => {};
 
 function renderOverlay() {
 	return render(
-		<MarketPriceChartOverlay series={SERIES} nodes={NODES} onClose={noop} />,
+		<MarketPriceChartOverlay
+			series={SERIES}
+			nodes={NODES}
+			onClose={noop}
+			isOpen={true}
+		/>,
 	);
 }
 

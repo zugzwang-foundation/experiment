@@ -221,6 +221,16 @@ export function MarketHeader({
 					<MarketPriceChartHost
 						series={priceChart.series}
 						nodes={priceChart.nodes}
+						// C-CHART-2 clause 1 (CHART-2) — the terminal pulse. READ
+						// from the market's own status, never assumed: this is the
+						// ONE surface where a non-`Open` market renders a chart at
+						// all (Discovery lists only `Open` ones), so it is the one
+						// place the frozen branch is reachable. A pulse on a
+						// `Closed`, `Resolving`, `Resolved` or `Voided` market
+						// asserts it is live, which is false where stake is
+						// committed and runs at INV-4 — the same reason
+						// `withLiveTail` reads `market.status` here and nowhere else.
+						isOpen={market.status === "Open"}
 					/>
 				) : null
 			}

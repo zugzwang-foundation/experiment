@@ -151,6 +151,7 @@ const SITES = [
 		renderNull: () =>
 			render(
 				<HeroPanels
+					isOpen={true}
 					card={cardFixture(null)}
 					series={SERIES}
 					topPosts={topPosts(null)}
@@ -159,6 +160,7 @@ const SITES = [
 		renderLoaded: () =>
 			render(
 				<HeroPanels
+					isOpen={true}
 					card={cardFixture(CARD_IMAGE_URL)}
 					series={SERIES}
 					topPosts={topPosts(null)}
@@ -173,6 +175,7 @@ const SITES = [
 		renderNull: () =>
 			render(
 				<HeroPanels
+					isOpen={true}
 					card={cardFixture(null)}
 					series={SERIES}
 					topPosts={topPosts(null)}
@@ -181,6 +184,7 @@ const SITES = [
 		renderLoaded: () =>
 			render(
 				<HeroPanels
+					isOpen={true}
 					card={cardFixture(null)}
 					series={SERIES}
 					topPosts={topPosts(POST_IMAGE_URL)}
@@ -361,6 +365,7 @@ describe("§8.1 zero-delta — HeroPanels' 54×54 thumb", () => {
 	const renderHero = (imageUrl: string | null) =>
 		render(
 			<HeroPanels
+				isOpen={true}
 				card={cardFixture(imageUrl)}
 				series={SERIES}
 				topPosts={topPosts(null)}
@@ -392,6 +397,7 @@ describe("§8.1 zero-delta — the hero POST image, at BOTH poles", () => {
 	const renderPosts = (imageUrl: string | null) =>
 		render(
 			<HeroPanels
+				isOpen={true}
 				card={cardFixture(null)}
 				series={SERIES}
 				topPosts={topPosts(imageUrl)}

@@ -57,7 +57,9 @@ const YES_POST: HeroPost = {
 };
 
 function renderHero(topPosts: HeroTopPosts) {
-	return render(<HeroPanels card={CARD} series={[]} topPosts={topPosts} />);
+	return render(
+		<HeroPanels card={CARD} series={[]} topPosts={topPosts} isOpen={true} />,
+	);
 }
 
 describe("UI.A5 §2 row 8 — hero author → /u/[pseudonym] (A4 follow-up #2)", () => {

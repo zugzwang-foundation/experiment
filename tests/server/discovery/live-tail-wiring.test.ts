@@ -215,4 +215,52 @@ describe("debate-view::price-chart-domain-frozen-when-not-open — INV-4, at the
 		expect(widened).not.toBe(ids);
 		expect(widened).not.toContain('eq(markets.status, "Open")');
 	});
+
+	it("Discovery spends the SAME licence twice, and both spendings are pinned", () => {
+		// ⛔ CHART-2 ADDED A SECOND `isOpen: true` TO THIS FILE AND THE CASE ABOVE
+		// COULD NOT SEE IT. `liveTailArgs` paren-matches the `withLiveTail(`
+		// argument list, deliberately, so a second call elsewhere cannot be
+		// confused for this one — and the new literal is a FIELD ON THE VIEW,
+		// outside those parens, feeding `C-CHART-2` clause 1's terminal pulse to
+		// the hero chart. It was therefore unguarded, and `page.tsx`'s own docblock
+		// already promised this assertion by name: "asserts this file carries
+		// exactly two `isOpen: true` and no `isOpen: false`, beside the `where`
+		// that licenses them". Minted at the CHART-2 test audit so that sentence is
+		// true rather than aspirational — a docblock that cites a guard which does
+		// not exist is worse than one that cites none, because it is checked once
+		// and trusted afterwards.
+		//
+		// ⚠ THE COUNT IS THE ASSERTION, not the presence. `toContain` is satisfied
+		// by one, so it cannot tell "both spendings are licensed" from "one of them
+		// is and nobody looked at the other".
+		const src = code(DISCOVERY);
+		const trues = src.match(/isOpen:\s*true\s*,/g) ?? [];
+		expect(trues).toHaveLength(2);
+		// Every `isOpen:` in the file is one of those two — a third form (a read
+		// that cannot exist here, or an inverted literal) reddens rather than
+		// slipping in beside them.
+		expect(src.match(/isOpen:/g) ?? []).toHaveLength(2);
+		expect(src).not.toMatch(/isOpen:\s*false/);
+
+		// …beside the `where` that licenses BOTH. Discovery may hard-code `true`
+		// only because every market it lists is `Open` by construction; the two
+		// literals and that filter are one claim, asserted in one breath.
+		expect(functionBlock(code(LIST), "getCachedDiscoveryMarketIds")).toContain(
+			'eq(markets.status, "Open")',
+		);
+
+		// POSITIVE CONTROL — on this exact text, not a hand-built one. Flip the
+		// SECOND literal (the pulse's) and require both halves of the check to go
+		// false: the count drops and the `false` ban fires. Without this, a regex
+		// that silently matched nothing would report "0 of 0" as agreement.
+		const LITERAL = "isOpen: true,";
+		const last = src.lastIndexOf(LITERAL);
+		expect(last).toBeGreaterThan(src.indexOf(LITERAL));
+		const flipped = `${src.slice(0, last)}isOpen: false,${src.slice(
+			last + LITERAL.length,
+		)}`;
+		expect(flipped).not.toBe(src);
+		expect(flipped.match(/isOpen:\s*true\s*,/g) ?? []).toHaveLength(1);
+		expect(flipped).toMatch(/isOpen:\s*false/);
+	});
 });

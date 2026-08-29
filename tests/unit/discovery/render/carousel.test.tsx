@@ -97,6 +97,7 @@ function views(n: number): DiscoveryMarketView[] {
 		const ordinal = i + 1;
 		const first = i === 0;
 		return {
+			isOpen: true,
 			card: {
 				id: `0190b3a0-9999-7000-8000-${String(ordinal).padStart(12, "0")}`,
 				slug: `fixture-market-${ordinal}`,

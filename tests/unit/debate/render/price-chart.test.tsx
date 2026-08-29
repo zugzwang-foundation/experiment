@@ -160,7 +160,7 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 	 */
 	it("collapsed-renders-the-time-axis", () => {
 		const { container } = render(
-			<MarketPriceChartCard series={SERIES} onExpand={vi.fn()} />,
+			<MarketPriceChartCard series={SERIES} onExpand={vi.fn()} isOpen={true} />,
 		);
 
 		// Non-vacuity: the chart rendered (its svg + both lines are present).
@@ -203,7 +203,7 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		// Sep 16 and a Sep 18 that appear nowhere in the series. Every rendered day
 		// must be one of the three the series actually carries.
 		const { container } = render(
-			<MarketPriceChartCard series={SERIES} onExpand={vi.fn()} />,
+			<MarketPriceChartCard series={SERIES} onExpand={vi.fn()} isOpen={true} />,
 		);
 		const realDays = new Set(["Sep 15", "Sep 17", "Sep 20"]);
 		const rendered = byPrefix(container, "axis-x-label-").map(
@@ -225,7 +225,7 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		// would stack on the left edge and all three labels would print the same
 		// day three times. §9's amendment says so in terms.
 		const { container } = render(
-			<MarketPriceChartCard series={SINGLE} onExpand={vi.fn()} />,
+			<MarketPriceChartCard series={SINGLE} onExpand={vi.fn()} isOpen={true} />,
 		);
 		// Non-vacuity: the chart itself still rendered, lines and all.
 		expect(screen.getByTestId("market-price-chart")).toBeTruthy();
@@ -241,14 +241,21 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		// the other out with it. §17 now carries them as two rows for the same
 		// reason.
 		const { container } = render(
-			<MarketPriceChartCard series={SERIES} onExpand={vi.fn()} />,
+			<MarketPriceChartCard series={SERIES} onExpand={vi.fn()} isOpen={true} />,
 		);
 		expect(byPrefix(container, "graph-node-")).toHaveLength(0);
 
 		// Positive control — nodes CAN render (expanded mode), so their absence
 		// above is meaningful, not vacuous.
 		cleanup();
-		render(<MarketPriceChart series={SERIES} nodes={NODES} mode="expanded" />);
+		render(
+			<MarketPriceChart
+				series={SERIES}
+				nodes={NODES}
+				mode="expanded"
+				isOpen={true}
+			/>,
+		);
 		expect(byPrefix(document.body, "graph-node-").length).toBeGreaterThan(0);
 	});
 
@@ -258,7 +265,7 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		// amendment was scoped to one mode and a shared helper leaking across would
 		// be invisible without this row.
 		const { container } = render(
-			<MarketPriceChart series={SERIES} mode="expanded" />,
+			<MarketPriceChart series={SERIES} mode="expanded" isOpen={true} />,
 		);
 		expect(screen.getByTestId("axis-x-start")).toBeTruthy();
 		expect(screen.getByTestId("axis-x-end")).toBeTruthy();
@@ -273,7 +280,7 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 	//        every other test). Guards the headline invariant against a silent
 	//        pole-swap (@code-reviewer MEDIUM, slice 1). ─────────────────────────
 	it("line-tokens-bind-by-side-inv3", () => {
-		render(<MarketPriceChart series={SERIES} mode="collapsed" />);
+		render(<MarketPriceChart series={SERIES} mode="collapsed" isOpen={true} />);
 		expect(screen.getByTestId("line-yes").getAttribute("stroke")).toBe(
 			"var(--graph-yes)",
 		);
@@ -289,7 +296,9 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		// point), the YES line must sit HIGHER on screen — a SMALLER SVG y — than
 		// the NO line at the SAME x. "When YES is winning, the YES line is higher."
 		cleanup();
-		render(<MarketPriceChart series={YES_WINNING} mode="collapsed" />);
+		render(
+			<MarketPriceChart series={YES_WINNING} mode="collapsed" isOpen={true} />,
+		);
 		const yesPts = parsePoints(
 			screen.getByTestId("line-yes").getAttribute("points") ?? "",
 		);
@@ -307,7 +316,13 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 	// ── 2. Accessible text summary — sr-only, names opening/current/endpoints;
 	//       the SVG itself stays aria-hidden (SPEC.1 §9 Accessibility) ───────────
 	it("accessible-summary-present", () => {
-		render(<MarketPriceChartCard series={SUMMARY_SERIES} onExpand={vi.fn()} />);
+		render(
+			<MarketPriceChartCard
+				series={SUMMARY_SERIES}
+				onExpand={vi.fn()}
+				isOpen={true}
+			/>,
+		);
 
 		const summary = screen.getByTestId("market-price-chart-summary");
 		// The summary is the ONE non-decorative element — screen-reader visible.
@@ -329,7 +344,9 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 
 	// ── 3. Single-point (unbet) → a full-width flat line at the opening price ───
 	it("flat-line-when-single-point", () => {
-		render(<MarketPriceChartCard series={SINGLE} onExpand={vi.fn()} />);
+		render(
+			<MarketPriceChartCard series={SINGLE} onExpand={vi.fn()} isOpen={true} />,
+		);
 
 		const pts = parsePoints(
 			screen.getByTestId("line-yes").getAttribute("points") ?? "",
@@ -380,7 +397,14 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 	//       only)"). The existing collapsed test at (1) already pins zero nodes in
 	//       the card; this adds the positive control that they DO render expanded. ─
 	it("expanded-renders-nodes", () => {
-		render(<MarketPriceChart series={SERIES} nodes={NODES} mode="expanded" />);
+		render(
+			<MarketPriceChart
+				series={SERIES}
+				nodes={NODES}
+				mode="expanded"
+				isOpen={true}
+			/>,
+		);
 
 		// One graph-node-<id> element per node in EXPANDED mode.
 		expect(byPrefix(document.body, "graph-node-")).toHaveLength(NODES.length);
@@ -390,12 +414,21 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 
 		// COLLAPSED renders ZERO nodes EVEN WITH nodes provided — expanded-only.
 		cleanup();
-		render(<MarketPriceChart series={SERIES} nodes={NODES} mode="collapsed" />);
+		render(
+			<MarketPriceChart
+				series={SERIES}
+				nodes={NODES}
+				mode="collapsed"
+				isOpen={true}
+			/>,
+		);
 		expect(byPrefix(document.body, "graph-node-")).toHaveLength(0);
 
 		// The collapsed CARD likewise shows no nodes (it renders the chart collapsed).
 		cleanup();
-		render(<MarketPriceChartCard series={SERIES} onExpand={vi.fn()} />);
+		render(
+			<MarketPriceChartCard series={SERIES} onExpand={vi.fn()} isOpen={true} />,
+		);
 		expect(byPrefix(document.body, "graph-node-")).toHaveLength(0);
 	});
 
@@ -404,7 +437,14 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 	//       data-side "NO". Bound by the semantic token NAME, never inverted and
 	//       never the `--color-*` slot (design decision #7). ─────────────────────
 	it("node-tokens-bind-by-side-inv3", () => {
-		render(<MarketPriceChart series={SERIES} nodes={NODES} mode="expanded" />);
+		render(
+			<MarketPriceChart
+				series={SERIES}
+				nodes={NODES}
+				mode="expanded"
+				isOpen={true}
+			/>,
+		);
 
 		const [yesNode, noNode] = NODES; // NODES[0] = YES, NODES[1] = NO.
 
