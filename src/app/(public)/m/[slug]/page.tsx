@@ -172,7 +172,8 @@ export default async function MarketPage({
 	// `auth.api.getSession`: the layout already read the session this request,
 	// and React's `cache()` collapses the two into ONE database lookup. That
 	// matters most here, because `DebatePoll` re-invokes BOTH the layout and
-	// this page every 15 s per open tab. ⛔ Everything below this line is
+	// this page every 30 s per open tab (was 15 s, frontend-optimization-
+	// notes item 1). ⛔ Everything below this line is
 	// viewer-scoped and NEVER cached.
 	const session = await getRequestSession();
 	const viewer = session?.user?.id

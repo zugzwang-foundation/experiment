@@ -113,24 +113,28 @@ const client = postgres(connectionString, {
 	// means "never given back", and staging degraded to EMAXCONNSESSION a few
 	// minutes after every redeploy.
 	//
-	// 20 s sits just above POLL_INTERVAL_MS_DEBATE_VIEW = 15000
-	// (src/server/config/limits.ts:262), the only sub-minute cadence on the
+	// 35 s sits just above POLL_INTERVAL_MS_DEBATE_VIEW = 30000
+	// (src/server/config/limits.ts), the only sub-minute cadence on the
 	// participant surface, so an actively-polling viewer keeps its connection
-	// warm instead of re-handshaking through Supavisor every tick. The pool is
-	// FIFO (`open.shift()`): with N connections and interval T each is touched
-	// every N×T, so at the 15 s cadence a full pool collapses back to the one
-	// connection the poller keeps hot.
+	// warm instead of re-handshaking through Supavisor every tick. Widened from
+	// 20s (which sat just above the prior 15000ms poll interval) when
+	// frontend-optimization-notes item 1 widened the poll — left at the old
+	// value this margin would have inverted, and a polling tab would go BACK to
+	// re-handshaking every tick, undoing the warm-connection intent below rather
+	// than serving it. The pool is FIFO (`open.shift()`): with N connections and
+	// interval T each is touched every N×T, so at the poll's cadence a full pool
+	// collapses back to the one connection the poller keeps hot.
 	//
 	// ⚠ MEASURED LIMIT — this does NOT reclaim an abandoned instance's slots.
 	// On Vercel Fluid the instance suspends and the timer stops with it: 620 s
-	// idle was observed against this 20 s setting. Even awake instances ran it
-	// ~3× slow (first release at ~59 s). Treat it as opportunistic release on a
-	// live instance, NOT as the pool guarantee — `max` above is the guarantee.
+	// idle was observed against the prior 20 s setting. Even awake instances ran
+	// it ~3× slow (first release at ~59 s). Treat it as opportunistic release on
+	// a live instance, NOT as the pool guarantee — `max` above is the guarantee.
 	//
 	// Returning an idle connection cannot break a running query: postgres.js
 	// `end()` terminates only when nothing is in flight, and otherwise defers
 	// until the query completes.
-	idle_timeout: 20,
+	idle_timeout: 35,
 	// Bounds a CONTINUOUSLY BUSY connection — the only kind `idle_timeout`
 	// never reaches — at 10 min, against a default of 30-60 min.
 	//

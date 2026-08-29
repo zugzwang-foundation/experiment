@@ -1,12 +1,22 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 
 import type { ChartNode } from "@/server/debate-view/price-chart";
 import type { PricePoint } from "@/server/discovery/price-series";
 
 import { MarketPriceChartCard } from "./MarketPriceChartCard";
-import { MarketPriceChartOverlay } from "./MarketPriceChartOverlay";
+
+// frontend-optimization-notes item 6 — the overlay is absent from the DOM
+// until the card is clicked (`open && <MarketPriceChartOverlay .../>` below),
+// so it never needs to be in the route's initial JS payload. `ssr: false`
+// because it is never present on first paint.
+const MarketPriceChartOverlay = dynamic(
+	() =>
+		import("./MarketPriceChartOverlay").then((m) => m.MarketPriceChartOverlay),
+	{ ssr: false },
+);
 
 /** The market-detail price-chart host (the §23 profile-graph host pattern) — the
  * collapsed card with a STATE-TOGGLE expanded overlay (not a route). The overlay

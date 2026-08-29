@@ -186,8 +186,9 @@ export async function getHeaderPortfolio(
 		//
 		// Captured, not swallowed silently — `safeCaptureException` is itself
 		// fail-open (SPEC.2 §17.5), so observing the failure cannot cause one.
-		// NOT deduped or sampled: `DebatePoll` re-runs this layout every 15 s per
-		// open `/m/[slug]` tab, so a deterministic DB failure emits at 4/min/tab —
+		// NOT deduped or sampled: `DebatePoll` re-runs this layout every 30 s
+		// per open `/m/[slug]` tab (was 15 s, frontend-optimization-notes item 1),
+		// so a deterministic DB failure emits at 2/min/tab (was 4/min/tab) —
 		// the same amplification shape `header-balance.ts` records, and it belongs
 		// to the same HARDEN pass, not to this slice.
 		safeCaptureException(err, {

@@ -257,10 +257,11 @@ export async function loadDebateView(
 	// sibling function is the only new export there.
 	//
 	// ⚠ THE MULTIPLIER IS WHY THIS IS COUNTED AT ALL. `DebatePoll` re-invokes
-	// this read every `POLL_INTERVAL_MS_DEBATE_VIEW` (15 s) = 4 renders per
-	// minute per viewer, against `src/db/index.ts`'s `max: 10` pool and a
-	// 15-slot session pooler. +1 read is +4 statements/minute/viewer; a per-post
-	// read would have been +4N.
+	// this read every `POLL_INTERVAL_MS_DEBATE_VIEW` (30 s; was 15 s,
+	// frontend-optimization-notes item 1) = 2 renders per minute per
+	// viewer (was 4), against `src/db/index.ts`'s `max: 10` pool and a
+	// 15-slot session pooler. +1 read is +2 statements/minute/viewer; a
+	// per-post read would have scaled the same way, N-fold.
 	//
 	// ⚠ It serves BOTH the market arm's media panel (`MarketHeader` →
 	// `MarketMediaPanel`) and the post arm's market card (`PostFocusHeader` →

@@ -42,7 +42,14 @@ export function VisitorCounter() {
 		firedFor.current = pathname;
 		void (async () => {
 			try {
-				const res = await fetch("/api/visits", { method: "POST" });
+				// frontend-optimization-notes item 5 — `keepalive` lets the browser
+				// finish this write even if the component unmounts mid-navigation,
+				// without giving up the response body the way `navigator.sendBeacon`
+				// would (this component needs the returned `total` to render).
+				const res = await fetch("/api/visits", {
+					method: "POST",
+					keepalive: true,
+				});
 				const data: unknown = await res.json();
 				const total =
 					data && typeof (data as { total?: unknown }).total === "number"

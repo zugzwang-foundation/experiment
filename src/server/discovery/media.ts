@@ -30,8 +30,9 @@ const READ_URL_TTL_SECONDS = 7200;
  * R2-MEMO — held for a fraction of its TTL (`read-url-memo.ts`), same rule as
  * `signRead`. The market image is the most re-served object on the site: it
  * renders on Discovery for every visitor AND on `/m/[slug]`, which re-renders
- * every 15 s. Re-minting per render meant a new URL, and so a full re-download
- * of an unchanged image, on every one of those.
+ * every 30 s (was 15 s, frontend-optimization-notes item 1). Re-minting per
+ * render meant a new URL, and so a full re-download of an unchanged image, on
+ * every one of those.
  *
  * ⚠ THE BUCKET IS PART OF THE MEMO KEY, and the memo now builds that key from
  * the bucket it is HANDED rather than from a prefix written here. This arm and

@@ -227,8 +227,9 @@ export const MARKET_SERIES_MAX_POINTS = 256;
  * there is the correct outcome rather than a defect (**INV-4**; changed at
  * CHART-1.A, which removed the non-`Open` restamp this sentence used to cover).
  *
- * ⚠ DELIBERATELY LONGER THAN `POLL_INTERVAL_MS_DEBATE_VIEW` (15000), and that
- * inequality is the whole design rather than an oversight. The window exists to
+ * ⚠ DELIBERATELY LONGER THAN `POLL_INTERVAL_MS_DEBATE_VIEW` (30000 as of
+ * frontend-optimization-notes item 1; was 15000), and that inequality is the
+ * whole design rather than an oversight. The window exists to
  * COALESCE, not to tolerate staleness: fifty bets in thirty seconds become one
  * derivation instead of fifty, so a busy market's cost stops scaling with how
  * busy it is. Keying invalidation on the pool instead — which is what the
@@ -267,7 +268,8 @@ export const PROFILE_GRAPH_Y_MAX = 10000;
 /** Debate-view poll interval in milliseconds (SPEC.1 1.0.25 §16.1 + Appendix B
  * + §9 F-DEBATE-4, per `C7`) — the cadence at which `/m/[slug]` re-invokes its
  * own server read via `router.refresh()` (`src/components/debate/DebatePoll.tsx`),
- * NOT a fetch against a read endpoint. **PROVISIONAL PIN at 15000.** Unlike the
+ * NOT a fetch against a read endpoint. **PROVISIONAL PIN at 30000** (widened
+ * from the original 15000 — frontend-optimization-notes item 1). Unlike the
  * pinned design constants above, this one **remains deferred to the
  * number-tuning pass** — SPEC.2 §4.3 assigns the tune to HARDEN.6; the pin
  * exists only because the flow is unbuildable without a value and go-live
@@ -281,19 +283,45 @@ export const PROFILE_GRAPH_Y_MAX = 10000;
  * steeply on the markets carrying the most viewers. The quantity to size
  * against is therefore ticks × concurrent tabs × round-trips × O(market
  * events), not the interval alone; visibility suspension is the larger lever,
- * and a cap or keyset on `listMarketComments` is a HARDEN.6 PREREQUISITE, not
- * an optimisation. Read from this constant at every
- * call site and never inlined, so the HARDEN.6 tune is a one-line change.
- * Integer (milliseconds, not Dharma). */
-export const POLL_INTERVAL_MS_DEBATE_VIEW = 15000;
+ * and a cap or keyset on `listMarketComments` is still a HARDEN.6
+ * PREREQUISITE, not an optimisation — widening the interval lowers the
+ * multiplier, it does not bound the per-tick cost.
+ *
+ * ⚠ NO PER-TAB JITTER, AND THAT WAS TRIED AND REVERTED — record it so it is not
+ * re-added blind. A `Math.random()`-jittered offset on top of this constant
+ * would desync concurrent tabs, but `tests/unit/debate/render/poll.test.tsx`
+ * asserts EXACT fake-timer boundaries (`advanceTimersByTime(INTERVAL - 1)`
+ * must not fire; `+1` must fire) across nine cases — a jittered real interval
+ * makes that assertion fail non-deterministically by design, not by defect.
+ * Loosening that suite to accommodate jitter is a test-writer-scoped call this
+ * task did not have standing to make unilaterally, so the interval stays flat.
+ *
+ * ⚠ THIS VALUE MUST DIVIDE EVENLY BY 60, and that is not cosmetic —
+ * `tests/unit/debate/render/auto-advance.test.tsx`'s `advance()` helper steps
+ * the fake clock in 60 increments of `ADVANCE_MS/60` (`scrollers.tsx`'s
+ * `ADVANCE_MS` reads this same constant) because a single large
+ * `vi.advanceTimersByTime()` jump under-counts React-rearmed timeouts (see
+ * that file's own docblock). 25000 does not divide evenly (416.6̄), and the
+ * fake timer's per-step sub-integer truncation accumulated to just under the
+ * real threshold, silently starving the 60th step of the callback it needed —
+ * caught by running this exact suite, not by inspection. 30000 (→ 500/step)
+ * and 15000 (→ 250/step) both divide clean; any future retune must land on a
+ * multiple of 60 or fix the test helper in the same change. Read from this
+ * constant at every call site and never inlined, so the HARDEN.6 tune is a
+ * one-line change. Integer (milliseconds, not Dharma). */
+export const POLL_INTERVAL_MS_DEBATE_VIEW = 30000;
 
 // === HEADER-PORTFOLIO-CACHE: header PORTFOLIO figure cache-aside ===========
 
 /** TTL for the Redis cache-aside in front of `getHeaderPortfolio`
  * (`getHeaderPortfolioCached`, `src/server/dharma/header-portfolio.ts`).
- * Matches `POLL_INTERVAL_MS_DEBATE_VIEW` (15000 ms → 15 s) deliberately: that
- * interval is already this product's accepted display-freshness bar (it's the
- * cadence `/m/[slug]` re-renders this exact figure on), so this cache adds no
- * staleness beyond what a viewer already experiences elsewhere. Seconds, not
- * milliseconds — Upstash `SET ... EX` takes seconds. */
+ * Originally pinned to equal `POLL_INTERVAL_MS_DEBATE_VIEW` (both 15000ms)
+ * deliberately, on the reasoning that the poll interval was already this
+ * product's accepted display-freshness bar. **That equality no longer
+ * holds** — the poll interval widened to 30000ms (frontend-
+ * optimization-notes item 1) and this TTL deliberately did NOT widen with
+ * it, so the cache is now STRICTER than the poll (15s ≤ the poll's 30s),
+ * which only ever serves a fresher figure than a viewer would otherwise see,
+ * never a staler one. Seconds, not milliseconds — Upstash `SET ... EX` takes
+ * seconds. */
 export const HEADER_PORTFOLIO_CACHE_TTL_SECONDS = 15;

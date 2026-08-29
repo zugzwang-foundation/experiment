@@ -31,6 +31,56 @@ const MIME_MESSAGE = "unsupported image type";
 export const IMAGE_OVERSIZE_MESSAGE = "image too large";
 const OVERSIZE_MESSAGE = IMAGE_OVERSIZE_MESSAGE;
 
+/** frontend-optimization-notes item 4 — the longest-edge cap for the
+ * client-side downscale below. Every `IMAGE_UPLOADS_ALLOWED_MIME` entry
+ * (jpeg/png/webp — no animated formats) is safe to re-encode. */
+const IMAGE_ATTACH_MAX_EDGE_PX = 1600;
+const IMAGE_ATTACH_JPEG_QUALITY = 0.8;
+
+/**
+ * Best-effort downscale/re-encode of an accepted image before upload
+ * (frontend-optimization-notes item 4) — caps the longest edge at
+ * `IMAGE_ATTACH_MAX_EDGE_PX` and re-encodes as JPEG at
+ * `IMAGE_ATTACH_JPEG_QUALITY`. The server-side `IMAGE_UPLOADS_MAX_BYTES` cap
+ * stays the hard backstop regardless of what this produces.
+ *
+ * Never throws (SG-5 posture, matching `attachImage` below): returns the
+ * ORIGINAL file unchanged if the image is already within the cap on both
+ * axes, or if decode/encode fails for any reason — a client-side
+ * optimization must never block an upload.
+ */
+async function downscaleForUpload(file: Blob): Promise<Blob> {
+	try {
+		const bitmap = await createImageBitmap(file);
+		const longestEdge = Math.max(bitmap.width, bitmap.height);
+		if (longestEdge <= IMAGE_ATTACH_MAX_EDGE_PX) {
+			bitmap.close();
+			return file;
+		}
+		const scale = IMAGE_ATTACH_MAX_EDGE_PX / longestEdge;
+		const width = Math.round(bitmap.width * scale);
+		const height = Math.round(bitmap.height * scale);
+
+		const canvas = document.createElement("canvas");
+		canvas.width = width;
+		canvas.height = height;
+		const ctx = canvas.getContext("2d");
+		if (!ctx) {
+			bitmap.close();
+			return file;
+		}
+		ctx.drawImage(bitmap, 0, 0, width, height);
+		bitmap.close();
+
+		const resized = await new Promise<Blob | null>((resolve) => {
+			canvas.toBlob(resolve, "image/jpeg", IMAGE_ATTACH_JPEG_QUALITY);
+		});
+		return resized ?? file;
+	} catch {
+		return file;
+	}
+}
+
 /**
  * The T3 local bound — the LIVE whitelist + byte cap (SCAFFOLD.15 Q5/Q6;
  * `<=` mirrors the route's CHECK: exactly-at-cap is legal).
@@ -63,14 +113,21 @@ export async function attachImage(args: {
 		};
 	}
 
+	// frontend-optimization-notes item 4 — accept/reject above ran against the
+	// ORIGINAL file (unchanged decision); everything below uploads the
+	// (possibly re-encoded) `uploadBlob` instead. Its `type`/`size` — not the
+	// original's — are what the sign request and the PUT's `content-type`
+	// header must agree on, since the header rides the SigV4 signature.
+	const uploadBlob = await downscaleForUpload(args.file);
+
 	let signRes: Response;
 	try {
 		signRes = await fetchFn("/api/uploads/sign", {
 			method: "POST",
 			headers: { "content-type": "application/json" },
 			body: JSON.stringify({
-				contentType: args.file.type,
-				byteSize: args.file.size,
+				contentType: uploadBlob.type,
+				byteSize: uploadBlob.size,
 			}),
 		});
 	} catch {
@@ -109,9 +166,9 @@ export async function attachImage(args: {
 	try {
 		putRes = await fetchFn(data.putUrl, {
 			method: "PUT",
-			body: args.file,
+			body: uploadBlob,
 			headers: {
-				"content-type": args.file.type,
+				"content-type": uploadBlob.type,
 				// Write-once (AUDIT-FIX-A1): SigV4-signed — byte-exact `*`.
 				"If-None-Match": "*",
 			},

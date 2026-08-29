@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 
 import type { ProfileArgumentItem } from "@/server/profile/arguments";
@@ -7,8 +8,20 @@ import type { ProfilePositionsPayload } from "@/server/profile/owner-view";
 import type { ProfileUser } from "@/server/profile/resolve";
 
 import { ArgumentList } from "./ArgumentList";
-import { PositionsTable } from "./PositionsTable";
 import { initialProfileSelection, type ProfileSelection } from "./selection";
+
+// frontend-optimization-notes item 6 — splits PositionsTable (66 KB) out of
+// the route's main bundle. No `ssr: false`: the table is always visible on
+// first load, so it still needs to render server-side for the initial paint
+// — only its JS chunk is split. `next/dynamic` without `ssr: false` resolves
+// its import asynchronously even when the module is already available, which
+// a plain synchronous client-render test doesn't wait for by default — fixed
+// at the test, not by avoiding the dynamic import: see
+// `tests/unit/profile/render/panel-filter.test.tsx`'s `mount()`, which now
+// awaits the table's actual appearance before a test proceeds.
+const PositionsTable = dynamic(() =>
+	import("./PositionsTable").then((m) => m.PositionsTable),
+);
 
 /**
  * ROUND 4 item 7 — THE ARENA'S TWO PANELS, SHARING ONE SELECTION.
