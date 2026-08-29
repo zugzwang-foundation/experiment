@@ -79,7 +79,7 @@ experiment/
 │   │   │                           #   bookmarks/{page,loading,error}.tsx     — BOOKMARKS (UI-A6, ADR-0032)
 │   │   ├── api/                    # _smoke-error, auth/[...all], bets/{place,sell}, cron/{r2-orphan-sweep,close-due-markets,alarms-drain}, health, uploads/sign, visits
 │   │   ├── globals.css, layout.tsx, page.tsx
-│   ├── components/                 # bookmarks/ debate/ discovery/ profile/ shell/ ui/
+│   ├── components/                 # art/ bookmarks/ debate/ discovery/ profile/ shell/ ui/
 │   │                               #   debate/ gained five components at HTML-FINISH ·
 │   │                               #   MARKET DETAIL: HeadZone (the arm-scoped two-column
 │   │                               #   header frame), MarketMediaPanel, FocusMarketCard
@@ -89,6 +89,22 @@ experiment/
 │   │                               #   OD-2; see docs/parked.md SEQUENCE #5, strip or
 │   │                               #   gate before the DP.2 promote), ScrollRail (the
 │   │                               #   rail — and, since R3, the auto-advance countdown)
+│   │   ├── art/warli/              #   WARLI-1 — a decorative SVG art layer, MOUNTED
+│   │                               #   NOWHERE. Two counter-rotating rings of sixteen
+│   │                               #   Warli-inspired figures around a still centre the
+│   │                               #   auth card sits in. Sealed: it imports nothing but
+│   │                               #   `react` and its own files, and nothing imports it
+│   │                               #   (both asserted by tests/unit/art/). ⚠ IT IS THE
+│   │                               #   ONLY COMPONENT IN THE TREE THAT EMBEDS ITS OWN
+│   │                               #   `<style>` AND AUTHORS `@keyframes` — necessary,
+│   │                               #   because Tailwind's `animate-spin` is NOT in this
+│   │                               #   app's built CSS (measured: the only keyframes
+│   │                               #   emitted are enter/exit/pulse), so the obvious
+│   │                               #   utility would have produced rings that silently
+│   │                               #   never turned. Names are `warli-` prefixed and
+│   │                               #   collision-free. Copy the pattern only when the
+│   │                               #   same measurement holds; it is not a general
+│   │                               #   licence to ship component-scoped stylesheets.
 │   │   └── ui/                     #   14 files, and they are NOT all shadcn. NINE shadcn
 │   │                               #   primitives: avatar, badge, button, card, dialog,
 │   │                               #   input, separator, skeleton, textarea. FIVE are
@@ -279,7 +295,7 @@ tests/
 ├── scale/         8 *.scale.test.ts (the ENGINE.10 Q-2 correctness-at-scale battery) + _fixtures/, _harness/ — opt-in only, see the Scale bullet below
 ├── staging/       OPERATIONAL RUNNERS, not tests — THREE runners (reset.staging.test.ts · generate.staging.test.ts · gates.staging.test.ts) + fixtures.ts (the literal fixture table) + _lib/ (target, client, read-client, write-guard, guards, reset, coverage, captured-identities). ADR-0035/0036, STAGING-PARITY Slices A–D. Points at the LIVE staging DB; opt-in only, see the Operational-runners bullet below
 ├── server/        auth/ (incl. _probe-* + admin-login-result + email-otp-from-guard, AUDIT-FIX-B7b), bets/ (atomicity, concurrency, daily-credit, events-idempotency, idempotency-replay, moderation-outside-transaction, sell, subsequent-buy, validation + AUDIT-FIX-B3: sell-oversell, place-replay-durable, sell-replay-durable, release-failure, double-sell-chain), cron/ (close-due-markets — ENGINE.15, the first route-handler test convention), events/, identity/, middleware/, moderation/, resolution/ (happy-path, pro-rata, correction, void, concurrency, actor-assert), storage/ (incl. sign-route-envelope, AUDIT-FIX-B7b), admin/ (moderation/ + markets, pool-seed, resolution — each carries its ENGINE.15 wire-action blocks; + markets-media-sign-envelope, AUDIT-FIX-B7b), dharma/ (non-transferable)
-└── unit/          body-fingerprint, rate-limit-prefix, upstash-keys, upstash-redis-config (AUDIT-FIX-B7a — the A14 transport-bound config pins), idempotency-release (AUDIT-FIX-B3), bets/ (errors, floors, wire-envelope), cpmm/ (calculate + validate + vectors.test.ts + *.property.test.ts + _arbitraries.ts), markets/ (transitions.test.ts), positions/ (compute.test.ts), resolution/ (basis + basis.property), dharma/ (accrual, canonical, _probe-decimal-negzero, ledger, conservation, conservation-correction), staging/ (8 files — the guards that constrain the tests/staging/ runners WITHOUT touching a database: generator-no-direct-writes incl. the import allowlist, write-guard, runner-target, runner-gating, runner-isolation, reset-guard, guard-list-parity, fixture-table), design/ (**FOUR height chains** — discovery, profile, bookmarks, and `debate-height-chain.test.ts` added at HTML-FINISH · MARKET DETAIL; all four are SOURCE SCANS, because jsdom performs no layout)
+└── unit/          body-fingerprint, rate-limit-prefix, upstash-keys, upstash-redis-config (AUDIT-FIX-B7a — the A14 transport-bound config pins), idempotency-release (AUDIT-FIX-B3), bets/ (errors, floors, wire-envelope), cpmm/ (calculate + validate + vectors.test.ts + *.property.test.ts + _arbitraries.ts), markets/ (transitions.test.ts), positions/ (compute.test.ts), resolution/ (basis + basis.property), dharma/ (accrual, canonical, _probe-decimal-negzero, ledger, conservation, conservation-correction), staging/ (8 files — the guards that constrain the tests/staging/ runners WITHOUT touching a database: generator-no-direct-writes incl. the import allowlist, write-guard, runner-target, runner-gating, runner-isolation, reset-guard, guard-list-parity, fixture-table), design/ (**FOUR height chains** — discovery, profile, bookmarks, and `debate-height-chain.test.ts` added at HTML-FINISH · MARKET DETAIL; all four are SOURCE SCANS, because jsdom performs no layout), art/ (WARLI-1 — 3 files: `ring-geometry.test.ts` asserts the ring engine against HAND-COMPUTED positions rather than a snapshot, because a snapshot pins whatever the engine does today and it caught a real `-0` defect on its first run; `warli-render.test.tsx` reads the rendered `transform` attribute, which is the ONLY place facing/radius/phase reach the DOM; `art-layer-guards.test.ts` holds the raster, side-pole, raw-hex, seal and unmounted checks)
 ```
 
 - **Unit** (no IO): pure functions in `src/lib/` and `src/server/<domain>/`. Happy path + ≥2 edges + the relevant invariant.
