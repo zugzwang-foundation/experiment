@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -21,8 +22,9 @@ vi.mock("next/cache", () => ({
 	revalidateTag: vi.fn(),
 }));
 
-import { events, markets } from "@/db/schema";
+import { events, markets, pools } from "@/db/schema";
 import { openMarket } from "@/server/markets/open";
+import type { LifecycleEventMetadata } from "@/server/markets/transaction";
 
 import { testClient, testDb } from "../db/_fixtures/db";
 import { truncateTables } from "../db/_fixtures/truncate";
@@ -124,7 +126,7 @@ async function attachGenesisEvent(marketId: string): Promise<void> {
 	});
 }
 
-function adminMetadata() {
+function adminMetadata(): LifecycleEventMetadata {
 	return {
 		request_id: "test-chart3-genesis",
 		flow_id: uuidv7(),
@@ -134,6 +136,32 @@ function adminMetadata() {
 		ip: "test",
 		user_agent: "vitest",
 	};
+}
+
+/**
+ * The same admin metadata block, missing one required field at RUNTIME while
+ * still satisfying `LifecycleEventMetadata` at compile time.
+ *
+ * ⛔ WHY THIS PARTICULAR LEVER, AND WHY IT IS NOT A MOCK. `openMarket` runs
+ * `assertAdminActor` at entry, which reads `actor_id` and `user_id` and nothing
+ * else — so a block short an `ip` walks straight past it. The full seven-field
+ * check is `eventMetadataSchema`, and that lives inside `insertEvent`, which is
+ * the LAST statement of the W-4 callback: the pools INSERT and the status
+ * UPDATE have already run when it throws. `InvalidEventPayloadError` is not a
+ * retryable SQLSTATE, so `runLifecycleTransaction` re-raises it without retry
+ * and Postgres rolls the whole transaction back.
+ *
+ * ⇒ That makes it a REAL failure of the real genesis write, reached through the
+ * shipped code path with nothing stubbed — the only kind of failure this file's
+ * own posture allows (ADR-0036 primitive 3: never mock anything that writes a
+ * row). `Reflect.deleteProperty` rather than an `as` cast because the shape of
+ * the defect is exactly a block that TYPE-CHECKS and is short a field at run
+ * time; that is how a real one would arrive.
+ */
+function metadataThatFailsTheEventWrite(): LifecycleEventMetadata {
+	const metadata = adminMetadata();
+	Reflect.deleteProperty(metadata, "ip");
+	return metadata;
 }
 
 describe("I-GENESIS-001: every Open market carries a market.opened event", () => {
@@ -228,6 +256,89 @@ describe("I-GENESIS-001: every Open market carries a market.opened event", () =>
 		);
 		expect(payload).toHaveLength(1);
 		expect(payload[0]?.payload).toMatchObject({ marketId, seedAmount: SEED });
+	});
+
+	it("open-implies-market-opened::a-market-CANNOT-reach-Open-when-its-genesis-event-fails", async () => {
+		// ⛔ THE ARM THAT MAKES THE ARM ABOVE MEAN SOMETHING. The positive control
+		// drives the real `openMarket` and proves that on the HAPPY PATH the event
+		// is written. It cannot see WHERE the write happens — and "where" is the
+		// entire mechanism. Move `insertEvent` out of the W-4 callback to sit
+		// beside the post-commit `revalidateTag` (four lines down, in a function
+		// that already does exactly that with a different call, so it reads as
+		// tidying rather than as a change of meaning) and the happy path is
+		// unaltered: the market opens, the event lands, the control stays green.
+		// The invariant would nonetheless have become violable on ANY failure of
+		// the event write, in a codebase where nothing else asserts this
+		// implication and the only symptom is a blank rectangle.
+		//
+		// ⇒ THE PROPERTY IS NOT "the event is emitted", IT IS "Open and the event
+		// commit together". This arm asserts the second one by failing the write
+		// and demanding that the status flip died with it.
+		const marketId = await seedMarketRow("genesis-atomic", "Draft");
+
+		// Control: clean before, so an empty predicate afterwards is a fact about
+		// the rollback rather than the resting state of the table.
+		expect(await openMarketsMissingGenesis()).toEqual([]);
+
+		await expect(
+			openMarket({
+				marketId,
+				seedAmount: SEED,
+				now: NOW,
+				metadata: metadataThatFailsTheEventWrite(),
+			}),
+		).rejects.toThrow();
+
+		// ⛔ THE LOAD-BEARING ASSERTION: the market did NOT reach Open. Under a
+		// post-commit emit this reads "Open" and the whole file is red, which is
+		// the point.
+		const status = await testClient.unsafe(
+			`SELECT status FROM markets WHERE id = $1`,
+			[marketId],
+		);
+		expect(status[0]?.status).toBe("Draft");
+
+		// The invariant itself, through its own predicate.
+		expect(await openMarketsMissingGenesis()).toEqual([]);
+
+		// And the rest of the transaction went back with it — the pool row and the
+		// event are both absent. Asserted because a partial commit would leave a
+		// market with a CPMM pool it never opened with, which the chart's replay
+		// would then walk from a seed no event records.
+		const poolRows = await testDb
+			.select({ id: pools.id })
+			.from(pools)
+			.where(eq(pools.marketId, marketId));
+		expect(poolRows).toHaveLength(0);
+		const genesis = await testClient.unsafe(
+			`SELECT count(*)::int AS n FROM events
+			  WHERE aggregate_id = $1 AND event_type = 'market.opened'`,
+			[marketId],
+		);
+		expect(genesis[0]?.n).toBe(0);
+
+		// ⭐ THE POSITIVE CONTROL, ON THE SAME ROW. Everything above is a set of
+		// absences, and absences are what a broken fixture also produces: if
+		// `openMarket` were failing for some reason unrelated to the event write —
+		// a bad seed, a missing admin session, a deadline in the past — every
+		// assertion so far would still pass. Re-running the SAME call on the SAME
+		// market with intact metadata must open it. That is what proves the
+		// rejection above was caused by the genesis write and nothing else, and
+		// that the rollback left the row usable rather than wedged.
+		const result = await openMarket({
+			marketId,
+			seedAmount: SEED,
+			now: NOW,
+			metadata: adminMetadata(),
+		});
+		expect(result.status).toBe("Open");
+		expect(await openMarketsMissingGenesis()).toEqual([]);
+		const after = await testClient.unsafe(
+			`SELECT count(*)::int AS n FROM events
+			  WHERE aggregate_id = $1 AND event_type = 'market.opened'`,
+			[marketId],
+		);
+		expect(after[0]?.n).toBe(1);
 	});
 
 	it("open-implies-market-opened::a-fixture-market-WITH-its-event-is-clean", async () => {

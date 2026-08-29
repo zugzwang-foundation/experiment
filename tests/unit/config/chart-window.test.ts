@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -32,6 +32,18 @@ function strippedSource(relPath: string): string {
 	return readFileSync(join(REPO_ROOT, relPath), "utf8")
 		.replace(/\/\*[\s\S]*?\*\//g, " ")
 		.replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
+}
+
+/** Every TypeScript source file under `src/`, repo-relative with forward
+ * slashes. Used by the scans below so their SELECTOR is a directory rather
+ * than a hand-maintained list — a list is a thing a new file joins only if
+ * someone remembers, which is the failure mode a negative assertion cannot
+ * survive. */
+function walkSrc(): string[] {
+	return readdirSync(join(REPO_ROOT, "src"), { recursive: true })
+		.map((entry) => `src/${String(entry).split("\\").join("/")}`)
+		.filter((rel) => rel.endsWith(".ts") || rel.endsWith(".tsx"))
+		.sort();
 }
 
 describe("chart-window::the production window is pinned to the experiment", () => {
@@ -98,6 +110,37 @@ describe("chart-window::staging and preview share the fixture window", () => {
 });
 
 describe("chart-window::the exported constants are a usable, non-degenerate domain", () => {
+	it("exports EXACTLY what resolveChartWindow returns for this environment", () => {
+		// ⛔ THE LINK BETWEEN THE FUNCTION EVERY TEST ABOVE EXERCISES AND THE TWO
+		// VALUES THE COMPONENT ACTUALLY READS — and until this assertion it did
+		// not exist. `resolveChartWindow` is pinned six ways above; the exported
+		// constants were pinned only as "a strictly increasing pair", which is
+		// true of BOTH windows and of most pairs of dates. So the whole file
+		// could be green while `MARKET_CHART_WINDOW_START` was wired to the
+		// staging literal, to the wrong field, or to a window nobody resolved —
+		// and the render guards, which derive from the constants rather than
+		// stating them, would have followed the wrong value without a word.
+		//
+		// ⚠ WHAT THIS DOES NOT REJECT, stated so the next reader does not
+		// over-read it: `CHART_WINDOW = PRODUCTION_CHART_WINDOW` with the env
+		// read deleted is green HERE, because the suite runs under
+		// `ZUGZWANG_ENV = "prod"` (tests/_setup/env.ts) where the two agree. The
+		// source scan's positive control below — `limits` must contain
+		// `process.env.ZUGZWANG_ENV` — is what catches that one.
+		const env = process.env.ZUGZWANG_ENV;
+		// Control: the suite really does pin an environment, so the comparison
+		// below is against a resolved window rather than against `undefined`
+		// twice over.
+		expect(typeof env, "tests/_setup/env.ts must pin ZUGZWANG_ENV").toBe(
+			"string",
+		);
+
+		expect({
+			start: MARKET_CHART_WINDOW_START,
+			end: MARKET_CHART_WINDOW_END,
+		}).toEqual(resolveChartWindow(env));
+	});
+
 	it("exports a strictly increasing pair of parseable instants", () => {
 		// The component's degenerate branch keys on `startMs === endMs`. Under a
 		// fixed window that must be unreachable, and this is what makes it so.
@@ -153,5 +196,80 @@ describe("chart-window::the environment branch never leaves the constants layer"
 		const calls = limits.match(/resolveChartWindow\(/g) ?? [];
 		// One declaration + one invocation.
 		expect(calls.length).toBe(2);
+	});
+
+	it("names resolveChartWindow in exactly ONE file under src/", () => {
+		// ⛔ THE TEST ABOVE CLAIMS "exactly one site in src/" AND MEASURES ONE
+		// FILE. It counts occurrences inside `limits.ts` and stops there, so a
+		// second call site anywhere else in `src/` — a component resolving its
+		// own window from a prop, a route handler resolving one per request —
+		// leaves that count at 2 and the guard green while the branch it exists
+		// to contain has left the constants layer by the front door.
+		const named = walkSrc().filter((rel) =>
+			strippedSource(rel).includes("resolveChartWindow"),
+		);
+		expect(named).toEqual(["src/server/config/limits.ts"]);
+	});
+
+	it("finds NO component under src/components/ that branches on the environment", () => {
+		// ⛔ THE HAND-WRITTEN LIST ABOVE IS THE HOLE, AND IT IS THE SHAPE THIS
+		// REPO KEEPS HITTING: a negative whose SELECTOR is a literal that has to
+		// be maintained. `DERIVATION_AND_COMPONENTS` names eight files; the
+		// window reaches more than eight. `HeroPanels.tsx` renders this chart in
+		// `hero` mode and is not on it — and ambiguity #3 ruled that the hero
+		// takes the SAME window precisely so one market cannot be two shapes on
+		// two surfaces, which is the ruling an env branch there would break. So
+		// would `MarketHeader.tsx`, `MarketCard.tsx`, or any component added
+		// tomorrow. A guard that passes because nobody thought to list the file
+		// is not distinguishable from one that passes because the code is right.
+		//
+		// ⇒ SCOPED BY DIRECTORY, NOT BY LIST, and the rule is broader and simpler
+		// than the window: NO component branches on the environment, for any
+		// reason. Today that set is empty — measured, not assumed — so this needs
+		// no allowlist and cannot rot. Adding an env read to a component is then
+		// a decision that reddens a named guard, not an edit nobody sees.
+		const components = walkSrc().filter((rel) =>
+			rel.startsWith("src/components/"),
+		);
+		// Non-vacuity: the walk found the component tree, not an empty set. A
+		// broken glob would otherwise satisfy "no component branches" trivially.
+		expect(components.length).toBeGreaterThan(50);
+		expect(components).toContain(
+			"src/components/debate/chart/MarketPriceChart.tsx",
+		);
+		expect(components).toContain("src/components/discovery/HeroPanels.tsx");
+
+		const offenders = components.filter((rel) =>
+			strippedSource(rel).includes("ZUGZWANG_ENV"),
+		);
+		expect(offenders).toEqual([]);
+	});
+
+	it("strips comments without eating the code it is meant to scan", () => {
+		// ⛔ THE STRIP ITSELF IS A NEGATIVE'S BLIND SPOT. `strippedSource` deletes
+		// everything between `/*` and the next `*/`; a `/*` appearing inside a
+		// string or a regex literal opens a comment that is not one, and the
+		// delete runs to the next real `*/` — which in this codebase, where
+		// docblocks are longer than the code, could be hundreds of lines later.
+		// The per-file `length > 200` floor above does not see that: it is
+		// satisfied by whatever survived ELSEWHERE in the file while the region
+		// carrying the env branch was swallowed.
+		//
+		// ⇒ SO ASSERT ON A SENTINEL OF REAL CODE, at the site that matters. If
+		// the window's own use in the chart component survives the strip, the
+		// strip reached that region and left it readable.
+		const chart = strippedSource(
+			"src/components/debate/chart/MarketPriceChart.tsx",
+		);
+		expect(chart).toContain("MARKET_CHART_WINDOW_START");
+		expect(chart).toContain("MARKET_CHART_WINDOW_END");
+		// …and it really did strip: the component's prose names the env branch's
+		// own rule, so an un-stripped read of this file would carry words the
+		// scan must never see as code.
+		const raw = readFileSync(
+			join(REPO_ROOT, "src/components/debate/chart/MarketPriceChart.tsx"),
+			"utf8",
+		);
+		expect(chart.length).toBeLessThan(raw.length / 2);
 	});
 });

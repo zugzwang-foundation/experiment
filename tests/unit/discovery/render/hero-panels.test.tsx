@@ -3,7 +3,12 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { MarketPriceChart } from "@/components/debate/chart/MarketPriceChart";
 import { HERO_SIDE_EMPTY, HeroPanels } from "@/components/discovery/HeroPanels";
+import {
+	MARKET_CHART_WINDOW_END,
+	MARKET_CHART_WINDOW_START,
+} from "@/server/config/limits";
 import type { HeroPost, HeroTopPosts } from "@/server/discovery/hero";
 import type { DiscoveryCard } from "@/server/discovery/list";
 import type { PricePoint } from "@/server/discovery/price-series";
@@ -637,6 +642,60 @@ describe("discovery::hero-chart-time-scaled", () => {
 		const drawnFraction = (xs[1] - xs[0]) / (xs[2] - xs[0]);
 		expect(drawnFraction).toBeCloseTo(0.1, 2);
 		expect(drawnFraction).not.toBeCloseTo(0.5, 1);
+	});
+
+	it("plots on the SAME fixed window market detail does — CHART-3 ruling #3", () => {
+		// ⛔ THE HERO'S DOMAIN IS ASSERTED NOWHERE, AND THAT IS A RULED DECISION
+		// LEFT UNGUARDED. CHART-3 ambiguity #3 chose "the fixed window applies to
+		// ALL THREE modes" over "fix the axis on collapsed/expanded and leave the
+		// §22 hero on market lifetime", because "a mode-conditional domain would
+		// make the same market's line a different shape on the card and in the
+		// header, which is worse than either option alone."
+		//
+		// ⛔ WHAT THIS FILE ALREADY PINS CANNOT SEE THAT. `drawnFraction` is a
+		// RATIO of drawn extents, and a ratio is invariant under ANY linear
+		// domain — it answers 0.1 on the window, on the market's lifetime, on a
+		// hero-only span of somebody's choosing. Its companion `xs[2] < 640`
+		// excludes exactly one domain (the one ending at the last point) and
+		// admits every other. So a hero-only domain — the precise thing ruling #3
+		// forbids — passes both, and this file, which never imports the window
+		// constants at all, has no way to notice.
+		const { container } = render(
+			<HeroPanels
+				isOpen={true}
+				card={CARD}
+				series={UNEVEN}
+				topPosts={{ yes: null, no: null }}
+			/>,
+		);
+		const xs = xsOf(container, "line-yes");
+
+		const startMs = Date.parse(MARKET_CHART_WINDOW_START);
+		const endMs = Date.parse(MARKET_CHART_WINDOW_END);
+		const want = UNEVEN.map(
+			(p) => ((Date.parse(p.at) - startMs) / (endMs - startMs)) * 640,
+		);
+		// Discrimination control: the three expectations are three DIFFERENT
+		// numbers, so matching all three is a statement about the mapping rather
+		// than about a domain that collapses everything to one x.
+		expect(new Set(want.map((v) => v.toFixed(2))).size).toBe(3);
+
+		expect(xs).toHaveLength(3);
+		for (let i = 0; i < 3; i++) {
+			expect(xs[i], `hero point ${i}`).toBeCloseTo(want[i], 1);
+		}
+
+		// ⛔ AND THE RULING STATED AS THE THING IT ACTUALLY PROTECTS: the same
+		// series, rendered on the market-detail surface, must land on the SAME
+		// x's. Derived expectations prove the hero uses THE WINDOW; this proves
+		// the two SURFACES agree — which is what "a mode-conditional domain" would
+		// break, and it would break it whether or not either mode's domain happened
+		// to be derivable from a constant.
+		cleanup();
+		const detail = render(
+			<MarketPriceChart series={UNEVEN} mode="collapsed" isOpen={true} />,
+		);
+		expect(xsOf(detail.container, "line-yes")).toEqual(xs);
 	});
 
 	it("the NO line mirrors the YES line on the same time axis", () => {
