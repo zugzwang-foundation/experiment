@@ -155,6 +155,33 @@ describe("chart-window::staging and preview share the fixture window", () => {
 		).toBe(7);
 	});
 
+	it("⏰ EXPIRY ALARM — the staging window has not yet run out", () => {
+		// ⛔ THIS TEST IS A DATE-DEPENDENT ALARM, ON PURPOSE, AND IT IS THE ONLY
+		// MECHANISM BEHIND AN OWED THAT IS OTHERWISE PROSE IN THREE PLACES.
+		//
+		// `STAGING_CHART_WINDOW.end` is 2026-09-10T23:45Z. Staging's markets are
+		// permanently `Open`, so `withLiveTail` keeps appending a point at `now`.
+		// The moment `now` passes that constant, every staging chart's live tail —
+		// and BOTH terminal dots and BOTH pulses, which follow the series — leave
+		// the canvas, while the HTML gutter keeps rendering `YES`/`NO` naming
+		// marks that are not drawn. Nothing else on disk fires on that date.
+		//
+		// ⚠ A time-dependent test is normally a defect. Here the CONSTANT is the
+		// thing that expires, so a guard that cannot see the calendar cannot see
+		// the failure. It fails loudly, with instructions, which is the whole
+		// point: the alternative already exists — three docblocks saying "owed
+		// before 2026-09-10" — and it is what silent decay looks like.
+		const stagingEnd = Date.parse(resolveChartWindow("staging").end);
+		expect(
+			Date.now(),
+			"STAGING_CHART_WINDOW.end has passed. Staging charts are now drawing " +
+				"their live tail, both terminal dots and both pulses off-canvas. " +
+				"FIX: extend `STAGING_CHART_WINDOW.end` in src/server/config/limits.ts " +
+				"and move this alarm with it. Do NOT clamp xPx — that draws the live " +
+				"price at an instant it did not happen (see the geometry docblock).",
+		).toBeLessThan(stagingEnd);
+	});
+
 	it("starts no later than staging's earliest measured bet, so no real data is clipped", () => {
 		// ⛔ MEASURED, NOT CHOSEN. The earliest `bet.placed` across staging's whole
 		// slate at CHART-3 was 2026-08-21T05:29:29.430Z. A window that began after

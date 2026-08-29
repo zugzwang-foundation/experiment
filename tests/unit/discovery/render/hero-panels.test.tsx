@@ -579,22 +579,33 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 //   discovery::hero-chart-time-scaled
 describe("discovery::hero-chart-time-scaled", () => {
 	/** Three points whose SPACING IN TIME is deliberately nothing like their
-	 * spacing in index: one day, then nine days. Under index spacing the middle
+	 * spacing in index: one unit of the window, then nine. Under index spacing the middle
 	 * point lands at the midpoint of the drawn span; under time spacing it lands
 	 * a tenth of the way along. Those two answers differ by a factor of five, so
 	 * no rounding rule can confuse them.
 	 *
-	 * ⚠ THE GAPS WERE 1h AND 9h UNTIL CHART-3 AND ARE NOW 1d AND 9d — a fixture
-	 * change forced by the domain, not a weakening of the assertion. The ratio
-	 * that carries the property is identical (1 : 9); what changed is that the
-	 * axis is now the whole ~52-day experiment window instead of the series' own
-	 * span, so a ten-HOUR series drew inside ~5px of a 640-unit plot and the
-	 * rounding floor ate the very difference this test exists to see. Scaling the
-	 * fixture keeps the measurement above the noise. */
+	 * ⚠ THE GAPS WERE 1h AND 9h UNTIL CHART-3 — a fixture change forced by the
+	 * domain, not a weakening of the assertion. The ratio that carries the
+	 * property is identical (1 : 9); what changed is that the axis is now the
+	 * whole experiment window instead of the series' own span, so a ten-HOUR
+	 * series drew inside ~5px of a 640-unit plot and the rounding floor ate the
+	 * very difference this test exists to see.
+	 *
+	 * ⛔ AND THE INSTANTS ARE DERIVED FROM THE WINDOW RATHER THAN WRITTEN AS
+	 * DATES. Hard-coded September dates sit inside the production window and
+	 * OUTSIDE the staging one, and the two do not overlap — so this guard reddened
+	 * under `ZUGZWANG_ENV=preview`, which is the command AGENTS.md §2 tells a
+	 * developer to run. Deriving removes the coupling rather than documenting it.
+	 * Found by `@security-auditor` at the CHART-3 cascade. */
+	const at = (f: number) => {
+		const startMs = Date.parse(MARKET_CHART_WINDOW_START);
+		const endMs = Date.parse(MARKET_CHART_WINDOW_END);
+		return new Date(startMs + (endMs - startMs) * f).toISOString();
+	};
 	const UNEVEN: PricePoint[] = [
-		{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
-		{ at: "2026-09-16T00:00:00.000Z", yes: "0.600000000000000000" },
-		{ at: "2026-09-25T00:00:00.000Z", yes: "0.700000000000000000" },
+		{ at: at(0), yes: "0.500000000000000000" },
+		{ at: at(0.01), yes: "0.600000000000000000" },
+		{ at: at(0.1), yes: "0.700000000000000000" },
 	];
 
 	/** The x coordinates of one polyline, in order. Read off the rendered

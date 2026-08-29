@@ -719,12 +719,27 @@ function CollapsedAxis({
 	if (series.length < 2 || endMs === startMs) {
 		return null;
 	}
-	// The two interior anchors: a fixed third and two-thirds of the WINDOW.
-	// Both are instants on a constant span, so every market's axis carries the
-	// same two dates — which is the property the fixed window exists to buy.
-	const interior = [1 / 3, 2 / 3].map((f) =>
-		new Date(startMs + (endMs - startMs) * f).toISOString(),
-	);
+	// The two interior anchors: a fixed third and two-thirds of the WINDOW,
+	// FLOORED TO UTC MIDNIGHT. Both are instants on a constant span, so every
+	// market's axis carries the same two dates — the property the fixed window
+	// exists to buy.
+	//
+	// ⛔ THE FLOOR IS WHY THE TICK AND ITS LABEL AGREE. A raw third of the
+	// production window is 2026-10-02T07:55Z and a raw two-thirds is
+	// 2026-10-19T15:50Z — so an unfloored rule draws the gridline 8 and 16 hours
+	// right of the midnight its label names, which is 4.09 and 8.18 user units.
+	// Under the superseded series-anchored rule tick and label were the same
+	// point BY CONSTRUCTION and could not disagree; a fixed span reintroduces the
+	// gap, and it is a small instance of the shape this file rejects everywhere
+	// else — a mark drawn at a time that is not the time written under it.
+	// Flooring costs perfectly even spacing, which nothing requires, and buys an
+	// axis whose labels are true. Raised by `@security-auditor` at the cascade.
+	const interior = [1 / 3, 2 / 3].map((f) => {
+		const raw = new Date(startMs + (endMs - startMs) * f);
+		return new Date(
+			Date.UTC(raw.getUTCFullYear(), raw.getUTCMonth(), raw.getUTCDate()),
+		).toISOString();
+	});
 
 	return (
 		<>

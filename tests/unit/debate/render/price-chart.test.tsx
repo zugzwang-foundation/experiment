@@ -261,6 +261,40 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		};
 	}
 
+	/**
+	 * An instant at fraction `f` of the RESOLVED window.
+	 *
+	 * ⛔ WHY THE FIXTURES BELOW ARE DERIVED RATHER THAN WRITTEN AS DATES. Until
+	 * CHART-3 the domain came from the series, so a fixture's absolute dates were
+	 * irrelevant and every chart guard was environment-independent. The fixed
+	 * window ends that: a fixture written in September sits inside the production
+	 * window and OUTSIDE the staging one, and the two windows do not overlap at
+	 * all (staging ends Sep 10, production opens Sep 15).
+	 *
+	 * ⚠ Measured: with hard-coded September dates, `ZUGZWANG_ENV=preview` reddened
+	 * FOUR of these guards — and AGENTS.md §2 tells a developer to run exactly
+	 * `ZUGZWANG_ENV=preview just verify`. The repo's own `??=` env-leak, reaching
+	 * the chart guards for the first time. They fail loudly rather than silently,
+	 * which is the right direction, but the repair a hurried reader reaches for is
+	 * to loosen the assertion — and these are the guards that pin the whole
+	 * change. Deriving from the window removes the coupling instead of documenting
+	 * it. Found by `@security-auditor` at the CHART-3 cascade.
+	 */
+	function atWindowFraction(f: number): string {
+		const startMs = Date.parse(MARKET_CHART_WINDOW_START);
+		const endMs = Date.parse(MARKET_CHART_WINDOW_END);
+		return new Date(startMs + (endMs - startMs) * f).toISOString();
+	}
+
+	/** A three-point series occupying `[from, to]` of the resolved window. */
+	function seriesAcross(from: number, to: number): PricePoint[] {
+		return [
+			{ at: atWindowFraction(from), yes: "0.500000000000000000" },
+			{ at: atWindowFraction((from + to) / 2), yes: "0.640000000000000000" },
+			{ at: atWindowFraction(to), yes: "0.800000000000000000" },
+		];
+	}
+
 	it("collapsed-axis-labels-are-the-FIXED-WINDOW-not-the-series", () => {
 		const { container } = render(
 			<MarketPriceChartCard series={SERIES} onExpand={vi.fn()} isOpen={true} />,
@@ -291,11 +325,10 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		// rather than a per-market one, which makes every market's axis identical
 		// and two charts directly comparable." Two series that share no timestamp
 		// must produce byte-identical axis labels AND byte-identical tick x's.
-		const OTHER: PricePoint[] = [
-			{ at: "2026-10-01T00:00:00.000Z", yes: "0.200000000000000000" },
-			{ at: "2026-10-04T00:00:00.000Z", yes: "0.300000000000000000" },
-			{ at: "2026-10-11T00:00:00.000Z", yes: "0.250000000000000000" },
-		];
+		// Both derived from the window, and they share no instant: one occupies
+		// its opening tenth, the other its middle. Env-robust by construction.
+		const EARLY = seriesAcross(0.02, 0.1);
+		const OTHER = seriesAcross(0.4, 0.62);
 		const read = (series: PricePoint[]) => {
 			const { container } = render(
 				<MarketPriceChartCard
@@ -324,7 +357,7 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 			return out;
 		};
 
-		const a = read(SERIES);
+		const a = read(EARLY);
 		const b = read(OTHER);
 
 		// Non-vacuity: the axis rendered at all, on both.
@@ -349,8 +382,8 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		// the two charts genuinely identical — the failure the surrounding test
 		// is named for, passing under a control written to exclude it.
 		//
-		// ⇒ MEASURED, AND STATED AS A DIFFERENCE. A market whose data stops on
-		// Sep 20 and one whose data stops on Oct 11 must end their lines at
+		// ⇒ MEASURED, AND STATED AS A DIFFERENCE. A market occupying the window's
+		// opening tenth and one occupying its middle must end their lines at
 		// DIFFERENT x, on the identical axis proved above.
 		expect(a.lineXs.length).toBeGreaterThan(1);
 		expect(b.lineXs.length).toBeGreaterThan(1);
@@ -368,18 +401,19 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		const endMs = Date.parse(MARKET_CHART_WINDOW_END);
 		const xOf = (at: string) =>
 			((Date.parse(at) - startMs) / (endMs - startMs)) * VIEWBOX_W;
-		expect(lastOf(a.lineXs)).toBeCloseTo(xOf(SERIES[SERIES.length - 1].at), 1);
+		expect(lastOf(a.lineXs)).toBeCloseTo(xOf(EARLY[EARLY.length - 1].at), 1);
 		expect(lastOf(b.lineXs)).toBeCloseTo(xOf(OTHER[OTHER.length - 1].at), 1);
 	});
 
 	it("price-chart-series-never-drawn-beyond-now", () => {
 		// ⛔ THE MOST IMPORTANT CORRECTNESS GUARD IN THE AXIS CHANGE. The axis is
-		// fixed; the line is not. A series ending on Sep 20 must stop where Sep 20
-		// falls on the window — roughly a tenth of the way along — and must NOT be
-		// stretched to the axis end, because a flat tail to `MARKET_CHART_WINDOW_END`
-		// asserts a price at an instant that has not happened.
+		// fixed; the line is not. A series covering the window's opening tenth
+		// must stop a tenth of the way along and must NOT be stretched to the axis
+		// end, because a flat tail to `MARKET_CHART_WINDOW_END` asserts a price at
+		// an instant that has not happened.
+		const EARLY = seriesAcross(0.0, 0.1);
 		const { container } = render(
-			<MarketPriceChart series={SERIES} mode="expanded" isOpen={true} />,
+			<MarketPriceChart series={EARLY} mode="expanded" isOpen={true} />,
 		);
 		const xs = (
 			container
@@ -400,13 +434,10 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		// against the old behaviour rather than passing either way.
 		expect(xs[2]).toBeLessThan(VIEWBOX_W);
 
-		// And quantitatively — Sep 15 → Sep 20 is 5 days of a window whose length
-		// the constants define, so the terminal x is that fraction of the plot.
-		const startMs = Date.parse(MARKET_CHART_WINDOW_START);
-		const endMs = Date.parse(MARKET_CHART_WINDOW_END);
-		const frac =
-			(Date.parse("2026-09-20T00:00:00.000Z") - startMs) / (endMs - startMs);
-		expect(xs[2]).toBeCloseTo(frac * VIEWBOX_W, 1);
+		// And quantitatively: the terminal x is the last instant's own fraction of
+		// the window, derived from the constants rather than from one
+		// environment's dates.
+		expect(xs[2]).toBeCloseTo(0.1 * VIEWBOX_W, 1);
 	});
 
 	it("expanded-axis-ENDPOINT-LABELS-name-the-WINDOW-not-the-series", () => {
@@ -523,6 +554,57 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		}
 	});
 
+	it("a-point-BEFORE-the-window-start-is-CLIPPED-not-CLAMPED", () => {
+		// ⭐ THE MIRROR OF THE RIGHT-EDGE GUARD, AND THE ONE THAT WAS MISSING.
+		// Every artefact in this change — the component comment, the `xPx`
+		// docblock, the constants, the §17 row, the beyond-the-end guard — reasoned
+		// about instants PAST the window end. Nothing reasoned about instants
+		// BEFORE its start, and that is the edge that is STRUCTURAL rather than
+		// hypothetical: `MARKET_CHART_WINDOW_START` is the experiment's OPENING
+		// instant, and a market must reach `Open` BEFORE that for anyone to bet at
+		// launch. So `market.opened` — the genesis point §9 calls "the opening
+		// price" — maps to a NEGATIVE x on every production market.
+		//
+		// ⛔ THE CONSEQUENCE OF LEAVING IT UNGUARDED IS EXACT: adding
+		// `Math.max(0, …)` to `xPx` passed the entire suite. A one-sided guard
+		// against a two-sided rule is not a guard against the rule. The clamp is
+		// wrong in this direction for the same reason it is wrong in the other —
+		// it would draw the market's opening price at the window's start, an
+		// instant at which that market did not yet exist.
+		// Found by `@security-auditor` at the CHART-3 cascade.
+		const PRE_LAUNCH: PricePoint[] = [
+			{ at: atWindowFraction(-0.004), yes: "0.500000000000000000" },
+			{ at: atWindowFraction(-0.001), yes: "0.520000000000000000" },
+			{ at: atWindowFraction(0.08), yes: "0.700000000000000000" },
+		];
+		const { container } = render(
+			<MarketPriceChart series={PRE_LAUNCH} mode="expanded" isOpen={true} />,
+		);
+		const xs = (
+			container
+				.querySelector('[data-testid="line-yes"]')
+				?.getAttribute("points") ?? ""
+		)
+			.split(" ")
+			.filter((p) => p.length > 0)
+			.map((p) => Number(p.split(",")[0]));
+
+		// Non-vacuity: three points were read and they advance left to right.
+		expect(xs).toHaveLength(3);
+		expect(xs[0]).toBeLessThan(xs[1]);
+		expect(xs[1]).toBeLessThan(xs[2]);
+
+		// THE ASSERTION. Both pre-window points are drawn at negative x — clipped
+		// by the viewBox, never folded onto the left edge. `Math.max(0, …)` in
+		// `xPx` reddens here and nowhere else in the suite.
+		expect(xs[0]).toBeLessThan(0);
+		expect(xs[1]).toBeLessThan(0);
+		// …and the in-window point is still placed normally, so the guard is about
+		// the clamp rather than about the whole mapping being broken.
+		expect(xs[2]).toBeGreaterThan(0);
+		expect(xs[2]).toBeLessThan(VIEWBOX_W);
+	});
+
 	it("terminal-dots-sit-at-the-LINE-end-not-the-AXIS-end", () => {
 		// ⛔ THE DEFECT THIS RUN INTRODUCED AND THEN FOUND, PINNED SO IT CANNOT
 		// COME BACK. `TerminalMarkers` hard-coded `cx = VIEWBOX_W`. That was
@@ -534,7 +616,11 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		// to no line. A hard-coded coordinate that used to be right by coincidence
 		// is invisible exactly until the coincidence ends.
 		const { container } = render(
-			<MarketPriceChart series={SERIES} mode="collapsed" isOpen={true} />,
+			<MarketPriceChart
+				series={seriesAcross(0.05, 0.3)}
+				mode="collapsed"
+				isOpen={true}
+			/>,
 		);
 
 		const lastLineX = (() => {

@@ -315,16 +315,27 @@ export function resolveChartWindow(env: string | undefined): ChartWindow {
 }
 
 /**
- * ⚠ THE BROWSER'S COPY IS A BUILD-TIME SNAPSHOT, AND THAT IS NEW FOR THIS FILE.
- * `next.config.ts` inlines `ZUGZWANG_ENV` into the client bundle, so this
- * resolves once at build and ships as a literal; the server re-reads
- * `process.env` per request. Every other client-visible constant in this module
- * is environment-INDEPENDENT, so the two sides have never been able to disagree
- * — these two can. Change `ZUGZWANG_ENV` in the Vercel dashboard without
- * redeploying and SSR emits one window while hydration emits the other, which
- * surfaces as a React hydration mismatch on `/m/[slug]` and Discovery rather
- * than as a wrong chart. ⇒ **An env change requires a rebuild**, not just a
- * variable edit. Raised by `@code-reviewer` at the CHART-3 cascade.
+ * ⚠ THIS IS A BUILD-TIME SNAPSHOT ON BOTH SIDES, SO AN ENV CHANGE REQUIRES A
+ * REBUILD. `next.config.ts` puts `ZUGZWANG_ENV` in its `env:` block, and Next
+ * spreads `getNextConfigEnv(config)` into the define set for the client, the
+ * node server AND the edge server alike — every `config.env` key becomes a
+ * literal substituted for `process.env.<KEY>` at compile time. Editing the
+ * variable in the Vercel dashboard therefore changes **nothing anywhere** until
+ * a redeploy.
+ *
+ * ⛔ AN EARLIER VERSION OF THIS DOCBLOCK GOT THE MECHANISM WRONG AND IS
+ * CORRECTED RATHER THAN DELETED, BECAUSE THE ERROR IS THE INSTRUCTIVE PART. It
+ * said the server re-reads `process.env` per request while the browser carries a
+ * frozen literal, and derived a hydration mismatch on `/m/[slug]` from the two
+ * disagreeing. They cannot disagree — both are the same literal — so that
+ * mismatch is unreachable. The CONCLUSION ("an env change requires a rebuild")
+ * was right, and is in fact stronger than the reasoning that produced it.
+ *
+ * That is precisely the shape `O-13` and CLAUDE.md §5.13 exist to end: a sound
+ * conclusion carried by a named mechanism nobody checked. Measured against the
+ * pinned Next by `@security-auditor` at the CHART-3 cascade; the runtime-read
+ * escape hatch is gated on `next experimental-compile`, which this repo does
+ * not use.
  */
 const CHART_WINDOW = resolveChartWindow(process.env.ZUGZWANG_ENV);
 

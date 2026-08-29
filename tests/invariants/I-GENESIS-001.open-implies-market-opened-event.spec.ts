@@ -23,6 +23,7 @@ vi.mock("next/cache", () => ({
 }));
 
 import { events, markets, pools } from "@/db/schema";
+import { InvalidEventPayloadError } from "@/lib/errors";
 import { openMarket } from "@/server/markets/open";
 import type { LifecycleEventMetadata } from "@/server/markets/transaction";
 
@@ -287,7 +288,17 @@ describe("I-GENESIS-001: every Open market carries a market.opened event", () =>
 				now: NOW,
 				metadata: metadataThatFailsTheEventWrite(),
 			}),
-		).rejects.toThrow();
+		).rejects.toThrow(InvalidEventPayloadError);
+		// ⛔ THE ERROR CLASS IS ASSERTED, NOT JUST "IT THREW". This arm's entire
+		// argument is about WHERE the throw happens — inside the W-4 callback,
+		// after the pools INSERT and the status UPDATE — and a bare `toThrow()`
+		// accepts a rejection from anywhere. If a future entry-side validation
+		// ever read `ip`, or the admin-session fixture broke, or the connection
+		// failed, the rejection would move EARLIER and every absence assertion
+		// below would still pass: the arm would silently degrade from an
+		// atomicity proof into "an early error leaves nothing behind", which is
+		// a much weaker claim wearing this one's name.
+		// Raised by `@security-auditor` at the CHART-3 cascade.
 
 		// ⛔ THE LOAD-BEARING ASSERTION: the market did NOT reach Open. Under a
 		// post-commit emit this reads "Open" and the whole file is red, which is
