@@ -4,6 +4,7 @@ import {
 	WEIGHT_DENSE,
 	WEIGHT_SPARE,
 } from "./types";
+import { bowedCircle, bowedLine, bowedPath, seedFrom } from "./wobble";
 
 /**
  * The non-figurative grammar: the marks that fill a ground, edge a border, or
@@ -117,6 +118,7 @@ export function HatchFill({
 	transform,
 	className,
 	weight = WEIGHT_DENSE,
+	seed = 0,
 }: PrimitiveProps & {
 	readonly halfWidth?: number;
 	readonly height?: number;
@@ -137,12 +139,16 @@ export function HatchFill({
 			className={className}
 		>
 			{rules.map((rule) => (
-				<line
+				<path
 					key={rule.y}
-					x1={-rule.half}
-					y1={rule.y}
-					x2={rule.half}
-					y2={rule.y}
+					d={bowedLine(
+						-rule.half,
+						rule.y,
+						rule.half,
+						rule.y,
+						seedFrom(seed, 401, rule.y),
+					)}
+					fill="none"
 					stroke={STROKE}
 					strokeWidth={weight}
 				/>
@@ -169,6 +175,7 @@ export function CombBorderSegment({
 	transform,
 	className,
 	weight = WEIGHT_DENSE,
+	seed = 0,
 }: PrimitiveProps & {
 	readonly length?: number;
 	readonly teeth?: number;
@@ -182,21 +189,17 @@ export function CombBorderSegment({
 			transform={transform}
 			className={className}
 		>
-			<line
-				x1={0}
-				y1={0}
-				x2={length}
-				y2={0}
+			<path
+				d={bowedLine(0, 0, length, 0, seedFrom(seed, 503, length))}
+				fill="none"
 				stroke={STROKE}
 				strokeWidth={weight}
 			/>
 			{positions.map((x) => (
-				<line
+				<path
 					key={x}
-					x1={x}
-					y1={0}
-					x2={x}
-					y2={toothHeight}
+					d={bowedLine(x, 0, x, toothHeight, seedFrom(seed, 509, x))}
+					fill="none"
 					stroke={STROKE}
 					strokeWidth={weight}
 				/>
@@ -222,24 +225,42 @@ export function Chauk({
 	transform,
 	className,
 	weight = WEIGHT_DENSE,
+	seed = 0,
 }: PrimitiveProps & { readonly size?: number }) {
 	const h = size / 2;
 	return (
 		<g data-warli-id={CHAUK.id} transform={transform} className={className}>
-			<rect
-				x={-h}
-				y={-h}
-				width={size}
-				height={size}
+			<path
+				d={bowedPath(
+					[
+						{ x: -h, y: -h },
+						{ x: h, y: -h },
+						{ x: h, y: h },
+						{ x: -h, y: h },
+					],
+					seedFrom(seed, 601, size),
+					{ close: true },
+				)}
 				fill="none"
 				stroke={STROKE}
 				strokeWidth={weight}
+				strokeLinejoin="round"
 			/>
-			<polygon
-				points={`0,${-h} ${h},0 0,${h} ${-h},0`}
+			<path
+				d={bowedPath(
+					[
+						{ x: 0, y: -h },
+						{ x: h, y: 0 },
+						{ x: 0, y: h },
+						{ x: -h, y: 0 },
+					],
+					seedFrom(seed, 607, size),
+					{ close: true },
+				)}
 				fill="none"
 				stroke={STROKE}
 				strokeWidth={weight}
+				strokeLinejoin="round"
 			/>
 			<circle cx={0} cy={0} r={1.3} fill={STROKE} />
 		</g>
@@ -304,25 +325,25 @@ export function WaterLine({
 	transform,
 	className,
 	weight = WEIGHT_DENSE,
+	seed = 0,
 }: PrimitiveProps & {
 	readonly length?: number;
 	readonly amplitude?: number;
 	readonly periods?: number;
 }) {
 	const steps = periods * 2;
-	const points = Array.from({ length: steps + 1 }, (_, i) => {
-		const x = (length * i) / steps;
-		const y = i % 2 === 0 ? -amplitude : amplitude;
-		return `${x.toFixed(2)},${y.toFixed(2)}`;
-	}).join(" ");
+	const points = Array.from({ length: steps + 1 }, (_, i) => ({
+		x: (length * i) / steps,
+		y: i % 2 === 0 ? -amplitude : amplitude,
+	}));
 	return (
 		<g
 			data-warli-id={WATER_LINE.id}
 			transform={transform}
 			className={className}
 		>
-			<polyline
-				points={points}
+			<path
+				d={bowedPath(points, seedFrom(seed, 701, length, periods))}
 				fill="none"
 				stroke={STROKE}
 				strokeWidth={weight}
@@ -346,6 +367,7 @@ export function Sun({
 	transform,
 	className,
 	weight = WEIGHT_SPARE,
+	seed = 0,
 }: PrimitiveProps & {
 	readonly radius?: number;
 	readonly rayLength?: number;
@@ -354,23 +376,26 @@ export function Sun({
 	const spokes = Array.from({ length: rays }, (_, i) => (360 * i) / rays);
 	return (
 		<g data-warli-id={SUN.id} transform={transform} className={className}>
-			<circle
-				cx={0}
-				cy={0}
-				r={radius}
+			<path
+				d={bowedCircle(0, 0, radius, seedFrom(seed, 809, radius))}
 				fill="none"
 				stroke={STROKE}
 				strokeWidth={weight}
+				strokeLinejoin="round"
 			/>
 			{spokes.map((deg) => {
 				const rad = (deg * Math.PI) / 180;
 				return (
-					<line
+					<path
 						key={deg}
-						x1={Math.cos(rad) * (radius + 1.5)}
-						y1={Math.sin(rad) * (radius + 1.5)}
-						x2={Math.cos(rad) * (radius + 1.5 + rayLength)}
-						y2={Math.sin(rad) * (radius + 1.5 + rayLength)}
+						d={bowedLine(
+							Math.cos(rad) * (radius + 1.5),
+							Math.sin(rad) * (radius + 1.5),
+							Math.cos(rad) * (radius + 1.5 + rayLength),
+							Math.sin(rad) * (radius + 1.5 + rayLength),
+							seedFrom(seed, 811, deg),
+						)}
+						fill="none"
 						stroke={STROKE}
 						strokeWidth={weight}
 						strokeLinecap="round"

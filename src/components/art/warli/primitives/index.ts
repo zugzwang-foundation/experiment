@@ -54,7 +54,9 @@ export * from "./field";
 export * from "./figure-parts";
 export * from "./marks";
 export * from "./props";
+export * from "./stroke";
 export * from "./types";
+export * from "./wobble";
 
 /** Every primitive's declared spec, grouped as the four source files are. */
 export const PRIMITIVE_SPECS: readonly PrimitiveSpec[] = [

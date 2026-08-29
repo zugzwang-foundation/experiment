@@ -1,24 +1,32 @@
+import { Dab, Disc, Run, Shape } from "./stroke";
 import { type PrimitiveProps, type PrimitiveSpec, WEIGHT_SPARE } from "./types";
 
 /**
- * The twelve held objects — one per figure, and the ONLY thing that tells the
- * sixteen figures apart.
+ * The twelve held objects — and, on the outer ring and in the static field, the
+ * main thing that tells one faceless figure from another.
  *
  * ⚠ THIS IS THE LOAD-BEARING DECISION OF THE WHOLE PIECE, so it is worth being
  * explicit about. A figure in this idiom is two triangles, a circle and four
- * lines; it has no face, no clothing, no build and no gesture vocabulary beyond
- * the angle of its limbs. There is therefore NO WAY to draw "a scholar" as
- * distinct from "a labourer" in the body itself without abandoning the form and
- * drawing a person instead — which is the failure mode this file exists to
- * avoid. So identity is carried entirely by the object in the hand, and the
- * figures stay identical underneath. That is not a compromise forced by the
- * medium; it is the argument. Everyone in the ring is the same shape. What
- * differs is what they are holding, and that is the whole of what divides them.
+ * lines; outside the eight faced positions it has no face, no build and no
+ * gesture vocabulary beyond the angle of its limbs. There is therefore NO WAY to
+ * draw "a scholar" as distinct from "a labourer" in the body itself without
+ * abandoning the form and drawing a person instead — which is the failure mode
+ * this file exists to avoid. So identity is carried by the object in the hand
+ * and by the ornament reserved out of the body, and the skeletons stay identical
+ * underneath. That is not a compromise forced by the medium; it is the argument.
+ * Everyone in the ring is the same shape. What differs is what they are holding.
  *
  * ⚠ EACH OBJECT IS DRAWN ABOUT ITS HOLD POINT at local `(0, 0)` — the place the
  * hand grips it — not about its centre or its corner. A figure's arm ends at a
  * known point, so hanging an object off it must not require knowing how big the
  * object is.
+ *
+ * ⚠ AND EVERY MARK GOES THROUGH `./stroke`, which is what applies the hand
+ * (`./wobble.ts`). Before that existed this file wrote out thirty-one raw
+ * `<line>` / `<polygon>` elements, and adding the wobble to each individually
+ * would have been thirty-one chances to miss one. A held object drawn machine-
+ * true beside a bowed body does not read as a clean object; it reads as a
+ * different drawing that wandered into this one.
  */
 
 const STROKE = "currentColor";
@@ -34,24 +42,31 @@ export function Book({
 	transform,
 	className,
 	weight = WEIGHT_SPARE,
+	seed = 0,
 }: PrimitiveProps) {
 	return (
 		<g data-warli-id={BOOK.id} transform={transform} className={className}>
-			<polygon
-				points="0,1 -8,3 -8,11 0,9"
-				fill="none"
-				stroke={STROKE}
-				strokeWidth={weight}
-				strokeLinejoin="round"
+			<Shape
+				points={[
+					{ x: 0, y: 1 },
+					{ x: -8, y: 3 },
+					{ x: -8, y: 11 },
+					{ x: 0, y: 9 },
+				]}
+				seed={seed}
+				weight={weight}
 			/>
-			<polygon
-				points="0,1 8,3 8,11 0,9"
-				fill="none"
-				stroke={STROKE}
-				strokeWidth={weight}
-				strokeLinejoin="round"
+			<Shape
+				points={[
+					{ x: 0, y: 1 },
+					{ x: 8, y: 3 },
+					{ x: 8, y: 11 },
+					{ x: 0, y: 9 },
+				]}
+				seed={seed + 1}
+				weight={weight}
 			/>
-			<line x1={0} y1={1} x2={0} y2={9} stroke={STROKE} strokeWidth={weight} />
+			<Run x1={0} y1={1} x2={0} y2={9} seed={seed} weight={weight} />
 		</g>
 	);
 }
@@ -67,24 +82,21 @@ export function Adze({
 	transform,
 	className,
 	weight = WEIGHT_SPARE,
+	seed = 0,
 }: PrimitiveProps) {
 	return (
 		<g data-warli-id={ADZE.id} transform={transform} className={className}>
-			<line
-				x1={0}
-				y1={0}
-				x2={0}
-				y2={11}
-				stroke={STROKE}
-				strokeWidth={weight}
-				strokeLinecap="round"
-			/>
-			<polygon
-				points="-5,11 5,11 2,14 -2,14"
+			<Run x1={0} y1={0} x2={0} y2={11} seed={seed} weight={weight} />
+			<Shape
+				points={[
+					{ x: -5, y: 11 },
+					{ x: 5, y: 11 },
+					{ x: 2, y: 14 },
+					{ x: -2, y: 14 },
+				]}
+				seed={seed}
+				weight={weight}
 				fill={STROKE}
-				stroke={STROKE}
-				strokeWidth={weight}
-				strokeLinejoin="round"
 			/>
 		</g>
 	);
@@ -101,24 +113,21 @@ export function Spear({
 	transform,
 	className,
 	weight = WEIGHT_SPARE,
+	seed = 0,
 }: PrimitiveProps) {
 	return (
 		<g data-warli-id={SPEAR.id} transform={transform} className={className}>
-			<line
-				x1={0}
-				y1={-12}
-				x2={0}
-				y2={14}
-				stroke={STROKE}
-				strokeWidth={weight}
-				strokeLinecap="round"
-			/>
-			<polygon
-				points="0,-16 3,-10 0,-8 -3,-10"
+			<Run x1={0} y1={-12} x2={0} y2={14} seed={seed} weight={weight} />
+			<Shape
+				points={[
+					{ x: 0, y: -16 },
+					{ x: 3, y: -10 },
+					{ x: 0, y: -8 },
+					{ x: -3, y: -10 },
+				]}
+				seed={seed}
+				weight={weight}
 				fill={STROKE}
-				stroke={STROKE}
-				strokeWidth={weight}
-				strokeLinejoin="round"
 			/>
 		</g>
 	);
@@ -135,27 +144,22 @@ export function Slate({
 	transform,
 	className,
 	weight = WEIGHT_SPARE,
+	seed = 0,
 }: PrimitiveProps) {
 	return (
 		<g data-warli-id={SLATE.id} transform={transform} className={className}>
-			<rect
-				x={-6.5}
-				y={1}
-				width={13}
-				height={15}
-				fill="none"
-				stroke={STROKE}
-				strokeWidth={weight}
+			<Shape
+				points={[
+					{ x: -6.5, y: 1 },
+					{ x: 6.5, y: 1 },
+					{ x: 6.5, y: 16 },
+					{ x: -6.5, y: 16 },
+				]}
+				seed={seed}
+				weight={weight}
 			/>
-			<line x1={-4} y1={6} x2={4} y2={6} stroke={STROKE} strokeWidth={weight} />
-			<line
-				x1={-4}
-				y1={10.5}
-				x2={2}
-				y2={10.5}
-				stroke={STROKE}
-				strokeWidth={weight}
-			/>
+			<Run x1={-4} y1={6} x2={4} y2={6} seed={seed} weight={weight} />
+			<Run x1={-4} y1={10.5} x2={2} y2={10.5} seed={seed} weight={weight} />
 		</g>
 	);
 }
@@ -166,29 +170,36 @@ export const VESSEL: PrimitiveSpec = {
 	origin: { x: 0, y: 0 },
 };
 
-/** A water pot: a narrow mouth over a wide belly. */
+/**
+ * A water pot: a narrow mouth over a wide belly.
+ *
+ * Drawn as a bowed polygon rather than as the cubic it used to be. The cubic was
+ * the only true CURVE in the vocabulary, and it read as a different hand — a
+ * confident sweep among marks that all wander. Six points bowed by the same
+ * function as everything else give the same silhouette in the same voice.
+ */
 export function Vessel({
 	transform,
 	className,
 	weight = WEIGHT_SPARE,
+	seed = 0,
 }: PrimitiveProps) {
 	return (
 		<g data-warli-id={VESSEL.id} transform={transform} className={className}>
-			<line
-				x1={-4}
-				y1={2}
-				x2={4}
-				y2={2}
-				stroke={STROKE}
-				strokeWidth={weight}
-				strokeLinecap="round"
-			/>
-			<path
-				d="M -4 2 C -8 6, -7 13, 0 14 C 7 13, 8 6, 4 2"
-				fill="none"
-				stroke={STROKE}
-				strokeWidth={weight}
-				strokeLinejoin="round"
+			<Run x1={-4} y1={2} x2={4} y2={2} seed={seed} weight={weight} />
+			<Shape
+				points={[
+					{ x: -4, y: 2 },
+					{ x: -7, y: 7 },
+					{ x: -5, y: 13 },
+					{ x: 0, y: 14.5 },
+					{ x: 5, y: 13 },
+					{ x: 7, y: 7 },
+					{ x: 4, y: 2 },
+				]}
+				seed={seed}
+				weight={weight}
+				close={false}
 			/>
 		</g>
 	);
@@ -205,26 +216,12 @@ export function Lens({
 	transform,
 	className,
 	weight = WEIGHT_SPARE,
+	seed = 0,
 }: PrimitiveProps) {
 	return (
 		<g data-warli-id={LENS.id} transform={transform} className={className}>
-			<circle
-				cx={0}
-				cy={5.5}
-				r={5}
-				fill="none"
-				stroke={STROKE}
-				strokeWidth={weight}
-			/>
-			<line
-				x1={0}
-				y1={10.5}
-				x2={0}
-				y2={17}
-				stroke={STROKE}
-				strokeWidth={weight}
-				strokeLinecap="round"
-			/>
+			<Disc cx={0} cy={5.5} r={5} seed={seed} weight={weight} />
+			<Run x1={0} y1={10.5} x2={0} y2={17} seed={seed} weight={weight} />
 		</g>
 	);
 }
@@ -247,43 +244,24 @@ export function Scales({
 	transform,
 	className,
 	weight = WEIGHT_SPARE,
+	seed = 0,
 }: PrimitiveProps) {
 	return (
 		<g data-warli-id={SCALES.id} transform={transform} className={className}>
-			<line
-				x1={0}
-				y1={0}
-				x2={0}
-				y2={3}
-				stroke={STROKE}
-				strokeWidth={weight}
-				strokeLinecap="round"
-			/>
-			<line
-				x1={-9}
-				y1={3}
-				x2={9}
-				y2={3}
-				stroke={STROKE}
-				strokeWidth={weight}
-				strokeLinecap="round"
-			/>
+			<Run x1={0} y1={0} x2={0} y2={3} seed={seed} weight={weight} />
+			<Run x1={-9} y1={3} x2={9} y2={3} seed={seed} weight={weight} />
 			{[-9, 9].map((x) => (
 				<g key={x}>
-					<line
-						x1={x}
-						y1={3}
-						x2={x}
-						y2={8}
-						stroke={STROKE}
-						strokeWidth={weight}
-					/>
-					<polyline
-						points={`${x - 4},8 ${x},13 ${x + 4},8`}
-						fill="none"
-						stroke={STROKE}
-						strokeWidth={weight}
-						strokeLinejoin="round"
+					<Run x1={x} y1={3} x2={x} y2={8} seed={seed} weight={weight} />
+					<Shape
+						points={[
+							{ x: x - 4, y: 8 },
+							{ x, y: 13 },
+							{ x: x + 4, y: 8 },
+						]}
+						seed={seed + x}
+						weight={weight}
+						close={false}
 					/>
 				</g>
 			))}
@@ -302,24 +280,21 @@ export function Sickle({
 	transform,
 	className,
 	weight = WEIGHT_SPARE,
+	seed = 0,
 }: PrimitiveProps) {
 	return (
 		<g data-warli-id={SICKLE.id} transform={transform} className={className}>
-			<line
-				x1={0}
-				y1={0}
-				x2={0}
-				y2={6}
-				stroke={STROKE}
-				strokeWidth={weight}
-				strokeLinecap="round"
-			/>
-			<path
-				d="M 0 6 C 10 6, 13 10, 10 15"
-				fill="none"
-				stroke={STROKE}
-				strokeWidth={weight}
-				strokeLinecap="round"
+			<Run x1={0} y1={0} x2={0} y2={6} seed={seed} weight={weight} />
+			<Shape
+				points={[
+					{ x: 0, y: 6 },
+					{ x: 7, y: 6.5 },
+					{ x: 12, y: 10 },
+					{ x: 10, y: 15 },
+				]}
+				seed={seed}
+				weight={weight}
+				close={false}
 			/>
 		</g>
 	);
@@ -336,19 +311,12 @@ export function Staff({
 	transform,
 	className,
 	weight = WEIGHT_SPARE,
+	seed = 0,
 }: PrimitiveProps) {
 	return (
 		<g data-warli-id={STAFF.id} transform={transform} className={className}>
-			<line
-				x1={0}
-				y1={-11}
-				x2={0}
-				y2={18}
-				stroke={STROKE}
-				strokeWidth={weight}
-				strokeLinecap="round"
-			/>
-			<circle cx={0} cy={-13} r={2.4} fill={STROKE} />
+			<Run x1={0} y1={-11} x2={0} y2={18} seed={seed} weight={weight} />
+			<Dab cx={0} cy={-13} r={2.4} />
 		</g>
 	);
 }
@@ -364,37 +332,32 @@ export function Loom({
 	transform,
 	className,
 	weight = WEIGHT_SPARE,
+	seed = 0,
 }: PrimitiveProps) {
 	return (
 		<g data-warli-id={LOOM.id} transform={transform} className={className}>
-			<rect
-				x={-8}
-				y={1}
-				width={16}
-				height={15}
-				fill="none"
-				stroke={STROKE}
-				strokeWidth={weight}
+			<Shape
+				points={[
+					{ x: -8, y: 1 },
+					{ x: 8, y: 1 },
+					{ x: 8, y: 16 },
+					{ x: -8, y: 16 },
+				]}
+				seed={seed}
+				weight={weight}
 			/>
 			{[-4.5, -1.5, 1.5, 4.5].map((x) => (
-				<line
+				<Run
 					key={x}
 					x1={x}
 					y1={1}
 					x2={x}
 					y2={16}
-					stroke={STROKE}
-					strokeWidth={weight * 0.7}
+					seed={seed}
+					weight={weight * 0.7}
 				/>
 			))}
-			<line
-				x1={-8}
-				y1={9.5}
-				x2={8}
-				y2={9.5}
-				stroke={STROKE}
-				strokeWidth={weight}
-			/>
+			<Run x1={-8} y1={9.5} x2={8} y2={9.5} seed={seed} weight={weight} />
 		</g>
 	);
 }
@@ -410,29 +373,14 @@ export function Post({
 	transform,
 	className,
 	weight = WEIGHT_SPARE,
+	seed = 0,
 }: PrimitiveProps) {
 	return (
 		<g data-warli-id={POST.id} transform={transform} className={className}>
-			<line
-				x1={0}
-				y1={0}
-				x2={0}
-				y2={20}
-				stroke={STROKE}
-				strokeWidth={weight}
-				strokeLinecap="round"
-			/>
-			<line
-				x1={-7}
-				y1={4}
-				x2={7}
-				y2={4}
-				stroke={STROKE}
-				strokeWidth={weight}
-				strokeLinecap="round"
-			/>
-			<line x1={0} y1={4} x2={-5} y2={9} stroke={STROKE} strokeWidth={weight} />
-			<line x1={0} y1={4} x2={5} y2={9} stroke={STROKE} strokeWidth={weight} />
+			<Run x1={0} y1={0} x2={0} y2={20} seed={seed} weight={weight} />
+			<Run x1={-7} y1={4} x2={7} y2={4} seed={seed} weight={weight} />
+			<Run x1={0} y1={4} x2={-5} y2={9} seed={seed} weight={weight} />
+			<Run x1={0} y1={4} x2={5} y2={9} seed={seed} weight={weight} />
 		</g>
 	);
 }
@@ -447,7 +395,7 @@ export const TARPA: PrimitiveSpec = {
  * The wind instrument the circle dance is named for: a gourd resonator with a
  * pipe leading to a flared bell.
  *
- * It is the one prop that is also a `field`-scale motif in its own right, and it
+ * It is the one prop that is also a field-scale motif in its own right, and it
  * is the reason the musician stands where it does — the dance forms AROUND the
  * player, so the instrument is the only object here that the ring is arranged
  * with respect to rather than merely carrying.
@@ -456,42 +404,23 @@ export function Tarpa({
 	transform,
 	className,
 	weight = WEIGHT_SPARE,
+	seed = 0,
 }: PrimitiveProps) {
 	return (
 		<g data-warli-id={TARPA.id} transform={transform} className={className}>
-			<circle
-				cx={0}
-				cy={2}
-				r={5.5}
-				fill="none"
-				stroke={STROKE}
-				strokeWidth={weight}
+			<Disc cx={0} cy={2} r={5.5} seed={seed} weight={weight} />
+			<Run x1={3} y1={6} x2={9} y2={14} seed={seed} weight={weight} />
+			<Shape
+				points={[
+					{ x: 6, y: 17 },
+					{ x: 9, y: 14 },
+					{ x: 14, y: 16 },
+				]}
+				seed={seed}
+				weight={weight}
+				close={false}
 			/>
-			<line
-				x1={3}
-				y1={6}
-				x2={9}
-				y2={14}
-				stroke={STROKE}
-				strokeWidth={weight}
-				strokeLinecap="round"
-			/>
-			<polyline
-				points="6,17 9,14 14,16"
-				fill="none"
-				stroke={STROKE}
-				strokeWidth={weight}
-				strokeLinejoin="round"
-			/>
-			<line
-				x1={0}
-				y1={-3.5}
-				x2={0}
-				y2={0}
-				stroke={STROKE}
-				strokeWidth={weight}
-				strokeLinecap="round"
-			/>
+			<Run x1={0} y1={-3.5} x2={0} y2={0} seed={seed} weight={weight} />
 		</g>
 	);
 }

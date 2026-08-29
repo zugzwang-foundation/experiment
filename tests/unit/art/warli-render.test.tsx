@@ -313,20 +313,41 @@ describe("warli hero — the registers", () => {
 			const arms = node?.querySelector(
 				'[data-warli-arms="straight"], [data-warli-arms="bent"]',
 			);
-			const lines = [...(arms?.querySelectorAll("line") ?? [])];
-			if (lines.length === 0) {
+			// ⚠ READS A `<path>`, NOT A `<line>`, SINCE WARLI-2 SLICE 2. Every
+			// straight run in this layer is now a bowed quadratic
+			// (`primitives/wobble.ts`), so the arm is `M x1 y1 Q cx cy x2 y2` and
+			// there is no `x2` attribute left to read.
+			//
+			// ⛔ THE ASSERTION IS NOT WEAKENED BY THAT, AND IT MATTERS THAT IT IS NOT:
+			// the wobble was built to move the MIDDLE of a segment and never its
+			// endpoints, precisely so this guard keeps meaning what it meant. The
+			// last coordinate pair of the `d` string is the same number the old `x2`
+			// carried, exactly — not approximately — and if a later change ever bows
+			// an endpoint, this reads the moved one and reds. Loosening it to a
+			// tolerance would have hidden the one defect it exists to catch.
+			const runs = [...(arms?.querySelectorAll("path") ?? [])];
+			if (runs.length === 0) {
 				throw new Error(`${spec.id} drew no arms`);
 			}
 			const k = spec.pose.scale ?? 1;
 			// The hand is the far end of the LAST segment of each arm: one segment
 			// per arm when straight, two when bent through an elbow.
-			const perArm = lines.length / 2;
-			const leftHand = lines[perArm - 1];
-			const rightHand = lines[lines.length - 1];
-			const drawn = (line: Element | undefined) => ({
-				x: Number(line?.getAttribute("x2")) * k,
-				y: Number(line?.getAttribute("y2")) * k,
-			});
+			const perArm = runs.length / 2;
+			const leftHand = runs[perArm - 1];
+			const rightHand = runs[runs.length - 1];
+			const endpointOf = (run: Element | undefined) => {
+				const nums = (run?.getAttribute("d") ?? "")
+					.match(/-?\d+(?:\.\d+)?/g)
+					?.map(Number);
+				if (nums === undefined || nums.length < 2) {
+					throw new Error(`${spec.id}: unparsable arm path`);
+				}
+				return {
+					x: (nums[nums.length - 2] as number) * k,
+					y: (nums[nums.length - 1] as number) * k,
+				};
+			};
+			const drawn = endpointOf;
 
 			expect(drawn(leftHand).x).toBeCloseTo(spec.handLeft.x, 6);
 			expect(drawn(leftHand).y).toBeCloseTo(spec.handLeft.y, 6);
