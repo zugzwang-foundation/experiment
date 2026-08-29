@@ -10,6 +10,7 @@ import {
 } from "./geometry";
 import {
 	Bird,
+	bowedCircle,
 	Chauk,
 	CombBorderSegment,
 	Deer,
@@ -203,13 +204,22 @@ export function Ring({
 		<g data-warli-ring={name} data-warli-density={density}>
 			{dense ? (
 				<g data-warli-ring-ground="">
-					<circle
-						cx={centre.x}
-						cy={centre.y}
-						r={radius}
+					{/* ⚠ A BOWED PATH, NOT A `<circle>`. This is the single longest
+					    continuous mark in the composition — about 2,073 units of arc —
+					    and it was the one thing slice 2 missed: a machine-true circle
+					    running behind fifty hand-drawn figures. `stroke.tsx` argues the
+					    verbs exist so a mark CANNOT forget to be hand-drawn; this was
+					    drawn without them. Sampled densely, because at this radius a
+					    coarse polygon would read as a polygon. */}
+					<path
+						d={bowedCircle(centre.x, centre.y, radius, 4_099, {
+							samples: 96,
+							amplitude: 1.4,
+						})}
 						fill="none"
 						stroke="currentColor"
 						strokeWidth={WEIGHT_DENSE}
+						strokeLinejoin="round"
 					/>
 					{fieldAngles.map((angle) => {
 						const at = pointOnRing(centre, radius, angle);

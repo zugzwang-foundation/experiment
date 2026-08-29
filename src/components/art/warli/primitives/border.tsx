@@ -67,7 +67,9 @@ function scallopPoints(
 	baseline: number,
 	facing: 1 | -1,
 ): WobblePoint[] {
-	const bumps = Math.max(1, Math.round(length / (radius * 2)));
+	// `radius === 0` makes this `Infinity` and the loop below never returns. The
+	// sole call site passes 4.5; the clamp keeps that a property of the code.
+	const bumps = Math.max(1, Math.round(length / (Math.max(0.5, radius) * 2)));
 	const span = length / bumps;
 	const points: WobblePoint[] = [{ x: 0, y: baseline }];
 	for (let i = 0; i < bumps; i++) {
@@ -194,8 +196,16 @@ export function BorderBand({
 
 			{/* 5 · the scalloped lip, facing the picture */}
 			<g data-warli-border-row="scallop">
+				{/* ⚠ BASELINE 21.5, NOT 26, BECAUSE THE BUMPS RISE INWARD FROM IT.
+				    `scallopPoints(…, radius 4.5, baseline b, facing −1)` peaks at
+				    `b + 4.5`, so a baseline equal to BORDER_DEPTH put the lip 4.5
+				    units PAST the depth this file declares — plus half a stroke, a
+				    true drawn depth of 31.3 against a declared 26. Everything that
+				    reserves space against `BORDER_DEPTH` was reserving against a
+				    number the border did not honour. Setting the baseline so the
+				    PEAK lands on 26 makes the constant true rather than aspirational. */}
 				<Shape
-					points={scallopPoints(length, 4.5, 26, -1)}
+					points={scallopPoints(length, 4.5, BORDER_DEPTH - 4.5, -1)}
 					seed={seed + 11}
 					weight={weight}
 					close={false}
@@ -217,8 +227,14 @@ export function BorderBand({
  *   bottom · translate(W H)         rotate(180)  → (t,d) ↦ (W−t, H−d)
  *   left   · translate(0 H)         rotate(270)  → (t,d) ↦ (d, H−t)
  *
- * Each maps depth `d` to the inward direction for its own edge, which is what
- * makes the four bands meet at the corners instead of crossing through them.
+ * Each maps depth `d` to the inward direction for its own edge.
+ *
+ * ⚠ THEY OVERLAP AT THE CORNERS RATHER THAN MEETING, and this sentence used to
+ * claim otherwise. Top spans x∈[0,W]×y∈[0,26] and right spans x∈[W−26,W]×y∈[0,H],
+ * so each corner is inked twice, in a 26 × 26 square. The OUTCOME is good — a
+ * double-inked corner reads as woven, which is what a real border does where two
+ * runs cross — but a docblock that names a mechanism the code does not implement
+ * is how the next reader debugs the wrong thing.
  * Each edge also takes its own seed, so the same band drawn four times is four
  * different hands rather than one stamp rotated — a rotated stamp is visible at
  * the corners, where the identical wobble appears twice at ninety degrees.

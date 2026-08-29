@@ -191,6 +191,17 @@ function figure(
 	};
 }
 
+/** The `i`th face, or a loud failure rather than a silent `undefined`. */
+function faceAt(i: number): FaceSet {
+	const set = FACE_SETS[i];
+	if (set === undefined) {
+		throw new Error(
+			`WARLI: no face at index ${i} — FACE_SETS holds ${FACE_SETS.length}`,
+		);
+	}
+	return set;
+}
+
 const faced = (
 	id: string,
 	label: string,
@@ -205,7 +216,12 @@ const faced = (
 		prop,
 		seed,
 		{ ...pose, scale: (pose.scale ?? 1) * FACED_SCALE },
-		FACE_SETS[i] as FaceSet,
+		// ⚠ CHECKED, NOT CAST. `FACE_SETS` holds exactly eight entries and the ring
+		// takes exactly eight, so `as FaceSet` held — until a ninth faced figure,
+		// where it would hand `undefined` to a component that dereferences
+		// `set.brow` and throw at RENDER time, far from the array that caused it.
+		// AGENTS.md §4 allows `as` at trust boundaries; a local index is not one.
+		faceAt(i),
 	);
 
 /**

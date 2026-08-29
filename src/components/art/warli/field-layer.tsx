@@ -38,12 +38,10 @@ import {
 	Winnow,
 } from "./primitives";
 import {
+	buildFieldScene,
 	FRAME,
 	type GroundMark,
 	type PlacedMotif,
-	placeFieldFigures,
-	placeGroundMarks,
-	placeMotifs,
 } from "./scene";
 
 /**
@@ -66,8 +64,18 @@ import {
  * are the things that are standing still.
  */
 
-/** How many of each population the composition carries. */
-export const FIELD_FIGURE_COUNT = 28;
+/**
+ * How many of each population the composition carries.
+ *
+ * ⚠ THE FIGURE COUNT IS DERIVED, NEVER WRITTEN DOWN. A literal here can exceed
+ * the roster, and the failure is silent and expensive: `placeFieldFigures` would
+ * happily place forty points and push all forty into the shared occupancy list —
+ * blocking that much ground against motifs — while `FIELD_FIGURES[i]` returns
+ * `undefined` past index 27, so the surplus render as `null` and the DOM count
+ * still reads 28. Phantom occupancy, correct-looking output, nothing red.
+ * Deriving it from the roster makes the over-count unrepresentable.
+ */
+export const FIELD_FIGURE_COUNT = FIELD_FIGURES.length;
 export const MOTIF_COUNT = 104;
 export const GROUND_MARK_COUNT = 330;
 
@@ -174,13 +182,16 @@ function Ground({ mark }: { readonly mark: GroundMark }) {
  * than be overlapped by it, or the frame stops reading as a frame.
  */
 export function FieldLayer() {
-	// One shared occupancy list, threaded through both placements in order, so
-	// motifs cannot land on top of figures. Placing them independently and hoping
-	// is how a hundred items produce a dozen collisions.
-	const taken: Array<{ x: number; y: number; r: number }> = [];
-	const figures = placeFieldFigures(FIELD_FIGURE_COUNT, taken);
-	const motifs = placeMotifs(MOTIF_COUNT, taken);
-	const ground = placeGroundMarks(GROUND_MARK_COUNT);
+	// ⚠ BUILT THROUGH `buildFieldScene`, NOT ASSEMBLED HERE. The occupancy list
+	// used to be threaded at this call site, which meant the guard could thread it
+	// correctly while the component quietly stopped — dropping 29 of 104 motifs on
+	// top of figures with nothing red. The shared builder is what makes the guard
+	// and the drawing the same scene rather than two scenes that happen to agree.
+	const { figures, motifs, ground } = buildFieldScene({
+		figures: FIELD_FIGURE_COUNT,
+		motifs: MOTIF_COUNT,
+		ground: GROUND_MARK_COUNT,
+	});
 
 	return (
 		<g data-warli-field-layer="">

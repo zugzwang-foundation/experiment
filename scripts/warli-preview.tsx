@@ -92,11 +92,23 @@ const art = renderToStaticMarkup(<WarliHero />);
  * Cheaper than narrowing the type, and it stays correct if the labels ever come
  * from somewhere else.
  *
- * ⚠ THE RULE IS "EVERYTHING RAW-INTERPOLATED HERE IS ESCAPED", not "only the
- * unconstrained ones". `density` and `prop` are closed unions and do not need it.
- * Escaping the `string` and not the unions would leave a reader deriving which
- * values are constrained on every future edit — and getting that derivation
- * wrong once is the whole bug. A uniform rule is greppable; a clever one is not.
+ * ⚠ THE RULE IS "EVERY STRING-TYPED VALUE INTERPOLATED INTO HTML HERE IS
+ * ESCAPED", not "only the unconstrained ones". `density`, `prop` and `kind` are
+ * closed unions or module data and would survive unescaped; escaping the plain
+ * `string` and not them would leave a reader re-deriving which values are
+ * constrained on every future edit, and getting that derivation wrong once is
+ * the whole bug. A uniform rule is greppable; a clever one is not.
+ *
+ * ⛔ AND THE RULE IS NOT "EVERYTHING", WHICH IS WHAT THIS SENTENCE USED TO SAY.
+ * It is false in the direction that misleads. Roughly two dozen interpolations
+ * here are NUMBERS and are correctly unescaped — and two of those
+ * (`${VIEW_WIDTH}`, `${VIEW_HEIGHT}`) sit inside the `<script>` block, where
+ * `esc()` would be the WRONG tool: it is an HTML-entity escaper, and `&amp;` is
+ * literal text in JavaScript, not an escape. What keeps those two safe is that
+ * they are `export const` numeric literals, which TypeScript pins at literal
+ * type — a compile-time guarantee, not an escaping one. A reader who believed
+ * the old sentence would either break them by "fixing" them, or add a new
+ * script-context string believing it was covered.
  */
 const esc = (value: string): string =>
 	value.replace(

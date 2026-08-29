@@ -43,8 +43,20 @@ export const RING_CLEAR = 478;
 /** The border stack's depth. Nothing but border may cross into it. */
 export const BORDER_INSET = 26;
 
-/** A figure's footprint, as a radius about its feet. Generous on purpose. */
-const FIGURE_RADIUS = 34;
+/**
+ * A field figure's true ink extent about its FEET.
+ *
+ * `up` is 58 body-units at the largest scale the placer hands out (1.08), plus a
+ * little for a raised hand and the head's own radius. `down` is small: almost
+ * nothing is drawn below the feet but the dotted ground.
+ */
+const FIGURE_EXTENT: Extent = { side: 26, up: 66, down: 8 };
+
+/** A motif's extent. Symmetric enough that one number serves, unlike a figure. */
+const MOTIF_EXTENT: Extent = { side: 20, up: 40, down: 6 };
+
+/** A ground mark is a small centred smudge. */
+const GROUND_EXTENT: Extent = { side: 14, up: 14, down: 14 };
 
 /**
  * The density meridian: 1 at the left edge, 0 at the right.
@@ -84,17 +96,53 @@ export type PlacedMotif = {
 	readonly seed: number;
 };
 
-/** Is this point inside the frame, clear of the border and clear of the rings? */
-function admissible(x: number, y: number, radius: number): boolean {
+/**
+ * How far a placed item's INK reaches from its anchor point.
+ *
+ * ⚠ THIS IS NOT A RADIUS, AND MODELLING IT AS ONE WAS A REAL DEFECT. A figure is
+ * anchored at its FEET and drawn upward from them: 58 body-units tall, scaled up
+ * to ~1.08, so its ink reaches about 62 units ABOVE the anchor and only a few
+ * below. Treating that as a 34-unit disc understated the upward extent by nearly
+ * a factor of two and got the asymmetry backwards.
+ *
+ * Measured consequences before the fix, both of them exactly the collisions the
+ * two constants below exist to prevent: **two of twenty-eight field figures had
+ * ink inside the counter-rotating crowd's annulus** (nearest ink at r = 450.1
+ * against an outer ring whose figures sweep inward to 412) and **three had head
+ * crowns inside the border band** (y = 13.75, 13.95, 22.20 against a 26-unit
+ * reserve). Both were invisible: every guard measured the ANCHOR, which sat
+ * comfortably clear at r = 492.7. That is CLAUDE.md §5.14 SC-1 transposed onto
+ * geometry — assert the ink's absence, not the anchor's.
+ */
+type Extent = {
+	readonly side: number;
+	readonly up: number;
+	readonly down: number;
+};
+
+/** Is this item's INK inside the frame, clear of the border and of the rings? */
+function admissible(x: number, y: number, extent: Extent): boolean {
 	if (
-		x - radius < BORDER_INSET ||
-		x + radius > FRAME.width - BORDER_INSET ||
-		y - radius < BORDER_INSET ||
-		y + radius > FRAME.height - BORDER_INSET
+		x - extent.side < BORDER_INSET ||
+		x + extent.side > FRAME.width - BORDER_INSET ||
+		y - extent.up < BORDER_INSET ||
+		y + extent.down > FRAME.height - BORDER_INSET
 	) {
 		return false;
 	}
-	return Math.hypot(x - CENTRE.x, y - CENTRE.y) > RING_CLEAR + radius * 0.35;
+	// Every corner of the item's own box has to clear the ring, not just its
+	// anchor. The crown is the far corner for a figure, and the crown is what the
+	// crowd walks through.
+	const corners = [
+		{ x: x - extent.side, y: y - extent.up },
+		{ x: x + extent.side, y: y - extent.up },
+		{ x: x - extent.side, y: y + extent.down },
+		{ x: x + extent.side, y: y + extent.down },
+		{ x, y },
+	];
+	return corners.every(
+		(c) => Math.hypot(c.x - CENTRE.x, c.y - CENTRE.y) > RING_CLEAR,
+	);
 }
 
 /**
@@ -151,7 +199,7 @@ function* candidates(salt: number): Generator<{ x: number; y: number }> {
  */
 function placeGreedy(
 	count: number,
-	radius: number,
+	extent: Extent,
 	spacingDense: number,
 	spacingOpen: number,
 	salt: number,
@@ -162,7 +210,7 @@ function placeGreedy(
 		if (out.length >= count) {
 			break;
 		}
-		if (!admissible(point.x, point.y, radius)) {
+		if (!admissible(point.x, point.y, extent)) {
 			continue;
 		}
 		const spacing =
@@ -174,7 +222,7 @@ function placeGreedy(
 			continue;
 		}
 		out.push(point);
-		taken.push({ x: point.x, y: point.y, r: radius });
+		taken.push({ x: point.x, y: point.y, r: extent.side });
 	}
 	return out;
 }
@@ -194,7 +242,7 @@ export function placeFieldFigures(
 	count: number,
 	taken: Array<{ x: number; y: number; r: number }> = [],
 ): readonly PlacedFigure[] {
-	const points = placeGreedy(count, FIGURE_RADIUS, 58, 88, 1_009, taken);
+	const points = placeGreedy(count, FIGURE_EXTENT, 58, 88, 1_009, taken);
 	return points.map((p, index) => {
 		const mirror: 1 | -1 = p.x <= CENTRE.x ? 1 : -1;
 		return {
@@ -265,7 +313,7 @@ export function placeMotifs(
 	count: number,
 	taken: Array<{ x: number; y: number; r: number }> = [],
 ): readonly PlacedMotif[] {
-	const points = placeGreedy(count, 17, 21, 34, 7_919, taken);
+	const points = placeGreedy(count, MOTIF_EXTENT, 21, 34, 7_919, taken);
 	return points.map((p, index) => ({
 		index,
 		kind: pick(SCENE_MOTIFS, index * 31 + 5),
@@ -307,7 +355,7 @@ export function placeGroundMarks(count: number): readonly GroundMark[] {
 			break;
 		}
 		index++;
-		if (!admissible(point.x, point.y, 12)) {
+		if (!admissible(point.x, point.y, GROUND_EXTENT)) {
 			continue;
 		}
 		// The meridian as a straight accept test. Ground marks are the one
@@ -338,6 +386,92 @@ export function placeGroundMarks(count: number): readonly GroundMark[] {
 		});
 	}
 	return out;
+}
+
+/**
+ * The ground marks' ACCEPTANCE RATE per column, measured on the same candidate
+ * stream that produced them.
+ *
+ * ⚠ THIS REPLACES A NORMALISED PROXY THAT WAS OVER-FITTED TO THE SCAN SEED, and
+ * the review that caught it did so by reseeding rather than by reading. Binning
+ * placed marks by x and dividing by a SEPARATELY-sampled estimate of admissible
+ * area gave four buckets whose middle two carried about 5 % of the ink each —
+ * fifteen to twenty marks — so a change of two motifs flipped the verdict.
+ * Changing the lattice stride from 439 to 443, which touches no meridian
+ * coefficient at all, reddened the guard. A guard that a pure reordering can
+ * flip is measuring the seed, not the gradient.
+ *
+ * This asks the engine's own question instead: **of the candidates admissible in
+ * this column, what fraction did the meridian accept?** Numerator and
+ * denominator come from ONE walk of ONE stream, so there is no sampling mismatch
+ * to average out, and the answer is a property of `meridian()` and its
+ * coefficients rather than of the order the lattice happened to be visited in.
+ */
+export function groundAcceptanceByColumn(
+	columns: number,
+): readonly { readonly admissible: number; readonly accepted: number }[] {
+	const out = Array.from({ length: columns }, () => ({
+		admissible: 0,
+		accepted: 0,
+	}));
+	let index = 0;
+	for (const point of candidates(3_331)) {
+		index++;
+		if (!admissible(point.x, point.y, GROUND_EXTENT)) {
+			continue;
+		}
+		const col = Math.min(
+			columns - 1,
+			Math.max(0, Math.floor((point.x / FRAME.width) * columns)),
+		);
+		const bucket = out[col];
+		if (bucket === undefined) {
+			continue;
+		}
+		bucket.admissible++;
+		if (hash01(index * 97 + 13) <= meridian(point.x) * 0.42 + 0.48) {
+			bucket.accepted++;
+		}
+	}
+	return out;
+}
+
+/**
+ * The whole static population, built once.
+ *
+ * ⚠ THIS EXISTS SO THE GUARD AND THE COMPONENT CANNOT DISAGREE, and it was added
+ * because they did. The composition guard used to re-derive its own scene from
+ * literal counts, which meant the entire motif layer, the entire ground layer and
+ * the whole border could be deleted from the render while every assertion stayed
+ * green — the guard was grading a scene the component was under no obligation to
+ * draw. It also meant the occupancy list could stop being threaded in the
+ * component (dropping 29 of 104 motifs on top of figures) while the test, which
+ * threaded it correctly, saw nothing.
+ *
+ * The test's own docblock had already named this failure — "a guard on the
+ * composition has to build the composition the same way the component does, or it
+ * is grading its own homework with a different question paper" — and then
+ * committed it with the counts. One builder is the fix that makes the sentence
+ * structurally true instead of aspirational.
+ */
+export function buildFieldScene(counts: {
+	readonly figures: number;
+	readonly motifs: number;
+	readonly ground: number;
+}): {
+	readonly figures: readonly PlacedFigure[];
+	readonly motifs: readonly PlacedMotif[];
+	readonly ground: readonly GroundMark[];
+} {
+	// ⚠ ORDER AND SHARED OCCUPANCY ARE BOTH LOAD-BEARING. Figures claim their
+	// ground first; motifs are then placed against a list that already contains
+	// them. Placing the two independently and hoping is how a hundred items
+	// produce a few dozen collisions.
+	const taken: Array<{ x: number; y: number; r: number }> = [];
+	const figures = placeFieldFigures(counts.figures, taken);
+	const motifs = placeMotifs(counts.motifs, taken);
+	const ground = placeGroundMarks(counts.ground);
+	return { figures, motifs, ground };
 }
 
 /**
@@ -387,7 +521,7 @@ export function inkByColumn(
 export function admissibleByColumn(columns: number): readonly number[] {
 	const out = new Array<number>(columns).fill(0);
 	for (const point of candidates(0)) {
-		if (!admissible(point.x, point.y, 12)) {
+		if (!admissible(point.x, point.y, GROUND_EXTENT)) {
 			continue;
 		}
 		const col = Math.min(

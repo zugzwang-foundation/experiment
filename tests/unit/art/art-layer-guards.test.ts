@@ -212,12 +212,23 @@ describe("art layer — the injection sinks stay shut", () => {
 		// POSITIVE CONTROL: the escaped forms are present, so the search works.
 		expect(gen).toContain("${esc(spec.label)}");
 		expect(gen).toContain("${esc(density)}");
+		expect(gen).toContain("${esc(kind)}");
 
 		// …and the unescaped forms are absent. `spec.label` is typed plain
 		// `string`; the other two are closed unions and are escaped anyway, so the
 		// rule is uniform and greppable rather than requiring the reader to
 		// re-derive which values happen to be constrained.
-		for (const raw of ["${spec.label}", "${density}", "${spec.prop}"]) {
+		// ⚠ `${kind}` JOINED THIS LIST AT WARLI-2, and its absence was the exact
+		// coverage-by-habit this test exists to end. `kind` comes from
+		// `SCENE_MOTIFS: readonly string[]` — plain `string`, the SAME trust level
+		// as `spec.label`, which the list already covered. Dropping its `esc()`
+		// passed the guard green.
+		for (const raw of [
+			"${spec.label}",
+			"${density}",
+			"${spec.prop}",
+			"${kind}",
+		]) {
 			expect(gen).not.toContain(raw);
 		}
 

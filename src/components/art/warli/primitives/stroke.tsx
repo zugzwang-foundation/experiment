@@ -95,10 +95,21 @@ export function Shape({
 }) {
 	return (
 		<path
-			d={bowedPath(points, seed, {
-				close,
-				...(amplitude === undefined ? {} : { amplitude }),
-			})}
+			// ⚠ THE FIRST POINT IS FOLDED INTO THE SEED, exactly as `Run` and `Disc`
+			// fold their coordinates. Without it, `Shape` was the one verb whose
+			// wobble depended on the seed ALONE — so two shapes handed the same seed
+			// in different places bowed identically, which is the shear `wobble.ts`
+			// documents `seedFrom` as existing to prevent. Nothing was visibly broken,
+			// because all 45 call sites do pass a seed; the asymmetry was undocumented
+			// and would have bitten the first caller who reused one.
+			d={bowedPath(
+				points,
+				seedFrom(seed, points[0]?.x ?? 0, points[0]?.y ?? 0),
+				{
+					close,
+					...(amplitude === undefined ? {} : { amplitude }),
+				},
+			)}
 			fill={fill}
 			stroke={STROKE}
 			strokeWidth={weight}

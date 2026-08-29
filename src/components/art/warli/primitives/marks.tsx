@@ -4,7 +4,7 @@ import {
 	WEIGHT_DENSE,
 	WEIGHT_SPARE,
 } from "./types";
-import { bowedCircle, bowedLine, bowedPath, seedFrom } from "./wobble";
+import { bowedCircle, bowedLine, bowedPath, noise, seedFrom } from "./wobble";
 
 /**
  * The non-figurative grammar: the marks that fill a ground, edge a border, or
@@ -126,7 +126,10 @@ export function HatchFill({
 	readonly step?: number;
 }) {
 	const rules: Array<{ readonly y: number; readonly half: number }> = [];
-	for (let t = step; t < height; t += step) {
+	// A non-positive step makes the loop below run forever. No call site passes
+	// one; the clamp is here so that stays true of call sites nobody has written.
+	const rung = Math.max(0.2, step);
+	for (let t = rung; t < height; t += rung) {
 		// `t` is the distance from the APEX, so the triangle's half-width there
 		// is a straight proportion of the distance travelled toward the base.
 		const half = (halfWidth * t) / height;
@@ -282,19 +285,27 @@ export const SPIRAL: PrimitiveSpec = {
 export function Spiral({
 	turns = 2.5,
 	radius = 10,
-	samples = 96,
+	samples = 48,
 	transform,
 	className,
 	weight = WEIGHT_DENSE,
+	seed = 0,
 }: PrimitiveProps & {
 	readonly turns?: number;
 	readonly radius?: number;
 	readonly samples?: number;
 }) {
+	// ⚠ THIS TOOK A `seed` AND THREW IT AWAY. `PrimitiveProps` carries one, every
+	// call site passes one, and nothing here read it — so every placed spiral was
+	// byte-identical apart from scale and mirror, which is the one thing
+	// `scene.ts` insists repeats must not be. It was also the only motif in the
+	// layer drawn machine-true, against `stroke.tsx`'s whole argument that a
+	// vocabulary should make hand-drawn the only available option.
 	const total = Math.PI * 2 * turns;
 	const points = Array.from({ length: samples + 1 }, (_, i) => {
 		const theta = (total * i) / samples;
-		const r = (radius * theta) / total;
+		const wobbleR = 1 + noise(seedFrom(seed, i)) * 0.05;
+		const r = ((radius * theta) / total) * wobbleR;
 		return `${(r * Math.cos(theta)).toFixed(2)},${(r * Math.sin(theta)).toFixed(2)}`;
 	}).join(" ");
 	return (

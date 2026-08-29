@@ -444,7 +444,7 @@ export function Crab({
 					{/* legs drop STEEPLY, so they read as under the shell */}
 					{[0, 1, 2].map((i) => (
 						<Run
-							key={i}
+							key={`leg-${i}`}
 							x1={s * (2 + i * 2)}
 							y1={-4.5}
 							x2={s * (5 + i * 2.4)}

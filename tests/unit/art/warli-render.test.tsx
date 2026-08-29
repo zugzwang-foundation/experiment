@@ -399,10 +399,16 @@ describe("warli hero — the registers", () => {
 			// ⛔ THE ASSERTION IS NOT WEAKENED BY THAT, AND IT MATTERS THAT IT IS NOT:
 			// the wobble was built to move the MIDDLE of a segment and never its
 			// endpoints, precisely so this guard keeps meaning what it meant. The
-			// last coordinate pair of the `d` string is the same number the old `x2`
-			// carried, exactly — not approximately — and if a later change ever bows
-			// an endpoint, this reads the moved one and reds. Loosening it to a
-			// tolerance would have hidden the one defect it exists to catch.
+			// last coordinate pair of the `d` string is the same point the old `x2`
+			// carried.
+			//
+			// ⚠ TO TWO DECIMALS, NOT EXACTLY — this comment claimed "exactly, not
+			// approximately" and that was false. `bowedLine` passes both endpoints
+			// through `q()`, which rounds to 2dp, where the old `<line x2>` carried
+			// the raw float. Guard resolution therefore went from ~5e-7 to 5e-3.
+			// Harmless — every pose coordinate is an integer and survives `q()` — but
+			// the sentence existed precisely to stop the next reader checking, which
+			// makes being wrong about it worse than saying nothing.
 			const runs = [...(arms?.querySelectorAll("path") ?? [])];
 			if (runs.length === 0) {
 				throw new Error(`${spec.id} drew no arms`);
@@ -425,12 +431,11 @@ describe("warli hero — the registers", () => {
 					y: (nums[nums.length - 1] as number) * k,
 				};
 			};
-			const drawn = endpointOf;
 
-			expect(drawn(leftHand).x).toBeCloseTo(spec.handLeft.x, 6);
-			expect(drawn(leftHand).y).toBeCloseTo(spec.handLeft.y, 6);
-			expect(drawn(rightHand).x).toBeCloseTo(spec.handRight.x, 6);
-			expect(drawn(rightHand).y).toBeCloseTo(spec.handRight.y, 6);
+			expect(endpointOf(leftHand).x).toBeCloseTo(spec.handLeft.x, 6);
+			expect(endpointOf(leftHand).y).toBeCloseTo(spec.handLeft.y, 6);
+			expect(endpointOf(rightHand).x).toBeCloseTo(spec.handRight.x, 6);
+			expect(endpointOf(rightHand).y).toBeCloseTo(spec.handRight.y, 6);
 
 			// ⚠ CONSISTENCY IS NOT ENOUGH, and finding that out cost a surviving
 			// mutant. Pre-scaling the pose AND scaling the anchor keeps the two in
@@ -442,10 +447,22 @@ describe("warli hero — the registers", () => {
 			// So: in BODY space every figure reaches the same distance out. That is
 			// the "sixteen bodies, one build" thesis expressed as a number, and it
 			// is what a scale applied in the wrong place destroys.
-			expect(Math.abs(spec.pose.handLeft.x)).toBeGreaterThanOrEqual(HAND_X - 1);
-			expect(Math.abs(spec.pose.handRight.x)).toBeGreaterThanOrEqual(
-				HAND_X - 1,
-			);
+			// ⚠ BOUNDED ON BOTH SIDES SINCE WARLI-2, and the one-sided version was a
+			// guard whose prose claimed more than its assertion — the exact shape this
+			// file's docblock warns about. There was no upper bound anywhere in the
+			// suite, so a pose reaching `handLeft.x = -200` passed this AND the drawn-
+			// endpoint checks above, because both derive from the same `pose`. WARLI-1
+			// could carry that because every pose used exactly ±HAND_X; WARLI-2 adds
+			// STOOP at ±(HAND_X + 1) and keeps SPEAK at HAND_X − 1, so the shipped
+			// spread is 19…21 and the floor had zero headroom. "The same distance" is
+			// now asserted as a BAND rather than merely claimed in a comment.
+			for (const reach of [
+				Math.abs(spec.pose.handLeft.x),
+				Math.abs(spec.pose.handRight.x),
+			]) {
+				expect(reach).toBeGreaterThanOrEqual(HAND_X - 1);
+				expect(reach).toBeLessThanOrEqual(HAND_X + 2);
+			}
 		}
 
 		// And the child's FIGURE-space anchors are exactly the shared reach taken
@@ -679,7 +696,13 @@ describe("warli hero — the registers", () => {
 		const { container } = render(<WarliHero />);
 		const css = container.querySelector("style")?.textContent ?? "";
 		expect(css).toContain("@media (prefers-reduced-motion: reduce)");
-		const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion"));
+		// ⚠ BOUNDED TO THE MEDIA BLOCK. The slice used to run to end-of-string, so a
+		// rule appended AFTER the block could satisfy these from outside the media
+		// query — the guard would report reduced motion honoured by a declaration
+		// that never applies under it. Today the block is last and nothing follows;
+		// that is a fact about today's stylesheet, not a property of the test.
+		const from = css.indexOf("@media (prefers-reduced-motion");
+		const reduced = css.slice(from, css.indexOf("\n}", from));
 		expect(reduced).toContain("animation: none");
 		expect(reduced).toContain("transform: none");
 	});
