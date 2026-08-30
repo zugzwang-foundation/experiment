@@ -929,11 +929,11 @@ curl -sS -D /tmp/h.txt https://staging.zugzwangworld.com/api/health
 
 **Found by** `@security-auditor` at DISCOVERY-COMPLETE Gate C (#311), MEDIUM. **Pre-existing; #311 adds zero queries.**
 
-`proxy.ts:41` sets the edge matcher to `["/admin/:path*"]` **only**, and `src/server/middleware/rate-limit.ts` is applied inside **route handlers**, not around RSC page renders. So `/` — `force-dynamic`, uncached, **~97 sequential DB round-trips** per render (`1 + 12N` at `N = DISCOVERY_GRID_SIZE = 8`) — is reachable by an unauthenticated client **at any rate**, against a Supabase session pooler with a bounded connection budget.
+`proxy.ts:41` sets the edge matcher to `["/admin/:path*"]` **only**, and `src/server/middleware/rate-limit.ts` is applied inside **route handlers**, not around RSC page renders. So `/` — `force-dynamic`, uncached, **~89 sequential DB round-trips** per render (`1 + 11N` at `N = DISCOVERY_GRID_SIZE = 8`) — is reachable by an unauthenticated client **at any rate**, against a Supabase session pooler with a bounded connection budget. ⚠ **Corrected at CHART-2 (2026-08-27): this read `~97` / `1 + 12N`.** CHART-1 moved the pin DOWN by one N — the F-1 drift pool read was folded away — and the machine pin moved with it while this prose did not. The shape of the exposure is unchanged and so is the argument; only the magnitude is smaller.
 
 **Why now.** PERF-1 has just bought this surface back from **35.07 s → 0.692 s p50** and closed the only GO-LIVE BLOCKER. Nothing prevents an attacker from spending that headroom again, and the failure mode is pooler exhaustion, which takes down more than Discovery.
 
-**#311 is not the cause and does not worsen it** — its query count is now mechanically pinned at `1 + 12N` by `tests/server/discovery/round-trip-budget.test.ts`. It is recorded here because the audit surfaced it while reading that surface.
+**#311 is not the cause and does not worsen it** — its query count is mechanically pinned at **`1 + 11N`** by `tests/server/discovery/round-trip-budget.test.ts`, in the case named `discovery::round-trip-count-is-1-plus-11N` (the describe block reads *"Discovery round-trip budget — 1 + 11N (plan §3a, the binding constraint)"*). It is recorded here because the audit surfaced it while reading that surface. ⚠ **Corrected at CHART-2 from `1 + 12N`, and the test name is now cited rather than just the path** — the prose and the pin had drifted apart at CHART-1, and a citation that names the assertion is the one a reader can check in a single grep.
 
 **Upstash is already in the stack** (`@upstash/ratelimit`, ADR-0015), so the primitive exists; what is missing is a limiter on the RSC path. ⚠ Note the ADR-0015 posture — rate-limit fails **OPEN** — so a limiter added here does not become a new availability dependency.
 
@@ -1325,7 +1325,7 @@ the runbook section.
 
 **Carried forward from this closure:**
 - **CHART-NODE-RING** — the W2.6 node primitive that never shipped. Its own row below.
-- **`PD-3-04`** — the overlay's missing accessible summary, a tier-1 conformance gap that only exists *because* tier 1 exists.
+- ~~**`PD-3-04`**~~ — the overlay's missing accessible summary, a tier-1 conformance gap that only exists *because* tier 1 exists. ✅ **DISCHARGED at CHART-1, 2026-08-27**, and struck here rather than left reading as live carried work: the summary now binds on all three modes — collapsed, expanded overlay, and the Discovery hero, which dropped `aria-hidden` when CHART-1 unified it onto the same time-scaled component. `POLISH-register.md`'s row carries the status.
 - Overlay focus management, cross-surface on both overlays → **A11Y.0**, row minted in this same commit.
 
 ⚠ **The lesson worth keeping is not the existence rider — that worked exactly as designed and found the phantom.** It is that the phantom's absence was allowed to stand in for a survey of the sources that were present. **A missing citation is a finding about the citation. It is not yet a finding about the component.**
@@ -2755,6 +2755,28 @@ report from a client.
 **Expected next task.** An idempotency-scoping task. Evidence:
 `src/server/idempotency/cache.ts`; `src/db/schema/bets.ts`; ADR-0015; ADR-0031.
 
+**Disposition at S-7 (2026-08-27) — AMENDED, not discharged.** The conditional trigger fired
+(this is that idempotency-scoping task). Design B (ADR-0044) qualifies the Redis key, the
+durable-receipt read, and the 23505-catch outcome by `user_id` — zero migration, so the two
+Postgres uniques named above stay globally unqualified exactly as this row describes.
+
+Read against the two things this row named separately:
+
+- **The cross-user axis is no longer merely refuted — it is now server-enforced.** A client can
+  no longer address another user's cache slot, receipt, or reservation at all; the property this
+  row worried lived "entirely in code the server does not run" is now also enforced in code the
+  server does run. **This part of D-8 is closed.**
+- **The same-user cross-endpoint (flow) confusion this row named is untouched by S-7 and stays
+  open.** One key reused across `place` and `sell` still resolves to one slot; the second call
+  still meets the fingerprint `mismatch` arm and still returns a 409 pointing at the key rather
+  than at the mixing. Design A (re-qualifying the two uniques) was considered and rejected for
+  S-7's stratum (no live-reachable attack, no migration inside the freeze window) and is recorded
+  in ADR-0044 as the testnet successor — at which point the flow axis should be revisited
+  alongside it, since it touches the same two indexes.
+
+**This row is not closed.** Only the cross-user half of its finding is. The same-user
+cross-endpoint half — and Design A generally — is the next idempotency task's starting point.
+
 ---
 
 ## D-9 — migration prose vs O-5: a superseded R9 sentence sits in two files AGENTS.md §11 forbids editing
@@ -3101,6 +3123,22 @@ explicitly marked "hard date, not a trigger." Today (2026-08-22) is not that dat
 dated-not-triggered row into a table defined around fired triggers would misstate what the
 file's own convention says about it. Nothing in the SEQUENCE table is edited by this session;
 this paragraph only names what a reader tracking sequence should already know.
+
+## CHART-1.A A-1 carry-forward — the uninjected terminal stamp is unobservable, and should be deleted as dead code
+
+**Originating task:** CHART-1.A (PR #425) A-1 — surfaced at Gate C while removing the same shape from `withLiveTail`'s non-`Open` branch, then **corrected by `@code-reviewer` in the same amendment** (see the ⚠ below; the first draft of this row overstated the harm).
+
+**Deferred work.** `buildSeries` (`src/server/debate-view/price-chart.ts`) still applies the decision-#6 terminal stamp on the **uninjected** path — writing the live pool price onto the series' last event's timestamp. On an `Open` market that is exact, because the uninjected path replays the walk in the same read that fetches the price, so the last step IS the event that produced it. On a **non-`Open`** market whose pool moved after its last event it would be a retro-stamp — the shape A-1 removed from `withLiveTail`.
+
+**⚠ CORRECTED — THE HARM THIS ROW FIRST CLAIMED IS NOT REAL.** The first draft said the `.md` export would render a price at an instant it was never true at, "in a file a reader keeps", and named ADR-0025 export bytes as the binding reason to defer. **Both are false.** The export never serializes the price series: `src/server/debate-export/serialize.ts` reads `model.market.{title,description,status,pricing}` and `model.posts`, and `model.priceChart` is referenced **nowhere** under `src/server/debate-export/` (verified by grep, with a positive control confirming the serializer does read other `model.*` fields). The export is the only caller of the uninjected path, and it discards the stamped series. ⇒ **The stamp is unobservable on every production path, and removing it would change zero exported bytes and need no ADR-0025 ruling.**
+
+**Why deferred, restated honestly.** Not because it is risky or gated — because it is **dead code with no observable effect**, and CHART-1.A's scope was the four Gate-C items, not a cleanup sweep of a path nothing reads. It is a one-line deletion whenever `price-chart.ts` is next opened. ⚠ The *reason to bother* is not correctness but the trap it sets: a future caller that takes the uninjected path and DOES render the series would inherit a retro-stamp nobody is watching for, and `loadMarketPriceSeries` — which also calls `buildSeries` and likewise has no production caller — is exactly the shape such a caller would revive.
+
+**Conditional trigger.** The next task that opens `src/server/debate-view/price-chart.ts`, or any task that gives the uninjected path a caller that renders the series.
+
+**Expected next task.** None scheduled. Evidence: `src/server/debate-view/price-chart.ts` (`buildSeries`, and the `args.walk === undefined` conditional above it recording why the injected path declines the same stamp); `src/server/debate-export/serialize.ts` (no `priceChart` reference); `src/app/(public)/m/[slug]/export/route.ts:47` (`loadDebateView(db, { market })`, no `walk`); `src/server/discovery/price-series.ts` (`withLiveTail`, whose non-`Open` branch this is the leftover of).
+
+---
 
 **The `.html` tracker dashboards are operator-local and were not touched here.** If the
 operator's dashboard still shows PERF-1 as blocking, or does not yet reflect PERF-2 / COLD-START

@@ -4,6 +4,7 @@ import { cacheLife, cacheTag } from "next/cache";
 
 import { db } from "@/db";
 import type { Reserves } from "@/server/cpmm/calculate";
+import { getCachedReserveWalk } from "@/server/discovery/cached-series";
 import type { MarketSummary } from "@/server/markets/get-by-slug";
 
 import { type DebateViewModel, loadDebateView } from "./load-debate-view";
@@ -26,9 +27,16 @@ import { type DebateViewModel, loadDebateView } from "./load-debate-view";
  *
  *   - `reserves` is fetched LIVE by the caller (`m/[slug]/page.tsx`, via
  *     `getMarketPricingAndReserves`) and passed in. Every bet — post, reply or
- *     sell — moves the CPMM pool, which changes this key and forces a miss. So
- *     the debate view cannot serve a post that a just-placed bet should have
- *     changed, and the price bar's own figures cannot go stale.
+ *     sell — moves the CPMM pool, so a hit proves the live reserves are
+ *     PROVABLY EQUAL TO A PREVIOUSLY OBSERVED VALUE: the one that generated
+ *     the entry. The price bar's own figures therefore cannot go stale.
+ *     ⚠ That is STRICTLY WEAKER than "no bet has intervened", and the
+ *     difference is real here: the CPMM is fee-less, so a buy-then-sell-back
+ *     of the same shares restores the exact prior 18-dp pair and the key
+ *     matches an entry that predates both bets — which mint comments (INV-1)
+ *     this entry does not carry. Priced fields stay correct (pure functions
+ *     of the matched `reserves`); comments/ranking/totals can lag by one
+ *     cache lifetime. Tracked as ADR-0041 OQ-1, open, not fixed here.
  *   - `market` carries `status`, so a lifecycle transition (Open → Closed →
  *     Resolved) changes the key and auto-misses. No explicit invalidation is
  *     needed for state changes.
@@ -42,10 +50,17 @@ import { type DebateViewModel, loadDebateView } from "./load-debate-view";
  * `pricing = getPrices(reserves)` and `unitToWin = deriveUnitToWin(reserves)`
  * are both PURE functions of `reserves`, and `reserves` is the cache key. The
  * cached values are therefore provably identical to what a live read would
- * return at hit time. (Disclosed at Phase C as a departure from R3's literal
- * "price is never cached" wording — never STALE, which is the property R3
- * protects, but not literally uncached. Awaiting the Gate C ruling; if that
- * ruling goes the other way, this file is where the fix lands.)
+ * return at hit time — a claim about PRICED fields only, and one that holds
+ * under OQ-1 above precisely because it rests on purity, not on the pool
+ * having stayed put. Ratified as R3 v2 in ADR-0041 D-2 — the priced figures
+ * are never STALE, which is the property R3 protects, proven from the
+ * compiled build and Next's own runtime source rather than asserted here.
+ * This is compliance with R3 v2, not an exception to it. (`/m/[slug]/page.tsx` additionally overrides the
+ * rendered `pricing`/`unitToWin` with its own live read of the same
+ * `reserves` this cache is keyed on — ADR-0041 D-2/D-6 — so the page's own
+ * guarantee does not rest on this file's internal computation at all; it is
+ * kept here because the price chart's terminal stamp and other consumers of
+ * `loadDebateView`'s return shape still need it.)
  *
  * ⛔ NOTHING VIEWER-SCOPED MAY ENTER THIS FUNCTION. No session, no `headers()`,
  * no `cookies()`, no `loadViewerMarketContext`. Its output is shared verbatim
@@ -69,8 +84,37 @@ export async function getCachedDebateView(
 	cacheTag(`market:${market.id}`);
 
 	// `reserves` is a KEY INPUT ONLY — deliberately not forwarded. Forwarding it
-	// would change `loadDebateView`'s signature, which this task does not touch.
+	// would change `loadDebateView`'s pricing semantics, which CHART-1 does not
+	// touch (the `walk` argument below is a separate, non-priced addition).
 	void reserves;
 
-	return loadDebateView(db, { market });
+	// CHART-1 — the price chart's HISTORY, on its OWN key.
+	//
+	// ⛔ THIS IS A NESTED CACHE, AND THE NESTING IS THE POINT. This block is
+	// keyed on `(market, reserves)`, so every bet moves the pool, changes the
+	// key, and forces a full miss. Before CHART-1 the three-statement reserve
+	// replay was inside that miss, which meant the chart's history was re-derived
+	// once per bet per reader — the "invalidation coupled to activity performs
+	// worst when load is highest" failure SPEC.1 §9 *Refresh* names by hand.
+	//
+	// `getCachedReserveWalk` is keyed on the market id ALONE, which no bet
+	// touches. So on a miss HERE, the walk can still HIT there, and fifty bets in
+	// thirty seconds cost one derivation instead of fifty. That is the founder's
+	// ruling made mechanical: the graph shows how the market MOVED, and a picture
+	// of the past does not need re-drawing four times a minute.
+	//
+	// ⚠ On an `Open` market the chart's RIGHT EDGE is not floored with it:
+	// `m/[slug]/page.tsx` recomposes the terminal point from its own live pool
+	// read (`withLiveTail`), so the chart cannot disagree with the `PriceBar`
+	// beneath it — the objection §9 raised against exactly this trade, answered
+	// rather than waived.
+	//
+	// ⛔ On every OTHER state the right edge IS floored with the walk, because
+	// `withLiveTail` returns a non-`Open` series untouched (CHART-1.A). That is
+	// deliberate: a frozen market's chart is its event history, and restamping it
+	// with a live price would put that price on a past event's timestamp
+	// (**INV-4**).
+	const walk = await getCachedReserveWalk(market.id);
+
+	return loadDebateView(db, { market, walk });
 }

@@ -6,7 +6,7 @@ import { OnboardingDeck } from "@/components/onboarding/OnboardingDeck";
 import { GlobalHeader } from "@/components/shell/GlobalHeader";
 import { db } from "@/db";
 import { getHeaderBalance } from "@/server/dharma/header-balance";
-import { getHeaderPortfolio } from "@/server/dharma/header-portfolio";
+import { getHeaderPortfolioCached } from "@/server/dharma/header-portfolio";
 import { readStarCount } from "@/server/github/star-count";
 import { pfpUrl } from "@/server/identity-pool/pfp-url";
 import { completeOnboardingDeckAction } from "@/server/onboarding/complete";
@@ -34,7 +34,9 @@ import {
  * `dharma_ledger` row.
  *
  * TWO READS, CONCURRENT, AND DELIBERATELY NOT FUSED. `getHeaderBalance` and
- * `getHeaderPortfolio` are separate modules awaited in ONE `Promise.all`, so
+ * `getHeaderPortfolioCached` (HEADER-PORTFOLIO-CACHE — a Redis cache-aside in
+ * front of the original `getHeaderPortfolio`, `dharma/header-portfolio.ts`)
+ * are separate modules awaited in ONE `Promise.all`, so
  * they cost one round-trip of wall-clock rather than two. The `Promise.all`
  * lives HERE, in the route layer, on purpose (HEADER-PORTFOLIO R6): there is no
  * server-side orchestrating module and no widened entry point. They are not
@@ -95,7 +97,7 @@ export default async function PublicLayout({
 	const [spendable, portfolio] = session?.user?.id
 		? await Promise.all([
 				getHeaderBalance(db, session.user.id),
-				getHeaderPortfolio(db, session.user.id),
+				getHeaderPortfolioCached(db, session.user.id),
 			])
 		: [null, null];
 

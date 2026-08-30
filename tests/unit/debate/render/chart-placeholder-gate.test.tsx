@@ -57,7 +57,7 @@ afterEach(() => {
 });
 
 const detail = (series: PricePoint[]) =>
-	render(<MarketPriceChartHost series={series} nodes={[]} />);
+	render(<MarketPriceChartHost series={series} nodes={[]} isOpen={true} />);
 const hero = (series: PricePoint[]) =>
 	render(<PriceSparkline series={series} size="hero" />);
 
@@ -76,16 +76,36 @@ describe("§5 the env gate — MARKET DETAIL mount", () => {
 		expect(container.innerHTML).toBe("");
 	});
 
-	it("gate::detail-NON-PROD-plus-empty-series-DOES-render-the-placeholder", () => {
-		// The positive control. Without it the assertion above would pass on a
-		// component that never renders a placeholder in any environment.
-		process.env.ZUGZWANG_ENV = "staging";
-		const { container } = detail(EMPTY);
-
-		expect(
-			container.querySelector('[data-testid="market-price-chart-placeholder"]'),
-		).not.toBeNull();
-		expect(container.querySelector("svg")).not.toBeNull();
+	it("gate::detail-EMPTY-series-renders-NOTHING-in-EVERY-env", () => {
+		// ⚠⚠ THIS TEST REVERSED AT THE main→staging MERGE, AND THE REVERSAL IS THE
+		// POINT. It used to assert the opposite — that a NON-prod empty series DOES
+		// render a placeholder — and it was written as the positive control for the
+		// prod assertion above, on the reasoning that "without it the assertion
+		// above would pass on a component that never renders a placeholder in any
+		// environment". CHART-1 on `main` made the component exactly that: the host
+		// now gates on `hasRenderableSeries()` and returns `null` for an empty
+		// series in EVERY environment, and the `market-price-chart-placeholder`
+		// testid exists nowhere in `src/` on `main` (measured). The old control
+		// therefore fired correctly — the behaviour moved out from under it.
+		//
+		// ⛔ THE CONTROL OBLIGATION DOES NOT DISAPPEAR, IT MOVES. What stops the
+		// prod assertion passing vacuously is now
+		// `gate::detail-a-REAL-series-renders-the-REAL-chart-in-EVERY-env` below:
+		// it proves this component renders SOMETHING when there is data, so "renders
+		// nothing" here is a statement about the empty series and not about a
+		// component that never renders at all. Deleting that test re-opens this hole.
+		for (const env of ["prod", "staging", "preview", "unknown"]) {
+			process.env.ZUGZWANG_ENV = env;
+			const { container } = detail(EMPTY);
+			expect(
+				container.querySelector(
+					'[data-testid="market-price-chart-placeholder"]',
+				),
+			).toBeNull();
+			expect(container.querySelector("svg")).toBeNull();
+			expect(container.innerHTML).toBe("");
+			cleanup();
+		}
 	});
 
 	it("gate::detail-a-REAL-series-renders-the-REAL-chart-in-EVERY-env", () => {
@@ -169,11 +189,18 @@ describe("§5 the replicas are deterministic", () => {
 		// the GRAPH family. ⛔ `--color-yes` is the page ground, so a value-copy
 		// would be invisible AND invert the poles — pinned so a later "simplify to
 		// neutral ramp steps" is caught.
+		// ⚠ RETARGETED FROM `EMPTY` TO `REAL` AT THE main→staging MERGE. This drew
+		// the PLACEHOLDER replica, which `main` retired (see the env-gate test
+		// above) — on an empty series there is now nothing to inspect. The token
+		// pin is the half worth keeping and it binds harder on the real chart, so
+		// it moves there rather than being deleted with the placeholder.
 		process.env.ZUGZWANG_ENV = "staging";
-		const { container } = detail(EMPTY);
+		const { container } = detail(REAL);
 		const html = container.innerHTML;
 
-		expect(container.querySelectorAll("polyline")).toHaveLength(2);
+		expect(
+			container.querySelectorAll("polyline").length,
+		).toBeGreaterThanOrEqual(2);
 		expect(html).toContain("var(--graph-yes)");
 		expect(html).toContain("var(--graph-no)");
 		expect(html).not.toContain("var(--color-yes)");

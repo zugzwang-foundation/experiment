@@ -35,7 +35,7 @@ import {
 	type ChartNode,
 	selectChartNodes,
 } from "@/server/debate-view/price-chart";
-import type { ReservePoint } from "@/server/discovery/price-series";
+import type { WireReservePoint } from "@/server/discovery/price-series";
 
 const DEC = (whole: string): string => `${whole}.000000000000000000`;
 
@@ -65,8 +65,13 @@ function post(args: {
 	};
 }
 
-function step(at: string, yes: string, no: string): ReservePoint {
-	return { at: new Date(at), reserves: { yes, no } as Reserves };
+// CHART-1 — the walk crosses a cache boundary as ISO strings rather than
+// `Date`s (see `WireReservePoint`), so this helper hands `at` straight
+// through. The helper is the ONLY line that moved: every assertion below is
+// untouched, because the selector's behaviour did not change — only the shape
+// of the instant it reads.
+function step(at: string, yes: string, no: string): WireReservePoint {
+	return { at, reserves: { yes, no } as Reserves };
 }
 
 const byId = (nodes: ChartNode[], id: string): ChartNode | undefined =>
@@ -77,7 +82,7 @@ const bucketKey = (n: ChartNode): string => `${n.at.slice(0, 10)}|${n.side}`;
 
 // A walk whose steps give clean YES prices: {40,160}→0.8, {160,40}→0.2,
 // {100,100}→0.5. reservesAt picks the last step ≤ at (never interpolates).
-const WALK: ReservePoint[] = [
+const WALK: WireReservePoint[] = [
 	step("2026-09-10T00:00:00.000Z", DEC("100"), DEC("100")), // yes 0.5
 	step("2026-09-10T00:05:00.000Z", DEC("40"), DEC("160")), // yes 0.8
 	step("2026-09-10T00:10:00.000Z", DEC("160"), DEC("40")), // yes 0.2

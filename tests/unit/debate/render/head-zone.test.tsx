@@ -57,7 +57,6 @@ afterEach(cleanup);
  * freeze (that is `debate-view-freeze.test.tsx`'s subject), so they pass a closed,
  * inert pair — present enough to compile, never asserted on here.
  */
-const CRITERION_STUB = { open: false, onOpenChange: () => {} };
 
 const ROOT = process.cwd();
 const VIEW = "src/components/debate/DebateView.tsx";
@@ -178,11 +177,7 @@ describe("HeadZone — the frame itself", () => {
 describe("the arm split — each arm renders through the shared frame", () => {
 	it("head-zone::the-market-arm-renders-through-the-frame", () => {
 		const { container } = render(
-			<MarketHeader
-				criterion={CRITERION_STUB}
-				market={market}
-				priceChart={null}
-			/>,
+			<MarketHeader market={market} priceChart={null} />,
 		);
 
 		const left = container.querySelector('[data-testid="headzone-left"]');
@@ -209,13 +204,8 @@ describe("the arm split — each arm renders through the shared frame", () => {
 	it("head-zone::the-two-arms-are-DISJOINT", () => {
 		// The whole finding in one assertion: the `vm` and `vp` element SETS never
 		// co-render.
-		const marketArm = render(
-			<MarketHeader
-				criterion={CRITERION_STUB}
-				market={market}
-				priceChart={null}
-			/>,
-		).container.innerHTML;
+		const marketArm = render(<MarketHeader market={market} priceChart={null} />)
+			.container.innerHTML;
 		cleanup();
 		const postArm = renderPostArm().container.innerHTML;
 
@@ -247,13 +237,8 @@ describe("the arm split — each arm renders through the shared frame", () => {
 		// ADR-0025's export and the INV-4 read-only marker become market-arm
 		// ONLY — ⛔ never that they are removed. Asserted on both arms so a later
 		// commit cannot quietly drop them while the arm split still passes.
-		const marketArm = render(
-			<MarketHeader
-				criterion={CRITERION_STUB}
-				market={market}
-				priceChart={null}
-			/>,
-		).container.innerHTML;
+		const marketArm = render(<MarketHeader market={market} priceChart={null} />)
+			.container.innerHTML;
 		cleanup();
 		const postArm = renderPostArm().container.innerHTML;
 

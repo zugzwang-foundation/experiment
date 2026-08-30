@@ -20,7 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // (redis / openai / sign-read) are mocked so `precommitModerate` runs FOR REAL
 // and throws ModerationUnavailableError on the terminal OpenAI failure.
 
-const { mockGetSession, mockRedis, mockOpenAiModerate, mockSignRead } =
+const { mockGetSession, mockRedis, mockOpenAiModerate, mockSignReadSingleUse } =
 	vi.hoisted(() => ({
 		mockGetSession: vi.fn(),
 		mockRedis: {
@@ -30,7 +30,7 @@ const { mockGetSession, mockRedis, mockOpenAiModerate, mockSignRead } =
 			eval: vi.fn(),
 		},
 		mockOpenAiModerate: vi.fn(),
-		mockSignRead: vi.fn(),
+		mockSignReadSingleUse: vi.fn(),
 	}));
 
 vi.mock("@sentry/nextjs", () => ({
@@ -69,7 +69,8 @@ vi.mock("@/server/moderation/openai", () => ({
 	moderate: mockOpenAiModerate,
 }));
 vi.mock("@/server/storage/sign-read", () => ({
-	signRead: mockSignRead,
+	signRead: vi.fn(),
+	signReadSingleUse: mockSignReadSingleUse,
 }));
 
 import { POST as placePOST } from "@/app/api/bets/place/route";
@@ -89,7 +90,7 @@ describe("DEBATE.7 moderation — fail-closed writes NO mod_actions row", () => 
 		mockRedis.set.mockReset();
 		mockRedis.del.mockReset();
 		mockOpenAiModerate.mockReset();
-		mockSignRead.mockReset();
+		mockSignReadSingleUse.mockReset();
 	});
 	afterEach(async () => {
 		await truncateTables(testClient, [

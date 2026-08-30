@@ -116,7 +116,32 @@ export function HeadZone({
 			>
 				{left}
 			</div>
-			{right === null ? null : (
+			{/* ⛔⛔ RESO-2 — THE RAIL'S WIDTH IS RESERVED WHEN THE RAIL IS ABSENT, and
+			    this spacer is deliberately NOT the rail. When a market has no
+			    renderable price series the rail does not render (CRIT-1), and the
+			    left column then took the whole band: the block row went 673.73px →
+			    1033.73px and each of the four blocks 162.43px → 252.43px. The blocks
+			    are not entitled to the chart's space, so the reading column keeps the
+			    width it has when the chart is there.
+			    ⚠ IT IS A SEPARATE NODE, NOT A RE-RENDERED `headzone-right`, AND THAT
+			    IS THE WHOLE CARE HERE. Resurrecting the rail would mechanically
+			    revert CRIT-1 — whose fix was that an empty 340px `headzone-right`
+			    must never render (`PD-3-09`) — and would red its two guards
+			    (`a-null-series-drops-the-RAIL-not-just-the-chart`,
+			    `an-EMPTY-series-drops-the-rail-too`). Those rulings stand: there is
+			    still no rail. What exists is a width reservation with no testid, no
+			    border, no background and no children, which is a layout constant
+			    rather than chrome.
+			    ⚠ `aria-hidden` + no content: it is invisible to AT and to find-in-page,
+			    and contributes nothing but a track width.
+			    ⛔ THE CHART COMPONENT AND THE RAIL'S POSITION ARE UNTOUCHED (CHANGE 2)
+			    — when `right` is non-null this branch does not run at all. */}
+			{right === null ? (
+				<div
+					aria-hidden="true"
+					className="hidden w-[340px] shrink-0 lg:block"
+				/>
+			) : (
 				<div
 					// ⛔⛔ THE RAIL IS d5's LITERAL `340px`, AND THE PREVIOUS RULING IS
 					// REVERSED. This read `lg:w-1/4` under a rule that a fixed track

@@ -15,11 +15,15 @@ import {
 	twoSlot,
 } from "@/lib/ranking";
 import { getSecondaryMarketMediaUrl } from "@/server/discovery/media";
-import type { PricePoint } from "@/server/discovery/price-series";
+import type {
+	PricePoint,
+	WireReservePoint,
+} from "@/server/discovery/price-series";
 import { PFP_PLACEHOLDER } from "@/server/identity-pool/pfp-url";
 import type { MarketSummary } from "@/server/markets/get-by-slug";
 import { safeCaptureMessage } from "@/server/observability/safe-capture";
 import type { Marker } from "@/server/positions/compute";
+import { DOWNSTREAM_CACHED_MINUTES } from "@/server/storage/read-url-memo";
 import { signRead } from "@/server/storage/sign-read";
 import { type DebateComment, listMarketComments } from "./list-comments";
 import { getMarketPricingAndUnitToWin } from "./market-pricing";
@@ -32,8 +36,19 @@ import { type AuthorIdentity, resolveAuthors } from "./resolve-authors";
 /** A bound read client — top-level `db` OR a caller's transaction. */
 type DebateViewReader = DbClient | DbTransaction;
 
-/** D9 — the DEBATE.4 render-path presigned-GET TTL (sign-read.ts seam tag). */
-const READ_URL_TTL_SECONDS = 3600;
+/**
+ * D9 — the DEBATE.4 render-path presigned-GET TTL (sign-read.ts seam tag).
+ *
+ * Gate C fix — MUST exceed `cacheLife("minutes").expire` (3600 s), not equal
+ * it. `getCachedDebateView` can serve an entry generated up to `expire`
+ * seconds ago (stale-while-revalidate), and a URL minted AT generation time
+ * is embedded in that entry — so a TTL equal to `expire` lets a served URL
+ * already be at or past its own expiry, a silent broken image with no error
+ * and no failing test. 7200 s (2×) covers the full worst-case serve age plus
+ * render/fetch latency, while staying short enough to hold D9's original
+ * intent (a presigned URL, not a long-lived link).
+ */
+const READ_URL_TTL_SECONDS = 7200;
 
 /**
  * Defensive author fallback. Every `comments.user_id` is a real `users` row
@@ -198,7 +213,28 @@ export type DebateViewModel = {
  */
 export async function loadDebateView(
 	client: DebateViewReader,
-	args: { market: MarketSummary },
+	args: {
+		market: MarketSummary;
+		/**
+		 * An already-derived reserve walk for the price chart (CHART-1). Passed
+		 * straight through to `deriveMarketPriceChart`, which skips its replay when
+		 * it is present — three SQL statements this read does not spend.
+		 *
+		 * ⛔ THIS IS NOT VIEWER STATE AND CANNOT BECOME IT. It is pool reserves and
+		 * event timestamps for one market: public, market-scoped facts, identical
+		 * for every reader. ADR-0034 D-1 keeps viewer-scoped values off
+		 * `DebateViewModel` so masking stays correct and so the 2026-11-06 export's
+		 * input type stays stable; this argument adds nothing to that model and
+		 * nothing derived from a session. It is the only addition to this
+		 * signature, and it is deliberately an INPUT rather than something fetched
+		 * here — see `deriveMarketPriceChart`'s own note for why that boundary is
+		 * what keeps the `.md` export uncached.
+		 *
+		 * Omitted ⇒ the live replay, byte-for-byte the prior behaviour. The export
+		 * route omits it.
+		 */
+		walk?: WireReservePoint[];
+	},
 ): Promise<DebateViewModel> {
 	const marketId = args.market.id;
 
@@ -381,6 +417,7 @@ export async function loadDebateView(
 			postSubstrate: postSubstrate.filter((s) => commentById.has(s.id)),
 			removedSet,
 			spotYes: pricingAndUnitToWin?.pricing.yes ?? null,
+			walk: args.walk,
 		});
 	} catch (e) {
 		priceChart = null;
@@ -479,7 +516,10 @@ async function mintImageUrls(
 				return;
 			}
 			try {
-				urlByComment.set(c.id, await signRead(key, READ_URL_TTL_SECONDS));
+				urlByComment.set(
+					c.id,
+					await signRead(key, READ_URL_TTL_SECONDS, DOWNSTREAM_CACHED_MINUTES),
+				);
 			} catch {
 				// R2 unavailable for this object → degrade to no image (resilient
 				// read render). The bet/comment are untouched.

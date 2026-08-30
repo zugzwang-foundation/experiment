@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -361,5 +361,126 @@ describe("debate height chain — the arena band takes the leftover", () => {
 		// than through `bandClasses` — the same declaration, read the way it is
 		// actually written on disk.
 		expect(source).toContain("flex min-h-0 flex-1 flex-col gap-3");
+	});
+});
+
+/**
+ * CRIT-1 · G-5 — THE CHAIN GAINS A NODE, AND THE BAND MUST NOT PAY FOR IT.
+ *
+ * The criterion disclosure is a new flex item of the one-screen container. That
+ * container is a FIXED `h-[calc(100dvh-60px-2px)]` with `overflow-hidden`, so
+ * every child's height comes out of somewhere — and the only thing that may give
+ * is the ARENA, which is the container's sole `flex-1` and whose columns scroll
+ * internally. The band must NOT give: it is `shrink-0 basis-[24.2dvh]`, and
+ * RESO-1 closed `headzone-stack` at scroll 188 vs client 188 — exactly zero
+ * overflow, down from +14. That was a deliverable, and this is what stops the
+ * next change from spending it.
+ *
+ * ⚠ WHY A SOURCE SCAN AND NOT A MEASUREMENT. jsdom performs no layout — it
+ * resolves no `calc()`, no `dvh`, no flex — so `scrollHeight`/`clientHeight` here
+ * are meaningless. What IS checkable is the STRUCTURAL property that protects the
+ * band: the disclosure is a sibling of the band, never a descendant of it. The
+ * rendered scroll-vs-client equality is measured in a browser at the RESO-1
+ * viewport ladder and reported in the CRIT-1 run log.
+ */
+describe("debate height chain — CRIT-1's criterion disclosure", () => {
+	const DISCLOSURE = "src/components/debate/CriterionDisclosure.tsx";
+
+	it("debate-height::the-disclosure-is-NOT-inside-the-band-or-the-header-stack", () => {
+		// ⛔ THE WALL, ASSERTED. Anything mounted inside `headzone-stack` comes
+		// straight back out of the four-block row, which is fully allocated.
+		// ⛔⛔ MATCH JSX SYNTAX, NEVER A BARE WORD. This was
+		// `expect(source).not.toContain("CriterionDisclosure")`, which fires on
+		// PROSE — and `MarketHeader.tsx`'s docblocks must NAME this component to
+		// explain why the criterion left that file. So the bare form would have gone
+		// red on a correct documentation fix, and the cheapest escape from a red
+		// guard is to write a correction that cannot name its subject. That is the
+		// substring-for-token defect this repo has now hit SIX times; the G-4 block
+		// in `criterion-disclosure.test.tsx` avoids it the same way.
+		// ⛔⛔ `VIEW` JOINED THIS LIST AT RESO-3 · CHANGE 6. It used to carry the
+		// POSITIVE control below — "it IS mounted, in the view that owns the
+		// container" — which was the right guard while the criterion was on the
+		// page. The founder has ruled it off the page again, so the same scan now
+		// asserts the same thing about all three files: no JSX site renders it.
+		for (const file of [
+			HEADZONE,
+			"src/components/debate/MarketHeader.tsx",
+			VIEW,
+		]) {
+			expect(read(file)).not.toMatch(/<CriterionDisclosure\b/);
+		}
+		// ⛔ THE POSITIVE CONTROL IS NOW THE FILE'S CONTINUED EXISTENCE, and it is
+		// not decoration. With nothing rendering the component, every assertion
+		// above would pass just as well against a repo where the component had been
+		// DELETED — which is precisely the outcome CHANGE 6 rules against ("keep the
+		// component file, unrendered"). This is what makes the negatives mean
+		// "unrendered" rather than "gone".
+		expect(existsSync(join(ROOT, DISCLOSURE))).toBe(true);
+		expect(read(DISCLOSURE)).toMatch(/export function CriterionDisclosure\b/);
+	});
+
+	it("debate-height::RESO-3-the-arena-does-not-pay-for-a-disclosure-it-no-longer-holds", () => {
+		// ⛔⛔ THIS REPLACES `the-disclosure-is-a-DIRECT-child-of-the-one-screen-
+		// container`, WHICH HAD NO SUBJECT LEFT. That test pinned the mount's DEPTH
+		// at three tabs, after a long fight to stop it being a false receipt — first
+		// an index window containing the whole ternary, then "after both arm
+		// headers", which a mount inside the market arm still satisfied. Depth was
+		// the class change that finally discriminated.
+		// ⇒ RESO-3 · CHANGE 6 removes the mount, so there is no depth to assert. The
+		// history above is kept because the NEXT person to mount something into this
+		// container will reach for a positional proxy, and this file is where they
+		// will look. The lesson outlived its assertion.
+		//
+		// ⚠ WHAT IS ASSERTED INSTEAD IS THE HEIGHT LEDGER, which is the reason this
+		// describe exists at all. `PageContainer` is a FIXED
+		// `h-[calc(100dvh-60px-2px)]` with `overflow-hidden`; the band is `shrink-0
+		// basis-[24.2dvh]` and the ARENA is the sole `flex-1`, so every direct child
+		// of the container is paid for by the arena and nothing else. The disclosure
+		// cost it 46.50px closed at 1440×777 (CRIT-1's own measurement, §3 of its
+		// log). With the mount gone the arena gets that back — measured in the
+		// browser and reported in the RESO-3 run notes, since jsdom resolves no
+		// `calc()`, no `dvh` and no flex.
+		// ⇒ What is checkable HERE is the structural precondition for that refund:
+		// the container's children are the band, the arena and the overlays, and the
+		// disclosure is not among them.
+		const source = read(VIEW);
+		expect(source).not.toMatch(/<CriterionDisclosure\b/);
+		// …and the arena is still the only thing allowed to absorb the difference.
+		// If a second `flex-1` ever appears among the container's children, the
+		// refund silently goes somewhere else and this describe's premise is void.
+		const containerChildren = [...source.matchAll(/^\t\t\t<(\w+)/gm)].map(
+			(m) => m[1],
+		);
+		expect(containerChildren.length).toBeGreaterThan(0); // the scan found something
+		expect(containerChildren).not.toContain("CriterionDisclosure");
+	});
+
+	it("debate-height::the-disclosure-does-not-grow-and-bounds-its-own-open-body", () => {
+		const source = read(DISCLOSURE);
+		const classAttrs = [...source.matchAll(/className="([^"]*)"/g)].map(
+			(m) => m[1] ?? "",
+		);
+		expect(classAttrs.length).toBeGreaterThan(0); // the scan found something
+
+		// ⚠ THE ELEMENT-BINDING HALF OF THIS MOVED TO THE RENDER TEST, and the
+		// reason is worth keeping: `classAttrs.find(c => …includes("shrink-0"))`
+		// scans EVERY `className` in the file and takes the first hit, so if
+		// `shrink-0` migrated off the `<details>` onto the summary this stayed green
+		// while the crushable element lost its protection — which is precisely the
+		// `<h1>` precedent the comment cites (@code-reviewer). `criterion-disclosure
+		// .test.tsx` now asserts it on the rendered `<details>` node itself. What
+		// remains here is the file-level property: the disclosure does not GROW.
+		const details = classAttrs.find((c) => c.split(/\s+/).includes("shrink-0"));
+		expect(details).toBeDefined();
+		expect(details?.split(/\s+/)).not.toContain("flex-1");
+
+		// ⛔ THE OPEN BODY IS BOUNDED AND SCROLLS ITSELF. Unbounded open content in
+		// an `overflow-hidden` one-screen container is CLIPPED, which this file's
+		// own doctrine calls a failure rather than a pass. The bound is a viewport
+		// FRACTION, matching the band's own `basis-[24.2dvh]` — a pixel cap would be
+		// correct at exactly one viewport height.
+		const body = classAttrs.find((c) => c.includes("overflow-y-auto"));
+		expect(body).toBeDefined();
+		expect(body).toMatch(/max-h-\[\d+(\.\d+)?dvh\]/);
 	});
 });

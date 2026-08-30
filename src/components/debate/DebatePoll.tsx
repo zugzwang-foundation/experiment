@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-
 import { POLL_INTERVAL_MS_DEBATE_VIEW } from "@/server/config/limits";
+import { getInitialPollPhaseOffsetMs } from "./poll-phase";
 
 /**
  * F-DEBATE-4 — the debate view's polled-on-view refresh (SPEC.1 1.0.25 §9).
@@ -55,6 +55,20 @@ import { POLL_INTERVAL_MS_DEBATE_VIEW } from "@/server/config/limits";
  * `system_state.frozen_at` reaches no client component, and `FREEZE_INSTANT_UTC`
  * compared against a client clock is a guess about a database state flip, not a
  * signal. `market.status` is real, already on the view model, and free.
+ *
+ * PHASE JITTER (HO-FRONT v2.0 T2) — a one-time random offset from
+ * `getInitialPollPhaseOffsetMs`, applied ONLY to the very first interval this
+ * component instance ever arms, de-synchronising concurrently open tabs on the
+ * same market. Steady-state cadence stays exactly
+ * `POLL_INTERVAL_MS_DEBATE_VIEW`; the offset only delays when the recurring
+ * timer is FIRST armed (`setTimeout(offset)` wrapping the `setInterval`), so
+ * the first refresh lands at `offset + interval`, never at `offset` itself —
+ * with `offset = 0` this collapses to byte-identical timing to the unjittered
+ * version, which is what lets `poll.test.tsx` pin exact boundary assertions by
+ * mocking `./poll-phase` to a constant 0 rather than loosening its contract.
+ * `hasStartedOnce` gates this to that one first arm: a RESUME from suspension
+ * re-enters this effect too (`suspended` is a dependency) and must keep firing
+ * its immediate resume-refresh un-jittered, exactly as ratified above.
  */
 export function DebatePoll({
 	marketOpen,
@@ -67,6 +81,15 @@ export function DebatePoll({
 }): null {
 	const router = useRouter();
 	const [documentHidden, setDocumentHidden] = useState(false);
+
+	// Computed once per component instance — "one-time... per client mount".
+	const phaseOffsetMs = useRef<number | undefined>(undefined);
+	if (phaseOffsetMs.current === undefined) {
+		phaseOffsetMs.current = getInitialPollPhaseOffsetMs(
+			POLL_INTERVAL_MS_DEBATE_VIEW,
+		);
+	}
+	const hasStartedOnce = useRef(false);
 
 	// Mirror page visibility into state. The initial `false` matches the server
 	// render; the mount call below adopts the real value post-hydration, which
@@ -104,6 +127,24 @@ export function DebatePoll({
 			wasSuspended.current = false;
 			router.refresh();
 		}
+
+		if (!hasStartedOnce.current) {
+			hasStartedOnce.current = true;
+			let interval: ReturnType<typeof setInterval> | undefined;
+			const arm = setTimeout(() => {
+				interval = setInterval(
+					() => router.refresh(),
+					POLL_INTERVAL_MS_DEBATE_VIEW,
+				);
+			}, phaseOffsetMs.current);
+			return () => {
+				clearTimeout(arm);
+				if (interval) {
+					clearInterval(interval);
+				}
+			};
+		}
+
 		const timer = setInterval(
 			() => router.refresh(),
 			POLL_INTERVAL_MS_DEBATE_VIEW,

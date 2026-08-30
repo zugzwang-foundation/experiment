@@ -135,7 +135,14 @@ export async function openMarket(args: {
 	// HTTP, but the ordering still only makes sense after the state is real).
 	// A newly-Open market changes the Discovery-eligible SET, not any one
 	// market's content, so this busts the LISTING tag, not a `market:` one.
-	revalidateTag("discovery", "max");
+	//
+	// Gate C CRITICAL fix — `{ expire: 0 }`, not `"max"` (non-evicting; see
+	// close.ts's identical fix and act.ts's measured proof). `openMarket` is
+	// `server-only`, not itself a Server Action — its only production caller
+	// today (`seedPoolAction`) happens to be one, but the function doesn't
+	// know that, and `updateTag` throws outside a Server Action. Matching
+	// `closeMarket`'s form rather than relying on today's one caller.
+	revalidateTag("discovery", { expire: 0 });
 
 	return result;
 }

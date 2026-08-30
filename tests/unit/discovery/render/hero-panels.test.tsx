@@ -86,7 +86,14 @@ function heroPost(side: HeroPost["side"]): HeroPost {
 }
 
 function renderHero(topPosts: HeroTopPosts) {
-	return render(<HeroPanels card={CARD} series={SERIES} topPosts={topPosts} />);
+	return render(
+		<HeroPanels
+			card={CARD}
+			series={SERIES}
+			topPosts={topPosts}
+			isOpen={true}
+		/>,
+	);
 }
 
 /** DOM-order assertion: `a` precedes `b` in the rendered tree. */
@@ -110,8 +117,12 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		expect(yesPanel.getAttribute("data-side")).toBe("YES");
 		expect(noPanel.getAttribute("data-side")).toBe("NO");
 		// The market panel sits BETWEEN them (§3.2 hero order).
-		const sparkline = screen.getByTestId("price-sparkline");
-		expect(sparkline.getAttribute("data-size")).toBe("hero");
+		// CHART-1 — the hero now renders the SAME component `/m/[slug]` does, in
+		// `hero` mode, so the selector moved from the retired `PriceSparkline`'s
+		// testid to the chart's. What the assertion PROVES is unchanged: the
+		// market panel carries a price graph and sits between the two post panels.
+		const sparkline = screen.getByTestId("market-price-chart");
+		expect(sparkline.getAttribute("data-mode")).toBe("hero");
 		expect(precedes(yesPanel, sparkline)).toBe(true);
 		expect(precedes(sparkline, noPanel)).toBe(true);
 		// Market panel carries question + stat line + the reused PriceBar.
@@ -318,7 +329,7 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		expect(bothEmpty.getByText(HERO_SIDE_EMPTY.NO)).toBeTruthy();
 		expect(bothEmpty.getByText(MARKET_TITLE).textContent).toBe(MARKET_TITLE);
 		expect(
-			bothEmpty.getByTestId("price-sparkline").getAttribute("data-size"),
+			bothEmpty.getByTestId("market-price-chart").getAttribute("data-mode"),
 		).toBe("hero");
 	});
 
@@ -710,5 +721,169 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		expect(bar.querySelector(".bg-no")).not.toBeNull();
 		expect(bar.innerHTML).not.toContain("bg-ink");
 		expect(bar.innerHTML).not.toContain("bg-n0");
+	});
+});
+
+// ── CHART-1 — the hero graph is TIME-scaled, not index-scaled ────────────────
+//
+// SPEC.1 §17 row proved here:
+//   discovery::hero-chart-time-scaled
+describe("discovery::hero-chart-time-scaled", () => {
+	/** Three points whose SPACING IN TIME is deliberately nothing like their
+	 * spacing in index: an hour, then nine hours. Under index spacing the middle
+	 * point lands at the midpoint of the plot; under time spacing it lands a
+	 * tenth of the way along. The two answers are 320 and 64 on a 640-wide
+	 * viewBox, so no rounding rule can confuse them. */
+	const UNEVEN: PricePoint[] = [
+		{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
+		{ at: "2026-09-15T01:00:00.000Z", yes: "0.600000000000000000" },
+		{ at: "2026-09-15T10:00:00.000Z", yes: "0.700000000000000000" },
+	];
+
+	/** The x coordinates of one polyline, in order. Read off the rendered
+	 * `points` attribute — the actual geometry, not a class or a prop. */
+	function xsOf(container: HTMLElement, testid: string): number[] {
+		const line = container.querySelector(`[data-testid="${testid}"]`);
+		const points = line?.getAttribute("points") ?? "";
+		return points
+			.split(" ")
+			.filter((pair) => pair.length > 0)
+			.map((pair) => Number(pair.split(",")[0]));
+	}
+
+	it("places the middle point by elapsed time, not by its index", () => {
+		const { container } = render(
+			<HeroPanels
+				isOpen={true}
+				card={CARD}
+				series={UNEVEN}
+				topPosts={{ yes: null, no: null }}
+			/>,
+		);
+
+		const xs = xsOf(container, "line-yes");
+		expect(xs).toHaveLength(3);
+
+		// Endpoints anchor the domain either way — they are the control that the
+		// coordinates were read at all, not the assertion.
+		expect(xs[0]).toBe(0);
+		expect(xs[2]).toBe(640);
+
+		// ⛔ THE ASSERTION. One hour into a ten-hour domain is a tenth of the way
+		// across: 64. The retired `PriceSparkline` would have answered 320 here,
+		// because it spaced by index — which is exactly the defect this row
+		// exists to reject, and why the fixture's gaps are 1h and 9h rather than
+		// anything evenly divisible.
+		expect(xs[1]).toBe(64);
+		expect(xs[1]).not.toBe(320);
+	});
+
+	it("the NO line mirrors the YES line on the same time axis", () => {
+		// The two lines must share a domain; a per-line domain would let them
+		// disagree about when something happened.
+		const { container } = render(
+			<HeroPanels
+				isOpen={true}
+				card={CARD}
+				series={UNEVEN}
+				topPosts={{ yes: null, no: null }}
+			/>,
+		);
+		expect(xsOf(container, "line-no")).toEqual(xsOf(container, "line-yes"));
+	});
+
+	it("renders no axis in hero mode — that is collapsed's", () => {
+		// C-CHART-2 unified the COMPONENT across surfaces; it did not put three
+		// date labels in a 96px-tall box. Asserted so a later "make the modes
+		// identical" tidy-up has something to fail against.
+		const { container } = render(
+			<HeroPanels
+				isOpen={true}
+				card={CARD}
+				series={UNEVEN}
+				topPosts={{ yes: null, no: null }}
+			/>,
+		);
+		expect(
+			container.querySelector('[data-testid="axis-x-label-end"]'),
+		).toBeNull();
+		expect(
+			container.querySelector('[data-testid="axis-x-tick-first"]'),
+		).toBeNull();
+		// POSITIVE CONTROL — the same query style DOES find the chart, so the two
+		// nulls above mean "absent", not "my selector is wrong".
+		expect(
+			container.querySelector('[data-testid="market-price-chart"]'),
+		).not.toBeNull();
+	});
+});
+
+// ── CHART-1 — the hero carries the SPEC.1 §9 accessible readout ─────────────
+//
+// SPEC.1 §17 row proved here:
+//   discovery::hero-chart-carries-accessible-summary
+describe("discovery::hero-chart-carries-accessible-summary", () => {
+	it("names the opening price, the current price and both endpoints", () => {
+		const { container } = render(
+			<HeroPanels
+				isOpen={true}
+				card={CARD}
+				series={[
+					{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
+					{ at: "2026-09-20T00:00:00.000Z", yes: "0.800000000000000000" },
+				]}
+				topPosts={{ yes: null, no: null }}
+			/>,
+		);
+
+		const summary = container.querySelector(
+			'[data-testid="hero-price-chart-summary"]',
+		);
+		expect(summary).not.toBeNull();
+
+		const text = summary?.textContent ?? "";
+		// All four quantities SPEC.1 §9 · Accessibility names, and no fewer.
+		expect(text).toContain("opening 50%");
+		expect(text).toContain("current 80%");
+		expect(text).toContain("Sep 15");
+		expect(text).toContain("Sep 20");
+	});
+
+	it("keys distinctly from the other two summaries", () => {
+		// Three summaries can share a document — a market page's card and overlay,
+		// and this. A shared testid would let a query assert about the wrong
+		// surface and pass.
+		const { container } = render(
+			<HeroPanels
+				isOpen={true}
+				card={CARD}
+				series={SERIES}
+				topPosts={{ yes: null, no: null }}
+			/>,
+		);
+		expect(
+			container.querySelectorAll('[data-testid="hero-price-chart-summary"]'),
+		).toHaveLength(1);
+		expect(
+			container.querySelector('[data-testid="market-price-chart-summary"]'),
+		).toBeNull();
+	});
+
+	it("is screen-reader-only — it must not become visible chrome", () => {
+		// The readout is an accessibility channel, not a caption. If it ever
+		// renders visibly it changes the hero's layout, which four height-chain
+		// guards read as source and none of them would attribute to this.
+		const { container } = render(
+			<HeroPanels
+				isOpen={true}
+				card={CARD}
+				series={SERIES}
+				topPosts={{ yes: null, no: null }}
+			/>,
+		);
+		const summary = container.querySelector(
+			'[data-testid="hero-price-chart-summary"]',
+		);
+		expect(summary?.getAttribute("class")).toContain("sr-only");
 	});
 });

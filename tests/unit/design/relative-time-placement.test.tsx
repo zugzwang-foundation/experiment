@@ -356,6 +356,7 @@ const SURFACES: {
 					card={CARD}
 					series={[]}
 					topPosts={{ yes: heroPost(), no: null }}
+					isOpen={true}
 				/>,
 			).container,
 	},

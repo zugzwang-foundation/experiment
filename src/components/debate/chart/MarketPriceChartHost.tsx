@@ -13,155 +13,75 @@ import { MarketPriceChartOverlay } from "./MarketPriceChartOverlay";
  * is absent from the DOM until the card is clicked. `nodes` ride to the EXPANDED
  * overlay only — the collapsed Card never receives them (nodes are expanded-only,
  * SPEC.1 §9). */
+/**
+ * ⛔⛔ THE ONE PLACE THAT DECIDES WHETHER THERE IS A CHART TO DRAW — exported so
+ * a CALLER can ask the same question before deciding whether to draw a COLUMN
+ * around it.
+ *
+ * ⚠ THIS EXISTS BECAUSE THE DUPLICATE COST US A LIVE DEFECT. RESO-1 · R-4 made
+ * `MarketHeader`'s rail conditional so that moving the price bar out could not
+ * leave an empty 340px column. It first asked `priceChart != null` — a PROXY for
+ * this condition rather than this condition — and `deriveMarketPriceChart`
+ * returns a NON-NULL `{ series: [], nodes: [] }` for a market with no price
+ * history (`server/debate-view/price-chart.ts:71-74`). So the caller drew the
+ * column and this component rendered `null` inside it. Two components deciding
+ * the same question by different tests is what produced the gap; a proxy for a
+ * condition will always eventually diverge from it, so the fix is to publish the
+ * condition rather than to restate it more carefully.
+ * ⇒ ⛔ IF A SECOND "nothing to draw" CASE IS EVER ADDED, ADD IT HERE. That is the
+ * whole point of the export: a new null path inside the component body would
+ * silently re-open the empty-column defect for every caller.
+ */
+export function hasRenderableSeries(series: PricePoint[]): boolean {
+	return series.length > 0;
+}
+
 export function MarketPriceChartHost({
 	series,
 	nodes,
+	isOpen,
 }: {
 	series: PricePoint[];
 	nodes: ChartNode[];
+	/**
+	 * `C-CHART-2` clause 1 — whether the terminal dots pulse. READ from
+	 * `market.status` by `MarketHeader`, never inferred here: a quiet `Open`
+	 * market and a `Closed` one are indistinguishable from the series alone, and
+	 * pulsing a frozen market asserts it is live (**INV-4**). `/m/[slug]` is the
+	 * one surface where the non-`Open` branch is reachable — Discovery lists only
+	 * `Open` markets — which is the same asymmetry `withLiveTail` carries.
+	 */
+	isOpen: boolean;
 }): React.JSX.Element | null {
 	const [open, setOpen] = useState(false);
 
-	// Defensive (unreachable — an opened market always seeds ≥1 point): an empty
-	// series omits the chart rather than rendering an empty frame.
-	if (series.length === 0) {
-		// ⛔ PRODUCTION IS BYTE-IDENTICAL TO BEFORE. The placeholder is non-prod
-		// only, so an empty series in prod still returns `null` exactly as it did.
-		// ⚠ `process.env.ZUGZWANG_ENV` IS READABLE HERE DESPITE `"use client"` —
-		// `next.config.ts:29` inlines it into the browser bundle (`ZUGZWANG_ENV:
-		// process.env.ZUGZWANG_ENV ?? "unknown"`). Server and client therefore read
-		// the SAME build-time constant, so this branch cannot hydration-mismatch.
-		if (process.env.ZUGZWANG_ENV === "prod") {
-			return null;
-		}
-		return <PlaceholderPriceChart />;
+	// An empty series omits the chart rather than rendering an empty frame.
+	// ⚠ THIS COMMENT USED TO CALL THE BRANCH "Defensive (unreachable — an opened
+	// market always seeds ≥1 point)". IT IS NOT UNREACHABLE AND IT IS NOT RARE:
+	// measured at RESO-1 recon, `market-price-chart-card` rendered on ZERO of the
+	// eight staging markets, because those fixtures are raw-INSERT rather than
+	// event-backed and the reserve walk comes back empty. Corrected in place —
+	// a branch documented as unreachable is one nobody thinks about, and this is
+	// the branch the empty-rail defect ran through.
+	if (!hasRenderableSeries(series)) {
+		return null;
 	}
 
 	return (
 		<>
-			<MarketPriceChartCard series={series} onExpand={() => setOpen(true)} />
+			<MarketPriceChartCard
+				series={series}
+				isOpen={isOpen}
+				onExpand={() => setOpen(true)}
+			/>
 			{open && (
 				<MarketPriceChartOverlay
 					series={series}
 					nodes={nodes}
+					isOpen={isOpen}
 					onClose={() => setOpen(false)}
 				/>
 			)}
 		</>
-	);
-}
-
-/**
- * ⛔⛔ DEMO REPLICA — FOUNDER RULING 2026-08-23/24. DELETE THIS, DO NOT MAINTAIN IT.
- *
- * WHAT IT IS. A hardcoded stand-in for `MarketPriceChart`, drawn only when the
- * real series is EMPTY and only outside production.
- *
- * ⛔⛔ IT STANDS IN FOR A CHART THAT CANNOT DRAW YET, AND THE REASON IS DATA.
- * `replayReserveSeries` seeds its CPMM walk from the `market.opened` event, and
- * there are ZERO of those in the entire staging database (measured 2026-08-24)
- * while all 8 markets sit Open with pools — every one was opened by raw INSERT
- * rather than through `openMarket()`. So the walk returns `[]` before reading a
- * single bet event, and it does that even on a market carrying 10 `bet.placed`
- * and 3 `bet.sold`. ⚠ The price BAR moves on those markets because it reads the
- * live `pools` row; the chart does not because it reads the event log. Two
- * sources, one of them unusable.
- * ⇒ DELETED WHEN STAGING IS RE-SEEDED THROUGH `openMarket()`. That re-seed is
- * deferred by founder ruling (R8), which is the only reason this exists.
- *
- * ⛔ THE LABEL IS GONE, founder ruling — no `Sample`, no replacement text, no
- * tooltip, no aria substitute. ⚠ THAT RAISES THE STAKES ON THE ENV GATE: with
- * nothing on screen saying "fabricated", the gate in `MarketPriceChartHost` is
- * the ONLY thing keeping invented data off production. It is exercised and
- * pinned in `tests/unit/debate/render/chart-placeholder-gate.test.tsx`.
- *
- * ⛔ IT NEVER TOUCHES REAL DATA. Reachable only from `series.length === 0`; it
- * does not override, merge with, or fall back over a real series.
- *
- * ⚠ DETERMINISTIC BY CONSTRUCTION. Every coordinate is a literal. No
- * `Math.random()`, no `Date.now()`, no client-only value — identical on every
- * load, and it cannot hydration-mismatch.
- *
- * ⛔⛔ THE TOKENS ARE THE REAL CHART'S, INCLUDING THE SIDE POLES — and that
- * REVERSES the previous placeholder, which used neutral ramp steps on the
- * ground that "a sample line is not a side". Founder ruling: mirror the real
- * component exactly, do not invent a treatment. So `line-no` strokes
- * `var(--graph-no)` and `line-yes` strokes `var(--graph-yes)`, both at 1.75,
- * NO into the buffer first so YES paints over it — the real component's own
- * order. ⚠ These are the GRAPH family, not `--color-yes`/`--color-no`:
- * `--color-yes` IS the page ground (#181818), so a value-copy would be
- * invisible AND invert the poles. `MarketPriceChart` states this in terms.
- * ⚠ `side-pole-binding.test.ts` does not gain an entry, because its offender
- * predicate keys on a SIDE COMPARISON (`x === "YES"`) reaching a pole token,
- * and there is no comparison here at all — the two lines are unconditional.
- *
- * ⚠ THE TIME AXIS IS DELIBERATELY HALF-CARRIED. The dashed thirds gridlines are
- * taken (pure geometry, `--color-n2`, `5 4` dash — the real `CollapsedAxis`'s
- * own recipe); the THREE DATE LABELS are NOT. A fabricated price shape says
- * "a chart belongs here"; fabricated dates would assert a specific market
- * lifetime that does not exist. Shape is replicated, claims are not.
- */
-function PlaceholderPriceChart(): React.JSX.Element {
-	return (
-		<div
-			data-testid="market-price-chart-placeholder"
-			// Box matched to `MarketPriceChartCard` so the swap is invisible as
-			// layout: same flex column, same `rounded-[var(--r)]`, same `bg-n0`,
-			// same `p-3`. That card is a <button>; this is a <div>, non-interactive.
-			className="flex min-h-0 w-full flex-1 flex-col rounded-[var(--r)] bg-n0 p-3"
-		>
-			<div className="min-h-0 w-full flex-1">
-				<svg
-					viewBox="0 0 640 320"
-					preserveAspectRatio="none"
-					aria-hidden="true"
-					className="h-full w-full"
-				>
-					{/* Drawn FIRST so the lines paint over it — the real component's
-					    layer order (gridlines behind data). */}
-					<line
-						x1="213"
-						x2="213"
-						y1="0"
-						y2="320"
-						stroke="var(--color-n2)"
-						strokeWidth="1"
-						strokeDasharray="5 4"
-						vectorEffect="non-scaling-stroke"
-					/>
-					<line
-						x1="427"
-						x2="427"
-						y1="0"
-						y2="320"
-						stroke="var(--color-n2)"
-						strokeWidth="1"
-						strokeDasharray="5 4"
-						vectorEffect="non-scaling-stroke"
-					/>
-					{/* Two complementary lines mirrored about 50% — y_yes + y_no = 320 at
-					    every x, exactly as the real chart's `yYesPx`/`yNoPx` guarantee.
-					    A market drifting 50% → ~64% YES, gently, no spikes. */}
-					<polyline
-						points="0,160 71,163 142,170 213,166 284,179 356,187 427,184 498,195 569,206 640,203"
-						fill="none"
-						stroke="var(--graph-no)"
-						strokeWidth="1.75"
-						strokeLinejoin="round"
-						strokeLinecap="round"
-						vectorEffect="non-scaling-stroke"
-					/>
-					<polyline
-						points="0,160 71,157 142,150 213,154 284,141 356,133 427,136 498,125 569,114 640,117"
-						fill="none"
-						stroke="var(--graph-yes)"
-						strokeWidth="1.75"
-						strokeLinejoin="round"
-						strokeLinecap="round"
-						vectorEffect="non-scaling-stroke"
-					/>
-				</svg>
-			</div>
-		</div>
 	);
 }

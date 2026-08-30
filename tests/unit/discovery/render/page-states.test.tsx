@@ -169,7 +169,11 @@ function primeHappyLoaders(n: number): DiscoveryCard[] {
 		async (_client, marketId) => {
 			const card = list.find((c) => c.id === marketId);
 			return card?.pricing
-				? { pricing: card.pricing, reserves: { yes: "1", no: "1" } }
+				? {
+						pricing: card.pricing,
+						reserves: { yes: "1", no: "1" },
+						unitToWin: { yes: "1", no: "1" },
+					}
 				: null;
 		},
 	);
@@ -295,6 +299,7 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 		vi.mocked(getMarketPricingAndReserves).mockResolvedValue({
 			pricing: { yes: "0.5", no: "0.5" },
 			reserves: { yes: "1", no: "1" },
+			unitToWin: { yes: "1", no: "1" },
 		});
 		vi.mocked(getCachedMarketDiscoveryData)
 			.mockResolvedValueOnce({

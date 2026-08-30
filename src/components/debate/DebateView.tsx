@@ -10,7 +10,6 @@ import {
 } from "react";
 
 import { PageContainer } from "@/components/shell/PageContainer";
-
 import { AuthGateSlot } from "./composer/AuthGateSlot";
 import { BetComposer } from "./composer/BetComposer";
 import { ComposerSlot } from "./composer/ComposerSlot";
@@ -111,6 +110,14 @@ export function DebateView({
 	// not in `ResolutionCriterion`, for one reason: `frozen` below is the list of
 	// every sub-view that stops the carousel, and a sub-view whose state the
 	// predicate cannot see is a sub-view that does not freeze anything.
+	// biome-ignore lint/correctness/noUnusedVariables: `setCriterionOpen` has no
+	// caller since the main→staging merge took RESO-1/RESO-3's `MarketHeader`,
+	// which has no `criterion` prop. The PAIR is kept deliberately: the freeze
+	// predicate still reads `criterionOpen` (dormant, constant false — see the
+	// change-set-4 §B block below), `debate-view-freeze.test.ts` pins this exact
+	// declaration as the ownership guard, and re-attaching a criterion trigger is
+	// then one prop rather than a re-lift of the state. Deleting the setter is how
+	// the §D defect comes back.
 	const [criterionOpen, setCriterionOpen] = useState(false);
 	/**
 	 * R6 — which composer slots are OCCUPYING their column, exit included. Keyed
@@ -1206,8 +1213,6 @@ export function DebateView({
 						market={market}
 						priceChart={priceChart}
 						pick={{ heldSide, marketOpen, suspended, onPick: toggleEntry }}
-						// §D — controlled from here so `frozen` can see it.
-						criterion={{ open: criterionOpen, onOpenChange: setCriterionOpen }}
 					/>
 					<div data-testid="arena" className="flex min-h-0 flex-1 gap-4">
 						{(["YES", "NO"] as const).map((side) => {
@@ -1326,6 +1331,18 @@ export function DebateView({
 					</div>
 				</>
 			)}
+
+			{/* ⛔⛔ RESO-3 · CHANGE 6 — THE CRITERION DISCLOSURE IS NOT RENDERED, AND ITS
+			    COMPONENT IS DELIBERATELY STILL IN THE REPO. `CriterionDisclosure.tsx`
+			    is unrendered, not deleted, because restoring it is one line here and
+			    the founder ruling that removed it is a placement decision rather than a
+			    verdict on the component. Deleting the file would turn a one-line restore
+			    into a rebuild, and would throw away the measurement its docblock carries
+			    — that `hidden="until-found"` on a `<details>` body stops it ever opening.
+			    ⚠ The criterion therefore has NO on-page presence on `/m/[slug]` again.
+			    It reaches a participant only through the ADR-0025 `.md` export, exactly
+			    as it did between RESO-1 and CRIT-1. That is the founder's call and it is
+			    recorded here so the next reader does not "fix" it. */}
 
 			<PostPopup post={popupPost} onClose={() => setPopupPost(null)} />
 			<ReplyPopup reply={popupReply} onClose={() => setPopupReply(null)} />

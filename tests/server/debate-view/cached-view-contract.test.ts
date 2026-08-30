@@ -188,9 +188,16 @@ describe("Phase D — the page keeps price live", () => {
 		// The live pool read happens on the page, per request, before the cached
 		// call — its `reserves` are what key the cache.
 		expect(src).toContain("getMarketPricingAndReserves(db, market.id)");
-		expect(src).toContain(
-			"getCachedDebateView(market, priced?.reserves ?? null)",
+		expect(src).toMatch(
+			/getCachedDebateView\(\s*market,\s*priced\?\.reserves\s*\?\?\s*null,?\s*\)/,
 		);
+		// Gate C fix — the cached call's OWN internal pricing/unitToWin no
+		// longer reach the render unexamined: the page explicitly overrides
+		// them with the SAME live read that keyed the cache, so the guarantee
+		// is an assignment at this call site, not an implication of the cache
+		// key nobody reading this file can see (ADR-0041 D-2/D-6).
+		expect(src).toContain("pricing: priced.pricing");
+		expect(src).toContain("unitToWin: priced.unitToWin");
 		// The page file itself must never be cached: `DebatePoll` re-invokes it
 		// every 15s and a cached page would serve a frozen payload forever
 		// (F-DEBATE-4 RULING F).
@@ -271,9 +278,10 @@ describe("Phase D — the cacheTag / revalidateTag handshake", () => {
 	it("removal fires the same `market:<id>` tag the cached view writes", () => {
 		// Writer: the cached debate view tags itself per market.
 		expect(read(CACHED)).toMatch(/cacheTag\(\s*`market:\$\{market\.id\}`\s*\)/);
-		// Firer: the moderation action busts that exact namespace on removal.
+		// Firer: the moderation action busts that exact namespace on removal —
+		// via `updateTag`, not `revalidateTag` (Gate C fix, see the test below).
 		expect(read(ACT)).toMatch(
-			/revalidateTag\(\s*`market:\$\{comment\.marketId\}`/,
+			/updateTag\(\s*`market:\$\{comment\.marketId\}`\s*\)/,
 		);
 	});
 
@@ -286,19 +294,42 @@ describe("Phase D — the cacheTag / revalidateTag handshake", () => {
 		expect(src).toMatch(/if\s*\(\s*action === "remove"\s*\)/);
 	});
 
-	it("revalidateTag passes a cache profile (required since Next 16.3)", () => {
-		// Without the second argument the call is a runtime error under Cache
-		// Components — and it is the kind that only surfaces on the moderation
-		// path, i.e. rarely, and in the worst place.
+	it("invalidation is immediate-expiration, never the non-evicting 'max' profile", () => {
+		// Gate C CRITICAL fix. `revalidateTag(tag, "max")` does NOT evict — it
+		// marks the tag stale with a 365-day expiry, and Next's shipped default
+		// cache handler keeps serving the pre-invalidation entry (verified
+		// directly against the installed next@16.3.2 handler: a "max"-profiled
+		// call returns the stale entry on the next read; only `updateTag` or an
+		// explicit `{ expire: 0 }` evicts). The prior version of this test
+		// REQUIRED the literal "max" on a false premise — that omitting the
+		// profile is a runtime error under Cache Components. It is not: Next
+		// emits a deprecation warning and proceeds with the CORRECT immediate
+		// expiration. That wrong premise is how the CRITICAL shipped: a test
+		// enforcing the vulnerable form is worse than no test.
+		//
+		// `act.ts` is a Server Action ("use server", and `moderateComment` IS
+		// the action), so `updateTag` — immediate expiration, no profile
+		// argument, throws outside a Server Action — is legal and used there.
+		// `open.ts`/`close.ts` are `server-only` engine functions, not
+		// themselves Server Actions, shared with a Route Handler caller
+		// (`api/cron/close-due-markets` calls `closeDueMarkets` directly) where
+		// `updateTag` would throw — they use `revalidateTag(tag, { expire: 0 })`
+		// instead, which hard-expires immediately from any calling context.
+		const actSrc = read(ACT);
+		expect(actSrc).toMatch(
+			/updateTag\(\s*`market:\$\{comment\.marketId\}`\s*\)/,
+		);
+		expect(actSrc).not.toMatch(/revalidateTag\(/);
+
 		for (const rel of [
-			ACT,
 			"src/server/markets/open.ts",
 			"src/server/markets/close.ts",
 		]) {
 			const calls = read(rel).match(/revalidateTag\([^)]*\)/g) ?? [];
 			expect(calls.length).toBeGreaterThan(0);
 			for (const call of calls) {
-				expect(call).toMatch(/,\s*["']max["']\s*\)$/);
+				expect(call).not.toMatch(/["']max["']/);
+				expect(call).toMatch(/\{\s*expire:\s*0\s*\}/);
 			}
 		}
 	});

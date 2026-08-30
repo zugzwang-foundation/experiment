@@ -98,9 +98,22 @@ describe("the sub-view freeze — every sub-view stops the carousel", () => {
 		expect(source).toContain("const [criterionOpen, setCriterionOpen] =");
 		expect(source).toContain("useState(false)");
 
-		// …and it is actually handed to the header, rather than owned and dropped.
-		expect(source).toContain("criterion={{");
-		expect(source).toContain("onOpenChange: setCriterionOpen");
+		// ⚠⚠ THE `criterion={{ … }}` HANDOFF ASSERTION IS GONE, AND ITS ABSENCE IS
+		// THE MERGE, NOT A RELAXATION. This file used to also assert the flag was
+		// "actually handed to the header, rather than owned and dropped". Merging
+		// `main` took RESO-1/RESO-3's `MarketHeader`, which HAS NO `criterion`
+		// PROP — the criterion has no on-page presence on `/m/[slug]` there at all
+		// (see the RESO-3 · CHANGE 6 block in `DebateView.tsx`). Keeping the
+		// assertion would have failed against a header that cannot accept the prop,
+		// and the only ways to make it pass again are to re-add the prop to main's
+		// header or revert to staging's — both product decisions, neither one a
+		// test's to make.
+		//
+		// ⛔ WHAT SURVIVES IS THE HALF THAT STILL BINDS: `DebateView` OWNS the
+		// flag. That is the guard against the original defect, and it is why the
+		// dormant `criterionOpen ||` term stays in the predicate. When a criterion
+		// surface is re-attached, RESTORE THE HANDOFF ASSERTION WITH IT — the
+		// owned-and-dropped failure mode is live again the moment a trigger exists.
 	});
 
 	it("debate-freeze::the-predicate-is-threaded-into-BOTH-scrollers", () => {
