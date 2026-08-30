@@ -308,13 +308,27 @@ describe("art layer — it is sealed, and it is unmounted", () => {
 		expect(offenders).toEqual([]);
 	});
 
-	it("is mounted NOWHERE — nothing outside the art layer imports it", () => {
-		// DELIBERATE, and the reason is not caution about the artwork. The mount
-		// point is `src/app/(auth)/**`, a named critical path that another session
-		// holds a live lock on for the signup-deadlock fix. Mounting is three
-		// lines; a collision there costs a full plan → execute → review → gate
-		// cycle. When this is mounted on purpose, this test is the one to delete,
-		// and deleting it should be a visible decision rather than a silent one.
+	/**
+	 * ⚠ TEMPORARY, AND IT NAMES THE ONE FILE IT FORGIVES.
+	 *
+	 * `WARLI-VIEW` added a throwaway viewer route so the composition could be
+	 * looked at in a browser — the artwork is mounted nowhere, so a deployment
+	 * alone renders nothing. **This allowance exists ONLY for that route and must
+	 * be deleted when the route is.**
+	 *
+	 * ⛔ It is NOT the mount. The mount decision is still open on a measured cost
+	 * (~82 KB gzipped markup, ~35 ms server CPU per render — WARLI-2 OWED-2), and
+	 * a viewer nobody but the founder opens does not settle it.
+	 */
+	const TEMPORARY_WARLI_VIEW_ROUTE = "src/app/(public)/warli/page.tsx";
+
+	it("is mounted NOWHERE — nothing outside the art layer imports it, bar the temporary viewer", () => {
+		// DELIBERATE, and the reason is not caution about the artwork. The real
+		// mount point is `src/app/(auth)/**`, a named critical path another lane
+		// holds. Mounting is three lines; a collision there costs a full plan →
+		// execute → review → gate cycle. When this is mounted on purpose, this
+		// test is the one to delete, and deleting it should be a visible decision
+		// rather than a silent one.
 		const all = sourceFilesUnder("src");
 		const importers = all
 			.filter((file) => !file.startsWith(ART_DIR))
@@ -323,7 +337,21 @@ describe("art layer — it is sealed, and it is unmounted", () => {
 					stripComments(readFileSync(join(ROOT, file), "utf8")),
 				),
 			);
-		expect(importers).toEqual([]);
+
+		// ⚠ EXACT EQUALITY AGAINST ONE NAMED PATH — deliberately NOT a filter that
+		// drops the viewer before asserting `[]`.
+		//
+		// The difference is what happens when the route is DELETED. A filter would
+		// keep passing, leaving a stale allowance that silently forgives whatever
+		// is added at that path next. Exact equality REDS the moment the importer
+		// set stops being exactly this one file — whether something new imports the
+		// art layer, OR the viewer goes away and the allowance outlives it.
+		//
+		// So the requirement "remove this when the route is removed" is enforced by
+		// the assertion rather than asked for in a comment. This is one allowed
+		// path, not a denylist and not a widened directory: any second importer
+		// fails, and `src/app/(auth)/**` is not reachable through it.
+		expect(importers).toEqual([TEMPORARY_WARLI_VIEW_ROUTE]);
 
 		// POSITIVE CONTROL: the same scan, pointed at a component family that IS
 		// mounted, finds importers. Without this the assertion above would pass
