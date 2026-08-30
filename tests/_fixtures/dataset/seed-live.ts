@@ -176,7 +176,27 @@ export async function seedDatasetFixture(
 			continue;
 		}
 
-		const adjusted = rows.map((r) => adjustForLiveSchema(table, r));
+		// ⚠ **Inserted in REVERSE fixture order, deliberately.**
+		//
+		// The fixture is sorted into the live reader's `ORDER BY id`. Seeding it
+		// in that same order makes the table's PHYSICAL order identical to its
+		// id order — and then a sequential scan with **no `ORDER BY` at all**
+		// returns exactly the right answer, so the round-trip's byte comparison
+		// passes against a reader that does not order anything.
+		//
+		// Measured, not theorised: mutating `drizzle-source.ts` to drop its
+		// `.orderBy(asc(...))` left all 18 round-trip tests GREEN. The test
+		// claimed in its own docblock to catch non-deterministic ordering and
+		// did not. Reversing the insert makes physical order disagree with id
+		// order, so an unordered read returns rows in the wrong sequence and
+		// the comparison fails — which is what that claim requires.
+		//
+		// It is also the more realistic state: a live table's physical order is
+		// whatever inserts, updates and vacuum left behind, never the PK's.
+		const adjusted = rows
+			.map((r) => adjustForLiveSchema(table, r))
+			.slice()
+			.reverse();
 
 		for (const row of adjusted) {
 			const cols = Object.keys(row);

@@ -168,16 +168,42 @@ describe("round-trip · the named wrong answers, each pinned on its own", () => 
 		expect(ledger?.text).toContain("-25.000000000000000000");
 	});
 
-	it("row order is deterministic across two independent live reads", () => {
-		// A reader without ORDER BY passes a single comparison intermittently.
-		// Reading twice and requiring identity is what makes the absence of
-		// ORDER BY visible rather than lucky.
-		//
-		// (The build above already matched the fixture once; this asserts the
-		// property that made that match reproducible rather than a coincidence.)
-		expect(liveBuild.manifest.content_sha256).toBe(
-			fixtureBuild.manifest.content_sha256,
-		);
+	it("the reader returns rows in ASCENDING order-column order", async () => {
+		// ⚠ A DIRECT assertion on the ordering property, added after measuring
+		// that the byte comparison alone did not have it. Removing the reader's
+		// `ORDER BY` left all 18 tests green, because the fixture was seeded in
+		// id order and a sequential scan therefore returned the right answer by
+		// accident. The seeder now inserts in REVERSE order so physical and id
+		// order disagree — and this test states the property directly rather
+		// than relying on the byte comparison to imply it.
+		const src = drizzleSource(testDb as unknown as DatasetDb, "probe");
+		for (const [table, key] of [
+			["events", "event_id"],
+			["comments", "id"],
+			["mod_actions", "id"],
+			["users", "id"],
+		] as const) {
+			const rows = await src.read(table);
+			// Control: a single-row table cannot demonstrate ordering at all.
+			expect(
+				rows.length,
+				`${table} needs >1 row to prove ordering`,
+			).toBeGreaterThan(1);
+			const keys = rows.map((r) => String(r[key]));
+			expect(keys, `${table} not in ascending ${key} order`).toEqual(
+				[...keys].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
+			);
+		}
+	});
+
+	it("physical insert order DIFFERS from id order — so the test above can fail", () => {
+		// The guard on the guard. If the seeder ever stops reversing, the
+		// ordering assertion silently stops being able to fail, and nothing
+		// else would say so.
+		const ids = DIRTY_TABLE_ROWS.comments.map((c) => String(c.id));
+		const ascending = [...ids].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+		expect(ids).toEqual(ascending); // the FIXTURE is ascending…
+		expect(ids.length).toBeGreaterThan(1); // …and the seeder reverses it.
 	});
 });
 
@@ -226,26 +252,43 @@ describe("round-trip · R1 is real only if the reader finds the removed set", ()
 describe("round-trip · the reader never QUERIES an unshipped table", () => {
 	const source = drizzleSource(testDb as unknown as DatasetDb, "probe");
 
+	// ⚠ Each of these asserts the REASON, not merely that something threw —
+	// and that is a correction to my own first version, which asserted only
+	// `rejects.toBeInstanceOf(EgressContractGapError)`.
+	//
+	// Measured: mutating the status check to `if (false)` left all three
+	// GREEN. With the classification guard disabled, `read("sessions")` fell
+	// through to the `ORDER_COLUMN` lookup, found nothing there either, and
+	// threw the SAME error class from a completely different guard. The tests
+	// passed while the thing they were written to protect was switched off —
+	// `@security-auditor` F-4's shape exactly: *a guard passing with the defect
+	// restored, because something unrelated made the wrong code right.*
+	//
+	// Pinning the message is what distinguishes "refused because it is
+	// NOT_SHIPPED" from "refused for some other reason on the way past".
 	it("refuses NOT_SHIPPED — the read is never issued", async () => {
 		// Not read-and-discard: `sessions` holds every participant's session
 		// token, and pulling it into the export process is the harm, whatever
 		// happens to the rows afterwards.
-		await expect(source.read("sessions")).rejects.toBeInstanceOf(
-			EgressContractGapError,
-		);
-		await expect(source.read("admin_sessions")).rejects.toBeInstanceOf(
-			EgressContractGapError,
-		);
+		await expect(source.read("sessions")).rejects.toThrow(/NOT_SHIPPED/);
+		await expect(source.read("admin_sessions")).rejects.toThrow(/NOT_SHIPPED/);
 	});
 
 	it("refuses UNDECIDED — reading `lots` would settle it by accident", async () => {
-		await expect(source.read("lots")).rejects.toBeInstanceOf(
-			EgressContractGapError,
-		);
+		await expect(source.read("lots")).rejects.toThrow(/UNDECIDED/);
 	});
 
 	it("refuses a table absent from the §19.3 inventory entirely", async () => {
-		await expect(source.read("not_a_table")).rejects.toBeInstanceOf(
+		await expect(source.read("not_a_table")).rejects.toThrow(
+			/not in the §19\.3 inventory/,
+		);
+	});
+
+	it("every refusal is an EgressContractGapError", async () => {
+		// The class assertion still matters — it is what makes the failures
+		// catchable as one kind by the build orchestrator — it just cannot be
+		// the ONLY assertion.
+		await expect(source.read("sessions")).rejects.toBeInstanceOf(
 			EgressContractGapError,
 		);
 	});
