@@ -2993,6 +2993,71 @@ this paragraph only names what a reader tracking sequence should already know.
 
 ---
 
+## WARLI-3 — the composition pass: fill the moat, thicken the rings, re-cut the border
+
+**Originating task:** WARLI-2 (PR #438, squash `ab0f23b`). Four items the founder
+named at the close-out read, plus one the security audit measured.
+
+⛔ **NOT A GO-LIVE GATE.** Its trigger is **after go-live, as in-window
+refinement**. The artwork is **mounted nowhere** — `tests/unit/art/art-layer-guards.test.ts`
+asserts that with a positive control — so nothing here can reach a participant
+until somebody mounts it on purpose. Filed so the composition notes survive the
+gap between building it and looking at it again, **not** to add a row to the
+SEQUENCE table, whose trigger set is "met today" and which correctly still has no
+go-live blocker in it.
+
+**1 · Fill the moat.** There is a visible empty annulus between the outer ring's
+baseline (`R_OUTER = 470`) and the nearest static-field ink. It is a *consequence*
+of a correct fix rather than an oversight: WARLI-2's reviewer pass found that
+`scene.ts::admissible` modelled a figure as a 34-unit disc about its FEET while a
+figure is drawn ~62 units UPWARD from them, so two field figures had ink inside
+the band the rotating crowd sweeps. Widening the extent to the true ink pushed the
+field out and opened the moat. **Closing it means putting marks that are not
+58-unit figures in there** — low ground marks, water lines, a scatter of small
+motifs — not shrinking `RING_CLEAR`, which would re-open the collision.
+
+**2 · Thicken both rings.** At 1440 × 1000 the two rings read thin against a field
+carrying 4,034 of the composition's 4,689 drawn shapes. The rings are the subject;
+they should not be the sparsest thing in the frame.
+
+**3 · Asymmetric border.** The border is capped at **26 units by the vertical
+budget, and that ceiling is measured, not chosen**: the auth card's half-diagonal
+(317.6) sets `R_INNER = 330`, the faced figures at 1.2 × 58 reach 399.6, the outer
+ring's inward figures need 58 of their own, and half the frame height is 500 —
+leaving 30 units top and bottom. But a 1440 × 1000 frame holding a 470-radius
+circle has **~250 units of spare width per side and none above**. A border deeper
+at the left and right than at the top and bottom is both traditional and what the
+aspect ratio actually asks for. Rejected at WARLI-2 for simplicity (CLAUDE.md
+§5.2), recorded here because it is the right move if a heavier frame is wanted — a
+uniform increase is **forbidden** by the budget above and would re-create the
+58-unit border/ring overlap WARLI-2 fixed.
+
+**4 · Static pre-render of the field.** ⚠ **This one is a resource decision and it
+is the reason this row matters before any mount, not after.** Measured by
+`@security-auditor` at WARLI-2: the shipped JS chunk is **12,994 B gzipped**, but
+the markup it produces is **82 KB gzipped — 6.4× the chunk** — plus ~35 ms of
+server CPU per render, and `WarliHero` is `"use client"`, so the 7,978-element
+scene is built on the server **and again in the browser at hydration**.
+`FieldLayer` is neither memoised nor `React.memo`'d. Harmless while unmounted; on
+`/sign-in` it becomes ~35 ms CPU and 82 KB egress **per unauthenticated request**
+on the highest-traffic pre-auth route, against ~2 KB for a normal page. The field
+is 86.0 % of the drawing and **never changes** — it is a pure function of a fixed
+seed — so it is a candidate for a static shell, a cached fragment, or a
+module-level element hoisted out of the render entirely.
+
+**Conditional trigger.** After go-live (2026-09-15), as in-window refinement; or
+immediately before any task that mounts the artwork, for item 4 alone.
+
+**Expected next task.** None scheduled. Evidence:
+`src/components/art/warli/scene.ts` (`RING_CLEAR`, `admissible`, the `Extent`
+docblock recording the feet-vs-ink defect), `src/components/art/warli/primitives/border.tsx`
+(`BORDER_DEPTH` and the vertical-budget derivation in its docblock),
+`src/components/art/warli/field-layer.tsx` (`FieldLayer`, unmemoised),
+`docs/logs/WARLI-2.md` (the measurements), and the preview HTML staged at the
+WARLI-2 close-out.
+
+---
+
 **The `.html` tracker dashboards are operator-local and were not touched here.** If the
 operator's dashboard still shows PERF-1 as blocking, or does not yet reflect PERF-2 / COLD-START
 / GAUGE, that is a manual move for the operator — not a PR.
