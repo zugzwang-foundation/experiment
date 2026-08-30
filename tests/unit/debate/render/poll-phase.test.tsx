@@ -106,6 +106,50 @@ describe("DebatePoll — a real, non-zero phase offset", () => {
 		expect(refreshMock).toHaveBeenCalledTimes(3);
 	});
 
+	it("holds BOTH boundaries to the millisecond — the phase moved, the period did not", () => {
+		// The one assertion that separates the ratified design (phase shifted,
+		// period intact) from the period jitter that was rejected.
+		//
+		// ⚠ THE TWO TESTS ABOVE PIN THE COUNT, NOT THE BOUNDARY, and that gap is
+		// what this test exists to close. They advance by WHOLE intervals and
+		// assert 1, 2, 3 — so a steady-state period of `interval - 1` reproduces
+		// every one of those sample points exactly while drifting a millisecond
+		// per tick, and a period jitter of a few ms would land the same counts
+		// most runs and redden at random on the rest. A guard that fails
+		// intermittently is worse than one that fails: it gets retried.
+		//
+		// Checking `- 1` and then `1` on EVERY window is what makes "exactly the
+		// interval" mean exactly. `0.5` is used rather than a derived fraction
+		// because it round-trips through the float multiply exactly at any even
+		// interval, so the assertion never turns on a rounding accident.
+		const offset = POLL_INTERVAL_MS_DEBATE_VIEW / 2;
+		vi.spyOn(Math, "random").mockReturnValue(0.5);
+
+		render(<DebatePoll marketOpen composerOpen={false} />);
+
+		// FIRST refresh: `offset + interval`, and not one millisecond sooner.
+		act(() => {
+			vi.advanceTimersByTime(offset + POLL_INTERVAL_MS_DEBATE_VIEW - 1);
+		});
+		expect(refreshMock).toHaveBeenCalledTimes(0);
+		act(() => {
+			vi.advanceTimersByTime(1);
+		});
+		expect(refreshMock).toHaveBeenCalledTimes(1);
+
+		// EVERY refresh thereafter: exactly one interval apart, both edges.
+		for (const n of [2, 3, 4]) {
+			act(() => {
+				vi.advanceTimersByTime(POLL_INTERVAL_MS_DEBATE_VIEW - 1);
+			});
+			expect(refreshMock).toHaveBeenCalledTimes(n - 1);
+			act(() => {
+				vi.advanceTimersByTime(1);
+			});
+			expect(refreshMock).toHaveBeenCalledTimes(n);
+		}
+	});
+
 	it("a resume-from-suspension is never jittered, even with a large first-arm offset still pending", () => {
 		vi.spyOn(Math, "random").mockReturnValue(0.9);
 		const { rerender } = render(<DebatePoll marketOpen composerOpen={false} />);

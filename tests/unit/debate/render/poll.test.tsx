@@ -65,7 +65,7 @@ vi.mock("next/navigation", () => ({
 // tabs by delaying when the FIRST interval arms, per client mount. Forced to
 // a constant 0 here so every timing assertion below collapses to exactly the
 // pre-jitter boundaries it already pins — the mechanism is exercised for
-// real by `tests/unit/debate/DebatePoll.poll-phase.test.tsx`, not this file.
+// real by `tests/unit/debate/render/poll-phase.test.tsx`, not this file.
 vi.mock("@/components/debate/poll-phase", () => ({
 	getInitialPollPhaseOffsetMs: () => 0,
 }));
