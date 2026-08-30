@@ -103,10 +103,54 @@ export const PAYLOAD_BEARING_TABLES = new Set([
  * to several passes, and a mutating strip would make the pipeline's result
  * depend on the order those passes happened to run in.
  */
-export function stripMetadata(metadata: unknown): unknown {
-	if (metadata === null || typeof metadata !== "object") return metadata;
-	if (Array.isArray(metadata)) return metadata;
+export function stripMetadata(metadata: unknown, where = "metadata"): unknown {
+	if (metadata === null || metadata === undefined) return metadata;
+	assertJsonObject("metadata", where, metadata);
 	return stripDeep(metadata, new Set(STRIPPED_METADATA_KEYS));
+}
+
+/**
+ * A `payload` / `metadata` column must be a plain JSON OBJECT.
+ *
+ * ⚠ **This is the correction to a genuine fail-OPEN** (`@code-reviewer`
+ * HIGH-2). Both strips previously returned the value unchanged when it was not
+ * an object — `if (typeof value !== "object") return value` — which reads like
+ * defensive coding and is the opposite. A stringified JSONB column then walked
+ * straight through **all four layers at once**, measured end to end on a build
+ * that reported zero violations and zero advisories while emitting into
+ * `events.csv`: a raw ip, a raw user-agent, a raw `users.id` and a raw admin
+ * session id.
+ *
+ * Every layer goes quiet on the same input, and each for a different reason —
+ * which is why nothing caught it:
+ *
+ *   · the **strip** returns early, so nothing is removed;
+ *   · the **harvest** walks a string, `walk` yields one entry with
+ *     `key === null`, the loop skips it, and the secrets are never collected —
+ *     so the value scan is never told to look for them;
+ *   · **`findValues`** is whole-leaf equality and the leaf is the entire JSON
+ *     blob, so no needle matches;
+ *   · **`findKeys`** sees no keys at all.
+ *
+ * The file's own docblock claims this pipeline fails closed. It did, for an
+ * unknown event *type*, and did not for an unexpected *value shape*. Failing
+ * the build is recoverable; publishing is not.
+ */
+function assertJsonObject(
+	column: string,
+	where: string,
+	value: unknown,
+): asserts value is Record<string, unknown> {
+	if (value === null || typeof value !== "object" || Array.isArray(value)) {
+		throw new EgressContractGapError(
+			`${where}.${column}`,
+			`is ${Array.isArray(value) ? "an array" : `a ${typeof value}`}, not a ` +
+				"JSON object. Refusing to pass it through: a non-object payload or " +
+				"metadata is invisible to the strip, to the secret harvest, to the " +
+				"value scan and to the key scan simultaneously — every guard " +
+				"reports clean while the whole blob ships verbatim.",
+		);
+	}
 }
 
 /**
@@ -187,8 +231,7 @@ export function stripPayload(eventType: string, payload: unknown): unknown {
 		);
 	}
 
-	if (payload === null || typeof payload !== "object") return payload;
-	if (Array.isArray(payload)) return payload;
+	assertJsonObject("payload", eventType, payload);
 
 	// ⚠ The union with the global net is LOAD-BEARING and is not belt-and-
 	// braces tidiness. SPEC.2 §19.4.1's per-row table omits `userId` from
@@ -263,7 +306,7 @@ export function stripRow(
 		if (treatments[col] === "STRIP") continue;
 
 		if (col === "metadata") {
-			out[col] = stripMetadata(value);
+			out[col] = stripMetadata(value, table);
 			continue;
 		}
 		if (col === "payload" && PAYLOAD_BEARING_TABLES.has(table)) {

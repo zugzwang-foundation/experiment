@@ -1,3 +1,5 @@
+import canonicalize from "canonicalize";
+
 import type { SourceRow } from "./strip";
 
 /**
@@ -55,7 +57,36 @@ export function escapeField(value: unknown): string {
 		value instanceof Date
 			? value.toISOString()
 			: typeof value === "object"
-				? JSON.stringify(value)
+				? // ⚠ **CANONICAL JSON (RFC 8785 JCS), not `JSON.stringify`.**
+					//
+					// `JSON.stringify` emits keys in the object's own iteration
+					// order, which makes the published bytes a function of where
+					// the row came from. A JS fixture literal yields authoring
+					// order; a row read from Postgres yields **jsonb's** order,
+					// which is normalized by key length then bytewise. The same
+					// data therefore serializes two different ways, and the
+					// manifest's `content_sha256` — which §19.1 relies on for a
+					// v2 rebuild "against the same source state" — moves with the
+					// source rather than with the data.
+					//
+					// Measured: seeding the identical fixture into Postgres and
+					// reading it back produced
+					// `{"ip":…,"flow_id":…,"user_id":…,"actor_id":…}` against the
+					// fixture's `{"request_id":…,"flow_id":…,"user_id":…}` — same
+					// object, different bytes, different archive hash.
+					//
+					// Key order carries no meaning here: `events/insert.ts:217`
+					// already records that "jsonb key-order is irrelevant — a raw
+					// string compare would false-mismatch". Sorting makes the
+					// bytes depend on the data alone, which is what a published,
+					// checksummed, non-withdrawable artifact needs.
+					//
+					// ⚠ **This CHANGES the emitted bytes and therefore every
+					// published checksum** versus DATASET.1. Nothing has been
+					// released (the release is 2026-11-06), so the cost is zero
+					// today — but it is a format decision and it is flagged for
+					// ratification rather than slipped in.
+					(canonicalize(value) ?? "")
 				: // ⚠ String(), never Number(). NUMERIC(38,18) arrives as a
 					// string and must leave as the same string.
 					String(value);

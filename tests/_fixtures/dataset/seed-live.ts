@@ -131,10 +131,59 @@ const OVERRIDING: Readonly<Record<string, string>> = {
 	dharma_ledger: "OVERRIDING SYSTEM VALUE ",
 };
 
+/**
+ * The `jsonb` columns of one table, read from the live catalogue.
+ *
+ * ⚠ Queried rather than hardcoded to `payload`/`metadata`/`categories`. A
+ * hardcoded list is a second declaration of the schema, and it goes stale
+ * silently — the failure mode being precisely the one this function exists to
+ * fix, where a jsonb column stored as a string scalar still round-trips
+ * through two cancelling parses and looks correct.
+ *
+ * Cached per table: this runs inside the per-row insert loop.
+ */
+const jsonbColumnCache = new Map<string, ReadonlySet<string>>();
+
+async function jsonbColumns(
+	client: postgres.Sql,
+	table: string,
+): Promise<ReadonlySet<string>> {
+	const hit = jsonbColumnCache.get(table);
+	if (hit !== undefined) return hit;
+
+	const rows = await client.unsafe(
+		`SELECT column_name FROM information_schema.columns
+		 WHERE table_schema = 'public' AND table_name = $1 AND data_type = 'jsonb'`,
+		[table] as never,
+	);
+	const set = new Set(rows.map((r) => String(r.column_name)));
+	jsonbColumnCache.set(table, set);
+	return set;
+}
+
 function bind(value: unknown): unknown {
-	if (value !== null && typeof value === "object" && !(value instanceof Date)) {
-		return JSON.stringify(value);
-	}
+	// ⚠ **Objects pass through UNCHANGED. Do not `JSON.stringify` here.**
+	//
+	// This function used to stringify them, which was the `@code-reviewer`
+	// CRITICAL: combined with the `$N::jsonb` cast, postgres-js infers the
+	// parameter's type FROM the cast, looks up its jsonb serializer, and
+	// applies `JSON.stringify` itself — so a pre-stringified object was
+	// encoded TWICE and landed as a jsonb **string scalar**
+	// (`jsonb_typeof = 'string'`), not an object.
+	//
+	// Measured across three states, which is the only way this was pinned
+	// down — the first fix attempt (adding the cast, keeping the stringify)
+	// changed nothing at all:
+	//
+	//   stringify + no cast → jsonb_typeof = 'string'   ✗
+	//   stringify + ::jsonb → jsonb_typeof = 'string'   ✗  (the cast alone
+	//                                                       is not the fix)
+	//   raw object + ::jsonb → jsonb_typeof = 'object'  ✓
+	//
+	// `NUMERIC(38,18)` values are strings and stay strings: a `Number()`
+	// anywhere on this path would truncate an 18-decimal balance to float
+	// precision and the CSV would still look completely normal
+	// (CLAUDE.md §2).
 	return value;
 }
 
@@ -200,7 +249,31 @@ export async function seedDatasetFixture(
 
 		for (const row of adjusted) {
 			const cols = Object.keys(row);
-			const placeholders = cols.map((_, i) => `$${i + 1}`).join(", ");
+			// ⚠ **`::jsonb` on every jsonb column — this is the fix for the
+			// `@code-reviewer` CRITICAL.**
+			//
+			// Without the cast, a `JSON.stringify`'d object arrives as an
+			// unspecified-type parameter and Postgres stores it as a **jsonb
+			// STRING SCALAR** — `jsonb_typeof` = `'string'`, the whole object
+			// escaped inside one JSON string — not as a jsonb object. Measured
+			// on all 27 seeded `events` rows and both `mod_actions` rows before
+			// the fix.
+			//
+			// It was invisible because two errors cancelled: postgres-js parses
+			// the wire text back into a JS *string*, and drizzle's
+			// `PgJsonb.mapFromDriverValue` sees a string and parses a SECOND
+			// time — recovering an object with the FIXTURE's key order. So the
+			// round-trip's byte comparison passed, on a row shape production
+			// never writes, for the exact columns carrying the §19.4.1 payload
+			// strips and the §19.5 metadata pseudonymization.
+			//
+			// The cast mirrors what production does verbatim:
+			// `src/server/events/insert.ts:164` writes
+			// `${JSON.stringify(payloadResult.data)}::jsonb`.
+			const jsonbCols = await jsonbColumns(client, table);
+			const placeholders = cols
+				.map((c, i) => (jsonbCols.has(c) ? `$${i + 1}::jsonb` : `$${i + 1}`))
+				.join(", ");
 			const quoted = cols.map((c) => `"${c}"`).join(", ");
 			await client.unsafe(
 				`INSERT INTO "${table}" (${quoted}) ${OVERRIDING[table] ?? ""}VALUES (${placeholders})`,

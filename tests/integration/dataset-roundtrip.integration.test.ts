@@ -77,7 +77,7 @@ beforeAll(async () => {
 	});
 
 	liveBuild = await buildDataset({
-		source: drizzleSource(testDb as unknown as DatasetDb, "fixture"),
+		source: drizzleSource(testDb, "fixture"),
 		releaseDate: RELEASE_DATE,
 	});
 }, 60_000);
@@ -141,6 +141,29 @@ describe("round-trip · the live reader reproduces the fixture build", () => {
 			Object.fromEntries(b.manifest.tables.map((t) => [t.name, t.row_count]));
 		expect(counts(liveBuild)).toEqual(counts(fixtureBuild));
 	});
+
+	it("reaches the same GUARD OUTCOME, not just the same bytes", () => {
+		// ⚠ `@code-reviewer` MEDIUM-8. The comparison above covers the
+		// artifacts and says nothing about what the egress layer DID while
+		// producing them — so a reader change that produced a new advisory, or
+		// newly skipped a needle as too short, would pass every other
+		// assertion in this file.
+		//
+		// It is not hypothetical here: the two builds genuinely run with
+		// DIFFERENT secret sets. `seed-live.ts` substitutes `[erased]` and
+		// `erased-<id>@erased.invalid` for the H2-erased row's NOT NULL
+		// `name`/`email`, so `harvestSecrets` puts those two strings into the
+		// LIVE build's needle sets and not the fixture's. That changes no byte
+		// today — both columns are STRIP and `findValues` is exact-match — and
+		// this is what would notice if it ever stopped being true.
+		expect(liveBuild.manifest.advisories).toEqual(
+			fixtureBuild.manifest.advisories,
+		);
+		expect(liveBuild.manifest.skipped_needles).toBe(
+			fixtureBuild.manifest.skipped_needles,
+		);
+		expect(liveBuild.manifest.withheld).toEqual(fixtureBuild.manifest.withheld);
+	});
 });
 
 describe("round-trip · the named wrong answers, each pinned on its own", () => {
@@ -176,7 +199,7 @@ describe("round-trip · the named wrong answers, each pinned on its own", () => 
 		// accident. The seeder now inserts in REVERSE order so physical and id
 		// order disagree — and this test states the property directly rather
 		// than relying on the byte comparison to imply it.
-		const src = drizzleSource(testDb as unknown as DatasetDb, "probe");
+		const src = drizzleSource(testDb, "probe");
 		for (const [table, key] of [
 			["events", "event_id"],
 			["comments", "id"],
@@ -196,14 +219,27 @@ describe("round-trip · the named wrong answers, each pinned on its own", () => 
 		}
 	});
 
-	it("physical insert order DIFFERS from id order — so the test above can fail", () => {
-		// The guard on the guard. If the seeder ever stops reversing, the
-		// ordering assertion silently stops being able to fail, and nothing
-		// else would say so.
-		const ids = DIRTY_TABLE_ROWS.comments.map((c) => String(c.id));
-		const ascending = [...ids].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-		expect(ids).toEqual(ascending); // the FIXTURE is ascending…
-		expect(ids.length).toBeGreaterThan(1); // …and the seeder reverses it.
+	it("physical insert order DIFFERS from id order — so the test above can fail", async () => {
+		// The guard on the guard, and ⚠ my first version of it did not observe
+		// the thing it guarded (`@code-reviewer` MEDIUM-9). It asserted only
+		// that the FIXTURE is ascending — which stays true if the seeder stops
+		// reversing, so the ordering assertion above would go vacuous and this
+		// test, written precisely to detect that, would stay green.
+		//
+		// Reading PHYSICAL order back is what closes it. `ctid` is the
+		// on-disk tuple position, so a freshly-seeded table's `ORDER BY ctid`
+		// IS its insert order.
+		const physical = await testClient`SELECT id FROM comments ORDER BY ctid`;
+		const physicalIds = physical.map((r) => String(r.id));
+		expect(physicalIds.length).toBeGreaterThan(1);
+
+		const ascending = [...physicalIds].sort((a, b) =>
+			a < b ? -1 : a > b ? 1 : 0,
+		);
+		// Physical order must NOT already be id order — otherwise a reader
+		// with no ORDER BY would return the right answer by accident.
+		expect(physicalIds).not.toEqual(ascending);
+		expect(physicalIds).toEqual([...ascending].reverse());
 	});
 });
 
@@ -250,7 +286,7 @@ describe("round-trip · R1 is real only if the reader finds the removed set", ()
 });
 
 describe("round-trip · the reader never QUERIES an unshipped table", () => {
-	const source = drizzleSource(testDb as unknown as DatasetDb, "probe");
+	const source = drizzleSource(testDb, "probe");
 
 	// ⚠ Each of these asserts the REASON, not merely that something threw —
 	// and that is a correction to my own first version, which asserted only
@@ -298,6 +334,50 @@ describe("round-trip · the reader never QUERIES an unshipped table", () => {
 		// succeed. A `read` that threw unconditionally would pass all of them.
 		const rows = await source.read("users");
 		expect(rows.length).toBe(DIRTY_TABLE_ROWS.users.length);
+	});
+});
+
+describe("round-trip · the seeded rows are PRODUCTION-shaped", () => {
+	it("every jsonb column stores an OBJECT, never a string scalar", async () => {
+		// ⚠⚠ **The `@code-reviewer` CRITICAL, pinned directly — and it has to
+		// be pinned directly, because the byte comparison cannot see it.**
+		//
+		// `bind()` used to `JSON.stringify` objects; combined with the
+		// `$N::jsonb` cast, postgres-js applied its own jsonb serializer on
+		// top, so values landed as jsonb STRING SCALARS. Two errors then
+		// cancelled on the way back out — postgres-js parses the wire text to a
+		// JS string, drizzle's `PgJsonb.mapFromDriverValue` sees a string and
+		// parses AGAIN — recovering an object, so every byte assertion passed
+		// on a shape production never writes.
+		//
+		// ⚠ **Measured: restoring the double-encode leaves all 21 other tests
+		// GREEN.** Canonical JSON makes both sides sort their keys, so the
+		// recovered object serialises identically either way. The byte
+		// comparison is therefore structurally blind here, and only an
+		// assertion about what is IN THE DATABASE can fail.
+		//
+		// Production writes `${JSON.stringify(data)}::jsonb`
+		// (`src/server/events/insert.ts:164`), which yields `'object'`.
+		const rows = await testClient`
+			SELECT jsonb_typeof(payload) AS p, jsonb_typeof(metadata) AS m
+			FROM events`;
+		expect(rows.length).toBeGreaterThan(0); // control: there ARE rows
+		for (const r of rows) {
+			expect(r.p).toBe("object");
+			expect(r.m).toBe("object");
+		}
+
+		const cats = await testClient`
+			SELECT jsonb_typeof(categories) AS t FROM mod_actions`;
+		expect(cats.length).toBeGreaterThan(0);
+		for (const c of cats) expect(c.t).toBe("object");
+	});
+
+	it("POSITIVE CONTROL — jsonb_typeof can return 'string'", async () => {
+		// Without this the assertion above could be passing because
+		// `jsonb_typeof` never returns 'string' at all.
+		const [row] = await testClient`SELECT jsonb_typeof('"x"'::jsonb) AS t`;
+		expect(row?.t).toBe("string");
 	});
 });
 

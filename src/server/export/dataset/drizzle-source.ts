@@ -1,5 +1,11 @@
-import { asc, getTableColumns, getTableName, gt } from "drizzle-orm";
-import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
+import { asc, getTableColumns, getTableName, gt, is, sql } from "drizzle-orm";
+import type {
+	PgColumn,
+	PgDatabase,
+	PgQueryResultHKT,
+	PgTable,
+} from "drizzle-orm/pg-core";
+import { PgTable as PgTableClass } from "drizzle-orm/pg-core";
 
 import * as schema from "@/db/schema";
 import { EgressContractGapError } from "@/server/export/egress/errors";
@@ -57,28 +63,28 @@ import type { SourceRow } from "./strip";
  */
 
 /**
- * The minimum drizzle surface this reader needs.
+ * The drizzle handle this reader is given.
  *
- * Structural rather than `typeof db`, so the caller may pass the app
- * singleton, a script's own `postgres()`-backed client, or a test client
- * without any of them having to be the same type. It also states, in the type,
- * that this module can only SELECT — there is no `insert` or `transaction` on
- * it to reach for.
+ * ⚠ **This was a hand-rolled structural interface, and no real drizzle client
+ * could satisfy it** (`@code-reviewer` HIGH-4, measured with `tsc`): its
+ * `where(cond: unknown)` and `orderBy(...cols: unknown[])` are contravariant
+ * under `strictFunctionTypes`, so `const d: DatasetDb = testDb` was a type
+ * error and every call site reached for `as unknown as DatasetDb` — the double
+ * cast AGENTS.md §11 lists under **Never**, which erases the check entirely.
+ * A type that is only ever satisfied by casting past it verifies nothing, and
+ * a drizzle signature change would have surfaced for the first time on the
+ * one-shot release run.
+ *
+ * `PgDatabase` is drizzle's own base class, which both the postgres-js and
+ * node-postgres handles extend, so the app singleton, a script's own client
+ * and a test client are all assignable **without a cast**.
+ *
+ * The lost property is worth naming: the old shape claimed to state "this
+ * module can only SELECT". It never did — the casts saw to that — and the
+ * real guarantee is the one the reviewer verified by reading the file: there
+ * is no `insert`, `update`, `delete` or `transaction` anywhere in it.
  */
-export interface DatasetDb {
-	select: (fields: Record<string, PgColumn>) => {
-		from: (table: PgTable) => {
-			where: (cond: unknown) => {
-				orderBy: (...cols: unknown[]) => {
-					limit: (n: number) => Promise<Record<string, unknown>[]>;
-				};
-			};
-			orderBy: (...cols: unknown[]) => {
-				limit: (n: number) => Promise<Record<string, unknown>[]>;
-			};
-		};
-	};
-}
+export type DatasetDb = PgDatabase<PgQueryResultHKT, Record<string, unknown>>;
 
 /**
  * Column each table is ordered and paged by.
@@ -92,7 +98,16 @@ export interface DatasetDb {
  *
  * All sixteen shipped tables carry `id` except `events`, whose PK is the
  * composite `(event_id, created_at)` — it is the hand-partitioned table
- * (AGENTS.md §6), and `event_id` alone is unique because it is a UUIDv7.
+ * (AGENTS.md §6). ⚠ `event_id` alone is unique **by construction in
+ * `events/insert.ts`, not by constraint** — the only unique index on each
+ * partition is `(event_id, created_at)`, because a partitioned table cannot
+ * enforce uniqueness on a column outside the partition key, and `insert.ts`'s
+ * `ON CONFLICT (event_id, created_at) DO NOTHING` would accept the same
+ * `event_id` under a different `created_at`. It holds because `created_at` is
+ * derived from the UUIDv7's own timestamp. Stated rather than assumed
+ * (`@code-reviewer` MEDIUM-7), because keyset `gt` would silently SKIP a
+ * duplicate that landed on a page boundary — and the row-count reconciliation
+ * below is what would notice.
  *
  * Written out per table rather than introspected from the PK, because the
  * value is auditable against §19.3 by reading it, and because a table whose
@@ -132,14 +147,15 @@ const PAGE_SIZE = 5_000;
 function tablesByName(): ReadonlyMap<string, PgTable> {
 	const map = new Map<string, PgTable>();
 	for (const value of Object.values(schema)) {
-		// `is(value, PgTable)` is the check `inventory.ts` uses; reusing the
-		// same predicate keeps the two from disagreeing about what a table is.
-		if (
-			typeof value === "object" &&
-			value !== null &&
-			Symbol.for("drizzle:Name") in value
-		) {
-			map.set(getTableName(value as PgTable), value as PgTable);
+		// ⚠ `is(value, PgTable)` — the SAME predicate `inventory.ts:271` and
+		// `treatments.ts:276` use, so the three cannot disagree about what
+		// counts as a table. This claim used to sit above a hand-rolled
+		// `Symbol.for("drizzle:Name") in value` test (`@code-reviewer` LOW):
+		// the two agree today (24 tables either way, measured), so it was
+		// documentation drift rather than a defect — but a comment that names
+		// a shared predicate should name one that is actually shared.
+		if (is(value, PgTableClass)) {
+			map.set(getTableName(value), value);
 		}
 	}
 	return map;
@@ -267,7 +283,15 @@ export function drizzleSource(db: DatasetDb, label: string): DatasetSource {
 				if (page.length < PAGE_SIZE) break;
 
 				cursor = page[page.length - 1]?.[orderName];
-				if (cursor === undefined) {
+				// ⚠ `null` as well as `undefined` (`@code-reviewer` MEDIUM-6).
+				// The check was `=== undefined` while the comment below said
+				// "null/absent" — and a `null` slipping through does NOT loop
+				// forever, which would at least be visible. It issues
+				// `col > NULL` → NULL → zero rows → `break`, ending the export
+				// EARLY with no error and no signal, losing exactly the
+				// NULL-keyed tail that `ASC` sorts last. A guard whose one
+				// stated purpose is the case it does not cover.
+				if (cursor === undefined || cursor === null) {
 					// The order column came back null/absent — paging cannot
 					// advance and would loop forever on the same page. Fail
 					// rather than spin: an infinite loop in a guard-bearing
@@ -279,6 +303,34 @@ export function drizzleSource(db: DatasetDb, label: string): DatasetSource {
 							"keyset paging cannot advance past it.",
 					);
 				}
+			}
+
+			// ⚠ **Reconcile against the table, not against ourselves**
+			// (`@code-reviewer` HIGH-5).
+			//
+			// `build.ts`'s `assertCountsAgree` compares the writer's count
+			// against a re-parse of the emitted CSV — but BOTH derive from this
+			// same read. If the paging loop drops rows (a null cursor, a
+			// duplicate order key, a mis-pruned partition), `rowCount` and
+			// `verifiedRowCount` still agree, the manifest publishes a number
+			// that faithfully describes a TRUNCATED file, and every guard
+			// reports clean. `build.ts` names "row counts computed from a
+			// different read than the one that wrote the files" as the wrong
+			// answer; for a PAGED reader the right answer needs a count that
+			// did not come from the paging loop at all.
+			//
+			// One extra query per table, on a job that gets one attempt.
+			const [countRow] = await db
+				.select({ n: sql<number>`count(*)::int` })
+				.from(pgTable);
+			const actual = Number(countRow?.n ?? -1);
+			if (actual !== out.length) {
+				throw new EgressContractGapError(
+					`table: ${table}`,
+					`paged read returned ${out.length} row(s) but the table holds ` +
+						`${actual}. The export would ship a truncated file whose ` +
+						"manifest row count describes it accurately — refusing.",
+				);
 			}
 
 			return out;

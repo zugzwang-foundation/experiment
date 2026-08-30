@@ -13,6 +13,7 @@ import {
 } from "@/server/export/dataset/pseudonymize";
 import {
 	stripDeep,
+	stripMetadata,
 	stripPayload,
 	stripTable,
 } from "@/server/export/dataset/strip";
@@ -364,6 +365,60 @@ describe("C3 · image_upload.committed.payload.commentId is stripped", () => {
 		});
 		const keptOut = out.find((r) => r.id === kept?.id);
 		expect(keptOut?.image_uploads_id).toBe(kept?.image_uploads_id);
+	});
+});
+
+describe("HIGH-2 · a non-object payload/metadata FAILS CLOSED", () => {
+	// ⚠ `@code-reviewer` HIGH-2 measured a genuine fail-OPEN: both strips
+	// returned the value unchanged when it was not an object, so a stringified
+	// JSONB column walked through **all four guard layers at once** — the
+	// strip returned early, the harvest walked a string and collected nothing,
+	// `findValues` compared whole leaves against a needle set that no longer
+	// contained the secrets, and `findKeys` saw no keys. The reviewer drove a
+	// full build in that state: zero violations, zero advisories, and a raw
+	// ip, user-agent, `users.id` and admin session id in `events.csv`.
+	//
+	// These are the direct controls, because the round-trip's byte comparison
+	// cannot see it — measured: restoring the passthrough leaves all 21
+	// round-trip tests green.
+
+	it("stripPayload THROWS on a stringified payload", () => {
+		expect(() =>
+			stripPayload(
+				"image_upload.committed",
+				JSON.stringify({ userId: "x", ip: "203.0.113.7" }),
+			),
+		).toThrow(/not a\s+JSON object/);
+	});
+
+	it("stripPayload THROWS on an array payload", () => {
+		expect(() =>
+			stripPayload("market.created", [{ key: "u/x/y.webp" }]),
+		).toThrow(/not a\s+JSON object/);
+	});
+
+	it("stripMetadata THROWS on a stringified metadata", () => {
+		expect(() =>
+			stripMetadata(JSON.stringify({ ip: "203.0.113.7" }), "events"),
+		).toThrow(/not a\s+JSON object/);
+	});
+
+	it("POSITIVE CONTROL — a real object still passes, and is stripped", () => {
+		// Without this, the three throws above are satisfied by a function that
+		// throws on everything.
+		const out = stripPayload("image_upload.committed", {
+			userId: "x",
+			uploadId: "u1",
+		}) as Record<string, unknown>;
+		expect("userId" in out).toBe(false);
+		expect(out.uploadId).toBe("u1");
+	});
+
+	it("null and undefined metadata still pass through (not an error)", () => {
+		// A genuinely absent JSONB column is not the defect — the defect is a
+		// SCALAR standing in for an object. Distinguishing them is the point.
+		expect(stripMetadata(null, "events")).toBeNull();
+		expect(stripMetadata(undefined, "events")).toBeUndefined();
 	});
 });
 
