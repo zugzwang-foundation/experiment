@@ -75,7 +75,7 @@ export const FIXTURE_SECRET_VALUES = {
 		`u/${FIXTURE_USER_IDS.basalt}/0192f3a4-bbbb-7000-8000-0000000000u2.webp`,
 		// ⚠ index 2 is the `m/` MARKET-MEDIA key and is NOT a secret —
 		// Appendix B.16 SHIPs it. See `fixtureSecrets`.
-		`m/0192f3a4-cccc-7000-8000-00000000m001/hero.webp`,
+		`m/0192f3a4-cccc-7000-8000-000000000001/hero.webp`,
 		// ⚠ index 3 is DATASET.2 C2's ARRAY-depth probe: a `u/` key reachable
 		// only at `image_upload.committed.payload.variants[0].key`. It proves
 		// depth THROUGH AN ARRAY, which the `m/` key next to it cannot — that
@@ -85,8 +85,23 @@ export const FIXTURE_SECRET_VALUES = {
 		`u/${FIXTURE_USER_IDS.amber}/0192f3a4-dddd-7000-8000-0000000000u4.webp`,
 	],
 	adminSessionIds: [
-		"adm_sess_0192f3a4dddd7000800000000000s001",
-		"adm_sess_0192f3a4eeee7000800000000000s002",
+		// ⚠ **UUIDv7s, because that is what an admin session id IS** — corrected
+		// at DATASET.2 Slice 5, where seeding into real Postgres rejected the
+		// previous `adm_sess_…` strings outright: `events.aggregate_id` is a
+		// `uuid` column, `admin_sessions.session_id` is a UUIDv7 PK, and
+		// `auth/admin/login.ts` writes `aggregate_id = cookie.value = that PK`.
+		// The old values were an invented opaque-token format the system never
+		// produces.
+		//
+		// **This makes the fixture harder, not easier, and that is the point.**
+		// An `adm_sess_`-prefixed string announces itself: any guard, and any
+		// human skimming a CSV, spots it immediately. A real admin session id
+		// is shaped exactly like every other id in the dataset and announces
+		// nothing — which is precisely why B.13's old "SHIPs raw" carve-out
+		// could sit there unremarked, and why the R2 redaction has to be a rule
+		// rather than something anyone would notice the absence of.
+		"0192f3a4-d1d1-7000-8000-000000000001",
+		"0192f3a4-d2d2-7000-8000-000000000002",
 	],
 } as const;
 
@@ -146,14 +161,14 @@ const [SESS_A, SESS_B] = FIXTURE_SECRET_VALUES.adminSessionIds;
 
 const AMBER = FIXTURE_USER_IDS.amber;
 const BASALT = FIXTURE_USER_IDS.basalt;
-const MARKET_ID = "0192f3a4-cccc-7000-8000-00000000m001";
+const MARKET_ID = "0192f3a4-cccc-7000-8000-000000000001";
 const BET_ID = "0192f3a4-dddd-7000-8000-00000000be01";
-const COMMENT_ID = "0192f3a4-eeee-7000-8000-00000000cm01";
-const UPLOAD_ID = "0192f3a4-ffff-7000-8000-00000000up01";
+const COMMENT_ID = "0192f3a4-eeee-7000-8000-000000000001";
+const UPLOAD_ID = "0192f3a4-ffff-7000-8000-000000000001";
 const AT = "2026-10-01T12:00:00.000Z";
 
 /** A comment an admin reactively removed (ADR-0021). */
-export const REMOVED_COMMENT_ID = "0192f3a4-babe-7000-8000-00000000cm02";
+export const REMOVED_COMMENT_ID = "0192f3a4-babe-7000-8000-000000000002";
 
 /**
  * The removed comment's body, as a distinctive canary.
@@ -355,7 +370,7 @@ export const DIRTY_EVENT_ROWS: readonly DirtyEventRow[] = [
 		event_id: "0192f3a4-0010-7000-8000-000000000e10",
 		event_type: "moderation.blocked",
 		aggregate_type: "mod_action",
-		aggregate_id: "0192f3a4-9999-7000-8000-00000000ma01",
+		aggregate_id: "0192f3a4-9999-7000-8000-000000000001",
 		// `reason` / `banned` / `uploadId` SHIP per §19.4.1 (AUDIT-FIX-B5).
 		payload: {
 			userId: BASALT,
@@ -611,7 +626,7 @@ if (missing.length > 0) {
  */
 export const RECOVERY_PATH_EVENT_ROWS: readonly DirtyEventRow[] = [
 	{
-		event_id: "0192f3a4-00fe-7000-8000-00000000rp01",
+		event_id: "0192f3a4-00fe-7000-8000-000000000001",
 		event_type: "comment.placed",
 		aggregate_type: "comment",
 		aggregate_id: REMOVED_COMMENT_ID,
@@ -638,7 +653,7 @@ export const RECOVERY_PATH_EVENT_ROWS: readonly DirtyEventRow[] = [
 
 export const SENTINEL_EVENT_ROWS: readonly DirtyEventRow[] = [
 	{
-		event_id: "0192f3a4-00ff-7000-8000-00000000se01",
+		event_id: "0192f3a4-00ff-7000-8000-000000000001",
 		event_type: "user.signed_out",
 		aggregate_type: "user",
 		aggregate_id: BASALT,
@@ -656,7 +671,7 @@ export const SENTINEL_EVENT_ROWS: readonly DirtyEventRow[] = [
 		created_at: AT,
 	},
 	{
-		event_id: "0192f3a4-00fe-7000-8000-00000000se02",
+		event_id: "0192f3a4-00fe-7000-8000-000000000002",
 		event_type: "image_upload.orphaned",
 		aggregate_type: "image_upload",
 		aggregate_id: UPLOAD_ID,
@@ -689,7 +704,7 @@ export const SENTINEL_EVENT_ROWS: readonly DirtyEventRow[] = [
  * silently skip on the erased one, and that row shape exists in production by
  * design rather than by accident.
  */
-export const DIRTY_TABLE_ROWS = {
+const DIRTY_TABLE_ROWS_UNSORTED = {
 	users: [
 		{
 			id: FIXTURE_USER_IDS.amber,
@@ -790,13 +805,26 @@ export const DIRTY_TABLE_ROWS = {
 			body: "The tunnelling is complete and trial runs began in August.",
 			image_uploads_id: UPLOAD_ID,
 			side_at_post_time: "YES",
-			bet_id: BET_ID,
+			// ⚠ **NULL, and it can never be anything else** — corrected at
+			// DATASET.2 Slice 5, where seeding into real Postgres proved it.
+			// `comments.bet_id` → `bets.id` and `bets.comment_id` → `comments.id`
+			// are a circular pair and NEITHER FK is DEFERRABLE
+			// (`0001_initial_schema.sql`), so the comment must be inserted before
+			// its bet exists and the column can never be back-filled — `comments`
+			// is Bucket-A append-only. CLAUDE.md §2 and AGENTS.md both state this
+			// (INV-1 is enforced through `bets.comment_id NOT NULL` instead); the
+			// fixture nonetheless carried a real bet id, which is a state
+			// production cannot reach. It ships as an empty field either way
+			// (Appendix B.6 SHIPs the column), so nothing downstream changes —
+			// but a fixture asserting an impossible row is a fixture that cannot
+			// be round-tripped, and until something tried, nothing could tell.
+			bet_id: null,
 			created_at: AT,
 		},
 	],
 	dharma_ledger: [
 		{
-			id: "0192f3a4-1a1a-7000-8000-00000000dl01",
+			id: "0192f3a4-1a1a-7000-8000-000000000001",
 			seq: 1,
 			user_id: FIXTURE_USER_IDS.amber,
 			bet_id: BET_ID,
@@ -809,7 +837,7 @@ export const DIRTY_TABLE_ROWS = {
 	// ⚠ §19.5's bullet list does NOT name this table. Appendix B.4 does.
 	positions: [
 		{
-			id: "0192f3a4-2b2b-7000-8000-00000000ps01",
+			id: "0192f3a4-2b2b-7000-8000-000000000001",
 			user_id: FIXTURE_USER_IDS.amber,
 			market_id: MARKET_ID,
 			side: "YES",
@@ -821,11 +849,11 @@ export const DIRTY_TABLE_ROWS = {
 	// ⚠ Likewise absent from §19.5's list; Appendix B.8 marks it PSEUDO.
 	payout_events: [
 		{
-			id: "0192f3a4-3c3c-7000-8000-00000000pe01",
+			id: "0192f3a4-3c3c-7000-8000-000000000001",
 			bet_id: BET_ID,
 			user_id: FIXTURE_USER_IDS.amber,
 			market_id: MARKET_ID,
-			resolution_event_id: "0192f3a4-4d4d-7000-8000-00000000re01",
+			resolution_event_id: "0192f3a4-4d4d-7000-8000-000000000001",
 			payout_type: "bet_payout",
 			amount: "50.000000000000000000",
 			created_at: AT,
@@ -834,7 +862,7 @@ export const DIRTY_TABLE_ROWS = {
 	// ⚠ Likewise; Appendix B.12 marks user_id PSEUDO and actor_id PSEUDO.
 	user_events: [
 		{
-			id: "0192f3a4-5e5e-7000-8000-00000000ue01",
+			id: "0192f3a4-5e5e-7000-8000-000000000001",
 			user_id: FIXTURE_USER_IDS.basalt,
 			event_type: "user.tos_accepted",
 			payload: { tosVersionHash: "sha256:abc123", ip: IP_B },
@@ -853,7 +881,7 @@ export const DIRTY_TABLE_ROWS = {
 			// both SHIP (B.10) — which is what makes an unmasked comments read
 			// worse than a plain leak: the archive would carry a labelled
 			// index of precisely which bodies had been removed.
-			id: "0192f3a4-7b7b-7000-8000-00000000ma02",
+			id: "0192f3a4-7b7b-7000-8000-000000000002",
 			target_user_id: FIXTURE_USER_IDS.basalt,
 			target_comment_id: REMOVED_COMMENT_ID,
 			target_bet_id: null,
@@ -867,7 +895,7 @@ export const DIRTY_TABLE_ROWS = {
 			created_at: AT,
 		},
 		{
-			id: "0192f3a4-6f6f-7000-8000-00000000ma01",
+			id: "0192f3a4-6f6f-7000-8000-000000000001",
 			target_user_id: FIXTURE_USER_IDS.basalt,
 			target_comment_id: null,
 			target_bet_id: null,
@@ -926,7 +954,7 @@ export const DIRTY_TABLE_ROWS = {
 	],
 	pools: [
 		{
-			id: "0192f3a4-8b8b-7000-8000-00000000pl01",
+			id: "0192f3a4-8b8b-7000-8000-000000000001",
 			market_id: MARKET_ID,
 			yes_reserves: "1050.000000000000000000",
 			no_reserves: "950.000000000000000000",
@@ -935,7 +963,7 @@ export const DIRTY_TABLE_ROWS = {
 	],
 	resolution_events: [
 		{
-			id: "0192f3a4-4d4d-7000-8000-00000000re01",
+			id: "0192f3a4-4d4d-7000-8000-000000000001",
 			market_id: MARKET_ID,
 			event_kind: "resolve",
 			outcome: "YES",
@@ -946,7 +974,7 @@ export const DIRTY_TABLE_ROWS = {
 	],
 	identity_pool: [
 		{
-			id: "0192f3a4-9c9c-7000-8000-00000000ip01",
+			id: "0192f3a4-9c9c-7000-8000-000000000001",
 			colour: "Amber",
 			animal: "Otter",
 			number: 42,
@@ -958,12 +986,12 @@ export const DIRTY_TABLE_ROWS = {
 	],
 	market_media: [
 		{
-			id: "0192f3a4-adad-7000-8000-00000000mm01",
+			id: "0192f3a4-adad-7000-8000-000000000001",
 			market_id: MARKET_ID,
 			// B.16 — this r2_object_key SHIPS. Admin-curated public context in
 			// the `m/<marketId>/` namespace: no user_id embedded, so it is NOT
 			// the same class of value as `image_uploads.r2_object_key`.
-			r2_object_key: "m/0192f3a4-cccc-7000-8000-00000000m001/hero.webp",
+			r2_object_key: "m/0192f3a4-cccc-7000-8000-000000000001/hero.webp",
 			display_order: 0,
 			is_default: true,
 			created_by: ADMIN_SENTINEL,
@@ -976,6 +1004,62 @@ export const DIRTY_TABLE_ROWS = {
 		...RECOVERY_PATH_EVENT_ROWS,
 	],
 } as const satisfies Record<string, readonly object[]>;
+
+/**
+ * The order column each table is read back by — mirrors `ORDER_COLUMN` in
+ * `src/server/export/dataset/drizzle-source.ts`.
+ */
+const FIXTURE_ORDER_COLUMN: Readonly<Record<string, string>> = {
+	events: "event_id",
+};
+
+/**
+ * The fixture, with every table sorted the way the LIVE READER returns it.
+ *
+ * ⚠ **Added at DATASET.2 Slice 5, and the reason is the round-trip test.**
+ * The literal above is grouped for a human reader — one events row per event
+ * type, in `EVENT_TYPES` order, with the sentinel and recovery-path rows
+ * appended. The live reader returns rows `ORDER BY id` (or `event_id`), which
+ * is UUIDv7 order and therefore creation order. Those are different sequences,
+ * and CSV row order is part of the published bytes.
+ *
+ * Sorting HERE rather than hand-ordering the literal keeps both properties:
+ * the source stays readable and grouped by meaning, and the exported fixture
+ * agrees with the database by construction rather than by someone maintaining
+ * a hand-sorted list of UUIDs.
+ *
+ * ⚠ It also means the in-memory build and the live build are comparable
+ * byte-for-byte — which is the entire point of the round-trip test. Without
+ * it, the only reachable assertion would be a set comparison, and a set
+ * comparison **cannot see a reader that returns rows in a different order
+ * every run** — the exact wrong answer the test exists to reject.
+ */
+function sortFixtureTable(
+	table: string,
+	rows: readonly Record<string, unknown>[],
+): readonly Record<string, unknown>[] {
+	const key = FIXTURE_ORDER_COLUMN[table] ?? "id";
+	// ⚠ BYTE order (`<` / `>`), never `localeCompare`. Postgres's `ORDER BY`
+	// on a `uuid` column is a byte comparison; `localeCompare` is a
+	// collation-aware comparison that can order the same two strings
+	// differently under a different ICU version or locale. `@code-reviewer`
+	// M-9 already caught exactly this once in `tar.ts` — sorting that reads
+	// ambient locale is how an archive's published checksum becomes a
+	// property of the machine that built it. My first version of this
+	// function used `localeCompare("en-US")` and reintroduced it.
+	return [...rows].sort((a, b) => {
+		const x = String(a[key]);
+		const y = String(b[key]);
+		return x < y ? -1 : x > y ? 1 : 0;
+	});
+}
+
+export const DIRTY_TABLE_ROWS = Object.fromEntries(
+	Object.entries(DIRTY_TABLE_ROWS_UNSORTED).map(([table, rows]) => [
+		table,
+		sortFixtureTable(table, rows as readonly Record<string, unknown>[]),
+	]),
+) as unknown as typeof DIRTY_TABLE_ROWS_UNSORTED;
 
 /**
  * The canonical `EgressSecrets` for this fixture.

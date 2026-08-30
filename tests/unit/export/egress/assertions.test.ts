@@ -222,8 +222,8 @@ describe("egress · key-shaped nets", () => {
 			{
 				event_type: "market.created",
 				payload: {
-					marketId: "0192f3a4-cccc-7000-8000-00000000m001",
-					media: [{ key: "m/0192f3a4-cccc-7000-8000-00000000m001/hero.webp" }],
+					marketId: "0192f3a4-cccc-7000-8000-000000000001",
+					media: [{ key: "m/0192f3a4-cccc-7000-8000-000000000001/hero.webp" }],
 				},
 			},
 		]);

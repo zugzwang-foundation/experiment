@@ -277,8 +277,11 @@ describe("H-4 · the three STRIP columns that had no VALUE guard", () => {
 			const all = r.artifacts.map((a) => a.text).join("\n");
 			expect(all).not.toContain("Amber Real Name");
 			expect(all).not.toContain("Basalt Real Name");
-			// POSITIVE CONTROL — the source provably carried them.
-			expect(DIRTY_TABLE_ROWS.users[0].name).toBe("Amber Real Name");
+			// POSITIVE CONTROL — the source provably carried them. By identity,
+			// not by position; see the note on the sibling test below.
+			expect(
+				DIRTY_TABLE_ROWS.users.some((u) => u.name === "Amber Real Name"),
+			).toBe(true);
 		});
 	});
 
@@ -288,12 +291,22 @@ describe("H-4 · the three STRIP columns that had no VALUE guard", () => {
 			expect(all).not.toContain("googleusercontent.com");
 			expect(all).not.toContain("the rejected comment body");
 
-			expect(DIRTY_TABLE_ROWS.users[0].image).toContain(
-				"googleusercontent.com",
+			// ⚠ POSITIVE CONTROLS selected by IDENTITY, not by array position.
+			// These read `users[0]` and `mod_actions[1]` until DATASET.2 Slice 5
+			// sorted the fixture into the live reader's `ORDER BY id`, at which
+			// point `mod_actions[1]` became the other row and this test failed
+			// with a confusing "null is invalid for this assertion". A control
+			// pinned to a position asserts something about the fixture's
+			// authoring order, which is not what it means to assert.
+			const amber = DIRTY_TABLE_ROWS.users.find(
+				(u) => u.name === "Amber Real Name",
 			);
-			expect(DIRTY_TABLE_ROWS.mod_actions[1].blocked_text).toContain(
-				"the rejected comment body",
+			expect(amber?.image).toContain("googleusercontent.com");
+
+			const blocked = DIRTY_TABLE_ROWS.mod_actions.find(
+				(m) => m.blocked_text !== null,
 			);
+			expect(blocked?.blocked_text).toContain("the rejected comment body");
 		});
 	});
 

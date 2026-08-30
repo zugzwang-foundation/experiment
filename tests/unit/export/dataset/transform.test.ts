@@ -353,7 +353,7 @@ describe("Slice 5 · export-time JOIN pseudonymization", () => {
 
 		// A market aggregate_id is a market PK, not a user — pseudonymizing
 		// it would corrupt the join AND throw, since it is not in the map.
-		const marketId = "0192f3a4-cccc-7000-8000-00000000m001";
+		const marketId = "0192f3a4-cccc-7000-8000-000000000001";
 		expect(pseudonymizeAggregateId("market", marketId, map, "t")).toBe(
 			marketId,
 		);
