@@ -1582,9 +1582,23 @@ exercised. **Gate stands**, cross-referenced rather than closed.
 
 ---
 
-## ADMIN-EVENTS-WRITER — ⚠ `admin_events` ships in the Nov-6 dataset with zero writers
+## ADMIN-EVENTS-WRITER — ⚠ `admin_events` **and `user_events`** ship in the Nov-6 dataset with zero writers
 
-**Originating task:** POLISH.8 recon (2026-08-12), `PD-8-10`. Requested as a ruling by `docs/logs/UI-6.md` on 2026-07-23 and never granted.
+**Originating task:** POLISH.8 recon (2026-08-12), `PD-8-10`. Requested as a ruling by `docs/logs/UI-6.md` on 2026-07-23 and never granted. **Extended to `user_events` at DATASET.1 (2026-08-28), founder-ratified 2026-08-28 as ruling R4 of the DATASET.2 brief.**
+
+> ### ⚠ `user_events` carries the identical defect, and until 2026-08-28 it was flagged nowhere
+>
+> **Same shape, same cause, same recommended fix, same date.** `user_events` (§19.3 row 9, Bucket A, YES — *"User lifecycle audit trail"*) has **zero writers anywhere in `src/`**. Every reference to `userEvents` is a schema declaration: `src/db/schema/audit.ts:113` (the `pgTable`), `:149` (relations), `:160` (the insert schema), and two lines in `auth.ts` importing and relating it. There is no `.insert(userEvents)` and no `INSERT INTO user_events`.
+>
+> **The evidence, with the control that makes it mean something.** A bare `grep -rn "insert(userEvents)"` returns nothing — but so does the same grep for tables that obviously *are* written, so on its own it establishes nothing (O-13: silence never corroborates). Run against the repo's actual write idiom, `grep -rn "\.insert(" src/server/` finds **13 distinct tables with real writers**, and a second probe for `INSERT INTO` finds the two written by raw SQL (`events`, `admin_sessions`). Both probes demonstrably return hits; neither finds `userEvents` or `adminEvents`.
+>
+> **It is contracted more thoroughly than `admin_events` is.** §19.3 row 9 promises *"ToS acceptance evidence, pseudonym assignment, daily-allowance accrual"*. Appendix B.12 gives it a **full per-column treatment map** — including a `PSEUDO` rewrite for a `user_id` no row carries, and a `metadata.actor_id` rule that DATASET.2's E3 had to reconcile against B.13. A treatment map is written for a table someone expects to have rows.
+>
+> **The lifecycle facts are being written — to `events`.** B.12's own note is the tell: *"Daily Credit accrual rides `events` as `dharma.credited` per §5.5 — ENGINE.12 R1/R2; no `user_events` row"*. Likewise `user.oauth_signed_in`, `user.otp_signed_in`, `user.pseudonym_assigned`, `user.tos_accepted` and `user.signed_out` are all live `EVENT_TYPES` landing in `events`. So, exactly as with `admin_events`, **the record exists and only its declared home is empty** — which is why the recommended fix is the same one, and why it is a **projection** rather than a writer: option (b) would dual-write the same fact into two tables in an event-sourced system.
+>
+> **Consequence if unruled:** on 2026-11-06 the dataset ships **TWO** empty tables each contracted as a complete audit trail, not one. The DATASET.1/.2 pipeline builds both to §19.3 as written (header-only CSVs) and reports them in the manifest `notes`; it does not invent a decision.
+>
+> ⚠ **The 2026-09-15 date below governs BOTH tables.** It was set when this entry covered one of the two, so a ruling that closes only `admin_events` leaves half the defect standing past its own deadline. **Rule them together, and prefer option (a) for both** — a projection of `events` into each. One caveat the projection task inherits, for `user_events` as much as for `admin_events`: `event_type` on both tables is `text` (open-extensible per §7.1) and **not** the closed `EVENT_TYPES` set, so a projection introducing its own vocabulary hits the export pipeline's fail-closed unknown-event-type throw. That is the correct direction — an unreviewed payload must not ship — but it means extending §19.4.1 to the projected vocabulary is a required step of that task, not a surprise at build time.
 
 **Deferred work.** `admin_events` has **no writer anywhere in `src/`** — 20 insert call sites across 13 tables, none of them this one. Two consequences, and the second is the serious one. (1) F-ADMIN-5's audit search unions `mod_actions ∪ admin_events`, so one arm is permanently empty; the page declares this in a `role="note"`, deliberately. (2) ⚠ **`SPEC.2` §19.3 ships `admin_events` in the 2026-11-06 public dataset** — table 8, Bucket A, YES, *"Admin-action audit trail"* — inside a contracted **"Shipped: 16 tables; not shipped: 5"** count and a named 9-table Bucket-A enumeration, and again in §19.4's PII row. **On 2026-11-06 the dataset would ship an empty table asserting a complete admin-action audit trail.**
 

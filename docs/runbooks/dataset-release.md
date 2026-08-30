@@ -47,7 +47,10 @@ DATASET.* / HARDEN.*.
 6. **Run the export pipeline** (DATASET.* / HARDEN.* implementation
    TBD). The pipeline reads:
    - SPEC.2 §19.3 row inventory (which tables ship).
-   - SPEC.2 §19.4 the 8 PII columns dropped.
+   - SPEC.2 §19.4 the **nine** PII columns dropped (this read *"the 8
+     PII columns"*; §19.4's table has never had eight rows, and note
+     that `users.pfp_filename` is **not** one of them — it SHIPs, and
+     dropping it destroys the identity-pool join).
    - SPEC.2 §19.4.1 per-event-type payload STRIP_KEY rules.
    - SPEC.2 §19.5 export-time JOIN pseudonymization (FK rewrites).
    - SPEC.2 Appendix B.* per-table column treatments.
@@ -60,7 +63,17 @@ DATASET.* / HARDEN.*.
    - `image_upload.*` rows: NO `key` (R2 object key) key.
    - `admin.signed_in` rows: NO `sessionId` / NO `ip` keys.
    - All `metadata.ip` / `metadata.user_agent` keys absent (already
-     covered by §19.4 row 7-8; this checks the strip actually ran).
+     covered by §19.4 **rows 8–9**, cited by name because a row number
+     moves: this read *"row 7-8"*, which named `tos_acceptance_ip` and
+     `tos_acceptance_user_agent` — a different pair, one layer up. This
+     step checks the strip actually ran).
+   - `image_upload.committed` rows: NO `commentId` key (§19.4.1 —
+     stripped unconditionally, so its absence is uniform and carries no
+     signal about which comments were removed).
+   - The four checks above are **key-absence at any depth**: §19.4.1's
+     rules apply through nesting and arrays, so a spot-check that only
+     reads top-level keys passes over the case the depth rule exists
+     for.
 
 8. **Spot-check pseudonymization** (per §19.5): cross-table joins
    should reference `user_pseudonym` columns, not raw `users.id`. The
