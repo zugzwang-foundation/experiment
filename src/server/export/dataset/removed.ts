@@ -58,7 +58,27 @@ import type { SourceRow } from "./strip";
  * reader can see that a comment was removed, when, and under what reason.
  * What they cannot see is what it said, which is the point of removing it.
  *
- * ## ⚠ KNOWN LIMITATION — the image FK is recoverable by a second path
+ * ## ⚠ The image FK — one recovery route CLOSED, a shorter one still OPEN
+ *
+ * ⚠ **Everything below this line described the `image_upload.committed` route
+ * as open and said closing it "is a spec question, and this run does not
+ * author spec". SPEC.2 1.0.28 (E4) ruled it and `forbidden-keys.ts`
+ * implements it — `commentId` IS stripped unconditionally now.** The text is
+ * kept, corrected here rather than deleted, because the reasoning is what a
+ * later reader needs; but a docblock advertising a leak that is closed is its
+ * own defect (`@security-auditor` F-11), and it would send someone to fix
+ * something already fixed.
+ *
+ * ⛔ **What IS still open is a SHORTER route the note never mentioned.**
+ * `comment.placed`'s payload carries BOTH `commentId` and `uploadId`, and
+ * §19.4.1 explicitly ships `uploadId` as a research key. Every comment emits
+ * one, so for a removed comment with an image the association rebuilds **in a
+ * single row, with no join at all**. Pinned by a `⛔ KNOWN OPEN` test in
+ * `tests/unit/export/dataset/depth-strip.test.ts`, and owed a ruling — closing
+ * it deletes a key the spec says ships, and a strip conditional on removal is
+ * the leaks-the-condition failure the C3 ruling itself rejects.
+ *
+ * ### The original note, as written, on the route that is now closed
  *
  * `image_uploads_id` is withheld here so a reader cannot join straight to the
  * upload row. But `image_upload.committed`'s payload carries `commentId`

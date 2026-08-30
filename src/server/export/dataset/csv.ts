@@ -1,6 +1,78 @@
-import canonicalize from "canonicalize";
-
 import type { SourceRow } from "./strip";
+
+/**
+ * RFC 8785 (JCS) canonical JSON, for the value subset this pipeline emits.
+ *
+ * ## Why this is hand-written and not the `canonicalize` dependency
+ *
+ * ⚠ **It WAS the dependency, and that broke the one code path nobody runs.**
+ * `canonicalize@3.0.0` declares `"exports"` with `"import"` and `"types"`
+ * conditions and **no `"require"`**. This repo has no `"type": "module"`, so
+ * `tsx` loads `scripts/build-dataset.ts` and its whole import graph as
+ * CommonJS — and the release entry point died at module resolution, before a
+ * line of the pipeline ran:
+ *
+ * ```
+ * Error [ERR_PACKAGE_PATH_NOT_EXPORTED]: No "exports" main defined in
+ *   node_modules/canonicalize/package.json
+ * ```
+ *
+ * **Nothing caught it, and the reason is the interesting part.** `tsc
+ * --noEmit` exits 0 (type resolution uses `"types"`, which exists); biome is
+ * clean; the full vitest suite is green (Vite resolves `"import"`). CI runs
+ * Biome → tsc → drizzle-kit → migrate → vitest, and **nothing in CI, in
+ * `tests/`, or in the `justfile` invokes `build-dataset.ts`**. So the single
+ * path that produces the release artifact was the only one not covered, and
+ * it was broken (`@security-auditor` H-1). `tests/integration/dataset-build-script.integration.test.ts`
+ * now runs the real script, because a build that happens once should not be
+ * the build that has never been run.
+ *
+ * ## What it has to handle, and what it deliberately does not
+ *
+ * These columns are Postgres `jsonb`: objects, arrays, strings, booleans,
+ * `null`, and numbers.
+ *
+ * ⚠ **This docblock claimed "there are no floats", and that is FALSE**
+ * (`@security-auditor` F-11 M-1). `mod_actions.categories` is `jsonb NOT NULL`,
+ * ships `SHIP` per Appendix B.10, routes through here, and holds **the raw
+ * OpenAI `category_scores` map** — `moderation/consequences.ts` says so
+ * verbatim, and the fixture carries `{ harassment: 0.91 }`. So floats are not
+ * merely reachable: that is the one float-bearing shipped column, and RFC
+ * 8785's number serialization is exactly the part governing it.
+ *
+ * **The code was right and the argument licensing it was wrong**, which is the
+ * more dangerous combination — it is the argument a future author reads before
+ * deciding whether the number path needs a test. It does, and it now has one.
+ *
+ * The number path is correct because `JSON.stringify` IS ECMAScript
+ * `Number::toString`, which is what RFC 8785 §3.2.2.3 mandates — verified
+ * differentially against `canonicalize@3.0.0` across `5e-324`, `1/3`, `1e21`,
+ * `0.30000000000000004`, `-0` and `2^53`: byte-identical.
+ *
+ * Every monetary and Dharma quantity is separately safe for a different
+ * reason: it is `NUMERIC(38,18)` and arrives as a STRING (CLAUDE.md §2), so it
+ * never enters the number path at all.
+ *
+ * Key ordering is RFC 8785's: ascending by UTF-16 code unit, which is exactly
+ * what `Array.prototype.sort()` does by default on strings.
+ *
+ * ⚠ `undefined` and non-finite numbers are not representable in JSON and
+ * cannot occur in a value read from a `jsonb` column; they would throw from
+ * `JSON.stringify` anyway rather than serialise wrongly.
+ */
+export function canonicalJson(value: unknown): string {
+	if (value === null || typeof value !== "object") return JSON.stringify(value);
+	if (Array.isArray(value)) {
+		// Array order is DATA, never sorted — JCS preserves it.
+		return `[${value.map(canonicalJson).join(",")}]`;
+	}
+	const entries = Object.entries(value as Record<string, unknown>)
+		.filter(([, v]) => v !== undefined)
+		.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+	return `{${entries
+		.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`)
+		.join(",")}}`;
+}
 
 /**
  * DATASET.1 Slice 6 — the per-table CSV writer (brief D1).
@@ -86,7 +158,7 @@ export function escapeField(value: unknown): string {
 					// released (the release is 2026-11-06), so the cost is zero
 					// today — but it is a format decision and it is flagged for
 					// ratification rather than slipped in.
-					(canonicalize(value) ?? "")
+					canonicalJson(value)
 				: // ⚠ String(), never Number(). NUMERIC(38,18) arrives as a
 					// string and must leave as the same string.
 					String(value);

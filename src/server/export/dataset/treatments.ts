@@ -42,6 +42,27 @@ export type ColumnTreatment =
 	/** Ships, except H2-erased rows, which release as NULL. */
 	| "NULL_IF_ERASED"
 	/**
+	 * Ships, EXCEPT for rows whose content an admin reactively removed — a
+	 * `mod_actions` row with `reason = 'content_removed'` per ADR-0021. Those
+	 * rows release the cell empty, with the row itself intact.
+	 *
+	 * ⚠ Distinct from `NULL_IF_ERASED`: erasure is the USER's request against
+	 * their own PII and fires at the `users` row; removal is a MODERATOR's
+	 * action against one piece of content, recorded in a different table
+	 * entirely. Both preserve the row so the join graph and the audit trail
+	 * survive; they differ in who acted and on what.
+	 *
+	 * ⚠ **This treatment is DECLARATIVE here and is NOT what enforces the
+	 * masking.** The withholding is structural, in `stripRow`, which
+	 * intersects the removed set before the column walk — because masking is a
+	 * property of every code path that reads `comments.body`, not of a row or
+	 * of a table (CLAUDE.md §5.14 SC-1). The value of naming it in this map is
+	 * that this map is the file a reader opens to ask *"does this column
+	 * ship?"*, and it must not answer with the pre-amendment answer.
+	 * (SPEC.2 1.0.28, Appendix B.6 — `@security-auditor` L-6.)
+	 */
+	| "WITHHELD_IF_REMOVED"
+	/**
 	 * Resolved per-row rather than per-column. Appendix B.13 uses this for
 	 * `events.aggregate_id`: `user`-aggregate rows pseudonymize, every other
 	 * aggregate type ships raw, and `admin_session` ships raw by explicit
@@ -133,8 +154,14 @@ export const COLUMN_TREATMENTS = {
 		user_id: "PSEUDO",
 		market_id: "SHIP",
 		parent_comment_id: "SHIP",
-		body: "SHIP", // the thesis-core signal; post-moderation rows only
-		image_uploads_id: "SHIP",
+		// ⚠ `WITHHELD_IF_REMOVED`, not `SHIP`. This read
+		// `body: "SHIP", // the thesis-core signal; post-moderation rows only`
+		// — the exact note SPEC.2 1.0.28's B.6 amendment identifies as wrong.
+		// "post-moderation rows only" is true of the PRE-COMMIT gate (§10) and
+		// false of REACTIVE removal (ADR-0021), which admits the comment and
+		// takes it down afterwards with zero writes to `comments`.
+		body: "WITHHELD_IF_REMOVED",
+		image_uploads_id: "WITHHELD_IF_REMOVED",
 		side_at_post_time: "SHIP",
 		bet_id: "SHIP",
 		created_at: "SHIP",

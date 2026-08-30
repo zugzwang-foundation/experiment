@@ -49,17 +49,62 @@ import type { SourceRow } from "./strip";
  *
  * ## Read-only, and nothing is held open
  *
- * No `insert`, `update`, `delete` or `transaction` appears here. Deliberately
- * **no transaction at all**, not even a read-only one: the release runs after
- * the 2026-11-05 write freeze (§19.1), so there is no concurrent writer to be
- * isolated from, and a transaction spanning sixteen table reads of a
- * multi-million-row `events` would hold one connection and one snapshot open
- * for the length of the whole export — buying consistency that the freeze
- * already provides, at the cost of a long-lived idle-in-transaction session.
+ * No `insert`, `update`, `delete` or `transaction` appears here. There is
+ * **no transaction at all**, not even a read-only one, and the sixteen table
+ * reads therefore take sixteen independent snapshots.
  *
- * ⚠ That reasoning depends on the freeze. A reader pointed at a LIVE database
- * would need the snapshot, and would then need `REPEATABLE READ`. Stated here
- * because the next person to reuse this will be pointing it somewhere else.
+ * ⛔⛔ **THE JUSTIFICATION THAT USED TO SIT HERE IS FALSE, AND IT WAS THE
+ * LOAD-BEARING SENTENCE.** It read: *"the release runs after the 2026-11-05
+ * write freeze (§19.1), so there is no concurrent writer to be isolated
+ * from"*. **Measured on this branch — there is one:**
+ *
+ * | cron | schedule | `isFrozen()` gate | writes a SHIPPED table |
+ * |---|---|---|---|
+ * | `close-due-markets` | every minute | **yes** | — |
+ * | `alarms-drain` | every 5 minutes | no | no (`cron_alarms`, not shipped) |
+ * | **`r2-orphan-sweep`** | **every 6 hours** | **NO** | **`events` INSERT + `image_uploads` UPDATE** |
+ *
+ * (Schedules in words rather than cron syntax on purpose: the literal
+ * `vercel.json` value for the sweep contains the two characters that end a
+ * block comment, and pasting it here silently truncated this docblock
+ * mid-table — caught by `tsc`, but only because the wreckage happened to be
+ * un-parseable.)
+ *
+ * `sweep-orphans.ts` appends `image_upload.orphaned` to `events` and CASes the
+ * Bucket-B whitelisted `image_uploads.terminal_state` transition — both legal
+ * post-freeze at the storage layer. `isFrozen()` is wired onto two surfaces
+ * and this is not one of them, and `is-frozen-surface.test.ts` pins that as
+ * intended, so the exclusion is structural rather than an oversight.
+ *
+ * ⚠ **This pipeline already knew.** `build.ts`'s `NON_SECRET_SENTINELS` names
+ * *"the orphan sweep writes `ip: "cron"` / `user_agent: "vercel-cron"`"* as a
+ * live emit site it must exempt. Two files on one branch held contradictory
+ * beliefs about whether that writer stops (`@security-auditor` F-11).
+ *
+ * **What that costs, concretely.** The sweep fires at 00:00/06:00/12:00/18:00
+ * UTC and commits one row:
+ *
+ *   · **after the last page, before `count(*)`** → the reconciliation below
+ *     fires and **aborts the entire one-shot build**, with a message naming a
+ *     paging bug and pointing the operator at the wrong subsystem. (Before the
+ *     reconciliation existed the same event was simply invisible.)
+ *   · **mid-read** → the row sorts after the cursor, is picked up, counts
+ *     agree, and the archive silently ships a fact that postdates the freeze.
+ *   · **between two table reads** → `image_uploads.csv` ships
+ *     `terminal_state = NULL` for a row `events.csv` reports as orphaned. A
+ *     self-contradicting archive that no guard notices, because each file is
+ *     internally consistent.
+ *
+ * ⚠ **NOT FIXED HERE, and the reason is procedural rather than technical.**
+ * The correct fix is one of: freeze-gate `r2-orphan-sweep` (a separate task —
+ * whether the sweep should stop is a founder call, and the surface test pins
+ * the current shape); or wrap the sixteen reads AND their counts in one
+ * `REPEATABLE READ` read-only transaction, re-deciding the connection-hold
+ * trade-off now that its premise is corrected; or at minimum take the count in
+ * the same snapshot as the final page. **Which one is right depends on the
+ * cron ruling**, and this finding arrived from the LAST reviewer in the
+ * cascade — so any structural change to the release reader made now would ship
+ * unreviewed. Correcting the false claim is safe; guessing at the fix is not.
  */
 
 /**

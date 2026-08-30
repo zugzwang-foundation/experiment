@@ -134,8 +134,34 @@ export function pseudonymizeMetadata(
 	map: PseudonymMap,
 	where: string,
 ): unknown {
-	if (metadata === null || typeof metadata !== "object") return metadata;
-	if (Array.isArray(metadata)) return metadata;
+	// ⚠ **Fail CLOSED on shape — the third instance of one mistake.**
+	//
+	// This read `if (typeof metadata !== "object") return metadata`, which is
+	// character-for-character the shape `assertJsonObject` was introduced to
+	// kill (`@code-reviewer` HIGH-2). That fix landed at two of the three
+	// functions that walk a `metadata`/`payload` container; this was the
+	// third and was missed — and commit `2772090` on this same branch is
+	// titled *"the re-audit found the same mistake again, one function over"*.
+	//
+	// **Not reachable through `buildDataset`**, because `stripTable` runs
+	// first and `stripRow`'s `metadata` branch is table-unconditional, so
+	// `assertJsonObject` throws before this is ever handed a scalar. It is
+	// reachable by any SECOND caller — and `pseudonymizeMetadata`,
+	// `pseudonymizeRow` and `pseudonymizeTable` are all exported. That is the
+	// same reasoning that made `StripOptions.removedCommentIds` a required
+	// argument rather than an optional one: a v2 rebuild script, a partial
+	// re-export or a debug tool does not inherit the build path's ordering.
+	// Belt applied, brace left off (`@security-auditor` F-11 M-3).
+	if (metadata === null || metadata === undefined) return metadata;
+	if (typeof metadata !== "object" || Array.isArray(metadata)) {
+		throw new EgressContractGapError(
+			`${where}.metadata`,
+			`is ${Array.isArray(metadata) ? "an array" : `a ${typeof metadata}`}, ` +
+				"not a JSON object. Refusing to pseudonymize it: a scalar standing " +
+				"in for a metadata object passes every key-shaped guard untouched, " +
+				"carrying whatever it holds straight into the artifact.",
+		);
+	}
 
 	const out: Record<string, unknown> = {};
 	for (const [k, v] of Object.entries(metadata as SourceRow)) {

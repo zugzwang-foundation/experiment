@@ -94,19 +94,6 @@ export const DATASET_FIXTURE_TABLES: readonly string[] = [
 ];
 
 /**
- * Render one JS value as a bind parameter Postgres will accept.
- *
- * Objects and arrays become JSON text (every such column in the shipped set is
- * `jsonb`: `payload`, `metadata`, `categories`). Everything else — including
- * the `NUMERIC(38,18)` strings — passes through untouched.
- *
- * ⚠ **`NUMERIC` values are passed as STRINGS and must stay strings.** The
- * fixture writes them already canonical (`"25.000000000000000000"`), so the
- * round trip is byte-exact. A `Number()` anywhere on this path would truncate
- * an 18-decimal balance to float precision and the CSV would still look
- * completely normal (CLAUDE.md §2).
- */
-/**
  * Tables needing `OVERRIDING SYSTEM VALUE` to accept a fixture-supplied value.
  *
  * ⚠ **`dharma_ledger.seq` is `GENERATED ALWAYS AS IDENTITY`** (measured:
