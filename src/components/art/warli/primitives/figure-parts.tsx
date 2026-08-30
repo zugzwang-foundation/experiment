@@ -1,4 +1,5 @@
 import { type PrimitiveProps, type PrimitiveSpec, WEIGHT_SPARE } from "./types";
+import { bowedCircle, bowedLine, bowedPath, seedFrom } from "./wobble";
 
 /**
  * The body. Warli-inspired geometric figuration builds a person out of exactly
@@ -6,7 +7,7 @@ import { type PrimitiveProps, type PrimitiveSpec, WEIGHT_SPARE } from "./types";
  * lines for the limbs — and the whole expressive range comes from the ANGLE of
  * those lines rather than from any added detail. So these six primitives are
  * deliberately the least interesting file in the directory: the character
- * arrives later, in `../figures/`, out of arrangement alone.
+ * arrives later, in `../figures/`, out of arrangement and ornament alone.
  *
  * ⚠ EVERY PART IS DRAWN AROUND THE WAIST, at local `(0, 0)`, and `−y` is UP.
  * The waist is where the two triangles meet, so it is the one point that does
@@ -14,6 +15,13 @@ import { type PrimitiveProps, type PrimitiveSpec, WEIGHT_SPARE } from "./types";
  * rotate a figure about. A figure's FEET sit at `y = +29` and its head crown at
  * `y = −29`; the 58-unit total is the figure height the ring geometry derives
  * from the auth card (see `docs/plans/WARLI-1.md` §3).
+ *
+ * ⚠ EVERY STRAIGHT RUN IS NOW A BOWED PATH (`./wobble.ts`), AND EVERY ENDPOINT
+ * IS STILL EXACT. The parts emit `<path>` rather than `<line>` / `<polygon>`,
+ * but the coordinates a caller can read off the end of a `d` string are the same
+ * numbers the old `x2` / `points` carried. That is what lets the hand chain, the
+ * pair geometry and the equal-reach guard survive a change that touches the
+ * appearance of every mark in the drawing.
  */
 
 const STROKE = "currentColor";
@@ -52,16 +60,16 @@ export function Head({
 	transform,
 	className,
 	weight = WEIGHT_SPARE,
+	seed = 0,
 }: PrimitiveProps & { readonly filled?: boolean }) {
 	return (
 		<g data-warli-id={HEAD.id} transform={transform} className={className}>
-			<circle
-				cx={0}
-				cy={0}
-				r={HEAD_RADIUS}
+			<path
+				d={bowedCircle(0, 0, HEAD_RADIUS, seedFrom(seed, 101))}
 				fill={filled ? STROKE : "none"}
 				stroke={STROKE}
 				strokeWidth={weight}
+				strokeLinejoin="round"
 			/>
 		</g>
 	);
@@ -78,16 +86,26 @@ export function TorsoUpper({
 	transform,
 	className,
 	weight = WEIGHT_SPARE,
-}: PrimitiveProps) {
+	seed = 0,
+	fill = "none",
+}: PrimitiveProps & { readonly fill?: string }) {
 	return (
 		<g
 			data-warli-id={TORSO_UPPER.id}
 			transform={transform}
 			className={className}
 		>
-			<polygon
-				points={`${-SHOULDER_HALF},${-TORSO_UPPER_HEIGHT} ${SHOULDER_HALF},${-TORSO_UPPER_HEIGHT} 0,0`}
-				fill="none"
+			<path
+				d={bowedPath(
+					[
+						{ x: -SHOULDER_HALF, y: -TORSO_UPPER_HEIGHT },
+						{ x: SHOULDER_HALF, y: -TORSO_UPPER_HEIGHT },
+						{ x: 0, y: 0 },
+					],
+					seedFrom(seed, 211),
+					{ close: true },
+				)}
+				fill={fill}
 				stroke={STROKE}
 				strokeWidth={weight}
 				strokeLinejoin="round"
@@ -107,16 +125,26 @@ export function TorsoLower({
 	transform,
 	className,
 	weight = WEIGHT_SPARE,
-}: PrimitiveProps) {
+	seed = 0,
+	fill = "none",
+}: PrimitiveProps & { readonly fill?: string }) {
 	return (
 		<g
 			data-warli-id={TORSO_LOWER.id}
 			transform={transform}
 			className={className}
 		>
-			<polygon
-				points={`0,0 ${-HIP_HALF},${TORSO_LOWER_HEIGHT} ${HIP_HALF},${TORSO_LOWER_HEIGHT}`}
-				fill="none"
+			<path
+				d={bowedPath(
+					[
+						{ x: 0, y: 0 },
+						{ x: -HIP_HALF, y: TORSO_LOWER_HEIGHT },
+						{ x: HIP_HALF, y: TORSO_LOWER_HEIGHT },
+					],
+					seedFrom(seed, 307),
+					{ close: true },
+				)}
+				fill={fill}
 				stroke={STROKE}
 				strokeWidth={weight}
 				strokeLinejoin="round"
@@ -136,16 +164,23 @@ export const TORSO: PrimitiveSpec = {
  * point-to-point join at the waist IS the figure, and offering it as two
  * separate calls would invite someone to drift them apart by a unit and lose
  * the only silhouette that reads as this tradition at all.
+ *
+ * `solid` fills both triangles with ink so ornament can be RESERVED out of them
+ * in ground colour, which is how the tradition actually gets pattern onto a
+ * body: the mark is the unpainted part, not a second stroke laid over the first.
  */
 export function Torso({
 	transform,
 	className,
 	weight = WEIGHT_SPARE,
-}: PrimitiveProps) {
+	seed = 0,
+	solid = false,
+}: PrimitiveProps & { readonly solid?: boolean }) {
+	const fill = solid ? STROKE : "none";
 	return (
 		<g data-warli-id={TORSO.id} transform={transform} className={className}>
-			<TorsoUpper weight={weight} />
-			<TorsoLower weight={weight} />
+			<TorsoUpper weight={weight} seed={seed} fill={fill} />
+			<TorsoLower weight={weight} seed={seed} fill={fill} />
 		</g>
 	);
 }
@@ -158,8 +193,11 @@ export const LIMB: PrimitiveSpec = {
 };
 
 /**
- * An arm or a leg: one straight line, and nothing else. Parametric, so its
- * declared `box` is the canonical instance (see `PrimitiveSpec`).
+ * An arm or a leg: one bowed run, and nothing else. Parametric, so its declared
+ * `box` is the canonical instance (see `PrimitiveSpec`).
+ *
+ * ⚠ ITS TWO ENDPOINTS ARE EXACT. `x2, y2` is where the hand IS, and the ring
+ * engine attaches the chain there. The bow lives entirely in the control point.
  */
 export function Limb({
 	x1 = 0,
@@ -169,6 +207,7 @@ export function Limb({
 	transform,
 	className,
 	weight = WEIGHT_SPARE,
+	seed = 0,
 }: PrimitiveProps & {
 	readonly x1?: number;
 	readonly y1?: number;
@@ -177,11 +216,9 @@ export function Limb({
 }) {
 	return (
 		<g data-warli-id={LIMB.id} transform={transform} className={className}>
-			<line
-				x1={x1}
-				y1={y1}
-				x2={x2}
-				y2={y2}
+			<path
+				d={bowedLine(x1, y1, x2, y2, seedFrom(seed, x1, y1, x2, y2))}
+				fill="none"
 				stroke={STROKE}
 				strokeWidth={weight}
 				strokeLinecap="round"
@@ -201,7 +238,7 @@ export const HAND_LINK: PrimitiveSpec = {
  * The line joining one figure's hand to the next figure's hand.
  *
  * It is a primitive rather than a detail of the ring engine because the link is
- * the thing that turns eight separate people into one body: in the dance this
+ * the thing that turns a row of separate people into one body: in the dance this
  * form comes from, the chain is unbroken, and a ring of figures standing near
  * each other is a crowd while a ring of figures HOLDING each other is a
  * position. The whole piece argues that opposed camps are internally joined,
@@ -212,7 +249,7 @@ export const HAND_LINK: PrimitiveSpec = {
  *
  * ⚠ IT FOLLOWS THE RING, AND THE STRAIGHT VERSION WAS A REAL DEFECT. The first
  * build joined the hands with a straight chord, which is the obvious reading of
- * "a line between two hands" and is what a linked chain of eight actually is
+ * "a line between two hands" and is what a linked chain actually is
  * geometrically. On screen it was wrong: eight chords at this radius draw a
  * hard OCTAGON, and the octagon became the subject — a bold polygon with the
  * figures reduced to specks at its vertices. The piece is about a circle,
@@ -234,6 +271,7 @@ export function HandLink({
 	transform,
 	className,
 	weight = WEIGHT_SPARE,
+	seed = 0,
 }: PrimitiveProps & {
 	readonly x1: number;
 	readonly y1: number;
@@ -246,25 +284,22 @@ export function HandLink({
 }) {
 	return (
 		<g data-warli-id={HAND_LINK.id} transform={transform} className={className}>
-			{arcRadius === undefined ? (
-				<line
-					x1={x1}
-					y1={y1}
-					x2={x2}
-					y2={y2}
-					stroke={STROKE}
-					strokeWidth={weight}
-					strokeLinecap="round"
-				/>
-			) : (
-				<path
-					d={`M ${x1} ${y1} A ${arcRadius} ${arcRadius} 0 0 ${sweep} ${x2} ${y2}`}
-					fill="none"
-					stroke={STROKE}
-					strokeWidth={weight}
-					strokeLinecap="round"
-				/>
-			)}
+			<path
+				d={
+					arcRadius === undefined
+						? bowedLine(x1, y1, x2, y2, seedFrom(seed, x1, y1, x2, y2))
+						: // The arc is left UNBOWED on purpose. It already curves, along a
+							// radius chosen to keep the chain reading as a band rather than a
+							// polygon, and adding a second curvature to a curve does not read
+							// as an unsteady hand — it reads as a wave, which is a different
+							// and much louder gesture than the one this line is making.
+							`M ${x1} ${y1} A ${arcRadius} ${arcRadius} 0 0 ${sweep} ${x2} ${y2}`
+				}
+				fill="none"
+				stroke={STROKE}
+				strokeWidth={weight}
+				strokeLinecap="round"
+			/>
 		</g>
 	);
 }
