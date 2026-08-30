@@ -244,6 +244,34 @@ describe("round-trip · the named wrong answers, each pinned on its own", () => 
 });
 
 describe("round-trip · R1 is real only if the reader finds the removed set", () => {
+	it("POSITIVE CONTROL — the DATABASE holds the body, and the READER returns it", async () => {
+		// ⚠⚠ **The control this block was missing, and its absence is the exact
+		// shape of `@test-writer` M-5 one arm over.** Every other assertion here
+		// is an ABSENCE — "the canary is not in the emitted bytes" — and an
+		// absence is only evidence if the thing was present upstream.
+		//
+		// The fixture arm has that control (`removed-masking.test.ts` asserts the
+		// SOURCE row carries the body). The live arm did not, and the two arms
+		// are not interchangeable here: the byte-comparison cannot supply it,
+		// because a database that stored an EMPTY body would produce a
+		// comments.csv byte-identical to one whose body was WITHHELD. Same row
+		// count, same header, same empty cell. Every R1 assertion in this file
+		// would pass against a seeder that silently failed to write the body.
+		//
+		// So this reads the database directly, and then reads it back through the
+		// live reader — which places the withholding squarely in the TRANSFORM
+		// rather than in the read.
+		const [stored] = await testClient`
+			SELECT body, image_uploads_id FROM comments WHERE id = ${REMOVED_COMMENT_ID}`;
+		expect(stored?.body).toBe(REMOVED_COMMENT_BODY);
+		expect(stored?.image_uploads_id).not.toBeNull();
+
+		const rows = await drizzleSource(testDb, "probe").read("comments");
+		const removed = rows.find((r) => r.id === REMOVED_COMMENT_ID);
+		expect(removed?.body).toBe(REMOVED_COMMENT_BODY);
+		expect(removed?.image_uploads_id).not.toBeNull();
+	});
+
 	it("the removed body is absent from the LIVE build's bytes", () => {
 		// ⚠ The brief's exact warning: *"a reader that returns an empty set
 		// silently un-withholds every removed body"*. The transform takes

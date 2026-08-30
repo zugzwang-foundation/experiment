@@ -162,8 +162,15 @@ export const NON_SECRET_SENTINELS = new Set([
  * metadata keys are `snake_case` (`user_agent`) — and the harvest now walks
  * both containers with one table, so it has to know both. A key spelled a
  * third way is a value nobody harvests and therefore a value nobody scans
- * for; the completeness guard over §19.4.1 is what keeps that from being
- * silent, but breadth here is cheap and the failure it prevents is not.
+ * for, so breadth here is cheap and the failure it prevents is not.
+ *
+ * ⚠ **This used to name the §19.4.1 completeness guard as the backstop for
+ * that, and it is not one** (`@test-writer` HIGH-1b). That guard asserts every
+ * event **type** has a rule; it says nothing about whether every **key** in a
+ * payload is covered. Adding a nested key to an existing type's payload
+ * passes it untouched — which is exactly the shape §19.4.1's table invites,
+ * since it asks an author *which keys are sensitive* and never *how deep*.
+ * There is no backstop for an unlisted key name today; see `strip.ts`.
  *
  * ⚠ `userId` is NOT here. Raw `users.id` values are harvested exhaustively
  * from the `users` table itself, which is the authoritative and complete set;
@@ -240,14 +247,20 @@ export function harvestSecrets(
 	// so the admin's ip and session id are ONLY reachable here.
 	//
 	// ⚠ **DEPTH (DATASET.2 C2).** This read `p.ip`, `p.key`, `p.sessionId` …
-	// at one level, and the strip walked one level too — so the two agreed,
-	// and their agreement was the problem. A nested secret was neither
-	// stripped NOR harvested, which means the value scan was never told to
-	// look for the value the strip had just failed to remove: **both layers
-	// fell silent on the same input, and the build reported success.** That
-	// is why `@security-auditor` H-3 could not be closed by making the strip
-	// recursive alone. The harvest now walks to the same depth the strip does,
-	// via the same `walk` the guards use.
+	// at one level, and the strip walked one level too. The harvest now walks
+	// to the same depth the strip does, via the same `walk` the guards use —
+	// which is what closes `@security-auditor` H-3's harvest half.
+	//
+	// ⚠ **Corrected after measurement** (`@test-writer` HIGH-1): this comment
+	// used to say the shallow pair "fell silent on the same input, and the
+	// build reported success". For a nested key that is ON one of the nets,
+	// that is false — `findKeys` rides the already-recursive `walk`, so the
+	// KEY nets fired and the build ABORTED (8 violations, measured). The
+	// value half of the claim was true and the conclusion was not.
+	//
+	// The harvest's depth still matters, for a reason worth stating exactly:
+	// it is what lets the VALUE scan corroborate the key scan on nested data,
+	// instead of leaving nested coverage resting on the key nets alone.
 	for (const table of ["events", "admin_events", "user_events"]) {
 		for (const row of tables[table] ?? []) {
 			for (const container of [row.payload, row.metadata]) {

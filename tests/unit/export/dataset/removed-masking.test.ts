@@ -1,6 +1,8 @@
+import { gunzipSync } from "node:zlib";
+
 import { describe, expect, it } from "vitest";
 
-import { buildDataset } from "@/server/export/dataset/build";
+import { buildDataset, harvestSecrets } from "@/server/export/dataset/build";
 import {
 	CONTENT_REMOVED_REASON,
 	maskRemovedComment,
@@ -8,6 +10,7 @@ import {
 } from "@/server/export/dataset/removed";
 import { fixtureSource } from "@/server/export/dataset/source";
 import { stripTable } from "@/server/export/dataset/strip";
+import { assertTableClean } from "@/server/export/egress";
 
 import {
 	DIRTY_TABLE_ROWS,
@@ -92,6 +95,93 @@ describe("removed masking · THE BODY does not reach any written file", () => {
 		});
 	});
 
+	it("…and absent from the TARBALL, which is what 'every artifact' has to mean", () => {
+		// ⚠ **The test above does not cover what its name says.** `r.artifacts`
+		// is the CSV list ONLY; `opts.extraEntries` — the `debates/*.md` class —
+		// enters the tarball without ever appearing in it. So the assertion
+		// reads as an archive-wide claim and is a per-table one, and the very
+		// artifact class most likely to carry a body verbatim is the class it
+		// cannot see.
+		//
+		// Scanning the decompressed archive makes the claim structural: an entry
+		// cannot get into the tarball without passing under this assertion,
+		// whatever list it arrived on.
+		const debate = [
+			"# Will the Mumbai Metro Line 3 open by 5 Nov 2026?",
+			"",
+			"**BasaltHeron117** · NO",
+			"",
+			"> [removed by moderation]",
+			"",
+		].join("\n");
+
+		return buildDataset({
+			source,
+			releaseDate: "2026-11-06",
+			extraEntries: [
+				{ name: "debates/mumbai-metro-line-3.md", content: debate },
+			],
+		}).then((r) => {
+			const archive = gunzipSync(r.tarball).toString("utf8");
+			// Control: the archive really does contain the files.
+			expect(archive).toContain("comments.csv");
+			expect(archive).toContain("debates/mumbai-metro-line-3.md");
+			expect(archive).toContain("The tunnelling is complete");
+			// The canary is in none of them.
+			expect(archive).not.toContain("REMOVED-BODY-CANARY");
+		});
+	});
+
+	it("⛔ KNOWN OPEN — a removed body has no VALUE class, so only ONE mechanism holds R1", () => {
+		// ⚠⚠ **A tripwire, not a passing guard.**
+		//
+		// `EgressSecrets` carries ten value classes, and three of them
+		// (`display-name`, `avatar-url`, `blocked-text`) exist precisely because
+		// `@code-reviewer` H-4 found STRIP columns with no VALUE class — the
+		// layer's strongest assertion, *"this exact string, known to be in the
+		// source, is absent from the artifact"*, had never been pointed at them.
+		//
+		// A reactively-removed `comments.body` is in exactly that position now.
+		// It is WITHHELD by ruling R1, the removed set is derivable at harvest
+		// time from rows the pipeline already reads (`mod_actions` ∩ `comments`),
+		// and no class covers it. So R1 rests on ONE mechanism — the predicate
+		// inside `stripRow` — with no value-level backstop behind it. A second
+		// read path that emitted the body (a teaser column, a payload field, a
+		// debate document built from the unmasked model) would publish it and
+		// every guard would report clean.
+		//
+		// That is CLAUDE.md §5.14 SC-1's own argument: masking is a property of
+		// every code path that reads `comments.body`, and a guarantee that lives
+		// in one predicate is a guarantee about one call site.
+		//
+		// Not closable in the test layer — adding a class means adding a field to
+		// `EgressSecrets` and a harvest step in `build.ts`.
+		// The canary IS in the source…
+		expect(
+			DIRTY_TABLE_ROWS.comments.some((c) => c.body === REMOVED_COMMENT_BODY),
+		).toBe(true);
+
+		// …and no harvested value class contains it. Pinned as the ABSENCE of a
+		// class rather than the presence of a leak, so this goes RED the day
+		// someone adds one — which is the signal wanted.
+		const secrets = harvestSecrets(DIRTY_TABLE_ROWS as never);
+		for (const [name, values] of Object.entries(secrets)) {
+			expect(
+				(values as ReadonlySet<string>).has(REMOVED_COMMENT_BODY),
+				`${name} unexpectedly covers a removed body — invert this test`,
+			).toBe(false);
+		}
+
+		// Consequence, made concrete: a row carrying the withheld body under any
+		// key at all passes every guard the layer has.
+		const guarded = assertTableClean(
+			"events",
+			[{ event_id: "probe", teaser: REMOVED_COMMENT_BODY }],
+			secrets,
+		);
+		expect(guarded.advisories).toEqual([]);
+	});
+
 	it("the ROW survives, and that is deliberate", () => {
 		// §19.4's H2-erasure precedent: erased rows "ship in the same shape",
 		// row preserved, sensitive fields withheld. Dropping the row would
@@ -139,6 +229,46 @@ describe("removed masking · THE BODY does not reach any written file", () => {
 		// Structural columns survive.
 		expect(masked).toHaveProperty("id");
 		expect(masked).toHaveProperty("side_at_post_time");
+	});
+
+	it("the body COLUMN survives; the removed row's CELL is empty", () => {
+		// ⚠ `removed.ts` states this shape explicitly — *"a removed row's `body`
+		// cell is emitted EMPTY rather than the column disappearing"*, because
+		// the column set is per-file and uniformity is what stops the absence
+		// itself from being a signal — and nothing asserted it.
+		//
+		// The distinction matters: masking by DELETING the column would satisfy
+		// every "the canary is not in the bytes" assertion above while destroying
+		// `comments.body` for the whole corpus, which is the dataset's
+		// thesis-core signal.
+		return build().then((r) => {
+			const comments = r.artifacts.find((a) => a.filename === "comments.csv");
+			expect(comments?.columns).toContain("body");
+
+			const [header, ...dataLines] = (comments?.text ?? "").split("\n");
+			const cols = (header ?? "").split(",");
+			const idAt = cols.indexOf("id");
+			const bodyAt = cols.indexOf("body");
+			expect(idAt).toBeGreaterThanOrEqual(0);
+			expect(bodyAt).toBeGreaterThanOrEqual(0);
+
+			// The removed row's line: id first field, body field empty.
+			const removedLine = dataLines.find((l) =>
+				l.startsWith(`${REMOVED_COMMENT_ID},`),
+			);
+			expect(removedLine).toBeDefined();
+			expect((removedLine ?? "").split(",")[bodyAt]).toBe("");
+
+			// ⚠ CONTROL on the field arithmetic. Without it, `bodyAt` could point
+			// at any always-empty column and the assertion above would hold for a
+			// reason that has nothing to do with masking. The kept row's body sits
+			// at the SAME index and is non-empty.
+			const keptLine = dataLines.find(
+				(l) => l.length > 0 && !l.startsWith(`${REMOVED_COMMENT_ID},`),
+			);
+			expect(keptLine).toBeDefined();
+			expect((keptLine ?? "").split(",")[bodyAt]).toContain("The tunnelling");
+		});
 	});
 
 	it("the manifest tells the reader masking happened", () => {

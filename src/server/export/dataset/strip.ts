@@ -171,12 +171,28 @@ function assertJsonObject(
  * keys* are sensitive — so a payload that nests one is the default outcome of
  * following the contract as written, not a mistake someone has to make.
  *
- * ⚠ **And the value-based guard cannot rescue it.** That is the part worth
- * spelling out: a nested secret is never *harvested* into `EgressSecrets`, so
- * the scan does not know to look for it. Both layers go quiet at once, and the
- * build reports success. A shallow strip is therefore not "a strip with a
- * known gap" — it is a strip whose gap is invisible to the thing that exists
- * to catch its gaps.
+ * ⚠ **What the shallow strip actually did — corrected after measuring it**
+ * (`@test-writer` HIGH-1). This docblock previously claimed the gap was
+ * *silent*: that a nested secret was neither stripped nor harvested, so "both
+ * layers go quiet at once and the build reports success". **That is false for
+ * any nested key on one of the nets.** `walk()` has been recursive since
+ * DATASET.1 and both KEY nets ride on it, so `findKeys` saw nested `userId` /
+ * `ip` / `key` whatever the strip did. Measured against the fixture with the
+ * one-level strip restored: **8 fatal violations**.
+ *
+ * ⇒ The shallow strip was a **guaranteed build ABORT on a one-shot job**, not
+ * a leak. Worth fixing for that alone — an abort on the morning of 6 November
+ * is as expensive as a leak, in a different currency — but the honest reason
+ * is not the one first written here.
+ *
+ * ⚠ **The genuinely silent case is narrower and recursion does NOT close it.**
+ * A nested secret under a key name on no list at all — `payload.client.
+ * remoteAddr` — is unstripped (no rule names it), unharvested (`HARVEST_KEYS`
+ * has no such spelling), unmatched by value (because it was never harvested)
+ * and unmatched by key. All four layers really are quiet, and depth is
+ * irrelevant to it. Closing it needs either a value-SHAPED net over payload
+ * leaves or a positive allow-list of shipped payload keys per event type —
+ * both spec decisions, both owed.
  *
  * ## Why the namespace predicate rides along
  *
