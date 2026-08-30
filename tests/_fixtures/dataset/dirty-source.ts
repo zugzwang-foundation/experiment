@@ -57,7 +57,13 @@ export const SYSTEM_SENTINEL = "system";
 // ── the secrets, named once so tests assert against the same strings ───
 
 export const FIXTURE_SECRET_VALUES = {
-	ips: ["203.0.113.7", "203.0.113.42", "203.0.113.99"],
+	// ⚠ The FOURTH ip is DATASET.2 C2's depth probe and appears NOWHERE except
+	// nested at `image_upload.committed.payload.context.ip`. That is what makes
+	// it able to fail: a harvest that walks one level never collects it, so the
+	// value scan is never told to look for it, and a nested leak passes both
+	// layers silently. An ip that also appeared at the top level would be
+	// harvested anyway and the guard would pass on the shallow implementation.
+	ips: ["203.0.113.7", "203.0.113.42", "203.0.113.99", "203.0.113.13"],
 	userAgents: [
 		"Mozilla/5.0 (FixtureBrowser/1.0; DATASET-1-CANARY)",
 		"Mozilla/5.0 (SecondFixtureBrowser/2.0; DATASET-1-CANARY)",
@@ -67,7 +73,16 @@ export const FIXTURE_SECRET_VALUES = {
 	r2ObjectKeys: [
 		`u/${FIXTURE_USER_IDS.amber}/0192f3a4-aaaa-7000-8000-0000000000u1.webp`,
 		`u/${FIXTURE_USER_IDS.basalt}/0192f3a4-bbbb-7000-8000-0000000000u2.webp`,
+		// ⚠ index 2 is the `m/` MARKET-MEDIA key and is NOT a secret —
+		// Appendix B.16 SHIPs it. See `fixtureSecrets`.
 		`m/0192f3a4-cccc-7000-8000-00000000m001/hero.webp`,
+		// ⚠ index 3 is DATASET.2 C2's ARRAY-depth probe: a `u/` key reachable
+		// only at `image_upload.committed.payload.variants[0].key`. It proves
+		// depth THROUGH AN ARRAY, which the `m/` key next to it cannot — that
+		// one is exempt by namespace, so it demonstrates survival rather than
+		// stripping, and a depth rule that handled objects but not arrays would
+		// still pass every assertion about it.
+		`u/${FIXTURE_USER_IDS.amber}/0192f3a4-dddd-7000-8000-0000000000u4.webp`,
 	],
 	adminSessionIds: [
 		"adm_sess_0192f3a4dddd7000800000000000s001",
@@ -122,11 +137,11 @@ export interface DirtyEventRow {
 	readonly created_at: string;
 }
 
-const [IP_A, IP_B, IP_C] = FIXTURE_SECRET_VALUES.ips;
+const [IP_A, IP_B, IP_C, IP_NESTED] = FIXTURE_SECRET_VALUES.ips;
 const [UA_A, UA_B] = FIXTURE_SECRET_VALUES.userAgents;
 const [GID_A, GID_B] = FIXTURE_SECRET_VALUES.googleIds;
 const [EMAIL_A, EMAIL_B] = FIXTURE_SECRET_VALUES.emails;
-const [R2_A, R2_B] = FIXTURE_SECRET_VALUES.r2ObjectKeys;
+const [R2_A, R2_B, , R2_NESTED] = FIXTURE_SECRET_VALUES.r2ObjectKeys;
 const [SESS_A, SESS_B] = FIXTURE_SECRET_VALUES.adminSessionIds;
 
 const AMBER = FIXTURE_USER_IDS.amber;
@@ -263,7 +278,39 @@ export const DIRTY_EVENT_ROWS: readonly DirtyEventRow[] = [
 		event_type: "image_upload.committed",
 		aggregate_type: "image_upload",
 		aggregate_id: UPLOAD_ID,
-		payload: { userId: AMBER, key: R2_A, uploadId: UPLOAD_ID },
+		// ⚠ **The DATASET.2 depth row.** `context` and `variants` do NOT model
+		// the shape `schemas.ts` declares for this event — they are deliberate
+		// NESTED DIRT, which is what this fixture is for. (`market.created`
+		// next door is the opposite case and carries its REAL payload, because
+		// the defect there was a fixture SIMPLER than production.)
+		//
+		// Four distinct things are being made visible, and each fails
+		// differently if depth is implemented badly:
+		//
+		//   · `commentId`      — C3. Stripped UNCONDITIONALLY (§19.4.1); it
+		//                        reconstructs the comment↔upload link that
+		//                        Appendix B.6 withholds on removal.
+		//   · `context.userId` — depth 2 through an OBJECT.
+		//   · `context.ip`     — depth 2, and it is `IP_NESTED`, a value
+		//                        reachable NOWHERE ELSE in the fixture. That is
+		//                        the harvest probe: a shallow harvest never
+		//                        collects it, so the value scan is never told
+		//                        to look for it and the leak is silent in both
+		//                        layers at once.
+		//   · `variants[].key` — depth 2 through an ARRAY, carrying a `u/` key,
+		//                        so it must be STRIPPED. Its sibling probe is
+		//                        `market.created.media[].key`, which must
+		//                        SURVIVE by namespace. Together they pin both
+		//                        directions: a rule that strips everything in
+		//                        arrays passes one and fails the other.
+		payload: {
+			userId: AMBER,
+			key: R2_A,
+			uploadId: UPLOAD_ID,
+			commentId: COMMENT_ID,
+			context: { userId: AMBER, ip: IP_NESTED },
+			variants: [{ key: R2_NESTED, width: 800 }],
+		},
 		payload_version: 1,
 		metadata: dirtyMetadata({
 			userId: AMBER,
@@ -540,6 +587,55 @@ if (missing.length > 0) {
  * `metadata.ip` only ever as a real address. This is the control that would
  * have caught both.
  */
+/**
+ * ⚠ **The comment↔upload RECOVERY-PATH row (DATASET.2 C3).**
+ *
+ * C3 strips `commentId` from `image_upload.committed` so that a reactively-
+ * removed comment's withheld `image_uploads_id` (Appendix B.6) cannot be
+ * rebuilt from `events`. Measured against the fixture as it stood, that guard
+ * passed — and it passed for the wrong reason: **the fixture's removed comment
+ * had no `comment.placed` event carrying an `uploadId`**, so the route was
+ * never travelled. The test was asserting the absence of something the data
+ * could not have produced.
+ *
+ * This row supplies it. `comment.placed`'s payload declares BOTH `commentId`
+ * and `uploadId` (`schemas.ts`), §19.4.1 strips only `userId` from it and
+ * names `uploadId` a research key that SHIPS — so on real data every comment
+ * emits one of these, and for a removed comment with an image the pair
+ * reconstructs the exact association B.6 withholds, **in a single row, with no
+ * join required.**
+ *
+ * It is here so the gap is DEMONSTRATED rather than argued. See the
+ * `KNOWN OPEN` test in `depth-strip.test.ts`, which pins the leak so that it
+ * cannot be quietly lost, and the run report's owed-rulings table.
+ */
+export const RECOVERY_PATH_EVENT_ROWS: readonly DirtyEventRow[] = [
+	{
+		event_id: "0192f3a4-00fe-7000-8000-00000000rp01",
+		event_type: "comment.placed",
+		aggregate_type: "comment",
+		aggregate_id: REMOVED_COMMENT_ID,
+		payload: {
+			userId: BASALT,
+			commentId: REMOVED_COMMENT_ID,
+			marketId: MARKET_ID,
+			betId: null,
+			side: "NO",
+			bodyLength: REMOVED_COMMENT_BODY.length,
+			// ⚠ The other half of the pair. §19.4.1 SHIPs this.
+			uploadId: UPLOAD_ID,
+		},
+		payload_version: 1,
+		metadata: dirtyMetadata({
+			userId: BASALT,
+			actorId: BASALT,
+			ip: IP_B,
+			userAgent: UA_B,
+		}),
+		created_at: AT,
+	},
+];
+
 export const SENTINEL_EVENT_ROWS: readonly DirtyEventRow[] = [
 	{
 		event_id: "0192f3a4-00ff-7000-8000-00000000se01",
@@ -874,7 +970,11 @@ export const DIRTY_TABLE_ROWS = {
 			created_at: AT,
 		},
 	],
-	events: [...DIRTY_EVENT_ROWS, ...SENTINEL_EVENT_ROWS],
+	events: [
+		...DIRTY_EVENT_ROWS,
+		...SENTINEL_EVENT_ROWS,
+		...RECOVERY_PATH_EVENT_ROWS,
+	],
 } as const satisfies Record<string, readonly object[]>;
 
 /**
@@ -914,11 +1014,14 @@ export function fixtureSecrets(): {
 		ips: new Set(FIXTURE_SECRET_VALUES.ips),
 		userAgents: new Set(FIXTURE_SECRET_VALUES.userAgents),
 		googleIds: new Set(FIXTURE_SECRET_VALUES.googleIds),
-		// ⚠ ONLY the two `u/<userId>/…` keys. The third is
+		// ⚠ ONLY the `u/<userId>/…` keys. Index 2 is
 		// `m/<marketId>/hero.webp`, which Appendix B.16 SHIPS — it is
 		// operator-curated market context with no user id embedded, so it is
 		// not a secret and must not be treated as one.
-		r2ObjectKeys: new Set([R2_A, R2_B]),
+		// `R2_NESTED` (index 3) IS a secret: it is a `u/` key, and it lives
+		// only inside `image_upload.committed.payload.variants[0]` — the
+		// DATASET.2 C2 array-depth probe.
+		r2ObjectKeys: new Set([R2_A, R2_B, R2_NESTED]),
 		adminSessionIds: new Set(FIXTURE_SECRET_VALUES.adminSessionIds),
 		emails: new Set(FIXTURE_SECRET_VALUES.emails),
 		// ⚠ The H2-erased participant has NULL name/image, so these are

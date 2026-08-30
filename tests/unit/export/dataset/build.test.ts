@@ -352,8 +352,12 @@ describe("build · secrets are harvested from SOURCE rows", () => {
 		expect((transformed.users as unknown[]).length).toBe(3);
 		// 24 event types + the 2 SENTINEL rows (`ip: "unknown"` / `"cron"`),
 		// which the fixture carries so the harvest's sentinel exclusion has a
-		// control (`@security-auditor` F-11 H-A).
-		expect((transformed.events as unknown[]).length).toBe(26);
+		// control (`@security-auditor` F-11 H-A) + the 1 RECOVERY-PATH row
+		// (DATASET.2 C3): a second `comment.placed`, for the REMOVED comment,
+		// carrying the `uploadId` that rebuilds the association B.6 withholds.
+		// It is in the fixture because without it the C3 guard passed over a
+		// route the data could not travel.
+		expect((transformed.events as unknown[]).length).toBe(27);
 
 		const post = harvestSecrets(transformed as never);
 
@@ -390,7 +394,13 @@ describe("build · secrets are harvested from SOURCE rows", () => {
 		// is empty by construction, passing on every input forever.
 		const pre = harvestSecrets(DIRTY_TABLE_ROWS as never);
 		expect(pre.emails.size).toBe(2);
-		expect(pre.ips.size).toBe(3);
+		// ⚠ **4, not 3, and the fourth is the DATASET.2 C2 depth probe.** The
+		// shallow harvest found three ips; the recursive one additionally finds
+		// `image_upload.committed.payload.context.ip`, which is reachable
+		// nowhere else in the fixture. **This count moving is the measurement
+		// that the harvest actually got deeper** — a recursive strip paired
+		// with a shallow harvest would leave this at 3 while looking fixed.
+		expect(pre.ips.size).toBe(4);
 		expect(pre.adminSessionIds.size).toBeGreaterThanOrEqual(2);
 	});
 });

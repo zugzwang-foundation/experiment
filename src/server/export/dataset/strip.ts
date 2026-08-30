@@ -4,6 +4,7 @@ import {
 	GLOBALLY_FORBIDDEN_PAYLOAD_KEYS,
 	PAYLOAD_STRIP_KEYS,
 	STRIPPED_METADATA_KEYS,
+	shipsDespiteForbiddenKey,
 } from "@/server/export/egress/forbidden-keys";
 
 import { maskRemovedComment } from "./removed";
@@ -105,11 +106,62 @@ export const PAYLOAD_BEARING_TABLES = new Set([
 export function stripMetadata(metadata: unknown): unknown {
 	if (metadata === null || typeof metadata !== "object") return metadata;
 	if (Array.isArray(metadata)) return metadata;
+	return stripDeep(metadata, new Set(STRIPPED_METADATA_KEYS));
+}
+
+/**
+ * Remove every `forbidden` key from a JSON-shaped value **at any depth**,
+ * descending through objects and through arrays of objects.
+ *
+ * ## Why depth (SPEC.2 §19.4.1, DATASET.2 C2)
+ *
+ * This walked exactly one level until DATASET.2, and the one-level walk was
+ * **correct for every payload shape that exists today** — which is precisely
+ * what made it worth changing rather than leaving. `@security-auditor` H-3
+ * found that a nested secret is neither stripped nor harvested nor
+ * key-matched, and closed the single live instance
+ * (`market.created.payload.media[].key`) by hand.
+ *
+ * Depth is not a property a future author thinks to check when they add an
+ * event type. They are asked, by the shape of §19.4.1's table, only *which
+ * keys* are sensitive — so a payload that nests one is the default outcome of
+ * following the contract as written, not a mistake someone has to make.
+ *
+ * ⚠ **And the value-based guard cannot rescue it.** That is the part worth
+ * spelling out: a nested secret is never *harvested* into `EgressSecrets`, so
+ * the scan does not know to look for it. Both layers go quiet at once, and the
+ * build reports success. A shallow strip is therefore not "a strip with a
+ * known gap" — it is a strip whose gap is invisible to the thing that exists
+ * to catch its gaps.
+ *
+ * ## Why the namespace predicate rides along
+ *
+ * Recursion is what makes `shipsDespiteForbiddenKey` load-bearing *here*
+ * rather than only in the assertion. `market.created.payload.media[].key` is
+ * a required field on every market and §19.4.1 SHIPs it; a depth rule applied
+ * without the namespace rule deletes it, and the first real read of a live
+ * `market.created` row hard-fails the one-shot release build. See that
+ * predicate's docblock — the strip, the harvest and the assertion must agree
+ * by construction.
+ *
+ * Returns NEW containers throughout; never mutates. The source rows are read
+ * once and fed to several passes, and a mutating strip would make the
+ * pipeline's output depend on the order those passes happened to run in.
+ */
+export function stripDeep(
+	value: unknown,
+	forbidden: ReadonlySet<string>,
+): unknown {
+	if (value === null || typeof value !== "object") return value;
+
+	if (Array.isArray(value)) {
+		return value.map((item) => stripDeep(item, forbidden));
+	}
 
 	const out: Record<string, unknown> = {};
-	for (const [k, v] of Object.entries(metadata as SourceRow)) {
-		if ((STRIPPED_METADATA_KEYS as readonly string[]).includes(k)) continue;
-		out[k] = v;
+	for (const [k, v] of Object.entries(value as SourceRow)) {
+		if (forbidden.has(k) && !shipsDespiteForbiddenKey(k, v)) continue;
+		out[k] = stripDeep(v, forbidden);
 	}
 	return out;
 }
@@ -157,12 +209,9 @@ export function stripPayload(eventType: string, payload: unknown): unknown {
 	// documented place rather than an untraceable edit inside the table.
 	const forbidden = new Set([...rules, ...GLOBALLY_FORBIDDEN_PAYLOAD_KEYS]);
 
-	const out: Record<string, unknown> = {};
-	for (const [k, v] of Object.entries(payload as SourceRow)) {
-		if (forbidden.has(k)) continue;
-		out[k] = v;
-	}
-	return out;
+	// ⚠ DEPTH (DATASET.2 C2 / SPEC.2 §19.4.1): the rules apply at any nesting
+	// level and through arrays, not only to top-level keys. See `stripDeep`.
+	return stripDeep(payload, forbidden);
 }
 
 /**

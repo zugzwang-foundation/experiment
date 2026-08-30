@@ -2,6 +2,7 @@ import { type EgressViolation, EgressViolationError } from "./errors";
 import {
 	GLOBALLY_FORBIDDEN_PAYLOAD_KEYS,
 	STRIPPED_METADATA_KEYS,
+	shipsDespiteForbiddenKey,
 } from "./forbidden-keys";
 import { findKeys, findValues, scanText, UUID_RE_GLOBAL } from "./scan";
 
@@ -148,16 +149,12 @@ export const FREE_TEXT_COLUMNS = new Set([
  */
 
 /**
- * Is this R2 object key operator-curated market media (`m/<marketId>/…`)?
- *
- * The `m/` namespace ships (Appendix B.16, §19.4.1's `market.created` row);
- * the `u/` namespace never does, because SCAFFOLD.15 §Q9 embeds the user id in
- * the path. Matching on the prefix rather than on the column name is what lets
- * the same key NAME be safe in one place and a leak in another.
+ * ⚠ `isMarketMediaKey` and `shipsDespiteForbiddenKey` now live in
+ * `forbidden-keys.ts` (DATASET.2 C2) and are imported above. They moved
+ * because the recursive strip and the recursive harvest became consumers of
+ * the same namespace rule, and a rule this file owned privately could only be
+ * applied *after* the strip had already removed the value.
  */
-export function isMarketMediaKey(value: unknown): boolean {
-	return typeof value === "string" && value.startsWith("m/");
-}
 
 /** An empty secret set — for callers with genuinely nothing to protect. */
 export function emptySecrets(): EgressSecrets {
@@ -393,7 +390,14 @@ export class EgressGuard {
 			// one-shot job, for a key the spec explicitly ships. The fixture
 			// modelled that payload as `{ marketId }` alone, so nothing on the
 			// branch could see it.
-			if (hit.key === "key" && isMarketMediaKey(hit.value)) continue;
+			//
+			// ⚠ The predicate is SHARED with the strip and the harvest
+			// (`forbidden-keys.ts`) as of DATASET.2 C2 — see its docblock for
+			// why all three must agree by construction rather than by three
+			// copies of the same `startsWith`.
+			if (hit.key !== null && shipsDespiteForbiddenKey(hit.key, hit.value)) {
+				continue;
+			}
 
 			this.add({
 				rule: "no-forbidden-payload-key",

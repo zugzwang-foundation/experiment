@@ -103,7 +103,34 @@ export const PAYLOAD_STRIP_KEYS = {
 	// — image upload lifecycle —
 	// `key` is the R2 object key, which embeds the userId per SCAFFOLD.15 §Q9.
 	"image_upload.sign_requested": ["userId", "key"],
-	"image_upload.committed": ["userId", "key"],
+	// ⚠ `commentId` is stripped UNCONDITIONALLY (SPEC.2 §19.4.1, DATASET.2 C3).
+	//
+	// Appendix B.6 withholds a reactively-removed comment's `image_uploads_id`,
+	// and THIS key reconstructs the identical association from the other side —
+	// so leaving it rebuilds exactly the link B.6 withholds
+	// (`@security-auditor` M-8). With removed bodies now ruled withheld (R1),
+	// leaving a recovery path for the one association that withholding exists
+	// to break is incoherent.
+	//
+	// **Unconditional, not conditional-on-removal**, and the reason is the
+	// interesting part: a strip that fired only for removed comments would make
+	// the key's own presence or absence the removal flag, on every row, in an
+	// archive that already ships `mod_actions`. The conditional leaks the
+	// condition. Uniform absence carries no signal at all.
+	//
+	// It is also nearly free, which is what makes the choice easy: the key is
+	// **redundant where it is permitted and harmful where it is not**.
+	// `comments.image_uploads_id` (B.6) already carries the association for
+	// every comment that is not withheld, so a researcher joining comments to
+	// uploads uses that column and never needed this one.
+	//
+	// ⚠ **It does NOT close the whole recovery path, and that is measured, not
+	// assumed.** `comment.placed`'s payload carries both `commentId` AND
+	// `uploadId`, and §19.4.1 ships the latter as a research key — so the same
+	// association survives in one row, with no join. See the `KNOWN OPEN` test
+	// in `tests/unit/export/dataset/depth-strip.test.ts`. Closing it deletes a
+	// key the spec says ships and needs its own ruling.
+	"image_upload.committed": ["userId", "key", "commentId"],
 	"image_upload.blocked": ["userId", "key"],
 	// `orphaned` carries no `userId`; `uploadId` is the row id and SHIPS.
 	"image_upload.orphaned": ["key"],
@@ -199,3 +226,50 @@ export const GLOBALLY_FORBIDDEN_PAYLOAD_KEYS = [
 	// either deletes a shipped column or ships a stripped one.
 	"userId",
 ] as const;
+
+/**
+ * Is this R2 object key operator-curated market media (`m/<marketId>/…`)?
+ *
+ * The `m/` namespace ships (Appendix B.16, §19.4.1's `market.created` row);
+ * the `u/` namespace never does, because SCAFFOLD.15 §Q9 embeds the user id in
+ * the path. Matching on the prefix rather than on the column name is what lets
+ * the same key NAME be safe in one place and a leak in another.
+ *
+ * ⚠ **Moved here from `assertions.ts` at DATASET.2 C2.** It lived next to its
+ * one consumer while it had one; the recursive strip and the recursive harvest
+ * are now consumers too, and a namespace rule enforced in the assertion but not
+ * in the strip is a rule that fires *after* the value has already been removed.
+ */
+export function isMarketMediaKey(value: unknown): boolean {
+	return typeof value === "string" && value.startsWith("m/");
+}
+
+/**
+ * Does this (key, value) pair carry a forbidden KEY NAME but a value the spec
+ * nonetheless SHIPS?
+ *
+ * ⚠ **One predicate, three consumers — the strip, the harvest and the
+ * assertion — and that is the whole reason it exists as a function rather than
+ * as three `startsWith("m/")` checks.** They have to agree by construction:
+ *
+ *   · the **strip** must not remove it (§19.4.1 ships `market.created.media[]`,
+ *     and `key` is `.min(1)` in `schemas.ts`, so EVERY market carries one);
+ *   · the **harvest** must not collect it as a secret, or the value scan then
+ *     fires on `market_media.csv`, which ships the identical string as a
+ *     column (Appendix B.16) — the build would fail on a value it published
+ *     itself;
+ *   · the **assertion** must not reject it after the other two let it through.
+ *
+ * Any one of the three disagreeing is a **guaranteed total build failure on a
+ * one-shot job**, which is what `@security-auditor` H-1 measured when only the
+ * assertion knew the rule. Going recursive multiplies the ways to disagree,
+ * so the rule stops being three checks and becomes one.
+ *
+ * Today the only such pair is `key` in the `m/` namespace. It is written as a
+ * general predicate rather than inlined so that a second exemption arrives as
+ * one edit here, visible to all three layers at once, instead of as three
+ * edits of which someone lands two.
+ */
+export function shipsDespiteForbiddenKey(key: string, value: unknown): boolean {
+	return key === "key" && isMarketMediaKey(value);
+}

@@ -475,10 +475,18 @@ describe("egress · assertTableClean / the dirty fixture end to end", () => {
 		// fixture edit that halves the violation count should not still pass.
 		//
 		// Every one of the 24 event rows carries `metadata.ip` +
-		// `metadata.user_agent`, so that is 2 × 24 = 48. The remaining 3 are
-		// PAYLOAD keys — `user.tos_accepted` carries both and
-		// `admin.signed_in` carries `ip` — because `findKeys` walks the whole
-		// row rather than only the `metadata` object.
+		// `metadata.user_agent`, so that is 2 × 24 = 48. The remaining 4 are
+		// PAYLOAD keys — `user.tos_accepted` carries both, `admin.signed_in`
+		// carries `ip`, and (DATASET.2 C2) `image_upload.committed` carries a
+		// NESTED `payload.context.ip` at depth 2 — because `findKeys` walks the
+		// whole row rather than only the `metadata` object.
+		//
+		// ⚠ **That fourth hit was 3 until the C2 depth row landed, and the
+		// increment is the measurement.** `findKeys` has always been recursive,
+		// so it saw the nested key immediately; the strip and the harvest did
+		// not. A number that moved by exactly one, in the arm that was already
+		// deep, is what a fixture gaining one nested secret should do — and if
+		// it had NOT moved, the fixture would not actually be nesting anything.
 		//
 		// ⚠ Worth stating rather than rounding away: the rule is NAMED
 		// `no-stripped-metadata-key` and its net is wider than its name. That
@@ -492,6 +500,13 @@ describe("egress · assertTableClean / the dirty fixture end to end", () => {
 			v.path.includes(".metadata."),
 		).length;
 		expect(inMetadata).toBe(DIRTY_EVENT_ROWS.length * 2);
-		expect(metadataHits.length - inMetadata).toBe(3);
+		expect(metadataHits.length - inMetadata).toBe(4);
+		// Pin the nested one by PATH, not only by the count above. A count
+		// alone cannot distinguish "the depth probe is being seen" from "some
+		// other row gained an ip" — and this file's own history is that a
+		// number agreeing with expectation is the failure mode.
+		expect(
+			metadataHits.some((v) => v.path.includes(".payload.context.ip")),
+		).toBe(true);
 	});
 });

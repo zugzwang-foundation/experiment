@@ -8,7 +8,9 @@ import type { EgressViolation } from "@/server/export/egress/errors";
 import {
 	SHIPPED_METADATA_KEYS,
 	STRIPPED_METADATA_KEYS,
+	shipsDespiteForbiddenKey,
 } from "@/server/export/egress/forbidden-keys";
+import { walk } from "@/server/export/egress/scan";
 
 import { type CsvArtifact, countCsvRows, toCsv } from "./csv";
 import {
@@ -152,6 +154,35 @@ export const NON_SECRET_SENTINELS = new Set([
 ]);
 
 /**
+ * JSONB sub-key name → the `EgressSecrets` bucket it feeds.
+ *
+ * ⚠ **Deliberately a superset of what any one payload shape carries today**,
+ * and deliberately covering both the `snake_case` and `camelCase` spellings
+ * of the same fact. Payload keys are `camelCase` (`googleId`, `userAgent`),
+ * metadata keys are `snake_case` (`user_agent`) — and the harvest now walks
+ * both containers with one table, so it has to know both. A key spelled a
+ * third way is a value nobody harvests and therefore a value nobody scans
+ * for; the completeness guard over §19.4.1 is what keeps that from being
+ * silent, but breadth here is cheap and the failure it prevents is not.
+ *
+ * ⚠ `userId` is NOT here. Raw `users.id` values are harvested exhaustively
+ * from the `users` table itself, which is the authoritative and complete set;
+ * collecting them again from payloads would add nothing and would risk
+ * harvesting a *pseudonymized* value if this ever ran post-transform.
+ */
+const HARVEST_KEYS: Readonly<Record<string, keyof EgressSecrets>> = {
+	ip: "ips",
+	user_agent: "userAgents",
+	userAgent: "userAgents",
+	googleId: "googleIds",
+	google_id: "googleIds",
+	email: "emails",
+	key: "r2ObjectKeys",
+	sessionId: "adminSessionIds",
+	session_id: "adminSessionIds",
+};
+
+/**
  * Harvest every secret value from the SOURCE rows.
  *
  * ⚠ Called on source rows only. See decision 2 above — this is the single
@@ -207,18 +238,35 @@ export function harvestSecrets(
 	// Audit payloads carry ips, user agents, session ids and google ids that
 	// may not appear on any `users` row — an admin has no users row at all,
 	// so the admin's ip and session id are ONLY reachable here.
+	//
+	// ⚠ **DEPTH (DATASET.2 C2).** This read `p.ip`, `p.key`, `p.sessionId` …
+	// at one level, and the strip walked one level too — so the two agreed,
+	// and their agreement was the problem. A nested secret was neither
+	// stripped NOR harvested, which means the value scan was never told to
+	// look for the value the strip had just failed to remove: **both layers
+	// fell silent on the same input, and the build reported success.** That
+	// is why `@security-auditor` H-3 could not be closed by making the strip
+	// recursive alone. The harvest now walks to the same depth the strip does,
+	// via the same `walk` the guards use.
 	for (const table of ["events", "admin_events", "user_events"]) {
 		for (const row of tables[table] ?? []) {
-			const p = (row.payload ?? {}) as Record<string, unknown>;
-			const m = (row.metadata ?? {}) as Record<string, unknown>;
-			add(s.ips, p.ip);
-			add(s.ips, m.ip);
-			add(s.userAgents, p.user_agent);
-			add(s.userAgents, m.user_agent);
-			add(s.googleIds, p.googleId);
-			add(s.emails, p.email);
-			add(s.r2ObjectKeys, p.key);
-			add(s.adminSessionIds, p.sessionId);
+			for (const container of [row.payload, row.metadata]) {
+				for (const entry of walk(container)) {
+					if (entry.key === null) continue;
+					const bucket = HARVEST_KEYS[entry.key];
+					if (bucket === undefined) continue;
+					// ⚠ The SAME namespace predicate the strip and the assertion
+					// use. Harvesting an `m/` market-media key as a secret would
+					// make the value scan fire on `market_media.csv`, which SHIPs
+					// that identical string as a column (Appendix B.16) — the
+					// build would fail on a value it published itself, which is
+					// `@security-auditor` H-1 reappearing one layer over. Going
+					// recursive is what first brings `media[].key` within reach
+					// of this loop at all.
+					if (shipsDespiteForbiddenKey(entry.key, entry.value)) continue;
+					add(s[bucket], entry.value);
+				}
+			}
 			if (row.aggregate_type === "admin_session") {
 				add(s.adminSessionIds, row.aggregate_id);
 			}
