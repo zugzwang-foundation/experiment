@@ -61,6 +61,15 @@ vi.mock("next/navigation", () => ({
 	useSearchParams: () => new URLSearchParams(),
 }));
 
+// HO-FRONT v2.0 T2 — poll phase jitter (DebatePoll.tsx) desyncs concurrent
+// tabs by delaying when the FIRST interval arms, per client mount. Forced to
+// a constant 0 here so every timing assertion below collapses to exactly the
+// pre-jitter boundaries it already pins — the mechanism is exercised for
+// real by `tests/unit/debate/DebatePoll.poll-phase.test.tsx`, not this file.
+vi.mock("@/components/debate/poll-phase", () => ({
+	getInitialPollPhaseOffsetMs: () => 0,
+}));
+
 import { DebatePoll } from "@/components/debate/DebatePoll";
 import { DebateView } from "@/components/debate/DebateView";
 import type { DebateViewModel } from "@/components/debate/types";
