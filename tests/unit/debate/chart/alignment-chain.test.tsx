@@ -347,9 +347,9 @@ describe("C-CHART-2 clause 2 — label legibility: 10px is declared ONCE, for ev
 	// `y-scale.test.tsx`. Raised by `@code-reviewer` at the CHART-5 cascade.
 	it("no label span overrides the gutter's type size", () => {
 		// The size is inherited, so a child override wins silently. The labels
-		// legitimately carry an arbitrary COLOUR class — `text-[color:var(...)]` —
-		// which shares the `text-[` prefix, so the ban is written against a digit
-		// or a named step and the control below proves it tells them apart.
+		// legitimately carry an arbitrary COLOUR class in the `text-[color:var(--x)]`
+		// shape, which shares the `text-[` prefix, so the ban is written against a
+		// digit or a named step and the control below proves it tells them apart.
 		const { container } = renderMode("collapsed");
 		for (const id of ["terminal-label-yes", "terminal-label-no"]) {
 			expect(hasToken(cls(container, id), TYPE_SIZE_RE)).toBe(false);

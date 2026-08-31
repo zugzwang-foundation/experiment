@@ -480,7 +480,8 @@ describe("SideBadge — the detail and profile seam presets", () => {
 		//
 		// TWO of those five are asserted here, not all five: `text-xs`, `px-2`
 		// and `py-0.5` are already pinned POSITIVELY by the preceding test, which
-		// requires the preset's own `text-[…]`/`px-[…]`/`py-[…]` to be present.
+		// requires the preset's own arbitrary-value size classes (in the
+		// `text-[Npx]`/`px-[Npx]`/`py-[Npx]` shape) to be present.
 		// `font-medium` and `rounded-4xl` are the two that `twMerge` does NOT
 		// resolve away on its own, so absence is the only way to catch them.
 		for (const { size } of PRESETS) {
