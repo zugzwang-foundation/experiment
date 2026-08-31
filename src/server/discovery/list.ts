@@ -200,7 +200,7 @@ export async function getCachedMarketDiscoveryData(
 	// market id ALONE, instead of `loadPriceSeries`, which replayed inside this
 	// reserves-keyed block. This block misses on every bet; that one does not, so
 	// the walk is derived once per `MARKET_SERIES_MIN_WINDOW_MS` however busy the
-	// market gets (SPEC.1 1.0.40 §9 *Refresh*). The hero's own cap is unchanged.
+	// market gets (SPEC.1 1.0.45 §9 *Refresh*). The hero's own cap is unchanged.
 	//
 	// ⚠ THE F-1 DRIFT WARN IS DELIBERATELY GONE FROM THIS PATH, AND IT IS A
 	// SUPERSESSION RATHER THAN AN OVERSIGHT. `loadPriceSeries` spends a fourth

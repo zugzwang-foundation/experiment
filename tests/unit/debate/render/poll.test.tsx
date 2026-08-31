@@ -25,7 +25,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 //   debate-view::poll-suspends-while-hidden-or-composer-open
 //   debate-view::price-chart-tail-pinned-to-live-price  (was
 //     `debate-view::poll-refreshes-price-chart`, removed from §17 at CHART-1 /
-//     SPEC.1 1.0.40 — see the rename note above that describe block)
+//     SPEC.1 1.0.45 — see the rename note above that describe block)
 //
 // Harness constraints (recon F13/F14): jsdom + @testing-library/react behind the
 // per-file docblock above. There is NO jest-dom — `toBeInTheDocument()` and
@@ -325,7 +325,7 @@ describe("F-DEBATE-4 — the stop rule (RULING D, client half)", () => {
 	});
 });
 
-// ⚠ RENAMED AT CHART-1 (SPEC.1 1.0.40), IN THE COMMIT THAT REMOVED ITS OLD NAME.
+// ⚠ RENAMED AT CHART-1 (SPEC.1 1.0.45), IN THE COMMIT THAT REMOVED ITS OLD NAME.
 // This case was `debate-view::poll-refreshes-price-chart`. §17 no longer carries
 // that row — it asserted the behaviour the CHART-1 amendment reverses — and
 // SPEC.2 §13.5 requires every case-id here to appear verbatim in §17, so leaving

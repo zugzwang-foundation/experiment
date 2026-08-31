@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 // CHART-1 AUDIT — the live right edge, at the two places it is actually
-// composed (SPEC.1 1.0.40 §9 *X domain* / *Refresh — floored history, live
+// composed (SPEC.1 1.0.45 §9 *X domain* / *Refresh — floored history, live
 // edge*).
 //
 // ⛔ WHAT THIS CLOSES, AND WHY THE PURE-FUNCTION SUITE DOES NOT CLOSE IT.
