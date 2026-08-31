@@ -1,3 +1,5 @@
+import { captureException } from "@sentry/nextjs";
+
 import {
 	getResolutionBlocks,
 	type ResolutionBlockEntry,
@@ -89,7 +91,29 @@ export function ResolverCards({
 	 */
 	market: DebateMarketHeader;
 }) {
-	const blockData = getResolutionBlocks(market.slug);
+	// ⛔⛔ CAUGHT HERE, NOT LEFT TO PROPAGATE — a joint @code-reviewer /
+	// @security-auditor finding on the first cut of this file, which let
+	// `getResolutionBlocks`'s throw reach `MarketHeader` → `DebateView`
+	// uncaught. `getResolutionBlocks` ITSELF still throws (unchanged,
+	// `resolution-block-data.test.ts`'s G1 still exercises that directly) —
+	// the failure mode that changed is what a CALLER does with it. Before this
+	// fix, a market slug with no map entry (a ninth market admin-created
+	// during the live window, or any drift between what's served and this
+	// task's static map) took the WHOLE `/m/[slug]` route down via the nearest
+	// error boundary — unauthenticated, GET-triggerable, repeatably, no
+	// participant action required. That is a bigger blast radius than "one
+	// row degrades", which is the failure this task's guard (G1) actually
+	// exists to prevent. ⇒ Capture once to Sentry (so it is still LOUD to an
+	// operator, never a silent regression to the empty bar RF-1 removed) and
+	// render nothing for this market's resolution row — the rest of the page,
+	// including the market's own bet/comment surface, stays fully functional.
+	let blockData: ReturnType<typeof getResolutionBlocks> | null = null;
+	try {
+		blockData = getResolutionBlocks(market.slug);
+	} catch (error) {
+		captureException(error);
+		return null;
+	}
 	return (
 		<div
 			data-testid="resolver-cards"

@@ -16,10 +16,19 @@
  *   1. `RESOLUTION_BLOCKS` is typed `Record<KnownMarketSlug, ResolutionBlockSet>`
  *      — omitting one of the eight known slugs from the object literal below
  *      is a `tsc` error. `just verify` genuinely fails the build for that case.
- *   2. `getResolutionBlocks` throws, loudly, for any slug outside the eight —
- *      caught by `m/[slug]/error.tsx`, never a silent empty bar. An empty bar
- *      is exactly the state this task exists to remove, so a silent fallback
- *      to it would be undetectable.
+ *   2. `getResolutionBlocks` throws for any slug outside the eight — never a
+ *      silent empty bar, which is exactly the state this task exists to
+ *      remove. ⚠ THIS FUNCTION'S OWN THROW IS UNCHANGED, but its CALLER
+ *      (`ResolverCards`) no longer lets it propagate to `m/[slug]/error.tsx`
+ *      — a joint @code-reviewer/@security-auditor finding on the first cut
+ *      of this task was that doing so took the WHOLE route down,
+ *      unauthenticated-GET-triggerable, for a failure that only needs one
+ *      row to degrade. `ResolverCards` now catches it, captures once to
+ *      Sentry (still loud — the RF-1 guarantee this rule exists for), and
+ *      renders nothing for that market's resolution row. See that
+ *      component's own docblock for the full reasoning; this function's
+ *      contract (throw on an unknown slug) is what every test against it
+ *      still exercises directly.
  * Given the code freeze, these eight markets are the only ones this
  * deployment will ever have — the distinction between "fails at tsc time" and
  * "fails loud at render time for a slug that cannot occur" is not a practical

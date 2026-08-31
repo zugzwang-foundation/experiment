@@ -2,6 +2,18 @@
 
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+// ⛔⛔ MOCKED, NOT SPIED — a joint @code-reviewer/@security-auditor finding
+// (post-S6) is what makes this necessary at all: an unknown market slug used
+// to throw straight through `render()`, which the "an-unknown-market-slug"
+// tests below asserted directly. It now degrades instead (captures once,
+// renders nothing) — see `ResolverCards.tsx`'s own docblock at the top of its
+// function body for why an uncaught throw here took the WHOLE `/m/[slug]`
+// route down, unauthenticated-GET-triggerable, for a failure mode that only
+// needs one market's row to degrade.
+vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
+
+import { captureException } from "@sentry/nextjs";
 import { ResolverCards } from "@/components/debate/ResolverCards";
 import { RESOLUTION_BLOCKS } from "@/components/debate/resolution-block-data";
 import type { DebateMarketHeader } from "@/components/debate/types";
@@ -329,17 +341,50 @@ describe("BLOCK-1 — G2, every value line is real content, never an empty bar",
 		).toBe("repo");
 	});
 
-	it("resolver-cards::an-unknown-market-slug-throws-rather-than-rendering-an-empty-bar", () => {
-		// ⛔ End-to-end confirmation of resolution-block-data.ts's G1 guard —
-		// component-level, not just the pure-function level.
+	it("resolver-cards::an-unknown-market-slug-degrades-to-NOTHING-captured-once-never-crashes-the-route", () => {
+		// ⛔⛔ REVERSED POST-REVIEW: this used to assert `render(...)` THROWS —
+		// correct End-to-end confirmation of G1 at the time, but @code-reviewer
+		// and @security-auditor independently converged on the same finding:
+		// letting that throw reach `MarketHeader` → `DebateView` took the WHOLE
+		// `/m/[slug]` route down (unauthenticated, GET-triggerable, repeatably)
+		// for a failure that only needs one market's resolution row to degrade.
+		// `getResolutionBlocks` itself is UNCHANGED and still throws — proven
+		// directly by `resolution-block-data.test.ts`'s G1 tests, not
+		// re-asserted here. What changed is `ResolverCards`, the caller: it now
+		// catches that throw, captures it once, and renders nothing.
+		vi.mocked(captureException).mockClear();
 		const unknown = { ...BASE, slug: "not-one-of-the-eight" };
-		// ⚠ MATCH THE MESSAGE, NOT JUST "something threw". A bare `.toThrow()`
-		// goes green on ANY error raised during render — a bad prop, a missing
-		// import, a jsdom quirk — and would certify this guard while the
-		// unknown-slug branch itself had been removed.
-		expect(() => render(<ResolverCards market={unknown} />)).toThrow(
+		const { container } = render(<ResolverCards market={unknown} />);
+
+		// ⛔ NOTHING renders — no row, no partial chrome, no empty bar (the
+		// state RF-1 removed). `container.firstChild === null` is the honest
+		// "this component opted out of rendering" signal; a stray wrapper
+		// `<div />` would pass a `toBeNull()` on `resolver-cards` alone while
+		// still adding an empty node to the DOM.
+		expect(container.firstChild).toBeNull();
+		expect(
+			container.querySelector('[data-testid="resolver-cards"]'),
+		).toBeNull();
+
+		// ⛔⛔ STILL LOUD — captured, not swallowed. This is what keeps the RF-1
+		// guarantee ("a missing slug must fail... a silent fallback would be
+		// undetectable") true under the new behaviour: an operator sees this in
+		// Sentry, a participant sees a working page with one row missing.
+		expect(captureException).toHaveBeenCalledTimes(1);
+		const captured = vi.mocked(captureException).mock.calls[0]?.[0];
+		expect(captured).toBeInstanceOf(Error);
+		expect((captured as Error).message).toMatch(
 			/no resolution-block data for market slug "not-one-of-the-eight"/,
 		);
+	});
+
+	it("resolver-cards::a-known-slug-never-calls-captureException", () => {
+		// ⛔ POSITIVE-PATH CONTROL for the test above — proves `captureException`
+		// isn't called unconditionally on every render, which would make the
+		// assertion above vacuous in the other direction.
+		vi.mocked(captureException).mockClear();
+		render(<ResolverCards market={PRIMARY_MARKET} />);
+		expect(captureException).not.toHaveBeenCalled();
 	});
 });
 
