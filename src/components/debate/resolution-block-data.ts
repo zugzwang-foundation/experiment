@@ -35,20 +35,33 @@
  * gap, only a naming one.
  *
  * RESOLUTION names the resolving SURFACE, independently of RESOLVER — it is
- * not a mirror of it. For five markets that surface is X (Zugzwang's own
- * eventual resolution post, U-3), so RESOLUTION reads "X". For the other
- * three the surface is the institution's own site (a festival's report, a
- * price index, a code host's own count) — CoinMarketCap and Oktoberfest, and
- * for `github-zugzwang-repo-stars` that surface is "GitHub", not "Zugzwang":
- * RESOLUTION and RESOLVER genuinely differ on that row, which is why "mirror"
- * is the wrong word for the rule even though it happens to describe two of
- * the three cases. Values are verbatim from the ratified register, not a
- * typo normalized to "X" across the board (@code-reviewer HIGH — flagged
- * that RF-2's cell for `oktoberfest-munich-beer-volume` may intend the
- * literal surface "oktoberfest.de" rather than the brand name "Oktoberfest";
- * shipped as ratified-verbatim per the kickoff's explicit instruction not to
- * paraphrase, flagged for operator confirmation in the run report rather
- * than silently changed against a document this task didn't cite).
+ * not a mirror of it, and only coincides with RESOLVER's own text by
+ * accident where the institution's brand name and its resolving surface
+ * happen to be the same string. For five markets that surface is X
+ * (Zugzwang's own eventual resolution post, U-3), so RESOLUTION reads "X".
+ * For the other three the surface is the institution's own site (a
+ * festival's report, a price index, a code host's own count):
+ * `oktoberfest-munich-beer-volume` reads the literal domain
+ * "oktoberfest.de" (BLOCK-2 correction — see below), `bitcoin-price-50k`
+ * reads "CoinMarketCap" (genuinely equal to RESOLVER's own text on this one
+ * row), and `github-zugzwang-repo-stars` reads "GitHub", not "Zugzwang"
+ * (RESOLUTION and RESOLVER differ there too). So of the three institutional
+ * rows, exactly ONE (bitcoin) has RESOLUTION textually equal to RESOLVER —
+ * which is why "mirror" was never the right word for the rule, only an
+ * artifact of two rows that happened to coincide before this correction.
+ * Values are verbatim from the ratified register, not a typo normalized to
+ * "X" across the board.
+ * ⚠⚠ BLOCK-2 · founder-ruled correction to `oktoberfest-munich-beer-volume`.
+ * BLOCK-1 shipped the brand name "Oktoberfest" here (@code-reviewer HIGH
+ * flagged it as possibly diverging from AMEND-1 item 15, which ratifies
+ * RESOLUTION as "X / oktoberfest.de / CoinMarketCap / GitHub" — the LITERAL
+ * surface, not a brand name); shipped verbatim-as-instructed and flagged for
+ * confirmation rather than silently changed, per BLOCK-1's own doctrine.
+ * BLOCK-2 confirms the founder ruling: the literal domain. The brand name
+ * had been picked for column-fit before BLOCK-1's own S4 measured how this
+ * surface's `truncate` recipe actually degrades (gracefully — full text
+ * stays in the DOM, ellipsis only, BLOCK-2 run report), so there was no fit
+ * reason left to prefer it once that was known.
  * RESOLUTION's `href` is `null` on all eight today (U-3's eventual target —
  * Zugzwang's own X post per market — doesn't exist yet); the seam for wiring
  * it later is one value per market, right here, with zero component changes.
@@ -111,7 +124,17 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 		flavour: { line1: "pressure", line2: null, href: null },
 	},
 	"oktoberfest-munich-beer-volume": {
-		resolution: { line1: "Oktoberfest", line2: null, href: null },
+		// ⚠⚠ BLOCK-2 · founder-ruled correction. AMEND-1 item 15 (§0)
+		// ratified RESOLUTION as the literal resolving SURFACE — "X /
+		// oktoberfest.de / CoinMarketCap / GitHub" — and this row shipped
+		// the brand name "Oktoberfest" at BLOCK-1 instead, picked for
+		// column-fit before BLOCK-1's own S4 measured how this surface's
+		// `truncate` recipe actually degrades. It degrades gracefully (full
+		// text stays in the DOM, ellipsis only — see BLOCK-2's run report),
+		// so there's no fit reason left to prefer the brand name over the
+		// ruled literal. RESOLVER keeps "Oktoberfest" — that field was never
+		// in question, only RESOLUTION was.
+		resolution: { line1: "oktoberfest.de", line2: null, href: null },
 		resolver: {
 			line1: "Oktoberfest",
 			line2: null,
@@ -156,6 +179,13 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 	},
 	"claude-bundle-response": {
 		resolution: { line1: "X", line2: null, href: null },
+		// ⚠ FOUNDER-RULED, BLOCK-2. The live criterion qualifies three accounts
+		// (@AnthropicAI, @claudeai, @ClaudeDevs) — @security-auditor flagged
+		// that showing only one here could read as excluding the other two.
+		// Ruled: this chip stays a single named pointer, not an exhaustive
+		// citation of the criterion (the full three-account list is in the
+		// market's own description, untouched by this map). Not an oversight
+		// — do not "complete" this to a `+2` marker or a second account.
 		resolver: {
 			line1: "@claudeai",
 			line2: null,

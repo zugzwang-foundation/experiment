@@ -130,15 +130,30 @@ describe("resolution-block-data — content matches the ratified register", () =
 	});
 
 	it("resolution-block-data::RESOLUTION-names-the-institution-for-the-other-three", () => {
+		// ⚠ BLOCK-2 — the literal surface "oktoberfest.de", not the brand name
+		// "Oktoberfest" BLOCK-1 shipped. Founder-ruled (AMEND-1 item 15); see
+		// this file's own docblock. RESOLVER keeps "Oktoberfest" — only
+		// RESOLUTION changed.
 		expect(
 			RESOLUTION_BLOCKS["oktoberfest-munich-beer-volume"].resolution.line1,
-		).toBe("Oktoberfest");
+		).toBe("oktoberfest.de");
 		expect(RESOLUTION_BLOCKS["bitcoin-price-50k"].resolution.line1).toBe(
 			"CoinMarketCap",
 		);
 		expect(
 			RESOLUTION_BLOCKS["github-zugzwang-repo-stars"].resolution.line1,
 		).toBe("GitHub");
+	});
+
+	it("resolution-block-data::CLA-01-RESOLVER-is-deliberately-single-account-not-an-oversight", () => {
+		// ⚠ BLOCK-2 — founder-ruled. The live criterion qualifies three
+		// accounts (@AnthropicAI, @claudeai, @ClaudeDevs); this chip stays a
+		// single named pointer, not an exhaustive citation. Guards against a
+		// future "completion" adding a second account or a `+2` marker.
+		const resolver = RESOLUTION_BLOCKS["claude-bundle-response"].resolver;
+		expect(resolver.line1).toBe("@claudeai");
+		expect(resolver.line2).toBeNull();
+		expect(resolver.href).toBe("https://x.com/claudeai");
 	});
 
 	it("resolution-block-data::RESOLVER-hrefs-are-real-absolute-URLs", () => {
