@@ -90,7 +90,15 @@ experiment/
 │   │                               #   gate before the DP.2 promote), ScrollRail (the
 │   │                               #   rail — and, since R3, the auto-advance countdown)
 │   │   ├── art/warli/              #   WARLI-1/2 — a decorative SVG art layer, MOUNTED
-│   │                               #   NOWHERE. Two counter-rotating rings — 8 FACED
+│   │                               #   AT ONE SITE: `src/app/(auth)/layout.tsx`, as a
+│   │                               #   `pointer-events-none fixed inset-0 -z-10` underlay
+│   │                               #   behind /sign-in, /sign-in/otp and /onboarding
+│   │                               #   (WARLI-MOUNT). The count and the site are BOTH
+│   │                               #   pinned — `tests/unit/art/art-layer-guards.test.ts`
+│   │                               #   asserts the importer list is exactly that one file
+│   │                               #   (it asserted the EMPTY list until this mount), and
+│   │                               #   `tests/unit/shell/sticky-header.test.ts` pins it as
+│   │                               #   the tree's only UNDERLAY. Two counter-rotating rings — 8 FACED
 │   │                               #   figures inner, 12 faceless outer — around a still
 │   │                               #   centre the auth card sits in, inside a STATIC
 │   │                               #   field of 28 more figures, 104 motifs, 330 ground

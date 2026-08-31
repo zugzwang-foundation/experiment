@@ -1,12 +1,18 @@
 /**
  * The art layer's public surface.
  *
- * ⚠ NOTHING IN THE APP IMPORTS THIS YET, AND THAT IS DELIBERATE. The mount
- * point is the auth surface, which is a named critical path and is under an
- * active lock in another session; mounting here would be a three-line diff and
- * a collision that costs a full plan → execute → review → gate cycle to
- * untangle. The recipe is in the PR body so that mounting stays a decision
- * somebody makes on purpose.
+ * ⚠ EXACTLY ONE THING IN THE APP IMPORTS THIS: `src/app/(auth)/layout.tsx`,
+ * where the piece hangs as a `fixed inset-0 -z-10` underlay behind the three
+ * auth routes (WARLI-MOUNT). This docblock used to say nothing imported it,
+ * which was true and was the point — the mount was deferred while the auth
+ * surface was under a lock in another session.
+ *
+ * ⚠ THE COUNT IS STILL PINNED, and that has not become less important now that
+ * it is one rather than zero. `tests/unit/art/art-layer-guards.test.ts` asserts
+ * the importer list equals exactly that one file, so a second mount reddens.
+ * The reason is the payload: this drawing serialises to ~790 KB of markup
+ * (82 KB gzipped) per render, which is a deliberate trade on a signed-out auth
+ * route and would be an accident anywhere else.
  */
 
 export {

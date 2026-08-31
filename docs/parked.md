@@ -3157,12 +3157,19 @@ this paragraph only names what a reader tracking sequence should already know.
 named at the close-out read, plus one the security audit measured.
 
 ⛔ **NOT A GO-LIVE GATE.** Its trigger is **after go-live, as in-window
-refinement**. The artwork is **mounted nowhere** — `tests/unit/art/art-layer-guards.test.ts`
-asserts that with a positive control — so nothing here can reach a participant
-until somebody mounts it on purpose. Filed so the composition notes survive the
-gap between building it and looking at it again, **not** to add a row to the
-SEQUENCE table, whose trigger set is "met today" and which correctly still has no
-go-live blocker in it.
+refinement**. Filed so the composition notes survive the gap between building it
+and looking at it again, **not** to add a row to the SEQUENCE table, whose trigger
+set is "met today" and which correctly still has no go-live blocker in it.
+
+⚠ **THE ARTWORK IS NOW MOUNTED, and the sentence that used to sit here said the
+opposite.** It read: *"The artwork is **mounted nowhere** … so nothing here can
+reach a participant until somebody mounts it on purpose."* Somebody did —
+WARLI-MOUNT hangs it on `src/app/(auth)/layout.tsx`, behind `/sign-in`,
+`/sign-in/otp` and `/onboarding`. The guard it cited still exists and still has
+its positive control; it now asserts the importer list is **exactly that one
+file** rather than empty. **Items 1–3 below therefore describe a composition a
+signed-out visitor can see**, which raises their stakes without changing their
+trigger: they remain in-window refinement, not a gate.
 
 **1 · Fill the moat.** There is a visible empty annulus between the outer ring's
 baseline (`R_OUTER = 470`) and the nearest static-field ink. It is a *consequence*
@@ -3190,8 +3197,34 @@ aspect ratio actually asks for. Rejected at WARLI-2 for simplicity (CLAUDE.md
 uniform increase is **forbidden** by the budget above and would re-create the
 58-unit border/ring overlap WARLI-2 fixed.
 
-**4 · Static pre-render of the field.** ⚠ **This one is a resource decision and it
-is the reason this row matters before any mount, not after.** Measured by
+**4 · Static pre-render of the field.** ⛔ **DISCHARGED AT WARLI-MOUNT, AND THE
+REMEDY THIS ROW PROPOSED DOES NOT WORK. Read the correction below before acting
+on the paragraph after it.**
+
+⚠ **THE ~35 ms IS SERIALISATION, NOT CONSTRUCTION — measured 2026-08-31, and the
+row's diagnosis was wrong while every one of its numbers was right.** Building the
+7,978-element tree costs **1.5 ms**; walking it and writing **791,640 bytes** of
+markup costs the other **~25 ms**. So of the three remedies this row names, the
+`module-level element hoisted out of the render` was implemented, measured, and
+**reverted**: it removes 100 % of the cost it targets and **4.4 %** of the cost
+that was measured (whole-hero `renderToStaticMarkup` median 26.82 → 25.65 ms,
+N=150, paired, output byte-identical at md5 `2bfe3db35755fea54fbc1710dcc72690`).
+
+⚠ **A `cached fragment` is unavailable here, and not for a reason that will
+change.** The field sits inside a `"use client"` `<svg>`, so nothing server-side
+can cache its output; the mechanism that would — pre-serialising it and emitting
+the string — needs `dangerouslySetInnerHTML`, which
+`tests/unit/art/art-layer-guards.test.ts:153-154` bans anywhere in the art layer.
+Passing the field in as a server-rendered child is possible but moves the
+artwork's completeness into the call site and breaks the ~20 `composition.test.tsx`
+guards that mount a bare `<WarliHero />` and assert what it draws.
+
+⇒ **The only lever that moves either the ~25 ms or the 82 KB is FEWER ELEMENTS,
+which is items 1–3 above.** The performance row and the composition rows turn out
+to be the same row. Nothing further is owed here that is not already owed there.
+
+*The original text follows, unedited, because its measurements are sound and are
+the evidence for the correction above.* Measured by
 `@security-auditor` at WARLI-2: the shipped JS chunk is **12,994 B gzipped**, but
 the markup it produces is **82 KB gzipped — 6.4× the chunk** — plus ~35 ms of
 server CPU per render, and `WarliHero` is `"use client"`, so the 7,978-element
@@ -3203,8 +3236,11 @@ is 86.0 % of the drawing and **never changes** — it is a pure function of a fi
 seed — so it is a candidate for a static shell, a cached fragment, or a
 module-level element hoisted out of the render entirely.
 
-**Conditional trigger.** After go-live (2026-09-15), as in-window refinement; or
-immediately before any task that mounts the artwork, for item 4 alone.
+**Conditional trigger.** After go-live (2026-09-15), as in-window refinement.
+⚠ The second clause — *"or immediately before any task that mounts the artwork,
+for item 4 alone"* — **has fired and is spent**: WARLI-MOUNT discharged item 4 in
+front of the mount, exactly as this trigger asked. Items 1–3 keep the first
+clause.
 
 **Expected next task.** None scheduled. Evidence:
 `src/components/art/warli/scene.ts` (`RING_CLEAR`, `admissible`, the `Extent`

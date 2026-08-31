@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import type { ReactNode } from "react";
 
+import { WarliHero } from "@/components/art/warli";
 import { GlobalHeader } from "@/components/shell/GlobalHeader";
 import { PageContainer } from "@/components/shell/PageContainer";
 import { auth } from "@/server/auth";
@@ -97,6 +98,41 @@ export default async function AuthLayout({
 		   ⚠ `dvh` tracks mobile browser chrome. POLISH is desktop-1440-only by G1,
 		   so that is recorded in the log and is not a finding on this surface. */
 		<div className="flex min-h-dvh flex-col">
+			{/* WARLI-MOUNT — the art layer's first and only mount, recipe #433.
+			    Two counter-rotating rings around a still centre that the auth card
+			    sits in; `R_INNER = 330` is derived from this container's own
+			    `max-w-md` card half-diagonal, which is why the artwork belongs
+			    HERE and reads as a frame rather than as a backdrop.
+
+			    ⚠ `fixed`, NOT `absolute`, and the difference is load-bearing.
+			    Recipe #438 offered `absolute inset-0`; there is no positioned
+			    ancestor anywhere above this node — the wrapper below is
+			    `flex min-h-dvh flex-col` and `<body>` is `min-h-full flex
+			    flex-col` — so `absolute` would resolve against the initial
+			    containing block by accident rather than by intent, and would
+			    scroll away on the tall onboarding page. `fixed` says the thing
+			    that is meant: the artwork is the window, not the document.
+
+			    ⚠ `-z-10` IS VISIBLE HERE, and it is worth saying why, because a
+			    negative z-index behind a painted background is a classic way to
+			    ship an invisible layer. `globals.css:238` puts `bg-background` on
+			    `<body>` and nothing on `<html>`; CSS propagates a body background
+			    to the CANVAS in that case and leaves body's own used background
+			    transparent, so the canvas is painted before this node rather than
+			    over it. Give `<html>` a background of its own and this layer
+			    disappears with nothing red.
+
+			    ⚠ `pointer-events-none` COSTS THE POINTER INTERACTION, deliberately.
+			    `hero.tsx` carries a pointerenter/move/leave gesture that aligns the
+			    rings toward the cursor; behind a full-viewport layer it cannot fire,
+			    and the alternative — letting it fire — is a full-bleed overlay that
+			    swallows every click landing outside the auth card. The gesture is
+			    ruled out of scope at this mount (WARLI-MOUNT ruling S(a)); it is
+			    kept as built rather than deleted, because the decision is about
+			    where the artwork is mounted and not about what it does. */}
+			<div className="pointer-events-none fixed inset-0 -z-10 grid place-items-center">
+				<WarliHero className="h-full w-full" />
+			</div>
 			<GlobalHeader viewer={viewer} stars={stars} />
 			{/* A7 seam — horizontal-center + max-width + vertical padding on the
 			    branded ground. Vertical placement is per-surface: short surfaces

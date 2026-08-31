@@ -247,7 +247,7 @@ describe("art layer — the injection sinks stay shut", () => {
 	});
 });
 
-describe("art layer — it is sealed, and it is unmounted", () => {
+describe("art layer — it is sealed, and it is mounted at one site", () => {
 	it("imports nothing from outside its own directory (bar react)", () => {
 		// ⚠ THIS WAS A DENYLIST AND IT LEAKED. It matched `@/…` and `../../…` and
 		// therefore could not see the import a contributor is most likely to add to
@@ -308,13 +308,22 @@ describe("art layer — it is sealed, and it is unmounted", () => {
 		expect(offenders).toEqual([]);
 	});
 
-	it("is mounted NOWHERE — nothing outside the art layer imports it", () => {
-		// DELIBERATE, and the reason is not caution about the artwork. The mount
-		// point is `src/app/(auth)/**`, a named critical path that another session
-		// holds a live lock on for the signup-deadlock fix. Mounting is three
-		// lines; a collision there costs a full plan → execute → review → gate
-		// cycle. When this is mounted on purpose, this test is the one to delete,
-		// and deleting it should be a visible decision rather than a silent one.
+	it("is mounted at EXACTLY ONE site, and that site is the (auth) layout", () => {
+		// ⚠ THIS ROW WAS INVERTED, NOT DELETED — WARLI-MOUNT, founder ruling Q(a).
+		// It used to assert `importers` was EMPTY, and both mount recipes said to
+		// delete it once the artwork landed. Deleting a guard because it has
+		// started failing is the move this project has spent five register passes
+		// unlearning: the assertion's SUBJECT is "where is this mounted", and that
+		// question does not stop mattering the moment the answer changes from
+		// nowhere to somewhere. It gets sharper — an artwork that is decorative on
+		// one route is a 790 KB payload on any other, and the scan that used to
+		// prove "nowhere" is the only thing in the tree that can prove "not
+		// anywhere else".
+		//
+		// So the count is pinned at one and the site is pinned by name. A second
+		// mount reddens here. Removing the mount reddens here. Both are decisions
+		// somebody should have to make on purpose, which is what the empty-set
+		// version bought and what deleting it would have thrown away.
 		const all = sourceFilesUnder("src");
 		const importers = all
 			.filter((file) => !file.startsWith(ART_DIR))
@@ -323,11 +332,14 @@ describe("art layer — it is sealed, and it is unmounted", () => {
 					stripComments(readFileSync(join(ROOT, file), "utf8")),
 				),
 			);
-		expect(importers).toEqual([]);
+		expect(importers).toEqual(["src/app/(auth)/layout.tsx"]);
 
-		// POSITIVE CONTROL: the same scan, pointed at a component family that IS
-		// mounted, finds importers. Without this the assertion above would pass
-		// just as happily against a broken regex.
+		// POSITIVE CONTROL, and it is doing MORE work than it was. The scan now
+		// asserts a non-empty result, so "the regex is broken" and "the artwork is
+		// unmounted" no longer produce the same green — but they do produce the
+		// same RED, and this separates them: a family that is definitely mounted
+		// must still be found by the identical scan. If both rows fail together
+		// the regex died; if only the row above fails, the mount did.
 		const shellImporters = all.filter((file) =>
 			/(?:from|import)\s*\(?\s*["'][^"']*components\/shell[^"']*["']/.test(
 				stripComments(readFileSync(join(ROOT, file), "utf8")),
