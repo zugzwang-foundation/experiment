@@ -115,12 +115,27 @@ export default async function AuthLayout({
 
 			    ⚠ `-z-10` IS VISIBLE HERE, and it is worth saying why, because a
 			    negative z-index behind a painted background is a classic way to
-			    ship an invisible layer. `globals.css:238` puts `bg-background` on
-			    `<body>` and nothing on `<html>`; CSS propagates a body background
-			    to the CANVAS in that case and leaves body's own used background
-			    transparent, so the canvas is painted before this node rather than
-			    over it. Give `<html>` a background of its own and this layer
-			    disappears with nothing red.
+			    ship an invisible layer. `globals.css`'s `body` selector applies
+			    `bg-background`, and its `html` selector sets only `font-sans`;
+			    CSS propagates a body background to the CANVAS when the root has
+			    none, and leaves body's own used background transparent — so the
+			    canvas is painted before this node rather than over it.
+
+			    ⛔ THREE EDITS MAKE THIS LAYER SILENTLY VANISH, AND THE ONE THIS
+			    COMMENT USED TO NAME IS THE LEAST LIKELY OF THEM. No test in this
+			    repo can see any of them: jsdom performs no layout.
+			      1. A background on `<html>` — propagation stops, body paints its
+			         own in step 3, over this node in step 2. (The original note.)
+			      2. A background on `<body>` OR on the `flex min-h-dvh flex-col`
+			         wrapper below. Far likelier than (1) — a wrapper picking up
+			         `bg-ground` looks entirely reasonable — and it kills the layer
+			         the same way.
+			      3. A `transform`, `filter`, `backdrop-filter`, `perspective`,
+			         `contain` or `will-change` on `<body>` or that wrapper. Any of
+			         those re-anchors `position: fixed` to that element, so the
+			         layer would size to the wrapper and SCROLL AWAY on the tall
+			         onboarding page — destroying the exact property `fixed` was
+			         chosen for two paragraphs up.
 
 			    ⚠ `pointer-events-none` COSTS THE POINTER INTERACTION, deliberately.
 			    `hero.tsx` carries a pointerenter/move/leave gesture that aligns the
@@ -129,8 +144,24 @@ export default async function AuthLayout({
 			    swallows every click landing outside the auth card. The gesture is
 			    ruled out of scope at this mount (WARLI-MOUNT ruling S(a)); it is
 			    kept as built rather than deleted, because the decision is about
-			    where the artwork is mounted and not about what it does. */}
-			<div className="pointer-events-none fixed inset-0 -z-10 grid place-items-center">
+			    where the artwork is mounted and not about what it does.
+
+			    ⚠ `aria-hidden` IS THE ONE ADDITION TO RECIPE #433, and it is a
+			    deviation stated rather than absorbed (surfaced in the PR body).
+			    `hero.tsx` renders `role="img"` with a 90-character `aria-label`
+			    and a `<title>` — correct for a component with no context, and
+			    wrong the moment it becomes a decorative backdrop mounted as the
+			    FIRST child of the layout root. Without this attribute a screen
+			    reader meeting `/sign-in` announces "Two rings of figures turning
+			    in opposite directions…" before it reaches anything actionable, on
+			    the first screen of the product. Hiding the wrapper is the smallest
+			    fix that stays inside the node this task owns: it touches neither
+			    `hero.tsx` nor the `<WarliHero>` call, and the art layer's own
+			    tests mount `<WarliHero />` bare, so none of them observes it. */}
+			<div
+				aria-hidden="true"
+				className="pointer-events-none fixed inset-0 -z-10 grid place-items-center"
+			>
 				<WarliHero className="h-full w-full" />
 			</div>
 			<GlobalHeader viewer={viewer} stars={stars} />

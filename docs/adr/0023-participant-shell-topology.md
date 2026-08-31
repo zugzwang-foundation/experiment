@@ -244,3 +244,36 @@ above it.
 **Scope.** This does not disturb Option 2. The header still lives in the group
 layouts, never at root; root remains shared with `(admin)` and carries no
 participant chrome.
+
+### Patch record — 2026-08-31 (WARLI-MOUNT): the stacking contract gains an UNDERLAY side
+
+**What changed, and it is a scoping rather than a reversal.** The Consequences
+paragraph above says *"every existing overlay must stack above it."* That was
+written when every `fixed` node in the tree was something that COVERS the page —
+a chart overlay, a dialog — so "fixed layer" and "overlay" named the same set and
+the sentence could name either. **WARLI-MOUNT mounts the art layer at
+`fixed inset-0 -z-10`: the first document-level layer here that goes UNDER.**
+
+**The contract is now two-sided.** A document-level `fixed` layer must DECLARE
+where it sits, on exactly one side:
+
+- an **overlay** tier strictly greater than the header's `z-40`, unchanged; or
+- an **underlay** tier that is strictly negative.
+
+**Why a negative tier is a different kind of thing and not merely a smaller
+number.** CSS paints negative-z descendants of a stacking context BEFORE that
+context's in-flow boxes, and the header is a positioned box painted after them.
+There is no value the header could take that an underlay could out-rank, so
+"stack above the header" is not a weaker claim about an underlay — it is an
+inapplicable one. `z-index: 0` is NOT an underlay for this purpose: it creates a
+stacking context painted above in-flow content and below the header, which is
+exactly the silent failure this consequence exists to prevent.
+
+**Enforcement.** `tests/unit/shell/sticky-header.test.ts`, which already encoded
+the original sentence. Both sides are name-pinned by file
+(`EXPECTED_OVERLAY_FILES`, `EXPECTED_UNDERLAY_FILES`) so the sets are ceilings,
+not floors, and a layer declaring neither side — or both — still fails.
+
+**Recorded in-place per CLAUDE.md §5.12** (decision unchanged, consumer surface
+scoped) rather than as a supersession: the header is still sticky, still `z-40`,
+and still requires everything that covers it to say so.

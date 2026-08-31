@@ -4,6 +4,14 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import {
+	anyOverlayTiers,
+	anyUnderlayTiers,
+	hasFixedToken,
+	overlayTiers,
+	underlayTiers,
+} from "./_stacking-predicates";
+
 /**
  * POLISH-1b B3 — the sticky header's STACKING CONTRACT.
  *
@@ -45,21 +53,15 @@ const ROOT = process.cwd();
 const HEADER_FILE = "src/components/shell/GlobalHeader.tsx";
 
 /**
- * Tailwind `z-<n>`. The `(?<!-)` matters: `-` is a non-word character, so a
- * bare `\bz-` boundary also matches the NEGATIVE utility `-z-10` and would
- * read it as tier 10 — inverting the very comparison this file exists to make.
- */
-const Z = /(?<!-)\bz-(\d+)\b/g;
-
-/**
- * Tailwind's NEGATIVE z utility, `-z-<n>`, as a class TOKEN.
- *
- * ⚠ WARLI-MOUNT — THIS EXISTS BECAUSE `fixed` STOPPED MEANING "OVERLAY". Every
- * document-level `fixed` layer in this tree used to be something that covers the
- * page: a chart overlay, a dialog. The art layer is the first that is fixed in
- * order to sit UNDER everything — it is the window the auth card floats in — and
- * the rule above, read literally, demanded it stack above the header, which
- * would put a 1440 × 1000 drawing on top of the sign-in form.
+ * ⚠ THE PREDICATES LIVE IN `./_stacking-predicates`, NOT HERE, AND THAT IS A
+ * WARLI-MOUNT CHANGE MADE FOR A MEASURED REASON. They used to be declared in
+ * this file and `stacking-contract.test.ts` — the audit that asserts the
+ * rejections this rule claims — lifted the regexes out of this source text and
+ * re-implemented the surrounding logic locally. The two copies drifted inside a
+ * single session: the moment `underlayTiers` gained its `-z-0` filter and
+ * `UNDERLAY_TOKEN` lost its variant prefix, the audit was still exercising the
+ * old shape and certifying a rule nobody ships. One definition, imported twice,
+ * makes that unrepresentable rather than merely discouraged.
  *
  * ⛔ AND A NEGATIVE TIER IS NOT MERELY A SMALLER NUMBER. It is on the other side
  * of the in-flow content: CSS paints negative-z descendants of a stacking
@@ -69,13 +71,6 @@ const Z = /(?<!-)\bz-(\d+)\b/g;
  * here — it is an inapplicable one. That is why this is a second branch and not
  * an exemption list.
  */
-const UNDERLAY_TOKEN = /(^|:)-z-(\d+)$/;
-const underlayTiers = (classes: string): number[] =>
-	classes
-		.split(/\s+/)
-		.map((c) => UNDERLAY_TOKEN.exec(c))
-		.filter((m): m is RegExpExecArray => m !== null)
-		.map((m) => Number(m[2]));
 
 /**
  * Directories that can hold a document-level layer. `src/app` is included
@@ -131,9 +126,6 @@ function headerZ(): number {
  * that lost a genuine layer would fail rather than pass on a smaller set — which
  * is the check that makes this tightening safe to make at all.
  */
-const FIXED_TOKEN = /(^|:)fixed$/;
-const hasFixedToken = (classes: string): boolean =>
-	classes.split(/\s+/).some((c) => FIXED_TOKEN.test(c));
 function fixedOverlayClassStrings(): { file: string; classes: string }[] {
 	const found: { file: string; classes: string }[] = [];
 	for (const dir of SCAN_DIRS) {
@@ -207,13 +199,39 @@ describe("B3 — the header is sticky and every fixed layer declares its side", 
 		}
 	});
 
-	it("the-scan-still-reaches-every-known-underlay-layer", () => {
-		// Same guard-the-guard as the overlay row above, and it earns its keep
-		// harder: there is exactly ONE underlay, so a scan that lost it would
-		// leave the negative branch below iterating an empty set and passing.
-		const seen = new Set(fixedOverlayClassStrings().map((o) => o.file));
+	it("the-underlay-set-is-a-CEILING-not-a-floor", () => {
+		// ⛔ THIS ROW IS THE PRICE OF THE SECOND BRANCH, and the first draft of it
+		// did not charge it. `@code-reviewer` at WARLI-MOUNT: before the widening,
+		// the set of document-level layers that could land WITHOUT review was
+		// empty — every `fixed` node had to out-rank the header or fail. After it,
+		// any file anywhere could ship `fixed inset-0 -z-10` and pass in silence,
+		// because the branch asks only that SOME side be declared, never WHOSE
+		// layer it is. A copied class string on a cookie banner or a freeze notice
+		// is exactly how that happens.
+		//
+		// So the underlay side is pinned by EQUALITY, not membership — the same
+		// shape `tests/unit/art/art-layer-guards.test.ts` uses for the art layer's
+		// importer list, and for the same reason: a new one must be a decision.
+		//
+		// ⚠ Compared as SETS. The file order falls out of a recursive directory
+		// walk, which is filesystem-ordered and not a property anything should
+		// depend on.
+		const underlayFiles = fixedOverlayClassStrings()
+			.filter((o) => underlayTiers(o.classes).length > 0)
+			.map((o) => o.file);
+		expect(new Set(underlayFiles)).toEqual(new Set(EXPECTED_UNDERLAY_FILES));
+
+		// …and each pinned file must ACTUALLY still carry an underlay tier. The
+		// first draft asserted only that the scan had SEEN the file, which any
+		// `fixed` class string satisfies — so flipping the art layer's `-z-10` to
+		// `z-50` left this row green while the underlay branch went back to being
+		// exercised by nothing but synthetic strings. That is the precise state
+		// this row claims to prevent.
 		for (const file of EXPECTED_UNDERLAY_FILES) {
-			expect(seen.has(file), `scan reaches ${file}`).toBe(true);
+			const tiers = fixedOverlayClassStrings()
+				.filter((o) => o.file === file)
+				.flatMap((o) => underlayTiers(o.classes));
+			expect(tiers.length, `${file} still declares an underlay tier`).toBe(1);
 		}
 	});
 
@@ -227,19 +245,60 @@ describe("B3 — the header is sticky and every fixed layer declares its side", 
 		// "or it may be an underlay" is an escape hatch that nothing tests.
 		expect(underlayTiers("fixed inset-0"), "no tier at all").toEqual([]);
 		expect(
-			[..."fixed inset-0 z-10".matchAll(Z)].length,
+			overlayTiers("fixed inset-0 z-10").length,
 			"a positive tier is still read as an overlay tier",
 		).toBe(1);
 		expect(underlayTiers("fixed inset-0 -z-10")).toEqual([10]);
-		expect(underlayTiers("fixed inset-0 md:-z-20")).toEqual([20]);
+		// ⛔ THE SMUGGLE THAT GOT THROUGH THE FIRST DRAFT. `-z-0` compiles to
+		// `calc(0 * -1)` → z-index 0, which is an overlay below the header, not an
+		// underlay. It must not be read as a declared underlay side.
+		expect(
+			underlayTiers("fixed inset-0 -z-0"),
+			"-z-0 is not an underlay",
+		).toEqual([]);
 		// `-z-10` must NOT read as the positive tier 10 — the whole point of Z's
 		// lookbehind, restated here because this branch depends on it.
-		expect([..."fixed -z-10".matchAll(Z)].length).toBe(0);
+		expect(overlayTiers("fixed -z-10").length).toBe(0);
+
+		// ⛔ A VARIANT-SCOPED TIER IS NOT A DECLARATION, ON EITHER SIDE.
+		// `md:-z-10` sets a tier only from the `md` breakpoint up; BELOW it the
+		// element is `fixed` with `z-index: auto`, ordered against the header by
+		// DOM position alone — exactly the unranked state this file exists to
+		// reject. Both token patterns are therefore anchored to an unprefixed
+		// utility.
+		//
+		// ⚠ THE POSITIVE HALF OF THIS IS PRE-EXISTING DEBT AND IS CLOSED HERE
+		// ANYWAY, deliberately. `fixed inset-0 md:z-50` passed the overlay branch
+		// long before an underlay side existed. Closing only the negative half —
+		// which is the half WARLI-MOUNT introduced, and therefore the only half
+		// this task strictly owes — would leave the rule saying two different
+		// things on its two sides, which is harder to reason about than either
+		// symmetric version. Nothing in the tree ships a variant-scoped tier
+		// (measured: four `fixed` class strings, all unconditional), so this costs
+		// nothing today and stops the rule from being half-true.
+		for (const c of ["fixed inset-0 md:-z-20", "fixed inset-0 md:z-50"]) {
+			expect(underlayTiers(c), `${c} declares no underlay tier`).toEqual([]);
+			expect(overlayTiers(c).length, `${c} declares no overlay tier`).toBe(0);
+		}
+
+		// ⚠ THREE TAILWIND FORMS THIS TOKEN DOES NOT COVER, ALL OF WHICH FAIL
+		// CLOSED — the arbitrary value, the CSS-variable value, and v4's trailing
+		// important modifier. Each yields NO tier on either side, so the layer is
+		// reported as undeclared and RED. That is the safe direction, and it is
+		// pinned here so a later pass does not "fix" the regex into accepting them
+		// without also deciding what they mean.
+		for (const c of ["fixed -z-[5]", "fixed -z-(--depth)", "fixed -z-10!"]) {
+			expect(underlayTiers(c), `${c} declares no underlay tier`).toEqual([]);
+			expect(overlayTiers(c).length, `${c} declares no overlay tier`).toBe(0);
+		}
 
 		const header = headerZ();
 		for (const { file, classes } of overlays) {
+			// UNPREFIXED tiers answer "did it declare a side" and "is that side
+			// above the header"; the variant-inclusive pair answers "did it declare
+			// BOTH". See `_stacking-predicates.ts` for why one pair cannot do both.
 			const under = underlayTiers(classes);
-			const over = [...classes.matchAll(Z)].map((m) => Number(m[1]));
+			const over = overlayTiers(classes);
 
 			// UNCHANGED CLAIM: a document-level fixed layer must DECLARE where it
 			// sits. Silence is the failure this file was written for.
@@ -253,9 +312,11 @@ describe("B3 — the header is sticky and every fixed layer declares its side", 
 			// them and the source stops saying which. Rejecting it is what keeps
 			// the underlay branch from being a way to smuggle an unranked overlay
 			// past the loop below.
+			const anyUnder = anyUnderlayTiers(classes);
+			const anyOver = anyOverlayTiers(classes);
 			expect(
-				under.length === 0 || over.length === 0,
-				`${file} declares BOTH an underlay (-z-${under[0]}) and an overlay (z-${over[0]}) tier`,
+				anyUnder.length === 0 || anyOver.length === 0,
+				`${file} declares BOTH an underlay (-z-${anyUnder[0]}) and an overlay (z-${anyOver[0]}) tier`,
 			).toBe(true);
 
 			// Overlays: the original rule, byte-for-byte in its intent.
@@ -278,9 +339,7 @@ describe("B3 — the header is sticky and every fixed layer declares its side", 
 		expect(overlays.length).toBeGreaterThan(0);
 
 		const used = new Set(
-			overlays.flatMap(({ classes }) =>
-				[...classes.matchAll(Z)].map((m) => Number(m[1])),
-			),
+			overlays.flatMap(({ classes }) => overlayTiers(classes)),
 		);
 		expect(used.size).toBeGreaterThan(0);
 		expect(used.has(20)).toBe(false);
