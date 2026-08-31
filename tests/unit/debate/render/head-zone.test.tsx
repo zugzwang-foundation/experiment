@@ -57,10 +57,16 @@ const readSource = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 
 const EMPTY_REPLIES: ReplyGroups = { support: [], counter: [], twoSlot: [] };
 
-/** Neutral fixture prose — no invented market content (CLAUDE.md §3). */
+/**
+ * Neutral fixture prose — no invented market content (CLAUDE.md §3).
+ * ⚠ BLOCK-1 — `slug` must be one of the eight known live markets or
+ * `ResolverCards` (nested under `MarketHeader`) throws (G1). This file
+ * doesn't test ResolverCards' content, so the specific slug doesn't matter
+ * beyond being valid.
+ */
 const market: DebateMarketHeader = {
 	id: "0190c0de-3333-7000-8000-000000000003",
-	slug: "head-zone-fixture-market",
+	slug: "bitcoin-price-50k",
 	title: "Fixture market question.",
 	description: "Fixture resolution criterion.",
 	status: "Open",

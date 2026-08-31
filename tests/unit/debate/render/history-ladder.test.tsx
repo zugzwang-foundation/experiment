@@ -14,7 +14,7 @@ vi.mock("next/navigation", () => ({
 		forward: () => undefined,
 		prefetch: () => undefined,
 	}),
-	usePathname: () => "/m/mumbai-metro-line-3-1m-riders",
+	usePathname: () => "/m/bitcoin-price-50k",
 	useSearchParams: () => new URLSearchParams(),
 }));
 
@@ -54,7 +54,7 @@ import { baseModel } from "./_posted-fixtures";
  * No jest-dom in this repo (AGENTS.md §9) — plain DOM assertions only.
  */
 
-const ROUTE = "/m/mumbai-metro-line-3-1m-riders";
+const ROUTE = "/m/bitcoin-price-50k";
 
 /** The market arm renders the two `slot-header-*` fieldsets; the post arm does not. */
 function onMarketArm(): boolean {

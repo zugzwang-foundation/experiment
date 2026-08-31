@@ -75,9 +75,12 @@ const YES_WINNING: PricePoint[] = [
 	{ at: "2026-09-20T00:00:00.000Z", yes: "0.800000000000000000" },
 ];
 
+// ⚠ BLOCK-1 — `slug` must be one of the eight known live markets or
+// `ResolverCards` throws (G1). This file doesn't test ResolverCards'
+// content, so the specific slug doesn't matter beyond being valid.
 const MARKET: DebateMarketHeader = {
 	id: "0190c0de-1111-7000-8000-000000000001",
-	slug: "chart-header-market",
+	slug: "bitcoin-price-50k",
 	title: "Chart Market Question",
 	description: "Resolution criterion text.",
 	status: "Open",

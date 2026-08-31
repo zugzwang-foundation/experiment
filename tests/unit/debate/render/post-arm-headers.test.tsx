@@ -12,7 +12,7 @@ vi.mock("next/navigation", () => ({
 		forward: () => undefined,
 		prefetch: () => undefined,
 	}),
-	usePathname: () => "/m/mumbai-metro-line-3-1m-riders",
+	usePathname: () => "/m/bitcoin-price-50k",
 	useSearchParams: () => new URLSearchParams(),
 }));
 
@@ -105,7 +105,7 @@ beforeEach(() => {
 		configurable: true,
 		get: () => false,
 	});
-	history.replaceState(null, "", "/m/mumbai-metro-line-3-1m-riders");
+	history.replaceState(null, "", "/m/bitcoin-price-50k");
 });
 afterEach(() => {
 	cleanup();

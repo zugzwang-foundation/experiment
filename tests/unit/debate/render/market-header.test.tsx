@@ -40,9 +40,12 @@ import type { DebateMarketHeader } from "@/components/debate/types";
 
 afterEach(cleanup);
 
+// ⚠ BLOCK-1 — `slug` must be one of the eight known live markets or
+// `ResolverCards` throws (G1). This file doesn't test ResolverCards'
+// content, so the specific slug doesn't matter beyond being valid.
 const market = (postCount: number, replyCount: number): DebateMarketHeader => ({
 	id: "0190c0de-2222-7000-8000-000000000002",
-	slug: "attrs-strip-market",
+	slug: "bitcoin-price-50k",
 	title: "Attrs Strip Market Question",
 	description: "Resolution criterion text.",
 	status: "Open",
