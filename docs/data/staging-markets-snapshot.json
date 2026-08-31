@@ -1,5 +1,5 @@
 {
-	"capturedAt": "2026-08-31T15:13:00.497Z",
+	"capturedAt": "2026-08-31T17:26:51.058Z",
 	"source": {
 		"host": "aws-1-ap-south-1.pooler.supabase.com",
 		"database": "postgres",
@@ -93,7 +93,7 @@
 			"id": "01a01181-da63-738b-a3ea-8da89299bc53",
 			"slug": "yc-paper-club-response",
 			"title": "YCombinator · Will YC reply to Zugzwang's pitch by 5 Nov 2026?",
-			"description": "Will @ycombinator reply to or quote-post any post in the Zugzwang thread submitting its research pitch to YC Paper Club, on X, between 15 September and 5 November 2026?\n\nResolves YES if a post by @ycombinator is a reply to any post in the Zugzwang Paper Club thread, or a quote-post of one. What the post says is never read: approval, rejection and dismissal all resolve YES identically.\n\nResolves NO in every other case, and this market is deliberately narrow. A standalone post naming Zugzwang resolves NO. A Paper Club recap or announcement naming Zugzwang resolves NO. The pitch being selected, scheduled or presented resolves NO absent a qualifying post — the outcome the submission wants is not the criterion. So do likes, any other account, and silence.\n\nDeadline 5 November 2026, 23:45 UTC.",
+			"description": "Will @ycombinator reply to or quote-post any post in the Zugzwang thread submitting its pitch to YC Paper Club, on X, between 15 September and 5 November 2026?\n\nResolves YES if a post by @ycombinator is a reply to any post in the Zugzwang Paper Club thread, or a quote-post of one. What the post says is never read: approval, rejection and dismissal all resolve YES identically.\n\nResolves NO in every other case, and this market is deliberately narrow. A standalone post naming Zugzwang resolves NO. A Paper Club recap or announcement naming Zugzwang resolves NO. The paper being selected, scheduled or presented resolves NO absent a qualifying post — the outcome the submission wants is not the criterion. So do likes, any other account, and silence.\n\nDeadline 5 November 2026, 23:45 UTC.",
 			"status": "Open",
 			"resolution_deadline": "2026-11-05T23:45:00.000Z",
 			"resolved_at": null,

@@ -7,7 +7,7 @@
 > the shortest to lose. This is the artifact that makes a future rebuild
 > survivable — it is a RECORD, not a seeder, and nothing reads it at runtime.
 
-**Captured:** `2026-08-31T15:13:00.497Z` (read-only) · **Source:** `aws-1-ap-south-1.pooler.supabase.com` / `postgres`
+**Captured:** `2026-08-31T17:26:51.058Z` (read-only) · **Source:** `aws-1-ap-south-1.pooler.supabase.com` / `postgres`
 **Machine-fidelity copy:** [`staging-markets-snapshot.json`](./staging-markets-snapshot.json) — every column, verbatim.
 
 | rows | count |
@@ -25,9 +25,10 @@ two are recorded separately so a restore is never mistaken for a rollback.
 **Seeded reserves (the restore target):** `yes_reserves = no_reserves = 10000.000000000000000000` for all eight.
 
 ⚠ **BLOCK-1 (2026-08-31) renamed YCP-01's (`yc-paper-club-response`) artifact
-noun "paper" → "pitch" in its title and description**, by founder ruling
-2026-08-29 — a guarded, scoped UPDATE (`scripts/rename-ycp01-artifact.ts`),
-not a restore-worthy seed change. The text below is CURRENT (post-rename).
+noun "paper" → "pitch" too broadly — BLOCK-2 (2026-08-31) repaired it to the
+actual founder-ruled scope** (only "submitting its research paper to" →
+"submitting its pitch to"; "The paper being selected…" restored to "paper").
+The text below is CURRENT (post-repair).
 
 ---
 
@@ -389,11 +390,11 @@ Operator intervention. Declared. The Zugzwang Foundation authored the entire sti
 **Resolution text (`markets.description`), verbatim:**
 
 ```text
-Will @ycombinator reply to or quote-post any post in the Zugzwang thread submitting its research pitch to YC Paper Club, on X, between 15 September and 5 November 2026?
+Will @ycombinator reply to or quote-post any post in the Zugzwang thread submitting its pitch to YC Paper Club, on X, between 15 September and 5 November 2026?
 
 Resolves YES if a post by @ycombinator is a reply to any post in the Zugzwang Paper Club thread, or a quote-post of one. What the post says is never read: approval, rejection and dismissal all resolve YES identically.
 
-Resolves NO in every other case, and this market is deliberately narrow. A standalone post naming Zugzwang resolves NO. A Paper Club recap or announcement naming Zugzwang resolves NO. The pitch being selected, scheduled or presented resolves NO absent a qualifying post — the outcome the submission wants is not the criterion. So do likes, any other account, and silence.
+Resolves NO in every other case, and this market is deliberately narrow. A standalone post naming Zugzwang resolves NO. A Paper Club recap or announcement naming Zugzwang resolves NO. The paper being selected, scheduled or presented resolves NO absent a qualifying post — the outcome the submission wants is not the criterion. So do likes, any other account, and silence.
 
 Deadline 5 November 2026, 23:45 UTC.
 ```
