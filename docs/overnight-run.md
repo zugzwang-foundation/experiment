@@ -1,6 +1,6 @@
 # ZUGZWANG · OVERNIGHT RUN DOCTRINE
 
-**Version:** v1.1 · **Written:** 2026-08-22 · **Supersedes:** v1.0 (same day)
+**Version:** v1.2 · **Written:** 2026-08-22 · **Amended:** 2026-08-30 from WARLI-CLOSE-2 (OVN-O8, OVN-V9, F-14; OVN-O2's Vercel example corrected in place) · **Supersedes:** v1.1 (2026-08-22)
 **Author:** web Claude (orchestrator)
 **Derived from:** POSREV-1 (`feat/posrev-1`, PR #396) — the first fully autonomous
 overnight recon → plan → execute → deploy run. Also draws on LOTS-1, MERGE-0,
@@ -233,6 +233,45 @@ assertion every time.
 Instruct: *"If a red is intermittent, establish whether it rotates. If it does,
 the cause is environmental and the diagnosis is measurement, not more retries."*
 
+### OVN-V9 · An instrument that cannot report an expensive load is not an instrument
+
+Before trusting a measurement, hand the instrument something it **must** call
+expensive. If it does not, it is not measuring the quantity it names.
+
+> WARLI-2 needed a frame cost. `requestAnimationFrame` sampling in a launched
+> browser returned **60.05 fps** for the artwork and **60.23 fps** for a rotating
+> group carrying `feTurbulence` + `feDisplacementMap`. rAF is **vsync-locked** —
+> it reports the display's cadence while raster falls behind. The replacement,
+> `Page.screencastFrame` timestamps, counts frames actually PRESENTED, and its own
+> controls fire: a rotation-removed arm reads 0.2 fps.
+
+⚠ **THE CONTROL MUST RUN AT A LOAD WHERE IT CAN DISCRIMINATE.** At 400 shapes all
+three arms were genuinely free and the control did not separate; it only fired at
+n=2000 and was decisive at n=5000. **A control run below its discrimination
+threshold reads exactly like a passing one.** Finding that threshold is part of
+the measurement, not preparation for it.
+
+**Two traps specific to driving a browser from an automation tab**, both of which
+have cost this project a run:
+
+1. The tab is `document.hidden`, so **`requestAnimationFrame` never fires at all**
+   — a sampler that awaits frames hangs rather than returning zero. Arm the
+   collector, return, and read it later, so "no frames" is a RESULT.
+2. **The obvious fallback fails for the same root cause.**
+   `document.getAnimations()[0].currentTime` does not advance either — measured
+   **0 → 0 over 17.7 s**, with the computed transform stuck at the identity
+   matrix. The hidden tab freezes the animation **TIMELINE**, not merely the
+   callback, so sampling it on a timer samples a clock that is not running.
+
+⇒ **Launch your own browser** (`--headless=new` + CDP) rather than measuring in an
+automation tab. A browser you launch is not hidden.
+
+The hidden-tab half of this is **V-12**, and the vsync-lock half is **V-16**, both
+in `docs/polish/POLISH-0_data-manifest.md` §5. Neither is restated here — this
+rule is the overnight-run METHOD; V-space is the register.
+
+---
+
 ---
 
 ## 4 · What the operator owes the run
@@ -256,9 +295,20 @@ CRITICALs and a HIGH on the money path, every one of which would have reached
 ### OVN-O2 · Never assert infrastructure behaviour you have not verified
 
 > POSREV-1's brief said *"A Vercel per-branch preview deploys automatically."*
-> It does not — the project carries an Ignored Build Step that cancels every
-> non-`main`/`staging`/`verify` build about two seconds in. Six previews died
-> before the session worked it out and routed around it.
+> At the time it did not — the project carried an Ignored Build Step that
+> cancelled every non-`main`/`staging`/`verify` build about two seconds in. Six
+> previews died before the session worked it out and routed around it.
+
+⚠ **AND THAT EXAMPLE IS NOW STALE IN THE OPPOSITE DIRECTION, which makes it a
+better illustration of this rule than it was when it was written.** `feat/*`
+branches **DO** preview today — measured at WARLI-1 and again at WARLI-2:
+`READY` in ~46 s, serving the branch's own canary. The allow-list changed
+underneath the doctrine and nothing announced it.
+
+**Do not read either state as fact.** The rule is not *"previews are blocked"* or
+*"previews work" —* it is that **a deploy premise has a shelf life measured in
+weeks, and this paragraph has now been wrong in both directions.** Verify it in
+the run, every run.
 
 If a premise about tooling, CI, hosting or deploy behaviour cannot be verified
 before writing the prompt, **make verifying it the session's first instruction**
@@ -319,6 +369,35 @@ locks.
 
 Mitigation, cheap: instruct the session to **report a canary or commit SHA the
 preview must serve**, and check it before trusting anything you see.
+
+---
+
+### OVN-O8 · A mutation-testing reviewer is a WRITER — give it its own worktree
+
+**OVN-O7 covers two SESSIONS contending. It does not cover a session and its own
+subagent, and that gap is live the moment a reviewer does mutation testing.**
+
+`@test-writer` proving a guard by reversal necessarily EDITS `src/`, runs the
+suite, and restores. While it works, every measurement the parent takes against
+that tree is contaminated — and silently, because the file is restored moments
+later and the tree looks innocent both before and after.
+
+> WARLI-2 ran a node census, generated the preview artifact and took an entire
+> before/after frame-cost measurement inside that window. Some of those numbers
+> were fine and one set was not, and it took a second measurement from an
+> isolated worktree to tell which — after the session had already reported a
+> retraction that turned out to be wrong.
+
+**Either fix works; pick one before the cascade starts:**
+
+- launch the reviewer with `isolation: "worktree"`, or
+- take every measurement **before** the cascade, never during it.
+
+⚠ **The detection rule is worth more than the fix, because it generalises:** two
+renders identical WITHIN one process but differing ACROSS processes means the
+INPUT changed, not the code — determinism cannot fail across processes and hold
+within one. That is **V-17** in `docs/polish/POLISH-0_data-manifest.md` §5; it is
+not restated here, and V-space is its only home.
 
 ---
 
@@ -533,6 +612,7 @@ whole time.
 | **F-11** | A fix creating the next hazard, with the last fix in the chain reviewed by nobody | POSREV-1 — C-2's fix opened the security HIGH |
 | **F-12** | Shared deploy lane with no lock, two sessions running | POSREV-1 / RANK-3, same night |
 | **F-13** | Local catalog bloat presenting as intermittent test failures | POSREV-1 — diagnosed, not blamed |
+| **F-14** | A session measuring its own tree while its mutation-testing subagent wrote to it | WARLI-2 — self-caught, but only after a wrong retraction (OVN-O8) |
 
 ### 7.1 · F-11 and why it has no in-session mitigation
 
