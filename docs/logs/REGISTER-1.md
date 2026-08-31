@@ -1,19 +1,22 @@
 # REGISTER-1 · session log
 
-**Task:** REGISTER-1 + REGISTER-1.A — four registers repaired in one PR.
-**Briefs:** `ZUGZWANG_REGISTER-1_authoring-brief_v1_0.md` (web Claude, 2026-08-31)
-and `ZUGZWANG_REGISTER-1A_amendment-brief_v1_0.md` (web Claude, 2026-08-31),
-which rules on the first run's findings and adds the work below.
+**Task:** REGISTER-1 + REGISTER-1.A + REGISTER-1.B — five registers repaired in one PR.
+**Briefs (all web Claude, 2026-08-31):** `ZUGZWANG_REGISTER-1_authoring-brief_v1_0.md`;
+`ZUGZWANG_REGISTER-1A_amendment-brief_v1_0.md`, which rules on the first run's
+findings; and `ZUGZWANG_REGISTER-1B_final-pass_v1_0.md`, which rules on the
+second's and closes the POLISH-0 §0 collision.
 **Run reports:** `zz_REGISTER-1_run_2026-08-31T1328.md` (541 lines, md5
-`b7215c06fbc87950197d8ef5086d1e66`) and `zz_REGISTER-1A_run_2026-08-31T1402.md`.
-**Baseline:** `origin/main` = `940cdcb`, measured at the start of both passes.
+`b7215c06fbc87950197d8ef5086d1e66`) · `zz_REGISTER-1A_run_2026-08-31T1402.md`
+(385 lines, md5 `7f8e7c3863cb3dad85a7ad3f85cbee03`) ·
+`zz_REGISTER-1B_run_2026-08-31T1424.md`.
+**Baseline:** `origin/main` = `940cdcb`, measured at the start of all three passes.
 **Branch:** `chore/register-1` · **PR:** #446, against `main`.
 
 ---
 
 ## 1 · What landed
 
-One PR, two commits, five repairs. Every one is the same defect seen in a
+One PR, three commits, seven repairs. Every one is the same defect seen in a
 different register.
 
 | # | File(s) | Repair |
@@ -22,8 +25,9 @@ different register.
 | 2 | 14 files in `src/` + `tests/` | 18 `SPEC.1 1.0.40` citations → `1.0.45` |
 | 3 | `docs/specs/SPEC.1.md` §9 ×2, `docs/specs/flows/F-DEBATE-4.md` ×1 | 3 further CHART-1 citations → `1.0.45` (REGISTER-1.A) |
 | 4 | `docs/polish/POLISH-0_data-manifest.md` §5 | V-space reconciled: `V-12` + `V-15`…`V-18` restored from RPLY-CLOSE, WARLI-CLOSE-2's three → `V-19`…`V-21`, redirect note, pointer sentence replaced |
-| 5 | `CLAUDE.md` §8 | `O-15` minted |
+| 5 | `CLAUDE.md` §8 | `O-15` minted; sharpened at REGISTER-1.B with the union-vs-discard clause |
 | 6 | `docs/specs/SPEC.2.md` line 3 | the self-contradicting `1.0.24` removed — the line now carries no version at all |
+| 7 | `docs/polish/POLISH-0_data-manifest.md` §0 | RPLY-CLOSE's dropped `v1.10` block (J1–J5) **restored byte-for-byte** from `26dc484`; WARLI-CLOSE-2's block renumbered `v1.10`→`v1.11`; `v1.12` minted *(REGISTER-1.B)* |
 
 ### Why
 
@@ -140,12 +144,56 @@ moving it would be authoring.
 
 ---
 
+### 2.7 · REGISTER-1.B — the restore, the renumber, and what was left alone
+
+**F-A1 ruled: the splice stands.** REGISTER-1.A's §1 said to replace the pointer
+sentence *in full* against a quotation that was itself truncated, so its own wall
+could not fire. Preserving the 297-character `V-7` tail was ruled correct and the
+reading is now standing: **you do not author register prose, and you do not
+silently unwrite it.** No edit at REGISTER-1.B.
+
+**F-A2 ruled: restore, renumber, earlier allocation keeps.** RPLY-CLOSE's `v1.10`
+block (rows J1–J5) is restored **byte-for-byte** from `26dc484` — proved by
+extracting both spans and diffing them to empty, md5 `ed613dce…` on each side.
+WARLI-CLOSE-2's block, allocated four days later, moves to `v1.11`; **its heading
+alone changed and row I1 is byte-identical**, because an amendment record is
+append-only — you append the correction rather than rewriting the entry. `v1.12`
+records the whole repair.
+
+**`v1.11` and `v1.12` were proved free in HISTORY, not merely on disk** — zero on
+`940cdcb`, zero on `26dc484`, and zero commits touching either string in that
+file's entire history across all refs. That check exists because F-A2's lesson is
+precisely that a disk census cannot see a discarded allocation.
+
+**`O-15` gained the sharper half:** a clean union is the *benign* outcome. The same
+merge gave §5 a union and §0 a discard, and the surface whose structure looked more
+robust is the one that lost data. ⇒ after a merge that touched a prose register,
+census what is **MISSING** against both parents, not only what is duplicated.
+
+### 2.8 · Two sites REGISTER-1.B does not reach, and why a partial fix is worse
+
+POLISH-0 carries its version in **three** places. The brief renumbers one.
+
+- **The document header, line 4** — `> **Status:** **v1.10** — 2026-08-30 IST.
+  Supersedes v1.9 (2026-08-19).` Now two behind §0's `v1.12`, and its *"Supersedes
+  v1.9"* clause is wrong as well.
+- **The footer version log** — carries `v1.10 2026-08-30 from WARLI-CLOSE-2` and has
+  **no `v1.10` RPLY-CLOSE clause at all**, having lost it in the same merge.
+
+Both were left. The brief says *"change the WARLI-CLOSE-2 heading **only**"*, and
+more importantly **a partial fix here is worse than a flagged gap**: bumping the
+header's number leaves *"Supersedes v1.9"* false, and restoring the footer's
+RPLY-CLOSE clause is impossible cleanly — **`26dc484`'s own footer is mangled**,
+that clause having been spliced into the middle of `v1.6`'s parenthetical
+(`POLISH.7a ( · **v1.10 … row)**.**V-7 and V-8 minted**;`). There is no clean text
+to copy. A repair that *looks* done is the failure mode this whole task documents.
+
 ## 3 · Open questions
 
-### 3.1 · ⛔ A THIRD COLLISION, IN A THIRD REGISTER — POLISH-0's own amendment record
+### 3.1 · ✅ CLOSED AT REGISTER-1.B — the third collision, in POLISH-0's own amendment record
 
-**Reported, not resolved, per the REGISTER-1.A §6 wall.** This is the item the next
-session should start from.
+**Reported at REGISTER-1.A, ruled and repaired at REGISTER-1.B.** Kept here in full
+because the diagnosis is the reusable part; the disposition is at §2.7.
 
 `docs/polish/POLISH-0_data-manifest.md` §0 is a versioned amendment record. **Both
 lanes labelled their entry `v1.10`:**
@@ -253,12 +301,14 @@ a check a two-digit relabel cannot fail without a second edit.
 
 ## 5 · Next session starts at
 
-**Rule on §3.1 — POLISH-0's `v1.10` double-allocation and the dropped RPLY-CLOSE
-amendment block.** Concretely: decide whether RPLY-CLOSE's J1–J5 block is restored
-from `26dc484` (and under which version number, given `v1.10` is taken on disk by
-WARLI-CLOSE-2), and whether WARLI-CLOSE-2's I1 row is corrected in place to name
-`V-19`/`V-20`/`V-21` or left to the redirect note. Nothing else in this task is
-open. PR #446 is complete against both briefs and awaiting review.
+**Nothing in REGISTER-1 is open.** All three passes are complete and PR #446 is
+awaiting review, unmerged.
+
+The one thing a reviewer should decide before merging: **POLISH-0's document header
+(line 4) and its footer version log still name `v1.10` for WARLI-CLOSE-2**, and the
+footer has no RPLY-CLOSE clause. §2.8 explains why both were left rather than
+half-fixed, and why `26dc484` is not a usable source for the footer. That is a
+ruling, not a task — it needs authored text, not an edit.
 
 ## 6 · Context to preserve
 
@@ -274,6 +324,8 @@ open. PR #446 is complete against both briefs and awaiting review.
 
 ## 7 · Time
 
-2026-08-31, one session, two passes (REGISTER-1 then REGISTER-1.A on the same
-branch, before merge — a `1.0.48` row correcting a `1.0.47` row would have been the
-CHART-1 / CHART-1.A shape this task exists to stop reproducing).
+2026-08-31, one session, **three passes** — REGISTER-1, then REGISTER-1.A, then
+REGISTER-1.B, all on the same branch before merge. Deliberately: a `1.0.48` row
+correcting a `1.0.47` row would be the CHART-1 / CHART-1.A shape this task exists
+to stop reproducing, and the same argument applies one register over to a `v1.13`
+correcting a `v1.12`.
