@@ -16,7 +16,7 @@ import { fmtUtcDay } from "./geometry";
  * describe the same chart differently.
  *
  * ⚠ THE SVG STAYS `aria-hidden` ON EVERY SURFACE AND THIS IS THE ACCESSIBLE
- * CHANNEL. "Not `aria-hidden` on any surface" (SPEC.1 1.0.40 §9) is a claim
+ * CHANNEL. "Not `aria-hidden` on any surface" (SPEC.1 1.0.45 §9) is a claim
  * about the CHART, not about the `<svg>` element: a screen reader cannot read a
  * polyline, so announcing the graphic means announcing this sentence beside it.
  * That is the pattern the card and overlay already shipped and the one the hero

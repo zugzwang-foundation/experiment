@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-// CHART-1 — the cache boundary under the price chart's HISTORY (SPEC.1 1.0.40
+// CHART-1 — the cache boundary under the price chart's HISTORY (SPEC.1 1.0.45
 // §9 *Refresh — floored history, live edge*; ADR-0034 D-1).
 //
 // ⛔ WHY THIS IS A SOURCE SCAN AND NOT A BEHAVIOURAL TEST, STATED PLAINLY —

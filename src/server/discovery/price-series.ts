@@ -33,7 +33,7 @@ export type ReservePoint = { at: Date; reserves: Reserves };
 
 /**
  * The same step, with its instant as an ISO string instead of a `Date` — the
- * form the walk takes once it crosses a cache boundary (CHART-1, SPEC.1 1.0.40
+ * form the walk takes once it crosses a cache boundary (CHART-1, SPEC.1 1.0.45
  * §9 *Refresh*).
  *
  * ⛔ THE `Date` IS CONVERTED DELIBERATELY, NOT INCIDENTALLY. `getCachedReserveWalk`
@@ -85,7 +85,7 @@ export function mapWalkToSeries(
 }
 
 /**
- * The chart's LIVE RIGHT EDGE, composed onto a floored history (SPEC.1 1.0.40
+ * The chart's LIVE RIGHT EDGE, composed onto a floored history (SPEC.1 1.0.45
  * §9 — *X domain* and *Refresh*, founder-ruled at CHART-1). PURE: it reads a
  * price and a clock that its CALLER supplies, and does no IO of its own.
  *
