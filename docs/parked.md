@@ -40,6 +40,131 @@ operator-owned `BETTER_AUTH_SECRET` check is now the head of the queue.*
 
 ---
 
+## RPLY-CLOSE — the reply lane's residue (2026-08-26)
+
+Seven rows out of RPLY-1/-2/-3, severity-labelled. **P1 is a live correctness
+bug on a shipped surface**, not polish; everything below it is accepted,
+routed, or cosmetic.
+
+⚠ **P1 is a SEQUENCE candidate and is deliberately NOT added to the table at
+the top of this file.** That ordering is founder-curated and adding to it is a
+ruling, not an edit. Flagged here so the omission is visible rather than
+silent.
+
+---
+
+### P1 · The market-arm position readout lies while a composer is open
+
+`SlotHeader` derives label, thumb, percent, TO-WIN unit **and the position
+readout** from one `side` prop where `side = openSide ?? side`, so with a
+composer open the readout compares the viewer's real holding against the
+**MIRRORED** pole — a viewer holding **Đ146 on NO is told they hold nothing**.
+
+**Correctness bug, not polish.** Display only: no ledger is touched, no write
+path is involved, and truth returns when the composer closes. That bounds the
+blast radius; it does not make the statement true while it is on screen, and
+it is the viewer's own money being misreported back to them.
+
+**The correct pattern already exists in the codebase.** `PositionStrip`
+decouples the two via a `composingSide` prop that drives label/percent/TO-WIN
+only, leaving the position readout bound to the column's own true pole
+(RPLY-2). This is a port **in the opposite direction** — the post arm was
+fixed and the market arm was not.
+
+⚠ **`header-mirror.test.ts:184` pins the falsehood as intended behaviour and
+must move with the fix. Expect it to red. That is not a regression** — it is
+`V-18` (a reconstruction does not merely omit, it can assert), and this row is
+one of that rule's two founding instances.
+
+⛔ **THAT CITATION IS BLOCKED, NOT BROKEN — `V-18` DOES NOT EXIST AT HEAD.**
+RECONCILE-1 found the two lanes had minted colliding V-numbers and refused to
+arbitrate them (**OWED-1**), restoring `main`'s register unchanged; its
+high-water is `V-17`. So this row's authority is currently unreachable. ⚠ **The
+danger is not the dangling number, it is the two that resolve.** `main`'s `V-16`
+and `V-17` are *different rules* from the staging-lane `V-16`/`V-17` this row was
+written beside, so a staging-lane citation of either now silently returns the
+wrong lesson and reads as fine. **The rule this row relies on is unchanged and
+still true — only its NUMBER is pending.** Read it by its words, not its number,
+until the founder rules OWED-1.
+
+**Trigger:** armed; next `SlotHeader.tsx` touch, or sooner if founder-ruled.
+**Estimate:** one session.
+**Canon:** `design-canon.md` §2's composer-open exception names this component
+as the wrong one, by name.
+
+---
+
+### P2 · `ci` is not a required check
+
+No branch protection on the repository, so every "checks passed" is
+**informational**. Detail and the dated measurement live in `CLAUDE.md` §5.13
+— not restated here, because a second copy drifts and whichever one a reader
+opens is the wrong one.
+
+**Trigger:** any decision that would lean on CI as a gate rather than a signal.
+
+---
+
+### P3 · `Đ BET` stops being reachable without scrolling below 600px / 580px viewport HEIGHT
+
+**ACCEPTED.** 600px on the post arm, 580px on the market arm — 50–70px below
+the tested floor. `column-scroll` takes the overflow, so the control stays
+**reachable**; it stops being reachable *without* scrolling. Measured at
+RPLY-3 across both arms and five heights.
+
+**Trigger:** only if a real device in that band is ruled in scope.
+
+---
+
+### P3 · The money row overflows its column below ~860px viewport WIDTH; `Đ BET` clips from ~800px
+
+**ACCEPTED.** Pre-existing, and **proven byte-identical to the pre-RPLY-2
+tree** — the money row's contents (comments stripped) and the grid track are
+the same 1705 characters and the same `grid-cols-[2fr_3fr]` declaration. It is
+behaviour that was restored deliberately along with the grid, not introduced.
+
+**Route to the responsive lane.**
+
+---
+
+### P3 · `min-h-48` is inert at narrow widths
+
+`ImageAttach`'s panel floor bounds HEIGHT, while the figure's `meet` scale is
+`min(w/200, h/250)` — so at a narrow enough column the artwork is
+**width**-limited and a height floor cannot bound it. Measured at 900px
+viewport width: width-limited at every height, scale 0.585.
+
+**Docket with the row above** — same lane, same cause.
+
+---
+
+### P3 · Reply-card parity gaps
+
+No download icon (canon §6 names it), no `KnowMore` mount in `PostCard`'s
+overlaid-gutter form, `LaneBadge` differs. **None is a defect** — the cards
+match in composition, which is what was ruled. One small task or none.
+
+---
+
+### P3 · Post-arm header ARIA grouping
+
+Two identically-rendered column headers with no grouping for a screen reader.
+The market arm uses a labelled `<fieldset>` for exactly this. **A11y lane.**
+
+---
+
+### P4 · `ImageAttach.tsx`'s `max-h-[308px]` calibration comment is stale — and dormant
+
+Stale since the footblock moved (the right column's baseline height changed
+underneath it), and **dormant**: measured, the cap never binds at any tested
+width, because the artwork is height- or width-limited well below 308px. Both
+halves matter — a comment that is merely stale invites a correction; one that
+is also dormant invites deleting the declaration, which is a different call.
+
+**Trigger:** next `ImageAttach.tsx` touch.
+
+---
+
 ## HTML-FINISH · MARKET DETAIL round 2 (R2) — the four visible placeholders
 
 **Parked:** strip or gate all four `/m/[slug]` placeholders before the **DP.2
@@ -2960,6 +3085,39 @@ it measures the shell. Recorded as a SCALE S-5 input, not a standalone task.
 
 ---
 
+## PD-PFP-10 — the onboarding deck's Card 2 is reshaped to a circle while still hard-coding the placeholder
+
+**Originating task:** PFP-UI-1 (2026-08-26), §7.2. Rowed in the SAME commit as the code, per the
+standing rule at the head of this file — the plan named a routing destination, so it gets a row
+rather than a promise.
+
+`components/onboarding/figures.tsx`'s `IdentityHero` renders `/pfp-placeholder.svg` as a literal.
+The O1-DECK copy register calls that slot *"the viewer's live PFP avatar as a centred hero"*, and
+`DESIGN_W2_2_CLOSE-OUT.md` says the same. PFP-1 (`c49138d`) made live PFPs real everywhere else:
+this is now the **one surface** still on the placeholder by construction rather than by fallback.
+
+**Why this pass makes it worse rather than better, which is the whole reason for the row.** The
+circle pass reshapes the frame around that placeholder. It does not touch the src, so the deck
+now presents a mount that looks exactly like the seven live ones and is not one. **A divergence
+that was legible as "nothing is wired yet" becomes invisible the moment the frame stops
+advertising it.**
+
+**Why it is parked and not fixed here.** Wiring a live avatar into the deck means giving
+`CardFigure` viewer data it does not currently take — a new prop threaded through the whole figure
+chain, which is a different change with a different blast radius. More importantly the deck's own
+docblock argues on the record that a deck-local avatar fetch would create a **second PFP path**
+beside the one resolver-owned builder, which is exactly what founder ruling **D-5** (2026-08-18)
+forecloses. That argument is sound and this pass does not overturn it. Shape was in scope; data
+flow was not.
+
+**Trigger.** Whenever the deck next takes viewer data for any reason. At that point the second
+path stops being a new cost and becomes a marginal one, and D-5's objection no longer bites.
+
+**Owner.** Whoever rules `OD-2` — the all-circle vs all-rounded-square decision this pass is
+built on. If `OD-2` were ever reversed the row survives unchanged: the src is wrong either way.
+
+---
+
 ## Sequencing note (stated here, not acted on)
 
 PERF-1 was carried as the sole GO-LIVE BLOCKER row (line 36, SEQUENCE table intro) and closed
@@ -3063,3 +3221,44 @@ operator's dashboard still shows PERF-1 as blocking, or does not yet reflect PER
 / GAUGE, that is a manual move for the operator — not a PR.
 
 ---
+
+## FEED-1 security-auditor SURPRISE — the pop-up and lightbox slots cache a resolved node, so they never re-mask
+
+**Originating task:** FEED-1 directed security audit (branch `feat/feed-1`, 2026-08-24) — out-of-scope SURPRISE per §5.11: **pre-existing on `main` and `staging`, not touched by the FEED-1 diff**; recorded, not absorbed. Also written to that run's `claude-progress.md`, which is **gitignored** — the auditor pushed back that a live masking gap whose only record dies with a worktree is the §8 founding case one register over, and it is right. This row is the durable half.
+
+**Deferred work.** `DebateView` holds three slots that capture a **resolved value** rather than an id: `popupPost` / `popupReply` (the whole `PresentPost` / `PresentReply`; `PostPopup` renders `post.body` off the captured object) and `lightboxUrl` (a presigned R2 GET URL). None is re-derived or cleared when a new model lands, and **`DebatePoll` is not suspended for pop-ups** — `composerOpen` reads only the composer flags. So a pop-up opened before a moderator removes its comment keeps rendering the withheld body for as long as it is left open, on a page that has the masked payload in hand. ⚠ **The image half outlives the DOM:** measured at this audit, after a masking payload closed the surrounding surface the presigned URL was still in the document, and `READ_URL_TTL_SECONDS = 3600` (`src/server/debate-view/load-debate-view.ts:36`) — removal does not revoke an already-minted URL, so the object stays fetchable and shareable for up to an hour. That half is the one most likely to be under-rated later, because it is invisible once the dialog closes.
+
+**This is the SC-1 class** (§5.14): a read path over `comments.body` that never re-intersects the removed set. SC-1 fires on *"any PR that adds or edits a read over `comments`"*; this is a standing one that predates the check.
+
+**Fix direction, and FEED-1 is the worked example.** Store the **id**, re-derive the node from `model` at render. `posted` does exactly that — it holds a `commentId`, never a node, so `postedNode` is recomputed every render and a masking payload takes the card off screen in the SAME commit (measured, both reviewers, `M0 → M1(present) → M2(removed)`: no intermediate frame). `popupPost` / `popupReply` / `lightboxUrl` want the same treatment. Sizing: two state slots plus a lightbox key, all inside `DebateView`; the removed variants are already unpassable at the type level, so the compiler does most of it. **The presigned-URL half is separate and harder** — R2 presign revocation is not a client concern and may be a TTL-shortening decision rather than a code fix.
+
+**Why deferred.** Pre-existing, reachable on three surfaces FEED-1 does not touch (market column, reply column, `PostFocusHeader`), and absorbing it would be the "while we're here" §5.4 forbids on a branch whose reviewer cascade has already run.
+
+**Conditional trigger.** The next task touching `DebateView`'s pop-up/lightbox slots or `dialogs.tsx`, OR any HARDEN.* moderation pass, OR the first moderator report that a removed argument stayed visible.
+
+**Expected next task.** A small `fix/` lane in `src/components/debate/` — id-not-node for the two pop-up slots (behavioural, guardable in jsdom exactly as FEED-1's confirmation is), with the R2 TTL question raised separately.
+
+---
+
+## TIME-1 Form B — `Replies · N` runs at two sizes on two rows canon §3 item 11 calls siblings
+
+**Originating task:** TIME-1 · Form B (branch `feat/time-1-form-b`, PR #406, 2026-08-25) — noticed while measuring the identity rows at 1440 for the argument-age alignment item. **Out of scope and deliberately not fixed:** that run's brief was a divider, a CSS measurement, two guard counts and two doc edits, and this is neither the age nor the divider.
+
+**Deferred work.** Canon §3 item 11 governs one composition — *"head = avatar · name | SIDE @ entry% | stake … `Replies · N` inline with enlarged count (`.repn`)"* — and the TIME-1 Form B amendment now treats the debate and profile identity rows as siblings, giving both the same trailing age under one rule. **They render `Replies · N` at different sizes.** Measured on staging at 1440, computed values:
+
+| surface | `Replies ·` label | the count | the age beside it |
+|---|---|---|---|
+| Market detail (`debate/ArgProfile.tsx`) | **9.5px** bold, `0.12em` tracking, uppercase, `text-ink` | **13px** | 12px |
+| Profile (`profile/ArgumentList.tsx`) | **12px** (`text-xs`), `text-n5` | **14px** (`text-sm`) | 12px |
+
+⚠ **Market detail is the one that matches the ratified source; Profile is the drift.** Both mockups declare the same two values — `surface_d5_v1_0.html:579-580` and `surface_profile_v1_0.html:327/336` give `.repmeta{font-size:9.5px}` and `.repn{font-size:13px}` byte-identically, and the profile mockup's own comment at `:616` names its count *"D5 `.repn`"*, i.e. it explicitly borrows d5's. So this is not two defensible readings of one rule; it is one ratified pair of values that Profile does not use.
+
+**Root cause, and it is already recorded in the code that caused it.** HTML-FINISH row 12 **moved** `Replies · N` on Profile from the card footer's running text into the head cluster, and `ArgumentList.tsx` states that *"both spans keep their class strings byte-for-byte from the footer they left."* Keeping the footer's classes is what carried the footer's **body-text** sizes (12/14) into a head whose mockup rule is 9.5/13. The move was right; the class strings came with it.
+
+**The visible cost, which is why it is worth a row rather than a shrug.** On market detail the run `REPLIES · 3   4d ago` now contains **three type sizes in five words** — 9.5px label, 13px count, 12px age. The founder has ruled that the **age** stays at its row's size and is not the field to change (measured: the age matches its row's declared size and its stake's baseline on all three surfaces — the alignment finding in that run's report). ⇒ **The label is the outlier**, and the question this row parks is whether Profile's head takes `.repmeta`/`.repn` — which would also collapse market detail's run from three sizes to two by making the label and the age the only pair left to reconcile.
+
+**Why deferred.** Changing either surface's `Replies · N` sizes moves a shipped composition that `tests/unit/design/debate-height-chain.test.ts` and `tests/unit/design/profile-height-chain.test.ts` both scan, and re-pointing Profile at the mockup's 9.5/13 is a visual ruling about the head cluster, not a typo fix. Taking it inside a task not asked to make it is the §5.4 "while we're here" this file exists to prevent.
+
+**Conditional trigger.** The next task touching either identity row's `Replies · N` cluster — `debate/ArgProfile.tsx` or `profile/ArgumentList.tsx` — OR any founder pass over head-cluster typography, OR the first Gate C that reads the two rows side by side and asks why they differ.
+
+**Expected next task.** A small `fix/` lane in `src/components/profile/`, taking `.repmeta`/`.repn`'s ratified 9.5px/13px onto the profile head, with the two height chains re-measured at 1440 before and after. ⛔ No mockup edit — both mockups already say 9.5/13; this is the build catching up to them, not a canon question.

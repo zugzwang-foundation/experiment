@@ -221,10 +221,27 @@ describe("the canon §6 caption is gone and must stay gone", () => {
 		});
 	}
 
-	it("empty-slot::the-label-Image-outside-the-box-is-untouched", () => {
-		// The caption went; the field label did not. Scope guard — a deletion that
-		// took the label with it would leave the column unnamed on screen.
+	it("empty-slot::the-visible-Image-label-is-GONE-and-the-column-is-still-NAMED", () => {
+		// ⚠⚠ INVERTED AT change set 10 §4, founder ruling, and the guard's actual
+		// concern is preserved rather than dropped. It read:
+		//   expect(screen.getByText("Image").tagName).toBe("SPAN");
+		// with the note "a deletion that took the label with it would leave the
+		// column unnamed on screen". The ruling removes that label — the word
+		// already appears INSIDE the artwork as `Add Image`, so the panel said it
+		// twice — which makes the old assertion assert the opposite of the ruling.
+		// ⛔ THE WORRY IT ENCODED IS THE PART THAT MATTERS, so it is now pinned
+		// DIRECTLY instead of by proxy: the visible duplicate is gone AND the
+		// column still has an accessible name. That is strictly stronger — the
+		// original only checked that a span existed, never that anything named
+		// the field.
+		// ⚠ The name was NEVER this span: `aria-label` on the `<fieldset>`
+		// ("Attach an image") and on the pick button ("Choose an image file") are
+		// the accessible names, and neither is touched.
+		// ⚠ Diverges from `design-canon.md` §6, which names `Image` as this
+		// field's label. Reported for routing; the canon is NOT amended here.
 		renderPhase({ phase: "none" });
-		expect(screen.getByText("Image").tagName).toBe("SPAN");
+		expect(screen.queryByText("Image")).toBeNull();
+		expect(screen.getByLabelText("Attach an image")).toBeTruthy();
+		expect(screen.getByLabelText("Choose an image file")).toBeTruthy();
 	});
 });

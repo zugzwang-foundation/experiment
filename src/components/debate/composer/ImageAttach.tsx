@@ -369,14 +369,84 @@ export function ImageAttach({
 	// not resize as the state moves through pick → busy → attached → error.
 	// `min-w-0` is LOAD-BEARING: a fieldset's UA `min-inline-size:min-content`
 	// would otherwise refuse to shrink inside the grid track.
+	//
+	// ⚠⚠ RPLY-3 · R1 — `min-h-48` IS THIS PANEL'S FLOOR, AND IT IS ALSO THE ONLY
+	// THING THAT LETS THE PANEL SHRINK AT ALL. Both halves from ONE declaration,
+	// which is why it reads as a floor and behaves as a release:
+	//   · A grid item's automatic minimum size is its CONTENT. With `min-height`
+	//     left at `auto` this panel refused to give an inch — MEASURED at 650px
+	//     on the post arm against the real compiled CSS, the grid box around it
+	//     had already shrunk to 117.41px while the panel still measured its full
+	//     266.45px and simply overflowed. Any explicit `min-height` replaces that
+	//     automatic minimum; `0` and `192px` were measured to release it
+	//     identically, so the number is free to be a real floor rather than a
+	//     token zero.
+	//   · Below the floor the panel would otherwise keep collapsing and take the
+	//     artwork with it, because the `<svg>` scales to whatever box it is given.
+	//     At the floor, at 1280 wide, the figure's uniform scale is 0.667 —
+	//     `Add Image` renders at an effective 7.3px (a 9.4px glyph box) and the
+	//     headline at 8.7px (11.3px box). Unfloored at 650px they were 4.1 and
+	//     4.8px (5.6 and 6.3px boxes) — the state the founder reported as the
+	//     panel being cut off. 192px does NOT bind at any tested height (650px lands the panel
+	//     near 224px), so it costs nothing in the range that matters and only
+	//     catches the fall below it.
+	//     ⚠ THE TWO FIGURES ARE FONT SIZES AND THE PARENTHESES ARE GLYPH BOXES,
+	//     stated apart because the first draft of this comment quoted only the
+	//     box heights and called them what the text "renders" — reading as a
+	//     font size roughly 28% larger than the type actually is.
+	//     `@code-reviewer` reconstructed the real scale from the declarations and
+	//     was right; re-measured with `svg.getScreenCTM().a` rather than with a
+	//     bounding rect.
+	//     ⚠⚠ AND THE FLOOR BOUNDS HEIGHT WHILE `meet` SCALES BY
+	//     `min(w/200, h/250)` — so at a narrow enough column the artwork is
+	//     WIDTH-limited and this floor buys no legibility at all, it only makes
+	//     the panel taller than its contents. Measured at 900px viewport width:
+	//     the figure is width-limited at every height, scale 0.585, `Add Image`
+	//     6.4px. The founder's matrix is 1280 wide; narrower widths are a
+	//     separate, unruled question and are recorded rather than fixed here.
+	//
+	// ⛔ THE FLOOR IS ON THE PANEL, NOT ON THE ARTWORK, AND THAT IS THE WHOLE
+	// DIFFERENCE BETWEEN SCALING AND CLIPPING. Floor the `<svg>` instead and the
+	// panel — released by its own `min-h-0` — keeps shrinking underneath it, so
+	// the drawing spills past this fieldset's own border; add `overflow-hidden`
+	// to stop the spill and you have cropped the sentence instead, which is the
+	// defect being fixed. Floor the BOX and the artwork simply scales to it:
+	// the `<svg>` keeps its `viewBox` and its default
+	// `preserveAspectRatio="xMidYMid meet"`, so it fits, stays centred, keeps
+	// its ratio, and never clips or scrolls at any height.
 	const panel =
-		"flex h-full min-w-0 flex-col items-center justify-center gap-2 rounded-(--imgr) p-3 text-center text-xs [border:var(--hairline)]";
+		"flex h-full min-h-48 min-w-0 flex-col items-center justify-center gap-2 rounded-(--imgr) p-3 text-center text-xs [border:var(--hairline)]";
 	// `.imgprev` — d5's `width:100%; aspect-ratio:4/5; max-height:calc(100% - 22px)`
 	// ported as PROPORTIONS ONLY: the `- 22px` is a value and is refused, so the
 	// clamp lands as `max-h-full`. Keeping d5's height clamp is what stops the
 	// preview from driving the composer's height off the grid row.
 	const preview =
-		"aspect-[4/5] max-h-full min-h-0 w-full rounded-(--imgr) bg-n1";
+		// ⚠⚠ change set 10 §1 — THE ART'S HEIGHT IS CAPPED AND NO LONGER TRACKS
+		// THE PANEL'S WIDTH. `aspect-[4/5] w-full` made height a FUNCTION of
+		// width, so the composer grew taller on wider screens: measured 239.5px
+		// at 1280 and 279.5px at 1440, which is why the panel out-grew the right
+		// column and set the grid row.
+		// ⇒ `max-h-[224px]` CAPS it. ⛔ `aspect-[4/5]` STAYS — it is a ratified
+		// PROPORTION (this file's own docblock files it under "arrangement, not
+		// values") and it is pinned by `attach-preview.test.tsx`. Removing it was
+		// my first attempt and it reddened four guards, correctly: the fix is to
+		// bound the box, not to stop declaring its shape. Width still drives the
+		// height until the cap, and the cap replaces the looser `max-h-full`.
+		// The `<svg>` keeps its own `viewBox` and its
+		// DEFAULT `preserveAspectRatio="xMidYMid meet"`, so the drawing scales
+		// DOWN to fit, stays centred, and keeps its ratio — letterboxed, never
+		// stretched or squashed. ⛔ Not one coordinate, text node or viewBox value
+		// is touched; only the box the artwork is asked to fit into.
+		// ⚠ THE CAP IS DERIVED FROM THE RIGHT COLUMN, AND IT MOVED AT CS11.
+		// panel = 2 (border) + 24 (`p-3`) + art. The right column grew when the
+		// title went to three lines (+40) and the description to 128px (+32),
+		// from 262 to 334 — so a 224 cap would have left the panel 72px short and
+		// letterboxing inside a stretched box. 308 puts the panel at 334, level
+		// with the column: neither drives the row alone.
+		// ⛔ STILL A FIXED px CAP, NOT A RATIO OF WIDTH and NOT `max-h-full`.
+		// Width-invariance is what CS10 bought and it is not being traded back —
+		// measured identical at 1440, 1728 and 1920.
+		"aspect-[4/5] max-h-[308px] min-h-0 w-full rounded-(--imgr) bg-n1";
 	// The slot's CONTENT — the same node at both render sites below, so the
 	// preview is present while `attaching` too and never waits on the PUT.
 	//
@@ -517,10 +587,25 @@ export function ImageAttach({
 						onClick={() => inputRef.current?.click()}
 						className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-2 rounded-(--imgr) transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
 					>
+						{/* ⚠⚠ change set 10 §4 — THE STANDALONE `Image` LABEL IS REMOVED,
+						    founder ruling. The word already appears INSIDE the artwork as
+						    `Add Image`, so the panel said it twice.
+						    ⛔⛔ IT WAS NOT THE ACCESSIBLE NAME AND NOTHING IS LOST. This
+						    control's name comes from `aria-label={PICK_LABEL}` on the button
+						    itself, and the `<fieldset>` around it carries `ATTACH_LABEL` —
+						    both untouched. A screen reader is unaffected by this removal;
+						    only the duplicated visible word goes.
+						    ⚠ THE ATTACHING STATE KEEPS ITS READOUT. While a file is
+						    uploading the label carried the filename, and dropping that would
+						    have removed the only feedback that anything is happening. It now
+						    renders ONLY in that phase.
+						    ⚠ DIVERGES FROM `design-canon.md` §6, which names `Image` as this
+						    field's label — reported for routing, NOT amended (that document
+						    is web-authored). */}
 						{previewBox}
-						<span className="text-n5">
-							{state.phase === "attaching" ? `${state.name}…` : "Image"}
-						</span>
+						{state.phase === "attaching" ? (
+							<span className="text-n5">{`${state.name}…`}</span>
+						) : null}
 					</button>
 				)}
 				{state.phase === "error" && (

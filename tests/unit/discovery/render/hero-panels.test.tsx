@@ -173,15 +173,25 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 				throw new Error(`expected the ${side} hero post panel`);
 			}
 
-			// Row 6 — TWO separators per panel (mockup markup `:187`, `:189`),
-			// between the author name and the side chip, and between the chip and
-			// the stake figure. The head row is the panel's first child.
+			// Row 6 — THREE separators per panel, and they DO NOT SHARE ONE
+			// GOVERNING SOURCE. ⛔ Read this before moving the count again.
+			//  · Separators ONE and TWO are the mockup's own markup
+			//    (`surface_discovery_v1_0.html:187`, `:189`) — between the author
+			//    name and the side chip, and between the chip and the stake.
+			//  · Separator THREE is canon §3 item 11's TIME-1 · Form B amendment,
+			//    which supersedes the discovery mockup ON THIS ELEMENT AND ONLY ON
+			//    THIS ELEMENT. The mockup's head carries no age field at all, so
+			//    TIME-1 had already put the shipped row ahead of it; this pipe
+			//    makes that divergence visible rather than opening a new one.
+			// ⛔ The mockup is deliberately NOT edited — a locked mockup is amended
+			// deliberately, never as a side effect of a UI pass.
+			// The head row is the panel's first child.
 			const head = panel.children[0];
 			const kids = Array.from(head.children);
 			const seps = kids.filter((el) => el.textContent === "|");
-			expect(seps).toHaveLength(2);
+			expect(seps).toHaveLength(3);
 			// Sibling ORDER is the point, so assert positions rather than a count
-			// alone: avatar · author · SEP · chip · SEP · stake.
+			// alone: avatar · author · SEP · chip · SEP · stake · SEP · age.
 			const authorLink = head.querySelector(
 				`[data-testid="hero-author-link-${side}"]`,
 			);
@@ -190,24 +200,44 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 			}
 			expect(kids.indexOf(seps[0])).toBe(kids.indexOf(authorLink) + 1);
 			expect(kids.indexOf(seps[1])).toBe(kids.indexOf(seps[0]) + 2);
+			expect(kids.indexOf(seps[2])).toBe(kids.indexOf(seps[1]) + 2);
+			// …and what the third separator PRECEDES is the age, which is what
+			// makes it a seam rather than a trailing glyph. Asserted here because
+			// a count alone passes on a pipe appended past the age.
+			const age = head.querySelector("[data-relative-time]");
+			if (!age) {
+				throw new Error(`expected the ${side} argument age`);
+			}
+			expect(kids.indexOf(age)).toBe(kids.indexOf(seps[2]) + 1);
+			expect(kids.indexOf(age)).toBe(kids.length - 1);
 			// The glyph is the BYTE the mockup carries — U+007C, not U+2502 and
 			// not any box-drawing look-alike.
 			for (const sep of seps) {
 				expect(sep.textContent).toBe("|");
 			}
 
-			// Row 7 — the ARGUMENT TEXT is wrapped in the mockup's own straight
-			// ASCII quotes (U+0022, byte-carried from `:192`; the mockup's JS at
-			// `:455` builds the same pair).
-			const teaser = panel.querySelector("p");
-			if (!teaser) {
-				throw new Error(`expected the ${side} teaser paragraph`);
-			}
-			expect(teaser.textContent).toBe(`"${EXTENDED}"`);
+			// ⛔⛔ RE-POINTED AT UI-QUICK CS13 §2 — THE HERO POST IS TITLE-ONLY.
+			// This assertion previously required the quoted `.argtext` teaser
+			// paragraph (mockup `:192`, straight U+0022 byte-carried, HTML-FINISH
+			// row 7). The founder ruled the teaser off this surface: the panel
+			// carries the argument's HEADLINE and its picture, and the argument
+			// itself is read one click away.
+			//
+			// ⚠ RE-POINTED, NOT DELETED, AND THE DIRECTION IS INVERTED ON PURPOSE.
+			// The teaser's absence is now the thing worth guarding — it is exactly
+			// what a future edit would restore without meaning to, and restoring
+			// it would silently undo §3's height work by re-taking the vertical
+			// space the image box was given. Dropping the assertion would have
+			// left that unguarded; flipping it keeps the same line load-bearing.
+			expect(panel.querySelector("p")).toBeNull();
+			expect(panel.textContent ?? "").not.toContain(EXTENDED);
+			// …and no stray quote glyph survived the removal either.
+			expect(panel.textContent ?? "").not.toContain('"');
 
-			// ⛔ AND THE HEADLINE IS NOT WRAPPED — row 3 is STRUCK, so the title
-			// keeps its shipped, unquoted form. This is the assertion that would
-			// catch row 7 being over-applied to the headline as well.
+			// ⛔ THE HEADLINE IS STILL THERE AND STILL UNWRAPPED — row 3 remains
+			// STRUCK. This half is UNCHANGED, and it is what proves the assertion
+			// above pins the TEASER's absence rather than an empty panel: a render
+			// that dropped everything would fail here.
 			const headline = panel.querySelector("h3");
 			expect(headline?.textContent).toBe(TITLE);
 			expect(headline?.textContent?.startsWith('"')).toBe(false);
@@ -221,9 +251,11 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		if (!link) {
 			throw new Error("expected the hero-post deep-link anchor");
 		}
-		// Title + teaser render inside the deep-link.
+		// The TITLE renders inside the deep-link. (CS13 §2 removed the teaser
+		// that used to be asserted alongside it — the link's reach is unchanged,
+		// only its contents shrank.)
 		expect(link.textContent).toContain(TITLE);
-		expect(link.textContent).toContain(EXTENDED);
+		expect(link.textContent).not.toContain(EXTENDED);
 		// The author's stake, Đ-formatted via the reused formatDharma.
 		const post = screen.getByTestId("hero-post");
 		expect(post.textContent ?? "").toContain("Đ 40");
@@ -477,11 +509,135 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		// adjacent (WCAG 1.1.1).
 		expect(img.getAttribute("alt")).toBe("");
 		const cls = img.getAttribute("class") ?? "";
-		expect(cls).toContain("object-cover");
+		// ⛔⛔ RE-POINTED AT UI-QUICK CS13 §3 — `contain`, NEVER `cover`.
+		// `cover` filled the box by CROPPING the picture, which on the portrait
+		// attachments meant most of the image was never shown. `contain` fits the
+		// whole picture inside the same box and letterboxes the remainder against
+		// the `bg-n1` the box already carried.
+		// ⚠ The NEGATIVE is asserted too, and it is the half that actually
+		// guards: `toContain("object-contain")` alone would still pass on a class
+		// string that carried BOTH, which is precisely what a careless re-add
+		// would produce.
+		expect(cls).toContain("object-contain");
+		expect(cls).not.toContain("object-cover");
 		expect(cls).toContain("rounded-[var(--imgr)]");
-		expect(cls).toContain("min-h-[40px]");
+		// ⛔⛔ CS13 §3 — THE PICTURE IS OUT OF FLOW, AND THAT IS THE WHOLE HEIGHT
+		// INVARIANT. An absolutely-positioned child contributes nothing to its
+		// parent's content height, so the panel cannot track its attachment.
+		//
+		// ⚠⚠ THIS ASSERTION REPLACED A WRONG ONE, AND THE REPLACEMENT IS THE
+		// POINT. It first pinned `flex-1` + `min-h-[40px]` ON THE IMAGE, on the
+		// reasoning that a zero flex-basis plus an explicit min-height leaves no
+		// path for an intrinsic height to reach the layout. That reasoning is
+		// false when the container's height is INDEFINITE — as it is here, the
+		// panel being sized by its grid row — because a PERCENTAGE flex-basis
+		// then falls back to `auto`, and `auto` on an `<img>` is its intrinsic
+		// height. Staging measured 198.8px of panel height moving with nothing
+		// but the attachment's aspect ratio (portrait 482x638 → 574.6px row;
+		// landscape 1200x400 → 375.8px row, same panel, same viewport).
+		// ⛔ So the negatives below are not tidiness — they are the specific
+		// wrong fix, pinned as wrong so it cannot come back.
+		expect(cls).toContain("absolute");
+		expect(cls).toContain("inset-0");
+		expect(cls).not.toContain("flex-1");
+		expect(cls).not.toContain("min-h-");
 		// No placeholder alongside it.
 		expect(screen.queryByTestId("hero-post-image-empty-YES")).toBeNull();
+	});
+
+	it("render::v15-the-image-box-and-the-placeholder-box-are-the-SAME-box", () => {
+		// ⛔⛔ CS13 §3, AND THIS IS THE ASSERTION THE INVARIANT ACTUALLY RESTS ON.
+		// The founder's requirement is that a hero panel is the same height with
+		// no image, with a landscape image and with a portrait image. The first
+		// of those three is a DIFFERENT ELEMENT — the `IMG` placeholder — so the
+		// invariant holds only if both elements carry the same box.
+		//
+		// ⚠ Asserted as a SHARED SET rather than as two literal class strings:
+		// the placeholder is a flex CONTAINER (it centres the word "IMG") and the
+		// image is not, so their class attributes legitimately differ. What must
+		// match is the height-determining subset, and that is what is compared.
+		//
+		// ⚠ jsdom PERFORMS NO LAYOUT (AGENTS.md §9), so this cannot measure two
+		// rendered heights — it pins the declarations that produce them. The
+		// browser measurement that proves they compose is recorded in the
+		// change-set file, across three image types at three viewports.
+		const withImage = {
+			...heroPost("YES"),
+			imageUrl: "https://signed.test/uploads/u/x/arg.webp",
+		};
+		renderHero({ yes: withImage, no: null });
+		const withImg = screen.getByTestId("hero-post-image-YES");
+		const imgWrap = withImg.parentElement;
+		const imgCls = withImg.className;
+		cleanup();
+		renderHero({ yes: heroPost("YES"), no: null });
+		const empty = screen.getByTestId("hero-post-image-empty-YES");
+		const emptyWrap = empty.parentElement;
+		const emptyCls = empty.className;
+
+		// ⛔ BOTH are out of flow, so NEITHER can push the panel — the no-image
+		// case and the image case are the same box because neither is a box at
+		// all as far as the panel's height is concerned.
+		for (const cls of [imgCls, emptyCls]) {
+			expect(cls).toContain("absolute");
+			expect(cls).toContain("inset-0");
+		}
+
+		// ⛔⛔ AND THE WRAPPER — the element that IS the box — is identical for
+		// both, carrying the shipped `mt-2 min-h-[40px] flex-1` and the
+		// `relative` that the `inset-0` above is measured against. Without
+		// `relative` the images would position against some ancestor further up
+		// and the panel would lose its picture entirely, so it is pinned here
+		// rather than left implicit.
+		for (const wrap of [imgWrap, emptyWrap]) {
+			const cls = wrap?.className ?? "";
+			expect(cls).toContain("relative");
+			for (const token of ["mt-2", "min-h-[40px]", "flex-1"]) {
+				expect(cls).toContain(token);
+			}
+			// ⛔ No FIXED height and no cap — either would re-introduce a number
+			// the panel's height depends on, which is what §3 removed.
+			expect(/(^|\s)h-\[/.test(cls)).toBe(false);
+			expect(/(^|\s)max-h-/.test(cls)).toBe(false);
+		}
+		expect(imgWrap?.className).toBe(emptyWrap?.className);
+	});
+
+	it("render::cs13-the-hero-market-panel-is-keyboard-operable-AND-visibly-focused", () => {
+		// ⛔⛔ CS13 §4. Two claims, and they fail for different reasons, so both
+		// are asserted.
+		//
+		// 1. ENTER OPENS THE MARKET — asserted as "the panel is a real anchor
+		//    with an href". That is the whole mechanism: a native `<a href>`
+		//    activates on Enter with no handler, so there is nothing else to
+		//    test and nothing that could regress except the element itself
+		//    turning back into a div-with-onClick. THAT is what this catches.
+		// 2. THE FOCUS IS VISIBLE — the half that was actually missing. The
+		//    panel was already Tab-reachable and Enter already worked; a
+		//    keyboard viewer simply could not see where they were.
+		const { container } = renderHero({ yes: null, no: null });
+		const panel = container.querySelector<HTMLAnchorElement>(
+			`a[href="/m/${SLUG}"]`,
+		);
+		if (!panel) {
+			throw new Error("expected the hero market panel anchor");
+		}
+		// (1) A real anchor — not a div, and not an anchor without an href
+		// (which is NOT focusable and would silently drop out of the tab order).
+		expect(panel.tagName).toBe("A");
+		expect(panel.getAttribute("href")).toBe(`/m/${SLUG}`);
+
+		// (2) The shipped focus idiom, BOTH halves. `outline-none` alone would
+		// REMOVE the browser's default ring and leave nothing in its place —
+		// strictly worse than before — so the token that replaces it is pinned
+		// in the same breath.
+		const cls = panel.className;
+		expect(cls).toContain("outline-none");
+		expect(cls).toContain("focus-visible:shadow-(--state-focus-ring)");
+		// ⛔ NO NEW COLOUR. The ring is an existing token, not a literal — a hex
+		// or an rgb() here would be a new value on a surface whose palette is
+		// pinned by `tokens-monochrome`.
+		expect(/#[0-9a-fA-F]{3,8}|rgb\(|oklch\(/.test(cls)).toBe(false);
 	});
 
 	it("render::v15-null-image-renders-the-placeholder-not-a-broken-img", () => {

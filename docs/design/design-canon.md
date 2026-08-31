@@ -1,7 +1,7 @@
 # Zugzwang — Design Canon (consolidated · v1.0-era + Wave-2 + DC rulings)
 
 > **Doc:** `docs/design/design-canon.md`
-> **Status:** v1.1-draft · authored at **DC.1** (2026-07-02) · committed at **DC.3** · BRIDGE amendments 2026-07-14
+> **Status:** v1.2-draft · authored at **DC.1** (2026-07-02) · committed at **DC.3** · BRIDGE amendments 2026-07-14 · TIME-1 Form B amendment 2026-08-25 · RPLY-CLOSE composer-open exception 2026-08-26
 > **Authorship:** web Claude (orchestrator) · ratified by operator · committed by Claude Code
 >
 > **What this is.** The single consolidated record of the DESIGN phase: the locked surfaces, the locked decisions, motion/timing, copy, spec deltas, the five DC rulings, the per-surface mockup index (the handoff unit), and the CD fine-tune log. It **absorbs** `DESIGN-phase-record.md` + the three by-type consolidations (motion / spec-changes / copy-register), reconciled against the 2026-07-02 rulings. Those four source docs are **superseded by this canon** (delete-after-verify from PK once DC.3 lands).
@@ -46,6 +46,10 @@
 
 **Reply** *(the d5 "postview" — per-post thread)*. **Columns are FIXED poles: left = YES, right = NO, for every post.** Column header = the side **price pill only** (`Yes 👍 38%` / `No 👎 62%`). **Support/Counter is a property of the POST, never the column** — it lives on the post's **split bar** (`Đ support ─ total ─ Đ counter`, with the Support/Counter buttons that open the composer) and in the composer ("Support/Counter <author>'s argument"). Replies route into columns by their **own** YES/NO side. Composer opens in the opposite slot.
 
+**Composer-open exception.** While a composer is open, the HOSTING column's header renders the label, percent and TO-WIN unit of the **side being bet**, not of its own pole. The non-hosting column's header does not move.
+
+**The position readout is excluded from the mirroring.** `NO ACTIVE POSITION` / `YOUR POSITION Đ N` is a fact about the viewer's holding on that specific pole; mirroring it prints a falsehood. `PositionStrip` decouples the two via a `composingSide` prop that drives display only. `SlotHeader` does not decouple them and is therefore wrong — see `docs/parked.md`.
+
 **Profile** *(frozen v0.18 + lock-cycle extensions)*. Two bands. Top: identity card (PFP + pseudonym + bookmark/download combo) + six account tiles (Wallet value · Positions value · Net P/L · Arguments · Total Support received · Total Counter received) + the graph slot (W2.6 design locked). Bottom "arena": **Positions** table (Position · Argument · Staked · Current; market + Open/Closed filters) + the **argument list** (D5-synced card anatomy; a reply card keeps its "Replied to …" context). The **Sell flow** is hosted on the positions row, not in the right panel. Owner sees Sell; **closed positions are unsellable** (frozen-at-resolution). Up/Down step the *visible filtered* rows; titles are the click targets (↗ arrows removed).
 
 > **⚠ CORRECTED at HTML-FINISH · PROFILE (2026-08-15), founder ruling, and corrected HERE rather than in an appendix (O-5 — an amendments block is a record of the change, never the delivery of it).** Two clauses of this entry were superseded and are rewritten above:
@@ -65,7 +69,7 @@
 ## §3 — Locked design decisions (the invariant spine)
 
 1. **Side binding (app-wide, permanent):** YES = **black** · NO = **white**; thumb-up = YES, thumb-down = NO. The poles encode **side only** — *Support/Counter is a separate, post-relative relation* (the v1.0 axis correction; design-language v0.5 §1.3/§6 now match).
-2. **Columns are fixed YES/NO poles** in the Reply view; Support/Counter lives on the split bar + composer only, never as a column label or colour.
+2. **Columns are fixed YES/NO poles** in the Reply view; Support/Counter lives on the split bar + composer only, never as a column label or colour. *(⚠ The fixed-poles half now carries the **composer-open exception** — see §2's Reply entry. The Support/Counter half is unqualified and unchanged: the exception moves which SIDE a hosting header names, never whether a column may be labelled by relation. Pointer added at RPLY-CLOSE per `O-5` — a ruling that states the superseded position has to carry the correction too, not rely on a reader reaching §2 first.)*
 3. **Composer slide rule:** the composer opens in the **opposite** slot; the bet's side stays visible.
 4. **Reply-as-bet** throughout: a reply IS a Support/Counter bet; the split-bar buttons open the composer; every buy carries the mandatory argument; **selling is the only comment-free action**.
 5. **"Đ BET" wordmark** end-to-end (entry button `Đ BET` → header `Place your Đ BET` → submit `PLACE Đ BET`; reads as DEBATE).
@@ -74,9 +78,14 @@
 8. **No invented market content** — extra posts reuse on-topic prose; only counts synthesized.
 9. **Bookmark = the profile blob in a mode**, not a fork, not a 4th source blob.
 10. **`:has()` is banned** (silently dropped CSS blocks in the operator's browser) — JS-toggled body classes instead.
-11. **Card anatomy** (all card renders): rounded corners `--r:8px` / `--imgr:6px`; ink argument text; head = avatar · name | SIDE @ entry% | stake → current + right-edge bookmark/download cluster; `Replies · N` inline with enlarged count (`.repn`); split-bar staked total enlarged + ink (`.stkn`); titles are the click targets.
+11. **Card anatomy** (all card renders): rounded corners `--r:8px` / `--imgr:6px`; ink argument text; head = avatar · name | SIDE @ entry% | stake → current + right-edge bookmark/download cluster; `Replies · N` inline with enlarged count (`.repn`); split-bar staked total enlarged + ink (`.stkn`); titles are the click targets. **Amendment (TIME-1).** Every identity row that names an author ends with the argument's age. It is the row's last field, following every existing tag, and **it is preceded by the row's own divider** — so wherever this field is present, the row's separator count is one higher than item 11 previously recorded. The age sits at the meta rung: `--text-meta`, which resolves to the same token the row's other muted fields already carry. **One treatment across every surface.** Size is the row's, never the field's — the three identity rows run at three different sizes and the age inherits whichever it lands in. **The age is a peer of the row's meta fields, not a trailing annotation set apart from them** — it takes the row's own alignment and joins whichever baseline group its own size belongs to. ⚠ On a row that mixes type sizes under centre alignment that is not necessarily the same optical line as its immediate neighbour: the profile head carries a 14px group and a 12px group 1px apart, and the age joins the 12px group alongside the stake, exactly as `.rchead` (`surface_profile_v1_0.html:321-336`) mixes four sizes the same way. Measured at TIME-1 · Form B — matching the age's line box to its neighbour's does not move the baseline; only `align-items: baseline` zeroes it, at the cost of the row's height and every field in it. ⛔ Do not "fix" that 1px to satisfy this rule. Where a row ends in a trailing-edge action cluster — a download mark, a menu glyph — **the age precedes that cluster.** The cluster is the row's edge, not one of its tags, and an age pushed past a control reads as chrome rather than as the last thing the row says.
 12. **Side chip** = curved rectangle (4px), card-scoped *(reply cards + popover still show pill chips — CD fine-tune log, §10)*.
 13. **Thumb glyph = the `ThumbGlyph` primitive** (`src/components/ui/thumb-glyph.tsx`), pinned **by component name and props — never by emoji**: `side` (required) and `size` (optional, **default 16**). Thumb-up renders **stroked `currentColor`**; thumb-down renders **FILLED `--color-no` (`fill-no`), `stroke="none"`, rotated 180°** *(values-log §1 item 3, which supersedes the W2.6 mockup's stroked `THDN` — "match the mockup" regresses it)*. ⚠ **Size does not inherit**: values-log `:186` scopes **16** to the slot header BY NAME, and the profile positions table passes **12** (`surface_profile_v1_0.html:509-510`), so each caller states its own. ⛔ The mockup's and the step-0 close-out's 👍/👎 shorthands are **superseded** — `D1(b)` ruled tier 2 over tier 4, with word-only (**never** an emoji) as the fallback had no reusable primitive existed.
+14. **Argument age = the `RelativeTime` primitive** — `ui/relative-time.tsx`, `RelativeTime({ createdAt, className? })`, pinned by component name and props in the manner of `thumb-glyph` (item 13). *(TIME-1: the `ui/` directory's project-authored primitives go from four to five.)*
+    - `createdAt` is the ISO instant the argument was written, already carried by every read model that reaches a card. Required, never optional — an optional prop would make "an age on some cards and not others" expressible by omission, which is the inconsistency the field exists to remove.
+    - `className` carries **size only**. The treatment is `--text-meta` and belongs to the component, not the caller. One treatment across every surface is the ruling; a colour passed by a caller would defeat it silently.
+    - Marks itself `data-relative-time` — its own marker, never an override of `data-slot`.
+    - Carries **no** `"use client"` directive. It is a shared presentational primitive and compiles into whichever graph imports it, in the manner of `ui/card.tsx` and `ui/badge.tsx`. This is a property of the module's position in the graph, not a bundle claim.
 
 ---
 
@@ -124,6 +133,27 @@ All content is **illustrative dummy** — not final product copy (final copy, mi
 **Profile:** tiles `Wallet value · Positions value · Net profit / loss · Arguments · Total Support received · Total Counter received` · view chip `Viewing as owner · V toggles` / visitor variant · list `Positions` (→ `Bookmarks`) · filters `Select market ▾`, `Open`/`Closed` · columns `Position · Argument · Staked · Current` · actions `Sell` / `Closed` tag · argument-card reply footer `Replied to <author>'s argument — "<parent quote>"` (2-line clamp) · sell hint `No argument needed — selling is the only comment-free action. Default = full position; edit for a partial sell.`
 **Bookmark:** list `Bookmarks` · chip `Your bookmarks` · visitor mode, never Sell.
 **Wave-2 strings:** live in the W2 close-outs' copy blocks (auth set, onboarding deck, header cluster, state kit, share card) — carried as-authored; final wording lands at branding/build per the Depth-1 rule.
+
+### Argument age
+
+Every post and every reply card states how long ago it was written, as the last field of its identity row. Four shapes and no others:
+
+| elapsed | renders |
+|---|---|
+| under a minute | `just now` |
+| 1–59 minutes | `1m ago` … `59m ago` |
+| 1–23 hours | `1h ago` … `23h ago` |
+| 24 hours and over | `1d ago`, `2d ago`, … unbounded |
+
+Lower case throughout. **Never compounded** — `1h 5m ago` is not a shape. **Never a zero unit**; the floor bucket is `just now`, which is also what an argument dated in the reader's future renders, because a device clock running ahead of the server's is ordinary and a card must not promise a future.
+
+**No weeks, months or years bucket.** The live window is ~51 days, so an unbounded day count is the honest end of the ladder and `51d ago` is the practical ceiling. A `w` or `mo` bucket would be code for a state this build cannot reach.
+
+**The exact instant is never shown** — no tooltip, no `title`, no `<time>` element, no calendar date anywhere on the page. The age is what the reader is given. The instant is not withheld reluctantly; it is simply not the affordance.
+
+**It does not tick.** Market detail re-reads its server model every `POLL_INTERVAL_MS_DEBATE_VIEW` and the string refreshes with it; elsewhere it is correct at load and stays as it was. A per-card timer is one timer per card.
+
+**Removed stubs carry no age.** A withheld argument renders its stub without an identity row, so there is no row for the field to end. This is a product ruling, not a security control — the instant survives masking by design and is already public at finer precision through the `.md` export. Reversing it is a visual decision, not a regression, **and it has one precondition recorded in `docs/plans/TIME-1.md` (A8) and in the guard's own docblock. Read that first.**
 
 ---
 
@@ -387,7 +417,8 @@ Reply-as-bet; mandatory argument on every buy; **selling is the only comment-fre
 **This canon supersedes (delete-after-verify from PK once DC.3 lands):** `DESIGN-phase-record.md` · `DESIGN-motion-consolidated.md` · `DESIGN-spec-changes-consolidated.md` · `DESIGN-copy-register-consolidated.md` · `DESIGN-PK-consolidation-manifest.md` (its program is complete). **Kept, standalone:** design-language v0.5 · design-token-contract v0.2 · the living guides · the mockups (§8) · the W2 close-outs (historical per-task records; canon is the current-state source).
 
 > **Changelog.**
+> **v1.2-draft (2026-08-25, TIME-1 Form B):** §3 item 11 gains the **argument age** as the identity row's final field, following every existing tag and **preceded by the row's own divider** — so wherever the field is present, that row's separator count is one higher than item 11 previously recorded; §3 gains **item 14**, minting `ui/relative-time.tsx` as the **fifth** project-authored `ui/` primitive, pinned by component name and props in the manner of `thumb-glyph` (item 13); §6 gains the **`Argument age`** copy-register entry (four shapes, never compounded, no zero unit, no weeks/months bucket, the exact instant never shown, does not tick, removed stubs carry no age). Ruled at TIME-1 Form B; the field itself shipped at TIME-1 Form A (#403) and was uncodified until here. **Item 11's optical-line sentence was corrected against measurement in this same PR** — it asserted the age shares the optical line of the fields beside it, which the profile head refutes (a 14px group and a 12px group sit 1px apart under centre alignment, and the age joins the 12px group alongside the stake), so as first written the rule read as licence to close that 1px at the cost of the row's height and every field in it. Source: the web-lane amendment `ZUGZWANG-TIME-1_canon-amendment_v1_0.md` (PK, not committed) + `docs/plans/TIME-1.md` + `9fbb41d` (PR #406).
 > **v1.1-draft (2026-07-14, BRIDGE):** canonical-set line → token contract v0.4 (branded dark values; monochrome era closed) + design-language v0.7; §11 `.dark`/`--destructive`/off-ramp row CLOSED (bridge swap); §10 gains three branding-session records (R-2 W2.4 digits-only timer · R-5 slot-header geometry supersession · R-3 W2.13 lockup note). Source: values-log v0_3 (committed alongside) + docs/plans/BRIDGE.md.
 > **v1.0-draft (2026-07-02, DC.1):** initial consolidation — absorbed the phase record + the three by-type consolidations; folded the five DC rulings (bookmark semantics · slippage/Option A · partial-sell-native · Discovery nav-identity · radio R2); reconciled Wave-2 done-state (**W2.9 OPEN**, **W2.12 descoped**, W2.7/W2.10 closed by ruling); recorded the design-language v0.5 fork-merge + token-contract v0.2 as canon members; built the per-surface mockup index + DC.3 commit list; seeded the CD fine-tune log (3 entries); homed every residual open item.
 
-*End design canon v1.1-draft. Committed at DC.3; branding (B1→B3) fills the token contract; DESIGN.SPEC derives the final value-filled `design.md`; DESIGN.HANDOVER consumes §8.*
+*End design canon v1.2-draft. Committed at DC.3; branding (B1→B3) fills the token contract; DESIGN.SPEC derives the final value-filled `design.md`; DESIGN.HANDOVER consumes §8.*

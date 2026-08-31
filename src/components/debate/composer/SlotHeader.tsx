@@ -57,6 +57,7 @@ export function SlotHeader({
 	onToggleEntry,
 	ownPseudonym,
 	slug,
+	showControls = true,
 }: {
 	side: Side;
 	pricing: { yes: string; no: string } | null;
@@ -71,6 +72,18 @@ export function SlotHeader({
 	ownPseudonym: string | null;
 	/** The market slug — the `/u/<own>?market=<slug>` preselect (OQ-5 B). */
 	slug: string;
+	/**
+	 * ⚠⚠ change set 12 §1 — FALSE ON THE COLUMN THAT IS HOSTING A COMPOSER.
+	 * Founder ruling: the mirrored header keeps the composing side's label,
+	 * percent, odds and position readout, and loses its Buy and its Sell.
+	 * ⛔ SCOPED TO THE HOSTING STATE, NEVER PERSISTENT. It is derived per render
+	 * from `openSide`/`openReply`, so closing the composer restores the controls
+	 * with no reset step to forget.
+	 * ⛔ THE REAL HEADER IS UNTOUCHED — the column whose own side IS the
+	 * composing side keeps both. Its Buy is the toggle-closed affordance, and
+	 * removing it would leave the × as the only way out.
+	 */
+	showControls?: boolean;
 }) {
 	const pct = pricing ? formatPricePercent(pricing, side) : "—";
 	const unit = unitToWin ? unitToWin[side === "YES" ? "yes" : "no"] : null;
@@ -85,24 +98,26 @@ export function SlotHeader({
 	return (
 		<div className="flex items-center justify-between gap-2 rounded-(--r) px-3.5 py-2 shadow-(--elev-1) [border:var(--hairline)]">
 			<div className="flex items-center gap-3">
-				<Button
-					variant="outline"
-					size="sm"
-					disabled={entryDisabled}
-					aria-disabled={entryDisabled}
-					aria-expanded={composerOpen}
-					aria-label={c3 ?? `Buy ${side}`}
-					title={c3 ?? undefined}
-					onClick={onToggleEntry}
-					// ⚠ `uppercase tracking-[0.06em]` — d5's `.tradebtn`/`.sellbtn`
-					// (`d5:559`) are `text-transform:uppercase;letter-spacing:.06em`, and
-					// the mockup renders `BUY` / `SELL`. CASE AND TRACKING ONLY: the
-					// button's 13px / `7px 14px` / 34px geometry is the values-log §1
-					// item 6 ruling and is deliberately NOT replaced by d5's 10px.
-					className="h-auto min-h-[34px] px-3.5 py-[7px] text-[13px] tracking-[0.06em] uppercase"
-				>
-					Buy
-				</Button>
+				{showControls ? (
+					<Button
+						variant="outline"
+						size="sm"
+						disabled={entryDisabled}
+						aria-disabled={entryDisabled}
+						aria-expanded={composerOpen}
+						aria-label={c3 ?? `Buy ${side}`}
+						title={c3 ?? undefined}
+						onClick={onToggleEntry}
+						// ⚠ `uppercase tracking-[0.06em]` — d5's `.tradebtn`/`.sellbtn`
+						// (`d5:559`) are `text-transform:uppercase;letter-spacing:.06em`, and
+						// the mockup renders `BUY` / `SELL`. CASE AND TRACKING ONLY: the
+						// button's 13px / `7px 14px` / 34px geometry is the values-log §1
+						// item 6 ruling and is deliberately NOT replaced by d5's 10px.
+						className="h-auto min-h-[34px] px-3.5 py-[7px] text-[13px] tracking-[0.06em] uppercase"
+					>
+						Buy
+					</Button>
+				) : null}
 				{unit !== null && (
 					/* ⚠ `.poslab` (`d5:556`) — `font-weight:800;letter-spacing:.12em;
 					   text-transform:uppercase`. The market arm read `To win` in
@@ -156,27 +171,60 @@ export function SlotHeader({
 						    behaviour. The signed-out arm keeps the same shape and stays
 						    non-interactive, so the affordance does not appear and
 						    disappear between session states. */}
-						{ownPseudonym !== null ? (
+						{/* ⚠⚠ UI-QUICK change set 1 item 3 — `SELL` NOW RENDERS AS `BUY`,
+						    AND THE `↗` IS GONE. The two controls sat in the same band at
+						    different sizes (`sm` vs `xs`) with only one of them carrying a
+						    glyph, so the market's two primary actions did not read as a
+						    pair.
+						    ⛔ THE MOCKUP IS THE AUTHORITY HERE, NOT A PREFERENCE. d5 gives
+						    `.sellbtn` and `.tradebtn` ONE shared rule (`d5:559`) — same
+						    font, size, weight, tracking and transform — so BUY and SELL are
+						    identical in the mockup BY CONSTRUCTION, and `d5:1061` renders
+						    `<button class="sellbtn">Sell</button>` with NO ARROW. The `↗`
+						    was the build's own addition. This is a restoration.
+						    ⛔⛔ IT IS STILL AN ANCHOR, AND THAT RULING IS UNTOUCHED. The
+						    `href` below is the W2.10-C click-through to the viewer's own
+						    profile with this market preselected (OQ-5 B) — the whole point
+						    of the control, and what plan H3-d makes a HALT to drop.
+						    `buttonVariants` supplies the SHAPE; `Link` keeps the
+						    behaviour; the sell path itself is not touched.
+						    ⚠ THE ARROW WAS DOING NAVIGATION-SIGNALLING WORK, and dropping
+						    it is a real cost: BUY opens a composer in place, SELL leaves
+						    for another page, and after this commit nothing on the control
+						    distinguishes those. d5 accepts that trade — its own arrowless
+						    `.sellbtn` navigates too (`:1909` → `nav('profile')`) — but it
+						    is the founder's to reverse, and one glyph restores it.
+						    ⚠ THE GEOMETRY IS BUY'S, BYTE FOR BYTE: `variant="outline"`,
+						    `size="sm"`, and the values-log §1 item 6 ruling
+						    `h-auto min-h-[34px] px-3.5 py-[7px] text-[13px]` — copied off
+						    the entry button 60 lines up, never re-derived, so the two
+						    cannot drift apart again. */}
+						{/* ⛔ change set 12 §1 — ONLY THE SELL IS GATED HERE. The
+						    `YOUR POSITION` readout above stays: the ruling removes the
+						    two CONTROLS from a hosting header, not its readouts, and a
+						    mirrored header that dropped the position would be hiding
+						    information the composer above it is about to act on. */}
+						{!showControls ? null : ownPseudonym !== null ? (
 							<Link
 								data-testid="w210c-sell-link"
 								href={`/u/${encodeURIComponent(ownPseudonym)}?market=${encodeURIComponent(slug)}`}
 								className={cn(
-									buttonVariants({ variant: "outline", size: "xs" }),
+									buttonVariants({ variant: "outline", size: "sm" }),
 									// `.sellbtn` (`d5:559`) — uppercase, `.06em`.
-									"tracking-[0.06em] uppercase",
+									"h-auto min-h-[34px] px-3.5 py-[7px] text-[13px] tracking-[0.06em] uppercase",
 								)}
 							>
-								{COMPOSER_COPY.sell} ↗
+								{COMPOSER_COPY.sell}
 							</Link>
 						) : (
 							<span
 								aria-disabled="true"
 								className={cn(
-									buttonVariants({ variant: "outline", size: "xs" }),
-									"cursor-default tracking-[0.06em] opacity-(--state-disabled-opacity) uppercase select-none",
+									buttonVariants({ variant: "outline", size: "sm" }),
+									"h-auto min-h-[34px] cursor-default px-3.5 py-[7px] text-[13px] tracking-[0.06em] opacity-(--state-disabled-opacity) uppercase select-none",
 								)}
 							>
-								{COMPOSER_COPY.sell} ↗
+								{COMPOSER_COPY.sell}
 							</span>
 						)}
 					</>
