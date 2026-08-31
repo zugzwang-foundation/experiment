@@ -254,7 +254,7 @@ V-1…V-4 came from Slice A, which found **six** controls that passed while blin
 
 > ### ⚠ PROPOSED — ONE ROW, DELIBERATELY UNNUMBERED. Ground: POLISH.5 PR A / A6
 >
-> **High-water read off this register at head: `V-21`** *(was `V-14`; V-15/V-16/V-17 were minted at WARLI-CLOSE-2 2026-08-30 — this pointer is re-read, never carried, per **V-9**)*. ⛔ **This row is STILL NOT NUMBERED, and it does not take `V-18` here.** V-7's own text is why — *"a V-number is minted HERE or it is not minted"* — and its converse binds equally: a number written by an executing task, before the register's owner has ruled it in, is exactly the `D4` failure this section records twice. **The founder mints it or it stays unnumbered.**
+> **High-water read off this register at head: `V-21`** *(was `V-17`; `V-16`, `V-17` and `V-18` were minted at RPLY-CLOSE 2026-08-26, and `V-19`, `V-20` and `V-21` at WARLI-CLOSE-2 2026-08-30 under the numbers `V-15`, `V-16` and `V-17`, renumbered here at REGISTER-1 2026-08-31 — this pointer is re-read, never carried, per **V-9**, and per **O-15** it is a citation and not a lock: both lanes above read it correctly at their own head, where the other was invisible)*. ⛔ **This row is STILL NOT NUMBERED. It does not take `V-22` here, and it does not take `V-15` — that number is reserved for the POLISH.5 PR A / A6 row and the gap is the queue, not an error.** V-7's own text is why — *"a V-number is minted HERE or it is not minted"* — and its converse binds equally: a number written by an executing task, before the register's owner has ruled it in, is exactly the `D4` failure this section records twice. **The founder mints it or it stays unnumbered.**
 >
 > **PROPOSED ROW —**
 >
