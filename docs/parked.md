@@ -3151,18 +3151,99 @@ this paragraph only names what a reader tracking sequence should already know.
 
 ---
 
+## AUTH-SURFACE-AUDIT — four findings from WARLI-MOUNT's `@security-auditor`, none of them WARLI-MOUNT's
+
+**Originating task:** WARLI-MOUNT (2026-08-31). The auditor was scoped to
+`src/app/(auth)/**` for a render-only change and, in enumerating what shares
+those files, found four things that have nothing to do with the artwork. Filed
+here rather than fixed there — the PR was a decorative mount and absorbing any of
+this into it would have been exactly the "while we're here" CLAUDE.md §5.4
+forbids. **Each is stated as the auditor measured it; none has been
+independently re-verified by the execute surface.**
+
+⛔ **1 · The Turnstile gate is fed a hard-coded literal, and exactly one of two
+readings is true — both are findings.** `src/app/(auth)/sign-in/page.tsx` posts
+`x-turnstile-token: "placeholder-token"`, and the OTP resend path hard-codes the
+same string. `src/server/auth/index.ts` calls `verifyTurnstile()` against
+Cloudflare siteverify and **fails closed**. So either **email-OTP sign-in is
+broken in production** (`turnstile_failed` on every send), or the deployed
+`TURNSTILE_SECRET_KEY` is Cloudflare's always-pass test key — in which case the
+bot gate is a no-op and the only remaining defence on an **email-sending**
+endpoint is two rate limits that both **fail OPEN**. ⚠ **This is the one to look
+at first**, and the email-bombing / Resend-quota consequence does not appear to
+be written down anywhere.
+
+**2 · No framing protection anywhere, on a consent surface.** No
+`X-Frame-Options`, no `frame-ancestors`, no CSP at all across `src/`,
+`next.config.ts` and `vercel.json`. `/onboarding` is the ToS-acceptance screen —
+one `required` checkbox and one submit — and `acceptTosAction` writes
+`tos_accepted_at`, both version hashes, IP and user-agent as **canonical
+acceptance evidence** (SPEC.2 §3.5). Clickjacking that flow forges precisely the
+thing the evidence exists to make unforgeable.
+
+**3 · No `robots.txt` exists**, and CLAUDE.md's own audit checklist calls for
+`Disallow: /admin/`. `src/app/(admin)/admin/login/page.tsx` exports a `robots`
+metadata block whose comment says *"robots.txt Disallow + noindex below"* — the
+`robots.txt` half was never built, and the other seven admin pages carry no
+`robots` metadata. Every crawler fetch of `/sign-in` is also a full uncached
+791 KB origin render (see the WARLI-3 item 4 correction).
+
+**4 · `Sentry.init({ tracesSampleRate: 1.0 })`** in `instrumentation-client.ts` —
+100 % client trace sampling on a pre-auth surface with Devcon traffic expected.
+Quota and cost, not security.
+
+**Expected next task.** None scheduled; **item 1 wants triage before go-live**
+rather than in-window. Evidence: `docs/logs/WARLI-MOUNT.md` and the audit it
+records.
+
+---
+
 ## WARLI-3 — the composition pass: fill the moat, thicken the rings, re-cut the border
 
 **Originating task:** WARLI-2 (PR #438, squash `ab0f23b`). Four items the founder
 named at the close-out read, plus one the security audit measured.
 
+⚠ **Item 5 was added later, by WARLI-MOUNT, and does not come from that reading.**
+It could not have: it is the first measurement of this piece in a browser at any
+width, and until that task the piece had never been mounted anywhere to measure.
+**Read the numbered items as the list, not the sentence above as the count** —
+that sentence records where the row STARTED, and a row that only ever grows will
+outlive any tally written into its own prose.
+
 ⛔ **NOT A GO-LIVE GATE.** Its trigger is **after go-live, as in-window
-refinement**. The artwork is **mounted nowhere** — `tests/unit/art/art-layer-guards.test.ts`
-asserts that with a positive control — so nothing here can reach a participant
-until somebody mounts it on purpose. Filed so the composition notes survive the
-gap between building it and looking at it again, **not** to add a row to the
-SEQUENCE table, whose trigger set is "met today" and which correctly still has no
-go-live blocker in it.
+refinement**. Filed so the composition notes survive the gap between building it
+and looking at it again, **not** to add a row to the SEQUENCE table, whose trigger
+set is "met today" and which correctly still has no go-live blocker in it.
+
+⚠ **THE ARTWORK IS NOW MOUNTED, and the sentence that used to sit here said the
+opposite.** It read: *"The artwork is **mounted nowhere** … so nothing here can
+reach a participant until somebody mounts it on purpose."* Somebody did —
+WARLI-MOUNT hangs it on `src/app/(auth)/layout.tsx`, the layout wrapping
+`/sign-in`, `/sign-in/otp` and `/onboarding`. The guard it cited still exists and
+still has its positive control; it now asserts the importer list is **exactly that
+one file** rather than empty. **Items 1–3 below therefore describe a composition a
+signed-out visitor can see**, which raises their stakes without changing their
+trigger: they remain in-window refinement, not a gate.
+
+⚠ **What each route actually costs, corrected — the first version of this
+paragraph was wrong in BOTH directions and `@security-auditor` caught both.**
+Measured on the preview: `/sign-in` **93.7 KB gzipped**, `/sign-in/otp`
+**94.6 KB**, `/onboarding` 15.2 KB *on the redirect path*.
+
+- ⛔ **The EMAIL flow does NOT pay twice.** It said it did. `/sign-in` reaches
+  `/sign-in/otp` by `router.push()` — a **client-side** navigation, and the two
+  routes share the `(auth)` layout segment, so the layout is not re-fetched and
+  the SVG stays mounted. The 94.6 KB figure is a `curl` of a cold document, which
+  is not what the flow does.
+- ⛔ **The OAUTH flow DOES pay twice, and the row said `/onboarding` carries no
+  artwork.** That 15.2 KB is the *redirect* — no `onboarding_ref`. **With a valid
+  ref, `/onboarding` renders inside `AuthLayout` and therefore renders the
+  artwork**, and Google's callback is a hard browser navigation. So a real OAuth
+  signup fetches the drawing at `/sign-in` and again at `/onboarding`, the
+  mandatory first screen after signup.
+
+**The lesson is the same one item 4 keeps teaching: a number measured with `curl`
+describes a document, not a journey.**
 
 **1 · Fill the moat.** There is a visible empty annulus between the outer ring's
 baseline (`R_OUTER = 470`) and the nearest static-field ink. It is a *consequence*
@@ -3183,15 +3264,64 @@ budget, and that ceiling is measured, not chosen**: the auth card's half-diagona
 (317.6) sets `R_INNER = 330`, the faced figures at 1.2 × 58 reach 399.6, the outer
 ring's inward figures need 58 of their own, and half the frame height is 500 —
 leaving 30 units top and bottom. But a 1440 × 1000 frame holding a 470-radius
-circle has **~250 units of spare width per side and none above**. A border deeper
+circle has **~250 units of spare width per side and none above** — ⚠ **spare
+RELATIVE TO THE RING, which is not the same as empty, and item 5 exists because
+WARLI-MOUNT read it the second way and measured otherwise: that band already
+holds both side border bands and 310 of the 462 placed marks.** A border deeper
 at the left and right than at the top and bottom is both traditional and what the
 aspect ratio actually asks for. Rejected at WARLI-2 for simplicity (CLAUDE.md
 §5.2), recorded here because it is the right move if a heavier frame is wanted — a
 uniform increase is **forbidden** by the budget above and would re-create the
 58-unit border/ring overlap WARLI-2 fixed.
 
-**4 · Static pre-render of the field.** ⚠ **This one is a resource decision and it
-is the reason this row matters before any mount, not after.** Measured by
+**4 · Static pre-render of the field.** ⛔ **DISCHARGED AT WARLI-MOUNT, AND THE
+REMEDY THIS ROW PROPOSED DOES NOT WORK. Read the correction below before acting
+on the paragraph after it.**
+
+⚠ **THE ~35 ms IS SERIALISATION, NOT CONSTRUCTION — measured 2026-08-31, and the
+row's diagnosis was wrong while every one of its numbers was right.** Building the
+7,978-element tree costs **1.5 ms**; walking it and writing **791,640 bytes** of
+markup costs the other **~25 ms**. So of the three remedies this row names, the
+`module-level element hoisted out of the render` was implemented, measured, and
+**reverted**: it removes 100 % of the cost it targets and **4.4 %** of the cost
+that was measured (whole-hero `renderToStaticMarkup` median 26.82 → 25.65 ms,
+N=150, paired, output byte-identical at md5 `2bfe3db35755fea54fbc1710dcc72690`).
+
+⚠ **A `cached fragment` is unavailable here, and not for a reason that will
+change.** The field sits inside a `"use client"` `<svg>`, so nothing server-side
+can cache its output; the mechanism that would — pre-serialising it and emitting
+the string — needs `dangerouslySetInnerHTML`, which
+`tests/unit/art/art-layer-guards.test.ts:153-154` bans anywhere in the art layer.
+Passing the field in as a server-rendered child is possible but moves the
+artwork's completeness into the call site and breaks the ~20 `composition.test.tsx`
+guards that mount a bare `<WarliHero />` and assert what it draws.
+
+⛔ **AND THE SENTENCE THAT SAT HERE — *"the only lever that moves either the
+~25 ms or the 82 KB is FEWER ELEMENTS"* — WAS ALSO WRONG.** `@security-auditor`
+refuted it at WARLI-MOUNT and it is worth keeping the refutation visible, because
+it is the second time this row has been reasoned about correctly from a premise
+that was not checked. **The artwork is a pure constant** — no props beyond
+`className`, no request data, no clock, no RNG, all four asserted by
+`tests/unit/art/art-layer-guards.test.ts`. A constant does not have to be rendered
+per request at all. **Two levers exist that are NOT composition changes:**
+
+1. **Emit it as a static asset** — a build-time `public/*.svg` referenced by
+   `<img>`. Removes the per-request CPU entirely, removes the bytes after the
+   first fetch (immutable CDN + browser cache), and removes the hydration cost.
+   Costs: `currentColor` / `var(--color-ink)` theming must be baked, which is
+   cheap because the theme is single, dark, and `.dark` is descoped-inert; and
+   the pointer gesture dies — but it is **already dead**, see the WARLI-MOUNT
+   audit's LOW-3.
+2. **Make the segment PPR-eligible** so the artwork lands in the prerendered
+   shell. Blocked today by `export const instant = false` in
+   `src/app/(auth)/layout.tsx`, which is what produces the empty shell.
+
+⇒ **Fewer elements is one lever of three, and it is the only one that is a
+composition change.** Items 1–3 above still stand on their own merits; they are
+no longer the whole answer to this one.
+
+*The original text follows, unedited, because its measurements are sound and are
+the evidence for the correction above.* Measured by
 `@security-auditor` at WARLI-2: the shipped JS chunk is **12,994 B gzipped**, but
 the markup it produces is **82 KB gzipped — 6.4× the chunk** — plus ~35 ms of
 server CPU per render, and `WarliHero` is `"use client"`, so the 7,978-element
@@ -3203,16 +3333,92 @@ is 86.0 % of the drawing and **never changes** — it is a pure function of a fi
 seed — so it is a candidate for a static shell, a cached fragment, or a
 module-level element hoisted out of the render entirely.
 
-**Conditional trigger.** After go-live (2026-09-15), as in-window refinement; or
-immediately before any task that mounts the artwork, for item 4 alone.
+**5 · The composition's own clearance guarantee does not hold at most real
+viewports. ⚠ MINTED AT WARLI-MOUNT, from the first measurement ever taken of this
+piece in a browser at any width.**
+
+`hero.tsx` derives `R_INNER = 330` from the auth card's half-diagonal and states
+the consequence in its own docblock: *"this is what lets the card CLEAR the
+artwork instead of sitting on top of it. Shrink it and the corners of the sign-in
+card start eating figures."* **The mount renders the SVG `h-full w-full` over
+`fixed inset-0` with the default `xMidYMid meet`, so the ring scales with the
+viewport while the card — `max-w-md` less `px-4`, a fixed 416 px — does not.**
+
+⛔ **THE RING SHRINKS AND THE CARD DOES NOT, so the guarantee is a function of
+viewport size, and it fails below ≈ 1271 × 883.** Measured on the deployed
+preview, each width a pinned same-origin iframe. The card's worst corner sits a
+**constant 291.3 px** from the composition centre at every width — it is a
+fixed-size box — so clearance is simply `330 · scale > 291.3`, i.e.
+**scale ≥ 0.8827**:
+
+| viewport | scale | inner ring R | worst card corner | clears? | overlap |
+|---|---|---|---|---|---|
+| 1920 × 1080 | 1.0800 | 356.4 px | 291.3 px | ✅ | — |
+| 1440 × 900 | 0.9000 | 297.0 px | 291.3 px | ✅ | 5.7 px to spare |
+| **1512 × 860** (MacBook Pro 14″) | 0.8600 | 283.8 px | 291.3 px | ⛔ | **7.5 px** |
+| **1440 × 790** (a 1440×900 screen less browser chrome) | 0.7900 | 260.7 px | 291.3 px | ⛔ | **30.6 px** |
+| 1366 × 768 | 0.7680 | 253.4 px | 291.3 px | ⛔ | 37.9 px |
+| 1280 × 720 | 0.7200 | 237.6 px | 291.3 px | ⛔ | 53.7 px |
+| 768 × 1024 | 0.5333 | 176.0 px | 291.3 px | ⛔ | 115.3 px |
+| 390 × 844 | 0.2708 | 89.4 px | 271.4 px | ⛔ | 182.0 px |
+
+⚠ **A 1440 × 900 SCREEN FAILS**, even though the 1440 × 900 *viewport* passes with
+5.7 px to spare — browser chrome takes ~110 px of height and the row above it is
+the real one. **Compounding it by a further 31 px, measured:** the artwork centres
+on the viewport while the card centres in the space *below* the 62 px header, so
+the card sits 31 px low and the bottom corners bite first.
+
+**At 390 px it stops being an overlap and becomes an erasure.** The whole outer
+ring is 254.6 px across inside a 358 px card; a phone visitor sees a dark page, a
+card, and roughly a 20 px sliver of the left border band. It does not read as a
+small artwork — it reads as a rendering fault.
+
+⛔ **CROPPING IS NOT AVAILABLE, and this is the item that kills the obvious fix.**
+The obvious move is to crop the viewBox's side margins and let `meet` scale the
+rings up. **There are no side margins.** `svg.getBBox()` returns `0,0 1441×1000`
+at every width — the ink fills the frame edge to edge; the left and right border
+bands sit exactly on x = 0 and x = 1440; and **310 of the 462 placed marks live
+outside x ∈ [220, 1220]** (193 left, 117 right). Item 3's *"~250 units of spare
+width per side"* is spare **relative to the ring**, which is precisely the ground
+items 1 and 3 want to spend. Any crop deletes both side borders and two-thirds of
+the static field.
+
+⇒ **Every remaining fix is a composition change**, which is why this is an item
+here and was not shipped at the mount: a different frame aspect below some
+breakpoint, a smaller `RING_CLEAR` (forbidden by item 1's collision), a second
+composition for narrow viewports, or capping the SVG's rendered scale so the ring
+stops shrinking past the card. ⚠ **Devcon traffic will be mobile AND the desktop
+case already fails on a MacBook**, so this is the item most likely to matter
+first, despite being minted last.
+
+⚠⚠ **THE FIRST VERSION OF THIS ITEM UNDERSTATED IT, AND THE MISTAKE IS WORTH
+KEEPING VISIBLE.** It compared the OUTER ring's diameter against the card's WIDTH
+(846 px vs 416 px at 1440 × 900) and concluded the artwork cleared the card at
+every desktop width — filing this as a phone-only problem. **That was never the
+constraint.** `hero.tsx` states the real one and derives `R_INNER` from it: the
+INNER ring's radius against the card's HALF-DIAGONAL. Against the right pair the
+answer inverts at four of the eight viewports above. Caught by `@code-reviewer`,
+re-measured, corrected here. A guarantee is only checked by the comparison it was
+written as.
+
+**Conditional trigger.** After go-live (2026-09-15), as in-window refinement.
+⚠ The second clause — *"or immediately before any task that mounts the artwork,
+for item 4 alone"* — **has fired and is spent**: WARLI-MOUNT discharged item 4 in
+front of the mount, exactly as this trigger asked. Items 1–3 keep the first
+clause.
 
 **Expected next task.** None scheduled. Evidence:
 `src/components/art/warli/scene.ts` (`RING_CLEAR`, `admissible`, the `Extent`
 docblock recording the feet-vs-ink defect), `src/components/art/warli/primitives/border.tsx`
 (`BORDER_DEPTH` and the vertical-budget derivation in its docblock),
-`src/components/art/warli/field-layer.tsx` (`FieldLayer`, unmemoised),
-`docs/logs/WARLI-2.md` (the measurements), and the preview HTML staged at the
-WARLI-2 close-out.
+`src/components/art/warli/field-layer.tsx` (`FieldLayer`, **still unmemoised —
+that is the reverted Slice 1, not an oversight**), `docs/logs/WARLI-2.md` (the
+measurements), and the preview HTML staged at the WARLI-2 close-out.
+
+⚠ **For items 4 and 5, the evidence is `docs/logs/WARLI-MOUNT.md` and
+`docs/plans/WARLI-MOUNT.md`** — the build-vs-serialise split, the byte-identity
+proof, and the four-width geometry table were all measured there, on the deployed
+preview, and none of them exists anywhere in the WARLI-2 material above.
 
 ---
 
