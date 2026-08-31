@@ -7,8 +7,8 @@
  * `tsx` script.
  *
  * Usage:
- *   doppler run --project zugzwang-experiment --config stg -- \
- *     pnpm exec tsx scripts/rename-ycp01-artifact.ts
+ *   RENAME_YCP01_INTENT=<token> doppler run --project zugzwang-experiment \
+ *     --config stg -- pnpm exec tsx scripts/rename-ycp01-artifact.ts
  *
  * ⛔⛔ `renameArtifactNoun` IS THE ONLY PART THAT DECIDES WHAT CHANGES, AND IT
  * IS A NEGATIVE-LOOKAHEAD REGEX, NOT A PLAIN SUBSTRING REPLACE. YCP-01's
@@ -26,6 +26,19 @@
  * of "paper" there) — unlike the concatenated token "ycpaperclub", which has
  * no boundary at all and is skipped by the pattern itself. G6 tests both
  * cases and does not conflate them.
+ *
+ * ⚠⚠ GUARDED LIKE `lots-1-staging-wipe.ts`, AND FOR THE SAME REASON — this is
+ * a committed, re-runnable write against a live database, and "reads a
+ * STAGING-suffixed env var" is a convention, not a check: nothing stops
+ * `DATABASE_URL_STAGING` from being misconfigured to point at production.
+ * Guards, in order: intent token → target proof (staging ref present,
+ * production ref absent) → live connection → compare-and-swap UPDATE →
+ * read-back. Any failure exits non-zero before the next step; @code-reviewer
+ * flagged the absence of the first two, correctly — this run already
+ * committed successfully (verified: 1 row, occurrence-count parity held,
+ * read-back matched) before this hardening pass landed, so re-running is
+ * unnecessary and would in fact now abort on the no-op guard below (the row
+ * is already renamed).
  */
 import postgres from "postgres";
 
@@ -42,17 +55,47 @@ export function countPaperClub(text: string): number {
 }
 
 const SLUG = "yc-paper-club-response";
+const INTENT_TOKEN = "rename-ycp01-paper-to-pitch";
+const PRODUCTION_PROJECT_REF = "zbvprdcyxhlguxbostdj";
+const STAGING_PROJECT_REF = "rwfdoqzsghqhhdapxafg";
+
+function fail(message: string): never {
+	console.error(`\n⛔ REFUSED — ${message}\n`);
+	process.exit(1);
+}
 
 async function main() {
+	// ── GUARD 1 · intent ────────────────────────────────────────────────────
+	if (process.env.RENAME_YCP01_INTENT !== INTENT_TOKEN) {
+		fail(
+			`intent token absent. Set RENAME_YCP01_INTENT=${INTENT_TOKEN} to proceed.`,
+		);
+	}
+
+	// ── GUARD 2 · target proof ──────────────────────────────────────────────
 	const DATABASE_URL_STAGING = process.env.DATABASE_URL_STAGING;
 	if (!DATABASE_URL_STAGING) {
-		console.error("DATABASE_URL_STAGING not set");
-		process.exit(1);
+		fail(
+			"DATABASE_URL_STAGING is not set (run under `doppler run --config stg`).",
+		);
 	}
+	if (DATABASE_URL_STAGING.includes(PRODUCTION_PROJECT_REF)) {
+		fail(
+			"the target DSN contains the PRODUCTION project ref. Production is forbidden.",
+		);
+	}
+	if (!DATABASE_URL_STAGING.includes(STAGING_PROJECT_REF)) {
+		fail("the target DSN does not contain the STAGING project ref.");
+	}
+	console.log("✓ guard 1 — intent token present");
+	console.log("✓ guard 2 — target is staging; production ref absent");
+
 	const sql = postgres(DATABASE_URL_STAGING, { max: 1 });
 
 	try {
-		const before = await sql`
+		const before = await sql<
+			{ id: string; title: string; description: string | null }[]
+		>`
 			SELECT id, title, description FROM markets WHERE slug = ${SLUG}
 		`;
 		if (before.length !== 1) {
@@ -61,16 +104,20 @@ async function main() {
 			);
 		}
 		const row = before[0];
-		const oldTitle: string = row.title;
-		const oldDescription: string = row.description ?? "";
+		const oldTitle = row.title;
+		const oldDescription = row.description;
 
 		const newTitle = renameArtifactNoun(oldTitle);
-		const newDescription = renameArtifactNoun(oldDescription);
+		// ⚠ NULL stays NULL — `description` is nullable (src/db/schema/markets.ts,
+		// no `.notNull()`). Transforming only when non-null means a NULL row
+		// can never be coerced into an empty-string UPDATE by this script.
+		const newDescription =
+			oldDescription === null ? null : renameArtifactNoun(oldDescription);
 
 		const beforeCount =
-			countPaperClub(oldTitle) + countPaperClub(oldDescription);
+			countPaperClub(oldTitle) + countPaperClub(oldDescription ?? "");
 		const afterCount =
-			countPaperClub(newTitle) + countPaperClub(newDescription);
+			countPaperClub(newTitle) + countPaperClub(newDescription ?? "");
 
 		console.log("--- before ---");
 		console.log("title:", oldTitle);
@@ -92,17 +139,27 @@ async function main() {
 		}
 
 		await sql.begin(async (tx) => {
+			// ⚠⚠ COMPARE-AND-SWAP, NOT A BARE SLUG WHERE. Staging is under active
+			// participant write (a market's description is otherwise immutable
+			// post-launch, but this script doesn't assume that from outside) — the
+			// WHERE clause re-asserts the exact `oldTitle`/`oldDescription` this
+			// UPDATE was computed from, so a row that changed between the SELECT
+			// above and this statement fails the row-count check below and rolls
+			// back, rather than silently clobbering a concurrent write with values
+			// computed from data that's no longer there.
 			const result = await tx`
 				UPDATE markets
 				SET title = ${newTitle}, description = ${newDescription}
 				WHERE slug = ${SLUG}
+				  AND title = ${oldTitle}
+				  AND description IS NOT DISTINCT FROM ${oldDescription}
 			`;
 			if (result.count !== 1) {
 				throw new Error(
-					`UPDATE affected ${result.count} rows, expected exactly 1. Rolling back.`,
+					`UPDATE affected ${result.count} rows (expected exactly 1) — the row likely changed between read and write. Rolling back.`,
 				);
 			}
-			const after = await tx`
+			const after = await tx<{ title: string; description: string | null }[]>`
 				SELECT title, description FROM markets WHERE slug = ${SLUG}
 			`;
 			if (

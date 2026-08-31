@@ -64,7 +64,7 @@ const { refreshMock, routerMock } = vi.hoisted(() => {
 
 vi.mock("next/navigation", () => ({
 	useRouter: () => routerMock,
-	usePathname: () => "/m/mumbai-metro-line-3-1m-riders",
+	usePathname: () => "/m/bitcoin-price-50k",
 	useSearchParams: () => new URLSearchParams(),
 }));
 

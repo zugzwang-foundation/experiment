@@ -113,6 +113,24 @@ export function ResolverCards({
 			// floor's old 11px placeholder-bar assumption, which the floor's own
 			// `flex-1`-above-a-floor mechanism absorbs rather than clips (S4 confirms
 			// no clipping in the browser, since jsdom performs no layout).
+			// ⛔⛔ THE FLOOR REPLACES A `min-h-0` THAT SILENTLY DISABLED THE WHOLE
+			// SCROLL BACKSTOP — restored here after @code-reviewer caught it cut
+			// during BLOCK-1's docblock pass; the claim was never falsified, only
+			// trimmed by mistake. With `min-h-0` this row's flex base is `0%`, so
+			// its hypothetical main size is 0 and the STACK's content minimum is
+			// only its fixed children (~76px). `scrollHeight` could then never
+			// exceed `clientHeight` above a realistic viewport, making the stack's
+			// `overflow-y-auto` DEAD CODE: every shortfall was absorbed by this row
+			// shrinking, and each block clipped its own content with no scrollbar
+			// anywhere to reach it.
+			// ⚠ `mt-4` IS THE ONLY THING THAT ACTUALLY SHORTENS THE BLOCK. This row
+			// is `flex-1` inside a band of fixed height, so its height is WHAT IS
+			// LEFT OVER — shrinking the square makes the block emptier, never
+			// shorter; taking 16px above the row is the 16px the row no longer has
+			// (measured 111.99 → 95.99 at RESO-2 · CHANGE 4).
+			// ⚠ THE HEIGHT-CHAIN GUARD CANNOT SEE ANY OF THIS: `debate-height-chain.test.ts`
+			// scans `headzone`, `-left`, `-right`, `arena` and `column-scroll`, and
+			// this row is not a chain node — which is why the reasoning lives here.
 			className="mt-4 grid min-h-[84px] flex-1 grid-cols-4 gap-2"
 		>
 			{BLOCKS.map((b) => (

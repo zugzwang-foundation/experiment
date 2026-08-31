@@ -25,11 +25,21 @@
  * "fails loud at render time for a slug that cannot occur" is not a practical
  * gap, only a naming one.
  *
- * RESOLUTION reads "X" for the five markets resolved by watching a named X
- * account's activity, and names the same institution as RESOLVER for the
- * three markets whose evidentiary basis is a named institution's own data (a
- * festival's own report, a price index, a code host's own count) — verbatim
- * from the ratified register, not a typo normalized to "X" across the board.
+ * RESOLUTION names the resolving SURFACE, independently of RESOLVER — it is
+ * not a mirror of it. For five markets that surface is X (Zugzwang's own
+ * eventual resolution post, U-3), so RESOLUTION reads "X". For the other
+ * three the surface is the institution's own site (a festival's report, a
+ * price index, a code host's own count) — CoinMarketCap and Oktoberfest, and
+ * for `github-zugzwang-repo-stars` that surface is "GitHub", not "Zugzwang":
+ * RESOLUTION and RESOLVER genuinely differ on that row, which is why "mirror"
+ * is the wrong word for the rule even though it happens to describe two of
+ * the three cases. Values are verbatim from the ratified register, not a
+ * typo normalized to "X" across the board (@code-reviewer HIGH — flagged
+ * that RF-2's cell for `oktoberfest-munich-beer-volume` may intend the
+ * literal surface "oktoberfest.de" rather than the brand name "Oktoberfest";
+ * shipped as ratified-verbatim per the kickoff's explicit instruction not to
+ * paraphrase, flagged for operator confirmation in the run report rather
+ * than silently changed against a document this task didn't cite).
  * RESOLUTION's `href` is `null` on all eight today (U-3's eventual target —
  * Zugzwang's own X post per market — doesn't exist yet); the seam for wiring
  * it later is one value per market, right here, with zero component changes.

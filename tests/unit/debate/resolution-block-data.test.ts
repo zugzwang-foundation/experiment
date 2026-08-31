@@ -5,6 +5,7 @@ import {
 	isKnownMarketSlug,
 	RESOLUTION_BLOCKS,
 } from "@/components/debate/resolution-block-data";
+import stagingSnapshot from "../../../docs/data/staging-markets-snapshot.json";
 
 const KNOWN_SLUGS = [
 	"mumbai-bmc-pink-october-disclosure",
@@ -64,14 +65,55 @@ describe("resolution-block-data — G1, exhaustive + fails loud on an unknown sl
 			[...KNOWN_SLUGS].sort(),
 		);
 	});
+
+	it("resolution-block-data::map-slugs-match-the-committed-LIVE-staging-snapshot", () => {
+		// ⛔⛔ THE GUARD ABOVE IS NOT INDEPENDENT — @code-reviewer caught that it
+		// compares the map against a list HAND-COPIED into this same file, so a
+		// slug added to both moves together and the test still passes. This one
+		// compares against `docs/data/staging-markets-snapshot.json` instead —
+		// zero IO (the file is committed, refreshed by S1/S5 of this same
+		// branch), and it's the one comparison that can catch the case that can
+		// actually occur: a real ninth market landing in the live DB with no
+		// corresponding map entry.
+		const liveSlugs = stagingSnapshot.markets.map((m) => m.slug).sort();
+		expect(Object.keys(RESOLUTION_BLOCKS).sort()).toEqual(liveSlugs);
+	});
+
+	it("resolution-block-data::CLOSES-matches-the-LIVE-resolution_deadline-for-every-market", () => {
+		// ⛔⛔ CLOSES duplicates `markets.resolution_deadline` with no foreign-key
+		// or shared-source mechanism keeping the two in sync — this file's own
+		// docblock says a wrong value here "would tell a participant they can
+		// still trade for another month" (the Oktoberfest exception). This
+		// assertion is the sync mechanism: it fails the moment the map and the
+		// live column disagree, for any of the eight markets.
+		for (const market of stagingSnapshot.markets) {
+			const blocks = getResolutionBlocks(market.slug);
+			const deadline = new Date(market.resolution_deadline);
+			const expectedDate = deadline.toLocaleDateString("en-GB", {
+				day: "numeric",
+				month: "short",
+				year: "numeric",
+				timeZone: "UTC",
+			});
+			const expectedTime = `${deadline.getUTCHours().toString().padStart(2, "0")}:${deadline
+				.getUTCMinutes()
+				.toString()
+				.padStart(2, "0")}Z`;
+			expect(blocks.closes.line1).toBe(expectedDate);
+			expect(blocks.closes.line2).toBe(expectedTime);
+		}
+	});
 });
 
 /**
  * Content spot-check against the ratified register — doubles as regression
- * coverage for the whole map (RF-2), and specifically pins the two rows
- * whose RESOLUTION text intentionally diverges from the "X" pattern (see the
- * data file's own docblock) so a future "cleanup" can't silently normalize
- * them away.
+ * coverage for the whole map (RF-2), and specifically pins the THREE rows
+ * (oktoberfest, bitcoin, github) whose RESOLUTION text intentionally
+ * diverges from the "X" pattern (see the data file's own docblock) so a
+ * future "cleanup" can't silently normalize them away. An earlier version of
+ * this comment said "two rows" — @code-reviewer caught that github is a
+ * third, and the test two lines down was already correctly named
+ * `...-for-the-other-three`, so the miscount was in the prose, not the code.
  */
 describe("resolution-block-data — content matches the ratified register", () => {
 	it("resolution-block-data::RESOLUTION-is-X-for-the-five-account-watching-markets", () => {
