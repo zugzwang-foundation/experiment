@@ -3468,3 +3468,50 @@ operator's dashboard still shows PERF-1 as blocking, or does not yet reflect PER
 **Conditional trigger.** The next task touching either identity row's `Replies · N` cluster — `debate/ArgProfile.tsx` or `profile/ArgumentList.tsx` — OR any founder pass over head-cluster typography, OR the first Gate C that reads the two rows side by side and asks why they differ.
 
 **Expected next task.** A small `fix/` lane in `src/components/profile/`, taking `.repmeta`/`.repn`'s ratified 9.5px/13px onto the profile head, with the two height chains re-measured at 1440 before and after. ⛔ No mockup edit — both mockups already say 9.5/13; this is the build catching up to them, not a canon question.
+
+---
+
+## T4-1 — the bundle script's manifest parse assumes no `deploymentId`
+
+**Originating task:** HO-T4 (branch `feat/frontend-bundle-instrument`), found while
+verifying exit criterion 1 against a real build.
+
+`scripts/measure-frontend-bundle.ts::parseClientReferenceManifest` reads a
+`_client-reference-manifest.js` file with a single regex expecting one
+`globalThis.__RSC_MANIFEST["<route>"] = {...};` object-literal assignment,
+then `JSON.parse`s the captured group directly. Next's own internal reader
+for the same file (`next/dist/cli/internal/static-routes-info.js`) documents
+that Turbopack emits a **different, incremental** shape — `clientModules[k]
+= val;` assigned key-by-key in a `for` loop after the initial literal —
+**when a Vercel `deploymentId` is set** (skew-protection builds). Confirmed
+directly: a plain local build with no `deploymentId` writes the single-literal
+form the script expects; the incremental form was not reproduced here because
+this environment has no Vercel deployment context to set one.
+
+If this script is ever pointed at a `.next` directory produced by an actual
+Vercel build (rather than a local or CI one), the trailing `for`-loop content
+after the first `}` would either fail the regex's `$`-anchored capture
+outright (loud, safe — the script throws) or, if the file shape drifts again
+in some future Next version, could silently under-count a route's chunks
+(quiet, unsafe — the failure mode this row exists to head off). Currently
+loud-safe, not silently wrong; flagged before it has a chance to become the
+latter.
+
+**Conditional trigger.** Before this script — or its `--exclusive-to`
+flag — is ever run against a `.next` directory that did not come from a
+plain local or CI build (i.e., anything pulled from an actual Vercel
+deployment). Not a blocker for T4's own local/CI use.
+
+**Expected next task.** None scheduled. A one-line guard (assert no trailing
+non-whitespace after the matched object literal; throw naming the
+`deploymentId` case by name if one is found) would convert "silently wrong"
+into "loud and safe" permanently, at whoever next touches this script.
+
+Evidence: `scripts/measure-frontend-bundle.ts` (`parseClientReferenceManifest`),
+`node_modules/next/dist/cli/internal/static-routes-info.js` (the documented
+two formats, in its own docblock above `parseClientReferenceManifest`),
+and the HO-T4 session report's local-build confirmation — an operator-staged
+artifact held off-repo, named here rather than linked because it is NOT
+resolvable from this tree. The two citations above are.
+
+---

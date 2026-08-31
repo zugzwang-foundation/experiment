@@ -128,6 +128,16 @@ function findClientReferenceManifests(dir: string): string[] {
  * key is read verbatim from that assignment — never derived from the file's own
  * path — because Next already wrote it correctly and a path-based re-derivation
  * would just be a second, redundant place for the Windows separator bug to hide.
+ *
+ * ⚠ ASSUMES THE SINGLE-OBJECT-LITERAL FORM, NOT THE INCREMENTAL ONE. Next's own
+ * reader for this same file format (`next/dist/cli/internal/static-routes-info.js`)
+ * documents that Turbopack rewrites this into `clientModules[k] = val;` assigned
+ * key-by-key in a trailing `for` loop when a Vercel `deploymentId` is set — a shape
+ * this regex was never written to parse. Confirmed: a plain local/CI build (no
+ * `deploymentId`) writes the single-literal form below; the incremental form has
+ * NOT been reproduced here. docs/parked.md T4-1. If this ever throws on a `.next`
+ * directory pulled from an actual Vercel deployment, that mismatch is why — do not
+ * "fix" it by loosening the regex without reading that file's docblock first.
  */
 function parseClientReferenceManifest(path: string): {
 	routeKey: string;
