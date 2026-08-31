@@ -153,12 +153,22 @@ export function MarketPriceChart({
 	// advertising a live price at a coordinate carrying no line. The dots mark
 	// where the lines END, so they follow the lines.
 	//
-	// ⚠ The degenerate arm keeps `VIEWBOX_W` deliberately: `buildLine` draws that
-	// case as a full-width flat line, so the right edge genuinely is its end.
-	// Both arms answer the same question — "where does the drawn line stop?" —
-	// which is why they read the same condition `terminalYes` does.
+	// ⛔ THE DEGENERATE ARM USED TO KEEP `VIEWBOX_W`, AND IT HAD TO MOVE IN THE
+	// SAME COMMIT AS `buildLine`. Both answer one question — "where does the
+	// drawn line stop?" — so the moment D9 stopped the sparse flat line at its
+	// own instant, a dot still pinned to the right edge would hang in empty space
+	// attached to nothing. That is the identical defect the ≥2-point arm below
+	// was written to fix, and leaving this arm behind would have re-opened it for
+	// the one market shape nobody looks at.
+	//
+	// ⚠ WITH THAT ARM GONE THE CONDITION COLLAPSES ENTIRELY, and the collapse is
+	// the tell that the special case was never real: for a single-point series
+	// `series[series.length - 1]` IS `series[0]`, and a degenerate domain sends
+	// `xPx` to 0 by its own `endMs === startMs` guard. So one expression now
+	// covers every non-empty series. The empty case keeps `VIEWBOX_W` because
+	// nothing renders there — `terminalYes` is null and the markers are skipped.
 	const terminalX =
-		series.length === 0 || series.length < 2 || endMs === startMs
+		series.length === 0
 			? VIEWBOX_W
 			: xPx(series[series.length - 1].at, startMs, endMs);
 
@@ -451,11 +461,13 @@ function TerminalMarkers({
 	isOpen,
 }: {
 	yes: string;
-	/** Where the drawn line ENDS — `xPx` of the series' last point, or
-	 * `VIEWBOX_W` on the full-width degenerate line. ⛔ REQUIRED, NEVER
-	 * DEFAULTED: a default would be `VIEWBOX_W`, which is exactly the wrong
-	 * answer under the CHART-3 fixed axis and would be wrong SILENTLY, since a
-	 * dot at the right edge looks deliberate. */
+	/** Where the drawn line ENDS — `xPx` of the series' last point, in EVERY
+	 * non-empty case. ⚠ This used to read "or `VIEWBOX_W` on the full-width
+	 * degenerate line"; CHART-4 D9 stopped that line at its own instant, so
+	 * there is no longer a case where the line ends anywhere but its last point.
+	 * ⛔ REQUIRED, NEVER DEFAULTED: a default would be `VIEWBOX_W`, which is
+	 * exactly the wrong answer under the CHART-3 fixed axis and would be wrong
+	 * SILENTLY, since a dot at the right edge looks deliberate. */
 	cx: number;
 	isOpen: boolean;
 }): React.JSX.Element {
@@ -791,26 +803,42 @@ function CollapsedAxis({
 }
 
 /** An SVG `points` string for one line. With fewer than two points OR a
- * degenerate domain (`startMs === endMs`), draws a FULL-WIDTH FLAT LINE — the
- * value duplicated at x = 0 and x = VIEWBOX_W (the "duplicate at both ends"
- * trick the retired `PriceSparkline` also used — that component was DELETED at
- * CHART-1 when the hero moved onto this one, so read the name as history, not
- * as a live reference; SPEC.1 §9 "flat line at the opening price").
+ * degenerate domain (`startMs === endMs`), draws a FLAT LINE from the left edge
+ * to the series' own instant — the value at x = 0 and again at that point's x
+ * (a narrowing of the "duplicate at both ends" trick the retired
+ * `PriceSparkline` also used — that component was DELETED at CHART-1 when the
+ * hero moved onto this one, so read the name as history, not as a live
+ * reference; SPEC.1 §9 "flat line at the opening price").
  *
  * ⚠ SINCE CHART-3 THE SECOND CONDITION IS UNREACHABLE and the first is nearly
- * so, which changes what this branch means without changing what it does. The
- * domain is now a constant non-empty window, so `startMs === endMs` cannot
- * happen; and an `Open` market always gains `withLiveTail`'s point at `now`, so
- * a single-point series needs a **non-`Open` market that was never bet on**.
- * The branch is KEPT because SPEC.1 §9 *Sparse and terminal states* pins it —
- * "fewer than two points … renders a flat line at the opening price across the
- * domain; there is no empty state" — and CHART-3 did not amend that paragraph.
- * ⚠ Read after CHART-3, "across the domain" IS the fixed window, so the line
- * for that one case spans the whole experiment. That reading is the spec's own
- * and is deliberately not second-guessed here, but it is the one place where
- * the fixed axis and the "never draw into time that has not happened" rule
- * point in different directions, and it is flagged for a founder ruling rather
- * than silently resolved. */
+ * so. The domain is now a constant non-empty window, so `startMs === endMs`
+ * cannot happen; and an `Open` market always gains `withLiveTail`'s point at
+ * `now`, so a single-point series needs a **non-`Open` market that was never
+ * bet on**. The branch is KEPT because SPEC.1 §9 *Sparse and terminal states*
+ * pins it — "fewer than two points … renders a flat line at the opening price
+ * … there is no empty state".
+ *
+ * ⛔ THE RIGHT EDGE WAS `VIEWBOX_W` UNTIL CHART-4, AND THAT WAS A FALSE
+ * STATEMENT ON A FROZEN SURFACE. Read after CHART-3, "across the domain" is the
+ * fixed experiment window, so the one reachable case — a market that closed on
+ * Oct 1 having never been bet on — painted a price all the way out to the
+ * window end on Nov 5, five weeks past the instant it froze. CHART-3 shipped
+ * that unchanged and flagged it for a founder ruling rather than inventing a
+ * rendering; **the ruling came back the other way (CHART-4 D9)**: a market's
+ * series never extends past the later of its last event or, on an `Open`
+ * market, the present instant — never to the window end. So the right edge is
+ * now the point's own `xPx`, which is the same rule the ≥2-point branch below
+ * has always followed, rather than a special case beside it.
+ *
+ * ⚠ THE LEFT EDGE IS DELIBERATELY STILL `0` AND IS NOT WHAT D9 RULED. Anchoring
+ * it at the point's own x too would collapse the line to zero length and render
+ * nothing, which is the "empty state" §9 forbids in terms. It does mean the
+ * opening price is drawn from the window start up to the genesis instant, which
+ * is a mirror of the defect just removed and is smaller only because the market
+ * had no other price to show. It is left alone because D9 constrains where a
+ * series may END, and widening the fix past the ruling would be this session
+ * choosing a rendering no document specifies — the exact thing CHART-3 declined
+ * to do. Flagged for the web lane in the CHART-4 report. */
 function buildLine(
 	series: PricePoint[],
 	startMs: number,
@@ -822,7 +850,7 @@ function buildLine(
 	}
 	if (series.length < 2 || endMs === startMs) {
 		const y = yFn(series[0].yes);
-		return `0,${y} ${VIEWBOX_W},${y}`;
+		return `0,${y} ${xPx(series[0].at, startMs, endMs)},${y}`;
 	}
 	return series
 		.map((p) => `${xPx(p.at, startMs, endMs)},${yFn(p.yes)}`)

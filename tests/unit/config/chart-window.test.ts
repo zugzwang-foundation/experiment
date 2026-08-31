@@ -86,7 +86,10 @@ describe("chart-window::staging and preview share the fixture window", () => {
 		// render as a line crushed against the left edge — broken-looking in the
 		// exact surface used to review a chart change.
 		const STG_START = "2026-08-21T00:00:00.000Z";
-		const STG_END = "2026-09-10T23:45:00.000Z";
+		// ⚠ CHART-4 D11 — was 2026-09-10T23:45Z, now production's own end. The
+		// start is still staging's (measured from its earliest bet), so the two
+		// windows share an end and differ only in where they begin.
+		const STG_END = "2026-11-05T23:45:00.000Z";
 
 		for (const env of ["staging", "preview"]) {
 			const w = resolveChartWindow(env);
@@ -159,18 +162,27 @@ describe("chart-window::staging and preview share the fixture window", () => {
 		// ⛔ THIS TEST IS A DATE-DEPENDENT ALARM, ON PURPOSE, AND IT IS THE ONLY
 		// MECHANISM BEHIND AN OWED THAT IS OTHERWISE PROSE IN THREE PLACES.
 		//
-		// `STAGING_CHART_WINDOW.end` is 2026-09-10T23:45Z. Staging's markets are
-		// permanently `Open`, so `withLiveTail` keeps appending a point at `now`.
-		// The moment `now` passes that constant, every staging chart's live tail —
-		// and BOTH terminal dots and BOTH pulses, which follow the series — leave
-		// the canvas, while the HTML gutter keeps rendering `YES`/`NO` naming
-		// marks that are not drawn. Nothing else on disk fires on that date.
+		// `STAGING_CHART_WINDOW.end` is 2026-11-05T23:45Z since CHART-4 D11 (it
+		// was 2026-09-10T23:45Z, which this alarm was about to catch). Staging's
+		// markets are permanently `Open`, so `withLiveTail` keeps appending a
+		// point at `now`. The moment `now` passes that constant, every staging
+		// chart's live tail — and BOTH terminal dots and BOTH pulses, which follow
+		// the series — leave the canvas, while the HTML gutter keeps rendering
+		// `YES`/`NO` naming marks that are not drawn. Nothing else on disk fires
+		// on that date.
 		//
 		// ⚠ A time-dependent test is normally a defect. Here the CONSTANT is the
 		// thing that expires, so a guard that cannot see the calendar cannot see
 		// the failure. It fails loudly, with instructions, which is the whole
-		// point: the alternative already exists — three docblocks saying "owed
-		// before 2026-09-10" — and it is what silent decay looks like.
+		// point: the alternative already exists — docblocks saying "owed before
+		// <date>" — and it is what silent decay looks like.
+		//
+		// ⛔ D11 MOVED THE DATE AND DELIBERATELY DID NOT RETIRE THE ALARM. Extending
+		// the constant postpones the failure; it does not remove it, and the new
+		// end is the same instant production's axis ends, so the day it fires is
+		// the day the experiment concludes rather than a quiet Thursday in
+		// September. The alarm reads the constant rather than a literal, so it
+		// moved with it and needs no edit next time either.
 		const stagingEnd = Date.parse(resolveChartWindow("staging").end);
 		expect(
 			Date.now(),

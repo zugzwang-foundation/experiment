@@ -266,25 +266,34 @@ const PRODUCTION_CHART_WINDOW: ChartWindow = {
  * canvas and nothing reports it. The latest `bet.placed` at that reading was
  * `2026-08-29T16:26:57.144Z`, comfortably inside `end`.
  *
- * ⛔ `end` EXPIRES ON 2026-09-10, AND THE CONSEQUENCE IS LARGER THAN "THE LINE
- * LOOKS SHORT" — this docblock said that and understated it. After that instant
- * `withLiveTail` appends a point at `now` beyond the axis, so `xPx` returns a
- * coordinate past `VIEWBOX_W` and the viewBox clips it. What is clipped is not
- * only the line's last segment: `terminalX` follows the series, so **both
- * terminal dots and both pulses leave the canvas entirely**, while
- * `TerminalLabels` — HTML in a gutter, outside the SVG — keeps rendering. The
- * result on every `Open` staging market is two colour-coded words naming two
- * marks that are not drawn.
+ * ⛔ `end` USED TO EXPIRE ON 2026-09-10, AND THE CONSEQUENCE WAS LARGER THAN
+ * "THE LINE LOOKS SHORT". After that instant `withLiveTail` appends a point at
+ * `now` beyond the axis, so `xPx` returns a coordinate past `VIEWBOX_W` and the
+ * viewBox clips it. What is clipped is not only the line's last segment:
+ * `terminalX` follows the series, so **both terminal dots and both pulses leave
+ * the canvas entirely**, while `TerminalLabels` — HTML in a gutter, outside the
+ * SVG — keeps rendering. The result on every `Open` staging market would be two
+ * colour-coded words naming two marks that are not drawn.
  *
  * The clip itself is deliberate: drawing the point AT the edge instead would put
  * the live price at an instant it did not happen, which this codebase rejects on
  * principle (`price-series.ts` `withLiveTail`, `price-chart.ts`
  * `deriveMarketPriceChart`). ⇒ **The fix is to move this value, never to clamp
- * the geometry**, and it is owed before 2026-09-10.
+ * the geometry** — and CHART-4 D11 moved it, to production's own
+ * `2026-11-05T23:45:00Z`, on founder ruling. Staging outlives 10 September, and
+ * an end date chosen to sit just past the fixtures was a value with a shelf life
+ * measured in days on an environment that is used every day.
+ *
+ * ⚠ THE EXPIRY ALARM IS KEPT ON PURPOSE, and it is the load-bearing half of this
+ * docblock rather than a leftover. The failure mode above is not repaired by the
+ * new value — it is only postponed, and it will fire again the moment `now`
+ * passes the new `end`. It is silent when it fires: nothing errors, the page
+ * renders, and the only symptom is two labels pointing at marks that are not
+ * there. A reader arriving in November needs the mechanism, not just the date.
  */
 const STAGING_CHART_WINDOW: ChartWindow = {
 	start: "2026-08-21T00:00:00.000Z",
-	end: "2026-09-10T23:45:00.000Z",
+	end: "2026-11-05T23:45:00.000Z",
 };
 
 /**

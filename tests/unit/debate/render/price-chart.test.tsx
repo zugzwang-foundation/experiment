@@ -34,7 +34,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // Render tests key on data-testid + structural attributes, NEVER on copy strings
 // (plan §6 / OQ-7). Prices cross as decimal STRINGS (CLAUDE.md §2).
 
-import { VIEWBOX_W } from "@/components/debate/chart/geometry";
+import { VIEWBOX_W, xPx } from "@/components/debate/chart/geometry";
 import { MarketPriceChart } from "@/components/debate/chart/MarketPriceChart";
 import { MarketPriceChartCard } from "@/components/debate/chart/MarketPriceChartCard";
 import { MarketHeader } from "@/components/debate/MarketHeader";
@@ -67,9 +67,28 @@ const SUMMARY_SERIES: PricePoint[] = [
 	{ at: "2026-09-20T00:00:00.000Z", yes: "0.800000000000000000" },
 ];
 
-// The unbet market: one seed point → the chart renders a full-width flat line.
+// The unbet market: one seed point → the chart renders a flat line at the
+// opening price. Its instant IS `MARKET_CHART_WINDOW_START`, so it maps to
+// x = 0.
 const SINGLE: PricePoint[] = [
 	{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
+];
+
+/**
+ * ⛔ THE SAME UNBET MARKET, BUT SEEDED STRICTLY INSIDE THE WINDOW, AND IT EXISTS
+ * BECAUSE `SINGLE` CANNOT DISCRIMINATE THE D9 RULING. `SINGLE`'s only point sits
+ * exactly on `MARKET_CHART_WINDOW_START`, so `xPx` returns 0 for it — and a
+ * guard asserting "the flat line stops at the point's own x, not at the window
+ * end" written against `SINGLE` would compare 0 against 0 and pass whether the
+ * fix is present or reverted. That is the shape of a control that cannot fire.
+ *
+ * This point is 2026-10-01, sixteen days into a ~52-day production window, so
+ * its x is strictly between 0 and `VIEWBOX_W` and the two answers — "ends at its
+ * own instant" and "ends at the axis end" — are different numbers. It is the
+ * same reason `INTERIOR` exists for the axis-label guards, one ruling later.
+ */
+const SINGLE_INTERIOR: PricePoint[] = [
+	{ at: "2026-10-01T00:00:00.000Z", yes: "0.500000000000000000" },
 ];
 
 /**
@@ -652,41 +671,69 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		}
 	});
 
-	it("terminal-dots-DO-sit-at-the-axis-end-on-the-full-width-flat-line", () => {
-		// The other arm, and the reason the fix is a condition rather than a
-		// blanket move: `buildLine` draws a single-point series as a full-width
-		// flat line, so for that case the right edge genuinely IS where the line
-		// ends. A fix that moved the dots unconditionally would detach them here
-		// instead — the same defect, mirrored.
+	it("a-SPARSE-series-never-reaches-the-window-end", () => {
+		// ⛔ THE D9 GUARD (CHART-4). The ruling arrived the way the CHART-3 version
+		// of this test said it might: it pinned the full-width flat line, recorded
+		// that `@code-reviewer` had established the behaviour was owed a founder
+		// ruling, and closed with "**If that ruling comes back the other way, this
+		// test is expected to change with it.**" It came back the other way, and
+		// this is that change.
 		//
-		// ⛔ THIS GUARD PINS THE CURRENT BEHAVIOUR; IT DOES NOT ENDORSE IT, and the
-		// distinction is load-bearing. `@code-reviewer` established at the CHART-3
-		// cascade that the full-width flat line is itself owed a founder ruling:
-		// the ONLY reachable route to a single-point series is a NON-`Open` market
-		// with zero bets (an `Open` one always gains `withLiveTail`'s point at
-		// `now`), and for that market SPEC.1 §9 says in the very next sentence that
-		// "the domain ends at the last event and never advances (**INV-4**)". So a
-		// market that closed on Oct 1 currently paints a price out to Nov 5, which
-		// is the thing `price-chart-series-never-drawn-beyond-now` forbids two
-		// tests up. CHART-3 shipped the existing behaviour because changing it
-		// means inventing a rendering §9 does not specify — recorded as
-		// DELIBERATELY UNAMENDED in the §20 row. ⇒ **If that ruling comes back the
-		// other way, this test is expected to change with it.**
+		// THE DEFECT: the ONLY reachable route to a single-point series is a
+		// NON-`Open` market with zero bets (an `Open` one always gains
+		// `withLiveTail`'s point at `now`). `buildLine` drew that as a line from
+		// x = 0 to x = VIEWBOX_W — so a market that closed on Oct 1 painted a price
+		// all the way out to Nov 5, five weeks past the instant it froze. That is a
+		// false statement on a frozen surface, it runs at **INV-4**, and it is the
+		// thing `price-chart-series-never-drawn-beyond-now` forbids two tests up.
+		//
+		// ⚠ THE FIXTURE IS `SINGLE_INTERIOR`, NOT `SINGLE`, AND THAT IS THE WHOLE
+		// DIFFERENCE BETWEEN A GUARD AND A DECORATION. `SINGLE`'s point sits on
+		// `MARKET_CHART_WINDOW_START`, so its `xPx` is 0 and "stops at its own
+		// instant" and "stops at the axis end" would be 0 vs 640 — but the FIRST
+		// endpoint is also 0, so a reverted fix still puts a 0 in the string and a
+		// carelessly-written assertion passes. See `SINGLE_INTERIOR`'s docblock.
 		const { container } = render(
-			<MarketPriceChart series={SINGLE} mode="collapsed" isOpen={true} />,
+			<MarketPriceChart
+				series={SINGLE_INTERIOR}
+				mode="collapsed"
+				isOpen={true}
+			/>,
 		);
-		const points = container
-			.querySelector('[data-testid="line-yes"]')
-			?.getAttribute("points");
-		expect(points).toContain(`${VIEWBOX_W},`);
+		const pts = parsePoints(
+			container
+				.querySelector('[data-testid="line-yes"]')
+				?.getAttribute("points") ?? "",
+		);
+		const expectedEnd = xPx(
+			SINGLE_INTERIOR[0].at,
+			Date.parse(MARKET_CHART_WINDOW_START),
+			Date.parse(MARKET_CHART_WINDOW_END),
+		);
 
+		// NON-VACUITY, and it is what makes the assertion below able to fail: the
+		// point's own x must be a genuinely different number from both the left
+		// edge and the axis end. If this ever stops holding, the fixture has
+		// drifted onto a window endpoint and the guard has quietly stopped testing.
+		expect(pts.length).toBe(2);
+		expect(expectedEnd).toBeGreaterThan(0);
+		expect(expectedEnd).toBeLessThan(VIEWBOX_W);
+
+		// THE ASSERTION — the line stops at the market's own last event.
+		expect(pts[1][0]).toBe(expectedEnd);
+		expect(pts[1][0]).not.toBe(VIEWBOX_W);
+
+		// And the terminal dot follows it. `buildLine` and `terminalX` answer one
+		// question, so a fix to only one of them leaves the dot hanging in empty
+		// space — the identical defect `terminal-dots-sit-at-the-LINE-end` exists
+		// to catch, mirrored onto the shape nobody looks at.
 		expect(
 			Number(
 				container
 					.querySelector('[data-testid="terminal-dot-yes"]')
 					?.getAttribute("cx"),
 			),
-		).toBe(VIEWBOX_W);
+		).toBe(expectedEnd);
 	});
 
 	it("collapsed-renders-NO-axis-on-a-degenerate-domain", () => {
@@ -812,8 +859,16 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		).toBe("true");
 	});
 
-	// ── 3. Single-point (unbet) → a full-width flat line at the opening price ───
+	// ── 3. Single-point (unbet) → a flat line at the opening price ──────────────
 	it("flat-line-when-single-point", () => {
+		// ⚠ THIS TEST KEEPS ITS NAME AND LOSES ITS FULL-WIDTH ASSERTION (CHART-4
+		// D9). What it exists to pin is that a one-point series still renders a
+		// LINE and that the line is FLAT — "there is no empty state", SPEC.1 §9 —
+		// and both of those survive the ruling untouched. The right EDGE is the
+		// part D9 moved, and it is asserted by
+		// `a-SPARSE-series-never-reaches-the-window-end` rather than here, on the
+		// interior fixture that can actually discriminate it: `SINGLE` sits on the
+		// window start, so this test could only ever have compared 0 with 0.
 		render(
 			<MarketPriceChartCard series={SINGLE} onExpand={vi.fn()} isOpen={true} />,
 		);
@@ -824,13 +879,15 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		// Both endpoints present (the "duplicate at both ends" flat-line trick).
 		expect(pts.length).toBeGreaterThanOrEqual(2);
 		const first = pts[0];
-		const last = pts[pts.length - 1];
-		// Full width — spans the domain from x = 0 to x = VIEWBOX_W.
-		expect(first[0]).toBeCloseTo(0, 3);
-		expect(last[0]).toBeCloseTo(VIEWBOX_W, 3);
 		// Flat — every point sits at the SAME y (the opening price), no slope.
 		for (const [, y] of pts) {
 			expect(y).toBeCloseTo(first[1], 3);
+		}
+		// Bounded by the axis in both directions — the line is drawn, and it is
+		// drawn on the canvas. It no longer spans the whole of it.
+		for (const [x] of pts) {
+			expect(x).toBeGreaterThanOrEqual(0);
+			expect(x).toBeLessThanOrEqual(VIEWBOX_W);
 		}
 	});
 
