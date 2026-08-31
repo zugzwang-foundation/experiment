@@ -3,14 +3,20 @@
 import { Button } from "@/components/ui/button";
 
 /**
- * UI-QUICK — the `Know more` control. ONE implementation, now FOUR mounts:
- * the resolution criterion (`ResolutionCriterion`), the post card (`PostCard`),
- * the focused post (`PostFocusHeader`) and the reply card (`ReplyCard`). The
- * affordance the reader learns is the same object in all four, which is the
- * whole point of hoisting it out of any one of them.
+ * UI-QUICK — the `Know more` control. ONE implementation, now THREE live mounts:
+ * the post card (`PostCard`), the focused post (`PostFocusHeader`) and the reply
+ * card (`ReplyCard`). The affordance the reader learns is the same object in all
+ * three, which is the whole point of hoisting it out of any one of them.
+ *
+ * ⚠ THIS SAID "FOUR" AND NAMED `ResolutionCriterion` FIRST, until the
+ * main→staging merge left that component with zero importers (see
+ * `dialogs.tsx`). The count is corrected rather than the name merely struck,
+ * because the sentences below reason FROM it — "the same object in all four"
+ * and the frame breakdown were both arithmetic on a mount that is no longer
+ * mounted. Restore the fourth here if and when the criterion regains a surface.
  *
  * ⚠⚠ EVERY MOUNT NOW OPENS A DIALOG, so `aria-haspopup="dialog"` is declared
- * HERE rather than at four call sites. The component briefly carried an
+ * HERE rather than at each call site. The component briefly carried an
  * `expanded` prop for the criterion's in-place toggle; ruling R3 = c made that
  * mount a dialog too, which left `aria-expanded` describing a state no mount
  * has. It is removed rather than left dangling — an ARIA attribute that does not

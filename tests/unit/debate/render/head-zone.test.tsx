@@ -51,13 +51,6 @@ import type {
 
 afterEach(cleanup);
 
-/**
- * §D — `MarketHeader.criterion` is REQUIRED, so the resolution dialog cannot be
- * mounted without something watching it. These render tests do not exercise the
- * freeze (that is `debate-view-freeze.test.tsx`'s subject), so they pass a closed,
- * inert pair — present enough to compile, never asserted on here.
- */
-
 const ROOT = process.cwd();
 const VIEW = "src/components/debate/DebateView.tsx";
 const readSource = (rel: string) => readFileSync(join(ROOT, rel), "utf8");

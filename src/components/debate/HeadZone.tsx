@@ -104,6 +104,29 @@ export function HeadZone({
 			// empty placeholder chrome docketed for removal before the DP.2 promote
 			// (`docs/parked.md` HTML-FINISH-MD-PLACEHOLDERS), so nothing a
 			// participant can read is being cut.
+			//
+			// ⛔⛔ EVERYTHING ABOVE IS CONTESTED AT HEAD AND MUST NOT BE READ AS LIVE
+			// DOCTRINE — RECONCILE-1 OWED-4, awaiting a founder ruling. The
+			// main→staging merge took `main`'s components alongside this block, and
+			// they DO two of the three things it rules out:
+			//   · `MarketHeader.tsx` — the `headzone-stack` carries `overflow-y-auto`,
+			//     the exact class bullet 1 says "cannot come back here".
+			//   · `ResolverCards.tsx` — carries a `min-h-[84px]` floor, which bullet 2
+			//     says would "contradict" the `min-h-0` pin; its own comment calls the
+			//     previous `min-h-0` a defect that silently disabled the scroll
+			//     backstop. The two rulings are in direct opposition.
+			// Also stale by consequence: the row renders FOUR blocks, not "both
+			// cards", and per `ResolverCards.tsx` the stack SCROLLS rather than clips.
+			// ⚠ And the arithmetic above ("3.64px", "29.14px") was measured against a
+			// stack that still contained staging's `ResolutionCriterion` block, which
+			// this merge removed — the numbers no longer describe the tree they
+			// annotate.
+			// ⛔ NEITHER SUITE CAN SEE ANY OF THIS: jsdom performs no layout, and the
+			// height chain scans only `headzone`, `-left`, `-right`, `arena` and
+			// `column-scroll`. Green here proves nothing about the conflict.
+			// ⇒ The prose is marked rather than rewritten, because choosing which
+			// ruling governs is a founder call and a merge is not the place to make
+			// it. When it is ruled, correct THIS block in place (O-5).
 			data-testid="headzone"
 			className="flex min-h-0 shrink-0 basis-[24.2dvh] flex-col gap-5 overflow-hidden lg:flex-row"
 		>

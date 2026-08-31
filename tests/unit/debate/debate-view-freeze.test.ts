@@ -69,6 +69,19 @@ describe("the sub-view freeze — every sub-view stops the carousel", () => {
 		// ⛔ THE ASSERTION THIS FILE EXISTS FOR. Remove `criterionOpen` from the
 		// predicate and this goes red — which is the failure that was observed
 		// before this guard was trusted.
+		//
+		// ⚠⚠ THIS CASE IS CURRENTLY VACUOUS, AND SAYING SO IS THE POINT. Since the
+		// main→staging merge nothing calls `setCriterionOpen` (see the
+		// `biome-ignore` on its declaration in `DebateView.tsx`), so `criterionOpen`
+		// is a constant `false` and its term in `frozen` can never change the
+		// predicate's value. What this pins today is the EXISTENCE of the wire, not
+		// the behaviour — it can fail on a cleanup and cannot fail on the defect.
+		// ⇒ It is kept rather than deleted because the wire is what makes
+		// re-attaching a criterion trigger cheap, and deleting the guard is how the
+		// §D defect returns unnoticed. **It stops being vacuous the moment a trigger
+		// exists — RECONCILE-1 OWED-2, which is also when the handoff assertion
+		// removed by that merge should be restored alongside it.** Do not read this
+		// case, or the ownership case below, as live cover until then.
 		expect(expr.includes("criterionOpen")).toBe(true);
 	});
 

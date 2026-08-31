@@ -238,15 +238,27 @@ export function ReplyPopup({
  * ⛔⛔ DORMANT BY FOUNDER RULING (change set 4 §B) — NOTHING OPENS THIS TODAY,
  * AND IT IS DELIBERATELY KEPT. The `Know more` trigger was removed from the
  * resolution zone because that treatment is being redesigned; this component,
- * its call site in `ResolutionCriterion`, the required `criterion` prop on
- * `MarketHeader`, the lifted `criterionOpen` state in `DebateView` and its term
- * in the `frozen` predicate are ALL held intact for that redesign.
- * ⚠ It has no reachable caller, so every signal a reader has — no trigger, a
- * permanently-`null` `description`, coverage that never enters — says "dead
- * code, delete it". It is not. Re-attaching a trigger is one line; deleting any
- * link in that chain first turns it back into a day's work AND re-opens the §D
- * freeze defect, where the dialog opened while the carousel kept advancing
- * behind it.
+ * the lifted `criterionOpen` state in `DebateView` and its term in the `frozen`
+ * predicate are held intact for that redesign.
+ *
+ * ⚠⚠ TWO LINKS OF THAT CHAIN WERE SEVERED AT THE main→staging MERGE, and this
+ * sentence used to claim all five were "ALL held intact". They are not, and a
+ * chain list that overstates itself is worse than none — it is the one thing
+ * standing between this component and a correct-looking deletion, so it has to
+ * be true. **The `criterion` prop on `MarketHeader` no longer exists** (the
+ * merge took RESO-1/RESO-3's header, which has none), and **the call site in
+ * `ResolutionCriterion` is unreachable** — that component now has zero
+ * importers anywhere in `src/` or `tests/`.
+ * ⇒ **Whether the criterion should have an on-page presence at all is an open
+ * product question, not a settled one** (RECONCILE-1 OWED-3): on `26dc484` the
+ * body rendered in the DOM behind a one-line clamp and staging's own guard
+ * asserted it; `main`'s replacement asserts the opposite. Re-attaching a trigger
+ * is no longer one line, and the honest estimate is a prop plus a mount.
+ *
+ * ⚠ It still has no reachable caller, so every signal a reader has — no trigger,
+ * a permanently-`null` `description`, coverage that never enters — says "dead
+ * code, delete it". Deleting it re-opens the §D freeze defect, where the dialog
+ * opened while the carousel kept advancing behind it.
  *
  * UI-QUICK change set 2 item 1 (ruling R3 = c) — the RESOLUTION CRITERION
  * pop-up, opened by `Know more` under the one-line clamp.

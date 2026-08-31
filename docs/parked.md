@@ -76,6 +76,17 @@ must move with the fix. Expect it to red. That is not a regression** — it is
 `V-18` (a reconstruction does not merely omit, it can assert), and this row is
 one of that rule's two founding instances.
 
+⛔ **THAT CITATION IS BLOCKED, NOT BROKEN — `V-18` DOES NOT EXIST AT HEAD.**
+RECONCILE-1 found the two lanes had minted colliding V-numbers and refused to
+arbitrate them (**OWED-1**), restoring `main`'s register unchanged; its
+high-water is `V-17`. So this row's authority is currently unreachable. ⚠ **The
+danger is not the dangling number, it is the two that resolve.** `main`'s `V-16`
+and `V-17` are *different rules* from the staging-lane `V-16`/`V-17` this row was
+written beside, so a staging-lane citation of either now silently returns the
+wrong lesson and reads as fine. **The rule this row relies on is unchanged and
+still true — only its NUMBER is pending.** Read it by its words, not its number,
+until the founder rules OWED-1.
+
 **Trigger:** armed; next `SlotHeader.tsx` touch, or sooner if founder-ruled.
 **Estimate:** one session.
 **Canon:** `design-canon.md` §2's composer-open exception names this component
