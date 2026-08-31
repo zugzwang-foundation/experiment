@@ -69,6 +69,16 @@ import { getInitialPollPhaseOffsetMs } from "./poll-phase";
  * `hasStartedOnce` gates this to that one first arm: a RESUME from suspension
  * re-enters this effect too (`suspended` is a dependency) and must keep firing
  * its immediate resume-refresh un-jittered, exactly as ratified above.
+ *
+ * That same flag is CONSUMED BY STRICTMODE'S FIRST MOUNT PASS — React
+ * double-invokes mount effects in development only, so the first pass sets
+ * `hasStartedOnce` and is then torn down, the surviving pass therefore takes the
+ * un-jittered `setInterval` below, and the jitter is INERT under `next dev`
+ * while remaining LIVE in production; that is expected rather than a defect, and
+ * is left alone deliberately (HARDEN.6 owns any change — setting the flag inside
+ * the `setTimeout` callback would restore dev jitter, but would also let a
+ * composer opened during the offset window re-enter the jittered branch on
+ * resume, changing the ratified resume semantics above).
  */
 export function DebatePoll({
 	marketOpen,
