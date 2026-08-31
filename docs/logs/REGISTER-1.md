@@ -1,22 +1,24 @@
 # REGISTER-1 · session log
 
-**Task:** REGISTER-1 + REGISTER-1.A + REGISTER-1.B — five registers repaired in one PR.
+**Task:** REGISTER-1 + REGISTER-1.A + REGISTER-1.B + REGISTER-1.C — five registers repaired in one PR.
 **Briefs (all web Claude, 2026-08-31):** `ZUGZWANG_REGISTER-1_authoring-brief_v1_0.md`;
 `ZUGZWANG_REGISTER-1A_amendment-brief_v1_0.md`, which rules on the first run's
-findings; and `ZUGZWANG_REGISTER-1B_final-pass_v1_0.md`, which rules on the
-second's and closes the POLISH-0 §0 collision.
+findings; `ZUGZWANG_REGISTER-1B_final-pass_v1_0.md`, which rules on the second's
+and closes the POLISH-0 §0 collision; and `REGISTER-1.C`, which censuses POLISH-0's
+remaining version statements, retires the header's, and stops on the footer's format.
 **Run reports:** `zz_REGISTER-1_run_2026-08-31T1328.md` (541 lines, md5
 `b7215c06fbc87950197d8ef5086d1e66`) · `zz_REGISTER-1A_run_2026-08-31T1402.md`
 (385 lines, md5 `7f8e7c3863cb3dad85a7ad3f85cbee03`) ·
-`zz_REGISTER-1B_run_2026-08-31T1424.md`.
-**Baseline:** `origin/main` = `940cdcb`, measured at the start of all three passes.
+`zz_REGISTER-1B_run_2026-08-31T1424.md` (291 lines, md5 `908e41b8e05a4fb0b5ac150548739ba9`) ·
+`zz_REGISTER-1C_run_2026-08-31T1444.md`.
+**Baseline:** `origin/main` = `940cdcb`, measured at the start of all four passes.
 **Branch:** `chore/register-1` · **PR:** #446, against `main`.
 
 ---
 
 ## 1 · What landed
 
-One PR, three commits, seven repairs. Every one is the same defect seen in a
+One PR, four commits, eight repairs. Every one is the same defect seen in a
 different register.
 
 | # | File(s) | Repair |
@@ -28,6 +30,7 @@ different register.
 | 5 | `CLAUDE.md` §8 | `O-15` minted; sharpened at REGISTER-1.B with the union-vs-discard clause |
 | 6 | `docs/specs/SPEC.2.md` line 3 | the self-contradicting `1.0.24` removed — the line now carries no version at all |
 | 7 | `docs/polish/POLISH-0_data-manifest.md` §0 | RPLY-CLOSE's dropped `v1.10` block (J1–J5) **restored byte-for-byte** from `26dc484`; WARLI-CLOSE-2's block renumbered `v1.10`→`v1.11`; `v1.12` minted *(REGISTER-1.B)* |
+| 8 | `docs/polish/POLISH-0_data-manifest.md` header | the `Status:` line stops carrying a version and a supersession claim — the same repair `SPEC.2` line 3 got at REGISTER-1 *(REGISTER-1.C)* |
 
 ### Why
 
@@ -188,6 +191,51 @@ that clause having been spliced into the middle of `v1.6`'s parenthetical
 (`POLISH.7a ( · **v1.10 … row)**.**V-7 and V-8 minted**;`). There is no clean text
 to copy. A repair that *looks* done is the failure mode this whole task documents.
 
+### 2.9 · REGISTER-1.C — the census the earlier passes never ran, and one STOP
+
+**The census came first this time, and that is the whole point of the pass.**
+POLISH-0 states its own version, lineage or high-water in **five** places, not the
+two REGISTER-1.B found by reading:
+
+| site | states | after this pass |
+|---|---|---|
+| header, line 4 | own version + *"Supersedes v1.9"* | ✅ **retired** — carries neither |
+| §0's eleven `### vN.N` headings | the lineage itself | ✅ ceiling `v1.12` |
+| §5 *"canonical home of V-1…V-21"* | V-space extent | ✅ |
+| §5's high-water pointer, `V-21` | V-space high-water | ✅ |
+| footer version log, line 291 | the whole lineage again | ⛔ **still stale — see §3.3** |
+
+⚠ **The brief's own second search pattern could not find one of them.** It greps
+`high-water`, and the pointer line reads `**High-water read off this register at
+head:`. Case-sensitive, so it missed the site the pattern was named for. Found by
+re-running with `-i`, and recorded because a census that misses a site is the
+defect this task exists to repair, one layer up.
+
+**The header's tail was preserved byte-for-byte** — 322 characters before and
+after, asserted, not assumed.
+
+### 2.10 · REGISTER-1.C STOPPED on the footer, by its own gate
+
+§3 said: print the footer, and if its format differs from `vN.N YYYY-MM-DD from
+LANE (**…**)` separated by ` · `, **STOP and report — do not adapt.** It differs,
+in two ways that would each have produced a wrong edit:
+
+1. **A lane name contains the separator.** `v1.8 2026-08-17 from HTML-FINISH ·
+   MARKET DETAIL Gate C (…)` — splitting on ` · ` cuts that clause in half, so
+   ` · ` does not delimit clauses.
+2. **The line does not end at the last version clause.** After WARLI-CLOSE-2's
+   clause comes a *"Constants named in caps…"* sentence and the closing `*`. §3c
+   says *"append at the end of the line"*; the end of the line is not the end of
+   the version log, so appending there would file `v1.12` after prose that has
+   nothing to do with versions.
+
+Three of eleven clauses also carry no parenthetical at all, so the stated shape is
+not the format even where the separator holds.
+
+**§2 was applied and §3 was not** — they are independent, and stopping the one
+that is genuinely ambiguous costs a round, while adapting it would have written a
+malformed register line that reads as finished.
+
 ## 3 · Open questions
 
 ### 3.1 · ✅ CLOSED AT REGISTER-1.B — the third collision, in POLISH-0's own amendment record
@@ -301,14 +349,17 @@ a check a two-digit relabel cannot fail without a second edit.
 
 ## 5 · Next session starts at
 
-**Nothing in REGISTER-1 is open.** All three passes are complete and PR #446 is
-awaiting review, unmerged.
+**POLISH-0's footer version log (line 291).** REGISTER-1.C stopped there on its own
+format gate; §2.10 gives the two breaks in full. It needs three things and all
+three want a ruling, not an edit: RPLY-CLOSE's `v1.10` clause restored, the
+WARLI-CLOSE-2 clause renumbered to `v1.11`, and a `v1.12` clause appended **before
+the trailing "Constants named in caps…" sentence** rather than at the end of the
+line.
 
-The one thing a reviewer should decide before merging: **POLISH-0's document header
-(line 4) and its footer version log still name `v1.10` for WARLI-CLOSE-2**, and the
-footer has no RPLY-CLOSE clause. §2.8 explains why both were left rather than
-half-fixed, and why `26dc484` is not a usable source for the footer. That is a
-ruling, not a task — it needs authored text, not an edit.
+**Second, smaller:** the header's preserved tail still reads *"see H2, and I1 of
+the v1.10 block."* REGISTER-1.B moved I1 into the `v1.11` block, so that pointer is
+stale. It sits inside the span REGISTER-1.C was told to preserve verbatim, so it
+was preserved and reported rather than quietly corrected.
 
 ## 6 · Context to preserve
 
@@ -324,8 +375,7 @@ ruling, not a task — it needs authored text, not an edit.
 
 ## 7 · Time
 
-2026-08-31, one session, **three passes** — REGISTER-1, then REGISTER-1.A, then
-REGISTER-1.B, all on the same branch before merge. Deliberately: a `1.0.48` row
-correcting a `1.0.47` row would be the CHART-1 / CHART-1.A shape this task exists
-to stop reproducing, and the same argument applies one register over to a `v1.13`
-correcting a `v1.12`.
+2026-08-31, one session, **four passes** — REGISTER-1, 1.A, 1.B and 1.C, all on the
+same branch before merge. Deliberately: a `1.0.48` row correcting a `1.0.47` row
+would be the CHART-1 / CHART-1.A shape this task exists to stop reproducing, and
+the same argument applies one register over to a `v1.13` correcting a `v1.12`.
