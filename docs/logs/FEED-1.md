@@ -89,3 +89,10 @@ Nothing else in the list matters if that one fails.
 
 Recon → plan → 4 slices → 3 reviewers → 2 scoped re-reviews → PR, in one session.
 CI run `32734397658`, `conclusion=success`, on `headSha=1763659`.
+
+---
+
+**Superseded by FEED-2 (PR #401, merged into `staging` as `1fc741b`).** The confirmation surface
+this log describes was deleted; the author's post is now shown by pointing the column on the
+bet's own side at the card. ⚠ The account above is left exactly as written — a log records
+what happened, and what happened is that this shipped and was then replaced.
