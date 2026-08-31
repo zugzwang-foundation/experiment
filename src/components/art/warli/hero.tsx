@@ -333,6 +333,7 @@ export function WarliHero({
 			ref={rootRef}
 			className={`warli-root${className === undefined ? "" : ` ${className}`}`}
 			viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
+			preserveAspectRatio="xMidYMid slice"
 			role="img"
 			aria-label={label}
 			fill="none"
