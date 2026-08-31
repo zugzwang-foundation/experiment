@@ -5,7 +5,22 @@ import type {
 	PresentPost,
 } from "@/components/debate/types";
 
-import { mumbaiMetroModel } from "../../debate-export/_fixtures/mumbai-metro.input";
+import { mumbaiMetroModel as mumbaiMetroModelRaw } from "../../debate-export/_fixtures/mumbai-metro.input";
+
+/**
+ * BLOCK-1 — `mumbaiMetroModelRaw.market.slug` is not one of BLOCK-1's eight
+ * known live markets, so `ResolverCards` (nested under `MarketHeader`, which
+ * every fixture below renders through) now throws on it — correctly; that's
+ * the new guard this task shipped (G1, `resolution-block-data.ts`). Nothing
+ * in this file tests ResolverCards' content, so every builder below gets a
+ * locally-corrected model with a real slug instead. The golden input fixture
+ * itself (`mumbai-metro.input.ts`) is marked "do not hand-edit" and stays
+ * untouched — this shadows the name, it doesn't alter the import.
+ */
+const mumbaiMetroModel: DebateViewModel = {
+	...mumbaiMetroModelRaw,
+	market: { ...mumbaiMetroModelRaw.market, slug: "bitcoin-price-50k" },
+};
 
 /**
  * FEED-1 — fixtures for the confirmation guards. Underscore-prefixed: the vitest

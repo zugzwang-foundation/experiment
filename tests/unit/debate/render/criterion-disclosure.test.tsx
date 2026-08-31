@@ -5,8 +5,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CriterionDisclosure } from "@/components/debate/CriterionDisclosure";
 import { DebateView } from "@/components/debate/DebateView";
+import type { DebateViewModel } from "@/components/debate/types";
 
-import { mumbaiMetroModel } from "../../debate-export/_fixtures/mumbai-metro.input";
+import { mumbaiMetroModel as mumbaiMetroModelRaw } from "../../debate-export/_fixtures/mumbai-metro.input";
+
+/**
+ * BLOCK-1 — `mumbaiMetroModelRaw.market.slug` isn't one of BLOCK-1's eight
+ * known live markets, so `ResolverCards` (nested under `MarketHeader`, which
+ * `DebateView` renders through) now throws on it — correctly; that's the new
+ * guard this task shipped (G1, `resolution-block-data.ts`). This file tests
+ * the criterion disclosure, not ResolverCards' content, so it gets a
+ * locally-corrected model with a real slug. The golden input fixture itself
+ * (`mumbai-metro.input.ts`, "do not hand-edit") stays untouched — only its
+ * `market.slug` is overridden here, so `.market.description` (what this file
+ * actually asserts against) is still the original golden text, byte for byte.
+ */
+const mumbaiMetroModel: DebateViewModel = {
+	...mumbaiMetroModelRaw,
+	market: { ...mumbaiMetroModelRaw.market, slug: "bitcoin-price-50k" },
+};
 
 /**
  * CRIT-1 · G-1…G-4 — the resolution criterion is on the page it binds, whole,
