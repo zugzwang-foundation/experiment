@@ -17,7 +17,7 @@ import {
 } from "./geometry";
 
 /**
- * The three surfaces this one component renders (CHART-1, SPEC.1 1.0.40 §9/§22).
+ * The three surfaces this one component renders (CHART-1, SPEC.1 1.0.45 §9/§22).
  *
  * `hero` is the Discovery hero, which until CHART-1 rendered a DIFFERENT
  * component — `PriceSparkline`, index-spaced and `aria-hidden`. Index spacing
@@ -53,7 +53,7 @@ export type MarketPriceChartMode = "collapsed" | "expanded" | "hero";
  * and the accessible readout lives in the shared `ChartSummary` beside it —
  * collapsed card, expanded overlay and, since CHART-1, the Discovery hero. ⚠ It
  * used to say "the card's `sr-only` summary", naming one surface of three and a
- * home the sentence no longer has. ⚠ SPEC.1 1.0.40 §9 says this chart is "not
+ * home the sentence no longer has. ⚠ SPEC.1 1.0.45 §9 says this chart is "not
  * `aria-hidden` on any surface"; that is a claim about the CHART, not this
  * ELEMENT — a screen reader cannot read a polyline, so announcing the graphic
  * means announcing the summary next to it. The attribute below and that sentence

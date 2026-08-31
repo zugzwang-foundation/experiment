@@ -118,7 +118,7 @@ export async function DiscoveryContent() {
 					totals: data.totals,
 					imageUrl: data.imageUrl,
 				},
-				// CHART-1 — the hero chart's live right edge (SPEC.1 1.0.40 §9).
+				// CHART-1 — the hero chart's live right edge (SPEC.1 1.0.45 §9).
 				// `data.series` is floored history from `getCachedReserveWalk`; the
 				// terminal point is composed HERE from `priced`, the same live pool
 				// read two lines above that already fills `card.pricing` and renders

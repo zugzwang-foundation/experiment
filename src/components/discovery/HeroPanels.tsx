@@ -176,7 +176,7 @@ export function HeroPanels({
 				    above that. A growing box with the shipped number as its
 				    minimum invents nothing. */}
 				{/* CHART-1 — THE SAME COMPONENT `/m/[slug]` RENDERS, in `hero` mode
-				    (SPEC.1 1.0.40 §22 + §9). This slot held `PriceSparkline`, a
+				    (SPEC.1 1.0.45 §22 + §9). This slot held `PriceSparkline`, a
 				    second, index-spaced two-line graph that drew twenty bets in an
 				    hour identically to twenty bets across three weeks.
 				    ⚠ THAT WAS DEFENSIBLE AND STOPPED BEING SO. §9 called the hero
@@ -191,7 +191,7 @@ export function HeroPanels({
 				<div className="mt-[11px] min-h-24 flex-1 rounded-[var(--r)] [border:var(--hairline)]">
 					<MarketPriceChart series={series} mode="hero" isOpen={isOpen} />
 				</div>
-				{/* SPEC.1 1.0.40 §9 · Accessibility — the hero's readout, the third and
+				{/* SPEC.1 1.0.45 §9 · Accessibility — the hero's readout, the third and
 				    last mode to get one, discharging `PD-3-04`.
 				    ⛔ THIS SLOT WAS LEGITIMATELY EMPTY UNTIL NOW AND IS NOT ANY MORE.
 				    The §22 hero graph was specified DECORATIVE — `aria-hidden`, no

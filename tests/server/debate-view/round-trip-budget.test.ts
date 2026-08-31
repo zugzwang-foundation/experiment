@@ -244,7 +244,7 @@ describe("/m/[slug] read budget — the polled surface (S-4 Phase E)", () => {
 	// `(market, reserves)`, so every bet changes that key and forces a miss; no
 	// bet touches the walk's key. So the 9 are re-paid per bet and the 3 are
 	// re-paid once per `MARKET_SERIES_MIN_WINDOW_MS`, however busy the market is
-	// (SPEC.1 1.0.40 §9 *Refresh*).
+	// (SPEC.1 1.0.45 §9 *Refresh*).
 	//
 	// ⚠ A STATEMENT COUNT CANNOT SEE THAT, WHICH IS EXACTLY WHY THE SPLIT IS
 	// PINNED AND NOT JUST THE TOTAL. Pinning 12 alone would stay green if
