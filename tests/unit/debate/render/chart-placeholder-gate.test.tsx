@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
 
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { MarketPriceChart } from "@/components/debate/chart/MarketPriceChart";
 import { MarketPriceChartHost } from "@/components/debate/chart/MarketPriceChartHost";
-import { PriceSparkline } from "@/components/discovery/PriceSparkline";
 import type { PricePoint } from "@/server/discovery/price-series";
 
 /**
@@ -58,8 +61,40 @@ afterEach(() => {
 
 const detail = (series: PricePoint[]) =>
 	render(<MarketPriceChartHost series={series} nodes={[]} isOpen={true} />);
+
+/**
+ * ⚠⚠ RETARGETED AT RECONCILE-1, AND THE RETARGET IS THE POINT.
+ *
+ * This helper rendered `PriceSparkline`, and after the main→staging merge that
+ * was a component **the product no longer mounts anywhere**. `main` deleted it
+ * at CHART-1 (#425) when the hero moved onto `MarketPriceChart`; the merge kept
+ * `main`'s `HeroPanels` — which renders `<MarketPriceChart mode="hero">` — while
+ * also restoring the deleted file, whose only importer in the whole tree was
+ * this test. The three `gate::hero-*` cases therefore went on passing against a
+ * component that ships to nobody, under a comment asserting they were "the only
+ * cover this mount has".
+ *
+ * ⛔ THAT IS THE FAILURE THIS FILE'S DETAIL ARM WAS ALREADY FIXED FOR. The same
+ * merge reworked the detail cases carefully — reversing one, retargeting
+ * another, writing down why each moved. The hero arm beside them was not
+ * touched, so the file ended up half-adapted: green on both halves, truthful on
+ * one. A guard pointed at a retired component is worse than no guard, because
+ * the absence of one is at least visible.
+ *
+ * ⚠ WHAT THE MERGED HERO ACTUALLY DOES, measured rather than assumed:
+ * `MarketPriceChart` has **no placeholder branch and no `ZUGZWANG_ENV` read** —
+ * `main` retired the whole fabricated-replica mechanism rather than gating it,
+ * so there is no invented data left to keep out of production. The obligation
+ * the staging lane wrote ("nothing fabricated reaches the hero in prod") is
+ * therefore preserved here as an assertion about the SHIPPED component, in every
+ * environment, which is strictly stronger than the env-conditional form it
+ * replaces.
+ *
+ * `isOpen` is the licensed `true` literal: Discovery lists only `Open` markets,
+ * which is exactly the call-site asymmetry `HeroPanels` itself relies on.
+ */
 const hero = (series: PricePoint[]) =>
-	render(<PriceSparkline series={series} size="hero" />);
+	render(<MarketPriceChart series={series} mode="hero" isOpen={true} />);
 
 describe("§5 the env gate — MARKET DETAIL mount", () => {
 	it("gate::detail-PROD-plus-empty-series-renders-NO-placeholder-and-no-svg", () => {
@@ -127,42 +162,90 @@ describe("§5 the env gate — MARKET DETAIL mount", () => {
 });
 
 describe("§5 the env gate — DISCOVERY HERO mount", () => {
-	it("gate::hero-PROD-plus-empty-series-renders-NO-placeholder-and-no-svg", () => {
-		// ⚠ A SEPARATE MOUNT WITH A SEPARATE GATE. The detail chart's gate lives in
-		// a different component and does not reach this one, so this is not a
-		// duplicate assertion — it is the only cover this mount has.
-		process.env.ZUGZWANG_ENV = "prod";
-		const { container } = hero(EMPTY);
-
-		expect(
-			container.querySelector('[data-testid="price-sparkline-placeholder"]'),
-		).toBeNull();
-		expect(container.querySelector("svg")).toBeNull();
-		expect(container.innerHTML).toBe("");
+	it("gate::hero-EMPTY-series-renders-NO-fabricated-replica-in-EVERY-env", () => {
+		// ⛔ THE ASSERTION THE SECTION EXISTS FOR, carried over from the staging
+		// lane and strengthened. It used to hold only in `prod`, because the
+		// component it guarded drew an invented two-line replica everywhere else.
+		// The shipped hero has no such branch, so the claim now holds in EVERY
+		// environment — and BOTH replica testids are named, not just the sparkline's,
+		// so a future component reintroducing either one is caught here regardless
+		// of which family it borrows from.
+		for (const env of ["prod", "staging", "preview", "unknown"]) {
+			process.env.ZUGZWANG_ENV = env;
+			const { container } = hero(EMPTY);
+			expect(
+				container.querySelector('[data-testid="price-sparkline-placeholder"]'),
+			).toBeNull();
+			expect(
+				container.querySelector(
+					'[data-testid="market-price-chart-placeholder"]',
+				),
+			).toBeNull();
+			cleanup();
+		}
 	});
 
-	it("gate::hero-NON-PROD-plus-empty-series-DOES-render-the-placeholder", () => {
-		process.env.ZUGZWANG_ENV = "staging";
-		const { container } = hero(EMPTY);
-
-		expect(
-			container.querySelector('[data-testid="price-sparkline-placeholder"]'),
-		).not.toBeNull();
-		expect(container.querySelector("svg")).not.toBeNull();
-	});
-
-	it("gate::hero-a-REAL-series-renders-the-REAL-sparkline-in-EVERY-env", () => {
+	it("gate::hero-a-REAL-series-renders-the-REAL-chart-in-EVERY-env", () => {
+		// ⛔ THE NON-VACUITY CONTROL, and it is load-bearing exactly as its detail
+		// twin is: without it "renders no replica" above would pass against a hero
+		// that renders nothing at all in any environment, which is the shape the
+		// merge defect actually had. This proves the mount draws the REAL chart
+		// when there is data, so the assertion above is about fabrication and not
+		// about a dead component.
 		for (const env of ["prod", "staging", "preview", "unknown"]) {
 			process.env.ZUGZWANG_ENV = env;
 			const { container } = hero(REAL);
 			expect(
-				container.querySelector('[data-testid="price-sparkline"]'),
+				container.querySelector('[data-testid="market-price-chart"]'),
+			).not.toBeNull();
+			expect(
+				container.querySelector('[data-testid="market-price-chart-frame"]'),
 			).not.toBeNull();
 			expect(
 				container.querySelector('[data-testid="price-sparkline-placeholder"]'),
 			).toBeNull();
 			cleanup();
 		}
+	});
+
+	it("gate::hero-mounts-the-SHIPPED-chart-and-the-retired-sparkline-is-GONE", () => {
+		// ⛔⛔ THE WALL THAT WOULD HAVE CAUGHT THE MERGE DEFECT, and the reason it
+		// is a source scan rather than a render: the defect was not that the hero
+		// rendered the wrong thing — it rendered the right thing — but that a
+		// SECOND, retired component survived beside it with a test still aimed at
+		// it. No amount of rendering the correct hero can see that.
+		//
+		// ⚠ FILE EXISTENCE, NOT A WORD MATCH. `PriceSparkline` appears in six
+		// comments across `src/` (`MarketPriceChart`, `geometry.ts`, `HeroPanels`,
+		// `MarketCard`) as deliberate history — one of them literally reads "that
+		// component was DELETED at CHART-1 … read the name as history, not as a
+		// live reference". A `grep` for the bare name would match every one of
+		// them and fail on prose that is doing its job.
+		expect(
+			existsSync(
+				join(process.cwd(), "src/components/discovery/PriceSparkline.tsx"),
+			),
+		).toBe(false);
+
+		// Positive control for the scan itself: a component that IS there.
+		expect(
+			existsSync(
+				join(process.cwd(), "src/components/debate/chart/MarketPriceChart.tsx"),
+			),
+		).toBe(true);
+
+		// And the hero's own import, matched as import SYNTAX so the comments
+		// above cannot satisfy it.
+		const heroSrc = readFileSync(
+			join(process.cwd(), "src/components/discovery/HeroPanels.tsx"),
+			"utf8",
+		);
+		expect(heroSrc).toMatch(
+			/import\s*\{[^}]*\bMarketPriceChart\b[^}]*\}\s*from\s*["'][^"']*chart\/MarketPriceChart["']/,
+		);
+		expect(heroSrc).not.toMatch(
+			/import\s*\{[^}]*\bPriceSparkline\b[^}]*\}\s*from/,
+		);
 	});
 });
 
@@ -178,9 +261,14 @@ describe("§5 the replicas are deterministic", () => {
 		expect(a).toBe(b);
 		cleanup();
 
-		const c = hero(EMPTY).container.innerHTML;
+		// ⚠ THE HERO HALF READS `REAL`, FOR THE SAME REASON THE TOKEN PIN BELOW
+		// DOES. On an empty series the shipped hero draws a frame with empty
+		// lines, and two identical near-empty strings would satisfy this
+		// assertion without ever exercising the arithmetic that could differ
+		// between mounts. `REAL` makes the comparison bind on the coordinates.
+		const c = hero(REAL).container.innerHTML;
 		cleanup();
-		const d = hero(EMPTY).container.innerHTML;
+		const d = hero(REAL).container.innerHTML;
 		expect(c).toBe(d);
 	});
 
