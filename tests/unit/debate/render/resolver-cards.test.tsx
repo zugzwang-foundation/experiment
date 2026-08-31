@@ -267,7 +267,35 @@ describe("BLOCK-1 — G2, every value line is real content, never an empty bar",
 			const { container, unmount } = render(
 				<ResolverCards market={marketFixture(slug)} />,
 			);
-			for (const a of Array.from(container.querySelectorAll("a"))) {
+			const data = RESOLUTION_BLOCKS[slug];
+			const anchors = Array.from(container.querySelectorAll("a"));
+
+			// ⛔⛔ NON-VACUITY CONTROL, AND IT IS NOT OPTIONAL. The href loop below
+			// iterates `querySelectorAll("a")` — on a component that renders NO
+			// anchor at all it runs ZERO times and asserts NOTHING, so the guard
+			// goes green against exactly the regression that would delete the
+			// RESOLVER link. Measured: a mutant rendering all four blocks as plain
+			// `<div>`s passed this test unchanged before these three lines existed.
+			// Only `bitcoin-price-50k` (G7) and `github-zugzwang-repo-stars` (G5)
+			// pin an anchor's existence by slug, so the other six markets had no
+			// coverage at all.
+			// ⚠ THE EXPECTED COUNT IS DERIVED FROM THE MAP, NOT HARDCODED TO 1 —
+			// that is what keeps the RESOLUTION-href seam open (the guard is
+			// deliberately generic over all blocks). Wire a second href in
+			// `resolution-block-data.ts` and this expectation moves with it, with
+			// no edit here.
+			const expectedAnchorKeys = KEYS.filter((k) => data[k].href !== null);
+			expect(expectedAnchorKeys.length).toBeGreaterThan(0);
+			expect(anchors.length).toBe(expectedAnchorKeys.length);
+			for (const k of expectedAnchorKeys) {
+				const block = container.querySelector(
+					`[data-testid="resolution-block-${k}"]`,
+				);
+				expect(block?.tagName).toBe("A");
+				expect(block?.getAttribute("href")).toBe(data[k].href);
+			}
+
+			for (const a of anchors) {
 				const href = a.getAttribute("href");
 				expect(href).not.toBeNull();
 				expect(href).not.toBe("");
@@ -305,7 +333,13 @@ describe("BLOCK-1 — G2, every value line is real content, never an empty bar",
 		// ⛔ End-to-end confirmation of resolution-block-data.ts's G1 guard —
 		// component-level, not just the pure-function level.
 		const unknown = { ...BASE, slug: "not-one-of-the-eight" };
-		expect(() => render(<ResolverCards market={unknown} />)).toThrow();
+		// ⚠ MATCH THE MESSAGE, NOT JUST "something threw". A bare `.toThrow()`
+		// goes green on ANY error raised during render — a bad prop, a missing
+		// import, a jsdom quirk — and would certify this guard while the
+		// unknown-slug branch itself had been removed.
+		expect(() => render(<ResolverCards market={unknown} />)).toThrow(
+			/no resolution-block data for market slug "not-one-of-the-eight"/,
+		);
 	});
 });
 
@@ -406,14 +440,28 @@ describe("BLOCK-1 — R-12 reversed for RESOLVER only; G7/G8 on the split", () =
 		expect(resolver).toContain("outline-none");
 
 		for (const k of ["resolution", "closes", "flavour"] as const) {
-			const cls =
-				container
-					.querySelector(`[data-testid="resolution-block-${k}"]`)
-					?.getAttribute("class") ?? "";
+			const el = container.querySelector(
+				`[data-testid="resolution-block-${k}"]`,
+			);
+			// ⛔ NON-VACUITY — the `?? ""` below turns a MISSING element into a
+			// one-token list holding `""`, which satisfies every `not.toMatch` in
+			// the loop. Measured: rendering a row with no blocks at all passed this
+			// test before this assertion existed.
+			expect(el).not.toBeNull();
+			const cls = el?.getAttribute("class") ?? "";
+			expect(cls.length).toBeGreaterThan(0);
 			for (const t of cls.split(/\s+/)) {
-				expect(t).not.toMatch(
-					/cursor|hover:|focus-visible:|active:|group-hover/,
-				);
+				// ⚠⚠ MATCH THE WORD, NOT THE `word:` VARIANT PREFIX. This read
+				// `/cursor|hover:|focus-visible:|active:|group-hover/` and an
+				// ARBITRARY-VARIANT form slipped straight past it — in
+				// `[&:hover]:border-(--ring)` the character after "hover" is `]`,
+				// not `:`, so the old pattern matched nothing and an inert block
+				// carrying a real hover affordance passed (measured). None of the
+				// shipped inert-block classes (`rounded-(--r) px-[11px] py-2
+				// [border:var(--hairline)] flex min-h-0 min-w-0 items-center
+				// gap-2.5`) contain any of these words, so the wider pattern costs
+				// nothing.
+				expect(t).not.toMatch(/cursor|hover|focus|active|group-/);
 			}
 		}
 	});
