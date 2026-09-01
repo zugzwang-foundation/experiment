@@ -51,44 +51,12 @@ export const numericString = z
  * surface, not a state-transition event.
  */
 
-export const EVENT_TYPES = [
-	// image_upload domain (4)
-	"image_upload.sign_requested",
-	"image_upload.committed",
-	"image_upload.blocked",
-	"image_upload.orphaned",
-	// user domain (5)
-	"user.oauth_signed_in",
-	"user.otp_signed_in",
-	"user.pseudonym_assigned",
-	"user.tos_accepted",
-	"user.signed_out",
-	// admin domain (2)
-	"admin.signed_in",
-	"admin.signed_out",
-	// market domain (7) — ENGINE.0 + ENGINE.9 (resolving); lifecycle
-	// (created→opened→closed→resolving) + settlement (resolved/corrected/
-	// voided). All ride aggregate_type "market".
-	"market.created",
-	"market.opened",
-	"market.closed",
-	"market.resolving",
-	"market.resolved",
-	"market.corrected",
-	"market.voided",
-	// bet domain (2) — ENGINE.0
-	"bet.placed",
-	"bet.sold",
-	// comment domain (1) — ENGINE.0 (SPEC.2 §13.1 canonical name)
-	"comment.placed",
-	// dharma domain (2) — ENGINE.0 + ENGINE.13
-	"dharma.credited",
-	"dharma.granted",
-	// moderation domain (1) — AUDIT-FIX-B5 (A13): the gate-block consequence emit
-	"moderation.blocked",
-] as const;
+import { EVENT_TYPES, type EventType } from "./event-types";
 
-export type EventType = (typeof EVENT_TYPES)[number];
+// Re-exported so every existing import site keeps working unchanged — the
+// extraction is about reachability without `server-only`, not about moving
+// the front door.
+export { EVENT_TYPES, type EventType };
 
 /**
  * Per-event-type payload schemas. Each `z.object()` corresponds to the

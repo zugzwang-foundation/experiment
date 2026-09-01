@@ -47,20 +47,70 @@ DATASET.* / HARDEN.*.
 6. **Run the export pipeline** (DATASET.* / HARDEN.* implementation
    TBD). The pipeline reads:
    - SPEC.2 §19.3 row inventory (which tables ship).
-   - SPEC.2 §19.4 the 8 PII columns dropped.
-   - SPEC.2 §19.4.1 per-event-type payload STRIP_KEY rules.
+   - SPEC.2 §19.4 the **nine** PII columns dropped (this read *"the 8
+     PII columns"*; §19.4's table has never had eight rows, and note
+     that `users.pfp_filename` is **not** one of them — it SHIPs, and
+     dropping it destroys the identity-pool join).
+   - SPEC.2 §19.4.1 per-event-type payload **SHIP** rules. ⚠ **The
+     section inverted on 2026-09-01 (DATASET.3, ruling E).** It named
+     the keys to REMOVE; it now names the keys that SHIP, with
+     everything else dropped by default at any depth. Read it that way
+     round, or a check for "the listed keys are absent" will be exactly
+     backwards.
    - SPEC.2 §19.5 export-time JOIN pseudonymization (FK rewrites).
    - SPEC.2 Appendix B.* per-table column treatments.
 
 7. **Spot-check exported `events.payload`:** sample 100 rows from each
    event_type. Verify:
-   - `user.tos_accepted` rows: `payload` shows `userId` + version
-     hashes + NO `ip` / NO `user_agent` keys.
-   - `user.oauth_signed_in` rows: NO `googleId` key.
+   - `user.tos_accepted` rows: `payload` shows the two version hashes
+     and **NOTHING ELSE** — no `userId`, no `ip`, no `user_agent`.
+     ⚠ **This bullet said `payload` shows `userId`, and it was wrong.**
+     `userId` is a raw `users.id`; shipping it into a CC-BY-4.0 artifact
+     is the re-identification vector the whole strip-not-hash posture
+     exists to close, and Appendix B.13 has always listed it in the
+     general strip set for `events.payload`. The pipeline has never
+     shipped it. An operator following the old bullet on the morning of
+     6 November would have found no `userId`, concluded the export was
+     broken, and had to decide under time pressure whether to trust the
+     runbook or the artifact. Corrected 2026-09-01 (DATASET.3, F5).
+   - `user.oauth_signed_in` rows: `payload` is **EMPTY** — `userId`,
+     `googleId` and the `provider` literal all withheld (§19.4.1).
    - `image_upload.*` rows: NO `key` (R2 object key) key.
-   - `admin.signed_in` rows: NO `sessionId` / NO `ip` keys.
+   - `admin.signed_in` / `admin.signed_out` rows: `payload` is **EMPTY**
+     — no `sessionId`, no `ip`.
    - All `metadata.ip` / `metadata.user_agent` keys absent (already
-     covered by §19.4 row 7-8; this checks the strip actually ran).
+     covered by §19.4 **rows 8–9**, cited by name because a row number
+     moves: this read *"row 7-8"*, which named `tos_acceptance_ip` and
+     `tos_acceptance_user_agent` — a different pair, one layer up. This
+     step checks the strip actually ran).
+   - `image_upload.committed` rows: NO `commentId` key (§19.4.1 —
+     withheld unconditionally, so its absence is uniform and carries no
+     signal about which comments were removed).
+   - `comment.placed` rows: **NO `uploadId` key** (2026-09-01, ruling
+     S5). It is the other half of the same recovery path: this payload
+     carries `commentId` too, so shipping `uploadId` would rebuild the
+     comment↔upload association Appendix B.6 withholds, in one row,
+     with no join. `comments.image_uploads_id` still carries the link
+     for every comment that is not withheld.
+   - **NO `idempotency_key`** anywhere — not in `bets.csv`, and not in
+     any `metadata` blob (2026-09-01, ruling S2). It is 255 bytes of
+     participant-chosen header text that moderation never sees.
+   - **Timestamps carry SIX fractional digits**
+     (`2026-11-06T12:00:00.123456Z`), not three. ⚠ Three digits means
+     the reader floored microseconds at the driver, and the archive has
+     silently lost the ordering resolution of events less than a
+     millisecond apart. Check one `created_at` in each of `users.csv`,
+     `events.csv` and `bets.csv` (2026-09-01, ruling S6).
+   - ⚠ The **key-absence** checks above — every bullet naming a key that
+     must be gone — hold **at any depth**: §19.4.1's declaration applies
+     through nesting and arrays, so a spot-check that only reads
+     top-level keys passes over the case the depth rule exists for.
+     (⚠ The timestamp-precision bullet is **not** one of them: it is a
+     format check on a value that ships, not a check that a key is
+     absent. This sentence read *"the four checks above"* when there
+     were six of them, and then nine — a count in prose goes stale from
+     the edit that adds a bullet, so it is now a description of which
+     bullets rather than a number of them.)
 
 8. **Spot-check pseudonymization** (per §19.5): cross-table joins
    should reference `user_pseudonym` columns, not raw `users.id`. The

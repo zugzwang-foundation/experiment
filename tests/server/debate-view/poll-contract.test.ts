@@ -202,10 +202,18 @@ describe("debate-view::poll-preserves-removal-masking", () => {
 		// `m/[slug]` — say `src/app/api/debate/[id]/route.ts` — is invisible to the
 		// subtree check above but cannot hide from this one. A future handler is
 		// not forbidden; it must be a conscious edit here.
-		// (On-disk 13 vs the §4.3 table's eleven rows is PRE-EXISTING drift, not
+		// (On-disk 14 vs the §4.3 table's eleven rows is PRE-EXISTING drift, not
 		// this task's: `api/visits`, `api/cron/alarms-drain` and `m/[slug]/quote`
-		// are built but uncatalogued, and `api/dataset/manifest` is catalogued but
-		// pending-build. Surfaced, deliberately not corrected here.)
+		// are built but uncatalogued. Surfaced, deliberately not corrected here.)
+		//
+		// ⚠ **`api/dataset/manifest` was the fourth item on that list —
+		// *"catalogued but pending-build"* — and DATASET.3 built it**, so the
+		// entry is ADDED here rather than the assertion loosened. That is the
+		// discipline this guard exists for: a new Route Handler is not
+		// forbidden, it is a conscious edit in the same commit as the route.
+		// SPEC.2 §19.7 defines it (public read, no auth, HTTP 503
+		// `error_dataset_not_yet_released` pre-release), so it is the one entry
+		// here that CLOSES a §4.3 gap rather than widening one.
 		const routes = sourcesUnder("src/app").filter((file) =>
 			file.endsWith("/route.ts"),
 		);
@@ -220,6 +228,7 @@ describe("debate-view::poll-preserves-removal-masking", () => {
 			"src/app/api/cron/alarms-drain/route.ts",
 			"src/app/api/cron/close-due-markets/route.ts",
 			"src/app/api/cron/r2-orphan-sweep/route.ts",
+			"src/app/api/dataset/manifest/route.ts",
 			"src/app/api/health/route.ts",
 			"src/app/api/uploads/sign/route.ts",
 			"src/app/api/visits/route.ts",
