@@ -381,13 +381,31 @@ const SITE_PROVENANCE = {
 	"events.aggregate_id[admin_session]": "SYSTEM",
 } as const satisfies Record<string, Provenance>;
 
-/** Sub-key spellings whose harvested value is participant-supplied. */
-const PARTICIPANT_JSONB_KEYS: ReadonlySet<string> = new Set([
-	"ip",
-	"user_agent",
-	"userAgent",
-	"email",
-]);
+/**
+ * Sub-key spellings whose harvested value is participant-supplied.
+ *
+ * ⚠ **DERIVED from `SITE_PROVENANCE`, not written out again**
+ * (`@security-auditor` L-3). This was a second literal listing four spellings,
+ * while `SITE_PROVENANCE` declared the provenance of the same eight JSONB
+ * sites — two statements of one policy, agreeing on the day they were written
+ * and with nothing making them agree afterwards. That is the exact shape
+ * ruling I closed for `STRIPPED_COLUMNS`, reproduced in the commit that
+ * applied it.
+ *
+ * Derived, so the JSONB half of the provenance decision has ONE home. Every
+ * `payload.<key>` / `metadata.<key>` entry in `SITE_PROVENANCE` contributes its
+ * sub-key; a site declared `PARTICIPANT` puts that spelling here and a site
+ * declared `SYSTEM` does not.
+ */
+const PARTICIPANT_JSONB_KEYS: ReadonlySet<string> = new Set(
+	Object.entries(SITE_PROVENANCE)
+		.filter(
+			([site, prov]) =>
+				prov === "PARTICIPANT" &&
+				(site.startsWith("payload.") || site.startsWith("metadata.")),
+		)
+		.map(([site]) => site.slice(site.indexOf(".") + 1)),
+);
 
 /**
  * Harvest every secret value from the SOURCE rows.
@@ -499,11 +517,18 @@ export function harvestSecrets(
 	// having failed at its own job and stays FATAL, while the identical string
 	// colliding elsewhere is advisory (ruling S1).
 	{
-		const removed = new Set(
-			(tables.mod_actions ?? [])
-				.filter((r) => r.reason === "content_removed")
-				.map((r) => String(r.target_comment_id)),
-		);
+		// ⚠ **`removedCommentIds(...)`, the SHIPPED predicate — not a second
+		// copy of it** (`@security-auditor` L-9). This block open-coded
+		// `reason === "content_removed"` and `String(target_comment_id)` while
+		// its own comment claimed to use *"the SAME predicate, never a second
+		// idea of what removal means"*. It was literally a second one, and it
+		// disagreed in a direction that matters: `removed.ts` requires the
+		// target to be a non-empty STRING, so a null target became the string
+		// `"null"` here and a member of the harvest set that the mask set does
+		// not contain. Equal on today's data; free to diverge; and the
+		// divergence that bites is the harvest set being SMALLER than the mask
+		// set, which silently un-backs the value guard ruling H exists to add.
+		const removed = removedCommentIds(tables.mod_actions ?? []);
 		for (const row of tables.comments ?? []) {
 			if (typeof row.id === "string" && removed.has(row.id)) {
 				add(s.removedBodies, row.body, "PARTICIPANT", "body");
@@ -655,13 +680,29 @@ export function assertPublishableSourceLabel(label: string): string {
 				"is PUBLISHED.",
 		);
 	}
-	// A scheme (`postgres://`, `postgresql://`, `http://`, …), userinfo
-	// (`user:pass@host`), or a `host:5432` port — none belong in a label, and
-	// all three are how a connection string looks.
+	// ⚠ **The two most likely non-URI forms were missing**
+	// (`@security-auditor` M-1). This docblock claimed to reject *"anything
+	// carrying a scheme, credentials, an `@` host or a port"* — and all three
+	// original patterns required a `://` or an `@`, so a **libpq keyword
+	// string** (`host=… port=5432 password=…`) and a **bare `host:5432`** both
+	// passed. The keyword form is a first-class Postgres connection string and
+	// is what a hand-assembled `DATABASE_URL`-adjacent paste usually looks
+	// like. A guard whose stated coverage exceeds its actual coverage is worse
+	// than none: it is what a reviewer reads instead of testing.
 	const secretShaped = [
+		// a scheme — `postgres://`, `postgresql://`, `http://`, …
 		/[a-z][a-z0-9+.-]*:\/\//i,
+		// userinfo — `user:pass@host`
 		/\S+:\S+@\S+/,
+		// a port after an `@` host
 		/@[\w.-]+:\d{2,5}\b/,
+		// ⚠ a BARE `host:5432` — no scheme, no `@`
+		/\b[\w.-]+:\d{2,5}\b/,
+		// ⚠ libpq keyword form — any one keyword is enough; a description does
+		// not contain `password=`
+		/\b(?:host|hostaddr|port|user|dbname|password|sslmode|options)\s*=/i,
+		// a Supabase / bearer-shaped secret pasted whole
+		/\b(?:sbp|sb|eyJ)[A-Za-z0-9_.-]{20,}/,
 	];
 	if (secretShaped.some((re) => re.test(trimmed))) {
 		throw new EgressContractGapError(
@@ -687,7 +728,13 @@ function summarizeAdvisories(
 		.map(([rule, n]) => `${rule}: ${n}`);
 }
 
-/** The five metadata fields that ship, for the manifest's per-table entry. */
+/**
+ * The metadata fields that ship, for the manifest's per-table entry.
+ *
+ * ⚠ FOUR since ruling S2 (DATASET.3) — `idempotency_key` moved to
+ * `STRIPPED_METADATA_KEYS`. Derived, never a literal, so the manifest cannot
+ * advertise a field the strip removes.
+ */
 const METADATA_TABLES = new Set(["events", "admin_events", "user_events"]);
 
 export async function buildDataset(opts: BuildOptions): Promise<BuildResult> {

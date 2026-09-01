@@ -104,14 +104,26 @@ describe("§19.7 · what this route must NOT do", () => {
 		);
 	});
 
-	it("is CACHEABLE — a public static answer, not a per-request computation", async () => {
+	it("the pre-release answer carries Retry-After, and does NOT claim to be cached", async () => {
+		// ⚠ **This test was named "is CACHEABLE" and asserted `Retry-After`**
+		// (`@security-auditor` L-5). It passed, and it certified a property
+		// nothing implemented: the constant was called `CACHE_BEFORE`, its
+		// docblock described caching behaviour, and it was being handed to
+		// `jsonResponse` as the `retryAfterHeader` argument — so no
+		// `Cache-Control` was ever emitted. A test whose NAME and whose
+		// ASSERTION disagree is a false receipt for whichever of the two a
+		// reader happens to trust, and the name is the half that gets read.
+		//
+		// `Retry-After` is the right header for a 503 that flips once, so the
+		// behaviour stayed and the name and the constant moved to match it.
 		const res = await GET(
 			new Request("https://zugzwang.world/api/dataset/manifest"),
 		);
-		// 503 carries Retry-After; the point is that neither answer is
-		// no-store, because a route that recomputed per request would be an
-		// unauthenticated way to spend the release budget.
-		expect(res.headers.get("Retry-After")).toBeTruthy();
+		expect(res.status).toBe(503);
+		expect(res.headers.get("Retry-After")).toBe("300");
+		// …and it is NOT advertised as cacheable, because a cached 503 outlives
+		// the state it describes — on the one morning this route is read.
+		expect(res.headers.get("Cache-Control")).toBeNull();
 	});
 
 	it("the module imports NO database and NO build path", async () => {

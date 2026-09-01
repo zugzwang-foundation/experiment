@@ -322,6 +322,26 @@ export function emptySecrets(): EgressSecrets {
 }
 
 /**
+ * The needle a `findValues` hit actually matched on.
+ *
+ * ⚠ **This must mirror `findValues`' own stringification exactly**
+ * (`scan.ts` — it skips anything that is neither `string` nor `number`, then
+ * compares `String(v)` against the needle set). Any divergence here means the
+ * matcher and the provenance lookup disagree about what the needle IS, on
+ * precisely the values where they differ — which is `@security-auditor` H-1:
+ * a numeric leaf matched by the scan and then missed by the S1 tier test,
+ * re-opening the participant-poisoning abort on a one-shot release build.
+ *
+ * Returns `null` for a leaf the matcher would never have produced a hit for,
+ * so the caller falls through to FATAL — the strict default.
+ */
+function needleOf(value: unknown): string | null {
+	if (typeof value === "string") return value;
+	if (typeof value === "number") return String(value);
+	return null;
+}
+
+/**
  * Accumulates violations across many assertions and throws once at the end.
  *
  * Deliberately not fail-fast. A pipeline that stops at the first violation
@@ -816,10 +836,34 @@ export class EgressGuard {
 			// `no-blocked-text` under `body` does not, because `blocked_text` is
 			// a different field and a re-post is a participant's own doing
 			// (`@security-auditor` H-4).
+			// ⚠⚠ **`needleOf(hit.value)`, NOT `hit.value` —
+			// `@security-auditor` H-1, DATASET.3, and it re-opened the very
+			// CRITICAL this ruling exists to close.**
+			//
+			// `findValues` matches NUMBERS as well as strings: it stringifies
+			// every leaf (`scan.ts` — `const s = String(v)`) and tests the
+			// needle set against that. Both halves of ruling S1 were written
+			// `typeof hit.value === "string" ? … : undefined`, so a hit on a
+			// NUMERIC leaf skipped the provenance lookup entirely and fell
+			// straight through to FATAL.
+			//
+			// Measured end to end, and it is self-serve: a participant uploads
+			// an image padded to exactly 1,048,576 bytes — they choose the byte
+			// count — and sends `Idempotency-Key: 1048576`. The needle is
+			// harvested and correctly tagged PARTICIPANT, and the release build
+			// still dies on `image_uploads.byte_size`. The identical collision
+			// against a STRING leaf is advisory, which is what proves the
+			// asymmetry was the `typeof` and not the class.
+			//
+			// The lesson generalises past this bug: **a provenance lookup must
+			// use the same stringification its MATCHER used**, or the two
+			// disagree about what "the needle" is on exactly the values where
+			// they differ — which is the only place it matters.
+			const needle = needleOf(hit.value);
 			const harvestedFrom =
-				typeof hit.value === "string"
-					? this.secrets.participantSourced.get(hit.value)
-					: undefined;
+				needle === null
+					? undefined
+					: this.secrets.participantSourced.get(needle);
 			const ownField = hit.key !== null && harvestedFrom?.has(hit.key) === true;
 
 			// A hit inside participant-authored free text is self-disclosure,
@@ -841,10 +885,7 @@ export class EgressGuard {
 			// `User-Agent` colliding with `markets.slug` lands in a column that is
 			// not free text, so the old rule made it fatal — which is the whole
 			// denial-of-service.
-			if (
-				typeof hit.value === "string" &&
-				!this.isFatalNeedle(hit.value, hit.key)
-			) {
+			if (needle !== null && !this.isFatalNeedle(needle, hit.key)) {
 				this.warnings.push({
 					...entry,
 					detail:

@@ -22,7 +22,7 @@ import { treatmentsFor } from "./treatments";
  *      an allow-list in effect: an unclassified column fails the build
  *      (`assertTreatmentsComplete`), because the schema is closed and every
  *      column has to be looked at once.
- *   2. **Metadata sub-key** — §3.7's seven fields; five ship.
+ *   2. **Metadata sub-key** — §3.7's seven fields; **four** ship (five until ruling S2, DATASET.3).
  *   3. **Payload sub-key** — the §19.4.1 per-event-type declarations on
  *      `events.payload`.
  *
@@ -115,7 +115,7 @@ export const PAYLOAD_BEARING_TABLES = new Set([
  * reason.** This removed `ip` and `user_agent` and passed the rest through, so
  * a `metadata.trace` or `metadata.client` object added by any future handler
  * would have shipped on the strength of not being named. §3.7 declares seven
- * fields; five ship. Nothing else does, whatever it is called.
+ * fields; **four** ship since ruling S2 (DATASET.3). Nothing else does, whatever it is called.
  *
  * Returns a NEW object; never mutates. The source rows are read once and fed
  * to several passes, and a mutating strip would make the pipeline's result
@@ -271,6 +271,12 @@ export function shipDeep(
 	// print of an intermediate readable against the row it came from.
 	const out: Record<string, unknown> = {};
 	for (const [k, v] of Object.entries(value as SourceRow)) {
+		// ⚠ `Object.hasOwn`, not `node[k] !== undefined` (`@security-auditor`
+		// L-4). A bare index reaches the PROTOTYPE, so a payload key literally
+		// named `toString`, `valueOf` or `constructor` resolved to an inherited
+		// function and was treated as a declaration — shipping a key nobody
+		// declared, which is the one outcome this whole file exists to prevent.
+		if (!Object.hasOwn(node, k)) continue;
 		const child = node[k];
 		if (child === undefined) continue;
 		out[k] = shipDeep(v, child, `${where}.${k}`);
@@ -291,9 +297,18 @@ export function shipDeep(
  * at CI; this is what catches it if that guard is ever removed.
  */
 export function shipPayload(eventType: string, payload: unknown): unknown {
-	const spec = (PAYLOAD_SHIP_KEYS as Record<string, ShipSpec | undefined>)[
-		eventType
-	];
+	// ⚠ `Object.hasOwn` FIRST (`@security-auditor` L-4). A bare index reaches
+	// the prototype, so `event_type` values of `__proto__`, `toString`,
+	// `valueOf` or `constructor` resolved to something non-undefined and
+	// SHIPPED `{}` instead of throwing — silently, for a whole event type, in
+	// an append-only corpus. Unreachable through `events` today (its
+	// `event_type` is the closed `EVENT_TYPES` enum and `insertEvent` validates
+	// against it), but `PAYLOAD_BEARING_TABLES` deliberately includes
+	// `admin_events` / `user_events`, whose `event_type` is open `text` — which
+	// is exactly the projection this file's own docblock anticipates.
+	const spec = Object.hasOwn(PAYLOAD_SHIP_KEYS, eventType)
+		? (PAYLOAD_SHIP_KEYS as Record<string, ShipSpec | undefined>)[eventType]
+		: undefined;
 
 	if (spec === undefined) {
 		throw new EgressContractGapError(

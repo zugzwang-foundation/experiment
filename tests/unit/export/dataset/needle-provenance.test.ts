@@ -240,3 +240,128 @@ describe("S1 · the C-1 attack, reproduced through the real build", () => {
 		);
 	});
 });
+
+describe("S1 · H-1 — a NUMERIC leaf gets the same tier as a string one", () => {
+	// ⚠⚠ **`@security-auditor` H-1, DATASET.3 — this re-opened the CRITICAL
+	// ruling S1 exists to close, and the suite was green over it.**
+	//
+	// `findValues` matches numbers as well as strings: it stringifies every
+	// leaf and compares against the needle set. Both halves of the S1 tier test
+	// were written `typeof hit.value === "string" ? … : undefined`, so a hit on
+	// a NUMERIC leaf skipped the provenance lookup and fell through to FATAL —
+	// while the identical collision against a string leaf was advisory.
+	//
+	// The attack is self-serve and needs no privileged knowledge: the
+	// participant chooses their upload's exact byte count, and
+	// `image_uploads.byte_size` ships. Pad an image to 1,048,576 bytes, send
+	// `Idempotency-Key: 1048576`, and the one-shot release build dies on a
+	// column nobody wrote to.
+	//
+	// ⚠ **Every test in this file used a STRING leaf**, which is why none of
+	// them could see it. That is the shape worth keeping: a guard set can be
+	// thorough about the mechanism and blind about the TYPE the mechanism
+	// dispatches on.
+
+	/** ≥6 digits, so the needle clears `MIN_NEEDLE_LENGTH`. */
+	const N = 1048576;
+
+	function tablesWithByteSize(
+		idempotencyKey?: string,
+	): Record<string, readonly Record<string, unknown>[]> {
+		const rows: Record<string, readonly Record<string, unknown>[]> = {
+			...DIRTY_TABLE_ROWS,
+			image_uploads: DIRTY_TABLE_ROWS.image_uploads.map((u, i) =>
+				i === 0 ? { ...u, byte_size: N } : u,
+			),
+		};
+		if (idempotencyKey === undefined) return rows;
+		return {
+			...rows,
+			bets: DIRTY_TABLE_ROWS.bets.map((b, i) =>
+				i === 0 ? { ...b, idempotency_key: idempotencyKey } : b,
+			),
+		};
+	}
+
+	it("CONTROL — the numeric leaf really ships, and really is a number", () => {
+		// Without this the whole block is satisfied by a column that does not
+		// exist or a value the scan would skip anyway.
+		const rows = tablesWithByteSize();
+		const upload = rows.image_uploads[0] as Record<string, unknown>;
+		expect(typeof upload.byte_size).toBe("number");
+		expect(String(upload.byte_size).length).toBeGreaterThanOrEqual(6);
+	});
+
+	it("the needle IS harvested and IS tagged participant-sourced", () => {
+		// The tag was never the problem — the tier test was. Pinning this
+		// separately keeps the two apart, so a future regression in the harvest
+		// cannot be mistaken for a regression in the tier.
+		const secrets = harvestSecrets(tablesWithByteSize(String(N)) as never);
+		expect(secrets.idempotencyKeys.has(String(N))).toBe(true);
+		expect(secrets.participantSourced.get(String(N))).toEqual(
+			new Set(["idempotency_key"]),
+		);
+	});
+
+	it("⇒ the build COMPLETES, and the numeric collision is an advisory", async () => {
+		const result = await buildDataset({
+			source: fixtureSource(
+				"S1 · H-1 numeric",
+				tablesWithByteSize(String(N)) as never,
+			),
+			releaseDate: "2026-11-06",
+		});
+		// CONTROL — real rows were read.
+		expect(
+			result.manifest.tables.find((t) => t.name === "image_uploads")?.row_count,
+		).toBeGreaterThan(0);
+		expect(result.manifest.advisories.join(" ")).toContain(
+			"no-idempotency-key",
+		);
+	});
+
+	it("THE WRONG ANSWER — the string-only tier test aborts the same build", () => {
+		// The pre-fix behaviour, reproduced as code rather than described: the
+		// tier decided on `typeof hit.value === "string"` instead of on the
+		// needle the matcher actually used.
+		const rows = tablesWithByteSize(String(N));
+		const secrets = harvestSecrets(rows as never);
+
+		// ⚠ A SYNTHETIC row carrying only the numeric leaf, not the raw fixture
+		// table. My first draft passed `rows.image_uploads` untransformed, so
+		// the guard also fired `no-r2-object-key` on a STRIP column the strip
+		// had not yet removed — two violations, and a green-looking red for the
+		// wrong reason. Running half the pipeline and asserting the whole
+		// contract is its own error, and this is the third time it has caught
+		// me on this branch.
+		const row = [{ id: "u1", byte_size: N }];
+
+		const stringOnly = {
+			...secrets,
+			// A numeric leaf's stringification is absent from the map, so the
+			// old code fell through to fatal. Emptying the map reproduces
+			// exactly that state for every needle.
+			participantSourced: new Map(),
+		};
+		expect(() => assertTableClean("image_uploads", row, stringOnly)).toThrow(
+			/no-idempotency-key/,
+		);
+
+		// …and with the fix the same row is clean-with-an-advisory.
+		const outcome = assertTableClean("image_uploads", row, secrets);
+		expect(outcome.advisories.map((a) => a.rule)).toContain(
+			"no-idempotency-key",
+		);
+	});
+
+	it("…and a numeric leaf under the HARVEST field is still FATAL", () => {
+		// The other half, so the fix cannot have simply switched the class off
+		// for numbers. `byte_size` is not a field any needle was harvested
+		// from; `idempotency_key` is.
+		const rows = tablesWithByteSize(String(N));
+		const secrets = harvestSecrets(rows as never);
+		expect(() =>
+			assertTableClean("bets", [{ id: "b1", idempotency_key: N }], secrets),
+		).toThrow(/no-idempotency-key/);
+	});
+});

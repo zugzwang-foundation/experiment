@@ -69,14 +69,29 @@ import type { SourceRow } from "./strip";
  * own defect (`@security-auditor` F-11), and it would send someone to fix
  * something already fixed.
  *
- * ⛔ **What IS still open is a SHORTER route the note never mentioned.**
- * `comment.placed`'s payload carries BOTH `commentId` and `uploadId`, and
- * §19.4.1 explicitly ships `uploadId` as a research key. Every comment emits
- * one, so for a removed comment with an image the association rebuilds **in a
- * single row, with no join at all**. Pinned by a `⛔ KNOWN OPEN` test in
- * `tests/unit/export/dataset/depth-strip.test.ts`, and owed a ruling — closing
- * it deletes a key the spec says ships, and a strip conditional on removal is
- * the leaks-the-condition failure the C3 ruling itself rejects.
+ * ✅ **The SHORTER route this note used to call open is CLOSED too, as of
+ * ruling S5 (DATASET.3).** `comment.placed`'s payload carries BOTH `commentId`
+ * and `uploadId`, and §19.4.1 shipped `uploadId` as a research key — so for a
+ * removed comment with an image the association rebuilt **in a single row,
+ * with no join at all**, by a shorter path than the one E4 had just closed.
+ * `PAYLOAD_SHIP_KEYS["comment.placed"]` no longer declares it, and the two
+ * `⛔ KNOWN OPEN` pins in `depth-strip.test.ts` were INVERTED in the same
+ * commit rather than deleted.
+ *
+ * ⚠ **This paragraph is corrected rather than removed, and the correction is
+ * the second one this docblock has needed** — it is the same defect it warns
+ * about three lines above (*"a docblock advertising a leak that is closed is
+ * its own defect"*), committed by the pass that wrote the warning
+ * (`@security-auditor` L-7, DATASET.3). Recorded because the pattern is what
+ * matters: a note describing an open hole is the one kind of prose that gets
+ * read and acted on, so it is the one kind that must not outlive the hole.
+ *
+ * ⚠ Worth stating what closing it cost, because it was less than the note
+ * feared: under the DATASET.3 allow-list inversion the key is simply not
+ * declared. No strip rule was added, nothing conditional was introduced, and
+ * the leaks-the-condition failure the C3 ruling rejected never arose —
+ * absence is uniform. `comments.image_uploads_id` still carries the link for
+ * every comment that is not withheld, so no research join was lost.
  *
  * ### The original note, as written, on the route that is now closed
  *

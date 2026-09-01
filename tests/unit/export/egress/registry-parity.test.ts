@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { eventMetadataSchema } from "@/server/events/schemas";
-import { HARVEST_COLUMN_BUCKETS } from "@/server/export/dataset/build";
+import {
+	HARVEST_COLUMN_BUCKETS,
+	harvestSecrets,
+} from "@/server/export/dataset/build";
 import { COLUMN_TREATMENTS } from "@/server/export/dataset/treatments";
 import {
 	assertTableClean,
@@ -10,10 +13,13 @@ import {
 	EgressViolationError,
 	emptySecrets,
 	FORBIDDEN_VALUE_CLASSES,
+	METADATA_SHIP_SPEC,
 	SHIPPED_METADATA_KEYS,
 	STRIPPED_COLUMNS,
 	STRIPPED_METADATA_KEYS,
 } from "@/server/export/egress";
+
+import { DIRTY_TABLE_ROWS } from "../../../_fixtures/dataset/dirty-source";
 
 /**
  * DATASET.1 Slice 1 — parity between the DECLARED registries and the ones the
@@ -380,5 +386,131 @@ describe("egress · FORBIDDEN_VALUE_CLASSES names rules that actually fire", () 
 				`no-${cls}`,
 			);
 		}
+	});
+});
+
+describe("§3.7 · the metadata allow-list is BOUND to the schema (L-1)", () => {
+	// ⚠ **`@security-auditor` L-1 — ruling I's own lesson, inverted inside the
+	// commit that applied it.** After the DATASET.3 inversion,
+	// `METADATA_SHIP_SPEC` is what DRIVES the metadata strip, and it had no
+	// test at all; `SHIPPED_METADATA_KEYS`, which now only feeds the published
+	// `metadata_fields_included`, is the one the parity block pinned.
+	//
+	// The failure that leaves open: add a field to `eventMetadataSchema`, add
+	// it to `SHIPPED_METADATA_KEYS` to satisfy the existing test, forget
+	// `METADATA_SHIP_SPEC` — the field is dropped (safe) while the PUBLIC
+	// manifest advertises it as included (a false claim about the artifact).
+
+	const schemaKeys = Object.keys(eventMetadataSchema.shape).sort();
+	const shipSpecKeys = Object.keys(METADATA_SHIP_SPEC).sort();
+
+	it("POSITIVE CONTROL — §3.7 really declares seven fields", () => {
+		// Without this, every assertion below passes against an empty schema.
+		expect(schemaKeys).toHaveLength(7);
+		expect(schemaKeys).toContain("request_id");
+		expect(schemaKeys).toContain("ip");
+	});
+
+	it("the two metadata lists are the SAME list", () => {
+		// The published `metadata_fields_included` must describe what the strip
+		// keeps, or the manifest lies about the artifact beside it.
+		expect(shipSpecKeys).toEqual([...SHIPPED_METADATA_KEYS].sort());
+	});
+
+	it("every §3.7 field is either shipped or stripped — no third state", () => {
+		const classified = new Set([...shipSpecKeys, ...STRIPPED_METADATA_KEYS]);
+		const unclassified = schemaKeys.filter((k) => !classified.has(k));
+		expect(
+			unclassified,
+			"a §3.7 metadata field is in neither the SHIP spec nor the STRIP " +
+				"list — it will silently not ship, which is safe and is still a " +
+				"decision nobody made",
+		).toEqual([]);
+	});
+
+	it("no field is in BOTH lists", () => {
+		const both = shipSpecKeys.filter((k) =>
+			(STRIPPED_METADATA_KEYS as readonly string[]).includes(k),
+		);
+		expect(both).toEqual([]);
+	});
+
+	it("FOUR ship since ruling S2, and the names are pinned", () => {
+		// ⚠ Pinned by NAME, not by count. `idempotency_key` left this list at
+		// DATASET.3 and five docblocks in `src/` still said "five ship" — a
+		// count is what goes stale, a name is what a reader can check.
+		expect(shipSpecKeys).toEqual([
+			"actor_id",
+			"flow_id",
+			"request_id",
+			"user_id",
+		]);
+		expect([...STRIPPED_METADATA_KEYS].sort()).toEqual([
+			"idempotency_key",
+			"ip",
+			"user_agent",
+		]);
+	});
+
+	it("THE WRONG ANSWER — a new §3.7 field with no decision is detected", () => {
+		// The control. The live pair agrees, so a test that could only compare
+		// the real two would assert emptiness against data with no gap.
+		const withNewField = [...schemaKeys, "trace_id"];
+		const classified = new Set([...shipSpecKeys, ...STRIPPED_METADATA_KEYS]);
+		expect(withNewField.filter((k) => !classified.has(k))).toEqual([
+			"trace_id",
+		]);
+	});
+});
+
+describe("ruling I · the harvest READS every bucket it declares (L-2)", () => {
+	// ⚠ **`@security-auditor` L-2.** The `satisfies Record<StrippedColumnPath,
+	// …>` clause forces a new STRIP column to acquire a bucket ENTRY. It does
+	// not force `harvestSecrets` — which is hand-written `add(...)` calls — to
+	// actually read that column, and `HARVEST_COLUMN_BUCKETS[...].bucket` is
+	// never dereferenced at runtime. So the compile error proves a DECLARATION
+	// and this proves the HARVEST, which are two different claims.
+
+	it("every declared bucket actually receives its column's value", () => {
+		const secrets = harvestSecrets(DIRTY_TABLE_ROWS as never);
+		const wrong: string[] = [];
+		for (const [path, decl] of Object.entries(HARVEST_COLUMN_BUCKETS)) {
+			const [table, column] = path.split(".") as [string, string];
+			const rows =
+				(
+					DIRTY_TABLE_ROWS as Record<string, readonly Record<string, unknown>[]>
+				)[table] ?? [];
+			for (const row of rows) {
+				const v = row[column];
+				if (typeof v !== "string" || v.trim() === "") continue;
+				const bucket = (
+					secrets as unknown as Record<string, ReadonlySet<string>>
+				)[decl.bucket];
+				if (!bucket?.has(v)) wrong.push(`${path} -> ${decl.bucket}`);
+			}
+		}
+		expect(
+			[...new Set(wrong)],
+			"a STRIP column has a declared harvest bucket that never receives " +
+				"its value — the compile error proved the declaration and not " +
+				"the harvest",
+		).toEqual([]);
+	});
+
+	it("POSITIVE CONTROL — the fixture populates every STRIP column", () => {
+		// Without this, the loop above skips every column and passes over
+		// nothing. A fixture that stopped populating a STRIP column would make
+		// the check vacuous exactly where it matters.
+		const populated = Object.keys(HARVEST_COLUMN_BUCKETS).filter((path) => {
+			const [table, column] = path.split(".") as [string, string];
+			const rows =
+				(
+					DIRTY_TABLE_ROWS as Record<string, readonly Record<string, unknown>[]>
+				)[table] ?? [];
+			return rows.some(
+				(r) => typeof r[column] === "string" && r[column] !== "",
+			);
+		});
+		expect(populated.length).toBe(Object.keys(HARVEST_COLUMN_BUCKETS).length);
 	});
 });

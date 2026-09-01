@@ -54,7 +54,7 @@ export const STRIPPED_METADATA_KEYS = [
 ] as const;
 
 /**
- * §19.4 — the five `metadata` fields that DO ship. Kept as an explicit
+ * §19.4 — the `metadata` fields that DO ship. ⚠ **FOUR since ruling S2 (DATASET.3)** — `idempotency_key` left this list when it became STRIP; §3.7 declares seven fields. Kept as an explicit
  * positive list, not merely as "everything else", so that a new metadata
  * field added to §3.7's set fails the completeness guard rather than
  * silently shipping on the strength of not being named a secret.
@@ -307,7 +307,7 @@ export const PAYLOAD_SHIP_KEYS = {
  * than silently shipping on the strength of not being named a secret" — a
  * guarantee that had no mechanism until the inversion gave it one.
  *
- * §3.7 declares seven metadata fields and this names the five that survive.
+ * §3.7 declares seven metadata fields and this names the **four** that survive (it was five until ruling S2 stripped `idempotency_key`).
  * `ip` and `user_agent` are absent because they are PII (§19.4 rows 9–10) —
  * and, more to the point, so is anything a future author adds to that object.
  *

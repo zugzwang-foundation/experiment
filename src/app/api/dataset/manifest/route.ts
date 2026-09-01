@@ -50,8 +50,9 @@ import {
  * a server in a positive offset would otherwise flip this route hours early,
  * which is precisely the kind of thing that is invisible until the day.
  *
- * Runtime: Node (ADR-0003 — no `runtime = 'edge'` export). Cached, because the
- * body is a static file that changes once, ever.
+ * Runtime: Node (ADR-0003 — no `runtime = 'edge'` export). The published answer
+ * is cached, because the body is a static file that changes once, ever; the
+ * pre-release 503 is NOT, because a cached 503 outlives the state it describes.
  */
 
 /** The §19.1 release date, as a UTC calendar day. */
@@ -61,14 +62,27 @@ const RELEASE_DATE = "2026-11-06";
 const NOT_YET_RELEASED = "error_dataset_not_yet_released";
 
 /**
- * Seconds a client may cache each answer.
+ * Seconds a client should wait before asking again, pre-release.
  *
- * Short before the release (the state flips once, and a researcher polling on
- * the morning should not be told 503 for an hour afterwards); long after, when
- * the body is immutable by definition — §19.1 permits a v2 rebuild, and a v2
- * would be a new release with its own manifest rather than an edit to this one.
+ * ⚠ **Renamed from `CACHE_BEFORE`, because it never was one**
+ * (`@security-auditor` L-5). It is passed as `jsonResponse`'s fourth argument,
+ * which is `retryAfterHeader` — so the emitted header was `Retry-After: 300`
+ * and no `Cache-Control` was sent at all, while the constant's own docblock
+ * described caching behaviour. The name is now what the value does.
+ *
+ * `Retry-After` is in fact the right header here: the 503 is a temporal state
+ * that flips once, and a researcher polling on the morning of the sixth should
+ * not be handed a cached 503 by an intermediary for an hour afterwards.
  */
-const CACHE_BEFORE = 300;
+const RETRY_AFTER_BEFORE = 300;
+
+/**
+ * Seconds a client may cache the published manifest.
+ *
+ * Long, because the body is immutable by definition — §19.1 permits a v2
+ * rebuild, and a v2 is a new release with its own manifest rather than an edit
+ * to this one.
+ */
 const CACHE_AFTER = 3600;
 
 /**
@@ -107,7 +121,7 @@ export async function GET(request: Request): Promise<Response> {
 					`published on ${RELEASE_DATE}; this endpoint serves its manifest ` +
 					"from then.",
 			),
-			CACHE_BEFORE,
+			RETRY_AFTER_BEFORE,
 		);
 	}
 
@@ -117,6 +131,14 @@ export async function GET(request: Request): Promise<Response> {
 			"content-type": "application/json",
 			"X-Request-Id": requestId,
 			"cache-control": `public, max-age=${CACHE_AFTER}`,
+			// ⚠ **`Vary: X-Request-Id`, because the response echoes it**
+			// (`@security-auditor` L-5). Without it a shared cache keys this
+			// response on the URL alone and serves one client's trace token to
+			// every other client. The content is harmless — a request id is not
+			// a secret — but a cache-key that ignores a header the body varies
+			// on is wrong in a way that stops being harmless the moment
+			// anything else varies with it.
+			vary: "X-Request-Id",
 		},
 	});
 }
