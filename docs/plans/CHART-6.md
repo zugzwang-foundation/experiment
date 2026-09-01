@@ -67,21 +67,41 @@ component ever compares them.
 | `docs/design-canon.md` | S1 — EDIT A, B, C |
 | `docs/specs/SPEC.1.md` | S1 — EDIT D (§16.1), EDIT E (§17 rows) |
 | `tests/unit/config/chart-window.test.ts` | S2 + S5 — the new start; RF-5 containment against the real constants |
-| `tests/unit/debate/chart/geometry.test.ts` | S3 — `labelLeftPct`, ring extent |
-| `tests/unit/debate/render/price-chart.test.tsx` | S3/S4 — anchor sweep, flip, hero scale |
+| `tests/unit/debate/chart/label-anchor.test.tsx` | S3/S5 — **NEW**: the anchor sweep, the flip, the ring clearance, `labelLeftPct`'s divisor |
 | `tests/unit/debate/chart/alignment-chain.test.tsx` | S3 — clause-2/3 structural chain follows the label out of the gutter |
-| `tests/unit/debate/render/y-scale.test.tsx` | S4 — hero joins the scale |
-| `tests/unit/discovery/render/hero-panels.test.tsx` | S4 — hero surface |
+| `tests/unit/debate/render/y-scale.test.tsx` | S4/S5 — hero joins the scale; the CSS-space collision band; the payload split |
+| `tests/unit/debate/render/terminal-markers.test.tsx` | S3 — positional `style` regexes; prose that named the deleted gutter |
+
+**Three rows in the first draft of this map were never executed, and are struck
+rather than quietly dropped** (`@test-writer`, L-9). `tests/unit/debate/chart/
+geometry.test.ts` and `tests/unit/debate/render/price-chart.test.tsx` were listed
+for the anchor/flip work; that work went to a new file of its own,
+`label-anchor.test.tsx`, because it is a new property with its own subject and
+folding it into an existing file would have buried the sweep. `labelLeftPct`'s
+`SVG_W` divisor is behaviourally pinned there rather than unit-tested in
+`geometry.test.ts`. `tests/unit/discovery/render/hero-panels.test.tsx` was listed
+for S4 and needed no edit — it already pins `data-mode === "hero"`, and what
+CHART-6 changes is what that mode renders, which `y-scale.test.tsx` owns.
+**Coverage is not lost; the plan was.**
 
 ---
 
 ## 4 · Ambiguities resolved, with the alternative rejected
 
 **#1 — How the flip decides it would cross the right edge.**
-*Chose:* decide in the component from `terminalX`, against `LABEL_FLIP_RESERVE_PCT = 12`, a
-percentage of the plot measured across four viewports (worst case 10.46 %, hero @1024 with the
-two-line label; collapsed is 9.69 % and viewport-independent because its rail is a pinned
-`w-[340px]`). Over-reserving flips early, which is benign; under-reserving overflows, which is not.
+*Chose:* decide in the component from `terminalX`, against **`LABEL_FLIP_RESERVE_PCT = 14`**, a
+percentage of the plot. Over-reserving flips early, which is benign; under-reserving overflows,
+which is not.
+*Re-measured at the `@code-reviewer` cascade, and the number moved.* The reviewer filed the reserve
+as under-sized, deriving the hero's box at 1024 as 421.95 px from a pure `1fr 1.9fr 1fr` reading of
+`HeroPanels`' grid. **Measured across the whole range, the hero's chart frame has a FLOOR of
+496.49 px** — 768, 900, 1024 and 1045 all give the same figure, because the `md:` grid's centre
+track resolves to a content minimum of 530.99 px and stops shrinking; below 768 the panel is
+single-column and the hero gets *wider*. So the derivation is wrong (it reproduces 1440 exactly,
+which is what made it convincing) and **the finding is DECLINED on its arithmetic**. Its concern was
+right, though: the true requirement is 10.31 % plus 1.06 pp for the 5 px of air the threshold cannot
+express = **11.37 %**, which `12` cleared by 0.63 pp. Raised to **14** for 2.6 pp of margin;
+`label-anchor.test.tsx` caps it at 20 from the other side.
 *Rejected:* (a) CSS anchor positioning `position-try-fallbacks: flip-inline` — the exact feature,
 but not assertable in jsdom, so its guard could only assert a string; (b) a pure CSS `min()` clamp
 — width-free and exact, but it *slides* the label onto its own dot rather than flipping, which

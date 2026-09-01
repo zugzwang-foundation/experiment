@@ -2,8 +2,12 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { SVG_W } from "@/components/debate/chart/geometry";
+import { SVG_W, VIEWBOX_W, xPx } from "@/components/debate/chart/geometry";
 import { MarketPriceChart } from "@/components/debate/chart/MarketPriceChart";
+import {
+	MARKET_CHART_WINDOW_END,
+	MARKET_CHART_WINDOW_START,
+} from "@/server/config/limits";
 import type { PricePoint } from "@/server/discovery/price-series";
 
 // CHART-2 AUDIT — the alignment chain, link by link (`C-CHART-2` clause 2, and
@@ -469,7 +473,27 @@ describe("C-CHART-2 clause 2 — the label sits beside its own DOT", () => {
 		it(`${mode}: the label's left is derived from the terminal dot's cx, not from the plot's edge`, () => {
 			const { container } = renderMode(mode);
 
-			// The two independent quantities, read from the two independent elements.
+			// ⛔⛔ DERIVED FROM THE SERIES, NOT READ BACK OUT OF THE RENDER — and this
+			// block said "the two independent quantities" while comparing ONE.
+			// `cx`, `data-plot-x` and the `left` percentage all descend from a single
+			// `terminalX`, so checking the label against the dot proves only that the
+			// component agrees with itself. Filed by `@test-writer` as H-3, with the
+			// mutation that walked straight through it: `terminalX = xPx(series[0].at,
+			// …)` — the FIRST point instead of the last. This file's fixture starts
+			// exactly at the window start, so under that mutation all three quantities
+			// become `0`, `expect(0).toBeCloseTo(0)` holds, `0 < 99` holds, and all 22
+			// tests stayed green. It is the very shape this describe block's own
+			// header calls out one screen above.
+			const expectedX = xPx(
+				SERIES[SERIES.length - 1].at,
+				Date.parse(MARKET_CHART_WINDOW_START),
+				Date.parse(MARKET_CHART_WINDOW_END),
+			);
+			// Non-vacuity: the fixture ends INSIDE the plot and at neither edge, so
+			// zero and full-width are both distinguishable from the right answer.
+			expect(expectedX).toBeGreaterThan(0);
+			expect(expectedX).toBeLessThan(VIEWBOX_W);
+
 			const dot = container.querySelector('[data-testid="terminal-dot-yes"]');
 			const label = container.querySelector(
 				'[data-testid="terminal-label-yes"]',
@@ -477,17 +501,17 @@ describe("C-CHART-2 clause 2 — the label sits beside its own DOT", () => {
 			expect(dot).not.toBeNull();
 			expect(label).not.toBeNull();
 
-			const cx = Number(dot?.getAttribute("cx"));
-			expect(Number.isFinite(cx)).toBe(true);
-
-			// The label carries the dot's own x, and the CSS it emits is anchored on
-			// the same number as a percentage of the viewBox's width.
-			expect(Number(label?.getAttribute("data-plot-x"))).toBe(cx);
+			// Each of the three is checked against that one independent truth.
+			expect(Number(dot?.getAttribute("cx"))).toBeCloseTo(expectedX, 6);
+			expect(Number(label?.getAttribute("data-plot-x"))).toBeCloseTo(
+				expectedX,
+				6,
+			);
 			const left =
 				label?.getAttribute("style")?.match(/left:([^;]*)/)?.[1] ?? "";
 			expect(left, `${mode} label has no left`).not.toBe("");
 			const anchorPct = Number.parseFloat(left.match(/([\d.]+)%/)?.[1] ?? "");
-			expect(anchorPct).toBeCloseTo((cx / SVG_W) * 100, 3);
+			expect(anchorPct).toBeCloseTo((expectedX / SVG_W) * 100, 3);
 
 			// ⛔ MUST REJECT THE OLD BEHAVIOUR: an anchor at the plot's right edge.
 			// This fixture's series ends well inside the window, so a label pinned to

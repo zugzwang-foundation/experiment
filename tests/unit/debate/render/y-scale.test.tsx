@@ -35,6 +35,14 @@ import type { PricePoint } from "@/server/discovery/price-series";
 const LABEL_NAME_PX = 10;
 const LABEL_VALUE_PX = 16;
 const LABEL_STACK_GAP_PX = 2;
+/** The numeric marks' OWN type size — `YMarks` declares `text-[10px]` for itself.
+ * ⚠ MIRRORED SEPARATELY FROM `LABEL_NAME_PX` EVEN THOUGH BOTH ARE 10, because
+ * `markTop`'s docblock exists precisely to stop the marks' edge clamp reading the
+ * end label's type: change the label to 12px — a one-token edit `labelHalfBoxPx`
+ * is built to absorb — and a guard that mirrored the label's constant would follow
+ * it and stop describing the marks. The guard reproduced that conflation until
+ * `@test-writer` filed it (L-3). */
+const MARK_TYPE_PX = 10;
 
 const D = (n: number) => n.toFixed(18);
 
@@ -93,6 +101,21 @@ describe("C-CHART-1 clause 1 (CHART-5) — the gridline set is a pure function o
 				["collapsed", "expanded", "hero"].map((m) => hasFullYScale(m as never)),
 			).size,
 		).toBe(2);
+
+		// ⛔ THE DIRECTION OF THE NEGATION, WHICH THE DOCBLOCK CALLS LOAD-BEARING AND
+		// NOTHING GUARDED (`@test-writer`, M-2). `hasFullYScale` is written as "not
+		// collapsed" rather than "expanded or hero" so that a FOURTH surface joins
+		// the full treatment by default and is excluded deliberately. Rewritten as a
+		// list — `mode === "expanded" || mode === "hero"` — every assertion above
+		// stays green, because the loop only ever visits the three modes that exist,
+		// and a new mode would then ship with no scale at all: silently, on a chart
+		// whose whole point is that the scale is a function of the mode. That is the
+		// exact failure `gridlinesFor`'s exhaustive switch turns into a COMPILE error,
+		// and the predicate must not be the soft spot beside it.
+		expect(
+			hasFullYScale("a-fourth-surface" as never),
+			"hasFullYScale must be written as a negation of `collapsed`, so an unrecognised mode gets the FULL scale rather than none",
+		).toBe(true);
 	});
 
 	it("the y of each line is its percent on the fixed 0–100 % scale, top-down", () => {
@@ -116,6 +139,16 @@ describe("C-CHART-1 clause 1 (CHART-5) — the gridline set is a pure function o
 		// Referential equality is the only thing that can tell the difference.
 		expect(gridlinesFor("expanded")).toBe(gridlinesFor("expanded"));
 		expect(gridlinesFor("collapsed")).toBe(gridlinesFor("collapsed"));
+		// ⚠ THE HERO WAS MISSING FROM THIS LIST — it is the mode CHART-6 added, and
+		// `case "hero": return [...GRIDLINES_TEN_STEP]` would rebuild an array per
+		// call while every other assertion in this file stayed green (`@test-writer`,
+		// L-1).
+		expect(gridlinesFor("hero")).toBe(gridlinesFor("hero"));
+		// …and the hero and the overlay are ONE array, not two equal ones. The
+		// geometry docblock's reason for a single constant is that "two names for one
+		// array would be two places for them to drift apart" — `toEqual` cannot see
+		// the difference, and identity is the only thing that can.
+		expect(gridlinesFor("hero")).toBe(gridlinesFor("expanded"));
 	});
 
 	it("the set does not move when the DATA moves", () => {
@@ -244,14 +277,19 @@ describe("CHART-5 — no new token, and no raw hex", () => {
 		// ⚠ THE SLICE USED THE LABEL LAYER AS ITS END BOUND AND THAT ORDER REVERSED
 		// AT CHART-6. The labels moved INSIDE the plot box, so they now precede the
 		// marks column in the markup rather than following it — the old bounds
-		// produced an EMPTY slice, and `not.toMatch` on an empty string passes. The
-		// column is bounded by its own element instead, which is what it should have
-		// been: a slice whose end is another component's testid goes wrong whenever
-		// either one moves.
+		// produced an EMPTY slice, and `not.toMatch` on an empty string passes.
+		// ⛔ AND THE FIRST REPLACEMENT WAS THE SAME MISTAKE INVERTED: it sliced to the
+		// END OF THE DOCUMENT, which equals the column only because `chart-y-marks`
+		// happens to be last in the frame today — while the comment three lines above
+		// claimed a bound the code did not have (`@test-writer`, M-4). It is bounded
+		// by its own closing tag now, and the count below proves the bound landed.
 		const m = markup("expanded");
 		const at = m.indexOf('data-testid="chart-y-marks"');
 		expect(at).toBeGreaterThan(-1);
-		const col = m.slice(at);
+		const lastMark = m.lastIndexOf('data-testid="y-mark-');
+		const end = m.indexOf("</div>", lastMark);
+		expect(end).toBeGreaterThan(at);
+		const col = m.slice(at, end + 6);
 		// Non-vacuity: the slice really contains the eleven marks, so the hex ban
 		// below is read against the column and not against whatever survived.
 		expect([...col.matchAll(/data-testid="y-mark-\d+"/g)].length).toBe(11);
@@ -259,7 +297,7 @@ describe("CHART-5 — no new token, and no raw hex", () => {
 	});
 });
 
-describe("C-CHART-1 clause 1 (CHART-6) — numeric marks are on every FULL-SCALE mode", () => {
+describe("discovery::hero-chart-carries-y-scale — C-CHART-1 clause 1 (CHART-6), marks on every FULL-SCALE mode", () => {
 	it("eleven marks on the overlay AND the hero, none on the card", () => {
 		const marks = (m: string) =>
 			[...m.matchAll(/data-testid="y-mark-(\d+)"/g)].map((x) => Number(x[1]));
@@ -288,7 +326,13 @@ describe("C-CHART-1 clause 1 (CHART-6) — numeric marks are on every FULL-SCALE
 		expect(col).not.toBeNull();
 		// MUST REJECT: a hand-measured `w-[22px]`, which is the defect CHART-2
 		// deleted for the label gutter, reintroduced one column over.
-		expect(col?.getAttribute("class") ?? "").not.toMatch(/(^|\s)w-\[/);
+		// ⚠ THE CORRECTED TOKEN FORM, not `/(^|\s)w-\[/` — that copy could not see
+		// `min-w-[`, `max-w-[` or a `md:w-[` variant, and a second, weaker spelling of
+		// one ban on one element is a place for the two to disagree (`@test-writer`,
+		// L-2).
+		expect(col?.getAttribute("class") ?? "").not.toMatch(
+			/(^|\s)(min-|max-)?w-/,
+		);
 		expect((col as HTMLElement | null)?.style.width ?? "").toBe("");
 		// …and the in-flow sizer that replaces it is present and INVISIBLE rather
 		// than `hidden` — `hidden` removes the box and collapses the column.
@@ -527,7 +571,10 @@ describe("C-CHART-2 clause 4 (CHART-5) — one collision rule, two measured inpu
 			"the name's type size",
 		);
 		const valueSize = num(
-			/terminal-value-yes"[^>]*style="font-size:(\d+)px/,
+			// ⚠ MATCHED WHEREVER IT SITS, not anchored to `font-size` being first — the
+			// same positional assumption this branch fixed for `top`, and the same
+			// failure mode: a false RED the next time a style prop is added above it.
+			/terminal-value-yes"[^>]*style="[^"]*font-size:(\d+)px/,
 			"the value's type size",
 		);
 		const stackGap = num(
@@ -629,15 +676,24 @@ describe("CHART-5 — a mark is BOUND to its gridline, and the column obeys the 
 		expect(top0).toContain(", 100%,");
 	});
 
-	it("the marks' edge floor is the ONE-LINE half box, by value", () => {
+	it("the marks' edge floor is half the MARKS' OWN type, by value", () => {
 		// Only the WORD `clamp(` was asserted before, so a wrong half-box passed —
 		// and a wrong half-box is precisely what that clamp exists to prevent: the
-		// 0 and 100 marks sit on the plot's boundaries and the gutter does not clip.
+		// 0 and 100 marks sit on the plot's boundaries and the column does not clip.
+		//
+		// ⛔ AGAINST `MARK_TYPE_PX`, NOT `LABEL_NAME_PX`, AND THE SWAP IS THE POINT
+		// (`@test-writer`, L-3). This asserted the END LABEL's constant — which is
+		// the exact conflation `markTop`'s docblock was written to end, reproduced
+		// inside the guard for it. Both are 10 today, so the assertion passed for a
+		// reason that has nothing to do with the marks: change the end label to 12px
+		// and this guard would follow the label and stop describing the column,
+		// silently, while the `0` and `100` marks drifted a pixel off their own
+		// gridlines in a column that does not clip.
 		const m = markup("expanded");
 		const at = m.indexOf('data-testid="y-mark-100"');
 		const style = m.slice(at, m.indexOf(">", at));
-		expect(style).toContain(`clamp(${LABEL_NAME_PX / 2}px,`);
-		expect(style).toContain(`calc(100% - ${LABEL_NAME_PX / 2}px)`);
+		expect(style).toContain(`clamp(${MARK_TYPE_PX / 2}px,`);
+		expect(style).toContain(`calc(100% - ${MARK_TYPE_PX / 2}px)`);
 	});
 
 	it("the marks column inherits the alignment contract — positioned, absolute, no vertical box model", () => {

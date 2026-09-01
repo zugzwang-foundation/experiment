@@ -1,8 +1,16 @@
 /**
  * CHART-6 — emit the standalone contact sheet.
  *
+ *   pnpm build && \
  *   ZUGZWANG_ENV=staging pnpm tsx scripts/chart-6-contact-sheet.tsx \
- *     ~/Downloads/zz_CHART-6_contact-sheet_<UTC>.html <geist.woff2>
+ *     ~/Downloads/zz_CHART-6_contact-sheet_<UTC>.html
+ *
+ * ⚠ ONE ARGUMENT, AND THE BUILD IS A PRECONDITION. An earlier version took a
+ * woff2 path as a second argument; the fonts come from `.next/static/media` now
+ * and that argument is gone. It is called out because the docblock kept
+ * describing it after the code stopped reading it, so a caller passing a font
+ * path would have had it silently ignored — a refusal-with-the-wrong-cause
+ * (`O-3`) in a file that otherwise polices its own diagnostics carefully.
  *
  * ⚠ `ZUGZWANG_ENV=staging` IS LOAD-BEARING, NOT A HABIT. The fixtures below are
  * August-dated, and under the PRODUCTION window (Sep 15 → Nov 5) every one of
@@ -20,11 +28,11 @@
  * ⛔ THE FONT IS THE ONE THE PRODUCT SERVES, INLINED. Every width figure in this
  * sheet is a text advance, and a text advance measured against a fallback face is
  * a fiction shaped exactly like a number — which is why CHART-1 had to pin `YES`
- * at a hand-guessed 26 units and why CHART-2 deleted that pin. The woff2 passed
- * as the second argument is fetched from the deployed app's own
- * `/_next/static/immutable/media/`, base64'd into the file, and CHECKED at
- * runtime: **the banner reads `FONT CHECK PASSED` only if `document.fonts.check`
- * confirms Geist, and every measured figure is withheld until it does.**
+ * at a hand-guessed 26 units and why CHART-2 deleted that pin. Every `.woff2`
+ * this build emitted is base64'd into the app's own `@font-face` rules, and the
+ * result is CHECKED at runtime: **the banner reads `FONT CHECK PASSED` only if
+ * `document.fonts.check` confirms Geist, and every measured figure is withheld
+ * until it does.**
  *
  * ⚠ HEX LITERALS ARE PERMITTED IN THE GENERATED FILE ONLY. It is not in the view
  * layer, it is not scanned by the raw-hex guard, and it must resolve its own
@@ -36,6 +44,7 @@ import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { TERMINAL_PULSE_PEAK_SCALE } from "@/components/debate/chart/geometry";
 import { MarketPriceChart } from "@/components/debate/chart/MarketPriceChart";
 import {
 	MARKET_CHART_WINDOW_END,
@@ -159,6 +168,27 @@ function compiledCss(): string {
 
 const APP_CSS = compiledCss();
 
+/**
+ * The transcribed pulse must be the SHIPPED pulse.
+ *
+ * ⛔ THE SHEET OVERRIDES THE REAL RULE, so without this it can show a ring the
+ * product no longer draws — silently, under a green banner, in the artifact whose
+ * whole job is to be believed. `TERMINAL_PULSE_PEAK_SCALE` is also what
+ * `LABEL_GAP_PCT` sizes the label's clearance from, so a drift here would make
+ * the sheet's most important measurement (dot ↔ label) describe a different ring
+ * than the one on screen. Filed by `@code-reviewer` as a control the class list
+ * above had and this transcription did not.
+ */
+function assertPulseMatches(): void {
+	const peak = `scale(${TERMINAL_PULSE_PEAK_SCALE})`;
+	if (!APP_CSS.includes(peak)) {
+		throw new Error(
+			`REFUSED — the compiled CSS does not contain \`${peak}\`. This sheet transcribes the pulse keyframes and overrides the real ones, so a drift would render a ring the product does not draw. Reconcile globals.css with TERMINAL_PULSE_PEAK_SCALE.`,
+		);
+	}
+}
+assertPulseMatches();
+
 const START_MS = Date.parse(MARKET_CHART_WINDOW_START);
 const END_MS = Date.parse(MARKET_CHART_WINDOW_END);
 
@@ -186,12 +216,7 @@ function series(f: number, end: number, n = 10): PricePoint[] {
 	});
 }
 
-function chart(
-	mode: Mode,
-	pts: PricePoint[],
-	isOpen = true,
-	extraStyle = "",
-): string {
+function chart(mode: Mode, pts: PricePoint[], isOpen = true): string {
 	const b = BOX[mode];
 	// ⛔ THE OVERLAY'S HEIGHT IS AUTO, AND THE OTHER TWO ARE PINNED, BECAUSE THAT IS
 	// HOW THE PRODUCT SIZES THEM. The collapsed card takes its height from the
@@ -206,8 +231,8 @@ function chart(
 	// only a sheet bug: deleting the label gutter returns ~48.73 px of width to the
 	// overlay's plot, and a locked aspect turns width into height. Captioned below.
 	const h = mode === "expanded" ? "auto" : `${b.h}px`;
-	return `<div class="frame" style="width:${b.w}px;height:${h};${extraStyle}" data-mode="${mode}">${renderToStaticMarkup(
-		MarketPriceChart({ series: pts, mode, isOpen }) as never,
+	return `<div class="frame" style="width:${b.w}px;height:${h}" data-mode="${mode}">${renderToStaticMarkup(
+		<MarketPriceChart series={pts} mode={mode} isOpen={isOpen} />,
 	)}</div>`;
 }
 
@@ -278,6 +303,34 @@ const s6 = MODES.map((m) =>
 	),
 ).join("");
 
+/**
+ * ⭐ SECTION 7 — THE ENDGAME, and it exists because `@code-reviewer` predicted a
+ * collision this sheet could not otherwise show.
+ *
+ * Moving the labels INSIDE the plot box put them in the same rectangle as the
+ * SVG date labels, which sit at `y = VIEWBOX_H − 8` along the bottom. While the
+ * labels lived in a gutter beside the plot that overlap was structurally
+ * impossible. It needs BOTH conditions at once — the series at the window end
+ * (so the label's x reaches the `Nov 5` label's x) AND an extreme price (so
+ * clause 4's clamp pushes the label's y down onto the axis strip) — and no other
+ * cell in this sheet carries both. On 2026-11-05 every market has both.
+ *
+ * The captions below report the MEASURED overlap rather than asserting there is
+ * none: this is the case the founder has to rule on, and it should arrive as a
+ * rectangle in pixels.
+ */
+const s7 = [0.04, 0.5, 0.96]
+	.map((p) =>
+		MODES.map((m) =>
+			cell(
+				`<b>${m}</b> · YES ${(p * 100).toFixed(0)} % at the window END`,
+				chart(m, series(1, p)),
+				`label × date-axis: <span class="measured" data-measure="end-${p}-${m}" data-axis="1"></span>`,
+			),
+		).join(""),
+	)
+	.join("");
+
 // ── The document ────────────────────────────────────────────────────────────
 
 const html = `<!doctype html>
@@ -312,7 +365,14 @@ figcaption{margin-top:6px;color:var(--color-n5);font-size:11px;max-width:640px}
 .measured:empty::after{content:"— withheld until FONT CHECK PASSES";color:#8a6d3b}
 
 /* ⛔ TRANSCRIBED FROM src/app/globals.css, AND SECTION 6 IS MEANINGLESS WITHOUT
-   IT. The first version of this sheet omitted the keyframes entirely, so NO
+   IT. ⚠ It is placed AFTER the app's own CSS so it overrides the real rule —
+   which means a change to TERMINAL_PULSE_PEAK_SCALE and globals.css would leave
+   this sheet quietly showing the OLD ring. assertPulseMatches() checks the
+   shipped scale against this transcription before the file is written, so the two
+   cannot drift silently.
+   (No backticks in this comment: it lives inside a JS template literal, and one
+   would end the string here. That has now happened twice in this file, which is
+   why both CSS comments say so.) The first version of this sheet omitted the keyframes entirely, so NO
    pulse animated anywhere — and the "reduced motion" section, whose whole job is
    to show that the ring FREEZES while the dot REMAINS, was showing a frozen ring
    next to eleven other frozen rings. A control that cannot differ from its
@@ -357,6 +417,12 @@ ${s2}
 
 <h2>6 · Reduced motion — the dots must still be present</h2>
 <div class="grid rm">${s6}</div>
+
+<h2>7 · ⭐ THE ENDGAME — series at the window end, price at an extreme</h2>
+<p id="meta">The labels moved inside the plot at CHART-6, so they now share a box with the
+SVG date labels along the bottom. This is the only combination that brings the two together —
+and it is what every market looks like on 2026-11-05. <b>Overlap is measured, not asserted.</b></p>
+<div class="grid">${s7}</div>
 
 <script>
 (async function () {
@@ -409,6 +475,32 @@ ${s2}
       var sep = Math.abs((a.top+a.bottom)/2 - (c.top+c.bottom)/2);
       var overlap = !(a.bottom <= c.top + 0.5 || c.bottom <= a.top + 0.5);
       span.textContent = f(sep)+'px apart · boxes '+f(a.height)+'px tall · '+(overlap?'⛔ OVERLAP':'clear');
+      return;
+    }
+
+    if (span.hasAttribute('data-axis')) {
+      // ⛔ MEASURED, NOT ASSERTED. Every SVG date label against every end label:
+      // the intersection rectangle, in CSS px, or the word "clear".
+      var dates = [].slice.call(fig.querySelectorAll('[data-testid^="axis-x-"]'));
+      var labels = ['yes','no'].map(function (s) {
+        return { side: s, el: fig.querySelector('[data-testid="terminal-label-'+s+'"]') };
+      });
+      var hits = [];
+      dates.forEach(function (dl) {
+        labels.forEach(function (lb) {
+          if (!lb.el) return;
+          var a = dl.getBoundingClientRect(), b = lb.el.getBoundingClientRect();
+          var ox = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+          var oy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+          if (ox > 0 && oy > 0) {
+            hits.push('⛔ ' + lb.side.toUpperCase() + ' × ' + dl.getAttribute('data-testid') +
+                      ' overlap ' + f(ox) + '×' + f(oy) + 'px');
+          }
+        });
+      });
+      span.textContent = dates.length === 0
+        ? 'no date axis on this mode'
+        : (hits.length ? hits.join(' · ') : 'clear (' + dates.length + ' date labels checked)');
       return;
     }
 

@@ -45,7 +45,14 @@ import {
  * hero "is a third of the height of the collapsed card", which is false. Measured
  * on the shipped build at 1440, the hero's chart box is **418.75 px** against the
  * collapsed card's **193.80** and the overlay's **382.25** — it is the TALLEST of
- * the three. The 96 px everyone had been quoting is `min-h-24`, the layout FLOOR
+ * the three. ⚠ THAT OVERLAY FIGURE IS PRE-CHART-6 and the margin moved: deleting
+ * the label gutter returns 48.73 px of width to the overlay's plot, and its
+ * aspect lock turns width into height, so the overlay measures **406.91** after
+ * this change and the hero leads by **11.84 px**, not 36.5. The comparison the
+ * CHART-5 claim needed is against the number that existed when it was made; the
+ * comparison a reader makes today is against the other one. Both are stated
+ * because quoting either alone is the hybrid-number defect this file records
+ * twice. The 96 px everyone had been quoting is `min-h-24`, the layout FLOOR
  * `HeroPanels` sets before `flex-1` grows it.
  *
  * ⚠ THE TIME AXIS STAYS OFF ANYWAY, and for a reason height never governed: three
@@ -202,16 +209,31 @@ export function MarketPriceChart({
 	const grid = gridlinesFor(mode);
 
 	return (
-		/* ⛔ THE FRAME IS A FLEX ROW, AND THAT IS THE WHOLE LABEL FIX
-		   (`C-CHART-2` clause 2, CHART-2). Left cell: the plot, which the viewBox
-		   stretches into. Right cell: an HTML gutter the viewBox cannot reach. A
-		   `<text>` inside the `<svg>` is scaled by `preserveAspectRatio="none"`
-		   along with everything else, and the scale is DIFFERENT on each of the
-		   three surfaces and varies with viewport and carousel position besides —
-		   so the same declared 10px rendered 4.28px on the collapsed card. Nothing
-		   applied inside that space can be right at more than one size. Out here,
-		   10px is 10px.
-		   ⚠ The gutter is RETURNED FROM THIS COMPONENT rather than left for each
+		/* ⛔ THE LABELS ARE HTML AND NOT SVG `<text>`, AND THAT IS THE HALF OF THE
+		   CHART-2 FIX THAT SURVIVES (`C-CHART-2` clause 2). A `<text>` inside the
+		   `<svg>` is scaled by `preserveAspectRatio="none"` along with everything
+		   else, and the scale is DIFFERENT on each of the three surfaces and varies
+		   with viewport and carousel position besides — so the same declared 10px
+		   rendered 4.28px on the collapsed card. Nothing applied inside that space
+		   can be right at more than one size. Out here, 10px is 10px.
+
+		   ⛔⛔ THE OTHER HALF IS GONE AND THIS COMMENT USED TO BE IT. It read "THE
+		   FRAME IS A FLEX ROW, AND THAT IS THE WHOLE LABEL FIX … Left cell: the
+		   plot. Right cell: an HTML gutter the viewBox cannot reach." **There is no
+		   right cell holding labels since CHART-6.** A gutter beside the plot can
+		   only give a label the plot's HEIGHT, and an x anchored to it is an x
+		   anchored to the plot's right EDGE — which is where the terminal dot sits
+		   on exactly one market shape. The labels are an overlay INSIDE the plot box
+		   now (`:relative` below, `absolute inset-0` in `TerminalLabels`), because
+		   that box shares BOTH dimensions with the viewBox. Corrected in place
+		   rather than annotated: two adjacent comments giving incompatible accounts
+		   of one mechanism is the `O-5` shape inside a single file, and
+		   `@code-reviewer` filed this as the largest missed docblock of the task.
+
+		   ⚠ THE ROW REMAINS, and still earns `items-stretch`: the numeric marks
+		   column is a real flex cell whose percentage tops resolve against its own
+		   height. The labels no longer depend on it.
+		   ⚠ The labels are RETURNED FROM THIS COMPONENT rather than left for each
 		   caller to place — the `ProfileChart` precedent (PROFILE OVERLAP R2),
 		   which moved its endpoint labels out of its `<svg>` the same way. A
 		   component-scoped query still finds them, which is the property that
@@ -343,6 +365,18 @@ export function MarketPriceChart({
 			    `scaleX/scaleY`. **One ratio, written both ways up, inside one
 			    paragraph** — and nothing could catch it, because no guard in this
 			    repo measures a CSS pixel.
+			    ⛔⛔ AND CHART-6 GAVE THE WIDTH BACK, WHICH FALSIFIES THE PARAGRAPHS
+			    ABOVE RATHER THAN EXTENDING THEM. The gutter is deleted, and the
+			    collapsed card carries no marks column, so its `<svg>` returns to the
+			    full **316 px** — WIDER than the 298.29 CHART-1 left, not 4.5 %
+			    narrower. Recomputed at 316: `scaleX 0.4869` against `scaleY 0.4282`,
+			    an anisotropy of **1.137** rather than 1.0394, so these date labels
+			    are ~9.4 % MORE horizontally stretched than before this change. That
+			    is the one thing besides the label that depended on the plot's width,
+			    it moved in the direction this paragraph calls a cost, and it is
+			    recorded rather than left for a reader to recompute. The expanded
+			    overlay is unaffected — its aspect is locked, so its anisotropy stays
+			    1.0000 and the extra width became height instead.
 			    ⛔ ITS SUBSTANTIVE HALF WAS CORRECT AND IS **NOT** DISCHARGED — and
 			    this paragraph said it was, on a prediction, before the measurement
 			    came back. Because `preserveAspectRatio="none"` maps the WHOLE viewBox
@@ -835,8 +869,12 @@ function TerminalLabels({
  * on `C-CHART-2` clause 2 link 4 and clause 3. Those guards are RIGHT: the
  * labels' `top: X%` must resolve against a box exactly as tall as the plot, and
  * the gutter's width must be measured by an in-flow sizer rather than pinned. The
- * fix was to stop disturbing the gutter at all. It is now byte-identical to what
- * it was before this task, and the marks are a sibling column.
+ * fix was to stop disturbing the gutter at all.
+ * ⚠ AND CHART-6 DELETED THE GUTTER OUTRIGHT, so "byte-identical to what it was
+ * before this task" — true of CHART-5 — describes a box that no longer exists.
+ * What survives is the RULE the regression taught: this column is a SIBLING of
+ * the plot and owns its own layout, and the labels are an overlay inside the
+ * plot. Neither can force the other's box.
  *
  * ⚠ NO PINNED WIDTH HERE EITHER. The column is sized by an in-flow invisible
  * copy of the widest mark string, the same mechanism and for the same reason
@@ -947,30 +985,54 @@ const LABEL_AIR_PX = 5;
  * (`min()`, `calc()`) but cannot branch on the comparison, and the ruling is a
  * FLIP, which is a branch. So the decision is taken here.
  *
- * ⛔ MEASURED ACROSS FOUR VIEWPORTS ON THE SHIPPED BUILD, in the shipped Geist
- * face, as `labelWidth / plotWidth`:
+ * ⛔ MEASURED ACROSS THE WHOLE VIEWPORT RANGE, on the shipped build, in the
+ * shipped Geist face, as `labelWidth / plotWidth`. The hero's chart frame:
  *
- *     collapsed  27.15 / 288.85 = 9.40 %   (viewport-independent — the rail is a
- *                                           pinned `w-[340px]`)
- *     hero @1024 49.00 / 468.61 = 10.46 %  ← the worst case
- *     hero @1440 49.00 / 597.47 =  8.20 %
- *     expanded   48.73 / 775.27 =  6.29 %  (a fixed-width overlay)
+ *      500 px → 496.49    768 px → 496.49    1280 px → 540.37
+ *      640 px → 549.51    900 px → 496.49    1440 px → 626.12
+ *      700 px → 609.51   1024 px → 496.49
+ *      767 px → 676.39   1045 px → 496.49
  *
- * **12 is the worst case rounded up**, with headroom to a hero plot of 408 px —
- * narrower than any viewport the product supports.
+ * ⇒ **The frame has a FLOOR of 496.49 px and never goes below it.** At 768 the
+ * `md:grid-cols-[1fr_1.9fr_1fr]` three-column layout engages and the centre track
+ * resolves to a CONTENT MINIMUM of 530.99 px — measured identical at 768, 900,
+ * 1024 and 1045 — so the hero stops shrinking rather than continuing down. Below
+ * 768 the panel is single-column and the hero gets WIDER, not narrower.
+ *
+ * ⚠ THAT FLOOR IS THE WHOLE SAFETY ARGUMENT AND IT CANNOT BE DERIVED, ONLY
+ * MEASURED — which is worth stating because a careful derivation gets it wrong.
+ * Reading the grid as a pure `1fr 1.9fr 1fr` split gives 421.95 px at 1024 and a
+ * required reserve of 12.31 %, i.e. a defect; `@code-reviewer` filed exactly that
+ * at the CHART-6 cascade. The arithmetic reproduces 1440 EXACTLY (347.7 / 660.6 /
+ * 347.7 really is 1 : 1.9 : 1), which is what makes it convincing — and it is
+ * wrong everywhere the tracks are content-bound instead. **A layout figure is
+ * measured or it is not known.**
+ *
+ * ⇒ Worst case, post-CHART-6: plot = 496.49 − 24 (the marks column) = **472.49**,
+ * and the two-line label measures **48.73** in the shipped face ⇒ **10.31 %**.
+ * The `5px` of air is NOT in `shouldFlip`'s comparison — it cannot be, since
+ * converting px to a percentage needs the plot width nobody knows at render — so
+ * the reserve must absorb it too: 5 / 472.49 = 1.06 pp, for a true requirement of
+ * **11.37 %**.
+ *
+ * **14 leaves 2.6 points of margin over that requirement.** It was 12, which
+ * cleared it by 0.63 — enough today and not enough to survive a longer value
+ * string or a type change. Over-reserving flips the label a few percent early,
+ * which still places it beside its own dot and is invisible; under-reserving
+ * overflows onto the numeric marks. The failure is one-sided, so the margin
+ * belongs on the safe side. `label-anchor.test.tsx` caps it at 20 from the other
+ * direction, so this cannot drift into "everything flips".
  *
  * ⚠ AND THIS IS NOT THE HAND-MEASURED CONSTANT CHART-2 DELETED, for two reasons
  * worth stating because the resemblance is close. CHART-1's `26` was a guess
  * about a font nobody could measure — Geist was unfetchable offline — guarding a
  * horizontal clip that nothing asserted. This is read off the shipped face on the
- * shipped surfaces, and it is used only as a THRESHOLD: over-reserving flips the
- * label a few percent early, which still places it beside its own dot and is
- * invisible; under-reserving overflows. The failure is bounded and one-sided,
- * where `26`'s was a clip. It is pinned at three series-end positions on all
- * three modes in the CHART-6 contact sheet, in a real browser, which is the only
- * place a text advance can honestly be checked.
+ * shipped surfaces, and it is used only as a THRESHOLD, so an imprecise value
+ * costs an early flip rather than a clip. It is pinned at four series-end
+ * positions on all three modes in the CHART-6 contact sheet, in a real browser,
+ * which is the only place a text advance can honestly be checked.
  */
-const LABEL_FLIP_RESERVE_PCT = 12;
+const LABEL_FLIP_RESERVE_PCT = 14;
 
 /** Whether a label at this x would cross the plot's right edge — `C-CHART-2`
  * clause 2's flip, per label. ⚠ Both labels share one `terminalX` today, because

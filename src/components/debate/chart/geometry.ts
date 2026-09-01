@@ -12,7 +12,8 @@
  *
  * ⚠ "FULL-BLEED" DESCRIBES THE PLOT, NOT THE `<svg>`, and at CHART-2 the two
  * came back almost into line. `C-CHART-2` clause 3 no longer puts a LABEL
- * gutter in the viewBox — the labels are HTML beside the plot now — so all the
+ * gutter in the viewBox — the labels are HTML OVER the plot since CHART-6, and
+ * were HTML beside it from CHART-2 until then — so all the
  * viewBox still reserves is a **terminal allowance**, `TERMINAL_DOT_ALLOWANCE`,
  * enough that the widest mark drawn at the plot's right edge — the pulse RING,
  * not the dot — cannot half-clip there. ⚠ CORRECTED AT CHART-5: this said the
@@ -147,7 +148,8 @@ export function gridlinesFor(mode: ChartMode): readonly Gridline[] {
 			// ⛔ EXHAUSTIVE BY COMPILE ERROR, NOT BY FALLING THROUGH. The first
 			// version ended `return GRIDLINES_HERO` after two `if`s, so a FOURTH
 			// surface added to `ChartMode` would compile clean and ship with no Y
-			// scale at all — silently, on a chart whose whole point is that the
+			// scale at all (the version that did this ended `return GRIDLINES_HERO`,
+			// an empty set that CHART-6 removed along with the name) — silently, on a chart whose whole point is that the
 			// scale is a function of the mode. `MarketPriceChartMode`'s own docblock
 			// names this hazard for the type union ("two places for a fourth surface
 			// to be added to only one of") and it was left open for the lookup.
@@ -412,9 +414,12 @@ export function labelTopPct(y: number): number {
  * `VIEWBOX_W` (640) would place every label 1.4 % of the plot right of its own
  * dot: small enough to look like a deliberate gap, large enough to be wrong, and
  * invisible to any assertion that compares two numbers both computed this way.
- * Verified against the shipped build rather than argued: the collapsed dot at
- * `cx = 94.86` renders 113.32 px into a 775.27 px plot, and `94.86 / 649 × 775.27
- * = 113.32`.
+ * Verified against the shipped build rather than argued: the EXPANDED overlay's
+ * dot at `cx = 94.86` renders 113.32 px into its 775.27 px plot, and
+ * `94.86 / 649 × 775.27 = 113.32`. ⚠ This said "the collapsed dot" and quoted the
+ * expanded plot's width — the arithmetic was right and the surface named was
+ * wrong, on the one measurement that justifies the divisor. Caught by
+ * `@code-reviewer`.
  *
  * ⛔ WHY THIS EXISTS AT ALL — THE DEFECT CHART-6 CORRECTS. Until this function the
  * label's x was a CONSTANT (`left: 5px` inside a fixed gutter) while the dot's x

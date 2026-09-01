@@ -105,7 +105,7 @@ function pct(p: number): string {
  * ⛔ THIS FILE USED TO MOUNT, AND THE MOUNTS BOUGHT NOTHING. Nothing here
  * interacts — every assertion reads an attribute, a class or a child order — and
  * the near-even sweep alone renders 401 charts in a single case, each of them a
- * flex frame plus an `<svg>` plus a gutter of three spans since CHART-2. The
+ * flex frame plus an `<svg>` plus a label layer of two spans since CHART-6. The
  * server render is also the more honest source: it is the markup that actually
  * ships, and it is what the `top`-expression case has to read regardless,
  * because jsdom's CSSOM silently drops nested CSS math.
@@ -156,7 +156,7 @@ function numAttr(el: Element | null, name: string): number {
  * ⛔ THE LABELS LEFT THE `<svg>` AT CHART-2 (`C-CHART-2` clause 2) and this
  * helper is what let the collision cases below survive that move unchanged.
  * They used to carry a `y` attribute in plot units; they now carry
- * `style="top: N%"` in the HTML gutter, where N is that same plot y as a
+ * `style="top: N%"` in the HTML label layer over the plot, where N is that same plot y as a
  * fraction of `VIEWBOX_H`. Multiplying back recovers the identical quantity, so
  * the clause-4 rules — the 12-unit minimum gap, the symmetric push, the clamp,
  * the tie-break — are still asserted against the numbers `terminalLabelYs`
@@ -418,11 +418,11 @@ describe("debate-view::price-chart-terminal-labels-never-overlap", () => {
 		// reddens here rather than silently making the box assertions above
 		// measure the wrong rectangle.
 		const { container } = renderChart(pct(0.65), "collapsed");
-		const gutter = container.querySelector(
+		const layer = container.querySelector(
 			'[data-testid="terminal-label-layer"]',
 		);
-		const gutterCls = gutter?.getAttribute("class") ?? "";
-		expect(gutterCls).toContain(`text-[${LABEL_HALF_BOX * 2}px]`);
+		const layerCls = layer?.getAttribute("class") ?? "";
+		expect(layerCls).toContain(`text-[${LABEL_HALF_BOX * 2}px]`);
 
 		// ⛔ `leading-none` IS ASSERTED, NOT ASSUMED, AND IT IS LOAD-BEARING TWICE
 		// OVER. A Tailwind arbitrary `text-[10px]` does NOT reset the paired
@@ -432,7 +432,7 @@ describe("debate-view::price-chart-terminal-labels-never-overlap", () => {
 		// breaking the alignment contract by 3px while every number in the source
 		// still read "10". Stating the leading beside an arbitrary size is the
 		// rule; this asserts the rule was followed.
-		expect(gutterCls).toContain("leading-none");
+		expect(layerCls).toContain("leading-none");
 
 		for (const id of ["terminal-label-yes", "terminal-label-no"]) {
 			const el = container.querySelector(`[data-testid="${id}"]`);
@@ -469,7 +469,7 @@ describe("C-CHART-2 — the end label is bound to its own line's token", () => {
 
 			// ⚠ TWO CARRIERS SINCE CHART-2, BECAUSE THE TWO MARKS NOW LIVE IN
 			// DIFFERENT DOCUMENTS. The dots are SVG and carry `fill="var(--…)"`;
-			// the labels are HTML in the gutter and carry the token in a Tailwind
+			// the labels are HTML in the layer over the plot and carry the token in a Tailwind
 			// arbitrary-colour class. Different attribute, identical binding — and
 			// asserting both in one case is deliberate, because the failure this
 			// guards is a SWAP, and a swap can be introduced on either carrier
@@ -522,7 +522,7 @@ describe("C-CHART-2 — the end label is bound to its own line's token", () => {
 		}
 	});
 
-	it("puts the labels OUTSIDE the svg, in an HTML gutter — C-CHART-2 clause 2", () => {
+	it("puts the labels OUTSIDE the svg, in an HTML layer over the plot — C-CHART-2 clause 2", () => {
 		// ⛔ THE ASSERTION THAT WOULD HAVE MADE CHART-2 UNNECESSARY IF IT HAD
 		// EXISTED. The whole defect was 10px type living inside a box that
 		// `preserveAspectRatio="none"` stretches by a different factor on every
@@ -532,19 +532,21 @@ describe("C-CHART-2 — the end label is bound to its own line's token", () => {
 		// before anyone has to re-measure a font.
 		const { container } = renderChart(pct(0.65), "collapsed");
 		const svg = container.querySelector('[data-testid="market-price-chart"]');
-		const gutter = container.querySelector(
+		const layer = container.querySelector(
 			'[data-testid="terminal-label-layer"]',
 		);
 		expect(svg).not.toBeNull();
-		expect(gutter).not.toBeNull();
+		expect(layer).not.toBeNull();
 
 		for (const id of ["terminal-label-yes", "terminal-label-no"]) {
 			const el = container.querySelector(`[data-testid="${id}"]`);
 			expect(el).not.toBeNull();
 			// Not in the stretched space…
 			expect(svg?.contains(el as Node)).toBe(false);
-			// …and in the gutter that sits beside it.
-			expect(gutter?.contains(el as Node)).toBe(true);
+			// …and in the label layer that covers it. ⚠ BESIDE the plot until CHART-6,
+			// OVER it since: an x anchored to a right-hand gutter is an x anchored to
+			// the plot's right edge, which is not where the dot is.
+			expect(layer?.contains(el as Node)).toBe(true);
 			// An HTML element, not an SVG one — `<text>` inside a foreignObject
 			// would satisfy "not a descendant of svg" on a careless selector.
 			expect(el?.namespaceURI).toBe("http://www.w3.org/1999/xhtml");
@@ -556,7 +558,7 @@ describe("C-CHART-2 — the end label is bound to its own line's token", () => {
 		expect(svg?.contains(dot as Node)).toBe(true);
 	});
 
-	it("the viewBox reserves a DOT ALLOWANCE only — the label gutter is gone from it", () => {
+	it("the viewBox reserves a DOT ALLOWANCE only — no label gutter, in it or beside it", () => {
 		// C-CHART-2 clause 3 as amended at CHART-2. The viewBox is still WIDER
 		// than the plot, because the terminal circle would otherwise half-clip —
 		// but only by the dot's own radius plus a hair, not by 38 units of room
@@ -591,7 +593,7 @@ describe("C-CHART-2 — the end label is bound to its own line's token", () => {
 		const peak = TERMINAL_DOT_R * TERMINAL_PULSE_PEAK_SCALE;
 		// Wide enough that the largest terminal mark cannot clip…
 		expect(w).toBeGreaterThanOrEqual(VIEWBOX_W + peak);
-		// …and no wider than that mark needs, so the label gutter cannot creep
+		// …and no wider than that mark needs, so a label reserve cannot creep
 		// back into the viewBox: 38 units would fail this, which is the CHART-1
 		// regression it exists to catch.
 		expect(w - VIEWBOX_W).toBeLessThanOrEqual(Math.ceil(peak) + 1);
@@ -771,11 +773,11 @@ describe("C-CHART-2 — the end label is bound to its own line's token", () => {
 		});
 	}
 
-	it("the CSS half-box is half the type the gutter actually declares", () => {
+	it("the CSS half-box is half the type the label layer actually declares", () => {
 		// ⛔ `LABEL_HALF_BOX_PX` COULD BE ANY NUMBER AND NOTHING NOTICED. Set it to
 		// 2 and the labels overlap again — the defect this whole mechanism exists
 		// to prevent — or to 8 and they splay. It is meaningful only as HALF THE
-		// RENDERED BOX, so it is pinned against the type size the gutter declares
+		// RENDERED BOX, so it is pinned against the type size the label layer declares
 		// rather than asserted as a literal.
 		const html = renderToStaticMarkup(
 			<MarketPriceChart

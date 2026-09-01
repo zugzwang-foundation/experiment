@@ -314,9 +314,18 @@ const PRODUCTION_CHART_WINDOW: ChartWindow = {
  * `now` beyond the axis, so `xPx` returns a coordinate past `VIEWBOX_W` and the
  * viewBox clips it. What is clipped is not only the line's last segment:
  * `terminalX` follows the series, so **both terminal dots and both pulses leave
- * the canvas entirely**, while `TerminalLabels` — HTML in a gutter, outside the
- * SVG — keeps rendering. The result on every `Open` staging market would be two
- * colour-coded words naming two marks that are not drawn.
+ * the canvas entirely**, while `TerminalLabels` — HTML, outside the SVG — keeps
+ * rendering. The result on every `Open` staging market would be two colour-coded
+ * words naming two marks that are not drawn.
+ *
+ * ⚠ CHART-6 CHANGED THE MECHANISM AND SHARPENED THE SYMPTOM. There is no gutter
+ * any more: the labels are an overlay positioned from the dot's own x. Past
+ * `end`, `terminalX` exceeds `VIEWBOX_W`, so the label's anchor exceeds 100 %, it
+ * FLIPS, and it comes to rest just inside the plot's right edge — naming a dot
+ * that has been clipped off the canvas. The failure is the same and it now looks
+ * MORE deliberate, because the label lands somewhere plausible instead of in a
+ * column. Restated rather than left, since a reader will grep this docblock for
+ * "gutter" and find nothing. Caught by `@code-reviewer`.
  *
  * The clip itself is deliberate: drawing the point AT the edge instead would put
  * the live price at an instant it did not happen, which this codebase rejects on
@@ -331,7 +340,8 @@ const PRODUCTION_CHART_WINDOW: ChartWindow = {
  * now carries the current PERCENTAGE beneath the name, so past `end` the failure
  * is no longer two colour-coded words naming absent marks — it is two words AND
  * TWO NUMERIC PRICE FIGURES attached to nothing drawn. A reader who cannot see
- * the dots can still read a price off the gutter. Written in here per `O-5`
+ * the dots can still read a price off the label. ⚠ CHART-6 widens this: the hero
+ * carries the value line too, so all three surfaces show the figure. Written in here per `O-5`
  * rather than left to the CHART-5 log, because this docblock is the site that
  * states the position the change supersedes.
  *

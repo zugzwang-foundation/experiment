@@ -221,7 +221,7 @@ describe("chart-window::staging and preview share the fixture window", () => {
 	});
 });
 
-describe("chart-window::the window CONTAINS ITS DATA — RF-5, against the real constants", () => {
+describe("debate-view::price-chart-window-contains-all-data — RF-5, against the real constants", () => {
 	// ⭐ THE GUARD THAT WOULD HAVE CAUGHT CHART-6's DEFECT, and the reason it is
 	// worth its lines is the reason it did not exist: nothing in a 4 249-test suite
 	// compared the window to the data. The failure was silent on eight markets

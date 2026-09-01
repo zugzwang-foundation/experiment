@@ -94,10 +94,24 @@ export function MarketPriceChartOverlay({
 				    ⛔ THE LOCK MOVED INTO `MarketPriceChart`, WHERE IT BELONGS: the
 				    box that must match the viewBox is the box the viewBox is mapped
 				    into, which is the plot — and the plot is no longer this div,
-				    because the labels now sit in a CSS gutter beside it. Sizing this
-				    div by an aspect would size plot + gutter together and mis-shape
-				    the plot by the gutter's width. `w-full` and nothing else; the
-				    plot derives its own height from `SVG_W / VIEWBOX_H`.
+				    because a sibling column sits beside it. `w-full` and nothing
+				    else; the plot derives its own height from `SVG_W / VIEWBOX_H`.
+				    ⚠ THE SIBLING IS THE NUMERIC MARKS, NOT A LABEL GUTTER, SINCE
+				    CHART-6. This read "the labels now sit in a CSS gutter beside it"
+				    and "sizing this div by an aspect would size plot + gutter
+				    together" — the labels are an overlay INSIDE the plot now and the
+				    gutter is deleted, so the ruling survives on the marks column
+				    instead. It is still 24px of this div that is not plot, so an
+				    aspect here would still mis-shape the plot; only the name of the
+				    thing taking the width changed. Caught by `@code-reviewer` at the
+				    CHART-6 cascade.
+				    ⚠ AND CHART-6 MADE THIS DIV'S CONTENT TALLER. Returning the
+				    gutter's 48.73px to the plot, under a locked aspect, takes the
+				    chart box from 382.25 to 406.91 — measured. The panel has no
+				    `max-h`, and at a 900px viewport it had 441.78px of spare room, so
+				    it is absorbed; below roughly 483px of viewport HEIGHT the panel
+				    overflows unreachably, which it already did below ~458px. This
+				    change moves that threshold by ~25px; it does not create it.
 				    ⚠ Replacing the literal with `aspect-[649/320]` was considered and
 				    rejected by ruling: it is the same defect with a newer number.
 				    `C-CHART-1` clause 4 now states a relationship, and
