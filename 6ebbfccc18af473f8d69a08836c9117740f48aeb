@@ -1,0 +1,55 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+This commit's message is a subject line and nothing else, so everything that
+made it worth doing lives here.
+
+Two rulings, and both are corrections to something that had already been
+agreed.
+
+The first retires a guard that had been ratified on a premise measurement did
+not support. `MAX_DECODE_PIXELS` was accepted on the understanding that it
+saved roughly half the peak memory of an image attachment. It does not, and
+the reason is structural: the canvas is created after the longest-edge early
+return and is sized to the target, so it can never grow to more than about ten
+megabytes — against a decode that can reach a hundred and sixty. The guard
+could not prevent the allocation that is the actual risk, and it stood in front
+of it looking as though it could.
+
+Its cost was also inverted, which is what settled the question. Images past the
+threshold skipped optimisation altogether, so the largest files — the ones with
+the most to gain — received the least help. A guard that protects nothing and
+penalises the cases it is nominally there for is worse than no guard, because
+it also stops anyone looking for a real one. `DOWNSCALE_TIMEOUT_MS` bounds the
+pathological case honestly, by wall clock, and makes no claim it cannot keep.
+
+Code that claims a protection it does not provide is the same class of defect
+as a docblock describing behaviour the function does not have — and this lane
+began with one of those.
+
+The second ruling repairs damage done by a correct finding. The legibility
+floor was right: below a certain shorter edge, resizing produces something
+unreadable, so the image should not be resized. But most uploads on this
+product are screenshots, screenshots are tall, and a tall image's shorter edge
+is the one that trips the floor — so the effect of an entirely sound catch was
+that the most common upload received no optimisation at all.
+
+So the floor now governs only dimension reduction. Below it a PNG is still
+re-encoded to lossless WebP at its native size, which on the tested files takes
+a multi-megabyte upload down to somewhere between one and two megabytes without
+touching a pixel. Peak canvas rises from roughly ten megabytes to about
+fifty-six on a fourteen-megapixel source, which is survivable on anything made
+in the last five years, and a failure still falls back to the original file
+rather than to a worse one.
+
+What stays unmitigated, deliberately: an out-of-memory failure on a genuinely
+pathological source. That waits on parsing dimensions from the file header
+before any decode is attempted, which is a larger change than this was, and it
+is docketed rather than quietly absorbed. Saying so is the point — an
+unmitigated risk that is written down is a decision, and one that is not is an
+accident waiting to be discovered by whoever hits it.
