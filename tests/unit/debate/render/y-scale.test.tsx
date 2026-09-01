@@ -758,47 +758,153 @@ describe("CHART-5 — a mark is BOUND to its gridline, and the column obeys the 
 	});
 });
 
-describe("CHART-5 — RF-4 payload budget", () => {
-	it("the Y scale adds well under 1.5 KB to the page, and zero client JS", () => {
-		// ⚠ THE COLLAPSED CHART IS WHAT SHIPS PER PAGE. The expanded overlay is a
-		// client-rendered dialog whose markup is not in the document until it is
-		// opened — measured on staging, the market page server-renders exactly one
-		// `market-price-chart` svg — so the per-page cost of this task is the
-		// collapsed card's grid and nothing else.
-		const m = markup("collapsed");
-		const start = m.indexOf('<g data-testid="chart-gridlines"');
-		const grid = m.slice(start, m.indexOf("</g>", start) + 4);
-		expect(start).toBeGreaterThan(-1);
-		expect(Buffer.byteLength(grid, "utf8")).toBeLessThan(1500);
+describe("C-CHART-2 clause 4 (CHART-6) — the CSS floor holds across the whole near-even band", () => {
+	it("separates the two labels by a full box on EVERY mode, at every tenth of a point", () => {
+		// ⛔ WHY A SECOND SWEEP WHEN `terminal-markers.test.tsx` ALREADY HAS ONE.
+		// That one sweeps PLOT SPACE and proves clause 4's own arithmetic — the
+		// 12-unit minimum, the symmetric push, the clamp — which CHART-6 did not
+		// touch and which is a scope fence. It runs on `collapsed` alone, and
+		// rightly: clause 4 takes no mode.
+		//
+		// ⚠ WHAT CHART-6 MOVED IS THE OTHER FLOOR, THE ONE IN CSS PIXELS, AND ONLY
+		// ON ONE SURFACE. `labelHalfBoxPx` went 5 → 14 for the hero, because its
+		// label grew a value line. In the near-even band the CSS floor DOMINATES
+		// clause 4 — it forces the two centres `2 × half` apart regardless of what
+		// plot space says — so on the hero the separation the reader actually sees
+		// changed from 10 px to 28 px, and nothing swept that.
+		//
+		// ⛔ THE FAILURE IT MUST REJECT is a hero that took the value line and kept
+		// the 5 px floor: two 28 px boxes with 10 px between their centres, i.e.
+		// overlapping by 18 px, across the band where every market rests. That ships
+		// green against every plot-space assertion in the repository, because in plot
+		// space nothing moved — the exact shape CHART-2's cascade already caught once.
+		const HALF = { collapsed: 5, expanded: 14, hero: 14 } as const;
 
-		// Zero client JS: the scale is markup. No handler, no script, no hydration
-		// hook reaches it.
-		expect(grid).not.toMatch(/on[A-Z]/);
-		expect(grid).not.toContain("<script");
+		for (const mode of ["collapsed", "expanded", "hero"] as const) {
+			const half = HALF[mode];
+			let seen = 0;
+			// A tenth of a point across the band, both sides of even.
+			for (let bp = 4800; bp <= 5200; bp += 1) {
+				const m = markup(mode, bp / 10000);
+				const tops = (["yes", "no"] as const).map((side) => {
+					const hit = m.match(
+						new RegExp(`terminal-label-${side}"[^>]*style="[^"]*top:([^";]*)`),
+					);
+					expect(hit, `${mode}@${bp}: no top for ${side}`).not.toBeNull();
+					return hit?.[1] ?? "";
+				});
+				// One label is floored above the midline and the other below, by the
+				// SAME half-box — which is what makes the gap a full box rather than a
+				// half one.
+				const upper = tops.filter((t) => t.includes(`calc(50% - ${half}px)`));
+				const lower = tops.filter((t) => t.includes(`calc(50% + ${half}px)`));
+				expect(upper.length, `${mode}@${bp}: upper floor missing`).toBe(1);
+				expect(lower.length, `${mode}@${bp}: lower floor missing`).toBe(1);
+				// …and neither carries the OTHER mode's half-box, which is the
+				// one-mode-updated failure this case exists for.
+				for (const t of tops) {
+					expect(t).toContain(`clamp(${half}px,`);
+				}
+				seen++;
+			}
+			// Non-vacuity: the loop really ran the band rather than skipping it.
+			expect(seen).toBe(401);
+		}
 
-		// ⚠ THE OVERLAY IS MEASURED AND PINNED SEPARATELY, AT ITS OWN CEILING, AND
-		// SAYING SO IS THE POINT. Grid + marks on the expanded overlay measure
-		// ~2.5 KB — ABOVE the 1.5 KB figure — and that is not a budget breach,
-		// because the budget is stated per PAGE and this markup is never in a
-		// page: the overlay is a client-rendered dialog that does not exist in the
-		// document until it is opened. Measured on staging, `/m/[slug]` server-
-		// renders exactly ONE `market-price-chart` svg, the collapsed one.
-		// ⛔ IT IS STILL BOUNDED, because "not charged to the page" is a reason to
-		// pick a different ceiling, not a reason to have none — an unbounded
-		// element count here is exactly the per-point computation RF-4 exists to
-		// catch, and it would still cost the reader who opens the overlay.
-		const e = markup("expanded");
-		const eStart = e.indexOf('<g data-testid="chart-gridlines"');
-		const eGrid = e.slice(eStart, e.indexOf("</g>", eStart) + 4);
-		const marks = e.slice(
-			e.indexOf('<div data-testid="chart-y-marks"'),
-			e.indexOf('<div data-testid="terminal-label-layer"'),
+		// POSITIVE CONTROL — the two half-boxes are genuinely different, so the
+		// per-mode assertions above are not three copies of one comparison.
+		expect(new Set(Object.values(HALF)).size).toBe(2);
+	});
+});
+
+describe("CHART-5/6 — RF-4 payload budget", () => {
+	/** The Y scale's markup for a mode: the gridline group plus the marks column,
+	 * each bounded by its OWN element.
+	 *
+	 * ⛔⛔ THIS HELPER EXISTS BECAUSE THE CASE BELOW WAS PASSING WHILE MEASURING
+	 * NOTHING, AND IT IS THE SAME DEFECT CLASS THE WHOLE TASK IS ABOUT. The marks
+	 * column used to be sliced from `chart-y-marks` to `terminal-label-layer` — an
+	 * end bound belonging to a DIFFERENT component. CHART-6 moved the labels INSIDE
+	 * the plot, so the layer now precedes the marks in the markup, the slice
+	 * inverted, and `String.slice(3681, 2635)` returns `""`. Zero bytes, added to a
+	 * real grid measurement, compared against a ceiling: **green, forever, measuring
+	 * half of what it names.** Measured — the slice really was length 0.
+	 *
+	 * ⇒ **A slice whose end bound is another component's testid goes wrong the
+	 * moment either one moves, and it goes wrong SILENTLY because an empty string
+	 * satisfies every size assertion.** Each region is now bounded by its own
+	 * element and each carries a non-vacuity floor. */
+	function yScaleBytes(mode: "collapsed" | "expanded" | "hero"): number {
+		const m = markup(mode);
+		const gStart = m.indexOf('<g data-testid="chart-gridlines"');
+		expect(gStart, `${mode}: no gridline group`).toBeGreaterThan(-1);
+		const grid = m.slice(gStart, m.indexOf("</g>", gStart) + 4);
+		expect(grid.length, `${mode}: gridline slice is empty`).toBeGreaterThan(
+			100,
 		);
-		const overlayBytes =
-			Buffer.byteLength(eGrid, "utf8") + Buffer.byteLength(marks, "utf8");
-		expect(overlayBytes).toBeLessThan(3000);
-		// Non-vacuity: it is genuinely bigger than the card's, so a ceiling that
-		// happened to be slack on the card is not what is passing here.
-		expect(overlayBytes).toBeGreaterThan(Buffer.byteLength(grid, "utf8"));
+
+		const kStart = m.indexOf('<div data-testid="chart-y-marks"');
+		let marks = "";
+		if (kStart > -1) {
+			// Bounded by its own closing structure: the last mark it renders.
+			const lastMark = m.lastIndexOf('data-testid="y-mark-');
+			const end = m.indexOf("</div>", lastMark);
+			expect(end, `${mode}: marks column has no end`).toBeGreaterThan(kStart);
+			marks = m.slice(kStart, end + 6);
+			expect(marks.length, `${mode}: marks slice is empty`).toBeGreaterThan(
+				100,
+			);
+			expect(
+				[...marks.matchAll(/data-testid="y-mark-\d+"/g)].length,
+				`${mode}: marks slice does not contain the marks`,
+			).toBe(11);
+		}
+		return Buffer.byteLength(grid, "utf8") + Buffer.byteLength(marks, "utf8");
+	}
+
+	it("the Y scale is bounded on every surface, and costs zero client JS", () => {
+		// ⚠ EXACTLY ONE CHART SHIPS PER PAGE, AND WHICH ONE DIFFERS BY PAGE.
+		// Measured against the deployed build on 2026-09-01 by counting
+		// `data-testid="market-price-chart"` in the raw server HTML: `/m/[slug]`
+		// ships ONE, in `collapsed` mode; Discovery `/` ships ONE, in `hero` mode.
+		// The expanded overlay is a client-rendered dialog and is in no document
+		// until it is opened.
+		//
+		// ⛔ SO CHART-6 MOVED WHICH SURFACE CARRIES DISCOVERY'S COST. Until this task
+		// the hero had no Y scale at all and the "per page" cost was the collapsed
+		// card's grid alone — which is what this case measured, and it would have
+		// gone on measuring only that while the hero gained eleven gridlines, eleven
+		// marks and a value line.
+		const collapsed = yScaleBytes("collapsed");
+		const hero = yScaleBytes("hero");
+		const expanded = yScaleBytes("expanded");
+
+		// `/m/[slug]`: the card's four lines, no marks.
+		expect(collapsed).toBeLessThan(1500);
+		// `/`: the hero's eleven lines plus its marks column. Deliberately a
+		// SEPARATE, LARGER ceiling rather than a shared one — it is a different
+		// page, and folding two pages into one number is how a real growth on one
+		// hides inside the other's slack.
+		expect(hero).toBeLessThan(4000);
+		// The overlay is not charged to any page, but "not charged" is a reason to
+		// pick a different ceiling, not a reason to have none: an unbounded element
+		// count here is the per-point computation RF-4 exists to catch, and it
+		// still costs the reader who opens it.
+		expect(expanded).toBeLessThan(4000);
+
+		// Non-vacuity, and the ordering that proves the three are distinct
+		// measurements rather than one ceiling that happens to be slack for all.
+		expect(hero).toBeGreaterThan(collapsed);
+		expect(expanded).toBeGreaterThan(collapsed);
+
+		// Zero client JS on every surface: the scale is markup. No handler, no
+		// script, no hydration hook reaches it.
+		for (const mode of ["collapsed", "expanded", "hero"] as const) {
+			const m = markup(mode);
+			const gStart = m.indexOf('<g data-testid="chart-gridlines"');
+			const grid = m.slice(gStart, m.indexOf("</g>", gStart) + 4);
+			expect(grid).not.toMatch(/on[A-Z]/);
+			expect(grid).not.toContain("<script");
+		}
 	});
 });
