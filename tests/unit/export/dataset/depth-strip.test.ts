@@ -12,9 +12,9 @@ import {
 	pseudonymizeTable,
 } from "@/server/export/dataset/pseudonymize";
 import {
-	stripDeep,
+	shipDeep,
+	shipPayload,
 	stripMetadata,
-	stripPayload,
 	stripRow,
 	stripTable,
 } from "@/server/export/dataset/strip";
@@ -22,56 +22,69 @@ import { assertTableClean } from "@/server/export/egress";
 import { EgressViolationError } from "@/server/export/egress/errors";
 import {
 	GLOBALLY_FORBIDDEN_PAYLOAD_KEYS,
-	PAYLOAD_STRIP_KEYS,
+	PAYLOAD_SHIP_KEYS,
 	STRIPPED_METADATA_KEYS,
 } from "@/server/export/egress/forbidden-keys";
 import { findKeys, findValues, walk } from "@/server/export/egress/scan";
 
 /**
- * DATASET.2 C2 + C3 — the depth guards.
+ * DATASET.2 C2 + C3 — the depth guards. **Rewritten at DATASET.3.**
  *
  * ## What these exist to reject
  *
- * `stripPayload` / `stripMetadata` walked ONE level until DATASET.2, and the
+ * The payload and metadata strips walked ONE level until DATASET.2, and the
  * harvest that feeds the value scan walked one level with them.
  *
- * ⚠ **CORRECTED (`@test-writer` HIGH-1), because this docblock previously
- * claimed something measurably false.** It said *"both layers fell silent on
- * the same input and the build reported success"*. They did not. `walk()` has
- * been recursive since DATASET.1 and **both KEY nets ride on it**, so
- * `findKeys` reached nested keys regardless of what the strip did — and every
- * nested key this fixture carries (`userId`, `ip`, `key`) is on
+ * ⚠ **CORRECTED (`@test-writer` HIGH-1), because this docblock once claimed
+ * something measurably false.** It said *"both layers fell silent on the same
+ * input and the build reported success"*. They did not. `walk()` has been
+ * recursive since DATASET.1 and **both KEY nets ride on it**, so `findKeys`
+ * reached nested keys regardless of what the strip did — and every nested key
+ * this fixture carries (`userId`, `ip`, `key`) is on
  * `GLOBALLY_FORBIDDEN_PAYLOAD_KEYS` or `STRIPPED_METADATA_KEYS`.
  *
  * Measured, by reproducing the one-level strip and running the guard over it:
- * **8 fatal violations, not silence** — `no-stripped-metadata-key` and
- * `no-forbidden-payload-key` on `payload.context.{ip,userId}`, plus
- * `no-forbidden-payload-key` on `payload.variants[0].key`.
+ * **8 fatal violations, not silence.** ⇒ The shallow strip was a guaranteed
+ * build ABORT on a one-shot job, not a silent leak — worth fixing for that
+ * alone, but a different claim than the one first written here.
  *
- * ⇒ The shallow strip was a **guaranteed build ABORT on a one-shot job**, not
- * a silent leak. That is still worth fixing — an abort at 06:00 on release
- * morning costs what a leak costs, in a different currency — but it is a
- * different claim, and the suite should certify the one that is true.
+ * ## ⚠ WHAT CHANGED AT DATASET.3, AND WHY THIS FILE READS DIFFERENTLY
  *
- * **The genuinely silent class is narrower, and it is STILL OPEN**: a nested
- * secret under a key name on NO list (`payload.client.remoteAddr`) is
- * unstripped, unharvested, unmatched by value (because it was never
- * harvested) and unmatched by key. Recursion does not touch it. Pinned as
- * `⛔ KNOWN OPEN` below.
+ * The depth work was correct and it was not enough. Depth made the strip walk
+ * to any level; it still only removed keys it was NAMED. So the genuinely
+ * silent class survived it: a nested secret under a key on NO list
+ * (`payload.client.remoteAddr`) was unstripped, unharvested, unmatched by
+ * value and unmatched by key — four layers quiet on one input — and this file
+ * pinned that as `⛔ KNOWN OPEN`, twice, because closing it was a spec
+ * decision nobody had made.
  *
- * Every test below is written so that reverting the fix it guards turns it
- * RED. The mutation table is in the run report; the point of writing them this
- * way is that "it passes" is only evidence if "it can fail" was demonstrated.
+ * **Ruling E made it, and the strip inverted to a positive allow-list.** Both
+ * pins have therefore FIRED and are inverted below; so has the `⛔ KNOWN OPEN`
+ * on `comment.placed`'s recovery path (ruling S5). That is the point of
+ * writing a tripwire as a test rather than as a paragraph in a report: it
+ * cannot be quietly lost, and when the ruling lands the suite says so.
+ *
+ * The consequence for reading this file: several assertions here now check
+ * that an UNDECLARED container is dropped **whole**, where their DATASET.2
+ * forms checked that a named key was removed from a container that survived.
+ * Each carries its own note. Nothing about the depth claim was withdrawn —
+ * the allow-list walks to the same depth, through the same arrays.
+ *
+ * Every test is written so that reverting the fix it guards turns it RED. The
+ * mutation table is in the run report; the point of writing them this way is
+ * that "it passes" is only evidence if "it can fail" was demonstrated.
  *
  * ## The fixture rows these lean on
  *
  * `image_upload.committed.payload` carries the deliberate nested dirt —
  * `context.{userId,ip}` (depth 2, object), `variants[0].key` (depth 2, through
- * an ARRAY, `u/`-namespaced so it must be stripped) and `commentId` (C3).
- * `market.created.payload.media[0].key` is its opposite number: also depth 2
- * through an array, but `m/`-namespaced, so it must SURVIVE.
+ * an ARRAY, `u/`-namespaced) and `commentId` (C3). `schemas.ts` declares none
+ * of `context`/`variants`, which is what makes them the right probe for an
+ * allow-list too: they are exactly the shape of a key nobody reviewed.
+ * `market.created.payload.media[0].key` is the opposite number — also depth 2
+ * through an array, and DECLARED, so it must SURVIVE.
  *
- * Both directions are pinned deliberately. A rule that strips everything it
+ * Both directions are pinned deliberately. A rule that drops everything it
  * reaches inside an array passes the first and fails the second, and a rule
  * that skips arrays entirely does the reverse — so neither test alone
  * distinguishes a correct implementation from a broken one.
@@ -154,30 +167,45 @@ describe("C2 · the fixture carries real depth (guard on the guards)", () => {
 	});
 });
 
-describe("C2 · GUARD 1 — a nested STRIP key at depth 2 is removed", () => {
-	it("strips payload.context.userId and payload.context.ip", () => {
-		const out = stripPayload(
+describe("C2 · GUARD 1 — an UNDECLARED container at depth 2 is dropped whole", () => {
+	it("drops payload.context entirely, secrets and innocent siblings alike", () => {
+		const out = shipPayload(
 			"image_upload.committed",
 			COMMITTED.payload,
 		) as Record<string, unknown>;
 
-		// The container survives — depth is about keys, not about deleting
-		// whole subtrees. A strip that removed `context` wholesale would pass
-		// a naive "is the secret gone" check while destroying shipped data.
-		expect(out.context).toBeTypeOf("object");
-		const ctx = out.context as Record<string, unknown>;
-		expect("userId" in ctx).toBe(false);
-		expect("ip" in ctx).toBe(false);
+		// ⚠ **This assertion INVERTED at DATASET.3, and the inversion is the
+		// slice.** Under the deny-list it read *"the container survives — depth
+		// is about keys, not about deleting whole subtrees"*, and that was the
+		// right thing to say about a mechanism that removed named keys and kept
+		// everything else. Under an allow-list `context` is simply not declared
+		// on `image_upload.committed` (`schemas.ts` does not declare it either —
+		// it is deliberate fixture dirt), so it is dropped without being read.
+		//
+		// The old worry — "a strip that removed `context` wholesale would
+		// destroy shipped data" — does not survive the change of mechanism:
+		// nothing inside an undeclared container is shipped data, because
+		// shipped data is exactly what somebody wrote down.
+		expect("context" in out).toBe(false);
+		// And the targeted-ness that mattered is still measured, one level up:
+		// `uploadId` is declared and survives, so this is not a payload that was
+		// emptied wholesale.
+		expect(out.uploadId).toBeTypeOf("string");
 	});
 
-	it("REJECTS the wrong answer: a one-level walk leaves both in place", () => {
-		// The pre-DATASET.2 implementation, reproduced exactly. This is the
-		// mutation the guard above exists to catch, run as code so the claim
-		// is measured rather than asserted in a comment.
+	it("REJECTS the wrong answer: the pre-DATASET.2 one-level DENY walk keeps both", () => {
+		// The pre-DATASET.2 implementation, reproduced as code so the claim is
+		// measured rather than asserted in a comment.
+		//
+		// ⚠ The forbidden set is a LITERAL of the historical rule, not a read of
+		// today's registry. It used to be `new Set(PAYLOAD_STRIP_KEYS[…])`, and
+		// after the inversion that expression names an OBJECT of shipped keys —
+		// so the reproduction would have silently become "remove the keys that
+		// ship", which passes for a reason unrelated to depth. A historical
+		// reproduction has to be pinned to history.
+		const HISTORICAL_STRIP_KEYS = ["userId", "key", "commentId"];
 		const oneLevel = (payload: Record<string, unknown>) => {
-			const forbidden = new Set<string>(
-				PAYLOAD_STRIP_KEYS["image_upload.committed"],
-			);
+			const forbidden = new Set<string>(HISTORICAL_STRIP_KEYS);
 			const out: Record<string, unknown> = {};
 			for (const [k, v] of Object.entries(payload)) {
 				if (forbidden.has(k)) continue;
@@ -194,8 +222,8 @@ describe("C2 · GUARD 1 — a nested STRIP key at depth 2 is removed", () => {
 
 describe("C2 · GUARD 1b — stripMetadata is recursive TOO, and nothing tested it", () => {
 	// ⚠ **The other half of the C2 fix, and it had no coverage at all.** The
-	// file docblock names `stripPayload` / `stripMetadata` together, and
-	// `stripMetadata` genuinely changed — it delegates to `stripDeep` now. But
+	// file docblock names `shipPayload` / `stripMetadata` together, and
+	// `stripMetadata` genuinely changed — it delegates to `shipDeep` now. But
 	// every metadata fixture in the suite is the flat §3.7 seven-field object,
 	// so reverting `stripMetadata` alone to a one-level walk left the entire
 	// suite green: `transform.test.ts:175` passes a flat object and this file's
@@ -206,7 +234,11 @@ describe("C2 · GUARD 1b — stripMetadata is recursive TOO, and nothing tested 
 	// and §19.4/Appendix B.23 say `ip` and `user_agent` never ship from any
 	// audit table, not that they never ship from the top level of one.
 
-	it("removes a nested ip / user_agent from metadata at depth 2", () => {
+	it("drops an undeclared metadata container whole, at depth 2", () => {
+		// ⚠ INVERTED at DATASET.3 with its payload twin. `context` is not one of
+		// §3.7's seven fields, so it never reaches the question "which of its
+		// keys are secret" — it is dropped for not being declared, which is a
+		// stronger property than dropping the two keys somebody remembered.
 		const out = stripMetadata(
 			{
 				request_id: "req_1",
@@ -220,26 +252,22 @@ describe("C2 · GUARD 1b — stripMetadata is recursive TOO, and nothing tested 
 			"events",
 		) as Record<string, unknown>;
 
-		const ctx = out.context as Record<string, unknown>;
-		expect("ip" in ctx).toBe(false);
-		expect("user_agent" in ctx).toBe(false);
-		// Targeted: the container and its innocent sibling survive.
-		expect(ctx.region).toBe("bom1");
+		expect("context" in out).toBe(false);
+		// The declared siblings survive — not an emptied object.
 		expect(out.request_id).toBe("req_1");
+		expect(out.flow_id).toBe("F-BET-1");
 	});
 
-	it("removes them through an ARRAY inside metadata", () => {
+	it("drops an undeclared ARRAY inside metadata too", () => {
 		const out = stripMetadata(
 			{ request_id: "req_1", hops: [{ ip: IP_NESTED, seq: 1 }] },
 			"events",
 		) as Record<string, unknown>;
-		const hops = out.hops as Record<string, unknown>[];
-		expect(Array.isArray(hops)).toBe(true);
-		expect("ip" in (hops[0] ?? {})).toBe(false);
-		expect(hops[0]?.seq).toBe(1);
+		expect("hops" in out).toBe(false);
+		expect(out.request_id).toBe("req_1");
 	});
 
-	it("REJECTS the wrong answer: a one-level metadata walk leaves both in place", () => {
+	it("REJECTS the wrong answer: a one-level DENY walk leaves the nested ip in place", () => {
 		const oneLevel = (m: Record<string, unknown>) => {
 			const out: Record<string, unknown> = {};
 			for (const [k, v] of Object.entries(m)) {
@@ -253,6 +281,48 @@ describe("C2 · GUARD 1b — stripMetadata is recursive TOO, and nothing tested 
 			context: { ip: IP_NESTED },
 		});
 		expect((shallow.context as Record<string, unknown>).ip).toBe(IP_NESTED);
+	});
+
+	it("REJECTS the wrong answer: a RECURSIVE deny walk still ships an unlisted nested key", () => {
+		// ⚠ The mutation that matters after DATASET.3, and it is a different one.
+		// A recursive deny-list — the DATASET.2 fix, correct as far as it went —
+		// removes `ip` at any depth and leaves `region` beside it. That is fine
+		// for `region` and fatal for the next key somebody adds, because the
+		// rule is "remove what I named" and the new key is never named.
+		//
+		// Written as code rather than argued, so "the allow-list is stronger" is
+		// a measurement and not a preference.
+		const recursiveDeny = (v: unknown): unknown => {
+			if (v === null || typeof v !== "object") return v;
+			if (Array.isArray(v)) return v.map(recursiveDeny);
+			const out: Record<string, unknown> = {};
+			for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+				if (STRIPPED_METADATA_KEYS.includes(k as never)) continue;
+				out[k] = recursiveDeny(val);
+			}
+			return out;
+		};
+		const denied = recursiveDeny({
+			request_id: "req_1",
+			context: { ip: IP_NESTED, remoteAddr: IP_NESTED },
+		}) as Record<string, unknown>;
+		// The named key goes…
+		expect("ip" in (denied.context as Record<string, unknown>)).toBe(false);
+		// …and its unnamed synonym ships, carrying the identical value.
+		expect((denied.context as Record<string, unknown>).remoteAddr).toBe(
+			IP_NESTED,
+		);
+
+		// The allow-list, on the same input, drops the container outright.
+		const allowed = stripMetadata(
+			{
+				request_id: "req_1",
+				context: { ip: IP_NESTED, remoteAddr: IP_NESTED },
+			},
+			"events",
+		) as Record<string, unknown>;
+		expect("context" in allowed).toBe(false);
+		expect(JSON.stringify(allowed)).not.toContain(IP_NESTED);
 	});
 });
 
@@ -293,42 +363,90 @@ describe("C2 · GUARD 2 — the nested secret is HARVESTED", () => {
 	});
 });
 
-describe("C2 · GUARD 3 — depth works THROUGH arrays", () => {
-	it("strips variants[].key, which is u/-namespaced", () => {
-		const out = stripPayload(
+describe("C2 · GUARD 3 — the allow-list reaches THROUGH arrays", () => {
+	it("drops the undeclared variants[] array whole", () => {
+		const out = shipPayload(
 			"image_upload.committed",
 			COMMITTED.payload,
 		) as Record<string, unknown>;
-		const variants = out.variants as Record<string, unknown>[];
-		expect(Array.isArray(variants)).toBe(true);
-		// The element and its non-forbidden siblings survive; only the key goes.
-		expect(variants[0]?.width).toBe(800);
-		expect("key" in (variants[0] ?? {})).toBe(false);
+		expect("variants" in out).toBe(false);
 	});
 
-	it("REJECTS the wrong answer: object-depth only, arrays not descended", () => {
-		// A recursion that handles objects but returns arrays untouched. It
-		// passes GUARD 1 completely and fails only here.
-		const objectsOnly = (
-			v: unknown,
-			forbidden: ReadonlySet<string>,
-		): unknown => {
+	it("and inside a DECLARED array, an undeclared element key is dropped", () => {
+		// ⚠ This is the array claim that still needs its own test, and it is
+		// genuinely distinct from the object claim. `market.created.media` IS
+		// declared, so the array survives; the question is whether the child
+		// spec is applied to every ELEMENT or only to the array itself. An
+		// implementation that declared the array and shipped its elements
+		// verbatim would pass every object-depth test in this file.
+		const out = shipPayload("market.created", {
+			marketId: "0192f3a4-cccc-7000-8000-000000000001",
+			resolutionDeadline: "2026-10-01T12:00:00.000Z",
+			media: [
+				{
+					key: M_KEY,
+					displayOrder: 0,
+					isDefault: true,
+					// The undeclared element key. A future author adding an
+					// upload attribution field writes exactly this.
+					uploadedBy: FIXTURE_USER_IDS.amber,
+				},
+			],
+			mediaVideoUrl: null,
+		}) as Record<string, unknown>;
+
+		const media = out.media as Record<string, unknown>[];
+		expect(Array.isArray(media)).toBe(true);
+		// Declared children survive…
+		expect(media[0]?.key).toBe(M_KEY);
+		expect(media[0]?.displayOrder).toBe(0);
+		// …and the undeclared one does not, along with the raw users.id it held.
+		expect("uploadedBy" in (media[0] ?? {})).toBe(false);
+		expect(JSON.stringify(out)).not.toContain(FIXTURE_USER_IDS.amber);
+	});
+
+	it("REJECTS the wrong answer: element specs not applied inside the array", () => {
+		// A walk that descends objects and passes arrays through untouched. It
+		// passes GUARD 1 completely and fails only here — which is what makes
+		// "depth through objects" and "depth through arrays" two claims.
+		const objectsOnly = (v: unknown, node: unknown): unknown => {
+			if (node === true) return v;
 			if (v === null || typeof v !== "object") return v;
 			if (Array.isArray(v)) return v; // ← the defect
 			const out: Record<string, unknown> = {};
 			for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
-				if (forbidden.has(k)) continue;
-				out[k] = objectsOnly(val, forbidden);
+				const child = (node as Record<string, unknown>)[k];
+				if (child === undefined) continue;
+				out[k] = objectsOnly(val, child);
 			}
 			return out;
 		};
 		const broken = objectsOnly(
-			COMMITTED.payload,
-			new Set<string>(PAYLOAD_STRIP_KEYS["image_upload.committed"]),
+			{
+				marketId: "m1",
+				media: [{ key: M_KEY, uploadedBy: FIXTURE_USER_IDS.amber }],
+			},
+			PAYLOAD_SHIP_KEYS["market.created"],
 		) as Record<string, unknown>;
-		expect((broken.variants as Record<string, unknown>[])[0]?.key).toBe(
-			R2_NESTED,
+		expect((broken.media as Record<string, unknown>[])[0]?.uploadedBy).toBe(
+			FIXTURE_USER_IDS.amber,
 		);
+	});
+
+	it("REJECTS the wrong answer: `true` used to ship a whole subtree", () => {
+		// ⚠ The escape hatch that would undo the inversion from inside. If
+		// `true` meant "ship whatever is here", an author could declare a
+		// container `true` and every key inside it would ship unreviewed — a
+		// deny-list's failure mode wearing an allow-list's clothes. It throws.
+		expect(() =>
+			shipPayload("market.created", {
+				marketId: "m1",
+				// `resolutionDeadline` is declared `true`, i.e. a scalar.
+				resolutionDeadline: { nested: FIXTURE_USER_IDS.amber },
+				media: [{ key: M_KEY, displayOrder: 0, isDefault: true }],
+				mediaVideoUrl: null,
+			}),
+		).toThrow(/declared as a shipped SCALAR but holds an object/);
 	});
 });
 
@@ -339,33 +457,66 @@ describe("C2 · GUARD 4 — the m/ namespace SURVIVES the recursive strip", () =
 		// and §19.4.1 SHIPs it. Recursion is what puts it in the strip's reach
 		// for the first time, so this is the test most likely to be the one
 		// that fails if the namespace predicate is dropped.
-		const out = stripPayload(
-			"market.created",
-			MARKET_CREATED.payload,
-		) as Record<string, unknown>;
+		const out = shipPayload("market.created", MARKET_CREATED.payload) as Record<
+			string,
+			unknown
+		>;
 		const media = out.media as Record<string, unknown>[];
 		expect(media[0]?.key).toBe(M_KEY);
 		expect(media[0]?.displayOrder).toBe(0);
 	});
 
-	it("but a u/ key under the SAME key name, same depth, is stripped", () => {
-		// The pair is the point: same key name, same nesting shape, opposite
-		// outcomes decided by the value's namespace and nothing else. A test
-		// that only asserted survival would pass against a strip that had been
-		// disabled entirely.
-		const out = stripDeep(
-			{ media: [{ key: `u/${FIXTURE_USER_IDS.amber}/x.webp` }] },
-			new Set(["key"]),
+	it("and a `key` on an event type that does not declare one never ships", () => {
+		// ⚠ **The pair, and its meaning changed with the mechanism.** Under the
+		// deny-list this asserted that a `u/`-namespaced key was stripped while
+		// its `m/` twin survived — the same key NAME, opposite outcomes decided
+		// by the value's NAMESPACE. That rule had to live in three places at
+		// once (strip, harvest, assertion) and disagreeing in any one of them
+		// was a guaranteed total build failure (`@security-auditor` H-1).
+		//
+		// Under the allow-list the namespace never enters the strip's reasoning.
+		// `market.created` declares `media[].key` so it ships; `image_upload.*`
+		// declares no `key` at all so it does not — decided by the DECLARATION,
+		// not by inspecting the value. The predicate survives in the harvest and
+		// the assertion, which still reason about key names; the strip no longer
+		// needs to know.
+		const out = shipPayload("image_upload.sign_requested", {
+			uploadId: "u1",
+			contentType: "image/webp",
+			byteSize: 1024,
+			key: `u/${FIXTURE_USER_IDS.amber}/x.webp`,
+		}) as Record<string, unknown>;
+		expect("key" in out).toBe(false);
+		expect(out.uploadId).toBe("u1");
+
+		// …and the same NAME under an m/ value is equally absent here, because
+		// nothing about the value is consulted. That is the simplification:
+		// one fewer rule three layers have to agree about.
+		const out2 = shipPayload("image_upload.sign_requested", {
+			uploadId: "u1",
+			key: M_KEY,
+		}) as Record<string, unknown>;
+		expect("key" in out2).toBe(false);
+	});
+
+	it("shipDeep drops an undeclared key at any depth, through arrays", () => {
+		// The primitive, exercised directly rather than only through
+		// `shipPayload`, so a change to the declaration table cannot make this
+		// pass or fail for a reason unrelated to the walk.
+		const out = shipDeep(
+			{ media: [{ key: "keep", secret: FIXTURE_USER_IDS.amber }] },
+			{ media: { key: true } },
+			"probe",
 		) as Record<string, unknown>;
-		expect("key" in ((out.media as Record<string, unknown>[])[0] ?? {})).toBe(
-			false,
-		);
+		const media = out.media as Record<string, unknown>[];
+		expect(media[0]?.key).toBe("keep");
+		expect("secret" in (media[0] ?? {})).toBe(false);
 	});
 });
 
 describe("C3 · image_upload.committed.payload.commentId is stripped", () => {
 	it("removes commentId unconditionally", () => {
-		const out = stripPayload(
+		const out = shipPayload(
 			"image_upload.committed",
 			COMMITTED.payload,
 		) as Record<string, unknown>;
@@ -407,28 +558,20 @@ describe("C3 · image_upload.committed.payload.commentId is stripped", () => {
 		expect(findKeys(uploadEvents, ["commentId"]).length).toBe(0);
 	});
 
-	it("⛔ KNOWN OPEN — comment.placed still rebuilds the association", () => {
-		// ⚠⚠ **THIS TEST PINS A LEAK THAT IS STILL OPEN. It is not a passing
-		// guard; it is a tripwire.** When the ruling lands and the route is
-		// closed, this goes RED and must be inverted — which is the point of
-		// asserting it rather than only writing it in a report.
+	it("S5 · comment.placed no longer rebuilds the association — the pin, INVERTED", () => {
+		// ⚠⚠ **This test was a tripwire and it fired.** Its DATASET.2 form
+		// asserted `leaking.length === 1` and was labelled `⛔ KNOWN OPEN`,
+		// written *"to go RED when the ruling lands and the route is closed —
+		// which is the point of asserting it rather than only writing it in a
+		// report."* Ruling S5 landed, the route is closed, and this is the
+		// inversion it was written to demand.
 		//
-		// C3 as ratified strips `commentId` from `image_upload.committed`,
-		// reasoning that "leaving a recovery path that rebuilds exactly the
-		// link R1 withholds is incoherent." Measured: **the ruling does not
-		// achieve that.** `comment.placed`'s payload declares BOTH `commentId`
-		// and `uploadId`; §19.4.1 strips only `userId` from it and explicitly
-		// names `uploadId` a shipped research key. Every comment emits one, so
-		// for a removed comment with an image the pair reconstructs the
-		// association in ONE row, with no join at all — a shorter path than the
-		// one C3 closed.
-		//
-		// Not fixed here, deliberately. Stripping `uploadId` from
-		// `comment.placed` deletes a key §19.4.1 says ships, which is a spec
-		// edit outside this task's E1–E7 fence; and stripping it only for
-		// removed comments is the conditional-strip-leaks-the-condition
-		// failure C3's own reasoning rejects. It needs the same kind of ruling
-		// R1 and C3 got.
+		// What closed it is worth being precise about, because it was not a new
+		// rule. `comment.placed`'s SHIP declaration simply does not name
+		// `uploadId`. Under the deny-list, closing this needed an added STRIP
+		// entry and a spec edit; under the allow-list it needed a line NOT to be
+		// written. That asymmetry is the whole argument for the inversion:
+		// the safe outcome became the cheap one.
 		const removed = DIRTY_TABLE_ROWS.mod_actions.find(
 			(r) => (r as Record<string, unknown>).reason === "content_removed",
 		) as Record<string, unknown>;
@@ -438,38 +581,73 @@ describe("C3 · image_upload.committed.payload.commentId is stripped", () => {
 			removedCommentIds: new Set([removedCommentId]),
 		});
 
-		const leaking = strippedEvents.filter(
+		// CONTROL, and it is load-bearing: the recovery row IS present and IS
+		// still a `comment.placed` naming the removed comment. Without this the
+		// absence below is equally consistent with "the fixture stopped carrying
+		// the row", which is `@test-writer` M-5's shape — an absence asserted
+		// over data that could not have produced a presence.
+		const recoveryRows = strippedEvents.filter(
 			(r) =>
 				r.event_type === "comment.placed" &&
-				(r.payload as Record<string, unknown>)?.commentId ===
-					removedCommentId &&
-				(r.payload as Record<string, unknown>)?.uploadId != null,
+				(r.payload as Record<string, unknown>)?.commentId === removedCommentId,
 		);
-		expect(leaking.length).toBe(1);
+		expect(recoveryRows.length).toBe(1);
 
-		// And the value it exposes is exactly the FK the comments arm withheld.
+		// …and the half that rebuilt the withheld association is gone.
+		expect("uploadId" in (recoveryRows[0]?.payload as object)).toBe(false);
+
+		// ⚠ **MY OWN ERROR, corrected in place.** The first version of this
+		// assertion scanned the whole stripped `events` table for the withheld
+		// FK's VALUE and demanded zero. It found **ten**, and it was the
+		// assertion that was wrong, not the pipeline: that FK is an
+		// `image_uploads.id`, and §19.4.1 SHIPs it as `uploadId` on every
+		// `image_upload.*` event and as their `aggregate_id`. Demanding zero
+		// demands the pipeline delete the upload lifecycle.
+		//
+		// It is the mirror of a mistake DATASET.2 already recorded one field
+		// over — a first draft asserting no `commentId` survived anywhere, which
+		// would have demanded the comment↔bet join graph be deleted. **What
+		// B.6 withholds is the ASSOCIATION, not either id.** So the right
+		// assertion is about co-occurrence in one row, and that is the CLASS
+		// test below; here the narrow claim is the one that belongs: the
+		// recovery row's own payload no longer carries the pair.
 		const withheldFk = (
 			DIRTY_TABLE_ROWS.comments.find(
 				(c) => (c as Record<string, unknown>).id === removedCommentId,
 			) as Record<string, unknown>
-		).image_uploads_id;
-		expect((leaking[0]?.payload as Record<string, unknown>).uploadId).toBe(
-			withheldFk,
-		);
+		).image_uploads_id as string;
+		// CONTROL on the needle: it really is a value that exists in the source,
+		// so a zero-hit scan is an absence rather than an unread input.
+		expect(
+			findValues(DIRTY_TABLE_ROWS.comments, new Set([withheldFk])).length,
+		).toBeGreaterThan(0);
+		// The pair is broken: this row names the removed comment and no upload.
+		expect(
+			findValues(recoveryRows[0]?.payload, new Set([withheldFk])).length,
+		).toBe(0);
+		// …while the SOURCE row did carry it, which is what makes the absence a
+		// consequence of the transform rather than of the fixture.
+		const sourceRecovery = DIRTY_TABLE_ROWS.events.find(
+			(r) =>
+				(r as Record<string, unknown>).event_type === "comment.placed" &&
+				((r as Record<string, unknown>).payload as Record<string, unknown>)
+					?.commentId === removedCommentId,
+		) as Record<string, unknown>;
+		expect(
+			findValues(sourceRecovery.payload, new Set([withheldFk])).length,
+		).toBe(1);
 	});
 
-	it("⛔ KNOWN OPEN — the CLASS, not the instance: any shipped pair rebuilds it", () => {
+	it("S5 · the CLASS, not the instance: NO shipped pair rebuilds it", () => {
 		// ⚠ Companion to the pin above, and the reason it needs one: that test
-		// filters on `event_type === "comment.placed"` and asserts the count is
-		// exactly 1, so it watches ONE ROUTE and one fixture row. A second event
-		// type shipping the same `commentId` + `uploadId` pair — or a second
-		// recovery row — leaves it green at 1 while the association becomes
-		// recoverable by a route nobody is looking at.
+		// filters on `event_type === "comment.placed"`, so it watches ONE ROUTE.
+		// A second event type shipping the same `commentId` + `uploadId` pair
+		// would leave it green while the association became recoverable by a
+		// route nobody is looking at.
 		//
 		// This asserts over EVERY stripped event of every type, so a new route
-		// arrives as a failure here rather than as silence. It is written to go
-		// RED in both directions: RED when the known route is closed (good news,
-		// invert it), and RED when a new one opens (bad news, close it).
+		// arrives as a failure here rather than as silence. It stays written in
+		// both directions: RED if a route is added, and its message says so.
 		const removed = DIRTY_TABLE_ROWS.mod_actions.find(
 			(r) => (r as Record<string, unknown>).reason === "content_removed",
 		) as Record<string, unknown>;
@@ -478,6 +656,14 @@ describe("C3 · image_upload.committed.payload.commentId is stripped", () => {
 		const strippedEvents = stripTable("events", DIRTY_TABLE_ROWS.events, {
 			removedCommentIds: new Set([removedCommentId]),
 		});
+
+		// CONTROL: the scan can find things. Without it, "no routes" is equally
+		// consistent with a filter that matches nothing at all.
+		expect(
+			strippedEvents.filter(
+				(r) => findValues(r.payload, new Set([removedCommentId])).length > 0,
+			).length,
+		).toBeGreaterThan(0);
 
 		// Every surviving payload that names the removed comment AND an upload,
 		// whatever key names or nesting it uses.
@@ -496,10 +682,9 @@ describe("C3 · image_upload.committed.payload.commentId is stripped", () => {
 
 		expect(
 			routes,
-			"a route that rebuilds a removed comment's image association changed — " +
-				"if a route was CLOSED this is good news and the pin should be " +
-				"inverted; if a route was ADDED, close it",
-		).toEqual(["comment.placed"]);
+			"a route that rebuilds a removed comment's image association was ADDED — " +
+				"ruling S5 closed this class at DATASET.3 and it must stay closed",
+		).toEqual([]);
 	});
 
 	it("POSITIVE CONTROL — a NON-removed comment still carries its image FK", () => {
@@ -542,18 +727,18 @@ describe("HIGH-2 · a non-object payload/metadata FAILS CLOSED", () => {
 	// cannot see it — measured: restoring the passthrough leaves all 21
 	// round-trip tests green.
 
-	it("stripPayload THROWS on a stringified payload", () => {
+	it("shipPayload THROWS on a stringified payload", () => {
 		expect(() =>
-			stripPayload(
+			shipPayload(
 				"image_upload.committed",
 				JSON.stringify({ userId: "x", ip: "203.0.113.7" }),
 			),
 		).toThrow(/not a\s+JSON object/);
 	});
 
-	it("stripPayload THROWS on an array payload", () => {
+	it("shipPayload THROWS on an array payload", () => {
 		expect(() =>
-			stripPayload("market.created", [{ key: "u/x/y.webp" }]),
+			shipPayload("market.created", [{ key: "u/x/y.webp" }]),
 		).toThrow(/not a\s+JSON object/);
 	});
 
@@ -566,7 +751,7 @@ describe("HIGH-2 · a non-object payload/metadata FAILS CLOSED", () => {
 	it("POSITIVE CONTROL — a real object still passes, and is stripped", () => {
 		// Without this, the three throws above are satisfied by a function that
 		// throws on everything.
-		const out = stripPayload("image_upload.committed", {
+		const out = shipPayload("image_upload.committed", {
 			userId: "x",
 			uploadId: "u1",
 		}) as Record<string, unknown>;
@@ -583,12 +768,21 @@ describe("HIGH-2 · a non-object payload/metadata FAILS CLOSED", () => {
 });
 
 describe("C2 · what the depth work actually bought — measured, not assumed", () => {
-	/** The pre-DATASET.2 one-level strip, applied to a whole payload. */
-	const oneLevel = (eventType: string, payload: Record<string, unknown>) => {
+	/**
+	 * The pre-DATASET.2 one-level strip, applied to a whole payload.
+	 *
+	 * ⚠ The per-type half is a LITERAL of the historical rule for
+	 * `image_upload.committed`, not a read of the live registry. Reading the
+	 * registry was correct while it held STRIP keys and became silently wrong
+	 * when DATASET.3 inverted it to SHIP keys — the reproduction would have
+	 * gone on "working" while removing the keys that ship. A historical
+	 * reproduction has to be pinned to history, or it stops reproducing
+	 * anything the moment the thing it reproduces is replaced.
+	 */
+	const HISTORICAL_COMMITTED_STRIP_KEYS = ["userId", "key", "commentId"];
+	const oneLevel = (_eventType: string, payload: Record<string, unknown>) => {
 		const forbidden = new Set<string>([
-			...((PAYLOAD_STRIP_KEYS as Record<string, readonly string[]>)[
-				eventType
-			] ?? []),
+			...HISTORICAL_COMMITTED_STRIP_KEYS,
 			...GLOBALLY_FORBIDDEN_PAYLOAD_KEYS,
 		]);
 		const out: Record<string, unknown> = {};
@@ -665,33 +859,28 @@ describe("C2 · what the depth work actually bought — measured, not assumed", 
 		]);
 	});
 
-	it("⛔ KNOWN OPEN — a nested secret under an UNLISTED key IS silent, and depth does not close it", () => {
-		// ⚠⚠ **THIS PINS AN OPEN LEAK. It is a tripwire, not a passing guard.**
+	it("DATASET.2 owed E, CLOSED — a nested secret under an UNLISTED key is now dropped", () => {
+		// ⚠⚠ **This test was the run's loudest tripwire and it has fired.** Its
+		// DATASET.2 form ended `expect(JSON.stringify(out)).toContain(UNSEEN_IP)`
+		// — asserting that an IP under a key nobody listed reached the emitted
+		// bytes with all four guard layers reporting clean:
 		//
-		// The genuinely silent case, which the fixture does not model and which
-		// recursion cannot reach: depth made the strip walk to any level, but the
-		// strip still only removes keys it was NAMED. A payload nesting a secret
-		// under a key nobody listed is:
-		//
-		//   · not STRIPPED    — the key is on no §19.4.1 rule and on no global net
+		//   · not STRIPPED    — the key was on no §19.4.1 rule and on no global net
 		//   · not HARVESTED   — `HARVEST_KEYS` has no entry for that spelling
 		//   · not VALUE-matched — because the harvest never collected it
-		//   · not KEY-matched — the key is on neither net
+		//   · not KEY-matched — the key was on neither net
 		//
-		// Four layers, four different reasons to stay quiet, and the build
-		// reports success. That is the shape the file docblock attributes to the
-		// pre-DATASET.2 shallow strip; it is in fact the shape of what remains
-		// AFTER the depth fix.
+		// Its own note said closing it *"means either a value-shaped net over
+		// payload leaves or a positive allow-list of shipped payload keys per
+		// event type, and both are spec decisions."* The second one was ruled
+		// (E) and built at DATASET.3, so the assertion inverts to `not.toContain`.
 		//
-		// `HARVEST_KEYS`'s own docblock reaches for the completeness guard as the
-		// backstop — *"the completeness guard over §19.4.1 is what keeps that from
-		// being silent"* — but that guard asserts every event TYPE has a rule, not
-		// that every KEY in a payload is covered by one. Adding a nested key to an
-		// existing type's payload passes it untouched.
-		//
-		// Not closable in the test layer. Closing it means either a value-shaped
-		// net (an IP/UA/email regex over payload leaves) or a positive allow-list
-		// of shipped payload keys per event type, and both are spec decisions.
+		// ⚠ **Nothing here names `client` or `remoteAddr`, and that is the
+		// point.** The three previous fixes for this class each added a name to
+		// a list, which closed one member and left the class open. This closes
+		// it by never consulting a list of forbidden names at all: `client` is
+		// dropped for not being declared, exactly as `wibble` or `trace` or
+		// whatever the next author writes would be.
 		const UNSEEN_IP = "198.51.100.77"; // RFC 5737 TEST-NET-2 — nowhere else
 		const probeRow = {
 			event_id: "0192f3a4-0fff-7000-8000-00000000ee01",
@@ -723,7 +912,13 @@ describe("C2 · what the depth work actually bought — measured, not assumed", 
 			...DIRTY_TABLE_ROWS,
 			events: [...DIRTY_TABLE_ROWS.events, probeRow],
 		} as never);
-		expect(secrets.ips.has(UNSEEN_IP)).toBe(false); // never harvested
+		// ⚠ STILL not harvested, and that is deliberately left alone. The
+		// harvest reads key NAMES and `remoteAddr` is not one it knows — so the
+		// value scan is still blind here and always will be for a novel
+		// spelling. What changed is that the value never survives the transform
+		// to be scanned for. Recording it keeps the two claims apart: the leak
+		// is closed by the STRIP, not by the guard.
+		expect(secrets.ips.has(UNSEEN_IP)).toBe(false);
 
 		const stripped = stripRow("events", probeRow as never, {
 			removedCommentIds: new Set<string>(),
@@ -734,10 +929,22 @@ describe("C2 · what the depth work actually bought — measured, not assumed", 
 			buildPseudonymMap(DIRTY_TABLE_ROWS.users),
 		);
 
-		// The guard passes…
+		// The guard still passes — it was never the thing that could see this.
 		expect(() => assertTableClean("events", out, secrets)).not.toThrow();
-		// …and the ip is in the bytes that would be written.
-		expect(JSON.stringify(out)).toContain(UNSEEN_IP);
+		// …and the ip is NOT in the bytes that would be written. This is the
+		// line that inverted.
+		expect(JSON.stringify(out)).not.toContain(UNSEEN_IP);
+		expect(
+			"client" in ((out[0] as Record<string, unknown>).payload as object),
+		).toBe(false);
+
+		// POSITIVE CONTROL — the row is not simply empty. A declared research
+		// key on the same payload survives, so "the ip is absent" is a statement
+		// about the ip and not about a payload the transform deleted.
+		expect(
+			((out[0] as Record<string, unknown>).payload as Record<string, unknown>)
+				.stake,
+		).toBe("25.000000000000000000");
 	});
 });
 

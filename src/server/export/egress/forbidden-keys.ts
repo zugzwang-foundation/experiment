@@ -73,102 +73,260 @@ export const SHIPPED_METADATA_KEYS = [
 ] as const;
 
 /**
- * §19.4.1 — per-event-type payload STRIP_KEY rules for `events.payload`.
+ * One node of a payload SHIP declaration.
  *
- * ⚠ **The `satisfies Record<EventType, …>` is the load-bearing part of this
- * declaration and must not be relaxed to `Partial<>` or to a plain object.**
- * It makes "a new event type shipped with no strip rule" a COMPILE error at
- * the moment `EVENT_TYPES` grows, rather than a runtime discovery. That is
- * O-1 — structural beats procedural — and it is strictly earlier than the
- * CI guard in `completeness.ts`, which exists as the belt to this brace
- * (a type error is skippable with a cast; the runtime guard is not).
+ * `true` ships a **scalar leaf** — a string, number, boolean, or null. It does
+ * NOT ship an object or an array, and reaching one under `true` throws.
  *
- * An event type with nothing to strip declares `[]` **explicitly**. Silence
- * and "nothing to strip" must not share a representation, because then the
- * guard cannot tell an answered question from an unasked one.
+ * ⚠ **That restriction is the whole inversion, and softening it undoes the
+ * night's work.** "Ship this subtree unread" is deny-by-default's exact
+ * opposite: it is how a key nobody has reviewed rides out inside a container
+ * somebody did review. A nested object is declared by nesting; an array
+ * applies its child spec to every element. If a payload grows a container the
+ * declaration does not describe, the build stops and a human decides what of
+ * it ships — which is the decision §19.4.1 exists to record.
  */
-export const PAYLOAD_STRIP_KEYS = {
+export type ShipNode = true | { readonly [key: string]: ShipNode };
+
+/** A whole event type's declaration: which top-level payload keys ship. */
+export type ShipSpec = { readonly [key: string]: ShipNode };
+
+/**
+ * §19.4.1 — per-event-type payload SHIP declarations for `events.payload`.
+ *
+ * ## Why this is an allow-list, and why it used to be the opposite
+ *
+ * Until DATASET.3 this was `PAYLOAD_STRIP_KEYS`: per event type, the keys to
+ * REMOVE, with everything else shipping. `events.payload` is a `jsonb` column
+ * whose shape is open — anyone adding an event type, or adding a key to an
+ * existing type, extends it — so "everything else" is an unbounded set and
+ * "unlisted" is the normal state of a key nobody has thought about yet.
+ *
+ * That produced the same defect three nights running, each time patched by
+ * extending a list: §19.5's six FK paths against Appendix B's ~14;
+ * `comment.placed.payload` rebuilding an association a shorter way than the
+ * path C3 closed; and `payload.client.remoteAddr`, which is silent in all four
+ * layers because no list spells it — unstripped (no rule names it),
+ * unharvested (`HARVEST_KEYS` has no such spelling), unmatched by value
+ * (because it was never harvested) and unmatched by key.
+ *
+ * **The list was the defect.** The table inventory already had this right one
+ * level up: a `pgTable` classified as nothing at all fails the build rather
+ * than defaulting either way. This extends that property inward, to keys.
+ * Everything undeclared is dropped, unread, at any depth and through arrays.
+ *
+ * ## What did NOT change
+ *
+ * The set of keys that ships is preserved exactly, event type by event type,
+ * against the deny-list this replaces — this is a change of mechanism, not of
+ * policy, and the proof is a byte comparison of the emitted archive across the
+ * change. The one measured delta is recorded in the DATASET.3 run report: the
+ * dirty fixture's `image_upload.committed` row carries two containers
+ * (`context`, `variants`) that `schemas.ts` does not declare and no reviewer
+ * ever reviewed, and the inversion drops them. That is the mechanism working
+ * on the one row built to carry undeclared keys.
+ *
+ * ## The two guards behind it
+ *
+ * `satisfies Record<EventType, ShipSpec>` makes "a new event type with no
+ * declaration" a COMPILE error the moment `EVENT_TYPES` grows (O-1 —
+ * structural beats procedural), and `completeness.ts` is the runtime belt to
+ * that brace, because a type error is silenceable with one cast and a runtime
+ * throw is not.
+ *
+ * ⚠ **Neither of those can see a new KEY on an existing type**, which is the
+ * gap that made the old deny-list unsafe. What covers that is
+ * `tests/unit/export/egress/payload-ship-schema-parity.test.ts`, which
+ * compares this declaration against `eventPayloadSchemas` — the Zod payload
+ * shapes in `src/server/events/schemas.ts` — and requires every schema key to
+ * be classified as either shipped or deliberately dropped. It has to be a test
+ * rather than a compile check because `schemas.ts` imports `server-only` and
+ * this module must stay loadable by `tsx` (AGENTS.md §7); stated here so the
+ * next reader does not take the missing `satisfies` for an oversight.
+ *
+ * An event type that ships **nothing** declares `{}` explicitly. Silence and
+ * "ships nothing" must not share a representation, or the guard cannot tell an
+ * answered question from an unasked one.
+ */
+export const PAYLOAD_SHIP_KEYS = {
 	// — user lifecycle —
-	// `ip`/`user_agent` are PII per §19.4 and redundant with the (already
-	// stripped) `users.tos_acceptance_*` columns.
-	"user.tos_accepted": ["ip", "user_agent"],
-	// `googleId` mirrors the `users.google_id` STRIP. `userId` is
-	// defense-in-depth: `aggregate_id` is rewritten to a pseudonym per §19.5,
-	// but a raw `payload.userId` left behind re-identifies by cross-join.
-	"user.oauth_signed_in": ["googleId", "userId"],
-	"user.otp_signed_in": ["email", "userId"],
-	"user.pseudonym_assigned": ["userId"],
-	"user.signed_out": ["userId"],
+	// `ip` / `userAgent` are PII per §19.4 and redundant with the (already
+	// stripped) `users.tos_acceptance_*` columns. `userId` is withheld
+	// throughout: `aggregate_id` is rewritten to a pseudonym per §19.5, and a
+	// raw `payload.userId` left beside it re-identifies by cross-join.
+	//
+	// ⚠ The two hashes are the research content — which version of the terms a
+	// participant accepted, without who they are.
+	"user.tos_accepted": { tosVersionHash: true, privacyVersionHash: true },
+	// `googleId` mirrors the `users.google_id` STRIP; `provider` is the literal
+	// "google" on every row, which carries no signal a researcher can use and
+	// which nobody ratified shipping. Under a deny-list it shipped because
+	// nobody had named it.
+	"user.oauth_signed_in": {},
+	"user.otp_signed_in": {},
+	"user.pseudonym_assigned": { pseudonym: true, pfpFilename: true },
+	"user.signed_out": {},
 
 	// — image upload lifecycle —
-	// `key` is the R2 object key, which embeds the userId per SCAFFOLD.15 §Q9.
-	"image_upload.sign_requested": ["userId", "key"],
-	// ⚠ `commentId` is stripped UNCONDITIONALLY (SPEC.2 §19.4.1, DATASET.2 C3).
+	// `key` is the R2 object key, which embeds the userId per SCAFFOLD.15 §Q9,
+	// so it is a raw `users.id` carrier under a name that does not say so.
+	"image_upload.sign_requested": {
+		uploadId: true,
+		contentType: true,
+		byteSize: true,
+	},
+	// ⚠ `commentId` does NOT ship (SPEC.2 §19.4.1, DATASET.2 C3).
 	//
 	// Appendix B.6 withholds a reactively-removed comment's `image_uploads_id`,
-	// and THIS key reconstructs the identical association from the other side —
-	// so leaving it rebuilds exactly the link B.6 withholds
-	// (`@security-auditor` M-8). With removed bodies now ruled withheld (R1),
+	// and that key reconstructs the identical association from the other side —
+	// so shipping it rebuilds exactly the link B.6 withholds
+	// (`@security-auditor` M-8). With removed bodies ruled withheld (R1),
 	// leaving a recovery path for the one association that withholding exists
 	// to break is incoherent.
 	//
 	// **Unconditional, not conditional-on-removal**, and the reason is the
-	// interesting part: a strip that fired only for removed comments would make
+	// interesting part: a rule that fired only for removed comments would make
 	// the key's own presence or absence the removal flag, on every row, in an
 	// archive that already ships `mod_actions`. The conditional leaks the
 	// condition. Uniform absence carries no signal at all.
 	//
-	// It is also nearly free, which is what makes the choice easy: the key is
-	// **redundant where it is permitted and harmful where it is not**.
-	// `comments.image_uploads_id` (B.6) already carries the association for
-	// every comment that is not withheld, so a researcher joining comments to
-	// uploads uses that column and never needed this one.
-	//
-	// ⚠ **It does NOT close the whole recovery path, and that is measured, not
-	// assumed.** `comment.placed`'s payload carries both `commentId` AND
-	// `uploadId`, and §19.4.1 ships the latter as a research key — so the same
-	// association survives in one row, with no join. See the `KNOWN OPEN` test
-	// in `tests/unit/export/dataset/depth-strip.test.ts`. Closing it deletes a
-	// key the spec says ships and needs its own ruling.
-	"image_upload.committed": ["userId", "key", "commentId"],
-	"image_upload.blocked": ["userId", "key"],
+	// ⚠ Under the deny-list this needed saying as an explicit STRIP entry.
+	// Under the allow-list it is simply not written down, which is the point:
+	// the same outcome now costs nothing to maintain and cannot be lost by
+	// somebody editing a different line.
+	"image_upload.committed": {
+		uploadId: true,
+		etag: true,
+		byteSizeActual: true,
+	},
+	"image_upload.blocked": {
+		uploadId: true,
+		modVerdict: true,
+		reasonCategory: true,
+	},
 	// `orphaned` carries no `userId`; `uploadId` is the row id and SHIPS.
-	"image_upload.orphaned": ["key"],
+	"image_upload.orphaned": { uploadId: true },
 
 	// — moderation —
 	// Research keys `reason` / `banned` / `uploadId` SHIP (AUDIT-FIX-B5).
-	"moderation.blocked": ["userId"],
+	"moderation.blocked": { reason: true, banned: true, uploadId: true },
 
 	// — admin —
-	// `sessionId` is the admin cookie value; `ip` is the admin's IP. Both are
-	// defense-in-depth on top of the BREAK_GLASS.md pre-freeze rotation.
-	"admin.signed_in": ["sessionId", "ip"],
-	"admin.signed_out": ["sessionId"],
+	// `sessionId` is the admin cookie value and `ip` is the admin's IP; both
+	// are withheld as defense-in-depth on top of the BREAK_GLASS.md pre-freeze
+	// rotation. Nothing else is on either payload, so both ship nothing — and
+	// the empty object says that was decided, not overlooked.
+	"admin.signed_in": {},
+	"admin.signed_out": {},
 
 	// — dharma —
-	"dharma.credited": ["userId"],
-	"dharma.granted": ["userId"],
+	"dharma.credited": { amount: true, creditedForDate: true },
+	"dharma.granted": { amount: true },
 
 	// — bet / comment —
-	// Research keys SHIP and are the K_eff(t) derivation core per §19.6:
-	// stake, side, price, sharesSold, proceeds, bodyLength, and the market /
-	// bet / comment ids. Only actor identity is stripped.
-	"bet.placed": ["userId"],
-	"bet.sold": ["userId"],
-	"comment.placed": ["userId"],
+	// These are the K_eff(t) derivation core per §19.6: stake, side, price,
+	// shares, proceeds, body length, and the market / bet / comment ids. Only
+	// the actor's identity is withheld.
+	"bet.placed": {
+		betId: true,
+		marketId: true,
+		side: true,
+		stake: true,
+		shares: true,
+		price: true,
+		commentId: true,
+		parentCommentId: true,
+	},
+	"bet.sold": {
+		betId: true,
+		marketId: true,
+		side: true,
+		sharesSold: true,
+		proceeds: true,
+		price: true,
+	},
+	// ⚠ `uploadId` is DELIBERATELY ABSENT — ruling S5, DATASET.3. It is the
+	// other half of the recovery path `image_upload.committed.commentId` was
+	// ratified to close: this payload carries `commentId` too, so the pair
+	// rebuilds the association Appendix B.6 withholds in ONE ROW with no join.
+	// Closing one end and leaving the other is not a partial mitigation; it is
+	// none. `comments.image_uploads_id` already carries the link for every
+	// comment that is not withheld, so nothing a researcher can use is lost.
+	"comment.placed": {
+		commentId: true,
+		betId: true,
+		marketId: true,
+		side: true,
+		parentCommentId: true,
+		bodyLength: true,
+	},
 
-	// — market lifecycle: nothing to strip, declared explicitly —
-	// Every market.* payload is admin-actor and carries no PII-class key. The
-	// actor is `metadata.actor_id = 'admin-singleton'`, a sentinel that is
-	// never pseudonymized (§19.5).
-	"market.created": [],
-	"market.opened": [],
-	"market.closed": [],
-	"market.resolving": [],
-	"market.resolved": [],
-	"market.corrected": [],
-	"market.voided": [],
-} as const satisfies Record<EventType, readonly string[]>;
+	// — market lifecycle —
+	// Every `market.*` payload is admin-actor and carries no PII-class key, so
+	// the whole declared shape ships. The actor is
+	// `metadata.actor_id = 'admin-singleton'`, a sentinel never pseudonymized
+	// (§19.5).
+	//
+	// ⚠ `media[]` is the one place a nested declaration is load-bearing. Its
+	// `key` lives in the `m/<marketId>/` namespace — operator-curated, no user
+	// id embedded, and Appendix B.16 ships the identical string as a
+	// `market_media` column. `schemas.ts` declares the array `.min(1)`, so
+	// EVERY market carries one: a rule that dropped it would hard-fail the
+	// one-shot release build on the first real read (`@security-auditor` H-1).
+	// Declaring the three child keys is what ships them WITHOUT shipping a
+	// fourth key somebody adds to that object later.
+	"market.created": {
+		marketId: true,
+		resolutionDeadline: true,
+		media: { key: true, displayOrder: true, isDefault: true },
+		mediaVideoUrl: true,
+	},
+	"market.opened": { marketId: true, seedAmount: true },
+	"market.closed": { marketId: true },
+	"market.resolving": { marketId: true },
+	"market.resolved": {
+		marketId: true,
+		winningSide: true,
+		resolutionNote: true,
+		poolUnwindAmount: true,
+	},
+	"market.corrected": {
+		marketId: true,
+		correctsEventId: true,
+		correctedWinningSide: true,
+		resolutionNote: true,
+	},
+	"market.voided": {
+		marketId: true,
+		voidReason: true,
+		poolUnwindAmount: true,
+	},
+} as const satisfies Record<EventType, ShipSpec>;
+
+/**
+ * The `metadata` sub-keys that SHIP, as a positive allow-list.
+ *
+ * ⚠ **This list is now what the metadata strip READS**, where it used to be a
+ * declaration nobody consumed (`@code-reviewer` H-4 pinned it with a test
+ * precisely because nothing in `src/` read it). Its own docblock claimed it
+ * existed "so that a new metadata field fails the completeness guard rather
+ * than silently shipping on the strength of not being named a secret" — a
+ * guarantee that had no mechanism until the inversion gave it one.
+ *
+ * §3.7 declares seven metadata fields and this names the five that survive.
+ * `ip` and `user_agent` are absent because they are PII (§19.4 rows 9–10) —
+ * and, more to the point, so is anything a future author adds to that object.
+ *
+ * @see SHIPPED_METADATA_KEYS — the same list, kept for the manifest's derived
+ * `metadata_fields_included` and for the parity tests.
+ */
+export const METADATA_SHIP_SPEC: ShipSpec = {
+	request_id: true,
+	flow_id: true,
+	user_id: true,
+	actor_id: true,
+	idempotency_key: true,
+};
 
 /**
  * The named value-classes brief §4 Slice 1 requires an assertion helper for.

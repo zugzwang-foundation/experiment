@@ -294,7 +294,7 @@ export interface InventoryReport {
  * The pure comparison, both sides injectable.
  *
  * ⚠ Exported for the guard's own positive control, exactly as
- * `compareStripRules` is. The live schema is fully classified today, so a test
+ * `compareShipRules` is. The live schema is fully classified today, so a test
  * able only to call `verifyInventoryCoverage()` would assert
  * `unclassified === []` against data with no gap — passing identically whether
  * the comparison works or always returns empty (OVN-V3).

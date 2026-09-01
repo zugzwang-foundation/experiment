@@ -10,8 +10,8 @@ import {
 	REDACTED_ADMIN_SESSION,
 } from "@/server/export/dataset/pseudonymize";
 import {
+	shipPayload,
 	stripMetadata,
-	stripPayload,
 	stripRow,
 	stripTable,
 } from "@/server/export/dataset/strip";
@@ -198,7 +198,7 @@ describe("Slice 4 · strip semantics", () => {
 		// Fail-closed. Passing through is the dangerous default and the one a
 		// reasonable person writes without thinking.
 		expect(() =>
-			stripPayload("user.email_changed", { email: "x@example.invalid" }),
+			shipPayload("user.email_changed", { email: "x@example.invalid" }),
 		).toThrow(EgressContractGapError);
 	});
 

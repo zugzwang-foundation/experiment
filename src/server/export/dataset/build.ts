@@ -3,7 +3,7 @@ import {
 	assertTextArtifactClean,
 	type EgressSecrets,
 } from "@/server/export/egress";
-import { assertStripRulesComplete } from "@/server/export/egress/completeness";
+import { assertShipRulesComplete } from "@/server/export/egress/completeness";
 import type { EgressViolation } from "@/server/export/egress/errors";
 import {
 	SHIPPED_METADATA_KEYS,
@@ -298,7 +298,7 @@ export function harvestSecrets(
  * agree, so the test asserting `verifiedRowCount === rowCount` passed
  * identically whether the gate worked, used `>=`, or had been deleted
  * (`@code-reviewer` H-2). Every other contract check here — `compareInventory`,
- * `compareTreatments`, `compareStripRules` — was already injectable for
+ * `compareTreatments`, `compareShipRules` — was already injectable for
  * exactly this reason, and this one had been missed.
  *
  * That matters more than the average un-fired guard, because this IS the
@@ -337,7 +337,7 @@ const METADATA_TABLES = new Set(["events", "admin_events", "user_events"]);
 
 export async function buildDataset(opts: BuildOptions): Promise<BuildResult> {
 	// ── 1 · contract checks, before a single row is read ────────────────
-	assertStripRulesComplete();
+	assertShipRulesComplete();
 	assertInventoryComplete();
 	assertTreatmentsComplete();
 

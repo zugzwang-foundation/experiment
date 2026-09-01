@@ -13,7 +13,7 @@ import {
 import { EgressContractGapError } from "@/server/export/egress/errors";
 import {
 	GLOBALLY_FORBIDDEN_PAYLOAD_KEYS,
-	PAYLOAD_STRIP_KEYS,
+	PAYLOAD_SHIP_KEYS,
 } from "@/server/export/egress/forbidden-keys";
 
 import {
@@ -65,20 +65,52 @@ describe("divergence 1 · user.tos_accepted payload.userId is STRIPPED", () => {
 	 * `events.payload`, and B is the exhaustive authority (§19.8).
 	 *
 	 * The pipeline follows B. This block is why that is not an accident.
+	 *
+	 * ⚠ **The DIVERGENCE IS GONE at DATASET.3, and the mechanism that closed it
+	 * is worth naming.** Under the deny-list, following B meant applying a
+	 * GLOBAL forbidden-key net on top of a registry deliberately kept a faithful
+	 * transcription of §19.4.1 — a correction bolted beside the table so the
+	 * table stayed auditable. Under the allow-list there is nothing to correct:
+	 * `userId` ships from a payload only if somebody wrote it down, and nobody
+	 * wrote it down. A spec table that is wrong by OMISSION stops being able to
+	 * cause a leak, because omission is now the safe direction.
+	 *
+	 * The tests below therefore assert the ABSENCE of a declaration where they
+	 * used to assert the presence of a counter-rule.
 	 */
 
-	it("the PER-TYPE rule does NOT name userId — so it cannot be the cause", () => {
-		// The control that makes the next assertion mean something. If the rule
-		// DID name `userId`, the strip below would prove nothing about the
-		// global net, and reverting the divergence would leave this file green.
-		expect(PAYLOAD_STRIP_KEYS["user.tos_accepted"]).toEqual([
-			"ip",
-			"user_agent",
-		]);
-		expect(PAYLOAD_STRIP_KEYS["user.tos_accepted"]).not.toContain("userId");
+	it("the SHIP declaration does not name userId — which is the whole mechanism", () => {
+		// The control that makes the next assertions mean something. Under the
+		// old deny-list this asserted the per-type rule's contents and then
+		// pointed at the global net as the cause; now the declaration's silence
+		// IS the cause, so silence is what gets pinned.
+		expect(PAYLOAD_SHIP_KEYS["user.tos_accepted"]).not.toHaveProperty("userId");
+		// …and the research keys ARE named, so this is not a vacuous absence
+		// over an empty declaration.
+		expect(PAYLOAD_SHIP_KEYS["user.tos_accepted"]).toEqual({
+			tosVersionHash: true,
+			privacyVersionHash: true,
+		});
 	});
 
-	it("the GLOBAL net is what removes it, and it names userId", () => {
+	it("no §19.4.1 declaration anywhere names userId — the class, not the case", () => {
+		// ⚠ Stronger than the old per-type assertion and cheap to make so. The
+		// deny-list could only promise "the global net catches it wherever it
+		// appears"; the allow-list can be asked directly whether ANY event type
+		// declares it, and the answer has to be none. A future author adding
+		// `userId: true` to one type reds here rather than being caught by a
+		// net that would then also have to be maintained.
+		const declaring = Object.entries(PAYLOAD_SHIP_KEYS)
+			.filter(([, spec]) => "userId" in spec)
+			.map(([t]) => t);
+		expect(declaring).toEqual([]);
+	});
+
+	it("the GLOBAL net survives as an independent OUTPUT net, and names userId", () => {
+		// It no longer participates in the strip (see `shipPayload`), but it is
+		// still what `assertNoForbiddenPayloadKeys` scans the emitted rows with —
+		// a second, independently-authored net over the result, which is where a
+		// belt belongs.
 		expect(GLOBALLY_FORBIDDEN_PAYLOAD_KEYS).toContain("userId");
 	});
 

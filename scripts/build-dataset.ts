@@ -8,7 +8,7 @@
  *
  * ## Runs under plain `tsx`, and that took a change to earn
  *
- * The pipeline's first act is `assertStripRulesComplete()`, which reads the
+ * The pipeline's first act is `assertShipRulesComplete()`, which reads the
  * **runtime** `EVENT_TYPES` array — not a scan of the source, because a naive
  * scan of that file counts 64 against a true 24, and this project has already
  * been bitten once by a comment inflating exactly that number.

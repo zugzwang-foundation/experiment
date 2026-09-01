@@ -1,43 +1,55 @@
 import type { EventType } from "@/server/events/event-types";
 import { EgressContractGapError } from "@/server/export/egress/errors";
 import {
-	GLOBALLY_FORBIDDEN_PAYLOAD_KEYS,
-	PAYLOAD_STRIP_KEYS,
-	STRIPPED_METADATA_KEYS,
-	shipsDespiteForbiddenKey,
+	METADATA_SHIP_SPEC,
+	PAYLOAD_SHIP_KEYS,
+	type ShipNode,
+	type ShipSpec,
 } from "@/server/export/egress/forbidden-keys";
 
 import { maskRemovedComment } from "./removed";
 import { treatmentsFor } from "./treatments";
 
 /**
- * DATASET.1 Slice 4 — the STRIP pipeline.
+ * DATASET.1 Slice 4 — the egress transform. **Inverted at DATASET.3.**
  *
- * Three strips, at three levels, because §19.4 and §19.4.1 operate at three
- * levels and conflating them loses one of them:
+ * Three levels, because §19.4 and §19.4.1 operate at three and conflating them
+ * loses one:
  *
- *   1. **Column** — Appendix B `STRIP` columns are removed from the released
- *      schema entirely (`users.email`, `mod_actions.image_r2_key`, …).
- *   2. **Metadata sub-key** — `metadata.ip` / `metadata.user_agent`, removed
- *      from every audit table's JSONB.
- *   3. **Payload sub-key** — the §19.4.1 per-event-type rules on
+ *   1. **Column** — Appendix B classifies every column of every shipped table.
+ *      `STRIP` columns are removed from the released schema entirely
+ *      (`users.email`, `mod_actions.image_r2_key`, …). This level is already
+ *      an allow-list in effect: an unclassified column fails the build
+ *      (`assertTreatmentsComplete`), because the schema is closed and every
+ *      column has to be looked at once.
+ *   2. **Metadata sub-key** — §3.7's seven fields; five ship.
+ *   3. **Payload sub-key** — the §19.4.1 per-event-type declarations on
  *      `events.payload`.
+ *
+ * ## Levels 2 and 3 are ALLOW-lists, and that is the DATASET.3 change
+ *
+ * They were deny-lists: name the keys to remove, pass the rest through. That
+ * is sound for a closed schema and unsound for `jsonb`, whose shape anyone can
+ * extend — so "unlisted" was both the dangerous state and the state every new
+ * key starts in. Three nights found the same class three times and each patch
+ * extended a list. See `shipDeep` for the measured instance and
+ * `PAYLOAD_SHIP_KEYS` for the declaration.
  *
  * ## Remove, never null
  *
- * Every strip DELETES the key. It does not set it to `null`. Appendix B.23
- * prescribes `metadata - 'ip'`, and the difference is not cosmetic: a
- * surviving `"ip": null` announces that the field existed and was withheld,
- * which tells an attacker the shape of what they are missing and tells a
- * researcher a column exists that never has data. The absent key says
- * neither.
+ * A dropped key is DELETED, not set to `null`. Appendix B.23 prescribes
+ * `metadata - 'ip'`, and the difference is not cosmetic: a surviving
+ * `"ip": null` announces that the field existed and was withheld, which tells
+ * an attacker the shape of what they are missing and tells a researcher a
+ * column exists that never has data. The absent key says neither.
  *
  * ## Fail closed
  *
- * An event type with no strip rule THROWS rather than passing its payload
- * through. Passing through is the dangerous default — the payload has never
- * been PII-reviewed, because the review IS the §19.4.1 table entry — and it is
- * the default a reasonable person writes without thinking about it.
+ * An event type with no §19.4.1 declaration THROWS rather than exporting a
+ * blank payload. Under the old deny-list the alternative was a LEAK — the
+ * whole unreviewed payload shipping. Under the allow-list the alternative is
+ * a SILENCE, and the throw is still right: see `shipPayload` for why the two
+ * failures are not equally recoverable.
  */
 
 /** A JSON-shaped row as read from Postgres. */
@@ -84,7 +96,7 @@ export interface StripOptions {
  * `admin_events.event_type` and `user_events.event_type` are `text`
  * (open-extensible per §7.1), not the closed `EVENT_TYPES` set — so a
  * projection introducing its own vocabulary (`admin.market_resolved`, which
- * Appendix B.11 already names) hits `stripPayload`'s unknown-type throw. That
+ * Appendix B.11 already names) hits `shipPayload`'s unknown-type throw. That
  * is the correct direction: an unreviewed payload must not ship. But it means
  * the projection task inherits a required step — extend §19.4.1 to cover the
  * admin vocabulary — and finding that out via a build failure is better than
@@ -97,7 +109,13 @@ export const PAYLOAD_BEARING_TABLES = new Set([
 ]);
 
 /**
- * Remove the two PII sub-keys from a `metadata` JSONB value.
+ * Keep only the declared `metadata` sub-keys; drop everything else, unread.
+ *
+ * ⚠ **Inverted at DATASET.3 along with the payload strip, and for the same
+ * reason.** This removed `ip` and `user_agent` and passed the rest through, so
+ * a `metadata.trace` or `metadata.client` object added by any future handler
+ * would have shipped on the strength of not being named. §3.7 declares seven
+ * fields; five ship. Nothing else does, whatever it is called.
  *
  * Returns a NEW object; never mutates. The source rows are read once and fed
  * to several passes, and a mutating strip would make the pipeline's result
@@ -106,7 +124,7 @@ export const PAYLOAD_BEARING_TABLES = new Set([
 export function stripMetadata(metadata: unknown, where = "metadata"): unknown {
 	if (metadata === null || metadata === undefined) return metadata;
 	assertJsonObject("metadata", where, metadata);
-	return stripDeep(metadata, new Set(STRIPPED_METADATA_KEYS));
+	return shipDeep(metadata, METADATA_SHIP_SPEC, `${where}.metadata`);
 }
 
 /**
@@ -154,123 +172,155 @@ function assertJsonObject(
 }
 
 /**
- * Remove every `forbidden` key from a JSON-shaped value **at any depth**,
- * descending through objects and through arrays of objects.
+ * Keep only what a SHIP declaration names, **at any depth and through
+ * arrays**. Everything undeclared is dropped without being read.
  *
- * ## Why depth (SPEC.2 §19.4.1, DATASET.2 C2)
+ * ## Why an allow-list (SPEC.2 §19.4.1, DATASET.3)
  *
- * This walked exactly one level until DATASET.2, and the one-level walk was
- * **correct for every payload shape that exists today** — which is precisely
- * what made it worth changing rather than leaving. `@security-auditor` H-3
- * found that a nested secret is neither stripped nor harvested nor
- * key-matched, and closed the single live instance
- * (`market.created.payload.media[].key`) by hand.
+ * This was `stripDeep(value, forbidden)` — remove the named keys, keep the
+ * rest — until DATASET.3, and getting depth right (DATASET.2 C2) did not fix
+ * what was wrong with it. A deny-list over an open `jsonb` column ships every
+ * key nobody has named, and "nobody has named it" is the state every new key
+ * starts in.
  *
- * Depth is not a property a future author thinks to check when they add an
- * event type. They are asked, by the shape of §19.4.1's table, only *which
- * keys* are sensitive — so a payload that nests one is the default outcome of
- * following the contract as written, not a mistake someone has to make.
- *
- * ⚠ **What the shallow strip actually did — corrected after measuring it**
- * (`@test-writer` HIGH-1). This docblock previously claimed the gap was
- * *silent*: that a nested secret was neither stripped nor harvested, so "both
- * layers go quiet at once and the build reports success". **That is false for
- * any nested key on one of the nets.** `walk()` has been recursive since
- * DATASET.1 and both KEY nets ride on it, so `findKeys` saw nested `userId` /
- * `ip` / `key` whatever the strip did. Measured against the fixture with the
- * one-level strip restored: **8 fatal violations**.
- *
- * ⇒ The shallow strip was a **guaranteed build ABORT on a one-shot job**, not
- * a leak. Worth fixing for that alone — an abort on the morning of 6 November
- * is as expensive as a leak, in a different currency — but the honest reason
- * is not the one first written here.
- *
- * ⚠ **The genuinely silent case is narrower and recursion does NOT close it.**
- * A nested secret under a key name on no list at all — `payload.client.
- * remoteAddr` — is unstripped (no rule names it), unharvested (`HARVEST_KEYS`
+ * The measured instance, from DATASET.2's own owed list: `payload.client.
+ * remoteAddr` was unstripped (no rule names it), unharvested (`HARVEST_KEYS`
  * has no such spelling), unmatched by value (because it was never harvested)
- * and unmatched by key. All four layers really are quiet, and depth is
- * irrelevant to it. Closing it needs either a value-SHAPED net over payload
- * leaves or a positive allow-list of shipped payload keys per event type —
- * both spec decisions, both owed.
+ * and unmatched by key. **All four layers quiet, on one input.** Depth was
+ * irrelevant to it, and no amount of extending the deny-list closes the class
+ * — only inverting it does.
  *
- * ## Why the namespace predicate rides along
+ * ## What `true` means, and what it refuses to mean
  *
- * Recursion is what makes `shipsDespiteForbiddenKey` load-bearing *here*
- * rather than only in the assertion. `market.created.payload.media[].key` is
- * a required field on every market and §19.4.1 SHIPs it; a depth rule applied
- * without the namespace rule deletes it, and the first real read of a live
- * `market.created` row hard-fails the one-shot release build. See that
- * predicate's docblock — the strip, the harvest and the assertion must agree
- * by construction.
+ * `true` ships a SCALAR. An object or array reached under `true` throws,
+ * because "ship this subtree unread" is the deny-list's failure mode wearing
+ * an allow-list's clothes: it is precisely how an unreviewed key rides out
+ * inside a reviewed container. A container is declared by nesting, and an
+ * array applies its child spec to every element.
+ *
+ * ## What this replaced, and what it made unnecessary
+ *
+ * The deny-list needed `shipsDespiteForbiddenKey` — the `m/` vs `u/` namespace
+ * predicate — because it banned the key NAME `key` globally and then had to
+ * carve out the one place §19.4.1 ships it (`market.created.media[].key`,
+ * `.min(1)`, so every market carries one). That carve-out is what
+ * `@security-auditor` H-1 measured as a guaranteed total build failure when
+ * only one of its three consumers knew the rule.
+ *
+ * Under an allow-list the question does not arise: `media[].key` ships because
+ * `market.created` declares it, and `image_upload.*`'s `key` does not ship
+ * because nothing declares it. **Same outcome, one fewer rule that three
+ * layers have to agree about.** The predicate survives in
+ * `forbidden-keys.ts` for the harvest and the assertion, which still reason
+ * about key names and still need it.
  *
  * Returns NEW containers throughout; never mutates. The source rows are read
- * once and fed to several passes, and a mutating strip would make the
+ * once and fed to several passes, and a mutating pass would make the
  * pipeline's output depend on the order those passes happened to run in.
+ *
+ * @param where a human path used only in error messages, so a contract gap
+ *              names the payload position rather than "somewhere in a row"
  */
-export function stripDeep(
+export function shipDeep(
 	value: unknown,
-	forbidden: ReadonlySet<string>,
+	node: ShipNode,
+	where: string,
 ): unknown {
-	if (value === null || typeof value !== "object") return value;
-
-	if (Array.isArray(value)) {
-		return value.map((item) => stripDeep(item, forbidden));
+	// A declared scalar leaf.
+	if (node === true) {
+		if (value !== null && typeof value === "object") {
+			throw new EgressContractGapError(
+				where,
+				`is declared as a shipped SCALAR but holds ${
+					Array.isArray(value) ? "an array" : "an object"
+				}. Refusing to ship a container nobody has described key by key — ` +
+					"that is the deny-by-default hole this declaration exists to " +
+					"close, because every key inside it would ship unreviewed. " +
+					"Declare its shape in PAYLOAD_SHIP_KEYS and amend SPEC.2 " +
+					"§19.4.1 in the same commit.",
+			);
+		}
+		return value;
 	}
 
+	// Null is not a container and carries no keys to leak; an absent nested
+	// object is an ordinary shape, not a contract gap.
+	if (value === null || value === undefined) return value;
+
+	// An array applies the SAME child spec to every element — these payload
+	// arrays are homogeneous (`market.created.media[]` is the only live one).
+	if (Array.isArray(value)) {
+		return value.map((item, i) => shipDeep(item, node, `${where}[${i}]`));
+	}
+
+	if (typeof value !== "object") {
+		throw new EgressContractGapError(
+			where,
+			`is declared as an object whose keys ship individually, but holds a ` +
+				`${typeof value}. The declaration and the data disagree; refusing ` +
+				"to guess which is right.",
+		);
+	}
+
+	// ⚠ Iterate the VALUE's keys, not the declaration's, and keep the ones the
+	// declaration names. Iterating the declaration would silently invent keys
+	// a row does not have (`{"etag": undefined}` on a payload that predates
+	// the column), and the emitted CSV would then describe a row that does not
+	// exist. Filtering preserves the source's own key order too — irrelevant
+	// to the bytes, since `escapeField` canonicalizes, but it keeps a debug
+	// print of an intermediate readable against the row it came from.
 	const out: Record<string, unknown> = {};
 	for (const [k, v] of Object.entries(value as SourceRow)) {
-		if (forbidden.has(k) && !shipsDespiteForbiddenKey(k, v)) continue;
-		out[k] = stripDeep(v, forbidden);
+		const child = node[k];
+		if (child === undefined) continue;
+		out[k] = shipDeep(v, child, `${where}.${k}`);
 	}
 	return out;
 }
 
 /**
- * Apply the §19.4.1 per-event-type STRIP rules to an `events.payload`.
+ * Apply the §19.4.1 per-event-type SHIP declaration to an `events.payload`.
  *
- * ⚠ Throws on an unknown event type. See the fail-closed note above — the
- * alternative is that a type added between releases ships its whole payload
- * into a public artifact on the strength of nobody having written it a rule.
+ * ⚠ **Throws on an unknown event type, rather than shipping `{}`.** Both are
+ * safe for privacy — an undeclared type ships nothing either way — and the
+ * throw is chosen because the two failures are not equally recoverable. An
+ * abort names the missing declaration and stops; a silent `{}` would publish
+ * blank payloads for a whole event type into a CC-BY corpus, deleting research
+ * data with nobody noticing, and `events` is append-only so it could not be
+ * corrected afterwards. `completeness.ts` catches the same gap months earlier,
+ * at CI; this is what catches it if that guard is ever removed.
  */
-export function stripPayload(eventType: string, payload: unknown): unknown {
-	const rules = (PAYLOAD_STRIP_KEYS as Record<string, readonly string[]>)[
+export function shipPayload(eventType: string, payload: unknown): unknown {
+	const spec = (PAYLOAD_SHIP_KEYS as Record<string, ShipSpec | undefined>)[
 		eventType
 	];
 
-	if (rules === undefined) {
+	if (spec === undefined) {
 		throw new EgressContractGapError(
 			`event_type: ${eventType}`,
-			"no SPEC.2 §19.4.1 STRIP rule. Refusing to pass the payload through " +
-				"unstripped — the payload has never been PII-reviewed, because the " +
-				"review is the §19.4.1 entry that is missing.",
+			"has no SPEC.2 §19.4.1 SHIP declaration. Its payload has never been " +
+				"PII-reviewed, because the review IS the §19.4.1 entry that is " +
+				"missing. Declare what ships — '{}' if genuinely nothing does, " +
+				"which is a decision to record rather than a default to fall into.",
 		);
 	}
 
 	assertJsonObject("payload", eventType, payload);
 
-	// ⚠ The union with the global net is LOAD-BEARING and is not belt-and-
-	// braces tidiness. SPEC.2 §19.4.1's per-row table omits `userId` from
-	// `user.tos_accepted` while stripping it from all four sibling `user.*`
-	// types, each with the stated rationale *"prevents re-identification via
-	// cross-join"* — and `dataset-release.md` step 7 confirms the omission is
-	// read as intentional, expecting that row's payload to *"show userId"*.
+	// ⚠ No union with a global forbidden-key net any more, and its absence is
+	// deliberate. The deny-list needed one: SPEC.2 §19.4.1's per-row table
+	// omits `userId` from `user.tos_accepted` while stripping it from all four
+	// sibling `user.*` types, and `dataset-release.md` step 7 reads that
+	// omission as intentional — expecting the row to *"show userId"*. That
+	// would put a raw `users.id` into a CC-BY-4.0 artifact, so the global net
+	// existed to correct a table that was wrong in one cell.
 	//
-	// That would put a raw `users.id` into `events.payload` on a CC-BY-4.0
-	// artifact, which brief §5's sixth wall forbids absolutely. Appendix B.13
-	// is the more complete statement and lists `userId` in the general strip
-	// set for `events.payload`, so the union follows B rather than the
-	// per-row table — the same precedence this task applies everywhere else.
-	//
-	// Keeping `PAYLOAD_STRIP_KEYS` a FAITHFUL transcription of §19.4.1 and
-	// applying the correction here is deliberate: the registry stays
-	// auditable line-by-line against the spec, and the divergence is one
-	// documented place rather than an untraceable edit inside the table.
-	const forbidden = new Set([...rules, ...GLOBALLY_FORBIDDEN_PAYLOAD_KEYS]);
-
-	// ⚠ DEPTH (DATASET.2 C2 / SPEC.2 §19.4.1): the rules apply at any nesting
-	// level and through arrays, not only to top-level keys. See `stripDeep`.
-	return stripDeep(payload, forbidden);
+	// An allow-list has no such failure mode. `userId` ships from a payload
+	// only if somebody wrote it down, and nobody has. The correction is no
+	// longer a patch applied on top of a faithful transcription; it is simply
+	// the absence of a line. The global net survives in `assertions.ts` as an
+	// independent second net over the OUTPUT, which is where a belt belongs.
+	return shipDeep(payload, spec, `${eventType}.payload`);
 }
 
 /**
@@ -326,7 +376,7 @@ export function stripRow(
 			continue;
 		}
 		if (col === "payload" && PAYLOAD_BEARING_TABLES.has(table)) {
-			out[col] = stripPayload(String(source.event_type), value);
+			out[col] = shipPayload(String(source.event_type), value);
 			continue;
 		}
 		out[col] = value;
@@ -344,12 +394,17 @@ export function stripTable(
 }
 
 /**
- * The event types whose payload rule is non-empty — i.e. those where a strip
- * measurably changes the row. Exported so the pipeline can report how many
- * keys it actually removed, rather than only that it ran.
+ * The event types that ship at least one payload key — i.e. those whose
+ * payload survives the transform as something other than `{}`. Exported so the
+ * pipeline can report what it kept rather than only that it ran.
+ *
+ * ⚠ Renamed and inverted at DATASET.3. It used to name the types with a
+ * NON-EMPTY strip rule, which was the complement of this set and read as its
+ * synonym — an easy thing to keep calling "the types with rules" after the
+ * meaning of "rule" had flipped.
  */
-export function eventTypesWithStripRules(): readonly EventType[] {
-	return Object.entries(PAYLOAD_STRIP_KEYS)
-		.filter(([, keys]) => (keys as readonly string[]).length > 0)
+export function eventTypesShippingPayloadKeys(): readonly EventType[] {
+	return Object.entries(PAYLOAD_SHIP_KEYS)
+		.filter(([, spec]) => Object.keys(spec).length > 0)
 		.map(([t]) => t as EventType);
 }
