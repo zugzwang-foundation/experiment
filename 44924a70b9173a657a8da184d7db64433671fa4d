@@ -1,0 +1,47 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+This note exists for two reasons, and the second one is the more useful to
+whoever reads it next.
+
+The first is the ordinary one. Nothing on this repository could measure
+frontend bundle size. Next 16.3.2 with Turbopack emits no First Load JS
+column, no app-build-manifest.json and no chunk sourcemaps, so every bundle
+claim made in this lane was unverifiable, and at least one turned out to be
+source line counts presented as shipped bytes. Two later tasks — a
+code-splitting decision and a telemetry audit — both needed a measured delta
+before they could honestly close. Neither could exist until something could
+count. That is what this commit is for: not to make anything smaller, but to
+make it possible to tell whether a change made anything smaller.
+
+What was deliberately let go: the guard that ships with it is the weak form.
+CI does not run `next build` anywhere, so the committed baseline is asserted
+for shape and for ceilings rather than re-verified against a live build. That
+was said plainly in the work rather than oversold, because a guard described
+as stronger than it is will be trusted for something it cannot do. It was
+later established that this weakness is sharper than it first read — the
+guard compares a committed artifact against ceilings, so it can only fail when
+somebody regenerates that artifact, and nothing obliges anybody to.
+
+The second reason is the one worth the reader's attention. THE MESSAGE ABOVE
+IS NOT THE MESSAGE THAT WAS WRITTEN FOR THIS WORK. Its body is the text of an
+untracked working-tree status file, and it contains the sentence "What's not
+done: I haven't opened the PR yet, and obviously nobody's merged anything" —
+on a commit that is merged, on main, permanently. It also carries no
+`Instructions for AI` block, which the contract admits no exemption from.
+
+The branch commit did carry one. The body that landed came from the pull
+request description instead, which is where a squash body is authored. That is
+the lesson: writing a conforming commit message on a branch does not put a
+conforming message into history when the merge is a squash. The merge dialog
+is a second authoring surface, and nobody was watching it.
+
+History here is append-only and is not rewritten, so the message stays exactly
+as it is and this note carries what it should have said. That is the mechanism
+the contract already provides for precisely this case, and using it is cheaper
+and more honest than manufacturing a past in which the mistake did not happen.
