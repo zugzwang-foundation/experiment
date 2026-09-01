@@ -90,10 +90,11 @@ experiment/
 │   │                               #   art/ debate/ discovery/ legal/ onboarding/ profile/
 │   │                               #   shell/ ui/. ⚠ The COMMAND is the claim; the list is a
 │   │                               #   reading of it. Both sides of the SYNC-5 merge carried
-│   │                               #   this list, each wrong in a different place — one had
-│   │                               #   dropped art/, the other onboarding/, and one still
-│   │                               #   named bookmarks/, which ADR-0040 deleted. A list
-│   │                               #   written out is a list that goes stale silently.
+│   │                               #   this list and each was wrong in a different place —
+│   │                               #   SYNC-5's had dropped art/, main's had dropped
+│   │                               #   onboarding/, BOTH had dropped legal/, and main's
+│   │                               #   still named bookmarks/ after ADR-0040 deleted it.
+│   │                               #
 │   │                               #   debate/ gained five components at HTML-FINISH ·
 │   │                               #   MARKET DETAIL: HeadZone (the arm-scoped two-column
 │   │                               #   header frame), MarketMediaPanel, FocusMarketCard
