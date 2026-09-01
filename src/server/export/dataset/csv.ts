@@ -1,3 +1,4 @@
+import { constants } from "node:buffer";
 import type { SourceRow } from "./strip";
 
 /**
@@ -180,6 +181,17 @@ export function escapeField(value: unknown): string {
  * which produce a file that parses cleanly and means something else.
  * Explicit `columns` should be passed whenever the caller knows the schema.
  */
+/**
+ * V8's maximum string length, read from Node rather than hardcoded.
+ *
+ * ⚠ Read at module load from `buffer.constants` because it is a property of
+ * the RUNTIME, not of this project: it differs between 32- and 64-bit builds
+ * and has changed across V8 versions. A literal here would be a second
+ * declaration of someone else's constant, and the failure of a stale one is
+ * that the guard stops firing exactly when the real limit moved down.
+ */
+export const MAX_CSV_TEXT_BYTES = constants.MAX_STRING_LENGTH;
+
 export function toCsv(
 	filename: string,
 	rows: readonly SourceRow[],
@@ -192,6 +204,48 @@ export function toCsv(
 	for (const row of rows) {
 		lines.push(cols.map((c) => escapeField(row[c])).join(","));
 		rowCount++;
+	}
+
+	// ⚠⚠ **THE V8 STRING CEILING — measured at DATASET.3 (C7), and it is a
+	// HARD limit this pipeline reaches at release scale.**
+	//
+	// The join below builds the WHOLE file as one JavaScript string, and V8
+	// caps a string at `buffer.constants.MAX_STRING_LENGTH` — measured on Node
+	// 24 as **536,870,888 bytes (0.54 GB)**. That is not a memory pressure that
+	// degrades; it is a `RangeError: Invalid string length` thrown from
+	// `Array.prototype.join`, on a job that gets one attempt on a conference
+	// morning.
+	//
+	// Measured cost per emitted `events` row on the dirty fixture: **342
+	// bytes**. So `events.csv` throws at about **1.57 MILLION rows** — and a
+	// central projection for 100k users over the 51-day experiment puts
+	// `events` at roughly 7.3 million (≈2.5 GB, 4.7× over). `bets` and
+	// `comments` clear the same ceiling around 2.4M and 3.1M rows.
+	//
+	// ⇒ **The release build cannot produce this archive at 100k users**, and
+	// the fix is the `AsyncIterable` seam DATASET.2 declined to build (C7,
+	// carried): the reader pages the QUERY but the pipeline still materialises
+	// every table three times and then joins it into one string. That is a
+	// piece of work with its own reviewer pass, not something to improvise.
+	//
+	// What IS built here is the check. A `RangeError` from `join` names
+	// nothing — not the table, not the limit, not the remedy — and an operator
+	// meeting it at 06:00 has a stack trace pointing at a standard library
+	// method. This throws first, with all three.
+	const projected = lines.reduce((n, l) => n + l.length + 1, 0);
+	if (projected > MAX_CSV_TEXT_BYTES) {
+		throw new Error(
+			`${filename} would serialize to ${projected.toLocaleString()} ` +
+				`characters, over V8's ${MAX_CSV_TEXT_BYTES.toLocaleString()} ` +
+				`string limit (${rowCount.toLocaleString()} rows). The CSV writer ` +
+				"builds each file as ONE string, so this is a hard ceiling rather " +
+				"than memory pressure — `Array.prototype.join` throws " +
+				"`RangeError: Invalid string length` a moment after this point, " +
+				"naming neither the table nor the cause. Streaming the export " +
+				"(an AsyncIterable seam through strip → pseudonymize → csv → the " +
+				"guards) is the fix; it is DATASET.2's carried item C7 and needs " +
+				"its own reviewer pass.",
+		);
 	}
 
 	// Trailing newline: a POSIX text file ends with one, and its absence

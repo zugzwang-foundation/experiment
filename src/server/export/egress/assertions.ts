@@ -259,7 +259,16 @@ export const FREE_TEXT_COLUMNS = new Set([
 	"body",
 	"title",
 	"description",
-	"resolution_note",
+	// ⚠ `resolution_note` was here and NO SHIPPED TABLE HAS IT
+	// (`@security-auditor` L-5). The real column is `resolution_events.reason`,
+	// which is deliberately NOT downgraded: it is ADMIN free text, not
+	// participant free text, and it ships by design — putting it here would
+	// silence a transform failure on a shipped column.
+	//
+	// A phantom entry is worse than a missing one, because it READS as
+	// coverage. `payload-ship-schema-parity.test.ts` learned the same lesson
+	// for its DROPPED map and carries a no-phantoms check for exactly this
+	// reason; `free-text-columns-are-real.test.ts` is this set's.
 ]);
 
 /**

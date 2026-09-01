@@ -4,7 +4,10 @@ import {
 	type EgressSecrets,
 } from "@/server/export/egress";
 import { assertShipRulesComplete } from "@/server/export/egress/completeness";
-import type { EgressViolation } from "@/server/export/egress/errors";
+import {
+	EgressContractGapError,
+	type EgressViolation,
+} from "@/server/export/egress/errors";
 import {
 	SHIPPED_METADATA_KEYS,
 	STRIPPED_METADATA_KEYS,
@@ -113,6 +116,43 @@ export interface BuildResult {
 	readonly tarball: Buffer;
 	readonly artifacts: readonly CsvArtifact[];
 	readonly results: readonly TableResult[];
+	/**
+	 * The advisory findings IN FULL, with their per-row paths — for the
+	 * operator's console, never for the manifest.
+	 *
+	 * ⚠ **This exists because the manifest's own comment promised it and
+	 * nothing delivered it** (`@security-auditor` L-1). The comment beside
+	 * `advisories` reads *"the operator gets the paths on the build console,
+	 * where they are useful and not published"* — and the array holding the
+	 * paths was local to `buildDataset` and discarded when it returned. Only
+	 * counts survived. An advisory that says `no-email: 3` and gives no way to
+	 * look at the three is a number, not a finding: the operator cannot tell a
+	 * participant who typed their own address into an argument from a strip
+	 * that half-worked.
+	 *
+	 * That is the `O-13` shape — a stated mechanism that does not exist — and
+	 * the fix is to return the thing rather than to soften the sentence.
+	 *
+	 * ⚠ It is deliberately NOT in `DatasetManifest`. A published advisory path
+	 * reads `[no-email] comments @ [412].body`, and §19.7 serves the manifest
+	 * publicly: take data row 413 of `comments.csv`, read the pseudonym beside
+	 * it, and you have confirmation that a substring of that body is a real
+	 * `users.email` from the source — a pseudonym↔identity oracle manufactured
+	 * by the privacy layer itself (`@security-auditor` F-11 M-A).
+	 */
+	readonly advisoryDetail: readonly EgressViolation[];
+	/**
+	 * Skipped needles WITH the rule each belongs to.
+	 *
+	 * ⚠ `manifest.skipped_needles` is a bare count, and a bare count of a
+	 * per-needle-per-rule-per-artifact product is close to unreadable: one
+	 * participant named "Li" yields sixteen entries plus ten per debate
+	 * document (`@security-auditor` L-2). The count still ships, because a
+	 * non-zero one means a value class is not fully covered and the reader is
+	 * entitled to know that. The BREAKDOWN — which rule, how many, how short —
+	 * goes to the console, where the operator can act on it.
+	 */
+	readonly skippedDetail: readonly { rule: string; length: number }[];
 }
 
 export interface BuildOptions {
@@ -590,6 +630,50 @@ export function assertCountsAgree(results: readonly TableResult[]): void {
 	}
 }
 
+/**
+ * Guard the caller-supplied `source` label before it is PUBLISHED.
+ *
+ * ⚠ `manifest.source` is a free string the caller constructs, and the manifest
+ * is served publicly per §19.7. The release task will build that string
+ * standing next to a `DATABASE_URL` — the two live in the same function, one
+ * describes the other, and nothing here rejected a connection string
+ * (`@security-auditor` L-4). It is not that anyone intends to paste one; it is
+ * that "the operator will not" is not a mechanism, and this is the one field
+ * on the artifact whose contents no other guard looks at.
+ *
+ * The constraint is deliberately shape-based rather than a URL blocklist: a
+ * label is a human description, so anything carrying a scheme, credentials, an
+ * `@` host or a port is not one, whatever protocol it names.
+ */
+export function assertPublishableSourceLabel(label: string): string {
+	const trimmed = label.trim();
+	if (trimmed === "" || trimmed.length > 200) {
+		throw new EgressContractGapError(
+			"manifest.source",
+			`is ${trimmed === "" ? "empty" : `${trimmed.length} characters`}. It ` +
+				"is a short human description of where the rows came from, and it " +
+				"is PUBLISHED.",
+		);
+	}
+	// A scheme (`postgres://`, `postgresql://`, `http://`, …), userinfo
+	// (`user:pass@host`), or a `host:5432` port — none belong in a label, and
+	// all three are how a connection string looks.
+	const secretShaped = [
+		/[a-z][a-z0-9+.-]*:\/\//i,
+		/\S+:\S+@\S+/,
+		/@[\w.-]+:\d{2,5}\b/,
+	];
+	if (secretShaped.some((re) => re.test(trimmed))) {
+		throw new EgressContractGapError(
+			"manifest.source",
+			"looks like a URL or a connection string rather than a description. " +
+				"This field is published in the manifest — refusing to write it. " +
+				"Use a phrase like 'production replica, 2026-11-06 freeze snapshot'.",
+		);
+	}
+	return trimmed;
+}
+
 /** Per-rule counts — the publishable shape of the advisory tier. */
 function summarizeAdvisories(
 	advisories: readonly EgressViolation[],
@@ -710,7 +794,7 @@ export async function buildDataset(opts: BuildOptions): Promise<BuildResult> {
 	const manifest: DatasetManifest = {
 		schema_version: "1.0",
 		release_date: opts.releaseDate,
-		source: opts.source.label,
+		source: assertPublishableSourceLabel(opts.source.label),
 		license: "CC-BY-4.0",
 		tarball_name: tarballName,
 		tarball_sha256: sha256(tarball),
@@ -768,7 +852,9 @@ export async function buildDataset(opts: BuildOptions): Promise<BuildResult> {
 		// by the privacy layer itself (`@security-auditor` F-11 M-A).
 		//
 		// The operator gets the paths on the build console, where they are
-		// useful and not published.
+		// useful and not published — via `BuildResult.advisoryDetail`, which
+		// exists because this sentence was true of the intent and false of the
+		// code until DATASET.3 (`@security-auditor` L-1).
 		advisories: summarizeAdvisories(advisories),
 		skipped_needles: guardSkips.length,
 		notes: [
@@ -796,7 +882,14 @@ export async function buildDataset(opts: BuildOptions): Promise<BuildResult> {
 		],
 	};
 
-	return { manifest, tarball, artifacts, results };
+	return {
+		manifest,
+		tarball,
+		artifacts,
+		results,
+		advisoryDetail: advisories,
+		skippedDetail: guardSkips,
+	};
 }
 
 /**

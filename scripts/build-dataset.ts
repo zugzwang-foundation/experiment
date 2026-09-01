@@ -112,6 +112,44 @@ async function main(): Promise<void> {
 	console.error(
 		`[dataset] tarball sha256 ${result.manifest.tarball_sha256} (${result.manifest.tarball_size_bytes} bytes)`,
 	);
+
+	// ── the operator-only detail (stderr, never the manifest) ────────────
+	//
+	// ⚠ **The manifest promised these and nothing printed them**
+	// (`@security-auditor` L-1). `manifest.advisories` publishes per-rule
+	// COUNTS deliberately — a published path is a pseudonym↔identity oracle —
+	// but the counts alone leave the operator unable to tell self-disclosure
+	// from a strip that half-worked. They go to stderr, so the stdout manifest
+	// stays a clean machine-readable artifact and the paths stay unpublished.
+	if (result.advisoryDetail.length > 0) {
+		console.error(
+			`\n[dataset] ${result.advisoryDetail.length} advisory finding(s) — ` +
+				"NOT published in the manifest; review each before releasing:",
+		);
+		for (const a of result.advisoryDetail) {
+			console.error(`  · [${a.rule}] ${a.artifact} @ ${a.path} — ${a.detail}`);
+		}
+	}
+
+	// ⚠ Skipped needles, grouped BY RULE (`@security-auditor` L-2). The
+	// manifest ships the bare count because a non-zero one means a value class
+	// is not fully covered; a count of a per-needle-per-rule-per-artifact
+	// product is not something anyone can act on, so the breakdown goes here.
+	if (result.skippedDetail.length > 0) {
+		const byRule = new Map<string, number[]>();
+		for (const s of result.skippedDetail) {
+			byRule.set(s.rule, [...(byRule.get(s.rule) ?? []), s.length]);
+		}
+		console.error(
+			`\n[dataset] ${result.skippedDetail.length} needle(s) skipped as too ` +
+				"short to scan safely — each is a value class not fully covered:",
+		);
+		for (const [rule, lengths] of [...byRule].sort()) {
+			console.error(
+				`  · ${rule}: ${lengths.length} skipped (lengths ${[...new Set(lengths)].sort((a, b) => a - b).join(", ")})`,
+			);
+		}
+	}
 }
 
 main().catch((err: unknown) => {
