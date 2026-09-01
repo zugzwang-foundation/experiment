@@ -1373,6 +1373,8 @@ Flat list. Each entry: **test name → spec section it covers → invariants enf
 | `debate-view::price-chart-series-memo-holds-no-viewer-state` | §9, ADR-0034 | ADR-0034 |
 | `debate-view::price-chart-series-never-drawn-beyond-now` | §9 | — |
 | `debate-view::price-chart-window-contains-all-data` | §9, §16.1 | — |
+| `debate-view::price-chart-label-anchored-to-terminal-dot` | §9, canon C-CHART-2 | — |
+| `debate-view::price-chart-label-flips-at-right-edge` | §9, canon C-CHART-2 | — |
 | `markets::open-implies-market-opened-event` | §9, ENGINE.15 | — *(⚠ the CHART-3 brief's verbatim edit block filed this row under **INV-4**, and it is changed to `—` at execute. INV-4 is append-only on `resolution_events` / `payout_events`; the property proved is `Open ⇒ market.opened` plus the atomicity of the status flip and the event write, which is an **invariant-class spec rule** and not one of INV-1..4. The `I-DAILY-ONCE-001` / `I-GRANT-ONCE-001` / `I-LOT-SUM-001` precedent files that class with a `—`, and a wrong tag sends a reader to the wrong trigger. Deviating from a verbatim block is recorded here and in the run report rather than done silently; flagged independently by both `@code-reviewer` and `@security-auditor`.)* |
 | `resolution::settles-and-locks` | §11 F-RESOLVE-1 | INV-2, INV-4 |
 | `resolution::void-full-refund-pool-unwind` | §11 F-RESOLVE-3 | INV-2, INV-4 |

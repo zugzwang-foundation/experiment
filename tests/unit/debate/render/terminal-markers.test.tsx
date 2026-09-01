@@ -419,7 +419,7 @@ describe("debate-view::price-chart-terminal-labels-never-overlap", () => {
 		// measure the wrong rectangle.
 		const { container } = renderChart(pct(0.65), "collapsed");
 		const gutter = container.querySelector(
-			'[data-testid="terminal-label-gutter"]',
+			'[data-testid="terminal-label-layer"]',
 		);
 		const gutterCls = gutter?.getAttribute("class") ?? "";
 		expect(gutterCls).toContain(`text-[${LABEL_HALF_BOX * 2}px]`);
@@ -533,7 +533,7 @@ describe("C-CHART-2 — the end label is bound to its own line's token", () => {
 		const { container } = renderChart(pct(0.65), "collapsed");
 		const svg = container.querySelector('[data-testid="market-price-chart"]');
 		const gutter = container.querySelector(
-			'[data-testid="terminal-label-gutter"]',
+			'[data-testid="terminal-label-layer"]',
 		);
 		expect(svg).not.toBeNull();
 		expect(gutter).not.toBeNull();
@@ -673,7 +673,14 @@ describe("C-CHART-2 — the end label is bound to its own line's token", () => {
 						isOpen={true}
 					/>,
 				).match(
-					new RegExp(`terminal-label-${side}[^>]*style="top:([^"]*)"`),
+					// ⚠ THE `top` IS NO LONGER THE FIRST DECLARATION IN THE ATTRIBUTE, and
+					// a regex anchored on `style="top:` reads that as ABSENT. CHART-6 gave
+					// the label a `left` as well — the horizontal half of this very
+					// contract — and React serialises the props in declaration order, so
+					// the shipped string is `style="left:…;top:…"`. The segment is matched
+					// wherever it sits; the assertions below are unchanged, because what
+					// they assert about `top` is unchanged.
+					new RegExp(`terminal-label-${side}[^>]*style="[^"]*top:([^";]*)`),
 				)?.[1] ?? "";
 
 			// The position is expressed in PERCENT, which is what makes it
@@ -734,7 +741,7 @@ describe("C-CHART-2 — the end label is bound to its own line's token", () => {
 			const read = (side: "yes" | "no") => {
 				const m = html.match(
 					new RegExp(
-						`terminal-label-${side}"[^>]*data-plot-y="([^"]*)"[^>]*style="top:([^"]*)"`,
+						`terminal-label-${side}"[^>]*data-plot-y="([^"]*)"[^>]*style="[^"]*top:([^";]*)`,
 					),
 				);
 				return { plotY: Number(m?.[1]), top: m?.[2] ?? "" };
@@ -778,11 +785,11 @@ describe("C-CHART-2 — the end label is bound to its own line's token", () => {
 			/>,
 		);
 		const declared = Number(
-			html.match(/terminal-label-gutter"[^>]*text-\[(\d+)px\]/)?.[1],
+			html.match(/terminal-label-layer"[^>]*text-\[(\d+)px\]/)?.[1],
 		);
 		const halfBox = Number(
 			html.match(
-				/terminal-label-yes"[^>]*style="top:clamp\((\d+(?:\.\d+)?)px/,
+				/terminal-label-yes"[^>]*style="[^"]*top:clamp\((\d+(?:\.\d+)?)px/,
 			)?.[1],
 		);
 		expect(declared).toBe(10);

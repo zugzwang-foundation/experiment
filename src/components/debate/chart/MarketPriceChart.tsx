@@ -13,9 +13,11 @@ import {
 	fmtUtcDay,
 	type Gridline,
 	gridlinesFor,
+	labelLeftPct,
 	labelTopPct,
 	SVG_W,
 	TERMINAL_DOT_R,
+	TERMINAL_PULSE_MAX_R,
 	terminalLabelYs,
 	VIEWBOX_H,
 	VIEWBOX_W,
@@ -213,7 +215,16 @@ export function MarketPriceChart({
 		>
 			<div
 				data-testid="market-price-chart-plot"
-				className="min-w-0 flex-1"
+				/* ⛔ `relative` IS NOT DECORATION — IT IS THE LABELS' CONTAINING BLOCK,
+				   and since CHART-6 that is this box rather than a gutter beside it
+				   (`C-CHART-2` clause 2 as amended). The labels resolve BOTH their
+				   `top` and their `left` as percentages of this element, which is the
+				   same box `preserveAspectRatio="none"` stretches the viewBox onto —
+				   so a label lands on its dot in both axes by construction rather than
+				   by a number that agrees at one size. Without it the percentages
+				   resolve against the nearest positioned ancestor, which on `/m/[slug]`
+				   is somewhere up in the page shell. */
+				className="relative min-w-0 flex-1"
 				/* ⛔ THE CONTAINER/VIEWBOX LOCK — `C-CHART-1` clause 4 as amended at
 				   CHART-2, and the reason this task exists. The expanded overlay is
 				   the ONE mode whose box is declared rather than inherited, so it is
@@ -504,9 +515,18 @@ export function MarketPriceChart({
 						<TerminalMarkers yes={terminalYes} cx={terminalX} isOpen={isOpen} />
 					)}
 				</svg>
+				{/* ⛔ INSIDE THE PLOT BOX, NOT BESIDE IT — CHART-6. The labels are still
+				    HTML and still outside the `<svg>`, so `10px` is still 10px on every
+				    surface (clause 2's original reason is untouched). What changed is
+				    which box their percentages resolve against: a gutter could only
+				    give them a HEIGHT to share with the plot, and an x anchored to a
+				    gutter is an x anchored to the plot's right EDGE — which is where
+				    the dot sits only on a market that has traded to the window end. */}
+				{terminalYes !== null && (
+					<TerminalLabels yes={terminalYes} mode={mode} terminalX={terminalX} />
+				)}
 			</div>
 			{mode === "expanded" && grid.length > 0 && <YMarks marks={grid} />}
-			{terminalYes !== null && <TerminalLabels yes={terminalYes} mode={mode} />}
 		</div>
 	);
 }
@@ -592,18 +612,30 @@ function TerminalMarkers({
 }
 
 /**
- * The two end labels, OUTSIDE the plot — `C-CHART-2` clause 2 as amended at
- * CHART-2. HTML text in a gutter beside the `<svg>`, so `10px` is 10px on every
- * surface at every width.
+ * The two end labels — HTML text layered OVER the plot, outside the `<svg>`, so
+ * `10px` is 10px on every surface at every width (`C-CHART-2` clause 2 as amended
+ * at CHART-2 and again at CHART-6).
  *
- * ⛔ THE VERTICAL POSITION IS A PERCENTAGE, AND THAT IS THE ALIGNMENT CONTRACT.
- * `preserveAspectRatio="none"` maps `VIEWBOX_H` onto the plot box's full height
- * whatever that height turns out to be, so a fraction of the viewBox is the
- * same fraction of the rendered box — always. The dot's rendered `cy` is
- * `(cy / VIEWBOX_H) · boxHeight`; the label's centre is `labelTopPct(y)` of the
- * gutter, which `items-stretch` makes exactly as tall as the plot. **The two
- * agree by construction rather than by a number that happens to match at one
- * size**, which is the property a pixel offset could not have given.
+ * ⛔ BOTH COORDINATES ARE NOW PERCENTAGES OF THE PLOT BOX, AND THAT IS THE WHOLE
+ * ALIGNMENT CONTRACT. `preserveAspectRatio="none"` maps the viewBox onto the plot
+ * box's full width AND full height, whatever those turn out to be — so a fraction
+ * of the viewBox is the same fraction of the rendered box in either axis. The
+ * dot renders at `(cx / SVG_W) · boxWidth`, `(cy / VIEWBOX_H) · boxHeight`; the
+ * label sits at `labelLeftPct(terminalX)`, `labelTopPct(y)` of the same box.
+ * **The two agree by construction rather than by a number that happens to match
+ * at one size**, which is the property a pixel offset could not have given — and,
+ * until CHART-6, the horizontal half did not have it at all.
+ *
+ * ⛔ THE DEFECT THIS REPLACES, STATED PLAINLY BECAUSE IT SURVIVED THREE TASKS.
+ * The label's x was `left: 5px` inside a gutter pinned to the plot's right edge —
+ * a CONSTANT. The dot's x is `terminalX`, DERIVED from the series' last point.
+ * While the domain was the series' own span those were the same number and the
+ * label could not be wrong. CHART-3 fixed the axis to the experiment window and
+ * separated them, and nothing noticed, because no guard in the repository
+ * compared a layout position to a data position. Measured on staging at CHART-6:
+ * the hero's `YES` label sat **515 px** from the dot it names, on a 597 px plot;
+ * collapsed 252 px of 289; expanded 691 px of 775. Roughly nine-tenths of the
+ * plot, on all three surfaces, on all eight markets.
  *
  * ⚠ `terminalLabelYs` IS NOT RE-DERIVED HERE, only converted. The 12-unit
  * minimum gap, the symmetric push, the clamp and the YES-takes-upper tie-break
@@ -622,9 +654,17 @@ function TerminalMarkers({
 function TerminalLabels({
 	yes,
 	mode,
+	terminalX,
 }: {
 	yes: string;
 	mode: ChartMode;
+	/** Where the drawn line ENDS, in viewBox units — the SAME `terminalX` the two
+	 * dots are drawn at, passed rather than re-derived so the label and the mark
+	 * cannot come to disagree about where the series stopped.
+	 * ⛔ REQUIRED, NEVER DEFAULTED, for `TerminalMarkers.cx`'s reason exactly: the
+	 * only plausible default is `VIEWBOX_W`, which is the pre-CHART-6 defect
+	 * spelled out as a value. */
+	terminalX: number;
 }): React.JSX.Element {
 	const labelY = terminalLabelYs(yes);
 	// Which of the two clause-4 already put on top. Read off its OUTPUT rather
@@ -635,6 +675,12 @@ function TerminalLabels({
 	const lowerPct = labelTopPct(yesOnTop ? labelY.no : labelY.yes);
 	const half = labelHalfBoxPx(mode);
 	const showValue = mode === "expanded";
+	// The horizontal half of the contract, computed once for both labels because
+	// both dots share one `cx` — `TerminalMarkers` draws them at the same
+	// `terminalX`, since a market has one series and therefore one last point.
+	const xPct = labelLeftPct(terminalX);
+	const flip = shouldFlip(xPct);
+	const left = labelLeftCss(xPct, flip);
 	// ⛔ THE PAIRED FORMATTER, AND IT IS THE POINT OF RF-2. This label renders
 	// BOTH sides, so NO must be DERIVED as `100 − YES` rather than rounded on its
 	// own — independent per-side half-up rounding prints 101 % at any exact `.xx5`
@@ -658,7 +704,8 @@ function TerminalLabels({
 	const pair = { yes, no: yes };
 	return (
 		<div
-			data-testid="terminal-label-gutter"
+			data-testid="terminal-label-layer"
+			data-flip={flip ? "true" : "false"}
 			// ⛔ ARIA-HIDDEN, AND THIS ATTRIBUTE IS A REGRESSION FIX, NOT TIDINESS.
 			// While the labels were `<text>` they sat inside an `aria-hidden`
 			// `<svg>` and were excluded from every accessible-name computation. Out
@@ -676,47 +723,36 @@ function TerminalLabels({
 			// and reading them aloud in isolation is noise.
 			// Caught by `@code-reviewer` at the CHART-2 cascade.
 			aria-hidden="true"
-			className="relative shrink-0 pl-[5px] text-[10px] leading-none font-bold tracking-[0.1em]"
+			/* ⛔ AN OVERLAY ON THE PLOT, NOT A COLUMN BESIDE IT — `C-CHART-2` clause 3
+			   as amended at CHART-6 (RF-2). `inset-0` makes this box exactly the plot
+			   box, which is what lets BOTH percentages resolve against the same
+			   rectangle the viewBox is stretched onto.
+			   ⛔ `pointer-events-none` IS A REGRESSION FIX, NOT TIDINESS. This layer
+			   now covers the whole plot, and the plot sits inside the collapsed card's
+			   `<button>` and the Discovery hero's `<Link>`. Without it, two 10px words
+			   would swallow clicks across the entire graph on the two surfaces whose
+			   graph IS the affordance.
+			   ⚠ THE SIZER IS GONE, AND ITS DELETION IS THE POINT RATHER THAN A
+			   SIDE-EFFECT. It existed to give the GUTTER a width — an in-flow
+			   invisible copy of the widest label, so no number encoded a string's
+			   advance in a face nobody could measure (CHART-2, deleting CHART-1's
+			   hand-pinned `26`). There is no gutter to size now: the labels are
+			   absolutely positioned and `whitespace-nowrap`, so they take their own
+			   width wherever they land. The mechanism is retired because its job
+			   went, not because the reason for it stopped being true — a pinned width
+			   here would be the same defect in a new place, which is why
+			   `alignment-chain.test.tsx` still bans one. */
+			className="pointer-events-none absolute inset-0 text-[10px] leading-none font-bold tracking-[0.1em]"
 		>
-			{/* ⛔ THE SIZER, AND IT REPLACES A HAND-MEASURED CONSTANT. CHART-1 had to
-				    pin `YES` at 26 user units because it could not measure Geist offline.
-				    This invisible copy is laid out by the browser in the real shipped
-				    face, so the gutter is exactly as wide as the widest label actually
-				    is — on every device, with no number to go stale.
-				    ⛔ IT CARRIES THE VALUE LINE TOO, AND THE FIRST VERSION OF THIS DID NOT.
-				    That version's docblock asserted that `YES` at 10px bold with 0.1em
-				    tracking is wider than four tabular digits at 16px, so the name alone
-				    could size the gutter. MEASURED IN THE CONTACT SHEET, IN THE SHIPPED
-				    FACE, THAT IS FALSE: the gutter came out **27.15px**, the rendered
-				    `99%` **33.56px** — overflowing by 11.41px — and `100%` measures
-				    **42.47px**, which would overflow by ~20. The stacked value hung
-				    outside its own gutter on every overlay above 9 %.
-				    ⚠ THE FIX IS THE MECHANISM, NOT A NUMBER: the sizer now contains the
-				    WIDEST LABEL THAT CAN OCCUR — the name, and beneath it `100%` in the
-				    value's own type — so the browser measures the real worst case in the
-				    real face. Adding a `w-[42px]` instead would have re-minted exactly the
-				    hand-measured constant CHART-2 deleted, one release after deleting it.
-				    The literal `100%` is the widest string the value can take: percentages
-				    are whole (SPEC.1 §10.8) and bounded at 100. */}
-			<span aria-hidden="true" className="invisible block">
-				<span className="block">YES</span>
-				{showValue && (
-					<span
-						className="block tracking-normal tabular-nums"
-						style={{
-							fontSize: `${LABEL_VALUE_PX}px`,
-							marginTop: `${LABEL_STACK_GAP_PX}px`,
-						}}
-					>
-						100%
-					</span>
-				)}
-			</span>
 			<span
 				data-testid="terminal-label-no"
 				data-plot-y={labelY.no}
-				className="absolute left-[5px] -translate-y-1/2 text-[color:var(--graph-no)]"
+				data-plot-x={terminalX}
+				className={`absolute -translate-y-1/2 whitespace-nowrap text-[color:var(--graph-no)]${
+					flip ? " -translate-x-full" : ""
+				}`}
 				style={{
+					left,
 					top: yesOnTop ? lowerTop(lowerPct, half) : upperTop(upperPct, half),
 				}}
 			>
@@ -737,8 +773,12 @@ function TerminalLabels({
 			<span
 				data-testid="terminal-label-yes"
 				data-plot-y={labelY.yes}
-				className="absolute left-[5px] -translate-y-1/2 text-[color:var(--graph-yes)]"
+				data-plot-x={terminalX}
+				className={`absolute -translate-y-1/2 whitespace-nowrap text-[color:var(--graph-yes)]${
+					flip ? " -translate-x-full" : ""
+				}`}
 				style={{
+					left,
 					top: yesOnTop ? upperTop(upperPct, half) : lowerTop(lowerPct, half),
 				}}
 			>
@@ -841,6 +881,102 @@ function YMarks({ marks }: { marks: readonly Gridline[] }): React.JSX.Element {
 function markTop(pct: number): string {
 	const half = MARK_TYPE_PX / 2;
 	return `clamp(${half}px, ${pct}%, calc(100% - ${half}px))`;
+}
+
+/**
+ * The gap between a terminal dot and its label, expressed as a PERCENTAGE of the
+ * plot — `C-CHART-2` clause 2 as amended at CHART-6.
+ *
+ * ⛔ IT IS THE PULSE RING'S OWN RADIUS, CONVERTED, AND NOT A CHOSEN NUMBER. The
+ * ruling is that the label must not be overlapped by the ring at any point in the
+ * animation, and the ring reaches `TERMINAL_PULSE_MAX_R` = 7.2 user units from
+ * the dot at its peak (`globals.css` `scale(2.4)`, pinned against
+ * `TERMINAL_PULSE_PEAK_SCALE` by `terminal-pulse.test.tsx`). Running it through
+ * `labelLeftPct` puts it in the same currency as the label's position, so the
+ * clearance is exact **at every mode and every viewport** — both quantities are
+ * fractions of the same box, so they scale together.
+ *
+ * ⚠ A CSS-PIXEL GAP WOULD HAVE BEEN WRONG ON TWO SURFACES OUT OF THREE, and that
+ * is not hypothetical — it is `TERMINAL_LABEL_MIN_GAP`'s history one axis over.
+ * The ring renders 3.20 px wide on the collapsed card, 6.63 px on the hero and
+ * 8.60 px on the expanded overlay (measured, 2026-09-01), because the plot's
+ * scale factor differs by 2.7× across them. Any single pixel value clears the
+ * ring on at most one.
+ */
+const LABEL_GAP_PCT = labelLeftPct(TERMINAL_PULSE_MAX_R);
+
+/**
+ * The air between the ring's edge and the label, in CSS px.
+ *
+ * ⚠ CARRIED, NOT MINTED. It is the `pl-[5px]` the gutter shipped with since
+ * CHART-2 — the same 5 px of separation, measured from the ring instead of from
+ * the plot's edge. A new value here would be this task inventing a spacing that
+ * no document rules, which is exactly what CHART-3 declined to do in the same
+ * component.
+ */
+const LABEL_AIR_PX = 5;
+
+/**
+ * How much of the plot a right-placed label needs, as a percentage — the flip
+ * threshold, and the one measured number in this mechanism.
+ *
+ * ⛔ WHY A NUMBER IS UNAVOIDABLE HERE, SAID BEFORE THE NUMBER. Everything else in
+ * this file is expressed as a fraction of the plot, so it holds at every size. A
+ * label's WIDTH cannot be: the label is HTML at a fixed type size, so its width is
+ * a constant in CSS PIXELS, while the plot's width is not — and the two are only
+ * ever known together inside the browser's layout pass. CSS can mix the units
+ * (`min()`, `calc()`) but cannot branch on the comparison, and the ruling is a
+ * FLIP, which is a branch. So the decision is taken here.
+ *
+ * ⛔ MEASURED ACROSS FOUR VIEWPORTS ON THE SHIPPED BUILD, in the shipped Geist
+ * face, as `labelWidth / plotWidth`:
+ *
+ *     collapsed  27.15 / 288.85 = 9.40 %   (viewport-independent — the rail is a
+ *                                           pinned `w-[340px]`)
+ *     hero @1024 49.00 / 468.61 = 10.46 %  ← the worst case
+ *     hero @1440 49.00 / 597.47 =  8.20 %
+ *     expanded   48.73 / 775.27 =  6.29 %  (a fixed-width overlay)
+ *
+ * **12 is the worst case rounded up**, with headroom to a hero plot of 408 px —
+ * narrower than any viewport the product supports.
+ *
+ * ⚠ AND THIS IS NOT THE HAND-MEASURED CONSTANT CHART-2 DELETED, for two reasons
+ * worth stating because the resemblance is close. CHART-1's `26` was a guess
+ * about a font nobody could measure — Geist was unfetchable offline — guarding a
+ * horizontal clip that nothing asserted. This is read off the shipped face on the
+ * shipped surfaces, and it is used only as a THRESHOLD: over-reserving flips the
+ * label a few percent early, which still places it beside its own dot and is
+ * invisible; under-reserving overflows. The failure is bounded and one-sided,
+ * where `26`'s was a clip. It is pinned at three series-end positions on all
+ * three modes in the CHART-6 contact sheet, in a real browser, which is the only
+ * place a text advance can honestly be checked.
+ */
+const LABEL_FLIP_RESERVE_PCT = 12;
+
+/** Whether a label at this x would cross the plot's right edge — `C-CHART-2`
+ * clause 2's flip, per label. ⚠ Both labels share one `terminalX` today, because
+ * a market has one series and both dots mark its end; the rule is still written
+ * per label so it stays correct if that ever stops being true. */
+function shouldFlip(xPct: number): boolean {
+	return xPct + LABEL_GAP_PCT > 100 - LABEL_FLIP_RESERVE_PCT;
+}
+
+/**
+ * A label's CSS `left` — its dot's x, plus or minus the ring's clearance.
+ *
+ * ⚠ THE FLIPPED ARM PAIRS WITH `-translate-x-full` ON THE ELEMENT, and neither
+ * half works alone. `left` places the label's LEFT edge; on the flipped side what
+ * must sit clear of the ring is its RIGHT edge, and the only width-free way to say
+ * that is a translate of −100 % of the element's own box — a percentage the
+ * browser resolves against the label, which is the one width nobody here knows.
+ * The two translates compose (`-translate-y-1/2` keeps the vertical centring);
+ * separating them into `left` and `transform` is what keeps the vertical rule —
+ * clause 4's whole arithmetic — untouched by this change.
+ */
+function labelLeftCss(xPct: number, flip: boolean): string {
+	return flip
+		? `calc(${xPct}% - ${LABEL_GAP_PCT}% - ${LABEL_AIR_PX}px)`
+		: `calc(${xPct}% + ${LABEL_GAP_PCT}% + ${LABEL_AIR_PX}px)`;
 }
 
 /**

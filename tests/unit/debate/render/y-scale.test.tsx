@@ -202,12 +202,20 @@ describe("CHART-5 — no new token, and no raw hex", () => {
 	});
 
 	it("the numeric marks carry no raw hex either", () => {
+		// ⚠ THE SLICE USED THE LABEL LAYER AS ITS END BOUND AND THAT ORDER REVERSED
+		// AT CHART-6. The labels moved INSIDE the plot box, so they now precede the
+		// marks column in the markup rather than following it — the old bounds
+		// produced an EMPTY slice, and `not.toMatch` on an empty string passes. The
+		// column is bounded by its own element instead, which is what it should have
+		// been: a slice whose end is another component's testid goes wrong whenever
+		// either one moves.
 		const m = markup("expanded");
-		const col = m.slice(
-			m.indexOf('data-testid="chart-y-marks"'),
-			m.indexOf('data-testid="terminal-label-gutter"'),
-		);
-		expect(col.length).toBeGreaterThan(0);
+		const at = m.indexOf('data-testid="chart-y-marks"');
+		expect(at).toBeGreaterThan(-1);
+		const col = m.slice(at);
+		// Non-vacuity: the slice really contains the eleven marks, so the hex ban
+		// below is read against the column and not against whatever survived.
+		expect([...col.matchAll(/data-testid="y-mark-\d+"/g)].length).toBe(11);
 		expect(col).not.toMatch(/#[0-9a-fA-F]{3,8}/);
 	});
 });
@@ -250,45 +258,53 @@ describe("C-CHART-1 clause 1 (CHART-5) — numeric marks are EXPANDED-ONLY", () 
 		expect(sizer?.textContent).toBe("100");
 	});
 
-	it("does not disturb the label gutter's own contract", () => {
+	it("does not disturb the label layer's own contract", () => {
 		// ⛔ THIS IS THE REGRESSION THAT ACTUALLY HAPPENED AT CHART-5, PINNED. The
 		// first implementation put the marks INSIDE the label gutter, which forced
 		// it from `relative` to `flex` and pushed its width-sizer one level down —
 		// breaking `alignment-chain.test.tsx`'s clause-2-link-4 and clause-3
-		// guards. Those guards were right and the structure was wrong. The marks
-		// are a sibling column now, and this asserts the gutter stayed as it was.
+		// guards. Those guards were right and the structure was wrong.
+		//
+		// ⚠ REWRITTEN AT CHART-6, BECAUSE THE THING IT PROTECTED MOVED RATHER THAN
+		// WENT AWAY. There is no gutter now — the labels are an overlay on the plot
+		// (`C-CHART-2` clause 2 as amended) — so "the gutter stayed `relative` with
+		// its sizer in flow" is a sentence about a box that no longer exists, and
+		// retargeting it to the new element would have asserted nothing. The
+		// property that survives is the one CHART-5 actually needed: **the marks are
+		// a SIBLING of the plot and the labels live INSIDE it, so neither can force
+		// the other's layout.** That is now a stronger separation than it was, and
+		// it is what the next attempt to merge the two columns must break.
 		const { container } = render(
 			<MarketPriceChart series={series(0.65)} mode="expanded" isOpen={true} />,
 		);
-		const gutter = container.querySelector(
-			'[data-testid="terminal-label-gutter"]',
+		const plot = container.querySelector(
+			'[data-testid="market-price-chart-plot"]',
 		);
-		expect((gutter?.getAttribute("class") ?? "").split(/\s+/)).toContain(
-			"relative",
+		const layer = container.querySelector(
+			'[data-testid="terminal-label-layer"]',
 		);
-		// The sizer is still the gutter's DIRECT in-flow child and still leads with
-		// the name; since the MED-7 fix it also carries the widest value beneath,
-		// so this asserts the structure rather than the flattened string — which is
-		// what `textContent` equality was really standing in for.
-		const sizer = gutter?.querySelector(':scope > span[aria-hidden="true"]');
-		expect(sizer).not.toBeNull();
-		const blocks = [...(sizer?.querySelectorAll(":scope > span") ?? [])].map(
-			(x) => x.textContent,
-		);
-		expect(blocks).toEqual(["YES", "100%"]);
-		// …and on a one-line mode it is the name alone.
-		const { container: c2 } = render(
-			<MarketPriceChart series={series(0.65)} mode="collapsed" isOpen={true} />,
-		);
+		const marks = container.querySelector('[data-testid="chart-y-marks"]');
+		expect(plot).not.toBeNull();
+		expect(layer).not.toBeNull();
+		expect(marks).not.toBeNull();
+
+		// The labels are inside the plot — that is what makes their `left` a
+		// percentage of the box the viewBox is stretched onto.
+		expect(plot?.contains(layer as Node)).toBe(true);
+		// …and the marks are NOT, so the marks column cannot take width from the
+		// plot's percentage basis, nor the labels from the marks' flow.
+		expect(plot?.contains(marks as Node)).toBe(false);
+		expect(layer?.contains(marks as Node)).toBe(false);
+		expect(marks?.contains(layer as Node)).toBe(false);
+
+		// POSITIVE CONTROL — `contains` really discriminates in this tree, so the
+		// three `false`s above are readings rather than a method that always says no.
+		expect(plot?.contains(plot as Node)).toBe(true);
 		expect(
-			[
-				...(c2
-					.querySelector(
-						'[data-testid="terminal-label-gutter"] > span[aria-hidden="true"]',
-					)
-					?.querySelectorAll(":scope > span") ?? []),
-			].map((x) => x.textContent),
-		).toEqual(["YES"]);
+			plot?.contains(
+				container.querySelector('[data-testid="terminal-label-yes"]') as Node,
+			),
+		).toBe(true);
 	});
 });
 
@@ -431,8 +447,12 @@ describe("C-CHART-2 clause 4 (CHART-5) — one collision rule, two measured inpu
 		const topsOf = (mode: "collapsed" | "expanded" | "hero") => {
 			const m = markup(mode, 0.5);
 			return (["yes", "no"] as const).map((side) => {
+				// ⚠ `top` IS NO LONGER THE ATTRIBUTE'S FIRST DECLARATION — CHART-6 added
+				// the label's `left`, which React serialises first because it is
+				// declared first. A regex anchored on `style="top:` reads that as a
+				// MISSING style, i.e. a false red on a correct render.
 				const re = new RegExp(
-					`terminal-label-${side}"[^>]*style="top:([^"]*)"`,
+					`terminal-label-${side}"[^>]*style="[^"]*top:([^";]*)`,
 				);
 				const hit = m.match(re);
 				expect(hit, `${mode}/${side} has no top style`).not.toBeNull();
@@ -456,7 +476,7 @@ describe("C-CHART-2 clause 4 (CHART-5) — one collision rule, two measured inpu
 			return Number(hit?.[1]);
 		};
 		const nameSize = num(
-			/terminal-label-gutter"[^>]*class="[^"]*text-\[(\d+)px\]/,
+			/terminal-label-layer"[^>]*class="[^"]*text-\[(\d+)px\]/,
 			"the name's type size",
 		);
 		const valueSize = num(
@@ -624,26 +644,61 @@ describe("CHART-5 — a mark is BOUND to its gridline, and the column obeys the 
 		).toBe("true");
 	});
 
-	it("the gutter sizer measures the WIDEST label, value line included", () => {
-		// ⛔ A MEASURED PRODUCT DEFECT, NOT A STYLE NIT. The sizer carried the name
-		// alone on the reasoning that `YES` at 10px bold outruns four tabular
-		// digits at 16px. Measured in the contact sheet, in the shipped face: the
-		// gutter came out 27.15px and the rendered `99%` 33.56px — overflowing its
-		// own gutter by 11.41px, with `100%` at 42.47px. The sizer now carries the
-		// value line too, so the browser measures the real worst case.
-		const m = markup("expanded");
-		const gutAt = m.indexOf('data-testid="terminal-label-gutter"');
-		const gut = m.slice(gutAt, m.indexOf("terminal-label-no", gutAt));
-		expect(gut).toContain("100%");
-		expect(gut).toContain(`font-size:${LABEL_VALUE_PX}px`);
-		// MUST REJECT: a hand-measured width standing in for the measurement.
-		expect(gut).not.toMatch(/(^|\s)(min-|max-)?w-\[/);
-		// The collapsed card has no value line, so its sizer must NOT carry one.
-		const cm = markup("collapsed");
-		const cAt = cm.indexOf('data-testid="terminal-label-gutter"');
-		expect(cm.slice(cAt, cm.indexOf("terminal-label-no", cAt))).not.toContain(
-			"100%",
+	it("the value line can never be clipped, because nothing constrains the label's width", () => {
+		// ⛔ THE DEFECT THIS REPLACES WAS REAL AND IS WORTH KEEPING IN VIEW. CHART-5's
+		// sizer carried the name alone, on the reasoning that `YES` at 10px bold
+		// outruns four tabular digits at 16px. Measured in the shipped face that is
+		// false: the gutter came out 27.15 px and the rendered `99%` 33.56 px —
+		// overflowing its own gutter by 11.41 px, with `100%` at 42.47 px. The fix
+		// was a sizer carrying the widest label that can occur.
+		//
+		// ⚠ CHART-6 REMOVES THE CONSTRAINT INSTEAD OF MEASURING IT. There is no
+		// gutter to overflow: the labels are absolutely positioned over the plot and
+		// carry `whitespace-nowrap`, so each takes exactly its own width wherever it
+		// lands. A sizer measuring a box nobody has would be theatre — so the
+		// assertion becomes the two properties that make the clip UNREACHABLE, which
+		// is strictly what the sizer was buying.
+		const { container } = render(
+			<MarketPriceChart series={series(0.65)} mode="expanded" isOpen={true} />,
 		);
+		for (const side of ["yes", "no"] as const) {
+			const el = container.querySelector(
+				`[data-testid="terminal-label-${side}"]`,
+			) as HTMLElement | null;
+			expect(el).not.toBeNull();
+			const cls = (el?.getAttribute("class") ?? "").split(/\s+/);
+			// It sizes to its own content…
+			expect(cls).toContain("whitespace-nowrap");
+			// …and nothing pins that content into a box. MUST REJECT: a hand-measured
+			// width standing in for the measurement — the CHART-1 `26` in a new unit.
+			expect(el?.getAttribute("class") ?? "").not.toMatch(
+				/(^|\s)(min-|max-)?w-[[\d]/,
+			);
+			expect(el?.style.width ?? "").toBe("");
+			expect(el?.style.maxWidth ?? "").toBe("");
+		}
+		// The value line is still there, at its own type size and its own stack
+		// gap, so this case is about an unclipped label rather than an absent one.
+		// ⚠ ALL THREE MIRRORED CONSTANTS ARE SPENT HERE, and that is deliberate:
+		// `labelHalfBoxPx` composes the collision floor from exactly this sum
+		// (`name + gap + value`), so a stack gap that drifted without the floor
+		// following it would widen the label's real box past the threshold meant to
+		// separate two of them — silently, in the band where every market rests.
+		// The gap had no assertion at all once CHART-6 retired the sizer that used
+		// to carry it.
+		const m = markup("expanded");
+		expect(m).toContain(`font-size:${LABEL_VALUE_PX}px`);
+		expect(m).toContain(`margin-top:${LABEL_STACK_GAP_PX}px`);
+		expect(m).toContain('data-testid="terminal-value-yes"');
+
+		// POSITIVE CONTROL — the width ban fires on the forms it is written against
+		// and on none of the label's shipped classes.
+		for (const offender of ["w-[42px]", "min-w-[26px]", "max-w-[50px]"]) {
+			expect(offender).toMatch(/(^|\s)(min-|max-)?w-[[\d]/);
+		}
+		for (const innocent of ["whitespace-nowrap", "-translate-x-full"]) {
+			expect(innocent).not.toMatch(/(^|\s)(min-|max-)?w-[[\d]/);
+		}
 	});
 });
 
@@ -681,7 +736,7 @@ describe("CHART-5 — RF-4 payload budget", () => {
 		const eGrid = e.slice(eStart, e.indexOf("</g>", eStart) + 4);
 		const marks = e.slice(
 			e.indexOf('<div data-testid="chart-y-marks"'),
-			e.indexOf('<div data-testid="terminal-label-gutter"'),
+			e.indexOf('<div data-testid="terminal-label-layer"'),
 		);
 		const overlayBytes =
 			Buffer.byteLength(eGrid, "utf8") + Buffer.byteLength(marks, "utf8");

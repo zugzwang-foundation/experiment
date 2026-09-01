@@ -139,6 +139,27 @@ export const TERMINAL_DOT_R = 3;
 export const TERMINAL_PULSE_PEAK_SCALE = 2.4;
 
 /**
+ * The pulse ring's outer radius AT ITS PEAK, in plot user units — `7.2`.
+ *
+ * ⛔ MINTED AT CHART-6 BECAUSE A SECOND CONSUMER APPEARED, AND TWO CALLERS
+ * MULTIPLYING THE SAME PAIR IS HOW THEY DRIFT. `TERMINAL_DOT_ALLOWANCE` below
+ * already computed this product to budget the viewBox; `C-CHART-2` clause 2 as
+ * amended at CHART-6 needs the same length again, to hold the end label clear of
+ * the ring. Naming it once means the label's gap and the viewBox's allowance
+ * cannot come to disagree about how big the ring is — which is exactly the
+ * failure this module's own docblocks record twice over, once when the allowance
+ * was sized to the dot rather than the ring, and once when `markTop` read the end
+ * label's type size instead of the mark's.
+ *
+ * ⚠ IT IS A RADIUS, NOT A DIAMETER. The ring shares the dot's `cx`/`cy` and
+ * scales about its own centre (`transform-box: fill-box; transform-origin:
+ * center` in `globals.css`), so at peak it reaches this far in EVERY direction
+ * from the terminal dot — which is why the label's horizontal gap and the
+ * viewBox's right-hand allowance are the same number.
+ */
+export const TERMINAL_PULSE_MAX_R = TERMINAL_DOT_R * TERMINAL_PULSE_PEAK_SCALE;
+
+/**
  * What the viewBox reserves to the right of the plot — `C-CHART-2` clause 3, as
  * amended at CHART-2. ⚠ CHART-5 correction: this read "the terminal marks are
  * centred at `cx = VIEWBOX_W`", which CHART-3 falsified — they are centred at
@@ -178,8 +199,7 @@ export const TERMINAL_PULSE_PEAK_SCALE = 2.4;
  * deleted rather than left stale, and no constant in this module encodes a
  * string's width any more.
  */
-export const TERMINAL_DOT_ALLOWANCE =
-	Math.ceil(TERMINAL_DOT_R * TERMINAL_PULSE_PEAK_SCALE) + 1;
+export const TERMINAL_DOT_ALLOWANCE = Math.ceil(TERMINAL_PULSE_MAX_R) + 1;
 
 /**
  * The `<svg viewBox>` width — the plot plus the terminal allowance. **649.**
@@ -338,6 +358,39 @@ export function labelTopPct(y: number): number {
 	// to be loosened to absorb an error this function invented. Four places puts
 	// the round-trip error at ~1e-4 units, which is nothing on either side.
 	return Math.round((y / VIEWBOX_H) * 100 * 10000) / 10000;
+}
+
+/**
+ * A viewBox-space x (0…`SVG_W`) as a PERCENTAGE of the plot box's rendered width
+ * — the horizontal mirror of `labelTopPct`, and the whole of `C-CHART-2` clause 2
+ * as amended at CHART-6.
+ *
+ * ⛔⛔ IT DIVIDES BY `SVG_W`, NOT BY `VIEWBOX_W`, AND THAT IS THE ONE THING TO GET
+ * RIGHT HERE. `preserveAspectRatio="none"` maps the WHOLE viewBox — all 649 units
+ * of it, plot plus terminal allowance — onto the plot box's full width. So a mark
+ * at user-space x renders at `(x / SVG_W) · boxWidth`, and dividing by
+ * `VIEWBOX_W` (640) would place every label 1.4 % of the plot right of its own
+ * dot: small enough to look like a deliberate gap, large enough to be wrong, and
+ * invisible to any assertion that compares two numbers both computed this way.
+ * Verified against the shipped build rather than argued: the collapsed dot at
+ * `cx = 94.86` renders 113.32 px into a 775.27 px plot, and `94.86 / 649 × 775.27
+ * = 113.32`.
+ *
+ * ⛔ WHY THIS EXISTS AT ALL — THE DEFECT CHART-6 CORRECTS. Until this function the
+ * label's x was a CONSTANT (`left: 5px` inside a fixed gutter) while the dot's x
+ * was DERIVED from the series. The two agreed only when the series happened to
+ * run to the axis end, which was always true while the domain WAS the series' own
+ * span, and stopped being true the moment CHART-3 fixed the axis. Measured on
+ * staging: 515 px between a hero label and the dot it names, on a 597 px plot.
+ * **A coordinate that is right only when two independent quantities happen to be
+ * equal is wrong, and it is invisible until they diverge.**
+ *
+ * ⚠ FOUR DECIMAL PLACES, for `labelTopPct`'s reason exactly — the quantity becomes
+ * a percentage of 649, so two places would quantise the position to 0.065 user
+ * units and the label could no longer land on the x its dot was drawn at.
+ */
+export function labelLeftPct(x: number): number {
+	return Math.round((x / SVG_W) * 100 * 10000) / 10000;
 }
 
 const MONTHS = [
