@@ -86,15 +86,14 @@ export type Gridline = { readonly pct: number; readonly y: number };
  * full panels and both carry every 10 %. Two names for one array would be two
  * places for them to drift apart, so there is one — and the collapsed card's
  * quarters stay separate, because its box genuinely is short.
- */
-/**
- * ⛔ `0` JOINED THE SET AT CHART-7 (RF-3, founder ruling), AND IT IS THE REASON
- * THE SET READS AS A SCALE. With both extremes labelled the five lines are
+ *
+ * ⛔ `0` JOINED THE COLLAPSED SET AT CHART-7 (RF-3, founder ruling), AND IT IS WHAT
+ * MAKES THAT SET READ AS A SCALE. With both extremes labelled the five lines are
  * plainly a frame — 0 at the floor, 100 at the ceiling, the quarters between —
- * where four lines starting at 25 read as rules someone drew. It also disposes,
- * by making it moot, of the never-ruled question the CHART-5 contact sheet
- * rendered both ways: whether the `100` line is redundant against the card's own
- * border. Paired with a `0` it is not a stray edge, it is the top of a scale.
+ * where four starting at 25 read as rules someone drew. It also disposes, by
+ * making it moot, of the never-ruled question the CHART-5 contact sheet rendered
+ * both ways: whether the `100` line is redundant against the card's own border.
+ * Paired with a `0` it is not a stray edge, it is the top of a scale.
  */
 const GRIDLINES_COLLAPSED: readonly Gridline[] = Object.freeze(
 	[0, 25, 50, 75, 100].map((pct) => Object.freeze({ pct, y: yPctPx(pct) })),
@@ -174,6 +173,48 @@ export function gridlinesFor(mode: ChartMode): readonly Gridline[] {
 			return exhaustive;
 		}
 	}
+}
+
+/**
+ * Which of an ordered anchor list a mode draws, each with its INDEX in that list
+ * — `C-CHART-1` clause 1 as amended at CHART-7 (RF-4).
+ *
+ * ⛔ THE LIST IS A PARAMETER, NOT AN IMPORT, AND THAT IS WHAT MAKES THE RULE
+ * TESTABLE. `MARKET_CHART_AXIS_ANCHORS` and the window constants are resolved once
+ * at module load from `ZUGZWANG_ENV`, so a guard that reached them directly could
+ * only ever exercise the one window the suite happens to run under — and BOTH
+ * shipped windows contain all three anchors, which means the out-of-window branch
+ * would never execute. A rule with no reachable case is a rule nobody has checked.
+ * Passing the list and the window in lets the guard drive the real anchors through
+ * a synthetic window, which is the only way to see the filter work.
+ *
+ * ⛔ AN ANCHOR OUTSIDE THE WINDOW IS NOT DRAWN, AND THE CONSEQUENCE IS NOT
+ * COSMETIC. `xPx` is deliberately unclamped in both directions, so an anchor before
+ * the window's start maps to a NEGATIVE x. Inside the `<svg>` that was clipped by
+ * the viewBox; the date labels are HTML since CHART-7 and HTML does not clip, so an
+ * out-of-window anchor escapes the plot and lands on whatever sits beside the
+ * chart.
+ *
+ * ⚠ THE COLLAPSED CARD TAKES THE FIRST AND LAST OF WHAT SURVIVES THE FILTER, never
+ * the first and last of the RAW list. Read off the raw list, a window that excluded
+ * the middle anchor would leave the card labelling one end twice.
+ */
+export function axisAnchorsFor(
+	anchors: readonly string[],
+	mode: ChartMode,
+	startMs: number,
+	endMs: number,
+): readonly { readonly iso: string; readonly i: number }[] {
+	const inWindow = anchors
+		.map((iso, i) => ({ iso, i }))
+		.filter(({ iso }) => {
+			const t = Date.parse(iso);
+			return t >= startMs && t <= endMs;
+		});
+	if (mode !== "collapsed" || inWindow.length <= 2) {
+		return inWindow;
+	}
+	return [inWindow[0], inWindow[inWindow.length - 1]];
 }
 
 /** Terminal dot radius — `C-CHART-2` clause 1. Deliberately NOT `C-CHART-1`

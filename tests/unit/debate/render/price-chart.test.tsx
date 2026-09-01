@@ -40,6 +40,7 @@ import { MarketPriceChartCard } from "@/components/debate/chart/MarketPriceChart
 import { MarketHeader } from "@/components/debate/MarketHeader";
 import type { DebateMarketHeader } from "@/components/debate/types";
 import {
+	MARKET_CHART_AXIS_ANCHORS,
 	MARKET_CHART_WINDOW_END,
 	MARKET_CHART_WINDOW_START,
 } from "@/server/config/limits";
@@ -210,13 +211,46 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		expect(screen.getByTestId("line-yes")).toBeTruthy();
 		expect(screen.getByTestId("line-no")).toBeTruthy();
 
-		// TWO interior ticks and THREE date labels — the ruled composition.
-		const ticks = ["axis-x-tick-first", "axis-x-tick-second"];
-		const labels = [
-			"axis-x-label-first",
-			"axis-x-label-second",
-			"axis-x-label-end",
-		];
+		// ⛔ THE COMPOSITION IS THE ANCHOR SET SINCE CHART-7 (RF-4), NOT A COUNT.
+		// It was "two interior ticks and three date labels", where the labels came
+		// from thirds of the window and the end. The card now labels the FIRST and
+		// LAST calendar anchors — `Sep 15` and `Nov 5` — and draws a tick only where
+		// an anchor falls strictly INSIDE the plot.
+		//
+		// ⚠ SO THE TICK COUNT IS ENVIRONMENT-DEPENDENT, AND DERIVING IT IS THE POINT.
+		// Under the production window the card's two anchors ARE the plot's edges, so
+		// there is no interior anchor and no tick; under staging, whose window opens
+		// on 17 August, `Sep 15` sits a fifth of the way in and gets one. Writing
+		// either count as a literal would pin one environment and red in the other —
+		// the coupling `atWindowFraction` below was introduced to remove. The suite
+		// runs `ZUGZWANG_ENV=prod` (tests/_setup/env.ts), so it exercises the
+		// no-interior-tick arm; the contact sheet renders the staging one.
+		const drawn = MARKET_CHART_AXIS_ANCHORS.map((iso, i) => ({
+			iso,
+			i,
+		})).filter(({ iso }) => {
+			const t = Date.parse(iso);
+			return (
+				t >= Date.parse(MARKET_CHART_WINDOW_START) &&
+				t <= Date.parse(MARKET_CHART_WINDOW_END)
+			);
+		});
+		expect(
+			drawn.length,
+			"no anchor is inside the window — fixture is broken",
+		).toBeGreaterThanOrEqual(2);
+		const cardAnchors = [drawn[0], drawn[drawn.length - 1]];
+		const labels = cardAnchors.map(({ i }) => `axis-x-anchor-${i}`);
+		const ticks = cardAnchors
+			.filter(({ iso }) => {
+				const x = xPx(
+					iso,
+					Date.parse(MARKET_CHART_WINDOW_START),
+					Date.parse(MARKET_CHART_WINDOW_END),
+				);
+				return x > 0 && x < VIEWBOX_W;
+			})
+			.map(({ i }) => `axis-x-tick-${i}`);
 
 		// ⛔ THE TICKS ARE STILL INSIDE THE `<svg>`, AND THAT HALF IS UNCHANGED. A
 		// tick is a rule at an x in the plot's own domain, so it belongs in the space
@@ -261,10 +295,17 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 			).toBe(false);
 		}
 
-		// EXACTLY two and three — a third tick or a fourth label is a different
-		// composition from the one §9 ruled, and "at least one" would not see it.
-		expect(byPrefix(container, "axis-x-tick-")).toHaveLength(2);
-		expect(byPrefix(container, "axis-x-label-")).toHaveLength(3);
+		// EXACTLY the drawn set — an extra tick or a third label is a different
+		// composition from the one RF-4 ruled, and "at least one" would not see it.
+		expect(byPrefix(container, "axis-x-tick-")).toHaveLength(ticks.length);
+		expect(byPrefix(container, "axis-x-anchor-")).toHaveLength(2);
+		// ⛔ AND THE SUPERSEDED NAMES ARE GONE, NOT MERELY UNUSED. `axis-x-label-*`
+		// and `axis-x-start`/`-end` asserted a POSITION IN THE PLOT, which a calendar
+		// axis makes environment-dependent: `Sep 15` is the left edge on production
+		// and a fifth of the way in on staging. A stale id left rendering beside the
+		// new one is two axes disagreeing about which is the axis.
+		expect(byPrefix(container, "axis-x-label-")).toHaveLength(0);
+		expect(container.querySelector('[data-testid="axis-x-start"]')).toBeNull();
 	});
 
 	// ── CHART-3 · the axis is the fixed experiment window ──────────────────────
@@ -349,27 +390,44 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		];
 	}
 
-	it("collapsed-axis-labels-are-the-FIXED-WINDOW-not-the-series", () => {
+	it("collapsed-axis-uses-CALENDAR-ANCHORS-not-window-endpoints", () => {
+		// `debate-view::price-chart-axis-uses-calendar-anchors` — RF-4, founder
+		// ruling D20(b)/D21(b).
+		//
+		// ⛔ THIS REPLACES `collapsed-axis-labels-are-the-FIXED-WINDOW-not-the-series`,
+		// which asserted the behaviour RF-4 reverses. That guard was right for
+		// CHART-3: it rejected labels derived from the SERIES, and the window was the
+		// only other source there was. RF-4 adds a third — the calendar — and the
+		// window becomes the wrong answer for the same reason the series was. Two
+		// environments configure different windows, so a window-derived axis makes
+		// the same market read as two different pictures; the anchors are experiment
+		// dates and do not move.
 		const { container } = render(
 			<MarketPriceChartCard series={SERIES} onExpand={vi.fn()} isOpen={true} />,
 		);
-		const rendered = byPrefix(container, "axis-x-label-").map(
+		const rendered = byPrefix(container, "axis-x-anchor-").map(
 			(el) => el.textContent ?? "",
 		);
-		const want = expectedAxisDays();
 
-		expect(rendered).toHaveLength(3);
-		expect(rendered).toEqual([want.first, want.second, want.end]);
+		expect(rendered).toHaveLength(2);
+		expect(rendered).toEqual([
+			utcDay(MARKET_CHART_AXIS_ANCHORS[0]),
+			utcDay(MARKET_CHART_AXIS_ANCHORS[2]),
+		]);
 
-		// ⛔ THE REJECTION, stated positively so it cannot pass vacuously. The
-		// fixture's own interior and terminal days are Sep 17 and Sep 20. Under
-		// the superseded rule the axis printed exactly those; under this one it
-		// must print neither, because neither is a third of the window.
+		// ⛔ THE THREE REJECTIONS, EACH STATED POSITIVELY SO NONE CAN PASS VACUOUSLY.
+		//
+		// (a) NOT the series. The fixture's own days are Sep 17 and Sep 20.
 		expect(rendered).not.toContain("Sep 17");
 		expect(rendered).not.toContain("Sep 20");
-		expect(
-			container.querySelector('[data-testid="axis-x-label-end"]')?.textContent,
-		).toBe(want.end);
+		// (b) NOT the window's thirds — the rule this replaces. Derived from the
+		//     real constants so it reddens whichever window is configured.
+		const want = expectedAxisDays();
+		expect(rendered).not.toContain(want.first);
+		expect(rendered).not.toContain(want.second);
+		// (c) NOT the interior anchor. The card takes the first and last only; a
+		//     card that drew all three is the plausible over-application.
+		expect(rendered).not.toContain(utcDay(MARKET_CHART_AXIS_ANCHORS[1]));
 	});
 
 	it("collapsed-axis-is-IDENTICAL-across-two-different-markets", () => {
@@ -397,7 +455,7 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 					?.getAttribute("points") ?? "",
 			);
 			const out = {
-				labels: byPrefix(container, "axis-x-label-").map(
+				labels: byPrefix(container, "axis-x-anchor-").map(
 					(el) => el.textContent ?? "",
 				),
 				tickXs: byPrefix(container, "axis-x-tick-").map((el) =>
@@ -415,8 +473,11 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		const b = read(OTHER);
 
 		// Non-vacuity: the axis rendered at all, on both.
-		expect(a.labels).toHaveLength(3);
-		expect(a.tickXs).toHaveLength(2);
+		// ⚠ THE COUNTS FOLLOW RF-4 — two labels, and a tick only where an anchor is
+		// strictly interior (none under the production window this suite runs). The
+		// tick assertion is therefore a SHAPE assertion rather than a count: whatever
+		// the environment draws, the two markets must draw the same thing.
+		expect(a.labels).toHaveLength(2);
 		expect(a.tickXs.every((x) => x !== null)).toBe(true);
 
 		expect(b.labels).toEqual(a.labels);
@@ -511,38 +572,67 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		// statement about when the market began trading, printed in the one place
 		// a reader goes to find out. It is not a cosmetic drift: label and
 		// position would disagree by weeks.
+		// ⛔ A LOCAL FIXTURE, AND THE REASON IS A COLLISION THIS RUN ACTUALLY HIT.
+		// The shared `INTERIOR` fixture opens on `2026-10-01T00:00:00.000Z` — which
+		// IS `MARKET_CHART_AXIS_ANCHORS[1]`. Against it, "the axis must not print a
+		// day the SERIES carries" and "the axis must print `Oct 1`" are contradictory,
+		// so the rejection below could not be written at all: an anchor rule and a
+		// series rule produce the same label and the guard distinguishes nothing.
+		// ⚠ CAUGHT BY THIS CASE'S OWN FIXTURE-INTEGRITY CONTROL, which CHART-3 added
+		// for exactly this — *"if a future edit moved either constant onto a fixture
+		// instant, this reddens rather than silently hollowing out the guard"*. It was
+		// written about the window constants; the anchors walked into it instead.
+		const OFF_ANCHOR: PricePoint[] = [
+			{ at: "2026-10-07T00:00:00.000Z", yes: "0.200000000000000000" },
+			{ at: "2026-10-12T00:00:00.000Z", yes: "0.300000000000000000" },
+			{ at: "2026-10-19T00:00:00.000Z", yes: "0.250000000000000000" },
+		];
 		const { container } = render(
-			<MarketPriceChart series={INTERIOR} mode="expanded" isOpen={true} />,
+			<MarketPriceChart series={OFF_ANCHOR} mode="expanded" isOpen={true} />,
 		);
 
-		const start = container.querySelector('[data-testid="axis-x-start"]');
-		const end = container.querySelector('[data-testid="axis-x-end"]');
-		// Non-vacuity: both labels rendered, so the text assertions below are
-		// about content rather than about `undefined`.
-		expect(start, "expanded axis-x-start missing").not.toBeNull();
-		expect(end, "expanded axis-x-end missing").not.toBeNull();
+		// ⛔ AND CHART-7 REPLACES THE SOURCE AGAIN (RF-4). The rule this case was
+		// written for — "these name the axis, not the series" — is intact and
+		// sharpened: they name the CALENDAR, not the axis's own ends. The overlay
+		// carries all THREE anchors, `Oct 1` included.
+		const rendered = byPrefix(container, "axis-x-anchor-").map(
+			(el) => el.textContent ?? "",
+		);
+		// Non-vacuity: the labels rendered, so the text assertions are about content
+		// rather than about `undefined`.
+		expect(rendered, "expanded anchors missing").toHaveLength(3);
+		expect(rendered).toEqual(MARKET_CHART_AXIS_ANCHORS.map(utcDay));
 
-		const wantStart = utcDay(MARKET_CHART_WINDOW_START);
-		const wantEnd = utcDay(MARKET_CHART_WINDOW_END);
-		expect(start?.textContent).toBe(wantStart);
-		expect(end?.textContent).toBe(wantEnd);
+		// MUST REJECT: the window's own ends, which is what this labelled until now
+		// and what a partial revert would restore. On production the two coincide
+		// with anchors 0 and 2 — so the assertion that can actually see the
+		// difference is the INTERIOR one, which no window endpoint can produce.
+		expect(rendered).toContain(utcDay(MARKET_CHART_AXIS_ANCHORS[1]));
+		expect(
+			container.querySelector('[data-testid="axis-x-start"]'),
+			"the window-endpoint testids are retired, not merely unused",
+		).toBeNull();
 
-		// ⛔ THE FIXTURE-INTEGRITY CONTROL, without which the two assertions above
-		// can be satisfied by the WRONG rule. `SERIES` opens exactly on
-		// `MARKET_CHART_WINDOW_START`, so against it "Sep 15" is both answers at
-		// once; `INTERIOR` is off-window at BOTH ends, and this proves it — if a
-		// future edit moved either constant onto a fixture instant, this reddens
-		// here rather than silently hollowing out the guard above.
-		const seriesDays = [
-			utcDay(INTERIOR[0].at),
-			utcDay(INTERIOR[INTERIOR.length - 1].at),
-		];
-		expect(seriesDays).not.toContain(wantStart);
-		expect(seriesDays).not.toContain(wantEnd);
+		// ⛔ THE FIXTURE-INTEGRITY CONTROL, CARRIED AND WIDENED. Without it the
+		// rejection below can be satisfied by the WRONG rule: `SERIES` opens exactly
+		// on `MARKET_CHART_WINDOW_START`, so against that fixture "Sep 15" is both
+		// answers at once. It used to check the two WINDOW constants; it now checks
+		// all three ANCHORS, because those are what the axis prints. If a future edit
+		// moves an anchor onto a fixture instant, this reddens here rather than
+		// silently hollowing out the guard above — which is precisely what it just
+		// did for `INTERIOR`.
+		const seriesDays = OFF_ANCHOR.map((p) => utcDay(p.at));
+		for (const anchor of MARKET_CHART_AXIS_ANCHORS) {
+			expect(
+				seriesDays,
+				`the fixture carries ${utcDay(anchor)}, which is an anchor — this guard cannot tell the two rules apart`,
+			).not.toContain(utcDay(anchor));
+		}
 
-		// THE REJECTION: neither label may print a day the SERIES carries.
-		expect(seriesDays).not.toContain(start?.textContent);
-		expect(seriesDays).not.toContain(end?.textContent);
+		// THE REJECTION: no label may print a day the SERIES carries.
+		for (const day of rendered) {
+			expect(seriesDays).not.toContain(day);
+		}
 	});
 
 	it("a-point-BEYOND-the-window-end-is-CLIPPED-not-CLAMPED", () => {
@@ -811,16 +901,21 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		expect(byPrefix(document.body, "graph-node-").length).toBeGreaterThan(0);
 	});
 
-	it("expanded-axis-is-UNTOUCHED-by-the-collapsed-amendment", () => {
-		// 1.0.32's "UNCHANGED" clause, pinned. The expanded overlay keeps its two
-		// ENDPOINT labels and gains none of the collapsed axis's ticks — the
-		// amendment was scoped to one mode and a shared helper leaking across would
-		// be invisible without this row.
+	it("expanded-axis-carries-LABELS-BUT-NO-TICKS", () => {
+		// 1.0.32's "UNCHANGED" clause, re-seated on what CHART-7 leaves of it. The
+		// overlay's LABELS changed source twice — series → window (CHART-3) →
+		// calendar anchors (CHART-7) — but the half this case exists for did not: it
+		// gains none of the collapsed card's dashed rules. Interior ticks on the
+		// overlay are canon-owned and unbuilt (`C-CHART-1` clause 1), and a shared
+		// helper leaking one across would be invisible without this row.
+		//
+		// ⚠ THAT LEAK IS NEWLY REACHABLE, WHICH IS WHY THE CASE MATTERS MORE THAN IT
+		// DID. Before CHART-7 the two modes' axes were separate code; they now share
+		// `drawnAnchors` and `drawsTimeAxis`, so one edit reaches both.
 		const { container } = render(
 			<MarketPriceChart series={SERIES} mode="expanded" isOpen={true} />,
 		);
-		expect(screen.getByTestId("axis-x-start")).toBeTruthy();
-		expect(screen.getByTestId("axis-x-end")).toBeTruthy();
+		expect(byPrefix(container, "axis-x-anchor-")).toHaveLength(3);
 		expect(byPrefix(container, "axis-x-tick-")).toHaveLength(0);
 		expect(byPrefix(container, "axis-x-label-")).toHaveLength(0);
 	});

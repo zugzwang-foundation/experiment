@@ -1,6 +1,7 @@
 "use client";
 
 import {
+	MARKET_CHART_AXIS_ANCHORS,
 	MARKET_CHART_WINDOW_END,
 	MARKET_CHART_WINDOW_START,
 } from "@/server/config/limits";
@@ -9,6 +10,7 @@ import type { PricePoint } from "@/server/discovery/price-series";
 
 import { formatPricePercent } from "../format";
 import {
+	axisAnchorsFor,
 	type ChartMode,
 	fmtUtcDay,
 	type Gridline,
@@ -39,8 +41,9 @@ import {
  * here for the same reason §9 gave for market detail: on a surface a reader uses
  * to judge whether a market has already moved, chronology *is* the information.
  *
- * `hero` renders lines, terminals and — since CHART-6 — the same Y scale the
- * expanded overlay carries, but still NO TIME AXIS. Those are two different
+ * `hero` renders lines, terminals, the same Y scale the expanded overlay carries
+ * (CHART-6) and — since CHART-7 — the same calendar X axis (RF-4). Those are two
+ * different
  * questions and this sentence used to answer them with one number: it said the
  * hero "is a third of the height of the collapsed card", which is false. Measured
  * on the shipped build at 1440, the hero's chart box is **418.75 px** against the
@@ -55,12 +58,20 @@ import {
  * twice. The 96 px everyone had been quoting is `min-h-24`, the layout FLOOR
  * `HeroPanels` sets before `flex-1` grows it.
  *
- * ⚠ THE TIME AXIS STAYS OFF ANYWAY, and for a reason height never governed: three
- * date labels along the bottom of a carousel panel a reader flicks past are noise
- * rather than orientation, and Discovery's job is to say whether a market has
- * moved, not when. That is a presentational choice inside canon's jurisdiction,
- * not a spec pin; §22 and C-CHART-2 both stop at "same component, same
- * derivation".
+ * ⛔ THE TIME AXIS USED TO STAY OFF AND THE FOUNDER HAS RULED IT ON (CHART-7,
+ * RF-4). This paragraph read: *"three date labels along the bottom of a carousel
+ * panel a reader flicks past are noise rather than orientation, and Discovery's
+ * job is to say whether a market has moved, not when."* It named its own ground
+ * correctly — a presentational choice inside canon's jurisdiction, not a spec pin,
+ * with §22 and C-CHART-2 both stopping at "same component, same derivation" — and
+ * that is exactly the kind of choice a founder ruling reverses. RF-4's table names
+ * `expanded` **and** `hero`; the canon text it ratifies reads *"plus `Oct 1` on
+ * the wider modes"*.
+ * ⚠ AND THE ANCHORS ARE WHAT MAKE IT CHEAP. The objection was to labels that vary
+ * per market and therefore have to be read; three fixed calendar dates, identical
+ * on every panel of the carousel, are frame rather than content — a reader learns
+ * them once and then reads position against them. That is not the element the
+ * paragraph above was arguing against.
  *
  * ⚠ ALIASED TO `geometry.ts`'s `ChartMode` AT CHART-5 RATHER THAN RESTATED. The
  * Y scale is a pure function of the mode, so `geometry` needed the union too —
@@ -87,11 +98,16 @@ export type MarketPriceChartMode = ChartMode;
  * :1260): the collapsed card was specified without an axis when it was a
  * sparkline, and it is now the market's primary price surface in the header
  * rail, where a price series without a time axis is not readable. ⛔ COLLAPSED
- * STILL RENDERS NO NODES — only the axis half moved. EXPANDED is UNTOUCHED: the
- * two X endpoint labels — ⚠ **the WINDOW's endpoints since CHART-3, no longer
- * `market.opened` · last event**; they name the axis they sit on, and the axis
- * stopped being the market's own span — and interior ticks there remain
- * canon-owned and unbuilt.
+ * STILL RENDERS NO NODES — only the axis half moved.
+ * ⛔⛔ AND AT CHART-7 THE AXIS STOPPED NAMING THE WINDOW AT ALL (RF-4, founder
+ * ruling D20(b)/D21(b)). This sentence read *"EXPANDED is UNTOUCHED: the two X
+ * endpoint labels — the WINDOW's endpoints since CHART-3"*, which was true through
+ * CHART-6 and is not now. **Every mode labels the same three calendar instants** —
+ * `MARKET_CHART_AXIS_ANCHORS`, of which the collapsed card draws the first and
+ * last — so two markets on two environments carry the same dates even though their
+ * windows differ. An anchor outside the configured window is not drawn. Interior
+ * ticks on the OVERLAY remain canon-owned and unbuilt; the collapsed card's two
+ * dashed rules are shipped and now follow the interior anchors.
  * Post nodes arrive in Slice 2. The SVG is `aria-hidden` on ALL THREE surfaces
  * and the accessible readout lives in the shared `ChartSummary` beside it —
  * collapsed card, expanded overlay and, since CHART-1, the Discovery hero. ⚠ It
@@ -1277,33 +1293,43 @@ function CollapsedTicks({
 	if (!drawsTimeAxis("collapsed", series, startMs, endMs)) {
 		return null;
 	}
-	// The two interior anchors: a fixed third and two-thirds of the WINDOW,
-	// FLOORED TO UTC MIDNIGHT.
+	// ⛔ THE TICKS FOLLOW THE ANCHORS SINCE CHART-7, AND ONLY THE INTERIOR ONES.
+	// They used to sit at a fixed third and two-thirds of the WINDOW, floored to
+	// UTC midnight — which was the right rule while the axis described the window,
+	// and is the wrong one now that it describes the calendar: a tick at a third of
+	// the span, under a label reading `Sep 15`, is a rule drawn at a time nothing
+	// names.
 	//
-	// ⛔ THE FLOOR IS WHY THE TICK AND ITS LABEL AGREE. A raw third of the
-	// production window is 2026-10-02T07:55Z and a raw two-thirds is
-	// 2026-10-19T15:50Z — so an unfloored rule draws the gridline 8 and 16 hours
-	// right of the midnight its label names, which is 4.09 and 8.18 user units.
-	// Flooring costs perfectly even spacing, which nothing requires, and buys an
-	// axis whose labels are true. Raised by `@security-auditor` at the CHART-3
-	// cascade.
-	const interior = [1 / 3, 2 / 3].map((f) => {
-		const raw = new Date(startMs + (endMs - startMs) * f);
-		return new Date(
-			Date.UTC(raw.getUTCFullYear(), raw.getUTCMonth(), raw.getUTCDate()),
-		).toISOString();
-	});
+	// ⚠ AN ANCHOR AT THE PLOT'S EDGE GETS NO TICK, WHICH IS WHY THIS FILTERS RATHER
+	// THAN DRAWING ALL OF THEM. On production the card's two anchors ARE the plot's
+	// edges, so it draws none — a `vector-effect` rule at x = 0 is half outside the
+	// viewBox and renders as a half-pixel smear along the border, which reads as a
+	// rendering fault rather than as an axis. On staging `Sep 15` is interior and
+	// gets its rule. The two environments differing here is the ruling working, not
+	// a defect: the anchors are calendar dates and the windows are not the same.
+	//
+	// ⛔ THE FLOORING WENT WITH THE THIRDS AND IS NOT MISSED. It existed because a
+	// raw third of the production window is `2026-10-02T07:55Z` — eight hours right
+	// of the midnight its label named, so tick and label disagreed by 4.09 user
+	// units. The anchors are already midnight-aligned instants (and `Nov 5` is the
+	// ratified 23:45 deadline, which is the instant it names), so tick and label
+	// read the SAME value and cannot diverge. Raised by `@security-auditor` at the
+	// CHART-3 cascade; discharged by construction here.
+	const interior = drawnAnchors("collapsed", startMs, endMs).filter(
+		({ iso }) => {
+			const x = xPx(iso, startMs, endMs);
+			return x > 0 && x < VIEWBOX_W;
+		},
+	);
 
 	return (
 		<>
-			{interior.map((at, i) => (
-				// Index-keyed on purpose: these two are a FIXED PAIR of positions
-				// (first third, second third), not an identity-bearing list.
+			{interior.map(({ iso, i }) => (
 				<line
-					key={`tick-${i === 0 ? "first" : "second"}`}
-					data-testid={`axis-x-tick-${i === 0 ? "first" : "second"}`}
-					x1={xPx(at, startMs, endMs)}
-					x2={xPx(at, startMs, endMs)}
+					key={`tick-${i}`}
+					data-testid={`axis-x-tick-${i}`}
+					x1={xPx(iso, startMs, endMs)}
+					x2={xPx(iso, startMs, endMs)}
 					y1={0}
 					y2={VIEWBOX_H}
 					stroke="var(--color-n2)"
@@ -1348,10 +1374,17 @@ function drawsTimeAxis(
 		case "expanded":
 			return series.length > 0;
 		case "hero":
-			// ⚠ NO TIME AXIS ON THE HERO — three date labels along the bottom of a
-			// carousel panel a reader flicks past are noise rather than orientation,
-			// and Discovery's job is to say whether a market has moved, not when.
-			return false;
+			// ⛔ REVERSED AT CHART-7 (RF-4, founder ruling D20(b)/D21(b)). This arm
+			// returned `false` on the ground that "three date labels along the bottom
+			// of a carousel panel a reader flicks past are noise rather than
+			// orientation, and Discovery's job is to say whether a market has moved,
+			// not when." That was a canon-jurisdiction presentational call and the
+			// founder has taken it the other way: RF-4's table names `expanded` AND
+			// `hero`, and the canon text it ratifies reads "plus `Oct 1` on the wider
+			// modes". The hero is the widest of the three — 624.62 px against the
+			// overlay's 848 in width but the TALLEST at 418.75 — so the argument from
+			// crowding does not hold there either.
+			return series.length > 0;
 		default: {
 			const exhaustive: never = mode;
 			return exhaustive;
@@ -1397,23 +1430,26 @@ function axisDatesFor(
 			anchor: x <= 0 ? "start" : x >= VIEWBOX_W ? "end" : "middle",
 		};
 	};
-	if (mode === "collapsed") {
-		const interior = [1 / 3, 2 / 3].map((f) => {
-			const raw = new Date(startMs + (endMs - startMs) * f);
-			return new Date(
-				Date.UTC(raw.getUTCFullYear(), raw.getUTCMonth(), raw.getUTCDate()),
-			).toISOString();
-		});
-		return [
-			at(interior[0], "axis-x-label-first"),
-			at(interior[1], "axis-x-label-second"),
-			at(new Date(endMs).toISOString(), "axis-x-label-end"),
-		];
-	}
-	return [
-		at(MARKET_CHART_WINDOW_START, "axis-x-start"),
-		at(MARKET_CHART_WINDOW_END, "axis-x-end"),
-	];
+	return drawnAnchors(mode, startMs, endMs).map(({ iso, i }) =>
+		at(iso, `axis-x-anchor-${i}`),
+	);
+}
+
+/**
+ * Which anchors this chart draws — the shipped list, bound to the pure selector.
+ *
+ * ⛔ ONE BINDING SITE FOR THE REAL CONSTANT, AND IT IS THE ONLY THING THIS WRAPPER
+ * DOES. `axisAnchorsFor` takes the list as a parameter so a guard can drive it
+ * through a synthetic window (see its docblock); that flexibility is exactly what
+ * must NOT reach the render, or a caller could pass a fixture list and the product
+ * would label dates nobody ruled. The component has one source and names it here.
+ */
+function drawnAnchors(
+	mode: ChartMode,
+	startMs: number,
+	endMs: number,
+): readonly { readonly iso: string; readonly i: number }[] {
+	return axisAnchorsFor(MARKET_CHART_AXIS_ANCHORS, mode, startMs, endMs);
 }
 
 /**
