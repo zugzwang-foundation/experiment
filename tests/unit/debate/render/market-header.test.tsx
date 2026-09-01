@@ -232,7 +232,14 @@ describe("RESO-1 — R-3, the meta line and the actions are one row", () => {
 			// ⛔ TOKEN MATCH, NOT SUBSTRING. This read
 			// `c.includes("flex") && !c.includes("flex-col")`, and `flex-1` CONTAINS
 			// `flex` — so any `flex-1` ancestor with `display:block` was returned as
-			// "the row" (@test-writer). `ResolverCards`' own row carries `flex-1`.
+			// "the row" (@test-writer).
+			// ⚠ THE EXAMPLE THIS COMMENT CITED IS GONE AND THE DEFECT IS NOT. It
+			// named `ResolverCards`' own row as the `flex-1` that tripped it;
+			// BLOCK-4 §2 made that row content-sized, so the row no longer carries
+			// `flex-1` — but `headzone-stack` and `headzone-left` still do, one and
+			// two levels up from every element this helper walks past. The token
+			// match is what keeps them from being mistaken for a row; the example
+			// was only ever an illustration of it.
 			const t = (n.getAttribute("class") ?? "").split(/\s+/);
 			if (t.includes("flex") && !t.includes("flex-col")) return n;
 			n = n.parentElement;
@@ -896,4 +903,81 @@ describe("CHART-2 — the terminal pulse is gated on market.status (INV-4)", () 
 			).not.toBeNull();
 		});
 	}
+});
+
+/**
+ * BLOCK-4 §3 — EVEN VERTICAL RHYTHM IN THE HEADER STACK.
+ *
+ * The brief names three stacked elements that read cramped — A the stats line,
+ * B the YES/NO bar, C the resolution block row — and rules the gaps A→B and
+ * B→C equal, on the existing spacing scale. Measured before the change on the
+ * deployed BLOCK-3 build at `7155cf1`, 1440×900: **A→B 5px, B→C 21px**. After:
+ * 20px and 20px.
+ *
+ * ⚠⚠ THE UNEVENNESS WAS INVISIBLE FROM EITHER FILE ALONE, WHICH IS WHY THIS
+ * GUARD READS BOTH HALVES. `headzone-stack` declared ONE gap for all three
+ * gaps (`gap-[5px]`) and looked perfectly even; `ResolverCards` separately
+ * carried `mt-4`, which added 16px to the last gap only. Neither file was
+ * wrong on its own terms and the composition was 5/5/21. A guard that pinned
+ * only the stack's gap would have gone green throughout.
+ *
+ * ⚠ WHY CLASSES AND NOT PIXELS. jsdom performs no layout — it resolves no
+ * `dvh`, no flex, no gap — so a computed-style or `getBoundingClientRect`
+ * assertion here would read zeros and prove nothing (AGENTS.md §9). The
+ * STRUCTURAL property that produces an even rhythm is checkable: exactly one
+ * gap utility on the shared parent, and no vertical margin on any of the three
+ * children to add to it behind the parent's back. The rendered pixel values are
+ * browser-measured and reported in BLOCK-4's run log.
+ */
+describe("BLOCK-4 §3 — the header stack's three gaps are equal", () => {
+	const stackOf = (container: HTMLElement) =>
+		container.querySelector('[data-testid="headzone-stack"]');
+
+	it("market-header::G-B4-the-stack-declares-ONE-gap-and-it-is-on-the-scale", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+		const tokens = (stackOf(container)?.getAttribute("class") ?? "").split(
+			/\s+/,
+		);
+		expect(tokens).toContain("flex-col");
+
+		// ⛔ EXACTLY ONE gap utility, and no responsive variant of one. A second
+		// (`sm:gap-2`, `gap-y-1`) would make the rhythm depend on the viewport,
+		// which is the thing §3 rules out.
+		const gaps = tokens.filter((t) => /(^|:)gap(-[xy])?-/.test(t));
+		expect(gaps).toEqual(["gap-5"]);
+
+		// ⛔⛔ ON THE SCALE, NOT AN ARBITRARY VALUE. `gap-[5px]` is what shipped
+		// through RESO-1→BLOCK-3 and it belonged to no scale at all; `gap-5` is
+		// 20px, the same value `HeadZone`'s band already uses (d5's
+		// `.headzone{gap:20px}`). A bracket value returning here would re-open
+		// exactly the "kept because nobody ruled it" drift §3 closes.
+		expect(gaps[0]).not.toMatch(/\[/);
+	});
+
+	it("market-header::G-B4-no-child-adds-a-vertical-margin-behind-the-gap", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+		const stack = stackOf(container);
+		const kids = Array.from(stack?.children ?? []);
+
+		// ⛔ NON-VACUITY — the loop below asserts only absences, so an empty or
+		// restructured stack would satisfy it completely. The stack is
+		// `h1 · statsRow · priceBar · blockRow`.
+		expect(kids.length).toBe(4);
+		expect(kids[0]?.tagName).toBe("H1");
+		expect(container.querySelector('[data-testid="resolver-cards"]')).toBe(
+			kids[3],
+		);
+
+		for (const kid of kids) {
+			for (const t of (kid.getAttribute("class") ?? "").split(/\s+/)) {
+				// Any margin on ANY axis that could resolve vertically — `m-*`,
+				// `my-*`, `mt-*`, `mb-*`, and their negative forms.
+				expect(t).not.toMatch(/^-?m([tby])?-/);
+			}
+		}
+	});
 });

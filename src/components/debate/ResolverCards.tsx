@@ -125,60 +125,66 @@ export function ResolverCards({
 			// so four across is wider there than it is at 1440, not narrower — the
 			// usual reason for folding a grid does not apply.
 			//
-			// ⚠ `flex-1` IS WHAT MAKES R-8 TRUE. The blocks "absorb the height freed
-			// by R-1 and R-2" by GROWING INTO IT rather than by carrying a tuned
-			// pixel height: the row takes whatever the question, the meta row and the
-			// price bar leave in the band.
-			// ⛔⛔ `min-h-[78px]` IS A CONTENT FLOOR, RE-DERIVED AT BLOCK-3 §2 against
-			// the recipe THIS task leaves behind (padding `py-1.5` → 12px, hairline
-			// border → 2px, glyph 36px, text-stack `gap-1` → 4px). The worst case is
-			// a two-line block at the `fontSize` ceiling — `label(~12, unset leading,
-			// AGENTS.md §8's ~1.2 default) + gap(4) + value(21, leading-[1.5]×14) +
-			// gap(4) + subvalue(21)` ≈ 62px of stack, which already exceeds the 36px
-			// glyph, so the glyph never binds for this case. 12 + 2 + 62 = 76,
-			// rounded up 2px for the label's approximate (not exact) line-height —
-			// `leading-[1.5]` is an exact multiplier for the value/subvalue lines,
-			// but the label carries no explicit `leading-*` class, so its real line
-			// box needs a browser to pin exactly; this floor errs high rather than
-			// risk clipping on that one approximation.
-			// ⚠ THE OLD 84px NUMBER WAS RESO-2's, computed against a 48px glyph and
-			// `py-2` padding — both superseded here, not merely re-labelled: the
-			// square dropped 48→36 (this task, "reduce block height") and the
-			// padding 16px→12px total, which is where the bulk of the 84→78
-			// reduction comes from, not from any change to the text itself. Real
-			// text still sits ABOVE this floor at every size the value line can take
-			// (BLOCK-3 §3 — `leading-[1.5]` over an 11–14px range, ≈16.5–21px line
-			// box per line), which the floor's own `flex-1`-above-a-floor mechanism
-			// absorbs rather than clips (jsdom performs no layout, so this is a
-			// browser-measured claim, not a jsdom one).
-			// ⛔⛔ THE FLOOR REPLACES A `min-h-0` THAT SILENTLY DISABLED THE WHOLE
-			// SCROLL BACKSTOP — restored here after @code-reviewer caught it cut
-			// during BLOCK-1's docblock pass; the claim was never falsified, only
-			// trimmed by mistake. With `min-h-0` this row's flex base is `0%`, so
-			// its hypothetical main size is 0 and the STACK's content minimum is
-			// only its fixed children (~76px). `scrollHeight` could then never
-			// exceed `clientHeight` above a realistic viewport, making the stack's
-			// `overflow-y-auto` DEAD CODE: every shortfall was absorbed by this row
-			// shrinking, and each block clipped its own content with no scrollbar
-			// anywhere to reach it.
-			// ⚠ `mt-4` AND THE SIBLINGS' OWN SIZE ARE WHAT ACTUALLY SHORTEN THE
-			// BLOCK. This row is `flex-1` inside a band of fixed height, so its
-			// rendered height is WHAT IS LEFT OVER after every fixed sibling in
-			// `headzone-stack` — shrinking the square or the padding makes the
-			// block's CONTENT emptier within whatever height it's given, never
-			// shorter on its own; what actually shortens the row is either this
-			// `mt-4` or a fixed sibling claiming more of the band (BLOCK-3 §2 grows
-			// two of them on purpose — the `detail` `PriceBar` and the attrs text —
-			// specifically to leave less flex-1 leftover for this row; see
-			// `MarketHeader.tsx`'s own budget docblock for the current, measured
-			// split). The RESO-2-era numbers that used to sit here (111.99 →
-			// 95.99px) predate BLOCK-1 and BLOCK-3 both and no longer describe
-			// this recipe — removed rather than corrected in place, since nothing
-			// in the current recipe corresponds to that measurement anymore.
+			// ⛔⛔ BLOCK-4 §2 — `flex-1` AND `mt-4` ARE BOTH GONE, AND R-8 IS
+			// REVERSED RATHER THAN RE-TUNED. This block read: "`flex-1` IS WHAT
+			// MAKES R-8 TRUE. The blocks absorb the height freed by R-1 and R-2 by
+			// GROWING INTO IT rather than by carrying a tuned pixel height." That
+			// was accurate and it is now the defect. Because this row was the only
+			// `flex-1` child of a band fixed at `basis-[24.2dvh]`, its rendered
+			// height was PURE LEFTOVER and had no relationship to its contents —
+			// MEASURED on the deployed BLOCK-3 build at `7155cf1`: **122.76px at
+			// 1440×900, 92.99px at 1440×777, 166.32px at 1920×1080**, for a block
+			// whose content is one label over one line of text. R-8 was written
+			// when these blocks were empty placeholder chrome and growing was the
+			// point; with real single-line values in them, growing is just a
+			// 70px-tall box around 53px of nothing.
+			// ⇒ THE ROW IS NOW CONTENT-SIZED. No `flex-1`, so its flex base is
+			// `auto` and its height is its tallest block. The band's leftover is no
+			// longer absorbed here and shows as empty ground below the row —
+			// 39.76px at 1440×900, 9.99px at 1440×777, 83.32px at 1920×1080,
+			// founder-ruled at BLOCK-4 §2 in preference to spending it on gaps that
+			// would then be a computed number rather than a scale step.
+			// ⛔⛔ `min-h-[54px]` IS RE-DERIVED, AND IT IS NOW THE THING THAT
+			// RENDERS RATHER THAN A FLOOR NOTHING REACHES. Every `line2` in
+			// `resolution-block-data.ts` is `null` (BLOCK-4 §1), so the worst case
+			// is a ONE-line block at the `fontSize` ceiling: padding `py-1.5` (12) +
+			// hairline border (2) + label (14.25) + text-stack `gap-1` (4) + value
+			// (21 = `leading-[1.5]` × 14px) = **53.25px**, browser-measured on a
+			// clone free to size itself, not computed. 36px of glyph never binds —
+			// the 39.25px text stack already clears it. 53.25 rounds up to 54.
+			// ⚠ THE LABEL'S 14.25px IS MEASURED NOW, NOT ESTIMATED. The superseded
+			// version of this note called it "~12, unset leading, AGENTS.md §8's
+			// ~1.2 default" and added 2px of slack against that guess; the computed
+			// `line-height` is exactly 14.25px (9.5 × 1.5, inherited), so the guess
+			// was low by 2.25px and the slack was covering a real error rather than
+			// rounding. Corrected in place.
+			// ⚠ AND THE FLOOR IS WHAT MAKES §2's UNIFORMITY EXACT. A block's
+			// natural height tracks its OWN `fontSize` — 53.25px at 14, 51.75 at
+			// 13, 50.25 at 12 — so content alone would give the eight markets three
+			// different row heights. The grid's default `align-items: stretch`
+			// levels the four blocks within a market to the tallest, and this floor,
+			// sitting 0.75px ABOVE even the 14px case, levels the eight markets to
+			// each other: **54px on every block, every market, every viewport.**
+			// ⚠ THE OLD NUMBERS, AND WHY THEY DO NOT TRANSFER: 84px was RESO-2's
+			// (48px glyph, `py-2`); 78px was BLOCK-3's (36px glyph, `py-1.5`, but
+			// sized for a TWO-line worst case that no longer exists). Both are
+			// superseded by content, not merely re-labelled.
+			// ⛔⛔ THE SCROLL BACKSTOP SURVIVES, BY A DIFFERENT MECHANISM, AND THE
+			// OLD REASONING FOR IT NO LONGER APPLIES. It used to read: with
+			// `min-h-0` this row's flex base is `0%`, its hypothetical main size is
+			// 0, so `scrollHeight` could never exceed `clientHeight` and the stack's
+			// `overflow-y-auto` was DEAD CODE. True while this row was `flex-1`;
+			// meaningless now that it is not. Without `flex-1` the row's automatic
+			// minimum size IS its content, so it cannot be squeezed at all — the
+			// stack overflows and scrolls the moment the band is shorter than
+			// 178.04px of fixed content and gaps (below roughly 736px of viewport
+			// height at the BLOCK-4 recipe). The backstop is stronger than before,
+			// not weaker: nothing in this row can now absorb a shortfall by
+			// clipping itself in silence.
 			// ⚠ THE HEIGHT-CHAIN GUARD CANNOT SEE ANY OF THIS: `debate-height-chain.test.ts`
 			// scans `headzone`, `-left`, `-right`, `arena` and `column-scroll`, and
 			// this row is not a chain node — which is why the reasoning lives here.
-			className="mt-4 grid min-h-[78px] flex-1 grid-cols-4 gap-2"
+			className="grid min-h-[54px] grid-cols-4 gap-2"
 		>
 			{BLOCKS.map((b) => (
 				<ResolutionBlock
@@ -306,10 +312,23 @@ const LINK_AFFORDANCE =
  * "Values move from `text-muted-foreground` to full ink"). `leading-[1.5]`
  * stays a bare unitless multiplier, so it scales with whichever literal size
  * lands without a second lookup. `truncate` still applies to both lines
- * (mirroring the label's own `truncate` + the text stack's `min-w-0`): the
- * one entry whose value does not fit even at the `fontSize` floor
- * (`@thomasfbloom`, `math-erdos-contribution-response`) leans on exactly this
- * truncation to degrade, rather than a fifth, smaller size the floor forbids.
+ * (mirroring the label's own `truncate` + the text stack's `min-w-0`).
+ * ⚠ THE JUSTIFICATION THAT USED TO FOLLOW THAT SENTENCE IS FALSE AND IS
+ * CORRECTED HERE. It read: "the one entry whose value does not fit even at the
+ * `fontSize` floor (`@thomasfbloom`, `math-erdos-contribution-response`) leans
+ * on exactly this truncation to degrade." That was true of BLOCK-3's FIRST
+ * fitting pass, against a 79px column; BLOCK-3's own second pass widened the
+ * column to 91px and moved that entry to 12px with room to spare, and updated
+ * `resolution-block-data.ts` while leaving this copy of the claim behind.
+ * ⇒ NOTHING IN THE SHIPPED MAP TRUNCATES. Re-measured at BLOCK-4 §4 across all
+ * twenty values at 1440×900: the tightest is that same `@thomasfbloom` at 12px,
+ * and it clears the column by 0.37px. `truncate` is therefore a pure BACKSTOP —
+ * it ships unconditionally on every value and subvalue, so a future map entry
+ * with a longer string degrades to an ellipsis instead of overflowing the
+ * block, and so the 11px floor never has to be broken by a fifth, smaller size.
+ * A guard that asserts nothing currently truncates and a class that handles it
+ * if something ever does are both correct at once; only the claim that
+ * something DOES truncate today was wrong.
  */
 function ResolutionBlock({
 	blockKey,
@@ -387,8 +406,22 @@ function ResolutionBlock({
 				    names the slot." Neither claim holds once there's a value to
 				    announce: `aria-hidden` is DROPPED (this is now real, readable
 				    content, not noise), and the subvalue line renders only when
-				    `entry.line2` is non-null — no empty span, no zero-height bar, for
-				    the five map entries whose second line is genuinely absent. */}
+				    `entry.line2` is non-null — no empty span, no zero-height bar.
+				    ⚠⚠ BLOCK-4 §1 — THAT CONDITION IS NOW FALSE FOR EVERY SHIPPED
+				    ENTRY, NOT FIVE OF THEM. This read "for the five map entries whose
+				    second line is genuinely absent"; `line2` is `null` on all
+				    thirty-two (eight markets × four blocks), so this branch never runs
+				    against production data and the count is retired rather than
+				    re-typed.
+				    ⛔ IT IS NOT DEAD CODE, AND DELETING IT WOULD COST A FUTURE TASK
+				    THE SEAM. `resolution-block-data.ts` keeps `line2` nullable
+				    precisely so RESOLUTION can gain a second line when Zugzwang's own
+				    stimulus posts publish (U-3), with zero changes in this file. What
+				    holds the branch honest meanwhile is a SYNTHETIC fixture rather
+				    than a real market — `resolver-cards.test.tsx`'s
+				    "a-SYNTHETIC-two-line-entry-still-renders-BOTH-lines" mocks the map
+				    with a two-line entry and asserts both spans render. That test is
+				    the only thing standing between this branch and rot. */}
 				<span
 					data-testid={`resolution-block-value-${blockKey}`}
 					className={`block w-full truncate leading-[1.5] text-ink ${VALUE_TEXT_SIZE[entry.fontSize]}`}
