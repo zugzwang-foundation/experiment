@@ -6,9 +6,18 @@ import { ChartSummary } from "./ChartSummary";
 import { MarketPriceChart } from "./MarketPriceChart";
 
 /** The collapsed in-header price chart — the whole card is the expand control
- * (mirroring the §23 profile card), holding the two lines, the SPEC.1 1.0.32
- * time axis (two interior ticks, three date labels — no nodes) and the
- * accessible summary.
+ * (mirroring the §23 profile card), holding the two lines, a Y scale, the SPEC.1
+ * 1.0.32 time axis and the accessible summary. No nodes.
+ *
+ * ⚠ THE AXIS IS TWO CALENDAR ANCHORS SINCE CHART-7 (RF-4), NOT "two interior
+ * ticks, three date labels" — which is what this sentence said, and what SPEC.1 §9
+ * still says. The card labels the first and last of `MARKET_CHART_AXIS_ANCHORS`
+ * (`Sep 15` and `Nov 5`) and draws a dashed rule only where an anchor falls
+ * strictly inside the plot — so on the PRODUCTION window, where both of its
+ * anchors are the plot's own edges, it draws none. ⚠ It also gained a left column
+ * of numeric marks at `0 / 25 / 50 / 75 / 100` (RF-1, RF-3), which it never had.
+ * Corrected here in the same commit rather than left contradicting the component
+ * one import away — the same reason the note below gives.
  *
  * ⚠ THIS DOCBLOCK USED TO SAY "the two lines only (no axis, no nodes)". The axis
  * half was reversed by SPEC.1 1.0.32 (HTML-FINISH · MARKET DETAIL round 2 · R8);

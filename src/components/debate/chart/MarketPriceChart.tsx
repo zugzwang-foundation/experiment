@@ -1,6 +1,7 @@
 "use client";
 
 import {
+	MARKET_CHART_AXIS_ANCHORS,
 	MARKET_CHART_WINDOW_END,
 	MARKET_CHART_WINDOW_START,
 } from "@/server/config/limits";
@@ -9,11 +10,12 @@ import type { PricePoint } from "@/server/discovery/price-series";
 
 import { formatPricePercent } from "../format";
 import {
+	axisAnchorsFor,
 	type ChartMode,
 	fmtUtcDay,
 	type Gridline,
 	gridlinesFor,
-	hasFullYScale,
+	hasEndValue,
 	labelLeftPct,
 	labelTopPct,
 	SVG_W,
@@ -39,8 +41,9 @@ import {
  * here for the same reason §9 gave for market detail: on a surface a reader uses
  * to judge whether a market has already moved, chronology *is* the information.
  *
- * `hero` renders lines, terminals and — since CHART-6 — the same Y scale the
- * expanded overlay carries, but still NO TIME AXIS. Those are two different
+ * `hero` renders lines, terminals, the same Y scale the expanded overlay carries
+ * (CHART-6) and — since CHART-7 — the same calendar X axis (RF-4). Those are two
+ * different
  * questions and this sentence used to answer them with one number: it said the
  * hero "is a third of the height of the collapsed card", which is false. Measured
  * on the shipped build at 1440, the hero's chart box is **418.75 px** against the
@@ -55,12 +58,20 @@ import {
  * twice. The 96 px everyone had been quoting is `min-h-24`, the layout FLOOR
  * `HeroPanels` sets before `flex-1` grows it.
  *
- * ⚠ THE TIME AXIS STAYS OFF ANYWAY, and for a reason height never governed: three
- * date labels along the bottom of a carousel panel a reader flicks past are noise
- * rather than orientation, and Discovery's job is to say whether a market has
- * moved, not when. That is a presentational choice inside canon's jurisdiction,
- * not a spec pin; §22 and C-CHART-2 both stop at "same component, same
- * derivation".
+ * ⛔ THE TIME AXIS USED TO STAY OFF AND THE FOUNDER HAS RULED IT ON (CHART-7,
+ * RF-4). This paragraph read: *"three date labels along the bottom of a carousel
+ * panel a reader flicks past are noise rather than orientation, and Discovery's
+ * job is to say whether a market has moved, not when."* It named its own ground
+ * correctly — a presentational choice inside canon's jurisdiction, not a spec pin,
+ * with §22 and C-CHART-2 both stopping at "same component, same derivation" — and
+ * that is exactly the kind of choice a founder ruling reverses. RF-4's table names
+ * `expanded` **and** `hero`; the canon text it ratifies reads *"plus `Oct 1` on
+ * the wider modes"*.
+ * ⚠ AND THE ANCHORS ARE WHAT MAKE IT CHEAP. The objection was to labels that vary
+ * per market and therefore have to be read; three fixed calendar dates, identical
+ * on every panel of the carousel, are frame rather than content — a reader learns
+ * them once and then reads position against them. That is not the element the
+ * paragraph above was arguing against.
  *
  * ⚠ ALIASED TO `geometry.ts`'s `ChartMode` AT CHART-5 RATHER THAN RESTATED. The
  * Y scale is a pure function of the mode, so `geometry` needed the union too —
@@ -87,11 +98,16 @@ export type MarketPriceChartMode = ChartMode;
  * :1260): the collapsed card was specified without an axis when it was a
  * sparkline, and it is now the market's primary price surface in the header
  * rail, where a price series without a time axis is not readable. ⛔ COLLAPSED
- * STILL RENDERS NO NODES — only the axis half moved. EXPANDED is UNTOUCHED: the
- * two X endpoint labels — ⚠ **the WINDOW's endpoints since CHART-3, no longer
- * `market.opened` · last event**; they name the axis they sit on, and the axis
- * stopped being the market's own span — and interior ticks there remain
- * canon-owned and unbuilt.
+ * STILL RENDERS NO NODES — only the axis half moved.
+ * ⛔⛔ AND AT CHART-7 THE AXIS STOPPED NAMING THE WINDOW AT ALL (RF-4, founder
+ * ruling D20(b)/D21(b)). This sentence read *"EXPANDED is UNTOUCHED: the two X
+ * endpoint labels — the WINDOW's endpoints since CHART-3"*, which was true through
+ * CHART-6 and is not now. **Every mode labels the same three calendar instants** —
+ * `MARKET_CHART_AXIS_ANCHORS`, of which the collapsed card draws the first and
+ * last — so two markets on two environments carry the same dates even though their
+ * windows differ. An anchor outside the configured window is not drawn. Interior
+ * ticks on the OVERLAY remain canon-owned and unbuilt; the collapsed card's two
+ * dashed rules are shipped and now follow the interior anchors.
  * Post nodes arrive in Slice 2. The SVG is `aria-hidden` on ALL THREE surfaces
  * and the accessible readout lives in the shared `ChartSummary` beside it —
  * collapsed card, expanded overlay and, since CHART-1, the Discovery hero. ⚠ It
@@ -233,6 +249,13 @@ export function MarketPriceChart({
 		   ⚠ THE ROW REMAINS, and still earns `items-stretch`: the numeric marks
 		   column is a real flex cell whose percentage tops resolve against its own
 		   height. The labels no longer depend on it.
+		   ⚠ IT IS THREE CELLS SINCE CHART-7, NOT TWO — `[marks | plot | reserve]`.
+		   RF-1 moved the marks to the LEADING cell and RF-5 added a trailing RESERVE
+		   the traveling end labels overflow into. Both are `shrink-0`; the plot is
+		   the only cell that grows, which is what `alignment-chain.test.tsx` pins.
+		   The LABEL layer is still not among them and must never be: it is an
+		   overlay sharing the plot's box, and putting it back in flow narrows the
+		   plot and moves every rendered coordinate in the product.
 		   ⚠ The labels are RETURNED FROM THIS COMPONENT rather than left for each
 		   caller to place — the `ProfileChart` precedent (PROFILE OVERLAP R2),
 		   which moved its endpoint labels out of its `<svg>` the same way. A
@@ -247,6 +270,7 @@ export function MarketPriceChart({
 					: "flex h-full w-full items-stretch"
 			}
 		>
+			{grid.length > 0 && <YMarks marks={grid} />}
 			<div
 				data-testid="market-price-chart-plot"
 				/* ⛔ `relative` IS NOT DECORATION — IT IS THE LABELS' CONTAINING BLOCK,
@@ -310,88 +334,37 @@ export function MarketPriceChart({
 					aria-hidden="true"
 					className="h-full w-full"
 				>
-					{/* ✅ COLLAPSED — THE TIME AXIS (SPEC.1 1.0.32, HTML-FINISH · MARKET
-			    DETAIL round 2 · R8). Two interior ticks and three date labels.
-			    ⚠ IT IS DRAWN FIRST, so the two price lines paint OVER it — gridlines
-			    behind data. That is also the shipped `expanded` order below and
-			    `ProfileChart`'s, so the three axes stack their layers the same way.
-			    ⛔ IT IS INSIDE THE `<svg>`, DELIBERATELY. d5 draws its `.xtick` /
-			    `.xlab` as absolutely-positioned DIVS over the graph (`d5:496-499`),
-			    and porting that literally is what would have slipped past
-			    `price-chart.test.tsx::collapsed-renders-no-axis` GREEN — the guard
-			    asserts the absence of testids inside this component, and DOM siblings
-			    of the chart carry none of them. Building it here keeps the axis under
-			    the guard that names it.
+					{/* ✅ COLLAPSED — THE TIME TICKS (SPEC.1 1.0.32, HTML-FINISH · MARKET
+			    DETAIL round 2 · R8), and NOTHING ELSE. They are drawn FIRST, so the
+			    two price lines paint OVER them — gridlines behind data, which is the
+			    order `ProfileChart` uses too, so the axes stack their layers the same
+			    way.
 
-			    ⚠⚠ AND `ProfileChart` HAS NOW DONE THE OPPOSITE, SO READ THE TRAP ABOVE
-			    AS A SCOPING HAZARD RATHER THAN A BAN. PROFILE OVERLAP R2 moved that
-			    chart's two endpoint labels OUT of its `<svg>` and into HTML, because
-			    `preserveAspectRatio="none"` scales user space non-uniformly and text
-			    goes with it. The hazard is answered there by RETURNING the labels from
-			    the component's own tree rather than making them a sibling of it — a
-			    component-scoped query still finds them, which is the property this
-			    block was protecting.
+			    ⛔⛔ EIGHTY LINES STOOD HERE AND ARE DELETED RATHER THAN ANNOTATED,
+			    BECAUSE CHART-7 MADE EVERY ONE OF THEM MOOT. They argued three things:
+			    that the axis belongs INSIDE the `<svg>` (against porting d5's
+			    absolutely-positioned divs, which is exactly what `AxisDates` now is);
+			    that its date labels are "the ONLY TEXT IN THIS `<svg>` THAT IS
+			    DISTORTED" (there is no text in this `<svg>` at all any more); and some
+			    fifty lines of anisotropy arithmetic about a declared 10px label
+			    rendering at 4.28px, which was the measurement that finally moved it
+			    out. What survives of the argument is one sentence, and it is the one
+			    worth keeping: **a tick is geometry in the plot's own domain and stays
+			    here; type is not, and left.**
 
-			    ⚠⚠ THESE DATE LABELS ARE STILL DISTORTED, AND THEY ARE NOW THE ONLY
-			    TEXT IN THIS `<svg>` THAT IS. The `YES`/`NO` end labels left for an
-			    HTML gutter at CHART-2 (`C-CHART-2` clause 2); the axis did not,
-			    because it is positioned against the PLOT's x-domain — a date sits
-			    under the series point it names — and moving it out would mean
-			    re-deriving every tick's x in CSS space. That is a real task and it is
-			    not this one. Measured in the CHART-2 contact sheet at a pinned
-			    1440×777: the collapsed `<svg>` renders **288.85 × 137.02** against
-			    the CHART-2 viewBox of 649×320, so `scaleX 0.4451` / `scaleY 0.4282`
-			    — an anisotropy of **1.0394**, and a declared 10px date label lands
-			    at **4.28px tall** (`10 × scaleY`).
-			    ⚠⚠ THIS PARAGRAPH ALSO CARRIED A HYBRID NUMBER, CAUGHT BY
-			    `@code-reviewer` AT THE CASCADE, and the correction matters more than
-			    the digits. It read `316 × 137.03` and `scaleX 0.49068` — the
-			    PRE-change `<svg>` width divided by the POST-change viewBox, giving an
-			    anisotropy of 1.1459 that describes no state this component has ever
-			    been in. The `<svg>` is no longer 316 wide: the label gutter left it,
-			    so it is 288.85. **One measurement from before the change combined
-			    with one constant from after it** — exactly the shape ("one ratio,
-			    written both ways up") that the paragraph immediately below was
-			    rewritten to eliminate, committed in the rewrite itself.
-			    ⚠⚠ THE PARAGRAPH THAT STOOD HERE WAS ARITHMETICALLY WRONG AND IS
-			    CORRECTED RATHER THAN ANNOTATED. It said that CHART-1's widening made
-			    "the anisotropy INVERT to ~0.92: labels are now slightly narrower than
-			    tall rather than wider". Measured against that 678-wide viewBox the
-			    anisotropy was **1.0884** — `scaleX` (0.46608) was still GREATER than
-			    `scaleY` (0.42822), so the labels stayed ~8.8 % **wider** than tall.
-			    The direction never inverted; the magnitude shrank, 1.153 → 1.088. The
-			    `0.92` is `scaleY/scaleX` (1 / 1.0884 = 0.9188) quoted as though it
-			    were the same quantity as the `1.153` two sentences earlier, which is
-			    `scaleX/scaleY`. **One ratio, written both ways up, inside one
-			    paragraph** — and nothing could catch it, because no guard in this
-			    repo measures a CSS pixel.
-			    ⛔⛔ AND CHART-6 GAVE THE WIDTH BACK, WHICH FALSIFIES THE PARAGRAPHS
-			    ABOVE RATHER THAN EXTENDING THEM. The gutter is deleted, and the
-			    collapsed card carries no marks column, so its `<svg>` returns to the
-			    full **316 px** — WIDER than the 298.29 CHART-1 left, not 4.5 %
-			    narrower. Recomputed at 316: `scaleX 0.4869` against `scaleY 0.4282`,
-			    an anisotropy of **1.137** rather than 1.0394, so these date labels
-			    are ~9.4 % MORE horizontally stretched than before this change. That
-			    is the one thing besides the label that depended on the plot's width,
-			    it moved in the direction this paragraph calls a cost, and it is
-			    recorded rather than left for a reader to recompute. The expanded
-			    overlay is unaffected — its aspect is locked, so its anisotropy stays
-			    1.0000 and the extra width became height instead.
-			    ⛔ ITS SUBSTANTIVE HALF WAS CORRECT AND IS **NOT** DISCHARGED — and
-			    this paragraph said it was, on a prediction, before the measurement
-			    came back. Because `preserveAspectRatio="none"` maps the WHOLE viewBox
-			    onto the CSS box, the 678-wide box rendered the PLOT ≈5.6 % narrower —
-			    true on screen, invisible in user units, docketed at CHART-1's Gate C
-			    as a cost to carry. CHART-2 was expected to dissolve it. Measured in
-			    the contact sheet, on this card's real 316px box, in the shipped face:
-			    the plot went **298.29 → 284.85 CSS px, a further 4.5 % NARROWER.**
-			    ⚠ THE GUTTER DID NOT GO AWAY; IT CHANGED CURRENCY. It used to be 38
-			    user units inside the viewBox and is now ~27 CSS px beside it — and it
-			    grew, because the label it holds is a legible 10px rather than a
-			    squashed 5.38px, and a bigger glyph needs more room. **That is the
-			    trade this task made: the line-end labels went 5.38px → 10px, and the
-			    plot paid ~13px of width.** Recorded as a cost, not a recovery,
-			    because the number says so. */}
+			    ⚠ THE SCOPING HAZARD THE DELETED BLOCK EXISTED TO GUARD IS STILL REAL
+			    and is answered elsewhere. Its point was that a DOM sibling of this
+			    component carries none of its testids, so
+			    `price-chart.test.tsx::collapsed-renders-no-axis` would pass against an
+			    axis built outside it. `AxisDates` is RETURNED FROM THIS COMPONENT —
+			    the `ProfileChart` / PROFILE OVERLAP R2 answer — so a component-scoped
+			    query still finds it, and `collapsed-renders-the-time-axis` asserts
+			    exactly that containment against the chart FRAME rather than the
+			    `<svg>`.
+			    ⚠ Deleted rather than left standing because two adjacent comments
+			    giving incompatible accounts of one mechanism is the `O-5` shape inside
+			    a single file — which this file's own frame docblock names, and which
+			    `@code-reviewer` filed here again at the CHART-7 cascade. */}
 					{/* ⛔ THE Y SCALE, AND IT IS DRAWN FIRST — before the x-axis, before the
 					    lines, before every mark — so the series paints over it. Gridlines
 					    behind data is the order `CollapsedAxis` and `ProfileChart` already
@@ -446,45 +419,25 @@ export function MarketPriceChart({
 						</g>
 					)}
 					{mode === "collapsed" && (
-						<CollapsedAxis series={series} startMs={startMs} endMs={endMs} />
+						<CollapsedTicks series={series} startMs={startMs} endMs={endMs} />
 					)}
 
-					{/* EXPANDED only — the two X endpoint labels (no interior ticks, §9).
-
-					    ⛔ THESE NAME THE AXIS, NOT THE SERIES, AND THAT CHANGED AT CHART-3.
-					    They read `series[0].at` and `series[last].at` while the domain WAS
-					    the series' own span, so label and position agreed by construction.
-					    Under a fixed window they no longer would: a market that opened
-					    three days ago plots its first point a fifth of the way along, and
-					    a label reading that date pinned to `x = 0` would place the market's
-					    first bet at the window's start — a false statement about when the
-					    market began trading, printed in the one place a reader goes to find
-					    out. SPEC.1 §9's rule is unchanged and is what settles it: "Axis
-					    labels are the domain endpoints." The domain moved; the labels
-					    follow it. */}
-					{mode === "expanded" && series.length > 0 && (
-						<>
-							<text
-								data-testid="axis-x-start"
-								x={0}
-								y={VIEWBOX_H - 8}
-								className="fill-n5 text-[10px]"
-								textAnchor="start"
-							>
-								{fmtUtcDay(MARKET_CHART_WINDOW_START)}
-							</text>
-							<text
-								data-testid="axis-x-end"
-								x={VIEWBOX_W}
-								y={VIEWBOX_H - 8}
-								className="fill-n5 text-[10px]"
-								textAnchor="end"
-							>
-								{fmtUtcDay(MARKET_CHART_WINDOW_END)}
-							</text>
-						</>
-					)}
-
+					{/* ⛔ THE DATE LABELS ARE NOT HERE ANY MORE — THEY ARE HTML, BELOW THE
+					    `</svg>` (CHART-7, RF-3). They were the LAST text left inside this
+					    stretched space, and this block used to hold the expanded overlay's
+					    two endpoint labels while `CollapsedAxis` held the card's three.
+					    Both moved for `C-CHART-2` clause 2's original reason, applied to
+					    the one element that had never taken it: `preserveAspectRatio="none"`
+					    scales user space non-uniformly and per surface, so ONE declared size
+					    rendered a **7.70 px** box on the collapsed card and a **16.00 px**
+					    box on the expanded overlay — measured, in the shipped face, on the
+					    unchanged tree. RF-3 asks for the dates to be made bigger and checked
+					    against the marks' 10 px, and no declared value inside this viewBox
+					    can satisfy that on more than one surface at a time.
+					    ⚠ WHAT DID NOT MOVE IS THE TICK, and the split is deliberate: a tick
+					    is GEOMETRY — a rule at an x in the plot's own domain — and belongs
+					    in the space that owns that domain. Only the TYPE had a reason to
+					    leave. */}
 					<polyline
 						data-testid="line-no"
 						points={buildLine(series, startMs, endMs, yNoPx)}
@@ -569,10 +522,41 @@ export function MarketPriceChart({
 				    gutter is an x anchored to the plot's right EDGE — which is where
 				    the dot sits only on a market that has traded to the window end. */}
 				{terminalYes !== null && (
-					<TerminalLabels yes={terminalYes} mode={mode} terminalX={terminalX} />
+					<TerminalLabels
+						yes={terminalYes}
+						mode={mode}
+						terminalX={terminalX}
+						// ⛔ THE SAME EXPRESSION `AxisDates` GATES ON, NOT A COARSER ONE.
+						// This read `drawsTimeAxis(...)`, which answers "may this mode draw
+						// an axis" — while the ROW additionally requires an anchor inside
+						// the window. Under a window containing none, `drawsTimeAxis` is
+						// still true, so the clamp reserved a band beneath a row that does
+						// not exist: the very case this prop's own docblock says it avoids.
+						// `drawsTimeAxis`'s docblock names the rule that leaked — "the two
+						// halves of one axis must not be able to disagree" — and the band is
+						// a THIRD consumer of that question. Caught by `@code-reviewer`.
+						bandPx={
+							axisDatesFor(mode, series, startMs, endMs).length > 0
+								? AXIS_DATE_BAND_PX
+								: 0
+						}
+					/>
 				)}
+				{/* ⛔ INSIDE THE PLOT BOX FOR `TerminalLabels`' REASON EXACTLY (CHART-7).
+				    A date label's x is a position in the plot's own domain, so it has to
+				    resolve against the same rectangle `preserveAspectRatio="none"`
+				    stretches the viewBox onto — which is this box and not a strip
+				    beneath it. `labelLeftPct` is CHART-6's own conversion, reused rather
+				    than re-derived, so the date and the tick it names cannot come to
+				    disagree about where that x is. */}
+				<AxisDates
+					mode={mode}
+					series={series}
+					startMs={startMs}
+					endMs={endMs}
+				/>
 			</div>
-			{hasFullYScale(mode) && grid.length > 0 && <YMarks marks={grid} />}
+			<LabelReserve mode={mode} />
 		</div>
 	);
 }
@@ -701,6 +685,7 @@ function TerminalLabels({
 	yes,
 	mode,
 	terminalX,
+	bandPx,
 }: {
 	yes: string;
 	mode: ChartMode;
@@ -711,6 +696,14 @@ function TerminalLabels({
 	 * only plausible default is `VIEWBOX_W`, which is the pre-CHART-6 defect
 	 * spelled out as a value. */
 	terminalX: number;
+	/** The height of the X-axis date row, in CSS px, or `0` on a render that draws
+	 * no axis — `C-CHART-2` clause 3's reserved band (RF-5).
+	 * ⛔ PASSED, NEVER RE-DERIVED. Whether an axis is drawn depends on the mode AND
+	 * the series, which this component does not see; computing it here would mean a
+	 * second copy of `drawsTimeAxis`'s per-mode gates, and two copies of a gate are
+	 * two answers to "is there a date row?" — one held by the row and one by the
+	 * clamp meant to clear it. */
+	bandPx: number;
 }): React.JSX.Element {
 	const labelY = terminalLabelYs(yes);
 	// Which of the two clause-4 already put on top. Read off its OUTPUT rather
@@ -720,7 +713,7 @@ function TerminalLabels({
 	const upperPct = labelTopPct(yesOnTop ? labelY.yes : labelY.no);
 	const lowerPct = labelTopPct(yesOnTop ? labelY.no : labelY.yes);
 	const half = labelHalfBoxPx(mode);
-	const showValue = hasFullYScale(mode);
+	const showValue = hasEndValue(mode);
 	// The horizontal half of the contract, computed once for both labels because
 	// both dots share one `cx` — `TerminalMarkers` draws them at the same
 	// `terminalX`, since a market has one series and therefore one last point.
@@ -799,22 +792,16 @@ function TerminalLabels({
 				}`}
 				style={{
 					left,
-					top: yesOnTop ? lowerTop(lowerPct, half) : upperTop(upperPct, half),
+					top: yesOnTop
+						? lowerTop(lowerPct, half, bandPx)
+						: upperTop(upperPct, half),
 				}}
 			>
-				<span className="block">NO</span>
-				{showValue && (
-					<span
-						data-testid="terminal-value-no"
-						className="block tracking-normal tabular-nums"
-						style={{
-							fontSize: `${LABEL_VALUE_PX}px`,
-							marginTop: `${LABEL_STACK_GAP_PX}px`,
-						}}
-					>
-						{formatPricePercent(pair, "NO")}
-					</span>
-				)}
+				<LabelParts
+					name="NO"
+					value={showValue ? formatPricePercent(pair, "NO") : null}
+					valueTestId="terminal-value-no"
+				/>
 			</span>
 			<span
 				data-testid="terminal-label-yes"
@@ -825,37 +812,70 @@ function TerminalLabels({
 				}`}
 				style={{
 					left,
-					top: yesOnTop ? upperTop(upperPct, half) : lowerTop(lowerPct, half),
+					top: yesOnTop
+						? upperTop(upperPct, half)
+						: lowerTop(lowerPct, half, bandPx),
 				}}
 			>
-				<span className="block">YES</span>
-				{showValue && (
-					<span
-						data-testid="terminal-value-yes"
-						className="block tracking-normal tabular-nums"
-						style={{
-							fontSize: `${LABEL_VALUE_PX}px`,
-							marginTop: `${LABEL_STACK_GAP_PX}px`,
-						}}
-					>
-						{formatPricePercent(pair, "YES")}
-					</span>
-				)}
+				<LabelParts
+					name="YES"
+					value={showValue ? formatPricePercent(pair, "YES") : null}
+					valueTestId="terminal-value-yes"
+				/>
 			</span>
 		</div>
 	);
 }
 
 /**
- * The Y scale's numeric marks — HTML in a column of their own, to the right of
- * the plot (`C-CHART-1` clause 1 as amended at CHART-5 and again at CHART-6).
+ * The Y scale's numeric marks — HTML in a column of their own, to the **LEFT** of
+ * the plot (`C-CHART-1` clause 1 as amended at CHART-5, CHART-6 and CHART-7).
+ *
+ * ⛔ THE SIDE IS THE CHART-7 CHANGE, AND IT IS A CONSEQUENCE RATHER THAN A TASTE.
+ * The right side now belongs to the traveling end labels: since CHART-6 they are
+ * positioned from their own dot's x, so on a market trading near the deadline they
+ * arrive at the plot's right edge — which is exactly where this column used to
+ * sit. Two systems reaching for one strip is what made both cramped, and the
+ * founder's ruling separates them by axis: **marks left, labels right** (`RF-1`).
+ * A left scale is also the conventional reading order for a Y axis, which is the
+ * smaller half of the reason and the one a reader notices first.
+ *
+ * ⛔⛔ THE AIR IS THE PADDING **AND** THE MARK'S OWN OFFSET, AND GETTING THAT WRONG
+ * IS THE DEFECT THIS TASK ALMOST SHIPPED. The 6px is the gap between the numerals
+ * and the gridlines they label. It is tempting to read it as a property of the
+ * padding alone — this docblock did, at length — but a mark is `absolute`, and an
+ * absolutely positioned box resolves `right` against its ancestor's **PADDING
+ * BOX**, whose right edge is the OUTER edge of the padding. So `right: 0` lands the
+ * numeral flush with the column's border edge and the padding sits BEHIND it,
+ * contributing width and no air.
+ *
+ * ⚠ THE OLD ARRANGEMENT PRODUCED THE 6PX BY ACCIDENT OF OPPOSITION, which is why
+ * nothing noticed. With the column on the RIGHT the padding was on the LEFT and the
+ * alignment on the RIGHT — two different edges, so the slack fell on the plot side.
+ * Moving the column made them the same edge and they cancelled. **Measured in a
+ * real browser, on a minimal repro of all four arrangements:**
+ *
+ *     column RIGHT · pl-[6px] · right:0      → 6.00px   (what shipped before)
+ *     column LEFT  · pr-[6px] · right:0      → 0.00px   ⛔ the defect
+ *     column LEFT  · pr-[6px] · right-[6px]  → 6.00px   ✅ shipped now
+ *     column LEFT  · mr-[6px] · right:0      → 6.00px   (rejected: the column's own
+ *                                               border box shrinks to 17.59px)
+ *
+ * ⇒ **A coordinate that is right only because two independent quantities happen to
+ * be arranged a particular way** — the register entry CHART-3 minted, CHART-6 hit on
+ * the label's x, and CHART-5 hit on this very column's edge clamp. Third instance,
+ * same file, caught by `@code-reviewer` at the CHART-7 cascade. The column keeps
+ * `pr-[6px]` so its measured 24px footprint is unchanged and the mark carries the
+ * matching `right-[6px]`; the guard asserts the PAIR, because asserting the padding
+ * side alone is exactly what certified the defect.
  *
  * ⚠ "BETWEEN THE PLOT AND THE END LABELS" WAS TRUE UNTIL CHART-6 AND IS NOT NOW.
  * The end labels left the row entirely — they are an overlay on the plot,
- * positioned from their own dots — so this column is the only thing beside the
- * plot and there is no longer a strip for two systems to share. It renders on
- * the overlay AND the Discovery hero (`hasFullYScale`), never on the collapsed
- * card.
+ * positioned from their own dots — so this column shares no strip with anything.
+ * ⚠ AND IT RENDERS ON ALL THREE MODES SINCE CHART-7 (`RF-3`), where it used to be
+ * the overlay and the hero only; the collapsed card carries the quarters plus `0`
+ * rather than the ten-step, which is `gridlinesFor`'s business and not this
+ * component's.
  *
  * ⛔ HTML AND NOT SVG `<text>`, for exactly the reason clause 2 moved `YES`/`NO`
  * out at CHART-2: `preserveAspectRatio="none"` stretches user space by a factor
@@ -891,7 +911,7 @@ function YMarks({ marks }: { marks: readonly Gridline[] }): React.JSX.Element {
 			// Same reasoning as the label gutter's: this is a visual key for a visual
 			// mark, and the chart's accessible channel is `ChartSummary` alone.
 			aria-hidden="true"
-			className="relative shrink-0 pl-[6px] text-right text-[10px] leading-none text-n5 tabular-nums"
+			className="relative shrink-0 pr-[6px] text-right text-[10px] leading-none text-n5 tabular-nums"
 		>
 			{/* The sizer — an in-flow copy of the widest mark, laid out by the browser
 			    in the real shipped face. `100` is the widest of the eleven at tabular
@@ -904,7 +924,7 @@ function YMarks({ marks }: { marks: readonly Gridline[] }): React.JSX.Element {
 					key={g.pct}
 					data-testid={`y-mark-${g.pct}`}
 					data-pct={g.pct}
-					className="absolute right-0 -translate-y-1/2"
+					className="absolute right-[6px] -translate-y-1/2"
 					style={{ top: markTop(labelTopPct(g.y)) }}
 				>
 					{g.pct}
@@ -941,6 +961,127 @@ function markTop(pct: number): string {
 }
 
 /**
+ * One end label's contents — the name, and beside it the value when the mode
+ * carries one (`C-CHART-2` clause 2 as amended at CHART-7).
+ *
+ * ⛔ EXTRACTED SO THE RIGHT RESERVE CAN BE SIZED BY THE REAL LABEL RATHER THAN BY A
+ * COPY OF IT. `LabelReserve` renders this same element at the widest price the
+ * chart can produce, invisibly and in flow, and takes its width from the browser.
+ * If the sizer duplicated the spans instead, the two would agree on the day they
+ * were written and drift on the day one of them changed — which is exactly the
+ * failure `C-CHART-2` clause 3 records for CHART-1's hand-measured `26`, in a new
+ * place. One element, two callers, no second declaration of what a label is.
+ *
+ * ⚠ THE TESTID IS OPTIONAL AND THE SIZER PASSES NONE, deliberately: two elements
+ * carrying `terminal-value-yes` would make every guard that reads "the value" pick
+ * whichever came first in the markup, and the one that comes first would be the
+ * invisible copy.
+ */
+function LabelParts({
+	name,
+	value,
+	valueTestId,
+}: {
+	name: "YES" | "NO";
+	value: string | null;
+	valueTestId?: string;
+}): React.JSX.Element {
+	return (
+		<>
+			<span>{name}</span>
+			{value !== null && (
+				<span
+					data-testid={valueTestId}
+					className="tracking-normal tabular-nums"
+					style={{
+						fontSize: `${LABEL_VALUE_PX}px`,
+						marginLeft: `${LABEL_INLINE_GAP_PX}px`,
+					}}
+				>
+					{value}
+				</span>
+			)}
+		</>
+	);
+}
+
+/**
+ * The RIGHT gutter — a reserve the traveling end labels can occupy without
+ * crossing the frame (`C-CHART-2` clause 3 as amended at CHART-7, RF-5).
+ *
+ * ⛔ WHY A RESERVE AND NOT A BIGGER FLIP THRESHOLD. Since CHART-6 the labels travel
+ * with their dots, so a market trading near the deadline drives them to the plot's
+ * right edge; the only thing standing between them and the edge was the FLIP,
+ * which puts the label on the other side of its dot. That works, and it means the
+ * normal end-of-experiment rendering is the fallback rather than the design. A
+ * reserve makes the flip the exception it was written to be.
+ *
+ * ⛔ SIZED BY AN IN-FLOW INVISIBLE COPY OF THE WIDEST LABEL, NOT BY A NUMBER — the
+ * mechanism `YMarks` already uses and CHART-2 minted when it deleted CHART-1's
+ * hand-measured `26`. `formatPricePercent` at a YES price of `1` is `100%` by the
+ * shipped formatter, so the sizer's string is the widest string the chart CAN
+ * produce rather than a literal somebody believed was. Measured in the shipped
+ * face: `YES 100%` is **69.88 px** and `NO 100%` is **64.84 px**, so `YES` is
+ * correctly the one to size from.
+ *
+ * ⚠ THE PADDING IS THE OTHER TWO MEASURED INPUTS. `LABEL_AIR_PX` is the 5 px of
+ * separation carried since CHART-2, and `RESERVE_RING_PX` is the pulse ring's
+ * maximum extent in CSS px — measured **3.48 px on the collapsed card, 6.64 on the
+ * hero, 9.12 on the expanded overlay**, so 10 covers the widest plot the product
+ * ships. One number rather than three, erring high: over-reserving costs a few
+ * pixels of plot, under-reserving flips a label early. The failure is one-sided,
+ * so the margin belongs on the safe side.
+ *
+ * ⚠ AND A MEASUREMENT THAT SAYS THE RING IS ALREADY PAID FOR, RECORDED BECAUSE IT
+ * IS THE INTERESTING PART. The dot's maximum x is `VIEWBOX_W / SVG_W` = **98.61 %**
+ * of the plot, not 100 %, and the ring's own clearance is `LABEL_GAP_PCT` =
+ * **1.1094 %** — the two sum to 99.72 %, still inside the plot. So the true
+ * overhang past the plot's edge is `5px + labelWidth − 0.28 % × plotWidth`, and the
+ * ring term is slack rather than load. It is included anyway because `C-CHART-2`
+ * clause 3 pins it; the slack is stated so nobody later "discovers" it and removes
+ * the wrong term.
+ *
+ * ⛔ `invisible`, NEVER `hidden`. `visibility: hidden` keeps the box, which is the
+ * whole mechanism; `display: none` removes it and the reserve collapses to its
+ * padding — silently, leaving a chart that looks almost right.
+ */
+function LabelReserve({ mode }: { mode: ChartMode }): React.JSX.Element {
+	return (
+		<div
+			data-testid="chart-label-reserve"
+			// A blank strip that must not be announced, and must not intercept a click
+			// on the collapsed card's `<button>` or the hero's `<Link>` — the same two
+			// attributes, for the same two reasons, as the label layer it serves.
+			aria-hidden="true"
+			className="pointer-events-none invisible shrink-0 whitespace-nowrap text-[10px] leading-none font-bold tracking-[0.1em]"
+			style={{ paddingLeft: `${LABEL_AIR_PX + RESERVE_RING_PX}px` }}
+		>
+			<LabelParts
+				name="YES"
+				value={
+					hasEndValue(mode)
+						? formatPricePercent({ yes: "1", no: "1" }, "YES")
+						: null
+				}
+			/>
+		</div>
+	);
+}
+
+/**
+ * The pulse ring's maximum extent, in CSS PIXELS, as the right reserve budgets it.
+ *
+ * ⛔ A BOUND, NOT AN EXACT VALUE, AND SAYING SO IS THE POINT. The ring's extent is
+ * a fraction of the plot — `TERMINAL_PULSE_MAX_R / SVG_W` — so in pixels it differs
+ * per surface and per viewport: measured **3.48 px (collapsed) · 6.64 (hero) ·
+ * 9.12 (expanded overlay)** on the product's real boxes, in the shipped face. The
+ * reserve is one CSS box and cannot carry three numbers, so it carries the ceiling.
+ * ⚠ A plot wider than ~900 px would exceed it; the flip is what covers that, which
+ * is what a fallback is for.
+ */
+const RESERVE_RING_PX = 10;
+
+/**
  * The gap between a terminal dot and its label, expressed as a PERCENTAGE of the
  * plot — `C-CHART-2` clause 2 as amended at CHART-6.
  *
@@ -974,75 +1115,70 @@ const LABEL_GAP_PCT = labelLeftPct(TERMINAL_PULSE_MAX_R);
 const LABEL_AIR_PX = 5;
 
 /**
- * How much of the plot a right-placed label needs, as a percentage — the flip
- * threshold, and the one measured number in this mechanism.
+ * How much of the plot a right-placed label needs BEYOND what the right reserve
+ * already holds, as a percentage — the flip threshold.
  *
- * ⛔ WHY A NUMBER IS UNAVOIDABLE HERE, SAID BEFORE THE NUMBER. Everything else in
- * this file is expressed as a fraction of the plot, so it holds at every size. A
- * label's WIDTH cannot be: the label is HTML at a fixed type size, so its width is
- * a constant in CSS PIXELS, while the plot's width is not — and the two are only
- * ever known together inside the browser's layout pass. CSS can mix the units
- * (`min()`, `calc()`) but cannot branch on the comparison, and the ruling is a
- * FLIP, which is a branch. So the decision is taken here.
+ * ⛔⛔ IT IS ZERO SINCE CHART-7, AND A ZERO CONSTANT NEEDS ITS REASON WRITTEN DOWN
+ * OR SOMEBODY WILL DELETE THE TERM. `LABEL_FLIP_RESERVE_PCT` was **14** — the
+ * percentage of the plot a label needed for itself, because there was nothing to
+ * the right of the plot and a label that would not fit inside it had to flip. RF-5
+ * puts a real reserve there, sized from the widest label the chart can produce plus
+ * the ring plus the gap, so the label no longer needs a percentage of the PLOT: it
+ * needs room in the RESERVE, and by construction the reserve has it.
  *
- * ⛔ MEASURED ACROSS THE WHOLE VIEWPORT RANGE, on the shipped build, in the
- * shipped Geist face, as `labelWidth / plotWidth`. The hero's chart frame:
+ * ⛔ THE ARITHMETIC, BECAUSE "BY CONSTRUCTION" IS A CLAIM. A label starts at
+ * `xPct% + LABEL_GAP_PCT% + LABEL_AIR_PX` of the plot and runs `labelWidth` past
+ * that. The reserve provides `labelWidth + LABEL_AIR_PX + RESERVE_RING_PX`. The
+ * dot's maximum in-window x is `VIEWBOX_W / SVG_W` = **98.61 %**, so the label's
+ * left edge is at most `98.61 + 1.11 = 99.72 %` of the plot — still inside it — and
+ * the overhang past the plot's edge is `5px + labelWidth − 0.28 % × plotWidth`,
+ * which is strictly less than the reserve for every plot width the product ships.
+ * **So an in-window label always fits, and the threshold that used to buy it room
+ * is spent.**
  *
- *      500 px → 496.49    768 px → 496.49    1280 px → 540.37
- *      640 px → 549.51    900 px → 496.49    1440 px → 626.12
- *      700 px → 609.51   1024 px → 496.49
- *      767 px → 676.39   1045 px → 496.49
+ * ⚠ THE FLIP IS NOT DEAD, AND THE CASE IT COVERS IS LIVE ON STAGING. `xPx` is
+ * deliberately unclamped, so a series running PAST the window end puts `terminalX`
+ * beyond `VIEWBOX_W`, and once `xPct` exceeds **98.8906** — i.e. `terminalX >
+ * 641.70`, about **3.3 hours** past the window end — `xPct + LABEL_GAP_PCT`
+ * exceeds 100 and this fires.
+ * ⚠ THE BAND BETWEEN 640 AND 641.70 IS COVERED BY THE RESERVE, NOT BY THE FLIP,
+ * and saying so is the point: this docblock first read "above 98.89", which is the
+ * THRESHOLD, and a reader would take it for the value a just-past-the-end series
+ * produces — that is 98.61, still inside. The reserve needs ≈74.9px there against
+ * the 84.88px it holds. Caught by `@code-reviewer` at the CHART-7 cascade. That is a real rendering (`limits.ts` records it
+ * happening for two weeks) and it is exactly what a fallback is for: the reserve
+ * covers a label anchored INSIDE the plot, and nothing can reserve room for a dot
+ * that is not on the canvas.
  *
- * ⇒ **The frame has a FLOOR of 496.49 px and never goes below it.** At 768 the
- * `md:grid-cols-[1fr_1.9fr_1fr]` three-column layout engages and the centre track
- * resolves to a CONTENT MINIMUM of 530.99 px — measured identical at 768, 900,
- * 1024 and 1045 — so the hero stops shrinking rather than continuing down. Below
- * 768 the panel is single-column and the hero gets WIDER, not narrower.
+ * ⚠ AND WHY THE TERM STAYS RATHER THAN THE COMPARISON BEING SIMPLIFIED TO
+ * `xPct + LABEL_GAP_PCT > 100`. The two are identical today. Keeping the named
+ * quantity keeps clause 2's flip arithmetic byte-identical to what CHART-6 shipped
+ * and measured — a scope fence this task honours by changing only its INPUT — and
+ * leaves one place to put a number back if a future reserve cannot cover
+ * something.
+ * ⚠ AND THE CAP IS TIGHTER THAN THIS DOCBLOCK FIRST CLAIMED. It said
+ * `label-anchor.test.tsx` "caps it at 20 from the other direction" — true of the
+ * sweep CHART-6 left, and understated by two orders of magnitude now: the
+ * in-window walk added at CHART-7 asserts that NO series with `f ≤ 1` flips, and
+ * the tightest of those anchors at 98.61 %, so anything above **0.28** reds.
+ * Corrected because it is exactly the sentence a future reader would cite to
+ * justify raising the constant. Found by `@test-writer` at the CHART-7 cascade.
  *
- * ⚠ THAT FLOOR IS THE WHOLE SAFETY ARGUMENT AND IT CANNOT BE DERIVED, ONLY
- * MEASURED — which is worth stating because a careful derivation gets it wrong.
- * Reading the grid as a pure `1fr 1.9fr 1fr` split gives 421.95 px at 1024 and a
- * required reserve of 12.31 %, i.e. a defect; `@code-reviewer` filed exactly that
- * at the CHART-6 cascade. The arithmetic reproduces 1440 EXACTLY (347.7 / 660.6 /
- * 347.7 really is 1 : 1.9 : 1), which is what makes it convincing — and it is
- * wrong everywhere the tracks are content-bound instead. **A layout figure is
- * measured or it is not known.**
- *
- * ⇒ Worst case, **measured on this branch's own deployed build** rather than
- * predicted: the hero's plot at the floor is **472.49** (496.49 − 24 for the
- * marks column, confirmed), and the two-line label renders **33.56** at a typical
- * `65%`. The WIDEST it can be is `100%`, measured at **42.47** in the shipped face
- * — percentages are whole and bounded at 100 (SPEC.1 §10.8) — so the ceiling is
- * 42.47 / 472.49 = **8.99 %**. The `5px` of air is NOT in `shouldFlip`'s
- * comparison — it cannot be, since converting px to a percentage needs the plot
- * width nobody knows at render — so the reserve must absorb it too:
- * 5 / 472.49 = 1.06 pp, for a true requirement of **10.05 %**.
- *
- * ⚠ AN EARLIER PASS PUT THAT AT 11.37 %, USING **48.73** FOR THE LABEL. That is
- * the expanded GUTTER's width, not the label's — it included the gutter's own
- * `pl-[5px]` and the column it sat in. Measuring the label itself is what the
- * deployed build settled, and it moves the requirement down rather than up. The
- * conclusion is unchanged and the margin is wider than claimed.
- *
- * **14 leaves 3.95 points of margin over that requirement.** It was 12, which
- * cleared it by 1.95 — enough, but sized against a label width that turned out to
- * be the gutter's. A threshold whose input was the wrong quantity is worth
- * re-seating even when the answer survives. Over-reserving flips the label a few percent early,
- * which still places it beside its own dot and is invisible; under-reserving
- * overflows onto the numeric marks. The failure is one-sided, so the margin
- * belongs on the safe side. `label-anchor.test.tsx` caps it at 20 from the other
- * direction, so this cannot drift into "everything flips".
- *
- * ⚠ AND THIS IS NOT THE HAND-MEASURED CONSTANT CHART-2 DELETED, for two reasons
- * worth stating because the resemblance is close. CHART-1's `26` was a guess
- * about a font nobody could measure — Geist was unfetchable offline — guarding a
- * horizontal clip that nothing asserted. This is read off the shipped face on the
- * shipped surfaces, and it is used only as a THRESHOLD, so an imprecise value
- * costs an early flip rather than a clip. It is pinned at four series-end
- * positions on all three modes in the CHART-6 contact sheet, in a real browser,
- * which is the only place a text advance can honestly be checked.
+ * ⛔ WHAT THE 14 WAS, KEPT BECAUSE THE MEASUREMENT COST SOMETHING AND STILL
+ * TEACHES. It was read off the shipped build across the whole viewport range as
+ * `labelWidth / plotWidth`: the hero's chart frame has a measured FLOOR of
+ * **496.49 px** — identical at 768, 900, 1024 and 1045, because the
+ * `md:grid-cols-[1fr_1.9fr_1fr]` centre track hits a content minimum of 530.99 and
+ * stops shrinking — its plot at that floor is **472.49**, and `100%` renders
+ * **42.47 px** in the shipped face, giving 8.99 % plus 1.06 pp for the air the
+ * threshold could not express: **10.05 %**, cleared by 14 with 3.95 points spare.
+ * ⚠ AND A CAREFUL DERIVATION GETS THAT FLOOR WRONG: reading the grid as a pure
+ * `1fr 1.9fr 1fr` split gives 421.95 px at 1024 and predicts a defect, and it
+ * reproduces 1440 EXACTLY, which is what makes it convincing. `@code-reviewer`
+ * filed exactly that at the CHART-6 cascade. **A layout figure is measured or it is
+ * not known.**
  */
-const LABEL_FLIP_RESERVE_PCT = 14;
+const LABEL_FLIP_RESERVE_PCT = 0;
 
 /** Whether a label at this x would cross the plot's right edge — `C-CHART-2`
  * clause 2's flip, per label. ⚠ Both labels share one `terminalX` today, because
@@ -1097,13 +1233,31 @@ const LABEL_NAME_PX = 10;
 // Caught by `@code-reviewer`.
 
 /**
- * The stacked VALUE line's type size and the air between it and the name — the
- * other two numbers the expanded label's box is made of (`C-CHART-2` clause 2 as
- * amended at CHART-5). Both are `leading-none`, so each line's box IS its type
- * and the stack's height is exactly the sum below.
+ * The VALUE's type size, and the air BESIDE it — the other two numbers the
+ * label's box is made of (`C-CHART-2` clause 2 as amended at CHART-5 and again at
+ * CHART-7).
+ *
+ * ⛔ THE SECOND NUMBER CHANGED AXIS AT CHART-7 AND WAS RENAMED WITH IT. It was
+ * `LABEL_STACK_GAP_PX = 2`, a `margin-top` separating a value stacked BENEATH its
+ * name. RF-2 puts the two side by side — `NO 52%` — so the air is horizontal and
+ * the old name would describe a stack that no longer exists. **A renamed constant
+ * is cheaper than a maintainer trusting the old one.**
+ *
+ * ⚠ 4 IS MEASURED, NOT PICKED. It is Geist's own space advance at the VALUE's
+ * type size — **4.39 px at 16 px**, measured in the shipped face with the font
+ * check passing — floored to the integer, so the gap is a word space and never
+ * wider than one. The name's own `tracking-[0.1em]` already contributes ~1 px of
+ * trailing letter-space, which is why the pair does not need the full advance.
+ * Measured widths of the whole `YES 100%` label at each candidate: **65.88 px at
+ * 0, 67.88 at 2, 69.88 at 4, 71.88 at 6** — the right reserve is sized from the
+ * 4 px figure.
+ *
+ * ⚠ THE GAP DOES NOT ENTER THE BOX'S HEIGHT ANY MORE, and that is the whole
+ * reason clause 4's threshold moves. Stacked, the box was `10 + 2 + 16 = 28`.
+ * Side by side it is `max(10, 16) = 16` — see `labelHalfBoxPx`.
  */
 const LABEL_VALUE_PX = 16;
-const LABEL_STACK_GAP_PX = 2;
+const LABEL_INLINE_GAP_PX = 4;
 
 /** The numeric marks' own type size — `YMarks` declares `text-[10px]`, and this
  * is that number rather than a second reader of the end label's. See `markTop`. */
@@ -1115,24 +1269,38 @@ const MARK_TYPE_PX = 10;
  *
  * ⛔ ONE RULE, TWO MEASURED INPUTS — NOT A SECOND COLLISION RULE. Clause 4's
  * arithmetic in `terminalLabelYs` is untouched, and so is the `min`/`max`/
- * `clamp` shape below. The only thing CHART-5 changes is the NUMBER handed to
- * that shape, because the expanded overlay's label is now two lines rather than
- * one and a taller box collides at a wider spread. Hard-coding a second
- * threshold would have been the CHART-2 defect exactly — a constant chosen
- * against one surface — so the box is composed from the same three type values
- * the label declares, and the threshold moves whenever they do.
+ * `clamp` shape below. The only thing CHART-5 and CHART-7 change is the NUMBER
+ * handed to that shape: CHART-5 made the value-bearing label two lines, so a
+ * taller box collided at a wider spread, and CHART-7's founder ruling puts the two
+ * on ONE line, so it collides at a narrower one. Hard-coding a threshold per
+ * surface would have been the CHART-2 defect exactly — a constant chosen against
+ * one surface — so the box is composed from the type values the label declares,
+ * and the threshold moves whenever they do.
  *
- * ⚠ THE ONE-LINE VALUE IS UNCHANGED AT 5 AND NOW APPLIES TO THE COLLAPSED CARD
+ * ⚠ THE NAME-ONLY VALUE IS UNCHANGED AT 5 AND APPLIES TO THE COLLAPSED CARD
  * ALONE. It used to cover the Discovery hero too, on CHART-5's asymmetry — those
  * two kept the name alone, so their box did not grow. CHART-6 gives the hero the
- * value line, so its box grew and its threshold has to grow with it: that is
- * exactly why this reads `hasFullYScale` rather than a second `mode ===` test.
- * A hero that gained the value and kept the 5px floor would overlap its own two
- * labels across the 46–54 % band, which is where every market rests.
+ * value, so its box grew and its threshold had to grow with it: that is exactly
+ * why this reads `hasEndValue` rather than a second `mode ===` test. A hero that
+ * gained the value and kept the 5px floor would overlap its own two labels across
+ * the band where every market rests.
+ *
+ * ⛔ AND AT CHART-7 THE VALUE-BEARING BOX HALVED, WHICH IS RF-2'S WHOLE MECHANICAL
+ * CONSEQUENCE. Stacked, the box was `10 + 2 + 16 = 28`, so the floor held the two
+ * centres 28 px apart. Side by side, the two share ONE line box and the horizontal
+ * gap contributes nothing to its height, so the box is `max(name, value) = 16` and
+ * the floor holds them 16 px apart. **The rule is untouched; only the measured
+ * input moved** — the same sentence CHART-5 wrote when it moved the other way.
+ *
+ * ⚠ `Math.max`, NOT `LABEL_VALUE_PX`, EVEN THOUGH THE VALUE IS THE TALLER TODAY.
+ * The two sizes are independently declared, so naming the taller one would be a
+ * coordinate that is right only because two quantities currently happen to be
+ * ordered a particular way — the register entry this file already keeps twice.
+ * Make the name 20px and this follows; name the value and it silently does not.
  */
 function labelHalfBoxPx(mode: ChartMode): number {
-	return hasFullYScale(mode)
-		? (LABEL_NAME_PX + LABEL_STACK_GAP_PX + LABEL_VALUE_PX) / 2
+	return hasEndValue(mode)
+		? Math.max(LABEL_NAME_PX, LABEL_VALUE_PX) / 2
 		: LABEL_NAME_PX / 2;
 }
 
@@ -1152,14 +1320,18 @@ function labelHalfBoxPx(mode: ChartMode): number {
  * the midline by construction (design-language §3.2), so the only place the two
  * can approach each other is there. Far from even, `min`/`max` are no-ops and
  * clause 4's plot-space positions pass through untouched.
- * ⚠ THIS PARAGRAPH USED TO END "which is why the expanded overlay still separates
- * by clause 4's own 12 units (~20 px) rather than being flattened to 10", and
- * CHART-5 made that false on the surface it names. With `half = 14` the floor
- * forces the two centres 28 px apart on the overlay, while clause 4's own
- * post-push separation is ~19 px there — so the CSS floor now DOMINATES clause 4
- * across roughly the 46–54 % band, which is where every market rests. That is the
- * correct behaviour for a 28 px box; what was wrong was a docblock still
- * describing the one-line case on a two-line label. Caught by `@code-reviewer`.
+ * ⚠ THIS PARAGRAPH HAS NOW BEEN WRONG IN BOTH DIRECTIONS AND IS CORRECTED IN
+ * PLACE FOR THE SECOND TIME. It first read "the expanded overlay still separates
+ * by clause 4's own 12 units (~20 px) rather than being flattened to 10", which
+ * CHART-5 falsified by stacking the value under the name: `half` became 14, the
+ * floor held the two centres 28 px apart, and the CSS floor DOMINATED clause 4
+ * across roughly the 46–54 % band. **CHART-7 halves it again, the other way.**
+ * RF-2 puts name and value on one line, so `half` is 8 and the floor holds them
+ * 16 px apart — still above clause 4's own post-push separation near even, so the
+ * floor still dominates, across a band roughly half as wide. The measured band is
+ * reported in the CHART-7 run rather than restated here, because a number written
+ * into a docblock is the thing that goes stale: this paragraph is the proof,
+ * twice over.
  *
  * ⛔ AND WHY CSS MATH RATHER THAN A BIGGER CONSTANT. The alternative was to
  * raise `TERMINAL_LABEL_MIN_GAP` to ~24 units so that 12 px survived the worst
@@ -1180,69 +1352,69 @@ function upperTop(pct: number, half: number): string {
 	return `clamp(${half}px, min(${pct}%, calc(50% - ${half}px)), calc(100% - ${half}px))`;
 }
 
-function lowerTop(pct: number, half: number): string {
-	return `clamp(${half}px, max(${pct}%, calc(50% + ${half}px)), calc(100% - ${half}px))`;
+/**
+ * ⛔ THE THIRD TERM IS THE DATE ROW, AND IT IS ONE MORE MEASURED INPUT TO THIS
+ * CLAMP RATHER THAN A SECOND RULE (`C-CHART-2` clause 3, RF-5). The bottom bound
+ * was `100% - half`, which keeps the label's box inside the PLOT; the plot's floor
+ * is also where the X-axis dates sit, so at the window end with an extreme price
+ * the lower label came to rest exactly on top of its own date label. Measured at
+ * CHART-6 and reproduced on this branch before the change: **19.99 × 16.00 px** on
+ * the expanded overlay, **4.54 × 7.70 px** on the collapsed card.
+ *
+ * ⚠ IT NEEDS BOTH CONDITIONS AT ONCE — a series reaching the window end AND a
+ * price at an extreme — which is why it is invisible today and is what every
+ * market looks like on 2026-11-05.
+ *
+ * ⛔ THE BAND IS COMPOSED, NOT WRITTEN DOWN. `AXIS_DATE_BAND_PX` is
+ * `AXIS_DATE_PX + AXIS_DATE_BOTTOM_PX` — the row's own type plus its own offset —
+ * so changing either moves the clamp with it. A literal here would be a threshold
+ * chosen against one date size, which is the CHART-2 defect this file records
+ * twice.
+ *
+ * ⚠ AND IT IS `0` ON A RENDER THAT DRAWS NO AXIS, passed in rather than assumed.
+ * Reserving a band under a row that is not there would push the lower label up on
+ * a degenerate market for no reason a reader could see.
+ */
+function lowerTop(pct: number, half: number, bandPx: number): string {
+	return `clamp(${half}px, max(${pct}%, calc(50% + ${half}px)), calc(100% - ${half}px - ${bandPx}px))`;
 }
 
 /**
- * The COLLAPSED chart's time axis — SPEC.1 1.0.32 (HTML-FINISH · MARKET DETAIL
- * round 2 · R8, founder-ruled 2026-08-16). d5's `.xtick` ×2 + `.xlab` ×2 +
- * `.xlab.end` (`d5:1014-1018`).
+ * The COLLAPSED chart's time TICKS — SPEC.1 1.0.32 (HTML-FINISH · MARKET DETAIL
+ * round 2 · R8, founder-ruled 2026-08-16). d5's `.xtick` ×2 (`d5:1014-1018`).
  *
- * ⛔⛔ EVERY TIMESTAMP IT RENDERS IS A REAL `PricePoint.at`, AND THAT IS THE
- * RULING'S OWN CONSTRAINT: *"it introduces no new data and no new read — every
- * timestamp it renders is already carried on `PricePoint.at`."*
+ * ⛔ IT WAS `CollapsedAxis` AND HELD THE LABELS TOO, UNTIL CHART-7. The labels are
+ * HTML now — `AxisDates` below — for `C-CHART-2` clause 2's original reason
+ * applied to the one element that had never taken it. What is left here is the
+ * part that had no reason to leave: a tick is a rule at an x in the PLOT's own
+ * domain, drawn in the space that owns that domain, and it carries no type for a
+ * non-uniform scale to distort.
  *
- * ⛔ THAT CONSTRAINT PRODUCED THE OPPOSITE RULE UNTIL CHART-3, AND THE REVERSAL
- * IS RATIFIED RATHER THAN INFERRED. The ticks used to be ANCHORED TO SERIES
- * POINTS — each one the series point whose x landed nearest a third — precisely
- * so the axis could not "mint a timestamp the series does not contain". That
- * was right while the domain was the market's own lifetime, because then an
- * interpolated date WAS a claim about the market's history. It is wrong against
- * a fixed window, for two reasons that compound:
- *
- * 1. **It stops being an axis.** Two markets on the same window would carry
- *    DIFFERENT tick dates, defeating the entire ruling — canon `C-CHART-1`
- *    clause 1 (amended CHART-3) says tick placement is "computed against a
- *    **constant** span rather than a per-market one, which makes every market's
- *    axis identical and two charts directly comparable."
- * 2. **It collapses.** A market three days into a seven-week window occupies
- *    the leftmost ~6 % of the axis, so `nearestPoint` returns the SAME final
- *    point for both thirds: two ticks stacked at one x under two identical
- *    labels. On the production window that is the rendering for roughly the
- *    experiment's first two and a half weeks — not an edge case, the opening.
- *
- * ⇒ Each interior tick now sits at a fixed third of the WINDOW and is labelled
- * with that instant's own UTC day. This mints no claim about the market: the
- * window is a constant this build already knows, so the label is a calendar
- * date, not an interpolated observation. The 1.0.32 constraint is honoured in
- * the sense that mattered — the axis still asserts nothing about the data that
- * the data does not say, because it no longer speaks about the data at all.
+ * ⛔⛔ EVERY TIMESTAMP IT RENDERS IS A REAL INSTANT ON A CONSTANT SPAN, which is
+ * how the 1.0.32 ruling's constraint — *"it introduces no new data and no new
+ * read"* — is honoured in the sense that mattered. The ticks used to be ANCHORED
+ * TO SERIES POINTS, precisely so the axis could not "mint a timestamp the series
+ * does not contain". That was right while the domain was the market's own
+ * lifetime, and wrong against a fixed window for two reasons that compound: two
+ * markets on one window would carry DIFFERENT tick dates, defeating the ruling
+ * canon `C-CHART-1` clause 1 states; and a market three days into a seven-week
+ * window has `nearestPoint` return the SAME final point for both thirds, stacking
+ * two ticks at one x.
  *
  * ⛔ NO AXIS ON A DEGENERATE DOMAIN. Fewer than two points, or `endMs ===
- * startMs` (the unbet market), is the flat-line case `buildLine` handles by
- * duplicating one value at both edges — every point shares x = 0, so ticks would
- * stack on the left edge and three labels would print the same day three times.
+ * startMs`, is the flat-line case `buildLine` handles by duplicating one value at
+ * both edges — every point shares x = 0, so ticks would stack on the left edge.
  * The chart keeps its lines and renders no axis, which is the honest reading of
- * "no time has passed yet".
+ * "no time has passed yet". `AxisDates` carries the SAME gate, from the same
+ * predicate, so the two halves of one axis cannot come to disagree about whether
+ * there is an axis.
  *
- * ⚠ NO GUTTER IS RESERVED, and the labels are drawn OVER the full-bleed plot.
- * `geometry.ts` is FULL-BLEED by construction ("X spans the whole width and Y
- * the whole height, no axis gutter") and it is outside this task's allow-list;
- * more to the point, the shipped `expanded` axis and `ProfileChart` both already
- * place their labels at `y = VIEWBOX_H − 8` over the plot, so this is the
- * established treatment rather than a new one. d5's `18px` gutter is a VALUE and
- * is not taken.
- *
- * ⚠ TOKENS, NEVER HEX. The tick is `--color-n2` — index-wise the same role d5
- * gives its `--n2` dotted rule: a faint gridline one step off the surface. The
- * label reuses `fill-n5 text-[10px]`, byte-identical to the `expanded` labels
- * eight lines below and to `ProfileChart`'s, so the three axes cannot drift. The
- * dash pattern `5 4` is byte-carried from `ProfileChart.tsx:104`, the shipped
- * dashed stroke on `main` — d5 says `dotted` and gives no numbers, so inventing
- * a pattern would have been the value this task may not take.
+ * ⚠ TOKENS, NEVER HEX. `--color-n2` — index-wise the same role d5 gives its `--n2`
+ * dotted rule. The dash pattern `5 4` is byte-carried from `ProfileChart.tsx:104`,
+ * the shipped dashed stroke on `main`; d5 says `dotted` and gives no numbers, so
+ * inventing a pattern would have been a value this component may not take.
  */
-function CollapsedAxis({
+function CollapsedTicks({
 	series,
 	startMs,
 	endMs,
@@ -1251,41 +1423,46 @@ function CollapsedAxis({
 	startMs: number;
 	endMs: number;
 }): React.JSX.Element | null {
-	if (series.length < 2 || endMs === startMs) {
+	if (!drawsTimeAxis("collapsed", series, startMs, endMs)) {
 		return null;
 	}
-	// The two interior anchors: a fixed third and two-thirds of the WINDOW,
-	// FLOORED TO UTC MIDNIGHT. Both are instants on a constant span, so every
-	// market's axis carries the same two dates — the property the fixed window
-	// exists to buy.
+	// ⛔ THE TICKS FOLLOW THE ANCHORS SINCE CHART-7, AND ONLY THE INTERIOR ONES.
+	// They used to sit at a fixed third and two-thirds of the WINDOW, floored to
+	// UTC midnight — which was the right rule while the axis described the window,
+	// and is the wrong one now that it describes the calendar: a tick at a third of
+	// the span, under a label reading `Sep 15`, is a rule drawn at a time nothing
+	// names.
 	//
-	// ⛔ THE FLOOR IS WHY THE TICK AND ITS LABEL AGREE. A raw third of the
-	// production window is 2026-10-02T07:55Z and a raw two-thirds is
-	// 2026-10-19T15:50Z — so an unfloored rule draws the gridline 8 and 16 hours
-	// right of the midnight its label names, which is 4.09 and 8.18 user units.
-	// Under the superseded series-anchored rule tick and label were the same
-	// point BY CONSTRUCTION and could not disagree; a fixed span reintroduces the
-	// gap, and it is a small instance of the shape this file rejects everywhere
-	// else — a mark drawn at a time that is not the time written under it.
-	// Flooring costs perfectly even spacing, which nothing requires, and buys an
-	// axis whose labels are true. Raised by `@security-auditor` at the cascade.
-	const interior = [1 / 3, 2 / 3].map((f) => {
-		const raw = new Date(startMs + (endMs - startMs) * f);
-		return new Date(
-			Date.UTC(raw.getUTCFullYear(), raw.getUTCMonth(), raw.getUTCDate()),
-		).toISOString();
-	});
+	// ⚠ AN ANCHOR AT THE PLOT'S EDGE GETS NO TICK, WHICH IS WHY THIS FILTERS RATHER
+	// THAN DRAWING ALL OF THEM. On production the card's two anchors ARE the plot's
+	// edges, so it draws none — a `vector-effect` rule at x = 0 is half outside the
+	// viewBox and renders as a half-pixel smear along the border, which reads as a
+	// rendering fault rather than as an axis. On staging `Sep 15` is interior and
+	// gets its rule. The two environments differing here is the ruling working, not
+	// a defect: the anchors are calendar dates and the windows are not the same.
+	//
+	// ⛔ THE FLOORING WENT WITH THE THIRDS AND IS NOT MISSED. It existed because a
+	// raw third of the production window is `2026-10-02T07:55Z` — eight hours right
+	// of the midnight its label named, so tick and label disagreed by 4.09 user
+	// units. The anchors are already midnight-aligned instants (and `Nov 5` is the
+	// ratified 23:45 deadline, which is the instant it names), so tick and label
+	// read the SAME value and cannot diverge. Raised by `@security-auditor` at the
+	// CHART-3 cascade; discharged by construction here.
+	const interior = drawnAnchors("collapsed", startMs, endMs).filter(
+		({ iso }) => {
+			const x = xPx(iso, startMs, endMs);
+			return x > 0 && x < VIEWBOX_W;
+		},
+	);
 
 	return (
 		<>
-			{interior.map((at, i) => (
+			{interior.map(({ iso, i }) => (
 				<line
-					// Index-keyed on purpose: these two are a FIXED PAIR of positions
-					// (first third, second third), not an identity-bearing list.
-					key={`tick-${i === 0 ? "first" : "second"}`}
-					data-testid={`axis-x-tick-${i === 0 ? "first" : "second"}`}
-					x1={xPx(at, startMs, endMs)}
-					x2={xPx(at, startMs, endMs)}
+					key={`tick-${i}`}
+					data-testid={`axis-x-tick-${i}`}
+					x1={xPx(iso, startMs, endMs)}
+					x2={xPx(iso, startMs, endMs)}
 					y1={0}
 					y2={VIEWBOX_H}
 					stroke="var(--color-n2)"
@@ -1294,36 +1471,227 @@ function CollapsedAxis({
 					vectorEffect="non-scaling-stroke"
 				/>
 			))}
-			{interior.map((at, i) => (
-				<text
-					key={`lab-${i === 0 ? "first" : "second"}`}
-					data-testid={`axis-x-label-${i === 0 ? "first" : "second"}`}
-					x={xPx(at, startMs, endMs)}
-					y={VIEWBOX_H - 8}
-					className="fill-n5 text-[10px]"
-					textAnchor="middle"
-				>
-					{fmtUtcDay(at)}
-				</text>
-			))}
-			{/* `.xlab.end` (`d5:499`) — right-anchored at the domain's end, so it
-			    cannot overflow the viewBox the way a centred label would.
-			    ⚠ It names the WINDOW's end, not the series' — CHART-3. It sits at
-			    `x = VIEWBOX_W`, which under a fixed axis is the window's end and no
-			    longer the last event, so labelling it with the last event's day
-			    would print a date at a position that is not that date. */}
-			<text
-				data-testid="axis-x-label-end"
-				x={VIEWBOX_W}
-				y={VIEWBOX_H - 8}
-				className="fill-n5 text-[10px]"
-				textAnchor="end"
-			>
-				{fmtUtcDay(new Date(endMs).toISOString())}
-			</text>
 		</>
 	);
 }
+
+/**
+ * Whether a mode draws a time axis at all — ONE predicate, read by both halves.
+ *
+ * ⛔ THE TWO HALVES OF ONE AXIS MUST NOT BE ABLE TO DISAGREE. The ticks are SVG
+ * and the dates are HTML, so they live in different trees and are mounted by
+ * different expressions; before CHART-7 they were one component and the gate was
+ * structural. Split apart, "ticks but no dates" and "dates but no ticks" both
+ * become reachable by editing one arm — and both look deliberate on screen.
+ *
+ * ⚠ THE PER-MODE GATES ARE CARRIED, NOT UNIFIED, and that is deliberate restraint
+ * rather than an oversight. The collapsed card has required ≥2 points since
+ * HTML-FINISH R8; the expanded overlay has required ≥1 since CHART-1. Both are
+ * shipped, measured behaviour that nothing in this task's register asks to move,
+ * and unifying them would change what a one-point market renders on a surface
+ * nobody ruled about. `endMs === startMs` is unreachable under a constant window
+ * and is kept because `xPx` still has the branch.
+ */
+function drawsTimeAxis(
+	mode: ChartMode,
+	series: PricePoint[],
+	startMs: number,
+	endMs: number,
+): boolean {
+	if (endMs === startMs) {
+		return false;
+	}
+	switch (mode) {
+		case "collapsed":
+			return series.length >= 2;
+		case "expanded":
+			return series.length > 0;
+		case "hero":
+			// ⛔ REVERSED AT CHART-7 (RF-4, founder ruling D20(b)/D21(b)). This arm
+			// returned `false` on the ground that "three date labels along the bottom
+			// of a carousel panel a reader flicks past are noise rather than
+			// orientation, and Discovery's job is to say whether a market has moved,
+			// not when." That was a canon-jurisdiction presentational call and the
+			// founder has taken it the other way: RF-4's table names `expanded` AND
+			// `hero`, and the canon text it ratifies reads "plus `Oct 1` on the wider
+			// modes". The hero is the widest of the three — 624.62 px against the
+			// overlay's 848 in width but the TALLEST at 418.75 — so the argument from
+			// crowding does not hold there either.
+			return series.length > 0;
+		default: {
+			const exhaustive: never = mode;
+			return exhaustive;
+		}
+	}
+}
+
+/** One drawn date label: where it sits, what it says, and how it hangs off its
+ * own x. */
+type AxisDate = {
+	readonly testId: string;
+	readonly at: string;
+	readonly x: number;
+	readonly anchor: "start" | "middle" | "end";
+};
+
+/**
+ * The date labels a mode draws, in order.
+ *
+ * ⚠ THE ANCHORING IS A PURE FUNCTION OF THE X, NEVER OF THE INDEX, and that is
+ * the form that survives RF-4. A label at the plot's left edge must hang to the
+ * RIGHT of its x or half of it is outside the box; one at the right edge must
+ * hang left; everything between is centred on the tick it names. Written as
+ * "first label → start-anchored" it would be right on a window whose first
+ * label sits at x = 0 and wrong the moment one sits inside the plot — which is
+ * exactly what the calendar anchors do on staging.
+ */
+function axisDatesFor(
+	mode: ChartMode,
+	series: PricePoint[],
+	startMs: number,
+	endMs: number,
+): readonly AxisDate[] {
+	if (!drawsTimeAxis(mode, series, startMs, endMs)) {
+		return [];
+	}
+	const at = (iso: string, testId: string): AxisDate => {
+		const x = xPx(iso, startMs, endMs);
+		return {
+			testId,
+			at: iso,
+			x,
+			anchor: x <= 0 ? "start" : x >= VIEWBOX_W ? "end" : "middle",
+		};
+	};
+	return drawnAnchors(mode, startMs, endMs).map(({ iso, i }) =>
+		at(iso, `axis-x-anchor-${i}`),
+	);
+}
+
+/**
+ * Which anchors this chart draws — the shipped list, bound to the pure selector.
+ *
+ * ⛔ ONE BINDING SITE FOR THE REAL CONSTANT, AND IT IS THE ONLY THING THIS WRAPPER
+ * DOES. `axisAnchorsFor` takes the list as a parameter so a guard can drive it
+ * through a synthetic window (see its docblock); that flexibility is exactly what
+ * must NOT reach the render, or a caller could pass a fixture list and the product
+ * would label dates nobody ruled. The component has one source and names it here.
+ */
+function drawnAnchors(
+	mode: ChartMode,
+	startMs: number,
+	endMs: number,
+): readonly { readonly iso: string; readonly i: number }[] {
+	return axisAnchorsFor(MARKET_CHART_AXIS_ANCHORS, mode, startMs, endMs);
+}
+
+/**
+ * The X axis's date labels — HTML text layered over the plot, outside the `<svg>`
+ * (CHART-7, RF-3).
+ *
+ * ⛔ THEY WERE THE LAST TEXT INSIDE THE STRETCHED VIEWBOX, AND THAT IS THE WHOLE
+ * REASON THEY MOVED. `C-CHART-2` clause 2 sent `YES`/`NO` out at CHART-2 because
+ * `preserveAspectRatio="none"` scales user space by a factor that differs per
+ * surface, so nothing applied inside it can be right at more than one size. The
+ * date row was left behind on the stated ground that moving it "would mean
+ * re-deriving every tick's x in CSS space" — a real objection when it was
+ * written, and one CHART-6 answered by building `labelLeftPct` for the end
+ * labels. The derivation already exists; this reuses it.
+ *
+ * ⛔ AND RF-3 IS NOT SATISFIABLE WITHOUT THE MOVE, WHICH IS THE ARGUMENT RATHER
+ * THAN A CONVENIENCE. Measured on the unchanged tree, in the shipped face: ONE
+ * declaration of `10px` rendered a **7.70 px** box on the collapsed card and a
+ * **16.00 px** box on the expanded overlay — a factor of 2.08. RF-3 asks for the
+ * dates to be made bigger AND checked against the numeric marks' 10 px so the two
+ * scales do not fight; against the marks the collapsed dates were 23 % SMALLER
+ * and the expanded ones 60 % LARGER, in opposite directions, from one number. No
+ * declared value inside the viewBox fixes both. Out here, `AXIS_DATE_PX` is that
+ * many pixels on every surface.
+ *
+ * ⚠ `aria-hidden` AND `pointer-events-none`, BOTH REGRESSION FIXES RATHER THAN
+ * TIDINESS — the same two `TerminalLabels` carries and for the same reasons.
+ * Inside the `aria-hidden` `<svg>` these strings were excluded from every
+ * accessible name; out here they are ordinary HTML inside the collapsed card's
+ * `<button>`, so they would JOIN its accessible name and read three bare dates in
+ * front of the sentence that IS the readout. And this layer covers the plot,
+ * which on that card and on the hero IS the affordance, so without
+ * `pointer-events-none` it would swallow clicks.
+ */
+function AxisDates({
+	mode,
+	series,
+	startMs,
+	endMs,
+}: {
+	mode: ChartMode;
+	series: PricePoint[];
+	startMs: number;
+	endMs: number;
+}): React.JSX.Element | null {
+	const dates = axisDatesFor(mode, series, startMs, endMs);
+	if (dates.length === 0) {
+		return null;
+	}
+	return (
+		<div
+			data-testid="axis-date-row"
+			aria-hidden="true"
+			className="pointer-events-none absolute inset-0 leading-none text-n5 tabular-nums"
+			style={{ fontSize: `${AXIS_DATE_PX}px` }}
+		>
+			{dates.map((d) => (
+				<span
+					key={d.testId}
+					data-testid={d.testId}
+					data-plot-x={d.x}
+					className={`absolute whitespace-nowrap${
+						d.anchor === "end"
+							? " -translate-x-full"
+							: d.anchor === "middle"
+								? " -translate-x-1/2"
+								: ""
+					}`}
+					style={{
+						left: `${labelLeftPct(d.x)}%`,
+						bottom: `${AXIS_DATE_BOTTOM_PX}px`,
+					}}
+				>
+					{fmtUtcDay(d.at)}
+				</span>
+			))}
+		</div>
+	);
+}
+
+/**
+ * The date row's type size, in CSS PIXELS, and the air beneath it.
+ *
+ * ⛔ 12, NOT 10, AND THE DIFFERENCE IS THE RULING. RF-3 says the dates are too
+ * small and asks that the result be checked against the marks' size "so the two
+ * scales do not fight". Ten would make them identical to the numeric marks — and
+ * identical is the one relation that DOES fight, because the two scales then
+ * compete to be read as the same system. Twelve reads as the axis: a step above
+ * the marks, plainly the frame rather than a value on it, and still close enough
+ * that neither dominates. Against what shipped, the collapsed card's dates go
+ * from a **7.70 px** rendered box to **12 px** — the increase the ruling asks
+ * for — and the expanded overlay's come DOWN from 16.00, which is not a
+ * regression but the removal of a distortion nobody chose.
+ *
+ * ⚠ `AXIS_DATE_BOTTOM_PX` IS THE ROW'S OWN OFFSET FROM THE PLOT'S FLOOR, and it
+ * is load-bearing beyond spacing: `lowerTop` reserves `AXIS_DATE_PX +
+ * AXIS_DATE_BOTTOM_PX` as a band the lower end label may not enter, so this pair
+ * is the measured input to `C-CHART-2` clause 3's date-row clearance. Change
+ * either and the clamp follows, because the band is composed from them rather
+ * than written down a second time.
+ */
+const AXIS_DATE_PX = 12;
+const AXIS_DATE_BOTTOM_PX = 4;
+
+/** The whole height the date row occupies above the plot's floor — the band
+ * `lowerTop` may not put a label into (`C-CHART-2` clause 3, RF-5). Composed from
+ * the two constants above rather than written as a third number, so the clamp and
+ * the row can never disagree about how tall the row is. */
+const AXIS_DATE_BAND_PX = AXIS_DATE_PX + AXIS_DATE_BOTTOM_PX;
 
 /** An SVG `points` string for one line. With fewer than two points OR a
  * degenerate domain (`startMs === endMs`), draws a FLAT LINE from the left edge

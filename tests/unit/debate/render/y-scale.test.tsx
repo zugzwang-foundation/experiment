@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
 	gridlinesFor,
-	hasFullYScale,
+	hasEndValue,
 	labelTopPct,
 	SVG_W,
 	VIEWBOX_H,
@@ -34,7 +34,12 @@ import type { PricePoint } from "@/server/discovery/price-series";
 // the intended signal.
 const LABEL_NAME_PX = 10;
 const LABEL_VALUE_PX = 16;
-const LABEL_STACK_GAP_PX = 2;
+/** ⚠ THE GAP CHANGED AXIS AND NAME AT CHART-7 (RF-2). It was `LABEL_STACK_GAP_PX
+ * = 2`, a `margin-top` under a value stacked beneath its name; the founder ruled
+ * the two onto ONE line, so it is a `margin-left` beside the value and its
+ * measured basis is Geist's own space advance at 16 px (4.39, floored). It no
+ * longer enters the box's HEIGHT — that is what narrows the collision band. */
+const LABEL_INLINE_GAP_PX = 4;
 /** The numeric marks' OWN type size — `YMarks` declares `text-[10px]` for itself.
  * ⚠ MIRRORED SEPARATELY FROM `LABEL_NAME_PX` EVEN THOUGH BOTH ARE 10, because
  * `markTop`'s docblock exists precisely to stop the marks' edge clamp reading the
@@ -70,40 +75,51 @@ describe("C-CHART-1 clause 1 (CHART-5) — the gridline set is a pure function o
 		// before `flex-1` grows it; the figure was a mis-read of the CSS, not a
 		// measurement. Founder-ruled at CHART-6: the hero carries what the overlay
 		// carries.
+		// ⚠ `0` JOINED THE COLLAPSED SET AT CHART-7 (RF-3, founder ruling). With
+		// both extremes labelled the five lines read as a frame; four starting at 25
+		// read as rules someone drew. It also makes moot the never-ruled question
+		// the CHART-5 sheet rendered both ways — whether the `100` line is redundant
+		// against the card's border — because paired with a `0` it is the top of a
+		// scale rather than a stray edge.
 		expect(gridlinesFor("collapsed").map((g) => g.pct)).toEqual([
-			25, 50, 75, 100,
+			0, 25, 50, 75, 100,
 		]);
 		const TEN_STEP = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 		expect(gridlinesFor("expanded").map((g) => g.pct)).toEqual(TEN_STEP);
 		expect(gridlinesFor("hero").map((g) => g.pct)).toEqual(TEN_STEP);
 	});
 
-	it("`hasFullYScale` and `gridlinesFor` cannot come to disagree", () => {
+	it("`hasEndValue` and `gridlinesFor` cannot come to disagree", () => {
 		// ⛔ TWO INDEPENDENT DECLARATIONS OF ONE RULING, TIED TOGETHER HERE RATHER
 		// THAN BY ONE CALLING THE OTHER. `gridlinesFor` keeps an exhaustive `switch`
 		// because that is what turns a fourth surface into a COMPILE error rather
-		// than a chart silently shipping with no scale; `hasFullYScale` is a
-		// predicate three other call sites read. Neither can be expressed in terms
+		// than a chart silently shipping with no scale; `hasEndValue` is a
+		// predicate two other call sites read. Neither can be expressed in terms
 		// of the other without losing what it is for — so the agreement is asserted.
 		//
-		// ⚠ What a drift would ship: a mode with eleven gridlines and no numeric
-		// marks, or marks against the quarters. Both look deliberate.
+		// ⚠ WHAT THIS PAIR MEANS CHANGED AT CHART-7 AND THE ASSERTION IS RE-SEATED
+		// RATHER THAN DELETED. The predicate used to govern the marks column too, so
+		// "eleven gridlines ⇔ the full treatment" was the whole ruling. RF-1/RF-3 put
+		// the marks on EVERY mode, so what the two now have to agree about is
+		// narrower and still real: the ten-step set and the value line ride the same
+		// surfaces, and a mode that gained one without the other would either overlap
+		// its own labels or carry a value nobody sized a box for.
 		for (const mode of ["collapsed", "expanded", "hero"] as const) {
 			expect(
 				gridlinesFor(mode).length === 11,
-				`${mode}: gridline set and hasFullYScale disagree`,
-			).toBe(hasFullYScale(mode));
+				`${mode}: gridline set and hasEndValue disagree`,
+			).toBe(hasEndValue(mode));
 		}
 		// Non-vacuity: the predicate really does discriminate, so the loop above is
 		// not three trivially-true comparisons.
 		expect(
 			new Set(
-				["collapsed", "expanded", "hero"].map((m) => hasFullYScale(m as never)),
+				["collapsed", "expanded", "hero"].map((m) => hasEndValue(m as never)),
 			).size,
 		).toBe(2);
 
 		// ⛔ THE DIRECTION OF THE NEGATION, WHICH THE DOCBLOCK CALLS LOAD-BEARING AND
-		// NOTHING GUARDED (`@test-writer`, M-2). `hasFullYScale` is written as "not
+		// NOTHING GUARDED (`@test-writer`, M-2). `hasEndValue` is written as "not
 		// collapsed" rather than "expanded or hero" so that a FOURTH surface joins
 		// the full treatment by default and is excluded deliberately. Rewritten as a
 		// list — `mode === "expanded" || mode === "hero"` — every assertion above
@@ -113,8 +129,8 @@ describe("C-CHART-1 clause 1 (CHART-5) — the gridline set is a pure function o
 		// exact failure `gridlinesFor`'s exhaustive switch turns into a COMPILE error,
 		// and the predicate must not be the soft spot beside it.
 		expect(
-			hasFullYScale("a-fourth-surface" as never),
-			"hasFullYScale must be written as a negation of `collapsed`, so an unrecognised mode gets the FULL scale rather than none",
+			hasEndValue("a-fourth-surface" as never),
+			"hasEndValue must be written as a negation of `collapsed`, so an unrecognised mode gets the value line rather than none",
 		).toBe(true);
 	});
 
@@ -174,7 +190,8 @@ describe("C-CHART-1 clause 1 (CHART-5) — the gridline set is a pure function o
 		const pcts = (m: string) =>
 			[...m.matchAll(/<line data-pct="(\d+)"/g)].map((x) => Number(x[1]));
 		const TEN_STEP = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
-		expect(pcts(collapsed)).toEqual([25, 50, 75, 100]);
+		const QUARTERS = [0, 25, 50, 75, 100];
+		expect(pcts(collapsed)).toEqual(QUARTERS);
 		expect(pcts(expanded)).toEqual(TEN_STEP);
 
 		// ⛔ THE HERO NOW CARRIES THE SAME ELEVEN, and the MUST-REJECT inverted with
@@ -185,11 +202,11 @@ describe("C-CHART-1 clause 1 (CHART-5) — the gridline set is a pure function o
 		// make the same market two different pictures on two surfaces.
 		expect(hero).toContain('data-testid="chart-gridlines"');
 		expect(pcts(hero)).toEqual(TEN_STEP);
-		expect(pcts(hero)).not.toEqual([25, 50, 75, 100]);
+		expect(pcts(hero)).not.toEqual(QUARTERS);
 
 		// POSITIVE CONTROL — the same matcher tells the two sets apart, so the
 		// equalities above are readings rather than one pattern matching everything.
-		expect(pcts(collapsed).length).toBe(4);
+		expect(pcts(collapsed).length).toBe(5);
 		expect(pcts(hero).length).toBe(11);
 	});
 
@@ -309,13 +326,21 @@ describe("discovery::hero-chart-carries-y-scale — C-CHART-1 clause 1 (CHART-6)
 		expect(markup("hero")).toContain('data-testid="chart-y-marks"');
 		expect(marks(markup("hero"))).toEqual(TEN_STEP);
 
-		// MUST REJECT: numbers on the collapsed card. It DOES carry gridlines and
-		// deliberately carries no figures — its box is 193.8 px and already holds
-		// three date labels along the bottom. Deriving the marks from "does this
-		// mode have gridlines?" would have given it four numbers nobody ruled for,
-		// which is why the predicate is `hasFullYScale` and not `grid.length > 0`.
-		expect(markup("collapsed")).not.toContain('data-testid="chart-y-marks"');
-		expect(marks(markup("collapsed"))).toEqual([]);
+		// ⛔ REVERSED AT CHART-7 (RF-3, founder ruling): THE COLLAPSED CARD NOW
+		// CARRIES MARKS. This case used to assert the opposite — *"MUST REJECT:
+		// numbers on the collapsed card … which is why the predicate is
+		// `hasFullYScale` and not `grid.length > 0`"* — on the ground that its box is
+		// short and already holds a date row. The founder ruled the other way: the
+		// card gets a full left scale, and the numbers are what make the gridlines
+		// read as a scale rather than as stray rules.
+		//
+		// ⚠ THE SET IS STILL PER-MODE AND THAT IS THE HALF THAT SURVIVED. The card
+		// takes the quarters, not the ten-step — eleven numbers down a 193.8 px box
+		// would be 18 px apart and read as hatching. So the predicate the marks
+		// column reads really is `grid.length > 0` now, and `gridlinesFor` is what
+		// keeps the two sets apart.
+		expect(markup("collapsed")).toContain('data-testid="chart-y-marks"');
+		expect(marks(markup("collapsed"))).toEqual([0, 25, 50, 75, 100]);
 	});
 
 	it("the marks column is SIZED, never pinned — the CHART-2 mechanism, reused", () => {
@@ -515,10 +540,17 @@ describe("C-CHART-2 clause 2 (CHART-5) — the end value can never disagree with
 });
 
 describe("C-CHART-2 clause 4 (CHART-5) — one collision rule, two measured inputs", () => {
-	it("the overlay's floor is the TALLER two-line box; the others are unchanged", () => {
+	it("the value-bearing floor is the TALLER of the two type sizes; the others are unchanged", () => {
 		// The half-box is composed from the type the label is actually made of:
-		// one line → 10/2 = 5; two lines → (10 + 2 + 16)/2 = 14. Asserted through
-		// the CSS the component emits, because that string IS the rule at runtime.
+		// name alone → 10/2 = 5; name AND value → max(10, 16)/2 = 8. Asserted
+		// through the CSS the component emits, because that string IS the rule at
+		// runtime.
+		// ⛔ IT WAS `(10 + 2 + 16)/2 = 14` UNTIL CHART-7, AND THE CHANGE IS RF-2's
+		// WHOLE MECHANICAL CONSEQUENCE. While the value sat BENEATH the name the box
+		// was the sum of both lines plus the air between them. Side by side they
+		// share one line box, the horizontal gap contributes nothing to its height,
+		// and the box is the taller of the two. Clause 4's rule is untouched; the
+		// number handed to it halved, so the collision band narrows.
 		// ⛔ READ OFF THE MARKUP, NOT OFF THE DOM, AND THIS IS A TRAP THAT COST THIS
 		// FILE A ROUND OF FALSE REDS. jsdom's CSS parser does not understand
 		// `clamp()` / `min()` / `max()`, so assigning one through React's style
@@ -577,25 +609,47 @@ describe("C-CHART-2 clause 4 (CHART-5) — one collision rule, two measured inpu
 			/terminal-value-yes"[^>]*style="[^"]*font-size:(\d+)px/,
 			"the value's type size",
 		);
-		const stackGap = num(
-			/terminal-value-yes"[^>]*margin-top:(\d+)px/,
-			"the stack gap",
+		// ⛔ THE GAP IS READ AS A MARGIN-LEFT AND ITS VERTICAL TWIN IS BANNED, WHICH
+		// IS WHERE THIS CASE ALSO BECOMES RF-2's GUARD. A value re-stacked beneath
+		// its name would emit `margin-top` again, and the box would grow back to 28
+		// while this floor stayed at 8 — the two labels then sit 16 px apart around
+		// 28 px boxes and OVERLAP across the band where every market rests. That is
+		// the exact failure CHART-6 shipped in the other direction, so it is
+		// asserted rather than assumed.
+		const inlineGap = num(
+			/terminal-value-yes"[^>]*margin-left:(\d+)px/,
+			"the inline gap",
 		);
-		const expandedHalf = (nameSize + stackGap + valueSize) / 2;
+		expect(inlineGap).toBeGreaterThan(0);
+		expect(em).not.toMatch(/terminal-value-yes"[^>]*margin-top:/);
+		// ⚠ THE GAP IS DELIBERATELY NOT IN THE HEIGHT. It is read above so that a
+		// change to it reddens the read rather than passing unnoticed, and then it
+		// is excluded from the composition on purpose — one line box, so only the
+		// taller of the two type sizes can set the height.
+		const expandedHalf = Math.max(nameSize, valueSize) / 2;
 		for (const top of topsOf("expanded")) {
 			expect(top).toContain(`clamp(${expandedHalf}px,`);
-			expect(top).toContain(`calc(100% - ${expandedHalf}px)`);
+			// ⚠ THE BOTTOM BOUND CARRIES A SECOND TERM SINCE CHART-7 (RF-5) — the
+			// X-axis date row, which the lower label may not enter. `C-CHART-2` clause
+			// 3: one clamp, one more measured input, never a second rule. The band's
+			// own composition is asserted in `label-anchor.test.tsx`; here it is enough
+			// that the half-box term is still the one this case is about.
+			expect(top).toMatch(
+				new RegExp(`calc\\(100% - ${expandedHalf}px( - \\d+px)?\\)`),
+			);
 		}
-		// ⛔ THE HERO NOW TAKES THE TALLER FLOOR TOO, AND THAT PAIRING IS THE POINT
-		// RATHER THAN A CONSEQUENCE. Its label grew a second line at CHART-6; a mode
-		// that gained the value line while keeping the 5px floor would push its two
-		// labels only 10px apart around a 28px box, so they would OVERLAP across the
-		// 46–54 % band — where every market rests. That is why the component reads
-		// one `hasFullYScale` for the value and the floor rather than two `mode ===`
+		// ⛔ THE HERO TAKES THE TALLER FLOOR TOO, AND THAT PAIRING IS THE POINT
+		// RATHER THAN A CONSEQUENCE. Its label gained the value at CHART-6; a mode
+		// that gained the value while keeping the 5px floor would push its two
+		// labels only 10px apart around a 16px box, so they would OVERLAP across the
+		// near-even band — where every market rests. That is why the component reads
+		// one `hasEndValue` for the value and the floor rather than two `mode ===`
 		// tests that can be updated one at a time.
 		for (const top of topsOf("hero")) {
 			expect(top).toContain(`clamp(${expandedHalf}px,`);
-			expect(top).toContain(`calc(100% - ${expandedHalf}px)`);
+			expect(top).toMatch(
+				new RegExp(`calc\\(100% - ${expandedHalf}px( - \\d+px)?\\)`),
+			);
 		}
 		// MUST REJECT: the wider threshold leaking onto the one-line collapsed card.
 		for (const top of topsOf("collapsed")) {
@@ -789,18 +843,19 @@ describe("CHART-5 — a mark is BOUND to its gridline, and the column obeys the 
 			expect(el?.style.width ?? "").toBe("");
 			expect(el?.style.maxWidth ?? "").toBe("");
 		}
-		// The value line is still there, at its own type size and its own stack
-		// gap, so this case is about an unclipped label rather than an absent one.
-		// ⚠ ALL THREE MIRRORED CONSTANTS ARE SPENT HERE, and that is deliberate:
-		// `labelHalfBoxPx` composes the collision floor from exactly this sum
-		// (`name + gap + value`), so a stack gap that drifted without the floor
-		// following it would widen the label's real box past the threshold meant to
-		// separate two of them — silently, in the band where every market rests.
-		// The gap had no assertion at all once CHART-6 retired the sizer that used
-		// to carry it.
+		// The value is still there, at its own type size and its own inline gap, so
+		// this case is about an unclipped label rather than an absent one.
+		// ⚠ THE GAP MOVED AXIS AT CHART-7 AND THE ASSERTION MOVED WITH IT. It was a
+		// `margin-top` under a stacked value and is a `margin-left` beside an inline
+		// one. The reason for pinning it is unchanged and now cuts the other way:
+		// `labelHalfBoxPx` composes the collision floor from the type sizes ALONE,
+		// so a gap that reverted to `margin-top` would grow the label's real box
+		// from 16 px back to 28 while the floor stayed at 8 — silently, in the band
+		// where every market rests.
 		const m = markup("expanded");
 		expect(m).toContain(`font-size:${LABEL_VALUE_PX}px`);
-		expect(m).toContain(`margin-top:${LABEL_STACK_GAP_PX}px`);
+		expect(m).toContain(`margin-left:${LABEL_INLINE_GAP_PX}px`);
+		expect(m).not.toMatch(/terminal-value-(yes|no)"[^>]*margin-top:/);
 		expect(m).toContain('data-testid="terminal-value-yes"');
 
 		// POSITIVE CONTROL — the width ban fires on the forms it is written against
@@ -829,12 +884,20 @@ describe("C-CHART-2 clause 4 (CHART-6) — the CSS floor holds across the whole 
 		// plot space says — so on the hero the separation the reader actually sees
 		// changed from 10 px to 28 px, and nothing swept that.
 		//
-		// ⛔ THE FAILURE IT MUST REJECT is a hero that took the value line and kept
-		// the 5 px floor: two 28 px boxes with 10 px between their centres, i.e.
-		// overlapping by 18 px, across the band where every market rests. That ships
-		// green against every plot-space assertion in the repository, because in plot
-		// space nothing moved — the exact shape CHART-2's cascade already caught once.
-		const HALF = { collapsed: 5, expanded: 14, hero: 14 } as const;
+		// ⛔ AND CHART-7 MOVED IT BACK DOWN, ON BOTH VALUE-BEARING SURFACES. RF-2
+		// puts name and value on ONE line, so the box is `max(10, 16) = 16` rather
+		// than `10 + 2 + 16 = 28`, and the floor is 8 rather than 14. **The rule is
+		// untouched and its input halved** — which is the same sentence CHART-5
+		// wrote going the other way.
+		//
+		// ⛔ THE FAILURE IT MUST REJECT is unchanged in shape and only in sign: a
+		// surface whose label box and whose floor disagree. A value re-stacked
+		// beneath its name against an 8 px floor gives two 28 px boxes 16 px apart —
+		// overlapping by 12 px, across the band where every market rests — and it
+		// ships green against every plot-space assertion in the repository, because
+		// in plot space nothing moved. That is the exact shape CHART-2's cascade
+		// caught once and CHART-6's caught again.
+		const HALF = { collapsed: 5, expanded: 8, hero: 8 } as const;
 
 		for (const mode of ["collapsed", "expanded", "hero"] as const) {
 			const half = HALF[mode];
@@ -910,10 +973,17 @@ describe("CHART-5/6 — RF-4 payload budget", () => {
 			expect(marks.length, `${mode}: marks slice is empty`).toBeGreaterThan(
 				100,
 			);
+			// ⚠ PER-MODE SINCE CHART-7, AND PINNED AS LITERALS RATHER THAN DERIVED
+			// FROM `gridlinesFor`. This is the non-vacuity floor on the SLICE — it
+			// proves the byte region really contains the column — so reading its
+			// expectation out of the module under test would make it agree with
+			// whatever that module currently does, which is the one thing a floor
+			// must not do. The collapsed card carries the quarters; the two wider
+			// modes carry the ten-step.
 			expect(
 				[...marks.matchAll(/data-testid="y-mark-\d+"/g)].length,
 				`${mode}: marks slice does not contain the marks`,
-			).toBe(11);
+			).toBe(mode === "collapsed" ? 5 : 11);
 		}
 		return Buffer.byteLength(grid, "utf8") + Buffer.byteLength(marks, "utf8");
 	}
@@ -935,8 +1005,31 @@ describe("CHART-5/6 — RF-4 payload budget", () => {
 		const hero = yScaleBytes("hero");
 		const expanded = yScaleBytes("expanded");
 
-		// `/m/[slug]`: the card's four lines, no marks.
-		expect(collapsed).toBeLessThan(1500);
+		// ⛔⛔ THE CEILINGS ARE RE-SEATED AT CHART-7 AND THE HONEST NUMBER IS OVER
+		// THE BRIEF'S BUDGET. RF-1 and RF-3 give the collapsed card a marks column it
+		// never had and a fifth gridline, so this region grows by design; the
+		// question is by how much, and the answer is bigger than the task's stated
+		// allowance.
+		//
+		// **Measured, whole-chart markup, per page, this branch against `47c3f86`:**
+		//     `/m/[slug]` (collapsed)  3452 → 4609 B   **+1157 B**
+		//     `/`         (hero)       5412 → 6354 B   **+942 B**
+		//     (expanded overlay        5657 → 6386 B   +729 B — in no document until
+		//      it is opened, so it is charged to no page)
+		//
+		// ⚠ THE CHART-7 BRIEF BUDGETS **600 B per page**. Both shipped surfaces
+		// exceed it. That is reported rather than engineered around: the overrun IS
+		// the founder's ruling — a full left scale on a card that had none — and
+		// trimming it would mean removing something ruled. CHART-6 recorded the same
+		// trade in the other direction ("the hero's markup roughly doubles. That is
+		// what a Y scale weighs"). **A founder call, not a test to loosen quietly.**
+		//
+		// The per-region ceilings below are set from the measured values with ~15 %
+		// headroom, so they still catch an unbounded element count — which is what
+		// RF-4's budget rule was for — without pretending the page total is inside
+		// its allowance.
+		// `/m/[slug]`: the card's FIVE lines and its five marks.
+		expect(collapsed).toBeLessThan(1750);
 		// `/`: the hero's eleven lines plus its marks column. Deliberately a
 		// SEPARATE, LARGER ceiling rather than a shared one — it is a different
 		// page, and folding two pages into one number is how a real growth on one

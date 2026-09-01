@@ -86,9 +86,17 @@ export type Gridline = { readonly pct: number; readonly y: number };
  * full panels and both carry every 10 %. Two names for one array would be two
  * places for them to drift apart, so there is one — and the collapsed card's
  * quarters stay separate, because its box genuinely is short.
+ *
+ * ⛔ `0` JOINED THE COLLAPSED SET AT CHART-7 (RF-3, founder ruling), AND IT IS WHAT
+ * MAKES THAT SET READ AS A SCALE. With both extremes labelled the five lines are
+ * plainly a frame — 0 at the floor, 100 at the ceiling, the quarters between —
+ * where four starting at 25 read as rules someone drew. It also disposes, by
+ * making it moot, of the never-ruled question the CHART-5 contact sheet rendered
+ * both ways: whether the `100` line is redundant against the card's own border.
+ * Paired with a `0` it is not a stray edge, it is the top of a scale.
  */
 const GRIDLINES_COLLAPSED: readonly Gridline[] = Object.freeze(
-	[25, 50, 75, 100].map((pct) => Object.freeze({ pct, y: yPctPx(pct) })),
+	[0, 25, 50, 75, 100].map((pct) => Object.freeze({ pct, y: yPctPx(pct) })),
 );
 
 const GRIDLINES_TEN_STEP: readonly Gridline[] = Object.freeze(
@@ -98,27 +106,40 @@ const GRIDLINES_TEN_STEP: readonly Gridline[] = Object.freeze(
 );
 
 /**
- * Whether a mode carries the FULL Y-scale treatment — the 10-step gridlines, the
- * numeric marks column, and the percentage beneath the end label's name.
+ * Whether a mode's end label carries the current VALUE beneath — now beside — its
+ * name (`C-CHART-2` clause 2, CHART-5/CHART-6).
  *
- * ⛔ ONE PREDICATE FOR ALL THREE, BECAUSE THE RULING IS ONE RULING. RF-4 gives the
- * hero *"what expanded has"* as a bundle, and three independent `mode ===
- * "expanded"` comparisons are three places for a fourth surface — or this very
- * amendment — to reach only some of them. The label's half-box in particular
- * composes from whether the value line renders, so a mode that gained the value
- * and not the taller collision floor would overlap its own labels in the band
- * where every market rests.
+ * ⛔ RENAMED FROM `hasFullYScale` AT CHART-7, BECAUSE IT STOPPED BEING TRUE OF THE
+ * NAME IT HAD. It governed three things as one bundle — the ten-step gridlines,
+ * the numeric marks column, and the value line — and RF-1/RF-3 break that bundle
+ * up: **the marks column now renders on every mode**, so its condition is
+ * `grid.length > 0` and not this predicate, and the gridline SET was always
+ * `gridlinesFor`'s business rather than this one's. What is left is the value line
+ * and the collision floor that composes from it. A predicate called
+ * `hasFullYScale` that no longer decides whether a mode has the full Y scale is
+ * the kind of name a maintainer reads instead of reading the code.
+ *
+ * ⛔ IT GOVERNS TWO DECISIONS — AND HAS A THIRD READER, WHICH IS NOT THE SAME
+ * THING. `LabelReserve` reads it to decide whether its invisible sizer carries a
+ * value, and that is not an independent decision: the reserve must be sized by the
+ * label the mode actually renders, so it is the same answer spent a third time
+ * rather than a third policy. If it ever became a policy, this predicate would be
+ * the wrong home for it.
+ * ⛔ THE TWO DECISIONS ARE DELIBERATELY ONE PREDICATE. The label's
+ * half-box composes from whether the value renders, so a mode that gained the
+ * value and kept the one-line floor would overlap its own two labels across the
+ * band where every market rests — the failure this component has shipped once
+ * already. One predicate, so the two cannot be given different answers.
  *
  * ⚠ WRITTEN AS A NEGATION OF `collapsed`, NOT A LIST OF THE OTHER TWO, and that
  * is the direction that survives a fourth surface: a new mode joins the full
  * treatment by default and is corrected deliberately, rather than silently
- * shipping with no scale at all — which is the failure `gridlinesFor`'s exhaustive
- * switch was added to catch and this predicate would otherwise reintroduce.
- * `gridlinesFor` keeps its own switch regardless; the two are tied together by an
- * assertion in `tests/unit/debate/render/y-scale.test.tsx` rather than by one
- * calling the other, so neither can quietly stop agreeing.
+ * shipping without the value. `gridlinesFor` keeps its own exhaustive switch; the
+ * two are tied together by an assertion in
+ * `tests/unit/debate/render/y-scale.test.tsx` rather than by one calling the
+ * other, so neither can quietly stop agreeing.
  */
-export function hasFullYScale(mode: ChartMode): boolean {
+export function hasEndValue(mode: ChartMode): boolean {
 	return mode !== "collapsed";
 }
 
@@ -126,11 +147,18 @@ export function hasFullYScale(mode: ChartMode): boolean {
  * The gridline set for a mode. A pure lookup — see the docblock above for why it
  * must not compute.
  *
- * ⚠ `0` AND `100` LAND EXACTLY ON THE PLOT'S EDGES (y = 320 and y = 0), so on the
- * expanded overlay two of the eleven are boundary rules rather than interior
- * ones. That is deliberate and is the founder's ruled set; whether the `100`
+ * ⚠ `0` AND `100` LAND EXACTLY ON THE PLOT'S EDGES (y = 320 and y = 0), so two of
+ * every set are boundary rules rather than interior ones — two of the eleven on the
+ * wider modes, and, since CHART-7 gave the card its `0`, two of its five as well.
+ * That is deliberate and is the founder's ruled set.
+ * ⚠ THE OPEN QUESTION IT USED TO CARRY IS CLOSED. This said "whether the `100`
  * line is visually redundant against the card border is a ruling the CHART-5
- * contact sheet renders both ways.
+ * contact sheet renders both ways" — RF-3 answers it by adding the `0`: paired
+ * with a floor, the `100` is the top of a scale rather than a stray edge.
+ * ⚠ THE BOUNDARY MARKS DO NOT SIT ON THEIR OWN LINES, AND THAT IS ALSO RULED.
+ * `markTop`'s edge clamp holds them half a box inside the plot — measured 5.00px
+ * off, at every mode and every width — because the column does not clip and an
+ * unclamped `0` would hang below the plot into the date row.
  */
 export function gridlinesFor(mode: ChartMode): readonly Gridline[] {
 	switch (mode) {
@@ -158,6 +186,48 @@ export function gridlinesFor(mode: ChartMode): readonly Gridline[] {
 			return exhaustive;
 		}
 	}
+}
+
+/**
+ * Which of an ordered anchor list a mode draws, each with its INDEX in that list
+ * — `C-CHART-1` clause 1 as amended at CHART-7 (RF-4).
+ *
+ * ⛔ THE LIST IS A PARAMETER, NOT AN IMPORT, AND THAT IS WHAT MAKES THE RULE
+ * TESTABLE. `MARKET_CHART_AXIS_ANCHORS` and the window constants are resolved once
+ * at module load from `ZUGZWANG_ENV`, so a guard that reached them directly could
+ * only ever exercise the one window the suite happens to run under — and BOTH
+ * shipped windows contain all three anchors, which means the out-of-window branch
+ * would never execute. A rule with no reachable case is a rule nobody has checked.
+ * Passing the list and the window in lets the guard drive the real anchors through
+ * a synthetic window, which is the only way to see the filter work.
+ *
+ * ⛔ AN ANCHOR OUTSIDE THE WINDOW IS NOT DRAWN, AND THE CONSEQUENCE IS NOT
+ * COSMETIC. `xPx` is deliberately unclamped in both directions, so an anchor before
+ * the window's start maps to a NEGATIVE x. Inside the `<svg>` that was clipped by
+ * the viewBox; the date labels are HTML since CHART-7 and HTML does not clip, so an
+ * out-of-window anchor escapes the plot and lands on whatever sits beside the
+ * chart.
+ *
+ * ⚠ THE COLLAPSED CARD TAKES THE FIRST AND LAST OF WHAT SURVIVES THE FILTER, never
+ * the first and last of the RAW list. Read off the raw list, a window that excluded
+ * the middle anchor would leave the card labelling one end twice.
+ */
+export function axisAnchorsFor(
+	anchors: readonly string[],
+	mode: ChartMode,
+	startMs: number,
+	endMs: number,
+): readonly { readonly iso: string; readonly i: number }[] {
+	const inWindow = anchors
+		.map((iso, i) => ({ iso, i }))
+		.filter(({ iso }) => {
+			const t = Date.parse(iso);
+			return t >= startMs && t <= endMs;
+		});
+	if (mode !== "collapsed" || inWindow.length <= 2) {
+		return inWindow;
+	}
+	return [inWindow[0], inWindow[inWindow.length - 1]];
 }
 
 /** Terminal dot radius — `C-CHART-2` clause 1. Deliberately NOT `C-CHART-1`
@@ -350,7 +420,8 @@ export function terminalLabelYs(yes: string): { yes: number; no: number } {
 		// from resolution lives exactly there.
 		// ⚠ THE CLIP SURFACE CHANGED AT CHART-2 AND THE CLAMP STILL EARNS ITS
 		// KEEP. It used to be the `<svg>` edge, which clips by default; the labels
-		// are HTML in a gutter now, and a gutter does NOT clip — an unclamped
+		// are HTML in an overlay on the plot now (a GUTTER until CHART-6), and
+		// neither clips — an unclamped
 		// label would instead escape upward past the top of the chart and collide
 		// with whatever the surface puts above it. Different failure, same fix,
 		// and worth saying so rather than leaving a reader to assume the clamp
@@ -371,8 +442,12 @@ export function terminalLabelYs(yes: string): { yes: number; no: number } {
 
 /**
  * A plot-space y (0…`VIEWBOX_H`) as a PERCENTAGE of the plot's rendered height
- * — the one bridge between the SVG's user space and the HTML gutter's CSS
+ * — the one bridge between the SVG's user space and the HTML label layer's CSS
  * space (`C-CHART-2` clause 2, CHART-2).
+ * ⚠ "GUTTER" IS THE WRONG WORD SINCE CHART-6 AND A CONFUSING ONE SINCE CHART-7.
+ * The labels left their gutter for an overlay on the plot at CHART-6; and CHART-7
+ * put two real gutters back in the row — the marks column on the left, the label
+ * RESERVE on the right — neither of which is what this function converts for.
  *
  * ⛔ THIS IS A CONVERSION, NOT A SECOND DERIVATION, and that distinction is the
  * whole reason the collision rule could stay untouched. `terminalLabelYs` still

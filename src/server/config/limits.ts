@@ -337,7 +337,8 @@ const PRODUCTION_CHART_WINDOW: ChartWindow = {
  * measured in days on an environment that is used every day.
  *
  * ⚠ AMENDED AT CHART-5, BECAUSE THE SYMPTOM GOT WORSE. The overlay's end label
- * now carries the current PERCENTAGE beneath the name, so past `end` the failure
+ * carries the current PERCENTAGE — **beside** the name since CHART-7 (RF-2), and
+ * beneath it when this paragraph was written — so past `end` the failure
  * is no longer two colour-coded words naming absent marks — it is two words AND
  * TWO NUMERIC PRICE FIGURES attached to nothing drawn. A reader who cannot see
  * the dots can still read a price off the label. ⚠ CHART-6 widens this: the hero
@@ -432,6 +433,44 @@ export const MARKET_CHART_WINDOW_START = CHART_WINDOW.start;
  * the series never does** — the line stops at the present instant, never at
  * this value. */
 export const MARKET_CHART_WINDOW_END = CHART_WINDOW.end;
+
+/**
+ * The ordered calendar instants the §9 chart's X axis labels (SPEC.1 §16.1,
+ * founder ruling D20(b) + D21(b) at CHART-7).
+ *
+ * ⭐ THESE ARE EXPERIMENT DATES, NOT WINDOW ENDPOINTS, AND THE DISTINCTION IS THE
+ * WHOLE RULING. Before CHART-7 the axis labelled wherever the window happened to
+ * begin and end, so a reader learned the configuration rather than the calendar.
+ * On production the two coincide — the window IS 15 September to 5 November — and
+ * on staging, whose window opens on 17 August because its fixtures predate the
+ * experiment, the first two anchors fall *inside* the plot. **That is correct and
+ * intended: the chart marks launch day even on a window that predates it.**
+ *
+ * ⚠ AN ANCHOR OUTSIDE THE CONFIGURED WINDOW IS NOT DRAWN. Neither environment has
+ * one today; the rule is specified anyway, because the alternative is a label at
+ * a negative x — clipped by the viewBox on the SVG side, and NOT clipped on the
+ * HTML side, where it would escape the plot and land on whatever sits beside the
+ * chart. A rule that only matters under a configuration nobody has yet is exactly
+ * the rule that gets discovered by a screenshot.
+ *
+ * ⛔ ONE ORDERED LIST RATHER THAN THREE SCATTERED DATES, so the set is tunable in
+ * one place, and **resolved here at the constants layer** — SPEC.1 §16.1's
+ * standing rule for this chart's constants, *"never branched on inside the
+ * derivation or the component"*. Unlike the WINDOW, this list takes no
+ * environment branch at all: an experiment date is the same date wherever it is
+ * read, and giving it an env arm would be inventing a variance the ruling does
+ * not have.
+ *
+ * ⚠ WRITTEN IN THE SPEC ROW'S OWN FORM (`…:00Z`, not `…:00.000Z`) so the constant
+ * is byte-comparable with the document that pins it — `MARKET_CHART_WINDOW_START`'s
+ * reason exactly. Every consumer goes through `Date.parse`, which reads the two
+ * spellings identically.
+ */
+export const MARKET_CHART_AXIS_ANCHORS: readonly string[] = Object.freeze([
+	"2026-09-15T00:00:00Z",
+	"2026-10-01T00:00:00Z",
+	"2026-11-05T23:45:00Z",
+]);
 
 // === UI.A5: Profile Dharma graph (SPEC.1 §23) =============================
 
