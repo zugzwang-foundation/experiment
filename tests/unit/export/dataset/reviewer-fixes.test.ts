@@ -510,10 +510,38 @@ describe("F-11 · the sentinel and tier corrections", () => {
 		// §19.7 serves this manifest publicly. A path like
 		// `[no-email] comments @ [412].body` is a machine-readable oracle
 		// binding a pseudonym to a confirmed real identity substring.
+		//
+		// ⚠ **This ran against the CLEAN fixture, whose `advisories` is `[]`, so
+		// the loop body never executed once** (F-11 re-run, LOW). Measured:
+		// mutating `summarizeAdvisories` to append the full
+		// `[rule] artifact @ path` — the exact published oracle F-11 M-A named
+		// — left this file 28 passed. The property was guarded elsewhere; the
+		// test that NAMES it was not.
+		//
+		// ⚠ `@test-writer` repaired this identical vacuity one file over and
+		// left this copy, which is its own small lesson: a fix applied by
+		// searching for a shape finds the instances that share the shape, and
+		// a second copy of the same test is exactly the thing that does not.
+		//
+		// Driven on a build that HAS advisories. Ruling S1 supplies one
+		// reliably: a participant-sourced needle colliding with a value the
+		// dataset ships.
+		const slug = String(
+			(DIRTY_TABLE_ROWS.markets[0] as Record<string, unknown>).slug,
+		);
 		return buildDataset({
-			source: fixtureSource("fixture", DIRTY_TABLE_ROWS as never),
+			source: fixtureSource("fixture", {
+				...DIRTY_TABLE_ROWS,
+				users: DIRTY_TABLE_ROWS.users.map((u, i) =>
+					i === 0 ? { ...u, tos_acceptance_user_agent: slug } : u,
+				),
+			} as never),
 			releaseDate: "2026-11-06",
 		}).then((r) => {
+			expect(
+				r.manifest.advisories.length,
+				"control: the loop below must have something to iterate",
+			).toBeGreaterThan(0);
 			for (const line of r.manifest.advisories) {
 				expect(line).not.toMatch(/@|\[\d+\]/);
 				expect(line).toMatch(/^[a-z-]+: \d+$/);

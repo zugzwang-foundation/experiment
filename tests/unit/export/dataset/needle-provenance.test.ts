@@ -467,3 +467,113 @@ describe("S1 · H-1 — a NUMERIC leaf gets the same tier as a string one", () =
 		).toThrow(/no-idempotency-key/);
 	});
 });
+
+describe("S1 · the STRICTER ARM WINS filter, which nothing was testing", () => {
+	// ⚠⚠ **F-11 re-run, MEDIUM.** Deleting the `participantOnly` filter in
+	// `harvestSecrets` left 409 of 409 tests green. The code was correct; the
+	// only mechanism holding the property its own docblock calls *"the one wall
+	// §19.5 exists to hold"* was protected by nothing. That is the ninth
+	// unfired guard on this branch, and it was found by the pass AFTER the one
+	// whose whole subject was unfired guards.
+	//
+	// The attack it defends against, concretely: Alice reads her own R2 object
+	// key out of the presigned-PUT URL `/api/uploads/sign` returns her
+	// (`u/<userId>/<uploadId>.webp`), then sends it as her `User-Agent`. The
+	// string is now harvested at a PARTICIPANT site
+	// (`users.tos_acceptance_user_agent`) AND a SYSTEM one
+	// (`image_uploads.r2_object_key`). Without the filter,
+	// `assertNoR2ObjectKeys` becomes ADVISORY everywhere except the fields it
+	// was harvested under — a self-serve downgrade of a value guard whose
+	// docblock says R2 keys embed the userId. It needs a second, independent
+	// strip failure to become a leak, which is why it is MEDIUM; but the
+	// downgrade itself is one request.
+
+	/** Alice echoes her own R2 object key back as her User-Agent. */
+	function dualSourced() {
+		const key = String(
+			(DIRTY_TABLE_ROWS.image_uploads[0] as Record<string, unknown>)
+				.r2_object_key,
+		);
+		return {
+			key,
+			tables: {
+				...DIRTY_TABLE_ROWS,
+				users: DIRTY_TABLE_ROWS.users.map((u, i) =>
+					i === 0 ? { ...u, tos_acceptance_user_agent: key } : u,
+				),
+			},
+		};
+	}
+
+	it("CONTROL — the value really is harvested at BOTH sites", () => {
+		// Without this the filter has nothing to filter and every assertion
+		// below is about an empty intersection.
+		const { key, tables } = dualSourced();
+		expect(key.startsWith("u/")).toBe(true);
+		const secrets = harvestSecrets(tables as never);
+		expect(secrets.r2ObjectKeys.has(key), "the SYSTEM site").toBe(true);
+		expect(secrets.userAgents.has(key), "the PARTICIPANT site").toBe(true);
+	});
+
+	it("a dual-sourced value is NOT tagged participant — the stricter arm wins", () => {
+		const { key, tables } = dualSourced();
+		const secrets = harvestSecrets(tables as never);
+		expect(
+			secrets.participantSourced.has(key),
+			"a value with any SYSTEM source must stay fatal, however it was also " +
+				"collected — otherwise echoing a server-minted value back as a " +
+				"header downgrades its own guard",
+		).toBe(false);
+	});
+
+	it("⇒ it stays FATAL where it lands, under any key", () => {
+		const { key, tables } = dualSourced();
+		const secrets = harvestSecrets(tables as never);
+		expect(() =>
+			assertTableClean("markets", [{ id: "m1", slug: key }], secrets),
+		).toThrow(/no-r2-object-key/);
+	});
+
+	it("THE WRONG ANSWER — without the filter it becomes an advisory", () => {
+		// The pre-filter state, reproduced: the participant map keeps the value
+		// even though a system site also produced it.
+		const { key, tables } = dualSourced();
+		const secrets = harvestSecrets(tables as never);
+		const unfiltered = {
+			...secrets,
+			participantSourced: new Map([
+				...secrets.participantSourced,
+				[key, new Set(["tos_acceptance_user_agent", "user_agent"])],
+			]),
+		};
+		const outcome = assertTableClean(
+			"markets",
+			[{ id: "m1", slug: key }],
+			unfiltered,
+		);
+		expect(
+			outcome.advisories.map((a) => a.rule),
+			"this is what the missing filter costs: a server-minted R2 key, " +
+				"surviving in a column it has no business in, reported and not halted",
+		).toContain("no-r2-object-key");
+	});
+
+	it("…and the same trick with the avatar URL, so it is the CLASS", () => {
+		// `users.image` is a Google-minted URL the participant can read off
+		// their own account page — a second, independent dual-source route.
+		const url = String(
+			(DIRTY_TABLE_ROWS.users[0] as Record<string, unknown>).image,
+		);
+		expect(typeof url).toBe("string");
+		const tables = {
+			...DIRTY_TABLE_ROWS,
+			users: DIRTY_TABLE_ROWS.users.map((u, i) =>
+				i === 0 ? { ...u, tos_acceptance_user_agent: url } : u,
+			),
+		};
+		const secrets = harvestSecrets(tables as never);
+		expect(secrets.avatarUrls.has(url)).toBe(true);
+		expect(secrets.userAgents.has(url)).toBe(true);
+		expect(secrets.participantSourced.has(url)).toBe(false);
+	});
+});

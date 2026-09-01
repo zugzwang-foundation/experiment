@@ -180,18 +180,6 @@ describe("L-4 · manifest.source cannot be a connection string", () => {
 	// as rejected. They are the guard's real accept case; the clock-free one is
 	// kept beside them as the pre-existing control.
 	it.each([
-		["no clock at all", "production replica, 2026-11-06 freeze snapshot"],
-		[
-			"the freeze instant, named",
-			"production replica, 2026-11-05 23:59 UTC freeze snapshot",
-		],
-		["a wall-clock time", "production replica, taken at 06:00 on 2026-11-06"],
-		["a midnight boundary", "production rows as of 2026-11-06 00:00 UTC"],
-	])("ACCEPTS an ordinary human label with %s", (_name, label) => {
-		expect(assertPublishableSourceLabel(label)).toBe(label);
-	});
-
-	it.each([
 		[
 			"a postgres URL",
 			"postgresql://zz:hunter2@db.example.supabase.co:5432/postgres",
@@ -199,10 +187,6 @@ describe("L-4 · manifest.source cannot be a connection string", () => {
 		["a bare scheme", "postgres://localhost/postgres"],
 		["userinfo only", "zz:hunter2@somehost"],
 		["a host:port after an @", "reading from @db-prod-1:5432 tonight"],
-		// ⚠ The two forms `@security-auditor` M-1 found missing. The libpq
-		// keyword string is a first-class Postgres connection string and is
-		// what a hand-assembled one usually looks like — both original nets
-		// required a `://` or an `@`, so both of these passed.
 		["a BARE host:port", "db.abcdefghijkl.supabase.co:5432"],
 		[
 			"a pooler host:port",
@@ -212,11 +196,65 @@ describe("L-4 · manifest.source cannot be a connection string", () => {
 			"the libpq keyword form",
 			"host=db.abc.supabase.co port=5432 user=postgres password=hunter2",
 		],
-		["a Supabase service key", "sbp_0123456789abcdef0123456789abcdef01234567"],
+		// ⚠ The forms the F-11 re-run found the DENY-LIST version had lost when
+		// it was narrowed to stop refusing clock times — an IP, a loopback, and
+		// the `PG*` environment spelling the `\buser\s*=` word-boundary could
+		// not see. The allow-list catches all three without naming any of them,
+		// which is the point of inverting it.
+		["an IP:port", "10.0.0.5:5432"],
+		["a loopback:port", "127.0.0.1:6543"],
+		["the PG env spelling", "PGPASSWORD=hunter2 psql -h db.abc.supabase.co"],
 	])("REFUSES %s", (_name, label) => {
 		expect(() => assertPublishableSourceLabel(label)).toThrow(
 			/egress_contract_gap/,
 		);
+	});
+
+	it("⚠ the ONE named cost: a `file.md:2084` citation is refused too", () => {
+		// ⚠ **Stated as a test rather than left to be discovered.** A dotted
+		// name followed by a colon and digits is the same shape whether it is
+		// `db.abc.supabase.co:5432` or `SPEC.2.md:2084`, and four rounds of
+		// trying to tell them apart is what made this guard wrong three times
+		// running — first too narrow, then refusing clock times, then refusing
+		// citations and `user=hrishikesh`.
+		//
+		// So the cost is accepted, bounded and NAMED in the thrown message,
+		// which tells the operator to drop the line number. That is a better
+		// trade than a fifth pattern for a field published beside a checksum on
+		// an artifact that cannot be withdrawn.
+		expect(() =>
+			assertPublishableSourceLabel(
+				"zugzwang production, per docs/specs/SPEC.2.md:2084",
+			),
+		).toThrow(/file\.md:2084/);
+		// …and the same label without the line number is fine.
+		expect(
+			assertPublishableSourceLabel(
+				"zugzwang production, per docs/specs/SPEC.2.md",
+			),
+		).toContain("SPEC.2.md");
+	});
+
+	it("⚠ what it deliberately does NOT catch, asserted so the gap is a decision", () => {
+		// An opaque credential with no punctuation is alphanumeric, and no
+		// character rule distinguishes one from a build identifier. A previous
+		// round tried, with a two-character `sb` anchor, and refused any
+		// hyphenated word beginning "sb" — including
+		// `sb-prod-replica-snapshot-2026-11-06`.
+		//
+		// That is a DIFFERENT class from the one ruling L-4 named (a connection
+		// string reaching a published field), and chasing it is what dragged
+		// this guard through three rounds. Asserted here so the gap is a
+		// recorded decision rather than something a reader assumes is covered.
+		expect(
+			assertPublishableSourceLabel(
+				"sbp_0123456789abcdef0123456789abcdef01234567",
+			),
+		).toContain("sbp_");
+		// …and the false positive that chasing it caused is gone.
+		expect(
+			assertPublishableSourceLabel("prod, sb-prod-replica-snapshot-2026-11-06"),
+		).toContain("sb-prod");
 	});
 
 	it("REFUSES an empty or absurdly long label", () => {

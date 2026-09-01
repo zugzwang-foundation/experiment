@@ -389,6 +389,11 @@ const SITE_PROVENANCE = {
 	// while the other nine entries were dead. The raw `Idempotency-Key`
 	// request header: participant-chosen, unmoderated, 255 bytes.
 	"bets.idempotency_key": "PARTICIPANT",
+	// ⚠ Ruling H's needle. It was tagged with an INLINE `"PARTICIPANT"` literal
+	// at the harvest site, which made this map's own docblock claim —
+	// *"provenance has exactly one home"* — false in its own file, and left the
+	// inline form as the pattern a future author copies (F-11 re-run, LOW).
+	"comments.body[removed]": "PARTICIPANT",
 } as const satisfies Record<string, Provenance>;
 
 /**
@@ -414,7 +419,28 @@ const PARTICIPANT_JSONB_KEYS: ReadonlySet<string> = new Set(
 				prov === "PARTICIPANT" &&
 				(site.startsWith("payload.") || site.startsWith("metadata.")),
 		)
-		.map(([site]) => site.slice(site.indexOf(".") + 1)),
+		.map(([site]) => {
+			// ⚠ **Exactly two segments, or throw** (F-11 re-run, LOW). This was
+			// `site.slice(site.indexOf(".") + 1)`, which slices at the FIRST
+			// dot — so a future `"payload.client.remoteAddr"` would yield the
+			// spelling `"client.remoteAddr"`, which no `walk` key ever equals,
+			// and the site would be silently tagged SYSTEM. That is fail-safe
+			// for privacy and fail-OPEN for C-1: the participant-poisoning
+			// abort returns for that key, quietly.
+			//
+			// A nested site needs a different representation than a sub-key
+			// spelling, so the honest response is to refuse rather than to
+			// guess. Thrown at module load, so it cannot reach a release.
+			const parts = site.split(".");
+			if (parts.length !== 2) {
+				throw new Error(
+					`SITE_PROVENANCE: '${site}' is a nested JSONB path, and the ` +
+						"harvest tags by SUB-KEY SPELLING, which cannot express one. " +
+						"Give it a representation before declaring it.",
+				);
+			}
+			return parts[1] as string;
+		}),
 );
 
 /**
@@ -541,7 +567,12 @@ export function harvestSecrets(
 		const removed = removedCommentIds(tables.mod_actions ?? []);
 		for (const row of tables.comments ?? []) {
 			if (typeof row.id === "string" && removed.has(row.id)) {
-				add(s.removedBodies, row.body, "PARTICIPANT", "body");
+				add(
+					s.removedBodies,
+					row.body,
+					SITE_PROVENANCE["comments.body[removed]"],
+					"body",
+				);
 			}
 		}
 	}
@@ -668,17 +699,101 @@ export function assertCountsAgree(results: readonly TableResult[]): void {
 /**
  * Guard the caller-supplied `source` label before it is PUBLISHED.
  *
- * ⚠ `manifest.source` is a free string the caller constructs, and the manifest
- * is served publicly per §19.7. The release task will build that string
- * standing next to a `DATABASE_URL` — the two live in the same function, one
- * describes the other, and nothing here rejected a connection string
+ * `manifest.source` is a free string the caller constructs, and §19.7 serves
+ * the manifest publicly. The release task will build that string standing next
+ * to a `DATABASE_URL` — the two live in the same function, one describes the
+ * other — and nothing rejected a connection string
  * (`@security-auditor` L-4). It is not that anyone intends to paste one; it is
- * that "the operator will not" is not a mechanism, and this is the one field
- * on the artifact whose contents no other guard looks at.
+ * that "the operator will not" is not a mechanism, and this is the one field on
+ * the artifact whose contents no other guard looks at.
  *
- * The constraint is deliberately shape-based rather than a URL blocklist: a
- * label is a human description, so anything carrying a scheme, credentials, an
- * `@` host or a port is not one, whatever protocol it names.
+ * ## ⚠⚠ This is an ALLOW-LIST, and it is a deny-list twice corrected
+ *
+ * The first version rejected three URI shapes. `@security-auditor` M-1 found it
+ * missed the libpq keyword form (`host=… password=…`) and a bare `host:5432` —
+ * both first-class connection strings. Widening it to catch those made it
+ * reject `"production replica, 2026-11-05 23:59 UTC freeze snapshot"`, because
+ * the new bare-`host:port` net matched any clock time and the freeze is
+ * *defined* as 23:59 UTC (`@code-reviewer` H-1). Narrowing THAT made it reject
+ * `"…per docs/specs/SPEC.2.md:2084"`, `"exported by user=hrishikesh"`, and any
+ * word beginning `sb` — while quietly losing coverage of `10.0.0.5:5432` and
+ * `localhost:5432` (F-11 re-run).
+ *
+ * **Three rounds, and each fix broke a case the previous one handled.** That is
+ * the deny-list failure this whole branch is about, in miniature: the space of
+ * "things that look like a secret" is open, so a rule enumerating members
+ * cannot close the class, and every extension trades a false negative for a
+ * false positive somewhere nobody looked.
+ *
+ * ⇒ Inverted, on ruling E's own argument. **A label is a human description**:
+ * letters, digits, spaces, and the punctuation prose uses. A connection string
+ * — in every form above, URI or keyword or host:port — needs at least one of
+ * `= : @ / \ ? & %` or a control character. So the rule is what a description
+ * may CONTAIN, and anything else is refused without anyone having to have
+ * anticipated its shape.
+ *
+ * The cost is real and is the right cost: a label cannot cite a `file.md:2084`
+ * or contain a URL. That is a small thing to give up for a field published
+ * beside a checksum on an artifact that cannot be withdrawn, and the error
+ * message says so rather than guessing at what the operator meant.
+ */
+/**
+ * Characters a human description may contain.
+ *
+ * ⚠ `:` and `/` ARE allowed, and that is deliberate: prose contains
+ * `23:59 UTC` and `tests/_fixtures/dataset`, and a first attempt at this
+ * allow-list excluded both and refused four of six ordinary labels. What no
+ * description needs — and every connection string has — is one of the three
+ * CONSTRUCTS below, not the characters themselves.
+ */
+const LABEL_ALLOWED_CHARS = /^[A-Za-z0-9 ,.:;/\-_()[\]'"—–·]+$/;
+
+/**
+ * The three constructs that make a string a connection string rather than a
+ * description, in every form the three previous rounds found:
+ *
+ *   · `://`  — the URI form (`postgresql://…`, and any other scheme)
+ *   · `@`    — userinfo, or a `user@host`
+ *   · `=`    — the libpq keyword form (`host=… port=… password=…`), and every
+ *              `PG*=` environment spelling with it
+ *
+ * A closed set of three, on CONSTRUCTS rather than on shapes — which is why it
+ * does not need to anticipate `10.0.0.5:5432`, `[2600:1f1c::1]:5432`,
+ * `localhost:5432` or a pooler hostname. All four carry a `://` or are simply
+ * a bare `host:port`, and the bare form is caught by the host pattern below,
+ * which needs no clock-time carve-out because a clock has no dot.
+ */
+const LABEL_FORBIDDEN = [
+	{ re: /:\/\//, what: "a URI scheme (`://`)" },
+	{ re: /@/, what: "an `@` (userinfo or a user@host)" },
+	{ re: /=/, what: "an `=` (the libpq keyword form: host=… password=…)" },
+	{
+		// A dotted hostname followed by a port. `23:59` has no dot before the
+		// colon, so a clock time cannot match this — which is the carve-out
+		// three rounds of pattern-widening kept getting wrong.
+		re: /[\w-]+(?:\.[\w-]+)+:\d{2,5}\b/,
+		what:
+			"a host:port (⚠ this also refuses a `file.md:2084` citation — a " +
+			"bounded, named cost: a dotted name followed by a colon and digits " +
+			"has the same shape either way, and four rounds of trying to tell " +
+			"them apart is what made this guard wrong three times. Drop the " +
+			"line number)",
+	},
+];
+
+/**
+ * ⚠ **What this deliberately does NOT catch, said plainly rather than implied.**
+ *
+ * An opaque credential with no punctuation — a Supabase service key
+ * (`sbp_…`), a bearer JWT — is alphanumeric, and no character rule can
+ * distinguish one from a build identifier. A previous round tried, with a
+ * two-character `sb` anchor, and refused any hyphenated word beginning "sb".
+ *
+ * That is a DIFFERENT class from the one ruling L-4 named, which is a
+ * connection string reaching a published field, and chasing it is what dragged
+ * this guard through three rounds of false positives. It is recorded here so
+ * the next reader knows the gap is a decision rather than an oversight; closing
+ * it needs a secret-shaped detector, not a longer list of prefixes.
  */
 export function assertPublishableSourceLabel(label: string): string {
 	const trimmed = label.trim();
@@ -690,54 +805,34 @@ export function assertPublishableSourceLabel(label: string): string {
 				"is PUBLISHED.",
 		);
 	}
-	// ⚠ **The two most likely non-URI forms were missing**
-	// (`@security-auditor` M-1). This docblock claimed to reject *"anything
-	// carrying a scheme, credentials, an `@` host or a port"* — and all three
-	// original patterns required a `://` or an `@`, so a **libpq keyword
-	// string** (`host=… port=5432 password=…`) and a **bare `host:5432`** both
-	// passed. The keyword form is a first-class Postgres connection string and
-	// is what a hand-assembled `DATABASE_URL`-adjacent paste usually looks
-	// like. A guard whose stated coverage exceeds its actual coverage is worse
-	// than none: it is what a reviewer reads instead of testing.
-	const secretShaped = [
-		// a scheme — `postgres://`, `postgresql://`, `http://`, …
-		/[a-z][a-z0-9+.-]*:\/\//i,
-		// userinfo — `user:pass@host`
-		/\S+:\S+@\S+/,
-		// a port after an `@` host
-		/@[\w.-]+:\d{2,5}\b/,
-		// ⚠ a BARE `host:5432` — no scheme, no `@`.
-		//
-		// ⚠⚠ **The left side must be HOST-SHAPED — a dotted name ending in a
-		// letters-only label** (`@code-reviewer` H-1). My first version was
-		// `/\b[\w.-]+:\d{2,5}\b/`, which matches any clock time, and
-		// **rejected the three most natural labels an operator would write** —
-		// `"…2026-11-05 23:59 UTC freeze snapshot"`, `"…taken at 06:00 on
-		// 2026-11-06"`, `"…rows as of 2026-11-06 00:00 UTC"` — while telling
-		// them the label *"looks like a URL or a connection string"*. The
-		// freeze is DEFINED as `2026-11-05 23:59 UTC`, so naming the time is
-		// the obvious thing to do.
-		//
-		// That is F-11's shape in one step: the fix for `@security-auditor`
-		// M-1 opened the hazard the next reviewer found. A guard that refuses
-		// the correct answer on a one-shot job is not a stricter guard; it is
-		// a different failure, and it arrives at 06:00 with a message pointing
-		// the operator somewhere else.
-		/\b[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}:\d{2,5}\b/i,
-		// ⚠ libpq keyword form — any one keyword is enough; a description does
-		// not contain `password=`
-		/\b(?:host|hostaddr|port|user|dbname|password|sslmode|options)\s*=/i,
-		// a Supabase / bearer-shaped secret pasted whole
-		/\b(?:sbp|sb|eyJ)[A-Za-z0-9_.-]{20,}/,
-	];
-	if (secretShaped.some((re) => re.test(trimmed))) {
+
+	if (!LABEL_ALLOWED_CHARS.test(trimmed)) {
+		// The offending CHARACTERS, never the label. If it really is a
+		// connection string, echoing it into a build log has relocated the
+		// secret rather than refused it.
+		const offending = [
+			...new Set(trimmed.split("").filter((c) => !LABEL_ALLOWED_CHARS.test(c))),
+		].join(" ");
 		throw new EgressContractGapError(
 			"manifest.source",
-			"looks like a URL or a connection string rather than a description. " +
-				"This field is published in the manifest — refusing to write it. " +
-				"Use a phrase like 'production replica, 2026-11-06 freeze snapshot'.",
+			`contains ${offending} — characters a human description does not ` +
+				"need. This field is PUBLISHED in the manifest (§19.7), so it is " +
+				"restricted to letters, digits, spaces and ordinary prose " +
+				"punctuation.",
 		);
 	}
+
+	const hit = LABEL_FORBIDDEN.find((f) => f.re.test(trimmed));
+	if (hit) {
+		throw new EgressContractGapError(
+			"manifest.source",
+			`contains ${hit.what}, which a description does not need and every ` +
+				"form of connection string has. This field is PUBLISHED in the " +
+				"manifest (§19.7). Use a phrase like 'production replica, " +
+				"2026-11-05 23:59 UTC freeze snapshot'.",
+		);
+	}
+
 	return trimmed;
 }
 

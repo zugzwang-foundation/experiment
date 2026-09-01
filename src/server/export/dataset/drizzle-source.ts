@@ -357,11 +357,15 @@ export function drizzleSource(db: DatasetDb, label: string): DatasetSource {
 				// so a future naive column would be bind-bound by the fixture
 				// AND mis-rendered by the reader — invisible to the round-trip
 				// byte comparison in both directions at once.
+				// ⚠ An explicit precision renders as `timestamp (6) with time
+				// zone`, which is still a timestamptz and still correct for the
+				// UTC cast — the first version of this check threw on it with a
+				// message saying the cast *"would shift the value"*, which is
+				// not true of it (F-11 re-run, LOW). Match on the `with time
+				// zone` SUFFIX, which is the property that actually decides.
 				const sqlType = col.getSQLType();
-				if (
-					sqlType.startsWith("timestamp") &&
-					sqlType !== "timestamp with time zone"
-				) {
+				const isTz = sqlType.endsWith("with time zone");
+				if (sqlType.startsWith("timestamp") && !isTz) {
 					throw new EgressContractGapError(
 						`${table}.${col.name}`,
 						`is \`${sqlType}\`, not \`timestamp with time zone\`. The ` +
