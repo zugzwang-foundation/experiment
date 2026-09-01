@@ -613,12 +613,33 @@ describe("BLOCK-3 §3 — value/subvalue read ink, sized per block from the map"
 		}
 	});
 
-	it("resolver-cards::math-erdos-RESOLVER-hits-the-11px-floor-and-still-truncates", () => {
-		// ⚠ THE ONE FLOOR-HIT CASE (§3's run-report table): "@thomasfbloom" does
-		// not fit the measured column even at 11px — the floor stops the size
-		// from dropping further, and `truncate` (unconditional on every
-		// value/subvalue span, unchanged by BLOCK-3) is what actually degrades
-		// it, same mechanism as any other overflowing value.
+	it("resolver-cards::no-entry-ships-at-the-11px-floor-after-BLOCK-3-§2-widened-the-column", () => {
+		// ⚠⚠ THIS TEST USED TO BE "math-erdos-RESOLVER-hits-the-11px-floor-and-
+		// still-truncates" — "@thomasfbloom" did not fit the column §3 first
+		// measured against (79px) even at the 11px floor. §2 then shrank the
+		// glyph for an unrelated reason (reducing block height) and widened
+		// that column to 91px as a side effect; re-measured before shipping,
+		// every entry that had been pinned to 11px moved up, including this
+		// one (now 12px, fits cleanly, no truncation needed). Recorded as a
+		// positive assertion rather than deleted outright (O-4): the floor and
+		// `truncate` stay in the type and the render path regardless — this
+		// proves the CURRENT map doesn't need them, not that it never will.
+		for (const slug of Object.keys(RESOLUTION_BLOCKS) as Array<
+			keyof typeof RESOLUTION_BLOCKS
+		>) {
+			const data = RESOLUTION_BLOCKS[slug];
+			for (const k of KEYS) {
+				expect(data[k].fontSize).toBeGreaterThan(11);
+			}
+		}
+	});
+
+	it("resolver-cards::truncate-still-ships-unconditionally-as-the-backstop", () => {
+		// ⚠ `truncate` is NOT conditioned on whether a value currently needs
+		// it — every value/subvalue span carries it regardless (`ResolverCards.tsx`),
+		// so a future map entry with a longer string degrades safely without
+		// this component needing to change. Asserted directly on the entry
+		// that most recently exercised this path.
 		const { container } = render(
 			<ResolverCards
 				market={marketFixture("math-erdos-contribution-response")}
@@ -628,11 +649,11 @@ describe("BLOCK-3 §3 — value/subvalue read ink, sized per block from the map"
 			'[data-testid="resolution-block-value-resolver"]',
 		);
 		const cls = (value?.getAttribute("class") ?? "").split(/\s+/);
-		expect(cls).toContain("text-[11px]");
+		expect(cls).toContain("text-[12px]");
 		expect(cls).toContain("truncate");
 		expect(
 			RESOLUTION_BLOCKS["math-erdos-contribution-response"].resolver.fontSize,
-		).toBe(11);
+		).toBe(12);
 	});
 });
 

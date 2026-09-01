@@ -77,21 +77,25 @@ export type ResolutionBlockEntry = {
 	 * (real text measurement needs a DOM) for an answer that never changes.
 	 * BAND 12–14, HARD FLOOR 11 — below the floor the value ellipsizes
 	 * (`truncate`, `ResolverCards.tsx`) rather than shrinking further.
-	 * MEASURED, not estimated: each value was tried at 14/13/12/11px against
-	 * the real rendered column (79px at 1440×777/900, the narrower of the two
-	 * widths §1's fix left them at — see the data file's own docblock) in the
-	 * real deployed font (Geist), picking the largest size where
-	 * `scrollWidth <= clientWidth` for BOTH `line1` and `line2` (when present)
-	 * — one shared size per block, not one per line. Full per-block,
-	 * per-market table in BLOCK-3's run report.
-	 * ⚠⚠ §2 SHRANK THE GLYPH AFTER THIS MEASUREMENT (48px → 36px), WHICH ONLY
-	 * WIDENS THE COLUMN THESE SIZES WERE FIT AGAINST — §2 left the block's
-	 * horizontal padding (`px-[11px]`) and the glyph-to-text gap untouched
-	 * specifically so this measurement would stay valid rather than need a
-	 * second pass (see `ResolverCards.tsx`'s `BLOCK_BOX` docblock). 79px is
-	 * therefore a LOWER BOUND on today's column, not today's exact figure —
-	 * every size chosen here still fits, with more room than it was measured
-	 * against, never less.
+	 * MEASURED, not estimated, and MEASURED TWICE. §3 first fit every value at
+	 * 14/13/12/11px against the column as it stood before §2: 79px at
+	 * 1440×777/900, real deployed font (Geist), largest size where
+	 * `scrollWidth <= clientWidth` for BOTH `line1` and `line2` when present —
+	 * one shared size per block, not one per line. §2 then shrank the glyph
+	 * (48px → 36px) for an unrelated reason (reducing block height) and, as a
+	 * side effect, widened that column to 91px — every §3 size still fit the
+	 * WIDER column (shrinking a glyph can only add room, never remove it), so
+	 * nothing was BROKEN by landing §2 after §3, but several sizes were now
+	 * smaller than they needed to be. Re-measured against the 91px column
+	 * before shipping rather than left at the first pass's numbers: every
+	 * `"Response on X"` RESOLUTION moved 11→13, most single-line RESOLVER
+	 * values moved up one or two steps, and the one entry that had been AT the
+	 * 11px floor and still truncating — `math-erdos-contribution-response`'s
+	 * `@thomasfbloom` — now fits cleanly at 12px. No entry in this map is at
+	 * the 11px floor as shipped; the floor and the `truncate` backstop stay in
+	 * the type and the render path regardless, because the content is frozen
+	 * but the column is not guaranteed to stay exactly 91px forever. Full
+	 * per-block, per-market table in BLOCK-3's run report.
 	 */
 	fontSize: 11 | 12 | 13 | 14;
 };
@@ -143,7 +147,7 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 			line1: "Response on X",
 			line2: null,
 			href: null,
-			fontSize: 11,
+			fontSize: 13,
 		},
 		resolver: {
 			line1: "@mybmc",
@@ -178,29 +182,29 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 			line1: "oktoberfest.de",
 			line2: "report",
 			href: null,
-			fontSize: 11,
+			fontSize: 13,
 		},
 		resolver: {
 			line1: "Oktoberfest",
 			line2: "management",
 			href: "https://www.oktoberfest.de/en",
-			fontSize: 13,
+			fontSize: 14,
 		},
 		closes: OKTOBERFEST_CLOSES,
-		flavour: { line1: "Consumption", line2: null, href: null, fontSize: 13 },
+		flavour: { line1: "Consumption", line2: null, href: null, fontSize: 14 },
 	},
 	"chess-fide-tiebreak-response": {
 		resolution: {
 			line1: "Response on X",
 			line2: null,
 			href: null,
-			fontSize: 11,
+			fontSize: 13,
 		},
 		resolver: {
 			line1: "@FIDE_chess",
 			line2: null,
 			href: "https://x.com/FIDE_chess",
-			fontSize: 12,
+			fontSize: 14,
 		},
 		closes: CLOSES_DEFAULT,
 		flavour: { line1: "Petition", line2: null, href: null, fontSize: 14 },
@@ -210,7 +214,7 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 			line1: "CoinMarketCap",
 			line2: null,
 			href: null,
-			fontSize: 11,
+			fontSize: 12,
 		},
 		resolver: {
 			line1: "CoinMarketCap",
@@ -221,7 +225,7 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 			// `href` are otherwise unchanged.
 			line2: null,
 			href: "https://coinmarketcap.com/currencies/bitcoin/historical-data/",
-			fontSize: 11,
+			fontSize: 12,
 		},
 		closes: CLOSES_DEFAULT,
 		flavour: { line1: "Barrier", line2: null, href: null, fontSize: 14 },
@@ -231,18 +235,24 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 			line1: "Response on X",
 			line2: null,
 			href: null,
-			fontSize: 11,
+			fontSize: 13,
 		},
 		resolver: {
-			// ⚠⚠ FLOOR HIT. "@thomasfbloom" does not fit the measured 79px column
-			// even at the 11px floor (needs ~83px) — per §3's own rule, the fix
-			// below the floor is ellipsis (`truncate`, ResolverCards.tsx), never
-			// a smaller size. fontSize stays 11 — the floor — and the value
-			// relies on `truncate` to degrade, same as any other overflow.
+			// ⚠⚠ WAS THE FLOOR-HIT CASE THROUGH §3'S FIRST PASS — "@thomasfbloom"
+			// did not fit the 79px column even at the 11px floor (needed ~83px),
+			// and this comment used to document that as the one entry relying on
+			// `truncate` to degrade rather than a fifth, smaller size. §2 shrank
+			// the glyph afterward (48px → 36px, for the unrelated reason of
+			// reducing block height) and widened the column to 91px as a side
+			// effect — re-measured against that column before shipping, and
+			// "@thomasfbloom" now fits cleanly at 12px, no truncation. `truncate`
+			// stays on the class list regardless (every value carries it,
+			// unconditionally — see `ResolverCards.tsx`), so nothing about the
+			// render path changed; only whether this specific string needs it did.
 			line1: "@thomasfbloom",
 			line2: null,
 			href: "https://x.com/thomasfbloom",
-			fontSize: 11,
+			fontSize: 12,
 		},
 		closes: CLOSES_DEFAULT,
 		flavour: { line1: "Innovation", line2: null, href: null, fontSize: 14 },
@@ -252,7 +262,7 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 			line1: "Response on X",
 			line2: null,
 			href: null,
-			fontSize: 11,
+			fontSize: 13,
 		},
 		// ⚠ FOUNDER-RULED, BLOCK-2. The live criterion qualifies three accounts
 		// (@AnthropicAI, @claudeai, @ClaudeDevs) — @security-auditor flagged
@@ -275,13 +285,13 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 			line1: "Response on X",
 			line2: null,
 			href: null,
-			fontSize: 11,
+			fontSize: 13,
 		},
 		resolver: {
 			line1: "@ycombinator",
 			line2: null,
 			href: "https://x.com/ycombinator",
-			fontSize: 12,
+			fontSize: 13,
 		},
 		closes: CLOSES_DEFAULT,
 		flavour: { line1: "Showcase", line2: null, href: null, fontSize: 14 },

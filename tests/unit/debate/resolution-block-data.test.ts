@@ -147,7 +147,7 @@ describe("resolution-block-data — content matches the ratified register", () =
 			line1: "oktoberfest.de",
 			line2: "report",
 			href: null,
-			fontSize: 11,
+			fontSize: 13,
 		});
 		expect(RESOLUTION_BLOCKS["bitcoin-price-50k"].resolution.line1).toBe(
 			"CoinMarketCap",
@@ -167,7 +167,7 @@ describe("resolution-block-data — content matches the ratified register", () =
 			line1: "Oktoberfest",
 			line2: "management",
 			href: "https://www.oktoberfest.de/en",
-			fontSize: 13,
+			fontSize: 14,
 		});
 	});
 
@@ -179,7 +179,7 @@ describe("resolution-block-data — content matches the ratified register", () =
 			line1: "CoinMarketCap",
 			line2: null,
 			href: "https://coinmarketcap.com/currencies/bitcoin/historical-data/",
-			fontSize: 11,
+			fontSize: 12,
 		});
 	});
 
