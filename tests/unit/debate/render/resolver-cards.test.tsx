@@ -420,7 +420,17 @@ describe("BLOCK-1 — R-12 reversed for RESOLVER only; G7/G8 on the split", () =
 	});
 
 	it("resolver-cards::G7-RESOLVER-is-ONE-anchor-wrapping-glyph-label-AND-value", () => {
-		const { container } = render(<ResolverCards market={PRIMARY_MARKET} />);
+		// ⚠ BLOCK-3 — oktoberfest, not PRIMARY_MARKET (bitcoin). §4c dropped
+		// bitcoin's RESOLVER subvalue ("Low"), so it no longer exercises the
+		// subvalue-inside-the-anchor branch this test exists to check;
+		// oktoberfest's RESOLVER gained one ("management") the same task, and
+		// is now the only market whose RESOLVER carries both an href and a
+		// subvalue.
+		const { container } = render(
+			<ResolverCards
+				market={marketFixture("oktoberfest-munich-beer-volume")}
+			/>,
+		);
 		const block = container.querySelector(
 			'[data-testid="resolution-block-resolver"]',
 		);

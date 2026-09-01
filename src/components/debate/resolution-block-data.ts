@@ -34,34 +34,31 @@
  * "fails loud at render time for a slug that cannot occur" is not a practical
  * gap, only a naming one.
  *
- * RESOLUTION names the resolving SURFACE, independently of RESOLVER — it is
- * not a mirror of it, and only coincides with RESOLVER's own text by
- * accident where the institution's brand name and its resolving surface
- * happen to be the same string. For five markets that surface is X
- * (Zugzwang's own eventual resolution post, U-3), so RESOLUTION reads "X".
- * For the other three the surface is the institution's own site (a
- * festival's report, a price index, a code host's own count):
- * `oktoberfest-munich-beer-volume` reads the literal domain
- * "oktoberfest.de" (BLOCK-2 correction — see below), `bitcoin-price-50k`
- * reads "CoinMarketCap" (genuinely equal to RESOLVER's own text on this one
- * row), and `github-zugzwang-repo-stars` reads "GitHub", not "Zugzwang"
- * (RESOLUTION and RESOLVER differ there too). So of the three institutional
- * rows, exactly ONE (bitcoin) has RESOLUTION textually equal to RESOLVER —
- * which is why "mirror" was never the right word for the rule, only an
- * artifact of two rows that happened to coincide before this correction.
- * Values are verbatim from the ratified register, not a typo normalized to
- * "X" across the board.
- * ⚠⚠ BLOCK-2 · founder-ruled correction to `oktoberfest-munich-beer-volume`.
- * BLOCK-1 shipped the brand name "Oktoberfest" here (@code-reviewer HIGH
- * flagged it as possibly diverging from AMEND-1 item 15, which ratifies
- * RESOLUTION as "X / oktoberfest.de / CoinMarketCap / GitHub" — the LITERAL
- * surface, not a brand name); shipped verbatim-as-instructed and flagged for
- * confirmation rather than silently changed, per BLOCK-1's own doctrine.
- * BLOCK-2 confirms the founder ruling: the literal domain. The brand name
- * had been picked for column-fit before BLOCK-1's own S4 measured how this
- * surface's `truncate` recipe actually degrades (gracefully — full text
- * stays in the DOM, ellipsis only, BLOCK-2 run report), so there was no fit
- * reason left to prefer it once that was known.
+ * ⚠⚠ BLOCK-3 · MKT-SLATE CONTENT-BLOCK MANIFEST v1.1 (founder-ratified
+ * 2026-09-01) REDEFINES RESOLUTION, SUPERSEDING v1.0 AND AMEND-1 ITEM 15 —
+ * READ THIS BEFORE READING ANY VALUE BELOW. Through BLOCK-1/BLOCK-2,
+ * RESOLUTION named "the surface the answer is read from" (a place). v1.1
+ * redefines it as "the thing that is read to settle the market" (a
+ * document, a post, an act of publication) — related to the old
+ * definition, not identical to it, and every value below reflects the NEW
+ * one. For the five markets resolved by watching a named X account,
+ * RESOLUTION now reads "Response on X" — the THING read is a response
+ * post, found on the platform X, where BLOCK-1/2 read bare "X" (the
+ * platform alone, under the old surface-only definition). For
+ * `oktoberfest-munich-beer-volume`, RESOLUTION is now TWO lines:
+ * "oktoberfest.de" (still the surface, unchanged since BLOCK-2) / "report"
+ * (the thing itself — the preliminary final report, not the domain that
+ * hosts it). `bitcoin-price-50k` keeps "CoinMarketCap" (a published data
+ * series IS the thing read, not merely a site — the old and new
+ * definitions happen to coincide there) and `github-zugzwang-repo-stars`
+ * keeps "GitHub" (the star count itself is the thing read).
+ * ⚠ RESOLVER is a DIFFERENT question — who or what publishes the thing —
+ * and v1.1 does not touch it. It stays "who resolves", independent of
+ * RESOLUTION's "what is read" — never a mirror of it (BLOCK-2's finding
+ * that only `bitcoin-price-50k` has the two fields textually equal still
+ * holds; `oktoberfest-munich-beer-volume`'s RESOLVER also gained a second
+ * line this task, "management" — the festival's own organizing body,
+ * i.e. WHO within "Oktoberfest" authors the report RESOLUTION now names).
  * RESOLUTION's `href` is `null` on all eight today (U-3's eventual target —
  * Zugzwang's own X post per market — doesn't exist yet); the seam for wiring
  * it later is one value per market, right here, with zero component changes.
@@ -114,14 +111,14 @@ const OKTOBERFEST_CLOSES: ResolutionBlockEntry = {
 
 export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 	"mumbai-bmc-pink-october-disclosure": {
-		resolution: { line1: "X", line2: null, href: null },
+		resolution: { line1: "Response on X", line2: null, href: null },
 		resolver: {
 			line1: "@mybmc",
 			line2: null,
 			href: "https://x.com/mybmc",
 		},
 		closes: CLOSES_DEFAULT,
-		flavour: { line1: "pressure", line2: null, href: null },
+		flavour: { line1: "Pressure", line2: null, href: null },
 	},
 	"oktoberfest-munich-beer-volume": {
 		// ⚠⚠ BLOCK-2 · founder-ruled correction. AMEND-1 item 15 (§0)
@@ -134,51 +131,61 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 		// so there's no fit reason left to prefer the brand name over the
 		// ruled literal. RESOLVER keeps "Oktoberfest" — that field was never
 		// in question, only RESOLUTION was.
-		resolution: { line1: "oktoberfest.de", line2: null, href: null },
+		// ⚠⚠ BLOCK-3 · MKT-SLATE v1.1 — BOTH LINES NOW USED, MATCHING THE
+		// REDEFINITION. v1.1 redefines RESOLUTION from "the surface the answer
+		// is read from" to "the thing that is read to settle the market" —
+		// which for Oktoberfest is a specific REPORT, published AT
+		// oktoberfest.de, not the domain alone. line1 stays the surface
+		// (unchanged from BLOCK-2); line2 names the thing itself. RESOLVER
+		// gains the same shape: "Oktoberfest" (who) + "management" (which
+		// part of who — the festival's own organizing body, the report's
+		// author). hrefs are unchanged by this — the seam is text only.
+		resolution: { line1: "oktoberfest.de", line2: "report", href: null },
 		resolver: {
 			line1: "Oktoberfest",
-			line2: null,
+			line2: "management",
 			href: "https://www.oktoberfest.de/en",
 		},
 		closes: OKTOBERFEST_CLOSES,
-		flavour: { line1: "consumption", line2: null, href: null },
+		flavour: { line1: "Consumption", line2: null, href: null },
 	},
 	"chess-fide-tiebreak-response": {
-		resolution: { line1: "X", line2: null, href: null },
+		resolution: { line1: "Response on X", line2: null, href: null },
 		resolver: {
 			line1: "@FIDE_chess",
 			line2: null,
 			href: "https://x.com/FIDE_chess",
 		},
 		closes: CLOSES_DEFAULT,
-		flavour: { line1: "petition", line2: null, href: null },
+		flavour: { line1: "Petition", line2: null, href: null },
 	},
 	"bitcoin-price-50k": {
 		resolution: { line1: "CoinMarketCap", line2: null, href: null },
 		resolver: {
 			line1: "CoinMarketCap",
-			// ⚠ CoinMarketCap's LIVE TICKER is excluded by name in BTC-01's B2 —
-			// the href below is the historical-data page, and "Low" names the
-			// specific published field (the daily low) the criterion reads,
-			// not a live price.
-			line2: "Low",
+			// ⚠⚠ BLOCK-3 — `line2: "Low"` REMOVED, founder-ruled. CoinMarketCap's
+			// LIVE TICKER is still excluded by name in BTC-01's B2 and the href
+			// below is still the historical-data page — that distinction stands
+			// on the URL alone now, not on a second display line. `line1` and
+			// `href` are otherwise unchanged.
+			line2: null,
 			href: "https://coinmarketcap.com/currencies/bitcoin/historical-data/",
 		},
 		closes: CLOSES_DEFAULT,
-		flavour: { line1: "barrier", line2: null, href: null },
+		flavour: { line1: "Barrier", line2: null, href: null },
 	},
 	"math-erdos-contribution-response": {
-		resolution: { line1: "X", line2: null, href: null },
+		resolution: { line1: "Response on X", line2: null, href: null },
 		resolver: {
 			line1: "@thomasfbloom",
 			line2: null,
 			href: "https://x.com/thomasfbloom",
 		},
 		closes: CLOSES_DEFAULT,
-		flavour: { line1: "innovation", line2: null, href: null },
+		flavour: { line1: "Innovation", line2: null, href: null },
 	},
 	"claude-bundle-response": {
-		resolution: { line1: "X", line2: null, href: null },
+		resolution: { line1: "Response on X", line2: null, href: null },
 		// ⚠ FOUNDER-RULED, BLOCK-2. The live criterion qualifies three accounts
 		// (@AnthropicAI, @claudeai, @ClaudeDevs) — @security-auditor flagged
 		// that showing only one here could read as excluding the other two.
@@ -192,17 +199,17 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 			href: "https://x.com/claudeai",
 		},
 		closes: CLOSES_DEFAULT,
-		flavour: { line1: "suggestion", line2: null, href: null },
+		flavour: { line1: "Suggestion", line2: null, href: null },
 	},
 	"yc-paper-club-response": {
-		resolution: { line1: "X", line2: null, href: null },
+		resolution: { line1: "Response on X", line2: null, href: null },
 		resolver: {
 			line1: "@ycombinator",
 			line2: null,
 			href: "https://x.com/ycombinator",
 		},
 		closes: CLOSES_DEFAULT,
-		flavour: { line1: "showcase", line2: null, href: null },
+		flavour: { line1: "Showcase", line2: null, href: null },
 	},
 	"github-zugzwang-repo-stars": {
 		resolution: { line1: "GitHub", line2: null, href: null },
@@ -221,7 +228,7 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 			href: "https://github.com/zugzwang-foundation/experiment",
 		},
 		closes: CLOSES_DEFAULT,
-		flavour: { line1: "callout", line2: null, href: null },
+		flavour: { line1: "Callout", line2: null, href: null },
 	},
 };
 

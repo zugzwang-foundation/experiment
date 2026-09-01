@@ -116,7 +116,11 @@ describe("resolution-block-data — G1, exhaustive + fails loud on an unknown sl
  * `...-for-the-other-three`, so the miscount was in the prose, not the code.
  */
 describe("resolution-block-data — content matches the ratified register", () => {
-	it("resolution-block-data::RESOLUTION-is-X-for-the-five-account-watching-markets", () => {
+	it("resolution-block-data::RESOLUTION-is-Response-on-X-for-the-five-account-watching-markets", () => {
+		// ⚠⚠ BLOCK-3 · MKT-SLATE v1.1 — "X" → "Response on X". RESOLUTION
+		// redefined from "the surface" to "the thing read to settle the
+		// market"; for these five the thing is a response POST, not the bare
+		// platform name. See the data file's own docblock.
 		for (const slug of [
 			"mumbai-bmc-pink-october-disclosure",
 			"chess-fide-tiebreak-response",
@@ -124,7 +128,7 @@ describe("resolution-block-data — content matches the ratified register", () =
 			"claude-bundle-response",
 			"yc-paper-club-response",
 		] as const) {
-			expect(RESOLUTION_BLOCKS[slug].resolution.line1).toBe("X");
+			expect(RESOLUTION_BLOCKS[slug].resolution.line1).toBe("Response on X");
 			expect(RESOLUTION_BLOCKS[slug].resolution.href).toBeNull();
 		}
 	});
@@ -134,15 +138,42 @@ describe("resolution-block-data — content matches the ratified register", () =
 		// "Oktoberfest" BLOCK-1 shipped. Founder-ruled (AMEND-1 item 15); see
 		// this file's own docblock. RESOLVER keeps "Oktoberfest" — only
 		// RESOLUTION changed.
+		// ⚠⚠ BLOCK-3 · MKT-SLATE v1.1 — oktoberfest's RESOLUTION gains line2
+		// "report": the redefined field names the THING read (the report),
+		// not just the surface it's published at.
 		expect(
-			RESOLUTION_BLOCKS["oktoberfest-munich-beer-volume"].resolution.line1,
-		).toBe("oktoberfest.de");
+			RESOLUTION_BLOCKS["oktoberfest-munich-beer-volume"].resolution,
+		).toEqual({ line1: "oktoberfest.de", line2: "report", href: null });
 		expect(RESOLUTION_BLOCKS["bitcoin-price-50k"].resolution.line1).toBe(
 			"CoinMarketCap",
 		);
 		expect(
 			RESOLUTION_BLOCKS["github-zugzwang-repo-stars"].resolution.line1,
 		).toBe("GitHub");
+	});
+
+	it("resolution-block-data::OKT-01-RESOLVER-gains-management-as-line2", () => {
+		// ⚠⚠ BLOCK-3 · MKT-SLATE v1.1 — "Oktoberfest" / "management": who (the
+		// festival) + which part of who (the organizing body that authors the
+		// report RESOLUTION now names). href unchanged.
+		expect(
+			RESOLUTION_BLOCKS["oktoberfest-munich-beer-volume"].resolver,
+		).toEqual({
+			line1: "Oktoberfest",
+			line2: "management",
+			href: "https://www.oktoberfest.de/en",
+		});
+	});
+
+	it("resolution-block-data::BTC-01-RESOLVER-no-longer-carries-a-Low-subvalue", () => {
+		// ⚠⚠ BLOCK-3 — §4c removed line2 "Low"; line1 and href are unchanged.
+		// Explicit regression guard: this is the one row that LOST a line2
+		// this task, easy to silently restore by copying an older fixture.
+		expect(RESOLUTION_BLOCKS["bitcoin-price-50k"].resolver).toEqual({
+			line1: "CoinMarketCap",
+			line2: null,
+			href: "https://coinmarketcap.com/currencies/bitcoin/historical-data/",
+		});
 	});
 
 	it("resolution-block-data::CLA-01-RESOLVER-is-deliberately-single-account-not-an-oversight", () => {
@@ -193,21 +224,31 @@ describe("resolution-block-data — content matches the ratified register", () =
 		}
 	});
 
-	it("resolution-block-data::FLAVOUR-is-lowercase-not-title-cased-and-href-is-null", () => {
+	it("resolution-block-data::FLAVOUR-is-sentence-case-IN-THE-DATA-and-href-is-null", () => {
+		// ⚠⚠ BLOCK-3 — lowercase → sentence case, and it happens HERE, never via
+		// a CSS `capitalize` on the rendered value. `capitalize` transforms the
+		// first letter of every WORD, which would turn "oktoberfest.de report"
+		// (a different block's two-word-ish value) into "Oktoberfest.de
+		// Report" — capitalizing "report" is exactly what sentence case (only
+		// the first letter of the WHOLE string) must not do. The data is the
+		// only place this can be gotten right per-string.
 		const expected: Record<(typeof KNOWN_SLUGS)[number], string> = {
-			"mumbai-bmc-pink-october-disclosure": "pressure",
-			"oktoberfest-munich-beer-volume": "consumption",
-			"chess-fide-tiebreak-response": "petition",
-			"bitcoin-price-50k": "barrier",
-			"math-erdos-contribution-response": "innovation",
-			"claude-bundle-response": "suggestion",
-			"yc-paper-club-response": "showcase",
-			"github-zugzwang-repo-stars": "callout",
+			"mumbai-bmc-pink-october-disclosure": "Pressure",
+			"oktoberfest-munich-beer-volume": "Consumption",
+			"chess-fide-tiebreak-response": "Petition",
+			"bitcoin-price-50k": "Barrier",
+			"math-erdos-contribution-response": "Innovation",
+			"claude-bundle-response": "Suggestion",
+			"yc-paper-club-response": "Showcase",
+			"github-zugzwang-repo-stars": "Callout",
 		};
 		for (const slug of KNOWN_SLUGS) {
 			const flavour = RESOLUTION_BLOCKS[slug].flavour;
 			expect(flavour.line1).toBe(expected[slug]);
-			expect(flavour.line1).toBe(flavour.line1.toLowerCase());
+			// Sentence case: first character upper, the rest lower (these are
+			// single words, so "the rest lower" is the whole remainder).
+			expect(flavour.line1[0]).toBe(flavour.line1[0].toUpperCase());
+			expect(flavour.line1.slice(1)).toBe(flavour.line1.slice(1).toLowerCase());
 			expect(flavour.href).toBeNull();
 			expect(flavour.line2).toBeNull();
 		}
