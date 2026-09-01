@@ -9,6 +9,7 @@ import {
 	dirtyMetadata,
 	FIXTURE_SECRET_VALUES,
 	FIXTURE_USER_IDS,
+	fixtureSecrets,
 } from "../../../_fixtures/dataset/dirty-source";
 
 /**
@@ -238,6 +239,107 @@ describe("S1 · the C-1 attack, reproduced through the real build", () => {
 		expect(() => assertTableClean("markets", [{ slug: key }], secrets)).toThrow(
 			/egress_violation/,
 		);
+	});
+});
+
+describe("S1 · provenance is DERIVED from SITE_PROVENANCE, per SUB-KEY", () => {
+	// ⚠ **`@security-auditor` L-3's derivation had no behavioural test.**
+	// `PARTICIPANT_JSONB_KEYS` is computed from `SITE_PROVENANCE` — precisely so
+	// that the JSONB half of the provenance decision has one home — and flipping
+	// `"metadata.ip"` or `"payload.email"` from PARTICIPANT to SYSTEM left the
+	// whole export suite green (measured, twice, 387/387).
+	//
+	// Nothing caught it because every S1 test above reaches provenance through
+	// a COLUMN site (`users.email`, `users.tos_acceptance_user_agent`,
+	// `bets.idempotency_key`), and those are tagged by an explicit
+	// `SITE_PROVENANCE[...]` lookup at the `add(...)` call. The JSONB sites are
+	// tagged by the derived SET, and no needle in the suite reached them alone.
+	//
+	// The fixture supplies two ips that do: IP_C and IP_NESTED are on no `users`
+	// row at all, so `ip` as a metadata/payload sub-key is the only way either
+	// enters the harvest.
+
+	const [, , IP_C, IP_NESTED] = FIXTURE_SECRET_VALUES.ips;
+
+	it("CONTROL — IP_C and IP_NESTED enter ONLY through JSONB", () => {
+		// Without this the assertions below are equally satisfied by a column
+		// site doing the tagging, and the derived set could be empty.
+		for (const u of DIRTY_TABLE_ROWS.users) {
+			expect((u as Record<string, unknown>).tos_acceptance_ip).not.toBe(IP_C);
+			expect((u as Record<string, unknown>).tos_acceptance_ip).not.toBe(
+				IP_NESTED,
+			);
+		}
+	});
+
+	it("a JSONB-only ip is tagged PARTICIPANT, under the sub-key `ip`", () => {
+		const secrets = harvestSecrets(DIRTY_TABLE_ROWS as never);
+		for (const ip of [IP_C, IP_NESTED]) {
+			expect(secrets.ips.has(ip)).toBe(true);
+			expect(
+				secrets.participantSourced.get(ip),
+				"`metadata.ip` / `payload.ip` are PARTICIPANT in SITE_PROVENANCE — " +
+					"an x-forwarded-for first entry is whatever the caller sent",
+			).toEqual(new Set(["ip"]));
+		}
+	});
+
+	it("⇒ the C-1 channel for an IP is advisory, and fatal under `ip`", () => {
+		// The consequence, so the tag above is not merely a data assertion. Both
+		// halves of the rule, on a needle whose provenance exists ONLY through
+		// the derivation.
+		const secrets = harvestSecrets(DIRTY_TABLE_ROWS as never);
+		const outcome = assertTableClean("markets", [{ slug: IP_C }], secrets);
+		expect(outcome.advisories.map((a) => a.rule)).toContain("no-ip");
+		expect(() => assertTableClean("events", [{ ip: IP_C }], secrets)).toThrow(
+			/no-ip/,
+		);
+	});
+
+	it("a SYSTEM-declared sub-key stays fatal — the partition is not blanket", () => {
+		// `payload.key` and `payload.sessionId` are declared SYSTEM, so the
+		// derived set must NOT contain those spellings. Without this half, a
+		// derivation that tagged every JSONB sub-key participant would pass
+		// every assertion above.
+		const secrets = harvestSecrets(DIRTY_TABLE_ROWS as never);
+		const sessionId = [...secrets.adminSessionIds][0] as string;
+		expect(secrets.participantSourced.has(sessionId)).toBe(false);
+		expect(() =>
+			assertTableClean("markets", [{ slug: sessionId }], secrets),
+		).toThrow(/no-admin-session-id/);
+	});
+
+	it("the fixture's LITERAL provenance map agrees with the harvest, field for field", () => {
+		// ⚠ **The fixture's docblock calls this map *"an INDEPENDENT statement of
+		// the same fact `harvestSecrets` derives"*, and nothing compared them.**
+		// It was wrong on four of its six needles when this was written: it
+		// claimed IP_C and IP_NESTED were harvested under `tos_acceptance_ip`
+		// (no `users` row carries either) and that both user-agents were
+		// harvested under the camelCase `userAgent` (no payload carries it).
+		//
+		// Both errors are in the STRICT direction, so nothing failed — the
+		// fixture merely made several tests assert a fatality the pipeline would
+		// not produce. An independent statement nobody checks is not an
+		// independent statement; it is a second source of truth with no arbiter.
+		const harvested = harvestSecrets(DIRTY_TABLE_ROWS as never);
+		const declared = fixtureSecrets();
+
+		const asObject = (m: ReadonlyMap<string, ReadonlySet<string>>) =>
+			Object.fromEntries(
+				[...m].map(([v, fields]) => [v, [...fields].sort()]),
+			) as Record<string, string[]>;
+
+		// CONTROL — there is something to compare. An empty map on both sides
+		// would satisfy the equality and measure nothing.
+		expect(harvested.participantSourced.size).toBeGreaterThan(5);
+
+		expect(
+			asObject(declared.participantSourced),
+			"the fixture's ruling-S1 literal has drifted from the harvest it is " +
+				"supposed to be checked against — the FIELD NAMES are the half " +
+				"that decides fatality, so a disagreement silently re-tiers every " +
+				"test that takes its secrets from fixtureSecrets()",
+		).toEqual(asObject(harvested.participantSourced));
 	});
 });
 

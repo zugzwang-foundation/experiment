@@ -1120,11 +1120,34 @@ function participantSites(): Map<string, ReadonlySet<string>> {
 		for (const f of fields) prev.add(f);
 		m.set(v, prev);
 	};
-	// An ip enters as `users.tos_acceptance_ip` and as the `ip` sub-key of
-	// `metadata` / `payload`; a user-agent likewise under two spellings.
-	for (const v of FIXTURE_SECRET_VALUES.ips) put(v, "tos_acceptance_ip", "ip");
+	// ⚠ **Per-value, not blanket, and the correction is the point.** This read
+	// `for (const v of ips) put(v, "tos_acceptance_ip", "ip")` and
+	// `put(ua, …, "user_agent", "userAgent")`, and over-claimed on four of the
+	// six needles: IP_C and IP_NESTED are on NO `users` row — they enter only
+	// through JSONB — and no fixture payload carries the camelCase `userAgent`
+	// spelling at all.
+	//
+	// The field names are the half of ruling S1 that decides FATALITY, so an
+	// over-wide literal makes the fixture stricter than the pipeline: a hit on
+	// `tos_acceptance_ip` carrying IP_C reads as the transform failing at its
+	// own job where the harvest says it is an arrangeable coincidence. Every
+	// test taking its secrets from `fixtureSecrets()` inherited that.
+	//
+	// It went unnoticed because nothing compared this map to the one
+	// `harvestSecrets` derives — the two were "independent" in the sense of
+	// being unchecked. `needle-provenance.test.ts` now compares them
+	// field-for-field, which is the only version of independence worth having.
+	//
+	// IP_A / IP_B sit on amber's and basalt's `tos_acceptance_ip` AND in
+	// metadata/payload; IP_C and IP_NESTED are JSONB-only.
+	put(IP_A, "tos_acceptance_ip", "ip");
+	put(IP_B, "tos_acceptance_ip", "ip");
+	put(IP_C, "ip");
+	put(IP_NESTED, "ip");
+	// Both user-agents sit on a `users` row and in metadata. `payload.userAgent`
+	// is a spelling `SITE_PROVENANCE` knows and this fixture never writes.
 	for (const v of FIXTURE_SECRET_VALUES.userAgents)
-		put(v, "tos_acceptance_user_agent", "user_agent", "userAgent");
+		put(v, "tos_acceptance_user_agent", "user_agent");
 	for (const v of FIXTURE_SECRET_VALUES.emails) put(v, "email");
 	for (const u of DIRTY_TABLE_ROWS.users) put(u.name as string, "name");
 	for (const a of DIRTY_TABLE_ROWS.mod_actions)

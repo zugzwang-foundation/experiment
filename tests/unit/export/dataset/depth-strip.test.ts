@@ -19,7 +19,10 @@ import {
 	stripTable,
 } from "@/server/export/dataset/strip";
 import { assertTableClean } from "@/server/export/egress";
-import { EgressViolationError } from "@/server/export/egress/errors";
+import {
+	EgressContractGapError,
+	EgressViolationError,
+} from "@/server/export/egress/errors";
 import {
 	GLOBALLY_FORBIDDEN_PAYLOAD_KEYS,
 	PAYLOAD_SHIP_KEYS,
@@ -710,6 +713,105 @@ describe("C3 · image_upload.committed.payload.commentId is stripped", () => {
 		});
 		const keptOut = out.find((r) => r.id === kept?.id);
 		expect(keptOut?.image_uploads_id).toBe(kept?.image_uploads_id);
+	});
+});
+
+describe("L-4 · the PROTOTYPE CHAIN is not a declaration", () => {
+	// ⚠ **`@security-auditor` L-4, DATASET.3 — and it shipped with no test.**
+	// Both lookups in `strip.ts` were a bare index into an object literal, so
+	// every name on `Object.prototype` resolved to something non-`undefined`
+	// and was treated as a DECLARATION. Reverting either `Object.hasOwn` guard
+	// left this whole export suite green (measured: 387/387, twice).
+	//
+	// It is unreachable through `events` today — its `event_type` is the closed
+	// `EVENT_TYPES` enum and `insertEvent` validates against it — but
+	// `PAYLOAD_BEARING_TABLES` deliberately includes `admin_events` and
+	// `user_events`, whose `event_type` is open `text` (§7.1), and `strip.ts`'s
+	// own docblock anticipates a projection landing there. A guard whose
+	// failing shape is one migration away is not hypothetical; it is early.
+
+	it("an event type named `toString` THROWS rather than shipping `{}`", () => {
+		// The exact defect: `PAYLOAD_SHIP_KEYS["toString"]` is the inherited
+		// function, so `spec !== undefined` held, the throw was skipped, and the
+		// whole type exported BLANK payloads — silently, permanently, into an
+		// append-only corpus. Blank is the safe direction and still the wrong
+		// artifact; that is `completeness.ts`'s entire argument.
+		for (const name of ["toString", "valueOf", "constructor", "__proto__"]) {
+			expect(
+				() => shipPayload(name, { marketId: "m1" }),
+				`event_type '${name}' must reach the unknown-type throw`,
+			).toThrow(EgressContractGapError);
+		}
+	});
+
+	it("…and the message names the missing DECLARATION, not the prototype", () => {
+		// The operator-facing half: at 06:00 the message has to send them to
+		// §19.4.1, not into a lecture on JavaScript.
+		let message = "";
+		try {
+			shipPayload("valueOf", { marketId: "m1" });
+		} catch (e) {
+			message = (e as Error).message;
+		}
+		expect(message).toContain("§19.4.1");
+		expect(message).toContain("valueOf");
+	});
+
+	it("POSITIVE CONTROL — a REAL event type still resolves and ships", () => {
+		// Without this, the four throws above are satisfied by a lookup that
+		// throws on everything, which would be a total build failure wearing a
+		// privacy fix's clothes.
+		const out = shipPayload("market.closed", { marketId: "m1" }) as Record<
+			string,
+			unknown
+		>;
+		expect(out.marketId).toBe("m1");
+	});
+
+	it("a payload KEY named `toString` is dropped, not shipped", () => {
+		// The `shipDeep` half. With the bare index, `node["toString"]` resolved
+		// to the inherited function and the key survived the filter — shipping a
+		// key nobody declared, which is the one outcome the allow-list exists to
+		// prevent.
+		const out = shipDeep(
+			{
+				marketId: "m1",
+				// A container, so the buggy version emits `toString: {}` rather
+				// than throwing on a scalar — i.e. the key SHIPS.
+				toString: { leaked: FIXTURE_USER_IDS.amber },
+				valueOf: { leaked: FIXTURE_USER_IDS.basalt },
+			},
+			{ marketId: true },
+			"probe",
+		) as Record<string, unknown>;
+
+		// ⚠ `Object.hasOwn`, NOT `"toString" in out` — and my first draft of
+		// this assertion used `in` and went red, which is the same mistake the
+		// production code made one file over. `in` walks the prototype chain, so
+		// on any plain object it is TRUE for every inherited method whether or
+		// not the strip shipped one. An assertion written that way can only
+		// fail, never pass, and would have been "fixed" by deleting it.
+		expect(Object.hasOwn(out, "toString")).toBe(false);
+		expect(Object.hasOwn(out, "valueOf")).toBe(false);
+		// The declared sibling survives, so this is not an emptied object.
+		expect(out.marketId).toBe("m1");
+		// The whole own-key set, so a third inherited name cannot slip through.
+		expect(Object.keys(out).sort()).toEqual(["marketId"]);
+	});
+
+	it("…and a SCALAR under such a key does not abort the build either", () => {
+		// The other arm, and a different failure. With the bare index, a scalar
+		// `toString` reached `shipDeep(value, <function>, …)`, fell past the
+		// `true` and array branches, hit `typeof value !== "object"` and THREW —
+		// so the same defect that ships a container silently kills the run on a
+		// string. One bug, two opposite outcomes, neither of them correct.
+		expect(() =>
+			shipDeep(
+				{ marketId: "m1", toString: "an ordinary string" },
+				{ marketId: true },
+				"probe",
+			),
+		).not.toThrow();
 	});
 });
 

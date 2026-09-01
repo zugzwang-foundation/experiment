@@ -66,6 +66,21 @@ describe("§19.7 · the pre-release state", () => {
 		// 2026-11-06. A server in a positive offset comparing local days would
 		// flip this route hours early — invisible in every test that runs in
 		// UTC, and visible exactly once, on the day.
+		//
+		// ⚠⚠ **THIS ASSERTION CANNOT CURRENTLY FAIL, AND SAYING SO IS THE
+		// POINT.** The handler's condition is
+		// `!released(new Date()) || PUBLISHED_MANIFEST === null`, and
+		// `PUBLISHED_MANIFEST` is the literal `null` until the release task
+		// writes the file — so the second disjunct forces 503 on every input and
+		// the first is unobservable through `GET`. Measured: rewriting
+		// `released()` to compare the LOCAL calendar day left this suite green.
+		//
+		// The status assertion is kept — it is the behaviour a researcher
+		// actually gets on 5 November — and the MECHANISM is pinned below by
+		// source, because that is the only surface the property is visible on
+		// while the 200 branch is unreachable. When `PUBLISHED_MANIFEST` stops
+		// being `null`, this becomes a real behavioural test and the source pin
+		// should go.
 		vi.useFakeTimers();
 		// 2026-11-05 23:00 UTC is already 2026-11-06 in IST (+05:30).
 		vi.setSystemTime(new Date("2026-11-05T23:00:00.000Z"));
@@ -73,6 +88,43 @@ describe("§19.7 · the pre-release state", () => {
 			new Request("https://zugzwang.world/api/dataset/manifest"),
 		);
 		expect(res.status).toBe(503);
+	});
+
+	it("…and the mechanism is pinned by SOURCE while the 200 branch is dead", async () => {
+		// ⚠ A source scan, and it is the honest shape here for the reason the
+		// test above states: the property has no observable behaviour yet. It is
+		// pinned by SYMBOL (`toISOString`, `getFullYear`), never by line — O-8.
+		//
+		// ⚠ Comments are stripped first, because this project has recorded six
+		// occasions where a negative source scan matched the prose explaining
+		// the absence rather than the code — and the docblock above literally
+		// contains the words `getFullYear`.
+		const { readFileSync } = await import("node:fs");
+		const src = readFileSync("src/app/api/dataset/manifest/route.ts", "utf8")
+			.replace(/\/\*[\s\S]*?\*\//g, "")
+			.replace(/\/\/.*$/gm, "");
+
+		// POSITIVE CONTROL — the scan found the function it is reasoning about.
+		// Without this every assertion below is satisfied by an empty string.
+		expect(src).toContain("function released(");
+		expect(src).toContain("RELEASE_DATE");
+
+		// The UTC path…
+		expect(src, "the day must come from an ISO-8601 UTC render").toContain(
+			"toISOString().slice(0, 10)",
+		);
+		// …and none of the local-calendar accessors that would silently shift it.
+		for (const local of [
+			"getFullYear",
+			"getMonth",
+			"getDate",
+			"toLocaleDateString",
+		]) {
+			expect(
+				src,
+				`${local} reads the SERVER's calendar, which flips this route hours early in any positive offset`,
+			).not.toContain(local);
+		}
 	});
 });
 
@@ -102,6 +154,29 @@ describe("§19.7 · what this route must NOT do", () => {
 		expect(id).toMatch(
 			/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
 		);
+	});
+
+	it("…and the BODY mirrors it — `retry_after`, per §15.1", async () => {
+		// ⚠ **`@code-reviewer` M-4, and it landed with no test.** SPEC.2 §15.1
+		// says the body field *"mirrors the HTTP `Retry-After` header on Route
+		// Handler responses"*, and the codebase's two other 503 sites — both
+		// upload-sign routes — pass the value to `envelope` AND to
+		// `jsonResponse`. This handler was the outlier; the fix added the
+		// `envelope` argument, and removing it again left this whole suite
+		// green (measured).
+		//
+		// It matters because the header is the half an INTERMEDIARY reads and
+		// the body is the half a researcher's script reads, and §19.7's entire
+		// stated purpose is programmatic discovery.
+		const res = await GET(
+			new Request("https://zugzwang.world/api/dataset/manifest"),
+		);
+		const body = (await res.json()) as {
+			error: { code: string; retry_after?: number };
+		};
+		expect(body.error.retry_after).toBe(300);
+		// …and it agrees with the header, which is what "mirrors" means.
+		expect(String(body.error.retry_after)).toBe(res.headers.get("Retry-After"));
 	});
 
 	it("the pre-release answer carries Retry-After, and does NOT claim to be cached", async () => {

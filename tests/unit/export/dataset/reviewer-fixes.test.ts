@@ -26,6 +26,7 @@ import { EgressGuard } from "@/server/export/egress";
 
 import {
 	DIRTY_TABLE_ROWS,
+	FIXTURE_USER_IDS,
 	fixtureSecrets,
 } from "../../../_fixtures/dataset/dirty-source";
 
@@ -248,6 +249,76 @@ describe("M-7 / M-10 · the manifest describes the WHOLE archive", () => {
 			}));
 			expect(contentSha256(entries)).toBe(r.manifest.content_sha256);
 		});
+	});
+
+	it("M-7 · an extraEntry cannot enter the ARCHIVE without passing the scan", async () => {
+		// ⚠ **The structural half of M-7, and nothing exercised it.** The fix
+		// moved the `.md` guard INTO `buildDataset`, so the archive's guarantee
+		// stops resting on the caller having remembered `debateEntries` with a
+		// secret set they derived themselves. `build.ts` says so in as many
+		// words: *"an entry cannot enter the archive without passing the same
+		// scan the tables did."*
+		//
+		// Measured: emptying that loop — `for (const entry of [])` — left every
+		// test in the export suite green (387/387). Every existing `.md` test
+		// goes through `debateEntries`, which is the OPTIONAL constructor the
+		// finding says is no longer what makes the archive safe; none handed a
+		// dirty entry straight to `buildDataset`.
+		//
+		// The needle is a raw `users.id`. It is SYSTEM-minted, so ruling S1
+		// keeps it fatal on the text arm — a UUID in a debate document is a
+		// serializer leak, not something a participant typed.
+		const leaked = `# Debate\n\nposted by ${FIXTURE_USER_IDS.amber}\n`;
+
+		await expect(
+			buildDataset({
+				source: fixtureSource("fixture", DIRTY_TABLE_ROWS as never),
+				releaseDate: "2026-11-06",
+				// ⚠ Bypassing `debateEntries` DELIBERATELY. That is the seam the
+				// finding is about: a v2 rebuild script, a partial re-export or a
+				// debug tool assembling `TarEntry`s by hand reaches exactly here.
+				extraEntries: [{ name: "debates/leaky.md", content: leaked }],
+			}),
+		).rejects.toThrow(/no-raw-user-id/);
+
+		// POSITIVE CONTROL — the same build with a CLEAN entry completes and
+		// archives it. Without this, the rejection above is satisfied by a build
+		// that refuses every extra entry, which would be a different defect.
+		const ok = await buildDataset({
+			source: fixtureSource("fixture", DIRTY_TABLE_ROWS as never),
+			releaseDate: "2026-11-06",
+			extraEntries: [
+				{ name: "debates/clean.md", content: "# Debate\n\nAmberOtter042\n" },
+			],
+		});
+		expect(ok.manifest.extra_files.map((f) => f.name)).toEqual([
+			"debates/clean.md",
+		]);
+	});
+
+	it("M-7 · …and an extraEntry's ADVISORIES reach the same manifest", async () => {
+		// The other half of that loop: it pushes `outcome.advisories` and
+		// `outcome.skipped` into the build's own tallies. A guard whose findings
+		// are computed and dropped is a guard that ran for nobody.
+		//
+		// A participant-authorable needle, so the tier is advisory rather than
+		// fatal — an email is something a participant writes into an argument
+		// (`@security-auditor` F-11 H-B).
+		const email = [...fixtureSecrets().emails][0] as string;
+		const r = await buildDataset({
+			source: fixtureSource("fixture", DIRTY_TABLE_ROWS as never),
+			releaseDate: "2026-11-06",
+			extraEntries: [
+				{
+					name: "debates/chatty.md",
+					content: `# Debate\n\nreach me at ${email}\n`,
+				},
+			],
+		});
+		expect(r.manifest.advisories.join(" ")).toContain("no-email");
+		expect(r.advisoryDetail.map((a) => a.artifact)).toContain(
+			"debates/chatty.md",
+		);
 	});
 
 	it("metadata field lists are DERIVED, carrying the §19.5 rename", () => {
