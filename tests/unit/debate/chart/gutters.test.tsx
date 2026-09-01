@@ -167,5 +167,32 @@ describe("debate-view::price-chart-mark-aligns-to-gridline — RF-1", () => {
 			// clamp.
 			expect(tokens(marksCol)).toContain("text-[10px]");
 		});
+
+		it(`${mode}: every mark is CENTRED on its top, not hung below it`, () => {
+			// ⛔⛔ THE HALF OF RF-1's RULING THE ALIGNMENT CASE ABOVE CANNOT SEE, AND
+			// A MUTATION PROVED IT. `top` places an element's TOP EDGE; what turns
+			// that coordinate into "the mark's centre sits on its gridline" is
+			// `-translate-y-1/2` beside it. Deleting that class from every mark drops
+			// all eleven numbers half a box below the rules they label, on all three
+			// modes — and it was GREEN across the whole chart suite, because the
+			// percentage the alignment case reads is still exactly right. The
+			// coordinate was never the claim; the coordinate PLUS the transform is.
+			//
+			// ⚠ THE END LABELS HAVE CARRIED THIS GUARD SINCE CHART-2
+			// (`terminal-markers.test.tsx`, `label-anchor.test.tsx`) FOR THE SAME
+			// REASON. RF-1 gave the marks column the same geometry on every mode and
+			// it did not inherit the guard — which is what makes this an omission
+			// rather than a new rule.
+			const marksCol = q(render(mode), "chart-y-marks");
+			const marks = [...marksCol.querySelectorAll("[data-pct]")];
+			// Positive control on the loop itself: −1 and 0 are both "no violation".
+			expect(marks.length).toBe(gridlinesFor(mode).length);
+			for (const mk of marks) {
+				expect(
+					tokens(mk),
+					`y-mark-${mk.getAttribute("data-pct")} hangs below its gridline`,
+				).toContain("-translate-y-1/2");
+			}
+		});
 	}
 });
