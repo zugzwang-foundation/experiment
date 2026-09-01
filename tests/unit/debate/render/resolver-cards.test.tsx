@@ -141,7 +141,10 @@ describe("RESO-1/BLOCK-1 — R-7, four blocks from one fixture, geometry unchang
 			container
 				.querySelector('[data-testid="resolver-cards"]')
 				?.getAttribute("class") ?? "";
-		expect(cls).toContain("min-h-[84px]");
+		// ⚠⚠ BLOCK-3 §2 — 84px → 78px, re-derived against the smaller glyph
+		// (48→36px) and padding (`py-2`→`py-1.5`) this task leaves behind. See
+		// `ResolverCards.tsx`'s own docblock on this class for the computation.
+		expect(cls).toContain("min-h-[78px]");
 		expect(cls).toMatch(/min-h-\[\d+px\]/);
 		expect(cls.split(/\s+/)).not.toContain("min-h-0");
 	});
@@ -187,6 +190,13 @@ describe("RESO-1/BLOCK-1 — R-7, four blocks from one fixture, geometry unchang
 			// The glyph stays decorative — unchanged by RESOLVER becoming a link
 			// (RF-3a: it must contribute nothing to the anchor's accessible name).
 			expect(glyph?.getAttribute("aria-hidden")).toBe("true");
+			// ⚠⚠ BLOCK-3 §2 — hidden below `sm`, visible at/above it. MEASURED at
+			// 390×844: a 36px glyph plus this block's own padding already exceeds
+			// the block's total width at that breakpoint, driving the text column
+			// to 0px — invisible, not merely truncated. `ResolverCards.tsx`'s own
+			// docblock on this span has the full arithmetic.
+			expect(gc.split(/\s+/)).toContain("hidden");
+			expect(gc.split(/\s+/)).toContain("sm:block");
 		}
 	});
 
@@ -420,7 +430,17 @@ describe("BLOCK-1 — R-12 reversed for RESOLVER only; G7/G8 on the split", () =
 	});
 
 	it("resolver-cards::G7-RESOLVER-is-ONE-anchor-wrapping-glyph-label-AND-value", () => {
-		const { container } = render(<ResolverCards market={PRIMARY_MARKET} />);
+		// ⚠ BLOCK-3 — oktoberfest, not PRIMARY_MARKET (bitcoin). §4c dropped
+		// bitcoin's RESOLVER subvalue ("Low"), so it no longer exercises the
+		// subvalue-inside-the-anchor branch this test exists to check;
+		// oktoberfest's RESOLVER gained one ("management") the same task, and
+		// is now the only market whose RESOLVER carries both an href and a
+		// subvalue.
+		const { container } = render(
+			<ResolverCards
+				market={marketFixture("oktoberfest-munich-beer-volume")}
+			/>,
+		);
 		const block = container.querySelector(
 			'[data-testid="resolution-block-resolver"]',
 		);
@@ -481,7 +501,14 @@ describe("BLOCK-1 — R-12 reversed for RESOLVER only; G7/G8 on the split", () =
 			container
 				.querySelector('[data-testid="resolution-block-resolver"]')
 				?.getAttribute("class") ?? "";
-		expect(resolver).toMatch(/focus-visible:shadow-\(--state-focus-ring\)/);
+		// ⚠⚠ BLOCK-3 §2 — inset now, not the shared `--state-focus-ring` token.
+		// `ResolverCards.tsx`'s `LINK_AFFORDANCE` docblock has the full reasoning:
+		// the outset token clips against `headzone-stack`'s `overflow-y-auto`, so
+		// this block's own focus ring switched to an inset shadow reusing `--ring`
+		// (the same token its hover state already borrows) instead.
+		expect(resolver).toMatch(
+			/focus-visible:shadow-\[inset_0_0_0_2px_var\(--ring\)\]/,
+		);
 		expect(resolver).toContain("outline-none");
 
 		for (const k of ["resolution", "closes", "flavour"] as const) {
@@ -522,6 +549,161 @@ describe("BLOCK-1 — R-12 reversed for RESOLVER only; G7/G8 on the split", () =
 		expect(row?.children.length).toBe(4);
 		expect((row?.textContent ?? "").trim()).toContain("Resolution");
 		expect((row?.textContent ?? "").trim().length).toBeGreaterThan(20);
+	});
+});
+
+/**
+ * BLOCK-3 §3 — value/subvalue move from `text-muted-foreground` to full ink,
+ * sized per block from the map's own measured `fontSize`. Labels are
+ * unchanged (still muted) — v1.1 re-ranks the VALUE against the label, never
+ * the label itself.
+ */
+describe("BLOCK-3 §3 — value/subvalue read ink, sized per block from the map", () => {
+	it("resolver-cards::every-value-and-subvalue-is-ink-sized-from-its-own-fontSize", () => {
+		for (const slug of Object.keys(RESOLUTION_BLOCKS) as Array<
+			keyof typeof RESOLUTION_BLOCKS
+		>) {
+			const { container, unmount } = render(
+				<ResolverCards market={marketFixture(slug)} />,
+			);
+			const data = RESOLUTION_BLOCKS[slug];
+			for (const k of KEYS) {
+				const entry = data[k];
+				const value = container.querySelector(
+					`[data-testid="resolution-block-value-${k}"]`,
+				);
+				const valueClasses = (value?.getAttribute("class") ?? "").split(/\s+/);
+				expect(valueClasses).toContain("text-ink");
+				expect(valueClasses).not.toContain("text-muted-foreground");
+				expect(valueClasses).toContain(`text-[${entry.fontSize}px]`);
+				// ⛔ THE FLOOR, ASSERTED AGAINST THE DATA ITSELF — a type of
+				// `11 | 12 | 13 | 14` already makes anything below 11 a `tsc` error,
+				// so this is a belt asserting the runtime-rendered class agrees with
+				// the type, not a second source of truth for the floor.
+				expect(entry.fontSize).toBeGreaterThanOrEqual(11);
+				expect(entry.fontSize).toBeLessThanOrEqual(14);
+
+				if (entry.line2 !== null) {
+					const subvalue = container.querySelector(
+						`[data-testid="resolution-block-subvalue-${k}"]`,
+					);
+					const subvalueClasses = (subvalue?.getAttribute("class") ?? "").split(
+						/\s+/,
+					);
+					expect(subvalueClasses).toContain("text-ink");
+					expect(subvalueClasses).not.toContain("text-muted-foreground");
+					// ⛔ SAME SIZE AS line1 — one shared size per block, not one per
+					// line (resolution-block-data.ts's `fontSize` docblock).
+					expect(subvalueClasses).toContain(`text-[${entry.fontSize}px]`);
+				}
+			}
+			unmount();
+		}
+	});
+
+	it("resolver-cards::labels-stay-muted-unchanged-by-the-ink-move", () => {
+		const { container } = render(<ResolverCards market={PRIMARY_MARKET} />);
+		for (const k of KEYS) {
+			const label = container.querySelector(
+				`[data-testid="resolution-block-label-${k}"]`,
+			);
+			const cls = (label?.getAttribute("class") ?? "").split(/\s+/);
+			expect(cls).toContain("text-n4");
+			expect(cls).not.toContain("text-ink");
+		}
+	});
+
+	it("resolver-cards::no-entry-ships-at-the-11px-floor-after-BLOCK-3-§2-widened-the-column", () => {
+		// ⚠⚠ THIS TEST USED TO BE "math-erdos-RESOLVER-hits-the-11px-floor-and-
+		// still-truncates" — "@thomasfbloom" did not fit the column §3 first
+		// measured against (79px) even at the 11px floor. §2 then shrank the
+		// glyph for an unrelated reason (reducing block height) and widened
+		// that column to 91px as a side effect; re-measured before shipping,
+		// every entry that had been pinned to 11px moved up, including this
+		// one (now 12px, fits cleanly, no truncation needed). Recorded as a
+		// positive assertion rather than deleted outright (O-4): the floor and
+		// `truncate` stay in the type and the render path regardless — this
+		// proves the CURRENT map doesn't need them, not that it never will.
+		for (const slug of Object.keys(RESOLUTION_BLOCKS) as Array<
+			keyof typeof RESOLUTION_BLOCKS
+		>) {
+			const data = RESOLUTION_BLOCKS[slug];
+			for (const k of KEYS) {
+				expect(data[k].fontSize).toBeGreaterThan(11);
+			}
+		}
+	});
+
+	it("resolver-cards::truncate-still-ships-unconditionally-as-the-backstop", () => {
+		// ⚠ `truncate` is NOT conditioned on whether a value currently needs
+		// it — every value/subvalue span carries it regardless (`ResolverCards.tsx`),
+		// so a future map entry with a longer string degrades safely without
+		// this component needing to change. Asserted directly on the entry
+		// that most recently exercised this path.
+		const { container } = render(
+			<ResolverCards
+				market={marketFixture("math-erdos-contribution-response")}
+			/>,
+		);
+		const value = container.querySelector(
+			'[data-testid="resolution-block-value-resolver"]',
+		);
+		const cls = (value?.getAttribute("class") ?? "").split(/\s+/);
+		expect(cls).toContain("text-[12px]");
+		expect(cls).toContain("truncate");
+		expect(
+			RESOLUTION_BLOCKS["math-erdos-contribution-response"].resolver.fontSize,
+		).toBe(12);
+	});
+});
+
+/**
+ * BLOCK-3 §5 — the render-level half of the FLAVOUR sentence-case guard.
+ * `resolution-block-data.test.ts` already proves the DATA is sentence-cased;
+ * this proves nothing at RENDER TIME undoes that — the specific regression
+ * the data file's own docblock warns against is a future `capitalize` class
+ * on the value span, which would turn "oktoberfest.de report" into
+ * "Oktoberfest.de Report" (capitalizing the second word, exactly what
+ * sentence case forbids) without touching the data at all.
+ */
+describe("BLOCK-3 §5 — FLAVOUR/oktoberfest sentence case survives to the DOM", () => {
+	it("resolver-cards::oktoberfest-de-report-renders-lowercase-r-report-in-the-DOM", () => {
+		const { container } = render(
+			<ResolverCards
+				market={marketFixture("oktoberfest-munich-beer-volume")}
+			/>,
+		);
+		const subvalue = container.querySelector(
+			'[data-testid="resolution-block-subvalue-resolution"]',
+		);
+		expect(subvalue?.textContent).toBe("report");
+		// The regression this guards: a `capitalize` class would not change
+		// `textContent` (CSS text-transform doesn't touch the DOM text node),
+		// so the string-equality check above is NOT what would catch it —
+		// this class-list check is.
+		const cls = (subvalue?.getAttribute("class") ?? "").split(/\s+/);
+		expect(cls).not.toContain("capitalize");
+	});
+
+	it("resolver-cards::no-value-or-subvalue-span-anywhere-carries-a-CSS-capitalize-class", () => {
+		for (const slug of Object.keys(RESOLUTION_BLOCKS) as Array<
+			keyof typeof RESOLUTION_BLOCKS
+		>) {
+			const { container, unmount } = render(
+				<ResolverCards market={marketFixture(slug)} />,
+			);
+			for (const k of KEYS) {
+				for (const suffix of ["value", "subvalue"]) {
+					const el = container.querySelector(
+						`[data-testid="resolution-block-${suffix}-${k}"]`,
+					);
+					if (!el) continue;
+					const cls = (el.getAttribute("class") ?? "").split(/\s+/);
+					expect(cls).not.toContain("capitalize");
+				}
+			}
+			unmount();
+		}
 	});
 });
 

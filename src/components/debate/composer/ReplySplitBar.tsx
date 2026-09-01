@@ -166,15 +166,25 @@ export function ReplySplitBar({
 				{/* ⚠⚠ RPLY-1 · R5 — THE TRACK SITS IN A PILL-HEIGHT BOX AND CENTRES
 				    IN IT. `h-6` is the pill's own specified box (`text-xs` 16px line +
 				    `py-1` 8px), so the track's CENTRE is that box's centre at any
-				    thickness — which is why growing it 6 → 14px moves what fills the
-				    box and not where the middle of it sits. A bare offset would hit
-				    today's number and drift the first time the pill's size changes.
-				    ⛔ `h-[14px]` and `rounded-[var(--r)]` are READ OFF `PriceBar`'s
+				    thickness — which is why growing it 6 → 14 → 18px each time moves
+				    what fills the box and not where the middle of it sits. A bare
+				    offset would hit today's number and drift the first time the
+				    pill's size changes.
+				    ⛔ `h-[18px]` and `rounded-[var(--r)]` are READ OFF `PriceBar`'s
 				    `detail` size, not chosen — the card's bar was matched to it at
 				    CS10/CS11 because two split bars on one screen must not read as a
 				    bar and a hairline, and at 14px a 3px radius reads as a rectangle
 				    beside a market bar that is a pill. Same reasoning, same source,
 				    now on both surfaces.
+				    ⚠⚠ BLOCK-3 §2 — 14px → 18px, THE THIRD SURFACE IN THE SAME CHAIN.
+				    `PriceBar.tsx`'s `detail` moved first (its own docblock has the
+				    layout-budget reasoning), `AggregateFooter.tsx`'s track followed to
+				    keep the market-view card in parity, and this file is the one
+				    `split-bar-parity.test.ts` exists to keep from drifting behind
+				    both: `the-reply-track-is-14px-with-the-card-radius-and-clip` reads
+				    the thickness straight off this literal, and a re-size of the other
+				    two that left this one behind is exactly the silent drift that
+				    guard is for.
 				    ⚠ THE HAIRLINE STAYS AND IS STILL LOAD-BEARING: side-keying the
 				    track means it takes `bg-yes` #181818 on a NO post against a
 				    #212121 card — ~1.10:1, i.e. gone — leaving the fill no visible
@@ -182,7 +192,7 @@ export function ReplySplitBar({
 				    on BOTH poles. */}
 				<span className="flex h-6 w-full items-center">
 					<span
-						className={`h-[14px] w-full overflow-hidden rounded-[var(--r)] [border:var(--hairline)] ${postSide === "YES" ? "bg-no" : "bg-yes"}`}
+						className={`h-[18px] w-full overflow-hidden rounded-[var(--r)] [border:var(--hairline)] ${postSide === "YES" ? "bg-no" : "bg-yes"}`}
 						aria-hidden="true"
 					>
 						<span

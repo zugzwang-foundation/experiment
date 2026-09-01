@@ -193,7 +193,7 @@ export function AggregateFooter({
 						className={cn(
 							// ⚠⚠ change set 10 §6a — THE TRACK MATCHES THE MARKET-LEVEL BAR.
 							// It was `h-1.5` (6px) beside a `PriceBar` whose `detail` size —
-							// the one on this very surface — is `h-[14px]`. Two split bars,
+							// the one on this very surface — was `h-[14px]`. Two split bars,
 							// one screen, and one of them read as a hairline next to the
 							// other. MEASURED before changing: 6px vs 14px.
 							// ⚠ `detail`, not `hero` (22px) or `card` (16px): those render on
@@ -212,9 +212,21 @@ export function AggregateFooter({
 							// ⛔ THIS DOES NOT MOVE THE ALIGNMENT, and that is a property of
 							// the CS6 fix rather than luck: the track is centred inside a
 							// fixed `h-6` box, so its CENTRE is the box's centre at any
-							// thickness. Growing it 6 → 14 changes what fills the box, not
-							// where the middle of it sits.
-							"h-[14px] w-full overflow-hidden rounded-[var(--r)] [border:var(--hairline)]",
+							// thickness. Growing it 6 → 14 changed what fills the box, not
+							// where the middle of it sits — the same is true of 14 → 18 below.
+							// ⚠⚠ BLOCK-3 §2 — 14px → 18px, TRACKING `PriceBar`'S `detail` BAR
+							// (`h-[14px]` → `h-[18px]`, `PriceBar.tsx`'s own docblock on `ROW`).
+							// `aggregate-footer-alignment.test.ts`'s
+							// `the-track-matches-the-market-level-bar-thickness` guard reads
+							// `detail`'s thickness FROM `PriceBar.tsx` rather than a copied
+							// literal specifically so a re-size like this one reddens and has
+							// to move both together — this edit is that guard doing its job,
+							// not scope creep: §2's brief names "the YES/NO bar" as one of the
+							// three things to redistribute freed height into, and this track
+							// is design-language's other half of that same bar family. 18px
+							// still clears the fixed `h-6` (24px) wrapper with 3px to spare on
+							// each side, so the CS6 centring is untouched.
+							"h-[18px] w-full overflow-hidden rounded-[var(--r)] [border:var(--hairline)]",
 							counterPole,
 						)}
 					>

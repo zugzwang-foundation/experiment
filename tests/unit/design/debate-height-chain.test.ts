@@ -128,8 +128,8 @@ function bandClasses(source: string, file: string, testid: string): string[][] {
  * `h-[calc(…)]` on a BAND are the three shapes that would do it.
  *
  * ⚠ Scoped to the band nodes only. `h-*` on a LEAF — an avatar, an icon, the
- * price bar's `h-[14px]` track — is not a chain node and is none of this
- * guard's business.
+ * price bar's `h-[18px]` track (BLOCK-3 §2; was `h-[14px]`) — is not a chain
+ * node and is none of this guard's business.
  */
 const FORBIDDEN_HEIGHT = /^h-(full|screen|\[)/;
 

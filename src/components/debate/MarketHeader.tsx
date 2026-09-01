@@ -238,7 +238,21 @@ export function MarketHeader({
 				/* HTML-FINISH · MARKET DETAIL row 2 — `.hleft` IS A ROW (`d5:448`),
 				   holding `.mmedia` then `.hstack`. The market arm's media panel takes
 				   the same slot the post arm gives the focused post's image, so the two
-				   arms swap contents inside one identical frame. */
+				   arms swap contents inside one identical frame.
+				   ⚠⚠ BLOCK-3 — `items-start` ON THIS ROW WAS TRIED AND REVERTED, MEASURED
+				   WRONG, NOT REASONED WRONG. The panel now derives its height from a
+				   THIRD of the row's width (`aspect-[16/9] w-1/3`, `MarketMediaPanel.tsx`)
+				   instead of `h-full`, so it no longer needs `align-items:stretch` to get
+				   its size — but `headzone-stack` DOES: its `flex-1` growth into
+				   whatever height the band leaves over (R-8's whole mechanism, and the
+				   reason the block row can absorb freed height at all) DEPENDS on being
+				   stretched to the row's height by the row's `align-items`. Setting the
+				   ROW to `items-start` un-stretches BOTH children, and `headzone-stack`
+				   is not supposed to be one of them. Measured: with `items-start` here,
+				   `headzone-stack` read the SAME 176px at both 1440×900 and 1440×777,
+				   where its band is 217.8px and 188px respectively — the extra height
+				   was going nowhere. The fix is on the ONE child that actually needs it
+				   — see `MarketMediaPanel.tsx`'s `self-start`. */
 				<div className="flex min-h-0 flex-1 gap-4">
 					<MarketMediaPanel
 						imageUrl={market.mediaImageUrl}
@@ -421,8 +435,15 @@ export function MarketHeader({
 						<div className="flex items-center gap-3">
 							{/* ⚠ `min-w-0` — this is the row's flexible child now, and without
 							    it a long attrs strip sets the row's automatic minimum and
-							    pushes the actions off the right edge instead of wrapping. */}
-							<div className="flex min-w-0 flex-wrap items-center gap-y-1 text-xs font-bold text-ink">
+							    pushes the actions off the right edge instead of wrapping.
+							    ⚠⚠ BLOCK-3 §2 — `text-xs` (12px) → `text-[13px]`, this task's
+							    share of the space `ResolverCards.tsx` no longer needs (the
+							    "stats line" in the §2 brief). The row's own height still
+							    tracks `LifecycleBadge`'s fixed `h-5` (20px, `ui/badge.tsx`) —
+							    a shared shadcn primitive, left untouched rather than resized
+							    for one call site — so this bump reads as denser, more legible
+							    figures within the SAME row height, not a taller row. */}
+							<div className="flex min-w-0 flex-wrap items-center gap-y-1 text-[13px] font-bold text-ink">
 								<InfoTip content={GLOSSARY.stakedMarket} asChild>
 									<span>
 										Đ {formatDharma(market.totals.dharmaStaked)} staked

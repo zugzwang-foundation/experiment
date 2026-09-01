@@ -111,10 +111,12 @@ export function HeadZone({
 			// they DO two of the three things it rules out:
 			//   · `MarketHeader.tsx` — the `headzone-stack` carries `overflow-y-auto`,
 			//     the exact class bullet 1 says "cannot come back here".
-			//   · `ResolverCards.tsx` — carries a `min-h-[84px]` floor, which bullet 2
-			//     says would "contradict" the `min-h-0` pin; its own comment calls the
-			//     previous `min-h-0` a defect that silently disabled the scroll
-			//     backstop. The two rulings are in direct opposition.
+			//   · `ResolverCards.tsx` — carries a `min-h-[78px]` floor (BLOCK-3 §2; was
+			//     `min-h-[84px]` — the exact number moved, the contradiction below did
+			//     not), which bullet 2 says would "contradict" the `min-h-0` pin; its
+			//     own comment calls the previous `min-h-0` a defect that silently
+			//     disabled the scroll backstop. The two rulings are in direct
+			//     opposition.
 			// Also stale by consequence: the row renders FOUR blocks, not "both
 			// cards", and per `ResolverCards.tsx` the stack SCROLLS rather than clips.
 			// ⚠ And the arithmetic above ("3.64px", "29.14px") was measured against a
@@ -178,8 +180,39 @@ export function HeadZone({
 					// be 436px — 5.7pp too wide, squeezing the text stack.
 					// ⚠ `shrink-0` unconditionally now, not `lg:shrink-0`: a fixed
 					// basis that is allowed to shrink is not a fixed basis.
+					//
+					// ⛔⛔ BLOCK-3 — `hidden lg:flex` IS NEW, AND IT CLOSES A GAP THIS
+					// BRANCH NEVER HAD TO FACE UNTIL NOW. Below `lg`, `headzone` is
+					// `flex-col`: `headzone-left` and this rail stack VERTICALLY,
+					// sharing one `basis-[24.2dvh]` band instead of standing side by
+					// side. This rail is content-sized (no `flex-1`), so it simply
+					// takes whatever height its chart needs FIRST, and `headzone-left`
+					// — which holds the market question, the stats line, the price bar
+					// and the resolver row — gets only the remainder. MEASURED at
+					// 390×844 on a market with a renderable chart: rail 166.4px,
+					// `headzone-left` 17.8px — the resolver row rendered inside a
+					// sliver under one line tall.
+					// ⇒ NOT HYPOTHETICAL, AND NOT REACHABLE AT BLOCK-1's TIME. At
+					// BLOCK-1 no market had enough price history for
+					// `MarketPriceChartHost` to return non-null (measured then: ZERO
+					// of eight), so this branch had never actually competed with
+					// `headzone-left` for the stacked band — the `right === null`
+					// branch two paragraphs up was the only one BLOCK-1-era markets
+					// could exercise below `lg`. Enough time has since passed that at
+					// least two of the eight now have one.
+					// ⇒ THE FIX MATCHES THE PATTERN THE SIBLING BRANCH ALREADY SET.
+					// `right === null` already hides its placeholder below `lg`
+					// (`hidden w-[340px] shrink-0 lg:block`, two branches up) — on the
+					// ruling that an empty rail is visible chrome with nothing to show
+					// at a width where it was never designed to stand. A rail that
+					// CAN'T fit without crushing its sibling is the same case: hidden
+					// below `lg`, exactly where the chart was always meant to stand
+					// beside `headzone-left` rather than above or below it. The chart
+					// itself and its wide-viewport position are UNCHANGED — this is a
+					// visibility toggle on the container, not a resize of what's
+					// inside it.
 					data-testid="headzone-right"
-					className="flex w-[340px] min-w-0 shrink-0 flex-col gap-3"
+					className="hidden w-[340px] min-w-0 shrink-0 flex-col gap-3 lg:flex"
 				>
 					{right}
 				</div>

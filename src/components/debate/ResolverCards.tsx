@@ -129,14 +129,28 @@ export function ResolverCards({
 			// by R-1 and R-2" by GROWING INTO IT rather than by carrying a tuned
 			// pixel height: the row takes whatever the question, the meta row and the
 			// price bar leave in the band.
-			// ⛔⛔ `min-h-[84px]` IS A CONTENT FLOOR, MEASURED, RE-DERIVED AT RESO-2 ·
-			// CHANGE 4 (padding 16 + label 14.25 + gap 6 + square 30 + gap 6 + value 11
-			// = 83.25px → 84). BLOCK-1 does not change block padding, the glyph size,
-			// or the gap — the floor is unchanged and still correct; real text at the
-			// A2 recipe (`text-[11px] leading-[1.5]`, ≈16.5px line box) sits ABOVE the
-			// floor's old 11px placeholder-bar assumption, which the floor's own
-			// `flex-1`-above-a-floor mechanism absorbs rather than clips (S4 confirms
-			// no clipping in the browser, since jsdom performs no layout).
+			// ⛔⛔ `min-h-[78px]` IS A CONTENT FLOOR, RE-DERIVED AT BLOCK-3 §2 against
+			// the recipe THIS task leaves behind (padding `py-1.5` → 12px, hairline
+			// border → 2px, glyph 36px, text-stack `gap-1` → 4px). The worst case is
+			// a two-line block at the `fontSize` ceiling — `label(~12, unset leading,
+			// AGENTS.md §8's ~1.2 default) + gap(4) + value(21, leading-[1.5]×14) +
+			// gap(4) + subvalue(21)` ≈ 62px of stack, which already exceeds the 36px
+			// glyph, so the glyph never binds for this case. 12 + 2 + 62 = 76,
+			// rounded up 2px for the label's approximate (not exact) line-height —
+			// `leading-[1.5]` is an exact multiplier for the value/subvalue lines,
+			// but the label carries no explicit `leading-*` class, so its real line
+			// box needs a browser to pin exactly; this floor errs high rather than
+			// risk clipping on that one approximation.
+			// ⚠ THE OLD 84px NUMBER WAS RESO-2's, computed against a 48px glyph and
+			// `py-2` padding — both superseded here, not merely re-labelled: the
+			// square dropped 48→36 (this task, "reduce block height") and the
+			// padding 16px→12px total, which is where the bulk of the 84→78
+			// reduction comes from, not from any change to the text itself. Real
+			// text still sits ABOVE this floor at every size the value line can take
+			// (BLOCK-3 §3 — `leading-[1.5]` over an 11–14px range, ≈16.5–21px line
+			// box per line), which the floor's own `flex-1`-above-a-floor mechanism
+			// absorbs rather than clips (jsdom performs no layout, so this is a
+			// browser-measured claim, not a jsdom one).
 			// ⛔⛔ THE FLOOR REPLACES A `min-h-0` THAT SILENTLY DISABLED THE WHOLE
 			// SCROLL BACKSTOP — restored here after @code-reviewer caught it cut
 			// during BLOCK-1's docblock pass; the claim was never falsified, only
@@ -147,15 +161,24 @@ export function ResolverCards({
 			// `overflow-y-auto` DEAD CODE: every shortfall was absorbed by this row
 			// shrinking, and each block clipped its own content with no scrollbar
 			// anywhere to reach it.
-			// ⚠ `mt-4` IS THE ONLY THING THAT ACTUALLY SHORTENS THE BLOCK. This row
-			// is `flex-1` inside a band of fixed height, so its height is WHAT IS
-			// LEFT OVER — shrinking the square makes the block emptier, never
-			// shorter; taking 16px above the row is the 16px the row no longer has
-			// (measured 111.99 → 95.99 at RESO-2 · CHANGE 4).
+			// ⚠ `mt-4` AND THE SIBLINGS' OWN SIZE ARE WHAT ACTUALLY SHORTEN THE
+			// BLOCK. This row is `flex-1` inside a band of fixed height, so its
+			// rendered height is WHAT IS LEFT OVER after every fixed sibling in
+			// `headzone-stack` — shrinking the square or the padding makes the
+			// block's CONTENT emptier within whatever height it's given, never
+			// shorter on its own; what actually shortens the row is either this
+			// `mt-4` or a fixed sibling claiming more of the band (BLOCK-3 §2 grows
+			// two of them on purpose — the `detail` `PriceBar` and the attrs text —
+			// specifically to leave less flex-1 leftover for this row; see
+			// `MarketHeader.tsx`'s own budget docblock for the current, measured
+			// split). The RESO-2-era numbers that used to sit here (111.99 →
+			// 95.99px) predate BLOCK-1 and BLOCK-3 both and no longer describe
+			// this recipe — removed rather than corrected in place, since nothing
+			// in the current recipe corresponds to that measurement anymore.
 			// ⚠ THE HEIGHT-CHAIN GUARD CANNOT SEE ANY OF THIS: `debate-height-chain.test.ts`
 			// scans `headzone`, `-left`, `-right`, `arena` and `column-scroll`, and
 			// this row is not a chain node — which is why the reasoning lives here.
-			className="mt-4 grid min-h-[84px] flex-1 grid-cols-4 gap-2"
+			className="mt-4 grid min-h-[78px] flex-1 grid-cols-4 gap-2"
 		>
 			{BLOCKS.map((b) => (
 				<ResolutionBlock
@@ -169,9 +192,16 @@ export function ResolverCards({
 	);
 }
 
-/** Box styling shared by every block regardless of interactivity — unchanged
- * from RESO-4 (`rounded-(--r)`, `px-[11px] py-2`, the hairline). */
-const BLOCK_BOX = "rounded-(--r) px-[11px] py-2 [border:var(--hairline)]";
+/** Box styling shared by every block regardless of interactivity.
+ * ⚠⚠ BLOCK-3 §2 — `py-2` → `py-1.5` (8px → 6px per side, −4px total vertical).
+ * `px-[11px]` is DELIBERATELY UNCHANGED: it is one of the three dimensions
+ * (with the glyph width and the glyph-to-text gap) that set the value/subvalue
+ * text COLUMN width BLOCK-3 §3's `fontSize` measurements were taken against —
+ * moving it would invalidate every measured size in `resolution-block-data.ts`
+ * without a re-measurement pass. Only the vertical padding (which §3 never
+ * touched) is in scope here. `rounded-(--r)` and the hairline are unchanged
+ * from RESO-4. */
+const BLOCK_BOX = "rounded-(--r) px-[11px] py-1.5 [border:var(--hairline)]";
 
 /** The flex arrangement of a block's contents (glyph + text stack) —
  * unchanged from RESO-3 · CHANGE 7, just factored out so the same classes
@@ -181,16 +211,56 @@ const BLOCK_BOX = "rounded-(--r) px-[11px] py-2 [border:var(--hairline)]";
 const BLOCK_INNER = "flex min-h-0 min-w-0 items-center gap-2.5";
 
 /**
+ * BLOCK-3 §3 — one literal Tailwind class per size in
+ * `ResolutionBlockEntry["fontSize"]`. This has to be a lookup over literal
+ * strings, not `text-[${entry.fontSize}px]` built at render time: Tailwind's
+ * scanner only emits CSS for class names that appear literally somewhere in
+ * source, so an interpolated class compiles to nothing. `leading-[1.5]` is a
+ * bare unitless multiplier and already scales with whichever size lands, so
+ * it needs no matching lookup.
+ */
+const VALUE_TEXT_SIZE: Record<ResolutionBlockEntry["fontSize"], string> = {
+	11: "text-[11px]",
+	12: "text-[12px]",
+	13: "text-[13px]",
+	14: "text-[14px]",
+};
+
+/**
  * BLOCK-1 · RF-3a — the shipped whole-element link/focus-visible recipe,
- * reused byte-for-byte from `GitHubStarsView`'s `GITHUB_TAB`
+ * ORIGINALLY reused byte-for-byte from `GitHubStarsView`'s `GITHUB_TAB`
  * (`src/components/shell/GitHubStars.tsx:62`), itself the same pairing
  * `HeaderNav.tsx` and `ui/button.tsx` use: `outline-none` paired with
  * `focus-visible:shadow-(--state-focus-ring)`, plus the repo's standard
- * hover/active pair. No new hex, size or radius token — every piece here
- * already ships elsewhere.
+ * hover/active pair.
+ *
+ * ⚠⚠ BLOCK-3 §2 — THE FOCUS RING NO LONGER MATCHES THAT RECIPE, AND THE
+ * DIVERGENCE IS THE FIX. `--state-focus-ring` (`0 0 0 2px rgb(255 255 255 /
+ * 0.32)`) is a non-inset `box-shadow`: zero blur, a 2px spread, which paints
+ * OUTSIDE the element's own border-box. That is invisible where every other
+ * consumer of the token sits (header controls, buttons, inputs, none of them
+ * inside a clipping ancestor) but this block lives inside
+ * `headzone-stack` (`MarketHeader.tsx`), which carries `overflow-y-auto` — and
+ * per the CSS overflow spec, setting ONE axis to anything but `visible` while
+ * leaving the other at its `visible` default computes THAT axis to `auto` too,
+ * so the stack clips on both X and Y. A ring painted 2px outside the block's
+ * own box, at the row that sits flush against the stack's inner edges, was
+ * measured clipped — confirmed by tabbing to a RESOLVER block and reading the
+ * rendered ring against the stack's own bounding box.
+ * ⇒ THE FIX: `focus-visible:shadow-[inset_0_0_0_2px_var(--ring)]` — an INSET
+ * shadow of the same 2px spread, reusing the existing `--ring` colour token
+ * this component's OWN hover state already borrows for its border
+ * (`hover:[border:1px_solid_var(--ring)]`, unchanged below), so hover and
+ * focus-visible read as the same colour on this block, just two different
+ * mechanisms. An inset shadow draws INSIDE the border-box by construction —
+ * it has no dependency on any ancestor's `overflow` value, today or after a
+ * future layout change, which is what "reserve its space inside the block's
+ * own box" means as a fix rather than as a description of the symptom. No new
+ * hex or token: `--ring` and the 2px spread both already ship on this exact
+ * component.
  */
 const LINK_AFFORDANCE =
-	"outline-none [transition:all_var(--dur-hover)] hover:[border:1px_solid_var(--ring)] active:bg-(--state-pressed-fill) focus-visible:shadow-(--state-focus-ring)";
+	"outline-none [transition:all_var(--dur-hover)] hover:[border:1px_solid_var(--ring)] active:bg-(--state-pressed-fill) focus-visible:shadow-[inset_0_0_0_2px_var(--ring)]";
 
 /**
  * One block — a 1:1 placeholder on the LEFT, and a label plus up to two real
@@ -219,18 +289,27 @@ const LINK_AFFORDANCE =
  * the map, zero changes here — this component never special-cases a block by
  * its `blockKey`, only by whether `entry.href` is `null`.
  *
- * ⚠ TOKENS AND SHIPPED RECIPES ONLY — no new hex, type size or radius enters,
- * which `tokens-monochrome.test.ts` enforces on an 11-token census. The square
+ * ⚠ TOKENS AND SHIPPED RECIPES ONLY — no new hex or radius enters, which
+ * `tokens-monochrome.test.ts` enforces on an 11-token census. The square
  * reuses the `bg-n1` + hairline + `--imgr` recipe already shipping in
- * `MarketMediaPanel`; the label reuses the `.overline` recipe; the value and
- * subvalue lines reuse the paragraph-text recipe already shipping in
- * `ResolutionCriterion.tsx` / `CriterionDisclosure.tsx`
- * (`text-[11px] leading-[1.5] text-muted-foreground`) — one recipe for both
- * lines, no second, dimmer treatment invented for the subvalue. `truncate` is
- * added to both (mirroring the label's own `truncate` + the text stack's
- * `min-w-0`): the map's strings vary in length ("X" vs "CoinMarketCap")
- * inside a fixed-width column, where the RESO-1 placeholder bars never had to
- * survive real content.
+ * `MarketMediaPanel`; the label reuses the `.overline` recipe, unchanged and
+ * still fixed at `text-[9.5px] text-n4` — v1.1 re-ranks the VALUE against the
+ * label, never the label itself.
+ * ⚠⚠ BLOCK-3 §3 — VALUE/SUBVALUE LEFT THE ONE SHARED FIXED RECIPE. Through
+ * BLOCK-1/2 both lines carried one hardcoded class string
+ * (`text-[11px] leading-[1.5] text-muted-foreground`, borrowed from
+ * `ResolutionCriterion.tsx` / `CriterionDisclosure.tsx`). MKT-SLATE v1.1
+ * moves the size to `VALUE_TEXT_SIZE[entry.fontSize]` — one of four literal
+ * classes, chosen per block from that block's own measured `fontSize` (see
+ * `resolution-block-data.ts`'s docblock on that field for the fit
+ * methodology) — and the colour to `text-ink` (the founder's instruction:
+ * "Values move from `text-muted-foreground` to full ink"). `leading-[1.5]`
+ * stays a bare unitless multiplier, so it scales with whichever literal size
+ * lands without a second lookup. `truncate` still applies to both lines
+ * (mirroring the label's own `truncate` + the text stack's `min-w-0`): the
+ * one entry whose value does not fit even at the `fontSize` floor
+ * (`@thomasfbloom`, `math-erdos-contribution-response`) leans on exactly this
+ * truncation to degrade, rather than a fifth, smaller size the floor forbids.
  */
 function ResolutionBlock({
 	blockKey,
@@ -248,18 +327,45 @@ function ResolutionBlock({
 }) {
 	const content = (
 		<>
-			{/* ⛔⛔ THE SQUARE IS 48px BY DECLARATION (RESO-4) — unchanged. `aspect-square`
-			    plus EXACTLY ONE length (`w-[48px]`), never `self-stretch` beside it; see
-			    RESO-4's history for why deriving the width from the row's height once
-			    clipped every label. `shrink-0` so a narrow block squeezes the TEXT,
-			    never the square. Still `aria-hidden` — decorative, and (BLOCK-1) that is
-			    also what keeps it out of the RESOLVER anchor's accessible name; there is
-			    no `<img>` here to carry an `alt=""`, so `aria-hidden` is the equivalent
-			    that actually applies to a `<span>`. */}
+			{/* ⛔⛔ THE SQUARE IS BY DECLARATION, NEVER DERIVED — `aspect-square` plus
+			    EXACTLY ONE length, never `self-stretch` beside it; see RESO-4's history
+			    for why deriving the width from the row's height once clipped every
+			    label. That mechanism is unchanged; the LENGTH is not.
+			    ⚠⚠ BLOCK-3 §2 — 48px (RESO-4) → 36px. Part of "reduce block height":
+			    for every block whose text stack is ONE line (label + one value line,
+			    ≤ ~39px tall at the tallest measured `fontSize`), the square was the
+			    height driver, not the text — shrinking it lowers those blocks' natural
+			    content height directly. Two-line blocks (label + value + subvalue,
+			    ≤ ~64px) were already text-bound before this change and stay text-bound
+			    after it; 36px still clears the label alone (14.25px) with room for
+			    `items-center` to look intentional rather than starved.
+			    ⚠⚠ BLOCK-3 §2 · A SECOND FIX, FOUND BY MEASURING §1's ROW WIDTH AGAINST
+			    REAL §3 CONTENT RATHER THAN AGAINST EMPTY PLACEHOLDER BARS — `hidden
+			    sm:block` IS NEW. `grid-cols-4` (R-7, unconditional) divides whatever
+			    width `headzone-stack` gets, and below `lg` that width is `2/3` of the
+			    reading column (`MarketMediaPanel.tsx`'s `w-1/3`) — 206.67px at
+			    1440-pinned 390-WIDE measurement (the iframe measures the actual
+			    viewport, not a literal 390 in a 1440 shell), 45.67px per block. A
+			    36px glyph plus `px-[11px]` padding (22px) is 58px — MORE than the
+			    45.67px block has BEFORE the text gets anything — and `shrink-0`
+			    (kept, see below) forces the square to take its 36px regardless,
+			    driving the text stack's available width to exactly 0. MEASURED: every
+			    value and every label read `scrollWidth > clientWidth` — not merely
+			    truncated, invisible, at 390×844. `hidden sm:block` removes the square
+			    below the 640px breakpoint where this stops being survivable, giving
+			    the text stack the block's FULL content width instead of block-minus-58.
+			    ⚠ THE CLAIM ONE PARAGRAPH UP — "shrink-0 so a narrow block squeezes the
+			    TEXT, never the square" — is now true only AT OR ABOVE `sm`; below it,
+			    the square is the thing that gives, which is the correction this
+			    paragraph exists to make rather than leave standing next to code that
+			    contradicts it. Still `aria-hidden` — decorative, and (BLOCK-1) that is
+			    also what keeps it out of the RESOLVER anchor's accessible name; there
+			    is no `<img>` here to carry an `alt=""`, so `aria-hidden` is the
+			    equivalent that actually applies to a `<span>`. */}
 			<span
 				aria-hidden="true"
 				data-testid={`resolution-block-glyph-${blockKey}`}
-				className="aspect-square w-[48px] shrink-0 rounded-[var(--imgr)] bg-n1 [border:var(--hairline)]"
+				className="hidden aspect-square w-[36px] shrink-0 rounded-[var(--imgr)] bg-n1 [border:var(--hairline)] sm:block"
 			/>
 			{/* The right-hand stack, centred as a GROUP against the square rather than
 			    each line centring itself.
@@ -285,14 +391,14 @@ function ResolutionBlock({
 				    the five map entries whose second line is genuinely absent. */}
 				<span
 					data-testid={`resolution-block-value-${blockKey}`}
-					className="block w-full truncate text-[11px] leading-[1.5] text-muted-foreground"
+					className={`block w-full truncate leading-[1.5] text-ink ${VALUE_TEXT_SIZE[entry.fontSize]}`}
 				>
 					{entry.line1}
 				</span>
 				{entry.line2 !== null && (
 					<span
 						data-testid={`resolution-block-subvalue-${blockKey}`}
-						className="block w-full truncate text-[11px] leading-[1.5] text-muted-foreground"
+						className={`block w-full truncate leading-[1.5] text-ink ${VALUE_TEXT_SIZE[entry.fontSize]}`}
 					>
 						{entry.line2}
 					</span>
