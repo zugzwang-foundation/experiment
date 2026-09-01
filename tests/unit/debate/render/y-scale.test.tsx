@@ -170,6 +170,37 @@ describe("CHART-5 — no new token, and no raw hex", () => {
 		expect('stroke="#404040"').toMatch(/#[0-9a-fA-F]{3,8}/);
 	});
 
+	it("every gridline carries non-scaling-stroke ON THE LINE, not on the group", () => {
+		// ⛔ THE GUARD THE REPOSITORY DID NOT HAVE, AND A REAL DEFECT SHIPPED THROUGH
+		// ITS ABSENCE. `vector-effect` is NOT an inherited property and does not
+		// apply to container elements, so declaring it on the `<g>` is silently
+		// discarded while `stroke`, `stroke-width` and `stroke-dasharray` beside it
+		// inherit and work — a group that looks correctly configured and draws at
+		// the wrong weight. A horizontal rule's stroke is vertical, so `scaleY
+		// 0.4282` on the collapsed card rendered these at ≈0.43 CSS px next to an
+		// x-axis tick at a true 1px. Nothing in `tests/` asserted `vector-effect`
+		// anywhere before this: deleting it from both polylines was green too.
+		// Caught by `@code-reviewer` at the CHART-5 cascade.
+		for (const mode of ["collapsed", "expanded"] as const) {
+			const m = markup(mode);
+			const gStart = m.indexOf('<g data-testid="chart-gridlines"');
+			const group = m.slice(gStart, m.indexOf("</g>", gStart) + 4);
+			const head = group.slice(0, group.indexOf(">") + 1);
+			// MUST REJECT: the attribute on the container, where it is inert.
+			expect(head).not.toContain("vector-effect");
+			const lines = group.match(/<line[^>]*>/g) ?? [];
+			expect(lines.length).toBe(gridlinesFor(mode).length);
+			for (const ln of lines) {
+				expect(ln).toContain('vector-effect="non-scaling-stroke"');
+			}
+		}
+		// POSITIVE CONTROL — the same matcher finds the attribute on the series
+		// polylines, which have carried it correctly since CHART-1.
+		expect(markup("expanded")).toMatch(
+			/<polyline[^>]*data-testid="line-yes"[^>]*vector-effect="non-scaling-stroke"|<polyline[^>]*vector-effect="non-scaling-stroke"[^>]*data-testid="line-yes"/,
+		);
+	});
+
 	it("the numeric marks carry no raw hex either", () => {
 		const m = markup("expanded");
 		const col = m.slice(
@@ -409,9 +440,34 @@ describe("C-CHART-2 clause 4 (CHART-5) — one collision rule, two measured inpu
 			});
 		};
 
-		// Composed, never a literal — see the sibling test for why.
-		const expandedHalf =
-			(LABEL_NAME_PX + LABEL_STACK_GAP_PX + LABEL_VALUE_PX) / 2;
+		// ⛔ THE EXPECTED FLOOR IS PARSED OUT OF THE RENDERED MARKUP, NOT MIRRORED
+		// FROM THE COMPONENT'S CONSTANTS — and the first attempt at this fix DID
+		// mirror them, which cannot tell a composed threshold from a literal `14`:
+		// with the type unchanged both emit the identical string, and the mutation
+		// proving that came back GREEN. What composition actually protects against
+		// is DRIFT — the value line growing while the threshold stays put — so the
+		// three type values are read from the label's own markup and the floor is
+		// computed from those. Grow `LABEL_VALUE_PX` against a literal floor and
+		// this reds.
+		const em = markup("expanded", 0.5);
+		const num = (re: RegExp, what: string) => {
+			const hit = em.match(re);
+			expect(hit, `could not read ${what} from the markup`).not.toBeNull();
+			return Number(hit?.[1]);
+		};
+		const nameSize = num(
+			/terminal-label-gutter"[^>]*class="[^"]*text-\[(\d+)px\]/,
+			"the name's type size",
+		);
+		const valueSize = num(
+			/terminal-value-yes"[^>]*style="font-size:(\d+)px/,
+			"the value's type size",
+		);
+		const stackGap = num(
+			/terminal-value-yes"[^>]*margin-top:(\d+)px/,
+			"the stack gap",
+		);
+		const expandedHalf = (nameSize + stackGap + valueSize) / 2;
 		for (const top of topsOf("expanded")) {
 			expect(top).toContain(`clamp(${expandedHalf}px,`);
 			expect(top).toContain(`calc(100% - ${expandedHalf}px)`);

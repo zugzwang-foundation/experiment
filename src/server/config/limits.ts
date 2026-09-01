@@ -284,6 +284,14 @@ const PRODUCTION_CHART_WINDOW: ChartWindow = {
  * an end date chosen to sit just past the fixtures was a value with a shelf life
  * measured in days on an environment that is used every day.
  *
+ * ⚠ AMENDED AT CHART-5, BECAUSE THE SYMPTOM GOT WORSE. The overlay's end label
+ * now carries the current PERCENTAGE beneath the name, so past `end` the failure
+ * is no longer two colour-coded words naming absent marks — it is two words AND
+ * TWO NUMERIC PRICE FIGURES attached to nothing drawn. A reader who cannot see
+ * the dots can still read a price off the gutter. Written in here per `O-5`
+ * rather than left to the CHART-5 log, because this docblock is the site that
+ * states the position the change supersedes.
+ *
  * ⚠ THE EXPIRY ALARM IS KEPT ON PURPOSE, and it is the load-bearing half of this
  * docblock rather than a leftover. The failure mode above is not repaired by the
  * new value — it is only postponed, and it will fire again the moment `now`

@@ -335,6 +335,16 @@ describe("C-CHART-2 clause 2 — label legibility: 10px is declared ONCE, for ev
 		expect(seen[0]).toContain("leading-none");
 	});
 
+	// ⚠ SCOPE NARROWED BY CHART-5, AND SAID SO RATHER THAN LEFT IMPLIED. This
+	// case matches a CLASS TOKEN on the two label spans under `collapsed`.
+	// CHART-5 added the overlay's stacked VALUE line, which overrides the type
+	// via an INLINE `style` on a CHILD span in `expanded` — three reasons this
+	// matcher cannot see it. That override is founder-ruled and intended, so
+	// the product is right; what would be wrong is leaving a guard asserting
+	// "no label span overrides the gutter's type size" as though it still held
+	// everywhere. It holds for the NAME, on every mode, which is what the
+	// legibility ruling was about. The value line's own size is pinned by
+	// `y-scale.test.tsx`. Raised by `@code-reviewer` at the CHART-5 cascade.
 	it("no label span overrides the gutter's type size", () => {
 		// The size is inherited, so a child override wins silently. The labels
 		// legitimately carry an arbitrary COLOUR class — `text-[color:var(...)]` —

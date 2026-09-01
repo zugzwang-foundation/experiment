@@ -249,10 +249,17 @@ export function MarketPriceChart({
 					// C-CHART-2 clause 3 (CHART-2) — the viewBox is the PLOT plus a DOT
 					// ALLOWANCE, and nothing else. The end labels used to live in a 38-unit
 					// gutter here; they are HTML beside the plot now, so all that remains is
-					// the 4 units the terminal circle needs not to half-clip at `cx =
-					// VIEWBOX_W`. Still ADDED to the viewBox rather than taken out of the
+					// the units the terminal circle needs not to half-clip at the plot's
+					// right edge. ⚠ CORRECTED AT CHART-5, TWICE OVER: this said "the 4
+					// units" and `TERMINAL_DOT_ALLOWANCE` is **9** — sized to the pulse
+					// RING at 2.4×, not the dot, and `geometry.ts` says "the allowance
+					// goes 4 → 9" three lines from the constant this comment describes.
+					// It also said the circle sits at `cx = VIEWBOX_W`, the sentence
+					// CHART-3 falsified and CHART-5 corrected one file over while
+					// leaving it standing here, in `src/`, on the attribute it describes.
+					// Still ADDED to the viewBox rather than taken out of the
 					// plot, so every plotted coordinate — and every guard asserting one — is
-					// exactly where it has always been; only the addition shrank, 38 → 4.
+					// exactly where it has always been; only the addition shrank, 38 → 9.
 					viewBox={`0 0 ${SVG_W} ${VIEWBOX_H}`}
 					preserveAspectRatio="none"
 					aria-hidden="true"
@@ -352,7 +359,6 @@ export function MarketPriceChart({
 							stroke="var(--color-n2)"
 							strokeWidth="1"
 							strokeDasharray="1 3"
-							vectorEffect="non-scaling-stroke"
 						>
 							{grid.map((g) => (
 								<line
@@ -362,6 +368,22 @@ export function MarketPriceChart({
 									x2={VIEWBOX_W}
 									y1={g.y}
 									y2={g.y}
+									// ⛔ ON THE LINE, NEVER ON THE `<g>` — AND IT WAS ON THE `<g>`
+									// UNTIL `@code-reviewer` CAUGHT IT. `vector-effect` is NOT an
+									// inherited property and does not apply to container
+									// elements, so a `<g>`-level declaration is silently
+									// discarded while `stroke`, `stroke-width` and
+									// `stroke-dasharray` beside it inherit normally and work.
+									// The result was a group that looked correctly configured
+									// and rendered at the WRONG WEIGHT: a horizontal rule's
+									// stroke is vertical, so `scaleY 0.4282` on the collapsed
+									// card drew these at ≈0.43 CSS px beside an x-axis tick at a
+									// true 1px — three surfaces, three weights, and the grid
+									// fainter than the ticks on the market's primary price
+									// display. Which is precisely the outcome this group's own
+									// docblock claims to prevent. Every other call site in this
+									// file already puts it on the shape element.
+									vectorEffect="non-scaling-stroke"
 								/>
 							))}
 						</g>
@@ -618,10 +640,21 @@ function TerminalLabels({
 	// own — independent per-side half-up rounding prints 101 % at any exact `.xx5`
 	// tie (SPEC.1 §10.8). `formatPricePercent` never reads `pricing.no` (its own
 	// docblock states that as the structural guarantee), so the pair is built from
-	// the single price this component actually holds: the terminal YES. That value
-	// is the same `spotYes` `price-chart.ts` stamps the terminal point with — the
-	// one the `PriceBar` renders — which is what makes "the chart's end label can
-	// never disagree with the bar" true by construction rather than by luck.
+	// the single price this component actually holds: the terminal YES.
+	//
+	// ⛔ AND THE GUARANTEE IS NARROWER THAN THIS COMMENT FIRST CLAIMED. It said the
+	// terminal is "the same `spotYes` `price-chart.ts` stamps the point with — the
+	// one the `PriceBar` renders", making agreement "true by construction". That is
+	// false on the path that actually serves this component: `deriveMarketPriceChart`
+	// passes `spotYes` only when it derives the walk itself, and the market-detail
+	// page INJECTS a cached walk, so the stamp does not run. What holds instead:
+	// on an `Open` market `withLiveTail` composes the right edge from the live pool,
+	// so the two agree; on every other state the chart shows the walk's terminal and
+	// the bar shows the pool, and `price-series.ts` RULED that a divergence there is
+	// "the correct outcome" rather than a defect. They agree today because a closed
+	// market's pool does not move. Corrected at the CHART-5 cascade — a comment
+	// re-asserting a guarantee an adjacent module spent thirty lines giving up is
+	// how a future reader "fixes" a correct render.
 	const pair = { yes, no: yes };
 	return (
 		<div
@@ -795,17 +828,24 @@ function YMarks({ marks }: { marks: readonly Gridline[] }): React.JSX.Element {
  * exactly on the plot's boundaries, from having half their box outside it. The
  * gutter does not clip, so an unclamped mark escapes rather than being cut.
  *
- * ⚠ Half-box is the ONE-LINE value: a mark is a single line of 10px type at
- * `leading-none` on every mode that has marks.
+ * ⚠ IT READS THE MARK'S OWN TYPE, NOT THE END LABEL'S, and the first version did
+ * the latter — `LABEL_NAME_PX / 2`. Those two constants are both 10 today and
+ * describe different things: one is the end label's name, the other is the size
+ * `YMarks` declares for itself. Change the end label to 12px — a one-token edit
+ * `labelHalfBoxPx` is explicitly built to absorb — and the marks' edge clamp
+ * silently became 6px against a 10px box, pushing the `0` and `100` marks a pixel
+ * off their own gridlines in a gutter that does not clip. A coordinate correct
+ * only because two independently-declared quantities happen to be equal is the
+ * register entry CHART-3 minted; caught here by `@code-reviewer`.
  */
 function markTop(pct: number): string {
-	const half = LABEL_NAME_PX / 2;
+	const half = MARK_TYPE_PX / 2;
 	return `clamp(${half}px, ${pct}%, calc(100% - ${half}px))`;
 }
 
 /**
- * Half the label's rendered box, in CSS PIXELS — the type is `text-[10px]` at
- * `leading-none`, so the box is 10px and half of it is 5.
+ * The end label NAME's type size, in CSS PIXELS — `text-[10px]` at
+ * `leading-none`, so the name's box IS 10px. Callers halve it themselves.
  *
  * ⛔ IN PIXELS, NOT PLOT UNITS, AND THAT DISTINCTION IS A DEFECT THIS TASK
  * ALMOST SHIPPED. `TERMINAL_LABEL_MIN_GAP = 12` and `clampLabelY`'s floor of 6
@@ -820,6 +860,14 @@ function markTop(pct: number): string {
  * Caught by `@test-writer` at the CHART-2 cascade.
  */
 const LABEL_NAME_PX = 10;
+// ⚠ Renamed from `LABEL_HALF_BOX_PX` at CHART-5, and the docblock above it was
+// NOT renamed with it — it read "half of it is 5" beside a constant of 10, i.e.
+// it described the value's predecessor. Both call sites (`labelHalfBoxPx` and
+// `markTop`) correctly treat this as the FULL box and divide, which is the
+// opposite of what that text said; a maintainer trusting it and writing
+// `clamp(${LABEL_NAME_PX}px, …)` in a new clamp would have got a silent 2×
+// over-clamp. `markTop` is exactly such a new clamp, added in the same commit.
+// Caught by `@code-reviewer`.
 
 /**
  * The stacked VALUE line's type size and the air between it and the name — the
@@ -829,6 +877,10 @@ const LABEL_NAME_PX = 10;
  */
 const LABEL_VALUE_PX = 16;
 const LABEL_STACK_GAP_PX = 2;
+
+/** The numeric marks' own type size — `YMarks` declares `text-[10px]`, and this
+ * is that number rather than a second reader of the end label's. See `markTop`. */
+const MARK_TYPE_PX = 10;
 
 /**
  * Half the label's rendered box, in CSS PIXELS — **derived from the type the
@@ -868,9 +920,15 @@ function labelHalfBoxPx(mode: ChartMode): number {
  * ⚠ WHY 50 % IS THE RIGHT PIVOT AND NOT AN ASSUMPTION. YES and NO mirror about
  * the midline by construction (design-language §3.2), so the only place the two
  * can approach each other is there. Far from even, `min`/`max` are no-ops and
- * clause 4's plot-space positions pass through untouched — which is why the
- * expanded overlay still separates by clause 4's own 12 units (~20 px) rather
- * than being flattened to 10.
+ * clause 4's plot-space positions pass through untouched.
+ * ⚠ THIS PARAGRAPH USED TO END "which is why the expanded overlay still separates
+ * by clause 4's own 12 units (~20 px) rather than being flattened to 10", and
+ * CHART-5 made that false on the surface it names. With `half = 14` the floor
+ * forces the two centres 28 px apart on the overlay, while clause 4's own
+ * post-push separation is ~19 px there — so the CSS floor now DOMINATES clause 4
+ * across roughly the 46–54 % band, which is where every market rests. That is the
+ * correct behaviour for a 28 px box; what was wrong was a docblock still
+ * describing the one-line case on a two-line label. Caught by `@code-reviewer`.
  *
  * ⛔ AND WHY CSS MATH RATHER THAN A BIGGER CONSTANT. The alternative was to
  * raise `TERMINAL_LABEL_MIN_GAP` to ~24 units so that 12 px survived the worst

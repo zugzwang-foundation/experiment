@@ -14,8 +14,12 @@
  * came back almost into line. `C-CHART-2` clause 3 no longer puts a LABEL
  * gutter in the viewBox — the labels are HTML beside the plot now — so all the
  * viewBox still reserves is a **terminal allowance**, `TERMINAL_DOT_ALLOWANCE`,
- * enough that the widest mark drawn at `cx = VIEWBOX_W` — the pulse RING, not
- * the dot — cannot half-clip on the right edge. The plot is full-bleed across
+ * enough that the widest mark drawn at the plot's right edge — the pulse RING,
+ * not the dot — cannot half-clip there. ⚠ CORRECTED AT CHART-5: this said the
+ * mark is drawn AT `cx = VIEWBOX_W`, which CHART-3 falsified — `terminalX`
+ * follows the series, so the mark reaches that edge only on a market that has
+ * traded to the window end. The allowance still budgets that MAXIMUM, which is
+ * the case it has to cover; what was wrong was calling it the only case. The plot is full-bleed across
  * `VIEWBOX_W × VIEWBOX_H`, `xPx`
  * still maps a domain onto 0…640, no plotted coordinate has ever moved, and
  * the `<svg>` is `SVG_W` wide — but `SVG_W` is now 649 rather than 678, which
@@ -39,15 +43,13 @@ export type ChartMode = "collapsed" | "expanded" | "hero";
  * a canonical price; this one takes a percent NUMBER because a gridline is a
  * property of the scale and never of the data — there is no price to preserve. */
 function yPctPx(pct: number): number {
-	// ⛔ ROUNDS LOCALLY INSTEAD OF CALLING THIS MODULE'S `round`, AND THE REASON IS
-	// LOAD ORDER, NOT TASTE. The gridline sets below are built at MODULE LOAD;
-	// `round` is a `const` arrow declared ~250 lines further down, so it is in its
-	// temporal dead zone at that moment and reaching for it would throw a
-	// ReferenceError on IMPORT — before any test could render anything. Rounding
-	// is genuinely needed: `(1 − 10/100) · 320` is `288.00000000000006` in binary
-	// floating point, and an unrounded coordinate would print those digits into
-	// every gridline's `y` in the shipped markup.
-	return Math.round((1 - pct / 100) * VIEWBOX_H * 100) / 100;
+	// Rounding is genuinely needed here: `(1 − 10/100) · 320` is
+	// `288.00000000000006` in binary floating point, and an unrounded coordinate
+	// would print those digits into every gridline's `y` in the shipped markup.
+	// ⚠ This calls the SHARED `round` — see its declaration for why it is a
+	// hoisted function rather than the `const` arrow it used to be. These sets are
+	// built at module load, above that declaration.
+	return round((1 - pct / 100) * VIEWBOX_H);
 }
 
 /** One horizontal gridline: the percent it marks and where that lands. */
@@ -94,13 +96,26 @@ const GRIDLINES_HERO: readonly Gridline[] = Object.freeze([]);
  * contact sheet renders both ways.
  */
 export function gridlinesFor(mode: ChartMode): readonly Gridline[] {
-	if (mode === "expanded") {
-		return GRIDLINES_EXPANDED;
+	switch (mode) {
+		case "expanded":
+			return GRIDLINES_EXPANDED;
+		case "collapsed":
+			return GRIDLINES_COLLAPSED;
+		case "hero":
+			return GRIDLINES_HERO;
+		default: {
+			// ⛔ EXHAUSTIVE BY COMPILE ERROR, NOT BY FALLING THROUGH. The first
+			// version ended `return GRIDLINES_HERO` after two `if`s, so a FOURTH
+			// surface added to `ChartMode` would compile clean and ship with no Y
+			// scale at all — silently, on a chart whose whole point is that the
+			// scale is a function of the mode. `MarketPriceChartMode`'s own docblock
+			// names this hazard for the type union ("two places for a fourth surface
+			// to be added to only one of") and it was left open for the lookup.
+			// Raised by `@code-reviewer` at the CHART-5 cascade.
+			const exhaustive: never = mode;
+			return exhaustive;
+		}
 	}
-	if (mode === "collapsed") {
-		return GRIDLINES_COLLAPSED;
-	}
-	return GRIDLINES_HERO;
 }
 
 /** Terminal dot radius — `C-CHART-2` clause 1. Deliberately NOT `C-CHART-1`
@@ -125,7 +140,10 @@ export const TERMINAL_PULSE_PEAK_SCALE = 2.4;
 
 /**
  * What the viewBox reserves to the right of the plot — `C-CHART-2` clause 3, as
- * amended at CHART-2. The terminal marks are centred at `cx = VIEWBOX_W`, so
+ * amended at CHART-2. ⚠ CHART-5 correction: this read "the terminal marks are
+ * centred at `cx = VIEWBOX_W`", which CHART-3 falsified — they are centred at
+ * `terminalX`, the series' own last point, and reach `VIEWBOX_W` only when the
+ * series runs to the window end. That MAXIMUM is what the allowance budgets, so
  * without an allowance their right halves sit outside the viewBox, and an
  * `<svg>` clips there by default.
  *
@@ -337,7 +355,19 @@ const MONTHS = [
 	"Dec",
 ] as const;
 
-const round = (v: number): number => Math.round(v * 100) / 100;
+// ⛔ A FUNCTION DECLARATION, NOT A `const` ARROW, AND THE FORM IS LOAD-BEARING.
+// The frozen gridline sets near the top of this module are built AT MODULE LOAD,
+// several hundred lines above this point. Against a `const` arrow that is a
+// temporal-dead-zone `ReferenceError` on import — so `yPctPx` was written with
+// its own inlined copy of this one-liner and a docblock explaining why. Two
+// copies of one rounding rule in one module is a real hazard: change this to 3 dp
+// for coordinates and the gridline y's silently keep 2 dp and stop agreeing with
+// the line and dot y's they are drawn to align with. A declaration hoists, so the
+// constraint disappears instead of being documented — structural beats
+// procedural (`O-1`). Raised by `@code-reviewer` at the CHART-5 cascade.
+function round(v: number): number {
+	return Math.round(v * 100) / 100;
+}
 
 /** "Sep 15" — UTC month + day (locale/timezone-free, deterministic). */
 export function fmtUtcDay(iso: string): string {

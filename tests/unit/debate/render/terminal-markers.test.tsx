@@ -563,11 +563,17 @@ describe("C-CHART-2 — the end label is bound to its own line's token", () => {
 		// for text.
 		// ⚠ CORRECTED AT CHART-5: this read "because the terminal circle is
 		// centred at `cx = VIEWBOX_W`", which CHART-3 made false — `terminalX`
-		// follows the series' last point, so the dot sits at VIEWBOX_W only on a
-		// market that has traded to the window end. The allowance is unchanged
-		// and still correct, because `terminalX` is BOUNDED ABOVE by VIEWBOX_W
-		// and the budget must cover its maximum; what was wrong was the stated
-		// reason, which described that maximum as the only case.
+		// follows the series' last point, so the dot reaches VIEWBOX_W only on a
+		// market that has traded to the window end. The allowance is unchanged and
+		// still correct, because THAT case is the widest the mark can be drawn
+		// inside the canvas, and the budget must cover it.
+		// ⛔ AND THE FIRST ATTEMPT AT THIS CORRECTION REPLACED ONE FALSE REASON WITH
+		// ANOTHER: it said `terminalX` is "BOUNDED ABOVE by VIEWBOX_W". It is not.
+		// `xPx` is unclamped in both directions by design, and `limits.ts` keeps a
+		// standing alarm for exactly the state where it exceeds the axis — past
+		// `MARKET_CHART_WINDOW_END` the dots and pulses leave the canvas entirely.
+		// The honest bound is "the widest mark DRAWN ON the canvas", not a bound on
+		// `terminalX`. Caught by `@code-reviewer` at the CHART-5 cascade.
 		const { container } = renderChart(pct(0.65), "collapsed");
 		const svg = container.querySelector('[data-testid="market-price-chart"]');
 		const [, , w, h] = (svg?.getAttribute("viewBox") ?? "")

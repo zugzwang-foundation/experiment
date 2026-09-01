@@ -28,12 +28,14 @@
 |---|---|
 | `docs/specs/SPEC.1.md` | Slice 1 — conflict resolution; CHART-3 row renumbered `1.0.42 → 1.0.48` |
 | `src/components/debate/chart/geometry.ts` | `ChartMode`, `Gridline`, `gridlinesFor`, `yPctPx` — the per-mode sets, frozen at module load |
-| `src/components/debate/chart/MarketPriceChart.tsx` | Gridline `<g>`, `YMarks` column, stacked end value, mode-aware half-box |
+| `src/components/debate/chart/MarketPriceChart.tsx` | Gridline `<g>`, `YMarks` column, stacked end value, mode-aware half-box, sizer fix |
 | `src/components/debate/PriceBar.tsx` | **untouched** — read only, to prove the percentages agree |
-| `tests/unit/debate/render/y-scale.test.tsx` | New — 21 guards |
+| `tests/unit/debate/render/y-scale.test.tsx` | New — 27 `it()` blocks (one is a 4-case loop, so 30 tests) |
 | `tests/unit/debate/render/terminal-markers.test.tsx` | One stale docblock corrected in place |
 | `docs/design/design-canon.md` | EDIT A + EDIT B, applied verbatim |
 | 7 citation sites | `SPEC.1 1.0.42 → 1.0.48` (see slice 1) |
+| `src/server/config/limits.ts` | The post-window standing alarm, amended at its own site (`O-5`) — the symptom now includes two price figures |
+| `tests/unit/debate/chart/alignment-chain.test.tsx` | One docblock narrowed: its "no label span overrides the type size" claim is now NAME-scoped |
 
 ## Baselines (measurement layer stated)
 
@@ -62,7 +64,10 @@
 ## Guards, and the mutation that proves each
 
 Every one verified by reverting the fix and confirming a **named** test reds
-(OVN-V2). Nine mutations, nine reds — full table in the run report.
+(OVN-V2). **Twenty-three mutations across four rounds, all red** — full table in
+the run report. Round 1 covered the shipped design; rounds 2–4 cover the guards
+`@test-writer` and `@code-reviewer` found soft, including the drift case that
+distinguishes a composed collision floor from a literal one.
 
 ## Not doing, with reasons
 
