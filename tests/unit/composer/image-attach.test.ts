@@ -4,7 +4,6 @@ import {
 	attachImage,
 	DOWNSCALE_TIMEOUT_MS,
 	type ImageAttachResult,
-	MAX_DECODE_PIXELS,
 	MAX_LONGEST_EDGE_PX,
 	validateImageFile,
 } from "@/components/debate/composer/image-attach";
@@ -584,27 +583,66 @@ describe("attachImage — T3 downscale (mocked canvas boundary)", () => {
 		expect(decode).not.toHaveBeenCalled();
 	});
 
-	it("image-attach::t3-pixel-guard-fires-after-decode-not-before", async () => {
-		// The guard caps the canvas allocation, not the decode — decode has
-		// already happened by the time this fires. This test asserts that
-		// shape precisely: createImageBitmap WAS called, but the canvas path
-		// (drawImage) was NOT reached.
-		const bitmap = fakeBitmap(8000, 6000); // 48,000,000 px > MAX_DECODE_PIXELS
-		expect(bitmap.width * bitmap.height).toBeGreaterThan(MAX_DECODE_PIXELS);
-		const decode = vi.fn(async () => bitmap);
-		(
-			globalThis as unknown as { createImageBitmap: unknown }
-		).createImageBitmap = decode;
-		const { drawImage } = stubCanvasEncode(null);
+	it("image-attach::t3-ruling-1-large-megapixels-proceeds-without-pixel-guard", async () => {
+		// Ruling 1 (HO-FINISH v1.0 §5): The pixel guard was dropped because the
+		// canvas allocation is target-sized (~10 MB) and cannot stop the decode.
+		// A 48 MP image proceeds to downscale to 1600px max edge.
+		stubDecode(fakeBitmap(8000, 6000));
+		const smaller = fakeFile("image/jpeg", 100);
+		const { drawImage, toBlobCalls } = stubCanvasEncode(smaller);
 		const file = fakeFile("image/jpeg", 5000);
 		const fetchFn = scriptedFetch(
 			signOkResponse(),
 			new Response(null, { status: 200 }),
 		);
 		await attachImage({ file, fetchFn });
-		expect(decode).toHaveBeenCalledTimes(1);
+		expect(drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, 1600, 1200);
+		expect(toBlobCalls).toEqual([{ type: "image/jpeg", quality: 0.8 }]);
+	});
+
+	it("image-attach::t3-ruling-2-tall-png-screenshot-encodes-native-resolution-lossless-webp", async () => {
+		// Ruling 2 (HO-FINISH v1.0 §5): Extreme aspect ratio (2228 × 12941 full-page
+		// screenshot). Scaling to 1600 longest edge would crush width to 275px
+		// (< 600px floor). For PNG sources, it skips dimension reduction and STILL
+		// encodes to lossless WebP at native 1:1 dimensions (2228 × 12941).
+		const bitmap = fakeBitmap(2228, 12941);
+		stubDecode(bitmap);
+		const smaller = fakeFile("image/webp", 500);
+		const { drawImage, toBlobCalls } = stubCanvasEncode(smaller);
+		const file = fakeFile("image/png", 5000);
+		const fetchFn = scriptedFetch(
+			signOkResponse(),
+			new Response(null, { status: 200 }),
+		);
+		const result = await attachImage({ file, fetchFn });
+		expect(result.kind).toBe("attached");
+		// Native 1:1 dimensions drawn to canvas
+		expect(drawImage).toHaveBeenCalledWith(
+			expect.anything(),
+			0,
+			0,
+			2228,
+			12941,
+		);
+		// Quality 1 lossless WebP
+		expect(toBlobCalls).toEqual([{ type: "image/webp", quality: 1 }]);
+	});
+
+	it("image-attach::t3-ruling-2-tall-non-png-below-floor-returns-original-untouched", async () => {
+		// Non-PNG sources (JPEG/WebP) below the 600px floor return the original
+		// file untouched, avoiding lossy re-compression at 1:1.
+		const bitmap = fakeBitmap(2228, 12941);
+		stubDecode(bitmap);
+		const { drawImage } = stubCanvasEncode(fakeFile("image/jpeg", 500));
+		const file = fakeFile("image/jpeg", 5000);
+		const fetchFn = scriptedFetch(
+			signOkResponse(),
+			new Response(null, { status: 200 }),
+		);
+		await attachImage({ file, fetchFn });
 		expect(drawImage).not.toHaveBeenCalled();
-		expect(bitmap.close).toHaveBeenCalledTimes(1);
+		const put = requestCall(fetchFn, 1);
+		expect(put.init.body).toBe(file);
 	});
 
 	it("image-attach::t3-browser-fallback-to-png-uses-the-real-returned-type", async () => {
@@ -870,17 +908,16 @@ describe("attachImage — T3 downscale (mocked canvas boundary)", () => {
 		expect(toBlobCalls).toHaveLength(1);
 	});
 
-	it("image-attach::t3-tall-screenshot-ships-UNRESIZED-rather-than-illegible", async () => {
+	it("image-attach::t3-tall-screenshot-ships-native-resolution-lossless-webp-rather-than-illegible", async () => {
 		// THE MEASURED CASE, pinned. 2228 x 12941 is a real full-page capture
-		// run through the real code in a real browser: it scaled to 275 x 1600
-		// (12% of its width) and lost 96.7% of its bytes — and its text.
-		// Lossless encoding cannot save text the RESIZE destroyed, so the
-		// floor declines the resize instead. Asserting the ORIGINAL is what
-		// uploads, and that no encode was even attempted.
+		// run through the real code in a real browser: scaling to 1600 longest
+		// edge scaled to 275 x 1600 (12% of its width), destroying text geometry.
+		// HO-FINISH v1.0 §5 Ruling 2: PNG screenshots below the 600px floor skip
+		// dimension reduction but STILL convert to lossless WebP at native 1:1
+		// dimensions, capturing byte savings without unreadable glyph distortion.
 		stubDecode(fakeBitmap(2228, 12941));
-		const { toBlobCalls, drawImage } = stubCanvasEncode(
-			fakeFile("image/webp", 100),
-		);
+		const smaller = fakeFile("image/webp", 100);
+		const { toBlobCalls, drawImage } = stubCanvasEncode(smaller);
 		const file = fakeFile("image/png", 5_975_654);
 		const fetchFn = scriptedFetch(
 			signOkResponse(),
@@ -888,17 +925,23 @@ describe("attachImage — T3 downscale (mocked canvas boundary)", () => {
 		);
 		const result = await attachImage({ file, fetchFn });
 		expect(result.kind).toBe("attached");
-		expect(requestCall(fetchFn, 1).init.body).toBe(file);
-		expect(drawImage).not.toHaveBeenCalled();
-		expect(toBlobCalls).toEqual([]);
+		expect(drawImage).toHaveBeenCalledWith(
+			expect.anything(),
+			0,
+			0,
+			2228,
+			12941,
+		);
+		expect(toBlobCalls).toEqual([{ type: "image/webp", quality: 1 }]);
+		expect(requestCall(fetchFn, 1).init.body).toBe(smaller);
 	});
 
 	it("image-attach::t3-the-legibility-floor-binds-on-the-SHORTER-edge-only", async () => {
 		// Both sides of the floor, so it is a boundary rather than a blanket
 		// refusal. Longest edge 3200 → scale 0.5 in both cases; the shorter
 		// edge is what decides.
-		//   1200 x 3200 → short lands at 600 == floor → RESIZES.
-		//   1100 x 3200 → short lands at 550 < floor  → ships original.
+		//   1200 x 3200 → short lands at 600 == floor → RESIZES dimensions to 600x1600.
+		//   1100 x 3200 → short lands at 550 < floor  → keeps native 1:1 dimensions (1100x3200) lossless WebP.
 		stubDecode(fakeBitmap(1200, 3200));
 		const atFloor = stubCanvasEncode(fakeFile("image/webp", 100));
 		const f1 = fakeFile("image/png", 5000);
@@ -907,6 +950,13 @@ describe("attachImage — T3 downscale (mocked canvas boundary)", () => {
 			new Response(null, { status: 200 }),
 		);
 		await attachImage({ file: f1, fetchFn: fetch1 });
+		expect(atFloor.drawImage).toHaveBeenCalledWith(
+			expect.anything(),
+			0,
+			0,
+			600,
+			1600,
+		);
 		expect(atFloor.toBlobCalls).toHaveLength(1);
 
 		stubDecode(fakeBitmap(1100, 3200));
@@ -917,8 +967,16 @@ describe("attachImage — T3 downscale (mocked canvas boundary)", () => {
 			new Response(null, { status: 200 }),
 		);
 		await attachImage({ file: f2, fetchFn: fetch2 });
-		expect(belowFloor.toBlobCalls).toEqual([]);
-		expect(requestCall(fetch2, 1).init.body).toBe(f2);
+		expect(belowFloor.drawImage).toHaveBeenCalledWith(
+			expect.anything(),
+			0,
+			0,
+			1100,
+			3200,
+		);
+		expect(belowFloor.toBlobCalls).toEqual([
+			{ type: "image/webp", quality: 1 },
+		]);
 	});
 
 	it("image-attach::t3-resize-targets-are-computed-from-the-longest-edge", async () => {

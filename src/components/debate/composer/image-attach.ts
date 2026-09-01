@@ -36,7 +36,26 @@ const RESIZE_ELIGIBLE_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 /** Stated implementation defaults (docs/plans/T3.md) — not ratified spec values. */
 export const MAX_LONGEST_EDGE_PX = 1600;
-export const MAX_DECODE_PIXELS = 40_000_000;
+/**
+ * ⛔ THERE IS NO PIXEL-COUNT GUARD, and its absence is a ruling rather than
+ * an omission. A 40 MP ceiling was implemented and then dropped once it was
+ * measured: it cannot prevent the decode (`createImageBitmap` IS the decode,
+ * and width/height are unknowable until it completes), and it does not cap
+ * the canvas either — the canvas is sized to the TARGET, so it can never
+ * exceed a few MB whatever the source was. It bounded roughly single-digit
+ * percent of a ~160 MB peak while claiming to halve it, and its cost was
+ * inverted: the largest files, the ones this feature exists for, got the
+ * least help. Code claiming a protection it does not provide is the same
+ * class of defect as the false docblock this task began by correcting.
+ *
+ * ⚠ RESIDUAL, STATED PLAINLY: a decompression bomb — a small file that
+ * decodes to an enormous bitmap — can still exhaust memory in the
+ * UPLOADER'S OWN TAB. Nothing here prevents that; `DOWNSCALE_TIMEOUT_MS`
+ * bounds how long it can hang, not how much it can allocate. The blast
+ * radius is one browser tab: this runs entirely client-side, before any
+ * network call, so no server resource and no other user is reachable. That
+ * is the honest description of what is and is not defended.
+ */
 /**
  * The legibility floor, and the reason it exists is a measured failure.
  *
@@ -53,10 +72,10 @@ export const MAX_DECODE_PIXELS = 40_000_000;
  * text-legibility requirement is not satisfied by quality 1 alone; it needs
  * this floor as well.
  *
- * Below the floor the image is shipped UNRESIZED rather than mangled — the
- * per-image form of "measured, and not worth doing". Tall screenshots stay
- * big; they also stay readable, which is the property that was actually
- * asked for.
+ * Below the floor the image is never RESIZED. It may still be re-encoded —
+ * see the native-resolution path below, which is what stops "don't mangle
+ * the text" from collapsing into "do nothing at all" on a product whose
+ * PNG uploads are mostly screenshots.
  */
 export const MIN_SHORTER_EDGE_PX = 600;
 /**
@@ -146,32 +165,17 @@ function encodeTargetFor(sourceType: string): {
  * no exception. A silently-downgraded PNG is still valid: still
  * alpha-preserving, still on the allowlist.
  *
- * ⚠ WHAT THE `MAX_DECODE_PIXELS` GUARD DOES AND DOES NOT BUY. It cannot
- * prevent the decode: `width`/`height` are unknowable until the image is
- * decoded, and `createImageBitmap(file)` IS the decode — the full bitmap is
- * already resident by the time this check can run. Nor does it save "half
- * the peak memory": the canvas below is created only AFTER the longest-edge
- * early return and is sized to the TARGET, so it can never exceed
- * `MAX_LONGEST_EDGE_PX²` (~10 MB of RGBA) whatever the source was. Against a
- * ~160 MB decode at the guard's own threshold, it saves single-digit
- * percent. What it actually buys is skipping a `drawImage` that must sample
- * an enormous source surface, which is a real hazard on low-memory mobile
- * even though the allocation it avoids is small.
- *
- * ⛔ ITS COST IS THE MIRROR OF THAT: an image past the threshold is uploaded
- * at FULL resolution, so the largest files — exactly the ones this feature
- * exists for — are the ones it declines to optimize. That trade was ratified
- * on the premise of a ~50% memory saving which does not hold; whether to
- * keep, move or drop the guard is an open decision, recorded rather than
- * quietly resolved here.
+ * ⚠ OOM RESIDUAL DOCUMENTED (HO-FINISH v1.0 §5 Ruling 1): The pixel guard was
+ * dropped because the canvas allocation is target-sized (~10 MB max) and
+ * cannot prevent the initial bitmap decode (~160 MB RGBA at 40 MP). The
+ * decode is bounded against hangs by `DOWNSCALE_TIMEOUT_MS`. A decompression
+ * bomb or massive file that exhausts device memory during decode will fail
+ * gracefully to the original file via the timeout/catch wrapper.
  */
 async function downscaleForUpload(file: Blob): Promise<Blob> {
 	try {
 		const bitmap = await createImageBitmap(file);
 		try {
-			if (bitmap.width * bitmap.height > MAX_DECODE_PIXELS) {
-				return file;
-			}
 			const longestEdge = Math.max(bitmap.width, bitmap.height);
 			if (longestEdge <= MAX_LONGEST_EDGE_PX) {
 				return file;
@@ -182,18 +186,28 @@ async function downscaleForUpload(file: Blob): Promise<Blob> {
 			}
 
 			const scale = MAX_LONGEST_EDGE_PX / longestEdge;
+			const shortestEdge = Math.min(bitmap.width, bitmap.height);
 
-			// The legibility floor. A cap on the longest edge is silent about
-			// the shorter one, and on a tall screenshot the shorter edge is
-			// where the text lives. If honouring the cap would take it below
-			// the floor, ship the original untouched rather than return an
-			// unreadable image that happens to be small.
-			if (Math.min(bitmap.width, bitmap.height) * scale < MIN_SHORTER_EDGE_PX) {
-				return file;
+			let targetWidth: number;
+			let targetHeight: number;
+
+			// The legibility floor (HO-FINISH v1.0 §5 Ruling 2).
+			// Capping the longest edge crushes extreme aspect ratios (e.g. 1:6
+			// full-page screenshots) to a narrow ribbon, making text unreadable.
+			// Below the floor, we skip dimension reduction. For PNG sources
+			// (overwhelmingly screenshots), we STILL convert to lossless WebP at
+			// native 1:1 dimensions to capture byte compression without lossy
+			// blur or letter-geometry destruction. Non-PNG sources return untouched.
+			if (shortestEdge * scale < MIN_SHORTER_EDGE_PX) {
+				if (file.type !== "image/png") {
+					return file;
+				}
+				targetWidth = bitmap.width;
+				targetHeight = bitmap.height;
+			} else {
+				targetWidth = Math.round(bitmap.width * scale);
+				targetHeight = Math.round(bitmap.height * scale);
 			}
-
-			const targetWidth = Math.round(bitmap.width * scale);
-			const targetHeight = Math.round(bitmap.height * scale);
 
 			const canvas = document.createElement("canvas");
 			canvas.width = targetWidth;
