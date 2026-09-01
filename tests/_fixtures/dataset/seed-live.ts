@@ -131,6 +131,26 @@ const OVERRIDING: Readonly<Record<string, string>> = {
  */
 const jsonbColumnCache = new Map<string, ReadonlySet<string>>();
 
+/**
+ * The `timestamp with time zone` columns of a table, read from
+ * `information_schema` — never a hardcoded list.
+ *
+ * ⚠ Same reasoning as `jsonbColumns`: a hardcoded list is a second
+ * declaration of the schema, and the one thing it is guaranteed to do is go
+ * stale on the migration nobody remembered to update it for.
+ */
+async function timestampColumns(
+	client: postgres.Sql,
+	table: string,
+): Promise<ReadonlySet<string>> {
+	const rows = await client<{ column_name: string }[]>`
+		SELECT column_name FROM information_schema.columns
+		WHERE table_schema = 'public' AND table_name = ${table}
+		  AND data_type = 'timestamp with time zone'
+	`;
+	return new Set(rows.map((r) => r.column_name));
+}
+
 async function jsonbColumns(
 	client: postgres.Sql,
 	table: string,
@@ -258,13 +278,55 @@ export async function seedDatasetFixture(
 			// `src/server/events/insert.ts:164` writes
 			// `${JSON.stringify(payloadResult.data)}::jsonb`.
 			const jsonbCols = await jsonbColumns(client, table);
+			const tsCols = await timestampColumns(client, table);
+			// ⚠ **TIMESTAMPS ARE INLINED, NOT BOUND — ruling S6, DATASET.3.**
+			//
+			// A `timestamptz` passed as a bind parameter goes through
+			// postgres-js's own serializer, which builds it from a JS `Date`
+			// and therefore FLOORS to milliseconds before Postgres ever sees
+			// it. The fixture's `…T12:00:00.123456Z` would land as
+			// `…12:00:00.123+00`, the database would hold three digits, and the
+			// reader would faithfully return them — so the round-trip would
+			// agree, the guard would pass, and the pipeline would look
+			// microsecond-correct while nothing in the test had ever held a
+			// microsecond.
+			//
+			// The literal is safe to inline because it is a fixture constant
+			// this file owns, not input: it is validated against a strict
+			// ISO-8601 shape below and quoted, so there is no interpolation of
+			// anything a caller supplies.
+			// ⚠ **Placeholders are RENUMBERED and only bound columns supply a
+			// value**, which is not what my first version did. It left the
+			// inlined timestamp's `$N` in the parameter list unreferenced, on
+			// the assumption that Postgres would ignore it. **Measured: it does
+			// not** — `could not determine data type of parameter $9`, because
+			// an unreferenced parameter has no context to infer a type from.
+			// An assumption about a mechanism, encoded before it was measured.
+			const params: unknown[] = [];
 			const placeholders = cols
-				.map((c, i) => (jsonbCols.has(c) ? `$${i + 1}::jsonb` : `$${i + 1}`))
+				.map((c) => {
+					if (tsCols.has(c)) {
+						const v = row[c];
+						if (v === null || v === undefined) return "NULL";
+						const iso = String(v);
+						if (
+							!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/.test(iso)
+						) {
+							throw new Error(
+								`seed-live: ${table}.${c} is not a strict ISO-8601 UTC instant: ${iso}`,
+							);
+						}
+						return `'${iso}'::timestamptz`;
+					}
+					params.push(bind(row[c]));
+					const n = params.length;
+					return jsonbCols.has(c) ? `$${n}::jsonb` : `$${n}`;
+				})
 				.join(", ");
 			const quoted = cols.map((c) => `"${c}"`).join(", ");
 			await client.unsafe(
 				`INSERT INTO "${table}" (${quoted}) ${OVERRIDING[table] ?? ""}VALUES (${placeholders})`,
-				cols.map((c) => bind(row[c])) as never,
+				params as never,
 			);
 		}
 		seeded[table] = adjusted;

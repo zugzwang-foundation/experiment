@@ -1,3 +1,4 @@
+import type { SQL } from "drizzle-orm";
 import { asc, getTableColumns, getTableName, gt, is, sql } from "drizzle-orm";
 import type {
 	PgColumn,
@@ -49,14 +50,25 @@ import type { SourceRow } from "./strip";
  *
  * ## Read-only, and nothing is held open
  *
- * No `insert`, `update`, `delete` or `transaction` appears here. There is
- * **no transaction at all**, not even a read-only one, and the sixteen table
- * reads therefore take sixteen independent snapshots.
+ * No `insert`, `update` or `delete` appears here.
  *
- * ⛔⛔ **THE JUSTIFICATION THAT USED TO SIT HERE IS FALSE, AND IT WAS THE
+ * ⚠ **`transaction` DOES appear here as of DATASET.3 (ruling B), and this
+ * sentence used to say it did not.** `withDatasetSnapshot` at the foot of the
+ * file opens one — `REPEATABLE READ`, `READ ONLY` — so that the sixteen table
+ * reads and their counts see ONE instant instead of sixteen. The read-only
+ * guarantee is no longer "there is no write verb in this file", which was an
+ * absence anyone could add to; it is `READ ONLY` declared to the server, which
+ * rejects a write rather than relying on nobody writing one.
+ *
+ * Corrected in place rather than annotated, because a docblock describing the
+ * file it used to be is worse than none: it is what the next reader trusts
+ * instead of reading.
+ *
+ * ⛔⛔ **THE JUSTIFICATION THAT USED TO SIT HERE WAS FALSE, AND IT WAS THE
  * LOAD-BEARING SENTENCE.** It read: *"the release runs after the 2026-11-05
  * write freeze (§19.1), so there is no concurrent writer to be isolated
- * from"*. **Measured on this branch — there is one:**
+ * from"*. **Measured at DATASET.2 — there is one**, and DATASET.3 stopped
+ * depending on the answer:
  *
  * | cron | schedule | `isFrozen()` gate | writes a SHIPPED table |
  * |---|---|---|---|
@@ -95,16 +107,31 @@ import type { SourceRow } from "./strip";
  *     self-contradicting archive that no guard notices, because each file is
  *     internally consistent.
  *
- * ⚠ **NOT FIXED HERE, and the reason is procedural rather than technical.**
- * The correct fix is one of: freeze-gate `r2-orphan-sweep` (a separate task —
- * whether the sweep should stop is a founder call, and the surface test pins
- * the current shape); or wrap the sixteen reads AND their counts in one
- * `REPEATABLE READ` read-only transaction, re-deciding the connection-hold
- * trade-off now that its premise is corrected; or at minimum take the count in
- * the same snapshot as the final page. **Which one is right depends on the
- * cron ruling**, and this finding arrived from the LAST reviewer in the
- * cascade — so any structural change to the release reader made now would ship
- * unreviewed. Correcting the false claim is safe; guessing at the fix is not.
+ * ## ✅ FIXED at DATASET.3, ruling B — `withDatasetSnapshot`
+ *
+ * The middle option is now built: `withDatasetSnapshot` wraps the whole build
+ * — all sixteen reads AND their `count(*)` reconciliations — in ONE
+ * `REPEATABLE READ`, `READ ONLY` transaction, so every table is read at one
+ * instant. All three failure modes above close together, and they close
+ * because they were all the same failure: sixteen independent snapshots.
+ *
+ * ⚠ **It holds regardless of the cron ruling, which is why it could be built
+ * without one.** Freeze-gating `r2-orphan-sweep` remains a founder call and a
+ * separate task (S4); a snapshot is correct whether or not the sweep stops,
+ * and it is correct against any future writer nobody has thought of yet. That
+ * is the difference between fixing the instance and fixing the class — the
+ * same distinction ruling E draws one file over.
+ *
+ * ⚠ The connection-hold trade-off is re-decided rather than inherited. The
+ * original reasoning against a transaction was that it would hold one
+ * connection and one snapshot open across sixteen reads of a multi-million-row
+ * `events`. That cost is real and it is the correct price: the alternative is
+ * an archive whose sixteen files describe sixteen different instants, and
+ * §19.1's promise to rebuild a v2 "against the same source state" has no
+ * meaning if the first build had no single source state either.
+ *
+ * `READ ONLY` is belt-and-braces on a module with no write verb in it — but it
+ * is the belt that a future caller inherits without having to read this file.
  */
 
 /**
@@ -285,10 +312,40 @@ export function drizzleSource(db: DatasetDb, label: string): DatasetSource {
 			// boundary, is what makes the live path and the fixture path
 			// interchangeable behind the seam; doing it anywhere later would
 			// mean two vocabularies inside the pipeline.
-			const projection: Record<string, PgColumn> = {};
+			const projection: Record<string, PgColumn | SQL<string | null>> = {};
 			let orderColumn: PgColumn | undefined;
 			for (const col of Object.values(columns)) {
-				projection[col.name] = col;
+				// ⚠ **TIMESTAMPS ARE READ AS TEXT — ruling S6, DATASET.3.**
+				//
+				// `timestamp({ withTimezone: true })` comes back from
+				// postgres-js as a JS `Date`, and a JS `Date` holds
+				// MILLISECONDS. Postgres stores MICROSECONDS. So
+				// `12:00:00.123456+00` arrived here as `12:00:00.123`, and
+				// `escapeField`'s `toISOString()` then wrote three digits —
+				// 456 µs discarded, permanently, on an artifact that cannot be
+				// re-issued. Two events 200 µs apart export as the same
+				// instant, which is exactly the resolution an event-ordering
+				// question needs.
+				//
+				// ⚠ **The precision is gone before `escapeField` ever sees the
+				// value**, so this could not be fixed downstream: the driver
+				// parsed it away. `to_char` is what keeps it, and it keeps the
+				// emitted FORMAT identical too — same ISO-8601 `…Z` shape, six
+				// fractional digits instead of three — so the change is a
+				// widening rather than a new format for a reader to handle.
+				//
+				// ⚠ And it was UNTESTABLE until the fixture was widened. Every
+				// `created_at` in the dirty fixture was `…T12:00:00.000Z`, so a
+				// truncating reader and a faithful one produced identical bytes
+				// and the round-trip comparison was blind BY CONSTRUCTION.
+				// Widening the fixture to `.123456Z` — before touching this
+				// file — turned the existing byte comparison red, which is the
+				// measurement that made this fix a fix rather than a claim.
+				projection[col.name] = col.getSQLType().startsWith("timestamp")
+					? sql<
+							string | null
+						>`to_char(${col} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
+					: col;
 				if (col.name === orderName) orderColumn = col;
 			}
 			if (orderColumn === undefined) {
@@ -415,3 +472,60 @@ export function drizzleSource(db: DatasetDb, label: string): DatasetSource {
  * memory-bounded at none, and that the check belongs in the release rehearsal
  * rather than in a guess made tonight.
  */
+
+/**
+ * Run `fn` inside ONE `REPEATABLE READ`, `READ ONLY` transaction — ruling B,
+ * DATASET.3.
+ *
+ * ## Why the release build needs a snapshot at all
+ *
+ * The reasoning that used to sit in this file's header was that the release
+ * runs after the 2026-11-05 write freeze, so there is no concurrent writer to
+ * isolate from. **That is false**, and it was false on the same branch that
+ * wrote it: `r2-orphan-sweep` is not freeze-gated and appends
+ * `image_upload.orphaned` to `events` every six hours, while `build.ts`'s own
+ * `NON_SECRET_SENTINELS` names that job by name as a live emit site the
+ * harvest must exempt. Two files, one branch, contradictory beliefs about
+ * whether that writer stops.
+ *
+ * Without a snapshot the sweep firing mid-build costs one of three things,
+ * depending only on when: an abort of the one-shot build blaming a paging bug;
+ * an archive silently shipping a fact that postdates the freeze; or —
+ * quietest and worst — `image_uploads.csv` shipping `terminal_state = NULL`
+ * for a row `events.csv` reports as orphaned, a self-contradicting archive no
+ * guard notices because each file is internally consistent.
+ *
+ * ## Why the handle is passed rather than captured
+ *
+ * `drizzleSource` takes whatever handle it is given, so the caller composes:
+ *
+ * ```ts
+ * await withDatasetSnapshot(db, (tx) =>
+ *   buildDataset({ source: drizzleSource(tx, label), releaseDate }),
+ * );
+ * ```
+ *
+ * ⚠ **This is the one `transaction` verb in this module**, and the file
+ * docblock's *"no `insert`, `update`, `delete` or `transaction` appears here"*
+ * is corrected rather than left standing — a docblock that describes the file
+ * it used to be is worse than none, because it is what the next reader trusts
+ * instead of reading. The read-only guarantee is now stated by `READ ONLY` at
+ * the transaction level, which is stronger than an absence anyone can add to.
+ *
+ * ⚠ `SET TRANSACTION` is issued as the first statement INSIDE the transaction,
+ * not as a connection option. Connection-level `default_transaction_read_only`
+ * is silently ignored by the Supavisor pooler this project runs behind, so a
+ * belt fastened there would not exist. This one is per-transaction and is the
+ * server's own mechanism.
+ */
+export async function withDatasetSnapshot<T>(
+	db: DatasetDb,
+	fn: (tx: DatasetDb) => Promise<T>,
+): Promise<T> {
+	return db.transaction(async (tx) => {
+		await tx.execute(
+			sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY`,
+		);
+		return fn(tx as unknown as DatasetDb);
+	});
+}

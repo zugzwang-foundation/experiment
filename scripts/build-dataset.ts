@@ -32,6 +32,28 @@
  * a live staging read would defeat the positive-control argument the fixture
  * exists to make (brief §3). Wiring the real read is the release task's, and
  * it needs its own reviewer pass.
+ *
+ * ⚠⚠ **When that arm IS wired, it must go through `withDatasetSnapshot`**
+ * (`dataset/drizzle-source.ts`, ruling B):
+ *
+ * ```ts
+ * await withDatasetSnapshot(db, (tx) =>
+ *   buildDataset({ source: drizzleSource(tx, label), releaseDate }),
+ * );
+ * ```
+ *
+ * Stated here, in the file the release task will open, rather than only in the
+ * wrapper's own docblock — because the failure it prevents is invisible in the
+ * output. Sixteen independent reads produce sixteen internally-consistent
+ * files describing sixteen different instants, and no guard in this pipeline
+ * can tell that from a correct archive. `r2-orphan-sweep` is not freeze-gated
+ * and writes `events` every six hours, so the window is real.
+ *
+ * ⚠ And said plainly: **`withDatasetSnapshot` has no production caller
+ * today** — its only callers are the round-trip integration tests. This
+ * project has been bitten by exports whose docblocks described a control
+ * nothing exercised (`@code-reviewer` H-4, three of them), so the absence is
+ * recorded rather than implied.
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";

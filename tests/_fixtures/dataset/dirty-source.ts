@@ -165,7 +165,23 @@ const MARKET_ID = "0192f3a4-cccc-7000-8000-000000000001";
 const BET_ID = "0192f3a4-dddd-7000-8000-00000000be01";
 const COMMENT_ID = "0192f3a4-eeee-7000-8000-000000000001";
 const UPLOAD_ID = "0192f3a4-ffff-7000-8000-000000000001";
-const AT = "2026-10-01T12:00:00.000Z";
+/**
+ * The fixture's single timestamp — **microsecond-precise since DATASET.3,
+ * ruling S6, and the widening had to come first.**
+ *
+ * ⚠ This read `2026-10-01T12:00:00.000Z`, three fractional digits, and that
+ * made every timestamp test in the suite **blind by construction**:
+ * `Date.prototype.toISOString()` emits milliseconds, so a reader that floored
+ * microseconds at the driver produced bytes identical to a reader that did
+ * not, and the round-trip comparison could not tell them apart. A test that
+ * cannot express the thing it tests is not a test — `@security-auditor` H-3
+ * recorded exactly that about this value and could go no further.
+ *
+ * `.123456` is chosen so the truncation is legible in a diff: a reader losing
+ * precision emits `.123Z` and the missing `456` is the finding, rather than a
+ * silently rounded final digit.
+ */
+const AT = "2026-10-01T12:00:00.123456Z";
 
 /** A comment an admin reactively removed (ADR-0021). */
 export const REMOVED_COMMENT_ID = "0192f3a4-babe-7000-8000-000000000002";

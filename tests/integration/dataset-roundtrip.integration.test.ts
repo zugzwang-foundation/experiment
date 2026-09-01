@@ -1,9 +1,11 @@
+import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { buildDataset } from "@/server/export/dataset/build";
 import {
 	type DatasetDb,
 	drizzleSource,
+	withDatasetSnapshot,
 } from "@/server/export/dataset/drizzle-source";
 import { shippedTables } from "@/server/export/dataset/inventory";
 import { fixtureSource } from "@/server/export/dataset/source";
@@ -168,15 +170,69 @@ describe("round-trip · the live reader reproduces the fixture build", () => {
 
 describe("round-trip · the named wrong answers, each pinned on its own", () => {
 	it("created_at is an ISO string, NOT a triple-quoted JSON Date", () => {
-		// ⚠ The M-8 regression, made to fire. drizzle hands back a JS `Date`
-		// for every `timestamp({ withTimezone: true })` column, so this is the
-		// first read on which `escapeField`'s Date branch executes at all.
-		// Without it the field ships as `"""2026-10-01T12:00:00.000Z"""` and
-		// parses back with literal quotes inside the value.
+		// ⚠ The M-8 regression, kept. It was the first read on which
+		// `escapeField`'s `Date` branch executed at all, because drizzle handed
+		// back a JS `Date` for every `timestamp({ withTimezone: true })`
+		// column; without that branch the field shipped as
+		// `"""2026-10-01T…"""` and parsed back with literal quotes inside.
+		//
+		// ⚠ Ruling S6 (DATASET.3) means the reader no longer produces a
+		// `Date` for these columns at all — it reads them as text — so this
+		// now guards the OUTCOME rather than that one branch. The branch stays
+		// in `escapeField` and stays unit-tested: it is reachable by any other
+		// `Date`-producing source, and deleting it would be a different change.
 		const users = liveBuild.artifacts.find((a) => a.filename === "users.csv");
 		expect(users).toBeDefined();
 		expect(users?.text).not.toContain('"""');
-		expect(users?.text).toContain("2026-10-01T12:00:00.000Z");
+		expect(users?.text).toContain("2026-10-01T12:00:00.123456Z");
+	});
+
+	it("S6 · timestamps emit FULL STORED PRECISION — six fractional digits", () => {
+		// ⚠⚠ **This test was impossible to write until the fixture was
+		// widened, and that is the whole story of ruling S6.** Every
+		// `created_at` in the dirty fixture was `…T12:00:00.000Z` — three
+		// digits — so a reader that floored microseconds at the driver
+		// produced bytes IDENTICAL to one that did not, and the round-trip
+		// comparison could not tell them apart. `@security-auditor` H-3
+		// recorded that as *"blind by construction"* and could go no further.
+		//
+		// Widening the fixture to `.123456Z` FIRST, before touching the
+		// reader, turned the existing byte comparison red on three tests and
+		// named the cause. This is the direct assertion that replaces it.
+		//
+		// The mechanism, for a reader who wonders why it is not fixed in
+		// `escapeField`: a JS `Date` holds milliseconds and Postgres holds
+		// microseconds, so the precision was gone at the DRIVER, before any
+		// formatting code saw the value. It has to be kept in the SQL.
+		for (const name of ["users.csv", "events.csv", "bets.csv"]) {
+			const a = liveBuild.artifacts.find((x) => x.filename === name);
+			expect(a, `${name} is missing`).toBeDefined();
+			expect(a?.text, `${name} lost sub-millisecond precision`).toContain(
+				".123456Z",
+			);
+			// …and NOT the truncated form, so this cannot pass on a file that
+			// happens to contain both.
+			expect(a?.text).not.toContain("12:00:00.123Z");
+		}
+	});
+
+	it("S6 · the DATABASE really holds microseconds — the seed is not the fiction", () => {
+		// ⚠ The control without which the assertion above is a statement about
+		// two pieces of JavaScript agreeing. A `timestamptz` passed as a BIND
+		// PARAMETER goes through postgres-js's `Date`-based serializer and is
+		// floored to milliseconds before Postgres ever sees it — so the fixture
+		// could carry `.123456` and the database could hold `.123`, the reader
+		// would faithfully return three digits, the round-trip would agree, and
+		// nothing in the suite would ever have held a microsecond.
+		//
+		// The seeder therefore inlines the literal. This reads the stored value
+		// back out of the catalogue, not out of the reader.
+		return testClient<{ micros: string }[]>`
+			SELECT to_char(created_at AT TIME ZONE 'UTC', 'US') AS micros
+			FROM users LIMIT 1
+		`.then((rows) => {
+			expect(rows[0]?.micros).toBe("123456");
+		});
 	});
 
 	it("NUMERIC(38,18) survives as an exact string, never a float", () => {
@@ -426,5 +482,117 @@ describe("round-trip · what the live schema could not hold", () => {
 		const rows = await testClient`SELECT bet_id FROM comments`;
 		expect(rows.length).toBeGreaterThan(0);
 		for (const r of rows) expect(r.bet_id).toBeNull();
+	});
+});
+
+describe("B · the build reads ONE instant — the repeatable-read snapshot", () => {
+	// ⚠ Ruling B, DATASET.3. Every read of the release build, and every
+	// `count(*)` reconciliation, happens inside one `REPEATABLE READ`,
+	// `READ ONLY` transaction — so a writer firing mid-build (today
+	// `r2-orphan-sweep`, which is not freeze-gated and appends to `events`
+	// every six hours) cannot make the sixteen files describe sixteen
+	// different instants.
+	//
+	// The failure it closes is the quiet one, not the loud one:
+	// `image_uploads.csv` shipping `terminal_state = NULL` for a row
+	// `events.csv` reports as orphaned, with each file internally consistent
+	// and no guard able to notice.
+
+	it("the transaction really is REPEATABLE READ and READ ONLY", async () => {
+		// ⚠ Asked of the SERVER, not asserted about the code. A
+		// connection-level `default_transaction_read_only` is silently ignored
+		// by the Supavisor pooler this project runs behind, so "we set an
+		// option" is precisely the kind of claim that needs measuring.
+		const seen = await withDatasetSnapshot(testDb, async (tx) => {
+			const iso = await tx.execute(
+				sql`SELECT current_setting('transaction_isolation') AS v`,
+			);
+			const ro = await tx.execute(
+				sql`SELECT current_setting('transaction_read_only') AS v`,
+			);
+			return {
+				isolation: (iso as unknown as { v: string }[])[0]?.v,
+				readOnly: (ro as unknown as { v: string }[])[0]?.v,
+			};
+		});
+		expect(seen.isolation).toBe("repeatable read");
+		expect(seen.readOnly).toBe("on");
+	});
+
+	it("THE WRONG ANSWER — a write inside the snapshot is REFUSED by Postgres", async () => {
+		// The control that makes `READ ONLY` a mechanism rather than a word.
+		// Without it, the setting could be ignored — which is exactly what the
+		// pooler does to its connection-level twin — and the test above would
+		// still pass by reading back a setting nothing enforces.
+		let caught: unknown;
+		try {
+			await withDatasetSnapshot(testDb, async (tx) => {
+				await tx.execute(
+					sql`INSERT INTO markets (id) VALUES (gen_random_uuid())`,
+				);
+				return null;
+			});
+		} catch (e) {
+			caught = e;
+		}
+		expect(caught).toBeDefined();
+
+		// ⚠ **Assert the REASON, not that it threw.** drizzle wraps the driver
+		// error as `Failed query: …`, so a `toThrow(/read-only/)` on the outer
+		// message fails even though the write was refused — and, worse, the
+		// mirror of that mistake passes: a bare `rejects.toThrow()` would be
+		// satisfied by a NOT NULL violation on `markets.slug`, which is a
+		// different refusal entirely and would certify read-only enforcement
+		// that does not exist. That is `@security-auditor` F-4's shape, and
+		// this project has recorded it twice — DATASET.2's own refusal tests
+		// were pinned to a REASON for exactly this reason.
+		const chain: string[] = [];
+		for (let e: unknown = caught; e; e = (e as { cause?: unknown }).cause) {
+			chain.push(String((e as Error).message ?? e));
+		}
+		expect(
+			chain.join(" | "),
+			"the write must be refused BECAUSE the transaction is read-only",
+		).toMatch(/read-only transaction/i);
+
+		// POSITIVE CONTROL — the same statement outside the snapshot is
+		// refused for a DIFFERENT reason (a not-null column), which proves the
+		// match above is about the isolation level and not about the statement
+		// being invalid on its own.
+		let outside: unknown;
+		try {
+			await testDb.execute(
+				sql`INSERT INTO markets (id) VALUES (gen_random_uuid())`,
+			);
+		} catch (e) {
+			outside = e;
+		}
+		const outsideChain: string[] = [];
+		for (let e: unknown = outside; e; e = (e as { cause?: unknown }).cause) {
+			outsideChain.push(String((e as Error).message ?? e));
+		}
+		expect(outsideChain.join(" | ")).not.toMatch(/read-only transaction/i);
+	});
+
+	it("a whole build runs inside it, and matches the un-snapshotted build byte for byte", async () => {
+		// The snapshot must not change WHAT is read, only WHEN. A build inside
+		// it has to agree with `liveBuild` exactly — same rows, same bytes,
+		// same checksum — or the isolation level has quietly changed the
+		// answer rather than fixing its consistency.
+		const snapshotBuild = await withDatasetSnapshot(testDb, (tx) =>
+			buildDataset({
+				source: drizzleSource(tx, "B · snapshot"),
+				releaseDate: "2026-11-06",
+			}),
+		);
+		expect(snapshotBuild.manifest.content_sha256).toBe(
+			liveBuild.manifest.content_sha256,
+		);
+		// CONTROL — it read real rows, so the equality is not two empty builds
+		// agreeing. (A build over sixteen empty tables still reports sixteen
+		// tables; this session already made that mistake once.)
+		expect(
+			snapshotBuild.manifest.tables.find((t) => t.name === "events")?.row_count,
+		).toBeGreaterThan(0);
 	});
 });
