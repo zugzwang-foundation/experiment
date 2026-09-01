@@ -203,7 +203,14 @@ async function downscaleForUpload(file: Blob): Promise<Blob> {
 				return file;
 			}
 			if (target.flattenOntoWhite) {
-				ctx.fillStyle = "#ffffff";
+				// ⚠ `rgb()` RATHER THAN A HEX LITERAL, and not by preference:
+				// `tests/unit/design/no-raw-hex-view-layer.test.ts` bans raw hex
+				// anywhere under `src/components`, so every colour arrives
+				// through the token layer. This one cannot — it is the ground
+				// under a JPEG that has no alpha channel, not a themeable
+				// surface — and that guard's own docblock names `rgb()` as the
+				// allowed spelling for exactly these untokenized white values.
+				ctx.fillStyle = "rgb(255, 255, 255)";
 				ctx.fillRect(0, 0, targetWidth, targetHeight);
 			}
 			ctx.drawImage(bitmap, 0, 0, targetWidth, targetHeight);

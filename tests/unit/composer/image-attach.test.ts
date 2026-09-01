@@ -395,6 +395,24 @@ describe("attachImage — sign → PUT orchestration (injected fetch double)", (
 // that is exactly why docs/plans/T3.md requires a separate manual check.
 // ---------------------------------------------------------------------------
 
+/**
+ * True for any spelling of opaque white. Canvas normalises `fillStyle` on
+ * read (a real browser returns `#ffffff` for `rgb(255, 255, 255)`), and the
+ * source uses the `rgb()` form because the raw-hex design guard bans hex
+ * under `src/components`. The property under test is that the ground is
+ * WHITE — not which of its equivalent spellings reached the mock.
+ */
+function isWhite(value: string): boolean {
+	const v = value.trim().toLowerCase().replace(/\s+/g, "");
+	return (
+		v === "#ffffff" ||
+		v === "#fff" ||
+		v === "white" ||
+		v === "rgb(255,255,255)" ||
+		v === "rgba(255,255,255,1)"
+	);
+}
+
 interface FakeBitmap {
 	width: number;
 	height: number;
@@ -685,7 +703,14 @@ describe("attachImage — T3 downscale (mocked canvas boundary)", () => {
 			new Response(null, { status: 200 }),
 		);
 		await attachImage({ file, fetchFn });
-		expect(fillStyleAtFill).toEqual(["#ffffff"]);
+		// Asserted as WHITE, not as one spelling of it. The source says
+		// `rgb(255, 255, 255)` because the raw-hex guard bans the hex form
+		// under `src/components`, and a real browser normalises the property
+		// back to `#ffffff` on read — so pinning either literal would make
+		// this test fail for a reason that has nothing to do with the ground
+		// being white.
+		expect(fillStyleAtFill).toHaveLength(1);
+		expect(isWhite(fillStyleAtFill[0] ?? "")).toBe(true);
 		expect(fillRect).toHaveBeenCalledWith(0, 0, 1600, 800);
 		expect(fillRect.mock.invocationCallOrder[0]).toBeLessThan(
 			drawImage.mock.invocationCallOrder[0] as number,
