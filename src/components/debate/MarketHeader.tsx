@@ -313,10 +313,33 @@ export function MarketHeader({
 					    budget: the row that grows is the block row, so these gaps no longer
 					    compete with anything for space. Kept because changing it would be a
 					    spacing change nobody ruled, not because 20.9px still divides by
-					    four. */}
+					    four.
+
+					    ⛔⛔ BLOCK-4 §3 — 5px IS RULED, AND IT IS `gap-5` (20px). The
+					    sentence directly above is the one this change answers: 5px survived
+					    three tasks purely because nobody had ruled on it, and the founder
+					    has now looked at the result and ruled it cramped. THE RHYTHM WAS
+					    ALSO UNEVEN, which the arbitrary value hid — `ResolverCards` carried
+					    its own `mt-4` on top of this gap, so the three stacked elements the
+					    §3 brief names read 5px / 5px / **21px**: question→stats 5,
+					    stats→bar 5, bar→blocks 21. Dropping that `mt-4` (see
+					    `ResolverCards.tsx`) and moving this to `gap-5` makes all three
+					    gaps 20px — measured 5/5/21 → 20/20/20 at 1440×900.
+					    ⚠ `gap-5` IS NOT A NEW TOKEN AND NOT AN ARBITRARY VALUE. It is
+					    d5's own `.headzone{gap:20px}` (`:447`), already shipping one level
+					    up on `HeadZone`'s band as the gap between this column and the chart
+					    rail. The stack's vertical rhythm and the band's horizontal one are
+					    now the same number, which is a composition argument rather than a
+					    coincidence — and it replaces a bracket value that belonged to no
+					    scale at all.
+					    ⚠ WHAT PAYS FOR IT: BLOCK-4 §2 stops the block row absorbing the
+					    band's leftover (it was 122.76px at 1440×900 for 53.25px of
+					    content), so the 45px these gaps gain is drawn from a row that was
+					    only ever holding air. The band, the arena and the media panel are
+					    all untouched by this. */}
 					<div
 						data-testid="headzone-stack"
-						className="flex min-h-0 min-w-0 flex-1 flex-col gap-[5px] overflow-y-auto"
+						className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto"
 					>
 						{/* `.question` (`d5:463`) — `font-size:21px;font-weight:700;
 							    line-height:1.24`, and SINGLE LINE with an ellipsis

@@ -112,7 +112,23 @@ describe("RESO-1/BLOCK-1 — R-7, four blocks from one fixture, geometry unchang
 			"grid-cols-4",
 		]);
 		expect(cls).not.toMatch(/:grid-cols-/);
-		expect(tokens).toContain("flex-1");
+		// ⛔⛔ BLOCK-4 §2 REVERSES THIS ASSERTION, WHICH USED TO READ
+		// `expect(tokens).toContain("flex-1")`. R-8 made the row `flex-1` so the
+		// blocks would "absorb the height freed by R-1/R-2" — correct while they
+		// were empty placeholder chrome, and the defect once they held one line of
+		// real text: as the only `flex-1` child of a band fixed at
+		// `basis-[24.2dvh]`, the row's height was pure LEFTOVER and tracked the
+		// viewport rather than its contents (measured on the BLOCK-3 build at
+		// `7155cf1`: 122.76px at 1440×900, 92.99 at 1440×777, 166.32 at
+		// 1920×1080, around 53.25px of content).
+		// ⇒ The row is CONTENT-SIZED now, and this is the assertion that keeps it
+		// that way. `flex-1` returning here would silently restore a block four
+		// times taller than its text at a tall viewport, and no other guard in
+		// this file or `debate-height-chain.test.ts` would see it (jsdom performs
+		// no layout, and this row is not a chain node).
+		expect(tokens).not.toContain("flex-1");
+		expect(tokens).not.toContain("grow");
+		expect(tokens).not.toContain("self-stretch");
 
 		// ⚠ BLOCK-1: the RESOLVER block is now an `<a>`, the other three stay
 		// `<div>`s — both are equally valid direct grid children, so this loop
@@ -141,12 +157,24 @@ describe("RESO-1/BLOCK-1 — R-7, four blocks from one fixture, geometry unchang
 			container
 				.querySelector('[data-testid="resolver-cards"]')
 				?.getAttribute("class") ?? "";
-		// ⚠⚠ BLOCK-3 §2 — 84px → 78px, re-derived against the smaller glyph
-		// (48→36px) and padding (`py-2`→`py-1.5`) this task leaves behind. See
-		// `ResolverCards.tsx`'s own docblock on this class for the computation.
-		expect(cls).toContain("min-h-[78px]");
+		// ⚠⚠ BLOCK-4 §2 — 78px → 54px, re-derived a third time (84 at RESO-2, 78
+		// at BLOCK-3, 54 here) because the worst case changed, not because the
+		// number was wrong. Every `line2` is `null` now, so the tallest possible
+		// block is ONE line at the `fontSize` ceiling: padding 12 + border 2 +
+		// label 14.25 + gap 4 + value 21 = 53.25px, browser-measured, rounded up.
+		// See `ResolverCards.tsx`'s own docblock on this class for the full
+		// derivation and for why 36px of glyph never binds.
+		expect(cls).toContain("min-h-[54px]");
 		expect(cls).toMatch(/min-h-\[\d+px\]/);
 		expect(cls.split(/\s+/)).not.toContain("min-h-0");
+		// ⛔⛔ NO TOP MARGIN. `mt-4` shipped on this row from RESO-1 to BLOCK-3
+		// and was the reason the three stacked elements read 5px / 5px / 21px
+		// instead of an even rhythm — the stack's own gap said 5 and this margin
+		// silently added 16 to the last one. BLOCK-4 §3 moves the rhythm entirely
+		// into `headzone-stack`'s `gap-5`, so a margin reappearing here would
+		// re-open exactly the unevenness that task was ruled to fix, from a file
+		// the founder would not think to look in.
+		expect(cls.split(/\s+/).filter((t) => /^-?m[tby]?-/.test(t))).toEqual([]);
 	});
 
 	it("resolver-cards::a-block-does-NOT-clip-its-own-content", () => {
@@ -265,11 +293,16 @@ describe("BLOCK-1 — G2, every value line is real content, never an empty bar",
 			container.querySelector('[data-testid="resolution-block-value-closes"]')
 				?.textContent,
 		).toBe("4 Oct 2026");
+		// ⚠⚠ BLOCK-4 §1 — the time line ("21:59Z") is gone from every market, so
+		// this asserts the subvalue's ABSENCE where it used to assert its text.
+		// The DATE is what G3 is about and it is untouched: oktoberfest's trading
+		// close is a month before everything else, and a block reading 5 Nov here
+		// locks a participant out early.
 		expect(
 			container.querySelector(
 				'[data-testid="resolution-block-subvalue-closes"]',
-			)?.textContent,
-		).toBe("21:59Z");
+			),
+		).toBeNull();
 
 		// Positive control: a different market on the SAME test run reads 5 Nov,
 		// proving the assertion above isn't vacuously true of every market.
@@ -340,15 +373,25 @@ describe("BLOCK-1 — G2, every value line is real content, never an empty bar",
 			"https://github.com/zugzwang-foundation/experiment",
 		);
 		// The display text is short by design — the href is not.
+		// ⚠⚠ BLOCK-4 §1 — "Zugzwang" / "repo" became the single word "GitHub".
+		// The href did not move a byte, which is the whole of G5: the rendered
+		// anchor must still carry the FULL repo URL even though its label no
+		// longer names the repo at all.
 		expect(
 			container.querySelector('[data-testid="resolution-block-value-resolver"]')
 				?.textContent,
-		).toBe("Zugzwang");
+		).toBe("GitHub");
 		expect(
 			container.querySelector(
 				'[data-testid="resolution-block-subvalue-resolver"]',
-			)?.textContent,
-		).toBe("repo");
+			),
+		).toBeNull();
+		// ⛔ THE RENDERED href, not the map's — this test reads the DOM, so it
+		// catches a component that renders a truncated or rewritten URL from a
+		// correct map entry, which the data-level G5 guard structurally cannot.
+		expect(anchor?.getAttribute("href")).toContain(
+			"/zugzwang-foundation/experiment",
+		);
 	});
 
 	it("resolver-cards::an-unknown-market-slug-degrades-to-NOTHING-captured-once-never-crashes-the-route", () => {
@@ -430,17 +473,20 @@ describe("BLOCK-1 — R-12 reversed for RESOLVER only; G7/G8 on the split", () =
 	});
 
 	it("resolver-cards::G7-RESOLVER-is-ONE-anchor-wrapping-glyph-label-AND-value", () => {
-		// ⚠ BLOCK-3 — oktoberfest, not PRIMARY_MARKET (bitcoin). §4c dropped
-		// bitcoin's RESOLVER subvalue ("Low"), so it no longer exercises the
-		// subvalue-inside-the-anchor branch this test exists to check;
-		// oktoberfest's RESOLVER gained one ("management") the same task, and
-		// is now the only market whose RESOLVER carries both an href and a
-		// subvalue.
-		const { container } = render(
-			<ResolverCards
-				market={marketFixture("oktoberfest-munich-beer-volume")}
-			/>,
-		);
+		// ⚠⚠ THE FIXTURE HAS MOVED TWICE AND THE SUBJECT NARROWED ONCE. BLOCK-3
+		// moved it from bitcoin to oktoberfest because §4c dropped bitcoin's
+		// RESOLVER subvalue ("Low") and oktoberfest had just gained one
+		// ("management"), making it the only market whose RESOLVER carried both
+		// an href and a subvalue. BLOCK-4 §1 removes every second line on every
+		// market, so NO fixture can exercise the subvalue-inside-the-anchor
+		// branch — it moves back to PRIMARY_MARKET and asserts the three
+		// descendants that still exist.
+		// ⛔ THE DROPPED HALF IS NOT LOST, IT IS RELOCATED. "a subvalue rendered
+		// inside the anchor rather than beside it" is now proven by the synthetic
+		// two-line fixture at the bottom of this file, which is the only place
+		// that branch can be reached at all. Deleting it would silently retire
+		// this assertion rather than move it.
+		const { container } = render(<ResolverCards market={PRIMARY_MARKET} />);
 		const block = container.querySelector(
 			'[data-testid="resolution-block-resolver"]',
 		);
@@ -455,12 +501,9 @@ describe("BLOCK-1 — R-12 reversed for RESOLVER only; G7/G8 on the split", () =
 		const value = container.querySelector(
 			'[data-testid="resolution-block-value-resolver"]',
 		);
-		const subvalue = container.querySelector(
-			'[data-testid="resolution-block-subvalue-resolver"]',
-		);
-		// ⛔ THE WHOLE BLOCK, NOT JUST THE VALUE TEXT — glyph, label and both
-		// value lines are all DESCENDANTS of the one anchor.
-		for (const el of [glyph, label, value, subvalue]) {
+		// ⛔ THE WHOLE BLOCK, NOT JUST THE VALUE TEXT — glyph, label and the value
+		// line are all DESCENDANTS of the one anchor.
+		for (const el of [glyph, label, value]) {
 			expect(el).not.toBeNull();
 			expect(block?.contains(el as Node)).toBe(true);
 		}
@@ -667,22 +710,32 @@ describe("BLOCK-3 §3 — value/subvalue read ink, sized per block from the map"
  * sentence case forbids) without touching the data at all.
  */
 describe("BLOCK-3 §5 — FLAVOUR/oktoberfest sentence case survives to the DOM", () => {
-	it("resolver-cards::oktoberfest-de-report-renders-lowercase-r-report-in-the-DOM", () => {
+	it("resolver-cards::oktoberfest-de-renders-a-lowercase-o-in-the-DOM", () => {
+		// ⚠⚠ RETARGETED AT BLOCK-4 §1, AND THE GUARD GOT SHARPER RATHER THAN
+		// WEAKER. This used to read the SUBVALUE line ("report", whose lowercase
+		// `r` a `capitalize` class would have raised); §1 removes that line, so
+		// the target moves up to the VALUE line — `oktoberfest.de`, where the same
+		// class would render `Oktoberfest.de`. That is not a styling wobble, it is
+		// a DIFFERENT DOMAIN printed as the market's resolving source, which is
+		// the reason the §1 brief rules sentence case into the data and out of CSS
+		// in the first place.
 		const { container } = render(
 			<ResolverCards
 				market={marketFixture("oktoberfest-munich-beer-volume")}
 			/>,
 		);
-		const subvalue = container.querySelector(
-			'[data-testid="resolution-block-subvalue-resolution"]',
+		const value = container.querySelector(
+			'[data-testid="resolution-block-value-resolution"]',
 		);
-		expect(subvalue?.textContent).toBe("report");
-		// The regression this guards: a `capitalize` class would not change
-		// `textContent` (CSS text-transform doesn't touch the DOM text node),
-		// so the string-equality check above is NOT what would catch it —
-		// this class-list check is.
-		const cls = (subvalue?.getAttribute("class") ?? "").split(/\s+/);
+		expect(value?.textContent).toBe("oktoberfest.de");
+		expect(value?.textContent?.[0]).toBe("o");
+		// ⛔⛔ THE STRING CHECK ABOVE CANNOT CATCH THE REGRESSION THIS TEST IS
+		// FOR. CSS `text-transform` does not touch the DOM text node, so
+		// `textContent` stays "oktoberfest.de" while the participant reads
+		// "Oktoberfest.de". The class-list check is the one that fires.
+		const cls = (value?.getAttribute("class") ?? "").split(/\s+/);
 		expect(cls).not.toContain("capitalize");
+		expect(cls).not.toContain("uppercase");
 	});
 
 	it("resolver-cards::no-value-or-subvalue-span-anywhere-carries-a-CSS-capitalize-class", () => {
@@ -703,6 +756,144 @@ describe("BLOCK-3 §5 — FLAVOUR/oktoberfest sentence case survives to the DOM"
 				}
 			}
 			unmount();
+		}
+	});
+});
+
+/**
+ * BLOCK-4 §1/§5 — every `line2` is `null`, so nothing on the surface renders a
+ * second line; and because nothing does, the two-line branch is held open by a
+ * SYNTHETIC fixture instead of a real market.
+ *
+ * ⚠ THE TWO TESTS BELOW ARE OPPOSITES ON PURPOSE. The first proves the branch
+ * never fires against shipped data; the second proves it still WORKS. Either
+ * one alone is a trap: without the first, a restored second line ships
+ * unnoticed; without the second, the branch could be deleted outright and every
+ * remaining assertion in this file would stay green, taking the U-3 seam
+ * `resolution-block-data.ts` deliberately keeps with it.
+ */
+describe("BLOCK-4 §1 — no second line ships, and the two-line path stays alive", () => {
+	it("resolver-cards::no-block-on-any-market-renders-a-SECOND-line", () => {
+		let checked = 0;
+		for (const slug of Object.keys(RESOLUTION_BLOCKS) as Array<
+			keyof typeof RESOLUTION_BLOCKS
+		>) {
+			const { container, unmount } = render(
+				<ResolverCards market={marketFixture(slug)} />,
+			);
+			for (const k of KEYS) {
+				expect(
+					container.querySelector(
+						`[data-testid="resolution-block-subvalue-${k}"]`,
+					),
+				).toBeNull();
+				// ⛔ NON-VACUITY, PER BLOCK — a component rendering nothing at all
+				// satisfies every `toBeNull()` above. The FIRST line must be present
+				// and non-empty for the absence of the second to mean anything.
+				const value = container.querySelector(
+					`[data-testid="resolution-block-value-${k}"]`,
+				);
+				expect(value).not.toBeNull();
+				expect((value?.textContent ?? "").length).toBeGreaterThan(0);
+				checked += 1;
+			}
+			unmount();
+		}
+		expect(checked).toBe(32);
+	});
+
+	it("resolver-cards::a-SYNTHETIC-two-line-entry-still-renders-BOTH-lines", async () => {
+		// ⛔⛔ THE ONLY TEST IN THE REPO THAT REACHES THE `entry.line2 !== null`
+		// BRANCH. No shipped market can reach it any more, so this mocks the map
+		// with a fixture that is OBVIOUSLY not market content — if either string
+		// ever appears on staging, the mock has leaked into a real render path.
+		// ⚠ `doMock` + `resetModules` + a dynamic import, rather than a top-level
+		// `vi.mock`: the latter is hoisted to the whole FILE and would replace the
+		// real map for all ~30 tests above, every one of which exists to assert
+		// against the real one.
+		const entry = (line1: string, line2: string | null) => ({
+			line1,
+			line2,
+			href: null,
+			fontSize: 14 as const,
+		});
+		vi.resetModules();
+		vi.doMock("@/components/debate/resolution-block-data", () => ({
+			isKnownMarketSlug: () => true,
+			RESOLUTION_BLOCKS: {},
+			getResolutionBlocks: () => ({
+				resolution: entry("SYNTHETIC-LINE-1", "SYNTHETIC-LINE-2"),
+				resolver: {
+					...entry("SYNTHETIC-RESOLVER-1", "SYNTHETIC-RESOLVER-2"),
+					// ⛔ AN href TOO — the branch that matters is a subvalue rendered
+					// INSIDE the anchor rather than beside it, which is the half G7
+					// used to cover with oktoberfest's "management" line and can no
+					// longer reach.
+					href: "https://example.invalid/synthetic",
+				},
+				closes: entry("SYNTHETIC-CLOSES", null),
+				flavour: entry("SYNTHETIC-FLAVOUR", null),
+			}),
+		}));
+		try {
+			const { ResolverCards: Isolated } = await import(
+				"@/components/debate/ResolverCards"
+			);
+			const { container, unmount } = render(
+				<Isolated market={{ ...BASE, slug: "synthetic-two-line-fixture" }} />,
+			);
+
+			// BOTH lines render, in order, for the entry that has two.
+			const value = container.querySelector(
+				'[data-testid="resolution-block-value-resolution"]',
+			);
+			const subvalue = container.querySelector(
+				'[data-testid="resolution-block-subvalue-resolution"]',
+			);
+			// ⛔ ASSERTED PRESENT BEFORE ANYTHING IS READ OFF THEM. `value?.x` on a
+			// null node yields `undefined`, which compares unequal to the expected
+			// string and so still reds here — but the ORDER check below would
+			// degrade to `undefined & N === 0`, falsy, and read as "wrong order"
+			// rather than "no element". Two different defects, one message.
+			expect(value).not.toBeNull();
+			expect(subvalue).not.toBeNull();
+			expect(value?.textContent).toBe("SYNTHETIC-LINE-1");
+			expect(subvalue?.textContent).toBe("SYNTHETIC-LINE-2");
+			// ⛔ ORDER, NOT JUST PRESENCE — `line2` under `line1`, never above it.
+			const order = (value as Element).compareDocumentPosition(
+				subvalue as Node,
+			);
+			expect(order & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+			// Both lines share ONE size, taken from the block's own `fontSize`
+			// (`resolution-block-data.ts` — one shared size per block, not per line).
+			for (const el of [value, subvalue]) {
+				const cls = (el?.getAttribute("class") ?? "").split(/\s+/);
+				expect(cls).toContain("text-[14px]");
+				expect(cls).toContain("text-ink");
+				expect(cls).toContain("truncate");
+			}
+			// The linked block wraps BOTH of its lines in the one anchor.
+			const anchor = container.querySelector(
+				'[data-testid="resolution-block-resolver"]',
+			);
+			expect(anchor?.tagName).toBe("A");
+			const resolverSub = container.querySelector(
+				'[data-testid="resolution-block-subvalue-resolver"]',
+			);
+			expect(resolverSub?.textContent).toBe("SYNTHETIC-RESOLVER-2");
+			expect(anchor?.contains(resolverSub as Node)).toBe(true);
+			// ⛔ THE CONTROL THAT MAKES THE ASSERTIONS ABOVE MEAN SOMETHING: a
+			// null `line2` in the SAME render still omits its span. Without this,
+			// a component that rendered a subvalue unconditionally would pass.
+			expect(
+				container.querySelector(
+					'[data-testid="resolution-block-subvalue-closes"]',
+				),
+			).toBeNull();
+			unmount();
+		} finally {
+			vi.doUnmock("@/components/debate/resolution-block-data");
+			vi.resetModules();
 		}
 	});
 });
