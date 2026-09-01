@@ -324,21 +324,47 @@ describe("H-4 · the three STRIP columns that had no VALUE guard", () => {
 		expect(entries).toHaveLength(1);
 	});
 
-	it("a MACHINE-GENERATED secret in a .md still aborts", () => {
-		// The control that keeps the tier honest. A user-agent string has no
-		// business in an argument, so one appearing is a serializer leak.
+	it("a SYSTEM-SOURCED secret in a .md still aborts", () => {
+		// The control that keeps the tier honest: downgrading participant-
+		// chosen needles (ruling S1) must not have switched the text arm off.
+		//
+		// ⚠ **The needle was a user-agent until DATASET.3**, on the reasoning
+		// that *"a user-agent string has no business in an argument, so one
+		// appearing is a serializer leak"*. The premise is false — the
+		// participant SENDS that header, so they choose the string, and the
+		// substring matcher then failed every debate containing whatever they
+		// chose. A Google `sub` carries the property the test is about: the
+		// serializer provably cannot emit one, and no request can arrange for
+		// it to collide.
 		const secrets = fixtureSecrets();
 		expect(() =>
 			debateEntries(
 				[
 					{
 						slug: "leaky",
-						markdown: `# Debate\n\nUA: ${[...secrets.userAgents][0]}\n`,
+						markdown: `# Debate\n\nsub: ${[...secrets.googleIds][0]}\n`,
 					},
 				],
 				secrets,
 			),
 		).toThrow(/egress_violation/);
+	});
+
+	it("S1 · …and the participant-chosen twin does NOT abort", () => {
+		// The other half, so the test above cannot be satisfied by an arm that
+		// halts on everything. Same document shape, same guard, a needle the
+		// participant supplied — and the one-shot build survives it.
+		const secrets = fixtureSecrets();
+		const ua = [...secrets.userAgents][0] as string;
+		// CONTROL: the needle is genuinely in the secret set and long enough
+		// to be scanned, so a clean result is a decision and not a skip.
+		expect(ua.length).toBeGreaterThanOrEqual(6);
+		expect(
+			debateEntries(
+				[{ slug: "ok", markdown: `# Debate\n\nUA: ${ua}\n` }],
+				secrets,
+			),
+		).toHaveLength(1);
 	});
 });
 

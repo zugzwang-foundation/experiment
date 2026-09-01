@@ -151,6 +151,17 @@ export interface TextHit {
 	 * leak rather than reported it.
 	 */
 	readonly fingerprint: string;
+	/**
+	 * The whole needle that matched.
+	 *
+	 * ⚠ **For deciding, never for reporting.** Ruling S1 (DATASET.3) makes
+	 * fatality depend on where the needle ENTERED the system, so the caller
+	 * needs the value itself to look up its provenance — a fingerprint cannot
+	 * be a set key. `fingerprint` above remains the only form that reaches a
+	 * violation's `detail`, and the reason is unchanged: a report that prints
+	 * the leaked value has relocated the leak rather than reported it.
+	 */
+	readonly value: string;
 }
 
 /**
@@ -175,6 +186,7 @@ export function scanText(
 				hits.push({
 					line: i + 1,
 					fingerprint: `${needle.slice(0, 8)}…`,
+					value: needle,
 				});
 			}
 		}

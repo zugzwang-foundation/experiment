@@ -123,7 +123,7 @@ describe("slice 7 · debateEntries guards every artifact", () => {
 		);
 	});
 
-	it("POSITIVE CONTROL — a non-UUID secret in prose is also rejected", () => {
+	it("POSITIVE CONTROL — a non-UUID SYSTEM secret in prose is also rejected", () => {
 		// The companion case the bare-UUID net cannot rescue: a user-agent has
 		// no UUID shape, so only the value scan can see it. Without this, the
 		// test above would pass with the value scan disabled.
@@ -134,7 +134,7 @@ describe("slice 7 · debateEntries guards every artifact", () => {
 		// participant chose to write (`@security-auditor` F-11 H-B).
 		const leaked = {
 			slug: "leaky-2",
-			markdown: `${clean.markdown}\nUA ${FIXTURE_SECRET_VALUES.userAgents[0]}`,
+			markdown: `${clean.markdown}\nsub ${FIXTURE_SECRET_VALUES.googleIds[0]}`,
 		};
 		expect(() => debateEntries([leaked], secrets)).toThrow(
 			EgressViolationError,

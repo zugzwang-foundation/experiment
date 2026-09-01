@@ -8,6 +8,7 @@ import {
 	emptySecrets,
 } from "@/server/export/egress";
 import { EgressViolationError } from "@/server/export/egress/errors";
+import { UUID_RE } from "@/server/export/egress/scan";
 
 import {
 	DIRTY_EVENT_ROWS,
@@ -35,7 +36,7 @@ import {
 const secrets: EgressSecrets = fixtureSecrets();
 
 /** Rules that fired, deduped — the assertion surface every test reads. */
-function rulesFiredOn(rows: unknown): string[] {
+function guardOn(rows: unknown): EgressGuard {
 	const g = new EgressGuard(secrets);
 	g.assertNoRawUserIds("t", rows)
 		.assertNoIps("t", rows)
@@ -46,7 +47,17 @@ function rulesFiredOn(rows: unknown): string[] {
 		.assertNoEmails("t", rows)
 		.assertNoStrippedMetadataKeys("t", rows)
 		.assertNoForbiddenPayloadKeys("t", rows);
-	return [...new Set(g.findings.map((f) => f.rule))].sort();
+	return g;
+}
+
+/** Rules that fired FATALLY. */
+function rulesFiredOn(rows: unknown): string[] {
+	return [...new Set(guardOn(rows).findings.map((f) => f.rule))].sort();
+}
+
+/** Rules that fired as ADVISORIES — ruling S1's other tier. */
+function advisoryRulesOn(rows: unknown): string[] {
+	return [...new Set(guardOn(rows).advisories.map((f) => f.rule))].sort();
 }
 
 describe("egress · the six named value guards", () => {
@@ -96,24 +107,103 @@ describe("egress · the six named value guards", () => {
 
 	// ── the other five ────────────────────────────────────────────────
 
+	// ⚠ **The tier column is ruling S1 (DATASET.3), and it is the point of
+	// this table now.** Every one of these rows carries a real secret under a
+	// key name nobody would expect — `ua`, `g`, `k`, `s`, `e` — which is the
+	// "found under ANY key" property the value scan exists for. What S1 adds is
+	// that the CONSEQUENCE differs by where the needle came from:
+	//
+	//   · a SYSTEM-minted needle (google id, R2 key, admin session id) cannot
+	//     be made to collide on purpose, so a hit is evidence of a transform
+	//     failure and stays FATAL wherever it lands;
+	//   · a PARTICIPANT-supplied needle (ip, user-agent, email) CAN be made to
+	//     collide on purpose — that is `@security-auditor` C-1, one request
+	//     poisoning a one-shot release — so a hit under a field it was never
+	//     harvested from is ADVISORY;
+	//   · …except under a field it WAS harvested from, where the transform
+	//     demonstrably failed at its own job. `no-ip` sits under key `ip`, and
+	//     that is why it alone among the three stays fatal.
+	//
+	// Pinning the tier rather than merely "it fired" is what makes this table
+	// able to notice the partition being widened or narrowed by accident.
 	it.each([
-		["no-ip", { metadata: { ip: FIXTURE_SECRET_VALUES.ips[0] } }],
+		["no-ip", { metadata: { ip: FIXTURE_SECRET_VALUES.ips[0] } }, "FATAL"],
 		[
 			"no-user-agent",
 			{ metadata: { ua: FIXTURE_SECRET_VALUES.userAgents[0] } },
+			"ADVISORY",
 		],
-		["no-google-id", { payload: { g: FIXTURE_SECRET_VALUES.googleIds[0] } }],
+		[
+			"no-google-id",
+			{ payload: { g: FIXTURE_SECRET_VALUES.googleIds[0] } },
+			"FATAL",
+		],
 		[
 			"no-r2-object-key",
 			{ payload: { k: FIXTURE_SECRET_VALUES.r2ObjectKeys[0] } },
+			"FATAL",
 		],
 		[
 			"no-admin-session-id",
 			{ payload: { s: FIXTURE_SECRET_VALUES.adminSessionIds[0] } },
+			"FATAL",
 		],
-		["no-email", { payload: { e: FIXTURE_SECRET_VALUES.emails[0] } }],
-	])("POSITIVE CONTROL — %s fires on a row carrying it", (rule, row) => {
-		expect(rulesFiredOn([row])).toContain(rule);
+		[
+			"no-email",
+			{ payload: { e: FIXTURE_SECRET_VALUES.emails[0] } },
+			"ADVISORY",
+		],
+	])("POSITIVE CONTROL — %s fires on a row carrying it, tier %s", (rule, row, tier) => {
+		const fatal = rulesFiredOn([row]);
+		const advisory = advisoryRulesOn([row]);
+		// It fired SOMEWHERE — the original claim, unchanged.
+		expect([...fatal, ...advisory]).toContain(rule);
+		// …and in the tier S1 assigns it.
+		if (tier === "FATAL") {
+			expect(fatal).toContain(rule);
+			expect(advisory).not.toContain(rule);
+		} else {
+			expect(advisory).toContain(rule);
+			expect(fatal).not.toContain(rule);
+		}
+	});
+
+	it("S1 · the SAME participant needle IS fatal under the field it came from", () => {
+		// ⚠ The control that stops the two ADVISORY rows above from reading as
+		// "participant classes are switched off". They are not: the identical
+		// value, on the identical guard, is fatal when it survives in a field
+		// the transform owns. Without this pair, a partition drawn far too wide
+		// — every participant needle advisory everywhere — would pass the table.
+		const ua = FIXTURE_SECRET_VALUES.userAgents[0];
+		expect(
+			rulesFiredOn([{ metadata: { user_agent: ua } }]),
+			"a user-agent surviving under `user_agent` is the strip failing at " +
+				"its own job and must halt",
+		).toContain("no-user-agent");
+		expect(
+			rulesFiredOn([{ users_column: FIXTURE_SECRET_VALUES.emails[0] }]),
+		).not.toContain("no-email");
+		expect(
+			rulesFiredOn([{ email: FIXTURE_SECRET_VALUES.emails[0] }]),
+		).toContain("no-email");
+	});
+
+	it("S1 · a participant needle that is ALSO system-sourced stays fatal", () => {
+		// The stricter-arm-wins rule, exercised. An attacker who sets their
+		// `User-Agent` to their own `users.id` must not thereby downgrade the
+		// raw-user-id guard — the one wall §19.5 exists to hold.
+		const both = FIXTURE_USER_IDS.amber;
+		const poisoned = {
+			...secrets,
+			userAgents: new Set([...secrets.userAgents, both]),
+			// The harvest would have filtered it out; construct the state the
+			// harvest produces, then assert the guard agrees.
+			participantSourced: new Map(secrets.participantSourced),
+		};
+		const g = new EgressGuard(poisoned);
+		g.assertNoRawUserIds("markets", [{ slug: both }]);
+		expect(g.findings.map((f) => f.rule)).toContain("no-raw-user-id");
+		expect(g.advisories).toHaveLength(0);
 	});
 
 	it("is silent on a row that carries none of them", () => {
@@ -176,10 +266,26 @@ describe("egress · the six named value guards", () => {
 	it("finds the value under ANY key name, not just the expected one", () => {
 		// The reason the guards are value-based rather than key-based: a
 		// strip that renamed rather than removed would defeat a key guard.
+		//
+		// ⚠ **The needle changed at DATASET.3 and the change is the ruling.**
+		// This used an `ip`, which is participant-supplied — so under S1 a hit
+		// on it in `harmless_looking_column` is now an ADVISORY, and the test
+		// would have passed only by accident of `rulesFiredOn` being renamed
+		// around it. An R2 object key is server-minted and unchoosable, so it
+		// carries the property this test is actually about: a value the
+		// transform owns, surviving under a name nobody would grep for, halts.
 		const smuggled = [
+			{ harmless_looking_column: FIXTURE_SECRET_VALUES.r2ObjectKeys[0] },
+		];
+		expect(rulesFiredOn(smuggled)).toContain("no-r2-object-key");
+
+		// …and the participant-sourced twin, so the tier is visible here too
+		// rather than only in the table above.
+		const arrangeable = [
 			{ harmless_looking_column: FIXTURE_SECRET_VALUES.ips[1] },
 		];
-		expect(rulesFiredOn(smuggled)).toContain("no-ip");
+		expect(rulesFiredOn(arrangeable)).not.toContain("no-ip");
+		expect(advisoryRulesOn(arrangeable)).toContain("no-ip");
 	});
 });
 
@@ -303,17 +409,84 @@ describe("egress · rendered TEXT artifacts (the debate .md class)", () => {
 
 	it("POSITIVE CONTROL — the value scan catches a non-UUID secret in prose", () => {
 		// The companion to the above, and the one the bare-UUID net CANNOT
-		// rescue: a user_agent has no UUID shape, so only the value scan can
+		// rescue: this needle has no UUID shape, so only the value scan can
 		// see it. Without this, breaking `scanText` would leave four of the
 		// five text tests green.
 		//
-		// ⚠ A user_agent is MACHINE-GENERATED, so it stays FATAL on this arm.
-		// That is the tier: a participant has no reason to type a UA string
-		// into an argument, so one appearing is a serializer leak.
+		// ⚠ **The needle was a `user_agent` until DATASET.3, and the reason it
+		// changed IS ruling S1.** The old note said *"a user_agent is
+		// MACHINE-GENERATED … a participant has no reason to type a UA string
+		// into an argument, so one appearing is a serializer leak."* That is
+		// false, and `@security-auditor` measured it: the participant SENDS
+		// the User-Agent header, so they choose the string, and
+		// `User-Agent: because` then failed every debate document containing
+		// the word "because" — six characters, one request. A Google `sub` is
+		// the honest choice here: opaque, non-UUID, and issued by Google
+		// rather than chosen by the account holder.
+		const leaked = `${md}\nsub: ${FIXTURE_SECRET_VALUES.googleIds[0]}`;
+		const g = new EgressGuard(secrets);
+		g.assertTextClean("m/metro/debate.md", leaked);
+		expect(g.findings.map((f) => f.rule)).toContain("no-google-id");
+		// CONTROL on the needle's shape, so this cannot quietly become a
+		// UUID test: the bare-UUID net must be unable to account for it.
+		expect(FIXTURE_SECRET_VALUES.googleIds[0]).not.toMatch(UUID_RE);
+	});
+
+	it("S1 · a PARTICIPANT-supplied needle in prose is advisory, however machine-shaped", () => {
+		// ⚠ The measured C-1 attack, run as a test. `scanText` is a SUBSTRING
+		// matcher over a document that is participant prose end to end, and
+		// the attacker picks the substring. Halting here hands every
+		// participant a deterministic abort of a one-shot release for content
+		// somebody else was entitled to write.
 		const leaked = `${md}\nUA: ${FIXTURE_SECRET_VALUES.userAgents[0]}`;
 		const g = new EgressGuard(secrets);
 		g.assertTextClean("m/metro/debate.md", leaked);
-		expect(g.findings.map((f) => f.rule)).toContain("no-user-agent");
+		expect(g.findings.map((f) => f.rule)).not.toContain("no-user-agent");
+		expect(g.advisories.map((f) => f.rule)).toContain("no-user-agent");
+		// …and it is REPORTED, not dropped. An advisory nobody can see is a
+		// downgrade to nothing.
+		expect(
+			g.advisories.find((f) => f.rule === "no-user-agent")?.detail,
+		).toContain("participant-writable");
+	});
+
+	it("S1 · the attack DATASET.2 measured now costs the build nothing", () => {
+		// `@security-auditor` C-1, reproduced end to end: a participant sets
+		// `User-Agent: because` and every debate document containing the
+		// ordinary English word fails. Six characters, one request, no
+		// privileged knowledge — and `events` is Bucket A, so post-freeze the
+		// poisoning row can be neither edited nor deleted.
+		const attacker = "because";
+		const poisoned = {
+			...secrets,
+			userAgents: new Set([...secrets.userAgents, attacker]),
+			participantSourced: new Map([
+				...secrets.participantSourced,
+				[attacker, new Set(["user_agent", "tos_acceptance_user_agent"])],
+			]),
+		};
+		const debate = "# Debate\n\nYES, because the tunnelling is complete.\n";
+
+		// CONTROL — the needle really is present in the document, so a clean
+		// result below is a decision rather than a scan that found nothing.
+		expect(debate).toContain(attacker);
+
+		const g = new EgressGuard(poisoned);
+		g.assertTextClean("m/metro/debate.md", debate);
+		expect(g.findings, "the release build must not abort on this").toEqual([]);
+		expect(g.advisories.map((f) => f.rule)).toContain("no-user-agent");
+
+		// THE WRONG ANSWER, constructed: the same document under the old rule,
+		// where every class was fatal by class alone.
+		const oldRule = new EgressGuard({
+			...poisoned,
+			participantSourced: new Map(),
+		});
+		oldRule.assertTextClean("m/metro/debate.md", debate);
+		expect(
+			oldRule.findings.map((f) => f.rule),
+			"the pre-S1 behaviour, kept as code so the improvement is measured",
+		).toContain("no-user-agent");
 	});
 
 	it("a HUMAN-AUTHORABLE secret in prose is an advisory, not fatal", () => {

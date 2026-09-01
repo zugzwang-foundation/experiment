@@ -177,7 +177,7 @@ export const NON_SECRET_SENTINELS = new Set([
  * collecting them again from payloads would add nothing and would risk
  * harvesting a *pseudonymized* value if this ever ran post-transform.
  */
-const HARVEST_KEYS: Readonly<Record<string, keyof EgressSecrets>> = {
+const HARVEST_KEYS: Readonly<Record<string, SecretBucket>> = {
 	ip: "ips",
 	user_agent: "userAgents",
 	userAgent: "userAgents",
@@ -188,6 +188,103 @@ const HARVEST_KEYS: Readonly<Record<string, keyof EgressSecrets>> = {
 	sessionId: "adminSessionIds",
 	session_id: "adminSessionIds",
 };
+
+/** The harvest buckets — every field of `EgressSecrets` except the tag set. */
+export type SecretBucket = Exclude<keyof EgressSecrets, "participantSourced">;
+
+/**
+ * Where a harvested value ENTERED the system — ruling S1, DATASET.3.
+ *
+ * ⚠ **This is a property of the SOURCE, not of the field it later turns up
+ * in, and not of the value class.** `ips` and `userAgents` are not
+ * participant-writable because of what they are; they are participant-writable
+ * because the participant sends them in a request header and the server writes
+ * them down verbatim. A hypothetical `ip` the system derived itself would be
+ * `SYSTEM`, and it would be right for it to be.
+ */
+export type Provenance =
+	/**
+	 * The value arrived in a request the participant controls. A collision
+	 * with a shipped value is therefore something they can arrange, so it is
+	 * not evidence that a transform failed.
+	 */
+	| "PARTICIPANT"
+	/**
+	 * The value was minted server-side and no request can choose it. A
+	 * collision cannot be arranged, so a hit IS evidence of a transform
+	 * failure and stays fatal.
+	 */
+	| "SYSTEM";
+
+/**
+ * The provenance of every harvest SITE, and the argument for each.
+ *
+ * ⚠ **Derived from where the value enters, and CHECKED against the merge.**
+ * Brief §4 Slice 2 asks whether the property captures a field nobody thought
+ * of. Measured on this branch: the 111 commits merged from `main` touched
+ * exactly six files under `src/server/`, `src/app/api/` and `src/db/`
+ * (`config/limits.ts`, `debate-view/{load-debate-view,price-chart}.ts`,
+ * `discovery/{cached-series,list,price-series}.ts`), and **not one of them
+ * writes `events` or touches a harvest bucket** — the composer's client-side
+ * downscale and the resolution blocks landed entirely in `src/components/`.
+ * `EVENT_TYPES` is still 24 at runtime, the migration head is still
+ * `0026_lots_no_delete`, and the payload-parity test would red on a new
+ * payload key. So the window added no participant-writable surface reaching
+ * this harvest, and that is measured rather than assumed.
+ */
+const SITE_PROVENANCE = {
+	// ── PARTICIPANT ─────────────────────────────────────────────────────
+	// `x-forwarded-for`'s first entry is client-supplied — proxies APPEND,
+	// so `[0]` is whatever the caller sent. (That the app trusts `[0]` at
+	// eight sites is a separate, escalated finding; here it is simply why
+	// the value cannot be treated as system-minted.)
+	"users.tos_acceptance_ip": "PARTICIPANT",
+	"metadata.ip": "PARTICIPANT",
+	"payload.ip": "PARTICIPANT",
+	// The `User-Agent` header, verbatim. This is the C-1 attack's channel.
+	"users.tos_acceptance_user_agent": "PARTICIPANT",
+	"metadata.user_agent": "PARTICIPANT",
+	"payload.userAgent": "PARTICIPANT",
+	// The participant types their email at OTP sign-in; the Google-supplied
+	// one is still an address they chose and control.
+	"users.email": "PARTICIPANT",
+	"payload.email": "PARTICIPANT",
+	// The participant's Google DISPLAY NAME — set by them, on their own
+	// account, to any string. This is `@security-auditor` H-4's "a
+	// participant named Li" and it is participant-writable by construction.
+	"users.name": "PARTICIPANT",
+	// The participant's own comment body, rejected by the pre-commit gate
+	// and retained for ban review. They wrote every byte of it.
+	"mod_actions.blocked_text": "PARTICIPANT",
+
+	// ── SYSTEM ──────────────────────────────────────────────────────────
+	// UUIDv7, minted by Postgres. Unchoosable.
+	"users.id": "SYSTEM",
+	// Google's `sub`. Issued by Google, opaque, not settable by the account
+	// holder — which is exactly why it is a durable identity key.
+	"users.google_id": "SYSTEM",
+	"payload.googleId": "SYSTEM",
+	// A Google-minted avatar URL. The participant chooses the IMAGE; the URL
+	// is generated. Classified SYSTEM because the string is not choosable —
+	// which is the property that matters, not who supplied the picture.
+	"users.image": "SYSTEM",
+	// R2 object keys are minted server-side (`sign-upload.ts` builds the
+	// prefix; no client input reaches the key) and embed the userId.
+	"image_uploads.r2_object_key": "SYSTEM",
+	"mod_actions.image_r2_key": "SYSTEM",
+	"payload.key": "SYSTEM",
+	// The admin session cookie value — a UUIDv7 PK (`admin_sessions.session_id`).
+	"payload.sessionId": "SYSTEM",
+	"events.aggregate_id[admin_session]": "SYSTEM",
+} as const satisfies Record<string, Provenance>;
+
+/** Sub-key spellings whose harvested value is participant-supplied. */
+const PARTICIPANT_JSONB_KEYS: ReadonlySet<string> = new Set([
+	"ip",
+	"user_agent",
+	"userAgent",
+	"email",
+]);
 
 /**
  * Harvest every secret value from the SOURCE rows.
@@ -212,34 +309,89 @@ export function harvestSecrets(
 		blockedTexts: new Set<string>(),
 	};
 
-	const add = (set: Set<string>, v: unknown) => {
+	/**
+	 * Participant-sourced values → the FIELD NAMES each was harvested under.
+	 *
+	 * ⚠ **Both halves of ruling S1 live here.** Membership says the value is
+	 * arrangeable, so a collision elsewhere is not evidence of a transform
+	 * failure. The field names say where a hit WOULD still be evidence: the
+	 * transform owns the fields it harvested from, so a hit under one of those
+	 * names means it failed at its own job and stays fatal. See
+	 * `EgressSecrets.participantSourced` for why provenance alone was too wide.
+	 */
+	const participant = new Map<string, Set<string>>();
+	const system = new Set<string>();
+
+	const add = (
+		set: Set<string>,
+		v: unknown,
+		provenance: Provenance,
+		field: string,
+	) => {
 		if (typeof v !== "string" || v.trim() === "") return;
 		if (NON_SECRET_SENTINELS.has(v)) return;
 		set.add(v);
+		if (provenance === "PARTICIPANT") {
+			const fields = participant.get(v) ?? new Set<string>();
+			fields.add(field);
+			participant.set(v, fields);
+		} else {
+			system.add(v);
+		}
 	};
 
 	for (const row of tables.users ?? []) {
-		add(s.userIds, row.id);
-		add(s.emails, row.email);
-		add(s.googleIds, row.google_id);
-		add(s.ips, row.tos_acceptance_ip);
-		add(s.userAgents, row.tos_acceptance_user_agent);
+		add(s.userIds, row.id, SITE_PROVENANCE["users.id"], "id");
+		add(s.emails, row.email, SITE_PROVENANCE["users.email"], "email");
+		add(
+			s.googleIds,
+			row.google_id,
+			SITE_PROVENANCE["users.google_id"],
+			"google_id",
+		);
+		add(
+			s.ips,
+			row.tos_acceptance_ip,
+			SITE_PROVENANCE["users.tos_acceptance_ip"],
+			"tos_acceptance_ip",
+		);
+		add(
+			s.userAgents,
+			row.tos_acceptance_user_agent,
+			SITE_PROVENANCE["users.tos_acceptance_user_agent"],
+			"tos_acceptance_user_agent",
+		);
 		// ⚠ `users.name` is the participant's real Google display name and
 		// `users.image` their avatar URL — both STRIP per B.1, and until
 		// `@code-reviewer` H-4 neither had a value class, so the strongest
 		// assertion this layer can make had never been pointed at the most
 		// identifying column in the dataset.
-		add(s.displayNames, row.name);
-		add(s.avatarUrls, row.image);
+		add(s.displayNames, row.name, SITE_PROVENANCE["users.name"], "name");
+		add(s.avatarUrls, row.image, SITE_PROVENANCE["users.image"], "image");
 	}
 	for (const row of tables.image_uploads ?? []) {
-		add(s.r2ObjectKeys, row.r2_object_key);
+		add(
+			s.r2ObjectKeys,
+			row.r2_object_key,
+			SITE_PROVENANCE["image_uploads.r2_object_key"],
+			"r2_object_key",
+		);
 	}
 	// ⚠ mod_actions.image_r2_key is a second R2 key on a shipped table.
 	// §19.4's ten-column table does not name it; Appendix B.10 marks it STRIP.
 	for (const row of tables.mod_actions ?? []) {
-		add(s.r2ObjectKeys, row.image_r2_key);
-		add(s.blockedTexts, row.blocked_text);
+		add(
+			s.r2ObjectKeys,
+			row.image_r2_key,
+			SITE_PROVENANCE["mod_actions.image_r2_key"],
+			"image_r2_key",
+		);
+		add(
+			s.blockedTexts,
+			row.blocked_text,
+			SITE_PROVENANCE["mod_actions.blocked_text"],
+			"blocked_text",
+		);
 	}
 
 	// Audit payloads carry ips, user agents, session ids and google ids that
@@ -277,16 +429,41 @@ export function harvestSecrets(
 					// recursive is what first brings `media[].key` within reach
 					// of this loop at all.
 					if (shipsDespiteForbiddenKey(entry.key, entry.value)) continue;
-					add(s[bucket], entry.value);
+					// Ruling S1 — provenance by SUB-KEY SPELLING, because a
+					// JSONB blob has no column to look the site up by. The four
+					// participant-supplied spellings are the ones the request
+					// carries verbatim; `key`, `sessionId` and `googleId` are
+					// minted elsewhere and stay fatal.
+					add(
+						s[bucket],
+						entry.value,
+						PARTICIPANT_JSONB_KEYS.has(entry.key) ? "PARTICIPANT" : "SYSTEM",
+						entry.key,
+					);
 				}
 			}
 			if (row.aggregate_type === "admin_session") {
-				add(s.adminSessionIds, row.aggregate_id);
+				add(
+					s.adminSessionIds,
+					row.aggregate_id,
+					SITE_PROVENANCE["events.aggregate_id[admin_session]"],
+					"aggregate_id",
+				);
 			}
 		}
 	}
 
-	return s;
+	// ⚠ **The stricter arm wins.** A value harvested from BOTH a
+	// participant-writable field and a system-minted one stays fatal: an
+	// attacker who sets their `User-Agent` to their own `users.id` must not
+	// thereby downgrade the raw-user-id guard, which is the one wall §19.5
+	// exists to hold.
+	const participantOnly = new Map<string, ReadonlySet<string>>();
+	for (const [v, fields] of participant) {
+		if (!system.has(v)) participantOnly.set(v, fields);
+	}
+
+	return { ...s, participantSourced: participantOnly };
 }
 
 /**

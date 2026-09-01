@@ -1081,6 +1081,41 @@ function strings(values: readonly unknown[]): Set<string> {
 	);
 }
 
+/**
+ * Ruling S1 — the participant-writable needles, each mapped to the FIELD NAMES
+ * it was harvested under.
+ *
+ * ⚠ The field names are the half that keeps the partition from being drawn too
+ * wide. A hit under one of these names is the transform failing at its own job
+ * and stays FATAL; a hit anywhere else, on a value a participant chose, is a
+ * collision they arranged and is advisory. See
+ * `EgressSecrets.participantSourced`.
+ *
+ * ⚠ Written as a literal, like everything else in this fixture, so that it is
+ * an INDEPENDENT statement of the same fact `harvestSecrets` derives. A fixture
+ * that computes its expected answer from the code under test agrees with that
+ * code by construction and can never disagree with it.
+ */
+function participantSites(): Map<string, ReadonlySet<string>> {
+	const m = new Map<string, ReadonlySet<string>>();
+	const put = (v: string | null | undefined, ...fields: string[]) => {
+		if (typeof v !== "string" || v.trim() === "") return;
+		const prev = new Set(m.get(v) ?? []);
+		for (const f of fields) prev.add(f);
+		m.set(v, prev);
+	};
+	// An ip enters as `users.tos_acceptance_ip` and as the `ip` sub-key of
+	// `metadata` / `payload`; a user-agent likewise under two spellings.
+	for (const v of FIXTURE_SECRET_VALUES.ips) put(v, "tos_acceptance_ip", "ip");
+	for (const v of FIXTURE_SECRET_VALUES.userAgents)
+		put(v, "tos_acceptance_user_agent", "user_agent", "userAgent");
+	for (const v of FIXTURE_SECRET_VALUES.emails) put(v, "email");
+	for (const u of DIRTY_TABLE_ROWS.users) put(u.name as string, "name");
+	for (const a of DIRTY_TABLE_ROWS.mod_actions)
+		put(a.blocked_text as string, "blocked_text");
+	return m;
+}
+
 export function fixtureSecrets(): {
 	userIds: Set<string>;
 	ips: Set<string>;
@@ -1092,6 +1127,18 @@ export function fixtureSecrets(): {
 	displayNames: Set<string>;
 	avatarUrls: Set<string>;
 	blockedTexts: Set<string>;
+	/**
+	 * Ruling S1 (DATASET.3) — the needle values that entered from a
+	 * participant-writable field, and are therefore ADVISORY on a value-scan
+	 * hit rather than fatal.
+	 *
+	 * ⚠ Written out as a literal rather than derived from `harvestSecrets`,
+	 * for the reason every other declaration in this file is a literal: the
+	 * fixture is the INDEPENDENT statement the harvest is checked against, and
+	 * a fixture that computes its answer from the code under test agrees with
+	 * it by construction.
+	 */
+	participantSourced: Map<string, ReadonlySet<string>>;
 } {
 	return {
 		userIds: new Set(Object.values(FIXTURE_USER_IDS)),
@@ -1118,5 +1165,11 @@ export function fixtureSecrets(): {
 		blockedTexts: strings(
 			DIRTY_TABLE_ROWS.mod_actions.map((m) => m.blocked_text),
 		),
+		// The five participant-writable classes: the ip and User-Agent a
+		// request carries verbatim, the email a participant types, the Google
+		// display NAME they set on their own account, and their own rejected
+		// comment body. Everything else — users.id, google_id, the avatar URL,
+		// R2 keys, admin session ids — is minted where no request can reach.
+		participantSourced: participantSites(),
 	};
 }

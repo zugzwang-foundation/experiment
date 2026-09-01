@@ -74,6 +74,86 @@ export interface EgressSecrets {
 	 * gate-block. STRIP per B.10, and absent from §19.4's ten-column table.
 	 */
 	readonly blockedTexts: ReadonlySet<string>;
+	/**
+	 * Needle values that entered from a **participant-writable field**, each
+	 * mapped to the FIELD NAMES it was harvested under — ruling S1, DATASET.3.
+	 *
+	 * ## The attack this exists to defuse
+	 *
+	 * The value scan's whole strength is that its needles are harvested from
+	 * the source. Three of those sources are chosen by whoever sends the
+	 * request. `@security-auditor` measured it end to end at DATASET.2: an
+	 * attacker sets `User-Agent: mumbai-metro-line-3-open-by-5-nov-2026`, that
+	 * string is harvested as a "secret", and it then collides — **fatally** —
+	 * with `markets.slug` on a legitimately shipped row. `Resolved` collides
+	 * with `markets.status`; `bet_stake` with `dharma_ledger.entry_type`;
+	 * `content_removed` with `mod_actions.reason`; their own prior
+	 * `idempotency_key` with itself.
+	 *
+	 * ⚠ **The remediation line is the finding.** `events` is Bucket A, so
+	 * post-freeze the poisoning row can be neither edited nor deleted. The only
+	 * move left at 06:00 on a conference morning is to switch a privacy guard
+	 * off under time pressure, on an artifact that cannot be withdrawn. That is
+	 * how a denial-of-service becomes a privacy incident.
+	 *
+	 * ## The rule, as a property rather than a list of three fields
+	 *
+	 * **A value the participant supplied is not evidence that a transform
+	 * failed, so it cannot be fatal evidence of one.** A value the system
+	 * minted still is: nobody can make a UUIDv7, a Google `sub` or a
+	 * server-minted R2 key collide with a market slug on purpose. So fatality
+	 * is decided by **where the value entered**, never by which field it turned
+	 * up in.
+	 *
+	 * ## ⚠ Provenance ALONE draws the partition too wide — hence the map
+	 *
+	 * The first version of this was a bare `Set` of participant-sourced values,
+	 * and it was wrong in the direction the brief warned about. `users.email`
+	 * is participant-chosen, so a bare provenance rule downgrades it — and a
+	 * bug that stopped `stripRow` removing `STRIP` columns would then ship
+	 * every participant's email address with an **advisory** and a zero exit
+	 * code. That is a genuine transform failure demoted by a rule meant to
+	 * demote collisions. Twelve tests went red saying so, including *"the
+	 * untransformed dirty fixture FAILS every class"*, and they were right.
+	 *
+	 * ⇒ The rule needs both halves of the same idea. A hit is **fatal** when:
+	 *
+	 *   · the needle is SYSTEM-sourced — nobody can arrange the collision; OR
+	 *   · the hit landed **under a field name the value was harvested from** —
+	 *     the transform demonstrably failed at its own job.
+	 *
+	 * and **advisory** only when a participant-chosen value turns up somewhere
+	 * it was never the transform's business to remove. `users.email` surviving
+	 * in `users.csv` under key `email` is the first case and halts. A
+	 * `User-Agent` colliding with `markets.slug` is the second and does not:
+	 * `slug` is not a field any needle was harvested from, so the collision is
+	 * a coincidence the attacker arranged, not a failure.
+	 *
+	 * That is why the values are a MAP rather than a set — the field names are
+	 * the second half of the rule, and they are recorded at harvest time,
+	 * where they are known for free.
+	 *
+	 * ## Why this names the PARTICIPANT half
+	 *
+	 * Absence from the map means FATAL. If a future class is added and nobody
+	 * tags it, the guard gets stricter rather than quieter — the direction a
+	 * privacy layer has to fail. Naming the system half instead would have made
+	 * forgetting to tag a class silently downgrade it.
+	 *
+	 * ## A value with BOTH provenances is fatal
+	 *
+	 * The stricter arm wins. An attacker who sets their `User-Agent` to their
+	 * own `users.id` puts that string in both sets — and a raw `users.id`
+	 * surviving outside `users` IS a transform failure however the needle got
+	 * collected. Such values are filtered out of this map at harvest.
+	 *
+	 * ⚠ **The KEY-shaped nets are untouched and stay fatal.** An attacker can
+	 * choose a header's value and cannot choose a key's NAME, so
+	 * `assertNoStrippedMetadataKeys` and `assertNoForbiddenPayloadKeys` are
+	 * unpoisonable and remain the hard guarantee. The structural promise that
+	 * `metadata.ip` never ships is the §19.4.1 allow-list, not this scan.
+	 */
+	readonly participantSourced: ReadonlyMap<string, ReadonlySet<string>>;
 }
 
 /**
@@ -169,6 +249,11 @@ export function emptySecrets(): EgressSecrets {
 		displayNames: new Set(),
 		avatarUrls: new Set(),
 		blockedTexts: new Set(),
+		// Empty, so every needle is absent from the map and therefore fatal —
+		// vacuously true here, and the right polarity: a caller that builds its
+		// own secrets without thinking about provenance gets the strict
+		// behaviour rather than the lenient one.
+		participantSourced: new Map(),
 	};
 }
 
@@ -469,7 +554,7 @@ export class EgressGuard {
 			],
 		];
 
-		for (const [rule, values, noun, fatal] of classes) {
+		for (const [rule, values, noun, classFatal] of classes) {
 			// ⚠ The SAME needle floor the CSV arm uses. This arm had neither
 			// the floor nor the free-text tier — and it is a substring
 			// matcher over a document that is participant prose end to end,
@@ -483,6 +568,22 @@ export class EgressGuard {
 			}
 
 			for (const hit of scanText(text, usable)) {
+				// ⚠ **Ruling S1 applies here TOO, and this arm is where it
+				// matters most.** `scanText` is a SUBSTRING matcher over a
+				// document that is participant prose end to end, so
+				// `User-Agent: because` fatally failed every debate document
+				// containing the word "because" — six characters, one request,
+				// no privileged knowledge (`@security-auditor` C-1).
+				//
+				// The class tier above already asks *"is this the sort of value
+				// a participant could plausibly type?"*, which is a good
+				// question answered by guesswork. Provenance answers it by
+				// measurement instead: a needle harvested from a header the
+				// participant sent is participant-chosen whatever class it
+				// nominally belongs to. Both tests apply, and a hit is fatal
+				// only if the class says fatal AND the needle is
+				// system-sourced.
+				const fatal = classFatal && this.isFatalNeedle(hit.value, null);
 				const entry = {
 					rule,
 					artifact,
@@ -493,7 +594,11 @@ export class EgressGuard {
 				else
 					this.warnings.push({
 						...entry,
-						detail: `${entry.detail} — advisory (participant-authorable)`,
+						detail: `${entry.detail} — advisory (${
+							classFatal
+								? "needle harvested from a participant-writable field"
+								: "participant-authorable"
+						})`,
 					});
 			}
 		}
@@ -538,6 +643,30 @@ export class EgressGuard {
 
 	// ── internal ────────────────────────────────────────────────────────
 
+	/**
+	 * Is a value-scan hit on this needle, at this key, fatal?
+	 *
+	 * Ruling S1 — see `EgressSecrets.participantSourced` for the argument. Two
+	 * ways to be fatal and one way to be advisory:
+	 *
+	 *   · **absent from the map** ⇒ system-sourced (or unclassified) ⇒ FATAL;
+	 *   · **hit under a field the value was harvested from** ⇒ the transform
+	 *     failed at its own job ⇒ FATAL;
+	 *   · otherwise ⇒ a participant-chosen value colliding somewhere it was
+	 *     never the transform's business to remove ⇒ advisory.
+	 *
+	 * `hitKey` is `null` for the rendered-text arm, which has no keys — so
+	 * there the second test cannot apply and provenance decides alone. That is
+	 * correct rather than a gap: a `.md` document has no field the transform
+	 * owns, and it is the arm where a substring match on six participant-chosen
+	 * characters failed every debate containing "because".
+	 */
+	private isFatalNeedle(value: string, hitKey: string | null): boolean {
+		const harvestedFrom = this.secrets.participantSourced.get(value);
+		if (harvestedFrom === undefined) return true;
+		return hitKey !== null && harvestedFrom.has(hitKey);
+	}
+
 	private byValue(
 		artifact: string,
 		rows: unknown,
@@ -567,6 +696,28 @@ export class EgressGuard {
 					detail:
 						`${noun} appears in participant-authored free text ` +
 						`(${hit.key}) — reported, not fatal`,
+				});
+				continue;
+			}
+			// ⚠ **Ruling S1 — provenance, not destination.** The clause above is
+			// about WHERE THE HIT LANDED; this one is about WHERE THE NEEDLE CAME
+			// FROM, and they are different questions with different answers. The
+			// destination test cannot see the C-1 attack at all: an attacker's
+			// `User-Agent` colliding with `markets.slug` lands in a column that is
+			// not free text, so the old rule made it fatal — which is the whole
+			// denial-of-service.
+			if (
+				typeof hit.value === "string" &&
+				!this.isFatalNeedle(hit.value, hit.key)
+			) {
+				this.warnings.push({
+					...entry,
+					detail:
+						`${noun} survived (key: ${hit.key ?? "—"}) — advisory: the ` +
+						"needle was harvested from a participant-writable field and " +
+						"this is not one of the fields it came from, so the " +
+						"collision is arrangeable and is not evidence that a " +
+						"transform failed",
 				});
 				continue;
 			}

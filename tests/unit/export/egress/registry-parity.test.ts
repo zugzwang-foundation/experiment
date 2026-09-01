@@ -134,11 +134,28 @@ function secretsWithOnly(field: string): EgressSecrets {
 	} as EgressSecrets;
 }
 
+/**
+ * The one `EgressSecrets` field that is NOT a secret class.
+ *
+ * ⚠ **Named as an explicit exclusion rather than filtered by shape**, because
+ * the whole value of the block below is that it is derived from the live
+ * shape — a `typeof v === "object"` filter would silently swallow the next
+ * genuine class somebody adds as a Map. `participantSourced` is a TAG over the
+ * other classes (ruling S1, DATASET.3): it holds no secret of its own, it
+ * carries the provenance that decides a hit's tier, and there is nothing for
+ * `assertTableClean` to fire on. Its own consumption is proven by the two
+ * tests immediately after, which is what keeps this exclusion from being a way
+ * to stop covering a field.
+ */
+const NOT_A_SECRET_CLASS = new Set(["participantSourced"]);
+
 describe("egress · every EgressSecrets field is consumed by the guards", () => {
 	// Derived at runtime from the shipped shape, so a field ADDED to
 	// `EgressSecrets` without a matching assertion in the chain fails here
 	// rather than passing vacuously forever.
-	const fields = Object.keys(emptySecrets());
+	const fields = Object.keys(emptySecrets()).filter(
+		(f) => !NOT_A_SECRET_CLASS.has(f),
+	);
 
 	it("the class list is read from the SHAPE, and every class is consumed", () => {
 		// ⚠ Was `toHaveLength(7)`, a literal that went stale the moment
@@ -151,6 +168,40 @@ describe("egress · every EgressSecrets field is consumed by the guards", () => 
 		expect(fields).toContain("displayNames");
 		expect(fields).toContain("avatarUrls");
 		expect(fields).toContain("blockedTexts");
+		// The exclusion is real and is exactly one field — so it cannot grow
+		// into a way of quietly dropping coverage.
+		expect(Object.keys(emptySecrets())).toContain("participantSourced");
+		expect(NOT_A_SECRET_CLASS.size).toBe(1);
+	});
+
+	it("S1 · participantSourced IS consumed — it decides the tier", () => {
+		// ⚠ The consumption proof the exclusion above owes. `participantSourced`
+		// cannot be driven by `canaryFor`/`secretsWithOnly` (it holds no
+		// secrets), so it is driven directly: the SAME needle, the SAME guard,
+		// the SAME row, tagged and untagged.
+		const canary = canaryFor("ips");
+		const row = [{ some_column: canary }];
+		const base = { ...emptySecrets(), ips: new Set([canary]) };
+
+		// Untagged ⇒ system-sourced ⇒ FATAL.
+		expect(() => assertTableClean("t", row, base)).toThrow(
+			EgressViolationError,
+		);
+
+		// Tagged participant-sourced, harvested under a DIFFERENT field ⇒
+		// advisory, and the build survives.
+		const tagged = {
+			...base,
+			participantSourced: new Map([[canary, new Set(["ip"])]]),
+		};
+		const outcome = assertTableClean("t", row, tagged);
+		expect(outcome.advisories.map((a) => a.rule)).toContain("no-ip");
+
+		// …and under the field it WAS harvested from, fatal again — so the tag
+		// is not a switch that turns a class off.
+		expect(() => assertTableClean("t", [{ ip: canary }], tagged)).toThrow(
+			EgressViolationError,
+		);
 	});
 
 	it.each(
@@ -236,10 +287,18 @@ describe("egress · FORBIDDEN_VALUE_CLASSES names rules that actually fire", () 
 		// classes were added for `@code-reviewer` H-4 — which is the same
 		// drift this whole file exists to catch, reproduced inside it.
 		const canary = (field: string) => `ZZ-CANARY-${field}`;
-		const fields = Object.keys(emptySecrets()) as (keyof EgressSecrets)[];
-		const secrets = Object.fromEntries(
-			fields.map((f) => [f, new Set([canary(f)])]),
-		) as unknown as EgressSecrets;
+		// ⚠ `participantSourced` is excluded: it is a Map of provenance tags,
+		// not a class of secrets, and filling it with a Set here silently
+		// broke the guard's `.get()` — which the bare catch below then read as
+		// "no rules fired". Left empty, so every canary is system-sourced and
+		// therefore fatal, which is what this test is about.
+		const fields = (
+			Object.keys(emptySecrets()) as (keyof EgressSecrets)[]
+		).filter((f) => !NOT_A_SECRET_CLASS.has(f));
+		const secrets = {
+			...Object.fromEntries(fields.map((f) => [f, new Set([canary(f)])])),
+			participantSourced: new Map<string, ReadonlySet<string>>(),
+		} as unknown as EgressSecrets;
 		const rows = [
 			Object.fromEntries(fields.map((f, i) => [`col${i}`, canary(f)])),
 		];
@@ -248,8 +307,20 @@ describe("egress · FORBIDDEN_VALUE_CLASSES names rules that actually fire", () 
 		try {
 			assertTableClean("t", rows, secrets);
 		} catch (e) {
+			// ⚠ Assert the CLASS before reading `.violations`. This was a bare
+			// cast, so a `TypeError` thrown anywhere inside the guard produced
+			// `undefined.map` — or, had the shape been friendlier, an empty
+			// `fired` that read as "the guards are silent". A catch that
+			// assumes its error class cannot tell a broken guard from a clean
+			// one, which is the exact failure this file exists to name.
+			expect(e).toBeInstanceOf(EgressViolationError);
 			fired = (e as EgressViolationError).violations.map((v) => v.rule);
 		}
+		// …and it must have thrown at all. Without this, a guard chain that
+		// stopped firing entirely would leave `fired` empty and the loop below
+		// would report every class as missing — a red for the right reason, but
+		// only by luck of the message.
+		expect(fired.length).toBeGreaterThan(0);
 
 		for (const cls of FORBIDDEN_VALUE_CLASSES) {
 			expect(fired, `FORBIDDEN_VALUE_CLASSES names '${cls}'`).toContain(
