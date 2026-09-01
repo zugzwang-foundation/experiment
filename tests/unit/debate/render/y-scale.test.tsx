@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
 	gridlinesFor,
-	hasFullYScale,
+	hasEndValue,
 	labelTopPct,
 	SVG_W,
 	VIEWBOX_H,
@@ -78,32 +78,37 @@ describe("C-CHART-1 clause 1 (CHART-5) — the gridline set is a pure function o
 		expect(gridlinesFor("hero").map((g) => g.pct)).toEqual(TEN_STEP);
 	});
 
-	it("`hasFullYScale` and `gridlinesFor` cannot come to disagree", () => {
+	it("`hasEndValue` and `gridlinesFor` cannot come to disagree", () => {
 		// ⛔ TWO INDEPENDENT DECLARATIONS OF ONE RULING, TIED TOGETHER HERE RATHER
 		// THAN BY ONE CALLING THE OTHER. `gridlinesFor` keeps an exhaustive `switch`
 		// because that is what turns a fourth surface into a COMPILE error rather
-		// than a chart silently shipping with no scale; `hasFullYScale` is a
-		// predicate three other call sites read. Neither can be expressed in terms
+		// than a chart silently shipping with no scale; `hasEndValue` is a
+		// predicate two other call sites read. Neither can be expressed in terms
 		// of the other without losing what it is for — so the agreement is asserted.
 		//
-		// ⚠ What a drift would ship: a mode with eleven gridlines and no numeric
-		// marks, or marks against the quarters. Both look deliberate.
+		// ⚠ WHAT THIS PAIR MEANS CHANGED AT CHART-7 AND THE ASSERTION IS RE-SEATED
+		// RATHER THAN DELETED. The predicate used to govern the marks column too, so
+		// "eleven gridlines ⇔ the full treatment" was the whole ruling. RF-1/RF-3 put
+		// the marks on EVERY mode, so what the two now have to agree about is
+		// narrower and still real: the ten-step set and the value line ride the same
+		// surfaces, and a mode that gained one without the other would either overlap
+		// its own labels or carry a value nobody sized a box for.
 		for (const mode of ["collapsed", "expanded", "hero"] as const) {
 			expect(
 				gridlinesFor(mode).length === 11,
-				`${mode}: gridline set and hasFullYScale disagree`,
-			).toBe(hasFullYScale(mode));
+				`${mode}: gridline set and hasEndValue disagree`,
+			).toBe(hasEndValue(mode));
 		}
 		// Non-vacuity: the predicate really does discriminate, so the loop above is
 		// not three trivially-true comparisons.
 		expect(
 			new Set(
-				["collapsed", "expanded", "hero"].map((m) => hasFullYScale(m as never)),
+				["collapsed", "expanded", "hero"].map((m) => hasEndValue(m as never)),
 			).size,
 		).toBe(2);
 
 		// ⛔ THE DIRECTION OF THE NEGATION, WHICH THE DOCBLOCK CALLS LOAD-BEARING AND
-		// NOTHING GUARDED (`@test-writer`, M-2). `hasFullYScale` is written as "not
+		// NOTHING GUARDED (`@test-writer`, M-2). `hasEndValue` is written as "not
 		// collapsed" rather than "expanded or hero" so that a FOURTH surface joins
 		// the full treatment by default and is excluded deliberately. Rewritten as a
 		// list — `mode === "expanded" || mode === "hero"` — every assertion above
@@ -113,8 +118,8 @@ describe("C-CHART-1 clause 1 (CHART-5) — the gridline set is a pure function o
 		// exact failure `gridlinesFor`'s exhaustive switch turns into a COMPILE error,
 		// and the predicate must not be the soft spot beside it.
 		expect(
-			hasFullYScale("a-fourth-surface" as never),
-			"hasFullYScale must be written as a negation of `collapsed`, so an unrecognised mode gets the FULL scale rather than none",
+			hasEndValue("a-fourth-surface" as never),
+			"hasEndValue must be written as a negation of `collapsed`, so an unrecognised mode gets the value line rather than none",
 		).toBe(true);
 	});
 
@@ -309,13 +314,21 @@ describe("discovery::hero-chart-carries-y-scale — C-CHART-1 clause 1 (CHART-6)
 		expect(markup("hero")).toContain('data-testid="chart-y-marks"');
 		expect(marks(markup("hero"))).toEqual(TEN_STEP);
 
-		// MUST REJECT: numbers on the collapsed card. It DOES carry gridlines and
-		// deliberately carries no figures — its box is 193.8 px and already holds
-		// three date labels along the bottom. Deriving the marks from "does this
-		// mode have gridlines?" would have given it four numbers nobody ruled for,
-		// which is why the predicate is `hasFullYScale` and not `grid.length > 0`.
-		expect(markup("collapsed")).not.toContain('data-testid="chart-y-marks"');
-		expect(marks(markup("collapsed"))).toEqual([]);
+		// ⛔ REVERSED AT CHART-7 (RF-3, founder ruling): THE COLLAPSED CARD NOW
+		// CARRIES MARKS. This case used to assert the opposite — *"MUST REJECT:
+		// numbers on the collapsed card … which is why the predicate is
+		// `hasFullYScale` and not `grid.length > 0`"* — on the ground that its box is
+		// short and already holds a date row. The founder ruled the other way: the
+		// card gets a full left scale, and the numbers are what make the gridlines
+		// read as a scale rather than as stray rules.
+		//
+		// ⚠ THE SET IS STILL PER-MODE AND THAT IS THE HALF THAT SURVIVED. The card
+		// takes the quarters, not the ten-step — eleven numbers down a 193.8 px box
+		// would be 18 px apart and read as hatching. So the predicate the marks
+		// column reads really is `grid.length > 0` now, and `gridlinesFor` is what
+		// keeps the two sets apart.
+		expect(markup("collapsed")).toContain('data-testid="chart-y-marks"');
+		expect(marks(markup("collapsed"))).toEqual([25, 50, 75, 100]);
 	});
 
 	it("the marks column is SIZED, never pinned — the CHART-2 mechanism, reused", () => {
@@ -910,10 +923,17 @@ describe("CHART-5/6 — RF-4 payload budget", () => {
 			expect(marks.length, `${mode}: marks slice is empty`).toBeGreaterThan(
 				100,
 			);
+			// ⚠ PER-MODE SINCE CHART-7, AND PINNED AS LITERALS RATHER THAN DERIVED
+			// FROM `gridlinesFor`. This is the non-vacuity floor on the SLICE — it
+			// proves the byte region really contains the column — so reading its
+			// expectation out of the module under test would make it agree with
+			// whatever that module currently does, which is the one thing a floor
+			// must not do. The collapsed card carries the quarters; the two wider
+			// modes carry the ten-step.
 			expect(
 				[...marks.matchAll(/data-testid="y-mark-\d+"/g)].length,
 				`${mode}: marks slice does not contain the marks`,
-			).toBe(11);
+			).toBe(mode === "collapsed" ? 4 : 11);
 		}
 		return Buffer.byteLength(grid, "utf8") + Buffer.byteLength(marks, "utf8");
 	}

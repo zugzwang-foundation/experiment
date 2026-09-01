@@ -374,8 +374,15 @@ describe("C-CHART-2 clause 3 — no width is ever pinned, and the plot keeps all
 		// gutter was a `shrink-0` cell taking 27.15 px from the plot on the collapsed
 		// card and the hero, and 48.73 px on the expanded overlay — measured in the
 		// shipped face, 2026-09-01. An overlay takes none, because it is out of flow.
-		// If a future change puts the labels back in the row, the plot silently
+		// If a future change puts the LABELS back in the row, the plot silently
 		// narrows again and every rendered coordinate in the product moves.
+		//
+		// ⚠ THE CELLS THEMSELVES ARE NOT THE THING BANNED, AND CHART-7 IS WHY THAT
+		// DISTINCTION HAD TO BE MADE EXPLICIT. The marks column has always been an
+		// in-flow cell and the right reserve is now another; both are `shrink-0`, both
+		// are ruled, and both legitimately cost the plot width. What must never be in
+		// flow is the LABEL LAYER — an overlay whose whole contract is that it shares
+		// the plot's box rather than taking width beside it.
 		const { container } = renderMode("collapsed");
 		const frame = container.querySelector(
 			'[data-testid="market-price-chart-frame"]',
@@ -383,8 +390,10 @@ describe("C-CHART-2 clause 3 — no width is ever pinned, and the plot keeps all
 		const inFlow = [...(frame?.children ?? [])].map(
 			(c) => c.getAttribute("data-testid") ?? "",
 		);
-		// The collapsed frame carries the plot and nothing else in flow.
-		expect(inFlow).toEqual(["market-price-chart-plot"]);
+		// The collapsed frame carries the marks column and the plot — and, since
+		// CHART-7 (RF-3), it carries marks at all, which it never did before.
+		expect(inFlow).toEqual(["chart-y-marks", "market-price-chart-plot"]);
+		expect(inFlow).not.toContain("terminal-label-layer");
 
 		// …and on the overlay, the plot plus the marks column — never the labels.
 		const { container: ex } = renderMode("expanded");
@@ -394,7 +403,12 @@ describe("C-CHART-2 clause 3 — no width is ever pinned, and the plot keeps all
 		const exInFlow = [...(exFrame?.children ?? [])].map(
 			(c) => c.getAttribute("data-testid") ?? "",
 		);
-		expect(exInFlow).toEqual(["market-price-chart-plot", "chart-y-marks"]);
+		// ⛔ THE MARKS COME FIRST SINCE CHART-7 (`RF-1`) — the column is the row's
+		// LEADING cell, not its trailing one. The order is the whole assertion: the
+		// two systems that used to compete for the right strip are now separated by
+		// axis, and a flex row states which side a cell is on by nothing but its
+		// position among its siblings.
+		expect(exInFlow).toEqual(["chart-y-marks", "market-price-chart-plot"]);
 		expect(exInFlow).not.toContain("terminal-label-layer");
 	});
 });

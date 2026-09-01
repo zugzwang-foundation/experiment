@@ -13,7 +13,7 @@ import {
 	fmtUtcDay,
 	type Gridline,
 	gridlinesFor,
-	hasFullYScale,
+	hasEndValue,
 	labelLeftPct,
 	labelTopPct,
 	SVG_W,
@@ -247,6 +247,7 @@ export function MarketPriceChart({
 					: "flex h-full w-full items-stretch"
 			}
 		>
+			{grid.length > 0 && <YMarks marks={grid} />}
 			<div
 				data-testid="market-price-chart-plot"
 				/* ⛔ `relative` IS NOT DECORATION — IT IS THE LABELS' CONTAINING BLOCK,
@@ -572,7 +573,6 @@ export function MarketPriceChart({
 					<TerminalLabels yes={terminalYes} mode={mode} terminalX={terminalX} />
 				)}
 			</div>
-			{hasFullYScale(mode) && grid.length > 0 && <YMarks marks={grid} />}
 		</div>
 	);
 }
@@ -720,7 +720,7 @@ function TerminalLabels({
 	const upperPct = labelTopPct(yesOnTop ? labelY.yes : labelY.no);
 	const lowerPct = labelTopPct(yesOnTop ? labelY.no : labelY.yes);
 	const half = labelHalfBoxPx(mode);
-	const showValue = hasFullYScale(mode);
+	const showValue = hasEndValue(mode);
 	// The horizontal half of the contract, computed once for both labels because
 	// both dots share one `cx` — `TerminalMarkers` draws them at the same
 	// `terminalX`, since a market has one series and therefore one last point.
@@ -847,15 +847,32 @@ function TerminalLabels({
 }
 
 /**
- * The Y scale's numeric marks — HTML in a column of their own, to the right of
- * the plot (`C-CHART-1` clause 1 as amended at CHART-5 and again at CHART-6).
+ * The Y scale's numeric marks — HTML in a column of their own, to the **LEFT** of
+ * the plot (`C-CHART-1` clause 1 as amended at CHART-5, CHART-6 and CHART-7).
+ *
+ * ⛔ THE SIDE IS THE CHART-7 CHANGE, AND IT IS A CONSEQUENCE RATHER THAN A TASTE.
+ * The right side now belongs to the traveling end labels: since CHART-6 they are
+ * positioned from their own dot's x, so on a market trading near the deadline they
+ * arrive at the plot's right edge — which is exactly where this column used to
+ * sit. Two systems reaching for one strip is what made both cramped, and the
+ * founder's ruling separates them by axis: **marks left, labels right** (`RF-1`).
+ * A left scale is also the conventional reading order for a Y axis, which is the
+ * smaller half of the reason and the one a reader notices first.
+ *
+ * ⚠ THE PADDING SWAPPED SIDES WITH THE COLUMN — `pr-[6px]`, not `pl-[6px]`. The
+ * 6px is the air between the numerals and the plot they annotate, so it belongs on
+ * whichever edge faces the plot. Leaving it as `pl` would have put the air on the
+ * OUTSIDE, against the card's own padding, and pushed the numerals hard against
+ * the gridlines they label — a two-character diff that looks like nothing and
+ * undoes the whole point of moving the column.
  *
  * ⚠ "BETWEEN THE PLOT AND THE END LABELS" WAS TRUE UNTIL CHART-6 AND IS NOT NOW.
  * The end labels left the row entirely — they are an overlay on the plot,
- * positioned from their own dots — so this column is the only thing beside the
- * plot and there is no longer a strip for two systems to share. It renders on
- * the overlay AND the Discovery hero (`hasFullYScale`), never on the collapsed
- * card.
+ * positioned from their own dots — so this column shares no strip with anything.
+ * ⚠ AND IT RENDERS ON ALL THREE MODES SINCE CHART-7 (`RF-3`), where it used to be
+ * the overlay and the hero only; the collapsed card carries the quarters plus `0`
+ * rather than the ten-step, which is `gridlinesFor`'s business and not this
+ * component's.
  *
  * ⛔ HTML AND NOT SVG `<text>`, for exactly the reason clause 2 moved `YES`/`NO`
  * out at CHART-2: `preserveAspectRatio="none"` stretches user space by a factor
@@ -891,7 +908,7 @@ function YMarks({ marks }: { marks: readonly Gridline[] }): React.JSX.Element {
 			// Same reasoning as the label gutter's: this is a visual key for a visual
 			// mark, and the chart's accessible channel is `ChartSummary` alone.
 			aria-hidden="true"
-			className="relative shrink-0 pl-[6px] text-right text-[10px] leading-none text-n5 tabular-nums"
+			className="relative shrink-0 pr-[6px] text-right text-[10px] leading-none text-n5 tabular-nums"
 		>
 			{/* The sizer — an in-flow copy of the widest mark, laid out by the browser
 			    in the real shipped face. `100` is the widest of the eleven at tabular
@@ -1126,12 +1143,12 @@ const MARK_TYPE_PX = 10;
  * ALONE. It used to cover the Discovery hero too, on CHART-5's asymmetry — those
  * two kept the name alone, so their box did not grow. CHART-6 gives the hero the
  * value line, so its box grew and its threshold has to grow with it: that is
- * exactly why this reads `hasFullYScale` rather than a second `mode ===` test.
+ * exactly why this reads `hasEndValue` rather than a second `mode ===` test.
  * A hero that gained the value and kept the 5px floor would overlap its own two
  * labels across the 46–54 % band, which is where every market rests.
  */
 function labelHalfBoxPx(mode: ChartMode): number {
-	return hasFullYScale(mode)
+	return hasEndValue(mode)
 		? (LABEL_NAME_PX + LABEL_STACK_GAP_PX + LABEL_VALUE_PX) / 2
 		: LABEL_NAME_PX / 2;
 }

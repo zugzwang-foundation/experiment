@@ -98,27 +98,34 @@ const GRIDLINES_TEN_STEP: readonly Gridline[] = Object.freeze(
 );
 
 /**
- * Whether a mode carries the FULL Y-scale treatment — the 10-step gridlines, the
- * numeric marks column, and the percentage beneath the end label's name.
+ * Whether a mode's end label carries the current VALUE beneath — now beside — its
+ * name (`C-CHART-2` clause 2, CHART-5/CHART-6).
  *
- * ⛔ ONE PREDICATE FOR ALL THREE, BECAUSE THE RULING IS ONE RULING. RF-4 gives the
- * hero *"what expanded has"* as a bundle, and three independent `mode ===
- * "expanded"` comparisons are three places for a fourth surface — or this very
- * amendment — to reach only some of them. The label's half-box in particular
- * composes from whether the value line renders, so a mode that gained the value
- * and not the taller collision floor would overlap its own labels in the band
- * where every market rests.
+ * ⛔ RENAMED FROM `hasFullYScale` AT CHART-7, BECAUSE IT STOPPED BEING TRUE OF THE
+ * NAME IT HAD. It governed three things as one bundle — the ten-step gridlines,
+ * the numeric marks column, and the value line — and RF-1/RF-3 break that bundle
+ * up: **the marks column now renders on every mode**, so its condition is
+ * `grid.length > 0` and not this predicate, and the gridline SET was always
+ * `gridlinesFor`'s business rather than this one's. What is left is the value line
+ * and the collision floor that composes from it. A predicate called
+ * `hasFullYScale` that no longer decides whether a mode has the full Y scale is
+ * the kind of name a maintainer reads instead of reading the code.
+ *
+ * ⛔ IT STILL GOVERNS TWO THINGS AND THAT IS STILL DELIBERATE. The label's
+ * half-box composes from whether the value renders, so a mode that gained the
+ * value and kept the one-line floor would overlap its own two labels across the
+ * band where every market rests — the failure this component has shipped once
+ * already. One predicate, so the two cannot be given different answers.
  *
  * ⚠ WRITTEN AS A NEGATION OF `collapsed`, NOT A LIST OF THE OTHER TWO, and that
  * is the direction that survives a fourth surface: a new mode joins the full
  * treatment by default and is corrected deliberately, rather than silently
- * shipping with no scale at all — which is the failure `gridlinesFor`'s exhaustive
- * switch was added to catch and this predicate would otherwise reintroduce.
- * `gridlinesFor` keeps its own switch regardless; the two are tied together by an
- * assertion in `tests/unit/debate/render/y-scale.test.tsx` rather than by one
- * calling the other, so neither can quietly stop agreeing.
+ * shipping without the value. `gridlinesFor` keeps its own exhaustive switch; the
+ * two are tied together by an assertion in
+ * `tests/unit/debate/render/y-scale.test.tsx` rather than by one calling the
+ * other, so neither can quietly stop agreeing.
  */
-export function hasFullYScale(mode: ChartMode): boolean {
+export function hasEndValue(mode: ChartMode): boolean {
 	return mode !== "collapsed";
 }
 
