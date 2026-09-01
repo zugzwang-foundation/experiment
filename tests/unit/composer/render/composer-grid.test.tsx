@@ -23,11 +23,36 @@ import { composerProps, stubWireFetch } from "./_harness";
  * `<ImageAttach>` → amount, with the money block a separate sibling of the
  * fields column — so every assertion in this file is RED at `8db535d`.
  *
+ * ⚠⚠ RPLY-2 · R1 amends the SECOND column's contents, recorded rather than
+ * silently overwritten (O-4/O-5). POLISH.4 PR B put the Amount row INSIDE
+ * `.compright` alongside title/body; R1 moves it back OUT — a `shrink-0`
+ * sibling of the whole grid (the "footblock"), so the AMOUNT/notice block and
+ * `Đ BET` are never subject to the argument region's own shrink-and-scroll at
+ * a short viewport. So the right column now holds title + body ONLY, and the
+ * Amount/`Đ BET` money block sits at the SECTION level, not inside the grid.
+ *
+ * ⚠⚠ RPLY-3 · R1 AMENDS IT BACK, and the two amendments are left stacked on
+ * purpose — this column's contents have now moved twice, and a reader who sees
+ * only the current state cannot tell a settled design from a repeated argument.
+ * ⛔ THE SECOND MOVE IS A SPECIFICATION CORRECTION, NOT A BUILD FIX. RPLY-2's
+ * own brief demanded the footblock be "`shrink-0` and a direct child of the
+ * composer's flex root"; that wording forced the hoist, and the founder had
+ * asked for the composer to FIT rather than for its layout to change. So the
+ * money row is `.compright`'s third child again, exactly as d5 draws it
+ * (`:1132`) and as POLISH.4 PR B originally built it — and the assertions below
+ * that read `right.contains(stake)` are back to `true`.
+ * ⚠ THE FIT IS NOT TRADED BACK TO GET THERE. What makes the money row safe
+ * inside a shrinking column this time is that the `overflow-y-auto` moved off
+ * the argument region onto the title/body pair alone, so the footblock is the
+ * scroll box's SIBLING rather than its content. `composer-fit.test.ts` owns
+ * that mechanism; this file owns the arrangement.
+ *
  * ⛔ ARRANGEMENT ONLY. Nothing here asserts a px, colour, radius, type size,
  * duration or easing (POLISH-4 §10 `H-VALUE` / `H-SYSTEM`): the grid's TRACK
  * SIZES are the shipped design system's, never this test's. What is pinned is
  * that a two-column grid exists, that the attach affordance is its FIRST
- * column and that the title + body + Amount row are its SECOND.
+ * column and that the title + body fields are its SECOND (RPLY-2 · R1 — the
+ * Amount row is no longer part of either column, see above).
  *
  * `O-7` — every assertion reads the `class` attribute or `innerHTML`, never
  * `textContent`: an arrangement lives in the markup, and `textContent` cannot
@@ -88,7 +113,7 @@ describe("BetComposer argument region — two-column grid (R1)", () => {
 		expect(columnsOf(grid)).toHaveLength(2);
 	});
 
-	it("render::attach-is-the-left-column-and-the-fields-are-the-right", () => {
+	it("render::attach-is-the-left-column-and-the-title-body-fields-are-the-right", () => {
 		const { section, attach, grid } = renderComposer();
 		const title = screen.getByLabelText("Argument title");
 		const body = screen.getByLabelText("Argument body");
@@ -103,11 +128,59 @@ describe("BetComposer argument region — two-column grid (R1)", () => {
 		expect(columns).toHaveLength(2);
 		// FIRST column — the image attach, a DIRECT child of the grid.
 		expect(columns[0]).toBe(attach);
-		// SECOND column — title input + body textarea + the Amount row.
+		// SECOND column — title, body AND the money footblock. RPLY-3 · R1 put
+		// the Amount row back here (see the file docblock's second amendment);
+		// RPLY-2 had briefly made it a section-level sibling of the grid.
 		const right = columns[1];
 		expect(right.contains(title)).toBe(true);
 		expect(right.contains(body)).toBe(true);
 		expect(right.contains(stake)).toBe(true);
+		expect(grid.contains(stake)).toBe(true);
+		// ⛔ AND SO IS THE SUBMIT — asserted separately, because "the stake input
+		// is in this column" and "the control that spends it is in this column"
+		// are different claims, and the founder's ruling names the second. A
+		// hoist that moved only `Đ BET` out would satisfy every line above.
+		const submit = screen.getByLabelText("PLACE Đ BET");
+		expect(right.contains(submit)).toBe(true);
+
+		// ⛔⛔ AND IT IS A **DIRECT CHILD** OF THAT COLUMN, WHICH IS THE HALF
+		// `.contains()` CANNOT SEE AND THE HALF R1 ACTUALLY RULES. `@code-reviewer`
+		// measured the hole: wrapping the money row in a plain
+		// `<div className="block">` INSIDE `.compright` left all 28 tests across
+		// this file, `composer-fit` and `notice-slot` green — while killing the
+		// mechanism outright, because `margin-top:auto` is inert in block layout
+		// (no bottom pin) and a shrinkable box now sits between the row and the
+		// flex container that was supposed to leave it alone.
+		// ⚠ THIS IS THE SAME HOLE `@test-writer` FOUND AND CLOSED FOR THE REPLY
+		// CARD — `reply-card-absorber.test.tsx` asserts `parentElement` for exactly
+		// this reason, with its own note that "a class is not a mechanism". The
+		// closure had not been applied to the footblock, which is the element this
+		// task is actually about.
+		const stakeRow = Array.from(right.children).find((c) => c.contains(stake));
+		if (stakeRow === undefined) {
+			// ⛔ A THROW, NOT `expect(...).toBeDefined()` — the assertions below need
+			// the narrowing, and a guard whose own subject is missing should say so
+			// once rather than report several downstream failures about a property
+			// of `undefined` (`O-3`: a true refusal reported with a misleading cause
+			// is a defect).
+			throw new Error(
+				"the money row is not a DIRECT child of the right column",
+			);
+		}
+		expect(stakeRow.contains(submit)).toBe(true);
+		// The relationship itself, stated the way the reviewer's mutation breaks it.
+		expect(stakeRow.parentElement).toBe(right);
+		// …and the column really is the flex COLUMN that distributes down this
+		// axis, or "direct child" would not mean the row is left alone.
+		const rightCls = (right.getAttribute("class") ?? "").split(/\s+/);
+		expect(rightCls).toContain("flex");
+		expect(rightCls).toContain("flex-col");
+		// ⛔ `mt-auto` + `shrink-0` on the ROW ITSELF — the bottom pin and the
+		// refusal to be squeezed, both inert if either the class or the parent
+		// relationship above is wrong.
+		const rowCls = (stakeRow.getAttribute("class") ?? "").split(/\s+/);
+		expect(rowCls).toContain("mt-auto");
+		expect(rowCls).toContain("shrink-0");
 		// The two are SIBLINGS, never nested: the attach is not in the right column.
 		expect(right.contains(attach)).toBe(false);
 	});

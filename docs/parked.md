@@ -40,6 +40,131 @@ operator-owned `BETTER_AUTH_SECRET` check is now the head of the queue.*
 
 ---
 
+## RPLY-CLOSE — the reply lane's residue (2026-08-26)
+
+Seven rows out of RPLY-1/-2/-3, severity-labelled. **P1 is a live correctness
+bug on a shipped surface**, not polish; everything below it is accepted,
+routed, or cosmetic.
+
+⚠ **P1 is a SEQUENCE candidate and is deliberately NOT added to the table at
+the top of this file.** That ordering is founder-curated and adding to it is a
+ruling, not an edit. Flagged here so the omission is visible rather than
+silent.
+
+---
+
+### P1 · The market-arm position readout lies while a composer is open
+
+`SlotHeader` derives label, thumb, percent, TO-WIN unit **and the position
+readout** from one `side` prop where `side = openSide ?? side`, so with a
+composer open the readout compares the viewer's real holding against the
+**MIRRORED** pole — a viewer holding **Đ146 on NO is told they hold nothing**.
+
+**Correctness bug, not polish.** Display only: no ledger is touched, no write
+path is involved, and truth returns when the composer closes. That bounds the
+blast radius; it does not make the statement true while it is on screen, and
+it is the viewer's own money being misreported back to them.
+
+**The correct pattern already exists in the codebase.** `PositionStrip`
+decouples the two via a `composingSide` prop that drives label/percent/TO-WIN
+only, leaving the position readout bound to the column's own true pole
+(RPLY-2). This is a port **in the opposite direction** — the post arm was
+fixed and the market arm was not.
+
+⚠ **`header-mirror.test.ts:184` pins the falsehood as intended behaviour and
+must move with the fix. Expect it to red. That is not a regression** — it is
+`V-18` (a reconstruction does not merely omit, it can assert), and this row is
+one of that rule's two founding instances.
+
+⛔ **THAT CITATION IS BLOCKED, NOT BROKEN — `V-18` DOES NOT EXIST AT HEAD.**
+RECONCILE-1 found the two lanes had minted colliding V-numbers and refused to
+arbitrate them (**OWED-1**), restoring `main`'s register unchanged; its
+high-water is `V-17`. So this row's authority is currently unreachable. ⚠ **The
+danger is not the dangling number, it is the two that resolve.** `main`'s `V-16`
+and `V-17` are *different rules* from the staging-lane `V-16`/`V-17` this row was
+written beside, so a staging-lane citation of either now silently returns the
+wrong lesson and reads as fine. **The rule this row relies on is unchanged and
+still true — only its NUMBER is pending.** Read it by its words, not its number,
+until the founder rules OWED-1.
+
+**Trigger:** armed; next `SlotHeader.tsx` touch, or sooner if founder-ruled.
+**Estimate:** one session.
+**Canon:** `design-canon.md` §2's composer-open exception names this component
+as the wrong one, by name.
+
+---
+
+### P2 · `ci` is not a required check
+
+No branch protection on the repository, so every "checks passed" is
+**informational**. Detail and the dated measurement live in `CLAUDE.md` §5.13
+— not restated here, because a second copy drifts and whichever one a reader
+opens is the wrong one.
+
+**Trigger:** any decision that would lean on CI as a gate rather than a signal.
+
+---
+
+### P3 · `Đ BET` stops being reachable without scrolling below 600px / 580px viewport HEIGHT
+
+**ACCEPTED.** 600px on the post arm, 580px on the market arm — 50–70px below
+the tested floor. `column-scroll` takes the overflow, so the control stays
+**reachable**; it stops being reachable *without* scrolling. Measured at
+RPLY-3 across both arms and five heights.
+
+**Trigger:** only if a real device in that band is ruled in scope.
+
+---
+
+### P3 · The money row overflows its column below ~860px viewport WIDTH; `Đ BET` clips from ~800px
+
+**ACCEPTED.** Pre-existing, and **proven byte-identical to the pre-RPLY-2
+tree** — the money row's contents (comments stripped) and the grid track are
+the same 1705 characters and the same `grid-cols-[2fr_3fr]` declaration. It is
+behaviour that was restored deliberately along with the grid, not introduced.
+
+**Route to the responsive lane.**
+
+---
+
+### P3 · `min-h-48` is inert at narrow widths
+
+`ImageAttach`'s panel floor bounds HEIGHT, while the figure's `meet` scale is
+`min(w/200, h/250)` — so at a narrow enough column the artwork is
+**width**-limited and a height floor cannot bound it. Measured at 900px
+viewport width: width-limited at every height, scale 0.585.
+
+**Docket with the row above** — same lane, same cause.
+
+---
+
+### P3 · Reply-card parity gaps
+
+No download icon (canon §6 names it), no `KnowMore` mount in `PostCard`'s
+overlaid-gutter form, `LaneBadge` differs. **None is a defect** — the cards
+match in composition, which is what was ruled. One small task or none.
+
+---
+
+### P3 · Post-arm header ARIA grouping
+
+Two identically-rendered column headers with no grouping for a screen reader.
+The market arm uses a labelled `<fieldset>` for exactly this. **A11y lane.**
+
+---
+
+### P4 · `ImageAttach.tsx`'s `max-h-[308px]` calibration comment is stale — and dormant
+
+Stale since the footblock moved (the right column's baseline height changed
+underneath it), and **dormant**: measured, the cap never binds at any tested
+width, because the artwork is height- or width-limited well below 308px. Both
+halves matter — a comment that is merely stale invites a correction; one that
+is also dormant invites deleting the declaration, which is a different call.
+
+**Trigger:** next `ImageAttach.tsx` touch.
+
+---
+
 ## HTML-FINISH · MARKET DETAIL round 2 (R2) — the four visible placeholders
 
 **Parked:** strip or gate all four `/m/[slug]` placeholders before the **DP.2
@@ -815,11 +940,11 @@ curl -sS -D /tmp/h.txt https://staging.zugzwangworld.com/api/health
 
 **Found by** `@security-auditor` at DISCOVERY-COMPLETE Gate C (#311), MEDIUM. **Pre-existing; #311 adds zero queries.**
 
-`proxy.ts:41` sets the edge matcher to `["/admin/:path*"]` **only**, and `src/server/middleware/rate-limit.ts` is applied inside **route handlers**, not around RSC page renders. So `/` — `force-dynamic`, uncached, **~97 sequential DB round-trips** per render (`1 + 12N` at `N = DISCOVERY_GRID_SIZE = 8`) — is reachable by an unauthenticated client **at any rate**, against a Supabase session pooler with a bounded connection budget.
+`proxy.ts:41` sets the edge matcher to `["/admin/:path*"]` **only**, and `src/server/middleware/rate-limit.ts` is applied inside **route handlers**, not around RSC page renders. So `/` — `force-dynamic`, uncached, **~89 sequential DB round-trips** per render (`1 + 11N` at `N = DISCOVERY_GRID_SIZE = 8`) — is reachable by an unauthenticated client **at any rate**, against a Supabase session pooler with a bounded connection budget. ⚠ **Corrected at CHART-2 (2026-08-27): this read `~97` / `1 + 12N`.** CHART-1 moved the pin DOWN by one N — the F-1 drift pool read was folded away — and the machine pin moved with it while this prose did not. The shape of the exposure is unchanged and so is the argument; only the magnitude is smaller.
 
 **Why now.** PERF-1 has just bought this surface back from **35.07 s → 0.692 s p50** and closed the only GO-LIVE BLOCKER. Nothing prevents an attacker from spending that headroom again, and the failure mode is pooler exhaustion, which takes down more than Discovery.
 
-**#311 is not the cause and does not worsen it** — its query count is now mechanically pinned at `1 + 12N` by `tests/server/discovery/round-trip-budget.test.ts`. It is recorded here because the audit surfaced it while reading that surface.
+**#311 is not the cause and does not worsen it** — its query count is mechanically pinned at **`1 + 11N`** by `tests/server/discovery/round-trip-budget.test.ts`, in the case named `discovery::round-trip-count-is-1-plus-11N` (the describe block reads *"Discovery round-trip budget — 1 + 11N (plan §3a, the binding constraint)"*). It is recorded here because the audit surfaced it while reading that surface. ⚠ **Corrected at CHART-2 from `1 + 12N`, and the test name is now cited rather than just the path** — the prose and the pin had drifted apart at CHART-1, and a citation that names the assertion is the one a reader can check in a single grep.
 
 **Upstash is already in the stack** (`@upstash/ratelimit`, ADR-0015), so the primitive exists; what is missing is a limiter on the RSC path. ⚠ Note the ADR-0015 posture — rate-limit fails **OPEN** — so a limiter added here does not become a new availability dependency.
 
@@ -2974,6 +3099,39 @@ it measures the shell. Recorded as a SCALE S-5 input, not a standalone task.
 
 ---
 
+## PD-PFP-10 — the onboarding deck's Card 2 is reshaped to a circle while still hard-coding the placeholder
+
+**Originating task:** PFP-UI-1 (2026-08-26), §7.2. Rowed in the SAME commit as the code, per the
+standing rule at the head of this file — the plan named a routing destination, so it gets a row
+rather than a promise.
+
+`components/onboarding/figures.tsx`'s `IdentityHero` renders `/pfp-placeholder.svg` as a literal.
+The O1-DECK copy register calls that slot *"the viewer's live PFP avatar as a centred hero"*, and
+`DESIGN_W2_2_CLOSE-OUT.md` says the same. PFP-1 (`c49138d`) made live PFPs real everywhere else:
+this is now the **one surface** still on the placeholder by construction rather than by fallback.
+
+**Why this pass makes it worse rather than better, which is the whole reason for the row.** The
+circle pass reshapes the frame around that placeholder. It does not touch the src, so the deck
+now presents a mount that looks exactly like the seven live ones and is not one. **A divergence
+that was legible as "nothing is wired yet" becomes invisible the moment the frame stops
+advertising it.**
+
+**Why it is parked and not fixed here.** Wiring a live avatar into the deck means giving
+`CardFigure` viewer data it does not currently take — a new prop threaded through the whole figure
+chain, which is a different change with a different blast radius. More importantly the deck's own
+docblock argues on the record that a deck-local avatar fetch would create a **second PFP path**
+beside the one resolver-owned builder, which is exactly what founder ruling **D-5** (2026-08-18)
+forecloses. That argument is sound and this pass does not overturn it. Shape was in scope; data
+flow was not.
+
+**Trigger.** Whenever the deck next takes viewer data for any reason. At that point the second
+path stops being a new cost and becomes a marginal one, and D-5's objection no longer bites.
+
+**Owner.** Whoever rules `OD-2` — the all-circle vs all-rounded-square decision this pass is
+built on. If `OD-2` were ever reversed the row survives unchanged: the src is wrong either way.
+
+---
+
 ## Sequencing note (stated here, not acted on)
 
 PERF-1 was carried as the sole GO-LIVE BLOCKER row (line 36, SEQUENCE table intro) and closed
@@ -3007,8 +3165,367 @@ this paragraph only names what a reader tracking sequence should already know.
 
 ---
 
+## AUTH-SURFACE-AUDIT — four findings from WARLI-MOUNT's `@security-auditor`, none of them WARLI-MOUNT's
+
+**Originating task:** WARLI-MOUNT (2026-08-31). The auditor was scoped to
+`src/app/(auth)/**` for a render-only change and, in enumerating what shares
+those files, found four things that have nothing to do with the artwork. Filed
+here rather than fixed there — the PR was a decorative mount and absorbing any of
+this into it would have been exactly the "while we're here" CLAUDE.md §5.4
+forbids. **Each is stated as the auditor measured it; none has been
+independently re-verified by the execute surface.**
+
+⛔ **1 · The Turnstile gate is fed a hard-coded literal, and exactly one of two
+readings is true — both are findings.** `src/app/(auth)/sign-in/page.tsx` posts
+`x-turnstile-token: "placeholder-token"`, and the OTP resend path hard-codes the
+same string. `src/server/auth/index.ts` calls `verifyTurnstile()` against
+Cloudflare siteverify and **fails closed**. So either **email-OTP sign-in is
+broken in production** (`turnstile_failed` on every send), or the deployed
+`TURNSTILE_SECRET_KEY` is Cloudflare's always-pass test key — in which case the
+bot gate is a no-op and the only remaining defence on an **email-sending**
+endpoint is two rate limits that both **fail OPEN**. ⚠ **This is the one to look
+at first**, and the email-bombing / Resend-quota consequence does not appear to
+be written down anywhere.
+
+**2 · No framing protection anywhere, on a consent surface.** No
+`X-Frame-Options`, no `frame-ancestors`, no CSP at all across `src/`,
+`next.config.ts` and `vercel.json`. `/onboarding` is the ToS-acceptance screen —
+one `required` checkbox and one submit — and `acceptTosAction` writes
+`tos_accepted_at`, both version hashes, IP and user-agent as **canonical
+acceptance evidence** (SPEC.2 §3.5). Clickjacking that flow forges precisely the
+thing the evidence exists to make unforgeable.
+
+**3 · No `robots.txt` exists**, and CLAUDE.md's own audit checklist calls for
+`Disallow: /admin/`. `src/app/(admin)/admin/login/page.tsx` exports a `robots`
+metadata block whose comment says *"robots.txt Disallow + noindex below"* — the
+`robots.txt` half was never built, and the other seven admin pages carry no
+`robots` metadata. Every crawler fetch of `/sign-in` is also a full uncached
+791 KB origin render (see the WARLI-3 item 4 correction).
+
+**4 · `Sentry.init({ tracesSampleRate: 1.0 })`** in `instrumentation-client.ts` —
+100 % client trace sampling on a pre-auth surface with Devcon traffic expected.
+Quota and cost, not security.
+
+**Expected next task.** None scheduled; **item 1 wants triage before go-live**
+rather than in-window. Evidence: `docs/logs/WARLI-MOUNT.md` and the audit it
+records.
+
+---
+
+## WARLI-3 — the composition pass: fill the moat, thicken the rings, re-cut the border
+
+**Originating task:** WARLI-2 (PR #438, squash `ab0f23b`). Four items the founder
+named at the close-out read, plus one the security audit measured.
+
+⚠ **Item 5 was added later, by WARLI-MOUNT, and does not come from that reading.**
+It could not have: it is the first measurement of this piece in a browser at any
+width, and until that task the piece had never been mounted anywhere to measure.
+**Read the numbered items as the list, not the sentence above as the count** —
+that sentence records where the row STARTED, and a row that only ever grows will
+outlive any tally written into its own prose.
+
+⛔ **NOT A GO-LIVE GATE.** Its trigger is **after go-live, as in-window
+refinement**. Filed so the composition notes survive the gap between building it
+and looking at it again, **not** to add a row to the SEQUENCE table, whose trigger
+set is "met today" and which correctly still has no go-live blocker in it.
+
+⚠ **THE ARTWORK IS NOW MOUNTED, and the sentence that used to sit here said the
+opposite.** It read: *"The artwork is **mounted nowhere** … so nothing here can
+reach a participant until somebody mounts it on purpose."* Somebody did —
+WARLI-MOUNT hangs it on `src/app/(auth)/layout.tsx`, the layout wrapping
+`/sign-in`, `/sign-in/otp` and `/onboarding`. The guard it cited still exists and
+still has its positive control; it now asserts the importer list is **exactly that
+one file** rather than empty. **Items 1–3 below therefore describe a composition a
+signed-out visitor can see**, which raises their stakes without changing their
+trigger: they remain in-window refinement, not a gate.
+
+⚠ **What each route actually costs, corrected — the first version of this
+paragraph was wrong in BOTH directions and `@security-auditor` caught both.**
+Measured on the preview: `/sign-in` **93.7 KB gzipped**, `/sign-in/otp`
+**94.6 KB**, `/onboarding` 15.2 KB *on the redirect path*.
+
+- ⛔ **The EMAIL flow does NOT pay twice.** It said it did. `/sign-in` reaches
+  `/sign-in/otp` by `router.push()` — a **client-side** navigation, and the two
+  routes share the `(auth)` layout segment, so the layout is not re-fetched and
+  the SVG stays mounted. The 94.6 KB figure is a `curl` of a cold document, which
+  is not what the flow does.
+- ⛔ **The OAUTH flow DOES pay twice, and the row said `/onboarding` carries no
+  artwork.** That 15.2 KB is the *redirect* — no `onboarding_ref`. **With a valid
+  ref, `/onboarding` renders inside `AuthLayout` and therefore renders the
+  artwork**, and Google's callback is a hard browser navigation. So a real OAuth
+  signup fetches the drawing at `/sign-in` and again at `/onboarding`, the
+  mandatory first screen after signup.
+
+**The lesson is the same one item 4 keeps teaching: a number measured with `curl`
+describes a document, not a journey.**
+
+**1 · Fill the moat.** There is a visible empty annulus between the outer ring's
+baseline (`R_OUTER = 470`) and the nearest static-field ink. It is a *consequence*
+of a correct fix rather than an oversight: WARLI-2's reviewer pass found that
+`scene.ts::admissible` modelled a figure as a 34-unit disc about its FEET while a
+figure is drawn ~62 units UPWARD from them, so two field figures had ink inside
+the band the rotating crowd sweeps. Widening the extent to the true ink pushed the
+field out and opened the moat. **Closing it means putting marks that are not
+58-unit figures in there** — low ground marks, water lines, a scatter of small
+motifs — not shrinking `RING_CLEAR`, which would re-open the collision.
+
+**2 · Thicken both rings.** At 1440 × 1000 the two rings read thin against a field
+carrying 4,034 of the composition's 4,689 drawn shapes. The rings are the subject;
+they should not be the sparsest thing in the frame.
+
+**3 · Asymmetric border.** The border is capped at **26 units by the vertical
+budget, and that ceiling is measured, not chosen**: the auth card's half-diagonal
+(317.6) sets `R_INNER = 330`, the faced figures at 1.2 × 58 reach 399.6, the outer
+ring's inward figures need 58 of their own, and half the frame height is 500 —
+leaving 30 units top and bottom. But a 1440 × 1000 frame holding a 470-radius
+circle has **~250 units of spare width per side and none above** — ⚠ **spare
+RELATIVE TO THE RING, which is not the same as empty, and item 5 exists because
+WARLI-MOUNT read it the second way and measured otherwise: that band already
+holds both side border bands and 310 of the 462 placed marks.** A border deeper
+at the left and right than at the top and bottom is both traditional and what the
+aspect ratio actually asks for. Rejected at WARLI-2 for simplicity (CLAUDE.md
+§5.2), recorded here because it is the right move if a heavier frame is wanted — a
+uniform increase is **forbidden** by the budget above and would re-create the
+58-unit border/ring overlap WARLI-2 fixed.
+
+**4 · Static pre-render of the field.** ⛔ **DISCHARGED AT WARLI-MOUNT, AND THE
+REMEDY THIS ROW PROPOSED DOES NOT WORK. Read the correction below before acting
+on the paragraph after it.**
+
+⚠ **THE ~35 ms IS SERIALISATION, NOT CONSTRUCTION — measured 2026-08-31, and the
+row's diagnosis was wrong while every one of its numbers was right.** Building the
+7,978-element tree costs **1.5 ms**; walking it and writing **791,640 bytes** of
+markup costs the other **~25 ms**. So of the three remedies this row names, the
+`module-level element hoisted out of the render` was implemented, measured, and
+**reverted**: it removes 100 % of the cost it targets and **4.4 %** of the cost
+that was measured (whole-hero `renderToStaticMarkup` median 26.82 → 25.65 ms,
+N=150, paired, output byte-identical at md5 `2bfe3db35755fea54fbc1710dcc72690`).
+
+⚠ **A `cached fragment` is unavailable here, and not for a reason that will
+change.** The field sits inside a `"use client"` `<svg>`, so nothing server-side
+can cache its output; the mechanism that would — pre-serialising it and emitting
+the string — needs `dangerouslySetInnerHTML`, which
+`tests/unit/art/art-layer-guards.test.ts:153-154` bans anywhere in the art layer.
+Passing the field in as a server-rendered child is possible but moves the
+artwork's completeness into the call site and breaks the ~20 `composition.test.tsx`
+guards that mount a bare `<WarliHero />` and assert what it draws.
+
+⛔ **AND THE SENTENCE THAT SAT HERE — *"the only lever that moves either the
+~25 ms or the 82 KB is FEWER ELEMENTS"* — WAS ALSO WRONG.** `@security-auditor`
+refuted it at WARLI-MOUNT and it is worth keeping the refutation visible, because
+it is the second time this row has been reasoned about correctly from a premise
+that was not checked. **The artwork is a pure constant** — no props beyond
+`className`, no request data, no clock, no RNG, all four asserted by
+`tests/unit/art/art-layer-guards.test.ts`. A constant does not have to be rendered
+per request at all. **Two levers exist that are NOT composition changes:**
+
+1. **Emit it as a static asset** — a build-time `public/*.svg` referenced by
+   `<img>`. Removes the per-request CPU entirely, removes the bytes after the
+   first fetch (immutable CDN + browser cache), and removes the hydration cost.
+   Costs: `currentColor` / `var(--color-ink)` theming must be baked, which is
+   cheap because the theme is single, dark, and `.dark` is descoped-inert; and
+   the pointer gesture dies — but it is **already dead**, see the WARLI-MOUNT
+   audit's LOW-3.
+2. **Make the segment PPR-eligible** so the artwork lands in the prerendered
+   shell. Blocked today by `export const instant = false` in
+   `src/app/(auth)/layout.tsx`, which is what produces the empty shell.
+
+⇒ **Fewer elements is one lever of three, and it is the only one that is a
+composition change.** Items 1–3 above still stand on their own merits; they are
+no longer the whole answer to this one.
+
+*The original text follows, unedited, because its measurements are sound and are
+the evidence for the correction above.* Measured by
+`@security-auditor` at WARLI-2: the shipped JS chunk is **12,994 B gzipped**, but
+the markup it produces is **82 KB gzipped — 6.4× the chunk** — plus ~35 ms of
+server CPU per render, and `WarliHero` is `"use client"`, so the 7,978-element
+scene is built on the server **and again in the browser at hydration**.
+`FieldLayer` is neither memoised nor `React.memo`'d. Harmless while unmounted; on
+`/sign-in` it becomes ~35 ms CPU and 82 KB egress **per unauthenticated request**
+on the highest-traffic pre-auth route, against ~2 KB for a normal page. The field
+is 86.0 % of the drawing and **never changes** — it is a pure function of a fixed
+seed — so it is a candidate for a static shell, a cached fragment, or a
+module-level element hoisted out of the render entirely.
+
+**5 · The composition's own clearance guarantee does not hold at most real
+viewports. ⚠ MINTED AT WARLI-MOUNT, from the first measurement ever taken of this
+piece in a browser at any width.**
+
+`hero.tsx` derives `R_INNER = 330` from the auth card's half-diagonal and states
+the consequence in its own docblock: *"this is what lets the card CLEAR the
+artwork instead of sitting on top of it. Shrink it and the corners of the sign-in
+card start eating figures."* **The mount renders the SVG `h-full w-full` over
+`fixed inset-0` with the default `xMidYMid meet`, so the ring scales with the
+viewport while the card — `max-w-md` less `px-4`, a fixed 416 px — does not.**
+
+⛔ **THE RING SHRINKS AND THE CARD DOES NOT, so the guarantee is a function of
+viewport size, and it fails below ≈ 1271 × 883.** Measured on the deployed
+preview, each width a pinned same-origin iframe. The card's worst corner sits a
+**constant 291.3 px** from the composition centre at every width — it is a
+fixed-size box — so clearance is simply `330 · scale > 291.3`, i.e.
+**scale ≥ 0.8827**:
+
+| viewport | scale | inner ring R | worst card corner | clears? | overlap |
+|---|---|---|---|---|---|
+| 1920 × 1080 | 1.0800 | 356.4 px | 291.3 px | ✅ | — |
+| 1440 × 900 | 0.9000 | 297.0 px | 291.3 px | ✅ | 5.7 px to spare |
+| **1512 × 860** (MacBook Pro 14″) | 0.8600 | 283.8 px | 291.3 px | ⛔ | **7.5 px** |
+| **1440 × 790** (a 1440×900 screen less browser chrome) | 0.7900 | 260.7 px | 291.3 px | ⛔ | **30.6 px** |
+| 1366 × 768 | 0.7680 | 253.4 px | 291.3 px | ⛔ | 37.9 px |
+| 1280 × 720 | 0.7200 | 237.6 px | 291.3 px | ⛔ | 53.7 px |
+| 768 × 1024 | 0.5333 | 176.0 px | 291.3 px | ⛔ | 115.3 px |
+| 390 × 844 | 0.2708 | 89.4 px | 271.4 px | ⛔ | 182.0 px |
+
+⚠ **A 1440 × 900 SCREEN FAILS**, even though the 1440 × 900 *viewport* passes with
+5.7 px to spare — browser chrome takes ~110 px of height and the row above it is
+the real one. **Compounding it by a further 31 px, measured:** the artwork centres
+on the viewport while the card centres in the space *below* the 62 px header, so
+the card sits 31 px low and the bottom corners bite first.
+
+**At 390 px it stops being an overlap and becomes an erasure.** The whole outer
+ring is 254.6 px across inside a 358 px card; a phone visitor sees a dark page, a
+card, and roughly a 20 px sliver of the left border band. It does not read as a
+small artwork — it reads as a rendering fault.
+
+⛔ **CROPPING IS NOT AVAILABLE, and this is the item that kills the obvious fix.**
+The obvious move is to crop the viewBox's side margins and let `meet` scale the
+rings up. **There are no side margins.** `svg.getBBox()` returns `0,0 1441×1000`
+at every width — the ink fills the frame edge to edge; the left and right border
+bands sit exactly on x = 0 and x = 1440; and **310 of the 462 placed marks live
+outside x ∈ [220, 1220]** (193 left, 117 right). Item 3's *"~250 units of spare
+width per side"* is spare **relative to the ring**, which is precisely the ground
+items 1 and 3 want to spend. Any crop deletes both side borders and two-thirds of
+the static field.
+
+⇒ **Every remaining fix is a composition change**, which is why this is an item
+here and was not shipped at the mount: a different frame aspect below some
+breakpoint, a smaller `RING_CLEAR` (forbidden by item 1's collision), a second
+composition for narrow viewports, or capping the SVG's rendered scale so the ring
+stops shrinking past the card. ⚠ **Devcon traffic will be mobile AND the desktop
+case already fails on a MacBook**, so this is the item most likely to matter
+first, despite being minted last.
+
+⚠⚠ **THE FIRST VERSION OF THIS ITEM UNDERSTATED IT, AND THE MISTAKE IS WORTH
+KEEPING VISIBLE.** It compared the OUTER ring's diameter against the card's WIDTH
+(846 px vs 416 px at 1440 × 900) and concluded the artwork cleared the card at
+every desktop width — filing this as a phone-only problem. **That was never the
+constraint.** `hero.tsx` states the real one and derives `R_INNER` from it: the
+INNER ring's radius against the card's HALF-DIAGONAL. Against the right pair the
+answer inverts at four of the eight viewports above. Caught by `@code-reviewer`,
+re-measured, corrected here. A guarantee is only checked by the comparison it was
+written as.
+
+**Conditional trigger.** After go-live (2026-09-15), as in-window refinement.
+⚠ The second clause — *"or immediately before any task that mounts the artwork,
+for item 4 alone"* — **has fired and is spent**: WARLI-MOUNT discharged item 4 in
+front of the mount, exactly as this trigger asked. Items 1–3 keep the first
+clause.
+
+**Expected next task.** None scheduled. Evidence:
+`src/components/art/warli/scene.ts` (`RING_CLEAR`, `admissible`, the `Extent`
+docblock recording the feet-vs-ink defect), `src/components/art/warli/primitives/border.tsx`
+(`BORDER_DEPTH` and the vertical-budget derivation in its docblock),
+`src/components/art/warli/field-layer.tsx` (`FieldLayer`, **still unmemoised —
+that is the reverted Slice 1, not an oversight**), `docs/logs/WARLI-2.md` (the
+measurements), and the preview HTML staged at the WARLI-2 close-out.
+
+⚠ **For items 4 and 5, the evidence is `docs/logs/WARLI-MOUNT.md` and
+`docs/plans/WARLI-MOUNT.md`** — the build-vs-serialise split, the byte-identity
+proof, and the four-width geometry table were all measured there, on the deployed
+preview, and none of them exists anywhere in the WARLI-2 material above.
+
+---
+
 **The `.html` tracker dashboards are operator-local and were not touched here.** If the
 operator's dashboard still shows PERF-1 as blocking, or does not yet reflect PERF-2 / COLD-START
 / GAUGE, that is a manual move for the operator — not a PR.
+
+---
+
+## FEED-1 security-auditor SURPRISE — the pop-up and lightbox slots cache a resolved node, so they never re-mask
+
+**Originating task:** FEED-1 directed security audit (branch `feat/feed-1`, 2026-08-24) — out-of-scope SURPRISE per §5.11: **pre-existing on `main` and `staging`, not touched by the FEED-1 diff**; recorded, not absorbed. Also written to that run's `claude-progress.md`, which is **gitignored** — the auditor pushed back that a live masking gap whose only record dies with a worktree is the §8 founding case one register over, and it is right. This row is the durable half.
+
+**Deferred work.** `DebateView` holds three slots that capture a **resolved value** rather than an id: `popupPost` / `popupReply` (the whole `PresentPost` / `PresentReply`; `PostPopup` renders `post.body` off the captured object) and `lightboxUrl` (a presigned R2 GET URL). None is re-derived or cleared when a new model lands, and **`DebatePoll` is not suspended for pop-ups** — `composerOpen` reads only the composer flags. So a pop-up opened before a moderator removes its comment keeps rendering the withheld body for as long as it is left open, on a page that has the masked payload in hand. ⚠ **The image half outlives the DOM:** measured at this audit, after a masking payload closed the surrounding surface the presigned URL was still in the document, and `READ_URL_TTL_SECONDS = 3600` (`src/server/debate-view/load-debate-view.ts:36`) — removal does not revoke an already-minted URL, so the object stays fetchable and shareable for up to an hour. That half is the one most likely to be under-rated later, because it is invisible once the dialog closes.
+
+**This is the SC-1 class** (§5.14): a read path over `comments.body` that never re-intersects the removed set. SC-1 fires on *"any PR that adds or edits a read over `comments`"*; this is a standing one that predates the check.
+
+**Fix direction, and FEED-1 is the worked example.** Store the **id**, re-derive the node from `model` at render. `posted` does exactly that — it holds a `commentId`, never a node, so `postedNode` is recomputed every render and a masking payload takes the card off screen in the SAME commit (measured, both reviewers, `M0 → M1(present) → M2(removed)`: no intermediate frame). `popupPost` / `popupReply` / `lightboxUrl` want the same treatment. Sizing: two state slots plus a lightbox key, all inside `DebateView`; the removed variants are already unpassable at the type level, so the compiler does most of it. **The presigned-URL half is separate and harder** — R2 presign revocation is not a client concern and may be a TTL-shortening decision rather than a code fix.
+
+**Why deferred.** Pre-existing, reachable on three surfaces FEED-1 does not touch (market column, reply column, `PostFocusHeader`), and absorbing it would be the "while we're here" §5.4 forbids on a branch whose reviewer cascade has already run.
+
+**Conditional trigger.** The next task touching `DebateView`'s pop-up/lightbox slots or `dialogs.tsx`, OR any HARDEN.* moderation pass, OR the first moderator report that a removed argument stayed visible.
+
+**Expected next task.** A small `fix/` lane in `src/components/debate/` — id-not-node for the two pop-up slots (behavioural, guardable in jsdom exactly as FEED-1's confirmation is), with the R2 TTL question raised separately.
+
+---
+
+## TIME-1 Form B — `Replies · N` runs at two sizes on two rows canon §3 item 11 calls siblings
+
+**Originating task:** TIME-1 · Form B (branch `feat/time-1-form-b`, PR #406, 2026-08-25) — noticed while measuring the identity rows at 1440 for the argument-age alignment item. **Out of scope and deliberately not fixed:** that run's brief was a divider, a CSS measurement, two guard counts and two doc edits, and this is neither the age nor the divider.
+
+**Deferred work.** Canon §3 item 11 governs one composition — *"head = avatar · name | SIDE @ entry% | stake … `Replies · N` inline with enlarged count (`.repn`)"* — and the TIME-1 Form B amendment now treats the debate and profile identity rows as siblings, giving both the same trailing age under one rule. **They render `Replies · N` at different sizes.** Measured on staging at 1440, computed values:
+
+| surface | `Replies ·` label | the count | the age beside it |
+|---|---|---|---|
+| Market detail (`debate/ArgProfile.tsx`) | **9.5px** bold, `0.12em` tracking, uppercase, `text-ink` | **13px** | 12px |
+| Profile (`profile/ArgumentList.tsx`) | **12px** (`text-xs`), `text-n5` | **14px** (`text-sm`) | 12px |
+
+⚠ **Market detail is the one that matches the ratified source; Profile is the drift.** Both mockups declare the same two values — `surface_d5_v1_0.html:579-580` and `surface_profile_v1_0.html:327/336` give `.repmeta{font-size:9.5px}` and `.repn{font-size:13px}` byte-identically, and the profile mockup's own comment at `:616` names its count *"D5 `.repn`"*, i.e. it explicitly borrows d5's. So this is not two defensible readings of one rule; it is one ratified pair of values that Profile does not use.
+
+**Root cause, and it is already recorded in the code that caused it.** HTML-FINISH row 12 **moved** `Replies · N` on Profile from the card footer's running text into the head cluster, and `ArgumentList.tsx` states that *"both spans keep their class strings byte-for-byte from the footer they left."* Keeping the footer's classes is what carried the footer's **body-text** sizes (12/14) into a head whose mockup rule is 9.5/13. The move was right; the class strings came with it.
+
+**The visible cost, which is why it is worth a row rather than a shrug.** On market detail the run `REPLIES · 3   4d ago` now contains **three type sizes in five words** — 9.5px label, 13px count, 12px age. The founder has ruled that the **age** stays at its row's size and is not the field to change (measured: the age matches its row's declared size and its stake's baseline on all three surfaces — the alignment finding in that run's report). ⇒ **The label is the outlier**, and the question this row parks is whether Profile's head takes `.repmeta`/`.repn` — which would also collapse market detail's run from three sizes to two by making the label and the age the only pair left to reconcile.
+
+**Why deferred.** Changing either surface's `Replies · N` sizes moves a shipped composition that `tests/unit/design/debate-height-chain.test.ts` and `tests/unit/design/profile-height-chain.test.ts` both scan, and re-pointing Profile at the mockup's 9.5/13 is a visual ruling about the head cluster, not a typo fix. Taking it inside a task not asked to make it is the §5.4 "while we're here" this file exists to prevent.
+
+**Conditional trigger.** The next task touching either identity row's `Replies · N` cluster — `debate/ArgProfile.tsx` or `profile/ArgumentList.tsx` — OR any founder pass over head-cluster typography, OR the first Gate C that reads the two rows side by side and asks why they differ.
+
+**Expected next task.** A small `fix/` lane in `src/components/profile/`, taking `.repmeta`/`.repn`'s ratified 9.5px/13px onto the profile head, with the two height chains re-measured at 1440 before and after. ⛔ No mockup edit — both mockups already say 9.5/13; this is the build catching up to them, not a canon question.
+
+---
+
+## T4-1 — the bundle script's manifest parse assumes no `deploymentId`
+
+**Originating task:** HO-T4 (branch `feat/frontend-bundle-instrument`), found while
+verifying exit criterion 1 against a real build.
+
+`scripts/measure-frontend-bundle.ts::parseClientReferenceManifest` reads a
+`_client-reference-manifest.js` file with a single regex expecting one
+`globalThis.__RSC_MANIFEST["<route>"] = {...};` object-literal assignment,
+then `JSON.parse`s the captured group directly. Next's own internal reader
+for the same file (`next/dist/cli/internal/static-routes-info.js`) documents
+that Turbopack emits a **different, incremental** shape — `clientModules[k]
+= val;` assigned key-by-key in a `for` loop after the initial literal —
+**when a Vercel `deploymentId` is set** (skew-protection builds). Confirmed
+directly: a plain local build with no `deploymentId` writes the single-literal
+form the script expects; the incremental form was not reproduced here because
+this environment has no Vercel deployment context to set one.
+
+If this script is ever pointed at a `.next` directory produced by an actual
+Vercel build (rather than a local or CI one), the trailing `for`-loop content
+after the first `}` would either fail the regex's `$`-anchored capture
+outright (loud, safe — the script throws) or, if the file shape drifts again
+in some future Next version, could silently under-count a route's chunks
+(quiet, unsafe — the failure mode this row exists to head off). Currently
+loud-safe, not silently wrong; flagged before it has a chance to become the
+latter.
+
+**Conditional trigger.** Before this script — or its `--exclusive-to`
+flag — is ever run against a `.next` directory that did not come from a
+plain local or CI build (i.e., anything pulled from an actual Vercel
+deployment). Not a blocker for T4's own local/CI use.
+
+**Expected next task.** None scheduled. A one-line guard (assert no trailing
+non-whitespace after the matched object literal; throw naming the
+`deploymentId` case by name if one is found) would convert "silently wrong"
+into "loud and safe" permanently, at whoever next touches this script.
+
+Evidence: `scripts/measure-frontend-bundle.ts` (`parseClientReferenceManifest`),
+`node_modules/next/dist/cli/internal/static-routes-info.js` (the documented
+two formats, in its own docblock above `parseClientReferenceManifest`),
+and the HO-T4 session report's local-build confirmation — an operator-staged
+artifact held off-repo, named here rather than linked because it is NOT
+resolvable from this tree. The two citations above are.
 
 ---

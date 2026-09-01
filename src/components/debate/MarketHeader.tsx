@@ -1,7 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { InfoTip } from "@/components/ui/info-tip";
 import { GLOSSARY } from "@/lib/copy/glossary";
-import type { ChartNode } from "@/server/debate-view/price-chart";
 import type { PricePoint } from "@/server/discovery/price-series";
 
 import {
@@ -136,7 +135,7 @@ export function MarketHeader({
 	pick,
 }: {
 	market: DebateMarketHeader;
-	priceChart: { series: PricePoint[]; nodes: ChartNode[] } | null;
+	priceChart: { series: PricePoint[] } | null;
 	/**
 	 * HTML-FINISH · MARKET DETAIL round 2 · R7 (row 8) — the rail bar's clickable
 	 * percent labels. Threaded straight through to `PriceBar`; this component
@@ -200,7 +199,7 @@ export function MarketHeader({
 			// 340×188, `innerHTML === ""` — an empty column on EVERY market.
 			// ⇒ THE MECHANISM, because it is subtle and it will recur. `priceChart`
 			// is NOT null on a market with no price history — the read model returns
-			// `{ series: [], nodes: [] }`, which is TRUTHY. The emptiness is decided
+			// `{ series: [] }`, which is TRUTHY. The emptiness is decided
 			// one level DOWN, inside `MarketPriceChartHost`, which returns `null` for
 			// an empty series. So `priceChart ? <Host/> : null` hands `HeadZone` a
 			// non-null React element that renders NOTHING, and `HeadZone` — correctly,
@@ -215,12 +214,24 @@ export function MarketHeader({
 			// ask a different question more carefully.
 			// ⚠ AND THE UNIT GUARD COULD NOT SEE IT. It rendered `priceChart={null}`,
 			// a shape production never produces, so it was green throughout.
-			// `market-header.test.tsx` now also exercises `{ series: [], nodes: [] }`.
+			// `market-header.test.tsx` now also exercises `{ series: [] }`.
+			// ⚠ THE SHAPE LOST ITS `nodes` AT CHART-NODE-REMOVE AND THE LESSON DID
+			// NOT: `{ series: [] }` is still truthy, so the condition is still
+			// `hasRenderableSeries(...)` and never `priceChart != null`.
 			right={
 				priceChart && hasRenderableSeries(priceChart.series) ? (
 					<MarketPriceChartHost
 						series={priceChart.series}
-						nodes={priceChart.nodes}
+						// C-CHART-2 clause 1 (CHART-2) — the terminal pulse. READ
+						// from the market's own status, never assumed: this is the
+						// ONE surface where a non-`Open` market renders a chart at
+						// all (Discovery lists only `Open` ones), so it is the one
+						// place the frozen branch is reachable. A pulse on a
+						// `Closed`, `Resolving`, `Resolved` or `Voided` market
+						// asserts it is live, which is false where stake is
+						// committed and runs at INV-4 — the same reason
+						// `withLiveTail` reads `market.status` here and nowhere else.
+						isOpen={market.status === "Open"}
 					/>
 				) : null
 			}
@@ -228,7 +239,21 @@ export function MarketHeader({
 				/* HTML-FINISH · MARKET DETAIL row 2 — `.hleft` IS A ROW (`d5:448`),
 				   holding `.mmedia` then `.hstack`. The market arm's media panel takes
 				   the same slot the post arm gives the focused post's image, so the two
-				   arms swap contents inside one identical frame. */
+				   arms swap contents inside one identical frame.
+				   ⚠⚠ BLOCK-3 — `items-start` ON THIS ROW WAS TRIED AND REVERTED, MEASURED
+				   WRONG, NOT REASONED WRONG. The panel now derives its height from a
+				   THIRD of the row's width (`aspect-[16/9] w-1/3`, `MarketMediaPanel.tsx`)
+				   instead of `h-full`, so it no longer needs `align-items:stretch` to get
+				   its size — but `headzone-stack` DOES: its `flex-1` growth into
+				   whatever height the band leaves over (R-8's whole mechanism, and the
+				   reason the block row can absorb freed height at all) DEPENDS on being
+				   stretched to the row's height by the row's `align-items`. Setting the
+				   ROW to `items-start` un-stretches BOTH children, and `headzone-stack`
+				   is not supposed to be one of them. Measured: with `items-start` here,
+				   `headzone-stack` read the SAME 176px at both 1440×900 and 1440×777,
+				   where its band is 217.8px and 188px respectively — the extra height
+				   was going nowhere. The fix is on the ONE child that actually needs it
+				   — see `MarketMediaPanel.tsx`'s `self-start`. */
 				<div className="flex min-h-0 flex-1 gap-4">
 					<MarketMediaPanel
 						imageUrl={market.mediaImageUrl}
@@ -289,10 +314,33 @@ export function MarketHeader({
 					    budget: the row that grows is the block row, so these gaps no longer
 					    compete with anything for space. Kept because changing it would be a
 					    spacing change nobody ruled, not because 20.9px still divides by
-					    four. */}
+					    four.
+
+					    ⛔⛔ BLOCK-4 §3 — 5px IS RULED, AND IT IS `gap-5` (20px). The
+					    sentence directly above is the one this change answers: 5px survived
+					    three tasks purely because nobody had ruled on it, and the founder
+					    has now looked at the result and ruled it cramped. THE RHYTHM WAS
+					    ALSO UNEVEN, which the arbitrary value hid — `ResolverCards` carried
+					    its own `mt-4` on top of this gap, so the three stacked elements the
+					    §3 brief names read 5px / 5px / **21px**: question→stats 5,
+					    stats→bar 5, bar→blocks 21. Dropping that `mt-4` (see
+					    `ResolverCards.tsx`) and moving this to `gap-5` makes all three
+					    gaps 20px — measured 5/5/21 → 20/20/20 at 1440×900.
+					    ⚠ `gap-5` IS NOT A NEW TOKEN AND NOT AN ARBITRARY VALUE. It is
+					    d5's own `.headzone{gap:20px}` (`:447`), already shipping one level
+					    up on `HeadZone`'s band as the gap between this column and the chart
+					    rail. The stack's vertical rhythm and the band's horizontal one are
+					    now the same number, which is a composition argument rather than a
+					    coincidence — and it replaces a bracket value that belonged to no
+					    scale at all.
+					    ⚠ WHAT PAYS FOR IT: BLOCK-4 §2 stops the block row absorbing the
+					    band's leftover (it was 122.76px at 1440×900 for 53.25px of
+					    content), so the 45px these gaps gain is drawn from a row that was
+					    only ever holding air. The band, the arena and the media panel are
+					    all untouched by this. */}
 					<div
 						data-testid="headzone-stack"
-						className="flex min-h-0 min-w-0 flex-1 flex-col gap-[5px] overflow-y-auto"
+						className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto"
 					>
 						{/* `.question` (`d5:463`) — `font-size:21px;font-weight:700;
 							    line-height:1.24`, and SINGLE LINE with an ellipsis
@@ -411,8 +459,15 @@ export function MarketHeader({
 						<div className="flex items-center gap-3">
 							{/* ⚠ `min-w-0` — this is the row's flexible child now, and without
 							    it a long attrs strip sets the row's automatic minimum and
-							    pushes the actions off the right edge instead of wrapping. */}
-							<div className="flex min-w-0 flex-wrap items-center gap-y-1 text-xs font-bold text-ink">
+							    pushes the actions off the right edge instead of wrapping.
+							    ⚠⚠ BLOCK-3 §2 — `text-xs` (12px) → `text-[13px]`, this task's
+							    share of the space `ResolverCards.tsx` no longer needs (the
+							    "stats line" in the §2 brief). The row's own height still
+							    tracks `LifecycleBadge`'s fixed `h-5` (20px, `ui/badge.tsx`) —
+							    a shared shadcn primitive, left untouched rather than resized
+							    for one call site — so this bump reads as denser, more legible
+							    figures within the SAME row height, not a taller row. */}
+							<div className="flex min-w-0 flex-wrap items-center gap-y-1 text-[13px] font-bold text-ink">
 								<InfoTip content={GLOSSARY.stakedMarket} asChild>
 									<span>
 										Đ {formatDharma(market.totals.dharmaStaked)} staked

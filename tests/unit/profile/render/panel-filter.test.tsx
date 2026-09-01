@@ -420,29 +420,34 @@ describe("items 5 + 7 end to end — picking a row moves the panel", () => {
 			/>,
 		);
 
-	it("arena::THE-PANEL-OPENS-ON-THE-FIRST-ROW-S-ARGUMENT", () => {
+	it("arena::THE-PANEL-OPENS-ON-THE-FIRST-ROW-S-ARGUMENT", async () => {
 		// ⚠⚠ PROFILE REFINEMENT · R3 — INVERTED AT THE FRONT. This opened by asserting
 		// the FULL LIST was on screen at mount and that a click then filtered it. R3
 		// rules the opposite: the rail must show a full post on load, because a rail
 		// of stubs was the defect. So the arena now mounts already filtered to the
 		// first row's argument, under that row's market question.
 		mount();
+		expect(
+			await screen.findByTestId(`argument-replica-${C_POST}`),
+		).toBeTruthy();
 		expect(screen.queryByTestId("argument-list")).toBeNull();
-		expect(screen.getByTestId(`argument-replica-${C_POST}`)).toBeTruthy();
 		expect(panelTitle()).toBe("Market question for the post");
 	});
 
-	it("arena::a-click-on-ANOTHER-row-moves-the-panel-to-ITS-argument", () => {
+	it("arena::a-click-on-ANOTHER-row-moves-the-panel-to-ITS-argument", async () => {
 		// The half of the original claim that survives unchanged: a pick still drives
 		// the panel. Asserted on the row that is NOT the mount default, so it is a
 		// real transition rather than a no-op.
 		mount();
-		fireEvent.click(screen.getByTestId(`position-tile-${M_REPLY}`));
-		expect(screen.getByTestId(`argument-replica-${C_REPLY}`)).toBeTruthy();
+		const row = await screen.findByTestId(`position-tile-${M_REPLY}`);
+		fireEvent.click(row);
+		expect(
+			await screen.findByTestId(`argument-replica-${C_REPLY}`),
+		).toBeTruthy();
 		expect(panelTitle()).toBe("Market question for the reply");
 	});
 
-	it("arena::A-SECOND-CLICK-KEEPS-THE-PANEL-rather-than-emptying-it", () => {
+	it("arena::A-SECOND-CLICK-KEEPS-THE-PANEL-rather-than-emptying-it", async () => {
 		// ⚠⚠ PROFILE REFINEMENT · R3 — INVERTED. This asserted that a second click
 		// DESELECTED and returned the full list under the header word `Arguments`.
 		// R3 retires deselect: the panel always holds a selection, so clearing would
@@ -451,16 +456,20 @@ describe("items 5 + 7 end to end — picking a row moves the panel", () => {
 		// zero-row filter and every call site that passes no selection still reach
 		// it); it is simply no longer where a second click goes.
 		mount();
-		const row = screen.getByTestId(`position-tile-${M_REPLY}`);
+		const row = await screen.findByTestId(`position-tile-${M_REPLY}`);
 		fireEvent.click(row);
-		expect(screen.getByTestId(`argument-replica-${C_REPLY}`)).toBeTruthy();
+		expect(
+			await screen.findByTestId(`argument-replica-${C_REPLY}`),
+		).toBeTruthy();
 		fireEvent.click(row);
-		expect(screen.getByTestId(`argument-replica-${C_REPLY}`)).toBeTruthy();
+		expect(
+			await screen.findByTestId(`argument-replica-${C_REPLY}`),
+		).toBeTruthy();
 		expect(screen.queryByTestId("argument-list")).toBeNull();
 		expect(panelTitle()).toBe("Market question for the reply");
 	});
 
-	it("arena::THE-PANEL-FOLLOWS-THE-ARROW-KEYS", () => {
+	it("arena::THE-PANEL-FOLLOWS-THE-ARROW-KEYS", async () => {
 		// The founder's own verification step: arrows step rows, wrap, and the
 		// panel follows. Both halves are asserted from the panel's side.
 		// ⚠ PROFILE OVERLAP R4 — THE PANEL STARTS ON THE FIRST ROW, so the first
@@ -469,23 +478,33 @@ describe("items 5 + 7 end to end — picking a row moves the panel", () => {
 		// therefore appeared to "follow" a press that had moved nothing. The claim
 		// is unchanged and the sequence is one row earlier.
 		mount();
-		const table = screen.getByTestId("positions-table");
-		expect(screen.getByTestId(`argument-replica-${C_POST}`)).toBeTruthy();
+		const table = await screen.findByTestId("positions-table");
+		expect(
+			await screen.findByTestId(`argument-replica-${C_POST}`),
+		).toBeTruthy();
 		fireEvent.keyDown(table, { key: "ArrowDown" });
-		expect(screen.getByTestId(`argument-replica-${C_REPLY}`)).toBeTruthy();
+		expect(
+			await screen.findByTestId(`argument-replica-${C_REPLY}`),
+		).toBeTruthy();
 		// …and it WRAPS back to the first.
 		fireEvent.keyDown(table, { key: "ArrowDown" });
-		expect(screen.getByTestId(`argument-replica-${C_POST}`)).toBeTruthy();
+		expect(
+			await screen.findByTestId(`argument-replica-${C_POST}`),
+		).toBeTruthy();
 	});
 
-	it("arena::a-filter-that-hides-the-picked-row-returns-the-panel-to-the-list", () => {
+	it("arena::a-filter-that-hides-the-picked-row-returns-the-panel-to-the-list", async () => {
 		// The derived-selection rule reaching the OTHER side of the arena: a panel
 		// filtered to a row that is no longer on screen would be unexplainable.
 		mount();
-		fireEvent.click(screen.getByTestId(`position-tile-${M_POST}`));
-		expect(screen.getByTestId(`argument-replica-${C_POST}`)).toBeTruthy();
-		fireEvent.click(screen.getByTestId("positions-status-closed"));
-		expect(screen.getByTestId("argument-list")).toBeTruthy();
+		const tile = await screen.findByTestId(`position-tile-${M_POST}`);
+		fireEvent.click(tile);
+		expect(
+			await screen.findByTestId(`argument-replica-${C_POST}`),
+		).toBeTruthy();
+		const closedFilter = await screen.findByTestId("positions-status-closed");
+		fireEvent.click(closedFilter);
+		expect(await screen.findByTestId("argument-list")).toBeTruthy();
 		expect(panelTitle()).toBe("Arguments");
 	});
 });

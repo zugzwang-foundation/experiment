@@ -74,8 +74,63 @@ export function HeadZone({
 			// `shrink-0` is the `0 0` half of `flex:0 0`.
 			// ⚠ `gap-5` = 20px is d5's `.headzone{gap:20px}` (`:447`), the gap
 			// between the text column and the chart rail.
+			// ⚠⚠ `overflow-hidden` — UI-QUICK change set 4 §C. THE BAND NOW CONTAINS
+			// ITS OWN CONTENT, and without it the resolver cards painted over the top
+			// border of both debate columns.
+			// MEASURED on staging, and the cause is arithmetic rather than a stray
+			// margin: `basis-[24.2dvh]` is a VIEWPORT FRACTION while the stack's
+			// content has an INTRINSIC height (~185px from the band's top). Below a
+			// viewport height of ~715px the fraction is smaller than the content, and
+			// with nothing containing it the excess simply painted downward onto the
+			// arena — 3.64px at 1440×700, and 29.14px before §B removed the `Know
+			// more` trigger.
+			// ⛔ THE THREE ALTERNATIVES WERE EACH RULED OUT, not overlooked:
+			//   · restore `overflow-y-auto` on the stack — that is precisely what
+			//     change set 1 removed by ruling (its scrollbar collided with the
+			//     sticky header), so it cannot come back here.
+			//   · drop `min-h-0` / add a `min-h-[…]` floor — `min-h-0` is pinned BY
+			//     NAME by `debate-height-chain.test.ts` as the link that lets the band
+			//     shrink; a floor would contradict it and re-open the one-screen
+			//     ruling.
+			//   · leave it — the exit bar is zero overlap at every tested width.
+			// ⇒ Containment matches what the chain ALREADY does one level up:
+			// `PageContainer` declares one screen and hides its own overflow, on the
+			// stated ground that content spilling out of a declared box "is the same
+			// page scroll under a different name". The band is a declared box too.
+			// ⚠ THE COST, MEASURED AND REPORTED: below ~715px of viewport height the
+			// resolver-card row is now CLIPPED rather than overlapping. That is worse
+			// than fitting and better than painting over the arena, and those were the
+			// only two options left once the scroller was ruled out. Both cards are
+			// empty placeholder chrome docketed for removal before the DP.2 promote
+			// (`docs/parked.md` HTML-FINISH-MD-PLACEHOLDERS), so nothing a
+			// participant can read is being cut.
+			//
+			// ⛔⛔ EVERYTHING ABOVE IS CONTESTED AT HEAD AND MUST NOT BE READ AS LIVE
+			// DOCTRINE — RECONCILE-1 OWED-4, awaiting a founder ruling. The
+			// main→staging merge took `main`'s components alongside this block, and
+			// they DO two of the three things it rules out:
+			//   · `MarketHeader.tsx` — the `headzone-stack` carries `overflow-y-auto`,
+			//     the exact class bullet 1 says "cannot come back here".
+			//   · `ResolverCards.tsx` — carries a `min-h-[78px]` floor (BLOCK-3 §2; was
+			//     `min-h-[84px]` — the exact number moved, the contradiction below did
+			//     not), which bullet 2 says would "contradict" the `min-h-0` pin; its
+			//     own comment calls the previous `min-h-0` a defect that silently
+			//     disabled the scroll backstop. The two rulings are in direct
+			//     opposition.
+			// Also stale by consequence: the row renders FOUR blocks, not "both
+			// cards", and per `ResolverCards.tsx` the stack SCROLLS rather than clips.
+			// ⚠ And the arithmetic above ("3.64px", "29.14px") was measured against a
+			// stack that still contained staging's `ResolutionCriterion` block, which
+			// this merge removed — the numbers no longer describe the tree they
+			// annotate.
+			// ⛔ NEITHER SUITE CAN SEE ANY OF THIS: jsdom performs no layout, and the
+			// height chain scans only `headzone`, `-left`, `-right`, `arena` and
+			// `column-scroll`. Green here proves nothing about the conflict.
+			// ⇒ The prose is marked rather than rewritten, because choosing which
+			// ruling governs is a founder call and a merge is not the place to make
+			// it. When it is ruled, correct THIS block in place (O-5).
 			data-testid="headzone"
-			className="flex min-h-0 shrink-0 basis-[24.2dvh] flex-col gap-5 lg:flex-row"
+			className="flex min-h-0 shrink-0 basis-[24.2dvh] flex-col gap-5 overflow-hidden lg:flex-row"
 		>
 			<div
 				// `.hleft{flex:1 1 auto;min-width:0;display:flex;gap:16px}` (`d5:448`)
@@ -125,8 +180,39 @@ export function HeadZone({
 					// be 436px — 5.7pp too wide, squeezing the text stack.
 					// ⚠ `shrink-0` unconditionally now, not `lg:shrink-0`: a fixed
 					// basis that is allowed to shrink is not a fixed basis.
+					//
+					// ⛔⛔ BLOCK-3 — `hidden lg:flex` IS NEW, AND IT CLOSES A GAP THIS
+					// BRANCH NEVER HAD TO FACE UNTIL NOW. Below `lg`, `headzone` is
+					// `flex-col`: `headzone-left` and this rail stack VERTICALLY,
+					// sharing one `basis-[24.2dvh]` band instead of standing side by
+					// side. This rail is content-sized (no `flex-1`), so it simply
+					// takes whatever height its chart needs FIRST, and `headzone-left`
+					// — which holds the market question, the stats line, the price bar
+					// and the resolver row — gets only the remainder. MEASURED at
+					// 390×844 on a market with a renderable chart: rail 166.4px,
+					// `headzone-left` 17.8px — the resolver row rendered inside a
+					// sliver under one line tall.
+					// ⇒ NOT HYPOTHETICAL, AND NOT REACHABLE AT BLOCK-1's TIME. At
+					// BLOCK-1 no market had enough price history for
+					// `MarketPriceChartHost` to return non-null (measured then: ZERO
+					// of eight), so this branch had never actually competed with
+					// `headzone-left` for the stacked band — the `right === null`
+					// branch two paragraphs up was the only one BLOCK-1-era markets
+					// could exercise below `lg`. Enough time has since passed that at
+					// least two of the eight now have one.
+					// ⇒ THE FIX MATCHES THE PATTERN THE SIBLING BRANCH ALREADY SET.
+					// `right === null` already hides its placeholder below `lg`
+					// (`hidden w-[340px] shrink-0 lg:block`, two branches up) — on the
+					// ruling that an empty rail is visible chrome with nothing to show
+					// at a width where it was never designed to stand. A rail that
+					// CAN'T fit without crushing its sibling is the same case: hidden
+					// below `lg`, exactly where the chart was always meant to stand
+					// beside `headzone-left` rather than above or below it. The chart
+					// itself and its wide-viewport position are UNCHANGED — this is a
+					// visibility toggle on the container, not a resize of what's
+					// inside it.
 					data-testid="headzone-right"
-					className="flex w-[340px] min-w-0 shrink-0 flex-col gap-3"
+					className="hidden w-[340px] min-w-0 shrink-0 flex-col gap-3 lg:flex"
 				>
 					{right}
 				</div>

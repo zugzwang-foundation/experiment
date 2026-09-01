@@ -79,7 +79,7 @@ experiment/
 │   │   │                           #   bookmarks/{page,loading,error}.tsx     — BOOKMARKS (UI-A6, ADR-0032)
 │   │   ├── api/                    # _smoke-error, auth/[...all], bets/{place,sell}, cron/{r2-orphan-sweep,close-due-markets,alarms-drain}, health, uploads/sign, visits
 │   │   ├── globals.css, layout.tsx, page.tsx
-│   ├── components/                 # bookmarks/ debate/ discovery/ profile/ shell/ ui/
+│   ├── components/                 # art/ bookmarks/ debate/ discovery/ profile/ shell/ ui/
 │   │                               #   debate/ gained five components at HTML-FINISH ·
 │   │                               #   MARKET DETAIL: HeadZone (the arm-scoped two-column
 │   │                               #   header frame), MarketMediaPanel, FocusMarketCard
@@ -89,20 +89,69 @@ experiment/
 │   │                               #   OD-2; see docs/parked.md SEQUENCE #5, strip or
 │   │                               #   gate before the DP.2 promote), ScrollRail (the
 │   │                               #   rail — and, since R3, the auto-advance countdown)
-│   │   └── ui/                     #   14 files, and they are NOT all shadcn. NINE shadcn
+│   │   ├── art/warli/              #   WARLI-1/2 — a decorative SVG art layer, MOUNTED
+│   │                               #   AT ONE SITE: `src/app/(auth)/layout.tsx`, as a
+│   │                               #   `pointer-events-none fixed inset-0 -z-10` underlay
+│   │                               #   behind /sign-in, /sign-in/otp and /onboarding
+│   │                               #   (WARLI-MOUNT). The count and the site are BOTH
+│   │                               #   pinned — `tests/unit/art/art-layer-guards.test.ts`
+│   │                               #   asserts the importer list is exactly that one file
+│   │                               #   (it asserted the EMPTY list until this mount), and
+│   │                               #   `tests/unit/shell/sticky-header.test.ts` pins it as
+│   │                               #   the tree's only UNDERLAY — the first `fixed`
+│   │                               #   node here that goes UNDER rather than over.
+│   │                               #   Two counter-rotating rings — 8 FACED
+│   │                               #   figures inner, 12 faceless outer — around a still
+│   │                               #   centre the auth card sits in, inside a STATIC
+│   │                               #   field of 28 more figures, 104 motifs, 330 ground
+│   │                               #   marks and a four-edge border stack (WARLI-2).
+│   │                               #   ⚠ ONLY THE TWO RINGS ROTATE; everything else is
+│   │                               #   painted once. Before WARLI-2, 497 of 497 drawn
+│   │                               #   shapes sat in an animated group — measured.
+│   │                               #   `scene.ts` places the static population from
+│   │                               #   seeded loops (no Math.random, no clock anywhere in
+│   │                               #   the layer — the ring engine's determinism guard
+│   │                               #   depends on it), and `primitives/wobble.ts` bows
+│   │                               #   every straight run into a quadratic whose CONTROL
+│   │                               #   POINT carries the noise and whose ENDPOINTS never
+│   │                               #   move — which is what lets the hand chain and the
+│   │                               #   equal-reach guard survive a change to every mark.
+│   │                               #   Sealed OUTBOUND: it imports nothing but
+│   │                               #   `react` and its own files (asserted by
+│   │                               #   tests/unit/art/). ⚠ THE INBOUND HALF OF THAT
+│   │                               #   SENTENCE IS DEAD — it used to read "and nothing
+│   │                               #   imports it", which WARLI-MOUNT made false; the
+│   │                               #   same test now asserts exactly one importer, named
+│   │                               #   above. Outbound seal and inbound count are two
+│   │                               #   claims, and only the first is still a zero.
+│   │                               #   ⚠ IT IS THE
+│   │                               #   ONLY COMPONENT IN THE TREE THAT EMBEDS ITS OWN
+│   │                               #   `<style>` AND AUTHORS `@keyframes` — necessary,
+│   │                               #   because Tailwind's `animate-spin` is NOT in this
+│   │                               #   app's built CSS (measured: the only keyframes
+│   │                               #   emitted are enter/exit/pulse), so the obvious
+│   │                               #   utility would have produced rings that silently
+│   │                               #   never turned. Names are `warli-` prefixed and
+│   │                               #   collision-free. Copy the pattern only when the
+│   │                               #   same measurement holds; it is not a general
+│   │                               #   licence to ship component-scoped stylesheets.
+│   │   └── ui/                     #   15 files, and they are NOT all shadcn. NINE shadcn
 │   │                               #   primitives: avatar, badge, button, card, dialog,
-│   │                               #   input, separator, skeleton, textarea. FIVE are
+│   │                               #   input, separator, skeleton, textarea. SIX are
 │   │                               #   project-authored — empty-block (P1), loading-block
 │   │                               #   (P7), error-block (the route-boundary family; canon
 │   │                               #   §10 C-STATES-1 rules it NEITHER P1 NOR P7),
 │   │                               #   thumb-glyph (canon §3 item 13, pinned by component
-│   │                               #   name and props), and info-tip (INFO-1 — the one
-│   │                               #   affordance that opens on both pointer hover and
+│   │                               #   name and props), relative-time (canon §3 item 14 + the
+│   │                               #   §6 copy register's `Argument age` entry, pinned the same
+│   │                               #   way — TIME-1's age at the end of every card's identity
+│   │                               #   row, on all four card surfaces), and info-tip (INFO-1 —
+│   │                               #   the one affordance that opens on both pointer hover and
 │   │                               #   touch tap; composes radix-ui's Tooltip and Popover,
-│   │                               #   picked per-render on `(hover: hover) and
-│   │                               #   (pointer: fine)`; not yet canon-ratified — the other
-│   │                               #   four are, this one landed the same night). Don't
-│   │                               #   reach for a shadcn generator to change one
+│   │                               #   picked per-render on `(hover: hover) and (pointer:
+│   │                               #   fine)`; not yet canon-ratified — the others are, this
+│   │                               #   one landed the same night). Don't reach for a shadcn
+│   │                               #   generator to change one
 │   ├── db/                         # ← Drizzle client + schema live HERE (not src/server/db)
 │   │   ├── index.ts                #   the drizzle client
 │   │   └── schema/                 #   14 files: _enums, audit, auth, bets, bookmarks, comments,
@@ -279,12 +328,22 @@ tests/
 ├── scale/         8 *.scale.test.ts (the ENGINE.10 Q-2 correctness-at-scale battery) + _fixtures/, _harness/ — opt-in only, see the Scale bullet below
 ├── staging/       OPERATIONAL RUNNERS, not tests — THREE runners (reset.staging.test.ts · generate.staging.test.ts · gates.staging.test.ts) + fixtures.ts (the literal fixture table) + _lib/ (target, client, read-client, write-guard, guards, reset, coverage, captured-identities). ADR-0035/0036, STAGING-PARITY Slices A–D. Points at the LIVE staging DB; opt-in only, see the Operational-runners bullet below
 ├── server/        auth/ (incl. _probe-* + admin-login-result + email-otp-from-guard, AUDIT-FIX-B7b), bets/ (atomicity, concurrency, daily-credit, events-idempotency, idempotency-replay, moderation-outside-transaction, sell, subsequent-buy, validation + AUDIT-FIX-B3: sell-oversell, place-replay-durable, sell-replay-durable, release-failure, double-sell-chain), cron/ (close-due-markets — ENGINE.15, the first route-handler test convention), events/, identity/, middleware/, moderation/, resolution/ (happy-path, pro-rata, correction, void, concurrency, actor-assert), storage/ (incl. sign-route-envelope, AUDIT-FIX-B7b), admin/ (moderation/ + markets, pool-seed, resolution — each carries its ENGINE.15 wire-action blocks; + markets-media-sign-envelope, AUDIT-FIX-B7b), dharma/ (non-transferable)
-└── unit/          body-fingerprint, rate-limit-prefix, upstash-keys, upstash-redis-config (AUDIT-FIX-B7a — the A14 transport-bound config pins), idempotency-release (AUDIT-FIX-B3), bets/ (errors, floors, wire-envelope), cpmm/ (calculate + validate + vectors.test.ts + *.property.test.ts + _arbitraries.ts), markets/ (transitions.test.ts), positions/ (compute.test.ts), resolution/ (basis + basis.property), dharma/ (accrual, canonical, _probe-decimal-negzero, ledger, conservation, conservation-correction), staging/ (8 files — the guards that constrain the tests/staging/ runners WITHOUT touching a database: generator-no-direct-writes incl. the import allowlist, write-guard, runner-target, runner-gating, runner-isolation, reset-guard, guard-list-parity, fixture-table), design/ (**FOUR height chains** — discovery, profile, bookmarks, and `debate-height-chain.test.ts` added at HTML-FINISH · MARKET DETAIL; all four are SOURCE SCANS, because jsdom performs no layout)
+└── unit/          body-fingerprint, rate-limit-prefix, upstash-keys, upstash-redis-config (AUDIT-FIX-B7a — the A14 transport-bound config pins), idempotency-release (AUDIT-FIX-B3), bets/ (errors, floors, wire-envelope), cpmm/ (calculate + validate + vectors.test.ts + *.property.test.ts + _arbitraries.ts), markets/ (transitions.test.ts), positions/ (compute.test.ts), resolution/ (basis + basis.property), dharma/ (accrual, canonical, _probe-decimal-negzero, ledger, conservation, conservation-correction), staging/ (8 files — the guards that constrain the tests/staging/ runners WITHOUT touching a database: generator-no-direct-writes incl. the import allowlist, write-guard, runner-target, runner-gating, runner-isolation, reset-guard, guard-list-parity, fixture-table), design/ (**FOUR height chains** — discovery, profile, bookmarks, and `debate-height-chain.test.ts` added at HTML-FINISH · MARKET DETAIL; all four are SOURCE SCANS, because jsdom performs no layout), art/ (WARLI-1/2 — 5 files: `ring-geometry.test.ts` asserts the ring engine against HAND-COMPUTED positions rather than a snapshot, because a snapshot pins whatever the engine does today and it caught a real `-0` defect on its first run; `warli-render.test.tsx` reads the rendered `transform` attribute, which is the ONLY place facing/radius/phase reach the DOM; `art-layer-guards.test.ts` holds the raster, side-pole, raw-hex, injection-sink and OUTBOUND-seal checks, plus the inbound MOUNT-SITE pin — that last row asserted the importer list was EMPTY until WARLI-MOUNT and now asserts it is exactly `src/app/(auth)/layout.tsx`, inverted rather than deleted so a second mount still reddens; `wobble.test.ts` (WARLI-2) — ⚠ its FIRST block is the load-bearing one, because determinism, endpoint-preservation and bounded amplitude are ALL satisfied perfectly by a wobble that does nothing, which is how this slice most likely fails and it fails GREEN; `composition.test.tsx` (WARLI-2) holds G1–G4 — pairs at 180°, the static field facing centre, exactly 8 faces, and the density meridian, the last of which measures ink NORMALISED BY ADMISSIBLE AREA because the middle columns of the frame ARE the rings and a raw column count measures the hole in the doughnut)
 ```
 
 - **Unit** (no IO): pure functions in `src/lib/` and `src/server/<domain>/`. Happy path + ≥2 edges + the relevant invariant.
-- **Component / render** (jsdom, no IO): `jsdom` + `@testing-library/react`, enabled **per file** by a `// @vitest-environment jsdom` docblock on line 1 — **75** `*.test.tsx` files, mostly under `tests/unit/**/render/` plus `tests/server/admin/*.component.test.tsx`. **There is no `jest-dom`**, so `toBeInTheDocument()` / `toBeDisabled()` and that whole matcher set are UNAVAILABLE — assert against plain DOM (`getAttribute`, `textContent`, `querySelector`). Fake timers + `act()` for interval/effect behaviour; page visibility is exercised by stubbing `document.hidden` and dispatching `visibilitychange` (F-DEBATE-4). *Recorded at F-DEBATE-4 because this harness has existed since UI.0 and §9 never named it, so successive plans inherited a false "the UI cannot be tested" premise.*
+- **Component / render** (jsdom, no IO): `jsdom` + `@testing-library/react`, enabled **per file** by a `// @vitest-environment jsdom` docblock on line 1 — **84** `*.test.tsx` files, mostly under `tests/unit/**/render/` plus `tests/server/admin/*.component.test.tsx`. **There is no `jest-dom`**, so `toBeInTheDocument()` / `toBeDisabled()` and that whole matcher set are UNAVAILABLE — assert against plain DOM (`getAttribute`, `textContent`, `querySelector`). Fake timers + `act()` for interval/effect behaviour; page visibility is exercised by stubbing `document.hidden` and dispatching `visibilitychange` (F-DEBATE-4). *Recorded at F-DEBATE-4 because this harness has existed since UI.0 and §9 never named it, so successive plans inherited a false "the UI cannot be tested" premise.*
   - ⚠ **AN OUTSIDE-CLICK ASSERTION MUST YIELD TO THE TASK QUEUE BEFORE IT FIRES.** Radix's `DismissableLayer` arms its `pointerdown` listener inside a **`setTimeout(…, 0)`**, so a pointer event dispatched synchronously after `render()` reaches **no listener at all**. Make the test `async` and `await new Promise((r) => setTimeout(r, 0))` first. ⛔ **The failure mode is a false GREEN, not a red:** a *"the backdrop does NOT dismiss this"* assertion written without the yield passes against a listener that was never armed, certifying a guard it never exercised. **Always pair it with the opposite assertion in the dismissible context** — that control is the only thing proving the mechanism fires at all. Escape is unaffected and works synchronously (`fireEvent.keyDown(document, { key: "Escape" })`). *Minted at O1-DECK, where the paired control went red on the first run; without it the non-dismissible guard would have shipped green and empty.*
+- **Browser measurement** (the LIVE deployed app, driven through the Chrome/CDP tools). Not a runner and not a suite — there is no E2E runner installed, and **jsdom performs no layout**, which is why the four `tests/unit/design/` height chains are SOURCE SCANS and why anything geometric has to be read off a real browser. Five rules, all of which exist because their failure mode is a plausible number rather than an error.
+  - ⛔ **EVERY BOX MEASURES `0×0` UNTIL YOU COMPLETE THE SUSPENSE BOUNDARY BY HAND, AND NOTHING TELLS YOU SO.** React 19 streams suspended content into a `<div hidden id="S:0">` near the end of the document and reveals it with an inline `$RC`, whose reveal path is **`requestAnimationFrame`-gated** — the shipped tail is `$RT?requestAnimationFrame($RV.bind(null,$RB)):(a=performance.now(),setTimeout(…))`. **A CDP-driven tab is `document.hidden`, so rAF never fires.** The document reaches `readyState: "complete"` with the whole page still parked in the hidden div. There is no error, no console warning, and `querySelector` still returns every element you ask for — so the probe reads `0×0` for the element, its row, its panel and every ancestor up to `<body>`, which looks like a **layout collapse rather than a harness failure**. ⚠ Not specific to `/`: any route with a `Suspense` boundary streams the same way, so the tell is `document.querySelectorAll('div[hidden][id^="S:"]').length > 0`, not the route.
+  - ⇒ **The remedy is to perform `$RC`'s own DOM operation.** For each `div[hidden][id^="S:"]`, find its `template#B:<n>`, walk back to the pending `<!--$?-->` marker, walk forward to the matching `<!--/$-->` honouring nesting, delete the range between them, insert the streamed children in order, then flip the marker to `<!--$-->`. Real markup, real stylesheet, real fonts — only the reveal is hand-driven, so this is not a hand-mapped probe reproducing your own assumption. ⛔ **Prove it worked before trusting any number:** assert the count of boundaries revealed, assert `stillHidden === 0`, and assert a **non-zero box on the element you came to measure**. A measurement taken on an un-revealed document is silently a measurement of nothing.
+  - ⚠ **Pin the frame IN-PAGE, never the OS window.** Load the route into a same-origin `iframe` carrying inline `position:fixed; width:1440px; max-width:none; min-width:0`, and **`throw` unless `contentWindow.innerWidth === 1440`**. Once a CDP metrics override is in play — taking a screenshot installs one — resizing the window no longer moves `innerWidth`, so the window is precisely the thing that can lie about the width you believe you measured. The throw is the control; a width copied into a report is not.
+  - ⚠ **`await document.fonts.ready` and confirm `document.fonts.status === "loaded"`** (plus `fonts.check('12px Geist')` for the face in question) **before reading a baseline.** Font metrics decide where the baseline sits inside a line box; a baseline measured against a fallback face is a fiction shaped exactly like a number.
+  - ⚠ **Kill animation and transition before measuring** — inject `*,*::before,*::after{animation:none !important;transition:none !important}` — because the same hidden-tab freeze that stops rAF leaves an unfinished reveal parked at its START transform instead of its settled position.
+  - ⚠ **Assert build identity in the SAME call as the geometry** — `fetch('/api/health')` from inside the measured frame and throw unless `canary` is the SHA you meant. The alias serves the previous build until the new one is Ready, so one trusting read returns a healthy response describing the old tree.
+  - ⛔⛔ **`getComputedStyle` RETURNS A LIVE DECLARATION — SNAPSHOT EVERY VALUE TO A STRING AT THE INSTANT IT IS VALID.** It is not a copy taken at call time: the object re-resolves on every property read. So `const cs = getComputedStyle(el); el.focus(); …; el.blur(); return cs.boxShadow` returns the BLURRED value, and the state you went to measure is gone by the time you read it. ⚠ **The failure mode is a fabricated defect, not a missing number.** Measured at BLOCK-4: a focus ring that renders correctly reported `boxShadow: "none"` this way, on an element whose `:focus-visible` had already been captured as `true` — a combination that reads as "the selector matches but the rule does not apply", i.e. exactly like a real CSS bug, and it was one edit away from being written up as an accessibility regression. Applies to every state-dependent read: `:hover`, `:focus-visible`, `:active`, `aria-expanded`, anything a class toggles.
+  - ⚠ **AND THE COMPOSED `box-shadow` SHORTHAND UNDER-REPORTS TAILWIND v4's RING CHAIN — READ `--tw-shadow`, OR READ THE PAINT.** Tailwind v4 builds `box-shadow` from five `var()` layers backed by `@property`-registered customs. Chrome's computed `box-shadow` for the shipped inset ring prints `rgba(0, 0, 0, 0) 0px 0px 0px 0px inset` — the `inset` keyword survives, the spread and colour do not — while `--tw-shadow` on the same element correctly holds `inset 0 0 0 2px #747474` and the ring is visibly drawn. **The paint is the arbiter**: capture a zoom of the element in the state in question and look at it, rather than trusting either string.
+  - *Minted at TIME-1 · Form B, where the first probe returned `0×0` for every element on Discovery and the cause was three layers down in React's shipped reveal script. Sub-bullets 3–6 are standing practice the same run used; they are recorded here because they are the same class — each turns a silent wrong answer into a thrown one. **The last two are BLOCK-4's and are the same class again, one layer up: there the harness lied about geometry, here the style API lies about state.***
 - **Integration** (real test Postgres): any service-layer function that writes. Mandatory scenarios as the ENGINE lands — bet atomicity, Dharma reconciliation, side-freeze on comment, payout math, append-only enforcement.
 - **Scale** (opt-in, real test Postgres): `tests/scale/` is the correctness-at-scale battery (collision storms, hot-row contention, determinism under load — ENGINE.10 Q-2). It runs **only** via `pnpm test:scale` with its own `vitest.scale.config.ts`; the default config **excludes `tests/scale/**`** (`vitest.config.ts`), so a bare `vitest run` — local or CI — never picks it up.
 - **Operational runners** (opt-in, the LIVE staging database): `tests/staging/` holds non-test operational artifacts that borrow the Vitest harness for module resolution — ADR-0036. **THREE runners are on disk, not one:**

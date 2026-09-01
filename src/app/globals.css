@@ -177,7 +177,16 @@
 	--border-hero: 1px solid var(--color-n3); /* rung 2 — FOUNDER-RULED, PD-2-07 */
 	--ring-active: 1.5px solid var(--color-n4); /* rung 3 — ruling OPEN, PD-2-08 */
 	--imgmax: 160px; /* tunable — comment-image max (consumed by DEBATE.4) */
-	--imgr: 6px; /* image corner radius — ratified (values-log §3 item 2: images, avatars, media, graph panels) */
+	/* ⚠ "avatars" WAS STRUCK FROM THIS SCOPE at PFP-UI-1 (2026-08-26). The avatar
+	 * is a circle at all eight mounts and its edge is `--avatar-ring`, not a
+	 * radius — the token was scoped to avatars while the avatar was an abstract
+	 * empty square, and the art delivered on 2026-08-25 is a disc with padding.
+	 * ⛔ THE VALUE IS UNCHANGED AND MUST STAY SO: 19 of this token's 21 consumers
+	 * are not avatars (market thumbs, comment images, media panels, composer
+	 * wells), so editing it would re-radius every image in the product. This line
+	 * reads like a token definition, which is exactly why the claim buried in its
+	 * comment was the one most likely to be missed. */
+	--imgr: 6px; /* image corner radius — ratified (values-log §3 item 2: images, media, graph panels) */
 	/* Applied surfaces */
 	--surface-page: var(--color-ground);
 	--surface-inset: var(--color-n1);
@@ -231,5 +240,63 @@
 	}
 	html {
 		@apply font-sans;
+	}
+}
+
+/*
+ * The market price chart's terminal pulse — design-canon §10 `C-CHART-2`
+ * clause 7. An `Open` market's line ends breathe; every other state is a
+ * static dot.
+ *
+ * ⛔ THE VALUES ARE NOT MINTED HERE. 1.4s, ease-in-out, opacity 1 → 0.2 are the
+ * project's ratified live-indicator values, from the radio "On Air" dot:
+ * `docs/design/mockups/DESIGN_W2_4-5-14_global-header_mockup-v0_2.html:72-73`
+ * (`animation:pulse 1.4s ease-in-out infinite` over
+ * `@keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}`), ratified at that
+ * mockup's CLOSE-OUT `:63-67`. Reused so the product's live indicators breathe
+ * at one rate rather than at two rates nobody chose.
+ * ⚠ The CHART-2 brief cited these to canon §5; §5 does not carry them. Clause 7
+ * records the corrected provenance — the values were right, the pointer was not.
+ *
+ * ⛔ CSS ONLY — no JavaScript, no SMIL, no client component. `C-CHART-2` clause
+ * 6 forbids this chart shipping a runtime, and clause 7 says that is not
+ * relaxed by animating something: a decoration that costs a client bundle is
+ * exactly what clause 6 exists to prevent. This costs zero bytes of JS.
+ *
+ * ⚠ `transform-box: fill-box` IS LOAD-BEARING ON AN SVG CIRCLE. Without it the
+ * transform origin is the SVG's user-space origin, not the circle's centre, so
+ * `scale()` would slide the ring away from its dot instead of growing out of
+ * it. With it, `transform-origin: center` means the circle's own centre.
+ */
+@keyframes chart-terminal-pulse {
+	0%,
+	100% {
+		opacity: 1;
+		transform: scale(1);
+	}
+	50% {
+		opacity: 0.2;
+		transform: scale(2.4);
+	}
+}
+
+.chart-terminal-pulse {
+	transform-box: fill-box;
+	transform-origin: center;
+	animation: chart-terminal-pulse 1.4s ease-in-out infinite;
+}
+
+/*
+ * ⛔ THE PULSE FREEZES; THE DOT REMAINS. `C-CHART-2` clause 7, and the
+ * distinction is the whole rule: `animation: none` leaves this ring rendered at
+ * its own static `fill-opacity`, coincident with the solid dot beneath it, so
+ * the line still ends in a visible marker. Hiding it instead would delete the
+ * terminal marker for precisely the readers least able to lose it — and take
+ * the label's visual anchor with it. The radio rule this borrows from freezes
+ * to a static pattern rather than to nothing, for the same reason.
+ */
+@media (prefers-reduced-motion: reduce) {
+	.chart-terminal-pulse {
+		animation: none;
 	}
 }

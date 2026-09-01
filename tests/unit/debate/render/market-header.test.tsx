@@ -40,9 +40,12 @@ import type { DebateMarketHeader } from "@/components/debate/types";
 
 afterEach(cleanup);
 
+// ⚠ BLOCK-1 — `slug` must be one of the eight known live markets or
+// `ResolverCards` throws (G1). This file doesn't test ResolverCards'
+// content, so the specific slug doesn't matter beyond being valid.
 const market = (postCount: number, replyCount: number): DebateMarketHeader => ({
 	id: "0190c0de-2222-7000-8000-000000000002",
-	slug: "attrs-strip-market",
+	slug: "bitcoin-price-50k",
 	title: "Attrs Strip Market Question",
 	description: "Resolution criterion text.",
 	status: "Open",
@@ -229,7 +232,14 @@ describe("RESO-1 — R-3, the meta line and the actions are one row", () => {
 			// ⛔ TOKEN MATCH, NOT SUBSTRING. This read
 			// `c.includes("flex") && !c.includes("flex-col")`, and `flex-1` CONTAINS
 			// `flex` — so any `flex-1` ancestor with `display:block` was returned as
-			// "the row" (@test-writer). `ResolverCards`' own row carries `flex-1`.
+			// "the row" (@test-writer).
+			// ⚠ THE EXAMPLE THIS COMMENT CITED IS GONE AND THE DEFECT IS NOT. It
+			// named `ResolverCards`' own row as the `flex-1` that tripped it;
+			// BLOCK-4 §2 made that row content-sized, so the row no longer carries
+			// `flex-1` — but `headzone-stack` and `headzone-left` still do, one and
+			// two levels up from every element this helper walks past. The token
+			// match is what keeps them from being mistaken for a row; the example
+			// was only ever an illustration of it.
 			const t = (n.getAttribute("class") ?? "").split(/\s+/);
 			if (t.includes("flex") && !t.includes("flex-col")) return n;
 			n = n.parentElement;
@@ -383,7 +393,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 4, the chart moves to the rail", 
 		const { container } = render(
 			<MarketHeader
 				market={market(3, 5)}
-				priceChart={{ series: CHART_SERIES, nodes: [] }}
+				priceChart={{ series: CHART_SERIES }}
 			/>,
 		);
 
@@ -432,7 +442,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 4, the chart moves to the rail", 
 	it("market-header::an-EMPTY-series-drops-the-rail-too", () => {
 		// ⛔⛔ THE SHAPE PRODUCTION ACTUALLY PRODUCES, AND THE ONE THE FIRST VERSION
 		// OF THIS GUARD MISSED. `priceChart` is NOT null on a market with no price
-		// history — the read model returns `{ series: [], nodes: [] }`, which is
+		// history — the read model returns `{ series: [] }`, which is
 		// TRUTHY — and `MarketPriceChartHost` returns null for an empty series one
 		// level down. So a rail gated on `priceChart != null` renders an EMPTY
 		// 340×188 column, which is `PD-3-09` verbatim.
@@ -442,10 +452,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 4, the chart moves to the rail", 
 		// test above was green the whole time. A control that does not exercise the
 		// failing condition IN ITS FAILING SHAPE is not a control (OVN-V3).
 		const { container } = render(
-			<MarketHeader
-				market={market(3, 5)}
-				priceChart={{ series: [], nodes: [] }}
-			/>,
+			<MarketHeader market={market(3, 5)} priceChart={{ series: [] }} />,
 		);
 		expect(
 			container.querySelector('[data-testid="headzone-right"]'),
@@ -472,12 +479,11 @@ describe("HTML-FINISH · MARKET DETAIL — row 4, the chart moves to the rail", 
 		// arms agree — but the assertion no longer depends on my having checked.
 		const shapes: Array<{
 			series: PricePointFixture[];
-			nodes: never[];
 		} | null> = [
 			null,
-			{ series: [], nodes: [] },
-			{ series: [CHART_SERIES[0]], nodes: [] },
-			{ series: CHART_SERIES, nodes: [] },
+			{ series: [] },
+			{ series: [CHART_SERIES[0]] },
+			{ series: CHART_SERIES },
 		];
 		for (const priceChart of shapes) {
 			cleanup();
@@ -511,7 +517,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 4, the chart moves to the rail", 
 		const { container } = render(
 			<MarketHeader
 				market={market(3, 5)}
-				priceChart={{ series: CHART_SERIES, nodes: [] }}
+				priceChart={{ series: CHART_SERIES }}
 			/>,
 		);
 		const right = container.querySelector('[data-testid="headzone-right"]');
@@ -549,7 +555,7 @@ describe("RESO-1 — R-4, the price bar sits above the block row", () => {
 		const { container } = render(
 			<MarketHeader
 				market={market(3, 5)}
-				priceChart={{ series: CHART_SERIES, nodes: [] }}
+				priceChart={{ series: CHART_SERIES }}
 			/>,
 		);
 
@@ -568,7 +574,7 @@ describe("RESO-1 — R-4, the price bar sits above the block row", () => {
 		const { container } = render(
 			<MarketHeader
 				market={market(3, 5)}
-				priceChart={{ series: CHART_SERIES, nodes: [] }}
+				priceChart={{ series: CHART_SERIES }}
 			/>,
 		);
 		// `PriceBar`'s root carries `data-size`; `detail` is its market-detail
@@ -584,7 +590,7 @@ describe("RESO-1 — R-4, the price bar sits above the block row", () => {
 		const { container } = render(
 			<MarketHeader
 				market={market(3, 5)}
-				priceChart={{ series: CHART_SERIES, nodes: [] }}
+				priceChart={{ series: CHART_SERIES }}
 			/>,
 		);
 		const left = container.querySelector('[data-testid="headzone-left"]');
@@ -669,7 +675,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 8, the clickable percent labels",
 		return render(
 			<MarketHeader
 				market={market(3, 5)}
-				priceChart={{ series: CHART_SERIES, nodes: [] }}
+				priceChart={{ series: CHART_SERIES }}
 				pick={{ ...state, onPick }}
 			/>,
 		);
@@ -786,7 +792,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 8, the clickable percent labels",
 		const { container } = render(
 			<MarketHeader
 				market={market(3, 5)}
-				priceChart={{ series: CHART_SERIES, nodes: [] }}
+				priceChart={{ series: CHART_SERIES }}
 			/>,
 		);
 		expect(
@@ -799,5 +805,175 @@ describe("HTML-FINISH · MARKET DETAIL — row 8, the clickable percent labels",
 		// every `pick` case above non-vacuous.
 		const left = container.querySelector('[data-testid="headzone-left"]');
 		expect(left?.innerHTML).toContain("YES 50%");
+	});
+});
+
+/**
+ * CHART-2 · `C-CHART-2` clause 1 — THE PULSE IS GATED ON THIS MARKET'S OWN
+ * STATUS, and this is the file where that can be proven.
+ *
+ * ⛔ WHAT `terminal-pulse.test.tsx` CANNOT SEE, AND WHY THAT GAP HAS A NAME
+ * HERE ALREADY. That file renders `MarketPriceChart` with `isOpen` held still
+ * by the test, which proves the COMPONENT honours the flag. It cannot prove
+ * that this page HANDS IT THE RIGHT ONE — the identical distinction
+ * `tests/server/discovery/live-tail-wiring.test.ts` was written to close for
+ * `withLiveTail`'s own `isOpen`, whose docblock says it plainly: `/m/[slug]` is
+ * "the ONLY call site where that branch is reachable, so nothing else in the
+ * repository would notice." CHART-2 adds a SECOND `isOpen`, at a DIFFERENT call
+ * site, with the same reachability and — until this block — no equivalent pin.
+ *
+ * ⛔ MEASURED, NOT ASSUMED: replacing `isOpen={market.status === "Open"}` with
+ * `isOpen={true}` in `MarketHeader.tsx` left the whole of `tests/unit` GREEN at
+ * 2296/2296 against the tree at `e152dec`. That build pulses the terminal dots
+ * of every `Closed`, `Resolving`, `Resolved` and `Voided` market — a rendered
+ * claim that a terminated market is live, on the surface where stake is
+ * committed (**INV-4**).
+ *
+ * ⚠ BEHAVIOURAL, NOT A SOURCE SCAN, because it can be: the fixture already
+ * carries a `status` and the chart already renders under it, so the wrong
+ * wiring is reachable by rendering rather than by reading. A source scan would
+ * pin the expression; this pins the CONSEQUENCE, and survives a refactor that
+ * keeps the behaviour.
+ *
+ * ⚠ Queries are targeted, per this file's own standing note — no
+ * `container.innerHTML` pin, so the block cannot become a tripwire for an
+ * unrelated change to the rail.
+ */
+describe("CHART-2 — the terminal pulse is gated on market.status (INV-4)", () => {
+	const FROZEN = ["Closed", "Resolving", "Resolved", "Voided"] as const;
+
+	function renderWithStatus(status: DebateMarketHeader["status"]) {
+		return render(
+			<MarketHeader
+				market={{ ...market(3, 5), status }}
+				priceChart={{ series: CHART_SERIES }}
+			/>,
+		);
+	}
+
+	it("market-header::an-Open-market-pulses", () => {
+		// The positive control for every absence below, and a real requirement:
+		// without it, a header that rendered no chart at all would satisfy the
+		// whole of the rest of this block.
+		const { container } = renderWithStatus("Open");
+		expect(
+			container.querySelector('[data-testid="terminal-pulse-yes"]'),
+		).not.toBeNull();
+		expect(
+			container.querySelector('[data-testid="terminal-pulse-no"]'),
+		).not.toBeNull();
+	});
+
+	for (const status of FROZEN) {
+		it(`market-header::a-${status}-market-does-NOT-pulse`, () => {
+			const { container } = renderWithStatus(status);
+
+			// GUARD IS ALIVE — the chart is present and drawing, so the two nulls
+			// below read as "no pulse" and not as "no chart".
+			expect(
+				container.querySelector('[data-testid="market-price-chart"]'),
+			).not.toBeNull();
+			expect(
+				container.querySelector('[data-testid="line-yes"]'),
+			).not.toBeNull();
+
+			expect(
+				container.querySelector('[data-testid="terminal-pulse-yes"]'),
+			).toBeNull();
+			expect(
+				container.querySelector('[data-testid="terminal-pulse-no"]'),
+			).toBeNull();
+
+			// …and the DOT survives the freeze — clause 1's second half. Gating the
+			// whole marker subtree on `isOpen` would satisfy every assertion above
+			// and delete the line's terminal mark, taking the HTML label's anchor
+			// with it.
+			expect(
+				container.querySelector('[data-testid="terminal-dot-yes"]'),
+			).not.toBeNull();
+			expect(
+				container.querySelector('[data-testid="terminal-dot-no"]'),
+			).not.toBeNull();
+			expect(
+				container.querySelector('[data-testid="terminal-label-yes"]'),
+			).not.toBeNull();
+		});
+	}
+});
+
+/**
+ * BLOCK-4 §3 — EVEN VERTICAL RHYTHM IN THE HEADER STACK.
+ *
+ * The brief names three stacked elements that read cramped — A the stats line,
+ * B the YES/NO bar, C the resolution block row — and rules the gaps A→B and
+ * B→C equal, on the existing spacing scale. Measured before the change on the
+ * deployed BLOCK-3 build at `7155cf1`, 1440×900: **A→B 5px, B→C 21px**. After:
+ * 20px and 20px.
+ *
+ * ⚠⚠ THE UNEVENNESS WAS INVISIBLE FROM EITHER FILE ALONE, WHICH IS WHY THIS
+ * GUARD READS BOTH HALVES. `headzone-stack` declared ONE gap for all three
+ * gaps (`gap-[5px]`) and looked perfectly even; `ResolverCards` separately
+ * carried `mt-4`, which added 16px to the last gap only. Neither file was
+ * wrong on its own terms and the composition was 5/5/21. A guard that pinned
+ * only the stack's gap would have gone green throughout.
+ *
+ * ⚠ WHY CLASSES AND NOT PIXELS. jsdom performs no layout — it resolves no
+ * `dvh`, no flex, no gap — so a computed-style or `getBoundingClientRect`
+ * assertion here would read zeros and prove nothing (AGENTS.md §9). The
+ * STRUCTURAL property that produces an even rhythm is checkable: exactly one
+ * gap utility on the shared parent, and no vertical margin on any of the three
+ * children to add to it behind the parent's back. The rendered pixel values are
+ * browser-measured and reported in BLOCK-4's run log.
+ */
+describe("BLOCK-4 §3 — the header stack's three gaps are equal", () => {
+	const stackOf = (container: HTMLElement) =>
+		container.querySelector('[data-testid="headzone-stack"]');
+
+	it("market-header::G-B4-the-stack-declares-ONE-gap-and-it-is-on-the-scale", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+		const tokens = (stackOf(container)?.getAttribute("class") ?? "").split(
+			/\s+/,
+		);
+		expect(tokens).toContain("flex-col");
+
+		// ⛔ EXACTLY ONE gap utility, and no responsive variant of one. A second
+		// (`sm:gap-2`, `gap-y-1`) would make the rhythm depend on the viewport,
+		// which is the thing §3 rules out.
+		const gaps = tokens.filter((t) => /(^|:)gap(-[xy])?-/.test(t));
+		expect(gaps).toEqual(["gap-5"]);
+
+		// ⛔⛔ ON THE SCALE, NOT AN ARBITRARY VALUE. `gap-[5px]` is what shipped
+		// through RESO-1→BLOCK-3 and it belonged to no scale at all; `gap-5` is
+		// 20px, the same value `HeadZone`'s band already uses (d5's
+		// `.headzone{gap:20px}`). A bracket value returning here would re-open
+		// exactly the "kept because nobody ruled it" drift §3 closes.
+		expect(gaps[0]).not.toMatch(/\[/);
+	});
+
+	it("market-header::G-B4-no-child-adds-a-vertical-margin-behind-the-gap", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+		const stack = stackOf(container);
+		const kids = Array.from(stack?.children ?? []);
+
+		// ⛔ NON-VACUITY — the loop below asserts only absences, so an empty or
+		// restructured stack would satisfy it completely. The stack is
+		// `h1 · statsRow · priceBar · blockRow`.
+		expect(kids.length).toBe(4);
+		expect(kids[0]?.tagName).toBe("H1");
+		expect(container.querySelector('[data-testid="resolver-cards"]')).toBe(
+			kids[3],
+		);
+
+		for (const kid of kids) {
+			for (const t of (kid.getAttribute("class") ?? "").split(/\s+/)) {
+				// Any margin on ANY axis that could resolve vertically — `m-*`,
+				// `my-*`, `mt-*`, `mb-*`, and their negative forms.
+				expect(t).not.toMatch(/^-?m([tby])?-/);
+			}
+		}
 	});
 });

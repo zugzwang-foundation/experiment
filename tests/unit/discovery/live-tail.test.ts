@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { type PricePoint, withLiveTail } from "@/server/discovery/price-series";
 
-// CHART-1 — the chart's live right edge on a floored history (SPEC.1 1.0.40 §9,
+// CHART-1 — the chart's live right edge on a floored history (SPEC.1 1.0.45 §9,
 // *X domain* and *Refresh — floored history, live edge*; founder-ruled).
 //
 // SPEC.1 §17 rows proved here:

@@ -72,3 +72,9 @@ test-db:
 # local Postgres (:54322); excluded from the default `vitest run` / test-db.
 test-scale:
     pnpm test:scale
+
+# HO-T4 — measure per-route frontend bundle size against the LAST `next build`
+# output. Never builds itself (a multi-minute step has no place behind a
+# named recipe someone runs repeatedly) — run `just build` first.
+bundle-report:
+    pnpm tsx scripts/measure-frontend-bundle.ts

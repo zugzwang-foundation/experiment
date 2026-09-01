@@ -1,14 +1,18 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
-
 import type { ProfileArgumentItem } from "@/server/profile/arguments";
 import type { ProfilePositionsPayload } from "@/server/profile/owner-view";
 import type { ProfileUser } from "@/server/profile/resolve";
 
 import { ArgumentList } from "./ArgumentList";
-import { PositionsTable } from "./PositionsTable";
 import { initialProfileSelection, type ProfileSelection } from "./selection";
+
+const PositionsTable = dynamic(
+	() => import("./PositionsTable").then((mod) => mod.PositionsTable),
+	{ ssr: true },
+);
 
 /**
  * ROUND 4 item 7 — THE ARENA'S TWO PANELS, SHARING ONE SELECTION.

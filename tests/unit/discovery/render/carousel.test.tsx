@@ -97,6 +97,7 @@ function views(n: number): DiscoveryMarketView[] {
 		const ordinal = i + 1;
 		const first = i === 0;
 		return {
+			isOpen: true,
 			card: {
 				id: `0190b3a0-9999-7000-8000-${String(ordinal).padStart(12, "0")}`,
 				slug: `fixture-market-${ordinal}`,
@@ -218,11 +219,39 @@ describe("UI.A4 §5 — DiscoveryCarousel (canon §5 motion)", () => {
 		expectActive(0);
 	});
 
+	/** A key pressed INSIDE the carousel.
+	 *
+	 *  ⛔ CS14 §1 — IT NOW FOCUSES THE CONTROL FIRST, AND THAT IS THE WHOLE
+	 *  RE-POINT. CS13 scoped by the event's bubble path, so dispatching on a
+	 *  descendant was enough. CS14 scopes by `document.activeElement`, because
+	 *  the bubble path cannot separate the hero from the grid that shares it.
+	 *  `fireEvent` does NOT move focus, so a press dispatched without this
+	 *  `focus()` would be read as "nothing has claimed focus" — which is a real
+	 *  and DIFFERENT branch (the cold-load entry gesture below), not this one.
+	 *  Focusing makes the helper mean what its name says. */
+	function keyInside(key: string) {
+		const control = screen.getByLabelText("Next market");
+		control.focus();
+		fireEvent.keyDown(control, { key });
+	}
+
+	/** A key pressed with focus on a real element OUTSIDE the carousel proper. */
+	function keyFocusedOn(el: HTMLElement, key: string) {
+		el.focus();
+		fireEvent.keyDown(el, { key });
+	}
+
 	it("render::arrow-keys-advance-and-reset", () => {
 		// POLISH.2 V37 — design-canon §5 Discovery: "`‹ ›` / Left-Right advance
 		// immediately and RESET the timer". The build had no keyboard handler at
 		// all. This is canon, not an a11y-deferred item, so it does not wait on
 		// R16. The mockup binds the same two keys at :477-479.
+		//
+		// ⛔⛔ RE-POINTED AT UI-QUICK CS13 §5 — the keys are now SCOPED TO THE
+		// CAROUSEL rather than bound to the document, so every press below is
+		// dispatched from inside it. The BEHAVIOUR asserted — advance, reset,
+		// wrap — is unchanged and every original assertion is still here; only
+		// the origin of the event moved, which is precisely what §5 changed.
 		render(<DiscoveryCarousel markets={views(3)} />);
 		expectActive(0);
 
@@ -230,7 +259,7 @@ describe("UI.A4 §5 — DiscoveryCarousel (canon §5 motion)", () => {
 		act(() => {
 			vi.advanceTimersByTime(7_000);
 		});
-		fireEvent.keyDown(document, { key: "ArrowRight" });
+		keyInside("ArrowRight");
 		expectActive(1);
 
 		// …and RESETS, exactly as the arrows do: the discarded countdown would
@@ -245,34 +274,349 @@ describe("UI.A4 §5 — DiscoveryCarousel (canon §5 motion)", () => {
 		expectActive(2);
 
 		// ArrowLeft steps back and wraps 0 → 2.
-		fireEvent.keyDown(document, { key: "ArrowLeft" });
+		keyInside("ArrowLeft");
 		expectActive(1);
-		fireEvent.keyDown(document, { key: "ArrowLeft" });
+		keyInside("ArrowLeft");
 		expectActive(0);
-		fireEvent.keyDown(document, { key: "ArrowLeft" });
+		keyInside("ArrowLeft");
 		expectActive(2);
+	});
+
+	it("render::cs13-ArrowUp-and-ArrowDown-join-Left-and-Right", () => {
+		// ⛔ CS13 §5 — Up/Left step BACK, Down/Right step FORWARD. All four are
+		// asserted against the SAME carousel so a handler that answered one pair
+		// and dropped the other cannot pass.
+		render(<DiscoveryCarousel markets={views(3)} />);
+		expectActive(0);
+
+		keyInside("ArrowDown");
+		expectActive(1);
+		keyInside("ArrowDown");
+		expectActive(2);
+		// …and Down wraps forward, exactly as Right does.
+		keyInside("ArrowDown");
+		expectActive(0);
+
+		// Up steps back and wraps 0 → 2, exactly as Left does.
+		keyInside("ArrowUp");
+		expectActive(2);
+		keyInside("ArrowUp");
+		expectActive(1);
+
+		// ⛔ AND THE PAIRS AGREE. Up must land where Left lands, Down where Right
+		// lands — asserted rather than assumed, because a transposed sign here
+		// would be invisible in any single-key test above.
+		keyInside("ArrowUp");
+		expectActive(0);
+		keyInside("ArrowLeft");
+		expectActive(2);
+		keyInside("ArrowDown");
+		expectActive(0);
+		keyInside("ArrowRight");
+		expectActive(1);
+	});
+
+	it("render::cs13-NO-arrow-key-is-answered-from-OUTSIDE-the-carousel", () => {
+		// ⛔⛔ CS13 §5, AND THIS IS THE ASSERTION THE SCOPING EXISTS FOR. Before
+		// this change the handler was on the DOCUMENT, so it answered arrow keys
+		// pressed anywhere on the page: it rotated the hero out from under a
+		// viewer arrowing through the market grid, and its `preventDefault`
+		// suppressed the page's own scroll on every arrow press on the surface.
+		//
+		// ⚠ ALL FOUR KEYS ARE CHECKED, not just the original two. A scope that
+		// leaked would most likely leak uniformly, but the two NEW keys are the
+		// ones with no prior coverage at all, and an outside-leak is exactly the
+		// defect a fresh binding introduces.
+		//
+		// ⛔ CS14 §1 RE-POINT — THE OUTSIDE ELEMENT IS NOW FOCUSED, and the
+		// document sub-case MOVED rather than being dropped. Scope is now
+		// `document.activeElement`, so an UNFOCUSED outside button leaves focus
+		// on `<body>` — which CS14 deliberately makes a rotating state for the
+		// HORIZONTAL pair (the cold-load entry gesture, asserted in its own test
+		// below). A press on an unfocused element therefore no longer tests
+		// "outside" at all; it tests the entry gesture by accident. Focusing is
+		// what restores this test's subject. The old document lines asserted the
+		// document binding was REMOVED — no longer true as stated (it is
+		// conditional now, not absent), so they are re-pointed to the claim that
+		// survives: with focus genuinely parked outside, a document-level press
+		// answers nothing.
+		render(<DiscoveryCarousel markets={views(3)} />);
+		const outside = document.createElement("button");
+		document.body.appendChild(outside);
+
+		for (const key of ["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"]) {
+			keyFocusedOn(outside, key);
+			expectActive(0);
+		}
+		// Focus stays on the outside button; the press itself originates at the
+		// document. Still nothing — the origin never mattered, the focus does.
+		for (const key of ["ArrowRight", "ArrowDown"]) {
+			outside.focus();
+			fireEvent.keyDown(document, { key });
+			expectActive(0);
+		}
+		outside.remove();
+
+		// ⛔ AND THE POSITIVE CONTROL, in the same test. Without it, a carousel
+		// that answered NOTHING — the failure mode a broken scope actually
+		// produces — would pass every assertion above.
+		keyInside("ArrowRight");
+		expectActive(1);
+	});
+
+	it("render::cs14-a-focused-GRID-CARD-rotates-nothing", () => {
+		// ⛔⛔ CS14 §1 — THE ROW THIS ITEM EXISTS FOR, and it is a genuine
+		// behaviour CHANGE rather than a preserved property. `DiscoveryGrid`
+		// renders INSIDE `<section data-testid="discovery-carousel">`, so under
+		// CS13's bubble-path scope a focused grid card WAS inside the carousel
+		// and did rotate the hero. Measured on staging at `0f04272` BEFORE this
+		// change, real ArrowRight with a card focused:
+		//     "Claude · Will an official " → "Bitcoin · Will BTC ever go"
+		// The founder ruled a grid card must rotate nothing. All four keys, on
+		// every card, because a boundary that leaks tends to leak per-axis.
+		render(<DiscoveryCarousel markets={views(3)} />);
+		for (const card of screen.getAllByTestId("market-card")) {
+			for (const key of ["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"]) {
+				keyFocusedOn(card, key);
+				expectActive(0);
+			}
+		}
+		// The positive control: the SAME keypress from inside the carousel does
+		// rotate, so the assertions above are discriminating rather than inert.
+		keyInside("ArrowRight");
+		expectActive(1);
+	});
+
+	it("render::cs14-cold-load-LEFT-RIGHT-answer-but-UP-DOWN-never-do", () => {
+		// ⛔⛔ CS14 §1 — THE ENTRY GESTURE AND THE SCROLL-KEY WALL, TOGETHER.
+		// They are asserted in ONE test on purpose: they are two halves of a
+		// single deliberate asymmetry, and splitting them would let a build that
+		// simply bound all four keys at document level pass the half it happens
+		// to satisfy.
+		//
+		// On a cold page load nothing has claimed focus — `activeElement` is
+		// `<body>`. Left/Right must answer from there, so the arrows work without
+		// the viewer first having to find and click a control.
+		render(<DiscoveryCarousel markets={views(3)} />);
+		expect(document.activeElement).toBe(document.body);
+
+		// ⚠ EACH PRESS IS PRECEDED BY A BLUR BACK TO `<body>`, and that is a
+		// CS14 §2 consequence rather than ceremony: an arrow rotation now hands
+		// focus to the hero market link, so only the FIRST press of a run is
+		// genuinely a cold one. Re-parking focus makes every iteration below test
+		// the cold state it claims to, instead of silently testing the
+		// focus-is-inside branch from the second press onward.
+		const cold = (key: string) => {
+			(document.activeElement as HTMLElement | null)?.blur();
+			expect(document.activeElement).toBe(document.body);
+			fireEvent.keyDown(document.body, { key });
+		};
+
+		cold("ArrowRight");
+		expectActive(1);
+		cold("ArrowLeft");
+		expectActive(0);
+		// …and it wraps backwards from a cold start, exactly as from inside.
+		cold("ArrowLeft");
+		expectActive(2);
+
+		// ⛔⛔ AND UP/DOWN MUST NOT. These are the PAGE'S SCROLL KEYS. A reader
+		// who lands on Discovery and presses Down to scroll must get a scroll,
+		// not a market rotation nothing on screen explains. Asserted from
+		// body-focus, which is the only state in which this could regress.
+		for (const key of ["ArrowDown", "ArrowUp"]) {
+			cold(key);
+			expectActive(2);
+		}
+	});
+
+	it("render::cs14-an-arrow-rotation-hands-focus-to-the-hero-market-link", () => {
+		// ⛔⛔ CS14 §2 — THE FIX FOR "ENTER OPENS THE NEXT SLIDE". Enter was
+		// advancing because after clicking `›` focus sat on that button and Enter
+		// re-activated it — correct button behaviour, with focus in the wrong
+		// place. Rotation now hands focus to the hero market panel, which is a
+		// real <Link>, so Enter opens THAT market with no Enter handler anywhere.
+		render(<DiscoveryCarousel markets={views(3)} />);
+		const heroLink = screen.getByTestId("hero-market-link");
+
+		// From the `›` button — the exact case the founder reported.
+		keyInside("ArrowRight");
+		expectActive(1);
+		expect(document.activeElement).toBe(heroLink);
+		// The link is the SAME node across rotations (React updates its href in
+		// place), and it now points at the market the hero is actually showing —
+		// which is what makes a native Enter open the right one.
+		expect(heroLink.getAttribute("href")).toBe("/m/fixture-market-2");
+
+		// From a cold page — the entry gesture must land focus in the same place,
+		// or the first Enter after it would still go somewhere unpredictable.
+		(document.activeElement as HTMLElement).blur();
+		fireEvent.keyDown(document.body, { key: "ArrowRight" });
+		expectActive(2);
+		expect(document.activeElement).toBe(heroLink);
+		expect(heroLink.getAttribute("href")).toBe("/m/fixture-market-3");
+
+		// ⛔ AND THE `‹ ›` BUTTONS KEEP THEIR OWN ENTER/SPACE. Neither key is
+		// overridden — pinned by asserting the buttons carry no keyboard handler
+		// of their own and that Enter on `›` still ADVANCES rather than
+		// navigating. A build that "fixed" Enter by intercepting it on the
+		// section would fail here, and would also have made the buttons
+		// keyboard-unusable.
+		const next = screen.getByLabelText("Next market");
+		next.focus();
+		fireEvent.keyDown(next, { key: "Enter" });
+		fireEvent.click(next);
+		expectActive(0);
+	});
+
+	it("render::cs14-the-arrow-buttons-ring-on-KEYBOARD-focus-only", () => {
+		// ⛔⛔ CS14 §3 — A CLASS-STRING CLAIM, ASSERTED AS ONE. jsdom performs no
+		// layout and paints nothing, so this cannot and does not assert that a
+		// ring APPEARS; that half was measured in a browser and reported. What is
+		// pinned here is the thing a future edit would actually break: which
+		// VARIANT gates the indicator, and that there is an indicator at all.
+		//
+		// The founder's report was a bright ring on mouse click. Measured on
+		// staging at `0f04272`, a real mouse click leaves `:focus-visible` FALSE
+		// with `outline-style: none` and `box-shadow: none` — nothing paints on a
+		// click. The ring seen was Chrome's UA `outline: auto`, arriving on the
+		// next keystroke when focus-visible modality flips. These buttons simply
+		// had no focus class, so they fell through to that UA default.
+		render(<DiscoveryCarousel markets={views(3)} />);
+		for (const label of ["Previous market", "Next market"]) {
+			const cls = screen.getByLabelText(label).getAttribute("class") ?? "";
+
+			// 1. THE INDICATOR EXISTS. A11Y.0's ratified floor is visible focus,
+			//    and these may be the only keyboard path through the hero — so
+			//    "no ring" is a floor violation, not a tidier button.
+			expect(cls).toContain("focus-visible:shadow-(--state-focus-ring)");
+
+			// 2. IT IS KEYBOARD-GATED. A bare `focus:` variant would paint on
+			//    mouse clicks, which is the appearance being removed. Matched on
+			//    the token boundary so `focus-visible:` cannot satisfy a search
+			//    for `focus:`.
+			expect(cls).not.toMatch(/(^|\s|:)focus:/);
+
+			// 3. THE UA RING IS SUPPRESSED, which is what makes the token the
+			//    thing that paints rather than a second ring beside Chrome's.
+			expect(cls).toContain("outline-none");
+
+			// 4. NO NEW COLOUR AND NO NEW TOKEN — the ring is the ratified one.
+			//    A hard-coded ring/shadow colour here would be a design-token
+			//    escape (canon: `--state-focus-ring` is the ratified slot).
+			expect(cls).not.toMatch(/shadow-\[/);
+			expect(cls).not.toMatch(/ring-\[/);
+		}
+	});
+
+	it("render::cs14-the-AUTO-ADVANCE-never-steals-focus", () => {
+		// ⛔⛔ CS14 §2 — ONLY ARROW ROTATIONS MOVE FOCUS. The 10s timer must not:
+		// yanking the caret away from a reader on a schedule they did not ask for
+		// is its own defect, and it would also fire while they were tabbing
+		// through the grid below. The timer lives in a separate effect precisely
+		// so it cannot reach the focus move — this is what pins that separation.
+		render(<DiscoveryCarousel markets={views(3)} />);
+		const heroLink = screen.getByTestId("hero-market-link");
+
+		// Nothing focused: a full auto-advance must leave it that way.
+		expect(document.activeElement).toBe(document.body);
+		act(() => {
+			vi.advanceTimersByTime(10_000);
+		});
+		expectActive(1);
+		expect(document.activeElement).toBe(document.body);
+
+		// …and with focus parked on a GRID CARD — a reader reading the tiles —
+		// the hero rotating under them must not pull the caret to the hero.
+		const card = screen.getAllByTestId("market-card")[0];
+		card.focus();
+		act(() => {
+			vi.advanceTimersByTime(10_000);
+		});
+		expectActive(2);
+		expect(document.activeElement).toBe(card);
+		expect(document.activeElement).not.toBe(heroLink);
+	});
+
+	it("render::cs14-preventDefault-ONLY-when-the-carousel-consumes-the-key", () => {
+		// ⛔ CS14 §1 — the scroll suppression must land exactly where a key was
+		// actually consumed and nowhere else. `defaultPrevented` is read off the
+		// dispatched event, so this sees what the browser would see.
+		function press(el: EventTarget, key: string): boolean {
+			const ev = new KeyboardEvent("keydown", {
+				key,
+				bubbles: true,
+				cancelable: true,
+			});
+			el.dispatchEvent(ev);
+			return ev.defaultPrevented;
+		}
+		render(<DiscoveryCarousel markets={views(3)} />);
+		const next = screen.getByLabelText("Next market");
+		const outside = document.createElement("button");
+		document.body.appendChild(outside);
+
+		// CONSUMED — focus inside, BOTH axes.
+		for (const key of ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"]) {
+			next.focus();
+			expect(press(next, key)).toBe(true);
+		}
+		// NOT CONSUMED — focus outside: the page keeps its own scrolling.
+		for (const key of ["ArrowRight", "ArrowDown", "ArrowUp", "ArrowLeft"]) {
+			outside.focus();
+			expect(press(outside, key)).toBe(false);
+		}
+		outside.remove();
+
+		// NOT CONSUMED — the VERTICAL pair from body-focus, the exact case the
+		// scroll-key wall protects.
+		for (const key of ["ArrowDown", "ArrowUp"]) {
+			expect(press(document.body, key)).toBe(false);
+		}
+		// …while the HORIZONTAL pair from body-focus IS consumed — the entry
+		// gesture, and the control proving the loop above discriminates.
+		for (const key of ["ArrowLeft", "ArrowRight"]) {
+			expect(press(document.body, key)).toBe(true);
+		}
 	});
 
 	it("render::arrow-keys-ignored-while-typing-and-when-static", () => {
 		// Two boundaries, both of which would be silent defects.
 		//
 		// 1. A viewer typing in a field must keep their caret. Nothing on `/`
-		//    has an input today, which is exactly why this is pinned now — the
-		//    handler is on the DOCUMENT and the first input added to this
-		//    surface would otherwise inherit a stolen ArrowLeft.
+		//    has an input today, and CS13 §5 narrowed the binding to the
+		//    carousel — but the guard is KEPT rather than dropped, because a
+		//    field placed INSIDE the carousel later would reach the handler and
+		//    a caret moving in it must not also rotate the hero. The input is
+		//    therefore mounted inside the carousel, which is now the only place
+		//    it could do harm.
+		//
+		// ⛔ CS14 §1 RE-POINT — THE INPUT IS NOW FOCUSED. A typing guard is a
+		// claim about where the CARET is, and CS14 reads that off
+		// `document.activeElement`; `fireEvent` alone never moves focus, so the
+		// old form dispatched at an unfocused field and was really testing
+		// body-focus. It passed under CS13 for a reason unrelated to typing, and
+		// would now pass or fail for another one. Focusing makes it test the
+		// thing it is named for — and ALL FOUR keys are checked, since a caret
+		// moves on the vertical pair too.
 		const { unmount } = render(<DiscoveryCarousel markets={views(3)} />);
 		const input = document.createElement("input");
-		document.body.appendChild(input);
-		fireEvent.keyDown(input, { key: "ArrowRight" });
-		expectActive(0);
+		screen.getByTestId("carousel-controls").appendChild(input);
+		for (const key of ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"]) {
+			keyFocusedOn(input, key);
+			expectActive(0);
+		}
 		input.remove();
 		unmount();
 
 		// 2. One market ⇒ static (§22 F-DISC-2). No timer, no arrows, and no
 		//    key handler either — a keypress must not move a single-position
-		//    carousel.
+		//    carousel. ⚠ With n = 1 the `‹ ›` buttons do not render, so the press
+		//    goes to the carousel root; there is no descendant control to use.
 		render(<DiscoveryCarousel markets={views(1)} />);
-		fireEvent.keyDown(document, { key: "ArrowRight" });
+		fireEvent.keyDown(screen.getByTestId("discovery-carousel"), {
+			key: "ArrowRight",
+		});
 		expectActive(0);
 	});
 

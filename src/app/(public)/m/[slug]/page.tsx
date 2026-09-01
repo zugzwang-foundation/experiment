@@ -107,7 +107,7 @@ export default async function MarketPage({
 	// exists so that identity is an explicit assignment at the call site, not
 	// an implicit property of the cache key nobody reading this file can see.
 	// CHART-1 — the price chart's live right edge, composed in the SAME override
-	// block and from the SAME live read, for the same reason (SPEC.1 1.0.40 §9,
+	// block and from the SAME live read, for the same reason (SPEC.1 1.0.45 §9,
 	// "X domain" and "Refresh"). `cachedModel.priceChart.series` is now floored
 	// HISTORY: `getCachedReserveWalk` derives it at most once per
 	// `MARKET_SERIES_MIN_WINDOW_MS` on a key no bet can move. **On an `Open`

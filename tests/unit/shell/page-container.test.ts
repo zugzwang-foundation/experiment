@@ -224,6 +224,14 @@ const GREENFIELD: { file: string; reason: string }[] = [
 		reason:
 			"POLISH.3 D4 / PD-3-11 — the /m/[slug] error boundary, added after c5892bc.",
 	},
+	{
+		file: "src/app/(public)/legal/page.tsx",
+		reason:
+			"ONBOARD-CARD — /legal, minted 2026-08-25 by the SPEC.1 §13 F-AUTH-4 " +
+			"amendment that stops the acceptance screen rendering the two document " +
+			"bodies inline. Takes `reading`, the preset the other document-shaped " +
+			"surfaces already run on; no preset is minted or edited.",
+	},
 ];
 
 const asSet = (s: string) => new Set(s.split(/\s+/).filter(Boolean));

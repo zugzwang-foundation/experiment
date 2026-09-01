@@ -4,7 +4,6 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { MarketPriceChartOverlay } from "@/components/debate/chart/MarketPriceChartOverlay";
-import type { ChartNode } from "@/server/debate-view/price-chart";
 import type { PricePoint } from "@/server/discovery/price-series";
 
 /**
@@ -47,13 +46,11 @@ const SERIES: PricePoint[] = [
 	{ at: "2026-09-18T00:00:00.000Z", yes: "0.730000000000000000" },
 ];
 
-const NODES: ChartNode[] = [];
-
 const noop = () => {};
 
 function renderOverlay() {
 	return render(
-		<MarketPriceChartOverlay series={SERIES} nodes={NODES} onClose={noop} />,
+		<MarketPriceChartOverlay series={SERIES} onClose={noop} isOpen={true} />,
 	);
 }
 

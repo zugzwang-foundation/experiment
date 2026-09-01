@@ -77,8 +77,21 @@ the social network spreads the truth freely.
 
 ### Card 2 · `WELCOME` · You’re {pseudonym}
 
-**Figure:** the viewer's live PFP avatar as a centred hero (`.idhero`), rounded-square at `--imgr`. Matches `.navav`. No decorative illustration.
+**Figure:** the viewer's live PFP avatar as a centred hero (`.idhero`), **a circle carrying `--avatar-ring`**. Matches `.navav` **as built**. No decorative illustration.
 
+> ⚠ **PFP-UI-1, 2026-08-26 — the shape in this line is superseded.** It read
+> *"rounded-square at `--imgr`"*. That was ratified against an avatar nobody had
+> seen: the brand system assigned `--imgr` to avatars while the asset was an
+> abstract empty square (values-log v0_3 `:44`, O6). The art that arrived on
+> 2026-08-25 is a **disc with padding around it**, so framing it as a square
+> renders a median **24.83%** of the tile as cream margin — 4.1× more visible
+> padding than a circular crop. Corrected here, at the site a reader reaches,
+> rather than only in an appendix (O-5). `.navav` is unamended mockup evidence
+> and still says `--imgr`; the mount it describes is a circle in the build.
+
+> ⚠ **SUPERSEDED 2026-08-26 — PFP-1 (`c49138d`) landed live PFPs; see the
+> annotation below this block.**
+>
 > ⚠ **BUILD ANNOTATION — O1-DECK, 2026-08-18.** *Appended, never a rewrite: the
 > note above is ratified and stands exactly as written. This records what the
 > build found, beneath it.*
@@ -107,6 +120,43 @@ the social network spreads the truth freely.
 > Recorded here rather than only in the plan because this note is what a future
 > reader checks the card against, and a figure note that outlives its own
 > falsification is how a register stops being a source of record.
+
+> ⚠ **BUILD ANNOTATION — PFP-UI-1, 2026-08-26. THE BLOCK ABOVE IS FALSE AS OF
+> 2026-08-25, AND IT IS PRESERVED RATHER THAN REWRITTEN.**
+>
+> **There are live PFPs.** PFP-1 (`c49138d`) built the `pfp_filename → URL`
+> path the 2026-08-18 note recorded as deferred. `users.pfp_filename` is now
+> read by `server/debate-view/resolve-authors.ts`, `server/profile/resolve.ts`,
+> both layouts (`(public)/layout.tsx`, `(auth)/layout.tsx`) and
+> `(auth)/onboarding/page.tsx`, and composed into a public R2 URL by
+> `server/identity-pool/pfp-url.ts` — which hard-codes the `v1/` version
+> sentinel at a single site, so an asset re-bake is a one-constant cutover.
+>
+> **`figures.tsx`'s `IdentityHero` — Card 2's figure — is the ONE SURFACE still
+> hard-coding `/pfp-placeholder.svg`, and it is deliberate.** ⚠ Two other
+> `PFP_PLACEHOLDER` references exist and are NOT counter-examples: the
+> `UNKNOWN_AUTHOR` fallbacks in `discovery/hero.ts` and `load-debate-view.ts`
+> are defensive null-guards for a `comments.user_id` with no `users` row
+> (unreachable in practice, and there to stop one missing identity 500-ing a
+> public render), and `pfp-url.ts` itself returns the placeholder for a NULL
+> filename — the scrubbed-row case. A resolver's fallback is not a surface.
+> Card 2 stays on the placeholder because wiring it means giving `CardFigure`
+> viewer data it does not take, creating a second PFP path beside the
+> resolver-owned builder — the very thing D-5 forecloses above. Parked as
+> `PD-PFP-10`; the trigger is *whenever the deck next takes viewer data for any
+> reason*.
+>
+> **Why this is appended and the 2026-08-18 block is untouched.** O-5 requires a
+> durable amendment to reach the reader at the site they arrive at — which is
+> what the **pointer at the head of that block** discharges. It does not require
+> overwriting a DATED OBSERVATION, and rewriting one would make 2026-08-18
+> assert something it did not assert, manufacturing a past that did not happen.
+> That is the same reasoning `CLAUDE.md` §5.13.1 applies to pre-convention
+> commits (a note attaches without altering) and the same reasoning that leaves
+> the `.html` mockups unamended as locked evidence. ⚠ **Appending ALONE would
+> not have been enough** — the 2026-08-18 block is itself styled *"Appended,
+> never a rewrite"*, and that is precisely how its false sentence survived eight
+> days: a reader still met it first. The pointer, not the append, is the fix.
 
 **Title** — `{pseudonym}` is interpolated from the viewer, never hard-coded:
 ```

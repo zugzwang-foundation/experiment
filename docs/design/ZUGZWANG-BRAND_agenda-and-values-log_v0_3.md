@@ -173,7 +173,27 @@ State report — Zugzwang Design System, resolved as of this turn.
 
 ### 2. Resolved base values
 
-Radii: `--radius 0.625rem` (shadcn base) · `--r 8px` (cards, panels, buttons, bars, inputs) · `--imgr 6px` (images, avatars, media, graph panels) · `--r-chip 4px` (card-scoped side chips) · `--r-dot 3px` (carousel active-dot pill).
+Radii: `--radius 0.625rem` (shadcn base) · `--r 8px` (cards, panels, buttons, bars, inputs) · `--imgr 6px` (images, media, graph panels) · `--r-chip 4px` (card-scoped side chips) · `--r-dot 3px` (carousel active-dot pill).
+
+> ⚠ **PFP-UI-1, 2026-08-26 — `--imgr` NO LONGER SCOPES AVATARS. The word
+> "avatars" is struck from that list, and this is the top-level ratification it
+> is struck from, so nothing downstream still has authority for it.**
+>
+> **This ratification was not a mistake — it was made about an object nobody had
+> seen.** §1 of this same log records it: *"avatar art is pipeline-owned, not CD
+> … Empty square in CD is the correct current state. Nothing to fix, nothing to
+> import."* `--imgr` was assigned to a slot that was, at the time, a literal
+> empty square. The art delivered on 2026-08-25 is a **disc with padding around
+> it** — measured across all 1,079 objects — so a 6px-radius square frame
+> renders a median **24.83%** of each tile as cream margin. **The avatar is now
+> a circle at all eight mounts**, and its edge treatment is `--avatar-ring`
+> (below), not a radius.
+>
+> ⛔ **The token itself is UNCHANGED and must stay that way.** `--imgr` has 21
+> consumers across 11 files and **nineteen are not avatars** — market thumbs,
+> comment images, media panels, composer wells. This strikes one word from its
+> SCOPE; editing the token would silently re-radius every image in the product
+> to fix three mounts.
 
 Borders: `--hairline` = 1px solid `#404040` — the one treatment on buttons, cards, panels, inputs, chips, modals, bars, pole elements. `--border-emphasis` and `--pole-hairline` are retired aliases of it. `--avatar-ring` = 1px solid `#404040`. Exception: the black (YES-pole) Support/Counter pill takes **0.5px** solid `#404040`.
 
@@ -278,6 +298,9 @@ Carried from v0.2, updated; new items minted this session.
 
 1. **Reply-page position strip** (operator-ruled a·a·a): the reply view's column headers gain the market grammar **minus action buttons** — `TO WIN Đ1 → Đx` left · price cluster centre · `YOUR POSITION Đa → Đb` / `NO ACTIVE POSITION` right. **No Đ BET / Sell buttons on the debate surface.** The held-side readout keeps its W2.10-C behaviour: click → Profile (where Sell lives). TO WIN renders on **both** columns always (market context, not position context).
 2. **H2-scrub avatar render:** scrubbed users (pseudonym → placeholder, PFP unset per SPEC.1) need a defined scrubbed-avatar visual at build. One-line brand ruling owed when the surface is built.
+   - ⚠ **PFP-UI-1, 2026-08-26 — THE CONDITION ON THIS ROW HAS BEEN MET. The surface is built, and the ruling is still owed.** *"When the surface is built"* is no longer a future tense: PFP-1 (`c49138d`) shipped the live PFP path, and a scrubbed row — `pfp_filename` NULL — resolves through `server/identity-pool/pfp-url.ts` to `/pfp-placeholder.svg`, i.e. **the same silhouette every identity rendered before PFP-1** (`server/profile/resolve.ts`). So scrubbed users are not undefined; they are **indistinguishable from a rendering failure**, which is the thing this row wanted ruled out.
+   - **What this pass settled, so the ruling is narrower than it was:** the FRAME is decided. A scrubbed avatar is a **circle carrying `--avatar-ring`**, exactly like every other mount — it inherits that from the shape rule and needs no separate decision. **What remains owed is the ASSET inside it**, and only that.
+   - ⛔ **Not taken here, deliberately.** A scrubbed-avatar visual is brand content, and this task's authority covers shape and ring, not new artwork. Recording the discharged half and narrowing the open half is what an execute pass can do; inventing the silhouette is not. Cross-refs PFP-RECON-1 **D-3** and the scrubbed-user note in `components/profile/IdentityCard.tsx`.
 3. **PFP pipeline** (ADR-0011) remains a separate pre-launch task — DGX Spark run, R2 upload, pool population.
 
 ---
