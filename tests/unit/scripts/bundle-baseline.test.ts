@@ -98,21 +98,24 @@ describe("frontend bundle baseline — scripts/bundle-baseline.json (HO-T4 D2)",
 		);
 	});
 
-	it("bundle-baseline::profile-route-own-bytes-under-ceiling (baseline 240,766 B +5%)", () => {
+	it("bundle-baseline::profile-route-own-bytes-under-ceiling (lowered at T5 with PositionsTable split)", () => {
 		const report = readBaseline();
+		// Lowered from 252_804 B at T5 when PositionsTable dynamic split landed (-22 KiB win).
 		expect(routeOf(report, "/u/[pseudonym]").ownRawBytes).toBeLessThanOrEqual(
-			252_804,
+			230_020,
 		);
 	});
 
-	it("bundle-baseline::next-dynamic-and-react-lazy-still-absent-from-src", () => {
-		// Companion to D3's H1-H3 and to T5/T7: the shared/route ceilings above are
-		// only meaningful baselines because this repo currently ships ZERO
-		// code-split boundaries (D3's reference table states this as a fact, not
-		// an aspiration). The moment a real `next/dynamic` or `React.lazy` lands,
-		// every number this file pins needs re-measuring, not defending — this
-		// test's job is to make that moment loud instead of silent.
+	it("bundle-baseline::next-dynamic-allowed-at-sanctioned-sites", () => {
+		// T5 (HO-FINISH §6) landed the first sanctioned dynamic boundary at
+		// `src/components/profile/ProfileArena.tsx` (PositionsTable, saving ~22 KiB).
+		// Any OTHER dynamic boundary still triggers this guard loudly so that
+		// wrapper costs are measured before shipping.
+		const SANCTIONED = new Set([
+			join(SRC_ROOT, "components", "profile", "ProfileArena.tsx"),
+		]);
 		const offenders = sourceFiles().filter((path) => {
+			if (SANCTIONED.has(path)) return false;
 			const src = readFileSync(path, "utf8");
 			return /\bnext\/dynamic\b/.test(src) || /\bReact\.lazy\s*\(/.test(src);
 		});

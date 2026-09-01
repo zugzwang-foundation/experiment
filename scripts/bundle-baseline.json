@@ -1,18 +1,18 @@
 {
-	"measuredAt": "2026-08-31T05:18:03.486Z",
-	"sharedChunkCount": 8,
-	"sharedRawBytes": 970863,
-	"sharedGzipBytes": 304080,
-	"largestSharedChunkRawBytes": 456602,
-	"nextStaticTotalRawBytes": 1696218,
+	"measuredAt": "2026-09-01T12:47:46.372Z",
+	"sharedChunkCount": 9,
+	"sharedRawBytes": 993244,
+	"sharedGzipBytes": 311255,
+	"largestSharedChunkRawBytes": 421514,
+	"nextStaticTotalRawBytes": 1781415,
 	"routes": [
 		{
 			"route": "/",
 			"chunkCount": 8,
-			"totalRawBytes": 218636,
-			"totalGzipBytes": 75842,
-			"ownRawBytes": 218636,
-			"ownGzipBytes": 75842
+			"totalRawBytes": 222076,
+			"totalGzipBytes": 76914,
+			"ownRawBytes": 222076,
+			"ownGzipBytes": 76914
 		},
 		{
 			"route": "/_global-error",
@@ -74,17 +74,17 @@
 			"route": "/admin/markets/new",
 			"chunkCount": 4,
 			"totalRawBytes": 29762,
-			"totalGzipBytes": 10441,
+			"totalGzipBytes": 10439,
 			"ownRawBytes": 29762,
-			"ownGzipBytes": 10441
+			"ownGzipBytes": 10439
 		},
 		{
 			"route": "/admin/moderation",
 			"chunkCount": 4,
 			"totalRawBytes": 63741,
-			"totalGzipBytes": 23471,
+			"totalGzipBytes": 23467,
 			"ownRawBytes": 63741,
-			"ownGzipBytes": 23471
+			"ownGzipBytes": 23467
 		},
 		{
 			"route": "/admin/moderation/audit",
@@ -167,12 +167,20 @@
 			"ownGzipBytes": 0
 		},
 		{
+			"route": "/legal",
+			"chunkCount": 5,
+			"totalRawBytes": 155777,
+			"totalGzipBytes": 51864,
+			"ownRawBytes": 155777,
+			"ownGzipBytes": 51864
+		},
+		{
 			"route": "/m/[slug]",
-			"chunkCount": 9,
-			"totalRawBytes": 278476,
-			"totalGzipBytes": 90679,
-			"ownRawBytes": 278476,
-			"ownGzipBytes": 90679
+			"chunkCount": 10,
+			"totalRawBytes": 291957,
+			"totalGzipBytes": 95690,
+			"ownRawBytes": 291957,
+			"ownGzipBytes": 95690
 		},
 		{
 			"route": "/m/[slug]/export",
@@ -192,35 +200,35 @@
 		},
 		{
 			"route": "/onboarding",
-			"chunkCount": 7,
-			"totalRawBytes": 171798,
-			"totalGzipBytes": 58323,
-			"ownRawBytes": 171798,
-			"ownGzipBytes": 58323
+			"chunkCount": 8,
+			"totalRawBytes": 220315,
+			"totalGzipBytes": 71177,
+			"ownRawBytes": 220315,
+			"ownGzipBytes": 71177
 		},
 		{
 			"route": "/sign-in",
-			"chunkCount": 8,
-			"totalRawBytes": 196433,
-			"totalGzipBytes": 67000,
-			"ownRawBytes": 196433,
-			"ownGzipBytes": 67000
+			"chunkCount": 9,
+			"totalRawBytes": 245173,
+			"totalGzipBytes": 79943,
+			"ownRawBytes": 245173,
+			"ownGzipBytes": 79943
 		},
 		{
 			"route": "/sign-in/otp",
-			"chunkCount": 8,
-			"totalRawBytes": 196671,
-			"totalGzipBytes": 67174,
-			"ownRawBytes": 196671,
-			"ownGzipBytes": 67174
+			"chunkCount": 9,
+			"totalRawBytes": 245188,
+			"totalGzipBytes": 80028,
+			"ownRawBytes": 245188,
+			"ownGzipBytes": 80028
 		},
 		{
 			"route": "/u/[pseudonym]",
 			"chunkCount": 10,
-			"totalRawBytes": 240766,
-			"totalGzipBytes": 82285,
-			"ownRawBytes": 240766,
-			"ownGzipBytes": 82285
+			"totalRawBytes": 219047,
+			"totalGzipBytes": 75296,
+			"ownRawBytes": 219047,
+			"ownGzipBytes": 75296
 		}
 	]
 }
