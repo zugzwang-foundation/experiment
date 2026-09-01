@@ -75,8 +75,14 @@ describe("C-CHART-1 clause 1 (CHART-5) — the gridline set is a pure function o
 		// before `flex-1` grows it; the figure was a mis-read of the CSS, not a
 		// measurement. Founder-ruled at CHART-6: the hero carries what the overlay
 		// carries.
+		// ⚠ `0` JOINED THE COLLAPSED SET AT CHART-7 (RF-3, founder ruling). With
+		// both extremes labelled the five lines read as a frame; four starting at 25
+		// read as rules someone drew. It also makes moot the never-ruled question
+		// the CHART-5 sheet rendered both ways — whether the `100` line is redundant
+		// against the card's border — because paired with a `0` it is the top of a
+		// scale rather than a stray edge.
 		expect(gridlinesFor("collapsed").map((g) => g.pct)).toEqual([
-			25, 50, 75, 100,
+			0, 25, 50, 75, 100,
 		]);
 		const TEN_STEP = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 		expect(gridlinesFor("expanded").map((g) => g.pct)).toEqual(TEN_STEP);
@@ -184,7 +190,8 @@ describe("C-CHART-1 clause 1 (CHART-5) — the gridline set is a pure function o
 		const pcts = (m: string) =>
 			[...m.matchAll(/<line data-pct="(\d+)"/g)].map((x) => Number(x[1]));
 		const TEN_STEP = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
-		expect(pcts(collapsed)).toEqual([25, 50, 75, 100]);
+		const QUARTERS = [0, 25, 50, 75, 100];
+		expect(pcts(collapsed)).toEqual(QUARTERS);
 		expect(pcts(expanded)).toEqual(TEN_STEP);
 
 		// ⛔ THE HERO NOW CARRIES THE SAME ELEVEN, and the MUST-REJECT inverted with
@@ -195,11 +202,11 @@ describe("C-CHART-1 clause 1 (CHART-5) — the gridline set is a pure function o
 		// make the same market two different pictures on two surfaces.
 		expect(hero).toContain('data-testid="chart-gridlines"');
 		expect(pcts(hero)).toEqual(TEN_STEP);
-		expect(pcts(hero)).not.toEqual([25, 50, 75, 100]);
+		expect(pcts(hero)).not.toEqual(QUARTERS);
 
 		// POSITIVE CONTROL — the same matcher tells the two sets apart, so the
 		// equalities above are readings rather than one pattern matching everything.
-		expect(pcts(collapsed).length).toBe(4);
+		expect(pcts(collapsed).length).toBe(5);
 		expect(pcts(hero).length).toBe(11);
 	});
 
@@ -333,7 +340,7 @@ describe("discovery::hero-chart-carries-y-scale — C-CHART-1 clause 1 (CHART-6)
 		// column reads really is `grid.length > 0` now, and `gridlinesFor` is what
 		// keeps the two sets apart.
 		expect(markup("collapsed")).toContain('data-testid="chart-y-marks"');
-		expect(marks(markup("collapsed"))).toEqual([25, 50, 75, 100]);
+		expect(marks(markup("collapsed"))).toEqual([0, 25, 50, 75, 100]);
 	});
 
 	it("the marks column is SIZED, never pinned — the CHART-2 mechanism, reused", () => {
@@ -967,7 +974,7 @@ describe("CHART-5/6 — RF-4 payload budget", () => {
 			expect(
 				[...marks.matchAll(/data-testid="y-mark-\d+"/g)].length,
 				`${mode}: marks slice does not contain the marks`,
-			).toBe(mode === "collapsed" ? 4 : 11);
+			).toBe(mode === "collapsed" ? 5 : 11);
 		}
 		return Buffer.byteLength(grid, "utf8") + Buffer.byteLength(marks, "utf8");
 	}

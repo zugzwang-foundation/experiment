@@ -217,16 +217,48 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 			"axis-x-label-second",
 			"axis-x-label-end",
 		];
-		for (const id of [...ticks, ...labels]) {
+
+		// ⛔ THE TICKS ARE STILL INSIDE THE `<svg>`, AND THAT HALF IS UNCHANGED. A
+		// tick is a rule at an x in the plot's own domain, so it belongs in the space
+		// that owns that domain — and d5's own structure, a `.xtick` div beside the
+		// chart, would satisfy a presence check while failing this one.
+		for (const id of ticks) {
 			const el = container.querySelector(`[data-testid="${id}"]`);
 			expect(el, `collapsed axis is missing ${id}`).not.toBeNull();
-			// ⛔ THE CONTAINMENT ASSERTION — see the docblock. A `.xtick` div beside
-			// the chart, d5's own structure, would satisfy a presence check and fail
-			// this one.
 			expect(
 				svg.contains(el),
 				`${id} must be INSIDE the <svg>, not a DOM sibling of the chart`,
 			).toBe(true);
+		}
+
+		// ⛔ THE LABELS LEFT THE `<svg>` AT CHART-7 AND THE CONTAINMENT ASSERTION
+		// MOVED WITH THEM RATHER THAN BEING DROPPED. They are HTML now, because a
+		// declared type size inside a viewBox stretched non-uniformly per surface
+		// rendered a 7.70px box on this card and a 16.00px box on the overlay — the
+		// same argument that sent `YES`/`NO` out at CHART-2, applied to the last text
+		// that had not taken it.
+		//
+		// ⚠ WHAT THE ORIGINAL ASSERTION WAS PROTECTING IS NOT THE `<svg>` — IT IS
+		// SCOPE. Its docblock says so: porting d5's absolutely-positioned divs
+		// literally would have slipped past `collapsed-renders-no-axis`, because that
+		// guard asserts the absence of testids INSIDE this component and a DOM
+		// SIBLING of the chart carries none of them. So the property that has to
+		// survive is that the labels are returned from the component's own tree —
+		// `PROFILE OVERLAP R2`'s answer, which this component already uses for the
+		// end labels. Asserted against the chart FRAME, which is the component's
+		// root, rather than against the `<svg>`, which is now only part of it.
+		const frame = screen.getByTestId("market-price-chart-frame");
+		for (const id of labels) {
+			const el = container.querySelector(`[data-testid="${id}"]`);
+			expect(el, `collapsed axis is missing ${id}`).not.toBeNull();
+			expect(
+				frame.contains(el),
+				`${id} must be inside the chart component's own tree, not a DOM sibling of it`,
+			).toBe(true);
+			expect(
+				svg.contains(el),
+				`${id} is HTML since CHART-7 and must NOT be inside the <svg>`,
+			).toBe(false);
 		}
 
 		// EXACTLY two and three — a third tick or a fourth label is a different

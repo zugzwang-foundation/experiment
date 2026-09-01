@@ -447,45 +447,25 @@ export function MarketPriceChart({
 						</g>
 					)}
 					{mode === "collapsed" && (
-						<CollapsedAxis series={series} startMs={startMs} endMs={endMs} />
+						<CollapsedTicks series={series} startMs={startMs} endMs={endMs} />
 					)}
 
-					{/* EXPANDED only — the two X endpoint labels (no interior ticks, §9).
-
-					    ⛔ THESE NAME THE AXIS, NOT THE SERIES, AND THAT CHANGED AT CHART-3.
-					    They read `series[0].at` and `series[last].at` while the domain WAS
-					    the series' own span, so label and position agreed by construction.
-					    Under a fixed window they no longer would: a market that opened
-					    three days ago plots its first point a fifth of the way along, and
-					    a label reading that date pinned to `x = 0` would place the market's
-					    first bet at the window's start — a false statement about when the
-					    market began trading, printed in the one place a reader goes to find
-					    out. SPEC.1 §9's rule is unchanged and is what settles it: "Axis
-					    labels are the domain endpoints." The domain moved; the labels
-					    follow it. */}
-					{mode === "expanded" && series.length > 0 && (
-						<>
-							<text
-								data-testid="axis-x-start"
-								x={0}
-								y={VIEWBOX_H - 8}
-								className="fill-n5 text-[10px]"
-								textAnchor="start"
-							>
-								{fmtUtcDay(MARKET_CHART_WINDOW_START)}
-							</text>
-							<text
-								data-testid="axis-x-end"
-								x={VIEWBOX_W}
-								y={VIEWBOX_H - 8}
-								className="fill-n5 text-[10px]"
-								textAnchor="end"
-							>
-								{fmtUtcDay(MARKET_CHART_WINDOW_END)}
-							</text>
-						</>
-					)}
-
+					{/* ⛔ THE DATE LABELS ARE NOT HERE ANY MORE — THEY ARE HTML, BELOW THE
+					    `</svg>` (CHART-7, RF-3). They were the LAST text left inside this
+					    stretched space, and this block used to hold the expanded overlay's
+					    two endpoint labels while `CollapsedAxis` held the card's three.
+					    Both moved for `C-CHART-2` clause 2's original reason, applied to
+					    the one element that had never taken it: `preserveAspectRatio="none"`
+					    scales user space non-uniformly and per surface, so ONE declared size
+					    rendered a **7.70 px** box on the collapsed card and a **16.00 px**
+					    box on the expanded overlay — measured, in the shipped face, on the
+					    unchanged tree. RF-3 asks for the dates to be made bigger and checked
+					    against the marks' 10 px, and no declared value inside this viewBox
+					    can satisfy that on more than one surface at a time.
+					    ⚠ WHAT DID NOT MOVE IS THE TICK, and the split is deliberate: a tick
+					    is GEOMETRY — a rule at an x in the plot's own domain — and belongs
+					    in the space that owns that domain. Only the TYPE had a reason to
+					    leave. */}
 					<polyline
 						data-testid="line-no"
 						points={buildLine(series, startMs, endMs, yNoPx)}
@@ -572,6 +552,19 @@ export function MarketPriceChart({
 				{terminalYes !== null && (
 					<TerminalLabels yes={terminalYes} mode={mode} terminalX={terminalX} />
 				)}
+				{/* ⛔ INSIDE THE PLOT BOX FOR `TerminalLabels`' REASON EXACTLY (CHART-7).
+				    A date label's x is a position in the plot's own domain, so it has to
+				    resolve against the same rectangle `preserveAspectRatio="none"`
+				    stretches the viewBox onto — which is this box and not a strip
+				    beneath it. `labelLeftPct` is CHART-6's own conversion, reused rather
+				    than re-derived, so the date and the tick it names cannot come to
+				    disagree about where that x is. */}
+				<AxisDates
+					mode={mode}
+					series={series}
+					startMs={startMs}
+					endMs={endMs}
+				/>
 			</div>
 		</div>
 	);
@@ -1238,64 +1231,41 @@ function lowerTop(pct: number, half: number): string {
 }
 
 /**
- * The COLLAPSED chart's time axis — SPEC.1 1.0.32 (HTML-FINISH · MARKET DETAIL
- * round 2 · R8, founder-ruled 2026-08-16). d5's `.xtick` ×2 + `.xlab` ×2 +
- * `.xlab.end` (`d5:1014-1018`).
+ * The COLLAPSED chart's time TICKS — SPEC.1 1.0.32 (HTML-FINISH · MARKET DETAIL
+ * round 2 · R8, founder-ruled 2026-08-16). d5's `.xtick` ×2 (`d5:1014-1018`).
  *
- * ⛔⛔ EVERY TIMESTAMP IT RENDERS IS A REAL `PricePoint.at`, AND THAT IS THE
- * RULING'S OWN CONSTRAINT: *"it introduces no new data and no new read — every
- * timestamp it renders is already carried on `PricePoint.at`."*
+ * ⛔ IT WAS `CollapsedAxis` AND HELD THE LABELS TOO, UNTIL CHART-7. The labels are
+ * HTML now — `AxisDates` below — for `C-CHART-2` clause 2's original reason
+ * applied to the one element that had never taken it. What is left here is the
+ * part that had no reason to leave: a tick is a rule at an x in the PLOT's own
+ * domain, drawn in the space that owns that domain, and it carries no type for a
+ * non-uniform scale to distort.
  *
- * ⛔ THAT CONSTRAINT PRODUCED THE OPPOSITE RULE UNTIL CHART-3, AND THE REVERSAL
- * IS RATIFIED RATHER THAN INFERRED. The ticks used to be ANCHORED TO SERIES
- * POINTS — each one the series point whose x landed nearest a third — precisely
- * so the axis could not "mint a timestamp the series does not contain". That
- * was right while the domain was the market's own lifetime, because then an
- * interpolated date WAS a claim about the market's history. It is wrong against
- * a fixed window, for two reasons that compound:
- *
- * 1. **It stops being an axis.** Two markets on the same window would carry
- *    DIFFERENT tick dates, defeating the entire ruling — canon `C-CHART-1`
- *    clause 1 (amended CHART-3) says tick placement is "computed against a
- *    **constant** span rather than a per-market one, which makes every market's
- *    axis identical and two charts directly comparable."
- * 2. **It collapses.** A market three days into a seven-week window occupies
- *    the leftmost ~6 % of the axis, so `nearestPoint` returns the SAME final
- *    point for both thirds: two ticks stacked at one x under two identical
- *    labels. On the production window that is the rendering for roughly the
- *    experiment's first two and a half weeks — not an edge case, the opening.
- *
- * ⇒ Each interior tick now sits at a fixed third of the WINDOW and is labelled
- * with that instant's own UTC day. This mints no claim about the market: the
- * window is a constant this build already knows, so the label is a calendar
- * date, not an interpolated observation. The 1.0.32 constraint is honoured in
- * the sense that mattered — the axis still asserts nothing about the data that
- * the data does not say, because it no longer speaks about the data at all.
+ * ⛔⛔ EVERY TIMESTAMP IT RENDERS IS A REAL INSTANT ON A CONSTANT SPAN, which is
+ * how the 1.0.32 ruling's constraint — *"it introduces no new data and no new
+ * read"* — is honoured in the sense that mattered. The ticks used to be ANCHORED
+ * TO SERIES POINTS, precisely so the axis could not "mint a timestamp the series
+ * does not contain". That was right while the domain was the market's own
+ * lifetime, and wrong against a fixed window for two reasons that compound: two
+ * markets on one window would carry DIFFERENT tick dates, defeating the ruling
+ * canon `C-CHART-1` clause 1 states; and a market three days into a seven-week
+ * window has `nearestPoint` return the SAME final point for both thirds, stacking
+ * two ticks at one x.
  *
  * ⛔ NO AXIS ON A DEGENERATE DOMAIN. Fewer than two points, or `endMs ===
- * startMs` (the unbet market), is the flat-line case `buildLine` handles by
- * duplicating one value at both edges — every point shares x = 0, so ticks would
- * stack on the left edge and three labels would print the same day three times.
+ * startMs`, is the flat-line case `buildLine` handles by duplicating one value at
+ * both edges — every point shares x = 0, so ticks would stack on the left edge.
  * The chart keeps its lines and renders no axis, which is the honest reading of
- * "no time has passed yet".
+ * "no time has passed yet". `AxisDates` carries the SAME gate, from the same
+ * predicate, so the two halves of one axis cannot come to disagree about whether
+ * there is an axis.
  *
- * ⚠ NO GUTTER IS RESERVED, and the labels are drawn OVER the full-bleed plot.
- * `geometry.ts` is FULL-BLEED by construction ("X spans the whole width and Y
- * the whole height, no axis gutter") and it is outside this task's allow-list;
- * more to the point, the shipped `expanded` axis and `ProfileChart` both already
- * place their labels at `y = VIEWBOX_H − 8` over the plot, so this is the
- * established treatment rather than a new one. d5's `18px` gutter is a VALUE and
- * is not taken.
- *
- * ⚠ TOKENS, NEVER HEX. The tick is `--color-n2` — index-wise the same role d5
- * gives its `--n2` dotted rule: a faint gridline one step off the surface. The
- * label reuses `fill-n5 text-[10px]`, byte-identical to the `expanded` labels
- * eight lines below and to `ProfileChart`'s, so the three axes cannot drift. The
- * dash pattern `5 4` is byte-carried from `ProfileChart.tsx:104`, the shipped
- * dashed stroke on `main` — d5 says `dotted` and gives no numbers, so inventing
- * a pattern would have been the value this task may not take.
+ * ⚠ TOKENS, NEVER HEX. `--color-n2` — index-wise the same role d5 gives its `--n2`
+ * dotted rule. The dash pattern `5 4` is byte-carried from `ProfileChart.tsx:104`,
+ * the shipped dashed stroke on `main`; d5 says `dotted` and gives no numbers, so
+ * inventing a pattern would have been a value this component may not take.
  */
-function CollapsedAxis({
+function CollapsedTicks({
 	series,
 	startMs,
 	endMs,
@@ -1304,24 +1274,19 @@ function CollapsedAxis({
 	startMs: number;
 	endMs: number;
 }): React.JSX.Element | null {
-	if (series.length < 2 || endMs === startMs) {
+	if (!drawsTimeAxis("collapsed", series, startMs, endMs)) {
 		return null;
 	}
 	// The two interior anchors: a fixed third and two-thirds of the WINDOW,
-	// FLOORED TO UTC MIDNIGHT. Both are instants on a constant span, so every
-	// market's axis carries the same two dates — the property the fixed window
-	// exists to buy.
+	// FLOORED TO UTC MIDNIGHT.
 	//
 	// ⛔ THE FLOOR IS WHY THE TICK AND ITS LABEL AGREE. A raw third of the
 	// production window is 2026-10-02T07:55Z and a raw two-thirds is
 	// 2026-10-19T15:50Z — so an unfloored rule draws the gridline 8 and 16 hours
 	// right of the midnight its label names, which is 4.09 and 8.18 user units.
-	// Under the superseded series-anchored rule tick and label were the same
-	// point BY CONSTRUCTION and could not disagree; a fixed span reintroduces the
-	// gap, and it is a small instance of the shape this file rejects everywhere
-	// else — a mark drawn at a time that is not the time written under it.
 	// Flooring costs perfectly even spacing, which nothing requires, and buys an
-	// axis whose labels are true. Raised by `@security-auditor` at the cascade.
+	// axis whose labels are true. Raised by `@security-auditor` at the CHART-3
+	// cascade.
 	const interior = [1 / 3, 2 / 3].map((f) => {
 		const raw = new Date(startMs + (endMs - startMs) * f);
 		return new Date(
@@ -1332,9 +1297,9 @@ function CollapsedAxis({
 	return (
 		<>
 			{interior.map((at, i) => (
+				// Index-keyed on purpose: these two are a FIXED PAIR of positions
+				// (first third, second third), not an identity-bearing list.
 				<line
-					// Index-keyed on purpose: these two are a FIXED PAIR of positions
-					// (first third, second third), not an identity-bearing list.
 					key={`tick-${i === 0 ? "first" : "second"}`}
 					data-testid={`axis-x-tick-${i === 0 ? "first" : "second"}`}
 					x1={xPx(at, startMs, endMs)}
@@ -1347,36 +1312,211 @@ function CollapsedAxis({
 					vectorEffect="non-scaling-stroke"
 				/>
 			))}
-			{interior.map((at, i) => (
-				<text
-					key={`lab-${i === 0 ? "first" : "second"}`}
-					data-testid={`axis-x-label-${i === 0 ? "first" : "second"}`}
-					x={xPx(at, startMs, endMs)}
-					y={VIEWBOX_H - 8}
-					className="fill-n5 text-[10px]"
-					textAnchor="middle"
-				>
-					{fmtUtcDay(at)}
-				</text>
-			))}
-			{/* `.xlab.end` (`d5:499`) — right-anchored at the domain's end, so it
-			    cannot overflow the viewBox the way a centred label would.
-			    ⚠ It names the WINDOW's end, not the series' — CHART-3. It sits at
-			    `x = VIEWBOX_W`, which under a fixed axis is the window's end and no
-			    longer the last event, so labelling it with the last event's day
-			    would print a date at a position that is not that date. */}
-			<text
-				data-testid="axis-x-label-end"
-				x={VIEWBOX_W}
-				y={VIEWBOX_H - 8}
-				className="fill-n5 text-[10px]"
-				textAnchor="end"
-			>
-				{fmtUtcDay(new Date(endMs).toISOString())}
-			</text>
 		</>
 	);
 }
+
+/**
+ * Whether a mode draws a time axis at all — ONE predicate, read by both halves.
+ *
+ * ⛔ THE TWO HALVES OF ONE AXIS MUST NOT BE ABLE TO DISAGREE. The ticks are SVG
+ * and the dates are HTML, so they live in different trees and are mounted by
+ * different expressions; before CHART-7 they were one component and the gate was
+ * structural. Split apart, "ticks but no dates" and "dates but no ticks" both
+ * become reachable by editing one arm — and both look deliberate on screen.
+ *
+ * ⚠ THE PER-MODE GATES ARE CARRIED, NOT UNIFIED, and that is deliberate restraint
+ * rather than an oversight. The collapsed card has required ≥2 points since
+ * HTML-FINISH R8; the expanded overlay has required ≥1 since CHART-1. Both are
+ * shipped, measured behaviour that nothing in this task's register asks to move,
+ * and unifying them would change what a one-point market renders on a surface
+ * nobody ruled about. `endMs === startMs` is unreachable under a constant window
+ * and is kept because `xPx` still has the branch.
+ */
+function drawsTimeAxis(
+	mode: ChartMode,
+	series: PricePoint[],
+	startMs: number,
+	endMs: number,
+): boolean {
+	if (endMs === startMs) {
+		return false;
+	}
+	switch (mode) {
+		case "collapsed":
+			return series.length >= 2;
+		case "expanded":
+			return series.length > 0;
+		case "hero":
+			// ⚠ NO TIME AXIS ON THE HERO — three date labels along the bottom of a
+			// carousel panel a reader flicks past are noise rather than orientation,
+			// and Discovery's job is to say whether a market has moved, not when.
+			return false;
+		default: {
+			const exhaustive: never = mode;
+			return exhaustive;
+		}
+	}
+}
+
+/** One drawn date label: where it sits, what it says, and how it hangs off its
+ * own x. */
+type AxisDate = {
+	readonly testId: string;
+	readonly at: string;
+	readonly x: number;
+	readonly anchor: "start" | "middle" | "end";
+};
+
+/**
+ * The date labels a mode draws, in order.
+ *
+ * ⚠ THE ANCHORING IS A PURE FUNCTION OF THE X, NEVER OF THE INDEX, and that is
+ * the form that survives RF-4. A label at the plot's left edge must hang to the
+ * RIGHT of its x or half of it is outside the box; one at the right edge must
+ * hang left; everything between is centred on the tick it names. Written as
+ * "first label → start-anchored" it would be right on a window whose first
+ * label sits at x = 0 and wrong the moment one sits inside the plot — which is
+ * exactly what the calendar anchors do on staging.
+ */
+function axisDatesFor(
+	mode: ChartMode,
+	series: PricePoint[],
+	startMs: number,
+	endMs: number,
+): readonly AxisDate[] {
+	if (!drawsTimeAxis(mode, series, startMs, endMs)) {
+		return [];
+	}
+	const at = (iso: string, testId: string): AxisDate => {
+		const x = xPx(iso, startMs, endMs);
+		return {
+			testId,
+			at: iso,
+			x,
+			anchor: x <= 0 ? "start" : x >= VIEWBOX_W ? "end" : "middle",
+		};
+	};
+	if (mode === "collapsed") {
+		const interior = [1 / 3, 2 / 3].map((f) => {
+			const raw = new Date(startMs + (endMs - startMs) * f);
+			return new Date(
+				Date.UTC(raw.getUTCFullYear(), raw.getUTCMonth(), raw.getUTCDate()),
+			).toISOString();
+		});
+		return [
+			at(interior[0], "axis-x-label-first"),
+			at(interior[1], "axis-x-label-second"),
+			at(new Date(endMs).toISOString(), "axis-x-label-end"),
+		];
+	}
+	return [
+		at(MARKET_CHART_WINDOW_START, "axis-x-start"),
+		at(MARKET_CHART_WINDOW_END, "axis-x-end"),
+	];
+}
+
+/**
+ * The X axis's date labels — HTML text layered over the plot, outside the `<svg>`
+ * (CHART-7, RF-3).
+ *
+ * ⛔ THEY WERE THE LAST TEXT INSIDE THE STRETCHED VIEWBOX, AND THAT IS THE WHOLE
+ * REASON THEY MOVED. `C-CHART-2` clause 2 sent `YES`/`NO` out at CHART-2 because
+ * `preserveAspectRatio="none"` scales user space by a factor that differs per
+ * surface, so nothing applied inside it can be right at more than one size. The
+ * date row was left behind on the stated ground that moving it "would mean
+ * re-deriving every tick's x in CSS space" — a real objection when it was
+ * written, and one CHART-6 answered by building `labelLeftPct` for the end
+ * labels. The derivation already exists; this reuses it.
+ *
+ * ⛔ AND RF-3 IS NOT SATISFIABLE WITHOUT THE MOVE, WHICH IS THE ARGUMENT RATHER
+ * THAN A CONVENIENCE. Measured on the unchanged tree, in the shipped face: ONE
+ * declaration of `10px` rendered a **7.70 px** box on the collapsed card and a
+ * **16.00 px** box on the expanded overlay — a factor of 2.08. RF-3 asks for the
+ * dates to be made bigger AND checked against the numeric marks' 10 px so the two
+ * scales do not fight; against the marks the collapsed dates were 23 % SMALLER
+ * and the expanded ones 60 % LARGER, in opposite directions, from one number. No
+ * declared value inside the viewBox fixes both. Out here, `AXIS_DATE_PX` is that
+ * many pixels on every surface.
+ *
+ * ⚠ `aria-hidden` AND `pointer-events-none`, BOTH REGRESSION FIXES RATHER THAN
+ * TIDINESS — the same two `TerminalLabels` carries and for the same reasons.
+ * Inside the `aria-hidden` `<svg>` these strings were excluded from every
+ * accessible name; out here they are ordinary HTML inside the collapsed card's
+ * `<button>`, so they would JOIN its accessible name and read three bare dates in
+ * front of the sentence that IS the readout. And this layer covers the plot,
+ * which on that card and on the hero IS the affordance, so without
+ * `pointer-events-none` it would swallow clicks.
+ */
+function AxisDates({
+	mode,
+	series,
+	startMs,
+	endMs,
+}: {
+	mode: ChartMode;
+	series: PricePoint[];
+	startMs: number;
+	endMs: number;
+}): React.JSX.Element | null {
+	const dates = axisDatesFor(mode, series, startMs, endMs);
+	if (dates.length === 0) {
+		return null;
+	}
+	return (
+		<div
+			data-testid="axis-date-row"
+			aria-hidden="true"
+			className="pointer-events-none absolute inset-0 leading-none text-n5 tabular-nums"
+			style={{ fontSize: `${AXIS_DATE_PX}px` }}
+		>
+			{dates.map((d) => (
+				<span
+					key={d.testId}
+					data-testid={d.testId}
+					data-plot-x={d.x}
+					className={`absolute whitespace-nowrap${
+						d.anchor === "end"
+							? " -translate-x-full"
+							: d.anchor === "middle"
+								? " -translate-x-1/2"
+								: ""
+					}`}
+					style={{
+						left: `${labelLeftPct(d.x)}%`,
+						bottom: `${AXIS_DATE_BOTTOM_PX}px`,
+					}}
+				>
+					{fmtUtcDay(d.at)}
+				</span>
+			))}
+		</div>
+	);
+}
+
+/**
+ * The date row's type size, in CSS PIXELS, and the air beneath it.
+ *
+ * ⛔ 12, NOT 10, AND THE DIFFERENCE IS THE RULING. RF-3 says the dates are too
+ * small and asks that the result be checked against the marks' size "so the two
+ * scales do not fight". Ten would make them identical to the numeric marks — and
+ * identical is the one relation that DOES fight, because the two scales then
+ * compete to be read as the same system. Twelve reads as the axis: a step above
+ * the marks, plainly the frame rather than a value on it, and still close enough
+ * that neither dominates. Against what shipped, the collapsed card's dates go
+ * from a **7.70 px** rendered box to **12 px** — the increase the ruling asks
+ * for — and the expanded overlay's come DOWN from 16.00, which is not a
+ * regression but the removal of a distortion nobody chose.
+ *
+ * ⚠ `AXIS_DATE_BOTTOM_PX` IS THE ROW'S OWN OFFSET FROM THE PLOT'S FLOOR, and it
+ * is load-bearing beyond spacing: `lowerTop` reserves `AXIS_DATE_PX +
+ * AXIS_DATE_BOTTOM_PX` as a band the lower end label may not enter, so this pair
+ * is the measured input to `C-CHART-2` clause 3's date-row clearance. Change
+ * either and the clamp follows, because the band is composed from them rather
+ * than written down a second time.
+ */
+const AXIS_DATE_PX = 12;
+const AXIS_DATE_BOTTOM_PX = 4;
 
 /** An SVG `points` string for one line. With fewer than two points OR a
  * degenerate domain (`startMs === endMs`), draws a FLAT LINE from the left edge

@@ -87,8 +87,17 @@ export type Gridline = { readonly pct: number; readonly y: number };
  * places for them to drift apart, so there is one — and the collapsed card's
  * quarters stay separate, because its box genuinely is short.
  */
+/**
+ * ⛔ `0` JOINED THE SET AT CHART-7 (RF-3, founder ruling), AND IT IS THE REASON
+ * THE SET READS AS A SCALE. With both extremes labelled the five lines are
+ * plainly a frame — 0 at the floor, 100 at the ceiling, the quarters between —
+ * where four lines starting at 25 read as rules someone drew. It also disposes,
+ * by making it moot, of the never-ruled question the CHART-5 contact sheet
+ * rendered both ways: whether the `100` line is redundant against the card's own
+ * border. Paired with a `0` it is not a stray edge, it is the top of a scale.
+ */
 const GRIDLINES_COLLAPSED: readonly Gridline[] = Object.freeze(
-	[25, 50, 75, 100].map((pct) => Object.freeze({ pct, y: yPctPx(pct) })),
+	[0, 25, 50, 75, 100].map((pct) => Object.freeze({ pct, y: yPctPx(pct) })),
 );
 
 const GRIDLINES_TEN_STEP: readonly Gridline[] = Object.freeze(
