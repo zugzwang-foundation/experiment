@@ -1162,8 +1162,14 @@ const LABEL_AIR_PX = 5;
  * quantity keeps clause 2's flip arithmetic byte-identical to what CHART-6 shipped
  * and measured — a scope fence this task honours by changing only its INPUT — and
  * leaves one place to put a number back if a future reserve cannot cover
- * something. `label-anchor.test.tsx` caps it at 20 from the other direction, so it
- * cannot drift into "everything flips".
+ * something.
+ * ⚠ AND THE CAP IS TIGHTER THAN THIS DOCBLOCK FIRST CLAIMED. It said
+ * `label-anchor.test.tsx` "caps it at 20 from the other direction" — true of the
+ * sweep CHART-6 left, and understated by two orders of magnitude now: the
+ * in-window walk added at CHART-7 asserts that NO series with `f ≤ 1` flips, and
+ * the tightest of those anchors at 98.61 %, so anything above **0.28** reds.
+ * Corrected because it is exactly the sentence a future reader would cite to
+ * justify raising the constant. Found by `@test-writer` at the CHART-7 cascade.
  *
  * ⛔ WHAT THE 14 WAS, KEPT BECAUSE THE MEASUREMENT COST SOMETHING AND STILL
  * TEACHES. It was read off the shipped build across the whole viewport range as
