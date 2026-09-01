@@ -802,14 +802,14 @@ function TerminalLabels({
 					top: yesOnTop ? lowerTop(lowerPct, half) : upperTop(upperPct, half),
 				}}
 			>
-				<span className="block">NO</span>
+				<span>NO</span>
 				{showValue && (
 					<span
 						data-testid="terminal-value-no"
-						className="block tracking-normal tabular-nums"
+						className="tracking-normal tabular-nums"
 						style={{
 							fontSize: `${LABEL_VALUE_PX}px`,
-							marginTop: `${LABEL_STACK_GAP_PX}px`,
+							marginLeft: `${LABEL_INLINE_GAP_PX}px`,
 						}}
 					>
 						{formatPricePercent(pair, "NO")}
@@ -828,14 +828,14 @@ function TerminalLabels({
 					top: yesOnTop ? upperTop(upperPct, half) : lowerTop(lowerPct, half),
 				}}
 			>
-				<span className="block">YES</span>
+				<span>YES</span>
 				{showValue && (
 					<span
 						data-testid="terminal-value-yes"
-						className="block tracking-normal tabular-nums"
+						className="tracking-normal tabular-nums"
 						style={{
 							fontSize: `${LABEL_VALUE_PX}px`,
-							marginTop: `${LABEL_STACK_GAP_PX}px`,
+							marginLeft: `${LABEL_INLINE_GAP_PX}px`,
 						}}
 					>
 						{formatPricePercent(pair, "YES")}
@@ -1114,13 +1114,31 @@ const LABEL_NAME_PX = 10;
 // Caught by `@code-reviewer`.
 
 /**
- * The stacked VALUE line's type size and the air between it and the name — the
- * other two numbers the expanded label's box is made of (`C-CHART-2` clause 2 as
- * amended at CHART-5). Both are `leading-none`, so each line's box IS its type
- * and the stack's height is exactly the sum below.
+ * The VALUE's type size, and the air BESIDE it — the other two numbers the
+ * label's box is made of (`C-CHART-2` clause 2 as amended at CHART-5 and again at
+ * CHART-7).
+ *
+ * ⛔ THE SECOND NUMBER CHANGED AXIS AT CHART-7 AND WAS RENAMED WITH IT. It was
+ * `LABEL_STACK_GAP_PX = 2`, a `margin-top` separating a value stacked BENEATH its
+ * name. RF-2 puts the two side by side — `NO 52%` — so the air is horizontal and
+ * the old name would describe a stack that no longer exists. **A renamed constant
+ * is cheaper than a maintainer trusting the old one.**
+ *
+ * ⚠ 4 IS MEASURED, NOT PICKED. It is Geist's own space advance at the VALUE's
+ * type size — **4.39 px at 16 px**, measured in the shipped face with the font
+ * check passing — floored to the integer, so the gap is a word space and never
+ * wider than one. The name's own `tracking-[0.1em]` already contributes ~1 px of
+ * trailing letter-space, which is why the pair does not need the full advance.
+ * Measured widths of the whole `YES 100%` label at each candidate: **65.88 px at
+ * 0, 67.88 at 2, 69.88 at 4, 71.88 at 6** — the right reserve is sized from the
+ * 4 px figure.
+ *
+ * ⚠ THE GAP DOES NOT ENTER THE BOX'S HEIGHT ANY MORE, and that is the whole
+ * reason clause 4's threshold moves. Stacked, the box was `10 + 2 + 16 = 28`.
+ * Side by side it is `max(10, 16) = 16` — see `labelHalfBoxPx`.
  */
 const LABEL_VALUE_PX = 16;
-const LABEL_STACK_GAP_PX = 2;
+const LABEL_INLINE_GAP_PX = 4;
 
 /** The numeric marks' own type size — `YMarks` declares `text-[10px]`, and this
  * is that number rather than a second reader of the end label's. See `markTop`. */
@@ -1132,24 +1150,38 @@ const MARK_TYPE_PX = 10;
  *
  * ⛔ ONE RULE, TWO MEASURED INPUTS — NOT A SECOND COLLISION RULE. Clause 4's
  * arithmetic in `terminalLabelYs` is untouched, and so is the `min`/`max`/
- * `clamp` shape below. The only thing CHART-5 changes is the NUMBER handed to
- * that shape, because the expanded overlay's label is now two lines rather than
- * one and a taller box collides at a wider spread. Hard-coding a second
- * threshold would have been the CHART-2 defect exactly — a constant chosen
- * against one surface — so the box is composed from the same three type values
- * the label declares, and the threshold moves whenever they do.
+ * `clamp` shape below. The only thing CHART-5 and CHART-7 change is the NUMBER
+ * handed to that shape: CHART-5 made the value-bearing label two lines, so a
+ * taller box collided at a wider spread, and CHART-7's founder ruling puts the two
+ * on ONE line, so it collides at a narrower one. Hard-coding a threshold per
+ * surface would have been the CHART-2 defect exactly — a constant chosen against
+ * one surface — so the box is composed from the type values the label declares,
+ * and the threshold moves whenever they do.
  *
- * ⚠ THE ONE-LINE VALUE IS UNCHANGED AT 5 AND NOW APPLIES TO THE COLLAPSED CARD
+ * ⚠ THE NAME-ONLY VALUE IS UNCHANGED AT 5 AND APPLIES TO THE COLLAPSED CARD
  * ALONE. It used to cover the Discovery hero too, on CHART-5's asymmetry — those
  * two kept the name alone, so their box did not grow. CHART-6 gives the hero the
- * value line, so its box grew and its threshold has to grow with it: that is
- * exactly why this reads `hasEndValue` rather than a second `mode ===` test.
- * A hero that gained the value and kept the 5px floor would overlap its own two
- * labels across the 46–54 % band, which is where every market rests.
+ * value, so its box grew and its threshold had to grow with it: that is exactly
+ * why this reads `hasEndValue` rather than a second `mode ===` test. A hero that
+ * gained the value and kept the 5px floor would overlap its own two labels across
+ * the band where every market rests.
+ *
+ * ⛔ AND AT CHART-7 THE VALUE-BEARING BOX HALVED, WHICH IS RF-2'S WHOLE MECHANICAL
+ * CONSEQUENCE. Stacked, the box was `10 + 2 + 16 = 28`, so the floor held the two
+ * centres 28 px apart. Side by side, the two share ONE line box and the horizontal
+ * gap contributes nothing to its height, so the box is `max(name, value) = 16` and
+ * the floor holds them 16 px apart. **The rule is untouched; only the measured
+ * input moved** — the same sentence CHART-5 wrote when it moved the other way.
+ *
+ * ⚠ `Math.max`, NOT `LABEL_VALUE_PX`, EVEN THOUGH THE VALUE IS THE TALLER TODAY.
+ * The two sizes are independently declared, so naming the taller one would be a
+ * coordinate that is right only because two quantities currently happen to be
+ * ordered a particular way — the register entry this file already keeps twice.
+ * Make the name 20px and this follows; name the value and it silently does not.
  */
 function labelHalfBoxPx(mode: ChartMode): number {
 	return hasEndValue(mode)
-		? (LABEL_NAME_PX + LABEL_STACK_GAP_PX + LABEL_VALUE_PX) / 2
+		? Math.max(LABEL_NAME_PX, LABEL_VALUE_PX) / 2
 		: LABEL_NAME_PX / 2;
 }
 
@@ -1169,14 +1201,18 @@ function labelHalfBoxPx(mode: ChartMode): number {
  * the midline by construction (design-language §3.2), so the only place the two
  * can approach each other is there. Far from even, `min`/`max` are no-ops and
  * clause 4's plot-space positions pass through untouched.
- * ⚠ THIS PARAGRAPH USED TO END "which is why the expanded overlay still separates
- * by clause 4's own 12 units (~20 px) rather than being flattened to 10", and
- * CHART-5 made that false on the surface it names. With `half = 14` the floor
- * forces the two centres 28 px apart on the overlay, while clause 4's own
- * post-push separation is ~19 px there — so the CSS floor now DOMINATES clause 4
- * across roughly the 46–54 % band, which is where every market rests. That is the
- * correct behaviour for a 28 px box; what was wrong was a docblock still
- * describing the one-line case on a two-line label. Caught by `@code-reviewer`.
+ * ⚠ THIS PARAGRAPH HAS NOW BEEN WRONG IN BOTH DIRECTIONS AND IS CORRECTED IN
+ * PLACE FOR THE SECOND TIME. It first read "the expanded overlay still separates
+ * by clause 4's own 12 units (~20 px) rather than being flattened to 10", which
+ * CHART-5 falsified by stacking the value under the name: `half` became 14, the
+ * floor held the two centres 28 px apart, and the CSS floor DOMINATED clause 4
+ * across roughly the 46–54 % band. **CHART-7 halves it again, the other way.**
+ * RF-2 puts name and value on one line, so `half` is 8 and the floor holds them
+ * 16 px apart — still above clause 4's own post-push separation near even, so the
+ * floor still dominates, across a band roughly half as wide. The measured band is
+ * reported in the CHART-7 run rather than restated here, because a number written
+ * into a docblock is the thing that goes stale: this paragraph is the proof,
+ * twice over.
  *
  * ⛔ AND WHY CSS MATH RATHER THAN A BIGGER CONSTANT. The alternative was to
  * raise `TERMINAL_LABEL_MIN_GAP` to ~24 units so that 12 px survived the worst

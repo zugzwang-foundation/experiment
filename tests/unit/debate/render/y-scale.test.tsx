@@ -34,7 +34,12 @@ import type { PricePoint } from "@/server/discovery/price-series";
 // the intended signal.
 const LABEL_NAME_PX = 10;
 const LABEL_VALUE_PX = 16;
-const LABEL_STACK_GAP_PX = 2;
+/** ⚠ THE GAP CHANGED AXIS AND NAME AT CHART-7 (RF-2). It was `LABEL_STACK_GAP_PX
+ * = 2`, a `margin-top` under a value stacked beneath its name; the founder ruled
+ * the two onto ONE line, so it is a `margin-left` beside the value and its
+ * measured basis is Geist's own space advance at 16 px (4.39, floored). It no
+ * longer enters the box's HEIGHT — that is what narrows the collision band. */
+const LABEL_INLINE_GAP_PX = 4;
 /** The numeric marks' OWN type size — `YMarks` declares `text-[10px]` for itself.
  * ⚠ MIRRORED SEPARATELY FROM `LABEL_NAME_PX` EVEN THOUGH BOTH ARE 10, because
  * `markTop`'s docblock exists precisely to stop the marks' edge clamp reading the
@@ -528,10 +533,17 @@ describe("C-CHART-2 clause 2 (CHART-5) — the end value can never disagree with
 });
 
 describe("C-CHART-2 clause 4 (CHART-5) — one collision rule, two measured inputs", () => {
-	it("the overlay's floor is the TALLER two-line box; the others are unchanged", () => {
+	it("the value-bearing floor is the TALLER of the two type sizes; the others are unchanged", () => {
 		// The half-box is composed from the type the label is actually made of:
-		// one line → 10/2 = 5; two lines → (10 + 2 + 16)/2 = 14. Asserted through
-		// the CSS the component emits, because that string IS the rule at runtime.
+		// name alone → 10/2 = 5; name AND value → max(10, 16)/2 = 8. Asserted
+		// through the CSS the component emits, because that string IS the rule at
+		// runtime.
+		// ⛔ IT WAS `(10 + 2 + 16)/2 = 14` UNTIL CHART-7, AND THE CHANGE IS RF-2's
+		// WHOLE MECHANICAL CONSEQUENCE. While the value sat BENEATH the name the box
+		// was the sum of both lines plus the air between them. Side by side they
+		// share one line box, the horizontal gap contributes nothing to its height,
+		// and the box is the taller of the two. Clause 4's rule is untouched; the
+		// number handed to it halved, so the collision band narrows.
 		// ⛔ READ OFF THE MARKUP, NOT OFF THE DOM, AND THIS IS A TRAP THAT COST THIS
 		// FILE A ROUND OF FALSE REDS. jsdom's CSS parser does not understand
 		// `clamp()` / `min()` / `max()`, so assigning one through React's style
@@ -590,21 +602,34 @@ describe("C-CHART-2 clause 4 (CHART-5) — one collision rule, two measured inpu
 			/terminal-value-yes"[^>]*style="[^"]*font-size:(\d+)px/,
 			"the value's type size",
 		);
-		const stackGap = num(
-			/terminal-value-yes"[^>]*margin-top:(\d+)px/,
-			"the stack gap",
+		// ⛔ THE GAP IS READ AS A MARGIN-LEFT AND ITS VERTICAL TWIN IS BANNED, WHICH
+		// IS WHERE THIS CASE ALSO BECOMES RF-2's GUARD. A value re-stacked beneath
+		// its name would emit `margin-top` again, and the box would grow back to 28
+		// while this floor stayed at 8 — the two labels then sit 16 px apart around
+		// 28 px boxes and OVERLAP across the band where every market rests. That is
+		// the exact failure CHART-6 shipped in the other direction, so it is
+		// asserted rather than assumed.
+		const inlineGap = num(
+			/terminal-value-yes"[^>]*margin-left:(\d+)px/,
+			"the inline gap",
 		);
-		const expandedHalf = (nameSize + stackGap + valueSize) / 2;
+		expect(inlineGap).toBeGreaterThan(0);
+		expect(em).not.toMatch(/terminal-value-yes"[^>]*margin-top:/);
+		// ⚠ THE GAP IS DELIBERATELY NOT IN THE HEIGHT. It is read above so that a
+		// change to it reddens the read rather than passing unnoticed, and then it
+		// is excluded from the composition on purpose — one line box, so only the
+		// taller of the two type sizes can set the height.
+		const expandedHalf = Math.max(nameSize, valueSize) / 2;
 		for (const top of topsOf("expanded")) {
 			expect(top).toContain(`clamp(${expandedHalf}px,`);
 			expect(top).toContain(`calc(100% - ${expandedHalf}px)`);
 		}
-		// ⛔ THE HERO NOW TAKES THE TALLER FLOOR TOO, AND THAT PAIRING IS THE POINT
-		// RATHER THAN A CONSEQUENCE. Its label grew a second line at CHART-6; a mode
-		// that gained the value line while keeping the 5px floor would push its two
-		// labels only 10px apart around a 28px box, so they would OVERLAP across the
-		// 46–54 % band — where every market rests. That is why the component reads
-		// one `hasFullYScale` for the value and the floor rather than two `mode ===`
+		// ⛔ THE HERO TAKES THE TALLER FLOOR TOO, AND THAT PAIRING IS THE POINT
+		// RATHER THAN A CONSEQUENCE. Its label gained the value at CHART-6; a mode
+		// that gained the value while keeping the 5px floor would push its two
+		// labels only 10px apart around a 16px box, so they would OVERLAP across the
+		// near-even band — where every market rests. That is why the component reads
+		// one `hasEndValue` for the value and the floor rather than two `mode ===`
 		// tests that can be updated one at a time.
 		for (const top of topsOf("hero")) {
 			expect(top).toContain(`clamp(${expandedHalf}px,`);
@@ -802,18 +827,19 @@ describe("CHART-5 — a mark is BOUND to its gridline, and the column obeys the 
 			expect(el?.style.width ?? "").toBe("");
 			expect(el?.style.maxWidth ?? "").toBe("");
 		}
-		// The value line is still there, at its own type size and its own stack
-		// gap, so this case is about an unclipped label rather than an absent one.
-		// ⚠ ALL THREE MIRRORED CONSTANTS ARE SPENT HERE, and that is deliberate:
-		// `labelHalfBoxPx` composes the collision floor from exactly this sum
-		// (`name + gap + value`), so a stack gap that drifted without the floor
-		// following it would widen the label's real box past the threshold meant to
-		// separate two of them — silently, in the band where every market rests.
-		// The gap had no assertion at all once CHART-6 retired the sizer that used
-		// to carry it.
+		// The value is still there, at its own type size and its own inline gap, so
+		// this case is about an unclipped label rather than an absent one.
+		// ⚠ THE GAP MOVED AXIS AT CHART-7 AND THE ASSERTION MOVED WITH IT. It was a
+		// `margin-top` under a stacked value and is a `margin-left` beside an inline
+		// one. The reason for pinning it is unchanged and now cuts the other way:
+		// `labelHalfBoxPx` composes the collision floor from the type sizes ALONE,
+		// so a gap that reverted to `margin-top` would grow the label's real box
+		// from 16 px back to 28 while the floor stayed at 8 — silently, in the band
+		// where every market rests.
 		const m = markup("expanded");
 		expect(m).toContain(`font-size:${LABEL_VALUE_PX}px`);
-		expect(m).toContain(`margin-top:${LABEL_STACK_GAP_PX}px`);
+		expect(m).toContain(`margin-left:${LABEL_INLINE_GAP_PX}px`);
+		expect(m).not.toMatch(/terminal-value-(yes|no)"[^>]*margin-top:/);
 		expect(m).toContain('data-testid="terminal-value-yes"');
 
 		// POSITIVE CONTROL — the width ban fires on the forms it is written against
@@ -842,12 +868,20 @@ describe("C-CHART-2 clause 4 (CHART-6) — the CSS floor holds across the whole 
 		// plot space says — so on the hero the separation the reader actually sees
 		// changed from 10 px to 28 px, and nothing swept that.
 		//
-		// ⛔ THE FAILURE IT MUST REJECT is a hero that took the value line and kept
-		// the 5 px floor: two 28 px boxes with 10 px between their centres, i.e.
-		// overlapping by 18 px, across the band where every market rests. That ships
-		// green against every plot-space assertion in the repository, because in plot
-		// space nothing moved — the exact shape CHART-2's cascade already caught once.
-		const HALF = { collapsed: 5, expanded: 14, hero: 14 } as const;
+		// ⛔ AND CHART-7 MOVED IT BACK DOWN, ON BOTH VALUE-BEARING SURFACES. RF-2
+		// puts name and value on ONE line, so the box is `max(10, 16) = 16` rather
+		// than `10 + 2 + 16 = 28`, and the floor is 8 rather than 14. **The rule is
+		// untouched and its input halved** — which is the same sentence CHART-5
+		// wrote going the other way.
+		//
+		// ⛔ THE FAILURE IT MUST REJECT is unchanged in shape and only in sign: a
+		// surface whose label box and whose floor disagree. A value re-stacked
+		// beneath its name against an 8 px floor gives two 28 px boxes 16 px apart —
+		// overlapping by 12 px, across the band where every market rests — and it
+		// ships green against every plot-space assertion in the repository, because
+		// in plot space nothing moved. That is the exact shape CHART-2's cascade
+		// caught once and CHART-6's caught again.
+		const HALF = { collapsed: 5, expanded: 8, hero: 8 } as const;
 
 		for (const mode of ["collapsed", "expanded", "hero"] as const) {
 			const half = HALF[mode];
