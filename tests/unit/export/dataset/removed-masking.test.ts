@@ -4,6 +4,10 @@ import { describe, expect, it } from "vitest";
 
 import { buildDataset, harvestSecrets } from "@/server/export/dataset/build";
 import {
+	buildPseudonymMap,
+	pseudonymizeTable,
+} from "@/server/export/dataset/pseudonymize";
+import {
 	CONTENT_REMOVED_REASON,
 	maskRemovedComment,
 	removedCommentIds,
@@ -132,54 +136,106 @@ describe("removed masking · THE BODY does not reach any written file", () => {
 		});
 	});
 
-	it("⛔ KNOWN OPEN — a removed body has no VALUE class, so only ONE mechanism holds R1", () => {
-		// ⚠⚠ **A tripwire, not a passing guard.**
+	it("H · a removed body HAS a value class now — the pin, INVERTED", () => {
+		// ⚠⚠ **This was a tripwire and it has fired.** Its DATASET.2 form
+		// asserted the ABSENCE of a class, and said so explicitly: *"pinned as
+		// the absence of a class rather than the presence of a leak, so this
+		// goes RED the day someone adds one — which is the signal wanted."*
+		// Ruling H added one at DATASET.3. This is the inversion it demanded.
 		//
-		// `EgressSecrets` carries ten value classes, and three of them
-		// (`display-name`, `avatar-url`, `blocked-text`) exist precisely because
-		// `@code-reviewer` H-4 found STRIP columns with no VALUE class — the
-		// layer's strongest assertion, *"this exact string, known to be in the
-		// source, is absent from the artifact"*, had never been pointed at them.
-		//
-		// A reactively-removed `comments.body` is in exactly that position now.
-		// It is WITHHELD by ruling R1, the removed set is derivable at harvest
-		// time from rows the pipeline already reads (`mod_actions` ∩ `comments`),
-		// and no class covers it. So R1 rests on ONE mechanism — the predicate
-		// inside `stripRow` — with no value-level backstop behind it. A second
-		// read path that emitted the body (a teaser column, a payload field, a
-		// debate document built from the unmasked model) would publish it and
-		// every guard would report clean.
+		// What it was about: `EgressSecrets` carries a value class for every
+		// other STRIP-class column, three of them added by `@code-reviewer`
+		// H-4 after exactly this observation — that the layer's strongest
+		// assertion, *"this exact string, known to be in the source, is absent
+		// from the artifact"*, had never been pointed at them. A reactively-
+		// removed `comments.body` sat in that position: withheld by ONE
+		// predicate inside `stripRow`, with nothing behind it. A second read
+		// path emitting the body — a teaser column, a payload field, a debate
+		// document built from the unmasked model — would have published it
+		// with every guard reporting clean.
 		//
 		// That is CLAUDE.md §5.14 SC-1's own argument: masking is a property of
-		// every code path that reads `comments.body`, and a guarantee that lives
-		// in one predicate is a guarantee about one call site.
-		//
-		// Not closable in the test layer — adding a class means adding a field to
-		// `EgressSecrets` and a harvest step in `build.ts`.
+		// every code path that reads `comments.body`, and a guarantee living in
+		// one predicate is a guarantee about one call site.
+
 		// The canary IS in the source…
 		expect(
 			DIRTY_TABLE_ROWS.comments.some((c) => c.body === REMOVED_COMMENT_BODY),
 		).toBe(true);
 
-		// …and no harvested value class contains it. Pinned as the ABSENCE of a
-		// class rather than the presence of a leak, so this goes RED the day
-		// someone adds one — which is the signal wanted.
+		// …and it is now harvested, into its own class and no other. Pinning
+		// the CLASS rather than "some class covers it" matters: a body landing
+		// in `blockedTexts` would look like coverage and would carry the wrong
+		// tier and the wrong reason.
 		const secrets = harvestSecrets(DIRTY_TABLE_ROWS as never);
+		expect(secrets.removedBodies.has(REMOVED_COMMENT_BODY)).toBe(true);
 		for (const [name, values] of Object.entries(secrets)) {
+			if (name === "removedBodies" || name === "participantSourced") continue;
 			expect(
 				(values as ReadonlySet<string>).has(REMOVED_COMMENT_BODY),
-				`${name} unexpectedly covers a removed body — invert this test`,
+				`${name} also covers the removed body — one class, one reason`,
 			).toBe(false);
 		}
 
-		// Consequence, made concrete: a row carrying the withheld body under any
-		// key at all passes every guard the layer has.
-		const guarded = assertTableClean(
-			"events",
-			[{ event_id: "probe", teaser: REMOVED_COMMENT_BODY }],
-			secrets,
+		// Consequence, made concrete and INVERTED: the row that used to pass
+		// every guard now halts the build.
+		expect(() =>
+			assertTableClean(
+				"events",
+				[{ event_id: "probe", body: REMOVED_COMMENT_BODY }],
+				secrets,
+			),
+		).toThrow(/no-removed-body/);
+	});
+
+	it("H · the canary fails if stripRow's masking predicate is DELETED", () => {
+		// ⚠ Ruling H's literal requirement: *"the canary must fail if
+		// `stripRow`'s predicate is deleted."* Written as code rather than
+		// argued, by reproducing the unmasked strip and running the real guard
+		// over its output.
+		const secrets = harvestSecrets(DIRTY_TABLE_ROWS as never);
+
+		// The defect, constructed: the comments table transformed with an
+		// EMPTY removed set — which is exactly what deleting the predicate,
+		// or forgetting the argument, produces.
+		// ⚠ **BOTH passes.** My first version ran only the strip and got two
+		// `no-raw-user-id` violations, which looked like an H defect and was
+		// not — `user_id` is rewritten by the PSEUDONYMIZE pass. DATASET.2
+		// recorded this exact error one file over: *"running half the pipeline
+		// and asserting the whole contract is its own error"*, and I made it
+		// again. The honest end-to-end is the one the build runs.
+		const map = buildPseudonymMap(DIRTY_TABLE_ROWS.users);
+		const unmasked = pseudonymizeTable(
+			"comments",
+			stripTable("comments", DIRTY_TABLE_ROWS.comments, {
+				removedCommentIds: new Set<string>(),
+			}),
+			map,
 		);
-		expect(guarded.advisories).toEqual([]);
+		expect(
+			JSON.stringify(unmasked),
+			"control: the unmasked transform really does carry the body",
+		).toContain(REMOVED_COMMENT_BODY);
+
+		expect(() => assertTableClean("comments", unmasked, secrets)).toThrow(
+			/no-removed-body/,
+		);
+
+		// …and the correctly-masked transform passes, so the guard is not
+		// simply throwing on every comments table.
+		const removedIds = new Set(
+			DIRTY_TABLE_ROWS.mod_actions
+				.filter((m) => m.reason === "content_removed")
+				.map((m) => String(m.target_comment_id)),
+		);
+		const masked = pseudonymizeTable(
+			"comments",
+			stripTable("comments", DIRTY_TABLE_ROWS.comments, {
+				removedCommentIds: removedIds,
+			}),
+			map,
+		);
+		expect(() => assertTableClean("comments", masked, secrets)).not.toThrow();
 	});
 
 	it("the ROW survives, and that is deliberate", () => {

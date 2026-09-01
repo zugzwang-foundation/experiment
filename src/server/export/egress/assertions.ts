@@ -75,6 +75,59 @@ export interface EgressSecrets {
 	 */
 	readonly blockedTexts: ReadonlySet<string>;
 	/**
+	 * Every `bets.idempotency_key` — ruling S2, DATASET.3.
+	 *
+	 * ⚠ **This class exists because the ruling-I compile error demanded it,
+	 * and that is the nicest thing that happened on this branch.** S2 made
+	 * `bets.idempotency_key` a `STRIP` column. `HARVEST_COLUMN_BUCKETS` is
+	 * declared `satisfies Record<StrippedColumnPath, …>`, so `tsc` refused the
+	 * commit until the new column had a harvest bucket — and there was no
+	 * bucket, because there was no value class. Two rulings written
+	 * independently, and the type system made the second complete the first.
+	 *
+	 * That is exactly the gap `@code-reviewer` H-4 found by hand at DATASET.1:
+	 * three `STRIP` columns with no value class, so the layer's strongest
+	 * assertion had never been pointed at them. It cannot recur silently now.
+	 *
+	 * Participant-chosen (the raw `Idempotency-Key` header), so ruling S1
+	 * applies: fatal under `idempotency_key`, advisory on a collision
+	 * elsewhere. Without that, this ruling would have opened a fresh C-1
+	 * channel through the very column it added.
+	 */
+	readonly idempotencyKeys: ReadonlySet<string>;
+	/**
+	 * Every reactively-REMOVED `comments.body` — ruling H, DATASET.3.
+	 *
+	 * ⚠ **This class exists because R1 rested on a single predicate.**
+	 * Withholding a removed body is done in `stripRow`, by intersecting the
+	 * removed set before the column walk. That is structural and it is
+	 * correct — but it is ONE `if`, and every other STRIP-class column in this
+	 * dataset has a value guard standing behind its strip precisely so that
+	 * the strip failing is not the same event as the secret shipping
+	 * (`@code-reviewer` H-4 added three such classes for exactly this reason;
+	 * `@test-writer` M-2 then observed a removed body sitting in the position
+	 * those three had been in).
+	 *
+	 * It is also CLAUDE.md §5.14 SC-1's own argument turned on this pipeline:
+	 * masking is a property of every code path that reads `comments.body`, not
+	 * of a row — so the assertion has to be about the BODY's absence, not the
+	 * row's.
+	 *
+	 * ⚠ **Fatal-tier, and the reasoning is inherited rather than invented.**
+	 * The needle is participant-authored, so ruling S1 would ordinarily make a
+	 * collision advisory — except that it is harvested under `body` and would
+	 * surface under `body`, which is the transform's own field. That is the
+	 * same call `@security-auditor` F-11 H-C made for `blocked_text`, which was
+	 * deliberately removed from `FREE_TEXT_COLUMNS` so it could stay fatal on
+	 * the one column it protects.
+	 *
+	 * ⚠ The residual, stated rather than hidden: a second participant posting
+	 * the removed text verbatim would collide fatally. Unlike C-1 that is not
+	 * self-serve — it needs an admin removal first — and it is the identical
+	 * exposure `blocked_text` already carries by decision.
+	 */
+	readonly removedBodies: ReadonlySet<string>;
+	/**
 	 * Needle values that entered from a **participant-writable field**, each
 	 * mapped to the FIELD NAMES it was harvested under — ruling S1, DATASET.3.
 	 *
@@ -249,6 +302,8 @@ export function emptySecrets(): EgressSecrets {
 		displayNames: new Set(),
 		avatarUrls: new Set(),
 		blockedTexts: new Set(),
+		idempotencyKeys: new Set(),
+		removedBodies: new Set(),
 		// Empty, so every needle is absent from the map and therefore fatal —
 		// vacuously true here, and the right polarity: a caller that builds its
 		// own secrets without thinking about provenance gets the strict
@@ -427,6 +482,34 @@ export class EgressGuard {
 		);
 	}
 
+	/** **No `idempotency_key`.** `bets.idempotency_key`, STRIP — ruling S2. */
+	assertNoIdempotencyKeys(artifact: string, rows: unknown): this {
+		return this.byValue(
+			artifact,
+			rows,
+			this.secrets.idempotencyKeys,
+			"no-idempotency-key",
+			"an idempotency key",
+		);
+	}
+
+	/**
+	 * **No reactively-removed body.** Appendix B.6 `WITHHELD_IF_REMOVED`,
+	 * ruling H (DATASET.3).
+	 *
+	 * The value-shaped backstop to `stripRow`'s masking predicate. Deleting
+	 * that predicate must not be the same event as publishing the body.
+	 */
+	assertNoRemovedBodies(artifact: string, rows: unknown): this {
+		return this.byValue(
+			artifact,
+			rows,
+			this.secrets.removedBodies,
+			"no-removed-body",
+			"a reactively-removed comment body",
+		);
+	}
+
 	// ── key-shaped nets ─────────────────────────────────────────────────
 
 	/**
@@ -550,6 +633,28 @@ export class EgressGuard {
 				"no-blocked-text",
 				this.secrets.blockedTexts,
 				"a gate-blocked comment body",
+				false,
+			],
+			// ⚠ Ruling H. Advisory on the TEXT arm and fatal on the table arm,
+			// and the asymmetry is deliberate rather than an oversight: the
+			// `.md` serializer inherits masking from `loadDebateView`
+			// (ADR-0025), so a removed body reaching a debate document is a
+			// serializer defect — but `scanText` is a SUBSTRING matcher over
+			// participant prose, so a removed argument's text recurring inside
+			// a longer surviving one is exactly the collision S1 exists to stop
+			// aborting a one-shot build. The hard guarantee is the table arm.
+			[
+				"no-removed-body",
+				this.secrets.removedBodies,
+				"a reactively-removed comment body",
+				false,
+			],
+			// Participant-chosen header text; a debate document containing one
+			// is a coincidence the participant arranged, never a serializer leak.
+			[
+				"no-idempotency-key",
+				this.secrets.idempotencyKeys,
+				"an idempotency key",
 				false,
 			],
 		];
@@ -687,10 +792,31 @@ export class EgressGuard {
 				path: hit.path,
 				detail: `${noun} survived (key: ${hit.key ?? "—"})`,
 			};
+			// ⚠ **Ordering is load-bearing, and getting it wrong was a real
+			// defect on this branch.** The free-text downgrade below used to run
+			// FIRST, which meant a rule whose needle is harvested FROM
+			// `comments.body` — ruling H's removed bodies — could never fire
+			// fatally on the one column it protects. That is
+			// `@security-auditor` F-11 H-C exactly, one column over: a fix that
+			// cut its own belt.
+			//
+			// The field-match test therefore comes first, and the two tiers
+			// collapse into one principle: **a hit under a field the needle was
+			// harvested from is the transform failing at its own job**, whatever
+			// else that field is. `no-removed-body` under `body` halts;
+			// `no-blocked-text` under `body` does not, because `blocked_text` is
+			// a different field and a re-post is a participant's own doing
+			// (`@security-auditor` H-4).
+			const harvestedFrom =
+				typeof hit.value === "string"
+					? this.secrets.participantSourced.get(hit.value)
+					: undefined;
+			const ownField = hit.key !== null && harvestedFrom?.has(hit.key) === true;
+
 			// A hit inside participant-authored free text is self-disclosure,
 			// not a transform failure — reported, never fatal. See
 			// FREE_TEXT_COLUMNS for why halting there is a kill switch.
-			if (hit.key !== null && FREE_TEXT_COLUMNS.has(hit.key)) {
+			if (!ownField && hit.key !== null && FREE_TEXT_COLUMNS.has(hit.key)) {
 				this.warnings.push({
 					...entry,
 					detail:
@@ -765,6 +891,8 @@ export function assertTableClean(
 		.assertNoDisplayNames(table, rows)
 		.assertNoAvatarUrls(table, rows)
 		.assertNoBlockedTexts(table, rows)
+		.assertNoIdempotencyKeys(table, rows)
+		.assertNoRemovedBodies(table, rows)
 		.assertNoStrippedMetadataKeys(table, rows)
 		.assertNoForbiddenPayloadKeys(table, rows)
 		.assertClean();

@@ -21,34 +21,19 @@ import type { EventType } from "@/server/events/event-types";
  */
 
 /**
- * §19.4 + Appendix B — columns dropped from the released schema entirely,
- * keyed by source table name.
+ * ⚠ `STRIPPED_COLUMNS` MOVED to `dataset/treatments.ts` at DATASET.3, ruling I.
  *
- * ⚠ `users.pfp_filename` is deliberately ABSENT. §19.4's table is titled "The
- * ten PII columns dropped at export" and lists it as row 7 — but its own
- * treatment column reads *"Released as-is; H2-erased rows release as NULL"*,
- * and Appendix B.1 classifies it `NULL_IF_ERASED`, not `STRIP`. It ships.
- * Dropping it would destroy the `identity_pool` join and delete a column the
- * spec twice says survives. The "ten" is a miscount of its own table, and
- * copying the count instead of the treatments is how it propagates.
+ * It lived here as a hand-written second statement of Appendix B's `STRIP`
+ * classifications, with no consumer in `src/` — the strip has always read
+ * `COLUMN_TREATMENTS`. Two independent statements of one policy, free to
+ * disagree, with a test as the only thing noticing. It is now DERIVED from
+ * that map, so the divergence is unwritable rather than merely tested for, and
+ * `build.ts`'s harvest is bound to it by a `satisfies` clause that turns a
+ * missing bucket into a compile error.
+ *
+ * Re-exported below so existing import sites keep working; the move is about
+ * where the truth lives, not about breaking the front door.
  */
-export const STRIPPED_COLUMNS = {
-	users: [
-		"email",
-		"google_id",
-		"name",
-		"image",
-		"tos_acceptance_ip",
-		"tos_acceptance_user_agent",
-	],
-	image_uploads: ["r2_object_key"],
-	// B.10 — neither of these appears in §19.4's ten-row table.
-	// `blocked_text` is the rejected comment body retained for ban review;
-	// `image_r2_key` is an R2 key, and R2 keys embed the userId per
-	// SCAFFOLD.15 §Q9 (`u/<userId>/<uploadId>.<ext>`), which makes it a raw
-	// `users.id` carrier under a name that does not say so.
-	mod_actions: ["blocked_text", "image_r2_key"],
-} as const satisfies Record<string, readonly string[]>;
 
 /**
  * §19.4 rows 9–10 + Appendix B.11/B.12/B.13 — JSONB sub-keys stripped from
@@ -56,7 +41,17 @@ export const STRIPPED_COLUMNS = {
  * `user_events`). Not table-scoped: `metadata` has one shape (§3.7's
  * seven-field set) and these two keys never ship from any of them.
  */
-export const STRIPPED_METADATA_KEYS = ["ip", "user_agent"] as const;
+export const STRIPPED_METADATA_KEYS = [
+	"ip",
+	"user_agent",
+	// ⚠ **Added at DATASET.3, ruling S2.** Same value, same reasoning as
+	// `bets.idempotency_key` — the raw `Idempotency-Key` header, participant-
+	// chosen, unmoderated, 255 bytes. Stripping it from the column and
+	// shipping it from the metadata blob one table over would have been the
+	// `admin_session` mistake repeating: the same bytes stripped from one
+	// field and published from another, with the strip named as the mitigation.
+	"idempotency_key",
+] as const;
 
 /**
  * §19.4 — the five `metadata` fields that DO ship. Kept as an explicit
@@ -69,7 +64,6 @@ export const SHIPPED_METADATA_KEYS = [
 	"flow_id",
 	"user_id",
 	"actor_id",
-	"idempotency_key",
 ] as const;
 
 /**
@@ -325,7 +319,8 @@ export const METADATA_SHIP_SPEC: ShipSpec = {
 	flow_id: true,
 	user_id: true,
 	actor_id: true,
-	idempotency_key: true,
+	// ⚠ `idempotency_key` is DELIBERATELY ABSENT — ruling S2, DATASET.3.
+	// §3.7 declares seven metadata fields; four now ship.
 };
 
 /**
@@ -350,6 +345,12 @@ export const FORBIDDEN_VALUE_CLASSES = [
 	"display-name", // B.1 `users.name` STRIP
 	"avatar-url", // B.1 `users.image` STRIP
 	"blocked-text", // B.10 `mod_actions.blocked_text` STRIP
+	// ⚠ Added at DATASET.3. `idempotency-key` is ruling S2's new STRIP column;
+	// `removed-body` is ruling H's backstop to R1's single masking predicate.
+	// The parity test binds this list to the rules the guards actually emit,
+	// so a class added to `EgressSecrets` without a helper reds there.
+	"idempotency-key", // B.5 `bets.idempotency_key` STRIP (S2)
+	"removed-body", // B.6 `comments.body` WITHHELD_IF_REMOVED (H)
 ] as const;
 
 export type ForbiddenValueClass = (typeof FORBIDDEN_VALUE_CLASSES)[number];

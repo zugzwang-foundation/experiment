@@ -145,7 +145,21 @@ export const COLUMN_TREATMENTS = {
 		share_quantity: "SHIP",
 		price_at_bet: "SHIP",
 		comment_id: "SHIP",
-		idempotency_key: "SHIP", // client-generated opaque string; no PII
+		// ⚠ **STRIP — ruling S2, DATASET.3.** This read `SHIP` with the note
+		// *"client-generated opaque string; no PII"*, which was an ASSUMPTION
+		// wearing the clothes of a constraint. The stored value is the raw
+		// `Idempotency-Key` request header, validated only by
+		// `^[A-Za-z0-9_-]{1,255}$` — 255 bytes the participant chooses, that
+		// moderation never sees (the gate covers comment bodies and images,
+		// not headers). A participant can place N bets each carrying a doxx, a
+		// slur or a Google `sub`, all regex-valid, into `bets.csv` and every
+		// `events.csv` metadata blob, under CC-BY-4.0, permanently.
+		//
+		// Its research value is close to nil: it is an opaque replay token,
+		// not a fact about a bet. Weighed against an unmoderated participant-
+		// chosen string in a public artifact that cannot be un-published, the
+		// trade is not close.
+		idempotency_key: "STRIP",
 		created_at: "SHIP",
 	},
 	// B.6
@@ -277,6 +291,53 @@ export const COLUMN_TREATMENTS = {
 } as const satisfies Record<string, Record<string, ColumnTreatment>>;
 
 export type TreatedTable = keyof typeof COLUMN_TREATMENTS;
+
+/**
+ * Every `table.column` this map classifies `STRIP`, as a TYPE.
+ *
+ * ⚠ **Ruling I (DATASET.3) — this is the derivation, and the compile error is
+ * the proof.** `STRIPPED_COLUMNS` used to be a second, hand-written statement
+ * of the same policy living in `forbidden-keys.ts`, with **zero consumers in
+ * `src/`**: the strip reads `COLUMN_TREATMENTS`, so editing the other list
+ * changed no behaviour and produced no signal. A test pinned the two together,
+ * which is better than nothing and is not the same thing — a test can be
+ * deleted by whoever is making it red, and it says nothing at the moment the
+ * divergence is written.
+ *
+ * Derived instead. `build.ts`'s `HARVEST_COLUMN_BUCKETS` is declared
+ * `satisfies Record<StrippedColumnPath, …>`, so **adding a `STRIP` column here
+ * without giving it a harvest bucket fails `tsc`** — which is what ruling I
+ * asks for and what a test could not give. That closes the gap
+ * `@security-auditor` M-2 measured: the two agreed on the day, and nothing made
+ * them.
+ */
+export type StrippedColumnPath = {
+	[T in keyof typeof COLUMN_TREATMENTS]: {
+		[C in keyof (typeof COLUMN_TREATMENTS)[T]]: (typeof COLUMN_TREATMENTS)[T][C] extends "STRIP"
+			? `${T & string}.${C & string}`
+			: never;
+	}[keyof (typeof COLUMN_TREATMENTS)[T]];
+}[keyof typeof COLUMN_TREATMENTS];
+
+/**
+ * The same set at RUNTIME, keyed by table — derived from the one declaration
+ * above, never re-typed.
+ *
+ * Kept exported because the parity tests and the manifest read it; what
+ * changed at DATASET.3 is that it can no longer disagree with the map the
+ * pipeline actually consumes, because it IS that map.
+ */
+export const STRIPPED_COLUMNS: Readonly<Record<string, readonly string[]>> =
+	Object.fromEntries(
+		Object.entries(COLUMN_TREATMENTS)
+			.map(([table, cols]) => [
+				table,
+				Object.entries(cols)
+					.filter(([, t]) => t === "STRIP")
+					.map(([c]) => c),
+			])
+			.filter(([, cols]) => (cols as string[]).length > 0),
+	);
 
 /**
  * Per-column treatments for one table, or `undefined` if it has none.

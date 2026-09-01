@@ -220,7 +220,11 @@ describe("build · the manifest describes what §19.3 actually did", () => {
 	it("names the metadata fields included and excluded, per §19.7", () => {
 		return build().then((r) => {
 			const events = r.manifest.tables.find((t) => t.name === "events");
-			expect(events?.metadata_fields_excluded).toEqual(["ip", "user_agent"]);
+			expect(events?.metadata_fields_excluded).toEqual([
+				"ip",
+				"user_agent",
+				"idempotency_key",
+			]);
 			// ⚠ `user_pseudonym`, not `user_id` — the manifest must describe the
 			// post-pseudonymization shape, which is what the file holds.
 			expect(events?.metadata_fields_included).toContain("user_pseudonym");

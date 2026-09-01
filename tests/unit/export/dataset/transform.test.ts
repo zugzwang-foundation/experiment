@@ -43,10 +43,27 @@ const secrets: EgressSecrets = fixtureSecrets();
 const map = buildPseudonymMap(DIRTY_TABLE_ROWS.users);
 
 /** The full transform, in pipeline order: strip, then pseudonymize. */
+/**
+ * ⚠ The removed set, derived the SAME way `buildDataset` derives it — from
+ * `mod_actions.reason === 'content_removed'` — rather than passed empty.
+ *
+ * An empty set was harmless while removal was enforced by one predicate whose
+ * only observable effect was a missing cell. Ruling H (DATASET.3) gives removed
+ * bodies a VALUE class, so an empty set here means the helper transforms
+ * `comments` in a state the pipeline never produces and the guard correctly
+ * fires on it. Running half the pipeline and asserting the whole contract is
+ * its own error — DATASET.2 recorded exactly this shape one file over.
+ */
+const REMOVED_IDS = new Set(
+	DIRTY_TABLE_ROWS.mod_actions
+		.filter((m) => (m as Record<string, unknown>).reason === "content_removed")
+		.map((m) => String((m as Record<string, unknown>).target_comment_id)),
+);
+
 function transform(table: string, rows: readonly Record<string, unknown>[]) {
 	return pseudonymizeTable(
 		table,
-		stripTable(table, rows, { removedCommentIds: new Set() }),
+		stripTable(table, rows, { removedCommentIds: REMOVED_IDS }),
 		map,
 	);
 }

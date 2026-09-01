@@ -9,6 +9,10 @@
  * downstream should reach past it into the individual modules.
  */
 
+// ⚠ Re-exported from its new home (ruling I, DATASET.3): `STRIPPED_COLUMNS` is
+// now DERIVED from `COLUMN_TREATMENTS` rather than hand-written beside it.
+// The barrel keeps the old import path working.
+export { STRIPPED_COLUMNS } from "../dataset/treatments";
 export {
 	assertTableClean,
 	assertTextArtifactClean,
@@ -30,7 +34,6 @@ export {
 	SHIPPED_METADATA_KEYS,
 	type ShipNode,
 	type ShipSpec,
-	STRIPPED_COLUMNS,
 	STRIPPED_METADATA_KEYS,
 } from "./forbidden-keys";
 export {

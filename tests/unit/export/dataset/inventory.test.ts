@@ -192,8 +192,13 @@ describe("treatments · the PSEUDO set is the wall, enumerated", () => {
 		]);
 	});
 
-	it("strips all NINE columns, including the two §19.4's table omits", () => {
+	it("strips all TEN columns, including the three §19.4's table omits", () => {
+		// ⚠ TEN as of DATASET.3. `bets.idempotency_key` is ruling S2's
+		// addition — 255 bytes of participant-chosen header text that
+		// moderation never sees, previously annotated `SHIP // no PII`, which
+		// was an assumption rather than a constraint.
 		expect(verifyTreatmentCoverage().stripColumns).toEqual([
+			"bets.idempotency_key",
 			"image_uploads.r2_object_key",
 			// ── absent from §19.4's ten-column table; B.10 marks both STRIP ──
 			"mod_actions.blocked_text",

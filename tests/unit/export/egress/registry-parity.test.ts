@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { eventMetadataSchema } from "@/server/events/schemas";
+import { HARVEST_COLUMN_BUCKETS } from "@/server/export/dataset/build";
 import { COLUMN_TREATMENTS } from "@/server/export/dataset/treatments";
 import {
 	assertTableClean,
@@ -83,9 +84,9 @@ describe("egress · metadata keys partition §3.7's seven-field set", () => {
 	});
 });
 
-// ── STRIPPED_COLUMNS vs the map the pipeline actually reads ───────────────
+// ── STRIPPED_COLUMNS is now DERIVED, and the harvest is bound to it ───────
 
-describe("egress · STRIPPED_COLUMNS agrees with COLUMN_TREATMENTS", () => {
+describe("egress · every STRIP column is harvested (ruling I)", () => {
 	/** `table.column` for every column the pipeline actually drops. */
 	const fromTreatments = Object.entries(COLUMN_TREATMENTS)
 		.flatMap(([table, cols]) =>
@@ -99,20 +100,72 @@ describe("egress · STRIPPED_COLUMNS agrees with COLUMN_TREATMENTS", () => {
 		.flatMap(([table, cols]) => cols.map((c) => `${table}.${c}`))
 		.sort();
 
-	it("the two lists name the same nine columns", () => {
-		// Nine, not §19.4's ten: `users.pfp_filename` is NULL_IF_ERASED and
-		// ships (B.1), and `mod_actions.blocked_text` / `image_r2_key` are two
-		// §19.4's table omits (B.10).
+	/**
+	 * ⚠ **This block's job CHANGED at DATASET.3, ruling I, and saying so is
+	 * the point.** It used to compare two hand-written lists — the strip map
+	 * the pipeline reads, and a `STRIPPED_COLUMNS` constant in
+	 * `forbidden-keys.ts` with no consumer in `src/` at all. Its own positive
+	 * control said *"the equality above is satisfied by both lists being
+	 * derived from the same object, WHICH THEY ARE NOT"*, and that was true and
+	 * was the problem: two statements of one policy, free to disagree, with a
+	 * test as the only thing that would notice — and only when someone ran it.
+	 *
+	 * `STRIPPED_COLUMNS` is now derived FROM `COLUMN_TREATMENTS`, so the two
+	 * cannot disagree and the old control cannot be written. What replaces it
+	 * is stronger and lives in `tsc`: `HARVEST_COLUMN_BUCKETS` is declared
+	 * `satisfies Record<StrippedColumnPath, …>`, so a `STRIP` column with no
+	 * harvest bucket is a COMPILE error. That is what ruling I asked for —
+	 * *"the proof is a compile error, not a test"* — and it has already fired
+	 * once on this branch: ruling S2 made `bets.idempotency_key` a `STRIP`
+	 * column and `tsc` refused it until the value class existed.
+	 *
+	 * What remains testable here is the RUNTIME half: that the derivation
+	 * produces what the map says, and that every derived column really is
+	 * reachable by the harvest.
+	 */
+	it("the derived list is exactly the STRIP set of the treatment map", () => {
 		expect(fromRegistry).toEqual(fromTreatments);
-		expect(fromTreatments).toHaveLength(9);
+		// ⚠ TEN, not nine, and not §19.4's ten either. `users.pfp_filename` is
+		// NULL_IF_ERASED and ships (B.1); `mod_actions.blocked_text` and
+		// `image_r2_key` are two §19.4's table omits (B.10); and
+		// `bets.idempotency_key` is ruling S2's addition (DATASET.3).
+		expect(fromTreatments).toHaveLength(10);
+		expect(fromTreatments).toContain("bets.idempotency_key");
 	});
 
-	it("POSITIVE CONTROL — a divergence between them is detectable", () => {
-		// Without this, the equality above is satisfied by both lists being
-		// derived from the same object, which they are not — but a reader
-		// cannot tell that from an equality alone.
-		const drifted = fromRegistry.filter((c) => c !== "users.email");
-		expect(drifted).not.toEqual(fromTreatments);
+	it("EVERY derived STRIP column has a harvest bucket", () => {
+		// The runtime shadow of the compile-time `satisfies`. Kept because a
+		// cast, an `as never`, or a `Partial<>` can silence a type error and
+		// cannot silence this — the same belt-to-the-brace argument
+		// `completeness.ts` makes about `PAYLOAD_SHIP_KEYS`.
+		const unbucketed = fromTreatments.filter(
+			(path) => !(path in HARVEST_COLUMN_BUCKETS),
+		);
+		expect(
+			unbucketed,
+			"a column Appendix B classifies STRIP is not harvested — it would " +
+				"leave the value scan's reach silently, which is exactly the " +
+				"decoupling ruling I closed",
+		).toEqual([]);
+	});
+
+	it("THE WRONG ANSWER — a STRIP column with no bucket is detected", () => {
+		// The control. The live pair agrees, so a test that could only compare
+		// the real two would assert emptiness against data with no gap.
+		const withNewColumn = [...fromTreatments, "markets.secret_note"];
+		const unbucketed = withNewColumn.filter(
+			(path) => !(path in HARVEST_COLUMN_BUCKETS),
+		);
+		expect(unbucketed).toEqual(["markets.secret_note"]);
+	});
+
+	it("no harvest bucket names a column that is not STRIP", () => {
+		// The other direction: a phantom bucket reads as coverage of a column
+		// the pipeline never drops.
+		const phantom = Object.keys(HARVEST_COLUMN_BUCKETS).filter(
+			(path) => !fromTreatments.includes(path),
+		);
+		expect(phantom).toEqual([]);
 	});
 });
 

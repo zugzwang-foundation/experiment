@@ -28,7 +28,11 @@ import { removedCommentIds } from "./removed";
 import type { DatasetSource } from "./source";
 import { type SourceRow, stripTable } from "./strip";
 import { contentSha256, createTarGz, sha256, type TarEntry } from "./tar";
-import { assertTreatmentsComplete, treatmentsFor } from "./treatments";
+import {
+	assertTreatmentsComplete,
+	type StrippedColumnPath,
+	treatmentsFor,
+} from "./treatments";
 
 /**
  * DATASET.1 Slice 6 — the build orchestrator.
@@ -193,6 +197,65 @@ const HARVEST_KEYS: Readonly<Record<string, SecretBucket>> = {
 export type SecretBucket = Exclude<keyof EgressSecrets, "participantSourced">;
 
 /**
+ * Every `STRIP` column → the `EgressSecrets` bucket its values are harvested
+ * into, plus the provenance of the field it comes from.
+ *
+ * ⚠⚠ **Ruling I (DATASET.3), and the `satisfies` clause IS the ruling.**
+ * `Record<StrippedColumnPath, …>` requires an entry for EVERY column Appendix
+ * B classifies `STRIP` — so adding one to `COLUMN_TREATMENTS` without deciding
+ * how its values are harvested **fails `tsc`**, months before anyone runs the
+ * release.
+ *
+ * The gap this closes was measured by `@security-auditor` M-2: the harvest's
+ * column list was hand-maintained and structurally decoupled from the strip
+ * set. They agreed on the day it was measured (`STRIP-but-NOT-harvested = []`
+ * for all three tables) and **nothing made them agree**. A new `STRIP` column
+ * would have passed every guard while silently leaving the value scan's reach
+ * — the strip would remove it, and if the strip ever stopped, no needle would
+ * exist to notice.
+ *
+ * ⚠ A test could not have delivered this. The reviewer's named failure mode
+ * for ruling I was *"a 'derivation' that is still two declarations wearing one
+ * name, so the compile error never fires"* — which is precisely what the
+ * previous `STRIPPED_COLUMNS` + `registry-parity` pairing was.
+ *
+ * `users.id` is deliberately NOT here: it is `SHIP` in `users` (the §19.5
+ * join-key exemption), not `STRIP`, so it is harvested separately.
+ */
+export const HARVEST_COLUMN_BUCKETS = {
+	"users.name": { bucket: "displayNames", provenance: "PARTICIPANT" },
+	"users.email": { bucket: "emails", provenance: "PARTICIPANT" },
+	"users.image": { bucket: "avatarUrls", provenance: "SYSTEM" },
+	"users.google_id": { bucket: "googleIds", provenance: "SYSTEM" },
+	"users.tos_acceptance_ip": { bucket: "ips", provenance: "PARTICIPANT" },
+	"users.tos_acceptance_user_agent": {
+		bucket: "userAgents",
+		provenance: "PARTICIPANT",
+	},
+	"image_uploads.r2_object_key": {
+		bucket: "r2ObjectKeys",
+		provenance: "SYSTEM",
+	},
+	"mod_actions.blocked_text": {
+		bucket: "blockedTexts",
+		provenance: "PARTICIPANT",
+	},
+	"mod_actions.image_r2_key": { bucket: "r2ObjectKeys", provenance: "SYSTEM" },
+	// ⚠ Ruling S2 (DATASET.3) — 255 bytes of participant-chosen header text
+	// that moderation never sees. It is STRIPPED now, so it needs a bucket;
+	// and because it is participant-chosen it needs the PARTICIPANT tag, or a
+	// participant could mint a key equal to a market slug and poison the build
+	// through the very column this ruling added. The two rulings meet here.
+	"bets.idempotency_key": {
+		bucket: "idempotencyKeys",
+		provenance: "PARTICIPANT",
+	},
+} as const satisfies Record<
+	StrippedColumnPath,
+	{ bucket: SecretBucket; provenance: Provenance }
+>;
+
+/**
  * Where a harvested value ENTERED the system — ruling S1, DATASET.3.
  *
  * ⚠ **This is a property of the SOURCE, not of the field it later turns up
@@ -307,6 +370,8 @@ export function harvestSecrets(
 		displayNames: new Set<string>(),
 		avatarUrls: new Set<string>(),
 		blockedTexts: new Set<string>(),
+		idempotencyKeys: new Set<string>(),
+		removedBodies: new Set<string>(),
 	};
 
 	/**
@@ -377,6 +442,35 @@ export function harvestSecrets(
 			"r2_object_key",
 		);
 	}
+	// Ruling S2 (DATASET.3) — 255 bytes of participant-chosen header text.
+	for (const row of tables.bets ?? []) {
+		add(
+			s.idempotencyKeys,
+			row.idempotency_key,
+			HARVEST_COLUMN_BUCKETS["bets.idempotency_key"].provenance,
+			"idempotency_key",
+		);
+	}
+
+	// ⚠ **Ruling H (DATASET.3) — the removed bodies.** Derived from the SAME
+	// `mod_actions` predicate `removedCommentIds` uses, never a second idea of
+	// what removal means: `reason === 'content_removed'`. Harvested under the
+	// field name `body`, so a hit in `comments.body` is the masking predicate
+	// having failed at its own job and stays FATAL, while the identical string
+	// colliding elsewhere is advisory (ruling S1).
+	{
+		const removed = new Set(
+			(tables.mod_actions ?? [])
+				.filter((r) => r.reason === "content_removed")
+				.map((r) => String(r.target_comment_id)),
+		);
+		for (const row of tables.comments ?? []) {
+			if (typeof row.id === "string" && removed.has(row.id)) {
+				add(s.removedBodies, row.body, "PARTICIPANT", "body");
+			}
+		}
+	}
+
 	// ⚠ mod_actions.image_r2_key is a second R2 key on a shipped table.
 	// §19.4's ten-column table does not name it; Appendix B.10 marks it STRIP.
 	for (const row of tables.mod_actions ?? []) {

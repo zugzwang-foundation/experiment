@@ -256,13 +256,16 @@ describe("M-7 / M-10 · the manifest describes the WHOLE archive", () => {
 		// literal manifest keeps describing the old shape.
 		return build().then((r) => {
 			const events = r.manifest.tables.find((t) => t.name === "events");
-			expect(events?.metadata_fields_excluded).toEqual(["ip", "user_agent"]);
+			expect(events?.metadata_fields_excluded).toEqual([
+				"ip",
+				"user_agent",
+				"idempotency_key",
+			]);
 			expect(events?.metadata_fields_included).toEqual([
 				"request_id",
 				"flow_id",
 				"user_pseudonym",
 				"actor_id",
-				"idempotency_key",
 			]);
 		});
 	});

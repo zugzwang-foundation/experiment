@@ -1113,6 +1113,13 @@ function participantSites(): Map<string, ReadonlySet<string>> {
 	for (const u of DIRTY_TABLE_ROWS.users) put(u.name as string, "name");
 	for (const a of DIRTY_TABLE_ROWS.mod_actions)
 		put(a.blocked_text as string, "blocked_text");
+	// Ruling S2 — the Idempotency-Key header, participant-chosen.
+	for (const b of DIRTY_TABLE_ROWS.bets)
+		put(b.idempotency_key as string, "idempotency_key");
+	// Ruling H — the removed body is participant-authored, harvested under
+	// `body`, so a hit in `comments.body` stays fatal and a collision
+	// elsewhere does not.
+	put(REMOVED_COMMENT_BODY, "body");
 	return m;
 }
 
@@ -1127,6 +1134,10 @@ export function fixtureSecrets(): {
 	displayNames: Set<string>;
 	avatarUrls: Set<string>;
 	blockedTexts: Set<string>;
+	/** Ruling S2 (DATASET.3) — the participant-chosen `Idempotency-Key`s. */
+	idempotencyKeys: Set<string>;
+	/** Ruling H (DATASET.3) — the reactively-removed comment bodies. */
+	removedBodies: Set<string>;
 	/**
 	 * Ruling S1 (DATASET.3) — the needle values that entered from a
 	 * participant-writable field, and are therefore ADVISORY on a value-scan
@@ -1165,6 +1176,14 @@ export function fixtureSecrets(): {
 		blockedTexts: strings(
 			DIRTY_TABLE_ROWS.mod_actions.map((m) => m.blocked_text),
 		),
+		// ⚠ Ruling H. Written as the LITERAL canary rather than derived from
+		// the mod_actions predicate, for the reason every declaration in this
+		// file is a literal: it is the independent statement `harvestSecrets`
+		// is checked against.
+		idempotencyKeys: strings(
+			DIRTY_TABLE_ROWS.bets.map((b) => b.idempotency_key),
+		),
+		removedBodies: new Set<string>([REMOVED_COMMENT_BODY]),
 		// The five participant-writable classes: the ip and User-Agent a
 		// request carries verbatim, the email a participant types, the Google
 		// display NAME they set on their own account, and their own rejected
