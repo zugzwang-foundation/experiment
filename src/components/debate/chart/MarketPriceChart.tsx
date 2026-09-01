@@ -1008,16 +1008,26 @@ const LABEL_AIR_PX = 5;
  * wrong everywhere the tracks are content-bound instead. **A layout figure is
  * measured or it is not known.**
  *
- * ⇒ Worst case, post-CHART-6: plot = 496.49 − 24 (the marks column) = **472.49**,
- * and the two-line label measures **48.73** in the shipped face ⇒ **10.31 %**.
- * The `5px` of air is NOT in `shouldFlip`'s comparison — it cannot be, since
- * converting px to a percentage needs the plot width nobody knows at render — so
- * the reserve must absorb it too: 5 / 472.49 = 1.06 pp, for a true requirement of
- * **11.37 %**.
+ * ⇒ Worst case, **measured on this branch's own deployed build** rather than
+ * predicted: the hero's plot at the floor is **472.49** (496.49 − 24 for the
+ * marks column, confirmed), and the two-line label renders **33.56** at a typical
+ * `65%`. The WIDEST it can be is `100%`, measured at **42.47** in the shipped face
+ * — percentages are whole and bounded at 100 (SPEC.1 §10.8) — so the ceiling is
+ * 42.47 / 472.49 = **8.99 %**. The `5px` of air is NOT in `shouldFlip`'s
+ * comparison — it cannot be, since converting px to a percentage needs the plot
+ * width nobody knows at render — so the reserve must absorb it too:
+ * 5 / 472.49 = 1.06 pp, for a true requirement of **10.05 %**.
  *
- * **14 leaves 2.6 points of margin over that requirement.** It was 12, which
- * cleared it by 0.63 — enough today and not enough to survive a longer value
- * string or a type change. Over-reserving flips the label a few percent early,
+ * ⚠ AN EARLIER PASS PUT THAT AT 11.37 %, USING **48.73** FOR THE LABEL. That is
+ * the expanded GUTTER's width, not the label's — it included the gutter's own
+ * `pl-[5px]` and the column it sat in. Measuring the label itself is what the
+ * deployed build settled, and it moves the requirement down rather than up. The
+ * conclusion is unchanged and the margin is wider than claimed.
+ *
+ * **14 leaves 3.95 points of margin over that requirement.** It was 12, which
+ * cleared it by 1.95 — enough, but sized against a label width that turned out to
+ * be the gutter's. A threshold whose input was the wrong quantity is worth
+ * re-seating even when the answer survives. Over-reserving flips the label a few percent early,
  * which still places it beside its own dot and is invisible; under-reserving
  * overflows onto the numeric marks. The failure is one-sided, so the margin
  * belongs on the safe side. `label-anchor.test.tsx` caps it at 20 from the other

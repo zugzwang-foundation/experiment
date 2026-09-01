@@ -326,10 +326,17 @@ describe("debate-view::price-chart-label-flips-at-right-edge", () => {
 
 	it("reserves enough room that the widest measured label cannot cross the plot's edge", () => {
 		// ⛔ THE ONE MEASURED NUMBER IN THE MECHANISM, PINNED AGAINST THE
-		// MEASUREMENT. `LABEL_FLIP_RESERVE_PCT` is 14 because the worst measured
-		// `labelWidth / plotWidth` is **10.31 %** — the hero at its FLOOR width,
+		// MEASUREMENT. `LABEL_FLIP_RESERVE_PCT` is 14 because the worst
+		// `labelWidth / plotWidth` is **8.99 %** — the widest label the value can
+		// take (`100%`, 42.47 px in the shipped face) against the hero's plot at its
+		// FLOOR width (472.49 px), both measured on this branch's deployed build —
 		// plus 1.06 pp for the 5 px of air the threshold cannot express, giving a
-		// true requirement of 11.37 %. The hero's frame bottoms out at 496.49 px and
+		// true requirement of 10.05 %.
+		//
+		// ⚠ `WORST_MEASURED_FRACTION` below is left at **0.1031**, deliberately
+		// ABOVE the 0.0899 ceiling. The walk asserts that an un-flipped label of that
+		// width still fits, so over-stating it makes the walk STRICTER; understating
+		// it would make the walk agree with a reserve that does not fit. The hero's frame bottoms out at 496.49 px and
 		// stops there (the `md:` grid's centre track is content-bound at 530.99 px,
 		// measured identical at 768 / 900 / 1024 / 1045); below 768 it is
 		// single-column and WIDER. The collapsed card is 8.6 % and is
