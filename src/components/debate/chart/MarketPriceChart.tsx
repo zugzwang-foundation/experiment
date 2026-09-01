@@ -249,6 +249,13 @@ export function MarketPriceChart({
 		   ⚠ THE ROW REMAINS, and still earns `items-stretch`: the numeric marks
 		   column is a real flex cell whose percentage tops resolve against its own
 		   height. The labels no longer depend on it.
+		   ⚠ IT IS THREE CELLS SINCE CHART-7, NOT TWO — `[marks | plot | reserve]`.
+		   RF-1 moved the marks to the LEADING cell and RF-5 added a trailing RESERVE
+		   the traveling end labels overflow into. Both are `shrink-0`; the plot is
+		   the only cell that grows, which is what `alignment-chain.test.tsx` pins.
+		   The LABEL layer is still not among them and must never be: it is an
+		   overlay sharing the plot's box, and putting it back in flow narrows the
+		   plot and moves every rendered coordinate in the product.
 		   ⚠ The labels are RETURNED FROM THIS COMPONENT rather than left for each
 		   caller to place — the `ProfileChart` precedent (PROFILE OVERLAP R2),
 		   which moved its endpoint labels out of its `<svg>` the same way. A
@@ -327,88 +334,37 @@ export function MarketPriceChart({
 					aria-hidden="true"
 					className="h-full w-full"
 				>
-					{/* ✅ COLLAPSED — THE TIME AXIS (SPEC.1 1.0.32, HTML-FINISH · MARKET
-			    DETAIL round 2 · R8). Two interior ticks and three date labels.
-			    ⚠ IT IS DRAWN FIRST, so the two price lines paint OVER it — gridlines
-			    behind data. That is also the shipped `expanded` order below and
-			    `ProfileChart`'s, so the three axes stack their layers the same way.
-			    ⛔ IT IS INSIDE THE `<svg>`, DELIBERATELY. d5 draws its `.xtick` /
-			    `.xlab` as absolutely-positioned DIVS over the graph (`d5:496-499`),
-			    and porting that literally is what would have slipped past
-			    `price-chart.test.tsx::collapsed-renders-no-axis` GREEN — the guard
-			    asserts the absence of testids inside this component, and DOM siblings
-			    of the chart carry none of them. Building it here keeps the axis under
-			    the guard that names it.
+					{/* ✅ COLLAPSED — THE TIME TICKS (SPEC.1 1.0.32, HTML-FINISH · MARKET
+			    DETAIL round 2 · R8), and NOTHING ELSE. They are drawn FIRST, so the
+			    two price lines paint OVER them — gridlines behind data, which is the
+			    order `ProfileChart` uses too, so the axes stack their layers the same
+			    way.
 
-			    ⚠⚠ AND `ProfileChart` HAS NOW DONE THE OPPOSITE, SO READ THE TRAP ABOVE
-			    AS A SCOPING HAZARD RATHER THAN A BAN. PROFILE OVERLAP R2 moved that
-			    chart's two endpoint labels OUT of its `<svg>` and into HTML, because
-			    `preserveAspectRatio="none"` scales user space non-uniformly and text
-			    goes with it. The hazard is answered there by RETURNING the labels from
-			    the component's own tree rather than making them a sibling of it — a
-			    component-scoped query still finds them, which is the property this
-			    block was protecting.
+			    ⛔⛔ EIGHTY LINES STOOD HERE AND ARE DELETED RATHER THAN ANNOTATED,
+			    BECAUSE CHART-7 MADE EVERY ONE OF THEM MOOT. They argued three things:
+			    that the axis belongs INSIDE the `<svg>` (against porting d5's
+			    absolutely-positioned divs, which is exactly what `AxisDates` now is);
+			    that its date labels are "the ONLY TEXT IN THIS `<svg>` THAT IS
+			    DISTORTED" (there is no text in this `<svg>` at all any more); and some
+			    fifty lines of anisotropy arithmetic about a declared 10px label
+			    rendering at 4.28px, which was the measurement that finally moved it
+			    out. What survives of the argument is one sentence, and it is the one
+			    worth keeping: **a tick is geometry in the plot's own domain and stays
+			    here; type is not, and left.**
 
-			    ⚠⚠ THESE DATE LABELS ARE STILL DISTORTED, AND THEY ARE NOW THE ONLY
-			    TEXT IN THIS `<svg>` THAT IS. The `YES`/`NO` end labels left for an
-			    HTML gutter at CHART-2 (`C-CHART-2` clause 2); the axis did not,
-			    because it is positioned against the PLOT's x-domain — a date sits
-			    under the series point it names — and moving it out would mean
-			    re-deriving every tick's x in CSS space. That is a real task and it is
-			    not this one. Measured in the CHART-2 contact sheet at a pinned
-			    1440×777: the collapsed `<svg>` renders **288.85 × 137.02** against
-			    the CHART-2 viewBox of 649×320, so `scaleX 0.4451` / `scaleY 0.4282`
-			    — an anisotropy of **1.0394**, and a declared 10px date label lands
-			    at **4.28px tall** (`10 × scaleY`).
-			    ⚠⚠ THIS PARAGRAPH ALSO CARRIED A HYBRID NUMBER, CAUGHT BY
-			    `@code-reviewer` AT THE CASCADE, and the correction matters more than
-			    the digits. It read `316 × 137.03` and `scaleX 0.49068` — the
-			    PRE-change `<svg>` width divided by the POST-change viewBox, giving an
-			    anisotropy of 1.1459 that describes no state this component has ever
-			    been in. The `<svg>` is no longer 316 wide: the label gutter left it,
-			    so it is 288.85. **One measurement from before the change combined
-			    with one constant from after it** — exactly the shape ("one ratio,
-			    written both ways up") that the paragraph immediately below was
-			    rewritten to eliminate, committed in the rewrite itself.
-			    ⚠⚠ THE PARAGRAPH THAT STOOD HERE WAS ARITHMETICALLY WRONG AND IS
-			    CORRECTED RATHER THAN ANNOTATED. It said that CHART-1's widening made
-			    "the anisotropy INVERT to ~0.92: labels are now slightly narrower than
-			    tall rather than wider". Measured against that 678-wide viewBox the
-			    anisotropy was **1.0884** — `scaleX` (0.46608) was still GREATER than
-			    `scaleY` (0.42822), so the labels stayed ~8.8 % **wider** than tall.
-			    The direction never inverted; the magnitude shrank, 1.153 → 1.088. The
-			    `0.92` is `scaleY/scaleX` (1 / 1.0884 = 0.9188) quoted as though it
-			    were the same quantity as the `1.153` two sentences earlier, which is
-			    `scaleX/scaleY`. **One ratio, written both ways up, inside one
-			    paragraph** — and nothing could catch it, because no guard in this
-			    repo measures a CSS pixel.
-			    ⛔⛔ AND CHART-6 GAVE THE WIDTH BACK, WHICH FALSIFIES THE PARAGRAPHS
-			    ABOVE RATHER THAN EXTENDING THEM. The gutter is deleted, and the
-			    collapsed card carries no marks column, so its `<svg>` returns to the
-			    full **316 px** — WIDER than the 298.29 CHART-1 left, not 4.5 %
-			    narrower. Recomputed at 316: `scaleX 0.4869` against `scaleY 0.4282`,
-			    an anisotropy of **1.137** rather than 1.0394, so these date labels
-			    are ~9.4 % MORE horizontally stretched than before this change. That
-			    is the one thing besides the label that depended on the plot's width,
-			    it moved in the direction this paragraph calls a cost, and it is
-			    recorded rather than left for a reader to recompute. The expanded
-			    overlay is unaffected — its aspect is locked, so its anisotropy stays
-			    1.0000 and the extra width became height instead.
-			    ⛔ ITS SUBSTANTIVE HALF WAS CORRECT AND IS **NOT** DISCHARGED — and
-			    this paragraph said it was, on a prediction, before the measurement
-			    came back. Because `preserveAspectRatio="none"` maps the WHOLE viewBox
-			    onto the CSS box, the 678-wide box rendered the PLOT ≈5.6 % narrower —
-			    true on screen, invisible in user units, docketed at CHART-1's Gate C
-			    as a cost to carry. CHART-2 was expected to dissolve it. Measured in
-			    the contact sheet, on this card's real 316px box, in the shipped face:
-			    the plot went **298.29 → 284.85 CSS px, a further 4.5 % NARROWER.**
-			    ⚠ THE GUTTER DID NOT GO AWAY; IT CHANGED CURRENCY. It used to be 38
-			    user units inside the viewBox and is now ~27 CSS px beside it — and it
-			    grew, because the label it holds is a legible 10px rather than a
-			    squashed 5.38px, and a bigger glyph needs more room. **That is the
-			    trade this task made: the line-end labels went 5.38px → 10px, and the
-			    plot paid ~13px of width.** Recorded as a cost, not a recovery,
-			    because the number says so. */}
+			    ⚠ THE SCOPING HAZARD THE DELETED BLOCK EXISTED TO GUARD IS STILL REAL
+			    and is answered elsewhere. Its point was that a DOM sibling of this
+			    component carries none of its testids, so
+			    `price-chart.test.tsx::collapsed-renders-no-axis` would pass against an
+			    axis built outside it. `AxisDates` is RETURNED FROM THIS COMPONENT —
+			    the `ProfileChart` / PROFILE OVERLAP R2 answer — so a component-scoped
+			    query still finds it, and `collapsed-renders-the-time-axis` asserts
+			    exactly that containment against the chart FRAME rather than the
+			    `<svg>`.
+			    ⚠ Deleted rather than left standing because two adjacent comments
+			    giving incompatible accounts of one mechanism is the `O-5` shape inside
+			    a single file — which this file's own frame docblock names, and which
+			    `@code-reviewer` filed here again at the CHART-7 cascade. */}
 					{/* ⛔ THE Y SCALE, AND IT IS DRAWN FIRST — before the x-axis, before the
 					    lines, before every mark — so the series paints over it. Gridlines
 					    behind data is the order `CollapsedAxis` and `ProfileChart` already
@@ -570,8 +526,17 @@ export function MarketPriceChart({
 						yes={terminalYes}
 						mode={mode}
 						terminalX={terminalX}
+						// ⛔ THE SAME EXPRESSION `AxisDates` GATES ON, NOT A COARSER ONE.
+						// This read `drawsTimeAxis(...)`, which answers "may this mode draw
+						// an axis" — while the ROW additionally requires an anchor inside
+						// the window. Under a window containing none, `drawsTimeAxis` is
+						// still true, so the clamp reserved a band beneath a row that does
+						// not exist: the very case this prop's own docblock says it avoids.
+						// `drawsTimeAxis`'s docblock names the rule that leaked — "the two
+						// halves of one axis must not be able to disagree" — and the band is
+						// a THIRD consumer of that question. Caught by `@code-reviewer`.
 						bandPx={
-							drawsTimeAxis(mode, series, startMs, endMs)
+							axisDatesFor(mode, series, startMs, endMs).length > 0
 								? AXIS_DATE_BAND_PX
 								: 0
 						}
@@ -875,12 +840,34 @@ function TerminalLabels({
  * A left scale is also the conventional reading order for a Y axis, which is the
  * smaller half of the reason and the one a reader notices first.
  *
- * ⚠ THE PADDING SWAPPED SIDES WITH THE COLUMN — `pr-[6px]`, not `pl-[6px]`. The
- * 6px is the air between the numerals and the plot they annotate, so it belongs on
- * whichever edge faces the plot. Leaving it as `pl` would have put the air on the
- * OUTSIDE, against the card's own padding, and pushed the numerals hard against
- * the gridlines they label — a two-character diff that looks like nothing and
- * undoes the whole point of moving the column.
+ * ⛔⛔ THE AIR IS THE PADDING **AND** THE MARK'S OWN OFFSET, AND GETTING THAT WRONG
+ * IS THE DEFECT THIS TASK ALMOST SHIPPED. The 6px is the gap between the numerals
+ * and the gridlines they label. It is tempting to read it as a property of the
+ * padding alone — this docblock did, at length — but a mark is `absolute`, and an
+ * absolutely positioned box resolves `right` against its ancestor's **PADDING
+ * BOX**, whose right edge is the OUTER edge of the padding. So `right: 0` lands the
+ * numeral flush with the column's border edge and the padding sits BEHIND it,
+ * contributing width and no air.
+ *
+ * ⚠ THE OLD ARRANGEMENT PRODUCED THE 6PX BY ACCIDENT OF OPPOSITION, which is why
+ * nothing noticed. With the column on the RIGHT the padding was on the LEFT and the
+ * alignment on the RIGHT — two different edges, so the slack fell on the plot side.
+ * Moving the column made them the same edge and they cancelled. **Measured in a
+ * real browser, on a minimal repro of all four arrangements:**
+ *
+ *     column RIGHT · pl-[6px] · right:0      → 6.00px   (what shipped before)
+ *     column LEFT  · pr-[6px] · right:0      → 0.00px   ⛔ the defect
+ *     column LEFT  · pr-[6px] · right-[6px]  → 6.00px   ✅ shipped now
+ *     column LEFT  · mr-[6px] · right:0      → 6.00px   (rejected: the column's own
+ *                                               border box shrinks to 17.59px)
+ *
+ * ⇒ **A coordinate that is right only because two independent quantities happen to
+ * be arranged a particular way** — the register entry CHART-3 minted, CHART-6 hit on
+ * the label's x, and CHART-5 hit on this very column's edge clamp. Third instance,
+ * same file, caught by `@code-reviewer` at the CHART-7 cascade. The column keeps
+ * `pr-[6px]` so its measured 24px footprint is unchanged and the mark carries the
+ * matching `right-[6px]`; the guard asserts the PAIR, because asserting the padding
+ * side alone is exactly what certified the defect.
  *
  * ⚠ "BETWEEN THE PLOT AND THE END LABELS" WAS TRUE UNTIL CHART-6 AND IS NOT NOW.
  * The end labels left the row entirely — they are an overlay on the plot,
@@ -937,7 +924,7 @@ function YMarks({ marks }: { marks: readonly Gridline[] }): React.JSX.Element {
 					key={g.pct}
 					data-testid={`y-mark-${g.pct}`}
 					data-pct={g.pct}
-					className="absolute right-0 -translate-y-1/2"
+					className="absolute right-[6px] -translate-y-1/2"
 					style={{ top: markTop(labelTopPct(g.y)) }}
 				>
 					{g.pct}
@@ -1151,8 +1138,14 @@ const LABEL_AIR_PX = 5;
  *
  * ⚠ THE FLIP IS NOT DEAD, AND THE CASE IT COVERS IS LIVE ON STAGING. `xPx` is
  * deliberately unclamped, so a series running PAST the window end puts `terminalX`
- * beyond `VIEWBOX_W` and `xPct` above 98.89 — at which point `xPct + LABEL_GAP_PCT`
- * exceeds 100 and this fires. That is a real rendering (`limits.ts` records it
+ * beyond `VIEWBOX_W`, and once `xPct` exceeds **98.8906** — i.e. `terminalX >
+ * 641.70`, about **3.3 hours** past the window end — `xPct + LABEL_GAP_PCT`
+ * exceeds 100 and this fires.
+ * ⚠ THE BAND BETWEEN 640 AND 641.70 IS COVERED BY THE RESERVE, NOT BY THE FLIP,
+ * and saying so is the point: this docblock first read "above 98.89", which is the
+ * THRESHOLD, and a reader would take it for the value a just-past-the-end series
+ * produces — that is 98.61, still inside. The reserve needs ≈74.9px there against
+ * the 84.88px it holds. Caught by `@code-reviewer` at the CHART-7 cascade. That is a real rendering (`limits.ts` records it
  * happening for two weeks) and it is exactly what a fallback is for: the reserve
  * covers a label anchored INSIDE the plot, and nothing can reserve room for a dot
  * that is not on the canvas.

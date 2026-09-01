@@ -1005,8 +1005,31 @@ describe("CHART-5/6 — RF-4 payload budget", () => {
 		const hero = yScaleBytes("hero");
 		const expanded = yScaleBytes("expanded");
 
-		// `/m/[slug]`: the card's four lines, no marks.
-		expect(collapsed).toBeLessThan(1500);
+		// ⛔⛔ THE CEILINGS ARE RE-SEATED AT CHART-7 AND THE HONEST NUMBER IS OVER
+		// THE BRIEF'S BUDGET. RF-1 and RF-3 give the collapsed card a marks column it
+		// never had and a fifth gridline, so this region grows by design; the
+		// question is by how much, and the answer is bigger than the task's stated
+		// allowance.
+		//
+		// **Measured, whole-chart markup, per page, this branch against `47c3f86`:**
+		//     `/m/[slug]` (collapsed)  3452 → 4609 B   **+1157 B**
+		//     `/`         (hero)       5412 → 6354 B   **+942 B**
+		//     (expanded overlay        5657 → 6386 B   +729 B — in no document until
+		//      it is opened, so it is charged to no page)
+		//
+		// ⚠ THE CHART-7 BRIEF BUDGETS **600 B per page**. Both shipped surfaces
+		// exceed it. That is reported rather than engineered around: the overrun IS
+		// the founder's ruling — a full left scale on a card that had none — and
+		// trimming it would mean removing something ruled. CHART-6 recorded the same
+		// trade in the other direction ("the hero's markup roughly doubles. That is
+		// what a Y scale weighs"). **A founder call, not a test to loosen quietly.**
+		//
+		// The per-region ceilings below are set from the measured values with ~15 %
+		// headroom, so they still catch an unbounded element count — which is what
+		// RF-4's budget rule was for — without pretending the page total is inside
+		// its allowance.
+		// `/m/[slug]`: the card's FIVE lines and its five marks.
+		expect(collapsed).toBeLessThan(1750);
 		// `/`: the hero's eleven lines plus its marks column. Deliberately a
 		// SEPARATE, LARGER ceiling rather than a shared one — it is a different
 		// page, and folding two pages into one number is how a real growth on one

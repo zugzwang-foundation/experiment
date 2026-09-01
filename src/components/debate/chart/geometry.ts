@@ -119,7 +119,13 @@ const GRIDLINES_TEN_STEP: readonly Gridline[] = Object.freeze(
  * `hasFullYScale` that no longer decides whether a mode has the full Y scale is
  * the kind of name a maintainer reads instead of reading the code.
  *
- * ⛔ IT STILL GOVERNS TWO THINGS AND THAT IS STILL DELIBERATE. The label's
+ * ⛔ IT GOVERNS TWO DECISIONS — AND HAS A THIRD READER, WHICH IS NOT THE SAME
+ * THING. `LabelReserve` reads it to decide whether its invisible sizer carries a
+ * value, and that is not an independent decision: the reserve must be sized by the
+ * label the mode actually renders, so it is the same answer spent a third time
+ * rather than a third policy. If it ever became a policy, this predicate would be
+ * the wrong home for it.
+ * ⛔ THE TWO DECISIONS ARE DELIBERATELY ONE PREDICATE. The label's
  * half-box composes from whether the value renders, so a mode that gained the
  * value and kept the one-line floor would overlap its own two labels across the
  * band where every market rests — the failure this component has shipped once
@@ -141,11 +147,18 @@ export function hasEndValue(mode: ChartMode): boolean {
  * The gridline set for a mode. A pure lookup — see the docblock above for why it
  * must not compute.
  *
- * ⚠ `0` AND `100` LAND EXACTLY ON THE PLOT'S EDGES (y = 320 and y = 0), so on the
- * expanded overlay two of the eleven are boundary rules rather than interior
- * ones. That is deliberate and is the founder's ruled set; whether the `100`
+ * ⚠ `0` AND `100` LAND EXACTLY ON THE PLOT'S EDGES (y = 320 and y = 0), so two of
+ * every set are boundary rules rather than interior ones — two of the eleven on the
+ * wider modes, and, since CHART-7 gave the card its `0`, two of its five as well.
+ * That is deliberate and is the founder's ruled set.
+ * ⚠ THE OPEN QUESTION IT USED TO CARRY IS CLOSED. This said "whether the `100`
  * line is visually redundant against the card border is a ruling the CHART-5
- * contact sheet renders both ways.
+ * contact sheet renders both ways" — RF-3 answers it by adding the `0`: paired
+ * with a floor, the `100` is the top of a scale rather than a stray edge.
+ * ⚠ THE BOUNDARY MARKS DO NOT SIT ON THEIR OWN LINES, AND THAT IS ALSO RULED.
+ * `markTop`'s edge clamp holds them half a box inside the plot — measured 5.00px
+ * off, at every mode and every width — because the column does not clip and an
+ * unclamped `0` would hang below the plot into the date row.
  */
 export function gridlinesFor(mode: ChartMode): readonly Gridline[] {
 	switch (mode) {
@@ -407,7 +420,8 @@ export function terminalLabelYs(yes: string): { yes: number; no: number } {
 		// from resolution lives exactly there.
 		// ⚠ THE CLIP SURFACE CHANGED AT CHART-2 AND THE CLAMP STILL EARNS ITS
 		// KEEP. It used to be the `<svg>` edge, which clips by default; the labels
-		// are HTML in a gutter now, and a gutter does NOT clip — an unclamped
+		// are HTML in an overlay on the plot now (a GUTTER until CHART-6), and
+		// neither clips — an unclamped
 		// label would instead escape upward past the top of the chart and collide
 		// with whatever the surface puts above it. Different failure, same fix,
 		// and worth saying so rather than leaving a reader to assume the clamp
@@ -428,8 +442,12 @@ export function terminalLabelYs(yes: string): { yes: number; no: number } {
 
 /**
  * A plot-space y (0…`VIEWBOX_H`) as a PERCENTAGE of the plot's rendered height
- * — the one bridge between the SVG's user space and the HTML gutter's CSS
+ * — the one bridge between the SVG's user space and the HTML label layer's CSS
  * space (`C-CHART-2` clause 2, CHART-2).
+ * ⚠ "GUTTER" IS THE WRONG WORD SINCE CHART-6 AND A CONFUSING ONE SINCE CHART-7.
+ * The labels left their gutter for an overlay on the plot at CHART-6; and CHART-7
+ * put two real gutters back in the row — the marks column on the left, the label
+ * RESERVE on the right — neither of which is what this function converts for.
  *
  * ⛔ THIS IS A CONVERSION, NOT A SECOND DERIVATION, and that distinction is the
  * whole reason the collision rule could stay untouched. `terminalLabelYs` still

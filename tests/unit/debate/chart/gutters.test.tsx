@@ -95,9 +95,27 @@ describe("debate-view::price-chart-marks-render-left — RF-1", () => {
 			// own padding — and presses the numerals against the plot. The render is
 			// wrong, nothing errors, and no other assertion in the repository can see
 			// it.
-			const t = tokens(q(render(mode), "chart-y-marks"));
+			const col = q(render(mode), "chart-y-marks");
+			const t = tokens(col);
 			expect(t).toContain("pr-[6px]");
 			expect(t).not.toContain("pl-[6px]");
+
+			// ⛔⛔ AND THE MARK'S OWN OFFSET, WHICH IS THE HALF THAT CERTIFIED THE
+			// DEFECT WHEN IT WAS MISSING. A mark is `absolute`, and `right` resolves
+			// against the ancestor's PADDING BOX — whose right edge is the OUTER edge
+			// of the padding. So `right: 0` lands the numeral flush with the column's
+			// border edge and the padding sits behind it: measured in a real browser,
+			// **0.00px of air**, against 6.00px before the column moved. The old
+			// arrangement worked because the padding side and the alignment side were
+			// OPPOSITE; making them the same side cancelled them.
+			// ⇒ The air is the PAIR. Asserting the padding alone is what let this
+			// through, so the pair is asserted.
+			for (const mk of col.querySelectorAll("[data-pct]")) {
+				expect(
+					tokens(mk),
+					`y-mark-${mk.getAttribute("data-pct")} is flush against the plot — the padding is behind it, not in front of it`,
+				).toContain("right-[6px]");
+			}
 			// Right-aligned within its column, so the numerals form a clean edge
 			// against the plot rather than a ragged one.
 			expect(t).toContain("text-right");

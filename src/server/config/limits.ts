@@ -337,7 +337,8 @@ const PRODUCTION_CHART_WINDOW: ChartWindow = {
  * measured in days on an environment that is used every day.
  *
  * ⚠ AMENDED AT CHART-5, BECAUSE THE SYMPTOM GOT WORSE. The overlay's end label
- * now carries the current PERCENTAGE beneath the name, so past `end` the failure
+ * carries the current PERCENTAGE — **beside** the name since CHART-7 (RF-2), and
+ * beneath it when this paragraph was written — so past `end` the failure
  * is no longer two colour-coded words naming absent marks — it is two words AND
  * TWO NUMERIC PRICE FIGURES attached to nothing drawn. A reader who cannot see
  * the dots can still read a price off the label. ⚠ CHART-6 widens this: the hero

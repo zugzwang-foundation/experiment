@@ -101,17 +101,23 @@ export function MarketPriceChartOverlay({
 				    and "sizing this div by an aspect would size plot + gutter
 				    together" — the labels are an overlay INSIDE the plot now and the
 				    gutter is deleted, so the ruling survives on the marks column
-				    instead. It is still 24px of this div that is not plot, so an
-				    aspect here would still mis-shape the plot; only the name of the
-				    thing taking the width changed. Caught by `@code-reviewer` at the
-				    CHART-6 cascade.
-				    ⚠ AND CHART-6 MADE THIS DIV'S CONTENT TALLER. Returning the
-				    gutter's 48.73px to the plot, under a locked aspect, takes the
-				    chart box from 382.25 to 406.91 — measured. The panel has no
-				    `max-h`, and at a 900px viewport it had 441.78px of spare room, so
-				    it is absorbed; below roughly 483px of viewport HEIGHT the panel
-				    overflows unreachably, which it already did below ~458px. This
-				    change moves that threshold by ~25px; it does not create it.
+				    instead. Caught by `@code-reviewer` at the CHART-6 cascade.
+				    ⛔ AND THERE ARE **TWO** SIBLINGS SINCE CHART-7, ON OPPOSITE SIDES,
+				    WHICH MAKES THE RULING MORE TRUE RATHER THAN LESS. The marks column
+				    moved LEFT (RF-1) and a right RESERVE for the traveling end labels
+				    took its place (RF-5). Measured on this branch's own build: the two
+				    together take **108.88px** of this div — 24.00 for the marks and
+				    84.88 for the reserve — where the sentence above said 24. An aspect
+				    declared here would now mis-shape the plot by four times as much.
+				    ⚠ AND THE HEIGHT MOVED BACK DOWN. CHART-6 returned the gutter's
+				    48.73px to the plot and took the chart box from 382.25 to 406.91;
+				    the reserve takes 84.88px of width back out, and under a locked
+				    aspect that is height — **measured 365.06**, below where CHART-6
+				    found it and below where CHART-5 left it. The panel-overflow
+				    threshold this paragraph tracks therefore moves in the SAFE
+				    direction; the figures above are the CHART-6 ones and are kept as
+				    the record of that pass rather than overwritten, because they were
+				    true when measured.
 				    ⚠ Replacing the literal with `aspect-[649/320]` was considered and
 				    rejected by ruling: it is the same defect with a newer number.
 				    `C-CHART-1` clause 4 now states a relationship, and
