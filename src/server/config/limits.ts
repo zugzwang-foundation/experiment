@@ -242,6 +242,144 @@ export const MARKET_SERIES_MAX_POINTS = 256;
  * (milliseconds, not Dharma). */
 export const MARKET_SERIES_MIN_WINDOW_MS = 60000;
 
+// === CHART-3: the fixed experiment window (SPEC.1 1.0.48 §9 + §16.1) ======
+
+/** The §9 price chart's fixed X axis, as a pair of ISO instants. */
+export type ChartWindow = { readonly start: string; readonly end: string };
+
+/**
+ * ⚠ `end` is **23:45**, not 23:59 — it is the ratified `resolution_deadline`
+ * shared by all eight markets, and the same instant is trading close and
+ * settlement. A 23:59 axis would run fifteen minutes past the last instant at
+ * which anything can happen.
+ */
+const PRODUCTION_CHART_WINDOW: ChartWindow = {
+	start: "2026-09-15T00:00:00.000Z",
+	end: "2026-11-05T23:45:00.000Z",
+};
+
+/**
+ * ⚠ `start` is MEASURED, not chosen: the earliest `bet.placed` across staging's
+ * whole slate is `2026-08-21T05:29:29.430Z` (on `github-zugzwang-repo-stars`),
+ * floored to its UTC day. Read at CHART-3 against the live staging database,
+ * because a window narrower than the data silently clips real bets off the
+ * canvas and nothing reports it. The latest `bet.placed` at that reading was
+ * `2026-08-29T16:26:57.144Z`, comfortably inside `end`.
+ *
+ * ⛔ `end` USED TO EXPIRE ON 2026-09-10, AND THE CONSEQUENCE WAS LARGER THAN
+ * "THE LINE LOOKS SHORT". After that instant `withLiveTail` appends a point at
+ * `now` beyond the axis, so `xPx` returns a coordinate past `VIEWBOX_W` and the
+ * viewBox clips it. What is clipped is not only the line's last segment:
+ * `terminalX` follows the series, so **both terminal dots and both pulses leave
+ * the canvas entirely**, while `TerminalLabels` — HTML in a gutter, outside the
+ * SVG — keeps rendering. The result on every `Open` staging market would be two
+ * colour-coded words naming two marks that are not drawn.
+ *
+ * The clip itself is deliberate: drawing the point AT the edge instead would put
+ * the live price at an instant it did not happen, which this codebase rejects on
+ * principle (`price-series.ts` `withLiveTail`, `price-chart.ts`
+ * `deriveMarketPriceChart`). ⇒ **The fix is to move this value, never to clamp
+ * the geometry** — and CHART-4 D11 moved it, to production's own
+ * `2026-11-05T23:45:00Z`, on founder ruling. Staging outlives 10 September, and
+ * an end date chosen to sit just past the fixtures was a value with a shelf life
+ * measured in days on an environment that is used every day.
+ *
+ * ⚠ AMENDED AT CHART-5, BECAUSE THE SYMPTOM GOT WORSE. The overlay's end label
+ * now carries the current PERCENTAGE beneath the name, so past `end` the failure
+ * is no longer two colour-coded words naming absent marks — it is two words AND
+ * TWO NUMERIC PRICE FIGURES attached to nothing drawn. A reader who cannot see
+ * the dots can still read a price off the gutter. Written in here per `O-5`
+ * rather than left to the CHART-5 log, because this docblock is the site that
+ * states the position the change supersedes.
+ *
+ * ⚠ THE EXPIRY ALARM IS KEPT ON PURPOSE, and it is the load-bearing half of this
+ * docblock rather than a leftover. The failure mode above is not repaired by the
+ * new value — it is only postponed, and it will fire again the moment `now`
+ * passes the new `end`. It is silent when it fires: nothing errors, the page
+ * renders, and the only symptom is two labels pointing at marks that are not
+ * there. A reader arriving in November needs the mechanism, not just the date.
+ */
+const STAGING_CHART_WINDOW: ChartWindow = {
+	start: "2026-08-21T00:00:00.000Z",
+	end: "2026-11-05T23:45:00.000Z",
+};
+
+/**
+ * The whole environment branch, in one pure function, evaluated ONCE below.
+ *
+ * ⛔ THIS IS THE ONLY PLACE `ZUGZWANG_ENV` MAY DECIDE THE WINDOW. SPEC.1 §16.1:
+ * "Resolved from `ZUGZWANG_ENV` at the constants layer; **never branched on
+ * inside the derivation or the component.**" A conditional in the read path is
+ * how staging behaviour leaks into production — it survives review because each
+ * individual branch looks correct, and it fires only in the environment nobody
+ * is testing.
+ *
+ * `preview` takes the STAGING window because anything pointed at the staging
+ * database needs staging's dates: given production's window, every such chart
+ * would render as a line crushed against the left edge.
+ *
+ * ⚠ MEASURED, AND IT INVERTS THE ASSUMPTION THAT PUT THAT ARM HERE. A Vercel
+ * Preview deployment reports `env: "staging"`, not `"preview"` — read off this
+ * branch's own preview at `/api/health` (`canary` matching the branch HEAD, so
+ * it was this build and not another session's). So the deployed preview lane
+ * already takes the staging window **through the `staging` arm**, and the
+ * `preview` arm covers only what actually sets that value: a LOCAL build, which
+ * AGENTS.md §2 instructs (`ZUGZWANG_ENV=preview just verify`), plus any future
+ * environment tagged that way. `preview` is in `VALID_ENVS` beside `prod` and
+ * `staging`, so the arm is not dead — but it is not the thing that makes
+ * previews work, and this docblock said it was.
+ *
+ * ⇒ Recorded rather than quietly corrected because `@code-reviewer` filed this
+ * as **NOT ESTABLISHED (O-13)** and the honest close is the reading, not a
+ * tidier sentence.
+ *
+ * Everything else — `prod`, the `"unknown"` fallback `next.config.ts` inlines
+ * into the browser bundle, and an unset var under `vitest` — takes PRODUCTION.
+ * That is the fail-safe direction: production is the only environment whose
+ * window is load-bearing, so an unrecognised value must not be able to serve it
+ * a fixture window.
+ */
+export function resolveChartWindow(env: string | undefined): ChartWindow {
+	return env === "staging" || env === "preview"
+		? STAGING_CHART_WINDOW
+		: PRODUCTION_CHART_WINDOW;
+}
+
+/**
+ * ⚠ THIS IS A BUILD-TIME SNAPSHOT ON BOTH SIDES, SO AN ENV CHANGE REQUIRES A
+ * REBUILD. `next.config.ts` puts `ZUGZWANG_ENV` in its `env:` block, and Next
+ * spreads `getNextConfigEnv(config)` into the define set for the client, the
+ * node server AND the edge server alike — every `config.env` key becomes a
+ * literal substituted for `process.env.<KEY>` at compile time. Editing the
+ * variable in the Vercel dashboard therefore changes **nothing anywhere** until
+ * a redeploy.
+ *
+ * ⛔ AN EARLIER VERSION OF THIS DOCBLOCK GOT THE MECHANISM WRONG AND IS
+ * CORRECTED RATHER THAN DELETED, BECAUSE THE ERROR IS THE INSTRUCTIVE PART. It
+ * said the server re-reads `process.env` per request while the browser carries a
+ * frozen literal, and derived a hydration mismatch on `/m/[slug]` from the two
+ * disagreeing. They cannot disagree — both are the same literal — so that
+ * mismatch is unreachable. The CONCLUSION ("an env change requires a rebuild")
+ * was right, and is in fact stronger than the reasoning that produced it.
+ *
+ * That is precisely the shape `O-13` and CLAUDE.md §5.13 exist to end: a sound
+ * conclusion carried by a named mechanism nobody checked. Measured against the
+ * pinned Next by `@security-auditor` at the CHART-3 cascade; the runtime-read
+ * escape hatch is gated on `next experimental-compile`, which this repo does
+ * not use.
+ */
+const CHART_WINDOW = resolveChartWindow(process.env.ZUGZWANG_ENV);
+
+/** Start of the §9 chart's fixed X axis (SPEC.1 §16.1). ISO, not ms — it is
+ * byte-comparable with the spec that pins it, and the one consumer already
+ * parses timestamps. */
+export const MARKET_CHART_WINDOW_START = CHART_WINDOW.start;
+
+/** End of the §9 chart's fixed X axis (SPEC.1 §16.1). ⚠ **The axis ends here;
+ * the series never does** — the line stops at the present instant, never at
+ * this value. */
+export const MARKET_CHART_WINDOW_END = CHART_WINDOW.end;
+
 // === UI.A5: Profile Dharma graph (SPEC.1 §23) =============================
 
 /** Profile graph-series downsample bound (UI-A5 §7 S2, OQ-4 B) — every served

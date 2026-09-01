@@ -3,7 +3,12 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { MarketPriceChart } from "@/components/debate/chart/MarketPriceChart";
 import { HERO_SIDE_EMPTY, HeroPanels } from "@/components/discovery/HeroPanels";
+import {
+	MARKET_CHART_WINDOW_END,
+	MARKET_CHART_WINDOW_START,
+} from "@/server/config/limits";
 import type { HeroPost, HeroTopPosts } from "@/server/discovery/hero";
 import type { DiscoveryCard } from "@/server/discovery/list";
 import type { PricePoint } from "@/server/discovery/price-series";
@@ -730,14 +735,33 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 //   discovery::hero-chart-time-scaled
 describe("discovery::hero-chart-time-scaled", () => {
 	/** Three points whose SPACING IN TIME is deliberately nothing like their
-	 * spacing in index: an hour, then nine hours. Under index spacing the middle
-	 * point lands at the midpoint of the plot; under time spacing it lands a
-	 * tenth of the way along. The two answers are 320 and 64 on a 640-wide
-	 * viewBox, so no rounding rule can confuse them. */
+	 * spacing in index: one unit of the window, then nine. Under index spacing the middle
+	 * point lands at the midpoint of the drawn span; under time spacing it lands
+	 * a tenth of the way along. Those two answers differ by a factor of five, so
+	 * no rounding rule can confuse them.
+	 *
+	 * ⚠ THE GAPS WERE 1h AND 9h UNTIL CHART-3 — a fixture change forced by the
+	 * domain, not a weakening of the assertion. The ratio that carries the
+	 * property is identical (1 : 9); what changed is that the axis is now the
+	 * whole experiment window instead of the series' own span, so a ten-HOUR
+	 * series drew inside ~5px of a 640-unit plot and the rounding floor ate the
+	 * very difference this test exists to see.
+	 *
+	 * ⛔ AND THE INSTANTS ARE DERIVED FROM THE WINDOW RATHER THAN WRITTEN AS
+	 * DATES. Hard-coded September dates sit inside the production window and
+	 * OUTSIDE the staging one, and the two do not overlap — so this guard reddened
+	 * under `ZUGZWANG_ENV=preview`, which is the command AGENTS.md §2 tells a
+	 * developer to run. Deriving removes the coupling rather than documenting it.
+	 * Found by `@security-auditor` at the CHART-3 cascade. */
+	const at = (f: number) => {
+		const startMs = Date.parse(MARKET_CHART_WINDOW_START);
+		const endMs = Date.parse(MARKET_CHART_WINDOW_END);
+		return new Date(startMs + (endMs - startMs) * f).toISOString();
+	};
 	const UNEVEN: PricePoint[] = [
-		{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
-		{ at: "2026-09-15T01:00:00.000Z", yes: "0.600000000000000000" },
-		{ at: "2026-09-15T10:00:00.000Z", yes: "0.700000000000000000" },
+		{ at: at(0), yes: "0.500000000000000000" },
+		{ at: at(0.01), yes: "0.600000000000000000" },
+		{ at: at(0.1), yes: "0.700000000000000000" },
 	];
 
 	/** The x coordinates of one polyline, in order. Read off the rendered
@@ -764,18 +788,81 @@ describe("discovery::hero-chart-time-scaled", () => {
 		const xs = xsOf(container, "line-yes");
 		expect(xs).toHaveLength(3);
 
-		// Endpoints anchor the domain either way — they are the control that the
-		// coordinates were read at all, not the assertion.
+		// The control that the coordinates were read at all. The fixture's first
+		// point sits exactly on `MARKET_CHART_WINDOW_START`, so it lands at 0 —
+		// which is a fact about the fixture, not about the domain rule.
 		expect(xs[0]).toBe(0);
-		expect(xs[2]).toBe(640);
+		expect(xs[2]).toBeGreaterThan(0);
 
-		// ⛔ THE ASSERTION. One hour into a ten-hour domain is a tenth of the way
-		// across: 64. The retired `PriceSparkline` would have answered 320 here,
-		// because it spaced by index — which is exactly the defect this row
-		// exists to reject, and why the fixture's gaps are 1h and 9h rather than
-		// anything evenly divisible.
-		expect(xs[1]).toBe(64);
-		expect(xs[1]).not.toBe(320);
+		// ⛔ CHART-3: `xs[2]` IS NO LONGER 640, AND THAT IS THE POINT. It used to
+		// be, because the domain ended at the last point; the axis is now the
+		// fixed experiment window, so a ten-day series occupies a tenth of it and
+		// the line stops where the data stops. Asserting the OLD 640 here would
+		// assert exactly the tail-stretching SPEC.1 §9 forbids.
+		expect(xs[2]).toBeLessThan(640);
+
+		// ⛔ THE ASSERTION, expressed as a RATIO so it survives the domain rather
+		// than encoding it. One day into a ten-day span is a tenth of the way
+		// across the DRAWN extent. The retired `PriceSparkline` spaced by index
+		// and would answer 0.5 — which is the defect this row exists to reject,
+		// and why the fixture's gaps are 1d and 9d rather than evenly divisible.
+		const drawnFraction = (xs[1] - xs[0]) / (xs[2] - xs[0]);
+		expect(drawnFraction).toBeCloseTo(0.1, 2);
+		expect(drawnFraction).not.toBeCloseTo(0.5, 1);
+	});
+
+	it("plots on the SAME fixed window market detail does — CHART-3 ruling #3", () => {
+		// ⛔ THE HERO'S DOMAIN IS ASSERTED NOWHERE, AND THAT IS A RULED DECISION
+		// LEFT UNGUARDED. CHART-3 ambiguity #3 chose "the fixed window applies to
+		// ALL THREE modes" over "fix the axis on collapsed/expanded and leave the
+		// §22 hero on market lifetime", because "a mode-conditional domain would
+		// make the same market's line a different shape on the card and in the
+		// header, which is worse than either option alone."
+		//
+		// ⛔ WHAT THIS FILE ALREADY PINS CANNOT SEE THAT. `drawnFraction` is a
+		// RATIO of drawn extents, and a ratio is invariant under ANY linear
+		// domain — it answers 0.1 on the window, on the market's lifetime, on a
+		// hero-only span of somebody's choosing. Its companion `xs[2] < 640`
+		// excludes exactly one domain (the one ending at the last point) and
+		// admits every other. So a hero-only domain — the precise thing ruling #3
+		// forbids — passes both, and this file, which never imports the window
+		// constants at all, has no way to notice.
+		const { container } = render(
+			<HeroPanels
+				isOpen={true}
+				card={CARD}
+				series={UNEVEN}
+				topPosts={{ yes: null, no: null }}
+			/>,
+		);
+		const xs = xsOf(container, "line-yes");
+
+		const startMs = Date.parse(MARKET_CHART_WINDOW_START);
+		const endMs = Date.parse(MARKET_CHART_WINDOW_END);
+		const want = UNEVEN.map(
+			(p) => ((Date.parse(p.at) - startMs) / (endMs - startMs)) * 640,
+		);
+		// Discrimination control: the three expectations are three DIFFERENT
+		// numbers, so matching all three is a statement about the mapping rather
+		// than about a domain that collapses everything to one x.
+		expect(new Set(want.map((v) => v.toFixed(2))).size).toBe(3);
+
+		expect(xs).toHaveLength(3);
+		for (let i = 0; i < 3; i++) {
+			expect(xs[i], `hero point ${i}`).toBeCloseTo(want[i], 1);
+		}
+
+		// ⛔ AND THE RULING STATED AS THE THING IT ACTUALLY PROTECTS: the same
+		// series, rendered on the market-detail surface, must land on the SAME
+		// x's. Derived expectations prove the hero uses THE WINDOW; this proves
+		// the two SURFACES agree — which is what "a mode-conditional domain" would
+		// break, and it would break it whether or not either mode's domain happened
+		// to be derivable from a constant.
+		cleanup();
+		const detail = render(
+			<MarketPriceChart series={UNEVEN} mode="collapsed" isOpen={true} />,
+		);
+		expect(xsOf(detail.container, "line-yes")).toEqual(xs);
 	});
 
 	it("the NO line mirrors the YES line on the same time axis", () => {

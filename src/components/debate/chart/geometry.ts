@@ -14,8 +14,12 @@
  * came back almost into line. `C-CHART-2` clause 3 no longer puts a LABEL
  * gutter in the viewBox — the labels are HTML beside the plot now — so all the
  * viewBox still reserves is a **terminal allowance**, `TERMINAL_DOT_ALLOWANCE`,
- * enough that the widest mark drawn at `cx = VIEWBOX_W` — the pulse RING, not
- * the dot — cannot half-clip on the right edge. The plot is full-bleed across
+ * enough that the widest mark drawn at the plot's right edge — the pulse RING,
+ * not the dot — cannot half-clip there. ⚠ CORRECTED AT CHART-5: this said the
+ * mark is drawn AT `cx = VIEWBOX_W`, which CHART-3 falsified — `terminalX`
+ * follows the series, so the mark reaches that edge only on a market that has
+ * traded to the window end. The allowance still budgets that MAXIMUM, which is
+ * the case it has to cover; what was wrong was calling it the only case. The plot is full-bleed across
  * `VIEWBOX_W × VIEWBOX_H`, `xPx`
  * still maps a domain onto 0…640, no plotted coordinate has ever moved, and
  * the `<svg>` is `SVG_W` wide — but `SVG_W` is now 649 rather than 678, which
@@ -29,6 +33,90 @@
 
 export const VIEWBOX_W = 640;
 export const VIEWBOX_H = 320;
+
+/** Which of the three surfaces a render is. Named here because the Y scale is a
+ * pure function of it and of nothing else. */
+export type ChartMode = "collapsed" | "expanded" | "hero";
+
+/** A whole-percent value on the fixed 0–100 % Y scale → its plot-space y.
+ * The mirror of `yYesPx`, which takes a 0..1 probability STRING because it reads
+ * a canonical price; this one takes a percent NUMBER because a gridline is a
+ * property of the scale and never of the data — there is no price to preserve. */
+function yPctPx(pct: number): number {
+	// Rounding is genuinely needed here: `(1 − 10/100) · 320` is
+	// `288.00000000000006` in binary floating point, and an unrounded coordinate
+	// would print those digits into every gridline's `y` in the shipped markup.
+	// ⚠ This calls the SHARED `round` — see its declaration for why it is a
+	// hoisted function rather than the `const` arrow it used to be. These sets are
+	// built at module load, above that declaration.
+	return round((1 - pct / 100) * VIEWBOX_H);
+}
+
+/** One horizontal gridline: the percent it marks and where that lands. */
+export type Gridline = { readonly pct: number; readonly y: number };
+
+/**
+ * The Y-scale gridline sets — `C-CHART-1` clause 1 as amended at CHART-5.
+ *
+ * ⛔ COMPUTED ONCE, AT MODULE LOAD, AND THAT IS A REQUIREMENT RATHER THAN AN
+ * OPTIMISATION. The set is a pure function of the MODE and never of the series,
+ * so building it per render — let alone per point — would be recomputing a
+ * constant on every paint of a component that renders three times per market
+ * page. Freezing them here also makes the "never per-point" property structural:
+ * there is no code path that could accidentally close over a data value, because
+ * these arrays exist before any data does.
+ *
+ * ⚠ THE THREE SETS DIFFER BECAUSE THE THREE BOXES DO, not because the data does.
+ * The collapsed card is 164 px tall, so eleven lines in it would be ~15 px apart
+ * and read as hatching rather than as a scale; it gets the quarters. The
+ * expanded overlay is ~418 px tall and can carry every 10 %. The Discovery hero
+ * is ~96 px tall and gets NONE — at that height even four lines compete with the
+ * series for the same pixels, and the hero exists to show shape, not value.
+ */
+const GRIDLINES_COLLAPSED: readonly Gridline[] = Object.freeze(
+	[25, 50, 75, 100].map((pct) => Object.freeze({ pct, y: yPctPx(pct) })),
+);
+
+const GRIDLINES_EXPANDED: readonly Gridline[] = Object.freeze(
+	Array.from({ length: 11 }, (_, i) => i * 10).map((pct) =>
+		Object.freeze({ pct, y: yPctPx(pct) }),
+	),
+);
+
+const GRIDLINES_HERO: readonly Gridline[] = Object.freeze([]);
+
+/**
+ * The gridline set for a mode. A pure lookup — see the docblock above for why it
+ * must not compute.
+ *
+ * ⚠ `0` AND `100` LAND EXACTLY ON THE PLOT'S EDGES (y = 320 and y = 0), so on the
+ * expanded overlay two of the eleven are boundary rules rather than interior
+ * ones. That is deliberate and is the founder's ruled set; whether the `100`
+ * line is visually redundant against the card border is a ruling the CHART-5
+ * contact sheet renders both ways.
+ */
+export function gridlinesFor(mode: ChartMode): readonly Gridline[] {
+	switch (mode) {
+		case "expanded":
+			return GRIDLINES_EXPANDED;
+		case "collapsed":
+			return GRIDLINES_COLLAPSED;
+		case "hero":
+			return GRIDLINES_HERO;
+		default: {
+			// ⛔ EXHAUSTIVE BY COMPILE ERROR, NOT BY FALLING THROUGH. The first
+			// version ended `return GRIDLINES_HERO` after two `if`s, so a FOURTH
+			// surface added to `ChartMode` would compile clean and ship with no Y
+			// scale at all — silently, on a chart whose whole point is that the
+			// scale is a function of the mode. `MarketPriceChartMode`'s own docblock
+			// names this hazard for the type union ("two places for a fourth surface
+			// to be added to only one of") and it was left open for the lookup.
+			// Raised by `@code-reviewer` at the CHART-5 cascade.
+			const exhaustive: never = mode;
+			return exhaustive;
+		}
+	}
+}
 
 /** Terminal dot radius — `C-CHART-2` clause 1. Deliberately NOT `C-CHART-1`
  * clause 2's `r=4` post node, and deliberately rimless: the two marks mean
@@ -52,7 +140,10 @@ export const TERMINAL_PULSE_PEAK_SCALE = 2.4;
 
 /**
  * What the viewBox reserves to the right of the plot — `C-CHART-2` clause 3, as
- * amended at CHART-2. The terminal marks are centred at `cx = VIEWBOX_W`, so
+ * amended at CHART-2. ⚠ CHART-5 correction: this read "the terminal marks are
+ * centred at `cx = VIEWBOX_W`", which CHART-3 falsified — they are centred at
+ * `terminalX`, the series' own last point, and reach `VIEWBOX_W` only when the
+ * series runs to the window end. That MAXIMUM is what the allowance budgets, so
  * without an allowance their right halves sit outside the viewBox, and an
  * `<svg>` clips there by default.
  *
@@ -264,7 +355,19 @@ const MONTHS = [
 	"Dec",
 ] as const;
 
-const round = (v: number): number => Math.round(v * 100) / 100;
+// ⛔ A FUNCTION DECLARATION, NOT A `const` ARROW, AND THE FORM IS LOAD-BEARING.
+// The frozen gridline sets near the top of this module are built AT MODULE LOAD,
+// several hundred lines above this point. Against a `const` arrow that is a
+// temporal-dead-zone `ReferenceError` on import — so `yPctPx` was written with
+// its own inlined copy of this one-liner and a docblock explaining why. Two
+// copies of one rounding rule in one module is a real hazard: change this to 3 dp
+// for coordinates and the gridline y's silently keep 2 dp and stop agreeing with
+// the line and dot y's they are drawn to align with. A declaration hoists, so the
+// constraint disappears instead of being documented — structural beats
+// procedural (`O-1`). Raised by `@code-reviewer` at the CHART-5 cascade.
+function round(v: number): number {
+	return Math.round(v * 100) / 100;
+}
 
 /** "Sep 15" — UTC month + day (locale/timezone-free, deterministic). */
 export function fmtUtcDay(iso: string): string {
@@ -272,10 +375,37 @@ export function fmtUtcDay(iso: string): string {
 	return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
 }
 
-/** ISO instant → x pixel over the market lifetime domain, FULL-BLEED:
- * `startMs` → 0, `endMs` → `VIEWBOX_W`. A degenerate domain (`startMs ===
- * endMs`, the single-point unbet market) collapses to the start edge (0) — a
- * FINITE value, never NaN; the component spans the flat line to `VIEWBOX_W`. */
+/** ISO instant → x pixel over the chart's domain, FULL-BLEED: `startMs` → 0,
+ * `endMs` → `VIEWBOX_W`. A degenerate domain (`startMs === endMs`) collapses to
+ * the start edge (0) — a FINITE value, never NaN; the component spans the flat
+ * line to `VIEWBOX_W`.
+ *
+ * ⚠ THE DOMAIN IS THE FIXED EXPERIMENT WINDOW SINCE CHART-3, not the market's
+ * lifetime, and this docblock said the latter. Two consequences for callers:
+ * the degenerate branch above is now unreachable from the shipped call sites
+ * (the window is a non-empty constant), and **the return value is NOT clamped
+ * IN EITHER DIRECTION** — an instant outside the window maps outside
+ * `0 … VIEWBOX_W` and is clipped by the viewBox. That is deliberate: clamping
+ * would place a point at a time it did not happen, and a price at the wrong
+ * time is a false statement about the market rather than a stale one.
+ *
+ * ⛔ "EITHER DIRECTION" IS LOAD-BEARING AND WAS MISSING. Every artefact in the
+ * CHART-3 branch — this docblock, the component's comment, the constants, the
+ * §17 row, the named guard — reasoned only about instants PAST the window end.
+ * The left edge is the one that is structural rather than hypothetical:
+ * `MARKET_CHART_WINDOW_START` is the experiment's OPENING instant, and a market
+ * must reach `Open` BEFORE that for anyone to bet at launch — so
+ * `market.opened`, the genesis point §9 calls "the opening price", maps to a
+ * NEGATIVE x on every production market and is clipped. Measured on the shipped
+ * component: a market opened 2026-09-14T18:30Z draws its first two points at
+ * x = −2.82 and −2.05.
+ *
+ * Both directions are guarded (`tests/unit/debate/render/price-chart.test.tsx`),
+ * because a one-sided guard is what let `Math.max(0, …)` pass a 3 792-test suite.
+ * ⚠ Whether the production START should instead be the earliest `market.opened`
+ * — which is what the STAGING constant already is, measured from data — is a
+ * founder ruling this branch flags and does not take. Found by
+ * `@security-auditor` at the CHART-3 cascade. */
 export function xPx(iso: string, startMs: number, endMs: number): number {
 	const t = Date.parse(iso);
 	const frac = endMs === startMs ? 0 : (t - startMs) / (endMs - startMs);
