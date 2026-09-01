@@ -5,7 +5,6 @@ import {
 	MARKET_CHART_WINDOW_END,
 	MARKET_CHART_WINDOW_START,
 } from "@/server/config/limits";
-import type { ChartNode } from "@/server/debate-view/price-chart";
 import type { PricePoint } from "@/server/discovery/price-series";
 
 import { formatPricePercent } from "../format";
@@ -108,7 +107,7 @@ export type MarketPriceChartMode = ChartMode;
  * windows differ. An anchor outside the configured window is not drawn. Interior
  * ticks on the OVERLAY remain canon-owned and unbuilt; the collapsed card's two
  * dashed rules are shipped and now follow the interior anchors.
- * Post nodes arrive in Slice 2. The SVG is `aria-hidden` on ALL THREE surfaces
+ * The SVG is `aria-hidden` on ALL THREE surfaces
  * and the accessible readout lives in the shared `ChartSummary` beside it —
  * collapsed card, expanded overlay and, since CHART-1, the Discovery hero. ⚠ It
  * used to say "the card's `sr-only` summary", naming one surface of three and a
@@ -120,18 +119,20 @@ export type MarketPriceChartMode = ChartMode;
  * the attribute and find them in apparent conflict. Strokes bind by the
  * `--graph-yes` / `--graph-no` token NAME (INV-3 side binding, never the slot
  * value; `--color-yes` = the ground, so a value-copy would be invisible AND
- * invert the poles). No raw hex. Slice 2: EXPANDED also marks the per-`(UTC day,
- * side)` top-post `nodes` — one dot each, side-bound to the SAME `--graph-*`
- * token (decision #7; never the `--color-*` slot), y = the node's YES price on
- * the fixed 0–100 % scale. Collapsed never renders nodes. */
+ * invert the poles). No raw hex.
+ * ⛔ THE POST NODES ARE GONE FROM EVERY SURFACE (CHART-NODE-REMOVE, founder
+ * ruling). This paragraph used to end: "Slice 2: EXPANDED also marks the
+ * per-`(UTC day, side)` top-post `nodes` … Collapsed never renders nodes." There
+ * are no nodes on any mode now, so the collapsed exemption has nothing left to
+ * except and is removed with the thing it excepted. **The only circles this
+ * component draws are the two terminal dots and, on an `Open` market, their two
+ * pulse rings** — `r=3`, rimless, each on its own series token. */
 export function MarketPriceChart({
 	series,
-	nodes,
 	mode,
 	isOpen,
 }: {
 	series: PricePoint[];
-	nodes?: ChartNode[];
 	mode: MarketPriceChartMode;
 	/**
 	 * `C-CHART-2` clause 1 (CHART-2) — whether the terminal dots pulse.
@@ -459,29 +460,26 @@ export function MarketPriceChart({
 						vectorEffect="non-scaling-stroke"
 					/>
 
-					{/* EXPANDED only — the per-(UTC day, side) top-post nodes (Slice 2). Each
-			    a dot at (post timestamp, its YES price on the 0–100 % scale), filled
-			    by the post's SIDE token (`--graph-yes`/`--graph-no`, INV-3 — never
-			    the `--color-*` slot; decision #7). A ground-toned rim separates a
-			    node from its same-token line. */}
-					{mode === "expanded" &&
-						(nodes ?? []).map((node) => (
-							<circle
-								key={node.id}
-								data-testid={`graph-node-${node.id}`}
-								data-side={node.side}
-								cx={xPx(node.at, startMs, endMs)}
-								cy={yYesPx(node.yYes)}
-								r="4"
-								fill={
-									node.side === "YES" ? "var(--graph-yes)" : "var(--graph-no)"
-								}
-								stroke="var(--color-ground)"
-								strokeWidth="1.5"
-								vectorEffect="non-scaling-stroke"
-							/>
-						))}
+					{/* ⛔ THE POST NODES STOOD HERE AND ARE REMOVED (CHART-NODE-REMOVE,
+			    founder ruling): one `r=4` circle per `(UTC day, side)` bucket, filled
+			    by the post's frozen side token and rimmed in `--color-ground` to
+			    separate it from its same-token line, drawn on the expanded overlay
+			    only.
 
+			    ⛔ THE RIM IS WHAT THE GUARD NOW BANS, AND IT IS THE RIGHT HANDLE
+			    BECAUSE IT WAS NEVER SHARED. The terminal marks below are rimless by
+			    ruling (`C-CHART-2` clause 1 — "with no rim", deliberately distinct
+			    from the node's `r=4` and its 1.5px rim), so "no circle carries a
+			    `--color-ground` rim" separates the thing removed from the thing kept
+			    without naming either by testid. A guard written on `graph-node-` would
+			    pass against a node re-added under any other name.
+
+			    ⚠ WHAT LEFT WITH IT, upward: the `nodes` prop through
+			    `MarketPriceChartHost` and `MarketPriceChartOverlay`, the
+			    `priceChart.nodes` field on the view model, and — the part a
+			    render-only delete would have missed — `selectChartNodes` and
+			    `reservesAt` in `price-chart.ts`, which would otherwise have gone on
+			    walking `topOrder` and pricing a bucket per post on every read. */}
 					{/* C-CHART-2 clauses 1 and 7 — EVERY MODE, INCLUDING THE HERO. Each line
 			    ends in a rimless r=3 dot on its own series token, and on an `Open`
 			    market a ring of the same token pulses out of it.

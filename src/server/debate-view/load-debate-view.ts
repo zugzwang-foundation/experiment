@@ -28,7 +28,7 @@ import { signRead } from "@/server/storage/sign-read";
 import { type DebateComment, listMarketComments } from "./list-comments";
 import { getMarketPricingAndUnitToWin } from "./market-pricing";
 import { getMarketTotals } from "./market-totals";
-import { type ChartNode, deriveMarketPriceChart } from "./price-chart";
+import { deriveMarketPriceChart } from "./price-chart";
 import { loadRankingSubstrate } from "./ranking-substrate";
 import { loadReplySubstrate } from "./reply-substrate";
 import { type AuthorIdentity, resolveAuthors } from "./resolve-authors";
@@ -187,7 +187,7 @@ export type DebateViewModel = {
 	 * `null` when the derivation failed — the header renders unaffected (non-fatal,
 	 * web Gate-C error-state).
 	 */
-	priceChart: { series: PricePoint[]; nodes: ChartNode[] } | null;
+	priceChart: { series: PricePoint[] } | null;
 };
 
 /**
@@ -398,24 +398,23 @@ export async function loadDebateView(
 
 	// UI.19 §9 / F-DEBATE-5 — the market-detail price chart (series + nodes),
 	// derived AFTER the pricing read (its terminal is stamped with `pricing.yes`,
-	// decision #6) over ONE shared reserve walk that also prices the nodes; node
-	// selection reuses the ALREADY-loaded `postSubstrate` + `removedSet` (decision
-	// #2, no second read). Wrapped NON-FATALLY (web Gate-C error-state): a
-	// rejection (series OR node build) sets `priceChart = null` + a WARN, and the
-	// rest of the header returns intact — a chart-read failure never 500s the
-	// market-detail read (the Discovery F-1 WARN-never-throw posture).
+	// decision #6) over ONE shared reserve walk. Wrapped NON-FATALLY (web Gate-C
+	// error-state): a rejection sets `priceChart = null` + a WARN, and the rest of
+	// the header returns intact — a chart-read failure never 500s the market-detail
+	// read (the Discovery F-1 WARN-never-throw posture).
+	//
+	// ⛔ IT USED TO PASS `postSubstrate` AND `removedSet` AND IT NO LONGER DOES
+	// (CHART-NODE-REMOVE). They were the node selector's inputs — a fail-CLOSED
+	// masking belt filtered the substrate to posts present in the comments read, so
+	// a post that raced in after that snapshot was excluded from nodes rather than
+	// emitted unmasked (`@security-auditor` LOW, slice 2). With no nodes there is
+	// nothing for that belt to protect, and the two reads it drew on are unaffected:
+	// **both are still loaded, three lines up, for the Top list, the badges and the
+	// comment-body masking.** This removal takes an argument, not a query.
 	let priceChart: DebateViewModel["priceChart"];
 	try {
 		priceChart = await deriveMarketPriceChart(client, {
 			marketId,
-			// Fail-CLOSED masking belt (mirrors the posts-array `!comment` mask
-			// below): the `removedSet` was queried over the `comments` read, so a
-			// post is only known-checked if it is in that same read. `postSubstrate`
-			// is a separate READ COMMITTED statement, so a post that raced in after
-			// the comments snapshot would be masked-unchecked — exclude it from
-			// nodes rather than emit it unmasked (@security-auditor LOW, slice 2).
-			postSubstrate: postSubstrate.filter((s) => commentById.has(s.id)),
-			removedSet,
 			spotYes: pricingAndUnitToWin?.pricing.yes ?? null,
 			walk: args.walk,
 		});

@@ -393,7 +393,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 4, the chart moves to the rail", 
 		const { container } = render(
 			<MarketHeader
 				market={market(3, 5)}
-				priceChart={{ series: CHART_SERIES, nodes: [] }}
+				priceChart={{ series: CHART_SERIES }}
 			/>,
 		);
 
@@ -442,7 +442,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 4, the chart moves to the rail", 
 	it("market-header::an-EMPTY-series-drops-the-rail-too", () => {
 		// ⛔⛔ THE SHAPE PRODUCTION ACTUALLY PRODUCES, AND THE ONE THE FIRST VERSION
 		// OF THIS GUARD MISSED. `priceChart` is NOT null on a market with no price
-		// history — the read model returns `{ series: [], nodes: [] }`, which is
+		// history — the read model returns `{ series: [] }`, which is
 		// TRUTHY — and `MarketPriceChartHost` returns null for an empty series one
 		// level down. So a rail gated on `priceChart != null` renders an EMPTY
 		// 340×188 column, which is `PD-3-09` verbatim.
@@ -452,10 +452,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 4, the chart moves to the rail", 
 		// test above was green the whole time. A control that does not exercise the
 		// failing condition IN ITS FAILING SHAPE is not a control (OVN-V3).
 		const { container } = render(
-			<MarketHeader
-				market={market(3, 5)}
-				priceChart={{ series: [], nodes: [] }}
-			/>,
+			<MarketHeader market={market(3, 5)} priceChart={{ series: [] }} />,
 		);
 		expect(
 			container.querySelector('[data-testid="headzone-right"]'),
@@ -482,12 +479,11 @@ describe("HTML-FINISH · MARKET DETAIL — row 4, the chart moves to the rail", 
 		// arms agree — but the assertion no longer depends on my having checked.
 		const shapes: Array<{
 			series: PricePointFixture[];
-			nodes: never[];
 		} | null> = [
 			null,
-			{ series: [], nodes: [] },
-			{ series: [CHART_SERIES[0]], nodes: [] },
-			{ series: CHART_SERIES, nodes: [] },
+			{ series: [] },
+			{ series: [CHART_SERIES[0]] },
+			{ series: CHART_SERIES },
 		];
 		for (const priceChart of shapes) {
 			cleanup();
@@ -521,7 +517,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 4, the chart moves to the rail", 
 		const { container } = render(
 			<MarketHeader
 				market={market(3, 5)}
-				priceChart={{ series: CHART_SERIES, nodes: [] }}
+				priceChart={{ series: CHART_SERIES }}
 			/>,
 		);
 		const right = container.querySelector('[data-testid="headzone-right"]');
@@ -559,7 +555,7 @@ describe("RESO-1 — R-4, the price bar sits above the block row", () => {
 		const { container } = render(
 			<MarketHeader
 				market={market(3, 5)}
-				priceChart={{ series: CHART_SERIES, nodes: [] }}
+				priceChart={{ series: CHART_SERIES }}
 			/>,
 		);
 
@@ -578,7 +574,7 @@ describe("RESO-1 — R-4, the price bar sits above the block row", () => {
 		const { container } = render(
 			<MarketHeader
 				market={market(3, 5)}
-				priceChart={{ series: CHART_SERIES, nodes: [] }}
+				priceChart={{ series: CHART_SERIES }}
 			/>,
 		);
 		// `PriceBar`'s root carries `data-size`; `detail` is its market-detail
@@ -594,7 +590,7 @@ describe("RESO-1 — R-4, the price bar sits above the block row", () => {
 		const { container } = render(
 			<MarketHeader
 				market={market(3, 5)}
-				priceChart={{ series: CHART_SERIES, nodes: [] }}
+				priceChart={{ series: CHART_SERIES }}
 			/>,
 		);
 		const left = container.querySelector('[data-testid="headzone-left"]');
@@ -679,7 +675,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 8, the clickable percent labels",
 		return render(
 			<MarketHeader
 				market={market(3, 5)}
-				priceChart={{ series: CHART_SERIES, nodes: [] }}
+				priceChart={{ series: CHART_SERIES }}
 				pick={{ ...state, onPick }}
 			/>,
 		);
@@ -796,7 +792,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 8, the clickable percent labels",
 		const { container } = render(
 			<MarketHeader
 				market={market(3, 5)}
-				priceChart={{ series: CHART_SERIES, nodes: [] }}
+				priceChart={{ series: CHART_SERIES }}
 			/>,
 		);
 		expect(
@@ -850,7 +846,7 @@ describe("CHART-2 — the terminal pulse is gated on market.status (INV-4)", () 
 		return render(
 			<MarketHeader
 				market={{ ...market(3, 5), status }}
-				priceChart={{ series: CHART_SERIES, nodes: [] }}
+				priceChart={{ series: CHART_SERIES }}
 			/>,
 		);
 	}

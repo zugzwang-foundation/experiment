@@ -113,7 +113,7 @@ const OPENING = { at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" };
 function modelWithChart(currentYes: string, at: string): DebateViewModel {
 	return {
 		...mumbaiMetroModel,
-		priceChart: { series: [OPENING, { at, yes: currentYes }], nodes: [] },
+		priceChart: { series: [OPENING, { at, yes: currentYes }] },
 	};
 }
 

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 
-import type { ChartNode } from "@/server/debate-view/price-chart";
 import type { PricePoint } from "@/server/discovery/price-series";
 
 import { MarketPriceChartCard } from "./MarketPriceChartCard";
@@ -38,11 +37,9 @@ export function hasRenderableSeries(series: PricePoint[]): boolean {
 
 export function MarketPriceChartHost({
 	series,
-	nodes,
 	isOpen,
 }: {
 	series: PricePoint[];
-	nodes: ChartNode[];
 	/**
 	 * `C-CHART-2` clause 1 — whether the terminal dots pulse. READ from
 	 * `market.status` by `MarketHeader`, never inferred here: a quiet `Open`
@@ -77,7 +74,6 @@ export function MarketPriceChartHost({
 			{open && (
 				<MarketPriceChartOverlay
 					series={series}
-					nodes={nodes}
 					isOpen={isOpen}
 					onClose={() => setOpen(false)}
 				/>

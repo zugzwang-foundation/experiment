@@ -1,7 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { InfoTip } from "@/components/ui/info-tip";
 import { GLOSSARY } from "@/lib/copy/glossary";
-import type { ChartNode } from "@/server/debate-view/price-chart";
 import type { PricePoint } from "@/server/discovery/price-series";
 
 import {
@@ -136,7 +135,7 @@ export function MarketHeader({
 	pick,
 }: {
 	market: DebateMarketHeader;
-	priceChart: { series: PricePoint[]; nodes: ChartNode[] } | null;
+	priceChart: { series: PricePoint[] } | null;
 	/**
 	 * HTML-FINISH · MARKET DETAIL round 2 · R7 (row 8) — the rail bar's clickable
 	 * percent labels. Threaded straight through to `PriceBar`; this component
@@ -200,7 +199,7 @@ export function MarketHeader({
 			// 340×188, `innerHTML === ""` — an empty column on EVERY market.
 			// ⇒ THE MECHANISM, because it is subtle and it will recur. `priceChart`
 			// is NOT null on a market with no price history — the read model returns
-			// `{ series: [], nodes: [] }`, which is TRUTHY. The emptiness is decided
+			// `{ series: [] }`, which is TRUTHY. The emptiness is decided
 			// one level DOWN, inside `MarketPriceChartHost`, which returns `null` for
 			// an empty series. So `priceChart ? <Host/> : null` hands `HeadZone` a
 			// non-null React element that renders NOTHING, and `HeadZone` — correctly,
@@ -215,12 +214,14 @@ export function MarketHeader({
 			// ask a different question more carefully.
 			// ⚠ AND THE UNIT GUARD COULD NOT SEE IT. It rendered `priceChart={null}`,
 			// a shape production never produces, so it was green throughout.
-			// `market-header.test.tsx` now also exercises `{ series: [], nodes: [] }`.
+			// `market-header.test.tsx` now also exercises `{ series: [] }`.
+			// ⚠ THE SHAPE LOST ITS `nodes` AT CHART-NODE-REMOVE AND THE LESSON DID
+			// NOT: `{ series: [] }` is still truthy, so the condition is still
+			// `hasRenderableSeries(...)` and never `priceChart != null`.
 			right={
 				priceChart && hasRenderableSeries(priceChart.series) ? (
 					<MarketPriceChartHost
 						series={priceChart.series}
-						nodes={priceChart.nodes}
 						// C-CHART-2 clause 1 (CHART-2) — the terminal pulse. READ
 						// from the market's own status, never assumed: this is the
 						// ONE surface where a non-`Open` market renders a chart at
