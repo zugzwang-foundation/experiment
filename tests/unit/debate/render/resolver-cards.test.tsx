@@ -657,6 +657,56 @@ describe("BLOCK-3 §3 — value/subvalue read ink, sized per block from the map"
 	});
 });
 
+/**
+ * BLOCK-3 §5 — the render-level half of the FLAVOUR sentence-case guard.
+ * `resolution-block-data.test.ts` already proves the DATA is sentence-cased;
+ * this proves nothing at RENDER TIME undoes that — the specific regression
+ * the data file's own docblock warns against is a future `capitalize` class
+ * on the value span, which would turn "oktoberfest.de report" into
+ * "Oktoberfest.de Report" (capitalizing the second word, exactly what
+ * sentence case forbids) without touching the data at all.
+ */
+describe("BLOCK-3 §5 — FLAVOUR/oktoberfest sentence case survives to the DOM", () => {
+	it("resolver-cards::oktoberfest-de-report-renders-lowercase-r-report-in-the-DOM", () => {
+		const { container } = render(
+			<ResolverCards
+				market={marketFixture("oktoberfest-munich-beer-volume")}
+			/>,
+		);
+		const subvalue = container.querySelector(
+			'[data-testid="resolution-block-subvalue-resolution"]',
+		);
+		expect(subvalue?.textContent).toBe("report");
+		// The regression this guards: a `capitalize` class would not change
+		// `textContent` (CSS text-transform doesn't touch the DOM text node),
+		// so the string-equality check above is NOT what would catch it —
+		// this class-list check is.
+		const cls = (subvalue?.getAttribute("class") ?? "").split(/\s+/);
+		expect(cls).not.toContain("capitalize");
+	});
+
+	it("resolver-cards::no-value-or-subvalue-span-anywhere-carries-a-CSS-capitalize-class", () => {
+		for (const slug of Object.keys(RESOLUTION_BLOCKS) as Array<
+			keyof typeof RESOLUTION_BLOCKS
+		>) {
+			const { container, unmount } = render(
+				<ResolverCards market={marketFixture(slug)} />,
+			);
+			for (const k of KEYS) {
+				for (const suffix of ["value", "subvalue"]) {
+					const el = container.querySelector(
+						`[data-testid="resolution-block-${suffix}-${k}"]`,
+					);
+					if (!el) continue;
+					const cls = (el.getAttribute("class") ?? "").split(/\s+/);
+					expect(cls).not.toContain("capitalize");
+				}
+			}
+			unmount();
+		}
+	});
+});
+
 describe("BLOCK-1 — no market's title/description/slug ever leaks into the row", () => {
 	it("resolver-cards::ships-no-invented-content-and-no-market-fields-leak", () => {
 		const { container } = render(<ResolverCards market={PRIMARY_MARKET} />);
