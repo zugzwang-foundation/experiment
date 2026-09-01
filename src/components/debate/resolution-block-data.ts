@@ -68,6 +68,32 @@ export type ResolutionBlockEntry = {
 	line1: string;
 	line2: string | null;
 	href: string | null;
+	/**
+	 * BLOCK-3 §3 — the value line's font size in px, PER BLOCK, sized to that
+	 * block's own strings. Precomputed and baked in here rather than computed
+	 * at render time, for the same reason the rest of this map is static: the
+	 * content is frozen, so the size that fits it is frozen too, and
+	 * recomputing on every request would be Server-Component-breaking work
+	 * (real text measurement needs a DOM) for an answer that never changes.
+	 * BAND 12–14, HARD FLOOR 11 — below the floor the value ellipsizes
+	 * (`truncate`, `ResolverCards.tsx`) rather than shrinking further.
+	 * MEASURED, not estimated: each value was tried at 14/13/12/11px against
+	 * the real rendered column (79px at 1440×777/900, the narrower of the two
+	 * widths §1's fix left them at — see the data file's own docblock) in the
+	 * real deployed font (Geist), picking the largest size where
+	 * `scrollWidth <= clientWidth` for BOTH `line1` and `line2` (when present)
+	 * — one shared size per block, not one per line. Full per-block,
+	 * per-market table in BLOCK-3's run report.
+	 * ⚠⚠ §2 SHRANK THE GLYPH AFTER THIS MEASUREMENT (48px → 36px), WHICH ONLY
+	 * WIDENS THE COLUMN THESE SIZES WERE FIT AGAINST — §2 left the block's
+	 * horizontal padding (`px-[11px]`) and the glyph-to-text gap untouched
+	 * specifically so this measurement would stay valid rather than need a
+	 * second pass (see `ResolverCards.tsx`'s `BLOCK_BOX` docblock). 79px is
+	 * therefore a LOWER BOUND on today's column, not today's exact figure —
+	 * every size chosen here still fits, with more room than it was measured
+	 * against, never less.
+	 */
+	fontSize: 11 | 12 | 13 | 14;
 };
 
 export type ResolutionBlockSet = {
@@ -94,6 +120,7 @@ const CLOSES_DEFAULT: ResolutionBlockEntry = {
 	line1: "5 Nov 2026",
 	line2: "23:45Z",
 	href: null,
+	fontSize: 14,
 };
 
 /**
@@ -107,18 +134,25 @@ const OKTOBERFEST_CLOSES: ResolutionBlockEntry = {
 	line1: "4 Oct 2026",
 	line2: "21:59Z",
 	href: null,
+	fontSize: 14,
 };
 
 export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 	"mumbai-bmc-pink-october-disclosure": {
-		resolution: { line1: "Response on X", line2: null, href: null },
+		resolution: {
+			line1: "Response on X",
+			line2: null,
+			href: null,
+			fontSize: 11,
+		},
 		resolver: {
 			line1: "@mybmc",
 			line2: null,
 			href: "https://x.com/mybmc",
+			fontSize: 14,
 		},
 		closes: CLOSES_DEFAULT,
-		flavour: { line1: "Pressure", line2: null, href: null },
+		flavour: { line1: "Pressure", line2: null, href: null, fontSize: 14 },
 	},
 	"oktoberfest-munich-beer-volume": {
 		// ⚠⚠ BLOCK-2 · founder-ruled correction. AMEND-1 item 15 (§0)
@@ -140,27 +174,44 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 		// gains the same shape: "Oktoberfest" (who) + "management" (which
 		// part of who — the festival's own organizing body, the report's
 		// author). hrefs are unchanged by this — the seam is text only.
-		resolution: { line1: "oktoberfest.de", line2: "report", href: null },
+		resolution: {
+			line1: "oktoberfest.de",
+			line2: "report",
+			href: null,
+			fontSize: 11,
+		},
 		resolver: {
 			line1: "Oktoberfest",
 			line2: "management",
 			href: "https://www.oktoberfest.de/en",
+			fontSize: 13,
 		},
 		closes: OKTOBERFEST_CLOSES,
-		flavour: { line1: "Consumption", line2: null, href: null },
+		flavour: { line1: "Consumption", line2: null, href: null, fontSize: 13 },
 	},
 	"chess-fide-tiebreak-response": {
-		resolution: { line1: "Response on X", line2: null, href: null },
+		resolution: {
+			line1: "Response on X",
+			line2: null,
+			href: null,
+			fontSize: 11,
+		},
 		resolver: {
 			line1: "@FIDE_chess",
 			line2: null,
 			href: "https://x.com/FIDE_chess",
+			fontSize: 12,
 		},
 		closes: CLOSES_DEFAULT,
-		flavour: { line1: "Petition", line2: null, href: null },
+		flavour: { line1: "Petition", line2: null, href: null, fontSize: 14 },
 	},
 	"bitcoin-price-50k": {
-		resolution: { line1: "CoinMarketCap", line2: null, href: null },
+		resolution: {
+			line1: "CoinMarketCap",
+			line2: null,
+			href: null,
+			fontSize: 11,
+		},
 		resolver: {
 			line1: "CoinMarketCap",
 			// ⚠⚠ BLOCK-3 — `line2: "Low"` REMOVED, founder-ruled. CoinMarketCap's
@@ -170,22 +221,39 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 			// `href` are otherwise unchanged.
 			line2: null,
 			href: "https://coinmarketcap.com/currencies/bitcoin/historical-data/",
+			fontSize: 11,
 		},
 		closes: CLOSES_DEFAULT,
-		flavour: { line1: "Barrier", line2: null, href: null },
+		flavour: { line1: "Barrier", line2: null, href: null, fontSize: 14 },
 	},
 	"math-erdos-contribution-response": {
-		resolution: { line1: "Response on X", line2: null, href: null },
+		resolution: {
+			line1: "Response on X",
+			line2: null,
+			href: null,
+			fontSize: 11,
+		},
 		resolver: {
+			// ⚠⚠ FLOOR HIT. "@thomasfbloom" does not fit the measured 79px column
+			// even at the 11px floor (needs ~83px) — per §3's own rule, the fix
+			// below the floor is ellipsis (`truncate`, ResolverCards.tsx), never
+			// a smaller size. fontSize stays 11 — the floor — and the value
+			// relies on `truncate` to degrade, same as any other overflow.
 			line1: "@thomasfbloom",
 			line2: null,
 			href: "https://x.com/thomasfbloom",
+			fontSize: 11,
 		},
 		closes: CLOSES_DEFAULT,
-		flavour: { line1: "Innovation", line2: null, href: null },
+		flavour: { line1: "Innovation", line2: null, href: null, fontSize: 14 },
 	},
 	"claude-bundle-response": {
-		resolution: { line1: "Response on X", line2: null, href: null },
+		resolution: {
+			line1: "Response on X",
+			line2: null,
+			href: null,
+			fontSize: 11,
+		},
 		// ⚠ FOUNDER-RULED, BLOCK-2. The live criterion qualifies three accounts
 		// (@AnthropicAI, @claudeai, @ClaudeDevs) — @security-auditor flagged
 		// that showing only one here could read as excluding the other two.
@@ -197,22 +265,29 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 			line1: "@claudeai",
 			line2: null,
 			href: "https://x.com/claudeai",
+			fontSize: 14,
 		},
 		closes: CLOSES_DEFAULT,
-		flavour: { line1: "Suggestion", line2: null, href: null },
+		flavour: { line1: "Suggestion", line2: null, href: null, fontSize: 14 },
 	},
 	"yc-paper-club-response": {
-		resolution: { line1: "Response on X", line2: null, href: null },
+		resolution: {
+			line1: "Response on X",
+			line2: null,
+			href: null,
+			fontSize: 11,
+		},
 		resolver: {
 			line1: "@ycombinator",
 			line2: null,
 			href: "https://x.com/ycombinator",
+			fontSize: 12,
 		},
 		closes: CLOSES_DEFAULT,
-		flavour: { line1: "Showcase", line2: null, href: null },
+		flavour: { line1: "Showcase", line2: null, href: null, fontSize: 14 },
 	},
 	"github-zugzwang-repo-stars": {
-		resolution: { line1: "GitHub", line2: null, href: null },
+		resolution: { line1: "GitHub", line2: null, href: null, fontSize: 14 },
 		resolver: {
 			// ⚠⚠ TEXT AND HREF DELIBERATELY DIVERGE. "Zugzwang" / "repo" is the
 			// short display pair; the href is the full repo URL. The URL does
@@ -226,9 +301,10 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 			// hardcoded rather than imported, to keep this presentation-layer
 			// data file free of any `src/server/` coupling.
 			href: "https://github.com/zugzwang-foundation/experiment",
+			fontSize: 14,
 		},
 		closes: CLOSES_DEFAULT,
-		flavour: { line1: "Callout", line2: null, href: null },
+		flavour: { line1: "Callout", line2: null, href: null, fontSize: 14 },
 	},
 };
 

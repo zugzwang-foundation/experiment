@@ -143,7 +143,12 @@ describe("resolution-block-data — content matches the ratified register", () =
 		// not just the surface it's published at.
 		expect(
 			RESOLUTION_BLOCKS["oktoberfest-munich-beer-volume"].resolution,
-		).toEqual({ line1: "oktoberfest.de", line2: "report", href: null });
+		).toEqual({
+			line1: "oktoberfest.de",
+			line2: "report",
+			href: null,
+			fontSize: 11,
+		});
 		expect(RESOLUTION_BLOCKS["bitcoin-price-50k"].resolution.line1).toBe(
 			"CoinMarketCap",
 		);
@@ -162,6 +167,7 @@ describe("resolution-block-data — content matches the ratified register", () =
 			line1: "Oktoberfest",
 			line2: "management",
 			href: "https://www.oktoberfest.de/en",
+			fontSize: 13,
 		});
 	});
 
@@ -173,6 +179,7 @@ describe("resolution-block-data — content matches the ratified register", () =
 			line1: "CoinMarketCap",
 			line2: null,
 			href: "https://coinmarketcap.com/currencies/bitcoin/historical-data/",
+			fontSize: 11,
 		});
 	});
 
@@ -213,6 +220,7 @@ describe("resolution-block-data — content matches the ratified register", () =
 			line1: "4 Oct 2026",
 			line2: "21:59Z",
 			href: null,
+			fontSize: 14,
 		});
 		for (const slug of KNOWN_SLUGS) {
 			if (slug === "oktoberfest-munich-beer-volume") continue;
@@ -220,6 +228,7 @@ describe("resolution-block-data — content matches the ratified register", () =
 				line1: "5 Nov 2026",
 				line2: "23:45Z",
 				href: null,
+				fontSize: 14,
 			});
 		}
 	});

@@ -111,10 +111,12 @@ export function HeadZone({
 			// they DO two of the three things it rules out:
 			//   · `MarketHeader.tsx` — the `headzone-stack` carries `overflow-y-auto`,
 			//     the exact class bullet 1 says "cannot come back here".
-			//   · `ResolverCards.tsx` — carries a `min-h-[84px]` floor, which bullet 2
-			//     says would "contradict" the `min-h-0` pin; its own comment calls the
-			//     previous `min-h-0` a defect that silently disabled the scroll
-			//     backstop. The two rulings are in direct opposition.
+			//   · `ResolverCards.tsx` — carries a `min-h-[78px]` floor (BLOCK-3 §2; was
+			//     `min-h-[84px]` — the exact number moved, the contradiction below did
+			//     not), which bullet 2 says would "contradict" the `min-h-0` pin; its
+			//     own comment calls the previous `min-h-0` a defect that silently
+			//     disabled the scroll backstop. The two rulings are in direct
+			//     opposition.
 			// Also stale by consequence: the row renders FOUR blocks, not "both
 			// cards", and per `ResolverCards.tsx` the stack SCROLLS rather than clips.
 			// ⚠ And the arithmetic above ("3.64px", "29.14px") was measured against a

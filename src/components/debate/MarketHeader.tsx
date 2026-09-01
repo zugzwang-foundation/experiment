@@ -435,8 +435,15 @@ export function MarketHeader({
 						<div className="flex items-center gap-3">
 							{/* ⚠ `min-w-0` — this is the row's flexible child now, and without
 							    it a long attrs strip sets the row's automatic minimum and
-							    pushes the actions off the right edge instead of wrapping. */}
-							<div className="flex min-w-0 flex-wrap items-center gap-y-1 text-xs font-bold text-ink">
+							    pushes the actions off the right edge instead of wrapping.
+							    ⚠⚠ BLOCK-3 §2 — `text-xs` (12px) → `text-[13px]`, this task's
+							    share of the space `ResolverCards.tsx` no longer needs (the
+							    "stats line" in the §2 brief). The row's own height still
+							    tracks `LifecycleBadge`'s fixed `h-5` (20px, `ui/badge.tsx`) —
+							    a shared shadcn primitive, left untouched rather than resized
+							    for one call site — so this bump reads as denser, more legible
+							    figures within the SAME row height, not a taller row. */}
+							<div className="flex min-w-0 flex-wrap items-center gap-y-1 text-[13px] font-bold text-ink">
 								<InfoTip content={GLOSSARY.stakedMarket} asChild>
 									<span>
 										Đ {formatDharma(market.totals.dharmaStaked)} staked

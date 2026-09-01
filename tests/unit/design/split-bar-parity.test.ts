@@ -30,19 +30,45 @@ import { describe, expect, it } from "vitest";
  * The browser measurement is in the run log (track centre −11.99px against the
  * pill centres before, −0.6px after). What is pinned here is the set of
  * declarations that produce it. ⛔ FENCE BY SYMBOL, NEVER BY LINE (O-8).
+ *
+ * ⚠⚠ BLOCK-3 §2 — THE "CARD DID NOT MOVE" HALF IS NOW HISTORICAL, NOT STANDING.
+ * It proved RPLY-1 (the reply-bar port) didn't touch `AggregateFooter` — true
+ * then and still true of THAT event. BLOCK-3 §2 moves `AggregateFooter`'s track
+ * for an unrelated reason (redistributing height freed by the resolution-block
+ * row, cascaded from `PriceBar`'s `detail` bar), and `ReplySplitBar.tsx` moves
+ * WITH it to hold the three-way parity this file's header names. The three
+ * literals this used to hardcode as `"14px"` (once at each of `trackWrapper`'s
+ * anchor, the reply assertion, and the card assertion) are the reason this
+ * chain broke silently at that resize — they are now READ OFF `PriceBar.tsx`'s
+ * `detail.bar`, the same pattern `aggregate-footer-alignment.test.ts` already
+ * uses, so the NEXT resize reddens here instead of drifting unnoticed.
  */
 
 const ROOT = process.cwd();
 const CARD = "src/components/debate/AggregateFooter.tsx";
 const REPLY = "src/components/debate/composer/ReplySplitBar.tsx";
+const PRICE_BAR = "src/components/debate/PriceBar.tsx";
 const card = readFileSync(join(ROOT, CARD), "utf8");
 const reply = readFileSync(join(ROOT, REPLY), "utf8");
+const priceBar = readFileSync(join(ROOT, PRICE_BAR), "utf8");
+
+/**
+ * The canonical thickness, READ OFF `PriceBar`'s `detail.bar` rather than
+ * hardcoded — the same pattern `aggregate-footer-alignment.test.ts` uses, and
+ * for the same reason: a copied literal drifts silently the next time `detail`
+ * is re-sized, and a re-derived one reddens instead.
+ */
+const DETAIL_PX = /detail:\s*\{\s*bar:\s*"h-\[(\d+)px\]"/.exec(priceBar)?.[1];
+if (!DETAIL_PX) {
+	throw new Error(`${PRICE_BAR}: no detail.bar declaration found`);
+}
+const TRACK_CLASS = `h-[${DETAIL_PX}px]`;
 
 /** The class string of the element WRAPPING a bar's track, in either file. */
 function trackWrapper(source: string, testid: string | null): string[] {
 	const at =
 		testid === null
-			? source.indexOf("h-[14px] w-full overflow-hidden")
+			? source.indexOf(`${TRACK_CLASS} w-full overflow-hidden`)
 			: source.indexOf(`data-testid="${testid}"`);
 	if (at === -1) {
 		throw new Error("no track found — if a bar was restructured, re-derive");
@@ -54,11 +80,11 @@ function trackWrapper(source: string, testid: string | null): string[] {
 }
 
 describe("R5 — the focused post's bar carries the card's geometry", () => {
-	it("split-bar-parity::the-reply-track-is-14px-with-the-card-radius-and-clip", () => {
+	it("split-bar-parity::the-reply-track-matches-PriceBar-detail-with-the-card-radius-and-clip", () => {
 		// ⛔ THE THREE THAT MOVED, asserted on the reply bar. Before: `h-1.5`
 		// (6px) and `rounded-(--r-dot)` (3px) — a hairline with a square corner
-		// beside a market bar that is a 14px pill.
-		expect(reply).toContain("h-[14px]");
+		// beside a market bar that is a pill.
+		expect(reply).toContain(TRACK_CLASS);
 		expect(reply).toContain("rounded-[var(--r)]");
 		expect(reply).toContain("overflow-hidden");
 		// …and the superseded pair pinned GONE, so a revert reddens here rather
@@ -122,17 +148,24 @@ describe("R5 — the focused post's bar carries the card's geometry", () => {
 	});
 });
 
-describe("R5 — the MARKET CARD did not move", () => {
-	it("split-bar-parity::the-card-keeps-its-own-track-declarations", () => {
-		// ⛔⛔ THE NEGATIVE HALF. If the port had "helpfully" touched the card, the
-		// founder would find a changed surface he never asked about.
+describe("R5 — the market card's own track still matches PriceBar's detail size", () => {
+	// ⚠⚠ BLOCK-3 §2 — RENAMED FROM "the MARKET CARD did not move". That title
+	// asserted a historical negative (RPLY-1's reply-bar port left the card's
+	// OWN literals untouched), which stayed true across that event but reads
+	// as false the moment a later task — this one — DOES move the card, for a
+	// reason RPLY-1 never had to consider. The assertions below already read
+	// the card's thickness against `TRACK_CLASS` (itself derived from
+	// `PriceBar.tsx`), so they never actually pinned "no change, ever" — only
+	// "in parity with the market bar" — and the describe title now says that
+	// instead of the narrower claim it used to make.
+	it("split-bar-parity::the-card-keeps-radius-and-clip-in-parity-with-PriceBar-detail", () => {
 		const at = card.indexOf('data-testid="aggregate-split-track"');
 		expect(at).toBeGreaterThan(-1);
 		const cls =
 			/className=\{cn\(\s*(?:\/\/[^\n]*\n\s*)*"([^"]*)"/.exec(
 				card.slice(at, at + 4000),
 			)?.[1] ?? "";
-		expect(cls).toContain("h-[14px]");
+		expect(cls).toContain(TRACK_CLASS);
 		expect(cls).toContain("rounded-[var(--r)]");
 		expect(cls).toContain("overflow-hidden");
 		expect(cls).toContain("[border:var(--hairline)]");

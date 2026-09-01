@@ -79,18 +79,30 @@ const PRICING = { yes: "0.38", no: "0.62" };
  * arrangement `PriceBar`'s `D-J` record had been carrying as a known, unactioned
  * divergence since POLISH.3.
  *
- * ⛔ THE NUMBERS DID NOT MOVE — `h-[14px]` and `text-[10px]` are POLISH.3's, byte
- * for byte. This re-capture is a COMPOSITION change, not a value change.
+ * ⛔ THE NUMBERS DID NOT MOVE AT R7 — `h-[14px]` and `text-[10px]` were
+ * POLISH.3's, byte for byte, and that re-capture was a COMPOSITION change, not
+ * a value change.
  *
- * ⛔ AND THE SCOPE IS EXACTLY ONE PRESET. The `hero` and `card` expectations
- * below are BYTE-IDENTICAL to their pre-R7 form — not re-derived, not re-run,
- * not touched. That is checkable rather than assertable: `git diff` this file
- * and every hunk lands above line 100. `ROW.hero` and `ROW.card` are likewise
+ * ⚠⚠ BLOCK-3 §2 RE-CAPTURES A THIRD TIME, AND THIS ONE IS A VALUE CHANGE —
+ * `h-[14px]`/`text-[10px]` → `h-[18px]`/`text-[11px]`, recorded per O-4 rather
+ * than silently overwritten. Unlike POLISH.3 and R7, this number has no d5
+ * citation behind it: `PriceBar.tsx`'s own docblock on `ROW` states the
+ * reasoning (a self-directed layout-budget call, BLOCK-3 §2, giving the
+ * `detail` bar more of the vertical space the resolution-block row no longer
+ * needs). The methodology is unchanged from R7's: the component was edited
+ * FIRST, this literal was then hand-written to match and passed on its first
+ * run — same as R7, this capture carries no intermediate-RED artifact, and
+ * for the same reason that is acceptable: the NUMBER (18px/11px) was decided
+ * before this file was touched, in the component's own docblock, not derived
+ * from a string typed here first.
+ *
+ * ⛔ AND THE SCOPE IS EXACTLY ONE PRESET, UNCHANGED SINCE R7. The `hero` and
+ * `card` expectations below are BYTE-IDENTICAL to their pre-R7 form — not
+ * re-derived, not re-run, not touched. That is checkable rather than
+ * assertable: `git diff` this file and every hunk lands in the `DETAIL_BASELINE`
+ * literal and this docblock alone. `ROW.hero` and `ROW.card` are likewise
  * byte-unchanged in the component, and both Discovery sites pass no `pick`, so
- * their labels stay `<span>`s. Round 1 had already MEASURED the boundary
- * question this raises — `next build` EXIT=0 with the handler fully wired and
- * both Discovery sites building unchanged — so `H1-e` was discharged before
- * this landed.
+ * their labels stay `<span>`s.
  *
  * ⚠ HOW THE NEW LITERAL WAS PRODUCED — stated as what actually happened, to the
  * standard the paragraph above sets for itself.
@@ -119,12 +131,12 @@ const PRICING = { yes: "0.38", no: "0.62" };
  */
 const DETAIL_BASELINE =
 	'<div data-size="detail" class="flex items-center gap-[9px]">' +
-	'<span class="text-[10px] font-bold tracking-[0.05em] whitespace-nowrap text-ink">YES 38%</span>' +
-	'<div class="h-[14px] flex flex-1 overflow-hidden rounded-[var(--r)] [border:var(--hairline)]" role="img" aria-label="YES 38%, NO 62%">' +
+	'<span class="text-[11px] font-bold tracking-[0.05em] whitespace-nowrap text-ink">YES 38%</span>' +
+	'<div class="h-[18px] flex flex-1 overflow-hidden rounded-[var(--r)] [border:var(--hairline)]" role="img" aria-label="YES 38%, NO 62%">' +
 	'<div class="h-full bg-yes" style="width: 38%;"></div>' +
 	'<div class="h-full flex-1 bg-no"></div>' +
 	"</div>" +
-	'<span class="text-[10px] font-bold tracking-[0.05em] whitespace-nowrap text-ink">NO 62%</span>' +
+	'<span class="text-[11px] font-bold tracking-[0.05em] whitespace-nowrap text-ink">NO 62%</span>' +
 	"</div>";
 
 describe("PriceBar presets — `detail` is byte-pinned to its captured render", () => {
