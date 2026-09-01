@@ -30,6 +30,79 @@
 export const VIEWBOX_W = 640;
 export const VIEWBOX_H = 320;
 
+/** Which of the three surfaces a render is. Named here because the Y scale is a
+ * pure function of it and of nothing else. */
+export type ChartMode = "collapsed" | "expanded" | "hero";
+
+/** A whole-percent value on the fixed 0–100 % Y scale → its plot-space y.
+ * The mirror of `yYesPx`, which takes a 0..1 probability STRING because it reads
+ * a canonical price; this one takes a percent NUMBER because a gridline is a
+ * property of the scale and never of the data — there is no price to preserve. */
+function yPctPx(pct: number): number {
+	// ⛔ ROUNDS LOCALLY INSTEAD OF CALLING THIS MODULE'S `round`, AND THE REASON IS
+	// LOAD ORDER, NOT TASTE. The gridline sets below are built at MODULE LOAD;
+	// `round` is a `const` arrow declared ~250 lines further down, so it is in its
+	// temporal dead zone at that moment and reaching for it would throw a
+	// ReferenceError on IMPORT — before any test could render anything. Rounding
+	// is genuinely needed: `(1 − 10/100) · 320` is `288.00000000000006` in binary
+	// floating point, and an unrounded coordinate would print those digits into
+	// every gridline's `y` in the shipped markup.
+	return Math.round((1 - pct / 100) * VIEWBOX_H * 100) / 100;
+}
+
+/** One horizontal gridline: the percent it marks and where that lands. */
+export type Gridline = { readonly pct: number; readonly y: number };
+
+/**
+ * The Y-scale gridline sets — `C-CHART-1` clause 1 as amended at CHART-5.
+ *
+ * ⛔ COMPUTED ONCE, AT MODULE LOAD, AND THAT IS A REQUIREMENT RATHER THAN AN
+ * OPTIMISATION. The set is a pure function of the MODE and never of the series,
+ * so building it per render — let alone per point — would be recomputing a
+ * constant on every paint of a component that renders three times per market
+ * page. Freezing them here also makes the "never per-point" property structural:
+ * there is no code path that could accidentally close over a data value, because
+ * these arrays exist before any data does.
+ *
+ * ⚠ THE THREE SETS DIFFER BECAUSE THE THREE BOXES DO, not because the data does.
+ * The collapsed card is 164 px tall, so eleven lines in it would be ~15 px apart
+ * and read as hatching rather than as a scale; it gets the quarters. The
+ * expanded overlay is ~418 px tall and can carry every 10 %. The Discovery hero
+ * is ~96 px tall and gets NONE — at that height even four lines compete with the
+ * series for the same pixels, and the hero exists to show shape, not value.
+ */
+const GRIDLINES_COLLAPSED: readonly Gridline[] = Object.freeze(
+	[25, 50, 75, 100].map((pct) => Object.freeze({ pct, y: yPctPx(pct) })),
+);
+
+const GRIDLINES_EXPANDED: readonly Gridline[] = Object.freeze(
+	Array.from({ length: 11 }, (_, i) => i * 10).map((pct) =>
+		Object.freeze({ pct, y: yPctPx(pct) }),
+	),
+);
+
+const GRIDLINES_HERO: readonly Gridline[] = Object.freeze([]);
+
+/**
+ * The gridline set for a mode. A pure lookup — see the docblock above for why it
+ * must not compute.
+ *
+ * ⚠ `0` AND `100` LAND EXACTLY ON THE PLOT'S EDGES (y = 320 and y = 0), so on the
+ * expanded overlay two of the eleven are boundary rules rather than interior
+ * ones. That is deliberate and is the founder's ruled set; whether the `100`
+ * line is visually redundant against the card border is a ruling the CHART-5
+ * contact sheet renders both ways.
+ */
+export function gridlinesFor(mode: ChartMode): readonly Gridline[] {
+	if (mode === "expanded") {
+		return GRIDLINES_EXPANDED;
+	}
+	if (mode === "collapsed") {
+		return GRIDLINES_COLLAPSED;
+	}
+	return GRIDLINES_HERO;
+}
+
 /** Terminal dot radius — `C-CHART-2` clause 1. Deliberately NOT `C-CHART-1`
  * clause 2's `r=4` post node, and deliberately rimless: the two marks mean
  * different things (where the series ENDS vs. where a post SITS) and are told

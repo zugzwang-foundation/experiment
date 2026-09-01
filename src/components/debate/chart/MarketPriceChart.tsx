@@ -7,8 +7,12 @@ import {
 import type { ChartNode } from "@/server/debate-view/price-chart";
 import type { PricePoint } from "@/server/discovery/price-series";
 
+import { formatPricePercent } from "../format";
 import {
+	type ChartMode,
 	fmtUtcDay,
+	type Gridline,
+	gridlinesFor,
 	labelTopPct,
 	SVG_W,
 	TERMINAL_DOT_R,
@@ -36,8 +40,14 @@ import {
  * of the collapsed card, where three date labels would be noise rather than
  * orientation. That is a presentational choice inside canon's jurisdiction, not
  * a spec pin; §22 and C-CHART-2 both stop at "same component, same derivation".
+ *
+ * ⚠ ALIASED TO `geometry.ts`'s `ChartMode` AT CHART-5 RATHER THAN RESTATED. The
+ * Y scale is a pure function of the mode, so `geometry` needed the union too —
+ * and two structurally-identical unions in two files are two places for a fourth
+ * surface to be added to only one of. The exported NAME is unchanged, because
+ * other modules import it.
  */
-export type MarketPriceChartMode = "collapsed" | "expanded" | "hero";
+export type MarketPriceChartMode = ChartMode;
 
 /** The market-detail price-chart SVG (SPEC.1 1.0.48 §9 / F-DEBATE-5) — two
  * complementary YES/NO probability lines mirrored about 50 % (design-language
@@ -171,6 +181,11 @@ export function MarketPriceChart({
 		series.length === 0
 			? VIEWBOX_W
 			: xPx(series[series.length - 1].at, startMs, endMs);
+
+	// The Y scale (CHART-5). A LOOKUP, not a computation — the frozen per-mode
+	// sets are built once at module load in `geometry.ts`, so this line costs one
+	// property read per render and cannot vary with the data.
+	const grid = gridlinesFor(mode);
 
 	return (
 		/* ⛔ THE FRAME IS A FLEX ROW, AND THAT IS THE WHOLE LABEL FIX
@@ -313,6 +328,44 @@ export function MarketPriceChart({
 			    trade this task made: the line-end labels went 5.38px → 10px, and the
 			    plot paid ~13px of width.** Recorded as a cost, not a recovery,
 			    because the number says so. */}
+					{/* ⛔ THE Y SCALE, AND IT IS DRAWN FIRST — before the x-axis, before the
+					    lines, before every mark — so the series paints over it. Gridlines
+					    behind data is the order `CollapsedAxis` and `ProfileChart` already
+					    use; a grid on top of a polyline reads as the polyline being
+					    dashed.
+					    ⚠ THE SET IS A PURE FUNCTION OF THE MODE, resolved once at module
+					    load in `gridlinesFor` — never per point and never per render. The
+					    data cannot reach it: a gridline marks a position on a FIXED 0–100 %
+					    scale, so unlike the x-axis it has no domain to consult.
+					    ⛔ THE STROKE IS `--color-n2`, WHICH IS THE STEP THE X TICKS
+					    ALREADY USE, and matching it is the reason rather than a
+					    coincidence: two axes on one plot drawn at two different weights
+					    read as two systems, one of which looks like it means more. It is an
+					    EXISTING ramp step — no token is minted, which the 11-token census
+					    (`tokens-monochrome.test.ts`) enforces as a correctness guard.
+					    ⚠ DOTTED `1 3` WHERE THE X TICKS ARE DASHED `5 4` — same colour,
+					    different rhythm, so the two directions stay distinguishable at a
+					    glance without spending a second tone on the difference. */}
+					{grid.length > 0 && (
+						<g
+							data-testid="chart-gridlines"
+							stroke="var(--color-n2)"
+							strokeWidth="1"
+							strokeDasharray="1 3"
+							vectorEffect="non-scaling-stroke"
+						>
+							{grid.map((g) => (
+								<line
+									key={g.pct}
+									data-pct={g.pct}
+									x1={0}
+									x2={VIEWBOX_W}
+									y1={g.y}
+									y2={g.y}
+								/>
+							))}
+						</g>
+					)}
 					{mode === "collapsed" && (
 						<CollapsedAxis series={series} startMs={startMs} endMs={endMs} />
 					)}
@@ -430,7 +483,8 @@ export function MarketPriceChart({
 					)}
 				</svg>
 			</div>
-			{terminalYes !== null && <TerminalLabels yes={terminalYes} />}
+			{mode === "expanded" && grid.length > 0 && <YMarks marks={grid} />}
+			{terminalYes !== null && <TerminalLabels yes={terminalYes} mode={mode} />}
 		</div>
 	);
 }
@@ -543,7 +597,13 @@ function TerminalMarkers({
  * the box would be 16px tall around 10px type and `-translate-y-1/2` would
  * centre the wrong box. At `leading-none` the box IS the type.
  */
-function TerminalLabels({ yes }: { yes: string }): React.JSX.Element {
+function TerminalLabels({
+	yes,
+	mode,
+}: {
+	yes: string;
+	mode: ChartMode;
+}): React.JSX.Element {
 	const labelY = terminalLabelYs(yes);
 	// Which of the two clause-4 already put on top. Read off its OUTPUT rather
 	// than recomputed from the price, so the tie-break at exactly 50 % stays
@@ -551,6 +611,18 @@ function TerminalLabels({ yes }: { yes: string }): React.JSX.Element {
 	const yesOnTop = labelY.yes <= labelY.no;
 	const upperPct = labelTopPct(yesOnTop ? labelY.yes : labelY.no);
 	const lowerPct = labelTopPct(yesOnTop ? labelY.no : labelY.yes);
+	const half = labelHalfBoxPx(mode);
+	const showValue = mode === "expanded";
+	// ⛔ THE PAIRED FORMATTER, AND IT IS THE POINT OF RF-2. This label renders
+	// BOTH sides, so NO must be DERIVED as `100 − YES` rather than rounded on its
+	// own — independent per-side half-up rounding prints 101 % at any exact `.xx5`
+	// tie (SPEC.1 §10.8). `formatPricePercent` never reads `pricing.no` (its own
+	// docblock states that as the structural guarantee), so the pair is built from
+	// the single price this component actually holds: the terminal YES. That value
+	// is the same `spotYes` `price-chart.ts` stamps the terminal point with — the
+	// one the `PriceBar` renders — which is what makes "the chart's end label can
+	// never disagree with the bar" true by construction rather than by luck.
+	const pair = { yes, no: yes };
 	return (
 		<div
 			data-testid="terminal-label-gutter"
@@ -574,10 +646,15 @@ function TerminalLabels({ yes }: { yes: string }): React.JSX.Element {
 			className="relative shrink-0 pl-[5px] text-[10px] leading-none font-bold tracking-[0.1em]"
 		>
 			{/* ⛔ THE SIZER, AND IT REPLACES A HAND-MEASURED CONSTANT. CHART-1 had to
-			    pin `YES` at 26 user units because it could not measure Geist offline.
-			    This invisible copy is laid out by the browser in the real shipped
-			    face, so the gutter is exactly as wide as the widest label actually
-			    is — on every device, with no number to go stale. */}
+				    pin `YES` at 26 user units because it could not measure Geist offline.
+				    This invisible copy is laid out by the browser in the real shipped
+				    face, so the gutter is exactly as wide as the widest label actually
+				    is — on every device, with no number to go stale.
+				    ⚠ IT SIZES ON THE NAME ALONE EVEN WHEN A VALUE IS STACKED BENEATH IT,
+				    and that is correct rather than an oversight: the value is at most
+				    four characters (`100%`) of TABULAR digits at 16px, and `YES` at 10px
+				    bold with 0.1em tracking is the wider of the two. If that ever stops
+				    holding the sizer is what must change — not a number somewhere else. */}
 			<span aria-hidden="true" className="invisible block">
 				YES
 			</span>
@@ -585,20 +662,124 @@ function TerminalLabels({ yes }: { yes: string }): React.JSX.Element {
 				data-testid="terminal-label-no"
 				data-plot-y={labelY.no}
 				className="absolute left-[5px] -translate-y-1/2 text-[color:var(--graph-no)]"
-				style={{ top: yesOnTop ? lowerTop(lowerPct) : upperTop(upperPct) }}
+				style={{
+					top: yesOnTop ? lowerTop(lowerPct, half) : upperTop(upperPct, half),
+				}}
 			>
-				NO
+				<span className="block">NO</span>
+				{showValue && (
+					<span
+						data-testid="terminal-value-no"
+						className="block tracking-normal tabular-nums"
+						style={{
+							fontSize: `${LABEL_VALUE_PX}px`,
+							marginTop: `${LABEL_STACK_GAP_PX}px`,
+						}}
+					>
+						{formatPricePercent(pair, "NO")}
+					</span>
+				)}
 			</span>
 			<span
 				data-testid="terminal-label-yes"
 				data-plot-y={labelY.yes}
 				className="absolute left-[5px] -translate-y-1/2 text-[color:var(--graph-yes)]"
-				style={{ top: yesOnTop ? upperTop(upperPct) : lowerTop(lowerPct) }}
+				style={{
+					top: yesOnTop ? upperTop(upperPct, half) : lowerTop(lowerPct, half),
+				}}
 			>
-				YES
+				<span className="block">YES</span>
+				{showValue && (
+					<span
+						data-testid="terminal-value-yes"
+						className="block tracking-normal tabular-nums"
+						style={{
+							fontSize: `${LABEL_VALUE_PX}px`,
+							marginTop: `${LABEL_STACK_GAP_PX}px`,
+						}}
+					>
+						{formatPricePercent(pair, "YES")}
+					</span>
+				)}
 			</span>
 		</div>
 	);
+}
+
+/**
+ * The Y scale's numeric marks — HTML in a gutter of their own, between the plot
+ * and the end labels (`C-CHART-1` clause 1 as amended at CHART-5).
+ *
+ * ⛔ HTML AND NOT SVG `<text>`, for exactly the reason clause 2 moved `YES`/`NO`
+ * out at CHART-2: `preserveAspectRatio="none"` stretches user space by a factor
+ * that differs per surface and per viewport, so a declared 10-unit label renders
+ * anywhere between ~4 px and ~19 px. Out here, 10px is 10px on every surface.
+ *
+ * ⛔ ITS OWN COLUMN, NOT A SECOND ABSOLUTE LAYER INSIDE `TerminalLabels`, AND THE
+ * FIRST ATTEMPT AT THIS SHIPPED THE WRONG ONE. Putting the marks inside the label
+ * gutter forced that gutter from `relative` to `flex` and pushed the width-sizer
+ * one level down — which broke `alignment-chain.test.tsx`'s two structural guards
+ * on `C-CHART-2` clause 2 link 4 and clause 3. Those guards are RIGHT: the
+ * labels' `top: X%` must resolve against a box exactly as tall as the plot, and
+ * the gutter's width must be measured by an in-flow sizer rather than pinned. The
+ * fix was to stop disturbing the gutter at all. It is now byte-identical to what
+ * it was before this task, and the marks are a sibling column.
+ *
+ * ⚠ NO PINNED WIDTH HERE EITHER. The column is sized by an in-flow invisible
+ * copy of the widest mark string, the same mechanism and for the same reason
+ * CHART-2 gave when it deleted a hand-measured `26` for the label gutter: a
+ * number encoding a string's width in a face nobody measured goes stale the
+ * moment the face or the set changes. `items-stretch` on the frame makes this
+ * column exactly the plot's height, which is what lets a percentage top land a
+ * mark on its own gridline.
+ */
+function YMarks({ marks }: { marks: readonly Gridline[] }): React.JSX.Element {
+	return (
+		<div
+			data-testid="chart-y-marks"
+			// Same reasoning as the label gutter's: this is a visual key for a visual
+			// mark, and the chart's accessible channel is `ChartSummary` alone.
+			aria-hidden="true"
+			className="relative shrink-0 pl-[6px] text-right text-[10px] leading-none text-n5 tabular-nums"
+		>
+			{/* The sizer — an in-flow copy of the widest mark, laid out by the browser
+			    in the real shipped face. `100` is the widest of the eleven at tabular
+			    figures, where every digit is the same width. */}
+			<span aria-hidden="true" className="invisible block">
+				100
+			</span>
+			{marks.map((g) => (
+				<span
+					key={g.pct}
+					data-testid={`y-mark-${g.pct}`}
+					data-pct={g.pct}
+					className="absolute right-0 -translate-y-1/2"
+					style={{ top: markTop(labelTopPct(g.y)) }}
+				>
+					{g.pct}
+				</span>
+			))}
+		</div>
+	);
+}
+
+/**
+ * A numeric mark's CSS `top` — the OUTER edge clamp only.
+ *
+ * ⛔ NOT A COLLISION RULE, AND THE OMISSION IS THE WHOLE POINT. `upperTop` /
+ * `lowerTop` carry a `min`/`max` term pivoting on 50 % because the two END
+ * labels converge there and must be pushed apart. Gridline marks are evenly
+ * spaced by construction and can never converge, so they need no such term —
+ * only the same edge floor that stops the `0` and `100` marks, whose centres sit
+ * exactly on the plot's boundaries, from having half their box outside it. The
+ * gutter does not clip, so an unclamped mark escapes rather than being cut.
+ *
+ * ⚠ Half-box is the ONE-LINE value: a mark is a single line of 10px type at
+ * `leading-none` on every mode that has marks.
+ */
+function markTop(pct: number): string {
+	const half = LABEL_NAME_PX / 2;
+	return `clamp(${half}px, ${pct}%, calc(100% - ${half}px))`;
 }
 
 /**
@@ -617,7 +798,39 @@ function TerminalLabels({ yes }: { yes: string }): React.JSX.Element {
  * seeded ones — on the surface that is the market's primary price display.
  * Caught by `@test-writer` at the CHART-2 cascade.
  */
-const LABEL_HALF_BOX_PX = 5;
+const LABEL_NAME_PX = 10;
+
+/**
+ * The stacked VALUE line's type size and the air between it and the name — the
+ * other two numbers the expanded label's box is made of (`C-CHART-2` clause 2 as
+ * amended at CHART-5). Both are `leading-none`, so each line's box IS its type
+ * and the stack's height is exactly the sum below.
+ */
+const LABEL_VALUE_PX = 16;
+const LABEL_STACK_GAP_PX = 2;
+
+/**
+ * Half the label's rendered box, in CSS PIXELS — **derived from the type the
+ * label is actually made of, per mode.**
+ *
+ * ⛔ ONE RULE, TWO MEASURED INPUTS — NOT A SECOND COLLISION RULE. Clause 4's
+ * arithmetic in `terminalLabelYs` is untouched, and so is the `min`/`max`/
+ * `clamp` shape below. The only thing CHART-5 changes is the NUMBER handed to
+ * that shape, because the expanded overlay's label is now two lines rather than
+ * one and a taller box collides at a wider spread. Hard-coding a second
+ * threshold would have been the CHART-2 defect exactly — a constant chosen
+ * against one surface — so the box is composed from the same three type values
+ * the label declares, and the threshold moves whenever they do.
+ *
+ * ⚠ THE ONE-LINE VALUE IS UNCHANGED AT 5, so the collapsed card and the
+ * Discovery hero keep the narrower threshold they already had. That is the
+ * ruling's own asymmetry: they keep the name alone, so their box did not grow.
+ */
+function labelHalfBoxPx(mode: ChartMode): number {
+	return mode === "expanded"
+		? (LABEL_NAME_PX + LABEL_STACK_GAP_PX + LABEL_VALUE_PX) / 2
+		: LABEL_NAME_PX / 2;
+}
 
 /**
  * The two end labels' CSS `top`, and the one place plot space and CSS space are
@@ -653,12 +866,12 @@ const LABEL_HALF_BOX_PX = 5;
  * clip — that is the point of it — so it escaped into whatever sits above the
  * chart rather than being cut off.
  */
-function upperTop(pct: number): string {
-	return `clamp(${LABEL_HALF_BOX_PX}px, min(${pct}%, calc(50% - ${LABEL_HALF_BOX_PX}px)), calc(100% - ${LABEL_HALF_BOX_PX}px))`;
+function upperTop(pct: number, half: number): string {
+	return `clamp(${half}px, min(${pct}%, calc(50% - ${half}px)), calc(100% - ${half}px))`;
 }
 
-function lowerTop(pct: number): string {
-	return `clamp(${LABEL_HALF_BOX_PX}px, max(${pct}%, calc(50% + ${LABEL_HALF_BOX_PX}px)), calc(100% - ${LABEL_HALF_BOX_PX}px))`;
+function lowerTop(pct: number, half: number): string {
+	return `clamp(${half}px, max(${pct}%, calc(50% + ${half}px)), calc(100% - ${half}px))`;
 }
 
 /**

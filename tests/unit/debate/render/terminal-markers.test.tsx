@@ -558,9 +558,16 @@ describe("C-CHART-2 — the end label is bound to its own line's token", () => {
 
 	it("the viewBox reserves a DOT ALLOWANCE only — the label gutter is gone from it", () => {
 		// C-CHART-2 clause 3 as amended at CHART-2. The viewBox is still WIDER
-		// than the plot, because the terminal circle is centred at `cx =
-		// VIEWBOX_W` and would otherwise half-clip — but only by the dot's own
-		// radius plus a hair, not by 38 units of room for text.
+		// than the plot, because the terminal circle would otherwise half-clip —
+		// but only by the dot's own radius plus a hair, not by 38 units of room
+		// for text.
+		// ⚠ CORRECTED AT CHART-5: this read "because the terminal circle is
+		// centred at `cx = VIEWBOX_W`", which CHART-3 made false — `terminalX`
+		// follows the series' last point, so the dot sits at VIEWBOX_W only on a
+		// market that has traded to the window end. The allowance is unchanged
+		// and still correct, because `terminalX` is BOUNDED ABOVE by VIEWBOX_W
+		// and the budget must cover its maximum; what was wrong was the stated
+		// reason, which described that maximum as the only case.
 		const { container } = renderChart(pct(0.65), "collapsed");
 		const svg = container.querySelector('[data-testid="market-price-chart"]');
 		const [, , w, h] = (svg?.getAttribute("viewBox") ?? "")
