@@ -93,19 +93,22 @@ const SINGLE_INTERIOR: PricePoint[] = [
 ];
 
 /**
- * ⚠ A SERIES WHOSE ENDPOINTS ARE STRICTLY INSIDE THE WINDOW AT BOTH ENDS, AND
- * IT EXISTS BECAUSE `SERIES` CANNOT DISCRIMINATE. `SERIES` opens on
- * 2026-09-15, which IS `MARKET_CHART_WINDOW_START` under the production
- * window — so a "the label names the window" assertion written against it
- * reads "Sep 15" under the correct rule AND under the reverted one, and pins
- * one endpoint instead of two. Every instant here differs from both window
- * endpoints, so both labels discriminate.
+ * ⛔ `INTERIOR` STOOD HERE AND IS DELETED AT CHART-7, NOT LEFT UNUSED. It existed
+ * because `SERIES` opens on 2026-09-15, which IS `MARKET_CHART_WINDOW_START` under
+ * the production window — so a "the label names the window" assertion written
+ * against it read "Sep 15" under the correct rule AND under the reverted one, and
+ * pinned one endpoint instead of two. `INTERIOR`'s instants differed from both
+ * window endpoints, so both labels discriminated.
+ *
+ * ⚠ RF-4 RETIRED THE RULE IT DISCRIMINATED FOR, AND THEN COLLIDED WITH THE NEW
+ * ONE. Its first instant is `2026-10-01T00:00:00.000Z`, which is now
+ * `MARKET_CHART_AXIS_ANCHORS[1]` — so against it "the axis must not print a day
+ * the series carries" and "the axis must print Oct 1" are contradictory, and the
+ * fixture that was built to discriminate could no longer discriminate anything.
+ * The overlay's axis guard carries its own off-anchor fixture instead, local to
+ * the case that needs it, and this docblock is kept so the next reader looking for
+ * `INTERIOR` finds out what happened to it rather than finding nothing.
  */
-const INTERIOR: PricePoint[] = [
-	{ at: "2026-10-01T00:00:00.000Z", yes: "0.200000000000000000" },
-	{ at: "2026-10-04T00:00:00.000Z", yes: "0.300000000000000000" },
-	{ at: "2026-10-11T00:00:00.000Z", yes: "0.250000000000000000" },
-];
 
 // YES winning at every point (yes > 0.5) — the INV-3 GEOMETRY guard: the YES
 // line must sit ABOVE the NO line (a smaller SVG y) at the same x.
