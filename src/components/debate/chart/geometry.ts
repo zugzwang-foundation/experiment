@@ -12,7 +12,8 @@
  *
  * ⚠ "FULL-BLEED" DESCRIBES THE PLOT, NOT THE `<svg>`, and at CHART-2 the two
  * came back almost into line. `C-CHART-2` clause 3 no longer puts a LABEL
- * gutter in the viewBox — the labels are HTML beside the plot now — so all the
+ * gutter in the viewBox — the labels are HTML OVER the plot since CHART-6, and
+ * were HTML beside it from CHART-2 until then — so all the
  * viewBox still reserves is a **terminal allowance**, `TERMINAL_DOT_ALLOWANCE`,
  * enough that the widest mark drawn at the plot's right edge — the pulse RING,
  * not the dot — cannot half-clip there. ⚠ CORRECTED AT CHART-5: this said the
@@ -66,24 +67,60 @@ export type Gridline = { readonly pct: number; readonly y: number };
  * there is no code path that could accidentally close over a data value, because
  * these arrays exist before any data does.
  *
- * ⚠ THE THREE SETS DIFFER BECAUSE THE THREE BOXES DO, not because the data does.
- * The collapsed card is 164 px tall, so eleven lines in it would be ~15 px apart
- * and read as hatching rather than as a scale; it gets the quarters. The
- * expanded overlay is ~418 px tall and can carry every 10 %. The Discovery hero
- * is ~96 px tall and gets NONE — at that height even four lines compete with the
- * series for the same pixels, and the hero exists to show shape, not value.
+ * ⚠ THE SETS DIFFER BECAUSE THE BOXES DO, not because the data does. The
+ * collapsed card is 194 px tall, so eleven lines in it would be ~18 px apart and
+ * read as hatching rather than as a scale; it gets the quarters.
+ *
+ * ⛔⛔ THE HERO TOOK THE EMPTY SET UNTIL CHART-6, ON A FIGURE THAT WAS WRONG BY A
+ * FACTOR OF FOUR. This docblock said *"The Discovery hero is ~96 px tall and gets
+ * NONE — at that height even four lines compete with the series for the same
+ * pixels"*. **Measured on the shipped build at 1440: the hero's chart box is
+ * 418.75 px, and the expanded overlay it was being contrasted against is
+ * 382.25 px. The hero is 36.5 px TALLER than the overlay.** Where 96 came from is
+ * worth knowing, because it is a live trap: `HeroPanels` mounts the chart in
+ * `min-h-24 flex-1`, and `min-h-24` is 6rem = 96 px — a FLOOR, not a height.
+ * HTML-FINISH row 9 changed `h-24` to `min-h-24 flex-1` precisely so the graph
+ * would grow with its panel, and CHART-5 read the floor as the box.
+ *
+ * ⇒ The hero and the overlay share ONE set (founder ruling, CHART-6): both are
+ * full panels and both carry every 10 %. Two names for one array would be two
+ * places for them to drift apart, so there is one — and the collapsed card's
+ * quarters stay separate, because its box genuinely is short.
  */
 const GRIDLINES_COLLAPSED: readonly Gridline[] = Object.freeze(
 	[25, 50, 75, 100].map((pct) => Object.freeze({ pct, y: yPctPx(pct) })),
 );
 
-const GRIDLINES_EXPANDED: readonly Gridline[] = Object.freeze(
+const GRIDLINES_TEN_STEP: readonly Gridline[] = Object.freeze(
 	Array.from({ length: 11 }, (_, i) => i * 10).map((pct) =>
 		Object.freeze({ pct, y: yPctPx(pct) }),
 	),
 );
 
-const GRIDLINES_HERO: readonly Gridline[] = Object.freeze([]);
+/**
+ * Whether a mode carries the FULL Y-scale treatment — the 10-step gridlines, the
+ * numeric marks column, and the percentage beneath the end label's name.
+ *
+ * ⛔ ONE PREDICATE FOR ALL THREE, BECAUSE THE RULING IS ONE RULING. RF-4 gives the
+ * hero *"what expanded has"* as a bundle, and three independent `mode ===
+ * "expanded"` comparisons are three places for a fourth surface — or this very
+ * amendment — to reach only some of them. The label's half-box in particular
+ * composes from whether the value line renders, so a mode that gained the value
+ * and not the taller collision floor would overlap its own labels in the band
+ * where every market rests.
+ *
+ * ⚠ WRITTEN AS A NEGATION OF `collapsed`, NOT A LIST OF THE OTHER TWO, and that
+ * is the direction that survives a fourth surface: a new mode joins the full
+ * treatment by default and is corrected deliberately, rather than silently
+ * shipping with no scale at all — which is the failure `gridlinesFor`'s exhaustive
+ * switch was added to catch and this predicate would otherwise reintroduce.
+ * `gridlinesFor` keeps its own switch regardless; the two are tied together by an
+ * assertion in `tests/unit/debate/render/y-scale.test.tsx` rather than by one
+ * calling the other, so neither can quietly stop agreeing.
+ */
+export function hasFullYScale(mode: ChartMode): boolean {
+	return mode !== "collapsed";
+}
 
 /**
  * The gridline set for a mode. A pure lookup — see the docblock above for why it
@@ -98,16 +135,21 @@ const GRIDLINES_HERO: readonly Gridline[] = Object.freeze([]);
 export function gridlinesFor(mode: ChartMode): readonly Gridline[] {
 	switch (mode) {
 		case "expanded":
-			return GRIDLINES_EXPANDED;
+			return GRIDLINES_TEN_STEP;
 		case "collapsed":
 			return GRIDLINES_COLLAPSED;
 		case "hero":
-			return GRIDLINES_HERO;
+			// CHART-6, founder ruling: the same set as the overlay. The hero's box was
+			// believed to be ~96px and measures 418.75px — taller than the overlay's
+			// 382.25px — so the ground the empty set stood on was a mis-read layout
+			// floor rather than a design constraint. See the sets' own docblock.
+			return GRIDLINES_TEN_STEP;
 		default: {
 			// ⛔ EXHAUSTIVE BY COMPILE ERROR, NOT BY FALLING THROUGH. The first
 			// version ended `return GRIDLINES_HERO` after two `if`s, so a FOURTH
 			// surface added to `ChartMode` would compile clean and ship with no Y
-			// scale at all — silently, on a chart whose whole point is that the
+			// scale at all (the version that did this ended `return GRIDLINES_HERO`,
+			// an empty set that CHART-6 removed along with the name) — silently, on a chart whose whole point is that the
 			// scale is a function of the mode. `MarketPriceChartMode`'s own docblock
 			// names this hazard for the type union ("two places for a fourth surface
 			// to be added to only one of") and it was left open for the lookup.
@@ -137,6 +179,27 @@ export const TERMINAL_DOT_R = 3;
  * lock, and for the same reason.
  */
 export const TERMINAL_PULSE_PEAK_SCALE = 2.4;
+
+/**
+ * The pulse ring's outer radius AT ITS PEAK, in plot user units — `7.2`.
+ *
+ * ⛔ MINTED AT CHART-6 BECAUSE A SECOND CONSUMER APPEARED, AND TWO CALLERS
+ * MULTIPLYING THE SAME PAIR IS HOW THEY DRIFT. `TERMINAL_DOT_ALLOWANCE` below
+ * already computed this product to budget the viewBox; `C-CHART-2` clause 2 as
+ * amended at CHART-6 needs the same length again, to hold the end label clear of
+ * the ring. Naming it once means the label's gap and the viewBox's allowance
+ * cannot come to disagree about how big the ring is — which is exactly the
+ * failure this module's own docblocks record twice over, once when the allowance
+ * was sized to the dot rather than the ring, and once when `markTop` read the end
+ * label's type size instead of the mark's.
+ *
+ * ⚠ IT IS A RADIUS, NOT A DIAMETER. The ring shares the dot's `cx`/`cy` and
+ * scales about its own centre (`transform-box: fill-box; transform-origin:
+ * center` in `globals.css`), so at peak it reaches this far in EVERY direction
+ * from the terminal dot — which is why the label's horizontal gap and the
+ * viewBox's right-hand allowance are the same number.
+ */
+export const TERMINAL_PULSE_MAX_R = TERMINAL_DOT_R * TERMINAL_PULSE_PEAK_SCALE;
 
 /**
  * What the viewBox reserves to the right of the plot — `C-CHART-2` clause 3, as
@@ -178,8 +241,7 @@ export const TERMINAL_PULSE_PEAK_SCALE = 2.4;
  * deleted rather than left stale, and no constant in this module encodes a
  * string's width any more.
  */
-export const TERMINAL_DOT_ALLOWANCE =
-	Math.ceil(TERMINAL_DOT_R * TERMINAL_PULSE_PEAK_SCALE) + 1;
+export const TERMINAL_DOT_ALLOWANCE = Math.ceil(TERMINAL_PULSE_MAX_R) + 1;
 
 /**
  * The `<svg viewBox>` width — the plot plus the terminal allowance. **649.**
@@ -338,6 +400,42 @@ export function labelTopPct(y: number): number {
 	// to be loosened to absorb an error this function invented. Four places puts
 	// the round-trip error at ~1e-4 units, which is nothing on either side.
 	return Math.round((y / VIEWBOX_H) * 100 * 10000) / 10000;
+}
+
+/**
+ * A viewBox-space x (0…`SVG_W`) as a PERCENTAGE of the plot box's rendered width
+ * — the horizontal mirror of `labelTopPct`, and the whole of `C-CHART-2` clause 2
+ * as amended at CHART-6.
+ *
+ * ⛔⛔ IT DIVIDES BY `SVG_W`, NOT BY `VIEWBOX_W`, AND THAT IS THE ONE THING TO GET
+ * RIGHT HERE. `preserveAspectRatio="none"` maps the WHOLE viewBox — all 649 units
+ * of it, plot plus terminal allowance — onto the plot box's full width. So a mark
+ * at user-space x renders at `(x / SVG_W) · boxWidth`, and dividing by
+ * `VIEWBOX_W` (640) would place every label 1.4 % of the plot right of its own
+ * dot: small enough to look like a deliberate gap, large enough to be wrong, and
+ * invisible to any assertion that compares two numbers both computed this way.
+ * Verified against the shipped build rather than argued: the EXPANDED overlay's
+ * dot at `cx = 94.86` renders 113.32 px into its 775.27 px plot, and
+ * `94.86 / 649 × 775.27 = 113.32`. ⚠ This said "the collapsed dot" and quoted the
+ * expanded plot's width — the arithmetic was right and the surface named was
+ * wrong, on the one measurement that justifies the divisor. Caught by
+ * `@code-reviewer`.
+ *
+ * ⛔ WHY THIS EXISTS AT ALL — THE DEFECT CHART-6 CORRECTS. Until this function the
+ * label's x was a CONSTANT (`left: 5px` inside a fixed gutter) while the dot's x
+ * was DERIVED from the series. The two agreed only when the series happened to
+ * run to the axis end, which was always true while the domain WAS the series' own
+ * span, and stopped being true the moment CHART-3 fixed the axis. Measured on
+ * staging: 515 px between a hero label and the dot it names, on a 597 px plot.
+ * **A coordinate that is right only when two independent quantities happen to be
+ * equal is wrong, and it is invisible until they diverge.**
+ *
+ * ⚠ FOUR DECIMAL PLACES, for `labelTopPct`'s reason exactly — the quantity becomes
+ * a percentage of 649, so two places would quantise the position to 0.065 user
+ * units and the label could no longer land on the x its dot was drawn at.
+ */
+export function labelLeftPct(x: number): number {
+	return Math.round((x / SVG_W) * 100 * 10000) / 10000;
 }
 
 const MONTHS = [

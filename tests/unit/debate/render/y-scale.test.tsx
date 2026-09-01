@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
 	gridlinesFor,
+	hasFullYScale,
 	labelTopPct,
 	SVG_W,
 	VIEWBOX_H,
@@ -34,6 +35,14 @@ import type { PricePoint } from "@/server/discovery/price-series";
 const LABEL_NAME_PX = 10;
 const LABEL_VALUE_PX = 16;
 const LABEL_STACK_GAP_PX = 2;
+/** The numeric marks' OWN type size — `YMarks` declares `text-[10px]` for itself.
+ * ⚠ MIRRORED SEPARATELY FROM `LABEL_NAME_PX` EVEN THOUGH BOTH ARE 10, because
+ * `markTop`'s docblock exists precisely to stop the marks' edge clamp reading the
+ * end label's type: change the label to 12px — a one-token edit `labelHalfBoxPx`
+ * is built to absorb — and a guard that mirrored the label's constant would follow
+ * it and stop describing the marks. The guard reproduced that conflation until
+ * `@test-writer` filed it (L-3). */
+const MARK_TYPE_PX = 10;
 
 const D = (n: number) => n.toFixed(18);
 
@@ -52,14 +61,61 @@ function markup(mode: "collapsed" | "expanded" | "hero", end = 0.65): string {
 }
 
 describe("C-CHART-1 clause 1 (CHART-5) — the gridline set is a pure function of the MODE", () => {
-	it("collapsed gets the quarters, expanded gets every ten, the hero gets none", () => {
+	it("collapsed gets the quarters; expanded AND the hero get every ten", () => {
+		// ⛔ THE HERO USED TO GET NONE, AND THIS CASE PINNED IT. CHART-5 gave it the
+		// empty set on the stated ground that its box is "roughly 96px tall".
+		// Measured on the shipped build at 1440 (CHART-6): the hero's chart box is
+		// **418.75 px** and the expanded overlay's is **382.25** — the hero is the
+		// TALLER of the two. 96 is `min-h-24`, the layout FLOOR `HeroPanels` sets
+		// before `flex-1` grows it; the figure was a mis-read of the CSS, not a
+		// measurement. Founder-ruled at CHART-6: the hero carries what the overlay
+		// carries.
 		expect(gridlinesFor("collapsed").map((g) => g.pct)).toEqual([
 			25, 50, 75, 100,
 		]);
-		expect(gridlinesFor("expanded").map((g) => g.pct)).toEqual([
-			0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100,
-		]);
-		expect(gridlinesFor("hero")).toEqual([]);
+		const TEN_STEP = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+		expect(gridlinesFor("expanded").map((g) => g.pct)).toEqual(TEN_STEP);
+		expect(gridlinesFor("hero").map((g) => g.pct)).toEqual(TEN_STEP);
+	});
+
+	it("`hasFullYScale` and `gridlinesFor` cannot come to disagree", () => {
+		// ⛔ TWO INDEPENDENT DECLARATIONS OF ONE RULING, TIED TOGETHER HERE RATHER
+		// THAN BY ONE CALLING THE OTHER. `gridlinesFor` keeps an exhaustive `switch`
+		// because that is what turns a fourth surface into a COMPILE error rather
+		// than a chart silently shipping with no scale; `hasFullYScale` is a
+		// predicate three other call sites read. Neither can be expressed in terms
+		// of the other without losing what it is for — so the agreement is asserted.
+		//
+		// ⚠ What a drift would ship: a mode with eleven gridlines and no numeric
+		// marks, or marks against the quarters. Both look deliberate.
+		for (const mode of ["collapsed", "expanded", "hero"] as const) {
+			expect(
+				gridlinesFor(mode).length === 11,
+				`${mode}: gridline set and hasFullYScale disagree`,
+			).toBe(hasFullYScale(mode));
+		}
+		// Non-vacuity: the predicate really does discriminate, so the loop above is
+		// not three trivially-true comparisons.
+		expect(
+			new Set(
+				["collapsed", "expanded", "hero"].map((m) => hasFullYScale(m as never)),
+			).size,
+		).toBe(2);
+
+		// ⛔ THE DIRECTION OF THE NEGATION, WHICH THE DOCBLOCK CALLS LOAD-BEARING AND
+		// NOTHING GUARDED (`@test-writer`, M-2). `hasFullYScale` is written as "not
+		// collapsed" rather than "expanded or hero" so that a FOURTH surface joins
+		// the full treatment by default and is excluded deliberately. Rewritten as a
+		// list — `mode === "expanded" || mode === "hero"` — every assertion above
+		// stays green, because the loop only ever visits the three modes that exist,
+		// and a new mode would then ship with no scale at all: silently, on a chart
+		// whose whole point is that the scale is a function of the mode. That is the
+		// exact failure `gridlinesFor`'s exhaustive switch turns into a COMPILE error,
+		// and the predicate must not be the soft spot beside it.
+		expect(
+			hasFullYScale("a-fourth-surface" as never),
+			"hasFullYScale must be written as a negation of `collapsed`, so an unrecognised mode gets the FULL scale rather than none",
+		).toBe(true);
 	});
 
 	it("the y of each line is its percent on the fixed 0–100 % scale, top-down", () => {
@@ -83,6 +139,16 @@ describe("C-CHART-1 clause 1 (CHART-5) — the gridline set is a pure function o
 		// Referential equality is the only thing that can tell the difference.
 		expect(gridlinesFor("expanded")).toBe(gridlinesFor("expanded"));
 		expect(gridlinesFor("collapsed")).toBe(gridlinesFor("collapsed"));
+		// ⚠ THE HERO WAS MISSING FROM THIS LIST — it is the mode CHART-6 added, and
+		// `case "hero": return [...GRIDLINES_TEN_STEP]` would rebuild an array per
+		// call while every other assertion in this file stayed green (`@test-writer`,
+		// L-1).
+		expect(gridlinesFor("hero")).toBe(gridlinesFor("hero"));
+		// …and the hero and the overlay are ONE array, not two equal ones. The
+		// geometry docblock's reason for a single constant is that "two names for one
+		// array would be two places for them to drift apart" — `toEqual` cannot see
+		// the difference, and identity is the only thing that can.
+		expect(gridlinesFor("hero")).toBe(gridlinesFor("expanded"));
 	});
 
 	it("the set does not move when the DATA moves", () => {
@@ -100,25 +166,31 @@ describe("C-CHART-1 clause 1 (CHART-5) — the gridline set is a pure function o
 		expect(a).toBe(b);
 	});
 
-	it("renders exactly the mode's set, and the hero renders no group at all", () => {
+	it("renders exactly the mode's set, on all three surfaces", () => {
 		const collapsed = markup("collapsed");
 		const expanded = markup("expanded");
 		const hero = markup("hero");
 
 		const pcts = (m: string) =>
 			[...m.matchAll(/<line data-pct="(\d+)"/g)].map((x) => Number(x[1]));
+		const TEN_STEP = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 		expect(pcts(collapsed)).toEqual([25, 50, 75, 100]);
-		expect(pcts(expanded)).toEqual([
-			0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100,
-		]);
+		expect(pcts(expanded)).toEqual(TEN_STEP);
 
-		// MUST REJECT: any gridline on the hero — its box is ~96px and eleven
-		// lines in it reduce to hatching.
-		expect(hero).not.toContain('data-testid="chart-gridlines"');
-		expect(pcts(hero)).toEqual([]);
-		// POSITIVE CONTROL — the same matcher finds lines when they exist, so the
-		// empty result above is "absent", not "my pattern is wrong".
+		// ⛔ THE HERO NOW CARRIES THE SAME ELEVEN, and the MUST-REJECT inverted with
+		// the ruling: this used to assert the hero had no group at all. What it must
+		// reject NOW is the hero taking the COLLAPSED card's quarters — the plausible
+		// wrong answer, since "give the hero a scale" reads as "give it any scale",
+		// and four lines on a 418 px panel beside eleven on a 382 px overlay would
+		// make the same market two different pictures on two surfaces.
+		expect(hero).toContain('data-testid="chart-gridlines"');
+		expect(pcts(hero)).toEqual(TEN_STEP);
+		expect(pcts(hero)).not.toEqual([25, 50, 75, 100]);
+
+		// POSITIVE CONTROL — the same matcher tells the two sets apart, so the
+		// equalities above are readings rather than one pattern matching everything.
 		expect(pcts(collapsed).length).toBe(4);
+		expect(pcts(hero).length).toBe(11);
 	});
 
 	it("is drawn BEHIND the series — the group precedes both polylines", () => {
@@ -202,33 +274,48 @@ describe("CHART-5 — no new token, and no raw hex", () => {
 	});
 
 	it("the numeric marks carry no raw hex either", () => {
+		// ⚠ THE SLICE USED THE LABEL LAYER AS ITS END BOUND AND THAT ORDER REVERSED
+		// AT CHART-6. The labels moved INSIDE the plot box, so they now precede the
+		// marks column in the markup rather than following it — the old bounds
+		// produced an EMPTY slice, and `not.toMatch` on an empty string passes.
+		// ⛔ AND THE FIRST REPLACEMENT WAS THE SAME MISTAKE INVERTED: it sliced to the
+		// END OF THE DOCUMENT, which equals the column only because `chart-y-marks`
+		// happens to be last in the frame today — while the comment three lines above
+		// claimed a bound the code did not have (`@test-writer`, M-4). It is bounded
+		// by its own closing tag now, and the count below proves the bound landed.
 		const m = markup("expanded");
-		const col = m.slice(
-			m.indexOf('data-testid="chart-y-marks"'),
-			m.indexOf('data-testid="terminal-label-gutter"'),
-		);
-		expect(col.length).toBeGreaterThan(0);
+		const at = m.indexOf('data-testid="chart-y-marks"');
+		expect(at).toBeGreaterThan(-1);
+		const lastMark = m.lastIndexOf('data-testid="y-mark-');
+		const end = m.indexOf("</div>", lastMark);
+		expect(end).toBeGreaterThan(at);
+		const col = m.slice(at, end + 6);
+		// Non-vacuity: the slice really contains the eleven marks, so the hex ban
+		// below is read against the column and not against whatever survived.
+		expect([...col.matchAll(/data-testid="y-mark-\d+"/g)].length).toBe(11);
 		expect(col).not.toMatch(/#[0-9a-fA-F]{3,8}/);
 	});
 });
 
-describe("C-CHART-1 clause 1 (CHART-5) — numeric marks are EXPANDED-ONLY", () => {
-	it("eleven marks on the overlay, none on the card, none on the hero", () => {
-		const expanded = markup("expanded");
+describe("discovery::hero-chart-carries-y-scale — C-CHART-1 clause 1 (CHART-6), marks on every FULL-SCALE mode", () => {
+	it("eleven marks on the overlay AND the hero, none on the card", () => {
 		const marks = (m: string) =>
 			[...m.matchAll(/data-testid="y-mark-(\d+)"/g)].map((x) => Number(x[1]));
+		const TEN_STEP = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
-		expect(marks(expanded)).toEqual([
-			0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100,
-		]);
+		expect(marks(markup("expanded"))).toEqual(TEN_STEP);
+		// CHART-6, founder ruling: the hero gets what the overlay has. Its box is
+		// 418.75 px — measured, and taller than the overlay's 382.25.
+		expect(markup("hero")).toContain('data-testid="chart-y-marks"');
+		expect(marks(markup("hero"))).toEqual(TEN_STEP);
 
 		// MUST REJECT: numbers on the collapsed card. It DOES carry gridlines and
-		// deliberately carries no figures — its box is 164px and already holds
-		// three date labels along the bottom. Deriving marks from the gridline set
-		// alone would have given it four numbers nobody ruled for.
+		// deliberately carries no figures — its box is 193.8 px and already holds
+		// three date labels along the bottom. Deriving the marks from "does this
+		// mode have gridlines?" would have given it four numbers nobody ruled for,
+		// which is why the predicate is `hasFullYScale` and not `grid.length > 0`.
 		expect(markup("collapsed")).not.toContain('data-testid="chart-y-marks"');
 		expect(marks(markup("collapsed"))).toEqual([]);
-		expect(markup("hero")).not.toContain('data-testid="chart-y-marks"');
 	});
 
 	it("the marks column is SIZED, never pinned — the CHART-2 mechanism, reused", () => {
@@ -239,7 +326,13 @@ describe("C-CHART-1 clause 1 (CHART-5) — numeric marks are EXPANDED-ONLY", () 
 		expect(col).not.toBeNull();
 		// MUST REJECT: a hand-measured `w-[22px]`, which is the defect CHART-2
 		// deleted for the label gutter, reintroduced one column over.
-		expect(col?.getAttribute("class") ?? "").not.toMatch(/(^|\s)w-\[/);
+		// ⚠ THE CORRECTED TOKEN FORM, not `/(^|\s)w-\[/` — that copy could not see
+		// `min-w-[`, `max-w-[` or a `md:w-[` variant, and a second, weaker spelling of
+		// one ban on one element is a place for the two to disagree (`@test-writer`,
+		// L-2).
+		expect(col?.getAttribute("class") ?? "").not.toMatch(
+			/(^|\s)(min-|max-)?w-/,
+		);
 		expect((col as HTMLElement | null)?.style.width ?? "").toBe("");
 		// …and the in-flow sizer that replaces it is present and INVISIBLE rather
 		// than `hidden` — `hidden` removes the box and collapses the column.
@@ -250,45 +343,53 @@ describe("C-CHART-1 clause 1 (CHART-5) — numeric marks are EXPANDED-ONLY", () 
 		expect(sizer?.textContent).toBe("100");
 	});
 
-	it("does not disturb the label gutter's own contract", () => {
+	it("does not disturb the label layer's own contract", () => {
 		// ⛔ THIS IS THE REGRESSION THAT ACTUALLY HAPPENED AT CHART-5, PINNED. The
 		// first implementation put the marks INSIDE the label gutter, which forced
 		// it from `relative` to `flex` and pushed its width-sizer one level down —
 		// breaking `alignment-chain.test.tsx`'s clause-2-link-4 and clause-3
-		// guards. Those guards were right and the structure was wrong. The marks
-		// are a sibling column now, and this asserts the gutter stayed as it was.
+		// guards. Those guards were right and the structure was wrong.
+		//
+		// ⚠ REWRITTEN AT CHART-6, BECAUSE THE THING IT PROTECTED MOVED RATHER THAN
+		// WENT AWAY. There is no gutter now — the labels are an overlay on the plot
+		// (`C-CHART-2` clause 2 as amended) — so "the gutter stayed `relative` with
+		// its sizer in flow" is a sentence about a box that no longer exists, and
+		// retargeting it to the new element would have asserted nothing. The
+		// property that survives is the one CHART-5 actually needed: **the marks are
+		// a SIBLING of the plot and the labels live INSIDE it, so neither can force
+		// the other's layout.** That is now a stronger separation than it was, and
+		// it is what the next attempt to merge the two columns must break.
 		const { container } = render(
 			<MarketPriceChart series={series(0.65)} mode="expanded" isOpen={true} />,
 		);
-		const gutter = container.querySelector(
-			'[data-testid="terminal-label-gutter"]',
+		const plot = container.querySelector(
+			'[data-testid="market-price-chart-plot"]',
 		);
-		expect((gutter?.getAttribute("class") ?? "").split(/\s+/)).toContain(
-			"relative",
+		const layer = container.querySelector(
+			'[data-testid="terminal-label-layer"]',
 		);
-		// The sizer is still the gutter's DIRECT in-flow child and still leads with
-		// the name; since the MED-7 fix it also carries the widest value beneath,
-		// so this asserts the structure rather than the flattened string — which is
-		// what `textContent` equality was really standing in for.
-		const sizer = gutter?.querySelector(':scope > span[aria-hidden="true"]');
-		expect(sizer).not.toBeNull();
-		const blocks = [...(sizer?.querySelectorAll(":scope > span") ?? [])].map(
-			(x) => x.textContent,
-		);
-		expect(blocks).toEqual(["YES", "100%"]);
-		// …and on a one-line mode it is the name alone.
-		const { container: c2 } = render(
-			<MarketPriceChart series={series(0.65)} mode="collapsed" isOpen={true} />,
-		);
+		const marks = container.querySelector('[data-testid="chart-y-marks"]');
+		expect(plot).not.toBeNull();
+		expect(layer).not.toBeNull();
+		expect(marks).not.toBeNull();
+
+		// The labels are inside the plot — that is what makes their `left` a
+		// percentage of the box the viewBox is stretched onto.
+		expect(plot?.contains(layer as Node)).toBe(true);
+		// …and the marks are NOT, so the marks column cannot take width from the
+		// plot's percentage basis, nor the labels from the marks' flow.
+		expect(plot?.contains(marks as Node)).toBe(false);
+		expect(layer?.contains(marks as Node)).toBe(false);
+		expect(marks?.contains(layer as Node)).toBe(false);
+
+		// POSITIVE CONTROL — `contains` really discriminates in this tree, so the
+		// three `false`s above are readings rather than a method that always says no.
+		expect(plot?.contains(plot as Node)).toBe(true);
 		expect(
-			[
-				...(c2
-					.querySelector(
-						'[data-testid="terminal-label-gutter"] > span[aria-hidden="true"]',
-					)
-					?.querySelectorAll(":scope > span") ?? []),
-			].map((x) => x.textContent),
-		).toEqual(["YES"]);
+			plot?.contains(
+				container.querySelector('[data-testid="terminal-label-yes"]') as Node,
+			),
+		).toBe(true);
 	});
 });
 
@@ -394,16 +495,22 @@ describe("C-CHART-2 clause 2 (CHART-5) — the end value can never disagree with
 		});
 	}
 
-	it("the value is EXPANDED-ONLY — the card and hero keep the name alone", () => {
-		for (const mode of ["collapsed", "hero"] as const) {
-			const m = markup(mode);
-			expect(m).not.toContain('data-testid="terminal-value-yes"');
-			expect(m).not.toContain('data-testid="terminal-value-no"');
-			// …but the NAME is still there, so the absence above is the value's,
-			// not the whole label's.
-			expect(m).toContain('data-testid="terminal-label-yes"');
+	it("the value rides the FULL-SCALE modes — the collapsed card keeps the name alone", () => {
+		// ⚠ THE HERO MOVED SIDES AT CHART-6. RF-4 gives it "what expanded has" as one
+		// bundle — gridlines, marks, and the percentage beneath the name — so a hero
+		// with the scale and without the value would be half a ruling. Its box is
+		// 418.75 px measured, which is where the room for a second line comes from.
+		const m = markup("collapsed");
+		expect(m).not.toContain('data-testid="terminal-value-yes"');
+		expect(m).not.toContain('data-testid="terminal-value-no"');
+		// …but the NAME is still there, so the absence above is the value's, not the
+		// whole label's.
+		expect(m).toContain('data-testid="terminal-label-yes"');
+
+		for (const mode of ["expanded", "hero"] as const) {
+			expect(markup(mode)).toContain('data-testid="terminal-value-yes"');
+			expect(markup(mode)).toContain('data-testid="terminal-value-no"');
 		}
-		expect(markup("expanded")).toContain('data-testid="terminal-value-yes"');
 	});
 });
 
@@ -431,8 +538,12 @@ describe("C-CHART-2 clause 4 (CHART-5) — one collision rule, two measured inpu
 		const topsOf = (mode: "collapsed" | "expanded" | "hero") => {
 			const m = markup(mode, 0.5);
 			return (["yes", "no"] as const).map((side) => {
+				// ⚠ `top` IS NO LONGER THE ATTRIBUTE'S FIRST DECLARATION — CHART-6 added
+				// the label's `left`, which React serialises first because it is
+				// declared first. A regex anchored on `style="top:` reads that as a
+				// MISSING style, i.e. a false red on a correct render.
 				const re = new RegExp(
-					`terminal-label-${side}"[^>]*style="top:([^"]*)"`,
+					`terminal-label-${side}"[^>]*style="[^"]*top:([^";]*)`,
 				);
 				const hit = m.match(re);
 				expect(hit, `${mode}/${side} has no top style`).not.toBeNull();
@@ -456,11 +567,14 @@ describe("C-CHART-2 clause 4 (CHART-5) — one collision rule, two measured inpu
 			return Number(hit?.[1]);
 		};
 		const nameSize = num(
-			/terminal-label-gutter"[^>]*class="[^"]*text-\[(\d+)px\]/,
+			/terminal-label-layer"[^>]*class="[^"]*text-\[(\d+)px\]/,
 			"the name's type size",
 		);
 		const valueSize = num(
-			/terminal-value-yes"[^>]*style="font-size:(\d+)px/,
+			// ⚠ MATCHED WHEREVER IT SITS, not anchored to `font-size` being first — the
+			// same positional assumption this branch fixed for `top`, and the same
+			// failure mode: a false RED the next time a style prop is added above it.
+			/terminal-value-yes"[^>]*style="[^"]*font-size:(\d+)px/,
 			"the value's type size",
 		);
 		const stackGap = num(
@@ -472,12 +586,21 @@ describe("C-CHART-2 clause 4 (CHART-5) — one collision rule, two measured inpu
 			expect(top).toContain(`clamp(${expandedHalf}px,`);
 			expect(top).toContain(`calc(100% - ${expandedHalf}px)`);
 		}
-		// MUST REJECT: the overlay's wider threshold leaking onto a one-line label.
-		for (const mode of ["collapsed", "hero"] as const) {
-			for (const top of topsOf(mode)) {
-				expect(top).toContain(`clamp(${LABEL_NAME_PX / 2}px,`);
-				expect(top).not.toContain(`${expandedHalf}px`);
-			}
+		// ⛔ THE HERO NOW TAKES THE TALLER FLOOR TOO, AND THAT PAIRING IS THE POINT
+		// RATHER THAN A CONSEQUENCE. Its label grew a second line at CHART-6; a mode
+		// that gained the value line while keeping the 5px floor would push its two
+		// labels only 10px apart around a 28px box, so they would OVERLAP across the
+		// 46–54 % band — where every market rests. That is why the component reads
+		// one `hasFullYScale` for the value and the floor rather than two `mode ===`
+		// tests that can be updated one at a time.
+		for (const top of topsOf("hero")) {
+			expect(top).toContain(`clamp(${expandedHalf}px,`);
+			expect(top).toContain(`calc(100% - ${expandedHalf}px)`);
+		}
+		// MUST REJECT: the wider threshold leaking onto the one-line collapsed card.
+		for (const top of topsOf("collapsed")) {
+			expect(top).toContain(`clamp(${LABEL_NAME_PX / 2}px,`);
+			expect(top).not.toContain(`${expandedHalf}px`);
 		}
 	});
 
@@ -553,15 +676,24 @@ describe("CHART-5 — a mark is BOUND to its gridline, and the column obeys the 
 		expect(top0).toContain(", 100%,");
 	});
 
-	it("the marks' edge floor is the ONE-LINE half box, by value", () => {
+	it("the marks' edge floor is half the MARKS' OWN type, by value", () => {
 		// Only the WORD `clamp(` was asserted before, so a wrong half-box passed —
 		// and a wrong half-box is precisely what that clamp exists to prevent: the
-		// 0 and 100 marks sit on the plot's boundaries and the gutter does not clip.
+		// 0 and 100 marks sit on the plot's boundaries and the column does not clip.
+		//
+		// ⛔ AGAINST `MARK_TYPE_PX`, NOT `LABEL_NAME_PX`, AND THE SWAP IS THE POINT
+		// (`@test-writer`, L-3). This asserted the END LABEL's constant — which is
+		// the exact conflation `markTop`'s docblock was written to end, reproduced
+		// inside the guard for it. Both are 10 today, so the assertion passed for a
+		// reason that has nothing to do with the marks: change the end label to 12px
+		// and this guard would follow the label and stop describing the column,
+		// silently, while the `0` and `100` marks drifted a pixel off their own
+		// gridlines in a column that does not clip.
 		const m = markup("expanded");
 		const at = m.indexOf('data-testid="y-mark-100"');
 		const style = m.slice(at, m.indexOf(">", at));
-		expect(style).toContain(`clamp(${LABEL_NAME_PX / 2}px,`);
-		expect(style).toContain(`calc(100% - ${LABEL_NAME_PX / 2}px)`);
+		expect(style).toContain(`clamp(${MARK_TYPE_PX / 2}px,`);
+		expect(style).toContain(`calc(100% - ${MARK_TYPE_PX / 2}px)`);
 	});
 
 	it("the marks column inherits the alignment contract — positioned, absolute, no vertical box model", () => {
@@ -624,70 +756,211 @@ describe("CHART-5 — a mark is BOUND to its gridline, and the column obeys the 
 		).toBe("true");
 	});
 
-	it("the gutter sizer measures the WIDEST label, value line included", () => {
-		// ⛔ A MEASURED PRODUCT DEFECT, NOT A STYLE NIT. The sizer carried the name
-		// alone on the reasoning that `YES` at 10px bold outruns four tabular
-		// digits at 16px. Measured in the contact sheet, in the shipped face: the
-		// gutter came out 27.15px and the rendered `99%` 33.56px — overflowing its
-		// own gutter by 11.41px, with `100%` at 42.47px. The sizer now carries the
-		// value line too, so the browser measures the real worst case.
-		const m = markup("expanded");
-		const gutAt = m.indexOf('data-testid="terminal-label-gutter"');
-		const gut = m.slice(gutAt, m.indexOf("terminal-label-no", gutAt));
-		expect(gut).toContain("100%");
-		expect(gut).toContain(`font-size:${LABEL_VALUE_PX}px`);
-		// MUST REJECT: a hand-measured width standing in for the measurement.
-		expect(gut).not.toMatch(/(^|\s)(min-|max-)?w-\[/);
-		// The collapsed card has no value line, so its sizer must NOT carry one.
-		const cm = markup("collapsed");
-		const cAt = cm.indexOf('data-testid="terminal-label-gutter"');
-		expect(cm.slice(cAt, cm.indexOf("terminal-label-no", cAt))).not.toContain(
-			"100%",
+	it("the value line can never be clipped, because nothing constrains the label's width", () => {
+		// ⛔ THE DEFECT THIS REPLACES WAS REAL AND IS WORTH KEEPING IN VIEW. CHART-5's
+		// sizer carried the name alone, on the reasoning that `YES` at 10px bold
+		// outruns four tabular digits at 16px. Measured in the shipped face that is
+		// false: the gutter came out 27.15 px and the rendered `99%` 33.56 px —
+		// overflowing its own gutter by 11.41 px, with `100%` at 42.47 px. The fix
+		// was a sizer carrying the widest label that can occur.
+		//
+		// ⚠ CHART-6 REMOVES THE CONSTRAINT INSTEAD OF MEASURING IT. There is no
+		// gutter to overflow: the labels are absolutely positioned over the plot and
+		// carry `whitespace-nowrap`, so each takes exactly its own width wherever it
+		// lands. A sizer measuring a box nobody has would be theatre — so the
+		// assertion becomes the two properties that make the clip UNREACHABLE, which
+		// is strictly what the sizer was buying.
+		const { container } = render(
+			<MarketPriceChart series={series(0.65)} mode="expanded" isOpen={true} />,
 		);
+		for (const side of ["yes", "no"] as const) {
+			const el = container.querySelector(
+				`[data-testid="terminal-label-${side}"]`,
+			) as HTMLElement | null;
+			expect(el).not.toBeNull();
+			const cls = (el?.getAttribute("class") ?? "").split(/\s+/);
+			// It sizes to its own content…
+			expect(cls).toContain("whitespace-nowrap");
+			// …and nothing pins that content into a box. MUST REJECT: a hand-measured
+			// width standing in for the measurement — the CHART-1 `26` in a new unit.
+			expect(el?.getAttribute("class") ?? "").not.toMatch(
+				/(^|\s)(min-|max-)?w-[[\d]/,
+			);
+			expect(el?.style.width ?? "").toBe("");
+			expect(el?.style.maxWidth ?? "").toBe("");
+		}
+		// The value line is still there, at its own type size and its own stack
+		// gap, so this case is about an unclipped label rather than an absent one.
+		// ⚠ ALL THREE MIRRORED CONSTANTS ARE SPENT HERE, and that is deliberate:
+		// `labelHalfBoxPx` composes the collision floor from exactly this sum
+		// (`name + gap + value`), so a stack gap that drifted without the floor
+		// following it would widen the label's real box past the threshold meant to
+		// separate two of them — silently, in the band where every market rests.
+		// The gap had no assertion at all once CHART-6 retired the sizer that used
+		// to carry it.
+		const m = markup("expanded");
+		expect(m).toContain(`font-size:${LABEL_VALUE_PX}px`);
+		expect(m).toContain(`margin-top:${LABEL_STACK_GAP_PX}px`);
+		expect(m).toContain('data-testid="terminal-value-yes"');
+
+		// POSITIVE CONTROL — the width ban fires on the forms it is written against
+		// and on none of the label's shipped classes.
+		for (const offender of ["w-[42px]", "min-w-[26px]", "max-w-[50px]"]) {
+			expect(offender).toMatch(/(^|\s)(min-|max-)?w-[[\d]/);
+		}
+		for (const innocent of ["whitespace-nowrap", "-translate-x-full"]) {
+			expect(innocent).not.toMatch(/(^|\s)(min-|max-)?w-[[\d]/);
+		}
 	});
 });
 
-describe("CHART-5 — RF-4 payload budget", () => {
-	it("the Y scale adds well under 1.5 KB to the page, and zero client JS", () => {
-		// ⚠ THE COLLAPSED CHART IS WHAT SHIPS PER PAGE. The expanded overlay is a
-		// client-rendered dialog whose markup is not in the document until it is
-		// opened — measured on staging, the market page server-renders exactly one
-		// `market-price-chart` svg — so the per-page cost of this task is the
-		// collapsed card's grid and nothing else.
-		const m = markup("collapsed");
-		const start = m.indexOf('<g data-testid="chart-gridlines"');
-		const grid = m.slice(start, m.indexOf("</g>", start) + 4);
-		expect(start).toBeGreaterThan(-1);
-		expect(Buffer.byteLength(grid, "utf8")).toBeLessThan(1500);
+describe("C-CHART-2 clause 4 (CHART-6) — the CSS floor holds across the whole near-even band", () => {
+	it("separates the two labels by a full box on EVERY mode, at every tenth of a point", () => {
+		// ⛔ WHY A SECOND SWEEP WHEN `terminal-markers.test.tsx` ALREADY HAS ONE.
+		// That one sweeps PLOT SPACE and proves clause 4's own arithmetic — the
+		// 12-unit minimum, the symmetric push, the clamp — which CHART-6 did not
+		// touch and which is a scope fence. It runs on `collapsed` alone, and
+		// rightly: clause 4 takes no mode.
+		//
+		// ⚠ WHAT CHART-6 MOVED IS THE OTHER FLOOR, THE ONE IN CSS PIXELS, AND ONLY
+		// ON ONE SURFACE. `labelHalfBoxPx` went 5 → 14 for the hero, because its
+		// label grew a value line. In the near-even band the CSS floor DOMINATES
+		// clause 4 — it forces the two centres `2 × half` apart regardless of what
+		// plot space says — so on the hero the separation the reader actually sees
+		// changed from 10 px to 28 px, and nothing swept that.
+		//
+		// ⛔ THE FAILURE IT MUST REJECT is a hero that took the value line and kept
+		// the 5 px floor: two 28 px boxes with 10 px between their centres, i.e.
+		// overlapping by 18 px, across the band where every market rests. That ships
+		// green against every plot-space assertion in the repository, because in plot
+		// space nothing moved — the exact shape CHART-2's cascade already caught once.
+		const HALF = { collapsed: 5, expanded: 14, hero: 14 } as const;
 
-		// Zero client JS: the scale is markup. No handler, no script, no hydration
-		// hook reaches it.
-		expect(grid).not.toMatch(/on[A-Z]/);
-		expect(grid).not.toContain("<script");
+		for (const mode of ["collapsed", "expanded", "hero"] as const) {
+			const half = HALF[mode];
+			let seen = 0;
+			// A tenth of a point across the band, both sides of even.
+			for (let bp = 4800; bp <= 5200; bp += 1) {
+				const m = markup(mode, bp / 10000);
+				const tops = (["yes", "no"] as const).map((side) => {
+					const hit = m.match(
+						new RegExp(`terminal-label-${side}"[^>]*style="[^"]*top:([^";]*)`),
+					);
+					expect(hit, `${mode}@${bp}: no top for ${side}`).not.toBeNull();
+					return hit?.[1] ?? "";
+				});
+				// One label is floored above the midline and the other below, by the
+				// SAME half-box — which is what makes the gap a full box rather than a
+				// half one.
+				const upper = tops.filter((t) => t.includes(`calc(50% - ${half}px)`));
+				const lower = tops.filter((t) => t.includes(`calc(50% + ${half}px)`));
+				expect(upper.length, `${mode}@${bp}: upper floor missing`).toBe(1);
+				expect(lower.length, `${mode}@${bp}: lower floor missing`).toBe(1);
+				// …and neither carries the OTHER mode's half-box, which is the
+				// one-mode-updated failure this case exists for.
+				for (const t of tops) {
+					expect(t).toContain(`clamp(${half}px,`);
+				}
+				seen++;
+			}
+			// Non-vacuity: the loop really ran the band rather than skipping it.
+			expect(seen).toBe(401);
+		}
 
-		// ⚠ THE OVERLAY IS MEASURED AND PINNED SEPARATELY, AT ITS OWN CEILING, AND
-		// SAYING SO IS THE POINT. Grid + marks on the expanded overlay measure
-		// ~2.5 KB — ABOVE the 1.5 KB figure — and that is not a budget breach,
-		// because the budget is stated per PAGE and this markup is never in a
-		// page: the overlay is a client-rendered dialog that does not exist in the
-		// document until it is opened. Measured on staging, `/m/[slug]` server-
-		// renders exactly ONE `market-price-chart` svg, the collapsed one.
-		// ⛔ IT IS STILL BOUNDED, because "not charged to the page" is a reason to
-		// pick a different ceiling, not a reason to have none — an unbounded
-		// element count here is exactly the per-point computation RF-4 exists to
-		// catch, and it would still cost the reader who opens the overlay.
-		const e = markup("expanded");
-		const eStart = e.indexOf('<g data-testid="chart-gridlines"');
-		const eGrid = e.slice(eStart, e.indexOf("</g>", eStart) + 4);
-		const marks = e.slice(
-			e.indexOf('<div data-testid="chart-y-marks"'),
-			e.indexOf('<div data-testid="terminal-label-gutter"'),
+		// POSITIVE CONTROL — the two half-boxes are genuinely different, so the
+		// per-mode assertions above are not three copies of one comparison.
+		expect(new Set(Object.values(HALF)).size).toBe(2);
+	});
+});
+
+describe("CHART-5/6 — RF-4 payload budget", () => {
+	/** The Y scale's markup for a mode: the gridline group plus the marks column,
+	 * each bounded by its OWN element.
+	 *
+	 * ⛔⛔ THIS HELPER EXISTS BECAUSE THE CASE BELOW WAS PASSING WHILE MEASURING
+	 * NOTHING, AND IT IS THE SAME DEFECT CLASS THE WHOLE TASK IS ABOUT. The marks
+	 * column used to be sliced from `chart-y-marks` to `terminal-label-layer` — an
+	 * end bound belonging to a DIFFERENT component. CHART-6 moved the labels INSIDE
+	 * the plot, so the layer now precedes the marks in the markup, the slice
+	 * inverted, and `String.slice(3681, 2635)` returns `""`. Zero bytes, added to a
+	 * real grid measurement, compared against a ceiling: **green, forever, measuring
+	 * half of what it names.** Measured — the slice really was length 0.
+	 *
+	 * ⇒ **A slice whose end bound is another component's testid goes wrong the
+	 * moment either one moves, and it goes wrong SILENTLY because an empty string
+	 * satisfies every size assertion.** Each region is now bounded by its own
+	 * element and each carries a non-vacuity floor. */
+	function yScaleBytes(mode: "collapsed" | "expanded" | "hero"): number {
+		const m = markup(mode);
+		const gStart = m.indexOf('<g data-testid="chart-gridlines"');
+		expect(gStart, `${mode}: no gridline group`).toBeGreaterThan(-1);
+		const grid = m.slice(gStart, m.indexOf("</g>", gStart) + 4);
+		expect(grid.length, `${mode}: gridline slice is empty`).toBeGreaterThan(
+			100,
 		);
-		const overlayBytes =
-			Buffer.byteLength(eGrid, "utf8") + Buffer.byteLength(marks, "utf8");
-		expect(overlayBytes).toBeLessThan(3000);
-		// Non-vacuity: it is genuinely bigger than the card's, so a ceiling that
-		// happened to be slack on the card is not what is passing here.
-		expect(overlayBytes).toBeGreaterThan(Buffer.byteLength(grid, "utf8"));
+
+		const kStart = m.indexOf('<div data-testid="chart-y-marks"');
+		let marks = "";
+		if (kStart > -1) {
+			// Bounded by its own closing structure: the last mark it renders.
+			const lastMark = m.lastIndexOf('data-testid="y-mark-');
+			const end = m.indexOf("</div>", lastMark);
+			expect(end, `${mode}: marks column has no end`).toBeGreaterThan(kStart);
+			marks = m.slice(kStart, end + 6);
+			expect(marks.length, `${mode}: marks slice is empty`).toBeGreaterThan(
+				100,
+			);
+			expect(
+				[...marks.matchAll(/data-testid="y-mark-\d+"/g)].length,
+				`${mode}: marks slice does not contain the marks`,
+			).toBe(11);
+		}
+		return Buffer.byteLength(grid, "utf8") + Buffer.byteLength(marks, "utf8");
+	}
+
+	it("the Y scale is bounded on every surface, and costs zero client JS", () => {
+		// ⚠ EXACTLY ONE CHART SHIPS PER PAGE, AND WHICH ONE DIFFERS BY PAGE.
+		// Measured against the deployed build on 2026-09-01 by counting
+		// `data-testid="market-price-chart"` in the raw server HTML: `/m/[slug]`
+		// ships ONE, in `collapsed` mode; Discovery `/` ships ONE, in `hero` mode.
+		// The expanded overlay is a client-rendered dialog and is in no document
+		// until it is opened.
+		//
+		// ⛔ SO CHART-6 MOVED WHICH SURFACE CARRIES DISCOVERY'S COST. Until this task
+		// the hero had no Y scale at all and the "per page" cost was the collapsed
+		// card's grid alone — which is what this case measured, and it would have
+		// gone on measuring only that while the hero gained eleven gridlines, eleven
+		// marks and a value line.
+		const collapsed = yScaleBytes("collapsed");
+		const hero = yScaleBytes("hero");
+		const expanded = yScaleBytes("expanded");
+
+		// `/m/[slug]`: the card's four lines, no marks.
+		expect(collapsed).toBeLessThan(1500);
+		// `/`: the hero's eleven lines plus its marks column. Deliberately a
+		// SEPARATE, LARGER ceiling rather than a shared one — it is a different
+		// page, and folding two pages into one number is how a real growth on one
+		// hides inside the other's slack.
+		expect(hero).toBeLessThan(4000);
+		// The overlay is not charged to any page, but "not charged" is a reason to
+		// pick a different ceiling, not a reason to have none: an unbounded element
+		// count here is the per-point computation RF-4 exists to catch, and it
+		// still costs the reader who opens it.
+		expect(expanded).toBeLessThan(4000);
+
+		// Non-vacuity, and the ordering that proves the three are distinct
+		// measurements rather than one ceiling that happens to be slack for all.
+		expect(hero).toBeGreaterThan(collapsed);
+		expect(expanded).toBeGreaterThan(collapsed);
+
+		// Zero client JS on every surface: the scale is markup. No handler, no
+		// script, no hydration hook reaches it.
+		for (const mode of ["collapsed", "expanded", "hero"] as const) {
+			const m = markup(mode);
+			const gStart = m.indexOf('<g data-testid="chart-gridlines"');
+			const grid = m.slice(gStart, m.indexOf("</g>", gStart) + 4);
+			expect(grid).not.toMatch(/on[A-Z]/);
+			expect(grid).not.toContain("<script");
+		}
 	});
 });

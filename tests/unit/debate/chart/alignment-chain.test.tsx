@@ -2,7 +2,12 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { SVG_W, VIEWBOX_W, xPx } from "@/components/debate/chart/geometry";
 import { MarketPriceChart } from "@/components/debate/chart/MarketPriceChart";
+import {
+	MARKET_CHART_WINDOW_END,
+	MARKET_CHART_WINDOW_START,
+} from "@/server/config/limits";
 import type { PricePoint } from "@/server/discovery/price-series";
 
 // CHART-2 AUDIT — the alignment chain, link by link (`C-CHART-2` clause 2, and
@@ -17,15 +22,27 @@ import type { PricePoint } from "@/server/discovery/price-series";
 // through four layout facts, none of which was asserted anywhere before this
 // file:
 //
-//   1. the frame is a flex ROW whose items STRETCH — so the gutter, which the
-//      percentage resolves against, is exactly as tall as the plot;
+//   1. the frame is a flex ROW whose items STRETCH — so the marks column, which
+//      also positions by percentage, is exactly as tall as the plot;
 //   2. the `<svg>` FILLS that plot box (`h-full w-full`) and does not
-//      letterbox (`preserveAspectRatio="none"`) — so viewBox y maps linearly
-//      onto the same height the gutter has;
-//   3. neither the plot nor the gutter adds vertical padding, border or margin
+//      letterbox (`preserveAspectRatio="none"`) — so the viewBox maps linearly
+//      onto the box the labels resolve against;
+//   3. neither the plot nor the layer adds vertical padding, border or margin
 //      — so "100 %" spans the same distance on both sides;
-//   4. the gutter is the labels' containing block (`relative`) — so the
-//      percentage resolves against IT and not against some ancestor.
+//   4. the PLOT is the labels' containing block (`relative`), and the layer
+//      fills it (`absolute inset-0`) — so both percentages resolve against the
+//      one box the viewBox is stretched onto.
+//
+// ⚠ LINK 4 CHANGED AT CHART-6 AND IS CORRECTED HERE RATHER THAN ANNOTATED. It
+// used to read "the GUTTER is the labels' containing block", which was true and
+// sufficient while only `top` was a percentage: a flex sibling under
+// `items-stretch` shares the plot's HEIGHT, and height was all the contract
+// needed. `C-CHART-2` clause 2 as amended gives the label a `left` as well, and
+// a box that shares only the plot's height cannot carry an x — an x measured
+// from a right-hand gutter is an x measured from the plot's right EDGE, which is
+// where the terminal dot sits on exactly one market shape. So the labels moved
+// into the plot box, which shares both dimensions with the viewBox by
+// construction, and the gutter was retired (RF-2).
 //
 // ⛔ MEASURED, NOT ARGUED: each of the first two was reverted against the tree
 // at `e152dec` and the whole of `tests/unit/debate`, `tests/unit/discovery` and
@@ -135,24 +152,36 @@ const PINNED_WIDTH = /^(min-|max-)?w-/;
  * legitimately. */
 const TYPE_SIZE_RE = /^text-\[[\d.]|^text-(xs|sm|base|lg|[2-9]?xl)$/;
 
-describe("C-CHART-2 clause 2 — link 1: the gutter is exactly as tall as the plot", () => {
+describe("C-CHART-2 clause 2 — link 1: the row's cells are exactly as tall as the plot", () => {
 	for (const mode of MODES) {
 		it(`${mode}: the frame is a flex row and nothing overrides the cross-axis stretch`, () => {
-			// ⛔ THE LINK THE PERCENTAGE STANDS ON. `top: 34.7 %` resolves against
-			// the GUTTER's height. The gutter's own content is one 10px sizer, so
-			// without stretch it is 10px tall and every label lands within 10px of
-			// the top of the chart — on all three surfaces, at every width, with
-			// every existing guard still green because every existing guard reads
-			// the percentage rather than what it resolves against.
+			// ⛔ THE LINK THE MARKS' PERCENTAGE STANDS ON. `markTop`'s `top: 34.7%`
+			// resolves against the marks COLUMN's height, and without stretch that
+			// column is as tall as its own content — one 10px sizer — so all eleven
+			// numbers would land within 10px of the top of the chart while every
+			// existing guard stayed green, because every existing guard reads the
+			// percentage rather than what it resolves against.
+			//
+			// ⚠ THE LABELS NO LONGER DEPEND ON THIS, and saying so is the point of
+			// the amendment rather than a reason to delete the case. Since CHART-6
+			// they resolve against the PLOT (link 4), which is stretched by the same
+			// rule but would still be the full height as the row's only growing
+			// child. The marks column is what genuinely needs the stretch now — and
+			// it exists on one mode of three, which is exactly the kind of narrowing
+			// that turns a guard into decoration if nobody writes it down.
 			const { container } = renderMode(mode);
 			const frame = cls(container, "market-price-chart-frame");
 
 			expect(hasToken(frame, /^flex$/)).toBe(true);
 			expect(hasToken(frame, CROSS_AXIS_OVERRIDE)).toBe(false);
-			// …and the gutter does not opt itself out of the row's alignment.
-			expect(
-				hasToken(cls(container, "terminal-label-gutter"), SELF_OVERRIDE),
-			).toBe(false);
+			// …and no in-flow cell opts itself out of the row's alignment.
+			for (const id of ["market-price-chart-plot", "chart-y-marks"]) {
+				const el = container.querySelector(`[data-testid="${id}"]`);
+				if (el === null) continue; // `chart-y-marks` is expanded-only
+				expect(hasToken(el.getAttribute("class") ?? "", SELF_OVERRIDE)).toBe(
+					false,
+				);
+			}
 
 			// POSITIVE CONTROL — the two bans can fire, on the same matcher, against
 			// the same-shaped string. Without this, a `hasToken` that never matched
@@ -200,14 +229,18 @@ describe("C-CHART-2 clause 2 — link 2: the svg fills the plot box and never le
 
 describe("C-CHART-2 clause 2 — link 3: 100 % is the same distance on both sides", () => {
 	for (const mode of MODES) {
-		it(`${mode}: neither the plot nor the gutter adds vertical padding, border or margin`, () => {
-			// A `py-1` on the gutter, or a `border-y` on the plot, silently makes the
-			// two boxes different heights while both still stretch to the same row —
-			// the percentage then resolves against a box the dot does not live in,
-			// and the drift is a couple of pixels, i.e. exactly inside the range a
+		it(`${mode}: neither the plot nor the label layer adds vertical padding, border or margin`, () => {
+			// A `py-1` on the layer, or a `border-y` on the plot, silently makes the
+			// two boxes different heights — and since CHART-6 the layer is INSIDE the
+			// plot, so padding there inset it from the very box it is meant to BE.
+			// Either way the percentage resolves against a box the dot does not live
+			// in, and the drift is a couple of pixels: exactly inside the range a
 			// reviewer's eye forgives and the 1px contract does not.
+			// ⚠ This applies to both axes now. `inset-0` gives the layer the plot's
+			// rectangle; any vertical box model takes it away again, and `left` would
+			// drift with `top`.
 			const { container } = renderMode(mode);
-			for (const id of ["market-price-chart-plot", "terminal-label-gutter"]) {
+			for (const id of ["market-price-chart-plot", "terminal-label-layer"]) {
 				expect(hasToken(cls(container, id), VERTICAL_BOX_MODEL)).toBe(false);
 			}
 
@@ -230,86 +263,139 @@ describe("C-CHART-2 clause 2 — link 3: 100 % is the same distance on both side
 	}
 });
 
-describe("C-CHART-2 clause 2 — link 4: the gutter is the labels' containing block", () => {
-	it("the gutter is positioned and both labels are absolute inside it", () => {
-		// Without `relative` on the gutter the percentage resolves against the
-		// nearest POSITIONED ancestor — on `/m/[slug]` that is somewhere up in the
-		// page shell, so `top: 34.7 %` becomes a third of the way down the
-		// viewport. The failure is spectacular in a browser and completely
-		// invisible to a guard that only reads the percentage.
-		const { container } = renderMode("collapsed");
-		expect(
-			hasToken(cls(container, "terminal-label-gutter"), /^relative$/),
-		).toBe(true);
-		for (const id of ["terminal-label-yes", "terminal-label-no"]) {
-			expect(hasToken(cls(container, id), /^absolute$/)).toBe(true);
-		}
+describe("C-CHART-2 clause 2 — link 4: the PLOT is the labels' containing block", () => {
+	// ⚠ THE CONTAINING BLOCK MOVED AT CHART-6, and that is the whole of this
+	// task's structural change. It used to be the gutter — a flex cell beside the
+	// plot, which `items-stretch` made the same HEIGHT. That was enough while only
+	// `top` was a percentage. Now `left` is one too, and a box that merely shares
+	// the plot's height cannot carry an x: an x measured from the gutter is an x
+	// measured from the plot's right EDGE, which is where the dot sits only on a
+	// market that traded to the window end. So the labels moved INTO the plot box,
+	// which shares both dimensions with the viewBox by construction.
+	for (const mode of MODES) {
+		it(`${mode}: the plot is positioned, the layer fills it, and both labels are absolute inside`, () => {
+			// Without `relative` on the plot the percentages resolve against the
+			// nearest POSITIONED ancestor — on `/m/[slug]` that is somewhere up in
+			// the page shell, so `top: 34.7%` becomes a third of the way down the
+			// viewport. The failure is spectacular in a browser and completely
+			// invisible to a guard that only reads the percentage.
+			const { container } = renderMode(mode);
+			expect(
+				hasToken(cls(container, "market-price-chart-plot"), /^relative$/),
+			).toBe(true);
 
-		// POSITIVE CONTROL, AND IT IS ALSO A REAL PROPERTY. The sizer must be IN
-		// FLOW — that is the only reason the gutter has a width at all — so it is
-		// a node in the same tree that the `absolute` matcher correctly does NOT
-		// match. A matcher that returned `true` for everything would fail here.
-		const sizer = container.querySelector(
-			'[data-testid="terminal-label-gutter"] > span[aria-hidden="true"]',
-		);
-		expect(sizer).not.toBeNull();
-		expect(hasToken(sizer?.getAttribute("class") ?? "", /^absolute$/)).toBe(
-			false,
-		);
-	});
+			// ⛔ `inset-0` IS WHAT MAKES THE LAYER THE PLOT BOX RATHER THAN A BOX
+			// INSIDE IT. An absolutely-positioned child with no insets sizes to its
+			// content and sits at the plot's origin, so `100%` would be the width of
+			// two words — and every label would land in the leftmost 30px of the
+			// chart while every percentage in the markup still read correctly.
+			const layerCls = cls(container, "terminal-label-layer");
+			expect(hasToken(layerCls, /^absolute$/)).toBe(true);
+			expect(hasToken(layerCls, /^inset-0$/)).toBe(true);
+
+			for (const id of ["terminal-label-yes", "terminal-label-no"]) {
+				expect(hasToken(cls(container, id), /^absolute$/)).toBe(true);
+			}
+
+			// ⛔ AND THE LAYER MUST NOT EAT THE CLICK. It covers the whole plot, and
+			// the plot sits inside the collapsed card's `<button>` and the hero's
+			// `<Link>` — so without this the graph stops being the affordance on the
+			// two surfaces where the graph IS the affordance.
+			expect(hasToken(layerCls, /^pointer-events-none$/)).toBe(true);
+
+			// POSITIVE CONTROL — the matchers discriminate on the same-shaped
+			// strings, so the four `true`s above are readings and not tautologies.
+			expect(hasToken("relative min-w-0 flex-1", /^relative$/)).toBe(true);
+			expect(hasToken("min-w-0 flex-1", /^relative$/)).toBe(false);
+			expect(hasToken("absolute inset-x-0", /^inset-0$/)).toBe(false);
+		});
+	}
 });
 
-describe("C-CHART-2 clause 3 — the gutter's width is measured, never pinned", () => {
-	it("an in-flow invisible copy of the widest label sizes it, and no class does", () => {
-		// ⛔ THIS IS THE DELETED CONSTANT, ASSERTED AS DELETED. CHART-1 reserved
-		// the gutter by hand-measuring `YES` at 23.41 user units against
-		// `ui-sans-serif` — Geist could not be fetched offline — and pinning 26
-		// with 11 % headroom. CHART-2 replaced that guess with a copy of the string
-		// the browser lays out in the real face. A `w-[26px]` added here would
-		// reintroduce the same class of defect in a new unit, and nothing else in
-		// the repository would notice.
+describe("C-CHART-2 clause 3 — no width is ever pinned, and the plot keeps all of it", () => {
+	// ⚠ CLAUSE 3'S SUBJECT WENT AWAY AT CHART-6 AND THE RULE UNDERNEATH IT DID NOT.
+	// The clause used to be about a GUTTER whose width had to be MEASURED rather
+	// than pinned — CHART-1 reserved it by hand-measuring `YES` at 23.41 user units
+	// against `ui-sans-serif`, Geist being unfetchable offline, and pinning 26 with
+	// 11 % headroom; CHART-2 replaced that guess with an in-flow invisible copy the
+	// browser lays out in the real face. RF-2 retires the gutter altogether, so the
+	// sizer goes with it — there is no box left to size.
+	//
+	// ⛔ THE BAN STAYS, BECAUSE THE BAN WAS NEVER ABOUT THE GUTTER. "No number in
+	// this component encodes a string's width" is the durable half, and a
+	// `w-[26px]` on the new label layer would be exactly the CHART-1 defect in a
+	// newer unit. What replaces the sizer is not a measurement but the REMOVAL of
+	// the constraint: the labels are `whitespace-nowrap` and absolutely positioned,
+	// so each takes its own width and there is nothing for a wrong number to clip.
+	for (const mode of MODES) {
+		it(`${mode}: neither the layer nor either label pins a width`, () => {
+			const { container } = renderMode(mode);
+			for (const id of [
+				"terminal-label-layer",
+				"terminal-label-yes",
+				"terminal-label-no",
+			]) {
+				const el = container.querySelector(
+					`[data-testid="${id}"]`,
+				) as HTMLElement | null;
+				expect(el, `${id} is absent — this guard is stale`).not.toBeNull();
+				expect(hasToken(el?.getAttribute("class") ?? "", PINNED_WIDTH)).toBe(
+					false,
+				);
+				// …nor an inline one, which no class-token matcher would ever see.
+				expect(el?.style.width ?? "").toBe("");
+				expect(el?.style.maxWidth ?? "").toBe("");
+			}
+
+			// The labels size to their own content instead — the property that makes
+			// the absent width safe rather than merely absent.
+			for (const id of ["terminal-label-yes", "terminal-label-no"]) {
+				expect(hasToken(cls(container, id), /^whitespace-nowrap$/)).toBe(true);
+			}
+
+			// POSITIVE CONTROL — the width ban fires on every form it is written
+			// against and on none of the shipped classes.
+			for (const offender of ["w-[26px]", "w-8", "min-w-[26px]", "max-w-10"]) {
+				expect(hasToken(offender, PINNED_WIDTH)).toBe(true);
+			}
+			for (const innocent of [
+				"absolute",
+				"inset-0",
+				"whitespace-nowrap",
+				"pointer-events-none",
+			]) {
+				expect(hasToken(innocent, PINNED_WIDTH)).toBe(false);
+			}
+		});
+	}
+
+	it("the plot is the only flex child that grows, so the labels cost it no width", () => {
+		// ⛔ THE MEASURED PAYOFF OF RETIRING THE GUTTER, ASSERTED STRUCTURALLY. The
+		// gutter was a `shrink-0` cell taking 27.15 px from the plot on the collapsed
+		// card and the hero, and 48.73 px on the expanded overlay — measured in the
+		// shipped face, 2026-09-01. An overlay takes none, because it is out of flow.
+		// If a future change puts the labels back in the row, the plot silently
+		// narrows again and every rendered coordinate in the product moves.
 		const { container } = renderMode("collapsed");
-		const gutter = container.querySelector(
-			'[data-testid="terminal-label-gutter"]',
-		) as HTMLElement | null;
-		expect(gutter).not.toBeNull();
-		expect(hasToken(gutter?.getAttribute("class") ?? "", PINNED_WIDTH)).toBe(
-			false,
+		const frame = container.querySelector(
+			'[data-testid="market-price-chart-frame"]',
 		);
-		// …nor an inline one.
-		expect(gutter?.style.width ?? "").toBe("");
+		const inFlow = [...(frame?.children ?? [])].map(
+			(c) => c.getAttribute("data-testid") ?? "",
+		);
+		// The collapsed frame carries the plot and nothing else in flow.
+		expect(inFlow).toEqual(["market-price-chart-plot"]);
 
-		// The sizer: present, hidden from the accessibility tree, and INVISIBLE
-		// rather than DISPLAY:NONE — `hidden` would take its box away and collapse
-		// the gutter to its 5px of padding, which is the one failure that looks
-		// like a styling nit and is actually the whole mechanism.
-		const sizer = container.querySelector(
-			'[data-testid="terminal-label-gutter"] > span[aria-hidden="true"]',
+		// …and on the overlay, the plot plus the marks column — never the labels.
+		const { container: ex } = renderMode("expanded");
+		const exFrame = ex.querySelector(
+			'[data-testid="market-price-chart-frame"]',
 		);
-		const sizerCls = sizer?.getAttribute("class") ?? "";
-		expect(hasToken(sizerCls, /^invisible$/)).toBe(true);
-		expect(hasToken(sizerCls, /^hidden$/)).toBe(false);
-
-		// …and it is a copy of the WIDEST label, read off the rendered labels
-		// rather than asserted as the literal "YES", so the relationship survives
-		// a copy change.
-		const labelTexts = ["terminal-label-yes", "terminal-label-no"].map(
-			(id) =>
-				container.querySelector(`[data-testid="${id}"]`)?.textContent ?? "",
+		const exInFlow = [...(exFrame?.children ?? [])].map(
+			(c) => c.getAttribute("data-testid") ?? "",
 		);
-		expect(labelTexts.every((t) => t.length > 0)).toBe(true);
-		expect((sizer?.textContent ?? "").trim().length).toBeGreaterThanOrEqual(
-			Math.max(...labelTexts.map((t) => t.trim().length)),
-		);
-
-		// POSITIVE CONTROL — the width ban fires on every form it is written
-		// against and on none of the gutter's shipped classes.
-		for (const offender of ["w-[26px]", "w-8", "min-w-[26px]", "max-w-10"]) {
-			expect(hasToken(offender, PINNED_WIDTH)).toBe(true);
-		}
-		for (const innocent of ["shrink-0", "relative", "pl-[5px]"]) {
-			expect(hasToken(innocent, PINNED_WIDTH)).toBe(false);
-		}
+		expect(exInFlow).toEqual(["market-price-chart-plot", "chart-y-marks"]);
+		expect(exInFlow).not.toContain("terminal-label-layer");
 	});
 });
 
@@ -326,7 +412,7 @@ describe("C-CHART-2 clause 2 — label legibility: 10px is declared ONCE, for ev
 		// written for.
 		const seen = MODES.map((mode) => {
 			const { container } = renderMode(mode);
-			const c = cls(container, "terminal-label-gutter");
+			const c = cls(container, "terminal-label-layer");
 			cleanup();
 			return c;
 		});
@@ -373,28 +459,81 @@ describe("C-CHART-2 clause 2 — label legibility: 10px is declared ONCE, for ev
 	});
 });
 
-describe("C-CHART-2 clause 2 — the gutter sits to the RIGHT of the plot", () => {
+describe("C-CHART-2 clause 2 — the label sits beside its own DOT", () => {
+	// ⛔⛔ THIS BLOCK ASSERTED THE DEFECT, AND THAT IS WORTH STATING PLAINLY. It
+	// read "the gutter sits to the RIGHT of the plot", and pinned DOM order to
+	// prove it — a faithful reading of clause 2's original wording ("immediately
+	// right of each terminal dot") under the assumption that the plot's right edge
+	// IS where the dots end. CHART-3 fixed the axis to the experiment window and
+	// broke that assumption without touching a line of this file, so the guard went
+	// on passing while the labels drifted up to 691 px from the marks they name.
+	// **A guard written against a coincidence certifies the coincidence, not the
+	// rule** — which is why the assertion is now against the DOT's own coordinate.
 	for (const mode of MODES) {
-		it(`${mode}: the plot precedes the gutter in the frame's markup`, () => {
-			// "Immediately right of each terminal dot" is the clause's own wording,
-			// and in a flex ROW that is DOM order. A gutter emitted before the plot
-			// puts both names on the left of the chart, away from the dots they
-			// name — the legend problem clause 2 retired, reintroduced by an
-			// argument reorder that changes nothing else. O-7: `innerHTML`, never
-			// `textContent`.
+		it(`${mode}: the label's left is derived from the terminal dot's cx, not from the plot's edge`, () => {
 			const { container } = renderMode(mode);
-			const frame = container.querySelector(
-				'[data-testid="market-price-chart-frame"]',
-			);
-			const html = frame?.innerHTML ?? "";
-			const plot = html.indexOf('data-testid="market-price-chart-plot"');
-			const gutter = html.indexOf('data-testid="terminal-label-gutter"');
 
-			// Both present — an absent marker indexes to -1 and would satisfy the
-			// ordering below by accident.
-			expect(plot).toBeGreaterThan(-1);
-			expect(gutter).toBeGreaterThan(-1);
-			expect(plot).toBeLessThan(gutter);
+			// ⛔⛔ DERIVED FROM THE SERIES, NOT READ BACK OUT OF THE RENDER — and this
+			// block said "the two independent quantities" while comparing ONE.
+			// `cx`, `data-plot-x` and the `left` percentage all descend from a single
+			// `terminalX`, so checking the label against the dot proves only that the
+			// component agrees with itself. Filed by `@test-writer` as H-3, with the
+			// mutation that walked straight through it: `terminalX = xPx(series[0].at,
+			// …)` — the FIRST point instead of the last. This file's fixture starts
+			// exactly at the window start, so under that mutation all three quantities
+			// become `0`, `expect(0).toBeCloseTo(0)` holds, `0 < 99` holds, and all 22
+			// tests stayed green. It is the very shape this describe block's own
+			// header calls out one screen above.
+			const expectedX = xPx(
+				SERIES[SERIES.length - 1].at,
+				Date.parse(MARKET_CHART_WINDOW_START),
+				Date.parse(MARKET_CHART_WINDOW_END),
+			);
+			// Non-vacuity: the fixture ends INSIDE the plot and at neither edge, so
+			// zero and full-width are both distinguishable from the right answer.
+			expect(expectedX).toBeGreaterThan(0);
+			expect(expectedX).toBeLessThan(VIEWBOX_W);
+
+			const dot = container.querySelector('[data-testid="terminal-dot-yes"]');
+			const label = container.querySelector(
+				'[data-testid="terminal-label-yes"]',
+			) as HTMLElement | null;
+			expect(dot).not.toBeNull();
+			expect(label).not.toBeNull();
+
+			// Each of the three is checked against that one independent truth.
+			expect(Number(dot?.getAttribute("cx"))).toBeCloseTo(expectedX, 6);
+			expect(Number(label?.getAttribute("data-plot-x"))).toBeCloseTo(
+				expectedX,
+				6,
+			);
+			const left =
+				label?.getAttribute("style")?.match(/left:([^;]*)/)?.[1] ?? "";
+			expect(left, `${mode} label has no left`).not.toBe("");
+			const anchorPct = Number.parseFloat(left.match(/([\d.]+)%/)?.[1] ?? "");
+			expect(anchorPct).toBeCloseTo((expectedX / SVG_W) * 100, 3);
+
+			// ⛔ MUST REJECT THE OLD BEHAVIOUR: an anchor at the plot's right edge.
+			// This fixture's series ends well inside the window, so a label pinned to
+			// the gutter would read as ~100 %. The guard therefore fails against
+			// exactly the build it was written to replace.
+			expect(anchorPct).toBeLessThan(99);
 		});
 	}
+
+	it("the labels are the LAST thing in the plot box, so they paint over the series", () => {
+		// O-7: `innerHTML`, never `textContent`. A label emitted before the `<svg>`
+		// is painted under the lines it names — same z-order problem the gridlines
+		// solve by being drawn first, in the opposite direction.
+		const { container } = renderMode("collapsed");
+		const plot = container.querySelector(
+			'[data-testid="market-price-chart-plot"]',
+		);
+		const html = plot?.innerHTML ?? "";
+		const svg = html.indexOf('data-testid="market-price-chart"');
+		const layer = html.indexOf('data-testid="terminal-label-layer"');
+		expect(svg).toBeGreaterThan(-1);
+		expect(layer).toBeGreaterThan(-1);
+		expect(svg).toBeLessThan(layer);
+	});
 });
