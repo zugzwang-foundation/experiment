@@ -122,10 +122,20 @@ export function escapeField(value: unknown): string {
 	// ships as `"""2026-11-06T00:00:00Z"""` and parses back with literal
 	// quotes inside the value.
 	//
-	// Latent while the only source is the fixture (all ISO strings), and live
-	// on the first row a drizzle reader returns: every shipped table has a
-	// `created_at`, and `timestamp({ withTimezone: true })` hands back a JS
-	// `Date`. So this fires on the release task's very first real read.
+	// ⚠ **That justification WAS true and is now false** (`@code-reviewer`
+	// M-3). It read: *"live on the first row a drizzle reader returns … this
+	// fires on the release task's very first real read."* Since ruling S6 the
+	// reader projects every `timestamp with time zone` through `to_char` and
+	// returns `string | null`, and the schema has no other temporal column
+	// type — so this branch is unreachable from both shipped sources.
+	//
+	// ⚠⚠ **And it would be WRONG if it ever fired.** `Date.toISOString()`
+	// emits THREE fractional digits, so a value reaching here would silently
+	// restore exactly the microsecond loss S6 exists to prevent, with nothing
+	// between it and the artifact. Kept as a backstop for a future
+	// `Date`-producing source, with the cost stated rather than implied —
+	// this file's own project has been bitten twice by a docblock describing
+	// the file it used to be.
 	const s =
 		value instanceof Date
 			? value.toISOString()
@@ -183,6 +193,12 @@ export function escapeField(value: unknown): string {
  */
 /**
  * V8's maximum string length, read from Node rather than hardcoded.
+ *
+ * ⚠ **UTF-16 CODE UNITS, not bytes** (`@code-reviewer` LOW). The comparison is
+ * correct — `String.prototype.length` is the same unit — but the name and the
+ * figures below say "bytes", and for a CSV carrying non-ASCII comment bodies
+ * the file is LARGER in bytes than this ceiling suggests. Stated rather than
+ * renamed, because the projection arithmetic is what a reader checks.
  *
  * ⚠ Read at module load from `buffer.constants` because it is a property of
  * the RUNTIME, not of this project: it differs between 32- and 64-bit builds

@@ -113,7 +113,21 @@ describe("L-4 · manifest.source cannot be a connection string", () => {
 		],
 		["a bare scheme", "postgres://localhost/postgres"],
 		["userinfo only", "zz:hunter2@somehost"],
-		["a host:port", "reading from @db-prod-1:5432 tonight"],
+		["a host:port after an @", "reading from @db-prod-1:5432 tonight"],
+		// ⚠ The two forms `@security-auditor` M-1 found missing. The libpq
+		// keyword string is a first-class Postgres connection string and is
+		// what a hand-assembled one usually looks like — both original nets
+		// required a `://` or an `@`, so both of these passed.
+		["a BARE host:port", "db.abcdefghijkl.supabase.co:5432"],
+		[
+			"a pooler host:port",
+			"aws-0-ap-south-1.pooler.supabase.com:5432 postgres.abcdefghijkl",
+		],
+		[
+			"the libpq keyword form",
+			"host=db.abc.supabase.co port=5432 user=postgres password=hunter2",
+		],
+		["a Supabase service key", "sbp_0123456789abcdef0123456789abcdef01234567"],
 	])("REFUSES %s", (_name, label) => {
 		expect(() => assertPublishableSourceLabel(label)).toThrow(
 			/egress_contract_gap/,

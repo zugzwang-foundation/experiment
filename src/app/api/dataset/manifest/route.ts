@@ -120,6 +120,14 @@ export async function GET(request: Request): Promise<Response> {
 				"The Zugzwang public dataset has not been released yet. It is " +
 					`published on ${RELEASE_DATE}; this endpoint serves its manifest ` +
 					"from then.",
+				// ⚠ **The BODY's `retry_after` too, not only the header**
+				// (`@code-reviewer` M-4). SPEC.2 §15.1 says the field *"mirrors
+				// the HTTP `Retry-After` header on Route Handler responses"*,
+				// and the codebase's two other 503 sites — both upload-sign
+				// routes — pass the value to `envelope` AND to `jsonResponse`.
+				// This handler was the outlier, and the test asserted only the
+				// header, so nothing caught it.
+				RETRY_AFTER_BEFORE,
 			),
 			RETRY_AFTER_BEFORE,
 		);

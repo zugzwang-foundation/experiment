@@ -101,10 +101,16 @@ DATASET.* / HARDEN.*.
      silently lost the ordering resolution of events less than a
      millisecond apart. Check one `created_at` in each of `users.csv`,
      `events.csv` and `bets.csv` (2026-09-01, ruling S6).
-   - The four checks above are **key-absence at any depth**: §19.4.1's
-     rules apply through nesting and arrays, so a spot-check that only
-     reads top-level keys passes over the case the depth rule exists
-     for.
+   - ⚠ The **key-absence** checks above — every bullet naming a key that
+     must be gone — hold **at any depth**: §19.4.1's declaration applies
+     through nesting and arrays, so a spot-check that only reads
+     top-level keys passes over the case the depth rule exists for.
+     (⚠ The timestamp-precision bullet is **not** one of them: it is a
+     format check on a value that ships, not a check that a key is
+     absent. This sentence read *"the four checks above"* when there
+     were six of them, and then nine — a count in prose goes stale from
+     the edit that adds a bullet, so it is now a description of which
+     bullets rather than a number of them.)
 
 8. **Spot-check pseudonymization** (per §19.5): cross-table joins
    should reference `user_pseudonym` columns, not raw `users.id`. The

@@ -238,7 +238,18 @@ export type SecretBucket = Exclude<keyof EgressSecrets, "participantSourced">;
 
 /**
  * Every `STRIP` column → the `EgressSecrets` bucket its values are harvested
- * into, plus the provenance of the field it comes from.
+ * into.
+ *
+ * ⚠ **It carried a `provenance` field too, and that field was a SECOND
+ * DECLARATION nobody read** (`@code-reviewer` H-2). Nine of these paths also
+ * appear in `SITE_PROVENANCE`, which is where `harvestSecrets` actually looks;
+ * flipping one here from `PARTICIPANT` to `SYSTEM` changed no behaviour, reddened
+ * no test and produced no type error — measured. Yet this is the map ruling I
+ * makes it mandatory to fill in, so it is the map a reader opens to ask the
+ * question, and it would have answered wrong.
+ *
+ * That is ruling I's own defect, one field over, inside the commit that applied
+ * ruling I. The field is gone; provenance has exactly one home.
  *
  * ⚠⚠ **Ruling I (DATASET.3), and the `satisfies` clause IS the ruling.**
  * `Record<StrippedColumnPath, …>` requires an entry for EVERY column Appendix
@@ -263,24 +274,21 @@ export type SecretBucket = Exclude<keyof EgressSecrets, "participantSourced">;
  * join-key exemption), not `STRIP`, so it is harvested separately.
  */
 export const HARVEST_COLUMN_BUCKETS = {
-	"users.name": { bucket: "displayNames", provenance: "PARTICIPANT" },
-	"users.email": { bucket: "emails", provenance: "PARTICIPANT" },
-	"users.image": { bucket: "avatarUrls", provenance: "SYSTEM" },
-	"users.google_id": { bucket: "googleIds", provenance: "SYSTEM" },
-	"users.tos_acceptance_ip": { bucket: "ips", provenance: "PARTICIPANT" },
+	"users.name": { bucket: "displayNames" },
+	"users.email": { bucket: "emails" },
+	"users.image": { bucket: "avatarUrls" },
+	"users.google_id": { bucket: "googleIds" },
+	"users.tos_acceptance_ip": { bucket: "ips" },
 	"users.tos_acceptance_user_agent": {
 		bucket: "userAgents",
-		provenance: "PARTICIPANT",
 	},
 	"image_uploads.r2_object_key": {
 		bucket: "r2ObjectKeys",
-		provenance: "SYSTEM",
 	},
 	"mod_actions.blocked_text": {
 		bucket: "blockedTexts",
-		provenance: "PARTICIPANT",
 	},
-	"mod_actions.image_r2_key": { bucket: "r2ObjectKeys", provenance: "SYSTEM" },
+	"mod_actions.image_r2_key": { bucket: "r2ObjectKeys" },
 	// ⚠ Ruling S2 (DATASET.3) — 255 bytes of participant-chosen header text
 	// that moderation never sees. It is STRIPPED now, so it needs a bucket;
 	// and because it is participant-chosen it needs the PARTICIPANT tag, or a
@@ -288,12 +296,8 @@ export const HARVEST_COLUMN_BUCKETS = {
 	// through the very column this ruling added. The two rulings meet here.
 	"bets.idempotency_key": {
 		bucket: "idempotencyKeys",
-		provenance: "PARTICIPANT",
 	},
-} as const satisfies Record<
-	StrippedColumnPath,
-	{ bucket: SecretBucket; provenance: Provenance }
->;
+} as const satisfies Record<StrippedColumnPath, { bucket: SecretBucket }>;
 
 /**
  * Where a harvested value ENTERED the system — ruling S1, DATASET.3.
@@ -379,6 +383,12 @@ const SITE_PROVENANCE = {
 	// The admin session cookie value — a UUIDv7 PK (`admin_sessions.session_id`).
 	"payload.sessionId": "SYSTEM",
 	"events.aggregate_id[admin_session]": "SYSTEM",
+	// ⚠ Ruling S2's column, moved here at `@code-reviewer` H-2. It was the one
+	// STRIP column whose provenance lived ONLY in `HARVEST_COLUMN_BUCKETS` —
+	// which is precisely why that map's `provenance` field looked load-bearing
+	// while the other nine entries were dead. The raw `Idempotency-Key`
+	// request header: participant-chosen, unmoderated, 255 bytes.
+	"bets.idempotency_key": "PARTICIPANT",
 } as const satisfies Record<string, Provenance>;
 
 /**
@@ -505,7 +515,7 @@ export function harvestSecrets(
 		add(
 			s.idempotencyKeys,
 			row.idempotency_key,
-			HARVEST_COLUMN_BUCKETS["bets.idempotency_key"].provenance,
+			SITE_PROVENANCE["bets.idempotency_key"],
 			"idempotency_key",
 		);
 	}
@@ -696,8 +706,24 @@ export function assertPublishableSourceLabel(label: string): string {
 		/\S+:\S+@\S+/,
 		// a port after an `@` host
 		/@[\w.-]+:\d{2,5}\b/,
-		// ⚠ a BARE `host:5432` — no scheme, no `@`
-		/\b[\w.-]+:\d{2,5}\b/,
+		// ⚠ a BARE `host:5432` — no scheme, no `@`.
+		//
+		// ⚠⚠ **The left side must be HOST-SHAPED — a dotted name ending in a
+		// letters-only label** (`@code-reviewer` H-1). My first version was
+		// `/\b[\w.-]+:\d{2,5}\b/`, which matches any clock time, and
+		// **rejected the three most natural labels an operator would write** —
+		// `"…2026-11-05 23:59 UTC freeze snapshot"`, `"…taken at 06:00 on
+		// 2026-11-06"`, `"…rows as of 2026-11-06 00:00 UTC"` — while telling
+		// them the label *"looks like a URL or a connection string"*. The
+		// freeze is DEFINED as `2026-11-05 23:59 UTC`, so naming the time is
+		// the obvious thing to do.
+		//
+		// That is F-11's shape in one step: the fix for `@security-auditor`
+		// M-1 opened the hazard the next reviewer found. A guard that refuses
+		// the correct answer on a one-shot job is not a stricter guard; it is
+		// a different failure, and it arrives at 06:00 with a message pointing
+		// the operator somewhere else.
+		/\b[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}:\d{2,5}\b/i,
 		// ⚠ libpq keyword form — any one keyword is enough; a description does
 		// not contain `password=`
 		/\b(?:host|hostaddr|port|user|dbname|password|sslmode|options)\s*=/i,
@@ -742,6 +768,19 @@ export async function buildDataset(opts: BuildOptions): Promise<BuildResult> {
 	assertShipRulesComplete();
 	assertInventoryComplete();
 	assertTreatmentsComplete();
+	// ⚠ **The label is checked HERE, not where it is written into the
+	// manifest** (`@code-reviewer` H-1). It was validated at step 6, inside the
+	// manifest construction — so a bad label threw after all sixteen reads, the
+	// strip, the pseudonymize, every guard, the CSV writes, the tar and two
+	// sha256 passes, and `buildDataset` returns nothing, so the operator loses
+	// the whole run.
+	//
+	// That contradicted this file's own first stated principle, four
+	// paragraphs up: *"Contract checks run BEFORE the first read. A pipeline
+	// that discovers a missing strip rule after writing nine tables has already
+	// spent the operator's single shot."* The label is caller-supplied and
+	// knowable at step zero; there was never a reason to wait.
+	const sourceLabel = assertPublishableSourceLabel(opts.source.label);
 
 	const tables = shippedTables();
 
@@ -841,7 +880,7 @@ export async function buildDataset(opts: BuildOptions): Promise<BuildResult> {
 	const manifest: DatasetManifest = {
 		schema_version: "1.0",
 		release_date: opts.releaseDate,
-		source: assertPublishableSourceLabel(opts.source.label),
+		source: sourceLabel,
 		license: "CC-BY-4.0",
 		tarball_name: tarballName,
 		tarball_sha256: sha256(tarball),

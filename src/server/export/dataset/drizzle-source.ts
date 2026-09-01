@@ -341,11 +341,40 @@ export function drizzleSource(db: DatasetDb, label: string): DatasetSource {
 				// Widening the fixture to `.123456Z` — before touching this
 				// file — turned the existing byte comparison red, which is the
 				// measurement that made this fix a fix rather than a claim.
-				projection[col.name] = col.getSQLType().startsWith("timestamp")
-					? sql<
-							string | null
-						>`to_char(${col} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
-					: col;
+				// ⚠ **`=== "timestamp with time zone"`, not `startsWith`**
+				// (`@code-reviewer` M-2). `startsWith("timestamp")` also matches
+				// a NAIVE `timestamp`, and `AT TIME ZONE 'UTC'` means the
+				// opposite thing for the two: on a `timestamptz` it converts an
+				// instant to UTC (correct, session-independent); on a naive
+				// `timestamp` it REINTERPRETS the wall-clock as UTC and shifts
+				// it. Measured — a naive column holding 12:00 IST emitted
+				// `17:30:00.123456Z`, a different instant, still wearing a `Z`.
+				//
+				// Every one of the 43 timestamp columns in the schema is
+				// `withTimezone: true` today, so this is latent. It stays a
+				// throw rather than a silent fallback because the seeder guards
+				// the NARROWER set (`data_type = 'timestamp with time zone'`),
+				// so a future naive column would be bind-bound by the fixture
+				// AND mis-rendered by the reader — invisible to the round-trip
+				// byte comparison in both directions at once.
+				const sqlType = col.getSQLType();
+				if (
+					sqlType.startsWith("timestamp") &&
+					sqlType !== "timestamp with time zone"
+				) {
+					throw new EgressContractGapError(
+						`${table}.${col.name}`,
+						`is \`${sqlType}\`, not \`timestamp with time zone\`. The ` +
+							"reader's UTC cast is only correct for an instant; on a naive " +
+							"timestamp it would shift the value and still label it Z.",
+					);
+				}
+				projection[col.name] =
+					sqlType === "timestamp with time zone"
+						? sql<
+								string | null
+							>`to_char(${col} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
+						: col;
 				if (col.name === orderName) orderColumn = col;
 			}
 			if (orderColumn === undefined) {
@@ -526,6 +555,13 @@ export async function withDatasetSnapshot<T>(
 		await tx.execute(
 			sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY`,
 		);
-		return fn(tx as unknown as DatasetDb);
+		// ⚠ No cast. `PgTransaction` extends `PgDatabase`, so `tx` is directly
+		// assignable — I wrote `tx as unknown as DatasetDb` out of habit, 380
+		// lines below the docblock explaining that exactly that double cast is
+		// what made the OLD `DatasetDb` type verify nothing
+		// (`@code-reviewer` M-1, and AGENTS.md §11 lists it under **Never**).
+		// Reinstating it here would have restored the blind spot on the only
+		// new DB-touching path on the branch. `tsc` is clean without it.
+		return fn(tx);
 	});
 }
