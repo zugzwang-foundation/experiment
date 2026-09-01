@@ -13,6 +13,7 @@ import {
 	fmtUtcDay,
 	type Gridline,
 	gridlinesFor,
+	hasFullYScale,
 	labelLeftPct,
 	labelTopPct,
 	SVG_W,
@@ -38,10 +39,21 @@ import {
  * here for the same reason §9 gave for market detail: on a surface a reader uses
  * to judge whether a market has already moved, chronology *is* the information.
  *
- * `hero` renders lines and terminals and NO axis — it is a third of the height
- * of the collapsed card, where three date labels would be noise rather than
- * orientation. That is a presentational choice inside canon's jurisdiction, not
- * a spec pin; §22 and C-CHART-2 both stop at "same component, same derivation".
+ * `hero` renders lines, terminals and — since CHART-6 — the same Y scale the
+ * expanded overlay carries, but still NO TIME AXIS. Those are two different
+ * questions and this sentence used to answer them with one number: it said the
+ * hero "is a third of the height of the collapsed card", which is false. Measured
+ * on the shipped build at 1440, the hero's chart box is **418.75 px** against the
+ * collapsed card's **193.80** and the overlay's **382.25** — it is the TALLEST of
+ * the three. The 96 px everyone had been quoting is `min-h-24`, the layout FLOOR
+ * `HeroPanels` sets before `flex-1` grows it.
+ *
+ * ⚠ THE TIME AXIS STAYS OFF ANYWAY, and for a reason height never governed: three
+ * date labels along the bottom of a carousel panel a reader flicks past are noise
+ * rather than orientation, and Discovery's job is to say whether a market has
+ * moved, not when. That is a presentational choice inside canon's jurisdiction,
+ * not a spec pin; §22 and C-CHART-2 both stop at "same component, same
+ * derivation".
  *
  * ⚠ ALIASED TO `geometry.ts`'s `ChartMode` AT CHART-5 RATHER THAN RESTATED. The
  * Y scale is a pure function of the mode, so `geometry` needed the union too —
@@ -526,7 +538,7 @@ export function MarketPriceChart({
 					<TerminalLabels yes={terminalYes} mode={mode} terminalX={terminalX} />
 				)}
 			</div>
-			{mode === "expanded" && grid.length > 0 && <YMarks marks={grid} />}
+			{hasFullYScale(mode) && grid.length > 0 && <YMarks marks={grid} />}
 		</div>
 	);
 }
@@ -674,7 +686,7 @@ function TerminalLabels({
 	const upperPct = labelTopPct(yesOnTop ? labelY.yes : labelY.no);
 	const lowerPct = labelTopPct(yesOnTop ? labelY.no : labelY.yes);
 	const half = labelHalfBoxPx(mode);
-	const showValue = mode === "expanded";
+	const showValue = hasFullYScale(mode);
 	// The horizontal half of the contract, computed once for both labels because
 	// both dots share one `cx` — `TerminalMarkers` draws them at the same
 	// `terminalX`, since a market has one series and therefore one last point.
@@ -801,8 +813,15 @@ function TerminalLabels({
 }
 
 /**
- * The Y scale's numeric marks — HTML in a gutter of their own, between the plot
- * and the end labels (`C-CHART-1` clause 1 as amended at CHART-5).
+ * The Y scale's numeric marks — HTML in a column of their own, to the right of
+ * the plot (`C-CHART-1` clause 1 as amended at CHART-5 and again at CHART-6).
+ *
+ * ⚠ "BETWEEN THE PLOT AND THE END LABELS" WAS TRUE UNTIL CHART-6 AND IS NOT NOW.
+ * The end labels left the row entirely — they are an overlay on the plot,
+ * positioned from their own dots — so this column is the only thing beside the
+ * plot and there is no longer a strip for two systems to share. It renders on
+ * the overlay AND the Discovery hero (`hasFullYScale`), never on the collapsed
+ * card.
  *
  * ⛔ HTML AND NOT SVG `<text>`, for exactly the reason clause 2 moved `YES`/`NO`
  * out at CHART-2: `preserveAspectRatio="none"` stretches user space by a factor
@@ -1031,12 +1050,16 @@ const MARK_TYPE_PX = 10;
  * against one surface — so the box is composed from the same three type values
  * the label declares, and the threshold moves whenever they do.
  *
- * ⚠ THE ONE-LINE VALUE IS UNCHANGED AT 5, so the collapsed card and the
- * Discovery hero keep the narrower threshold they already had. That is the
- * ruling's own asymmetry: they keep the name alone, so their box did not grow.
+ * ⚠ THE ONE-LINE VALUE IS UNCHANGED AT 5 AND NOW APPLIES TO THE COLLAPSED CARD
+ * ALONE. It used to cover the Discovery hero too, on CHART-5's asymmetry — those
+ * two kept the name alone, so their box did not grow. CHART-6 gives the hero the
+ * value line, so its box grew and its threshold has to grow with it: that is
+ * exactly why this reads `hasFullYScale` rather than a second `mode ===` test.
+ * A hero that gained the value and kept the 5px floor would overlap its own two
+ * labels across the 46–54 % band, which is where every market rests.
  */
 function labelHalfBoxPx(mode: ChartMode): number {
-	return mode === "expanded"
+	return hasFullYScale(mode)
 		? (LABEL_NAME_PX + LABEL_STACK_GAP_PX + LABEL_VALUE_PX) / 2
 		: LABEL_NAME_PX / 2;
 }

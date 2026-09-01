@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
 	gridlinesFor,
+	hasFullYScale,
 	labelTopPct,
 	SVG_W,
 	VIEWBOX_H,
@@ -52,14 +53,46 @@ function markup(mode: "collapsed" | "expanded" | "hero", end = 0.65): string {
 }
 
 describe("C-CHART-1 clause 1 (CHART-5) — the gridline set is a pure function of the MODE", () => {
-	it("collapsed gets the quarters, expanded gets every ten, the hero gets none", () => {
+	it("collapsed gets the quarters; expanded AND the hero get every ten", () => {
+		// ⛔ THE HERO USED TO GET NONE, AND THIS CASE PINNED IT. CHART-5 gave it the
+		// empty set on the stated ground that its box is "roughly 96px tall".
+		// Measured on the shipped build at 1440 (CHART-6): the hero's chart box is
+		// **418.75 px** and the expanded overlay's is **382.25** — the hero is the
+		// TALLER of the two. 96 is `min-h-24`, the layout FLOOR `HeroPanels` sets
+		// before `flex-1` grows it; the figure was a mis-read of the CSS, not a
+		// measurement. Founder-ruled at CHART-6: the hero carries what the overlay
+		// carries.
 		expect(gridlinesFor("collapsed").map((g) => g.pct)).toEqual([
 			25, 50, 75, 100,
 		]);
-		expect(gridlinesFor("expanded").map((g) => g.pct)).toEqual([
-			0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100,
-		]);
-		expect(gridlinesFor("hero")).toEqual([]);
+		const TEN_STEP = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+		expect(gridlinesFor("expanded").map((g) => g.pct)).toEqual(TEN_STEP);
+		expect(gridlinesFor("hero").map((g) => g.pct)).toEqual(TEN_STEP);
+	});
+
+	it("`hasFullYScale` and `gridlinesFor` cannot come to disagree", () => {
+		// ⛔ TWO INDEPENDENT DECLARATIONS OF ONE RULING, TIED TOGETHER HERE RATHER
+		// THAN BY ONE CALLING THE OTHER. `gridlinesFor` keeps an exhaustive `switch`
+		// because that is what turns a fourth surface into a COMPILE error rather
+		// than a chart silently shipping with no scale; `hasFullYScale` is a
+		// predicate three other call sites read. Neither can be expressed in terms
+		// of the other without losing what it is for — so the agreement is asserted.
+		//
+		// ⚠ What a drift would ship: a mode with eleven gridlines and no numeric
+		// marks, or marks against the quarters. Both look deliberate.
+		for (const mode of ["collapsed", "expanded", "hero"] as const) {
+			expect(
+				gridlinesFor(mode).length === 11,
+				`${mode}: gridline set and hasFullYScale disagree`,
+			).toBe(hasFullYScale(mode));
+		}
+		// Non-vacuity: the predicate really does discriminate, so the loop above is
+		// not three trivially-true comparisons.
+		expect(
+			new Set(
+				["collapsed", "expanded", "hero"].map((m) => hasFullYScale(m as never)),
+			).size,
+		).toBe(2);
 	});
 
 	it("the y of each line is its percent on the fixed 0–100 % scale, top-down", () => {
@@ -100,25 +133,31 @@ describe("C-CHART-1 clause 1 (CHART-5) — the gridline set is a pure function o
 		expect(a).toBe(b);
 	});
 
-	it("renders exactly the mode's set, and the hero renders no group at all", () => {
+	it("renders exactly the mode's set, on all three surfaces", () => {
 		const collapsed = markup("collapsed");
 		const expanded = markup("expanded");
 		const hero = markup("hero");
 
 		const pcts = (m: string) =>
 			[...m.matchAll(/<line data-pct="(\d+)"/g)].map((x) => Number(x[1]));
+		const TEN_STEP = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 		expect(pcts(collapsed)).toEqual([25, 50, 75, 100]);
-		expect(pcts(expanded)).toEqual([
-			0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100,
-		]);
+		expect(pcts(expanded)).toEqual(TEN_STEP);
 
-		// MUST REJECT: any gridline on the hero — its box is ~96px and eleven
-		// lines in it reduce to hatching.
-		expect(hero).not.toContain('data-testid="chart-gridlines"');
-		expect(pcts(hero)).toEqual([]);
-		// POSITIVE CONTROL — the same matcher finds lines when they exist, so the
-		// empty result above is "absent", not "my pattern is wrong".
+		// ⛔ THE HERO NOW CARRIES THE SAME ELEVEN, and the MUST-REJECT inverted with
+		// the ruling: this used to assert the hero had no group at all. What it must
+		// reject NOW is the hero taking the COLLAPSED card's quarters — the plausible
+		// wrong answer, since "give the hero a scale" reads as "give it any scale",
+		// and four lines on a 418 px panel beside eleven on a 382 px overlay would
+		// make the same market two different pictures on two surfaces.
+		expect(hero).toContain('data-testid="chart-gridlines"');
+		expect(pcts(hero)).toEqual(TEN_STEP);
+		expect(pcts(hero)).not.toEqual([25, 50, 75, 100]);
+
+		// POSITIVE CONTROL — the same matcher tells the two sets apart, so the
+		// equalities above are readings rather than one pattern matching everything.
 		expect(pcts(collapsed).length).toBe(4);
+		expect(pcts(hero).length).toBe(11);
 	});
 
 	it("is drawn BEHIND the series — the group precedes both polylines", () => {
@@ -220,23 +259,25 @@ describe("CHART-5 — no new token, and no raw hex", () => {
 	});
 });
 
-describe("C-CHART-1 clause 1 (CHART-5) — numeric marks are EXPANDED-ONLY", () => {
-	it("eleven marks on the overlay, none on the card, none on the hero", () => {
-		const expanded = markup("expanded");
+describe("C-CHART-1 clause 1 (CHART-6) — numeric marks are on every FULL-SCALE mode", () => {
+	it("eleven marks on the overlay AND the hero, none on the card", () => {
 		const marks = (m: string) =>
 			[...m.matchAll(/data-testid="y-mark-(\d+)"/g)].map((x) => Number(x[1]));
+		const TEN_STEP = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
-		expect(marks(expanded)).toEqual([
-			0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100,
-		]);
+		expect(marks(markup("expanded"))).toEqual(TEN_STEP);
+		// CHART-6, founder ruling: the hero gets what the overlay has. Its box is
+		// 418.75 px — measured, and taller than the overlay's 382.25.
+		expect(markup("hero")).toContain('data-testid="chart-y-marks"');
+		expect(marks(markup("hero"))).toEqual(TEN_STEP);
 
 		// MUST REJECT: numbers on the collapsed card. It DOES carry gridlines and
-		// deliberately carries no figures — its box is 164px and already holds
-		// three date labels along the bottom. Deriving marks from the gridline set
-		// alone would have given it four numbers nobody ruled for.
+		// deliberately carries no figures — its box is 193.8 px and already holds
+		// three date labels along the bottom. Deriving the marks from "does this
+		// mode have gridlines?" would have given it four numbers nobody ruled for,
+		// which is why the predicate is `hasFullYScale` and not `grid.length > 0`.
 		expect(markup("collapsed")).not.toContain('data-testid="chart-y-marks"');
 		expect(marks(markup("collapsed"))).toEqual([]);
-		expect(markup("hero")).not.toContain('data-testid="chart-y-marks"');
 	});
 
 	it("the marks column is SIZED, never pinned — the CHART-2 mechanism, reused", () => {
@@ -410,16 +451,22 @@ describe("C-CHART-2 clause 2 (CHART-5) — the end value can never disagree with
 		});
 	}
 
-	it("the value is EXPANDED-ONLY — the card and hero keep the name alone", () => {
-		for (const mode of ["collapsed", "hero"] as const) {
-			const m = markup(mode);
-			expect(m).not.toContain('data-testid="terminal-value-yes"');
-			expect(m).not.toContain('data-testid="terminal-value-no"');
-			// …but the NAME is still there, so the absence above is the value's,
-			// not the whole label's.
-			expect(m).toContain('data-testid="terminal-label-yes"');
+	it("the value rides the FULL-SCALE modes — the collapsed card keeps the name alone", () => {
+		// ⚠ THE HERO MOVED SIDES AT CHART-6. RF-4 gives it "what expanded has" as one
+		// bundle — gridlines, marks, and the percentage beneath the name — so a hero
+		// with the scale and without the value would be half a ruling. Its box is
+		// 418.75 px measured, which is where the room for a second line comes from.
+		const m = markup("collapsed");
+		expect(m).not.toContain('data-testid="terminal-value-yes"');
+		expect(m).not.toContain('data-testid="terminal-value-no"');
+		// …but the NAME is still there, so the absence above is the value's, not the
+		// whole label's.
+		expect(m).toContain('data-testid="terminal-label-yes"');
+
+		for (const mode of ["expanded", "hero"] as const) {
+			expect(markup(mode)).toContain('data-testid="terminal-value-yes"');
+			expect(markup(mode)).toContain('data-testid="terminal-value-no"');
 		}
-		expect(markup("expanded")).toContain('data-testid="terminal-value-yes"');
 	});
 });
 
@@ -492,12 +539,21 @@ describe("C-CHART-2 clause 4 (CHART-5) — one collision rule, two measured inpu
 			expect(top).toContain(`clamp(${expandedHalf}px,`);
 			expect(top).toContain(`calc(100% - ${expandedHalf}px)`);
 		}
-		// MUST REJECT: the overlay's wider threshold leaking onto a one-line label.
-		for (const mode of ["collapsed", "hero"] as const) {
-			for (const top of topsOf(mode)) {
-				expect(top).toContain(`clamp(${LABEL_NAME_PX / 2}px,`);
-				expect(top).not.toContain(`${expandedHalf}px`);
-			}
+		// ⛔ THE HERO NOW TAKES THE TALLER FLOOR TOO, AND THAT PAIRING IS THE POINT
+		// RATHER THAN A CONSEQUENCE. Its label grew a second line at CHART-6; a mode
+		// that gained the value line while keeping the 5px floor would push its two
+		// labels only 10px apart around a 28px box, so they would OVERLAP across the
+		// 46–54 % band — where every market rests. That is why the component reads
+		// one `hasFullYScale` for the value and the floor rather than two `mode ===`
+		// tests that can be updated one at a time.
+		for (const top of topsOf("hero")) {
+			expect(top).toContain(`clamp(${expandedHalf}px,`);
+			expect(top).toContain(`calc(100% - ${expandedHalf}px)`);
+		}
+		// MUST REJECT: the wider threshold leaking onto the one-line collapsed card.
+		for (const top of topsOf("collapsed")) {
+			expect(top).toContain(`clamp(${LABEL_NAME_PX / 2}px,`);
+			expect(top).not.toContain(`${expandedHalf}px`);
 		}
 	});
 

@@ -66,24 +66,60 @@ export type Gridline = { readonly pct: number; readonly y: number };
  * there is no code path that could accidentally close over a data value, because
  * these arrays exist before any data does.
  *
- * ⚠ THE THREE SETS DIFFER BECAUSE THE THREE BOXES DO, not because the data does.
- * The collapsed card is 164 px tall, so eleven lines in it would be ~15 px apart
- * and read as hatching rather than as a scale; it gets the quarters. The
- * expanded overlay is ~418 px tall and can carry every 10 %. The Discovery hero
- * is ~96 px tall and gets NONE — at that height even four lines compete with the
- * series for the same pixels, and the hero exists to show shape, not value.
+ * ⚠ THE SETS DIFFER BECAUSE THE BOXES DO, not because the data does. The
+ * collapsed card is 194 px tall, so eleven lines in it would be ~18 px apart and
+ * read as hatching rather than as a scale; it gets the quarters.
+ *
+ * ⛔⛔ THE HERO TOOK THE EMPTY SET UNTIL CHART-6, ON A FIGURE THAT WAS WRONG BY A
+ * FACTOR OF FOUR. This docblock said *"The Discovery hero is ~96 px tall and gets
+ * NONE — at that height even four lines compete with the series for the same
+ * pixels"*. **Measured on the shipped build at 1440: the hero's chart box is
+ * 418.75 px, and the expanded overlay it was being contrasted against is
+ * 382.25 px. The hero is 36.5 px TALLER than the overlay.** Where 96 came from is
+ * worth knowing, because it is a live trap: `HeroPanels` mounts the chart in
+ * `min-h-24 flex-1`, and `min-h-24` is 6rem = 96 px — a FLOOR, not a height.
+ * HTML-FINISH row 9 changed `h-24` to `min-h-24 flex-1` precisely so the graph
+ * would grow with its panel, and CHART-5 read the floor as the box.
+ *
+ * ⇒ The hero and the overlay share ONE set (founder ruling, CHART-6): both are
+ * full panels and both carry every 10 %. Two names for one array would be two
+ * places for them to drift apart, so there is one — and the collapsed card's
+ * quarters stay separate, because its box genuinely is short.
  */
 const GRIDLINES_COLLAPSED: readonly Gridline[] = Object.freeze(
 	[25, 50, 75, 100].map((pct) => Object.freeze({ pct, y: yPctPx(pct) })),
 );
 
-const GRIDLINES_EXPANDED: readonly Gridline[] = Object.freeze(
+const GRIDLINES_TEN_STEP: readonly Gridline[] = Object.freeze(
 	Array.from({ length: 11 }, (_, i) => i * 10).map((pct) =>
 		Object.freeze({ pct, y: yPctPx(pct) }),
 	),
 );
 
-const GRIDLINES_HERO: readonly Gridline[] = Object.freeze([]);
+/**
+ * Whether a mode carries the FULL Y-scale treatment — the 10-step gridlines, the
+ * numeric marks column, and the percentage beneath the end label's name.
+ *
+ * ⛔ ONE PREDICATE FOR ALL THREE, BECAUSE THE RULING IS ONE RULING. RF-4 gives the
+ * hero *"what expanded has"* as a bundle, and three independent `mode ===
+ * "expanded"` comparisons are three places for a fourth surface — or this very
+ * amendment — to reach only some of them. The label's half-box in particular
+ * composes from whether the value line renders, so a mode that gained the value
+ * and not the taller collision floor would overlap its own labels in the band
+ * where every market rests.
+ *
+ * ⚠ WRITTEN AS A NEGATION OF `collapsed`, NOT A LIST OF THE OTHER TWO, and that
+ * is the direction that survives a fourth surface: a new mode joins the full
+ * treatment by default and is corrected deliberately, rather than silently
+ * shipping with no scale at all — which is the failure `gridlinesFor`'s exhaustive
+ * switch was added to catch and this predicate would otherwise reintroduce.
+ * `gridlinesFor` keeps its own switch regardless; the two are tied together by an
+ * assertion in `tests/unit/debate/render/y-scale.test.tsx` rather than by one
+ * calling the other, so neither can quietly stop agreeing.
+ */
+export function hasFullYScale(mode: ChartMode): boolean {
+	return mode !== "collapsed";
+}
 
 /**
  * The gridline set for a mode. A pure lookup — see the docblock above for why it
@@ -98,11 +134,15 @@ const GRIDLINES_HERO: readonly Gridline[] = Object.freeze([]);
 export function gridlinesFor(mode: ChartMode): readonly Gridline[] {
 	switch (mode) {
 		case "expanded":
-			return GRIDLINES_EXPANDED;
+			return GRIDLINES_TEN_STEP;
 		case "collapsed":
 			return GRIDLINES_COLLAPSED;
 		case "hero":
-			return GRIDLINES_HERO;
+			// CHART-6, founder ruling: the same set as the overlay. The hero's box was
+			// believed to be ~96px and measures 418.75px — taller than the overlay's
+			// 382.25px — so the ground the empty set stood on was a mis-read layout
+			// floor rather than a design constraint. See the sets' own docblock.
+			return GRIDLINES_TEN_STEP;
 		default: {
 			// ⛔ EXHAUSTIVE BY COMPILE ERROR, NOT BY FALLING THROUGH. The first
 			// version ended `return GRIDLINES_HERO` after two `if`s, so a FOURTH

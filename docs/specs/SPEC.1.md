@@ -1458,6 +1458,7 @@ Flat list. Each entry: **test name → spec section it covers → invariants enf
 | `discovery::hero-top-post-per-side-by-top-ranking` | §22 F-DISC-2 | — |
 | `discovery::hero-masks-track-b-hidden-from-public` | §22 F-DISC-2 | — |
 | `discovery::hero-single-market-static` | §22 F-DISC-2 | — |
+| `discovery::hero-chart-carries-y-scale` | §22, canon C-CHART-1 | — |
 | `profile::route-pseudonym-resolves` | §23 F-PROF-1 | ADR-0016 |
 | `profile::unknown-pseudonym-404` | §23 F-PROF-1 | ADR-0016 |
 | `profile::scrubbed-pseudonym-resolves-placeholder` | §23 F-PROF-1 | — |
