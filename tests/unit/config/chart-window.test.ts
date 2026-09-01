@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { VIEWBOX_W, xPx } from "@/components/debate/chart/geometry";
 import {
 	MARKET_CHART_WINDOW_END,
 	MARKET_CHART_WINDOW_START,
@@ -85,9 +86,13 @@ describe("chart-window::staging and preview share the fixture window", () => {
 		// the staging database. Given production's window a preview chart would
 		// render as a line crushed against the left edge — broken-looking in the
 		// exact surface used to review a chart change.
-		const STG_START = "2026-08-21T00:00:00.000Z";
+		// ⚠ CHART-6 — was 2026-08-21T00:00Z, measured from the earliest `bet.placed`.
+		// CHART-4's backfilled `market.opened` seeds are four days earlier, and the
+		// series starts from that seed, so the old value clipped the genesis point
+		// of all eight markets. Now the earliest event of ANY type, floored.
+		const STG_START = "2026-08-17T00:00:00.000Z";
 		// ⚠ CHART-4 D11 — was 2026-09-10T23:45Z, now production's own end. The
-		// start is still staging's (measured from its earliest bet), so the two
+		// start is still staging's (measured from its own data), so the two
 		// windows share an end and differ only in where they begin.
 		const STG_END = "2026-11-05T23:45:00.000Z";
 
@@ -194,17 +199,163 @@ describe("chart-window::staging and preview share the fixture window", () => {
 		).toBeLessThan(stagingEnd);
 	});
 
-	it("starts no later than staging's earliest measured bet, so no real data is clipped", () => {
-		// ⛔ MEASURED, NOT CHOSEN. The earliest `bet.placed` across staging's whole
-		// slate at CHART-3 was 2026-08-21T05:29:29.430Z. A window that began after
-		// it would push real bets off the left of the canvas and report nothing —
-		// the failure is silent, which is why it is asserted here.
-		const EARLIEST_MEASURED_BET = Date.parse("2026-08-21T05:29:29.430Z");
-		const LATEST_MEASURED_BET = Date.parse("2026-08-29T16:26:57.144Z");
+	it("starts no later than staging's earliest measured EVENT, so no real data is clipped", () => {
+		// ⛔ MEASURED, NOT CHOSEN — AND THE QUANTITY MEASURED CHANGED AT CHART-6.
+		// This asserted the earliest `bet.placed` (2026-08-21T05:29:29.430Z, read at
+		// CHART-3) and passed every day for two weeks while the genesis point of all
+		// eight markets sat OUTSIDE the window. `replayReserveSeries` walks from the
+		// `market.opened` seed, and CHART-4 backfilled those seeds four days earlier
+		// than the first bet — so the guard was measuring one of the three event
+		// types the chart renders and reporting on all of them.
+		//
+		// ⇒ The floor is now the earliest event of ANY type on the slate, read
+		// 2026-09-01 against the live staging database:
+		//   earliest  2026-08-17T20:55:20.712Z  (market.opened, mumbai-bmc-…)
+		//   latest    2026-09-01T07:30:30.139Z  (image_upload.sign_requested)
+		const EARLIEST_MEASURED_EVENT = Date.parse("2026-08-17T20:55:20.712Z");
+		const LATEST_MEASURED_EVENT = Date.parse("2026-09-01T07:30:30.139Z");
 		const w = resolveChartWindow("staging");
 
-		expect(Date.parse(w.start)).toBeLessThanOrEqual(EARLIEST_MEASURED_BET);
-		expect(Date.parse(w.end)).toBeGreaterThanOrEqual(LATEST_MEASURED_BET);
+		expect(Date.parse(w.start)).toBeLessThanOrEqual(EARLIEST_MEASURED_EVENT);
+		expect(Date.parse(w.end)).toBeGreaterThanOrEqual(LATEST_MEASURED_EVENT);
+	});
+});
+
+describe("chart-window::the window CONTAINS ITS DATA — RF-5, against the real constants", () => {
+	// ⭐ THE GUARD THAT WOULD HAVE CAUGHT CHART-6's DEFECT, and the reason it is
+	// worth its lines is the reason it did not exist: nothing in a 4 249-test suite
+	// compared the window to the data. The failure was silent on eight markets
+	// across two environments for two weeks and was found by a founder looking at a
+	// screen.
+	//
+	// ⛔ IT ASSERTS THE RENDERED COORDINATE, NOT THE INSTANT. `xPx` is deliberately
+	// unclamped in both directions, so an instant outside the window maps outside
+	// `0 … VIEWBOX_W` and is cut by the viewBox — which is what "clipped" means
+	// here. Comparing two ISO strings would prove the arithmetic; running the real
+	// projection proves the picture.
+	//
+	// ⛔ AND IT USES `resolveChartWindow`, NEVER A FIXTURE WINDOW. A guard written
+	// against a made-up start and end is green against any constants at all, which
+	// is precisely how this defect survived: the render guards derive from the
+	// constants and therefore followed the wrong value without a word.
+
+	/** The genesis instant of every staging market: the `market.opened` seed
+	 * `replayReserveSeries` starts its walk from, which CHART-4 backfilled as the
+	 * pool's own `created_at`. Verified equal (to the millisecond) against the live
+	 * database on 2026-09-01. */
+	function stagingGenesisInstants(): { slug: string; at: string }[] {
+		const snap: {
+			markets: { id: string; slug: string }[];
+			pools: { market_id: string; created_at: string }[];
+		} = JSON.parse(
+			readFileSync(
+				join(REPO_ROOT, "docs/data/staging-markets-snapshot.json"),
+				"utf8",
+			),
+		);
+		const slugOf = new Map(snap.markets.map((m) => [m.id, m.slug]));
+		return snap.pools.map((p) => ({
+			slug: slugOf.get(p.market_id) ?? p.market_id,
+			at: p.created_at,
+		}));
+	}
+
+	it("places every staging market's GENESIS point inside the plot — the CHART-6 defect", () => {
+		const genesis = stagingGenesisInstants();
+
+		// Non-vacuity: eight markets, eight parseable instants. An empty read would
+		// satisfy the loop below while looking at nothing — the failure mode the
+		// deadline guard above has already been bitten by once.
+		expect(genesis.length).toBe(8);
+		expect(genesis.every((g) => !Number.isNaN(Date.parse(g.at)))).toBe(true);
+
+		const w = resolveChartWindow("staging");
+		const startMs = Date.parse(w.start);
+		const endMs = Date.parse(w.end);
+
+		for (const g of genesis) {
+			const x = xPx(g.at, startMs, endMs);
+			expect(
+				x,
+				`${g.slug} genesis ${g.at} maps to x=${x}, LEFT of the plot — its opening price is clipped`,
+			).toBeGreaterThanOrEqual(0);
+			expect(
+				x,
+				`${g.slug} genesis ${g.at} maps to x=${x}, RIGHT of the plot`,
+			).toBeLessThanOrEqual(VIEWBOX_W);
+		}
+	});
+
+	it("REDS on the pre-CHART-6 staging start — the control that proves the guard can fire", () => {
+		// ⛔ OVN-V2 IN THE FILE RATHER THAN IN A REPORT. The assertion above is
+		// written against code that is now correct, so on its own it has never seen
+		// the defect and could be asserting something unrelated. This restores the
+		// exact superseded constant and requires the SAME projection to reject it.
+		//
+		// ⚠ It pins the DEFECT, not the fix, so it does not go stale when the
+		// staging window moves again — which it will, the next time the fixtures do.
+		const SUPERSEDED_START = Date.parse("2026-08-21T00:00:00.000Z");
+		const endMs = Date.parse(resolveChartWindow("staging").end);
+
+		const clipped = stagingGenesisInstants().filter(
+			(g) => xPx(g.at, SUPERSEDED_START, endMs) < 0,
+		);
+		expect(
+			clipped.length,
+			"the superseded window must clip all eight genesis points; if it does not, this guard is measuring the wrong quantity",
+		).toBe(8);
+	});
+
+	it("places every ratified market's resolution deadline inside the PRODUCTION plot", () => {
+		// The right-hand half of the same rule, on the environment whose window is
+		// load-bearing. The staging arm above covers the left edge; the deadlines
+		// cover the right, and `oktoberfest-munich-beer-volume`'s 2026-10-04 deadline
+		// makes that a real case rather than a boundary one.
+		const snap: { markets: { slug: string; resolution_deadline: string }[] } =
+			JSON.parse(
+				readFileSync(
+					join(REPO_ROOT, "docs/data/staging-markets-snapshot.json"),
+					"utf8",
+				),
+			);
+		expect(snap.markets.length).toBe(8);
+
+		const w = resolveChartWindow("prod");
+		const startMs = Date.parse(w.start);
+		const endMs = Date.parse(w.end);
+		for (const m of snap.markets) {
+			const x = xPx(m.resolution_deadline, startMs, endMs);
+			expect(
+				x,
+				`${m.slug} deadline ${m.resolution_deadline} maps to x=${x}, outside the production plot`,
+			).toBeLessThanOrEqual(VIEWBOX_W);
+			expect(x).toBeGreaterThanOrEqual(0);
+		}
+	});
+
+	it("states the production START's precondition, and what breaks when it is not met", () => {
+		// ⛔ D10 IS CLOSED OPERATIONALLY, NOT BY MOVING THE CONSTANT (CHART-6,
+		// founder ruling). Production's start is the experiment's opening instant and
+		// is correct PROVIDED the markets are seeded on 15 September. A market opened
+		// during the run-up emits `market.opened` before the axis begins, and this
+		// arithmetic is what happens to it: exactly the staging failure, in
+		// production, on the surface where stake is committed.
+		//
+		// This is a mechanism, not prose in a docblock: it fails if anyone "fixes"
+		// the clip by clamping `xPx`, which is the wrong repair and is rejected in
+		// three other places in writing.
+		const w = resolveChartWindow("prod");
+		const startMs = Date.parse(w.start);
+		const endMs = Date.parse(w.end);
+
+		const openedInTheRunUp = "2026-09-14T18:30:00.000Z";
+		expect(
+			xPx(openedInTheRunUp, startMs, endMs),
+			"a market opened before the axis begins must map to a NEGATIVE x; if this is 0 the geometry has been clamped, which draws a price at an instant it did not happen",
+		).toBeLessThan(0);
+
+		const seededOnLaunchDay = w.start;
+		expect(xPx(seededOnLaunchDay, startMs, endMs)).toBe(0);
 	});
 });
 

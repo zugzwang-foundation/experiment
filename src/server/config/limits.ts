@@ -252,6 +252,26 @@ export type ChartWindow = { readonly start: string; readonly end: string };
  * shared by all eight markets, and the same instant is trading close and
  * settlement. A 23:59 axis would run fifteen minutes past the last instant at
  * which anything can happen.
+ *
+ * ⛔ `start` IS CORRECT ONLY IF THE MARKETS ARE SEEDED ON 15 SEPTEMBER, and that
+ * condition is written here rather than assumed because it is the whole of what
+ * makes this value right (CHART-6, founder ruling — D10 closed OPERATIONALLY,
+ * not by moving the constant). `market.opened` is emitted at Draft → Open, so a
+ * market opened during the run-up carries a genesis instant BEFORE this axis
+ * begins — and `xPx` is deliberately unclamped in both directions, so that point
+ * maps to a negative x and is cut by the viewBox. **Seed on launch day, or move
+ * this constant.**
+ *
+ * ⚠ THAT IS NOT HYPOTHETICAL — IT IS WHAT HAPPENED ON STAGING, ON ALL EIGHT
+ * MARKETS, FOR TWO WEEKS. The staging window began 21 August against a slate
+ * whose genesis instants are all 17 August, so the opening price of every market
+ * was clipped off the left edge with nothing raised: the chart still rendered, the
+ * suite stayed green, and the symptom the founder eventually saw was not a missing
+ * point but the LABELS, stranded at the far right beside a line crushed into the
+ * leftmost sixth of the plot. A window that does not contain its data clips it
+ * **silently**; the guard added at CHART-6 asserts containment against these real
+ * constants, because a guard written against a fixture window would have passed
+ * every day of those two weeks.
  */
 const PRODUCTION_CHART_WINDOW: ChartWindow = {
 	start: "2026-09-15T00:00:00.000Z",
@@ -259,12 +279,35 @@ const PRODUCTION_CHART_WINDOW: ChartWindow = {
 };
 
 /**
- * ⚠ `start` is MEASURED, not chosen: the earliest `bet.placed` across staging's
- * whole slate is `2026-08-21T05:29:29.430Z` (on `github-zugzwang-repo-stars`),
- * floored to its UTC day. Read at CHART-3 against the live staging database,
- * because a window narrower than the data silently clips real bets off the
- * canvas and nothing reports it. The latest `bet.placed` at that reading was
- * `2026-08-29T16:26:57.144Z`, comfortably inside `end`.
+ * ⚠ `start` is MEASURED, not chosen: the earliest event of ANY type across
+ * staging's whole slate is `2026-08-17T20:55:20.712Z`, floored to its UTC day.
+ * Read at CHART-6 against the live staging database, because a window narrower
+ * than the data silently clips real points off the canvas and nothing reports it.
+ * The latest event at that reading was `2026-09-01T07:30:30.139Z`, comfortably
+ * inside `end`.
+ *
+ * ⛔ IT WAS `2026-08-21T00:00:00.000Z` UNTIL CHART-6, AND THAT VALUE WAS CLIPPING
+ * THE GENESIS POINT OF ALL EIGHT MARKETS. The measurement CHART-3 took was of the
+ * earliest **`bet.placed`** — `2026-08-21T05:29:29.430Z` on
+ * `github-zugzwang-repo-stars` — which was the right instant for the series
+ * CHART-3 could see. CHART-4 then backfilled a `market.opened` row per market
+ * carrying that market's `pools.created_at`, four days EARLIER, and the walk
+ * `replayReserveSeries` performs starts from exactly that seed. So the first
+ * point of every staging chart moved outside a window nobody re-measured.
+ *
+ * ⚠ THE LESSON IS THE PREDICATE, NOT THE DATE. The floor is the earliest event
+ * the chart can RENDER, which is the earliest of `market.opened` · `bet.placed` ·
+ * `bet.sold` — and a measurement scoped to one of the three is a measurement of
+ * the wrong quantity that looks exactly like the right one. Measured 2026-09-01,
+ * both floors land on the same instant only because `market.opened` is now the
+ * earliest; the all-types floor is taken deliberately so it stays true if a
+ * fourth event type ever joins the walk.
+ *
+ * ⚠ The eight backfilled `market.opened` rows carry their pool's `created_at`
+ * FLOORED TO THE MILLISECOND (measured Δ −59 … −923 µs), because the backfill
+ * bound the value through a JS `Date`. Recorded so a later reader comparing
+ * `events.created_at` to `pools.created_at` for equality finds them unequal and
+ * does not read that as a defect.
  *
  * ⛔ `end` USED TO EXPIRE ON 2026-09-10, AND THE CONSEQUENCE WAS LARGER THAN
  * "THE LINE LOOKS SHORT". After that instant `withLiveTail` appends a point at
@@ -300,7 +343,7 @@ const PRODUCTION_CHART_WINDOW: ChartWindow = {
  * there. A reader arriving in November needs the mechanism, not just the date.
  */
 const STAGING_CHART_WINDOW: ChartWindow = {
-	start: "2026-08-21T00:00:00.000Z",
+	start: "2026-08-17T00:00:00.000Z",
 	end: "2026-11-05T23:45:00.000Z",
 };
 
