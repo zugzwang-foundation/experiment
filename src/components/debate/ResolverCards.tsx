@@ -338,15 +338,34 @@ function ResolutionBlock({
 			    content height directly. Two-line blocks (label + value + subvalue,
 			    ≤ ~64px) were already text-bound before this change and stay text-bound
 			    after it; 36px still clears the label alone (14.25px) with room for
-			    `items-center` to look intentional rather than starved. `shrink-0` so a
-			    narrow block squeezes the TEXT, never the square. Still `aria-hidden` —
-			    decorative, and (BLOCK-1) that is also what keeps it out of the RESOLVER
-			    anchor's accessible name; there is no `<img>` here to carry an `alt=""`,
-			    so `aria-hidden` is the equivalent that actually applies to a `<span>`. */}
+			    `items-center` to look intentional rather than starved.
+			    ⚠⚠ BLOCK-3 §2 · A SECOND FIX, FOUND BY MEASURING §1's ROW WIDTH AGAINST
+			    REAL §3 CONTENT RATHER THAN AGAINST EMPTY PLACEHOLDER BARS — `hidden
+			    sm:block` IS NEW. `grid-cols-4` (R-7, unconditional) divides whatever
+			    width `headzone-stack` gets, and below `lg` that width is `2/3` of the
+			    reading column (`MarketMediaPanel.tsx`'s `w-1/3`) — 206.67px at
+			    1440-pinned 390-WIDE measurement (the iframe measures the actual
+			    viewport, not a literal 390 in a 1440 shell), 45.67px per block. A
+			    36px glyph plus `px-[11px]` padding (22px) is 58px — MORE than the
+			    45.67px block has BEFORE the text gets anything — and `shrink-0`
+			    (kept, see below) forces the square to take its 36px regardless,
+			    driving the text stack's available width to exactly 0. MEASURED: every
+			    value and every label read `scrollWidth > clientWidth` — not merely
+			    truncated, invisible, at 390×844. `hidden sm:block` removes the square
+			    below the 640px breakpoint where this stops being survivable, giving
+			    the text stack the block's FULL content width instead of block-minus-58.
+			    ⚠ THE CLAIM ONE PARAGRAPH UP — "shrink-0 so a narrow block squeezes the
+			    TEXT, never the square" — is now true only AT OR ABOVE `sm`; below it,
+			    the square is the thing that gives, which is the correction this
+			    paragraph exists to make rather than leave standing next to code that
+			    contradicts it. Still `aria-hidden` — decorative, and (BLOCK-1) that is
+			    also what keeps it out of the RESOLVER anchor's accessible name; there
+			    is no `<img>` here to carry an `alt=""`, so `aria-hidden` is the
+			    equivalent that actually applies to a `<span>`. */}
 			<span
 				aria-hidden="true"
 				data-testid={`resolution-block-glyph-${blockKey}`}
-				className="aspect-square w-[36px] shrink-0 rounded-[var(--imgr)] bg-n1 [border:var(--hairline)]"
+				className="hidden aspect-square w-[36px] shrink-0 rounded-[var(--imgr)] bg-n1 [border:var(--hairline)] sm:block"
 			/>
 			{/* The right-hand stack, centred as a GROUP against the square rather than
 			    each line centring itself.

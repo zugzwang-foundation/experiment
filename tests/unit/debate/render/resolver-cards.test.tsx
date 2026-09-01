@@ -190,6 +190,13 @@ describe("RESO-1/BLOCK-1 — R-7, four blocks from one fixture, geometry unchang
 			// The glyph stays decorative — unchanged by RESOLVER becoming a link
 			// (RF-3a: it must contribute nothing to the anchor's accessible name).
 			expect(glyph?.getAttribute("aria-hidden")).toBe("true");
+			// ⚠⚠ BLOCK-3 §2 — hidden below `sm`, visible at/above it. MEASURED at
+			// 390×844: a 36px glyph plus this block's own padding already exceeds
+			// the block's total width at that breakpoint, driving the text column
+			// to 0px — invisible, not merely truncated. `ResolverCards.tsx`'s own
+			// docblock on this span has the full arithmetic.
+			expect(gc.split(/\s+/)).toContain("hidden");
+			expect(gc.split(/\s+/)).toContain("sm:block");
 		}
 	});
 
