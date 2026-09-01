@@ -650,13 +650,34 @@ function TerminalLabels({
 				    This invisible copy is laid out by the browser in the real shipped
 				    face, so the gutter is exactly as wide as the widest label actually
 				    is — on every device, with no number to go stale.
-				    ⚠ IT SIZES ON THE NAME ALONE EVEN WHEN A VALUE IS STACKED BENEATH IT,
-				    and that is correct rather than an oversight: the value is at most
-				    four characters (`100%`) of TABULAR digits at 16px, and `YES` at 10px
-				    bold with 0.1em tracking is the wider of the two. If that ever stops
-				    holding the sizer is what must change — not a number somewhere else. */}
+				    ⛔ IT CARRIES THE VALUE LINE TOO, AND THE FIRST VERSION OF THIS DID NOT.
+				    That version's docblock asserted that `YES` at 10px bold with 0.1em
+				    tracking is wider than four tabular digits at 16px, so the name alone
+				    could size the gutter. MEASURED IN THE CONTACT SHEET, IN THE SHIPPED
+				    FACE, THAT IS FALSE: the gutter came out **27.15px**, the rendered
+				    `99%` **33.56px** — overflowing by 11.41px — and `100%` measures
+				    **42.47px**, which would overflow by ~20. The stacked value hung
+				    outside its own gutter on every overlay above 9 %.
+				    ⚠ THE FIX IS THE MECHANISM, NOT A NUMBER: the sizer now contains the
+				    WIDEST LABEL THAT CAN OCCUR — the name, and beneath it `100%` in the
+				    value's own type — so the browser measures the real worst case in the
+				    real face. Adding a `w-[42px]` instead would have re-minted exactly the
+				    hand-measured constant CHART-2 deleted, one release after deleting it.
+				    The literal `100%` is the widest string the value can take: percentages
+				    are whole (SPEC.1 §10.8) and bounded at 100. */}
 			<span aria-hidden="true" className="invisible block">
-				YES
+				<span className="block">YES</span>
+				{showValue && (
+					<span
+						className="block tracking-normal tabular-nums"
+						style={{
+							fontSize: `${LABEL_VALUE_PX}px`,
+							marginTop: `${LABEL_STACK_GAP_PX}px`,
+						}}
+					>
+						100%
+					</span>
+				)}
 			</span>
 			<span
 				data-testid="terminal-label-no"

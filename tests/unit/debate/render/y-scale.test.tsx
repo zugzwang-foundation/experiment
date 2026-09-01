@@ -5,6 +5,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
 	gridlinesFor,
+	labelTopPct,
+	SVG_W,
 	VIEWBOX_H,
 	VIEWBOX_W,
 } from "@/components/debate/chart/geometry";
@@ -22,6 +24,16 @@ import type { PricePoint } from "@/server/discovery/price-series";
 // mode, in what order, bound to which token, carrying which arithmetic. That
 // split is `alignment-chain.test.tsx`'s and is followed deliberately rather than
 // reinvented.
+
+// The three type values the end label's box is composed from. Mirrored from
+// `MarketPriceChart.tsx` deliberately rather than exported: a guard that imported
+// the constants it checks would agree with the component by construction, which
+// is the "comparing a value to itself" failure this file exists to avoid. If
+// these drift from the component the composed assertions below go red, which is
+// the intended signal.
+const LABEL_NAME_PX = 10;
+const LABEL_VALUE_PX = 16;
+const LABEL_STACK_GAP_PX = 2;
 
 const D = (n: number) => n.toFixed(18);
 
@@ -76,9 +88,16 @@ describe("C-CHART-1 clause 1 (CHART-5) — the gridline set is a pure function o
 	it("the set does not move when the DATA moves", () => {
 		// The whole clause: a gridline marks a position on a fixed scale, so two
 		// markets at opposite extremes must produce byte-identical grid markup.
-		const grid = (m: string) =>
-			m.slice(m.indexOf('<g data-testid="chart-gridlines"'), m.indexOf("</g>"));
-		expect(grid(markup("expanded", 0.01))).toBe(grid(markup("expanded", 0.99)));
+		const grid = (m: string) => {
+			const st = m.indexOf('<g data-testid="chart-gridlines"');
+			return st < 0 ? "" : m.slice(st, m.indexOf("</g>", st) + 4);
+		};
+		const a = grid(markup("expanded", 0.01));
+		const b = grid(markup("expanded", 0.99));
+		// NON-VACUITY: with the group absent both slices are `""` and `"" === ""`
+		// passes. The equality below proves nothing without this line.
+		expect(a.length).toBeGreaterThan(0);
+		expect(a).toBe(b);
 	});
 
 	it("renders exactly the mode's set, and the hero renders no group at all", () => {
@@ -116,7 +135,10 @@ describe("C-CHART-1 clause 1 (CHART-5) — the gridline set is a pure function o
 		// ran to SVG_W would underline the dot allowance, which is not plot.
 		const m = markup("expanded");
 		expect(m).toContain(`x2="${VIEWBOX_W}"`);
-		expect(m).not.toContain(`x2="${VIEWBOX_W + 9}"`);
+		// Derived, not literal: `TERMINAL_DOT_ALLOWANCE` is computed from the pulse
+		// peak, so a hard-coded `VIEWBOX_W + 9` would silently stop naming the
+		// viewBox the moment that peak moved (`O-8`, one unit over).
+		expect(m).not.toContain(`x2="${SVG_W}"`);
 	});
 });
 
@@ -213,9 +235,29 @@ describe("C-CHART-1 clause 1 (CHART-5) — numeric marks are EXPANDED-ONLY", () 
 		expect((gutter?.getAttribute("class") ?? "").split(/\s+/)).toContain(
 			"relative",
 		);
+		// The sizer is still the gutter's DIRECT in-flow child and still leads with
+		// the name; since the MED-7 fix it also carries the widest value beneath,
+		// so this asserts the structure rather than the flattened string — which is
+		// what `textContent` equality was really standing in for.
+		const sizer = gutter?.querySelector(':scope > span[aria-hidden="true"]');
+		expect(sizer).not.toBeNull();
+		const blocks = [...(sizer?.querySelectorAll(":scope > span") ?? [])].map(
+			(x) => x.textContent,
+		);
+		expect(blocks).toEqual(["YES", "100%"]);
+		// …and on a one-line mode it is the name alone.
+		const { container: c2 } = render(
+			<MarketPriceChart series={series(0.65)} mode="collapsed" isOpen={true} />,
+		);
 		expect(
-			gutter?.querySelector(':scope > span[aria-hidden="true"]')?.textContent,
-		).toBe("YES");
+			[
+				...(c2
+					.querySelector(
+						'[data-testid="terminal-label-gutter"] > span[aria-hidden="true"]',
+					)
+					?.querySelectorAll(":scope > span") ?? []),
+			].map((x) => x.textContent),
+		).toEqual(["YES"]);
 	});
 });
 
@@ -225,16 +267,37 @@ describe("C-CHART-2 clause 2 (CHART-5) — the end value can never disagree with
 	// 53 % / 47 %, and under independent per-side half-up rounding it renders
 	// 53 % / 48 % — a pair summing to 101 %. Any fixture away from a tie passes
 	// under both rules and proves nothing about which one shipped.
-	const cases: { label: string; yes: string }[] = [
-		{ label: "tie — the 101 % case", yes: D(0.525) },
-		{ label: "ordinary", yes: D(0.65) },
-		{ label: "extreme", yes: D(0.99) },
-		{ label: "even", yes: D(0.5) },
+	// ⛔ LITERAL 18-dp STRINGS, NEVER `toFixed` OF A JS FLOAT — and this correction
+	// is the difference between a discriminating control and a decorative one.
+	// `(0.525).toFixed(18)` is `"0.525000000000000022"` and its complement is
+	// `"0.474999999999999978"`, whose third decimal is a **4**. The float
+	// round-trip DESTROYS the exact `.xx5`, so the fixture could not produce the
+	// 101 % pair it was written to catch: measured, a chart deriving NO by exact
+	// decimal complement plus independent half-up rounding stayed GREEN against
+	// it, and only reddened against the literal below. Caught by `@test-writer`.
+	// The same literal form is already used at `price-percent-pair.test.tsx:29`.
+	const cases: { label: string; yes: string; no: string }[] = [
+		{
+			label: "tie — the exact .xx5, where independent rounding prints 101 %",
+			yes: "0.525000000000000000",
+			no: "0.475000000000000000",
+		},
+		{
+			label: "ordinary",
+			yes: "0.650000000000000000",
+			no: "0.350000000000000000",
+		},
+		{
+			label: "extreme",
+			yes: "0.990000000000000000",
+			no: "0.010000000000000000",
+		},
+		{ label: "even", yes: "0.500000000000000000", no: "0.500000000000000000" },
 	];
 
 	for (const c of cases) {
 		it(`${c.label}: the overlay's value equals the bar's, both READ FROM THE DOM`, () => {
-			const pricing = { yes: c.yes, no: D(1 - Number(c.yes)) };
+			const pricing = { yes: c.yes, no: c.no };
 
 			// ⚠ TWO SEPARATE RENDERS, TWO SEPARATE DOM READS. Comparing a value to
 			// itself — asserting the chart's number against `formatPricePercent`
@@ -326,17 +389,39 @@ describe("C-CHART-2 clause 4 (CHART-5) — one collision rule, two measured inpu
 		// from "the runner cannot represent it", and the inverse form
 		// (`not.toContain`) would PASS against a component that emits no style at
 		// all. `renderToStaticMarkup` serialises the string React actually ships.
-		const topOf = (mode: "collapsed" | "expanded" | "hero") => {
+		// ⛔ THE `style` ATTRIBUTE ALONE, AND BOTH LABELS. The first version sliced
+		// the whole opening tag and asserted `toContain("5px")` — which the class
+		// `left-[5px]` satisfies, so a label with NO vertical positioning at all
+		// passed. And it read only `terminal-label-yes`, which at a 0.5 fixture is
+		// always the UPPER one, so `lowerTop` was never observed: giving the lower
+		// label the one-line floor while the upper kept 14 stayed green, an
+		// asymmetric rule that overlaps exactly at the midline where every market
+		// rests. Both caught by `@test-writer`.
+		const topsOf = (mode: "collapsed" | "expanded" | "hero") => {
 			const m = markup(mode, 0.5);
-			const at = m.indexOf('data-testid="terminal-label-yes"');
-			return m.slice(at, m.indexOf(">", at));
+			return (["yes", "no"] as const).map((side) => {
+				const re = new RegExp(
+					`terminal-label-${side}"[^>]*style="top:([^"]*)"`,
+				);
+				const hit = m.match(re);
+				expect(hit, `${mode}/${side} has no top style`).not.toBeNull();
+				return hit?.[1] ?? "";
+			});
 		};
 
-		expect(topOf("expanded")).toContain("14px");
+		// Composed, never a literal — see the sibling test for why.
+		const expandedHalf =
+			(LABEL_NAME_PX + LABEL_STACK_GAP_PX + LABEL_VALUE_PX) / 2;
+		for (const top of topsOf("expanded")) {
+			expect(top).toContain(`clamp(${expandedHalf}px,`);
+			expect(top).toContain(`calc(100% - ${expandedHalf}px)`);
+		}
 		// MUST REJECT: the overlay's wider threshold leaking onto a one-line label.
 		for (const mode of ["collapsed", "hero"] as const) {
-			expect(topOf(mode)).toContain("5px");
-			expect(topOf(mode)).not.toContain("14px");
+			for (const top of topsOf(mode)) {
+				expect(top).toContain(`clamp(${LABEL_NAME_PX / 2}px,`);
+				expect(top).not.toContain(`${expandedHalf}px`);
+			}
 		}
 	});
 
@@ -378,6 +463,131 @@ describe("C-CHART-2 clause 4 (CHART-5) — one collision rule, two measured inpu
 		// survived the render at all".
 		const lat = m.indexOf('data-testid="terminal-label-yes"');
 		expect(m.slice(lat, m.indexOf(">", lat))).toMatch(/min\(|max\(/);
+	});
+});
+
+describe("CHART-5 — a mark is BOUND to its gridline, and the column obeys the alignment contract", () => {
+	it("every numeric mark's top IS its own gridline's y", () => {
+		// ⛔ THE GUARD THIS FILE WAS MISSING, AND ITS ABSENCE LET THE SCALE RENDER
+		// UPSIDE DOWN. Pinning the mark SET, the mark STYLE SHAPE and the gridline
+		// Y VALUES separately never says that mark N and gridline N describe the
+		// same height — so `markTop(g.pct)` in place of `markTop(labelTopPct(g.y))`
+		// put 100 at the bottom and 0 at the top with the whole suite green. That
+		// is the sibling failure this file already names for the LINES ("a chart
+		// that reads every market backwards"), left open for the NUMBERS, which are
+		// the half a reader actually takes a value from. Caught by `@test-writer`.
+		const m = markup("expanded");
+		for (const g of gridlinesFor("expanded")) {
+			const at = m.indexOf(`data-testid="y-mark-${g.pct}"`);
+			expect(at, `y-mark-${g.pct} missing`).toBeGreaterThan(-1);
+			const top = m.slice(at, m.indexOf(">", at));
+			// The clamp's MIDDLE term is the gridline's own y as a percentage.
+			expect(top).toContain(`, ${labelTopPct(g.y)}%,`);
+		}
+		// …and the scale runs top-down, which is the direction that can invert.
+		const top100 = m.slice(
+			m.indexOf('data-testid="y-mark-100"'),
+			m.indexOf(">", m.indexOf('data-testid="y-mark-100"')),
+		);
+		const top0 = m.slice(
+			m.indexOf('data-testid="y-mark-0"'),
+			m.indexOf(">", m.indexOf('data-testid="y-mark-0"')),
+		);
+		expect(top100).toContain(", 0%,");
+		expect(top0).toContain(", 100%,");
+	});
+
+	it("the marks' edge floor is the ONE-LINE half box, by value", () => {
+		// Only the WORD `clamp(` was asserted before, so a wrong half-box passed —
+		// and a wrong half-box is precisely what that clamp exists to prevent: the
+		// 0 and 100 marks sit on the plot's boundaries and the gutter does not clip.
+		const m = markup("expanded");
+		const at = m.indexOf('data-testid="y-mark-100"');
+		const style = m.slice(at, m.indexOf(">", at));
+		expect(style).toContain(`clamp(${LABEL_NAME_PX / 2}px,`);
+		expect(style).toContain(`calc(100% - ${LABEL_NAME_PX / 2}px)`);
+	});
+
+	it("the marks column inherits the alignment contract — positioned, absolute, no vertical box model", () => {
+		// ⛔ A NEW FLEX CELL BESIDE THE PLOT INHERITS EVERY LINK OF `C-CHART-2`
+		// clause 2's chain, and none of them was extended to it when the column
+		// landed. Each mutation below shipped GREEN across the whole unit tree:
+		// dropping `relative` (the percentage then resolves against a positioned
+		// ancestor somewhere up the page shell — the exact defect
+		// `alignment-chain.test.tsx` was minted for), dropping `absolute` from the
+		// spans (top becomes inert and eleven numbers stack in flow), and adding
+		// vertical padding (the column stops being exactly the plot's height, so
+		// its percentages and the gridlines' resolve against different boxes).
+		const { container } = render(
+			<MarketPriceChart series={series(0.65)} mode="expanded" isOpen={true} />,
+		);
+		const col = container.querySelector('[data-testid="chart-y-marks"]');
+		expect(col).not.toBeNull();
+		const cls = (col?.getAttribute("class") ?? "").split(/\s+/);
+		expect(cls).toContain("relative");
+		// No vertical padding / margin / border — anything that would make the
+		// column a different height from the plot it annotates.
+		for (const t of cls) {
+			expect(t).not.toMatch(/^(p|m)(y|t|b)-/);
+			expect(t).not.toMatch(/^border(-(y|t|b))?(-|$)/);
+		}
+		// Every mark is absolutely positioned.
+		const marks = [...(col?.querySelectorAll("[data-pct]") ?? [])];
+		expect(marks.length).toBe(11);
+		for (const mk of marks) {
+			expect((mk.getAttribute("class") ?? "").split(/\s+/)).toContain(
+				"absolute",
+			);
+		}
+		// PINNED WIDTH, in the corrected form: the first version banned
+		// `/(^|\s)w-\[/`, which cannot see `min-w-[`, `max-w-[` or `md:w-[`.
+		// `alignment-chain.test.tsx` matches a class TOKEN against
+		// `/^(min-|max-)?w-/` and that is the form used here.
+		for (const t of cls) {
+			expect(t).not.toMatch(/^(min-|max-)?w-/);
+		}
+		// POSITIVE CONTROL — the same token matcher DOES fire on a pinned width.
+		expect("w-[22px]").toMatch(/^(min-|max-)?w-/);
+		expect("min-w-[22px]").toMatch(/^(min-|max-)?w-/);
+	});
+
+	it("the marks are hidden from the accessible tree", () => {
+		// ⛔ THE REGRESSION CHART-2 ALREADY SHIPPED ONCE, ONE COLUMN OVER. When the
+		// sibling gutter lacked this attribute the card announced "NO YES Price
+		// history: opening 50 %, current 65 %, …" — two orphan words in front of
+		// the sentence that IS the readout. These are eleven more orphan strings,
+		// outside the `aria-hidden` svg, in front of the same summary. The chart's
+		// only sanctioned accessible channel is `ChartSummary`.
+		const { container } = render(
+			<MarketPriceChart series={series(0.65)} mode="expanded" isOpen={true} />,
+		);
+		expect(
+			container
+				.querySelector('[data-testid="chart-y-marks"]')
+				?.getAttribute("aria-hidden"),
+		).toBe("true");
+	});
+
+	it("the gutter sizer measures the WIDEST label, value line included", () => {
+		// ⛔ A MEASURED PRODUCT DEFECT, NOT A STYLE NIT. The sizer carried the name
+		// alone on the reasoning that `YES` at 10px bold outruns four tabular
+		// digits at 16px. Measured in the contact sheet, in the shipped face: the
+		// gutter came out 27.15px and the rendered `99%` 33.56px — overflowing its
+		// own gutter by 11.41px, with `100%` at 42.47px. The sizer now carries the
+		// value line too, so the browser measures the real worst case.
+		const m = markup("expanded");
+		const gutAt = m.indexOf('data-testid="terminal-label-gutter"');
+		const gut = m.slice(gutAt, m.indexOf("terminal-label-no", gutAt));
+		expect(gut).toContain("100%");
+		expect(gut).toContain(`font-size:${LABEL_VALUE_PX}px`);
+		// MUST REJECT: a hand-measured width standing in for the measurement.
+		expect(gut).not.toMatch(/(^|\s)(min-|max-)?w-\[/);
+		// The collapsed card has no value line, so its sizer must NOT carry one.
+		const cm = markup("collapsed");
+		const cAt = cm.indexOf('data-testid="terminal-label-gutter"');
+		expect(cm.slice(cAt, cm.indexOf("terminal-label-no", cAt))).not.toContain(
+			"100%",
+		);
 	});
 });
 
