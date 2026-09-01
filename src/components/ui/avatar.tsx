@@ -18,6 +18,29 @@ import { cn } from "@/lib/utils";
  * The mockup's `.avatar{border-radius:50%; border:1.5px solid var(--ink)}` is
  * NOT ported by token name — the built `--avatar-ring` already carries the ring,
  * and `--color-ink` is #fafafa in this build (see C0 / plan pushback §3).
+ *
+ * ⚠ PFP-UI-1 (2026-08-26) — TWO CORRECTIONS TO THE SENTENCE ABOVE. Comment
+ * only; nothing in this component's behaviour, class strings or API moved.
+ *
+ * 1 · IT CITES ONE SOURCE FOR A RULE THAT HAS TWO, AND THEY DISAGREE. `.avatar`
+ *     is `border-radius:50%` in `surface_discovery_v1_0.html:84`, but `--imgr`
+ *     in `surface_d5_v1_0.html:437` and `surface_profile_v1_0.html:181` — the
+ *     mockup corpus is itself split, three files circle to six square. Written
+ *     against whichever was opened first, it reads as though the corpus spoke
+ *     with one voice. It did not, and a reader who checks only the cited line
+ *     will not discover that.
+ *
+ * 2 · THE REASON THE MOCKUP'S RING VALUE IS UNUSABLE IS MISSING, AND IT IS THE
+ *     LOAD-BEARING HALF. Saying `--color-ink` "is #fafafa in this build" makes
+ *     the divergence sound incidental. It is not: **#fafafa IS `--color-no`,
+ *     the NO pole** (values-log v0_3 §3). A 1.5px `--ink` ring on every avatar
+ *     would put the NO-side colour around every identity in the product,
+ *     including YES-side authors — a side signal on a surface that carries no
+ *     side. That is why the value is not portable, rather than merely
+ *     different. (Width too: 1.5px on the 16px `xs` mount is 9.4% of the
+ *     diameter.) The shape half of the mockup — the circle — is now what every
+ *     one of the eight mounts renders; it is only the ring VALUE that stays
+ *     unported, and only for this reason.
  */
 function Avatar({
 	className,

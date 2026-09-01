@@ -47,7 +47,7 @@ Recorded because a later reader will otherwise find rows that were recommended f
 
 | ID | What | Class | Verdict | Ground |
 |---|---|---|---|---|
-| **P7a-D01** | Card title → "Continue to Zugzwang" | V | **BUILD** | §4.2 B2. Tier 4 `auth-modal:313`; higher tiers silent |
+| **P7a-D01** | Card title → "Continue to Zugzwang" | V | **SUPERSEDED** → PR #408 | §4.2 B2. Tier 4 `auth-modal:313`; higher tiers silent |
 | **P7a-D02** | Google `.gmark` circular mark absent | V | **HOLD** → `AUTH-GOOGLE-MARK` | §2.1 (1) |
 | **P7a-D03** | Email entry stacked; mockup is a flex row | V | **BUILD** | §4.2 B1. Tier 4 `:154`, `:318`. Non-token layout, §6 fair game |
 | **P7a-D04** | Submit copy "Send code" → "Continue" | V | **HOLD** → `AUTH-TURNSTILE-WIRE` | §4.2 **S2**. The mockup's "Continue" advanced to a Turnstile pane that does not exist; the built control sends immediately. Porting the label would make it lie. New ground stated |
@@ -83,6 +83,12 @@ Named so a later reader sees they were considered, not missed: every modal-chrom
 
 ### D01 · Card title
 `src/app/(auth)/sign-in/page.tsx:88` → `"Continue to Zugzwang"`, matching tier-4 `auth-modal:313`. Check `tests/unit/auth/sign-in-render.test.tsx` for any assertion pinning the current string; the recon reports its DRIVER cases assert presence, not treatment — **re-verify at PR head rather than trusting that.**
+
+> **SUPERSEDED 2026-08-25 — PR #408.** The `.mhead` text heading on
+> `/sign-in` is replaced by the brand lockup (`/brand/zugzwang-mark.svg`
+> + `<Wordmark scale="card" />`). The accessible name "Zugzwang" is
+> retained as an `sr-only` `CardTitle` in the same slot. This row's copy
+> ratification no longer describes the shipped surface.
 
 ### D03 · Email entry as a flex row
 `src/app/(auth)/sign-in/page.tsx:113–129`. Baseline tier-4 `:154` — `.emailrow{display:flex;gap:9px}`.

@@ -116,6 +116,53 @@ describe("MarketMediaPanel — row 2", () => {
 		);
 	});
 
+	/**
+	 * BLOCK-3 §1/§5 — THE ENABLER'S OWN MECHANISM, PREVIOUSLY UNGUARDED. §1
+	 * fixed a real bug (the panel's `h-full w-auto` derived its width from
+	 * viewport HEIGHT, collapsing the text column to 0 and overflowing the
+	 * page by 364px at 390×844) but landed with no class-level regression
+	 * test — only the run report's browser measurements. §5 asks to verify
+	 * "390×844 page overflow is 0 AND the block row is on-screen... this is
+	 * the bug §1 exists to fix" by assertion, not report; this is that
+	 * assertion, pinned on the frame class `MarketMediaPanel.tsx`'s own
+	 * docblock explains in full.
+	 */
+	it("market-media::the-frame-derives-width-from-the-ROW-never-from-height", () => {
+		const { container } = render(
+			<MarketMediaPanel imageUrl={IMAGE} videoUrl={null} title={TITLE} />,
+		);
+		const panel = container.querySelector('[data-testid="market-media-panel"]');
+		const cls = (panel?.getAttribute("class") ?? "").split(/\s+/);
+		expect(cls).toContain("w-1/3");
+		expect(cls).toContain("self-start");
+		expect(cls).toContain("aspect-[16/9]");
+		// The two classes that CAUSED the bug, pinned gone: `h-full` derives
+		// height from the row (fine alone) but paired with `w-auto` let
+		// `aspect-[16/9]` derive WIDTH from that height instead of the other
+		// way around — a taller viewport produced a WIDER panel and a
+		// narrower text column, worst at 390×844 where it went to zero.
+		expect(cls).not.toContain("h-full");
+		expect(cls).not.toContain("w-auto");
+	});
+
+	it("market-media::the-placeholder-arm-carries-the-SAME-frame-mechanism", () => {
+		// Non-vacuity: the fix lives in a `frame` constant shared by both the
+		// real-media and placeholder branches. Asserting only the real-media
+		// arm (above) would miss a regression that re-introduced `h-full
+		// w-auto` on just the placeholder arm.
+		const { container } = render(
+			<MarketMediaPanel imageUrl={null} videoUrl={null} title={TITLE} />,
+		);
+		const panel = container.querySelector(
+			'[data-testid="market-media-placeholder"]',
+		);
+		const cls = (panel?.getAttribute("class") ?? "").split(/\s+/);
+		expect(cls).toContain("w-1/3");
+		expect(cls).toContain("self-start");
+		expect(cls).not.toContain("h-full");
+		expect(cls).not.toContain("w-auto");
+	});
+
 	it("market-media::a-video-with-no-image-still-surfaces-the-video", () => {
 		// The defensive arm. Markets always carry media (§15 F-ADMIN-1 + the
 		// `market_media_one_default_per_market_uq` backstop), so a null image is a

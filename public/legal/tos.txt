@@ -1,22 +1,189 @@
-Zugzwang Experiment — Terms of Service (PLACEHOLDER v0)
+Zugzwang Experiment — Terms of Service
 
-This is placeholder Lorem ipsum copy used during SCAFFOLD.3 development.
-The real Terms of Service text is produced by HARDEN.7 (legal review,
-mid-July 2026 per project tracker). The placeholder hash
-`placeholder-tos-v0` is recorded as acceptance evidence in users.
-tos_version_hash; the real hash replaces this when HARDEN.7 lands.
+Version 1.0 · Effective 15 September 2026
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
-tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim
-veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea
-commodo consequat. Duis aute irure dolor in reprehenderit in voluptate
-velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint
-occaecat cupidatat non proident, sunt in culpa qui officia deserunt
-mollit anim id est laborum.
+By creating an account and ticking the acceptance box, you agree to
+these Terms and to the Privacy Policy published alongside them.
 
-Sed ut perspiciatis unde omnis iste natus error sit voluptatem
-accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab
-illo inventore veritatis et quasi architecto beatae vitae dicta sunt
-explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut
-odit aut fugit, sed quia consequuntur magni dolores eos qui ratione
-voluptatem sequi nesciunt.
+
+1. What this is
+
+The Zugzwang Experiment ("the Service") is an independent,
+non-commercial research experiment run by an individual operator ("the
+Operator", "we"). It is a prediction market in which participants take
+positions on real-world questions using a fictional score, and every
+position must carry a written argument.
+
+The experiment is live from 15 September 2026 to 5 November 2026
+(23:59 UTC), after which it ends permanently: markets resolve, the
+platform stops accepting activity, and the experiment's pseudonymous
+activity record becomes part of a published open research record.
+
+Nothing on the Service involves real money. Participation is free.
+
+
+2. Eligibility
+
+You must be at least 18 years old to use the Service. One account per
+person. By creating an account you confirm both.
+
+
+3. Your identity on the Service
+
+When you sign up, you are automatically assigned a pseudonym (for
+example, "RedOwl006") and a computer-generated profile picture. Both
+are permanent: they cannot be chosen, changed, or transferred, and
+they are bound to your account for the life of the experiment. Your
+pseudonym — not your name or email — is what other participants and
+the public see.
+
+Your pseudonym is public and your activity is recorded as a permanent
+record. Distinctive patterns in your writing or betting may allow
+others to re-identify you across platforms. If anonymity from
+de-anonymisation analysis matters to you, do not use this product.
+
+Keep your account to yourself. Do not share access to it, do not
+operate more than one, and do not present your account as belonging to
+someone else.
+
+
+4. Dharma has no value
+
+The in-app score, Dharma, is a fictional number in a database. It:
+
+  — cannot be purchased, and there is no entry fee;
+  — cannot be transferred to any other person or account;
+  — cannot be sold, cashed out, redeemed, or exchanged for money or
+    anything of value;
+  — confers no rights, ownership, winnings, or claims of any kind; and
+  — is void when the experiment ends on 5 November 2026.
+
+Every participant receives the same free initial grant and the same
+free daily credit. There is no prize. The Service is offered solely
+for research, learning, and recreation.
+
+
+5. Markets and resolution
+
+Markets are questions about real-world outcomes. Every position you
+take must include a written argument — on this Service there is no
+stake without a voice, and replies to arguments are themselves
+positions.
+
+All markets resolve when the experiment concludes. The Operator is the
+sole resolver of every market: the Operator determines outcomes in
+good faith against each market's stated resolution criteria, may
+correct a resolution made in error, and may void a market that becomes
+unresolvable. The Operator's determinations are final. The Operator
+does not participate in any market.
+
+
+6. Acceptable use
+
+Use the Service lawfully and honestly. You must not post or upload
+content that:
+
+  — is illegal, or promotes or facilitates illegal activity;
+  — sexualises, endangers, or harms minors in any way — this is
+    absolutely prohibited (see section 7);
+  — harasses, threatens, or incites violence or hatred against any
+    person or group;
+  — is sexually explicit or gratuitously violent;
+  — violates another person's rights, including privacy and
+    intellectual-property rights;
+  — discloses another person's personal information without their
+    consent;
+  — impersonates any person, or misrepresents your affiliation with
+    anyone;
+  — is spam, or is posted to flood, manipulate, or degrade the
+    Service.
+
+You must not attempt to probe, disrupt, overload, or gain unauthorised
+access to the Service or its infrastructure, and you must not
+manipulate markets through coordinated or inauthentic accounts.
+
+
+7. Moderation and enforcement
+
+Content you submit is screened automatically before it is published,
+and may also be reviewed after publication. Content that violates
+section 6 may be blocked or removed, and the account responsible may
+be suspended or terminated without notice.
+
+Child sexual abuse material is treated with zero tolerance: it is
+blocked, preserved as evidence, and reported to the relevant
+authorities, and the account responsible is terminated permanently.
+
+Because Dharma has no value, no compensation is owed for any
+moderation or enforcement action.
+
+
+8. Your content and the permission you give
+
+You own what you write and upload. So that the Service can work — and
+so the research record can exist — you grant the Operator a worldwide,
+non-exclusive, royalty-free, irrevocable licence to host, store,
+reproduce, adapt (for example, resizing an image), display, and
+publish your contributions as part of the Service, in communications
+about the experiment (for example, quoting a public argument on the
+experiment's channels), and in the experiment's published research
+record.
+
+Your arguments are public while the experiment runs, and they stay
+public afterwards as part of the research record published when the
+experiment closes, under an open licence (Creative Commons Attribution
+4.0) that lets anyone read and reuse them with attribution. Post only
+what you are comfortable making permanently public.
+
+You are responsible for what you post, and you confirm you have the
+rights to post it.
+
+
+9. Disclaimers
+
+The Service is an experiment, provided "as is" and "as available",
+without warranties of any kind. We do not guarantee that it will be
+available, uninterrupted, or error-free, or that anything it displays
+is accurate. Market prices, scores, and rankings are artifacts of a
+research game. Nothing on the Service is financial, investment,
+betting, or professional advice of any kind, and nothing on it has
+monetary value.
+
+
+10. Liability, suspension, and changes
+
+To the maximum extent permitted by applicable law, the Operator is not
+liable for any indirect, incidental, consequential, or special
+damages, or for any loss of data, reputation, or opportunity, arising
+from your use of the Service; and because the Service is free, the
+Operator's total aggregate liability for any claim is limited to the
+greatest extent the law allows.
+
+We may suspend or terminate accounts that violate these Terms, and may
+modify, pause, or discontinue the Service at any time.
+
+If these Terms change, the updated version will be posted at this
+address with a new version number and date, and significant changes
+will be noted in the product. The version you accepted, and when you
+accepted it, is recorded.
+
+
+11. Open source
+
+The Service's source code is available at
+github.com/zugzwang-foundation/experiment under the AGPL-3.0 licence.
+You are entitled to the source code of the version of the Service you
+are interacting with.
+
+
+12. Contact
+
+For anything concerning the Service — questions about these Terms,
+reports of content you believe violates section 6, complaints, or
+requests about your data — write to legal@zugzwangworld.com. Reports
+and requests are reviewed promptly, and we act on valid ones. When
+reporting content, include a link to it and a short explanation.
+
+
+Zugzwang Experiment · Terms of Service · Version 1.0 ·
+legal@zugzwangworld.com

@@ -177,6 +177,15 @@ describe("POLISH.3 PR 2 — PD-3-07, the spaced Đ across all four PR-2 sites", 
 				marker="none"
 				authorStake="1500.000000000000000000"
 				replyCount={0}
+				// TIME-1 — `createdAt` became REQUIRED on `ArgProfile` (O-1: a mount
+				// that forgets the age should not compile). ⛔ THE ASSERTIONS BELOW
+				// ARE UNTOUCHED, and `STAKE_SPAN` still returns the stake: the
+				// timestamp leaf carries NO `font-mono` and is rendered AFTER the
+				// stake, so it is outside this selector on both counts. That was
+				// checked deliberately — `querySelector` returns the first match in
+				// tree order, and this file's own docblock records that a bare
+				// `.font-mono` once returned the SIDE BADGE for exactly that reason.
+				createdAt="2026-07-30T00:00:00.000Z"
 			/>,
 		);
 

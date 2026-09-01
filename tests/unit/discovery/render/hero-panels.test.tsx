@@ -3,7 +3,12 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { MarketPriceChart } from "@/components/debate/chart/MarketPriceChart";
 import { HERO_SIDE_EMPTY, HeroPanels } from "@/components/discovery/HeroPanels";
+import {
+	MARKET_CHART_WINDOW_END,
+	MARKET_CHART_WINDOW_START,
+} from "@/server/config/limits";
 import type { HeroPost, HeroTopPosts } from "@/server/discovery/hero";
 import type { DiscoveryCard } from "@/server/discovery/list";
 import type { PricePoint } from "@/server/discovery/price-series";
@@ -86,7 +91,14 @@ function heroPost(side: HeroPost["side"]): HeroPost {
 }
 
 function renderHero(topPosts: HeroTopPosts) {
-	return render(<HeroPanels card={CARD} series={SERIES} topPosts={topPosts} />);
+	return render(
+		<HeroPanels
+			card={CARD}
+			series={SERIES}
+			topPosts={topPosts}
+			isOpen={true}
+		/>,
+	);
 }
 
 /** DOM-order assertion: `a` precedes `b` in the rendered tree. */
@@ -166,15 +178,25 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 				throw new Error(`expected the ${side} hero post panel`);
 			}
 
-			// Row 6 — TWO separators per panel (mockup markup `:187`, `:189`),
-			// between the author name and the side chip, and between the chip and
-			// the stake figure. The head row is the panel's first child.
+			// Row 6 — THREE separators per panel, and they DO NOT SHARE ONE
+			// GOVERNING SOURCE. ⛔ Read this before moving the count again.
+			//  · Separators ONE and TWO are the mockup's own markup
+			//    (`surface_discovery_v1_0.html:187`, `:189`) — between the author
+			//    name and the side chip, and between the chip and the stake.
+			//  · Separator THREE is canon §3 item 11's TIME-1 · Form B amendment,
+			//    which supersedes the discovery mockup ON THIS ELEMENT AND ONLY ON
+			//    THIS ELEMENT. The mockup's head carries no age field at all, so
+			//    TIME-1 had already put the shipped row ahead of it; this pipe
+			//    makes that divergence visible rather than opening a new one.
+			// ⛔ The mockup is deliberately NOT edited — a locked mockup is amended
+			// deliberately, never as a side effect of a UI pass.
+			// The head row is the panel's first child.
 			const head = panel.children[0];
 			const kids = Array.from(head.children);
 			const seps = kids.filter((el) => el.textContent === "|");
-			expect(seps).toHaveLength(2);
+			expect(seps).toHaveLength(3);
 			// Sibling ORDER is the point, so assert positions rather than a count
-			// alone: avatar · author · SEP · chip · SEP · stake.
+			// alone: avatar · author · SEP · chip · SEP · stake · SEP · age.
 			const authorLink = head.querySelector(
 				`[data-testid="hero-author-link-${side}"]`,
 			);
@@ -183,24 +205,44 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 			}
 			expect(kids.indexOf(seps[0])).toBe(kids.indexOf(authorLink) + 1);
 			expect(kids.indexOf(seps[1])).toBe(kids.indexOf(seps[0]) + 2);
+			expect(kids.indexOf(seps[2])).toBe(kids.indexOf(seps[1]) + 2);
+			// …and what the third separator PRECEDES is the age, which is what
+			// makes it a seam rather than a trailing glyph. Asserted here because
+			// a count alone passes on a pipe appended past the age.
+			const age = head.querySelector("[data-relative-time]");
+			if (!age) {
+				throw new Error(`expected the ${side} argument age`);
+			}
+			expect(kids.indexOf(age)).toBe(kids.indexOf(seps[2]) + 1);
+			expect(kids.indexOf(age)).toBe(kids.length - 1);
 			// The glyph is the BYTE the mockup carries — U+007C, not U+2502 and
 			// not any box-drawing look-alike.
 			for (const sep of seps) {
 				expect(sep.textContent).toBe("|");
 			}
 
-			// Row 7 — the ARGUMENT TEXT is wrapped in the mockup's own straight
-			// ASCII quotes (U+0022, byte-carried from `:192`; the mockup's JS at
-			// `:455` builds the same pair).
-			const teaser = panel.querySelector("p");
-			if (!teaser) {
-				throw new Error(`expected the ${side} teaser paragraph`);
-			}
-			expect(teaser.textContent).toBe(`"${EXTENDED}"`);
+			// ⛔⛔ RE-POINTED AT UI-QUICK CS13 §2 — THE HERO POST IS TITLE-ONLY.
+			// This assertion previously required the quoted `.argtext` teaser
+			// paragraph (mockup `:192`, straight U+0022 byte-carried, HTML-FINISH
+			// row 7). The founder ruled the teaser off this surface: the panel
+			// carries the argument's HEADLINE and its picture, and the argument
+			// itself is read one click away.
+			//
+			// ⚠ RE-POINTED, NOT DELETED, AND THE DIRECTION IS INVERTED ON PURPOSE.
+			// The teaser's absence is now the thing worth guarding — it is exactly
+			// what a future edit would restore without meaning to, and restoring
+			// it would silently undo §3's height work by re-taking the vertical
+			// space the image box was given. Dropping the assertion would have
+			// left that unguarded; flipping it keeps the same line load-bearing.
+			expect(panel.querySelector("p")).toBeNull();
+			expect(panel.textContent ?? "").not.toContain(EXTENDED);
+			// …and no stray quote glyph survived the removal either.
+			expect(panel.textContent ?? "").not.toContain('"');
 
-			// ⛔ AND THE HEADLINE IS NOT WRAPPED — row 3 is STRUCK, so the title
-			// keeps its shipped, unquoted form. This is the assertion that would
-			// catch row 7 being over-applied to the headline as well.
+			// ⛔ THE HEADLINE IS STILL THERE AND STILL UNWRAPPED — row 3 remains
+			// STRUCK. This half is UNCHANGED, and it is what proves the assertion
+			// above pins the TEASER's absence rather than an empty panel: a render
+			// that dropped everything would fail here.
 			const headline = panel.querySelector("h3");
 			expect(headline?.textContent).toBe(TITLE);
 			expect(headline?.textContent?.startsWith('"')).toBe(false);
@@ -214,9 +256,11 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		if (!link) {
 			throw new Error("expected the hero-post deep-link anchor");
 		}
-		// Title + teaser render inside the deep-link.
+		// The TITLE renders inside the deep-link. (CS13 §2 removed the teaser
+		// that used to be asserted alongside it — the link's reach is unchanged,
+		// only its contents shrank.)
 		expect(link.textContent).toContain(TITLE);
-		expect(link.textContent).toContain(EXTENDED);
+		expect(link.textContent).not.toContain(EXTENDED);
 		// The author's stake, Đ-formatted via the reused formatDharma.
 		const post = screen.getByTestId("hero-post");
 		expect(post.textContent ?? "").toContain("Đ 40");
@@ -470,11 +514,135 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		// adjacent (WCAG 1.1.1).
 		expect(img.getAttribute("alt")).toBe("");
 		const cls = img.getAttribute("class") ?? "";
-		expect(cls).toContain("object-cover");
+		// ⛔⛔ RE-POINTED AT UI-QUICK CS13 §3 — `contain`, NEVER `cover`.
+		// `cover` filled the box by CROPPING the picture, which on the portrait
+		// attachments meant most of the image was never shown. `contain` fits the
+		// whole picture inside the same box and letterboxes the remainder against
+		// the `bg-n1` the box already carried.
+		// ⚠ The NEGATIVE is asserted too, and it is the half that actually
+		// guards: `toContain("object-contain")` alone would still pass on a class
+		// string that carried BOTH, which is precisely what a careless re-add
+		// would produce.
+		expect(cls).toContain("object-contain");
+		expect(cls).not.toContain("object-cover");
 		expect(cls).toContain("rounded-[var(--imgr)]");
-		expect(cls).toContain("min-h-[40px]");
+		// ⛔⛔ CS13 §3 — THE PICTURE IS OUT OF FLOW, AND THAT IS THE WHOLE HEIGHT
+		// INVARIANT. An absolutely-positioned child contributes nothing to its
+		// parent's content height, so the panel cannot track its attachment.
+		//
+		// ⚠⚠ THIS ASSERTION REPLACED A WRONG ONE, AND THE REPLACEMENT IS THE
+		// POINT. It first pinned `flex-1` + `min-h-[40px]` ON THE IMAGE, on the
+		// reasoning that a zero flex-basis plus an explicit min-height leaves no
+		// path for an intrinsic height to reach the layout. That reasoning is
+		// false when the container's height is INDEFINITE — as it is here, the
+		// panel being sized by its grid row — because a PERCENTAGE flex-basis
+		// then falls back to `auto`, and `auto` on an `<img>` is its intrinsic
+		// height. Staging measured 198.8px of panel height moving with nothing
+		// but the attachment's aspect ratio (portrait 482x638 → 574.6px row;
+		// landscape 1200x400 → 375.8px row, same panel, same viewport).
+		// ⛔ So the negatives below are not tidiness — they are the specific
+		// wrong fix, pinned as wrong so it cannot come back.
+		expect(cls).toContain("absolute");
+		expect(cls).toContain("inset-0");
+		expect(cls).not.toContain("flex-1");
+		expect(cls).not.toContain("min-h-");
 		// No placeholder alongside it.
 		expect(screen.queryByTestId("hero-post-image-empty-YES")).toBeNull();
+	});
+
+	it("render::v15-the-image-box-and-the-placeholder-box-are-the-SAME-box", () => {
+		// ⛔⛔ CS13 §3, AND THIS IS THE ASSERTION THE INVARIANT ACTUALLY RESTS ON.
+		// The founder's requirement is that a hero panel is the same height with
+		// no image, with a landscape image and with a portrait image. The first
+		// of those three is a DIFFERENT ELEMENT — the `IMG` placeholder — so the
+		// invariant holds only if both elements carry the same box.
+		//
+		// ⚠ Asserted as a SHARED SET rather than as two literal class strings:
+		// the placeholder is a flex CONTAINER (it centres the word "IMG") and the
+		// image is not, so their class attributes legitimately differ. What must
+		// match is the height-determining subset, and that is what is compared.
+		//
+		// ⚠ jsdom PERFORMS NO LAYOUT (AGENTS.md §9), so this cannot measure two
+		// rendered heights — it pins the declarations that produce them. The
+		// browser measurement that proves they compose is recorded in the
+		// change-set file, across three image types at three viewports.
+		const withImage = {
+			...heroPost("YES"),
+			imageUrl: "https://signed.test/uploads/u/x/arg.webp",
+		};
+		renderHero({ yes: withImage, no: null });
+		const withImg = screen.getByTestId("hero-post-image-YES");
+		const imgWrap = withImg.parentElement;
+		const imgCls = withImg.className;
+		cleanup();
+		renderHero({ yes: heroPost("YES"), no: null });
+		const empty = screen.getByTestId("hero-post-image-empty-YES");
+		const emptyWrap = empty.parentElement;
+		const emptyCls = empty.className;
+
+		// ⛔ BOTH are out of flow, so NEITHER can push the panel — the no-image
+		// case and the image case are the same box because neither is a box at
+		// all as far as the panel's height is concerned.
+		for (const cls of [imgCls, emptyCls]) {
+			expect(cls).toContain("absolute");
+			expect(cls).toContain("inset-0");
+		}
+
+		// ⛔⛔ AND THE WRAPPER — the element that IS the box — is identical for
+		// both, carrying the shipped `mt-2 min-h-[40px] flex-1` and the
+		// `relative` that the `inset-0` above is measured against. Without
+		// `relative` the images would position against some ancestor further up
+		// and the panel would lose its picture entirely, so it is pinned here
+		// rather than left implicit.
+		for (const wrap of [imgWrap, emptyWrap]) {
+			const cls = wrap?.className ?? "";
+			expect(cls).toContain("relative");
+			for (const token of ["mt-2", "min-h-[40px]", "flex-1"]) {
+				expect(cls).toContain(token);
+			}
+			// ⛔ No FIXED height and no cap — either would re-introduce a number
+			// the panel's height depends on, which is what §3 removed.
+			expect(/(^|\s)h-\[/.test(cls)).toBe(false);
+			expect(/(^|\s)max-h-/.test(cls)).toBe(false);
+		}
+		expect(imgWrap?.className).toBe(emptyWrap?.className);
+	});
+
+	it("render::cs13-the-hero-market-panel-is-keyboard-operable-AND-visibly-focused", () => {
+		// ⛔⛔ CS13 §4. Two claims, and they fail for different reasons, so both
+		// are asserted.
+		//
+		// 1. ENTER OPENS THE MARKET — asserted as "the panel is a real anchor
+		//    with an href". That is the whole mechanism: a native `<a href>`
+		//    activates on Enter with no handler, so there is nothing else to
+		//    test and nothing that could regress except the element itself
+		//    turning back into a div-with-onClick. THAT is what this catches.
+		// 2. THE FOCUS IS VISIBLE — the half that was actually missing. The
+		//    panel was already Tab-reachable and Enter already worked; a
+		//    keyboard viewer simply could not see where they were.
+		const { container } = renderHero({ yes: null, no: null });
+		const panel = container.querySelector<HTMLAnchorElement>(
+			`a[href="/m/${SLUG}"]`,
+		);
+		if (!panel) {
+			throw new Error("expected the hero market panel anchor");
+		}
+		// (1) A real anchor — not a div, and not an anchor without an href
+		// (which is NOT focusable and would silently drop out of the tab order).
+		expect(panel.tagName).toBe("A");
+		expect(panel.getAttribute("href")).toBe(`/m/${SLUG}`);
+
+		// (2) The shipped focus idiom, BOTH halves. `outline-none` alone would
+		// REMOVE the browser's default ring and leave nothing in its place —
+		// strictly worse than before — so the token that replaces it is pinned
+		// in the same breath.
+		const cls = panel.className;
+		expect(cls).toContain("outline-none");
+		expect(cls).toContain("focus-visible:shadow-(--state-focus-ring)");
+		// ⛔ NO NEW COLOUR. The ring is an existing token, not a literal — a hex
+		// or an rgb() here would be a new value on a surface whose palette is
+		// pinned by `tokens-monochrome`.
+		expect(/#[0-9a-fA-F]{3,8}|rgb\(|oklch\(/.test(cls)).toBe(false);
 	});
 
 	it("render::v15-null-image-renders-the-placeholder-not-a-broken-img", () => {
@@ -567,14 +735,33 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 //   discovery::hero-chart-time-scaled
 describe("discovery::hero-chart-time-scaled", () => {
 	/** Three points whose SPACING IN TIME is deliberately nothing like their
-	 * spacing in index: an hour, then nine hours. Under index spacing the middle
-	 * point lands at the midpoint of the plot; under time spacing it lands a
-	 * tenth of the way along. The two answers are 320 and 64 on a 640-wide
-	 * viewBox, so no rounding rule can confuse them. */
+	 * spacing in index: one unit of the window, then nine. Under index spacing the middle
+	 * point lands at the midpoint of the drawn span; under time spacing it lands
+	 * a tenth of the way along. Those two answers differ by a factor of five, so
+	 * no rounding rule can confuse them.
+	 *
+	 * ⚠ THE GAPS WERE 1h AND 9h UNTIL CHART-3 — a fixture change forced by the
+	 * domain, not a weakening of the assertion. The ratio that carries the
+	 * property is identical (1 : 9); what changed is that the axis is now the
+	 * whole experiment window instead of the series' own span, so a ten-HOUR
+	 * series drew inside ~5px of a 640-unit plot and the rounding floor ate the
+	 * very difference this test exists to see.
+	 *
+	 * ⛔ AND THE INSTANTS ARE DERIVED FROM THE WINDOW RATHER THAN WRITTEN AS
+	 * DATES. Hard-coded September dates sit inside the production window and
+	 * OUTSIDE the staging one, and the two do not overlap — so this guard reddened
+	 * under `ZUGZWANG_ENV=preview`, which is the command AGENTS.md §2 tells a
+	 * developer to run. Deriving removes the coupling rather than documenting it.
+	 * Found by `@security-auditor` at the CHART-3 cascade. */
+	const at = (f: number) => {
+		const startMs = Date.parse(MARKET_CHART_WINDOW_START);
+		const endMs = Date.parse(MARKET_CHART_WINDOW_END);
+		return new Date(startMs + (endMs - startMs) * f).toISOString();
+	};
 	const UNEVEN: PricePoint[] = [
-		{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
-		{ at: "2026-09-15T01:00:00.000Z", yes: "0.600000000000000000" },
-		{ at: "2026-09-15T10:00:00.000Z", yes: "0.700000000000000000" },
+		{ at: at(0), yes: "0.500000000000000000" },
+		{ at: at(0.01), yes: "0.600000000000000000" },
+		{ at: at(0.1), yes: "0.700000000000000000" },
 	];
 
 	/** The x coordinates of one polyline, in order. Read off the rendered
@@ -591,6 +778,7 @@ describe("discovery::hero-chart-time-scaled", () => {
 	it("places the middle point by elapsed time, not by its index", () => {
 		const { container } = render(
 			<HeroPanels
+				isOpen={true}
 				card={CARD}
 				series={UNEVEN}
 				topPosts={{ yes: null, no: null }}
@@ -600,18 +788,81 @@ describe("discovery::hero-chart-time-scaled", () => {
 		const xs = xsOf(container, "line-yes");
 		expect(xs).toHaveLength(3);
 
-		// Endpoints anchor the domain either way — they are the control that the
-		// coordinates were read at all, not the assertion.
+		// The control that the coordinates were read at all. The fixture's first
+		// point sits exactly on `MARKET_CHART_WINDOW_START`, so it lands at 0 —
+		// which is a fact about the fixture, not about the domain rule.
 		expect(xs[0]).toBe(0);
-		expect(xs[2]).toBe(640);
+		expect(xs[2]).toBeGreaterThan(0);
 
-		// ⛔ THE ASSERTION. One hour into a ten-hour domain is a tenth of the way
-		// across: 64. The retired `PriceSparkline` would have answered 320 here,
-		// because it spaced by index — which is exactly the defect this row
-		// exists to reject, and why the fixture's gaps are 1h and 9h rather than
-		// anything evenly divisible.
-		expect(xs[1]).toBe(64);
-		expect(xs[1]).not.toBe(320);
+		// ⛔ CHART-3: `xs[2]` IS NO LONGER 640, AND THAT IS THE POINT. It used to
+		// be, because the domain ended at the last point; the axis is now the
+		// fixed experiment window, so a ten-day series occupies a tenth of it and
+		// the line stops where the data stops. Asserting the OLD 640 here would
+		// assert exactly the tail-stretching SPEC.1 §9 forbids.
+		expect(xs[2]).toBeLessThan(640);
+
+		// ⛔ THE ASSERTION, expressed as a RATIO so it survives the domain rather
+		// than encoding it. One day into a ten-day span is a tenth of the way
+		// across the DRAWN extent. The retired `PriceSparkline` spaced by index
+		// and would answer 0.5 — which is the defect this row exists to reject,
+		// and why the fixture's gaps are 1d and 9d rather than evenly divisible.
+		const drawnFraction = (xs[1] - xs[0]) / (xs[2] - xs[0]);
+		expect(drawnFraction).toBeCloseTo(0.1, 2);
+		expect(drawnFraction).not.toBeCloseTo(0.5, 1);
+	});
+
+	it("plots on the SAME fixed window market detail does — CHART-3 ruling #3", () => {
+		// ⛔ THE HERO'S DOMAIN IS ASSERTED NOWHERE, AND THAT IS A RULED DECISION
+		// LEFT UNGUARDED. CHART-3 ambiguity #3 chose "the fixed window applies to
+		// ALL THREE modes" over "fix the axis on collapsed/expanded and leave the
+		// §22 hero on market lifetime", because "a mode-conditional domain would
+		// make the same market's line a different shape on the card and in the
+		// header, which is worse than either option alone."
+		//
+		// ⛔ WHAT THIS FILE ALREADY PINS CANNOT SEE THAT. `drawnFraction` is a
+		// RATIO of drawn extents, and a ratio is invariant under ANY linear
+		// domain — it answers 0.1 on the window, on the market's lifetime, on a
+		// hero-only span of somebody's choosing. Its companion `xs[2] < 640`
+		// excludes exactly one domain (the one ending at the last point) and
+		// admits every other. So a hero-only domain — the precise thing ruling #3
+		// forbids — passes both, and this file, which never imports the window
+		// constants at all, has no way to notice.
+		const { container } = render(
+			<HeroPanels
+				isOpen={true}
+				card={CARD}
+				series={UNEVEN}
+				topPosts={{ yes: null, no: null }}
+			/>,
+		);
+		const xs = xsOf(container, "line-yes");
+
+		const startMs = Date.parse(MARKET_CHART_WINDOW_START);
+		const endMs = Date.parse(MARKET_CHART_WINDOW_END);
+		const want = UNEVEN.map(
+			(p) => ((Date.parse(p.at) - startMs) / (endMs - startMs)) * 640,
+		);
+		// Discrimination control: the three expectations are three DIFFERENT
+		// numbers, so matching all three is a statement about the mapping rather
+		// than about a domain that collapses everything to one x.
+		expect(new Set(want.map((v) => v.toFixed(2))).size).toBe(3);
+
+		expect(xs).toHaveLength(3);
+		for (let i = 0; i < 3; i++) {
+			expect(xs[i], `hero point ${i}`).toBeCloseTo(want[i], 1);
+		}
+
+		// ⛔ AND THE RULING STATED AS THE THING IT ACTUALLY PROTECTS: the same
+		// series, rendered on the market-detail surface, must land on the SAME
+		// x's. Derived expectations prove the hero uses THE WINDOW; this proves
+		// the two SURFACES agree — which is what "a mode-conditional domain" would
+		// break, and it would break it whether or not either mode's domain happened
+		// to be derivable from a constant.
+		cleanup();
+		const detail = render(
+			<MarketPriceChart series={UNEVEN} mode="collapsed" isOpen={true} />,
+		);
+		expect(xsOf(detail.container, "line-yes")).toEqual(xs);
 	});
 
 	it("the NO line mirrors the YES line on the same time axis", () => {
@@ -619,6 +870,7 @@ describe("discovery::hero-chart-time-scaled", () => {
 		// disagree about when something happened.
 		const { container } = render(
 			<HeroPanels
+				isOpen={true}
 				card={CARD}
 				series={UNEVEN}
 				topPosts={{ yes: null, no: null }}
@@ -633,6 +885,7 @@ describe("discovery::hero-chart-time-scaled", () => {
 		// identical" tidy-up has something to fail against.
 		const { container } = render(
 			<HeroPanels
+				isOpen={true}
 				card={CARD}
 				series={UNEVEN}
 				topPosts={{ yes: null, no: null }}
@@ -660,6 +913,7 @@ describe("discovery::hero-chart-carries-accessible-summary", () => {
 	it("names the opening price, the current price and both endpoints", () => {
 		const { container } = render(
 			<HeroPanels
+				isOpen={true}
 				card={CARD}
 				series={[
 					{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
@@ -688,6 +942,7 @@ describe("discovery::hero-chart-carries-accessible-summary", () => {
 		// surface and pass.
 		const { container } = render(
 			<HeroPanels
+				isOpen={true}
 				card={CARD}
 				series={SERIES}
 				topPosts={{ yes: null, no: null }}
@@ -707,6 +962,7 @@ describe("discovery::hero-chart-carries-accessible-summary", () => {
 		// guards read as source and none of them would attribute to this.
 		const { container } = render(
 			<HeroPanels
+				isOpen={true}
 				card={CARD}
 				series={SERIES}
 				topPosts={{ yes: null, no: null }}

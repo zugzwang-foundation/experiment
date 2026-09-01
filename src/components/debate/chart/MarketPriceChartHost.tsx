@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 
-import type { ChartNode } from "@/server/debate-view/price-chart";
 import type { PricePoint } from "@/server/discovery/price-series";
 
 import { MarketPriceChartCard } from "./MarketPriceChartCard";
@@ -38,10 +37,18 @@ export function hasRenderableSeries(series: PricePoint[]): boolean {
 
 export function MarketPriceChartHost({
 	series,
-	nodes,
+	isOpen,
 }: {
 	series: PricePoint[];
-	nodes: ChartNode[];
+	/**
+	 * `C-CHART-2` clause 1 — whether the terminal dots pulse. READ from
+	 * `market.status` by `MarketHeader`, never inferred here: a quiet `Open`
+	 * market and a `Closed` one are indistinguishable from the series alone, and
+	 * pulsing a frozen market asserts it is live (**INV-4**). `/m/[slug]` is the
+	 * one surface where the non-`Open` branch is reachable — Discovery lists only
+	 * `Open` markets — which is the same asymmetry `withLiveTail` carries.
+	 */
+	isOpen: boolean;
 }): React.JSX.Element | null {
 	const [open, setOpen] = useState(false);
 
@@ -59,11 +66,15 @@ export function MarketPriceChartHost({
 
 	return (
 		<>
-			<MarketPriceChartCard series={series} onExpand={() => setOpen(true)} />
+			<MarketPriceChartCard
+				series={series}
+				isOpen={isOpen}
+				onExpand={() => setOpen(true)}
+			/>
 			{open && (
 				<MarketPriceChartOverlay
 					series={series}
-					nodes={nodes}
+					isOpen={isOpen}
 					onClose={() => setOpen(false)}
 				/>
 			)}

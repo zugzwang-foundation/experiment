@@ -25,7 +25,7 @@ const EXPIRE_SEC = WINDOW_SEC * 60;
 
 /**
  * The market's CPMM reserve walk, derived at most once per
- * `MARKET_SERIES_MIN_WINDOW_MS` (SPEC.1 1.0.40 §9 *Refresh — floored history,
+ * `MARKET_SERIES_MIN_WINDOW_MS` (SPEC.1 1.0.45 §9 *Refresh — floored history,
  * live edge*; founder-ruled at CHART-1).
  *
  * ⛔ **KEYED ON `marketId` AND NOTHING ELSE, AND THAT IS THE WHOLE MECHANISM.**

@@ -1,22 +1,78 @@
-Zugzwang Experiment — Privacy Policy (PLACEHOLDER v0)
+Zugzwang Experiment — Privacy Policy
 
-This is placeholder Lorem ipsum copy used during SCAFFOLD.3 development.
-The real Privacy Policy text is produced by HARDEN.7 (legal review,
-mid-July 2026 per project tracker). The placeholder hash
-`placeholder-privacy-v0` is recorded as acceptance evidence in users.
-privacy_version_hash; the real hash replaces this when HARDEN.7 lands.
+Version 1.0 · Effective 15 September 2026
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
-tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim
-veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea
-commodo consequat.
+This Privacy Policy sits alongside the Terms of Service published with
+it. Terms defined there carry the same meaning here.
 
-Data we collect: pseudonym, email, Google account ID (if OAuth), profile
-picture filename, timestamps of acceptance + activity. Data we do not
-collect: real names, government identifiers, payment information,
-geolocation beyond IP-derived country. Retention: indefinite for the
-experiment phase (ends 2026-11-05); public dataset published 2026-11-06
-contains pseudonymised activity. Erasure: H2-scrub per SPEC.1 §13
-replaces pseudonym with a placeholder; the tuple is permanently retired.
 
-(Real text: HARDEN.7.)
+1. What we collect, and why
+
+We collect:
+
+  — your email address, to create your account and send sign-in codes;
+  — if you sign in with Google, your Google account identifier,
+    display name, and avatar image, to authenticate you — these are
+    never shown publicly;
+  — technical data such as IP address and browser user-agent, for
+    security, abuse prevention, and to record your acceptance of these
+    documents;
+  — your activity on the Service — positions, arguments, uploads, and
+    their timestamps, which are the experiment itself.
+
+We use this data to operate the Service, keep it secure, understand
+aggregate usage, and produce the research record. We do not sell your
+data, and we do not use it for advertising.
+
+
+2. Who else processes it
+
+The Service runs on infrastructure operated by service providers, who
+process data on the Operator's behalf: Vercel (hosting), Supabase
+(database), Cloudflare (file storage and bot protection), Upstash
+(rate limiting), Resend (sign-in emails), Sentry (error monitoring),
+PostHog (usage analytics), and OpenAI (automated content screening).
+
+Some of these providers operate systems outside your country, so data
+may be processed across borders. Each provider receives only what its
+function requires.
+
+
+3. Cookies
+
+The Service uses a small number of cookies and similar technologies: a
+session cookie that keeps you signed in, and security tokens that
+protect the Service from automated abuse. Usage analytics are
+collected in aggregate to understand how the Service is used. We use
+no advertising cookies and no cross-site tracking.
+
+
+4. Retention, and what happens at the end
+
+The Service's record of activity — positions, arguments, and the
+ledger connecting them — is append-only by design: it is a permanent
+record that is not edited or deleted, because the integrity of that
+record is the point of the experiment.
+
+When the experiment ends on 5 November 2026, all markets resolve, all
+Dharma is void, and the Service stops accepting activity. The activity
+record is then prepared for publication: direct identifiers — your
+email address, Google account details, IP addresses, and browser data
+— are removed and are never published. What is published is the
+pseudonymous record: pseudonyms, positions, arguments, and timestamps.
+
+You may ask us at any time to delete the personal identifiers
+associated with your account (your email and sign-in details). Because
+the activity record is permanent and pseudonymous, published arguments
+and positions cannot be deleted.
+
+
+5. Contact
+
+For questions about this Policy, or any request concerning your data,
+write to legal@zugzwangworld.com. Requests are reviewed promptly, and
+we act on valid ones.
+
+
+Zugzwang Experiment · Privacy Policy · Version 1.0 ·
+legal@zugzwangworld.com

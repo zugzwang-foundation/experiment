@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 
-import type { ChartNode } from "@/server/debate-view/price-chart";
 import type { PricePoint } from "@/server/discovery/price-series";
 
 import { ChartSummary } from "./ChartSummary";
@@ -15,11 +14,14 @@ import { MarketPriceChart } from "./MarketPriceChart";
  * locked while open. */
 export function MarketPriceChartOverlay({
 	series,
-	nodes,
+	isOpen,
 	onClose,
 }: {
 	series: PricePoint[];
-	nodes: ChartNode[];
+	/** `C-CHART-2` clause 1 — whether the market is `Open`, i.e. whether the
+	 * terminal dots pulse. Threaded straight through; this component neither
+	 * derives nor gates it, for the reason `MarketHeader` gives about `pick`. */
+	isOpen: boolean;
 	onClose: () => void;
 }): React.JSX.Element {
 	useEffect(() => {
@@ -79,8 +81,46 @@ export function MarketPriceChartOverlay({
 						✕
 					</button>
 				</div>
-				<div className="aspect-[2/1] w-full">
-					<MarketPriceChart series={series} nodes={nodes} mode="expanded" />
+				{/* ⛔ THIS DIV NO LONGER DECLARES AN ASPECT, AND THAT IS THE CHART-2
+				    REGRESSION FIX. It was `aspect-[2/1] w-full` — a literal tuned to
+				    a `0 0 640 320` viewBox, giving exactly uniform scaling. CHART-1
+				    widened the viewBox to 678×320 for the label gutter and left this
+				    class alone, so the expanded overlay — the one mode that had been
+				    undistorted — fell to an anisotropy of 0.94395, and no guard in
+				    the repo could see it because every guard asserts in user units.
+				    ⛔ THE LOCK MOVED INTO `MarketPriceChart`, WHERE IT BELONGS: the
+				    box that must match the viewBox is the box the viewBox is mapped
+				    into, which is the plot — and the plot is no longer this div,
+				    because a sibling column sits beside it. `w-full` and nothing
+				    else; the plot derives its own height from `SVG_W / VIEWBOX_H`.
+				    ⚠ THE SIBLING IS THE NUMERIC MARKS, NOT A LABEL GUTTER, SINCE
+				    CHART-6. This read "the labels now sit in a CSS gutter beside it"
+				    and "sizing this div by an aspect would size plot + gutter
+				    together" — the labels are an overlay INSIDE the plot now and the
+				    gutter is deleted, so the ruling survives on the marks column
+				    instead. Caught by `@code-reviewer` at the CHART-6 cascade.
+				    ⛔ AND THERE ARE **TWO** SIBLINGS SINCE CHART-7, ON OPPOSITE SIDES,
+				    WHICH MAKES THE RULING MORE TRUE RATHER THAN LESS. The marks column
+				    moved LEFT (RF-1) and a right RESERVE for the traveling end labels
+				    took its place (RF-5). Measured on this branch's own build: the two
+				    together take **108.88px** of this div — 24.00 for the marks and
+				    84.88 for the reserve — where the sentence above said 24. An aspect
+				    declared here would now mis-shape the plot by four times as much.
+				    ⚠ AND THE HEIGHT MOVED BACK DOWN. CHART-6 returned the gutter's
+				    48.73px to the plot and took the chart box from 382.25 to 406.91;
+				    the reserve takes 84.88px of width back out, and under a locked
+				    aspect that is height — **measured 365.06**, below where CHART-6
+				    found it and below where CHART-5 left it. The panel-overflow
+				    threshold this paragraph tracks therefore moves in the SAFE
+				    direction; the figures above are the CHART-6 ones and are kept as
+				    the record of that pass rather than overwritten, because they were
+				    true when measured.
+				    ⚠ Replacing the literal with `aspect-[649/320]` was considered and
+				    rejected by ruling: it is the same defect with a newer number.
+				    `C-CHART-1` clause 4 now states a relationship, and
+				    `container-viewbox-lock.test.tsx` asserts it. */}
+				<div className="w-full">
+					<MarketPriceChart series={series} mode="expanded" isOpen={isOpen} />
 				</div>
 				{/* Row 8 · PD-3-04 · class F, TIER 1. SPEC.1 §9 · Accessibility requires
 				    "an accessible text summary naming the opening price, the current

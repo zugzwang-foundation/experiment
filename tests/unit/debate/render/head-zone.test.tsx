@@ -57,10 +57,16 @@ const readSource = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 
 const EMPTY_REPLIES: ReplyGroups = { support: [], counter: [], twoSlot: [] };
 
-/** Neutral fixture prose — no invented market content (CLAUDE.md §3). */
+/**
+ * Neutral fixture prose — no invented market content (CLAUDE.md §3).
+ * ⚠ BLOCK-1 — `slug` must be one of the eight known live markets or
+ * `ResolverCards` (nested under `MarketHeader`) throws (G1). This file
+ * doesn't test ResolverCards' content, so the specific slug doesn't matter
+ * beyond being valid.
+ */
 const market: DebateMarketHeader = {
 	id: "0190c0de-3333-7000-8000-000000000003",
-	slug: "head-zone-fixture-market",
+	slug: "bitcoin-price-50k",
 	title: "Fixture market question.",
 	description: "Fixture resolution criterion.",
 	status: "Open",
@@ -311,19 +317,27 @@ describe("HTML-FINISH · MARKET DETAIL — row 15, the focused post's teaser", (
 			/>,
 		);
 
-		const plus = Array.from(container.querySelectorAll("button")).find(
-			(b) => b.getAttribute("aria-label") === "Show more",
+		// ⚠ UI-QUICK change set 2 item 2 — the `+` became `Know more`, so the
+		// selector moves to the visible string and the accessible name is asserted
+		// on its own. ⛔ The behavioural assertion is untouched.
+		const knowMore = Array.from(container.querySelectorAll("button")).find(
+			(b) => b.innerHTML.includes("Know more"),
 		);
-		expect(plus).toBeDefined();
-		fireEvent.click(plus as HTMLButtonElement);
+		expect(knowMore).toBeDefined();
+		// WCAG 2.5.3 — the name must CONTAIN the visible string.
+		expect(knowMore?.getAttribute("aria-label")).toContain("Know more");
+		fireEvent.click(knowMore as HTMLButtonElement);
 		expect(onOpenPopup).toHaveBeenCalledWith(presentPost());
 	});
 
-	it("head-zone::a-bodyless-post-hides-the-teaser-but-KEEPS-the-plus", () => {
+	it("head-zone::a-bodyless-post-hides-the-teaser-but-KEEPS-the-expand-control", () => {
 		// d5 marks this case "hidden-but-reserved when bodyless" (`:972`).
 		// `deriveTitleTeaser` makes the teaser the SECOND paragraph, so a
-		// single-paragraph argument has none — and the `+` must survive, because
-		// the full body exists either way and the control is the only path to it.
+		// single-paragraph argument has none — and the control must survive,
+		// because the full body exists either way and it is the only path to it.
+		// ⚠ UI-QUICK change set 2 item 2 — the `+` became `Know more`. Re-pointed
+		// at the live control rather than left green against a string no mount
+		// carries any more.
 		const post = { ...presentPost(), teaser: "" } as PresentPost;
 		const { container } = render(
 			<PostFocusHeader
@@ -341,9 +355,10 @@ describe("HTML-FINISH · MARKET DETAIL — row 15, the focused post's teaser", (
 		);
 
 		expect(container.innerHTML).not.toContain("Fixture teaser.");
-		const plus = Array.from(container.querySelectorAll("button")).find(
-			(b) => b.getAttribute("aria-label") === "Show more",
+		const knowMore = Array.from(container.querySelectorAll("button")).find(
+			(b) => b.innerHTML.includes("Know more"),
 		);
-		expect(plus).toBeDefined();
+		expect(knowMore).toBeDefined();
+		expect(knowMore?.getAttribute("aria-label")).toContain("Know more");
 	});
 });

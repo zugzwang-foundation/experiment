@@ -74,6 +74,35 @@
 
 ---
 
+## E · WARLI-2 — the build/suite ordering hazard
+
+| ID | Title | Class | Baseline | Evidence | Disposition | Status | Root cause | Routed to |
+|---|---|---|---|---|---|---|---|---|
+| **L-10** | A build that talks to the TEST DATABASE must not immediately precede the suite | S | `AGENTS.md` §2 (`just verify` DOES build) · `vitest.config.ts` (default parallelism) | `next build` collects page data with **nine workers** against the same local Postgres; its connections are still draining when `vitest` starts, and ~26 DB-touching tests red in files the change never opened | routed | open | Two independent consumers of one local Postgres, serialised by nothing | **Guard-hardening docket.** Ordering is the fix — run them apart, or drain between — not a retry |
+
+⚠ **L-10 is DISTINCT from the `??=` env leak, and conflating them is the trap.**
+Both present as *"tests I did not touch went red after I ran a build"*, and the two
+have different causes and different fixes:
+
+- **The `??=` leak** is an ENVIRONMENT collision. `tests/_setup/env.ts` assigns its
+  defaults with `??=`, so a `ZUGZWANG_ENV` exported into the shell for `next build`
+  is already set and the suite's own default never applies. Fix: **separate
+  shells** — never export build env into a vitest shell. Tell: CI green, local red.
+- **L-10** is a CONNECTION collision. Nothing is exported and no variable is
+  wrong; the build's nine page-data workers are simply still holding Postgres
+  connections when the suite starts. Fix: **ordering** — do not run a build
+  immediately before the suite.
+
+Diagnosing one as the other sends you to change environment handling for a
+resource problem, or to re-order runs for a variable problem, and either way the
+symptom survives the fix. ⚠ **Both are order-dependent and therefore ROTATE**, so
+neither is safely diagnosed from a single red run — establish rotation first
+(`docs/overnight-run.md`, OVN-V8).
+
+*Ground: WARLI-1 (PR #433) hit the `??=` leak; WARLI-2 (PR #438) hit L-10. Recorded
+at WARLI-CLOSE-2 2026-08-30. Evidence in `docs/logs/WARLI-2.md` and
+`docs/logs/WARLI-CLOSE.md`.*
+
 ## Apply checklist
 
 **1.** Allocate real `PD-<surface>-<nn>` numbers from the live register's high-water mark.
@@ -81,7 +110,10 @@
 **3.** File §B under **POLISH.5** or route to the STAGING-PARITY stratum per `POLISH-0.md` §5 — SP-1/2/3 are B/R/S class, not V, so §5 routing governs, not the surface table.
 **4.** File §C per its `Routed to` column (POLISH.1 · POLISH.3 · POLISH.2), and §D (`DRIFT-1`) wherever process/infra rulings live — it is not a surface defect.
 **5.** L-8 is already `accepted-divergence`/`closed` by founder ruling (P12) — do not re-open it, and do not unify the two grouping implementations.
-**6.** Emit one batched summary row into the tracker at surface close — never row-by-row.
+**6.** File §E (`L-10`) on the guard-hardening docket. It is a PROCESS hazard, not a surface
+defect — do not route it to a POLISH surface. **Read its ⚠ note before acting on it:** it is
+the twin of the `??=` env leak and the two have different fixes.
+**7.** Emit one batched summary row into the tracker at surface close — never row-by-row.
 
 *G1's seven requirements are **not** here by ruling — they go to the separate web-authored docs task against `docs/maintenance.md` and the recon template.*
 
