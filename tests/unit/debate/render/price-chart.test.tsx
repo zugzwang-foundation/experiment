@@ -44,11 +44,11 @@ import {
 	MARKET_CHART_WINDOW_END,
 	MARKET_CHART_WINDOW_START,
 } from "@/server/config/limits";
+
 // UI.19 Slice 2 additive: the expanded-mode post-node type. TYPE-ONLY (erased) —
 // does not exist on the slice-1 price-chart module yet, so it drives no runtime
 // import; the RED below is the node MARKS not rendering (assertion), the RIGHT
 // reason (CLAUDE.md §5.6).
-import type { ChartNode } from "@/server/debate-view/price-chart";
 
 type PricePoint = { at: string; yes: string };
 
@@ -136,26 +136,6 @@ const MARKET: DebateMarketHeader = {
 		replyCount: 5,
 	},
 };
-
-// UI.19 Slice 2 — two expanded-mode post nodes, one per side. Each renders as an
-// SVG element `data-testid="graph-node-<id>"` carrying `data-side` and a
-// side-bound `--graph-yes`/`--graph-no` fill (INV-3 node binding, decision #7 —
-// never the `--color-yes`/`--color-no` slot the profile chart uses, which would
-// make a YES node invisible against the ground). NODES[0] = YES, NODES[1] = NO.
-const NODES: ChartNode[] = [
-	{
-		id: "0190c0de-2222-7000-8000-0000000000a1",
-		side: "YES",
-		at: "2026-09-17T00:00:00.000Z",
-		yYes: "0.640000000000000000",
-	},
-	{
-		id: "0190c0de-2222-7000-8000-0000000000b2",
-		side: "NO",
-		at: "2026-09-19T00:00:00.000Z",
-		yYes: "0.300000000000000000",
-	},
-];
 
 /** Every element under `root` whose data-testid starts with `prefix`. */
 function byPrefix(root: ParentNode, prefix: string): Element[] {
@@ -879,29 +859,68 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		expect(byPrefix(container, "axis-x-label-")).toHaveLength(0);
 	});
 
-	it("collapsed-renders-no-nodes", () => {
-		// ⛔ THE SURVIVING HALF OF THE OLD ROW, SPLIT OUT AND KEPT. 1.0.32 reversed
-		// the axis pin and left the NODES pin untouched, and the two were welded
-		// into one assertion — where reversing either would have silently carried
-		// the other out with it. §17 now carries them as two rows for the same
-		// reason.
-		const { container } = render(
-			<MarketPriceChartCard series={SERIES} onExpand={vi.fn()} isOpen={true} />,
-		);
-		expect(byPrefix(container, "graph-node-")).toHaveLength(0);
+	it("no-circle-carries-a-ground-rim — CHART-NODE-REMOVE", () => {
+		// ⛔ THE GUARD FOR THE REMOVAL, AND THE RIM IS THE HANDLE ON PURPOSE. The post
+		// nodes were the only circles in this component with a `--color-ground` rim:
+		// `r=4`, 1.5px, drawn to separate a node from its same-token line. The
+		// terminal marks are RIMLESS BY RULING — `C-CHART-2` clause 1 says "with no
+		// rim", "deliberately distinct from `C-CHART-1` clause 2's post node, which
+		// keeps `r=4` and its 1.5px non-scaling `--color-ground` rim". So the rim
+		// separates exactly the thing removed from the thing kept.
+		//
+		// ⚠ WHY NOT `graph-node-`. A testid ban passes against a node re-added under
+		// any other name, and the ruling is that the MARK comes off — not that one
+		// string does. The rim is the mark's own property.
+		for (const mode of ["collapsed", "expanded", "hero"] as const) {
+			cleanup();
+			const { container } = render(
+				<MarketPriceChart series={SERIES} mode={mode} isOpen={true} />,
+			);
+			const circles = [...container.querySelectorAll("circle")];
 
-		// Positive control — nodes CAN render (expanded mode), so their absence
-		// above is meaningful, not vacuous.
+			// ⭐ POSITIVE CONTROL FIRST, so a zero below is a real zero and not an
+			// empty selector: the same query must still find the terminal dots.
+			expect(
+				circles.map((c) => c.getAttribute("data-testid")),
+				`${mode}: the circle query found nothing — a ban over an empty set`,
+			).toEqual(
+				expect.arrayContaining([
+					"terminal-dot-yes",
+					"terminal-dot-no",
+					"terminal-pulse-yes",
+					"terminal-pulse-no",
+				]),
+			);
+			// …and the inventory is exactly those four on an Open market: two dots and
+			// two rings. A fifth circle of any kind reds here.
+			expect(circles, `${mode}: unexpected circle count`).toHaveLength(4);
+
+			for (const c of circles) {
+				const stroke = c.getAttribute("stroke");
+				expect(
+					stroke === null || !stroke.includes("--color-ground"),
+					`${mode}: ${c.getAttribute("data-testid")} carries a --color-ground rim`,
+				).toBe(true);
+				// The terminals are rimless outright, which is the stronger statement
+				// clause 1 actually makes.
+				expect(
+					stroke,
+					`${mode}: ${c.getAttribute("data-testid")} has a rim`,
+				).toBeNull();
+			}
+		}
+
+		// ⚠ AND THE FROZEN ARM, because `isOpen` gates the rings: two circles, still
+		// no rim. Without this the count above pins one market state only.
 		cleanup();
-		render(
-			<MarketPriceChart
-				series={SERIES}
-				nodes={NODES}
-				mode="expanded"
-				isOpen={true}
-			/>,
+		const { container: frozen } = render(
+			<MarketPriceChart series={SERIES} mode="expanded" isOpen={false} />,
 		);
-		expect(byPrefix(document.body, "graph-node-").length).toBeGreaterThan(0);
+		const frozenCircles = [...frozen.querySelectorAll("circle")];
+		expect(frozenCircles).toHaveLength(2);
+		expect(frozenCircles.every((c) => c.getAttribute("stroke") === null)).toBe(
+			true,
+		);
 	});
 
 	it("expanded-axis-carries-LABELS-BUT-NO-TICKS", () => {
@@ -1043,79 +1062,18 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		// Positive control — a non-null priceChart DOES mount the collapsed card,
 		// so the null-case absence above is meaningful.
 		cleanup();
-		render(
-			<MarketHeader
-				market={MARKET}
-				priceChart={{ series: SERIES, nodes: [] }}
-			/>,
-		);
+		render(<MarketHeader market={MARKET} priceChart={{ series: SERIES }} />);
 		expect(screen.getByTestId("market-price-chart-card")).toBeTruthy();
 	});
 
-	// ── 5. Slice 2 — EXPANDED renders one node mark per node; COLLAPSED renders
-	//       NONE (nodes are expanded-only; SPEC.1 §9 "Post nodes (expanded mode
-	//       only)"). The existing collapsed test at (1) already pins zero nodes in
-	//       the card; this adds the positive control that they DO render expanded. ─
-	it("expanded-renders-nodes", () => {
-		render(
-			<MarketPriceChart
-				series={SERIES}
-				nodes={NODES}
-				mode="expanded"
-				isOpen={true}
-			/>,
-		);
-
-		// One graph-node-<id> element per node in EXPANDED mode.
-		expect(byPrefix(document.body, "graph-node-")).toHaveLength(NODES.length);
-		for (const node of NODES) {
-			expect(screen.getByTestId(`graph-node-${node.id}`)).toBeTruthy();
-		}
-
-		// COLLAPSED renders ZERO nodes EVEN WITH nodes provided — expanded-only.
-		cleanup();
-		render(
-			<MarketPriceChart
-				series={SERIES}
-				nodes={NODES}
-				mode="collapsed"
-				isOpen={true}
-			/>,
-		);
-		expect(byPrefix(document.body, "graph-node-")).toHaveLength(0);
-
-		// The collapsed CARD likewise shows no nodes (it renders the chart collapsed).
-		cleanup();
-		render(
-			<MarketPriceChartCard series={SERIES} onExpand={vi.fn()} isOpen={true} />,
-		);
-		expect(byPrefix(document.body, "graph-node-")).toHaveLength(0);
-	});
-
-	// ── 6. Node side → token binding (INV-3, no pole inversion). A YES node fills
-	//       `--graph-yes` + data-side "YES"; a NO node fills `--graph-no` +
-	//       data-side "NO". Bound by the semantic token NAME, never inverted and
-	//       never the `--color-*` slot (design decision #7). ─────────────────────
-	it("node-tokens-bind-by-side-inv3", () => {
-		render(
-			<MarketPriceChart
-				series={SERIES}
-				nodes={NODES}
-				mode="expanded"
-				isOpen={true}
-			/>,
-		);
-
-		const [yesNode, noNode] = NODES; // NODES[0] = YES, NODES[1] = NO.
-
-		const yesEl = screen.getByTestId(`graph-node-${yesNode.id}`);
-		expect(yesEl.getAttribute("data-side")).toBe("YES");
-		expect(yesEl.getAttribute("fill")).toBe("var(--graph-yes)");
-
-		const noEl = screen.getByTestId(`graph-node-${noNode.id}`);
-		expect(noEl.getAttribute("data-side")).toBe("NO");
-		expect(noEl.getAttribute("fill")).toBe("var(--graph-no)");
-	});
+	// ⛔ THE SLICE-2 NODE SECTION STOOD HERE AND IS REMOVED WITH ITS SUBJECT
+	// (CHART-NODE-REMOVE, founder ruling). It held `expanded-renders-nodes` and
+	// `node-tokens-bind-by-side-inv3` — the second being a real INV-3 guard, that a
+	// node bound `--graph-yes`/`--graph-no` by TOKEN NAME and never the `--color-*`
+	// slot. ⚠ That binding rule is NOT weakened by the deletion: it still holds on
+	// every mark this component draws, and `terminal-markers.test.tsx` asserts it
+	// for the terminal dots and rings on all three modes. What went is the element,
+	// not the rule.
 });
 
 /**

@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 
-import type { ChartNode } from "@/server/debate-view/price-chart";
 import type { PricePoint } from "@/server/discovery/price-series";
 
 import { ChartSummary } from "./ChartSummary";
@@ -15,12 +14,10 @@ import { MarketPriceChart } from "./MarketPriceChart";
  * locked while open. */
 export function MarketPriceChartOverlay({
 	series,
-	nodes,
 	isOpen,
 	onClose,
 }: {
 	series: PricePoint[];
-	nodes: ChartNode[];
 	/** `C-CHART-2` clause 1 — whether the market is `Open`, i.e. whether the
 	 * terminal dots pulse. Threaded straight through; this component neither
 	 * derives nor gates it, for the reason `MarketHeader` gives about `pick`. */
@@ -123,12 +120,7 @@ export function MarketPriceChartOverlay({
 				    `C-CHART-1` clause 4 now states a relationship, and
 				    `container-viewbox-lock.test.tsx` asserts it. */}
 				<div className="w-full">
-					<MarketPriceChart
-						series={series}
-						nodes={nodes}
-						mode="expanded"
-						isOpen={isOpen}
-					/>
+					<MarketPriceChart series={series} mode="expanded" isOpen={isOpen} />
 				</div>
 				{/* Row 8 · PD-3-04 · class F, TIER 1. SPEC.1 §9 · Accessibility requires
 				    "an accessible text summary naming the opening price, the current

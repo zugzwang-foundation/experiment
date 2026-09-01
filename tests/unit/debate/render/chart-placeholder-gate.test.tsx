@@ -60,7 +60,7 @@ afterEach(() => {
 });
 
 const detail = (series: PricePoint[]) =>
-	render(<MarketPriceChartHost series={series} nodes={[]} isOpen={true} />);
+	render(<MarketPriceChartHost series={series} isOpen={true} />);
 
 /**
  * ⚠⚠ RETARGETED AT RECONCILE-1, AND THE RETARGET IS THE POINT.
