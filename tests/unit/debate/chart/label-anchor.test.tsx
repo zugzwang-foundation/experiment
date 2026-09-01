@@ -99,8 +99,26 @@ const AIR_PX = 5;
 
 const MODES = ["collapsed", "expanded", "hero"] as const;
 
-/** The sweep. ~10 % is the case the shipped defect fails; ~50 % is the ordinary
- * mid-experiment market; ~95 % is where the flip must fire. */
+/** The sweep. ~10 % is the case the pre-CHART-6 defect fails; ~50 % is the
+ * ordinary mid-experiment market.
+ *
+ * ⛔⛔ THE FLIP POINT MOVED OFF THE WINDOW ENTIRELY AT CHART-7 (RF-5), AND THE
+ * SWEEP IS RE-SEATED RATHER THAN RELAXED. `~95 %` used to flip and no longer does,
+ * because there is now a real RIGHT RESERVE beside the plot sized from the widest
+ * label the chart can produce plus the ring plus the gap. The label no longer has
+ * to fit inside the PLOT, so an in-window series never flips: the dot's maximum x
+ * is 98.61 % of the plot and the ring's clearance is 1.11 %, which puts the
+ * label's left edge at 99.72 % — inside — with its body landing in the reserve.
+ *
+ * ⛔ SO THE FLIPPED ARM WOULD HAVE LOST ITS ONLY EXERCISE, AND THAT IS THE DANGER
+ * WORTH NAMING. The flipped arm's term-by-term assertions exist because
+ * `@test-writer` found at CHART-6 that dropping the ring's clearance from that
+ * branch was green across 118 tests — its whole contract was "the string contains
+ * a minus". If every position stopped flipping, those assertions would range over
+ * nothing and the mutation would go green again, silently. **The last row is a
+ * series running PAST the window end**, which is the case the reserve structurally
+ * cannot cover and the one `limits.ts` records happening on staging for two weeks:
+ * `xPx` is unclamped, so the dot leaves the canvas and its label flips. */
 const POSITIONS = [
 	{ name: "~10 % of the window", f: 0.1, flips: false },
 	{ name: "~50 % of the window", f: 0.5, flips: false },
@@ -108,17 +126,27 @@ const POSITIONS = [
 	// Swept against every shipped assertion, `LABEL_FLIP_RESERVE_PCT` could be
 	// anything in **[11, 49]** and stay green — so `= 40` was green, and at 40 every
 	// label flips from ~59 % of the window onward and lies back over the series it
-	// just drew, on all three surfaces. The under-reserve side (the one that
-	// overflows) was already tight at 11; this closes the other. A market at 80 % of
-	// the window has ample room on its right and must NOT flip, which caps the
-	// reserve at 20.
+	// just drew, on all three surfaces. It is 0 now and the cap still earns its
+	// keep: it is what stops a future reserve being "fixed" by flipping everything.
 	{ name: "~80 % of the window", f: 0.8, flips: false },
-	{ name: "~95 % of the window", f: 0.95, flips: true },
+	{ name: "~95 % of the window", f: 0.95, flips: false },
+	{ name: "hard against the window end", f: 1, flips: false },
+	{ name: "PAST the window end (staging's live case)", f: 1.05, flips: true },
 ] as const;
+
+/** The sweep positions whose series end INSIDE the plot.
+ * ⚠ THE ANCHOR SWEEP CANNOT TAKE THE OUT-OF-WINDOW POSITION, AND THE REASON IS ITS
+ * OWN NON-VACUITY CHECK RATHER THAN SQUEAMISHNESS. That sweep asserts the fixture
+ * ends `0 < x ≤ VIEWBOX_W` before comparing anything, because a fixture that fell
+ * off the canvas would make "the label sits on its dot" a claim about two things
+ * nobody can see. A series past the window end is exactly that case — `xPx` is
+ * unclamped, so it lands at 672 — and it belongs to the FLIP sweep, whose whole
+ * subject it is. Two sweeps, two subjects, one list. */
+const IN_WINDOW_POSITIONS = POSITIONS.filter((p) => p.f <= 1);
 
 describe("debate-view::price-chart-label-anchored-to-terminal-dot", () => {
 	for (const mode of MODES) {
-		for (const pos of POSITIONS) {
+		for (const pos of IN_WINDOW_POSITIONS) {
 			it(`${mode}, series ending ${pos.name}: the label's anchor IS the dot's x`, () => {
 				const series = seriesEndingAtFraction(pos.f);
 				const container = markup(series, mode);
@@ -154,16 +182,27 @@ describe("debate-view::price-chart-label-anchored-to-terminal-dot", () => {
 		// If the sweep above could not tell that apart from a tracking anchor it
 		// would have been green throughout the defect's whole life — so the
 		// discrimination is asserted rather than assumed.
-		const anchors = POSITIONS.map((pos) =>
+		const anchors = IN_WINDOW_POSITIONS.map((pos) =>
 			anchorPctOf(
 				leftOf(markup(seriesEndingAtFraction(pos.f), "collapsed"), "yes"),
 			),
 		);
 		// Every series end produces a DIFFERENT anchor — derived from the list rather
 		// than a literal, so adding a sweep position does not silently loosen this.
-		expect(new Set(anchors).size).toBe(POSITIONS.length);
-		// …none of which is the old constant.
+		expect(new Set(anchors).size).toBe(IN_WINDOW_POSITIONS.length);
+		// …none of which is the old constant. ⚠ THE CEILING IS THE PLOT'S OWN SHARE
+		// OF THE VIEWBOX, not a round 99: an in-window series anchors at most at
+		// `VIEWBOX_W / SVG_W` = 98.61 %, and the superseded binding sat at a constant
+		// 100. Written as the derived bound so the discrimination is exactly as tight
+		// as the geometry allows.
+		// ⚠ THE TOLERANCE IS `labelLeftPct`'s OWN ROUNDING AND NOTHING LOOSER. It
+		// quantises to four decimal places, so the SHIPPED anchor at the window end
+		// is 98.6133 against an exact 98.613251… — larger by 5e-5. An assertion
+		// written without it reds on a correct render, which is the worst kind of
+		// guard: one that punishes precision.
+		const CEILING = (VIEWBOX_W / SVG_W) * 100;
 		for (const a of anchors) {
+			expect(a).toBeLessThanOrEqual(CEILING + 1e-4);
 			expect(a).toBeLessThan(99);
 		}
 		// …and they are ORDERED, so the anchor tracks the data rather than merely
@@ -301,11 +340,12 @@ describe("debate-view::price-chart-label-flips-at-right-edge", () => {
 		}
 	}
 
-	it("does not flip on a market that has barely traded, and does on one at the axis end", () => {
+	it("no in-window market flips, and one past the window end does", () => {
 		// The two ends of the rule, stated as one case so the boundary is visible.
-		// MUST REJECT: a build that flips everything (the label would sit left of
-		// every dot, which is the mirror of the defect) or nothing (it would overflow
-		// the plot on any market near the end — the normal case in November).
+		// ⛔ MUST REJECT, BOTH WAYS: a build that flips everything (the label sits
+		// left of every dot and lies back over the series it just drew) and one that
+		// flips nothing (past the window end the dot is off the canvas, and an
+		// un-flipped label runs further off it).
 		const at = (f: number) =>
 			markup(seriesEndingAtFraction(f), "collapsed")
 				.querySelector('[data-testid="terminal-label-layer"]')
@@ -313,86 +353,226 @@ describe("debate-view::price-chart-label-flips-at-right-edge", () => {
 
 		expect(at(0.0001)).toBe("false");
 		expect(at(0.5)).toBe("false");
-		expect(at(1)).toBe("true");
+		// ⚠ THE BOUNDARY IS NOW THE WINDOW ITSELF, WHICH IS THE WHOLE OF RF-5. Before
+		// the right reserve this read `expect(at(1)).toBe("true")` — the label had to
+		// flip on any market trading to the deadline, i.e. on every market in
+		// November. That was the fallback carrying the normal case.
+		expect(at(1)).toBe("false");
+		expect(at(1.05)).toBe("true");
 
 		// …and the flip is monotone in x: once it fires it stays fired, so there is
-		// no band in which the label oscillates as a market trades.
-		const flips = Array.from({ length: 21 }, (_, i) => at(i / 20) === "true");
+		// no band in which the label oscillates as a market trades. Swept across the
+		// window AND past it, because the transition now lives outside the window.
+		const flips = Array.from({ length: 25 }, (_, i) => at(i / 20) === "true");
 		const firstTrue = flips.indexOf(true);
 		expect(firstTrue).toBeGreaterThan(0);
 		expect(flips.slice(firstTrue).every(Boolean)).toBe(true);
 		expect(flips.slice(0, firstTrue).some(Boolean)).toBe(false);
+		// Non-vacuity: the transition really is OUTSIDE the window, not merely late
+		// inside it. `firstTrue` indexes `i/20`, so a value above 20 is past f = 1.
+		expect(firstTrue).toBeGreaterThan(20);
 	});
 
-	it("reserves enough room that the widest measured label cannot cross the plot's edge", () => {
-		// ⛔ THE ONE MEASURED NUMBER IN THE MECHANISM, PINNED AGAINST THE
-		// MEASUREMENT. `LABEL_FLIP_RESERVE_PCT` is 14 because the worst
-		// `labelWidth / plotWidth` is **8.99 %** — the widest label the value can
-		// take (`100%`, 42.47 px in the shipped face) against the hero's plot at its
-		// FLOOR width (472.49 px), both measured on this branch's deployed build —
-		// plus 1.06 pp for the 5 px of air the threshold cannot express, giving a
-		// true requirement of 10.05 %.
+	it("an in-window label's LEFT EDGE never leaves the plot — which is what the reserve then holds", () => {
+		// ⛔ WHAT REPLACED THE `LABEL_FLIP_RESERVE_PCT = 14` GUARD, AND WHY THE CLAIM
+		// CHANGED SHAPE. That case pinned a threshold against a measured
+		// `labelWidth / plotWidth`: the widest value (`100%`, 42.47 px in the shipped
+		// face) against the hero's plot at its measured FLOOR (472.49 px), plus the
+		// air the threshold could not express, giving 10.05 % — cleared by 14.
 		//
-		// ⚠ `WORST_MEASURED_FRACTION` below is left at **0.1031**, deliberately
-		// ABOVE the 0.0899 ceiling. The walk asserts that an un-flipped label of that
-		// width still fits, so over-stating it makes the walk STRICTER; understating
-		// it would make the walk agree with a reserve that does not fit. The hero's frame bottoms out at 496.49 px and
-		// stops there (the `md:` grid's centre track is content-bound at 530.99 px,
-		// measured identical at 768 / 900 / 1024 / 1045); below 768 it is
-		// single-column and WIDER. The collapsed card is 8.6 % and is
-		// viewport-independent (its rail is a pinned `w-[340px]`); the expanded
-		// overlay is 5.9 % in a fixed-width dialog.
+		// ⚠ RF-5 REMOVES THE QUANTITY THAT GUARD WAS ABOUT. With a real reserve beside
+		// the plot, a label does not have to fit INSIDE the plot, so "how much of the
+		// plot does a label need" is no longer the question. The question is whether
+		// the label's ANCHOR stays inside the plot — because everything past the
+		// anchor lands in the reserve, which is sized from the label itself.
 		//
-		// ⚠ THE NUMBER WAS 12 AND CLEARED THE REQUIREMENT BY 0.63 pp, which is
-		// enough today and not enough to survive a longer value string. Raised at
-		// the `@code-reviewer` cascade, which filed the reserve as under-sized on a
-		// DERIVED hero width (a pure `1fr 1.9fr 1fr` reading gives 421.95 px at
-		// 1024). The derivation is wrong — measured, the track is content-bound —
-		// but the margin it argued for was right.
-		//
-		// ⚠ WHAT THIS CAN AND CANNOT PROVE. jsdom lays out no text, so no assertion
-		// here can measure a glyph advance — the rendered check is in the contact
-		// sheet, in the shipped face, at the three sweep positions. What IS provable
-		// here is the arithmetic the reserve exists to guarantee: past the flip
-		// point, a label of the worst measured width still fits to the LEFT of its
-		// dot; before it, one still fits to the RIGHT. A reserve that failed either
-		// would put the label off the canvas on some market.
-		const WORST_MEASURED_FRACTION = 0.1031;
-		const ringPct = labelLeftPct(TERMINAL_PULSE_MAX_R);
+		// ⛔ AND THAT IS PROVABLE HERE, WHERE THE WIDTH CLAIM WAS NOT. Both terms are
+		// pure functions of the shipped constants: the dot's maximum in-window x is
+		// `VIEWBOX_W / SVG_W` and the ring's clearance is `labelLeftPct(
+		// TERMINAL_PULSE_MAX_R)`. jsdom lays out no text, so the WIDTH half stays a
+		// rendered claim and is measured in the contact sheet; this is the half that
+		// is arithmetic, and it is the half the flip threshold now rests on.
+		const maxAnchorPct = (VIEWBOX_W / SVG_W) * 100;
+		expect(maxAnchorPct).toBeCloseTo(98.6133, 3);
+		expect(maxAnchorPct + RING_PCT).toBeLessThan(100);
 
-		const flipsAt = (f: number) =>
-			markup(seriesEndingAtFraction(f), "hero")
-				.querySelector('[data-testid="terminal-label-layer"]')
-				?.getAttribute("data-flip") === "true";
-
-		// Walk the window and check both arms at every step.
+		// …and that is exactly the comparison `shouldFlip` makes, so no in-window
+		// series can flip. Swept through the render rather than asserted from the
+		// arithmetic, so the two are shown to agree.
 		for (let i = 0; i <= 100; i++) {
 			const f = i / 100;
-			const anchor =
-				(xPx(
-					new Date(START_MS + (END_MS - START_MS) * f).toISOString(),
-					START_MS,
-					END_MS,
-				) /
-					SVG_W) *
-				100;
-			if (flipsAt(f)) {
-				// ⚠ NOTHING IS ASSERTED ON THIS ARM, DELIBERATELY, AND SAYING SO BEATS
-				// AN ASSERTION THAT CANNOT FIRE (`@test-writer`, L-6). The flipped
-				// label runs LEFT from its anchor, so the failure it could have would
-				// be crossing the LEFT edge — but the flip only ever fires near the
-				// RIGHT edge, so at the first flipping sample the margin is ~77
-				// percentage points and the check could not fail for any reserve the
-				// sibling guards permit. A control below its discrimination threshold
-				// reads exactly like a passing one. The "flip everything" failure this
-				// looked like cover for is caught by the sweep's `flips: false` cases.
-			} else {
-				// Not flipped: it runs RIGHT and must not cross the right edge.
-				expect(
-					anchor + ringPct + WORST_MEASURED_FRACTION * 100,
-					`un-flipped label at f=${f} would cross the RIGHT edge`,
-				).toBeLessThanOrEqual(100);
-			}
+			const flipped =
+				markup(seriesEndingAtFraction(f), "hero")
+					.querySelector('[data-testid="terminal-label-layer"]')
+					?.getAttribute("data-flip") === "true";
+			expect(flipped, `in-window series at f=${f} must not flip`).toBe(false);
 		}
+
+		// ⛔ THE CAP FROM THE OTHER DIRECTION, KEPT. `LABEL_FLIP_RESERVE_PCT` is 0
+		// today; the ban that matters is on it drifting UP into "everything flips",
+		// which is how an under-sized reserve gets "fixed". Read out of the rendered
+		// behaviour rather than from the constant: a market at 80 % of the window has
+		// ample room and must not flip, which caps the threshold at ~20.
+		expect(
+			markup(seriesEndingAtFraction(0.8), "hero")
+				.querySelector('[data-testid="terminal-label-layer"]')
+				?.getAttribute("data-flip"),
+		).toBe("false");
+	});
+});
+
+describe("debate-view::price-chart-label-clears-date-row — RF-5, the right reserve", () => {
+	for (const mode of MODES) {
+		it(`${mode}: the reserve is the row's TRAILING cell, shrink-0, and pins no width`, () => {
+			const container = markup(seriesEndingAtFraction(0.6), mode);
+			const frame = container.querySelector(
+				'[data-testid="market-price-chart-frame"]',
+			);
+			const inFlow = [...(frame?.children ?? [])].map(
+				(c) => c.getAttribute("data-testid") ?? "",
+			);
+			// Marks left, plot, reserve right — the whole of RF-1 and RF-5 in one row.
+			expect(inFlow).toEqual([
+				"chart-y-marks",
+				"market-price-chart-plot",
+				"chart-label-reserve",
+			]);
+
+			const reserve = container.querySelector(
+				'[data-testid="chart-label-reserve"]',
+			);
+			const cls = (reserve?.getAttribute("class") ?? "").split(/\s+/);
+			// ⛔ IT MUST NOT GROW. A reserve that took `flex-1` would eat the plot on
+			// every surface; `shrink-0` is what makes it exactly as wide as the label
+			// it holds and no wider.
+			expect(cls).toContain("shrink-0");
+			expect(cls).not.toContain("flex-1");
+			// ⛔ AND NO PINNED WIDTH — the CHART-1 `26` in a new place. The width comes
+			// from the browser laying out the sizer, which is the point of the sizer.
+			expect(reserve?.getAttribute("class") ?? "").not.toMatch(
+				/(^|\s)(min-|max-)?w-/,
+			);
+			expect((reserve as HTMLElement | null)?.style.width ?? "").toBe("");
+			// ⛔ `invisible`, NEVER `hidden`. `visibility: hidden` keeps the box —
+			// which IS the mechanism; `display:none` removes it and the reserve
+			// silently collapses to its padding.
+			expect(cls).toContain("invisible");
+			expect(cls).not.toContain("hidden");
+			// It is a blank strip: never announced, never clickable.
+			expect(reserve?.getAttribute("aria-hidden")).toBe("true");
+			expect(cls).toContain("pointer-events-none");
+		});
+	}
+
+	it("the reserve is sized by the WIDEST label the chart can produce", () => {
+		// ⛔ `YES 100%` ON THE VALUE-BEARING MODES, `YES` ON THE CARD — and the string
+		// comes from the shipped formatter at an extreme price rather than from a
+		// literal, so the sizer cannot come to disagree with what a label can print.
+		// Measured in the shipped face: `YES 100%` is 69.88 px and `NO 100%` is
+		// 64.84 px, so YES is correctly the one to size from.
+		const textOf = (mode: "collapsed" | "expanded" | "hero") =>
+			markup(seriesEndingAtFraction(0.6), mode).querySelector(
+				'[data-testid="chart-label-reserve"]',
+			)?.textContent ?? "";
+		expect(textOf("expanded")).toBe("YES100%");
+		expect(textOf("hero")).toBe("YES100%");
+		expect(textOf("collapsed")).toBe("YES");
+
+		// ⛔ AND THE SIZER CARRIES NO VALUE TESTID. Two elements answering to
+		// `terminal-value-yes` would make every guard that reads "the value" pick
+		// whichever came first in the markup — and the reserve comes last, so the
+		// bug would be intermittent by markup order rather than absent.
+		const container = markup(seriesEndingAtFraction(0.6), "expanded");
+		expect(
+			container.querySelectorAll('[data-testid="terminal-value-yes"]'),
+		).toHaveLength(1);
+		expect(
+			container
+				.querySelector('[data-testid="chart-label-reserve"]')
+				?.querySelector('[data-testid^="terminal-"]'),
+		).toBeNull();
+	});
+
+	it("the lower label is clamped clear of the DATE ROW, and only where a row is drawn", () => {
+		// ⛔ THE CHART-6 OVERLAP, CLOSED. At the window end with an extreme price the
+		// lower label came to rest on its own date label — measured 19.99 × 16.00 px
+		// on the overlay and 4.54 × 7.70 px on the card, on this branch, before the
+		// change. The repair is ONE MORE TERM in the clamp that already holds the
+		// label inside the plot, never a second rule (`C-CHART-2` clause 3).
+		const lowerTopOf = (
+			mode: "collapsed" | "expanded" | "hero",
+			yes: string,
+		) => {
+			const html = renderToStaticMarkup(
+				<MarketPriceChart
+					series={seriesEndingAtFraction(1, yes)}
+					mode={mode}
+					isOpen={true}
+				/>,
+			);
+			// The LOWER label is whichever carries the `max(` arm — read off the
+			// markup rather than assumed from the price, so clause 4's tie-break stays
+			// clause 4's.
+			// The LOWER label is whichever carries the `max(` arm, found by scanning
+			// every `top:` in the markup rather than by a single nested-paren regex —
+			// `clamp(… max(… calc(…)))` nests three deep and a lazy match stops at the
+			// first close-paren, returning a truncated string that then fails to match
+			// anything downstream. Read the whole declaration, then pick.
+			return (
+				[...html.matchAll(/top:([^";]*)/g)]
+					.map((m) => m[1])
+					.find((t) => t.includes("max(")) ?? ""
+			);
+		};
+
+		for (const mode of MODES) {
+			const top = lowerTopOf(mode, "0.960000000000000000");
+			expect(top, `${mode}: no lower label found`).not.toBe("");
+			// The bottom bound carries BOTH terms: half the label's own box, and the
+			// date row's height.
+			expect(top).toMatch(/calc\(100% - \d+(?:\.\d+)?px - \d+px\)/);
+			const band = Number(top.match(/calc\(100% - [\d.]+px - (\d+)px\)/)?.[1]);
+			expect(band, `${mode}: the band is not a number`).toBeGreaterThan(0);
+			// ⚠ COMPOSED FROM THE ROW'S OWN TYPE AND OFFSET, not written down twice.
+			// Read the row's declared size out of the same markup so a change to
+			// either moves both.
+			const html = renderToStaticMarkup(
+				<MarketPriceChart
+					series={seriesEndingAtFraction(1, "0.960000000000000000")}
+					mode={mode}
+					isOpen={true}
+				/>,
+			);
+			const rowPx = Number(
+				html.match(/axis-date-row"[^>]*style="[^"]*font-size:(\d+)px/)?.[1],
+			);
+			expect(rowPx, `${mode}: the date row declares no size`).toBeGreaterThan(
+				0,
+			);
+			expect(band).toBeGreaterThan(rowPx);
+		}
+	});
+
+	it("reserves NO band on a render that draws no date row", () => {
+		// ⚠ THE ARM THAT MAKES THE BAND HONEST. A band reserved under a row that is
+		// not there pushes the lower label up for a reason no reader can see. The
+		// collapsed card draws no axis below two points — its shipped gate since
+		// HTML-FINISH R8 — so that is the case to check.
+		const html = renderToStaticMarkup(
+			<MarketPriceChart
+				series={[
+					{ at: MARKET_CHART_WINDOW_START, yes: "0.960000000000000000" },
+				]}
+				mode="collapsed"
+				isOpen={true}
+			/>,
+		);
+		expect(html).not.toContain('data-testid="axis-date-row"');
+		const top =
+			[...html.matchAll(/top:([^";]*)/g)]
+				.map((m) => m[1])
+				.find((t) => t.includes("max(")) ?? "";
+		expect(top).not.toBe("");
+		expect(top).toMatch(/calc\(100% - \d+(?:\.\d+)?px - 0px\)/);
 	});
 });

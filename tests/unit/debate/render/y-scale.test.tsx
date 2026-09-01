@@ -629,7 +629,14 @@ describe("C-CHART-2 clause 4 (CHART-5) — one collision rule, two measured inpu
 		const expandedHalf = Math.max(nameSize, valueSize) / 2;
 		for (const top of topsOf("expanded")) {
 			expect(top).toContain(`clamp(${expandedHalf}px,`);
-			expect(top).toContain(`calc(100% - ${expandedHalf}px)`);
+			// ⚠ THE BOTTOM BOUND CARRIES A SECOND TERM SINCE CHART-7 (RF-5) — the
+			// X-axis date row, which the lower label may not enter. `C-CHART-2` clause
+			// 3: one clamp, one more measured input, never a second rule. The band's
+			// own composition is asserted in `label-anchor.test.tsx`; here it is enough
+			// that the half-box term is still the one this case is about.
+			expect(top).toMatch(
+				new RegExp(`calc\\(100% - ${expandedHalf}px( - \\d+px)?\\)`),
+			);
 		}
 		// ⛔ THE HERO TAKES THE TALLER FLOOR TOO, AND THAT PAIRING IS THE POINT
 		// RATHER THAN A CONSEQUENCE. Its label gained the value at CHART-6; a mode
@@ -640,7 +647,9 @@ describe("C-CHART-2 clause 4 (CHART-5) — one collision rule, two measured inpu
 		// tests that can be updated one at a time.
 		for (const top of topsOf("hero")) {
 			expect(top).toContain(`clamp(${expandedHalf}px,`);
-			expect(top).toContain(`calc(100% - ${expandedHalf}px)`);
+			expect(top).toMatch(
+				new RegExp(`calc\\(100% - ${expandedHalf}px( - \\d+px)?\\)`),
+			);
 		}
 		// MUST REJECT: the wider threshold leaking onto the one-line collapsed card.
 		for (const top of topsOf("collapsed")) {

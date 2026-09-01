@@ -566,7 +566,16 @@ export function MarketPriceChart({
 				    gutter is an x anchored to the plot's right EDGE — which is where
 				    the dot sits only on a market that has traded to the window end. */}
 				{terminalYes !== null && (
-					<TerminalLabels yes={terminalYes} mode={mode} terminalX={terminalX} />
+					<TerminalLabels
+						yes={terminalYes}
+						mode={mode}
+						terminalX={terminalX}
+						bandPx={
+							drawsTimeAxis(mode, series, startMs, endMs)
+								? AXIS_DATE_BAND_PX
+								: 0
+						}
+					/>
 				)}
 				{/* ⛔ INSIDE THE PLOT BOX FOR `TerminalLabels`' REASON EXACTLY (CHART-7).
 				    A date label's x is a position in the plot's own domain, so it has to
@@ -582,6 +591,7 @@ export function MarketPriceChart({
 					endMs={endMs}
 				/>
 			</div>
+			<LabelReserve mode={mode} />
 		</div>
 	);
 }
@@ -710,6 +720,7 @@ function TerminalLabels({
 	yes,
 	mode,
 	terminalX,
+	bandPx,
 }: {
 	yes: string;
 	mode: ChartMode;
@@ -720,6 +731,14 @@ function TerminalLabels({
 	 * only plausible default is `VIEWBOX_W`, which is the pre-CHART-6 defect
 	 * spelled out as a value. */
 	terminalX: number;
+	/** The height of the X-axis date row, in CSS px, or `0` on a render that draws
+	 * no axis — `C-CHART-2` clause 3's reserved band (RF-5).
+	 * ⛔ PASSED, NEVER RE-DERIVED. Whether an axis is drawn depends on the mode AND
+	 * the series, which this component does not see; computing it here would mean a
+	 * second copy of `drawsTimeAxis`'s per-mode gates, and two copies of a gate are
+	 * two answers to "is there a date row?" — one held by the row and one by the
+	 * clamp meant to clear it. */
+	bandPx: number;
 }): React.JSX.Element {
 	const labelY = terminalLabelYs(yes);
 	// Which of the two clause-4 already put on top. Read off its OUTPUT rather
@@ -808,22 +827,16 @@ function TerminalLabels({
 				}`}
 				style={{
 					left,
-					top: yesOnTop ? lowerTop(lowerPct, half) : upperTop(upperPct, half),
+					top: yesOnTop
+						? lowerTop(lowerPct, half, bandPx)
+						: upperTop(upperPct, half),
 				}}
 			>
-				<span>NO</span>
-				{showValue && (
-					<span
-						data-testid="terminal-value-no"
-						className="tracking-normal tabular-nums"
-						style={{
-							fontSize: `${LABEL_VALUE_PX}px`,
-							marginLeft: `${LABEL_INLINE_GAP_PX}px`,
-						}}
-					>
-						{formatPricePercent(pair, "NO")}
-					</span>
-				)}
+				<LabelParts
+					name="NO"
+					value={showValue ? formatPricePercent(pair, "NO") : null}
+					valueTestId="terminal-value-no"
+				/>
 			</span>
 			<span
 				data-testid="terminal-label-yes"
@@ -834,22 +847,16 @@ function TerminalLabels({
 				}`}
 				style={{
 					left,
-					top: yesOnTop ? upperTop(upperPct, half) : lowerTop(lowerPct, half),
+					top: yesOnTop
+						? upperTop(upperPct, half)
+						: lowerTop(lowerPct, half, bandPx),
 				}}
 			>
-				<span>YES</span>
-				{showValue && (
-					<span
-						data-testid="terminal-value-yes"
-						className="tracking-normal tabular-nums"
-						style={{
-							fontSize: `${LABEL_VALUE_PX}px`,
-							marginLeft: `${LABEL_INLINE_GAP_PX}px`,
-						}}
-					>
-						{formatPricePercent(pair, "YES")}
-					</span>
-				)}
+				<LabelParts
+					name="YES"
+					value={showValue ? formatPricePercent(pair, "YES") : null}
+					valueTestId="terminal-value-yes"
+				/>
 			</span>
 		</div>
 	);
@@ -967,6 +974,127 @@ function markTop(pct: number): string {
 }
 
 /**
+ * One end label's contents — the name, and beside it the value when the mode
+ * carries one (`C-CHART-2` clause 2 as amended at CHART-7).
+ *
+ * ⛔ EXTRACTED SO THE RIGHT RESERVE CAN BE SIZED BY THE REAL LABEL RATHER THAN BY A
+ * COPY OF IT. `LabelReserve` renders this same element at the widest price the
+ * chart can produce, invisibly and in flow, and takes its width from the browser.
+ * If the sizer duplicated the spans instead, the two would agree on the day they
+ * were written and drift on the day one of them changed — which is exactly the
+ * failure `C-CHART-2` clause 3 records for CHART-1's hand-measured `26`, in a new
+ * place. One element, two callers, no second declaration of what a label is.
+ *
+ * ⚠ THE TESTID IS OPTIONAL AND THE SIZER PASSES NONE, deliberately: two elements
+ * carrying `terminal-value-yes` would make every guard that reads "the value" pick
+ * whichever came first in the markup, and the one that comes first would be the
+ * invisible copy.
+ */
+function LabelParts({
+	name,
+	value,
+	valueTestId,
+}: {
+	name: "YES" | "NO";
+	value: string | null;
+	valueTestId?: string;
+}): React.JSX.Element {
+	return (
+		<>
+			<span>{name}</span>
+			{value !== null && (
+				<span
+					data-testid={valueTestId}
+					className="tracking-normal tabular-nums"
+					style={{
+						fontSize: `${LABEL_VALUE_PX}px`,
+						marginLeft: `${LABEL_INLINE_GAP_PX}px`,
+					}}
+				>
+					{value}
+				</span>
+			)}
+		</>
+	);
+}
+
+/**
+ * The RIGHT gutter — a reserve the traveling end labels can occupy without
+ * crossing the frame (`C-CHART-2` clause 3 as amended at CHART-7, RF-5).
+ *
+ * ⛔ WHY A RESERVE AND NOT A BIGGER FLIP THRESHOLD. Since CHART-6 the labels travel
+ * with their dots, so a market trading near the deadline drives them to the plot's
+ * right edge; the only thing standing between them and the edge was the FLIP,
+ * which puts the label on the other side of its dot. That works, and it means the
+ * normal end-of-experiment rendering is the fallback rather than the design. A
+ * reserve makes the flip the exception it was written to be.
+ *
+ * ⛔ SIZED BY AN IN-FLOW INVISIBLE COPY OF THE WIDEST LABEL, NOT BY A NUMBER — the
+ * mechanism `YMarks` already uses and CHART-2 minted when it deleted CHART-1's
+ * hand-measured `26`. `formatPricePercent` at a YES price of `1` is `100%` by the
+ * shipped formatter, so the sizer's string is the widest string the chart CAN
+ * produce rather than a literal somebody believed was. Measured in the shipped
+ * face: `YES 100%` is **69.88 px** and `NO 100%` is **64.84 px**, so `YES` is
+ * correctly the one to size from.
+ *
+ * ⚠ THE PADDING IS THE OTHER TWO MEASURED INPUTS. `LABEL_AIR_PX` is the 5 px of
+ * separation carried since CHART-2, and `RESERVE_RING_PX` is the pulse ring's
+ * maximum extent in CSS px — measured **3.48 px on the collapsed card, 6.64 on the
+ * hero, 9.12 on the expanded overlay**, so 10 covers the widest plot the product
+ * ships. One number rather than three, erring high: over-reserving costs a few
+ * pixels of plot, under-reserving flips a label early. The failure is one-sided,
+ * so the margin belongs on the safe side.
+ *
+ * ⚠ AND A MEASUREMENT THAT SAYS THE RING IS ALREADY PAID FOR, RECORDED BECAUSE IT
+ * IS THE INTERESTING PART. The dot's maximum x is `VIEWBOX_W / SVG_W` = **98.61 %**
+ * of the plot, not 100 %, and the ring's own clearance is `LABEL_GAP_PCT` =
+ * **1.1094 %** — the two sum to 99.72 %, still inside the plot. So the true
+ * overhang past the plot's edge is `5px + labelWidth − 0.28 % × plotWidth`, and the
+ * ring term is slack rather than load. It is included anyway because `C-CHART-2`
+ * clause 3 pins it; the slack is stated so nobody later "discovers" it and removes
+ * the wrong term.
+ *
+ * ⛔ `invisible`, NEVER `hidden`. `visibility: hidden` keeps the box, which is the
+ * whole mechanism; `display: none` removes it and the reserve collapses to its
+ * padding — silently, leaving a chart that looks almost right.
+ */
+function LabelReserve({ mode }: { mode: ChartMode }): React.JSX.Element {
+	return (
+		<div
+			data-testid="chart-label-reserve"
+			// A blank strip that must not be announced, and must not intercept a click
+			// on the collapsed card's `<button>` or the hero's `<Link>` — the same two
+			// attributes, for the same two reasons, as the label layer it serves.
+			aria-hidden="true"
+			className="pointer-events-none invisible shrink-0 whitespace-nowrap text-[10px] leading-none font-bold tracking-[0.1em]"
+			style={{ paddingLeft: `${LABEL_AIR_PX + RESERVE_RING_PX}px` }}
+		>
+			<LabelParts
+				name="YES"
+				value={
+					hasEndValue(mode)
+						? formatPricePercent({ yes: "1", no: "1" }, "YES")
+						: null
+				}
+			/>
+		</div>
+	);
+}
+
+/**
+ * The pulse ring's maximum extent, in CSS PIXELS, as the right reserve budgets it.
+ *
+ * ⛔ A BOUND, NOT AN EXACT VALUE, AND SAYING SO IS THE POINT. The ring's extent is
+ * a fraction of the plot — `TERMINAL_PULSE_MAX_R / SVG_W` — so in pixels it differs
+ * per surface and per viewport: measured **3.48 px (collapsed) · 6.64 (hero) ·
+ * 9.12 (expanded overlay)** on the product's real boxes, in the shipped face. The
+ * reserve is one CSS box and cannot carry three numbers, so it carries the ceiling.
+ * ⚠ A plot wider than ~900 px would exceed it; the flip is what covers that, which
+ * is what a fallback is for.
+ */
+const RESERVE_RING_PX = 10;
+
+/**
  * The gap between a terminal dot and its label, expressed as a PERCENTAGE of the
  * plot — `C-CHART-2` clause 2 as amended at CHART-6.
  *
@@ -1000,75 +1128,58 @@ const LABEL_GAP_PCT = labelLeftPct(TERMINAL_PULSE_MAX_R);
 const LABEL_AIR_PX = 5;
 
 /**
- * How much of the plot a right-placed label needs, as a percentage — the flip
- * threshold, and the one measured number in this mechanism.
+ * How much of the plot a right-placed label needs BEYOND what the right reserve
+ * already holds, as a percentage — the flip threshold.
  *
- * ⛔ WHY A NUMBER IS UNAVOIDABLE HERE, SAID BEFORE THE NUMBER. Everything else in
- * this file is expressed as a fraction of the plot, so it holds at every size. A
- * label's WIDTH cannot be: the label is HTML at a fixed type size, so its width is
- * a constant in CSS PIXELS, while the plot's width is not — and the two are only
- * ever known together inside the browser's layout pass. CSS can mix the units
- * (`min()`, `calc()`) but cannot branch on the comparison, and the ruling is a
- * FLIP, which is a branch. So the decision is taken here.
+ * ⛔⛔ IT IS ZERO SINCE CHART-7, AND A ZERO CONSTANT NEEDS ITS REASON WRITTEN DOWN
+ * OR SOMEBODY WILL DELETE THE TERM. `LABEL_FLIP_RESERVE_PCT` was **14** — the
+ * percentage of the plot a label needed for itself, because there was nothing to
+ * the right of the plot and a label that would not fit inside it had to flip. RF-5
+ * puts a real reserve there, sized from the widest label the chart can produce plus
+ * the ring plus the gap, so the label no longer needs a percentage of the PLOT: it
+ * needs room in the RESERVE, and by construction the reserve has it.
  *
- * ⛔ MEASURED ACROSS THE WHOLE VIEWPORT RANGE, on the shipped build, in the
- * shipped Geist face, as `labelWidth / plotWidth`. The hero's chart frame:
+ * ⛔ THE ARITHMETIC, BECAUSE "BY CONSTRUCTION" IS A CLAIM. A label starts at
+ * `xPct% + LABEL_GAP_PCT% + LABEL_AIR_PX` of the plot and runs `labelWidth` past
+ * that. The reserve provides `labelWidth + LABEL_AIR_PX + RESERVE_RING_PX`. The
+ * dot's maximum in-window x is `VIEWBOX_W / SVG_W` = **98.61 %**, so the label's
+ * left edge is at most `98.61 + 1.11 = 99.72 %` of the plot — still inside it — and
+ * the overhang past the plot's edge is `5px + labelWidth − 0.28 % × plotWidth`,
+ * which is strictly less than the reserve for every plot width the product ships.
+ * **So an in-window label always fits, and the threshold that used to buy it room
+ * is spent.**
  *
- *      500 px → 496.49    768 px → 496.49    1280 px → 540.37
- *      640 px → 549.51    900 px → 496.49    1440 px → 626.12
- *      700 px → 609.51   1024 px → 496.49
- *      767 px → 676.39   1045 px → 496.49
+ * ⚠ THE FLIP IS NOT DEAD, AND THE CASE IT COVERS IS LIVE ON STAGING. `xPx` is
+ * deliberately unclamped, so a series running PAST the window end puts `terminalX`
+ * beyond `VIEWBOX_W` and `xPct` above 98.89 — at which point `xPct + LABEL_GAP_PCT`
+ * exceeds 100 and this fires. That is a real rendering (`limits.ts` records it
+ * happening for two weeks) and it is exactly what a fallback is for: the reserve
+ * covers a label anchored INSIDE the plot, and nothing can reserve room for a dot
+ * that is not on the canvas.
  *
- * ⇒ **The frame has a FLOOR of 496.49 px and never goes below it.** At 768 the
- * `md:grid-cols-[1fr_1.9fr_1fr]` three-column layout engages and the centre track
- * resolves to a CONTENT MINIMUM of 530.99 px — measured identical at 768, 900,
- * 1024 and 1045 — so the hero stops shrinking rather than continuing down. Below
- * 768 the panel is single-column and the hero gets WIDER, not narrower.
+ * ⚠ AND WHY THE TERM STAYS RATHER THAN THE COMPARISON BEING SIMPLIFIED TO
+ * `xPct + LABEL_GAP_PCT > 100`. The two are identical today. Keeping the named
+ * quantity keeps clause 2's flip arithmetic byte-identical to what CHART-6 shipped
+ * and measured — a scope fence this task honours by changing only its INPUT — and
+ * leaves one place to put a number back if a future reserve cannot cover
+ * something. `label-anchor.test.tsx` caps it at 20 from the other direction, so it
+ * cannot drift into "everything flips".
  *
- * ⚠ THAT FLOOR IS THE WHOLE SAFETY ARGUMENT AND IT CANNOT BE DERIVED, ONLY
- * MEASURED — which is worth stating because a careful derivation gets it wrong.
- * Reading the grid as a pure `1fr 1.9fr 1fr` split gives 421.95 px at 1024 and a
- * required reserve of 12.31 %, i.e. a defect; `@code-reviewer` filed exactly that
- * at the CHART-6 cascade. The arithmetic reproduces 1440 EXACTLY (347.7 / 660.6 /
- * 347.7 really is 1 : 1.9 : 1), which is what makes it convincing — and it is
- * wrong everywhere the tracks are content-bound instead. **A layout figure is
- * measured or it is not known.**
- *
- * ⇒ Worst case, **measured on this branch's own deployed build** rather than
- * predicted: the hero's plot at the floor is **472.49** (496.49 − 24 for the
- * marks column, confirmed), and the two-line label renders **33.56** at a typical
- * `65%`. The WIDEST it can be is `100%`, measured at **42.47** in the shipped face
- * — percentages are whole and bounded at 100 (SPEC.1 §10.8) — so the ceiling is
- * 42.47 / 472.49 = **8.99 %**. The `5px` of air is NOT in `shouldFlip`'s
- * comparison — it cannot be, since converting px to a percentage needs the plot
- * width nobody knows at render — so the reserve must absorb it too:
- * 5 / 472.49 = 1.06 pp, for a true requirement of **10.05 %**.
- *
- * ⚠ AN EARLIER PASS PUT THAT AT 11.37 %, USING **48.73** FOR THE LABEL. That is
- * the expanded GUTTER's width, not the label's — it included the gutter's own
- * `pl-[5px]` and the column it sat in. Measuring the label itself is what the
- * deployed build settled, and it moves the requirement down rather than up. The
- * conclusion is unchanged and the margin is wider than claimed.
- *
- * **14 leaves 3.95 points of margin over that requirement.** It was 12, which
- * cleared it by 1.95 — enough, but sized against a label width that turned out to
- * be the gutter's. A threshold whose input was the wrong quantity is worth
- * re-seating even when the answer survives. Over-reserving flips the label a few percent early,
- * which still places it beside its own dot and is invisible; under-reserving
- * overflows onto the numeric marks. The failure is one-sided, so the margin
- * belongs on the safe side. `label-anchor.test.tsx` caps it at 20 from the other
- * direction, so this cannot drift into "everything flips".
- *
- * ⚠ AND THIS IS NOT THE HAND-MEASURED CONSTANT CHART-2 DELETED, for two reasons
- * worth stating because the resemblance is close. CHART-1's `26` was a guess
- * about a font nobody could measure — Geist was unfetchable offline — guarding a
- * horizontal clip that nothing asserted. This is read off the shipped face on the
- * shipped surfaces, and it is used only as a THRESHOLD, so an imprecise value
- * costs an early flip rather than a clip. It is pinned at four series-end
- * positions on all three modes in the CHART-6 contact sheet, in a real browser,
- * which is the only place a text advance can honestly be checked.
+ * ⛔ WHAT THE 14 WAS, KEPT BECAUSE THE MEASUREMENT COST SOMETHING AND STILL
+ * TEACHES. It was read off the shipped build across the whole viewport range as
+ * `labelWidth / plotWidth`: the hero's chart frame has a measured FLOOR of
+ * **496.49 px** — identical at 768, 900, 1024 and 1045, because the
+ * `md:grid-cols-[1fr_1.9fr_1fr]` centre track hits a content minimum of 530.99 and
+ * stops shrinking — its plot at that floor is **472.49**, and `100%` renders
+ * **42.47 px** in the shipped face, giving 8.99 % plus 1.06 pp for the air the
+ * threshold could not express: **10.05 %**, cleared by 14 with 3.95 points spare.
+ * ⚠ AND A CAREFUL DERIVATION GETS THAT FLOOR WRONG: reading the grid as a pure
+ * `1fr 1.9fr 1fr` split gives 421.95 px at 1024 and predicts a defect, and it
+ * reproduces 1440 EXACTLY, which is what makes it convincing. `@code-reviewer`
+ * filed exactly that at the CHART-6 cascade. **A layout figure is measured or it is
+ * not known.**
  */
-const LABEL_FLIP_RESERVE_PCT = 14;
+const LABEL_FLIP_RESERVE_PCT = 0;
 
 /** Whether a label at this x would cross the plot's right edge — `C-CHART-2`
  * clause 2's flip, per label. ⚠ Both labels share one `terminalX` today, because
@@ -1242,8 +1353,31 @@ function upperTop(pct: number, half: number): string {
 	return `clamp(${half}px, min(${pct}%, calc(50% - ${half}px)), calc(100% - ${half}px))`;
 }
 
-function lowerTop(pct: number, half: number): string {
-	return `clamp(${half}px, max(${pct}%, calc(50% + ${half}px)), calc(100% - ${half}px))`;
+/**
+ * ⛔ THE THIRD TERM IS THE DATE ROW, AND IT IS ONE MORE MEASURED INPUT TO THIS
+ * CLAMP RATHER THAN A SECOND RULE (`C-CHART-2` clause 3, RF-5). The bottom bound
+ * was `100% - half`, which keeps the label's box inside the PLOT; the plot's floor
+ * is also where the X-axis dates sit, so at the window end with an extreme price
+ * the lower label came to rest exactly on top of its own date label. Measured at
+ * CHART-6 and reproduced on this branch before the change: **19.99 × 16.00 px** on
+ * the expanded overlay, **4.54 × 7.70 px** on the collapsed card.
+ *
+ * ⚠ IT NEEDS BOTH CONDITIONS AT ONCE — a series reaching the window end AND a
+ * price at an extreme — which is why it is invisible today and is what every
+ * market looks like on 2026-11-05.
+ *
+ * ⛔ THE BAND IS COMPOSED, NOT WRITTEN DOWN. `AXIS_DATE_BAND_PX` is
+ * `AXIS_DATE_PX + AXIS_DATE_BOTTOM_PX` — the row's own type plus its own offset —
+ * so changing either moves the clamp with it. A literal here would be a threshold
+ * chosen against one date size, which is the CHART-2 defect this file records
+ * twice.
+ *
+ * ⚠ AND IT IS `0` ON A RENDER THAT DRAWS NO AXIS, passed in rather than assumed.
+ * Reserving a band under a row that is not there would push the lower label up on
+ * a degenerate market for no reason a reader could see.
+ */
+function lowerTop(pct: number, half: number, bandPx: number): string {
+	return `clamp(${half}px, max(${pct}%, calc(50% + ${half}px)), calc(100% - ${half}px - ${bandPx}px))`;
 }
 
 /**
@@ -1553,6 +1687,12 @@ function AxisDates({
  */
 const AXIS_DATE_PX = 12;
 const AXIS_DATE_BOTTOM_PX = 4;
+
+/** The whole height the date row occupies above the plot's floor — the band
+ * `lowerTop` may not put a label into (`C-CHART-2` clause 3, RF-5). Composed from
+ * the two constants above rather than written as a third number, so the clamp and
+ * the row can never disagree about how tall the row is. */
+const AXIS_DATE_BAND_PX = AXIS_DATE_PX + AXIS_DATE_BOTTOM_PX;
 
 /** An SVG `points` string for one line. With fewer than two points OR a
  * degenerate domain (`startMs === endMs`), draws a FLAT LINE from the left edge

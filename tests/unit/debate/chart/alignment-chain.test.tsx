@@ -392,7 +392,11 @@ describe("C-CHART-2 clause 3 — no width is ever pinned, and the plot keeps all
 		);
 		// The collapsed frame carries the marks column and the plot — and, since
 		// CHART-7 (RF-3), it carries marks at all, which it never did before.
-		expect(inFlow).toEqual(["chart-y-marks", "market-price-chart-plot"]);
+		expect(inFlow).toEqual([
+			"chart-y-marks",
+			"market-price-chart-plot",
+			"chart-label-reserve",
+		]);
 		expect(inFlow).not.toContain("terminal-label-layer");
 
 		// …and on the overlay, the plot plus the marks column — never the labels.
@@ -408,7 +412,11 @@ describe("C-CHART-2 clause 3 — no width is ever pinned, and the plot keeps all
 		// two systems that used to compete for the right strip are now separated by
 		// axis, and a flex row states which side a cell is on by nothing but its
 		// position among its siblings.
-		expect(exInFlow).toEqual(["chart-y-marks", "market-price-chart-plot"]);
+		expect(exInFlow).toEqual([
+			"chart-y-marks",
+			"market-price-chart-plot",
+			"chart-label-reserve",
+		]);
 		expect(exInFlow).not.toContain("terminal-label-layer");
 	});
 });
