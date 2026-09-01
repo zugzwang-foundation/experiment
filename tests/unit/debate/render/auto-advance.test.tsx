@@ -29,14 +29,29 @@ vi.mock("next/navigation", () => ({
 		forward: () => undefined,
 		prefetch: () => undefined,
 	}),
-	usePathname: () => "/m/mumbai-metro-line-3-1m-riders",
+	usePathname: () => "/m/bitcoin-price-50k",
 	useSearchParams: () => new URLSearchParams(),
 }));
 
 import { DebateView } from "@/components/debate/DebateView";
+import type { DebateViewModel } from "@/components/debate/types";
 import { POLL_INTERVAL_MS_DEBATE_VIEW } from "@/server/config/limits";
 
-import { mumbaiMetroModel } from "../../debate-export/_fixtures/mumbai-metro.input";
+import { mumbaiMetroModel as mumbaiMetroModelRaw } from "../../debate-export/_fixtures/mumbai-metro.input";
+
+/**
+ * BLOCK-1 — `mumbaiMetroModelRaw.market.slug` isn't one of BLOCK-1's eight
+ * known live markets, so `ResolverCards` (nested under `MarketHeader`, which
+ * `DebateView` renders through) now throws on it — correctly; that's the new
+ * guard this task shipped (G1, `resolution-block-data.ts`). This file tests
+ * arena auto-advance timing, not ResolverCards' content, so it gets a
+ * locally-corrected model with a real slug. The golden input fixture itself
+ * (`mumbai-metro.input.ts`, "do not hand-edit") stays untouched.
+ */
+const mumbaiMetroModel: DebateViewModel = {
+	...mumbaiMetroModelRaw,
+	market: { ...mumbaiMetroModelRaw.market, slug: "bitcoin-price-50k" },
+};
 
 /**
  * ⛔ THE CADENCE IS IMPORTED, NEVER RESTATED. Writing `15000` here would pin a

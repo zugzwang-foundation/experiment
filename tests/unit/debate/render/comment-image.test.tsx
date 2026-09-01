@@ -300,15 +300,33 @@ describe("HTML-FINISH · MARKET DETAIL — row 26, the reply's own image", () =>
 		expect(img?.getAttribute("src")).toBe(
 			"https://example.invalid/reply-image",
 		);
-		// It rides the SAME `CommentImage` as the post path — same T2 geometry,
-		// same lightbox affordance, not a second image component.
-		expect(img?.getAttribute("class")).toContain("max-h-[var(--imgmax)]");
+		// It rides the SAME `CommentImage` as the post path — same lightbox
+		// affordance, not a second image component.
+		// ⚠⚠ RPLY-1 · R6 — THE BOUND MOVED FROM `--imgmax` TO `max-h-full`, AND
+		// THE SUPERSEDED ASSERTION IS RECORDED RATHER THAN DELETED (O-4). It read
+		// `toContain("max-h-[var(--imgmax)]")`, which is `CommentImage`'s
+		// NON-`fill` arm — a 160px cap on a `w-fit` box. The reply card now gives
+		// its attachment the same `.argimg` CELL the post card has, so the image
+		// is bounded by the CELL (`max-h-full`) rather than by a constant, exactly
+		// as `PostCard`'s is. T2 is untouched: both axes are still BOUNDS
+		// (`max-h-full` + `max-w-full`, no fixed dimension), so the intrinsic
+		// aspect is preserved and a small image is never upscaled.
+		expect(img?.getAttribute("class")).toContain("max-h-full");
+		expect(img?.getAttribute("class")).toContain("max-w-full");
+		expect(img?.getAttribute("class")).not.toContain("max-h-[var(--imgmax)]");
 		expect(
 			container.querySelector('button[aria-label="Open attached image"]'),
 		).not.toBeNull();
 	});
 
-	it("comment-image::a-reply-without-one-mounts-nothing", () => {
+	it("comment-image::a-reply-without-one-mounts-THE-PLACEHOLDER", () => {
+		// ⚠⚠ RPLY-1 · R6 — THIS TEST'S NAME AND CLAIM BOTH CHANGED, AND IT WOULD
+		// HAVE STAYED GREEN WITHOUT NOTICING. It was
+		// `a-reply-without-one-mounts-nothing`, asserting only
+		// `querySelector("img") === null`. The placeholder is a `<div>`, so that
+		// assertion still passes against a card that now DOES draw an empty image
+		// slot — a test whose name had quietly become false while its colour said
+		// everything was fine. Corrected in place rather than left to mislead.
 		const { container } = render(
 			<ReplyCard
 				reply={presentReply(null)}
@@ -317,12 +335,19 @@ describe("HTML-FINISH · MARKET DETAIL — row 26, the reply's own image", () =>
 			/>,
 		);
 
+		// Still no real image — nothing is invented for an attachment-less reply.
 		expect(container.querySelector("img")).toBeNull();
+		// ⛔ But the SLOT is drawn, which is R6's whole mechanism: the cell is what
+		// absorbs the card's leftover height, and a cell that renders nothing
+		// absorbs nothing.
+		expect(
+			container.querySelector('[data-testid="post-image-placeholder"]'),
+		).not.toBeNull();
 		// Non-vacuity: the reply itself rendered.
 		expect(container.innerHTML).toContain("Fixture reply body.");
 	});
 
-	it("comment-image::a-REMOVED-reply-renders-no-image-and-no-body", () => {
+	it("comment-image::a-REMOVED-reply-renders-no-image-no-body-AND-NO-PLACEHOLDER", () => {
 		// ⛔ SC-1 at the render. The removed variant carries neither field, so
 		// this asserts the BODY's absence as well as the image's — a row-level
 		// "it still renders something" check would not.
@@ -341,6 +366,17 @@ describe("HTML-FINISH · MARKET DETAIL — row 26, the reply's own image", () =>
 
 		expect(container.querySelector("img")).toBeNull();
 		expect(container.innerHTML).not.toContain("Fixture reply body.");
+		// ⛔⛔ RPLY-1 · R6 — AND NO PLACEHOLDER EITHER, WHICH IS A MASKING CLAIM
+		// RATHER THAN A LAYOUT ONE. `PostCard` already records the reasoning for
+		// its own path: a "POST IMAGE" box beside a withheld argument announces
+		// that the withheld argument HAD an attachment, which is an inference
+		// about removed content leaking off a masked payload. The type system does
+		// NOT help here — the removed branch is a separate early return, and an
+		// `else` arm needs no field — so R6's new mount is exactly the shape that
+		// could have reached it, and this is the assertion that says it did not.
+		expect(
+			container.querySelector('[data-testid="post-image-placeholder"]'),
+		).toBeNull();
 	});
 });
 

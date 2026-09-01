@@ -217,7 +217,7 @@ export const DISCOVERY_SERIES_MAX_POINTS = 64;
 export const MARKET_SERIES_MAX_POINTS = 256;
 
 /** Minimum interval between derivations of a market's price-series HISTORY
- * (SPEC.1 1.0.40 §9 *Refresh — floored history, live edge* + §16.1 + Appendix
+ * (SPEC.1 1.0.45 §9 *Refresh — floored history, live edge* + §16.1 + Appendix
  * B, founder-ruled at CHART-1). Within the window a derivation is REUSED; the
  * series' TERMINAL point is composed fresh on every render from the live pool
  * price and is never floored, so the chart's right edge cannot disagree with
@@ -242,7 +242,7 @@ export const MARKET_SERIES_MAX_POINTS = 256;
  * (milliseconds, not Dharma). */
 export const MARKET_SERIES_MIN_WINDOW_MS = 60000;
 
-// === CHART-3: the fixed experiment window (SPEC.1 1.0.42 §9 + §16.1) ======
+// === CHART-3: the fixed experiment window (SPEC.1 1.0.48 §9 + §16.1) ======
 
 /** The §9 price chart's fixed X axis, as a pair of ISO instants. */
 export type ChartWindow = { readonly start: string; readonly end: string };

@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
 	ALL_FIGURES,
 	DEFAULT_POSE,
+	FIELD_FIGURES,
 	HAND_X,
 	INNER_FIGURES,
 	OPPOSED_PAIRS,
@@ -42,7 +43,7 @@ import { PRIMITIVE_SPECS } from "@/components/art/warli/primitives";
 const CENTRE = { x: 0, y: 0 } as const;
 
 describe("warli hero — it renders", () => {
-	it("draws both rings and all sixteen figures", () => {
+	it("draws both rings, the static field, and every figure once", () => {
 		const { container } = render(<WarliHero />);
 
 		expect(container.querySelectorAll("[data-warli-ring]")).toHaveLength(2);
@@ -50,20 +51,38 @@ describe("warli hero — it renders", () => {
 			container
 				.querySelector('[data-warli-ring="inner"]')
 				?.getAttribute("data-warli-density"),
-		).toBe("dense");
+		).toBe("solid");
 		expect(
 			container
 				.querySelector('[data-warli-ring="outer"]')
 				?.getAttribute("data-warli-density"),
 		).toBe("spare");
 
-		const labels = [...container.querySelectorAll("[data-warli-label]")].map(
-			(node) => node.getAttribute("data-warli-label"),
-		);
-		expect(labels).toHaveLength(16);
-		expect(new Set(labels).size).toBe(16);
-		expect(labels).toContain("scholar");
-		expect(labels).toContain("labourer");
+		// ⚠ IDS, NOT LABELS. Ring figures have unique labels; the static field
+		// deliberately does not — it holds two elders, two pupils, two mourners
+		// and three dancers, because a field of twenty-eight people in which no
+		// two do the same job is not a village, it is a catalogue. Asserting label
+		// uniqueness would therefore forbid the correct composition. Ids stay
+		// unique, and that is the property worth pinning: a duplicate id means a
+		// figure was registered twice.
+		const ids = [...container.querySelectorAll("[data-warli-id^='warli-']")]
+			.map((node) => node.getAttribute("data-warli-id"))
+			.filter((id) => ALL_FIGURES.some((f) => f.id === id));
+		expect(new Set(ids).size).toBe(ALL_FIGURES.length);
+
+		expect(
+			container.querySelectorAll(
+				'[data-warli-ring="inner"] [data-warli-label]',
+			),
+		).toHaveLength(INNER_FIGURES.length);
+		expect(
+			container.querySelectorAll(
+				'[data-warli-ring="outer"] [data-warli-label]',
+			),
+		).toHaveLength(OUTER_FIGURES.length);
+		expect(
+			container.querySelectorAll("[data-warli-field-figure]"),
+		).toHaveLength(FIELD_FIGURES.length);
 	});
 
 	it("closes both hand chains — one link per figure, both rings", () => {
@@ -101,7 +120,7 @@ const clockAngle = (x: number, y: number) =>
 	((((Math.atan2(x, -y) * 180) / Math.PI + 360) % 360) + 360) % 360;
 
 describe("warli hero — the argument, asserted", () => {
-	it("stands every pair on a shared radius at rest, READ OFF THE DOM", () => {
+	it("stands each opposed pair at 180° across the inner ring, READ OFF THE DOM", () => {
 		// THE THESIS: "every figure faces its social opposite across the gap".
 		//
 		// ⚠ THIS TEST USED TO PROVE NOTHING, and the way it failed is worth keeping
@@ -116,36 +135,71 @@ describe("warli hero — the argument, asserted", () => {
 		// The fix is to read what actually reaches the DOM. Facing, radius and
 		// phase reach it in exactly one place — the figure's `transform` — so
 		// nothing that does not read that attribute can see any of the three.
+		// ⚠ WARLI-2 RE-HOMED THE PAIRS. In WARLI-1 each opposition straddled the
+		// two rings, so "facing its opposite" meant "across the gap". Now both
+		// members stand on the SAME ring, four indices apart on a ring of eight —
+		// which is what makes "at 180° across the ring" a literally true sentence
+		// and G1 a checkable one. The assertion below is therefore about BEARING,
+		// not about radius: the two must sit at opposite points of one circle.
 		const { container } = render(<WarliHero />);
 
 		for (const [i, pair] of OPPOSED_PAIRS.entries()) {
-			const [innerSpec, outerSpec] = pair;
-			const inner = readTransform(
+			const [a, b] = pair;
+			const first = readTransform(
 				container.querySelector(
-					`[data-warli-ring="inner"] [data-warli-id="${innerSpec.id}"]`,
+					`[data-warli-ring="inner"] [data-warli-id="${a.id}"]`,
 				),
 			);
-			const outer = readTransform(
+			const second = readTransform(
 				container.querySelector(
-					`[data-warli-ring="outer"] [data-warli-id="${outerSpec.id}"]`,
+					`[data-warli-ring="inner"] [data-warli-id="${b.id}"]`,
 				),
 			);
-			if (inner === null || outer === null) {
+			if (first === null || second === null) {
 				throw new Error(`pair ${i} did not render a parsable transform`);
 			}
 
-			// Same bearing from the centre — the pair shares a radius.
-			expect(clockAngle(outer.x, outer.y)).toBeCloseTo(
-				clockAngle(inner.x, inner.y),
-				6,
-			);
-			// Facing each other, not the same way: exactly a half turn apart.
-			expect(outer.rotate - inner.rotate).toBe(180);
-			// And on the two DIFFERENT rings they were assigned to, or the pairing
-			// holds while the composition has collapsed to one radius.
-			expect(Math.hypot(inner.x, inner.y)).toBeCloseTo(R_INNER, 3);
-			expect(Math.hypot(outer.x, outer.y)).toBeCloseTo(R_OUTER, 3);
+			// Diametrically opposite, to within a degree (G1).
+			//
+			// ⚠ I WROTE THIS ARITHMETIC WRONG FIRST TIME and it reddened against a
+			// correct composition: `((b − a + 540) % 360) − 180` maps a perfect
+			// 180° separation to −180, so `Math.abs` gave 180 and the assertion
+			// read "expected 180 to be less than 1". Normalise the separation into
+			// [0, 360) FIRST, then measure its distance from 180. Worth keeping,
+			// because a hand-computed expectation disagreeing with the code is
+			// supposed to fail in exactly this direction — it does not care which
+			// of the two is wrong, and this time it was me.
+			const separation =
+				(((clockAngle(second.x, second.y) - clockAngle(first.x, first.y)) %
+					360) +
+					360) %
+				360;
+			expect(Math.abs(separation - 180)).toBeLessThan(1);
+			// Both on the inner ring's own radius.
+			expect(Math.hypot(first.x, first.y)).toBeCloseTo(R_INNER, 3);
+			expect(Math.hypot(second.x, second.y)).toBeCloseTo(R_INNER, 3);
+			// And both faced — these eight are the only faces in the piece.
+			expect(a.face).toBeDefined();
+			expect(b.face).toBeDefined();
 		}
+
+		// The outer ring still faces the inner one across the gap, which is the
+		// half-turn relationship WARLI-1 pinned and WARLI-2 keeps.
+		const innerFirst = readTransform(
+			container.querySelector(
+				`[data-warli-ring="inner"] [data-warli-id="${INNER_FIGURES[0]?.id}"]`,
+			),
+		);
+		const outerFirst = readTransform(
+			container.querySelector(
+				`[data-warli-ring="outer"] [data-warli-id="${OUTER_FIGURES[0]?.id}"]`,
+			),
+		);
+		expect(outerFirst?.rotate ?? 0).toBe((innerFirst?.rotate ?? 0) + 180);
+		expect(Math.hypot(outerFirst?.x ?? 0, outerFirst?.y ?? 0)).toBeCloseTo(
+			R_OUTER,
+			3,
+		);
 	});
 
 	it("wires each ring to its own radius, phase and facing — exact transforms", () => {
@@ -166,10 +220,17 @@ describe("warli hero — the argument, asserted", () => {
 				)
 				?.getAttribute("transform"),
 		).toBe("translate(126.2855 -304.8802) rotate(22.5)");
+		// ⚠ THE OUTER RING'S FIRST FIGURE IS NOW `speaker`, NOT `labourer`.
+		// WARLI-2 moved labourer to the inner ring so it could sit opposite the
+		// scholar at 180°. The transform literal is unchanged — index 0 at phase
+		// 22.5 on radius 470 is the same point whoever is standing there — which
+		// is exactly why this selector had to be corrected by hand rather than
+		// caught by the number: the assertion would have kept passing if the outer
+		// ring had twelve figures and this one happened to still be at index 0.
 		expect(
 			container
 				.querySelector(
-					'[data-warli-ring="outer"] [data-warli-id="warli-labourer"]',
+					'[data-warli-ring="outer"] [data-warli-id="warli-speaker"]',
 				)
 				?.getAttribute("transform"),
 		).toBe("translate(179.8612 -434.2234) rotate(202.5)");
@@ -248,25 +309,21 @@ describe("warli hero — the argument, asserted", () => {
 		expect(R_OUTER - 58 - (R_INNER + 58)).toBe(24);
 	});
 
-	it("pairs the eight oppositions, inner to outer, without drift", () => {
-		expect(OPPOSED_PAIRS).toHaveLength(8);
+	it("pairs the four oppositions across the inner ring, without drift", () => {
+		expect(OPPOSED_PAIRS).toHaveLength(4);
 		expect(OPPOSED_PAIRS.map(([a, b]) => `${a.label}/${b.label}`)).toEqual([
 			"scholar/labourer",
 			"soldier/student",
 			"priest/scientist",
 			"merchant/farmer",
-			"speaker/listener",
-			"elder/child",
-			"weaver/builder",
-			"musician/dancer",
 		]);
 	});
 });
 
 describe("warli hero — the registers", () => {
-	it("declares thirty primitives with unique ids and real boxes", () => {
-		expect(PRIMITIVE_SPECS).toHaveLength(30);
-		expect(new Set(PRIMITIVE_SPECS.map((s) => s.id)).size).toBe(30);
+	it("declares fifty-six primitives with unique ids and real boxes", () => {
+		expect(PRIMITIVE_SPECS).toHaveLength(56);
+		expect(new Set(PRIMITIVE_SPECS.map((s) => s.id)).size).toBe(56);
 		for (const spec of PRIMITIVE_SPECS) {
 			expect(spec.id.startsWith("warli-")).toBe(true);
 			expect(spec.box.width).toBeGreaterThan(0);
@@ -276,19 +333,40 @@ describe("warli hero — the registers", () => {
 		}
 	});
 
-	it("gives the dense ring hatch and ground the spare ring does not have", () => {
+	it("gives the loud ring a solid body and a ground the quiet one lacks", () => {
+		// ⚠ THE REGISTERS WENT FROM TWO TO THREE AT WARLI-2, and the inner ring
+		// moved from `dense` to `solid` — its torsos are filled with ink and the
+		// ornament is cut back out of them in ground, rather than being hatched.
+		// So the inner ring now carries ZERO hatch, which reads like a regression
+		// unless you know that. The property that actually distinguishes the rings
+		// is unchanged: the loud one stands on a drawn ground and is filled, the
+		// quiet one is bare outline on nothing.
 		const { container } = render(<WarliHero />);
 		const innerRing = container.querySelector('[data-warli-ring="inner"]');
 		const outerRing = container.querySelector('[data-warli-ring="outer"]');
 
 		expect(
-			innerRing?.querySelectorAll('[data-warli-density="hatch"]'),
+			innerRing?.querySelectorAll('[data-warli-register="solid"]'),
 		).toHaveLength(INNER_FIGURES.length);
 		expect(
-			outerRing?.querySelectorAll('[data-warli-density="hatch"]'),
-		).toHaveLength(0);
+			outerRing?.querySelectorAll('[data-warli-register="spare"]'),
+		).toHaveLength(OUTER_FIGURES.length);
 		expect(innerRing?.querySelector("[data-warli-ring-ground]")).not.toBeNull();
 		expect(outerRing?.querySelector("[data-warli-ring-ground]")).toBeNull();
+
+		// The ornament on a solid body must be RESERVED — drawn in ground colour,
+		// not ink. Without the class it is ink on ink and silently invisible: the
+		// figures would render as plain solids and nothing would fail.
+		const reserved = innerRing?.querySelectorAll(
+			'[data-warli-id="warli-ornament"].warli-reserve',
+		);
+		expect(reserved).toHaveLength(INNER_FIGURES.length);
+		// …and on an open body it must NOT be, or it would vanish into the ground.
+		expect(
+			outerRing?.querySelectorAll(
+				'[data-warli-id="warli-ornament"].warli-reserve',
+			),
+		).toHaveLength(0);
 	});
 
 	it("attaches the hand chain where the hand is actually DRAWN", () => {
@@ -313,25 +391,51 @@ describe("warli hero — the registers", () => {
 			const arms = node?.querySelector(
 				'[data-warli-arms="straight"], [data-warli-arms="bent"]',
 			);
-			const lines = [...(arms?.querySelectorAll("line") ?? [])];
-			if (lines.length === 0) {
+			// ⚠ READS A `<path>`, NOT A `<line>`, SINCE WARLI-2 SLICE 2. Every
+			// straight run in this layer is now a bowed quadratic
+			// (`primitives/wobble.ts`), so the arm is `M x1 y1 Q cx cy x2 y2` and
+			// there is no `x2` attribute left to read.
+			//
+			// ⛔ THE ASSERTION IS NOT WEAKENED BY THAT, AND IT MATTERS THAT IT IS NOT:
+			// the wobble was built to move the MIDDLE of a segment and never its
+			// endpoints, precisely so this guard keeps meaning what it meant. The
+			// last coordinate pair of the `d` string is the same point the old `x2`
+			// carried.
+			//
+			// ⚠ TO TWO DECIMALS, NOT EXACTLY — this comment claimed "exactly, not
+			// approximately" and that was false. `bowedLine` passes both endpoints
+			// through `q()`, which rounds to 2dp, where the old `<line x2>` carried
+			// the raw float. Guard resolution therefore went from ~5e-7 to 5e-3.
+			// Harmless — every pose coordinate is an integer and survives `q()` — but
+			// the sentence existed precisely to stop the next reader checking, which
+			// makes being wrong about it worse than saying nothing.
+			const runs = [...(arms?.querySelectorAll("path") ?? [])];
+			if (runs.length === 0) {
 				throw new Error(`${spec.id} drew no arms`);
 			}
 			const k = spec.pose.scale ?? 1;
 			// The hand is the far end of the LAST segment of each arm: one segment
 			// per arm when straight, two when bent through an elbow.
-			const perArm = lines.length / 2;
-			const leftHand = lines[perArm - 1];
-			const rightHand = lines[lines.length - 1];
-			const drawn = (line: Element | undefined) => ({
-				x: Number(line?.getAttribute("x2")) * k,
-				y: Number(line?.getAttribute("y2")) * k,
-			});
+			const perArm = runs.length / 2;
+			const leftHand = runs[perArm - 1];
+			const rightHand = runs[runs.length - 1];
+			const endpointOf = (run: Element | undefined) => {
+				const nums = (run?.getAttribute("d") ?? "")
+					.match(/-?\d+(?:\.\d+)?/g)
+					?.map(Number);
+				if (nums === undefined || nums.length < 2) {
+					throw new Error(`${spec.id}: unparsable arm path`);
+				}
+				return {
+					x: (nums[nums.length - 2] as number) * k,
+					y: (nums[nums.length - 1] as number) * k,
+				};
+			};
 
-			expect(drawn(leftHand).x).toBeCloseTo(spec.handLeft.x, 6);
-			expect(drawn(leftHand).y).toBeCloseTo(spec.handLeft.y, 6);
-			expect(drawn(rightHand).x).toBeCloseTo(spec.handRight.x, 6);
-			expect(drawn(rightHand).y).toBeCloseTo(spec.handRight.y, 6);
+			expect(endpointOf(leftHand).x).toBeCloseTo(spec.handLeft.x, 6);
+			expect(endpointOf(leftHand).y).toBeCloseTo(spec.handLeft.y, 6);
+			expect(endpointOf(rightHand).x).toBeCloseTo(spec.handRight.x, 6);
+			expect(endpointOf(rightHand).y).toBeCloseTo(spec.handRight.y, 6);
 
 			// ⚠ CONSISTENCY IS NOT ENOUGH, and finding that out cost a surviving
 			// mutant. Pre-scaling the pose AND scaling the anchor keeps the two in
@@ -343,10 +447,22 @@ describe("warli hero — the registers", () => {
 			// So: in BODY space every figure reaches the same distance out. That is
 			// the "sixteen bodies, one build" thesis expressed as a number, and it
 			// is what a scale applied in the wrong place destroys.
-			expect(Math.abs(spec.pose.handLeft.x)).toBeGreaterThanOrEqual(HAND_X - 1);
-			expect(Math.abs(spec.pose.handRight.x)).toBeGreaterThanOrEqual(
-				HAND_X - 1,
-			);
+			// ⚠ BOUNDED ON BOTH SIDES SINCE WARLI-2, and the one-sided version was a
+			// guard whose prose claimed more than its assertion — the exact shape this
+			// file's docblock warns about. There was no upper bound anywhere in the
+			// suite, so a pose reaching `handLeft.x = -200` passed this AND the drawn-
+			// endpoint checks above, because both derive from the same `pose`. WARLI-1
+			// could carry that because every pose used exactly ±HAND_X; WARLI-2 adds
+			// STOOP at ±(HAND_X + 1) and keeps SPEAK at HAND_X − 1, so the shipped
+			// spread is 19…21 and the floor had zero headroom. "The same distance" is
+			// now asserted as a BAND rather than merely claimed in a comment.
+			for (const reach of [
+				Math.abs(spec.pose.handLeft.x),
+				Math.abs(spec.pose.handRight.x),
+			]) {
+				expect(reach).toBeGreaterThanOrEqual(HAND_X - 1);
+				expect(reach).toBeLessThanOrEqual(HAND_X + 2);
+			}
 		}
 
 		// And the child's FIGURE-space anchors are exactly the shared reach taken
@@ -383,24 +499,37 @@ describe("warli hero — the registers", () => {
 				?.firstElementChild?.getAttribute("transform");
 
 		expect(first("inner")).toBe("translate(251.73 -251.73) rotate(45)");
-		expect(first("outer")).toBe("translate(332.3402 -332.3402) rotate(45)");
+
+		// ⚠ THE OUTER RING NO LONGER HAS A FIELD AT ALL, and that is a fix rather
+		// than a loss. Its motifs grew OUTWARD from a baseline at radius 470 in a
+		// frame whose half-height is 500, so the fringe reached 496 and drew
+		// straight through the border stack. It existed because the area outside
+		// the rings was empty; the static field now fills that with actual scenery.
+		expect(first("outer")).toBeUndefined();
 	});
 
-	it("keeps every figure the same drawing — sixteen bodies, one build", () => {
+	it("keeps every figure the same drawing — forty-eight bodies, one build", () => {
 		// If a later change gives one figure its own construction, this reddens.
-		// The thesis is that everyone in the ring is the same shape and differs
-		// only in what they carry, so a bespoke body would reverse the argument
-		// while looking like a styling tweak.
+		// The thesis is that everyone here is the same shape and differs only in
+		// what they carry and how they are dressed, so a bespoke body would
+		// reverse the argument while looking like a styling tweak.
 		const { container } = render(<WarliHero />);
 		expect(container.querySelectorAll("[data-warli-figure-body]")).toHaveLength(
-			16,
+			ALL_FIGURES.length,
 		);
 		expect(
 			container.querySelectorAll('[data-warli-id="warli-torso"]'),
-		).toHaveLength(16);
-		// Twelve carry an object; four are told apart by pose alone.
-		expect(container.querySelectorAll("[data-warli-hold]")).toHaveLength(12);
-		expect(ALL_FIGURES.filter((f) => f.prop === "none")).toHaveLength(4);
+		).toHaveLength(ALL_FIGURES.length);
+		// Everyone who carries something renders exactly one held object.
+		expect(container.querySelectorAll("[data-warli-hold]")).toHaveLength(
+			ALL_FIGURES.filter((f) => f.prop !== "none").length,
+		);
+		// And a real minority are told apart by pose and ornament alone — if this
+		// ever reached zero, identity would rest entirely on objects, which is a
+		// smaller idea than the one the piece is making.
+		expect(
+			ALL_FIGURES.filter((f) => f.prop === "none").length,
+		).toBeGreaterThanOrEqual(8);
 	});
 
 	it("nudges both rings toward the pointer, and releases", () => {
@@ -567,7 +696,13 @@ describe("warli hero — the registers", () => {
 		const { container } = render(<WarliHero />);
 		const css = container.querySelector("style")?.textContent ?? "";
 		expect(css).toContain("@media (prefers-reduced-motion: reduce)");
-		const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion"));
+		// ⚠ BOUNDED TO THE MEDIA BLOCK. The slice used to run to end-of-string, so a
+		// rule appended AFTER the block could satisfy these from outside the media
+		// query — the guard would report reduced motion honoured by a declaration
+		// that never applies under it. Today the block is last and nothing follows;
+		// that is a fact about today's stylesheet, not a property of the test.
+		const from = css.indexOf("@media (prefers-reduced-motion");
+		const reduced = css.slice(from, css.indexOf("\n}", from));
 		expect(reduced).toContain("animation: none");
 		expect(reduced).toContain("transform: none");
 	});

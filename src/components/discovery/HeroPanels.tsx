@@ -1,10 +1,12 @@
 import Link from "next/link";
+import type { RefObject } from "react";
 
 import { SideBadge } from "@/components/debate/badges";
 import { computeSplitBar } from "@/components/debate/composer/split-bar";
 import { formatDharma } from "@/components/debate/format";
 import { PriceBar } from "@/components/debate/PriceBar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { RelativeTime } from "@/components/ui/relative-time";
 import type { HeroPost, HeroTopPosts } from "@/server/discovery/hero";
 import type { DiscoveryCard } from "@/server/discovery/list";
 import type { PricePoint } from "@/server/discovery/price-series";
@@ -64,11 +66,19 @@ export function HeroPanels({
 	card,
 	series,
 	topPosts,
+	linkRef,
 	isOpen,
 }: {
 	card: DiscoveryCard;
 	series: PricePoint[];
 	topPosts: HeroTopPosts;
+	/**
+	 * CS14 §2 — the carousel's handle on the market panel's own `<Link>`, so an
+	 * arrow rotation can hand focus to the market it just revealed and Enter
+	 * opens THAT market. Optional: the panel is complete without it, and every
+	 * render test mounts this component directly with no carousel above it.
+	 */
+	linkRef?: RefObject<HTMLAnchorElement | null>;
 	/** `C-CHART-2` clause 1 — whether the hero chart's terminal dots pulse.
 	 * Threaded from `page.tsx`, where the `status = 'Open'` licence is written
 	 * and guarded; deliberately NOT a literal here, which would put a second
@@ -102,9 +112,33 @@ export function HeroPanels({
 			    ⚠ Canon §3 item 6 ("Pick / carousel-select is view-only — never
 			    mutates a position") governs POSITION MUTATION. Navigating to
 			    `/m/[slug]` mutates nothing; ruled as not barring this. */}
+			{/* ⛔ CS13 §4 — THE KEYBOARD PATH WAS ALREADY WHOLE; WHAT WAS MISSING
+			    WAS THE EVIDENCE OF IT. This panel is a real `<Link>`, so it has
+			    always been Tab-reachable and Enter has always opened the market —
+			    no handler is added here and none is needed. The defect was that a
+			    keyboard viewer could not SEE where they were: the panel had no
+			    focus treatment at all, so Tab moved an invisible cursor and Enter
+			    navigated somewhere the viewer had no way to predict.
+			    ⚠ NO NEW COLOUR AND NO NEW TOKEN. `focus-visible:shadow-(--state-focus-ring)`
+			    with `outline-none` is the idiom already shipped on every focusable
+			    in the participant tree — the header controls, both route-boundary
+			    links, the composer's controls and `discovery/ErrorState.tsx` all
+			    carry this exact pair. Matching it is what keeps focus looking the
+			    same everywhere rather than inventing a second appearance. */}
+			{/* ⛔ CS14 §2 — AND STILL NO ENTER HANDLER, WHICH IS THE POINT. This is
+			    a real `<Link>`, so Enter has always opened the market natively.
+			    What was missing was somewhere sensible for focus to BE: after an
+			    arrow rotation focus sat on the `‹ ›` button that caused it, so
+			    Enter re-activated that button and advanced again. The carousel now
+			    hands focus HERE on every arrow rotation (`linkRef`), which fixes
+			    Enter by moving the cursor rather than by intercepting the key —
+			    and leaves the buttons' own Enter/Space behaviour untouched, as it
+			    must be, or they stop being usable from the keyboard at all. */}
 			<Link
+				ref={linkRef}
+				data-testid="hero-market-link"
 				href={`/m/${card.slug}`}
-				className="flex flex-col rounded-[var(--r)] bg-n0 px-4 pt-[14px] pb-3 [border:var(--border-hero)]"
+				className="flex flex-col rounded-[var(--r)] bg-n0 px-4 pt-[14px] pb-3 outline-none [border:var(--border-hero)] focus-visible:shadow-(--state-focus-ring)"
 			>
 				<div className="flex items-center gap-3">
 					{/* The shared `MarketThumb` (PRIMITIVES-2 D2) — one owner of null ·
@@ -142,7 +176,7 @@ export function HeroPanels({
 				    above that. A growing box with the shipped number as its
 				    minimum invents nothing. */}
 				{/* CHART-1 — THE SAME COMPONENT `/m/[slug]` RENDERS, in `hero` mode
-				    (SPEC.1 1.0.40 §22 + §9). This slot held `PriceSparkline`, a
+				    (SPEC.1 1.0.45 §22 + §9). This slot held `PriceSparkline`, a
 				    second, index-spaced two-line graph that drew twenty bets in an
 				    hour identically to twenty bets across three weeks.
 				    ⚠ THAT WAS DEFENSIBLE AND STOPPED BEING SO. §9 called the hero
@@ -157,7 +191,7 @@ export function HeroPanels({
 				<div className="mt-[11px] min-h-24 flex-1 rounded-[var(--r)] [border:var(--hairline)]">
 					<MarketPriceChart series={series} mode="hero" isOpen={isOpen} />
 				</div>
-				{/* SPEC.1 1.0.40 §9 · Accessibility — the hero's readout, the third and
+				{/* SPEC.1 1.0.45 §9 · Accessibility — the hero's readout, the third and
 				    last mode to get one, discharging `PD-3-04`.
 				    ⛔ THIS SLOT WAS LEGITIMATELY EMPTY UNTIL NOW AND IS NOT ANY MORE.
 				    The §22 hero graph was specified DECORATIVE — `aria-hidden`, no
@@ -275,6 +309,42 @@ function HeroPostPanel({
 						</>
 					)}
 				</span>
+				{/* TIME-1 · Form B — HOW LONG AGO, LAST ON THE ROW.
+				    `HeroPost.createdAt` has been on the read model since the hero
+				    shipped (`server/discovery/hero.ts:117`); nothing new is queried,
+				    presigned or serialized for it.
+				    ⚠ `Replies · N` IS NOT ON THIS ROW — it lives in the panel's own
+				    reply head below (`hero-reply-head-${side}`), so this row ends at
+				    the Đ figure and the age follows the figure. That is the same
+				    RULE as the debate card ("after every existing tag on the identity
+				    row"), applied to the tags this row actually has, rather than the
+				    same POSITION copied across from a row with different contents.
+				    ⚠⚠ THE `HeadSeparator` IS RULED IN, AND THIS BLOCK ARGUED THE
+				    OPPOSITE UNTIL THE COMMIT BEFORE THIS ONE. It read "⛔ NO
+				    `HeadSeparator` BEFORE IT", because the hero guard pins this row's
+				    separator count against the MOCKUP's own markup and a third pipe
+				    would have reddened it.
+				    ⛔ THAT GUARD'S TWO SOURCES ARE NOW DIFFERENT DOCUMENTS, and the
+				    guard says so. Separators one and two remain governed by
+				    `surface_discovery_v1_0.html`; the third is governed by the canon
+				    §3 item 11 amendment, which supersedes the mockup ON THIS ELEMENT
+				    AND ONLY ON THIS ELEMENT. TIME-1 had already put this row ahead of
+				    the mockup — the mockup's head has no age field at all — so the
+				    pipe does not open a new divergence, it makes the existing one
+				    visible. ⛔ The mockup is NOT edited: a locked mockup is amended
+				    deliberately, never as a side effect of a UI pass.
+				    ⛔ NO SIZE AND NO `shrink-0`. The row is `text-[9.5px]
+				    flex-nowrap overflow-hidden whitespace-nowrap` and the leaf
+				    inherits all of it; every other element here is governed by that
+				    same clip, and exempting this one would make the newest field the
+				    only one that survives a narrow panel.
+				    ⚠ PD-2-36 — this row is the binding constraint on Discovery's
+				    horizontal overflow, and each pipe costs it. Measured at 1440 on
+				    staging before this landed: pipe min-content 2.52px + one 6px gap,
+				    against 33.87px of slack on the wider (NO) panel. Overflow was 0
+				    before and is 0 after; the after-figure is in the run report. */}
+				<HeadSeparator />
+				<RelativeTime createdAt={post.createdAt} />
 			</div>
 			{/* V18 — the WHOLE panel is the post's click target, matching the
 			    mockup's `.argbody[data-post]` handler. Implemented as a stretched
@@ -288,42 +358,112 @@ function HeroPostPanel({
 				<h3 className="line-clamp-2 text-sm leading-snug font-medium">
 					{post.title}
 				</h3>
-				{/* HTML-FINISH row 7 — THE ARGUMENT TEXT IS QUOTED; the headline
-				    above it is NOT (the mockup's `.argtext` at `:192` carries the
-				    quotes and its own header declares the missing headline a MOCKUP
-				    gap at `:11-13`, so row 3 — "drop the headline" — is STRUCK).
-				    ⛔ Glyphs BYTE-CARRIED from `:192`: hexdump gives `3e 22 52 …`
-				    opening and `… 2e 22 3c` closing — `0x22` both ends, U+0022
-				    QUOTATION MARK, straight ASCII, NOT curly. Corroborated by the
-				    mockup's own JS: `q('.argtext').textContent='"'+d[4]+'"'`
-				    (`:455`). Curly-vs-straight is a byte question, and this is the
-				    byte. */}
-				{post.teaser !== "" && (
-					<p className="line-clamp-3 text-xs leading-snug text-muted-foreground">
-						"{post.teaser}"
-					</p>
-				)}
+				{/* UI-QUICK CS13 §2 — THE HERO POST IS TITLE-ONLY. The quoted
+				    `.argtext` teaser that stood here is removed; the panel now
+				    carries the argument's headline and its picture, and the
+				    argument itself is read one click away on the debate surface.
+				    The space it freed is NOT left as a gap — the image box below
+				    absorbs it (§3 lands with this for that reason).
+				    ⚠ THIS DIVERGES FROM THE RATIFIED MOCKUP, DELIBERATELY AND ON
+				    A FOUNDER RULING. `surface_discovery_v1_0.html:192` renders
+				    `.argtext`, and HTML-FINISH row 7 ruled on the QUOTE GLYPHS it
+				    carried (byte-carried `0x22`, straight not curly) — a finding
+				    that is now moot here because there is no quoted text left on
+				    this surface to carry them. Reported to the founder rather than
+				    amended: design-canon and the mockup are read-only to this lane.
+				    ⛔ `post.teaser` IS STILL COMPUTED AND STILL ON THE WIRE.
+				    `deriveTitleTeaser` still splits it in `hero.ts` and the DTO
+				    still carries the field — this change is PRESENTATION ONLY, and
+				    the read model was deliberately not touched. Anything that
+				    wants the teaser back needs only to render it. */}
 			</Link>
 			{/* V15 — `.argimg` (mockup :91-93, markup :193). `flex-1` so it absorbs
 			    the panel's spare height and pushes the reply head + bar to the
-			    bottom, exactly as the mockup's `flex:1 1 auto` does. */}
-			<MarketThumb
-				data-testid={`hero-post-image-${side}`}
-				src={post.imageUrl}
-				// The argument text carries the meaning and the post title is
-				// adjacent, so the attachment is decorative here (WCAG 1.1.1).
-				alt=""
-				className="mt-2 min-h-[40px] flex-1 rounded-[var(--imgr)] bg-n1 object-cover [border:var(--hairline)]"
-				fallback={
-					<div
-						data-testid={`hero-post-image-empty-${side}`}
-						aria-hidden="true"
-						className="mt-2 flex min-h-[40px] flex-1 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[9px] tracking-[0.18em] text-n4 [border:var(--hairline)]"
-					>
-						IMG
-					</div>
-				}
-			/>
+			    bottom, exactly as the mockup's `flex:1 1 auto` does — and, since
+			    CS13 §2, the teaser's freed space along with it.
+
+			    ⛔⛔ CS13 §3 — THE PANEL'S HEIGHT IS A PROPERTY OF THE LAYOUT, NEVER
+			    OF THE PICTURE. The picture is taken OUT OF FLOW to achieve that:
+			    the wrapper below is the box, and the image is absolutely
+			    positioned to fill it. An out-of-flow child contributes nothing to
+			    its parent's content height — no intrinsic size, no aspect ratio,
+			    nothing — so the wrapper's height is decided by the panel and the
+			    image simply occupies whatever it is given.
+
+			    ⚠⚠ AND THE OBVIOUS SIMPLER VERSION DOES NOT WORK — MEASURED, NOT
+			    ASSUMED. Leaving the `<img>` in flow as `flex-1 min-h-[40px]` LOOKS
+			    sufficient: `flex-1` is `flex: 1 1 0%`, so the basis reads as zero,
+			    and the explicit `min-height` appears to close the flex
+			    AUTOMATIC-MINIMUM-SIZE path that would otherwise resolve to a
+			    replaced element's intrinsic height. Both halves of that reasoning
+			    are wrong here, for one reason: a PERCENTAGE flex-basis resolved
+			    against an INDEFINITE container height falls back to `auto`, and
+			    `auto` on an `<img>` is its intrinsic height. This panel's height
+			    comes from the grid row, so the height IS indefinite and the
+			    fallback fires.
+
+			    The measurement that caught it, on staging at 1440, same panel,
+			    same market, same viewport — only the picture swapped:
+			      portrait  482x638  → hero row 574.6px
+			      landscape 1200x400 → hero row 375.8px
+			    198.8px of panel height carried by nothing but the attachment's
+			    aspect ratio. 375.8 is the row's true height; the portrait was
+			    inflating it. Out of flow, both cases sit at 375.8.
+
+			    ⛔ NO NEW NUMBER IS INTRODUCED. `mt-2`, `min-h-[40px]` and `flex-1`
+			    are the shipped values, moved from the image to the wrapper that
+			    now owns the box; `inset-0` is not a size.
+
+			    ⛔ `object-contain`, NEVER `object-cover` (founder wall: no crop).
+			    `cover` filled the box by cropping — on a portrait attachment most
+			    of the picture was simply not shown. `contain` fits the whole
+			    picture inside the box and letterboxes the remainder.
+
+			    ⛔⛔ CS14 §4 — AND THE LETTERBOX IS NOW INVISIBLE, BECAUSE THE
+			    LOADED IMAGE CARRIES NO FILL. `object-contain` leaves bars
+			    wherever the picture's aspect ratio differs from the box's, and
+			    the `<img>` used to paint `bg-n1` behind them — so a portrait
+			    attachment read as a small picture mounted on a grey card rather
+			    than as the picture itself. Measured on staging at `0f04272`, the
+			    482×638 portrait in the NO panel at a 1440×900 frame: image box
+			    321.7 wide, picture 205.7 wide, i.e. 58.0px of `#2a2a2a` — 29.0px
+			    down each side. Dropping the fill lets the panel's own `bg-n0`
+			    show through and the bars stop reading as an object.
+
+			    ⛔ THE PLACEHOLDER KEEPS ITS WELL, and the two arms are separate
+			    class strings, so this is a one-word difference rather than a
+			    conditional: with NO image there must still be a visible box, or
+			    the empty state becomes nothing at all. `bg-n1` stays on the
+			    fallback below and is gone from the image above — that IS the
+			    distinction, and a test asserts both halves so neither can drift
+			    into the other.
+
+			    ⚠ THE HAIRLINE IS DELIBERATELY LEFT ON BOTH. It outlines the box,
+			    not the picture, and removing it is a second visual change nobody
+			    ruled on. Reported rather than taken.
+
+			    ⚠ The FALLBACK takes the same `absolute inset-0`, so the no-image
+			    case and the image case are the SAME box by construction rather
+			    than by two class strings that could drift apart. */}
+			<div className="relative mt-2 min-h-[40px] flex-1">
+				<MarketThumb
+					data-testid={`hero-post-image-${side}`}
+					src={post.imageUrl}
+					// The argument text carries the meaning and the post title is
+					// adjacent, so the attachment is decorative here (WCAG 1.1.1).
+					alt=""
+					className="absolute inset-0 h-full w-full rounded-[var(--imgr)] object-contain [border:var(--hairline)]"
+					fallback={
+						<div
+							data-testid={`hero-post-image-empty-${side}`}
+							aria-hidden="true"
+							className="absolute inset-0 flex items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[9px] tracking-[0.18em] text-n4 [border:var(--hairline)]"
+						>
+							IMG
+						</div>
+					}
+				/>
+			</div>
 			{/* V16 — `.replyhead` (mockup :97-98, markup :194). Display-only, and a
 			    SIBLING of the stretched link above, so a click anywhere on it still
 			    opens the post (the mockup's whole-`.argbody` handler). */}

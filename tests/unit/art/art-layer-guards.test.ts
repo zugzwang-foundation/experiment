@@ -1,6 +1,14 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
+
+import {
+	ART_DIR,
+	artImporters,
+	reachesArt,
+	sourceFilesUnder,
+	stripComments,
+} from "./_mount-scan";
 
 /**
  * WARLI-1 slice 6 — the standing guards on the art layer.
@@ -20,25 +28,6 @@ import { describe, expect, it } from "vitest";
  */
 
 const ROOT = process.cwd();
-const ART_DIR = "src/components/art";
-
-function sourceFilesUnder(dir: string): readonly string[] {
-	return readdirSync(join(ROOT, dir), { recursive: true, withFileTypes: true })
-		.filter(
-			(entry) =>
-				entry.isFile() &&
-				(entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")),
-		)
-		.map((entry) => join(entry.parentPath, entry.name).replace(`${ROOT}/`, ""));
-}
-
-/** Verbatim from `tests/unit/design/no-raw-hex-view-layer.test.ts:81-86`. */
-function stripComments(source: string): string {
-	return source
-		.replace(/\/\*[\s\S]*?\*\//g, "")
-		.replace(/^\s*\/\/.*$/gm, "")
-		.replace(/\/\/[^"'`\n]*$/gm, "");
-}
 
 const artFiles = sourceFilesUnder(ART_DIR);
 const artCode = artFiles.map((file) => ({
@@ -212,12 +201,23 @@ describe("art layer — the injection sinks stay shut", () => {
 		// POSITIVE CONTROL: the escaped forms are present, so the search works.
 		expect(gen).toContain("${esc(spec.label)}");
 		expect(gen).toContain("${esc(density)}");
+		expect(gen).toContain("${esc(kind)}");
 
 		// …and the unescaped forms are absent. `spec.label` is typed plain
 		// `string`; the other two are closed unions and are escaped anyway, so the
 		// rule is uniform and greppable rather than requiring the reader to
 		// re-derive which values happen to be constrained.
-		for (const raw of ["${spec.label}", "${density}", "${spec.prop}"]) {
+		// ⚠ `${kind}` JOINED THIS LIST AT WARLI-2, and its absence was the exact
+		// coverage-by-habit this test exists to end. `kind` comes from
+		// `SCENE_MOTIFS: readonly string[]` — plain `string`, the SAME trust level
+		// as `spec.label`, which the list already covered. Dropping its `esc()`
+		// passed the guard green.
+		for (const raw of [
+			"${spec.label}",
+			"${density}",
+			"${spec.prop}",
+			"${kind}",
+		]) {
 			expect(gen).not.toContain(raw);
 		}
 
@@ -236,7 +236,7 @@ describe("art layer — the injection sinks stay shut", () => {
 	});
 });
 
-describe("art layer — it is sealed, and it is unmounted", () => {
+describe("art layer — it is sealed, and it is mounted at one site", () => {
 	it("imports nothing from outside its own directory (bar react)", () => {
 		// ⚠ THIS WAS A DENYLIST AND IT LEAKED. It matched `@/…` and `../../…` and
 		// therefore could not see the import a contributor is most likely to add to
@@ -297,27 +297,75 @@ describe("art layer — it is sealed, and it is unmounted", () => {
 		expect(offenders).toEqual([]);
 	});
 
-	it("is mounted NOWHERE — nothing outside the art layer imports it", () => {
-		// DELIBERATE, and the reason is not caution about the artwork. The mount
-		// point is `src/app/(auth)/**`, a named critical path that another session
-		// holds a live lock on for the signup-deadlock fix. Mounting is three
-		// lines; a collision there costs a full plan → execute → review → gate
-		// cycle. When this is mounted on purpose, this test is the one to delete,
-		// and deleting it should be a visible decision rather than a silent one.
-		const all = sourceFilesUnder("src");
-		const importers = all
-			.filter((file) => !file.startsWith(ART_DIR))
-			.filter((file) =>
-				/(?:from|import)\s*\(?\s*["'][^"']*components\/art[^"']*["']/.test(
-					stripComments(readFileSync(join(ROOT, file), "utf8")),
-				),
-			);
-		expect(importers).toEqual([]);
+	it("is mounted at EXACTLY ONE site, and that site is the (auth) layout", () => {
+		// ⚠ THIS ROW WAS INVERTED, NOT DELETED — WARLI-MOUNT, founder ruling Q(a).
+		// It used to assert `importers` was EMPTY, and both mount recipes said to
+		// delete it once the artwork landed. Deleting a guard because it has
+		// started failing is the move this project has spent five register passes
+		// unlearning: the assertion's SUBJECT is "where is this mounted", and that
+		// question does not stop mattering the moment the answer changes from
+		// nowhere to somewhere. It gets sharper — an artwork that is decorative on
+		// one route is a 790 KB payload on any other, and the scan that used to
+		// prove "nowhere" is the only thing in the tree that can prove "not
+		// anywhere else".
+		//
+		// So the count is pinned at one and the site is pinned by name. A second
+		// mount reddens here. Removing the mount reddens here. Both are decisions
+		// somebody should have to make on purpose, which is what the empty-set
+		// version bought and what deleting it would have thrown away.
+		// ⛔ RESOLVED, NOT SUBSTRING-MATCHED, and the substring form was a live
+		// hole. It flagged a specifier whose TEXT contained `components/art` —
+		// which is the same question as "does it reach the art layer" only for
+		// `@/…` and for deep-relative paths written from `src/app`. From a file
+		// already under `src/components`, the idiomatic specifier for a neighbour
+		// is `../art/warli`, which contains no `components/` at all and walked
+		// straight past. Measured: 118 files under `src/` already import a
+		// neighbour that way, so it is this codebase's house style rather than a
+		// contrived form.
+		//
+		// ⚠ THE FIX WAS ALREADY SITTING ONE FUNCTION UP. The sibling row above
+		// resolves each specifier with `join(ROOT, dirname(file), spec)` and
+		// compares the resolved path against `ART_DIR`, precisely because its
+		// author found a literal `../../` denylist "wrong in both directions".
+		// That is the OUTBOUND direction of the same question; the inbound scan
+		// never got the same treatment until WARLI-MOUNT.
+		// POSITIVE CONTROLS for the shared detector, including the two the old
+		// substring form got wrong. The detector itself lives in `./_mount-scan`
+		// so the audit in `mount-scan-reach.test.ts` exercises THIS one rather
+		// than a copy — see that module's docblock for why a text-lift was not
+		// good enough.
+		expect(
+			reachesArt("src/app/(auth)/layout.tsx", "@/components/art/warli"),
+		).toBe(true);
+		expect(reachesArt("src/components/shell/X.tsx", "../art/warli")).toBe(true);
+		expect(reachesArt("src/components/X.tsx", "./art/warli")).toBe(true);
+		expect(
+			reachesArt("src/app/(auth)/layout.tsx", "../../components/art/warli"),
+		).toBe(true);
+		expect(reachesArt("src/components/shell/X.tsx", "../debate/Y")).toBe(false);
+		expect(
+			reachesArt(
+				"src/app/(auth)/layout.tsx",
+				"@/components/shell/GlobalHeader",
+			),
+		).toBe(false);
+		expect(reachesArt("src/app/(auth)/layout.tsx", "react")).toBe(false);
+		// The boundary case: a sibling directory sharing the `art` prefix.
+		expect(reachesArt("src/app/x.tsx", "@/components/artifacts/y")).toBe(false);
 
-		// POSITIVE CONTROL: the same scan, pointed at a component family that IS
-		// mounted, finds importers. Without this the assertion above would pass
-		// just as happily against a broken regex.
-		const shellImporters = all.filter((file) =>
+		const importers = artImporters();
+		// ⚠ Compared as SETS — the list falls out of a recursive directory walk,
+		// so its ORDER is a filesystem property and not one this pin should assert.
+		// Harmless at one element; it would flake the moment a second lands.
+		expect(new Set(importers)).toEqual(new Set(["src/app/(auth)/layout.tsx"]));
+
+		// POSITIVE CONTROL, and it is doing MORE work than it was. The scan now
+		// asserts a non-empty result, so "the regex is broken" and "the artwork is
+		// unmounted" no longer produce the same green — but they do produce the
+		// same RED, and this separates them: a family that is definitely mounted
+		// must still be found by the identical scan. If both rows fail together
+		// the regex died; if only the row above fails, the mount did.
+		const shellImporters = sourceFilesUnder("src").filter((file) =>
 			/(?:from|import)\s*\(?\s*["'][^"']*components\/shell[^"']*["']/.test(
 				stripComments(readFileSync(join(ROOT, file), "utf8")),
 			),

@@ -69,6 +69,16 @@ export type PrimitiveProps = {
 	readonly className?: string;
 	/** Stroke width override, in local units. */
 	readonly weight?: number;
+	/**
+	 * The instance seed for this primitive's hand-wobble (`./wobble.ts`).
+	 *
+	 * ⚠ IT IS AN INTEGER INDEX, NOT A SOURCE OF RANDOMNESS, and the difference is
+	 * the whole determinism contract. Two renders of the same seed produce
+	 * byte-identical path strings; two different seeds produce two different
+	 * hands. Callers pass the element's own index. Nothing in this layer may
+	 * derive a seed from `Math.random` or from a clock.
+	 */
+	readonly seed?: number;
 };
 
 /** The single line weight the spare register is drawn at. */

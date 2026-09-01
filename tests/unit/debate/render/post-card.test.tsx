@@ -123,27 +123,67 @@ describe("POLISH.3 PR 2 — PostCard's disabled write triggers and Read more", (
 		expect(offender).toBeUndefined();
 	});
 
-	it("post-card::the-plus-glyph-replaces-Read-more", () => {
+	it("post-card::Know-more-replaces-the-plus-glyph", () => {
 		// ⚠ ROW 24 REVERSES R4, and the superseded assertion is recorded rather
 		// than silently swapped. R4 (2026-08-12) ruled `<Plus /> Full` → a
 		// `Read more` TEXT LINK and removed the glyph outright. The founder ruling
 		// of 2026-08-16 reverses it: the glyph returns, `Read more` goes.
+		//
+		// ⚠⚠ AND UI-QUICK CHANGE SET 1 REVERSES *THAT* — the glyph becomes the
+		// text control `Know more`. This assertion read:
+		//   const plus = buttons.find(b => b.getAttribute("aria-label") === "Show more");
+		//   expect(plus?.innerHTML).toContain("+");
+		// ⛔ THE THIRD LABEL JOINS THE PINNED-AS-GONE LIST rather than replacing
+		// it. `Read more` and `Full` were already pinned absent so a card
+		// rendering BOTH forms could not pass; `+` now sits beside them for the
+		// same reason. The guard covers strictly more shapes than before.
 		const { container } = renderCard();
 		const buttons = buttonsIn(container);
 
-		const plus = buttons.find(
-			(b) => b.getAttribute("aria-label") === "Show more",
-		);
-		expect(plus).toBeDefined();
-		expect(plus?.innerHTML).toContain("+");
+		const knowMore = buttons.find((b) => b.innerHTML.includes("Know more"));
+		expect(knowMore).toBeDefined();
 
-		// Both superseded labels pinned as gone — asserting only the new form
-		// would pass on a card that rendered BOTH.
+		// Every superseded form pinned as gone.
 		expect(buttons.some((b) => b.innerHTML.includes("Read more"))).toBe(false);
 		expect(buttons.some((b) => b.innerHTML.includes("Full"))).toBe(false);
+		expect(buttons.some((b) => b.innerHTML.trim() === "+")).toBe(false);
+		expect(
+			buttons.some((b) => b.getAttribute("aria-label") === "Show more"),
+		).toBe(false);
 	});
 
-	it("post-card::the-glyph-carries-an-aria-label-and-WCAG-2.5.3-still-holds", () => {
+	it("post-card::the-download-placeholder-sits-left-of-Know-more-and-is-inert", () => {
+		// UI-QUICK change set 1 item 5. ⛔ A PLACEHOLDER THAT READS AS A WORKING
+		// CONTROL IS THE DEFECT — it must be inert to the pointer, inert to the
+		// keyboard, and announced as unavailable, or it promises a download this
+		// build cannot perform.
+		const { container } = renderCard();
+
+		const download = container.querySelector<HTMLButtonElement>(
+			'button[aria-label="Download post image"]',
+		);
+		expect(download).not.toBeNull();
+		expect(download?.disabled).toBe(true);
+		expect(download?.getAttribute("aria-disabled")).toBe("true");
+		// No handler and no navigation — a placeholder with an href would be a
+		// working control wearing a disabled costume.
+		expect(download?.getAttribute("href")).toBeNull();
+
+		// ⚠ ORDER IS PART OF THE ASK ("to the LEFT of Know more, same row"), and
+		// DOM order is what a screen reader and the Tab sequence both follow.
+		// `compareDocumentPosition` reads the real tree rather than a class string.
+		const knowMore = buttonsIn(container).find((b) =>
+			b.innerHTML.includes("Know more"),
+		);
+		expect(knowMore).toBeDefined();
+		expect(
+			(download as HTMLElement).compareDocumentPosition(
+				knowMore as HTMLElement,
+			) & Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
+	});
+
+	it("post-card::Know-more-carries-a-2.5.3-compliant-name-and-keeps-the-tokens", () => {
 		// ⚠ THE ACCESSIBILITY ARGUMENT INVERTED WITH THE CONTROL, which is why
 		// this is not simply "R4 undone". R4 dropped the `aria-label` DELIBERATELY:
 		// "Read the full argument" does not CONTAIN the visible text "Read more",
@@ -151,16 +191,26 @@ describe("POLISH.3 PR 2 — PostCard's disabled write triggers and Read more", (
 		// (Label in Name). A GLYPH has no visible label, so 2.5.3 does not apply
 		// and an `aria-label` becomes REQUIRED rather than forbidden — the concern
 		// is answered, not dismissed.
-		// ⛔ The label is BYTE-CARRIED from `d5:1077`'s own control, not authored.
+		//
+		// ⚠⚠ AND IT INVERTS ONCE MORE AT UI-QUICK CHANGE SET 1. The control has
+		// visible text again, so 2.5.3 applies again — and the label
+		// BYTE-CARRIED from `d5:1077` ("Show more") becomes a FAILURE, because a
+		// button reading `Know more` cannot be named `Show more`. This used to
+		// assert `aria-label === "Show more"`; it now asserts the strictly
+		// stronger property that the name CONTAINS the visible string, which is
+		// the actual WCAG rule rather than one hard-coded instance of it.
 		const { container } = renderCard();
 
-		const plus = buttonsIn(container).find(
-			(b) => b.getAttribute("aria-label") === "Show more",
+		const knowMore = buttonsIn(container).find((b) =>
+			b.innerHTML.includes("Know more"),
 		);
-		expect(plus).toBeDefined();
+		expect(knowMore).toBeDefined();
+		const label = knowMore?.getAttribute("aria-label") ?? "";
+		expect(label).toContain("Know more");
+
 		// The ported tokens survive the control swap (Ruling A / H-HEX — a raw hex
 		// here also reddens `no-raw-hex-view-layer`).
-		const className = plus?.getAttribute("class") ?? "";
+		const className = knowMore?.getAttribute("class") ?? "";
 		expect(className).toContain("text-n5");
 		expect(className).toContain("hover:text-ink");
 	});

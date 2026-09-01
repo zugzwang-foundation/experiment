@@ -155,25 +155,41 @@ describe("ReplyCard — row 26, the mockup's anatomy", () => {
  * lives on the non-removed branch only, so the two controls agree.
  */
 describe("ReplyCard — rows 27 + 34, the pop-up and the lightbox", () => {
-	it("reply-card::the-plus-opens-the-pop-up-with-THIS-reply", () => {
+	it("reply-card::Know-more-opens-the-pop-up-with-THIS-reply", () => {
+		// ⚠ UI-QUICK change set 2 item 2 — the `+` became `Know more`. This found
+		// the control by `aria-label === "Show more"`; that label is now a WCAG
+		// 2.5.3 failure on a control with visible text, so the query moves to the
+		// visible string and the NAME is asserted separately below.
+		// ⛔ THE BEHAVIOURAL ASSERTION IS UNCHANGED — same click, same handler,
+		// same `toHaveBeenCalledWith(reply)`. Only the selector moved.
 		const onOpenPopup = vi.fn();
 		const reply = presentReply();
 		const { container } = render(
 			<ReplyCard reply={reply} onOpenImage={noop} onOpenPopup={onOpenPopup} />,
 		);
 
-		const plus = Array.from(container.querySelectorAll("button")).find(
-			(b) => b.getAttribute("aria-label") === "Show more",
+		const knowMore = Array.from(container.querySelectorAll("button")).find(
+			(b) => b.innerHTML.includes("Know more"),
 		);
-		expect(plus).toBeDefined();
-		fireEvent.click(plus as HTMLButtonElement);
+		expect(knowMore).toBeDefined();
+		// WCAG 2.5.3 — the accessible name must CONTAIN the visible string.
+		expect(knowMore?.getAttribute("aria-label")).toContain("Know more");
+		fireEvent.click(knowMore as HTMLButtonElement);
 		expect(onOpenPopup).toHaveBeenCalledWith(reply);
 	});
 
-	it("reply-card::a-REMOVED-reply-offers-NO-plus", () => {
+	it("reply-card::a-REMOVED-reply-offers-NO-expand-control", () => {
 		// ⛔ SC-1 / H3-e at the render. Belt: the branch placement. Braces: the
 		// type — `onOpenPopup` takes a `PresentReply`, so the removed branch
-		// could not call it even if a `+` were added there.
+		// could not call it even if a control were added there.
+		//
+		// ⚠⚠ THIS ASSERTION WOULD HAVE GONE VACUOUS AND SILENT. It read
+		// `aria-label === "Show more"` → `false`. After the relabel NO control
+		// anywhere carries that string, so it would have passed on a removed
+		// reply that rendered a fully working `Know more` — a masking guard
+		// (SC-1) reporting green while leaking the affordance it exists to catch.
+		// ⇒ It now pins BOTH the superseded label and the live one. A guard whose
+		// subject was renamed has to be re-pointed, not just left green.
 		const { container } = render(
 			<ReplyCard
 				reply={{
@@ -186,11 +202,12 @@ describe("ReplyCard — rows 27 + 34, the pop-up and the lightbox", () => {
 				onOpenPopup={noop}
 			/>,
 		);
+		const buttons = Array.from(container.querySelectorAll("button"));
+		expect(buttons.some((b) => b.innerHTML.includes("Know more"))).toBe(false);
 		expect(
-			Array.from(container.querySelectorAll("button")).some(
-				(b) => b.getAttribute("aria-label") === "Show more",
-			),
+			buttons.some((b) => b.getAttribute("aria-label") === "Show more"),
 		).toBe(false);
+		expect(buttons.some((b) => b.innerHTML.trim() === "+")).toBe(false);
 	});
 
 	it("reply-card::row-34-the-image-opens-the-lightbox", () => {

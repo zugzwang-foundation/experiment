@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, type ReactElement, useState } from "react";
 import { AuthAlert } from "@/app/(auth)/_components/AuthAlert";
+import { Wordmark } from "@/components/shell/Wordmark";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -81,11 +82,50 @@ export default function SignInPage(): ReactElement {
 	return (
 		<Card className="my-auto w-full">
 			<CardHeader className="text-center">
-				{/* POLISH.7a D01 — the W2.1 `.mhead` copy (mockup `:313`). "Sign in
-				    to Zugzwang" named only one of the two paths this card serves:
-				    the picker is also the SIGN-UP entry, and new-vs-returning is
-				    server-side and silent (`DESIGN_W2_1_CLOSE-OUT.md:55`). */}
-				<CardTitle className="text-lg">Continue to Zugzwang</CardTitle>
+				{/* The brand lockup stands where the title string stood, SUPERSEDING
+				    POLISH.7a D01 (the W2.1 `.mhead` copy "Continue to Zugzwang",
+				    mockup `:313`). Same substitution SPEC.1 §21.9 already ruled for
+				    onboarding Card 1 — the wordmark takes the title's place, and the
+				    card supplies a visually hidden one so the surface stays NAMED
+				    rather than becoming an unnamed card. `CardTitle` is kept as that
+				    name, not replaced by a bare `<h*>`: the accessible name then
+				    still lives in the slot it lived in before, and
+				    `data-slot="card-title"` survives for anything reading the header
+				    grid. `dialogs.tsx:201` is the same `sr-only` title move.
+
+				    ⛔ REUSED, NOT REDRAWN. The mark is `BrandCluster`'s own
+				    `/brand/zugzwang-mark.svg` static asset — at the 140px it renders
+				    at on the re-show deck the header's RULES control opens
+				    (`figures.tsx:402`), not the header's own 48px, because this card
+				    is a destination and not chrome. The letters are that cluster's
+				    own `Wordmark` — the
+				    component extracted at O1-DECK-R2 §4 precisely so a second site
+				    could not drift from the header. No SVG is inlined here and there
+				    is no second implementation of either half. `gap-2.5` is the
+				    cluster's own mark-to-letters gap, carried across; the `card`
+				    scale is the ratified one for a wordmark standing in a title's
+				    place, which is exactly what this is.
+
+				    ⛔ NO COUNTDOWN, AND NOTHING SHARED HAD TO BE REFACTORED TO LEAVE
+				    IT OUT. `BrandCluster` itself is not reusable here — it owns the
+				    minute timer, its `targetMs`/`initialDisplay` props and a
+				    remaining-time `aria-label`, and it is ONE link target to `/`. But
+				    the countdown was never fused to the mark: `Wordmark` renders the
+				    letters and nothing else, which is what that extraction was for,
+				    and the mark is a static file. Time-to-freeze is header chrome and
+				    has no business on a sign-in card. */}
+				<CardTitle className="sr-only">Zugzwang</CardTitle>
+				<div className="flex flex-col items-center gap-2.5">
+					{/* biome-ignore lint/performance/noImgElement: static 140px brand svg — next/image's optimizer refuses svg by default and buys nothing here. */}
+					<img
+						src="/brand/zugzwang-mark.svg"
+						alt=""
+						width={140}
+						height={140}
+						className="size-[140px]"
+					/>
+					<Wordmark scale="card" />
+				</div>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-4">
 				{/* F-AUTH-1 — Google OAuth. */}

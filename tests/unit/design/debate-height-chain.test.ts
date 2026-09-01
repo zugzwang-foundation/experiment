@@ -25,6 +25,27 @@ import { describe, expect, it } from "vitest";
  *   arena band      flex-1 min-h-0                    ← takes ALL the leftover
  *   pole columns    min-h-0 flex-col                  ← may be shorter than content
  *   column scroll   flex-1 min-h-0 overflow-y-auto    ← THE ONLY SCROLLER
+ *                                                       IN *THIS* CHAIN
+ *
+ * ⚠⚠ RPLY-2 · R1 — NOT the only scroller on the surface any more, one level
+ * BELOW this chain: `BetComposer` gained a second, deliberate `overflow-y-auto`
+ * region, nested INSIDE whatever `column scroll` renders (a card, a composer —
+ * the chain above does not know or care which).
+ * `DebateColumn.tsx`'s own docblock is corrected in place for that; this
+ * diagram is left naming only the chain it actually asserts node-by-node
+ * below, which stops at `column scroll` and never reaches into its children.
+ *
+ * ⚠⚠ RPLY-3 · R1 — THE EXCEPTION STANDS AND THE ELEMENT MOVED, which is worth
+ * a line because "is the claim true again?" was asked explicitly and the answer
+ * is no. RPLY-2 put that `overflow-y-auto` on the composer's whole ARGUMENT
+ * REGION. R1 rules the money footblock back into the right column — i.e. back
+ * INSIDE that region — so a scroller there would once again be able to hide
+ * `Đ BET`, the exact defect RPLY-2 hoisted the footblock to avoid. The overflow
+ * therefore moved DOWN onto the title/body pair's own wrapper (`.fieldscroll`),
+ * whose sibling the footblock is.
+ * ⇒ `column scroll` is STILL not the only scroller on the surface; there is
+ * still exactly one deliberate exception, and it is now a smaller box in a
+ * different place. The retired claim is NOT restored.
  *
  * ⚠ `min-h-0` IS THE LINK EVERYONE DROPS, and dropping it is invisible. A flex
  * item's automatic minimum size is its CONTENT, so without `min-h-0` a node
@@ -203,6 +224,31 @@ describe("debate height chain — the headzone band does not grow", () => {
 		expect(classes).toContain("min-h-0");
 		expect(classes).toContain("flex");
 		expect(classes.filter((c) => FORBIDDEN_HEIGHT.test(c))).toEqual([]);
+
+		// ⛔⛔ UI-QUICK change set 4 §C — THE BAND CONTAINS ITS OWN CONTENT, and
+		// this line is the guard for a defect that shipped to staging and that
+		// NOTHING in this file could previously see.
+		//
+		// `basis-[24.2dvh]` is a viewport FRACTION; the stack inside it has an
+		// INTRINSIC height. Below ~715px of viewport height the fraction is the
+		// smaller of the two, and with no containment the excess painted downward
+		// over the top border of both debate columns — measured at 1440×700 on
+		// staging, and worse before the resolution trigger came out.
+		//
+		// ⚠ WHY THE REST OF THIS FILE COULD NOT CATCH IT. Every other assertion
+		// here checks that a DECLARATION is present, and every declaration WAS
+		// present and correct: the band declared its fraction, the arena took the
+		// leftover, the column scrolled. The defect was that the declared band was
+		// smaller than its own content at a viewport height nobody had measured —
+		// a layout FACT, not a missing class. This file is a source scan (jsdom
+		// performs no layout, as the header says), so the only thing it can pin is
+		// the containment that makes the fact harmless. That is what this line is.
+		//
+		// ⛔ Do not "simplify" this away as redundant with `PageContainer`'s own
+		// `overflow-hidden`. That one keeps content inside the PAGE; this one keeps
+		// the headzone's content inside the HEADZONE, one level down, and the
+		// overlap happened with the page-level rule already in force.
+		expect(classes).toContain("overflow-hidden");
 		// ⚠ THE BAND IS A FRACTION OF THE VIEWPORT, never d5's literal `188px` and
 		// never a percentage of the CONTAINER. `.headzone{flex:0 0 188px}` is
 		// 188/777 = 24.2% of the viewport at the pinned 1440×777.
@@ -283,7 +329,11 @@ describe("debate height chain — the arena band takes the leftover", () => {
 		expect([...arenas[0]].sort()).toEqual([...arenas[1]].sort());
 	});
 
-	it("debate-height::the-column-is-the-ONLY-scroller-and-it-is-wired", () => {
+	it("debate-height::the-column-is-the-ONLY-scroller-IN-THIS-CHAIN-and-it-is-wired", () => {
+		// ⚠ RPLY-2 · R1 gave `BetComposer` its own nested `overflow-y-auto`
+		// region — see the docblock amendment above. This test's own three
+		// assertions were never about "nothing else on the page scrolls"; they
+		// pin `column-scroll`'s className, which R1 does not touch.
 		const source = read(COLUMN);
 		const [classes, ...extra] = bandClasses(source, COLUMN, "column-scroll");
 

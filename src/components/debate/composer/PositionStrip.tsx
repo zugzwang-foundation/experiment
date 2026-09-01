@@ -21,6 +21,7 @@ import { COMPOSER_COPY, formatMultiplier } from "./copy";
  */
 export function PositionStrip({
 	side,
+	composingSide = null,
 	pricing,
 	unitToWin,
 	viewer,
@@ -28,6 +29,42 @@ export function PositionStrip({
 	slug,
 }: {
 	side: Side;
+	/**
+	 * RPLY-2 · R2 — the other half of CS12 that was never built on this strip
+	 * (see the block below). Set by the caller ONLY on the column hosting an
+	 * open composer, to the bet's own resulting side; `null` (the default)
+	 * everywhere else, which collapses `displaySide` below to `side` and
+	 * leaves this component's rendering identical to before this prop existed.
+	 *
+	 * ⛔ MEASURED, NOT PORTED FROM `SlotHeader`. `SlotHeader` derives its
+	 * label, percent, TO WIN *and* its position readout from ONE `side` prop
+	 * (the caller passes it `headerSide = openSide ?? side`), so its position
+	 * readout mirrors too — `viewer.position.side === side` compares the
+	 * viewer's REAL holding against the MIRRORED pole while a composer is
+	 * open, which prints a falsehood on the market arm (a real finding,
+	 * reported rather than fixed here — `SlotHeader` is this task's read-only
+	 * reference, not its subject). This component deliberately does NOT
+	 * repeat that: `composingSide` drives ONLY the label/percent/TO-WIN
+	 * below; `side` — the column's own true pole — is what the position
+	 * readout (`held`) keeps comparing against, unconditionally.
+	 *
+	 * ⚠ THE GOVERNING RULE IS `design-canon.md` §2's **composer-open
+	 * exception** (the Reply surface entry), which is where the founder's
+	 * ruling now lives: "when a composer opens, the headers must be the same
+	 * as the side bet being taken." Canon carries the same split this
+	 * component implements — the hosting column's label, percent and TO-WIN
+	 * follow the side being bet; the position readout is excluded from the
+	 * mirroring because it is a fact about the viewer's holding on that
+	 * specific pole, and mirroring it prints a falsehood.
+	 * ⚠ This block used to read as a DIVERGENCE from canon, and did so
+	 * correctly: canon then said only "Columns are FIXED poles … Column header
+	 * = the side price pill only", and a component contradicting a
+	 * prescriptive document has to say so. RPLY-CLOSE amended canon, so the
+	 * divergence is discharged and the two clauses that recorded it are gone.
+	 * The ruling itself is kept verbatim above — canon is its source now,
+	 * not the document it departs from.
+	 */
+	composingSide?: Side | null;
 	pricing: { yes: string; no: string } | null;
 	unitToWin: { yes: string; no: string } | null;
 	viewer: ViewerMarketContext | null;
@@ -35,9 +72,58 @@ export function PositionStrip({
 	ownPseudonym: string | null;
 	/** The market slug — the `/u/<own>?market=<slug>` preselect (OQ-5 B). */
 	slug: string;
+	/**
+	 * ⚠⚠ RPLY-1 · R4b — `showControls` IS GONE FROM THIS COMPONENT, AND THE
+	 * SUPERSEDED RULING IS RECORDED RATHER THAN DELETED (O-4). It read: "FALSE ON
+	 * THE COLUMN THAT IS HOSTING A COMPOSER. Founder ruling: the mirrored header
+	 * keeps the composing side's label, percent, odds and position readout, and
+	 * loses its Buy and its Sell."
+	 *
+	 * ⛔ THAT RULING IS `SlotHeader`'S, AND IT STILL HOLDS THERE. It was carried
+	 * across to this strip by name, but the two components are not the same
+	 * shape: this one's own docblock says it in terms — "the market grammar MINUS
+	 * action buttons … NO Đ BET / Sell buttons on the debate surface." There was
+	 * no Buy and no Sell here to suppress. The founder's R4b wording is exactly
+	 * that observation: "both headers should be same … there are no buy/sell
+	 * buttons anyway."
+	 *
+	 * ⇒ MEASURED BEFORE REMOVING (OVN-O4). Across signed-out · signed-in with no
+	 * position · holding YES · holding NO, each with and without a pseudonym, and
+	 * in all three composer states, the flag changed exactly ONE thing: whether
+	 * the held column's position readout was a `<Link>` or plain text. A
+	 * click-through to the viewer's own profile is not a Buy and not a Sell, so
+	 * suppressing it was the ruling being applied past its subject — and opening
+	 * a composer silently took an affordance away from a header that was not
+	 * hosting anything the reader was interacting with.
+	 *
+	 * ⛔ REMOVED RATHER THAN LEFT DEFAULTING TRUE. After R1 the hosting column is
+	 * the pole OPPOSITE the bet, and F-3 only permits opening a relation whose
+	 * resulting side IS the held side — so the held column can no longer BE the
+	 * hosting column and the flag had become unreachable. Leaving it would have
+	 * meant the founder's ruling holding by an arithmetic coincidence with a
+	 * different slice, which is precisely the kind of guarantee that evaporates
+	 * the next time someone changes the column rule.
+	 *
+	 * ⚠⚠ RPLY-2 · R2 — CS12'S OTHER CLAUSE ARRIVES HERE NOW, AND THIS RULING IS
+	 * UNCHANGED BY IT. R4b's finding was about the SECOND clause only ("loses
+	 * its Buy and its Sell") — correctly retired above, since this strip never
+	 * had either. The FIRST clause ("keeps the composing side's label, percent,
+	 * odds") was never implemented on this strip at all until `composingSide`
+	 * above. Both are true at once: nothing here had a control to lose, and
+	 * nothing here ever mirrored a label either — until the founder's separate
+	 * observation that a YES composer hosted in the NO column left that
+	 * column's strip reading "No" beside what the reader had just bet YES on.
+	 */
 }) {
-	const pct = pricing ? formatPricePercent(pricing, side) : "—";
-	const unit = unitToWin ? unitToWin[side === "YES" ? "yes" : "no"] : null;
+	const displaySide = composingSide ?? side;
+	const pct = pricing ? formatPricePercent(pricing, displaySide) : "—";
+	const unit = unitToWin
+		? unitToWin[displaySide === "YES" ? "yes" : "no"]
+		: null;
+	// ⛔ NOT `displaySide`. The position readout is a fact about the VIEWER'S
+	// OWN holding on THIS column's true pole — mirroring it would print a
+	// falsehood the moment the viewer holds a position on the pole this
+	// column is temporarily labelled with instead of the one it actually is.
 	const held = viewer?.position && viewer.position.side === side;
 	return (
 		<div className="flex min-h-12 items-center justify-between gap-2 rounded-(--r) px-3.5 py-3 shadow-(--elev-1) [border:var(--hairline)]">
@@ -50,8 +136,8 @@ export function PositionStrip({
 			</span>
 
 			<span className="flex items-center gap-[5px] text-[19px] font-semibold text-ink">
-				{side === "YES" ? "Yes" : "No"}
-				<PriceThumb side={side} />
+				{displaySide === "YES" ? "Yes" : "No"}
+				<PriceThumb side={displaySide} />
 				<b className="font-extrabold">{pct}</b>
 			</span>
 
@@ -60,6 +146,11 @@ export function PositionStrip({
 			    preselected (OQ-5 B). Signed-out → non-interactive. */}
 			<span className="flex items-center gap-1 text-[10px] font-bold tracking-[0.1em] text-n5 uppercase">
 				{held && viewer?.position ? (
+					/* ⚠ RPLY-1 · R4b — the ONLY remaining condition is whether we know
+					   who the viewer is. Signed out there is nobody to link to, so the
+					   plain-text variant below carries the same words and the same
+					   figure without a click-through. Opening a composer no longer
+					   enters this decision at all — see the prop block above. */
 					ownPseudonym !== null ? (
 						<Link
 							data-testid="w210c-sell-link"

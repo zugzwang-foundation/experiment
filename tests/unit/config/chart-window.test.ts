@@ -9,7 +9,7 @@ import {
 	resolveChartWindow,
 } from "@/server/config/limits";
 
-// CHART-3 — the constants layer for SPEC.1 1.0.42 §9's fixed experiment window.
+// CHART-3 — the constants layer for SPEC.1 1.0.48 §9's fixed experiment window.
 //
 // SPEC.1 §17 row proved here (in part):
 //   debate-view::price-chart-axis-spans-fixed-window

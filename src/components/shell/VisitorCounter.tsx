@@ -42,7 +42,13 @@ export function VisitorCounter() {
 		firedFor.current = pathname;
 		void (async () => {
 			try {
-				const res = await fetch("/api/visits", { method: "POST" });
+				// keepalive (HO-FRONT v2.0 T2/2a): survives navigation/unmount —
+				// sendBeacon was considered and rejected, since this call needs the
+				// response body (the rendered total), which sendBeacon has no access to.
+				const res = await fetch("/api/visits", {
+					method: "POST",
+					keepalive: true,
+				});
 				const data: unknown = await res.json();
 				const total =
 					data && typeof (data as { total?: unknown }).total === "number"

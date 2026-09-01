@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 import { ArgProfile } from "./ArgProfile";
@@ -9,6 +8,7 @@ import { CommentImage, PostImagePlaceholder } from "./CommentImage";
 import { ReplySplitBar } from "./composer/ReplySplitBar";
 import { FocusMarketCard } from "./FocusMarketCard";
 import { HeadZone } from "./HeadZone";
+import { KnowMore } from "./KnowMore";
 import { RemovedPlaceholder } from "./placeholders";
 import type {
 	DebateMarketHeader,
@@ -152,6 +152,7 @@ export function PostFocusHeader({
 											originalStake={post.authorStakeOriginal}
 											sold={post.authorSold}
 											replyCount={replyCount}
+											createdAt={post.createdAt}
 										/>
 										<LaneBadge badge={post.badge} />
 									</div>
@@ -190,18 +191,23 @@ export function PostFocusHeader({
 										) : (
 											<span />
 										)}
-										{/* Byte-carried from the mockup's own control (`d5:972`,
-										    `aria-label="Show more"`) — the same string the card's
-										    `+` carries, because it is the same action. */}
-										<Button
-											variant="ghost"
-											size="xs"
+										{/* ⚠⚠ UI-QUICK change set 2 item 2 — `Know more` REPLACES THE
+										    GLYPH, and the superseded note is the reason it had to.
+										    It read: "Byte-carried from the mockup's own control
+										    (`d5:972`, `aria-label='Show more'`) — the same string
+										    the card's `+` carries, because it is the same action."
+										    The second clause is the binding one: it IS the same
+										    action, so once the card's control became text this one
+										    had to follow or the claim stopped being true.
+										    ⛔ The byte-carried label does not survive the relabel —
+										    a button reading `Know more` named `Show more` fails
+										    WCAG 2.5.3 (Label in Name). Mockup fidelity loses to the
+										    success criterion; `KnowMore.tsx` owns the rule. */}
+										<KnowMore
+											label="Know more about this argument"
 											onClick={() => onOpenPopup(post)}
-											aria-label="Show more"
-											className="shrink-0 text-n5 hover:text-ink"
-										>
-											+
-										</Button>
+											className="shrink-0"
+										/>
 									</div>
 								</>
 							)}

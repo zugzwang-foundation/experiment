@@ -47,8 +47,42 @@ export function ReplySplitBar({
 		aggregate.counterDharma,
 	);
 	return (
-		<div className="flex items-center gap-3 text-xs">
-			<span className="flex items-center gap-1.5">
+		/* ⚠⚠ RPLY-1 · R5 — THE FOCUSED POST'S BAR CATCHES UP TO THE CARD'S.
+		   `AggregateFooter` (the market-view card) and this component are two
+		   files with two file-private `TriggerPill`s, and the card's geometry was
+		   corrected at CS6/CS10/CS11 while this one was left behind — not by
+		   oversight, but because this file was allow-list-EXCLUDED for writing at
+		   the time, which is stated in its own guard
+		   (`reply-split-bar.test.tsx`). The exclusion is lifted for this task and
+		   the geometry is PORTED; the two are NOT unified, which stays docketed on
+		   `AggregateFooter` — that would be a refactor across two surfaces, one of
+		   which this task does not touch.
+
+		   ⛔⛔ `items-start`, NOT `items-center`, AND THIS IS THE ONE THING THE PORT
+		   LIST DID NOT NAME. The `h-6` box below only aligns the track under
+		   `items-start`, and `AggregateFooter`'s own comment records that
+		   `items-center` was tried and lands ~2px off. MEASURED HERE on the real
+		   compiled CSS at 1440×900: the track sat **11.99px ABOVE** the pill
+		   centres before this change; keeping `items-center` while adding the box
+		   would have left −2.0px, and `items-start` leaves −0.6px, inside the
+		   bar's own thickness. Shipping the box without the row change would have
+		   been the alignment fix that does not align.
+
+		   ⚠ `gap-2` matches the card too. The pole logic below is UNTOUCHED — RR-3
+		   corrected which SIDE each span paints, and this row moves only where the
+		   spans sit. */
+		/* ⚠ `data-testid` so the parity guard can ANCHOR on this row rather than
+		   matching the first `flex items-* gap-*` div in the file — the card half
+		   already anchors on `aggregate-footer`, and an unanchored generic pattern
+		   silently re-points the moment any earlier div takes that extremely common
+		   shape (OVN-V5: never select the thing under test by a styling class). */
+		<div
+			data-testid="reply-split-bar"
+			className="flex items-start gap-2 text-xs"
+		>
+			{/* `.sidewrap` (`d5:585-586`) — the Đ figure is CENTRED UNDER its own
+			    pill rather than inline beside it, on both flanks. */}
+			<span className="flex shrink-0 flex-col items-center gap-1">
 				<TriggerPill
 					relation="support"
 					postSide={postSide}
@@ -129,24 +163,46 @@ export function ReplySplitBar({
 				    positive control for the EDGE rule.
 				    ⛔ NOT `--border-strong` — `emphasis-ladder-tokens.test.ts` pins that
 				    token at zero consumers. */}
-				<span
-					className={`h-1.5 w-full overflow-hidden rounded-(--r-dot) [border:var(--hairline)] ${postSide === "YES" ? "bg-no" : "bg-yes"}`}
-					aria-hidden="true"
-				>
+				{/* ⚠⚠ RPLY-1 · R5 — THE TRACK SITS IN A PILL-HEIGHT BOX AND CENTRES
+				    IN IT. `h-6` is the pill's own specified box (`text-xs` 16px line +
+				    `py-1` 8px), so the track's CENTRE is that box's centre at any
+				    thickness — which is why growing it 6 → 14px moves what fills the
+				    box and not where the middle of it sits. A bare offset would hit
+				    today's number and drift the first time the pill's size changes.
+				    ⛔ `h-[14px]` and `rounded-[var(--r)]` are READ OFF `PriceBar`'s
+				    `detail` size, not chosen — the card's bar was matched to it at
+				    CS10/CS11 because two split bars on one screen must not read as a
+				    bar and a hairline, and at 14px a 3px radius reads as a rectangle
+				    beside a market bar that is a pill. Same reasoning, same source,
+				    now on both surfaces.
+				    ⚠ THE HAIRLINE STAYS AND IS STILL LOAD-BEARING: side-keying the
+				    track means it takes `bg-yes` #181818 on a NO post against a
+				    #212121 card — ~1.10:1, i.e. gone — leaving the fill no visible
+				    extent to be a proportion OF. `reply-split-bar.test.tsx` asserts it
+				    on BOTH poles. */}
+				<span className="flex h-6 w-full items-center">
 					<span
-						className={`block h-full ${postSide === "YES" ? "bg-yes" : "bg-no"}`}
-						style={{ width: supportPct }}
-					/>
+						className={`h-[14px] w-full overflow-hidden rounded-[var(--r)] [border:var(--hairline)] ${postSide === "YES" ? "bg-no" : "bg-yes"}`}
+						aria-hidden="true"
+					>
+						<span
+							className={`block h-full ${postSide === "YES" ? "bg-yes" : "bg-no"}`}
+							style={{ width: supportPct }}
+						/>
+					</span>
 				</span>
 				<span className="text-n5">
 					<b className="text-sm text-ink">Đ {formatDharma(displayedTotal)}</b>{" "}
-					staked
+					{/* `.sb2.mid` (`d5:620`) — the figure stays cased; the WORD is the
+					    overline. Ported from the card so the two bars read alike. */}
+					<span className="tracking-[0.1em] uppercase">staked</span>
 				</span>
 			</span>
-			<span className="flex items-center gap-1.5">
-				<span className="text-n5">
-					Đ {formatDharma(aggregate.counterDharma)}
-				</span>
+			{/* ⚠ PILL FIRST ON THIS FLANK TOO. It used to be figure-then-pill so the
+			    row read outward-in; stacked, both flanks lead with their pill and the
+			    figure sits under it, which is what makes the two Đ amounts land on
+			    one baseline instead of on opposite sides of the row. */}
+			<span className="flex shrink-0 flex-col items-center gap-1">
 				<TriggerPill
 					relation="counter"
 					postSide={postSide}
@@ -156,6 +212,9 @@ export function ReplySplitBar({
 					active={activeRelation === "counter"}
 					onToggle={onToggleRelation}
 				/>
+				<span className="text-n5">
+					Đ {formatDharma(aggregate.counterDharma)}
+				</span>
 			</span>
 		</div>
 	);

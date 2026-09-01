@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import type { ReactNode } from "react";
 
+import { WarliHero } from "@/components/art/warli";
 import { GlobalHeader } from "@/components/shell/GlobalHeader";
 import { PageContainer } from "@/components/shell/PageContainer";
 import { auth } from "@/server/auth";
@@ -97,6 +98,72 @@ export default async function AuthLayout({
 		   ⚠ `dvh` tracks mobile browser chrome. POLISH is desktop-1440-only by G1,
 		   so that is recorded in the log and is not a finding on this surface. */
 		<div className="flex min-h-dvh flex-col">
+			{/* WARLI-MOUNT — the art layer's first and only mount, recipe #433.
+			    Two counter-rotating rings around a still centre that the auth card
+			    sits in; `R_INNER = 330` is derived from this container's own
+			    `max-w-md` card half-diagonal, which is why the artwork belongs
+			    HERE and reads as a frame rather than as a backdrop.
+
+			    ⚠ `fixed`, NOT `absolute`, and the difference is load-bearing.
+			    Recipe #438 offered `absolute inset-0`; there is no positioned
+			    ancestor anywhere above this node — the wrapper below is
+			    `flex min-h-dvh flex-col` and `<body>` is `min-h-full flex
+			    flex-col` — so `absolute` would resolve against the initial
+			    containing block by accident rather than by intent, and would
+			    scroll away on the tall onboarding page. `fixed` says the thing
+			    that is meant: the artwork is the window, not the document.
+
+			    ⚠ `-z-10` IS VISIBLE HERE, and it is worth saying why, because a
+			    negative z-index behind a painted background is a classic way to
+			    ship an invisible layer. `globals.css`'s `body` selector applies
+			    `bg-background`, and its `html` selector sets only `font-sans`;
+			    CSS propagates a body background to the CANVAS when the root has
+			    none, and leaves body's own used background transparent — so the
+			    canvas is painted before this node rather than over it.
+
+			    ⛔ THREE EDITS MAKE THIS LAYER SILENTLY VANISH, AND THE ONE THIS
+			    COMMENT USED TO NAME IS THE LEAST LIKELY OF THEM. No test in this
+			    repo can see any of them: jsdom performs no layout.
+			      1. A background on `<html>` — propagation stops, body paints its
+			         own in step 3, over this node in step 2. (The original note.)
+			      2. A background on `<body>` OR on the `flex min-h-dvh flex-col`
+			         wrapper below. Far likelier than (1) — a wrapper picking up
+			         `bg-ground` looks entirely reasonable — and it kills the layer
+			         the same way.
+			      3. A `transform`, `filter`, `backdrop-filter`, `perspective`,
+			         `contain` or `will-change` on `<body>` or that wrapper. Any of
+			         those re-anchors `position: fixed` to that element, so the
+			         layer would size to the wrapper and SCROLL AWAY on the tall
+			         onboarding page — destroying the exact property `fixed` was
+			         chosen for two paragraphs up.
+
+			    ⚠ `pointer-events-none` COSTS THE POINTER INTERACTION, deliberately.
+			    `hero.tsx` carries a pointerenter/move/leave gesture that aligns the
+			    rings toward the cursor; behind a full-viewport layer it cannot fire,
+			    and the alternative — letting it fire — is a full-bleed overlay that
+			    swallows every click landing outside the auth card. The gesture is
+			    ruled out of scope at this mount (WARLI-MOUNT ruling S(a)); it is
+			    kept as built rather than deleted, because the decision is about
+			    where the artwork is mounted and not about what it does.
+
+			    ⚠ `aria-hidden` IS THE ONE ADDITION TO RECIPE #433, and it is a
+			    deviation stated rather than absorbed (surfaced in the PR body).
+			    `hero.tsx` renders `role="img"` with a 90-character `aria-label`
+			    and a `<title>` — correct for a component with no context, and
+			    wrong the moment it becomes a decorative backdrop mounted as the
+			    FIRST child of the layout root. Without this attribute a screen
+			    reader meeting `/sign-in` announces "Two rings of figures turning
+			    in opposite directions…" before it reaches anything actionable, on
+			    the first screen of the product. Hiding the wrapper is the smallest
+			    fix that stays inside the node this task owns: it touches neither
+			    `hero.tsx` nor the `<WarliHero>` call, and the art layer's own
+			    tests mount `<WarliHero />` bare, so none of them observes it. */}
+			<div
+				aria-hidden="true"
+				className="pointer-events-none fixed inset-0 -z-10 grid place-items-center"
+			>
+				<WarliHero className="h-full w-full" />
+			</div>
 			<GlobalHeader viewer={viewer} stars={stars} />
 			{/* A7 seam — horizontal-center + max-width + vertical padding on the
 			    branded ground. Vertical placement is per-surface: short surfaces
