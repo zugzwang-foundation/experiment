@@ -146,11 +146,47 @@ export type ResolutionBlockEntry = {
 	fontSize: 11 | 12 | 13 | 14;
 };
 
+/**
+ * BLOCK-5b — the FLAVOUR taxonomy, promoted from a bare `string` to a closed
+ * union.
+ *
+ * ⚠⚠ FLAVOUR IS A TAXONOMY THAT HAPPENS TO MAP 1:1 TO EIGHT MARKETS TODAY, AND
+ * THE TYPE IS WHAT KEEPS THOSE TWO FACTS APART. Every other block keys off
+ * `market.slug`; FLAVOUR keys off the STRING, so two markets that later share a
+ * flavour share its glyph with no second entry anywhere. Widening this back to
+ * `string` would silently re-admit that duplication and, worse, make
+ * `FLAVOUR_GLYPHS`'s `Record<FlavourName, …>` exhaustiveness check vacuous —
+ * the whole point of which is that adding a ninth flavour must fail `tsc`
+ * rather than fall through to a missing glyph.
+ * ⛔ THE ORDER HERE IS THE `RESOLUTION_BLOCKS` ORDER, not alphabetical, so the
+ * two literals read side by side.
+ */
+const FLAVOUR_NAMES = [
+	"Pressure",
+	"Consumption",
+	"Petition",
+	"Sentiment",
+	"Innovation",
+	"Feedback",
+	"Showcase",
+	"Callout",
+] as const;
+
+export type FlavourName = (typeof FLAVOUR_NAMES)[number];
+
+/**
+ * A FLAVOUR block is an ordinary entry whose `line1` is narrowed to the closed
+ * taxonomy above. Narrowing the FIELD rather than introducing a parallel
+ * `flavourKey` is deliberate: the string a participant reads and the key the
+ * glyph map is looked up by are the SAME value, so they cannot drift.
+ */
+export type FlavourBlockEntry = ResolutionBlockEntry & { line1: FlavourName };
+
 export type ResolutionBlockSet = {
 	resolution: ResolutionBlockEntry;
 	resolver: ResolutionBlockEntry;
 	closes: ResolutionBlockEntry;
-	flavour: ResolutionBlockEntry;
+	flavour: FlavourBlockEntry;
 };
 
 const KNOWN_SLUGS = [
