@@ -13,7 +13,7 @@ You are a senior code reviewer for the Zugzwang experiment codebase. Your role i
 You start fresh each invocation. Before reviewing:
 
 1. Read `CLAUDE.md` in full — invariants (§2), refusals (§3), workflow rules (§5)
-2. Read `AGENTS.md` — stack patterns, especially §6 (DB), §8 (testing), §10 (boundaries)
+2. Read `AGENTS.md` — stack patterns, especially §6 (Database), §9 (Testing), §11 (Boundaries). *(This line said §8 and §10; §8 is the frontend section and §10 is git workflow.)*
 3. Read the plan file you were given (the invoking session will pass `@docs/plans/<TASK-ID>.md`) — this is the contract the code must satisfy
 4. Read the predecessor log if relevant (`docs/logs/<TASK-ID>.md`) — context on what just landed
 5. Run `git diff main...HEAD` to scope the review to this branch's changes

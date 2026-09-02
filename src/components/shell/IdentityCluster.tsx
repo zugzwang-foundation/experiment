@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { InfoTip } from "@/components/ui/info-tip";
+import { GLOSSARY } from "@/lib/copy/glossary";
 
 /**
  * Right-zone identity affordance. Signed-out → the JOIN entry (mockup v0_2,
@@ -9,8 +11,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
  * no inverse-button row, noted at the log). Signed-in → the identity chip,
  * which LINKS to the viewer's own profile (`/u/[pseudonym]`, activated at
  * UI.A5 — the A4 follow-up #2; a null pseudonym keeps a non-linked chip).
- * Avatar = the D8 placeholder for every author
- * (`/pfp-placeholder.svg`) + the mockup's 1-char fallback. The Đ cluster
+ * Avatar = the viewer's own PFP, composed server-side in the layout and passed
+ * down as a plain string (PFP-1) + the mockup's 1-char fallback. A viewer with
+ * no assigned PFP gets the placeholder from the same builder, so this component
+ * never decides what a missing avatar looks like. The Đ cluster
  * (Portfolio/Balance) SHIPPED and stands beside this chip in the signed-in
  * right zone — Balance at #283, Σ open-position value at #286 — and both
  * figures render through the single shared display formatter, rounded and
@@ -22,6 +26,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
  */
 export type HeaderViewer = {
 	pseudonym: string | null;
+	/** The viewer's PFP URL, already resolved by `pfpUrl` in the layout. */
+	pfpUrl: string;
 };
 
 export function IdentityCluster({ viewer }: { viewer: HeaderViewer | null }) {
@@ -46,7 +52,7 @@ export function IdentityCluster({ viewer }: { viewer: HeaderViewer | null }) {
 		return (
 			<span className={`${chipClass} select-none`}>
 				<Avatar size="sm">
-					<AvatarImage src="/pfp-placeholder.svg" alt="" />
+					<AvatarImage src={viewer.pfpUrl} alt="" />
 					<AvatarFallback>{""}</AvatarFallback>
 				</Avatar>
 			</span>
@@ -60,12 +66,14 @@ export function IdentityCluster({ viewer }: { viewer: HeaderViewer | null }) {
 			className={`${chipClass} outline-none [transition:all_var(--dur-hover)] hover:bg-n1 focus-visible:shadow-(--state-focus-ring)`}
 		>
 			<Avatar size="sm">
-				<AvatarImage src="/pfp-placeholder.svg" alt="" />
+				<AvatarImage src={viewer.pfpUrl} alt="" />
 				<AvatarFallback>{viewer.pseudonym.charAt(0)}</AvatarFallback>
 			</Avatar>
-			<span className="max-w-40 truncate text-xs font-semibold text-ink">
-				{viewer.pseudonym}
-			</span>
+			<InfoTip content={GLOSSARY.pseudonym} asChild>
+				<span className="max-w-40 truncate text-xs font-semibold text-ink">
+					{viewer.pseudonym}
+				</span>
+			</InfoTip>
 		</Link>
 	);
 }

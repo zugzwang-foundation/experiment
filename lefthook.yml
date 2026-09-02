@@ -17,6 +17,28 @@ pre-commit:
 pre-push:
   parallel: true
   jobs:
+    # ⚠ A DISCIPLINE WITH A MECHANISM — NOT A CONTROL, and it must never be
+    # written up as one. It is client-side, it exists only in a clone that ran
+    # `lefthook install`, and `--no-verify` skips it like every other hook here.
+    # It is worth having anyway because this repository has NO branch
+    # protection (CLAUDE.md §5.13 holds that measurement and its date), so O-4's
+    # ban on force-pushing `staging` had nothing but a document behind it.
+    #
+    # `use_stdin` is load-bearing: git sends the refs being pushed on stdin and
+    # nowhere else, so without it the script cannot tell which branch is being
+    # written to. Feature-branch force-pushes stay allowed, on purpose.
+    #
+    # ⚠ KNOWN GAP, measured not assumed: lefthook skips EVERY pre-push job when
+    # the push changes no files (`(skip) no matching push files`), so a
+    # force-push carrying no file delta runs this guard not at all. A `files:`
+    # override does not rescue it — the push-file set is computed first. The
+    # same gap has always applied to `typecheck` and `biome-check-all` below.
+    - name: no-force-push-protected
+      use_stdin: true
+      run: sh scripts/git/no-force-push-protected.sh {0}
+      skip:
+        - merge
+        - rebase
     - name: typecheck
       run: pnpm tsc --noEmit
       skip:

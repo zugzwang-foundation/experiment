@@ -45,8 +45,16 @@ export async function getMarketPricing(
  * DISCOVERY-COMPLETE C8 (V13) — the SAME one pool read, now also returning the
  * raw reserves. `getMarketPricing` above stays UNTOUCHED: its shape is pinned by
  * `tests/server/debate-view/market-pricing.integration.test.ts` and its docstring
- * says so. This mirrors `getMarketPricingAndUnitToWin` below — one read, one
- * extra return field, no new round-trip.
+ * says so. This mirrors `getMarketPricingAndUnitToWin` below — one read, now two
+ * extra return fields (`reserves`, `unitToWin`), no new round-trip.
+ *
+ * `unitToWin` was added so `/m/[slug]/page.tsx` can override the cached
+ * `DebateViewModel`'s `market.pricing`/`market.unitToWin` with this LIVE read
+ * after calling `getCachedDebateView` — the reserves used to key that cache
+ * came from THIS SAME read, so the override is a same-value assignment on a
+ * hit and a same-derivation assignment on a miss either way; it exists so the
+ * page's own guarantee doesn't rest on cache-key-equality reasoning nobody
+ * can see from the call site.
  *
  * ⚠ The reserves are a SERVER-INTERNAL row value. They must never reach
  * `DiscoveryCard` / `DiscoveryMarketView`, which cross to the `"use client"`
@@ -60,6 +68,7 @@ export async function getMarketPricingAndReserves(
 ): Promise<{
 	pricing: { yes: string; no: string };
 	reserves: { yes: string; no: string };
+	unitToWin: { yes: string; no: string };
 } | null> {
 	const rows = await client
 		.select({
@@ -75,7 +84,11 @@ export async function getMarketPricingAndReserves(
 		return null;
 	}
 	const reserves = { yes: pool.yesReserves, no: pool.noReserves };
-	return { pricing: getPrices(reserves), reserves };
+	return {
+		pricing: getPrices(reserves),
+		reserves,
+		unitToWin: deriveUnitToWin(reserves),
+	};
 }
 
 /**

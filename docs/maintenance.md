@@ -28,8 +28,8 @@ Run an audit on one or more of the files above when ANY of these happen:
 
 1. **A task discovers drift.** A task log's "Core file updates needed?" section flags that something is wrong. Don't defer — fix the same week, ideally as part of the task PR.
 2. **A phase ends.** At the end of each tracker phase (FOUND, SPEC, SCAFFOLD, ENGINE, DEBATE, UI, HARDEN, LAUNCH, LIVE): full audit pass on CLAUDE.md and AGENTS.md.
-3. **An ADR is accepted.** If the ADR changes a default in CLAUDE.md §10 (Decision log), update §10. If it changes a coding convention, update AGENTS.md.
-4. **A new subagent / slash command / hook is added.** Update CLAUDE.md §5.
+3. **An ADR is accepted.** If the ADR changes a default in the CLAUDE.md **§7** Decision log, update it there. If it changes a coding convention, update AGENTS.md. *(These two rows said §10 and §5. CLAUDE.md has nine sections — there is no §10 — and the Decision log lives in §7 "Maintaining this file".)*
+4. **A new subagent / slash command / hook is added.** Update CLAUDE.md **§6** (Subagents, hooks, model), and — if it changes when a reviewer is invoked — §5.11.
 5. **Calendar: every two weeks regardless.** Standing 30-minute review of CLAUDE.md and AGENTS.md, even if nothing else triggered an audit. Catches slow drift the other triggers miss.
 
 ---

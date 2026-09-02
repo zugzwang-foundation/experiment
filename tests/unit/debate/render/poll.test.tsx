@@ -23,7 +23,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // SPEC.1 §17 rows proved here:
 //   debate-view::poll-interval
 //   debate-view::poll-suspends-while-hidden-or-composer-open
-//   debate-view::poll-refreshes-price-chart
+//   debate-view::price-chart-tail-pinned-to-live-price  (was
+//     `debate-view::poll-refreshes-price-chart`, removed from §17 at CHART-1 /
+//     SPEC.1 1.0.45 — see the rename note above that describe block)
 //
 // Harness constraints (recon F13/F14): jsdom + @testing-library/react behind the
 // per-file docblock above. There is NO jest-dom — `toBeInTheDocument()` and
@@ -55,8 +57,17 @@ const { refreshMock, routerMock } = vi.hoisted(() => {
 
 vi.mock("next/navigation", () => ({
 	useRouter: () => routerMock,
-	usePathname: () => "/m/mumbai-metro-line-3-1m-riders",
+	usePathname: () => "/m/bitcoin-price-50k",
 	useSearchParams: () => new URLSearchParams(),
+}));
+
+// HO-FRONT v2.0 T2 — poll phase jitter (DebatePoll.tsx) desyncs concurrent
+// tabs by delaying when the FIRST interval arms, per client mount. Forced to
+// a constant 0 here so every timing assertion below collapses to exactly the
+// pre-jitter boundaries it already pins — the mechanism is exercised for
+// real by `tests/unit/debate/render/poll-phase.test.tsx`, not this file.
+vi.mock("@/components/debate/poll-phase", () => ({
+	getInitialPollPhaseOffsetMs: () => 0,
 }));
 
 import { DebatePoll } from "@/components/debate/DebatePoll";
@@ -64,7 +75,21 @@ import { DebateView } from "@/components/debate/DebateView";
 import type { DebateViewModel } from "@/components/debate/types";
 import { POLL_INTERVAL_MS_DEBATE_VIEW } from "@/server/config/limits";
 
-import { mumbaiMetroModel } from "../../debate-export/_fixtures/mumbai-metro.input";
+import { mumbaiMetroModel as mumbaiMetroModelRaw } from "../../debate-export/_fixtures/mumbai-metro.input";
+
+/**
+ * BLOCK-1 — `mumbaiMetroModelRaw.market.slug` isn't one of BLOCK-1's eight
+ * known live markets, so `ResolverCards` (nested under `MarketHeader`, which
+ * `DebateView` renders through) now throws on it — correctly; that's the new
+ * guard this task shipped (G1, `resolution-block-data.ts`). This file tests
+ * poll phase/timing, not ResolverCards' content, so it gets a
+ * locally-corrected model with a real slug. The golden input fixture itself
+ * (`mumbai-metro.input.ts`, "do not hand-edit") stays untouched.
+ */
+const mumbaiMetroModel: DebateViewModel = {
+	...mumbaiMetroModelRaw,
+	market: { ...mumbaiMetroModelRaw.market, slug: "bitcoin-price-50k" },
+};
 
 /** Stub `document.hidden` and fire the event the browser would fire. */
 function setHidden(hidden: boolean): void {
@@ -88,7 +113,7 @@ const OPENING = { at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" };
 function modelWithChart(currentYes: string, at: string): DebateViewModel {
 	return {
 		...mumbaiMetroModel,
-		priceChart: { series: [OPENING, { at, yes: currentYes }], nodes: [] },
+		priceChart: { series: [OPENING, { at, yes: currentYes }] },
 	};
 }
 
@@ -300,8 +325,22 @@ describe("F-DEBATE-4 — the stop rule (RULING D, client half)", () => {
 	});
 });
 
-describe("F-DEBATE-4 — the price chart rides the poll (F-DEBATE-5)", () => {
-	it("debate-view::poll-refreshes-price-chart", () => {
+// ⚠ RENAMED AT CHART-1 (SPEC.1 1.0.45), IN THE COMMIT THAT REMOVED ITS OLD NAME.
+// This case was `debate-view::poll-refreshes-price-chart`. §17 no longer carries
+// that row — it asserted the behaviour the CHART-1 amendment reverses — and
+// SPEC.2 §13.5 requires every case-id here to appear verbatim in §17, so leaving
+// the name would have been a build error by the repo's own rule.
+//
+// ⛔ THE TEST ITSELF IS UNCHANGED, AND THAT IS THE POINT. What it actually
+// proves is that a poll tick reaches the chart and moves its CURRENT reading —
+// the terminal point — which is exactly the behaviour the amendment KEEPS and
+// strengthens. What the amendment removes is re-derivation of the chart's
+// HISTORY on every tick, which this test never exercised: it feeds two whole
+// models in as props and never touches the server derivation. So the case is
+// re-pointed at the row it was always evidence for, rather than deleted along
+// with the row it was named after.
+describe("F-DEBATE-4 — the price chart's terminal rides the poll (F-DEBATE-5)", () => {
+	it("debate-view::price-chart-tail-pinned-to-live-price", () => {
 		const first = modelWithChart(
 			"0.500000000000000000",
 			"2026-09-15T00:00:00.000Z",

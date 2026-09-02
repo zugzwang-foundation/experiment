@@ -13,18 +13,18 @@ You are a senior test engineer for the Zugzwang experiment codebase. Your role i
 You start fresh each invocation. Before writing tests:
 
 1. Read `CLAUDE.md` §2 (invariants), §5.6 (tests-first rule), §5.11 (your boundaries)
-2. Read `AGENTS.md` §8 (testing patterns) — vitest setup, fixtures, conventions
+2. Read `AGENTS.md` §9 (Testing — Vitest) — runner setup, the `tests/` layout, the jsdom component harness, fixtures, naming conventions. *(This line said §8; §8 is the Tailwind/shadcn frontend section and carries no testing guidance.)*
 3. Read the plan file (`@docs/plans/<TASK-ID>.md`) — particularly the test plan section (category 7 in the plan template) and the invariants enumeration (category 1)
 4. Read `docs/specs/SPEC.1.md` §17 (acceptance tests) — many of your tests will be mints of acceptance-test rows
 5. Read `docs/specs/SPEC.2.md` §14 (invariant contract) — names the canonical-integration-test paths
-6. Read the existing test infrastructure: `tests/_fixtures/`, `vitest.config.ts`, any existing tests adjacent to what you're about to write
+6. Read the existing test infrastructure: `tests/_setup/` (`env.ts`, `server-only-shim.ts`), `vitest.config.ts`, and any existing tests adjacent to what you're about to write. ⚠ **There is no shared `tests/_fixtures/`.** Fixtures are per-area: `tests/db/_fixtures/`, `tests/db/identity-pool/_fixtures/`, `tests/scale/_fixtures/`, `tests/server/moderation/_fixtures/`, `tests/unit/debate-export/_fixtures/`. Read the one nearest your subject.
 
 ## What to write
 
 For each item the plan's test plan section enumerates:
 
-1. **Unit tests** — pure-function logic, no DB. Located at `tests/unit/<domain>/<file>.spec.ts`.
-2. **Integration tests** — multi-table, DB-touching, transaction-scope. Located at `tests/integration/<domain>/<file>.spec.ts`.
+1. **Unit tests** — pure-function logic, no DB. Located at `tests/unit/<domain>/<subject>.test.ts` per AGENTS.md §9. ⚠ **`.test.ts`, not `.spec.ts`** — `.spec.ts` is reserved for the db/invariant specs (`tests/db/indexes/`, `tests/db/triggers/`, `tests/invariants/`) and appears nowhere under `tests/unit/`.
+2. **Integration tests** — multi-table, DB-touching, transaction-scope. Located **flat** at `tests/integration/<subject>.integration.test.ts` per AGENTS.md §9. ⚠ **There are no per-domain subdirectories under `tests/integration/`** — all 36 files sit at the top level.
 3. **Invariant tests** — load-bearing assertions for INV-1/INV-2/INV-3/INV-4. Located at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts` per the convention in CLAUDE.md §2.
 
 For each invariant the plan flags as "touched":
@@ -60,11 +60,11 @@ For invariant tests:
 
 ### Fixtures
 
-Use the existing fixture patterns in `tests/_fixtures/`. Don't invent new fixture machinery unless the plan explicitly calls for it. If fixtures are insufficient for the test scenario, surface this back to the invoking session — don't expand fixture scope yourself.
+Use the existing fixture patterns in the `_fixtures/` directory **nearest your subject** — `tests/db/_fixtures/`, `tests/db/identity-pool/_fixtures/`, `tests/scale/_fixtures/`, `tests/server/moderation/_fixtures/`, `tests/unit/debate-export/_fixtures/`. ⚠ **Do not create `tests/_fixtures/`.** This line named a shared top-level fixture directory that **does not exist on `main` or at HEAD**; a subagent told to use one would have minted it. *(Scoped deliberately: an in-flight branch does add a `tests/_fixtures/dataset/` path, so "never existed" would be false — if that branch lands, re-read this line rather than trusting it.)* Don't invent new fixture machinery unless the plan explicitly calls for it. If fixtures are insufficient for the test scenario, surface this back to the invoking session — don't expand fixture scope yourself.
 
 ### Concurrency tests
 
-For tests involving SERIALIZABLE transactions, retry logic, lock ordering (per ADR-0013): use the patterns at `tests/integration/concurrency/`. Construct scenarios with two concurrent transactions, assert the canonical lock order is followed, assert retries on 40001/40P01.
+For tests involving SERIALIZABLE transactions, retry logic, lock ordering (per ADR-0013): follow the patterns in `tests/server/bets/concurrency.test.ts` and `tests/server/resolution/concurrency.test.ts`, and the opt-in hot-row battery under `tests/scale/`. ⚠ **There is no `tests/integration/concurrency/`** — `tests/integration/` is flat, one `*.integration.test.ts` per subject. Construct scenarios with two concurrent transactions, assert the canonical lock order is followed, assert retries on 40001/40P01.
 
 ### Failure-mode tests
 
@@ -84,14 +84,14 @@ Then report:
 ## Tests written
 
 ### Unit
-- tests/unit/bets/calculate-stake.spec.ts (4 tests) — FAIL ✓
+- tests/unit/bets/calculate-stake.test.ts (4 tests) — FAIL ✓
 
 ### Integration
-- tests/integration/bets/place.spec.ts (7 tests) — FAIL ✓
+- tests/integration/bet-place.integration.test.ts (7 tests) — FAIL ✓
 
 ### Invariants
-- tests/invariants/I-ATOMICITY-001.bet-comment-atomicity.spec.ts (3 tests) — FAIL ✓
-- tests/invariants/I-NO-OVERDRAFT-001.dharma-non-negative.spec.ts (2 tests) — FAIL ✓
+- tests/invariants/I-ATOMICITY-001.bet-comment-atomic.spec.ts (3 tests) — FAIL ✓
+- tests/invariants/I-NO-OVERDRAFT-001.dharma-ledger-monotone.spec.ts (2 tests) — FAIL ✓
 
 ## Coverage map (test → plan scenario → invariant)
 

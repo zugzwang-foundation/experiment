@@ -53,7 +53,7 @@ beforeEach(() => {
 	);
 });
 
-const VIEWER = { pseudonym: "RedFox001" };
+const VIEWER = { pseudonym: "RedFox001", pfpUrl: "/pfp-placeholder.svg" };
 
 // LABEL TEXT IS THE COPY REGISTER; UPPERCASE IS ITS RENDERING. Plan §6.2 says
 // exactly that — "the copy register's `Portfolio` · `Balance` is the label
@@ -351,5 +351,47 @@ describe("T6 — the null matrix (R9: zero ≠ absence)", () => {
 		expect(statBlock(cluster, PORTFOLIO_LABEL)?.textContent).toContain("Đ 0");
 		expect(cluster.textContent).not.toContain("0.000000000000000000");
 		expect(cluster.textContent).not.toContain("—");
+	});
+});
+
+describe("INFO-1 — the cluster exposes THREE distinct descriptions, not one", () => {
+	// Today's fix replaces one `title` on the container (firing over the glyph,
+	// Portfolio and Balance alike) with a separate `InfoTip` on each of the
+	// three children. This is the assertion that demonstrates the fix rather
+	// than just failing to contradict it: three leaf elements, three non-null
+	// `aria-describedby` values, and — the part a single shared title could
+	// never produce — no two of them the same.
+	it("the glyph, Portfolio label and Balance label each carry their own aria-describedby", () => {
+		render(
+			<DharmaCluster
+				portfolio="2480.000000000000000000"
+				spendable="610.000000000000000000"
+			/>,
+		);
+		const cluster = screen.getByTestId("dharma-cluster");
+
+		const glyph = clusterElements(cluster).find(
+			(el) => el.children.length === 0 && el.textContent?.trim() === "Đ",
+		);
+		const portfolioLabel = labelElement(cluster, PORTFOLIO_LABEL);
+		const balanceLabel = labelElement(cluster, BALANCE_LABEL);
+
+		const ids = [glyph, portfolioLabel, balanceLabel].map((el) =>
+			el?.getAttribute("aria-describedby"),
+		);
+
+		for (const id of ids) {
+			expect(
+				id,
+				"every one of the three carries aria-describedby",
+			).toBeTruthy();
+		}
+		// Pairwise distinct — the negative control this proves against: a single
+		// container `title` (or one shared InfoTip) would put the SAME id (or no
+		// id at all) on all three, and `new Set(ids).size` would read 1, not 3.
+		expect(new Set(ids).size).toBe(3);
+
+		// The container itself no longer carries the old blended string.
+		expect(cluster.getAttribute("title")).toBeNull();
 	});
 });

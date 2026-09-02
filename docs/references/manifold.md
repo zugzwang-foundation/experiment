@@ -45,14 +45,23 @@ Read these before lifting code from the corresponding files.
 
 2. **Comments do not record an at-post-time side or stake.** The
    schema in `common/src/comment.ts` has no field for the author's
-   market position at the moment of posting. Our schema needs
-   `side_at_post_time` and `stake_at_post_time` columns.
+   market position at the moment of posting. Our schema carries
+   `side_at_post_time` (INV-3). *(A `stake_at_post_time` column
+   shipped beside it and was DROPPED at DEBATE.8 — migration
+   `0017_drop_comments_stake_at_post_time.sql` — once ADR-0017
+   superseded the ADR-0009 ranking function that was its only
+   consumer. Do not re-add it.)*
 
 3. **Database writes use mutable tables.** The schema under
    `backend/supabase/` is a traditional write-in-place design. Our
-   schema is event-sourced — append-only events plus projector
-   workers. Read the reference schema for column shapes and
-   indexes; do not mirror the mutability pattern.
+   schema is event-sourced **Pattern A** (ADR-0005): every state
+   change appends to `events` inside the same transaction that
+   writes the read-model row. ⚠ **There are no projector workers**
+   — ADR-0005 explicitly REJECTS Pattern B (handler writes only
+   events, read models derived by projectors) and records "no
+   projector daemon to monitor in v1". Read the reference schema
+   for column shapes and indexes; do not mirror the mutability
+   pattern.
 
 ## Per-task index
 
@@ -106,10 +115,16 @@ rules.
 The reference has no directly applicable code; its currency model is
 different in kind.
 
-### ENGINE.7 — Single-writer actor per market
+### ENGINE.7 — Bet transaction primitive (the W-1 SERIALIZABLE wrapper)
 
-The reference uses queue-based concurrency, not in-memory
-single-writer actors. No directly applicable code.
+The reference uses queue-based concurrency. We use neither that nor the
+in-memory single-writer actor this row was originally named for — that
+approach was dropped at SPEC.2 §2.2 D2 (ratified 2026-05-04) in favour of
+a Postgres SERIALIZABLE transaction holding a pessimistic
+`FOR NO KEY UPDATE` lock on the pool row, with full-jitter retry on
+SQLSTATE 40001/40P01 (ADR-0013; built as `src/server/bets/transaction.ts`).
+For the closest reference reading see the ENGINE.8 row below, and read
+watch-out #1 before porting any transaction structure.
 
 ### ENGINE.8 — Order processing API
 

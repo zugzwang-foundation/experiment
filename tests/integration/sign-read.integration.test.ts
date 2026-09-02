@@ -26,10 +26,19 @@ vi.mock("@/server/storage/r2", () => ({
 }));
 
 import { READ_URL_TTL_SECONDS_MODERATION } from "@/server/config/limits";
+import {
+	__resetReadUrlMemo,
+	DOWNSTREAM_NONE,
+} from "@/server/storage/read-url-memo";
 import { signRead } from "@/server/storage/sign-read";
 
 beforeEach(() => {
 	mockMintReadUrl.mockReset();
+	// ⚠ The memo outlives a single `it()`. Without this, a second case reusing
+	// an object key would be served the FIRST case's URL against a reset mock —
+	// a green that proves nothing. These cases happen to use distinct keys
+	// (u1…u5), so the suite passed on a coincidence; this makes it not one.
+	__resetReadUrlMemo();
 });
 
 afterEach(() => {
@@ -43,7 +52,7 @@ describe("signRead (SCAFFOLD.15 §5.1)", () => {
 		const scripted = "https://r2.example/u/u1/abc.jpg?X-Amz-Signature=read";
 		mockMintReadUrl.mockResolvedValueOnce(scripted);
 
-		const url = await signRead("u/u1/abc.jpg", 60);
+		const url = await signRead("u/u1/abc.jpg", 60, DOWNSTREAM_NONE);
 
 		expect(mockMintReadUrl).toHaveBeenCalledTimes(1);
 		expect(mockMintReadUrl).toHaveBeenCalledWith("uploads", "u/u1/abc.jpg", 60);
@@ -52,9 +61,11 @@ describe("signRead (SCAFFOLD.15 §5.1)", () => {
 
 	it("sign-read::passes-caller-ttl-verbatim-3600", async () => {
 		// Caller-chosen TTL is passed verbatim (no clamp / no override).
-		// DEBATE.4 will use 3600 (1h) for render; this wrapper is the seam.
+		// The render path uses 7200 (ADR-0041 D-6, raised from 3600 so a URL
+		// survives its cache entry's serve window); 3600 here is simply an
+		// arbitrary caller value, which is the whole point of "verbatim".
 		mockMintReadUrl.mockResolvedValueOnce("https://r2.example/render?sig");
-		await signRead("u/u2/long.png", 3600);
+		await signRead("u/u2/long.png", 3600, DOWNSTREAM_NONE);
 		expect(mockMintReadUrl).toHaveBeenCalledWith(
 			"uploads",
 			"u/u2/long.png",
@@ -63,13 +74,21 @@ describe("signRead (SCAFFOLD.15 §5.1)", () => {
 	});
 
 	it("sign-read::passes-caller-ttl-verbatim-moderation-60s", async () => {
+		// ⚠ The moderation PATH now calls `signReadSingleUse`, not this — see
+		// sign-read.ts for why a fail-closed CSAM gate must not be memoised.
+		// The 60s forwarding contract asserted here is still `signRead`'s, and
+		// review-feed.ts still uses it at that TTL.
 		// SCAFFOLD.15 moderation path uses the 60s read TTL via the named
 		// constant READ_URL_TTL_SECONDS_MODERATION = 60. Test asserts both
 		// the constant value AND that signRead forwards it untouched (so
 		// the precommit moderate path's signed-URL TTL matches the spec).
 		mockMintReadUrl.mockResolvedValueOnce("https://r2.example/mod?sig");
 
-		await signRead("u/u3/moderate.jpg", READ_URL_TTL_SECONDS_MODERATION);
+		await signRead(
+			"u/u3/moderate.jpg",
+			READ_URL_TTL_SECONDS_MODERATION,
+			DOWNSTREAM_NONE,
+		);
 
 		expect(mockMintReadUrl).toHaveBeenCalledWith(
 			"uploads",
@@ -85,7 +104,7 @@ describe("signRead (SCAFFOLD.15 §5.1)", () => {
 		// Pure pass-through; no URL post-processing.
 		const scripted = "https://example.r2.cloudflarestorage.com/x?a=1&b=2";
 		mockMintReadUrl.mockResolvedValueOnce(scripted);
-		const out = await signRead("u/u4/photo.webp", 60);
+		const out = await signRead("u/u4/photo.webp", 60, DOWNSTREAM_NONE);
 		expect(out).toBe(scripted);
 	});
 
@@ -96,6 +115,8 @@ describe("signRead (SCAFFOLD.15 §5.1)", () => {
 		const networkError = new Error("ECONNREFUSED to R2");
 		mockMintReadUrl.mockRejectedValueOnce(networkError);
 
-		await expect(signRead("u/u5/x.jpg", 60)).rejects.toBe(networkError);
+		await expect(signRead("u/u5/x.jpg", 60, DOWNSTREAM_NONE)).rejects.toBe(
+			networkError,
+		);
 	});
 });

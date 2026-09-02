@@ -1,0 +1,234 @@
+{
+	"measuredAt": "2026-09-01T12:47:46.372Z",
+	"sharedChunkCount": 9,
+	"sharedRawBytes": 993244,
+	"sharedGzipBytes": 311255,
+	"largestSharedChunkRawBytes": 421514,
+	"nextStaticTotalRawBytes": 1781415,
+	"routes": [
+		{
+			"route": "/",
+			"chunkCount": 8,
+			"totalRawBytes": 222076,
+			"totalGzipBytes": 76914,
+			"ownRawBytes": 222076,
+			"ownGzipBytes": 76914
+		},
+		{
+			"route": "/_global-error",
+			"chunkCount": 1,
+			"totalRawBytes": 15976,
+			"totalGzipBytes": 4381,
+			"ownRawBytes": 15976,
+			"ownGzipBytes": 4381
+		},
+		{
+			"route": "/_not-found",
+			"chunkCount": 3,
+			"totalRawBytes": 24561,
+			"totalGzipBytes": 8107,
+			"ownRawBytes": 24561,
+			"ownGzipBytes": 8107
+		},
+		{
+			"route": "/admin",
+			"chunkCount": 3,
+			"totalRawBytes": 24561,
+			"totalGzipBytes": 8107,
+			"ownRawBytes": 24561,
+			"ownGzipBytes": 8107
+		},
+		{
+			"route": "/admin/login",
+			"chunkCount": 3,
+			"totalRawBytes": 24561,
+			"totalGzipBytes": 8107,
+			"ownRawBytes": 24561,
+			"ownGzipBytes": 8107
+		},
+		{
+			"route": "/admin/markets",
+			"chunkCount": 3,
+			"totalRawBytes": 26393,
+			"totalGzipBytes": 8779,
+			"ownRawBytes": 26393,
+			"ownGzipBytes": 8779
+		},
+		{
+			"route": "/admin/markets/[marketId]",
+			"chunkCount": 3,
+			"totalRawBytes": 30556,
+			"totalGzipBytes": 10203,
+			"ownRawBytes": 30556,
+			"ownGzipBytes": 10203
+		},
+		{
+			"route": "/admin/markets/media/sign",
+			"chunkCount": 0,
+			"totalRawBytes": 0,
+			"totalGzipBytes": 0,
+			"ownRawBytes": 0,
+			"ownGzipBytes": 0
+		},
+		{
+			"route": "/admin/markets/new",
+			"chunkCount": 4,
+			"totalRawBytes": 29762,
+			"totalGzipBytes": 10439,
+			"ownRawBytes": 29762,
+			"ownGzipBytes": 10439
+		},
+		{
+			"route": "/admin/moderation",
+			"chunkCount": 4,
+			"totalRawBytes": 63741,
+			"totalGzipBytes": 23467,
+			"ownRawBytes": 63741,
+			"ownGzipBytes": 23467
+		},
+		{
+			"route": "/admin/moderation/audit",
+			"chunkCount": 3,
+			"totalRawBytes": 24561,
+			"totalGzipBytes": 8107,
+			"ownRawBytes": 24561,
+			"ownGzipBytes": 8107
+		},
+		{
+			"route": "/api/auth/[...all]",
+			"chunkCount": 0,
+			"totalRawBytes": 0,
+			"totalGzipBytes": 0,
+			"ownRawBytes": 0,
+			"ownGzipBytes": 0
+		},
+		{
+			"route": "/api/bets/place",
+			"chunkCount": 0,
+			"totalRawBytes": 0,
+			"totalGzipBytes": 0,
+			"ownRawBytes": 0,
+			"ownGzipBytes": 0
+		},
+		{
+			"route": "/api/bets/sell",
+			"chunkCount": 0,
+			"totalRawBytes": 0,
+			"totalGzipBytes": 0,
+			"ownRawBytes": 0,
+			"ownGzipBytes": 0
+		},
+		{
+			"route": "/api/cron/alarms-drain",
+			"chunkCount": 0,
+			"totalRawBytes": 0,
+			"totalGzipBytes": 0,
+			"ownRawBytes": 0,
+			"ownGzipBytes": 0
+		},
+		{
+			"route": "/api/cron/close-due-markets",
+			"chunkCount": 0,
+			"totalRawBytes": 0,
+			"totalGzipBytes": 0,
+			"ownRawBytes": 0,
+			"ownGzipBytes": 0
+		},
+		{
+			"route": "/api/cron/r2-orphan-sweep",
+			"chunkCount": 0,
+			"totalRawBytes": 0,
+			"totalGzipBytes": 0,
+			"ownRawBytes": 0,
+			"ownGzipBytes": 0
+		},
+		{
+			"route": "/api/health",
+			"chunkCount": 0,
+			"totalRawBytes": 0,
+			"totalGzipBytes": 0,
+			"ownRawBytes": 0,
+			"ownGzipBytes": 0
+		},
+		{
+			"route": "/api/uploads/sign",
+			"chunkCount": 0,
+			"totalRawBytes": 0,
+			"totalGzipBytes": 0,
+			"ownRawBytes": 0,
+			"ownGzipBytes": 0
+		},
+		{
+			"route": "/api/visits",
+			"chunkCount": 0,
+			"totalRawBytes": 0,
+			"totalGzipBytes": 0,
+			"ownRawBytes": 0,
+			"ownGzipBytes": 0
+		},
+		{
+			"route": "/legal",
+			"chunkCount": 5,
+			"totalRawBytes": 155777,
+			"totalGzipBytes": 51864,
+			"ownRawBytes": 155777,
+			"ownGzipBytes": 51864
+		},
+		{
+			"route": "/m/[slug]",
+			"chunkCount": 10,
+			"totalRawBytes": 291957,
+			"totalGzipBytes": 95690,
+			"ownRawBytes": 291957,
+			"ownGzipBytes": 95690
+		},
+		{
+			"route": "/m/[slug]/export",
+			"chunkCount": 0,
+			"totalRawBytes": 0,
+			"totalGzipBytes": 0,
+			"ownRawBytes": 0,
+			"ownGzipBytes": 0
+		},
+		{
+			"route": "/m/[slug]/quote",
+			"chunkCount": 0,
+			"totalRawBytes": 0,
+			"totalGzipBytes": 0,
+			"ownRawBytes": 0,
+			"ownGzipBytes": 0
+		},
+		{
+			"route": "/onboarding",
+			"chunkCount": 8,
+			"totalRawBytes": 220315,
+			"totalGzipBytes": 71177,
+			"ownRawBytes": 220315,
+			"ownGzipBytes": 71177
+		},
+		{
+			"route": "/sign-in",
+			"chunkCount": 9,
+			"totalRawBytes": 245173,
+			"totalGzipBytes": 79943,
+			"ownRawBytes": 245173,
+			"ownGzipBytes": 79943
+		},
+		{
+			"route": "/sign-in/otp",
+			"chunkCount": 9,
+			"totalRawBytes": 245188,
+			"totalGzipBytes": 80028,
+			"ownRawBytes": 245188,
+			"ownGzipBytes": 80028
+		},
+		{
+			"route": "/u/[pseudonym]",
+			"chunkCount": 10,
+			"totalRawBytes": 219047,
+			"totalGzipBytes": 75296,
+			"ownRawBytes": 219047,
+			"ownGzipBytes": 75296
+		}
+	]
+}

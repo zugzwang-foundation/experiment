@@ -344,7 +344,24 @@ const PERMITTED_FILES = [
 	// remains the one thing this file must never do to stay green.
 	"src/components/debate/AggregateFooter.tsx",
 	"src/components/debate/badges.tsx",
-	"src/components/debate/chart/MarketPriceChart.tsx",
+	// ⛔ `chart/MarketPriceChart.tsx` LEAVES THE INVENTORY AT CHART-NODE-REMOVE, and
+	// it leaves for the same reason `composer/SlotHeader.tsx` did: its only
+	// side-keyed colour expression is gone, not relaxed. That expression was the
+	// post node's fill — `node.side === "YES" ? "var(--graph-yes)" : "var(--graph-no)"`
+	// — and the founder ruled the nodes off every surface.
+	//
+	// ⚠ THE COMPONENT STILL DRAWS ON BOTH POLES; IT NO LONGER CHOOSES BETWEEN THEM.
+	// The two terminal dots and their two pulse rings carry FIXED fills, one token
+	// per element (`fill="var(--graph-yes)"` on the YES mark, `"var(--graph-no)"` on
+	// the NO one), so there is no side VALUE keying a colour and nothing for this
+	// predicate to match. Verified before removing the entry: the scanner finds zero
+	// side-keyed colour expressions in the file, while the same pattern still fires
+	// on `badges.tsx` above.
+	//
+	// ⛔ THE PREDICATE IS UNTOUCHED — both `>=` floors, the pole-boundness test and
+	// every `offenders.toEqual([])` are unchanged, and the scanner still walks `src/`
+	// recursively and still reaches this file. This is a NARROWING of an ENUMERATION
+	// that follows a deletion, not a weakening of a guard.
 	"src/components/debate/composer/PositionStrip.tsx",
 	"src/components/debate/composer/ReplySplitBar.tsx",
 	// SEVENTH ENTRY, added deliberately at the V17 fix — the guard's own

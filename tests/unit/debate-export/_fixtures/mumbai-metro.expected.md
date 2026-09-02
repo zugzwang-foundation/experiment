@@ -24,13 +24,13 @@ chronological_index_posts: [post-3, post-1, post-2, post-4, post-5, post-6]
 
 This debate asks: Will Mumbai Metro Line 3 average over 1M daily riders before the freeze? It is currently open and unresolved, with the current price at 54% YES / 46% NO. 11 participants have staked 3,225 Đ across 6 posts and 10 replies.
 
-The most heavily backed YES argument is "The corridor is built for this volume" (CrimsonHawk207, 560 Đ). The most heavily backed NO argument is "Anchor on the actual number" (GoldenLynx288, 500 Đ).
+The most heavily backed YES argument is "The corridor is built for this volume" (MagentaWolf207, 560 Đ). The most heavily backed NO argument is "Anchor on the actual number" (SilverLynx288, 500 Đ).
 
 ## Contents
 
-1. Post 1 — YES — "The corridor is built for this volume" (CrimsonHawk207, 560 Đ)
-2. Post 2 — NO — "Anchor on the actual number" (GoldenLynx288, 500 Đ)
-3. Post 3 — YES — "The monsoon case alone gets you most of the way" (AmberFox042, 320 Đ)
+1. Post 1 — YES — "The corridor is built for this volume" (MagentaWolf207, 560 Đ)
+2. Post 2 — NO — "Anchor on the actual number" (SilverLynx288, 500 Đ)
+3. Post 3 — YES — "The monsoon case alone gets you most of the way" (OliveFox042, 320 Đ)
 4. Post 4 — NO — [removed by moderator]
 5. Post 5 — YES — "Fare competitiveness is the quiet driver" (TealOwl118, 150 Đ)
 6. Post 6 — NO — "The feeder rationalization slipped" (IndigoWolf355, 95 Đ)
@@ -50,7 +50,7 @@ The most heavily backed YES argument is "The corridor is built for this volume" 
 
 - **Rank:** 1 of 6
 - **Side:** YES
-- **Author:** CrimsonHawk207
+- **Author:** MagentaWolf207
 - **Stake:** 560 Đ
 - **Entry price:** 0.47
 - **Support / Counter:** 2 support (255 Đ) · 1 counter (210 Đ)
@@ -72,7 +72,7 @@ Line 3 finally connects the three densest job corridors in the city in one ride:
 
 Agreed, and the monsoon multiplier is underrated. Once the July flooding starts, the underground line is the only reliable option on this stretch. Last year ridership on the open sections jumped through the wet months.
 
-#### Reply 1.2 — Support (YES) — SlateHeron061
+#### Reply 1.2 — Support (YES) — GreenCamel061
 
 - **Replies to:** Post 1
 - **Side:** YES
@@ -104,7 +104,7 @@ Design intent and realized ridership are different things. Line 1 was projected 
 
 - **Rank:** 2 of 6
 - **Side:** NO
-- **Author:** GoldenLynx288
+- **Author:** SilverLynx288
 - **Stake:** 500 Đ
 - **Entry price:** 0.50
 - **Support / Counter:** 1 support (140 Đ) · 1 counter (165 Đ)
@@ -113,7 +113,7 @@ Design intent and realized ridership are different things. Line 1 was projected 
 
 Let us anchor on the actual number. Current daily ridership is running in the few-hundred-thousand range, not near a million. To clear a 7-day average of 1M before the freeze you need to roughly double-to-triple current throughput in under six months, including the festival-season dip in Oct–Nov. New-line ramps do not move that fast without a step change in feeder connectivity, which is not coming by then.
 
-#### Reply 2.1 — Support (NO) — RustStag149
+#### Reply 2.1 — Support (NO) — GoldSwan149
 
 - **Replies to:** Post 2
 - **Side:** NO
@@ -126,7 +126,7 @@ Let us anchor on the actual number. Current daily ridership is running in the fe
 
 The last-mile gap is the killer. Half these stations drop you 1.5 km from where you are actually going with no integrated bus feeder. Until that is fixed, people with a direct bus stick to the bus.
 
-#### Reply 2.2 — Counter (YES) — VioletCrane092
+#### Reply 2.2 — Counter (YES) — VioletHorse092
 
 - **Replies to:** Post 2
 - **Side:** YES
@@ -145,7 +145,7 @@ Doubling current throughput sounds dramatic, but that is literally the normal ra
 
 - **Rank:** 3 of 6
 - **Side:** YES
-- **Author:** AmberFox042
+- **Author:** OliveFox042
 - **Stake:** 320 Đ
 - **Entry price:** 0.45
 - **Support / Counter:** 0 support · 1 counter (230 Đ)
@@ -154,7 +154,7 @@ Doubling current throughput sounds dramatic, but that is literally the normal ra
 
 The monsoon case alone gets you most of the way. Mumbai's wet season is four months of unreliable roads, and Line 3 is fully underground end to end. Every serious flood day pushes a wave of riders onto whatever rail still runs. Stack that seasonal surge on top of the opening ramp and 1M is reachable in the window.
 
-#### Reply 3.1 — Counter (NO) — GoldenLynx288
+#### Reply 3.1 — Counter (NO) — SilverLynx288
 
 - **Replies to:** Post 3
 - **Side:** NO
@@ -178,7 +178,7 @@ Monsoon lifts ridership for days at a time, not a sustained 7-day average over a
 
 *[This argument was removed by a moderator. Its text, author, and stake are not shown. The replies below remain part of the debate.]*
 
-#### Reply 4.1 — Support (NO) — AzureBison330
+#### Reply 4.1 — Support (NO) — OliveBison330
 
 - **Replies to:** Post 4 (removed)
 - **Side:** NO
@@ -191,7 +191,7 @@ Monsoon lifts ridership for days at a time, not a sustained 7-day average over a
 
 Even setting tone aside, the throughput math in the parent is roughly right: the gap to 1M is large and the clock is short.
 
-#### Reply 4.2 — Counter (YES) — MossViper175
+#### Reply 4.2 — Counter (YES) — JadeSnake175
 
 - **Replies to:** Post 4 (removed)
 - **Side:** YES
@@ -219,7 +219,7 @@ The gap looks large only if you ignore that two major interchange stations open 
 
 Fare competitiveness is the quiet driver here. For the BKC–airport–SEEPZ triangle the line undercuts a cab by a wide margin and beats the door-to-door time. Price-sensitive daily commuters switch on cost, and that is the bulk of the volume.
 
-#### Reply 5.1 — Counter (NO) — RustStag149
+#### Reply 5.1 — Counter (NO) — GoldSwan149
 
 - **Replies to:** Post 5
 - **Side:** NO
@@ -247,7 +247,7 @@ Fare beats a cab, sure, but most of the "bulk volume" you need is people current
 
 Concretely on connectivity: the bus feeder rationalization that was supposed to wrap before the line's full opening has slipped. Without those feeders the catchment per station is walking distance only, which caps daily throughput well under the million mark regardless of how good the core line is.
 
-#### Reply 6.1 — Support (NO) — SlateHeron061
+#### Reply 6.1 — Support (NO) — GreenCamel061
 
 - **Replies to:** Post 6
 - **Side:** NO

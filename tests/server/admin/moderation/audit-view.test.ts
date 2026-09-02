@@ -35,7 +35,7 @@ function rawRow(
 		imageR2Key: null,
 		targetUserId: "0190aaaa-bbbb-7ccc-8ddd-eeeeffff0000",
 		targetMarketId: "0190mmmm-nnnn-7ooo-8ppp-qqqqrrrr0000",
-		authorPseudonym: "CrimsonOtter042",
+		authorPseudonym: "MagentaHorse042",
 		authorBannedAt: null,
 		marketSlug: "will-x-happen",
 		marketTitle: "Will X happen by 2027?",
@@ -70,7 +70,7 @@ describe("toAuditRowView — pure raw→view mapper", () => {
 		expect(view.actorId).toBe("system");
 		expect(view.marketSlug).toBe("will-x-happen");
 		expect(view.marketTitle).toBe("Will X happen by 2027?");
-		expect(view.authorPseudonym).toBe("CrimsonOtter042");
+		expect(view.authorPseudonym).toBe("MagentaHorse042");
 		// blocked_text rides into the ADMIN view model (admin-gated render only).
 		expect(view.blockedText).toBe("the rejected comment body");
 	});

@@ -6,6 +6,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AggregateFooter } from "@/components/debate/AggregateFooter";
 import { PostCard } from "@/components/debate/PostCard";
 import type { DebatePost, ReplyGroups, Side } from "@/components/debate/types";
+import { contentHashId } from "@/components/ui/info-tip";
+import { GLOSSARY } from "@/lib/copy/glossary";
 
 /**
  * POLISH.3 PR 2 · C1 — the market-view split-bar guard (plan §7; §6 row T3,
@@ -329,11 +331,37 @@ describe("HTML-FINISH · MARKET DETAIL — row 22, the card trigger pills", () =
 		);
 		expect(support?.disabled).toBe(false);
 		expect(counter?.disabled).toBe(true);
-		// The C3 batch string carries the refusal in BOTH channels, identical to
+		// The C3 batch string carries the refusal in TWO channels, identical to
 		// the focused-post bar — one refusal, one wording, wherever it is met.
-		expect(counter?.getAttribute("title")).toBeTruthy();
-		expect(counter?.getAttribute("aria-label")).toBe(
-			counter?.getAttribute("title"),
+		// INFO-1: the second channel moved from a native `title` to `InfoTip`
+		// (`aria-describedby` + a Popover/Tooltip carrying the same string,
+		// INFO-1 §3.4 C3 precedence) — `aria-label` is unchanged and still
+		// carries the refusal on its own channel.
+		//
+		// ⚠ A bare truthiness check here can't fail: EVERY InfoTip carries a
+		// non-null aria-describedby, including one wired to GLOSSARY.counter —
+		// so a C3-precedence regression (picking the glossary gloss instead of
+		// the refusal string) would still pass it. Hash BOTH channels' actual
+		// strings and compare: aria-label already carries the live c3 string
+		// verbatim, so if the describedby id doesn't match a hash of THAT exact
+		// string, this fails — and it fails differently (a hash of
+		// GLOSSARY.counter, not of c3) if precedence is ever inverted.
+		const ariaLabel = counter?.getAttribute("aria-label");
+		expect(
+			ariaLabel,
+			"the disabled trigger states the C3 refusal",
+		).toBeTruthy();
+		expect(ariaLabel).not.toBe(GLOSSARY.counter);
+		// Positive control on the hash comparison itself: a degenerate or
+		// colliding `contentHashId` would make the assertion below pass
+		// vacuously no matter which string won. Prove the two candidate
+		// strings hash to two different ids before trusting that the
+		// describedby id singles one of them out.
+		expect(contentHashId(GLOSSARY.counter)).not.toBe(
+			contentHashId(ariaLabel as string),
+		);
+		expect(counter?.getAttribute("aria-describedby")).toBe(
+			contentHashId(ariaLabel as string),
 		);
 	});
 

@@ -21,6 +21,7 @@ import {
 	users,
 } from "@/db/schema";
 import { computeSell } from "@/server/cpmm/calculate";
+import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { deriveTitleTeaser } from "@/server/debate-view/load-debate-view";
 import { loadProfilePositions } from "@/server/profile/positions";
 import { loadProfileTiles } from "@/server/profile/tiles";
@@ -634,9 +635,22 @@ describe("UI.A5 Slice 2 — loadProfilePositions (F-PROF-1 positions read model)
 		expect(row?.current).toBe(dp18("250"));
 	});
 
-	it("fully-exited-open-market-yields-no-row", async () => {
-		// OQ-3 A: an exited, still-Open market has nothing to value or settle — NO
-		// row. A separate still-held market is the selectivity control.
+	it("fully-exited-open-market-yields-a-row-carrying-its-arguments", async () => {
+		// ⚠⚠ THIS TEST ASSERTED THE OPPOSITE UNTIL POSREV-1 RF-13, and it is
+		// updated to the new behaviour with its reason rather than "fixed" by
+		// restoring the old one. It read `fully-exited-open-market-yields-no-row`
+		// on OQ-3 A: "an exited participation carries NO positions row — its
+		// record lives in the argument list". RF-13 supersedes that. The old
+		// reasoning was sound about VALUE — there is nothing to mark to market —
+		// and the row is no longer asked to carry one. It carries the ARGUMENTS,
+		// and an exited holding has exactly as many of those as a held one.
+		//
+		// ⛔ IT IS ALSO THE `computeSell` GUARD'S ONLY REGRESSION TEST.
+		// `cpmm/calculate.ts:126` runs `requirePositive(shares)`, which THROWS on
+		// zero — so without the guard in `loadProfilePositions` this call does not
+		// return a wrong row, it rejects, and the profile route 500s for anyone
+		// who ever fully exited a market. `await` alone is the assertion: a throw
+		// here fails the test before any `expect` runs.
 		const userA = await seedUser("exit-user", "exit");
 		const mExit = await seedMarket("m-exit", "Open");
 		await seedPool(mExit);
@@ -698,18 +712,164 @@ describe("UI.A5 Slice 2 — loadProfilePositions (F-PROF-1 positions read model)
 			quantity: dp18("20"),
 		});
 
+		// A zero-quantity position with NO lot at all — the RF-13 floor. It
+		// attributes nothing and holds nothing, so it is not a record of anything
+		// and must NOT become a row. ⚠ THIS IS THE CONTROL FOR THE WIDENING: without
+		// it, "the exited market appears" would be indistinguishable from "the
+		// predicate was deleted and everything appears".
+		const mEmpty = await seedMarket("m-exit-no-lots", "Open");
+		await seedPool(mEmpty);
+		await seedPosition({
+			userId: userA,
+			marketId: mEmpty,
+			side: "YES",
+			quantity: dp18("0"),
+		});
+
 		const rows = await loadProfilePositions(testDb, { userId: userA });
-		expect(rows.filter((r) => r.marketId === mExit).length).toBe(0);
+
+		const exited = rows.find((r) => r.marketId === mExit);
+		expect(exited).toBeDefined();
+		// Nothing held, nothing surviving, nothing to value — but the argument
+		// survives, which is the whole point of the row existing.
+		expect(exited?.quantity).toBe(dp18("0"));
+		expect(exited?.staked).toBe(dp18("0"));
+		expect(exited?.current).toBe(dp18("0"));
+		expect(exited?.lots.length).toBe(1);
+		expect(exited?.lots[0]?.sold).toBe(true);
+		expect(exited?.lots[0]?.survivingShares).toBe(dp18("0"));
+		// The argument's OWN side rides the lot, not the position row.
+		expect(exited?.lots[0]?.side).toBe("YES");
+		expect(exited?.lots[0]?.originalBasis).toBe(dp18("100"));
+
+		// The still-held control is untouched by the widening.
 		expect(rows.filter((r) => r.marketId === mHeld).length).toBe(1);
+		// And the lot-less zero row is still refused.
+		expect(rows.filter((r) => r.marketId === mEmpty).length).toBe(0);
 	});
 
-	it("fully-exited-then-settled-yields-no-row", async () => {
+	it("a-FLIPPED-market-reports-the-HELD-side-not-the-exited-one", async () => {
+		// ⛔⛔ THE ROW DOMAIN'S SHARPEST EDGE, AND IT WAS A LIVE DEFECT UNTIL
+		// @code-reviewer CRITICAL-1. `positions` is UNIQUE on
+		// `(user_id, market_id, SIDE)`; the partial `positions_one_held_side_idx`
+		// narrows that to at most one row with `quantity > 0`, NOT to one row per
+		// market. So a participant who fully exits one pole and re-enters the other
+		// has BOTH rows — and a flip is a first-class move (`positions/read.ts`).
+		//
+		// The old `quantity > 0` domain made the collision impossible. RF-13's
+		// widening brings it back, and a market-keyed map is LAST-WRITE-WINS over a
+		// SELECT with no ORDER BY. When the ZERO row won, a live holding rendered
+		// at `Đ 0`, dropped out of the Positions-value tile, and lost its Sell
+		// control — locking a participant out of exiting a position they hold, by
+		// scan order.
+		//
+		// ⚠⚠ THE FIXTURE IS A **NO → YES** FLIP, AND THE DIRECTION IS THE WHOLE
+		// POINT. A first attempt at this test used YES → NO and PASSED AGAINST THE
+		// DEFECT: with the held row returned last, last-write-wins happened to land
+		// on the right one, so the "control" proved nothing. The exited row has to
+		// come LAST under BOTH plausible orders —
+		//   · SEQ SCAN  → insertion order, so the held row is inserted FIRST;
+		//   · INDEX SCAN on `positions_user_market_side_idx` → `(user, market,
+		//     side)` with `sideEnum` ordered ["YES","NO"], so NO sorts last.
+		// Held = YES, exited = NO satisfies both. The wrong implementation is now
+		// the one that looks right.
+		const userA = await seedUser("flip-user", "flip");
+		const marketId = await seedMarket("m-flip", "Open");
+		await seedPool(marketId);
+
+		// The NO argument, made first and later exited in full.
+		const cNo = await seedComment({
+			userId: userA,
+			marketId,
+			body: "The NO argument, later exited",
+			side: "NO",
+			createdAt: new Date("2026-09-18T10:00:00Z"),
+		});
+		const bNo = await seedBet({
+			userId: userA,
+			marketId,
+			side: "NO",
+			stake: dp18("100"),
+			shares: dp18("40"),
+			commentId: cNo,
+			createdAt: new Date("2026-09-18T10:00:00Z"),
+		});
+		// ⚠ A REAL `bet.sold` EVENT, not just a zeroed lot. `computeEpisodes` walks
+		// the merged trade stream and REFUSES a buy on the opposite side while an
+		// episode is open ("buy on YES while holding NO") — so zeroing the lot
+		// alone leaves the walk seeing an un-exited NO position and a YES buy on
+		// top of it. The exit has to exist in the STREAM as well as in the books,
+		// which is what the engine would have written. ⚠ At this moment the NO lot
+		// is the only one, so the helper's pro-rata reduction lands entirely on it.
+		void bNo;
+		await seedSell({
+			userId: userA,
+			marketId,
+			side: "NO",
+			sharesSold: dp18("40"),
+			proceeds: dp18("20"),
+			createdAt: new Date("2026-09-18T11:00:00Z"),
+		});
+
+		// The YES argument, entered after the exit and still held.
+		const cYes = await seedComment({
+			userId: userA,
+			marketId,
+			body: "The YES argument, still held",
+			side: "YES",
+			createdAt: new Date("2026-09-19T10:00:00Z"),
+		});
+		await seedBet({
+			userId: userA,
+			marketId,
+			side: "YES",
+			stake: dp18("60"),
+			shares: dp18("30"),
+			commentId: cYes,
+			createdAt: new Date("2026-09-19T10:00:00Z"),
+		});
+
+		// ⛔ HELD ROW INSERTED FIRST, exited row second — see the block above.
+		await seedPosition({
+			userId: userA,
+			marketId,
+			side: "YES",
+			quantity: dp18("30"),
+		});
+		await seedPosition({
+			userId: userA,
+			marketId,
+			side: "NO",
+			quantity: dp18("0"),
+		});
+
+		const rows = await loadProfilePositions(testDb, { userId: userA });
+		const row = rows.find((r) => r.marketId === marketId);
+		expect(row).toBeDefined();
+		// ⛔ THE HELD SIDE, its real quantity, and a NON-ZERO current.
+		expect(row?.side).toBe("YES");
+		expect(row?.quantity).toBe(dp18("30"));
+		expect(new CpmmDecimal(row?.current ?? "0").greaterThan(0)).toBe(true);
+		// ⚠ AND EXACTLY ONE ROW for the market — the two position rows collapse to
+		// one holding, they do not double it.
+		expect(rows.filter((r) => r.marketId === marketId).length).toBe(1);
+		// Both arguments survive on the record, each on its OWN side — which is
+		// what `lots.side` is for: the exited NO argument is not relabelled YES.
+		expect(row?.lots.length).toBe(2);
+		expect(row?.lots.map((l) => l.side).sort()).toEqual(["NO", "YES"]);
+	});
+
+	it("fully-exited-then-settled-yields-a-row-valued-at-its-payout", async () => {
 		// @code-reviewer HIGH-1 (Slice 2): a user who FULLY EXITS before the
 		// market settles has a zero-quantity position AND a zero-amount
 		// payout_events row (settle.ts writes one payout per bet, zero legs
-		// included). OQ-3 A: an exited participation carries NO positions row —
-		// its record lives in the argument list + graph, not the table. The
-		// closed-row domain is held-to-settlement, not every payout.
+		// included).
+		//
+		// ⚠⚠ UPDATED AT POSREV-1 RF-13, same supersession as the test above. It
+		// asserted `…-yields-no-row` on OQ-3 A. The row now exists. Its `current`
+		// comes from the SETTLED arm — Σ payout_events — rather than from the
+		// zero-shares guard, so this case proves the two arms are independent:
+		// `settled` is decided by the presence of a payout row, not by quantity.
 		const userA = await seedUser("exited-settled-user", "exited-settled");
 		const marketId = await seedMarket("m-exited-settled", "Resolved", {
 			outcome: "YES",
@@ -763,7 +923,16 @@ describe("UI.A5 Slice 2 — loadProfilePositions (F-PROF-1 positions read model)
 		});
 
 		const rows = await loadProfilePositions(testDb, { userId: userA });
-		expect(rows.filter((r) => r.marketId === marketId).length).toBe(0);
+		const row = rows.find((r) => r.marketId === marketId);
+		expect(row).toBeDefined();
+		// `settled` is decided by the PRESENCE of a payout row, never by quantity
+		// — so this row takes the settled `current` arm (Σ payouts = Đ 0 here),
+		// not the zero-shares guard the still-Open case above takes.
+		expect(row?.settled).toBe(true);
+		expect(row?.quantity).toBe(dp18("0"));
+		expect(row?.current).toBe(dp18("0"));
+		expect(row?.lots.length).toBe(1);
+		expect(row?.lots[0]?.sold).toBe(true);
 	});
 
 	it("held-in-closed-unsettled-market", async () => {

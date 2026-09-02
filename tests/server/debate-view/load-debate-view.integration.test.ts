@@ -38,8 +38,16 @@ const { mockSignRead, mockMintReadUrl } = vi.hoisted(() => ({
 	),
 }));
 
+import {
+	DOWNSTREAM_CACHED_MINUTES,
+	RENDER_TTL_SECONDS,
+} from "@/server/storage/read-url-memo";
+
 vi.mock("@/server/storage/sign-read", () => ({
 	signRead: mockSignRead,
+	signReadSingleUse: vi.fn(
+		async (key: string) => `https://signed.example/${key}`,
+	),
 }));
 
 // ⚠ A SECOND, DIFFERENT SEAM. Market media is signed through `storage/r2.ts`'s
@@ -515,9 +523,12 @@ describe("DEBATE.4 §6 — loadDebateView removal-masking gate (body/author neve
 		expect(eRemoved.removed).toBe(true);
 		expect(eRemoved).not.toHaveProperty("imageUrl");
 		// The loader must NEVER mint a signed URL for a removed comment's media.
-		expect(mockSignRead).not.toHaveBeenCalledWith(
+		// ⚠ ARITY-INDEPENDENT ON PURPOSE. `not.toHaveBeenCalledWith(key, anything())`
+		// stops matching the moment `signRead` grows an argument — it would then
+		// pass while a removed comment's URL was being minted, which is precisely
+		// the leak SC-1 exists to catch. Assert over the FIRST argument only.
+		expect(mockSignRead.mock.calls.map((c) => c[0])).not.toContain(
 			removedImg.r2Key,
-			expect.anything(),
 		);
 
 		const ePresent = findPost(vm, presentPost);
@@ -525,7 +536,8 @@ describe("DEBATE.4 §6 — loadDebateView removal-masking gate (body/author neve
 		// Present image → signed URL minted via signRead and surfaced.
 		expect(mockSignRead).toHaveBeenCalledWith(
 			presentImg.r2Key,
-			expect.anything(),
+			RENDER_TTL_SECONDS,
+			DOWNSTREAM_CACHED_MINUTES,
 		);
 		expect(ePresent.imageUrl).toBe(
 			`https://signed.example/${presentImg.r2Key}`,
@@ -588,16 +600,20 @@ describe("DEBATE.4 §6 — loadDebateView removal-masking gate (body/author neve
 		expect(payload).not.toContain("Removed reply with an image");
 		// …and the same for its MEDIA, which is the field this row added.
 		expect(payload).not.toContain(removedImg.r2Key);
-		expect(mockSignRead).not.toHaveBeenCalledWith(
+		// ⚠ ARITY-INDEPENDENT ON PURPOSE. `not.toHaveBeenCalledWith(key, anything())`
+		// stops matching the moment `signRead` grows an argument — it would then
+		// pass while a removed comment's URL was being minted, which is precisely
+		// the leak SC-1 exists to catch. Assert over the FIRST argument only.
+		expect(mockSignRead.mock.calls.map((c) => c[0])).not.toContain(
 			removedImg.r2Key,
-			expect.anything(),
 		);
 
 		// Positive control — the present reply's image IS minted and surfaced, so
 		// the absences above are not merely "replies never get images".
 		expect(mockSignRead).toHaveBeenCalledWith(
 			presentImg.r2Key,
-			expect.anything(),
+			RENDER_TTL_SECONDS,
+			DOWNSTREAM_CACHED_MINUTES,
 		);
 		expect(payload).toContain(`https://signed.example/${presentImg.r2Key}`);
 

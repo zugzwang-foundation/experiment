@@ -1,6 +1,7 @@
 import "server-only";
 
 import { and, eq } from "drizzle-orm";
+import { revalidateTag } from "next/cache";
 import { v7 as uuidv7 } from "uuid";
 
 import { markets, pools } from "@/db/schema";
@@ -59,7 +60,7 @@ export async function openMarket(args: {
 	// Minted internally ONCE at entry (gate ruling), closed over (ADR-0016 D1).
 	const openedEventId = uuidv7();
 
-	return runLifecycleTransaction(
+	const result = await runLifecycleTransaction(
 		{ marketId: args.marketId, flow: "F-ADMIN-2", expectedStatus: ["Draft"] },
 		async ({ tx, market }) => {
 			if (market === null) {
@@ -127,4 +128,21 @@ export async function openMarket(args: {
 			};
 		},
 	);
+
+	// S-4 Phase C, post-commit (mirrors the `emitSignedInEvent` posture in
+	// `src/server/auth/index.ts` — never inside the transaction, ADR-0014's
+	// no-external-work-in-tx discipline; `revalidateTag` is in-process, not
+	// HTTP, but the ordering still only makes sense after the state is real).
+	// A newly-Open market changes the Discovery-eligible SET, not any one
+	// market's content, so this busts the LISTING tag, not a `market:` one.
+	//
+	// Gate C CRITICAL fix — `{ expire: 0 }`, not `"max"` (non-evicting; see
+	// close.ts's identical fix and act.ts's measured proof). `openMarket` is
+	// `server-only`, not itself a Server Action — its only production caller
+	// today (`seedPoolAction`) happens to be one, but the function doesn't
+	// know that, and `updateTag` throws outside a Server Action. Matching
+	// `closeMarket`'s form rather than relying on today's one caller.
+	revalidateTag("discovery", { expire: 0 });
+
+	return result;
 }

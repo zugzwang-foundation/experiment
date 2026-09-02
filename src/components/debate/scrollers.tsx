@@ -78,7 +78,25 @@ const STAGGER_MS = ADVANCE_MS / 2;
  * and is reported as such in the run log: `document.hidden` was true, so the
  * poll was suspended and nothing fired.
  */
-function usePagedColumn(total: number, paused: boolean, stagger: boolean) {
+function usePagedColumn(
+	total: number,
+	paused: boolean,
+	stagger: boolean,
+	/**
+	 * FEED-2 — the comment this column should be SHOWING, and where it sits.
+	 *
+	 * ⚠⚠ TWO SCALARS, NOT ONE OBJECT, and the id is the one that matters. The
+	 * INDEX is the target; the ID is what makes the jump ONE-SHOT. Guarding on
+	 * the index instead would re-fire the moment ranking moved the card — the
+	 * reader would be yanked back to a post they had already scrolled past,
+	 * because a new bet landed somewhere above it. Guarding on the id means a
+	 * given comment is jumped to exactly once, however its position moves after.
+	 * ⛔ An object would be a fresh identity every render, which is the
+	 * dependency shape this file's own `useRegisterStep` docblock argues against.
+	 */
+	focusId: string | null,
+	focusIndex: number,
+) {
 	const [index, setIndex] = useState(0);
 	// Bumped on EVERY index change, whoever caused it — the timer, an arrow, or
 	// the clamp below. The rail remounts its countdown bar off this, so the bar
@@ -93,6 +111,38 @@ function usePagedColumn(total: number, paused: boolean, stagger: boolean) {
 		setIndex((i) => (total === 0 ? 0 : (i + delta + total) % total));
 		setProgressKey((k) => k + 1);
 	};
+
+	/**
+	 * ⚠⚠ FEED-2 — POINT THIS COLUMN AT ONE CARD, ONCE. The reader has just placed
+	 * a bet; the column on that bet's own side shows the post they wrote, in its
+	 * true ranked position, with no chrome and nothing to dismiss.
+	 *
+	 * ⛔ `focusIndex < 0` IS THE WHOLE FALLBACK, AND IT IS SILENT. A post masked
+	 * between submit and refresh, or simply absent, is not in this array — so
+	 * `findIndex` returned -1 and this does NOTHING. The column stays exactly
+	 * where it was and the bet takes its ordinary place. There is deliberately no
+	 * message: a "could not find your post" state would be a held state under
+	 * another name, which is the thing FEED-2 exists to delete.
+	 *
+	 * ⚠ `jumped` IS NOT CLEARED BY THE READER STEPPING, and it must not be. Once
+	 * this column has been pointed at a comment, stepping away is the reader's
+	 * decision and nothing may undo it. The ref clears only when the focus is
+	 * withdrawn entirely (`focusId === null`), which is what lets a SECOND bet
+	 * jump again.
+	 */
+	const jumped = useRef<string | null>(null);
+	useEffect(() => {
+		if (focusId === null) {
+			jumped.current = null;
+			return;
+		}
+		if (jumped.current === focusId || focusIndex < 0 || focusIndex >= total) {
+			return;
+		}
+		jumped.current = focusId;
+		setIndex(focusIndex);
+		setProgressKey((k) => k + 1);
+	}, [focusId, focusIndex, total]);
 
 	// A column whose list SHRANK (a post removed between polls) must not point
 	// past the end. Runs before the timer effect reads `index`.
@@ -206,6 +256,7 @@ type ColumnAuto = {
 export function PostScroller({
 	posts,
 	side,
+	focusId,
 	onEnter,
 	onOpenPopup,
 	onOpenImage,
@@ -232,11 +283,21 @@ export function PostScroller({
 	 * running somewhere nobody can stop it.
 	 */
 	auto?: ColumnAuto;
+	/**
+	 * FEED-2 — the just-posted comment to show, or `null`. ⛔ The ID is handed
+	 * down and the INDEX is resolved HERE, against the very array this component
+	 * pages. `DebateView` therefore never computes a position and never reads an
+	 * ordering — which is how "no ranking or read-model change" holds by
+	 * construction rather than by care.
+	 */
+	focusId?: string | null;
 }) {
 	const { index, progressKey, step } = usePagedColumn(
 		posts.length,
 		auto === undefined || auto.picked || auto.frozen,
 		auto?.stagger ?? false,
+		focusId ?? null,
+		focusId == null ? -1 : posts.findIndex((x) => x.id === focusId),
 	);
 	// ⚠⚠ THE RAILS FACE EACH OTHER ACROSS THE CENTRE GUTTER. d5 pins the LEFT
 	// column's rail to its RIGHT edge and the RIGHT column's to its LEFT
@@ -317,6 +378,7 @@ export function PostScroller({
 export function ReplyScroller({
 	replies,
 	side,
+	focusId,
 	onOpenImage,
 	onOpenPopup,
 	auto,
@@ -329,11 +391,21 @@ export function ReplyScroller({
 	onOpenPopup: (reply: PresentReply) => void;
 	/** Round 2 · R3 — omit to page manually with no timer. */
 	auto?: ColumnAuto;
+	/**
+	 * FEED-2 — the just-posted comment to show, or `null`. ⛔ The ID is handed
+	 * down and the INDEX is resolved HERE, against the very array this component
+	 * pages. `DebateView` therefore never computes a position and never reads an
+	 * ordering — which is how "no ranking or read-model change" holds by
+	 * construction rather than by care.
+	 */
+	focusId?: string | null;
 }) {
 	const { index, progressKey, step } = usePagedColumn(
 		replies.length,
 		auto === undefined || auto.picked || auto.frozen,
 		auto?.stagger ?? false,
+		focusId ?? null,
+		focusId == null ? -1 : replies.findIndex((x) => x.id === focusId),
 	);
 	// `.rps` mirrors `.pscroll` exactly — `.slot.l .rps{right:2px}` /
 	// `.slot.r .rps{left:2px}` (`d5:920-921`). Same rail, same gutter, same reason.

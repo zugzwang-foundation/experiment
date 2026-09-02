@@ -10,12 +10,16 @@ import { ProfileTiles } from "./ProfileTiles";
  * scrubbed user (H2 — the pseudonym is a bracketed placeholder like
  * `[scrubbed_user_4729]`) renders the scrubbed marker + the shared placeholder
  * avatar; NO PII (the DTO carries only the pseudonym, banned flag, and the
- * placeholder PFP — no email/name/googleId ever reaches this surface).
+ * resolved PFP URL — no email/name/googleId ever reaches this surface). The URL
+ * is a public R2 link built from `pfp_filename` by
+ * `server/identity-pool/pfp-url.ts` (PFP-1); `pfp_filename` is a coarsening of
+ * the already-public pseudonym — `<colour>-<animal>.webp`, with the number
+ * dropped — so it discloses nothing the DTO did not already carry.
  *
  * The dedicated scrubbed-user silhouette asset is UNDEFINED (a brand ruling is
- * owed — values-log §278); v1 reuses the shared `pfp-placeholder.svg` (the same
- * avatar every identity shows until the R2 PFP builder is wired). Surfaced for
- * Gate C.
+ * owed — values-log §278); a scrubbed row carries `pfp_filename` NULL and so
+ * reuses the shared `pfp-placeholder.svg`, which is now the fallback rather
+ * than the universal case it was before PFP-1. Surfaced for Gate C.
  */
 export function IdentityCard({
 	user,
@@ -117,28 +121,71 @@ export function IdentityCard({
 			    ⚠ The sentence that stood here said the chip "now renders in the
 			    positions panel head", which was true for exactly one pass. Corrected
 			    rather than left, because a reader who trusts it goes looking for an
-			    element that no longer exists. */}
-			{/* A plain <img> (not the radix Avatar, which defers the img until load
-			    and shows only its fallback under jsdom) — the PFP is a tiny static
-			    SVG placeholder; next/image would rewrite its src and add no value.
-			    A scrubbed user shows the same placeholder until the R2 PFP builder +
-			    the owed scrubbed-silhouette asset land (surfaced for Gate C).
-			    ⛔ A `biome-ignore` ATTACHES TO THE NODE THAT FOLLOWS IT, so no
-			    comment may be inserted between the block above and this element —
-			    and because both an orphaned suppression and the un-suppressed
-			    `noImgElement` are WARNINGS, `just verify` stays EXIT=0 while
-			    reporting both. Measured at HTML-FINISH row 16, which did exactly
-			    that; the suppression therefore rides the LAST block, which is this
-			    one — and it was moved OFF the row-16 block above precisely because
-			    that block stopped being last when this one was written.
-			    biome-ignore lint/performance/noImgElement: static SVG placeholder — next/image is not warranted */}
-			<img
-				src={user.pfpUrl}
-				alt=""
-				width={56}
-				height={56}
-				className="h-14 w-14 shrink-0 rounded-[var(--imgr)] bg-n1 object-cover xl:aspect-square xl:h-full xl:w-auto"
-			/>
+			    element that no longer exists.
+
+			    ⚠⚠ PFP-UI-1 (2026-08-26): EVERY SIZING UTILITY THIS BLOCK ARGUES FOR
+			    NOW LIVES ON THE WRAPPER BELOW, NOT ON THE `<img>`. The reasoning is
+			    unchanged and still governs — `h-14 w-14` over `size-14`, the `xl:`
+			    scope, the 188 box, the named lg/xl cost — it simply attaches one
+			    element out. Read the wrapper's own block for WHY it had to move; the
+			    short version is that a wrapper between the grid item and the image
+			    breaks the percentage-height chain these numbers depend on. */}
+			{/* ⚠⚠ PFP-UI-1 — THE WRAPPER EXISTS TO CARRY THE RING, AND IT COSTS THE
+			    SIZING CHAIN IF THE UTILITIES DO NOT COME WITH IT.
+			    This mount was the only one of the eight with NO ring. It cannot take
+			    one from `ui/avatar.tsx` without adopting the radix primitive, and
+			    adopting the primitive would delete the only coverage in the repo that
+			    proves this hero renders the right image (the primitive defers its
+			    `<img>` under jsdom — `grep AvatarImage tests/` returns zero hits
+			    across the whole suite). So the ring arrives on a wrapper instead,
+			    carrying the identical declaration `ui/avatar.tsx:34` uses — copied,
+			    not imported, because extracting a shared constant would mean editing
+			    a file serving six mounts across five surfaces to dedupe a string.
+			    ⛔ THE WRAPPER IS NOT FREE, AND THE COST WAS MEASURED, NOT REASONED.
+			    The 188px box exists because the card root is a grid item stretched to
+			    the 188px row, which gives `xl:h-full` a definite percentage base. A
+			    naive wrapper makes that base `auto`; `w-auto` + `aspect-ratio:1/1`
+			    then fall back to the intrinsic asset size and the image renders
+			    256×256 — 68px larger in BOTH axes, overflowing the band. Measured at
+			    1440 in a pinned iframe. The fix is to give the wrapper the sizing
+			    utilities and the `<img>` `size-full`, which restores 188×188 at ≥xl
+			    and leaves the 56px box and its 66px centring untouched below xl.
+			    ⚠ `bg-n1` stays on the `<img>`: it is the loading-state fill and must
+			    sit on the element that is loading. `rounded-full` is on BOTH — the
+			    `<img>` for the crop, the wrapper's `::after` for the ring.
+			    ⛔ NO AUTOMATED TEST CAN SEE ANY OF THIS. jsdom performs no layout, so
+			    the suite proves only that the classes sit on the right elements; the
+			    256×256 blow-out, a 56×56 collapse and an ellipse all pass it. The
+			    proof is the founder visual pass at ≥1280. */}
+			<span className="relative shrink-0 h-14 w-14 xl:aspect-square xl:h-full xl:w-auto after:absolute after:inset-0 after:rounded-full after:[border:var(--avatar-ring)]">
+				{/* A plain <img> (not the radix Avatar, which defers the img until
+				    load and shows only its fallback under jsdom).
+				    ⚠ THE SUPPRESSION'S PREMISE CHANGED AT PFP-1 AND ITS CONCLUSION
+				    DID NOT. This is no longer "a tiny static SVG placeholder" — it is
+				    a 256×256 R2 webp, median 4.7KB, resolved per user. `next/image`
+				    still buys nothing here, but for a different and harder reason:
+				    `next.config.ts` declares no `images.remotePatterns`, so
+				    `next/image` on an R2 host THROWS at render. The reason string is
+				    re-stated rather than deleted, because a suppression whose stated
+				    cause is false is one a later reader deletes on sight.
+				    A scrubbed user shows the same placeholder until the owed
+				    scrubbed-silhouette asset lands (surfaced for Gate C).
+				    ⛔ A `biome-ignore` ATTACHES TO THE NODE THAT FOLLOWS IT, so no
+				    comment may be inserted between this block and the element — the
+				    wrapper above therefore opens OUTSIDE this block, never between
+				    it and the `<img>`. Because both an orphaned suppression and the
+				    un-suppressed `noImgElement` are WARNINGS, `just verify` stays
+				    EXIT=0 while reporting both, so nothing fails loudly if this is
+				    got wrong. Measured at HTML-FINISH row 16, which did exactly that.
+				    biome-ignore lint/performance/noImgElement: an absolute R2 URL on a host absent from images.remotePatterns — next/image would throw at render */}
+				<img
+					src={user.pfpUrl}
+					alt=""
+					width={56}
+					height={56}
+					className="size-full rounded-full bg-n1 object-cover"
+				/>
+			</span>
 			{/* HTML-FINISH row 8 — `.idcol` (mockup `:194`, `:437`): the identity
 			    COLUMN, holding the pseudonym row and — new — the six tiles beneath
 			    it. `min-w-0` and `flex-1` are the mockup's `min-width:0; flex:1 1

@@ -54,6 +54,8 @@ vi.mock("next/headers", () => ({
 
 vi.mock("next/cache", () => ({
 	revalidatePath: vi.fn(),
+	revalidateTag: vi.fn(),
+	updateTag: vi.fn(),
 }));
 
 import {

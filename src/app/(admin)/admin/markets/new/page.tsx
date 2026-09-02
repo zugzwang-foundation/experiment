@@ -8,6 +8,14 @@ import { CreateMarketForm } from "./create-market-form";
 // (SPEC.1 §15 / K3), not optional — so the page is a thin Server Component shell
 // (admin gate + initial error param) wrapping the `CreateMarketForm` client
 // island. The service + state machine remain the real gate.
+//
+// S-4 Phase B — `instant = false`: this page never carried a `dynamic`
+// export (implicit dynamism via `requireAdminPage`'s `cookies()` read and
+// this page's own unwrapped `searchParams` — same shape as `/admin/login`).
+// Under `cacheComponents` that errors the prerender build. Deferred, not
+// restructured — admin is outside S-4's scope (CLAUDE.md §1).
+export const instant = false;
+
 export default async function NewMarketPage(props: {
 	searchParams: Promise<{ error?: string }>;
 }): Promise<React.ReactElement> {

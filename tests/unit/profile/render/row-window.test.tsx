@@ -4,7 +4,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+// POSREV-1 — `PositionsTable` now owns the inline sell, which calls `useRouter`
+// for its post-sale `refresh()`. Nothing here submits; the stub only has to exist.
+vi.mock("next/navigation", () => ({
+	useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+}));
 
 import { PositionsTable } from "@/components/profile/PositionsTable";
 import type { ProfilePositionRow } from "@/server/profile/positions";
@@ -59,6 +65,17 @@ const SOURCE = readFileSync(
 	"utf8",
 );
 
+/**
+ * ⚠⚠ POSREV-1 RF-10 — THE WINDOW IS NOW THREE ARGUMENT TILES, NOT THREE MARKET
+ * ROWS, and every mechanism assertion below survives that unchanged: a bound is
+ * still a bound, the gate still gates, and `ROW_WINDOW` is still three. What
+ * moved is the SELECTOR (`position-tile-` rather than `position-tile-`) and the
+ * fact that group headers are excluded from the count — they are chrome, not
+ * slots. ⚠ These fixtures carry NO lots, so each renders through the
+ * whole-holding FALLBACK tile, whose key is the market id. That is deliberate
+ * here: this file tests the window mechanism, and the fallback is the cheapest
+ * fixture that produces exactly one tile per row.
+ */
 describe("item 8 — the window is a BOUND, never a clip", () => {
 	it("window::the-scroll-container-keeps-its-overflow-y-auto", () => {
 		// ⛔ THE WHOLE DISTINCTION. A `max-height` with a scroll container means
@@ -120,7 +137,7 @@ describe("item 8 — the measurement gates on the node having a box", () => {
 		expect(body.style.maxHeight).toBe("");
 		// …and the rows are all still reachable, which is the observable half.
 		for (const n of [1, 2, 3, 4]) {
-			expect(screen.getByTestId(`position-row-${M(n)}`)).toBeTruthy();
+			expect(screen.getByTestId(`position-tile-${M(n)}`)).toBeTruthy();
 		}
 	});
 
@@ -133,7 +150,7 @@ describe("item 8 — the measurement gates on the node having a box", () => {
 	it("window::FEWER-rows-than-the-window-clear-the-cap-rather-than-keep-it", () => {
 		// A stale cap from a wider filter would leave the panel short after the
 		// rows shrank under it.
-		expect(/visible\.length < ROW_WINDOW/.test(SOURCE)).toBe(true);
+		expect(/visibleTiles\.length < ROW_WINDOW/.test(SOURCE)).toBe(true);
 		render(<PositionsTable payload={{ owner: false, rows: [openRow(1)] }} />);
 		expect(screen.getByTestId("positions-panel-body").style.maxHeight).toBe("");
 	});

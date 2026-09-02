@@ -224,7 +224,7 @@ Grows additively as surfaces build. Rule: **every new component token aliases a 
 | Slot (CSS) | Contract name | Value (current) | Notes |
 |---|---|---|---|
 | `--imgmax` | `component.comment-media.max` | `160px` | tunable; consumed by the debate render (DEBATE.4) |
-| `--imgr` | `component.comment-media.radius` | `6px` | **RATIFIED** at BRIDGE (values-log v0_3 §3 item 2) — images, avatars, media, graph panels. *(This row said "CD-DEFERRED placeholder — value open" until SYNC-1, contradicting both the code and AGENTS.md: `globals.css:168` reads `--imgr: 6px; /* image corner radius — ratified … */` and AGENTS.md §8 says ratified. The contract was the stale one of the three.)* |
+| `--imgr` | `component.comment-media.radius` | `6px` | **RATIFIED** at BRIDGE (values-log v0_3 §3 item 2) — images, media, graph panels. ⚠ **NOT avatars, since PFP-UI-1 (2026-08-26)** — the avatar is a circle at all eight mounts and its edge is `--avatar-ring`, not a radius. `--imgr` was scoped to avatars while the avatar was an abstract empty square (values-log `:44`); the art that arrived on 2026-08-25 is a disc with padding, and a square frame renders a median 24.83% of the tile as cream margin. ⛔ **The VALUE is untouched and the other 19 non-avatar consumers are untouched** — this strikes one word from the scope, nothing else. *(This row said "CD-DEFERRED placeholder — value open" until SYNC-1, contradicting both the code and AGENTS.md: `globals.css:168` reads `--imgr: 6px; /* image corner radius — ratified … */` and AGENTS.md §8 says ratified. The contract was the stale one of the three.)* |
 
 ---
 

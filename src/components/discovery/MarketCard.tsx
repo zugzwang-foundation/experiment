@@ -18,10 +18,14 @@ import { StatLine } from "./StatLine";
  * rule (`:155`) styles NO ELEMENT IN THE DOCUMENT — a dead rule is the tell
  * that the chart was removed from the tile and its CSS left behind. The
  * sparkline box and the `series` prop that fed it are gone from this
- * composition. ⚠ `PriceSparkline` itself is NOT deleted: the hero still
- * renders it (`HeroPanels.tsx`), and `DiscoveryMarketView.series` still
- * carries the series there, so no read model changed (removing the FETCH is
- * PERF-1's, not this task's).
+ * composition. ⚠ THE TILE STILL CARRIES NO CHART, AND CHART-1 DID NOT CHANGE
+ * THAT — the ratified mockup governs the tile and this paragraph stands. What
+ * changed is the sentence that used to follow it: `PriceSparkline` was kept
+ * alive because the hero rendered it, and at CHART-1 the hero moved onto the
+ * `/m/[slug]` chart component, so the sparkline had no caller left and was
+ * deleted. `DiscoveryMarketView.series` still carries the series to the hero,
+ * so no read model changed here either (removing the FETCH remains PERF-1's,
+ * not this task's).
  * The thumb is the shared `MarketThumb` (PRIMITIVES-2 D2), which renders the
  * canon-§6 `IMG` placeholder box for BOTH a null `imageUrl` (defensive arm)
  * and a presigned URL that 404s. Its `alt` is `""`: the same title renders in

@@ -1,4 +1,6 @@
 import { formatDharma } from "@/components/debate/format";
+import { InfoTip } from "@/components/ui/info-tip";
+import { GLOSSARY } from "@/lib/copy/glossary";
 
 /**
  * The card/hero stat line — `Đ staked · posts · replies` (design-language
@@ -56,9 +58,14 @@ export function StatLine({
 			    (n5) and the UA's default 700 made the emphasised value DIMMER than
 			    the label it emphasises. */}
 			<b className="font-[650] text-n6">
-				Đ {formatDharma(totals.dharmaStaked)}
+				<InfoTip content={GLOSSARY.dharma} asChild>
+					<span>Đ</span>
+				</InfoTip>{" "}
+				{formatDharma(totals.dharmaStaked)}
 			</b>{" "}
-			staked
+			<InfoTip content={GLOSSARY.stakedMarket} asChild>
+				<span>staked</span>
+			</InfoTip>
 			{/* V27 — an explicit n3 separator. `opacity-50` dimmed whatever colour
 			    happened to be inherited, so the separator's value drifted with its
 			    parent instead of naming a slot. */}

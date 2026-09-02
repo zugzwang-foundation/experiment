@@ -13,7 +13,7 @@
 ## 1. Stack (live versions — from `package.json`)
 
 - **Runtime:** Node 24 (`mise.toml`). CI pins via `.nvmrc` (pinned to 24).
-- **Framework:** Next.js `16.2.4`, App Router, React `19.2.4`, TypeScript strict.
+- **Framework:** Next.js `16.3.2`, App Router, React `19.2.4`, TypeScript strict. *(Bumped 16.2.4 → 16.3.2 at S-4 Phase B: `cacheComponents` needs the `instant` segment option, which 16.2.4 silently ignored — see §5 Caching and `next.config.ts`.)*
 - **DB:** Postgres 17 on Supabase (ap-south-1, session pooler). Drizzle ORM `0.45`, `drizzle-kit 0.30`, `drizzle-zod 0.7`.
 - **Auth:** Better Auth `1.6.11` (Google OAuth + email-OTP via Resend + Cloudflare Turnstile). See §H/§7.
 - **Styling:** Tailwind v4 (CSS-first via `@theme`) + shadcn (`shadcn 4.7`, `radix-ui 1.4`, `tw-animate-css`).
@@ -23,7 +23,7 @@
 - **Email:** Resend `6.12`. **Canonical JSON:** `canonicalize 3.0`. **IDs:** `uuid 11`. **Validation:** `zod 3.25`.
 - **Observability:** Sentry (`@sentry/nextjs 10.53`) + PostHog (`posthog-js 1.376`, `posthog-node 5.35`). Two-vendor. **No Axiom.**
 - **Tooling:** `pnpm 10.33.2` (the `packageManager` field), Biome `2.4.13`, Lefthook `2.1.6`, `just`, `tsx 4.22`, Vitest `3`, fast-check `4.8.0`.
-- **Build-script approval:** `package.json` → `pnpm.onlyBuiltDependencies` (`esbuild`, `lefthook`, `sharp`). *(Not a `pnpm-workspace.yaml` allow-list.)*
+- **Build-script approval: `package.json` → `pnpm.onlyBuiltDependencies` is the live list.** It is `esbuild`, `lefthook`, `sharp`. ⛔ **`pnpm-workspace.yaml`'s `allowBuilds` map is DEAD CONFIG in this repo and its extra entries do nothing.** Measured against pnpm 10.33.2: if `package.json` carries `pnpm.onlyBuiltDependencies` **at all — even as an empty array —** `allowBuilds` is never consulted (`allowBuilds` desugars via `settings.onlyBuiltDependencies ??= []`, and `??=` is a no-op once the key exists). Consequence on disk: `@sentry/cli` and `protobufjs` are listed `true` in `allowBuilds`, are absent from `package.json`, and **their install scripts therefore never run.** ⚠ **That does NOT leave `@sentry/cli` without a binary, and this line said it did.** Measured 2026-09-02 on a fresh `pnpm install --frozen-lockfile` at `4c041633`: `@sentry/cli-darwin@2.58.6` ships a **36 MB prebuilt** `bin/sentry-cli`, and running it answers `sentry-cli 2.58.6` at exit 0 — because `@sentry/cli` 2.x delivers its binary through a platform-specific OPTIONAL DEPENDENCY. ⚠ It **does** declare a `postinstall`, and that is the precise point rather than a caveat: `scripts/install.js` resolves the platform package FIRST and skips the manual download when that succeeds, so with the optional dependency present there is nothing the blocked build script would have fetched. The 487-byte file under `@sentry/cli/bin/` is the shim that resolves to it. **Source-map upload is unaffected.** The two claims are separate: *the script never ran* is measurable and true; *therefore the binary is missing* was inferred, and is false. That is the same shape SYNC-5's own reviewer pass named in this very PR — a fact measured at HEAD extrapolated into a consequence HEAD cannot support — and it survived into the correction itself. `protobufjs` was not measured and inherits no verdict from this. **Add a new build-script approval to `package.json`.** Adding it only to `allowBuilds` will silently do nothing. *(This line has now been wrong twice: it first read "Not a `pnpm-workspace.yaml` allow-list" — true when written, false once that file appeared — and SYNC-5 then over-corrected it to "TWO files carry it … which one pnpm honours is version-dependent", which presented a dead map as a live peer. It is not version-dependent; it is measurable, and it was measured at SYNC-5 Gate C across eight installs with a negative control.)*
 - **Not installed yet:** Playwright / any E2E runner; `commitlint`.
 
 ---
@@ -33,6 +33,8 @@
 `just` is the task entry point; `set dotenv-load := true` sources `.env.local` for every recipe.
 
 ```bash
+just                  # = `just list` — print every recipe (the `default` recipe)
+just list             # just --list
 just setup            # mise install; pnpm install; lefthook install
 just dev              # next dev
 just build            # next build
@@ -76,39 +78,129 @@ experiment/
 │   │   │                           #   m/[slug]/export/route.ts     — debate .md export (ADR-0025)
 │   │   │                           #   m/[slug]/quote/route.ts      — CPMM quote read (UI-A2)
 │   │   │                           #   u/[pseudonym]/{page,loading,error}.tsx — PROFILE (UI-A5)
-│   │   │                           #   bookmarks/{page,loading,error}.tsx     — BOOKMARKS (UI-A6, ADR-0032)
+│   │   │                           #   _lib/session.ts              — the route group's viewer-session read
+│   │   │                           #   ⛔ NO bookmarks/ route. UI-A6 shipped it and
+│   │   │                           #   ADR-0040 UNWIRED it — the route, the read model
+│   │   │                           #   (src/server/bookmarks/) and the components are all
+│   │   │                           #   gone from disk. The `bookmarks` TABLE survives
+│   │   │                           #   (src/db/schema/bookmarks.ts, migration 0024).
 │   │   ├── api/                    # _smoke-error, auth/[...all], bets/{place,sell}, cron/{r2-orphan-sweep,close-due-markets,alarms-drain}, health, uploads/sign, visits
-│   │   ├── globals.css, layout.tsx, page.tsx
-│   ├── components/                 # bookmarks/ debate/ discovery/ profile/ shell/ ui/
+│   │   ├── globals.css, layout.tsx, not-found.tsx, global-error.tsx
+│   ├── components/                 # `ls -d src/components/*/` — EIGHT as at 2026-09-02:
+│   │                               #   art/ debate/ discovery/ legal/ onboarding/ profile/
+│   │                               #   shell/ ui/. ⚠ The COMMAND is the claim; the list is a
+│   │                               #   reading of it. Both sides of the SYNC-5 merge carried
+│   │                               #   this list and each was wrong in a different place —
+│   │                               #   SYNC-5's had dropped art/, main's had dropped
+│   │                               #   onboarding/, BOTH had dropped legal/, and main's
+│   │                               #   still named bookmarks/ after ADR-0040 deleted it.
+│   │                               #
 │   │                               #   debate/ gained five components at HTML-FINISH ·
 │   │                               #   MARKET DETAIL: HeadZone (the arm-scoped two-column
 │   │                               #   header frame), MarketMediaPanel, FocusMarketCard
 │   │                               #   (the post arm's rail — and the EXIT), ResolverCards
-│   │                               #   (the resolver + X-official PLACEHOLDER cards —
-│   │                               #   it rendered `null` until round 2's R2 reversed
-│   │                               #   OD-2; see docs/parked.md SEQUENCE #5, strip or
-│   │                               #   gate before the DP.2 promote), ScrollRail (the
-│   │                               #   rail — and, since R3, the auto-advance countdown)
-│   │   └── ui/                     #   13 files, and they are NOT all shadcn. NINE shadcn
+│   │                               #   (⚠ the NAME is now narrow and deliberately kept —
+│   │                               #   RESO-1 turned the two "resolver + X-official" cards
+│   │                               #   into FOUR evenly-placed vertical blocks from one
+│   │                               #   hardcoded fixture. Chrome and labels land — and since
+│   │                               #   BLOCK-1 (#447) so do the VALUE and SUBVALUE lines, for
+│   │                               #   all eight live markets, from a static per-slug map with
+│   │                               #   NO migration, so `markets` still carries no
+│   │                               #   resolver/logo/source/handle column. ⚠ This line said
+│   │                               #   "the DATA fields are still empty" until 2026-09-02 —
+│   │                               #   true when SYNC-5 measured it, false by the time that
+│   │                               #   work merged, because BLOCK-1 landed in between.
+│   │                               #   `ResolverCards.tsx`'s own docblock states the reversal
+│   │                               #   and names THIS list as the site to fix. ⚠ It also moves
+│   │                               #   the placeholder inventory: with the resolution blocks
+│   │                               #   out of it, FIVE placeholders of TWO kinds remain
+│   │                               #   (market-media, post-image) against SEQUENCE #5's
+│   │                               #   "four" — the docket text is NOT corrected here. It rendered
+│   │                               #   `null` until round 2's R2 reversed OD-2; see
+│   │                               #   docs/parked.md SEQUENCE #5, strip or gate before the
+│   │                               #   DP.2 promote), ScrollRail (the rail — and, since R3,
+│   │                               #   the auto-advance countdown). Since HTML-FINISH the
+│   │                               #   directory has ALSO gained CriterionDisclosure (CRIT-1),
+│   │                               #   DebatePoll, and chart/ (CHART-1, the price chart).
+│   │   ├── art/warli/              #   WARLI-1/2 — a decorative SVG art layer, MOUNTED
+│   │                               #   AT ONE SITE: `src/app/(auth)/layout.tsx`, as a
+│   │                               #   `pointer-events-none fixed inset-0 -z-10` underlay
+│   │                               #   behind /sign-in, /sign-in/otp and /onboarding
+│   │                               #   (WARLI-MOUNT). The count and the site are BOTH
+│   │                               #   pinned — `tests/unit/art/art-layer-guards.test.ts`
+│   │                               #   asserts the importer list is exactly that one file
+│   │                               #   (it asserted the EMPTY list until this mount), and
+│   │                               #   `tests/unit/shell/sticky-header.test.ts` pins it as
+│   │                               #   the tree's only UNDERLAY — the first `fixed`
+│   │                               #   node here that goes UNDER rather than over.
+│   │                               #   Two counter-rotating rings — 8 FACED
+│   │                               #   figures inner, 12 faceless outer — around a still
+│   │                               #   centre the auth card sits in, inside a STATIC
+│   │                               #   field of 28 more figures, 104 motifs, 330 ground
+│   │                               #   marks and a four-edge border stack (WARLI-2).
+│   │                               #   ⚠ ONLY THE TWO RINGS ROTATE; everything else is
+│   │                               #   painted once. Before WARLI-2, 497 of 497 drawn
+│   │                               #   shapes sat in an animated group — measured.
+│   │                               #   `scene.ts` places the static population from
+│   │                               #   seeded loops (no Math.random, no clock anywhere in
+│   │                               #   the layer — the ring engine's determinism guard
+│   │                               #   depends on it), and `primitives/wobble.ts` bows
+│   │                               #   every straight run into a quadratic whose CONTROL
+│   │                               #   POINT carries the noise and whose ENDPOINTS never
+│   │                               #   move — which is what lets the hand chain and the
+│   │                               #   equal-reach guard survive a change to every mark.
+│   │                               #   Sealed OUTBOUND: it imports nothing but
+│   │                               #   `react` and its own files (asserted by
+│   │                               #   tests/unit/art/). ⚠ THE INBOUND HALF OF THAT
+│   │                               #   SENTENCE IS DEAD — it used to read "and nothing
+│   │                               #   imports it", which WARLI-MOUNT made false; the
+│   │                               #   same test now asserts exactly one importer, named
+│   │                               #   above. Outbound seal and inbound count are two
+│   │                               #   claims, and only the first is still a zero.
+│   │                               #   ⚠ IT IS THE
+│   │                               #   ONLY COMPONENT IN THE TREE THAT EMBEDS ITS OWN
+│   │                               #   `<style>` AND AUTHORS `@keyframes` — necessary,
+│   │                               #   because Tailwind's `animate-spin` is NOT in this
+│   │                               #   app's built CSS (measured: the only keyframes
+│   │                               #   emitted are enter/exit/pulse), so the obvious
+│   │                               #   utility would have produced rings that silently
+│   │                               #   never turned. Names are `warli-` prefixed and
+│   │                               #   collision-free. Copy the pattern only when the
+│   │                               #   same measurement holds; it is not a general
+│   │                               #   licence to ship component-scoped stylesheets.
+│   │   └── ui/                     #   15 files, and they are NOT all shadcn. NINE shadcn
 │   │                               #   primitives: avatar, badge, button, card, dialog,
-│   │                               #   input, separator, skeleton, textarea. FOUR are
-│   │                               #   project-authored and canon-ratified — empty-block
-│   │                               #   (P1), loading-block (P7), error-block (the
-│   │                               #   route-boundary family; canon §10 C-STATES-1 rules
-│   │                               #   it NEITHER P1 NOR P7), thumb-glyph (canon §3
-│   │                               #   item 13, pinned by component name and props).
-│   │                               #   Don't reach for a shadcn generator to change one
+│   │                               #   input, separator, skeleton, textarea. SIX are
+│   │                               #   project-authored — empty-block (P1), loading-block
+│   │                               #   (P7), error-block (the route-boundary family; canon
+│   │                               #   §10 C-STATES-1 rules it NEITHER P1 NOR P7),
+│   │                               #   thumb-glyph (canon §3 item 13, pinned by component
+│   │                               #   name and props), relative-time (canon §3 item 14 + the
+│   │                               #   §6 copy register's `Argument age` entry, pinned the same
+│   │                               #   way — TIME-1's age at the end of every card's identity
+│   │                               #   row, on all four card surfaces), and info-tip (INFO-1 —
+│   │                               #   the one affordance that opens on both pointer hover and
+│   │                               #   touch tap; composes radix-ui's Tooltip and Popover,
+│   │                               #   picked per-render on `(hover: hover) and (pointer:
+│   │                               #   fine)`; not yet canon-ratified — the others are, this
+│   │                               #   one landed the same night). Don't reach for a shadcn
+│   │                               #   generator to change one
 │   ├── db/                         # ← Drizzle client + schema live HERE (not src/server/db)
 │   │   ├── index.ts                #   the drizzle client
 │   │   └── schema/                 #   14 files: _enums, audit, auth, bets, bookmarks, comments,
 │   │                               #   dharma, events, identity, image-uploads, index, lots, markets, system
-│   ├── lib/                        # auth-client, errors, utils, ranking{,.config,-decimal}, posthog/
-│   └── server/                     # server-side business logic — 29 dirs (measured at PHASE-0; the line read 26 and was stale by three)
+│   ├── lib/                        # `ls src/lib/` — TEN entries as at 2026-09-02: auth-client,
+│   │                               #   errors, legal-sections, relative-time, utils,
+│   │                               #   ranking{,.config,-decimal}, copy/, posthog/. The command
+│   │                               #   is the claim; the list is a reading of it.
+│   └── server/                     # server-side business logic — 28 dirs (re-measured at SYNC-5,
+│                                   #   2026-08-28: the line read 29 and had counted `bookmarks/`,
+│                                   #   which ADR-0040 deleted. Measure with `ls -d src/server/*/ | wc -l`.)
 │       ├── admin/                  # actor (assertAdminActor — the R-14.5 belt; ENGINE.14)
 │       ├── auth/                   # index, email-otp, session-gate, onboarding-ref, tos-*, logout
 │       │   └── admin/              # login, logout, validate (admin path)
-│       ├── bets/ bookmarks/ comments/ config/ cpmm/ debate-export/ debate-view/ dharma/ events/ github/ health/ idempotency/ identity-pool/ onboarding/
-│       ├── discovery/              # ← list.ts is the Discovery read model. THE PERF-1 SURFACE (docs/parked.md, GO-LIVE BLOCKER)
+│       ├── bets/ comments/ config/ cpmm/ debate-export/ debate-view/ dharma/ events/ github/ health/ idempotency/ identity-pool/ onboarding/
+│       ├── discovery/              # ← list.ts is the Discovery read model. PERF-1 was here and is CLOSED (see the callout below §3's tree) — no go-live blocker row remains
 │       ├── markets/                # transitions, errors + ENGINE.14: transaction (W-4), create, open, close (incl. the closeDueMarkets sweep)
 │       ├── lots/                   # ← LOTS-1 / ADR-0039. compute (the pure core: mintLot · sellFromLot · allocateProRata · sumLots), persist (the ONLY `lots` write path), errors, basis (Đa = Σ surviving_basis)
 │       ├── middleware/ moderation/ observability/ positions/ profile/ resolution/ storage/ system/ upstash/ visitors/
@@ -116,7 +208,23 @@ experiment/
 ├── docs/{adr,specs,logs,plans,…}
 ├── drizzle/migrations/             # generated + hand-written; append-only — DO NOT EDIT
 ├── scripts/                        # tsx operational scripts (seed, verify, migrate-staging, smoke)
-├── supabase/                       # branch/snippet scratch only — NO migrations dir (RLS out of scope, ADR-0019)
+├── supabase/                       # ⚠ NOT TRACKED — 0 files under version control
+│                                   #   (`git ls-files 'supabase/*'` → 0; control:
+│                                   #   `git ls-files 'scripts/*'` → 27 as at 2026-09-02 — RUN
+│                                   #   the control, never trust the figure: its only job is to
+│                                   #   prove the pattern finds files at all, so any non-zero
+│                                   #   discharges it and the exact number is disposable).
+│                                   #   `.gitignore` ignores the whole
+│                                   #   directory, so a fresh clone or worktree has none of
+│                                   #   it — but the operator's working tree DOES: the
+│                                   #   Supabase CLI writes `.branches`, `.temp`, `snippets`
+│                                   #   there, exactly as `.gitignore`'s own comment predicts.
+│                                   #   ⚠ Do not read its absence in a worktree as absence —
+│                                   #   a worktree cannot see gitignored files, so that
+│                                   #   reading is unfalsifiable by construction. No
+│                                   #   migrations dir and none is planned — RLS is out of
+│                                   #   scope (ADR-0019); if one is ever minted, `.gitignore`
+│                                   #   already says to add `!supabase/migrations/`.
 ├── biome.json, drizzle.config.ts, lefthook.yml, mise.toml, justfile,
 ├── next.config.ts, postcss.config.mjs, tsconfig.json, vitest.config.ts, vitest.scale.config.ts,
 │   vitest.staging.config.ts, vercel.json
@@ -130,7 +238,13 @@ experiment/
 | **Discovery** (the market list) | `(public)/page.tsx` | `src/server/discovery/list.ts` | UI-A4 |
 | Debate view | `(public)/m/[slug]/page.tsx` | `src/server/debate-view/` | DEBATE.4 · ADR-0034 |
 | Profile | `(public)/u/[pseudonym]/page.tsx` | `src/server/profile/` | UI-A5 |
-| Bookmarks | `(public)/bookmarks/page.tsx` | `src/server/bookmarks/` | UI-A6 · ADR-0032 |
+
+⛔ **Bookmarks is NOT a surface any more.** It shipped at UI-A6 (ADR-0032) and **ADR-0040
+unwired it**: `src/app/(public)/bookmarks/`, `src/server/bookmarks/` and
+`src/components/bookmarks/` are all absent from disk. What survives is the `bookmarks`
+TABLE (`src/db/schema/bookmarks.ts`, migration `0024_bookmarks`) — schema kept, surface
+withdrawn. This table previously listed Bookmarks as a live route; it did not, and a
+session planning against that row would have looked for three directories that are gone.
 
 > ⚠ **Discovery is built and PERF-1 is CLOSED.** The surface served in ~35 s because Vercel
 > functions ran in `iad1` against a Mumbai database — ADR-0006 ratified `bom1` and it had
@@ -183,7 +297,7 @@ const placeBetSchema = z.object({
 
 **Admin Route Handlers live under `src/app/(admin)/admin/...`** (URL `/admin/...`), **NEVER** `/api/admin/...` — the admin session cookie is scoped `Path=/admin`, so a handler under `/api/admin/...` never receives it and 401s the real admin. (Participant routes may live under `/api/...` because the participant cookie is `Path=/`.) Verified by MEDIA.1: the planned `/api/admin/markets/media/sign` was relocated to `/admin/markets/media/sign` for exactly this reason — a `cookies()` mock had masked the failure in the unit layer.
 
-**Caching.** `next.config.ts` is currently a Sentry wrapper + env injection only — **`cacheComponents` is NOT enabled** and no Turbopack flags are set. If `cacheComponents` is turned on later, fetches become uncached by default and you mark scopes with `'use cache'`, reading cookies/headers *outside* cached scopes. Until then, standard Next 16 caching applies.
+**Caching. ⚠ `cacheComponents` IS ENABLED** — the `cacheComponents` key in `next.config.ts`, landed at S-4 Phase B (ADR-0041). This line previously said it was NOT enabled and that the config was "a Sentry wrapper + env injection only"; both are now false and the difference changes how you write every route. With the flag on: Partial Prerendering is the default, `'use cache'` / `cacheLife` / `cacheTag` are available, and **cookies/headers must be read OUTSIDE a cached scope**. A segment not yet restructured for the framework's instant-navigation validation opts out with `instant = false` (this is why Next had to go to `16.3.2` — `16.2.4` silently ignored `instant`). `next.config.ts` also carries `agentRules: false` (the 16.3.x dev/build step otherwise appends a generated `agentRules` block to **this file** on every run) and `outputFileTracingIncludes` for `/api/health` (the migration files) and `/m/[slug]/export` (`public/zugzwang.md`). No Turbopack flags are set.
 
 **`params` / `searchParams` are Promises** (Next 15+). `const { id } = await params;`.
 
@@ -234,6 +348,7 @@ const placeBetSchema = z.object({
 ## 7. Server stack — `server-only`, middleware, handlers
 
 - Files under `src/server/**` that touch the DB or secrets import `server-only`. **Scripts run under `tsx` must not delegate into the `@/db` → `server-only` chain** — inline their own `postgres()` client (the staging-seed/smoke pattern).
+  - ⚠ **ONE EXCEPTION, and it is narrow: a script whose subject IS the shipped client.** A verification control that must observe the pool options, connection string or pooler the app actually ships **may** import `@/db`, and must then be invoked as **`tsx --conditions=react-server`**. `server-only`'s package exports map `react-server` → an empty module and `default` → a module whose whole body is a `throw`, so plain `tsx` dies on the import before a line of the script runs; the condition flag is what makes the shipped singleton reachable (measured 2026-08-22 — plain `tsx` throws, `--conditions=react-server` imports clean). **The rule above still governs everything else.** The distinction is what the script is *for*: a seeder or a smoke check needs *a* connection and should inline one, but a control needs *the* connection — and a copied client is a copy, free to drift from the shipped pool options, at which point the control is exercising a connection nobody ships and passing while it does. That is the failure mode a control exists to catch, reproduced inside the control. **Sole instance: `scripts/verify-pooler-mode.ts` (S-1).** Adding a second is a decision, not an edit.
 - **Structured logging** via the `src/server/middleware/logging.ts` logger — no `console.log` in server code (a convention today, *not* a Biome rule; `console.error` does appear in auth). No request bodies in logs.
 - Middleware: `logging`, `origin-allowlist`, `rate-limit`, `envelope` (the §4.4 wire helpers for non-bet Route Handlers — attributed duplication of the bets-private copies, AUDIT-FIX-B7b A29; unification rides ENGINE.8 Q4). Idempotency store + lock in `idempotency/` + `upstash/`. Moderation is `moderation/precommit.ts` (OpenAI **before** the bet tx, guarded by a Redis SETNX reservation; fail-closed on terminal — ADR-0014). Rate-limit fails **open**; idempotency fails **closed** (ADR-0015).
 - **Better Auth custom `users` columns:** the drizzle adapter persists only fields in Better Auth's user model (6 core + `user.additionalFields`). Any custom `users` column written through a `databaseHook`/`mapProfileToUser` **must** be declared in `user.additionalFields` (`type:"string"`, `required:false`, `input:false` for server-only/identity fields) or it is silently stripped before INSERT — the cause of the `unable_to_create_user`/`23502` null-`pseudonym` signup bug (FIX-AUTH-SIGNUP). `input:false` also blocks client identity-spoofing at `parseInputData`.
@@ -262,23 +377,36 @@ const placeBetSchema = z.object({
 tests/
 ├── _setup/        env.ts, server-only-shim.ts
 ├── db/            _fixtures/, identity-pool/, indexes/ (positions-market-id pg_indexes assert — the catalog-assertion mint, AUDIT-FIX-B7b), triggers/ (13 append-only specs, one per protected table — +bet-receipts-append-only, AUDIT-FIX-B3 — plus truncate-rejected.spec, plus lots-no-delete.spec: NOT an append-only spec — `lots` is Bucket C and the file's third test is a POSITIVE control proving `TRUNCATE bets CASCADE` still empties it)
-├── integration/   30 *.integration.test.ts (admin-moderation-audit-feed, alarms-drain, composer-image,
-│                  composer-place, composer-reply, composer-sell, debate-export, dharma-chain-drift-drain,
+├── integration/   36 *.integration.test.ts (admin-moderation-audit-feed, alarms-drain,
+│                  auth-dbl-1-first-login-session, composer-image, composer-place, composer-reply,
+│                  composer-sell, cross-user-idempotency, debate-export, dharma-chain-drift-drain,
 │                  dharma-ledger, email-otp-send, header-balance, header-portfolio, idempotency-cache — the
-│                  former idempotency suite, renamed — market-by-slug, market-quote, migration-drift,
-│                  nightly-drift-resolution, onboarded-login-session, orphan-sweep, positions, post-param,
-│                  precommit-moderate, rate-limit, resolution-conservation, sign-read, sign-upload,
-│                  signup-create-path, staging-reset-mechanism, upstash-lock, viewer-context)
-├── invariants/    10 specs — see the Invariant-tests bullet below
+│                  former idempotency suite, renamed — market-by-slug, market-media-selection, market-quote,
+│                  migration-drift, nightly-drift-resolution, oauth-orphan-fallback,
+│                  oauth-signup-pool-deadlock, onboarded-login-session, orphan-sweep, positions, post-param,
+│                  precommit-moderate, profile-statement-count, rate-limit, resolution-conservation,
+│                  sign-read, sign-upload, signup-create-path, staging-reset-mechanism, upstash-lock,
+│                  viewer-context)
+├── invariants/    `ls tests/invariants/ | wc -l` — 13 as at 2026-09-02; the command is the claim. See the Invariant-tests bullet below
 ├── scale/         8 *.scale.test.ts (the ENGINE.10 Q-2 correctness-at-scale battery) + _fixtures/, _harness/ — opt-in only, see the Scale bullet below
 ├── staging/       OPERATIONAL RUNNERS, not tests — THREE runners (reset.staging.test.ts · generate.staging.test.ts · gates.staging.test.ts) + fixtures.ts (the literal fixture table) + _lib/ (target, client, read-client, write-guard, guards, reset, coverage, captured-identities). ADR-0035/0036, STAGING-PARITY Slices A–D. Points at the LIVE staging DB; opt-in only, see the Operational-runners bullet below
-├── server/        auth/ (incl. _probe-* + admin-login-result + email-otp-from-guard, AUDIT-FIX-B7b), bets/ (atomicity, concurrency, daily-credit, events-idempotency, idempotency-replay, moderation-outside-transaction, sell, subsequent-buy, validation + AUDIT-FIX-B3: sell-oversell, place-replay-durable, sell-replay-durable, release-failure, double-sell-chain), cron/ (close-due-markets — ENGINE.15, the first route-handler test convention), events/, identity/, middleware/, moderation/, resolution/ (happy-path, pro-rata, correction, void, concurrency, actor-assert), storage/ (incl. sign-route-envelope, AUDIT-FIX-B7b), admin/ (moderation/ + markets, pool-seed, resolution — each carries its ENGINE.15 wire-action blocks; + markets-media-sign-envelope, AUDIT-FIX-B7b), dharma/ (non-transferable)
-└── unit/          body-fingerprint, rate-limit-prefix, upstash-keys, upstash-redis-config (AUDIT-FIX-B7a — the A14 transport-bound config pins), idempotency-release (AUDIT-FIX-B3), bets/ (errors, floors, wire-envelope), cpmm/ (calculate + validate + vectors.test.ts + *.property.test.ts + _arbitraries.ts), markets/ (transitions.test.ts), positions/ (compute.test.ts), resolution/ (basis + basis.property), dharma/ (accrual, canonical, _probe-decimal-negzero, ledger, conservation, conservation-correction), staging/ (8 files — the guards that constrain the tests/staging/ runners WITHOUT touching a database: generator-no-direct-writes incl. the import allowlist, write-guard, runner-target, runner-gating, runner-isolation, reset-guard, guard-list-parity, fixture-table), design/ (**FOUR height chains** — discovery, profile, bookmarks, and `debate-height-chain.test.ts` added at HTML-FINISH · MARKET DETAIL; all four are SOURCE SCANS, because jsdom performs no layout)
+├── server/        21 dirs. auth/ (incl. _probe-* + admin-login-result + email-otp-from-guard, AUDIT-FIX-B7b), bets/ (atomicity, concurrency, daily-credit, events-idempotency, idempotency-replay, moderation-outside-transaction, sell, subsequent-buy, validation + AUDIT-FIX-B3: sell-oversell, place-replay-durable, sell-replay-durable, release-failure, double-sell-chain), cron/ (close-due-markets — ENGINE.15, the first route-handler test convention), events/, identity/, middleware/, moderation/ (+ _fixtures/), resolution/ (happy-path, pro-rata, correction, void, concurrency, actor-assert), storage/ (incl. sign-route-envelope, AUDIT-FIX-B7b), admin/ (moderation/ + markets, pool-seed, resolution — each carries its ENGINE.15 wire-action blocks; + markets-media-sign-envelope, AUDIT-FIX-B7b), dharma/ (non-transferable), and — undocumented here until SYNC-5 — comments/, debate-view/, discovery/, health/, lots/, markets/, observability/, profile/, system/, visitors/
+└── unit/          `ls -d tests/unit/*/ | wc -l` → 32 as at 2026-09-02; the command is the claim, the figure is a reading of it. Loose: body-fingerprint, rate-limit-prefix, upstash-keys, upstash-redis-config (AUDIT-FIX-B7a — the A14 transport-bound config pins), idempotency-release (AUDIT-FIX-B3). Dirs: bets/ (errors, floors, wire-envelope), cpmm/ (calculate + validate + vectors.test.ts + *.property.test.ts + _arbitraries.ts), markets/ (transitions.test.ts), positions/ (compute.test.ts), resolution/ (basis + basis.property), dharma/ (accrual, canonical, _probe-decimal-negzero, ledger, conservation, conservation-correction), staging/ (8 files — the guards that constrain the tests/staging/ runners WITHOUT touching a database: generator-no-direct-writes incl. the import allowlist, write-guard, runner-target, runner-gating, runner-isolation, reset-guard, guard-list-parity, fixture-table), design/ (`ls tests/unit/design/ | wc -l` → 16 as at 2026-09-02, of which **THREE height chains** — `discovery-height-chain`, `profile-height-chain`, `debate-height-chain` (added at HTML-FINISH · MARKET DETAIL); all three are SOURCE SCANS, because jsdom performs no layout. ⚠ this line said FOUR. The fourth was real: `tests/unit/design/bookmarks-height-chain.test.ts` was minted at `c6526a9`, landed on `main` at `fd4b357` (HTML-FINISH · BOOKMARKS, PR #338, 2026-08-16), and was **deleted by UNWIRE-1 / ADR-0040** at `8f353c4` and `ff1c0f9` on 2026-08-22, along with the surface it guarded. Three remain), and — undocumented here until SYNC-5 — _support/, auth/, comments/, composer/, config/, copy/, db/, debate/, debate-export/, debate-view/, discovery/, docs/, identity-pool/, lots/, middleware/, observability/, onboarding/, profile/, ranking/, scripts/, shell/, storage/, ui/, and art/ (WARLI-1/2 — `ls tests/unit/art/ | wc -l` → 7 as at 2026-09-02, not the 5 this entry carried before WARLI-MOUNT added `_mount-scan.ts` and `mount-scan-reach.test.ts`: `ring-geometry.test.ts` asserts the ring engine against HAND-COMPUTED positions rather than a snapshot, because a snapshot pins whatever the engine does today and it caught a real `-0` defect on its first run; `warli-render.test.tsx` reads the rendered `transform` attribute, which is the ONLY place facing/radius/phase reach the DOM; `art-layer-guards.test.ts` holds the raster, side-pole, raw-hex, injection-sink and OUTBOUND-seal checks, plus the inbound MOUNT-SITE pin — that last row asserted the importer list was EMPTY until WARLI-MOUNT and now asserts it is exactly `src/app/(auth)/layout.tsx`, inverted rather than deleted so a second mount still reddens; `wobble.test.ts` (WARLI-2) — ⚠ its FIRST block is the load-bearing one, because determinism, endpoint-preservation and bounded amplitude are ALL satisfied perfectly by a wobble that does nothing, which is how this slice most likely fails and it fails GREEN; `composition.test.tsx` (WARLI-2) holds G1–G4 — pairs at 180°, the static field facing centre, exactly 8 faces, and the density meridian, the last of which measures ink NORMALISED BY ADMISSIBLE AREA because the middle columns of the frame ARE the rings and a raw column count measures the hole in the doughnut)
 ```
 
 - **Unit** (no IO): pure functions in `src/lib/` and `src/server/<domain>/`. Happy path + ≥2 edges + the relevant invariant.
-- **Component / render** (jsdom, no IO): `jsdom` + `@testing-library/react`, enabled **per file** by a `// @vitest-environment jsdom` docblock on line 1 — **75** `*.test.tsx` files, mostly under `tests/unit/**/render/` plus `tests/server/admin/*.component.test.tsx`. **There is no `jest-dom`**, so `toBeInTheDocument()` / `toBeDisabled()` and that whole matcher set are UNAVAILABLE — assert against plain DOM (`getAttribute`, `textContent`, `querySelector`). Fake timers + `act()` for interval/effect behaviour; page visibility is exercised by stubbing `document.hidden` and dispatching `visibilitychange` (F-DEBATE-4). *Recorded at F-DEBATE-4 because this harness has existed since UI.0 and §9 never named it, so successive plans inherited a false "the UI cannot be tested" premise.*
+- **Component / render** (jsdom, no IO): `jsdom` + `@testing-library/react`, enabled **per file** by a `// @vitest-environment jsdom` docblock on line 1 — `find tests -name '*.test.tsx' | wc -l` → **106** as at 2026-09-02 (the command is the claim; the number is a reading of it — this figure has been written out and gone stale three times, at 30, 79 and 84) — mostly under `tests/unit/**/render/` plus `tests/server/admin/*.component.test.tsx`. **There is no `jest-dom`**, so `toBeInTheDocument()` / `toBeDisabled()` and that whole matcher set are UNAVAILABLE — assert against plain DOM (`getAttribute`, `textContent`, `querySelector`). Fake timers + `act()` for interval/effect behaviour; page visibility is exercised by stubbing `document.hidden` and dispatching `visibilitychange` (F-DEBATE-4). *Recorded at F-DEBATE-4 because this harness has existed since UI.0 and §9 never named it, so successive plans inherited a false "the UI cannot be tested" premise.*
   - ⚠ **AN OUTSIDE-CLICK ASSERTION MUST YIELD TO THE TASK QUEUE BEFORE IT FIRES.** Radix's `DismissableLayer` arms its `pointerdown` listener inside a **`setTimeout(…, 0)`**, so a pointer event dispatched synchronously after `render()` reaches **no listener at all**. Make the test `async` and `await new Promise((r) => setTimeout(r, 0))` first. ⛔ **The failure mode is a false GREEN, not a red:** a *"the backdrop does NOT dismiss this"* assertion written without the yield passes against a listener that was never armed, certifying a guard it never exercised. **Always pair it with the opposite assertion in the dismissible context** — that control is the only thing proving the mechanism fires at all. Escape is unaffected and works synchronously (`fireEvent.keyDown(document, { key: "Escape" })`). *Minted at O1-DECK, where the paired control went red on the first run; without it the non-dismissible guard would have shipped green and empty.*
+- **Browser measurement** (the LIVE deployed app, driven through the Chrome/CDP tools). Not a runner and not a suite — there is no E2E runner installed, and **jsdom performs no layout**, which is why the three `tests/unit/design/` height chains are SOURCE SCANS and why anything geometric has to be read off a real browser. *(Three, not four — this sentence said FOUR until 2026-09-02. The fourth was `bookmarks-height-chain`, deleted with the surface it guarded by ADR-0040. It survived SYNC-5's `FOUR → THREE` repair because this bullet did not exist in the tree SYNC-5 measured; it arrived from `main` in the merge, carrying the superseded number into a document that had just corrected it. The count lives with its command in the tree block above — this site should never have carried one.)* Five rules, all of which exist because their failure mode is a plausible number rather than an error.
+  - ⛔ **EVERY BOX MEASURES `0×0` UNTIL YOU COMPLETE THE SUSPENSE BOUNDARY BY HAND, AND NOTHING TELLS YOU SO.** React 19 streams suspended content into a `<div hidden id="S:0">` near the end of the document and reveals it with an inline `$RC`, whose reveal path is **`requestAnimationFrame`-gated** — the shipped tail is `$RT?requestAnimationFrame($RV.bind(null,$RB)):(a=performance.now(),setTimeout(…))`. **A CDP-driven tab is `document.hidden`, so rAF never fires.** The document reaches `readyState: "complete"` with the whole page still parked in the hidden div. There is no error, no console warning, and `querySelector` still returns every element you ask for — so the probe reads `0×0` for the element, its row, its panel and every ancestor up to `<body>`, which looks like a **layout collapse rather than a harness failure**. ⚠ Not specific to `/`: any route with a `Suspense` boundary streams the same way, so the tell is `document.querySelectorAll('div[hidden][id^="S:"]').length > 0`, not the route.
+  - ⇒ **The remedy is to perform `$RC`'s own DOM operation.** For each `div[hidden][id^="S:"]`, find its `template#B:<n>`, walk back to the pending `<!--$?-->` marker, walk forward to the matching `<!--/$-->` honouring nesting, delete the range between them, insert the streamed children in order, then flip the marker to `<!--$-->`. Real markup, real stylesheet, real fonts — only the reveal is hand-driven, so this is not a hand-mapped probe reproducing your own assumption. ⛔ **Prove it worked before trusting any number:** assert the count of boundaries revealed, assert `stillHidden === 0`, and assert a **non-zero box on the element you came to measure**. A measurement taken on an un-revealed document is silently a measurement of nothing.
+  - ⚠ **Pin the frame IN-PAGE, never the OS window.** Load the route into a same-origin `iframe` carrying inline `position:fixed; width:1440px; max-width:none; min-width:0`, and **`throw` unless `contentWindow.innerWidth === 1440`**. Once a CDP metrics override is in play — taking a screenshot installs one — resizing the window no longer moves `innerWidth`, so the window is precisely the thing that can lie about the width you believe you measured. The throw is the control; a width copied into a report is not.
+  - ⚠ **`await document.fonts.ready` and confirm `document.fonts.status === "loaded"`** (plus `fonts.check('12px Geist')` for the face in question) **before reading a baseline.** Font metrics decide where the baseline sits inside a line box; a baseline measured against a fallback face is a fiction shaped exactly like a number.
+  - ⚠ **Kill animation and transition before measuring** — inject `*,*::before,*::after{animation:none !important;transition:none !important}` — because the same hidden-tab freeze that stops rAF leaves an unfinished reveal parked at its START transform instead of its settled position.
+  - ⚠ **Assert build identity in the SAME call as the geometry** — `fetch('/api/health')` from inside the measured frame and throw unless `canary` is the SHA you meant. The alias serves the previous build until the new one is Ready, so one trusting read returns a healthy response describing the old tree.
+  - ⛔⛔ **`getComputedStyle` RETURNS A LIVE DECLARATION — SNAPSHOT EVERY VALUE TO A STRING AT THE INSTANT IT IS VALID.** It is not a copy taken at call time: the object re-resolves on every property read. So `const cs = getComputedStyle(el); el.focus(); …; el.blur(); return cs.boxShadow` returns the BLURRED value, and the state you went to measure is gone by the time you read it. ⚠ **The failure mode is a fabricated defect, not a missing number.** Measured at BLOCK-4: a focus ring that renders correctly reported `boxShadow: "none"` this way, on an element whose `:focus-visible` had already been captured as `true` — a combination that reads as "the selector matches but the rule does not apply", i.e. exactly like a real CSS bug, and it was one edit away from being written up as an accessibility regression. Applies to every state-dependent read: `:hover`, `:focus-visible`, `:active`, `aria-expanded`, anything a class toggles.
+  - ⚠ **AND THE COMPOSED `box-shadow` SHORTHAND UNDER-REPORTS TAILWIND v4's RING CHAIN — READ `--tw-shadow`, OR READ THE PAINT.** Tailwind v4 builds `box-shadow` from five `var()` layers backed by `@property`-registered customs. Chrome's computed `box-shadow` for the shipped inset ring prints `rgba(0, 0, 0, 0) 0px 0px 0px 0px inset` — the `inset` keyword survives, the spread and colour do not — while `--tw-shadow` on the same element correctly holds `inset 0 0 0 2px #747474` and the ring is visibly drawn. **The paint is the arbiter**: capture a zoom of the element in the state in question and look at it, rather than trusting either string.
+  - *Minted at TIME-1 · Form B, where the first probe returned `0×0` for every element on Discovery and the cause was three layers down in React's shipped reveal script. Sub-bullets 3–6 are standing practice the same run used; they are recorded here because they are the same class — each turns a silent wrong answer into a thrown one. **The last two are BLOCK-4's and are the same class again, one layer up: there the harness lied about geometry, here the style API lies about state.***
 - **Integration** (real test Postgres): any service-layer function that writes. Mandatory scenarios as the ENGINE lands — bet atomicity, Dharma reconciliation, side-freeze on comment, payout math, append-only enforcement.
 - **Scale** (opt-in, real test Postgres): `tests/scale/` is the correctness-at-scale battery (collision storms, hot-row contention, determinism under load — ENGINE.10 Q-2). It runs **only** via `pnpm test:scale` with its own `vitest.scale.config.ts`; the default config **excludes `tests/scale/**`** (`vitest.config.ts`), so a bare `vitest run` — local or CI — never picks it up.
 - **Operational runners** (opt-in, the LIVE staging database): `tests/staging/` holds non-test operational artifacts that borrow the Vitest harness for module resolution — ADR-0036. **THREE runners are on disk, not one:**
@@ -289,11 +417,13 @@ tests/
   - **`pnpm staging:rebuild`** is the composite: reset → seed → generate → gates.
 - **Never mocked in a runner:** anything that writes a row or moves Dharma (ADR-0036 primitive 3). Only the HTTP/cookie shell may be — `next/headers`, `next/navigation`, `next/cache`, `verifyOnboardingRef`, `requireAdminSession`, `auth.api.getSession`. **`tests/unit/staging/generator-no-direct-writes.test.ts` pins an ALLOWLIST of the `@/server/**` entrypoints a runner may import**; adding a name to it is a decision, not an edit, and `@/server/events/insert` + `@/server/dharma/persist` are pinned as *not* ratified as its own positive control.
 - The default config **excludes `tests/staging/**`** exactly as it excludes `tests/scale/**`, so no bare `vitest run` — local, CI, or a subagent's — can reach a live database. Each runner additionally refuses to start unless the FIVE-guard contract passes (intent · target · environment · live connection · post-run verification — the G-5 intent token is the ADR-0035 Addendum's addition to primitive 6's four); the **write-capable** runners require the intent token, the read-only gates deliberately do not. Isolation is asserted by `tests/unit/staging/runner-isolation.test.ts`; the runners' gating shape by `runner-gating.test.ts`; the no-direct-writes rule behaviourally by `_lib/write-guard.ts` and textually by `generator-no-direct-writes.test.ts`; and the fixture table's own consistency — including the C3/C4 lane calibration, computed with the shipped pure `badgeFor` — by `fixture-table.test.ts`.
-- **Invariant tests** at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts` — 11 on disk:
+- **Invariant tests** at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts` — `ls tests/invariants/ | wc -l` → **13** as at 2026-09-02. ⚠ The count and the enumeration below are two claims, and they have disagreed before: this line read `12` beside a list of 12 while `I-GENESIS-001` sat on disk unlisted. Count first, then read the list.
   - `I-APPEND-ONLY-001.resolutions-append-only` (INV-4) — `resolution_events` + `payout_events` reject UPDATE/DELETE post-INSERT at the storage layer.
   - `I-ATOMICITY-001.bet-comment-atomic` (INV-1) — one SERIALIZABLE W-1 tx wraps the full bet spine; if any write throws, every write rolls back (minted ENGINE.7).
   - `I-DAILY-ONCE-001.daily-credit-once-per-utc-day` — at most one `daily_allowance` ledger row per user per UTC day; storage backstop is the unique partial index `dharma_ledger_daily_allowance_day_uq` (minted ENGINE.12).
+  - `I-GENESIS-001.open-implies-market-opened-event` — every market in status `Open` carries a `market.opened` event (SPEC.1 §17 `markets::open-implies-market-opened-event`; minted CHART-3). True by construction in the product — `seedPoolAction` → `openMarket` is the only path to `Open` and emits the event inside the same W-4 transaction — which is exactly why it needed a test: a property nothing asserts stays true until a migration, a restored snapshot or a hand-fixed status makes it false, and the only symptom is a blank chart. `replayReserveSeries` seeds its walk from that event, so without it the series is `[]` and the surface renders nothing, indistinguishable from a market nobody has bet on. Staging is in that state on all eight markets, because they reached `Open` outside the product.
   - `I-GRANT-ONCE-001.initial-grant-once-per-user` — at most one `initial_grant` ledger row per user, EVER; storage backstop is the unique partial index `dharma_ledger_initial_grant_user_uq` (minted ENGINE.13).
+  - `I-IDEM-NOMASK-001.cached-non-2xx-never-masks-a-commit` — a SINGLE REQUEST's own cached non-2xx response never coexists with THAT SAME REQUEST's own committed transaction (five cases: rate-limit, validation, moderation, durable-mismatch, post-tx-mismatch). ⚠ Scope it narrowly: it does **not** cover the cross-request case (an earlier commit's receipt sitting beside a later request's genuinely-cached rejection) — that is `endpoint.ts`'s `case "hit"` durable consult, "DC-a", guarded by `tests/integration/cross-user-idempotency.integration.test.ts`. Green on the day it was written and correctly so: a `_probe-*`-posture regression guard, not a TDD driver (minted S-7 / ADR-0044).
   - `I-IDEM-ONCE-001.one-commit-per-idempotency-key` — at most one committed bet/sell per idempotency key; storage backstop is the unique index `bet_receipts_idempotency_key_uq` (fixture-bypass duplicate key → 23505; the route layer rides it via the durable pre-check + 23505 catch — minted AUDIT-FIX-B3 / ADR-0031).
   - `I-LOT-SUM-001.lot-shares-sum-to-position` — Σ `lots.surviving_shares` == `positions.quantity` per (user, market, side); the ADR-0039 R2 invariant-class rule. ⚠ It seeds its own rows into the local ephemeral Postgres and truncates after, so it proves the RULE and observes NO live environment — a live-DB Σ check is owed and belongs with the staging gates (minted LOTS-1 S4a).
   - `I-NO-OVERDRAFT-001.dharma-ledger-monotone` (INV-2) — `dharma_ledger` `balance_after >= 0`; no overdraft.
@@ -308,7 +438,7 @@ tests/
 
 ## 10. Git workflow + macOS/zsh
 
-- **Branches:** `feat/*`, `fix/*`, `chore/*`, `refactor/*`. **PRs required. Signed commits (SSH, ED25519).** These are enforced by **GitHub branch protection (server-side)** — **not** by a local hook. ⚠ **`Squash-merge only` is DISCIPLINE — corrected 2026-08-14 against the live API**, which reports `allow_squash_merge`, `allow_merge_commit` and `allow_rebase_merge` **all `true`**. Linear history blocks the merge-commit in practice; **the reachable set is squash OR rebase**, and nothing rejects a rebase merge. Locally, Lefthook runs only: `pre-commit` → Biome on staged files (auto-fix, re-stage); `pre-push` → `tsc --noEmit` + `biome check .`. There is **no** commit-msg/commitlint job and **no** block-main hook.
+- **Branches:** `feat/*`, `fix/*`, `chore/*`, `refactor/*`. PRs, signed commits (SSH, ED25519), squash-merge and linear history are all **CONVENTIONS**. ⛔ **There is no branch protection on this repository, on any branch.** **The measurement and its date live in CLAUDE.md §5.13 and only there** — read it there; a second copy would drift and whichever one you happened to open would be the wrong one. What follows from it in this file's territory: **`ci` is not a required check**, so a red PR can merge and green must be re-checked at the moment of merging; **nothing server-side rejects a force-push**; and **nothing blocks a direct push to `main` or `staging`** — 32 of the 35 commits `staging` carried at S-1 arrived that way. Locally, Lefthook runs `pre-commit` → Biome on staged files (auto-fix, re-stage); `pre-push` → `tsc --noEmit` + `biome check .` + **`no-force-push-protected`**, which refuses a non-fast-forward push to `main` or `staging` (S-1; client-side, `--no-verify` skips it, so it is a discipline with a mechanism rather than a control). There is **no** commit-msg/commitlint job and **no** block-main hook. ⚠ **All pre-push jobs are skipped when the push changes no files** — measured at S-1; see §11.
 - **Conventional Commits** by convention (e.g. `feat(bets): …`, `fix(dharma): …`, `chore(deps): …`) — a style rule, not machine-enforced.
 - **Multi-line commit messages:** write to `/tmp/commit-msg.txt`, then `git commit -F /tmp/commit-msg.txt`. Never multi-line `-m` or heredocs (macOS zsh truncates pastes ~1KB — split multi-command pastes into single commands; files >1KB via the editor).
 - **Canonical SHA** for landed work is the **squash-merge SHA on `main`**; feature-branch SHAs are ephemeral.
@@ -340,12 +470,16 @@ tests/
 - Expose Drizzle row types directly in API responses.
 - Create a "send Dharma" / user-to-user transfer endpoint (CLAUDE.md §3).
 - `UPDATE` rows in `resolution_events` or `payout_events` (append-only, INV-4).
-- Commit directly to `main` (PR-only — and server-side protection will reject it).
+- Commit directly to `main` (PR-only). ⛔ **Nothing will reject it** — this line previously said server-side protection would, and it will not (§11, CLAUDE.md §5.13). It is now the sharpest "Never" in this list precisely because it is the one with no mechanism behind it.
 
-**What is actually enforced vs. discipline.** Mechanically enforced today: PR-required + signed-commit + linear-history + no-force-push + `enforce_admins` + a required **`ci`** status check with `strict: true` (GitHub branch protection; `ci` promoted to a required check at D2, required-reviews still 0). ⚠ **NOT squash** — measured 2026-08-14: all three merge methods are enabled at the repo level, so squash-only is **discipline**, not a control; Biome + `tsc` (Lefthook pre-push + CI); append-only on Bucket-A tables (DB triggers); `bets.comment_id NOT NULL` (schema). Everything else in this section is **discipline** — no hook blocks it. (The previously-documented `deploy-prod.yml`, `commitlint`, block-main / block-destructive hooks, Playwright, and `gitleaks`/CodeQL CI steps do **not** exist; CI is `ci.yml` = Biome → tsc → `drizzle-kit check` → migrate → `db:check-drift` → `vitest run` against a Postgres-17 service [the two migration checks added at D2]. `env-audit.yml` (scheduled Doppler↔Vercel parity, D2) is **not** a merge gate.)
+**What is actually enforced vs. discipline.** ⛔ **Mechanically enforced today, in full: append-only on Bucket-A tables (DB triggers) and `bets.comment_id NOT NULL` (schema). That is the list.** Everything else in this section — and every "Never" above it — is **discipline**, held by whoever is typing, with nothing that rejects the violation.
+
+Biome + `tsc` run at Lefthook `pre-push` and in CI, which is real friction but not a control: `--no-verify` skips the hook, and CI's verdict **gates nothing**, because no status check can be required without branch protection. ⛔ **PR-required, signed commits, linear history, no-force-push, `enforce_admins`, and the required `ci` check with `strict: true` were all documented here as enforced and NONE of them is.** **The reads, the date and the not-established question are in CLAUDE.md §5.13 — the single home; don't restate them here.** The nearest thing to a mechanism is `lefthook.yml`'s `no-force-push-protected` pre-push job (S-1), which is client-side and therefore still a discipline. ⚠ **NOT squash either** — all three merge methods remain enabled at the repo level; that flag reading was always sound because it comes from the repository endpoint rather than the protection endpoint, which is exactly the distinction the 2026-08-14 pass did not draw (**O-13**).
+
+⚠ **Lefthook skips EVERY `pre-push` job when the push changes no files** — the log reads `(skip) no matching push files`, and it applies to `typecheck` and `biome-check-all` as much as to the force-push guard. Measured at S-1 by pushing empty commits to a local bare repo: three jobs, three skips, exit 0, and a summary that looks identical to a clean run. A `files:` override does not rescue it; the push-file set is computed first and an empty one short-circuits the hook. **Consequence: a push that only reorders or removes commits — which is exactly what a force-push often is — runs no pre-push job at all.** The guard therefore covers the common case and not the empty-diff one, and saying so is the point: a guard whose coverage is unstated will be read as total. (The previously-documented `deploy-prod.yml`, `commitlint`, block-main / block-destructive hooks, Playwright, and `gitleaks`/CodeQL CI steps do **not** exist; CI is `ci.yml` = Biome → tsc → `drizzle-kit check` → migrate → `db:check-drift` → `vitest run` against a Postgres-17 service [the two migration checks added at D2]. `env-audit.yml` (scheduled Doppler↔Vercel parity, D2) is **not** a merge gate.)
 
 - `staging-migrate.yml` — armed; fires on push to `staging`, applying pending migrations to the staging DB (`--config stg`). The full deploy/promote path (staging gate → scoped prod promote) lives in `docs/runbooks/deploy-pipeline.md` §3 — do not re-document it here.
 
 ---
 
-*Rebuilt at SYNC.8 (Jun 2, 2026) against the live repo at `27216fc` + SPEC.1 v1.9.0-draft + SPEC.2 + ADRs 0003–0031; descriptive drift reconciled at BC.1 (Jul 1, 2026) against `248e02f`; SPEC.1/SPEC.2 version citations reconciled at the SYNC sweep (Jul 7, 2026), then SYNC-LITE (Jul 16). **Reconciled against the live repo at SYNC-1 (Aug 8, 2026), `fecbaf3` — SPEC.1 1.0.29, SPEC.2 1.0.22, cpmm 2.1.0, ADRs 0001–0036 (34 files), migration head `0024_bookmarks`, `EVENT_TYPES` 24, 23 tables / 13 schema files.** **Counts re-measured at PHASE-0 (Aug 21, 2026): ADRs 0001–0039 (37 files), migration head `0026_lots_no_delete`, `EVENT_TYPES` still 24 (a lot rides its bet's events and mints none), 24 tables / 14 schema files, 11 invariant specs.** SYNC-1 corrected: the `(public)/` tree (Discovery / Profile / Bookmarks were all live and undocumented), the `src/server/` directory list (+`bookmarks`, `discovery`, `profile`, `visitors`), the `api/` list (+`visits`), `components/ui/` (+dialog, input, textarea), the integration count (20 → 30) and `*.test.tsx` count (26 → 30), the `just` recipe list (+`test-scale`), and the `Sonner` instruction (removed — not installed). Descriptive: tracks the repo, not the target. Follows the [agents.md](https://agents.md) standard. Maintained per `docs/maintenance.md`.*
+*Rebuilt at SYNC.8 (Jun 2, 2026) against the live repo at `27216fc` + SPEC.1 v1.9.0-draft + SPEC.2 + ADRs 0003–0031; descriptive drift reconciled at BC.1 (Jul 1, 2026) against `248e02f`; SPEC.1/SPEC.2 version citations reconciled at the SYNC sweep (Jul 7, 2026), then SYNC-LITE (Jul 16). **Reconciled against the live repo at SYNC-1 (Aug 8, 2026), `fecbaf3` — SPEC.1 1.0.29, SPEC.2 1.0.22, cpmm 2.1.0, ADRs 0001–0036 (34 files), migration head `0024_bookmarks`, `EVENT_TYPES` 24, 23 tables / 13 schema files.** **Counts re-measured at PHASE-0 (Aug 21, 2026): ADRs 0001–0039 (37 files), migration head `0026_lots_no_delete`, `EVENT_TYPES` still 24 (a lot rides its bet's events and mints none), 24 tables / 14 schema files, 11 invariant specs.** **Re-measured again at SYNC-5 (Aug 28, 2026) against `acb71cb`: SPEC.1 `1.0.41`, SPEC.2 `1.0.27`, cpmm `2.1.0`, ADRs 0001–0044 (42 ADRs + `_template.md`; 0002 and 0012 permanently unused; next free **0045**), migration head still `0026_lots_no_delete`, `EVENT_TYPES` still 24 (measured by RUNTIME import, not a regex), 24 tables / 14 schema files, **12** invariant specs, **36** integration tests, **79** `*.test.tsx`, **28** `src/server/` dirs, **37** `F-*.md` flow files. SYNC-5 corrected here: Next `16.2.4 → 16.3.2`; `cacheComponents` NOT-enabled → **enabled**; the `pnpm-workspace.yaml` allow-list parenthetical; the Bookmarks route/read-model/components rows (ADR-0040 unwired them — the TABLE survives); the `src/server/` dir count and list; the `components/` and `src/lib/` lists; the `tests/server/` and `tests/unit/` dir lists; `FOUR height chains` → THREE; the ResolverCards description (RESO-1); and the `discovery/` GO-LIVE BLOCKER note that contradicted the PERF-1-is-CLOSED callout twenty lines below it. SYNC-1 corrected: the `(public)/` tree (Discovery / Profile / Bookmarks were all live and undocumented), the `src/server/` directory list (+`bookmarks`, `discovery`, `profile`, `visitors`), the `api/` list (+`visits`), `components/ui/` (+dialog, input, textarea), the integration count (20 → 30) and `*.test.tsx` count (26 → 30), the `just` recipe list (+`test-scale`), and the `Sonner` instruction (removed — not installed). Descriptive: tracks the repo, not the target. Follows the [agents.md](https://agents.md) standard. Maintained per `docs/maintenance.md`.*

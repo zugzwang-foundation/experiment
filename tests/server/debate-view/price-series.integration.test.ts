@@ -38,7 +38,12 @@ vi.mock("@sentry/nextjs", () => ({
 const { mockSignRead } = vi.hoisted(() => ({
 	mockSignRead: vi.fn(async (key: string) => `https://signed.example/${key}`),
 }));
-vi.mock("@/server/storage/sign-read", () => ({ signRead: mockSignRead }));
+vi.mock("@/server/storage/sign-read", () => ({
+	signRead: mockSignRead,
+	signReadSingleUse: vi.fn(
+		async (key: string) => `https://signed.example/${key}`,
+	),
+}));
 
 // The series-read seam. By DEFAULT it delegates to the REAL `replayReserveSeries`
 // (so the six happy-path tests replay from the seeded events); the non-fatal test

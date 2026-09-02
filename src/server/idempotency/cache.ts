@@ -79,6 +79,11 @@ export async function computeBodyFingerprint(body: unknown): Promise<string> {
  * Q4 ratification (2026-05-15: pending body-mismatch returns the in-
  * flight shape, NOT the completed-mismatch shape).
  *
+ * User-scoped since ADR-0044 (S-7 G2) — the Redis key is
+ * `getRedisKey("idem", userId, key)`, mirroring `precommitModerate`'s
+ * `getRedisKey(RESERVATION_KEY_BASE, userId, marketId, idempotencyKey)`.
+ * A client can no longer address another user's cache slot.
+ *
  * Five-arm tagged union — see `IdempotencyResult` in types.ts for arm
  * semantics. Caller MUST exhaustively discriminate on `kind`.
  *
@@ -89,10 +94,11 @@ export async function computeBodyFingerprint(body: unknown): Promise<string> {
  * per SPEC.2 §17.3 alarm-6b).
  */
 export async function idempotencyLookupOrReserve(
+	userId: string,
 	key: string,
 	bodyFingerprint: string,
 ): Promise<IdempotencyResult> {
-	const redisKey = getRedisKey("idem", key);
+	const redisKey = getRedisKey("idem", userId, key);
 	try {
 		return await tryReserveOrLookup(redisKey, bodyFingerprint, true);
 	} catch (err) {

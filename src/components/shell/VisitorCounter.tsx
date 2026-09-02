@@ -4,6 +4,9 @@ import { Eye } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { InfoTip } from "@/components/ui/info-tip";
+import { HEADER_GLOSSARY } from "@/lib/copy/glossary";
+
 /**
  * The global-header visitor counter (SPEC.1 §21.1, DESIGN.W2.5). A vanity /
  * traction count of TOTAL page views — repeats counted — labelled plainly
@@ -39,7 +42,13 @@ export function VisitorCounter() {
 		firedFor.current = pathname;
 		void (async () => {
 			try {
-				const res = await fetch("/api/visits", { method: "POST" });
+				// keepalive (HO-FRONT v2.0 T2/2a): survives navigation/unmount —
+				// sendBeacon was considered and rejected, since this call needs the
+				// response body (the rendered total), which sendBeacon has no access to.
+				const res = await fetch("/api/visits", {
+					method: "POST",
+					keepalive: true,
+				});
 				const data: unknown = await res.json();
 				const total =
 					data && typeof (data as { total?: unknown }).total === "number"
@@ -67,17 +76,18 @@ export function VisitorCounter() {
 			: NUMBER_FORMAT.format(state.total);
 
 	return (
-		<span
-			data-testid="visitor-counter"
-			data-state={dataState}
-			aria-busy={state === "loading"}
-			title="Total page views — not participants"
-			className="flex items-center gap-1.5 text-xs text-muted-foreground select-none"
-		>
-			<Eye aria-hidden="true" className="size-3.5 shrink-0" />
-			<span>
-				<span className="tabular-nums">{numberText}</span> views
+		<InfoTip content={HEADER_GLOSSARY.visitorCounter} asChild>
+			<span
+				data-testid="visitor-counter"
+				data-state={dataState}
+				aria-busy={state === "loading"}
+				className="flex items-center gap-1.5 text-xs text-muted-foreground select-none"
+			>
+				<Eye aria-hidden="true" className="size-3.5 shrink-0" />
+				<span>
+					<span className="tabular-nums">{numberText}</span> views
+				</span>
 			</span>
-		</span>
+		</InfoTip>
 	);
 }

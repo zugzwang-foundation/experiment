@@ -1,3 +1,5 @@
+import { InfoTip } from "@/components/ui/info-tip";
+import { GLOSSARY } from "@/lib/copy/glossary";
 import { cn } from "@/lib/utils";
 
 import { c3OppositeSide } from "./composer/copy";
@@ -157,19 +159,83 @@ export function AggregateFooter({
 				    STRUCTURE, so the border returns via the build's own token.
 				    ⛔ NOT `--border-strong`: `emphasis-ladder-tokens.test.ts:216`
 				    pins that token at zero consumers. */}
-				<span
-					data-testid="aggregate-split-track"
-					aria-hidden="true"
-					className={cn(
-						"h-1.5 w-full overflow-hidden rounded-(--r-dot) [border:var(--hairline)]",
-						counterPole,
-					)}
-				>
+				{/* ⚠⚠ UI-QUICK change set 6 §1 — THE TRACK NOW OCCUPIES THE PILL'S OWN
+				    BOX, so its centre lands on the Support/Counter centres.
+				    MEASURED before: track centre 696.00 against Support 705.50 and
+				    Counter 706.00 — the bar sat 9.5px HIGH, because `items-start` on
+				    the row (`:106`) top-aligns all three columns and the 6px track is
+				    the first child of its column while a 25px pill is the first child
+				    of each neighbour. Two different first-child heights, one shared
+				    top edge.
+				    ⛔ `items-start` → `items-center` WAS TRIED ON PAPER AND DOES NOT
+				    SOLVE IT. That centres the COLUMNS, not the track: the track stays
+				    the first child of its own column, so it would land ~2px off — the
+				    arithmetic is columns 45/30/45 tall, centring the 30 inside 45
+				    moves the track by 7.5px against a 12.5px target. Better than 9.5,
+				    still outside the 1px bar. So the row's alignment is UNCHANGED.
+				    ⇒ The fix is declarative instead: the track sits in a box the same
+				    height as the control it aligns to (`h-6` = the pill's own
+				    specified box — `text-xs` 16px line + `py-1` 8px) and centres
+				    inside it. A bare offset like `mt-[9.5px]` would hit the same
+				    number today and drift silently the first time the pill's size
+				    variant changes; this expression stays true because it names the
+				    pill's box rather than a difference measured against it.
+				    ⚠ COST, MEASURED AND REPORTED: the centre column grows, so the
+				    strip grows a few px. Reported in the change-set file with the
+				    height-chain check.
+				    ⚠ The `items-center` cited in the comment below belongs to d5's
+				    INNER `.sidewrap` columns (`:585-586`) and is NOT authority for
+				    the outer row — it is not read as such here in either direction. */}
+				<span className="flex h-6 w-full items-center">
 					<span
-						data-testid="aggregate-split-fill"
-						className={cn("block h-full", supportPole)}
-						style={{ width: supportPct }}
-					/>
+						data-testid="aggregate-split-track"
+						aria-hidden="true"
+						className={cn(
+							// ⚠⚠ change set 10 §6a — THE TRACK MATCHES THE MARKET-LEVEL BAR.
+							// It was `h-1.5` (6px) beside a `PriceBar` whose `detail` size —
+							// the one on this very surface — was `h-[14px]`. Two split bars,
+							// one screen, and one of them read as a hairline next to the
+							// other. MEASURED before changing: 6px vs 14px.
+							// ⚠ `detail`, not `hero` (22px) or `card` (16px): those render on
+							// the Discovery surfaces, and the comparison a reader actually
+							// makes is against the bar in the same viewport.
+							// ⚠⚠ change set 11 §2 — AND THE RADIUS COMES WITH IT. At 6px the
+							// corner was invisible; at 14px `rounded-(--r-dot)` (3px) read as
+							// a RECTANGLE beside a market bar that is a pill.
+							// ⛔ READ OFF `PriceBar`, not chosen: its track is
+							// `rounded-[var(--r)]` + `overflow-hidden` + the hairline, and
+							// its two fill segments carry NO radius of their own — the
+							// track's `overflow-hidden` clips them. This mirrors all three:
+							// same radius token, same clip, and the fill below stays plain.
+							// ⚠ design-language names these ONE split-bar family, two
+							// variants of one construction; they should not diverge in shape.
+							// ⛔ THIS DOES NOT MOVE THE ALIGNMENT, and that is a property of
+							// the CS6 fix rather than luck: the track is centred inside a
+							// fixed `h-6` box, so its CENTRE is the box's centre at any
+							// thickness. Growing it 6 → 14 changed what fills the box, not
+							// where the middle of it sits — the same is true of 14 → 18 below.
+							// ⚠⚠ BLOCK-3 §2 — 14px → 18px, TRACKING `PriceBar`'S `detail` BAR
+							// (`h-[14px]` → `h-[18px]`, `PriceBar.tsx`'s own docblock on `ROW`).
+							// `aggregate-footer-alignment.test.ts`'s
+							// `the-track-matches-the-market-level-bar-thickness` guard reads
+							// `detail`'s thickness FROM `PriceBar.tsx` rather than a copied
+							// literal specifically so a re-size like this one reddens and has
+							// to move both together — this edit is that guard doing its job,
+							// not scope creep: §2's brief names "the YES/NO bar" as one of the
+							// three things to redistribute freed height into, and this track
+							// is design-language's other half of that same bar family. 18px
+							// still clears the fixed `h-6` (24px) wrapper with 3px to spare on
+							// each side, so the CS6 centring is untouched.
+							"h-[18px] w-full overflow-hidden rounded-[var(--r)] [border:var(--hairline)]",
+							counterPole,
+						)}
+					>
+						<span
+							data-testid="aggregate-split-fill"
+							className={cn("block h-full", supportPole)}
+							style={{ width: supportPct }}
+						/>
+					</span>
 				</span>
 				<span>
 					<b className="text-sm text-ink">Đ {formatDharma(displayedTotal)}</b>{" "}
@@ -213,8 +279,15 @@ export function AggregateFooter({
  *
  * ⚠ F-3 GATING IS NOT OPTIONAL. A trigger whose RESULTING side is not the
  * viewer's held side renders disabled, carrying the C3 batch string in both
- * `title` and `aria-label` — identical to the focused-post bar, so the same
- * refusal reads the same way wherever the viewer meets it.
+ * `aria-label` and the `InfoTip` gloss (INFO-1 §3.4 C3 precedence — the
+ * refusal wins over the relation's definition) — identical to the
+ * focused-post bar, so the same refusal reads the same way wherever the
+ * viewer meets it. ⚠ The `aria-label` channel is the one that reliably
+ * reaches a screen reader here: this trigger also carries
+ * `disabled:pointer-events-none` (below), which — same reasoning as
+ * `RadioSlot`'s (O-3) — suppresses hover/click at the browser's hit-testing
+ * layer, so the `InfoTip` channel may never actually open on a disabled
+ * pill in a real browser. Not measured; not worked around here.
  */
 function TriggerPill({
 	relation,
@@ -245,24 +318,30 @@ function TriggerPill({
 		resultingSide === "YES"
 			? "bg-yes text-no border-[0.5px] border-n2"
 			: "bg-no text-yes [border:var(--hairline)]";
+	// C3 precedence (INFO-1 §3.4): a viewer blocked by the single-side rule is
+	// told why they are blocked, not given the relation's definition. The
+	// glossary gloss fills the null branch only — c3 still wins outright.
+	const gloss =
+		c3 ?? (relation === "support" ? GLOSSARY.support : GLOSSARY.counter);
 	return (
-		<button
-			type="button"
-			data-testid={`card-trigger-${relation}`}
-			disabled={disabled}
-			aria-disabled={disabled}
-			aria-label={
-				c3 ??
-				`${relation === "support" ? "Support" : "Counter"} — bet ${resultingSide}`
-			}
-			title={c3 ?? undefined}
-			onClick={() => onReply(relation)}
-			className={cn(
-				"rounded-(--r-chip) px-3 py-1 text-xs font-bold transition-all hover:shadow-(--state-hover-glow-pole) focus-visible:shadow-(--state-focus-ring) active:shadow-(--state-pressed-glow-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)",
-				pole,
-			)}
-		>
-			{relation === "support" ? "Support" : "Counter"}
-		</button>
+		<InfoTip content={gloss} asChild>
+			<button
+				type="button"
+				data-testid={`card-trigger-${relation}`}
+				disabled={disabled}
+				aria-disabled={disabled}
+				aria-label={
+					c3 ??
+					`${relation === "support" ? "Support" : "Counter"} — bet ${resultingSide}`
+				}
+				onClick={() => onReply(relation)}
+				className={cn(
+					"rounded-(--r-chip) px-3 py-1 text-xs font-bold transition-all hover:shadow-(--state-hover-glow-pole) focus-visible:shadow-(--state-focus-ring) active:shadow-(--state-pressed-glow-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)",
+					pole,
+				)}
+			>
+				{relation === "support" ? "Support" : "Counter"}
+			</button>
+		</InfoTip>
 	);
 }

@@ -87,11 +87,69 @@ function sourcesUnder(relativeDir: string): string[] {
 		.sort();
 }
 
+/** The top-level parameter NAMES of a matched function signature, in order —
+ * `["client", "args"]`. Splits only at depth 0, so an object type's own fields
+ * never leak in as parameters. */
+function paramNames(signature: string): string[] {
+	const inner = signature.slice(
+		signature.indexOf("(") + 1,
+		signature.lastIndexOf(")"),
+	);
+	const out: string[] = [];
+	let depth = 0;
+	let current = "";
+	for (const ch of inner) {
+		if ("{[(<".includes(ch)) depth++;
+		else if ("}])>".includes(ch)) depth--;
+		if (ch === "," && depth === 0) {
+			out.push(current);
+			current = "";
+			continue;
+		}
+		current += ch;
+	}
+	out.push(current);
+	return out
+		.map((p) => p.trim().split(":")[0]?.trim() ?? "")
+		.filter((p) => p.length > 0);
+}
+
+/** The field names declared on the `args: { … }` object of a matched signature,
+ * in order — `["market", "walk"]`. Depth-aware for the same reason as above, so
+ * a nested type's fields are not mistaken for `args`' own. */
+function argsFields(signature: string): string[] {
+	const start = signature.indexOf("args: {");
+	if (start === -1) return [];
+	const body = signature.slice(start + "args: {".length);
+	const out: string[] = [];
+	let depth = 0;
+	let current = "";
+	for (const ch of body) {
+		if ("{[(<".includes(ch)) depth++;
+		else if ("}])>".includes(ch)) {
+			if (depth === 0) break;
+			depth--;
+		}
+		if (ch === ";" && depth === 0) {
+			out.push(current);
+			current = "";
+			continue;
+		}
+		current += ch;
+	}
+	out.push(current);
+	return out
+		.map((f) => f.trim().split(/[?:]/)[0]?.trim() ?? "")
+		.filter((f) => f.length > 0 && /^[A-Za-z_$][\w$]*$/.test(f));
+}
+
 const POLL = "src/components/debate/DebatePoll.tsx";
 const HOST = "src/components/debate/DebateView.tsx";
 const LOADER = "src/server/debate-view/load-debate-view.ts";
 const PAGE = "src/app/(public)/m/[slug]/page.tsx";
 const EXPORT_ROUTE = "src/app/(public)/m/[slug]/export/route.ts";
+/** S-4 Phase D — the page's `'use cache'` wrapper around the loader. */
+const CACHED_VIEW = "src/server/debate-view/cached-view.ts";
 
 /**
  * Any client-side transport a forked poll could reach for. SSE and WebSocket are
@@ -172,27 +230,84 @@ describe("debate-view::poll-preserves-removal-masking", () => {
 		// SPEC.2 §4.3's catalogue is closed at eleven and F-DEBATE-4 adds no
 		// twelfth. A dedicated poll endpoint would necessarily surface here as a
 		// third `loadDebateView(` call site.
+		//
+		// ⚠ THE SECOND ENTRY MOVED AT S-4 PHASE D, and the count did not. The
+		// page no longer calls `loadDebateView` itself: it calls
+		// `getCachedDebateView` (`debate-view/cached-view.ts`), which is the one
+		// carrying `'use cache'`. So the two callers are now the export route
+		// (DIRECT and uncached — ADR-0025 forbids caching the `.md` export) and
+		// the cached wrapper (the page's path).
+		//
+		// ⛔ WHAT THIS GUARD PROTECTS IS UNCHANGED: still exactly two readers,
+		// still ONE masking implementation, still no third path that could fork
+		// `loadRemovedSet`. The entry is edited here, in the same commit as the
+		// change, rather than the assertion being loosened — a `toEqual` on an
+		// explicit list is what makes a genuine third reader impossible to add
+		// silently, and relaxing it to a length check would give that up.
 		const callers = sourcesUnder("src")
 			// The loader's own `export async function loadDebateView(` is the
 			// definition, not a call site.
 			.filter((file) => file !== LOADER)
 			.filter((file) => /loadDebateView\s*\(/.test(code(file)));
-		expect(callers).toEqual([EXPORT_ROUTE, PAGE]);
+		expect(callers).toEqual([EXPORT_ROUTE, CACHED_VIEW]);
+	});
+
+	it("the cached wrapper is the page's ONLY route to the debate model", () => {
+		// The other half of the move above: the page must reach the model through
+		// the cached wrapper and never around it. A page that called both would
+		// issue the shared reads twice — once cached, once not — and the uncached
+		// copy would quietly become the one rendered.
+		const page = code(PAGE);
+		expect(page).toContain("getCachedDebateView(");
+		expect(page).not.toMatch(/loadDebateView\s*\(/);
 	});
 
 	it("keeps loadDebateView's viewer-independent signature (ADR-0034 D-1)", () => {
 		const source = code(LOADER);
-		expect(source).toMatch(
-			/export async function loadDebateView\(\s*client: DebateViewReader,\s*args: \{ market: MarketSummary \},\s*\): Promise<DebateViewModel>/,
-		);
-		// No session / viewer / userId parameter may be threaded into the masking
-		// loader — the property that makes masking structurally viewer-independent
-		// rather than merely tested to be.
 		const signature =
 			source.match(
 				/export async function loadDebateView\([\s\S]*?\): Promise<DebateViewModel>/,
 			)?.[0] ?? "";
+		expect(signature).not.toBe("");
+
+		// ⚠ THE SIGNATURE GAINED ONE PARAMETER AT CHART-1, and this assertion is
+		// edited here in the same commit rather than deleted — the same posture
+		// the two-callers guard above records for its own edit. `args` now carries
+		// an OPTIONAL `walk`: an already-derived CPMM reserve walk for the price
+		// chart, so the market-detail read can skip a three-statement replay it
+		// has already paid for behind `getCachedReserveWalk`.
+		//
+		// ⛔ IT IS NOT VIEWER STATE, AND THE ASSERTION BELOW IS WHAT PROVES THAT
+		// RATHER THAN THIS COMMENT. A walk is pool reserves and event timestamps
+		// for one market — public, market-scoped, identical for every reader. What
+		// ADR-0034 D-1 forbids is threading a session/user identity into the
+		// masking loader, and that remains forbidden and mechanically checked.
+		const params = paramNames(signature);
+		expect(params).toEqual(["client", "args"]);
+		expect(argsFields(signature)).toEqual(["market", "walk"]);
+
+		// No session / viewer / userId parameter may be threaded into the masking
+		// loader — the property that makes masking structurally viewer-independent
+		// rather than merely tested to be.
+		//
+		// ⚠ THE SCAN IS ALREADY COMMENT-FREE, and that is load-bearing rather than
+		// incidental: `code()` strips comments before this file sees a byte, for
+		// exactly the reason its own helper docblock gives — the prose explaining
+		// why a parameter is NOT viewer-scoped necessarily contains the word
+		// "viewer", and a guard that reddens on its own explanation is a guard
+		// that gets suppressed. So the ban below applies to declarations, and the
+		// new `walk` parameter can be documented at length without touching it.
 		expect(signature).not.toMatch(/session|viewer|userId|user_id/i);
+
+		// POSITIVE CONTROL — the ban above must be able to FIRE. A negative
+		// assertion over a stripped string proves nothing unless the stripping
+		// left something a violation could still be found in. Inject the exact
+		// shape of the violation into the same text and require a match; if the
+		// comment-stripping upstream ever over-reached and left the signature
+		// empty, this line reddens instead of the guard passing vacuously.
+		expect(signature.replace("args: {", "args: { userId: string;")).toMatch(
+			/session|viewer|userId|user_id/i,
+		);
 	});
 
 	it("keeps masking single-sourced on loadRemovedSet (ADR-0034 D-4)", () => {
@@ -276,10 +391,16 @@ describe("debate-view::poll-stops-when-market-leaves-open", () => {
 		);
 	});
 
-	it("the polled route is explicitly dynamic, not dynamic by accident (RULING F)", () => {
-		// The route was previously dynamic only as a side effect of calling
-		// `headers()` for the session; a poll against an accidentally-static route
-		// would serve a frozen payload indefinitely.
-		expect(code(PAGE)).toMatch(/export const dynamic = "force-dynamic";/);
+	it("the polled route is not cached, not dynamic by accident (RULING F)", () => {
+		// Originally pinned via `export const dynamic = "force-dynamic";`. S-4
+		// Phase B enabled `cacheComponents`, under which that export is
+		// redundant and build-breaking — every route is dynamic by default
+		// unless it opts INTO caching with `'use cache'`. RULING F's guarantee
+		// now inverts to the same effect: this file must carry no `'use cache'`
+		// directive, so nothing can make the poll start serving a frozen
+		// payload. (The S-4 Phase C/D retrofit caches an EXTRACTED child
+		// component, never this page file itself — see the cache-boundary note
+		// in `docs/scale/S4-WORK-PACK.md` §2.4 / the Phase A audit's T5.)
+		expect(code(PAGE)).not.toMatch(/["']use cache["']/);
 	});
 });

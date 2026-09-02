@@ -16,10 +16,15 @@ import {
 	type AuthorIdentity,
 	resolveAuthors,
 } from "@/server/debate-view/resolve-authors";
+import { PFP_PLACEHOLDER } from "@/server/identity-pool/pfp-url";
+import { DOWNSTREAM_CACHED_MINUTES } from "@/server/storage/read-url-memo";
 import { signRead } from "@/server/storage/sign-read";
 
-/** Mirrors the D9 render-side seam (`load-debate-view.ts`, `media.ts`). */
-const READ_URL_TTL_SECONDS = 3600;
+/** Mirrors the D9 render-side seam (`load-debate-view.ts`, `media.ts`). Gate C
+ * fix — 7200 s (2× `cacheLife("minutes").expire`), not 3600: see
+ * `load-debate-view.ts`'s constant for why equal-to-expire silently expires
+ * URLs still being served. */
+const READ_URL_TTL_SECONDS = 7200;
 
 /** A bound read client — top-level `db` OR a caller's transaction. */
 type DiscoveryReader = DbClient | DbTransaction;
@@ -32,7 +37,7 @@ type DiscoveryReader = DbClient | DbTransaction;
  */
 const UNKNOWN_AUTHOR: AuthorIdentity = {
 	pseudonym: "—",
-	pfpUrl: "/pfp-placeholder.svg",
+	pfpUrl: PFP_PLACEHOLDER,
 };
 
 /**
@@ -277,7 +282,14 @@ export async function selectHeroTopPosts(
 				return;
 			}
 			try {
-				urlById.set(r.id, await signRead(r.imageKey, READ_URL_TTL_SECONDS));
+				urlById.set(
+					r.id,
+					await signRead(
+						r.imageKey,
+						READ_URL_TTL_SECONDS,
+						DOWNSTREAM_CACHED_MINUTES,
+					),
+				);
 			} catch {
 				// R2 unavailable for this object → degrade to no image (the
 				// `mintImageUrls` / `getDefaultMarketMediaUrl` resilience posture).

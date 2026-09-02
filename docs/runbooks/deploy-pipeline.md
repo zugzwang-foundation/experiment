@@ -12,11 +12,11 @@
 
 | Environment | Git trigger | DB | Vercel domain | Migrate path |
 |---|---|---|---|---|
-| **Preview** | any feature branch | **staging** Supabase | per-deploy `*.vercel.app` | none (schema correctness via CI's ephemeral Postgres) |
+| **Preview** | ⚠ **NOT any feature branch** — only a ref on Vercel's dashboard-side **Ignored Build Step** allowlist. A non-matching ref is `Canceled by Ignored Build Step` seconds in, with no error. The setting lives in the Vercel dashboard, **not** in `vercel.json`, so it cannot be read from this repo. Escape hatch when you need a preview off a non-allowlisted ref: `vercel deploy --yes -e VERCEL_GIT_COMMIT_SHA=<HEAD>` — a CLI-direct build is not a git-integration build and is not gated. **Never push a shared ref just to force a preview.** | **staging** Supabase | per-deploy `*.vercel.app` | none (schema correctness via CI's ephemeral Postgres) |
 | **Staging** | push to **`staging`** branch | **staging** Supabase (`rwfdoqzsghqhhdapxafg`) | `staging.zugzwangworld.com` | **auto** — `staging-migrate.yml` (GHA) on push to `staging` |
 | **Production** | merge to **`main`** | **production** Supabase (`zbvprdcyxhlguxbostdj`) | `zugzwangworld.com` | **manual gate** — `db:migrate:prod` then promote (see §3, first exercised at D6) |
 
-Both DBs run the **same committed** `drizzle/migrations/` set (head currently `0024_bookmarks`). Migrations **never** run in the Vercel `buildCommand` — `buildCommand` stays plain `next build`.
+Both DBs run the **same committed** `drizzle/migrations/` set (head `0026_lots_no_delete` as measured 2026-08-28 — **read `drizzle/migrations/` and `meta/_journal.json` for the live head rather than this line.** A head written into prose is stale from the next migration onward; this number is evidence, not the source of truth. It said `0024_bookmarks` for the two migrations `lots` added). Migrations **never** run in the Vercel `buildCommand` — `buildCommand` stays plain `next build`.
 
 ---
 
@@ -25,12 +25,13 @@ Both DBs run the **same committed** `drizzle/migrations/` set (head currently `0
 Every environment exposes `GET /api/health` (`src/app/api/health/route.ts`, public, uncached, Node runtime). It is the **authoritative** deploy/migrate signal — curl it; do not trust migrate exit codes (drizzle-orm #5769).
 
 ```json
-{ "status": "ok", "env": "staging", "canary": "<git-commit-sha>", "db": "ok", "migrations": "ok" }
+{ "status": "ok", "env": "staging", "canary": "<git-commit-sha>", "region": "bom1", "db": "ok", "migrations": "ok" }
 ```
 
 - **`env`** — `ZUGZWANG_ENV` (`prod` / `staging` / `preview`). Proves *which environment config* the deployment booted with.
 - **`canary`** — `VERCEL_GIT_COMMIT_SHA`, the **bare commit SHA** the deployment is serving (ADR-0024 item 7). This is how you confirm "which SHA is live". *(It is the bare SHA — **not** a `staging-…`/`preview-…` prefixed string. Any tooling that asserts a prefix is stale; see §4.)*
 - **`db`** — `"ok"` iff `SELECT 1` succeeds.
+- **`region`** — `VERCEL_REGION`, the region the function actually executed in (`null` off-platform — local and CI have no region, and a fallback string would be a control reporting a region it never read). **This is the PERF-1 control that ADR-0006's ratified `bom1` is really applied.** The project served from `iad1` for three months because nothing read the region back and `vercel.json` was *silent* rather than wrong — so it looked identical to a correct file in every diff, CI run and review. Its truthfulness proof is not that the field exists; it is that the value equals the **compute** half of `x-vercel-id` (`<ingress>::<compute>`) on the same response, a header the edge generates independently of this function's environment. Expect `bom1` on staging. ⚠ **Production is a known exception, not a discovery** — the prod alias serves a pre-#308 build and does not report `bom1`. Any *other* reading, on either environment, is a real finding; if it disagrees with `x-vercel-id`, the header is the authority. *(Added at SYNC-5: the field has shipped since PERF-1 and this bullet list never named it, so the one field that caught a 35 s → 0.7 s regression had no prompt at promote time.)*
 - **`migrations`** — the **per-hash** drift verdict (`src/server/health/migration-drift.ts`, ADR-0024 item 6): `"ok"` iff the applied-migration-hash multiset equals the journal-hash multiset; `"drift"` if they diverge; `"error"` if the DB is unreachable. Per-hash lives **only** on this surface (deployed envs have pg_cron → unstripped); CI's `db:check-drift` stays timestamp+count (CI strips pg_cron). a `migrations:"drift"` reading on **prod** was expected *pre-D5* (prod DB lagged the journal by design); post-D5 the prod DB is migrated to head, so a `drift` reading now is a **real failure** to investigate before promoting.
 
 ```bash
@@ -69,10 +70,12 @@ Staging data = **seed scripts** (no prod clone). Seeding is idempotent (`ON CONF
 
 ```bash
 doppler run --config stg -- pnpm db:seed:staging
-#    re-run on a seeded DB → "[seed-staging] Done — 0 new rows, 200 already present"
+#    re-run on a seeded DB → "[seed-staging] Done — 0 new rows, 871 already present"
 ```
 
-Full reset (only if the sandbox is wedged): drop the staging schema → re-run `db:migrate:staging` → re-run `db:seed:staging`. The DB is disposable; never break-glass a sandbox.
+*(The count is **871**, not the 200 this line carried. `scripts/seed-staging.ts` seeds `COLOURS.length * ANIMALS.length` = 13 × 67 = 871, and the script's own header says so. ⚠ **A second lookalike sits in the same gate:** `scripts/smoke-staging.ts` item 8 `identity-pool-seeded` still passes only 100–300 rows, so on a correctly seeded staging DB that smoke item goes **RED**. That is a code finding, raised not fixed — this run does not touch `scripts/`.)*
+
+Full reset (only if the sandbox is wedged): the ratified path is the **guarded reset**, not a hand-rolled schema drop — `pnpm staging:reset` (ADR-0035 + ADR-0036: owner-privilege disablement of the `_no_truncate` guards *only* → `TRUNCATE … CASCADE` → re-enable, issued as one implicit transaction behind the five-guard contract, then `db:seed:staging`; `drizzle.__drizzle_migrations` and `system_state` are never truncated), or `pnpm staging:rebuild` for the composite reset → seed → generate → gates. **Dropping the staging schema and re-running `db:migrate:staging` + `db:seed:staging` is ADR-0035's Option 2, explicitly rejected** — it leaves `drizzle.__drizzle_migrations` claiming every migration applied against an empty schema, and the two `pg_cron` schedules are declared with no `IF NOT EXISTS` and no un-schedule. Reach for it only if the guarded reset itself cannot run. ⛔ **And never `pnpm staging:rebuild` to "check something"** — it does not merely truncate the seeded markets, it replaces them with `sp-*` fixtures and reports green gates while doing it. There is no restore path; `docs/data/staging-markets-snapshot.md` is the only record of the eight hand-authored markets. The DB is disposable; never break-glass a sandbox.
 
 > **Doppler config is `stg` (never `staging`).** *(The "some script headers still say `--config staging`" warning that stood here is removed at SYNC-1 — the defect was fixed and §4 has recorded it **✅ RESOLVED** since D3. Verified: `scripts/migrate-staging.ts:8` and `:42` both read `stg`. The warning had outlived its defect and contradicted §4 in the same file.)*
 
@@ -259,7 +262,7 @@ The ledger is append-only and frozen-at-resolution. Production must **never** se
    curl https://zugzwangworld.com/api/health
 ```
    Require `migrations:"ok"`, `canary == «PROMOTE-SHA»`, serving `200`. The live alias now points at the migrated build.
-7. **Promotion note (the log — ADR-0024 item 10).** Record: «PROMOTE-SHA» · who · when (UTC) · the per-hash `/api/health` result. GitHub deployment history is the rest of the log. Native Doppler↔Vercel sync is the documented escalation only — not built.
+7. **Promotion note (the log — ADR-0024 item 10).** Record: «PROMOTE-SHA» · who · when (UTC) · the per-hash `/api/health` result. GitHub deployment history is the rest of the log. *(⚠ ADR-0024 item 10 also reads *"Native Doppler↔Vercel sync is the documented escalation only — not built."* **That clause was overtaken by the ADR's own D1 errata 1**, which found the syncs live: `stg → Vercel Staging`, `stg → Vercel Preview`, `prd → Vercel Production`. Step 1's precondition above depends on that last one being In Sync, so this section previously contradicted itself. Read item 10's **log rule as standing** and its **sync clause as superseded**. **Consequence for this path:** never hand-edit a Vercel env var that a Doppler sync owns — the sync has no per-secret include/exclude filter, so a single key cannot be overridden under a sourced sync and an orphaned value is repopulated. Change it in Doppler, then redeploy: a Doppler change does not reach a running deployment on its own.)*
 
 ### Rollback
 

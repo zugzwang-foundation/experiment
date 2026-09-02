@@ -216,6 +216,262 @@ export const DISCOVERY_SERIES_MAX_POINTS = 64;
  * `DISCOVERY_SERIES_MAX_POINTS`. Integer (a point count, not Dharma). */
 export const MARKET_SERIES_MAX_POINTS = 256;
 
+/** Minimum interval between derivations of a market's price-series HISTORY
+ * (SPEC.1 1.0.45 §9 *Refresh — floored history, live edge* + §16.1 + Appendix
+ * B, founder-ruled at CHART-1). Within the window a derivation is REUSED; the
+ * series' TERMINAL point is composed fresh on every render from the live pool
+ * price and is never floored, so the chart's right edge cannot disagree with
+ * the `PriceBar` directly beneath it — **on an `Open` market**. ⚠ On every other
+ * state the series is rendered UNTOUCHED and nothing is recomposed: a frozen
+ * chart is its event history alone, and a visible disagreement with `PriceBar`
+ * there is the correct outcome rather than a defect (**INV-4**; changed at
+ * CHART-1.A, which removed the non-`Open` restamp this sentence used to cover).
+ *
+ * ⚠ DELIBERATELY LONGER THAN `POLL_INTERVAL_MS_DEBATE_VIEW` (15000), and that
+ * inequality is the whole design rather than an oversight. The window exists to
+ * COALESCE, not to tolerate staleness: fifty bets in thirty seconds become one
+ * derivation instead of fifty, so a busy market's cost stops scaling with how
+ * busy it is. Keying invalidation on the pool instead — which is what the
+ * surrounding `'use cache'` blocks do, since they key on `reserves` — performs
+ * WORST exactly when load is highest, because every bet busts every reader's
+ * entry. That is why this series is keyed on market identity alone.
+ *
+ * A pinned DESIGN value, not a tuned economy value — contrast the poll interval
+ * above, which is explicitly provisional. Read from this constant at every call
+ * site and never inlined, so the HARDEN.6 tune stays a one-line change. Integer
+ * (milliseconds, not Dharma). */
+export const MARKET_SERIES_MIN_WINDOW_MS = 60000;
+
+// === CHART-3: the fixed experiment window (SPEC.1 1.0.48 §9 + §16.1) ======
+
+/** The §9 price chart's fixed X axis, as a pair of ISO instants. */
+export type ChartWindow = { readonly start: string; readonly end: string };
+
+/**
+ * ⚠ `end` is **23:45**, not 23:59 — it is the ratified `resolution_deadline`
+ * shared by all eight markets, and the same instant is trading close and
+ * settlement. A 23:59 axis would run fifteen minutes past the last instant at
+ * which anything can happen.
+ *
+ * ⛔ `start` IS CORRECT ONLY IF THE MARKETS ARE SEEDED ON 15 SEPTEMBER, and that
+ * condition is written here rather than assumed because it is the whole of what
+ * makes this value right (CHART-6, founder ruling — D10 closed OPERATIONALLY,
+ * not by moving the constant). `market.opened` is emitted at Draft → Open, so a
+ * market opened during the run-up carries a genesis instant BEFORE this axis
+ * begins — and `xPx` is deliberately unclamped in both directions, so that point
+ * maps to a negative x and is cut by the viewBox. **Seed on launch day, or move
+ * this constant.**
+ *
+ * ⚠ THAT IS NOT HYPOTHETICAL — IT IS WHAT HAPPENED ON STAGING, ON ALL EIGHT
+ * MARKETS, FOR TWO WEEKS. The staging window began 21 August against a slate
+ * whose genesis instants are all 17 August, so the opening price of every market
+ * was clipped off the left edge with nothing raised: the chart still rendered, the
+ * suite stayed green, and the symptom the founder eventually saw was not a missing
+ * point but the LABELS, stranded at the far right beside a line crushed into the
+ * leftmost sixth of the plot. A window that does not contain its data clips it
+ * **silently**; the guard added at CHART-6 asserts containment against these real
+ * constants, because a guard written against a fixture window would have passed
+ * every day of those two weeks.
+ */
+const PRODUCTION_CHART_WINDOW: ChartWindow = {
+	start: "2026-09-15T00:00:00.000Z",
+	end: "2026-11-05T23:45:00.000Z",
+};
+
+/**
+ * ⚠ `start` is MEASURED, not chosen: the earliest event of ANY type across
+ * staging's whole slate is `2026-08-17T20:55:20.712Z`, floored to its UTC day.
+ * Read at CHART-6 against the live staging database, because a window narrower
+ * than the data silently clips real points off the canvas and nothing reports it.
+ * The latest event at that reading was `2026-09-01T07:30:30.139Z`, comfortably
+ * inside `end`.
+ *
+ * ⛔ IT WAS `2026-08-21T00:00:00.000Z` UNTIL CHART-6, AND THAT VALUE WAS CLIPPING
+ * THE GENESIS POINT OF ALL EIGHT MARKETS. The measurement CHART-3 took was of the
+ * earliest **`bet.placed`** — `2026-08-21T05:29:29.430Z` on
+ * `github-zugzwang-repo-stars` — which was the right instant for the series
+ * CHART-3 could see. CHART-4 then backfilled a `market.opened` row per market
+ * carrying that market's `pools.created_at`, four days EARLIER, and the walk
+ * `replayReserveSeries` performs starts from exactly that seed. So the first
+ * point of every staging chart moved outside a window nobody re-measured.
+ *
+ * ⚠ THE LESSON IS THE PREDICATE, NOT THE DATE. The floor is the earliest event
+ * the chart can RENDER, which is the earliest of `market.opened` · `bet.placed` ·
+ * `bet.sold` — and a measurement scoped to one of the three is a measurement of
+ * the wrong quantity that looks exactly like the right one. Measured 2026-09-01,
+ * both floors land on the same instant only because `market.opened` is now the
+ * earliest; the all-types floor is taken deliberately so it stays true if a
+ * fourth event type ever joins the walk.
+ *
+ * ⚠ The eight backfilled `market.opened` rows carry their pool's `created_at`
+ * FLOORED TO THE MILLISECOND (measured Δ −59 … −923 µs), because the backfill
+ * bound the value through a JS `Date`. Recorded so a later reader comparing
+ * `events.created_at` to `pools.created_at` for equality finds them unequal and
+ * does not read that as a defect.
+ *
+ * ⛔ `end` USED TO EXPIRE ON 2026-09-10, AND THE CONSEQUENCE WAS LARGER THAN
+ * "THE LINE LOOKS SHORT". After that instant `withLiveTail` appends a point at
+ * `now` beyond the axis, so `xPx` returns a coordinate past `VIEWBOX_W` and the
+ * viewBox clips it. What is clipped is not only the line's last segment:
+ * `terminalX` follows the series, so **both terminal dots and both pulses leave
+ * the canvas entirely**, while `TerminalLabels` — HTML, outside the SVG — keeps
+ * rendering. The result on every `Open` staging market would be two colour-coded
+ * words naming two marks that are not drawn.
+ *
+ * ⚠ CHART-6 CHANGED THE MECHANISM AND SHARPENED THE SYMPTOM. There is no gutter
+ * any more: the labels are an overlay positioned from the dot's own x. Past
+ * `end`, `terminalX` exceeds `VIEWBOX_W`, so the label's anchor exceeds 100 %, it
+ * FLIPS, and it comes to rest just inside the plot's right edge — naming a dot
+ * that has been clipped off the canvas. The failure is the same and it now looks
+ * MORE deliberate, because the label lands somewhere plausible instead of in a
+ * column. Restated rather than left, since a reader will grep this docblock for
+ * "gutter" and find nothing. Caught by `@code-reviewer`.
+ *
+ * The clip itself is deliberate: drawing the point AT the edge instead would put
+ * the live price at an instant it did not happen, which this codebase rejects on
+ * principle (`price-series.ts` `withLiveTail`, `price-chart.ts`
+ * `deriveMarketPriceChart`). ⇒ **The fix is to move this value, never to clamp
+ * the geometry** — and CHART-4 D11 moved it, to production's own
+ * `2026-11-05T23:45:00Z`, on founder ruling. Staging outlives 10 September, and
+ * an end date chosen to sit just past the fixtures was a value with a shelf life
+ * measured in days on an environment that is used every day.
+ *
+ * ⚠ AMENDED AT CHART-5, BECAUSE THE SYMPTOM GOT WORSE. The overlay's end label
+ * carries the current PERCENTAGE — **beside** the name since CHART-7 (RF-2), and
+ * beneath it when this paragraph was written — so past `end` the failure
+ * is no longer two colour-coded words naming absent marks — it is two words AND
+ * TWO NUMERIC PRICE FIGURES attached to nothing drawn. A reader who cannot see
+ * the dots can still read a price off the label. ⚠ CHART-6 widens this: the hero
+ * carries the value line too, so all three surfaces show the figure. Written in here per `O-5`
+ * rather than left to the CHART-5 log, because this docblock is the site that
+ * states the position the change supersedes.
+ *
+ * ⚠ THE EXPIRY ALARM IS KEPT ON PURPOSE, and it is the load-bearing half of this
+ * docblock rather than a leftover. The failure mode above is not repaired by the
+ * new value — it is only postponed, and it will fire again the moment `now`
+ * passes the new `end`. It is silent when it fires: nothing errors, the page
+ * renders, and the only symptom is two labels pointing at marks that are not
+ * there. A reader arriving in November needs the mechanism, not just the date.
+ */
+const STAGING_CHART_WINDOW: ChartWindow = {
+	start: "2026-08-17T00:00:00.000Z",
+	end: "2026-11-05T23:45:00.000Z",
+};
+
+/**
+ * The whole environment branch, in one pure function, evaluated ONCE below.
+ *
+ * ⛔ THIS IS THE ONLY PLACE `ZUGZWANG_ENV` MAY DECIDE THE WINDOW. SPEC.1 §16.1:
+ * "Resolved from `ZUGZWANG_ENV` at the constants layer; **never branched on
+ * inside the derivation or the component.**" A conditional in the read path is
+ * how staging behaviour leaks into production — it survives review because each
+ * individual branch looks correct, and it fires only in the environment nobody
+ * is testing.
+ *
+ * `preview` takes the STAGING window because anything pointed at the staging
+ * database needs staging's dates: given production's window, every such chart
+ * would render as a line crushed against the left edge.
+ *
+ * ⚠ MEASURED, AND IT INVERTS THE ASSUMPTION THAT PUT THAT ARM HERE. A Vercel
+ * Preview deployment reports `env: "staging"`, not `"preview"` — read off this
+ * branch's own preview at `/api/health` (`canary` matching the branch HEAD, so
+ * it was this build and not another session's). So the deployed preview lane
+ * already takes the staging window **through the `staging` arm**, and the
+ * `preview` arm covers only what actually sets that value: a LOCAL build, which
+ * AGENTS.md §2 instructs (`ZUGZWANG_ENV=preview just verify`), plus any future
+ * environment tagged that way. `preview` is in `VALID_ENVS` beside `prod` and
+ * `staging`, so the arm is not dead — but it is not the thing that makes
+ * previews work, and this docblock said it was.
+ *
+ * ⇒ Recorded rather than quietly corrected because `@code-reviewer` filed this
+ * as **NOT ESTABLISHED (O-13)** and the honest close is the reading, not a
+ * tidier sentence.
+ *
+ * Everything else — `prod`, the `"unknown"` fallback `next.config.ts` inlines
+ * into the browser bundle, and an unset var under `vitest` — takes PRODUCTION.
+ * That is the fail-safe direction: production is the only environment whose
+ * window is load-bearing, so an unrecognised value must not be able to serve it
+ * a fixture window.
+ */
+export function resolveChartWindow(env: string | undefined): ChartWindow {
+	return env === "staging" || env === "preview"
+		? STAGING_CHART_WINDOW
+		: PRODUCTION_CHART_WINDOW;
+}
+
+/**
+ * ⚠ THIS IS A BUILD-TIME SNAPSHOT ON BOTH SIDES, SO AN ENV CHANGE REQUIRES A
+ * REBUILD. `next.config.ts` puts `ZUGZWANG_ENV` in its `env:` block, and Next
+ * spreads `getNextConfigEnv(config)` into the define set for the client, the
+ * node server AND the edge server alike — every `config.env` key becomes a
+ * literal substituted for `process.env.<KEY>` at compile time. Editing the
+ * variable in the Vercel dashboard therefore changes **nothing anywhere** until
+ * a redeploy.
+ *
+ * ⛔ AN EARLIER VERSION OF THIS DOCBLOCK GOT THE MECHANISM WRONG AND IS
+ * CORRECTED RATHER THAN DELETED, BECAUSE THE ERROR IS THE INSTRUCTIVE PART. It
+ * said the server re-reads `process.env` per request while the browser carries a
+ * frozen literal, and derived a hydration mismatch on `/m/[slug]` from the two
+ * disagreeing. They cannot disagree — both are the same literal — so that
+ * mismatch is unreachable. The CONCLUSION ("an env change requires a rebuild")
+ * was right, and is in fact stronger than the reasoning that produced it.
+ *
+ * That is precisely the shape `O-13` and CLAUDE.md §5.13 exist to end: a sound
+ * conclusion carried by a named mechanism nobody checked. Measured against the
+ * pinned Next by `@security-auditor` at the CHART-3 cascade; the runtime-read
+ * escape hatch is gated on `next experimental-compile`, which this repo does
+ * not use.
+ */
+const CHART_WINDOW = resolveChartWindow(process.env.ZUGZWANG_ENV);
+
+/** Start of the §9 chart's fixed X axis (SPEC.1 §16.1). ISO, not ms — it is
+ * byte-comparable with the spec that pins it, and the one consumer already
+ * parses timestamps. */
+export const MARKET_CHART_WINDOW_START = CHART_WINDOW.start;
+
+/** End of the §9 chart's fixed X axis (SPEC.1 §16.1). ⚠ **The axis ends here;
+ * the series never does** — the line stops at the present instant, never at
+ * this value. */
+export const MARKET_CHART_WINDOW_END = CHART_WINDOW.end;
+
+/**
+ * The ordered calendar instants the §9 chart's X axis labels (SPEC.1 §16.1,
+ * founder ruling D20(b) + D21(b) at CHART-7).
+ *
+ * ⭐ THESE ARE EXPERIMENT DATES, NOT WINDOW ENDPOINTS, AND THE DISTINCTION IS THE
+ * WHOLE RULING. Before CHART-7 the axis labelled wherever the window happened to
+ * begin and end, so a reader learned the configuration rather than the calendar.
+ * On production the two coincide — the window IS 15 September to 5 November — and
+ * on staging, whose window opens on 17 August because its fixtures predate the
+ * experiment, the first two anchors fall *inside* the plot. **That is correct and
+ * intended: the chart marks launch day even on a window that predates it.**
+ *
+ * ⚠ AN ANCHOR OUTSIDE THE CONFIGURED WINDOW IS NOT DRAWN. Neither environment has
+ * one today; the rule is specified anyway, because the alternative is a label at
+ * a negative x — clipped by the viewBox on the SVG side, and NOT clipped on the
+ * HTML side, where it would escape the plot and land on whatever sits beside the
+ * chart. A rule that only matters under a configuration nobody has yet is exactly
+ * the rule that gets discovered by a screenshot.
+ *
+ * ⛔ ONE ORDERED LIST RATHER THAN THREE SCATTERED DATES, so the set is tunable in
+ * one place, and **resolved here at the constants layer** — SPEC.1 §16.1's
+ * standing rule for this chart's constants, *"never branched on inside the
+ * derivation or the component"*. Unlike the WINDOW, this list takes no
+ * environment branch at all: an experiment date is the same date wherever it is
+ * read, and giving it an env arm would be inventing a variance the ruling does
+ * not have.
+ *
+ * ⚠ WRITTEN IN THE SPEC ROW'S OWN FORM (`…:00Z`, not `…:00.000Z`) so the constant
+ * is byte-comparable with the document that pins it — `MARKET_CHART_WINDOW_START`'s
+ * reason exactly. Every consumer goes through `Date.parse`, which reads the two
+ * spellings identically.
+ */
+export const MARKET_CHART_AXIS_ANCHORS: readonly string[] = Object.freeze([
+	"2026-09-15T00:00:00Z",
+	"2026-10-01T00:00:00Z",
+	"2026-11-05T23:45:00Z",
+]);
+
 // === UI.A5: Profile Dharma graph (SPEC.1 §23) =============================
 
 /** Profile graph-series downsample bound (UI-A5 §7 S2, OQ-4 B) — every served
@@ -260,3 +516,14 @@ export const PROFILE_GRAPH_Y_MAX = 10000;
  * call site and never inlined, so the HARDEN.6 tune is a one-line change.
  * Integer (milliseconds, not Dharma). */
 export const POLL_INTERVAL_MS_DEBATE_VIEW = 15000;
+
+// === HEADER-PORTFOLIO-CACHE: header PORTFOLIO figure cache-aside ===========
+
+/** TTL for the Redis cache-aside in front of `getHeaderPortfolio`
+ * (`getHeaderPortfolioCached`, `src/server/dharma/header-portfolio.ts`).
+ * Matches `POLL_INTERVAL_MS_DEBATE_VIEW` (15000 ms → 15 s) deliberately: that
+ * interval is already this product's accepted display-freshness bar (it's the
+ * cadence `/m/[slug]` re-renders this exact figure on), so this cache adds no
+ * staleness beyond what a viewer already experiences elsewhere. Seconds, not
+ * milliseconds — Upstash `SET ... EX` takes seconds. */
+export const HEADER_PORTFOLIO_CACHE_TTL_SECONDS = 15;

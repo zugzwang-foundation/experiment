@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { OnboardingDeck } from "@/components/onboarding/OnboardingDeck";
+import { HEADER_GLOSSARY } from "@/lib/copy/glossary";
 
 /**
  * The header's `RULES` control, and the re-show deck it opens (SPEC.1 §21.9).
@@ -54,10 +55,20 @@ export function RulesControl() {
 
 	return (
 		<>
+			{/* INFO-1: NOT wired to `InfoTip`, measured rather than by default —
+			    the only site in that task's wiring map this held true for.
+			    Opening this button ALSO opens `OnboardingDeck` below, a Radix
+			    `Dialog`; Dialog `aria-hide`s the rest of the page (including this
+			    trigger) the instant it opens, which leaves the gloss no window to
+			    coexist in — confirmed empirically: the popover never reaches an
+			    open state on tap. The register string stays centralized here via
+			    `title` rather than duplicated, and the modal itself explains the
+			    product far more completely than a one-line gloss would, so a
+			    touch user loses nothing real — they get the deck instead. */}
 			<button
 				type="button"
 				onClick={() => setOpen(true)}
-				title="Rules — how it works"
+				title={HEADER_GLOSSARY.rules}
 				className={RULES_TAB}
 			>
 				Rules

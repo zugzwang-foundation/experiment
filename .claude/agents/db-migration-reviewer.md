@@ -1,6 +1,6 @@
 ---
 name: db-migration-reviewer
-description: MUST BE USED after any change in src/db/schema/ or drizzle/migrations/. Reviews Drizzle schema declarations against SPEC.2 §5 inventory and Appendix B per-column shapes, verifies FK lambda forms per ADR-0008, indexes per AGENTS.md §6, Bucket A/B/C classifications, append-only trigger SQL, partition DDL, and same-commit SPEC amendments. Returns PASS / FAIL / SURPRISE per table or migration. Use proactively when schema or migration files are added or modified.
+description: MUST BE USED after any change in src/db/schema/ or drizzle/migrations/. Reviews Drizzle schema declarations against SPEC.2 §5 inventory and Appendix B per-column shapes, verifies FK lambda forms and indexes per AGENTS.md §6, Bucket A/B/C classifications, append-only trigger SQL, partition DDL, and same-commit SPEC amendments. Returns PASS / FAIL / SURPRISE per table or migration. Use proactively when schema or migration files are added or modified.
 tools: Read, Grep, Glob, Bash
 model: claude-opus-5
 effort: max
@@ -31,11 +31,11 @@ For each table:
 2. **Column names + types** — match SPEC.2 Appendix B row-by-row. Flag any divergence as FAIL with the specific cell.
 3. **Nullability** — match SPEC.2 Appendix B. NOT NULL where required (FKs that are load-bearing per invariants, e.g., `bets.comment_id`).
 4. **Bucket classification** — schema-level Bucket A (strictly append-only) and Bucket B (one or two whitelisted column transitions) tables match SPEC.2 §5.1 inventory. Bucket C tables have no special constraints.
-5. **FK declarations** — every FK uses `.references(() => target.id, { onDelete: '...' })`. Circular FKs use lambda form with `AnyPgColumn` typing per ADR-0008 §6.1. Wrong `onDelete` is a FAIL.
+5. **FK declarations** — every FK uses `.references(() => target.id, { onDelete: '...' })`. Circular FK pairs use the lambda form `(): AnyPgColumn => other.id` per **AGENTS.md §6** — *not* ADR-0008 §6.1, which is about explicit joins vs `relations()` and says nothing about lambdas. Wrong `onDelete` is a FAIL.
 6. **Indexes** — every FK column has an explicit index declaration. Plus named indexes from the plan (e.g., `events_aggregate_lookup_idx`, `comments_parent_side_idx`).
 7. **pgEnum declarations** — declared once per enum, value set matches plan exactly. No drift in value names.
 8. **drizzle-zod co-location** — every table file has `createInsertSchema(table)` and `createSelectSchema(table)` per ADR-0008 §5.
-9. **relations() blocks** — every table with cross-table FKs has a `relations()` block per AGENTS.md §6.
+9. **relations() blocks** — ⚠ **NOT required, and their absence is never a FAIL.** Per ADR-0008 §6.1 the default is explicit `.leftJoin(...)` / `.innerJoin(...)`; a `relations()` block is added per-domain **only** when nested-eager-load ergonomics (`.findMany({ with: {...} })`) earn it for a specific read path. The API is deliberately partially used. A file without one is correct by default; a file that ADDS one with no read path needing it is a **SURPRISE**, because it mints a second source of truth for FK shape. Measure rather than assume: `grep -lc 'relations(' src/db/schema/*.ts` (**8 of the 12 table-bearing files** at 2026-08-28). **Four TABLES across THREE files** carry cross-table FKs with no block, all correctly: `bet_receipts` (in `bets.ts`, which does carry blocks for its other two tables), `bookmarks`, and `pools` + `market_media` (both in `markets.ts`). *(This item previously required a block on every such table, which inverted ADR-0008's ruling and would have FAILed all four. Count TABLES, not files — `identity.ts` and `system.ts` also carry no block and never could have FAILed, because they declare no cross-table FK at all.)*
 10. **CHECK constraints** — only allowed where the plan explicitly approves them (e.g., `dharma_ledger.balance_after >= 0` for INV-2). Any other CHECK is FAIL — should defer to HARDEN.*.
 
 ### Migration file checks (drizzle/migrations/*.sql)
@@ -45,19 +45,19 @@ For each migration:
 1. **Numerical ordering** — applies cleanly in order. No gaps, no duplicates.
 2. **Hand-written SQL correctness** — trigger functions match SPEC.2 §6 contract. Partition DDL matches SPEC.2 §7.2.
 3. **Bucket A triggers** — BEFORE UPDATE and BEFORE DELETE both `RAISE EXCEPTION`. No accidental holes.
-4. **Bucket B triggers** — permit the named whitelisted transition (NULL → timestamp once), reject all other column changes. Two-transition Bucket B tables (like `friendly_fire_events`) reject both transitions firing in the same UPDATE.
+4. **Bucket B triggers** — permit the named whitelisted transition (NULL → timestamp once), reject all other column changes. **`image_uploads` is the two-column case:** `terminal_state` + `terminal_at` must transition **together**, in one UPDATE, as a single atomic whitelisted move — either moving alone is a reject. *(This item named `friendly_fire_events`, which was dropped at `0018_drop_friendly_fire_events.sql`; the example modelled the review against a table that cannot appear in any diff.)*
 5. **Partition definitions** — monthly partitions cover the planned date range plus a DEFAULT partition (per SPEC.2 §7.2).
-6. **No down-migrations applied in production** — down.sql files are documentation only per ADR-0008 §6.
+6. **Forward-only migration set** — there are **no** `down.sql` files anywhere under `drizzle/` and none should be added; the set is append-only per **AGENTS.md §6** (never edit a committed migration — write a new one). A reversal is a NEW forward migration, and a destructive one needs PR sign-off plus a backup snapshot first. The established convention (`0025_lots.sql`, `0026_lots_no_delete.sql`) records the reversal as a `-- DOWN (recorded, NOT applied)` comment block inside the up-migration; that block is documentation, not an executable artifact, and is not a FAIL. *(This item cited an ADR-0008 §6 rule about `down.sql` that ADR-0008 does not contain.)*
 7. **Seed migrations** — singleton inserts (e.g., `system_state`) use `ON CONFLICT DO NOTHING` for idempotency.
 8. When reviewing prod-bound migrations, apply the sequencing + drift-guard rules in ADR-0022 / ADR-0024 and `docs/runbooks/deploy-pipeline.md` §3 (expand/contract, migrate-before-serve).
 
 ### Same-commit SPEC amendments
 
-If the plan called for SPEC.2 amendments to land in the same commit (per §5.11):
+If the plan called for SPEC.2 amendments to land in the same commit (per CLAUDE.md **§5.10** schema audit / **§5.12** ADRs — §5.11 is subagent invocation and does not carry this rule):
 
 1. **Grep verification** — the old text is gone. Run `grep -c "<old phrase>" docs/specs/SPEC.2.md` and confirm 0.
 2. **New text present** — the new phrase is in the right section (§5.1 row, Appendix B row, etc.).
-3. **Drift items flagged for PRECURSOR.5** — if the plan surfaced SPEC drift items not amended this commit, they should be named in the PR body for the sweep.
+3. **Drift items named in the PR body** — if the plan surfaced SPEC drift items not amended this commit, name them in the PR body so the next SYNC sweep picks them up. *(This said "flagged for PRECURSOR.5"; PRECURSOR.5 was dissolved into SYNC.8 and both are long closed.)*
 
 ## Output format
 
@@ -68,8 +68,8 @@ If the plan called for SPEC.2 amendments to land in the same commit (per §5.11)
 - 0000_uuidv7_function.sql — pure SQL variant, LANGUAGE sql VOLATILE, AGPL header
 
 ## FAIL
-- friendly_fire_events.cleared_at — declared as `timestamp` (no withTimezone). Plan says `timestamptz`. Fix in src/db/schema/comments.ts line 47.
-- 0003_append_only_triggers.sql — Bucket B trigger for friendly_fire_events permits both columns transitioning together. Plan says reject if both fire in same UPDATE.
+- image_uploads.terminal_at — declared as `timestamp` (no withTimezone). Plan says `timestamptz`. Fix the `terminalAt` column in src/db/schema/image-uploads.ts.
+- 0003_append_only_triggers.sql — `enforce_image_uploads_terminal_atomic` permits `terminal_state` transitioning without `terminal_at`. Plan says the two columns must transition together in one UPDATE or the row is rejected.
 
 ## SURPRISE
 - Biome auto-reorganized imports in auth.ts (third-party + relative blocks merged). Safe but not predicted by plan. Confirm acceptable.

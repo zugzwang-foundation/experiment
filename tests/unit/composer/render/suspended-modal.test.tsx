@@ -74,11 +74,23 @@ describe("BetComposer suspended modal (R-4)", () => {
 				name: /retry|try again|resubmit/i,
 			}),
 		).toBeNull();
-		expect(within(dialog).queryByText(COMPOSER_COPY.submit)).toBeNull();
-		// The composer's own submit renders disabled under the P2 terminal
-		// (queried by text: the modal marks the backgrounded tree aria-hidden).
+		// ⚠⚠ RE-POINTED AT THE ACCESSIBLE NAME — change set 7 §4. These read
+		// `queryByText(COMPOSER_COPY.submit)` / `getByText(COMPOSER_COPY.submit)`
+		// while the submit rendered that string as ONE text node. It now stacks
+		// two spans (`Place` over `Đ BET`), so no single node carries the phrase
+		// and a text query cannot find it.
+		// ⛔ THE NEGATIVE ONE WOULD HAVE GONE VACUOUS, NOT RED: after the relabel
+		// NO node anywhere holds that string, so `queryByText(...)` → null would
+		// have passed on a dialog that DID render a submit. Re-pointing it is what
+		// keeps it a guard rather than a tautology.
+		// ⚠ `ByLabelText`, not `ByRole` — the modal marks the backgrounded tree
+		// `aria-hidden`, which `getByRole` filters out and `getByLabelText` does
+		// not. Same reason the original used a text query; the subject moved from
+		// the text node to the accessible name, and the name is the stronger pin.
+		expect(within(dialog).queryByLabelText(COMPOSER_COPY.submit)).toBeNull();
+		// The composer's own submit renders disabled under the P2 terminal.
 		expect(
-			screen.getByText(COMPOSER_COPY.submit).hasAttribute("disabled"),
+			screen.getByLabelText(COMPOSER_COPY.submit).hasAttribute("disabled"),
 		).toBe(true);
 	});
 

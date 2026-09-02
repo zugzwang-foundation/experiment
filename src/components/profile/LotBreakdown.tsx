@@ -11,6 +11,8 @@ import {
 import { buildSellRequest } from "@/components/debate/composer/requests";
 import { formatDharma } from "@/components/debate/format";
 import { Button } from "@/components/ui/button";
+import { InfoTip } from "@/components/ui/info-tip";
+import { GLOSSARY, SOLD_LABEL } from "@/lib/copy/glossary";
 import type { ProfilePositionLot } from "@/server/profile/positions";
 
 /**
@@ -115,12 +117,14 @@ function LotRow({
 			    with the position-level Exited/Flipped markers rather than replacing
 			    them: an argument can be Sold while the holding is still held. */}
 			{lot.sold && (
-				<span
-					data-testid={`lot-sold-${lot.lotId}`}
-					className="shrink-0 rounded-[var(--r-chip)] bg-n1 px-1.5 py-0.5 font-bold text-[10px] text-n5 uppercase tracking-[0.08em]"
-				>
-					Sold
-				</span>
+				<InfoTip content={GLOSSARY.sold} asChild>
+					<span
+						data-testid={`lot-sold-${lot.lotId}`}
+						className="shrink-0 rounded-[var(--r-chip)] bg-n1 px-1.5 py-0.5 font-bold text-[10px] text-n5 uppercase tracking-[0.08em]"
+					>
+						{SOLD_LABEL}
+					</span>
+				</InfoTip>
 			)}
 
 			{sellable && !lot.sold && (

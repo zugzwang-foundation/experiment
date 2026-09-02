@@ -157,11 +157,11 @@ describe("debate-export route — masking + gap-fills (open market, injected con
 		const slug = "export-it-mumbai";
 		const marketId = await seedMarket({ slug, status: "Open" });
 
-		const userA = await seedUser("CrimsonHawk207");
-		const userB = await seedUser("GoldenLynx288");
+		const userA = await seedUser("MagentaWolf207");
+		const userB = await seedUser("SilverLynx288");
 		const userC = await seedUser(REMOVED_PSEUDONYM); // the removed author
 		const userD = await seedUser("TealOwl118");
-		const userE = await seedUser("AzureBison330");
+		const userE = await seedUser("OliveBison330");
 
 		const postA = await seedNode({
 			userId: userA,
@@ -272,7 +272,7 @@ describe("debate-export route — masking + gap-fills (open market, injected con
 		expect(body).toContain(
 			"Even setting tone aside, the throughput math holds.",
 		);
-		expect(body).toContain("AzureBison330");
+		expect(body).toContain("OliveBison330");
 	});
 
 	it("debate-export-totals::total_stake_dharma-includes-removed-node-stake", async () => {
@@ -324,7 +324,7 @@ describe("debate-export route — resolved market final state", () => {
 			resolutionOutcome: "YES",
 			resolvedAt: new Date("2026-07-01T00:00:00.000Z"),
 		});
-		const author = await seedUser("EmeraldFinch512");
+		const author = await seedUser("MagentaMacaw512");
 		await seedNode({
 			userId: author,
 			marketId,

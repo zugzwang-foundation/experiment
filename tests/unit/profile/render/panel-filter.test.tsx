@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+// POSREV-1 — the arena mounts `PositionsTable`, which now owns the inline sell
+// and therefore calls `useRouter` for its post-sale `refresh()`. Nothing here
+// submits; the stub only has to exist.
+vi.mock("next/navigation", () => ({
+	useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+}));
 
 import { ArgumentList } from "@/components/profile/ArgumentList";
 import { ProfileArena } from "@/components/profile/ProfileArena";
@@ -13,11 +20,18 @@ import type { ProfileUser } from "@/server/profile/resolve";
 /**
  * ROUND 4 item 7 — THE ARGUMENT PANEL FILTERS TO THE PICKED ROW.
  *
- * ⚠ THE LOAD-BEARING ASSERTION IS THAT IT FILTERS AND DOES NOT REPLACE: the
- * full list is the default, one deselect away, and every argument that was in it
- * before is in it after. `positions.ts:151-158` drops fully-exited markets from
- * the table, so the list holds arguments the table can never reach — a
- * replacement would delete them from the surface.
+ * ⚠ THE LOAD-BEARING ASSERTION IS THAT IT FILTERS AND DOES NOT REPLACE: every
+ * argument that was in the list before a pick is in it after. The list holds
+ * arguments the table cannot reach — one made on a market the participant never
+ * took a position in — so a replacement would delete them from the surface.
+ *
+ * ⚠ TWO CLAUSES OF THIS PARAGRAPH WERE STALE AND ARE CORRECTED IN PLACE. It said
+ * the full list is "one deselect away" (PROFILE REFINEMENT R3 retired deselect)
+ * and that "`positions.ts:151-158` drops fully-exited markets from the table"
+ * (POSREV-1 RF-13 widened that domain — an exited market now has a row carrying
+ * its arguments). The assertion under test never depended on either; only the
+ * justification did, and a justification that has stopped being true is how a
+ * correct test comes to be deleted by someone who checks it.
  *
  * ⚠ THE MASKING ASSERTIONS READ THE BODY, NOT THE ROW (SC-1). A removed argument
  * is checked by asserting its BODY STRING is absent from the panel's serialised
@@ -395,35 +409,45 @@ describe("items 5 + 7 end to end — picking a row moves the panel", () => {
 		render(
 			<ProfileArena
 				positions={{ owner: false, rows: ROWS }}
+				// POSREV-1 RF-15 level 1 — the tile's exact figure. This suite does not
+				// exercise the identity; the prop is required so the arena cannot be
+				// mounted without one, which is what keeps the tile and the headers
+				// derived from a single number.
+				positionsValue="0.000000000000000000"
 				argumentItems={ITEMS}
 				owner={false}
 				author={USER}
 			/>,
 		);
 
-	it("arena::THE-PANEL-OPENS-ON-THE-FIRST-ROW-S-ARGUMENT", () => {
+	it("arena::THE-PANEL-OPENS-ON-THE-FIRST-ROW-S-ARGUMENT", async () => {
 		// ⚠⚠ PROFILE REFINEMENT · R3 — INVERTED AT THE FRONT. This opened by asserting
 		// the FULL LIST was on screen at mount and that a click then filtered it. R3
 		// rules the opposite: the rail must show a full post on load, because a rail
 		// of stubs was the defect. So the arena now mounts already filtered to the
 		// first row's argument, under that row's market question.
 		mount();
+		expect(
+			await screen.findByTestId(`argument-replica-${C_POST}`),
+		).toBeTruthy();
 		expect(screen.queryByTestId("argument-list")).toBeNull();
-		expect(screen.getByTestId(`argument-replica-${C_POST}`)).toBeTruthy();
 		expect(panelTitle()).toBe("Market question for the post");
 	});
 
-	it("arena::a-click-on-ANOTHER-row-moves-the-panel-to-ITS-argument", () => {
+	it("arena::a-click-on-ANOTHER-row-moves-the-panel-to-ITS-argument", async () => {
 		// The half of the original claim that survives unchanged: a pick still drives
 		// the panel. Asserted on the row that is NOT the mount default, so it is a
 		// real transition rather than a no-op.
 		mount();
-		fireEvent.click(screen.getByTestId(`position-row-${M_REPLY}`));
-		expect(screen.getByTestId(`argument-replica-${C_REPLY}`)).toBeTruthy();
+		const row = await screen.findByTestId(`position-tile-${M_REPLY}`);
+		fireEvent.click(row);
+		expect(
+			await screen.findByTestId(`argument-replica-${C_REPLY}`),
+		).toBeTruthy();
 		expect(panelTitle()).toBe("Market question for the reply");
 	});
 
-	it("arena::A-SECOND-CLICK-KEEPS-THE-PANEL-rather-than-emptying-it", () => {
+	it("arena::A-SECOND-CLICK-KEEPS-THE-PANEL-rather-than-emptying-it", async () => {
 		// ⚠⚠ PROFILE REFINEMENT · R3 — INVERTED. This asserted that a second click
 		// DESELECTED and returned the full list under the header word `Arguments`.
 		// R3 retires deselect: the panel always holds a selection, so clearing would
@@ -432,16 +456,20 @@ describe("items 5 + 7 end to end — picking a row moves the panel", () => {
 		// zero-row filter and every call site that passes no selection still reach
 		// it); it is simply no longer where a second click goes.
 		mount();
-		const row = screen.getByTestId(`position-row-${M_REPLY}`);
+		const row = await screen.findByTestId(`position-tile-${M_REPLY}`);
 		fireEvent.click(row);
-		expect(screen.getByTestId(`argument-replica-${C_REPLY}`)).toBeTruthy();
+		expect(
+			await screen.findByTestId(`argument-replica-${C_REPLY}`),
+		).toBeTruthy();
 		fireEvent.click(row);
-		expect(screen.getByTestId(`argument-replica-${C_REPLY}`)).toBeTruthy();
+		expect(
+			await screen.findByTestId(`argument-replica-${C_REPLY}`),
+		).toBeTruthy();
 		expect(screen.queryByTestId("argument-list")).toBeNull();
 		expect(panelTitle()).toBe("Market question for the reply");
 	});
 
-	it("arena::THE-PANEL-FOLLOWS-THE-ARROW-KEYS", () => {
+	it("arena::THE-PANEL-FOLLOWS-THE-ARROW-KEYS", async () => {
 		// The founder's own verification step: arrows step rows, wrap, and the
 		// panel follows. Both halves are asserted from the panel's side.
 		// ⚠ PROFILE OVERLAP R4 — THE PANEL STARTS ON THE FIRST ROW, so the first
@@ -450,23 +478,33 @@ describe("items 5 + 7 end to end — picking a row moves the panel", () => {
 		// therefore appeared to "follow" a press that had moved nothing. The claim
 		// is unchanged and the sequence is one row earlier.
 		mount();
-		const table = screen.getByTestId("positions-table");
-		expect(screen.getByTestId(`argument-replica-${C_POST}`)).toBeTruthy();
+		const table = await screen.findByTestId("positions-table");
+		expect(
+			await screen.findByTestId(`argument-replica-${C_POST}`),
+		).toBeTruthy();
 		fireEvent.keyDown(table, { key: "ArrowDown" });
-		expect(screen.getByTestId(`argument-replica-${C_REPLY}`)).toBeTruthy();
+		expect(
+			await screen.findByTestId(`argument-replica-${C_REPLY}`),
+		).toBeTruthy();
 		// …and it WRAPS back to the first.
 		fireEvent.keyDown(table, { key: "ArrowDown" });
-		expect(screen.getByTestId(`argument-replica-${C_POST}`)).toBeTruthy();
+		expect(
+			await screen.findByTestId(`argument-replica-${C_POST}`),
+		).toBeTruthy();
 	});
 
-	it("arena::a-filter-that-hides-the-picked-row-returns-the-panel-to-the-list", () => {
+	it("arena::a-filter-that-hides-the-picked-row-returns-the-panel-to-the-list", async () => {
 		// The derived-selection rule reaching the OTHER side of the arena: a panel
 		// filtered to a row that is no longer on screen would be unexplainable.
 		mount();
-		fireEvent.click(screen.getByTestId(`position-row-${M_POST}`));
-		expect(screen.getByTestId(`argument-replica-${C_POST}`)).toBeTruthy();
-		fireEvent.click(screen.getByTestId("positions-status-closed"));
-		expect(screen.getByTestId("argument-list")).toBeTruthy();
+		const tile = await screen.findByTestId(`position-tile-${M_POST}`);
+		fireEvent.click(tile);
+		expect(
+			await screen.findByTestId(`argument-replica-${C_POST}`),
+		).toBeTruthy();
+		const closedFilter = await screen.findByTestId("positions-status-closed");
+		fireEvent.click(closedFilter);
+		expect(await screen.findByTestId("argument-list")).toBeTruthy();
 		expect(panelTitle()).toBe("Arguments");
 	});
 });

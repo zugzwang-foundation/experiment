@@ -1,13 +1,14 @@
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import type { ReactNode } from "react";
 
+import { getRequestSession } from "@/app/(public)/_lib/session";
 import { OnboardingDeck } from "@/components/onboarding/OnboardingDeck";
 import { GlobalHeader } from "@/components/shell/GlobalHeader";
 import { db } from "@/db";
-import { auth } from "@/server/auth";
 import { getHeaderBalance } from "@/server/dharma/header-balance";
-import { getHeaderPortfolio } from "@/server/dharma/header-portfolio";
+import { getHeaderPortfolioCached } from "@/server/dharma/header-portfolio";
 import { readStarCount } from "@/server/github/star-count";
+import { pfpUrl } from "@/server/identity-pool/pfp-url";
 import { completeOnboardingDeckAction } from "@/server/onboarding/complete";
 import {
 	INTRO_SEEN_COOKIE,
@@ -33,7 +34,9 @@ import {
  * `dharma_ledger` row.
  *
  * TWO READS, CONCURRENT, AND DELIBERATELY NOT FUSED. `getHeaderBalance` and
- * `getHeaderPortfolio` are separate modules awaited in ONE `Promise.all`, so
+ * `getHeaderPortfolioCached` (HEADER-PORTFOLIO-CACHE — a Redis cache-aside in
+ * front of the original `getHeaderPortfolio`, `dharma/header-portfolio.ts`)
+ * are separate modules awaited in ONE `Promise.all`, so
  * they cost one round-trip of wall-clock rather than two. The `Promise.all`
  * lives HERE, in the route layer, on purpose (HEADER-PORTFOLIO R6): there is no
  * server-side orchestrating module and no widened entry point. They are not
@@ -65,20 +68,36 @@ import {
  * single-row indexed lookups and still not optimised here, but HARDEN.6 sizes
  * against ticks × tabs × round-trips and must count these two
  * (@code-reviewer, SHELL-COMPLETE).
+ *
+ * S-4 Phase B — `instant = false` (below) defers the framework's
+ * instant-navigation validation now that `cacheComponents` is on
+ * (`next.config.ts`). This layout's `cookies()`/`headers()` reads are
+ * unwrapped and unchanged; the Suspense hoist that would let a static shell
+ * prerender around them is S-4 Phase C/D work, done alongside the actual
+ * caching it exists to enable — not free-standing restructuring here.
  */
+export const instant = false;
+
 export default async function PublicLayout({
 	children,
 }: {
 	children: ReactNode;
 }) {
-	const session = await auth.api.getSession({ headers: await headers() });
+	// S-4 Phase D — deduped. `/m/[slug]`, `/u/[pseudonym]` and `/bookmarks` each
+	// read the session AGAIN in their page (layouts cannot pass data to pages),
+	// so this was two lookups per render on three surfaces. React's `cache()`
+	// collapses them to one per request. See `_lib/session.ts`.
+	const session = await getRequestSession();
 	const viewer = session
-		? { pseudonym: session.user?.pseudonym ?? null }
+		? {
+				pseudonym: session.user?.pseudonym ?? null,
+				pfpUrl: pfpUrl(session.user?.pfpFilename ?? null),
+			}
 		: null;
 	const [spendable, portfolio] = session?.user?.id
 		? await Promise.all([
 				getHeaderBalance(db, session.user.id),
-				getHeaderPortfolio(db, session.user.id),
+				getHeaderPortfolioCached(db, session.user.id),
 			])
 		: [null, null];
 

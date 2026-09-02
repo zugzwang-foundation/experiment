@@ -66,23 +66,60 @@ export function MarketMediaPanel({
 	title: string;
 }) {
 	/**
-	 * ⚠⚠ MEASURED DEFECT, FIXED HERE: THE PANEL WAS 19.4px WIDE ON STAGING.
-	 * `frame` used to carry `w-1/3` and was applied to the `MarketThumb` /
-	 * fallback CHILD, while the wrapper `<div data-testid="market-media-panel">`
-	 * carried no sizing at all. The wrapper is a flex item of `.hleft`, so it
-	 * shrank to its content — and its content was a percentage OF THAT WRAPPER.
-	 * A percentage width resolving against a box that is itself sized by its
-	 * content collapses, and the panel rendered as a 19.4 × 202 sliver: present
-	 * in the DOM, invisible on the page. Measured on live staging at `5349ae9`
-	 * (`getBoundingClientRect` → `{w: 19.4, h: 202.1}`), which is the same defect
-	 * class as the 324×578 PFP.
+	 * ⚠⚠ MEASURED DEFECT, FIXED HERE (HISTORICAL — READ BEFORE TOUCHING THIS
+	 * AGAIN): THE PANEL WAS 19.4px WIDE ON STAGING. `frame` used to carry
+	 * `w-1/3` and was applied to the `MarketThumb` / fallback CHILD, while the
+	 * wrapper `<div data-testid="market-media-panel">` carried no sizing at
+	 * all. The wrapper is a flex item of `.hleft`, so it shrank to its
+	 * content — and its content was a percentage OF THAT WRAPPER. A
+	 * percentage width resolving against a box that is itself sized by its
+	 * content collapses, and the panel rendered as a 19.4 × 202 sliver:
+	 * present in the DOM, invisible on the page. Measured on live staging at
+	 * `5349ae9` (`getBoundingClientRect` → `{w: 19.4, h: 202.1}`), which is
+	 * the same defect class as the 324×578 PFP.
 	 *
 	 * ⇒ THE FRAME IS NOW ON THE OUTER ELEMENT IN ALL THREE BRANCHES, and the
 	 * media inside fills it (`size-full`). The wrapper is the thing `.hleft`
 	 * measures, so the wrapper is the thing that has to declare a width.
+	 *
+	 * ⛔⛔ BLOCK-3 — `h-full w-auto` REPLACED WITH `w-1/3`, AND THIS IS NOT THE
+	 * SAME "PERCENTAGE WIDTH" MISTAKE THE PARAGRAPH ABOVE WARNS AGAINST. That
+	 * defect was a percentage resolving against a box sized BY ITS OWN
+	 * CONTENT (circular). This wrapper's containing block
+	 * (`MarketHeader.tsx`'s `<div className="flex min-h-0 flex-1 ...">`) is
+	 * NOT content-sized — it is `flex-1` inside `headzone-left`, which is
+	 * itself sized by the definite-height `headzone` band's own width. No
+	 * circularity.
+	 * ⚠ WHAT ACTUALLY CHANGED, AND WHY. `h-full w-auto` + `aspect-[16/9]`
+	 * derives WIDTH from the band's HEIGHT — measured to make the row and
+	 * every block inside it a function of viewport HEIGHT, not width: the
+	 * text column was 80.4px at 1440×777 but 67.2px at 1440×900 (a TALLER
+	 * viewport left LESS room, since a taller band makes a 16:9 panel
+	 * proportionally WIDER), and at 390×844 the height-derived width
+	 * (363.1px) exceeded the ENTIRE row's available width (334px) — the
+	 * panel alone didn't fit inside its own row, so the text column
+	 * collapsed to 0 and the page overflowed by 364px. `w-1/3` makes the
+	 * panel's width a fraction of the ROW instead — constant across every
+	 * viewport HEIGHT, and it degrades gracefully (not to zero) at any
+	 * viewport WIDTH, because the row itself always divides by the same
+	 * ratio regardless of how narrow it is. `aspect-[16/9]` still holds
+	 * exactly — height is now DERIVED FROM width, never the reverse, so the
+	 * ratio is never violated. See BLOCK-3's run report for the measured
+	 * before/after at all four viewports this was checked against.
+	 * ⚠⚠ `self-start`, NOT `items-start` ON THE ROW — measured, not assumed.
+	 * An earlier version of this fix put `items-start` on the shared row in
+	 * `MarketHeader.tsx`, which un-stretches BOTH the panel and its sibling
+	 * `headzone-stack` — and `headzone-stack` needs `align-items:stretch` to
+	 * grow into whatever height the band leaves over (R-8's mechanism).
+	 * Measured with the row-level fix: `headzone-stack` read an IDENTICAL
+	 * 176px at both a 217.8px band and a 188px band — the difference was
+	 * going nowhere. `self-start` opts out ONLY the panel, which is the one
+	 * child whose height no longer needs the row's stretch (it derives its
+	 * own from `w-1/3` + `aspect-[16/9]` now) — `headzone-stack` keeps the
+	 * row's default stretch untouched.
 	 */
 	const frame =
-		"aspect-[16/9] h-full w-auto shrink-0 overflow-hidden rounded-[var(--imgr)]";
+		"aspect-[16/9] w-1/3 shrink-0 self-start overflow-hidden rounded-[var(--imgr)]";
 
 	// ✅ R2 — NOTHING TO SHOW NOW DRAWS THE MOCKUP'S PLACEHOLDER, where it used to
 	// `return null`. `.mmedia`'s empty state is a centred column: the `.playmark`
