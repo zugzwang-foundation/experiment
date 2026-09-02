@@ -3401,6 +3401,8 @@ answer inverts at four of the eight viewports above. Caught by `@code-reviewer`,
 re-measured, corrected here. A guarantee is only checked by the comparison it was
 written as.
 
+⛔ **DISCHARGED AT WARLI-FIT (#450), AND THE MECHANISM THIS ROW NAMES IS NO LONGER WHAT SHIPS.** The row's stated cause is *"the default `xMidYMid meet`"*. `origin/main` now carries `preserveAspectRatio="xMidYMid slice"` (`hero.tsx:336`), a one-line change, and the guarantee holds at every viewport measured: clearance went from **2 of 4** to **4 of 4** — 1920×1080 +148.7 px, 1512×860 +55.2 (it failed by −7.5 under `meet`), 1440×900 +38.7, 390×844 +7.1 (it failed by −182). ⚠ **`slice` fills the frame by cropping, and this row itself establishes at the derivation above that there is nothing spare to crop** — `getBBox` returns `0,0 1441×1000` and 310 of 462 marks live outside `x ∈ [220, 1220]`. What is cropped was measured: at every desktop width the **top and bottom border bands** leave the screen; on the phone the **left and right** do. **The piece stops reading as a closed rectangle and starts reading as a window onto something larger, and the operator ruled that acceptable on 2026-09-01 after viewing both builds side by side.** ⇒ The clearance guarantee is discharged. **The border's behaviour under `slice` is now item 3's problem, not this row's** — an asymmetric border was proposed when all four bands were always visible, and that premise no longer holds. Reverting is one line.
+
 **Conditional trigger.** After go-live (2026-09-15), as in-window refinement.
 ⚠ The second clause — *"or immediately before any task that mounts the artwork,
 for item 4 alone"* — **has fired and is spent**: WARLI-MOUNT discharged item 4 in
@@ -3515,3 +3517,7 @@ artifact held off-repo, named here rather than linked because it is NOT
 resolvable from this tree. The two citations above are.
 
 ---
+
+## PROMOTE-GAP — production is 316 commits behind, on a 2026-07-02 build
+
+**Measured 2026-09-01 (STATE-RECON):** `zugzwangworld.com/api/health` serves canary `a61859ae92362d20fab27174bf8c842b555505bb` and returns **no `region` field at all**, against staging's `bom1`. `origin/main` and `origin/staging` are both `4c041633`. The distance is **316 commits**. ⚠ **Every gate this project has measured — every register repaired, every surface polished, every invariant asserted — has been measured on staging against a production that has received none of it.** The first promote will surface what staging structurally cannot: prod-only environment variables, the prod migration delta, the drift guard against real prod schema, and any behaviour that differs because prod data is not staging data. ⇒ **Sequencing is ADR-0024's, and this is a founder-present operation in daylight — not an overnight or autonomous task.** Go-live is 2026-09-15; the precursor freeze is 2026-09-10. The promote wants to happen with days of slack behind it, not hours.

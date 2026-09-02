@@ -223,6 +223,8 @@ The marker means *do not merge before Gate C*, written into the PR title so that
 
 **Going forward: put the gate in the PR body, not the title.** A title is permanent history; a body is not. This section exists because history is append-only and the fourteen cannot be rewritten — but nothing requires a fifteenth.
 
+⚠ **`⛔ LEAVE UNMERGED` is retired as a PR-title marker.** It was Overnight Run Doctrine §7 boilerplate naming Gate C as not-yet-done, and it was read as a standing prohibition at least twice — once against PR #403, whose lane had closed and shipped ten days earlier, and once in a task brief that treated it as a hazard warning. By 2026-09-01 two PRs carrying it were merged on `main` and a third carrying it was still open, so the marker no longer distinguished the two states it was written to distinguish. ⇒ Use the forms this section already names. A title is permanent history and a body is not, which is exactly why a title must not carry a state that changes.
+
 ### 5.14 Standing review checks
 Per-PR reviewer items that fire on *any* PR matching their trigger — critical-path or not. Unlike §5.10 (which is the execute surface's own critical-path audit), these are checklist lines for the reviewer and for `@code-reviewer` / `@security-auditor`.
 
