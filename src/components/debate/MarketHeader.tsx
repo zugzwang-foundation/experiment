@@ -526,14 +526,39 @@ export function MarketHeader({
 								    treatments are `ghost` and `secondary`, and picking one is a
 								    design ruling, not an edit.
 
-								    ⚠ THE ACCESSIBLE NAME IS "AI mode" AND SO NAMES NO FILE. That
-								    is deliberate and ratified, and the glyph does not fix it for
-								    a screen reader. What carries the download is the `InfoTip`
-								    gloss, which reaches AT as a DESCRIPTION (`aria-describedby`
-								    on the touch branch, Radix's `VisuallyHidden` copy on the
-								    pointer branch) — name "AI mode", description "…download this
-								    entire market debate as a Markdown file…". Deleting the
-								    `InfoTip` therefore removes more than a tooltip. */}
+								    ⛔⛔ THE ACCESSIBLE NAME IS "AI mode" AND SO NAMES NO FILE,
+								    AND ON TOUCH NOTHING ELSE NAMES IT EITHER. The name is
+								    founder-ratified, so it stands; what follows is the cost,
+								    recorded because an earlier draft of THIS BLOCK got it wrong
+								    and the correction is the part worth having.
+								    
+								    That draft said the download "reaches AT as a DESCRIPTION"
+								    via `aria-describedby`. ⛔ IT DOES NOT, on the branch that
+								    matters. MEASURED, not read: while the tip is CLOSED,
+								    `aria-describedby` on this anchor resolves to `null` — the
+								    Popover mounts its content only when open, while `InfoTip`
+								    sets the attribute unconditionally, so the id DANGLES and the
+								    gloss is not in the document at all. The touch branch is the
+								    DEFAULT for every unknown, including anything without
+								    `matchMedia`.
+								    ⇒ Pointer/desktop is fine — Radix's Tooltip renders a
+								    `VisuallyHidden` copy and opens on FOCUS, so a keyboard user
+								    meets it. On TOUCH the only way to open the description is to
+								    activate the control, which also starts the download. So a
+								    touch AT user gets "AI mode" and no indication that a file
+								    arrives — a WCAG 2.4.4 (Link Purpose, Level A) regression
+								    against the old `aria-label`, which said so outright.
+								    ⇒ OPEN, founder's call, NOT taken here because it is a COPY
+								    change: `aria-label="AI mode — download this debate as
+								    Markdown"` closes it while keeping the visible label inside
+								    the accessible name (2.5.3 Label in Name).
+								    
+								    ⚠ TARGET SIZE, the other cost of matching the badge. `h-5`
+								    is 20px against WCAG 2.5.8 (AA)'s 24px floor — and `size=xs`
+								    alone would have been 24px exactly. The Spacing exception
+								    most likely carries it (the badge is the nearest target, a
+								    `gap-2` away), but the geometry match was ratified knowing
+								    this rather than in ignorance of it. */}
 								<InfoTip content={GLOSSARY.downloadMd} asChild>
 									<a
 										download

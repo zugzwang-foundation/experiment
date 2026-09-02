@@ -433,10 +433,24 @@ describe("AIMODE-1 — the `.md` export is an `AI mode` button", () => {
 	});
 
 	it("market-header::AIMODE-chrome-never-borrows-the-SIDE-poles", () => {
-		// `#181818` / `#fafafa` are bound to the SIDE (YES/NO) — INV-3. This
-		// control is neutral chrome and must not reach for that pair as
-		// decoration. Asserted against the RENDERED class attribute, so a
-		// docblock mentioning a pole can neither trip nor satisfy it.
+		// `--color-yes` / `--color-no` are bound to the SIDE (YES/NO), and this
+		// control is neutral chrome that must not borrow that pair as decoration.
+		//
+		// ⚠ THIS IS A DESIGN-LANGUAGE RULE, NOT INV-3, and an earlier version of
+		// this comment said INV-3. It is not: INV-3 is
+		// `comments.side_at_post_time` immutable post-INSERT — a storage-layer
+		// property held by `0003_append_only_triggers.sql` and proved by
+		// `I-SIDE-BIND-001`. No CSS class can violate it. Naming an invariant for
+		// weight it does not carry is how the invariant's name stops being
+		// load-bearing, so the rule is stated as the rule it actually is.
+		//
+		// ⚠ AND IT PINS THE REACH, NOT THE RENDERED HEX. The rendered fill IS
+		// `#181818` and the rendered text IS `#fafafa` — but reached through
+		// `--btn-fill → --color-ground` and `text-ink`, which every Button in the
+		// product does. What must never appear is a reach for the SIDE token, and
+		// that is what these assertions can see. Asserted against the RENDERED
+		// class attribute, so a docblock mentioning a pole neither trips nor
+		// satisfies it.
 		const { container } = render(
 			<MarketHeader market={market(3, 5)} priceChart={null} />,
 		);

@@ -46,13 +46,52 @@ const SPACED_HYPHEN = / - /;
  * Only the LENGTH is exempt. The em dash, terminal-period and spaced-hyphen
  * rules below still apply to it unchanged.
  */
-const EXACT_LEN_EXEMPT: Readonly<Record<string, number | undefined>> = {
+const EXACT_LEN_EXEMPT: Readonly<
+	Partial<Record<keyof typeof GLOSSARY | keyof typeof HEADER_GLOSSARY, number>>
+> = {
 	downloadMd: 89,
 };
 
+/**
+ * AIMODE-1 — the founder-ratified TEXT, pinned as text.
+ *
+ * ⚠ The exemption above guards the wrong axis on its own, and that is worth
+ * saying plainly rather than leaving implied: it pins a LENGTH, and what was
+ * ratified was a STRING. Any 89-character rewrite of this public campaign copy
+ * would satisfy it. `glossary.ts` opens with "Do not edit a string here without
+ * a founder ruling", so the guard that actually matches the requirement is an
+ * equality on the string itself; the length exemption's remaining job is
+ * narrower — it is only what lets the shape loop admit a gloss this long.
+ */
+const RATIFIED_TEXT: Readonly<Partial<Record<keyof typeof GLOSSARY, string>>> =
+	{
+		downloadMd:
+			"AI mode — download this entire market debate as a Markdown file and paste it into any LLM",
+	};
+
+const ALL_ENTRIES = [
+	...Object.entries(GLOSSARY),
+	...Object.entries(HEADER_GLOSSARY),
+] as [string, string][];
+
+/**
+ * String-keyed VIEWS over the two typed literals above.
+ *
+ * ⚠ The literals are keyed to `keyof typeof GLOSSARY` on purpose — a typo'd key
+ * there is a compile error rather than a silent no-op that quietly exempts
+ * nothing (O-1: structural beats procedural). But `assertWellFormed` receives an
+ * arbitrary `string`, including the `_fixture_*` keys its own positive control
+ * invents, so it cannot index a keyed record. A `Map` gives the loose read
+ * without an `as` cast reaching back across that boundary.
+ */
+const LEN_BUDGET = new Map<string, number | undefined>(
+	Object.entries(EXACT_LEN_EXEMPT),
+);
+const REGISTER = new Map<string, string>(ALL_ENTRIES);
+
 function assertWellFormed(key: string, value: string): void {
 	expect(value.length, `${key}: empty`).toBeGreaterThan(0);
-	const exactLen = EXACT_LEN_EXEMPT[key];
+	const exactLen = LEN_BUDGET.get(key);
 	if (exactLen === undefined) {
 		expect(
 			value.length,
@@ -70,11 +109,6 @@ function assertWellFormed(key: string, value: string): void {
 		`${key}: uses a spaced hyphen instead of an em dash`,
 	).not.toMatch(SPACED_HYPHEN);
 }
-
-const ALL_ENTRIES = [
-	...Object.entries(GLOSSARY),
-	...Object.entries(HEADER_GLOSSARY),
-] as [string, string][];
 
 describe("INFO-1 — glossary copy register", () => {
 	it("every GLOSSARY and HEADER_GLOSSARY string is well-formed", () => {
@@ -135,6 +169,30 @@ describe("INFO-1 — glossary copy register", () => {
 				entry?.[1].length,
 				`${key}: no longer exceeds ${MAX_LEN} — delete its exemption`,
 			).toBeGreaterThan(MAX_LEN);
+		}
+	});
+
+	it("the ratified copy is pinned as TEXT, not merely as a length", () => {
+		const pins = Object.entries(RATIFIED_TEXT);
+		// Guard the guard — an empty pin set would make the loop vacuous.
+		expect(pins.length).toBeGreaterThan(0);
+
+		for (const [key, text] of pins) {
+			// The requirement was a string. Assert the string.
+			expect(
+				REGISTER.get(key),
+				`${key}: ratified copy changed — this needs a founder ruling, not an edit`,
+			).toBe(text);
+
+			// …and keep the two guards honest about each other. A ratified-text key
+			// that is also length-exempt must agree with its own budget, so the
+			// string and the number can never drift apart while both look green.
+			const budget = LEN_BUDGET.get(key);
+			if (budget !== undefined) {
+				expect(text?.length, `${key}: text and length budget disagree`).toBe(
+					budget,
+				);
+			}
 		}
 	});
 
