@@ -382,10 +382,17 @@ describe("AIMODE-1 — the `.md` export is an `AI mode` button", () => {
 		const link = exportAnchor(container);
 		const cls = tokensOf(link);
 
-		// ⛔ Still an `<a download>`. It reaches the route natively and works
-		// signed-out; a real `<button>` would need an onClick, and so a client
-		// boundary inside a server component, to re-implement that. "Rendered as
-		// a button" is a claim about appearance, and only about appearance.
+		// ⛔ Still an `<a download>`. An anchor is what FETCHES A RESOURCE, and
+		// `download` is a native attribute of one; a `<button>` would have to
+		// re-implement that in JS and would then do it worse — this way it still
+		// works before hydration and with JS off. "Rendered as a button" is a
+		// claim about appearance, and only about appearance.
+		// ⚠ This comment previously argued the point via "a client boundary
+		// inside a server component". That was FALSE — `MarketHeader`'s sole
+		// importer is `DebateView`, which is `"use client"` and passes it a
+		// function prop, so it is already client-side. Corrected here as well as
+		// in the component, because a justification repeated in two files is
+		// twice as likely to be the one someone copies.
 		expect(link?.tagName).toBe("A");
 		expect(link?.hasAttribute("download")).toBe(true);
 

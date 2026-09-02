@@ -498,12 +498,24 @@ export function MarketHeader({
 								    ⛔ IT STAYS AN `<a>`, AND AIMODE-1 DID NOT CHANGE THAT. The
 								    brief said "rendered as a button, not a text link" — which is
 								    a statement about APPEARANCE, and is satisfied by
-								    `buttonVariants`. A real `<button>` would need an onClick to
-								    reach the route, which means a client boundary in a server
-								    component, to re-implement what `<a download>` already does
-								    natively and signed-out. The two halves of the sentence are
-								    separable: it stops being a text LINK, it does not stop being
-								    an anchor.
+								    `buttonVariants`. The two halves are separable: it stops being
+								    a text LINK, it does not stop being an anchor.
+								    
+								    ⚠ AN EARLIER DRAFT JUSTIFIED THIS BY SAYING A `<button>` WOULD
+								    INTRODUCE "a client boundary in a server component". ⛔ THAT WAS
+								    FALSE and is corrected here rather than quietly dropped, because
+								    a right answer resting on a wrong mechanism is the thing that
+								    gets copied. THIS COMPONENT IS ALREADY CLIENT-SIDE: its sole
+								    importer is `DebateView.tsx`, which is `"use client"` and hands
+								    it `pick.onPick` — a FUNCTION prop, which only passes
+								    client→client. There is no boundary here to cross.
+								    ⇒ The real grounds, which do hold: an anchor is what FETCHES A
+								    RESOURCE, and `download` is a native attribute of one. A button
+								    would have to re-implement the download in JS — and would then
+								    do it WORSE, because this way it still works before hydration
+								    and with JS off. AT hearing "link" is also simply true of it.
+								    Same shape as `composer/SlotHeader.tsx`, where `buttonVariants`
+								    supplies the look and a `Link` keeps the behaviour.
 
 								    ⚠ GEOMETRY IS PINNED TO `LifecycleBadge`, ITS ROW-NEIGHBOUR,
 								    and the two overrides are what pin it. `size="xs"` is h-6 with
@@ -549,9 +561,14 @@ export function MarketHeader({
 								    arrives — a WCAG 2.4.4 (Link Purpose, Level A) regression
 								    against the old `aria-label`, which said so outright.
 								    ⇒ OPEN, founder's call, NOT taken here because it is a COPY
-								    change: `aria-label="AI mode — download this debate as
-								    Markdown"` closes it while keeping the visible label inside
-								    the accessible name (2.5.3 Label in Name).
+								    change: prefixing the ratified name onto a short statement that
+								    a Markdown file downloads would close it while keeping the
+								    visible label inside the accessible name (2.5.3 Label in Name).
+								    ⚠ The proposed string is DESCRIBED and deliberately not written
+								    out in attribute syntax: this file would then contain two
+								    `aria-label` literals, only one of which ships, and a later
+								    source-scan guard would match the one that does not. That
+								    failure has six recorded instances in this repo.
 								    
 								    ⚠ TARGET SIZE, the other cost of matching the badge. `h-5`
 								    is 20px against WCAG 2.5.8 (AA)'s 24px floor — and `size=xs`
