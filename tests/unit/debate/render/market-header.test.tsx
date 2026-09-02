@@ -253,9 +253,7 @@ describe("RESO-1 — R-3, the meta line and the actions are one row", () => {
 		);
 
 		const meta = screen.getByText("Đ 150 staked");
-		const exportLink = container.querySelector(
-			'a[aria-label="Download this debate as Markdown"]',
-		);
+		const exportLink = container.querySelector('a[aria-label="AI mode"]');
 		const badge = screen.getByText("Open");
 		expect(exportLink).not.toBeNull();
 
@@ -288,9 +286,7 @@ describe("RESO-1 — R-3, the meta line and the actions are one row", () => {
 		const { container } = render(
 			<MarketHeader market={market(3, 5)} priceChart={null} />,
 		);
-		const exportLink = container.querySelector(
-			'a[aria-label="Download this debate as Markdown"]',
-		);
+		const exportLink = container.querySelector('a[aria-label="AI mode"]');
 		const actions = rowOf(exportLink);
 		expect(actions).not.toBeNull();
 		// ⛔ `ml-auto`, not `justify-between` — the two are identical while both
@@ -315,9 +311,7 @@ describe("RESO-1 — R-3, the meta line and the actions are one row", () => {
 		);
 		const stack = container.querySelector('[data-testid="headzone-stack"]');
 		expect(stack).not.toBeNull();
-		const exportLink = container.querySelector(
-			'a[aria-label="Download this debate as Markdown"]',
-		);
+		const exportLink = container.querySelector('a[aria-label="AI mode"]');
 		const metaRow = rowOf(screen.getByText("Đ 150 staked"));
 		const actionsRow = rowOf(exportLink);
 		// Neither is a DIRECT child of the stack — they are both nested one level
@@ -325,6 +319,145 @@ describe("RESO-1 — R-3, the meta line and the actions are one row", () => {
 		expect(metaRow?.parentElement).not.toBe(stack);
 		expect(actionsRow?.parentElement).not.toBe(stack);
 		expect(metaRow?.parentElement).toBe(actionsRow?.parentElement);
+	});
+});
+
+describe("AIMODE-1 — the `.md` export is an `AI mode` button", () => {
+	const exportAnchor = (container: HTMLElement) =>
+		container.querySelector('a[href$="/export"]');
+
+	const tokensOf = (el: Element | null) =>
+		new Set((el?.getAttribute("class") ?? "").split(/\s+/).filter(Boolean));
+
+	it("market-header::AIMODE-label-and-accessible-name-are-both-AI-mode", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+		const link = exportAnchor(container);
+		expect(link).not.toBeNull();
+
+		// The visible label…
+		expect(link?.textContent).toBe("AI mode");
+		// …and the accessible name, which is a SEPARATE claim, not a restatement
+		// of it. The glyph is `aria-hidden` and the label is the same words, so a
+		// dropped `aria-label` changes nothing visible and nothing textual — the
+		// only assertion that can see it is this one.
+		expect(link?.getAttribute("aria-label")).toBe("AI mode");
+
+		// ⛔ And the old name is gone from the control entirely — body and ARIA.
+		expect(link?.outerHTML).not.toContain("Download .md");
+		expect(link?.getAttribute("aria-label")).not.toContain("Download");
+	});
+
+	it("market-header::AIMODE-box-is-the-LifecycleBadge's-box-on-both-elements", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+		const link = tokensOf(exportAnchor(container));
+		const badge = tokensOf(container.querySelector('[data-slot="badge"]'));
+		expect(badge.size).toBeGreaterThan(1);
+
+		// Every box declaration is asserted on BOTH elements rather than on the
+		// control alone. Pinning only the control would let the shared `Badge`
+		// primitive be resized underneath it while this still passed against a
+		// literal — the divergence, not the value, is what matters here.
+		for (const box of ["h-5", "rounded-4xl", "px-2", "text-xs", "gap-1"]) {
+			expect(badge.has(box), `LifecycleBadge no longer carries ${box}`).toBe(
+				true,
+			);
+			expect(link.has(box), `the export control dropped ${box}`).toBe(true);
+		}
+
+		// ⛔ THE REGRESSION THIS EXISTS FOR, NAMED. `size="xs"` on its own is
+		// `h-6`; left unoverridden, this control — not the badge — would set the
+		// row's height, growing it 4px inside a `basis-[24.2dvh] overflow-hidden`
+		// band whose interior budget is already fully allocated.
+		expect(link.has("h-6")).toBe(false);
+	});
+
+	it("market-header::AIMODE-is-a-button-TREATMENT-on-an-anchor-that-stays-an-anchor", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+		const link = exportAnchor(container);
+		const cls = tokensOf(link);
+
+		// ⛔ Still an `<a download>`. It reaches the route natively and works
+		// signed-out; a real `<button>` would need an onClick, and so a client
+		// boundary inside a server component, to re-implement that. "Rendered as
+		// a button" is a claim about appearance, and only about appearance.
+		expect(link?.tagName).toBe("A");
+		expect(link?.hasAttribute("download")).toBe(true);
+
+		// It stops looking like a text link. Named one at a time so a failure
+		// says WHICH class came back rather than that something did.
+		for (const linkish of [
+			"underline-offset-2",
+			"hover:underline",
+			"text-muted-foreground",
+		]) {
+			expect(cls.has(linkish), `text-link class ${linkish} is back`).toBe(
+				false,
+			);
+		}
+
+		// …and carries the button treatment instead.
+		expect(cls.has("inline-flex")).toBe(true);
+		expect(cls.has("bg-(--btn-fill)")).toBe(true);
+		expect(cls.has("[border:var(--hairline)]")).toBe(true);
+	});
+
+	it("market-header::AIMODE-glyph-is-aria-hidden-and-LEADS-the-label", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+		const link = exportAnchor(container);
+		const svg = link?.querySelector("svg");
+
+		expect(svg).not.toBeNull();
+		expect(svg?.getAttribute("class") ?? "").toContain("lucide-download");
+		// It must not reach the accessible name — the label already names the
+		// control and lucide ships no `<title>`.
+		expect(svg?.getAttribute("aria-hidden")).toBe("true");
+		// "left of the label", asserted as source order rather than as CSS, which
+		// jsdom could not answer anyway.
+		expect(link?.firstElementChild).toBe(svg);
+	});
+
+	it("market-header::AIMODE-chrome-never-borrows-the-SIDE-poles", () => {
+		// `#181818` / `#fafafa` are bound to the SIDE (YES/NO) — INV-3. This
+		// control is neutral chrome and must not reach for that pair as
+		// decoration. Asserted against the RENDERED class attribute, so a
+		// docblock mentioning a pole can neither trip nor satisfy it.
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+		const cls = exportAnchor(container)?.getAttribute("class") ?? "";
+		const tokens = tokensOf(exportAnchor(container));
+
+		for (const banned of [
+			"bg-yes",
+			"bg-no",
+			"text-yes",
+			"text-no",
+			"border-yes",
+			"border-no",
+		]) {
+			expect(tokens.has(banned), `side-pole utility ${banned}`).toBe(false);
+		}
+		// The var() and raw-hex forms of the same reach. `#` catches any literal
+		// colour at all, which no class on this control should carry.
+		for (const banned of [
+			"--color-yes",
+			"--color-no",
+			"--graph-yes",
+			"--graph-no",
+			"#",
+		]) {
+			expect(cls.includes(banned), `side-pole/raw colour ${banned}`).toBe(
+				false,
+			);
+		}
 	});
 });
 

@@ -241,10 +241,16 @@ describe("the arm split — each arm renders through the shared frame", () => {
 		cleanup();
 		const postArm = renderPostArm().container.innerHTML;
 
-		expect(marketArm).toContain("Download .md");
-		expect(marketArm).toContain("Download this debate as Markdown");
+		// AIMODE-1 — the label and the accessible name are both `AI mode` now.
+		// ⚠ Asserting the ARIA form as a full attribute (`aria-label="AI mode"`),
+		// not as the bare words: the visible label is also `AI mode`, so a bare
+		// `toContain("AI mode")` is satisfied by EITHER on its own and would keep
+		// passing if the accessible name were dropped entirely. The two lines
+		// below are the visible text and the accessible name, separately.
+		expect(marketArm).toContain("AI mode");
+		expect(marketArm).toContain('aria-label="AI mode"');
 		expect(marketArm).toContain("Market Open");
-		expect(postArm).not.toContain("Download .md");
+		expect(postArm).not.toContain("AI mode");
 	});
 });
 

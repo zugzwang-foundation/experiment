@@ -1,6 +1,10 @@
+import { Download } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { InfoTip } from "@/components/ui/info-tip";
 import { GLOSSARY } from "@/lib/copy/glossary";
+import { cn } from "@/lib/utils";
 import type { PricePoint } from "@/server/discovery/price-series";
 
 import {
@@ -122,7 +126,8 @@ function LifecycleBadge({ status }: { status: DebateMarketHeader["status"] }) {
  * renders, and a list of "every element below" that names one that is not below
  * is the kind of faithfully-carried-forward falsehood doctrine §6.2 is about.
  *
- * ⇒ CONSEQUENCE, DECLARED: the lifecycle marker and `Download .md` become
+ * ⇒ CONSEQUENCE, DECLARED: the lifecycle marker and the `.md` export (labelled
+ * `AI mode` since AIMODE-1; `Download .md` before it) become
  * MARKET-ARM ONLY, exactly like every other `vm` element beside them. ⛔ Neither
  * is DELETED — row 9 is a reverse delta the founder has not ruled, and OD-3
  * keeps all five. The ADR-0025 export stays reachable and the INV-4 read-only
@@ -489,15 +494,60 @@ export function MarketHeader({
 							<div className="ml-auto flex shrink-0 items-center gap-2">
 								<LifecycleBadge status={market.status} />
 								{/* EXPORT.1 — native download of the debate `.md` (server-mediated
-								    GET); plain anchor, no client boundary, works signed-out. */}
+								    GET); plain anchor, no client boundary, works signed-out.
+								    ⛔ IT STAYS AN `<a>`, AND AIMODE-1 DID NOT CHANGE THAT. The
+								    brief said "rendered as a button, not a text link" — which is
+								    a statement about APPEARANCE, and is satisfied by
+								    `buttonVariants`. A real `<button>` would need an onClick to
+								    reach the route, which means a client boundary in a server
+								    component, to re-implement what `<a download>` already does
+								    natively and signed-out. The two halves of the sentence are
+								    separable: it stops being a text LINK, it does not stop being
+								    an anchor.
+
+								    ⚠ GEOMETRY IS PINNED TO `LifecycleBadge`, ITS ROW-NEIGHBOUR,
+								    and the two overrides are what pin it. `size="xs"` is h-6 with
+								    a ~10px radius; the badge beside it is `h-5 rounded-4xl`
+								    (`ui/badge.tsx`). Left at `xs` this control would set the
+								    row's height instead of the badge, growing it 4px — and the
+								    note at the top of this row records that the row tracks the
+								    badge's fixed `h-5`, inside a `basis-[24.2dvh] overflow-hidden`
+								    band whose interior budget is already fully allocated. So the
+								    override is a height CONTRACT with the element beside it, not
+								    a nudge: `h-5 rounded-4xl` reproduces the badge's box exactly
+								    (h-5 · gap-1 · rounded-4xl · px-2 · text-xs · svg size-3) and
+								    the row's height delta is zero.
+
+								    ⚠ `variant="outline"` NAMES a bordered pill; it does NOT buy
+								    de-emphasis. `default` and `outline` are byte-identical in
+								    `buttonVariants` — the one-button system (values-log §3 item 3
+								    / R-6). Anyone reaching here to make this "quieter" by
+								    swapping the variant will change nothing; the lighter
+								    treatments are `ghost` and `secondary`, and picking one is a
+								    design ruling, not an edit.
+
+								    ⚠ THE ACCESSIBLE NAME IS "AI mode" AND SO NAMES NO FILE. That
+								    is deliberate and ratified, and the glyph does not fix it for
+								    a screen reader. What carries the download is the `InfoTip`
+								    gloss, which reaches AT as a DESCRIPTION (`aria-describedby`
+								    on the touch branch, Radix's `VisuallyHidden` copy on the
+								    pointer branch) — name "AI mode", description "…download this
+								    entire market debate as a Markdown file…". Deleting the
+								    `InfoTip` therefore removes more than a tooltip. */}
 								<InfoTip content={GLOSSARY.downloadMd} asChild>
 									<a
 										download
 										href={`/m/${market.slug}/export`}
-										aria-label="Download this debate as Markdown"
-										className="text-muted-foreground text-xs underline-offset-2 hover:underline"
+										aria-label="AI mode"
+										className={cn(
+											buttonVariants({ variant: "outline", size: "xs" }),
+											"h-5 rounded-4xl",
+										)}
 									>
-										Download .md
+										{/* `aria-hidden` — the label beside it already names the
+										    control, and lucide ships no title element. */}
+										<Download aria-hidden="true" />
+										AI mode
 									</a>
 								</InfoTip>
 							</div>

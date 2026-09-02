@@ -26,11 +26,44 @@ const MAX_LEN = 80;
  * spaces. */
 const SPACED_HYPHEN = / - /;
 
+/**
+ * AIMODE-1 — the register's one ratified over-length string, exempted BY NAME.
+ *
+ * `downloadMd` is 89 characters against the 80 below. The floor is deliberately
+ * NOT raised to admit it: `MAX_LEN` covers ~25 strings, and loosening it for
+ * all of them to fit one would retire glossary.ts's stated "≤ ~75 characters so
+ * it survives an unstyled render" rule product-wide as a side effect of a copy
+ * change to a single gloss. The reason for the floor still holds everywhere it
+ * held yesterday.
+ *
+ * ⚠ THE EXEMPT BUDGET IS PINNED EXACTLY, NOT LOOSENED, and that is the whole
+ * design of it. A `<=` here would let this one string grow without limit the
+ * moment it was exempted — which is precisely the failure an exemption invites:
+ * the guard stops guarding the key most likely to drift, while still reporting
+ * green for the other twenty-five. Editing the copy therefore edits this number
+ * in the same commit. The friction is intentional and is the point.
+ *
+ * Only the LENGTH is exempt. The em dash, terminal-period and spaced-hyphen
+ * rules below still apply to it unchanged.
+ */
+const EXACT_LEN_EXEMPT: Readonly<Record<string, number | undefined>> = {
+	downloadMd: 89,
+};
+
 function assertWellFormed(key: string, value: string): void {
 	expect(value.length, `${key}: empty`).toBeGreaterThan(0);
-	expect(value.length, `${key}: exceeds ${MAX_LEN} chars`).toBeLessThanOrEqual(
-		MAX_LEN,
-	);
+	const exactLen = EXACT_LEN_EXEMPT[key];
+	if (exactLen === undefined) {
+		expect(
+			value.length,
+			`${key}: exceeds ${MAX_LEN} chars`,
+		).toBeLessThanOrEqual(MAX_LEN);
+	} else {
+		expect(
+			value.length,
+			`${key}: ratified over-length gloss — its budget is pinned exactly, so update EXACT_LEN_EXEMPT in the same commit as the copy`,
+		).toBe(exactLen);
+	}
 	expect(value, `${key}: ends with a terminal period`).not.toMatch(/\.$/);
 	expect(
 		value,
@@ -75,6 +108,42 @@ describe("INFO-1 — glossary copy register", () => {
 		// just proves the em dash appears for real, not that every string uses it.
 		const withEmDash = ALL_ENTRIES.filter(([, v]) => v.includes("—"));
 		expect(withEmDash.length).toBeGreaterThan(ALL_ENTRIES.length / 2);
+	});
+
+	it("the length exemption is narrow, live, and still genuinely needed", () => {
+		// An exemption that outlives its reason is worse than no exemption: it
+		// reads as coverage while silently excusing a key nothing is checking.
+		// These three assertions are what make it expire on its own.
+		const keys = Object.keys(EXACT_LEN_EXEMPT);
+
+		// 1 — it stays NARROW. Growing the list is a decision, and it reddens here
+		//     rather than passing quietly as one more entry in an object literal.
+		expect(keys).toEqual(["downloadMd"]);
+
+		for (const key of keys) {
+			const entry = ALL_ENTRIES.find(([k]) => k === key);
+			// 2 — it stays LIVE. An exemption for a key deleted from the register
+			//     is dead weight pointing at nothing.
+			expect(
+				entry,
+				`${key}: exempted but absent from the register`,
+			).toBeDefined();
+			// 3 — it stays NEEDED. If the copy is ever shortened back under the
+			//     floor, this fails and the exemption gets deleted instead of
+			//     quietly licensing a future over-length rewrite of the same key.
+			expect(
+				entry?.[1].length,
+				`${key}: no longer exceeds ${MAX_LEN} — delete its exemption`,
+			).toBeGreaterThan(MAX_LEN);
+		}
+	});
+
+	it("positive control: the exact-length pin rejects a drifted exempt string", () => {
+		// The exempt branch has its own machinery, so it gets its own proof that
+		// it can fail — the same rule the malformed-string control above follows.
+		expect(() =>
+			assertWellFormed("downloadMd", "AI mode — a gloss of the wrong length"),
+		).toThrow();
 	});
 
 	it("GLOSSARY.sold is the register's one founder-flagged invented string", () => {

@@ -70,7 +70,7 @@ export const GLOSSARY = {
 
 	// — Export ————————————————————————————————————————————
 	downloadMd:
-		"Download .md — this whole debate as a plain text file, yours to keep",
+		"AI mode — download this entire market debate as a Markdown file and paste it into any LLM",
 	downloadStub: "Download — per-argument export isn't available yet",
 
 	// — Identity ——————————————————————————————————————————
