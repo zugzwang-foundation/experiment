@@ -198,7 +198,7 @@ export function buildCoverage(
 				GROUP BY p.id
 				HAVING count(rb.id) >= 5 OR SUM(rb.stake) >= 2000
 			) dominant HAVING count(*) >= 2`,
-			"three badges, one per lane: M2-P2 Most Debated, M2-P3 Highest Stakes, M2-P4 Contested",
+			"ONE badge since RANK-3: M2-P3 Highest Stakes. M2-P2 and M2-P4 lost theirs when traction became DISTINCT PEOPLE — P2 draws 5 replies from 3 people, P4 draws 4 from 3, and neither clears floor_lane(n)=5 or n^b=3. The fixture data needs re-shaping to restore a three-badge M2; that needs a rebuild.",
 		],
 		[
 			"C4",
@@ -212,7 +212,7 @@ export function buildCoverage(
 				WHERE m.slug = 'sp-m2-active' AND p.parent_comment_id IS NULL
 				  AND (SELECT count(*) FROM comments r WHERE r.parent_comment_id = p.id) < 5
 			) quiet HAVING count(*) > 6`,
-			"9 of the 12 posts carry NO badge — that is the criterion, not an omission",
+			"11 of the 12 posts carry NO badge — that is the criterion, not an omission (was 9 before RANK-3 redefined traction as distinct people)",
 		],
 		[
 			"C5",

@@ -58,8 +58,21 @@ function substrateFor(marketKey: string): PostSubstrate[] {
 		return {
 			id: post.key,
 			parentSide: post.side,
-			supportCount: support.length,
-			counterCount: counter.length,
+			// ⚠ RANK-3 — THE RANKING COUNTS ARE DISTINCT PEOPLE, and in THIS table
+			// that is not the same as the number of replies. `M2-P2` draws 5
+			// replies from 3 people and `M2-P4` draws 4 from 3. Computing these as
+			// `support.length` — as this file did until RANK-3 — would model a
+			// substrate the shipped query no longer produces, and the badge
+			// assertions below would keep passing against a shape that no longer
+			// exists. That is the precise failure this file was minted to prevent,
+			// so it is computed the way the SQL computes it.
+			supportCount: new Set(support.map((r) => r.author)).size,
+			counterCount: new Set(counter.map((r) => r.author)).size,
+			// The DISPLAY totals: every reply, self-authored and removed included.
+			// The fixture table contains no self-replies (verified), so these differ
+			// from the counts above only where one person replied more than once.
+			supportCountTotal: support.length,
+			counterCountTotal: counter.length,
 			supportDharma: sum(support),
 			counterDharma: sum(counter),
 			// Creation order is the fixture-table order; only the ORDERING matters
@@ -242,13 +255,21 @@ describe("C3 + C4 · the lane calibration, computed with the shipped model", () 
 		substrate.map((p) => [p.id, badgeFor(p, substrate, cfg)]),
 	);
 
-	it("fires each of the three badges exactly once (C3)", () => {
+	// ⚠⚠ THE C3 CALIBRATION IS STALE AND THIS IS WHERE THAT BECAME VISIBLE.
+	// RANK-3's R-2 redefined traction as DISTINCT PEOPLE, and the M2 fixture
+	// draws repeat repliers: M2-P2 has 5 replies from 3 people, M2-P4 has 4 from
+	// 3. Neither clears `floor_lane(n) = 5`, and P4's contestation falls to
+	// 3^0.5 = 1.73 < 3. So M2 now fires ONE badge, not three.
+	//
+	// ⛔ THE EXPECTATIONS ARE UPDATED TO THE MEASURED TRUTH, NOT RESTORED. The
+	// old numbers described the old noun; preserving them would mean asserting a
+	// substrate the shipped query no longer produces (RANK-1 R-C). Restoring a
+	// three-badge M2 means re-shaping the fixture DATA so five distinct people
+	// reply to M2-P2 — which only takes effect after a staging rebuild, and a
+	// rebuild is out of scope here. **Flagged for the founder as RANK-3-D1.**
+	it("fires ONE badge — the C3 three-badge calibration is stale (RANK-3 R-2)", () => {
 		const fired = [...badges.values()].filter((b) => b !== null);
-		expect(fired.slice().sort()).toEqual([
-			"Contested",
-			"Highest Stakes",
-			"Most Debated",
-		]);
+		expect(fired.slice().sort()).toEqual(["Highest Stakes"]);
 	});
 
 	it("puts each badge on its named carrier (C3)", () => {
@@ -260,15 +281,20 @@ describe("C3 + C4 · the lane calibration, computed with the shipped model", () 
 			"M2-P3": badges.get("M2-P3"),
 			"M2-P4": badges.get("M2-P4"),
 		}).toEqual({
-			"M2-P2": "Most Debated",
+			// Lost Most Debated: 5 replies, 3 people, and 3 < floor_lane(n) = 5.
+			"M2-P2": null,
+			// Unaffected — the stake lane does not count anything.
 			"M2-P3": "Highest Stakes",
-			"M2-P4": "Contested",
+			// Lost Contested: 4 replies, 3 people ⇒ n^b = 3^0.5 = 1.73 < 3.
+			"M2-P4": null,
 		});
 	});
 
 	it("leaves the MAJORITY of M2's posts with no badge (C4)", () => {
 		const unbadged = [...badges.values()].filter((b) => b === null).length;
-		expect(unbadged).toBe(M2_POSTS.length - 3);
+		// Was `- 3`; one badge fires since RANK-3 R-2. C4's PROPERTY (the majority
+		// carry none) is unharmed and is asserted below on its own terms.
+		expect(unbadged).toBe(M2_POSTS.length - 1);
 		// "Majority" stated as an assertion rather than left to arithmetic the
 		// reader has to do.
 		expect(unbadged).toBeGreaterThan(M2_POSTS.length / 2);
@@ -295,12 +321,18 @@ describe("C3 + C4 · the lane calibration, computed with the shipped model", () 
 			"M2-P3": laneOf("M2-P3"),
 			"M2-P4": laneOf("M2-P4"),
 		}).toEqual({
-			// SOLE clearer of the traction floor (n >= 5) -> SENTINEL_MAX.
-			"M2-P2": { n: 5, D: 280, nPowB: "1.495" },
-			// D 2500 against a second place of 280 = 8.93x, well over kLane 3.
+			// ⚠ WAS `n: 5` when n counted REPLIES. Five replies, three people —
+			// so since RANK-3 R-2 it is 3, below floor_lane(n) = 5, and the
+			// Most Debated badge it used to carry is gone.
+			"M2-P2": { n: 3, D: 280, nPowB: "1.732" },
+			// Unaffected: D 2500 against a second place of 280 = 8.93x, over
+			// kLane 3. The stake lane counts nothing, so R-2 does not reach it.
 			"M2-P3": { n: 3, D: 2500, nPowB: "1.732" },
-			// SOLE clearer of the contestation floor (n^b >= 3) -> SENTINEL_MAX.
-			"M2-P4": { n: 4, D: 215, nPowB: "4.000" },
+			// ⚠ WAS `n: 4, nPowB: "4.000"` — four replies from three people. At
+			// n = 3 with a 1:2 split, n^b = 3^0.5 = 1.732 < 3, so Contested is
+			// gone too. All three posts now sit at n = 3, which is why exactly
+			// one badge fires and it is the one decided on stake.
+			"M2-P4": { n: 3, D: 215, nPowB: "1.732" },
 		});
 		// And the floors those values are measured against, so a tuning change
 		// that invalidates the calibration cannot pass silently.

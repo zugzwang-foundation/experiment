@@ -29,13 +29,44 @@ export type PostSubstrate = {
 	id: string;
 	/** The post's own frozen side (`side_at_post_time`) — support/counter basis. */
 	parentSide: Side;
-	/** Reply-bets on the post's own side. */
+	/**
+	 * Reply-bets on the post's own side, **by anyone other than the post's own
+	 * author**. Self-authored replies are excluded here and from the three
+	 * fields below (ADR-0039 patch record P2, RANK-2): a post attracting its own
+	 * author is not attracting anything, and attraction is what these measure.
+	 *
+	 * ⚠ **Counts do NOT decay and are not meant to.** Unlike the stake inputs,
+	 * these are `COUNT(...)` over Bucket-A rows — a count can never move, by any
+	 * mechanism including moderation. Making them decay would assert that an
+	 * argument someone made and later exited never got made, which R9 forbids.
+	 * The single-account capture that exploited that immovability was closed by
+	 * removing its other leg (the self-reply), not by decaying the count.
+	 */
 	supportCount: number;
-	/** Reply-bets on the opposing side. */
+	/** Reply-bets on the opposing side, self-authored excluded (see above). */
 	counterCount: number;
-	/** SUM of support-side reply-bet stakes — decimal string. */
+	/**
+	 * The DISPLAYED reply count on the post's own side — **every** reply,
+	 * self-authored and removed INCLUDED (ADR-0039 patch record P3, RANK-3).
+	 *
+	 * ⚠ **This is the only count that may reach a DTO or a screen.** It answers
+	 * *"how many replies are here"* and must match what a reader can count on the
+	 * surface. The ranking counts above must not be rendered anywhere, because
+	 * the difference between the two IS the self-reply count — and on a post with
+	 * a removed reply that arithmetic attributes the removal to a named
+	 * pseudonym, from a signed-out page.
+	 *
+	 * ⚠ This does NOT contradict RANK-1's one-field-two-consumers rule. There the
+	 * badge and the ruler measured the same thing, so splitting them would let one
+	 * lie. Here they measure different things — a display fact and a ranking
+	 * judgement. What must never split is a number and its own meaning.
+	 */
+	supportCountTotal: number;
+	/** The displayed reply count on the opposing side; see above. */
+	counterCountTotal: number;
+	/** SUM of support-side reply-bet SURVIVING BASIS, self-authored excluded. */
 	supportDharma: string;
-	/** SUM of counter-side reply-bet stakes — decimal string. */
+	/** SUM of counter-side reply-bet SURVIVING BASIS, self-authored excluded. */
 	counterDharma: string;
 	/** `comments.created_at`. */
 	createdAt: Date;

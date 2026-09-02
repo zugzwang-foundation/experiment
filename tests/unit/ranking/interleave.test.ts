@@ -32,6 +32,12 @@ function makePost(rank: number): PostSubstrate {
 		parentSide: "YES",
 		supportCount: 15,
 		counterCount: 15,
+		// RANK-3 — the DISPLAY totals (self- and removed-inclusive). In these fixtures
+		// every replier is a distinct person and nobody replies to their own post, so
+		// the displayed reply count and the distinct-people ranking count coincide. A
+		// case needing them to differ states both explicitly.
+		supportCountTotal: 15,
+		counterCountTotal: 15,
 		supportDharma: half,
 		counterDharma: half,
 		// createdAt monotonically NEWER as rank grows → R12 is the newest.

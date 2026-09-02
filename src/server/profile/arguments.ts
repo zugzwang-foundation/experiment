@@ -126,6 +126,8 @@ type PostAggRow = {
 	author_stake_original: string;
 	author_sold: boolean;
 	price_at_bet: string;
+	support_count_total: string | number;
+	counter_count_total: string | number;
 	support_count: string | number;
 	counter_count: string | number;
 	support_dharma: string;
@@ -181,11 +183,62 @@ export async function loadProfileArguments(
 			pb.original_stake AS author_stake_original,
 			pb.sold AS author_sold,
 			pb.price_at_bet AS price_at_bet,
-			COUNT(rb.id) FILTER (
+			-- ⚠ TWO DIFFERENT NUMBERS LIVE HERE AND THEY ARE NOT INTERCHANGEABLE
+			-- (ADR-0039 patch record P3, RANK-3).
+			--
+			-- *_count_total  = the DISPLAYED count. Every reply, self-authored and
+			--                  removed INCLUDED. It answers "how many replies are
+			--                  here" and must match what a reader can count on the
+			--                  surface. This is the only one that reaches a DTO.
+			-- *_count        = the RANKING input. DISTINCT PEOPLE, self-authored
+			--                  excluded. Never rendered anywhere, on any surface.
+			--
+			-- R-2: the lanes count PEOPLE, not replies. The thesis is K·n > C and n
+			-- is how many people hold the knowledge — one person posting five times
+			-- is n = 1. COUNT(rb.id) measured the wrong noun; this is a correction
+			-- to a definition, not a mitigation.
+			--
+			-- ⚠ THE SELF-EXCLUSION MOVED FROM THE JOIN INTO THESE FILTERS at RANK-3,
+			-- and it had to: a JOIN predicate removes the row, so the total could
+			-- not be computed from the same query. A FILTER keeps the row and
+			-- declines to count it, which preserves the property the JOIN form was
+			-- chosen for — a post whose only replies are its own still appears, with
+			-- its ranking counts at zero, rather than vanishing from the listing.
+			-- ⚠ THE DISPLAY TOTAL COUNTS REPLY COMMENTS, NOT REPLY-BET ROWS, and the
+			-- distinction is load-bearing rather than pedantic. R-1 only holds if
+			-- this number equals what a reader can COUNT on the surface, and the
+			-- surface is the reply lane, which is one row per reply COMMENT
+			-- (reply-substrate.ts takes its bet through a LIMIT 1 LATERAL). The
+			-- join below is a plain LEFT JOIN on bets.comment_id, which has an
+			-- index but NO unique constraint -- so COUNT(rb.id) would report 2 for
+			-- a comment carrying two bets while the lane still showed one row, and
+			-- the differential this task exists to close would silently re-open at
+			-- exactly the surfaces it was closed at. That a second bet is
+			-- unreachable today is a property of place.ts being the sole write
+			-- path, not of the schema; COUNT(DISTINCT rc.id) does not depend on it.
+			--
+			-- AND rb.id IS NOT NULL makes both forms agree with the lane on the
+			-- other edge too: the lane's LATERAL is an inner join, so a comment
+			-- with no bet at all is absent from it. Without this clause the people
+			-- count would score such a row as a whole person of traction at zero
+			-- stake, since rc.user_id is non-null whether or not a bet exists.
+			COUNT(DISTINCT rc.id) FILTER (
 				WHERE rc.side_at_post_time = p.side_at_post_time
-			) AS support_count,
-			COUNT(rb.id) FILTER (
+					AND rb.id IS NOT NULL
+			) AS support_count_total,
+			COUNT(DISTINCT rc.id) FILTER (
 				WHERE rc.side_at_post_time <> p.side_at_post_time
+					AND rb.id IS NOT NULL
+			) AS counter_count_total,
+			COUNT(DISTINCT rc.user_id) FILTER (
+				WHERE rc.side_at_post_time = p.side_at_post_time
+					AND rc.user_id <> p.user_id
+					AND rb.id IS NOT NULL
+			) AS support_count,
+			COUNT(DISTINCT rc.user_id) FILTER (
+				WHERE rc.side_at_post_time <> p.side_at_post_time
+					AND rc.user_id <> p.user_id
+					AND rb.id IS NOT NULL
 			) AS counter_count,
 			-- LOTS-1 / ADR-0039 R4+R5 — the attracted-value aggregates key off SURVIVING
 			-- LOT BASIS, not the frozen bets.stake. A replier who sells their lot
@@ -201,9 +254,11 @@ export async function loadProfileArguments(
 			-- is exactly the pre-LOTS-1 behaviour.
 			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (
 				WHERE rc.side_at_post_time = p.side_at_post_time
+					AND rc.user_id <> p.user_id
 			), 0) AS support_dharma,
 			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (
 				WHERE rc.side_at_post_time <> p.side_at_post_time
+					AND rc.user_id <> p.user_id
 			), 0) AS counter_dharma
 		FROM ${comments} p
 		JOIN LATERAL (
@@ -267,6 +322,8 @@ export async function loadProfileArguments(
 		parentSide: r.parent_side,
 		supportCount: Number(r.support_count),
 		counterCount: Number(r.counter_count),
+		supportCountTotal: Number(r.support_count_total),
+		counterCountTotal: Number(r.counter_count_total),
 		supportDharma: toFixed18(new CpmmDecimal(r.support_dharma)),
 		counterDharma: toFixed18(new CpmmDecimal(r.counter_dharma)),
 		createdAt: new Date(r.created_at),
@@ -410,8 +467,16 @@ export type MarketMeta = { id: string; slug: string; title: string };
 
 function aggregateOf(post: PostSubstrate): ProfileArgumentAggregate {
 	return {
-		supportCount: post.supportCount,
-		counterCount: post.counterCount,
+		// ⚠ THE DISPLAY TOTALS, NEVER THE RANKING COUNTS (ADR-0039 P3, RANK-3).
+		// The ranking counts are DISTINCT PEOPLE with self-authored replies
+		// excluded; these are every reply, self-authored and removed included.
+		// Putting the ranking numbers on a DTO is what created the SC-1
+		// differential: subtract the rendered aggregate from the rendered lane
+		// length and the remainder is the self-reply count — which, on a post
+		// carrying a removed reply, attributes that removal to a named pseudonym
+		// from a signed-out page.
+		supportCount: post.supportCountTotal,
+		counterCount: post.counterCountTotal,
 		supportDharma: post.supportDharma,
 		counterDharma: post.counterDharma,
 	};
