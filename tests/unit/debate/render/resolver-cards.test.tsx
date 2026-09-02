@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -17,6 +20,8 @@ import { captureException } from "@sentry/nextjs";
 import { ResolverCards } from "@/components/debate/ResolverCards";
 import { RESOLUTION_BLOCKS } from "@/components/debate/resolution-block-data";
 import type { DebateMarketHeader } from "@/components/debate/types";
+
+import { decodePng } from "../_png";
 
 /**
  * RESO-1 · R-7 / R-8 / R-12, reversed in part by BLOCK-1 — the resolution
@@ -924,5 +929,126 @@ describe("BLOCK-1 — no market's title/description/slug ever leaks into the row
 		expect(container.innerHTML).not.toContain(PRIMARY_MARKET.title);
 		expect(container.innerHTML).not.toContain(PRIMARY_MARKET.description);
 		expect(container.innerHTML).not.toContain(PRIMARY_MARKET.slug);
+	});
+});
+
+describe("BLOCK-5b · G-d — every block on every market renders a real glyph image", () => {
+	// ⚠⚠ WHAT jsdom CAN AND CANNOT PROVE, STATED PLAINLY. jsdom fetches nothing
+	// and decodes nothing, so `naturalWidth` here is 0 for every image no matter
+	// what — asserting it non-zero in this environment would be asserting a
+	// constant, and would keep passing over a `src` that 404s. So the guarantee
+	// is split: this file proves all 32 images render with the RIGHT `src`, and
+	// that each `src` resolves to a file on disk whose PNG header declares
+	// non-zero dimensions (decoded from the real shipped bytes); the browser's
+	// own decode is measured against the deployed build at close.
+	const slugs = Object.keys(
+		RESOLUTION_BLOCKS,
+	) as (keyof typeof RESOLUTION_BLOCKS)[];
+
+	it("finds EXACTLY 32 glyph images across the eight markets — 8 x 4", () => {
+		// ⛔⛔ THE POSITIVE CONTROL, AND IT COMES FIRST ON PURPOSE. Every assertion
+		// below iterates a NodeList; a selector that matched nothing would make all
+		// of them pass vacuously and report "0 broken" as success. The count is
+		// asserted before any property of any element is read, so "found nothing"
+		// can never be mistaken for "nothing wrong".
+		let total = 0;
+		for (const slug of slugs) {
+			const { container } = render(
+				<ResolverCards market={{ ...BASE, slug }} />,
+			);
+			total += container.querySelectorAll(
+				'[data-testid^="resolution-block-glyph-img-"]',
+			).length;
+			cleanup();
+		}
+		expect(slugs).toHaveLength(8);
+		expect(total).toBe(32);
+	});
+
+	it("gives every one of the 32 a src that resolves to a non-empty 512x512 PNG", () => {
+		const seen = new Set<string>();
+		let checked = 0;
+		for (const slug of slugs) {
+			const { container } = render(
+				<ResolverCards market={{ ...BASE, slug }} />,
+			);
+			const imgs = container.querySelectorAll<HTMLImageElement>(
+				'[data-testid^="resolution-block-glyph-img-"]',
+			);
+			expect(imgs).toHaveLength(4);
+			for (const img of imgs) {
+				const src = img.getAttribute("src") ?? "";
+				expect(src).toMatch(/^\/brand\/blocks\/[a-z0-9-]+\.png$/);
+				// Decorative: the value text beside it already names the thing.
+				expect(img.getAttribute("alt")).toBe("");
+				const png = decodePng(readFileSync(join(process.cwd(), "public", src)));
+				// The stand-in for `naturalWidth`: the referenced bytes really are an
+				// image, and really do have dimensions.
+				expect(png.width).toBe(512);
+				expect(png.height).toBe(512);
+				seen.add(src);
+				checked++;
+			}
+			cleanup();
+		}
+		expect(checked).toBe(32);
+		// 32 slots, 13 distinct assets — RESOLUTION/RESOLVER share, CLOSES is one
+		// for all eight, and five markets share `response-on-x`.
+		expect(seen.size).toBe(13);
+	});
+
+	it("puts the image INSIDE the aria-hidden span that carries bg-n1", () => {
+		// ⛔ THE COMPOSITING CONTRACT. The asset is transparent; the span's own
+		// `bg-n1` is the plate. If the image ever escapes that span, the mark
+		// renders on whatever happens to be behind the block.
+		const { container } = render(
+			<ResolverCards market={{ ...BASE, slug: "bitcoin-price-50k" }} />,
+		);
+		for (const key of ["resolution", "resolver", "closes", "flavour"]) {
+			const span = container.querySelector(
+				`[data-testid="resolution-block-glyph-${key}"]`,
+			);
+			expect(span).not.toBeNull();
+			expect(span?.getAttribute("aria-hidden")).toBe("true");
+			expect(span?.className).toContain("bg-n1");
+			expect(span?.className).toContain("overflow-hidden");
+			expect(
+				span?.querySelector(
+					`[data-testid="resolution-block-glyph-img-${key}"]`,
+				),
+			).not.toBeNull();
+		}
+	});
+
+	it("renders RESOLUTION and RESOLVER from the same asset, per market", () => {
+		for (const slug of slugs) {
+			const { container } = render(
+				<ResolverCards market={{ ...BASE, slug }} />,
+			);
+			const res = container
+				.querySelector('[data-testid="resolution-block-glyph-img-resolution"]')
+				?.getAttribute("src");
+			const rsv = container
+				.querySelector('[data-testid="resolution-block-glyph-img-resolver"]')
+				?.getAttribute("src");
+			expect(res).toBeTruthy();
+			expect(res).toBe(rsv);
+			cleanup();
+		}
+	});
+
+	it("renders NO glyph image for an unknown slug — the whole row degrades", () => {
+		// The row returns null before any block renders, so there is no
+		// half-rendered state with chrome but no glyph.
+		vi.mocked(captureException).mockClear();
+		const { container } = render(
+			<ResolverCards market={{ ...BASE, slug: "not-one-of-the-eight" }} />,
+		);
+		expect(
+			container.querySelectorAll(
+				'[data-testid^="resolution-block-glyph-img-"]',
+			),
+		).toHaveLength(0);
+		expect(captureException).toHaveBeenCalledTimes(1);
 	});
 });

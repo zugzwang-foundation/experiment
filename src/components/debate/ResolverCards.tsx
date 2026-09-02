@@ -4,6 +4,7 @@ import {
 	getResolutionBlocks,
 	type ResolutionBlockEntry,
 } from "./resolution-block-data";
+import { getResolutionBlockGlyphs } from "./resolution-block-glyphs";
 import type { DebateMarketHeader } from "./types";
 
 /**
@@ -107,9 +108,16 @@ export function ResolverCards({
 	// operator, never a silent regression to the empty bar RF-1 removed) and
 	// render nothing for this market's resolution row — the rest of the page,
 	// including the market's own bet/comment surface, stays fully functional.
+	// ⚠ BLOCK-5b — THE GLYPH LOOKUP RIDES THE SAME `try`, ON PURPOSE. It mirrors
+	// `getResolutionBlocks`' contract (throws for a slug outside the eight), so
+	// the degradation above covers both without a second failure mode, and the
+	// error the participant's Sentry event carries is still the FIRST thing that
+	// went wrong rather than a downstream symptom of it.
 	let blockData: ReturnType<typeof getResolutionBlocks> | null = null;
+	let glyphs: ReturnType<typeof getResolutionBlockGlyphs> | null = null;
 	try {
 		blockData = getResolutionBlocks(market.slug);
+		glyphs = getResolutionBlockGlyphs(market.slug, blockData.flavour.line1);
 	} catch (error) {
 		captureException(error);
 		return null;
@@ -192,6 +200,7 @@ export function ResolverCards({
 					blockKey={b.key}
 					label={b.label}
 					entry={blockData[b.key]}
+					glyph={glyphs[b.key]}
 				/>
 			))}
 		</div>
@@ -334,6 +343,7 @@ function ResolutionBlock({
 	blockKey,
 	label,
 	entry,
+	glyph,
 }: {
 	/** ⚠ THE FIXTURE'S OWN KEY UNION, not `string`. The guards query these blocks
 	 * by `data-testid="resolution-block-<key>"`, so a typo here would silently
@@ -343,6 +353,13 @@ function ResolutionBlock({
 	label: string;
 	/** BLOCK-1 — this block's resolved line1/line2/href from the per-slug map. */
 	entry: ResolutionBlockEntry;
+	/** BLOCK-5b — this block's glyph asset path, already resolved against
+	 * `/brand/blocks` by `getResolutionBlockGlyphs`. Required, never optional:
+	 * an optional path would let a missing map entry render the empty span
+	 * again, which is exactly the state this task replaces and which nobody
+	 * would notice had come back (CLAUDE.md §8 O-1 — structural beats
+	 * procedural). */
+	glyph: string;
 }) {
 	const content = (
 		<>
@@ -384,8 +401,49 @@ function ResolutionBlock({
 			<span
 				aria-hidden="true"
 				data-testid={`resolution-block-glyph-${blockKey}`}
-				className="hidden aspect-square w-[36px] shrink-0 rounded-[var(--imgr)] bg-n1 [border:var(--hairline)] sm:block"
-			/>
+				className="hidden aspect-square w-[36px] shrink-0 overflow-hidden rounded-[var(--imgr)] bg-n1 [border:var(--hairline)] sm:block"
+			>
+				{/* ⛔⛔ BLOCK-5b — `bg-n1` ON THE SPAN ABOVE IS NOW LOAD-BEARING, NOT A
+				    FALLBACK. The asset is a TRANSPARENT png — flat `#FAFAFA` ink carried
+				    entirely by an alpha channel — so the span's own background IS the
+				    plate the mark composites onto. Delete `bg-n1` and the mark renders on
+				    whatever happens to sit behind the block. The sources shipped with a
+				    baked plate instead, measured per file at `#232323`–`#2E2E2E` against
+				    the `#2A2A2A` this span paints, and eight of the thirteen read as a
+				    visible square inside the block's own frame; keying the plate out is
+				    what dissolved that rather than papering over it, and it is why there
+				    is no second copy of the colour left to drift.
+				    ⚠⚠ `overflow-hidden` IS THE RADIUS FIX AND IT IS ON THE SPAN, NOT THE
+				    IMAGE. The span is `rounded-[var(--imgr)]` (6px) and `border-box` with
+				    a 1px hairline, so its padding box is 34x34 with a 5px inner radius. A
+				    square-cornered child would poke through all four corners. Clipping at
+				    the parent is correct where a matching `rounded-` on the child is only
+				    approximately correct: the child would need `calc(6px - 1px)` to agree,
+				    and would silently disagree again the moment the border or `--imgr`
+				    moves. Verified against the paint, not the class list.
+				    ⚠ `object-contain`, not `cover`. Asset and box are both square today so
+				    the two are identical — `contain` is chosen for the case where they
+				    are not, because cropping a MARK loses meaning while letterboxing it
+				    only loses size.
+				    ⚠ DECORATIVE TWICE OVER, DELIBERATELY. `aria-hidden` stays on the span
+				    (BLOCK-1 put it there so the glyph contributes nothing to the RESOLVER
+				    anchor's accessible name, which reads "Resolver @mybmc" off the label
+				    and value beside it) AND the image carries `alt=""`. The span's
+				    attribute is what actually removes it from the tree today; `alt=""` is
+				    the per-element declaration that keeps it decorative if the span's ever
+				    goes. Neither is redundant with the other — one is a subtree removal,
+				    the other is this element's own contract.
+				    ⚠ `hidden sm:block` on the span is UNTOUCHED, so nothing here renders
+				    below 640px — the image is inside a `display:none` parent and is never
+				    laid out or fetched. Desktop only, as before. */}
+				{/* biome-ignore lint/performance/noImgElement: a build-time-constant 512px static glyph rendered at 36px — it must stay crisp at 3x DPR (108px), which the optimizer's fixed-size 1x/2x srcset would not deliver, and per-request optimization buys nothing for an immutable asset already sized and losslessly compressed at build time. */}
+				<img
+					src={glyph}
+					alt=""
+					data-testid={`resolution-block-glyph-img-${blockKey}`}
+					className="h-full w-full object-contain"
+				/>
+			</span>
 			{/* The right-hand stack, centred as a GROUP against the square rather than
 			    each line centring itself.
 			    ⚠ `min-w-0` IS LOAD-BEARING: without it this flex item's automatic
