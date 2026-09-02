@@ -1,0 +1,18 @@
+# Cloudflare Worker config for the stub moderation endpoint used ONLY by
+# write-path load testing. See stub-moderation-worker.js's own docblock and
+# docs/runbooks/loadtest-moderation-stub.md before deploying or using this.
+#
+# Deploy from this directory: `wrangler deploy`
+# Set the shared secret once, out of band (never committed):
+#   wrangler secret put LOADTEST_AUTH_TOKEN
+#
+# No KV/Durable Object bindings — request visibility comes from Cloudflare's
+# own built-in Worker logs/analytics (`wrangler tail`, or the dashboard),
+# not custom counting.
+
+name = "zugzwang-loadtest-stub-moderation"
+main = "stub-moderation-worker.js"
+compatibility_date = "2026-08-01"
+
+# LOADTEST_AUTH_TOKEN is a SECRET, set via `wrangler secret put`, never here
+# and never in this repo.

@@ -9,6 +9,7 @@ import { resolvePostParam } from "@/server/debate-view/resolve-post-param";
 import { loadViewerMarketContext } from "@/server/debate-view/viewer-context";
 import { withLiveTail } from "@/server/discovery/price-series";
 import { getMarketBySlug } from "@/server/markets/get-by-slug";
+import { recordCacheAttempt } from "@/server/observability/cache-metrics";
 
 /**
  * F-DEBATE-4 — the route's dynamism, stated explicitly. Originally
@@ -90,6 +91,9 @@ export default async function MarketPage({
 	// `admin/moderation/act.ts`. ⛔ The `.md` export route still calls
 	// `loadDebateView` DIRECTLY and uncached — ADR-0025 forbids caching it. See
 	// `cached-view.ts` for why that boundary is a separate file.
+	// RELAY C2 — fires on every attempt (hit or miss); paired with the
+	// miss-only counter inside getCachedDebateView itself.
+	await recordCacheAttempt("debate-view", market.id);
 	const cachedModel = await getCachedDebateView(
 		market,
 		priced?.reserves ?? null,

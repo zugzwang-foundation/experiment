@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { markets } from "@/db/schema";
 import { assertAdminActor } from "@/server/admin/actor";
 import { insertEvent } from "@/server/events/insert";
+import { recordInvalidation } from "@/server/observability/cache-metrics";
 
 import {
 	MarketDeadlineNotReachedError,
@@ -105,6 +106,8 @@ export async function closeMarket(args: {
 	// `closeDueMarkets` directly from a Route Handler — `updateTag` throws
 	// outside a Server Action, so the call site must work from any caller.
 	revalidateTag("discovery", { expire: 0 });
+	// RELAY C2 — timestamp only, same reasoning as openMarket's call.
+	await recordInvalidation("discovery");
 
 	return result;
 }

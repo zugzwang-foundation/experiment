@@ -6,7 +6,7 @@
 | **Date** | 2026-08-19 |
 | **Supersedes** | — (scopes ADR-0006 §Cost and §Sizing; see below) |
 | **Superseded-by** | — |
-| **Patch records** | P1 |
+| **Patch records** | P1, P2 |
 
 ## Patch record
 
@@ -163,6 +163,42 @@ and this warns that a *participant's bet* will look slow rather than broken. **A
 a failure mode the bet path previously had**, so no existing halt condition, alarm, or
 runbook names it. S-1's plan §6 criterion-4 halt condition is extended to name it; the
 standing operational gap is S-5's to close.
+
+### P2 — Founder revision, 2,000,000 → 2–5,000,000 page loads (Day-1 pack A-1, 2026-08-30)
+
+In-place Patch record per CLAUDE.md §5.12 (consumer-surface scoping, **not** supersession).
+**The decision body above still says 2,000,000** and is left exactly as it reads — this record
+exists because a ratified number moved and the ADR did not, and the gap between the two needs
+one paragraph, not a rewrite that would erase what was actually decided on 2026-08-19.
+
+The founder's stated goal, as of the `ZUGZWANG_DAY-1-EXECUTION-PACK_v1_0.md` kickoff
+(2026-08-30), is now **2–5,000,000 page loads** — a range, not a single figure, and open at
+the top end pending the load programme's own findings.
+
+⚠ **The concurrency premise this ADR's load model is built on is UNCHANGED and still
+governs.** Decision §Context (below) derives its design target from *concurrency*, not from
+cumulative volume — `5,000,000 loads ÷ 52 days ÷ 86,400 s ≈ 1.11 req/s mean × a 50× peak
+factor ≈ 56 req/s`, still an order of magnitude under the **≤5,000 concurrent** ceiling
+ADR-0006 sizes against and this ADR's decision 1 leaves untouched. Every stage, ramp,
+threshold and abort the load programme runs against is therefore unaffected by this revision —
+nothing here reopens decision 1, 2 or 3, and nothing here authorises re-planning the load runs.
+
+**What the revision does move: four vendor ceilings, none of which are code.** Upstash command
+volume (the visits-counter `INCR` this ADR's Consequences section already names, plus the
+`GET`-per-render bill, which is now **≥5,000,000 commands**, not ≥2,000,000), Sentry/PostHog
+event quota (**2.5×** the figure this ADR sized for), Vercel invocations + bandwidth
+(**2.5×**), and the cost model in ADR-0006's superseded §Cost cells (re-derivation owed, not
+done here). All four are plan-tier questions — reversible in one dashboard action, per this
+ADR's own decision 3 authorisation shape — not architectural, and not authorised by this patch
+record; they are named so a load run does not discover them late.
+
+⚠ **Open, not decided here:** whether the 2–5M figure means (i) real bot-filtered **visits**
+(what `/api/visits` increments) or (ii) every server **render** including each 15-second poll
+tick — the two differ by roughly the render multiplier per session, and the vendors bill the
+larger one. The Day-1 pack recommends defining the target as (i) and having the load
+programme's own poll-cost measurement produce the render multiplier empirically, rather than
+guessing it — consistent with this ADR's decision 2 (*"sizing decided from measurement, never
+estimate"*). Unresolved pending that measurement; not a blocker to starting the load programme.
 
 ## Context
 

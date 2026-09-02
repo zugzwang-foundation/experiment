@@ -7,6 +7,7 @@ import { v7 as uuidv7 } from "uuid";
 import { markets, pools } from "@/db/schema";
 import { assertAdminActor } from "@/server/admin/actor";
 import { insertEvent } from "@/server/events/insert";
+import { recordInvalidation } from "@/server/observability/cache-metrics";
 
 import { MarketDeadlineInPastError, MarketSeedInvalidError } from "./errors";
 import {
@@ -143,6 +144,10 @@ export async function openMarket(args: {
 	// know that, and `updateTag` throws outside a Server Action. Matching
 	// `closeMarket`'s form rather than relying on today's one caller.
 	revalidateTag("discovery", { expire: 0 });
+	// RELAY C2 — timestamp only, joined at analysis time against the next
+	// miss-counter increment for the "discovery" tag to derive invalidation
+	// latency (CM-10). Never blocks, never throws (see recordInvalidation).
+	await recordInvalidation("discovery");
 
 	return result;
 }

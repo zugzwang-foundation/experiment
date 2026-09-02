@@ -104,11 +104,21 @@ export interface ParticipantFixture {
  * by `created_at`, so this order fixes which pseudonym each role receives —
  * which is what makes `/u/<pseudonym>` stable across rebuilds (Q4).
  *
- * ⚠ THE THREE CAPTURED IDENTITIES. Index 0 is the operator's primary account
- * and takes P-owner (the owner arm of Profile and positions). The
- * two others take P-visitor-target and P-empty — the roles an operator most
- * wants to be able to SIGN IN AS during inspection: one well-populated profile
- * and one showing every empty state at once. Class-1 decision, Slice B.
+ * ⚠ THE THREE CAPTURED IDENTITIES, ORIGINALLY. Index 0 is the operator's
+ * primary account and takes P-owner (the owner arm of Profile and
+ * positions). The two others took P-visitor-target and P-empty — the roles
+ * an operator most wants to be able to SIGN IN AS during inspection: one
+ * well-populated profile and one showing every empty state at once.
+ * Class-1 decision, Slice B.
+ *
+ * ⚠ LOCAL, UNCOMMITTED OVERRIDE (backend load-testing session, 2026-09-01):
+ * only one real Google account was available to capture, so
+ * P-visitor-target and P-empty are dropped to `null` here and fall back to
+ * synthetic emails like the other seven roles. They keep their fixture
+ * content (posts/positions/empty-state behavior) — the only thing lost is
+ * the ability to sign into staging AS those two roles with a real account.
+ * Revert this hunk before committing if the two-account capture is ever
+ * done for real.
  */
 export const PARTICIPANTS: readonly ParticipantFixture[] = [
 	{
@@ -120,7 +130,7 @@ export const PARTICIPANTS: readonly ParticipantFixture[] = [
 	},
 	{
 		role: "P-visitor-target",
-		capturedIdentityIndex: 1,
+		capturedIdentityIndex: null,
 		syntheticEmailLocal: "p-visitor-target",
 		displayName: "Staging Fixture Visitor Target",
 		serves:
@@ -128,7 +138,7 @@ export const PARTICIPANTS: readonly ParticipantFixture[] = [
 	},
 	{
 		role: "P-empty",
-		capturedIdentityIndex: 2,
+		capturedIdentityIndex: null,
 		syntheticEmailLocal: "p-empty",
 		displayName: "Staging Fixture Empty",
 		serves:
