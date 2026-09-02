@@ -9,9 +9,70 @@ import type { ProfileUser } from "@/server/profile/resolve";
 import { ArgumentList } from "./ArgumentList";
 import { initialProfileSelection, type ProfileSelection } from "./selection";
 
+/**
+ * ⚠ THE `loading` IS WHAT CREATES THE SUSPENSE BOUNDARY, and its absence was a
+ * defect rather than a default. Next resolves
+ * `hasSuspenseBoundary = !opts.ssr || !!opts.loading`
+ * (`next/dist/shared/lib/lazy-dynamic/loadable.js`), so `ssr: true` with no
+ * `loading` — the shape this file shipped with — yields a Fragment and NO local
+ * boundary. The suspension then escaped to the route segment, so a client-side
+ * navigation showed the WHOLE-PAGE skeleton until this one chunk arrived, and
+ * every sibling waited on a chunk none of them needed.
+ *
+ * ⛔ WHY THE FALLBACK IS WRITTEN OUT HERE INSTEAD OF IMPORTED. The real shell is
+ * `PositionsPanel`, which lives INSIDE `PositionsTable.tsx`. Importing it would
+ * pull that entire module back into the initial chunk and undo the split this
+ * boundary exists to make safe. The class strings below are therefore a
+ * deliberate third copy. ⚠ The ROOT BOX and BODY strings are byte-identical
+ * across `PositionsTable`, `ArgumentList` and here; the HEADER is NOT —
+ * `PositionsPanel` carries `relative` and `ArgumentsPanel` does not, so those
+ * two already disagree and both files claim byte-identity they do not have.
+ * This copy follows `PositionsPanel`, the panel it stands in for. Extracting the
+ * shell to its own module would collapse all three and end the drift; it reaches
+ * `ArgumentList`, which this task was not scoped to touch.
+ *
+ * ⚠ IT RESERVES NO PIXEL HEIGHT, BECAUSE THERE IS NONE TO RESERVE. The height
+ * chain runs viewport-downward — `<main>` `min-h-[calc(100vh-60px-2px)]` → the
+ * arena band `flex-1 min-h-0` → both panels `min-h-0` → both bodies `flex-1
+ * min-h-0 overflow-y-auto`. A panel never sizes to its rows; the body scrolls
+ * inside whatever the band gives it. The only height literal in the panel is the
+ * header band's `min-h-[52px]`, carried below so the chrome does not jump when
+ * the real panel arrives.
+ *
+ * What actually broke without this was NOT a collapsed height. `ProfileArena`
+ * returns a fragment, so both panels are direct children of the page's
+ * `grid ... lg:grid-cols-2`; a fallback rendering nothing leaves the grid with
+ * ONE child, and `ArgumentList` moves into column one. The fallback's job is to
+ * occupy the cell.
+ *
+ * The body is deliberately empty rather than skeleton rows. P7 requires a
+ * placeholder's COUNT to come from the host surface's own constant, never a
+ * literal — and this panel has no such constant, so there is nothing to derive
+ * rows from. (P7 does ask placeholders to be content-SHAPED; it is the count,
+ * not the shaping, that rules them out here. An earlier draft of this comment
+ * cited P7 for the opposite and was wrong.) The head carries its real overline
+ * so the chrome is stable; only the rows are absent.
+ */
 const PositionsTable = dynamic(
 	() => import("./PositionsTable").then((mod) => mod.PositionsTable),
-	{ ssr: true },
+	{
+		ssr: true,
+		loading: () => (
+			<section
+				aria-busy="true"
+				aria-label="Positions"
+				data-testid="positions-panel-loading"
+				className="flex min-h-0 flex-col overflow-hidden rounded-[var(--r)] bg-n0 [border:var(--hairline)]"
+			>
+				<div className="relative flex min-h-[52px] flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]">
+					<span className="text-[11px] leading-[1.2] font-extrabold tracking-[0.12em] text-ink uppercase">
+						Positions
+					</span>
+				</div>
+				<div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3" />
+			</section>
+		),
+	},
 );
 
 /**
