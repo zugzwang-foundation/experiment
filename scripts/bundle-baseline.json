@@ -1,10 +1,10 @@
 {
-	"measuredAt": "2026-09-02T09:28:46.506Z",
+	"measuredAt": "2026-09-02T14:53:10.197Z",
 	"sharedChunkCount": 9,
 	"sharedRawBytes": 993244,
-	"sharedGzipBytes": 311253,
+	"sharedGzipBytes": 311254,
 	"largestSharedChunkRawBytes": 421514,
-	"nextStaticTotalRawBytes": 1783920,
+	"nextStaticTotalRawBytes": 1784386,
 	"routes": [
 		{
 			"route": "/",
@@ -58,9 +58,9 @@
 			"route": "/admin/markets/[marketId]",
 			"chunkCount": 4,
 			"totalRawBytes": 35156,
-			"totalGzipBytes": 12265,
+			"totalGzipBytes": 12262,
 			"ownRawBytes": 35156,
-			"ownGzipBytes": 12265
+			"ownGzipBytes": 12262
 		},
 		{
 			"route": "/admin/markets/media/sign",
@@ -74,17 +74,17 @@
 			"route": "/admin/markets/new",
 			"chunkCount": 4,
 			"totalRawBytes": 29762,
-			"totalGzipBytes": 10437,
+			"totalGzipBytes": 10440,
 			"ownRawBytes": 29762,
-			"ownGzipBytes": 10437
+			"ownGzipBytes": 10440
 		},
 		{
 			"route": "/admin/moderation",
 			"chunkCount": 5,
 			"totalRawBytes": 68341,
-			"totalGzipBytes": 25531,
+			"totalGzipBytes": 25533,
 			"ownRawBytes": 68341,
-			"ownGzipBytes": 25531
+			"ownGzipBytes": 25533
 		},
 		{
 			"route": "/admin/moderation/audit",
@@ -225,10 +225,10 @@
 		{
 			"route": "/u/[pseudonym]",
 			"chunkCount": 11,
-			"totalRawBytes": 223647,
-			"totalGzipBytes": 77358,
-			"ownRawBytes": 223647,
-			"ownGzipBytes": 77358
+			"totalRawBytes": 224086,
+			"totalGzipBytes": 77405,
+			"ownRawBytes": 224086,
+			"ownGzipBytes": 77405
 		}
 	]
 }
