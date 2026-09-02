@@ -124,20 +124,47 @@ function findClientReferenceManifests(dir: string): string[] {
 
 /**
  * One `..._client-reference-manifest.js` file assigns
- * `globalThis.__RSC_MANIFEST["<route key>"] = {clientModules: {...}}`. The route
- * key is read verbatim from that assignment — never derived from the file's own
- * path — because Next already wrote it correctly and a path-based re-derivation
- * would just be a second, redundant place for the Windows separator bug to hide.
+ * `globalThis.__RSC_MANIFEST["<route key>"] = {...}`. The route key is read
+ * verbatim from that assignment — never derived from the file's own path —
+ * because Next already wrote it correctly and a path-based re-derivation would
+ * just be a second, redundant place for the Windows separator bug to hide.
  *
- * ⚠ ASSUMES THE SINGLE-OBJECT-LITERAL FORM, NOT THE INCREMENTAL ONE. Next's own
- * reader for this same file format (`next/dist/cli/internal/static-routes-info.js`)
- * documents that Turbopack rewrites this into `clientModules[k] = val;` assigned
- * key-by-key in a trailing `for` loop when a Vercel `deploymentId` is set — a shape
- * this regex was never written to parse. Confirmed: a plain local/CI build (no
- * `deploymentId`) writes the single-literal form below; the incremental form has
- * NOT been reproduced here. docs/parked.md T4-1. If this ever throws on a `.next`
- * directory pulled from an actual Vercel deployment, that mismatch is why — do not
- * "fix" it by loosening the regex without reading that file's docblock first.
+ * ⛔ DEFECT 1, CORRECTED HERE: THIS READ THE WEBPACK FALLBACK ON A TURBOPACK
+ * BUILD, AND SILENTLY UNDER-COUNTED EVERY ROUTE.
+ *
+ * Next's own reader for this same file (`next/dist/cli/internal/
+ * static-routes-info.js`, `collectAppClientFiles`) documents the source
+ * priority explicitly: `entryJSFiles` is the Turbopack field and comes FIRST —
+ * "explicit list of all JS files needed for the entry's segments" — and
+ * `clientModules[*].chunks` is the fallback for "webpack: no entryJSFiles".
+ * This function read only the fallback.
+ *
+ * Measured on a live build before the fix: all 28 manifests carried
+ * `entryJSFiles`; ten routes were each missing exactly one chunk,
+ * `static/chunks/1brctutd14125.js`, 4,600 B; and `entryJSFiles` was a strict
+ * superset — `clientModules` contributed nothing it lacked. So every absolute
+ * per-route number this instrument produced before this commit was 4,600 B low.
+ *
+ * ⚠ DELTAS WERE NEVER WRONG, and that distinction is why the error survived so
+ * long. Both sides of any A/B under-counted by the same chunk, so T5's
+ * −22,879 B stands and every before/after comparison made with this script
+ * remains valid. Only the absolute figures moved.
+ *
+ * The `.js` filter is Next's too, and it is not cosmetic: under webpack the
+ * `chunks` array interleaves chunk IDs with file names, and an ID has no
+ * extension. Filtering by extension is what makes the fallback branch safe to
+ * take if this repo ever moves off Turbopack.
+ *
+ * ⚠ ASSUMES THE SINGLE-OBJECT-LITERAL FORM, NOT THE INCREMENTAL ONE. Next
+ * rewrites this into `clientModules[k] = val;` assigned key-by-key in a
+ * trailing `for` loop when a Vercel `deploymentId` is set — a shape this regex
+ * was never written to parse. Confirmed: a plain local/CI build (no
+ * `deploymentId`) writes the single-literal form below; the incremental form
+ * has NOT been reproduced here. It fails LOUDLY — the `$`-anchored capture
+ * cannot match, so `JSON.parse` throws — which is the safe direction.
+ * docs/parked.md T4-1. If this ever throws on a `.next` pulled from an actual
+ * Vercel deployment, that mismatch is why; do not "fix" it by loosening the
+ * regex without reading that file's docblock first.
  */
 function parseClientReferenceManifest(path: string): {
 	routeKey: string;
@@ -152,16 +179,29 @@ function parseClientReferenceManifest(path: string): {
 	}
 	const routeKey = match[1];
 	const manifest = JSON.parse(match[2]) as {
+		entryJSFiles?: Record<string, string[]>;
 		clientModules?: Record<string, { chunks?: string[] }>;
 	};
+
 	const chunks = new Set<string>();
-	for (const mod of Object.values(manifest.clientModules ?? {})) {
-		for (const raw of mod.chunks ?? []) {
-			// Manifest chunk paths are "/_next/static/chunks/x.js"; build-manifest's
-			// shared-file paths are "static/chunks/x.js" — same file, different
-			// prefix. Normalizing here is what lets the two sets be compared by
-			// simple `Set` membership below.
-			chunks.add(raw.replace(/^\/?_next\//, ""));
+	// Manifest chunk paths appear as "/_next/static/chunks/x.js" in
+	// `clientModules` and as "static/chunks/x.js" in `entryJSFiles` —
+	// same file, different prefix. Normalizing here is what lets the two sets be
+	// compared against build-manifest's shared files by simple `Set` membership.
+	const add = (raw: string) => {
+		if (!raw.endsWith(".js")) return;
+		chunks.add(raw.replace(/^\/?_next\//, ""));
+	};
+
+	if (manifest.entryJSFiles) {
+		for (const files of Object.values(manifest.entryJSFiles)) {
+			for (const raw of files) add(raw);
+		}
+	} else {
+		for (const mod of Object.values(manifest.clientModules ?? {})) {
+			for (const raw of mod.chunks ?? []) {
+				if (typeof raw === "string") add(raw);
+			}
 		}
 	}
 	return { routeKey, chunks };

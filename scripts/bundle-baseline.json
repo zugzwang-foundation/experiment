@@ -1,18 +1,18 @@
 {
-	"measuredAt": "2026-09-01T12:47:46.372Z",
+	"measuredAt": "2026-09-02T09:28:46.506Z",
 	"sharedChunkCount": 9,
 	"sharedRawBytes": 993244,
-	"sharedGzipBytes": 311255,
+	"sharedGzipBytes": 311253,
 	"largestSharedChunkRawBytes": 421514,
-	"nextStaticTotalRawBytes": 1781415,
+	"nextStaticTotalRawBytes": 1783920,
 	"routes": [
 		{
 			"route": "/",
-			"chunkCount": 8,
-			"totalRawBytes": 222076,
-			"totalGzipBytes": 76914,
-			"ownRawBytes": 222076,
-			"ownGzipBytes": 76914
+			"chunkCount": 9,
+			"totalRawBytes": 227237,
+			"totalGzipBytes": 79303,
+			"ownRawBytes": 227237,
+			"ownGzipBytes": 79303
 		},
 		{
 			"route": "/_global-error",
@@ -48,19 +48,19 @@
 		},
 		{
 			"route": "/admin/markets",
-			"chunkCount": 3,
-			"totalRawBytes": 26393,
-			"totalGzipBytes": 8779,
-			"ownRawBytes": 26393,
-			"ownGzipBytes": 8779
+			"chunkCount": 4,
+			"totalRawBytes": 30993,
+			"totalGzipBytes": 10840,
+			"ownRawBytes": 30993,
+			"ownGzipBytes": 10840
 		},
 		{
 			"route": "/admin/markets/[marketId]",
-			"chunkCount": 3,
-			"totalRawBytes": 30556,
-			"totalGzipBytes": 10203,
-			"ownRawBytes": 30556,
-			"ownGzipBytes": 10203
+			"chunkCount": 4,
+			"totalRawBytes": 35156,
+			"totalGzipBytes": 12265,
+			"ownRawBytes": 35156,
+			"ownGzipBytes": 12265
 		},
 		{
 			"route": "/admin/markets/media/sign",
@@ -74,17 +74,17 @@
 			"route": "/admin/markets/new",
 			"chunkCount": 4,
 			"totalRawBytes": 29762,
-			"totalGzipBytes": 10439,
+			"totalGzipBytes": 10437,
 			"ownRawBytes": 29762,
-			"ownGzipBytes": 10439
+			"ownGzipBytes": 10437
 		},
 		{
 			"route": "/admin/moderation",
-			"chunkCount": 4,
-			"totalRawBytes": 63741,
-			"totalGzipBytes": 23467,
-			"ownRawBytes": 63741,
-			"ownGzipBytes": 23467
+			"chunkCount": 5,
+			"totalRawBytes": 68341,
+			"totalGzipBytes": 25531,
+			"ownRawBytes": 68341,
+			"ownGzipBytes": 25531
 		},
 		{
 			"route": "/admin/moderation/audit",
@@ -168,19 +168,19 @@
 		},
 		{
 			"route": "/legal",
-			"chunkCount": 5,
-			"totalRawBytes": 155777,
-			"totalGzipBytes": 51864,
-			"ownRawBytes": 155777,
-			"ownGzipBytes": 51864
+			"chunkCount": 6,
+			"totalRawBytes": 160377,
+			"totalGzipBytes": 53925,
+			"ownRawBytes": 160377,
+			"ownGzipBytes": 53925
 		},
 		{
 			"route": "/m/[slug]",
-			"chunkCount": 10,
-			"totalRawBytes": 291957,
-			"totalGzipBytes": 95690,
-			"ownRawBytes": 291957,
-			"ownGzipBytes": 95690
+			"chunkCount": 11,
+			"totalRawBytes": 298355,
+			"totalGzipBytes": 98354,
+			"ownRawBytes": 298355,
+			"ownGzipBytes": 98354
 		},
 		{
 			"route": "/m/[slug]/export",
@@ -200,35 +200,35 @@
 		},
 		{
 			"route": "/onboarding",
-			"chunkCount": 8,
-			"totalRawBytes": 220315,
-			"totalGzipBytes": 71177,
-			"ownRawBytes": 220315,
-			"ownGzipBytes": 71177
+			"chunkCount": 9,
+			"totalRawBytes": 224915,
+			"totalGzipBytes": 73238,
+			"ownRawBytes": 224915,
+			"ownGzipBytes": 73238
 		},
 		{
 			"route": "/sign-in",
-			"chunkCount": 9,
-			"totalRawBytes": 245173,
-			"totalGzipBytes": 79943,
-			"ownRawBytes": 245173,
-			"ownGzipBytes": 79943
+			"chunkCount": 10,
+			"totalRawBytes": 249773,
+			"totalGzipBytes": 82004,
+			"ownRawBytes": 249773,
+			"ownGzipBytes": 82004
 		},
 		{
 			"route": "/sign-in/otp",
-			"chunkCount": 9,
-			"totalRawBytes": 245188,
-			"totalGzipBytes": 80028,
-			"ownRawBytes": 245188,
-			"ownGzipBytes": 80028
+			"chunkCount": 10,
+			"totalRawBytes": 249788,
+			"totalGzipBytes": 82089,
+			"ownRawBytes": 249788,
+			"ownGzipBytes": 82089
 		},
 		{
 			"route": "/u/[pseudonym]",
-			"chunkCount": 10,
-			"totalRawBytes": 219047,
-			"totalGzipBytes": 75296,
-			"ownRawBytes": 219047,
-			"ownGzipBytes": 75296
+			"chunkCount": 11,
+			"totalRawBytes": 223647,
+			"totalGzipBytes": 77358,
+			"ownRawBytes": 223647,
+			"ownGzipBytes": 77358
 		}
 	]
 }
