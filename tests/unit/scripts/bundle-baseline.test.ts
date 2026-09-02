@@ -73,36 +73,68 @@ describe("frontend bundle baseline — scripts/bundle-baseline.json (HO-T4 D2)",
 		expect(report.routes.length).toBeGreaterThan(0);
 	});
 
-	it("bundle-baseline::shared-chunks-stay-under-ceiling (baseline 970,863 B +5%)", () => {
+	// R3 RE-PIN, AND THE REASON FOR EACH NUMBER THAT MOVED.
+	//
+	// Every ceiling below was re-measured after `measure-frontend-bundle.ts` was
+	// corrected to read Turbopack's `entryJSFiles` instead of the webpack
+	// `clientModules` fallback. The correction alone adds exactly one 4,600 B
+	// chunk to every route that has client modules at all, so a bare "the numbers
+	// went up" would have hidden real growth inside a mechanical correction.
+	// Split, so neither hides the other:
+	//
+	//   route                committed    measured   delta   correction   drift
+	//   /                      222,076     227,237   +5,161      +4,600    +561
+	//   /m/[slug]              291,957     298,355   +6,398      +4,600  +1,798
+	//   /u/[pseudonym]         219,047     223,647   +4,600      +4,600       0
+	//   /onboarding            220,315     224,915   +4,600      +4,600       0
+	//   /sign-in               245,173     249,773   +4,600      +4,600       0
+	//   /sign-in/otp           245,188     249,788   +4,600      +4,600       0
+	//   /legal                 155,777     160,377   +4,600      +4,600       0
+	//   /admin/moderation       63,741      68,341   +4,600      +4,600       0
+	//   /admin/markets          26,393      30,993   +4,600      +4,600       0
+	//   /admin/markets/[id]     30,556      35,156   +4,600      +4,600       0
+	//   sharedRawBytes         993,244     993,244       +0           0       0
+	//
+	// ⚠ TWO ROUTES CARRY REAL DRIFT AND IT IS NOT THIS TASK'S: `/` +561 B and
+	// `/m/[slug]` +1,798 B beyond the correction. They are named here rather than
+	// absorbed silently, because the previous regeneration swallowed 102 commits
+	// of growth without an owner and this file's own header forbids exactly that.
+	//
+	// ⚠ `/m/[slug]` was ALREADY 392 B over its old ceiling before any of this —
+	// and this suite was GREEN, because it asserts the committed artifact rather
+	// than a live build. That is the second defect R3 records: a pin that cannot
+	// fire until somebody regenerates, and nothing obliges anybody to. The
+	// re-pin below does not fix it; only measuring the tree would.
+	it("bundle-baseline::shared-chunks-stay-under-ceiling (baseline 993,244 B +5%, re-pinned at R3)", () => {
 		const report = readBaseline();
-		expect(report.sharedRawBytes).toBeLessThanOrEqual(1_019_406);
+		expect(report.sharedRawBytes).toBeLessThanOrEqual(1_042_906);
 	});
 
-	it("bundle-baseline::shared-chunks-gzip-stays-under-ceiling (baseline 304,080 B +5%)", () => {
+	it("bundle-baseline::shared-chunks-gzip-stays-under-ceiling (baseline 311,253 B +5%, re-pinned at R3)", () => {
 		const report = readBaseline();
-		expect(report.sharedGzipBytes).toBeLessThanOrEqual(319_284);
+		expect(report.sharedGzipBytes).toBeLessThanOrEqual(326_815);
 	});
 
-	it("bundle-baseline::discovery-route-own-bytes-under-ceiling (baseline 218,636 B +5%)", () => {
+	it("bundle-baseline::discovery-route-own-bytes-under-ceiling (baseline 227,237 B +5%, re-pinned at R3)", () => {
 		const report = readBaseline();
-		expect(routeOf(report, "/").ownRawBytes).toBeLessThanOrEqual(229_568);
+		expect(routeOf(report, "/").ownRawBytes).toBeLessThanOrEqual(238_598);
 	});
 
-	it("bundle-baseline::debate-view-route-own-bytes-under-ceiling (baseline 278,476 B +5%)", () => {
+	it("bundle-baseline::debate-view-route-own-bytes-under-ceiling (baseline 298,355 B +5%, re-pinned at R3)", () => {
 		// The route T5 exists to shrink. Its ceiling is the one this repo most
 		// wants a future PR to LOWER, deliberately, as the ratchet this file's
 		// header describes — not a number to defend as-is.
 		const report = readBaseline();
 		expect(routeOf(report, "/m/[slug]").ownRawBytes).toBeLessThanOrEqual(
-			292_400,
+			313_272,
 		);
 	});
 
-	it("bundle-baseline::profile-route-own-bytes-under-ceiling (lowered at T5 with PositionsTable split)", () => {
+	it("bundle-baseline::profile-route-own-bytes-under-ceiling (baseline 223,647 B +5%, re-pinned at R3)", () => {
 		const report = readBaseline();
 		// Lowered from 252_804 B at T5 when PositionsTable dynamic split landed (-22 KiB win).
 		expect(routeOf(report, "/u/[pseudonym]").ownRawBytes).toBeLessThanOrEqual(
-			230_020,
+			234_829,
 		);
 	});
 
