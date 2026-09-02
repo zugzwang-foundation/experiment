@@ -544,9 +544,18 @@ export function MarketHeader({
 											"h-5 rounded-4xl",
 										)}
 									>
-										{/* `aria-hidden` — the label beside it already names the
-										    control, and lucide ships no title element. */}
-										<Download aria-hidden="true" />
+										{/* Bare, like the two sibling call sites (`ArgProfile`,
+										    `DownloadStub`). The glyph IS hidden from AT — lucide
+										    adds `aria-hidden="true"` itself — but it does so
+										    CONDITIONALLY: `!children && !hasA11yProp(rest)`
+										    (`lucide-react@1.14.0` `dist/esm/Icon.mjs:36`, read, not
+										    assumed). So passing it here would be redundant, and —
+										    the part worth knowing — passing any OTHER a11y prop
+										    later SILENTLY REVOKES the default and un-hides the
+										    glyph. That is a vendor contract, so it is pinned as one
+										    in `market-header.test.tsx` rather than restated here as
+										    a prop that only looks like it is doing the work. */}
+										<Download />
 										AI mode
 									</a>
 								</InfoTip>

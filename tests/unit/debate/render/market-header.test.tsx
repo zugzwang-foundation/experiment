@@ -416,6 +416,14 @@ describe("AIMODE-1 — the `.md` export is an `AI mode` button", () => {
 
 		expect(svg).not.toBeNull();
 		expect(svg?.getAttribute("class") ?? "").toContain("lucide-download");
+		// ⚠ THIS LINE IS A VENDOR PIN, NOT A PROP CHECK, and the difference is
+		// the whole reason it is worded this way. Nothing in `MarketHeader`
+		// passes `aria-hidden` — lucide adds it, but only while the icon gets
+		// no children and NO a11y prop (`Icon.mjs:36`). Hand an icon an
+		// `aria-label` or a `role` and the default silently disappears, taking
+		// the glyph into the accessible name with it. So the assertion is on the
+		// RENDERED attribute, which is the only thing that survives both a
+		// lucide upgrade and a call-site edit.
 		// It must not reach the accessible name — the label already names the
 		// control and lucide ships no `<title>`.
 		expect(svg?.getAttribute("aria-hidden")).toBe("true");
