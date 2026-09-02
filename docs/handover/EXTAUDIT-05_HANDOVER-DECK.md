@@ -909,7 +909,7 @@ nothing is ever edited, so a corrected market's full audit trail survives (INV-4
 (create/open/close/resolve/void/seed), the `close-due-markets` cron route (minutely,
 `CRON_SECRET`-gated, timing-safe compare), and the resolution actor belt — plus the SPEC
 riders that keep canon in lock-step (→ SPEC.1 1.0.5). Also mints the route-handler test
-convention (`tests/server/cron/close-due-markets`).
+convention (`tests/server/cron/close-due-markets.test.ts`).
 
 **#127 — ENGINE.16: the conclusion freeze read-guard.** `isFrozen()` consults the
 `system_state` singleton (Bucket B: `frozen_at` flips NULL→timestamp exactly once);
@@ -1236,10 +1236,24 @@ exists is drizzle-orm issue #5769: `drizzle-kit migrate` can exit `0` with a mig
 silently skipped, so **exit codes are not promote evidence; the serving deployment's own
 hash comparison is.**
 
-**#167 — D2: CI becomes a required check.** Branch protection now requires the `ci` status
-(squash + signed commits were already server-enforced); CI itself gains `drizzle-kit
-check` (journal integrity) and `db:check-drift`. The scheduled `env-audit.yml`
-(Doppler↔Vercel parity) and an inert `staging-migrate.yml` land alongside — armed at D3.
+**#167 — D2: the CI gate grows journal and drift checks.** CI gains `drizzle-kit check`
+(offline journal integrity) and `db:check-drift` — both still in the workflow today. The
+scheduled `env-audit.yml` (Doppler↔Vercel parity) and an inert `staging-migrate.yml` land
+alongside — armed at D3.
+
+⚠ **Corrected at SYNC-5, 2026-08-28.** This block previously read *"Branch protection now
+requires the `ci` status (squash + signed commits were already server-enforced)."* **It
+does not, and they were not.** #167 changed in-repo files and no GitHub setting — a commit
+cannot change one — and its own body files the promotion as a human checklist line, not a
+landed mechanism. Measured live: `allow_squash_merge`, `allow_merge_commit` **and**
+`allow_rebase_merge` are all three `true`, so squash-merge is a convention; `branches/main`
+and `branches/staging` both report `"protected": false`; `branches/*/protection` and
+`rulesets` both return **403 — "Upgrade to GitHub Pro or make this repository public to
+enable this feature"** (private repo, Free organisation plan), which forecloses branch
+protection wholesale. **What the deck reported as a landed mechanism was a checklist item
+nobody could confirm.** See `CLAUDE.md` §5.13, which holds the measurement and its date —
+and note the 403 is *not* a reading: whether protection ever existed and was lost is
+**NOT ESTABLISHED** and needs `admin:org` on the audit log to settle.
 
 **#170 — D3: staging un-shadowed.** The `staging` branch becomes a true replica lane: push
 → GitHub Actions applies migrations to the staging Supabase (Doppler `stg` config) while
@@ -1541,14 +1555,20 @@ Read this table through the pipeline's rules (B10), not as a defect list:
 | **Auth vendors** | Google OAuth + Resend (email OTP) + Cloudflare Turnstile (captcha); Better Auth orchestrates; admin auth bypasses all of it (separate hand-rolled path, ADR-0010) |
 | **OpenAI** | omni-moderation, pre-commit gate only (ADR-0014) — the single moderation vendor at PIN_SHA (B7's seam note) |
 | **Sentry + PostHog** | two-vendor observability (ADR-0007); Sentry owns alarms (serialization exhaustion, CSAM-pending, drift), PostHog owns product analytics |
-| **Local dev** | `supabase start` on :54322 + `.env.local`; the DB-only test tiers run secret-free against it — the engine/invariant layer is auditable without any SaaS credential |
+| **Local dev** | a local Postgres on `:54322` (the Supabase CLI default) + `.env.local`. ⚠ **`supabase start` will not work from a clone** — the repo tracks no `supabase/` directory (`.gitignore` excludes it wholesale, 0 tracked files), so there is no `config.toml` for the CLI to start; `supabase init` first, or bring your own Postgres 17 on that port. Once it is up, the DB-only test tiers run secret-free against it — the engine/invariant layer is auditable without any SaaS credential |
 
 ### C3 — CI/CD: the gates as they actually run
 
-`ci.yml` — the **required** PR gate (branch protection: PRs only, squash-only, signed
-commits, `ci` must pass; required reviews 0 — the review ritual lives in the build harness
-instead). Steps in order, against a real `postgres:17` service
-(`.github/workflows/ci.yml`):
+`ci.yml` — the PR gate, and ⛔ **a discipline rather than a control.** There is **no branch
+protection on this repository, on any branch** (measured 2026-08-28): `branches/main` and
+`branches/staging` both `"protected": false`; `/protection` and `/rulesets` both 403
+"Upgrade to GitHub Pro or make this repository public to enable this feature"; and all
+three merge methods are enabled. **PR-required, squash-only, signed commits and a passing
+`ci` check are therefore conventions with no server-side backstop** — a red PR can be
+merged and a force-push to `main` would succeed. Treat CI green as a thing to check in the
+same action as the merge, never as a gate to lean on. *(This paragraph asserted the
+opposite until SYNC-5. `CLAUDE.md` §5.13 is the single home of the measurement.)* Steps in
+order, against a real `postgres:17` service (`.github/workflows/ci.yml`):
 
 ```
 Checkout → Setup pnpm → Setup Node (.nvmrc) → pnpm install --frozen-lockfile

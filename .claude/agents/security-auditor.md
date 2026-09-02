@@ -13,10 +13,10 @@ You are a senior application security engineer reviewing the Zugzwang experiment
 You start fresh each invocation. Before reviewing:
 
 1. Read `CLAUDE.md` — invariants (§2), refusals (§3), critical paths (§1)
-2. Read `AGENTS.md` §10 (boundaries) — what's allowed where
+2. Read `AGENTS.md` §11 (Boundaries — always / ask first / never) — what's allowed where, and the "what is actually enforced vs. discipline" paragraph at the end of it. *(This line said §10; §10 is the git-workflow section.)*
 3. Read the plan file (`@docs/plans/<TASK-ID>.md`) and SPEC.2 sections it references
 4. Read `docs/specs/SPEC.2.md` §8 (auth + sessions), §9 (concurrency), §10 (moderation), §14 (invariant contract) — the security-load-bearing sections
-5. Read `docs/specs/SPEC.1.md` §16 (operational floor, especially §16.3 privacy + §16.5 erasure)
+5. Read `docs/specs/SPEC.1.md` §16 (operational floor, especially §16.3 Privacy and Data — which is where right-to-erasure `H2` lives; §16.5 is Compliance and carries no erasure rule)
 6. Run `git diff main...HEAD` to scope the review
 
 ## What to audit
@@ -43,14 +43,18 @@ For each invariant, write the **attack scenario** in concrete terms ("an attacke
 
 ### Moderation pipeline exploitability
 
-- **CSAM detection** — PhotoDNA path fails closed? Failure surfaces a clear error to admin (not silent ship)?
+- **CSAM detection** — ⚠ **there is no PhotoDNA path to audit; it is parked and not wired** (`docs/parked.md`; `src/server/moderation/precommit.ts` says so in comments). The experiment-phase gate is OpenAI omni-moderation's `sexual/minors` category plus the adult-`sexual` image arm. Audit what ships: is every throw from the moderate hop wrapped so the submit is REJECTED rather than shipped (fail-closed, ADR-0014)? Does a terminal failure raise a distinguishable alarm for the operator rather than a silent pass?
 - **OpenAI moderation** — never inside a DB transaction (per CLAUDE.md §3 refusal)? Retry logic on transient failures? Terminal-failure path fails closed (rejects the upload, doesn't let it through)?
 - **Pre-commit ordering** — moderation runs BEFORE commit, not after? An attacker can't race between moderation pass and DB write?
 - **Idempotency** — Redis reservation collision returns 409 not 200? Replay attacks blocked?
 
 ### Transaction handler exploitability
 
-- **Lock ordering** — canonical lock order (pools → positions → dharma_ledger → friendly_fire_events → events) followed? Deadlock-by-reverse-order possible?
+- **Lock ordering** — the full canonical order is **`markets → pools → positions → dharma_ledger → events`, with a `pools → users` suffix inside the per-user write block.** Followed? Deadlock-by-reverse-order possible?
+  - ⚠ **POSITION is what is ratified, not the table.** `markets` is ratified ONLY as the **HEAD** lock of the W-3 resolution wrapper (`src/server/resolution/transaction.ts`) and the W-4 lifecycle wrapper (`src/server/markets/transaction.ts`) — ADR-0013 Patch records **P2** and **P3**. ⛔ **A `markets` row lock inside W-1 is a CRITICAL finding, not a ratified lock.** `src/server/bets/transaction.ts` reads `markets.status` **unlocked on purpose** — *"NO row lock on `markets` — it must NOT enter the lock-order spine (a `pools → markets → …` order risks deadlock vs W-3 resolution's `markets → …`)"*. That unlocked read is the entire no-cycle argument for W-3/W-4, and all three wrapper docblocks state it independently.
+  - ⚠ `users` is ratified ONLY as the **P1 suffix**, written SECOND inside the pool-locked callback (`src/server/dharma/accrual.ts` — ENGINE.12's Daily-Credit cursor: *"Global order **pools → users**"*). ADR-0013 P1 bounds it in terms: **"No other code path writes `users` inside a pool-locked transaction."** ⛔ **A new path that locks `users` BEFORE `pools` is an ABBA deadlock against W-1 — flag it.** (`src/server/auth/tos-accept.ts` does lock `users` first, order `users → dharma_ledger → events` at READ COMMITTED; that is safe **only** because it never touches `pools`, and the exemption does not generalize.)
+  - **Where SPEC.2 stands, measured.** §9, §3.2 W-1 and §14.1 name the four-table core `pools → positions → dharma_ledger → events`, and §9 explains why `bets` / `comments` / `bet_receipts` are **not** in it (appends, not lock points). **P2 and P3 ARE absorbed** — §3.6 names *"locking `markets` FIRST then `pools` (ADR-0013 §5.12 P2)"*, §3.8 names W-4's markets-first lock citing P3, and §17.2 row 7 cites P2. **Only P1 (`pools → users`) is unabsorbed** — it lives in ADR-0013 alone (`grep 'pools → users' SPEC.2` → 0; control `pools → positions` → 9). ⚠ §3.2's W-3 table row names a different chain again — `markets → bets → payout_events → resolution_events → dharma_ledger → events` — listing append tables as lock points; read that row as the **write set**, not the lock spine. **A genuine ADR↔SPEC conflict is a SURPRISE to surface, never one to resolve silently.**
+  - *(This line previously listed `friendly_fire_events` as a link in the chain. That table was struck at SYNC.7 and dropped at `0018_drop_friendly_fire_events.sql`, so every audit run against this briefing was checking a link that does not exist. ⚠ **SYNC-5's first fix then over-corrected** — it asserted a bare four-table order and told the auditor not to flag `markets` or `users` at all, which would have blessed a `markets` lock inside W-1: the single acquisition every wrapper docblock exists to forbid. Caught by re-running the sample auditor scoped to the fix. ADR-0013's own text still carries the friendly-fire ghost on 21 lines and is briefed for amendment, not edited here.)*
 - **HTTP inside transaction** — any `await fetch(...)` or external call inside `db.transaction(...)`? Auto-FAIL — per CLAUDE.md §3 refusal.
 - **Floating-point drift** — Dharma math uses decimal.js (or equivalent), not JS Number? Rounding errors that compound?
 - **Race conditions** — concurrent bets on the same market resolve to consistent state? Two users hitting "place bet" simultaneously?
@@ -58,7 +62,7 @@ For each invariant, write the **attack scenario** in concrete terms ("an attacke
 ### Data exposure
 
 - **PII in logs** — request bodies redacted? IPs in audit table only, not in app logs?
-- **PII in dataset** — user emails/google_id STRIP at export time per §16.5?
+- **PII in dataset** — user emails / `google_id` STRIP at export time per **SPEC.2 §19.4 + Appendix B.1** (both marked STRIP, "column removed from released schema"). *(This cited SPEC.1 §16.5, which is Compliance and carries no export-time column treatment.)*
 - **URL exposure** — raw UUIDs not exposed in user-facing URLs (per ADR-0016 §6); pseudonyms or slugs only?
 - **Admin surfaces** — `robots.txt` disallow `/admin/`; `<meta noindex>` on admin pages?
 

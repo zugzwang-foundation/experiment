@@ -31,8 +31,8 @@ Some code paths are catastrophic if broken — silent thesis violations are the 
 
 - **Phase 1 plan** must enumerate every thesis invariant the task touches, how each is preserved, and a test assertion proving it.
 - **Phase 2** invokes `@security-auditor` after `@code-reviewer`.
-- **Phase 2** runs `pnpm vitest run tests/integration/` in addition to the standard verification path.
-- **After PR**: 24-hour soak before merge. Use the time to read the diff once more in a fresh tab the next morning. The wait catches bugs your morning brain finds that your evening brain missed.
+- **Phase 2** runs `pnpm test:invariants` **and** `pnpm test:integration` in addition to the standard verification path (CLAUDE.md §5.7 names both).
+- **Before PR**: the §5.10 **pre-PR self-audit** — walk the plan item by item, in-session, marking each **PASS** / **FAIL** / **SURPRISE**, and fix every FAIL before `gh pr create`. ⚠ **This replaced the 24-hour soak, which this line used to mandate.** Verification is left-shifted to write-time where fixes are cheap; CLAUDE.md §5.10 states it flatly — *"there is no post-PR soak."*
 
 For tasks NOT on critical paths, skip these extras. Don't bloat the workflow when the risk doesn't warrant it.
 
@@ -114,11 +114,17 @@ silently break? Output ranked findings, severity high/medium/low.
 We iterate on the plan until it survives your own self-critique.
 ```
 
-When the plan survives self-critique, commit it. The plan is now the contract for Phase 2:
+When the plan survives self-critique, commit it, **then relay it to the web Claude chat for sign-off.** Self-critique is not the gate — CLAUDE.md §5.1: *"The plan is confirmed in CC, then pasted to the web Claude chat for sign-off; only then exit and execute"*, and §1's operating model says the same (*"Claude Code executes; web Claude reviews and gates decisions"*). The plan file is committed before Phase 1 ends; it becomes the contract for Phase 2 once that sign-off lands:
 
 ```bash
 git add docs/plans/<TASK.ID>.md
-git commit -m "plan: <TASK.ID> — <short title>"
+# Multi-line message REQUIRED (CLAUDE.md §5.13.1): write the subject
+#   docs(plans): <TASK.ID> — <short title>
+# then a body, then the constant `Instructions for AI` block copied
+# verbatim from §5.13.1, into /tmp/commit-msg.txt.
+# A bare `git commit -m` can no longer produce a conforming message,
+# and `plan:` is not one of this repo's commit types.
+git commit -F /tmp/commit-msg.txt
 ```
 
 If Phase 2 later reveals the plan was wrong, **return to Phase 1 in a fresh tab** — do not quietly patch the plan during execution.
@@ -127,7 +133,7 @@ If Phase 2 later reveals the plan was wrong, **return to Phase 1 in a fresh tab*
 
 ## Phase 2 — Execute (Tab 2)
 
-Open a **NEW Claude Code tab** — not `/clear`. Independent context is what makes the review honest:
+Open a **NEW Claude Code tab** — not `/clear`. Independent context is what makes the review honest. ⚠ **Launch it from a worktree at `origin/main`.** Subagent definitions load from the session's working directory at launch and are **not** hot-reloaded, so a tab started in a tree whose branch predates a model repin runs the OLD pins (CLAUDE.md §6) — and Phase 2 is the reviewer-bearing phase:
 
 ```bash
 claude
@@ -166,14 +172,19 @@ wait if any step fails.
    test is wrong — fix it before continuing.
 3. Implement the change. Stay strictly within plan scope.
 4. Run the tests. Verify they pass (green).
-5. Invoke @code-reviewer on the diff. Address findings.
-6. [Critical-path only] Invoke @security-auditor. Address findings.
+5. Invoke @code-reviewer on the diff, PASSING @docs/plans/<TASK.ID>.md —
+   subagents start from zero context (CLAUDE.md §5.11). If the diff
+   touches src/db/schema/ or drizzle/migrations/, also invoke
+   @db-migration-reviewer. Address findings.
+6. [Critical-path only] Invoke @security-auditor, AFTER @code-reviewer,
+   with the same plan hand-off. Address findings.
 7. Run the standard verification path:
-   - pnpm tsc --noEmit
-   - pnpm biome check .
+   - ZUGZWANG_ENV=preview just verify
+     (= tsc --noEmit -> biome check . -> next build. The build env gate
+     rejects an unset ZUGZWANG_ENV, so the var is required; env, not a
+     regression. `just verify` runs NO tests.)
    - pnpm vitest run
-   - pnpm build  (if app-level changes)
-8. [Critical-path only] Run pnpm vitest run tests/integration/.
+8. [Critical-path only] Run pnpm test:invariants and pnpm test:integration.
 9. Stop. Report status.
 
 STAY IN SCOPE. If you discover something else broken, write it to
@@ -185,10 +196,12 @@ When all green, open the PR:
 
 ```bash
 gh pr create --fill
-# or use the /pr slash command once SCAFFOLD.10 lands
+# There is no `/pr` slash command. The repo tracks no `.claude/commands/`
+# and never has; SCAFFOLD.10 was recorded effectively closed without
+# shipping one.
 ```
 
-**Critical-path PRs:** wait 24 hours before merge. Tomorrow morning, open one final fresh tab, paste the PR URL, ask for a final review. Then merge.
+**Critical-path PRs:** the §5.10 self-audit must be clean **before** the PR opens; there is no post-PR soak. Open one final fresh tab, paste the PR URL, ask for a final review, then merge — and **check the `ci` run's conclusion in the same action as the merge**, because no status check is required on this repository (CLAUDE.md §5.13: `main` and `staging` are both unprotected, so a red PR can be merged).
 
 **Non-critical PRs:** open a final fresh tab, paste the PR URL, ask for a final review. Merge.
 
@@ -201,7 +214,7 @@ gh pr create --fill
 - **Skipping Phase 1 because "this task is small."** If it qualifies for the workflow, it qualifies for both phases. The small tasks are where shortcuts get taken silently and the bug ships.
 - **Patching the plan during Phase 2.** If the plan is wrong, go back to Phase 1 in a fresh tab. Don't quietly diverge.
 - **Adding tasks during Phase 2 that weren't in the plan.** Note them in `claude-progress.md` and don't expand scope. "While we're here" is forbidden.
-- **Skipping the 24-hour soak on critical-path PRs because the change "feels right."** That feeling is a session-confidence artifact, not a verification.
+- **Skipping the §5.10 pre-PR self-audit on critical-path PRs because the change "feels right."** That feeling is a session-confidence artifact, not a verification. *(This bullet named the 24-hour soak until SYNC-5; the soak is retired, the failure mode is not.)*
 
 ---
 
@@ -216,4 +229,4 @@ The `ultrathink` keyword is a habit, not a setting. Drop it as the first word in
 
 ---
 
-*Workflow lives at `docs/workflows/plan-then-execute.md`. Referenced from CLAUDE.md §3 ("Plan before you write") and from `.claude/commands/plan.md` (a slash command landing at SCAFFOLD.10 that bootstraps Phase 1 with the prompt scaffold pre-filled with the task ID).*
+*Workflow lives at `docs/workflows/plan-then-execute.md`. Referenced from CLAUDE.md **§5.1** (Plan mode) — the section that actually carries the plan gate; this line said §3, which is the Refusal-triggers section and says nothing about planning. ⚠ **`.claude/commands/plan.md` does not exist.** This line described it as "a slash command landing at SCAFFOLD.10"; `.claude/` contains only `agents/`, and `docs/maintenance.md` already records `.claude/commands/*` as a directory that has never existed. Invoke this workflow by reading the file, not by a slash command.*

@@ -12,7 +12,7 @@
 
 1. **NEVER live-test CSAM.** Real or simulated child-sexual-abuse material is illegal to possess or upload. **Under no circumstances upload real or simulated CSAM to any environment.** The PhotoDNA hash gate is a *parked* operator capability, proven only with **mocked** hashes — it is not wired in this stratum.
 2. **Thresholds are UNTUNED until HARDEN.5.** This smoke test verifies that **the wiring fires given a verdict** — not classifier calibration. A benign image that happens to score over an untuned threshold is a calibration finding for HARDEN.5, not a wiring failure.
-3. **No admin UI at this stage.** Verify the `mod_actions` row and the ban via a **DB / log check**, *not* a feed. The upload → review-feed → Remove/Ban loop is the reactive-admin-dashboard stratum's demo, not this one.
+3. **Do not verify through the admin UI.** ⚠ *(This said "No admin UI at this stage." There is one now — `/admin/moderation` and `/admin/moderation/audit` both landed after this runbook was written.)* Verify the `mod_actions` row and the ban via a **DB / log check** anyway, *not* a feed: what this smoke proves is the classifier→consequence wiring itself, not the dashboard's rendering of it. The upload → review-feed → Remove/Ban loop is the reactive-admin stratum's demo, not this one.
 4. **`sexual/minors` is TEXT-ONLY** on `omni-moderation-2024-09-26` (image input scores 0 for that category). **Image-CSAM detection cannot be smoke-tested here** — it is covered only by the parked PhotoDNA gate + the A2 adult-`sexual` image backstop (case 3 below) + reactive admin removal. Do not attempt to construct an image-CSAM test.
 5. **The only OpenAI `track_a` path other than the adult-NSFW image backstop is CSAM-adjacent text + image — NEVER test it.** The adult-NSFW image backstop (case 3) is the only `track_a` path this runbook exercises.
 
@@ -57,7 +57,7 @@ Each case is: submit a comment-bearing bet with the image attached (the F-COMMEN
 
 ---
 
-## Verification reference (DB / log, since there is no admin UI)
+## Verification reference (DB / log — the admin audit viewer at `/admin/moderation/audit` now shows these rows directly, but check the DB, not the viewer)
 
 - `mod_actions`: `SELECT reason, verdict, actor_id, target_market_id, image_r2_key, blocked_text FROM mod_actions ORDER BY created_at DESC;` (run via the session pooler; `blocked_text` is admin-only / STRIP-in-dataset).
 - ban state: `SELECT banned_at FROM users WHERE id = '<test-account-id>';`

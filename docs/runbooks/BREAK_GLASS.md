@@ -1,8 +1,10 @@
 # BREAK_GLASS.md
 
 > Suspected-compromise admin rotation + dataset-release-prep procedures
-> per ADR-0010 + SPEC.2 §8.6 + §19.4.1. Authoring stub; HARDEN.10 owns
-> the full procedure per §21.3.
+> per ADR-0010 + SPEC.2 §8.4 + §20.3 + §19.4.1. Authoring stub; HARDEN.10
+> owns the full procedure per §21.3. *(This header cited §8.6, which is
+> F-AUTH-5 logout; §8.4 is the Admin auth path this runbook operates on,
+> and §21.3 slot 1 names §8.4 + §20.3 as the owners.)*
 
 This file is a placeholder for the full admin-rotation runbook owned by
 HARDEN.10. Current content covers:
@@ -19,9 +21,10 @@ public dataset release per SPEC.1 G3 + SPEC.2 §19.1.
 events with `aggregate_id = admin_sessions.session_id` (the UUIDv7 that
 IS the admin cookie value per SPEC.2 §8.5). The same value is also
 written into `events.payload.sessionId`. Per SPEC.2 §19.4.1 the payload
-keys are STRIP at export, and Appendix B.14's `aggregate_id` note flags
-admin_session aggregate_id as defense-in-depth STRIP candidate covered
-by this runbook's rotation step.
+keys are STRIP at export, and Appendix **B.13**'s `aggregate_id` note
+flags admin_session aggregate_id as **SHIP-raw**, with defense-in-depth
+covered by this runbook's rotation step. *(This said B.14; B.14 is
+`identity_pool`, which has no `aggregate_id` column at all.)*
 
 Without rotation, a session_id that was created weeks before the freeze
 and is still live (no logout in the interim) is present in the released
@@ -73,12 +76,29 @@ known admin workstations).
 1. Generate a new `ADMIN_PASSWORD` (long random alphanumeric;
    `pwgen 64 1` or `openssl rand -base64 48`).
 
-2. Update Vercel env via `vercel env rm ADMIN_PASSWORD production`
-   then `vercel env add ADMIN_PASSWORD production` (operator-only; CC
-   cannot read or write env vars per memory `feedback_vercel_env_writeonly`).
+2. ⚠ **Rotate it in DOPPLER, not in Vercel.** Doppler is the source of
+   truth and syncs INTO Vercel:
+   `doppler secrets set ADMIN_PASSWORD="<new>" --config prd`
+   (operator-only; CC cannot read or write env vars). **Do NOT edit the
+   Vercel entry directly** — it is a Doppler-integration-managed copy and
+   the next sync overwrites a hand-edit, silently: `env-audit.yml` /
+   `pnpm ci-env-parity` is a KEYS-ONLY parity check and never compares
+   values, so an overwritten rotation looks identical to a successful one.
+   *(This step said `vercel env rm` / `vercel env add`, which is the
+   pre-Doppler procedure and would have been undone by the next sync.)*
 
-3. Redeploy production (`vercel --prod` or push to main if CI is
-   wired). The new env value is picked up at function cold-start.
+3. Redeploy **and promote** production per
+   `docs/runbooks/deploy-pipeline.md` §3. ⚠ `autoAssignCustomDomains` is
+   **OFF** (ADR-0024 item 5), so neither a `main` merge nor a bare
+   `vercel --prod` serves the new build — `zugzwangworld.com` keeps
+   serving the old deployment, **with the old password**, until the
+   staged build is manually promoted
+   (`vercel promote <staged-url> --scope <team-slug>`; `--scope` is not
+   optional). The new env value reaches users only on the promoted
+   build, never on the staged one. *(This step said `vercel --prod` or
+   push to main was enough. Under a gated promote it is not, and the
+   failure mode is the worst possible one for a rotation: you believe
+   the old password is dead while it is still the one serving.)*
 
 4. Invalidate all live admin sessions as in §1 step 2.
 
