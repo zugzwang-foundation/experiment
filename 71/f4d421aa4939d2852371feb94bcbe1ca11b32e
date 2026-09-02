@@ -1,0 +1,21 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Backwards In Public
+
+Black means YES. White means NO. It's the one thing the visual language says, and it isn't decoration — it's the only way to see which side an argument is on.
+
+On two pages it rendered exactly backwards. YES came out near-white, NO near-black, colour and text both. Two files had each hand-rolled their own side label, both reached for generic components named "default" and "secondary" — and the greys those resolve to sit on the wrong sides.
+
+One of those pages needs no login. Anyone could load it and read every side inverted.
+
+The test that found it was committed deliberately failing, and left failing across two commits. It went green because both faults were fixed — not because either file was added to a list of exceptions. There is no such list.
+
+Then a third way in turned up in the same stretch: a bar with a fixed colour, measuring a quantity whose meaning flips with the side. Its own comment claimed immunity, with the reason precisely backwards.
+
+Four ways to get this wrong were eventually written down. The guard catches two. That's recorded in the guard itself, in capitals, so a green run is never read as an all-clear.

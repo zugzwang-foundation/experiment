@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+The Button Was Never Wired
+
+The action that saves a bookmark had been written, tested and merged more than a week earlier with nothing anywhere able to call it. This connects it. Telling a card whether it is already saved costs two additional queries inside a transaction that was already running, and the existing loader is left with a zero-line diff — the surrounding code does not learn that anything changed.

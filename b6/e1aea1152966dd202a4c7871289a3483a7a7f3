@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Deleting What Never Ran
+
+Two rate limiters are removed for the offence of never having been used. The specification had already declared them gone; the code still carried them, referenced by nothing except a test that existed to test them. Both are excised. The notable part is that deleting code which provably did nothing took a plan, a review and a blast-radius check first.

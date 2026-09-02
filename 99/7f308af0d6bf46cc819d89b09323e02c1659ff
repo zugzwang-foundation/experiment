@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+One Name For Two Contracts
+
+Numbers get thousands separators everywhere a person reads one. The rename that comes first is the better part: two functions, two files apart, shared a name and disagreed about their job — one kept full precision for the export, the other rounded for display. Nothing was broken yet. A name that can be imported by mistake is a defect that has not happened.

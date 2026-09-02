@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+It Ran To The Edge
+
+Thirty corrections to the front page, the first of them the plainest: the mockup gives the page an inset and the build had none, so the grid ran flush to the edge of the screen on every load. The commit is careful that this does not reopen a settled ruling — an inset is not a container, and the page still takes none.

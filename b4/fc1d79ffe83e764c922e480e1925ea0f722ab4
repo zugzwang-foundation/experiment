@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Nobody Expected A Failure
+
+The rules that reject bad writes had gone in the same day, and they worked — which is the exact point at which people stop checking. Fifty-one cases went in anyway. The commit is blunt that they were written after the thing they test, backwards by this project's own standard, and declares it as an exception rather than dressing it up. They match on the error's code rather than its wording, so a later rewrite of a message cannot quietly turn a test green.

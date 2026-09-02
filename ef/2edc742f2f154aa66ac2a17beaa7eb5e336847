@@ -1,0 +1,29 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Given Away First
+
+Six days in. There is barely a product yet.
+
+The first thing formally decided is how to give it away.
+
+The licence chosen is the strict one. Most open licences let you take the
+code, change it, run it as a service, and keep your changes private — you
+never distributed anything, you just hosted it. This one closes that. Run a
+modified version as a service and you owe your users the source.
+
+The commit message is empty. The commit is not. It adds a document six reasons
+deep, and the first — the one the record itself calls load-bearing — says a
+hosted fork keeping its changes private takes the shared knowledge the whole
+argument depends on and makes it somebody's property.
+
+So the licence is the thesis, applied to itself, before there was anything to
+apply it to.
+
+And the licence text was already there. It arrived in the very first commit,
+alongside almost nothing else, before a line of code existed.

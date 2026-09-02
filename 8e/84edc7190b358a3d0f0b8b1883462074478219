@@ -1,0 +1,28 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Only The Mechanism Moves
+
+The strip along the bottom of every page is deleted. Not shortened, not
+reduced to the legal minimum — gone, from every surface.
+
+Except one thing in it could not go.
+
+The licence chosen on day six obliges anyone running a modified version of
+this as a service to offer their users the source. That obligation had been
+discharged by a link in the footer. Remove the footer and the obligation does
+not leave with it — so the link moves into the terms of service, and the
+commit says why in four words: only the mechanism moves.
+
+The rest is about what was not touched. Four lines change, and no
+search-and-replace for the word "footer" was run at any point, because three
+other things here are called footers and none of them is this one. A card has
+a footer. A profile has a footer.
+
+A blind find-and-replace would have caught all three, looked like a clean
+deletion, and quietly broken two surfaces nobody was discussing.

@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+The Header Was Blind
+
+The market page has two modes, and everything inside its header swaps between them — the two sets share nothing at all. The build had the header rendering outside that choice entirely, blind to which mode it was in, with the second mode's header stacked underneath the first. Five later rows all needed to land inside that header, and none of them could until this. Which is why the first row is a restructure rather than a nudge.

@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Seven Places Doing It Themselves
+
+Recording what happened had been done by hand in seven places, each carrying a note promising to come back and do it properly. This is coming back. One helper now writes every event: it checks what it is given against a shape defined for that kind of event, takes the timestamp out of the identifier instead of the clock, and ignores a repeat of something already written. The seven notes were cashed in the commit that made them unnecessary.

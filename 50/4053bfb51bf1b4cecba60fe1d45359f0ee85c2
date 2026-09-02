@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Five Guards Before It Runs
+
+The reset that clears the rehearsal database refuses to start unless five separate things are true: that somebody meant it, that it points at the right target, that the environment is the expected one, that the connection is live, and that it can check itself afterwards. The commit states plainly that it has not yet been run against anything at all.

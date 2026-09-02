@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Eight Legal Moves
+
+A market can be in one of seven conditions, and there are exactly eight moves between them. Everything else is refused. The module deciding this touches nothing — no clock, no database, no network — so it can be tested exhaustively and cannot behave differently on a Tuesday. Every write that changes a market's condition has to ask it first. The whole set of legal moves fits on one screen, which is the point of it.

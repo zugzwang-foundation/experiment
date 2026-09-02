@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+It Refuses To Ship Wrong
+
+A package for an outside reviewer: seven documents pinned to an exact commit, and a script that assembles the sixty files they were promised. The script's useful property is that it will not finish if what it staged disagrees with the manifest saying what should be there. A checksum receipt comes out the other end. A handover that quietly ships the wrong set is worse than no handover.

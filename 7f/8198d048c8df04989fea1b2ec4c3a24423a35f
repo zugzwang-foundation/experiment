@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+The Rules Explain Nothing
+
+Three weeks in, writing code stopped being enough. This commit rewrites the file that says how work happens here: plan before touching anything, wipe the conversation between tasks, write a log at the end of every session, hand off deliberately instead of by accident. The rules are new and nobody knows yet which of them will hold. The commit that set them down carries no message — not one line about why any of it was needed.

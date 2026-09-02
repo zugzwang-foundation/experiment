@@ -1,0 +1,23 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Nobody Was Awake To Do It
+
+The database allows fifteen open connections. Hand them back when you're done and it's fine.
+
+Staging kept running out a few minutes after every deploy, then recovering the next time somebody deployed.
+
+The first cause was a good one: the setting that closes an idle connection was off by default, and off means the timer that would close it never starts. Not "fires late" — never runs. So a fix was written. Close after twenty seconds, and force-close after ten minutes regardless.
+
+Then it was measured. A connection sat idle for six hundred and twenty seconds against both.
+
+Because the app doesn't stay awake. Between requests the whole thing is suspended, and a suspended program runs no timers. The twenty-second countdown was sitting inside something frozen. Nobody was awake to hand the connection back.
+
+So the fix stopped being a timer and became a limit on how much any one copy of the app may take — which needs nobody awake to enforce.
+
+The commit says in its own subject line that this is a mitigation and must not be merged. It knows it's a smaller blast radius, not a solution.

@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+The Error Was The Proof
+
+The subject says the database got connected. The repository did not do that — someone connected it by hand through a web dashboard, out of order, and the commit says so plainly: the state is right and the procedure broke. It also records a defect that was reported, withdrawn, then resolved from an unlikely direction. An error complaining about the wrong data format turned out to be proof the connection worked, because something has to be reachable before it can complain.
