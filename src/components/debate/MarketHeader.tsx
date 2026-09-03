@@ -538,38 +538,46 @@ export function MarketHeader({
 								    treatments are `ghost` and `secondary`, and picking one is a
 								    design ruling, not an edit.
 
-								    ⛔⛔ THE ACCESSIBLE NAME IS "AI mode" AND SO NAMES NO FILE,
-								    AND ON TOUCH NOTHING ELSE NAMES IT EITHER. The name is
-								    founder-ratified, so it stands; what follows is the cost,
-								    recorded because an earlier draft of THIS BLOCK got it wrong
-								    and the correction is the part worth having.
-								    
-								    That draft said the download "reaches AT as a DESCRIPTION"
-								    via `aria-describedby`. ⛔ IT DOES NOT, on the branch that
-								    matters. MEASURED, not read: while the tip is CLOSED,
-								    `aria-describedby` on this anchor resolves to `null` — the
-								    Popover mounts its content only when open, while `InfoTip`
-								    sets the attribute unconditionally, so the id DANGLES and the
-								    gloss is not in the document at all. The touch branch is the
-								    DEFAULT for every unknown, including anything without
-								    `matchMedia`.
-								    ⇒ Pointer/desktop is fine — Radix's Tooltip renders a
-								    `VisuallyHidden` copy and opens on FOCUS, so a keyboard user
-								    meets it. On TOUCH the only way to open the description is to
-								    activate the control, which also starts the download. So a
-								    touch AT user gets "AI mode" and no indication that a file
-								    arrives — a WCAG 2.4.4 (Link Purpose, Level A) regression
-								    against the old `aria-label`, which said so outright.
-								    ⇒ OPEN, founder's call, NOT taken here because it is a COPY
-								    change: prefixing the ratified name onto a short statement that
-								    a Markdown file downloads would close it while keeping the
-								    visible label inside the accessible name (2.5.3 Label in Name).
-								    ⚠ The proposed string is DESCRIBED and deliberately not written
-								    out in attribute syntax: this file would then contain two
-								    `aria-label` literals, only one of which ships, and a later
-								    source-scan guard would match the one that does not. That
-								    failure has six recorded instances in this repo.
-								    
+								    ⛔⛔ THE ACCESSIBLE NAME IS NOT THE VISIBLE LABEL, AND THE
+								    DIFFERENCE IS THE WHOLE FIX. Visible: the ratified two words.
+								    Accessible: those words, an em dash, then a short statement
+								    that a Markdown file downloads. Both halves are
+								    founder-ratified — the name at AIMODE-1, the suffix at its
+								    addendum (OQ-1) — and the suffix exists because of what is
+								    measured below.
+
+								    An earlier draft of THIS BLOCK said the download "reaches AT
+								    as a DESCRIPTION" via `aria-describedby`. ⛔ IT DOES NOT, on
+								    the branch that matters. MEASURED, not read: while the tip is
+								    CLOSED, `aria-describedby` on this anchor resolves to `null`
+								    — the Popover mounts its content only when open, while
+								    `InfoTip` sets the attribute unconditionally, so the id
+								    DANGLES and the gloss is not in the document at all. The touch
+								    branch is the DEFAULT for every unknown, including anything
+								    without `matchMedia`.
+								    ⇒ Pointer/desktop was never the problem — Radix's Tooltip
+								    renders a `VisuallyHidden` copy and opens on FOCUS, so a
+								    keyboard user meets the gloss. On TOUCH the only way to open
+								    the description is to activate the control, which also starts
+								    the download. A touch AT user therefore got a name that names
+								    no file and no indication that one arrives — a WCAG 2.4.4
+								    (Link Purpose, Level A) regression against the pre-AIMODE-1
+								    label, which said so outright.
+								    ⇒ CLOSED HERE, in the one place that reaches every branch:
+								    the name itself. Purpose carried in the attribute needs no tip
+								    to open, no pointer to hover and no id to resolve. The
+								    ratified label stays the PREFIX, so the visible words remain a
+								    leading substring of the accessible name and a speech-input
+								    user can still say them (WCAG 2.5.3, Label in Name).
+								    ⚠ This block still NAMES the string rather than quoting it in
+								    attribute syntax, and the restraint outlived its first reason.
+								    That reason — an unshipped literal here is the one a
+								    source-scan guard would match — is discharged; the string
+								    ships. What replaces it is the mirror: a second copy in a
+								    comment can drift from the JSX silently, and the guards that
+								    own this claim read the rendered DOM, so they would never see
+								    the drift. Six recorded instances in this repo.
+
 								    ⚠ TARGET SIZE, the other cost of matching the badge. `h-5`
 								    is 20px against WCAG 2.5.8 (AA)'s 24px floor — and `size=xs`
 								    alone would have been 24px exactly. The Spacing exception
@@ -580,7 +588,7 @@ export function MarketHeader({
 									<a
 										download
 										href={`/m/${market.slug}/export`}
-										aria-label="AI mode"
+										aria-label="AI mode — download this debate as Markdown"
 										className={cn(
 											buttonVariants({ variant: "outline", size: "xs" }),
 											"h-5 rounded-4xl",

@@ -241,20 +241,24 @@ describe("the arm split — each arm renders through the shared frame", () => {
 		cleanup();
 		const postArm = renderPostArm().container.innerHTML;
 
-		// AIMODE-1 — the label and the accessible name are both `AI mode` now.
-		// ⚠ THE ARIA FORM IS ASSERTED AS A FULL ATTRIBUTE (`aria-label="AI
-		// mode"`), not as the bare words, because a bare `toContain("AI mode")`
-		// is satisfied by EITHER the label or the attribute alone.
+		// AIMODE-1 — the visible label is `AI mode`; the accessible name is that
+		// name plus a statement of purpose, which is the OQ-1 addendum.
+		// ⚠ THE ARIA FORM IS ASSERTED AS A FULL ATTRIBUTE, not as the bare
+		// words, because a bare `toContain("AI mode")` is satisfied by EITHER
+		// the label or the attribute alone.
 		// ⚠ AND THAT MAKES THE FIRST LINE STRICTLY WEAKER THAN THE SECOND, which
 		// an earlier version of this comment denied by claiming the two pinned
 		// "the visible text and the accessible name, separately". They do not:
 		// line 2 implies line 1. THIS FILE'S SUBJECT IS THE ARM SPLIT — that the
 		// control renders in the market arm and not the post arm — so a
-		// substring check is the right instrument here. The visible-text claim is
-		// made where it belongs, on `textContent`, in
-		// `market-header.test.tsx::AIMODE-label-and-accessible-name-are-both-AI-mode`.
+		// substring check is the right instrument here. The visible-text claim,
+		// and the containment relation between the two strings, are made where
+		// they belong, on `textContent`, in
+		// `market-header.test.tsx::AIMODE-visible-label-is-the-PREFIX-of-the-accessible-name`.
 		expect(marketArm).toContain("AI mode");
-		expect(marketArm).toContain('aria-label="AI mode"');
+		expect(marketArm).toContain(
+			'aria-label="AI mode — download this debate as Markdown"',
+		);
 		expect(marketArm).toContain("Market Open");
 		expect(postArm).not.toContain("AI mode");
 	});

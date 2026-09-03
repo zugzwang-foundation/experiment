@@ -253,7 +253,9 @@ describe("RESO-1 — R-3, the meta line and the actions are one row", () => {
 		);
 
 		const meta = screen.getByText("Đ 150 staked");
-		const exportLink = container.querySelector('a[aria-label="AI mode"]');
+		const exportLink = container.querySelector(
+			'a[aria-label="AI mode — download this debate as Markdown"]',
+		);
 		const badge = screen.getByText("Open");
 		expect(exportLink).not.toBeNull();
 
@@ -286,7 +288,9 @@ describe("RESO-1 — R-3, the meta line and the actions are one row", () => {
 		const { container } = render(
 			<MarketHeader market={market(3, 5)} priceChart={null} />,
 		);
-		const exportLink = container.querySelector('a[aria-label="AI mode"]');
+		const exportLink = container.querySelector(
+			'a[aria-label="AI mode — download this debate as Markdown"]',
+		);
 		const actions = rowOf(exportLink);
 		expect(actions).not.toBeNull();
 		// ⛔ `ml-auto`, not `justify-between` — the two are identical while both
@@ -311,7 +315,9 @@ describe("RESO-1 — R-3, the meta line and the actions are one row", () => {
 		);
 		const stack = container.querySelector('[data-testid="headzone-stack"]');
 		expect(stack).not.toBeNull();
-		const exportLink = container.querySelector('a[aria-label="AI mode"]');
+		const exportLink = container.querySelector(
+			'a[aria-label="AI mode — download this debate as Markdown"]',
+		);
 		const metaRow = rowOf(screen.getByText("Đ 150 staked"));
 		const actionsRow = rowOf(exportLink);
 		// Neither is a DIRECT child of the stack — they are both nested one level
@@ -329,22 +335,48 @@ describe("AIMODE-1 — the `.md` export is an `AI mode` button", () => {
 	const tokensOf = (el: Element | null) =>
 		new Set((el?.getAttribute("class") ?? "").split(/\s+/).filter(Boolean));
 
-	it("market-header::AIMODE-label-and-accessible-name-are-both-AI-mode", () => {
+	// ⚠ RENAMED at the AIMODE-1 addendum, from
+	// `…-label-and-accessible-name-are-both-AI-mode`. OQ-1 made that title
+	// assert the opposite of what the body asserts: the two are deliberately
+	// NOT the same string any more. The cross-reference in
+	// `head-zone.test.tsx` moved in the same commit — it was the only one.
+	it("market-header::AIMODE-visible-label-is-the-PREFIX-of-the-accessible-name", () => {
 		const { container } = render(
 			<MarketHeader market={market(3, 5)} priceChart={null} />,
 		);
 		const link = exportAnchor(container);
 		expect(link).not.toBeNull();
 
-		// The visible label…
+		// The visible label — the ratified two words, and ONLY those, because
+		// the glyph beside it is `aria-hidden` and contributes no text.
 		expect(link?.textContent).toBe("AI mode");
-		// …and the accessible name, which is a SEPARATE claim, not a restatement
-		// of it. The glyph is `aria-hidden` and the label is the same words, so a
-		// dropped `aria-label` changes nothing visible and nothing textual — the
-		// only assertion that can see it is this one.
-		expect(link?.getAttribute("aria-label")).toBe("AI mode");
+
+		// …and the accessible name, which carries the link's PURPOSE. OQ-1: on
+		// touch the `InfoTip` gloss is unreachable without activating the
+		// control (the component's own block measures why), so a name that
+		// named no file was a WCAG 2.4.4 regression. The em dash is U+2014.
+		expect(link?.getAttribute("aria-label")).toBe(
+			"AI mode — download this debate as Markdown",
+		);
+
+		// ⛔ THE LOAD-BEARING RELATION, not a restatement of the two lines
+		// above: the visible label is a substring of the accessible name, and
+		// specifically its PREFIX. That is what lets a speech-input user say
+		// what they can see and have it match (WCAG 2.5.3, Label in Name). An
+		// edit that keeps both strings valid on their own but breaks the
+		// containment — reordering the halves, or paraphrasing the prefix —
+		// passes both assertions above and reddens only here.
+		const accessibleName = link?.getAttribute("aria-label") ?? "";
+		const visibleLabel = link?.textContent ?? "";
+		expect(visibleLabel).not.toBe("");
+		expect(accessibleName).toContain(visibleLabel);
+		expect(accessibleName.startsWith(visibleLabel)).toBe(true);
 
 		// ⛔ And the old name is gone from the control entirely — body and ARIA.
+		// ⚠ The capital `D` is now load-bearing and was not before: the
+		// accessible name legitimately contains "download" in lower case, so a
+		// case-insensitive ban is no longer available. What this still catches
+		// is the pre-AIMODE-1 label coming back, which is what it was for.
 		expect(link?.outerHTML).not.toContain("Download .md");
 		expect(link?.getAttribute("aria-label")).not.toContain("Download");
 	});
