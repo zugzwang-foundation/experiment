@@ -7,14 +7,16 @@ It is an account of the build, one entry per commit, in the order things
 happened — written afterwards, from the commit messages and the decision
 records, not from memory. Where the record doesn't explain something, the
 entry says so rather than guessing. That happens more often than you would
-expect: a fifth of these commits explain nothing about themselves, and most
-of them are early.
+expect: about a sixth of these commits explain nothing about themselves, and
+nearly all of those are early — seventy-five of the seventy-seven land before
+the middle of August 2026.
 
 Some entries run to a paragraph. Most are two or three sentences. A few are a
 single line, because some commits genuinely have a single line in them.
 
-Every entry is also attached to its own commit as a git note, so this can be
-read front to back, or one commit at a time from inside the log:
+Entries for commits before 18 August 2026 are also attached to their own commit
+as a git note, so this can be read front to back, or one commit at a time from
+inside the log:
 
 ```bash
 git fetch origin "refs/notes/*:refs/notes/*"
@@ -22,7 +24,7 @@ git log --notes=commits
 ```
 
 
-Five commits have no entry. That is a decision, not an omission.
+Six commits have no entry. That is a decision, not an omission.
 
 The last chapter is unwritten. It gets written while it happens.
 
@@ -36,7 +38,7 @@ there is a note, that is the one you want.
 
 ---
 
-## The eight acts
+## The nine acts
 
 | Act | | n | Dates | |
 |---|---|---|---|---|
@@ -47,13 +49,16 @@ there is a note, that is the one you want.
 | **V** | [The Audit](05-the-audit.md) | n196–226 | 3 – 16 July 2026 | Everything exists now. |
 | **VI** | [The Face](06-the-face.md) | n227–285 | 16 July – 3 August 2026 | Everything to this point is machinery. |
 | **VII** | [The Last Mile](07-the-last-mile.md) | n286–346 | 3 – 18 August 2026 | By the start of August the thing works. |
+| **VIII** | [The Instruments](08-the-instruments.md) | n347–433 | 18 August – 3 September 2026 | By the middle of August the product is finished enough that the work changes shape. |
 | **IX** | [The Window](09-the-window.md) | unwritten | 15 September – 5 November 2026 | Everything before this is preparation. |
 
-Every commit in this repository carries its reasoning. Commits from 17 August 2026 onward carry it in the message; everything before that carries it as an attached git note, which a default clone does not fetch:
+Nearly every commit in this repository carries its reasoning. Commits from 18 August 2026 onward carry it in the message; everything before that carries it as an attached git note, which a default clone does not fetch:
 
 ```bash
 git fetch origin "refs/notes/*:refs/notes/*"
 git log --notes=commits
 ```
+
+Thirteen commits since that date carry no such block, eight of them merge commits — the rule admits no exemption by type, so those are gaps rather than a category, and two have already been answered with a note instead.
 
 The repository's own [`README.md`](../../README.md) carries the same fetch path for a reader who arrives at a commit rather than at this document.
