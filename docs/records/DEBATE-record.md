@@ -40,7 +40,7 @@ read path.
 | **Removal masking on every body read** | SHIPPED | `loadRemovedSet` defined in `src/server/debate-view/load-debate-view.ts:461`; **five call sites** — `:287` · `discovery/hero.ts:168` · `admin/moderation/review-feed.ts:233` · `profile/arguments.ts:434` · `profile/positions.ts:484` | SPEC.1 §15 | 0020, 0021 | `tests/server/debate-view/load-debate-view.integration.test.ts` (SC-1-compliant: asserts the **body**'s absence) · `tests/server/discovery/hero.test.ts` · `tests/server/admin/moderation/review-feed-completeness.integration.test.ts` · `tests/server/profile/{masking,arguments,positions}.test.ts` | CLAUDE.md §5.14 SC-1 fires on every new body read |
 | Ranking — multi-mode composite | SHIPPED | `src/lib/ranking.ts`, `ranking.config.ts`, `ranking-decimal.ts`, substrate `src/server/debate-view/ranking-substrate.ts` | `docs/specs/RANKING.md` | 0017, 0039 | `tests/unit/ranking/` | `F-3` (numerics are a placeholder) |
 | Ranking reads surviving basis, not frozen stake | SHIPPED | `src/server/debate-view/ranking-substrate.ts:166,170` | SPEC.2 §4 | 0039 R4 | **behavioural**: `tests/server/lots/rank-decay-parity.test.ts` (real rows through `loadRankingSubstrate`) · source scan: `tests/unit/ranking/substrate-site-parity.test.ts` | — |
-| Self-authored replies excluded from attraction | SHIPPED | `src/server/debate-view/ranking-substrate.ts:144,151,168,172` (in `FILTER`, not the JOIN) | SPEC.2 §4 | 0039 P2 | `tests/unit/ranking/substrate-site-parity.test.ts:276` · behavioural: `tests/server/lots/rank-decay-parity.test.ts` | — |
+| Self-authored replies excluded from attraction | SHIPPED | `src/server/debate-view/ranking-substrate.ts:146,151,168,172` (in `FILTER`, not the JOIN) | SPEC.2 §4 | 0039 P2 | `tests/unit/ranking/substrate-site-parity.test.ts:276` · behavioural: `tests/server/lots/rank-decay-parity.test.ts` | — |
 | Two count pairs — displayed vs ranking input | SHIPPED | `src/server/debate-view/ranking-substrate.ts` | SPEC.2 §4 | 0039 P3 | `tests/unit/ranking/substrate-site-parity.test.ts` | — |
 | Viewer-scoped debate reads | SHIPPED | `src/server/debate-view/viewer-context.ts`, `load-debate-view.ts` | `F-DEBATE-1` | 0034 | `tests/integration/viewer-context.integration.test.ts` | — |
 | Debate view polling (client interval) | SHIPPED | `src/components/debate/DebatePoll.tsx`, `poll-phase.ts` | SPEC.1 §9 · `F-DEBATE-4` | — | `tests/server/debate-view/poll-contract.test.ts` | `F-3` (`POLL_INTERVAL_MS_DEBATE_VIEW` provisional) |
@@ -75,7 +75,7 @@ a reader needs from this record is the *shape* and the *entry points*.
    predating `lots` has no lot row — the file says so at `:160`.
 2. **Self-authored replies are excluded** (ADR-0039 P2). A reply whose author is the parent
    post's author counts toward none of the four ranking aggregates. ⛔ **The predicate sits in
-   the aggregate `FILTER`, NOT in the JOIN** — `ranking-substrate.ts:144,151,168,172` carry
+   the aggregate `FILTER`, NOT in the JOIN** — `ranking-substrate.ts:146,151,168,172` carry
    `AND rc.user_id <> p.user_id` inside `FILTER (…)`, while `:212` is a bare
    `LEFT JOIN comments rc ON rc.parent_comment_id = p.id`. ⚠ **RANK-2 put it in the `ON` clause
    and RANK-3 had to move it**, because a JOIN predicate *removes* the row, so the displayed
