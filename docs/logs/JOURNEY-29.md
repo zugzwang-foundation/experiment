@@ -131,3 +131,85 @@ of. Do it only after this PR is reviewed and merged.
 ## Time
 
 One session, 2026-09-03. Recon was pre-existing and was not re-run.
+
+---
+
+# Round 4 and close — 2026-09-04
+
+**Mode:** autonomous. **Branch:** `journey/29-act-viii`, from `781be9b4`. **PR #469 left OPEN and
+UNMERGED.**
+
+## What landed
+
+| Commit | |
+|---|---|
+| `a68beb4` | round 4's twelve fixes, style spec v1.4, and one sentence in the index |
+
+Three things in one commit because they are one decision each and none stands alone: the guards are
+what make the spec's §14 true, and the index sentence is what §11.2 says is owed instead of editing a
+published bridge.
+
+## Decisions made
+
+- **The owed re-review was run, and it was not a formality.** `13058cad`'s own subject says a fix
+  reopened its own hole one layer down. It did it again, twice — both HIGH. The act-title/span-line
+  position rule was the right property asserted nowhere, and the new comment scanner kept prose on
+  the left of a self-closed delimiter and dropped everything on the right. Both were found by
+  planting and watching **nothing** happen.
+- **The control regression ran AFTER the spec and index changes, not before.** The brief ordered it
+  second. Running it last certifies the tree that actually ships rather than an intermediate one,
+  which is the whole point of calling it the terminator.
+- **Every control is scripted, not hand-run.** 59 plants across four guards, each one plant →
+  run → capture the assertion verbatim → restore → prove the restore. No two plants are ever live at
+  once, which is the failure that cost this task a reverted edit and nine stray files earlier.
+- **The style spec is installed verbatim and its two errors are reported, not fixed.** It is not
+  ours to edit. See below.
+- **The reviewer's four declines were accepted.** The strongest is the `> 400` floors: pinning 427
+  into three files to satisfy a criticism already discharged by one pinned map would create three
+  sites to update for one decision, which is the decay this project keeps paying for.
+
+## Open questions
+
+- **The style spec v1.4 still dates the convention to 17 August in two of the three places its own
+  change table says it corrected** — and one of them now says it in committer-local terms, the one
+  reading that cannot be true. Measured: `n=347` `35bc6641` is `2026-08-18T01:07:24+05:30`. The act
+  file's own front matter, the index, and §1 and §4.1 all have it right. **The web lane owns this.**
+- **§3.1 is declared a census and its Act column mislabels five of 21 rows** — three wrong, two
+  blank. Row 8 is contradicted inside the same document by §8's own gold standard. Also web-lane.
+- **The apply instructions' refspecs are executed by no guard.** Planted; nothing fired. Declined
+  as out of scope with reasoning, and it is the same class as the defect that minted the discovery
+  guard — a refspec whose asterisks were eaten, reviewed by eye, merged. The minimal fix is naming
+  it here: make that guard's `README` constant a two-file concatenation and re-check its third test.
+- **Prose deleted from inside an entry is uncaught** for the 416 entries with no note body. This is
+  deliberate — §3 is "ceilings, no floors" — and is written down so it is a known boundary rather
+  than an assumed one.
+
+## Next session starts at
+
+**Nothing is owed by this branch.** It ends at an open pull request with a green gate and every
+control proven to fire. The next action belongs to a human: read the diff, and only after it merges,
+read the eleven files in `docs/journey/notes-owed/` and follow that directory's README **exactly** —
+it is written for an interactive `zsh`, its list is written out rather than globbed, and step 4 is a
+separate block so pasting the verification cannot run the irreversible push.
+
+## Context to preserve
+
+- **`git notes list | wc -l` is 343 and `refs/notes/commits` is `56b12a2f` — unchanged, measured at
+  the start and the end of this session.** No `git notes` subcommand that writes was run in this
+  repository or any other at any point.
+- **343 now reconciles**, which it did not before: 341 pre-convention (`n1–346`) + exactly 2
+  post-convention (`n=414` `6ebbfccc`, `n=418` `44924a70`), and zero off the first-parent spine.
+- **All eleven owed notes are still safe to apply**: every target is a real commit, none carries the
+  block, none already has a note, and the `n` in every filename matches its true first-parent
+  position. Eight of the eleven are merge commits.
+- **A reviewer that plants is a writer, and this run honoured that** — it got its own worktree and
+  wrote to nothing else. All 23 files under `docs/journey/` came back byte-identical from three
+  separate plants into the published bridge.
+- **O-14 has a clean instance here.** The reviewer flagged that the brief cited a spec section that
+  did not exist. It was right about the tree it could see — v1.3 stops at §14.4 — and the v1.4
+  installed in the same session runs to §14.8. It flagged rather than retracted, so a sound finding
+  reconciled instead of a true one being thrown away.
+
+## Time
+
+One session, 2026-09-04 (UTC 2026-09-03 evening). Recon was not re-run.
