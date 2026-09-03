@@ -8,4 +8,4 @@ there is a note, that is the one you want.
 
 The Table Outlives The Feature
 
-Two finished features come out on a ruling: the bookmark surface entire — its page, its components, its server side, the icon on the debate page — and the graph on the profile. Eleven thousand lines gone. The database table behind bookmarks stays, deliberately, with nothing changed about it; the record says it is kept and does not say what for. A download control that had been bundled with the bookmark icon is lifted out and preserved unchanged. Three places pointing at the deleted code were ones no merge could flag.
+Two finished features come out on a ruling: the bookmark surface entire, and the graph on the profile. Eleven thousand lines gone. The table behind bookmarks stays, deliberately; the record says it is kept and does not say what for. A download control bundled with the bookmark icon is lifted out and preserved unchanged. Three references to the deleted code were ones no merge could flag.

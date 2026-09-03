@@ -8,4 +8,4 @@ there is a note, that is the one you want.
 
 A Noun Came Along
 
-The four blocks about resolution get wired to their content. A noun belonging to another piece of work is renamed on the way past. Twenty-three files changed; the record is one line long.
+The four resolution blocks get wired to their content, and a noun belonging to another piece of work is renamed on the way past. Twenty-three files; the record is one line.

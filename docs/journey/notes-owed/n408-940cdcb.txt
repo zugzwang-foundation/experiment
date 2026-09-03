@@ -8,4 +8,4 @@ there is a note, that is the one you want.
 
 Say It In The File
 
-A deliberate randomness in when the page asks for fresh data is silently swallowed while you develop, and nothing in a development run says so. Ten lines in one file say it instead.
+A deliberate randomness in when the page asks for fresh data is swallowed while you develop, and nothing says so. Ten lines in one file say it instead.

@@ -8,4 +8,4 @@ there is a note, that is the one you want.
 
 It Said Leave Unmerged
 
-The line this merge carries ends with a marker telling whoever finds it not to merge. It was merged anyway. The artwork goes up on the sign-in pages, and the cost it was supposed to have gets measured.
+The line this merge carries ends with a marker saying not to merge. It was merged anyway. The artwork goes up on the sign-in pages, and the cost it was supposed to have is measured.

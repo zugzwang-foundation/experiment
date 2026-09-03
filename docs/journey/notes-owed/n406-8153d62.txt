@@ -8,4 +8,4 @@ there is a note, that is the one you want.
 
 Labelled Rather Than Gone
 
-A plan that had already been overtaken is now marked as overtaken, and a second record lands with it. Not one line is removed to do it — the superseded plan stays legible, labelled rather than gone.
+A plan already overtaken is now marked as overtaken, and a second record lands with it. Nothing is removed to do it — the superseded plan is labelled rather than gone.

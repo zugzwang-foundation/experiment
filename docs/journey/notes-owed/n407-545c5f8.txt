@@ -8,4 +8,4 @@ there is a note, that is the one you want.
 
 The Frame Gives
 
-One file, eighty-two lines, and one line to account for them. The frame takes the shape its contents already had — the container gives, not the picture. Which way it gives is the whole record.
+One file, eighty-two lines, and one line to account for them: the avatar takes the shape the asset already has. The container gives, not the picture.

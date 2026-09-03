@@ -8,4 +8,4 @@ there is a note, that is the one you want.
 
 What Was Done, Not Why
 
-Pictures get made smaller in the browser. That is the whole of it: the body under this merge is one line, and the line says what was done.
+Pictures get made smaller in the browser. The body under this merge is one line, and it says what was done.

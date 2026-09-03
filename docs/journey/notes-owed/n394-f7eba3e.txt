@@ -8,4 +8,4 @@ there is a note, that is the one you want.
 
 Nothing Underneath
 
-Six files changed and the message is the subject line. Nothing about what was cached, why, or what makes this the final part. By then every commit was meant to carry its own account.
+Six files change and the message is the subject line: nothing about what was cached, or why. By then every commit was meant to carry its own account.
