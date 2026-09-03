@@ -14,9 +14,9 @@ the middle of August 2026.
 Some entries run to a paragraph. Most are two or three sentences. A few are a
 single line, because some commits genuinely have a single line in them.
 
-Entries for commits before 18 August 2026 are also attached to their own commit
-as a git note, so this can be read front to back, or one commit at a time from
-inside the log:
+Entries for the commits before the convention — n1 to n346 — are also attached
+to their own commit as a git note, so this can be read front to back, or one
+commit at a time from inside the log:
 
 ```bash
 git fetch origin "refs/notes/*:refs/notes/*"

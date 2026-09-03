@@ -77,8 +77,8 @@ git push origin refs/notes/commits    # no --force, ever
 
 ⛔ **If the push is rejected, it is protecting you.** It means the ref moved since you fetched. Run
 step 1 again and redo step 2. **Never `--force` this ref** — it is the only copy of the reasoning
-behind three hundred and forty-one commits, and a forced push silently discards whatever you had
-not fetched.
+attached to three hundred and forty-three commits, and a forced push silently discards whatever
+you had not fetched.
 
 ⛔ **If `git notes add` says a note already exists, stop and find out why** rather than reaching for
 `-f`. It means that commit was already answered, and `-f` would overwrite the answer.
