@@ -32,13 +32,14 @@ rather than a check somebody has to remember to write.
 | Signed-out session read on `(public)` | SHIPPED | `src/app/(public)/_lib/session.ts` | — | 0034 | `tests/integration/viewer-context.integration.test.ts` | — |
 | Session gate (deferred-session hook) | SHIPPED | `src/server/auth/session-gate.ts` | `F-AUTH-4` | 0004 | `tests/server/auth/session-gate.test.ts` | — |
 | Sign-out | SHIPPED | `src/server/auth/logout.ts` | `F-AUTH-5` | — | `tests/server/auth/logout.test.ts`, `logout-event.test.ts` | — |
-| **Identity pool — FIFO consume** | SHIPPED | `src/server/identity-pool/consume.ts:36` (`FOR UPDATE SKIP LOCKED`) | SPEC.1 §13 · `F-AUTH-3` | 0011, 0016 | `tests/server/auth/pseudonym.test.ts`, `tests/server/auth/pseudonym-assigned-event.test.ts` | `docs/parked.md` — no FIFO tiebreak |
-| Identity pool — seed + verify | SHIPPED | `scripts/seed-identity-pool.ts`, `scripts/verify-identity-pool.ts` | — | 0011 | `tests/db/identity-pool/seed.test.ts`, `watermark.test.ts` | **`F-2`** — 0 rows on prod |
+| **Identity pool — FIFO consume** | SHIPPED | `src/server/identity-pool/consume.ts:36` (`FOR UPDATE SKIP LOCKED`) | SPEC.1 §13 · `F-AUTH-3` | 0011, 0016 | ⚠ `tests/server/auth/pseudonym.test.ts` **mocks `@/db` entirely** and asserts the SQL *contains* `FOR UPDATE` / `SKIP LOCKED`; its two-different-rows assertion is scripted by the mock and is vacuous. **No real-Postgres test of concurrent pool consumption exists.** Event emission: `pseudonym-assigned-event.test.ts` | `docs/parked.md` — no FIFO tiebreak |
+| Identity pool — seed | SHIPPED | `scripts/seed-identity-pool.ts` | — | 0011 | `tests/db/identity-pool/seed.test.ts` (drives `runSeed` against real Postgres) | **`F-2`** — 0 rows on prod |
+| Identity pool — verify script | SHIPPED | `scripts/verify-identity-pool.ts` | — | 0011 | **none** — nothing in `tests/` imports it | |
 | Identity pool — low-watermark alarm | SHIPPED | `drizzle/migrations/0007_pg_cron_jobs.sql` | — | 0011 | `tests/db/identity-pool/watermark.test.ts` | — |
 | PFP URL derivation | SHIPPED | `src/server/identity-pool/pfp-url.ts` | SPEC.1 §13 | 0011 | `tests/unit/identity-pool/pfp-url.test.ts` | — |
 | Pseudonym vocabulary + rotation | SHIPPED | `src/server/identity-pool/vocabulary.ts`, `rotation.ts` | SPEC.1 §13 | 0011 | `tests/unit/identity-pool/vocabulary.test.ts`, `rotation.test.ts` | — |
 | Terms acceptance (versioned) | SHIPPED | `src/server/auth/tos-accept.ts`, `tos-versions.ts`, `public/legal/tos.txt` | SPEC.1 §13 · `F-AUTH-4` | — | `tests/server/auth/tos.test.ts`, `tos-accept-event.test.ts`, `tos-accept-grant.test.ts` | — |
-| Initial Dharma grant, once per user, in the acceptance tx | SHIPPED | `src/server/auth/tos-accept.ts` | SPEC.1 §10.1 | 0018 | `tests/invariants/I-GRANT-ONCE-001.initial-grant-once-per-user.spec.ts` | — |
+| Initial Dharma grant, once per user, in the acceptance tx | SHIPPED | `src/server/auth/tos-accept.ts` | SPEC.1 §10.1 | 0018 | **primary** (the `FOR UPDATE` lock + tab-race no-op branch): `tests/server/auth/tos-accept-grant.test.ts` T2/T3 · **storage backstop**: `tests/invariants/I-GRANT-ONCE-001…spec.ts`, which inserts raw and imports no `src/server/auth/**` | — |
 | Onboarding completion | SHIPPED | `src/server/onboarding/complete.ts`, `src/app/(auth)/onboarding/page.tsx` | `F-AUTH-4` | — | `tests/unit/onboarding/complete.test.ts`, `tests/server/auth/onboarding-page-wiring.test.ts` | — |
 | Onboarding-ref signing | SHIPPED | `src/server/auth/onboarding-ref.ts` | `F-AUTH-4` | — | `tests/server/auth/onboarding-ref.test.ts` | — |
 | **Onboarding deck — first-login gate** | SHIPPED | `src/server/onboarding/gate.ts`, `src/components/onboarding/OnboardingDeck.tsx`, cards at `cards.ts:67` | SPEC.1 §21.9 | 0037 | `tests/unit/onboarding/gate.test.ts`, `cards.test.ts`, `copy-drift.test.ts`, `render/deck.test.tsx` | — |
@@ -93,14 +94,15 @@ audience."*
 | | Value | Source |
 |---|--:|---|
 | Namespace as specified | **50,000** = 50 colours × 100 animals × 10 numbers | ADR-0011; ADR-0016:161 states it as fact |
-| Rows on **staging** | **1,070** (549 unassigned, 521 assigned) | `SELECT count(*) … FROM identity_pool` |
+| Rows on **staging** | **1,070** (**548** unassigned, 522 assigned — ⚠ live and drifting: it read 549/521 minutes earlier in this same generation) | `SELECT count(*) … FROM identity_pool` |
 | Rows on **production** | **0** | same query, `--config prd` |
 
 ⚠ **ADR-0011 already contradicts its own headline** and is the honest source here: its patch
 section records that the generation run *"covers 13 c…"* colours and that *"Still owed: …
 the 50,000-row production manifest"*. So the gap is known and written down; what was not
-written down anywhere is the measured figure. **Staging can absorb 549 further signups before
-the pool is empty.** Production can absorb none, because it has none.
+written down anywhere is the measured figure. **Staging can absorb ~548 further signups before
+the pool is empty**, and that figure falls by one with every signup — it fell by one during
+this generation. Production can absorb none, because it has none.
 
 ## 3 · The decisions that shaped it
 
@@ -140,7 +142,7 @@ Admin handlers live under `src/app/(admin)/admin/...`.
 |---|---|
 | **INV-2** — Dharma non-transferable, no overdraft | the initial grant is the only credit this lane writes, once per user, inside the acceptance transaction. `tests/invariants/I-GRANT-ONCE-001.initial-grant-once-per-user.spec.ts`; storage backstop is the unique partial index `dharma_ledger_initial_grant_user_uq` |
 | Bucket B — one-shot `NULL → timestamp` | `identity_pool.assigned_at` transitions once and is then immutable; every other column change and every DELETE is rejected at the storage layer. `tests/db/triggers/` |
-| Pool exhaustion | `FOR UPDATE SKIP LOCKED` (`consume.ts:36`) lets parallel signups take different rows rather than serialising on one. A retired tuple never returns to the pool |
+| Pool exhaustion | `FOR UPDATE SKIP LOCKED` (`consume.ts:36`) lets parallel signups take different rows rather than serialising on one. A retired tuple never returns to the pool. ⚠ **This is a claim about the shipped SQL, not a measured concurrency result** — the only test is a mocked substring assertion (see §2). `tests/integration/oauth-signup-pool-deadlock.integration.test.ts` exercises concurrent signup against real Postgres and is the nearest thing to a behavioural proof |
 
 **Two vendor contracts that fail silently if forgotten**, both recorded here because each cost
 a production-shaped bug:
@@ -180,7 +182,7 @@ record — PR #366 merged the work; the lane has no session log.**
 | Pointer | What |
 |---|---|
 | `docs/STATE.md` §4 · `F-2` | `identity_pool` holds **0 rows on production**; 1,070 on staging with 549 unassigned |
-| `docs/STATE.md` §4 · `F-7` | `BETTER_AUTH_TRUSTED_ORIGINS` is absent from Doppler `prd` |
+| `docs/STATE.md` §4 · `F-7` | `BETTER_AUTH_TRUSTED_ORIGINS` is absent from Doppler `prd` — **config hygiene, not a security gap**: the baseURL origin is trusted unconditionally |
 | `docs/STATE.md` §4 · `F-9` | ADR-0011 sizes the namespace at 50,000 and ADR-0016 states it as fact; the built pool is 1,070 |
 | `docs/parked.md` — SCAFFOLD.12 §10.b | Resend domain verification + `RESEND_FROM_EMAIL` flip |
 | `docs/parked.md` — SCAFFOLD.12 §10.c / §10.d | preview `BETTER_AUTH_URL`; preview-alias callback URI on the Google client |

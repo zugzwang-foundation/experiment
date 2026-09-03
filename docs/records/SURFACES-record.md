@@ -37,9 +37,9 @@ learn that from a record rather than from a fruitless search for code that is go
 | **Profile** `/u/[pseudonym]` | SHIPPED | `src/app/(public)/u/[pseudonym]/{page,loading,error}.tsx` | SPEC.1 §23 | — | `tests/unit/profile/`, `tests/unit/design/profile-height-chain.test.ts` | — |
 | **Legal** `/legal` | SHIPPED | `src/app/(public)/legal/page.tsx`, `src/lib/legal-sections.ts`, `public/legal/{tos,privacy}.txt` | SPEC.1 §13 | — | `tests/unit/design/legal-figures.test.ts` | — |
 | Auth group + layout | SHIPPED | `src/app/(auth)/{layout,error}.tsx`, `sign-in/`, `sign-in/otp/`, `onboarding/` | SPEC.1 §13 | 0023 | `tests/unit/auth/` | — |
-| Visitor counter POST | SHIPPED | `src/app/api/visits/route.ts`, `src/components/shell/VisitorCounter.tsx` | SPEC.1 §21.1 | — | `tests/unit/shell/` | — |
-| ⛔ **Bookmarks** `/bookmarks` | **REMOVED** | — | — | **0040** | — | table + migration retained |
-| ⛔ **Profile Dharma graph** | **REMOVED** | — | — | **0040** | — | — |
+| Visitor counter POST | SHIPPED | `src/app/api/visits/route.ts`, `src/components/shell/VisitorCounter.tsx` | SPEC.1 §21.1 | — | route: `tests/server/visitors/{route,counter}.test.ts` · component: `tests/unit/shell/` | — |
+| ⛔ **Bookmarks** `/bookmarks` | **REMOVED** | — | — | **0040** | **none** — searched; no coverage exists under another name | table + migration retained |
+| ⛔ **Profile Dharma graph** | **REMOVED** | — | — | **0040** | **none** — searched; no coverage exists under another name | — |
 | Mobile-responsive read surfaces | **NOT BUILT** | — | — | **0045** (accepted 2026-09-01) | none | plan at `docs/plans/MOBILE-1.md`; no PR |
 
 ### 2.2 · Components, by directory
@@ -77,7 +77,7 @@ pointer hover and touch tap — it composes Radix's Tooltip and Popover and pick
 | Inline sell on profile | SHIPPED | `src/components/profile/InlineSell.tsx`, `LotBreakdown.tsx` | 0039 | `tests/unit/profile/` |
 | Onboarding deck (7 cards, re-show drops 1) | SHIPPED | `src/components/onboarding/cards.ts:67` | 0037 | `tests/unit/onboarding/copy-drift.test.ts` |
 | Warli auth artwork | SHIPPED | `src/components/art/warli/` | — | `tests/unit/art/` (7 files) |
-| ⛔ Expanded post nodes on the chart | **REMOVED** | — | — | removed by #457, CHART-NODE-REMOVE |
+| ⛔ Expanded post nodes on the chart | **REMOVED** | — | — | **absence guarded**: `tests/unit/debate/render/price-chart.test.tsx:862` — `no-circle-carries-a-ground-rim — CHART-NODE-REMOVE`, written so a re-added node reddens |
 | Toast / notification layer | **NOT BUILT** | — | — | none |
 
 ### 2.4 · SPEC.1 §21 ancillary surfaces — the status of each

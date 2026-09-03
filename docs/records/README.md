@@ -43,6 +43,11 @@ retire the chat-era close-out corpus afterwards: nothing here depends on it.
 number · `ADR` is a number or `—` · **`Proved by` is a test path or the word `none`** · `Open`
 is a pointer, never restated prose.
 
+⚠ **`none` and `—` are not interchangeable in the `Proved by` column, and the difference is the
+point.** `none` means *searched, and there is no coverage*. `—` means *not applicable*. A cell
+that takes `—` to avoid saying `none` has hidden a gap behind a dash — which is exactly how five
+wrong `none`/`—` cells got into the first draft of this set.
+
 ## The four rules
 
 1. **Repository only.** No project-knowledge document, no chat history, no summary. A lane whose

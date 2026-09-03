@@ -35,23 +35,24 @@ read path.
 | Image attach — resolve, ownership, un-attached | SHIPPED | `src/server/comments/image-attach.ts` | `F-COMMENT-3` | 0028 | `tests/server/comments/image-attach.test.ts`, `tests/integration/composer-image.integration.test.ts` | — |
 | Byte-identity binding on the moderated image | SHIPPED | `src/server/storage/`, `image_uploads` triggers | `F-COMMENT-3` | 0028 | `tests/server/comments/image-verify-audit-record.test.ts` | — |
 | **Pre-commit moderation (text + image, one call)** | SHIPPED | `src/server/moderation/precommit.ts`, `openai.ts`; sole call site `src/app/api/bets/place/route.ts:135` | SPEC.1 §16.5 · `F-MOD-1` | 0014, 0021 | `tests/server/moderation/`, `tests/integration/precommit-moderate.integration.test.ts` | — |
-| Gate-block consequences (`mod_actions`, auto-ban, CSAM seam) | SHIPPED | `src/server/moderation/consequences.ts:75`, `:127`, `:188` | SPEC.1 §15 · `F-MOD-2` | 0021 | `tests/server/moderation/moderation-blocked-event.test.ts` | — |
+| Gate-block consequences (`mod_actions`, auto-ban, CSAM seam) | SHIPPED | `src/server/moderation/consequences.ts:75`, `:127`, `:188` | SPEC.1 §15 · `F-MOD-2` | 0021 | `mod_actions` + event: `tests/server/moderation/moderation-blocked-event.test.ts` · **auto-ban**: `tests/server/moderation/track-a.test.ts` · **CSAM seam**: `tests/server/moderation/csam-seam.test.ts` | — |
 | Reactive removal — no held queue | SHIPPED | `src/server/admin/moderation/` | SPEC.1 §15 | 0020, 0021 | `tests/server/admin/moderation/` | — |
-| **Removal masking on every body read** | SHIPPED | `loadRemovedSet` in `src/server/debate-view/load-debate-view.ts`, reused by `src/server/discovery/hero.ts:168` and `src/server/admin/moderation/review-feed.ts:16` | SPEC.1 §15 | 0020, 0021 | `tests/server/debate-view/load-debate-view.integration.test.ts` | CLAUDE.md §5.14 SC-1 fires on every new body read |
+| **Removal masking on every body read** | SHIPPED | `loadRemovedSet` defined in `src/server/debate-view/load-debate-view.ts:461`; **five call sites** — `:287` · `discovery/hero.ts:168` · `admin/moderation/review-feed.ts:233` · `profile/arguments.ts:434` · `profile/positions.ts:484` | SPEC.1 §15 | 0020, 0021 | `tests/server/debate-view/load-debate-view.integration.test.ts` (SC-1-compliant: asserts the **body**'s absence) · `tests/server/discovery/hero.test.ts` · `tests/server/admin/moderation/review-feed-completeness.integration.test.ts` · `tests/server/profile/{masking,arguments,positions}.test.ts` | CLAUDE.md §5.14 SC-1 fires on every new body read |
 | Ranking — multi-mode composite | SHIPPED | `src/lib/ranking.ts`, `ranking.config.ts`, `ranking-decimal.ts`, substrate `src/server/debate-view/ranking-substrate.ts` | `docs/specs/RANKING.md` | 0017, 0039 | `tests/unit/ranking/` | `F-3` (numerics are a placeholder) |
-| Ranking reads surviving basis, not frozen stake | SHIPPED | `src/server/debate-view/ranking-substrate.ts` (`COALESCE(lots.surviving_basis, bets.stake)`) | SPEC.2 §4 | 0039 R4 | `tests/unit/ranking/` | — |
-| Self-authored replies excluded from attraction | SHIPPED | `src/server/debate-view/ranking-substrate.ts` | SPEC.2 §4 | 0039 P2 | `tests/unit/ranking/` | — |
-| Two count pairs — displayed vs ranking input | SHIPPED | `src/server/debate-view/ranking-substrate.ts` | SPEC.2 §4 | 0039 P3 | `tests/unit/ranking/` | — |
+| Ranking reads surviving basis, not frozen stake | SHIPPED | `src/server/debate-view/ranking-substrate.ts:166,170` | SPEC.2 §4 | 0039 R4 | **behavioural**: `tests/server/lots/rank-decay-parity.test.ts` (real rows through `loadRankingSubstrate`) · source scan: `tests/unit/ranking/substrate-site-parity.test.ts` | — |
+| Self-authored replies excluded from attraction | SHIPPED | `src/server/debate-view/ranking-substrate.ts:144,151,168,172` (in `FILTER`, not the JOIN) | SPEC.2 §4 | 0039 P2 | `tests/unit/ranking/substrate-site-parity.test.ts:276` · behavioural: `tests/server/lots/rank-decay-parity.test.ts` | — |
+| Two count pairs — displayed vs ranking input | SHIPPED | `src/server/debate-view/ranking-substrate.ts` | SPEC.2 §4 | 0039 P3 | `tests/unit/ranking/substrate-site-parity.test.ts` | — |
 | Viewer-scoped debate reads | SHIPPED | `src/server/debate-view/viewer-context.ts`, `load-debate-view.ts` | `F-DEBATE-1` | 0034 | `tests/integration/viewer-context.integration.test.ts` | — |
 | Debate view polling (client interval) | SHIPPED | `src/components/debate/DebatePoll.tsx`, `poll-phase.ts` | SPEC.1 §9 · `F-DEBATE-4` | — | `tests/server/debate-view/poll-contract.test.ts` | `F-3` (`POLL_INTERVAL_MS_DEBATE_VIEW` provisional) |
 | Price chart on the debate view | SHIPPED | `src/components/debate/chart/`, `src/server/debate-view/price-chart.ts` | SPEC.1 §9 | — | `tests/unit/debate/chart/`, `tests/invariants/I-GENESIS-001.open-implies-market-opened-event.spec.ts` | — |
 | Market quote read | SHIPPED | `src/app/(public)/m/[slug]/quote/route.ts`, `src/server/debate-view/quote.ts` | SPEC.1 §7 | — | `tests/integration/market-quote.integration.test.ts` | — |
 | **`.md` export / AI mode** | SHIPPED | `src/app/(public)/m/[slug]/export/route.ts`, `src/server/debate-export/{serialize,context,market-meta}.ts`, button in `src/components/debate/MarketHeader.tsx` | SPEC.1 §21.3 | 0025 | `tests/integration/debate-export.integration.test.ts`, `tests/unit/debate-export/` | — |
-| Comment foreclosure (frozen market) | SHIPPED | `src/server/comments/foreclosure.ts` | SPEC.1 §14 | — | `tests/server/comments/no-position.test.ts` | — |
-| Standalone comment (no bet) | **NOT BUILT — refused by design** | — | SPEC.1 §5 INV-1 | 0017 | `tests/server/comments/direct.test.ts` | never |
+| Reply foreclosure — single-side × Counter | SHIPPED | `src/server/comments/foreclosure.ts` (`computeReplyAffordance`, `readReplyAffordance`) | SPEC.1 §8 | 0017 | `tests/unit/comments/foreclosure.test.ts` (12 tests) | — |
+| No stake, no voice — a comment requires a bet | SHIPPED | `src/app/api/bets/place/route.ts` step 5 | SPEC.1 §5 INV-1 · `F-COMMENT-5` | 0017 | `tests/server/comments/no-position.test.ts::comment-requires-bet` | — |
+| Standalone comment (no bet) | **NOT BUILT — refused by design** | — | SPEC.1 §5 INV-1 | 0017 | `tests/server/comments/no-position.test.ts::comment-requires-bet` + `tests/invariants/I-ATOMICITY-001…::every-comment-has-a-referencing-bet-construction` | never |
 | Friendly-fire vote as its own row | **REMOVED** | — | — | 0017 | `drizzle/migrations/0018_*` dropped `friendly_fire_events` | — |
-| Second moderation vendor (PhotoDNA / Hive / Safer) | **NOT BUILT** | — | — | 0014 | none | `docs/parked.md` SCAFFOLD.16 §6 |
-| NCMEC CyberTipline reporting | **NOT BUILT** | — | — | — | none | `docs/parked.md` SCAFFOLD.16 §6 |
+| CSAM escalation seam (`csam_auto_report_pending`) | SHIPPED | `src/server/moderation/consequences.ts:188` | SPEC.1 §16.5 | 0014, 0021 | `tests/server/moderation/` | — |
+| Vendor and reporting coverage beyond the shipped gate | **NOT BUILT** | — | — | 0014 | none | **`docs/parked.md` SCAFFOLD.16 §6 owns the scope and the resolution path — not restated here** |
 
 ### 2.1 · Ranking — the shape, and where the maths lives
 
@@ -73,9 +74,15 @@ a reader needs from this record is the *shape* and the *entry points*.
    carrying the weight they no longer hold. The `COALESCE` fallback exists because a reply-bet
    predating `lots` has no lot row — the file says so at `:160`.
 2. **Self-authored replies are excluded** (ADR-0039 P2). A reply whose author is the parent
-   post's author counts toward none of the four aggregates. **The predicate sits in the JOIN,
-   not the filter** — in the filter it would make posts whose only replies are their author's
-   vanish from listings entirely, which is a worse defect than the one being closed.
+   post's author counts toward none of the four ranking aggregates. ⛔ **The predicate sits in
+   the aggregate `FILTER`, NOT in the JOIN** — `ranking-substrate.ts:144,151,168,172` carry
+   `AND rc.user_id <> p.user_id` inside `FILTER (…)`, while `:212` is a bare
+   `LEFT JOIN comments rc ON rc.parent_comment_id = p.id`. ⚠ **RANK-2 put it in the `ON` clause
+   and RANK-3 had to move it**, because a JOIN predicate *removes* the row, so the displayed
+   total could not be computed from the same query and a post whose only replies were its own
+   would vanish from the listing entirely. A `FILTER` keeps the row and declines to count it.
+   `tests/unit/ranking/substrate-site-parity.test.ts:276` asserts this by name and would red on
+   a reversion.
 3. **The counts are two numbers** (ADR-0039 P3). `support_count_total` / `counter_count_total`
    are what a surface **displays** and must equal what a reader can count on the page,
    self-authored and removed included. `support_count` / `counter_count` are the **ranking
@@ -162,8 +169,11 @@ ADR-0026 §D4. That is the admin lane's fact and lives in `docs/records/ADMIN-re
 | **INV-4** — resolutions append-only | `resolution_events` + `payout_events` immutable post-INSERT. `tests/invariants/I-APPEND-ONLY-001…` |
 
 **Removal masking is a property of every body read, not of rows.** `loadRemovedSet` is
-extracted once in `load-debate-view.ts` and reused — never re-implemented — by
-`discovery/hero.ts:168` and `admin/moderation/review-feed.ts:16`. `hero.ts:142-143` says so
+extracted once in `load-debate-view.ts:461` and reused — never re-implemented — at **five**
+call sites: `load-debate-view.ts:287`, `discovery/hero.ts:168`,
+`admin/moderation/review-feed.ts:233`, `profile/arguments.ts:434` and
+`profile/positions.ts:484`. **The last two are body reads on Profile** and are easy to miss
+when enumerating "the debate surfaces". `hero.ts:142-143` says so
 explicitly: *"the SAME masking primitive F-DEBATE-1's debate view enforces
 (extracted-and-exported, never re-implemented)"*. ⚠ **CLAUDE.md §5.14 SC-1 fires on any PR
 that adds or edits a read over `comments`**, and it exists because a second read path in one
@@ -202,8 +212,7 @@ beyond what `docs/logs/FEED-1.md` / `FEED-2.md` carry. Where a lane has no sessi
 |---|---|
 | `docs/STATE.md` §4 · `F-3` | 26 constants still `TBD` in SPEC.1 Appendix B; 13 ship as labelled placeholders. The comment length, the post floor, the poll interval and every ranking numeric are among them |
 | `docs/STATE.md` §4 · `F-5` | `ResolverCards.tsx:56-60` states placeholder arithmetic that does not work; `AGENTS.md` copied the result |
-| `docs/parked.md` — SCAFFOLD.16 §6 | second moderation vendor (Hive / PhotoDNA / Safer) deferred |
-| `docs/parked.md` — SCAFFOLD.16 §6 | NCMEC CyberTipline reporting deferred |
+| `docs/parked.md` — SCAFFOLD.16 §6 | the deferred moderation-coverage scope, with its resolution path |
 | `docs/parked.md` — SCAFFOLD.16 §1.1 | the Track A text/image asymmetry rationale (LD-3) |
 | `docs/parked.md` — UI-6 Gate C D1 | review-feed prior-flag count is blind to content removals |
 | `docs/parked.md` — UI-6 Gate C D2 | moderation image TTL too short for a browsing surface |

@@ -38,8 +38,8 @@ do not read the values.
 | **`migrations`** | `ok` | `ok` *(against a DB that matches the old code)* | same curl; `src/server/health/migration-drift.ts` |
 | **Migration head applied** | **27** — `0026_lots_no_delete` | **20** | `doppler run --config <stg\|prd> -- pnpm db:check-drift` |
 | Drift verdict | `IN SYNC ✓` | ⛔ **`DRIFT ✗`** | same |
-| `identity_pool` total / unassigned | **1,070 / 549** | ⛔ **0 / 0** | `SELECT count(*), count(*) FILTER (WHERE assigned_at IS NULL) FROM identity_pool` |
-| `users` | 320 | ⛔ **0** | `SELECT count(*) FROM users` |
+| `identity_pool` total / unassigned | **1,070 / 548** | ⛔ **0 / 0** | `SELECT count(*), count(*) FILTER (WHERE assigned_at IS NULL) FROM identity_pool` |
+| `users` | 321 | ⛔ **0** | `SELECT count(*) FROM users` |
 | `markets` | 12 (all `Open`) | ⛔ **0** | `SELECT count(*) FROM markets` |
 
 ⛔ **Seven migrations are unapplied on production** — `0020_dharma_ledger_seq`,
@@ -47,6 +47,18 @@ do not read the values.
 `0024_bookmarks`, `0025_lots`, `0026_lots_no_delete`. Among them the durable
 idempotency receipts, the TRUNCATE guards and the whole lot-accounting table.
 See `docs/STATE.md` §4 · `F-1`.
+
+⛔ **Ordering dependency — migrate to head BEFORE seeding production.** `0022_bet_receipts` is
+the durable idempotency backstop; without it a replay inside a Redis-outage window is guarded by
+the cache alone. That is harmless today because production holds zero users, markets and pool
+rows — there is nothing to double-charge. **It stops being harmless the moment production is
+seeded.** Apply migrations to head first; seed second.
+
+⚠ **Staging drifts between reads, and this set holds reads taken minutes apart.** During this
+generation `identity_pool` unassigned went **549 → 548** and `users` went **320 → 321** — one
+signup. `comments`/`bets` went **1,689 → 1,692** and stayed equal throughout. Where another
+record shows the earlier figure, that is live drift, not a contradiction; **re-measure rather
+than reconcile.**
 
 ⛔ **The production database is empty** — no identity pool, no users, no markets.
 See `docs/STATE.md` §4 · `F-2`.
@@ -62,8 +74,8 @@ independently of the function's environment. `tests/server/health/region.test.ts
 |---|---|---|---|---|---|---|
 | Health / canary / region / drift endpoint | SHIPPED | `src/app/api/health/route.ts` | SPEC.2 §22 | 0022, 0024 | `tests/server/health/` | — |
 | Single-region execution (`bom1`) | SHIPPED | `vercel.json` (`"regions": ["bom1"]`) | — | 0006 | `tests/server/health/region.test.ts` | — |
-| Postgres via Supabase session pooler | SHIPPED | `src/db/index.ts` | SPEC.2 §5 | 0008, 0024 | `scripts/verify-pooler-mode.ts` | — |
-| Transaction-pooler mode behind a flag | PARTIAL — staging only | `src/db/index.ts:45` (`DB_POOLER_MODE`), `:55` refuses `transaction` in prod | — | 0024 P3, 0038 P1 | `scripts/verify-pooler-mode.ts` | `STATE.md` §4 · `F-6` |
+| Postgres via Supabase session pooler | SHIPPED | `src/db/index.ts` | SPEC.2 §5 | 0008, 0024 | `tests/unit/db/client-options.test.ts` (pins the shipped pool options); live control `scripts/verify-pooler-mode.ts` | — |
+| Transaction-pooler mode behind a flag | PARTIAL — staging only | `src/db/index.ts:45` (`DB_POOLER_MODE`), `:55` refuses `transaction` in prod | — | 0024 P3, 0038 P1 | `tests/unit/db/pooler-mode.test.ts` (13 tests, incl. *"transaction mode in prod is refused at boot"*); live control `scripts/verify-pooler-mode.ts` | `STATE.md` §4 · `F-6` |
 | Rate limiting, six sliding windows | SHIPPED | `src/server/middleware/rate-limit.ts:40-87` | SPEC.2 §11 | 0015 | `tests/integration/rate-limit.integration.test.ts`, `tests/unit/rate-limit-prefix.test.ts` | — |
 | Idempotency cache (Redis) | SHIPPED | `src/server/idempotency/cache.ts` | SPEC.2 §11 | 0015, 0044 | `tests/integration/idempotency-cache.integration.test.ts`, `tests/unit/idempotency-release.test.ts` | — |
 | Durable idempotency receipts (`bet_receipts`) | SHIPPED | `src/db/schema/bets.ts`, `drizzle/migrations/0022_bet_receipts.sql` | SPEC.2 §11 | 0031 | `tests/invariants/I-IDEM-ONCE-001.one-commit-per-idempotency-key.spec.ts` | not on prod — `F-1` |
@@ -82,10 +94,10 @@ independently of the function's environment. `tests/server/health/region.test.ts
 | Migration applier — staging | SHIPPED | `scripts/migrate-staging.ts`, `.github/workflows/staging-migrate.yml` | — | 0024 | `tests/integration/migration-drift.integration.test.ts` | — |
 | Migration applier — production | SHIPPED, **never run to head** | `scripts/migrate-prod.ts` | — | 0022, 0024 | `tests/integration/migration-drift.integration.test.ts` | `F-1` |
 | Schema-drift guard | SHIPPED | `scripts/check-migration-drift.ts`, `src/server/health/migration-drift.ts` | — | 0022, 0024 | `tests/integration/migration-drift.integration.test.ts` | — |
-| Doppler-managed secrets (`stg` / `prd`) | SHIPPED | — | SPEC.2 §19 | — | `.github/workflows/env-audit.yml`, `scripts/ci-env-parity.ts` | `F-7` |
+| Doppler-managed secrets (`stg` / `prd`) | SHIPPED | — | SPEC.2 §19 | — | `tests/unit/ci-env-parity.test.ts` (12 tests over `auditEnvParity`); driven by `.github/workflows/env-audit.yml` | `F-7` |
 | Origin allowlist | SHIPPED | `src/server/middleware/origin-allowlist.ts` | SPEC.2 §11 | — | `tests/server/middleware/` | — |
 | Structured request logging | SHIPPED | `src/server/middleware/logging.ts` | SPEC.2 §17 | 0007 | `tests/server/middleware/` | — |
-| Frontend bundle instrument | SHIPPED | `scripts/measure-frontend-bundle.ts`, baseline `scripts/bundle-baseline.json` | — | — | none | — |
+| Frontend bundle instrument | SHIPPED | `scripts/measure-frontend-bundle.ts`, baseline `scripts/bundle-baseline.json` | — | — | `tests/unit/scripts/bundle-baseline.test.ts` (7 tests — the report shape plus five ceiling ratchets) | — |
 | Branch protection / required checks | **NOT BUILT** | — | — | — | none | `F-8` |
 | E2E runner (Playwright) | **NOT BUILT** | — | — | — | none | — |
 | Enforcement hooks / `permissions.deny` | **NOT BUILT** | — | — | — | none | — |
@@ -145,7 +157,7 @@ recorded here only where a name's presence or absence is itself a fact.
 | `SENTRY_API_TOKEN` | ✓ | — | **correct by design** — read by the local staging smoke runner only, never by deployed code |
 | `DATABASE_URL_TXN`, `DB_POOLER_MODE` | ✓ | — | the S-1 transaction-pooler pair. `src/db/index.ts:55` **refuses** `transaction` mode in prod, so the absence is enforced by code, not only by configuration |
 | `ZUGZWANG_ENV_CANARY` | ✓ | — | ⚠ **dead config.** `/api/health` reads exactly three env vars and this is not one of them (`route.ts:38-60`); ADR-0024 item 7 moved `canary` to `VERCEL_GIT_COMMIT_SHA`. Harmless, but nothing reads it |
-| `BETTER_AUTH_TRUSTED_ORIGINS` | ✓ | ⛔ **absent** | `src/server/auth/index.ts:330-333` reads it and falls back to `[]`. `docs/plans/SCAFFOLD.8-staging-plan.md:173` ratifies `prd = https://zugzwangworld.com`. See `STATE.md` §4 · `F-7` |
+| `BETTER_AUTH_TRUSTED_ORIGINS` | ✓ | ⛔ **absent** | ⚠ **Config hygiene, not a security gap — measured, because the obvious reading is wrong.** `src/server/auth/index.ts:330-333` resolves it to `[]`, but that is not an empty trust set: `getTrustedOrigins` pushes `new URL(baseURL).origin` **first and unconditionally** (`node_modules/better-auth/dist/context/helpers.mjs:73`), and `baseURL` is `BETTER_AUTH_URL`, which `auth/index.ts:47-49` hard-throws without. Production serves, so it is set, and the effective trust set is `["https://zugzwangworld.com"]` — **exactly the value** `docs/plans/SCAFFOLD.8-staging-plan.md:173` ratifies. `src/server/middleware/origin-allowlist.ts:24` derives a second, independent allowlist from the same variable. **What is absent is the name and any recorded decision to drop it.** See `STATE.md` §4 · `F-7` |
 | `R2_*` (12 names) | ✓ ×12 | ✓ ×12 | full three-arm parity — uploads, pfp, market-media |
 | `BETTER_AUTH_SECRET`, `TURNSTILE_*`, `RESEND_*`, `OPENAI_API_KEY`, `UPSTASH_*`, `ADMIN_PASSWORD`, `CRON_SECRET` | ✓ | ✓ | present both |
 
@@ -250,7 +262,7 @@ merged the work; the lanes have no session log.
 | `docs/STATE.md` §4 · `F-1` | production is 7 migrations behind the code |
 | `docs/STATE.md` §4 · `F-2` | the production database is empty |
 | `docs/STATE.md` §4 · `F-6` | `DATABASE_URL_TXN` / `DB_POOLER_MODE` present in `stg`, absent in `prd` |
-| `docs/STATE.md` §4 · `F-7` | `BETTER_AUTH_TRUSTED_ORIGINS` absent from `prd` |
+| `docs/STATE.md` §4 · `F-7` | `BETTER_AUTH_TRUSTED_ORIGINS` absent from `prd` — config hygiene; the protection is intact via the baseURL origin |
 | `docs/STATE.md` §4 · `F-8` | no branch protection on any branch; `ci` is not a required check |
 | `docs/parked.md` — SEQUENCE row 1 | `BETTER_AUTH_SECRET` may differ between Doppler `stg` and Vercel `staging` |
 | `docs/parked.md` — SEQUENCE row 2 | the Sentry routing smoke check is a lookalike |
