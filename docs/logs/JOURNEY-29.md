@@ -213,3 +213,71 @@ separate block so pasting the verification cannot run the irreversible push.
 ## Time
 
 One session, 2026-09-04 (UTC 2026-09-03 evening). Recon was not re-run.
+
+---
+
+# Spec v1.5 — 2026-09-04
+
+**Mode:** autonomous. **Branch:** `journey/29-act-viii`, from `2f89963d`. **PR #469 left OPEN for the
+operator to merge.**
+
+## What landed
+
+| Commit | |
+|---|---|
+| `78ec5a4` | `docs/journey/STYLE.md` ← style spec v1.5, verbatim (md5 `8d1e4beb…`, 818 lines) |
+
+It closes the two defects the close audit reported and this branch could not fix itself, because the
+spec is web-owned: **S-1**, the convention date, and **S-2**, the Landmark census's act column.
+
+## Decisions made
+
+- **The fix was verified, not trusted, and the verification was widened past what was asked.** The
+  brief named two strings to search for; the wrong date was searched for in six spellings, on the
+  reasoning that a value can survive a correction by changing format. It had not. All twenty-one act
+  attributions were re-derived from the corpus rather than checked against the five the brief said
+  had moved — because a correction landing on five rows and breaking a sixth is precisely the shape
+  this document has produced three times.
+- **The measuring rule was controlled before its results were believed.** The word-count mirror had
+  to reproduce the nine pinned per-act counts, the 427 total and the pinned 207 before any number it
+  produced was written down. A number from an unproven rule is not a measurement.
+- **The whole diff was audited, not just the announced sites.** Nine changed lines outside the new
+  preamble; every one announced, and nothing announced missing. That is the check that catches a
+  revision doing something extra on the way past.
+- **Two inherited numbers are reported and left alone**, per the standing rule that the spec is not
+  ours to edit. See below.
+
+## Open questions
+
+- **The §8 gold standards overstate every specimen they label** — 165/72/58/36 against a measured
+  150/68/47/31, using the rule the spec itself defines. Byte-identical across v1.3, v1.4 and v1.5,
+  so inherited rather than introduced; but §8 is where a drafter calibrates a tier, and the Landmark
+  label sits above a specimen whose real published entry the same file measures at 184. **Web lane.**
+- **§1's "gives the wrong answer for three commits" measures one** — `n=346` `6272d5b9` alone. The
+  warning it attaches to is right and worth keeping; the count is not. New in v1.4, retained in v1.5.
+  **Web lane.**
+- Still open from the close audit, unchanged: the apply instructions' refspecs are executed by no
+  guard, and prose deleted from inside an entry is uncaught for the 416 entries with no note body.
+  Both were declined with reasoning rather than missed.
+
+## Next session starts at
+
+**Nothing is owed by this branch.** It ends merge-ready: gate green, every guard control proven to
+fire last session, and the two spec defects this branch reported now closed by the spec's owner. The
+next action is the operator's — merge #469 — and only then the eleven notes in
+`docs/journey/notes-owed/`, following that directory's README exactly.
+
+## Context to preserve
+
+- **`git notes list | wc -l` is 343 and `refs/notes/commits` is `56b12a2f` — measured at the start
+  and the end of this session, local and remote, unchanged.** No `git notes` verb was run.
+- **Removing a transcribed count beats resetting it, and this session is the proof.** Last session
+  the parser docblock's *"21 `### ` headings"* was replaced with a numberless form rather than
+  updated to 26. One revision later the real count is **28**. A reset number would already be wrong;
+  the numberless sentence is still true.
+- **The spec's own §0.1 now makes that rule mechanical** — a value is measured when it is written or
+  it is not written — which is the rule this file's three failures earned.
+
+## Time
+
+One session, 2026-09-04 (UTC 2026-09-03 evening).
