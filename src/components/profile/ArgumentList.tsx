@@ -5,7 +5,8 @@ import {
 	computeSplitBar,
 	displaySplitTotal,
 } from "@/components/debate/composer/split-bar";
-import { formatDharma } from "@/components/debate/format";
+import { CompactDharmaFigure } from "@/components/debate/DharmaFigure";
+import { formatDharma, formatDharmaCompact } from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
@@ -440,6 +441,10 @@ function PresentHead({
 	const originalStake =
 		item.kind === "post" ? item.authorStakeOriginal : item.stakeOriginal;
 	const soldOut = item.kind === "post" ? item.authorSold : item.sold;
+	// UI-OVERNIGHT entry 1a — the head stake's RENDERED spelling. The
+	// strike-through below compares against it rather than against the stored
+	// value, so it compares the strings the reader actually sees.
+	const compactStake = formatDharmaCompact(currentStake);
 	return (
 		<div className="flex flex-wrap items-center gap-2">
 			<AuthorHead author={author} />
@@ -481,12 +486,18 @@ function PresentHead({
 			    Nothing here is erased — the commitment survives in the strikethrough
 			    and in Bucket-A `bets.stake`; it just stops being what ranks. */}
 			<HeadSeparator />
-			<span
-				data-testid={`argument-stake-${item.id}`}
+			{/* UI-OVERNIGHT entry 1a — ABBREVIATED past Đ10,000, with the exact
+			    figure on the element as a native tooltip and only when the two
+			    spellings differ. Same rule, same formatter and same reason as the
+			    debate surface's `ArgProfile`: this is the same head cluster, and
+			    the two renderings of it must not disagree about how a stake is
+			    spelled. ⛔ The POSITIONS table's `CURRENT` cell keeps the exact
+			    figure — that is a number a participant checks before selling. */}
+			<CompactDharmaFigure
+				value={currentStake}
+				testId={`argument-stake-${item.id}`}
 				className="text-n6 text-xs"
-			>
-				Đ {formatDharma(currentStake)}
-			</span>
+			/>
 			{soldOut ? (
 				<InfoTip content={GLOSSARY.sold} asChild>
 					<span
@@ -496,18 +507,19 @@ function PresentHead({
 						{SOLD_LABEL}
 					</span>
 				</InfoTip>
-			) : formatDharma(originalStake) !== formatDharma(currentStake) ? (
+			) : formatDharmaCompact(originalStake) !== compactStake ? (
 				/* Only when the figure has actually moved ON SCREEN. Compared through
-				   `formatDharma`, not on the raw 18-dp strings: a sub-Đ1 reduction is a
-				   real change to the basis and a non-change to what the reader sees, and
-				   striking a number through beside an identical number is exactly the
-				   "same number twice" this branch exists to prevent. */
-				<span
-					data-testid={`argument-stake-original-${item.id}`}
+				   `formatDharmaCompact`, not on the raw 18-dp strings: a sub-Đ1
+				   reduction is a real change to the basis and a non-change to what the
+				   reader sees, and striking a number through beside an identical number
+				   is exactly the "same number twice" this branch exists to prevent.
+				   ⚠ The comparison follows the RENDERED spelling wherever it goes — so
+				   since UI-OVERNIGHT entry 1a it is the abbreviated one. */
+				<CompactDharmaFigure
+					value={originalStake}
+					testId={`argument-stake-original-${item.id}`}
 					className="text-n4 text-xs line-through"
-				>
-					Đ {formatDharma(originalStake)}
-				</span>
+				/>
 			) : null}
 			{/* `Replies · N` stays POST-ONLY — replies attract nothing by design
 			    (§9), so a reply has no count to show. That gate was always correct;

@@ -8,7 +8,8 @@ import { RelativeTime } from "@/components/ui/relative-time";
 import { GLOSSARY, SOLD_LABEL } from "@/lib/copy/glossary";
 
 import { PositionMarker, SideBadge } from "./badges";
-import { formatDharma } from "./format";
+import { CompactDharmaFigure } from "./DharmaFigure";
+import { formatDharmaCompact } from "./format";
 import type { AuthorIdentity, Marker, Side } from "./types";
 
 /**
@@ -109,6 +110,12 @@ export function ArgProfile({
 	 */
 	chipSize?: "detail";
 }) {
+	// UI-OVERNIGHT entry 1a — the header stake renders ABBREVIATED (`Đ 12.5k`)
+	// with the exact figure on its tooltip (`CompactDharmaFigure`). The
+	// strike-through below compares the two stakes AS RENDERED, so it compares
+	// the ABBREVIATED spelling.
+	const compactStake =
+		authorStake === undefined ? "" : formatDharmaCompact(authorStake);
 	return (
 		// ⚠ `w-full` — change set 7 §1. `ml-auto` on the download mark only reaches
 		// the TRAILING EDGE if this row actually spans its container; as a
@@ -182,23 +189,32 @@ export function ArgProfile({
 						    ⇒ Colour only here: `text-ink` lifts the figure out of the row's
 						    inherited `text-muted-foreground` to the same weight as
 						    `Replies · n`, with the node shape untouched. */}
-						<span className="font-mono text-ink">
-							Đ {formatDharma(authorStake)}
-						</span>
-						{/* ⚠ COMPARED AS RENDERED, not as stored. `formatDharma` rounds to
-						    whole Đ, so comparing the raw 18-dp strings would strike through on
-						    any movement at all — including one too small to change what is
-						    printed, giving `Đ 1,500  ~~Đ 1,500~~`. The RULER keeps the full
-						    precision; only this affordance keys off what is on screen. */}
+						{/* UI-OVERNIGHT entry 1a — ABBREVIATED past Đ10,000, exact figure on
+						    the tooltip. `CompactDharmaFigure` owns both halves of that rule
+						    so this row and the profile's head cluster cannot drift apart on
+						    it; the class string and the contiguous `Đ 1,500` text node the
+						    guard below reads are unchanged. */}
+						<CompactDharmaFigure
+							value={authorStake}
+							className="font-mono text-ink"
+						/>
+						{/* ⚠ COMPARED AS RENDERED, not as stored. `formatDharmaCompact`
+						    rounds to whole Đ and abbreviates past Đ10,000, so comparing the
+						    raw 18-dp strings would strike through on any movement at all —
+						    including one too small to change what is printed, giving
+						    `Đ 1,500  ~~Đ 1,500~~`. The RULER keeps the full precision; only
+						    this affordance keys off what is on screen, which since
+						    UI-OVERNIGHT entry 1a means the ABBREVIATED spelling: two stakes
+						    that both print `Đ 12.5k` are the same figure to the reader, and
+						    striking one through beside the other would say otherwise. */}
 						{!sold &&
 						originalStake !== undefined &&
-						formatDharma(originalStake) !== formatDharma(authorStake) ? (
-							<span
-								data-testid="argstake-original"
+						formatDharmaCompact(originalStake) !== compactStake ? (
+							<CompactDharmaFigure
+								value={originalStake}
+								testId="argstake-original"
 								className="font-mono text-n4 line-through"
-							>
-								Đ {formatDharma(originalStake)}
-							</span>
+							/>
 						) : null}
 						{sold ? (
 							<InfoTip content={GLOSSARY.sold} asChild>
