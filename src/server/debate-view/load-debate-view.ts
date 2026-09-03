@@ -14,7 +14,7 @@ import {
 	type Side,
 	twoSlot,
 } from "@/lib/ranking";
-import { getSecondaryMarketMediaUrl } from "@/server/discovery/media";
+import { getMarketMediaUrls } from "@/server/discovery/media";
 import type {
 	PricePoint,
 	WireReservePoint,
@@ -169,6 +169,24 @@ export type DebateMarketHeader = MarketSummary & {
 	 * image.
 	 */
 	mediaImageUrl: string | null;
+	/**
+	 * UI-OVERNIGHT entry 4 — THE DISCOVERY CARD'S IMAGE, for the surfaces that
+	 * render the LOCKED CARD COMPOSITION rather than the detail header.
+	 *
+	 * `mediaImageUrl` above is the header's own picture and is deliberately NOT
+	 * the `is_default` row (MEDIA-SECOND-ROW). That is right for a header and
+	 * wrong for a market CARD: the post arm's rail renders the same composition
+	 * Discovery renders, so a reader who entered a post from Discovery found the
+	 * same market showing a different face. This field is that row — the one
+	 * `getDefaultMarketMediaUrl` signs for Discovery's own card.
+	 *
+	 * ⚠ IT COSTS NO EXTRA READ. One statement returns the market's media rows
+	 * and both choices are made from them (`getMarketMediaUrls`); the media
+	 * budget for this render is unchanged at one.
+	 * `null` on the defensive arm only — a missing row or a presign failure,
+	 * degrading to the card's own placeholder.
+	 */
+	thumbImageUrl: string | null;
 	pricing: { yes: string; no: string } | null;
 	/** UI.A2 §3.2 (SG-3 additive) — per-side `computeBuy(stake:"1").shares`, the A3 strip's `TO WIN Đ1 → Đx` substrate; rides the header's one pool read. */
 	unitToWin: { yes: string; no: string } | null;
@@ -249,36 +267,42 @@ export async function loadDebateView(
 	);
 	const totals = await getMarketTotals(client, marketId);
 	// HTML-FINISH · MARKET DETAIL rows 2 + 17 — THE ONE STATEMENT THIS READ
-	// SPENDS ON MEDIA, and the whole media read budget is +1 per render, still
-	// exactly one after MEDIA-SECOND-ROW Slice 1. Read-only reuse of a sibling
-	// in Discovery's module (`getSecondaryMarketMediaUrl`, not the
-	// `getDefaultMarketMediaUrl` Discovery's own card calls) and the SAME
-	// presign seam. ⛔ Nothing under `src/server/discovery/**` is written; the
-	// sibling function is the only new export there.
+	// SPENDS ON MEDIA, and the whole media read budget is +1 per render: still
+	// exactly one after MEDIA-SECOND-ROW Slice 1, and still exactly one after
+	// UI-OVERNIGHT entry 4 gave the two surfaces different images. Read-only
+	// reuse of a sibling in Discovery's module and the SAME presign seam.
+	// ⛔ Nothing under `src/server/discovery/**` is written.
 	//
 	// ⚠ THE MULTIPLIER IS WHY THIS IS COUNTED AT ALL. `DebatePoll` re-invokes
 	// this read every `POLL_INTERVAL_MS_DEBATE_VIEW` (15 s) = 4 renders per
 	// minute per viewer, against `src/db/index.ts`'s `max: 10` pool and a
 	// 15-slot session pooler. +1 read is +4 statements/minute/viewer; a per-post
-	// read would have been +4N.
+	// read would have been +4N, and a second image fetched separately would have
+	// been +8 for one picture the first result set already held.
 	//
-	// ⚠ It serves BOTH the market arm's media panel (`MarketHeader` →
-	// `MarketMediaPanel`) and the post arm's market card (`PostFocusHeader` →
-	// `FocusMarketCard`) — the same field, the same image, at both zoom levels
-	// — so row 17 rides row 2's read and adds nothing. Slice 1 does not thread
-	// these apart: both now render whichever row
-	// `getSecondaryMarketMediaUrl` resolves, exactly as both rendered
-	// `getDefaultMarketMediaUrl`'s row before this slice.
-	//
-	// ⚠ NOT the market's `is_default` row: `getSecondaryMarketMediaUrl`
-	// (`discovery/media.ts`) orders `is_default ASC, display_order ASC LIMIT
-	// 1`, so it resolves the lowest-`display_order` NON-default row when one
-	// exists, falling back to the sole `is_default` row when it doesn't (every
-	// market today) — one query either way, per ADR-0026 Driver 8's
-	// zero-extra-round-trip posture. SPEC.1 §9 "Market media" is narrowed
-	// same-commit from an auto-advancing carousel to this single image; the
-	// carousel is deferred, not dropped.
-	const mediaImageUrl = await getSecondaryMarketMediaUrl(client, marketId);
+	// ⚠⚠ THE TWO SURFACES NO LONGER SHOW THE SAME IMAGE, and this block said
+	// they did. Until entry 4 it read: "It serves BOTH the market arm's media
+	// panel and the post arm's market card — the same field, the same image, at
+	// both zoom levels." That was true and was the defect: the post arm's rail
+	// is the LOCKED CARD COMPOSITION, the same one Discovery renders, so the
+	// market changed its face when a reader entered a post from Discovery.
+	//   · `mediaImageUrl` → the market arm's media panel. The lowest-order
+	//     NON-DEFAULT row (`is_default ASC, display_order ASC, id ASC`), which
+	//     is what MEDIA-SECOND-ROW introduced so the HEADER could carry its own
+	//     larger image. Unchanged, and SPEC.1 §9's narrowing still describes it.
+	//   · `thumbImageUrl` → the post arm's market card. The `is_default` row —
+	//     the one Discovery's own card signs.
+	// Both come out of one `SELECT` (`getMarketMediaUrls`), which is ADR-0026
+	// Driver 8's zero-extra-round-trip posture applied to two choices instead of
+	// one.
+	// ⚠ UI-OVERNIGHT entry 4 — ONE statement, TWO images. The header keeps the
+	// secondary row it has taken since MEDIA-SECOND-ROW; the post arm's market
+	// CARD takes the `is_default` row, because that card is the same locked
+	// composition Discovery renders and the two were showing different pictures
+	// of the same market. `getMarketMediaUrls` makes both choices from one
+	// result set, so the budget counted above is unchanged.
+	const { thumb: thumbImageUrl, secondary: mediaImageUrl } =
+		await getMarketMediaUrls(client, marketId);
 
 	const commentById = new Map(comments.map((c) => [c.id, c]));
 
@@ -439,6 +463,7 @@ export async function loadDebateView(
 		market: {
 			...args.market,
 			mediaImageUrl,
+			thumbImageUrl,
 			pricing: pricingAndUnitToWin?.pricing ?? null,
 			unitToWin: pricingAndUnitToWin?.unitToWin ?? null,
 			totals,

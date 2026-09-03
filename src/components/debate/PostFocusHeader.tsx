@@ -89,7 +89,22 @@ export function PostFocusHeader({
 			right={
 				<FocusMarketCard
 					title={market.title}
-					imageUrl={market.mediaImageUrl}
+					// ⚠⚠ UI-OVERNIGHT entry 4 — THE DISCOVERY THUMBNAIL, NOT THE HEADER'S
+					// IMAGE. This rail is the LOCKED market-card composition (image thumb
+					// + question · YES/NO bar · totals), the same one Discovery renders —
+					// and it was showing a different picture of the same market, because
+					// the detail header deliberately takes the lowest-order NON-default
+					// media row (MEDIA-SECOND-ROW) while Discovery's card takes the
+					// default one. A reader who entered a post from Discovery saw the
+					// market change its face on the way in.
+					// ⚠ THE FALLBACK CHAIN IS THE BRIEF'S: thumbnail → the header's own
+					// media → the card's placeholder. `MarketThumb` supplies the last
+					// step for `null`, so a market with no media at all still renders the
+					// `IMG` box rather than a broken image.
+					// ⛔ THE HEADER'S OWN PANEL IS UNTOUCHED — `MarketMediaPanel` keeps
+					// `mediaImageUrl`. The two surfaces show different images on purpose;
+					// what was wrong was that one of them was a CARD.
+					imageUrl={market.thumbImageUrl ?? market.mediaImageUrl}
 					pricing={market.pricing}
 					totals={market.totals}
 					onExit={onExit}

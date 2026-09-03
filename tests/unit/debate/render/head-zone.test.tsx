@@ -72,6 +72,13 @@ const market: DebateMarketHeader = {
 	status: "Open",
 	mediaVideoUrl: null,
 	mediaImageUrl: null,
+	// ⚠ UI-OVERNIGHT entry 4 — the DISCOVERY thumbnail, distinct from
+	// `mediaImageUrl` above: the detail header takes the secondary media row,
+	// the post arm's market CARD takes the default one, because that card is
+	// the same locked composition Discovery renders. REQUIRED on the type, so a
+	// fixture that forgets it is a compile error rather than a card that
+	// silently shows the wrong picture.
+	thumbImageUrl: null,
 	pricing: { yes: "0.500000000000000000", no: "0.500000000000000000" },
 	unitToWin: { yes: "1.960000000000000000", no: "1.960000000000000000" },
 	totals: {
@@ -418,5 +425,79 @@ describe("HTML-FINISH · MARKET DETAIL — row 15, the focused post's teaser", (
 		// Non-vacuity: the post itself renders. Without this the assertion above
 		// would pass on a header that failed to mount at all.
 		expect(container.innerHTML).toContain("Fixture argument title.");
+	});
+});
+
+/**
+ * UI-OVERNIGHT entry 4 — the post arm's market card shows the DISCOVERY
+ * thumbnail, not the detail header's image.
+ *
+ * ⛔ WHY THE TWO ARE DIFFERENT AT ALL. MEDIA-SECOND-ROW gave the Market-Detail
+ * header its own picture — the lowest-order NON-default media row — so the
+ * header could carry a larger image than the tile. That is right for a header
+ * and wrong for this rail, which is the LOCKED market-card composition, the
+ * same one Discovery renders. A reader who clicked a market on Discovery and
+ * then entered a post found the market wearing a different face.
+ *
+ * ⚠ THE READ MODEL CARRIES BOTH and this suite asserts the WIRING — which field
+ * reaches the card. The selection rule itself (which row is which) is pinned
+ * against a real database in `market-media-selection.integration.test.ts`.
+ */
+describe("UI-OVERNIGHT 4 — the market card takes the discovery thumbnail", () => {
+	const withMedia = (
+		thumbImageUrl: string | null,
+		mediaImageUrl: string | null,
+	) =>
+		render(
+			<PostFocusHeader
+				post={presentPost()}
+				market={{ ...market, thumbImageUrl, mediaImageUrl }}
+				heldSide={null}
+				marketOpen
+				suspended={false}
+				activeRelation={null}
+				onToggleRelation={noop}
+				onExit={noop}
+				onOpenImage={noop}
+				onOpenPopup={noop}
+			/>,
+		);
+
+	const cardImage = (container: HTMLElement) =>
+		container
+			.querySelector('[data-testid="focus-market-card"]')
+			?.querySelector("img")
+			?.getAttribute("src") ?? null;
+
+	it("head-zone::the-market-card-renders-the-THUMB-not-the-header-image", () => {
+		const { container } = withMedia(
+			"https://example.invalid/tile-default.png",
+			"https://example.invalid/panel-second.png",
+		);
+		expect(cardImage(container)).toBe(
+			"https://example.invalid/tile-default.png",
+		);
+	});
+
+	it("head-zone::it-falls-back-to-the-header-image-when-there-is-no-thumb", () => {
+		// The brief's chain: discovery thumbnail → market media → placeholder. The
+		// middle step matters because `thumbImageUrl` is null on the defensive arm
+		// — a missing row or a presign failure — and a card with a picture
+		// available should not fall all the way to the placeholder.
+		const { container } = withMedia(
+			null,
+			"https://example.invalid/panel-second.png",
+		);
+		expect(cardImage(container)).toBe(
+			"https://example.invalid/panel-second.png",
+		);
+	});
+
+	it("head-zone::with-neither-it-renders-the-placeholder-and-no-broken-image", () => {
+		const { container } = withMedia(null, null);
+		const card = container.querySelector('[data-testid="focus-market-card"]');
+		expect(card?.querySelector("img")).toBeNull();
+		// `MarketThumb`'s own fallback box — chrome, not a broken image.
+		expect(card?.textContent).toContain("IMG");
 	});
 });

@@ -267,6 +267,13 @@ const MARKET_HEADER: DebateMarketHeader = {
 	status: "Open",
 	mediaVideoUrl: null,
 	mediaImageUrl: null,
+	// ⚠ UI-OVERNIGHT entry 4 — the DISCOVERY thumbnail, distinct from
+	// `mediaImageUrl` above: the detail header takes the secondary media row,
+	// the post arm's market CARD takes the default one, because that card is
+	// the same locked composition Discovery renders. REQUIRED on the type, so a
+	// fixture that forgets it is a compile error rather than a card that
+	// silently shows the wrong picture.
+	thumbImageUrl: null,
 	pricing: { yes: "0.500000000000000000", no: "0.500000000000000000" },
 	unitToWin: { yes: "2.000000000000000000", no: "2.000000000000000000" },
 	totals: {
