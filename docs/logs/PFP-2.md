@@ -179,3 +179,17 @@ Get `docs/plans/PFP-2.md` signed off, then execute it: `v1/` → `v2/` in `pfp-u
 ## Time
 
 ~1h — bucket survey, two detector passes, the corner-fill and filter comparisons, upload and verification.
+
+---
+
+## Addendum, 2026-09-03 — the swap ran in place, and no code changed
+
+**What landed.** `zugzwang-staging-pfp/v1/` now holds the re-framed images. 823 of 1,079 objects overwritten from `v2/`, 256 already byte-identical and untouched; all 1,079 keys now ETag-match their `v2/` twin, and six fetched over the public host with a cache-buster md5-matched the same ETag. No file in `src/` changed. Files: `docs/plans/PFP-2.md` rewritten from a plan into a record.
+
+**The decision that reversed.** The plan above was to bump the builder to `v2/`. The operator instead chose to replace the objects under `v1/`, which leaves `pfp-url.ts`, its five test assertions, `scripts/verify-identity-pool.ts:94`, SPEC.2 §12.7 and ADR-0011 all correct as written. The prefix bump is not deferred — it is not needed.
+
+**Rollback.** `v1-pre-pfp2/` holds all 1,079 pre-swap objects, ETag-verified. The apply phase refused to start until that was true. `v2/` is also still in place. There is no commit to revert, so those two prefixes are the whole rollback.
+
+**What the in-place route costs.** The objects carry `max-age=31536000, immutable` and `pub-*.r2.dev` has no purge control, so any browser that already loaded a PFP keeps it for a year unless hard-reloaded. Survivable now because only the team has loaded them. After the 15 Sep open this route is closed and a prefix bump becomes the only safe way to change these images.
+
+**Next session starts at:** PFP-3 — the pseudonym-number assignment in `src/server/identity-pool/rotation.ts`, whose plan is committed and awaiting sign-off. That is a critical-path code change and carries the full ritual.
