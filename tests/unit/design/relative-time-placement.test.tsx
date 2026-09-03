@@ -385,6 +385,47 @@ const SURFACES: {
 	},
 ];
 
+/** The fixture authors — how a node is recognised as an identity ROW. */
+const IDENTITY_ROW_TEXT =
+	/fixture-author|fixture-replier|hero-yes-author|fixture-user/;
+
+/** Does this element carry text of its own? */
+const speaks = (el: Element) => (el.textContent ?? "").trim() !== "";
+
+/** Action-cluster controls — what a text-free trailing element must be part of. */
+const CHROME = "button, a, [role='button']";
+
+/**
+ * The three lane-dominance strings (`src/lib/ranking`'s `Badge`). UI-OVERNIGHT
+ * entry 1b ruled the lane badge INTO this row, after the age, so it is the one
+ * thing allowed to speak after it — see (b).
+ */
+const LANE_BADGES = ["Most Debated", "Highest Stakes", "Contested"];
+const notALaneBadge = (el: Element) =>
+	!LANE_BADGES.includes((el.textContent ?? "").trim());
+
+const followsInOrder = (leaf: Element, el: Element) =>
+	(leaf.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+/**
+ * The row's TEXT LEAVES — elements that speak and contain no element that does
+ * the speaking for them. Reading leaves rather than every ancestor is what
+ * keeps a wrapper from being reported as a tag: since entry 1b the age lives
+ * inside a no-wrap group, and the group speaks only because its child does.
+ */
+const textLeaves = (from: Element) =>
+	[...from.querySelectorAll("*")].filter(
+		(el) => speaks(el) && el.querySelector("*") === null,
+	);
+
+/** Text leaves of `row` that come after `leaf` in document order. */
+const spokenAfter = (row: Element, leaf: Element) =>
+	textLeaves(row).filter((el) => followsInOrder(leaf, el));
+
+/** Text leaves of `row` that come before `leaf` in document order. */
+const spokenBefore = (row: Element, leaf: Element) =>
+	textLeaves(row).filter((el) => el !== leaf && !followsInOrder(leaf, el));
+
 describe("TIME-1 :: G6 — the age is the LAST element of the identity row", () => {
 	for (const surface of SURFACES) {
 		it(`relative-time::G6-last-on-the-identity-row — ${surface.name}`, () => {
@@ -399,28 +440,38 @@ describe("TIME-1 :: G6 — the age is the LAST element of the identity row", () 
 			// It rendered the age, not something else that happens to be last.
 			expect(leaf.textContent).toBe(EXPECTED);
 
-			const row = leaf.parentElement;
-			expect(row).not.toBeNull();
-
-			// (a) THE ROW IS THE IDENTITY ROW. Without this, "last child of its
-			// parent" is trivially true of a leaf in a footer wrapper, and G6
-			// would pass against the exact placement it exists to reject.
-			const rowText = row?.textContent ?? "";
+			// (a) THE ROW IS THE IDENTITY ROW — the NEAREST ANCESTOR of the age
+			// that carries the author. Without this, "last child of its parent" is
+			// trivially true of a leaf in a footer wrapper, and G6 would pass
+			// against the exact placement it exists to reject.
+			// ⚠⚠ IT USED TO BE `leaf.parentElement`, AND UI-OVERNIGHT ENTRY 1b MADE
+			// THAT WRONG RATHER THAN MERELY FRAGILE. The age now sits inside a
+			// no-wrap GROUP with the lane badge — so that the two move to a second
+			// line together instead of splitting — which means its literal parent is
+			// that group and carries no author at all. Walking up binds the same
+			// node this guard always meant: the row the author is on, whether or not
+			// the age is nested inside it.
+			let row: HTMLElement | null = leaf.parentElement;
+			while (row !== null && !IDENTITY_ROW_TEXT.test(row.textContent ?? "")) {
+				row = row.parentElement;
+			}
 			expect(
-				rowText,
-				`${surface.name}: the leaf's parent is not the identity row — it does not carry the author`,
-			).toMatch(/fixture-author|fixture-replier|hero-yes-author|fixture-user/);
+				row,
+				`${surface.name}: no ancestor of the age carries the author — the leaf is not on an identity row`,
+			).not.toBeNull();
+			if (row === null) return;
 
 			// (b) …AND IT IS AFTER EVERY TAG. ⚠ THIS WAS FIRST WRITTEN AS
 			// `row.lastElementChild === leaf` AND THAT WAS WRONG — it went red on
-			// the profile head, correctly. Two of these rows end with a
-			// TEXT-FREE trailing action cluster (`ArgProfile`'s download mark,
+			// the profile head, correctly. Two of these rows end with a TEXT-FREE
+			// trailing action cluster (`ArgProfile`'s download mark,
 			// `ArgumentList`'s `ml-auto` wrapper around `DownloadStub`), which is
 			// the row's trailing EDGE rather than one of its tags. The ruling is
-			// "after every existing tag", so the honest predicate is that the age
-			// is the last thing the row SAYS: nothing carrying text may follow it.
-			// A strict last-child assertion would have forced the age past a
-			// control on two surfaces to stay green — the guard bending the build.
+			// "after every existing tag", so the honest predicate is that the age is
+			// the last thing the row SAYS: nothing carrying text may follow it.
+			// ⚠⚠ AND IT IS NOW READ IN DOCUMENT ORDER, NOT SIBLING ORDER — entry 1b
+			// again. A sibling walk over the row's children now sees a GROUP where
+			// it used to see a field, and would pass whatever that group contained.
 			// ⚠ ONE PREDICATE, SHARED BY THE ASSERTION AND BY ITS CONTROL AT (d).
 			// The control used to carry a SECOND, textually separate copy of this
 			// expression — so weakening the one below to `() => false` would have
@@ -428,23 +479,31 @@ describe("TIME-1 :: G6 — the age is the LAST element of the identity row", () 
 			// predicate it no longer shared. A control that does not share code
 			// with what it certifies proves the wrong thing. (`@test-writer`
 			// NEW-3.)
-			const speaks = (el: Element) => (el.textContent ?? "").trim() !== "";
-			const siblings = [...(row?.children ?? [])];
-			const at = siblings.indexOf(leaf);
-			expect(at).toBeGreaterThanOrEqual(0);
-			const speaksAfter = siblings.slice(at + 1).filter(speaks);
+			const after = spokenAfter(row, leaf);
+
+			// ⚠⚠ THE ONE THING RATIFIED TO FOLLOW THE AGE IS THE LANE BADGE
+			// (UI-OVERNIGHT entry 1b rule 5), AND THIS IS A REVERSAL OF TIME-1's
+			// RULING ON THIS ROW RATHER THAN AN EXEMPTION INSIDE IT. The badge used
+			// to sit in the card's top-right corner, where it took width off the
+			// identity line and pushed the age onto a second one; the founder ruled
+			// it into the row, after the age, so the pair wraps as a unit. A badge
+			// BEFORE the age would put the timestamp in the middle of that pair.
+			// ⛔ EVERYTHING ELSE THAT SPEAKS IS STILL FORBIDDEN HERE — the allowance
+			// is keyed on the three lane strings, not on "the last element", so a
+			// fourth tag appended after the age still reddens.
+			// ⚠ Canon §3 item 11 is OWED AN AMENDMENT for this row; the guard
+			// follows the ruling, and the ordering is recorded rather than hidden.
 			expect(
-				speaksAfter.map((el) => el.textContent),
+				after.filter(notALaneBadge).map((el) => el.textContent),
 				`${surface.name}: something the row SAYS comes after the age`,
 			).toEqual([]);
 
 			// (c) POSITIVE CONTROL, INLINE, AND IT IS WHAT STOPS (b) PASSING
-			// VACUOUSLY. If the row had no text-bearing tags at all, `speaksAfter`
-			// would be empty wherever the leaf sat — including first. So assert
-			// the tags exist and that they are all BEFORE it.
-			const speaksBefore = siblings.slice(0, at).filter(speaks);
+			// VACUOUSLY. If the row had no text-bearing tags at all, the set above
+			// would be empty wherever the leaf sat — including first. So assert the
+			// tags exist and that they are all BEFORE it.
 			expect(
-				speaksBefore.length,
+				spokenBefore(row, leaf).length,
 				`${surface.name}: no tags precede the age — the guard cannot tell first from last here`,
 			).toBeGreaterThan(0);
 
@@ -457,55 +516,93 @@ describe("TIME-1 :: G6 — the age is the LAST element of the identity row", () 
 			// a tautology, which is worse than an absent control because it makes
 			// the guard look better-controlled than it is. (`@test-writer` M-2.)
 			// This runs the REAL predicate over a REAL mutation of the REAL row.
-			const mutated = row?.cloneNode(true) as HTMLElement;
+			// ⚠ THE INTRUDER IS NOT A LANE BADGE, deliberately: the allowance added
+			// above must not be wide enough to swallow the control that proves the
+			// rule still bites.
+			const mutated = row.cloneNode(true) as HTMLElement;
 			const intruder = mutated.ownerDocument.createElement("span");
 			intruder.textContent = "posted 30 July 2026";
 			mutated.appendChild(intruder);
 			const mutatedLeaf = mutated.querySelector("[data-relative-time]");
-			const mutatedSiblings = [...mutated.children];
-			const mutatedAt = mutatedSiblings.indexOf(mutatedLeaf as Element);
+			expect(mutatedLeaf).not.toBeNull();
 			expect(
-				mutatedSiblings.slice(mutatedAt + 1).filter(speaks).length,
+				spokenAfter(mutated, mutatedLeaf as Element).filter(notALaneBadge)
+					.length,
 				`${surface.name}: the predicate cannot see a tag appended after the age`,
 			).toBeGreaterThan(0);
 
-			// (e) THE STRICT RULE WHERE IT IS AVAILABLE. Three of the four rows
-			// end at the age outright; only the profile head has a trailing
-			// action cluster. Giving the strict predicate up on all four to
-			// accommodate one is how a text-free intruder — a pin, a badge, a
-			// menu glyph — lands after the age unnoticed.
+			// (e) A TEXT-FREE INTRUDER MUST NOT LAND AFTER THE AGE EITHER — a pin,
+			// a menu glyph, a second mark. Three of the four rows carry nothing at
+			// all after the age; only the profile head has a trailing action
+			// cluster. Giving that distinction up to accommodate one surface is how
+			// a silent intruder lands unnoticed on the other three.
+			// ⚠ KEYED ON WHAT THE ELEMENT IS, NEVER ON `ml-auto`. This assertion
+			// used to read the class string — in the file whose own docblock forbids
+			// selecting by presentation, and a purely cosmetic `ml-auto` → `ms-auto`
+			// reddened it while nothing about the age moved (`@test-writer` NEW-4).
+			// The exemption is for a TEXT-FREE TRAILING ACTION CLUSTER; what makes
+			// it that is the control inside it, not the utility that right-aligns it.
+			const mute = [...row.querySelectorAll("*")].filter(
+				(el) => followsInOrder(leaf, el) && !speaks(el),
+			);
 			if (surface.strictLast) {
 				expect(
-					row?.lastElementChild === leaf,
-					`${surface.name}: the age is not the literal last element of the identity row`,
-				).toBe(true);
+					mute.map((el) => el.tagName),
+					`${surface.name}: a text-free element follows the age on a row that should end at it`,
+				).toEqual([]);
 			} else {
-				// The exemption is ASSERTED, never assumed: whatever follows the
-				// age here must be the text-free trailing action cluster and
-				// nothing else.
-				// ⚠ KEYED ON THE CLUSTER'S CONTENT, NEVER ON `ml-auto`. This
-				// assertion used to read the class string — in the file whose own
-				// docblock forbids selecting by presentation, and a purely
-				// cosmetic `ml-auto` → `ms-auto` reddened it while nothing about
-				// the age moved (`@test-writer` NEW-4). The exemption is for a
-				// TEXT-FREE TRAILING ACTION CLUSTER; what makes it that is the
-				// control inside it, not the utility that right-aligns it.
-				const after = siblings.slice(at + 1);
 				expect(
-					after.length,
-					`${surface.name}: the trailing cluster is no longer a single element — re-derive the exemption rather than widening it`,
-				).toBe(1);
-				expect(
-					after[0]?.querySelector("button, a, [role='button']"),
-					`${surface.name}: what follows the age is not an action cluster`,
-				).not.toBeNull();
-				expect(
-					speaks(after[0] as Element),
-					`${surface.name}: the element after the age carries text, so it is a tag and not the trailing edge`,
-				).toBe(false);
+					mute.length,
+					`${surface.name}: the trailing cluster vanished — re-derive the exemption rather than keeping it`,
+				).toBeGreaterThan(0);
+				for (const el of mute) {
+					expect(
+						el.matches(CHROME) ||
+							el.querySelector(CHROME) !== null ||
+							el.closest(CHROME) !== null,
+						`${surface.name}: a text-free element that is not part of an action cluster follows the age`,
+					).toBe(true);
+				}
 			}
 		});
 	}
+
+	it("relative-time::G6-the-lane-badge-allowance-is-EXERCISED-not-merely-declared", () => {
+		// ⛔ THE ALLOWANCE ADDED AT (b) HAS NO FIXTURE ABOVE. All four surfaces
+		// render a post with `badge: null`, so widening the predicate for lane
+		// badges would sit there untested — a hole with a justification attached,
+		// which is the shape this file has already been corrected for once.
+		// ⇒ One card WITH a badge, run through the same predicate.
+		const { container } = render(
+			<PostCard
+				post={{ ...presentPost(), badge: "Highest Stakes" }}
+				onEnter={noop}
+				onOpenPopup={noop}
+				onOpenImage={noop}
+				onReplyToPost={noop}
+				heldSide={null}
+				marketOpen
+				suspended={false}
+			/>,
+		);
+		const leaf = container.querySelector("[data-relative-time]");
+		expect(leaf).not.toBeNull();
+		let row: HTMLElement | null = (leaf as Element).parentElement;
+		while (row !== null && !IDENTITY_ROW_TEXT.test(row.textContent ?? "")) {
+			row = row.parentElement;
+		}
+		expect(row).not.toBeNull();
+		if (row === null) return;
+
+		// It really is after the age, and inside the identity row — so the
+		// allowance is load-bearing rather than decorative.
+		const after = spokenAfter(row, leaf as Element);
+		expect(after.map((el) => (el.textContent ?? "").trim())).toContain(
+			"Highest Stakes",
+		);
+		// …and it is the ONLY thing allowed to be there.
+		expect(after.filter(notALaneBadge).map((el) => el.textContent)).toEqual([]);
+	});
 
 	it("relative-time::G6-the-wiring-carries-every-bucket-not-just-the-hour-one", () => {
 		// ⚠ THE FIXTURES ABOVE ALL SIT 5 h OLD, so until this test the leaf's

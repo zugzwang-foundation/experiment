@@ -3,7 +3,7 @@
 import { Card } from "@/components/ui/card";
 
 import { ArgProfile } from "./ArgProfile";
-import { LaneBadge, SideBadge } from "./badges";
+import { SideBadge } from "./badges";
 import { CommentImage, PostImagePlaceholder } from "./CommentImage";
 import { ReplySplitBar } from "./composer/ReplySplitBar";
 import { FocusMarketCard } from "./FocusMarketCard";
@@ -141,21 +141,22 @@ export function PostFocusHeader({
 								</>
 							) : (
 								<>
-									<div className="flex items-start justify-between gap-2">
-										<ArgProfile
-											author={post.author}
-											side={post.sideAtPostTime}
-											marker={post.marker}
-											entryPrice={post.entryPrice}
-											chipSize="detail"
-											authorStake={post.authorStake}
-											originalStake={post.authorStakeOriginal}
-											sold={post.authorSold}
-											replyCount={replyCount}
-											createdAt={post.createdAt}
-										/>
-										<LaneBadge badge={post.badge} />
-									</div>
+									{/* ⚠ UI-OVERNIGHT entry 1b — the lane badge rides the author
+									    row now (see `ArgProfile`), so the corner wrapper that held
+									    it beside this row is gone with it. */}
+									<ArgProfile
+										author={post.author}
+										side={post.sideAtPostTime}
+										marker={post.marker}
+										entryPrice={post.entryPrice}
+										chipSize="detail"
+										authorStake={post.authorStake}
+										originalStake={post.authorStakeOriginal}
+										sold={post.authorSold}
+										replyCount={replyCount}
+										createdAt={post.createdAt}
+										badge={post.badge}
+									/>
 									<h2 className="font-heading text-lg leading-snug font-medium">
 										{post.title}
 									</h2>

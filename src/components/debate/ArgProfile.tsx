@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { InfoTip } from "@/components/ui/info-tip";
 import { RelativeTime } from "@/components/ui/relative-time";
 import { GLOSSARY, SOLD_LABEL } from "@/lib/copy/glossary";
+import type { Badge as BadgeKind } from "@/lib/ranking";
 
-import { PositionMarker, SideBadge } from "./badges";
+import { LaneBadge, PositionMarker, SideBadge } from "./badges";
 import { CompactDharmaFigure } from "./DharmaFigure";
 import { formatDharmaCompact } from "./format";
 import type { AuthorIdentity, Marker, Side } from "./types";
@@ -40,6 +41,7 @@ export function ArgProfile({
 	replyCount,
 	createdAt,
 	chipSize,
+	badge = null,
 	download = false,
 }: {
 	author: AuthorIdentity;
@@ -85,6 +87,22 @@ export function ArgProfile({
 	 */
 	createdAt: string;
 	/**
+	 * UI-OVERNIGHT entry 1b — the LANE-DOMINANCE BADGE, now part of this row.
+	 *
+	 * It used to be a SIBLING of this component, pinned to the card's top-right
+	 * corner by every one of its three mounts. That placement is what made the
+	 * row unreadable: the badge took width off line 1, the age wrapped under it,
+	 * and the download mark — centred on the resulting two-line block — sat on
+	 * neither line. Bringing it inside makes it one of the row's tags, wrapping
+	 * with the age as a unit rather than competing with it for the same corner.
+	 *
+	 * ⚠ OPTIONAL AND DEFAULTED, unlike `createdAt`. A reply has no lane badge in
+	 * existence (dominance is a post-ranking artifact, `REPLY_DEPTH_MAX = 1`), so
+	 * a required prop would force the two reply mounts to pass `null` to say
+	 * "this concept does not apply here" — which is what a default already says.
+	 */
+	badge?: BadgeKind | null;
+	/**
 	 * ⚠ change set 6 §2 — render the (non-functional) download placeholder at the
 	 * END of this row. OPT-IN: only the post card and the post pop-up pass it, so
 	 * replies and the reply pop-up keep the row they have.
@@ -123,7 +141,18 @@ export function ArgProfile({
 		// `Replies · n` instead of at the edge. The row is a flex ITEM of the card's
 		// header (`PostCard`'s `justify-between` row), so without this it measured
 		// exactly its content.
-		<div className="flex w-full items-center gap-2">
+		// ⚠⚠ UI-OVERNIGHT entry 1b — `items-start`, NOT `items-center`, and that
+		// one word is the defect this entry exists to fix. With a badge present
+		// the metadata area wraps to two lines, and a CENTRED download mark then
+		// sits half a line below the row it belongs to — three baselines on a row
+		// that has one thing to say. Starting the row instead pins the mark to
+		// line 1 and leaves it there whether the age wraps or not.
+		<div className="flex w-full items-start gap-2">
+			{/* ⚠ THE AVATAR SETS LINE 1's HEIGHT — `size="sm"` is `size-6`, 24px,
+			    the tallest thing in Group A (the side chip is `h-5`). The download
+			    mark's wrapper below is `h-6` for exactly that reason, so "centred on
+			    line 1" is a consequence of the two boxes agreeing rather than an
+			    offset somebody has to maintain. */}
 			<Avatar size="sm">
 				<AvatarImage src={author.pfpUrl} alt="" />
 				<AvatarFallback>
@@ -138,8 +167,30 @@ export function ArgProfile({
 			    shapes, so a variant prop would be an abstraction over a difference
 			    that does not exist (CLAUDE.md §5.2). The chip's GEOMETRY is the one
 			    thing that varies, and it varies through `chipSize`. */}
-			<div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-				{/* HTML-FINISH · MARKET DETAIL row 42 — the pseudonym navigates to that
+			{/* ⚠⚠ UI-OVERNIGHT entry 1b — THE WRAPPING AREA, AND IT WRAPS IN TWO
+			    UNITS RATHER THAN IN FIELDS. Group A (identity · side · stake ·
+			    replies) and Group B (age · lane badge) are each `whitespace-nowrap`
+			    flex runs, so the row has exactly two shapes: one line, or A above B.
+			    ⛔ WHAT THIS REPLACES IS THE REASON FOR IT. Every field was its own
+			    flex item, so a narrow card broke the row wherever it ran out of
+			    width — the age alone under the stake, the badge alone under the age
+			    — and the download mark, centred on the resulting block, floated
+			    between the two lines. Grouping is what makes the wrap predictable.
+			    ⛔ NO `flex-1` HERE, and that is a MEASURED constraint rather than a
+			    style choice. `reply-card-absorber.test.tsx` reads the FIRST `flex-1`
+			    descendant of a reply card and requires it to be the image cell — the
+			    absorber that stops the card leaving dead space under its text. A
+			    `flex-1` on this row would take that slot, and the guard would be
+			    describing a header while claiming to describe an image cell. The
+			    download mark keeps its own `ml-auto` instead, which reaches the
+			    trailing edge for exactly the same reason it always did: the row is
+			    `w-full`. */}
+			<div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+				{/* GROUP A — never wraps internally (rule 2). A pseudonym long enough
+				    to overflow it is preferred to a pseudonym that is cut in half:
+				    identity is not a field this product truncates. */}
+				<span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
+					{/* HTML-FINISH · MARKET DETAIL row 42 — the pseudonym navigates to that
 				    author's Profile. SPEC.1 `:1628` already rules exactly this for the
 				    Discovery hero ("an author pseudonym click navigates to that
 				    author's **Profile (§23)**"), so this extends a ruled behaviour to
@@ -155,19 +206,24 @@ export function ArgProfile({
 				    ⚠ The accessible name is the pseudonym itself, so no `aria-label`
 				    is added: an override would have to CONTAIN the visible text to
 				    satisfy WCAG 2.5.3, and the visible text already says it. */}
-				<Link
-					href={`/u/${encodeURIComponent(author.pseudonym)}`}
-					className="truncate text-sm font-medium text-ink hover:underline"
-				>
-					{author.pseudonym}
-				</Link>
-				<Sep />
-				<SideBadge side={side} price={entryPrice} size={chipSize} />
-				<PositionMarker marker={marker} />
-				{authorStake !== undefined ? (
-					<>
-						<Sep />
-						{/* RANK-1 / ADR-0039 R6 — the figure FOLLOWS THE RULER. This is
+					<Link
+						href={`/u/${encodeURIComponent(author.pseudonym)}`}
+						// ⚠ UI-OVERNIGHT entry 1b rule 8 — NEVER TRUNCATED. `truncate` stood
+						// here since row 42; a pseudonym is the one field on this row that
+						// IS a person, and half of one identifies nobody. Group A may
+						// overflow a narrow card instead; that is the trade, made
+						// deliberately.
+						className="text-sm font-medium text-ink hover:underline"
+					>
+						{author.pseudonym}
+					</Link>
+					<Sep />
+					<SideBadge side={side} price={entryPrice} size={chipSize} />
+					<PositionMarker marker={marker} />
+					{authorStake !== undefined ? (
+						<>
+							<Sep />
+							{/* RANK-1 / ADR-0039 R6 — the figure FOLLOWS THE RULER. This is
 						    the stake still held, which is exactly what the lane sorted
 						    on; a fully-exited argument reads `Đ 0` here rather than
 						    keeping the number that bought its slot. The original is
@@ -176,7 +232,7 @@ export function ArgProfile({
 						    ⛔ "Lot" appears nowhere here (R1): on screen these are
 						    ARGUMENTS. `tests/unit/debate/render/arg-stake.test.tsx`
 						    pins that with a textContent assertion. */}
-						{/* ⚠⚠ change set 8 §1 — THE WHOLE UNIT GOES `text-ink`, GLYPH AND
+							{/* ⚠⚠ change set 8 §1 — THE WHOLE UNIT GOES `text-ink`, GLYPH AND
 						    NUMBER TOGETHER, AND IT STAYS ONE TEXT NODE.
 						    ⛔ THE NUMBER IS NOT PROMOTED SEPARATELY, and that is a founder
 						    ruling rather than a shortcut. `dharma-spacing.test.tsx` asserts
@@ -189,16 +245,16 @@ export function ArgProfile({
 						    ⇒ Colour only here: `text-ink` lifts the figure out of the row's
 						    inherited `text-muted-foreground` to the same weight as
 						    `Replies · n`, with the node shape untouched. */}
-						{/* UI-OVERNIGHT entry 1a — ABBREVIATED past Đ10,000, exact figure on
+							{/* UI-OVERNIGHT entry 1a — ABBREVIATED past Đ10,000, exact figure on
 						    the tooltip. `CompactDharmaFigure` owns both halves of that rule
 						    so this row and the profile's head cluster cannot drift apart on
 						    it; the class string and the contiguous `Đ 1,500` text node the
 						    guard below reads are unchanged. */}
-						<CompactDharmaFigure
-							value={authorStake}
-							className="font-mono text-ink"
-						/>
-						{/* ⚠ COMPARED AS RENDERED, not as stored. `formatDharmaCompact`
+							<CompactDharmaFigure
+								value={authorStake}
+								className="font-mono text-ink"
+							/>
+							{/* ⚠ COMPARED AS RENDERED, not as stored. `formatDharmaCompact`
 						    rounds to whole Đ and abbreviates past Đ10,000, so comparing the
 						    raw 18-dp strings would strike through on any movement at all —
 						    including one too small to change what is printed, giving
@@ -207,43 +263,69 @@ export function ArgProfile({
 						    UI-OVERNIGHT entry 1a means the ABBREVIATED spelling: two stakes
 						    that both print `Đ 12.5k` are the same figure to the reader, and
 						    striking one through beside the other would say otherwise. */}
-						{!sold &&
-						originalStake !== undefined &&
-						formatDharmaCompact(originalStake) !== compactStake ? (
-							<CompactDharmaFigure
-								value={originalStake}
-								testId="argstake-original"
-								className="font-mono text-n4 line-through"
-							/>
-						) : null}
-						{sold ? (
-							<InfoTip content={GLOSSARY.sold} asChild>
-								<span
-									data-testid="argstake-sold"
-									className="rounded-[var(--r-chip)] bg-n1 px-1.5 py-0.5 font-bold text-[10px] text-n5 uppercase tracking-[0.08em]"
-								>
-									{SOLD_LABEL}
-								</span>
-							</InfoTip>
-						) : null}
-					</>
-				) : null}
-				{replyCount !== undefined ? (
-					<>
-						<Sep />
-						{/* `.repmeta` (`d5:580`) — `font-weight:700;letter-spacing:.12em;
+							{!sold &&
+							originalStake !== undefined &&
+							formatDharmaCompact(originalStake) !== compactStake ? (
+								<CompactDharmaFigure
+									value={originalStake}
+									testId="argstake-original"
+									className="font-mono text-n4 line-through"
+								/>
+							) : null}
+							{sold ? (
+								<InfoTip content={GLOSSARY.sold} asChild>
+									<span
+										data-testid="argstake-sold"
+										className="rounded-[var(--r-chip)] bg-n1 px-1.5 py-0.5 font-bold text-[10px] text-n5 uppercase tracking-[0.08em]"
+									>
+										{SOLD_LABEL}
+									</span>
+								</InfoTip>
+							) : null}
+						</>
+					) : null}
+					{replyCount !== undefined ? (
+						<>
+							<Sep />
+							{/* `.repmeta` (`d5:580`) — `font-weight:700;letter-spacing:.12em;
 						    text-transform:uppercase;color:var(--ink)`, with `.repn`
 						    (`:579`) setting the COUNT back to 13px / no tracking. The row
 						    read `Replies · 0` in sentence case at the muted weight, which
 						    is the one field in this line the mockup deliberately promotes
 						    to ink. */}
-						<span className="text-[9.5px] font-bold tracking-[0.12em] text-ink uppercase">
-							Replies ·{" "}
-							<span className="text-[13px] tracking-normal">{replyCount}</span>
-						</span>
-					</>
-				) : null}
-				{/* TIME-1 · Form B — HOW LONG AGO, AND IT IS THE LAST THING ON THE ROW.
+							<span className="text-[9.5px] font-bold tracking-[0.12em] text-ink uppercase">
+								Replies ·{" "}
+								<span className="text-[13px] tracking-normal">
+									{replyCount}
+								</span>
+							</span>
+						</>
+					) : null}
+				</span>
+				{/* GROUP B — the age and the lane badge, one unbreakable unit. When
+				    the row runs out of width this MOVES WHOLE to a second line; it is
+				    never split, so the badge cannot end up orphaned under its own
+				    timestamp.
+				    ⚠⚠ THE BADGE MOVED HERE FROM THE CARD'S TOP-RIGHT CORNER
+				    (UI-OVERNIGHT entry 1b, founder ruling). It used to be a sibling of
+				    this whole component, pinned to the corner — which is what pushed
+				    the age onto a second line in the first place, and what left the
+				    download mark centred against a two-line block. It is a TAG about
+				    the argument, so it now travels with the argument's other tags.
+				    ⛔ AND IT NO LONGER TAKES A `Sep`. The separators inside Group A
+				    stay — they divide fields of one sentence — but a pipe before the
+				    age would DANGLE at the end of line 1 the moment Group B wraps.
+				    ⚠⚠ THIS REVERSES A RECORDED RULING AND SAYS SO. The block below
+				    used to read "THE `Sep` IS RULED IN … canon §3 item 11 gained the
+				    field AND its divider first". That ruling was made for a row that
+				    never wrapped as a unit; this one does. The founder ruled the wrap,
+				    and the divider cannot survive it — so canon §3 item 11 is OWED an
+				    amendment for this row, and the report says so rather than letting
+				    the code quietly disagree with the document it cites. */}
+				<span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
+					{/* TIME-1 · Form B — HOW LONG AGO, AND IT IS THE LAST THING GROUP A
+				    SAYS. The lane badge follows it (entry 1b, rule 5); nothing else
+				    does.
 				    ⛔ INSIDE THIS DIV, NOT THE ROW ABOVE IT. The outer row's last
 				    child is the `ml-auto` download mark, which sits at the trailing
 				    EDGE; appending there would put the age past a control rather than
@@ -272,8 +354,17 @@ export function ArgProfile({
 				    three existing pipes and the stake all sit at baseline 439.50, and
 				    so does the age. The new pipe is the same `Sep` at the same size,
 				    so it joins that line rather than introducing a second one. */}
-				<Sep />
-				<RelativeTime createdAt={createdAt} />
+					<RelativeTime createdAt={createdAt} />
+					{/* ⚠ AT MOST ONE BADGE EXISTS TO RENDER. `LaneBadge` takes a single
+					    `Badge | null` (a post dominates a lane or it does not), so the
+					    brief's "at most 2" is satisfied by the data shape rather than by
+					    a slice here — writing a cap over a scalar would be code that
+					    cannot run. If the lane model ever returns a list, the cap
+					    belongs at that seam, not at this one.
+					    ⚠ A REPLY PASSES NOTHING: lane dominance is a post-ranking
+					    artifact, and `LaneBadge` renders `null` for `null`. */}
+					<LaneBadge badge={badge ?? null} />
+				</span>
 			</div>
 			{/* ⚠⚠ UI-QUICK change set 6 §2 — THE DOWNLOAD PLACEHOLDER MOVED HERE FROM
 			    THE TITLE ROW, founder ruling. On the title row it shared an absolutely
@@ -292,23 +383,35 @@ export function ArgProfile({
 			    announces itself as unavailable rather than promising a download this
 			    build cannot perform. */}
 			{download ? (
-				<Button
-					variant="ghost"
-					size="icon"
-					disabled
-					aria-disabled="true"
-					aria-label="Download post image"
-					// ⚠ change set 7 §1 — `text-ink`, the SAME token `Replies · n` uses
-					// two elements to the left, not the muted ramp. The mark and the one
-					// promoted field on this row now sit at the same emphasis.
-					// ⚠ One step larger again: `icon-sm` (28px box / 16px glyph) →
-					// `icon` (32px / 20px). ⛔ `disabled` keeps it inert at every size;
-					// a bigger placeholder reads MORE like a working control, so the
-					// disabled state matters more here than it did at 24px.
-					className="ml-auto shrink-0 text-ink [&_svg]:size-5"
-				>
-					<Download />
-				</Button>
+				/* ⚠⚠ UI-OVERNIGHT entry 1b — `h-6` IS THE WHOLE ALIGNMENT MECHANISM.
+				   Line 1 of the metadata area is 24px, because the avatar is
+				   `size-6`; this wrapper is that same height and centres the mark
+				   inside it, so the mark sits on line 1's centre line whether the row
+				   is one line or two. The 32px button overhangs the band by 4px top
+				   and bottom, which is invisible on a ghost control and keeps its box
+				   — and therefore the ruled glyph size — untouched.
+				   ⛔ NOT AN OFFSET. A negative margin would have produced the same
+				   pixels today and drifted the moment either box changed size; two
+				   boxes that agree by name cannot. */
+				<span className="ml-auto flex h-6 shrink-0 items-center">
+					<Button
+						variant="ghost"
+						size="icon"
+						disabled
+						aria-disabled="true"
+						aria-label="Download post image"
+						// ⚠ change set 7 §1 — `text-ink`, the SAME token `Replies · n` uses
+						// two elements to the left, not the muted ramp. The mark and the one
+						// promoted field on this row now sit at the same emphasis.
+						// ⚠ One step larger again: `icon-sm` (28px box / 16px glyph) →
+						// `icon` (32px / 20px). ⛔ `disabled` keeps it inert at every size;
+						// a bigger placeholder reads MORE like a working control, so the
+						// disabled state matters more here than it did at 24px.
+						className="shrink-0 text-ink [&_svg]:size-5"
+					>
+						<Download />
+					</Button>
+				</span>
 			) : null}
 		</div>
 	);

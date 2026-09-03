@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 
 import { AggregateFooter } from "./AggregateFooter";
 import { ArgProfile } from "./ArgProfile";
-import { LaneBadge, SideBadge } from "./badges";
+import { SideBadge } from "./badges";
 import { CommentImage, PostImagePlaceholder } from "./CommentImage";
 import { KnowMore } from "./KnowMore";
 import { RemovedPlaceholder } from "./placeholders";
@@ -114,21 +114,28 @@ export function PostCard({
 		   Without it the card is content-sized, `.argimg`'s `flex-1` has nothing to
 		   distribute, and the image falls back to its intrinsic size. */
 		<Card className="min-h-0 flex-1 gap-2.5 p-3">
-			<div className="flex items-start justify-between gap-2">
-				<ArgProfile
-					author={post.author}
-					side={post.sideAtPostTime}
-					marker={post.marker}
-					entryPrice={post.entryPrice}
-					authorStake={post.authorStake}
-					originalStake={post.authorStakeOriginal}
-					sold={post.authorSold}
-					replyCount={replyCount}
-					createdAt={post.createdAt}
-					download
-				/>
-				<LaneBadge badge={post.badge} />
-			</div>
+			{/* ⚠⚠ UI-OVERNIGHT entry 1b — THE BADGE IS NO LONGER A CORNER SIBLING,
+			    and the wrapper that positioned it goes with it. `ArgProfile` renders
+			    the lane badge inside its own row now, beside the age, because that
+			    is where it stopped costing the row a line: pinned to this corner it
+			    took width off the identity line and pushed the timestamp under it.
+			    ⛔ The `justify-between` row had exactly two children and one of them
+			    has moved, so a one-child flex wrapper is left over. It is deleted
+			    rather than kept — `ArgProfile` is already `w-full`, so the wrapper
+			    was doing nothing the component does not do itself. */}
+			<ArgProfile
+				author={post.author}
+				side={post.sideAtPostTime}
+				marker={post.marker}
+				entryPrice={post.entryPrice}
+				authorStake={post.authorStake}
+				originalStake={post.authorStakeOriginal}
+				sold={post.authorSold}
+				replyCount={replyCount}
+				createdAt={post.createdAt}
+				badge={post.badge}
+				download
+			/>
 
 			{/* HTML-FINISH · MARKET DETAIL rows 23 + 24 — d5's `.rtitle.plust`
 			    (`:1077`): the TITLE enters post-focus (`onclick="enterPost(…)"`) and
