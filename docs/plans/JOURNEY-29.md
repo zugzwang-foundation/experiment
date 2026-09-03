@@ -142,7 +142,7 @@ the marker assertion, obtained for free.
 | `docs/journey/08-the-window.md` → `09-the-window.md` | the renumber; only line 1's heading changes, the bridge prose is untouched |
 | `docs/journey/08-the-instruments.md` | **new** — the act |
 | `docs/journey/README.md` | the act table, the link, and every count reconciled to its measured value |
-| `docs/journey/notes/` | **new** — eleven note-body files, written, **not pushed** |
+| `docs/journey/notes-owed/` | **new** — eleven note-body files plus their apply instructions, written, **not pushed** |
 | `CLAUDE.md` | the §5.13.1 count sentence, and nothing else |
 
 ---

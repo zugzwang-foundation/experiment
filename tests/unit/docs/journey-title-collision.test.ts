@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { parseEntries } from "./_journey-entries";
+import {
+	actFiles,
+	EXPECTED_ACT_FILES,
+	headingCountAcrossDir,
+	normaliseTitle,
+	parseEntries,
+} from "./_journey-entries";
 
 /**
  * EVERY JOURNEY ENTRY TITLE IS UNIQUE.
@@ -16,12 +22,21 @@ import { parseEntries } from "./_journey-entries";
  * to check only the entries that carry weight. A Groundwork title collides just
  * as hard, and there are far more of them.
  *
+ * ⚠ TITLES ARE COMPARED NORMALISED — case-folded, punctuation stripped. On the
+ * surface that makes a collision unrecoverable, `Green And Gone` and
+ * `green and gone` are the same title, and a byte comparison lets the second
+ * one through. Verified against the corpus: normalising introduces no new
+ * collision beyond the one deliberate duplicate below.
+ *
  * ⚠ ONE DUPLICATE IS DELIBERATE AND IS PINNED AT ITS EXACT COUNT.
  * `Voice, Not Balance` is printed twice, byte-identical, because it is ONE
  * entry covering TWO commits and the document keeps one heading per commit so
  * the positional count stays honest. Pinning it at exactly two is what makes
  * this guard survive that fact without being blinded by it: a third copy, or a
- * second title going double, still reds.
+ * second title going double, still reds. **The identity check includes the mono
+ * line**, because that is the line somebody would edit first if they ever gave
+ * the second copy its own commit subject — and a divergence check that skipped
+ * it would call two different entries identical.
  */
 
 /** Titles known to repeat on purpose, pinned to how many times. */
@@ -32,30 +47,39 @@ const PINNED_DUPLICATES: Record<string, number> = {
 describe("journey entries — title collision", () => {
 	const entries = parseEntries();
 
-	it("reads titles at all, and the duplicate detector can fire (control)", () => {
-		expect(entries.length).toBeGreaterThan(300);
-		const doubled = [...entries, entries[0]];
+	it("every act file is present and every title is reachable (control)", () => {
+		expect(actFiles()).toEqual([...EXPECTED_ACT_FILES]);
+		expect(entries.length).toBe(headingCountAcrossDir());
 		const counts = new Map<string, number>();
-		for (const e of doubled)
-			counts.set(e.title, (counts.get(e.title) ?? 0) + 1);
-		expect(counts.get(entries[0].title)).toBeGreaterThan(1);
+		for (const e of [...entries, entries[0]]) {
+			const k = normaliseTitle(e.title);
+			counts.set(k, (counts.get(k) ?? 0) + 1);
+		}
+		expect(
+			counts.get(normaliseTitle(entries[0].title)),
+			"the duplicate detector cannot fire",
+		).toBeGreaterThan(1);
 	});
 
 	it("no title appears more than once, except where pinned", () => {
 		const counts = new Map<string, number>();
-		for (const e of entries)
-			counts.set(e.title, (counts.get(e.title) ?? 0) + 1);
+		for (const e of entries) {
+			const k = normaliseTitle(e.title);
+			counts.set(k, (counts.get(k) ?? 0) + 1);
+		}
 
+		const allowed = new Map(
+			Object.entries(PINNED_DUPLICATES).map(([t, n]) => [normaliseTitle(t), n]),
+		);
 		const collisions: string[] = [];
-		for (const [title, count] of counts) {
-			const allowed = PINNED_DUPLICATES[title] ?? 1;
-			if (count !== allowed) {
+		for (const [key, count] of counts) {
+			if (count !== (allowed.get(key) ?? 1)) {
 				const where = entries
-					.filter((e) => e.title === title)
-					.map((e) => `${e.file}:${e.line}`)
+					.filter((e) => normaliseTitle(e.title) === key)
+					.map((e) => `${e.file}:${e.line} "${e.title}"`)
 					.join(", ");
 				collisions.push(
-					`"${title}" appears ${count}× (allowed ${allowed}) at ${where}`,
+					`"${key}" appears ${count}× (allowed ${allowed.get(key) ?? 1}) at ${where}`,
 				);
 			}
 		}
@@ -65,14 +89,26 @@ describe("journey entries — title collision", () => {
 		).toEqual([]);
 	});
 
-	it("every pinned duplicate is still exactly as pinned", () => {
+	it("the pin map has not grown, and every pinned duplicate is still exactly as pinned", () => {
+		expect(
+			Object.keys(PINNED_DUPLICATES).sort(),
+			"a new row here forgives a collision nobody argued for",
+		).toEqual(["Voice, Not Balance"]);
+
 		for (const [title, expected] of Object.entries(PINNED_DUPLICATES)) {
-			const found = entries.filter((e) => e.title === title);
+			const found = entries.filter(
+				(e) => normaliseTitle(e.title) === normaliseTitle(title),
+			);
 			expect(
 				found.length,
 				`"${title}" is pinned as a deliberate ${expected}× duplicate and now appears ${found.length}×`,
 			).toBe(expected);
-			const bodies = new Set(found.map((e) => e.visible.join("\n")));
+			// mono line included: it is the line most likely to be given its own
+			// commit subject later, and skipping it would call two different
+			// entries identical.
+			const bodies = new Set(
+				found.map((e) => [e.title, e.mono, ...e.visible].join("\n")),
+			);
 			expect(
 				bodies.size,
 				`"${title}" repeats because it is ONE entry covering two commits; the copies have diverged`,

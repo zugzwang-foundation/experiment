@@ -1,14 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { CEILINGS, parseEntries, type Tier } from "./_journey-entries";
+import {
+	actFiles,
+	CEILINGS,
+	EXPECTED_ACT_FILES,
+	headingCountAcrossDir,
+	parseBridges,
+	parseEntries,
+	type Tier,
+} from "./_journey-entries";
 
 /**
  * NO JOURNEY ENTRY EXCEEDS ITS TIER'S WORD CEILING.
  *
  * Landmark 200, Chapter 90, Groundwork 40 — ceilings, no floors (style spec
- * §3). The failure mode this catches is INFLATION, which is the one drift
- * produces first: an entry written at 85 words for a commit that deserved 40
- * reads as though the commit mattered more than it did, and a document written
- * to convey weight will manufacture weight if nothing stops it.
+ * §3).
+ *
+ * ⚠ THIS GUARD CATCHES BREACH. IT CANNOT CATCH INFLATION, AND AN EARLIER
+ * VERSION OF THIS DOCBLOCK CLAIMED IT DID. The distinction is not academic and
+ * it was found by measurement, not argument: the act written by the first
+ * unattended pass came out with 65 Chapters averaging 86 words against 67 for
+ * the 118 Chapters written before it, 41 of them within three words of the
+ * ceiling and 19 sitting at exactly 89 or 90 — against ONE entry above 87 in
+ * the whole of the preceding seven acts. Every one of those was green here,
+ * correctly, because none of them breached. **A ceiling measures the line, not
+ * the distribution underneath it**, and writing to the budget is what a drafter
+ * with no reader does. The repair for that is editorial, and it was made; this
+ * test is not the thing that would have caught it, and it should not claim to
+ * be.
  *
  * ⚠ THE CEILING CANNOT BE CHECKED WITHOUT A TIER, WHICH IS WHY THE MARKER IS
  * ASSERTED FIRST AND SEPARATELY. Before this landed, a Landmark and a
@@ -18,45 +36,114 @@ import { CEILINGS, parseEntries, type Tier } from "./_journey-entries";
  * corpus while looking green; guess a tier, and it enforces a ceiling nobody
  * chose. So an entry with no marker is a failure of THIS test, not a skip.
  *
- * ⚠ TABLE ROWS ARE NOT PROSE. The visual is Landmark furniture listed
- * separately from prose in §4, and counting it changes the answer: with table
- * rows included, `Let The Money In` measures 206 against a 200 ceiling. That
- * is the table being counted, not an entry being long.
+ * ⚠ `TIER: UNKNOWN` IS PARSEABLE AND MUST NOT BE PRESENT. The task that added
+ * these markers was told to use it for an entry that could not be marked
+ * without rewording; none arose. Leaving it merely skippable would have put a
+ * one-token, self-service exemption from the ceiling one line from any entry
+ * that reddened — no test edit, no map entry, nothing explaining itself. So it
+ * parses, and its presence is a failure.
  *
- * ⚠ ONE PUBLISHED ENTRY ALREADY EXCEEDS ITS CEILING AND IS PINNED, NOT
- * EXEMPTED. `Backwards In Public` is 207 words against 200. It is one of 340
- * published records and rewording it is forbidden, so the overage is recorded
- * at its exact measured value. An exemption would go quiet forever; a pin still
- * has a tripwire on it — if that entry moves in EITHER direction, this reds.
+ * ⚠ TABLE ROWS ARE NOT PROSE, AND ONLY A LANDMARK MAY HAVE THEM. Counting a
+ * table changes the answer: with table rows included, `Let The Money In`
+ * measures 206 against a 200 ceiling. But excluding them unconditionally makes
+ * a table an unbounded channel for words at any tier — 200 filler words as a
+ * table passed at Groundwork — so §4's "Chapters and Groundwork get none" is
+ * asserted here rather than assumed.
+ *
+ * ⚠ ONE PUBLISHED ENTRY EXCEEDS ITS CEILING AND IS PINNED, NOT EXEMPTED.
+ * `Backwards In Public` is 207 words against 200. It is a published record and
+ * rewording it is forbidden, so the overage is recorded at its exact measured
+ * value: it reds if that entry moves in EITHER direction, and the map's own
+ * membership is asserted so it cannot quietly grow a second row.
  */
 
 /**
  * Entries known to exceed their ceiling before this guard existed, pinned to
- * the exact word count measured at the commit that added this file.
+ * the exact word count measured when this file landed.
  *
- * This map may shrink. It must never grow: a new entry over its ceiling is the
- * defect, and adding it here is how the guard gets talked out of firing.
+ * This map may shrink. It must never grow — asserted below, because a docblock
+ * saying so is how the guard gets talked out of firing.
  */
 const PINNED_OVERAGES: Record<string, number> = {
 	"Backwards In Public": 207,
 };
 
+/**
+ * Bridges outside §11's 150–250 range before this guard existed.
+ *
+ * `09-the-window.md` measures 342. It is the bridge into the act written LIVE
+ * during the experiment window, it is marked provisional in its own text
+ * (*"the closing half is provisional until the window ends"*), and the task
+ * that added this guard was explicitly forbidden to rewrite it — it carries two
+ * of the document's open loops and rewriting it to fit a number would destroy a
+ * record to tidy a measurement. So it is pinned at its exact length: green
+ * today, red the moment it changes. Whoever drafts the forward half at go-live
+ * should bring it into range and delete this pin.
+ */
+const PINNED_BRIDGES: Record<string, number> = {
+	"09-the-window.md": 342,
+};
+
 describe("journey entries — word ceilings", () => {
 	const entries = parseEntries();
 
-	it("parses a corpus at all (control for every assertion below)", () => {
-		expect(entries.length).toBeGreaterThan(300);
+	it("every act file is present and every entry is reachable (control)", () => {
+		// A file that stops matching `NN-*.md` vanishes from all three guards in
+		// silence. A floor like `> 300` tolerates losing an entire act, so the
+		// file list is pinned and the count is derived a second way.
+		expect(actFiles()).toEqual([...EXPECTED_ACT_FILES]);
+		expect(entries.length).toBe(headingCountAcrossDir());
 		expect(entries.some((e) => e.words > 0)).toBe(true);
 	});
 
-	it("every entry carries a tier marker", () => {
+	it("every entry carries exactly one tier marker, and none is UNKNOWN", () => {
 		const unmarked = entries
-			.filter((e) => e.tier === null)
-			.map((e) => `${e.file}:${e.line} ${e.title}`);
+			.filter((e) => e.markers.length !== 1)
+			.map(
+				(e) => `${e.file}:${e.line} ${e.title} (${e.markers.length} markers)`,
+			);
 		expect(
 			unmarked,
-			`entries with no <!-- TIER: … --> marker, so no ceiling applies to them:\n${unmarked.join("\n")}`,
+			`entries without exactly one <!-- TIER: … --> marker:\n${unmarked.join("\n")}`,
 		).toEqual([]);
+
+		const unknown = entries
+			.filter((e) => e.tier === "UNKNOWN")
+			.map((e) => `${e.file}:${e.line} ${e.title}`);
+		expect(
+			unknown,
+			`UNKNOWN is an escape from the ceiling, not a tier. These entries must be marked properly:\n${unknown.join("\n")}`,
+		).toEqual([]);
+	});
+
+	it("every entry's mono line has the right shape", () => {
+		// Without this, a deleted mono line is reported as a missing marker —
+		// a true refusal with a misleading cause.
+		const bad = entries
+			.filter((e) => !e.monoOk)
+			.map(
+				(e) => `${e.file}:${e.line} ${e.title} — mono: ${e.mono.slice(0, 70)}`,
+			);
+		expect(bad, `malformed mono lines:\n${bad.join("\n")}`).toEqual([]);
+	});
+
+	it("only a Landmark carries a visual, and never more than one", () => {
+		const offenders: string[] = [];
+		for (const e of entries) {
+			if (e.tier !== "LANDMARK" && e.tableRows > 0) {
+				offenders.push(
+					`${e.file}:${e.line} ${e.title} — ${e.tier} carries ${e.tableRows} table rows; the visual is Landmark furniture (§4)`,
+				);
+			}
+			// a markdown table is a header row, a separator row, then its body:
+			// four or more rows past the separator means a second table.
+			if (e.tier === "LANDMARK" && e.tableRows > 6) {
+				offenders.push(
+					`${e.file}:${e.line} ${e.title} — ${e.tableRows} table rows reads as more than one visual (§4: never two)`,
+				);
+			}
+		}
+		expect(offenders, offenders.join("\n")).toEqual([]);
 	});
 
 	it("every marked entry is within its tier's ceiling", () => {
@@ -64,8 +151,7 @@ describe("journey entries — word ceilings", () => {
 		for (const e of entries) {
 			if (e.tier === null || e.tier === "UNKNOWN") continue;
 			const ceiling = CEILINGS[e.tier as Exclude<Tier, "UNKNOWN">];
-			const pinned = PINNED_OVERAGES[e.title];
-			if (pinned !== undefined) continue;
+			if (PINNED_OVERAGES[e.title] !== undefined) continue;
 			if (e.words > ceiling) {
 				over.push(
 					`${e.file}:${e.line} ${e.title} — ${e.tier} is ${e.words} words, ceiling ${ceiling}`,
@@ -78,13 +164,40 @@ describe("journey entries — word ceilings", () => {
 		).toEqual([]);
 	});
 
-	it("every pinned overage still measures exactly what it was pinned at", () => {
+	it("the pin map has not grown, and every pin still measures exactly what it was pinned at", () => {
+		expect(
+			Object.keys(PINNED_OVERAGES).sort(),
+			"a new row in PINNED_OVERAGES is how this guard gets talked out of firing",
+		).toEqual(["Backwards In Public"]);
 		for (const [title, expected] of Object.entries(PINNED_OVERAGES)) {
 			const found = entries.filter((e) => e.title === title);
 			expect(found.length, `pinned entry ${title} not found`).toBe(1);
 			expect(
 				found[0].words,
 				`${title} was pinned at ${expected} words because it is a published record that cannot be reworded; it now measures ${found[0].words}`,
+			).toBe(expected);
+		}
+	});
+
+	it("every written bridge is inside the 150–250 word range, or is pinned", () => {
+		const bad: string[] = [];
+		for (const b of parseBridges()) {
+			if (b.words === 0) continue; // Act I has no bridge, by record
+			if (PINNED_BRIDGES[b.file] !== undefined) continue;
+			if (b.words < 150 || b.words > 250) {
+				bad.push(`${b.file} — bridge is ${b.words} words, range is 150–250`);
+			}
+		}
+		expect(bad, bad.join("\n")).toEqual([]);
+	});
+
+	it("the pinned bridge has not grown or shrunk", () => {
+		expect(Object.keys(PINNED_BRIDGES).sort()).toEqual(["09-the-window.md"]);
+		const byFile = new Map(parseBridges().map((b) => [b.file, b.words]));
+		for (const [file, expected] of Object.entries(PINNED_BRIDGES)) {
+			expect(
+				byFile.get(file),
+				`${file}'s bridge was pinned at ${expected} words because it is published prose this task may not rewrite; it now measures ${byFile.get(file)}. If it was rewritten at go-live, bring it inside 150–250 and delete this pin.`,
 			).toBe(expected);
 		}
 	});

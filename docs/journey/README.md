@@ -59,6 +59,6 @@ git fetch origin "refs/notes/*:refs/notes/*"
 git log --notes=commits
 ```
 
-Thirteen commits since that date carry no such block, eight of them merge commits — the rule admits no exemption by type, so those are gaps rather than a category, and two have already been answered with a note instead.
+Thirteen commits since that date carry no such block, eight of them merge commits — the rule admits no exemption by type, so those are gaps rather than a category. Two have already been answered with a note instead; the reasoning owed to the other eleven is written and waiting in [`notes-owed/`](notes-owed/).
 
 The repository's own [`README.md`](../../README.md) carries the same fetch path for a reader who arrives at a commit rather than at this document.
