@@ -199,12 +199,17 @@ describe("the arm split — each arm renders through the shared frame", () => {
 
 		const left = container.querySelector('[data-testid="headzone-left"]');
 		expect(left).not.toBeNull();
-		// `vp` content — the focused post's title and teaser.
-		// ⚠ RE-DERIVED AT ROW 15: the focused post renders a TEASER with a `+`
-		// into the pop-up, not the whole body inline. The arm-split property this
-		// asserts is unchanged; only the marker moved.
+		// `vp` content — the focused post's title and its reply bar.
+		// ⚠ RE-DERIVED TWICE, NEVER RELAXED. Row 15 replaced the inline body with
+		// a TEASER, so the marker became the teaser; UI-OVERNIGHT entry 3 removes
+		// the teaser as well — two lines of preview were costing this header the
+		// Support/Counter bar at its foot — so the marker moves to that bar, which
+		// is `vp` content the market arm cannot render either. The arm-split
+		// property is untouched; only the string standing for it has moved.
 		expect(left?.innerHTML).toContain("Fixture argument title.");
-		expect(left?.innerHTML).toContain("Fixture teaser.");
+		expect(
+			left?.querySelector('[data-testid="post-focus-foot"]'),
+		).not.toBeNull();
 	});
 
 	it("head-zone::the-two-arms-are-DISJOINT", () => {
@@ -312,15 +317,29 @@ describe("the mount site — read off the source, because jsdom cannot see it", 
  * ADR-0025 `.md` export — this defers it, it does not withhold it.
  */
 describe("HTML-FINISH · MARKET DETAIL — row 15, the focused post's teaser", () => {
-	it("head-zone::the-focused-post-renders-its-teaser-not-its-body", () => {
+	it("head-zone::the-focused-post-renders-NEITHER-its-teaser-NOR-its-body", () => {
+		// ⚠⚠ THIS ASSERTION IS INVERTED BY FOUNDER RULING (UI-OVERNIGHT entry 3),
+		// AND ROW 15's REASONING IS THE REASON IT COULD BE. Row 15 moved the body
+		// out of this header because an unclamped argument pushed the reply arena
+		// below the fold; it left a two-line teaser behind. The teaser was the same
+		// trade at a smaller size, and the band is a FIXED fraction of the
+		// viewport — so what the preview actually cost was not scroll, it was the
+		// Support/Counter bar and the stake summary at the foot of the card, which
+		// the band clipped without any sign that it had.
+		// ⇒ Post-focus is where a reader reads an argument and answers it. A
+		// preview that removes the answering is not a preview of anything.
 		const { container } = renderPostArm();
 		const left = container.querySelector('[data-testid="headzone-left"]');
 
-		expect(left?.innerHTML).toContain("Fixture teaser.");
-		// The full body no longer renders INLINE — it is the pop-up's now.
+		expect(left?.innerHTML).not.toContain("Fixture teaser.");
+		// The full body does not render inline either — it is the pop-up's.
 		expect(left?.innerHTML).not.toContain("Fixture body.");
-		// Non-vacuity: the title still renders in full.
+		// Non-vacuity: the title still renders in full, and the foot the preview
+		// was displacing is now inside the header.
 		expect(left?.innerHTML).toContain("Fixture argument title.");
+		expect(
+			left?.querySelector('[data-testid="post-focus-foot"]'),
+		).not.toBeNull();
 	});
 
 	it("head-zone::the-plus-opens-the-pop-up-with-this-post", () => {

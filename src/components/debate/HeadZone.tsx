@@ -1,6 +1,41 @@
 import type { ReactNode } from "react";
 
 /**
+ * ⚠⚠ UI-OVERNIGHT entry 3 — THE TWO BANDS, AND WHY THERE ARE TWO.
+ *
+ * `BAND_DECLARED` is the shipped market-arm band, byte-for-byte: a fraction of
+ * the viewport that does not grow, does not shrink, and contains its own
+ * content. Every word of the reasoning below it belongs to that string.
+ *
+ * `BAND_CONTENT_SIZED` is the POST arm's, and it exists because the post arm
+ * put something inside the band that a declared height cannot hold. The market
+ * arm's contents are chrome — a question, a stat line, a price bar — and
+ * clipping the last few pixels of a resolver card costs a reader nothing. The
+ * post arm's contents END IN A CONTROL: the Support / Counter split bar and the
+ * stake summary beneath it. Clipping those does not shorten the header, it
+ * removes the reply affordance from the surface whose whole purpose is replying,
+ * and it does it silently — the band looks full, so nothing looks wrong.
+ *
+ * ⛔ THE FRACTION IS NOT REPLACED BY A BIGGER FRACTION, and that is the point.
+ * Any fixed band is a bet that the content fits at every viewport height; the
+ * bet was already lost once at 1440×700, which is what put `overflow-hidden`
+ * here in the first place. Content-sizing is what makes the bet unnecessary.
+ * `shrink-0` and `min-h-0` are kept — the band still does not grow into the
+ * arena's space, and it still may shrink below its content when the page is
+ * short, which is the one-screen chain's link.
+ * ⚠ `lg:items-start` — the rail stops STRETCHING to the reading column's
+ * height. On a content-sized band a stretched rail would be as tall as whatever
+ * the post happens to say, which is how a market card ends up with a hundred
+ * pixels of empty border under it. Scoped to `lg` because below it the band is
+ * `flex-col` and `items-start` would shrink the reading column to its content
+ * WIDTH — a desktop-only change stays a desktop-only change.
+ */
+const BAND_DECLARED =
+	"flex min-h-0 shrink-0 basis-[24.2dvh] flex-col gap-5 overflow-hidden lg:flex-row";
+const BAND_CONTENT_SIZED =
+	"flex min-h-0 shrink-0 flex-col gap-5 lg:flex-row lg:items-start";
+
+/**
  * HTML-FINISH · MARKET DETAIL row 1 — the header zone's two-column FRAME, and
  * nothing else. One frame, two consumers.
  *
@@ -51,13 +86,24 @@ import type { ReactNode } from "react";
 export function HeadZone({
 	left,
 	right,
+	fit = false,
 }: {
 	left: ReactNode;
 	/** `null` ⇒ no rail is rendered at all (see the docblock's last paragraph). */
 	right: ReactNode | null;
+	/**
+	 * UI-OVERNIGHT entry 3 — size the band to its CONTENT instead of to a
+	 * fraction of the viewport, and stop stretching the rail. Opt-in, and the
+	 * post arm is the only caller: see `BAND_CONTENT_SIZED` for why the two arms
+	 * genuinely differ rather than one of them being behind.
+	 */
+	fit?: boolean;
 }) {
 	return (
 		<section
+			// ⚠ EVERYTHING IN THIS COMMENT DESCRIBES `BAND_DECLARED` — the market
+			// arm's band. The post arm takes `BAND_CONTENT_SIZED` instead, and that
+			// constant's own docblock says why the reasoning below does not reach it.
 			// ⚠⚠ THE BAND IS A FRACTION OF THE VIEWPORT — not d5's literal `188px`,
 			// and NOT a percentage of the container. `.headzone{flex:0 0 188px}`
 			// (`d5:447`) is 188/777 = **24.2%** of the viewport at the pinned
@@ -130,7 +176,7 @@ export function HeadZone({
 			// ruling governs is a founder call and a merge is not the place to make
 			// it. When it is ruled, correct THIS block in place (O-5).
 			data-testid="headzone"
-			className="flex min-h-0 shrink-0 basis-[24.2dvh] flex-col gap-5 overflow-hidden lg:flex-row"
+			className={fit ? BAND_CONTENT_SIZED : BAND_DECLARED}
 		>
 			<div
 				// `.hleft{flex:1 1 auto;min-width:0;display:flex;gap:16px}` (`d5:448`)

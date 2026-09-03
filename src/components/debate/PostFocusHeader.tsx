@@ -72,6 +72,15 @@ export function PostFocusHeader({
 	const replyCount = post.aggregate.supportCount + post.aggregate.counterCount;
 	return (
 		<HeadZone
+			// ⚠⚠ UI-OVERNIGHT entry 3 — THIS ARM IS CONTENT-SIZED. The band's
+			// declared fraction was smaller than this header at ordinary viewport
+			// heights, and the band contains its own overflow — so the Support /
+			// Counter bar at the foot of this card, and the stake summary under it,
+			// were simply cut off. Nothing looked broken: the band was full, and the
+			// one control the surface exists for was below its edge.
+			// ⛔ THE MARKET ARM IS UNTOUCHED and keeps the declared band — its
+			// contents are chrome, and chrome may be clipped. See `HeadZone`.
+			fit
 			// HTML-FINISH · MARKET DETAIL row 17 — `.mcard` (`d5:1021`) is the post
 			// arm's whole rail, and it IS THE EXIT. See `FocusMarketCard` for why
 			// building it inert would make post-focus a trap: `?post=` syncs with
@@ -124,10 +133,31 @@ export function PostFocusHeader({
 								<CommentImage url={post.imageUrl} onOpen={onOpenImage} />
 							</div>
 						) : (
-							<div className="aspect-[16/9] h-full w-auto shrink-0">
+							<div className="aspect-[16/9] w-auto shrink-0 self-stretch">
 								{/* `.hpimg{aspect-ratio:16/9;height:100%;width:auto}` (`d5:787`)
 								    — the same height-driven frame the market arm gives
-								    `.mmedia`, now that the band has a definite height. */}
+								    `.mmedia`.
+								    ⚠⚠ UI-OVERNIGHT entry 3 — `self-stretch` REPLACES `h-full`,
+								    AND WITHOUT IT THIS BOX WOULD HAVE COLLAPSED SILENTLY. The
+								    superseded note ended "now that the band has a definite
+								    height", which was the load-bearing half: `height:100%`
+								    resolves against a definite parent height, and entry 3 makes
+								    this band CONTENT-SIZED so that its own reply bar stops being
+								    clipped. A percentage height inside a chain that derives its
+								    height from this element is circular, and a browser resolves
+								    it to `auto` — the frame would shrink to one line of
+								    placeholder text with no error anywhere.
+								    ⇒ `self-stretch` takes the height from the SIBLING text stack
+								    instead, which is what actually determines the row: the item
+								    keeps `height:auto`, stretch gives it the line's cross size,
+								    and `aspect-ratio` derives the width from that. The inner
+								    placeholder's own `h-full` then resolves against a height that
+								    is definite after layout. Same rendered geometry, obtained
+								    from the sibling rather than from an ancestor that no longer
+								    declares one.
+								    ⚠ NOT VERIFIABLE IN THIS SUITE — jsdom performs no layout, so
+								    this is a construction argument and a browser check at 1440 is
+								    owed before merge. Reported. */}
 								<PostImagePlaceholder fill />
 							</div>
 						)}
@@ -161,64 +191,52 @@ export function PostFocusHeader({
 									<h2 className="font-heading text-lg leading-snug font-medium">
 										{post.title}
 									</h2>
-									{/* HTML-FINISH · MARKET DETAIL row 15 — d5's `.tease` (`:972`):
-									    a body TEASER with a `+` opening the full argument in the
-									    pop-up. The focused post used to render the whole body
-									    inline, which pushed the reply columns below the fold on
-									    any long argument — post-focus is where you READ the
-									    argument and then reply, so the reply surface has to stay
-									    reachable.
-									    ⚠ THE FULL BODY IS NOT LOST — one click away in the
-									    pop-up, and still whole in the ADR-0025 `.md` export. This
-									    defers it; it does not withhold it.
-									    ⚠ `deriveTitleTeaser` makes the teaser the SECOND
-									    paragraph, so a single-paragraph argument has none. d5
-									    marks that case "hidden-but-reserved when bodyless" — the
-									    TEXT hides, the `+` does NOT, because the full body exists
-									    either way and the control is the only path to it. */}
-									<div className="flex items-start justify-between gap-2">
-										{post.teaser ? (
-											/* ⚠⚠ `line-clamp-2` — `.tease .tx{-webkit-line-clamp:2}`
-											   (`d5:607`), and the mockup calls it a "2-line body
-											   TEASER" at `:971`. It was missing, so the WHOLE second
-											   paragraph rendered: measured on staging at `5349ae9`,
-											   a real fixture argument filled ~330px of the header and
-											   pushed the reply arena entirely below the fold. A
-											   teaser that is not clamped is not a teaser — it is the
-											   body, which is exactly what row 15 moved into the
-											   pop-up. */
-											<p className="line-clamp-2 text-sm whitespace-pre-line text-muted-foreground">
-												{post.teaser}
-											</p>
-										) : (
-											<span />
-										)}
-										{/* ⚠⚠ UI-QUICK change set 2 item 2 — `Know more` REPLACES THE
-										    GLYPH, and the superseded note is the reason it had to.
-										    It read: "Byte-carried from the mockup's own control
-										    (`d5:972`, `aria-label='Show more'`) — the same string
-										    the card's `+` carries, because it is the same action."
-										    The second clause is the binding one: it IS the same
-										    action, so once the card's control became text this one
-										    had to follow or the claim stopped being true.
-										    ⛔ The byte-carried label does not survive the relabel —
-										    a button reading `Know more` named `Show more` fails
-										    WCAG 2.5.3 (Label in Name). Mockup fidelity loses to the
-										    success criterion; `KnowMore.tsx` owns the rule. */}
-										{/* ⚠ UI-OVERNIGHT entry 5 — ONLY WHEN THERE IS MORE TO SHOW.
-										    ⛔ THIS REVERSES d5's "hidden-but-reserved when bodyless" and the
-										    guard that encoded it. The old reasoning was that "the full body
-										    exists either way and the control is the only path to it" — but on
-										    a post with no second paragraph the full body IS the title, and the
-										    pop-up showed the reader the sentence they had just read. */}
-										{hasExtendedText(post.body) ? (
-											<KnowMore
-												label="Know more about this argument"
-												onClick={() => onOpenPopup(post)}
-												className="shrink-0"
-											/>
-										) : null}{" "}
-									</div>
+									{/* ⚠⚠ UI-OVERNIGHT entry 3 — THE INLINE TEASER IS GONE FROM THIS
+									    HEADER, and what it cost is the reason. d5's `.tease` (`:972`)
+									    is a two-line body teaser, and row 15 had already narrowed it
+									    from the whole body to a clamped preview because an unclamped
+									    one pushed the reply arena below the fold. The clamp bought
+									    room; it did not buy enough. The band this header sits in is a
+									    fraction of the viewport, and with a title, an author row, two
+									    lines of teaser and a split bar inside it, the bar and the stake
+									    summary under it were CLIPPED — the reader saw an argument and
+									    no way to answer it.
+									    ⇒ Post-focus is where you READ an argument and then reply. Two
+									    lines of preview are not reading, and they were being paid for
+									    with the control that makes the surface work.
+									    ⚠ THE FULL BODY IS NOT LOST — one click away in the pop-up, and
+									    still whole in the ADR-0025 `.md` export.
+									    ⛔ `post.teaser` IS STILL ON THE WIRE and still derived; nothing
+									    server-side changes, and a surface that wants it back needs only
+									    to render it. Same posture `HeroPanels` took when its own teaser
+									    was removed. */}
+									{/* ⚠⚠ UI-QUICK change set 2 item 2 — `Know more` REPLACES THE
+									    GLYPH, and the superseded note is the reason it had to. It read:
+									    "Byte-carried from the mockup's own control (`d5:972`,
+									    `aria-label='Show more'`) — the same string the card's `+`
+									    carries, because it is the same action." The second clause is the
+									    binding one: it IS the same action, so once the card's control
+									    became text this one had to follow or the claim stopped being
+									    true. ⛔ The byte-carried label does not survive the relabel — a
+									    button reading `Know more` named `Show more` fails WCAG 2.5.3
+									    (Label in Name). Mockup fidelity loses to the success criterion;
+									    `KnowMore.tsx` owns the rule for every mount.
+									    ⚠ UI-OVERNIGHT entry 5 — ONLY WHEN THERE IS MORE TO SHOW, and
+									    that reverses d5's "hidden-but-reserved when bodyless". On a
+									    post with no second paragraph the full body IS the title, so the
+									    pop-up showed the reader the sentence they had just read.
+									    ⚠ `self-end` REPLACES the flex row this control shared with the
+									    teaser. With the teaser gone that row held one child, and a
+									    one-child `justify-between` row is a wrapper that does nothing —
+									    except add a `gap-3` of empty space on the posts that render no
+									    control at all. */}
+									{hasExtendedText(post.body) ? (
+										<KnowMore
+											label="Know more about this argument"
+											onClick={() => onOpenPopup(post)}
+											className="self-end"
+										/>
+									) : null}
 								</>
 							)}
 
