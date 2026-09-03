@@ -54,34 +54,67 @@ both would be permanent.
 
 **Only after this pull request is reviewed and merged.** Run from the repository root.
 
+⚠ **The blocks below contain no comments, deliberately.** An interactive `zsh` — the shell this
+repository is operated from — does not treat `#` as a comment, so an explanatory line pasted into a
+command block becomes an argument, and an apostrophe inside one swallows everything after it. A
+block that cannot be pasted forces improvisation, and this is the one procedure in the project
+where improvisation lands on a ref no pull request can see. Every explanation is out here, in prose.
+
+**Step 1 — bring the ref up to date and record where it starts.** A plain `git fetch` does not
+touch it; the remote's fetch refspec covers heads only. The count should read **343**.
+
 ```bash
-# 1. A plain `git fetch` does NOT update this ref — the remote's fetch refspec covers heads only.
-git fetch origin "refs/notes/*:refs/notes/*"
-
-# 2. Attach each body to the commit its own filename names. Nothing is typed twice.
-for f in docs/journey/notes-owed/n*.txt; do
-  sha="${f##*-}"; sha="${sha%.txt}"
-  git notes add -F "$f" "$sha"     # no -f: this REFUSES where a note already exists
-done
-
-# 3. Read back what you are about to make permanent, before you make it permanent.
-for f in docs/journey/notes-owed/n*.txt; do
-  sha="${f##*-}"; sha="${sha%.txt}"
-  git notes show "$sha" | diff -u "$f" - && echo "OK   $sha"
-done
-git notes list | wc -l               # 343 before, 354 after
-
-# 4. Only if every line above said OK and the count reads 354.
-git push origin refs/notes/commits    # no --force, ever
+git fetch origin "+refs/notes/*:refs/notes/*"
+git notes list | wc -l
 ```
 
-⛔ **If the push is rejected, it is protecting you.** It means the ref moved since you fetched. Run
-step 1 again and redo step 2. **Never `--force` this ref** — it is the only copy of the reasoning
-attached to three hundred and forty-three commits, and a forced push silently discards whatever
-you had not fetched.
+**Step 2 — attach the eleven, by name.** The list is written out rather than globbed. A glob is
+evaluated against the directory at run time, so a later task that leaves its own bodies here would
+have them attached and pushed unread — and the read-back in step 3 could not catch it, because a
+file that created a note matches that note by construction. The hash comes from the filename, so
+nothing is retyped.
 
-⛔ **If `git notes add` says a note already exists, stop and find out why** rather than reaching for
-`-f`. It means that commit was already answered, and `-f` would overwrite the answer.
+```bash
+set -- n365-e5e520c n377-ff1c0f9 n394-f7eba3e n405-d2e99aa n406-8153d62 n407-545c5f8        n408-940cdcb n409-2d40a68 n410-98e203f n411-0366714 n412-b2da687
+for b in "$@"; do git notes add -F "docs/journey/notes-owed/$b.txt" "${b##*-}"; done
+```
+
+`git notes add` without `-f` refuses where a note already exists. If it refuses, **stop** — that
+commit was already answered, and `-f` would overwrite the answer. Go to Recovery.
+
+**Step 3 — read back what you are about to make permanent.** Eleven `OK` lines, no `FAIL`, and a
+count of **354**.
+
+```bash
+for b in "$@"; do git notes show "${b##*-}" | diff -q "docs/journey/notes-owed/$b.txt" - > /dev/null && echo "OK $b" || echo "FAIL $b"; done
+git notes list | wc -l
+```
+
+**Step 4 — only if step 3 was eleven `OK`s and 354.** This is the irreversible one, and it is a
+separate block so that pasting steps 1–3 cannot run it.
+
+```bash
+git push origin refs/notes/commits
+```
+
+## Recovery, if the push is rejected
+
+**A rejection is protecting you: the ref moved since you fetched.** Do **not** reach for `--force`
+— it is the only copy of the reasoning attached to three hundred and forty-three commits, and it
+discards whatever you had not fetched.
+
+Re-running step 1 will not help on its own: that refspec cannot fast-forward a diverged local ref.
+Reset the local ref to the remote and start again. **This is safe here and only here**, because
+every note you were adding comes from a file in this directory — discarding the local ref loses
+nothing that is not on disk.
+
+```bash
+git fetch origin "+refs/notes/commits:refs/notes/commits"
+git notes list | wc -l
+```
+
+Then repeat steps 2, 3 and 4. If the new count is not 343, one or more of the eleven was answered
+by somebody else while you were working; read those notes before doing anything further.
 
 ## When they are applied, delete them
 

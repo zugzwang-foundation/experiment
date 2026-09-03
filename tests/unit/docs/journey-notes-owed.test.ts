@@ -25,14 +25,45 @@ import { journeyDir, parseEntries } from "./_journey-entries";
  * slightly different from the published record. A guarantee that holds at the
  * moment somebody checks it and not afterwards is not a guarantee.
  *
- * ⚠ NO LINE MAY BEGIN WITH `#`. `git notes add -F` applies `stripspace` on the
- * non-editor path, which silently drops `#`-leading lines — so a markdown
- * heading in a body would be eaten between the file a reviewer read and the
- * note that landed, with nothing reporting it.
+ * ⚠ WHAT `git notes add -F` ACTUALLY CHANGES, MEASURED — an earlier version of
+ * this docblock said it drops `#`-leading lines. **It does not**, on git 2.53:
+ * `stripspace` removes comments only under `--strip-comments`, which that path
+ * does not pass. Stating a mechanism that does not exist is worse than stating
+ * none, because the next reader trusts it.
+ *
+ * What it DOES do is real and was unguarded: it strips trailing whitespace,
+ * collapses runs of blank lines to one, and drops leading and trailing blank
+ * lines. So a body carrying any of those would be stored differently from the
+ * file a reviewer approved — the same divergence, by a different route. Those
+ * three properties are asserted below instead of the `#` claim, which is kept
+ * only as a cheap belt: a leading `#` is still a markdown heading nobody wants
+ * in a note.
  */
 
 /** `CLAUDE.md` §5.13.1, the one text every note opens with. */
 const CANONICAL_BLOCK_MD5 = "8f4aab09d860acfca37a6df02ae8f481";
+
+/**
+ * The eleven, by name. Pinned rather than counted, because the apply
+ * instructions iterate a written-out list for exactly the same reason: a later
+ * task that leaves its own bodies in this directory must not be swept up by
+ * anything — not by a glob in a shell block, and not by a guard that only
+ * checks the directory is non-empty. A twelfth file is a decision, and it
+ * reddens here until somebody makes it.
+ */
+const EXPECTED_BODIES = [
+	"n365-e5e520c.txt",
+	"n377-ff1c0f9.txt",
+	"n394-f7eba3e.txt",
+	"n405-d2e99aa.txt",
+	"n406-8153d62.txt",
+	"n407-545c5f8.txt",
+	"n408-940cdcb.txt",
+	"n409-2d40a68.txt",
+	"n410-98e203f.txt",
+	"n411-0366714.txt",
+	"n412-b2da687.txt",
+] as const;
 
 const notesDir = (): string => join(journeyDir(), "notes-owed");
 
@@ -47,8 +78,8 @@ describe("journey — note bodies owed", () => {
 	const files = bodyFiles();
 	const entries = parseEntries();
 
-	it("there are bodies to check (control)", () => {
-		expect(files.length).toBeGreaterThan(0);
+	it("the directory holds exactly the eleven bodies this task owes", () => {
+		expect(files).toEqual([...EXPECTED_BODIES]);
 		expect(entries.length).toBeGreaterThan(400);
 	});
 
@@ -78,8 +109,7 @@ describe("journey — note bodies owed", () => {
 				drift.push(`${f} names "${title}", which is not an entry`);
 				continue;
 			}
-			const live = entry.prose.join("\n").replace(/\n{3,}/g, "\n\n");
-			if (prose !== live) {
+			if (prose !== entry.proseText) {
 				drift.push(
 					`${f} ("${title}") has drifted from its entry — the note would say something the record does not`,
 				);
@@ -88,11 +118,35 @@ describe("journey — note bodies owed", () => {
 		expect(drift, drift.join("\n")).toEqual([]);
 	});
 
-	it("no line begins with '#', which git notes would silently eat", () => {
+	it("every body survives what git notes actually rewrites", () => {
 		for (const f of files) {
-			const lines = readFileSync(join(notesDir(), f), "utf8").split("\n");
-			const hashed = lines.filter((l) => l.startsWith("#"));
-			expect(hashed, `${f} carries a line git notes would strip`).toEqual([]);
+			const raw = readFileSync(join(notesDir(), f), "utf8");
+			const lines = raw.split("\n");
+
+			expect(
+				lines.filter((l) => /[ \t]+$/.test(l)),
+				`${f} has trailing whitespace, which git notes strips — the stored note would differ from this file`,
+			).toEqual([]);
+
+			expect(
+				/\n[ \t]*\n[ \t]*\n/.test(raw),
+				`${f} has a run of blank lines, which git notes collapses to one`,
+			).toBe(false);
+
+			expect(
+				/^\s*\n/.test(raw),
+				`${f} opens with a blank line, which git notes drops`,
+			).toBe(false);
+
+			expect(
+				/\n\s*\n$/.test(raw),
+				`${f} ends with a blank line, which git notes drops`,
+			).toBe(false);
+
+			expect(
+				lines.filter((l) => l.startsWith("#")),
+				`${f} carries a markdown heading, which does not belong in a note`,
+			).toEqual([]);
 		}
 	});
 });

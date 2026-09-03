@@ -80,6 +80,16 @@ export type Entry = {
 	markers: Tier[];
 	/** Prose lines only — no heading, mono line, marker, table row or rule. */
 	prose: string[];
+	/**
+	 * The prose as a reader meets it, paragraph breaks preserved. `prose` drops
+	 * blank lines because a word count does not want them; anything comparing an
+	 * entry to a copy of itself does. Reconstructing with `join("\n")` silently
+	 * welds a three-paragraph entry into one — green for the single-paragraph
+	 * entries that happen to exist today, red on the next multi-paragraph one,
+	 * and the natural repair is to loosen the comparison, which would destroy
+	 * the byte-identity the notes ref's whole review argument rests on.
+	 */
+	proseText: string;
 	/** Every line a reader sees below the mono line, tables included. */
 	visible: string[];
 	tableRows: number;
@@ -186,14 +196,20 @@ export const parseEntries = (): Entry[] => {
 			const title = lines[i].slice(4).trim();
 			const mono = lines[i + 1] ?? "";
 			const prose: string[] = [];
+			const proseParas: string[] = [];
 			const visible: string[] = [];
 			const markers: Tier[] = [];
 			let tableRows = 0;
+			let gap = false;
 			let j = i + 2;
 			for (; j < lines.length && !lines[j].startsWith("### "); j++) {
 				const raw = lines[j];
 				const t = raw.trim();
-				if (t === "" || t === "---") continue;
+				if (t === "") {
+					if (prose.length > 0) gap = true;
+					continue;
+				}
+				if (t === "---") continue;
 				const marker = TIER_MARKER.exec(t);
 				if (marker) {
 					markers.push(marker[1] as Tier);
@@ -204,7 +220,10 @@ export const parseEntries = (): Entry[] => {
 					tableRows++;
 					continue;
 				}
+				if (gap) proseParas.push("");
+				gap = false;
 				prose.push(raw);
+				proseParas.push(raw);
 			}
 			out.push({
 				file,
@@ -215,6 +234,7 @@ export const parseEntries = (): Entry[] => {
 				tier: markers.length === 1 ? markers[0] : null,
 				markers,
 				prose,
+				proseText: proseParas.join("\n"),
 				visible,
 				tableRows,
 				words: countWords(prose.join("\n")),
