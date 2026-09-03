@@ -66,7 +66,7 @@ The DB half of INV-1 is already built (`bets.comment_id NOT NULL FK → comments
 
 ## 3. API surface
 
-> **STEP-A ground truth (moderation seam, verified on `main` @ `c6dffa6`).** `precommitModerate` (`src/server/moderation/precommit.ts:61`) **already accepts an `imageR2Key` argument and classifies images today** — it mints a 60s signed read URL and calls `moderate({ text, imageUrl })`, which sends **multimodal** input (`text` + `image_url`) to the OpenAI `omni-moderation` snapshot (`openai.ts:80-91`) and maps `sexual/minors`+image → `track_a`. **The multimodal classifier *primitive* is built (SCAFFOLD.15/16), not deferred.** What is NOT wired today: the place **route** passes the comment's image into that seam (route.ts:51-56 is text-only), and the Track A/B/C **consequences** (DEBATE.7). PhotoDNA hash-match is a parked pre-launch operator gate (`ENGINE-phase-record.md:123`).
+> **STEP-A ground truth (moderation seam, verified on `main` @ `c6dffa6`).** `precommitModerate` (`src/server/moderation/precommit.ts:61`) **already accepts an `imageR2Key` argument and classifies images today** — it mints a 60s signed read URL and calls `moderate({ text, imageUrl })`, which sends **multimodal** input (`text` + `image_url`) to the OpenAI `omni-moderation` snapshot (`openai.ts:80-91`) and maps `sexual/minors`+image → `track_a`. **The multimodal classifier *primitive* is built (SCAFFOLD.15/16), not deferred.** What is NOT wired today: the place **route** passes the comment's image into that seam (route.ts:51-56 is text-only), and the Track A/B/C **consequences** (DEBATE.7). PhotoDNA hash-match is a parked pre-launch operator gate (`ENGINE-record.md:123`).
 
 ### DEBATE.1 — the INV-1 frontstop (no new route)
 `POST /api/bets/place` already requires `body: z.string().min(1)`. DEBATE.1 makes the "bet with no comment" rejection a **named, testable** code:
@@ -190,7 +190,7 @@ The **write-path** enforcement of this is the existing **F-BET-10** `opposite_si
 ## 8. Out of scope
 
 - **DEBATE.4** — debate-view render / Support/Counter display (DESIGN.5-gated). DEBATE.2 ships only the `ReplyAffordance` read contract.
-- **DEBATE.7** — moderation Track A/B/C **consequence** wiring (auto-ban, mod queue, `mod_actions`, legal report, the `image_upload.blocked` audit event). **The multimodal image classifier *primitive* is already built (SCAFFOLD.15/16) — NOT a DEBATE.7 item;** DEBATE.2 *routes* a comment's image into that existing seam and *respects* the verdict. DEBATE.2 wires neither the classifier backend nor the consequences. PhotoDNA second-vendor / CSAM hash-match is a **parked** pre-launch operator gate (`ENGINE-phase-record.md:123`).
+- **DEBATE.7** — moderation Track A/B/C **consequence** wiring (auto-ban, mod queue, `mod_actions`, legal report, the `image_upload.blocked` audit event). **The multimodal image classifier *primitive* is already built (SCAFFOLD.15/16) — NOT a DEBATE.7 item;** DEBATE.2 *routes* a comment's image into that existing seam and *respects* the verdict. DEBATE.2 wires neither the classifier backend nor the consequences. PhotoDNA second-vendor / CSAM hash-match is a **parked** pre-launch operator gate (`ENGINE-record.md:123`).
 - **DEBATE.3** — the BEFORE-UPDATE side-freeze trigger. DEBATE.2 **sets** `side_at_post_time`; DEBATE.3 **freezes** it.
 - **DEBATE.5** — In/Flipped/**Exited** marker computation.
 - **DEBATE.8** — ranking + `RANKING.md`.
@@ -232,7 +232,7 @@ The **write-path** enforcement of this is the existing **F-BET-10** `opposite_si
 - `CLAUDE.md` §1–§3 · `AGENTS.md` §6/§9
 - `docs/specs/SPEC.1.md` §5 (INV-1/INV-3), §7 (F-BET-1/2/10), **§8 (F-COMMENT-1…5 — CANONICAL; the `flows/F-COMMENT-{4,5,6}.md` skeletons are STALE, ignore)**, §10.9 (floors), §14 (F-MOD-4)
 - `docs/specs/SPEC.2.md` §5 (comments/bets), ADR-0017 Flow-table line 402
-- `docs/logs/ENGINE-phase-record.md` §2 (forward contract), §6 (ruling 1a foreclosure; reply-as-bet LOAD deferral; line 123 DEBATE.7/PhotoDNA), §7 (governing ADRs)
+- `docs/records/ENGINE-record.md` §2 (forward contract), §6 (ruling 1a foreclosure; reply-as-bet LOAD deferral; line 123 DEBATE.7/PhotoDNA), §7 (governing ADRs)
 - ADR-0013, ADR-0014, ADR-0017, ADR-0018
 - Built scaffolding: `src/server/bets/{place,floors,transaction,errors}.ts`, `src/server/moderation/{precommit,openai}.ts`, `src/server/positions/read.ts`, `src/server/storage/sign-upload.ts`, `src/db/schema/comments.ts`, `src/app/api/bets/place/route.ts`
 - Tracker: DEBATE.1, DEBATE.2 (rows above)

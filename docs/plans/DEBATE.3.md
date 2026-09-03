@@ -44,7 +44,7 @@ full append-only — a **regression** against SPEC.2 §6 and a §2 weakening. Re
 | The spec mechanism IS append-only-`comments` | SPEC.2 §6.5 line 605; SPEC.2 §3.2 line 232 (Pattern W-2 retired; side frozen *inside the W-1 tx*); SPEC.1 §5 line 170 (*"never updated after insert; a row-level rule rejects updates to that column"*) |
 | Capture built in DEBATE.2 | `place.ts:133` `sideAtPostTime: side` (INSERT). No `UPDATE comments` anywhere in `place.ts`. |
 | NO legitimate UPDATE path to `comments` | `place.ts` post-insert UPDATEs touch only `image_uploads` (Bucket B, `:216`) + `pools` (Bucket C, `:258`). `image_uploads_id` set at INSERT (`:135`). `image-attach.ts` is read-only on comments. No moderation-state column on `comments` (moderation is pre-commit, aborts the INSERT). |
-| Already recorded as done | ENGINE-phase-record §5 line 100: *"INV-3 side-bind — I-SIDE-BIND-001 (ENGINE.8). side_at_post_time frozen by BEFORE-UPDATE trigger."* |
+| Already recorded as done | ENGINE-record §5 line 100: *"INV-3 side-bind — I-SIDE-BIND-001 (ENGINE.8). side_at_post_time frozen by BEFORE-UPDATE trigger."* |
 
 **ADR-0013 (kickoff STEP 1):** moot — no new trigger. The existing `bucket_a_no_update`
 is BEFORE UPDATE, never fires on the INSERT capture path, and does not conflict with the
