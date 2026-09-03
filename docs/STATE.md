@@ -94,7 +94,7 @@ left blank for the founder.
 
 | ID | Finding | Evidence | Owner |
 |---|---|---|---|
-| **F-16** | The **pseudonymiser** and the **egress guard** — the two components whose failure mode is publishing what must not be published — have **no test file of their own** in PR #435's file list. Transitive coverage is possible; nobody can tell from the list | `gh pr view 435 --json files` | |
+| **F-16** | The **pseudonymiser** has **no test file bearing its name** in PR #435's list (no `pseudonymize.test.ts`). Transitive coverage via `build.test.ts`, the round-trip and the egress suite is possible; nobody can tell from the list alone. ⚠ **A draft of this finding also named the egress guard and was WRONG** — the PR carries five `tests/unit/export/egress/*.test.ts`, two name-matched to their modules, inside 18 `tests/unit/export/**` files | `gh pr view 435 --json files \| grep egress` | |
 | **F-17** | The shipped debate `.md` export has **no round-trip proof** — nothing parses the emitted Markdown back and compares it to the source | `tests/unit/debate-export/`, `tests/integration/debate-export.integration.test.ts` | |
 | **F-14** | **SCALE S-4's own exit metric is unmet.** `docs/logs/S4-FINAL-RECORD.md:8-11`: *"budget tests on five surfaces and two of five exist"*. Partly overtaken — the commits landed — but the gap is undischarged and no closure record exists | that file | |
 | **F-13** | The **2026-09-02 load report is not in the repository** (`~/Downloads/zz_LOAD-TESTING-FINAL-REPORT_20260902T1802.md`, 70 lines, md5 `d35063aa61d282d826921fe14f04e0d7`; matches **no** tracked blob). ADR-0038's W-9 / W-10 are still written as open although S-5 has measured | md5 scan over all 1,510 tracked files, with a positive control | |
@@ -108,7 +108,7 @@ left blank for the founder.
 | **F-20** | **`SPEC.2` §0 states the ADR ceiling as `0039` and the count as 37** — stale by **six**. The same paragraph warns that *"THREE successive versions of this annotation have now gone stale by one"* and instructs the reader to run `ls docs/adr/` | `ls docs/adr/` → `0045` | |
 | **F-21** | `CLAUDE.md` §1 and the `AGENTS.md` footer both state ADRs **0001–0044**, next free **0045** — stale by one | same | |
 | **F-22** | **`SPEC.2` changed on 2026-09-02 without a version bump or a changelog row.** `073f65e` (#394, RANK-2) rewrote the §4 ranking-aggregate definitions, +15/−6; §0 still reads `1.0.27`, dated 2026-08-27 | `git log -1 --format='%h %ad' -- docs/specs/SPEC.2.md` | |
-| **F-10** | **SPEC.1 contradicts itself on the deck.** *"six-card deck"* at `:1505`, `:1573`, `:1640`, `:1730`; *"govern all seven cards"* at `:1783`. The array has **seven** (`src/components/onboarding/cards.ts:67`); six is the re-show | `grep -c 'figure: "' cards.ts` → 7 | |
+| **F-10** | **SPEC.1 carries two live stale statements about the deck.** `grep -n 'six-card deck'` returns **three** lines — `:1505`, `:1573`, `:1730` — but `:1730` ends *"the card count is likewise superseded, the deck no longer being six cards"*, and the changelog row at `:1640` records the correction. **Only `:1505` and `:1573` are uncorrected.** §21.9 at `:1783` (*"govern all seven cards"*) and the seven-element array at `src/components/onboarding/cards.ts:67` agree | `grep -n 'six-card deck' docs/specs/SPEC.1.md` | |
 | **F-5** | **`src/components/debate/ResolverCards.tsx:56-60` states arithmetic that does not work** — *"SIX placeholders of THREE kinds … leaving FIVE of TWO"*; 6 − 4 = 2. `AGENTS.md` copied the five. `docs/parked.md` SEQUENCE row 5 still says four. **Measured: two kinds at four mount sites** (`SURFACES-record.md` §4.1) | that file, and the four mount sites | |
 | **F-19** | **Four references to `docs/logs/ENGINE-phase-record.md` are left dangling by this pass, deliberately** — `docs/adr/0005-postgres-event-sourcing.md:19`, `docs/parked.md:816`, `docs/parked.md:822`, `scripts/stage-reviewer-project.sh:70`. All four are in files this pass is forbidden to edit. Baseline 10 lines / 7 files → 4 remain | `git grep -n 'ENGINE-phase-record'` | |
 
@@ -121,7 +121,7 @@ left blank for the founder.
 | **F-8** | **No branch protection exists on any branch.** `ci` is not a required status check, nothing rejects a force-push, nothing blocks a direct push to `main` or `staging`. Measured and dated in `CLAUDE.md` §5.13 — **the single home; not restated here** | `CLAUDE.md` §5.13 | |
 | **F-6** | `DATABASE_URL_TXN` and `DB_POOLER_MODE` exist in Doppler `stg` and not in `prd`. **Deliberate** — ADR-0038 keeps `prd` on `:5432` and `src/db/index.ts:55` refuses `transaction` mode there. Listed so the asymmetry is not later read as a gap | `doppler secrets --only-names` | |
 | **F-7** | **`BETTER_AUTH_TRUSTED_ORIGINS` is absent from Doppler `prd` — a config-hygiene item, NOT a security gap.** `src/server/auth/index.ts:330-333` resolves it to `[]`, but Better Auth's `getTrustedOrigins` pushes `new URL(baseURL).origin` **first and unconditionally** (`node_modules/better-auth/dist/context/helpers.mjs:73`) — so the effective production trust set is `["https://zugzwangworld.com"]`, which is exactly what `docs/plans/SCAFFOLD.8-staging-plan.md:173` ratifies. `BETTER_AUTH_URL` cannot be unset: `auth/index.ts:47-49` hard-throws at module load. A second, independent origin defence derives from the same variable at `src/server/middleware/origin-allowlist.ts:24`. **What is missing is the name and any record of a decision to drop it**, not the protection | `doppler secrets --only-names`; `helpers.mjs:60-84` read directly | |
-| **F-24** | `origin/chore/pfp-2-plans-log` was pushed 2026-09-03 with **no PR of any state**; `origin/feat/e2e-playwright-setup` (2026-08-26) likewise | `gh pr list --state all --head <branch>` → empty | |
+| **F-24** | `origin/chore/pfp-2-plans-log` was pushed 2026-09-03 with **no PR of any state** — `gh pr list --state all --head chore/pfp-2-plans-log` → empty, against a control that returns rows for a branch that has one. ⚠ `origin/feat/e2e-playwright-setup` **does** have a PR — **#420, CLOSED unmerged**, 2026-08-26 — so only one branch is orphaned, not two | `gh pr list --state all --head <branch>` | |
 
 ---
 
@@ -136,7 +136,7 @@ left blank for the founder.
 | `docs/specs/cpmm.md` | every CPMM formula and the numeric policy |
 | `docs/specs/RANKING.md` | the ranking function |
 | `docs/specs/debate-export.md` | the export format |
-| `docs/specs/flows/` | 38 normative flow specs — `F-AUTH-*`, `F-BET-*`, `F-COMMENT-*`, `F-DEBATE-*`, `F-MOD-*`, `F-RESOLVE-*`, `F-ADMIN-*` |
+| `docs/specs/flows/` | **37** normative flow specs — `F-AUTH-*`, `F-BET-*`, `F-COMMENT-*`, `F-DEBATE-*`, `F-MOD-*`, `F-RESOLVE-*`, `F-ADMIN-*` — plus a `README.md` (`ls docs/specs/flows/F-*.md \| wc -l` → 37) |
 | `docs/adr/` | 43 decisions, `0001`–`0045`. **On conflict with a spec, the ADR wins** |
 | `CLAUDE.md` | the build contract — invariants, refusal triggers, workflow, **O-space** (§8), the branch-protection measurement (§5.13) |
 | `AGENTS.md` | stack patterns — descriptive, tracks the repo |

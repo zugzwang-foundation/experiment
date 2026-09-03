@@ -243,7 +243,7 @@ searching for the component will find the comments first.
 | **AIMODE-1** | **#466** | `e193cfb` | **2026-09-03** | the `.md` export becomes the AI-mode button |
 | **ADR-0045 + MOBILE-1 plan** | **#467** | `ead7415` | **2026-09-03** | the decision and the plan. **No implementation PR exists** |
 
-⚠ **Three merged PRs in this lane carry the retired `⛔ LEAVE UNMERGED` / `DO NOT MERGE`
+⚠ **Four merged PRs in this lane carry the retired `⛔ LEAVE UNMERGED` / `DO NOT MERGE`
 marker** — #254, #336, #403, #448. CLAUDE.md §5.13.2 explains why a marker on `main` is not
 evidence that unreviewed work landed, and retires the form.
 
@@ -252,7 +252,7 @@ evidence that unreviewed work landed, and retires the form.
 | Pointer | What |
 |---|---|
 | `docs/STATE.md` §4 · `F-5` | the placeholder-count arithmetic in `ResolverCards.tsx` and in `AGENTS.md` |
-| `docs/STATE.md` §4 · `F-10` | SPEC.1 says "six-card deck" at four sites and "all seven cards" at one; the array has seven |
+| `docs/STATE.md` §4 · `F-10` | SPEC.1 carries two uncorrected "six-card deck" statements (`:1505`, `:1573`); §21.9 and the seven-element array agree |
 | `docs/STATE.md` §4 · `F-11` | ADR-0045 is accepted and MOBILE-1 is planned; nothing is built, 12 days out |
 | `docs/parked.md` — SEQUENCE row 5 | strip or gate the `/m/[slug]` placeholders before the DP.2 promote |
 | `docs/parked.md` — SEQUENCE row 6 | a staging session cannot be re-obtained in-session (its `/bookmarks` example is a removed route) |

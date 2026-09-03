@@ -98,7 +98,8 @@ audience."*
 | Rows on **production** | **0** | same query, `--config prd` |
 
 ⚠ **ADR-0011 already contradicts its own headline** and is the honest source here: its patch
-section records that the generation run *"covers 13 c…"* colours and that *"Still owed: …
+section records that the generation run *"covers **13 colours × 67 animals = 871 pairs**"*
+(`ADR-0011:298`) and that *"Still owed: …
 the 50,000-row production manifest"*. So the gap is known and written down; what was not
 written down anywhere is the measured figure. **Staging can absorb ~548 further signups before
 the pool is empty**, and that figure falls by one with every signup — it fell by one during
@@ -126,11 +127,13 @@ this generation. Production can absorb none, because it has none.
 > `// No `role` column. No `is_admin`. Per §8.7 pillar 1 (admin has no users`
 > `// row; structural separation by data-model) — also CLAUDE.md §3.`
 
-Verified as a negative with a positive control (OVN-V1): `grep -n 'role\|is_admin\|isAdmin'
-src/db/schema/auth.ts` returns **nothing**; the control `grep -n 'pseudonym\|email'` on the
-same file returns `:36 email`, `:39 pseudonym`. **The pattern finds real columns; those two
-do not exist.** There is therefore no row an admin could bet from, no flag to flip, and no
-check to forget to write.
+⚠ **The naïve negative does not work here, and the working one is worth copying.**
+`grep -n 'role\|is_admin\|isAdmin' src/db/schema/auth.ts` returns **one line — its own
+explanatory comment at `:29`** (the `V-17` trap: a textual negative matching the sentence that
+explains the absence). The reproducible form matches a **column declaration**:
+`grep -nE '(role|is_admin|isAdmin)\s*:' src/db/schema/auth.ts` → **exit 1, no output**, against
+the control `grep -nE '(pseudonym|email)\s*:'`, which returns the real declarations. **There is
+no row an admin could bet from, no flag to flip, and no check to forget to write.**
 
 The second half of the separation is the cookie. `src/server/auth/admin/login.ts:224` sets
 `path: "/admin"`, and `logout.ts:66` deletes it at the same path. ⚠ **The consequence is a
@@ -181,7 +184,7 @@ record — PR #366 merged the work; the lane has no session log.**
 
 | Pointer | What |
 |---|---|
-| `docs/STATE.md` §4 · `F-2` | `identity_pool` holds **0 rows on production**; 1,070 on staging with 549 unassigned |
+| `docs/STATE.md` §4 · `F-2` | `identity_pool` holds **0 rows on production**; 1,070 on staging, unassigned falling with each signup (see §2.3) |
 | `docs/STATE.md` §4 · `F-7` | `BETTER_AUTH_TRUSTED_ORIGINS` is absent from Doppler `prd` — **config hygiene, not a security gap**: the baseURL origin is trusted unconditionally |
 | `docs/STATE.md` §4 · `F-9` | ADR-0011 sizes the namespace at 50,000 and ADR-0016 states it as fact; the built pool is 1,070 |
 | `docs/parked.md` — SCAFFOLD.12 §10.b | Resend domain verification + `RESEND_FROM_EMAIL` flip |

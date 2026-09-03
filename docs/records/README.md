@@ -24,7 +24,9 @@ retire the chat-era close-out corpus afterwards: nothing here depends on it.
 | `SCALE-record.md` | what was measured, what was asserted, and which is which | 150–200 |
 | `DATASET-record.md` | the debate export and the public dataset pipeline | 150–200 |
 
-## The six-section shape — identical in all eight lane records
+## The six-section shape — identical in all **seven** generated lane records
+
+*(`ENGINE-record.md` is the exception: it was moved, not generated, keeps its own section titles, and is marked do-not-regenerate below.)*
 
 ```
 # <LANE> — record

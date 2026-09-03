@@ -47,7 +47,7 @@ read path.
 | Price chart on the debate view | SHIPPED | `src/components/debate/chart/`, `src/server/debate-view/price-chart.ts` | SPEC.1 §9 | — | `tests/unit/debate/chart/`, `tests/invariants/I-GENESIS-001.open-implies-market-opened-event.spec.ts` | — |
 | Market quote read | SHIPPED | `src/app/(public)/m/[slug]/quote/route.ts`, `src/server/debate-view/quote.ts` | SPEC.1 §7 | — | `tests/integration/market-quote.integration.test.ts` | — |
 | **`.md` export / AI mode** | SHIPPED | `src/app/(public)/m/[slug]/export/route.ts`, `src/server/debate-export/{serialize,context,market-meta}.ts`, button in `src/components/debate/MarketHeader.tsx` | SPEC.1 §21.3 | 0025 | `tests/integration/debate-export.integration.test.ts`, `tests/unit/debate-export/` | — |
-| Reply foreclosure — single-side × Counter | SHIPPED | `src/server/comments/foreclosure.ts` (`computeReplyAffordance`, `readReplyAffordance`) | SPEC.1 §8 | 0017 | `tests/unit/comments/foreclosure.test.ts` (12 tests) | — |
+| Reply foreclosure — single-side × Counter | SHIPPED | `src/server/comments/foreclosure.ts` (`computeReplyAffordance`, `readReplyAffordance`) | SPEC.1 §8 | 0017 | `tests/unit/comments/foreclosure.test.ts` (14 tests) | — |
 | No stake, no voice — a comment requires a bet | SHIPPED | `src/app/api/bets/place/route.ts` step 5 | SPEC.1 §5 INV-1 · `F-COMMENT-5` | 0017 | `tests/server/comments/no-position.test.ts::comment-requires-bet` | — |
 | Standalone comment (no bet) | **NOT BUILT — refused by design** | — | SPEC.1 §5 INV-1 | 0017 | `tests/server/comments/no-position.test.ts::comment-requires-bet` + `tests/invariants/I-ATOMICITY-001…::every-comment-has-a-referencing-bet-construction` | never |
 | Friendly-fire vote as its own row | **REMOVED** | — | — | 0017 | `drizzle/migrations/0018_*` dropped `friendly_fire_events` | — |
@@ -122,10 +122,13 @@ and a background call here would admit unclassified content.
 
 **Where it sits.** `src/app/api/bets/place/route.ts:135` — `await precommitModerate({…})` —
 step 6, with the transaction opening at `:197` (`await runBetTransaction`). ⛔ **Outside the
-transaction, before it, always.** `precommitModerate` has **exactly one call site in `src/`**:
-`git grep -n 'precommitModerate(' -- src/` returns one hit. Positive control: the same grep shape for
-`await runBetTransaction(` returns **two** call sites (`place/route.ts:197`, `sell/route.ts:82`), so the
-pattern finds real call sites and the single hit above is a measurement.
+transaction, before it, always.** `precommitModerate` has **exactly one call site in `src/`**. ⚠ The naïve grep does not show
+that: `git grep -n 'precommitModerate(' -- src/` returns **two** lines — the call at
+`place/route.ts:135` **and its own declaration** at `precommit.ts:75`. Anchoring on the call
+form is what makes it a measurement: `git grep -n 'await precommitModerate(' -- src/` returns
+**one**, against the control `git grep -n 'await runBetTransaction(' -- src/`, which returns
+**two** (`place/route.ts:197`, `sell/route.ts:82`) — so the anchored shape does find multiple
+real call sites when they exist.
 
 **Text and image are the same call.** An attached image is not classified at upload time —
 `src/app/api/uploads/sign/route.ts` contains no moderation import (0; positive control: the
@@ -140,7 +143,7 @@ single-use signed READ URL** and `openai.ts` appends it as an `image_url` part t
 | Signed-read mint failure | `precommit.ts:113-118` | — | — | `ModerationUnavailableError` → **503** |
 | **Transient** — connection, timeout, user-abort, 5xx, 429 | `openai.ts:59-67`, loop `:88` | **1** (`OPENAI_MAX_RETRIES`) | `openai_moderation_upstream_failure` (`:162`) | after the retry, `ModerationUnavailableError` (`:164`) → **503** |
 | **Auth** — 401 / 403 | `openai.ts:141-147` | ⛔ **none** | `openai_moderation_auth_failure` (`:145`) | immediate **503**. Retrying a bad key only burns the vendor's rate limit |
-| **Malformed-flagged** — `flagged === true` with no category true | `openai.ts:113-119` | ⛔ none (re-thrown at `:137`) | `openai_moderation_malformed_flagged` (`:117`) | immediate **503**. ⚠ **This branch exists because the alternative is a fail-OPEN on a legal-floor gate:** the mapper reads specific category booleans, so a flagged-with-no-category response would fall through to `pass` |
+| **Malformed-flagged** — `flagged === true` with no category true | `openai.ts:113-119` | ⛔ none (re-thrown at `:139`) | `openai_moderation_malformed_flagged` (`:117`) | immediate **503**. ⚠ **This branch exists because the alternative is a fail-OPEN on a legal-floor gate:** the mapper reads specific category booleans, so a flagged-with-no-category response would fall through to `pass` |
 | Empty results | `openai.ts:96` | — | `openai_moderation_upstream_failure` | **503** |
 | Any other non-transient | `openai.ts:149-155` | ⛔ none | `openai_moderation_upstream_failure` | **503** |
 
@@ -188,7 +191,7 @@ no HTTP in flight — it is a pure-DB transaction opened *after* the classifier 
 
 | Unit | PR | Merge SHA | Date | What landed |
 |---|---|---|---|---|
-| ENGINE.7 / .8 | #93, #99 | `7dc22d8`, `1a1cd84` | 2026-06-09/10 | W-1 bet-transaction wrapper; side-bind minted as `I-SIDE-BIND-001` |
+| ENGINE.7 / .8 | #93, #99 | `7dc22d8`, `66fa532` | 2026-06-09 | W-1 bet-transaction wrapper; side-bind minted as `I-SIDE-BIND-001` |
 | DEBATE.2 | #136 | — | 2026-06 | the image reaches the classifier seam; post-time side capture |
 | Reactive moderation foundation | #143 | `02f87ac` | 2026-06-19 | gate consequences + `mod_actions` |
 | DEBATE.7 smoke | #151 | `07f6972` | 2026-06-21 | moderation smoke close-out |

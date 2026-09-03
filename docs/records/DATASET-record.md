@@ -49,7 +49,7 @@ substring inside **"regression"**. Word-bound it.
 | Feature | Status | Code (on the branch) | Proved by (on the branch) |
 |---|---|---|---|
 | Dataset build orchestration | NOT ON `main` | `src/server/export/dataset/build.ts` | `tests/unit/export/dataset/build.test.ts` |
-| Pseudonymisation | NOT ON `main` | `src/server/export/dataset/pseudonymize.ts` | — |
+| Pseudonymisation | NOT ON `main` | `src/server/export/dataset/pseudonymize.ts` | ⚠ **none by name** — no `pseudonymize.test.ts` in the PR's file list |
 | Field stripping | NOT ON `main` | `src/server/export/dataset/strip.ts` | — |
 | Removed-content handling | NOT ON `main` | `src/server/export/dataset/removed.ts` | — |
 | CSV writer | NOT ON `main` | `src/server/export/dataset/csv.ts` | — |
@@ -58,7 +58,7 @@ substring inside **"regression"**. Word-bound it.
 | Inventory + manifest | NOT ON `main` | `src/server/export/dataset/inventory.ts`, `src/app/api/dataset/manifest/route.ts` | `tests/server/dataset/manifest-route.test.ts` |
 | Source readers | NOT ON `main` | `src/server/export/dataset/{source,drizzle-source}.ts` | `tests/integration/dataset-paging-reconciliation.integration.test.ts` |
 | Treatments | NOT ON `main` | `src/server/export/dataset/treatments.ts` | — |
-| **Egress guard layer** | NOT ON `main` | `src/server/export/egress/{index,scan,assertions,completeness,forbidden-keys,errors}.ts` | — |
+| **Egress guard layer** | NOT ON `main` | `src/server/export/egress/{index,scan,assertions,completeness,forbidden-keys,errors}.ts` | **five on the branch** — `tests/unit/export/egress/{assertions,completeness,contract-gap-strip-rules,payload-ship-schema-parity,registry-parity}.test.ts` |
 | CLI entry point | NOT ON `main` | `scripts/build-dataset.ts` | `tests/integration/dataset-build-script.integration.test.ts` |
 | **Round-trip proof** | NOT ON `main` | — | `tests/integration/dataset-roundtrip.integration.test.ts` |
 
@@ -77,17 +77,22 @@ what has neither"*. Answered per surface, and the columns are not the same claim
 | Dataset build | ⛔ | ✅ on the branch | ✅ `dataset-roundtrip.integration.test.ts` on the branch | **the round-trip exists and is not merged** |
 | Paging reconciliation | ⛔ | ✅ on the branch | ✅ | a paged read reconciles against the source |
 | Manifest route | ⛔ | ✅ on the branch | n/a | |
-| **Pseudonymisation** | ⛔ | ⚠ **no dedicated test file in the PR's list** | ⛔ **no** | the file is `pseudonymize.ts`; the PR adds no `pseudonymize.test.ts`. Its correctness rides on `build.test.ts` and the round-trip |
-| **Egress guard (6 files)** | ⛔ | ⚠ **no dedicated test file in the PR's list** | ⛔ **no** | **this is the layer whose whole job is to prevent a leak, and no test in the PR names it** |
+| **Pseudonymisation** | ⛔ | ⚠ **no test file bears its name** | ⛔ no | the PR adds no `pseudonymize.test.ts`. Its correctness rides on `build.test.ts`, the round-trip, and the egress suite |
+| **Egress guard (6 files)** | ⛔ | ✅ **five tests** — `assertions`, `completeness`, `contract-gap-strip-rules`, `payload-ship-schema-parity`, `registry-parity` | ⛔ no | **two are name-matched to their modules.** The PR carries **18** `tests/unit/export/**` files in all, including `removed-masking.test.ts` and `needle-provenance.test.ts` |
 | Release runbook | ✅ (126 lines) | n/a | n/a | never exercised |
 
-⛔ **Two rows deserve to be read twice.** The pseudonymiser and the egress guard are the two
-components whose failure mode is *publishing something that should not be published*, and
-neither has a test file of its own in the pull request that introduces them. That is a
-statement about the file list, measured from `gh pr view 435 --json files`; it is **not** a
-claim that the behaviour is unexercised — `build.test.ts` and the round-trip may cover it
-transitively. **What is certain is that no test names them, so nobody can tell from the file
-list whether they are covered.**
+⚠ **One row deserves to be read twice, and it is narrower than it first looks.** The
+**pseudonymiser** has no test file bearing its name — `gh pr view 435 --json files` lists no
+`pseudonymize.test.ts`. That is a statement about the file list; it is **not** a claim that the
+behaviour is unexercised, since `build.test.ts`, the round-trip and the egress suite may cover
+it transitively.
+
+⛔ **The egress guard is NOT in that position, and an earlier draft of this record said it
+was.** The PR carries **five** `tests/unit/export/egress/*.test.ts` files, two of them
+name-matched to the modules the draft called untested, inside **18** `tests/unit/export/**`
+tests in total. That draft finding was wrong and would have sent a reader to close a gap that
+does not exist — recorded here rather than silently corrected, because a false blocker in a
+blocker list costs more than a missing one.
 
 ### 3.1 · What the debate export actually emits
 
@@ -158,7 +163,7 @@ and the pipeline it drives is not merged.
 | Pointer | What |
 |---|---|
 | `docs/STATE.md` §4 · `F-15` | **the dataset pipeline is unmerged** — PR #435, 57 files, `ci=SUCCESS`, base `main`, carrying the retired `⛔ LEAVE UNMERGED` marker |
-| `docs/STATE.md` §4 · `F-16` | the pseudonymiser and the egress guard have no test file of their own in #435's list |
+| `docs/STATE.md` §4 · `F-16` | the pseudonymiser has no test file bearing its name in #435's list — **the egress guard does, five of them** |
 | `docs/STATE.md` §4 · `F-17` | the debate `.md` export has no round-trip proof — nothing parses the emitted Markdown back |
 | `docs/STATE.md` §4 · `F-2` | the production database is empty; an archive taken from it today would be empty too |
 | `docs/runbooks/dataset-release.md` | never exercised; #435 modifies it |
