@@ -47,9 +47,21 @@ const PINNED_DUPLICATES: Record<string, number> = {
 describe("journey entries — title collision", () => {
 	const entries = parseEntries();
 
-	it("every act file is present and every title is reachable (control)", () => {
+	it("every act file is parsed, and the duplicate detector can fire (control)", () => {
+		// ⚠ THIS CONTROL CANNOT SEE TITLES DISAPPEAR, AND ITS NAME USED TO SAY IT
+		// COULD — it read "every title is reachable". The two sides of the
+		// comparison below are counted from THE SAME FILES, so deleting entries
+		// moves both together: fifteen were cut from one act and this test stayed
+		// green. What it does prove is FILE SELECTION — a file that stops matching
+		// `NN-*.md` leaves `parseEntries()` but not the directory walk, and the two
+		// numbers separate. Titles disappearing is proved by the per-act pins in
+		// `journey-word-ceilings.test.ts`, which is where that assertion belongs;
+		// this name now claims only what this test measures.
 		expect(actFiles()).toEqual([...EXPECTED_ACT_FILES]);
-		expect(entries.length).toBe(headingCountAcrossDir());
+		expect(
+			entries.length,
+			`the parser sees ${entries.length} entries but ${headingCountAcrossDir()} '### ' headings exist in docs/journey/ — a file has stopped matching the act-file pattern, or a non-act .md has appeared`,
+		).toBe(headingCountAcrossDir());
 		const counts = new Map<string, number>();
 		for (const e of [...entries, entries[0]]) {
 			const k = normaliseTitle(e.title);

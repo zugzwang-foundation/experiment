@@ -1,16 +1,21 @@
-# JOURNEY — style spec v1.3
+# JOURNEY — style spec v1.4
 
-**Status:** ratified · **Date:** 2026-09-03 · **Owner:** web Claude (prescriptive)
-**Supersedes:** v1.2 (2026-08-17)
-**Repo home:** `docs/journey/STYLE.md` — committed by this task. See §15.
+**Status:** ratified · **Date:** 2026-09-04 · **Owner:** web Claude (prescriptive)
+**Supersedes:** v1.3 (2026-09-03)
+**Repo home:** `docs/journey/STYLE.md`. See §15.
 
-**Changes from v1.2:**
-§0 new — how to read this against the recon · §3 new act's Landmark set opened
-and named, all prior sets remain closed · §4 date basis and week formula bound to
-measurement, not to this file · §7.2 minted (cited by the JOURNEY close-out,
-absent from v1.2) · §11 acts table extended, The Window renumbered VIII → IX ·
-§12 batching replaced for a single autonomous run · §13 new — the `n` definition ·
-§14 new — the three mechanical drift guards · §15 new — where this file lives.
+**Changes from v1.3 — all four are corrections this file's own §0 discipline
+should have prevented, found by the JOURNEY-29 run and its reviewer cascade:**
+
+| | v1.3 said | Measured |
+|---|---|---|
+| §2 | the convention starts `2026-08-17`, in three places | That is the **UTC** reading of a corpus that is wholly committer-local. 0 of 341 existing mono lines disagree with local; **64 disagree with UTC**. §4.1 ruled the basis local and §2 then contradicted it |
+| §3.1 | a Landmark table that reads as a census | It omits **four** Landmark-sized entries and its own last line names a row it does not print. §3.1 is now the full census, and §3.1a records why the old table was not |
+| §4 | the visual is "exactly one" per Landmark | Three of the four most recent existing Landmarks carry **none**. The rule stands; the divergence is now stated rather than left for a drafter to trip over |
+| §11 | Act VIII spans `n347–HEAD`, `18 Aug – 15 Sep` | Built at `n347–433`, **18 Aug – 3 Sep**. The act is named **The Instruments** by §11.1's rule: **49 of 87** bodies, **56.3%** against a 25% threshold |
+
+Also new: §3.2 records that the Act VIII Landmark set is now CLOSED, and §14
+gains the guards that actually shipped.
 
 This document is injected into context on **every** drafting batch, without
 exception. It is the only authority on voice, shape, and evidence. Where a
@@ -29,7 +34,7 @@ needed, this file names where it is measured rather than transcribing it:
 
 | Value | Measured in |
 |---|---|
-| Corpus size, entry count, heading count | `zz_JOURNEY-28_recon_2026-09-03T1126.md` §7 |
+| Corpus size, entry count, heading count | the repository — `grep -c '^### ' docs/journey/*.md` |
 | The week formula and its exceptions | recon §4 |
 | The date basis of existing mono lines | recon §3, §4 |
 | The stretch and its per-commit classification | `stretch-manifest_2026-09-03T1126.tsv` |
@@ -55,15 +60,22 @@ It lands in two places, written once:
 
 Same words on both. This constraint governs everything in §5.
 
-**Notes were only ever for the pre-convention commits.** Everything from
-2026-08-17 forward carries its reasoning in the message and needs no note. The
+**Notes were only ever for the pre-convention commits.** Everything from the
+convention forward carries its reasoning in the message and needs no note.
+
+⚠ **The boundary is a commit, not a calendar date.** `n=346` is committed on 18
+August at 00:59 local and carries a note; the convention lands seven and a half
+minutes later. Any sentence drawing the line as *"before 18 August"* gives the
+wrong answer for three commits. The boundary is **n1…n346 carry notes; n347
+forward carry the block**, and every date in this document is committer-local
+(+05:30) — see §4.1. The
 two exceptions are §13.2.
 
 ---
 
 ## 2. The rule the document exists to obey
 
-Every commit from 17 August 2026 forward carries this block, after the body and
+Every commit from 17 August 2026 (committer-local, +05:30) forward carries this block, after the body and
 before any trailers, with no exemption by type:
 
 ```
@@ -102,42 +114,72 @@ not counted; prose is.
 A tier is a **length** budget, not a quality budget. Groundwork entries are
 short, not lazy. Every entry gets the same voice and the same evidence standard.
 
-### 3.1 Acts I–VII — the Landmark set is CLOSED
+### 3.1 Acts I–VII — the Landmark census, CLOSED
 
-These `n` values are taken and drafted. Any pass must skip them entirely. Do not
-redraft, do not improve, do not renumber.
+These entries are drafted and published. Any pass must skip them entirely. Do
+not redraft, do not improve, do not renumber.
 
-| n | Title | Act |
-|---|---|---|
-| 16 | Given Away First | I |
-| 27 | A Rule You Have To Remember | I |
-| 29 | The Database Says No | II |
-| 51 | You Don't Pick Your Name | II |
-| 65 | Zero Deletions | III |
-| 75 | The Price Of Yes Is How Much No | III |
-| 93 | One Door | III |
-| 140 + 141 | Voice, Not Balance *(one entry, two commits)* | IV |
-| 143 | What Isn't Built Yet | IV |
-| 154 | The Ranking Remembers Nothing | IV |
-| 159 | Delete The Brand | IV |
-| 196 | There Is No Second Upload | V |
-| 244 | Nobody Wrote It Down | VI |
-| 298 | It Didn't Recognise Itself | VII |
-| 306 | Nothing Was Wrong | VII |
-| 310 | Backwards In Public | VII |
-| 341 | Nobody Was Awake To Do It | VII |
+**This is a census, not a sample.** v1.3's table was neither, and it cost the
+JOURNEY-29 run a ruling it should not have had to make — see §3.1a.
 
-Plus the ranking-decision Landmark in Act IV. **n=193** is absorbed into the
-bridge into Act VII and gets no standalone entry.
+| # | Title | Act | How it is known to be a Landmark |
+|---|---|---|---|
+| 1 | Given Away First | I | named |
+| 2 | A Rule You Have To Remember | I | named |
+| 3 | The Database Says No | II | named |
+| 4 | You Don't Pick Your Name | II | named |
+| 5 | Zero Deletions | III | named |
+| 6 | The Price Of Yes Is How Much No | III | named |
+| 7 | One Door | III | named |
+| 8 | Let The Money In | IV | **measured** — 184 words |
+| 9 | Voice, Not Balance | IV | named · **printed twice**, see §3.1b |
+| 10 | What Isn't Built Yet | IV | named |
+| 11 | The Ranking Remembers Nothing | IV | named |
+| 12 | Delete The Brand | IV | named |
+| 13 | The Second Door | — | **measured** — 187 words |
+| 14 | There Is No Second Upload | V | named |
+| 15 | Only The Mechanism Moves | — | **measured** — 169 words |
+| 16 | Nobody Wrote It Down | VI | named |
+| 17 | It Didn't Recognise Itself | VII | named |
+| 18 | Nothing Was Wrong | VII | named |
+| 19 | Backwards In Public | VII | named · **207 words, pinned**, see §14.5 |
+| 20 | Nobody Was Awake To Do It | VII | named |
+| 21 | Correct Five Times | VII | **measured** — 159 words |
 
-**The document's own Landmark list is not a substitute for this table.** The
-recon found no tier marker anywhere in the act files, so a Landmark and a
-Groundwork entry are currently indistinguishable by reading. §14.4 closes that.
+**21 titles across 22 headings.** Each entry's `n` is recoverable from its tier
+marker in the repository; §0 forbids transcribing values into this file.
 
-### 3.2 Act VIII — the Landmark set, OPEN, three slots
+`n=193` is absorbed into the bridge into Act VII and gets no standalone entry.
+
+#### 3.1a Why v1.3's table was not a census, and what that cost
+
+It named seventeen titles and omitted four — `Let The Money In`, `The Second
+Door`, `Only The Mechanism Moves` and `Correct Five Times`, all Landmark-sized —
+while its own last line read *"Plus the ranking-decision Landmark in Act IV"*,
+naming a row it did not print. A list that ends by admitting it is incomplete is
+not a list.
+
+The run reached the right answer through RF-5's word-count fallback, which is
+what a fallback is for. **A fallback firing on the common case is a defect in the
+primary.** The four recovered entries are marked `measured` above so a future
+reader can see which rows the naming path never carried.
+
+**Closed against redrafting and complete as an inventory are different
+properties.** This table is now both. If an entry is Landmark-sized and absent
+here, that is a defect in this table, not a licence to reclassify.
+
+#### 3.1b The deliberate duplicate
+
+`Voice, Not Balance` appears at two headings, byte-identical. It is one entry
+covering two commits, rendered positionally so the heading count stays 1:1
+against commits. **It is not an error and must not be de-duplicated.** The
+collision guard pins it at exactly 2× and reds at 1 or 3 — see §14.3.
+
+### 3.2 Act VIII — the Landmark set, CLOSED
 
 Selected from the twelve candidate bodies against §7's rule that refusals are the
-best material.
+best material. **Drafted and published by JOURNEY-29 at 184 / 173 / 173 words.
+This set is now closed on the same terms as §3.1.**
 
 | n | sha7 | The turn |
 |---|---|---|
@@ -167,7 +209,17 @@ technical language lives here and only here. Nothing in the prose.
 **The turn** — what was available, what happened instead.
 
 **The visual** *(Landmark only, exactly one)* — a three-row table, a
-before/after pair, or a single stat. Never two. Chapters and Groundwork get none.
+before/after pair, or a single stat. Never two. Chapters and Groundwork get none,
+and that is asserted by §14.6 rather than left to care: a table is otherwise an
+unbounded word-laundering channel, since table rows are excluded from the word
+count.
+
+⚠ **The corpus diverges from this rule and the rule still wins.** Three of the
+four most recent existing Landmarks carry no visual at all. They are published
+and cannot be touched. New Landmarks carry exactly one — the visual is now one of
+the few things that makes a Landmark legible as one, and §0 gives the spec
+precedence over the corpus. Stated here so a drafter matching the recent corpus
+does not conclude the rule is dead.
 
 **The spike** — one sincere line, last. Never more than two sentences. Landmarks
 only; a Chapter that reaches for a spike is overwriting.
@@ -418,30 +470,60 @@ what makes a single pass legitimate here where it was not in the original task.
 | **V — The Audit** | n196–226 | 3 – 16 Jul | One week that checked everything, then an outside audit. |
 | **VI — The Face** | n227–285 | 16 Jul – 3 Aug | The interface built out. The shell. The time-boxed collaborator. |
 | **VII — The Last Mile** | n286–346 | 3 – 18 Aug | Polish, parity, and the three months nobody noticed. |
-| **VIII — «see §11.1»** | n347–HEAD | 18 Aug – 15 Sep | The run-up to go-live. Written by this task. |
-| **IX — The Window** | unwritten | 15 Sep – 5 Nov | The experiment running. Drafted live, not retrospectively. |
+| **VIII — The Instruments** | n347–433 | 18 Aug – 3 Sep | Instruments, proofs and claims that read green and were wrong. Named by §11.1's rule: **49 of 87 bodies, 56.3% against a 25% threshold**. 86 entries for 87 commits. |
+| **IX — The Window** | unwritten | 15 Sep – 5 Nov | The experiment running. Drafted live, not retrospectively. Its bridge is **provisional** — see §11.2. |
 
 **The Window renumbers VIII → IX.** It is unwritten, so the cost is one filename,
 one README row, and the references in the bridges and the loop table — all of
 which this task touches anyway. A "VII-B" would be the only act that is not a
 numeral and would read as an appendix to parity work Act VIII is explicitly not.
 
-### 11.1 Act VIII's name is decided by measurement, not by this file
+### 11.1 Act VIII's name was decided by measurement — RESOLVED
 
-Two candidates, and a mechanical rule for choosing between them.
+The rule was fixed **in advance** and §6.1 says why it had to run across the whole
+act rather than the twelve Landmark candidates: *a selection rule that hunts for a
+theme will return that theme.*
 
-Across **all** commits in the act — not the twelve candidates, per §6.1 — count
-the bodies that record an instrument, a proof, a measurement or a stated claim
-that turned out wrong, and was corrected. Report the count and the rule.
+**The rule.** Across all commits in the act, count the bodies recording an
+instrument, a proof, a measurement or a stated claim **that turned out wrong, and
+was corrected** — both halves required. ≥25% → *The Instruments*. <25% → *The
+Start Line*.
 
-| Count | Name | Because |
-|---|---|---|
-| **≥ 25%** | **The Instruments** | The act is then about the checking being unreliable, which is a different thing from Act V's outside audit and deserves its own name. |
-| **< 25%** | **The Start Line** | The act is then the shipping push the close-out described, and the name should say so. |
+| | |
+|---|---|
+| Classified | 87 of 87 |
+| First pass | 55 YES |
+| Killed by adversarial refutation | 6 |
+| **Final** | **49 · 56.3%** against a 25% threshold |
+| **Selected** | **The Instruments** |
 
-State the count, the threshold, and which name it selected, in the act file's
-front matter and in the run report. **A name chosen by a rule stated in advance
-is auditable; one chosen by feel is not.**
+The margin does not turn on a judgement call: taking every kill back gives 63%.
+
+**Kept as a worked example, not as live machinery.** The value of this section is
+now the shape — a name chosen by a rule stated in advance is auditable; one
+chosen by feel is not. Act IX names itself the same way or better.
+
+### 11.2 Act IX's bridge is provisional, and says so
+
+Its closing statistic reads *"a fifth of the commits behind this document explain
+nothing about themselves"*, and the index beside it now reads *about a sixth*.
+Both are correct **at different moments** — the corpus grew from 346 commits to
+433 under a sentence written against the smaller one, and the bridge is drafted
+as if from 5 November.
+
+**It is not corrected here.** It is published prose, the wall forbids rewriting
+it, and it is rewritten at go-live anyway. What is owed instead is one sentence
+in `docs/journey/README.md`, beside the live figure, saying which moment the
+bridge speaks from — so a reader meeting two numbers in one directory is told
+rather than left to guess.
+
+⛔ **Do not resolve this by editing the act file.** The guards identify a file's
+title and span line **by position** — lines 1 and 2 — so inserting front matter
+above the bridge breaks the parser for all nine acts. The README is the safe
+surface, and this footnote exists because the obvious fix is the dangerous one.
+
+Whoever drafts Act IX's forward half re-measures the figure and deletes both this
+section and the bridge's pin.
 
 ### The bridge contract
 
@@ -556,45 +638,117 @@ section already instructs it: *"Update the count when it moves."*
 
 ## 14. The drift guards
 
-The original task's defence against drift across hundreds of entries was a human
-holding the voice in context. A single unattended pass has no such reader, so the
-defence has to be mechanical. Each guard is a test, and each is verified by
-planting a violation and watching it red — **a guard written against clean text
-has never seen the defect it claims to catch.**
+The original task's defence against drift was a human holding the voice in
+context. A single unattended pass has no such reader, so the defence is
+mechanical. Each guard is a test, and each is verified by **planting the defect it
+claims to catch and watching the named assertion move** — a guard written against
+clean text has never seen its own defect and may be passing for an unrelated
+reason.
+
+Four shipped. The fourth was added beyond v1.3's three, against a defect the run
+actually committed, and is ratified here.
 
 ### 14.1 Word ceilings
 
-Every entry's prose word count against its tier: Landmark ≤200, Chapter ≤90,
-Groundwork ≤40. A word is a run of letters or digits. Mono line excluded.
+Prose word count against tier: Landmark ≤200, Chapter ≤90, Groundwork ≤40. A word
+is a run of letters or digits; the mono line and table rows are excluded.
 
-Catches inflation, which is the failure mode drift produces first.
+⚠ **It catches BREACH, not INFLATION, and must never claim otherwise.** Act VIII's
+first draft averaged 86 words against 67 for the acts before it, with nineteen
+entries at exactly 89 or 90 — **every one green, correctly, because none
+breached.** A ceiling cannot see a distribution pressed against it. What caught
+that was a reviewer measuring one act against seven others and asking why the
+shape differed. **A reviewer is not the same object as a test**, and this is the
+clearest evidence in the project for why the cascade is not optional.
 
 ### 14.2 Jargon
 
-No prose line matches a task code, `ADR-\d+`, a `§`, a `V-\d`/`O-\d`/`L-\d`
-register reference, or a path containing a slash. §7 forbids all of these; a
+No prose line carries a task code, a decision-record number, a `§`, a register
+reference, a repository path, a bare filename, a pull-request reference, a commit
+hash, a branch name, or a migration identifier. §7 forbids all of these; a
 drifting session reaches for them because they are the nearest true thing to say.
 
-Scoped to prose. Mono lines are exempt — that is where technical language lives.
+Scoped to prose and to bridges. **Mono lines are exempt** — that is where
+technical language lives. ⚠ **The exemption must be proved by a discriminating
+control**: plant the identical tokens in a mono line and confirm the guard stays
+green. A guard planted only in prose proves it fires, never that it is *scoped*.
+
+Patterns carry positive controls and hostile negatives — `plan/execute/log`,
+`and/or`, `50/50`, `Washington, D.C.`, a 400-day cookie ceiling that looks like a
+hash. Anything deliberately out of reach goes in a `KNOWN_UNCAUGHT` list rather
+than being left to look like an oversight.
 
 ### 14.3 Title collision
 
-Every new `### ` heading is unique against every heading already in
-`docs/journey/`.
+Every `### ` heading unique across `docs/journey/`, compared **normalised** —
+case-folded, punctuation stripped — not byte-wise. `Voice, Not Balance` is pinned
+at exactly 2× per §3.1b and reds at 1 or 3.
 
-Two entries with the same title, in a document read cold one entry at a time, is
-unrecoverable: the reader has no way to tell which one they are in.
+⚠ **Its honest limit:** exact matching cannot see near-duplicates. Two titles nine
+entries apart saying the same thing is the same failure one notch below the
+machine. A similarity threshold is a number somebody tunes until the guard stops
+complaining. **The exact guard plus a human reading every title in order is the
+better pair** — and the second half is a real obligation, not a hope.
 
 ### 14.4 Tier markers
 
-Every entry carries its tier in a machine-readable marker. Without one, 14.1
-cannot know which ceiling applies, and no reader can tell a Landmark from
-Groundwork — which is the state the recon found the document in.
+Every entry carries exactly one machine-readable tier marker. Without one, 14.1
+cannot know which ceiling applies and no reader can tell a Landmark from
+Groundwork — the state the corpus was in until JOURNEY-29.
 
-Existing entries are marked by tier derived from §3.1 and from measured word
-count. **Marking is not redrafting**; no existing prose changes.
+`TIER: UNKNOWN` still parses, so the escape hatch exists, but **its presence is a
+failure**. Using it requires a deliberate test edit. A one-token self-service
+exemption from a ceiling is not an escape hatch; it is a hole.
 
----
+### 14.5 Pins, not exemptions
+
+Two published entries violate rules they predate: `Backwards In Public` at 207
+words against a 200 ceiling, and Act IX's bridge at 365 words against §11's
+150–250. Neither can be reworded.
+
+**Each is pinned at its exact measured value, with an md5 of its text — not
+exempted.** An exemption goes quiet forever. A pin reds if the entry moves in
+*either* direction, including a same-length reword. Pin key-sets are asserted
+exactly so they cannot grow silently.
+
+### 14.6 The structural assertions
+
+Three properties that are not about voice and fail *green* when broken, which is
+why each is pinned rather than counted:
+
+- **Act files are pinned by name**, all nine. A file that stops matching the
+  naming pattern otherwise vanishes from every guard silently — and this very
+  task renamed one. Entry count is cross-checked against an independent
+  derivation, so a file dropping out separates two numbers.
+- **Per-act entry counts are pinned.** Counting headings in the same files the
+  parser reads moves both numbers together: twenty entries were deleted from one
+  act in testing with every guard green. An act gaining or losing entries is a
+  decision, not something that happens quietly.
+- **Note bodies assert their derivation, not their output.** See §14.7.
+
+### 14.7 Assert the derivation, not the output
+
+The single most expensive defect of the JOURNEY-29 run: an editorial pass rewrote
+82 entries and silently invalidated all eleven note bodies — files that **three
+separate reviews had verified byte-identical** to those entries, since that
+identity was the entire argument for reviewing them as files. The reviews had
+finished with the property before the fix that broke it existed.
+
+**A generated artifact checked once is not checked.** Every review verified the
+identity by hand and it broke anyway, two commits later, because nothing was
+watching the *relationship* — only the values it produced at one moment.
+
+So the property is a test: each note body's prose is byte-identical to its entry,
+it opens with the canonical block by md5, and it survives `git notes` whitespace
+normalisation unchanged. Verified by planting each failure.
+
+### 14.8 A guard's failure message names the right cause
+
+A true refusal reported with a misleading cause is a defect. A missing mono line
+diagnosed as a missing marker sends a reader hunting the wrong thing; an
+assertion reading `expected 427 to be 428` names nothing. **Every assertion says
+what broke and where**, and a test's name says what it actually proves rather
+than what it was meant to.
 
 ## 15. Where this file lives
 
@@ -611,4 +765,4 @@ else.
 
 ---
 
-**END — JOURNEY style spec v1.3**
+**END — JOURNEY style spec v1.4**

@@ -1,10 +1,13 @@
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
 	actFiles,
 	CEILINGS,
 	EXPECTED_ACT_FILES,
 	headingCountAcrossDir,
+	journeyDir,
 	parseBridges,
 	parseEntries,
 	type Tier,
@@ -72,7 +75,7 @@ const PINNED_OVERAGES: Record<string, number> = {
 /**
  * Bridges outside §11's 150–250 range before this guard existed.
  *
- * `09-the-window.md` measures 342. It is the bridge into the act written LIVE
+ * `09-the-window.md` measures 365. It is the bridge into the act written LIVE
  * during the experiment window, it is marked provisional in its own text
  * (*"the closing half is provisional until the window ends"*), and the task
  * that added this guard was explicitly forbidden to rewrite it — it carries two
@@ -84,6 +87,9 @@ const PINNED_OVERAGES: Record<string, number> = {
 const PINNED_BRIDGES: Record<string, number> = {
 	"09-the-window.md": 365,
 };
+
+/** The pinned bridge's exact content, so a same-length rewording cannot pass. */
+const PINNED_BRIDGE_MD5 = "99a4c10b5c310342f59e218fcf9b4f3c";
 
 /**
  * Per-act entry counts, pinned.
@@ -100,8 +106,6 @@ const PINNED_BRIDGES: Record<string, number> = {
  * which is exactly right, because that is a decision somebody makes, once per
  * act, and never a thing that should happen quietly.
  */
-const PINNED_BRIDGE_MD5 = "99a4c10b5c310342f59e218fcf9b4f3c";
-
 const EXPECTED_ENTRY_COUNTS: Record<string, number> = {
 	"01-before-anything.md": 21,
 	"02-the-ground.md": 28,
@@ -128,6 +132,49 @@ describe("journey entries — word ceilings", () => {
 			`the parser sees ${entries.length} entries but ${headingCountAcrossDir()} '### ' headings exist in docs/journey/ — a file has stopped matching the act-file pattern, or a non-act .md has appeared`,
 		).toBe(headingCountAcrossDir());
 		expect(entries.some((e) => e.words > 0)).toBe(true);
+	});
+
+	it("every act file still has the shape the parsers assume", () => {
+		// ⚠ THE ONLY THING THAT ASSERTS THE PARSER'S STRUCTURAL ASSUMPTIONS.
+		// `parseBridges` identifies the act title and the front-matter span line
+		// BY POSITION — lines 1 and 2 — after identifying them by markup was found
+		// to eat live prose. Position is the correct property, and until this test
+		// nothing checked it held. Both directions were planted and all 26 tests
+		// passed: delete the span line and its blank, and the first line of real
+		// bridge prose lands on line 2 and is skipped — four shorthand tokens in it
+		// went unscanned; delete the act title, and the technical span line is read
+		// as prose instead. That is the same escape that proved bridges were
+		// unscanned in the first place, reached a third time, through the fix for
+		// the fix.
+		//
+		// The fence check is the other half. No parser here knows what a ``` block
+		// is, deliberately — a fence rule in one reader and not another made
+		// `headingCountAcrossDir()` disagree with `parseEntries()` and report it as
+		// a file-selection failure. So a fenced block arriving in an act file is a
+		// red that names itself, rather than sample text quietly becoming an entry.
+		const wrong: string[] = [];
+		for (const f of EXPECTED_ACT_FILES) {
+			const lines = readFileSync(join(journeyDir(), f), "utf8").split("\n");
+			const first = lines[0] ?? "";
+			const second = lines[1] ?? "";
+			if (!/^# Act [IVX]+ — .+/.test(first)) {
+				wrong.push(
+					`${f}:1 is not the act title, so the bridge parser is skipping the wrong line: ${JSON.stringify(first.slice(0, 60))}`,
+				);
+			}
+			if (!/^\*.+\*$/.test(second.trim())) {
+				wrong.push(
+					`${f}:2 is not the front-matter span line, so the bridge parser is skipping a line a reader meets: ${JSON.stringify(second.slice(0, 60))}`,
+				);
+			}
+			const fence = lines.findIndex((l) => l.trimStart().startsWith("```"));
+			if (fence !== -1) {
+				wrong.push(
+					`${f}:${fence + 1} opens a fenced block; every reader of this corpus treats '### ' as an entry heading unconditionally, so a heading inside a fence would parse as an entry`,
+				);
+			}
+		}
+		expect(wrong, wrong.join("\n")).toEqual([]);
 	});
 
 	it("every act holds exactly the entries it is supposed to", () => {
@@ -195,7 +242,13 @@ describe("journey entries — word ceilings", () => {
 		for (const e of entries) {
 			if (e.tier === null || e.tier === "UNKNOWN") continue;
 			const ceiling = CEILINGS[e.tier as Exclude<Tier, "UNKNOWN">];
-			if (PINNED_OVERAGES[e.title] !== undefined) continue;
+			// `hasOwn`, not `!== undefined`: a plain object answers for every key on
+			// `Object.prototype`, so an entry titled `constructor` was exempted from
+			// its ceiling by 130 words with all nine tests green — and `Object.keys`
+			// does not see it, so the "map has not grown" assertion stayed green too.
+			// That is the one-token, self-service exemption this file's docblock says
+			// `TIER: UNKNOWN` exists to prevent, reached by a different door.
+			if (Object.hasOwn(PINNED_OVERAGES, e.title)) continue;
 			if (e.words > ceiling) {
 				over.push(
 					`${e.file}:${e.line} ${e.title} — ${e.tier} is ${e.words} words, ceiling ${ceiling}`,

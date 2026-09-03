@@ -11,6 +11,11 @@ expect: about a sixth of these commits explain nothing about themselves, and
 nearly all of those are early — seventy-five of the seventy-seven land before
 the middle of August 2026.
 
+The bridge into the last act says a fifth rather than a sixth — it is
+provisional, written as if from the far end of the window and against the
+smaller corpus that existed when it was drafted, and both figures are right
+about the moment they speak from.
+
 Some entries run to a paragraph. Most are two or three sentences. A few are a
 single line, because some commits genuinely have a single line in them.
 

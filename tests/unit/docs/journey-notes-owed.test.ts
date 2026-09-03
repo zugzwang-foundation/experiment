@@ -32,12 +32,21 @@ import { journeyDir, parseEntries } from "./_journey-entries";
  * none, because the next reader trusts it.
  *
  * What it DOES do is real and was unguarded: it strips trailing whitespace,
- * collapses runs of blank lines to one, and drops leading and trailing blank
- * lines. So a body carrying any of those would be stored differently from the
- * file a reviewer approved — the same divergence, by a different route. Those
- * three properties are asserted below instead of the `#` claim, which is kept
- * only as a cheap belt: a leading `#` is still a markdown heading nobody wants
- * in a note.
+ * collapses runs of blank lines to one, drops leading and trailing blank lines,
+ * and ADDS a final newline to a file that does not end with one. So a body
+ * carrying any of those would be stored differently from the file a reviewer
+ * approved — the same divergence, by a different route. Those FOUR properties
+ * are asserted below instead of the `#` claim, which is kept only as a cheap
+ * belt: a leading `#` is still a markdown heading nobody wants in a note.
+ *
+ * ⚠ The fourth was missed on the pass that wrote the other three, and it is the
+ * one with teeth. The others make a body look wrong before it is attached; a
+ * missing final newline makes it look wrong AFTER. Step 2 of the apply
+ * instructions attaches the note, step 3's `diff -q` then reports `FAIL` on a
+ * body nobody can re-attach cleanly, because `git notes add` without `-f`
+ * refuses where a note already exists — so the reader is sent to Recovery for a
+ * defect a byte-level check catches in CI. Measured on git 2.53: `alpha\nbeta`
+ * goes in and `alpha\nbeta\n` comes out.
  */
 
 /** `CLAUDE.md` §5.13.1, the one text every note opens with. */
@@ -67,9 +76,22 @@ const EXPECTED_BODIES = [
 
 const notesDir = (): string => join(journeyDir(), "notes-owed");
 
+/**
+ * EVERY FILE IN THE DIRECTORY, not every file that already looks like a note
+ * body. This used to filter on `/^n\d+-[0-9a-f]{7}\.txt$/`, which quietly turned
+ * the equality below into a statement about the files that match the naming
+ * convention — so two rogue files dropped in beside the eleven passed a test
+ * named "the directory holds exactly the eleven bodies", and a docblock saying
+ * "a twelfth file is a decision, and it reddens here" was false for any twelfth
+ * file that did not happen to be named like the first eleven.
+ *
+ * Only `README.md` — the apply instructions, which live here on purpose — and
+ * dotfiles are excluded, and both exclusions are written out rather than
+ * hidden inside a pattern that also decides what the test can see.
+ */
 const bodyFiles = (): string[] =>
 	readdirSync(notesDir())
-		.filter((f) => /^n\d+-[0-9a-f]{7}\.txt$/.test(f))
+		.filter((f) => f !== "README.md" && !f.startsWith("."))
 		.sort();
 
 const md5 = (s: string): string => createHash("md5").update(s).digest("hex");
@@ -79,7 +101,10 @@ describe("journey — note bodies owed", () => {
 	const entries = parseEntries();
 
 	it("the directory holds exactly the eleven bodies this task owes", () => {
-		expect(files).toEqual([...EXPECTED_BODIES]);
+		expect(
+			files,
+			"a file appeared in or vanished from notes-owed/ — a twelfth body is a decision somebody makes, not something that arrives",
+		).toEqual([...EXPECTED_BODIES]);
 		expect(entries.length).toBeGreaterThan(400);
 	});
 
@@ -142,6 +167,11 @@ describe("journey — note bodies owed", () => {
 				/\n\s*\n$/.test(raw),
 				`${f} ends with a blank line, which git notes drops`,
 			).toBe(false);
+
+			expect(
+				raw.endsWith("\n"),
+				`${f} does not end with a newline, which git notes ADDS — the stored note would differ from this file by a byte, and it would differ only after it had already been attached`,
+			).toBe(true);
 
 			expect(
 				lines.filter((l) => l.startsWith("#")),

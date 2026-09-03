@@ -20,7 +20,7 @@ import { parseBridges, parseEntries } from "./_journey-entries";
  * the mono line too would be unsatisfiable and would be deleted within a week.
  *
  * ⚠ SCOPE IS EVERY LINE A READER MEETS EXCEPT THAT ONE: prose, table cells,
- * entry TITLES, and the BRIDGE at the head of each act. The bridge is 1,887
+ * entry TITLES, and the BRIDGE at the head of each act. The bridge is 1,910
  * words of prose across eight written bridges — Act I has none — and was scanned
  * by nothing until a review planted four tokens in one and watched all sixteen
  * tests pass. It is also the region
@@ -201,7 +201,17 @@ describe("journey entries — no shorthand in prose", () => {
 		}
 		// KNOWN_UNCAUGHT is documentation, not an assertion — every entry in it is
 		// a class these patterns deliberately miss. It is checked by being read.
-		expect(KNOWN_UNCAUGHT.some((k) => k.includes("rootless path"))).toBe(true);
+		// The one line pinned here is the one a reader is most likely to delete
+		// while "tidying", because it reads like an admission rather than a
+		// decision: it is what stops `DIR_PATH`'s trailing-slash requirement from
+		// looking like an oversight instead of the boundary that keeps
+		// `plan/execute/log` out. Pinned WITH its cause, because without a message
+		// this reds as "expected false to be true" inside a test named after the
+		// patterns, sending the reader to look at a regex that is fine.
+		expect(
+			KNOWN_UNCAUGHT.some((k) => k.includes("rootless path")),
+			"the rootless-path line was removed from KNOWN_UNCAUGHT — DIR_PATH's trailing-slash requirement is a deliberate boundary, and this list is the only place that says so",
+		).toBe(true);
 	});
 
 	it("no pattern reddens on ordinary prose (negative controls)", () => {
