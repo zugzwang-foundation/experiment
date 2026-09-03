@@ -1,6 +1,10 @@
+import { Download } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { InfoTip } from "@/components/ui/info-tip";
 import { GLOSSARY } from "@/lib/copy/glossary";
+import { cn } from "@/lib/utils";
 import type { PricePoint } from "@/server/discovery/price-series";
 
 import {
@@ -122,7 +126,8 @@ function LifecycleBadge({ status }: { status: DebateMarketHeader["status"] }) {
  * renders, and a list of "every element below" that names one that is not below
  * is the kind of faithfully-carried-forward falsehood doctrine §6.2 is about.
  *
- * ⇒ CONSEQUENCE, DECLARED: the lifecycle marker and `Download .md` become
+ * ⇒ CONSEQUENCE, DECLARED: the lifecycle marker and the `.md` export (labelled
+ * `AI mode` since AIMODE-1; `Download .md` before it) become
  * MARKET-ARM ONLY, exactly like every other `vm` element beside them. ⛔ Neither
  * is DELETED — row 9 is a reverse delta the founder has not ruled, and OD-3
  * keeps all five. The ADR-0025 export stays reachable and the INV-4 read-only
@@ -489,15 +494,119 @@ export function MarketHeader({
 							<div className="ml-auto flex shrink-0 items-center gap-2">
 								<LifecycleBadge status={market.status} />
 								{/* EXPORT.1 — native download of the debate `.md` (server-mediated
-								    GET); plain anchor, no client boundary, works signed-out. */}
+								    GET); plain anchor, no client boundary, works signed-out.
+								    ⛔ IT STAYS AN `<a>`, AND AIMODE-1 DID NOT CHANGE THAT. The
+								    brief said "rendered as a button, not a text link" — which is
+								    a statement about APPEARANCE, and is satisfied by
+								    `buttonVariants`. The two halves are separable: it stops being
+								    a text LINK, it does not stop being an anchor.
+								    
+								    ⚠ AN EARLIER DRAFT JUSTIFIED THIS BY SAYING A `<button>` WOULD
+								    INTRODUCE "a client boundary in a server component". ⛔ THAT WAS
+								    FALSE and is corrected here rather than quietly dropped, because
+								    a right answer resting on a wrong mechanism is the thing that
+								    gets copied. THIS COMPONENT IS ALREADY CLIENT-SIDE: its sole
+								    importer is `DebateView.tsx`, which is `"use client"` and hands
+								    it `pick.onPick` — a FUNCTION prop, which only passes
+								    client→client. There is no boundary here to cross.
+								    ⇒ The real grounds, which do hold: an anchor is what FETCHES A
+								    RESOURCE, and `download` is a native attribute of one. A button
+								    would have to re-implement the download in JS — and would then
+								    do it WORSE, because this way it still works before hydration
+								    and with JS off. AT hearing "link" is also simply true of it.
+								    Same shape as `composer/SlotHeader.tsx`, where `buttonVariants`
+								    supplies the look and a `Link` keeps the behaviour.
+
+								    ⚠ GEOMETRY IS PINNED TO `LifecycleBadge`, ITS ROW-NEIGHBOUR,
+								    and the two overrides are what pin it. `size="xs"` is h-6 with
+								    a ~10px radius; the badge beside it is `h-5 rounded-4xl`
+								    (`ui/badge.tsx`). Left at `xs` this control would set the
+								    row's height instead of the badge, growing it 4px — and the
+								    note at the top of this row records that the row tracks the
+								    badge's fixed `h-5`, inside a `basis-[24.2dvh] overflow-hidden`
+								    band whose interior budget is already fully allocated. So the
+								    override is a height CONTRACT with the element beside it, not
+								    a nudge: `h-5 rounded-4xl` reproduces the badge's box exactly
+								    (h-5 · gap-1 · rounded-4xl · px-2 · text-xs · svg size-3) and
+								    the row's height delta is zero.
+
+								    ⚠ `variant="outline"` NAMES a bordered pill; it does NOT buy
+								    de-emphasis. `default` and `outline` are byte-identical in
+								    `buttonVariants` — the one-button system (values-log §3 item 3
+								    / R-6). Anyone reaching here to make this "quieter" by
+								    swapping the variant will change nothing; the lighter
+								    treatments are `ghost` and `secondary`, and picking one is a
+								    design ruling, not an edit.
+
+								    ⛔⛔ THE ACCESSIBLE NAME IS NOT THE VISIBLE LABEL, AND THE
+								    DIFFERENCE IS THE WHOLE FIX. Visible: the ratified two words.
+								    Accessible: those words, an em dash, then a short statement
+								    that a Markdown file downloads. Both halves are
+								    founder-ratified — the name at AIMODE-1, the suffix at its
+								    addendum (OQ-1) — and the suffix exists because of what is
+								    measured below.
+
+								    An earlier draft of THIS BLOCK said the download "reaches AT
+								    as a DESCRIPTION" via `aria-describedby`. ⛔ IT DOES NOT, on
+								    the branch that matters. MEASURED, not read: while the tip is
+								    CLOSED, `aria-describedby` on this anchor resolves to `null`
+								    — the Popover mounts its content only when open, while
+								    `InfoTip` sets the attribute unconditionally, so the id
+								    DANGLES and the gloss is not in the document at all. The touch
+								    branch is the DEFAULT for every unknown, including anything
+								    without `matchMedia`.
+								    ⇒ Pointer/desktop was never the problem — Radix's Tooltip
+								    renders a `VisuallyHidden` copy and opens on FOCUS, so a
+								    keyboard user meets the gloss. On TOUCH the only way to open
+								    the description is to activate the control, which also starts
+								    the download. A touch AT user therefore got a name that names
+								    no file and no indication that one arrives — a WCAG 2.4.4
+								    (Link Purpose, Level A) regression against the pre-AIMODE-1
+								    label, which said so outright.
+								    ⇒ CLOSED HERE, in the one place that reaches every branch:
+								    the name itself. Purpose carried in the attribute needs no tip
+								    to open, no pointer to hover and no id to resolve. The
+								    ratified label stays the PREFIX, so the visible words remain a
+								    leading substring of the accessible name and a speech-input
+								    user can still say them (WCAG 2.5.3, Label in Name).
+								    ⚠ This block still NAMES the string rather than quoting it in
+								    attribute syntax, and the restraint outlived its first reason.
+								    That reason — an unshipped literal here is the one a
+								    source-scan guard would match — is discharged; the string
+								    ships. What replaces it is the mirror: a second copy in a
+								    comment can drift from the JSX silently, and the guards that
+								    own this claim read the rendered DOM, so they would never see
+								    the drift. Six recorded instances in this repo.
+
+								    ⚠ TARGET SIZE, the other cost of matching the badge. `h-5`
+								    is 20px against WCAG 2.5.8 (AA)'s 24px floor — and `size=xs`
+								    alone would have been 24px exactly. The Spacing exception
+								    most likely carries it (the badge is the nearest target, a
+								    `gap-2` away), but the geometry match was ratified knowing
+								    this rather than in ignorance of it. */}
 								<InfoTip content={GLOSSARY.downloadMd} asChild>
 									<a
 										download
 										href={`/m/${market.slug}/export`}
-										aria-label="Download this debate as Markdown"
-										className="text-muted-foreground text-xs underline-offset-2 hover:underline"
+										aria-label="AI mode — download this debate as Markdown"
+										className={cn(
+											buttonVariants({ variant: "outline", size: "xs" }),
+											"h-5 rounded-4xl",
+										)}
 									>
-										Download .md
+										{/* Bare, like the two sibling call sites (`ArgProfile`,
+										    `DownloadStub`). The glyph IS hidden from AT — lucide
+										    adds `aria-hidden="true"` itself — but it does so
+										    CONDITIONALLY: `!children && !hasA11yProp(rest)`
+										    (`lucide-react@1.14.0` `dist/esm/Icon.mjs:36`, read, not
+										    assumed). So passing it here would be redundant, and —
+										    the part worth knowing — passing any OTHER a11y prop
+										    later SILENTLY REVOKES the default and un-hides the
+										    glyph. That is a vendor contract, so it is pinned as one
+										    in `market-header.test.tsx` rather than restated here as
+										    a prop that only looks like it is doing the work. */}
+										<Download />
+										AI mode
 									</a>
 								</InfoTip>
 							</div>

@@ -26,22 +26,89 @@ const MAX_LEN = 80;
  * spaces. */
 const SPACED_HYPHEN = / - /;
 
+/**
+ * AIMODE-1 — the register's one ratified over-length string, exempted BY NAME.
+ *
+ * `downloadMd` is 89 characters against the 80 below. The floor is deliberately
+ * NOT raised to admit it: `MAX_LEN` covers ~25 strings, and loosening it for
+ * all of them to fit one would retire glossary.ts's stated "≤ ~75 characters so
+ * it survives an unstyled render" rule product-wide as a side effect of a copy
+ * change to a single gloss. The reason for the floor still holds everywhere it
+ * held yesterday.
+ *
+ * ⚠ THE EXEMPT BUDGET IS PINNED EXACTLY, NOT LOOSENED, and that is the whole
+ * design of it. A `<=` here would let this one string grow without limit the
+ * moment it was exempted — which is precisely the failure an exemption invites:
+ * the guard stops guarding the key most likely to drift, while still reporting
+ * green for the other twenty-five. Editing the copy therefore edits this number
+ * in the same commit. The friction is intentional and is the point.
+ *
+ * Only the LENGTH is exempt. The em dash, terminal-period and spaced-hyphen
+ * rules below still apply to it unchanged.
+ */
+const EXACT_LEN_EXEMPT: Readonly<
+	Partial<Record<keyof typeof GLOSSARY | keyof typeof HEADER_GLOSSARY, number>>
+> = {
+	downloadMd: 89,
+};
+
+/**
+ * AIMODE-1 — the founder-ratified TEXT, pinned as text.
+ *
+ * ⚠ The exemption above guards the wrong axis on its own, and that is worth
+ * saying plainly rather than leaving implied: it pins a LENGTH, and what was
+ * ratified was a STRING. Any 89-character rewrite of this public campaign copy
+ * would satisfy it. `glossary.ts` opens with "Do not edit a string here without
+ * a founder ruling", so the guard that actually matches the requirement is an
+ * equality on the string itself; the length exemption's remaining job is
+ * narrower — it is only what lets the shape loop admit a gloss this long.
+ */
+const RATIFIED_TEXT: Readonly<Partial<Record<keyof typeof GLOSSARY, string>>> =
+	{
+		downloadMd:
+			"AI mode — download this entire market debate as a Markdown file and paste it into any LLM",
+	};
+
+const ALL_ENTRIES = [
+	...Object.entries(GLOSSARY),
+	...Object.entries(HEADER_GLOSSARY),
+] as [string, string][];
+
+/**
+ * String-keyed VIEWS over the two typed literals above.
+ *
+ * ⚠ The literals are keyed to `keyof typeof GLOSSARY` on purpose — a typo'd key
+ * there is a compile error rather than a silent no-op that quietly exempts
+ * nothing (O-1: structural beats procedural). But `assertWellFormed` receives an
+ * arbitrary `string`, including the `_fixture_*` keys its own positive control
+ * invents, so it cannot index a keyed record. A `Map` gives the loose read
+ * without an `as` cast reaching back across that boundary.
+ */
+const LEN_BUDGET = new Map<string, number | undefined>(
+	Object.entries(EXACT_LEN_EXEMPT),
+);
+const REGISTER = new Map<string, string>(ALL_ENTRIES);
+
 function assertWellFormed(key: string, value: string): void {
 	expect(value.length, `${key}: empty`).toBeGreaterThan(0);
-	expect(value.length, `${key}: exceeds ${MAX_LEN} chars`).toBeLessThanOrEqual(
-		MAX_LEN,
-	);
+	const exactLen = LEN_BUDGET.get(key);
+	if (exactLen === undefined) {
+		expect(
+			value.length,
+			`${key}: exceeds ${MAX_LEN} chars`,
+		).toBeLessThanOrEqual(MAX_LEN);
+	} else {
+		expect(
+			value.length,
+			`${key}: ratified over-length gloss — its budget is pinned exactly, so update EXACT_LEN_EXEMPT in the same commit as the copy`,
+		).toBe(exactLen);
+	}
 	expect(value, `${key}: ends with a terminal period`).not.toMatch(/\.$/);
 	expect(
 		value,
 		`${key}: uses a spaced hyphen instead of an em dash`,
 	).not.toMatch(SPACED_HYPHEN);
 }
-
-const ALL_ENTRIES = [
-	...Object.entries(GLOSSARY),
-	...Object.entries(HEADER_GLOSSARY),
-] as [string, string][];
 
 describe("INFO-1 — glossary copy register", () => {
 	it("every GLOSSARY and HEADER_GLOSSARY string is well-formed", () => {
@@ -75,6 +142,66 @@ describe("INFO-1 — glossary copy register", () => {
 		// just proves the em dash appears for real, not that every string uses it.
 		const withEmDash = ALL_ENTRIES.filter(([, v]) => v.includes("—"));
 		expect(withEmDash.length).toBeGreaterThan(ALL_ENTRIES.length / 2);
+	});
+
+	it("the length exemption is narrow, live, and still genuinely needed", () => {
+		// An exemption that outlives its reason is worse than no exemption: it
+		// reads as coverage while silently excusing a key nothing is checking.
+		// These three assertions are what make it expire on its own.
+		const keys = Object.keys(EXACT_LEN_EXEMPT);
+
+		// 1 — it stays NARROW. Growing the list is a decision, and it reddens here
+		//     rather than passing quietly as one more entry in an object literal.
+		expect(keys).toEqual(["downloadMd"]);
+
+		for (const key of keys) {
+			const entry = ALL_ENTRIES.find(([k]) => k === key);
+			// 2 — it stays LIVE. An exemption for a key deleted from the register
+			//     is dead weight pointing at nothing.
+			expect(
+				entry,
+				`${key}: exempted but absent from the register`,
+			).toBeDefined();
+			// 3 — it stays NEEDED. If the copy is ever shortened back under the
+			//     floor, this fails and the exemption gets deleted instead of
+			//     quietly licensing a future over-length rewrite of the same key.
+			expect(
+				entry?.[1].length,
+				`${key}: no longer exceeds ${MAX_LEN} — delete its exemption`,
+			).toBeGreaterThan(MAX_LEN);
+		}
+	});
+
+	it("the ratified copy is pinned as TEXT, not merely as a length", () => {
+		const pins = Object.entries(RATIFIED_TEXT);
+		// Guard the guard — an empty pin set would make the loop vacuous.
+		expect(pins.length).toBeGreaterThan(0);
+
+		for (const [key, text] of pins) {
+			// The requirement was a string. Assert the string.
+			expect(
+				REGISTER.get(key),
+				`${key}: ratified copy changed — this needs a founder ruling, not an edit`,
+			).toBe(text);
+
+			// …and keep the two guards honest about each other. A ratified-text key
+			// that is also length-exempt must agree with its own budget, so the
+			// string and the number can never drift apart while both look green.
+			const budget = LEN_BUDGET.get(key);
+			if (budget !== undefined) {
+				expect(text?.length, `${key}: text and length budget disagree`).toBe(
+					budget,
+				);
+			}
+		}
+	});
+
+	it("positive control: the exact-length pin rejects a drifted exempt string", () => {
+		// The exempt branch has its own machinery, so it gets its own proof that
+		// it can fail — the same rule the malformed-string control above follows.
+		expect(() =>
+			assertWellFormed("downloadMd", "AI mode — a gloss of the wrong length"),
+		).toThrow();
 	});
 
 	it("GLOSSARY.sold is the register's one founder-flagged invented string", () => {

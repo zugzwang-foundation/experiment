@@ -254,7 +254,7 @@ describe("RESO-1 — R-3, the meta line and the actions are one row", () => {
 
 		const meta = screen.getByText("Đ 150 staked");
 		const exportLink = container.querySelector(
-			'a[aria-label="Download this debate as Markdown"]',
+			'a[aria-label="AI mode — download this debate as Markdown"]',
 		);
 		const badge = screen.getByText("Open");
 		expect(exportLink).not.toBeNull();
@@ -289,7 +289,7 @@ describe("RESO-1 — R-3, the meta line and the actions are one row", () => {
 			<MarketHeader market={market(3, 5)} priceChart={null} />,
 		);
 		const exportLink = container.querySelector(
-			'a[aria-label="Download this debate as Markdown"]',
+			'a[aria-label="AI mode — download this debate as Markdown"]',
 		);
 		const actions = rowOf(exportLink);
 		expect(actions).not.toBeNull();
@@ -316,7 +316,7 @@ describe("RESO-1 — R-3, the meta line and the actions are one row", () => {
 		const stack = container.querySelector('[data-testid="headzone-stack"]');
 		expect(stack).not.toBeNull();
 		const exportLink = container.querySelector(
-			'a[aria-label="Download this debate as Markdown"]',
+			'a[aria-label="AI mode — download this debate as Markdown"]',
 		);
 		const metaRow = rowOf(screen.getByText("Đ 150 staked"));
 		const actionsRow = rowOf(exportLink);
@@ -325,6 +325,200 @@ describe("RESO-1 — R-3, the meta line and the actions are one row", () => {
 		expect(metaRow?.parentElement).not.toBe(stack);
 		expect(actionsRow?.parentElement).not.toBe(stack);
 		expect(metaRow?.parentElement).toBe(actionsRow?.parentElement);
+	});
+});
+
+describe("AIMODE-1 — the `.md` export is an `AI mode` button", () => {
+	const exportAnchor = (container: HTMLElement) =>
+		container.querySelector('a[href$="/export"]');
+
+	const tokensOf = (el: Element | null) =>
+		new Set((el?.getAttribute("class") ?? "").split(/\s+/).filter(Boolean));
+
+	// ⚠ RENAMED at the AIMODE-1 addendum, from
+	// `…-label-and-accessible-name-are-both-AI-mode`. OQ-1 made that title
+	// assert the opposite of what the body asserts: the two are deliberately
+	// NOT the same string any more. The cross-reference in
+	// `head-zone.test.tsx` moved in the same commit — it was the only one.
+	it("market-header::AIMODE-visible-label-is-the-PREFIX-of-the-accessible-name", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+		const link = exportAnchor(container);
+		expect(link).not.toBeNull();
+
+		// The visible label — the ratified two words, and ONLY those, because
+		// the glyph beside it is `aria-hidden` and contributes no text.
+		expect(link?.textContent).toBe("AI mode");
+
+		// …and the accessible name, which carries the link's PURPOSE. OQ-1: on
+		// touch the `InfoTip` gloss is unreachable without activating the
+		// control (the component's own block measures why), so a name that
+		// named no file was a WCAG 2.4.4 regression. The em dash is U+2014.
+		expect(link?.getAttribute("aria-label")).toBe(
+			"AI mode — download this debate as Markdown",
+		);
+
+		// ⛔ THE LOAD-BEARING RELATION, not a restatement of the two lines
+		// above: the visible label is a substring of the accessible name, and
+		// specifically its PREFIX. That is what lets a speech-input user say
+		// what they can see and have it match (WCAG 2.5.3, Label in Name). An
+		// edit that keeps both strings valid on their own but breaks the
+		// containment — reordering the halves, or paraphrasing the prefix —
+		// passes both assertions above and reddens only here.
+		const accessibleName = link?.getAttribute("aria-label") ?? "";
+		const visibleLabel = link?.textContent ?? "";
+		expect(visibleLabel).not.toBe("");
+		expect(accessibleName).toContain(visibleLabel);
+		expect(accessibleName.startsWith(visibleLabel)).toBe(true);
+
+		// ⛔ And the old name is gone from the control entirely — body and ARIA.
+		// ⚠ The capital `D` is now load-bearing and was not before: the
+		// accessible name legitimately contains "download" in lower case, so a
+		// case-insensitive ban is no longer available. What this still catches
+		// is the pre-AIMODE-1 label coming back, which is what it was for.
+		expect(link?.outerHTML).not.toContain("Download .md");
+		expect(link?.getAttribute("aria-label")).not.toContain("Download");
+	});
+
+	it("market-header::AIMODE-box-is-the-LifecycleBadge's-box-on-both-elements", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+		const link = tokensOf(exportAnchor(container));
+		const badge = tokensOf(container.querySelector('[data-slot="badge"]'));
+		expect(badge.size).toBeGreaterThan(1);
+
+		// Every box declaration is asserted on BOTH elements rather than on the
+		// control alone. Pinning only the control would let the shared `Badge`
+		// primitive be resized underneath it while this still passed against a
+		// literal — the divergence, not the value, is what matters here.
+		for (const box of ["h-5", "rounded-4xl", "px-2", "text-xs", "gap-1"]) {
+			expect(badge.has(box), `LifecycleBadge no longer carries ${box}`).toBe(
+				true,
+			);
+			expect(link.has(box), `the export control dropped ${box}`).toBe(true);
+		}
+
+		// ⛔ THE REGRESSION THIS EXISTS FOR, NAMED. `size="xs"` on its own is
+		// `h-6`; left unoverridden, this control — not the badge — would set the
+		// row's height, growing it 4px inside a `basis-[24.2dvh] overflow-hidden`
+		// band whose interior budget is already fully allocated.
+		expect(link.has("h-6")).toBe(false);
+	});
+
+	it("market-header::AIMODE-is-a-button-TREATMENT-on-an-anchor-that-stays-an-anchor", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+		const link = exportAnchor(container);
+		const cls = tokensOf(link);
+
+		// ⛔ Still an `<a download>`. An anchor is what FETCHES A RESOURCE, and
+		// `download` is a native attribute of one; a `<button>` would have to
+		// re-implement that in JS and would then do it worse — this way it still
+		// works before hydration and with JS off. "Rendered as a button" is a
+		// claim about appearance, and only about appearance.
+		// ⚠ This comment previously argued the point via "a client boundary
+		// inside a server component". That was FALSE — `MarketHeader`'s sole
+		// importer is `DebateView`, which is `"use client"` and passes it a
+		// function prop, so it is already client-side. Corrected here as well as
+		// in the component, because a justification repeated in two files is
+		// twice as likely to be the one someone copies.
+		expect(link?.tagName).toBe("A");
+		expect(link?.hasAttribute("download")).toBe(true);
+
+		// It stops looking like a text link. Named one at a time so a failure
+		// says WHICH class came back rather than that something did.
+		for (const linkish of [
+			"underline-offset-2",
+			"hover:underline",
+			"text-muted-foreground",
+		]) {
+			expect(cls.has(linkish), `text-link class ${linkish} is back`).toBe(
+				false,
+			);
+		}
+
+		// …and carries the button treatment instead.
+		expect(cls.has("inline-flex")).toBe(true);
+		expect(cls.has("bg-(--btn-fill)")).toBe(true);
+		expect(cls.has("[border:var(--hairline)]")).toBe(true);
+	});
+
+	it("market-header::AIMODE-glyph-is-aria-hidden-and-LEADS-the-label", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+		const link = exportAnchor(container);
+		const svg = link?.querySelector("svg");
+
+		expect(svg).not.toBeNull();
+		expect(svg?.getAttribute("class") ?? "").toContain("lucide-download");
+		// ⚠ THIS LINE IS A VENDOR PIN, NOT A PROP CHECK, and the difference is
+		// the whole reason it is worded this way. Nothing in `MarketHeader`
+		// passes `aria-hidden` — lucide adds it, but only while the icon gets
+		// no children and NO a11y prop (`Icon.mjs:36`). Hand an icon an
+		// `aria-label` or a `role` and the default silently disappears, taking
+		// the glyph into the accessible name with it. So the assertion is on the
+		// RENDERED attribute, which is the only thing that survives both a
+		// lucide upgrade and a call-site edit.
+		// It must not reach the accessible name — the label already names the
+		// control and lucide ships no `<title>`.
+		expect(svg?.getAttribute("aria-hidden")).toBe("true");
+		// "left of the label", asserted as source order rather than as CSS, which
+		// jsdom could not answer anyway.
+		expect(link?.firstElementChild).toBe(svg);
+	});
+
+	it("market-header::AIMODE-chrome-never-borrows-the-SIDE-poles", () => {
+		// `--color-yes` / `--color-no` are bound to the SIDE (YES/NO), and this
+		// control is neutral chrome that must not borrow that pair as decoration.
+		//
+		// ⚠ THIS IS A DESIGN-LANGUAGE RULE, NOT INV-3, and an earlier version of
+		// this comment said INV-3. It is not: INV-3 is
+		// `comments.side_at_post_time` immutable post-INSERT — a storage-layer
+		// property held by `0003_append_only_triggers.sql` and proved by
+		// `I-SIDE-BIND-001`. No CSS class can violate it. Naming an invariant for
+		// weight it does not carry is how the invariant's name stops being
+		// load-bearing, so the rule is stated as the rule it actually is.
+		//
+		// ⚠ AND IT PINS THE REACH, NOT THE RENDERED HEX. The rendered fill IS
+		// `#181818` and the rendered text IS `#fafafa` — but reached through
+		// `--btn-fill → --color-ground` and `text-ink`, which every Button in the
+		// product does. What must never appear is a reach for the SIDE token, and
+		// that is what these assertions can see. Asserted against the RENDERED
+		// class attribute, so a docblock mentioning a pole neither trips nor
+		// satisfies it.
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+		const cls = exportAnchor(container)?.getAttribute("class") ?? "";
+		const tokens = tokensOf(exportAnchor(container));
+
+		for (const banned of [
+			"bg-yes",
+			"bg-no",
+			"text-yes",
+			"text-no",
+			"border-yes",
+			"border-no",
+		]) {
+			expect(tokens.has(banned), `side-pole utility ${banned}`).toBe(false);
+		}
+		// The var() and raw-hex forms of the same reach. `#` catches any literal
+		// colour at all, which no class on this control should carry.
+		for (const banned of [
+			"--color-yes",
+			"--color-no",
+			"--graph-yes",
+			"--graph-no",
+			"#",
+		]) {
+			expect(cls.includes(banned), `side-pole/raw colour ${banned}`).toBe(
+				false,
+			);
+		}
 	});
 });
 
