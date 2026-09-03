@@ -148,11 +148,17 @@ export function ArgProfile({
 		// that has one thing to say. Starting the row instead pins the mark to
 		// line 1 and leaves it there whether the age wraps or not.
 		<div className="flex w-full items-start gap-2">
-			{/* ⚠ THE AVATAR SETS LINE 1's HEIGHT — `size="sm"` is `size-6`, 24px,
-			    the tallest thing in Group A (the side chip is `h-5`). The download
-			    mark's wrapper below is `h-6` for exactly that reason, so "centred on
-			    line 1" is a consequence of the two boxes agreeing rather than an
-			    offset somebody has to maintain. */}
+			{/* ⚠ THE AVATAR IS A SIBLING OF THE WRAPPING AREA, NOT A MEMBER OF IT,
+			    and that is the whole reason the mark's wrapper below is `h-5` rather
+			    than `h-6`. This comment said the opposite — that the avatar's 24px
+			    box set line 1's height — which was a plausible mechanism and the
+			    wrong one: the avatar sits OUTSIDE the flex-wrap container, so it
+			    cannot contribute to any line inside it.
+			    ⚠ MEASURED at 1440×777 against the compiled CSS: line 1 is 20px, set
+			    by the SIDE CHIP (`badgeVariants` ships `h-5`), which is the tallest
+			    thing in Group A. At `h-6` the mark's centre sat 2px below the line
+			    it belongs to. `O-3` — a right call with a wrong stated cause is
+			    still a defect, and here the wrong cause produced a wrong number. */}
 			<Avatar size="sm">
 				<AvatarImage src={author.pfpUrl} alt="" />
 				<AvatarFallback>
@@ -383,17 +389,24 @@ export function ArgProfile({
 			    announces itself as unavailable rather than promising a download this
 			    build cannot perform. */}
 			{download ? (
-				/* ⚠⚠ UI-OVERNIGHT entry 1b — `h-6` IS THE WHOLE ALIGNMENT MECHANISM.
-				   Line 1 of the metadata area is 24px, because the avatar is
-				   `size-6`; this wrapper is that same height and centres the mark
-				   inside it, so the mark sits on line 1's centre line whether the row
-				   is one line or two. The 32px button overhangs the band by 4px top
-				   and bottom, which is invisible on a ghost control and keeps its box
-				   — and therefore the ruled glyph size — untouched.
+				/* ⚠⚠ UI-OVERNIGHT entry 1b — `h-5` IS THE WHOLE ALIGNMENT MECHANISM.
+				   Line 1 of the metadata area is 20px, set by the SIDE CHIP's `h-5`
+				   (the tallest thing in Group A — the avatar is a sibling of the
+				   wrapping area and contributes to no line inside it). This wrapper
+				   is that same height and centres the mark inside it, so the mark
+				   sits on line 1's centre line whether the row is one line or two.
+				   The 32px button overhangs the band by 6px top and bottom, which is
+				   invisible on a ghost control and keeps its box — and therefore the
+				   ruled glyph size — untouched.
 				   ⛔ NOT AN OFFSET. A negative margin would have produced the same
 				   pixels today and drifted the moment either box changed size; two
-				   boxes that agree by name cannot. */
-				<span className="ml-auto flex h-6 shrink-0 items-center">
+				   boxes that agree by name cannot.
+				   ⚠ MEASURED, not reasoned: at 1440×777 against the compiled CSS the
+				   line is 20.00px and the mark's centre now coincides with it. It was
+				   `h-6` on the reasoning that the avatar set the line, and that put
+				   the mark 2px low — jsdom performs no layout, so only the browser
+				   could see it. */
+				<span className="ml-auto flex h-5 shrink-0 items-center">
 					<Button
 						variant="ghost"
 						size="icon"

@@ -129,13 +129,18 @@ describe("UI-OVERNIGHT 1b — the identity row wraps in two units", () => {
 		const mark = container.querySelector('[aria-label="Download post image"]');
 		expect(mark).not.toBeNull();
 		expect(metaArea(container).contains(mark)).toBe(false);
-		// …and its wrapper is the height of line 1 (the avatar's `size-6`), which
-		// is what centres it on that line instead of on the block.
+		// …and its wrapper states the height of line 1 — the SIDE CHIP's `h-5`,
+		// which is what centres the mark on that line instead of on the block.
+		// ⚠ MEASURED, and it was wrong first: `h-6` (the avatar's box) put the
+		// mark 2px low, because the avatar is a sibling of the wrapping area and
+		// sets no line inside it. jsdom performs no layout, so this assertion pins
+		// the CONSTANT a browser measurement established rather than re-deriving
+		// the geometry it came from.
 		const wrapper = mark?.parentElement;
 		expect(
 			(wrapper?.getAttribute("class") ?? "").split(/\s+/),
 			"the mark's wrapper no longer states line 1's height",
-		).toContain("h-6");
+		).toContain("h-5");
 	});
 
 	it("arg-profile-row::the-row-renders-the-SAME-mark-with-and-without-a-badge", () => {
