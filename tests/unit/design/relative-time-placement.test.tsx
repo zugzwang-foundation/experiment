@@ -573,9 +573,17 @@ describe("TIME-1 :: G6 — the age is the LAST element of the identity row", () 
 		// badges would sit there untested — a hole with a justification attached,
 		// which is the shape this file has already been corrected for once.
 		// ⇒ One card WITH a badge, run through the same predicate.
+		// ⚠ NARROWED FIRST. `presentPost()` is typed `DebatePost` — the masking
+		// union — and the removed variant carries no `badge` field at all, so a
+		// bare spread is a type error rather than a fixture. Narrowing here is
+		// the same SC-1 guarantee the components rely on, applied to a test.
+		const base = presentPost();
+		const badged: DebatePost = base.removed
+			? base
+			: { ...base, badge: "Highest Stakes" };
 		const { container } = render(
 			<PostCard
-				post={{ ...presentPost(), badge: "Highest Stakes" }}
+				post={badged}
 				onEnter={noop}
 				onOpenPopup={noop}
 				onOpenImage={noop}

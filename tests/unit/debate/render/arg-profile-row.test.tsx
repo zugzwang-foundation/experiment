@@ -93,8 +93,9 @@ describe("UI-OVERNIGHT 1b — the identity row wraps in two units", () => {
 	it("arg-profile-row::the-badge-is-INSIDE-the-row-and-AFTER-the-age", () => {
 		const { container } = widestRow({ badge: "Highest Stakes" });
 		const [, groupB] = groups(container);
-		const age = groupB?.querySelector("[data-relative-time]");
+		const age = groupB?.querySelector("[data-relative-time]") ?? null;
 		expect(age, "the age is not in group B").not.toBeNull();
+		if (age === null) return;
 		// Rule 5 — badges come after the timestamp. They wrap together, and a
 		// badge before the age would put the timestamp inside the pair.
 		const badge = [...(groupB?.children ?? [])].find((el) =>
@@ -102,7 +103,7 @@ describe("UI-OVERNIGHT 1b — the identity row wraps in two units", () => {
 		);
 		expect(badge).toBeDefined();
 		expect(
-			age?.compareDocumentPosition(badge as Node) &
+			age.compareDocumentPosition(badge as Node) &
 				Node.DOCUMENT_POSITION_FOLLOWING,
 		).toBeTruthy();
 	});

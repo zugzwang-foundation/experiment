@@ -446,13 +446,25 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// R-2 turned the delta into a PERCENTAGE, and a percentage whose denominator
 		// appears nowhere is a figure nobody can check. So `survivingBasis` — the
 		// very string R-2 divides by — rides the market-question line.
-		// ⚠ ASSERTED THROUGH ITS OWN NODE, not by a bare substring: `25` could match
-		// almost anything on a money surface, and this is specifically the staked
-		// denominator.
-		expect(rowOpen.textContent ?? "").toContain("25");
+		// ⚠⚠ AND IT HAS NOW FLIPPED A THIRD TIME — UI-OVERNIGHT entry 2 takes it
+		// off again, by founder ruling. R-3's reasoning above is not disputed and
+		// is not repaired: the percentage keeps its invisible denominator, and that
+		// cost is reported rather than absorbed. What the ruling weighs against it
+		// is that the figure sat in a grey sub-line UNDER the argument title,
+		// running on from the market question, where it read as part of the
+		// market's name rather than as an operand.
+		// ⛔ ASSERTED THROUGH ITS OWN NODE IN BOTH DIRECTIONS. A bare
+		// `not.toContain("25")` would pass for any reason at all on a surface full
+		// of numbers; the node is what makes the absence specific.
 		expect(
-			within(rowOpen).getByTestId(`tile-staked-inline-${L1}`).textContent ?? "",
-		).toContain("staked Đ 25");
+			within(rowOpen).queryByTestId(`tile-staked-inline-${L1}`),
+		).toBeNull();
+		expect(rowOpen.textContent ?? "").not.toContain("staked Đ");
+		// The sub-line is now the market question and nothing else — the positive
+		// half, so this is not merely an absence.
+		expect(
+			within(rowOpen).getByTestId(`tile-market-${L1}`).textContent ?? "",
+		).toContain("Market fixture-alpha");
 		// The present argument cell carries the opener title (N-1a).
 		expect(text(within(rowOpen).getByTestId(`tile-arg-${L1}`))).toContain(
 			"Opener argument alpha",

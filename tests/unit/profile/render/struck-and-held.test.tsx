@@ -95,6 +95,34 @@ const ROW_OPEN: ProfilePositionRow = {
 	},
 };
 
+/**
+ * ⚠ A REPLY, ADDED AT UI-OVERNIGHT entry 2. A-7 guards the parent reference as
+ * a PRESENCE, and after entry 2 the only place it renders is the argument
+ * panel's reply context — so a fixture set holding only a POST would leave that
+ * inverted guard passing because nothing could ever produce the string, which
+ * is the failure mode this file's own docblock calls "indistinguishable from a
+ * detector that CANNOT fire".
+ */
+const REPLY: ProfileArgumentItem = {
+	removed: false,
+	kind: "reply",
+	id: "0190b3a0-9999-7000-8000-00000000000d",
+	side: "YES",
+	marketSlug: "fixture-alpha",
+	marketTitle: "Market fixture-alpha",
+	ordinal: 4,
+	title: "A profile reply",
+	teaser: "Neutral fixture teaser.",
+	body: "A profile reply\n\nNeutral fixture body.",
+	marker: "none",
+	stake: "20.000000000000000000",
+	stakeOriginal: "20.000000000000000000",
+	sold: false,
+	priceAtBet: "0.310000000000000000",
+	createdAt: "2026-07-01T00:00:00.000Z",
+	repliedToTitle: "Parent argument gamma",
+};
+
 const POST: ProfileArgumentItem = {
 	removed: false,
 	kind: "post",
@@ -138,7 +166,7 @@ function surfaceHtml(): string {
 			<PositionsTable
 				payload={{ owner: true, rows: [{ ...ROW_OPEN, sellEligible: true }] }}
 			/>
-			<ArgumentList items={[POST]} owner={true} author={USER} />
+			<ArgumentList items={[POST, REPLY]} owner={true} author={USER} />
 		</>,
 	);
 	const ownerHtml = owner.container.innerHTML;
@@ -148,7 +176,7 @@ function surfaceHtml(): string {
 		<>
 			<IdentityCard user={USER} owner={false} tiles={TILES} />
 			<PositionsTable payload={{ owner: false, rows: [ROW_OPEN] }} />
-			<ArgumentList items={[POST]} owner={false} author={USER} />
+			<ArgumentList items={[POST, REPLY]} owner={false} author={USER} />
 		</>,
 	);
 	const visitorHtml = visitor.container.innerHTML;
@@ -275,13 +303,55 @@ const STRUCK: StruckRow[] = [
 		control: 'Đ 240 <span class="arrow">→</span> Đ 310',
 	},
 	{
-		id: "A-7 — removing the 'Replied to …' line from the positions cell",
-		why: "STRUCK on tier 1. SPEC.1 §23: 'for reply-bets — the parent post reference'. The line is REQUIRED, so this row guards a PRESENCE.",
+		id: "A-7 — removing the 'Replied to …' parent reference from the profile",
+		why:
+			"STRUCK on tier 1. SPEC.1 §23: 'for reply-bets — the parent post " +
+			"reference'. The reference is REQUIRED, so this row guards a PRESENCE. " +
+			"⚠⚠ UI-OVERNIGHT entry 2 MOVED IT rather than deleting it: the founder " +
+			"ruled the line out of the POSITIONS CELL, where it stacked a third " +
+			"grey line under a title the reader had already followed. It still " +
+			"renders in the argument panel, under the argument being read, which is " +
+			"where a reader needs to know what is being replied to. ⛔ SPEC.1 §23 " +
+			"names no location, so this is compatible with the sentence and NOT " +
+			"with the guard's previous reading of it — the divergence is recorded " +
+			"in the run report and an amendment is owed either way.",
 		// ⚠ INVERTED: the struck thing is the REMOVAL, so the detector fires when
-		// the line is MISSING. Written this way rather than dropped, because "the
-		// mockup does not show it" is exactly the argument that would delete it.
+		// the reference is MISSING. Written this way rather than dropped, because
+		// "the mockup does not show it" is exactly the argument that would delete
+		// it. The fixture set below now carries a REPLY for the same reason — an
+		// inverted guard whose fixture cannot produce the string is a guard that
+		// passes by construction.
 		detect: (h) => !/Replied to/.test(h),
-		control: "<span>a positions cell with no parent reference</span>",
+		control: "<span>a profile with no parent reference anywhere</span>",
+	},
+	{
+		id: "A-7b — the parent reference in the POSITIONS cell specifically",
+		why:
+			"STRUCK by founder ruling (UI-OVERNIGHT entry 2). The positions row's " +
+			"sub-line is the market question and nothing else: no `· staked Đ n`, " +
+			"no `Replied to …`. A-7 above keeps the reference REQUIRED on the " +
+			"surface; this row keeps it OUT of the cell, so the two together say " +
+			"'somewhere, but not here' rather than leaving either half implicit.",
+		// The reference INSIDE a positions argument cell — keyed on the cell's own
+		// testid so it cannot fire on the argument panel's copy, which is ratified.
+		detect: (h) =>
+			/data-testid="tile-arg-[^"]*"[^>]*>(?:(?!<\/td>)[\s\S])*?Replied to/.test(
+				h,
+			),
+		control:
+			'<span data-testid="tile-arg-x"><a>title</a><span>Replied to a parent</span></span></td>',
+	},
+	{
+		id: "A-7c — `· staked Đ n` on the positions cell's market line",
+		why:
+			"STRUCK by founder ruling (UI-OVERNIGHT entry 2). POSREV-POLISH-2 R-3 " +
+			"put it there as the visible denominator for the Current cell's " +
+			"percentage; the founder ruled that a figure the row already prints in " +
+			"its own column, set in a grey line running on from the market " +
+			"question, reads as part of the market's NAME. ⚠ The percentage's " +
+			"denominator is now off-screen — the known cost, reported not absorbed.",
+		detect: (h) => /staked Đ/.test(h),
+		control: "<span>Market fixture-alpha · staked Đ 25</span>",
 	},
 	{
 		id: "A-8 — the per-row market-status token, now RULED OUT (POSREV-1 RF-12)",

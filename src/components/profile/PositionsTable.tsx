@@ -1107,7 +1107,6 @@ function TileRow({
 					cell={tile.argument}
 					tileKey={tile.key}
 					marketTitle={tile.row.marketTitle}
-					basis={tile.basis}
 				/>
 			</td>
 			{isOpenTab ? (
@@ -1331,14 +1330,11 @@ function TileArgumentCell({
 	cell,
 	tileKey,
 	marketTitle,
-	basis,
 }: {
 	cell: ProfileArgumentCell;
 	tileKey: string;
 	/** The market question, rendered under the argument title (P-1). */
 	marketTitle: string;
-	/** `survivingBasis` — R-2's denominator, printed on the market line (R-3). */
-	basis: string;
 }): React.JSX.Element {
 	/* ⚠ THE PRE-RF-3 SPELLING, CARRIED RATHER THAN REDESIGNED: 11px / 1.35 /
 	   semibold / `text-n5`, `block`, linking to the market. P-1 says "exactly as
@@ -1346,20 +1342,21 @@ function TileArgumentCell({
 	   happens to look similar. Its testid is keyed by TILE rather than by market,
 	   because the unit of this table is now the argument and two tiles in one
 	   market would otherwise collide on one id. */
-	/* ⚠⚠ POSREV-POLISH-2 R-3 — **THE DENOMINATOR RIDES THIS LINE.** R-2 replaced
-	   the absolute delta with a percentage, and by then this tile had no absolute
-	   reference left at all: POSREV-POLISH removed the group header's Đa and the
-	   `from Đ …` line, and R-2 took the last one. A percentage whose denominator
-	   appears nowhere is a figure nobody can check.
-	   ⛔ IT IS `survivingBasis` — the SAME string R-2 divides by — so the number
-	   shown IS the number being divided by, rather than a second figure that
-	   happens to agree today. Routed through `formatDharma`, space after Đ.
-	   ⚠ APPENDED, NOT STACKED. No new row and no height cost: the line already
-	   existed and this rides it, which is what keeps the three-tile window intact.
-	   ⚠ THE LINK WRAPS THE QUESTION ONLY. The staked figure is a sibling text node
-	   inside the same block, so the market link's text stays the market's name —
-	   a link reading "…5 Nov 2026? · staked Đ 100" would be naming a destination
-	   it does not go to. */
+	/* ⚠⚠ UI-OVERNIGHT entry 2 — **THE SUB-LINE IS THE MARKET QUESTION AND
+	   NOTHING ELSE**, and two things left it in one commit.
+	   · `· staked Đ n` — POSREV-POLISH-2 R-3 put it here as the DENOMINATOR for
+	     the percentage in the `CURRENT` cell, on the sound reasoning that "a
+	     percentage whose denominator appears nowhere is a figure nobody can
+	     check". That reasoning still holds and the founder has overruled its
+	     conclusion: the row already prints the staked figure in its own column,
+	     and a second copy inside a grey sub-line read as part of the market's
+	     name rather than as an operand. ⚠ THE PERCENTAGE NOW HAS NO INLINE
+	     DENOMINATOR — that is the known cost, reported rather than absorbed.
+	   · `Replied to …` — see the reply-context block below.
+	   ⚠ THE LINK STILL WRAPS THE QUESTION ONLY. It was the only child of this
+	   block before the staked figure joined it, and it is again — a link reading
+	   "…5 Nov 2026? · staked Đ 100" would name a destination it does not go to,
+	   which is why the two were siblings rather than nested. */
 	const marketLine = (
 		<span className="block text-[11px] leading-[1.35] font-semibold text-n5">
 			<Link
@@ -1369,10 +1366,6 @@ function TileArgumentCell({
 			>
 				{marketTitle}
 			</Link>
-			<span data-testid={`tile-staked-inline-${tileKey}`}>
-				{" · staked Đ "}
-				{formatDharma(basis)}
-			</span>
 		</span>
 	);
 	if (cell.removed) {
@@ -1403,11 +1396,22 @@ function TileArgumentCell({
 				{cell.title}
 			</Link>
 			{marketLine}
-			{cell.isReply && cell.repliedToTitle !== null && (
-				<span className="line-clamp-2 text-[11px] leading-[1.35] font-semibold text-n5">
-					Replied to {cell.repliedToTitle}
-				</span>
-			)}
+			{/* ⚠⚠ UI-OVERNIGHT entry 2 — **THE `Replied to …` LINE IS GONE FROM THIS
+			    CELL**, and it is the one removal in this entry that crosses a spec
+			    sentence. SPEC.1 §23 lists, for a positions row, "for reply-bets —
+			    the parent post reference"; `struck-and-held.test.tsx` row A-7 guards
+			    that as a PRESENCE precisely so nobody deletes it on the grounds that
+			    the mockup does not show it.
+			    ⇒ The founder ruled it out of this cell. The parent reference is NOT
+			    lost from the surface: the argument panel to the right renders
+			    `Replied to …` under the argument it is showing, which is the place a
+			    reader is actually reading the reply. A7's guard is re-pointed there
+			    rather than deleted, so the reference is still required to exist —
+			    only its location moved.
+			    ⛔ SPEC.1 §23 IS OWED AN AMENDMENT and this task does not write it.
+			    The divergence is recorded here and in the run report; a comment that
+			    contradicts a spec section it names is exactly what O-9 exists to
+			    catch, so it says so in terms rather than falling silent. */}
 		</span>
 	);
 }
