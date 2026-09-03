@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
 	actFiles,
@@ -81,19 +82,62 @@ const PINNED_OVERAGES: Record<string, number> = {
  * should bring it into range and delete this pin.
  */
 const PINNED_BRIDGES: Record<string, number> = {
-	"09-the-window.md": 342,
+	"09-the-window.md": 365,
+};
+
+/**
+ * Per-act entry counts, pinned.
+ *
+ * ⚠ `headingCountAcrossDir()` is a control on FILE SELECTION and nothing else —
+ * it counts headings in the same files the parser reads, so deleting entries
+ * moves both numbers together and the comparison stays green. A review deleted
+ * **twenty whole entries** from one act and every guard passed; the only thing
+ * left was a `> 400` floor in another file, which tolerates losing twenty-seven.
+ * That is the same magic-number-floor mechanism this file replaced for file
+ * selection, still standing for content.
+ *
+ * So each act's count is pinned. It reds when an act gains or loses entries —
+ * which is exactly right, because that is a decision somebody makes, once per
+ * act, and never a thing that should happen quietly.
+ */
+const PINNED_BRIDGE_MD5 = "99a4c10b5c310342f59e218fcf9b4f3c";
+
+const EXPECTED_ENTRY_COUNTS: Record<string, number> = {
+	"01-before-anything.md": 21,
+	"02-the-ground.md": 28,
+	"03-the-engine.md": 85,
+	"04-the-argument.md": 57,
+	"05-the-audit.md": 30,
+	"06-the-face.md": 59,
+	"07-the-last-mile.md": 61,
+	"08-the-instruments.md": 86,
+	"09-the-window.md": 0,
 };
 
 describe("journey entries — word ceilings", () => {
 	const entries = parseEntries();
 
-	it("every act file is present and every entry is reachable (control)", () => {
-		// A file that stops matching `NN-*.md` vanishes from all three guards in
-		// silence. A floor like `> 300` tolerates losing an entire act, so the
-		// file list is pinned and the count is derived a second way.
+	it("every act file is present, and none has silently stopped being parsed", () => {
+		// A file that stops matching `NN-*.md` vanishes from all guards in silence.
+		// The list is pinned, and the total is derived a second way — by walking
+		// the directory rather than the pattern — so the two numbers separate the
+		// moment one file drops out.
 		expect(actFiles()).toEqual([...EXPECTED_ACT_FILES]);
-		expect(entries.length).toBe(headingCountAcrossDir());
+		expect(
+			entries.length,
+			`the parser sees ${entries.length} entries but ${headingCountAcrossDir()} '### ' headings exist in docs/journey/ — a file has stopped matching the act-file pattern, or a non-act .md has appeared`,
+		).toBe(headingCountAcrossDir());
 		expect(entries.some((e) => e.words > 0)).toBe(true);
+	});
+
+	it("every act holds exactly the entries it is supposed to", () => {
+		const actual: Record<string, number> = {};
+		for (const f of EXPECTED_ACT_FILES) actual[f] = 0;
+		for (const e of entries) actual[e.file] = (actual[e.file] ?? 0) + 1;
+		expect(
+			actual,
+			"an act gained or lost entries — which is a decision, not something that happens quietly",
+		).toEqual(EXPECTED_ENTRY_COUNTS);
 	});
 
 	it("every entry carries exactly one tier marker, and none is UNKNOWN", () => {
@@ -191,14 +235,23 @@ describe("journey entries — word ceilings", () => {
 		expect(bad, bad.join("\n")).toEqual([]);
 	});
 
-	it("the pinned bridge has not grown or shrunk", () => {
+	it("the pinned bridge has not changed — in length OR in content", () => {
 		expect(Object.keys(PINNED_BRIDGES).sort()).toEqual(["09-the-window.md"]);
-		const byFile = new Map(parseBridges().map((b) => [b.file, b.words]));
+		const byFile = new Map(parseBridges().map((b) => [b.file, b]));
 		for (const [file, expected] of Object.entries(PINNED_BRIDGES)) {
+			const b = byFile.get(file);
 			expect(
-				byFile.get(file),
-				`${file}'s bridge was pinned at ${expected} words because it is published prose this task may not rewrite; it now measures ${byFile.get(file)}. If it was rewritten at go-live, bring it inside 150–250 and delete this pin.`,
+				b?.words,
+				`${file}'s bridge was pinned at ${expected} words because it is published prose this task may not rewrite; it now measures ${b?.words}. If it was rewritten at go-live, bring it inside 150–250 and delete this pin.`,
 			).toBe(expected);
+			// A word count is not a content pin: an earlier version claimed "red the
+			// moment it changes" while a same-length rewording passed it.
+			expect(
+				createHash("md5")
+					.update(b?.lines.join("\n") ?? "")
+					.digest("hex"),
+				`${file}'s bridge was reworded. It is published prose and this guard is what says so.`,
+			).toBe(PINNED_BRIDGE_MD5);
 		}
 	});
 });

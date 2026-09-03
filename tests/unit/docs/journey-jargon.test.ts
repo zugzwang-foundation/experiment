@@ -14,7 +14,7 @@ import { parseBridges, parseEntries } from "./_journey-entries";
  * person writing it, because to them the shorthand reads as precision.
  *
  * ⚠ THE MONO LINE IS EXEMPT AND MUST BE. It is the real commit subject, and
- * real commit subjects here are full of exactly these tokens — 253 of them
+ * real commit subjects here are full of exactly these tokens — 301 of the 427
  * would trip these patterns. That is the whole design: all technical language
  * lives on that one line, so the prose can be free of it. A guard that scanned
  * the mono line too would be unsatisfiable and would be deleted within a week.
@@ -75,21 +75,47 @@ const REPO_PATH = new RegExp(`\\b${ROOTS}/[\\w./-]+`);
 /** A filename, with or without a directory: `CLAUDE.md`, `docs/parked.md`, `0003_x.sql`. */
 const FILE_NAME = new RegExp(`\\b[\\w-]+(?:/[\\w-]+)*\\.${EXT}\\b`);
 
+/**
+ * A directory path with no repository root: `server/bets/`, `app/api/health/`.
+ * The trailing slash must END the token — without that guard, `plan/execute/log`
+ * matches on `plan/execute/`, and that is the style spec's own phrase.
+ */
+const DIR_PATH = /\b[\w-]+\/[\w-]+\/(?![\w-])/;
+
+/** A branch name: `feat/journey-29`, `chore/register-1`. */
+const BRANCH_NAME =
+	/\b(?:feat|fix|chore|refactor|docs|test|polish|htmlfinish)\/[\w./-]+/;
+
+/** A migration stem: `0026_lots_no_delete`. */
+const MIGRATION = /\b\d{4}_[a-z][a-z0-9_]*\b/;
+
+/** A decision record written with a space: `ADR 0045`. */
+const RECORD_SPACED = /\bADR\s+\d{3,4}\b/;
+
 /** A pull-request or issue reference. Two digits or more, so `#1` in prose survives. */
 const PR_REF = /#\d{2,}/;
 
 /**
- * A short commit hash. Requires at least one digit, because `defaced` and
- * `effaced` are seven characters drawn from the same alphabet and are English.
+ * A short commit hash. Requires at least one digit AND at least one letter.
+ * Without the digit, `defaced` and `effaced` match — they are seven characters
+ * from the same alphabet and they are English. Without the letter, `34560000`
+ * matches, and that is this project's own four-hundred-day cookie ceiling,
+ * quoted in prose. A real hash avoids letters about 4% of the time; a number
+ * avoids them always.
  */
-const SHORT_SHA = /\b(?=[0-9a-f]{7,40}\b)(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b/;
+const SHORT_SHA =
+	/\b(?=[0-9a-f]{7,40}\b)(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b/;
 
 const PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
 	["task code with a number", TASK_NUMBERED],
 	["all-caps lane name", TASK_ALLCAPS],
 	["spec section mark", SECTION_MARK],
 	["repository path", REPO_PATH],
+	["directory path", DIR_PATH],
+	["branch name", BRANCH_NAME],
 	["filename", FILE_NAME],
+	["migration stem", MIGRATION],
+	["spaced record number", RECORD_SPACED],
 	["pull-request reference", PR_REF],
 	["commit hash", SHORT_SHA],
 ];
@@ -107,7 +133,13 @@ const MUST_CATCH: ReadonlyArray<readonly [string, string]> = [
 	["repository path", "everything under src/server"],
 	["repository path", "it lives in docs/journey/README.md"],
 	["repository path", "scoped by directory across tests/unit/docs/"],
+	["repository path", "everything under src/server/bets/"],
+	["directory path", "it lives under server/bets/"],
+	["directory path", "app/api/health/ returns it"],
+	["branch name", "it landed on feat/journey-29"],
 	["filename", "the rule was already in CLAUDE.md"],
+	["migration stem", "0026_lots_no_delete applies it"],
+	["spaced record number", "recorded at ADR 0045 for later"],
 	["filename", "0003_append_only_triggers.sql applies it"],
 	["pull-request reference", "it landed in #465"],
 	["commit hash", "on commit ead7415, right after"],
@@ -125,6 +157,8 @@ const MUST_PASS: readonly string[] = [
 	"A two-thirds majority, in week 19, on a 50/50 split.",
 	"The plan/execute/log rhythm ran all summer, and approve/discard/block was the menu.",
 	"A defaced wall, effaced entirely, decade after decade.",
+	"A session capped at 34560000 seconds, against a ceiling of 1000000.",
+	"He/she/they, input/output, 24/7, and it happened on 23/07/2026.",
 ];
 
 /**
@@ -137,9 +171,12 @@ const MUST_PASS: readonly string[] = [
  *     hash avoids one about 0.1% of the time; English does not.
  */
 const KNOWN_UNCAUGHT = [
-	"bare acronyms (CPMM, RLS)",
-	"sections spelled out in words",
-	"all-letter hex runs (defaced)",
+	"bare acronyms with no separator (CPMM, RLS, PFP, OTP)",
+	'a section spelled out in words ("section seven point two")',
+	"an all-letter hex run (defaced, effaced) — indistinguishable from English",
+	"an all-digit hex run (a decimal number, which this project quotes)",
+	"a rootless path with no trailing slash (app/api/health) — indistinguishable from an English alternation list like plan/execute/log",
+	"a single-digit reference (#7)",
 ] as const;
 
 describe("journey entries — no shorthand in prose", () => {
@@ -162,7 +199,9 @@ describe("journey entries — no shorthand in prose", () => {
 				`pattern "${name}" has no control and could be dead`,
 			).toBe(true);
 		}
-		expect(KNOWN_UNCAUGHT.length).toBeGreaterThan(0);
+		// KNOWN_UNCAUGHT is documentation, not an assertion — every entry in it is
+		// a class these patterns deliberately miss. It is checked by being read.
+		expect(KNOWN_UNCAUGHT.some((k) => k.includes("rootless path"))).toBe(true);
 	});
 
 	it("no pattern reddens on ordinary prose (negative controls)", () => {

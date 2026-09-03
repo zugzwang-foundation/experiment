@@ -95,7 +95,7 @@ One paragraph is the whole route to the notes, and nothing fails if a character 
 `docs(sync-2): the doc truth pass — two register mints, a retired phase tracker` · 18 August 2026 · week 17
 <!-- TIER: GROUNDWORK -->
 
-The pass ran under a rule forbidding it to fix what it found. Ten places where instruction and repository disagree are written down instead. A silent correction teaches nobody anything.
+The pass ran under a rule forbidding it to fix what it found. Ten places where instruction and repository disagree are written down instead. That call belongs to the founder, and a silent correction teaches nobody anything.
 
 ---
 

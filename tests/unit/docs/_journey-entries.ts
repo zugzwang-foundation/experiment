@@ -162,26 +162,50 @@ export const normaliseTitle = (t: string): string =>
  * front matter carries a multi-line HTML comment recording the date basis, the
  * week formula and the count that named the act. Act I has no bridge at all —
  * its first entry is four lines in — so it correctly measures zero.
+ *
+ * ⚠ THE TITLE AND THE SPAN LINE ARE IDENTIFIED BY POSITION — lines 1 and 2 —
+ * NOT BY THEIR MARKUP. An earlier version skipped any line wrapped in `*`,
+ * described in its own comment as "the front-matter span line", singular. It
+ * dropped **every** wholly-italic line anywhere in the region, and two are live
+ * prose in `09-the-window.md`: the go-live provisionality note and the
+ * placeholder for the forward half. Four shorthand tokens planted in the first
+ * of them passed all thirteen tests — the same plant that proved bridges were
+ * unscanned in the first place, working again, through a hole opened by the
+ * fix for it. The span line is always line 2 in all nine files; position is
+ * what actually identifies it.
+ *
+ * ⚠ Prose sharing a line with a comment delimiter is kept, on both sides. It is
+ * visible to a reader, so it is visible here.
  */
 export const parseBridges = (): Bridge[] =>
 	actFiles().map((file) => {
 		const lines = readFileSync(join(journeyDir(), file), "utf8").split("\n");
 		const out: string[] = [];
 		let inComment = false;
-		for (const raw of lines) {
+		for (let k = 0; k < lines.length; k++) {
+			const raw = lines[k];
 			if (raw.startsWith("### ")) break;
 			const t = raw.trim();
 			if (inComment) {
-				if (t.includes("-->")) inComment = false;
+				const close = t.indexOf("-->");
+				if (close === -1) continue;
+				inComment = false;
+				// prose may follow the close on the same line — it is visible to a
+				// reader, so it must be visible here.
+				const after = t.slice(close + 3).trim();
+				if (after !== "" && after !== "---") out.push(after);
 				continue;
 			}
-			if (t.startsWith("<!--")) {
-				if (!t.includes("-->")) inComment = true;
+			const open = t.indexOf("<!--");
+			if (open !== -1) {
+				const before = t.slice(0, open).trim();
+				if (before !== "" && before !== "---") out.push(before);
+				if (!t.slice(open).includes("-->")) inComment = true;
 				continue;
 			}
 			if (t === "" || t === "---") continue;
-			if (t.startsWith("#")) continue; // the act's own title
-			if (/^\*.*\*$/.test(t)) continue; // the front-matter span line
+			if (k === 0 && t.startsWith("#")) continue; // the act's own title
+			if (k === 1) continue; // the front-matter span line
 			out.push(raw);
 		}
 		return { file, lines: out, words: countWords(out.join("\n")) };
@@ -191,7 +215,16 @@ export const parseEntries = (): Entry[] => {
 	const out: Entry[] = [];
 	for (const file of actFiles()) {
 		const lines = readFileSync(join(journeyDir(), file), "utf8").split("\n");
+		let fenced = false;
 		for (let i = 0; i < lines.length; i++) {
+			// a heading inside a fenced block is sample text, not an entry; without
+			// this it parses as one and reds as a missing marker, sending the reader
+			// after metadata that was never the problem.
+			if (lines[i].trimStart().startsWith("```")) {
+				fenced = !fenced;
+				continue;
+			}
+			if (fenced) continue;
 			if (!lines[i].startsWith("### ")) continue;
 			const title = lines[i].slice(4).trim();
 			const mono = lines[i + 1] ?? "";
