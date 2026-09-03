@@ -47,7 +47,7 @@ there is a note, that is the one you want.
 | **V** | [The Audit](05-the-audit.md) | n196–226 | 3 – 16 July 2026 | Everything exists now. |
 | **VI** | [The Face](06-the-face.md) | n227–285 | 16 July – 3 August 2026 | Everything to this point is machinery. |
 | **VII** | [The Last Mile](07-the-last-mile.md) | n286–346 | 3 – 18 August 2026 | By the start of August the thing works. |
-| **VIII** | [The Window](08-the-window.md) | unwritten | 15 September – 5 November 2026 | Everything before this is preparation. |
+| **IX** | [The Window](09-the-window.md) | unwritten | 15 September – 5 November 2026 | Everything before this is preparation. |
 
 Every commit in this repository carries its reasoning. Commits from 17 August 2026 onward carry it in the message; everything before that carries it as an attached git note, which a default clone does not fetch:
 
