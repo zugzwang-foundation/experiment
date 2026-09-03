@@ -1,11 +1,37 @@
-# JOURNEY — style spec v1.4
+# JOURNEY — style spec v1.5
 
 **Status:** ratified · **Date:** 2026-09-04 · **Owner:** web Claude (prescriptive)
-**Supersedes:** v1.3 (2026-09-03)
+**Supersedes:** v1.4 (2026-09-04), v1.3 (2026-09-03)
 **Repo home:** `docs/journey/STYLE.md`. See §15.
 
-**Changes from v1.3 — all four are corrections this file's own §0 discipline
-should have prevented, found by the JOURNEY-29 run and its reviewer cascade:**
+## Changes from v1.4 — two defects v1.4 introduced or failed to close
+
+Both found by the JOURNEY-29 close audit, both measured against the repository,
+both in this file rather than in the build.
+
+**S-1 · v1.4 announced a fix it did not make, and made one site worse.** Its
+change table named `2026-08-17` as the UTC reading of a committer-local corpus.
+It then rewrote §2 to read *"17 August 2026 (committer-local, +05:30)"* — keeping
+the UTC value and labelling it local, which is the one reading that cannot be
+true — and left §13.2 saying `2026-08-17` outright. Measured: the convention
+commit is `2026-08-18T01:07:24+05:30`, `2026-08-17T19:37:24Z`. **The convention
+lands on 18 August.** Both sites now say so.
+
+**S-2 · §3.1 declared itself a census with five of 21 rows unmeasured.** Three
+named the wrong act and two named none. `Let The Money In` was contradicted
+*inside this file* — §8 prints its mono line as 31 May, and §11's own table puts
+31 May in Act III. Every act attribution is now measured from the file the entry
+lives in.
+
+⚠ **This is the third consecutive version to commit the error class §0 defines,
+and the second to do it while announcing the fix for it.** §0 says a value
+transcribed into this file is a second source of truth nobody maintains; §6 says
+a claim traces to the record or it is not made; §3.1a says a fallback firing on
+the common case is a defect in the primary. All three were written by the
+document that then broke them. **The rule this earns is at §0.1: a value in this
+file is either measured at the moment it is written or it is not written.**
+
+### Changes from v1.3, retained
 
 | | v1.3 said | Measured |
 |---|---|---|
@@ -44,6 +70,29 @@ needed, this file names where it is measured rather than transcribing it:
 **A value transcribed into this file is a second source of truth nobody
 maintains.** Where a rule below needs a number, it names the measurement.
 
+### 0.1 A value is measured when it is written, or it is not written
+
+Three consecutive versions of this file have shipped a wrong value, twice while
+announcing the correction. The pattern is always the same: a value is carried
+forward from an earlier draft, the surrounding prose is updated to describe the
+new state, and **nobody re-measures the number the prose is now vouching for.**
+
+So the rule is mechanical, not aspirational:
+
+- **Any date, count, act attribution, word count, span or name written into this
+  file carries the command that produced it**, or it is replaced by a pointer to
+  where it is measured. §0's table is the pattern.
+- **A correction is applied at every site that states the superseded value**, and
+  the sites are found by search, not by memory. v1.4 fixed one of three and
+  relabelled a second.
+- **Declaring something complete raises the standard on it.** §3.1 became a
+  census the moment it said so, and five rows had never been checked. If a table
+  cannot be measured, it does not get to claim completeness.
+
+⚠ **The file that defines an evidence rule is not exempt from it.** That has now
+been the failure three times running, which makes it this document's most
+reliable defect and the first thing to check in any future version.
+
 ---
 
 ## 1. What is being made
@@ -75,7 +124,7 @@ two exceptions are §13.2.
 
 ## 2. The rule the document exists to obey
 
-Every commit from 17 August 2026 (committer-local, +05:30) forward carries this block, after the body and
+Every commit from 18 August 2026 (committer-local, +05:30) forward carries this block, after the body and
 before any trailers, with no exemption by type:
 
 ```
@@ -125,20 +174,20 @@ JOURNEY-29 run a ruling it should not have had to make — see §3.1a.
 | # | Title | Act | How it is known to be a Landmark |
 |---|---|---|---|
 | 1 | Given Away First | I | named |
-| 2 | A Rule You Have To Remember | I | named |
+| 2 | A Rule You Have To Remember | II | named |
 | 3 | The Database Says No | II | named |
-| 4 | You Don't Pick Your Name | II | named |
+| 4 | You Don't Pick Your Name | III | named |
 | 5 | Zero Deletions | III | named |
 | 6 | The Price Of Yes Is How Much No | III | named |
 | 7 | One Door | III | named |
-| 8 | Let The Money In | IV | **measured** — 184 words |
+| 8 | Let The Money In | III | **measured** — 184 words |
 | 9 | Voice, Not Balance | IV | named · **printed twice**, see §3.1b |
 | 10 | What Isn't Built Yet | IV | named |
 | 11 | The Ranking Remembers Nothing | IV | named |
 | 12 | Delete The Brand | IV | named |
-| 13 | The Second Door | — | **measured** — 187 words |
+| 13 | The Second Door | VI | **measured** — 187 words |
 | 14 | There Is No Second Upload | V | named |
-| 15 | Only The Mechanism Moves | — | **measured** — 169 words |
+| 15 | Only The Mechanism Moves | VI | **measured** — 169 words |
 | 16 | Nobody Wrote It Down | VI | named |
 | 17 | It Didn't Recognise Itself | VII | named |
 | 18 | Nothing Was Wrong | VII | named |
@@ -620,7 +669,8 @@ arrived, not that it happened.
 
 ### 13.2 Post-convention commits missing the block
 
-The convention has been in force since 2026-08-17 and some commits do not carry
+The convention has been in force since 18 August 2026 (committer-local; see §2)
+and some commits do not carry
 the block. The remedy is **a note**, carrying the block and the entry, exactly as
 a pre-convention commit does — same words in both places is the whole design, and
 a post-convention commit without the block reads identically to a pre-convention
@@ -765,4 +815,4 @@ else.
 
 ---
 
-**END — JOURNEY style spec v1.4**
+**END — JOURNEY style spec v1.5**
