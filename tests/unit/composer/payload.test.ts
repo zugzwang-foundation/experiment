@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
 	composeWireBody,
 	extendedMaxChars,
+	hasExtendedText,
 	isArgumentSubmittable,
 	TITLE_MAX_CHARS,
 } from "@/components/debate/composer/payload";
@@ -208,5 +209,58 @@ describe("extendedMaxChars — the two-field counter budget (OQ-6)", () => {
 
 	it("payload::extended-budget-with-a-full-title", () => {
 		expect(extendedMaxChars(125)).toBe(COMMENT_MAX_LENGTH - 127);
+	});
+});
+
+/**
+ * UI-OVERNIGHT entry 5 — `hasExtendedText`, the inverse of `composeWireBody`'s
+ * optional half. It is what decides whether a card offers `Know more`, so it
+ * has to agree with the composer that wrote the body and with the server split
+ * that derives the teaser from it. Round-tripping through `composeWireBody`
+ * below is that agreement, asserted rather than assumed.
+ */
+describe("hasExtendedText — does this argument carry a description", () => {
+	it("payload::a-title-only-body-has-no-extended-text", () => {
+		expect(hasExtendedText("A title and nothing else")).toBe(false);
+	});
+
+	it("payload::a-title-plus-extended-body-has-one", () => {
+		expect(hasExtendedText("A title\n\nThe extended argument")).toBe(true);
+	});
+
+	it("payload::whitespace-after-the-break-does-not-count", () => {
+		// The brief's rule: non-empty AFTER TRIMMING.
+		expect(hasExtendedText("A title\n\n   ")).toBe(false);
+		expect(hasExtendedText("A title\n\n\n\n")).toBe(false);
+	});
+
+	it("payload::an-extended-text-equal-to-the-title-still-counts", () => {
+		// The predicate asks whether a second paragraph exists, never what it
+		// says — an author who repeats themselves has still written one.
+		expect(hasExtendedText("A title\n\nA title")).toBe(true);
+	});
+
+	it("payload::it-round-trips-with-composeWireBody", () => {
+		// ⛔ THE ASSERTION THAT MATTERS. These two functions are the write and the
+		// read of one convention; if they ever disagree, a card offers to show
+		// more of an argument that has no more, or hides an extended text its
+		// author took the trouble to write.
+		const title = "A title";
+		expect(hasExtendedText(composeWireBody({ title, extended: "" }))).toBe(
+			false,
+		);
+		expect(hasExtendedText(composeWireBody({ title, extended: "   " }))).toBe(
+			false,
+		);
+		expect(
+			hasExtendedText(composeWireBody({ title, extended: "More argument" })),
+		).toBe(true);
+	});
+
+	it("payload::a-long-single-paragraph-is-still-not-a-description", () => {
+		// Deliberate, and the one case that looks like a miss. The card clamps a
+		// title at two lines of a 125-character string; a long FIRST paragraph is
+		// the title, so the pop-up would show what the card is already showing.
+		expect(hasExtendedText("x".repeat(4000))).toBe(false);
 	});
 });

@@ -36,7 +36,12 @@ function presentReply(overrides?: Partial<DebateReply>): DebateReply {
 		id: "0199a0c0-0000-7000-8000-00000000ef01",
 		side: "YES",
 		createdAt: "2026-07-30T00:00:00.000Z",
-		body: "Fixture reply argument.",
+		// ⚠ UI-OVERNIGHT entry 5 — TWO PARAGRAPHS, because `Know more` now
+		// renders only where there IS more: the composer writes an optional
+		// extended text after a blank line, and this fixture has to carry one
+		// for the control it asserts to exist. The single-paragraph case is a
+		// test of its own below, not the default.
+		body: "Fixture reply argument.\n\nFixture reply extended text.",
 		marker: "none",
 		author: { pseudonym: "fixture-replier", pfpUrl: "" },
 		stake: "1000.000000000000000000",
@@ -282,5 +287,48 @@ describe("ReplyCard — row 42, the pseudonym links to the profile", () => {
 			/>,
 		);
 		expect(container.querySelector('a[href^="/u/"]')).toBeNull();
+	});
+});
+
+/**
+ * UI-OVERNIGHT entry 5 — the same presence rule as the post card, applied to a
+ * reply's own body. A reply has no title/description split of its own, so the
+ * "description" is what the composer's optional extended field wrote: whatever
+ * follows the first blank line.
+ *
+ * ⚠ THIS CARD ALREADY SHOWS THE WHOLE BODY, so the control was doing less here
+ * than anywhere else — the pop-up adds a larger image and nothing else on a
+ * one-paragraph reply. Gating it on the same predicate keeps ONE rule across
+ * the surface rather than a second one that happens to look similar.
+ */
+describe("UI-OVERNIGHT 5 — a reply's Know more is presence-driven too", () => {
+	const hasKnowMore = (container: HTMLElement) =>
+		Array.from(container.querySelectorAll("button")).some((b) =>
+			b.innerHTML.includes("Know more"),
+		);
+
+	function cardWithBody(body: string) {
+		// ⚠ NARROWED, NOT CAST — the removed variant of `DebateReply` carries no
+		// `body`, and a spread that pretends otherwise is the masking union being
+		// talked around rather than used.
+		const base = presentReply();
+		const reply: DebateReply = base.removed ? base : { ...base, body };
+		return render(
+			<ReplyCard reply={reply} onOpenImage={noop} onOpenPopup={noop} />,
+		);
+	}
+
+	it("reply-card::a-one-paragraph-reply-renders-NO-Know-more", () => {
+		const { container } = cardWithBody("Fixture reply argument.");
+		expect(hasKnowMore(container)).toBe(false);
+		// Non-vacuity — the reply itself is on the card.
+		expect(container.innerHTML).toContain("Fixture reply argument.");
+	});
+
+	it("reply-card::a-reply-WITH-extended-text-keeps-the-control", () => {
+		const { container } = cardWithBody(
+			"Fixture reply argument.\n\nFixture reply extended text.",
+		);
+		expect(hasKnowMore(container)).toBe(true);
 	});
 });

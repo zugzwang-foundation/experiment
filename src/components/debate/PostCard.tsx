@@ -7,6 +7,7 @@ import { AggregateFooter } from "./AggregateFooter";
 import { ArgProfile } from "./ArgProfile";
 import { SideBadge } from "./badges";
 import { CommentImage, PostImagePlaceholder } from "./CommentImage";
+import { hasExtendedText } from "./composer/payload";
 import { KnowMore } from "./KnowMore";
 import { RemovedPlaceholder } from "./placeholders";
 import type { DebatePost, PresentPost, Side } from "./types";
@@ -71,6 +72,10 @@ export function PostCard({
 			onReplyToPost(post.id, relation),
 	};
 	const replyCount = post.aggregate.supportCount + post.aggregate.counterCount;
+	// UI-OVERNIGHT entry 5 — `Know more` only where there IS more. On a
+	// title-only argument the control opened a pop-up showing the reader the
+	// same sentence back; see `hasExtendedText` for the rule and its reason.
+	const knowMore = post.removed ? false : hasExtendedText(post.body);
 
 	if (post.removed) {
 		return (
@@ -185,7 +190,15 @@ export function PostCard({
 				    on the `+`, and the column scrolls as the backstop. */}
 				<button
 					type="button"
-					className="block w-full rounded-(--r-chip) pr-21 text-left hover:bg-n1 hover:underline"
+					// ⚠ UI-OVERNIGHT entry 5 — THE GUTTER IS RESERVED ONLY WHEN THERE IS
+					// SOMETHING TO RESERVE IT FOR. `pr-21` keeps the title clear of the
+					// OVERLAID `Know more`; with no control there it was 84px taken off
+					// every title-only card for a neighbour that never arrives. The title's
+					// LEFT edge does not move either way, so a card with the control and a
+					// card without differ by the control alone.
+					className={`block w-full rounded-(--r-chip) text-left hover:bg-n1 hover:underline${
+						knowMore ? " pr-21" : ""
+					}`}
 					onClick={() => onEnter(post.id)}
 				>
 					<h3 className="line-clamp-2 font-heading text-base leading-snug font-medium">
@@ -216,11 +229,13 @@ export function PostCard({
 				    it a flex sibling would reproduce the measured defect row 24 fixed
 				    (title 628px → 104px, the widest delta in the phase-1 table). The
 				    gutter grows; the mechanism does not change. */}
-				<KnowMore
-					label="Know more about this argument"
-					onClick={() => onOpenPopup(post)}
-					className="absolute right-0 bottom-0"
-				/>
+				{knowMore ? (
+					<KnowMore
+						label="Know more about this argument"
+						onClick={() => onOpenPopup(post)}
+						className="absolute right-0 bottom-0"
+					/>
+				) : null}{" "}
 			</div>
 			{/* HTML-FINISH · MARKET DETAIL round 2 · R2 — d5 substitutes its
 			    `POST IMAGE · 640:586` box into `.argimg` on every card with no real

@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { ArgProfile } from "./ArgProfile";
 import { SideBadge } from "./badges";
 import { CommentImage, PostImagePlaceholder } from "./CommentImage";
+import { hasExtendedText } from "./composer/payload";
 import { ReplySplitBar } from "./composer/ReplySplitBar";
 import { FocusMarketCard } from "./FocusMarketCard";
 import { HeadZone } from "./HeadZone";
@@ -204,11 +205,19 @@ export function PostFocusHeader({
 										    a button reading `Know more` named `Show more` fails
 										    WCAG 2.5.3 (Label in Name). Mockup fidelity loses to the
 										    success criterion; `KnowMore.tsx` owns the rule. */}
-										<KnowMore
-											label="Know more about this argument"
-											onClick={() => onOpenPopup(post)}
-											className="shrink-0"
-										/>
+										{/* ⚠ UI-OVERNIGHT entry 5 — ONLY WHEN THERE IS MORE TO SHOW.
+										    ⛔ THIS REVERSES d5's "hidden-but-reserved when bodyless" and the
+										    guard that encoded it. The old reasoning was that "the full body
+										    exists either way and the control is the only path to it" — but on
+										    a post with no second paragraph the full body IS the title, and the
+										    pop-up showed the reader the sentence they had just read. */}
+										{hasExtendedText(post.body) ? (
+											<KnowMore
+												label="Know more about this argument"
+												onClick={() => onOpenPopup(post)}
+												className="shrink-0"
+											/>
+										) : null}{" "}
 									</div>
 								</>
 							)}

@@ -89,8 +89,15 @@ function presentPost(): DebatePost {
 		sideAtPostTime: "YES",
 		createdAt: "2026-07-30T00:00:00.000Z",
 		title: "Fixture argument title.",
+		// ⚠ UI-OVERNIGHT entry 5 — THE BODY NOW CONTAINS ITS OWN TEASER, and
+		// that is a fixture CORRECTION rather than an accommodation. The wire
+		// `body` is `title\n\nextended` (`composeWireBody`) and the server splits
+		// `teaser` back out of it, so a fixture whose `teaser` names a paragraph
+		// its `body` does not contain describes a post the product cannot
+		// produce. Nothing read the two together until `Know more` became
+		// presence-driven; now they have to agree.
 		teaser: "Fixture teaser.",
-		body: "Fixture body.",
+		body: "Fixture argument title.\n\nFixture teaser.",
 		imageUrl: null,
 		marker: "none",
 		badge: null,
@@ -346,15 +353,27 @@ describe("HTML-FINISH · MARKET DETAIL — row 15, the focused post's teaser", (
 		expect(onOpenPopup).toHaveBeenCalledWith(presentPost());
 	});
 
-	it("head-zone::a-bodyless-post-hides-the-teaser-but-KEEPS-the-expand-control", () => {
-		// d5 marks this case "hidden-but-reserved when bodyless" (`:972`).
-		// `deriveTitleTeaser` makes the teaser the SECOND paragraph, so a
-		// single-paragraph argument has none — and the control must survive,
-		// because the full body exists either way and it is the only path to it.
-		// ⚠ UI-QUICK change set 2 item 2 — the `+` became `Know more`. Re-pointed
-		// at the live control rather than left green against a string no mount
-		// carries any more.
-		const post = { ...presentPost(), teaser: "" } as PresentPost;
+	it("head-zone::a-bodyless-post-hides-the-teaser-AND-the-expand-control", () => {
+		// ⚠⚠ THIS ASSERTION IS INVERTED, BY FOUNDER RULING (UI-OVERNIGHT entry 5),
+		// AND THE SUPERSEDED REASONING IS WORTH KEEPING. It read: d5 marks this
+		// case "hidden-but-reserved when bodyless" (`:972`) … "the control must
+		// survive, because the full body exists either way and it is the only path
+		// to it."
+		// ⛔ THE PREMISE IS FALSE ON THIS CASE, which is why the conclusion goes.
+		// `deriveTitleTeaser` takes the teaser from the SECOND paragraph, so a
+		// bodyless post's full body IS its title — and the pop-up the control
+		// opened showed the reader the sentence they had just read. A control that
+		// promises more and delivers the same sentence teaches a reader to stop
+		// trusting it everywhere else, including on the posts that do have more.
+		// ⚠ THE FIXTURE STRIPS THE BODY, NOT THE TEASER. The gate reads `body`
+		// (`hasExtendedText`), which is the field the composer actually writes and
+		// the server derives `teaser` FROM; blanking the derived field while
+		// leaving the source intact would describe a post that cannot exist.
+		const post = {
+			...presentPost(),
+			teaser: "",
+			body: "Fixture argument title.",
+		} as PresentPost;
 		const { container } = render(
 			<PostFocusHeader
 				post={post}
@@ -371,10 +390,14 @@ describe("HTML-FINISH · MARKET DETAIL — row 15, the focused post's teaser", (
 		);
 
 		expect(container.innerHTML).not.toContain("Fixture teaser.");
-		const knowMore = Array.from(container.querySelectorAll("button")).find(
-			(b) => b.innerHTML.includes("Know more"),
-		);
-		expect(knowMore).toBeDefined();
-		expect(knowMore?.getAttribute("aria-label")).toContain("Know more");
+		expect(
+			Array.from(container.querySelectorAll("button")).some((b) =>
+				b.innerHTML.includes("Know more"),
+			),
+			"a title-only post still offers to show more",
+		).toBe(false);
+		// Non-vacuity: the post itself renders. Without this the assertion above
+		// would pass on a header that failed to mount at all.
+		expect(container.innerHTML).toContain("Fixture argument title.");
 	});
 });

@@ -1,6 +1,7 @@
 import { ArgProfile } from "./ArgProfile";
 import { SideBadge } from "./badges";
 import { CommentImage, PostImagePlaceholder } from "./CommentImage";
+import { hasExtendedText } from "./composer/payload";
 import { KnowMore } from "./KnowMore";
 import { RemovedPlaceholder } from "./placeholders";
 import type { DebateReply, PresentReply } from "./types";
@@ -135,11 +136,17 @@ export function ReplyCard({
 				    A control reading `Know more` named `Show more` fails Label in Name
 				    outright, so mockup fidelity loses to the success criterion here.
 				    `KnowMore.tsx` owns that rule for all four mounts. */}
-				<KnowMore
-					label="Know more about this reply"
-					onClick={() => onOpenPopup(reply)}
-					className="shrink-0"
-				/>
+				{/* ⚠ UI-OVERNIGHT entry 5 — ONLY WHEN THE REPLY HAS A DESCRIPTION.
+				    The same predicate as the post card's, applied to the reply's own
+				    body: a one-paragraph reply opens a pop-up holding the paragraph
+				    already on the card, which is a promise the control cannot keep. */}
+				{hasExtendedText(reply.body) ? (
+					<KnowMore
+						label="Know more about this reply"
+						onClick={() => onOpenPopup(reply)}
+						className="shrink-0"
+					/>
+				) : null}{" "}
 			</div>
 			{/* HTML-FINISH · MARKET DETAIL row 26 — the reply's own attachment.
 			    ⛔ ON THE NON-REMOVED BRANCH ONLY. A removed reply's variant has no

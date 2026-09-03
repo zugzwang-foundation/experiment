@@ -58,8 +58,15 @@ function presentPost(): DebatePost {
 		sideAtPostTime: "YES",
 		createdAt: "2026-07-30T00:00:00.000Z",
 		title: "Fixture argument title.",
+		// ⚠ UI-OVERNIGHT entry 5 — THE BODY NOW CONTAINS ITS OWN TEASER, and
+		// that is a fixture CORRECTION rather than an accommodation. The wire
+		// `body` is `title\n\nextended` (`composeWireBody`) and the server splits
+		// `teaser` back out of it, so a fixture whose `teaser` names a paragraph
+		// its `body` does not contain describes a post the product cannot
+		// produce. Nothing read the two together until `Know more` became
+		// presence-driven; now they have to agree.
 		teaser: "Fixture teaser.",
-		body: "Fixture body.",
+		body: "Fixture argument title.\n\nFixture teaser.",
 		imageUrl: null,
 		marker: "none",
 		badge: null,
@@ -432,5 +439,103 @@ describe("HTML-FINISH · MARKET DETAIL — row 25, the card sheds teaser + repli
 		// …and it KEEPS its way in (plan F-3). Deleting this would strand a
 		// removed post and every surviving reply under it.
 		expect(removed.container.innerHTML).toContain("Open debate");
+	});
+});
+
+/**
+ * UI-OVERNIGHT entry 5 — `Know more` renders only where there IS more, and the
+ * gutter it sits in is reserved only when it does.
+ *
+ * ⛔ WHAT THE CONTROL PROMISED AND COULD NOT KEEP. Every card carried one
+ * unconditionally, and a post whose author typed a title and nothing else has
+ * no second paragraph — so the pop-up it opened held the sentence the reader
+ * had just read. The cost of that is not the wasted click; it is that a reader
+ * who learns the control is empty stops using it on the posts where it is full.
+ *
+ * ⚠ THE PREDICATE IS `hasExtendedText(body)`, NOT `teaser !== ""`. The composer
+ * writes `title\n\nextended` and the server derives `teaser` back out of it, so
+ * the body is the field that decides and the teaser is downstream of it.
+ */
+describe("UI-OVERNIGHT 5 — Know more is presence-driven", () => {
+	function cardWithBody(body: string) {
+		// ⚠ NARROWED, NOT CAST. `presentPost()` is typed `DebatePost` — the
+		// masking union — and the removed variant carries no `body` at all, which
+		// is the SC-1 guarantee working rather than a nuisance.
+		const base = presentPost();
+		const post: DebatePost = base.removed ? base : { ...base, body };
+		return render(
+			<PostCard
+				post={post}
+				onEnter={noop}
+				onOpenPopup={noop}
+				onOpenImage={noop}
+				onReplyToPost={noopReply}
+				heldSide={null}
+				marketOpen
+				suspended={false}
+			/>,
+		);
+	}
+
+	const hasKnowMore = (container: HTMLElement) =>
+		buttonsIn(container).some((b) => b.innerHTML.includes("Know more"));
+
+	it("post-card::a-title-only-post-renders-NO-Know-more", () => {
+		const { container } = cardWithBody("Fixture argument title.");
+		expect(hasKnowMore(container)).toBe(false);
+		// Non-vacuity: the card rendered, and its title is intact.
+		expect(container.innerHTML).toContain("Fixture argument title.");
+	});
+
+	it("post-card::a-whitespace-only-description-counts-as-none", () => {
+		// The brief's wording: non-empty AFTER TRIMMING. A body ending in a blank
+		// paragraph of spaces is a title-only post that happens to have a stray
+		// keystroke in it.
+		const { container } = cardWithBody("Fixture argument title.\n\n   \n");
+		expect(hasKnowMore(container)).toBe(false);
+	});
+
+	it("post-card::a-post-WITH-a-description-still-renders-it", () => {
+		// The positive control. Without it every assertion above passes on a card
+		// that lost the control for some unrelated reason.
+		const { container } = cardWithBody(
+			"Fixture argument title.\n\nFixture extended text.",
+		);
+		expect(hasKnowMore(container)).toBe(true);
+	});
+
+	it("post-card::a-description-equal-to-the-title-still-counts-as-present", () => {
+		// Stated in the brief, and it falls out of the rule rather than needing a
+		// case: the predicate asks whether a second paragraph EXISTS, never what
+		// it says. An author who repeats themselves has still written one.
+		const { container } = cardWithBody(
+			"Fixture argument title.\n\nFixture argument title.",
+		);
+		expect(hasKnowMore(container)).toBe(true);
+	});
+
+	it("post-card::the-title-gutter-is-reserved-only-when-the-control-is-there", () => {
+		// ⚠ THE HALF THAT IS NOT THE BUTTON. `pr-21` exists to keep the title clear
+		// of the OVERLAID control; with no control it was 84px of width taken off
+		// every title-only card for a neighbour that never arrives. The brief:
+		// "no button and no reserved space — the title row uses the full width".
+		const withMore = cardWithBody(
+			"Fixture argument title.\n\nFixture extended text.",
+		);
+		const titleOnly = cardWithBody("Fixture argument title.");
+		const titleButton = (c: HTMLElement) =>
+			Array.from(c.querySelectorAll("button")).find(
+				(b) => b.querySelector("h3") !== null,
+			);
+		expect(
+			(titleButton(withMore.container)?.getAttribute("class") ?? "").split(
+				/\s+/,
+			),
+		).toContain("pr-21");
+		expect(
+			(titleButton(titleOnly.container)?.getAttribute("class") ?? "").split(
+				/\s+/,
+			),
+		).not.toContain("pr-21");
 	});
 });
