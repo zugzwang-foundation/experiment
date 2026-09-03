@@ -91,6 +91,14 @@ A single paragraph is the whole route to the notes, and nothing fails on disk if
 
 ---
 
+### Forbidden To Fix It
+`docs(sync-2): the doc truth pass — two register mints, a retired phase tracker` · 18 August 2026 · week 17
+<!-- TIER: GROUNDWORK -->
+
+The pass ran under a rule forbidding it from fixing what it found. Ten places where instruction and repository disagree are written down rather than reconciled. That call belongs to the founder, and a silent correction teaches nobody anything.
+
+---
+
 ### The Login That Never Comes
 `docs(spec): §21.9 — the deck gets a spec before a line of code` · 18 August 2026 · week 17
 <!-- TIER: CHAPTER -->
@@ -118,6 +126,22 @@ So it stops counting anything. Two commands ask the question directly instead, a
 The right place to record that somebody has seen the deck was a column on the person — once per human, not once per browser. It was rejected on cost, the better option in plain view: a migration, a spec row, a review gate, all for a fact nothing else reads. A cookie holds it instead.
 
 The mark is written at the end, never at the open — otherwise it records somebody as having read rules they closed on card one, the outcome the gate exists to prevent.
+
+---
+
+### Nothing Lived Only There
+`chore(onboarding): log session — O1-DECK closed, merged, staging returned to main` · 18 August 2026 · week 17
+<!-- TIER: GROUNDWORK -->
+
+Returning the rehearsal branch meant overwriting it, and overwriting is where this project has lost work. What authorised it was not whether the push would be refused, but whether anything existed only there. Nothing did.
+
+---
+
+### Making The Reference True
+`docs(plan): land O1-DECK — the plan the execute ran from, which never reached main` · 18 August 2026 · week 17
+<!-- TIER: GROUNDWORK -->
+
+A landed log cites the plan that governed it by a path resolving to nothing. The plan sat on a branch nobody proposed. A governing document unreadable from the tree it governs is a claim, not a control.
 
 ---
 
@@ -201,6 +225,14 @@ Those substitutes are load-bearing only because there was no behaviour to reason
 
 ---
 
+### Counted, Not Computed
+`SYNC-4 · SWEEP — the ADR index rebuilt to the files on disk` · 20 August 2026 · week 18
+<!-- TIER: GROUNDWORK -->
+
+Every count was read off the table rather than worked out. Arithmetic reproduces your assumption about a table; reading reproduces the table. The note warning that the count was stale had itself gone stale twice, once inside eleven days.
+
+---
+
 ### Anonymous On The Way Home
 `fix(auth): issue the participant session on F-AUTH-4 Continue` · 21 August 2026 · week 18
 <!-- TIER: CHAPTER -->
@@ -214,6 +246,14 @@ Accept the terms, get sent to the front page, and arrive as nobody — every new
 <!-- TIER: CHAPTER -->
 
 The market's own page and the tile that links to it drew on one read, so a market carrying more than one image showed the same one at both sizes. The header now has a read of its own; the tile's is untouched to the line. The better part is a promise narrowed to fit — the specification described a carousel advancing through every image, and no build has ever shipped one. It now describes the single picture that exists. The carousel is deferred, not dropped.
+
+---
+
+### An Agreement That Was Wrong
+`chore(onboarding): log session — O1-DECK-R2 closed, merged, staging returned to main` · 21 August 2026 · week 18
+<!-- TIER: GROUNDWORK -->
+
+Two lanes amended the spec from one base and both minted the same version. The edits matched, so the merge took that line silently, flagging only the date beneath. A conflict display cannot show an agreement that is wrong.
 
 ---
 
@@ -244,6 +284,14 @@ The same sentence sat in six places, and a correction had already been aimed at 
 Three changes were merged into the rehearsal copy, never into the main line. They work and they are live, which is not the point: the mirror had started holding what the original never had, and the reset that rebuilds it does not ask. It wipes and regenerates from the main line, and whatever lived only there is gone with nothing to say it existed.
 
 Not a feature. The same three changes copied across word for word, and the only checkable claim is that the two now differ by nothing.
+
+---
+
+### Nobody Would Be Told
+`chore(lots): log session — MERGE-1, the cascade that ran late and what it found` · 22 August 2026 · week 18
+<!-- TIER: GROUNDWORK -->
+
+There is no way back to the eight markets — nothing reads the snapshot that records them. The rebuild does not merely empty them: it creates fifteen fixture markets instead, and its checks go green while it does.
 
 ---
 
@@ -351,6 +399,22 @@ The plan this ran from had gone stale, and would have walked its reader into dia
 
 ---
 
+### Empty Either Way
+`chore(scale): S-1 close-out — the log, and the §3.3 install step` · 25 August 2026 · week 18
+<!-- TIER: GROUNDWORK -->
+
+A check planned as a dashboard reading closes without one: the database cannot say which route a connection takes, and the setting reads empty whether it is set or not. A count that looked decisive no longer settles anything.
+
+---
+
+### A Colour And An Animal
+`PFP-Migration` · 26 August 2026 · week 18
+<!-- TIER: GROUNDWORK -->
+
+An identity becomes a colour and an animal, with a picture to match. The record does not say why. What stands in for a reason is two subject lines and three copies of the same signature.
+
+---
+
 ### The Cheaper Wrong Guess
 `feat(ui): INFO-1 — one gloss per term, on an affordance that works on a phone` · 26 August 2026 · week 18
 <!-- TIER: CHAPTER -->
@@ -420,6 +484,14 @@ The claim that page search reaches the hidden text is recorded as an inference, 
 A signed link carries a timestamp, so asking twice gives two addresses for one unchanged picture, and browsers cache by address. The market page refreshes every fifteen seconds, so a picture nobody touched was fetched two hundred and forty times an hour per open tab, and paid for each time. Signing was never the cost. Renaming was.
 
 Two things are deliberately left alone. Profile pictures already work by a simpler route, so making the two consistent would only endanger the one that is fine.
+
+---
+
+### Nothing Underneath
+`latest final caching part` · 28 August 2026 · week 19
+<!-- TIER: GROUNDWORK -->
+
+Six files changed and the message is the subject line. Nothing about what was cached, why, or what makes this the final part. By then every commit was meant to carry its own account.
 
 ---
 
@@ -537,6 +609,70 @@ There is a gap between the ring and the field, and it looks like something nobod
 Three lessons, one shape. A check whose two sides come from the same source agrees perfectly while the error reaches both. An instrument returns a plausible number for a load that cannot possibly be cheap. A renderer stays deterministic while its output changes, because what moved was the input. Every reading looks healthy, and the reason it looks healthy is the defect.
 
 A version block already missing from the record stays missing. Its content belongs to somebody else, and backfilling it would be the failure the record names.
+
+---
+
+### One Line For Sixteen Thousand
+`Merge pull request #443 — feat/reconcile-staging` · 31 August 2026 · week 19
+<!-- TIER: GROUNDWORK -->
+
+Ninety-seven files and sixteen thousand added lines arrive in one move. The account of them is a single line naming the lane they came from. What was reconciled, and against what, is not written down here.
+
+---
+
+### Labelled Rather Than Gone
+`Merge pull request #402 — chore/feed-doc-drift` · 31 August 2026 · week 19
+<!-- TIER: GROUNDWORK -->
+
+A plan that had already been overtaken is now marked as overtaken, and a second record lands with it. Not one line is removed to do it — the superseded plan stays legible, labelled rather than gone.
+
+---
+
+### The Frame Gives
+`Merge pull request #421 — feat/pfp-ui-1` · 31 August 2026 · week 19
+<!-- TIER: GROUNDWORK -->
+
+One file, eighty-two lines, and one line to account for them. The frame takes the shape its contents already had — the container gives, not the picture. Which way it gives is the whole record.
+
+---
+
+### Say It In The File
+`Merge pull request #442 — chore/poll-jitter-strictmode-note` · 31 August 2026 · week 19
+<!-- TIER: GROUNDWORK -->
+
+A deliberate randomness in when the page asks for fresh data is silently swallowed while you develop, and nothing in a development run says so. Ten lines in one file say it instead.
+
+---
+
+### Neither Lane Could See
+`Merge pull request #446 — chore/register-1` · 31 August 2026 · week 19
+<!-- TIER: GROUNDWORK -->
+
+Two streams of work were handing out the same numbers to different things. Which numbers, and for what, the record does not say — only that the chart side is the one that moves. Twenty files change.
+
+---
+
+### It Said Leave Unmerged
+`Merge pull request #448 — feat/warli-mount` · 1 September 2026 · week 19
+<!-- TIER: GROUNDWORK -->
+
+The line this merge carries ends with a marker telling whoever finds it not to merge. It was merged anyway. The artwork goes up on the sign-in pages, and the cost it was supposed to have gets measured.
+
+---
+
+### A Noun Came Along
+`Merge pull request #447 — feat/block-1-resolution-content` · 1 September 2026 · week 19
+<!-- TIER: GROUNDWORK -->
+
+The four blocks about resolution get wired to their content. A noun belonging to another piece of work is renamed on the way past. Twenty-three files changed; the record is one line long.
+
+---
+
+### What Was Done, Not Why
+`Merge pull request #449 — block-b-t3-image-optimize` · 1 September 2026 · week 19
+<!-- TIER: GROUNDWORK -->
+
+Pictures get made smaller in the browser. That is the whole of it: the body under this merge is one line, and the line says what was done.
 
 ---
 
@@ -671,6 +807,14 @@ Every route died in local development for twenty-plus commits and every gate sta
 The cause was a comment. The scanner that hunts for style names searches plain text and cannot tell prose from code, so an example written to explain a test became a real, broken rule.
 
 Writing the guard broke the build again, on its first run. Its own explanation quoted the thing it was written to catch.
+
+---
+
+### The Explanation Was The Defect
+`chore(docs): SYNC-5 — repair every measured-fact document the tree had outgrown` · 2 September 2026 · week 19
+<!-- TIER: GROUNDWORK -->
+
+Reviewers read the repair and found defects in it. Every number was right; the wrong part was always the sentence bolted on to explain one. The logs were left uncorrected on purpose — correcting one destroys what it is for.
 
 ---
 
