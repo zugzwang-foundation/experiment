@@ -125,7 +125,7 @@ Numbering gaps are real: `0002` was never minted and `0012` never landed on disk
 
 | Staged file | Source | Role | Currency |
 |---|---|---|---|
-| `ENGINE-phase-record.md` | `docs/logs/ENGINE-phase-record.md` @ `e28d4b6` | The consolidated ENGINE-arc record (the market engine build) | current |
+| `ENGINE-record.md` | `docs/records/ENGINE-record.md` @ `e28d4b6` | The consolidated ENGINE-arc record (the market engine build) | current |
 | `INCIDENT-2026-07-02-prod-migration-drift.md` | `docs/logs/INCIDENT-2026-07-02-prod-migration-drift.md` @ `e28d4b6` | The one production incident: migration drift + the drizzle-orm #5769 lesson | current |
 | `SYNC-SWEEP.md` | `docs/logs/SYNC-SWEEP.md` @ `e28d4b6` | The doc-reconciliation sweep that produced SPEC.1 1.0.14 / SPEC.2 1.0.17 | current |
 | `EXTAUDIT-05.md` | `docs/logs/EXTAUDIT-05.md` @ `e28d4b6` | Deck close-out log — how the deck was built + verified | current |

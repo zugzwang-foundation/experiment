@@ -1,6 +1,6 @@
 # ENGINE Phase — Consolidated Record
 
-> **Doc:** `docs/logs/ENGINE-phase-record.md`
+> **Doc:** `docs/records/ENGINE-record.md`
 > **Status:** ENGINE phase **CLOSED** — all strata `.0`–`.16` DONE and green on `main`.
 > **Authored:** 2026-06-15 (web, at the ENGINE.10 close), from the read-only engine-close recon + orchestration context. CC-committed, PK-mirrored.
 > **Purpose.** One commit-referenced index for the whole ENGINE phase. **GitHub retains the full per-stratum plan + log set forever** (17 plans + 23 logs under `docs/plans/` + `docs/logs/`); this record is the standing index that replaces the ~35 scattered ENGINE plan/log/close-out files in the PK mirror. It also **subsumes the post-phase reconciliation sweep** (§4) — there is no separate sweep-log file.
