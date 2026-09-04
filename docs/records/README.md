@@ -1,8 +1,16 @@
 # `docs/records/` — what these files are, and how to rebuild them
 
 **Nine records and one index**, replacing — for the purpose of *knowing what exists* — the
-**366** documents in `docs/logs/` (236) and `docs/plans/` (130). They replace them for nothing
-else: the history is still the history, and the commit log is where it lives.
+close-out corpus in `docs/logs/` and `docs/plans/`. They replace it for nothing else: the
+history is still the history, and the commit log is where it lives.
+
+⚠ **That replacement has since been acted on, and this paragraph used to carry the old figures.**
+It read *"the **366** documents in `docs/logs/` (236) and `docs/plans/` (130)"* — true when this
+set was generated, and made false by SYNC-6 · CLEANUP, which retired the 202 of them whose work
+was merged and which no live document cited. **166 remain (89 logs, 77 plans)** — measured with
+`ls docs/logs | wc -l` and `ls docs/plans | wc -l`, which is the only way this sentence should
+ever be read (**rule 2**). What survived is what something still points at, plus every plan that
+might describe work nobody has done yet.
 
 A session log answers *what happened that night*. These answer *what is true now*, which is the
 question an operator has during a live experiment. **Every one can be regenerated**, because
@@ -50,7 +58,7 @@ point.** `none` means *searched, and there is no coverage*. `—` means *not app
 that takes `—` to avoid saying `none` has hidden a gap behind a dash — which is exactly how five
 wrong `none`/`—` cells got into the first draft of this set.
 
-## The four rules
+## The five rules
 
 1. **Repository only.** No project-knowledge document, no chat history, no summary. A lane whose
    history exists only outside the repo is **a finding to record**, not a reason to go looking.
@@ -65,6 +73,15 @@ wrong `none`/`—` cells got into the first draft of this set.
 4. **No hedging.** Either it was measured, or the record says **NOT ESTABLISHED** and names what
    would establish it. A hedge is a fact and a disclaimer in one sentence; the reader keeps
    the fact.
+5. **A citation that points at a DEFINITION carries the symbol INSIDE the code span** —
+   `` `load-debate-view.ts:486 (loadRemovedSet)` `` — so the line is a convenience and the
+   symbol is the anchor. A line number is a distance, and prose is what moves (**O-8**); a
+   symbol survives the edit that invalidates the number, and the reader who follows a drifted
+   citation can still find what it meant. Inside the span deliberately: a citation gets copied
+   out of its sentence, and an anchor sitting next to the backticks does not travel with it.
+   ⚠ **Only definitions.** A citation onto a call site, an assertion inside a test, or a line
+   whose content *is* the claim gets nothing — there is no symbol there to anchor to, and the
+   nearest name would point away from what the row is asserting.
 
 ## Regenerating
 

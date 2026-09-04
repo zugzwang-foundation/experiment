@@ -27,7 +27,7 @@ rather than a check somebody has to remember to write.
 | Email OTP sign-in (Resend) | SHIPPED | `src/server/auth/email-otp.ts`, `src/app/(auth)/sign-in/otp/page.tsx` | SPEC.1 §13 · `F-AUTH-2` | 0004, 0033 | `tests/server/auth/otp.test.ts`, `tests/integration/email-otp-send.integration.test.ts` | — |
 | OTP sender boot guard (non-sandbox in prod/staging) | SHIPPED | `src/server/auth/resend-from.ts` | — | 0033 | `tests/server/auth/email-otp-from-guard.test.ts` | `docs/parked.md` SCAFFOLD.12 §10.b |
 | Cloudflare Turnstile | SHIPPED | `src/server/auth/index.ts:88-107` | SPEC.1 §13 | 0004 | `tests/server/auth/` | — |
-| Session issue + 400-day cap | SHIPPED | `src/server/auth/index.ts:69` (`SESSION_MAX_AGE_SEC`), `:349` | SPEC.2 §8.2 | 0004 P1 | `tests/integration/onboarded-login-session.integration.test.ts` | — |
+| Session issue + 400-day cap | SHIPPED | `src/server/auth/index.ts:69 (SESSION_MAX_AGE_SEC)`, `:349` | SPEC.2 §8.2 | 0004 P1 | `tests/integration/onboarded-login-session.integration.test.ts` | — |
 | Session issued on F-AUTH-4 Continue | SHIPPED | `src/server/auth/tos-accept.ts` | `F-AUTH-4` | 0004 | `tests/integration/auth-dbl-1-first-login-session.integration.test.ts` | — |
 | Signed-out session read on `(public)` | SHIPPED | `src/app/(public)/_lib/session.ts` | — | 0034 | `tests/integration/viewer-context.integration.test.ts` | — |
 | Session gate (deferred-session hook) | SHIPPED | `src/server/auth/session-gate.ts` | `F-AUTH-4` | 0004 | `tests/server/auth/session-gate.test.ts` | — |
@@ -42,7 +42,7 @@ rather than a check somebody has to remember to write.
 | Initial Dharma grant, once per user, in the acceptance tx | SHIPPED | `src/server/auth/tos-accept.ts` | SPEC.1 §10.1 | 0018 | **primary** (the `FOR UPDATE` lock + tab-race no-op branch): `tests/server/auth/tos-accept-grant.test.ts` T2/T3 · **storage backstop**: `tests/invariants/I-GRANT-ONCE-001…spec.ts`, which inserts raw and imports no `src/server/auth/**` | — |
 | Onboarding completion | SHIPPED | `src/server/onboarding/complete.ts`, `src/app/(auth)/onboarding/page.tsx` | `F-AUTH-4` | — | `tests/unit/onboarding/complete.test.ts`, `tests/server/auth/onboarding-page-wiring.test.ts` | — |
 | Onboarding-ref signing | SHIPPED | `src/server/auth/onboarding-ref.ts` | `F-AUTH-4` | — | `tests/server/auth/onboarding-ref.test.ts` | — |
-| **Onboarding deck — first-login gate** | SHIPPED | `src/server/onboarding/gate.ts`, `src/components/onboarding/OnboardingDeck.tsx`, cards at `cards.ts:67` | SPEC.1 §21.9 | 0037 | `tests/unit/onboarding/gate.test.ts`, `cards.test.ts`, `copy-drift.test.ts`, `render/deck.test.tsx` | — |
+| **Onboarding deck — first-login gate** | SHIPPED | `src/server/onboarding/gate.ts`, `src/components/onboarding/OnboardingDeck.tsx`, cards at `cards.ts:67 (ONBOARDING_CARDS)` | SPEC.1 §21.9 | 0037 | `tests/unit/onboarding/gate.test.ts`, `cards.test.ts`, `copy-drift.test.ts`, `render/deck.test.tsx` | — |
 | OAuth orphan fallback | SHIPPED | `src/server/auth/index.ts` | `F-AUTH-1` | — | `tests/integration/oauth-orphan-fallback.integration.test.ts` | — |
 | OAuth signup pool deadlock fix | SHIPPED | `src/server/auth/index.ts` | — | 0043 | `tests/integration/oauth-signup-pool-deadlock.integration.test.ts` | — |
 | Post-commit auth events | SHIPPED | `src/server/auth/post-commit-events.ts` | SPEC.2 §7 | 0005 | `tests/server/auth/post-commit-events-wiring.test.ts` | — |
