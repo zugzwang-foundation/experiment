@@ -67,7 +67,7 @@ FIXED_REPO_FILES=(
 	"docs/runbooks/dataset-release.md"
 	"docs/runbooks/DEBATE.7-moderation-smoke.md"
 	"docs/parked.md"
-	"docs/logs/ENGINE-phase-record.md"
+	"docs/records/ENGINE-record.md"
 	"docs/logs/INCIDENT-2026-07-02-prod-migration-drift.md"
 	"docs/logs/SYNC-SWEEP.md"
 	"docs/logs/EXTAUDIT-05.md"
