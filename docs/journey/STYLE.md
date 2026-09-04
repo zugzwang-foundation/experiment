@@ -1,8 +1,42 @@
-# JOURNEY — style spec v1.5
+# JOURNEY — style spec v1.6
 
 **Status:** ratified · **Date:** 2026-09-04 · **Owner:** web Claude (prescriptive)
-**Supersedes:** v1.4 (2026-09-04), v1.3 (2026-09-03)
+**Supersedes:** v1.5, v1.4 (2026-09-04), v1.3 (2026-09-03)
 **Repo home:** `docs/journey/STYLE.md`. See §15.
+
+## Changes from v1.5 — the two values §0.1 was written to forbid, and a closed state
+
+The first two were found by the v1.5 install audit, in the same revision that
+added §0.1. Both are here because §0.1 sits on `main` above two unmeasured
+numbers, and a rule its own document immediately breaks is decorative.
+
+**O-1 · §8's four gold-standard labels overstated their specimens.** Measured
+with the shipped word rule over blockquote prose only: 165→**150**, 72→**68**,
+58→**47**, 36→**31**. All four overstate — the signature of numbers written by
+eye. `165` matches no reading of the specimen, so it is not an extraction
+artefact. Byte-identical in v1.3, v1.4 and v1.5, so inherited rather than
+introduced, but §8 is where a drafter calibrates a tier, and `Landmark — 165
+words` sat directly above a specimen whose real published entry §3.1 measures at
+184: three numbers, one name.
+
+⚠ **The fix is a deletion, not a correction.** §0 says a value transcribed into
+this file is a second source of truth nobody maintains, and these four were
+exactly that. §3's ceilings already carry the budget; §8's job is to show the
+voice. A corrected number would drift again — this run proved it, when a
+transcribed heading count moved 26 → 28 one version later, so a reset value would
+already have been wrong.
+
+**O-2 · §1's *"wrong answer for three commits"* measures as one.** Against the
+true rule, exactly one commit on the first-parent spine is misclassified by a
+date rule: `n=346`, committed 2026-08-18 00:59 local, pre-convention but
+post-`18 August`. `n=344` and `n=345` are 17 August and classify correctly;
+`n=347` onward are 18 August or later and classify correctly. New in v1.4,
+retained in v1.5 — the one number the revision that fixed the dates inherited
+from the version it was correcting.
+
+**O-3 · §13.2 records a closed state.** The eleven owed notes were applied and
+pushed on 4 September; `refs/notes/commits` is at `b41ecbf7`, 354 notes. The
+prohibition on an unattended run pushing them stands unchanged and always will.
 
 ## Changes from v1.4 — two defects v1.4 introduced or failed to close
 
@@ -115,7 +149,8 @@ convention forward carries its reasoning in the message and needs no note.
 ⚠ **The boundary is a commit, not a calendar date.** `n=346` is committed on 18
 August at 00:59 local and carries a note; the convention lands seven and a half
 minutes later. Any sentence drawing the line as *"before 18 August"* gives the
-wrong answer for three commits. The boundary is **n1…n346 carry notes; n347
+wrong answer for exactly one commit — `n=346` itself, which is the only one on
+the spine that a date rule misclassifies. The boundary is **n1…n346 carry notes; n347
 forward carry the block**, and every date in this document is committer-local
 (+05:30) — see §4.1. The
 two exceptions are §13.2.
@@ -413,7 +448,7 @@ A commit without an entry is a decision, not a gap. The count in `CLAUDE.md`
 
 ## 8. Gold standards
 
-### Landmark — 165 words
+### Landmark
 
 > ### Let The Money In
 > `feat(ranking): debate ordering` · 31 May 2026 · week 6
@@ -445,7 +480,7 @@ A commit without an entry is a decision, not a gap. The count in `CLAUDE.md`
 
 *The mono line above is provisional pending the real commit anchor.*
 
-### Chapter — 72 words
+### Chapter
 
 > ### Two Answers To One Price
 > `fix(debate): derive NO percent as 100 − YES` · 31 July 2026 · week 14
@@ -456,7 +491,7 @@ A commit without an entry is a decision, not a gap. The count in `CLAUDE.md`
 > to the same question. One of them was deleted. The other now derives NO from
 > YES, so they can never drift apart again.
 
-### Chapter — 58 words *(second reference, for range)*
+### Chapter — a shorter one, for range
 
 > ### The Warning That Went Away
 > `docs(specs): retire the slippage warning` · 15 July 2026 · week 12
@@ -466,7 +501,7 @@ A commit without an entry is a decision, not a gap. The count in `CLAUDE.md`
 > what used to be there. Nothing here is deleted quietly, including the things
 > nobody will miss.
 
-### Groundwork — 36 words
+### Groundwork
 
 > ### The PDF
 > `Delete docs/specs/SPEC.1.pdf` · 10 May 2026 · week 3
@@ -676,10 +711,22 @@ a pre-convention commit does — same words in both places is the whole design, 
 a post-convention commit without the block reads identically to a pre-convention
 one.
 
-Precedent exists on the shared ref: two such notes already stand.
+**Closed for the eleven that were owed.** They were written as files, reviewed in
+the pull request, and applied and pushed attended on 4 September 2026:
+`refs/notes/commits` moved `56b12a2f` → `b41ecbf7` as a fast-forward, 343 → 354
+notes, verified as purely additive by set-difference over the notes tree rather
+than by count — zero pre-existing entries removed or modified, every one keeping
+its blob sha. The two that already stood before this are among the 343.
 
-⚠ **Note bodies are written as files in the pull request. They are not pushed by
-an unattended run.** See the walls in the task brief.
+⚠ **The prohibition stands and is not spent.** Note bodies are written as files
+in a pull request. **An unattended run never pushes them.** `refs/notes/commits`
+is shared, unlocked, and has no review surface, so a pushed note is live the
+instant it lands and no pull request can catch it — and this task proved why in
+the worst possible way: an editorial pass rewrote 82 entries and silently
+invalidated all eleven bodies **after three separate reviews had verified them
+byte-identical.** Had they been pushed when they were verified, eleven permanent
+records would say something the document does not, with no way back. The next
+commit that needs a note follows the same route.
 
 `CLAUDE.md` §5.13.1's count sentence is amended to the measured value. That
 section already instructs it: *"Update the count when it moves."*
@@ -815,4 +862,4 @@ else.
 
 ---
 
-**END — JOURNEY style spec v1.5**
+**END — JOURNEY style spec v1.6**
