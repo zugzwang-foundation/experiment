@@ -29,7 +29,7 @@ Delete all HTML comments (including this one) before committing.
 | **Date** | YYYY-MM-DD |
 | **Deciders** | <Name(s)> |
 | **Tracker task** | <SPEC.N or FOUND.N> |
-| **Frame document** | <SPEC.2 §N where this decision is delegated, e.g. "SPEC.2 §1.4 #N (delegation), §23 (ADR Index)"> |
+| **Frame document** | <SPEC.2 §N where this decision is delegated, e.g. "SPEC.2 §1.4 #N (delegation), §22 (ADR Index)"> |
 | **Supersedes** | — \| <ADR-NNNN> |
 | **Superseded-by** | — \| <ADR-NNNN> |
 

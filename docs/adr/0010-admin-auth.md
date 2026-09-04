@@ -6,7 +6,7 @@
 | **Date** | 2026-05-06 |
 | **Deciders** | Hrishikesh Manoj Hundekari (HMH) |
 | **Tracker task** | SPEC.11 |
-| **Frame document** | SPEC.2 §1.4 #5 (delegation), §8 (Authentication & Sessions stub), §23 (ADR Index) |
+| **Frame document** | SPEC.2 §1.4 #5 (delegation), §8 (Authentication & Sessions stub), §22 (ADR Index) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
 

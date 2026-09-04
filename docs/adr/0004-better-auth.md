@@ -6,7 +6,7 @@
 | **Date** | 2026-05-05 |
 | **Deciders** | Hrishikesh Manoj Hundekari |
 | **Tracker task** | SPEC.4 |
-| **Frame document** | SPEC.2 §1.4 #5 (delegation), §8 (Authentication & Sessions shape), §23 (ADR Index) |
+| **Frame document** | SPEC.2 §1.4 #5 (delegation), §8 (Authentication & Sessions shape), §22 (ADR Index) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
 
@@ -33,7 +33,7 @@ The decision must satisfy three load-bearing constraints from SPEC.1 §13 that a
 This ADR does **not** decide:
 
 - Admin auth wiring → ADR-0010 (SPEC.11)
-- Cloudflare Turnstile vendor configuration → SPEC.2 §19
+- Cloudflare Turnstile vendor configuration → SPEC.2 §18
 - Pseudonym pool design (word lists, asset pipeline, exhaustion handling) → ADR-0011 (SPEC.12)
 - Specific numerical values: OTP TTL, OTP wrong-guess attempt cap, per-surface rate-limit windows, session expiry duration, Resend retry policy → SPEC.1 number-tuning pass + ADR-0015 (SPEC.16)
 - ToS document content, version-hash mechanism, or acceptance-evidence schema → SCAFFOLD.3 / UI task
@@ -273,7 +273,7 @@ Sunset by maintainer in late 2024. Not a viable choice for a fresh build. Listed
 | SPEC.2 §1.4 #5 | Delegated decision | Auth library + callback chain — ratified by this ADR |
 | SPEC.2 §8 (stub) | Authentication & Sessions shape | "Auth.js v5 + database session strategy" reference is invalidated by this ADR; back-pressure: §8 is rewritten on the next §8 drafting pass to name "Better Auth + Drizzle adapter + database session strategy" and the cookie name `zugzwang_session`. The two-parallel-cookie-systems and structural-separation rule is unchanged. |
 | SPEC.2 §11 (stub) | Rate-Limit & Idempotency Contract | Better Auth's `rateLimit.customRules` provides the per-endpoint rate-limit primitive consumed by §11 / ADR-0015. No back-pressure on §11 substance; specific window/cap values remain SPEC.1 number-tuning pass / ADR-0015 territory. |
-| SPEC.2 §19 (stub) | Sybil & Security Model | Cloudflare Turnstile token verification on `/email-otp/send-verification-otp` is implemented as a Better Auth `hooks.before` middleware on that path. Vendor configuration substance remains §19 / ADR-0004's scope (this ADR), per the SPEC.4 brief; this ADR ratifies that the integration shape is "Better Auth `hooks.before` calls Cloudflare siteverify before the OTP send fires." |
+| SPEC.2 §18 (stub) | Sybil & Security Model | Cloudflare Turnstile token verification on `/email-otp/send-verification-otp` is implemented as a Better Auth `hooks.before` middleware on that path. Vendor configuration substance remains §18 / ADR-0004's scope (this ADR), per the SPEC.4 brief; this ADR ratifies that the integration shape is "Better Auth `hooks.before` calls Cloudflare siteverify before the OTP send fires." |
 | SPEC.2 §23 | ADR Index | Status of ADR-0004 flips from `provisional` to `accepted` on this commit. |
 | SPEC.1 §13 F-AUTH-1 | Google sign-in | Implemented via Better Auth `socialProviders.google` with scopes `openid email profile`; signup flow rejects `email_verified === false`. |
 | SPEC.1 §13 F-AUTH-2 | Email + OTP | Implemented via `emailOTP` plugin with Resend transport. |
@@ -303,7 +303,7 @@ Sunset by maintainer in late 2024. Not a viable choice for a fresh build. Listed
 - CLAUDE.md row 321 (auth library `DECIDE`) — flips to "Better Auth (per ADR-0004)" on this commit; GATING flag clears
 - SPEC.1 §13 (Authentication, including F-AUTH-1 through F-AUTH-5)
 - SPEC.2 §8 (Authentication & Sessions stub) — back-pressure pending on next §8 drafting pass
-- SPEC.2 §23 (ADR Index)
+- SPEC.2 §22 (ADR Index)
 
 ---
 

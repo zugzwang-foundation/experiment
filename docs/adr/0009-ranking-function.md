@@ -6,7 +6,7 @@
 | **Date** | 2026-05-06 |
 | **Deciders** | Hrishikesh Manoj Hundekari |
 | **Tracker task** | SPEC.10 |
-| **Frame document** | SPEC.2 §1.4 #3 (delegation: ranking math owned here, not duplicated in SPEC.2), §23 (ADR Index) |
+| **Frame document** | SPEC.2 §1.4 #3 (delegation: ranking math owned here, not duplicated in SPEC.2), §22 (ADR Index) |
 | **Supersedes** | — |
 | **Superseded-by** | ADR-0017 |
 
@@ -334,7 +334,7 @@ Two indexes flagged for SCAFFOLD.2:
 | SPEC.2 §5 (Data Model — Table Inventory) | `comments` table column shape | Mints: new column `comments.stake_at_post_time NUMERIC(38, 18) NOT NULL`. Bucket A append-only mutation discipline applies (set on INSERT, never updated). Substantive absorption deferred to SPEC.2 §5 drafting chat per the outline-level absorption pattern. |
 | SPEC.2 §7 (Event Model) | Read-time-computed classification | Consumes: ADR-0005 §4's "Read-time-computed (no projection table): debate-view ranking" classification stands. This ADR confirms the classification by specifying inputs that fit the read-time-computed contract. |
 | SPEC.2 §9 (Concurrency & Transactions) | Comment-writing transaction | Shapes: F-BET-1 / F-COMMENT-1 / F-COMMENT-2 transactions must compute and persist `stake_at_post_time` inside the transaction (Dharma-valued position size on the comment's side at write-time). Substantive absorption deferred to SPEC.2 §9 drafting chat. |
-| SPEC.2 §23 (ADR Index) | ADR-0009 status | Consumes: SPEC.2 §23 entry flipped to `accepted (2026-05-06)` in same commit. |
+| SPEC.2 §22 (ADR Index) | ADR-0009 status | Consumes: SPEC.2 §23 entry flipped to `accepted (2026-05-06)` in same commit. |
 | SPEC.2 Appendix A (Single-Source-of-Truth File Map) | Ranking module + spec | Mints: two file-map rows (`experiment/docs/specs/RANKING.md` for the spec; `src/lib/ranking.ts` for the implementation). Substantive absorption deferred to SPEC.2 Appendix A drafting chat. |
 | ADR-0001 | License (AGPL-3.0-or-later) | Consumes: RANKING.md ships under AGPL-3.0-or-later, same as protocol. |
 | ADR-0005 §3 | Bucket A append-only triggers on `comments` | Consumes: `comments.stake_at_post_time` is INSERT-only; existing trigger covers it for free, no new trigger required. |

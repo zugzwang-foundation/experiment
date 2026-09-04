@@ -6,7 +6,7 @@
 | **Date** | 2026-05-05 |
 | **Deciders** | Hrishikesh Manoj Hundekari |
 | **Tracker task** | SPEC.6 |
-| **Frame document** | SPEC.2 §1.4 #5 (delegation), §4 (System Context), §22 (Operational Runbook Pointers), §23 (ADR Index) |
+| **Frame document** | SPEC.2 §1.4 #5 (delegation), §4 (System Context), §22 (Operational Runbook Pointers), §22 (ADR Index) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
 | **Patch records** | 2026-08-09 · the ratified `bom1` region was never applied to the Vercel project — see §Patch record (PERF-1)<br>2026-08-19 · the sizing premise changed, and §4 undercounted its own buckets — see §Patch record (SYNC-3)<br>2026-08-22 · re-verified post-LOTS-1, and the Discovery gauge corrected — see §Patch record (PERF-1-CLOSE) |
@@ -35,7 +35,7 @@ This ADR does **not** decide:
 - Specific cron schedule values (cron syntax, cadences) → `HARDEN.*` task outputs
 - R2 bucket policy specifics (CORS, signed URL TTLs, object-key conventions) → SCAFFOLD.15
 - Backup verification drill / disaster-recovery runbook → HARDEN.9
-- Cloudflare Turnstile vendor configuration → SPEC.2 §19 / ADR-0004 (already covered)
+- Cloudflare Turnstile vendor configuration → SPEC.2 §18 / ADR-0004 (already covered)
 
 ## Decision Drivers
 

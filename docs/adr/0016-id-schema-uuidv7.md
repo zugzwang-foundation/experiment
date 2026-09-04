@@ -6,7 +6,7 @@
 | **Date** | 2026-05-08 |
 | **Deciders** | Hrishikesh Manoj Hundekari |
 | **Tracker task** | SPEC.17 |
-| **Frame document** | SPEC.2 §1.4 #5 (delegation), §5 (Data Model — Table Inventory), §17 (Identifiers shape), §23 (ADR Index) |
+| **Frame document** | SPEC.2 §1.4 #5 (delegation), §5 (Data Model — Table Inventory), §17 (Identifiers shape), §22 (ADR Index) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
 

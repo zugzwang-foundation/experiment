@@ -6,7 +6,7 @@
 | **Date** | 2026-06-01 |
 | **Deciders** | Hrishikesh Manoj Hundekari |
 | **Tracker task** | SYNC.5 (RLS ruling — open item #1 / drift signal D4) |
-| **Frame document** | SPEC.2 (architecture / data access); SPEC.2 §23 (ADR Index); refinement-01 (public-read posture, interacts) |
+| **Frame document** | SPEC.2 (architecture / data access); SPEC.2 §22 (ADR Index); refinement-01 (public-read posture, interacts) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
 
@@ -80,7 +80,7 @@ This ADR does **not** decide:
 | ADR-0005 (append-only triggers) / INV-1/2/3 | DB-level integrity | **Unaffected.** Append-only triggers, balance `CHECK`s, and NOT-NULL FKs are independent Postgres-level controls and remain in force; this ADR is narrowly about RLS, not all DB-level hardening. |
 | Better Auth | Auth boundary (ADR-0004) | Consumes: authentication/authorization at the server layer is the load-bearing control the RLS decision relies on. |
 | SPEC.2 (architecture / data access) | Architecture section | **Mints** (SYNC.7/8): a recorded RLS posture + tripwire in the data-access architecture section. |
-| SPEC.2 §23 (ADR Index) | ADR index | **Mints** an ADR-0019 entry (same SYNC.7/8 commit). |
+| SPEC.2 §22 (ADR Index) | ADR index | **Mints** an ADR-0019 entry (same SYNC.7/8 commit). |
 | Tracker | SYNC.5 (this ADR), SYNC.7/8 (SPEC.2 architecture + §23), ADR backfill (commit this file) | Resolves open ruling #1 and drift signal D4. |
 
 ## More Information

@@ -6,7 +6,7 @@
 | **Date** | 2026-05-06 |
 | **Deciders** | Hrishikesh Manoj Hundekari |
 | **Tracker task** | SPEC.9 |
-| **Frame document** | SPEC.2 §1.4 #5 (delegation), §5, §6, §7, §23 (ADR Index), Appendix A (file map) |
+| **Frame document** | SPEC.2 §1.4 #5 (delegation), §5, §6, §7, §22 (ADR Index), Appendix A (file map) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
 

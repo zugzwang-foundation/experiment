@@ -6,7 +6,7 @@
 | **Date** | 2026-05-05 |
 | **Deciders** | Hrishikesh Manoj Hundekari |
 | **Tracker task** | SPEC.7 |
-| **Frame document** | SPEC.2 §1.4 #5 (delegation, observability sub-bullet), §18 (Observability Contract — substantively filled), §22 (Operational Runbook Pointers — alarm catalogue feeds), §23 (ADR Index) |
+| **Frame document** | SPEC.2 §1.4 #5 (delegation, observability sub-bullet), §18 (Observability Contract — substantively filled), §22 (Operational Runbook Pointers — alarm catalogue feeds), §22 (ADR Index) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
 
