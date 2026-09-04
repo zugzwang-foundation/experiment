@@ -12,6 +12,7 @@ import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { EmptyBlock } from "@/components/ui/empty-block";
+import { FieldSeparator } from "@/components/ui/field-separator";
 import { InfoTip } from "@/components/ui/info-tip";
 import { RelativeTime } from "@/components/ui/relative-time";
 import { GLOSSARY, SOLD_LABEL } from "@/lib/copy/glossary";
@@ -26,30 +27,6 @@ import { PROFILE_COPY } from "./copy";
 import { DownloadStub } from "./DownloadStub";
 import { ReplicaBody } from "./ReplicaBody";
 import type { ProfileSelection } from "./selection";
-
-/**
- * The `.vsep` upright separator between the head cluster's parts (mockup
- * `:324`, emitted at `:624-627`). Canon §3 item 11 writes the head with them:
- * "avatar · name | SIDE @ entry% | stake …".
- *
- * ⛔ THE GLYPH IS BYTE-CARRIED, NOT TYPED — `0x7C`, U+007C VERTICAL LINE, plain
- * ASCII, the same byte `HeroPanels.tsx:156-158` records for the identical role.
- *
- * ⚠ THE COLOUR COMES FROM SHIPPED CODE, NEVER FROM THE MOCKUP. `text-n3` is
- * `HeroPanels.tsx:173`'s and `StatLine.tsx`'s value for this exact separator;
- * the mockup's `.vsep{color:var(--n3)}` is NOT the source, because the ramps are
- * inverted between the light prototype and the shipped dark system.
- *
- * ⚠ ATTRIBUTED DUPLICATION, ROUTED NOT ABSORBED. `HeroPanels.tsx` has a private
- * `HeadSeparator` with this exact body. It is not exported, `discovery/**` is
- * read-only in this task, and `ui/**` mints no new primitive here — so the
- * third occurrence would be the moment to lift it. Filed as a widening rather
- * than done in passing (AGENTS.md §7 uses the same posture for the envelope
- * helpers' bets-private copies).
- */
-function HeadSeparator() {
-	return <span className="shrink-0 text-n3">|</span>;
-}
 
 /**
  * The profile argument list (SPEC.1 §23) — the user's posts and replies in
@@ -405,7 +382,7 @@ function RemovedHead({
 	return (
 		<div className="flex flex-wrap items-center gap-2">
 			<AuthorHead author={author} />
-			<HeadSeparator />
+			<FieldSeparator />
 			<SideBadge side={side} size="profile" />
 		</div>
 	);
@@ -450,7 +427,7 @@ function PresentHead({
 	return (
 		<div className="flex flex-wrap items-center gap-2">
 			<AuthorHead author={author} />
-			<HeadSeparator />
+			<FieldSeparator />
 			{/* Item 3 (P5-D04) — canon §3 item 11's `SIDE @ entry%`. A PROP PASS:
 			    `SideBadge` already takes `price` and already renders it, so NO
 			    formatting happens here. Formatting it in this component would need a
@@ -487,7 +464,7 @@ function PresentHead({
 			    tag. ⛔ "Lot" is never the word: on screen these are ARGUMENTS (R1).
 			    Nothing here is erased — the commitment survives in the strikethrough
 			    and in Bucket-A `bets.stake`; it just stops being what ranks. */}
-			<HeadSeparator />
+			<FieldSeparator />
 			{/* UI-OVERNIGHT entry 1a — ABBREVIATED past Đ10,000, with the exact
 			    figure on the element as a native tooltip and only when the two
 			    spellings differ. Same rule, same formatter and same reason as the
@@ -528,7 +505,7 @@ function PresentHead({
 			    it was only ever the STAKE that was wrongly bundled behind it. */}
 			{item.kind === "post" && (
 				<>
-					<HeadSeparator />
+					<FieldSeparator />
 					{/* HTML-FINISH row 12 — `Replies · N` MOVES INTO THE HEAD, beside the
 					    stake. Canon §3 item 11 places it "inline with enlarged count
 					    (`.repn`)", i.e. inline in the head cluster, and the mockup emits
@@ -554,8 +531,8 @@ function PresentHead({
 			{/* TIME-1 · Form B — HOW LONG AGO, AFTER EVERY TAG ON THIS ROW: after
 			    `Replies · N` on a post, and after the stake / `Sold` / struck
 			    original on a reply, since a reply has no reply count (§9).
-			    ⚠⚠ THE `HeadSeparator` IS RULED IN, AND THIS BLOCK ARGUED THE
-			    OPPOSITE UNTIL THE COMMIT BEFORE THIS ONE. It read "⛔ NO
+			    ⚠⚠ THE `FieldSeparator` IS RULED IN, AND THIS BLOCK ARGUED THE
+			    OPPOSITE UNTIL TIME-1 · Form B. It read "⛔ NO
 			    `HeadSeparator` BEFORE IT", because the arrangement guard pins this
 			    head's seam count against canon §3 item 11 and a fourth pipe would
 			    have reddened it. Canon §3 item 11 now carries the field and its
@@ -590,7 +567,7 @@ function PresentHead({
 			    surface is that present cards carry an age and removed stubs do not.
 			    Adding one there would be a new decision about what a withheld
 			    argument discloses, made in a task that was not asked to make it. */}
-			<HeadSeparator />
+			<FieldSeparator />
 			<RelativeTime createdAt={item.createdAt} className="text-xs" />
 			{/* UNWIRE-1 — the bookmark half of this cluster is gone (bookmark module
 			    unwired product-wide, SUB-2/H-NEW-2); the download stub survives,
