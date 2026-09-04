@@ -37,7 +37,7 @@ read path.
 | **Pre-commit moderation (text + image, one call)** | SHIPPED | `src/server/moderation/precommit.ts`, `openai.ts`; sole call site `src/app/api/bets/place/route.ts:135` | SPEC.1 §16.5 · `F-MOD-1` | 0014, 0021 | `tests/server/moderation/`, `tests/integration/precommit-moderate.integration.test.ts` | — |
 | Gate-block consequences (`mod_actions`, auto-ban, CSAM seam) | SHIPPED | `src/server/moderation/consequences.ts:75`, `:127`, `:188` | SPEC.1 §15 · `F-MOD-2` | 0021 | `mod_actions` + event: `tests/server/moderation/moderation-blocked-event.test.ts` · **auto-ban**: `tests/server/moderation/track-a.test.ts` · **CSAM seam**: `tests/server/moderation/csam-seam.test.ts` | — |
 | Reactive removal — no held queue | SHIPPED | `src/server/admin/moderation/` | SPEC.1 §15 | 0020, 0021 | `tests/server/admin/moderation/` | — |
-| **Removal masking on every body read** | SHIPPED | `loadRemovedSet` defined in `src/server/debate-view/load-debate-view.ts:461`; **five call sites** — `:287` · `discovery/hero.ts:168` · `admin/moderation/review-feed.ts:233` · `profile/arguments.ts:434` · `profile/positions.ts:484` | SPEC.1 §15 | 0020, 0021 | `tests/server/debate-view/load-debate-view.integration.test.ts` (SC-1-compliant: asserts the **body**'s absence) · `tests/server/discovery/hero.test.ts` · `tests/server/admin/moderation/review-feed-completeness.integration.test.ts` · `tests/server/profile/{masking,arguments,positions}.test.ts` | CLAUDE.md §5.14 SC-1 fires on every new body read |
+| **Removal masking on every body read** | SHIPPED | `loadRemovedSet` defined in `src/server/debate-view/load-debate-view.ts:486`; **five call sites** — `:311` · `discovery/hero.ts:168` · `admin/moderation/review-feed.ts:233` · `profile/arguments.ts:434` · `profile/positions.ts:484` | SPEC.1 §15 | 0020, 0021 | `tests/server/debate-view/load-debate-view.integration.test.ts` (SC-1-compliant: asserts the **body**'s absence) · `tests/server/discovery/hero.test.ts` · `tests/server/admin/moderation/review-feed-completeness.integration.test.ts` · `tests/server/profile/{masking,arguments,positions}.test.ts` | CLAUDE.md §5.14 SC-1 fires on every new body read |
 | Ranking — multi-mode composite | SHIPPED | `src/lib/ranking.ts`, `ranking.config.ts`, `ranking-decimal.ts`, substrate `src/server/debate-view/ranking-substrate.ts` | `docs/specs/RANKING.md` | 0017, 0039 | `tests/unit/ranking/` | `F-3` (numerics are a placeholder) |
 | Ranking reads surviving basis, not frozen stake | SHIPPED | `src/server/debate-view/ranking-substrate.ts:166,170` | SPEC.2 §4 | 0039 R4 | **behavioural**: `tests/server/lots/rank-decay-parity.test.ts` (real rows through `loadRankingSubstrate`) · source scan: `tests/unit/ranking/substrate-site-parity.test.ts` | — |
 | Self-authored replies excluded from attraction | SHIPPED | `src/server/debate-view/ranking-substrate.ts:146,151,168,172` (in `FILTER`, not the JOIN) | SPEC.2 §4 | 0039 P2 | `tests/unit/ranking/substrate-site-parity.test.ts:276` · behavioural: `tests/server/lots/rank-decay-parity.test.ts` | — |
@@ -172,11 +172,15 @@ ADR-0026 §D4. That is the admin lane's fact and lives in `docs/records/ADMIN-re
 | **INV-4** — resolutions append-only | `resolution_events` + `payout_events` immutable post-INSERT. `tests/invariants/I-APPEND-ONLY-001…` |
 
 **Removal masking is a property of every body read, not of rows.** `loadRemovedSet` is
-extracted once in `load-debate-view.ts:461` and reused — never re-implemented — at **five**
-call sites: `load-debate-view.ts:287`, `discovery/hero.ts:168`,
+extracted once in `load-debate-view.ts:486` and reused — never re-implemented — at **five**
+call sites: `load-debate-view.ts:311`, `discovery/hero.ts:168`,
 `admin/moderation/review-feed.ts:233`, `profile/arguments.ts:434` and
 `profile/positions.ts:484`. **The last two are body reads on Profile** and are easy to miss
-when enumerating "the debate surfaces". `hero.ts:142-143` says so
+when enumerating "the debate surfaces". ⚠ **The two `load-debate-view.ts` numbers above were
+`:461` and `:287` when this record was generated, and were correct then** — measured at
+`ead7415`. PR #470 (`613982c9`) added 25 lines to that file and moved them; corrected against
+`e945b760` at SYNC-6 · VERIFY. The other four call sites did not move, which is the tell that
+this was drift rather than a mis-read. `hero.ts:142-143` says so
 explicitly: *"the SAME masking primitive F-DEBATE-1's debate view enforces
 (extracted-and-exported, never re-implemented)"*. ⚠ **CLAUDE.md §5.14 SC-1 fires on any PR
 that adds or edits a read over `comments`**, and it exists because a second read path in one
