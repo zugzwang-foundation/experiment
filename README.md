@@ -14,4 +14,4 @@ git fetch origin "refs/notes/*:refs/notes/*"   # re-run to pick up notes added s
 git log --notes=commits                        # show them inline in the log
 ```
 
-The same text, read front to back instead of one commit at a time, is [`docs/journey/README.md`](docs/journey/README.md) — an account of the build in eight acts, one entry per commit.
+The same text, read front to back instead of one commit at a time, is [`docs/journey/README.md`](docs/journey/README.md) — an account of the build in nine acts, one entry per commit.

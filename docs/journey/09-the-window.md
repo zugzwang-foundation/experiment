@@ -1,4 +1,4 @@
-# Act VIII — The Window
+# Act IX — The Window
 *15 September – 5 November 2026*
 
 This act is written during the live window, not retrospectively. What follows is the bridge into it; the entries do not exist yet.
