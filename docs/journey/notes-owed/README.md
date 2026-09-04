@@ -1,4 +1,20 @@
-# Note bodies owed, written but not applied
+# Note bodies — applied, and kept on disk deliberately
+
+> ## ✅ DONE — nothing in this directory is pending
+>
+> The eleven note bodies here were applied to `refs/notes/commits` and pushed, **attended, on
+> 4 September 2026**. The ref moved `56b12a2f` → **`b41ecbf7`** as a fast-forward, **343 → 354
+> notes**. Every one of the eleven is live on the shared ref.
+>
+> **The files were kept on purpose. Their presence is a record, not a queue.** An earlier version
+> of this page told you to delete them once applied; that instruction was withdrawn — see
+> [Why these files are still here](#why-these-files-are-still-here).
+>
+> Check it yourself, without needing this page to be honest:
+>
+> ```bash
+> git ls-remote origin "refs/notes/*"
+> ```
 
 Eleven commits on `main` carry no `Instructions for AI` block in their message. The contract that
 requires it admits no exemption by type, so each of those is a gap rather than a category — and the
@@ -6,7 +22,9 @@ remedy the contract already provides is a **note**: the same block, then the com
 as every pre-convention commit carries its reasoning. Same words in both places is the whole design,
 and a post-convention commit without the block reads identically to a pre-convention one.
 
-This directory holds those eleven note bodies, ready to apply. **It does not apply them.**
+This directory holds those eleven note bodies. **They have been applied** — see the status block
+above and [Why these files are still here](#why-these-files-are-still-here). What follows is the
+record of that, and the route for the next commit that needs a note.
 
 ## Why they are files and not notes
 
@@ -25,9 +43,11 @@ same review that reads the rest of the diff reads them too.
 the entry of the same name in [`../08-the-instruments.md`](../08-the-instruments.md), so reviewing
 the act reviews these — but read them here too, because here is where they become permanent.
 
+*This was done for the eleven before they were pushed, and it stands as the rule for the next batch.*
+
 ## The eleven, and nothing else
 
-**This list is the work. Do not glob the directory.** A later task that owes its own notes will drop
+**This list was the work, and it is what the guard now pins. Do not glob the directory.** A later task that owes its own notes will drop
 its files in beside these, and "every file here" would sweep them up and push them unread — which is
 the one thing this directory exists to prevent.
 
@@ -50,9 +70,14 @@ alike.** Do not retype them. The filename already carries the commit, so the com
 it — a transposed hash would attach two bodies to the wrong two commits, both would succeed, and
 both would be permanent.
 
-## Applying them
+## How they were applied — and the route for the next one
 
-**Only after this pull request is reviewed and merged.** Run from the repository root.
+**This is the procedure that ran on 4 September 2026, recorded verbatim.** It is kept because it is
+the route for the next commit that needs a note, not because anything here is outstanding. The
+counts below are the ones this run actually read: 343 before, 354 after.
+
+⚠ **It runs only after the pull request carrying the bodies is reviewed and merged**, and only
+attended. Run from the repository root.
 
 ⚠ **The blocks below contain no comments, deliberately.** An interactive `zsh` — the shell this
 repository is operated from — does not treat `#` as a comment, so an explanatory line pasted into a
@@ -116,10 +141,35 @@ git notes list | wc -l
 Then repeat steps 2, 3 and 4. If the new count is not 343, one or more of the eleven was answered
 by somebody else while you were working; read those notes before doing anything further.
 
-## When they are applied, delete them
+## Why these files are still here
 
-Applied and unapplied look identical on disk otherwise, and the next person cannot tell. Remove the
-eleven files in the same commit that pushes them, so the directory empties itself as it is used.
+**They are applied. They are kept anyway, and that is a decision rather than an oversight.**
+
+This section used to say the opposite: *remove the eleven files in the same commit that pushes
+them, so the directory empties itself as it is used.* The reasoning was sound — applied and
+unapplied look identical on disk, so a later reader cannot tell which they are looking at. **That
+problem is real and it is solved here by saying so, at the top of the page, rather than by deleting
+the evidence.**
+
+Three reasons the deletion was withdrawn:
+
+1. **The bodies are the only reviewable copy of what went onto a ref nobody can review.** A note on
+   `refs/notes/commits` has no pull request, no diff, and no history a reader can walk. These files
+   are the artifact that a reviewer actually read, sitting in a tree that keeps them forever. Delete
+   them and the sole auditable record of what was pushed is the push itself.
+2. **A guard pins them by name.** `tests/unit/docs/journey-notes-owed.test.ts` asserts this
+   directory holds exactly these eleven, and separately that each body is byte-identical to its
+   entry in the act file. That second property is the one that broke silently once, after three
+   reviews had verified it by hand. Deleting the files retires a live guard against a defect this
+   project has already committed.
+3. **An empty directory is not a clearer signal than a full one that says it is done.** "Empty"
+   reads the same as "never populated", and it cannot tell you the ref, the date, or the count.
+   The status block at the top of this page can, and it survives being read cold.
+
+**So: a file in this directory does NOT mean work is pending.** It means a note was written,
+reviewed, applied, and kept. If a future task leaves its own bodies here, the guard reds until
+somebody deliberately adds them to its list — and that pull request is where the pending-versus-
+applied distinction gets stated, in this section, for that batch.
 
 ## What is in them
 
