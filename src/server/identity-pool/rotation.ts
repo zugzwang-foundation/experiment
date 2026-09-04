@@ -28,7 +28,9 @@ export type PoolTuple = {
 /**
  * Build the PFP filename for one (colour, animal, variant) triple.
  *
- * Input: a colour and animal from the vocabulary, and a zero-based variant index. Output: the `pfp_filename` value, matching the object keys `asset-pipeline/convert_and_upload_pfp.py` uploads under `v1/`.
+ * Input: a colour and animal from the vocabulary, and a zero-based variant index. Output: the `pfp_filename` value, matching the object keys the asset pipeline's upload step writes under `v1/`.
+ *
+ * The upload script's own path is deliberately not named here: it lives in a private operator environment that nothing in this repository can reach, and the contract that matters to a caller is the KEY SHAPE below, which is reproduced in full.
  *
  * Variant 0 gets the bare slug so the common case — 65 of 67 animals have exactly one render — carries no suffix. The `v` prefix keeps this axis distinct from the `-<number>` segment ADR-0011 adds once number compositing is built.
  */
