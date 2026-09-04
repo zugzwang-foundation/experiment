@@ -1,10 +1,24 @@
-// The colour and animal vocabulary the PFP render library was actually built in, measured on spark-3100 at ~/comfy/ComfyUI/output/pfp (2026-08-25).
+// The colour and animal vocabulary the PFP render library was actually built in,
+// measured against the render output on 2026-08-25.
 //
-// `~/pfp_recolor/recolor_batch.py` takes one red source render per animal and recolours it into twelve targets via the ComfyUI API, which makes Red the thirteenth colour rather than an absence of colour. On disk the red originals sit loose in each animal directory instead of in a `Red/` subdirectory; `asset-pipeline/convert_and_upload_pfp.py` normalises that when it converts.
+// The recolour step takes one red source render per animal and recolours it into
+// twelve further targets, which is why Red is the thirteenth colour here rather
+// than an absence of colour. In the render output the red originals sit loose in
+// each animal directory rather than under a `Red/` subdirectory; the asset
+// pipeline's conversion step normalises that when it uploads.
 //
-// This module is the single source for both seed scripts and their tests. Before PFP-1 the lists were duplicated in five places and described renders that had never been made.
+// This module is the single source for both seed scripts and their tests. Before
+// PFP-1 the lists were duplicated in five places and described renders that had
+// never been made.
 //
-// ⚠ ADR-0011 sized the namespace at 50 colours x 100 animals x 10 numbers = 50,000. The render run covers 13 x 67 = 871 pairs. See the ADR-0011 patch record.
+// ⚠ ADR-0011 sized the namespace at 50 colours x 100 animals x 10 numbers =
+// 50,000. The render run covers 13 x 67 = 871 pairs. See the ADR-0011 patch
+// record.
+//
+// The render machine and the local render/recolour paths this note used to name
+// are deliberately out: they describe a private operator environment, none of it
+// is reachable from this repository, and the vocabulary below is the only part a
+// reader of this file needs. Do not restore them.
 
 export const COLOURS = [
 	"Red",

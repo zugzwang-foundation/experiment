@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # stage-reviewer-project.sh — EXTAUDIT-06: stage the reviewer Claude-Project folder.
 #
-# Stages the ratified 60-file knowledge base (48 repo + 5 external package + 7 kit)
-# flat into DEST, from the COMMITTED tree at SHA (git show), never the working tree.
+# Stages the ratified knowledge base (19 fixed repo paths + the ADRs SOURCES.md names
+# + 7 kit + 5 external package files) flat into DEST, from the COMMITTED tree at SHA
+# (git show), never the working tree.
 # Deterministic + rerunnable; writes DEST/STAGING-RECEIPT.txt and aborts unless the
 # staged set matches both the embedded manifest count and SOURCES.md's row list.
 #
@@ -49,9 +50,25 @@ SHA="$(git rev-parse --verify "${SHA_REF}^{commit}")"
 echo "Staging from: $SHA ($SHA_REF)"
 
 # --- The manifest (single source of truth) ---------------------------------
-# 19 fixed repo paths + derived globs: docs/adr/00*.md (expect 29, _template.md
-# excluded by the 00 prefix), docs/handover/project-kit/*.md (expect 7), and
-# ~/Downloads/EXTAUDIT-0[0-4]_*.md (expect 5). Total content files: 60.
+# 19 fixed repo paths + docs/handover/project-kit/*.md + ~/Downloads/EXTAUDIT-0[0-4]_*.md
+# + the ADRs SOURCES.md names.
+#
+# ⚠ THE ADR SET IS READ FROM SOURCES.md, NOT GLOBBED FROM docs/adr/.
+# This script used to glob every `docs/adr/00NN-*.md` and assert the count was
+# 29. That assertion was true on the day it was written and false on the day the
+# thirtieth ADR merged, which is every future day: it had reached 43 against a
+# hardcoded 29 and the script exited at that gate before doing any work (F-18).
+#
+# Raising the number would only have bought time until the next ADR, and the
+# gate below already had a stronger check sitting under the broken one — the
+# staged set is compared to SOURCES.md's rows. So the count is DERIVED from the
+# same manifest that arbitrates the comparison, and the two can no longer
+# disagree. There is no number here left to go stale.
+#
+# Drift in the other direction — an ADR in the tree that the kit does not carry
+# — is REPORTED, not fatal. Whether a new ADR belongs in a reviewer's knowledge
+# base is an editorial call, and a staging script is the wrong place to make it
+# and a worse place to block on it.
 FIXED_REPO_FILES=(
 	"AGENTS.md"
 	"CLAUDE.md"
@@ -67,25 +84,42 @@ FIXED_REPO_FILES=(
 	"docs/runbooks/dataset-release.md"
 	"docs/runbooks/DEBATE.7-moderation-smoke.md"
 	"docs/parked.md"
-	"docs/logs/ENGINE-phase-record.md"
+	"docs/records/ENGINE-record.md"
 	"docs/logs/INCIDENT-2026-07-02-prod-migration-drift.md"
 	"docs/logs/SYNC-SWEEP.md"
 	"docs/logs/EXTAUDIT-05.md"
 	"docs/briefs/SCAFFOLD.16-technical-research-brief.md"
 )
-EXPECTED_ADR=29
-EXPECTED_KIT=7
-EXPECTED_EXTERNAL=5
-EXPECTED_TOTAL=60
-
-ADR_FILES=()
-while IFS= read -r p; do ADR_FILES+=("$p"); done < <(
-	git ls-tree -r --name-only "$SHA" -- docs/adr/ | grep -E '^docs/adr/00[0-9]{2}-.*\.md$' | sort
-)
-[ "${#ADR_FILES[@]}" -eq "$EXPECTED_ADR" ] || {
-	echo "ERROR: expected $EXPECTED_ADR ADR decision files at \$SHA, got ${#ADR_FILES[@]}" >&2
+SOURCES_PATH="docs/handover/project-kit/SOURCES.md"
+MANIFEST="$(git show "${SHA}:${SOURCES_PATH}" | sed -nE 's/^\| `([^`]+)`.*/\1/p')"
+[ -n "$MANIFEST" ] || {
+	echo "ERROR: read no rows from ${SOURCES_PATH} at \$SHA — the manifest is the source of" >&2
+	echo "       truth for every count below, so an empty read would make them all vacuous." >&2
 	exit 1
 }
+EXPECTED_TOTAL="$(printf '%s\n' "$MANIFEST" | grep -c . | tr -d ' ')"
+EXPECTED_KIT=7
+EXPECTED_EXTERNAL=5
+
+# The ADRs the kit carries, named by the manifest rather than globbed.
+ADR_FILES=()
+while IFS= read -r b; do
+	[ -n "$b" ] || continue
+	git cat-file -e "${SHA}:docs/adr/${b}" 2>/dev/null || {
+		echo "ERROR: ${SOURCES_PATH} names docs/adr/${b}, which is not in the tree at \$SHA." >&2
+		echo "       A manifest row pointing at nothing is the one drift that must stay fatal:" >&2
+		echo "       the staging below would fail on it anyway, later and less legibly." >&2
+		exit 1
+	}
+	ADR_FILES+=("docs/adr/${b}")
+done < <(printf '%s\n' "$MANIFEST" | grep -E '^00[0-9]{2}-.*\.md$' | sort)
+EXPECTED_ADR="${#ADR_FILES[@]}"
+
+# Drift the other way: in the tree, not in the kit. Reported, never fatal.
+ADR_IN_TREE="$(git ls-tree -r --name-only "$SHA" -- docs/adr/ | grep -E '^docs/adr/00[0-9]{2}-.*\.md$' | wc -l | tr -d ' ')"
+if [ "$ADR_IN_TREE" -ne "$EXPECTED_ADR" ]; then
+	echo "note: ${ADR_IN_TREE} ADRs in the tree, ${EXPECTED_ADR} carried by the kit — $((ADR_IN_TREE - EXPECTED_ADR)) not in ${SOURCES_PATH}." >&2
+fi
 
 KIT_FILES=()
 while IFS= read -r p; do KIT_FILES+=("$p"); done < <(
@@ -148,7 +182,7 @@ STAGED_COUNT="$(printf '%s\n' "$STAGED_LIST" | grep -c . | tr -d ' ')"
 
 # --- Assert: manifest count -------------------------------------------------
 [ "$STAGED_COUNT" -eq "$EXPECTED_TOTAL" ] || {
-	echo "ERROR: staged $STAGED_COUNT content files, expected $EXPECTED_TOTAL (48 repo + 5 package + 7 kit)" >&2
+	echo "ERROR: staged $STAGED_COUNT content files, expected $EXPECTED_TOTAL (19 fixed + $EXPECTED_ADR ADR + $EXPECTED_KIT kit + $EXPECTED_EXTERNAL package)" >&2
 	exit 1
 }
 
@@ -175,7 +209,7 @@ RECEIPT="${DEST}/STAGING-RECEIPT.txt"
 	echo "date:       $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 	echo "staged-from: $SHA ($SHA_REF)"
 	echo "dest:       $DEST"
-	echo "files:      $STAGED_COUNT content files (expected $EXPECTED_TOTAL = 48 repo + 5 package + 7 kit)"
+	echo "files:      $STAGED_COUNT content files (expected $EXPECTED_TOTAL = 19 fixed + $EXPECTED_ADR ADR + $EXPECTED_KIT kit + $EXPECTED_EXTERNAL package)"
 	echo ""
 	(cd "$DEST" && printf '%s\n' "$STAGED_LIST" | while IFS= read -r f; do $MD5_CMD "$f"; done)
 	echo ""

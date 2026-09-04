@@ -1,9 +1,21 @@
 # SOURCES.md — manifest of the reviewer Claude-Project folder
 
 **Dated:** 2026-07-15 · **Pinned to:** `e28d4b6` (`origin/main`, the PR #223 squash)
+**Amended:** 2026-09-04 at SYNC-6 · PK REFRESH — ADRs `0032`–`0045` added (14 rows).
 **Contract:** every content file staged into this folder has exactly one row below
-(60 rows: 48 repo files + 5 external package files + 7 kit files). The staging script
-asserts this count against the staged folder and aborts on mismatch. `STAGING-RECEIPT.txt`
+(74 rows: 62 repo files + 5 external package files + 7 kit files). The staging script
+asserts this count against the staged folder and aborts on mismatch.
+
+⚠ **Two pins, deliberately.** Rows added on 2026-09-04 carry `eec56d38`; the rest keep
+`e28d4b6`. A row's pin records the commit its content was read at, so re-stamping every
+row to today's SHA would assert a re-read that did not happen. The staging script does
+not consult these pins — it stages from its own `--sha` — so the mixed pin is a record,
+not a mechanism.
+
+⚠ **The ADR count in the §6 heading is no longer load-bearing.** Until 2026-09-04 the
+staging script hardcoded `EXPECTED_ADR=29`, which had been dead since the thirtieth ADR
+merged; it now reads the ADR set *from this file* and derives its totals from the row
+count (#474, `F-18`). **Adding an ADR to the kit means adding a row here — nothing else.** `STAGING-RECEIPT.txt`
 is written at staging time and is not a content file.
 
 Row format: staged filename → source (repo path @ `e28d4b6`, or external) → role → currency.
@@ -68,7 +80,7 @@ Row format: staged filename → source (repo path @ `e28d4b6`, or external) → 
 |---|---|---|---|
 | `EXTAUDIT-05_HANDOVER-DECK.md` | `docs/handover/EXTAUDIT-05_HANDOVER-DECK.md` @ `e28d4b6` | The commit-sequenced walkthrough: Part A system map, Part B chronicle (218 commits), Part C ops | pinned `31d8965`; fully current for Parts A/B per `DELTA-NOTE.md` |
 
-## 6 · ADRs (29 — every decision file on disk; `_template.md` excluded)
+## 6 · ADRs (43 — every decision file on disk; `_template.md` excluded)
 
 Numbering gaps are real: `0002` was never minted and `0012` never landed on disk
 (recorded in SPEC.2 §22) — do not chase missing files.
@@ -104,6 +116,20 @@ Numbering gaps are real: `0002` was never minted and `0012` never landed on disk
 | `0029-dharma-ledger-total-order-contract.md` | `docs/adr/` @ `e28d4b6` | `dharma_ledger.seq` total order; balance reads order on `seq` | accepted |
 | `0030-truncate-rejection-append-only.md` | `docs/adr/` @ `e28d4b6` | Statement-level TRUNCATE guards on Bucket A/B | accepted |
 | `0031-durable-bet-receipts-and-terminal-error-mapping.md` | `docs/adr/` @ `e28d4b6` | `bet_receipts` durable idempotency + the terminal error-mapping contract | accepted |
+| `0032-bookmarks.md` | `docs/adr/` @ `eec56d38` | Bookmarks — storage, toggle write, cross-author list read, bookmark-mode read semantics | **superseded by ADR-0040** (surface unwired; the `bookmarks` table survives) |
+| `0033-otp-delivery-boot-guard-and-optimistic-request-semantics.md` | `docs/adr/` @ `eec56d38` | OTP delivery — sandbox-from boot guard, optimistic-request error semantics, the structural send-suppression constraint | accepted |
+| `0034-viewer-scoped-debate-reads.md` | `docs/adr/` @ `eec56d38` | Viewer-scoped debate reads live outside the export-bound view model | accepted |
+| `0035-guarded-staging-reset.md` | `docs/adr/` @ `eec56d38` | Guarded staging reset via owner-privilege trigger disablement | accepted |
+| `0036-vitest-context-operational-runners.md` | `docs/adr/` @ `eec56d38` | Vitest-context runners for operational staging tasks — the three `tests/staging/` runners are artifacts, not tests | accepted |
+| `0037-onboarding-deck-seen-marker-cookie.md` | `docs/adr/` @ `eec56d38` | Onboarding-deck seen-marker is a browser cookie, not a `users` column | accepted |
+| `0038-scale-target-100k.md` | `docs/adr/` @ `eec56d38` | Scale target — 100,000 signups and 2,000,000 page loads | accepted |
+| `0039-per-argument-lot-accounting.md` | `docs/adr/` @ `eec56d38` | Per-argument lot accounting (lot = bet = argument; sell is per-lot); mints the `lots` table | accepted |
+| `0040-unwire-bookmarks-and-profile-graph.md` | `docs/adr/` @ `eec56d38` | Unwire the bookmark module and the Profile Dharma graph — supersedes ADR-0032 | accepted |
+| `0041-cache-components-and-reserves-keyed-participant-caching.md` | `docs/adr/` @ `eec56d38` | Cache Components, reserves-keyed participant caching, immediate-expiration invalidation | accepted |
+| `0042-presigned-url-hold-budgeted-against-downstream-cache.md` | `docs/adr/` @ `eec56d38` | A presigned URL's hold is budgeted against the cache that outlives it — amends ADR-0041 D-6, does not supersede it | accepted |
+| `0043-oauth-signup-nested-pool-checkout-deadlock.md` | `docs/adr/` @ `eec56d38` | OAuth signup nested pool checkout — drop the adapter transaction | accepted |
+| `0044-user-scoped-idempotency-and-the-double-charge-reclassification.md` | `docs/adr/` @ `eec56d38` | User-scoped idempotency keys, and the double-charge reclassification | accepted |
+| `0045-mobile-responsive-browsing-and-auth-gate.md` | `docs/adr/` @ `eec56d38` | Mobile-responsive read surfaces, with join/login hard-gated on mobile | accepted |
 
 ## 7 · References, runbooks in scope, registers (4)
 

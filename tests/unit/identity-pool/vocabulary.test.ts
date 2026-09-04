@@ -3,7 +3,12 @@
 // The pre-PFP-1 lists were invented before any render existed: 20 colours x 10
 // animals, of which 13 colours and 5 animals had no image, and one entry
 // ("Pine") was not an animal. These tests pin the vocabulary to the render
-// library measured on spark-3100 at ~/comfy/ComfyUI/output/pfp.
+// library as it was measured on 2026-08-25.
+//
+// The render machine and the local output path this note used to name are
+// deliberately out: they describe a private operator environment, none of it is
+// reachable from this repository, and what a reader of this file needs is which
+// vocabulary is pinned — not where the images were made. Do not restore them.
 
 import { describe, expect, it } from "vitest";
 

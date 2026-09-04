@@ -813,13 +813,13 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 
 **Originating task:** SYNC-1 (2026-08-08), PK eviction.
 
-**Deferred work.** Write `docs/logs/UI-phase-record.md` — the analogue of the existing `docs/logs/ENGINE-phase-record.md`: a per-task SHA spine for the UI lane (task → PR # → squash SHA on `main` → what landed → gate outcome). **15 UI close-outs were evicted from project knowledge at SYNC-1 with only a raw archive as insurance.** The repo holds per-task logs and plans, but nothing that reads as one lane-level spine, so reconstructing "what the UI lane did, in order" currently means opening fifteen files and trusting their cross-references.
+**Deferred work.** Write `docs/logs/UI-phase-record.md` — the analogue of the existing `docs/records/ENGINE-record.md`: a per-task SHA spine for the UI lane (task → PR # → squash SHA on `main` → what landed → gate outcome). **15 UI close-outs were evicted from project knowledge at SYNC-1 with only a raw archive as insurance.** The repo holds per-task logs and plans, but nothing that reads as one lane-level spine, so reconstructing "what the UI lane did, in order" currently means opening fifteen files and trusting their cross-references.
 
 **Why deferred.** It is a writing task over ~15 close-outs plus their PRs, not a truth-pass edit; and it is most useful written *once* at lane close rather than incrementally.
 
 **Conditional trigger.** **Before POLISH closes.** ~~(POLISH is itself sequenced below PERF-1 — see the SEQUENCE table.)~~ **PERF-1 closed 2026-08-10; POLISH is no longer gated behind it.**
 
-**Expected next task.** A UI-lane or POLISH close-out task. Model: `docs/logs/ENGINE-phase-record.md`.
+**Expected next task.** A UI-lane or POLISH close-out task. Model: `docs/records/ENGINE-record.md`.
 
 ## N3 — Task-scope the bare `L-n` citations that live outside `docs/`
 

@@ -66,8 +66,26 @@ describe("session logs survive", () => {
 		// ALIVE CHECK, the C0 shape. A `git ls-tree` that matched nothing — wrong
 		// path, renamed directory, detached HEAD with no tree — would make every
 		// assertion below iterate an empty list and pass VACUOUSLY, which is the
-		// exact failure mode this file exists to prevent. 153 logs at HEAD today.
-		expect(trackedSessionLogs().length).toBeGreaterThanOrEqual(150);
+		// exact failure mode this file exists to prevent.
+		//
+		// ⚠ THE FLOOR IS ALSO A MASS-DELETION TRIPWIRE, and that is why it is a
+		// baseline rather than a token `> 0`. A `git rm`'d log leaves HEAD and
+		// this expectation together, so the per-file checks below cannot see it;
+		// only the count can. It has been re-baselined ONCE, deliberately:
+		//
+		//   153 → the guard was minted (DISCOVERY-COMPLETE Gate C)
+		//   236 → the corpus at its peak
+		//    89 → SYNC-6 · CLEANUP retired 147 close-out logs whose work is
+		//         merged and which no live document cites, against a per-file
+		//         evidence table carried in that commit's own message.
+		//
+		// The tripwire FIRED on that purge, which is it working: a deliberate,
+		// reviewed curation is the one case it was not written to stop. The
+		// answer to that is to move the baseline and say why — never to widen it
+		// for headroom, and never to trim a deletion to sneak under it. There is
+		// no headroom here on purpose: at exactly 89, the next log to go missing
+		// still reddens this test.
+		expect(trackedSessionLogs().length).toBeGreaterThanOrEqual(89);
 	});
 
 	it("session-logs::every-tracked-log-is-present-and-non-empty", () => {
