@@ -77,7 +77,7 @@ pointer hover and touch tap — it composes Radix's Tooltip and Popover and pick
 | Inline sell on profile | SHIPPED | `src/components/profile/InlineSell.tsx`, `LotBreakdown.tsx` | 0039 | `tests/unit/profile/` |
 | Onboarding deck (7 cards, re-show drops 1) | SHIPPED | `src/components/onboarding/cards.ts:67` | 0037 | `tests/unit/onboarding/copy-drift.test.ts` |
 | Warli auth artwork | SHIPPED | `src/components/art/warli/` | — | `tests/unit/art/` (7 files) |
-| ⛔ Expanded post nodes on the chart | **REMOVED** | — | — | **absence guarded**: `tests/unit/debate/render/price-chart.test.tsx:862` — `no-circle-carries-a-ground-rim — CHART-NODE-REMOVE`, written so a re-added node reddens |
+| ⛔ Expanded post nodes on the chart | **REMOVED** | — | — | **absence guarded**: `tests/unit/debate/render/price-chart.test.tsx:869` — `no-circle-carries-a-ground-rim — CHART-NODE-REMOVE`, written so a re-added node reddens. ⚠ Cited as `:862` when generated, which was correct at `ead7415`; PR #470 moved it — corrected against `e945b760` at SYNC-6 · VERIFY |
 | Toast / notification layer | **NOT BUILT** | — | — | none |
 
 ### 2.4 · SPEC.1 §21 ancillary surfaces — the status of each
