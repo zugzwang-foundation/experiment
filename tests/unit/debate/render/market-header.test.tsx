@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MarketHeader } from "@/components/debate/MarketHeader";
 import type { DebateMarketHeader } from "@/components/debate/types";
+import { contentHashId } from "@/components/ui/info-tip";
+import { GLOSSARY } from "@/lib/copy/glossary";
 
 /**
  * POLISH.3 PR 1 items 2 + 3 — the market header's attrs strip.
@@ -75,6 +77,41 @@ describe("POLISH.3 — MarketHeader attrs strip", () => {
 		expect(screen.getByText("Đ 150 staked")).toBeTruthy();
 		// The failure mode this exists for — the unspaced form must be gone.
 		expect(screen.queryByText("Đ150 staked")).toBeNull();
+	});
+
+	it("market-header::a-total-past-a-thousand-abbreviates-and-the-gloss-carries-the-exact-figure", () => {
+		// ⚠⚠ UI-FOLLOWUP A — THIS FIXTURE IS THE ONLY REASON THE MERGED-GLOSS PATH
+		// IS VISIBLE AT ALL. Every other fixture in this file stakes `150`, which is
+		// below the market-total threshold: the compact and exact spellings agree,
+		// `dharmaExactHint` returns `null`, and the gloss renders exactly as it did
+		// before the change. A suite that only ever renders `150` would go green on
+		// a component that abbreviated nothing and hinted nothing.
+		const big = market(3, 5);
+		big.totals.dharmaStaked = "34365.000000000000000000";
+		render(<MarketHeader market={big} priceChart={null} />);
+
+		const meta = screen.getByText("Đ 34.4k staked");
+		// One phrase, one contiguous text run — the shape every DOM-walk anchor in
+		// this file depends on, asserted here on the arm where the markup COULD
+		// have gained a child element.
+		expect(meta.textContent).toBe("Đ 34.4k staked");
+		// ⛔ ONE AFFORDANCE, NOT TWO. The gloss and the exact figure share a single
+		// `InfoTip`; a nested second tip would show up as a describedby on a child.
+		expect(meta.getAttribute("aria-describedby")).toBe(
+			contentHashId(`${GLOSSARY.stakedMarket}. This market: Đ 34,365`),
+		);
+		expect(meta.querySelector("[aria-describedby]")).toBeNull();
+	});
+
+	it("market-header::a-total-below-the-threshold-carries-the-BARE-gloss", () => {
+		// The inverted half — without it the assertion above cannot distinguish
+		// "the exact figure is appended when it is hidden" from "it is always
+		// appended", and the redundant-affordance rule would be unguarded.
+		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
+
+		expect(
+			screen.getByText("Đ 150 staked").getAttribute("aria-describedby"),
+		).toBe(contentHashId(GLOSSARY.stakedMarket));
 	});
 
 	it("market-header::singular-count-takes-singular-noun", () => {

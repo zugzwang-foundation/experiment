@@ -1,6 +1,10 @@
 import { InfoTip } from "@/components/ui/info-tip";
 
-import { formatDharma, formatDharmaCompact } from "./format";
+import {
+	COMPACT_FROM_MARKET_TOTAL,
+	dharmaExactHint,
+	formatDharmaCompact,
+} from "./format";
 
 /**
  * UI-OVERNIGHT entry 1a — ONE HEADER-STAKE FIGURE, rendered once and shared by
@@ -45,19 +49,57 @@ export function CompactDharmaFigure({
 	className?: string;
 	testId?: string;
 }) {
-	const compact = formatDharmaCompact(value);
-	const exact = formatDharma(value);
 	const figure = (
 		<span data-testid={testId} className={className}>
-			Đ {compact}
+			Đ {formatDharmaCompact(value)}
 		</span>
 	);
-	if (compact === exact) {
+	// ⚠ THE "ONLY WHERE THE SHORT FORM HIDES SOMETHING" RULE MOVED TO
+	// `dharmaExactHint` and is not re-decided here. It was a call-site pattern for
+	// exactly as long as there was one call site; the market stat line is the
+	// second, and a rule spelled twice is a rule that drifts once.
+	const hint = dharmaExactHint(value);
+	if (hint === null) {
 		return figure;
 	}
 	return (
-		<InfoTip content={`Đ ${exact}`} asChild>
+		<InfoTip content={hint} asChild>
 			{figure}
+		</InfoTip>
+	);
+}
+
+/**
+ * The market stat line's staked TOTAL — the number ALONE, with no `Đ` glyph, and
+ * the same conditional exact-value tooltip `CompactDharmaFigure` carries.
+ *
+ * ⛔ NO GLYPH, AND THAT IS WHY THIS IS A SECOND COMPONENT RATHER THAN A PROP ON
+ * THE FIRST. All three stat-line surfaces already own their `Đ`: `StatLine` hangs
+ * the `GLOSSARY.dharma` gloss on it, and `FocusMarketCard` spells it inline
+ * inside a `Đ … staked` phrase. Swallowing the glyph here would either delete a
+ * wired info affordance or split a phrase that reads as one.
+ *
+ * ⚠⚠ IT RENDERS NO ELEMENT AT ALL WHEN THERE IS NOTHING TO REVEAL, and that is
+ * deliberate rather than incidental. Below the threshold the compact and exact
+ * spellings agree, so a wrapper would buy nothing and cost something real: the
+ * surrounding phrase stops being one contiguous run of text nodes, which is what
+ * `getByText("Đ 150 staked")` and every `innerHTML` ordering assertion in
+ * `market-header.test.tsx` match on. A fragment keeps the small case
+ * byte-identical to what shipped and confines the new markup to the large one.
+ *
+ * ⚠ `COMPACT_FROM_MARKET_TOTAL`, not the header-stake threshold — see the two
+ * constants' own docblock for why a total abbreviates a decade earlier than a
+ * stake does.
+ */
+export function MarketTotalDharma({ value }: { value: string }) {
+	const compact = formatDharmaCompact(value, COMPACT_FROM_MARKET_TOTAL);
+	const hint = dharmaExactHint(value, COMPACT_FROM_MARKET_TOTAL);
+	if (hint === null) {
+		return <>{compact}</>;
+	}
+	return (
+		<InfoTip content={hint} asChild>
+			<span>{compact}</span>
 		</InfoTip>
 	);
 }

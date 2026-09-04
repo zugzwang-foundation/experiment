@@ -1,19 +1,24 @@
-import { formatDharma } from "@/components/debate/format";
+import { MarketTotalDharma } from "@/components/debate/DharmaFigure";
 import { InfoTip } from "@/components/ui/info-tip";
 import { GLOSSARY } from "@/lib/copy/glossary";
 
 /**
  * The card/hero stat line — `Đ staked · posts · replies` (design-language
  * §3.2; the committed mockup's attrs grammar: bold value, ` | ` separators).
- * `formatDharma` REUSED from the debate formatters — still no new formatter,
- * which is the point: it is the single shared display formatter for every Đ
- * value rendered to a user (SPEC.1 §10.8), and it both rounds to 0 dp and
- * GROUPS the integer part in threes with a literal ASCII comma.
+ * The Đ figure is the debate surface's `MarketTotalDharma` — still no new
+ * formatter, which is the point: it composes `formatDharmaCompact` at the
+ * market-total threshold over the same single shared display formatter
+ * (`formatDharma`, SPEC.1 §10.8), which both rounds to 0 dp and GROUPS the
+ * integer part in threes with a literal ASCII comma.
+ * ⚠ THIS LINE READ "`formatDharma` REUSED" and the reuse is now one level up:
+ * below a thousand the rendered string is byte-identical to what that formatter
+ * printed, and at or above it the abbreviated spelling takes over with the exact
+ * figure on a tooltip (UI-FOLLOWUP A).
  *
  * ONE component, TWO surfaces: this line is what both the discovery card and
- * the hero panel render, which is why `market-card.test.tsx:65` and
- * `hero-panels.test.tsx:103` assert the same `Đ 14,260 staked` string off the
- * same `data-testid="stat-line"`.
+ * the hero panel render, which is why `market-card.test.tsx` and
+ * `hero-panels.test.tsx` assert the same `Đ 14.3k staked` string off the same
+ * `data-testid="stat-line"`.
  *
  * SUPERSEDED, recorded so it cannot be mistaken for governing: this comment
  * previously read "pure string trimming of the NUMERIC(38,18) scale — no new
@@ -61,7 +66,14 @@ export function StatLine({
 				<InfoTip content={GLOSSARY.dharma} asChild>
 					<span>Đ</span>
 				</InfoTip>{" "}
-				{formatDharma(totals.dharmaStaked)}
+				{/* ⚠ UI-FOLLOWUP A — the total ABBREVIATES from a thousand
+				    (`Đ 34.4k`), with the exact figure on a tooltip where the two
+				    spellings differ. It is the widest field on a fixed-width card and
+				    the only one that grows without bound; the counts beside it cannot.
+				    ⛔ The `Đ` glyph stays OUTSIDE it, keeping the `GLOSSARY.dharma`
+				    gloss above on the glyph and the exact figure on the number — two
+				    tips as siblings, never nested. */}
+				<MarketTotalDharma value={totals.dharmaStaked} />
 			</b>{" "}
 			<InfoTip content={GLOSSARY.stakedMarket} asChild>
 				<span>staked</span>

@@ -4,6 +4,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { MarketCard } from "@/components/discovery/MarketCard";
+import { contentHashId } from "@/components/ui/info-tip";
 import type { DiscoveryCard } from "@/server/discovery/list";
 
 import { MARKET_ID, SLUG } from "../../composer/render/_harness";
@@ -13,7 +14,8 @@ import { MARKET_ID, SLUG } from "../../composer/render/_harness";
  * composition: image thumb (alt `""` since PRIMITIVES-2 D4, which supersedes
  * the OQ-6 dynamic-alt rule at this site; null image → the canon §6 `IMG`
  * placeholder, no img element) ·
- * question · StatLine (the canon attrs grammar over the REUSED formatDharma)
+ * question · StatLine (the canon attrs grammar over the shared formatter,
+ * ABBREVIATED at the market-total threshold since UI-FOLLOWUP A)
  * · the REUSED debate PriceBar (F-6 — no fresh
  * bar; null pricing → its "Pricing unavailable" stub). One next/link anchor
  * wraps the whole card → `/m/[slug]`; `active` marks the carousel-ring hook
@@ -74,14 +76,23 @@ describe("UI.A4 §4 — MarketCard (the §3.2 locked composition)", () => {
 		expect(img?.getAttribute("src")).toBe(IMAGE_URL);
 		// The question.
 		expect(screen.getByText(MARKET_TITLE).textContent).toBe(MARKET_TITLE);
-		// Stat line — formatDharma REUSED, and it GROUPS: every Đ value rendered
-		// to a user groups its integer part in threes with a literal ASCII comma
-		// (SPEC.1 §10.8, 1.0.29 — the same-commit rider). The pre-ruling `Đ 14260`
-		// this line used to pin was a docket, not a baseline: discovery staked
-		// totals rendered ungrouped beside composers that grouped.
+		// Stat line — the shared display formatter, ABBREVIATED at the market-total
+		// threshold (UI-FOLLOWUP A): a total is glanced at, not compared, and it is
+		// the one field on this fixed-width card that grows without bound.
+		// ⚠ THE GROUPING RULE IS NOT REPEALED — it is what `formatDharma` still does
+		// below Đ1,000 and what the tooltip below prints in full. The pre-ruling
+		// `Đ 14260` this line once pinned was a docket, not a baseline: discovery
+		// staked totals rendered ungrouped beside composers that grouped
+		// (SPEC.1 §10.8, 1.0.29).
 		const statLine = screen.getByTestId("stat-line");
 		const statText = statLine.textContent ?? "";
-		expect(statText).toContain("Đ 14,260 staked");
+		expect(statText).toContain("Đ 14.3k staked");
+		// The exact figure is not lost — it rides the abbreviated number as the
+		// conditional `InfoTip` gloss, which is the half a text assertion alone
+		// would let regress silently.
+		expect(screen.getByText("14.3k").getAttribute("aria-describedby")).toBe(
+			contentHashId("Đ 14,260"),
+		);
 		expect(statText).toContain("28 posts");
 		expect(statText).toContain("68 replies");
 		// HTML-FINISH row 1 — NO price chart on the tile. Asserted as an absence

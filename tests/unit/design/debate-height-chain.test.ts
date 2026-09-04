@@ -331,13 +331,39 @@ describe("debate height chain — the headzone band does not grow", () => {
 		expect(classes).toContain("flex");
 		expect(classes.filter((c) => FORBIDDEN_HEIGHT.test(c))).toEqual([]);
 
-		// ⚠ THE RAIL STOPS STRETCHING, AND ONLY AT `lg`. On a content-sized band a
-		// stretched rail is as tall as whatever the post happens to say. Below
-		// `lg` the band is `flex-col`, where `items-start` would shrink the reading
-		// column to its content WIDTH — this is a desktop-only change and the
-		// breakpoint prefix is what keeps it one.
+		// ⚠⚠ `lg:items-start` STAYS ON THE CONTAINER, AND THE RAIL IS STRETCHED BY
+		// NAME INSTEAD (`lg:self-stretch`, asserted in its own test below).
+		// UI-FOLLOWUP B wanted the rail to fill the band — `FocusMarketCard` now
+		// carries a return line pinned to its floor, so the height has somewhere to
+		// go. Taking the alignment off the CONTAINER achieves that and also
+		// stretches `headzone-left`, which is the half that breaks: MEASURED at
+		// 1440, the post arm's `aspect-[16/9] self-stretch` image re-resolved from
+		// 146.46px to 278.57px wide, the title column lost that width, a
+		// 99-character title wrapped to a second line (h2 24.75 → 49.49px) and the
+		// Support / Counter bar overflowed the header block by 8px — entry 3's own
+		// clip, returning through the fix for it.
+		// ⇒ The container's alignment is therefore LOAD-BEARING FOR THE READING
+		// COLUMN, not merely left over from entry 3, and this assertion holds it.
+		// ⚠ Still `lg:`-prefixed and never bare: below `lg` the band is `flex-col`,
+		// where `items-start` would shrink the reading column to its content WIDTH.
 		expect(classes).toContain("lg:items-start");
 		expect(classes).not.toContain("items-start");
+	});
+
+	it("debate-height::the-RAIL-is-stretched-by-NAME-not-by-the-containers-alignment", () => {
+		// ⛔ THE OTHER HALF OF THE PAIR ABOVE, AND NEITHER IS MEANINGFUL ALONE. The
+		// band keeps `lg:items-start` so the reading column's geometry is untouched;
+		// the rail opts out of it so `FocusMarketCard` reaches the reading column's
+		// bottom edge and its `mt-auto` return line has a floor to sit on. Drop this
+		// and the card is content-height again with dead space under it; drop the
+		// container's `items-start` instead and a long title overflows the block.
+		// ⚠ It is `lg:`-scoped for the same reason the container's alignment is:
+		// below `lg` the two columns STACK, and stretching a stacked rail means
+		// nothing.
+		const source = read(HEADZONE);
+		const right = bandClasses(source, HEADZONE, "headzone-right");
+		expect(right).toHaveLength(1);
+		expect(right[0]).toContain("lg:self-stretch");
 	});
 
 	it("debate-height::both-headzone-columns-may-shrink-below-their-content", () => {

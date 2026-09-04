@@ -11,7 +11,11 @@ import {
 	hasRenderableSeries,
 	MarketPriceChartHost,
 } from "./chart/MarketPriceChartHost";
-import { formatDharma } from "./format";
+import {
+	COMPACT_FROM_MARKET_TOTAL,
+	dharmaExactHint,
+	formatDharmaCompact,
+} from "./format";
 import { HeadZone } from "./HeadZone";
 import { MarketMediaPanel } from "./MarketMediaPanel";
 import { PriceBar } from "./PriceBar";
@@ -33,6 +37,18 @@ const TERMINAL: ReadonlySet<string> = new Set([
  * cannot be imported without widening that module's surface.
  */
 const noun = (n: number, one: string, many: string) => (n === 1 ? one : many);
+
+/**
+ * Append an abbreviated figure's exact value to a gloss, or return the gloss
+ * untouched when there is nothing hidden to reveal (UI-FOLLOWUP A).
+ *
+ * ⚠ THE `null` ARM IS THE POINT. `dharmaExactHint` returns `null` below the
+ * threshold, where the compact and exact spellings are the SAME string — and a
+ * gloss ending "this market: Đ 435" beside a figure already reading `Đ 435` is
+ * the redundant affordance UI-OVERNIGHT entry 1a took care not to build.
+ */
+const joinGloss = (gloss: string, hint: string | null) =>
+	hint === null ? gloss : `${gloss}. This market: ${hint}`;
 
 /**
  * `.attrs .sep` (`d5:502`) — the middle dot between the three stat fields:
@@ -473,9 +489,39 @@ export function MarketHeader({
 							    for one call site — so this bump reads as denser, more legible
 							    figures within the SAME row height, not a taller row. */}
 							<div className="flex min-w-0 flex-wrap items-center gap-y-1 text-[13px] font-bold text-ink">
-								<InfoTip content={GLOSSARY.stakedMarket} asChild>
+								{/* ⚠⚠ UI-FOLLOWUP A — THE EXACT FIGURE RIDES THE GLOSS RATHER THAN A
+								    SECOND TOOLTIP, AND THAT IS THE ONE THING THIS SITE DOES DIFFERENTLY
+								    FROM `StatLine` AND `FocusMarketCard`. Both of those hang the exact
+								    value on the NUMBER, because the number is a free element there. Here
+								    the whole `Đ … staked` phrase is ALREADY an `InfoTip` host, so a second
+								    tip inside it would NEST two info affordances on one run of text: a
+								    hover over the number opens the inner tip and — the event bubbling to
+								    the outer trigger — the gloss on top of it. Two popups, one anchor, at
+								    every market past a thousand Đ.
+								    ⇒ ONE AFFORDANCE CARRYING BOTH FACTS. A reader who opens it wanted to
+								    know what `staked` counts or what `34.4k` hides, and gets either.
+								    ⛔ THE PHRASE STAYS ONE CONTIGUOUS TEXT RUN — no child element is
+								    introduced, which is what keeps `market-header.test.tsx`'s five
+								    `getByText("Đ 150 staked")` DOM-walk anchors and its two `innerHTML`
+								    ordering assertions matching. Splitting it would have reddened them for
+								    a reason unrelated to anything they guard. */}
+								<InfoTip
+									content={joinGloss(
+										GLOSSARY.stakedMarket,
+										dharmaExactHint(
+											market.totals.dharmaStaked,
+											COMPACT_FROM_MARKET_TOTAL,
+										),
+									)}
+									asChild
+								>
 									<span>
-										Đ {formatDharma(market.totals.dharmaStaked)} staked
+										Đ{" "}
+										{formatDharmaCompact(
+											market.totals.dharmaStaked,
+											COMPACT_FROM_MARKET_TOTAL,
+										)}{" "}
+										staked
 									</span>
 								</InfoTip>
 								<AttrSep />

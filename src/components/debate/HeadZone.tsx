@@ -23,12 +23,33 @@ import type { ReactNode } from "react";
  * `shrink-0` and `min-h-0` are kept — the band still does not grow into the
  * arena's space, and it still may shrink below its content when the page is
  * short, which is the one-screen chain's link.
- * ⚠ `lg:items-start` — the rail stops STRETCHING to the reading column's
- * height. On a content-sized band a stretched rail would be as tall as whatever
- * the post happens to say, which is how a market card ends up with a hundred
- * pixels of empty border under it. Scoped to `lg` because below it the band is
- * `flex-col` and `items-start` would shrink the reading column to its content
- * WIDTH — a desktop-only change stays a desktop-only change.
+ * ⚠⚠ `lg:items-start` STAYS, AND THE RAIL STRETCHES ANYWAY — THE ALIGNMENT IS
+ * ON THE ITEM, NOT THE CONTAINER (`lg:self-stretch`, on `headzone-right`).
+ *
+ * Entry 3 added `lg:items-start` for a reason that no longer holds: "on a
+ * content-sized band a stretched rail would be as tall as whatever the post
+ * happens to say, which is how a market card ends up with a hundred pixels of
+ * empty border under it." That was true of a rail whose card ENDED where its
+ * content ended. `FocusMarketCard` now closes with a return line pinned to its
+ * own floor, so the reclaimed height is spent on the affordance that says what
+ * the card is for. The rail should stretch.
+ *
+ * ⛔⛔ BUT TAKING `items-start` OFF THE CONTAINER STRETCHES `headzone-LEFT` TOO,
+ * AND THAT BREAKS THE READING COLUMN — MEASURED AT 1440, NOT REASONED. The post
+ * arm's image placeholder is `aspect-[16/9] w-auto self-stretch`, so its WIDTH is
+ * derived from its height; stretching the left column changes whether that height
+ * is definite when the aspect ratio resolves, and the box went **146.46px →
+ * 278.57px** wide. The title column lost that width, a 99-character title wrapped
+ * from one line to two (h2 **24.75 → 49.49px**), and the Support / Counter bar
+ * beneath it overflowed the header block by **8px** — landing 8.12px BELOW the
+ * band, which is entry 3's own defect returning through the fix for it.
+ * ⇒ So the rail is stretched BY NAME. `headzone-left` keeps the alignment it had
+ * and its geometry is byte-identical to the pre-change render; only the rail's
+ * cross-axis size changes, which is the whole of what was asked for.
+ *
+ * ⚠ THE CLIP CANNOT COME BACK EITHER WAY: entry 3's clip was `basis-[24.2dvh]`
+ * plus `overflow-hidden` — a DECLARED height containing its own overflow — and
+ * both are still absent, so the band is still sized by its content.
  */
 const BAND_DECLARED =
 	"flex min-h-0 shrink-0 basis-[24.2dvh] flex-col gap-5 overflow-hidden lg:flex-row";
@@ -257,8 +278,20 @@ export function HeadZone({
 					// itself and its wide-viewport position are UNCHANGED — this is a
 					// visibility toggle on the container, not a resize of what's
 					// inside it.
+					// ⚠⚠ `lg:self-stretch` — THE RAIL FILLS THE BAND, BY NAME RATHER THAN
+					// BY ITS CONTAINER'S ALIGNMENT. The post arm's band carries
+					// `lg:items-start`, and `BAND_CONTENT_SIZED`'s docblock carries the
+					// measurement that keeps it there — taking it off the CONTAINER also
+					// stretches the reading column, which re-resolves the post image's
+					// aspect ratio and wraps a long title into the Support / Counter bar.
+					// This opts THIS column out of it instead, so the market card reaches
+					// the reading column's bottom edge and its return line is pinned to a
+					// floor that exists.
+					// ⛔ A NO-OP ON THE MARKET ARM, whose band never declared `items-start`
+					// — stretch is already the default there. One arm changes, and this
+					// says which.
 					data-testid="headzone-right"
-					className="hidden w-[340px] min-w-0 shrink-0 flex-col gap-3 lg:flex"
+					className="hidden w-[340px] min-w-0 shrink-0 flex-col gap-3 lg:flex lg:self-stretch"
 				>
 					{right}
 				</div>
