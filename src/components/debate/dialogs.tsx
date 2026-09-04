@@ -12,7 +12,6 @@ import {
 
 import { AggregateFooter } from "./AggregateFooter";
 import { ArgProfile } from "./ArgProfile";
-import { LaneBadge } from "./badges";
 import type { PresentPost, PresentReply } from "./types";
 
 /**
@@ -92,6 +91,13 @@ export function PostPopup({
 							    UNWIRE-1 — `bookmarks`/`showActions` dropped: `ArgProfile` no
 							    longer renders any action cluster (SUB-3), so this call site's
 							    own former no-cluster instruction has nothing left to say. */}
+							{/* ⚠ UI-OVERNIGHT entry 1b — the lane badge is inside the author
+							    row now, beside the age, so it is passed rather than placed.
+							    ⛔ THE WRAPPING `div` STAYS, unlike at the two card mounts.
+							    `DialogDescription asChild` merges its `id` onto its child,
+							    and the dialog's `aria-describedby` points at that id — merged
+							    onto a COMPONENT instead of a DOM node it would be dropped,
+							    and the description would describe nothing. */}
 							<DialogDescription asChild>
 								<div className="flex flex-wrap items-center gap-1.5">
 									<ArgProfile
@@ -103,9 +109,9 @@ export function PostPopup({
 										originalStake={post.authorStakeOriginal}
 										sold={post.authorSold}
 										createdAt={post.createdAt}
+										badge={post.badge}
 										download
 									/>
-									<LaneBadge badge={post.badge} />
 								</div>
 							</DialogDescription>
 						</DialogHeader>

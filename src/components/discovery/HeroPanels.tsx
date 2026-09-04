@@ -3,9 +3,10 @@ import type { RefObject } from "react";
 
 import { SideBadge } from "@/components/debate/badges";
 import { computeSplitBar } from "@/components/debate/composer/split-bar";
-import { formatDharma } from "@/components/debate/format";
+import { formatDharma, formatDharmaCompact } from "@/components/debate/format";
 import { PriceBar } from "@/components/debate/PriceBar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { InfoTip } from "@/components/ui/info-tip";
 import { RelativeTime } from "@/components/ui/relative-time";
 import type { HeroPost, HeroTopPosts } from "@/server/discovery/hero";
 import type { DiscoveryCard } from "@/server/discovery/list";
@@ -265,6 +266,18 @@ function HeroPostPanel({
 		);
 	}
 
+	// UI-OVERNIGHT entry 1a — the head stake's two spellings. The exact one is
+	// the WHOLE unit (both figures and the arrow) so the tooltip answers for
+	// what the row actually shows.
+	const exactStake =
+		post.currentValue === null
+			? `Đ ${formatDharma(post.authorStake)}`
+			: `Đ ${formatDharma(post.authorStake)} → Đ ${formatDharma(post.currentValue)}`;
+	const compactStake =
+		post.currentValue === null
+			? `Đ ${formatDharmaCompact(post.authorStake)}`
+			: `Đ ${formatDharmaCompact(post.authorStake)} → Đ ${formatDharmaCompact(post.currentValue)}`;
+
 	return (
 		// `relative` is load-bearing for V18's stretched link below.
 		<div
@@ -300,15 +313,28 @@ function HeroPostPanel({
 				    THIS post's own entry bet, the right the author's current value on
 				    the side they argued. `null` — no pool, no holding, exited, or
 				    flipped — renders the single figure with NO arrow. */}
-				<span className="font-mono font-bold text-n6">
-					Đ {formatDharma(post.authorStake)}
+				{/* ⚠ UI-OVERNIGHT entry 1a — ABBREVIATED past Đ10,000, the same rule
+				    the debate and profile head clusters carry, because this is the same
+				    element: a post card's header stake. It matters MORE here than
+				    anywhere else — PD-2-36 records this row as Discovery's binding
+				    horizontal-overflow constraint, and it is `flex-nowrap
+				    overflow-hidden`, so an exact six-figure pair does not wrap, it
+				    DISAPPEARS off the clip edge.
+				    ⛔ BOTH FIGURES OR NEITHER. The progression is read as a comparison;
+				    spelling one side exactly and the other abbreviated would invite the
+				    reader to compare two different units.
+				    ⚠ The tooltip carries the exact pair — one attribute on the unit
+				    rather than two, because the arrow makes it one figure to a reader
+				    and `title` on a nested span would only answer for half of it. */}
+				<HeroStakeTip exact={exactStake} compact={compactStake}>
+					Đ {formatDharmaCompact(post.authorStake)}
 					{post.currentValue !== null && (
 						<>
 							<span className="mx-[2px] font-normal text-n4">→</span>Đ{" "}
-							{formatDharma(post.currentValue)}
+							{formatDharmaCompact(post.currentValue)}
 						</>
 					)}
-				</span>
+				</HeroStakeTip>
 				{/* TIME-1 · Form B — HOW LONG AGO, LAST ON THE ROW.
 				    `HeroPost.createdAt` has been on the read model since the hero
 				    shipped (`server/discovery/hero.ts:117`); nothing new is queried,
@@ -581,5 +607,42 @@ function SupportCounterBar({
 				</span>
 			</span>
 		</div>
+	);
+}
+
+/**
+ * UI-OVERNIGHT entry 1a — the hero head stake's tooltip, attached only when the
+ * abbreviated spelling actually hides something.
+ *
+ * ⛔ NOT `CompactDharmaFigure`, and the difference is the ARROW. That component
+ * renders ONE figure; this row renders a PROGRESSION — entry stake → current
+ * value — which a reader takes as a single comparison. One tip over the pair
+ * answers the question the pair asks ("what are these two numbers?"); two tips,
+ * one per figure, would answer half of it twice.
+ *
+ * ⚠ It wraps rather than replaces: the span, its class string and its children
+ * are exactly what shipped, so `hero-panels.test.tsx`'s reads of this row are
+ * untouched when the figures are small enough to render exactly — which is
+ * every fixture it carries.
+ */
+function HeroStakeTip({
+	exact,
+	compact,
+	children,
+}: {
+	exact: string;
+	compact: string;
+	children: React.ReactNode;
+}) {
+	const figure = (
+		<span className="font-mono font-bold text-n6">{children}</span>
+	);
+	if (exact === compact) {
+		return figure;
+	}
+	return (
+		<InfoTip content={exact} asChild>
+			{figure}
+		</InfoTip>
 	);
 }

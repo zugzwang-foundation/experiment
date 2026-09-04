@@ -121,6 +121,32 @@ function bandClasses(source: string, file: string, testid: string): string[][] {
 }
 
 /**
+ * A band's class string read off a NAMED CONSTANT rather than off the element.
+ *
+ * ⚠⚠ WHY THIS EXISTS — UI-OVERNIGHT entry 3. The headzone frame now serves two
+ * bands: the market arm keeps the declared viewport fraction, and the POST arm
+ * is content-sized, because a fixed band was clipping the Support/Counter bar
+ * and the stake summary at the foot of the focused post. So the element takes
+ * `className={fit ? A : B}` and the literal-attribute reader above cannot see
+ * either string.
+ * ⛔ IT STILL READS THE SHIPPED FILE. This is the V-register discipline the
+ * header states: the constant is the string the component renders, not a
+ * lookalike rebuilt in the test. What changed is where in the file it is
+ * written, which is exactly the "re-derive this chain rather than deleting the
+ * guard" the thrower above asks for.
+ */
+function constClasses(source: string, file: string, name: string): string[] {
+	const m = source.match(new RegExp(`const ${name} =\\s*\n?\\s*"([^"]*)"`));
+	if (m === null) {
+		throw new Error(
+			`${file}: no band constant named ${name}. If the headzone frame was ` +
+				`restructured, re-derive this chain rather than deleting the guard.`,
+		);
+	}
+	return (m[1] ?? "").split(/\s+/).filter(Boolean);
+}
+
+/**
  * ⛔ THE FORBIDDEN SET. A FIXED height clips: content taller than the box is
  * simply lost, with no scroll and no overflow. `(public)/layout.tsx` rules
  * `min-h-*`, never `h-*`, on this chain, and unlike the profile this route
@@ -204,15 +230,26 @@ describe("debate height chain — the source", () => {
 
 describe("debate height chain — the headzone band does not grow", () => {
 	it("debate-height::headzone-is-declared-and-does-NOT-grow", () => {
-		const [classes, ...extra] = bandClasses(
-			read(HEADZONE),
-			HEADZONE,
-			"headzone",
-		);
+		// ⚠⚠ THE MARKET ARM'S BAND, READ OFF ITS CONSTANT. Until UI-OVERNIGHT
+		// entry 3 this was a literal `className` on the element; the frame now
+		// serves two bands and the element chooses between them, so the string is
+		// read where it is now written. ⛔ The assertions below are UNCHANGED —
+		// every one of them still holds of this band, and the post arm's band is
+		// held to its own set in the test after this one.
+		const classes = constClasses(read(HEADZONE), HEADZONE, "BAND_DECLARED");
 
-		// One frame, ONE authoring site. Two would be the duplicated grid
-		// class-set this component exists to prevent.
-		expect(extra).toEqual([]);
+		// One frame, ONE authoring site per arm. A second literal `className` on
+		// the element would be the duplicated grid class-set this component exists
+		// to prevent.
+		// ⚠ COUNTED DIRECTLY, NOT THROUGH `bandClasses` — that helper THROWS on
+		// zero, which is the state this line asserts. Reading a literal back onto
+		// the element would put a third band in the file that neither constant
+		// describes and neither arm's assertions reach.
+		expect(
+			read(HEADZONE).match(/"headzone"\s+className="/g),
+			"the headzone element carries a literal className again — the band " +
+				"belongs in its constant, where both arms can be read",
+		).toBeNull();
 
 		// The mockup's `.headzone{flex:0 0 …}` — it does not grow and it does not
 		// shrink. The LENGTH is deliberately not carried (it is a mockup value);
@@ -261,6 +298,46 @@ describe("debate height chain — the headzone band does not grow", () => {
 		expect(classes.some((c) => /^basis-\[\d+(\.\d+)?dvh\]$/.test(c))).toBe(
 			true,
 		);
+	});
+
+	it("debate-height::the-POST-arm-band-is-content-sized-and-still-does-not-grow", () => {
+		// ⚠⚠ THE SECOND BAND, ADDED AT UI-OVERNIGHT entry 3, AND IT IS A REAL
+		// DIVERGENCE RATHER THAN A COPY. The declared band is a bet that the arm's
+		// content fits inside a fraction of the viewport. The market arm can make
+		// that bet — its contents are chrome, and a clipped resolver card costs a
+		// reader nothing. The post arm cannot: its contents END IN A CONTROL, the
+		// Support/Counter bar plus the stake summary under it, and the band's own
+		// `overflow-hidden` removed them from the surface whose purpose is
+		// replying. Silently, because a full-looking band looks correct.
+		const classes = constClasses(
+			read(HEADZONE),
+			HEADZONE,
+			"BAND_CONTENT_SIZED",
+		);
+
+		// ⛔ WHAT IT GIVES UP, ASSERTED: the fraction and the containment. Those
+		// two together ARE the clip.
+		expect(classes.some((c) => /^basis-\[/.test(c))).toBe(false);
+		expect(classes).not.toContain("overflow-hidden");
+
+		// ⛔ AND WHAT IT KEEPS, WHICH IS THE REST OF THE CHAIN. The band still does
+		// not GROW into the arena's space, still may shrink below its content, and
+		// still declares no fixed height — so `PageContainer`'s one-screen ruling
+		// is untouched and the arena is still the thing that takes the remainder.
+		expect(classes).toContain("shrink-0");
+		expect(classes).not.toContain("flex-1");
+		expect(classes).not.toContain("grow");
+		expect(classes).toContain("min-h-0");
+		expect(classes).toContain("flex");
+		expect(classes.filter((c) => FORBIDDEN_HEIGHT.test(c))).toEqual([]);
+
+		// ⚠ THE RAIL STOPS STRETCHING, AND ONLY AT `lg`. On a content-sized band a
+		// stretched rail is as tall as whatever the post happens to say. Below
+		// `lg` the band is `flex-col`, where `items-start` would shrink the reading
+		// column to its content WIDTH — this is a desktop-only change and the
+		// breakpoint prefix is what keeps it one.
+		expect(classes).toContain("lg:items-start");
+		expect(classes).not.toContain("items-start");
 	});
 
 	it("debate-height::both-headzone-columns-may-shrink-below-their-content", () => {

@@ -1552,7 +1552,7 @@ describe("POSREV-1 item D — Đ on the positions table's value figures", () => 
 	 */
 	const VISITOR_PAYLOAD = { owner: false as const, rows: [ROW_OPEN] };
 
-	it("itemD::BOTH-value-figures-carry-the-glyph", () => {
+	it("itemD::the-tiles-ONE-value-figure-carries-the-glyph-and-its-space", () => {
 		// ⚠ "BOTH" NOW MEANS THE TWO FIGURES IN THE CURRENT CELL — the value and its
 		// delta. It used to mean the group header's Đb and the tile's Current;
 		// POSREV-POLISH P-1 removed that header, so the pair being held to the
@@ -1574,16 +1574,22 @@ describe("POSREV-1 item D — Đ on the positions table's value figures", () => 
 			value.codePointAt(0),
 			`item D: the tile Current figure must start with Đ (U+0110). Got "${value}".`,
 		).toBe(0x110);
-		const staked = (
-			screen.getByTestId(`tile-staked-inline-${L1}`).textContent ?? ""
-		).trim();
-		const at = staked.indexOf("Đ");
-		expect(
-			staked.codePointAt(at),
-			`item D: the staked figure must carry Đ (U+0110). Got "${staked}".`,
-		).toBe(0x110);
-		// ⛔ AND THE SPACE, which is the whole of item D: `Đ 25`, never `Đ25`.
-		expect(staked).not.toMatch(/Đ[0-9]/);
+		// ⛔ AND THE SPACE, which is the whole of item D: `Đ 31`, never `Đ31`.
+		expect(value).not.toMatch(/Đ[0-9]/);
+
+		// ⚠⚠ "BOTH" HAS MOVED A THIRD TIME, AND THIS TIME IT MOVED TO ONE.
+		// UI-OVERNIGHT entry 2 removes `· staked Đ n` from the argument cell's
+		// sub-line — the founder's ruling that a figure the row already prints in
+		// its own column read, inside a grey line under the title, as part of the
+		// market's NAME. So the tile now carries exactly one Đ figure and the
+		// all-or-none discipline has one member.
+		// ⛔ THE PAIR IS ASSERTED AS ABSENT RATHER THAN THE TEST BEING NARROWED
+		// SILENTLY: the denominator's node must be gone, or this test would keep
+		// its name while quietly checking half of what it says.
+		// ⚠ THE COST R-3 NAMED IS NOW PAID: the percentage in the Current cell has
+		// no visible denominator. Reported in the run report, not absorbed here.
+		expect(screen.queryByTestId(`tile-staked-inline-${L1}`)).toBeNull();
+		expect(screen.queryByText(/staked Đ/)).toBeNull();
 	});
 
 	it("itemD::the-rendered-strings-are-exactly-the-expected-shape", () => {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { ArgProfile } from "@/components/debate/ArgProfile";
@@ -145,5 +145,104 @@ describe("RANK-1 — the rendered stake follows the ruler (ADR-0039 R6)", () => 
 			null,
 		);
 		expect(container.querySelector('[data-testid="argstake-sold"]')).toBe(null);
+	});
+});
+
+/**
+ * UI-OVERNIGHT entry 1a — the header stake ABBREVIATES past Đ10,000, and the
+ * exact figure survives on the element's tooltip.
+ *
+ * ⚠ WHY IT IS GUARDED AT THE RENDER AND NOT ONLY AT THE FORMATTER.
+ * `tests/unit/debate/format.test.ts` proves the rule; this proves the ROW USES
+ * IT. Those are two claims, and the second is the one that was broken before
+ * this task: a correct formatter that no card calls changes nothing on screen.
+ *
+ * ⚠ THE STRIKE-THROUGH COMPARISON MOVED WITH IT, and that is the non-obvious
+ * half. It compares the two stakes AS RENDERED — so two figures that both print
+ * `Đ 12.5k` are one number to the reader and only one is drawn. Comparing the
+ * stored values there would print `Đ 12.5k  ~~Đ 12.5k~~`, which says a stake
+ * moved while showing that it did not.
+ */
+describe("UI-OVERNIGHT 1a — the header stake abbreviates", () => {
+	it("arg-stake::under-the-threshold-renders-the-exact-grouped-figure", () => {
+		const { container } = renderStake({ authorStake: "9999" });
+		expect(container.textContent).toContain("Đ 9,999");
+		// ⚠ READ OFF `textContent`, NOT `innerHTML`: a bare `k` occurs in a dozen
+		// Tailwind class names on this row, so the same assertion over the markup
+		// is red for a reason that has nothing to do with the figure.
+		expect(container.textContent).not.toContain("Đ 10k");
+	});
+
+	it("arg-stake::at-and-past-the-threshold-renders-the-k-form", () => {
+		const { container } = renderStake({ authorStake: "12500" });
+		expect(container.textContent).toContain("Đ 12.5k");
+		// Non-vacuity: the exact spelling is GONE from the row, not merely joined.
+		expect(container.textContent).not.toContain("12,500");
+	});
+
+	it("arg-stake::the-abbreviated-figure-carries-the-exact-value", async () => {
+		const { container } = renderStake({ authorStake: "12500" });
+		const figure = container.querySelector(
+			'.font-mono:not([data-slot="badge"])',
+		) as HTMLElement;
+		expect(figure.textContent).toBe("Đ 12.5k");
+		// INFO-1's affordance, merged onto the figure (`asChild`) rather than
+		// wrapping it — so the tip is reachable by pointer AND by tap, which a
+		// native `title` is not.
+		const describedBy = figure.getAttribute("aria-describedby");
+		expect(describedBy).toBeTruthy();
+		// ⛔ THE CONTENT IS PORTALLED AND ONLY EXISTS WHILE OPEN, so the exact
+		// figure is asserted after a tap rather than in the closed markup. Reading
+		// the closed DOM for it passes vacuously on `aria-describedby` alone and
+		// proves nothing about WHAT the tip says — which is the whole claim.
+		// jsdom has no `matchMedia`, so `usePointerFine` takes its unknown ⇒ touch
+		// default and this is the Popover branch (INFO-1).
+		expect(document.body.textContent).not.toContain("Đ 12,500");
+		fireEvent.click(figure);
+		await waitFor(() => {
+			expect(document.body.textContent).toContain("Đ 12,500");
+		});
+		const content = Array.from(document.querySelectorAll("[id]")).find(
+			(el) => el.textContent === "Đ 12,500",
+		);
+		expect(content?.id).toBe(describedBy);
+	});
+
+	it("arg-stake::an-unabbreviated-figure-carries-NO-tooltip", () => {
+		// A figure that already renders exactly needs no second copy of itself.
+		const { container } = renderStake({ authorStake: "1500" });
+		const figure = container.querySelector(
+			'.font-mono:not([data-slot="badge"])',
+		);
+		expect(figure?.textContent).toBe("Đ 1,500");
+		expect(figure?.getAttribute("aria-describedby")).toBeNull();
+	});
+
+	it("arg-stake::two-stakes-that-PRINT-the-same-draw-ONE-figure", () => {
+		// 12,499 and 12,500 are both `Đ 12.5k`. The strike-through exists to show
+		// movement; drawing it here would show movement that is not visible.
+		const { container } = renderStake({
+			authorStake: "12500",
+			originalStake: "12499",
+			sold: false,
+		});
+		expect(container.querySelector('[data-testid="argstake-original"]')).toBe(
+			null,
+		);
+	});
+
+	it("arg-stake::a-VISIBLE-reduction-still-strikes-the-original-through", () => {
+		// The positive control for the assertion above: when the two spellings do
+		// differ, both figures render and the original is struck.
+		const { container } = renderStake({
+			authorStake: "12500",
+			originalStake: "40000",
+			sold: false,
+		});
+		const original = container.querySelector(
+			'[data-testid="argstake-original"]',
+		);
+		expect(original?.textContent).toBe("Đ 40k");
+		expect(container.textContent).toContain("Đ 12.5k");
 	});
 });

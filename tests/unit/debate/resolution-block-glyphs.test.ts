@@ -389,8 +389,18 @@ describe("BLOCK-5b · G-g — BLOCK-4's geometry must not move", () => {
 		expect(marketHeader).toContain(
 			'className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto"',
 		);
+		// ⚠ READ OFF THE NAMED CONSTANT SINCE UI-OVERNIGHT entry 3. The band is no
+		// longer one literal on the element: the post arm is content-sized
+		// (`BAND_CONTENT_SIZED`) because a fixed fraction was clipping its reply
+		// bar, so the class string moved to a pair of consts and the element takes
+		// whichever applies. ⛔ BOTH ARE CHECKED — `gap-5` is BLOCK-4 geometry and
+		// must survive on either arm, and asserting only the one that still carries
+		// `basis-` would leave the new band free to drop it.
 		expect(headZone).toContain(
-			'className="flex min-h-0 shrink-0 basis-[24.2dvh] flex-col gap-5 overflow-hidden lg:flex-row"',
+			'"flex min-h-0 shrink-0 basis-[24.2dvh] flex-col gap-5 overflow-hidden lg:flex-row"',
+		);
+		expect(headZone).toContain(
+			'"flex min-h-0 shrink-0 flex-col gap-5 lg:flex-row lg:items-start"',
 		);
 	});
 

@@ -141,8 +141,14 @@ function focusedPost(imageUrl: string | null): DebatePost {
 		sideAtPostTime: "YES",
 		createdAt: "2026-07-30T00:00:00.000Z",
 		title: "Fixture argument title.",
+		// ⚠ UI-OVERNIGHT entry 5 — THE BODY CONTAINS ITS OWN TEASER. The wire
+		// `body` is `title\n\nextended`, and `teaser` is derived back out of it,
+		// so a fixture whose two fields disagree describes a post the product
+		// cannot write. It matters here because `Know more` now renders only when
+		// the body carries a second paragraph, and this suite reads that control
+		// as the end of the argument stack.
 		teaser: "Fixture teaser.",
-		body: "Fixture body.",
+		body: "Fixture argument title.\n\nFixture teaser.",
 		imageUrl,
 		marker: "none",
 		badge: null,
@@ -171,6 +177,13 @@ const MARKET: DebateMarketHeader = {
 	status: "Open",
 	mediaVideoUrl: null,
 	mediaImageUrl: null,
+	// ⚠ UI-OVERNIGHT entry 4 — the DISCOVERY thumbnail, distinct from
+	// `mediaImageUrl` above: the detail header takes the secondary media row,
+	// the post arm's market CARD takes the default one, because that card is
+	// the same locked composition Discovery renders. REQUIRED on the type, so a
+	// fixture that forgets it is a compile error rather than a card that
+	// silently shows the wrong picture.
+	thumbImageUrl: null,
 	pricing: { yes: "0.500000000000000000", no: "0.500000000000000000" },
 	unitToWin: { yes: "1.960000000000000000", no: "1.960000000000000000" },
 	totals: {
@@ -207,22 +220,24 @@ describe("HTML-FINISH · MARKET DETAIL — row 11, the image is a left sibling",
 		const html = row?.innerHTML ?? "";
 		const image = html.indexOf("<img");
 		const title = html.indexOf("Fixture argument title.");
-		const teaser = html.indexOf("Fixture teaser.");
+		const knowMore = html.indexOf("Know more");
 
 		expect(image).toBeGreaterThan(-1);
 		expect(title).toBeGreaterThan(-1);
 		// The mount-site claim: the image comes BEFORE the whole stack, not
 		// between the title and the body as it used to.
 		expect(image).toBeLessThan(title);
-		// ⚠ RE-DERIVED AT ROW 15, NOT RELAXED. This tail used to read
-		// `expect(title).toBeLessThan(body)` against the full body, which the
-		// focused post rendered inline. Row 15 replaced that with a TEASER plus a
-		// `+` into the pop-up, so the body is no longer in this subtree at all and
-		// the old assertion would index to -1. The property under test is
-		// unchanged — the image precedes the argument stack — and the marker moved
-		// with the render.
-		expect(teaser).toBeGreaterThan(-1);
-		expect(title).toBeLessThan(teaser);
+		// ⚠ RE-DERIVED TWICE NOW, AND NEVER RELAXED. It first read
+		// `expect(title).toBeLessThan(body)` against the full body the focused post
+		// rendered inline; row 15 replaced that with a TEASER, so the marker became
+		// the teaser. UI-OVERNIGHT entry 3 removes the teaser too — the clamped
+		// preview was costing this header the Support/Counter bar at its foot — so
+		// the marker moves again, to the control that is now the last thing in the
+		// stack. ⛔ THE PROPERTY UNDER TEST HAS NOT MOVED ONCE: the image precedes
+		// the argument stack. Only the string that stands for "the end of the
+		// stack" has, each time, with the render.
+		expect(knowMore).toBeGreaterThan(-1);
+		expect(title).toBeLessThan(knowMore);
 	});
 
 	it("comment-image::the-image-slot-does-not-grow-and-is-absent-when-there-is-none", () => {

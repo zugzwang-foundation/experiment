@@ -98,65 +98,91 @@ export async function getDefaultMarketMediaUrl(
 }
 
 /**
- * The Market-Detail header's own image (MEDIA-SECOND-ROW, SPEC.1 §9 "Market
- * media" narrowed same-commit): the market's lowest-`display_order`
- * NON-default `market_media` row, signed for read. A single sibling to
- * `getDefaultMarketMediaUrl` above — not a parameter on it — so Discovery's
- * card (`list.ts:82`) keeps calling the unmodified original and never has to
- * reason about a second argument's default.
+ * UI-OVERNIGHT entry 4 — BOTH OF A MARKET'S RENDERED IMAGES, IN ONE STATEMENT.
  *
- * One query does both jobs `ORDER BY is_default ASC, display_order ASC, id
- * ASC LIMIT 1`: SQL boolean ordering sorts `false` before `true`, so a
- * non-default row (any `display_order`) always outranks the default row when
- * one exists. When a market carries only its single `is_default` row (every
- * market today), that row is the only candidate and is returned — the
- * fallback in item 3 of the plan, expressed as the natural result of the
- * `ORDER BY`, not a branch. This is the zero-extra-round-trip shape ADR-0026
- * Driver 8 requires: one `SELECT`, same as `getDefaultMarketMediaUrl` issues
- * today, never two.
+ * ⚠⚠ THIS SUPERSEDES `getSecondaryMarketMediaUrl`, WHICH IS DELETED IN THE SAME
+ * COMMIT. That function resolved the header's image with the identical
+ * `ORDER BY` and a `LIMIT 1`; keeping it beside this one would have put the same
+ * ordering rule — including the `id ASC` tiebreak that stops the header
+ * flickering between two rows across polls — in two places, free to drift. Its
+ * integration coverage is re-pointed here rather than dropped, so the rule is
+ * still measured against a real database and is now measured on both arms.
  *
- * ⚠ `id ASC` is a deterministic tiebreaker, not decoration: `display_order`
- * carries no DB-level uniqueness constraint (`market_media_market_id_idx`
- * only, no `(market_id, display_order)` unique index — the admin-form write
- * path assigns it sequentially but nothing enforces that at the row level,
- * and the plan's raw-insert data step bypasses the service entirely). Two
- * non-default rows sharing a `display_order` would otherwise leave Postgres
- * free to return either on any given call — with `DebatePoll` re-invoking
- * this read every 15s, an unstable tiebreak would surface as the header
- * image flickering between two rows across polls, silently. UUIDv7 `id` is
- * insertion-ordered, so this also picks the earliest-created row among ties.
- * Unreachable today (every market has ≤1 non-default row); cheap now,
- * expensive to diagnose later once the deferred multi-image pool lands.
+ * Discovery's card and the Market-Detail header do not show the same picture,
+ * and until now nothing said so out loud. Discovery signs the `is_default` row
+ * (`getDefaultMarketMediaUrl`); the detail header signs the lowest-order
+ * NON-default row (`getSecondaryMarketMediaUrl`), which MEDIA-SECOND-ROW
+ * introduced deliberately so the header could carry a second, larger image.
+ * That divergence is correct for the HEADER and wrong for the post arm's market
+ * CARD, which is the same locked card composition Discovery renders — a reader
+ * who left Discovery to enter a post found the market wearing a different face.
+ *
+ * ⛔ ONE QUERY, NOT TWO, AND THAT IS A BUDGET RATHER THAN AN OPTIMISATION.
+ * `loadDebateView` spends exactly one statement on media, and `DebatePoll`
+ * re-invokes the whole read every 15 s — 4 renders per minute per viewer,
+ * against a `max: 10` pool behind a 15-slot session pooler. A second `SELECT`
+ * for a second image is +4 statements/minute/viewer for a picture the first
+ * statement's rows already contain. So the rows come back once and the two
+ * choices are made in memory, exactly as ADR-0026 Driver 8 requires.
+ *
+ * ⚠ THE ORDER IS `getSecondaryMarketMediaUrl`'s, VERBATIM — `is_default ASC,
+ * display_order ASC, id ASC`. SQL sorts `false` before `true`, so the first row
+ * is the secondary when one exists and the sole default row otherwise; the
+ * `id ASC` tiebreak is what stops two rows sharing a `display_order` from
+ * flickering across polls. Nothing about which row the header picks changes.
+ *
+ * ⚠ NO `LIMIT`. A market carries a handful of media rows at most (one today),
+ * and the limit is what forced two statements for two choices in the first
+ * place.
+ *
+ * Both arms degrade to `null` independently — a presign failure on one image
+ * must not blank the other, and neither may 500 a read render.
  */
-export async function getSecondaryMarketMediaUrl(
+export async function getMarketMediaUrls(
 	client: DiscoveryReader,
 	marketId: string,
-): Promise<string | null> {
+): Promise<{ thumb: string | null; secondary: string | null }> {
 	const rows = await client
-		.select({ key: marketMedia.r2ObjectKey })
+		.select({
+			key: marketMedia.r2ObjectKey,
+			isDefault: marketMedia.isDefault,
+		})
 		.from(marketMedia)
 		.where(eq(marketMedia.marketId, marketId))
 		.orderBy(
 			asc(marketMedia.isDefault),
 			asc(marketMedia.displayOrder),
 			asc(marketMedia.id),
-		)
-		.limit(1);
-
-	const row = rows[0];
-	if (!row) {
-		return null;
-	}
-	try {
-		return await signReadMarketMedia(
-			row.key,
-			READ_URL_TTL_SECONDS,
-			DOWNSTREAM_CACHED_MINUTES,
 		);
-	} catch {
-		// R2 unavailable for this object → degrade to no image (same resilience
-		// posture as getDefaultMarketMediaUrl — a single unavailable object must
-		// not 500 the debate view).
-		return null;
-	}
+
+	// The DEFAULT row is Discovery's card image. `??` and not `[0]`: the first
+	// row in this order is the secondary whenever one exists, and the two are
+	// the same row only on a market that carries nothing else.
+	const thumbKey = rows.find((r) => r.isDefault)?.key ?? null;
+	const secondaryKey = rows[0]?.key ?? null;
+
+	const sign = async (key: string | null): Promise<string | null> => {
+		if (key === null) {
+			return null;
+		}
+		try {
+			return await signReadMarketMedia(
+				key,
+				READ_URL_TTL_SECONDS,
+				DOWNSTREAM_CACHED_MINUTES,
+			);
+		} catch {
+			// Same resilience posture as the two single-image readers above: one
+			// unavailable object degrades to no image, never to a failed render.
+			return null;
+		}
+	};
+
+	// ⚠ Sequential, not `Promise.all`: the memo in `read-url-memo.ts` is what
+	// makes the common case (both keys equal) a single presign, and racing the
+	// two calls would defeat it for no gain — neither touches the database.
+	const thumb = await sign(thumbKey);
+	const secondary =
+		thumbKey === secondaryKey ? thumb : await sign(secondaryKey);
+	return { thumb, secondary };
 }

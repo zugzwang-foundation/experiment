@@ -106,6 +106,91 @@ export function formatDharma(value: string): string {
 }
 
 /**
+ * The header-stake ABBREVIATION THRESHOLD — below this the figure renders
+ * exactly, at or above it the `k`/`M` form takes over. Whole Đ, so the
+ * comparison is made against the ROUNDED value rather than the stored one
+ * (see `formatDharmaCompact`).
+ */
+const COMPACT_FROM = 10_000;
+
+/**
+ * The compact header-stake formatter (UI-OVERNIGHT entry 1a): the SAME rounded
+ * whole-Đ figure `formatDharma` prints below `COMPACT_FROM`, and a `k`/`M`
+ * abbreviation at or above it — `Đ 9,999` · `Đ 10k` · `Đ 12.5k` · `Đ 1.2M`.
+ *
+ * ⛔ THE HEADER STAKE AND NOTHING ELSE. `formatDharma` remains the single
+ * display formatter for every other Đ on the site (SPEC.1 §10.8); this one is
+ * narrower, not a replacement. A stake sits in a fixed-width identity row beside
+ * a pseudonym, a side chip and a reply count, and a six-figure exact number is
+ * what pushes that row onto a second line. Totals, balances, composer inputs,
+ * footers and the positions table keep the exact figure, because those are
+ * numbers a participant checks rather than glances at.
+ *
+ * ⚠ THE THRESHOLD IS TESTED AGAINST THE ROUNDED VALUE, not the stored one. A
+ * NUMERIC(38,18) `9999.5` renders `Đ 10,000` through `formatDharma`, so
+ * branching on the raw value would print the exact form for something that has
+ * already become five digits — the one case the abbreviation exists to catch,
+ * missed at its own boundary. Rounding first makes the two formatters agree on
+ * what number they are looking at.
+ *
+ * ⚠ ROUND HALF UP, at every step — `round0Dharma`'s mode, so a value never
+ * rounds one way in the exact form and the other way in the abbreviated one.
+ * The roll-up is a CONSEQUENCE of that rather than a special case: `999,950`
+ * rounds to `1000.0k`, which is not a legible thousand, so the same value is
+ * re-expressed in millions and reads `1M`.
+ *
+ * ⚠ THE SIGN IS DERIVED FROM THE NUMERIC VALUE (SPEC.1 §10.8 — a displayed
+ * figure is never read back), and the MINUS is U+2212, the glyph this module's
+ * other signed formatters already emit. Balances cannot go negative (INV-2), so
+ * this arm is defensive; it exists so a malformed or corrected value cannot
+ * render as an unsigned magnitude.
+ *
+ * Degrades to `formatDharma` on a malformed / non-finite value — a bad value
+ * must not crash a render, and the exact fallback is the honest one.
+ */
+export function formatDharmaCompact(value: string): string {
+	let parsed: Decimal;
+	try {
+		parsed = new DisplayDecimal(value);
+	} catch {
+		return formatDharma(value);
+	}
+	if (!parsed.isFinite()) {
+		return formatDharma(value);
+	}
+	const whole = parsed.toDecimalPlaces(0, Decimal.ROUND_HALF_UP);
+	if (whole.abs().lessThan(COMPACT_FROM)) {
+		return formatDharma(value);
+	}
+	// `isZero()` covers +0 and −0 — unreachable above the threshold, kept so the
+	// sign is derived by the same rule as everywhere else in this module.
+	const sign = whole.isNegative() ? "−" : "";
+	const thousands = whole
+		.abs()
+		.dividedBy(1000)
+		.toDecimalPlaces(1, Decimal.ROUND_HALF_UP);
+	if (thousands.lessThan(1000)) {
+		return `${sign}${oneDecimal(thousands)}k`;
+	}
+	const millions = whole
+		.abs()
+		.dividedBy(1_000_000)
+		.toDecimalPlaces(1, Decimal.ROUND_HALF_UP);
+	return `${sign}${oneDecimal(millions)}M`;
+}
+
+/**
+ * An already-1dp-rounded magnitude as its shortest exact spelling: the trailing
+ * `.0` is dropped (`10.0 → 10`) so the common whole case reads `Đ 10k` rather
+ * than `Đ 10.0k`, and the integer part is grouped by the same rule every other
+ * Đ figure uses — reachable only past a billion, where `1,200M` beats `1200M`.
+ */
+function oneDecimal(magnitude: Decimal): string {
+	const fixed = magnitude.toFixed(1);
+	return groupInteger(fixed.endsWith(".0") ? fixed.slice(0, -2) : fixed);
+}
+
+/**
  * Trim a NUMERIC(38,18) decimal string to a human Đ amount — pure string
  * trimming of trailing scale zeros, no `Number()` on the value. e.g.
  * `"150.000000000000000000" → "150"`, `"0.500000000000000000" → "0.5"`.

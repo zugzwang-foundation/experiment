@@ -72,6 +72,13 @@ const market: DebateMarketHeader = {
 	status: "Open",
 	mediaVideoUrl: null,
 	mediaImageUrl: null,
+	// ⚠ UI-OVERNIGHT entry 4 — the DISCOVERY thumbnail, distinct from
+	// `mediaImageUrl` above: the detail header takes the secondary media row,
+	// the post arm's market CARD takes the default one, because that card is
+	// the same locked composition Discovery renders. REQUIRED on the type, so a
+	// fixture that forgets it is a compile error rather than a card that
+	// silently shows the wrong picture.
+	thumbImageUrl: null,
 	pricing: { yes: "0.500000000000000000", no: "0.500000000000000000" },
 	unitToWin: { yes: "1.960000000000000000", no: "1.960000000000000000" },
 	totals: {
@@ -89,8 +96,15 @@ function presentPost(): DebatePost {
 		sideAtPostTime: "YES",
 		createdAt: "2026-07-30T00:00:00.000Z",
 		title: "Fixture argument title.",
+		// ⚠ UI-OVERNIGHT entry 5 — THE BODY NOW CONTAINS ITS OWN TEASER, and
+		// that is a fixture CORRECTION rather than an accommodation. The wire
+		// `body` is `title\n\nextended` (`composeWireBody`) and the server splits
+		// `teaser` back out of it, so a fixture whose `teaser` names a paragraph
+		// its `body` does not contain describes a post the product cannot
+		// produce. Nothing read the two together until `Know more` became
+		// presence-driven; now they have to agree.
 		teaser: "Fixture teaser.",
-		body: "Fixture body.",
+		body: "Fixture argument title.\n\nFixture teaser.",
 		imageUrl: null,
 		marker: "none",
 		badge: null,
@@ -192,12 +206,17 @@ describe("the arm split — each arm renders through the shared frame", () => {
 
 		const left = container.querySelector('[data-testid="headzone-left"]');
 		expect(left).not.toBeNull();
-		// `vp` content — the focused post's title and teaser.
-		// ⚠ RE-DERIVED AT ROW 15: the focused post renders a TEASER with a `+`
-		// into the pop-up, not the whole body inline. The arm-split property this
-		// asserts is unchanged; only the marker moved.
+		// `vp` content — the focused post's title and its reply bar.
+		// ⚠ RE-DERIVED TWICE, NEVER RELAXED. Row 15 replaced the inline body with
+		// a TEASER, so the marker became the teaser; UI-OVERNIGHT entry 3 removes
+		// the teaser as well — two lines of preview were costing this header the
+		// Support/Counter bar at its foot — so the marker moves to that bar, which
+		// is `vp` content the market arm cannot render either. The arm-split
+		// property is untouched; only the string standing for it has moved.
 		expect(left?.innerHTML).toContain("Fixture argument title.");
-		expect(left?.innerHTML).toContain("Fixture teaser.");
+		expect(
+			left?.querySelector('[data-testid="post-focus-foot"]'),
+		).not.toBeNull();
 	});
 
 	it("head-zone::the-two-arms-are-DISJOINT", () => {
@@ -305,15 +324,29 @@ describe("the mount site — read off the source, because jsdom cannot see it", 
  * ADR-0025 `.md` export — this defers it, it does not withhold it.
  */
 describe("HTML-FINISH · MARKET DETAIL — row 15, the focused post's teaser", () => {
-	it("head-zone::the-focused-post-renders-its-teaser-not-its-body", () => {
+	it("head-zone::the-focused-post-renders-NEITHER-its-teaser-NOR-its-body", () => {
+		// ⚠⚠ THIS ASSERTION IS INVERTED BY FOUNDER RULING (UI-OVERNIGHT entry 3),
+		// AND ROW 15's REASONING IS THE REASON IT COULD BE. Row 15 moved the body
+		// out of this header because an unclamped argument pushed the reply arena
+		// below the fold; it left a two-line teaser behind. The teaser was the same
+		// trade at a smaller size, and the band is a FIXED fraction of the
+		// viewport — so what the preview actually cost was not scroll, it was the
+		// Support/Counter bar and the stake summary at the foot of the card, which
+		// the band clipped without any sign that it had.
+		// ⇒ Post-focus is where a reader reads an argument and answers it. A
+		// preview that removes the answering is not a preview of anything.
 		const { container } = renderPostArm();
 		const left = container.querySelector('[data-testid="headzone-left"]');
 
-		expect(left?.innerHTML).toContain("Fixture teaser.");
-		// The full body no longer renders INLINE — it is the pop-up's now.
+		expect(left?.innerHTML).not.toContain("Fixture teaser.");
+		// The full body does not render inline either — it is the pop-up's.
 		expect(left?.innerHTML).not.toContain("Fixture body.");
-		// Non-vacuity: the title still renders in full.
+		// Non-vacuity: the title still renders in full, and the foot the preview
+		// was displacing is now inside the header.
 		expect(left?.innerHTML).toContain("Fixture argument title.");
+		expect(
+			left?.querySelector('[data-testid="post-focus-foot"]'),
+		).not.toBeNull();
 	});
 
 	it("head-zone::the-plus-opens-the-pop-up-with-this-post", () => {
@@ -346,15 +379,27 @@ describe("HTML-FINISH · MARKET DETAIL — row 15, the focused post's teaser", (
 		expect(onOpenPopup).toHaveBeenCalledWith(presentPost());
 	});
 
-	it("head-zone::a-bodyless-post-hides-the-teaser-but-KEEPS-the-expand-control", () => {
-		// d5 marks this case "hidden-but-reserved when bodyless" (`:972`).
-		// `deriveTitleTeaser` makes the teaser the SECOND paragraph, so a
-		// single-paragraph argument has none — and the control must survive,
-		// because the full body exists either way and it is the only path to it.
-		// ⚠ UI-QUICK change set 2 item 2 — the `+` became `Know more`. Re-pointed
-		// at the live control rather than left green against a string no mount
-		// carries any more.
-		const post = { ...presentPost(), teaser: "" } as PresentPost;
+	it("head-zone::a-bodyless-post-hides-the-teaser-AND-the-expand-control", () => {
+		// ⚠⚠ THIS ASSERTION IS INVERTED, BY FOUNDER RULING (UI-OVERNIGHT entry 5),
+		// AND THE SUPERSEDED REASONING IS WORTH KEEPING. It read: d5 marks this
+		// case "hidden-but-reserved when bodyless" (`:972`) … "the control must
+		// survive, because the full body exists either way and it is the only path
+		// to it."
+		// ⛔ THE PREMISE IS FALSE ON THIS CASE, which is why the conclusion goes.
+		// `deriveTitleTeaser` takes the teaser from the SECOND paragraph, so a
+		// bodyless post's full body IS its title — and the pop-up the control
+		// opened showed the reader the sentence they had just read. A control that
+		// promises more and delivers the same sentence teaches a reader to stop
+		// trusting it everywhere else, including on the posts that do have more.
+		// ⚠ THE FIXTURE STRIPS THE BODY, NOT THE TEASER. The gate reads `body`
+		// (`hasExtendedText`), which is the field the composer actually writes and
+		// the server derives `teaser` FROM; blanking the derived field while
+		// leaving the source intact would describe a post that cannot exist.
+		const post = {
+			...presentPost(),
+			teaser: "",
+			body: "Fixture argument title.",
+		} as PresentPost;
 		const { container } = render(
 			<PostFocusHeader
 				post={post}
@@ -371,10 +416,88 @@ describe("HTML-FINISH · MARKET DETAIL — row 15, the focused post's teaser", (
 		);
 
 		expect(container.innerHTML).not.toContain("Fixture teaser.");
-		const knowMore = Array.from(container.querySelectorAll("button")).find(
-			(b) => b.innerHTML.includes("Know more"),
+		expect(
+			Array.from(container.querySelectorAll("button")).some((b) =>
+				b.innerHTML.includes("Know more"),
+			),
+			"a title-only post still offers to show more",
+		).toBe(false);
+		// Non-vacuity: the post itself renders. Without this the assertion above
+		// would pass on a header that failed to mount at all.
+		expect(container.innerHTML).toContain("Fixture argument title.");
+	});
+});
+
+/**
+ * UI-OVERNIGHT entry 4 — the post arm's market card shows the DISCOVERY
+ * thumbnail, not the detail header's image.
+ *
+ * ⛔ WHY THE TWO ARE DIFFERENT AT ALL. MEDIA-SECOND-ROW gave the Market-Detail
+ * header its own picture — the lowest-order NON-default media row — so the
+ * header could carry a larger image than the tile. That is right for a header
+ * and wrong for this rail, which is the LOCKED market-card composition, the
+ * same one Discovery renders. A reader who clicked a market on Discovery and
+ * then entered a post found the market wearing a different face.
+ *
+ * ⚠ THE READ MODEL CARRIES BOTH and this suite asserts the WIRING — which field
+ * reaches the card. The selection rule itself (which row is which) is pinned
+ * against a real database in `market-media-selection.integration.test.ts`.
+ */
+describe("UI-OVERNIGHT 4 — the market card takes the discovery thumbnail", () => {
+	const withMedia = (
+		thumbImageUrl: string | null,
+		mediaImageUrl: string | null,
+	) =>
+		render(
+			<PostFocusHeader
+				post={presentPost()}
+				market={{ ...market, thumbImageUrl, mediaImageUrl }}
+				heldSide={null}
+				marketOpen
+				suspended={false}
+				activeRelation={null}
+				onToggleRelation={noop}
+				onExit={noop}
+				onOpenImage={noop}
+				onOpenPopup={noop}
+			/>,
 		);
-		expect(knowMore).toBeDefined();
-		expect(knowMore?.getAttribute("aria-label")).toContain("Know more");
+
+	const cardImage = (container: HTMLElement) =>
+		container
+			.querySelector('[data-testid="focus-market-card"]')
+			?.querySelector("img")
+			?.getAttribute("src") ?? null;
+
+	it("head-zone::the-market-card-renders-the-THUMB-not-the-header-image", () => {
+		const { container } = withMedia(
+			"https://example.invalid/tile-default.png",
+			"https://example.invalid/panel-second.png",
+		);
+		expect(cardImage(container)).toBe(
+			"https://example.invalid/tile-default.png",
+		);
+	});
+
+	it("head-zone::it-falls-back-to-the-header-image-when-there-is-no-thumb", () => {
+		// The brief's chain: discovery thumbnail → market media → placeholder. The
+		// middle step matters because `thumbImageUrl` is null on the defensive arm
+		// — a missing row or a presign failure — and a card with a picture
+		// available should not fall all the way to the placeholder.
+		const { container } = withMedia(
+			null,
+			"https://example.invalid/panel-second.png",
+		);
+		expect(cardImage(container)).toBe(
+			"https://example.invalid/panel-second.png",
+		);
+	});
+
+	it("head-zone::with-neither-it-renders-the-placeholder-and-no-broken-image", () => {
+		const { container } = withMedia(null, null);
+		const card = container.querySelector('[data-testid="focus-market-card"]');
+		expect(card?.querySelector("img")).toBeNull();
+		// `MarketThumb`'s own fallback box — chrome, not a broken image.
+		expect(card?.textContent).toContain("IMG");
 	});
 });

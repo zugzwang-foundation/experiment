@@ -9,16 +9,27 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 //                                Discovery tile's read. UNCHANGED by this
 //                                slice (zero-line diff) — case 1 is the guard
 //                                on that.
-//   getSecondaryMarketMediaUrl → `ORDER BY is_default ASC, display_order ASC,
-//                                id ASC LIMIT 1`. Called from `loadDebateView`
-//                                (`load-debate-view.ts`), the Market-Detail
-//                                header's read (feeding BOTH `MarketMediaPanel`
-//                                and `FocusMarketCard`): the lowest-
-//                                `display_order` NON-default row, falling back
-//                                to the sole `is_default` row when no sibling
-//                                exists — the fallback is the ORDER BY's
-//                                natural result, not a branch, so case 3 is
-//                                what pins it.
+//   getMarketMediaUrls         → `ORDER BY is_default ASC, display_order ASC,
+//                                id ASC`, both images from ONE result set.
+//                                Called from `loadDebateView`. Its `.secondary`
+//                                arm is the Market-Detail header's image: the
+//                                lowest-`display_order` NON-default row,
+//                                falling back to the sole `is_default` row when
+//                                no sibling exists — the fallback is the ORDER
+//                                BY's natural result, not a branch, so case 3
+//                                is what pins it.
+//
+// ⚠⚠ THE SECOND NAME CHANGED AT UI-OVERNIGHT entry 4, AND SO DID WHAT THE TWO
+// READERS FEED. This block read `getSecondaryMarketMediaUrl … feeding BOTH
+// `MarketMediaPanel` and `FocusMarketCard``. They are no longer the same image:
+// `FocusMarketCard` is the LOCKED market-card composition, the same one
+// Discovery renders, and it was showing a different picture of the same market
+// than the card a reader had just clicked. It takes the DEFAULT row now — the
+// `.thumb` arm — while the header's panel keeps the secondary.
+// ⛔ THE SELECTION RULE ITSELF IS UNTOUCHED, which is why these cases are
+// re-pointed rather than rewritten: one function now makes both choices from
+// one `SELECT`, so the ordering has exactly one implementation instead of two
+// that could drift.
 //
 // Plan item 5 — the exactly-one-`is_default`-per-market storage backstop
 // (`market_media_one_default_per_market_uq`) — is "re-run not re-written". It
@@ -61,7 +72,7 @@ vi.mock("@/server/storage/r2", () => ({
 import { marketMedia, markets } from "@/db/schema";
 import {
 	getDefaultMarketMediaUrl,
-	getSecondaryMarketMediaUrl,
+	getMarketMediaUrls,
 } from "@/server/discovery/media";
 // The mocked module — imported ONLY to assert the sign calls (bucket + key).
 import { mintReadUrl } from "@/server/storage/r2";
@@ -179,7 +190,7 @@ describe("market media selection — the tile row vs the header row", () => {
 			{ marketId, key: defaultKey, displayOrder: 0, isDefault: true },
 		]);
 
-		const url = await getSecondaryMarketMediaUrl(testDb, marketId);
+		const url = (await getMarketMediaUrls(testDb, marketId)).secondary;
 
 		expect(url).toBe(signed(secondKey));
 		// Not the later non-default sibling (display_order ordering)…
@@ -202,6 +213,36 @@ describe("market media selection — the tile row vs the header row", () => {
 		);
 	});
 
+	// ── 2b. Both arms, one statement — the UI-OVERNIGHT entry 4 case ─────────
+	it("market-media::one-read-returns-the-tile-row-AND-the-panel-row", async () => {
+		// ⛔ THE ASSERTION ENTRY 4 EXISTS FOR. The post arm's market card renders
+		// the LOCKED card composition — the same one Discovery renders — and it
+		// was showing the HEADER's image, so the market changed its face when a
+		// reader entered a post from the card they had just clicked. Both rows now
+		// come back from one call, and the card takes `.thumb`.
+		const marketId = await seedMarket("mms-both-arms");
+		const defaultKey = `m/${marketId}/tile-default.png`;
+		const secondKey = `m/${marketId}/panel-second.png`;
+
+		await seedMedia([
+			{ marketId, key: secondKey, displayOrder: 1, isDefault: false },
+			{ marketId, key: defaultKey, displayOrder: 0, isDefault: true },
+		]);
+
+		const { thumb, secondary } = await getMarketMediaUrls(testDb, marketId);
+
+		expect(thumb).toBe(signed(defaultKey));
+		expect(secondary).toBe(signed(secondKey));
+		// ⚠ THEY MUST DIFFER HERE. Equal URLs would mean the two arms had
+		// collapsed onto one row again — which is either the defect this case
+		// closes or the one-row fallback (case 3) firing on a two-row market.
+		expect(thumb).not.toBe(secondary);
+		// …and the tile arm agrees with the reader Discovery's own card calls, so
+		// "the same picture" is a fact about the two READS and not only about two
+		// strings that happen to match today.
+		expect(thumb).toBe(await getDefaultMarketMediaUrl(testDb, marketId));
+	});
+
 	// ── 3. One row (every market in production today) → the fallback ──────────
 	it("market-media::panel-falls-back-to-the-default-row-when-it-is-the-only-row", async () => {
 		const marketId = await seedMarket("mms-panel-fallback");
@@ -213,7 +254,7 @@ describe("market media selection — the tile row vs the header row", () => {
 			{ marketId, key: defaultKey, displayOrder: 0, isDefault: true },
 		]);
 
-		const panelUrl = await getSecondaryMarketMediaUrl(testDb, marketId);
+		const panelUrl = (await getMarketMediaUrls(testDb, marketId)).secondary;
 		const tileUrl = await getDefaultMarketMediaUrl(testDb, marketId);
 
 		// The sole candidate is returned — no branch, no null, no throw.
@@ -244,7 +285,7 @@ describe("market media selection — the tile row vs the header row", () => {
 			getDefaultMarketMediaUrl(testDb, marketId),
 		).resolves.toBeNull();
 		await expect(
-			getSecondaryMarketMediaUrl(testDb, marketId),
+			getMarketMediaUrls(testDb, marketId).then((m) => m.secondary),
 		).resolves.toBeNull();
 
 		// The `null` came from the no-row branch, NOT from a presign that threw

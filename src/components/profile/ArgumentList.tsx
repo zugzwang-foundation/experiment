@@ -1,11 +1,13 @@
 import Link from "next/link";
 
 import { PositionMarker, SideBadge } from "@/components/debate/badges";
+import { hasExtendedText } from "@/components/debate/composer/payload";
 import {
 	computeSplitBar,
 	displaySplitTotal,
 } from "@/components/debate/composer/split-bar";
-import { formatDharma } from "@/components/debate/format";
+import { CompactDharmaFigure } from "@/components/debate/DharmaFigure";
+import { formatDharma, formatDharmaCompact } from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
@@ -22,6 +24,7 @@ import type { ProfileUser } from "@/server/profile/resolve";
 import { ArgumentBody } from "./ArgumentBody";
 import { PROFILE_COPY } from "./copy";
 import { DownloadStub } from "./DownloadStub";
+import { ReplicaBody } from "./ReplicaBody";
 import type { ProfileSelection } from "./selection";
 
 /**
@@ -440,6 +443,10 @@ function PresentHead({
 	const originalStake =
 		item.kind === "post" ? item.authorStakeOriginal : item.stakeOriginal;
 	const soldOut = item.kind === "post" ? item.authorSold : item.sold;
+	// UI-OVERNIGHT entry 1a — the head stake's RENDERED spelling. The
+	// strike-through below compares against it rather than against the stored
+	// value, so it compares the strings the reader actually sees.
+	const compactStake = formatDharmaCompact(currentStake);
 	return (
 		<div className="flex flex-wrap items-center gap-2">
 			<AuthorHead author={author} />
@@ -481,12 +488,18 @@ function PresentHead({
 			    Nothing here is erased — the commitment survives in the strikethrough
 			    and in Bucket-A `bets.stake`; it just stops being what ranks. */}
 			<HeadSeparator />
-			<span
-				data-testid={`argument-stake-${item.id}`}
+			{/* UI-OVERNIGHT entry 1a — ABBREVIATED past Đ10,000, with the exact
+			    figure on the element as a native tooltip and only when the two
+			    spellings differ. Same rule, same formatter and same reason as the
+			    debate surface's `ArgProfile`: this is the same head cluster, and
+			    the two renderings of it must not disagree about how a stake is
+			    spelled. ⛔ The POSITIONS table's `CURRENT` cell keeps the exact
+			    figure — that is a number a participant checks before selling. */}
+			<CompactDharmaFigure
+				value={currentStake}
+				testId={`argument-stake-${item.id}`}
 				className="text-n6 text-xs"
-			>
-				Đ {formatDharma(currentStake)}
-			</span>
+			/>
 			{soldOut ? (
 				<InfoTip content={GLOSSARY.sold} asChild>
 					<span
@@ -496,18 +509,19 @@ function PresentHead({
 						{SOLD_LABEL}
 					</span>
 				</InfoTip>
-			) : formatDharma(originalStake) !== formatDharma(currentStake) ? (
+			) : formatDharmaCompact(originalStake) !== compactStake ? (
 				/* Only when the figure has actually moved ON SCREEN. Compared through
-				   `formatDharma`, not on the raw 18-dp strings: a sub-Đ1 reduction is a
-				   real change to the basis and a non-change to what the reader sees, and
-				   striking a number through beside an identical number is exactly the
-				   "same number twice" this branch exists to prevent. */
-				<span
-					data-testid={`argument-stake-original-${item.id}`}
+				   `formatDharmaCompact`, not on the raw 18-dp strings: a sub-Đ1
+				   reduction is a real change to the basis and a non-change to what the
+				   reader sees, and striking a number through beside an identical number
+				   is exactly the "same number twice" this branch exists to prevent.
+				   ⚠ The comparison follows the RENDERED spelling wherever it goes — so
+				   since UI-OVERNIGHT entry 1a it is the abbreviated one. */
+				<CompactDharmaFigure
+					value={originalStake}
+					testId={`argument-stake-original-${item.id}`}
 					className="text-n4 text-xs line-through"
-				>
-					Đ {formatDharma(originalStake)}
-				</span>
+				/>
 			) : null}
 			{/* `Replies · N` stays POST-ONLY — replies attract nothing by design
 			    (§9), so a reply has no count to show. That gate was always correct;
@@ -610,26 +624,24 @@ function PresentHead({
  * border, no label. ⛔ Deliberately not a grey box: a permanent placeholder
  * states "an image is missing" on every argument, most of which have none.
  *
- * ⛔ NO `+` AFFORDANCE ON THE REPLICA'S TITLE, AND THAT SURVIVES PROFILE
- * REFINEMENT · R4 — for the reason this note already gave rather than for the old
- * one. The mockup's `.rtitle .plus` (`:346`, wired at `:630`) opens the
- * full-argument pop-up; A-6 struck its shape and it duplicated the known PD-0-01.
- * ⇒ R4 asks for the `+` and it IS built — on the argument-LIST card, where the
- * teaser is clamped to two lines and there is genuinely more to reveal (see
- * `ArgumentBody`). It is NOT built here, because this card renders the body IN FULL
- * already: a control whose whole job is to show the rest of the text would reveal
- * nothing, and a control that does nothing visible is worse than an absent one.
- * That is the same test R4 applies to the download affordance, one step removed.
- * ⚠ THE HEAD CLUSTER IS DIFFERENT AND DOES LAND HERE — the disabled download
- * stub (UNWIRE-1: the bookmark half is gone product-wide). Only the `+` is
- * surface-specific, because only the `+` depends on whether the text is clamped.
+ * ⚠⚠ UI-OVERNIGHT entry 3 — THIS CARD NOW CARRIES A REVEAL CONTROL, AND THE
+ * PARAGRAPH THAT ARGUED AGAINST ONE IS KEPT BECAUSE ITS TEST IS STILL THE RIGHT
+ * TEST. It read: "⛔ NO `+` AFFORDANCE ON THE REPLICA'S TITLE … It is NOT built
+ * here, because this card renders the body IN FULL already: a control whose
+ * whole job is to show the rest of the text would reveal nothing, and a control
+ * that does nothing visible is worse than an absent one."
+ * ⇒ The test is "does it reveal anything", and the answer flipped when the body
+ * left the card. It is `Know more` rather than the mockup's `+` — the same
+ * control the debate surface uses, so one affordance means one thing — and it is
+ * gated on there BEING a description (entry 5), which is that same test applied
+ * to the remaining case.
+ * ⛔ THE HEAD CLUSTER IS UNCHANGED and still carries the disabled download stub.
  *
- * ⚠ TITLE-THEN-WHOLE-BODY IS THE SHIPPED SHAPE, NOT A DUPLICATION BUG.
- * `deriveTitleTeaser` (`load-debate-view.ts:402-411`) takes the title FROM the
- * body's first line, so the title does appear twice — and that is exactly what
- * the shipped focused post does at `PostFocusHeader.tsx:84-90`, whose
- * `<p className="text-sm whitespace-pre-line">` this reuses byte-for-byte.
- * Diverging here would make the same comment read differently on two surfaces.
+ * ⚠ TITLE-THEN-WHOLE-BODY IS STILL THE SHIPPED SHAPE WHEN THE BODY IS OPEN, NOT
+ * a duplication bug. `deriveTitleTeaser` takes the title FROM the body's first
+ * line, so the title does appear twice once the description is revealed — and
+ * the paragraph is the same `<p className="text-sm whitespace-pre-line">` the
+ * debate surface uses, so one argument reads identically wherever it is read.
  */
 function ReplicaCard({
 	item,
@@ -654,16 +666,26 @@ function ReplicaCard({
 			>
 				{item.title}
 			</Link>
-			{/* ⛔ NO `line-clamp` HERE, and that is the point of the replica. The
-			    list card clamps its teaser to two lines (item 6 / P5-D08) because it
-			    is a list; this panel exists to READ the argument, so the body ships
-			    whole and the panel's own `overflow-y-auto` carries it. */}
-			<p
-				data-testid={`argument-replica-body-${item.id}`}
-				className="text-sm whitespace-pre-line"
-			>
-				{item.body}
-			</p>
+			{/* ⚠⚠ UI-OVERNIGHT entry 3 — THE BODY MOVES BEHIND `Know more`, AND THE
+			    NOTE THIS REPLACES WAS RIGHT WHEN IT WAS WRITTEN. It read: "⛔ NO
+			    `line-clamp` HERE, and that is the point of the replica. The list card
+			    clamps its teaser to two lines (item 6 / P5-D08) because it is a list;
+			    this panel exists to READ the argument, so the body ships whole and
+			    the panel's own `overflow-y-auto` carries it."
+			    ⇒ That holds while the panel is where the argument is read. It stops
+			    holding when the panel sits in a fixed band beside a positions table:
+			    a long argument pushed the image slot and the split-bar footer out of
+			    view, so the card promised a whole argument and delivered a scroller
+			    with no bottom. The founder ruled the description out of the preview.
+			    ⛔ NOTHING IS HIDDEN THAT WAS NOT ONE CLICK AWAY BEFORE — and when it
+			    is open, the paragraph is byte-identical to the one this replaces
+			    (same testid, same classes, still unclamped).
+			    ⚠ ONLY WHERE THERE IS A DESCRIPTION (entry 5): an argument that is a
+			    title and nothing else gets no control, because the control would
+			    reveal the title. */}
+			{hasExtendedText(item.body) ? (
+				<ReplicaBody id={item.id} body={item.body} />
+			) : null}
 			{/* The image SLOT — see the ⛔ above. Empty by design; it contributes the
 			    mockup's growth region and nothing else. */}
 			<div

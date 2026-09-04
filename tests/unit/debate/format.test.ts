@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
 	displayNetProfitLoss,
 	formatDharma,
+	formatDharmaCompact,
 	formatDharmaExact,
 	formatPercentUnpaired,
 	formatPricePercent,
@@ -293,5 +294,79 @@ describe("formatPercentUnpaired — the single-side escape hatch", () => {
 		const no = formatPercentUnpaired(TIE.no);
 		const sum = Number(yes.replace("%", "")) + Number(no.replace("%", ""));
 		expect(`${yes} + ${no} = ${sum}`).toBe("53% + 48% = 101");
+	});
+});
+
+// UI-OVERNIGHT entry 1a — the compact HEADER-STAKE formatter. It is the same
+// rounded whole-Đ figure `formatDharma` prints below Đ10,000, and a `k`/`M`
+// abbreviation at or above it, so an identity row holding a six-figure stake
+// stays on one line beside its pseudonym, side chip and reply count.
+//
+// ⚠ THE SEVEN CASES BELOW ARE THE BRIEF'S OWN TABLE, verbatim. They are kept
+// as a block rather than folded into the edge cases beneath so the ratified
+// contract stays legible against a change to the implementation.
+describe("formatDharmaCompact — the header-stake abbreviation", () => {
+	it.each([
+		["0", "0"],
+		["550", "550"],
+		["9999", "9,999"],
+		["10000", "10k"],
+		["12500", "12.5k"],
+		["999950", "1M"], // rolls up rather than printing an illegible `1000k`
+		["1240000", "1.2M"],
+	])("format::compact-brief-table-%s", (input, expected) => {
+		expect(formatDharmaCompact(input)).toBe(expected);
+	});
+
+	it.each([
+		// The boundary is tested against the ROUNDED value: `9999.5` is already
+		// `Đ 10,000` in the exact form, so branching on the stored value would
+		// print five digits from the formatter whose job is to prevent them.
+		["9999.499999999999999999", "9,999"],
+		["9999.5", "10k"],
+		// One tick below the roll-up — still thousands, one decimal.
+		["999949", "999.9k"],
+		["1000000", "1M"],
+		// A NUMERIC(38,18) value arrives with its full scale; the k/M form is
+		// taken from the rounded whole, never from the raw string.
+		["12500.000000000000000000", "12.5k"],
+		["12450", "12.5k"], // ROUND_HALF_UP on the first decimal
+		["12449", "12.4k"],
+	])("format::compact-boundaries-%s", (input, expected) => {
+		expect(formatDharmaCompact(input)).toBe(expected);
+	});
+
+	it("format::compact-below-the-threshold-IS-formatDharma", () => {
+		// Not merely "looks the same": the exact arm delegates, so the two
+		// formatters cannot drift below Đ10,000.
+		for (const v of ["0", "1", "9.5", "550", "1000", "9999", "9999.4"]) {
+			expect(formatDharmaCompact(v)).toBe(formatDharma(v));
+		}
+	});
+
+	it("format::compact-signs-the-magnitude-with-U+2212", () => {
+		// Defensive — a stake cannot go negative (INV-2). The sign comes from the
+		// numeric value, never from a printed string (SPEC.1 §10.8), and the glyph
+		// is the same MINUS this module's other signed formatters emit.
+		expect(formatDharmaCompact("-12500")).toBe("−12.5k");
+		expect(formatDharmaCompact("-1240000")).toBe("−1.2M");
+		// Below the threshold it is `formatDharma`'s ASCII form, unchanged.
+		expect(formatDharmaCompact("-550")).toBe("-550");
+	});
+
+	it("format::compact-degrades-to-the-exact-formatter-on-a-bad-value", () => {
+		// A bad value must not crash a render; the exact fallback is the honest
+		// one, and it is what `formatDharma` itself already returns here.
+		expect(formatDharmaCompact("not-a-number")).toBe(
+			formatDharma("not-a-number"),
+		);
+		expect(formatDharmaCompact("Infinity")).toBe(formatDharma("Infinity"));
+	});
+
+	it("format::compact-groups-a-magnitude-past-a-billion", () => {
+		// Unreachable in this economy; pinned because the grouping rule is the
+		// same one every other Đ figure uses and an ungrouped `1200M` would be
+		// the one figure on the site that opted out of it.
+		expect(formatDharmaCompact("1200000000")).toBe("1,200M");
 	});
 });

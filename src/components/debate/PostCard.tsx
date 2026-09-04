@@ -5,8 +5,9 @@ import { Card } from "@/components/ui/card";
 
 import { AggregateFooter } from "./AggregateFooter";
 import { ArgProfile } from "./ArgProfile";
-import { LaneBadge, SideBadge } from "./badges";
+import { SideBadge } from "./badges";
 import { CommentImage, PostImagePlaceholder } from "./CommentImage";
+import { hasExtendedText } from "./composer/payload";
 import { KnowMore } from "./KnowMore";
 import { RemovedPlaceholder } from "./placeholders";
 import type { DebatePost, PresentPost, Side } from "./types";
@@ -71,6 +72,10 @@ export function PostCard({
 			onReplyToPost(post.id, relation),
 	};
 	const replyCount = post.aggregate.supportCount + post.aggregate.counterCount;
+	// UI-OVERNIGHT entry 5 — `Know more` only where there IS more. On a
+	// title-only argument the control opened a pop-up showing the reader the
+	// same sentence back; see `hasExtendedText` for the rule and its reason.
+	const knowMore = post.removed ? false : hasExtendedText(post.body);
 
 	if (post.removed) {
 		return (
@@ -114,21 +119,28 @@ export function PostCard({
 		   Without it the card is content-sized, `.argimg`'s `flex-1` has nothing to
 		   distribute, and the image falls back to its intrinsic size. */
 		<Card className="min-h-0 flex-1 gap-2.5 p-3">
-			<div className="flex items-start justify-between gap-2">
-				<ArgProfile
-					author={post.author}
-					side={post.sideAtPostTime}
-					marker={post.marker}
-					entryPrice={post.entryPrice}
-					authorStake={post.authorStake}
-					originalStake={post.authorStakeOriginal}
-					sold={post.authorSold}
-					replyCount={replyCount}
-					createdAt={post.createdAt}
-					download
-				/>
-				<LaneBadge badge={post.badge} />
-			</div>
+			{/* ⚠⚠ UI-OVERNIGHT entry 1b — THE BADGE IS NO LONGER A CORNER SIBLING,
+			    and the wrapper that positioned it goes with it. `ArgProfile` renders
+			    the lane badge inside its own row now, beside the age, because that
+			    is where it stopped costing the row a line: pinned to this corner it
+			    took width off the identity line and pushed the timestamp under it.
+			    ⛔ The `justify-between` row had exactly two children and one of them
+			    has moved, so a one-child flex wrapper is left over. It is deleted
+			    rather than kept — `ArgProfile` is already `w-full`, so the wrapper
+			    was doing nothing the component does not do itself. */}
+			<ArgProfile
+				author={post.author}
+				side={post.sideAtPostTime}
+				marker={post.marker}
+				entryPrice={post.entryPrice}
+				authorStake={post.authorStake}
+				originalStake={post.authorStakeOriginal}
+				sold={post.authorSold}
+				replyCount={replyCount}
+				createdAt={post.createdAt}
+				badge={post.badge}
+				download
+			/>
 
 			{/* HTML-FINISH · MARKET DETAIL rows 23 + 24 — d5's `.rtitle.plust`
 			    (`:1077`): the TITLE enters post-focus (`onclick="enterPost(…)"`) and
@@ -178,7 +190,15 @@ export function PostCard({
 				    on the `+`, and the column scrolls as the backstop. */}
 				<button
 					type="button"
-					className="block w-full rounded-(--r-chip) pr-21 text-left hover:bg-n1 hover:underline"
+					// ⚠ UI-OVERNIGHT entry 5 — THE GUTTER IS RESERVED ONLY WHEN THERE IS
+					// SOMETHING TO RESERVE IT FOR. `pr-21` keeps the title clear of the
+					// OVERLAID `Know more`; with no control there it was 84px taken off
+					// every title-only card for a neighbour that never arrives. The title's
+					// LEFT edge does not move either way, so a card with the control and a
+					// card without differ by the control alone.
+					className={`block w-full rounded-(--r-chip) text-left hover:bg-n1 hover:underline${
+						knowMore ? " pr-21" : ""
+					}`}
 					onClick={() => onEnter(post.id)}
 				>
 					<h3 className="line-clamp-2 font-heading text-base leading-snug font-medium">
@@ -209,11 +229,13 @@ export function PostCard({
 				    it a flex sibling would reproduce the measured defect row 24 fixed
 				    (title 628px → 104px, the widest delta in the phase-1 table). The
 				    gutter grows; the mechanism does not change. */}
-				<KnowMore
-					label="Know more about this argument"
-					onClick={() => onOpenPopup(post)}
-					className="absolute right-0 bottom-0"
-				/>
+				{knowMore ? (
+					<KnowMore
+						label="Know more about this argument"
+						onClick={() => onOpenPopup(post)}
+						className="absolute right-0 bottom-0"
+					/>
+				) : null}{" "}
 			</div>
 			{/* HTML-FINISH · MARKET DETAIL round 2 · R2 — d5 substitutes its
 			    `POST IMAGE · 640:586` box into `.argimg` on every card with no real

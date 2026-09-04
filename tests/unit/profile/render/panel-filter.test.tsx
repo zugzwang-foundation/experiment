@@ -210,7 +210,14 @@ describe("item 7 — the replica card's parts", () => {
 			/>,
 		);
 
-	it("replica::head-cluster-title-body-image-slot-footer-in-that-order", () => {
+	it("replica::head-cluster-title-control-image-slot-footer-in-that-order", () => {
+		// ⚠⚠ THE THIRD CHILD IS THE CONTROL NOW, NOT THE BODY (UI-OVERNIGHT entry
+		// 3). The description moved behind `Know more`: a long argument rendered in
+		// full pushed the image slot and the split-bar footer out of the panel, so
+		// the card promised a whole argument and delivered a scroller with no
+		// bottom. ⛔ THE ORDER PROPERTY IS UNCHANGED and is what this test is for —
+		// head, then title, then the argument, then the growth region, then the
+		// foot. Only what occupies slot 2 has changed.
 		renderPost();
 		const card = screen.getByTestId(`argument-replica-${C_POST}`);
 		const kids = [...card.children];
@@ -224,9 +231,8 @@ describe("item 7 — the replica card's parts", () => {
 			(k) =>
 				k.getAttribute("data-testid") === `argument-replica-title-${C_POST}`,
 		);
-		const body = kids.findIndex(
-			(k) =>
-				k.getAttribute("data-testid") === `argument-replica-body-${C_POST}`,
+		const control = kids.findIndex((k) =>
+			(k.textContent ?? "").includes("Know more"),
 		);
 		const slot = at(`argument-replica-image-slot-${C_POST}`);
 		const foot = at(`argument-split-bar-${C_POST}`);
@@ -234,20 +240,41 @@ describe("item 7 — the replica card's parts", () => {
 		// content rather than by a testid it does not own.
 		expect(kids[0]?.textContent).toContain(USER.pseudonym);
 		expect(title).toBe(1);
-		expect(body).toBe(2);
+		expect(control).toBe(2);
 		expect(slot).toBe(3);
 		expect(foot).toBe(4);
+		// The body is not on the card until the control is used — asserted here so
+		// "child 2 is the control" cannot be true alongside a body rendered
+		// somewhere else in the card.
+		expect(screen.queryByTestId(`argument-replica-body-${C_POST}`)).toBeNull();
 	});
 
-	it("replica::the-body-ships-WHOLE-and-UNCLAMPED", () => {
-		// The list card clamps its teaser to two lines because it is a list; this
-		// panel exists to READ the argument.
+	it("replica::the-body-opens-in-place-WHOLE-and-UNCLAMPED", () => {
+		// ⚠ THE CLAIM IS UNCHANGED — when the argument is shown it is shown whole,
+		// with its paragraph breaks, never clamped. What moved is WHEN: the panel
+		// no longer opens with it, because a full body displaced the panel's own
+		// footer. UI-OVERNIGHT entry 3.
 		renderPost();
+		const control = [
+			...screen
+				.getByTestId(`argument-replica-${C_POST}`)
+				.querySelectorAll("button"),
+		].find((b) => (b.textContent ?? "").includes("Know more"));
+		expect(control).toBeDefined();
+		// ⛔ AN IN-PLACE DISCLOSURE, ANNOUNCED AS ONE. This mount opens no dialog,
+		// so it carries `aria-expanded` and NOT `aria-haspopup` — announcing a
+		// dialog that never appears is a lie to a screen reader.
+		expect(control?.getAttribute("aria-expanded")).toBe("false");
+		expect(control?.getAttribute("aria-haspopup")).toBeNull();
+		expect(control?.getAttribute("aria-label")).toContain("Know more");
+
+		fireEvent.click(control as HTMLButtonElement);
 		const body = screen.getByTestId(`argument-replica-body-${C_POST}`);
 		expect(body.textContent).toBe(POST_BODY);
 		expect(body.className).not.toContain("line-clamp");
 		// …and it preserves the paragraph breaks it was written with.
 		expect(body.className).toContain("whitespace-pre-line");
+		expect(control?.getAttribute("aria-expanded")).toBe("true");
 	});
 
 	it("replica::the-IMAGE-SLOT-exists-and-renders-NOTHING", () => {
@@ -316,6 +343,10 @@ describe("item 7 — the replica card's parts", () => {
 		);
 		expect(labels.some((l) => l.startsWith("+"))).toBe(false);
 		expect(labels.some((l) => l.includes("Show more"))).toBe(false);
+		// ⚠ UI-OVERNIGHT entry 3 — `Know more` IS here now, and it is not the `+`.
+		// The mockup's glyph stays struck; what the card gained is the shipped
+		// text control, so one affordance means one thing across the product.
+		expect(labels.some((l) => l.includes("Know more"))).toBe(true);
 		// …and the cluster IS here, so the narrowing did not quietly drop coverage of
 		// what the card should carry.
 		expect(labels.some((l) => l.includes("Download"))).toBe(true);

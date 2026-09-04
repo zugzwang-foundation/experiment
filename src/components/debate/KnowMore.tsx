@@ -15,13 +15,24 @@ import { Button } from "@/components/ui/button";
  * and the frame breakdown were both arithmetic on a mount that is no longer
  * mounted. Restore the fourth here if and when the criterion regains a surface.
  *
- * ⚠⚠ EVERY MOUNT NOW OPENS A DIALOG, so `aria-haspopup="dialog"` is declared
- * HERE rather than at each call site. The component briefly carried an
- * `expanded` prop for the criterion's in-place toggle; ruling R3 = c made that
- * mount a dialog too, which left `aria-expanded` describing a state no mount
- * has. It is removed rather than left dangling — an ARIA attribute that does not
- * match the widget's actual behaviour is worse than none, because a screen
- * reader announces "collapsed" about something that never expands.
+ * ⚠⚠ MOST MOUNTS OPEN A DIALOG, so `aria-haspopup="dialog"` is declared HERE
+ * rather than at each call site. The component briefly carried an `expanded`
+ * prop for the criterion's in-place toggle; ruling R3 = c made that mount a
+ * dialog too, which left `aria-expanded` describing a state no mount had, and it
+ * was removed — an ARIA attribute that does not match the widget's behaviour is
+ * worse than none, because a screen reader announces "collapsed" about something
+ * that never expands.
+ *
+ * ⚠⚠ AND IT IS BACK, FOR A MOUNT THAT REALLY DOES EXPAND (UI-OVERNIGHT entry 3).
+ * The profile's argument panel renders the body IN PLACE — there is no dialog
+ * to open there, and reusing the debate pop-up would mean constructing a
+ * `PresentPost` out of fields that surface does not hold, i.e. fabricating data
+ * to satisfy a type (`ArgumentBody` records the same finding). So the prop
+ * returns, and the two attributes are mutually exclusive by construction: a
+ * mount that passes `expanded` announces a disclosure, a mount that omits it
+ * announces a dialog. ⛔ THE VISIBLE CONTROL IS IDENTICAL EITHER WAY — same
+ * text, same tokens, same size — which is the whole reason this is one
+ * component. Only the promise it makes to a screen reader follows the mount.
  *
  * ⚠⚠ `label` MUST CONTAIN THE STRING `Know more`, and that is WCAG 2.5.3 (Label
  * in Name), not a style preference. The visible text IS `Know more`, so an
@@ -47,12 +58,20 @@ export function KnowMore({
 	label,
 	onClick,
 	className,
+	expanded,
 }: {
 	/** Full accessible name. MUST contain `Know more` — see the docblock. */
 	label: string;
 	onClick: () => void;
 	/** Layout only — positioning at the mount. Never a restyle. */
 	className?: string;
+	/**
+	 * Present ⇒ this mount reveals content IN PLACE and announces
+	 * `aria-expanded`; absent ⇒ it opens a dialog and announces
+	 * `aria-haspopup`. Never both — see the docblock for why the second form
+	 * came back.
+	 */
+	expanded?: boolean;
 }) {
 	return (
 		<Button
@@ -61,7 +80,8 @@ export function KnowMore({
 			size="xs"
 			onClick={onClick}
 			aria-label={label}
-			aria-haspopup="dialog"
+			aria-haspopup={expanded === undefined ? "dialog" : undefined}
+			aria-expanded={expanded}
 			className={`text-n5 hover:text-ink${className ? ` ${className}` : ""}`}
 		>
 			Know more

@@ -76,3 +76,35 @@ export function composeWireBody(args: {
 export function extendedMaxChars(titleLength: number): number {
 	return COMMENT_MAX_LENGTH - titleLength - 2;
 }
+
+/**
+ * UI-OVERNIGHT entry 5 — DOES THIS ARGUMENT HAVE A DESCRIPTION? The exact
+ * inverse of `composeWireBody`'s optional half, read back off the wire.
+ *
+ * The composer writes two fields into one `body`: a title line, and — only when
+ * the author typed one — an extended text after a blank line. The server's
+ * `deriveTitleTeaser` splits them apart again, taking the SECOND paragraph as
+ * the teaser. This asks the question those two halves imply: is there anything
+ * here beyond the title?
+ *
+ * ⛔ WHY IT EXISTS AT ALL. `Know more` opens the full argument in a pop-up. On
+ * an argument that is a title and nothing else, it opens a dialog showing the
+ * title again — a control that promises more and delivers the same sentence.
+ * Every card carried one unconditionally, so the promise was broken more often
+ * than it was kept. Gating on this predicate is what makes the control mean
+ * what it says.
+ *
+ * ⚠ IT MIRRORS `deriveTitleTeaser`'s SPLIT, deliberately and to the character —
+ * the same `/\n\s*\n/` and the same second paragraph. Two definitions of "the
+ * description" would let a card show `Know more` for a teaser the server does
+ * not derive, or hide it for one it does.
+ * ⚠ TRIMMED, so a body ending in whitespace after its title does not count as
+ * carrying a description.
+ * ⛔ IT IS NOT A LENGTH TEST. A long single-paragraph argument has no
+ * description and gets no control — correct, because the surfaces that clamp a
+ * title clamp it at two lines of a 125-character string, and the pop-up would
+ * add nothing the card is not already showing.
+ */
+export function hasExtendedText(body: string): boolean {
+	return (body.split(/\n\s*\n/)[1] ?? "").trim().length > 0;
+}
