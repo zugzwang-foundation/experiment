@@ -6,7 +6,7 @@
 | **Date** | 2026-06-01 |
 | **Deciders** | Hrishikesh Manoj Hundekari |
 | **Tracker task** | SYNC.5 (issuance ruling — the gate item) |
-| **Frame document** | SPEC.1 (product surface: economy, bet floors); SPEC.2 §23 (ADR Index); number-tuning pass (2026-09-01) |
+| **Frame document** | SPEC.1 (product surface: economy, bet floors); SPEC.2 §22 (ADR Index); number-tuning pass (2026-09-01) |
 | **Supersedes** | — (supersedes the informally-documented "fixed signup grant + daily login credit" draft, which was never ratified into a spec or ADR) |
 | **Superseded-by** | — |
 
@@ -119,7 +119,7 @@ The informally-documented "~10,000 grant / ~1,000-per-day / 100 minimum" draft i
 | INV-1 / INV-2 (append-only Dharma ledger, balance ≥ 0) | SPEC.2 §5, ADR-0005 | Consumes: grants and daily credits are issuance events on the append-only ledger; the engine mechanics (`src/server/dharma`, absent/forward) implement them. Minimum-bet enforcement is a write-path check in the bet handler. |
 | K · n > C | Thesis | Consumes: issuance defines the *cost of one unit of `n`*; faucet discipline protects the signal value of staked Dharma; the reply floor protects the K-side of reply-level participation against runaway C. |
 | Number-tuning pass (2026-09-01) | Project standing rule | **Mints** tuning-pass items: ratify/adjust initial grant, daily credit, post floor; re-examine reply floor = 50; decide the optional-sink mechanism or the faucet-tightening fallback; set the median-free-balance monitoring threshold. |
-| SPEC.2 §23 (ADR Index) | ADR index | **Mints** an ADR-0018 entry (same SYNC.7/8 commit). |
+| SPEC.2 §22 (ADR Index) | ADR index | **Mints** an ADR-0018 entry (same SYNC.7/8 commit). |
 | Tracker | SYNC.5 (this ADR), SYNC.7/8 (SPEC.1 economy rewrite, SPEC.2 §23), ADR backfill (commit this file), number-tuning pass | All consume this ADR being accepted. |
 
 ## More Information

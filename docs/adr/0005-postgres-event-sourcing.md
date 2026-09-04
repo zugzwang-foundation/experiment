@@ -6,7 +6,7 @@
 | **Date** | 2026-05-05 |
 | **Deciders** | Hrishikesh Manoj Hundekari |
 | **Tracker task** | SPEC.5 |
-| **Frame document** | SPEC.2 §1.4 #5 (delegation), §5, §6, §7, §14, §20, §23 (ADR Index) |
+| **Frame document** | SPEC.2 §1.4 #5 (delegation), §5, §6, §7, §14, §20, §22 (ADR Index) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
 
@@ -288,7 +288,7 @@ Listed for the record. Not viable: Vercel functions are stateless, with no persi
 - CLAUDE.md row 318 (Supabase as DB provider — locked) — consumed by ADR-0006
 - CLAUDE.md row 319 (Drizzle ORM — locked) — consumed by ADR-0008
 - SPEC.1 §5 (invariants), §11 (resolution surface), §16.4 (audit log catalogue), §12.2 (dataset release)
-- SPEC.2 §5, §6, §7 (stubs absorbing this ADR), §9 (concurrency), §14 (invariant contract), §18 (observability), §20 (public dataset), §23 (ADR Index)
+- SPEC.2 §5, §6, §7 (stubs absorbing this ADR), §9 (concurrency), §14 (invariant contract), §18 (observability), §20 (public dataset), §22 (ADR Index)
 - ADR-0001 (license — Postgres' license is AGPL-compatible)
 - ADR-0003 (Next.js 16 — provides Server Action contract for Pattern A handlers)
 - ADR-0004 (Better Auth — `verifications` table classified as mutable in this ADR)

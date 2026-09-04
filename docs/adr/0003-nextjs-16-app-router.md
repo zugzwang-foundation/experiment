@@ -6,7 +6,7 @@
 | **Date** | 2026-05-04 |
 | **Deciders** | Hrishikesh Manoj Hundekari |
 | **Tracker task** | SPEC.3 |
-| **Frame document** | SPEC.2 §1.4 #5 (delegation), §23 (ADR Index) |
+| **Frame document** | SPEC.2 §1.4 #5 (delegation), §22 (ADR Index) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
 
@@ -238,7 +238,7 @@ This ADR mints, consumes, or shapes the following items from SPEC.1 and SPEC.2. 
 - Vercel Cache Components documentation: <https://nextjs.org/docs/app/api-reference/config/next-config-js/cacheComponents>
 - AGENTS.md §1 (stack), §5 (Next.js 16 patterns), §7 (Tailwind v4 + shadcn bridge) — already aligned with this decision
 - CLAUDE.md §10 decision log row "Framework" — cites this ADR
-- SPEC.2 §1.4 #5 (delegation) and §23 (ADR Index)
+- SPEC.2 §1.4 #5 (delegation) and §22 (ADR Index)
 
 ---
 

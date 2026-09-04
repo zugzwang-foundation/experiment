@@ -696,4 +696,4 @@ On reading the report:
 
 ---
 
-**END — Zugzwang overnight run doctrine v1.1**
+**END — Zugzwang overnight run doctrine v1.2**

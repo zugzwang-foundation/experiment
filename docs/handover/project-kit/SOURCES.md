@@ -166,7 +166,7 @@ Numbering gaps are real: `0002` was never minted and `0012` never landed on disk
 
 ## Not in this folder (deliberate exclusions)
 
-- `docs/specs/flows/` — **38 intentionally-skeleton placeholder stubs** ("substance
+- `docs/specs/flows/` — **37 intentionally-skeleton placeholder stubs** (`ls docs/specs/flows/F-*.md | wc -l`; the directory holds 38 entries because `README.md` is not a stub) ("substance
   pending per SPEC.2 §13.4 gating cadence"). Excluded; do not chase them — the flow
   substance lives in SPEC.1 §7–§15.
 - `docs/runbooks/deploy-pipeline.md`, `docs/runbooks/BREAK_GLASS.md`,

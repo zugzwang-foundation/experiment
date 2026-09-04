@@ -6,7 +6,7 @@
 | **Date** | 2026-05-07 |
 | **Deciders** | Hrishikesh Manoj Hundekari |
 | **Tracker task** | SPEC.14 |
-| **Frame document** | SPEC.2 §1.4 #5 (delegation), §9 (Concurrency & Transactions), §14 (Invariant Contract), §15 (Error Envelope), §23 (ADR Index) |
+| **Frame document** | SPEC.2 §1.4 #5 (delegation), §9 (Concurrency & Transactions), §14 (Invariant Contract), §15 (Error Envelope), §22 (ADR Index) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
 
@@ -485,7 +485,7 @@ Ten new rows under the `bets::concurrency-*` family in SPEC.1 §17:
 - ADR-0007 (Observability): Sentry alarm 3 catalogue entry
 - ADR-0008 (Drizzle ORM): `db.transaction(...)`, `.for()` API, `sql\`...\`` template
 - SPEC.1 §5 (INV-1/2/3/4), §7 (F-BET-1 through F-BET-10), §8 F-COMMENT-8, §16.1 (`IN_FLIGHT_BET_TIMEOUT_SEC`), §17 (acceptance tests)
-- SPEC.2 §9 (Concurrency & Transactions), §14 (Invariant Contract), §15 (Error Envelope), §23 (ADR Index)
+- SPEC.2 §9 (Concurrency & Transactions), §14 (Invariant Contract), §15 (Error Envelope), §22 (ADR Index)
 
 ---
 

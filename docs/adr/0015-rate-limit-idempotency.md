@@ -6,7 +6,7 @@
 | **Date** | 2026-05-07 |
 | **Deciders** | Hrishikesh Manoj Hundekari |
 | **Tracker task** | SPEC.16 |
-| **Frame document** | SPEC.2 §1.4 #5 (delegation), §11 (Rate-Limit & Idempotency Contract), §15 (Error Envelope), §23 (ADR Index) |
+| **Frame document** | SPEC.2 §1.4 #5 (delegation), §11 (Rate-Limit & Idempotency Contract), §15 (Error Envelope), §22 (ADR Index) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
 

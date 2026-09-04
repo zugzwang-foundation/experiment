@@ -8,7 +8,7 @@
 | **Tracker task** | AUDIT-FIX-B3 |
 | **Frame document** | AUDIT.1 master report findings A3 / A4 / A9; `docs/plans/AUDIT-FIX-B3.md` |
 | **Supersedes** | — |
-| **Superseded-by** | — |
+| **Superseded-by** | ADR-0044 (partial — the "receipt keyed by `idempotency_key` alone" risk-acceptance bullet) |
 
 **This ADR does not decide:** the ownership-checked / never-throws release semantics and the completion-write alarm half (those scope ADR-0015 — see its in-place Patch record, same commit); a user-scoped receipt lookup (recorded below as candidate future hardening, out of B3); the non-owner runtime DB role (parked, pre-Sep-15, `parked.md`).
 

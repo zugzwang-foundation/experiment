@@ -6,7 +6,7 @@
 | **Date** | 2026-05-31 |
 | **Deciders** | Hrishikesh Manoj Hundekari |
 | **Tracker task** | SYNC.4 (successor ranking ADR) |
-| **Frame document** | SPEC.2 §1.4 #3 (delegation: ranking math owned here, not duplicated in SPEC.2), §23 (ADR Index) |
+| **Frame document** | SPEC.2 §1.4 #3 (delegation: ranking math owned here, not duplicated in SPEC.2), §22 (ADR Index) |
 | **Supersedes** | ADR-0009 (Ranking Function Lock) |
 | **Superseded-by** | — |
 
@@ -42,7 +42,7 @@ Read the body below through these reconciliations:
    work at DEBATE.9. The SPEC.1 §9 friendly-fire-as-input removal this ADR flagged "for same-commit
    SYNC.7/8" was completed in SYNC.7.
 
-4. **ADR Index is SPEC.2 §22, not §23.** This ADR's inline "SPEC.2 §23 (ADR Index)" references
+4. **ADR Index is SPEC.2 §22, not §23.** This ADR's inline "SPEC.2 §22 (ADR Index)" references
    (metadata *Frame document* row; Flow & invariant table; More Information) predate the
    PRECURSOR.2-B renumber (§23 → §22). The canonical index is **SPEC.2 §22**; the inline §23
    pointers are left as historical, uniform with ADR-0018/0019 which carry the same pre-strike number.
@@ -441,7 +441,7 @@ Per ADR-0005 §4, ranking is read-time-computed. No `ranking_snapshots` table, n
 | SPEC.2 §5 (Data Model) | Per-side reply-bet aggregates | Consumes the `comments` / `bets` shape (`side_at_post_time`, `bets.stake`, `bets.side`). Confirms the four per-side base signals are read-time-aggregable from existing columns; **no new frozen column required** on `comments` (unlike ADR-0009's `stake_at_post_time`, which this model does not need at post-level — value is aggregated from reply-bets). Author stake `a` for cold-start/tiebreak reads the post's own entry bet. Substantive absorption deferred to SPEC.2 §5 drafting chat. |
 | SPEC.2 §7 (Event Model) | Read-time-computed classification | Consumes: ADR-0005 §4's "read-time-computed (no projection table)" classification stands and is reaffirmed. |
 | SPEC.2 §9 (Concurrency) | Bet/comment write transaction | Consumes: per-side aggregates read `bets.stake` + `side`; no new in-transaction computation required at post level (value aggregates at read-time). |
-| SPEC.2 §23 (ADR Index) | ADR index | **Mints** an ADR-0017 entry; flips ADR-0009 to `superseded`. Same SYNC.7/8 commit. |
+| SPEC.2 §22 (ADR Index) | ADR index | **Mints** an ADR-0017 entry; flips ADR-0009 to `superseded`. Same SYNC.7/8 commit. |
 | SPEC.2 Appendix A (File Map) | Ranking module + spec | Consumes the existing `RANKING.md` + `src/lib/ranking.ts` rows; adds `src/lib/ranking.config.ts` for the new tunables. Substantive absorption deferred to SPEC.2 Appendix A drafting chat. |
 | ADR-0001 | License (AGPL-3.0-or-later) | Consumes: `RANKING.md` ships AGPL-3.0-or-later, same as protocol. |
 | ADR-0005 §3/§4 | Append-only triggers; read-model classification | Consumes: ranking reads current-state tables read-time; `bets.stake` is INSERT-only (existing trigger covers it); no projection table. |

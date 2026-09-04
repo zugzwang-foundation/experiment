@@ -6,7 +6,7 @@
 | **Date** | 2026-06-18 |
 | **Deciders** | Hrishikesh Manoj Hundekari |
 | **Tracker task** | DEBATE.7 (consumer); admin-dashboard stratum (consumer) |
-| **Frame document** | SPEC.1 §14 (Moderation), §15 (Admin Operations — F-ADMIN-4); SPEC.2 §10 (Pre-Commit Moderation Contract), §23 (ADR Index) |
+| **Frame document** | SPEC.1 §14 (Moderation), §15 (Admin Operations — F-ADMIN-4); SPEC.2 §10 (Pre-Commit Moderation Contract), §22 (ADR Index) |
 | **Supersedes** | ADR-0020 (held queue removed in full) |
 | **Superseded-by** | — |
 | **Amends** | ADR-0014 (Track B verdict *consequence* only — §85 + the §154 verdict-router `track_b` outcome; the gate architecture is otherwise unchanged) |
@@ -191,7 +191,7 @@ The following are ratified:
 - ADR-0013 (Concurrency / bet transaction — §8 moderation-unaware wrapper)
 - ADR-0010 (admin-is-not-a-participant)
 - SPEC.1 §14 (Moderation), §15 (Admin Operations — F-ADMIN-4), §16.4 (Audit Logs), §16.5 (CSAM legal floor)
-- SPEC.2 §10 (Pre-Commit Moderation Contract), §23 (ADR Index)
+- SPEC.2 §10 (Pre-Commit Moderation Contract), §22 (ADR Index)
 
 ---
 
