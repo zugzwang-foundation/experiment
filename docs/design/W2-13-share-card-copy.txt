@@ -1,0 +1,117 @@
+# SOURCE: docs/design/mockups/DESIGN_W2_13_post-reply-share-card_mockup-v0_1.html @ 54b0b2a · 271 lines
+# <line>: [kind] string ; kind = text | aria-label | alt | title | placeholder
+# HTML entities are decoded. Verbatim source is in the __raw files.
+
+=== STATIC MARKUP (108) ===
+6: [text] Zugzwang · W2.13 — Share-card download (v0.1)
+131: [text] Zugzwang · W2.13 — Post / reply share-card download · mockup v0.1
+132: [text] The artifact a user downloads to post on X. Each white box below
+133: [text] is
+133: [text] the exported image — a fixed
+134: [text] 16:9 canvas
+134: [text] (target 1600×900) with the card centered. 16:9 is what X shows in full, so the header % (top) and the tally / footer (bottom) are never clipped in the timeline.
+135: [text] Refinements applied:
+136: [text] (1)
+136: [text] bookmark + download icons → "Zugzwang Verified" badge ·
+137: [text] (2)
+137: [text] "+" removed ·
+137: [text] (3)
+137: [text] reply footer says Supported / Countered ·
+137: [text] (4)
+137: [text] header % shows the current price on the post's side. Brand is deferred — the badge mark and the source line are placeholders.
+143: [text] Variant A · Post card —
+143: [text] YES side
+147: [text] Will Mumbai Metro Line 3 average over 1M daily riders before the freeze?
+148: [text] Yes
+149: [text] 38%
+156: [text] umber-falcon-31
+157: [text] |
+158: [text] YES @ 31%
+159: [text] |
+160: [text] Đ 240
+160: [text] →
+160: [text] Đ 310
+161: [text] |
+162: [text] Replies ·
+162: [text] 9
+163: [title] Zugzwang Verified — placeholder, finalised at branding
+169: [text] Zugzwang Verified
+172: [text] Monsoon rebound is already in the dailies — the October base makes 1M arithmetic, not hope.
+173: [text] IMAGE · SHOWN WHOLE
+175: [text] Support
+175: [text] Đ 1,250
+176: [text] Đ 2,840
+176: [text] staked
+177: [text] Counter
+177: [text] Đ 1,590
+181: [text] zugzwangworld.com
+184: [text] Post variant.
+184: [text] Header reads
+184: [text] Yes 38%
+184: [text] (current price, YES because the author is on YES); the author's
+185: [text] entry price "YES @ 31%"
+185: [text] stays beside the name as its own black side-pill. Bottom keeps the SUPPORT / staked / COUNTER split bar.
+190: [text] Variant B · Reply card —
+190: [text] YES side
+194: [text] Will Mumbai Metro Line 3 average over 1M daily riders before the freeze?
+195: [text] Yes
+196: [text] 34%
+203: [text] umber-falcon-31
+204: [text] |
+205: [text] YES @ 29%
+206: [text] |
+207: [text] Đ 180
+207: [text] →
+207: [text] Đ 214
+208: [title] Zugzwang Verified — placeholder, finalised at branding
+214: [text] Zugzwang Verified
+217: [text] Monthly-pass volumes are climbing faster than single-journey tokens — that's habit forming, and habit doesn't churn when the weather turns.
+218: [text] IMAGE · SHOWN WHOLE
+220: [text] Supported verdant-heron-07's argument
+220: [text] —
+221: [text] "The airport feeder opens October 1 and MMRC's own note adds 180k daily trips from day one — none of it is in the curve we see today."
+225: [text] zugzwangworld.com
+228: [text] Reply variant.
+228: [text] No REPLIES count and no split bar (replies are flat, depth-1). The footer swaps "Replied to" →
+229: [text] "Supported … "
+229: [text] (it would read
+229: [text] "Countered … "
+229: [text] for a Counter reply), and keeps the parent quote beneath it.
+234: [text] Side reference ·
+234: [text] NO styling
+234: [text] — header + entry pill only
+237: [text] Will Mumbai Metro Line 3 average over 1M daily riders before the freeze?
+238: [text] No
+239: [text] 53%
+245: [text] umber-falcon-31
+246: [text] |
+247: [text] NO @ 47%
+248: [text] |
+249: [text] Đ 300
+249: [text] →
+249: [text] Đ 312
+252: [text] For a
+253: [text] NO-side
+253: [text] post/reply: header flips to
+253: [text] No 53%
+253: [text] (current price on the NO side = 100 − YES), and the entry pill
+254: [text] "NO @ 47%"
+254: [text] renders white/outline per the side binding (YES/Support = black, NO/Counter = white). Same composition otherwise.
+260: [text] Notes for this v0.1
+262: [text] The canvas is the export.
+262: [text] The drop-shadow and grey page behind it are mockup-only; the real PNG is just the white 16:9 frame and its contents.
+263: [text] Brand-deferred placeholders
+263: [text] brand pass
+263: [text] — the hourglass + "Zugzwang Verified" lockup, and the
+263: [text] zugzwangworld.com
+263: [text] source line in the bottom margin. Both get finalised when the logo is locked; the source line is the pull-back-to-platform mechanism, so it holds the space now.
+264: [text] Tall / square user images
+264: [text] make the card narrower than 16:9, so it sits centered with wider side margins (these examples use wide images, so the margin is even). That gutter is the cost of guaranteeing no X-crop; filling it is a brand-pass question, not a v1 blocker.
+265: [text] Not in v0.1, by design
+265: [text] — the file format / resolution / how the download fires (that's the UI.15 build), and the debate
+265: [text] .md
+265: [text] (a separate download).
+
+=== STRING LITERALS INSIDE <script> (0) ===
+# Unfiltered and exhaustive: several mockups build their copy in JS,
+# so identifiers and selectors appear here alongside rendered copy.
