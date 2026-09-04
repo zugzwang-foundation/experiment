@@ -135,11 +135,14 @@ export function HeroPanels({
 			    Enter by moving the cursor rather than by intercepting the key —
 			    and leaves the buttons' own Enter/Space behaviour untouched, as it
 			    must be, or they stop being usable from the keyboard at all. */}
+			{/* min-w-0 on all three grid children below — grid items default to
+			    min-width:auto and won't shrink past their content's min-content
+			    width, which pushed this row past the viewport below ~1280px. */}
 			<Link
 				ref={linkRef}
 				data-testid="hero-market-link"
 				href={`/m/${card.slug}`}
-				className="flex flex-col rounded-[var(--r)] bg-n0 px-4 pt-[14px] pb-3 outline-none [border:var(--border-hero)] focus-visible:shadow-(--state-focus-ring)"
+				className="flex min-w-0 flex-col rounded-[var(--r)] bg-n0 px-4 pt-[14px] pb-3 outline-none [border:var(--border-hero)] focus-visible:shadow-(--state-focus-ring)"
 			>
 				<div className="flex items-center gap-3">
 					{/* The shared `MarketThumb` (PRIMITIVES-2 D2) — one owner of null ·
@@ -256,10 +259,13 @@ function HeroPostPanel({
 }) {
 	if (post === null) {
 		return (
+			// min-w-0 — same grid-item min-content trap as hero-market-link
+			// above; this is the alternate root HeroPostPanel can render into
+			// the same grid slot.
 			<div
 				data-testid="hero-side-empty"
 				data-side={side}
-				className="flex items-center justify-center rounded-[var(--r)] bg-n0 p-4 text-xs text-muted-foreground [border:var(--border-hero)]"
+				className="flex min-w-0 items-center justify-center rounded-[var(--r)] bg-n0 p-4 text-xs text-muted-foreground [border:var(--border-hero)]"
 			>
 				{HERO_SIDE_EMPTY[side]}
 			</div>
@@ -283,7 +289,7 @@ function HeroPostPanel({
 		<div
 			data-testid="hero-post"
 			data-side={side}
-			className="relative flex flex-col rounded-[var(--r)] bg-n0 px-3 pt-3 pb-[11px] [border:var(--border-hero)]"
+			className="relative flex min-w-0 flex-col rounded-[var(--r)] bg-n0 px-3 pt-3 pb-[11px] [border:var(--border-hero)]"
 		>
 			<div className="flex flex-nowrap items-center gap-1.5 overflow-hidden text-[9.5px] whitespace-nowrap">
 				<Avatar size="xs">
