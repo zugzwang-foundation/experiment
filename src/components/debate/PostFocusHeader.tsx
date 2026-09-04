@@ -83,12 +83,23 @@ export function PostFocusHeader({
 			fit
 			// HTML-FINISH · MARKET DETAIL row 17 — `.mcard` (`d5:1021`) is the post
 			// arm's whole rail, and it IS THE EXIT. See `FocusMarketCard` for why
-			// building it inert would make post-focus a trap: `?post=` syncs with
-			// `history.replaceState`, never `pushState`, so browser Back does not
-			// leave post view, and this card replaces the only other way out.
+			// building it inert would make post-focus a trap.
+			// ⚠ THE REASON GIVEN HERE WAS SUPERSEDED AND IS CORRECTED RATHER THAN
+			// LEFT (O-5). It read: "`?post=` syncs with `history.replaceState`,
+			// never `pushState`, so browser Back does not leave post view, and this
+			// card replaces the only other way out." RPLY-1 · R2 made entering PUSH
+			// a rung precisely so Back would work — so Back is now an exit too, and
+			// this card is the VISIBLE one rather than the only one. That is a
+			// weaker claim and it still forbids an inert card: an exit a reader
+			// cannot see is one they do not have.
 			right={
 				<FocusMarketCard
 					title={market.title}
+					// UI-FOLLOWUP B — the card is an `<a>` now and needs the market's
+					// address. Already on `DebateMarketHeader` (it is `MarketSummary`'s
+					// own field, the one `/m/[slug]` resolved this page by), so nothing
+					// new is threaded and no read model changes.
+					slug={market.slug}
 					// ⚠⚠ UI-OVERNIGHT entry 4 — THE DISCOVERY THUMBNAIL, NOT THE HEADER'S
 					// IMAGE. This rail is the LOCKED market-card composition (image thumb
 					// + question · YES/NO bar · totals), the same one Discovery renders —
