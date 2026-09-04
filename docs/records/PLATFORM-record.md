@@ -83,7 +83,7 @@ independently of the function's environment. `tests/server/health/region.test.ts
 | Redis key namespacing by environment | SHIPPED | `src/server/upstash/keys.ts` | SPEC.2 §11 | — | `tests/unit/upstash-keys.test.ts`, `tests/unit/upstash-redis-config.test.ts` | — |
 | Distributed locks (cron singletons) | SHIPPED | `src/server/upstash/lock.ts` | SPEC.2 §12 | — | `tests/integration/upstash-lock.integration.test.ts` | — |
 | Presigned PUT (upload) | SHIPPED | `src/server/storage/sign-upload.ts`, `src/app/api/uploads/sign/route.ts` | SPEC.2 §12 | 0028, 0042 | `tests/integration/sign-upload.integration.test.ts`, `tests/server/storage/sign-route-envelope.test.ts` | — |
-| Presigned READ (moderation, 60 s) | SHIPPED | `src/server/storage/sign-read.ts`, TTL `src/server/config/limits.ts:40` | SPEC.2 §12 | 0028, 0042 | `tests/integration/sign-read.integration.test.ts` | — |
+| Presigned READ (moderation, 60 s) | SHIPPED | `src/server/storage/sign-read.ts`, TTL `src/server/config/limits.ts:40 (READ_URL_TTL_SECONDS_MODERATION)` | SPEC.2 §12 | 0028, 0042 | `tests/integration/sign-read.integration.test.ts` | — |
 | R2 orphan sweep (6-hourly cron) | SHIPPED | `src/app/api/cron/r2-orphan-sweep/route.ts`, `vercel.json` | SPEC.2 §12 | — | `tests/integration/orphan-sweep.integration.test.ts` | — |
 | Close-due-markets sweep (per minute) | SHIPPED | `src/app/api/cron/close-due-markets/route.ts` | SPEC.1 §14 | — | `tests/server/cron/` | — |
 | Alarms drain (5-minutely) | SHIPPED | `src/app/api/cron/alarms-drain/route.ts`, `src/server/observability/drain-cron-alarms.ts` | SPEC.2 §17 | — | `tests/integration/alarms-drain.integration.test.ts` | — |

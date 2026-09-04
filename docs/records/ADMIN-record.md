@@ -37,7 +37,7 @@ the same audit rows; the difference is only where the admin enters the action fr
 | Moderation action (remove / ban) | SHIPPED | `src/server/admin/moderation/act.ts` | `F-ADMIN-4` | 0020, 0021 | `tests/server/admin/moderation/act.test.ts` | no un-ban affordance — UI-6 D4 |
 | **Audit log + search** | SHIPPED | `src/server/admin/moderation/{audit-feed,audit-view}.ts`, `src/app/(admin)/admin/moderation/audit/` | SPEC.1 §15 · `F-ADMIN-5` | — | `tests/server/admin/audit-search.test.ts`, `moderation/audit-{feed-leak,page-auth,view}.test.ts`, `audit-search-surface.component.test.tsx` | — |
 | **Resolution trio** — settle / correct / void | SHIPPED | `src/server/resolution/{settle,correct,void,trigger,basis}.ts`, W-3 `transaction.ts` | SPEC.1 §11 · `F-RESOLVE-1..3` | 0039 | `tests/server/resolution/` (**7** files — `actor-assert`, `concurrency`, `correction`, `freeze-exemption`, `happy-path`, `pro-rata`, `void`), `tests/invariants/I-RESOLVE-ONCE-001…`, `tests/integration/resolution-conservation.integration.test.ts` | — |
-| Admin actor belt | SHIPPED | `src/server/admin/actor.ts:30` | SPEC.2 §3.7 | — | `tests/server/resolution/actor-assert.test.ts` | — |
+| Admin actor belt | SHIPPED | `src/server/admin/actor.ts:30 (assertAdminActor)` | SPEC.2 §3.7 | — | `tests/server/resolution/actor-assert.test.ts` | — |
 | Conclusion freeze | SHIPPED | `src/server/system/is-frozen.ts`, `system_state.frozen_at` | SPEC.1 §14 | — | `tests/server/system/` | freeze **banner** not built |
 | Break-glass rotation | **DOCUMENTED, never exercised** | — | — | — | `docs/runbooks/BREAK_GLASS.md` (124 lines) | §3 "Future HARDEN.10 scope" |
 | Admin `users` row / `role` column | **NOT BUILT — refused by design** | — | SPEC.1 §15 | 0010 | `src/db/schema/auth.ts:29-30` | never |
@@ -97,7 +97,7 @@ not fixed — `docs/STATE.md` §4 · `F-4`.
 > `// No `role` column. No `is_admin`. Per §8.7 pillar 1 (admin has no users`
 > `// row; structural separation by data-model) — also CLAUDE.md §3.`
 
-**The admin actor belt is the runtime half of that.** `src/server/admin/actor.ts:30`
+**The admin actor belt is the runtime half of that.** `src/server/admin/actor.ts:30 (assertAdminActor)`
 `assertAdminActor` throws unless `actor_id === "admin-singleton"` **and** `user_id === null`.
 Every lifecycle and resolution write passes through it — create, open, close, trigger, settle,
 correct, void. Its docblock states the reason the identity is a singleton rather than a user:

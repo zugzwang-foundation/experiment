@@ -295,9 +295,9 @@ The five existing pseudonym tests (`auth::pseudonym-auto-assigned-permanent`, `p
 
 ### 1 · Namespace: 871 pairs, not 5,000
 
-The ADR sizes the namespace at 50 colours × 100 animals = 5,000 pairs × 10 numbers = 50,000. The Flux run that exists on `spark-3100` covers **13 colours × 67 animals = 871 pairs** — 17% of the planned animal list and 26% of the colours.
+The ADR sizes the namespace at 50 colours × 100 animals = 5,000 pairs × 10 numbers = 50,000. The Flux run that exists on the render machine covers **13 colours × 67 animals = 871 pairs** — 17% of the planned animal list and 26% of the colours.
 
-The thirteen colours are Red plus the twelve `~/pfp_recolor/recolor_batch.py` recolours it into: Orange, Gold, Olive, Green, Jade, Teal, Cerulean, Indigo, Violet, Magenta, Rose, Silver. Red is the source render every other arm is derived from, which is why it has no folder of its own in the render tree — the red originals sit at the animal directory root.
+The thirteen colours are Red plus the twelve the recolour step recolours it into: Orange, Gold, Olive, Green, Jade, Teal, Cerulean, Indigo, Violet, Magenta, Rose, Silver. Red is the source render every other arm is derived from, which is why it has no folder of its own in the render tree — the red originals sit at the animal directory root.
 
 `src/server/identity-pool/vocabulary.ts` is the single source for both lists. The word-list files this ADR names (`asset-pipeline/colours.txt`, `animals.txt`) were never created; the TS module supersedes them, because it is what both the seed scripts and their tests import, and a second copy in `.txt` could only drift from it.
 
@@ -322,7 +322,7 @@ Not a change to the decision, but a property the ADR does not state and which tu
 | Colour + animal vocabulary | `src/server/identity-pool/vocabulary.ts` |
 | Seed-order generator | `src/server/identity-pool/rotation.ts` |
 | Public URL builder | `src/server/identity-pool/pfp-url.ts` |
-| Converter + uploader | `~/asset-pipeline/convert_and_upload_pfp.py` — on spark-3100, not in this repo |
+| Converter + uploader | the asset pipeline's convert-and-upload step — on the render machine, not in this repo |
 
 The converter centre-crops each 1280×720 render to square, resizes to 256×256 (the size this ADR names as the distinguishability target), encodes webp, and uploads under `v1/` with the `Content-Type` and `Cache-Control` this ADR requires. 1,079 objects, 4.9 MiB.
 
