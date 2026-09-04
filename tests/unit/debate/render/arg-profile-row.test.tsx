@@ -108,14 +108,59 @@ describe("UI-OVERNIGHT 1b — the identity row wraps in two units", () => {
 		).toBeTruthy();
 	});
 
-	it("arg-profile-row::NO-separator-stands-between-the-replies-and-the-age", () => {
-		// Rule 7 — the pipes inside group A stay; the one before the age goes.
-		// It would DANGLE at the end of line 1 the moment group B wrapped, which
-		// is the state this entry makes ordinary rather than exceptional.
+	it("arg-profile-row::the-separator-LEADS-group-B-rather-than-trailing-group-A", () => {
+		// SEP-1, founder ruling — AND THIS ASSERTION IS INVERTED FROM WHAT IT SAID
+		// UNTIL THIS COMMIT. It read
+		// `arg-profile-row::NO-separator-stands-between-the-replies-and-the-age`,
+		// on rule 7: "the pipes inside group A stay; the one before the age goes.
+		// It would DANGLE at the end of line 1 the moment group B wrapped."
+		//
+		// The dangle was real; deleting the separator was the wrong remedy for it,
+		// and it left this row the only author row in the product without one —
+		// `… REPLIES · 2  14d ago` here against `… Đ 18 | 1d ago` on Discovery and
+		// on the profile, off the SAME governing rule (canon §3 item 11).
+		//
+		// ⛔ THE PLACEMENT IS THE FIX, AND IT IS WHAT THIS ASSERTS. A separator
+		// that is a sibling of group B is the last thing on line 1 when the group
+		// wraps away from it — the dangle. As group B's FIRST CHILD it travels
+		// with the timestamp it divides, and line 2 reads `| 14d ago  [badge]`.
+		// That is accepted and known; nothing measures around it.
+		//
+		// ⚠ jsdom performs no layout, so this cannot see a wrap. What it CAN see
+		// is the containment that decides the wrap's outcome, which is exactly the
+		// part that was wrong.
 		const { container } = widestRow({ badge: "Highest Stakes" });
 		const [groupA, groupB] = groups(container);
 		expect(groupA?.textContent).toContain("|");
-		expect(groupB?.textContent ?? "").not.toContain("|");
+		expect(groupB?.textContent ?? "").toContain("|");
+		// FIRST child, not merely present: appended after the age it would divide
+		// nothing, and would trail line 2 instead of leading it.
+		const first = groupB?.firstElementChild ?? null;
+		expect(first?.getAttribute("data-field-separator")).toBe("");
+		expect(first?.textContent).toBe("|");
+	});
+
+	it("arg-profile-row::every-separator-on-the-row-is-the-SHARED-primitive", () => {
+		// SEP-1 — the defect was not one missing pipe, it was three private
+		// copies of the same element drifting apart. Counting pipes that are NOT
+		// the shared component is what would catch a fourth copy being hand-rolled
+		// back in, which is how the first three arrived.
+		const { container } = widestRow({ badge: "Highest Stakes" });
+		const pipes = [...container.querySelectorAll("span")].filter(
+			(el) => el.textContent === "|",
+		);
+		expect(pipes.length).toBeGreaterThan(0);
+		for (const pipe of pipes) {
+			expect(pipe.getAttribute("data-field-separator")).toBe("");
+			// The glyph is U+007C, plain ASCII — asserted by CODE POINT so a
+			// visually identical look-alike (U+2502 and the box-drawing family)
+			// reddens, exactly as the Discovery and profile guards do.
+			expect(pipe.textContent?.codePointAt(0)).toBe(0x7c);
+			// Punctuation, and never announced. Two of the three copies this
+			// primitive replaces lacked this, so Discovery and the profile were
+			// reading their pipes aloud.
+			expect(pipe.getAttribute("aria-hidden")).toBe("true");
+		}
 	});
 
 	it("arg-profile-row::the-download-mark-is-OUTSIDE-the-wrapping-area", () => {
@@ -171,7 +216,13 @@ describe("UI-OVERNIGHT 1b — the identity row wraps in two units", () => {
 		// non-vacuity control for every assertion above.
 		const { container } = widestRow();
 		const [, groupB] = groups(container);
-		expect(groupB?.children).toHaveLength(1);
+		// TWO children — the separator and the age. ⚠ It was ONE until SEP-1 put
+		// the divider back INSIDE this group; the assertion moved because the
+		// composition did, and what it is actually guarding is unchanged: no
+		// badge slot, empty or otherwise, on a reply.
+		expect(groupB?.children).toHaveLength(2);
 		expect(groupB?.querySelector("[data-relative-time]")).not.toBeNull();
+		expect(groupB?.querySelector("[data-field-separator]")).not.toBeNull();
+		expect(groupB?.textContent).not.toContain("Highest Stakes");
 	});
 });

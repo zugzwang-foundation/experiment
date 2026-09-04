@@ -168,9 +168,9 @@ experiment/
 │   │                               #   collision-free. Copy the pattern only when the
 │   │                               #   same measurement holds; it is not a general
 │   │                               #   licence to ship component-scoped stylesheets.
-│   │   └── ui/                     #   15 files, and they are NOT all shadcn. NINE shadcn
+│   │   └── ui/                     #   16 files, and they are NOT all shadcn. NINE shadcn
 │   │                               #   primitives: avatar, badge, button, card, dialog,
-│   │                               #   input, separator, skeleton, textarea. SIX are
+│   │                               #   input, separator, skeleton, textarea. SEVEN are
 │   │                               #   project-authored — empty-block (P1), loading-block
 │   │                               #   (P7), error-block (the route-boundary family; canon
 │   │                               #   §10 C-STATES-1 rules it NEITHER P1 NOR P7),
@@ -183,7 +183,15 @@ experiment/
 │   │                               #   touch tap; composes radix-ui's Tooltip and Popover,
 │   │                               #   picked per-render on `(hover: hover) and (pointer:
 │   │                               #   fine)`; not yet canon-ratified — the others are, this
-│   │                               #   one landed the same night). Don't reach for a shadcn
+│   │                               #   one landed the same night), and field-separator (SEP-1 —
+│   │                               #   the author row's `.vsep` pipe, lifted out of THREE private
+│   │                               #   copies in `debate/ArgProfile`, `discovery/HeroPanels` and
+│   │                               #   `profile/ArgumentList` after those copies drifted: one lost
+│   │                               #   the divider before its timestamp and the other two kept it.
+│   │                               #   ⚠ It is the one leaf here that states its OWN font-size and
+│   │                               #   inherits none — the inverse of relative-time's split,
+│   │                               #   because a seam that changes size per surface is the drift
+│   │                               #   it exists to end). Don't reach for a shadcn
 │   │                               #   generator to change one
 │   ├── db/                         # ← Drizzle client + schema live HERE (not src/server/db)
 │   │   ├── index.ts                #   the drizzle client

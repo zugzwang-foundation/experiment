@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { FieldSeparator } from "@/components/ui/field-separator";
 import { InfoTip } from "@/components/ui/info-tip";
 import { RelativeTime } from "@/components/ui/relative-time";
 import { GLOSSARY, SOLD_LABEL } from "@/lib/copy/glossary";
@@ -223,12 +224,12 @@ export function ArgProfile({
 					>
 						{author.pseudonym}
 					</Link>
-					<Sep />
+					<FieldSeparator />
 					<SideBadge side={side} price={entryPrice} size={chipSize} />
 					<PositionMarker marker={marker} />
 					{authorStake !== undefined ? (
 						<>
-							<Sep />
+							<FieldSeparator />
 							{/* RANK-1 / ADR-0039 R6 — the figure FOLLOWS THE RULER. This is
 						    the stake still held, which is exactly what the lane sorted
 						    on; a fully-exited argument reads `Đ 0` here rather than
@@ -292,7 +293,7 @@ export function ArgProfile({
 					) : null}
 					{replyCount !== undefined ? (
 						<>
-							<Sep />
+							<FieldSeparator />
 							{/* `.repmeta` (`d5:580`) — `font-weight:700;letter-spacing:.12em;
 						    text-transform:uppercase;color:var(--ink)`, with `.repn`
 						    (`:579`) setting the COUNT back to 13px / no tracking. The row
@@ -318,16 +319,26 @@ export function ArgProfile({
 				    the age onto a second line in the first place, and what left the
 				    download mark centred against a two-line block. It is a TAG about
 				    the argument, so it now travels with the argument's other tags.
-				    ⛔ AND IT NO LONGER TAKES A `Sep`. The separators inside Group A
-				    stay — they divide fields of one sentence — but a pipe before the
-				    age would DANGLE at the end of line 1 the moment Group B wraps.
-				    ⚠⚠ THIS REVERSES A RECORDED RULING AND SAYS SO. The block below
-				    used to read "THE `Sep` IS RULED IN … canon §3 item 11 gained the
-				    field AND its divider first". That ruling was made for a row that
-				    never wrapped as a unit; this one does. The founder ruled the wrap,
-				    and the divider cannot survive it — so canon §3 item 11 is OWED an
-				    amendment for this row, and the report says so rather than letting
-				    the code quietly disagree with the document it cites. */}
+				    ⚠⚠ AND IT LEADS WITH THE SEPARATOR — SEP-1, founder ruling, and
+				    this block argued the OPPOSITE until this commit. It read "⛔ AND IT
+				    NO LONGER TAKES A `Sep` … a pipe before the age would DANGLE at the
+				    end of line 1 the moment Group B wraps", which removed the divider
+				    from this row and left canon §3 item 11 owed an amendment. The
+				    founder ruled the other way: the divider stays, and it moves INSIDE
+				    Group B as its LEADING element.
+				    ⛔ THAT PLACEMENT IS THE WHOLE ANSWER TO THE DANGLE, and it is why
+				    the position is not interchangeable with "before the group". A
+				    separator that is a sibling of Group B is the last thing on line 1
+				    when the group wraps away from it — the dangle the removal was
+				    reaching for. Inside it, it is the first thing on line 2 and travels
+				    with the timestamp it divides: `| 14d ago  [badge]`. That second
+				    line is ACCEPTED AND KNOWN (founder ruling), and it is deliberately
+				    not measured around — no ResizeObserver, no badge-conditional
+				    render, nothing that would make this row's composition depend on
+				    layout the server cannot see.
+				    ⇒ Canon §3 item 11 is no longer owed an amendment for this row: it
+				    already records the field AND its divider, which is what the three
+				    sibling author rows ship. This row now agrees with them. */}
 				<span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
 					{/* TIME-1 · Form B — HOW LONG AGO, AND IT IS THE LAST THING GROUP A
 				    SAYS. The lane badge follows it (entry 1b, rule 5); nothing else
@@ -338,28 +349,30 @@ export function ArgProfile({
 				    after the tags. Canon §3 item 11 now rules exactly that — "the age
 				    precedes that cluster" — so the position is ratified rather than
 				    merely reasoned from d5.
-				    ⚠⚠ THE `Sep` IS RULED IN, AND THIS BLOCK ARGUED THE OPPOSITE UNTIL
-				    THE COMMIT BEFORE THIS ONE. It read "⛔⛔ NO `Sep` BEFORE IT, AND
-				    THAT IS A MEASURED DECISION RATHER THAN AN OMISSION", on the
-				    reasoning that two shipped guards count the pipes on the SIBLING
-				    rows against a governing source and would redden on a fourth. That
-				    was right about the guards and wrong about the remedy. The founder
-				    ruled Form B; canon §3 item 11 gained the field AND its divider
-				    first; the counts move because the ruling moved. The ordering is
-				    the whole point — a guard edited ahead of the ruling it cites is a
-				    guard edited to match the code.
+				    ⚠⚠ THE SEPARATOR IS BACK, AND IT IS THE FIRST THING IN THIS GROUP.
+				    It was removed at UI-OVERNIGHT entry 1b to stop it dangling at the
+				    end of line 1, which left this row the ONLY author row in the
+				    product with no divider before its age — Discovery's hero and the
+				    profile's argument list both keep theirs, so the same row read
+				    `… REPLIES · 2  14d ago` here and `… Đ 18 | 1d ago` there. The
+				    founder ruled the divider back in with its placement stated: inside
+				    Group B, ahead of the age, so a wrap carries it to line 2 instead of
+				    stranding it on line 1.
 				    ⛔ THIS ROW STILL HAS NO GUARD COUNTING ITS OWN PIPES, and that is
 				    a recorded gap rather than a licence: a composition change here is
 				    invisible to CI, while both sibling rows redden. Adding one would
 				    pin a third composition against canon and is a deliberate decision,
-				    not a side effect of this pass.
-				    ⛔ NO SIZE IS PASSED. This row is `text-xs` and the leaf inherits
-				    it — stating a size here would state it without its leading, which
-				    is the trap that put every tile 10px tall at PROFILE-FULL.
-				    ⚠ MEASURED at 1440 on staging before the pipe landed: this row's
-				    three existing pipes and the stake all sit at baseline 439.50, and
-				    so does the age. The new pipe is the same `Sep` at the same size,
-				    so it joins that line rather than introducing a second one. */}
+				    not a side effect of this pass. What IS guarded, since this commit,
+				    is that the pipe sits inside Group B rather than beside it —
+				    `arg-profile-row` asserts the group's own children, which is the
+				    only part of the wrap jsdom can see.
+				    ⛔ NO SIZE IS PASSED TO EITHER LEAF, and for two different reasons.
+				    `RelativeTime` inherits this row's `text-xs` because stating a size
+				    here would state it without its leading (the trap that put every
+				    tile 10px tall at PROFILE-FULL); `FieldSeparator` states its OWN
+				    size and leading and inherits nothing, because a seam that changes
+				    size per surface is the drift it was lifted to end. */}
+					<FieldSeparator />
 					<RelativeTime createdAt={createdAt} />
 					{/* ⚠ AT MOST ONE BADGE EXISTS TO RENDER. `LaneBadge` takes a single
 					    `Badge | null` (a post dominates a lane or it does not), so the
@@ -427,20 +440,5 @@ export function ArgProfile({
 				</span>
 			) : null}
 		</div>
-	);
-}
-
-/**
- * d5's `.vsep` — the pipe between the author row's fields. Byte-carried from the
- * shipped separator at `discovery/HeroPanels.tsx` and `profile/ArgumentList.tsx`
- * so the three surfaces render one separator, not three.
- * `aria-hidden`: it is punctuation, and announcing "vertical line" between every
- * field would make the row unlistenable.
- */
-function Sep() {
-	return (
-		<span aria-hidden="true" className="shrink-0 text-n3">
-			|
-		</span>
 	);
 }

@@ -6,6 +6,7 @@ import { computeSplitBar } from "@/components/debate/composer/split-bar";
 import { formatDharma, formatDharmaCompact } from "@/components/debate/format";
 import { PriceBar } from "@/components/debate/PriceBar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { FieldSeparator } from "@/components/ui/field-separator";
 import { InfoTip } from "@/components/ui/info-tip";
 import { RelativeTime } from "@/components/ui/relative-time";
 import type { HeroPost, HeroTopPosts } from "@/server/discovery/hero";
@@ -222,31 +223,6 @@ export function HeroPanels({
 	);
 }
 
-/**
- * HTML-FINISH row 6 — the thin upright separator between the author name, the
- * side chip and the stake figure. TWO per post panel (mockup markup `:187` and
- * `:189`; `.vsep` at `:87`).
- *
- * ⛔ THE GLYPH IS BYTE-CARRIED, NOT TYPED. `hexdump` of both mockup lines gives
- * `3e 7c 3c` — the content byte is `0x7C`, U+007C VERTICAL LINE, plain ASCII.
- * Both lines are byte-identical to each other.
- *
- * ⚠ THE COLOUR COMES FROM SHIPPED CODE, NEVER FROM THE MOCKUP. `StatLine.tsx`
- * already ships `<span className="… text-n3">|</span>` for this exact glyph in
- * this exact separator role ("V27 — an explicit n3 separator"), so `text-n3` is
- * a shipped-precedent match. The mockup's `.vsep{color:var(--n3)}` is NOT the
- * source: the ramps are inverted between the light prototype and the shipped
- * dark system, and porting a neutral by NAME across them is exactly the
- * failure `side-pole-binding` and the V7/V42 rulings exist to prevent.
- *
- * No margin is invented either — the mockup's `.vsep` carries none and spacing
- * comes from `.argprofile`'s `gap:6px`, which this row already ships as
- * `gap-1.5`. `shrink-0` is the mockup's `flex:0 0 auto`, i.e. topology.
- */
-function HeadSeparator() {
-	return <span className="shrink-0 text-n3">|</span>;
-}
-
 /** One side's hero post panel — or the OQ-6 empty copy when none eligible. */
 function HeroPostPanel({
 	side,
@@ -311,9 +287,9 @@ function HeroPostPanel({
 				>
 					{post.author.pseudonym}
 				</Link>
-				<HeadSeparator />
+				<FieldSeparator />
 				<SideBadge side={post.side} size="hero" price={post.entryPrice} />
-				<HeadSeparator />
+				<FieldSeparator />
 				{/* V13 — `.argstake` (mockup :86-88, markup :190). The progression is
 				    POST-ANCHORED (founder ruling OD-1 = Option B): the left figure is
 				    THIS post's own entry bet, the right the author's current value on
@@ -351,8 +327,8 @@ function HeroPostPanel({
 				    RULE as the debate card ("after every existing tag on the identity
 				    row"), applied to the tags this row actually has, rather than the
 				    same POSITION copied across from a row with different contents.
-				    ⚠⚠ THE `HeadSeparator` IS RULED IN, AND THIS BLOCK ARGUED THE
-				    OPPOSITE UNTIL THE COMMIT BEFORE THIS ONE. It read "⛔ NO
+				    ⚠⚠ THE `FieldSeparator` IS RULED IN, AND THIS BLOCK ARGUED THE
+				    OPPOSITE UNTIL TIME-1 · Form B. It read "⛔ NO
 				    `HeadSeparator` BEFORE IT", because the hero guard pins this row's
 				    separator count against the MOCKUP's own markup and a third pipe
 				    would have reddened it.
@@ -365,17 +341,25 @@ function HeroPostPanel({
 				    pipe does not open a new divergence, it makes the existing one
 				    visible. ⛔ The mockup is NOT edited: a locked mockup is amended
 				    deliberately, never as a side effect of a UI pass.
-				    ⛔ NO SIZE AND NO `shrink-0`. The row is `text-[9.5px]
+				    ⛔ NO SIZE AND NO `shrink-0` ON THE AGE. The row is `text-[9.5px]
 				    flex-nowrap overflow-hidden whitespace-nowrap` and the leaf
 				    inherits all of it; every other element here is governed by that
 				    same clip, and exempting this one would make the newest field the
 				    only one that survives a narrow panel.
+				    ⚠ THE SEPARATOR IS THE ONE EXEMPTION, AND IT IS DELIBERATE (SEP-1).
+				    `FieldSeparator` states its own `text-xs`, so all three pipes on this
+				    row render at 12px rather than at the row's 9.5px — one computed size
+				    for the seam on every author row in the product, which is what the
+				    shared element was lifted to guarantee. It costs this row width, and
+				    PD-2-36 records this row as Discovery's binding horizontal-overflow
+				    constraint, so the cost is MEASURED rather than reasoned: the figure is
+				    in the SEP-1 report and the row's overflow is still 0.
 				    ⚠ PD-2-36 — this row is the binding constraint on Discovery's
 				    horizontal overflow, and each pipe costs it. Measured at 1440 on
 				    staging before this landed: pipe min-content 2.52px + one 6px gap,
 				    against 33.87px of slack on the wider (NO) panel. Overflow was 0
 				    before and is 0 after; the after-figure is in the run report. */}
-				<HeadSeparator />
+				<FieldSeparator />
 				<RelativeTime createdAt={post.createdAt} />
 			</div>
 			{/* V18 — the WHOLE panel is the post's click target, matching the
