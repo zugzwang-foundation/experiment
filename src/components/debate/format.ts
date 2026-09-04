@@ -106,25 +106,44 @@ export function formatDharma(value: string): string {
 }
 
 /**
- * The header-stake ABBREVIATION THRESHOLD — below this the figure renders
- * exactly, at or above it the `k`/`M` form takes over. Whole Đ, so the
- * comparison is made against the ROUNDED value rather than the stored one
- * (see `formatDharmaCompact`).
+ * The ABBREVIATION THRESHOLDS — below one, the figure renders exactly; at or
+ * above it the `k`/`M` form takes over. Whole Đ, so the comparison is made
+ * against the ROUNDED value rather than the stored one (see
+ * `formatDharmaCompact`).
+ *
+ * ⚠ TWO THRESHOLDS, ONE FORMATTER, AND THE SPLIT IS THE POINT. A header stake
+ * sits inside a sentence a reader is comparing against its neighbours — `Đ 550`
+ * against `Đ 1,830` — so it stays exact until five digits force the row to wrap
+ * (UI-OVERNIGHT entry 1a, the reason `formatDharmaCompact` exists at all). A
+ * market TOTAL is not compared with anything; it is the size of the room, read
+ * once at a glance, and it is the widest figure on a card whose width is fixed.
+ * Abbreviating it from a thousand is what keeps `Đ 34.4k staked · 12 posts ·
+ * 40 replies` on one line where `Đ 34,365 staked` did not fit.
+ *
+ * ⛔ A THRESHOLD IS A PARAMETER, NOT A SECOND FORMATTER. The rounding, the
+ * roll-up, the sign rule and the degrade are one implementation below; only the
+ * point at which it engages differs, and it is passed in so the two domains
+ * cannot drift in any other respect.
  */
-const COMPACT_FROM = 10_000;
+export const COMPACT_FROM_HEADER_STAKE = 10_000;
+export const COMPACT_FROM_MARKET_TOTAL = 1_000;
 
 /**
- * The compact header-stake formatter (UI-OVERNIGHT entry 1a): the SAME rounded
- * whole-Đ figure `formatDharma` prints below `COMPACT_FROM`, and a `k`/`M`
+ * The compact abbreviating formatter (UI-OVERNIGHT entry 1a): the SAME rounded
+ * whole-Đ figure `formatDharma` prints below `from`, and a `k`/`M`
  * abbreviation at or above it — `Đ 9,999` · `Đ 10k` · `Đ 12.5k` · `Đ 1.2M`.
  *
- * ⛔ THE HEADER STAKE AND NOTHING ELSE. `formatDharma` remains the single
- * display formatter for every other Đ on the site (SPEC.1 §10.8); this one is
- * narrower, not a replacement. A stake sits in a fixed-width identity row beside
- * a pseudonym, a side chip and a reply count, and a six-figure exact number is
- * what pushes that row onto a second line. Totals, balances, composer inputs,
- * footers and the positions table keep the exact figure, because those are
- * numbers a participant checks rather than glances at.
+ * ⛔ TWO NAMED DOMAINS AND NOTHING ELSE — the card-head stake
+ * (`COMPACT_FROM_HEADER_STAKE`) and the market stat line's staked total
+ * (`COMPACT_FROM_MARKET_TOTAL`). `formatDharma` remains the single display
+ * formatter for every other Đ on the site (SPEC.1 §10.8); this one is narrower,
+ * not a replacement. ⚠ THIS PARAGRAPH READ "THE HEADER STAKE AND NOTHING ELSE"
+ * until the stat line joined it, and the sentence under it is what the rule
+ * actually rests on: a figure is abbreviated where it sits in a FIXED-WIDTH row
+ * that a long number breaks. Balances, composer inputs, footers, Support/Counter
+ * splits and the positions table keep the exact figure, because those are
+ * numbers a participant checks before acting rather than glances at while
+ * reading — and that half is unchanged.
  *
  * ⚠ THE THRESHOLD IS TESTED AGAINST THE ROUNDED VALUE, not the stored one. A
  * NUMERIC(38,18) `9999.5` renders `Đ 10,000` through `formatDharma`, so
@@ -148,7 +167,10 @@ const COMPACT_FROM = 10_000;
  * Degrades to `formatDharma` on a malformed / non-finite value — a bad value
  * must not crash a render, and the exact fallback is the honest one.
  */
-export function formatDharmaCompact(value: string): string {
+export function formatDharmaCompact(
+	value: string,
+	from: number = COMPACT_FROM_HEADER_STAKE,
+): string {
 	let parsed: Decimal;
 	try {
 		parsed = new DisplayDecimal(value);
@@ -159,7 +181,7 @@ export function formatDharmaCompact(value: string): string {
 		return formatDharma(value);
 	}
 	const whole = parsed.toDecimalPlaces(0, Decimal.ROUND_HALF_UP);
-	if (whole.abs().lessThan(COMPACT_FROM)) {
+	if (whole.abs().lessThan(from)) {
 		return formatDharma(value);
 	}
 	// `isZero()` covers +0 and −0 — unreachable above the threshold, kept so the
@@ -188,6 +210,34 @@ export function formatDharmaCompact(value: string): string {
 function oneDecimal(magnitude: Decimal): string {
 	const fixed = magnitude.toFixed(1);
 	return groupInteger(fixed.endsWith(".0") ? fixed.slice(0, -2) : fixed);
+}
+
+/**
+ * The exact figure a compact spelling HIDES, ready to hang in a tooltip —
+ * `Đ 34,365` — or `null` when the two spellings agree and there is nothing to
+ * reveal.
+ *
+ * ⚠ THE CONDITIONAL IS THE WHOLE VALUE OF THIS FUNCTION, and it is UI-OVERNIGHT
+ * entry 1a's rule lifted out of `CompactDharmaFigure` so a second render site
+ * cannot spell it differently. An unconditional hint would put `Đ 550` on top of
+ * `Đ 550` on most cards on a surface and teach the reader that the affordance
+ * means nothing — after which they stop opening it on the figures where it does.
+ *
+ * ⚠ COMPARED AS RENDERED, never as stored: `formatDharmaCompact` and
+ * `formatDharma` are asked what they would PRINT, and the hint exists only where
+ * those two strings differ. Two values that both print `Đ 12.5k` are one number
+ * to a reader, and a hint is owed on both or neither.
+ *
+ * ⛔ The `Đ` glyph is included, because a bare `34,365` floating over a figure
+ * says nothing about what it counts. Call sites that need only the number
+ * compose their own gloss around this.
+ */
+export function dharmaExactHint(
+	value: string,
+	from: number = COMPACT_FROM_HEADER_STAKE,
+): string | null {
+	const exact = formatDharma(value);
+	return formatDharmaCompact(value, from) === exact ? null : `Đ ${exact}`;
 }
 
 /**

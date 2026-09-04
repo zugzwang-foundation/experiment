@@ -3,6 +3,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+	COMPACT_FROM_MARKET_TOTAL,
+	dharmaExactHint,
 	displayNetProfitLoss,
 	formatDharma,
 	formatDharmaCompact,
@@ -368,5 +370,91 @@ describe("formatDharmaCompact — the header-stake abbreviation", () => {
 		// same one every other Đ figure uses and an ungrouped `1200M` would be
 		// the one figure on the site that opted out of it.
 		expect(formatDharmaCompact("1200000000")).toBe("1,200M");
+	});
+});
+
+// UI-FOLLOWUP A — the market stat line's staked TOTAL abbreviates a decade
+// earlier than a card-head stake does. Same formatter, same rounding, same
+// roll-up; only the engagement point is passed in, so the two domains cannot
+// drift in any other respect. The five values below are the brief's own
+// expectations, kept as literals because a derived expectation would restate the
+// implementation and prove nothing about the figure a reader actually sees.
+describe("formatDharmaCompact — the market-total threshold", () => {
+	it.each([
+		["34365", "34.4k"],
+		["10350", "10.4k"],
+		["1830", "1.8k"],
+		["9843", "9.8k"],
+		["435", "435"],
+	])("format::market-total %s → %s", (input, expected) => {
+		expect(formatDharmaCompact(input, COMPACT_FROM_MARKET_TOTAL)).toBe(
+			expected,
+		);
+	});
+
+	it("format::market-total-abbreviates-where-the-header-stake-does-NOT", () => {
+		// ⛔ THE DISCRIMINATING CASE. Four of the five values above sit BETWEEN the
+		// two thresholds, so a market-total figure wired to the default would print
+		// the exact form and every one of those rows would still be a legible
+		// number — the defect would look like a decision. This is the assertion
+		// that separates "the threshold was passed" from "the call happened to
+		// work".
+		for (const v of ["1830", "9843", "1000"]) {
+			expect(formatDharmaCompact(v, COMPACT_FROM_MARKET_TOTAL)).not.toBe(
+				formatDharmaCompact(v),
+			);
+			expect(formatDharmaCompact(v)).toBe(formatDharma(v));
+		}
+	});
+
+	it("format::market-total-boundary-is-tested-against-the-ROUNDED-value", () => {
+		// The same rule the header threshold already holds, at the lower boundary:
+		// `999.6` is already `Đ 1,000` in the exact form, so branching on the
+		// stored value would print four digits from the formatter whose job here is
+		// to prevent them.
+		expect(formatDharmaCompact("999.6", COMPACT_FROM_MARKET_TOTAL)).toBe("1k");
+		expect(formatDharmaCompact("999.4", COMPACT_FROM_MARKET_TOTAL)).toBe("999");
+	});
+
+	it("format::market-total-rolls-up-into-millions-at-the-boundary", () => {
+		// `1000.0k` is not a legible thousand, so the same value is re-expressed —
+		// a CONSEQUENCE of rounding half up at every step, not a special case.
+		expect(formatDharmaCompact("999950", COMPACT_FROM_MARKET_TOTAL)).toBe("1M");
+	});
+});
+
+describe("dharmaExactHint — the tooltip only where the short form hides", () => {
+	it("format::hint-is-null-when-the-two-spellings-agree", () => {
+		// An unconditional hint would put `Đ 435` on top of `Đ 435` and teach the
+		// reader that the affordance means nothing.
+		expect(dharmaExactHint("435", COMPACT_FROM_MARKET_TOTAL)).toBeNull();
+		expect(dharmaExactHint("550")).toBeNull();
+		expect(dharmaExactHint("9999")).toBeNull();
+	});
+
+	it("format::hint-carries-the-grouped-exact-figure-with-its-glyph", () => {
+		expect(dharmaExactHint("34365", COMPACT_FROM_MARKET_TOTAL)).toBe(
+			"Đ 34,365",
+		);
+		expect(dharmaExactHint("14260", COMPACT_FROM_MARKET_TOTAL)).toBe(
+			"Đ 14,260",
+		);
+		expect(dharmaExactHint("12500")).toBe("Đ 12,500");
+	});
+
+	it("format::hint-follows-the-threshold-it-is-given", () => {
+		// The same value, hinted at one threshold and not at the other — which is
+		// what makes this a property of the pair rather than of the number.
+		expect(dharmaExactHint("1830", COMPACT_FROM_MARKET_TOTAL)).toBe("Đ 1,830");
+		expect(dharmaExactHint("1830")).toBeNull();
+	});
+
+	it("format::hint-is-null-on-a-malformed-value", () => {
+		// Both formatters degrade to the same exact fallback, so they agree and
+		// there is nothing to reveal — a bad value is not dressed in a tooltip.
+		expect(
+			dharmaExactHint("not-a-number", COMPACT_FROM_MARKET_TOTAL),
+		).toBeNull();
+		expect(dharmaExactHint("Infinity", COMPACT_FROM_MARKET_TOTAL)).toBeNull();
 	});
 });

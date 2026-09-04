@@ -2,7 +2,7 @@
 
 import { MarketThumb } from "@/components/discovery/MarketThumb";
 
-import { formatDharma } from "./format";
+import { MarketTotalDharma } from "./DharmaFigure";
 import { PriceBar } from "./PriceBar";
 
 /**
@@ -90,7 +90,15 @@ export function FocusMarketCard({
 
 			{/* `Đ volume · posts · replies` — the locked composition's third element. */}
 			<span className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-				<span>Đ {formatDharma(totals.dharmaStaked)} staked</span>
+				{/* ⚠ UI-FOLLOWUP A — the same abbreviating figure the discovery tiles
+				    render (`MarketTotalDharma`), because this IS that card: the locked
+				    §3.2 composition, whose third element must be identical everywhere.
+				    A total that reads `Đ 34.4k` on Discovery and `Đ 34,365` here would
+				    be the same defect entry 4 closed for the thumbnail, in the other
+				    field of the same row. */}
+				<span>
+					Đ <MarketTotalDharma value={totals.dharmaStaked} /> staked
+				</span>
 				<span>
 					{totals.postCount} {noun(totals.postCount, "post", "posts")}
 				</span>
