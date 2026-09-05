@@ -10,6 +10,7 @@
 | **Supersedes** | ADR-0020 (held queue removed in full) |
 | **Superseded-by** | — |
 | **Amends** | ADR-0014 (Track B verdict *consequence* only — §85 + the §154 verdict-router `track_b` outcome; the gate architecture is otherwise unchanged) |
+| **Amended-by** | ADR-0046 (Track B consequence: publish, then flag) |
 
 ---
 
