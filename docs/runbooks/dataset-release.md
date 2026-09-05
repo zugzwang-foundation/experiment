@@ -1,14 +1,23 @@
 # dataset-release.md
 
-> 2026-11-06 public dataset release checklist. ENGINE.6 stub; HARDEN.*
+> Public dataset release checklist. ENGINE.6 stub; HARDEN.*
 > / DATASET.* stratum owns the full procedure including the
 > export-pipeline implementation.
 
-The 2026-11-06 release is the canonical egress for the experiment per
+The public dataset release is the canonical egress for the experiment per
 SPEC.1 G3 + SPEC.2 §19.1. This file is the operator-facing checklist;
 the technical export pipeline (which reads SPEC.2 §19.4 + §19.4.1
 STRIP rules + §19.5 PSEUDO joins) is implemented separately at
 DATASET.* / HARDEN.*.
+
+⚠ **The release is UNTIMED, and the date is deliberately gone from this
+header (D-21 as narrowed by D-26).** The experiment ends at the
+`2026-11-05 23:59 UTC` write-freeze; this repository describes nothing
+after it, and the release is one of the things after it. **The freeze
+instant is unmoved and every step below still stands** — the checklist is
+a sequence, and a sequence does not need a calendar to run in order. What
+is struck is the claim that the release happens on a particular day. Do
+not re-date this header; the release runs when the founder runs it.
 
 ## Pre-release (2026-11-05 17:00 UTC — 6h before write-freeze)
 

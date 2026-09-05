@@ -147,7 +147,7 @@ left blank for the founder.
 | `docs/polish/POLISH-register-ADDITIONS.md` | **L-space** |
 | `docs/overnight-run.md` | how an unattended run works |
 | `docs/runbooks/deploy-pipeline.md` | the promote sequence |
-| `docs/runbooks/dataset-release.md` | the 2026-11-06 release |
+| `docs/runbooks/dataset-release.md` | the public dataset release (untimed — D-21/D-26) |
 | `docs/runbooks/BREAK_GLASS.md` | credential rotation |
 | `docs/runbooks/staging-provisioning.md` | the staging sandbox |
 | `docs/design/design-{canon,language,token-contract}.md` | tokens, composition, copy register |
