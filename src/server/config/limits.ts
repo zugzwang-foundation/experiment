@@ -39,6 +39,38 @@ export const PUT_URL_TTL_SECONDS = 60;
 /** Signed-READ URL TTL for moderation hop. Per SCAFFOLD.15 Q3 + SPEC.2 §10.10 — 60s spans OpenAI's 3s call + 1 retry + slack. Discarded after the call returns; never flows to client. */
 export const READ_URL_TTL_SECONDS_MODERATION = 60;
 
+/**
+ * `Cache-Control` served with a rendered image, applied at SERVE time via the
+ * presigned URL's `response-cache-control` parameter rather than stored on the
+ * object.
+ *
+ * ⚠ WHY SERVE TIME AND NOT UPLOAD TIME, because upload time is the obvious
+ * answer and it is the wrong one here. A header written at upload only ever
+ * describes objects uploaded AFTER the change; every object already in the
+ * bucket keeps whatever it was born with, and the only remedy is a backfill.
+ * That was measured rather than reasoned: a backfill of the `uploads` arm on
+ * 2026-09-04 left 41/41 objects correct, and within three hours 204 new objects
+ * had arrived uncacheable, because nothing in the upload path sets the header.
+ * A fix that decays in an afternoon is a cleanup, not a fix.
+ *
+ * Serving it instead makes the question moot — past and future objects are
+ * covered by the same line, and no bucket ever needs touching again.
+ *
+ * ⚠ IT IS SIGNED, WHICH IS WHY IT IS SAFE. `response-cache-control` is a QUERY
+ * PARAMETER, so it falls under the SigV4 signature; a client that edits it gets
+ * 403 rather than a URL that serves with its own caching policy (measured).
+ * Contrast the upload direction, where `CacheControl` on a presigned PUT is
+ * INERT — `X-Amz-SignedHeaders` there is `host` alone, so the header has to come
+ * from the client, which in turn needs `cache-control` on the bucket's CORS
+ * allow-list. That asymmetry is the whole reason this direction is cheaper.
+ *
+ * `immutable` is honest here because keys are minted per upload and never
+ * reused, so a given URL's bytes genuinely cannot change. ⚠ A future
+ * replace-image feature that REUSES a key would break that promise and must
+ * change this constant, not work around it.
+ */
+export const RENDER_IMAGE_CACHE_CONTROL = "public, max-age=31536000, immutable";
+
 // READ_URL_TTL_SECONDS_RENDER (3600s render-side TTL per SCAFFOLD.15 Q3) is
 // documented but NOT exported — SCAFFOLD.15 doesn't ship a render-side
 // caller; DEBATE.4 adds the constant + caller together when the render path

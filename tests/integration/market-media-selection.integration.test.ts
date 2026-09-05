@@ -70,11 +70,12 @@ vi.mock("@/server/storage/r2", () => ({
 }));
 
 import { marketMedia, markets } from "@/db/schema";
+// The mocked module — imported ONLY to assert the sign calls (bucket + key).
+import { RENDER_IMAGE_CACHE_CONTROL } from "@/server/config/limits";
 import {
 	getDefaultMarketMediaUrl,
 	getMarketMediaUrls,
 } from "@/server/discovery/media";
-// The mocked module — imported ONLY to assert the sign calls (bucket + key).
 import { mintReadUrl } from "@/server/storage/r2";
 
 import { testClient, testDb } from "../db/_fixtures/db";
@@ -171,6 +172,7 @@ describe("market media selection — the tile row vs the header row", () => {
 			"market-media",
 			defaultKey,
 			READ_URL_TTL_SECONDS,
+			RENDER_IMAGE_CACHE_CONTROL,
 		);
 	});
 
@@ -203,6 +205,7 @@ describe("market media selection — the tile row vs the header row", () => {
 			"market-media",
 			secondKey,
 			READ_URL_TTL_SECONDS,
+			RENDER_IMAGE_CACHE_CONTROL,
 		);
 
 		// Control — on the SAME seed, the tile's read still resolves the default
@@ -267,6 +270,7 @@ describe("market media selection — the tile row vs the header row", () => {
 			"market-media",
 			defaultKey,
 			READ_URL_TTL_SECONDS,
+			RENDER_IMAGE_CACHE_CONTROL,
 		);
 	});
 

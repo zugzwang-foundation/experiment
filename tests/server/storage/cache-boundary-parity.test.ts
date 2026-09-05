@@ -233,8 +233,18 @@ describe("no call site reaches the memo without stating its downstream", () => {
 	 * someone runs `tsc`, and this asserts the shape survives in the tree that
 	 * ships. Two-argument `signRead(a, b)` is the pre-fix shape and must be
 	 * gone entirely.
+	 *
+	 * ⚠ THE COUNT IS NOW FOUR, and the fourth is required for the same reason
+	 * the third is. `cacheControl` decides whether a browser may reuse the image
+	 * for a year, and the two answers in this tree are opposites: the render
+	 * paths pass the directive, the ADMIN MODERATION FEED passes `null` because
+	 * it signs a sixty-second URL and must not leave a reviewing admin's browser
+	 * holding content that is under review. A default would have silently given
+	 * that feed the year — which an earlier version of this change did. So the
+	 * parameter is required, `null` is a statement rather than an omission, and
+	 * a three-argument call is now as much a defect as a two-argument one was.
 	 */
-	it("every signRead / signReadMarketMedia call passes three arguments", () => {
+	it("every signRead / signReadMarketMedia call passes four arguments", () => {
 		const offenders: string[] = [];
 
 		for (const rel of serverSources()) {
@@ -246,16 +256,23 @@ describe("no call site reaches the memo without stating its downstream", () => {
 				// Skip the declarations themselves (they carry type annotations).
 				if (args.includes(":")) continue;
 				if (args.trim() === "") continue;
-				// ⚠ Drop empty parts before counting. Biome breaks a three-argument
+				// ⚠ Drop empty parts before counting. Biome breaks a multi-argument
 				// call across lines and adds a TRAILING COMMA, so a naive split
-				// yields four and reports every correctly-fixed call site as an
-				// offender — a false positive that would have been "fixed" by
+				// yields one too many and reports every correctly-fixed call site as
+				// an offender — a false positive that would have been "fixed" by
 				// deleting the assertion.
+				//
+				// ⚠ AND DROP COMMENT LINES. The admin feed's `null` carries an
+				// explanatory comment above it, and a comma inside that prose would
+				// otherwise be counted as an argument separator.
 				const argc = args
+					.split("\n")
+					.map((line) => line.replace(/\/\/.*$/, ""))
+					.join("\n")
 					.split(",")
 					.map((a) => a.trim())
 					.filter((a) => a !== "").length;
-				if (argc !== 3) {
+				if (argc !== 4) {
 					offenders.push(`${rel} → ${m[0]}`);
 				}
 			}

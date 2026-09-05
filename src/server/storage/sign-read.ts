@@ -37,17 +37,34 @@ import { memoizedReadUrl } from "@/server/storage/read-url-memo";
 // Failure posture UNCHANGED: a throwing mint stores nothing, so R2
 // unavailability still propagates raw on this and every subsequent call.
 
+// ⚠ `cacheControl` IS REQUIRED AND NULLABLE, for the same reason
+// `downstreamMaxAgeSeconds` is required: a default would be a guess about
+// someone else's surface, and the guess would be silent.
+//
+// The guess was very nearly made. A first version applied
+// `RENDER_IMAGE_CACHE_CONTROL` inside this function to every caller, which
+// silently handed the ADMIN MODERATION FEED a year-long browser cache for
+// images it signs with a deliberate SIXTY-SECOND TTL (`review-feed.ts`: "Short-
+// TTL admin-viewable signed URL"). The signature would still have died on
+// schedule, so nothing would have looked wrong — while the reviewing admin's
+// browser retained a copy of content it was reviewing precisely because it may
+// be harmful. Two of the three callers wanted the directive and the third
+// wanted its absence, and no default expresses that.
+//
+// So the parameter is required, `null` is a statement rather than an omission,
+// and a new call site is a compile error until its author decides.
 export async function signRead(
 	key: string,
 	ttlSeconds: number,
 	downstreamMaxAgeSeconds: number,
+	cacheControl: string | null,
 ): Promise<string> {
 	return memoizedReadUrl(
 		"uploads",
 		key,
 		ttlSeconds,
 		downstreamMaxAgeSeconds,
-		() => mintReadUrl("uploads", key, ttlSeconds),
+		() => mintReadUrl("uploads", key, ttlSeconds, cacheControl ?? undefined),
 	);
 }
 
@@ -67,6 +84,12 @@ export async function signRead(
  * would have been equivalent arithmetic and a worse rule — it would leave the
  * moderation path one edited argument away from being held again. A separate
  * function states the decision where it cannot be undone by a number.
+ *
+ * ⚠ FOR THE SAME REASON IT PASSES NO `cacheControl`. `signRead` serves
+ * `RENDER_IMAGE_CACHE_CONTROL` so a browser can reuse an image for a year;
+ * there is no browser on this path, so the directive would instruct nobody. The
+ * omission is the decision, not a gap — if a caching header ever appears here,
+ * something has confused a server fetch for a render.
  */
 export async function signReadSingleUse(
 	key: string,

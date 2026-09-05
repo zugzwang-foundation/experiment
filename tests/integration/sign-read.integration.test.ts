@@ -52,10 +52,18 @@ describe("signRead (SCAFFOLD.15 §5.1)", () => {
 		const scripted = "https://r2.example/u/u1/abc.jpg?X-Amz-Signature=read";
 		mockMintReadUrl.mockResolvedValueOnce(scripted);
 
-		const url = await signRead("u/u1/abc.jpg", 60, DOWNSTREAM_NONE);
+		const url = await signRead("u/u1/abc.jpg", 60, DOWNSTREAM_NONE, null);
 
 		expect(mockMintReadUrl).toHaveBeenCalledTimes(1);
-		expect(mockMintReadUrl).toHaveBeenCalledWith("uploads", "u/u1/abc.jpg", 60);
+		// `null` (no caching directive) forwards as `undefined`, so the
+		// GetObjectCommand carries no `ResponseCacheControl` at all rather than an
+		// empty one.
+		expect(mockMintReadUrl).toHaveBeenCalledWith(
+			"uploads",
+			"u/u1/abc.jpg",
+			60,
+			undefined,
+		);
 		expect(url).toBe(scripted);
 	});
 
@@ -65,11 +73,12 @@ describe("signRead (SCAFFOLD.15 §5.1)", () => {
 		// survives its cache entry's serve window); 3600 here is simply an
 		// arbitrary caller value, which is the whole point of "verbatim".
 		mockMintReadUrl.mockResolvedValueOnce("https://r2.example/render?sig");
-		await signRead("u/u2/long.png", 3600, DOWNSTREAM_NONE);
+		await signRead("u/u2/long.png", 3600, DOWNSTREAM_NONE, null);
 		expect(mockMintReadUrl).toHaveBeenCalledWith(
 			"uploads",
 			"u/u2/long.png",
 			3600,
+			undefined,
 		);
 	});
 
@@ -88,12 +97,16 @@ describe("signRead (SCAFFOLD.15 §5.1)", () => {
 			"u/u3/moderate.jpg",
 			READ_URL_TTL_SECONDS_MODERATION,
 			DOWNSTREAM_NONE,
+			// `null` is the admin feed's real argument: a 60s URL must not carry a
+			// year-long browser caching directive. See sign-read.ts.
+			null,
 		);
 
 		expect(mockMintReadUrl).toHaveBeenCalledWith(
 			"uploads",
 			"u/u3/moderate.jpg",
 			READ_URL_TTL_SECONDS_MODERATION,
+			undefined,
 		);
 		// Sanity floor: 60s for moderation (matches Q3 ratification +
 		// SPEC.2 §10.10).
@@ -104,7 +117,7 @@ describe("signRead (SCAFFOLD.15 §5.1)", () => {
 		// Pure pass-through; no URL post-processing.
 		const scripted = "https://example.r2.cloudflarestorage.com/x?a=1&b=2";
 		mockMintReadUrl.mockResolvedValueOnce(scripted);
-		const out = await signRead("u/u4/photo.webp", 60, DOWNSTREAM_NONE);
+		const out = await signRead("u/u4/photo.webp", 60, DOWNSTREAM_NONE, null);
 		expect(out).toBe(scripted);
 	});
 
@@ -115,8 +128,8 @@ describe("signRead (SCAFFOLD.15 §5.1)", () => {
 		const networkError = new Error("ECONNREFUSED to R2");
 		mockMintReadUrl.mockRejectedValueOnce(networkError);
 
-		await expect(signRead("u/u5/x.jpg", 60, DOWNSTREAM_NONE)).rejects.toBe(
-			networkError,
-		);
+		await expect(
+			signRead("u/u5/x.jpg", 60, DOWNSTREAM_NONE, null),
+		).rejects.toBe(networkError);
 	});
 });

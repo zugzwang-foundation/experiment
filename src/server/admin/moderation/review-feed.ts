@@ -207,6 +207,16 @@ export async function loadReviewFeed(
 								key,
 								READ_URL_TTL_SECONDS_MODERATION,
 								DOWNSTREAM_ADMIN_FEED_FETCH,
+								// ⛔ NO browser caching directive, deliberately. The render
+								// surfaces serve `RENDER_IMAGE_CACHE_CONTROL` so a visitor
+								// reuses an image for a year; this feed signs a SIXTY-SECOND
+								// URL on purpose (see the field docs above), and telling the
+								// browser to keep the bytes for a year would leave a
+								// reviewing admin's cache holding content that is under
+								// review precisely because it may be harmful. The short TTL
+								// and a long cache directive contradict each other; the TTL
+								// is the one that means something here.
+								null,
 							),
 						);
 					} catch {
