@@ -396,9 +396,39 @@ describe("BLOCK-5b · G-g — BLOCK-4's geometry must not move", () => {
 		// whichever applies. ⛔ BOTH ARE CHECKED — `gap-5` is BLOCK-4 geometry and
 		// must survive on either arm, and asserting only the one that still carries
 		// `basis-` would leave the new band free to drop it.
-		expect(headZone).toContain(
-			'"flex min-h-0 shrink-0 basis-[24.2dvh] flex-col gap-5 overflow-hidden lg:flex-row"',
-		);
+		// ⚠ `BAND_DECLARED` IS A TOKEN CHECK, NOT A WHOLE-STRING MATCH, SINCE
+		// MOBILE-1 Phase A. It appended `max-mobile:basis-auto
+		// max-mobile:overflow-visible` to this constant — ADDITIVE, inert at and
+		// above 640px, so every token this guard exists to protect is still
+		// present and BLOCK-4's geometry has not moved. A whole-string match would
+		// redden here on any future additive change too, which is a guard that
+		// reports "the geometry moved" when it did not. The tokens below ARE the
+		// geometry; asserting each one keeps the protection and drops only the
+		// claim that nothing may ever be added.
+		const declared = /const BAND_DECLARED =\s*"([^"]*)"/.exec(headZone);
+		if (!declared) {
+			throw new Error(
+				"HeadZone.tsx: BAND_DECLARED is not a single string literal any more.",
+			);
+		}
+		const declaredTokens = (declared[1] ?? "").split(/\s+/).filter(Boolean);
+		for (const t of [
+			"flex",
+			"min-h-0",
+			"shrink-0",
+			"basis-[24.2dvh]",
+			"flex-col",
+			"gap-5",
+			"overflow-hidden",
+			"lg:flex-row",
+		]) {
+			expect(declaredTokens).toContain(t);
+		}
+		// ⛔ UNCHANGED AND DELIBERATELY STILL A WHOLE-STRING MATCH. MOBILE-1 did
+		// not touch the post arm — it declares neither `basis-` nor
+		// `overflow-hidden`, so the mobile release would be inert on it — and a
+		// guard that is not under pressure should not be loosened alongside one
+		// that is.
 		expect(headZone).toContain(
 			'"flex min-h-0 shrink-0 flex-col gap-5 lg:flex-row lg:items-start"',
 		);

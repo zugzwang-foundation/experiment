@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { InfoTip } from "@/components/ui/info-tip";
 import { HEADER_GLOSSARY } from "@/lib/copy/glossary";
+import { cn } from "@/lib/utils";
 
 /**
  * The global-header visitor counter (SPEC.1 §21.1, DESIGN.W2.5). A vanity /
@@ -32,7 +33,14 @@ type CounterState = "loading" | { total: number | null };
 
 const NUMBER_FORMAT = new Intl.NumberFormat("en-US");
 
-export function VisitorCounter() {
+export function VisitorCounter({
+	mobileResponsive = false,
+}: {
+	/** MOBILE-1 Phase A — see `GlobalHeader`'s own prop docblock; threaded
+	 * from there rather than inferred, so this component never has to know
+	 * which route mounted it. */
+	mobileResponsive?: boolean;
+} = {}) {
 	const pathname = usePathname();
 	const [state, setState] = useState<CounterState>("loading");
 	const firedFor = useRef<string | null>(null);
@@ -81,7 +89,16 @@ export function VisitorCounter() {
 				data-testid="visitor-counter"
 				data-state={dataState}
 				aria-busy={state === "loading"}
-				className="flex items-center gap-1.5 text-xs text-muted-foreground select-none"
+				// MOBILE-1 Phase A — a vanity/non-thesis figure (§21.1: "reads
+				// nothing from the ledger/engine"), the cheapest thing in the
+				// header's right zone to give up for room below 640px. No wrapper:
+				// this stays the direct sibling `tests/unit/shell/dharma-cluster
+				// .test.tsx`'s T4 guard (SG5) requires immediately right of the
+				// register divider.
+				className={cn(
+					"flex items-center gap-1.5 text-xs text-muted-foreground select-none",
+					mobileResponsive && "max-mobile:hidden",
+				)}
 			>
 				<Eye aria-hidden="true" className="size-3.5 shrink-0" />
 				<span>

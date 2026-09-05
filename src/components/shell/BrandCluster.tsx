@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 import { CountdownDigits } from "./CountdownDigits";
 import { formatCountdown } from "./countdown-format";
 import { Wordmark } from "./Wordmark";
@@ -40,9 +41,14 @@ function freezeLabel(display: string): string {
 export function BrandCluster({
 	targetMs,
 	initialDisplay,
+	mobileResponsive = false,
 }: {
 	targetMs: number;
 	initialDisplay: string;
+	/** MOBILE-1 Phase A — see `GlobalHeader`'s own prop docblock; threaded
+	 * from there rather than inferred, so this component never has to know
+	 * which route mounted it. */
+	mobileResponsive?: boolean;
 }) {
 	const [display, setDisplay] = useState(initialDisplay);
 
@@ -67,7 +73,21 @@ export function BrandCluster({
 				height={48}
 				className="size-12"
 			/>
-			<span aria-hidden="true" className="flex flex-col items-center">
+			{/* MOBILE-1 Phase A — the mark alone carries the link and the brand
+			    identity below 640px; the wordmark + countdown text is the
+			    header's single biggest reflow cost and is dropped rather than
+			    squeezed. Nothing here is lost to a11y: the outer `<Link>`'s
+			    `aria-label` above already carries the countdown in words, so
+			    hiding this block relocates the information rather than
+			    removing it. */}
+			<span
+				aria-hidden="true"
+				data-testid="brand-cluster-text"
+				className={cn(
+					"flex flex-col items-center",
+					mobileResponsive && "max-mobile:hidden",
+				)}
+			>
 				<Wordmark scale="header" />
 				<CountdownDigits display={display} />
 			</span>

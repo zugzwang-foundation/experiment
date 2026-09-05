@@ -169,7 +169,23 @@ export function OnboardingDeck({
 				// reason the mockup's own reduced-motion rule is: the primitive's
 				// `data-[state=open]:animate-in` is an attribute selector, and a
 				// media query adds no specificity to outrank it with.
-				className="grid max-h-[90vh] w-[513px] max-w-[calc(100vw-88px)] gap-0 overflow-y-auto rounded-(--r) border border-ink bg-n0 p-[30px] ring-0 motion-reduce:animate-none!"
+				// ⛔⛔ MOBILE-1 Phase A — THE PHONE-WIDTH INSET AND PADDING, and this
+				// is a CLIPPING fix, not a comfort one. `max-w-[calc(100vw-88px)]`
+				// plus `p-[30px]` leaves 225px of content at a 375px viewport, and
+				// the deck's own wordmark is an 8-cell row that measures 256px and
+				// cannot reflow — so the card clipped its own content by 33px:
+				// `ZUGZWAN`, `STEP 1 O`, and every body line cut off mid-word at the
+				// right edge, with the Next/Back row sheared. MEASURED on a real
+				// phone, then reproduced at 375px (scrollWidth 318 vs clientWidth
+				// 285). ⚠ The 88px inset is a DESKTOP figure — it is generous
+				// against 1440 and punitive against 375, where it costs 23% of the
+				// screen. Below 640px the inset drops to 24px and the padding to
+				// 16px, giving 319px of content against the 256px the wordmark
+				// needs — headroom down to a ~320px device.
+				// ⚠ `w-[513px]` and the desktop `max-w`/`p` are untouched: >=640px
+				// renders byte-identical, including the 451px-subtext measurement
+				// the comment above records.
+				className="grid max-h-[90vh] w-[513px] max-w-[calc(100vw-88px)] gap-0 overflow-y-auto rounded-(--r) border border-ink bg-n0 p-[30px] ring-0 motion-reduce:animate-none! max-mobile:max-w-[calc(100vw-24px)] max-mobile:p-4"
 			>
 				<DialogTitle className="sr-only">{DIALOG_LABEL[context]}</DialogTitle>
 
@@ -190,7 +206,17 @@ export function OnboardingDeck({
 					</div>
 					<div
 						data-slot="onboarding-step"
-						className="ml-auto text-[10px] leading-[1.2] font-bold tracking-[0.1em] text-n5 uppercase"
+						// ⚠ MOBILE-1 Phase A — `max-mobile:pr-6` clears the close button.
+						// `ui/dialog.tsx` pins its ✕ at `absolute top-4 right-4`, i.e. 16px
+						// from the dialog EDGE. At the desktop `p-[30px]` that lands the
+						// button inside the padding, clear of the content box, so this
+						// `ml-auto` label never reaches it. The phone-width `p-4` above
+						// makes the padding 16px too, so the content edge and the button
+						// now coincide and `STEP 1 OF 6` rendered underneath the ✕ —
+						// measured: label right edge 346, button spanning 330–346.
+						// 24px of right padding puts the label's edge at 322 and restores
+						// the clearance the desktop padding was providing implicitly.
+						className="ml-auto text-[10px] leading-[1.2] font-bold tracking-[0.1em] text-n5 uppercase max-mobile:pr-6"
 					>
 						Step {index + 1} of {total}
 					</div>

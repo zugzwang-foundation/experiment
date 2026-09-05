@@ -51,8 +51,21 @@ import type { ReactNode } from "react";
  * plus `overflow-hidden` — a DECLARED height containing its own overflow — and
  * both are still absent, so the band is still sized by its content.
  */
+/**
+ * MOBILE-1 Phase A — `max-mobile:basis-auto max-mobile:overflow-visible` is
+ * appended here rather than at the call site, because the two overrides only
+ * mean anything against THIS constant: `BAND_CONTENT_SIZED` declares neither
+ * `basis-[24.2dvh]` nor `overflow-hidden`, so the same pair would be inert
+ * noise on the post arm.
+ *
+ * Below 640px the arena stacks (`DebateView`'s two `arena` divs), so a band
+ * pinned to a viewport FRACTION and clipping its own overflow no longer has
+ * the two-column layout it was sized to protect — it just truncates a column
+ * that is now full-width. Released to content height and ordinary flow.
+ * >=640px both tokens are inert and the band is byte-unchanged.
+ */
 const BAND_DECLARED =
-	"flex min-h-0 shrink-0 basis-[24.2dvh] flex-col gap-5 overflow-hidden lg:flex-row";
+	"flex min-h-0 shrink-0 basis-[24.2dvh] flex-col gap-5 overflow-hidden lg:flex-row max-mobile:basis-auto max-mobile:overflow-visible";
 const BAND_CONTENT_SIZED =
 	"flex min-h-0 shrink-0 flex-col gap-5 lg:flex-row lg:items-start";
 
@@ -196,6 +209,20 @@ export function HeadZone({
 			// ⇒ The prose is marked rather than rewritten, because choosing which
 			// ruling governs is a founder call and a merge is not the place to make
 			// it. When it is ruled, correct THIS block in place (O-5).
+			// ═══ END OF THE CONTESTED BLOCK (RECONCILE-1 OWED-4) — everything
+			// below this line is MOBILE-1 Phase A, live doctrine, unrelated to
+			// the dispute above. ═══
+			// MOBILE-1 Phase A — the viewport-fraction band and its
+			// overflow-hidden exist to protect the one-screen /m/[slug]
+			// composition (PageContainer, DebateView.tsx), which is itself
+			// released below 640px. Below lg the rail already renders nothing
+			// (headzone-right is `hidden ... lg:flex`, BLOCK-3), so at phone
+			// width this band holds headzone-left ALONE — question, price bar,
+			// resolver row — and that content's own height at a typical phone
+			// viewport (e.g. ~812px tall) exceeds 24.2dvh (~197px) on its own,
+			// with no rail contributing to it. Releasing basis/overflow here
+			// is what stops that content being clipped, matching the page
+			// around it going to ordinary scroll instead of clipping.
 			data-testid="headzone"
 			className={fit ? BAND_CONTENT_SIZED : BAND_DECLARED}
 		>

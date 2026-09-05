@@ -243,26 +243,31 @@ describe("GH-STAR wiring — the prop survives GlobalHeader", () => {
 		expect(count, "the `stars` prop never reached the view").not.toBeNull();
 		expect(count?.textContent).toBe("42");
 
+		// ⚠ MOBILE-1 Phase A — Radio and GitHub now share a wrapper div one
+		// level below RulesControl (the wrapper hides below 640px; RulesControl
+		// never does — SPEC.1 §21.9). So Radio/GitHub/Rules are no longer
+		// SIBLINGS: a `.children`-based lookup at any one scope can see at most
+		// two of the three. `compareDocumentPosition` proves the same left-to-
+		// right ORDER regardless of nesting depth, which is the property this
+		// test actually cares about.
+		const radio = document.querySelector('[aria-label="Radio"]');
 		const control = screen.getByTestId("github-stars");
-		const kids = Array.from(control.parentElement?.children ?? []);
-		const radio = kids.findIndex(
-			(el) => el.getAttribute("aria-label") === "Radio",
+		const rules = Array.from(document.querySelectorAll("button")).find(
+			(el) => el.textContent === "Rules",
 		);
-		const rules = kids.findIndex(
-			(el) => el.tagName === "BUTTON" && el.textContent === "Rules",
-		);
-		const github = kids.indexOf(control);
 
-		// ⚠ EACH INDEX IS PROVEN FOUND BEFORE ANY OF THEM IS COMPARED. `findIndex`
-		// returns -1 for a node that is not there, and `-1 < 0` is TRUE — so an
-		// ordering assertion can be satisfied by a control that never rendered.
-		// The header regression this file's sibling caught surfaced as exactly
-		// that shape (`expected -1 to be less than -1`).
-		expect(radio, "RadioSlot").toBeGreaterThanOrEqual(0);
-		expect(github, "the GitHub control").toBeGreaterThanOrEqual(0);
-		expect(rules, "RulesControl").toBeGreaterThanOrEqual(0);
+		// ⚠ EACH IS PROVEN FOUND BEFORE ANY ORDERING IS ASSERTED — a `null` on
+		// either side of `compareDocumentPosition` throws rather than silently
+		// comparing nothing, but proving it explicitly keeps the failure message
+		// naming WHICH control never rendered, matching this file's existing style.
+		expect(radio, "RadioSlot").not.toBeNull();
+		expect(control, "the GitHub control").not.toBeNull();
+		expect(rules, "RulesControl").not.toBeNull();
 
-		expect(radio).toBeLessThan(github);
-		expect(github).toBeLessThan(rules);
+		const isBefore = (a: Element, b: Element) =>
+			(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+		expect(isBefore(radio as Element, control)).toBe(true);
+		expect(isBefore(control, rules as Element)).toBe(true);
 	});
 });

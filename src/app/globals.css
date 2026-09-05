@@ -153,6 +153,19 @@
 	/* Geist ratified FINAL (values-log item 2 / WI-13) */
 	--font-sans: var(--font-geist-sans);
 	--font-mono: var(--font-geist-mono);
+	/*
+	 * Mobile breakpoint (MOBILE-1 / ADR-0045) — read-surface responsive
+	 * reflow only (Discovery, /m/[slug], and the shared header chrome they
+	 * render inside). A deliberate synonym for Tailwind's own unoverridden
+	 * `sm` (640px), minted under its own name per ADR-0045's file-map
+	 * requirement ("breakpoints are minted here or not at all") rather than
+	 * relying on the generic scale name — see MOBILE-1 M1-8. Generates
+	 * `mobile:*` (>=640px, desktop and up) and `max-mobile:*` (<640px,
+	 * phone and below) variants. Desktop stays the unprefixed default
+	 * everywhere; every mobile-specific rule is a `max-mobile:` override,
+	 * never a replacement of the base one.
+	 */
+	--breakpoint-mobile: 640px;
 }
 
 /*

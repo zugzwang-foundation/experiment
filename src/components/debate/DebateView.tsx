@@ -967,7 +967,14 @@ export function DebateView({
 		   would push the band past the height it just declared. */
 		<PageContainer
 			preset="screen"
-			className="flex h-[calc(100dvh-60px-2px)] min-h-0 flex-col gap-3 overflow-hidden"
+			// MOBILE-1 Phase A — the one-screen, no-page-scroll band is a
+			// desktop composition over a fixed two-column arena (founder ruling
+			// 2026-08-17, see the block above). Below 640px the arena stacks
+			// instead (see both `arena` divs below), so the fixed viewport-height
+			// band and its clipped overflow no longer have a two-column layout to
+			// protect — released to ordinary page flow/scroll rather than forcing
+			// a stacked arena through a one-screen box it was never sized for.
+			className="flex h-[calc(100dvh-60px-2px)] min-h-0 flex-col gap-3 overflow-hidden max-mobile:h-auto max-mobile:overflow-visible"
 		>
 			{/* F-DEBATE-4 — the polled-on-view refresh. Renders nothing; re-invokes
 			    this page's own server read on an interval, suspended while the
@@ -1025,7 +1032,13 @@ export function DebateView({
 						onOpenImage={setLightboxUrl}
 						onOpenPopup={setPopupPost}
 					/>
-					<div data-testid="arena" className="flex min-h-0 flex-1 gap-4">
+					{/* MOBILE-1 Phase A — the fixed two-column YES/NO arena stacks
+					    below 640px (plan §4: "not preserved at phone width"); the
+					    PageContainer above releases its one-screen band to match. */}
+					<div
+						data-testid="arena"
+						className="flex min-h-0 flex-1 gap-4 max-mobile:flex-col"
+					>
 						{(["YES", "NO"] as const).map((side) => {
 							// ⚠⚠ RPLY-1 · R1 — THE COLUMN IS OPPOSITE THE **BET**, NEVER
 							// OPPOSITE THE PARENT. This read "opens in the slot OPPOSITE THE
@@ -1214,7 +1227,13 @@ export function DebateView({
 						priceChart={priceChart}
 						pick={{ heldSide, marketOpen, suspended, onPick: toggleEntry }}
 					/>
-					<div data-testid="arena" className="flex min-h-0 flex-1 gap-4">
+					{/* MOBILE-1 Phase A — the fixed two-column YES/NO arena stacks
+					    below 640px (plan §4: "not preserved at phone width"); the
+					    PageContainer above releases its one-screen band to match. */}
+					<div
+						data-testid="arena"
+						className="flex min-h-0 flex-1 gap-4 max-mobile:flex-col"
+					>
 						{(["YES", "NO"] as const).map((side) => {
 							// §5 — the pole this column's HEADER speaks for. Normally its own;
 							// while a composer is open it is the composing side, for BOTH

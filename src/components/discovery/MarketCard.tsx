@@ -74,8 +74,26 @@ export function MarketCard({
 			// all inside the ratified ramp. Founder ruling requested at Gate C.
 			//
 			// JS-toggled class — no `:has()` (canon §3.10).
+			//
+			// ⛔⛔ MOBILE-1 Phase A — THE RING IS SUPPRESSED BELOW 640px, and the
+			// reason is that it stops meaning anything there. The ring marks the
+			// card whose hero is currently featured; the founder ruled the hero
+			// hidden at phone width (`HeroPanels.tsx`), so the ring would point
+			// at a panel that is not on screen. Worse, it MOVES: the carousel's
+			// 10s auto-advance keeps running behind the hidden hero, so a card
+			// highlights itself and the highlight wanders down the list every
+			// ten seconds with nothing on screen explaining it. MEASURED in a
+			// browser at 375px — this was visible, not theoretical, and it is
+			// the user-facing half of the "CSS hide leaves the timer running"
+			// cost that this task first recorded as invisible.
+			// ⚠ `max-mobile:outline-none` rather than stopping the timer: killing
+			// the timer needs a client viewport read, which plan §4 rules against
+			// (hydration). Suppressing the only thing it renders is the
+			// pure-CSS answer, and it leaves >=640px byte-identical.
 			className={`flex flex-col justify-between rounded-[var(--r)] bg-n0 p-[13px] [border:var(--hairline)]${
-				active ? " [outline:var(--ring-active)] outline-offset-[3px]" : ""
+				active
+					? " [outline:var(--ring-active)] outline-offset-[3px] max-mobile:outline-none"
+					: ""
 			}`}
 		>
 			{/* HTML-FINISH row 5 — the picture is CENTRED against the title block,

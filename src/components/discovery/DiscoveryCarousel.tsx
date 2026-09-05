@@ -233,7 +233,19 @@ export function DiscoveryCarousel({
 				    the slack: the mockup's `.sliderwrap` is `flex:0 0 18px` (`:139`).
 				    The 18px was already shipped; `flex-none` is what makes it refuse
 				    to grow now that there is slack to be had. */}
-				<div className="mt-[9px] mb-2 flex h-[18px] flex-none items-center justify-center gap-[7px]">
+				{/* MOBILE-1 Phase A — hides WITH the hero below 640px, never
+				    independently of it. This rail's whole job is navigating
+				    `HeroPanels`, which the founder ruled hidden at phone width
+				    (its own comment carries the ruling and why it answers the
+				    @code-reviewer objection rather than waiving it); a rail left
+				    behind would be eight dots and two arrows steering a panel
+				    that is not on screen. Above 640px both render exactly as
+				    before — the two are pinned together in
+				    discovery-mobile-reflow.test.ts so neither can hide alone. */}
+				<div
+					data-testid="carousel-rail"
+					className="mt-[9px] mb-2 flex h-[18px] flex-none items-center justify-center gap-[7px] max-mobile:hidden"
+				>
 					{/* ⛔ CS14 §3 — THESE TWO CARRY THE RATIFIED FOCUS IDIOM NOW, AND
 					    WHAT THEY HAD BEFORE WAS NOT `:focus`. Measured on staging at
 					    `0f04272`, real mouse click on `›`: `:focus` true,
