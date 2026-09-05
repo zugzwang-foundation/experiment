@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | accepted |
 | **Date** | 2026-07-05 |
 | **Deciders** | Hrishikesh (founder) |
 | **Tracker task** | AUDIT-FIX-B3 |
