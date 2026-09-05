@@ -208,7 +208,17 @@ export function ArgProfile({
 				    second LINE instead of taking more WIDTH. Nothing is shortened and
 				    nothing is cut: every field stays whole, `whitespace-nowrap` still
 				    forbids breaking INSIDE a field, and the pseudonym in particular is
-				    as intact as rule 2 requires. The two tokens are one mechanism —
+				    as intact as rule 2 requires.
+				    ⚠ THAT CLAIM IS ABOUT FIELDS AND DOES NOT REACH THE SEAMS BETWEEN
+				    THEM — it was written as though it did. Every field does stay
+				    whole; what wrapping also does is let the break land between a
+				    separator and the field it divides, which shortens and cuts
+				    nothing and still renders wrongly. That is a real consequence of
+				    this token pair and it was measured, not predicted: two dangling
+				    separators per author row at 375px. It is handled where the
+				    separators live — see the span below — rather than by widening
+				    this sentence to cover it.
+				    The two tokens are one mechanism —
 				    `flex-wrap` alone cannot help while `shrink-0` pins the group at its
 				    362px content width, so releasing the shrink is what lets the wrap
 				    ever engage.
@@ -250,11 +260,37 @@ export function ArgProfile({
 					>
 						{author.pseudonym}
 					</Link>
-					<FieldSeparator />
-					<SideBadge side={side} price={entryPrice} size={chipSize} />
-					<PositionMarker marker={marker} />
+					{/* ⛔⛔ EACH SEPARATOR TRAVELS WITH THE FIELD IT LEADS, IN A SPAN
+					    THAT CANNOT WRAP INTERNALLY — and that span is the whole of this
+					    change. `max-mobile:flex-wrap` above makes every child of group A
+					    an independently wrappable flex item, so the break could land
+					    BETWEEN a separator and the field it divides, stranding the pipe
+					    at the end of a line where it divides nothing. MEASURED at 375px
+					    on staging data: group A wrapped to three lines at 181px and
+					    `GoldRhino000 |` / `YES @ 53% | Đ 25 |` BOTH ended in a dangling
+					    separator — two per author row, on every card.
+					    ⇒ That is UI-OVERNIGHT 1b rule 7's dangle, one level in. Rule 7
+					    exists to stop exactly this, and SEP-1 already ruled the remedy:
+					    a separator is placed as the FIRST CHILD of what it divides, so
+					    it moves with it and line 2 reads `| YES @ 53%`. A LEADING
+					    separator on a wrapped line is accepted and known
+					    (`arg-profile-row.test.tsx:123-127`); a TRAILING one is the
+					    defect. This applies that same ruling to group A's interior.
+					    ⛔ NOT `after:`/`before:` pseudo-elements: `FieldSeparator` exists
+					    because three private copies of this glyph had drifted apart
+					    (SEP-1), and a `content-['|']` utility here would re-fork the
+					    seam that component was lifted to unify.
+					    ⚠ >=640px IS UNCHANGED: `flex-wrap` is inert there, so these
+					    spans are transparent — one line, same gaps, same order. Group B
+					    is untouched; its separator was already its first child and it
+					    measured no dangle. */}
+					<span className="flex shrink-0 items-center gap-1.5">
+						<FieldSeparator />
+						<SideBadge side={side} price={entryPrice} size={chipSize} />
+						<PositionMarker marker={marker} />
+					</span>
 					{authorStake !== undefined ? (
-						<>
+						<span className="flex shrink-0 items-center gap-1.5">
 							<FieldSeparator />
 							{/* RANK-1 / ADR-0039 R6 — the figure FOLLOWS THE RULER. This is
 						    the stake still held, which is exactly what the lane sorted
@@ -315,10 +351,10 @@ export function ArgProfile({
 									</span>
 								</InfoTip>
 							) : null}
-						</>
+						</span>
 					) : null}
 					{replyCount !== undefined ? (
-						<>
+						<span className="flex shrink-0 items-center gap-1.5">
 							<FieldSeparator />
 							{/* `.repmeta` (`d5:580`) — `font-weight:700;letter-spacing:.12em;
 						    text-transform:uppercase;color:var(--ink)`, with `.repn`
@@ -332,7 +368,7 @@ export function ArgProfile({
 									{replyCount}
 								</span>
 							</span>
-						</>
+						</span>
 					) : null}
 				</span>
 				{/* GROUP B — the age and the lane badge, one unbreakable unit. When

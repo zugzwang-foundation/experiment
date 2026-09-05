@@ -396,34 +396,46 @@ describe("BLOCK-5b · G-g — BLOCK-4's geometry must not move", () => {
 		// whichever applies. ⛔ BOTH ARE CHECKED — `gap-5` is BLOCK-4 geometry and
 		// must survive on either arm, and asserting only the one that still carries
 		// `basis-` would leave the new band free to drop it.
-		// ⚠ `BAND_DECLARED` IS A TOKEN CHECK, NOT A WHOLE-STRING MATCH, SINCE
-		// MOBILE-1 Phase A. It appended `max-mobile:basis-auto
-		// max-mobile:overflow-visible` to this constant — ADDITIVE, inert at and
-		// above 640px, so every token this guard exists to protect is still
-		// present and BLOCK-4's geometry has not moved. A whole-string match would
-		// redden here on any future additive change too, which is a guard that
-		// reports "the geometry moved" when it did not. The tokens below ARE the
-		// geometry; asserting each one keeps the protection and drops only the
-		// claim that nothing may ever be added.
+		// ⛔ WHOLE-STRING EQUALITY, WITH MOBILE-1's TWO TOKENS APPENDED — AND
+		// THAT MATTERS MORE THAN IT LOOKS. This assertion was briefly loosened to
+		// token containment when MOBILE-1 Phase A appended `max-mobile:basis-auto
+		// max-mobile:overflow-visible`, under a describe block titled "BLOCK-4's
+		// geometry must not move." Class ORDER is immaterial to the cascade, so
+		// nothing was lost there; what was lost is every ADDITIONAL token. Under
+		// containment a later `lg:basis-full`, a second `overflow-*`, a stray
+		// height or a `!` override all pass — and each of those does move the
+		// geometry this block exists to pin.
+		//
+		// The equality-preserving answer was already in the same PR:
+		// `tests/unit/shell/page-container.test.ts`'s `now` string met identical
+		// pressure on an identical equality pin and kept equality by appending
+		// the two new tokens with a comment saying why. And `:433` below kept its
+		// whole-string match on the post arm, reasoning that a guard not under
+		// pressure should not be loosened alongside one that is — which concedes
+		// the loosening here was pressure, not judgement.
+		//
+		// ⚠ SO THE MAINTENANCE COST IS REAL AND IS THE POINT: a future additive
+		// change reddens this line and must be re-approved here. That is the
+		// guard working. "BLOCK-4's geometry must not move" is a claim about the
+		// WHOLE string; asserting a subset of it asserts something else.
 		const declared = /const BAND_DECLARED =\s*"([^"]*)"/.exec(headZone);
 		if (!declared) {
 			throw new Error(
 				"HeadZone.tsx: BAND_DECLARED is not a single string literal any more.",
 			);
 		}
-		const declaredTokens = (declared[1] ?? "").split(/\s+/).filter(Boolean);
-		for (const t of [
-			"flex",
-			"min-h-0",
-			"shrink-0",
-			"basis-[24.2dvh]",
-			"flex-col",
-			"gap-5",
-			"overflow-hidden",
-			"lg:flex-row",
-		]) {
-			expect(declaredTokens).toContain(t);
-		}
+		expect(
+			declared[1],
+			"HeadZone.tsx: BAND_DECLARED changed. This is BLOCK-4 geometry pinned " +
+				"by whole-string equality — if the change is genuinely additive and " +
+				"inert at >=640px, append the new token here and say why, exactly as " +
+				"MOBILE-1's two `max-mobile:` tokens are appended below. Do not " +
+				"relax this to token containment: that admits every additional " +
+				"token, including the ones that do move the geometry.",
+		).toBe(
+			"flex min-h-0 shrink-0 basis-[24.2dvh] flex-col gap-5 overflow-hidden " +
+				"lg:flex-row max-mobile:basis-auto max-mobile:overflow-visible",
+		);
 		// ⛔ UNCHANGED AND DELIBERATELY STILL A WHOLE-STRING MATCH. MOBILE-1 did
 		// not touch the post arm — it declares neither `basis-` nor
 		// `overflow-hidden`, so the mobile release would be inert on it — and a

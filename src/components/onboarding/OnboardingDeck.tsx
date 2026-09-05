@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Wordmark } from "@/components/shell/Wordmark";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 import {
 	cardTitle,
@@ -48,6 +49,17 @@ import { CardFigure } from "./figures";
  * so the guarantee is a compile-time fact about the import graph rather than a
  * runtime branch a later edit can flip. The `context` check below is the second
  * lock, not the first.
+ *
+ * ⛔ `context` IS NOT A ROUTE, AND IT CANNOT GATE THE BREAKPOINT CLASSES. The
+ * re-show reaches BOTH route groups through one static chain —
+ * `GlobalHeader` → `RulesControl` → here — with no conditional on any hop, so
+ * `context === "reshow"` is true on `/sign-in` and on `/` alike. The
+ * `(public)` first-login mount legitimately wants the phone-width inset;
+ * the `(auth)` reach must not have it (ADR-0045: auth/join surfaces "remain
+ * governed by the original constraint… gated, not made responsive"). The only
+ * thing that separates the two is which LAYOUT mounted the chain, so the
+ * separation is a threaded prop and nothing else — no `usePathname`, no
+ * branch on `context`, no route special-case.
  */
 
 export type OnboardingDeckContext = "first-login" | "reshow";
@@ -76,6 +88,7 @@ export function OnboardingDeck({
 	open: controlledOpen,
 	onOpenChange,
 	onComplete,
+	mobileResponsive = false,
 }: {
 	context: OnboardingDeckContext;
 	/** Seeds the deck's own state ONCE. Ignored when `open` is supplied. */
@@ -86,6 +99,18 @@ export function OnboardingDeck({
 	onOpenChange?: (open: boolean) => void;
 	/** Supplied by the first-login mount only. See the D-4 note above. */
 	onComplete?: () => void;
+	/**
+	 * MOBILE-1 Phase A — the ADR-0045 read-surface amendment, threaded rather
+	 * than assumed, matching `GlobalHeader` / `BrandCluster` / `VisitorCounter`.
+	 * `(public)/layout.tsx` passes `true` on the first-login mount and
+	 * `GlobalHeader` threads it to `RulesControl` for the re-show; the `(auth)`
+	 * layout passes nothing, so the deck opened from `/sign-in`,
+	 * `/sign-in/otp` and `/onboarding` renders BYTE-IDENTICAL to before this
+	 * task. Defaulting to `false` is the correct polarity: a future mount that
+	 * forgets the prop inherits the pre-MOBILE-1 deck rather than an accidental
+	 * reflow onto an auth surface.
+	 */
+	mobileResponsive?: boolean;
 }) {
 	const cards: readonly OnboardingCard[] =
 		context === "first-login" ? ONBOARDING_CARDS : reshowCards();
@@ -185,7 +210,15 @@ export function OnboardingDeck({
 				// ⚠ `w-[513px]` and the desktop `max-w`/`p` are untouched: >=640px
 				// renders byte-identical, including the 451px-subtext measurement
 				// the comment above records.
-				className="grid max-h-[90vh] w-[513px] max-w-[calc(100vw-88px)] gap-0 overflow-y-auto rounded-(--r) border border-ink bg-n0 p-[30px] ring-0 motion-reduce:animate-none! max-mobile:max-w-[calc(100vw-24px)] max-mobile:p-4"
+				// ⚠ GATED BY `mobileResponsive`, not unconditional. This deck is
+				// reachable from the `(auth)` layout's own header through
+				// `RulesControl`, and ADR-0045 leaves those surfaces gated rather
+				// than responsive — see the prop's own note above.
+				className={cn(
+					"grid max-h-[90vh] w-[513px] max-w-[calc(100vw-88px)] gap-0 overflow-y-auto rounded-(--r) border border-ink bg-n0 p-[30px] ring-0 motion-reduce:animate-none!",
+					mobileResponsive &&
+						"max-mobile:max-w-[calc(100vw-24px)] max-mobile:p-4",
+				)}
 			>
 				<DialogTitle className="sr-only">{DIALOG_LABEL[context]}</DialogTitle>
 
@@ -216,7 +249,14 @@ export function OnboardingDeck({
 						// measured: label right edge 346, button spanning 330–346.
 						// 24px of right padding puts the label's edge at 322 and restores
 						// the clearance the desktop padding was providing implicitly.
-						className="ml-auto text-[10px] leading-[1.2] font-bold tracking-[0.1em] text-n5 uppercase max-mobile:pr-6"
+						// ⚠ Gated with the padding it compensates for — it exists only
+						// because `max-mobile:p-4` above collapses the clearance, so the
+						// two must appear and disappear together or this one corrects a
+						// problem that is not there.
+						className={cn(
+							"ml-auto text-[10px] leading-[1.2] font-bold tracking-[0.1em] text-n5 uppercase",
+							mobileResponsive && "max-mobile:pr-6",
+						)}
 					>
 						Step {index + 1} of {total}
 					</div>

@@ -227,6 +227,7 @@ export default async function PublicLayout({
 				initialOpen={showOnboardingDeck}
 				pseudonym={viewer?.pseudonym ?? null}
 				onComplete={completeOnboardingDeckAction}
+				mobileResponsive
 			/>
 		</div>
 	);

@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
  * it CLIPS it, and clipping to hit a number is a failure rather than a pass
  * (`debate-height-chain.test.ts:72-78`, the same ruling one viewport down).
  *
- * ⇒ So below 640px three declarations are released, all as APPENDED
+ * ⇒ So below 640px these declarations are released, all as APPENDED
  * `max-mobile:*` tokens, never as replacements:
  *
  *   PageContainer   max-mobile:h-auto  max-mobile:overflow-visible
@@ -26,6 +26,31 @@ import { describe, expect, it } from "vitest";
  *                     viewport, and stops clipping what it holds
  *   arena band      max-mobile:flex-col
  *                   ← the two poles stack instead of splitting 375px
+ *
+ * ⚠⚠ THIS LIST IS THE THREE DECLARATIONS **THIS FILE CHECKS**, NOT THE
+ * DECLARATIONS THAT SHIPPED ON THIS SURFACE — and it read as the latter until
+ * the PR #486 remediation pass, which is the same defect this suite's own
+ * `⛔ THE ONE-SCREEN RULING IS NOT REVERSED` paragraph is careful to avoid:
+ * a docblock stating a completeness property the assertions below do not have.
+ * **Five more `max-mobile:` declarations shipped on `/m/[slug]` in the same
+ * commit**, and nothing here opens their files:
+ *
+ *   MarketHeader.tsx:290       max-mobile:flex-col     ← UNCHECKED HERE
+ *   MarketMediaPanel.tsx:128   max-mobile:w-full       ← UNCHECKED HERE
+ *   ArgProfile.tsx:225,375     max-mobile:shrink
+ *                              max-mobile:flex-wrap    ← UNCHECKED HERE
+ *
+ * ⛔ `MarketHeader` and `MarketMediaPanel` are ONE MECHANISM — both files'
+ * comments say so — and they are NOT pinned together the way
+ * `discovery-mobile::hero-and-rail-hide-TOGETHER-never-one-alone` correctly
+ * pins its pair, so either can be removed alone and stay green. ⚠ And
+ * `MarketHeader`'s token is "guarded" only by coincidence: `DebateView.tsx`
+ * carries the same string, so a scan for the STRING finds it while no test
+ * opens the FILE.
+ *
+ * ⇒ Adding those assertions is DEFERRED with a written entry in
+ * `docs/parked.md` (PR #486, Block D). What is fixed here is only the claim:
+ * the enumeration above no longer reads as the surface's full inventory.
  *
  * ⛔ THE ONE-SCREEN RULING IS NOT REVERSED — IT IS SCOPED. Every unprefixed
  * token above stays exactly where it is, so 1440px renders byte-identically and

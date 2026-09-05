@@ -50,7 +50,22 @@ import { HEADER_GLOSSARY } from "@/lib/copy/glossary";
 const RULES_TAB =
 	"inline-flex h-[34px] shrink-0 items-center rounded-(--r) bg-(--btn-fill) px-[13px] text-[12px] leading-[1.2] font-bold tracking-[0.1em] text-ink uppercase outline-none select-none [border:var(--hairline)] [transition:all_var(--dur-hover)] hover:[border:1px_solid_var(--ring)] active:bg-(--state-pressed-fill) focus-visible:shadow-(--state-focus-ring)";
 
-export function RulesControl() {
+export function RulesControl({
+	mobileResponsive = false,
+}: {
+	/**
+	 * MOBILE-1 Phase A — passed straight through to `OnboardingDeck` and used
+	 * for nothing else here. This component is the ONLY seam between the two
+	 * `GlobalHeader` mounts and the deck: the chain
+	 * `GlobalHeader → RulesControl → OnboardingDeck` is three static hops with
+	 * no conditional, so a breakpoint class left unconditional in the deck
+	 * reaches `/sign-in`, `/sign-in/otp` and `/onboarding` — which ADR-0045
+	 * leaves gated rather than responsive. Threading the flag is what keeps the
+	 * `(auth)` reach byte-identical; the deck cannot tell the two apart on its
+	 * own, because `context="reshow"` is what BOTH groups pass.
+	 */
+	mobileResponsive?: boolean;
+}) {
 	const [open, setOpen] = useState(false);
 
 	return (
@@ -73,7 +88,12 @@ export function RulesControl() {
 			>
 				Rules
 			</button>
-			<OnboardingDeck context="reshow" open={open} onOpenChange={setOpen} />
+			<OnboardingDeck
+				context="reshow"
+				open={open}
+				onOpenChange={setOpen}
+				mobileResponsive={mobileResponsive}
+			/>
 		</>
 	);
 }

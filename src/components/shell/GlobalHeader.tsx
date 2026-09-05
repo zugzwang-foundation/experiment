@@ -34,6 +34,13 @@ import { VisitorCounter } from "./VisitorCounter";
  * not made responsive"). No breakpoint-scoped class in this file is
  * unconditional; every one is gated by that prop.
  *
+ * ⚠ AND THAT OBLIGATION DOES NOT STOP AT THIS FILE. `RulesControl` is a static
+ * child of both mounts and `OnboardingDeck` is a static child of it, so a
+ * breakpoint class left unconditional two hops down reaches `(auth)` exactly as
+ * surely as one written here. Both take the prop for that reason; `RulesControl`
+ * consumes it for nothing else. Anything added to this subtree inherits the same
+ * rule — the gate is the prop chain, not the file boundary.
+ *
  * Left zone order Back · Home · Radio · GitHub · RULES (mockup v0_2 for the
  * first three; GitHub and RULES are named deviations — see below).
  * Social/Research/Đ-info are ratified omissions (OQ-3/OQ-4 zero-supplied), each
@@ -203,7 +210,7 @@ export function GlobalHeader({
 						<RadioSlot />
 						<GitHubStarsView stars={stars} />
 					</div>
-					<RulesControl />
+					<RulesControl mobileResponsive={mobileResponsive} />
 				</div>
 				<div className="justify-self-center">
 					<BrandCluster

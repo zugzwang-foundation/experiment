@@ -214,4 +214,67 @@ describe("globals.css — the MOBILE-1 breakpoint token", () => {
 				`ramp.`,
 		).toBe(false);
 	});
+
+	it("mobile-breakpoint::the-px-vs-rem-divergence-from-sm-is-STATED-not-assumed", () => {
+		// ⛔⛔ THREE DOCUMENTS CALLED THIS TOKEN "A DELIBERATE SYNONYM FOR `sm`",
+		// AND IT IS A UNIT DIFFERENCE, NOT AN IDENTITY. Tailwind ships
+		// `--breakpoint-sm: 40rem`; this repo overrides nothing, so `sm` is
+		// 40rem and `mobile` is 640px. They are equal at a 16px root font size
+		// and at NO other — and root font size is a first-class browser
+		// accessibility setting, so at a 20px root `sm` fires at 800px while
+		// `mobile` fires at 640px. Both boundaries ship in this one stylesheet,
+		// so anywhere a `max-mobile:` override is meant to hand off to an
+		// `sm:`/`md:` rule, for that reader it does not.
+		//
+		// ⚠ THE TOKEN VALUE IS RIGHT AND `px` IS DELIBERATE: this breakpoint
+		// describes a DEVICE viewport, which does not grow when someone
+		// enlarges their text, and Phase B's gate must fire at the same
+		// physical width. Nothing here asks for the value to change.
+		//
+		// ⚠ WHAT IS ASSERTED IS THE COMMENT, AND THAT IS THE POINT. This
+		// guard's other four assertions never mention `rem`, `40rem`, root font
+		// size or 16px — so the repo's one written record that the two
+		// boundaries differ lived in prose nothing checked, in a file whose
+		// whole subject is this token. The divergence is intended; being
+		// undocumented is what was wrong, and a documented-only fact in a tree
+		// this size is one refactor from being undocumented again.
+		const source = read(GLOBALS);
+		const at = source.indexOf(DECLARATION);
+		const commentBefore = source.slice(Math.max(0, at - 2000), at);
+		for (const needed of ["40rem", "root font size"]) {
+			expect(
+				commentBefore,
+				`${GLOBALS}: the comment above \`${DECLARATION}\` no longer records ` +
+					`"${needed}". \`${TOKEN}\` is 640px and Tailwind's \`sm\` is 40rem; ` +
+					`they coincide only at a 16px root font size, which readers change. ` +
+					`Calling them synonyms — as this comment, docs/plans/MOBILE-1.md ` +
+					`M1-8 and PR #486's body all once did — records a unit difference ` +
+					`as an identity. Do not "fix" this by changing the token: px is ` +
+					`deliberate. Restore the caveat.`,
+			).toContain(needed);
+		}
+
+		// ⛔ AND THE PREMISE IS MEASURED, NOT RECITED. If a future Tailwind ships
+		// `sm` in px, or this repo overrides it, the caveat above becomes the
+		// stale claim rather than the correct one — so the divergence it
+		// describes is read from the installed package, and this guard reddens
+		// when the ground moves instead of outliving it.
+		const sm = /--breakpoint-sm:\s*([^;]+);/.exec(
+			read("node_modules/tailwindcss/theme.css"),
+		)?.[1];
+		expect(
+			sm?.trim(),
+			`tailwindcss/theme.css no longer declares \`--breakpoint-sm: 40rem\` ` +
+				`(found: ${sm}). The px-vs-rem caveat in globals.css, ` +
+				`docs/plans/MOBILE-1.md M1-8 and the PR body describes a divergence ` +
+				`that may no longer exist — re-derive all three rather than deleting ` +
+				`this assertion.`,
+		).toBe("40rem");
+		expect(
+			/--breakpoint-sm/.test(source),
+			`${GLOBALS}: now overrides \`--breakpoint-sm\`. The caveat assumes \`sm\` ` +
+				`is Tailwind's unoverridden 40rem default; if this repo sets it, ` +
+				`re-derive the caveat.`,
+		).toBe(false);
+	});
 });

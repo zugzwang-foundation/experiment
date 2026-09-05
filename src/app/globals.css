@@ -164,6 +164,23 @@
 	 * phone and below) variants. Desktop stays the unprefixed default
 	 * everywhere; every mobile-specific rule is a `max-mobile:` override,
 	 * never a replacement of the base one.
+	 *
+	 * ⚠ "SYNONYM FOR sm" IS A UNIT DIFFERENCE STATED AS AN IDENTITY, AND
+	 * THE DIFFERENCE IS A USER SETTING. Tailwind's `sm` is `40rem`; this
+	 * token is `640px`. They coincide at a 16px root font size and NOT
+	 * otherwise — root font size is a first-class browser accessibility
+	 * setting, so a reader who has raised theirs to 20px gets `sm` at
+	 * 800px and `mobile` at 640px, and BOTH boundaries ship in this one
+	 * stylesheet. Anywhere a `max-mobile:` override and an `sm:`/`md:`
+	 * rule are meant to hand off to each other, they will not, for that
+	 * reader.
+	 *
+	 * The token value is deliberately `px` and stays that way: this
+	 * breakpoint exists to describe a DEVICE (a phone's viewport), which
+	 * does not grow when someone enlarges their text, and Phase B's gate
+	 * must fire at the same physical width. Recorded rather than
+	 * "corrected" — the divergence is intended, and what was wrong was
+	 * three documents calling it an identity.
 	 */
 	--breakpoint-mobile: 640px;
 }

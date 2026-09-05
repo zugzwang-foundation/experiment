@@ -26,12 +26,29 @@ import { describe, expect, it } from "vitest";
  * `/sign-in/otp`, `/onboarding`) — and ADR-0045 is explicit that auth/join
  * surfaces "remain governed by the original constraint... gated, not made
  * responsive." A class applied unconditionally in `GlobalHeader.tsx` reaches
- * BOTH mounts; there is no other seam between them. So every reflow class in
- * this file, `BrandCluster.tsx` and `VisitorCounter.tsx` is wrapped in
+ * BOTH mounts. So every reflow class in this file, `BrandCluster.tsx` and
+ * `VisitorCounter.tsx` is wrapped in
  * `cn(base, mobileResponsive && "max-mobile:hidden")`, the prop defaults
  * `false`, and only `(public)/layout.tsx` passes it. This describe block's
  * first test is the one that makes that call-site asymmetry itself a
  * guarded fact rather than a claim in a comment.
+ *
+ * ⛔⛔ AND `GlobalHeader.tsx` IS NOT THE ONLY SEAM — THIS GUARD ONCE SAID IT
+ * WAS. The claim above used to end "there is no other seam between them," and
+ * that was false in the same commit that wrote it. `RulesControl` is a static
+ * child of both mounts and `OnboardingDeck` is a static child of IT, with no
+ * conditional on any hop, so a breakpoint class two files down reaches
+ * `/sign-in`, `/sign-in/otp` and `/onboarding` exactly as surely as one written
+ * here — and three such classes did. ⚠ `context` cannot separate the two:
+ * `context="reshow"` is what BOTH route groups pass. Nor can the deck itself,
+ * which knows nothing about who mounted it. So the prop is threaded the whole
+ * way down and the seam is CHECKED, in the last describe block of this file —
+ * a completeness claim nobody verifies is the exact failure this file exists
+ * to prevent elsewhere.
+ *
+ * ⚠ THE SEAM IS THE PROP CHAIN, NOT THE FILE BOUNDARY. Anything added under
+ * `GlobalHeader` that carries a breakpoint class inherits the same obligation,
+ * whichever file it lives in.
  *
  * ⛔⛔ THE NEGATIVE HALF IS THE LOAD-BEARING HALF OF THIS FILE. Five elements
  * must stay visible at EVERY width and each is pinned by an explicit negative:
@@ -80,6 +97,9 @@ const VISITOR = "src/components/shell/VisitorCounter.tsx";
 const IDENTITY = "src/components/shell/IdentityCluster.tsx";
 const PUBLIC_LAYOUT = "src/app/(public)/layout.tsx";
 const AUTH_LAYOUT = "src/app/(auth)/layout.tsx";
+/** The seam: the two files between `GlobalHeader` and the `(auth)` reach. */
+const RULES = "src/components/shell/RulesControl.tsx";
+const DECK = "src/components/onboarding/OnboardingDeck.tsx";
 
 /** The variant MOBILE-1 §4 mints — phone and below, everything under 640px. */
 const HIDE_BELOW_640 = "max-mobile:hidden";
@@ -205,6 +225,164 @@ function mountLines(source: string, component: string): string[] {
 		.filter((line) => new RegExp(`<${component}\\b`).test(line));
 }
 
+/**
+ * Source with `/* *\/` and `//` comments removed.
+ *
+ * ⛔ LOAD-BEARING FOR EVERY SCAN BELOW, NOT TIDINESS. This tree documents its
+ * breakpoint decisions in prose beside the class that implements them, so
+ * `max-mobile:p-4` appears in `OnboardingDeck.tsx` twice as a class and twice
+ * more as a comment explaining it. A scan that cannot tell the two apart reads
+ * a rationale as an unconditional utility and reddens on the documentation
+ * rather than on the code — which is how a guard gets deleted instead of fixed.
+ *
+ * ⚠ Its one assumption: no `//` inside a string literal in the scanned files.
+ * True today (no URLs, no protocol-relative paths in any of the five), and the
+ * failure mode is loud rather than silent — a truncated line makes a scan throw
+ * on a tag it cannot close, never pass on one it should have caught.
+ */
+function stripComments(source: string): string {
+	return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+}
+
+/**
+ * The source range each element carrying `max-mobile:hidden` WRAPS — the
+ * regions of this header that vanish below 640px.
+ *
+ * ⛔⛔ THIS EXISTS BECAUSE A LINE-BASED CHECK CANNOT SEE THE REAL HIDE
+ * MECHANISM. `mountLines()` asks whether a hide token sits on a component's own
+ * mount line, and the way this header actually hides things is the wrapper
+ * `<div>` introduced at `GlobalHeader.tsx`'s left zone — so a SECOND such
+ * wrapper placed around `<IdentityCluster>` or `<DharmaCluster>` would hide the
+ * JOIN CTA at phone width while passing every line-based assertion in this
+ * file. That is not hypothetical: one wrapper of exactly that shape is already
+ * here and is correct, which is precisely what makes a second one plausible.
+ *
+ * Depth-counted by tag name, and it THROWS rather than guesses on anything it
+ * cannot bound — an unparseable region silently returning `[]` would report a
+ * clean sweep of nothing.
+ */
+function hiddenRegions(rawSource: string, file: string): string[] {
+	const source = stripComments(rawSource);
+	const regions: string[] = [];
+	let at = source.indexOf(HIDE_BELOW_640);
+	while (at !== -1) {
+		const open = source.lastIndexOf("<", at);
+		if (open === -1 || !/[A-Za-z]/.test(source[open + 1] ?? "")) {
+			throw new Error(
+				`${file}: found "${HIDE_BELOW_640}" outside any element's attributes ` +
+					`(offset ${at}). Re-derive this scan rather than skipping it — an ` +
+					`occurrence it cannot bound is an occurrence it is not checking.`,
+			);
+		}
+		const tag = /^<([A-Za-z][\w.]*)/.exec(source.slice(open))?.[1];
+		if (!tag) {
+			throw new Error(`${file}: unreadable tag name at offset ${open}.`);
+		}
+		const tagEnd = source.indexOf(">", at);
+		if (tagEnd === -1) {
+			throw new Error(`${file}: <${tag} at ${open} never closes its tag.`);
+		}
+		// Self-closing: no children, so it wraps nothing and hides only itself.
+		if (source[tagEnd - 1] !== "/") {
+			let depth = 1;
+			let cursor = tagEnd + 1;
+			const start = cursor;
+			while (depth > 0) {
+				const nextOpen = source.indexOf(`<${tag}`, cursor);
+				const nextClose = source.indexOf(`</${tag}`, cursor);
+				if (nextClose === -1) {
+					throw new Error(
+						`${file}: <${tag}> opened at ${open} is never closed.`,
+					);
+				}
+				if (nextOpen !== -1 && nextOpen < nextClose) {
+					depth += 1;
+					cursor = nextOpen + tag.length + 1;
+				} else {
+					depth -= 1;
+					cursor = nextClose + tag.length + 2;
+					if (depth === 0) regions.push(source.slice(start, nextClose));
+				}
+			}
+		}
+		at = source.indexOf(HIDE_BELOW_640, at + HIDE_BELOW_640.length);
+	}
+	return regions;
+}
+
+/**
+ * Every `max-mobile:` utility in `source` that is NOT the second operand of a
+ * `mobileResponsive &&` — i.e. every breakpoint class that reaches BOTH route
+ * groups.
+ *
+ * This is the seam check A-1 was missing. It is deliberately a scan for the
+ * ABSENCE of a gate rather than a check that the right classes are present:
+ * the property ADR-0045 needs is "nothing responsive reaches `(auth)`", and a
+ * list of expected classes would go stale the moment a fourth one is added
+ * while this one stays true forever.
+ */
+/**
+ * How many elements are still OPEN at `index`, counting from the element whose
+ * opening tag contains `anchor` — i.e. the JSX nesting depth of `index`
+ * relative to that container. `0` means "direct child".
+ *
+ * ⚠ ADJACENCY IS NOT DEPTH, AND THE FIRST ATTEMPT AT THIS GUARD CONFUSED THE
+ * TWO. Checking that nothing sits between the previous `>` and a mount looks
+ * like a containment check and is not one: a wrapper opened immediately before
+ * the mount leaves exactly zero characters between them, and its `</div>` is
+ * indistinguishable from the zone's own. That mutation passed. Depth is the
+ * property the T4 guard actually depends on, so depth is what is counted.
+ *
+ * ⚠ Assumes no `>` inside an attribute value between the two points — the same
+ * assumption `tagWindowFrom` states, true across this header — and throws if
+ * the count ever goes negative rather than reporting a depth it cannot justify.
+ */
+function depthWithin(
+	rawSource: string,
+	file: string,
+	anchor: string,
+	needle: string,
+): number {
+	const source = stripComments(rawSource);
+	const anchorAt = source.indexOf(anchor);
+	const needleAt = source.indexOf(needle);
+	if (anchorAt === -1 || needleAt === -1) {
+		throw new Error(`${file}: could not locate "${anchor}" or "${needle}".`);
+	}
+	const from = source.indexOf(">", anchorAt) + 1;
+	let depth = 0;
+	const tags = /<(\/?)([A-Za-z][\w.]*)[^>]*?(\/?)>/g;
+	tags.lastIndex = from;
+	let m = tags.exec(source);
+	while (m !== null && m.index < needleAt) {
+		if (m[1] === "/") depth -= 1;
+		else if (m[3] !== "/") depth += 1;
+		if (depth < 0) {
+			throw new Error(
+				`${file}: the container holding "${anchor}" closed before "${needle}" ` +
+					`— this scan's bounds are wrong, re-derive them.`,
+			);
+		}
+		m = tags.exec(source);
+	}
+	return depth;
+}
+
+function ungatedBreakpointClasses(rawSource: string): string[] {
+	const source = stripComments(rawSource);
+	const found: string[] = [];
+	const re = /max-mobile:[^\s"']+/g;
+	let m = re.exec(source);
+	while (m !== null) {
+		const quote = source.lastIndexOf('"', m.index);
+		const prefix =
+			quote === -1 ? "" : source.slice(Math.max(0, quote - 60), quote);
+		if (!/mobileResponsive\s*&&\s*$/.test(prefix)) found.push(m[0]);
+		m = re.exec(source);
+	}
+	return found;
+}
+
 describe("global header mobile reflow — the mobileResponsive prop, not an unconditional class", () => {
 	it("header-mobile::GlobalHeader-declares-the-prop-defaulting-false", () => {
 		expect(
@@ -327,15 +505,37 @@ describe("global header mobile reflow — the secondary controls drop out below 
 
 describe("global header mobile reflow — the right zone sheds its anti-conflation tail", () => {
 	it("header-mobile::the-register-divider-carries-NO-testid-ever-SG6", () => {
-		const source = read(HEADER);
 		// SG6, verbatim from docs/plans/HEADER-PORTFOLIO.md: "The divider is a
 		// named untouchable. It carries no `data-testid` and must not gain one."
+		//
+		// ⚠ THIS ASSERTED ONE HYPOTHETICAL STRING UNTIL THE REMEDIATION PASS.
+		// It matched the literal `data-testid="header-register-divider"` and
+		// nothing else — so `data-testid="register-divider"`, or any other name,
+		// passed a test whose own failure message said "(or similar)". SG6 does
+		// not forbid A name; it forbids a testid. Read the divider's actual tag
+		// and assert the attribute is absent from it, which is the rule as
+		// written and is indifferent to what anyone would have called it.
+		const source = stripComments(read(HEADER));
+		const anchor = "mx-3 h-[30px] w-px bg-n2";
+		const at = source.indexOf(anchor);
+		if (at === -1) {
+			throw new Error(
+				`${HEADER}: the §21.1 divider's \`${anchor}\` class is gone. It is a ` +
+					`named untouchable and is located by that class here and in ` +
+					`dharma-cluster.test.tsx's T4 guard — re-derive both, do not delete.`,
+			);
+		}
+		const open = source.lastIndexOf("<", at);
+		const close = source.indexOf(">", at);
+		if (open === -1 || close === -1) {
+			throw new Error(`${HEADER}: could not bound the divider's own tag.`);
+		}
 		expect(
-			source,
-			`${HEADER}: found "header-register-divider" (or similar). SG6 forbids ` +
-				`a testid on the §21.1 divider — locate it by its \`w-px\` class, ` +
+			source.slice(open, close + 1),
+			`${HEADER}: the §21.1 divider gained a \`data-testid\`. SG6 forbids one ` +
+				`on this element under ANY name — locate it by its \`w-px\` class, ` +
 				`exactly as dharma-cluster.test.tsx's T4 guard already does.`,
-		).not.toMatch(/data-testid="header-register-divider"/);
+		).not.toMatch(/data-testid/);
 	});
 
 	it("header-mobile::the-register-divider-keeps-its-hairline-and-gates-its-hide", () => {
@@ -375,8 +575,25 @@ describe("global header mobile reflow — the right zone sheds its anti-conflati
 		// hide lives on VisitorCounter's own root node instead (its only call
 		// site is this file), which keeps the DOM shape T4 depends on
 		// byte-identical.
-		const source = read(HEADER);
-		expect(source).not.toContain("header-visitor-counter-slot");
+		//
+		// ⚠ THE WRAPPER HALF OF THIS TEST WAS ONE HYPOTHETICAL STRING UNTIL THE
+		// REMEDIATION PASS: `not.toContain("header-visitor-counter-slot")`, a
+		// name nobody would independently pick, so any OTHER wrapper name passed
+		// a test called `with-NO-wrapper`. What T4 actually depends on is
+		// structural — that this mount is a DIRECT child of the right zone — so
+		// that is what is read now: the mount's JSX nesting DEPTH inside the
+		// right zone must be zero. No wrapper, under any name, survives that.
+		const source = stripComments(read(HEADER));
+		expect(
+			depthWithin(source, HEADER, "justify-self-end", "<VisitorCounter"),
+			`${HEADER}: <VisitorCounter> is no longer a DIRECT child of the right ` +
+				`zone — something wraps it. dharma-cluster.test.tsx's T4 guard (SG5) ` +
+				`walks \`dharma-cluster\`'s parent's direct \`.children\` and requires ` +
+				`the \`visitor-counter\` node among them; a wrapper pushes the real ` +
+				`node down one level, which is invisible to a className check and is ` +
+				`exactly what broke T4 the first time this task landed.`,
+		).toBe(0);
+
 		const tag = /<VisitorCounter\b[^/]*\/>/.exec(source);
 		if (!tag) {
 			throw new Error(`${HEADER}: no <VisitorCounter ... /> mount found.`);
@@ -547,6 +764,18 @@ describe("global header mobile reflow — what this task may NOT touch", () => {
 			],
 		];
 
+		// ⛔⛔ TWO MECHANISMS, AND THE SECOND IS THE REAL ONE. Until the
+		// remediation pass this loop checked only the first: that no hide token
+		// sits on the component's own mount line. But nothing in this header
+		// hides anything that way — the way it hides things is the wrapper
+		// `<div>` this task itself introduced around Radio and GitHub, and a
+		// second wrapper of that exact shape around `<IdentityCluster>` would
+		// have hidden the JOIN CTA at phone width while passing every assertion
+		// in this file. `hiddenRegions()` reads what each hide-bearing element
+		// WRAPS, so the two mechanisms are now both covered and the test's name
+		// is true of what it does.
+		const regions = hiddenRegions(source, HEADER);
+
 		for (const [component, why] of cases) {
 			const lines = mountLines(source, component);
 			expect(
@@ -556,28 +785,61 @@ describe("global header mobile reflow — what this task may NOT touch", () => {
 			).toBeGreaterThan(0);
 			for (const line of lines) {
 				expect(
-					line.includes(HIDE_BELOW_640) ||
-						(line.includes("mobileResponsive={mobileResponsive}") &&
-							component !== "BrandCluster"),
+					line.includes(HIDE_BELOW_640),
 					`${HEADER}: \`<${component}\` carries a hide token directly on its ` +
 						`mount line. It must render at every width — ${why}`,
 				).toBe(false);
 			}
+			for (const region of regions) {
+				expect(
+					region.includes(`<${component}`),
+					`${HEADER}: \`<${component}\` is now INSIDE an element that ` +
+						`carries \`${HIDE_BELOW_640}\`, so it disappears below 640px ` +
+						`without any hide token of its own. It must render at every ` +
+						`width — ${why}`,
+				).toBe(false);
+			}
 		}
 
-		// BrandCluster legitimately RECEIVES the prop (it decides internally,
-		// per its own gated test above) — the forbidden case is a hide token
-		// applied to BrandCluster's OWN mount line, which the loop already checks.
+		// ⚠ RECEIVING `mobileResponsive` IS NOT A HIDE AND IS NO LONGER TREATED
+		// AS ONE. This loop used to also fail a mount line carrying
+		// `mobileResponsive={mobileResponsive}`, exempting `BrandCluster` — a
+		// disjunct that was dead when written (`mountLines` returns the bare
+		// `<BrandCluster` line, its props being on the lines below, so the
+		// exemption could never fire) and that became actively WRONG once
+		// `RulesControl` began taking the prop to thread it down to
+		// `OnboardingDeck`. Two components legitimately receive it for two
+		// different reasons — one to decide its own render, one to pass it on —
+		// and neither is hiding itself. The region scan above is what actually
+		// proves that, and it does so without caring how the prop travels.
 	});
 
 	it("header-mobile::IdentityCluster.tsx-carries-no-responsive-token-at-all", () => {
-		const source = read(IDENTITY);
+		// ⚠ "AT ALL" NOW MEANS AT ALL. This checked two literals —
+		// `max-mobile:hidden` and `mobileResponsive` — so `max-sm:hidden`,
+		// `mobile:flex`, `max-[640px]:hidden` and `max-mobile:opacity-0` every
+		// one of them passed a test whose name promises exhaustiveness. The
+		// point of this guard is that Phase A adds NO responsive behaviour to
+		// the file carrying the JOIN CTA, and "no responsive behaviour" is a
+		// property of the whole variant vocabulary, not of the one variant this
+		// task happened to use. Anything that would land half of Phase B's
+		// two-condition mechanism here reddens now, whatever it is spelled.
+		const source = stripComments(read(IDENTITY));
+		const VARIANTS =
+			/\b(?:max-)?(?:mobile|sm|md|lg|xl|2xl):|\b(?:max|min)-\[[^\]]+\]:/;
+		const offender =
+			VARIANTS.exec(source)?.[0] ??
+			(source.includes("mobileResponsive") ? "mobileResponsive" : null);
 		expect(
-			source.includes(HIDE_BELOW_640) || source.includes("mobileResponsive"),
-			`${IDENTITY}: carries a responsive token. This file is Phase B's ` +
-				`subject and Phase A must not add any hide/responsive behaviour to ` +
-				`it, conditional or not.`,
-		).toBe(false);
+			offender,
+			`${IDENTITY}: carries the responsive token \`${offender}\`. This file ` +
+				`is Phase B's subject and Phase A must not add ANY hide or ` +
+				`responsive behaviour to it — conditional or not, at any breakpoint, ` +
+				`under any variant. The JOIN CTA it hosts is governed by two ` +
+				`independent conditions ruled in Phase B (a width rule AND a ` +
+				`touch-primary rule); landing either one here puts half of a ` +
+				`critical-path mechanism under Phase A's review.`,
+		).toBe(null);
 	});
 
 	it("header-mobile::the-header-tag-and-its-60px-row-take-ZERO-diff", () => {
@@ -611,5 +873,120 @@ describe("global header mobile reflow — what this task may NOT touch", () => {
 				`\`(public)/layout.tsx\` subtracts 60px; the two must move together ` +
 				`or every surface gains a scrollbar or a dead gap.`,
 		).toBe("60");
+	});
+});
+
+/**
+ * THE SEAM. `GlobalHeader.tsx` is not the only file whose breakpoint classes
+ * reach the `(auth)` route group, and this file claimed it was.
+ *
+ * The chain is three static hops with no conditional on any of them:
+ *
+ *   (auth)/layout.tsx  →  <GlobalHeader viewer stars />     ← no prop
+ *   GlobalHeader.tsx   →  <RulesControl />                  ← outside the
+ *                                                             gated wrapper,
+ *                                                             deliberately,
+ *                                                             per SPEC.1 §21.9
+ *   RulesControl.tsx   →  <OnboardingDeck context="reshow" …/>
+ *
+ * So an unconditional `max-mobile:` class in `OnboardingDeck.tsx` renders a
+ * responsive deck to anyone who opens RULES on `/sign-in`, `/sign-in/otp` or
+ * `/onboarding` — which ADR-0045 rules out in as many words: auth/join
+ * surfaces "remain governed by the original constraint… gated, not made
+ * responsive." Three such classes shipped that way.
+ *
+ * ⚠ `context` CANNOT GATE IT, and this is the part worth reading twice. The
+ * obvious fix is to key off `context === "reshow"`, and it is wrong: the
+ * `(public)` header opens the very same re-show, and `(public)`'s own
+ * first-login mount legitimately wants those classes. `context` describes WHICH
+ * DECK, never WHICH SURFACE. Only the layout knows the surface, so only a
+ * threaded prop can carry the distinction — no `usePathname`, no route
+ * special-case, and nothing the deck can work out for itself.
+ *
+ * ⚠ WHY AN ABSENCE SCAN RATHER THAN A LIST OF EXPECTED CLASSES. The property
+ * ADR-0045 needs is "nothing responsive reaches `(auth)`". An enumeration of
+ * today's three classes would go stale the first time a fourth is added — and
+ * would go stale SILENTLY, in the passing direction. `ungatedBreakpointClasses`
+ * stays true however many there are.
+ */
+describe("global header mobile reflow — the RulesControl → OnboardingDeck seam", () => {
+	it("header-mobile::RulesControl-receives-the-prop-and-passes-it-to-OnboardingDeck", () => {
+		const header = read(HEADER);
+		const rulesTag = /<RulesControl\b[\s\S]*?\/>/.exec(header);
+		if (!rulesTag) {
+			throw new Error(`${HEADER}: no <RulesControl ... /> mount found.`);
+		}
+		expect(
+			rulesTag[0],
+			`${HEADER}: <RulesControl> is not passed \`mobileResponsive\`. It is ` +
+				`the only seam between this header's two mounts and the onboarding ` +
+				`deck; without the prop the deck cannot tell an (auth) render from a ` +
+				`(public) one, because both pass \`context="reshow"\`.`,
+		).toMatch(/mobileResponsive=\{mobileResponsive\}/);
+
+		const rules = read(RULES);
+		expect(
+			rules,
+			`${RULES}: no \`mobileResponsive = false\` default. The (auth) mount ` +
+				`relies on the default rather than passing \`false\`, so the polarity ` +
+				`is what keeps a forgotten prop inheriting the pre-MOBILE-1 deck.`,
+		).toMatch(/mobileResponsive\s*=\s*false/);
+
+		const deckTag = /<OnboardingDeck\b[\s\S]*?\/>/.exec(rules);
+		if (!deckTag) {
+			throw new Error(`${RULES}: no <OnboardingDeck ... /> mount found.`);
+		}
+		expect(
+			deckTag[0],
+			`${RULES}: its <OnboardingDeck> mount does not forward ` +
+				`\`mobileResponsive\`. The chain breaks here and every breakpoint ` +
+				`class in the deck reaches /sign-in again.`,
+		).toMatch(/mobileResponsive=\{mobileResponsive\}/);
+	});
+
+	it("header-mobile::OnboardingDeck-carries-NO-ungated-breakpoint-class", () => {
+		expect(
+			read(DECK),
+			`${DECK}: no \`mobileResponsive = false\` default.`,
+		).toMatch(/mobileResponsive\s*=\s*false/);
+
+		const ungated = ungatedBreakpointClasses(read(DECK));
+		expect(
+			ungated,
+			`${DECK}: ${ungated.length} breakpoint class(es) are not wrapped in ` +
+				`\`mobileResponsive && "…"\` — ${ungated.join(", ")}. This deck is ` +
+				`reachable from the (auth) header through RulesControl, so an ` +
+				`unconditional class here reflows /sign-in, /sign-in/otp and ` +
+				`/onboarding. ⚠ Do NOT gate on \`context\` instead: the (public) ` +
+				`header opens the same re-show and (public)'s first-login mount ` +
+				`legitimately wants these classes.`,
+		).toEqual([]);
+	});
+
+	it("header-mobile::ONLY-the-public-layout-first-login-mount-opts-the-deck-in", () => {
+		const publicTag = /<OnboardingDeck\b[\s\S]*?\/>/.exec(read(PUBLIC_LAYOUT));
+		if (!publicTag) {
+			throw new Error(`${PUBLIC_LAYOUT}: no <OnboardingDeck ... /> mount.`);
+		}
+		expect(
+			publicTag[0],
+			`${PUBLIC_LAYOUT}: its first-login <OnboardingDeck> mount does not pass ` +
+				`\`mobileResponsive\`. This is the (public) route group and the deck ` +
+				`clipped its own content at 375px before this task — 33px of every ` +
+				`body line, and the wordmark row — so the fix must reach it.`,
+		).toMatch(/\bmobileResponsive\b/);
+
+		// ⛔ AND THE (auth) LAYOUT IMPORTS NO DECK AT ALL. Its only path to one
+		// is through `GlobalHeader` → `RulesControl`, which is exactly why the
+		// prop chain above is the whole of the gate: there is no second mount
+		// here that could be given the prop by mistake.
+		expect(
+			read(AUTH_LAYOUT).includes("OnboardingDeck"),
+			`${AUTH_LAYOUT}: now references OnboardingDeck directly. The (auth) ` +
+				`group reaches the deck only through RulesControl's re-show, and D-4 ` +
+				`depends on that: a mount here could be passed \`onComplete\`, and a ` +
+				`signed-out visitor writing the completion marker would suppress ` +
+				`their own first-login deck later.`,
+		).toBe(false);
 	});
 });

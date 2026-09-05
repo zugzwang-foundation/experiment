@@ -2,12 +2,56 @@
 
 ## Phase A — 2026-09-03
 
-**What landed (files + PR#).** No PR opened yet — this session's brief ended at
-"stop, report status," not "open a PR." Working tree on `main`, uncommitted.
-Twelve files modified, four new test files:
+> ⚠ **A NOTE ON HOW BREAKPOINT CLASSES ARE SPELLED IN THIS FILE, because it
+> looks like a typo and is not.** Tailwind v4's source detection scans `docs/`,
+> so a class-shaped string written in prose here becomes a real emitted utility
+> in the built stylesheet. That is not hypothetical: `max-mobile:grid&#8203;-cols-2`
+> was written out in the deferral section below, was found in **no other file in
+> the tree**, tracked or untracked, and was nonetheless emitted into
+> `.next/static/chunks/` as a live rule — this document restored the very class
+> the code had reverted. The dead weight is ~72 bytes and does not matter. What
+> matters is that **the built stylesheet stops being evidence of what components
+> use**, which breaks any audit of the mobile surface done by grepping it and
+> makes any *"the stylesheet must not contain X"* guard falsifiable by a
+> documentation edit.
+>
+> ⇒ **Any `max-mobile:` class named in this file that is NOT shipped in `src/`
+> carries a zero-width space (`&#8203;`) after its prefix**, which breaks
+> Tailwind's scanner and is invisible when rendered. Classes that ARE shipped
+> are written plainly — they are in the stylesheet either way, so hiding them
+> would cost readability for nothing.
+
+**What landed (files + PR#).** **PR #486** —
+*"MOBILE-1 Phase A — the read surfaces reflow at phone width"* — open against
+`main`. Five commits: `c217bd3` (the reflow), `c81591b` (the identity row),
+`a544f80` (the AGENTS.md traps), `b8c3739` (the merge of `origin/main`), and
+`39ad64b` (the remediation pass this section was rewritten by).
+
+**Measured at `39ad64b`: 22 files modified (19 non-test, 3 tests) and 5 added
+(4 tests + this log).** ⚠ **The command is the claim and the numbers are a
+reading of it** — `git diff --name-status origin/main...HEAD`. Run it. This
+sentence carried `19 / 16 / 3` for about an hour, written one commit before the
+remediation pass added three more files and made it wrong; it is pinned to a
+SHA now so that a reader can tell a stale number from a current one instead of
+having to trust it (**O-15**: a number written into prose decays no matter how
+loudly the surrounding prose says not to trust it).
+
+*(This section stated the opposite until the remediation pass, and that is the
+finding worth recording rather than quietly fixing: it read "No PR opened yet…
+working tree on `main`, uncommitted. Twelve files modified, four new test
+files," and said `HeroPanels` and `DiscoveryCarousel` took zero functional diff
+because both hides were reverted. The corrections all existed — sixty to a
+hundred and thirty lines below. A reader stops at "What landed," which is where
+a reader starts, and learned the opposite of what the diff contains. **O-5:
+write the correction INTO the operative section; an amendments block records a
+change, it never delivers it.**)*
+
+**The header and its subtree.**
 
 - `src/app/globals.css` — mints `--breakpoint-mobile: 640px` inside the
-  existing branded `@theme` block.
+  existing branded `@theme` block. ⚠ It is the repo's **first breakpoint ever
+  minted**; ADR-0045 calls the `max-mobile:` override discipline "a new
+  convention future work must follow consistently."
 - `src/components/shell/GlobalHeader.tsx` — new `mobileResponsive?: boolean`
   prop (default `false`), gating every reflow class via `cn()`. Radio +
   GitHub stars share one hidden wrapper (`shrink-0`); RULES and HeaderNav
@@ -17,30 +61,80 @@ Twelve files modified, four new test files:
   same `mobileResponsive` prop, threaded from `GlobalHeader`. VisitorCounter
   gates its own root directly (no wrapper — preserves
   `dharma-cluster.test.tsx`'s T4 direct-children guard).
+- `src/components/shell/RulesControl.tsx`, **`src/components/onboarding/OnboardingDeck.tsx`**
+  — ⛔ **THE SEAM, AND IT WAS MISSED IN THE FIRST THREE COMMITS.** The deck's
+  three phone-width classes (`max-mobile:max-w-[calc(100vw-24px)]`,
+  `max-mobile:p-4`, `max-mobile:pr-6`) shipped as **unconditional literals** —
+  the only breakpoint classes in the diff not behind `mobileResponsive`. The
+  chain `(auth)/layout.tsx → GlobalHeader → RulesControl → OnboardingDeck` is
+  three static hops with no conditional on any of them, so below 640px on
+  `/sign-in`, `/sign-in/otp` and `/onboarding`, opening RULES rendered a
+  responsive deck — which ADR-0045 rules out in as many words. Both files now
+  take and forward the prop. ⚠ `context` **cannot** gate this: `context="reshow"`
+  is what BOTH route groups pass, and `(public)`'s own first-login mount
+  legitimately wants those classes. `context` describes which deck, never which
+  surface. **The deck change itself was correct and stays** — it was fixing real
+  clipping (`scrollWidth 318` vs `clientWidth 285` at 375px); only its gating
+  was the defect.
 - `src/app/(public)/layout.tsx` — passes `mobileResponsive` to its
-  `<GlobalHeader>` mount. `(auth)/layout.tsx` is untouched — its mount omits
-  the prop, so `/sign-in`, `/sign-in/otp`, `/onboarding` render
-  byte-identical to before this task (browser-confirmed: 394px overflow,
-  unchanged).
+  `<GlobalHeader>` mount and to its first-login `<OnboardingDeck>` mount.
+  `(auth)/layout.tsx` is untouched — its mount omits the prop, so `/sign-in`,
+  `/sign-in/otp`, `/onboarding` render byte-identical to before this task
+  (browser-confirmed: 394px overflow, unchanged).
+
+**The debate surface (`/m/[slug]`).**
+
 - `src/components/debate/DebateView.tsx` — `max-mobile:h-auto
   max-mobile:overflow-visible` on the `PageContainer`; `max-mobile:flex-col`
   on both `arena` divs (both arms of the market/post ternary).
 - `src/components/debate/HeadZone.tsx` — `max-mobile:basis-auto
   max-mobile:overflow-visible`, releasing the same one-screen discipline.
-- `src/components/discovery/HeroPanels.tsx`, `DiscoveryCarousel.tsx` — **zero
-  functional diff** (comments only). First draft hid both below 640px; both
-  hides were reverted — the hero carries real participant argument content
-  (SPEC.1 §22 F-DISC-2, CHART-1 made the price chart non-decorative), and it
-  already stacks via its pre-existing `md:grid-cols-…` breakpoint with no
-  new code needed.
-- Pre-existing tests fixed where this diff legitimately changed what they
-  pinned: `tests/unit/shell/dharma-cluster.test.tsx` (no — see below, this
-  one needed no edit, VisitorCounter's no-wrapper design preserved it
-  as-is), `tests/unit/shell/page-container.test.ts`, `github-stars.test.tsx`,
-  `tests/unit/debate/resolution-block-glyphs.test.ts`.
+- **`src/components/debate/MarketHeader.tsx`** — `max-mobile:flex-col` at
+  `:290`, stacking the header's own row. ⚠ **Nothing opens this file in
+  `tests/`**; it is "guarded" only incidentally, because `DebateView.tsx`
+  carries the same string. See the Block D docket entry.
+- **`src/components/debate/MarketMediaPanel.tsx`** — `max-mobile:w-full` at
+  `:128`. ⛔ **This and `MarketHeader` are ONE MECHANISM** — both files' own
+  comments say so — and they are **not pinned together** the way
+  `discovery-mobile::hero-and-rail-hide-TOGETHER-never-one-alone` correctly
+  pins its pair. Either can be removed alone and stay green. Docketed.
+- `src/components/debate/ArgProfile.tsx` — `max-mobile:shrink
+  max-mobile:flex-wrap` on both author-row groups (`:225`, `:375`).
+
+**Discovery.**
+
+- `src/components/discovery/HeroPanels.tsx` (`:137`), `DiscoveryCarousel.tsx`
+  (`:247`) — **both ship `max-mobile:hidden`.** ⚠ This is the FOUNDER RULING at
+  `:99` below, which re-reversed an earlier `@code-reviewer`-driven revert; the
+  first draft's hide was reverted, and then the ruling restored it with the
+  missing path supplied (`MarketCard` is a whole-card link, so every hidden post
+  and chart is one tap away). The reviewer was not wrong — the ground moved. The
+  two are pinned to hide TOGETHER by a dedicated guard, because either alone is
+  a defect with a different shape.
+- `src/components/discovery/MarketCard.tsx` — `max-mobile:outline-none` at
+  `:95`, killing the active ring that WANDERED down the list every ten seconds
+  once the hero it marks was hidden. Measured in a browser at 375px — visible,
+  not theoretical. ⚠ Guarded nowhere; deleting that one class reddens nothing.
+  Docketed.
+
+**Tests.**
+
+- Modified where this diff legitimately changed what they pinned:
+  `tests/unit/shell/page-container.test.ts` (equality kept, two tokens
+  appended), `github-stars.test.tsx` (rewritten to `compareDocumentPosition`),
+  `tests/unit/debate/resolution-block-glyphs.test.ts` (equality kept, two
+  tokens appended — ⚠ it was briefly loosened to token containment and is
+  restored to whole-string equality in the remediation pass; see `:396`).
+  `tests/unit/shell/dharma-cluster.test.tsx` needed **no** edit —
+  VisitorCounter's no-wrapper design preserved its T4 guard as-is.
 - New: `tests/unit/design/mobile-breakpoint-token.test.ts`,
   `discovery-mobile-reflow.test.ts`, `debate-mobile-reflow.test.ts`,
   `tests/unit/shell/global-header-mobile-reflow.test.ts`.
+- ⚠ **Coverage is not complete and the claims that said otherwise are
+  corrected.** Seven of twelve distinct shipped `max-mobile:` tokens have no
+  assertion anywhere in `tests/`. Writing them is deferred with a written
+  docket entry in `docs/parked.md`; what is fixed now is every claim that
+  overstated what is checked.
 
 **Decisions made.**
 - Header-chrome fix (`GlobalHeader.tsx` + children) was **not** in the
@@ -143,7 +237,7 @@ value truncates to an ellipsis** — `RESOL…` over `CoinMa…`, `CLOSE…` ove
 because the throwaway preview's hand-written slugs are absent from BLOCK-1's
 per-slug resolver map, so this row rendered empty chrome in every local test.
 **Not fixed, deliberately — this is a SURPRISE (§5.10), not an in-scope fix.**
-`max-mobile:grid-cols-2` was written, measured good (2×155.5px, full text, 0
+`max-mobile:grid&#8203;-cols-2` was written, measured good (2×155.5px, full text, 0
 overflow, desktop unchanged at four 160.7px columns) and then **reverted**,
 because three independent sources say the four-across geometry is a held
 decision rather than an oversight:
@@ -170,10 +264,10 @@ fixed, measured, reverted and ruled on inside one session. `ResolverCards.tsx`
 is byte-unchanged on this branch.
 
 **The fix, recorded so a later task needs no re-derivation.** Apply
-`max-mobile:grid-cols-2` to the row, then update both guards **in the same
+`max-mobile:grid&#8203;-cols-2` to the row, then update both guards **in the same
 commit**, narrowed rather than loosened: pin the *unprefixed* token as
 `grid-cols-4` and the sole responsive variant as exactly
-`max-mobile:grid-cols-2`, so a third value or a different breakpoint still
+`max-mobile:grid&#8203;-cols-2`, so a third value or a different breakpoint still
 reddens. Three files, no ADR, no SPEC amendment — nothing under `docs/specs/`,
 `docs/adr/` or `docs/design/` pins this geometry (grep-verified); it lives only
 in `docs/plans/BLOCK-1.md` and the two tests.
@@ -195,10 +289,11 @@ rescue from invisible to truncated; the intent was to make text fit. 2×2
 finishes it rather than contradicting it.
 
 **(1b) `ArgProfile`'s identity row is CLIPPED at 375px — found only after the
-rebase onto `main`, and NOT fixed.** Measured on the rebased tree: Group A
-(`ArgProfile.tsx:199` / `:342`, `flex shrink-0 items-center gap-1.5
-whitespace-nowrap`, holding `CeruleanCapybara000 | YES @ 50% | Đ 10 | Replies ·
-0`) renders **362px wide inside a 203px parent**, and the card ancestor's
+rebase onto `main`, and NOT fixed.** Measured on the rebased tree: **Group A** —
+the `whitespace-nowrap` span opening `ArgProfile`'s meta row, the one the
+`GROUP A` comment marks and `arg-profile-row.test.tsx`'s `groups()` helper finds
+by that same token, holding `CeruleanCapybara000 | YES @ 50% | Đ 10 | Replies ·
+0` — renders **362px wide inside a 203px parent**, and the card ancestor's
 `overflow-hidden` cuts the remainder — `Replies · 0` is off-card and invisible.
 Page-level overflow is still 0; this is clipping *within* a card, which is why
 the document-level check does not see it.
@@ -217,8 +312,8 @@ better way — so the rebase took upstream's version and my override went with
 it. Correct resolution; the residual clip is one level deeper than either fix.
 
 **FIXED — OPERATOR RULING 2026-09-05, after a side-by-side of the two builds.**
-`ArgProfile.tsx:196-198` documents the constraint as a rule with a stated
-purpose: *"GROUP A — never wraps internally (rule 2). A pseudonym long enough to
+`ArgProfile.tsx`'s `GROUP A` comment documents the constraint as a rule with a
+stated purpose: *"GROUP A — never wraps internally (rule 2). A pseudonym long enough to
 overflow it is preferred to a pseudonym that is cut in half: identity is not a
 field this product truncates."*
 
@@ -249,6 +344,37 @@ UI-OVERNIGHT 1b's two-locked-groups desktop row is byte-identical.
 (`tests/unit/debate/render/arg-profile-row.test.tsx`): it locates the groups by
 the `whitespace-nowrap` token, which is KEPT, and its `.flex-wrap` selector does
 not match the distinct `max-mobile:flex-wrap` token. 3202/3202 green.
+
+**⚠ AND THE WRAP REINTRODUCED RULE 7's DANGLE, ONE LEVEL IN — found at the
+PR #486 remediation pass, measured, and fixed.** `max-mobile:flex-wrap` makes
+every child of group A an independently wrappable flex item, and group A's
+interior `<FieldSeparator />`s ARE children. So the break could land between a
+separator and the field it divides. Measured at 375px against staging data, on
+every author card: group A wrapped to three lines at 181px reading
+`GoldRhino000 |` / `YES @ 53% | Đ 25 |` / `Replies · 1` — **two dangling pipes
+per row**, each ending a line while dividing nothing.
+
+That is precisely what UI-OVERNIGHT 1b rule 7 exists to prevent, and
+`arg-profile-row.test.tsx:116` states its reason in the same words the
+measurement produced: *"it would DANGLE at the end of line 1 the moment group B
+wrapped."* Group B was made safe by SEP-1's ruling — the separator became its
+FIRST CHILD, so it travels with the timestamp and line 2 reads `| 14d ago`,
+accepted and known. Group A's interior never got the same treatment because it
+was never supposed to wrap.
+
+⇒ **The fix applies that same ruling inward:** each separator and the field it
+leads now share one non-wrapping span, so they cannot be split. Re-measured:
+`RoseHamster000` / `|YES @ 56%  |Đ 25` / `|Replies · 1` — **0 dangles**, group
+box unchanged at 181 × 69.3px, page overflow 0, and 0 elements clipped inside
+author rows. At 1440px every group is still ONE line at 20px with 0 page
+overflow: `flex-wrap` is inert there, so the spans are transparent.
+⛔ **NOT `after:`/`before:` pseudo-element separators**, which was the other
+candidate: `FieldSeparator` was lifted at SEP-1 precisely because three private
+copies of this glyph had drifted apart, and a `content-['|']` utility here
+would re-fork the seam that component exists to unify.
+⚠ `arg-profile-row.test.tsx` is **still unmodified and still passes** — it pins
+group B's child count, not group A's — and it is the reason the fix was scoped
+to group A's interior rather than to the row.
 
 ⚠ **Group B takes the pair too, though it does not overflow on today's data** —
 the behaviour belongs to the row at phone width, not to one group's current

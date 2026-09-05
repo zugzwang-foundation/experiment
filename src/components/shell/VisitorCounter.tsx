@@ -40,7 +40,7 @@ export function VisitorCounter({
 	 * from there rather than inferred, so this component never has to know
 	 * which route mounted it. */
 	mobileResponsive?: boolean;
-} = {}) {
+}) {
 	const pathname = usePathname();
 	const [state, setState] = useState<CounterState>("loading");
 	const firedFor = useRef<string | null>(null);
