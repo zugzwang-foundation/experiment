@@ -195,8 +195,44 @@ export function ArgProfile({
 			<div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
 				{/* GROUP A — never wraps internally (rule 2). A pseudonym long enough
 				    to overflow it is preferred to a pseudonym that is cut in half:
-				    identity is not a field this product truncates. */}
-				<span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
+				    identity is not a field this product truncates.
+				    ⚠⚠ MOBILE-1 Phase A SCOPES RULE 2 TO >=640px, AND DOES IT TO SERVE
+				    THE RULE RATHER THAN TO OVERRIDE IT. Rule 2 exists to prevent
+				    TRUNCATION — that is the whole of its stated reason. Below 640px it
+				    was PRODUCING truncation: measured at 375px on real staging data,
+				    this group renders 362px inside a 203px parent and the card's own
+				    `overflow-hidden` cuts the last 106px, so `Đ 10` and `Replies · 0`
+				    are not shortened, they are GONE. The rule's purpose and the rule's
+				    effect had come apart, and only at phone width.
+				    ⇒ `max-mobile:shrink max-mobile:flex-wrap` lets the group take a
+				    second LINE instead of taking more WIDTH. Nothing is shortened and
+				    nothing is cut: every field stays whole, `whitespace-nowrap` still
+				    forbids breaking INSIDE a field, and the pseudonym in particular is
+				    as intact as rule 2 requires.
+				    ⚠ THAT CLAIM IS ABOUT FIELDS AND DOES NOT REACH THE SEAMS BETWEEN
+				    THEM — it was written as though it did. Every field does stay
+				    whole; what wrapping also does is let the break land between a
+				    separator and the field it divides, which shortens and cuts
+				    nothing and still renders wrongly. That is a real consequence of
+				    this token pair and it was measured, not predicted: two dangling
+				    separators per author row at 375px. It is handled where the
+				    separators live — see the span below — rather than by widening
+				    this sentence to cover it.
+				    The two tokens are one mechanism —
+				    `flex-wrap` alone cannot help while `shrink-0` pins the group at its
+				    362px content width, so releasing the shrink is what lets the wrap
+				    ever engage.
+				    ⛔ >=640px IS BYTE-IDENTICAL: both tokens are inert there, so the
+				    desktop row is still one line of two locked groups exactly as
+				    UI-OVERNIGHT 1b designed it, and `arg-profile-row.test.tsx` — which
+				    finds these groups BY the `whitespace-nowrap` token, kept — still
+				    sees the same two.
+				    ⚠ This was covered before the rebase onto `main` and silently lost:
+				    `PostCard` used to wrap the badge onto its own line, which freed
+				    enough width that this group fit. Upstream deleted that wrapper
+				    (the better fix for the crowding it addressed) and the coverage went
+				    with it, one level shallower than the real constraint. */}
+				<span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap max-mobile:shrink max-mobile:flex-wrap">
 					{/* HTML-FINISH · MARKET DETAIL row 42 — the pseudonym navigates to that
 				    author's Profile. SPEC.1 `:1628` already rules exactly this for the
 				    Discovery hero ("an author pseudonym click navigates to that
@@ -224,11 +260,37 @@ export function ArgProfile({
 					>
 						{author.pseudonym}
 					</Link>
-					<FieldSeparator />
-					<SideBadge side={side} price={entryPrice} size={chipSize} />
-					<PositionMarker marker={marker} />
+					{/* ⛔⛔ EACH SEPARATOR TRAVELS WITH THE FIELD IT LEADS, IN A SPAN
+					    THAT CANNOT WRAP INTERNALLY — and that span is the whole of this
+					    change. `max-mobile:flex-wrap` above makes every child of group A
+					    an independently wrappable flex item, so the break could land
+					    BETWEEN a separator and the field it divides, stranding the pipe
+					    at the end of a line where it divides nothing. MEASURED at 375px
+					    on staging data: group A wrapped to three lines at 181px and
+					    `GoldRhino000 |` / `YES @ 53% | Đ 25 |` BOTH ended in a dangling
+					    separator — two per author row, on every card.
+					    ⇒ That is UI-OVERNIGHT 1b rule 7's dangle, one level in. Rule 7
+					    exists to stop exactly this, and SEP-1 already ruled the remedy:
+					    a separator is placed as the FIRST CHILD of what it divides, so
+					    it moves with it and line 2 reads `| YES @ 53%`. A LEADING
+					    separator on a wrapped line is accepted and known
+					    (`arg-profile-row.test.tsx:123-127`); a TRAILING one is the
+					    defect. This applies that same ruling to group A's interior.
+					    ⛔ NOT `after:`/`before:` pseudo-elements: `FieldSeparator` exists
+					    because three private copies of this glyph had drifted apart
+					    (SEP-1), and a `content-['|']` utility here would re-fork the
+					    seam that component was lifted to unify.
+					    ⚠ >=640px IS UNCHANGED: `flex-wrap` is inert there, so these
+					    spans are transparent — one line, same gaps, same order. Group B
+					    is untouched; its separator was already its first child and it
+					    measured no dangle. */}
+					<span className="flex shrink-0 items-center gap-1.5">
+						<FieldSeparator />
+						<SideBadge side={side} price={entryPrice} size={chipSize} />
+						<PositionMarker marker={marker} />
+					</span>
 					{authorStake !== undefined ? (
-						<>
+						<span className="flex shrink-0 items-center gap-1.5">
 							<FieldSeparator />
 							{/* RANK-1 / ADR-0039 R6 — the figure FOLLOWS THE RULER. This is
 						    the stake still held, which is exactly what the lane sorted
@@ -289,10 +351,10 @@ export function ArgProfile({
 									</span>
 								</InfoTip>
 							) : null}
-						</>
+						</span>
 					) : null}
 					{replyCount !== undefined ? (
-						<>
+						<span className="flex shrink-0 items-center gap-1.5">
 							<FieldSeparator />
 							{/* `.repmeta` (`d5:580`) — `font-weight:700;letter-spacing:.12em;
 						    text-transform:uppercase;color:var(--ink)`, with `.repn`
@@ -306,7 +368,7 @@ export function ArgProfile({
 									{replyCount}
 								</span>
 							</span>
-						</>
+						</span>
 					) : null}
 				</span>
 				{/* GROUP B — the age and the lane badge, one unbreakable unit. When
@@ -338,8 +400,15 @@ export function ArgProfile({
 				    layout the server cannot see.
 				    ⇒ Canon §3 item 11 is no longer owed an amendment for this row: it
 				    already records the field AND its divider, which is what the three
-				    sibling author rows ship. This row now agrees with them. */}
-				<span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
+				    sibling author rows ship. This row now agrees with them.
+				    ⚠ GROUP B TAKES THE SAME `max-mobile:` PAIR AS GROUP A, and for the
+				    same reason — see that group's block above for the full argument.
+				    It is applied here even though group B is the narrower of the two
+				    and does not overflow on today's data: the pair is a property of the
+				    ROW's behaviour at phone width, not of one group's current contents,
+				    and a longer badge string is exactly the kind of change that would
+				    otherwise reintroduce the clip in the half nobody thought to cover. */}
+				<span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap max-mobile:shrink max-mobile:flex-wrap">
 					{/* TIME-1 · Form B — HOW LONG AGO, AND IT IS THE LAST THING GROUP A
 				    SAYS. The lane badge follows it (entry 1b, rule 5); nothing else
 				    does.

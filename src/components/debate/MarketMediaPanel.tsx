@@ -118,8 +118,14 @@ export function MarketMediaPanel({
 	 * own from `w-1/3` + `aspect-[16/9]` now) — `headzone-stack` keeps the
 	 * row's default stretch untouched.
 	 */
+	// MOBILE-1 Phase A — `max-mobile:w-full`. `w-1/3 shrink-0` is correct
+	// beside the text stack and wrong beneath it: `MarketHeader`'s row stacks
+	// below 640px (see its own comment and the measurement that forced it), and
+	// a third-width 16:9 letterbox floating above full-width text is not a
+	// reflow, it is the same defect one axis over. Full width keeps the 16:9
+	// ratio and the panel's own frame untouched. >=640px is byte-identical.
 	const frame =
-		"aspect-[16/9] w-1/3 shrink-0 self-start overflow-hidden rounded-[var(--imgr)]";
+		"aspect-[16/9] w-1/3 shrink-0 self-start overflow-hidden rounded-[var(--imgr)] max-mobile:w-full";
 
 	// ✅ R2 — NOTHING TO SHOW NOW DRAWS THE MOCKUP'S PLACEHOLDER, where it used to
 	// `return null`. `.mmedia`'s empty state is a centred column: the `.playmark`

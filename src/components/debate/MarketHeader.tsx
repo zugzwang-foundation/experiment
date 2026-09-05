@@ -275,7 +275,19 @@ export function MarketHeader({
 				   where its band is 217.8px and 188px respectively — the extra height
 				   was going nowhere. The fix is on the ONE child that actually needs it
 				   — see `MarketMediaPanel.tsx`'s `self-start`. */
-				<div className="flex min-h-0 flex-1 gap-4">
+				/* MOBILE-1 Phase A — STACKS BELOW 640px. This row is the media
+				   panel beside the text stack, and `MarketMediaPanel`'s frame is
+				   `w-1/3 shrink-0`: at 375px that leaves the stack 197px of a
+				   319px row, which is not a narrow column but a broken one —
+				   MEASURED on a real phone, `Đ 12,450 staked` broke across three
+				   lines and `4 posts` / `6 replies` each wrapped with their `·`
+				   separators orphaned. Stacking hands the text the full width and
+				   puts the media above it, which is what every one-column reading
+				   surface does. The panel goes full-width in the same commit
+				   (`MarketMediaPanel.tsx`) — a `w-1/3` panel in a stacked column
+				   would be a third-width letterbox floating over full-width text.
+				   ⚠ >=640px is byte-identical: `flex` + `gap-4` are unprefixed. */
+				<div className="flex min-h-0 flex-1 gap-4 max-mobile:flex-col">
 					<MarketMediaPanel
 						imageUrl={market.mediaImageUrl}
 						videoUrl={market.mediaVideoUrl}

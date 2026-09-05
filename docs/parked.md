@@ -41,6 +41,80 @@ when it closes; a row enters it when its trigger fires.*
 
 ---
 
+## MOBILE-1 Phase A (PR #486) — seven shipped `max-mobile:` tokens have no assertion (2026-09-05)
+
+**Deferred on purpose, with the overstating claims corrected now.** PR #486's
+remediation pass fixed every document, docblock and test name that claimed more
+coverage than exists (A-4, B-6). The coverage itself is deferred here, because
+writing it is larger than every other item in that handover combined and the
+**Sep 10 production window** does not have room for it. The distinction is the
+whole point: what shipped is a guard suite that is *smaller than it looked*, and
+the fix for that is either more guards or a smaller claim. The claim is now
+smaller; the guards are this row.
+
+**Trigger.** Phase B (the auth/join half — critical path, full ritual) touches
+the same header subtree and the same breakpoint. It should not inherit an
+inventory nobody has pinned. Otherwise: the first time any of these classes is
+edited.
+
+**Measured 2026-09-05 against the merged head.** Twelve distinct `max-mobile:`
+tokens ship in `src/`; **seven have no assertion anywhere in `tests/`.** The
+census is reproducible and must be re-run rather than read off this list —
+comments in test files contain these strings, so a plain `git grep` reports
+coverage that is not there, which is how this row's own first measurement came
+out wrong by four:
+
+```bash
+# tokens shipped in src/
+git grep -ohE 'max-mobile:[a-z0-9-]+(\[[^]"]*\])?' -- 'src/*' | sort -u
+# then, for each, grep tests/ with /* */ and // COMMENTS STRIPPED FIRST
+```
+
+| Token | Site | State |
+|---|---|---|
+| `max-mobile:shrink`, `max-mobile:flex-wrap` | `ArgProfile.tsx:225,375` | unguarded |
+| `max-mobile:w-full` | `MarketMediaPanel.tsx:128` | unguarded |
+| `max-mobile:outline-none` | `MarketCard.tsx:95` | unguarded |
+| `max-mobile:max-w-[calc(100vw-24px)]`, `max-mobile:p-4`, `max-mobile:pr-6` | `OnboardingDeck.tsx:220,258` | not name-pinned — see below |
+| `max-mobile:flex-col` | `MarketHeader.tsx:290` | guarded by COINCIDENCE — see below |
+
+**Three cases worth naming, because each fails in a different shape:**
+
+- **`MarketCard.tsx:95` — the one with a witness.** `docs/logs/MOBILE-1.md`
+  records the wandering active ring as *"MEASURED in a browser at 375px — this
+  was visible, not theoretical."* With the hero hidden below 640px the
+  carousel's 10s timer keeps running, so a card highlights itself and the
+  highlight walks down the list every ten seconds with nothing on screen
+  explaining it. **Deleting the single class that suppresses it reddens
+  nothing.** A defect that has already been seen once, with no guard, is the
+  strongest row here.
+- **`MarketHeader` + `MarketMediaPanel` are ONE MECHANISM and are not pinned
+  together.** Both files' own comments say so. `discovery-mobile-reflow.test.ts`
+  gets this right for its own pair —
+  `discovery-mobile::hero-and-rail-hide-TOGETHER-never-one-alone` — because
+  either alone is a defect with a different shape. Here **either can be removed
+  alone and stay green.** ⚠ And `MarketHeader.tsx:290` is "guarded" only by
+  coincidence: `DebateView.tsx` carries the same string, so a scan for the
+  STRING finds it while **no test opens the FILE**. String coverage and file
+  coverage are different things and only one of them survives a rename.
+- **The `OnboardingDeck` three are covered GENERICALLY, not by name.**
+  `global-header-mobile-reflow.test.ts`'s
+  `header-mobile::OnboardingDeck-carries-NO-ungated-breakpoint-class` asserts
+  that no breakpoint class in that file escapes its `mobileResponsive` gate —
+  which is the ADR-0045 property and is the right shape. It does **not** assert
+  the three classes are present, so deleting them (re-breaking the 375px
+  clipping the deck was fixed for) stays green. The absence scan is deliberate
+  and stays; a presence pin is what is owed.
+
+**Not owed:** new responsive surfaces, a `MarketHeader` render suite, or
+anything that would need a browser. jsdom performs no layout, so these are
+source scans like every other guard in `tests/unit/design/` — the work is
+volume, not difficulty.
+
+**Source:** `MOBILE-1A_dev-handover_PR-486.md` Block D; PR #486.
+
+---
+
 ## RPLY-CLOSE — the reply lane's residue (2026-08-26)
 
 Seven rows out of RPLY-1/-2/-3, severity-labelled. **P1 is a live correctness

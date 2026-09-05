@@ -25,6 +25,17 @@ next-env.d.ts
 .env.test
 !.env.example
 
+# Captured browser session state. `tests/e2e/.auth/participant.json` holds a
+# live `zugzwang_session` cookie; it is untracked but was NOT ignored, so a
+# single `git add -A` would have committed a working session token to a repo
+# whose history cannot be rewritten. Ignored here rather than deleted — the
+# files are somebody's working state and are not this PR's to remove.
+# ⚠ Nothing in this repository creates them: no Playwright, no
+# `playwright.config.*`, no `storageState` caller (AGENTS.md §1/§9). Whatever
+# wrote them ran out of band, and that is flagged separately — the ignore stops
+# the leak, it does not explain the origin.
+tests/e2e/.auth/
+
 # === IDE / editor ===
 .vscode/*
 !.vscode/extensions.json

@@ -97,7 +97,44 @@ export function HeroPanels({
 			// are grid items and stretch to the row height, so each fills the
 			// hero's height without needing its own growth rule.
 			// ⛔ The mockup's `min-height:0` is NOT ported — see `page.tsx`.
-			className="grid flex-1 gap-[14px] md:grid-cols-[1fr_1.9fr_1fr]"
+			// ⚠⚠ MOBILE-1 Phase A carries TWO SEPARATE mobile rules here, at two
+			// different widths. Read both before touching either.
+			//
+			// (1) `max-mobile:hidden` — FOUNDER-RULED, and it REVERSES a
+			// @code-reviewer finding rather than overlooking it. The reviewer
+			// objected (correctly, on the information it had) that hiding this
+			// root hides real participant content: SPEC.1 §22 F-DISC-2's
+			// top-ranked YES/NO posts and CHART-1's now-accessible price chart,
+			// none of it decorative since 2026-08-27. The founder's ruling
+			// answers that objection rather than waiving it — below 640px the
+			// surface becomes a plain vertical list of market cards, and
+			// `MarketCard` is a whole-card Link to `/m/{slug}`, so every
+			// hidden post and chart is ONE TAP away on the market's own page
+			// rather than unreachable. Content relocated, not destroyed. The
+			// rail hides with it (`DiscoveryCarousel`) because it navigates
+			// this.
+			// ⚠ KNOWN COST, ACCEPTED: a CSS hide leaves the carousel's 10s
+			// auto-advance timer and its document keydown listener running
+			// against a hidden hero. A JS-level conditional render would need a
+			// client viewport read, which plan §4 rules against for exactly the
+			// hydration reasons a pure-CSS toggle avoids.
+			//
+			// (2) `grid-cols-1` — a REAL FIX and NOT redundant with (1). It
+			// governs the 640–767px band, where the hero IS visible and `md:`
+			// has not yet taken over. Without an EXPLICIT single column, an
+			// implicit grid track sizes to its content's max-content width
+			// rather than the container: each stacked panel rendered ~526px
+			// inside a 375px viewport, measured in a browser once real card
+			// content existed to render (the local database had none when this
+			// was first written, so the grid had never been exercised with
+			// content at all). `grid-cols-1` is Tailwind's
+			// `repeat(1, minmax(0, 1fr))`; the `minmax(0, …)` is what lets the
+			// track shrink. `md:grid-cols-[1fr_1.9fr_1fr]` fully overrides it at
+			// >=768px, so desktop is untouched.
+			// ⛔ Deleting it because "the hero is hidden on mobile anyway" is the
+			// mistake this paragraph exists to prevent — hidden below 640px is
+			// not hidden at 700px. See discovery-mobile-reflow.test.ts.
+			className="grid flex-1 grid-cols-1 gap-[14px] md:grid-cols-[1fr_1.9fr_1fr] max-mobile:hidden"
 		>
 			<HeroPostPanel side="YES" post={topPosts.yes} slug={card.slug} />
 

@@ -198,7 +198,12 @@ const SITES: Site[] = [
 		// `.colwrap` scrolls internally, so a long argument and a removed-content
 		// placeholder stay reachable. A fixed height that clips would be a failure,
 		// not a pass.
-		now: "mx-auto w-full max-w-none px-7 py-4 flex h-[calc(100dvh-60px-2px)] min-h-0 flex-col gap-3 overflow-hidden",
+		// ⚠ MOBILE-1 Phase A adds two `max-mobile:` tokens (below 640px, the
+		// one-screen band releases to ordinary page flow — see DebateView.tsx
+		// and tests/unit/design/debate-mobile-reflow.test.ts). Additive only:
+		// every desktop token above is unchanged, so this is a `now` update,
+		// not a new `movedBy` — the preset selection and its ruling are untouched.
+		now: "mx-auto w-full max-w-none px-7 py-4 flex h-[calc(100dvh-60px-2px)] min-h-0 flex-col gap-3 overflow-hidden max-mobile:h-auto max-mobile:overflow-visible",
 		movedBy:
 			"HTML-FINISH · MARKET DETAIL · DIMENSIONAL PARITY — /m/[slug] is a " +
 			"fixed-height one-screen full-bleed grid (founder-ruled 2026-08-17); " +

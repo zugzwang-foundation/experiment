@@ -328,6 +328,22 @@ cutoff can move independently of `sm` later without an app-wide rename. The
 duplication was real and worth questioning; the resolution is to keep it,
 for these two stated reasons, not leave it implicit.
 
+⚠ **AMENDED AT THE PR #486 REMEDIATION PASS — "synonym" OVERSTATES IT, AND
+THE GAP IS AN ACCESSIBILITY SETTING.** Tailwind's `sm` is **`40rem`**
+(`node_modules/tailwindcss/theme.css:327`, unoverridden here); this token is
+**`640px`**. Those are equal at a 16px root font size and at no other, and
+root font size is something readers change on purpose. At a 20px root, `sm`
+fires at 800px while `mobile` fires at 640px — and both boundaries are live
+in the same stylesheet, so any place a `max-mobile:` override is expected to
+hand off to an `sm:`/`md:` rule will leave a 160px band where neither
+applies. Reason (2) above — that the two can diverge later without an
+app-wide rename — is therefore already true today, for some readers, rather
+than a future option. **The value is right and matching `sm` was the correct
+call**; `px` is deliberate because a phone's viewport does not grow when
+someone enlarges their text. What is corrected is the word *synonym*, in
+this entry, in `globals.css`'s own comment, and in the PR body — three
+documents recording a unit difference as an identity.
+
 **Read surfaces (Phase A):**
 - `(public)/page.tsx` (Discovery/feed): single-column stack below 640px;
   the featured-market hero carousel and the two-line price graph (both

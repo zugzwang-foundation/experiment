@@ -140,6 +140,11 @@ export default async function PublicLayout({
 				portfolio={portfolio}
 				spendable={spendable}
 				stars={stars}
+				// MOBILE-1 Phase A — this mount backs Discovery and /m/[slug],
+				// the two ADR-0045 read surfaces; the (auth) mount deliberately
+				// omits this prop, so /sign-in, /sign-in/otp and /onboarding
+				// keep rendering the header exactly as before this task.
+				mobileResponsive
 			/>
 			{/* HTML-FINISH row 8 — the surface column fills the viewport BELOW the
 			    header, so a surface can hand its leftover vertical space to a
@@ -177,7 +182,15 @@ export default async function PublicLayout({
 			    EVERY OTHER `(public)` SURFACE. The ruling names one route; a
 			    surface that has not been ruled one-screen must keep the floor,
 			    because a fixed height without an internal scroller CLIPS. Do not
-			    generalise this exemption without a ruling that names the route. */}
+			    generalise this exemption without a ruling that names the route.
+
+			    ⚠ MOBILE-1 Phase A scopes the one-screen exemption to >=640px
+			    only (max-mobile:h-auto max-mobile:overflow-visible on that
+			    same container, DebateView.tsx) — below 640px the arena stacks
+			    instead of running two columns side by side, so the
+			    no-page-scroll composition this paragraph describes releases
+			    to ordinary page flow, same as every other (public) surface.
+			    See debate-mobile-reflow.test.ts. */}
 			<main className="flex min-h-[calc(100vh-60px-2px)] flex-1 flex-col">
 				{children}
 			</main>
@@ -214,6 +227,7 @@ export default async function PublicLayout({
 				initialOpen={showOnboardingDeck}
 				pseudonym={viewer?.pseudonym ?? null}
 				onComplete={completeOnboardingDeckAction}
+				mobileResponsive
 			/>
 		</div>
 	);

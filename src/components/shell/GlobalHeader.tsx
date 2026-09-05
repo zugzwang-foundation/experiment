@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { FREEZE_INSTANT_UTC } from "@/server/markets/create";
 
 import { BrandCluster } from "./BrandCluster";
@@ -23,7 +24,22 @@ import { VisitorCounter } from "./VisitorCounter";
  * edits): bg-n0, top+bottom hairline, tier-1 elevation ("the top bar" is
  * tier 1), 3-zone `1fr auto 1fr` grid — equal side tracks keep the brand
  * cluster absolutely centred — fixed desktop max-width 1440 / 24px side
- * padding, no responsive breakpoints (design-language §1.7).
+ * padding.
+ *
+ * MOBILE-1 Phase A amends design-language §1.7 for THIS component only when
+ * `mobileResponsive` is true (see the prop below) — the same narrowing
+ * ADR-0045 makes for Discovery and `/m/[slug]`, never for the `(auth)`
+ * mount, which stays governed by §1.7 as originally written (ADR-0045:
+ * "auth/join surfaces remain governed by the original constraint... gated,
+ * not made responsive"). No breakpoint-scoped class in this file is
+ * unconditional; every one is gated by that prop.
+ *
+ * ⚠ AND THAT OBLIGATION DOES NOT STOP AT THIS FILE. `RulesControl` is a static
+ * child of both mounts and `OnboardingDeck` is a static child of it, so a
+ * breakpoint class left unconditional two hops down reaches `(auth)` exactly as
+ * surely as one written here. Both take the prop for that reason; `RulesControl`
+ * consumes it for nothing else. Anything added to this subtree inherits the same
+ * rule — the gate is the prop chain, not the file boundary.
  *
  * Left zone order Back · Home · Radio · GitHub · RULES (mockup v0_2 for the
  * first three; GitHub and RULES are named deviations — see below).
@@ -153,11 +169,23 @@ export function GlobalHeader({
 	portfolio = null,
 	spendable = null,
 	stars = null,
+	mobileResponsive = false,
 }: {
 	viewer: HeaderViewer | null;
 	portfolio?: string | null;
 	spendable?: string | null;
 	stars?: number | null;
+	/**
+	 * MOBILE-1 Phase A — the ADR-0045 read-surface amendment, threaded down
+	 * rather than assumed. `(public)/layout.tsx` passes `true` (its mount
+	 * backs Discovery and `/m/[slug]`); `(auth)/layout.tsx` passes nothing,
+	 * so `/sign-in`, `/sign-in/otp` and `/onboarding` render this component
+	 * BYTE-IDENTICAL to before this task — those are auth/join surfaces,
+	 * which ADR-0045 explicitly leaves gated rather than made responsive.
+	 * `BrandCluster` and `VisitorCounter` take the same prop for the same
+	 * reason; nothing here infers "which route" from anything but this flag.
+	 */
+	mobileResponsive?: boolean;
 }) {
 	const targetMs = FREEZE_INSTANT_UTC.getTime();
 	const initialDisplay = formatCountdown(Date.now(), targetMs);
@@ -167,18 +195,45 @@ export function GlobalHeader({
 			<div className="mx-auto grid h-[60px] w-full max-w-[1440px] grid-cols-[1fr_auto_1fr] items-center gap-[18px] px-6">
 				<div className="flex items-center gap-2 justify-self-start">
 					<HeaderNav />
-					<RadioSlot />
-					<GitHubStarsView stars={stars} />
-					<RulesControl />
+					{/* MOBILE-1 Phase A — RULES stays OUTSIDE this wrapper: it is
+					    the onboarding deck's only re-show entry point (SPEC.1
+					    §21.9, "present for every viewer, authenticated or not"),
+					    so it is never optional the way Radio/GitHub are. Only the
+					    two off-site/decorative utility controls hide below 640px. */}
+					<div
+						data-testid="header-secondary-controls"
+						className={cn(
+							"flex shrink-0 items-center gap-2",
+							mobileResponsive && "max-mobile:hidden",
+						)}
+					>
+						<RadioSlot />
+						<GitHubStarsView stars={stars} />
+					</div>
+					<RulesControl mobileResponsive={mobileResponsive} />
 				</div>
 				<div className="justify-self-center">
-					<BrandCluster targetMs={targetMs} initialDisplay={initialDisplay} />
+					<BrandCluster
+						targetMs={targetMs}
+						initialDisplay={initialDisplay}
+						mobileResponsive={mobileResponsive}
+					/>
 				</div>
 				<div className="flex items-center justify-self-end">
 					<DharmaCluster portfolio={portfolio} spendable={spendable} />
 					<IdentityCluster viewer={viewer} />
-					<span aria-hidden="true" className="mx-3 h-[30px] w-px bg-n2" />
-					<VisitorCounter />
+					{/* §21.1 register divider — a NAMED UNTOUCHABLE (SG6): no
+					    data-testid, ever. Located by its `w-px` class, exactly as
+					    `tests/unit/shell/dharma-cluster.test.tsx`'s T4 guard already
+					    does. */}
+					<span
+						aria-hidden="true"
+						className={cn(
+							"mx-3 h-[30px] w-px bg-n2",
+							mobileResponsive && "max-mobile:hidden",
+						)}
+					/>
+					<VisitorCounter mobileResponsive={mobileResponsive} />
 				</div>
 			</div>
 		</header>
