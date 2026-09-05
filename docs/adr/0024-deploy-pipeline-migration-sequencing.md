@@ -38,7 +38,7 @@ This ADR does **not** decide:
 1. **Append-only + frozen-at-resolution makes prod migrate-before-serve non-negotiable.** No acceptable window where new code serves against an un-migrated prod DB.
 2. **drizzle-orm #5769: migrate exit codes are not trustworthy.** The pass/fail signal for a *deployed* DB must be content-level (per-hash). Because per-hash false-positives under CI's pg_cron stripping (ADR-0022), it belongs only on a surface that never runs in CI — `/api/health`.
 3. **Solo operator, no second approver.** The prod write cannot hide behind a reviewer-gated GHA approval (self-approval theatre); it must be a deliberate manual action — as ADR-0022 already ruled and this ADR preserves.
-4. **Experiment-capacity only; time locked, scope flexes.** Smallest reliable thing. No blue-green, k8s, multi-region, progressive rollout, or release-orchestration tooling. Dispensable at close (2026-11-08 archive).
+4. **Experiment-capacity only; time locked, scope flexes.** Smallest reliable thing. No blue-green, k8s, multi-region, progressive rollout, or release-orchestration tooling. Dispensable at close (the 2026-11-05 freeze).
 5. **A correct posture must survive future change.** Record the decisions and their escape hatches so a later edit can't silently reopen the drift.
 6. **Two environments, one source of migration truth.** Staging and prod run the *same committed* Drizzle migrations with no schema fork, so "passed on staging" is evidence about prod.
 
@@ -215,3 +215,9 @@ Item 8 reads *"All envs connect via the session pooler on `:5432`."* On 2026-06-
 ⚠ **The errata is a June-era record of a live reading.** Whether those syncs are still configured that way **today** is a dashboard fact, not a repo fact, and is confirmed at execute rather than assumed here.
 
 S-1 plan: `docs/plans/S-1.md`. Branch `fix/pool-transaction-mode`. Companion record: **ADR-0038 Patch record P1**, same commit.
+
+---
+
+## Patch record — 2026-09-05 · the repository-archive boundary is struck (D-21 / D-26)
+
+**D-21, as narrowed by D-26 (decision record amendment 2.2 / 2.3).** The experiment ends at the `2026-11-05 23:59 UTC` write-freeze (`system_state.frozen_at`) and this repository describes nothing after it. Two claims are therefore struck wherever they appeared above: the **`2026-11-08` repository-archive boundary**, and the **conference that used to justify the conclusion date**. One date site. ⚠ **The decision itself is unchanged and its reasoning is not rewritten** — this ADR is a genesis-era record and stays one. Every argument here that leaned on *"the build has a hard end"* still holds; the hard end is simply the freeze, three days earlier, and never was the archive.

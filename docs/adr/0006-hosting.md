@@ -15,7 +15,7 @@
 
 ## Context and Problem Statement
 
-The Zugzwang experiment-phase build runs from 2026-04-24 (build start) through 2026-09-15 (launch) to 2026-11-08 (conclusion at Devcon 8 / ETHGlobal Mumbai). The build is owned by one developer with two support devs and Claude Code; scope freezes at launch and the codebase reaches end-of-life at conclusion. The hosting topology must be locked before SCAFFOLD.* tasks can begin provisioning environments.
+The Zugzwang experiment-phase build runs from 2026-04-24 (build start) through 2026-09-15 (launch) to the **2026-11-05 23:59 UTC** write-freeze (conclusion). The build is owned by one developer with two support devs and Claude Code; scope freezes at launch and the product write-freezes at conclusion. The hosting topology must be locked before SCAFFOLD.* tasks can begin provisioning environments.
 
 ADR-0003 ratified Next.js 16 on the Node.js runtime as the framework. ADR-0004 ratified Better Auth on a locked vendor stack that named Google Identity Services, Resend, Cloudflare Turnstile, and Postgres-on-Supabase. ADR-0005 ratified Postgres + event-sourced schema (Pattern A) but explicitly deferred the Postgres major-version pin, hosting vendor, region, PITR retention, and `pg_cron` topology to this ADR.
 
@@ -31,7 +31,7 @@ This ADR does **not** decide:
 - Concurrency model and bet-transaction shape → ADR-0013 (SPEC.14)
 - Pre-commit moderation flow → ADR-0014 (SPEC.15)
 - Rate-limit and idempotency contract → ADR-0015 (SPEC.16)
-- Observability vendor configuration (Sentry / PostHog / Axiom) → ADR-0007 (SPEC.7)
+- Observability vendor configuration (Sentry / PostHog) → ADR-0007 (SPEC.7). ⚠ This row read *"Sentry / PostHog / Axiom"* until SYNC-10: **ADR-0007 rejected Axiom** — Vercel runtime logs already carry the per-request data the §16.3 H3 contract needs. The delegation was always to ADR-0007; only the candidate list it enumerated went stale.
 - Specific cron schedule values (cron syntax, cadences) → `HARDEN.*` task outputs
 - R2 bucket policy specifics (CORS, signed URL TTLs, object-key conventions) → SCAFFOLD.15
 - Backup verification drill / disaster-recovery runbook → HARDEN.9
@@ -51,7 +51,7 @@ This ADR does **not** decide:
 
 6. **Cron topology must be principled, not reflexive.** v1 has four cadenced operational jobs (drift detection, partition-overrun monitoring, R2 orphan sweep, identity-pool low-watermark check). Three are SQL-only; one (R2 orphan sweep) requires HTTP fanout to Cloudflare R2. The topology must use each cadence engine where it is structurally strongest, not pick one for ideological consistency.
 
-7. **Latency for the admin path and the conclusion event.** Admin (Hrishikesh) operates from Mumbai. The conclusion event is at Devcon 8 (Mumbai) and ETHGlobal Mumbai. Region selection minimizes latency on these two paths. Audience is global but ≤5k concurrent — origin-latency-vs-CDN-edge tradeoff is small at this scale.
+7. **Latency for the admin path.** Admin (Hrishikesh) operates from Mumbai. Region selection minimizes latency on that path. Audience is global but ≤5k concurrent — origin-latency-vs-CDN-edge tradeoff is small at this scale.
 
 8. **Failure-domain co-location vs cross-vendor blast radius.** A coherent single-region story across all four vendors is operationally simpler than a multi-region setup, and the testnet phase is the natural place to revisit multi-region architecture. v1 single-region is acceptable because the experiment is read-mostly with a hard end date — a regional outage during the live window is a recoverable narrative event, not a failed experiment.
 
@@ -229,7 +229,7 @@ The two write paths that hard-fail on Redis outage (idempotency and pre-commit m
 ### Neutral
 
 - **Cloudflare-as-CDN-in-front-of-Vercel is preserved as a same-day flip option.** Engaging it requires only flipping DNS-only → orange-cloud and minor origin-cert pinning. The decision is not foreclosed; it is explicitly deferred until a real DDoS pattern exists.
-- **Postgres 17 is the major-version pin for this build.** Any future migration to Postgres 18 is a testnet-phase concern; the experiment archive at `2026-11-08` does not need to upgrade.
+- **Postgres 17 is the major-version pin for this build.** Any future migration to Postgres 18 is a testnet-phase concern; the experiment ends at the 2026-11-05 freeze and does not need to upgrade.
 - **`pg_net` is uninstalled in v1.** Future ADRs that want Postgres-side HTTP must install the extension and accept the operational profile; this ADR does not foreclose `pg_net`, it just declines to install it.
 
 ## Pros and Cons of the Options
@@ -337,7 +337,7 @@ The two write paths that hard-fail on Redis outage (idempotency and pre-commit m
 | SPEC.2 §1.4 #5 | Delegated decision | Hosting topology + regions + PITR + cron engine — ratified by this ADR |
 | SPEC.2 §4 (stub) | System Context | Mints substantive deployment topology: end-users + admin → Cloudflare (DNS-only) + Cloudflare Turnstile + Cloudflare R2 → Vercel Edge Network → Next.js 16 on Vercel Node.js runtime, region `bom1` → Supabase Postgres 17 (`ap-south-1`) + Upstash Redis (`ap-south-1`) + Cloudflare R2 (`APAC`) → external services (OpenAI moderation, image moderation vendor, Resend email, Sentry, PostHog, Axiom, Google OAuth). Single-region principle and its failure-mode implications stated. **Back-pressure: §4 is rewritten on the next §4 drafting pass to absorb this topology and the failure-mode profile substance.** |
 | SPEC.2 §22 (stub) | Operational Runbook Pointers | Mints: cron-schedule register substance — pg_cron is the engine, Vercel Cron is the HTTP-fanout carve-out, and the four jobs named here are the v1 inventory. Specific cadence values remain `HARDEN.*` territory. **Back-pressure: §22 absorbs the engine-vs-fanout cut and the four-job inventory on the next §22 drafting pass.** |
-| SPEC.2 §23 | ADR Index | Status of ADR-0006 flips from `provisional` to `accepted` on this commit. |
+| SPEC.2 §22 | ADR Index | Status of ADR-0006 flips from `provisional` to `accepted` on this commit. |
 | SPEC.1 §13 | Vendor stack (per `K1`, `K2`, `K3`) | Consumes: Cloudflare R2, Cloudflare Turnstile, Resend, Google IS, Upstash Redis, Vercel — all already locked in SPEC.1 §13 and CLAUDE.md decision log. This ADR ratifies the regions, plan tiers, and operational disciplines. |
 | SPEC.1 §16.1 | Operational floor | Consumes: rate-limit constants are enforced via Upstash Redis (per ADR-0015 / SCAFFOLD.4); this ADR ratifies the engine choice. |
 | SPEC.1 §16.4 | Audit log catalogue + 7-day PITR commitment | Consumes: the `events` log + per-table audit tables ship in Postgres 17 on Supabase Pro per this ADR. PITR retention pinned at 7 days. The 30-day option is rejected per §"Database" rationale. |
@@ -368,7 +368,7 @@ The two write paths that hard-fail on Redis outage (idempotency and pre-commit m
 - AGENTS.md §1 (stack — already aligned with this ADR's vendor picks)
 - CLAUDE.md rows 316 (Postgres 17), 318 (Supabase), 325 (Cloudflare R2), 328 (Upstash), 329 (Vercel) — unchanged in content; this ADR is the ratification
 - SPEC.1 §13 (vendor lock), §16.1 (operational floor), §16.4 (audit log + PITR), §3 G3 post-amendment (K_eff dataset-derivability)
-- SPEC.2 §1.4 #5 (delegation), §4 (System Context — back-pressure pending), §22 (Operational Runbook Pointers — back-pressure pending), §23 (ADR Index — status flip)
+- SPEC.2 §1.4 #5 (delegation), §4 (System Context — back-pressure pending), §21 (Operational Runbook Pointers — back-pressure pending), §22 (ADR Index — status flip)
 
 ---
 
@@ -534,3 +534,9 @@ seeder against this ADR.
 ---
 
 *ADR-0006 ratifies the four-vendor hosting topology (Vercel + Supabase + Upstash + Cloudflare R2) for the Zugzwang experiment phase, with Mumbai single-region across all four vendors, Postgres 17 on Supabase Pro with 7-day PITR (default) / 14-day PITR (upgrade), the `pg_cron` + Vercel Cron hybrid cadence topology where Vercel Cron is reserved for HTTP-fanout to non-Postgres services, the four-job v1 cron inventory (drift detection, partition-overrun monitoring, identity-pool low-watermark check on pg_cron; R2 orphan sweep on Vercel Cron), the two-tier traction-gated cost model ($300/mo default, $500/mo upgrade pre-authorized), and the per-vendor failure-mode profile. The decision body, the Vercel-Cron-only-for-HTTP-fanout discipline, the failure-mode profile, and the two-tier cost ceiling are immutable; superseding requires a new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy.*
+
+---
+
+## Patch record — 2026-09-05 · the repository-archive boundary is struck (D-21 / D-26)
+
+**D-21, as narrowed by D-26 (decision record amendment 2.2 / 2.3).** The experiment ends at the `2026-11-05 23:59 UTC` write-freeze (`system_state.frozen_at`) and this repository describes nothing after it. Two claims are therefore struck wherever they appeared above: the **`2026-11-08` repository-archive boundary**, and the **conference that used to justify the conclusion date**. Two date sites and two conference sites, one of which — driver 7 — named the conference as half of its own justification. **The `ap-south-1` decision is unaffected:** the admin path is still operated from Mumbai and that alone selected the region, which is why striking the event costs the driver nothing. ⚠ **The decision itself is unchanged and its reasoning is not rewritten** — this ADR is a genesis-era record and stays one. Every argument here that leaned on *"the build has a hard end"* still holds; the hard end is simply the freeze, three days earlier, and never was the archive.

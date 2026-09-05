@@ -15,6 +15,26 @@ Supersession rule: superseding an accepted ADR requires a same-commit SPEC.2
 update per SPEC.2 §0 versioning policy. Add a "Superseded-by" link in the
 old ADR; the new ADR adds a "Supersedes" link.
 
+Supersedes vs Amends -- the distinction is what the OLD ADR is still good for:
+  - Supersedes: the old decision is REPLACED. Its outcome no longer governs;
+    read it as history. Partial supersession is allowed and must name its
+    scope in the row, e.g. "ADR-0014 (partial -- the gate architecture only)",
+    because a bare "Supersedes" over a partial change tells a reader to
+    discard parts that still govern.
+  - Amends: the old decision STANDS and one consequence of it moves. The
+    reasoning is still live and still worth reading; only a downstream
+    outcome changed. This is the in-place Patch record's cross-ADR twin
+    (CLAUDE.md 5.12).
+  Both are bidirectional and both halves land in the SAME commit: the new ADR
+  carries "Supersedes" or "Amends", the old one carries "Superseded-by" or
+  "Amended-by". A one-sided link is the defect these four fields exist to
+  prevent -- a reader arriving at the OLD ADR is the one who needs telling,
+  and they are the reader a one-sided link fails.
+
+  Leave a row as an em-dash when it does not apply. Do not delete the row:
+  an empty row is filled by a later ADR, and a missing row gets a duplicate
+  added beside the one already there.
+
 Sections marked <!-- optional --> may be omitted if not applicable.
 Sections without that marker are mandatory for every ADR.
 
@@ -30,8 +50,10 @@ Delete all HTML comments (including this one) before committing.
 | **Deciders** | <Name(s)> |
 | **Tracker task** | <SPEC.N or FOUND.N> |
 | **Frame document** | <SPEC.2 §N where this decision is delegated, e.g. "SPEC.2 §1.4 #N (delegation), §22 (ADR Index)"> |
-| **Supersedes** | — \| <ADR-NNNN> |
-| **Superseded-by** | — \| <ADR-NNNN> |
+| **Supersedes** | — \| <ADR-NNNN> \| <ADR-NNNN (partial — what is replaced)> |
+| **Superseded-by** | — \| <ADR-NNNN> \| <ADR-NNNN (partial — what is replaced)> |
+| **Amends** | — \| <ADR-NNNN — the consequence that moves> |
+| **Amended-by** | — \| <ADR-NNNN — the consequence that moves> |
 
 ---
 

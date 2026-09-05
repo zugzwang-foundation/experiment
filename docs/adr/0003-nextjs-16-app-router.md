@@ -14,7 +14,7 @@
 
 ## Context and Problem Statement
 
-The Zugzwang experiment-phase build runs from 2026-04-24 (build start) through 2026-09-15 (launch) to 2026-11-08 (conclusion at Devcon 8 / ETHGlobal Mumbai). The build is owned by one developer with two support devs and Claude Code; scope freezes at launch and the codebase reaches end-of-life at conclusion. There is no time, headcount, or appetite for a mid-build framework migration.
+The Zugzwang experiment-phase build runs from 2026-04-24 (build start) through 2026-09-15 (launch) to the **2026-11-05 23:59 UTC** write-freeze (conclusion). The build is owned by one developer with two support devs and Claude Code; scope freezes at launch and the product write-freezes at conclusion. There is no time, headcount, or appetite for a mid-build framework migration.
 
 The product is a CPMM prediction market with mandatory commentary, a soulbound reputation token (Dharma), a debate-view ranking surface, and a K_eff dashboard. SPEC.1 surface mix is approximately:
 
@@ -38,7 +38,7 @@ This ADR does **not** decide:
 
 1. **Build-lifetime LTS alignment.** The build runs May 2026 → Nov 2026 with no scope flex post-launch. The framework chosen today must be on **Active LTS** for the entire build lifetime — receiving feature, performance, and security work — not on a Maintenance LTS branch frozen to critical fixes only.
 
-2. **No mid-build major-version migration.** Scope freezes at 2026-09-15. A framework major upgrade between launch and 2026-11-08 conclusion is infeasible. The framework must carry through conclusion with no major version bump required.
+2. **No mid-build major-version migration.** Scope freezes at 2026-09-15. A framework major upgrade between launch and the 2026-11-05 conclusion is infeasible. The framework must carry through conclusion with no major version bump required.
 
 3. **Single-developer + Claude Code workflow.** The framework's documentation footprint, ecosystem maturity, and tooling integration must be where Claude Code and broader agent training data align most cleanly. This compounds across every code-generation cycle for the next ~5 months.
 
@@ -111,7 +111,7 @@ Per SPEC.2 Appendix A discipline:
 
 ### Positive
 
-- **Active LTS for the entire build lifetime.** Next.js 16 stays in Active LTS until ~2026-10-21 — past launch, into the live window, ~2 weeks shy of conclusion. Next.js 17 likely ships ~2026-10-21; the build does not need to upgrade because the live window ends 2026-11-08 and the codebase archives at conclusion.
+- **Active LTS for the entire build lifetime.** Next.js 16 stays in Active LTS until ~2026-10-21 — past launch, into the live window, ~2 weeks shy of conclusion. Next.js 17 likely ships ~2026-10-21; the build does not need to upgrade because the live window ends 2026-11-05.
 - **Cache Components matches the read-freshness model.** Uncached-by-default lines up with bet-flow read paths needing freshness; explicit `'use cache'` opt-in for the K_eff dashboard, market list, and public profiles is a precise control surface that SPEC.2 §16 already references in shape.
 - **Server Actions reduce mutation surface area.** Mutations go through typed Server Actions with zod validation, not a parallel REST/RPC layer. One mutation contract for the codebase. Client components consume actions via `useActionState`, not via fetch + custom client cache.
 - **Turbopack iteration speed.** Faster dev server and production builds compared to Webpack — material for solo-dev iteration cadence.
@@ -122,7 +122,7 @@ Per SPEC.2 Appendix A discipline:
 ### Negative
 
 - **Cache Components is a relatively young feature.** It is stable in Next.js 16 (the flag is no longer behind `experimental`), but the surface for `'use cache'` semantics, `cacheLife()` profiles, and tagging will likely keep evolving inside Next.js 16's Active LTS window. Patch-version regressions are plausible. Mitigated by pinning `next` to a known-good patch in `package.json` and testing upgrades in a feature branch.
-- **Server Actions tie the mutation layer to Next.js.** Migrating off Next.js post-experiment would require rewriting the mutation layer. Acceptable: the experiment phase concludes 2026-11-08; the testnet phase is a fresh codebase per FOUND-3 / ADR-0002, with no requirement to carry mutation-layer code forward.
+- **Server Actions tie the mutation layer to Next.js.** Migrating off Next.js post-experiment would require rewriting the mutation layer. Acceptable: the experiment phase concludes 2026-11-05; the testnet phase is a fresh codebase per FOUND-3 / ADR-0002, with no requirement to carry mutation-layer code forward.
 - **Edge runtime is partially forfeited.** Public read paths could in principle benefit from Edge runtime (lower latency, broader region coverage), but the codebase commits to Node.js runtime as the default to keep the bet-flow constraint clean and reduce per-route runtime-selection cognitive load. Per-route Edge opt-in remains available for non-critical-path read endpoints; the ADR does not forbid it outside the four named directories.
 - **`params` and `searchParams` as Promises.** Next.js 15+ breaking change that propagates through every page and route handler signature. Already absorbed in AGENTS.md §5; no further migration work, but new contributors (or new agents) MUST internalize this on first read.
 - **Turbopack ecosystem gaps.** Turbopack's plugin ecosystem is narrower than Webpack's. If a build-time dependency requires a Webpack plugin with no Turbopack equivalent, the codebase falls back to Webpack via `next.config.ts`. Tracked, not blocking. Adding such a dependency is an "ask first" event per AGENTS.md §10.
@@ -147,7 +147,7 @@ Per SPEC.2 Appendix A discipline:
 
 **Cons**
 
-- Framework lock-in for the experiment phase (acceptable given 2026-11-08 hard end and fresh testnet codebase)
+- Framework lock-in for the experiment phase (acceptable given the 2026-11-05 hard end and a fresh testnet codebase)
 - Cache Components surface is younger; more API churn likely within Next.js 16's Active LTS window than in older caching primitives
 
 ### Option 2 — Next.js 15 + App Router
@@ -197,7 +197,7 @@ Per SPEC.2 Appendix A discipline:
 - shadcn/ui new-york v4's first-class targeting is Next.js; Remix support exists but is second-class
 - AGENTS.md, CLAUDE.md, and the current `src/app/` skeleton already assume Next.js — switching would require rewriting all stack documentation
 
-**Verdict:** Rejected. Viable on architectural merits but pays a documentation-and-tooling penalty for marginal architectural gain, in a single-developer build with a hard 2026-11-08 deadline.
+**Verdict:** Rejected. Viable on architectural merits but pays a documentation-and-tooling penalty for marginal architectural gain, in a single-developer build with a hard 2026-11-05 deadline.
 
 ### Option 5 — SvelteKit / Nuxt / Astro
 
@@ -212,7 +212,7 @@ Per SPEC.2 Appendix A discipline:
 - Claude Code's React + Next.js performance is the strongest of any agent / framework combination relevant to this build; switching frameworks loses the compounding agent-quality advantage
 - Stack documentation, solo-dev playbook, and the existing scaffold all assume React + Next.js
 
-**Verdict:** Rejected. Unjustifiable for an experiment phase with a fixed 2026-11-08 end and a single non-technical product owner relying on agent-assisted code generation.
+**Verdict:** Rejected. Unjustifiable for an experiment phase with a fixed 2026-11-05 end and a single non-technical product owner relying on agent-assisted code generation.
 
 ## Flow & invariant constraints absorbed
 
@@ -226,7 +226,7 @@ This ADR mints, consumes, or shapes the following items from SPEC.1 and SPEC.2. 
 | SPEC.2 §9 | Concurrency contract | The bet handler MUST run on Node.js runtime — minted here, consumed by ADR-0013 |
 | SPEC.2 §10 | Pre-commit moderation | Server Action sequence (parse → Redis reserve → OpenAI moderate → DB transaction → Redis release) is implementable because Server Actions are the framework's mutation contract per this ADR. ADR-0014 owns the moderation substance. |
 | SPEC.2 §16 | K_eff dashboard | `cacheLife({ revalidate, expire })` is callable because `cacheComponents: true` is set per this ADR. ADR-0007 owns the cadence values. |
-| SPEC.2 §23 | ADR Index | Status of ADR-0003 flips from `provisional` to `accepted` on this commit |
+| SPEC.2 §22 | ADR Index | Status of ADR-0003 flips from `provisional` to `accepted` on this commit |
 | SPEC.1 INV-1 | Bet+comment atomicity | Implemented via Server Action wrapping `db.transaction(...)`. The Action shape comes from this ADR; the atomicity itself comes from the Postgres transaction (ADR-0013) |
 | Tracker | SCAFFOLD.1, SCAFFOLD.2, every UI.* task, every ENGINE.* task that ships a Server Action or page | All depend on this ADR being `accepted` |
 
@@ -243,3 +243,9 @@ This ADR mints, consumes, or shapes the following items from SPEC.1 and SPEC.2. 
 ---
 
 *ADR-0003 ratifies the framework choice for the Zugzwang experiment phase. The decision body and the runtime constraint in §7 are immutable; superseding requires a new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy.*
+
+---
+
+## Patch record — 2026-09-05 · the repository-archive boundary is struck (D-21 / D-26)
+
+**D-21, as narrowed by D-26 (decision record amendment 2.2 / 2.3).** The experiment ends at the `2026-11-05 23:59 UTC` write-freeze (`system_state.frozen_at`) and this repository describes nothing after it. Two claims are therefore struck wherever they appeared above: the **`2026-11-08` repository-archive boundary**, and the **conference that used to justify the conclusion date**. Seven date sites and one conference site in this file. ⚠ **The decision itself is unchanged and its reasoning is not rewritten** — this ADR is a genesis-era record and stays one. Every argument here that leaned on *"the build has a hard end"* still holds; the hard end is simply the freeze, three days earlier, and never was the archive.

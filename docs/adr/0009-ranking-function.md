@@ -21,7 +21,7 @@ The function shapes which arguments readers see, which they engage with, and ult
 The forces at play:
 
 - **Open-source publishing constraint.** RANKING.md is AGPL-3.0 and public. Anyone can read it; anyone can optimise against it. Most production ranking systems (Reddit, HN, Twitter) defend partly via secrecy. Zugzwang explicitly does not. The function must be **gaming-resistant by construction** — every input it uses must satisfy the property that optimising for the input coincides with optimising for K × n.
-- **45-day experiment window.** The function ships at launch (2026-09-15) and runs through conclusion (2026-11-08). Reputation signals that take months or years to develop are dead weight in this window.
+- **45-day experiment window.** The function ships at launch (2026-09-15) and runs through conclusion (2026-11-05). Reputation signals that take months or years to develop are dead weight in this window.
 - **ADR-0005 §4 read-time-computed classification.** Ranking is read-time-computed (no projection table, no materialised view). The function reads from `comments` + `friendly_fire_events` per page render. Any input the function uses must be available on those tables (frozen at write or read-time-aggregable).
 - **Performance budget.** Debate view is a hot path. The function runs once per top-level comment per render, on top of N comments and their replies. SQL aggregation cost dominates; per-comment compute must be O(1) and IO-free.
 - **Frozen-at-resolution requirement.** Per SPEC.1 §11 + INV-4, resolved markets are immutable historical artifacts. Ranking must freeze with the market — auditors must be able to reproduce the rendered order at any past resolution moment.
@@ -334,7 +334,7 @@ Two indexes flagged for SCAFFOLD.2:
 | SPEC.2 §5 (Data Model — Table Inventory) | `comments` table column shape | Mints: new column `comments.stake_at_post_time NUMERIC(38, 18) NOT NULL`. Bucket A append-only mutation discipline applies (set on INSERT, never updated). Substantive absorption deferred to SPEC.2 §5 drafting chat per the outline-level absorption pattern. |
 | SPEC.2 §7 (Event Model) | Read-time-computed classification | Consumes: ADR-0005 §4's "Read-time-computed (no projection table): debate-view ranking" classification stands. This ADR confirms the classification by specifying inputs that fit the read-time-computed contract. |
 | SPEC.2 §9 (Concurrency & Transactions) | Comment-writing transaction | Shapes: F-BET-1 / F-COMMENT-1 / F-COMMENT-2 transactions must compute and persist `stake_at_post_time` inside the transaction (Dharma-valued position size on the comment's side at write-time). Substantive absorption deferred to SPEC.2 §9 drafting chat. |
-| SPEC.2 §22 (ADR Index) | ADR-0009 status | Consumes: SPEC.2 §23 entry flipped to `accepted (2026-05-06)` in same commit. |
+| SPEC.2 §22 (ADR Index) | ADR-0009 status | Consumes: SPEC.2 §22 entry flipped to `accepted (2026-05-06)` in same commit. |
 | SPEC.2 Appendix A (Single-Source-of-Truth File Map) | Ranking module + spec | Mints: two file-map rows (`experiment/docs/specs/RANKING.md` for the spec; `src/lib/ranking.ts` for the implementation). Substantive absorption deferred to SPEC.2 Appendix A drafting chat. |
 | ADR-0001 | License (AGPL-3.0-or-later) | Consumes: RANKING.md ships under AGPL-3.0-or-later, same as protocol. |
 | ADR-0005 §3 | Bucket A append-only triggers on `comments` | Consumes: `comments.stake_at_post_time` is INSERT-only; existing trigger covers it for free, no new trigger required. |
@@ -364,3 +364,9 @@ Two indexes flagged for SCAFFOLD.2:
 ---
 
 *ADR-0009 ratifies the universal deterministic ranking function in `RANKING.md`. The function shape, input set, design-intent weight ordering, reply-rendering rule, and behavioural properties are immutable; superseding requires a new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy. Specific weight values are deferred to the 2026-09-01 number-tuning pass and pin in `RANKING.md` §7 before public launch.*
+
+---
+
+## Patch record — 2026-09-05 · the repository-archive boundary is struck (D-21 / D-26)
+
+**D-21, as narrowed by D-26 (decision record amendment 2.2 / 2.3).** The experiment ends at the `2026-11-05 23:59 UTC` write-freeze (`system_state.frozen_at`) and this repository describes nothing after it. Two claims are therefore struck wherever they appeared above: the **`2026-11-08` repository-archive boundary**, and the **conference that used to justify the conclusion date**. One date site. ⚠ **Pre-existing and deliberately not corrected here:** the *"45-day experiment window"* figure is arithmetic neither date supports — 2026-09-15 to 2026-11-08 is 54 days and to 2026-11-05 is 51. It was already wrong before this edit, so correcting it would be rewriting genesis reasoning rather than applying D-21. Reported, not fixed. ⚠ **The decision itself is unchanged and its reasoning is not rewritten** — this ADR is a genesis-era record and stays one. Every argument here that leaned on *"the build has a hard end"* still holds; the hard end is simply the freeze, three days earlier, and never was the archive.

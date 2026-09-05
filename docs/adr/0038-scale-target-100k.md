@@ -187,7 +187,7 @@ arithmetic.
 **1 · The cost ceiling is lifted for the live window.** ADR-0006's `$300/mo default` and
 `$500/mo upgrade` tiers no longer bind. Spend is founder-authorised per vendor, per decision,
 with no aggregate architectural cap through 2026-11-05. ⚠ **The ceiling returns at archive:
-nothing in this ADR authorises spend past 2026-11-08.**
+nothing in this ADR authorises spend past 2026-11-05.**
 
 **2 · Sizing is decided from measurement, never from estimate.** No compute tier, pooler mode,
 replica or vendor plan is bought before a load run has produced a number for it.
@@ -253,3 +253,9 @@ cache failing.** No change is authorised here; it is named so a load run watches
 §22.1/§22.5 edit — adding one row without rebuilding the counts around it makes
 the index worse, not better. **ADR-0038 is therefore the FOURTH ADR in that
 backlog**, after 0035, 0036 and 0037. No `SPEC.1` change.
+
+---
+
+## Patch record — 2026-09-05 · the repository-archive boundary is struck (D-21 / D-26)
+
+**D-21, as narrowed by D-26 (decision record amendment 2.2 / 2.3).** The experiment ends at the `2026-11-05 23:59 UTC` write-freeze (`system_state.frozen_at`) and this repository describes nothing after it. Two claims are therefore struck wherever they appeared above: the **`2026-11-08` repository-archive boundary**, and the **conference that used to justify the conclusion date**. One date site, in the spend ceiling. ⚠ **The decision itself is unchanged and its reasoning is not rewritten** — this ADR is a genesis-era record and stays one. Every argument here that leaned on *"the build has a hard end"* still holds; the hard end is simply the freeze, three days earlier, and never was the archive.
