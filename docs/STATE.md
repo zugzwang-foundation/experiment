@@ -81,14 +81,16 @@ left blank for the founder.
 
 ### Go-live gating
 
+⚠ **Three of these six rows no longer gate, and `D-28` is why.** `F-9` is **discharged**; `F-15` and `F-11` are **reclassified** — the first *by design*, the second *in flight*. They stay in this table rather than leaving it, because an ID a reader is chasing has to remain findable at that ID, and because a reclassification is part of the record rather than a deletion from it. **`F-1`, `F-2` and `F-3` are the live gates.**
+
 | ID | Finding | Evidence | Owner |
 |---|---|---|---|
 | **F-1** | **Production is 7 migrations behind the code** — `0020_dharma_ledger_seq` … `0026_lots_no_delete`, including `bet_receipts` (the `I-IDEM-ONCE-001` durable backstop), the TRUNCATE guards and `lots` | `doppler run --config prd -- pnpm db:check-drift` → `20 applied` vs journal `27` | |
 | **F-2** | **The production database is empty** — no identity pool, no users, no markets | `SELECT count(*)` ×3 against `prd` → `0 0 0` | |
 | **F-3** | **The number-tuning pass has not run.** SPEC.1 Appendix B carries **26** `TBD` constants; `src/server/config/limits.ts` ships **13** of them as values whose own JSDoc reads `PLACEHOLDER VALUE — tuned by HARDEN.5`, dated **~2026-09-01** in five comments | `awk 'NR>=1975' docs/specs/SPEC.1.md \| grep -cE '^[A-Z_0-9]+ = TBD'` → 26; no number-tuning ADR exists | |
-| **F-15** | **The dataset pipeline is unmerged.** PR **#435**, 57 files, `ci=SUCCESS`, base `main` — the artifact the experiment exists to publish | `gh pr view 435` | |
-| **F-11** | **Mobile is decided and unbuilt.** ADR-0045 accepted 2026-09-01, `docs/plans/MOBILE-1.md` landed 2026-09-03; **no implementation PR** | `ls docs/plans/MOBILE-1.md`; PR search returns only #467 (the plan) | |
-| **F-9** | `identity_pool` is sized at **50,000** by ADR-0011 and stated as fact by ADR-0016:161; **1,070 rows exist** on staging, 548 unassigned. ADR-0011's own patch text already says the manifest is *"still owed"* | `SELECT count(*) FROM identity_pool` | |
+| **F-15** | ⚠ **RECLASSIFIED — by design, not a blocker (D-28 row 5).** The dataset pipeline (PR **#435**, 57 files, `ci=SUCCESS`, base `main`) is **deliberately held open until after 5 November**. Its being unmerged is the plan, not a gap in it: the artifact the experiment exists to publish is published *after* the experiment ends, so landing it before the freeze would gate nothing and risk something. **Reclassified, not discharged** — the PR is open and still has to land, which is why the row stays. | `gh pr view 435` | D-28 (reclassified) |
+| **F-11** | ⚠ **RECLASSIFIED — in flight, not a documented gate (D-28 row 6).** Mobile is decided (ADR-0045, accepted 2026-09-01) and `docs/plans/MOBILE-1.md` landed 2026-09-03; the implementation **PR is to come**. What D-28 rules here is the classification and not the work: a decision with a plan and a PR coming is a lane in progress, and calling it a go-live gate asserted a dependency the founder does not hold. | `ls docs/plans/MOBILE-1.md`; PR search returns only #467 (the plan) | D-28 (reclassified) |
+| **F-9** | ✅ **DISCHARGED by D-28 row 4.** The pool is **1,070 by decision, not by shortfall** — 1,070 PFPs × numeric suffixes, the seeding PR merged, and D-11's stated size *superseded*. ADR-0011's 50,000 and ADR-0016:161's restatement of it are the figures that lost, not a target the pool is failing to reach. ⚠ **The ruling closes the question; the count is still a fact, so SYNC-11 re-measured it (2026-09-05):** staging **1,070** rows — **520** unassigned, **550** assigned; production **0**. This row read *548 unassigned* when it was written on 2026-09-03: 28 identities consumed in two days, which is live participant signup and not drift. **Production's zero belongs to `F-2`, not here** — the pool is sized; production has no data of any kind yet. | `doppler run --project zugzwang-experiment --config <stg\|prd> -- psql "$DATABASE_URL" -Atc "SELECT count(*), count(*) FILTER (WHERE assigned_at IS NULL) FROM identity_pool"` → stg `1070\|520`, prd `0\|0` | D-28 · SYNC-11 |
 
 ### Correctness and coverage
 
@@ -145,7 +147,7 @@ left blank for the founder.
 | `docs/polish/POLISH-register-ADDITIONS.md` | **L-space** |
 | `docs/overnight-run.md` | how an unattended run works |
 | `docs/runbooks/deploy-pipeline.md` | the promote sequence |
-| `docs/runbooks/dataset-release.md` | the 2026-11-06 release |
+| `docs/runbooks/dataset-release.md` | the public dataset release (untimed — D-21/D-26) |
 | `docs/runbooks/BREAK_GLASS.md` | credential rotation |
 | `docs/runbooks/staging-provisioning.md` | the staging sandbox |
 | `docs/design/design-{canon,language,token-contract}.md` | tokens, composition, copy register |

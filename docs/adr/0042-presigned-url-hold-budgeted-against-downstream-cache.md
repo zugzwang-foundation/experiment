@@ -1,9 +1,16 @@
 # ADR-0042 — A presigned URL's hold is budgeted against the cache that outlives it
 
-- **Status:** Accepted
-- **Date:** 2026-08-27
-- **Amends:** ADR-0041 D-6 (does not supersede it — the 7200 s TTL stands, on a premise this ADR restores)
-- **Task:** R2-MEMO / PR #424, Gate C finding C-1
+| | |
+|---|---|
+| **Status** | accepted |
+| **Date** | 2026-08-27 |
+| **Deciders** | — |
+| **Tracker task** | R2-MEMO / PR #424, Gate C finding C-1 |
+| **Frame document** | — |
+| **Supersedes** | — |
+| **Superseded-by** | — |
+| **Amends** | ADR-0041 D-6 (does not supersede it — the 7200 s TTL stands, on a premise this ADR restores) |
+| **Amended-by** | — |
 
 ---
 

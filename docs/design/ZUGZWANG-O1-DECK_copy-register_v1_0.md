@@ -316,7 +316,7 @@ anywhere in the stepper is a defect.
 |---|---|---|
 | 1 | **New Card 1** (`ZUGZWANG` / Knowledge first) | Founder commission. The deck previously opened on identity with no statement of what the product is |
 | 2 | Deck goes **6 → 7 cards** | Consequence of 1 |
-| 3 | **Đ figures removed** from the WELCOME card | The mockup asserted `Đ 1,000` and `about 10 Đ a day`. Both are ranged pending the **2026-09-01 number-tuning pass**, two weeks before go-live. Deleting them closes the risk outright — there is now **no tuning-pass-sensitive number in the deck** |
+| 3 | **Đ figures removed** from the WELCOME card | The mockup asserted `Đ 1,000` and `about 10 Đ a day`. Both are ranged pending the **number-tuning pass**. Deleting them closes the risk outright — there is now **no tuning-pass-sensitive number in the deck** |
 | 4 | *"You earn it by being right"* **struck** from the Soulbound card | **It was false for this phase.** Nothing resolves until 2026-11-06, so no Dharma is earned by being right during the live window. ADR-0018 Driver 3 is explicit: with no in-window resolution, reputation is *granted* equally, not earned. Replaced with the equal-start line |
 | 5 | `Know more (K)` → `True knowledge (K)` | Founder edit; the `(K)` gloss restored so the equation's three variables are all defined before use |
 | 6 | WELCOME card rewritten | Founder edit — experiment window, market count, and Dharma's role replace the grant/credit figures |

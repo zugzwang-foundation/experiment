@@ -58,7 +58,7 @@ the cookie issues only after it — and supplies the per-user serialization for 
   `insert.ts:80`).
 - **R3a — constant:** `INITIAL_USER_DHARMA` — the SPEC.1 §16.1:930 name, zero spec edit
   (rider R-E dropped). Decimal string `"1000"`, never a float. JSDoc: PLACEHOLDER ~1,000
-  (ranged 1,000–2,000), HARDEN.5 (number-tuning pass, 2026-09-01) owns the value,
+  (ranged 1,000–2,000), HARDEN.5 (number-tuning pass) owns the value,
   equal-for-all per ADR-0018 Driver 3, name adopted from SPEC.1 §16.1 (ENGINE.12 /
   `DAILY_CREDIT_DHARMA` precedent).
 - **R4a — isolation drift RECORDED, not conformed:** no `isolationLevel` change to
@@ -221,7 +221,7 @@ Appended after the ENGINE.12 block:
 /** Equal initial Dharma grant, paid once per user inside the F-AUTH-4 first-
  * acceptance tx (ADR-0018 Driver 3 — equal for all; differentiation by
  * deployment, not endowment). PLACEHOLDER VALUE (~1,000, ranged 1,000–2,000)
- * — HARDEN.5 (number-tuning pass, 2026-09-01) owns the value. Decimal string
+ * — HARDEN.5 (number-tuning pass) owns the value. Decimal string
  * — never a JS float (CLAUDE.md §2). Name adopted from SPEC.1 §16.1. */
 export const INITIAL_USER_DHARMA = "1000";
 ```

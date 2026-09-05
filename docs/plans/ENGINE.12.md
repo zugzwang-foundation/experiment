@@ -85,7 +85,7 @@ an authenticated write and must NOT pay) — recorded once, no action (recon OQ-
   untouched (`tags.ts:44-48`, `conservation.ts:50-54`).
 - **P3 — constant.** `DAILY_CREDIT_DHARMA = "10"` (decimal string placeholder, ranged)
   added to `src/server/config/limits.ts` — name ADOPTED from SPEC.1 §16.1; **HARDEN.5**
-  ("Number-tuning pass", 2026-09-01) owns the value.
+  ("Number-tuning pass") owns the value.
 - **P4 — banned users.** Structurally excluded at gate 1 (`endpoint.ts:167-173`, 403
   pre-idem, F-BET-7 `SPEC.1:327-334`) — RECORDED as satisfying the tracker's "banned skip"
   + SPEC.1 §10.7 "No Daily Credit from ban-time forward". No in-callback check. Tracker
@@ -228,7 +228,7 @@ pointer comment — `@db-migration-reviewer` checks schema↔SQL coherence eithe
 `export const DAILY_CREDIT_DHARMA = "10";` — JSDoc: "Flat (non-escalating) Daily Credit,
 paid once per UTC day only on a day the user places a commented bet (ADR-0018 + SPEC.1
 §10.4/§16.1). Use-or-lose. PLACEHOLDER VALUE (~10, ranged) — HARDEN.5 (number-tuning
-pass, 2026-09-01) owns the value. Decimal string — never a JS float (CLAUDE.md §2)."
+pass) owns the value. Decimal string — never a JS float (CLAUDE.md §2)."
 Name adopted from SPEC.1 §16.1 — no new name minted.
 
 ## Carry-forwards consumed / minted

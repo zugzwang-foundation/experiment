@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | accepted — approved by Hrishikesh, 2026-09-01 (relayed; formal repo trail to follow at commit) |
+| **Status** | accepted |
 | **Date** | 2026-09-01 |
 | **Deciders** | Hrishikesh |
 | **Tracker task** | MOBILE-1 (ad hoc — not a SCALE-TRACKER or UI-LANE row; ownership assigned to this pod directly) |
@@ -126,3 +126,11 @@ This ADR does **not** decide:
 ---
 
 *ADR-0045 ratifies scoped responsive treatment of participant read surfaces plus a two-layer hard exclusion of Join/Login on mobile, including the accepted tradeoff against ADR-0038's signup target (Decision Driver 1). The decision body and constraints minted above are immutable; superseding requires a new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy.*
+
+---
+
+## Patch record — 2026-09-05 · the Status field is a status again (D-28 row 19)
+
+**D-28 row 19 rules one cohesive formatting pass over all 44 ADR `Status` fields, and this file was the outlier.** Its Status read *"accepted — approved by Hrishikesh, 2026-09-01 (relayed; formal repo trail to follow at commit)"* — a sentence in a field the template defines as one of four words. **The approval is not withdrawn and the caveat is not dropped; both are moved here, which is where a qualification belongs.** The distinction is worth stating: a `Status` cell is read by anything scanning the ADR set for what is load-bearing, and a cell that has to be parsed rather than matched breaks every such scan silently. A patch record is read by a person, who is the only reader the caveat was ever for.
+
+**The caveat, preserved verbatim in substance:** this ADR was **approved by Hrishikesh on 2026-09-01**, relayed rather than committed at the time, with the formal repository trail to follow at commit. That trail is this file's own history. ⚠ **The decision, its drivers and its outcome are untouched by this pass** — nothing here re-opens the mobile gate.

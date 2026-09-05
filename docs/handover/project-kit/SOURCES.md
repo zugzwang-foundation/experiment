@@ -71,7 +71,7 @@ Row format: staged filename → source (repo path @ `e28d4b6`, or external) → 
 > prose↔build gap as a finding.
 >
 > **RIDER — RANKING.md.** v1.0.0-draft and **deliberately unpinned**: every numeric
-> constant in it (§12 — lane ratios, floors, gravity) defers to the 2026-09-01
+> constant in it (§12 — lane ratios, floors, gravity) defers to the
 > number-tuning pass. The *shape* is locked; the *numbers* are placeholders. Not drift.
 
 ## 5 · The handover deck (1)

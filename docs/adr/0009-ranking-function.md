@@ -25,13 +25,13 @@ The forces at play:
 - **ADR-0005 §4 read-time-computed classification.** Ranking is read-time-computed (no projection table, no materialised view). The function reads from `comments` + `friendly_fire_events` per page render. Any input the function uses must be available on those tables (frozen at write or read-time-aggregable).
 - **Performance budget.** Debate view is a hot path. The function runs once per top-level comment per render, on top of N comments and their replies. SQL aggregation cost dominates; per-comment compute must be O(1) and IO-free.
 - **Frozen-at-resolution requirement.** Per SPEC.1 §11 + INV-4, resolved markets are immutable historical artifacts. Ranking must freeze with the market — auditors must be able to reproduce the rendered order at any past resolution moment.
-- **Number-tuning deferral rule.** Project standing rule: specific weight values lock at the number-tuning pass (target 2026-09-01) against dogfooded markets, not at design time. This ADR locks shape and design-intent ordering only.
+- **Number-tuning deferral rule.** Project standing rule: specific weight values lock at the number-tuning pass against dogfooded markets, not at design time. This ADR locks shape and design-intent ordering only.
 
 This ADR resolves the function shape, input set, weight ordering, reply-rendering rule, and behavioural properties for v1. Specific weight values are deferred per the number-tuning rule.
 
 This ADR does **not** decide:
 
-- Specific weight values for `w_stake`, `w_ff`, `w_reply_opp`, `w_reply_same`, `gravity` — pinned by the number-tuning pass (target 2026-09-01) against dogfooded markets, then locked in `RANKING.md` §7 before public launch.
+- Specific weight values for `w_stake`, `w_ff`, `w_reply_opp`, `w_reply_same`, `gravity` — pinned by the number-tuning pass against dogfooded markets, then locked in `RANKING.md` §7 before public launch.
 - The gravity exponent's exact value (HN uses 1.8 in production; verify empirically) — number-tuning pass.
 - The schema choice for `friendly_fire_events.cleared_at` (column flip on existing row vs separate compensating row vs row delete) — SCAFFOLD.2 per F-COMMENT-7 ("schema decides"). This ADR consumes whichever shape SCAFFOLD.2 picks via the named filter `frozen_at IS NULL AND cleared_at IS NULL`.
 - Hot-path query optimisation (whether the per-render aggregation uses Drizzle query builder or `sql<T>\`...\`` template) — SCAFFOLD.2 / DEBATE.4 / DEBATE.8 per ADR-0008.
@@ -98,7 +98,7 @@ score = numerator / (comment_age_hours + 2)^gravity
 
 ### Tunable parameters and design-intent ordering
 
-Five tunable parameters: `w_stake`, `w_ff`, `w_reply_opp`, `w_reply_same`, `gravity`. Specific values pin via the number-tuning pass (target 2026-09-01) against dogfooded markets, then lock in `RANKING.md` §7 before public launch.
+Five tunable parameters: `w_stake`, `w_ff`, `w_reply_opp`, `w_reply_same`, `gravity`. Specific values pin via the number-tuning pass against dogfooded markets, then lock in `RANKING.md` §7 before public launch.
 
 Design-intent ordering ratified by this ADR (specific numbers in tuning pass):
 
@@ -148,7 +148,7 @@ Two indexes flagged for SCAFFOLD.2:
 |---|---|
 | Function specification (formula, inputs, behavioural properties, worked example, weights) | `experiment/docs/specs/RANKING.md` |
 | Function implementation (pure TypeScript module, no IO) | `src/lib/ranking.ts` |
-| Tunable parameter values (post-2026-09-01 number-tuning pass) | `RANKING.md` §7 — pinned values; `src/lib/ranking.config.ts` — runtime configuration source |
+| Tunable parameter values (pinned at the number-tuning pass) | `RANKING.md` §7 — pinned values; `src/lib/ranking.config.ts` — runtime configuration source |
 | Index DDL for `friendly_fire_events(comment_id, direction, frozen_at, cleared_at)` and `comments(parent_comment_id, side_at_post_time)` | `drizzle/migrations/<NNNN>_ranking_indexes.sql` (SCAFFOLD.2 deliverable) |
 
 ## Consequences
@@ -165,7 +165,7 @@ Two indexes flagged for SCAFFOLD.2:
 
 ### Negative
 
-- **Specific numbers deferred.** Until the number-tuning pass completes (target 2026-09-01), the function cannot be called — calling it without pinned weights is an error per RANKING.md §7. Mitigated by: the number-tuning pass is on the critical path before public launch, and the design-intent ordering locked in this ADR is sufficient to begin implementation against placeholder constants.
+- **Specific numbers deferred.** Until the number-tuning pass completes, the function cannot be called — calling it without pinned weights is an error per RANKING.md §7. Mitigated by: the number-tuning pass is on the critical path before public launch, and the design-intent ordering locked in this ADR is sufficient to begin implementation against placeholder constants.
 - **Reputation signal absent in v1.** Author Dharma at post time is excluded — a user who consistently wins early markets gets no ranking lift from track record alone. Mitigated by: stake-at-post-time captures the same correctness-derived advantage on a per-comment basis (a winning user has more Dharma to stake, so their per-comment stake naturally grows). Reintroducible at testnet phase via new ADR.
 - **Subtree reply count unavailable.** Counting full reply subtrees would capture "this comment generated long debate" but is rejected for the reply-bombing attack surface. Mitigated by: direct-reply count plus friendly-fire on the replies themselves (replies are scored by the same function) captures sub-tree quality without weighting raw subtree size.
 - **No filter tabs (Top / Controversial / Latest).** Single rendered order, no reader-toggleable variants. Some readers may prefer "newest first" or "controversial-first" views. Acceptable because: the platform's whole stance is "ranking is opinionated by design" — multiple sort tabs are an engagement-platform default, not a knowledge-platform default. Reintroducible post-launch if dogfooded markets show demand.
@@ -194,7 +194,7 @@ Two indexes flagged for SCAFFOLD.2:
 
 **Cons**
 
-- Five tunable parameters (slightly more than HN's two) — more knobs to tune in the 2026-09-01 pass.
+- Five tunable parameters (slightly more than HN's two) — more knobs to tune at the number-tuning pass.
 - Counter-reply count is filterable by a coordinated group of opponents (rare but possible). Mitigated: replies require an active position + Dharma, and friendly-fire on the replies themselves catches low-quality counter-replies.
 
 ### Option 2 — Wilson score interval on friendly-fire alone
@@ -363,7 +363,7 @@ Two indexes flagged for SCAFFOLD.2:
 
 ---
 
-*ADR-0009 ratifies the universal deterministic ranking function in `RANKING.md`. The function shape, input set, design-intent weight ordering, reply-rendering rule, and behavioural properties are immutable; superseding requires a new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy. Specific weight values are deferred to the 2026-09-01 number-tuning pass and pin in `RANKING.md` §7 before public launch.*
+*ADR-0009 ratifies the universal deterministic ranking function in `RANKING.md`. The function shape, input set, design-intent weight ordering, reply-rendering rule, and behavioural properties are immutable; superseding requires a new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy. Specific weight values are deferred to the number-tuning pass and pin in `RANKING.md` §7 before public launch.*
 
 ---
 

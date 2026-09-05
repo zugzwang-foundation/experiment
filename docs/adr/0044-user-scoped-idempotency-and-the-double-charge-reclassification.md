@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | accepted |
 | **Date** | 2026-08-27 |
 | **Deciders** | Hrishikesh (founder) |
 | **Tracker task** | S-7 |

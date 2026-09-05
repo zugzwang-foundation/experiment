@@ -32,7 +32,7 @@ This ADR does **not** decide:
 
 - Bet transaction concurrency model (SERIALIZABLE isolation, lock order, retry ladder, jitter shape) — ADR-0013 / SPEC.14.
 - Pre-commit moderation flow (OpenAI call, image moderation, Track A/B routing, 10-second moderation reservation primitive) — ADR-0014 / SPEC.15.
-- Numeric values for any rate-limit constant in SPEC.1 §16.1 or Appendix B — HARDEN.6 number-tuning pass (target 2026-09-01).
+- Numeric values for any rate-limit constant in SPEC.1 §16.1 or Appendix B — HARDEN.6 number-tuning pass.
 - UUIDv7 ID schema (used by other ID fields in the system; idempotency-keys are client-generated opaque strings, not server-allocated UUIDs) — ADR-0016 / SPEC.17.
 - Specific Redis key namespacing convention beyond the per-surface key-composition table in §Decision Outcome — SCAFFOLD.4 implementation.
 - Rate-limit-bypass allowlist for Hrishikesh-as-admin during testing — operational tooling, not architectural ratification.

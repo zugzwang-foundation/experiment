@@ -1,6 +1,18 @@
 # ADR-0001: Use AGPL-3.0-or-later for the experiment-phase repo
 
-**Status:** Accepted
+| | |
+|---|---|
+| **Status** | accepted |
+| **Date** | 2026-04-29 |
+| **Deciders** | — |
+| **Tracker task** | FOUND.3 (PR #6) |
+| **Frame document** | — |
+| **Supersedes** | — |
+| **Superseded-by** | — |
+| **Amends** | — |
+| **Amended-by** | — |
+
+---
 
 ## Decision Drivers
 

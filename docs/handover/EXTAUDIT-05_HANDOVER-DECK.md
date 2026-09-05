@@ -1118,7 +1118,7 @@ Every ranking input (support/counter counts, Dharma totals, author stake, age) c
 committed Dharma to generate — there is no free-signal lane to game. The same commit drops
 `comments.stake_at_post_time` (migration `0017`) — the ranking model reads live position
 data, so the frozen copy was dead weight. **Caveat for your probes:** RANKING.md is
-`v1.0.0-draft`; the *shape* is locked, the numeric constants pin at the 2026-09-01 tuning
+`v1.0.0-draft`; the *shape* is locked, the numeric constants pin at the number-tuning
 pass (§C7) — any ranking output you compute today is provisional by declaration.
 
 **#157 — DEBATE.9** deletes the orphaned `friendly_fire_events` table (migration `0018`)
@@ -1686,7 +1686,7 @@ prerequisite you own (EXTAUDIT-03 §3), two auth-transaction follow-ups (pool-co
 atomicity, isolation level), and the deferred second moderation vendor.
 
 **Dates that bound everything:** deferred economic constants (ranking numerics, floors)
-lock at the **2026-09-01 number-tuning pass** · launch window **15 Sep – 5 Nov 2026** ·
+lock at the **number-tuning pass** · launch window **15 Sep – 5 Nov 2026** ·
 conclusion freeze **2026-11-05 23:59 UTC** (`system_state.frozen_at`) · public dataset
 **2026-11-06** · Devcon 8 Mumbai **Nov 6–8**, then the repo archives.
 
@@ -1702,7 +1702,7 @@ spec:**
 | UI | Per-surface UI build lane, incl. market-list | after handover |
 | Media | MEDIA.2 (gated by W2.9 design) · MEDIA.3 · MEDIA.4 | backlog |
 | Harden | Non-owner runtime DB role (pre-Sep-15) · Resend sender flip · 7-site XFF sweep · freeze cron · request_id log field | register |
-| Economy | Number-tuning pass locks deferred constants | ~2026-09-01 |
+| Economy | Number-tuning pass locks deferred constants | in progress |
 | Launch | LAUNCH.1–.8 → live window | Sep 15 – Nov 5 2026 |
 | Close | Conclusion Devcon 8 Mumbai + dataset release; repo archived | Nov 6–8 2026 |
 

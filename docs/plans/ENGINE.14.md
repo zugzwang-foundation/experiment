@@ -91,7 +91,7 @@ log is the authority (sweep deferred to after ENGINE.10 by founder ruling
   `pool_seed`"; SPEC.1 §10.1 :464 "Seeds pools at market creation"; F-ADMIN-2's
   "synthetic actor in the Dharma ledger"). Seed **magnitude** stays a service
   input — the admin enters it per market; `POOL_SEED_PER_MARKET_DEFAULT` stays
-  TBD for the number-tuning pass (~2026-09-01). Nothing in this stratum pins a
+  TBD for the number-tuning pass. Nothing in this stratum pins a
   value.
 
 - **R-14.2 — Transaction shape (closes Q2): mint W-4, duplicate the spine.**
