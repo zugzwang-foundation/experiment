@@ -73,6 +73,7 @@ import {
 	users,
 } from "@/db/schema";
 // The RED import: greenfield aggregator under test (the masking gate).
+import { RENDER_IMAGE_CACHE_CONTROL } from "@/server/config/limits";
 import { loadDebateView } from "@/server/debate-view/load-debate-view";
 import type { MarketSummary } from "@/server/markets/get-by-slug";
 
@@ -538,6 +539,7 @@ describe("DEBATE.4 §6 — loadDebateView removal-masking gate (body/author neve
 			presentImg.r2Key,
 			RENDER_TTL_SECONDS,
 			DOWNSTREAM_CACHED_MINUTES,
+			RENDER_IMAGE_CACHE_CONTROL,
 		);
 		expect(ePresent.imageUrl).toBe(
 			`https://signed.example/${presentImg.r2Key}`,
@@ -614,6 +616,7 @@ describe("DEBATE.4 §6 — loadDebateView removal-masking gate (body/author neve
 			presentImg.r2Key,
 			RENDER_TTL_SECONDS,
 			DOWNSTREAM_CACHED_MINUTES,
+			RENDER_IMAGE_CACHE_CONTROL,
 		);
 		expect(payload).toContain(`https://signed.example/${presentImg.r2Key}`);
 
@@ -675,6 +678,7 @@ describe("DEBATE.4 §6 — loadDebateView removal-masking gate (body/author neve
 			"market-media",
 			`m/${market.id}/not-default.png`,
 			expect.anything(),
+			expect.anything(),
 		);
 
 		// ⛔ AND THE OTHER ARM, FROM THE SAME CALL. `thumbImageUrl` is the
@@ -687,6 +691,7 @@ describe("DEBATE.4 §6 — loadDebateView removal-masking gate (body/author neve
 		expect(mockMintReadUrl).toHaveBeenCalledWith(
 			"market-media",
 			`m/${market.id}/default.png`,
+			expect.anything(),
 			expect.anything(),
 		);
 	});

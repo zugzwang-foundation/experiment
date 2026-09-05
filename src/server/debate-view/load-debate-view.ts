@@ -14,6 +14,7 @@ import {
 	type Side,
 	twoSlot,
 } from "@/lib/ranking";
+import { RENDER_IMAGE_CACHE_CONTROL } from "@/server/config/limits";
 import { getMarketMediaUrls } from "@/server/discovery/media";
 import type {
 	PricePoint,
@@ -550,7 +551,12 @@ async function mintImageUrls(
 			try {
 				urlByComment.set(
 					c.id,
-					await signRead(key, READ_URL_TTL_SECONDS, DOWNSTREAM_CACHED_MINUTES),
+					await signRead(
+						key,
+						READ_URL_TTL_SECONDS,
+						DOWNSTREAM_CACHED_MINUTES,
+						RENDER_IMAGE_CACHE_CONTROL,
+					),
 				);
 			} catch {
 				// R2 unavailable for this object → degrade to no image (resilient

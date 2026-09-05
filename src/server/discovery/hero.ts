@@ -5,6 +5,7 @@ import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { DbClient, DbTransaction } from "@/db";
 import { bets, comments, imageUploads, lots, positions } from "@/db/schema";
 import { type PostSubstrate, type Side, topOrder } from "@/lib/ranking";
+import { RENDER_IMAGE_CACHE_CONTROL } from "@/server/config/limits";
 import { computeSell, type Reserves } from "@/server/cpmm/calculate";
 import { CpmmDecimal, toFixed18 } from "@/server/cpmm/decimal";
 import {
@@ -288,6 +289,7 @@ export async function selectHeroTopPosts(
 						r.imageKey,
 						READ_URL_TTL_SECONDS,
 						DOWNSTREAM_CACHED_MINUTES,
+						RENDER_IMAGE_CACHE_CONTROL,
 					),
 				);
 			} catch {

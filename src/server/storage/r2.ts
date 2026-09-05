@@ -155,17 +155,34 @@ export async function mintPutUrl(
 /**
  * Sign a READ URL for the given bucket + key. Caller chooses TTL — 60s for
  * the moderation hop, 3600s for the future DEBATE.4 render path.
+ *
+ * `cacheControl`, when given, is served as the object's `Cache-Control` via the
+ * `response-cache-control` query parameter, overriding whatever is (or is not)
+ * stored on the object itself. See `RENDER_IMAGE_CACHE_CONTROL` for why the
+ * header is applied here rather than at upload; the short version is that this
+ * direction covers objects that already exist, and the upload direction cannot.
+ *
+ * ⚠ IT IS DELIBERATELY OPTIONAL, and the omitting caller is not an oversight.
+ * `signReadSingleUse` hands its URL to OpenAI's fetcher, where no browser cache
+ * exists to instruct — the same reasoning that keeps that path out of the memo
+ * (`sign-read.ts`). A caching directive there would be noise on a gate that
+ * fails closed, so the parameter is absent rather than defaulted.
  */
 export async function mintReadUrl(
 	bucket: R2Bucket,
 	key: string,
 	ttlSeconds: number,
+	cacheControl?: string,
 ): Promise<string> {
 	const { client, bucketName } = getClient(bucket);
 	try {
 		return await getSignedUrl(
 			client,
-			new GetObjectCommand({ Bucket: bucketName, Key: key }),
+			new GetObjectCommand({
+				Bucket: bucketName,
+				Key: key,
+				...(cacheControl ? { ResponseCacheControl: cacheControl } : {}),
+			}),
 			{ expiresIn: ttlSeconds },
 		);
 	} catch (err) {

@@ -4,6 +4,7 @@ import { and, asc, eq } from "drizzle-orm";
 
 import type { DbClient, DbTransaction } from "@/db";
 import { marketMedia } from "@/db/schema";
+import { RENDER_IMAGE_CACHE_CONTROL } from "@/server/config/limits";
 import { mintReadUrl } from "@/server/storage/r2";
 import {
 	DOWNSTREAM_CACHED_MINUTES,
@@ -45,17 +46,27 @@ const READ_URL_TTL_SECONDS = 7200;
  * ⚠ CALLERS STATE THEIR DOWNSTREAM WINDOW. Both call sites below sit inside
  * `"use cache"` blocks; see `read-url-memo.ts` for why that has to be counted.
  */
+// ⚠ `cacheControl` IS REQUIRED AND NULLABLE, exactly as on `signRead`, and it is
+// stated by the caller rather than baked in here even though BOTH of today's
+// callers want the same answer. Baking it in is the shape that already went
+// wrong once: applying the directive inside `signRead` silently handed the admin
+// moderation feed a year-long browser cache for a sixty-second URL. Market media
+// has no admin-review surface today, so there is no second answer to get wrong —
+// but "no second caller yet" is a fact about this week, and the parameter costs
+// one argument to keep honest.
 export async function signReadMarketMedia(
 	key: string,
 	ttlSeconds: number,
 	downstreamMaxAgeSeconds: number,
+	cacheControl: string | null,
 ): Promise<string> {
 	return memoizedReadUrl(
 		"market-media",
 		key,
 		ttlSeconds,
 		downstreamMaxAgeSeconds,
-		() => mintReadUrl("market-media", key, ttlSeconds),
+		() =>
+			mintReadUrl("market-media", key, ttlSeconds, cacheControl ?? undefined),
 	);
 }
 
@@ -89,6 +100,7 @@ export async function getDefaultMarketMediaUrl(
 			row.key,
 			READ_URL_TTL_SECONDS,
 			DOWNSTREAM_CACHED_MINUTES,
+			RENDER_IMAGE_CACHE_CONTROL,
 		);
 	} catch {
 		// R2 unavailable for this object → degrade to no image (resilient read
@@ -170,6 +182,7 @@ export async function getMarketMediaUrls(
 				key,
 				READ_URL_TTL_SECONDS,
 				DOWNSTREAM_CACHED_MINUTES,
+				RENDER_IMAGE_CACHE_CONTROL,
 			);
 		} catch {
 			// Same resilience posture as the two single-image readers above: one
