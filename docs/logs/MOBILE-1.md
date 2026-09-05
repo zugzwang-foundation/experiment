@@ -216,18 +216,44 @@ wrapper** and moved the badge inside `ArgProfile`, solving the same crowding a
 better way — so the rebase took upstream's version and my override went with
 it. Correct resolution; the residual clip is one level deeper than either fix.
 
-**NOT fixed, same reasoning as (1).** `ArgProfile.tsx:196-198` documents the
-constraint as a rule with a stated purpose: *"GROUP A — never wraps internally
-(rule 2). A pseudonym long enough to overflow it is preferred to a pseudonym
-that is cut in half: identity is not a field this product truncates."* It also
-carries a guard (`tests/unit/debate/render/arg-profile-row.test.tsx`, unread
-this session). ⚠ **There is a real argument FOR fixing it, and it is the same
-shape as the ResolverCards analysis — record it rather than lose it:** the rule
-exists to prevent truncation, and at 375px the shipped behaviour *is*
-truncation, so `max-mobile:flex-wrap` on Group A would serve the rule's stated
-purpose rather than violate it (wrapping keeps every field whole; only the line
-breaks). That is an argument to put to the operator, not one to act on
-unilaterally inside a task whose plan never scopes `ArgProfile`.
+**FIXED — OPERATOR RULING 2026-09-05, after a side-by-side of the two builds.**
+`ArgProfile.tsx:196-198` documents the constraint as a rule with a stated
+purpose: *"GROUP A — never wraps internally (rule 2). A pseudonym long enough to
+overflow it is preferred to a pseudonym that is cut in half: identity is not a
+field this product truncates."*
+
+⚠ **The ruling turned on evidence, not on preference, and the evidence was that
+the operator had already SEEN this row working.** Both builds were compiled from
+source against live staging data and screenshotted at 375px: the pre-rebase tree
+(`d9c1c61`) measured **0 elements clipped inside cards**; the post-rebase tree
+measured Group A at **362px inside a 203px parent**, 106px cut. So this was a
+regression relative to what was tested, not an inherited wart — which is what
+separates it from (1), where nothing had ever worked differently.
+
+**The fix scopes rule 2 to >=640px; it does not overturn it.** Rule 2's stated
+reason is to prevent truncation, and below 640px it was *producing* truncation —
+purpose and effect had come apart, at one width only. `max-mobile:shrink
+max-mobile:flex-wrap` on BOTH groups lets the row take a second LINE instead of
+more WIDTH: every field stays whole, `whitespace-nowrap` still forbids breaking
+inside a field, and the pseudonym is as intact as the rule demands. The two
+tokens are one mechanism — `flex-wrap` cannot engage while `shrink-0` pins the
+group at its content width.
+
+**Verified.** 375px: 0 clipped, Group A 203px × 46px (two lines), full text
+`CeruleanCapybara000|YES @ 50%|Đ 10|Replies · 0`, page overflow 0. 1440px:
+`flex-wrap: nowrap`, `flex-shrink: 0`, Group A 20px — ONE line — arena `row`,
+still one screen. Both `max-mobile:` tokens are inert above 640px, so
+UI-OVERNIGHT 1b's two-locked-groups desktop row is byte-identical.
+
+**The guard was read before editing and still passes unmodified**
+(`tests/unit/debate/render/arg-profile-row.test.tsx`): it locates the groups by
+the `whitespace-nowrap` token, which is KEPT, and its `.flex-wrap` selector does
+not match the distinct `max-mobile:flex-wrap` token. 3202/3202 green.
+
+⚠ **Group B takes the pair too, though it does not overflow on today's data** —
+the behaviour belongs to the row at phone width, not to one group's current
+contents, and a longer badge string would otherwise reintroduce the clip in the
+half nobody thought to cover.
 
 **(2)** **The 640–767px band overflows
 horizontally by ~54px at 700px**, and it is the HEADER's right zone

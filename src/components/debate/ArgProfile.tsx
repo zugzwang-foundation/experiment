@@ -195,8 +195,34 @@ export function ArgProfile({
 			<div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
 				{/* GROUP A — never wraps internally (rule 2). A pseudonym long enough
 				    to overflow it is preferred to a pseudonym that is cut in half:
-				    identity is not a field this product truncates. */}
-				<span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
+				    identity is not a field this product truncates.
+				    ⚠⚠ MOBILE-1 Phase A SCOPES RULE 2 TO >=640px, AND DOES IT TO SERVE
+				    THE RULE RATHER THAN TO OVERRIDE IT. Rule 2 exists to prevent
+				    TRUNCATION — that is the whole of its stated reason. Below 640px it
+				    was PRODUCING truncation: measured at 375px on real staging data,
+				    this group renders 362px inside a 203px parent and the card's own
+				    `overflow-hidden` cuts the last 106px, so `Đ 10` and `Replies · 0`
+				    are not shortened, they are GONE. The rule's purpose and the rule's
+				    effect had come apart, and only at phone width.
+				    ⇒ `max-mobile:shrink max-mobile:flex-wrap` lets the group take a
+				    second LINE instead of taking more WIDTH. Nothing is shortened and
+				    nothing is cut: every field stays whole, `whitespace-nowrap` still
+				    forbids breaking INSIDE a field, and the pseudonym in particular is
+				    as intact as rule 2 requires. The two tokens are one mechanism —
+				    `flex-wrap` alone cannot help while `shrink-0` pins the group at its
+				    362px content width, so releasing the shrink is what lets the wrap
+				    ever engage.
+				    ⛔ >=640px IS BYTE-IDENTICAL: both tokens are inert there, so the
+				    desktop row is still one line of two locked groups exactly as
+				    UI-OVERNIGHT 1b designed it, and `arg-profile-row.test.tsx` — which
+				    finds these groups BY the `whitespace-nowrap` token, kept — still
+				    sees the same two.
+				    ⚠ This was covered before the rebase onto `main` and silently lost:
+				    `PostCard` used to wrap the badge onto its own line, which freed
+				    enough width that this group fit. Upstream deleted that wrapper
+				    (the better fix for the crowding it addressed) and the coverage went
+				    with it, one level shallower than the real constraint. */}
+				<span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap max-mobile:shrink max-mobile:flex-wrap">
 					{/* HTML-FINISH · MARKET DETAIL row 42 — the pseudonym navigates to that
 				    author's Profile. SPEC.1 `:1628` already rules exactly this for the
 				    Discovery hero ("an author pseudonym click navigates to that
@@ -338,8 +364,15 @@ export function ArgProfile({
 				    layout the server cannot see.
 				    ⇒ Canon §3 item 11 is no longer owed an amendment for this row: it
 				    already records the field AND its divider, which is what the three
-				    sibling author rows ship. This row now agrees with them. */}
-				<span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
+				    sibling author rows ship. This row now agrees with them.
+				    ⚠ GROUP B TAKES THE SAME `max-mobile:` PAIR AS GROUP A, and for the
+				    same reason — see that group's block above for the full argument.
+				    It is applied here even though group B is the narrower of the two
+				    and does not overflow on today's data: the pair is a property of the
+				    ROW's behaviour at phone width, not of one group's current contents,
+				    and a longer badge string is exactly the kind of change that would
+				    otherwise reintroduce the clip in the half nobody thought to cover. */}
+				<span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap max-mobile:shrink max-mobile:flex-wrap">
 					{/* TIME-1 · Form B — HOW LONG AGO, AND IT IS THE LAST THING GROUP A
 				    SAYS. The lane badge follows it (entry 1b, rule 5); nothing else
 				    does.
