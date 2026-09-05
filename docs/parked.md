@@ -22,9 +22,9 @@ waiting on an event that has not happened. Go-live is **2026-09-15**.
 
 | # | Row | Owner / gate | Why here |
 |---|---|---|---|
-| **1** | **POOL-2 — `BETTER_AUTH_SECRET` may differ between Doppler `stg` and Vercel `staging`** | **operator-owned, before DP.2** | Unresolvable from a CC session — Vercel env values are write-only once set. A promote that discovers this afterwards has already signed out every production participant. |
+| ~~**1**~~ | ~~**POOL-2 — `BETTER_AUTH_SECRET` may differ between Doppler `stg` and Vercel `staging`**~~ | ✅ **RETIRED — D-28 row 24** | Ruled *not important*. The check itself is not dropped; it stops being a queued row and becomes **one line in the 7–8 September migration protocol: verify before promote**. A standing docket row and a step in a procedure that is about to run are different instruments, and this is the second — see the section body below. |
 | **2** | **POOL-2 — the Sentry routing smoke check is a lookalike, three times over** | runbook corrected here; **probe at HARDEN** | The doc half is done at SYNC-1: `deploy-pipeline.md` **§3.0** now states the smoke's real reach and that it does **not** certify Sentry routing. What remains is the scripts-only fix + a real delivery assertion. |
-| **3** | **AUDIT-FIX-B2 OQ-2 — app-as-owner role split** | **pre-launch, before Sep 15** | The only COMPLETE TRUNCATE fix. Migration 0021's guards close the accident class, not the owner-level class. |
+| ~~**3**~~ | ~~**AUDIT-FIX-B2 OQ-2 — app-as-owner role split**~~ | ✅ **RETIRED — D-28 row 25** | Ruled *not important*; the ruling's own consequence column reads *"`parked.md` row retired"*. The owner-level TRUNCATE class stays open **by acceptance, not by oversight** — migration 0021's guards close the accident class, and the founder has ruled the remainder not worth a pre-launch role split. See the section body below. |
 | **4** | **UI-6 Gate C D3 — review-feed `innerJoin(users)`** | **armed; next `review-feed.ts` touch** | Verified safe today (no users-row hard-delete path; `onDelete: restrict`). Fires on contact, not on a date. |
 | **5** | **HTML-FINISH-MD-PLACEHOLDERS — four visible placeholders ship on `/m/[slug]`** | **operator-owned, STRIP OR GATE before the DP.2 production promote** | Founder-ruled IN at HTML-FINISH · MARKET DETAIL round 2 (R2, 2026-08-16, the OD-2 reversal) so the review surface shows the mockup's full composition. They are build-time notes about unbuilt work — exactly what `PD-3-09` / `OD-6` deleted from `MarketHeader` — and **a real participant must never meet one.** |
 | **6** | **STAGING-AUTH-ONE-WAY — a staging session cannot be re-obtained in-session** | **HARDEN Tier 2** | Signing out of staging cannot be reversed in-session, so auth-gated surfaces (`/bookmarks`, and the signed-out arm of any surface) are unmeasurable by CC without a founder-supplied session. **Blocked two measurements across PROFILE round 1 and round 2.** Needs a repeatable way to obtain and drop a staging session. ⚠ Round 2 found a PARTIAL workaround for the signed-OUT half only — the same deployment's `*.vercel.app` URL is a different origin, so the session cookie is not sent (same canary, same DB, same viewport). That gives the anonymous arm without signing out; it does **not** give a session where none exists, which is the half that blocked round 1. |
@@ -33,8 +33,9 @@ waiting on an event that has not happened. Go-live is **2026-09-15**.
 gate → dated pre-launch hardening → armed-on-touch. A row leaves this table only
 when it closes; a row enters it when its trigger fires.*
 
-*PERF-1 closed 2026-08-10 and **there is no GO-LIVE BLOCKER row left** — the
-operator-owned `BETTER_AUTH_SECRET` check is now the head of the queue.*
+*PERF-1 closed 2026-08-10 and **there is no GO-LIVE BLOCKER row left**. ⚠ **Rows 1 and 3 were retired at D-28 (2026-09-05)**, both ruled "not important" — so the head of the queue is now row **2**, the Sentry-routing smoke check. The `BETTER_AUTH_SECRET` check that used to head it survives as a step in the 7–8 September migration protocol rather than as a row here.*
+
+⚠ **The numbers do not renumber, and that is deliberate.** `AGENTS.md` cites **SEQUENCE #5** by number, twice, in the `components/debate/` block. Renumbering 2·4·5·6 down to 1·2·3·4 would silently repoint both citations at a different row — the `L-n` / `GC-n` collision (`CLAUDE.md` §8, **O-15**) arriving by subtraction instead of by addition. A retired row keeps its number and is struck in place; the table's ordering rule below still describes how a live row earns its position.
 
 ---
 
@@ -532,7 +533,9 @@ repo-side `Sec-Fetch-Site` check at the catch-all wrapper
 
 **Debt paid in full at PR #218 (branch `docs/sync-sweep`, 2026-07-07)** — one doc-only sweep PR covering the seven originating tasks (A1 #197 · B1 #199 · B2 #201 · B3 #202 · B7-A26 #209 · B7a #211 · B8 #216). Scope, one line: SPEC.2 §0 → **1.0.17** (+ §0.1 row · §19.3 `market_media`/`bet_receipts` enumeration · §22 rows ADR-0029/0030/0031 + counts — 30 ADRs = 29 files + 0012 in-flight, 27 accepted, range `0003–0031`) · SPEC.1 §0 → **1.0.14** (+ §20 row · F-BET-1 Errors + `comment_requires_bet`) · CLAUDE.md/AGENTS.md ADR-range + spec-version cites → 1.0.14/1.0.17 · deploy-pipeline.md §0 head `0023` + the §4 seed-staging OPEN note closed (strings already fixed pre-sweep at `b724094`). **Do not re-pay** — the debt is settled and the seven originating tasks stay closed. ⚠ **Version anchors refreshed at SYNC-1 (2026-08-08): the "1.0.14 / 1.0.17" figures above are the values *as of PR #218* and are historical.** The live versions are **SPEC.1 1.0.29 · SPEC.2 1.0.22 · cpmm 2.1.0**; a future §0 bump starts from those, read off the files, never from this row. The next sweep opens a fresh entry.
 
-## AUDIT-FIX-B2 OQ-2 — app-as-owner role split (the only COMPLETE TRUNCATE fix)
+## ~~AUDIT-FIX-B2 OQ-2 — app-as-owner role split (the only COMPLETE TRUNCATE fix)~~ — ✅ **RETIRED 2026-09-05 (D-28 row 25)**
+
+⛔ **Ruled *not important* by the founder at D-28; the consequence column reads "`parked.md` row retired", and `SEQUENCE` row 3 is struck.** Nothing below is withdrawn — the probe's finding was correct and still is: the app connects as `postgres`, the table owner, and a table owner's TRUNCATE privilege cannot be revoked. **What changed is the verdict on whether that matters enough to act on before launch, and the answer is no.** The residual is therefore *accepted*, not *unnoticed* — which is the whole distinction this file exists to keep, and the reason the row is struck rather than deleted. It reopens only on a new ruling, or on the incident its own conditional trigger names.
 
 **Originating task:** AUDIT-FIX-B2 A20 STEP-0 probe (2026-07-04, operator-ratified park; target **before Sep 15, 2026 launch**).
 
@@ -742,7 +745,11 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 
 **Expected next task.** Process-owned, not code — a checklist line in the partition-migration procedure and a `@db-migration-reviewer` check. Evidence is in `docs/logs/STAGING-PARITY-A-mutation-audit.md` under *GROUP 5 · item 9*; this entry is the tracking, that one is the argument.
 
-## POOL-2 — `BETTER_AUTH_SECRET` may differ between Doppler `stg` and Vercel `staging`
+## ~~POOL-2 — `BETTER_AUTH_SECRET` may differ between Doppler `stg` and Vercel `staging`~~ — ✅ **RETIRED 2026-09-05 (D-28 row 24)**
+
+⛔ **Ruled *not important* by the founder at D-28, and `SEQUENCE` row 1 is struck.** ⚠ **This one is a re-homing, not a dismissal, and the difference is the point.** The consequence column reads *"one line in the 7–8 Sep migration protocol: verify before promote"* — so the check still happens, at the moment it can actually be performed, by the person who will be holding the promote. What is retired is the *docket row*: a standing item waiting on an event has no job left once that event is scheduled and the item is a step inside it.
+
+⚠ **The protocol line is NOT written into `docs/runbooks/deploy-pipeline.md` by this pass** — that file is outside SYNC-11's lifted wall, and D-28 rows 2–3 place the migration protocol in the 7–8 September chats with §3 of that runbook as the procedure. **Recorded here so the obligation is visible rather than assumed discharged.**
 
 **Originating task:** POOL-2 (2026-08-08), STEP 1a. Surfaced while trying to obtain a real staging session cookie for the authenticated reproduction probe; the probe could not be completed because of it.
 
