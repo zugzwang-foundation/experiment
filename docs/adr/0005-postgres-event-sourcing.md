@@ -128,7 +128,7 @@ Columns:
 
 Idempotency: `event_id` is the storage-layer dedupe key. `INSERT ... ON CONFLICT (event_id) DO NOTHING` is the dedupe primitive, called via the helper at `src/server/events/insert.ts`. The API-boundary idempotency-key surface lives in ADR-0015; this ADR ratifies that the storage primitive is `event_id` collision.
 
-Partitioning: monthly `RANGE` partitions on `created_at`. Twelve partitions are pre-created in the initial schema migration (`events_2026_05` through `events_2027_04`); a `DEFAULT` partition catches any out-of-range insert. Sentry alarms on any DEFAULT-partition row (per SPEC.2 §18). No partition-rotation cron in v1 — twelve months exceeds the build window (codebase archives 2026-11-08).
+Partitioning: monthly `RANGE` partitions on `created_at`. Twelve partitions are pre-created in the initial schema migration (`events_2026_05` through `events_2027_04`); a `DEFAULT` partition catches any out-of-range insert. Sentry alarms on any DEFAULT-partition row (per SPEC.2 §18). No partition-rotation cron in v1 — twelve months exceeds the build window (which ends at the 2026-11-05 freeze).
 
 Per-aggregate event-stream queries are supported by an index on `(aggregate_type, aggregate_id, created_at)`; SCAFFOLD.2 owns the index DDL.
 
@@ -170,7 +170,7 @@ The first two file paths are the DDL ground truth — they bypass Drizzle's Type
 - **Pattern A puts bookkeeping discipline in handler code.** Every state-mutating Server Action MUST call `events.insert(...)` alongside its read-model writes. A forgotten event row = silent audit-log gap. *Mitigated by:* a single `src/server/events/insert.ts` helper called by every handler; CI lint flagging state-mutating handlers without an `events.insert(...)` call (HARDEN.* task).
 - **`markets.status` is a denormalised cache of `resolution_events`.** A bug in the resolution handler that updates `resolution_events` but fails to update `markets.status` produces a UI / audit-log mismatch. *Mitigated by:* the resolution Server Action is one transaction; either both writes happen or neither does. A test asserts the invariant after every resolution.
 - **No replay CLI in experiment phase = replayability is unverified.** The architecture says replay is possible; no test exercises it. *Acceptable because:* experiment-phase disaster recovery uses Supabase PITR + daily snapshots (SCAFFOLD.19), not replay. Flag for future readers: if testnet phase wants replayability as a live recovery primitive, it must be tested then.
-- **Twelve pre-created partitions cover 2026-05 → 2027-04.** Overrun is theoretically possible if the experiment runs past 2027-04. *Acceptable because:* codebase archives 2026-11-08; the DEFAULT partition + Sentry alarm catch any overrun loudly.
+- **Twelve pre-created partitions cover 2026-05 → 2027-04.** Overrun is theoretically possible if the experiment runs past 2027-04. *Acceptable because:* the experiment concludes at the 2026-11-05 freeze; the DEFAULT partition + Sentry alarm catch any overrun loudly.
 - **Triggers and partitioning bypass Drizzle's TypeScript schema.** Two migration files are hand-written SQL, not generated. *Mitigated by:* both files are small, named, version-controlled, and reviewed at SCAFFOLD.2.
 
 ### Neutral
@@ -263,7 +263,7 @@ Listed for the record. Not viable: Vercel functions are stateless, with no persi
 | SPEC.2 §14 (stub) | Invariant contract | Mints: INV-2 (Dharma conservation) is enforced by `dharma_ledger` Bucket A status + bet-handler discipline writing one ledger row per Dharma flow inside the originating transaction; INV-4 (resolutions append-only) is enforced by `resolution_events` + `payout_events` Bucket A status + the BEFORE UPDATE / BEFORE DELETE triggers. Back-pressure: §14's invariant-mechanism table cites the trigger SQL file and the ledger-row discipline. |
 | SPEC.2 §18 (stub) | Observability contract | Consumes: `events.metadata` JSONB carries `request_id`, `flow_id`, `user_id`, `idempotency_key`, IP, user agent — the §18 tag set. Mints: a Sentry alarm on any DEFAULT-partition row in `events` (signals partition-range overrun). |
 | SPEC.2 §20 (stub) | Public dataset export pipeline | Consumes: `pg_dump` + a per-table view (PII scrubbed, identity columns pseudonymized, audit columns kept raw) is the export pipeline. The events log is the canonical record; the 2026-11-06 release includes the events log per Appendix B. |
-| SPEC.2 §23 | ADR Index | Status of ADR-0005 flips from `provisional` to `accepted` on this commit. |
+| SPEC.2 §22 | ADR Index | Status of ADR-0005 flips from `provisional` to `accepted` on this commit. |
 | SPEC.1 INV-1 | Bet+comment atomicity | Implemented via `db.transaction(...)` wrapping both inserts. Postgres ACID is the mechanism; ADR-0013 owns the SERIALIZABLE shape. |
 | SPEC.1 INV-2 | Dharma conservation | Implemented by every Dharma flow inserting one `dharma_ledger` row inside the originating transaction; the trigger on `dharma_ledger` (Bucket A) prevents post-hoc tampering. INV-2 is therefore enforced by handler discipline + DB-layer immutability of past entries. |
 | SPEC.1 INV-3 | Comments side-bound at post-time | Indirectly supported: `comments` is Bucket A — the whole-row `bucket_a_no_update` trigger means `comments.side_at_post_time` cannot be modified after insert, which is what INV-3 requires (`I-SIDE-BIND-001`, minted at ENGINE.8). The post-time-side **capture** was built in DEBATE.2 (`place.ts:133`); ADR-0013 owns the W-1 transaction shape it rides. See **Patch record P1**. |
@@ -296,3 +296,9 @@ Listed for the record. Not viable: Vercel functions are stateless, with no persi
 ---
 
 *ADR-0005 ratifies Postgres + event-sourced schema (Pattern A) for the Zugzwang experiment phase, with the per-table append-only-vs-mutable classification, the events table shape, monthly partitioning with twelve pre-created partitions, the synchronous-vs-asynchronous read-model classification rule, and replayability as an architectural property without a v1 replay CLI. The decision body and the per-table classification are immutable; superseding requires a new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy.*
+
+---
+
+## Patch record — 2026-09-05 · the repository-archive boundary is struck (D-21 / D-26)
+
+**D-21, as narrowed by D-26 (decision record amendment 2.2 / 2.3).** The experiment ends at the `2026-11-05 23:59 UTC` write-freeze (`system_state.frozen_at`) and this repository describes nothing after it. Two claims are therefore struck wherever they appeared above: the **`2026-11-08` repository-archive boundary**, and the **conference that used to justify the conclusion date**. Two date sites, both load-bearing for the no-rotation-cron decision. ⚠ **The decision itself is unchanged and its reasoning is not rewritten** — this ADR is a genesis-era record and stays one. Every argument here that leaned on *"the build has a hard end"* still holds; the hard end is simply the freeze, three days earlier, and never was the archive. The twelve pre-created partitions still overshoot the window by more than a year, which is the entire argument for shipping no rotation cron.

@@ -281,7 +281,7 @@ The five existing pseudonym tests (`auth::pseudonym-auto-assigned-permanent`, `p
 | SPEC.1 §19 Q15 | ADR-PSEUDONYM open question | Closes: Q15 flips to ✅ Closed 2026-05-07 with locked word-list shape, pipeline parameters, and seed-derivation algorithm. |
 | SPEC.2 §1.4 #5 | Delegation: pseudonym pool word lists + asset pipeline → ADR-0011 | Consumes: delegation. |
 | SPEC.2 §5 | Table inventory — `identity_pool` named | Consumes: inventory entry. Shapes: row classification per ADR-0005 Bucket B (consumed from ADR-0005, not minted here). |
-| SPEC.2 §23 | ADR Index entry for ADR-0011 | Mints: status flip from outline-stub to `accepted` with date 2026-05-07. |
+| SPEC.2 §22 | ADR Index entry for ADR-0011 | Mints: status flip from outline-stub to `accepted` with date 2026-05-07. |
 | ADR-0005 | Bucket B classification of `identity_pool` (whitelisted `assigned_at` transition) | Consumes: classification + trigger SQL location. |
 | ADR-0006 §4 | Cloudflare R2 jurisdiction APAC; `zugzwang-pfp` bucket | Consumes: vendor + bucket. |
 | ADR-0006 §7 | `pg_cron` for identity-pool low-watermark check | Consumes: cadence engine + job location. |

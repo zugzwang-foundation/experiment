@@ -101,7 +101,7 @@ The ranking model shapes which posts a reader sees, which they engage with, and 
 The forces at play:
 
 - **Open-source publishing constraint.** `RANKING.md` is AGPL-3.0 and public. Anyone can read it and optimise against it. Zugzwang does not defend ranking by secrecy. **But the thesis-level defense is not the ranking function — it is mandatory commentary** (see Decision Driver 2). Capital is *not* handicapped at the ranking layer; surfacing a heavily-staked post surfaces its argument for public scrutiny, and the commentary layer adjudicates in the open.
-- **45-day experiment window.** The model ships at launch (2026-09-15) and runs through conclusion (2026-11-08). Signals that take months to develop are dead weight.
+- **45-day experiment window.** The model ships at launch (2026-09-15) and runs through conclusion (2026-11-05). Signals that take months to develop are dead weight.
 - **ADR-0005 §4 read-time-computed classification.** Ranking is read-time-computed (no projection table, no materialised view). The model reads from `comments` + `bets` (+ `friendly_fire_events` only where a mode uses it) per page render. Any input must be available on those tables (frozen at write or read-time-aggregable).
 - **Performance budget.** Debate view is a hot path. Lane aggregation runs per market render. SQL aggregation dominates; per-post compute must be O(1) and IO-free.
 - **Frozen-at-resolution requirement.** Per SPEC.1 §11 + INV-4, resolved markets are immutable. Ranking must freeze with the market — auditors must reproduce the rendered order at any past resolution moment.
@@ -465,3 +465,9 @@ Per ADR-0005 §4, ranking is read-time-computed. No `ranking_snapshots` table, n
 ---
 
 *ADR-0017 supersedes ADR-0009 and ratifies a multi-mode ranking model: a fixed multi-lane "Top" default (dominate any lane by a relative margin over second place, all lanes equal including stake), single-axis filter modes (Most Debated, Highest Stakes, Contested, Newest; Surging deferred to v1.x), and reply ranking by stake within side (depth = 1). The model shape, lane set, margin shape (ratio-to-#2 above an activity floor), design-intent mode order, and behavioural properties are immutable; superseding requires a new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy. Specific numeric values (`k_lane`, `floor_lane`, `c`, `g`, Surging window) defer to the 2026-09-01 number-tuning pass and pin in `RANKING.md` before public launch. The ranking carries no anti-capital logic by design — K · n > C is upheld by the mandatory-commentary floor operating in the open, not by ranking-level suppression of capital.*
+
+---
+
+## Patch record — 2026-09-05 · the repository-archive boundary is struck (D-21 / D-26)
+
+**D-21, as narrowed by D-26 (decision record amendment 2.2 / 2.3).** The experiment ends at the `2026-11-05 23:59 UTC` write-freeze (`system_state.frozen_at`) and this repository describes nothing after it. Two claims are therefore struck wherever they appeared above: the **`2026-11-08` repository-archive boundary**, and the **conference that used to justify the conclusion date**. One date site. ⚠ **Pre-existing and deliberately not corrected here:** the *"45-day experiment window"* figure is arithmetic neither date supports — 2026-09-15 to 2026-11-08 is 54 days and to 2026-11-05 is 51. It was already wrong before this edit, so correcting it would be rewriting genesis reasoning rather than applying D-21. Reported, not fixed. ⚠ **The decision itself is unchanged and its reasoning is not rewritten** — this ADR is a genesis-era record and stays one. Every argument here that leaned on *"the build has a hard end"* still holds; the hard end is simply the freeze, three days earlier, and never was the archive.

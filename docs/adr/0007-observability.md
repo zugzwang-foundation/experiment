@@ -14,7 +14,7 @@
 
 ## Context and Problem Statement
 
-The Zugzwang experiment-phase build runs from 2026-04-24 (build start) through 2026-09-15 (launch) to 2026-11-08 (conclusion at Devcon 8 / ETHGlobal Mumbai). The build is owned by one developer with two support devs and Claude Code; scope freezes at launch and the codebase reaches end-of-life at conclusion. The observability surface must be locked before SCAFFOLD.5 (Sentry wiring), SCAFFOLD.6 (PostHog wiring), and any task that consumes feature flags can begin.
+The Zugzwang experiment-phase build runs from 2026-04-24 (build start) through 2026-09-15 (launch) to the **2026-11-05 23:59 UTC** write-freeze (conclusion). The build is owned by one developer with two support devs and Claude Code; scope freezes at launch and the product write-freezes at conclusion. The observability surface must be locked before SCAFFOLD.5 (Sentry wiring), SCAFFOLD.6 (PostHog wiring), and any task that consumes feature flags can begin.
 
 ADR-0003 ratified Next.js 16 on the Node.js runtime as the framework. ADR-0006 ratified Vercel Pro `bom1` as the web tier and minted a per-vendor failure-mode profile that names the degradation states the alarm catalogue must consume. ADR-0005 Pattern A removed projector workers from v1 and minted a Sentry alarm on any DEFAULT-partition row in the events table; that alarm is absorbed into this ADR's catalogue.
 
@@ -39,7 +39,7 @@ This ADR does **not** decide:
 
 1. **Solo-operator + 7-week live window.** One human plus Claude Code runs the live experiment. Every observability tool kept must justify itself against the AGENTS.md ground rule "if a decision can be deferred to `HARDEN.*` or to testnet phase without breaking the live window, defer it."
 
-2. **Build-lifetime stability through 2026-11-08.** Every vendor chosen must remain on a stable plan with no announced major migration through 2026-11-08. Vendor lock-in is acceptable because the codebase archives at conclusion.
+2. **Build-lifetime stability through 2026-11-05.** Every vendor chosen must remain on a stable plan with no announced major migration through 2026-11-05. Vendor lock-in is acceptable because the build ends at conclusion.
 
 3. **ADR-0006 hosting topology already names what to integrate with.** Vercel deploy hooks → Sentry release tagging is the integration pattern. Vercel runtime logs already capture per-request data. This ADR builds on those surfaces; it does not replicate them.
 
@@ -213,7 +213,7 @@ Both vendors are designed fail-open at the SDK level. The failure-mode profile:
 
 ### Neutral
 
-- **`CLAUDE.md` row 336 (Axiom) is struck or marked superseded** as part of this ADR's commit. The "Logs + metrics" row drops; structured logs route to Vercel runtime logs; custom metrics defer to Postgres events log queries.
+- **Axiom is struck from the vendor stack — DISCHARGED, though not where this line said it would be.** The "Logs + metrics" row drops, structured logs route to Vercel runtime logs, and custom metrics defer to Postgres events-log queries; all three hold. ⚠ **The instruction itself was never executable:** it named *"`CLAUDE.md` row 336 (Axiom)"*, and `CLAUDE.md` has no vendor table and no Axiom row — the stack inventory lives in `AGENTS.md` §1, which records **"Sentry + PostHog. Two-vendor. No Axiom."** So the consequence was satisfied by the correct document while the pointer aged against a line number in a file that never held it. Closed at SYNC-10; kept rather than deleted because a consequence that could not be closed as written is worth one sentence of evidence (O-8: fence by symbol, never by line).
 - **SPEC.2 §18 substance is now this ADR.** Future drafting passes on §18 reference this ADR rather than redefining.
 - **Testnet-phase reconsideration** is the natural place to revisit Axiom or another structured-log vendor if the experiment surfaces a real need that Vercel logs cannot serve.
 - **SPEC.1 §3 G3 K_eff dataset-derivability** removes any K_eff dashboard observability hooks from v1 (the K_eff dashboard itself was removed per SPEC.1 v1.1.0-draft). No alarm, no PostHog event, no Vercel-log dimension for K_eff in v1.
@@ -309,7 +309,7 @@ Both vendors are designed fail-open at the SDK level. The failure-mode profile:
 | SPEC.2 §1.4 #5 | Delegated decision (observability sub-bullet) | Observability vendor configuration + alarm catalogue + structured-log surface — ratified by this ADR |
 | SPEC.2 §18 (stub) | Observability Contract | **Substantively filled** by this ADR. Mints: vendor configuration (Sentry + PostHog), six-category Sentry alarm catalogue, PostHog `useFlag()` runtime contract, structured-log surface (Vercel runtime logs + code-level redaction discipline), failure-mode profile (fail open across the board), session-replay-disabled-in-v1 lock. **Back-pressure:** §18 stub is rewritten on the next §18 drafting pass to reference this ADR rather than restating; the stub's "projector lag" alarm is dropped (no projectors in v1 per ADR-0005); the stub's "structured Axiom log line" phrasing is replaced with "Vercel runtime log entry"; the stub's "Axiom" mentions are struck. |
 | SPEC.2 §22 (stub) | Operational Runbook Pointers | Consumes: the alarm catalogue minted here is the input to the per-alarm runbook entries `HARDEN.*` will produce. The failure-mode profile here aligns with ADR-0006's failure-mode profile and feeds the same runbook surface. |
-| SPEC.2 §23 | ADR Index | Status of ADR-0007 flips from `provisional` to `accepted` on this commit. |
+| SPEC.2 §22 | ADR Index | Status of ADR-0007 flips from `provisional` to `accepted` on this commit. |
 | SPEC.1 §16.3 H3 | Structured request log contract | Consumes: timestamp, user_id, route, status_code, IP, user_agent, latency_ms — served by Vercel runtime logs. Mints: code-level redaction discipline ("no request body, no response body" enforced as a code rule; CI lint flagged as a `HARDEN.*` task addition). |
 | SPEC.1 §15.2 widget #2 | Identity-pool low-watermark visibility | Consumes: 5%-of-pool threshold for the admin hub widget; this ADR mints the corresponding Sentry alarm (catalogue entry #5) so the admin doesn't need the dashboard open to know the pool is exhausting. |
 | SPEC.1 §3 G3 (post-amendment) | K_eff dataset-derivability | Consumes: no K_eff dashboard observability hooks in v1 per SPEC.1 v1.1.0-draft. No Sentry alarm, no PostHog event, no Vercel-log dimension for K_eff. The K_eff trajectory series ships in the public dataset only. |
@@ -347,8 +347,14 @@ Both vendors are designed fail-open at the SDK level. The failure-mode profile:
 - `AGENTS.md` §1 (stack — observability section to be updated)
 - `CLAUDE.md` rows 334 (Sentry), 335 (PostHog), 336 (Axiom — superseded by this ADR)
 - SPEC.1 §16.3 H3 (structured request log contract), §15.2 widget #2 (identity-pool low-watermark)
-- SPEC.2 §18 (Observability Contract — substantively filled), §22 (Operational Runbook Pointers — alarm catalogue feeds), §23 (ADR Index — status flip)
+- SPEC.2 §17 (Observability Contract — substantively filled), §21 (Operational Runbook Pointers — alarm catalogue feeds), §22 (ADR Index — status flip)
 
 ---
 
 *ADR-0007 ratifies the two-vendor observability surface (Sentry for error tracking + PostHog for analytics + feature flags) for the Zugzwang experiment phase, with Vercel runtime logs serving the SPEC.1 §16.3 H3 structured request log contract and a code-level redaction discipline (CI lint flagged as `HARDEN.*`) replacing middleware enforcement. The six-category Sentry alarm catalogue (append-only-trigger violation, DEFAULT-partition insert, 40001-retry exhaustion, OpenAI moderation upstream-failure rate, identity-pool low-watermark, per-vendor unavailability + cron job failure) mints alarm names with thresholds deferred to `HARDEN.*`. Sentry session-replay is disabled in v1. PostHog `useFlag()` runtime contract is fail-open with safe `defaultValue` discipline. Cost ceiling is single-tier $50/mo total (free tiers cover experiment scale), separate from ADR-0006's hosting tier. Axiom is dropped from v1 — testnet phase decides afresh. The decision body, the fail-open posture, the alarm catalogue names, the `useFlag()` contract, and the structured-log redaction discipline are immutable; superseding requires a new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy.*
+
+---
+
+## Patch record — 2026-09-05 · the repository-archive boundary is struck (D-21 / D-26)
+
+**D-21, as narrowed by D-26 (decision record amendment 2.2 / 2.3).** The experiment ends at the `2026-11-05 23:59 UTC` write-freeze (`system_state.frozen_at`) and this repository describes nothing after it. Two claims are therefore struck wherever they appeared above: the **`2026-11-08` repository-archive boundary**, and the **conference that used to justify the conclusion date**. Two date sites and one conference site. ⚠ **The decision itself is unchanged and its reasoning is not rewritten** — this ADR is a genesis-era record and stays one. Every argument here that leaned on *"the build has a hard end"* still holds; the hard end is simply the freeze, three days earlier, and never was the archive.

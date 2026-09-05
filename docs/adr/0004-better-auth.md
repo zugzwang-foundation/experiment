@@ -150,7 +150,7 @@ ADR-0011 (pseudonym pool, F-AUTH-3 substance) and SCAFFOLD.3 (auth wiring) consu
 
 ### Negative
 
-- **Younger track record than Clerk or Auth.js v4.** Better Auth shipped v1 in early 2025; ~16 months of production exposure as of this ADR. Mitigation: the build window ends 2026-11-08 with codebase archive; pin to a known-good patch version after launch and update only on CVE or required bugfix.
+- **Younger track record than Clerk or Auth.js v4.** Better Auth shipped v1 in early 2025; ~16 months of production exposure as of this ADR. Mitigation: the build window ends 2026-11-05; pin to a known-good patch version after launch and update only on CVE or required bugfix.
 - **No commercial SLA.** Support is community + maintainer-team via GitHub Issues and Discord; response time is observably hours-to-days, but there is no ticket-and-engineer-on-the-other-end. Acceptable because: build window is 1.75 months live, the library's core auth flow is small enough that critical-path bugs are reproducible quickly, and the AGPL codebase can fork-and-patch a Better Auth dependency if needed without licensing friction.
 - **`onAPIError.errorURL` is ignored on the OAuth callback path** (Better Auth issue #5518). The OAuth-callback failure redirect must be handled in an explicit `app/auth/error/page.tsx` that reads error query params and routes accordingly. Mitigated by: SCAFFOLD.3 owns the error page; one-time cost.
 - **Indefinite cookie lifetime is achieved by very-large `session.expiresIn` (~100 years), not a literal `Infinity`.** Combined with `disableSessionRefresh: true` to prevent sliding-window updates. Functionally indefinite for the build window (codebase archives Nov 2026); browsers cap visible cookie lifetime at ~400 days (Chrome) regardless of what the server sends, but the server-side row remains valid and the cookie is silently re-issued on next request. **(Corrected by Patch record P1: the ~100-year value is removed and `expiresIn` capped at 400 days; with `disableSessionRefresh: true` the cookie is not re-issued.)**
@@ -274,7 +274,7 @@ Sunset by maintainer in late 2024. Not a viable choice for a fresh build. Listed
 | SPEC.2 §8 (stub) | Authentication & Sessions shape | "Auth.js v5 + database session strategy" reference is invalidated by this ADR; back-pressure: §8 is rewritten on the next §8 drafting pass to name "Better Auth + Drizzle adapter + database session strategy" and the cookie name `zugzwang_session`. The two-parallel-cookie-systems and structural-separation rule is unchanged. |
 | SPEC.2 §11 (stub) | Rate-Limit & Idempotency Contract | Better Auth's `rateLimit.customRules` provides the per-endpoint rate-limit primitive consumed by §11 / ADR-0015. No back-pressure on §11 substance; specific window/cap values remain SPEC.1 number-tuning pass / ADR-0015 territory. |
 | SPEC.2 §18 (stub) | Sybil & Security Model | Cloudflare Turnstile token verification on `/email-otp/send-verification-otp` is implemented as a Better Auth `hooks.before` middleware on that path. Vendor configuration substance remains §18 / ADR-0004's scope (this ADR), per the SPEC.4 brief; this ADR ratifies that the integration shape is "Better Auth `hooks.before` calls Cloudflare siteverify before the OTP send fires." |
-| SPEC.2 §23 | ADR Index | Status of ADR-0004 flips from `provisional` to `accepted` on this commit. |
+| SPEC.2 §22 | ADR Index | Status of ADR-0004 flips from `provisional` to `accepted` on this commit. |
 | SPEC.1 §13 F-AUTH-1 | Google sign-in | Implemented via Better Auth `socialProviders.google` with scopes `openid email profile`; signup flow rejects `email_verified === false`. |
 | SPEC.1 §13 F-AUTH-2 | Email + OTP | Implemented via `emailOTP` plugin with Resend transport. |
 | SPEC.1 §13 F-AUTH-3 | Pseudonym assignment | Sequenced before session creation by the session-deferral hook minted in this ADR. ADR-0011 owns substance. |
@@ -308,3 +308,9 @@ Sunset by maintainer in late 2024. Not a viable choice for a fresh build. Listed
 ---
 
 *ADR-0004 ratifies Better Auth as the participant authentication library on the locked Google OAuth + Resend + Cloudflare Turnstile + Postgres + Drizzle vendor stack, with database session strategy, the participant cookie name `zugzwang_session`, Google OAuth scopes `openid email profile` with `email_verified` enforced, the official email-OTP plugin wired to Resend, and the session-deferral hook contract gating session creation on pseudonym + ToS. The decision body and the session-deferral hook constraint in §"Decision Outcome" are immutable; superseding requires a new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy.*
+
+---
+
+## Patch record — 2026-09-05 · the repository-archive boundary is struck (D-21 / D-26)
+
+**D-21, as narrowed by D-26 (decision record amendment 2.2 / 2.3).** The experiment ends at the `2026-11-05 23:59 UTC` write-freeze (`system_state.frozen_at`) and this repository describes nothing after it. Two claims are therefore struck wherever they appeared above: the **`2026-11-08` repository-archive boundary**, and the **conference that used to justify the conclusion date**. One date site, inside the Better Auth maturity mitigation. ⚠ **The decision itself is unchanged and its reasoning is not rewritten** — this ADR is a genesis-era record and stays one. Every argument here that leaned on *"the build has a hard end"* still holds; the hard end is simply the freeze, three days earlier, and never was the archive. The mitigation is if anything stronger: a shorter window is less exposure, not more.

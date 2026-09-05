@@ -137,7 +137,7 @@ left blank for the founder.
 | `docs/specs/RANKING.md` | the ranking function |
 | `docs/specs/debate-export.md` | the export format |
 | `docs/specs/flows/` | **37** normative flow specs — `F-AUTH-*`, `F-BET-*`, `F-COMMENT-*`, `F-DEBATE-*`, `F-MOD-*`, `F-RESOLVE-*`, `F-ADMIN-*` — plus a `README.md` (`ls docs/specs/flows/F-*.md \| wc -l` → 37) |
-| `docs/adr/` | 43 decisions, `0001`–`0045`. **On conflict with a spec, the ADR wins** |
+| `docs/adr/` | **44** decisions, `0001`–`0046` — 0002 and 0012 unused, so read the highest number and never count (`ls docs/adr/`). **Precedence (D-22): decision record → `SPEC.1` → `SPEC.2` → ADRs → tracker.** An ADR loses to either spec, and all three lose to the decision record — the ADRs were written at product genesis, before the goal was settled |
 | `CLAUDE.md` | the build contract — invariants, refusal triggers, workflow, **O-space** (§8), the branch-protection measurement (§5.13) |
 | `AGENTS.md` | stack patterns — descriptive, tracks the repo |
 | `docs/parked.md` | the deferred docket, and the SEQUENCE table of rows whose trigger has fired |
