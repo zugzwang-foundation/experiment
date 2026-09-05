@@ -787,10 +787,10 @@ Literal and checkable. STAGING-PARITY is not done until **all six** pass from a 
   **Candidate:** merge #295 before STAGING-PARITY execute begins. This plan PR is independent of it and can merge in either order.
   **Resolve with:** operator, before Slice A.
 
-- **OQ-4 · Ranking constants pin on 2026-09-01.**
+- **OQ-4 · Ranking constants pin at the number-tuning pass.**
   **Q:** C3 and C4's shapes are calibrated against `kLane = 3` and floors `n ≥ 5 · D ≥ 200 · n^b ≥ 3`, every one labelled *"pre-tuning placeholder — NOT final; pins 2026-09-01"* (`src/lib/ranking.config.ts:30–38`). The number-tuning pass will move them.
-  **Candidate:** accept the rework. Build C3/C4 against today's constants, and add a line to the tuning task's scope: *re-run `staging:gates` and re-calibrate M2/M3 after the pin*. The alternative — waiting for 2026-09-01 — blocks all eight POLISH surfaces for four weeks.
-  **Resolve with:** this plan section; noted for the 2026-09-01 tuning task.
+  **Candidate:** accept the rework. Build C3/C4 against today's constants, and add a line to the tuning task's scope: *re-run `staging:gates` and re-calibrate M2/M3 after the pin*. The alternative — waiting for that pass — blocks all eight POLISH surfaces for four weeks.
+  **Resolve with:** this plan section; noted for the number-tuning task.
 
 - **OQ-5 · Does `settleMarket` on M7 leave `positions` rows at `quantity > 0`?**
   **Q:** Gate 6 asserts zero `bets.share_quantity = 0`. Settlement pays out but does not obviously zero the position. If settled positions retain quantity, Q3's "settled position" shape and G6 are both satisfied; if settlement writes a zeroing row, the interaction with SP-2's future `CHECK` needs stating.
@@ -940,11 +940,11 @@ The estimate does **not** gain a session.
 manifest is on `main` and staging is advanced to it. The Tracker-context and
 References entries reading "arriving via PR #295" are superseded (§4).
 
-**OQ-4 · Ranking constants pin 2026-09-01 — ACCEPT THE REWORK, as a tracker row.**
+**OQ-4 · Ranking constants pin at the number-tuning pass — ACCEPT THE REWORK, as a tracker row.**
 Accepting rework is only reasonable because the generator is clean-recreate: a
 re-run, not a rebuild. That makes it schedulable rather than hopeful.
 **Action: add a row to the HARDEN.5 number-tuning task — "re-run
-`staging:rebuild` and re-calibrate M2/M3 after the pin."** Waiting for 2026-09-01
+`staging:rebuild` and re-calibrate M2/M3 after the pin."** Waiting for that pass
 would block all eight POLISH surfaces for four weeks and is rejected.
 
 **OQ-5 · `settleMarket` and `positions.quantity` — CORRECTLY DEFERRED.** Read

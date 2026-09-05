@@ -196,7 +196,7 @@ rows after the rebuild** — the instrument STEP 8a preserved. Verbatim:
 `2 post(s) … 0 badge(s) fired`, over a substrate with real replies.
 
 `ranking.config.ts` was **not touched**. Those constants are ratified and pin at
-2026-09-01; the fixture table moved instead, which is the correct direction.
+the number-tuning pass; the fixture table moved instead, which is the correct direction.
 
 ---
 

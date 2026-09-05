@@ -42,7 +42,7 @@ Operator: deploy this branch to staging, run `doppler run --config stg -- pnpm t
 
 ## Context to preserve
 - `loadDebateView` is the single masking trust boundary — `listMarketComments` must not back a public surface without it (SPEC.2 §5.4). Masking keys on `content_removed` ONLY (NOT `banned_at`).
-- Ranking floors are pre-tuning placeholders (`floorLane.n=5`, `kLane=3`; `ranking.config.ts`), pinned 2026-09-01.
+- Ranking floors are pre-tuning placeholders (`floorLane.n=5`, `kLane=3`; `ranking.config.ts`), pinned at the number-tuning pass.
 - D6 coupling: revisit the title-source if the write slice adds `comments.title`. D7: `@entry%`/`→now` deferred (substrate LATERAL / valuation compute).
 - **Doc drift for the next SYNC sweep (NOT folded this task):** AGENTS.md §3 still calls `src/server/comments/` greenfield (it exists) and `(public)/m/[slug]` a placeholder (it is now the debate view); `src/server/debate-view/` gained 5 modules. Descriptive-doc drift — reconcile at the sweep, not per-task (CLAUDE.md §7).
 

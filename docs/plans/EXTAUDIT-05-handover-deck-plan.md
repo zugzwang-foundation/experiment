@@ -23,7 +23,7 @@ complete). No code changes ride this task except the deliverables listed in §1.
 | First-parent commit census | **218 commits** = root `4f4d746` + **217 squash-merged PRs #1–#219** (gaps: #58, #146 closed-unmerged; zero duplicate PR numbers — script-verified) |
 | Suffix-less commits resolved | `02f87ac` → PR #143, `e61a733` → PR #144, `b724094` → PR #178 (via `commits/{sha}/pulls`); root `4f4d746` pre-dates the PR flow |
 | Link base | `https://github.com/zugzwang-foundation/experiment` (remote verified; kickoff's repo name correct) |
-| Doc-canon versions | SPEC.1 **1.0.14** · SPEC.2 **1.0.17** · cpmm.md **2.0.0** · RANKING.md **v1.0.0-draft** (constants defer to the 2026-09-01 tuning pass) · ADR census **29 files** = 0001 + 0003–0011 + 0013–0031 (0002 never authored; 0012 in-flight, no file — matches SYNC-SWEEP §6 ceilings). Kickoff said "ADR 0001–0031"; the deck states the real 29-file census. |
+| Doc-canon versions | SPEC.1 **1.0.14** · SPEC.2 **1.0.17** · cpmm.md **2.0.0** · RANKING.md **v1.0.0-draft** (constants defer to the number-tuning pass) · ADR census **29 files** = 0001 + 0003–0011 + 0013–0031 (0002 never authored; 0012 in-flight, no file — matches SYNC-SWEEP §6 ceilings). Kickoff said "ADR 0001–0031"; the deck states the real 29-file census. |
 | Environments (from DP-1.md, D5.md, #194 incident log) | staging = `f0be380` (#216 squash) with migrations **0020–0023 applied and health-proven** (DP.1); prod = last promoted at D5/D6 arc, DB through **0019** (incident remediation), **3 doc-commits + 4 migrations behind** — **DP.2 pending**. Deck states this divergence honestly. |
 | Test estate | 220 test files: unit 41 · server 114 · integration 20 · invariants 10 · db 19 · scale 14 · _setup 2. Migrations: 24 (0000–0023). `src/server/` has 22 domain dirs. Crons: 3 Vercel (`vercel.json`) + pg_cron (0007, 0011). Workflows: `ci.yml`, `env-audit.yml`, `staging-migrate.yml`. |
 
@@ -134,7 +134,7 @@ therefore exact by construction (§2 sums to 218).
 | C4 | Crons & runbooks: 3 Vercel crons (close-due-markets 1min, alarms-drain 5min, r2-orphan-sweep 6h) + pg_cron (0007, 0011); runbook index (deploy-pipeline, BREAK_GLASS, dataset-release, moderation-smoke, staging-provisioning) | vercel.json, docs/runbooks/ |
 | C5 | Test architecture: 220 files by tier; invariant-spec naming (`I-<AREA>-NNN`); the 10 invariant specs; trigger backstops; ENGINE.10 scale gate (tests/scale, 8 suites) | AGENTS.md §9 |
 | C6 | Security posture: admin/participant structural separation, moderation fail-closed + CSAM stance, append-only storage guarantees, AUDIT campaign summary (~40 findings remediated across #197–#216) + **cross-refs into EXTAUDIT-01/03/04** (never duplicating their verification content) | CLAUDE.md §2–§3, AUDIT logs, EXTAUDIT package |
-| C7 | Forward state: v16 ceilings baseline (SYNC-SWEEP.md §6), parked.md ledger, what testing-phase readiness means (DP.2, number-tuning 2026-09-01, conclusion freeze 2026-11-05) | SYNC-SWEEP.md, parked.md, SPEC.1 |
+| C7 | Forward state: v16 ceilings baseline (SYNC-SWEEP.md §6), parked.md ledger, what testing-phase readiness means (DP.2, number-tuning at its own pass, conclusion freeze 2026-11-05) | SYNC-SWEEP.md, parked.md, SPEC.1 |
 
 **Total estimate: ~2,700 lines .md** (Part A 350 + Part B 1,835 + Part C 450 + front-matter/index/
 epilogue ~65). HTML ≈ 4,500–5,500 lines self-contained. Tolerance ±20%; thinning order if the

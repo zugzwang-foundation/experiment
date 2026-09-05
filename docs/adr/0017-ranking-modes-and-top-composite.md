@@ -51,7 +51,7 @@ Read the body below through these reconciliations:
 
 In-place Patch record per CLAUDE.md §5.12 (refines the **Top default's order**; **not** supersession). **The load-bearing decisions are unchanged** — the multi-lane "Top" composite, the single-axis filter modes, reply ranking by stake-descending-within-side, shared time-decay, author-stake as seed-and-tiebreaker, read-time computation, and the v1 ship set all stand. This patch adds one element to the Top default and records the rationale, because it touches a property this ADR locked under **Decision Outcome → "Default is fixed, not shuffled."**
 
-**The change.** The **Top** default order interleaves the **newest post not yet shown** at a fixed positional cadence: after every `LATEST_INTERLEAVE_INTERVAL` ranked posts, the next position is filled by the most recent post (by `created_at`) that has not already appeared higher in the list; ranking then resumes. The cadence constant `LATEST_INTERLEAVE_INTERVAL` is owned by `RANKING.md` and pinned at the 2026-09-01 number-tuning pass (placeholder until then), per the number-tuning rule.
+**The change.** The **Top** default order interleaves the **newest post not yet shown** at a fixed positional cadence: after every `LATEST_INTERLEAVE_INTERVAL` ranked posts, the next position is filled by the most recent post (by `created_at`) that has not already appeared higher in the list; ranking then resumes. The cadence constant `LATEST_INTERLEAVE_INTERVAL` is owned by `RANKING.md` and pinned at the number-tuning pass (placeholder until then), per the number-tuning rule.
 
 **Scope of the change (deliberately narrow):**
 
@@ -105,13 +105,13 @@ The forces at play:
 - **ADR-0005 §4 read-time-computed classification.** Ranking is read-time-computed (no projection table, no materialised view). The model reads from `comments` + `bets` (+ `friendly_fire_events` only where a mode uses it) per page render. Any input must be available on those tables (frozen at write or read-time-aggregable).
 - **Performance budget.** Debate view is a hot path. Lane aggregation runs per market render. SQL aggregation dominates; per-post compute must be O(1) and IO-free.
 - **Frozen-at-resolution requirement.** Per SPEC.1 §11 + INV-4, resolved markets are immutable. Ranking must freeze with the market — auditors must reproduce the rendered order at any past resolution moment.
-- **Number-tuning deferral rule.** Project standing rule: specific weight, ratio, and threshold values lock at the number-tuning pass (target 2026-09-01) against dogfooded markets, not at design time. This ADR locks **shape and design-intent ordering only**.
+- **Number-tuning deferral rule.** Project standing rule: specific weight, ratio, and threshold values lock at the number-tuning pass against dogfooded markets, not at design time. This ADR locks **shape and design-intent ordering only**.
 
 This ADR resolves: the per-side data model the ranking reads; the fresh-post default ("Top") and its multi-lane mechanism; the single-axis filter modes; the reply ranking rule; the v1 ship set; and the behavioural properties. Specific numeric values are deferred per the number-tuning rule.
 
 This ADR does **not** decide:
 
-- Specific values for any lane ratio threshold `k_lane`, any activity floor `floor_lane`, the gravity exponent `g`, the recency offset `c`, or the Surging window length — pinned by the number-tuning pass (target 2026-09-01), then locked in `RANKING.md` before public launch.
+- Specific values for any lane ratio threshold `k_lane`, any activity floor `floor_lane`, the gravity exponent `g`, the recency offset `c`, or the Surging window length — pinned by the number-tuning pass, then locked in `RANKING.md` before public launch.
 - The debate-view UI rendering (visual treatment of the Top list, the filter selector, the two-slot reply pair, mobile layout) — ADR-0012 (`design.md`, SPEC.13) + DEBATE.4 + DEBATE.8.
 - **Filters** (subsetting the post set — by tag, status, etc., distinct from *ranking* which orders the set) — a separate SYNC.7/8 refinement, explicitly out of scope here.
 - The cache profile at the rendered-page layer — ADR-0007 + DEBATE.4.
@@ -281,7 +281,7 @@ Per ADR-0005 §4, ranking is read-time-computed. No `ranking_snapshots` table, n
 |---|---|
 | Model specification (modes, Top lanes + margin shape, decay, reply rule, behavioural properties, worked example, thresholds) | `experiment/docs/specs/RANKING.md` |
 | Model implementation (pure TypeScript, no IO) | `src/lib/ranking.ts` |
-| Tunable values (post-2026-09-01) — `k_lane`, `floor_lane` per lane, `c`, `g`, Surging window | `RANKING.md` (pinned values); `src/lib/ranking.config.ts` (runtime config) |
+| Tunable values (pinned at the number-tuning pass) — `k_lane`, `floor_lane` per lane, `c`, `g`, Surging window | `RANKING.md` (pinned values); `src/lib/ranking.config.ts` (runtime config) |
 | Lane / mode aggregation index DDL | `drizzle/migrations/<NNNN>_ranking_indexes.sql` (SCAFFOLD.2 deliverable) |
 
 ## Consequences
@@ -299,7 +299,7 @@ Per ADR-0005 §4, ranking is read-time-computed. No `ranking_snapshots` table, n
 ### Negative
 
 - **Reply ranking is pure C-axis.** (See the boxed Known Tension.) Accepted consequence of depth-1 + no-free-votes; recorded, not hidden; narrow (reply-level only).
-- **Specific numbers deferred.** Until the 2026-09-01 number-tuning pass pins `k_lane`, `floor_lane`, `c`, `g`, the model cannot render real orders (placeholder constants only). Mitigated: the tuning pass is on the critical path before launch; this ADR's shape + design-intent ordering is sufficient to implement against placeholders.
+- **Specific numbers deferred.** Until the number-tuning pass pins `k_lane`, `floor_lane`, `c`, `g`, the model cannot render real orders (placeholder constants only). Mitigated: the tuning pass is on the critical path before launch; this ADR's shape + design-intent ordering is sufficient to implement against placeholders.
 - **Stale-blowout edge is tuning-sensitive.** The split lane must not resurface an old, dead, lopsided post. Handled by gating split on `n` and by the closest-to-landslide fallback's freshness pressure — but whether the dominance margin needs an explicit decay term is a tuning-pass call. Flagged so it is not discovered in production.
 - **No filter tabs beyond the named modes.** No personalised or reader-tunable variants beyond mode selection. Acceptable: the platform's stance is "ranking is opinionated"; an unbounded sort-menu is an engagement-platform default, not a knowledge-platform one. Filters (set-subsetting) are a separate SYNC.7/8 refinement.
 - **Order changes per render (decayed modes).** Time-decay means a post can drift down between renders as hours pass. A property of the function class (HN, every time-decay ranker), not a bug; `RANKING.md` states it explicitly.
@@ -464,7 +464,7 @@ Per ADR-0005 §4, ranking is read-time-computed. No `ranking_snapshots` table, n
 
 ---
 
-*ADR-0017 supersedes ADR-0009 and ratifies a multi-mode ranking model: a fixed multi-lane "Top" default (dominate any lane by a relative margin over second place, all lanes equal including stake), single-axis filter modes (Most Debated, Highest Stakes, Contested, Newest; Surging deferred to v1.x), and reply ranking by stake within side (depth = 1). The model shape, lane set, margin shape (ratio-to-#2 above an activity floor), design-intent mode order, and behavioural properties are immutable; superseding requires a new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy. Specific numeric values (`k_lane`, `floor_lane`, `c`, `g`, Surging window) defer to the 2026-09-01 number-tuning pass and pin in `RANKING.md` before public launch. The ranking carries no anti-capital logic by design — K · n > C is upheld by the mandatory-commentary floor operating in the open, not by ranking-level suppression of capital.*
+*ADR-0017 supersedes ADR-0009 and ratifies a multi-mode ranking model: a fixed multi-lane "Top" default (dominate any lane by a relative margin over second place, all lanes equal including stake), single-axis filter modes (Most Debated, Highest Stakes, Contested, Newest; Surging deferred to v1.x), and reply ranking by stake within side (depth = 1). The model shape, lane set, margin shape (ratio-to-#2 above an activity floor), design-intent mode order, and behavioural properties are immutable; superseding requires a new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy. Specific numeric values (`k_lane`, `floor_lane`, `c`, `g`, Surging window) defer to the number-tuning pass and pin in `RANKING.md` before public launch. The ranking carries no anti-capital logic by design — K · n > C is upheld by the mandatory-commentary floor operating in the open, not by ranking-level suppression of capital.*
 
 ---
 

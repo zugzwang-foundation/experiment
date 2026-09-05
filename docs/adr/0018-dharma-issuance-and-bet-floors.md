@@ -6,7 +6,7 @@
 | **Date** | 2026-06-01 |
 | **Deciders** | Hrishikesh Manoj Hundekari |
 | **Tracker task** | SYNC.5 (issuance ruling — the gate item) |
-| **Frame document** | SPEC.1 (product surface: economy, bet floors); SPEC.2 §22 (ADR Index); number-tuning pass (2026-09-01) |
+| **Frame document** | SPEC.1 (product surface: economy, bet floors); SPEC.2 §22 (ADR Index); number-tuning pass |
 | **Supersedes** | — (supersedes the informally-documented "fixed signup grant + daily login credit" draft, which was never ratified into a spec or ADR) |
 | **Superseded-by** | — |
 
@@ -30,7 +30,7 @@ This ADR resolves the three issuance parameters the experiment must ship with:
 
 This ADR does **not** decide:
 
-- **Final pinned values** for the initial grant, the daily credit, or the post-level minimum bet — these are launch *intents* / *ranges* here; the number-tuning pass (2026-09-01) ratifies or adjusts them against dogfooded markets, then pins in the relevant config before launch. (The reply floor is pinned as a founder policy value — see Decision Outcome — but remains tuning-pass-revisable.)
+- **Final pinned values** for the initial grant, the daily credit, or the post-level minimum bet — these are launch *intents* / *ranges* here; the number-tuning pass ratifies or adjusts them against dogfooded markets, then pins in the relevant config before launch. (The reply floor is pinned as a founder policy value — see Decision Outcome — but remains tuning-pass-revisable.)
 - **Sybil / identity gating** (phone verification, OAuth-only, vouching) — deprioritized for the experiment; reconsider at testnet.
 - **The optional in-window sink design** (amplify-a-market, seed-a-market, etc.) — this ADR rules the *principle* that at least one sink is desirable; the mechanism is a SYNC.7/8 product-spec question or a future ADR.
 - **Issuance ledger mechanics** — how grants/credits are written as events (INV-1/INV-2 append-only ledger) — SPEC.2 §5/§7 + the engine work in `src/server/dharma` (absent, forward).
@@ -118,7 +118,7 @@ The informally-documented "~10,000 grant / ~1,000-per-day / 100 minimum" draft i
 | Two-instrument architecture | Artha vs Dharma | Consumes: participant scope is Dharma-only; Artha (MM instrument) is untouched. Issuance here is participant Dharma only. |
 | INV-1 / INV-2 (append-only Dharma ledger, balance ≥ 0) | SPEC.2 §5, ADR-0005 | Consumes: grants and daily credits are issuance events on the append-only ledger; the engine mechanics (`src/server/dharma`, absent/forward) implement them. Minimum-bet enforcement is a write-path check in the bet handler. |
 | K · n > C | Thesis | Consumes: issuance defines the *cost of one unit of `n`*; faucet discipline protects the signal value of staked Dharma; the reply floor protects the K-side of reply-level participation against runaway C. |
-| Number-tuning pass (2026-09-01) | Project standing rule | **Mints** tuning-pass items: ratify/adjust initial grant, daily credit, post floor; re-examine reply floor = 50; decide the optional-sink mechanism or the faucet-tightening fallback; set the median-free-balance monitoring threshold. |
+| Number-tuning pass | Project standing rule | **Mints** tuning-pass items: ratify/adjust initial grant, daily credit, post floor; re-examine reply floor = 50; decide the optional-sink mechanism or the faucet-tightening fallback; set the median-free-balance monitoring threshold. |
 | SPEC.2 §22 (ADR Index) | ADR index | **Mints** an ADR-0018 entry (same SYNC.7/8 commit). |
 | Tracker | SYNC.5 (this ADR), SYNC.7/8 (SPEC.1 economy rewrite, SPEC.2 §23), ADR backfill (commit this file), number-tuning pass | All consume this ADR being accepted. |
 
@@ -131,4 +131,4 @@ The informally-documented "~10,000 grant / ~1,000-per-day / 100 minimum" draft i
 
 ---
 
-*ADR-0018 ratifies Zugzwang's experiment-phase Dharma issuance: an equal initial grant (~1,000, ranged), a small flat daily credit (~10, paid only on a commented bet, never escalating), at least one optional in-window sink, and — the load-bearing decision — **two asymmetric minimum-bet floors with the reply floor (pinned at 50) set higher than the post floor (low, ranged)**, because the reply floor is the only remaining parameter-level lever on the reply-level C > n that ADR-0017 conceded. Sybil identity gating is deliberately out of experiment scope. All values except the reply-floor pin defer to the 2026-09-01 number-tuning pass; the reply-floor pin is founder policy and remains tuning-pass-revisable. The schedule upholds K · n > C by keeping staked Dharma scarce enough to signal in a window with a faucet but no loss-sink.*
+*ADR-0018 ratifies Zugzwang's experiment-phase Dharma issuance: an equal initial grant (~1,000, ranged), a small flat daily credit (~10, paid only on a commented bet, never escalating), at least one optional in-window sink, and — the load-bearing decision — **two asymmetric minimum-bet floors with the reply floor (pinned at 50) set higher than the post floor (low, ranged)**, because the reply floor is the only remaining parameter-level lever on the reply-level C > n that ADR-0017 conceded. Sybil identity gating is deliberately out of experiment scope. All values except the reply-floor pin defer to the number-tuning pass; the reply-floor pin is founder policy and remains tuning-pass-revisable. The schedule upholds K · n > C by keeping staked Dharma scarce enough to signal in a window with a faucet but no loss-sink.*

@@ -119,7 +119,7 @@ At the ENGINE.10 close, the post-phase sweep ran and produced the v13 tracker:
 - **`friendly_fire_events` physical drop — DEBATE.9.** The table + append-only trigger are built but orphaned by the ADR-0017 reply-as-bet model; **intentionally still present**, dropped (with the vestigial `stake_at_post_time` column + stale index) at DEBATE.9.
 - **Reply-as-bet LOAD half — deferred to the post-DEBATE.2 k6 stratum** (ENGINE.10 Q-1). The side-bind *correctness* half is covered; the reply-posting *load* half (50 Đ floor + aggregates) is not yet.
 - **Single-side × Counter foreclosure (engine→debate seam).** F-BET-10 forecloses the opposite Support/Counter affordance based on the viewer's held side; ruling (1a): **disable-and-explain** the foreclosed side (DEBATE.2 write-path enforcement + the read/UI surface; new item on the DESIGN.5 lock checklist).
-- **Number-tuning pass — HARDEN.5 (~2026-09-01).** Pins all ranged economy values (post floor, grant ~1,000, daily ~10) + rate-limit + moderation thresholds.
+- **Number-tuning pass — HARDEN.5.** Pins all ranged economy values (post floor, grant ~1,000, daily ~10) + rate-limit + moderation thresholds.
 - **PhotoDNA CSAM onboarding — deferred/parked.** DEBATE.7 wires OpenAI `omni-moderation-latest` (multimodal) only for v1; PhotoDNA hash-match is an operator pre-launch gate.
 - **PARKED (Testnet/Mainnet scope, not tracker rows — see `parked.md`):** 50k literal-scale work and the per-user cooldown lever (carries an ADR-level / thesis caveat).
 

@@ -7,7 +7,7 @@ cpmm.md §10 · `src/server/config/limits.ts` · `src/server/cpmm/decimal.ts` ·
 
 The system runs on a small set of named constants. Three classes: **PINNED** (the value is
 ratified — treat a different value as a finding), **DEFERRED** (symbolic; the shipped number
-is a placeholder owned by the 2026-09-01 number-tuning pass — do **not** file placeholder
+is a placeholder owned by the number-tuning pass — do **not** file placeholder
 values as findings), and **PROVISIONAL-OPS** (real ratified values that a HARDEN pass may
 retune — operational, not economic).
 
@@ -35,7 +35,7 @@ retune — operational, not economic).
 | `RESERVATION_TTL_SECONDS` | 10 s (the moderation SETNX reservation) | `limits.ts` · SPEC.2 §10.10 |
 | Idempotency-Key format | `^[A-Za-z0-9_-]{1,255}$`, required on bet endpoints; SHA-256 canonical-JSON body fingerprint | SPEC.2 §4.4 · ADR-0015 |
 
-## 2 · DEFERRED — symbolic until the 2026-09-01 number-tuning pass
+## 2 · DEFERRED — symbolic until the number-tuning pass
 
 SPEC.1 §19 Q4/Q16 and Appendix B hold this list as `TBD`. Where code ships a number today,
 it is a **labelled placeholder** (JSDoc in `limits.ts` names the tuning owner per value).
@@ -81,7 +81,7 @@ it is a **labelled placeholder** (JSDoc in `limits.ts` names the tuning owner pe
 | `ORPHAN_SWEEP_LOCK_TTL_SECONDS` / `ORPHAN_SWEEP_CIRCUIT_BREAKER_THRESHOLD` / `ORPHAN_SWEEP_BATCH_SIZE` | 600 s / 5 / 100 | `limits.ts` (SCAFFOLD.15) |
 
 **Reading rule:** if a probe's result depends on a §2 value, state the dependency —
-"holds at the shipped placeholder; re-check after 2026-09-01 tuning" — rather than
+"holds at the shipped placeholder; re-check after the number-tuning pass" — rather than
 treating the placeholder as contract.
 
 ---
