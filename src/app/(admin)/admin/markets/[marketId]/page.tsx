@@ -100,7 +100,10 @@ export default async function MarketDetailPage(props: {
 						<h2>Seed pool (open market)</h2>
 						<input type="hidden" name="marketId" value={marketId} />
 						<label>
-							Seed amount <input name="seedAmount" required />
+							Opening YES price <input name="openingPriceYes" required />
+						</label>
+						<label>
+							Tank <input name="tank" required />
 						</label>
 						<button type="submit">Seed &amp; open</button>
 					</form>
