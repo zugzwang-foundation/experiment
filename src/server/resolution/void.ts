@@ -13,7 +13,7 @@ import { assertAdminActor } from "@/server/admin/actor";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { appendLedgerRow, readBalance } from "@/server/dharma/persist";
 import { insertEvent } from "@/server/events/insert";
-import { loadMarketDiscards } from "@/server/markets/backing";
+import { requireMarketDiscards } from "@/server/markets/backing";
 import { transition } from "@/server/markets/transitions";
 
 import { assertStrictlyPositive, refundBasis } from "./basis";
@@ -188,7 +188,7 @@ export async function voidMarket(args: {
 			// Read on THIS tx, under the pool lock already held (§Wrapper b). A
 			// second connection would read outside the lock and could see a
 			// different world than the one being voided.
-			const discards = await loadMarketDiscards(tx, args.marketId);
+			const discards = await requireMarketDiscards(tx, args.marketId);
 			let yesHeld = new CpmmDecimal(0);
 			let noHeld = new CpmmDecimal(0);
 			for (const position of positionRows) {

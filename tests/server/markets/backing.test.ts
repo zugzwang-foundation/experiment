@@ -13,6 +13,7 @@ import {
 	loadMarketDiscards,
 	openingBacking,
 	readOpenedReserves,
+	requireMarketDiscards,
 } from "@/server/markets/backing";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
@@ -246,8 +247,15 @@ describe("markets/backing — the single market.opened reader (LIQ-1 T6b)", () =
 		// The expected values are the OLDEST row's (`OPENED_AT` < `OPENED_AT_2`),
 		// matching `replayReserveSeries`'s `ORDER BY created_at ASC LIMIT 1` — so
 		// the chart and the payout can never describe different markets.
+		// ⛔ THE NEWER ROW IS INSERTED FIRST, DELIBERATELY. An unordered `LIMIT 1`
+		// returns the physically-first row, so inserting oldest-first would let an
+		// implementation that KEEPS `.limit(1)` but DROPS `.orderBy(...)` return the
+		// right answer by accident and pass. Inserting newest-first makes the
+		// ordering load-bearing: without it this reads 125 / 80500 and reds.
+		// (`@code-reviewer` M-1 — the previous arrangement pinned the cap but not
+		// the ORDER, and the order is the half that stops the chart and the payout
+		// describing different markets.)
 		const marketId = uuidv7();
-		await insertOpenedRow(marketId, asymmetricPayload(marketId), OPENED_AT);
 		await insertOpenedRow(
 			marketId,
 			asymmetricPayload(marketId, {
@@ -256,12 +264,47 @@ describe("markets/backing — the single market.opened reader (LIQ-1 T6b)", () =
 			}),
 			OPENED_AT_2,
 		);
+		await insertOpenedRow(marketId, asymmetricPayload(marketId), OPENED_AT);
 
 		const discards = await loadMarketDiscards(testDb, marketId);
 
 		// The first row's discards, NOT the sum of both.
 		expect(eq(discards.yes, "0")).toBe(true);
 		expect(eq(discards.no, "80000")).toBe(true);
+	});
+
+	it("backing::require-discards-THROWS-when-the-genesis-row-is-absent", async () => {
+		// ⛔ THE POINT OF THE SECOND ENTRY POINT. `loadMarketDiscards` answers
+		// (0,0) here, which is right for a Draft market and for the scale
+		// harnesses' synthetic pools. For `settleMarket` it would mean writing
+		// `poolUnwindAmount = w` — a D-14 NO outcome under-reported by 80,000 Đ —
+		// onto a terminal, append-only row, with no cross-assert behind it and no
+		// way to correct it. Void survives that (its cross-assert catches the gap);
+		// settle does not, which is why they cannot share the tolerant read.
+		const marketId = uuidv7();
+
+		await expect(requireMarketDiscards(testDb, marketId)).rejects.toThrow(
+			/no market\.opened event/,
+		);
+
+		// The CONTROL: the tolerant read is still tolerant on the same market.
+		// Without this the assertion above could pass because both functions
+		// throw, which would break every scale harness rather than fix settle.
+		const tolerant = await loadMarketDiscards(testDb, marketId);
+		expect(eq(tolerant.yes, "0")).toBe(true);
+		expect(eq(tolerant.no, "0")).toBe(true);
+	});
+
+	it("backing::require-discards-agrees-with-the-tolerant-read-when-a-row-exists", async () => {
+		// The two must differ ONLY on the absent case. If they diverge on a
+		// present row, settle and the harnesses are reconciling different books.
+		const marketId = uuidv7();
+		await insertOpenedRow(marketId, asymmetricPayload(marketId), OPENED_AT);
+
+		const strict = await requireMarketDiscards(testDb, marketId);
+		const tolerant = await loadMarketDiscards(testDb, marketId);
+		expect(strict).toEqual(tolerant);
+		expect(eq(strict.no, "80000")).toBe(true);
 	});
 
 	it("backing::load-discards-is-scoped-to-its-own-market", async () => {

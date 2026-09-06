@@ -13,7 +13,7 @@ import { assertAdminActor } from "@/server/admin/actor";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { appendLedgerRow, readBalance } from "@/server/dharma/persist";
 import { insertEvent } from "@/server/events/insert";
-import { loadMarketDiscards } from "@/server/markets/backing";
+import { requireMarketDiscards } from "@/server/markets/backing";
 
 import { applySideBasis, assertStrictlyPositive } from "./basis";
 import {
@@ -201,7 +201,7 @@ export async function settleMarket(args: {
 			// no holder to pay and nowhere else to go.
 			//
 			// Same tx, same held pool lock as void's read, for the same reason.
-			const discards = await loadMarketDiscards(tx, args.marketId);
+			const discards = await requireMarketDiscards(tx, args.marketId);
 			const winningReserve =
 				args.winningSide === "YES" ? pool.yesReserves : pool.noReserves;
 			const poolUnwindAmount = new CpmmDecimal(winningReserve)

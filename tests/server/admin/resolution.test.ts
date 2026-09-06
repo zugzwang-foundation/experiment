@@ -42,6 +42,7 @@ import { settleMarket } from "@/server/resolution/settle";
 import { triggerResolution } from "@/server/resolution/trigger";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { attachGenesisEvent } from "../../db/_fixtures/genesis";
 import { truncateTables } from "../../db/_fixtures/truncate";
 
 const ADMIN_COOKIE_NAME = "zugzwang_admin_session";
@@ -122,6 +123,11 @@ async function seedMarketWithPool(
 		yesReserves: SEED_RESERVES,
 		noReserves: SEED_RESERVES,
 	});
+	// The genesis event a directly-inserted pool would otherwise lack.
+	// `settleMarket`/`voidMarket` read the ADR-0047 discard terms from it and
+	// fail closed without it — a fixture with no `market.opened` builds a state
+	// `openMarket` cannot produce (I-GENESIS-001).
+	await attachGenesisEvent({ marketId, seedAmount: SEED_RESERVES });
 	return marketId;
 }
 
@@ -237,11 +243,18 @@ describe("ENGINE.9 F-ADMIN-3 — triggerResolution (W-3a)", () => {
 				.from(markets)
 				.where(eq(markets.id, marketId));
 			expect(marketRow?.status).toBe(status);
+			// The rejection must write NO event. Excluding `market.opened` is not a
+			// loosening: the fixture emits one because a market cannot reach Open
+			// without it (I-GENESIS-001), and this assertion is about what the
+			// REJECTED trigger did, not about what the fixture built. Asserting the
+			// whole table is empty only worked while the fixture was unfaithful.
 			const eventRows = await testDb
-				.select({ eventId: events.eventId })
+				.select({ eventId: events.eventId, eventType: events.eventType })
 				.from(events)
 				.where(eq(events.aggregateId, marketId));
-			expect(eventRows.length).toBe(0);
+			expect(eventRows.filter((r) => r.eventType !== "market.opened")).toEqual(
+				[],
+			);
 			const resolutionRows = await testDb
 				.select({ id: resolutionEvents.id })
 				.from(resolutionEvents)
@@ -477,9 +490,14 @@ describe("resolveMarketAction wire surface", () => {
 		if (result.ok) throw new Error("unreachable — asserted not-ok above");
 		expect(result.error.code).toBe("admin_session_required");
 
-		// Zero writes: status unchanged, no market events.
+		// Zero writes: status unchanged, and no event the ACTION would have
+		// written. `market.opened` is the fixture's genesis row — a market cannot
+		// be Closed without having been Open, and Open implies that row
+		// (I-GENESIS-001). Excluding it keeps the assertion about the rejection.
 		expect(await marketStatusOf(marketId)).toBe("Closed");
-		expect((await eventTypesFor(marketId)).length).toBe(0);
+		expect(
+			(await eventTypesFor(marketId)).filter((t) => t !== "market.opened"),
+		).toEqual([]);
 	});
 });
 

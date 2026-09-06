@@ -105,7 +105,7 @@ export function openingBacking(r: OpenedReserves): string {
 }
 
 /**
- * Cumulative discards per side for one market, summed from its events.
+ * Cumulative discards per side for one market, read from its genesis event.
  *
  * Takes an explicit client rather than importing `db`, because `void.ts` and
  * `settle.ts` both call this INSIDE their W-3 transaction while holding the
@@ -141,14 +141,93 @@ export function openingBacking(r: OpenedReserves): string {
  * An absent row returns (0,0) — a market with no open has no discards, which is
  * the same answer for a Draft market and for a defensive miss.
  */
+/**
+ * The fail-closed read, and the ONLY one `settleMarket` / `voidMarket` may use.
+ *
+ * ⛔ AN ABSENT GENESIS ROW IS CORRUPTION HERE, NOT A ZERO. `loadMarketDiscards`
+ * answers (0,0) when a market has no `market.opened`, which is right for a Draft
+ * market and right for the scale harnesses, whose synthetic pools emit no such
+ * event. It is WRONG for settlement: `settleMarket` only matches `Resolving`,
+ * which implies the market was `Open`, which by `I-GENESIS-001` implies the row
+ * exists. So for these two callers, absent means the audit trail lost a row.
+ *
+ * Answering (0,0) there would make `settleMarket` write `poolUnwindAmount = w`
+ * to a terminal, append-only row — under-reporting a D-14 NO outcome by 80,000 Đ
+ * with no throw and no alarm. That is the same defect `loadMarketDiscards`'s own
+ * capped read was written to prevent, reached through the opposite door: too few
+ * rows rather than too many. `voidMarket` would survive it — its cross-assert
+ * catches the gap — but settle has nothing behind it, which is exactly why the
+ * two must not share the tolerant read.
+ *
+ * Consistent with `readOpenedReserves`, which throws on a payload it cannot
+ * parse: an unsettleable market is a problem someone can fix, and a wrong
+ * terminal payout is not.
+ */
+export async function requireMarketDiscards(
+	client: DbClient | DbTransaction,
+	marketId: string,
+): Promise<{ yes: string; no: string }> {
+	const genesis = await readGenesisRow(client, marketId);
+	if (genesis === undefined) {
+		throw new Error(
+			`requireMarketDiscards: market ${marketId} has no market.opened event — refusing to settle against an incomplete audit trail (I-GENESIS-001)`,
+		);
+	}
+	const opened = readOpenedReserves(genesis);
+	return {
+		yes: toFixed18(new CpmmDecimal(opened.dYes)),
+		no: toFixed18(new CpmmDecimal(opened.dNo)),
+	};
+}
+
+/**
+ * The TOLERANT read: (0,0) when a market has no `market.opened` event.
+ *
+ * ⛔ NOT FOR `settleMarket` OR `voidMarket` — they use `requireMarketDiscards`,
+ * and the difference is the whole point. This answer is correct for a Draft
+ * market and for the `tests/scale/` harnesses, whose synthetic pools are
+ * inserted directly and emit no genesis event at all; it is a silent
+ * under-report on a settlement.
+ *
+ * ⚠ Reads the OLDEST genesis row, and does NOT sum across rows. It summed until
+ * `@code-reviewer` HIGH-1, on the reasoning that `I-GENESIS-001` guarantees one
+ * row. It does not: that invariant is a `NOT EXISTS` predicate, so it asserts AT
+ * LEAST one, and no unique index on `events (aggregate_id, event_type)` backs it.
+ * A duplicate genesis row would have doubled `D` — and worse, the two readers
+ * would have DISAGREED, since `replayReserveSeries` takes the oldest row: the
+ * chart would draw one market while the payout described another.
+ *
+ * ⚠ Phase 2's `pool.liquidity_added` rows ARE summed, and belong in a SEPARATE
+ * query. Genesis happens once per market; injections happen many times. Do not
+ * merge them back into one `WHERE event_type IN (...)` — that is how this was
+ * written wrong the first time.
+ */
 export async function loadMarketDiscards(
 	client: DbClient | DbTransaction,
 	marketId: string,
 ): Promise<{ yes: string; no: string }> {
-	// Byte-for-byte the genesis read in `replayReserveSeries`
-	// (discovery/price-series.ts): same predicate, same ASC order, same LIMIT 1.
-	// If these two ever drift, the chart and the payout describe different
-	// markets.
+	const genesis = await readGenesisRow(client, marketId);
+	if (genesis === undefined) {
+		return { yes: ZERO, no: ZERO };
+	}
+	const opened = readOpenedReserves(genesis);
+	return {
+		yes: toFixed18(new CpmmDecimal(opened.dYes)),
+		no: toFixed18(new CpmmDecimal(opened.dNo)),
+	};
+}
+
+/**
+ * The shared genesis read. Byte-for-byte the one in `replayReserveSeries`
+ * (discovery/price-series.ts): same three predicates, same ASC order, same
+ * LIMIT 1. If these two ever drift, the chart and the payout describe different
+ * markets — which is the failure the cap exists to prevent, not merely a tidy
+ * duplication.
+ */
+async function readGenesisRow(
+	client: DbClient | DbTransaction,
+	marketId: string,
+): Promise<unknown> {
 	const rows = await client
 		.select({ payload: events.payload })
 		.from(events)
@@ -159,16 +238,13 @@ export async function loadMarketDiscards(
 				eq(events.eventType, "market.opened"),
 			),
 		)
-		.orderBy(asc(events.createdAt))
+		// `event_id` is the tiebreak, not decoration: `created_at` is millisecond
+		// precision and a backfill can write several rows inside one millisecond,
+		// so ASC on the timestamp alone is not a total order. UUIDv7 is
+		// time-ordered, which makes the pair deterministic. `replayReserveSeries`
+		// carries the same tiebreak on its bet walk for the same reason.
+		.orderBy(asc(events.createdAt), asc(events.eventId))
 		.limit(1);
 
-	const genesis = rows[0];
-	if (genesis === undefined) {
-		return { yes: ZERO, no: ZERO };
-	}
-	const opened = readOpenedReserves(genesis.payload);
-	return {
-		yes: toFixed18(new CpmmDecimal(opened.dYes)),
-		no: toFixed18(new CpmmDecimal(opened.dNo)),
-	};
+	return rows[0]?.payload;
 }

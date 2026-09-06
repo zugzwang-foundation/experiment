@@ -191,7 +191,10 @@ export async function replayReserveSeries(
 				eq(events.eventType, "market.opened"),
 			),
 		)
-		.orderBy(asc(events.createdAt))
+		// `event_id` tiebreaks a `created_at` tie — ms precision, and a backfill
+		// can write several rows in one millisecond. `markets/backing.ts` carries
+		// the identical pair: these two reads must never pick different rows.
+		.orderBy(asc(events.createdAt), asc(events.eventId))
 		.limit(1);
 
 	const openedRow = openedRows[0];
