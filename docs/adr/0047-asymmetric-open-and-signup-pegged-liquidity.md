@@ -131,7 +131,7 @@ backingMinted · discardedSide · discardedShares
 priceYesBefore · priceYesAfter
 ```
 
-`event_type` is `text` with no CHECK — no migration (RECON-2 §5c). `EVENT_TYPES` gains one member; three `.toBe(24)` pins become 25 (RECON-2 §9d). **The dataset export throws on an undeclared type by design** (`strip.ts:299`, RECON-2 §7): a SPEC.2 §19.4.1 SHIP declaration and a `PAYLOAD_SHIP_KEYS` entry land in the same commit, or PR #435's build fails at CI.
+`event_type` is `text` with no CHECK — no migration (RECON-2 §5c). `EVENT_TYPES` gains one member; three `.toBe(24)` pins become 25 (RECON-2 §9d). **The dataset export throws on an undeclared type by design** (`strip.ts:299`, RECON-2 §7): a SPEC.2 §19.4.1 SHIP declaration and a `PAYLOAD_SHIP_KEYS` entry land in the same commit, or PR #435's build fails at CI. The extended `market.opened` payload's §19.4.1 SHIP row lands in Phase 1; PR #435 conforms on rebase.
 
 ### G · The policy table
 
@@ -227,7 +227,7 @@ Plan-mode precedes each phase from this ADR. A fresh session executes each ratif
 
 | test | asserts |
 |---|---|
-| Price invariance | A moves price by < 1e-18 across ≥ 10,000 fuzzed reserve pairs, including 90:1 |
+| Price invariance | A moves price by ≤ 1e-18 across ≥ 10,000 fuzzed reserve pairs, including 90:1 |
 | Differential | SQL and TypeScript A agree across the same fuzz |
 | `k` monotone with named door | `k′ ≥ k` across buy/sell/inject; `k′ > k` only on inject |
 | Backing identity | E holds after open, after N buys and sells, after N injections, on both outcomes |
@@ -259,7 +259,6 @@ Plan-mode precedes each phase from this ADR. A fresh session executes each ratif
 
 ## Drift recorded, not acted on
 
-- `CLAUDE.md` §1 ADR ceiling is two behind (live 0046).
-- `CLAUDE.md` §2 and `AGENTS.md` §9 say staging's markets carry no `market.opened`; all twelve do (`chart-4-genesis-backfill`).
+- `AGENTS.md` §9:445 says staging's markets carry no `market.opened`; all twelve do (`chart-4-genesis-backfill`).
 - ADR-0013 §2's lock order names `friendly_fire_events`, dropped at `0018`.
 - `0007` asks for pg_cron `WITH SCHEMA extensions`; it lives in `pg_catalog`.
