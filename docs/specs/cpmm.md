@@ -732,7 +732,14 @@ low-p bet, with no bonus term anywhere.
 - NO wins: user holds no NO shares; payouts = D − n = 110 − 110 = 0;
   `pool_unwind` = 110 (the NO reserve) ✓.
 
-The §8.1 residual identity, demonstrated on both branches.
+The §8.1 residual identity, demonstrated on both branches. ⚠ E5 is a
+SYMMETRIC seed, so `D_yes = D_no = 0` and the unwind equals the winning
+reserve exactly. That is the special case, not the rule: since ADR-0047 the
+identity is `unwind = w + D_W`, and on a market opened at a price the winning
+side's discard is added. E1–E5 are deliberately left on the symmetric seed —
+they are ENGINE.3's fixed vectors and rewriting them would rewrite the
+`tests/unit/cpmm/vectors.test.ts` suite in a task with no mandate to. An
+asymmetric worked example is owed and belongs with Phase 2.
 
 ## §13 Module API (ENGINE.2 contract)
 
@@ -762,8 +769,13 @@ changing meaning.
 
     computeResolvedUnwind(args: { reserves: Reserves; outcome: Side }):
       { residual: string }
-      // = winning-side reserve (§8.1). Void residual is a ledger identity
-      // (§8.2), not a curve computation — no function exists for it.
+      // ⛔ SUPERSEDED BY ADR-0047 §E AS THE RESOLVED UNWIND, and it has no
+      // src/ caller. Returns the bare winning-side reserve, which was the
+      // residual only while every discard was zero. The shipped resolved
+      // unwind is `w + D_W` (§8.1) and lives in resolution/settle.ts, not
+      // here — this function would under-pay every asymmetric winning side.
+      // Kept because §12's vectors pin it; its removal is a Phase-2 call.
+      // Void residual is a ledger identity (§8.2), not a curve computation.
 
     CpmmDecimal   // the §10.2 cloned constructor, exported for ENGINE.5
 
@@ -798,3 +810,4 @@ the curation slate's product definition (§7.2 — SPEC.1, debate phase).
 | 3.0.0 | 2026-09-06 | HMH | **ADR-0047 Phase 1 — asymmetric open at a chosen price (LIQ-1).** **§7.1** rewritten: the `Draft → Open` seed commits a TANK of T Đ at an opening price p ∈ (0,1) and initialises the reserves ASYMMETRICALLY at `(y0, n0) = ((1 − p)·T, p·T)`, replacing the symmetric `(y0, n0) = (C, C)`; the symmetric seed is now the p = ½ special case, not the rule. The pair-mint account is completed by the **backing identity** `Y + H_yes + D_yes == N + H_no + D_no == total Đ deposited`, where `D_x` is the cumulative DISCARD per side — summed from `market.opened` (and, from ADR-0047 Phase 2, `pool.liquidity_added`). Discards are large by construction: the fraction is `1 − min(p,1−p)/max(p,1−p)`, 88.9% at a 10% open. **§7.3** the recorded rejection of asymmetric open is REVERSED and kept in place, struck, with the measurement that overturned it (a curation slate reaching 10% needs operator-held NO positions carrying mandatory arguments the operator does not hold — arguments by fiat, with stake, which is further from an honest book than a discard nobody holds); the upstream `p`-weight rejection STANDS and is re-derived rather than inherited. **MAJOR per §0 semver** — `(y0,n0) = (C,C)` is a formula this changes, and the backing identity is a new invariant. §7.2's slate paragraph is narrowed by §7.1's new closing sentence rather than rewritten; §7.4 and §14 are Phase 2 and deliberately untouched here. Paired: SPEC.2 §19.4.1 `market.opened` SHIP row (same commit), `src/server/cpmm/calculate.ts` `openingReserves`/`addLiquidity`/`seedReserves`, `src/server/markets/open.ts`. |
 | 3.0.0 | 2026-09-06 | HMH | **§7.2 rewritten under the same version (LIQ-1 Phase 1 addendum D3).** The row above deliberately left §7.2 alone, which put a flat "the probability at seed is 0.5 structurally" one section below a §7.1 that had just made it false — a reader landing on §7.2 first met the superseded claim, with the correction in a section they had not opened (`O-4`). §7.2 no longer sets price: the slate seeds ARGUMENTS ONLY, in stakes deliberately too small to move the curve, and every sentence describing operator-controlled accounts walking the price to a chosen level is DELETED rather than qualified. The reasoning that overturned it is kept, because the old design was not obviously wrong and a reversal with no argument teaches a later reader nothing. "Per-market opening levels" is struck from §7.2's deferred-product list — it is a parameter of market opening now, not a curation outcome. **No version bump: 3.0.0 is the ADR-0047 version and this is that same amendment finishing its job**, not a second one. |
 | 3.0.0 | 2026-09-06 | HMH | **§8.1, §11 INV-C4 and §11 INV-C5 amended; §7.1's `T` disambiguated (LIQ-1 Phase 1, `@code-reviewer` HIGH-3 and MEDIUM-5).** §8.1 and INV-C4 still said the resolved unwind is **exactly the winning-side reserve, auditable from the frozen reserves alone** — true only while every discard was zero, and CONTRADICTING the shipped `resolution/settle.ts` as of this same version. On a spec↔code conflict the spec wins, so a later session reading INV-C4 would have "corrected" settle.ts back and silently under-paid every asymmetric winning side by its discard. Now: `unwind = w + D_W`, payout = `D − w − D_W`, and the reserves-only audit claim is struck — D_W is read from `market.opened`. INV-C5's determinism claim SURVIVES and is scoped: the auditor needs the reserves AND the genesis payload, both of which ship (SPEC.2 §19.3 row 1 + §19.4.1). **The plan's T11 only ever scoped §7.1 and §7.3, so §8/§11 were a plan gap rather than an execution slip.** §7.1 additionally: `T` is the reserve SUM, not the Đ deposited (that is `B = max(y0,n0)`, 90,000 against T = 100,000) — the original wording conflated the two in the same section that equates the backing identity to Đ deposited, and Phase 2's target rule compares against T. |
+| 3.0.0 | 2026-09-06 | HMH | **§13 and §12 E5 — the two sites the §8.1 amendment above MISSED (self-grep, LIQ-1 Phase 1).** O-4 says a durable amendment lands at every site that states the superseded position, and the row above corrected §8.1 and §11 while leaving two others asserting it. **§13** — the module API contract — still documented `computeResolvedUnwind` as `= winning-side reserve (§8.1)`, which is a contract line directly contradicting `resolution/settle.ts`; it now carries the supersession, the reason it is kept (§12's vectors pin it) and the warning that reaching for it by name under-pays every asymmetric winning side. **§12 E5** was not wrong — it is a symmetric seed, so `D_W = 0` and its figures stand — but it closed "the §8.1 residual identity, demonstrated on both branches", from which a reader concludes the identity is reserves-only. E1–E5 stay on the symmetric seed deliberately: they are ENGINE.3's fixed vectors and rewriting them rewrites `tests/unit/cpmm/vectors.test.ts`, which this task has no mandate to do. An asymmetric worked example is OWED and belongs with Phase 2. |
