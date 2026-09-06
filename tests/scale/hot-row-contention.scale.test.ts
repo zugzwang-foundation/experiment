@@ -18,7 +18,7 @@ import {
 } from "@/server/dharma/conservation";
 import type { DharmaEntryType } from "@/server/dharma/tags";
 import { FLOW_TAGS } from "@/server/dharma/tags";
-import { loadMarketDiscards } from "@/server/markets/backing";
+import { requireMarketDiscards } from "@/server/markets/backing";
 
 import { testClient, testDb } from "../db/_fixtures/db";
 import { truncateTables } from "../db/_fixtures/truncate";
@@ -253,8 +253,8 @@ describe("scale — hot-row contention (axes 1,2,3)", () => {
 		for (const marketId of marketIds) {
 			const ledgerFlows = await gatherBetTiedFlows(marketId);
 			// Pool cash backing = Y + H_yes + D_yes; injection = BACKING − cash
-			// (ADR-0047 §E). `D_yes` is 0 across this battery — symmetric fixtures,
-			// no `market.opened` event — and is written anyway so the identity is
+			// (ADR-0047 §E). `D_yes` is 0 across this battery — the fixtures open
+			// symmetrically, so their genesis row discards nothing — and is written anyway so the identity is
 			// stated in the terms it actually holds in.
 			const poolRow = await testDb
 				.select({ yesReserves: pools.yesReserves })
@@ -267,7 +267,7 @@ describe("scale — hot-row contention (axes 1,2,3)", () => {
 			const yesHeld = positionRows
 				.filter((p) => p.side === "YES")
 				.reduce((acc, p) => acc.plus(p.quantity), new CpmmDecimal(0));
-			const discards = await loadMarketDiscards(testDb, marketId);
+			const discards = await requireMarketDiscards(testDb, marketId);
 			const cash = new CpmmDecimal(
 				poolRow[0]?.yesReserves ?? SYNTHETIC_SEED_RESERVES,
 			)

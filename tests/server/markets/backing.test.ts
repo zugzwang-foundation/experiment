@@ -10,7 +10,6 @@ vi.mock("@sentry/nextjs", () => ({
 import { events } from "@/db/schema";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 import {
-	loadMarketDiscards,
 	openingBacking,
 	readOpenedReserves,
 	requireMarketDiscards,
@@ -39,7 +38,7 @@ import { truncateTables } from "../../db/_fixtures/truncate";
 //       `.parse()` posture, preserved).
 //   openingBacking(r) → yes + dYes  (== no + dNo). R8's starting term: every
 //     conservation caller opens from BACKING, never from `seedAmount`.
-//   loadMarketDiscards(client, marketId) → { yes, no }, SUMMED from events;
+//   requireMarketDiscards(client, marketId) → { yes, no } from the genesis row;
 //     absent row ⇒ (0,0). Takes a db OR a tx, because `void.ts` and `settle.ts`
 //     call it INSIDE their W-3 transaction under the pool lock.
 //
@@ -186,21 +185,21 @@ describe("markets/backing — the single market.opened reader (LIQ-1 T6b)", () =
 		expect(eq(openingBacking(legacy), SEED_AMOUNT)).toBe(true);
 	});
 
-	it("backing::load-discards-legacy-row-is-zero-zero", async () => {
+	it("backing::require-discards-legacy-row-is-zero-zero", async () => {
 		const marketId = uuidv7();
 		await insertOpenedRow(marketId, legacyPayload(marketId), OPENED_AT);
 
-		const discards = await loadMarketDiscards(testDb, marketId);
+		const discards = await requireMarketDiscards(testDb, marketId);
 
 		expect(eq(discards.yes, "0")).toBe(true);
 		expect(eq(discards.no, "0")).toBe(true);
 	});
 
-	it("backing::load-discards-new-variant-row-is-the-payload-values", async () => {
+	it("backing::require-discards-new-variant-row-is-the-payload-values", async () => {
 		const marketId = uuidv7();
 		await insertOpenedRow(marketId, asymmetricPayload(marketId), OPENED_AT);
 
-		const discards = await loadMarketDiscards(testDb, marketId);
+		const discards = await requireMarketDiscards(testDb, marketId);
 		expect(eq(discards.yes, "0")).toBe(true);
 		expect(eq(discards.no, "80000")).toBe(true);
 
@@ -210,22 +209,12 @@ describe("markets/backing — the single market.opened reader (LIQ-1 T6b)", () =
 		// symptom would be an intermittently wrong cross-assert rather than a
 		// type error.
 		const inTx = await testDb.transaction((tx) =>
-			loadMarketDiscards(tx, marketId),
+			requireMarketDiscards(tx, marketId),
 		);
 		expect(inTx).toEqual(discards);
 	});
 
-	it("backing::load-discards-absent-row-is-zero-zero", async () => {
-		// A market with no `market.opened` row at all — Draft, or a restored
-		// snapshot. (0,0), never a throw: the caller's own guards decide what an
-		// unopened market means.
-		const discards = await loadMarketDiscards(testDb, uuidv7());
-
-		expect(eq(discards.yes, "0")).toBe(true);
-		expect(eq(discards.no, "0")).toBe(true);
-	});
-
-	it("backing::load-discards-reads-the-OLDEST-genesis-row-never-their-sum", async () => {
+	it("backing::require-discards-reads-the-OLDEST-genesis-row-never-their-sum", async () => {
 		// ⚠ INVERTED at `@code-reviewer` HIGH-1, not deleted — a regression to
 		// summing genesis rows reddens here (it would read 125 / 80500).
 		//
@@ -266,7 +255,7 @@ describe("markets/backing — the single market.opened reader (LIQ-1 T6b)", () =
 		);
 		await insertOpenedRow(marketId, asymmetricPayload(marketId), OPENED_AT);
 
-		const discards = await loadMarketDiscards(testDb, marketId);
+		const discards = await requireMarketDiscards(testDb, marketId);
 
 		// The first row's discards, NOT the sum of both.
 		expect(eq(discards.yes, "0")).toBe(true);
@@ -274,46 +263,40 @@ describe("markets/backing — the single market.opened reader (LIQ-1 T6b)", () =
 	});
 
 	it("backing::require-discards-THROWS-when-the-genesis-row-is-absent", async () => {
-		// ⛔ THE POINT OF THE SECOND ENTRY POINT. `loadMarketDiscards` answers
-		// (0,0) here, which is right for a Draft market and for the scale
-		// harnesses' synthetic pools. For `settleMarket` it would mean writing
+		// ⛔ AN ABSENT GENESIS ROW IS CORRUPTION, NOT A ZERO — and answering zero
+		// is what a tolerant read would do. `settleMarket` would then write
 		// `poolUnwindAmount = w` — a D-14 NO outcome under-reported by 80,000 Đ —
 		// onto a terminal, append-only row, with no cross-assert behind it and no
-		// way to correct it. Void survives that (its cross-assert catches the gap);
-		// settle does not, which is why they cannot share the tolerant read.
+		// way to correct it afterwards. `voidMarket` would survive it (its
+		// cross-assert sees the gap and throws); settle has nothing behind it.
+		//
+		// This file used to carry a tolerant sibling and a pair of tests
+		// contrasting the two. `@code-reviewer` measured that no caller needed
+		// tolerance any more — the scale fixtures gained a genesis row in the same
+		// commit that split them — so the sibling is deleted rather than left as a
+		// second, wrong choice next to the right one on a money path (O-1: a
+		// compile error beats a discipline).
 		const marketId = uuidv7();
 
 		await expect(requireMarketDiscards(testDb, marketId)).rejects.toThrow(
 			/no market\.opened event/,
 		);
 
-		// The CONTROL: the tolerant read is still tolerant on the same market.
-		// Without this the assertion above could pass because both functions
-		// throw, which would break every scale harness rather than fix settle.
-		const tolerant = await loadMarketDiscards(testDb, marketId);
-		expect(eq(tolerant.yes, "0")).toBe(true);
-		expect(eq(tolerant.no, "0")).toBe(true);
-	});
-
-	it("backing::require-discards-agrees-with-the-tolerant-read-when-a-row-exists", async () => {
-		// The two must differ ONLY on the absent case. If they diverge on a
-		// present row, settle and the harnesses are reconciling different books.
-		const marketId = uuidv7();
+		// The CONTROL: the SAME market becomes readable once its genesis row
+		// exists. Without it the assertion above could pass because the function
+		// throws unconditionally, which no test here would otherwise catch.
 		await insertOpenedRow(marketId, asymmetricPayload(marketId), OPENED_AT);
-
-		const strict = await requireMarketDiscards(testDb, marketId);
-		const tolerant = await loadMarketDiscards(testDb, marketId);
-		expect(strict).toEqual(tolerant);
-		expect(eq(strict.no, "80000")).toBe(true);
+		const after = await requireMarketDiscards(testDb, marketId);
+		expect(eq(after.no, "80000")).toBe(true);
 	});
 
-	it("backing::load-discards-is-scoped-to-its-own-market", async () => {
+	it("backing::require-discards-is-scoped-to-its-own-market", async () => {
 		const mine = uuidv7();
 		const theirs = uuidv7();
 		await insertOpenedRow(mine, legacyPayload(mine), OPENED_AT);
 		await insertOpenedRow(theirs, asymmetricPayload(theirs), OPENED_AT);
 
-		const discards = await loadMarketDiscards(testDb, mine);
+		const discards = await requireMarketDiscards(testDb, mine);
 
 		// A missing market_id predicate would leak the neighbour's 80,000 in and
 		// void/settle would over-report the residual by exactly that.

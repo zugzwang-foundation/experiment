@@ -43,7 +43,7 @@ import {
 	checkMarketConservation,
 } from "@/server/dharma/conservation";
 import { type DharmaEntryType, FLOW_TAGS } from "@/server/dharma/tags";
-import { loadMarketDiscards } from "@/server/markets/backing";
+import { requireMarketDiscards } from "@/server/markets/backing";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
 import {
@@ -366,11 +366,13 @@ export async function gatherSnapshot(): Promise<ConservationSnapshot> {
 				.from(pools)
 				.where(eq(pools.marketId, marketId));
 			// Y + H_yes + D_yes. `D_yes` is 0 for every fixture in this battery —
-			// they are symmetric and none emits a `market.opened` event — so the
+			// they open symmetrically, so their genesis row discards nothing — so the
 			// term is written rather than assumed away: the identity is about
 			// backing, and a harness that only holds on symmetric pools is one that
-			// stops holding the first time a pool is not.
-			const discards = await loadMarketDiscards(testDb, marketId);
+			// stops holding the first time a pool is not. (These fixtures DO carry a
+			// genesis row since the LIQ-1 fixture repair — a legacy symmetric one,
+			// so `D` reads 0 rather than being absent.)
+			const discards = await requireMarketDiscards(testDb, marketId);
 			const cash = new CpmmDecimal(
 				poolRow[0]?.yesReserves ?? SYNTHETIC_SEED_RESERVES,
 			)

@@ -105,43 +105,6 @@ export function openingBacking(r: OpenedReserves): string {
 }
 
 /**
- * Cumulative discards per side for one market, read from its genesis event.
- *
- * Takes an explicit client rather than importing `db`, because `void.ts` and
- * `settle.ts` both call this INSIDE their W-3 transaction while holding the
- * pool lock — a second connection there would read outside the lock and could
- * see a different world than the one being settled.
- *
- * ⛔ READS THE OLDEST `market.opened` ROW, AND DOES NOT SUM OVER GENESIS ROWS.
- * This was a sum until `@code-reviewer` HIGH-1, on the reasoning that
- * `I-GENESIS-001` guarantees one row. It does not: that invariant is a
- * `NOT EXISTS` predicate, so it asserts AT LEAST one, and there is no unique
- * index on `events (aggregate_id, event_type)`. A duplicate genesis row would
- * therefore double `D`, and the two consumers would disagree about it —
- * `replayReserveSeries` takes `ORDER BY created_at ASC LIMIT 1`, so the chart
- * would draw one market while `settleMarket` paid out another.
- *
- * That divergence is the dangerous half. Void would THROW (its cross-assert
- * would see the doubled term on one side only) — loud, recoverable. Settle on
- * the discarded side would quietly over-report `poolUnwindAmount` and write it
- * to a terminal, append-only row: a wrong number, no alarm, no way back. It is
- * the exact defect class this branch exists to remove, one layer up.
- *
- * Not reachable through the product — `pools.market_id` is UNIQUE, so a second
- * `openMarket` hits 23505 — but the repository documents the precedent for
- * inserting one out of band: `chart-4-genesis-backfill`, whose script is not in
- * this repository (docs/parked.md LIQ-1 L-1). Matching the chart's read exactly
- * means the two readers cannot diverge even then.
- *
- * ⚠ Phase 2's `pool.liquidity_added` rows ARE summed, and are a separate query.
- * Genesis is once per market; injections are many. Do not merge them back into
- * one `WHERE event_type IN (...)` — that is how this defect was written the
- * first time.
- *
- * An absent row returns (0,0) — a market with no open has no discards, which is
- * the same answer for a Draft market and for a defensive miss.
- */
-/**
  * The fail-closed read, and the ONLY one `settleMarket` / `voidMarket` may use.
  *
  * ⛔ AN ABSENT GENESIS ROW IS CORRUPTION HERE, NOT A ZERO. `loadMarketDiscards`
@@ -162,6 +125,11 @@ export function openingBacking(r: OpenedReserves): string {
  * Consistent with `readOpenedReserves`, which throws on a payload it cannot
  * parse: an unsettleable market is a problem someone can fix, and a wrong
  * terminal payout is not.
+ *
+ * Takes an explicit client rather than importing `db`, because `void.ts` and
+ * `settle.ts` both call this INSIDE their W-3 transaction while holding the
+ * pool lock — a second connection there would read outside the lock and could
+ * see a different world than the one being settled.
  */
 export async function requireMarketDiscards(
 	client: DbClient | DbTransaction,
@@ -172,43 +140,6 @@ export async function requireMarketDiscards(
 		throw new Error(
 			`requireMarketDiscards: market ${marketId} has no market.opened event — refusing to settle against an incomplete audit trail (I-GENESIS-001)`,
 		);
-	}
-	const opened = readOpenedReserves(genesis);
-	return {
-		yes: toFixed18(new CpmmDecimal(opened.dYes)),
-		no: toFixed18(new CpmmDecimal(opened.dNo)),
-	};
-}
-
-/**
- * The TOLERANT read: (0,0) when a market has no `market.opened` event.
- *
- * ⛔ NOT FOR `settleMarket` OR `voidMarket` — they use `requireMarketDiscards`,
- * and the difference is the whole point. This answer is correct for a Draft
- * market and for the `tests/scale/` harnesses, whose synthetic pools are
- * inserted directly and emit no genesis event at all; it is a silent
- * under-report on a settlement.
- *
- * ⚠ Reads the OLDEST genesis row, and does NOT sum across rows. It summed until
- * `@code-reviewer` HIGH-1, on the reasoning that `I-GENESIS-001` guarantees one
- * row. It does not: that invariant is a `NOT EXISTS` predicate, so it asserts AT
- * LEAST one, and no unique index on `events (aggregate_id, event_type)` backs it.
- * A duplicate genesis row would have doubled `D` — and worse, the two readers
- * would have DISAGREED, since `replayReserveSeries` takes the oldest row: the
- * chart would draw one market while the payout described another.
- *
- * ⚠ Phase 2's `pool.liquidity_added` rows ARE summed, and belong in a SEPARATE
- * query. Genesis happens once per market; injections happen many times. Do not
- * merge them back into one `WHERE event_type IN (...)` — that is how this was
- * written wrong the first time.
- */
-export async function loadMarketDiscards(
-	client: DbClient | DbTransaction,
-	marketId: string,
-): Promise<{ yes: string; no: string }> {
-	const genesis = await readGenesisRow(client, marketId);
-	if (genesis === undefined) {
-		return { yes: ZERO, no: ZERO };
 	}
 	const opened = readOpenedReserves(genesis);
 	return {

@@ -160,22 +160,19 @@ async function seedAsymmetricOpenMarket(slug: string): Promise<string> {
 		yesReserves: ASYM_YES,
 		noReserves: ASYM_NO,
 	});
-	await testDb.insert(events).values({
-		eventType: "market.opened",
-		aggregateType: "market",
-		aggregateId: marketId,
-		payload: {
-			marketId,
-			yesReserves: ASYM_YES,
-			noReserves: ASYM_NO,
+	// Through the shared fixture, not a fourth hand-rolled copy of the
+	// payload — the helper exists so the shape has ONE maintenance site.
+	await attachGenesisEvent({
+		marketId,
+		createdAt: ASYM_OPENED_AT,
+		reserves: {
+			yes: ASYM_YES,
+			no: ASYM_NO,
 			openingPriceYes: ASYM_PRICE_YES,
 			backingMinted: ASYM_BACKING,
 			discardedYes: ASYM_D_YES,
 			discardedNo: ASYM_D_NO,
 		},
-		payloadVersion: 1,
-		metadata: {},
-		createdAt: ASYM_OPENED_AT,
 	});
 	return marketId;
 }
@@ -465,7 +462,7 @@ describe("ENGINE.9 F-RESOLVE-3 — voidMarket (W-3d)", () => {
 		// one EXERCISES it.
 		//
 		// After T7 the two sides become Y + H_yes + D_yes and N + H_no + D_no,
-		// with (D_yes, D_no) read from `loadMarketDiscards` on the SAME tx under
+		// with (D_yes, D_no) read from `requireMarketDiscards` on the SAME tx under
 		// the pool lock, and both equal the total Đ deposited.
 		const userK = await seedUser("void-k");
 		const userL = await seedUser("void-l");

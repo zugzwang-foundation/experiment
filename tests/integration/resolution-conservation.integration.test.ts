@@ -57,8 +57,8 @@ const SEED = "100.000000000000000000";
 /**
  * The Đ deposited at open — the term the conservation identity starts from
  * (ADR-0047 §E). These fixtures insert a SYMMETRIC pool row directly
- * (`yesReserves = noReserves = SEED`) and emit no `market.opened`, so nothing
- * is discarded and the backing equals the per-side reserve. Named separately
+ * (`yesReserves = noReserves = SEED`) with a matching LEGACY genesis row, so
+ * nothing is discarded and the backing equals the per-side reserve. Named separately
  * anyway: the identity is written in backing, and the two coincide only while
  * the open is symmetric.
  */
