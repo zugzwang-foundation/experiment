@@ -175,18 +175,35 @@ style of the existing `invariants.property.test.ts` (which is the only file in
 
 | # | property | bound |
 |---|---|---|
-| 1 | **Price invariance.** `\|price(addLiquidity(r,a)) − price(r)\| < 1e-18` | ≥ 10,000 pairs |
+| 1 | **Price invariance.** `\|price(addLiquidity(r,a)) − price(r)\| ≤ 1e-18` | ≥ 10,000 pairs |
 | 2 | **The 90:1 case explicitly**, not left to the generator | `(90000, 1000)` + the D-14 `(90000, 10000)` |
 | 3 | **Backing closes exactly.** `(S'−S) + discarded == a` at 18 dp | same corpus |
-| 4 | **`openingReserves` hits the price on the nose.** `getPrices(reserves).yes == openingPriceYes` | all `p ∈ (0,1)` at 18 dp |
+| 4a | **`openingReserves` hits the price on the nose, on a whole-Đ tank.** `getPrices(reserves).yes == openingPriceYes`, exact equality | all `p ∈ (0,1)`, integer `T` |
+| 4b | **…and to within one ulp on any tank.** `\|getPrices(reserves).yes − openingPriceYes\| ≤ 1e-18` | all `p ∈ (0,1)`, any 18-dp `T ≥ 1` |
 | 5 | **Direction pin.** `openingPriceYes = 0.1` ⇒ `yes > no` | fixed case, not generative |
 
-⚠ Property 1 is `< 1e-18`, **not** exact equality: `a·S/L` is generally
-non-terminating (at the D-14 ratio it is `a/9`), so a fixed-18-dp output cannot
-preserve price exactly. The ADR's own acceptance row says *"moves price by
-< 1e-18"*, which this matches. **Property 3 is the load-bearing one** — it is
-what makes the residual-discard design correct, and it is the property a
-"round both sides independently" implementation would fail.
+⚠ Property 1 is `≤ 1e-18` — **one ulp, not a strict inequality, and not exact
+equality**. `a·S/L` is generally non-terminating (at the D-14 ratio it is `a/9`),
+so a fixed-18-dp output cannot preserve price exactly; and a floored `S′` can move
+a half-even-quantized price by exactly one ulp, which a `<` bound would reject.
+Corrected at the LIQ-1-P1-EXEC rulings (R4), and the ADR's acceptance row was
+corrected to `≤` in the same pass. **A strict bound here fails a CORRECT
+implementation**, which is the worst kind of wrong test: the next person to hit it
+loosens it, on a money path, without a ruling.
+
+⚠ **Property 4 is TWO arms and the original single row was unsatisfiable.**
+`no = floor18(p · T)` is exact only when `p · T` is representable at 18 dp; two
+arbitrary 18-dp values multiply to 36 fractional digits and the tail is dropped.
+Exact equality therefore holds on a whole-Đ tank — which is the entire product
+domain, since every tank in ADR §Constants is a whole number of Đ — and to within
+one ulp otherwise, the residue being amplified by `1/T` as `T` falls (hence the
+1 Đ floor on the generator). Split by `@test-writer` at execute and ratified as
+addendum **D1**; the original row asked for something no correct implementation
+could deliver.
+
+**Property 3 is the load-bearing one** — it is what makes the residual-discard
+design correct, and it is the property a "round both sides independently"
+implementation would fail.
 
 ### T2 · `src/server/events/schemas.ts` — the `market.opened` payload
 
@@ -630,11 +647,21 @@ Three, and **OD-1 is the one that changes the shape of the work**.
   `@db-migration-reviewer` in and make §0's central claim false. **If the
   founder prefers the clean break, Phase 1 grows a migration and this plan
   needs a second pass.**
-- **OD-2 · `seedPool` is kept, not deleted.** It stays as the legacy-payload
-  replay path in `price-series.ts` and is used by six of the seven
+- **OD-2 · `seedPool` is kept, not deleted.** It is used by six of the seven
   `tests/unit/cpmm/` files including the `cpmm.md` §12 worked vectors, which are
   the spec's own examples. Deleting it would rewrite the vector suite in a task
   that has no mandate to.
+
+  ⚠ **Amended at addendum D1: it has ZERO `src/` callers, and the rationale this
+  row originally gave is void.** It said `seedPool` "stays as the legacy-payload
+  replay path in `price-series.ts`" — but R1 forbids a consumer from knowing which
+  payload variant it holds, so `price-series.ts` seeds from `seedReserves` over the
+  pair `readOpenedReserves` returns, for legacy and asymmetric rows alike. The two
+  rulings' rationales interact and R1 wins: you cannot both branch on the variant in
+  `price-series.ts` and forbid consumers from inspecting the shape. The decision to
+  keep it is unchanged and still right — the vector suite is the reason — but "kept
+  because X" where X no longer holds is how a function becomes dead code two phases
+  later without anyone noticing.
 - **OD-3 · `cpmm.md` 2.1.0 → 3.0.0 (MAJOR).** The file's own rule at `:8`.
   Flagged because it is the first MAJOR bump this file has taken.
 
