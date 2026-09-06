@@ -359,8 +359,6 @@ async function placeVolumeComment(args: {
 	return result.commentId;
 }
 
-let generationError: unknown = null;
-
 beforeAll(async () => {
 	await assertRunnerLiveConnection();
 
@@ -399,141 +397,137 @@ afterAll(async () => {
 });
 
 describe("staging volume-fixture generation (C1 STEP 2)", () => {
+	// 45 min — the FIRST real attempt (2026-09-02) hit Vitest's 120s default
+	// and was killed mid-run (harmlessly — the idempotent design means the
+	// partial progress, 272 participants, just gets reused on the next run).
+	// ~300 sequential signups plus up to ~1,610 sequential real bet+comment
+	// placements, each carrying a live OpenAI moderation call, genuinely does
+	// not fit in 120s. This is a runtime budget, not a correctness change.
 	it("is ADD-ONLY: reuses existing volume markets/participants, places only the comment shortfall", async () => {
-		try {
-			const now = new Date();
+		const now = new Date();
 
-			// ── PARTICIPANTS — reuse existing volume-fixture users by email
-			// prefix; create only what's missing. ──────────────────────────────
-			const existingParticipants = await readOnly
-				.select({ id: users.id, email: users.email })
-				.from(users)
-				.where(like(users.email, `${EMAIL_PREFIX}%@${EMAIL_DOMAIN}`));
-			const participantIds: string[] = existingParticipants.map((p) => p.id);
+		// ── PARTICIPANTS — reuse existing volume-fixture users by email
+		// prefix; create only what's missing. ──────────────────────────────
+		const existingParticipants = await readOnly
+			.select({ id: users.id, email: users.email })
+			.from(users)
+			.where(like(users.email, `${EMAIL_PREFIX}%@${EMAIL_DOMAIN}`));
+		const participantIds: string[] = existingParticipants.map((p) => p.id);
 
-			for (let i = participantIds.length; i < VOLUME_PARTICIPANT_COUNT; i++) {
-				participantIds.push(await createVolumeParticipant(i));
-			}
-
-			// ── MARKETS — reuse by slug if already present; create + open
-			// otherwise. NEVER re-opens or mutates an existing row. ─────────────
-			const marketIds = new Map<string, string>();
-			for (const m of VOLUME_MARKETS) {
-				const [existing] = await readOnly
-					.select({ id: markets.id, status: markets.status })
-					.from(markets)
-					.where(eq(markets.slug, m.slug));
-
-				if (existing) {
-					marketIds.set(m.key, existing.id);
-					continue;
-				}
-
-				const marketId = uuidv7();
-				const mediaId = uuidv7();
-				await createMarket({
-					marketId,
-					slug: m.slug,
-					title: m.title,
-					description: m.description,
-					resolutionDeadline: new Date(now.getTime() + LONG_DEADLINE_MS),
-					media: [
-						{
-							mediaId,
-							key: `m/${marketId}/${mediaId}.png`,
-							displayOrder: 0,
-							isDefault: true,
-						},
-					],
-					mediaVideoUrl: null,
-					now,
-					metadata: adminMetadata("F-ADMIN-1"),
-				});
-				await openMarket({
-					marketId,
-					seedAmount: canonicalizeAmount18(m.seedAmount),
-					now,
-					metadata: adminMetadata("F-ADMIN-2"),
-				});
-				marketIds.set(m.key, marketId);
-			}
-
-			// ── COMMENTS — idempotent shortfall per market. ─────────────────────
-			const produced: Record<string, number> = {};
-			for (const m of VOLUME_MARKETS) {
-				const marketId = marketIds.get(m.key);
-				if (!marketId) throw new Error(`market ${m.key} was not resolved`);
-
-				const [{ n: currentCount }] = await readOnly
-					.select({ n: sql<number>`count(*)::int` })
-					.from(comments)
-					.where(eq(comments.marketId, marketId));
-
-				const shortfall = m.targetComments - currentCount;
-				produced[m.key] = 0;
-				if (shortfall <= 0) continue;
-
-				// Track post ids placed THIS run so replies (REPLY_DEPTH_MAX=1) can
-				// only ever target a post, never another reply.
-				const postIds: string[] = [];
-
-				for (let i = 0; i < shortfall; i++) {
-					const globalIndex = currentCount + i;
-					// Every 3rd comment is a reply to an earlier post on the SAME
-					// market, when one exists yet; otherwise it's a post. Pure
-					// function of the index — no RNG, no clock read.
-					const isReply = globalIndex % 3 === 2 && postIds.length > 0;
-					const participant =
-						participantIds[globalIndex % participantIds.length];
-					if (!participant) {
-						throw new Error("participant pool exhausted unexpectedly");
-					}
-					const side: "YES" | "NO" = globalIndex % 2 === 0 ? "YES" : "NO";
-
-					if (isReply) {
-						const parentCommentId =
-							postIds[globalIndex % postIds.length] ?? null;
-						const stake =
-							REPLY_STAKES[globalIndex % REPLY_STAKES.length] ?? "55";
-						await placeVolumeComment({
-							userId: participant,
-							marketId,
-							side,
-							stake,
-							body: bodyFor(m.key, globalIndex, true),
-							parentCommentId,
-						});
-					} else {
-						const stake = POST_STAKES[globalIndex % POST_STAKES.length] ?? "12";
-						const commentId = await placeVolumeComment({
-							userId: participant,
-							marketId,
-							side,
-							stake,
-							body: bodyFor(m.key, globalIndex, false),
-							parentCommentId: null,
-						});
-						postIds.push(commentId);
-					}
-					produced[m.key] = (produced[m.key] ?? 0) + 1;
-				}
-			}
-
-			console.log(
-				"[staging:generate-volume] produced this run:",
-				JSON.stringify(produced),
-			);
-			console.log(
-				"[staging:generate-volume] hot market for the k6 writer arm:",
-				VOLUME_MARKETS.find((m) => m.hot)?.slug,
-			);
-		} catch (err) {
-			generationError = err;
-			throw err;
+		for (let i = participantIds.length; i < VOLUME_PARTICIPANT_COUNT; i++) {
+			participantIds.push(await createVolumeParticipant(i));
 		}
 
-		expect(generationError).toBeNull();
-	});
+		// ── MARKETS — reuse by slug if already present; create + open
+		// otherwise. NEVER re-opens or mutates an existing row. ─────────────
+		const marketIds = new Map<string, string>();
+		for (const m of VOLUME_MARKETS) {
+			const [existing] = await readOnly
+				.select({ id: markets.id, status: markets.status })
+				.from(markets)
+				.where(eq(markets.slug, m.slug));
+
+			if (existing) {
+				marketIds.set(m.key, existing.id);
+				continue;
+			}
+
+			const marketId = uuidv7();
+			const mediaId = uuidv7();
+			await createMarket({
+				marketId,
+				slug: m.slug,
+				title: m.title,
+				description: m.description,
+				resolutionDeadline: new Date(now.getTime() + LONG_DEADLINE_MS),
+				media: [
+					{
+						mediaId,
+						key: `m/${marketId}/${mediaId}.png`,
+						displayOrder: 0,
+						isDefault: true,
+					},
+				],
+				mediaVideoUrl: null,
+				now,
+				metadata: adminMetadata("F-ADMIN-1"),
+			});
+			await openMarket({
+				marketId,
+				seedAmount: canonicalizeAmount18(m.seedAmount),
+				now,
+				metadata: adminMetadata("F-ADMIN-2"),
+			});
+			marketIds.set(m.key, marketId);
+		}
+
+		// ── COMMENTS — idempotent shortfall per market. ─────────────────────
+		const produced: Record<string, number> = {};
+		for (const m of VOLUME_MARKETS) {
+			const marketId = marketIds.get(m.key);
+			if (!marketId) throw new Error(`market ${m.key} was not resolved`);
+
+			const [{ n: currentCount }] = await readOnly
+				.select({ n: sql<number>`count(*)::int` })
+				.from(comments)
+				.where(eq(comments.marketId, marketId));
+
+			const shortfall = m.targetComments - currentCount;
+			produced[m.key] = 0;
+			if (shortfall <= 0) continue;
+
+			// Track post ids placed THIS run so replies (REPLY_DEPTH_MAX=1) can
+			// only ever target a post, never another reply.
+			const postIds: string[] = [];
+
+			for (let i = 0; i < shortfall; i++) {
+				const globalIndex = currentCount + i;
+				// Every 3rd comment is a reply to an earlier post on the SAME
+				// market, when one exists yet; otherwise it's a post. Pure
+				// function of the index — no RNG, no clock read.
+				const isReply = globalIndex % 3 === 2 && postIds.length > 0;
+				const participant = participantIds[globalIndex % participantIds.length];
+				if (!participant) {
+					throw new Error("participant pool exhausted unexpectedly");
+				}
+				const side: "YES" | "NO" = globalIndex % 2 === 0 ? "YES" : "NO";
+
+				if (isReply) {
+					const parentCommentId = postIds[globalIndex % postIds.length] ?? null;
+					const stake = REPLY_STAKES[globalIndex % REPLY_STAKES.length] ?? "55";
+					await placeVolumeComment({
+						userId: participant,
+						marketId,
+						side,
+						stake,
+						body: bodyFor(m.key, globalIndex, true),
+						parentCommentId,
+					});
+				} else {
+					const stake = POST_STAKES[globalIndex % POST_STAKES.length] ?? "12";
+					const commentId = await placeVolumeComment({
+						userId: participant,
+						marketId,
+						side,
+						stake,
+						body: bodyFor(m.key, globalIndex, false),
+						parentCommentId: null,
+					});
+					postIds.push(commentId);
+				}
+				produced[m.key] = (produced[m.key] ?? 0) + 1;
+			}
+		}
+
+		console.log(
+			"[staging:generate-volume] produced this run:",
+			JSON.stringify(produced),
+		);
+		console.log(
+			"[staging:generate-volume] hot market for the k6 writer arm:",
+			VOLUME_MARKETS.find((m) => m.hot)?.slug,
+		);
+	}, 2_700_000);
 
 	it("final row counts land at or above target for every volume market", async () => {
 		for (const m of VOLUME_MARKETS) {
