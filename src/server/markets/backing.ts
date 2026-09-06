@@ -84,6 +84,38 @@ export function readOpenedReserves(payload: unknown): OpenedReserves {
 			openingPriceYes: HALF,
 		};
 	}
+	// ⛔ SHAPE IS NOT ENOUGH ON A PAYOUT INPUT. `numericString` is SIGNED (its
+	// own comment says so), and `z.object` strips rather than rejects, so a
+	// negative discard or a structurally impossible pair parses cleanly and
+	// flows into a terminal, append-only `poolUnwindAmount`.
+	//
+	// The two checks below are what make the fail-closed posture this file
+	// argues for actually closed. A well-formed open satisfies BOTH by
+	// construction — backing is `max(yes, no)`, so one discard is necessarily
+	// zero, and both sides sum to the backing. ⚠ The second is the load-bearing
+	// one: `void.ts`'s cross-assert is the only self-check on the books, and a
+	// common offset added to BOTH discards passes it exactly — both sides shift
+	// together — while inflating the unwind on a row INV-4 forbids correcting.
+	// `settle.ts` has no cross-check at all.
+	const dYes = new CpmmDecimal(parsed.discardedYes);
+	const dNo = new CpmmDecimal(parsed.discardedNo);
+	if (dYes.isNegative() || dNo.isNegative()) {
+		throw new Error(
+			`readOpenedReserves: negative discard on market ${parsed.marketId} (${parsed.discardedYes}, ${parsed.discardedNo})`,
+		);
+	}
+	if (!dYes.isZero() && !dNo.isZero()) {
+		throw new Error(
+			`readOpenedReserves: both sides discarded on market ${parsed.marketId} (${parsed.discardedYes}, ${parsed.discardedNo}) — an open mints max(yes,no) pairs, so one side's discard is always zero`,
+		);
+	}
+	const backedYes = new CpmmDecimal(parsed.yesReserves).plus(dYes);
+	const backedNo = new CpmmDecimal(parsed.noReserves).plus(dNo);
+	if (!backedYes.equals(backedNo)) {
+		throw new Error(
+			`readOpenedReserves: backing identity broken at open on market ${parsed.marketId}: Y+D_yes=${backedYes.toFixed(18)} != N+D_no=${backedNo.toFixed(18)}`,
+		);
+	}
 	return {
 		yes: parsed.yesReserves,
 		no: parsed.noReserves,
@@ -107,7 +139,7 @@ export function openingBacking(r: OpenedReserves): string {
 /**
  * The fail-closed read, and the ONLY one `settleMarket` / `voidMarket` may use.
  *
- * ⛔ AN ABSENT GENESIS ROW IS CORRUPTION HERE, NOT A ZERO. `loadMarketDiscards`
+ * ⛔ AN ABSENT GENESIS ROW IS CORRUPTION HERE, NOT A ZERO. A tolerant read
  * answers (0,0) when a market has no `market.opened`, which is right for a Draft
  * market and right for the scale harnesses, whose synthetic pools emit no such
  * event. It is WRONG for settlement: `settleMarket` only matches `Resolving`,
@@ -116,7 +148,7 @@ export function openingBacking(r: OpenedReserves): string {
  *
  * Answering (0,0) there would make `settleMarket` write `poolUnwindAmount = w`
  * to a terminal, append-only row — under-reporting a D-14 NO outcome by 80,000 Đ
- * with no throw and no alarm. That is the same defect `loadMarketDiscards`'s own
+ * with no throw and no alarm. That is the same defect this reader's own
  * capped read was written to prevent, reached through the opposite door: too few
  * rows rather than too many. `voidMarket` would survive it — its cross-assert
  * catches the gap — but settle has nothing behind it, which is exactly why the
@@ -149,6 +181,43 @@ export async function requireMarketDiscards(
 }
 
 /**
+ * ⚠ PHASE 2 OWES A SECOND, SUMMING QUERY HERE — and the ratified plan says the
+ * opposite, so read this before following it. `docs/plans/LIQ-1-P1_plan.md` §4
+ * T6 instructs that this function SUM, "so Phase 2 adds `pool.liquidity_added`
+ * to the same `WHERE event_type IN (...)` and no call site changes". Executing
+ * that reintroduces the defect `@code-reviewer` found at HIGH-1: genesis is once
+ * per market and `I-GENESIS-001` is a `NOT EXISTS` predicate with no unique index
+ * behind it, so summing lets a duplicate genesis row double `D`. The plan was
+ * amended at the LIQ-1-P1-EXEC close; if you are reading a copy that still says
+ * "sum", it is stale.
+ *
+ * ADR-0047 §E defines `D` as summed from `market.opened` AND every
+ * `pool.liquidity_added`. Injections ARE many and DO sum — in their own query,
+ * added alongside this one. A Phase-2 injector that lands without it makes
+ * `settleMarket` under-report by the whole injected discard, silently, on a
+ * terminal row.
+ *
+ * ⚠ COST, MEASURED (`@security-auditor` HIGH-1, 2026-09-07). `event_type` is
+ * NOT in `events_aggregate_idx (aggregate_type, aggregate_id, created_at)`, so
+ * it is applied as a FILTER, and `bet.sold` rides the same `(market, marketId)`
+ * range (`bets/sell.ts`). Merge Append must obtain the first QUALIFYING tuple
+ * from every partition, so each partition holding this market's sales but no
+ * genesis row is run to exhaustion. The cost therefore grows with the market's
+ * SALE count and peaks exactly at settlement, inside a 5 s `statement_timeout`
+ * whose `57014` is not retryable — and `Resolving → Resolved` is the only edge
+ * out, so a timeout here is an unsettleable market.
+ *
+ * Measured against the local Postgres at **200,000 `bet.sold` rows on one
+ * market**: `Rows Removed by Filter` 28,799 / 29,760 / … per partition — the
+ * exhaustion is real and confirmed — and **actual time 15.2 ms**. Against the
+ * 5,000 ms budget that is a ~330× margin, i.e. roughly 65 MILLION sales on a
+ * single market before it bites. Not reachable at experiment scale (8–12
+ * markets, six weeks, `BET_MAX_STAKE` 250, 1,000 Đ per participant), so no
+ * index and no query rewrite here — Phase 1 has no migration by design.
+ * ⛔ RE-MEASURE BEFORE TESTNET, or if `events` ever stops being partitioned by
+ * month: the margin is large but the growth is monotonic in a number
+ * participants control.
+ *
  * The shared genesis read. Byte-for-byte the one in `replayReserveSeries`
  * (discovery/price-series.ts): same three predicates, same ASC order, same
  * LIMIT 1. If these two ever drift, the chart and the payout describe different

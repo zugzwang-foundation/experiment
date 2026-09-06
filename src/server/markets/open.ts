@@ -24,10 +24,21 @@ import { transition } from "./transitions";
  * `openingPriceYes` is stricter: it must sit strictly INSIDE (0,1), so the
  * regex admits only a leading `0.` — which excludes 1 and everything above by
  * construction — and the all-zeros form is rejected on top of it. BOTH
- * endpoints are excluded because either produces a zero reserve, at which point
- * `requirePositive` inside `openingReserves` throws from within the W-4
- * transaction instead of at the boundary: an admin typo would arrive as a
- * rolled-back transaction and a 500 rather than a `seed_invalid`.
+ * endpoints are excluded because either produces a zero reserve, and a market
+ * with an empty side is not a market.
+ *
+ * ⚠ This paragraph used to justify the guard by claiming the alternative was a
+ * throw from INSIDE the W-4 transaction — a rolled-back write and a 500. That
+ * was wrong on all three counts, and it is corrected rather than left because a
+ * reader relies on a stated control flow (`@security-auditor` LOW-1, O-9):
+ * `openingReserves` is called BEFORE `runLifecycleTransaction` opens, so nothing
+ * rolls back; the zero-reserve case is caught by `openingReserves`' own explicit
+ * reserve check, not by `requirePositive`, which only validates the two inputs;
+ * and a `CpmmInputError` from this flow now maps to `seed_invalid` regardless.
+ * The guard is correct and triple-layered — the wire canonicaliser, these
+ * regexes, and the pure module's own check — and it earns its place by rejecting
+ * at the boundary in a form the admin can act on, not by preventing a rollback
+ * that never happens.
  */
 const SEED_RE = /^\d{1,20}(?:\.\d{1,18})?$/;
 const ZERO_SEED_RE = /^0+(?:\.0+)?$/;
