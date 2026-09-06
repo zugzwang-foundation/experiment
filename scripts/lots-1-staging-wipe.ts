@@ -164,13 +164,24 @@ async function main(): Promise<void> {
 		// Reserves are restored per side. Collapsing them to one scalar would
 		// reprice every asymmetric market to 0.5, which is the guessing this
 		// script refuses to do.
+		//
+		// ⚠ THE READ MIRRORS `readGenesisRow`: all three predicates (including
+		// `aggregate_type`), keyed on `aggregate_id` rather than the payload's own
+		// `marketId`, and OLDEST-wins on a duplicate. It was one predicate, keyed
+		// on the payload, with no ordering — so `new Map` took LAST-wins in
+		// unspecified row order while the chart and the payout both take oldest.
+		// On a duplicated genesis row that resets the pool to a payload neither of
+		// them uses, which is the divergence `backing.ts` exists to prevent.
 		const seedRows = await client<
 			{ market_id: string; yes: string | null; no: string | null }[]
 		>`
-			SELECT payload->>'marketId' AS market_id,
+			SELECT DISTINCT ON (aggregate_id)
+			       aggregate_id::text AS market_id,
 			       COALESCE(payload->>'yesReserves', payload->>'seedAmount') AS yes,
 			       COALESCE(payload->>'noReserves',  payload->>'seedAmount') AS no
-			FROM events WHERE event_type = 'market.opened'
+			FROM events
+			WHERE aggregate_type = 'market' AND event_type = 'market.opened'
+			ORDER BY aggregate_id, created_at ASC, event_id ASC
 		`;
 		// A type PREDICATE, not a cast. `as string` here would be the same shape
 		// of assertion that carried the null into the UPDATE in the first place —

@@ -184,22 +184,19 @@ async function seedAsymmetricOpenMarket(slug: string): Promise<string> {
 		yesReserves: ASYM_YES,
 		noReserves: ASYM_NO,
 	});
-	await testDb.insert(events).values({
-		eventType: "market.opened",
-		aggregateType: "market",
-		aggregateId: marketId,
-		payload: {
-			marketId,
-			yesReserves: ASYM_YES,
-			noReserves: ASYM_NO,
+	// Through the shared fixture, not a fourth hand-rolled copy of the
+	// payload — the helper exists so the shape has ONE maintenance site.
+	await attachGenesisEvent({
+		marketId,
+		createdAt: ASYM_OPENED_AT,
+		reserves: {
+			yes: ASYM_YES,
+			no: ASYM_NO,
 			openingPriceYes: ASYM_PRICE_YES,
 			backingMinted: ASYM_BACKING,
 			discardedYes: ASYM_D_YES,
 			discardedNo: ASYM_D_NO,
 		},
-		payloadVersion: 1,
-		metadata: {},
-		createdAt: ASYM_OPENED_AT,
 	});
 	return marketId;
 }

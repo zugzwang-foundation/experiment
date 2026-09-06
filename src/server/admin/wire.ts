@@ -272,7 +272,14 @@ export function toActionError(
 	// capture reserved for UNRECOGNISED errors — reporting a valid-shaped admin
 	// input as a wire bug. No write is at risk (the call is outside the W-4
 	// transaction); this is O-3, a true refusal reported with a false cause.
-	if (error instanceof CpmmInputError) {
+	//
+	// ⛔ SCOPED TO F-ADMIN-2 DELIBERATELY. The message names an opening price
+	// and a tank, which exist on exactly one form. `addLiquidity` also throws
+	// `CpmmInputError` (via `requirePositive`), and Phase 2 wires the liquidity
+	// injector as an admin action — an unscoped arm would answer a rejected
+	// injection with two field names its form does not have, which is the same
+	// O-3 defect this arm was added to fix, one flow over.
+	if (error instanceof CpmmInputError && flow === "F-ADMIN-2") {
 		return err(
 			"seed_invalid",
 			"That opening price and tank produce an empty reserve on one side. Raise the tank, or move the price away from 0 or 1.",

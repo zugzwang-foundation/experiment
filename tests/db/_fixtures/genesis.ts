@@ -26,21 +26,32 @@ import { testDb } from "./db";
  * `yesReserves = noReserves = seed` pool actually corresponds to — the fixtures
  * that want an asymmetric open pass the reserves explicitly.
  */
-export async function attachGenesisEvent(args: {
-	marketId: string;
-	/** Symmetric seed. Mutually exclusive with `reserves`. */
-	seedAmount?: string;
+type GenesisOpen =
+	/** Symmetric seed — the legacy payload arm. */
+	| { seedAmount: string; reserves?: never }
 	/** An ADR-0047 asymmetric open. */
-	reserves?: {
-		yes: string;
-		no: string;
-		openingPriceYes: string;
-		backingMinted: string;
-		discardedYes: string;
-		discardedNo: string;
-	};
-	createdAt?: Date;
-}): Promise<void> {
+	| { seedAmount?: never; reserves: AsymmetricOpen };
+
+type AsymmetricOpen = {
+	yes: string;
+	no: string;
+	openingPriceYes: string;
+	backingMinted: string;
+	discardedYes: string;
+	discardedNo: string;
+};
+
+/**
+ * ⚠ Inside a DECLARED partition. `events` is hand-partitioned BY RANGE from
+ * 2026-05, so a 2026-01 default would route every fixture genesis row into
+ * `events_default` — harmless in the test DB, and silently wrong anywhere that
+ * observes partition routing.
+ */
+const DEFAULT_GENESIS_AT = new Date("2026-06-01T00:00:00.000Z");
+
+export async function attachGenesisEvent(
+	args: { marketId: string; createdAt?: Date } & GenesisOpen,
+): Promise<void> {
 	const payload =
 		args.reserves === undefined
 			? { marketId: args.marketId, seedAmount: args.seedAmount }
@@ -62,6 +73,6 @@ export async function attachGenesisEvent(args: {
 		payload,
 		payloadVersion: 1,
 		metadata: {},
-		createdAt: args.createdAt ?? new Date("2026-01-01T00:00:00.000Z"),
+		createdAt: args.createdAt ?? DEFAULT_GENESIS_AT,
 	});
 }

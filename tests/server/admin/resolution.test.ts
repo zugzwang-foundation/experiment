@@ -252,9 +252,9 @@ describe("ENGINE.9 F-ADMIN-3 — triggerResolution (W-3a)", () => {
 				.select({ eventId: events.eventId, eventType: events.eventType })
 				.from(events)
 				.where(eq(events.aggregateId, marketId));
-			expect(eventRows.filter((r) => r.eventType !== "market.opened")).toEqual(
-				[],
-			);
+			// Pins the COUNT of the excluded type too — a bare filter would pass on a
+			// DUPLICATE genesis row, which is this branch's founding hazard.
+			expect(eventRows.map((r) => r.eventType)).toEqual(["market.opened"]);
 			const resolutionRows = await testDb
 				.select({ id: resolutionEvents.id })
 				.from(resolutionEvents)
@@ -495,9 +495,7 @@ describe("resolveMarketAction wire surface", () => {
 		// be Closed without having been Open, and Open implies that row
 		// (I-GENESIS-001). Excluding it keeps the assertion about the rejection.
 		expect(await marketStatusOf(marketId)).toBe("Closed");
-		expect(
-			(await eventTypesFor(marketId)).filter((t) => t !== "market.opened"),
-		).toEqual([]);
+		expect(await eventTypesFor(marketId)).toEqual(["market.opened"]);
 	});
 });
 
