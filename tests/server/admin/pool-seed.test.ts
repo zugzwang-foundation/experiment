@@ -657,6 +657,34 @@ describe("seedPoolAction wire surface", () => {
 		expect((await openedEventRows()).length).toBe(0);
 	});
 
+	it("seed-pool::tiny-tank-is-seed-invalid-not-an-internal-error", async () => {
+		// ⛔ THE POINT IS THE ERROR CODE, NOT THE REFUSAL. `p = 1e-18` over a
+		// tank of 0.5 floors the NO reserve to zero, so `openingReserves` throws
+		// `CpmmInputError` — correctly. But that pair passes EVERY guard above it:
+		// `canonicalizeAmount18`, `PRICE_RE` and `SEED_RE` all accept both values.
+		// Before the `CpmmInputError` arm in `toActionError` the throw fell
+		// through to `error_internal` AND fired the Sentry capture reserved for
+		// unrecognised errors, reporting a valid-shaped admin input as a wire bug.
+		// O-3: a true refusal reported with a false cause is a defect.
+		await withAdminSession();
+		const marketId = await seedDraftFixture("wire-seed-tiny-tank");
+
+		const result = await seedPoolAction(
+			seedFormData(marketId, "0.000000000000000001", "0.5"),
+		);
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error.code).toBe("seed_invalid");
+		expect(result.error.code).not.toBe("error_internal");
+
+		// The market must be untouched — the throw happens before the W-4
+		// transaction opens, so there is no partial write to roll back.
+		expect(await marketStatus(marketId)).toBe("Draft");
+		expect((await poolRowsFor(marketId)).length).toBe(0);
+		expect((await openedEventRows()).length).toBe(0);
+	});
+
 	it("seed-pool::rejects-without-admin-session", async () => {
 		withoutAdminSession();
 		const marketId = await seedDraftFixture("wire-seed-no-session");

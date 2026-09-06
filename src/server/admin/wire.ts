@@ -6,6 +6,7 @@ import { v7 as uuidv7 } from "uuid";
 import type { z } from "zod";
 import { AdminActorError } from "@/server/admin/actor";
 import { validateAdminSession } from "@/server/auth/admin/validate";
+import { CpmmInputError } from "@/server/cpmm/errors";
 import type { eventMetadataSchema } from "@/server/events/schemas";
 import {
 	DefaultMediaRequiredError,
@@ -252,10 +253,29 @@ export function toActionError(
 			"Resolution deadline cannot be after the conclusion freeze.",
 		);
 	}
+	// ONE code covering TWO fields since ADR-0047 split the single seed into an
+	// opening price and a tank, and three distinct rejections across them
+	// (shape, >18 dp, out of range). The message therefore has to name both
+	// fields: it previously said "Seed amount", so an admin typing `10` into
+	// Opening YES price — D-14 is spoken as "10% YES", so that is the natural
+	// mistake — was told a field that no longer exists on the form was wrong.
 	if (error instanceof MarketSeedInvalidError) {
 		return err(
 			"seed_invalid",
-			"Seed amount must be a positive number with at most 18 decimal places.",
+			"Opening YES price must be strictly between 0 and 1 (e.g. 0.10 for 10%), and tank must be a positive number. Both take at most 18 decimal places and are never rounded.",
+		);
+	}
+	// ADR-0047 — `openingReserves` rejects a tank so small that a reserve floors
+	// to zero (`p = 1e-18, T = 0.5`), and that pair passes every guard above it:
+	// `canonicalizeAmount18`, `PRICE_RE` and `SEED_RE` all accept it. Without
+	// this arm the throw fell through to `error_internal` and fired the Sentry
+	// capture reserved for UNRECOGNISED errors — reporting a valid-shaped admin
+	// input as a wire bug. No write is at risk (the call is outside the W-4
+	// transaction); this is O-3, a true refusal reported with a false cause.
+	if (error instanceof CpmmInputError) {
+		return err(
+			"seed_invalid",
+			"That opening price and tank produce an empty reserve on one side. Raise the tank, or move the price away from 0 or 1.",
 		);
 	}
 	if (error instanceof MarketDeadlineNotReachedError) {
