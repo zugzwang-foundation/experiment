@@ -54,6 +54,17 @@ import { truncateTables } from "../../db/_fixtures/truncate";
 const SEED = "100.000000000000000000";
 const VOID_REASON = "Question became unresolvable.";
 
+// LIQ-1 Phase 1 · T7b — D-14's own open (ADR-0047 §B / plan §2), the pool this
+// function fails on today. p_yes = 0.10 at T = 100,000 ⇒ the LARGE reserve is
+// on YES, 90,000 pairs are minted and 80,000 NO shares are DISCARDED.
+const ASYM_YES = "90000.000000000000000000";
+const ASYM_NO = "10000.000000000000000000";
+const ASYM_PRICE_YES = "0.100000000000000000";
+const ASYM_BACKING = "90000.000000000000000000";
+const ASYM_D_YES = "0.000000000000000000";
+const ASYM_D_NO = "80000.000000000000000000";
+const ASYM_OPENED_AT = new Date("2026-09-01T00:00:00.000Z");
+
 function adminMetadata() {
 	return {
 		request_id: "test-resolution-void",
@@ -112,6 +123,53 @@ async function seedOpenMarketWithPool(slug: string): Promise<string> {
 		marketId,
 		yesReserves: SEED,
 		noReserves: SEED,
+	});
+	return marketId;
+}
+
+/**
+ * LIQ-1 Phase 1 · T7b — an Open market whose pool was opened ASYMMETRICALLY,
+ * with the `market.opened` row that carries its discards.
+ *
+ * The event row is written through the DRIZZLE builder rather than
+ * `insertEvent` ON PURPOSE: the payload union is T2's subject and
+ * `tests/server/events/insert.test.ts` owns it. Routing this fixture through
+ * `insertEvent` would make the test below red for T2's missing `z.union`
+ * instead of for the cross-assert it exists to exercise, and a test that reds
+ * one layer early proves nothing about the layer it named.
+ */
+async function seedAsymmetricOpenMarket(slug: string): Promise<string> {
+	const [market] = await testDb
+		.insert(markets)
+		.values({
+			slug,
+			title: "Void Market",
+			status: "Open",
+			resolutionDeadline: new Date("2026-11-01T00:00:00Z"),
+		})
+		.returning({ id: markets.id });
+	const marketId = market?.id ?? "";
+	await testDb.insert(pools).values({
+		marketId,
+		yesReserves: ASYM_YES,
+		noReserves: ASYM_NO,
+	});
+	await testDb.insert(events).values({
+		eventType: "market.opened",
+		aggregateType: "market",
+		aggregateId: marketId,
+		payload: {
+			marketId,
+			yesReserves: ASYM_YES,
+			noReserves: ASYM_NO,
+			openingPriceYes: ASYM_PRICE_YES,
+			backingMinted: ASYM_BACKING,
+			discardedYes: ASYM_D_YES,
+			discardedNo: ASYM_D_NO,
+		},
+		payloadVersion: 1,
+		metadata: {},
+		createdAt: ASYM_OPENED_AT,
 	});
 	return marketId;
 }
@@ -382,6 +440,134 @@ describe("ENGINE.9 F-RESOLVE-3 — voidMarket (W-3d)", () => {
 			.reduce((a, b) => (a.greaterThan(b) ? a : b))
 			.toFixed(18);
 		expect(finalBalance).toBe("1007.142857142857142857");
+	});
+
+	it("resolution-void::asymmetric-open-with-positions-reconciles", async () => {
+		// LIQ-1 Phase 1 · T7b — ADR-0047 §Acceptance row "Void, asymmetric":
+		// `voidMarket` on a 90,000/10,000 market with positions RETURNS and
+		// RECONCILES. Plan §9 R4.
+		//
+		// ⛔ RED-FIRST, AND BY THE THROW. Against today's `void.ts` this test
+		// does not fail an equality — it fails because line 189 THROWS
+		// "cash cross-assert failed (economics bug)". That distinction is the
+		// whole point: `cash = Y + H_yes` and `crossCash = N + H_no` differ by
+		// exactly D_no = 80,000 on any asymmetric open, and every buy moves BOTH
+		// by the stake, so the gap never closes. The function's own comment at
+		// :176-177 predicts this ("assumes the symmetric seed Y₀ = N₀ — an
+		// asymmetric ENGINE.14 seed breaks this loudly, never silently"). A test
+		// that reddened on a number instead would be DESCRIBING the defect; this
+		// one EXERCISES it.
+		//
+		// After T7 the two sides become Y + H_yes + D_yes and N + H_no + D_no,
+		// with (D_yes, D_no) read from `loadMarketDiscards` on the SAME tx under
+		// the pool lock, and both equal the total Đ deposited.
+		const userK = await seedUser("void-k");
+		const userL = await seedUser("void-l");
+		const marketId = await seedAsymmetricOpenMarket("void-asymmetric");
+		const betK = await placeBet({
+			userId: userK,
+			marketId,
+			side: "YES",
+			stake: "100",
+		});
+		const betL = await placeBet({
+			userId: userL,
+			marketId,
+			side: "NO",
+			stake: "50",
+		});
+
+		const result = await voidMarket({
+			marketId,
+			reason: VOID_REASON,
+			voidEventId: uuidv7(),
+			metadata: adminMetadata(),
+		});
+
+		// No sells ⇒ f = 1 everywhere ⇒ Σ void_refund == Σ stakes EXACTLY, and
+		// the unwind is the admin's BACKING coming back out whole — 90,000, not
+		// the 10,000 sitting in the NO reserve and not the 100,000 tank.
+		expect(result.betsRefunded).toBe(2);
+		expect(new CpmmDecimal(result.poolUnwindAmount).toFixed(18)).toBe(
+			ASYM_BACKING,
+		);
+
+		const refundRows = await testDb
+			.select({ betId: payoutEvents.betId, amount: payoutEvents.amount })
+			.from(payoutEvents)
+			.where(eq(payoutEvents.marketId, marketId));
+		expect(refundRows.length).toBe(2);
+		const amountByBet = new Map(refundRows.map((r) => [r.betId, r.amount]));
+		expect(amountByBet.get(betK)).toBe("100.000000000000000000");
+		expect(amountByBet.get(betL)).toBe("50.000000000000000000");
+
+		// markets: Voided + VOID outcome — it VOIDED, which is the acceptance
+		// row's first word and the thing today's code cannot do.
+		const [marketRow] = await testDb
+			.select({
+				status: markets.status,
+				resolutionOutcome: markets.resolutionOutcome,
+			})
+			.from(markets)
+			.where(eq(markets.id, marketId));
+		expect(marketRow?.status).toBe("Voided");
+		expect(marketRow?.resolutionOutcome).toBe("VOID");
+
+		// ADR-0047 §E, read off the POST-STATE rows rather than restated from
+		// the fixture: Y + H_yes + D_yes == N + H_no + D_no == total Đ deposited
+		// (backing 90,000 + Σ stakes 150). Positions are never touched by void,
+		// so these are the same rows the transaction saw.
+		const [poolRow] = await testDb
+			.select({
+				yesReserves: pools.yesReserves,
+				noReserves: pools.noReserves,
+			})
+			.from(pools)
+			.where(eq(pools.marketId, marketId));
+		const positionRows = await testDb
+			.select({ side: positions.side, quantity: positions.quantity })
+			.from(positions)
+			.where(eq(positions.marketId, marketId));
+		let heldYes = new CpmmDecimal(0);
+		let heldNo = new CpmmDecimal(0);
+		for (const p of positionRows) {
+			if (p.side === "YES") heldYes = heldYes.plus(p.quantity);
+			else heldNo = heldNo.plus(p.quantity);
+		}
+		const deposited = new CpmmDecimal(ASYM_BACKING).plus("150").toFixed(18);
+		const yesSide = new CpmmDecimal(poolRow?.yesReserves ?? "0")
+			.plus(heldYes)
+			.plus(ASYM_D_YES)
+			.toFixed(18);
+		const noSide = new CpmmDecimal(poolRow?.noReserves ?? "0")
+			.plus(heldNo)
+			.plus(ASYM_D_NO)
+			.toFixed(18);
+		expect(yesSide).toBe(deposited);
+		expect(noSide).toBe(deposited);
+		// …and the half-identity the OLD code checked is genuinely BROKEN here —
+		// stated so nobody "fixes" this test by dropping the discard terms.
+		expect(
+			new CpmmDecimal(poolRow?.yesReserves ?? "0").plus(heldYes).toFixed(18),
+		).not.toBe(
+			new CpmmDecimal(poolRow?.noReserves ?? "0").plus(heldNo).toFixed(18),
+		);
+
+		// unwind == cash − Σ refunds, with cash the TRUE backing-side total.
+		expect(new CpmmDecimal(yesSide).minus("150").toFixed(18)).toBe(
+			result.poolUnwindAmount,
+		);
+
+		// Terminal emit carries the same number (R-9.5e).
+		const voidedEvents = await testDb
+			.select({ payload: events.payload })
+			.from(events)
+			.where(eq(events.eventType, "market.voided"));
+		expect(voidedEvents.length).toBe(1);
+		const payload = voidedEvents[0]?.payload as Record<string, unknown>;
+		expect(new CpmmDecimal(String(payload.poolUnwindAmount)).toFixed(18)).toBe(
+			ASYM_BACKING,
+		);
 	});
 
 	it("resolution-void::void-from-open-and-from-closed", async () => {
