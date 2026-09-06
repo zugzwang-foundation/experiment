@@ -3635,7 +3635,7 @@ resolvable from this tree. The two citations above are.
 
 ---
 
-## LIQ-1 / ADR-0047 — three drift rows recorded, not acted on (2026-09-06)
+## LIQ-1 / ADR-0047 — drift rows recorded, not acted on (2026-09-06; L-4 added 2026-09-07)
 
 Surfaced by `LIQ-RECON-2` and carried into ADR-0047's *Drift recorded, not acted
 on* list. Each is a documented claim that measures false today. None is
@@ -3643,8 +3643,14 @@ load-bearing for LIQ-1 Phase 1; each is recorded here so the next reader of the
 stated document does not inherit it. **Status OPEN, no owner** — a row leaves
 this table when someone rules on it, not when someone notices it again.
 
+⚠ **L-4 is a different kind of row and is the one with an owner.** L-1…L-3 are
+stale documentation. L-4 is a live gap in the product, surfaced by
+`@security-auditor` at the LIQ-1 Phase 1 close, and it is **already ruled** — it
+is here because the fix belongs to Phase 2, not because the decision is open.
+
 | # | Row | Status | Owner |
 |---|---|---|---|
 | **LIQ-1 L-1** | `AGENTS.md` §9:445 says of `I-GENESIS-001` *"Staging is in that state on all eight markets, because they reached `Open` outside the product"* — i.e. no `market.opened`, therefore a blank chart. **Measured 2026-09-06: all twelve `Open` staging markets carry one**; the absence predicate returns 0 rows. A `chart-4-genesis-backfill` (the arbiter is `events.metadata.request_id`, not UUIDv7 id arithmetic) closed the gap after CHART-3 wrote the sentence — **`O-14`, the ground moved**; the doc was true when written. ⚠ **Corrected against ADR-0047 and RECON-2 §4.5, which both say `CLAUDE.md` §2 states this too: it does not, and `git log -S` shows it never has.** One site, not two. | OPEN | — |
 | **LIQ-1 L-2** | `ADR-0013` §2 pins the canonical lock order as `pools → positions → dharma_ledger → friendly_fire_events → events` and devotes a whole decision (T2) to placing `friendly_fire_events` in it — a table **dropped at migration `0018`** (DEBATE.9). The order that actually runs has four links, not five. ADR substance is immutable once accepted (SPEC.2 §22.4), so this wants a Patch record or a superseding ADR, not an edit. | OPEN | — |
 | **LIQ-1 L-3** | `drizzle/migrations/0007_pg_cron_jobs.sql:16` runs `CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;` — **`pg_cron` installs into `pg_catalog`**, so the requested schema is not where it lives. Inert today: CI strips every `cron.*` statement from `*pg_cron*.sql` before applying, and the extension is already present on both environments. Bites the first time a migration is applied to a database where `pg_cron` is *absent*. Migrations are append-only — a new migration, never an edit to `0007`. | OPEN | — |
+| **LIQ-1 L-4** | **`openMarket` is not freeze-gated.** `isFrozen()` is consulted at exactly two sites — `src/server/bets/endpoint.ts` and the close-due cron — so `createMarket`, `openMarket`, `closeMarket` and every resolution flow run unchecked after the 2026-11-05 23:59 UTC write-freeze. Resolution's exemption is DELIBERATE and tested (`tests/server/resolution/freeze-exemption.test.ts`): a market already in flight must be able to finish. **Opening a BRAND-NEW market after the freeze is not that**, and nothing in SPEC, ADR or test ratifies it — a market opened post-freeze can take no bets (the bet path IS gated), so it would exist only as an un-actionable row in the public dataset. Admin-only, therefore outside the threat model, therefore not a security finding — which is exactly why it needs a ruling rather than an incident. ⚠ Pre-existing, NOT introduced by ADR-0047; surfaced by `@security-auditor` while auditing Phase 1's changes to `openMarket`. **RULED: gate it — refuse when `system_state.frozen_at IS NOT NULL`.** | **OPEN** | **LIQ-1 Phase 2** — lands with it |
