@@ -345,38 +345,54 @@ price-preserving addition that §7.4 will admit, are one function —
 derived from upstream's `addCpmmLiquidityFixedP` under the §2 MIT
 attribution.
 
-### 7.2 Opening price — the pre-launch curation slate
+### 7.2 The pre-launch curation slate — arguments, not price
 
-The probability at seed is 0.5 structurally: opening elsewhere via reserves
-would require a holder for the excess side, and the admin cannot hold
-positions (SPEC.1 §10.1); opening elsewhere via the curve would require the
-stripped weight.
+**AMENDED by ADR-0047 (2026-09-06). This section previously made the slate
+the price-setting mechanism. It is not, and it does not set price again.**
 
-The price the audience sees at public launch is **not** 0.5 by default —
-it is set deliberately. **Standard launch procedure for every market:**
-after seed and before public availability, a **curation slate** executes on
-the curve — a set of ordinary, fully-commented bets (§4 buys under INV-1,
-every stake carrying its argument) on both sides, curated per-market, that
-(a) skews the price from 0.5 to the chosen opening level for the question
-asked, and (b) kickstarts the debate with substantive commentary on each
-side. The pre-launch phase is under complete operator control: which
-arguments, which sides, which stakes, what opening level. The slate rides
-**operator-controlled participant accounts** — never the admin ledger
-account, which structurally cannot bet or comment (SPEC.1 §10.1) — so the
-data model's admin/participant separation is preserved while the operator
-retains full control of the launch state.
+Price is set structurally, by the two opening reserves (§7.1). The slate's
+only remaining job is the one it was always better at: giving a market a
+debate to arrive into.
+
+The paragraph that stood here opened "the probability at seed is 0.5
+structurally", and that sentence held for exactly as long as the seed was
+symmetric. §7.1 now opens the market at a chosen p and DISCARDS the excess
+side rather than finding a holder for it — which is precisely the
+impossibility this section used to rest on.
+
+**Standard launch procedure for every market:** after the open and before
+public availability, a **curation slate** posts a small number of sincere,
+fully-argued bets on each side (§4 buys under INV-1, every stake carrying
+its argument), curated per-market. Its purpose is (a) that a market does
+not go live with an empty debate, and (b) that both sides are represented
+by an argument someone can answer. **Stakes are deliberately small enough
+not to move the price** — the opening price is §7.1's, and a slate that
+moved it would be re-introducing the mechanism ADR-0047 removed.
+
+Why this changed is worth recording, because the old design was not
+obviously wrong. Reaching a 10% open by slate required operator-controlled
+participant accounts to hold NO positions worth twice the seed, riding to
+resolution, each carrying a mandatory argument under INV-1 that the
+operator does not hold — arguments by fiat, with stake, taking real
+payouts and real leaderboard rows. That is strictly further from an honest
+book than a discard, which has no holder, no position, no vote, no payout
+and no leaderboard row. Setting the price structurally and letting the
+slate seed ARGUMENTS ONLY separates the two things this section used to
+conflate. See ADR-0047 §Decision Outcome B and §Consequences.
 
 To this file a slate bet is indistinguishable from any other bet: same
 formulas, same rounding, same ledger flows, same k-preservation; slate
 positions are real positions, exposed to §8 resolution like any other.
-**No special math exists or is needed.** What the slate requires is product
+**No special math exists or is needed** — and now that the slate does not
+set price, none is implied either. What the slate requires is product
 definition, owned by SPEC.1 and deferred to the debate-phase market design:
 the curation-account model and Dharma provenance, the lifecycle window in
 which the slate executes (a SPEC.1 §6 definition — bets currently exist
 only in `Open`, so pre-launch implies a visibility gate or a defined
-sub-state), per-market opening levels and the curation process itself,
-dataset labeling/disclosure of slate bets, and leaderboard treatment of
-slate accounts.
+sub-state), dataset labeling/disclosure of slate bets, and leaderboard
+treatment of slate accounts. **Per-market opening levels are no longer on
+that list**: they are a parameter of market opening (§7.1), not a curation
+outcome.
 
 ### 7.3 Rejected reserve-side alternatives (recorded)
 
@@ -744,3 +760,4 @@ the curation slate's product definition (§7.2 — SPEC.1, debate phase).
 | 2.0.0 | 2026-07-07 | HMH | **§8.2 + INV-C4 rewritten to the founder-ratified R-9.8 void basis** (AUDIT.1 finding D1; canonical sources: SPEC.1/SPEC.2 v1.0.3 ENGINE.9 riders + shipped `resolution/void.ts`): refund = f × stake per bet, sale proceeds stand, no negative compensating entries, no void-leg `uncollectable`; residual (`poolUnwindAmount`, R-9.5e) = D − Σ `void_refund`, equal to seed only absent realized sale P&L; void auditing is ledger-based, not reserve-alone. §13 contract comment verified current (void stays ledger arithmetic, no curve function — unchanged). MAJOR per §0 semver (formula/invariant change). Also records the previously-unlogged ENGINE.14 amendment (`a29ef7e`, pool-seed payload recording form — no version bump was made at the time). |
 | 2.1.0 | 2026-07-15 | HMH | **Slippage warning trigger retired** (F-BET-9; SPEC.1 1.0.15; basis design-canon §4 ruling 2 — W2.10 Option A, operator-ratified 2026-06-27). §6.2 trigger removed (threshold, strict->, pre-confirm modal); its probability-points rationale relocated to §6.1 as the impact-unit definition. §6.4 consumable reframed from the pre-confirm modal to the non-blocking preview (price / shares / cost-or-proceeds; `threshold` dropped from the bundle; the caller-side SPEC.1 §16.1 per-bet stake cap is reflected in the preview figures — the cap constant itself deliberately lives only in SPEC.1: app-layer guard, the pure functions stay pure). §0 gates / §1 / §4.4 / §14 warning references scrubbed. MINOR per §0 semver: no change to the §6.1 impact formula, §6.3 preview semantics, §13 returns, or the worked examples — consumer-scope change, not a formula/invariant change. |
 | 3.0.0 | 2026-09-06 | HMH | **ADR-0047 Phase 1 — asymmetric open at a chosen price (LIQ-1).** **§7.1** rewritten: the `Draft → Open` seed commits a TANK of T Đ at an opening price p ∈ (0,1) and initialises the reserves ASYMMETRICALLY at `(y0, n0) = ((1 − p)·T, p·T)`, replacing the symmetric `(y0, n0) = (C, C)`; the symmetric seed is now the p = ½ special case, not the rule. The pair-mint account is completed by the **backing identity** `Y + H_yes + D_yes == N + H_no + D_no == total Đ deposited`, where `D_x` is the cumulative DISCARD per side — summed from `market.opened` (and, from ADR-0047 Phase 2, `pool.liquidity_added`). Discards are large by construction: the fraction is `1 − min(p,1−p)/max(p,1−p)`, 88.9% at a 10% open. **§7.3** the recorded rejection of asymmetric open is REVERSED and kept in place, struck, with the measurement that overturned it (a curation slate reaching 10% needs operator-held NO positions carrying mandatory arguments the operator does not hold — arguments by fiat, with stake, which is further from an honest book than a discard nobody holds); the upstream `p`-weight rejection STANDS and is re-derived rather than inherited. **MAJOR per §0 semver** — `(y0,n0) = (C,C)` is a formula this changes, and the backing identity is a new invariant. §7.2's slate paragraph is narrowed by §7.1's new closing sentence rather than rewritten; §7.4 and §14 are Phase 2 and deliberately untouched here. Paired: SPEC.2 §19.4.1 `market.opened` SHIP row (same commit), `src/server/cpmm/calculate.ts` `openingReserves`/`addLiquidity`/`seedReserves`, `src/server/markets/open.ts`. |
+| 3.0.0 | 2026-09-06 | HMH | **§7.2 rewritten under the same version (LIQ-1 Phase 1 addendum D3).** The row above deliberately left §7.2 alone, which put a flat "the probability at seed is 0.5 structurally" one section below a §7.1 that had just made it false — a reader landing on §7.2 first met the superseded claim, with the correction in a section they had not opened (`O-4`). §7.2 no longer sets price: the slate seeds ARGUMENTS ONLY, in stakes deliberately too small to move the curve, and every sentence describing operator-controlled accounts walking the price to a chosen level is DELETED rather than qualified. The reasoning that overturned it is kept, because the old design was not obviously wrong and a reversal with no argument teaches a later reader nothing. "Per-market opening levels" is struck from §7.2's deferred-product list — it is a parameter of market opening now, not a curation outcome. **No version bump: 3.0.0 is the ADR-0047 version and this is that same amendment finishing its job**, not a second one. |
