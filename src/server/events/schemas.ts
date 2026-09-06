@@ -109,24 +109,26 @@ export type EventType = (typeof EVENT_TYPES)[number];
  * (`market.resolved`/`corrected`/`voided`); per-bet payouts are rows in the
  * `payout_events` TABLE, not generic events (D-B reversed pre-merge).
  *
- * `as const satisfies Record<EventType, z.ZodTypeAny>` is load-bearing:
+ * The `as const satisfies Record<EventType, …>` clause is load-bearing:
  * `as const` preserves per-key narrowing so
  * `eventPayloadSchemas['user.signed_out']` is the specific
  * `z.ZodObject<{ userId: ZodString }>`, NOT widened. `satisfies` enforces the
- * closed-enum coverage at compile time — that is the property this clause is
- * here for, and it is unaffected by the constraint's width.
+ * closed-enum coverage at compile time — adding a type to `EVENT_TYPES` without
+ * a schema here fails `tsc`.
  *
- * ⚠ The constraint was `z.ZodObject<z.ZodRawShape>` until ADR-0047, and a
- * `z.ZodObject` bound is no longer expressible: `market.opened` is a
- * `z.ZodUnion` of two object schemas, and a union is not a `ZodObject` (tsc
- * says so — TS2740, `missing the following properties: _cached, _getCached,
- * shape, strict, and 14 more`). Widening to `ZodTypeAny` gives up the
- * "every payload schema is an object schema" assertion, which the union makes
- * untrue as stated while leaving it true in substance — every ARM is an object,
- * and every payload is still a JSON object. Nothing consumes these schemas
- * through a `ZodObject`-only surface: `insertEvent` uses `.safeParse` and
- * `z.infer`, and the two read sites use `.parse`. Reach for `.shape` or
- * `.extend` on one of these and the union is where it will bite.
+ * ⚠ The bound reads "an object schema, OR a union of object schemas", and both
+ * halves are deliberate. It was a bare `z.ZodObject<z.ZodRawShape>` until
+ * ADR-0047; `market.opened` is now a `z.ZodUnion` of two object schemas, and a
+ * union is not a `ZodObject` — tsc is unambiguous (TS2740: `missing the
+ * following properties: _cached, _getCached, shape, strict, and 14 more`).
+ *
+ * The obvious repair is `z.ZodTypeAny`, and it is too loose: it admits a
+ * `z.string()` or a `z.array()` here, which would break `insert.ts`'s
+ * `JSON.stringify(payload)::jsonb` write and its `Record<string, unknown>`
+ * compare. What every payload must be is a JSON OBJECT, and this bound says
+ * exactly that while allowing an event type to carry more than one object
+ * shape. Keep it this shape when the next union lands; do not relax it to
+ * `ZodTypeAny` to make an error go away.
  */
 export const eventPayloadSchemas = {
 	"image_upload.sign_requested": z.object({
@@ -344,7 +346,11 @@ export const eventPayloadSchemas = {
 		banned: z.boolean(),
 		uploadId: z.string().uuid().nullable(),
 	}),
-} as const satisfies Record<EventType, z.ZodTypeAny>;
+} as const satisfies Record<
+	EventType,
+	| z.ZodObject<z.ZodRawShape>
+	| z.ZodUnion<[z.ZodObject<z.ZodRawShape>, ...z.ZodObject<z.ZodRawShape>[]]>
+>;
 
 /**
  * Canonical 7-field metadata set per SPEC.2 §3.7. Stored in
