@@ -53,6 +53,15 @@ import { truncateTables } from "../db/_fixtures/truncate";
 //  (iii) void:    Σ FLOW == seed − unwind                       (★ unchanged)
 
 const SEED = "100.000000000000000000";
+/**
+ * The Đ deposited at open — the term the conservation identity starts from
+ * (ADR-0047 §E). These fixtures insert a SYMMETRIC pool row directly
+ * (`yesReserves = noReserves = SEED`) and emit no `market.opened`, so nothing
+ * is discarded and the backing equals the per-side reserve. Named separately
+ * anyway: the identity is written in backing, and the two coincide only while
+ * the open is symmetric.
+ */
+const SEED_BACKING = SEED;
 const REASON = "Conservation fixture reason.";
 const FLOW_SET = new Set<DharmaEntryType>(FLOW_TAGS);
 
@@ -207,7 +216,7 @@ describe("ENGINE.9 — resolution conservation identities (i)/(ii)/(iii)", () =>
 		});
 
 		const ledgerFlows = await gatherBetTiedFlows(marketId);
-		const netAdminPoolInjection = new CpmmDecimal(SEED)
+		const netAdminPoolInjection = new CpmmDecimal(SEED_BACKING)
 			.minus(result.poolUnwindAmount)
 			.toFixed(18);
 		expect(netAdminPoolInjection).toBe("50.000000000000000000");
@@ -291,7 +300,7 @@ describe("ENGINE.9 — resolution conservation identities (i)/(ii)/(iii)", () =>
 		expect(uncollectableTotal).toBe("110.000000000000000000");
 
 		const ledgerFlows = await gatherBetTiedFlows(marketId);
-		const netAdminPoolInjection = new CpmmDecimal(SEED)
+		const netAdminPoolInjection = new CpmmDecimal(SEED_BACKING)
 			.minus(settled.poolUnwindAmount)
 			.toFixed(18);
 		expect(
@@ -337,7 +346,7 @@ describe("ENGINE.9 — resolution conservation identities (i)/(ii)/(iii)", () =>
 		expect(
 			checkMarketConservation({
 				ledgerFlows,
-				netAdminPoolInjection: new CpmmDecimal(SEED)
+				netAdminPoolInjection: new CpmmDecimal(SEED_BACKING)
 					.minus(result.poolUnwindAmount)
 					.toFixed(18),
 			}),
@@ -394,7 +403,7 @@ describe("ENGINE.9 — resolution conservation identities (i)/(ii)/(iii)", () =>
 		expect(
 			checkMarketConservation({
 				ledgerFlows: [...betTied, ...saleProceeds],
-				netAdminPoolInjection: new CpmmDecimal(SEED)
+				netAdminPoolInjection: new CpmmDecimal(SEED_BACKING)
 					.minus(result.poolUnwindAmount)
 					.toFixed(18),
 			}),
