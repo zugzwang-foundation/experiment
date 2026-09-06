@@ -297,10 +297,24 @@ export function computeSell({
 }
 
 /**
- * Resolved unwind (§8.1): the residual returned to the winning side equals its
- * reserve — a selector, not curve math. Both reserves are validated (§3.4:
- * y, n > 0 always). The void residual is a ledger identity (§8.2) — no curve
- * function exists for it.
+ * ⛔ SUPERSEDED AS THE RESOLVED UNWIND BY ADR-0047 §E. THIS IS NOT WHAT
+ * `settleMarket` PAYS OUT, AND IT HAS NO `src/` CALLER.
+ *
+ * It returns the bare winning-side reserve, which WAS the residual for as long
+ * as every open was symmetric and nothing was ever discarded. With a discard the
+ * residual is `winning reserve + D_winning` — the destroyed shares' Đ has no
+ * holder to pay and nowhere else to go — and `resolution/settle.ts` computes
+ * that directly, routing around this function on purpose.
+ *
+ * Kept, not deleted, because `cpmm.md` §13 names it in the module contract and
+ * three `tests/unit/cpmm/` files pin it, including the §12 worked vectors. But
+ * it is the obviously-named function for a job it no longer does, so a future
+ * caller reaching for it by name would silently under-pay every asymmetric NO
+ * outcome. Flagged by `@code-reviewer` MEDIUM-3; its fate is a Phase-2 decision
+ * alongside the §8.1 amendment, not an edit to make here.
+ *
+ * Both reserves are validated (§3.4: y, n > 0 always). The void residual is a
+ * ledger identity (§8.2) — no curve function exists for it.
  */
 export function computeResolvedUnwind({
 	reserves,

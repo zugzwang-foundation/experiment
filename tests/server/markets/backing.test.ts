@@ -224,15 +224,28 @@ describe("markets/backing — the single market.opened reader (LIQ-1 T6b)", () =
 		expect(eq(discards.no, "0")).toBe(true);
 	});
 
-	it("backing::load-discards-SUMS-across-rows-rather-than-reading-one", async () => {
-		// ⚠ DELIBERATELY NOT A PRODUCT STATE. `I-GENESIS-001` says a market
-		// carries exactly one `market.opened`, so two rows can never occur today.
-		// The case exists because plan §4 T6 requires the function to be written
-		// to SUM, not to read one row: Phase 2 adds `pool.liquidity_added` to the
-		// same `WHERE event_type IN (...)` and NO call site changes. A
-		// `.limit(1)` implementation passes every other test in this file and
-		// silently drops every injection in Phase 2 — this is the only assertion
-		// that catches it.
+	it("backing::load-discards-reads-the-OLDEST-genesis-row-never-their-sum", async () => {
+		// ⚠ INVERTED at `@code-reviewer` HIGH-1, not deleted — a regression to
+		// summing genesis rows reddens here (it would read 125 / 80500).
+		//
+		// This case asserted the SUM, on the plan's reasoning that
+		// `I-GENESIS-001` guarantees one row. It does not: that invariant is a
+		// `NOT EXISTS` predicate — AT LEAST one — and no unique index backs it.
+		// Summing therefore let a duplicate genesis row double `D`, and
+		// `settleMarket` would have written the doubled figure to a terminal,
+		// append-only row with no cross-assert to catch it.
+		//
+		// ⛔ THE ORIGINAL COMMENT'S WARNING STILL STANDS AND IS NOT DISCHARGED:
+		// "a `.limit(1)` implementation silently drops every injection in Phase 2".
+		// True — which is why Phase 2 adds a SECOND, SUMMING query for
+		// `pool.liquidity_added` rather than widening this one to
+		// `WHERE event_type IN (...)`. Genesis happens once per market; injections
+		// happen many times. Merging them back into one query reintroduces exactly
+		// the defect this inversion removes, and this test is what says so.
+		//
+		// The expected values are the OLDEST row's (`OPENED_AT` < `OPENED_AT_2`),
+		// matching `replayReserveSeries`'s `ORDER BY created_at ASC LIMIT 1` — so
+		// the chart and the payout can never describe different markets.
 		const marketId = uuidv7();
 		await insertOpenedRow(marketId, asymmetricPayload(marketId), OPENED_AT);
 		await insertOpenedRow(
@@ -246,8 +259,9 @@ describe("markets/backing — the single market.opened reader (LIQ-1 T6b)", () =
 
 		const discards = await loadMarketDiscards(testDb, marketId);
 
-		expect(eq(discards.yes, "125")).toBe(true);
-		expect(eq(discards.no, "80500")).toBe(true);
+		// The first row's discards, NOT the sum of both.
+		expect(eq(discards.yes, "0")).toBe(true);
+		expect(eq(discards.no, "80000")).toBe(true);
 	});
 
 	it("backing::load-discards-is-scoped-to-its-own-market", async () => {

@@ -61,7 +61,16 @@ export async function openMarket(args: {
 	marketId: string;
 	/** p_yes at open, strictly inside (0,1). */
 	openingPriceYes: string;
-	/** T — the Đ committed to the pool. */
+	/**
+	 * T — the reserve TANK: `yes + no` sums to exactly this.
+	 *
+	 * ⚠ NOT the Đ deposited. The open mints `max(yes, no)` pairs, so at
+	 * `p = 0.10, T = 100,000` the admin commits 90,000 Đ and the reserves sum
+	 * to 100,000 — the other 80,000 NO shares are discarded, never bought.
+	 * `backingMinted` is the Đ figure and the one the backing identity uses.
+	 * Phase 2's target rule compares against the TANK (`tank = yes + no`), so
+	 * reading this as Đ sizes FLOOR and COEFF against the wrong quantity.
+	 */
 	tank: string;
 	/** D-14.e: the clock is an argument — never read internally. */
 	now: Date;

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import type { DbClient, DbTransaction } from "@/db";
 import { events } from "@/db/schema";
@@ -55,9 +55,22 @@ const HALF = toFixed18(new CpmmDecimal("0.5"));
  * this shape, which is why the union keeps its legacy arm rather than migrating
  * the rows.
  *
- * Parses with the shipped schema and THROWS on a malformed payload, preserving
- * the posture `price-series.ts` has had since UI-A5 — a payload that cannot be
- * read is a corrupt audit trail, not a chart to draw approximately.
+ * Parses with the shipped schema and THROWS on a malformed payload. That was
+ * `price-series.ts`'s posture already, but inheriting a CHART's posture is not
+ * an argument for a settlement's, so here is the argument (`@code-reviewer`
+ * MEDIUM-4): `settleMarket` and `voidMarket` now call this inside their
+ * transaction, so an unreadable genesis row makes a market unsettleable rather
+ * than merely unchartable. That is deliberate and it is the right way round.
+ * The alternative — default `D` to zero and settle anyway — writes a knowably
+ * wrong `poolUnwindAmount` onto a terminal, append-only row that INV-4 forbids
+ * anyone from correcting. An unsettleable market is a problem someone can fix;
+ * a wrong terminal payout is not.
+ *
+ * ⚠ It is a NEW money-path posture: before this branch neither resolution
+ * function read any event payload, and a corrupt genesis row cost a chart. The
+ * exposure is narrow — prod has no markets, and plan §7's `staging:rebuild`
+ * replaces all twelve staging rows with engine-emitted ones — but it is real
+ * until that reseed runs.
  */
 export function readOpenedReserves(payload: unknown): OpenedReserves {
 	const parsed = eventPayloadSchemas["market.opened"].parse(payload);
@@ -99,17 +112,43 @@ export function openingBacking(r: OpenedReserves): string {
  * pool lock — a second connection there would read outside the lock and could
  * see a different world than the one being settled.
  *
- * Written as a SUM over rows rather than a read of one row. Today there is
- * exactly one source (`market.opened`, and `I-GENESIS-001` says every Open
- * market has it), so the sum is over a single row; ADR-0047 Phase 2 adds
- * `pool.liquidity_added` to the same walk and no call site changes. An absent
- * row returns (0,0) — a market with no open has no discards, which is the same
- * answer for a Draft market and for a defensive miss.
+ * ⛔ READS THE OLDEST `market.opened` ROW, AND DOES NOT SUM OVER GENESIS ROWS.
+ * This was a sum until `@code-reviewer` HIGH-1, on the reasoning that
+ * `I-GENESIS-001` guarantees one row. It does not: that invariant is a
+ * `NOT EXISTS` predicate, so it asserts AT LEAST one, and there is no unique
+ * index on `events (aggregate_id, event_type)`. A duplicate genesis row would
+ * therefore double `D`, and the two consumers would disagree about it —
+ * `replayReserveSeries` takes `ORDER BY created_at ASC LIMIT 1`, so the chart
+ * would draw one market while `settleMarket` paid out another.
+ *
+ * That divergence is the dangerous half. Void would THROW (its cross-assert
+ * would see the doubled term on one side only) — loud, recoverable. Settle on
+ * the discarded side would quietly over-report `poolUnwindAmount` and write it
+ * to a terminal, append-only row: a wrong number, no alarm, no way back. It is
+ * the exact defect class this branch exists to remove, one layer up.
+ *
+ * Not reachable through the product — `pools.market_id` is UNIQUE, so a second
+ * `openMarket` hits 23505 — but the repository documents the precedent for
+ * inserting one out of band: `chart-4-genesis-backfill`, whose script is not in
+ * this repository (docs/parked.md LIQ-1 L-1). Matching the chart's read exactly
+ * means the two readers cannot diverge even then.
+ *
+ * ⚠ Phase 2's `pool.liquidity_added` rows ARE summed, and are a separate query.
+ * Genesis is once per market; injections are many. Do not merge them back into
+ * one `WHERE event_type IN (...)` — that is how this defect was written the
+ * first time.
+ *
+ * An absent row returns (0,0) — a market with no open has no discards, which is
+ * the same answer for a Draft market and for a defensive miss.
  */
 export async function loadMarketDiscards(
 	client: DbClient | DbTransaction,
 	marketId: string,
 ): Promise<{ yes: string; no: string }> {
+	// Byte-for-byte the genesis read in `replayReserveSeries`
+	// (discovery/price-series.ts): same predicate, same ASC order, same LIMIT 1.
+	// If these two ever drift, the chart and the payout describe different
+	// markets.
 	const rows = await client
 		.select({ payload: events.payload })
 		.from(events)
@@ -119,14 +158,17 @@ export async function loadMarketDiscards(
 				eq(events.aggregateId, marketId),
 				eq(events.eventType, "market.opened"),
 			),
-		);
+		)
+		.orderBy(asc(events.createdAt))
+		.limit(1);
 
-	let yes = new CpmmDecimal(0);
-	let no = new CpmmDecimal(0);
-	for (const row of rows) {
-		const opened = readOpenedReserves(row.payload);
-		yes = yes.plus(opened.dYes);
-		no = no.plus(opened.dNo);
+	const genesis = rows[0];
+	if (genesis === undefined) {
+		return { yes: ZERO, no: ZERO };
 	}
-	return { yes: toFixed18(yes), no: toFixed18(no) };
+	const opened = readOpenedReserves(genesis.payload);
+	return {
+		yes: toFixed18(new CpmmDecimal(opened.dYes)),
+		no: toFixed18(new CpmmDecimal(opened.dNo)),
+	};
 }
