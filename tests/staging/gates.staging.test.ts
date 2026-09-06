@@ -420,6 +420,13 @@ describe("gate 2 · conservation", () => {
 			// market.opened payload rather than a single constant, because the
 			// fixture table opens markets differently from one another.
 			//
+			// ⚠ ALL THREE PREDICATES, ORDERED, LIMIT 1 — byte-for-byte `readGenesisRow`
+			// (`markets/backing.ts`) and `replayReserveSeries`. It was one predicate
+			// with no ordering, taking `openedRows[0]`: on a duplicated genesis row
+			// this gate would have reconciled against a THIRD row, while the chart and
+			// the payout each took the oldest. Three readers, three answers, and this
+			// one is the arbiter of the reseed.
+			//
 			// ⛔ THE WHOLE PAYLOAD, NOT `payload->>'seedAmount'`. An ADR-0047 open
 			// carries no `seedAmount` key at all, so the old SQL returned NULL for
 			// every asymmetric market — and the `continue` below reads NULL as
@@ -432,7 +439,11 @@ describe("gate 2 · conservation", () => {
 			>`
 				SELECT payload
 				FROM events
-				WHERE event_type = 'market.opened' AND aggregate_id = ${market.id}
+				WHERE aggregate_type = 'market'
+				  AND event_type = 'market.opened'
+				  AND aggregate_id = ${market.id}
+				ORDER BY created_at ASC, event_id ASC
+				LIMIT 1
 			`;
 			const openedPayload = openedRows[0]?.payload;
 			if (openedPayload == null) {
