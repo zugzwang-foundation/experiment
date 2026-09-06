@@ -47,11 +47,14 @@ pool once at `Draft → Open` and there are no external liquidity providers and 
 mid-market adjustments (SPEC.1 §10.5, §10.6); **binary single-answer** — no
 multi-outcome machinery; and **weight-pinned** — Manifold's pool weight is fixed at
 p ≡ ½, which collapses their parametrised maker to the pure constant product
-`y · n = k` (§3.3). A direct consequence: every pool *seeds* at probability 0.5.
-The opening price the audience sees is then set deliberately — a standard
-pre-launch curation slate of ordinary commented bets moves the price from 0.5 to a
-per-market level chosen for the question, under full operator control, before
-public availability (§7.2).
+`y · n = k` (§3.3). ⚠ **Note the scope of that stripping: it removes the curve
+WEIGHT, not the ability to open at a chosen price.** Since ADR-0047 a pool seeds
+at whatever probability the operator names, by placing the two reserves
+asymmetrically and discarding the excess side (§7.1) — the weight-pinning is why
+that is done with reserves rather than with an exponent. The pre-launch curation
+slate seeds ARGUMENTS, in stakes deliberately too small to move the price (§7.2);
+it stopped being the price-setting mechanism at ADR-0047, and the sentences here
+that described it walking the price from 0.5 to a chosen level are gone with it.
 
 **Numbers.** This file pins **no magnitudes**. Seed sizes and bet floors
 remain symbolic constants owned by SPEC.1 §16.1 and pin at the
@@ -100,10 +103,15 @@ one (YES, NO) share **pair**. One pair is worth exactly 1 Đ; at resolution each
 winning-side share pays 1 Đ and each losing-side share pays 0 (SPEC.1 §10.3).
 Conversely, every 1 Đ that leaves the pool (sale proceeds, §5) burns one pair. At
 all times every share in existence sits either in the pool reserves or in a user
-position — the admin holds no positions (SPEC.1 §10.1) — and the count of pairs in
-existence equals the Đ the pool holds. Solvency is therefore structural, not
-managed: whichever side wins, the shares users hold are each backed by a Đ already
-inside the pool (stated as an invariant with the residual identity in §8 and §11).
+position — the admin holds no positions (SPEC.1 §10.1) — **or was DISCARDED at
+open (§7.1)**, and the count of pairs in existence equals the Đ the pool holds.
+⚠ The discard clause is ADR-0047's and it is load-bearing: a discarded share is
+in no reserve and no position, so without it this sentence is false the moment a
+market opens at a price (at a 10% open, pairs in existence are 10,000 against
+90,000 Đ held). Solvency is still structural, not managed: whichever side wins,
+the shares users hold are each backed by a Đ already inside the pool, and the Đ
+behind the discarded shares is the residual §8.1 returns (stated as an invariant
+with the residual identity in §8 and §11).
 
 ### 3.3 Price
 
@@ -335,10 +343,12 @@ the identity was invisible before this section was written.
 T > 0 and p ∈ (0,1) are parameters of market opening; magnitude and
 policy are owned by SPEC.1 §10.5/§16.1 and by ADR-0047. ⚠ **T is the
 reserve SUM, not the Đ deposited.** The Đ deposited is B = max(y0, n0) —
-90,000 at p = 0.10, T = 100,000 — and B is the quantity the backing
-identity above equates to. Reading T as Đ overstates the deposit by the
-discard, and Phase 2's target rule compares against T, so the two must not
-be conflated. This file fixes
+90,000 at p = 0.10, T = 100,000 — and B is what the identity above equates
+to AT OPEN. Thereafter it equates to §8.1's D = B + Σ stakes − Σ proceeds:
+the identity holds at every instant, but the constant it holds against
+grows with the book. Reading T as Đ overstates the deposit by the discard,
+and Phase 2's target rule compares against T, so the two must not be
+conflated. This file fixes
 the mechanism: asymmetric initialisation at a chosen price, exactly
 once, with the excess discarded. There is still no curve-weight dial —
 upstream's `p` parameter (which lets Manifold open at an arbitrary
@@ -440,7 +450,12 @@ is reasonable at testnet and out of scope for the experiment.
 ### 7.4 No liquidity operations exist
 
 Per SPEC.1 §10.6, the seed is fixed for the market's life. This module
-exposes no add/remove-liquidity operation; upstream's liquidity functions
+exposes no add/remove-liquidity operation IN ANY RUNTIME PATH — ⚠ but
+`addLiquidity` IS an export of `src/server/cpmm/calculate.ts` as of ADR-0047
+Phase 1, with no caller: it is the specification and differential-fuzz oracle the
+Phase-2 SQL injector is pinned against. This section's rewrite rides Phase 2 with
+SPEC.1 §10.6; until then, read it as "no operation is WIRED", not "no function
+exists". Upstream's liquidity functions
 are stripped (§2). Reserves change through exactly three doors: §4 buy,
 §5 sell, §8 terminal unwind.
 
@@ -754,7 +769,27 @@ changing meaning.
     type Reserves = { yes: string; no: string }
 
     seedPool(seed: string): Reserves
-      // {yes: seed, no: seed}; requires seed > 0  (§7.1)
+      // {yes: seed, no: seed}; requires seed > 0. ⚠ The p = ½ SPECIAL CASE of
+      // §7.1, not the open mechanism — `openingReserves` is. Kept because every
+      // historical market.opened row is this shape and §12's vectors pin it.
+
+    seedReserves(yes: string, no: string): Reserves
+      // Seed from two explicit reserves; both > 0  (§7.1)
+
+    openingReserves(args: { openingPriceYes: string; tank: string }):
+      { reserves: Reserves; backingMinted: string;
+        discardedYes: string; discardedNo: string }
+      // THE open mechanism (§7.1, ADR-0047 §B). no = floor18(p·T),
+      // yes = T − no, so yes + no == T exactly; mints max(yes,no) pairs and
+      // discards max − min on the short side. p strictly inside (0,1).
+
+    addLiquidity(args: { reserves: Reserves; amount: string }):
+      { reserves: Reserves; backingMinted: string;
+        discardedYes: string; discardedNo: string }
+      // Price-preserving addition (ADR-0047 §A). L' = L + a,
+      // S' = floor18(S + a·S/L), discarded = a − (S'−S) as a RESIDUAL so the
+      // backing identity closes exactly. NO runtime caller in Phase 1 — it is
+      // the oracle the Phase-2 SQL injector is differentially fuzzed against.
 
     getPrices(reserves: Reserves): { yes: string; no: string }
       // §3.3; 18 dp HALF_EVEN
@@ -789,7 +824,8 @@ module reads no clock, no environment, no randomness.
 ## §14 Non-goals
 
 Fees of any kind; order books and limit orders; multi-outcome markets;
-curve weights (p ≠ ½) and asymmetric seeds (§7.3 — reopening is an ADR);
+curve weights (p ≠ ½) — asymmetric seeds are NO LONGER a non-goal; ADR-0047
+made them the only open mechanism (§7.1, §7.3);
 mid-market liquidity operations (SPEC.1 §10.6); slippage tolerance,
 auto-abort, or per-trade warning — retired by ruling, not open (design-canon
 §4 ruling 2, W2.10 Option A: deep-liquidity seeding + the SPEC.1 §16.1
