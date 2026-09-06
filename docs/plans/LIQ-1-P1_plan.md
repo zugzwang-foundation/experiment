@@ -285,9 +285,24 @@ rather than papered over.
 events. In Phase 1 the only source is `market.opened`: a new-variant payload
 contributes its `discardedYes`/`discardedNo`, and a **legacy** payload
 contributes `("0","0")`, which is exactly right because a symmetric seed
-discards nothing. The function is written to **sum**, not to read one row, so
-Phase 2 adds `pool.liquidity_added` to the same `WHERE event_type IN (...)`
-and no call site changes. It takes an explicit `client` argument (a `db` or a
+discards nothing.
+
+⚠ **AMENDED AT EXECUTE — this row said the function is written to SUM, "so Phase
+2 adds `pool.liquidity_added` to the same `WHERE event_type IN (...)` and no call
+site changes". IT READS ONE ROW, and following the original instruction
+reintroduces a defect.** `@code-reviewer` found it: `I-GENESIS-001` is a
+`NOT EXISTS` predicate — it asserts AT LEAST one `market.opened`, never exactly
+one — and no unique index on `events (aggregate_id, event_type)` backs it. So a
+duplicate genesis row would double `D`, and worse, the two readers would
+DISAGREE: `replayReserveSeries` takes `ORDER BY created_at ASC LIMIT 1`, so the
+chart would draw one market while `settleMarket` paid out another. Void throws on
+that; settle writes it silently to a terminal, append-only row.
+
+⇒ **Genesis is capped at the oldest row. Phase 2's `pool.liquidity_added` rows DO
+sum, in a SECOND query added alongside.** Genesis happens once per market;
+injections happen many times, and one query cannot have both properties. Merging
+them back into a single `WHERE event_type IN (...)` is how this was written wrong
+the first time. It takes an explicit `client` argument (a `db` or a
 `tx`) rather than importing `db` itself, because `void.ts` and `settle.ts` both
 call it **inside** their W-3 transaction under the pool lock, and a second
 connection there would read outside the lock.
