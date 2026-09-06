@@ -1032,7 +1032,7 @@ The Control Centre is reachable two ways. Both call the same backend endpoints; 
 
 **Hub** (`/admin`). The admin's workplace: the reactive review feed, audit-log search, the market list, and the terminal market actions. Used for orchestration — systematic work, market-level events, deliberation-required actions. There is **no held queue** (ADR-0021) and **no hub homepage** (§15.2); `/admin` redirects to the Moderation tab.
 
-**Inline.** When an authenticated admin views public-facing pages (e.g., `/markets/<id>`), small admin-only affordances render alongside the content for *content-level remediation only*. The admin clicks a comment-removal icon next to a comment they're reading. The action calls the same endpoint as the hub mod queue. Used for opportunistic work — the admin notices something while reading and remediates without context-switching.
+**Inline.** When an authenticated admin views public-facing pages (e.g., `/markets/<id>`), small admin-only affordances render alongside the content for *content-level remediation only*. The admin clicks a comment-removal icon next to a comment they're reading. The action calls the same endpoint as the hub review feed. Used for opportunistic work — the admin notices something while reading and remediates without context-switching.
 
 **The split is principled.**
 
@@ -1060,7 +1060,7 @@ The prior four-widget homepage design is resolved as follows, so nothing is lost
 
 **Two tabs, deliberately minimal.** `/admin` redirects to Moderation.
 
-- **Moderation** (`/admin/moderation`) — the **default landing**. The reactive review feed of published content, flagged items marked with **Remove / Ban** (F-ADMIN-4), plus audit log search (F-ADMIN-5). The operator's primary workspace.
+- **Moderation** (`/admin/moderation`) — the **default landing**. The reactive review feed of published content, flagged items marked, with **Remove / Ban** (F-ADMIN-4), plus audit log search (F-ADMIN-5). The operator's primary workspace.
 - **Markets** (`/admin/markets`) — the market list with the pinned **live** needs-resolution count and freeze countdown (§15.2), and the three terminal market actions: **Close** (manual `Open → Closed`), **Resolve** (F-ADMIN-3), and **Void** (F-RESOLVE-3 in §11). The list itself is deliberately thin; the actions are the surface.
 
 **Not in the Control Centre.** Market creation (F-ADMIN-1) and pool seed (F-ADMIN-2) are the **pre-live** market-maker workflow, executed before the 2026-09-15 go-live and not part of the in-experiment operating loop. Their existing routes under `/admin/markets/*` remain **functional and unstyled** — they are required in September and must not be removed. **Correction (F-RESOLVE-2)** is a post-hoc repair path, not required before the freeze, and is **not surfaced in v1** of the Centre; the underlying action remains available.
@@ -1197,7 +1197,7 @@ Each F-flow already names its errors inline. This subsection is a cross-referenc
 | Track A image verdict at attach | The composer says which image was rejected and why. The account is banned (E2); subsequent writes return 403. | `mod_actions` row (`track_a_auto_ban`); `users.banned_at` set. The post is not blocked; a post already live stays live until the admin acts. |
 | Track B verdict | Nothing at all for text — the post is live. A Track B image is dropped and the author told which one and why. | `mod_actions` row (`track_b_flagged` / `image_rejected`); the item is marked in the review feed; the admin acts reactively. |
 | User banned mid-session | 403 with notice; session cookie remains but write paths reject. | F-MOD-5. |
-| AI moderation false-positive ban | No appeal in v1. User contacts admin via `foundation@zugzwangworld.com`. Admin can manually reverse via append-only correction event. |  |
+| AI moderation false-positive ban | No appeal in v1. User contacts admin via `foundation@zugzwangworld.com`. Admin can manually reverse via append-only correction event. | The `mod_actions` row stands; a reversal is a new append-only event, never an edit. No ledger touch (INV-2). |
 | Network failure on bet | Idempotency key prevents duplicate submission. | Client retries on key-aware endpoint. |
 | Erasure-request (banned or active user) | "30-day verification window pending". | Per `H2`; pseudonym scrubbed at window end. |
 | Review-feed backlog | Nothing — nothing is withheld from participants. | Flagged items wait on the admin's schedule; no SLA (ADR-0021). |
