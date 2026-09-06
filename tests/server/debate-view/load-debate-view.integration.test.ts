@@ -679,6 +679,7 @@ describe("DEBATE.4 §6 — loadDebateView removal-masking gate (body/author neve
 			`m/${market.id}/not-default.png`,
 			expect.anything(),
 			expect.anything(),
+			expect.any(Date),
 		);
 
 		// ⛔ AND THE OTHER ARM, FROM THE SAME CALL. `thumbImageUrl` is the
@@ -693,6 +694,7 @@ describe("DEBATE.4 §6 — loadDebateView removal-masking gate (body/author neve
 			`m/${market.id}/default.png`,
 			expect.anything(),
 			expect.anything(),
+			expect.any(Date),
 		);
 	});
 

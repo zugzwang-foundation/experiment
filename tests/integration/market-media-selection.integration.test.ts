@@ -173,6 +173,7 @@ describe("market media selection — the tile row vs the header row", () => {
 			defaultKey,
 			READ_URL_TTL_SECONDS,
 			RENDER_IMAGE_CACHE_CONTROL,
+			expect.any(Date),
 		);
 	});
 
@@ -206,6 +207,7 @@ describe("market media selection — the tile row vs the header row", () => {
 			secondKey,
 			READ_URL_TTL_SECONDS,
 			RENDER_IMAGE_CACHE_CONTROL,
+			expect.any(Date),
 		);
 
 		// Control — on the SAME seed, the tile's read still resolves the default
@@ -271,6 +273,7 @@ describe("market media selection — the tile row vs the header row", () => {
 			defaultKey,
 			READ_URL_TTL_SECONDS,
 			RENDER_IMAGE_CACHE_CONTROL,
+			expect.any(Date),
 		);
 	});
 

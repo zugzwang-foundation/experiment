@@ -351,7 +351,7 @@ export async function memoizedReadUrl(
 	key: string,
 	ttlSeconds: number,
 	downstreamMaxAgeSeconds: number,
-	mint: () => Promise<string>,
+	mint: (signingDate?: Date) => Promise<string>,
 ): Promise<string> {
 	const holdMs = holdWindowMs(ttlSeconds, downstreamMaxAgeSeconds);
 	if (holdMs === 0) {
@@ -359,6 +359,13 @@ export async function memoizedReadUrl(
 		// would hand out a URL that is already dead by the time it is read, so
 		// this path deliberately becomes a plain mint — no read, no write, no
 		// entry occupying a slot that a memoisable object could use.
+		//
+		// ⚠ AND NO PINNED DATE EITHER. Aligning a signature to a window is only
+		// safe while something bounds how long that window's URL may be served,
+		// and this arm is the one where nothing does. Signing at a window start
+		// here would hand out a URL already partway through its life with no hold
+		// to cap it — strictly worse than "now". The degenerate arm stays exactly
+		// what this module's absence was.
 		return mint();
 	}
 
@@ -377,18 +384,40 @@ export async function memoizedReadUrl(
 	const memoKey = `${bucket}:${key}:${ttlSeconds}:${downstreamMaxAgeSeconds}`;
 	const nowMs = Date.now();
 
+	// ⚠ THE WINDOW IS `holdMs` WIDE, AND REUSING THAT NUMBER IS THE SAFETY
+	// ARGUMENT, not a convenience. `holdWindowMs` is the quantity the theorem
+	// above was proved about; aligning signatures to a window of any OTHER size
+	// would need its own proof, and would silently not have one.
+	const windowStartMs = Math.floor(nowMs / holdMs) * holdMs;
+
 	const hit = memo.get(memoKey);
 	if (hit !== undefined && hit.holdUntilMs > nowMs) {
 		return hit.url;
 	}
 
-	const url = await mint();
+	const url = await mint(new Date(windowStartMs));
 
 	evictIfFull(nowMs);
-	// `nowMs` was read BEFORE the await, so the hold clock starts at or before
-	// the signature's own timestamp. The error is in the safe direction — the
-	// mint's latency comes out of the hold rather than being added to it.
-	memo.set(memoKey, { url, holdUntilMs: nowMs + holdMs });
+	// ⛔ THE HOLD ENDS AT THE WINDOW'S END, NOT AT `nowMs + holdMs`, AND THE
+	// DIFFERENCE IS THE WHOLE CORRECTNESS OF PINNING THE DATE.
+	//
+	// The signature no longer starts its life when we mint; it starts at
+	// `windowStartMs`, which may be almost a full window in the past. Keeping the
+	// old `nowMs + holdMs` would therefore let a URL be served for up to TWO
+	// windows after it was signed — at the shipped numbers, 2·2750 + 3900 = 9400
+	// against a 7200 s signature, i.e. dead for the last thirty-seven minutes,
+	// silently, with the mint having succeeded and nothing throwing. That is
+	// exactly the C-1 shape this module exists to have closed, re-opened by the
+	// change meant to improve it.
+	//
+	// Ending the hold at the window boundary restores the original theorem
+	// verbatim: a URL signed at `windowStartMs` is last served at
+	// `windowStartMs + holdMs`, and whatever cache received it serves for
+	// `downstreamMaxAgeSeconds` more — so the worst-case age at last read is
+	// `hold + downstream < ttl`, unchanged. It also means the entry expires at
+	// the same instant the next window begins, which is the moment the URL would
+	// change anyway.
+	memo.set(memoKey, { url, holdUntilMs: windowStartMs + holdMs });
 	return url;
 }
 

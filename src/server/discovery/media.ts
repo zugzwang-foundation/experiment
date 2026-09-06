@@ -65,8 +65,14 @@ export async function signReadMarketMedia(
 		key,
 		ttlSeconds,
 		downstreamMaxAgeSeconds,
-		() =>
-			mintReadUrl("market-media", key, ttlSeconds, cacheControl ?? undefined),
+		(signingDate) =>
+			mintReadUrl(
+				"market-media",
+				key,
+				ttlSeconds,
+				cacheControl ?? undefined,
+				signingDate,
+			),
 	);
 }
 
