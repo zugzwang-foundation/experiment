@@ -1,6 +1,6 @@
 # SPEC-1-PASS — plan and change ledger · SPEC.1 → 2.0.0
 
-**Plan version:** 1.1 (2026-09-06). Supersedes 1.0 (md5 `8368654804774b392e29fe10c221079e`) — see §8 for what changed and why.
+**Plan version:** 1.2 (2026-09-06). Supersedes 1.1 (md5 `098d694593a6bb4df8ebb0a0f598f044`) and 1.0 (md5 `8368654804774b392e29fe10c221079e`) — see §8 for what changed and why.
 **Status:** RATIFIED by the founder, 2026-09-06 (this document is the plan; D-29 is the ruling).
 **Anchor base:** `docs/specs/SPEC.1.md` blob `fdf5db80bba9eaa00875f1a7694c56f441b0e28e` · 2,018 lines · declared 1.0.49.
 **Branch base:** current `origin/main`. The blob above is byte-identical at `5d53ed58` and at `20cd322c` (measured, SPEC-1-PASS execute report 2026-09-06T1339 §2), so **every line anchor in §2 and §3 holds regardless of how far `main` has advanced, as long as the blob check in §0.1 passes.**
@@ -24,6 +24,7 @@
 - **Verbatim.** Every text block in §4 is applied character-for-character. No paraphrase, no "improvement", no reflow beyond what markdown requires. A restatement in your own words has changed the spec.
 - **Rule-based edits** (§4 T-23) are applied by the stated rule; every before/after pair is listed in the run report.
 - **Conditionals** (marked ⟨COND⟩) are decided by the command shown, never by inference; the command and its output go in the run report.
+- **Line 113 carries two operations.** L-48's second half substitutes *within* line 113; L-43 inserts T-05 *after* it. Do the substitution first, then the insertion, or the inserted block lands between the old and the new text.
 - **ONE commit**, `docs/specs/SPEC.1.md` only. `CLAUDE.md` is **not** edited by this task (T-22, §8.2). Author `Zugzwang/world <zugzwangworld@proton.me>`; SSH-signed; no Co-authored-by trailer.
 - **Then §5 post-checks, all of them, measured.** Then push, then `gh pr create --draft`. **Do not merge. Do not mark ready.**
 
@@ -92,7 +93,7 @@ Also in Relay A: append one row to the amendment index in `docs/decisions/README
 | S-06 | 1951–1965 | starts `` | `csam` (hash match) | `` | `| (below threshold) | — | C | Posts normally. |` | replace Notes column per T-20.a (AI category, Source layer and Track columns unchanged) |
 | S-07 | 1947 | `Source vendors: OpenAI moderation API (text) …` | same | replace with T-20.c |
 | S-08 | 1670–1944 | `## §21 Ancillary Product Surfaces` | (blank line before `## Appendix A` at 1945) | delete §21, §22, §23 (D-29) |
-| S-09 | 1590–1668 | `## §20 Change Log` | (last change-log table row; line 1669 is blank and stays) | replace with T-19 |
+| S-09 | **1590–1666** | `## §20 Change Log` | `| 2026-09-03 | 1.0.49 | §0; §21.3; §20 | AIMODE-1 — the .md export control is renamed and re-formed.` — the last change-log table row | replace with T-19. **1667 (blank), 1668 (`---`), 1669 (blank) are OUTSIDE the range and stay** — they are the §20 → Appendix A separator |
 | S-10 | 1558–1589 | `## §19 Open Questions and Deferred Decisions` | (blank line after the `---` at 1588) | delete (D-29; all answered) |
 | S-11 | 1493–1557 | `## §18 Out of Scope (Negative Space)` | (blank line after the `---` at 1556) | delete — **after** T-05 is inserted at §3.2 (bottom-up order guarantees this; §5 post-checks confirm T-05 is present) |
 | S-12 | 1262–1492 | `## §17 Acceptance Tests` | (blank line after the `---` at 1491) | delete (D-29) |
@@ -149,9 +150,9 @@ Confirm the quoted fragment is on the stated line before editing. If it is not, 
 | L-34 | **391** | `400 comment_track_a_blocked, 400 comment_track_b_blocked, ` (each in backticks) — **F-COMMENT-1 Errors** | delete that fragment | D-20 |
 | L-35 | **389** | `single transaction; moderation; insert comment row` — **F-COMMENT-1 System** | delete `moderation; ` | D-20 |
 | L-36 | **388** | `Comment passes moderation Track C.` — **F-COMMENT-1 Pre** | delete the sentence | D-20 |
-| L-37 | 304 | `Run text/image moderation on C; if Track A or Track B, abort (see §14 F-MOD-4).` — F-BET-2 System | → `Moderation never gates the transaction (§14).` | D-20 |
+| L-37 | 304 | ``Run text/image moderation on `C`; if Track A or Track B, abort (see §14 F-MOD-4).`` — F-BET-2 System. **`C` is backticked in the file; match the backticked form** | → `Moderation never gates the transaction (§14).` | D-20 |
 | L-38 | **297** | `400 comment_track_a_blocked, 400 comment_track_b_blocked, ` (each in backticks) — **F-BET-1 Errors** | delete that fragment | D-20 |
-| L-39 | 295 | `Run text and image moderation on C; if Track A or Track B, abort transaction (see §14 F-MOD-4).` — F-BET-1 System | → `Moderation never gates the transaction: text moderation is dispatched off the request path once the transaction commits, and an attached image carries its attach-time outcome (§14).` | D-20 |
+| L-39 | 295 | ``Run text and image moderation on `C`; if Track A or Track B, abort transaction (see §14 F-MOD-4).`` — F-BET-1 System. **`C` is backticked in the file; match the backticked form** | → `Moderation never gates the transaction: text moderation is dispatched off the request path once the transaction commits, and an attached image carries its attach-time outcome (§14).` | D-20 |
 | L-40 | 272 | `Active --> Banned: Track A or admin Block (E2)` | → `Active --> Banned: Track A image verdict or admin Ban (E2)` | ADR-0046 |
 | L-41 | 246 | `4. **Human factors.**` | replace whole line with T-07 | D-21/D-26 |
 | L-42 | 141 | `lived out in §10, §11, §15, and §16.4` | → `lived out in §10, §11, and §15` | D-29 |
@@ -164,6 +165,7 @@ Confirm the quoted fragment is on the stated line before editing. If it is not, 
 | L-49 | 71 | the `**Mod-action log**` glossary row | replace whole row with T-04.d | ADR-0046 |
 | L-50 | 65, 66, 67 | the `**Track A**`, `**Track B**`, `**Track C**` glossary rows | replace with T-04.a, T-04.b, T-04.c respectively | D-20 |
 | L-51 | 27 | `## §1 One-Paragraph Product Description` | → `## §1 Product Description` | founder F-5 |
+| **L-52** | **447** | the line's FINAL sentence, beginning `There is no hidden-but-stored Track B content anywhere in the system:` and ending `the only residue is an admin-only mod_actions row.` (F-DEBATE-1 System) | replace **that sentence only** with T-24. **Everything earlier on line 447 stays verbatim — in particular the Moderation-masking sentence, which is correct under ADR-0046** | ADR-0046 · D-20 |
 
 ---
 
@@ -321,7 +323,11 @@ No misinformation moderation. No community / user-side moderation in v1 (per `C9
 ```
 - **Identity-pool depth tripwire — DROPPED as a UI surface.** Pool depletion halts signups (F-AUTH-3); detection is operational, not a widget.
 ```
-If `> 0`, use the line above with this appended, the job name in backticks: ` A pg_cron low-watermark job at 5% of pool covers it.` Report the command and count either way.
+If `> 0`, use this line instead (ratified 2026-09-06; the cron job name, not the alarm id, in backticks):
+```
+- **Identity-pool depth tripwire — DROPPED as a UI surface.** Pool depletion halts signups (F-AUTH-3); detection is operational, not a widget. A pg_cron low-watermark job (`identity-pool-watermark`) at 5% of pool covers it.
+```
+Report the command and count either way.
 
 **T-16.b** (replaces line 1112)
 ```
@@ -440,6 +446,17 @@ If `Moderation is advisory` returns 0 on this branch, **HALT and report** — th
 - **`sexual_minors_text_blocked`** anywhere surviving → `sexual_minors_text_flagged`.
 - Do **not** touch: "showcase", "conference", "Track A"/"Track B"/"Track C" as names, ADR-0014 / ADR-0021 citations, the `MARKET_CHART_*` constant rows at 1176–1180 (their dates are axis values, not deadline claims), §10.6, §13.
 
+### T-24 — SPEC.1 §9 F-DEBATE-1, line 447, final sentence (replaces it; L-52)
+The sentence being replaced, in full, so the boundary is unambiguous:
+```
+There is no hidden-but-stored Track B content anywhere in the system: Track B **blocks at the pre-commit gate** (ADR-0021 supersedes the held queue) — the bet+comment transaction never opens and no comment row exists; the only residue is an admin-only `mod_actions` row.
+```
+Replacement:
+```
+There is no hidden-but-stored content anywhere in the system: a Track B verdict is advisory and changes nothing the Audience sees — a flagged post renders exactly as any other (§14). The only content a reader does not see is a comment an admin has Removed, which renders its placeholder; the flag itself is an admin-only `mod_actions` row.
+```
+Everything earlier on line 447 is untouched. In particular the preceding **Moderation masking** sentence is correct under ADR-0046 and must survive verbatim.
+
 ---
 
 ## 5 · Post-checks (all measured; table in the run report: command · expected · actual · PASS/FAIL)
@@ -452,7 +469,7 @@ grep -c '^## ' docs/specs/SPEC.1.md             # 20  (S0-S16, S20, App A, App B
 grep -nE '^## §' docs/specs/SPEC.1.md           # S0..S16, S20 - no 17/18/19/21/22/23
 grep -c 'Devcon' docs/specs/SPEC.1.md           # 0     control: grep -c 'Dharma' > 0
 grep -ciE 'comment_track_[ab]_blocked|track_b_blocked|sexual_minors_text_blocked|gate-block|fail[ -]closed|block or pass|transaction never opens|auto-report|NCMEC' docs/specs/SPEC.1.md   # 0   control: grep -c 'advisory' >= 3
-grep -nE 'PhotoDNA' docs/specs/SPEC.1.md        # list every survivor; each must say "parked" on the same line
+grep -nE 'PhotoDNA' docs/specs/SPEC.1.md        # list every survivor; each must EITHER say "parked" on the same line OR be a Source-layer cell inside Appendix A's table (1951-1965 pre-edit), which the head note at 1947 covers
 grep -nE '§16\.[345]|§17|§18|§19|§21|§22|§23' docs/specs/SPEC.1.md   # only inside S0's "Sections" bullet and S20 - list any others
 grep -n '2026-09-01' docs/specs/SPEC.1.md       # list every survivor; each must be inside a MARKET_CHART_* row (1176-1180 pre-edit)
 grep -ciE 'six[ -‑]card' docs/specs/SPEC.1.md   # 0  (Unicode hyphen included)
@@ -466,6 +483,8 @@ grep -c 'AGPL-3.0 §13' docs/specs/SPEC.1.md     # 1 (S13 F-AUTH-4)
 grep -c 'No rendering or export of removed content' docs/specs/SPEC.1.md   # 1
 grep -c '2.0.0' docs/specs/SPEC.1.md            # >= 2 (S0 Version, S20 row)
 grep -n 'Submitted --> Posted' docs/specs/SPEC.1.md   # 0 - the old lifecycle fence is gone
+grep -cE 'blocks at the pre-commit gate|hidden-but-stored Track B' docs/specs/SPEC.1.md   # 0 - L-52 / T-24 applied
+grep -c 'A flagged post renders exactly as any other' docs/specs/SPEC.1.md   # 1 - T-24 landed
 grep -nE 'SPEC.1 §1[6789]|SPEC.1 §2[123]' docs/specs/SPEC.2.md        # REPORT ONLY (SPEC.2 pass repairs)
 grep -rnE 'SPEC.1 §1[789]|SPEC.1 §2[123]' docs/specs/flows/ CLAUDE.md AGENTS.md   # REPORT ONLY
 pnpm biome check docs/ 2>&1 | tail -3           # or the repo's markdown lint, if any; report
@@ -488,7 +507,7 @@ From that worktree:
   git fetch origin --prune; git rev-parse HEAD; git rev-parse origin/main   # equal, or ff-only
   git hash-object docs/specs/SPEC.1.md   # must be fdf5db80bba9eaa00875f1a7694c56f441b0e28e, else HALT
 
-1. cp ~/Downloads/SPEC-1-PASS_ledger.md docs/plans/SPEC-1-PASS.md   (md5 both; must match, and the file's line 3 must read "Plan version: 1.1")
+1. cp ~/Downloads/SPEC-1-PASS_ledger.md docs/plans/SPEC-1-PASS.md   (md5 both; must match, and the file's line 3 must read "Plan version: 1.2")
 2. Create docs/decisions/RECORD-v2.5-amendment.md with the block in plan §1, verbatim.
 3. Append the amendment-2.5 index row to docs/decisions/README.md in the existing rows' format (measure the format first).
 4. ONE commit: "docs(spec): SPEC-1-PASS plan + D-29 (amendment 2.5) — SPEC.1 rebaseline to 2.0.0"
@@ -552,6 +571,18 @@ Plan 1.0 instructed an edit to `CLAUDE.md` §2. Claude Code measured that the ad
 
 ### 8.3 `<LAST-1.0.x-SHA>` — an asserted value removed
 Plan 1.0 wrote `e193cfb6` into T-02 and T-19 as "last 1.0.x commit". That sha was **never measured**. It is replaced by a token substituted from §0.1.5's command, and a post-check fails if the token survives into the file.
+
+### 8.5 What changed from plan 1.1 (this revision), and why
+Both items were found by the execute session's §0.2 boundary checks, before any byte was written. Neither is a judgement call it was allowed to make: a range endpoint is the plan's to state, and line 447 is Lock-5 prose.
+
+| Item | 1.1 said | Measured | Fix in 1.2 |
+|---|---|---|---|
+| **S-09** | range `1590–1668`, last line "the last change-log table row" | 1666 is the last table row; **1668 is `---`** — the range as numbered would delete the only separator between §20 and Appendix A, which every sibling op (S-10…S-13) is cut to preserve | range set to **1590–1666**, endpoint quoted verbatim, and 1667/1668/1669 named as surviving |
+| **line 447** | not in any §2 range, not named by any §3 anchor, not matched by any T-23 rule | the line's final sentence states the superseded gate posture (*"blocks at the pre-commit gate … the transaction never opens"*), contradicting T-15, T-16.b, T-04.b and T-18.b, and failing 1.1's own §5 post-check mid-run. A full sweep of every surviving, unanchored line proves it is the **only** such gap | new **L-52** + **T-24**, replacing that one sentence and preserving the correct masking sentence beside it |
+| L-37 / L-39 | fragments quoted without the backticks around `C` | the file has `` `C` `` — a literal match on the plan's string would silently no-op | fragments corrected to the backticked form |
+| T-16.a `> 0` branch | "the job name in backticks" with no slot for one | migration `0007_pg_cron_jobs.sql`: cron job `identity-pool-watermark`, alarm id `identity_pool_low_watermark`, threshold exactly 5% | full ratified sentence supplied, cron job name in backticks |
+| §5 PhotoDNA check | "each survivor must say parked on the same line" | 1951 and 1953 are Source-layer cells that T-20.a deliberately leaves unchanged; the check was unsatisfiable on a correct application | relaxed: parked on the line, **or** a Source-layer cell covered by the head note T-20.c installs at 1947 |
+| line 113 | two operations, no ordering stated | L-48's substitution and L-43's insertion both act there | ordering fixed in §0.2 |
 
 ### 8.4 Base
 Plan 1.0 declared base `5d53ed58`; `origin/main` has since advanced (`20cd322c` at last measurement) with no change to `SPEC.1.md`, `CLAUDE.md` or `docs/decisions/`. The blob check in §0.1.2 — not a commit sha — is what makes the anchors valid, so the plan needs no re-measurement while that check passes.
