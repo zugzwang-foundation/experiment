@@ -64,7 +64,14 @@ export async function signRead(
 		key,
 		ttlSeconds,
 		downstreamMaxAgeSeconds,
-		() => mintReadUrl("uploads", key, ttlSeconds, cacheControl ?? undefined),
+		(signingDate) =>
+			mintReadUrl(
+				"uploads",
+				key,
+				ttlSeconds,
+				cacheControl ?? undefined,
+				signingDate,
+			),
 	);
 }
 

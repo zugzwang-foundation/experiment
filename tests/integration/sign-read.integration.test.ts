@@ -63,6 +63,7 @@ describe("signRead (SCAFFOLD.15 §5.1)", () => {
 			"u/u1/abc.jpg",
 			60,
 			undefined,
+			expect.any(Date),
 		);
 		expect(url).toBe(scripted);
 	});
@@ -79,6 +80,7 @@ describe("signRead (SCAFFOLD.15 §5.1)", () => {
 			"u/u2/long.png",
 			3600,
 			undefined,
+			expect.any(Date),
 		);
 	});
 
@@ -107,6 +109,7 @@ describe("signRead (SCAFFOLD.15 §5.1)", () => {
 			"u/u3/moderate.jpg",
 			READ_URL_TTL_SECONDS_MODERATION,
 			undefined,
+			expect.any(Date),
 		);
 		// Sanity floor: 60s for moderation (matches Q3 ratification +
 		// SPEC.2 §10.10).

@@ -167,12 +167,32 @@ export async function mintPutUrl(
  * exists to instruct — the same reasoning that keeps that path out of the memo
  * (`sign-read.ts`). A caching directive there would be noise on a gate that
  * fails closed, so the parameter is absent rather than defaulted.
+ *
+ * `signingDate` pins the instant the signature is computed against, instead of
+ * letting it default to "now".
+ *
+ * ⚠ WHY THAT MATTERS, because it looks like a testing seam and is not. A SigV4
+ * signature covers `X-Amz-Date`, so signing the same object twice a second apart
+ * yields two DIFFERENT URLs — and a browser caches by URL, so the second one is
+ * a full re-download of bytes it already holds. The memo hides that within one
+ * process, but the memo is a `Map` in one process: every serverless instance
+ * keeps its own, a cold start starts empty, and two instances serving the same
+ * image hand out two different URLs to the same visitor. The cache-hit rate is
+ * therefore not "one URL per hold window" but "one URL per hold window PER
+ * INSTANCE", which on a fleet is close to no reuse at all.
+ *
+ * Pinning the date to a window START makes the URL a pure function of
+ * (bucket, key, ttl, window) — so every instance, warm or cold, computes the
+ * same bytes, and the reuse becomes global rather than per-process. It is the
+ * memo's caller (`read-url-memo.ts`) that owns the window, because the window
+ * has to be the one its own safety theorem was proved against.
  */
 export async function mintReadUrl(
 	bucket: R2Bucket,
 	key: string,
 	ttlSeconds: number,
 	cacheControl?: string,
+	signingDate?: Date,
 ): Promise<string> {
 	const { client, bucketName } = getClient(bucket);
 	try {
@@ -183,7 +203,7 @@ export async function mintReadUrl(
 				Key: key,
 				...(cacheControl ? { ResponseCacheControl: cacheControl } : {}),
 			}),
-			{ expiresIn: ttlSeconds },
+			{ expiresIn: ttlSeconds, ...(signingDate ? { signingDate } : {}) },
 		);
 	} catch (err) {
 		safeCaptureException(err, { tags: { kind: "r2_unavailable" } });

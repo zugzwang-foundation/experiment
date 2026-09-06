@@ -105,6 +105,16 @@ describe("holding — the same object returns the same URL", () => {
 	});
 
 	it("re-mints once the hold lapses, and before the URL expires", async () => {
+		// ⚠ THE CLOCK IS ALIGNED TO A WINDOW START, and that is not cosmetic.
+		// Signatures are now pinned to a window boundary and the hold ends at that
+		// window's END, so "hold lapses one `holdWindowMs` after the FIRST call"
+		// is true only when the first call happens at a boundary. Starting
+		// mid-window would make the lapse arrive early and this test's arithmetic
+		// would be measuring the clock rather than the hold. Aligning states the
+		// assumption instead of relying on whatever `beforeEach` happened to pick.
+		const window = holdWindowMs(HOUR, DOWNSTREAM_NONE);
+		vi.setSystemTime(new Date(Math.ceil(Date.now() / window) * window));
+
 		const mint = makeMint("a");
 		const first = await memoizedReadUrl(
 			"uploads",
