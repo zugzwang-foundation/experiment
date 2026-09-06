@@ -22,7 +22,8 @@
  *
  * **What is preserved, and why each:**
  *   - `markets`      — F3. Not reproducible from this repo.
- *   - `pools`        — one row per market; RESET in place to the seeded reserves
+ *   - `pools`        — one row per market; RESET in place PER SIDE to the
+ *                      reserves the market opened with
  *                      rather than dropped, so pool state is consistent with a
  *                      population that now holds zero bets.
  *   - `market_media` — belongs to a market, not to a participant.
@@ -171,15 +172,20 @@ async function main(): Promise<void> {
 			       COALESCE(payload->>'noReserves',  payload->>'seedAmount') AS no
 			FROM events WHERE event_type = 'market.opened'
 		`;
-		// A row whose reserves cannot be read is NOT a usable seed. Keying the
-		// map on presence of the ROW was what let a null through.
+		// A type PREDICATE, not a cast. `as string` here would be the same shape
+		// of assertion that carried the null into the UPDATE in the first place —
+		// sound today because of the filter above, and silently unsound the moment
+		// someone edits the filter. Narrowing costs one line and cannot rot.
+		const hasPair = (r: {
+			market_id: string;
+			yes: string | null;
+			no: string | null;
+		}): r is { market_id: string; yes: string; no: string } =>
+			r.yes !== null && r.no !== null;
 		const seedByMarket = new Map(
 			seedRows
-				.filter((r) => r.yes !== null && r.no !== null)
-				.map((r) => [
-					r.market_id,
-					{ yes: r.yes as string, no: r.no as string },
-				]),
+				.filter(hasPair)
+				.map((r) => [r.market_id, { yes: r.yes, no: r.no }]),
 		);
 		const missing = marketRows.filter((m) => !seedByMarket.has(m.id));
 		if (missing.length > 0) {
@@ -204,7 +210,7 @@ async function main(): Promise<void> {
 		await runGuardedReset(client, WIPE_TABLES);
 		console.log("✓ wipe committed");
 
-		// ── POOL RESET — y₀ = n₀ = the market's own recorded seed ───────────────
+		// ── POOL RESET — each side to the market's own recorded opening reserve ──
 		let poolsReset = 0;
 		for (const m of marketRows) {
 			if (!m.has_pool) {

@@ -39,9 +39,8 @@ export const numericString = z
  *
  * Enum-hygiene contract (plan §G): adding a new event_type is a one-line
  * edit to `EVENT_TYPES` + one new `z.object()` entry in
- * `eventPayloadSchemas`. The `as const satisfies Record<EventType,
- * z.ZodObject<z.ZodRawShape>>` clause catches step-2 omission at TypeScript
- * compile time — adding to the enum without a matching schema fails
+ * `eventPayloadSchemas`. The `as const satisfies Record<EventType, …>` clause
+ * catches step-2 omission at TypeScript compile time — adding to the enum without a matching schema fails
  * `tsc --noEmit`. AGENTS.md inclusion of this contract is deferred per
  * project memory (`project_adr_catalogue_framing`); this docstring is the
  * stopgap.
@@ -127,8 +126,15 @@ export type EventType = (typeof EVENT_TYPES)[number];
  * `JSON.stringify(payload)::jsonb` write and its `Record<string, unknown>`
  * compare. What every payload must be is a JSON OBJECT, and this bound says
  * exactly that while allowing an event type to carry more than one object
- * shape. Keep it this shape when the next union lands; do not relax it to
- * `ZodTypeAny` to make an error go away.
+ * shape.
+ *
+ * ⚠ Two forms this bound REJECTS, measured — and neither is a reason to reach
+ * for `ZodTypeAny`: a NESTED union (a union with a union arm), and
+ * `z.discriminatedUnion` (`ZodDiscriminatedUnion` is not assignable to
+ * `ZodUnion`). If you need either, ADD AN ARM to this bound rather than
+ * widening it — the width is what stops a `z.string()` reaching `insert.ts`'s
+ * jsonb write. A three-arm plain union, `.strict()`, `.passthrough()`,
+ * `.extend()` and `.merge()` all satisfy it as-is.
  */
 export const eventPayloadSchemas = {
 	"image_upload.sign_requested": z.object({
