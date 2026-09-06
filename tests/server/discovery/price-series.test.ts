@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // UI.A4 Slice 2 tests-first (plan §2 row 2 / §3 / §16 rulings OQ-2=A+F-1,
@@ -68,6 +69,28 @@ import { testClient, testDb } from "../../db/_fixtures/db";
 import { truncateTables } from "../../db/_fixtures/truncate";
 
 const SEED_AMOUNT = "100.000000000000000000";
+
+// LIQ-1 Phase 1 · T10b — D-14's own open (ADR-0047 §B / plan §2). The whole
+// point of the case below is that the FIRST point is 0.10 and not 0.50.
+const ASYM_YES = "90000.000000000000000000";
+const ASYM_NO = "10000.000000000000000000";
+const ASYM_PRICE_YES = "0.100000000000000000";
+const ASYM_BACKING = "90000.000000000000000000";
+const ASYM_D_YES = "0.000000000000000000";
+const ASYM_D_NO = "80000.000000000000000000";
+
+/** The ADR-0047 §B `market.opened` payload variant. */
+function asymmetricOpenedPayload(marketId: string): Record<string, unknown> {
+	return {
+		marketId,
+		yesReserves: ASYM_YES,
+		noReserves: ASYM_NO,
+		openingPriceYes: ASYM_PRICE_YES,
+		backingMinted: ASYM_BACKING,
+		discardedYes: ASYM_D_YES,
+		discardedNo: ASYM_D_NO,
+	};
+}
 
 // Fixed 2026-09 instants — inside the events partition range (2026-05…
 // 2027-04). Millisecond-exact Dates round-trip timestamptz losslessly, so
@@ -395,6 +418,138 @@ describe("UI.A4 §22 — discovery price-series replay (OQ-2 A + F-1)", () => {
 		// …and the FULL replay-computed 3-point series is STILL returned —
 		// warn + always-serve, never throw/500 (OQ-2 F-1 verbatim).
 		expect(series).toEqual(expectedSeries);
+	});
+
+	it("asymmetric-open-first-point-is-the-opening-price-not-one-half", async () => {
+		// LIQ-1 Phase 1 · T10b — ADR-0047 §Acceptance row "Replay"; plan §9 R3.
+		//
+		// ⛔ THIS IS THE SITE THAT FAILS SILENTLY, and it is why chart replay is
+		// in Phase 1 rather than Phase 2. `replayReserveSeries` seeds from
+		// `seedPool(payload.seedAmount)` — a SYMMETRIC pair — so an asymmetric
+		// market would replay from (C, C), draw a line starting at 0.50 on every
+		// Discovery card and every debate page, and the ONLY signal would be the
+		// F-1 drift check at :274-278, which per its own docblock "WARNs
+		// (discovery_price_series_drift) and ALWAYS serves the computed series —
+		// never throw/500". A warn, not a gate. Nobody is watching that log.
+		//
+		// ⚠ RED-FIRST, and the first failure is one layer UP from the assertion:
+		// against today's code `eventPayloadSchemas["market.opened"].parse()` at
+		// :199 throws a ZodError on this payload, because the schema is a bare
+		// `z.object({ marketId, seedAmount })` and the union is T2's job. That IS
+		// the right reason — T2 is T10's stated prerequisite in the plan's task
+		// graph — but the DURABLE assertion is the first point, below: after T2
+		// lands and before T10 does, the payload parses and the series still
+		// starts at 0.50.
+		//
+		// The legacy-payload cases beside this one (seed-only-flat-at-50pct,
+		// replay-matches-live-pool, includes-sells, monotone-created-at-order)
+		// are UNTOUCHED and must stay green — plan §9 R1's load-bearing half.
+		const marketId = await seedMarket("disc-series-asymmetric");
+		const userId = await seedUser("disc-series-asym");
+
+		// The seed pair is a LITERAL, not `seedPool(...)`: the symmetric seeder
+		// is exactly what this case exists to stop being used here.
+		const r0: Reserves = { yes: ASYM_YES, no: ASYM_NO };
+		const buy1 = computeBuy({
+			reserves: r0,
+			side: "yes",
+			stake: "250.000000000000000000",
+		});
+		const buy2 = computeBuy({
+			reserves: buy1.reserves,
+			side: "no",
+			stake: "100.000000000000000000",
+		});
+
+		const b1 = await seedBetRow({
+			userId,
+			marketId,
+			side: "YES",
+			stake: "250.000000000000000000",
+			shares: buy1.shares,
+			price: buy1.pEff,
+			createdAt: EVENT_1_AT,
+		});
+		const b2 = await seedBetRow({
+			userId,
+			marketId,
+			side: "NO",
+			stake: "100.000000000000000000",
+			shares: buy2.shares,
+			price: buy2.pEff,
+			createdAt: EVENT_2_AT,
+		});
+		await testDb.insert(events).values([
+			eventRow(
+				"market.opened",
+				{ type: "market", id: marketId },
+				asymmetricOpenedPayload(marketId),
+				OPENED_AT,
+			),
+			eventRow(
+				"bet.placed",
+				{ type: "bet", id: b1.betId },
+				betPlacedPayload({
+					betId: b1.betId,
+					marketId,
+					userId,
+					commentId: b1.commentId,
+					side: "YES",
+					stake: "250.000000000000000000",
+					shares: buy1.shares,
+					price: buy1.pEff,
+				}),
+				EVENT_1_AT,
+			),
+			eventRow(
+				"bet.placed",
+				{ type: "bet", id: b2.betId },
+				betPlacedPayload({
+					betId: b2.betId,
+					marketId,
+					userId,
+					commentId: b2.commentId,
+					side: "NO",
+					stake: "100.000000000000000000",
+					shares: buy2.shares,
+					price: buy2.pEff,
+				}),
+				EVENT_2_AT,
+			),
+		]);
+		// The live pool carries EXACTLY the replayed finals — so a drift warn
+		// here means the WALK is wrong, not that a race happened.
+		await seedPoolRow(marketId, buy2.reserves.yes, buy2.reserves.no);
+
+		const series = await loadPriceSeries(testDb, marketId);
+
+		// THE assertion: the chart opens where the admin opened the market.
+		expect(series[0].yes).toBe(ASYM_PRICE_YES);
+		expect(series[0].yes).not.toBe("0.500000000000000000");
+		expect(series[0].at).toBe(OPENED_AT.toISOString());
+
+		// …and the whole walk is the two-buy series computed off the ASYMMETRIC
+		// seed, not a symmetric one that happens to end nearby.
+		expect(series).toEqual([
+			{ at: OPENED_AT.toISOString(), yes: getPrices(r0).yes },
+			{ at: EVENT_1_AT.toISOString(), yes: getPrices(buy1.reserves).yes },
+			{ at: EVENT_2_AT.toISOString(), yes: getPrices(buy2.reserves).yes },
+		]);
+
+		// DRIFT = 0 (the ADR "Replay" row): the walk's final reserves match the
+		// live `pools` row EXACTLY. Asserted BOTH ways — the reserve strings
+		// directly, and the absence of the F-1 warn — because the warn is the
+		// only production signal and it is one nobody reads.
+		const [poolRow] = await testDb
+			.select({
+				yesReserves: pools.yesReserves,
+				noReserves: pools.noReserves,
+			})
+			.from(pools)
+			.where(eq(pools.marketId, marketId));
+		expect(poolRow?.yesReserves).toBe(buy2.reserves.yes);
+		expect(poolRow?.noReserves).toBe(buy2.reserves.no);
+		expect(vi.mocked(captureMessage)).not.toHaveBeenCalled();
 	});
 
 	it("includes-sells", async () => {
