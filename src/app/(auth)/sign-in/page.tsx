@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { authClient } from "@/lib/auth-client";
+import { MOBILE_AUTH_MESSAGE } from "@/lib/copy/device-gate";
 
 // F-AUTH-1 + F-AUTH-2 sign-in landing per plan §4 page inventory.
 // Client component (per SCAFFOLD.3-FOLLOWUP-1 §2) — Better Auth's
@@ -127,7 +128,30 @@ export default function SignInPage(): ReactElement {
 					<Wordmark scale="card" />
 				</div>
 			</CardHeader>
-			<CardContent className="flex flex-col gap-4">
+			{/* ⛔⛔ MOBILE-1 · Phase B — TWO SIBLING BLOCKS, BOTH SERVER-RENDERED,
+			    AND A PURE-CSS TOGGLE BETWEEN THEM. Never a JS-computed conditional
+			    render, and that is a correctness requirement rather than a style
+			    preference (plan §4). This page is already `"use client"` and cannot
+			    submit anything without JS — but a `matchMedia`/`innerWidth` branch
+			    would paint the WRONG block until hydration, so a blocked visitor
+			    would watch a real sign-in form flash before being told they cannot
+			    use it. A CSS toggle is correct from the first paint, with no
+			    runtime width read anywhere.
+
+			    Both conditions apply to both blocks, in mirror: the form hides under
+			    either, the message appears under either. `max-mobile:` is the 640px
+			    phone rule; `touch-primary:` is width-independent and is the only
+			    layer a default-mode iPad ever meets, since that device's User-Agent
+			    is byte-identical to a real Mac's and the server gate cannot see it
+			    (`src/server/auth/device-class.ts`).
+
+			    ⚠ The header above stays at every width — the brand lockup is not
+			    part of what is being refused, and a card with no name is worse than
+			    one whose form is hidden. */}
+			<CardContent
+				data-testid="sign-in-form-block"
+				className="flex flex-col gap-4 max-mobile:hidden touch-primary:hidden"
+			>
 				{/* F-AUTH-1 — Google OAuth. */}
 				<form onSubmit={handleGoogle}>
 					<Button type="submit" disabled={googleLoading} className="w-full">
@@ -189,6 +213,19 @@ export default function SignInPage(): ReactElement {
 						<AuthAlert className="mt-3">{emailError}</AuthAlert>
 					) : null}
 				</form>
+			</CardContent>
+			{/* The message half of the toggle. Copy is founder-ratified and
+			    VERBATIM (MOBILE-1 Decisions received #5) — it is the whole of what
+			    this surface says to a blocked device, so it is not paraphrased,
+			    softened, or given a "try again later" that nobody promised. The
+			    exclusion is deliberate and indefinite (ADR-0045: "genuinely
+			    excluding mobile participants from this experiment phase's identity
+			    system"), not a not-ready-yet. */}
+			<CardContent
+				data-testid="mobile-auth-unavailable"
+				className="hidden flex-col items-center gap-2 text-center text-sm text-n5 max-mobile:flex touch-primary:flex"
+			>
+				{MOBILE_AUTH_MESSAGE}
 			</CardContent>
 		</Card>
 	);

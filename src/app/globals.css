@@ -4,6 +4,33 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * MOBILE-1 · Phase B (ADR-0045) — the SECOND of the two independent conditions
+ * that hide Join/Login. The first is the phone-width rule in the @theme block
+ * below; this one is deliberately VIEWPORT-WIDTH-INDEPENDENT, and the pair is
+ * not redundant — they catch different devices and neither subsumes the other.
+ *
+ * ⛔ WHY A WIDTH RULE IS NOT ENOUGH. A tablet is ~1024px wide, so no phone
+ * breakpoint reaches it, and the ruling (plan Decisions received #8) excludes
+ * tablets and iPads from Join/Login too. Worse, for a default-mode iPad the
+ * server-side gate provides NO enforcement at all — iPadOS Safari sends a
+ * User-Agent byte-identical to macOS Safari, so any pattern catching it would
+ * block every real Mac (src/server/auth/device-class.ts). For that device class
+ * THIS RULE IS THE ONLY LAYER, not a cosmetic backup on top of a working check.
+ *
+ * ⛔ `hover: none` AND `pointer: coarse`, NOT Tailwind's built-in
+ * `pointer-coarse` alone. The combined form is the standard touch-primary test
+ * and is more precise against hybrid / 2-in-1 devices carrying a secondary
+ * pointer. A hand-authored variant is what lets the two features be required
+ * together.
+ *
+ * ⚠ KNOWN, ACCEPTED FALSE POSITIVE (plan §4, Self-critique #5b): a touchscreen
+ * laptop presents as coarse-pointer / no-hover and loses the CTA too. This is
+ * the cosmetic layer, and such a user's User-Agent is an ordinary desktop
+ * string, so reaching /sign-in another way still signs them up server-side.
+ */
+@custom-variant touch-primary (@media (hover: none) and (pointer: coarse));
+
 @theme inline {
 	--font-heading: var(--font-sans);
 	--font-sans: var(--font-sans);
