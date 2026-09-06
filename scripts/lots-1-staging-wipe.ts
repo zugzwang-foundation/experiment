@@ -142,25 +142,59 @@ async function main(): Promise<void> {
 			);
 		}
 
-		const seedRows = await client<{ market_id: string; seed_amount: string }[]>`
+		// ⚠ ADR-0047 — `market.opened` HAS TWO PAYLOAD SHAPES, and this script
+		// reads both here rather than through `readOpenedReserves`. That reader
+		// is the single authority (`src/server/markets/backing.ts`) and every
+		// other consumer goes through it; a `tsx` script cannot, because it
+		// imports `server-only` and this file must inline its own client
+		// (AGENTS.md §7). The exception is DECLARED rather than silent — if the
+		// payload shape changes again, this is the second place to fix.
+		//
+		// ⛔ IT READ `payload->>'seedAmount'` ALONE UNTIL LIQ-1 PHASE 1, AND THE
+		// FAILURE WAS NOT A CRASH AT THE READ. An asymmetric payload has no
+		// `seedAmount`, so the arrow returned SQL NULL; guard 4 below keyed on
+		// `marketId`, which BOTH shapes carry, so the guard PASSED with a null
+		// seed for every market and printed `seed=null` in its own receipt. The
+		// null then bound into a NOT NULL column — 23502 — AFTER `runGuardedReset`
+		// had already committed the truncate, leaving staging with every
+		// participant table empty and the pools untouched: precisely the
+		// inconsistency the pool reset exists to prevent.
+		//
+		// Reserves are restored per side. Collapsing them to one scalar would
+		// reprice every asymmetric market to 0.5, which is the guessing this
+		// script refuses to do.
+		const seedRows = await client<
+			{ market_id: string; yes: string | null; no: string | null }[]
+		>`
 			SELECT payload->>'marketId' AS market_id,
-			       payload->>'seedAmount' AS seed_amount
+			       COALESCE(payload->>'yesReserves', payload->>'seedAmount') AS yes,
+			       COALESCE(payload->>'noReserves',  payload->>'seedAmount') AS no
 			FROM events WHERE event_type = 'market.opened'
 		`;
+		// A row whose reserves cannot be read is NOT a usable seed. Keying the
+		// map on presence of the ROW was what let a null through.
 		const seedByMarket = new Map(
-			seedRows.map((r) => [r.market_id, r.seed_amount]),
+			seedRows
+				.filter((r) => r.yes !== null && r.no !== null)
+				.map((r) => [
+					r.market_id,
+					{ yes: r.yes as string, no: r.no as string },
+				]),
 		);
 		const missing = marketRows.filter((m) => !seedByMarket.has(m.id));
 		if (missing.length > 0) {
 			fail(
-				`no market.opened event for: ${missing.map((m) => m.slug).join(", ")}. The seeded reserves are unknowable and this script will NOT guess one — guessing reprices a market.`,
+				`no readable market.opened reserves for: ${missing.map((m) => m.slug).join(", ")}. The seeded reserves are unknowable and this script will NOT guess one — guessing reprices a market.`,
 			);
 		}
 		console.log(
 			`✓ guard 4 — ${marketRows.length} markets, ${seedByMarket.size} seeds read from market.opened`,
 		);
 		for (const m of marketRows) {
-			console.log(`    ${m.slug.padEnd(36)} seed=${seedByMarket.get(m.id)}`);
+			const r = seedByMarket.get(m.id);
+			console.log(
+				`    ${m.slug.padEnd(36)} yes=${r?.yes ?? "?"} no=${r?.no ?? "?"}`,
+			);
 		}
 
 		// ── THE WIPE — the ADR-0035 mechanism, markets-preserving parameter ─────
@@ -177,9 +211,17 @@ async function main(): Promise<void> {
 				console.log(`    (${m.slug} has no pool row — skipped)`);
 				continue;
 			}
-			const seed = seedByMarket.get(m.id) as string;
+			// No `as string` launder here. Guard 4 above proved every market has a
+			// readable pair; this narrows on the value so tsc agrees, rather than
+			// asserting past it — the cast is what carried a null into the UPDATE.
+			const seeded = seedByMarket.get(m.id);
+			if (seeded === undefined) {
+				fail(`no seeded reserves for ${m.slug} after guard 4 passed (bug)`);
+				return;
+			}
 			await client`
-				UPDATE pools SET yes_reserves = ${seed}::numeric, no_reserves = ${seed}::numeric
+				UPDATE pools SET yes_reserves = ${seeded.yes}::numeric,
+				                 no_reserves  = ${seeded.no}::numeric
 				WHERE market_id = ${m.id}
 			`;
 			poolsReset += 1;
