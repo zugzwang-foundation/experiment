@@ -104,11 +104,17 @@ winning-side share pays 1 Đ and each losing-side share pays 0 (SPEC.1 §10.3).
 Conversely, every 1 Đ that leaves the pool (sale proceeds, §5) burns one pair. At
 all times every share in existence sits either in the pool reserves or in a user
 position — the admin holds no positions (SPEC.1 §10.1) — **or was DISCARDED at
-open (§7.1)**, and the count of pairs in existence equals the Đ the pool holds.
-⚠ The discard clause is ADR-0047's and it is load-bearing: a discarded share is
-in no reserve and no position, so without it this sentence is false the moment a
-market opens at a price (at a 10% open, pairs in existence are 10,000 against
-90,000 Đ held). Solvency is still structural, not managed: whichever side wins,
+open (§7.1)**, and **per side**, reserve + user-held + discarded equals the Đ
+deposited (the §7.1 BACKING IDENTITY). ⚠ Both halves are ADR-0047's, and the
+second REPLACES a claim that is now false: this read *"the count of pairs in
+existence equals the Đ the pool holds"*, which holds only while nothing is
+discarded — at a 10% open, pairs in existence are 10,000 against 90,000 Đ. That
+counterexample sat here as a footnote defending the FIRST clause while the
+second still asserted the thing it disproves. ⚠ Note also that *"in existence"*
+is used narrowly from §8.1 onward — a discarded share is destroyed and does NOT
+exist for the resolution arithmetic — so the per-side identity, not a global
+pair count, is what §8 derives from. Solvency is still structural, not managed:
+whichever side wins,
 the shares users hold are each backed by a Đ already inside the pool, and the Đ
 behind the discarded shares is the residual §8.1 returns (stated as an invariant
 with the residual identity in §8 and §11).
@@ -527,10 +533,16 @@ discipline (SPEC.1 §10.7 per B4) belongs to the **correction** path
 (§8.3) and has **no void leg**.
 
 **Residual.** The pool's remaining Đ after refunds — D − Σ `void_refund`,
-with D = seed + Σ stakes − Σ proceeds (§8.1) — is **not in general the
-seed**: it differs from the seed by exactly the users' net realized sale
+with D = **backing** + Σ stakes − Σ proceeds (§8.1) — is **not in general the
+backing**: it differs from it by exactly the users' net realized sale
 P&L (a seller's gain stayed with the seller, so the pool carries the
-mirror; a seller's loss likewise stayed in the pool). The residual exits
+mirror; a seller's loss likewise stayed in the pool). ⚠ **`backing`, not
+`seed`** — this clause said *seed* on both sides until ADR-0047's third sweep.
+The Đ deposited is `B = max(y0, n0)`, not the tank `T`, and on an asymmetric
+market the two differ by exactly the discard: an auditor reconciling a D-14
+void from `T` lands 10,000 Đ high and reports `void.ts` as under-refunding.
+`voidMarket` computes `D` as `Y + H_yes + D_yes`, which is `B` + net flows.
+The residual exits
 circulation as `poolUnwindAmount` on the terminal `market.voided` events
 row (R-9.5/R-9.5e) via `pool_unwind`; there is no admin balance. Shares
 are extinguished without payout; comments lock `voided`. **Audit path:**
@@ -549,9 +561,13 @@ positions. The CPMM state is never recomputed or mutated by a correction.
 
 The reserve pair at the moment the market enters `Resolved` or `Voided` is
 permanent. The module performs no computation against a terminal market
-except pure reads. From the frozen (y, n), the bets, and the ledger, every
-§8 quantity — each payout, the unwind, the residual — is exactly
-reproducible by any auditor. The pool account row dissolves at `→ Frozen`
+except pure reads. From the frozen (y, n), the bets, the ledger **and the
+market's `market.opened` payload**, every §8 quantity — each payout, the
+unwind, the residual — is exactly reproducible by any auditor. ⚠ The genesis
+payload is REQUIRED, and this sentence omitted it until ADR-0047 was swept
+through: the discard terms live there, not in `pools`, and the unwind is
+`w + D_W` (§8.1). All four inputs ship in the dataset (SPEC.2 §19.3 row 1 +
+§19.4.1), so the reproducibility claim holds — what changed is the input list. The pool account row dissolves at `→ Frozen`
 (SPEC.1 §10.1); the frozen reserve values persist for the dataset.
 
 ## §9 Award-rule reconciliation (SPEC.1 §10.3)
@@ -847,3 +863,4 @@ the curation slate's product definition (§7.2 — SPEC.1, debate phase).
 | 3.0.0 | 2026-09-06 | HMH | **§7.2 rewritten under the same version (LIQ-1 Phase 1 addendum D3).** The row above deliberately left §7.2 alone, which put a flat "the probability at seed is 0.5 structurally" one section below a §7.1 that had just made it false — a reader landing on §7.2 first met the superseded claim, with the correction in a section they had not opened (`O-4`). §7.2 no longer sets price: the slate seeds ARGUMENTS ONLY, in stakes deliberately too small to move the curve, and every sentence describing operator-controlled accounts walking the price to a chosen level is DELETED rather than qualified. The reasoning that overturned it is kept, because the old design was not obviously wrong and a reversal with no argument teaches a later reader nothing. "Per-market opening levels" is struck from §7.2's deferred-product list — it is a parameter of market opening now, not a curation outcome. **No version bump: 3.0.0 is the ADR-0047 version and this is that same amendment finishing its job**, not a second one. |
 | 3.0.0 | 2026-09-06 | HMH | **§8.1, §11 INV-C4 and §11 INV-C5 amended; §7.1's `T` disambiguated (LIQ-1 Phase 1, `@code-reviewer` HIGH-3 and MEDIUM-5).** §8.1 and INV-C4 still said the resolved unwind is **exactly the winning-side reserve, auditable from the frozen reserves alone** — true only while every discard was zero, and CONTRADICTING the shipped `resolution/settle.ts` as of this same version. On a spec↔code conflict the spec wins, so a later session reading INV-C4 would have "corrected" settle.ts back and silently under-paid every asymmetric winning side by its discard. Now: `unwind = w + D_W`, payout = `D − w − D_W`, and the reserves-only audit claim is struck — D_W is read from `market.opened`. INV-C5's determinism claim SURVIVES and is scoped: the auditor needs the reserves AND the genesis payload, both of which ship (SPEC.2 §19.3 row 1 + §19.4.1). **The plan's T11 only ever scoped §7.1 and §7.3, so §8/§11 were a plan gap rather than an execution slip.** §7.1 additionally: `T` is the reserve SUM, not the Đ deposited (that is `B = max(y0,n0)`, 90,000 against T = 100,000) — the original wording conflated the two in the same section that equates the backing identity to Đ deposited, and Phase 2's target rule compares against T. |
 | 3.0.0 | 2026-09-06 | HMH | **§13 and §12 E5 — the two sites the §8.1 amendment above MISSED (self-grep, LIQ-1 Phase 1).** O-4 says a durable amendment lands at every site that states the superseded position, and the row above corrected §8.1 and §11 while leaving two others asserting it. **§13** — the module API contract — still documented `computeResolvedUnwind` as `= winning-side reserve (§8.1)`, which is a contract line directly contradicting `resolution/settle.ts`; it now carries the supersession, the reason it is kept (§12's vectors pin it) and the warning that reaching for it by name under-pays every asymmetric winning side. **§12 E5** was not wrong — it is a symmetric seed, so `D_W = 0` and its figures stand — but it closed "the §8.1 residual identity, demonstrated on both branches", from which a reader concludes the identity is reserves-only. E1–E5 stay on the symmetric seed deliberately: they are ENGINE.3's fixed vectors and rewriting them rewrites `tests/unit/cpmm/vectors.test.ts`, which this task has no mandate to do. An asymmetric worked example is OWED and belongs with Phase 2. |
+| 3.0.0 | 2026-09-07 | HMH | **§3.2, §8.2 and §8.4 — the THIRD sweep, and the sites the second one missed (`@code-reviewer` pass 3).** **§3.2** kept *"the count of pairs in existence equals the Đ the pool holds"* while the previous pass added a discard clause to the sentence before it AND a footnote supplying the counterexample — 10,000 pairs against 90,000 Đ — so the section carried its own disproof as a defence. Replaced with the per-side backing identity, which is what §8 derives from; *"in existence"* is scoped too, because §8.1 counts a discarded share as destroyed while §3.2 was counting it as existing. **§8.4** was the THIRD site asserting the reserves-only audit (after §8.1 and INV-C4, both already struck): its input list omitted the `market.opened` payload, where the discard terms live. **§8.2** defined `D` from *seed* while citing §8.1, which defines it from *backing* — on an asymmetric market those differ by the discard, so an auditor reconciling a void from the tank lands 10,000 Đ high on the D-14 example and reports `void.ts` as under-refunding. ⚠ **Three sweeps, three sets of missed sites, every one traceable to the plan's T11 scoping only §7.1 and §7.3.** Recorded as a plan gap for the third time rather than absorbed — the amendment was under-scoped at ratification, and each pass found the next layer of what that left standing. |
