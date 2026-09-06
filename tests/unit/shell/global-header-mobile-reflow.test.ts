@@ -57,12 +57,37 @@ import { describe, expect, it } from "vitest";
  * authenticated or not" — unconditional in the SPEC, so it cannot be hidden
  * at any width, not even conditionally), `BrandCluster` (the home link),
  * and `DharmaCluster` + `IdentityCluster` (balance and identity).
- * ⚠ `IdentityCluster` especially: it hosts the JOIN CTA, which is PHASE B's
- * subject and is governed by two independent conditions ruled there (a width
- * rule AND a touch-primary rule — MOBILE-1 §4). Phase A adding a width-only
- * hide to it would land half of Phase B's mechanism under Phase A's review,
- * on a critical-path surface Phase A is explicitly not cleared for. This
- * guard reddens if it does.
+ *
+ * ⚠⚠ `IdentityCluster` IS THE ONE ROW THAT MOVED, AND IT WAS INVERTED RATHER
+ * THAN DELETED (MOBILE-1 · Phase B). It used to assert that
+ * `IdentityCluster.tsx` carried NO responsive token at all — correct while
+ * Phase A was the only thing on this branch, and its own failure message said
+ * why: the JOIN CTA it hosts is governed by TWO independent conditions ruled in
+ * Phase B (a width rule AND a touch-primary rule — MOBILE-1 §4), and landing
+ * either one under Phase A's review would have put half a critical-path
+ * mechanism through a review not cleared for it.
+ *
+ * Phase B is what lands both. The question this row asks — "what responsive
+ * behaviour does the file carrying the JOIN CTA have" — does not stop mattering
+ * the moment the answer changes from none to two; it gets sharper, because the
+ * gate is now a thing that can be over- or under-applied. So the row asserts the
+ * NEW exact truth: the file's responsive vocabulary is EXACTLY
+ * `{max-mobile:hidden, touch-primary:hidden}`, those tokens sit ONLY inside the
+ * `if (!viewer)` JOIN branch, and a stray third variant of any spelling still
+ * reddens.
+ *
+ * ⛔ AND THE JOIN HIDE IS DELIBERATELY **UNGATED** BY `mobileResponsive` —
+ * WHICH IS THE OPPOSITE OF EVERY OTHER RULE IN THIS FILE, ON PURPOSE. The prop
+ * chain exists because a REFLOW class must not reach `(auth)`: ADR-0045 leaves
+ * auth/join surfaces "gated, not made responsive." This hide is not a reflow —
+ * it IS that gate, and ADR-0045 wants it on every route ("global JOIN, mounted
+ * via `GlobalHeader` on every route"). Gating it on `mobileResponsive` would
+ * leave the JOIN button visible at phone width on `/sign-in` and
+ * `/sign-in/otp` — precisely where a device-blocked visitor is redirected, and
+ * precisely the surface the plan swaps for "Sign-up only works on a computer
+ * right now." So the row below asserts the file contains NO `mobileResponsive`
+ * at all: here the prop's absence is the correct state, not the bug the rest of
+ * this guard hunts for.
  *
  * ⛔⛔ THE §21.1 REGISTER DIVIDER CARRIES NO `data-testid`, EVER (SG6). It is
  * a named untouchable — `docs/plans/HEADER-PORTFOLIO.md`'s SG6: "The divider
@@ -814,32 +839,91 @@ describe("global header mobile reflow — what this task may NOT touch", () => {
 		// proves that, and it does so without caring how the prop travels.
 	});
 
-	it("header-mobile::IdentityCluster.tsx-carries-no-responsive-token-at-all", () => {
-		// ⚠ "AT ALL" NOW MEANS AT ALL. This checked two literals —
-		// `max-mobile:hidden` and `mobileResponsive` — so `max-sm:hidden`,
-		// `mobile:flex`, `max-[640px]:hidden` and `max-mobile:opacity-0` every
-		// one of them passed a test whose name promises exhaustiveness. The
-		// point of this guard is that Phase A adds NO responsive behaviour to
-		// the file carrying the JOIN CTA, and "no responsive behaviour" is a
-		// property of the whole variant vocabulary, not of the one variant this
-		// task happened to use. Anything that would land half of Phase B's
-		// two-condition mechanism here reddens now, whatever it is spelled.
+	it("header-mobile::IdentityCluster-carries-EXACTLY-the-Phase-B-gate-tokens", () => {
+		// ⚠ INVERTED, NOT DELETED — MOBILE-1 · Phase B. See this file's docblock
+		// for why the row survives its own answer changing. The property is
+		// unchanged in kind: "no responsive behaviour" and "exactly this
+		// responsive behaviour" are both statements about the WHOLE variant
+		// vocabulary of the file carrying the JOIN CTA, which is why the scan
+		// still reads every variant spelling rather than the two it expects.
+		// `max-sm:hidden`, `mobile:flex`, `max-[640px]:hidden` and
+		// `max-mobile:opacity-0` each still redden.
 		const source = stripComments(read(IDENTITY));
-		const VARIANTS =
-			/\b(?:max-)?(?:mobile|sm|md|lg|xl|2xl):|\b(?:max|min)-\[[^\]]+\]:/;
-		const offender =
-			VARIANTS.exec(source)?.[0] ??
-			(source.includes("mobileResponsive") ? "mobileResponsive" : null);
+
+		// Phase B's second, width-INDEPENDENT condition (MOBILE-1 §4 condition 2:
+		// `@custom-variant touch-primary (@media (hover: none) and (pointer:
+		// coarse))`). Local to this row on purpose — no Phase A reflow class uses
+		// it, so it does not belong beside `HIDE_BELOW_640` in the shared header.
+		const TOUCH_PRIMARY_HIDE = "touch-primary:hidden";
+
+		// Whole utility tokens, not just their prefixes — the set below is
+		// compared by value, so a prefix-only match could not tell
+		// `max-mobile:hidden` from `max-mobile:opacity-0`.
+		const RESPONSIVE_TOKEN =
+			/(?:\b(?:max-)?(?:mobile|sm|md|lg|xl|2xl):|\btouch-primary:|\b(?:max|min)-\[[^\]]+\]:)[^\s"'`]*/g;
+		const tokens = [...source.matchAll(RESPONSIVE_TOKEN)].map((m) => m[0]);
+
+		// ⛔ THE EXACT SET. MOBILE-1 §4 rules TWO independent hide conditions on
+		// this CTA — the 640px phone-width rule and the width-independent
+		// touch-primary rule — and the second is not a redundant backup: for a
+		// default-mode iPad the server-side gate provides NO enforcement at all
+		// (plan §3 "Consequence", Self-critique #1, rated high), so the client
+		// rule is the only layer that device class ever meets.
 		expect(
-			offender,
-			`${IDENTITY}: carries the responsive token \`${offender}\`. This file ` +
-				`is Phase B's subject and Phase A must not add ANY hide or ` +
-				`responsive behaviour to it — conditional or not, at any breakpoint, ` +
-				`under any variant. The JOIN CTA it hosts is governed by two ` +
-				`independent conditions ruled in Phase B (a width rule AND a ` +
-				`touch-primary rule); landing either one here puts half of a ` +
-				`critical-path mechanism under Phase A's review.`,
-		).toBe(null);
+			new Set(tokens),
+			`${IDENTITY}: its responsive vocabulary is {${[...new Set(tokens)].join(
+				", ",
+			)}}, expected exactly {${HIDE_BELOW_640}, ${TOUCH_PRIMARY_HIDE}}. ` +
+				`MOBILE-1 §4 rules two independent hide conditions on the JOIN CTA ` +
+				`and nothing else in this file — a third token, or a different ` +
+				`spelling of either, is a mechanism nobody ruled.`,
+		).toEqual(new Set([HIDE_BELOW_640, TOUCH_PRIMARY_HIDE]));
+
+		// ⛔ AND THEY SIT ONLY IN THE `if (!viewer)` JOIN BRANCH. A signed-in
+		// mobile participant keeps their identity affordance — plan §3/§6:
+		// existing mobile sessions are "completely unaffected", the gate blocks
+		// only NEW sign-in attempts. Bounded by two symbols rather than by line
+		// numbers (O-8): the branch opener, and the first statement after it.
+		const branchOpen = source.indexOf("if (!viewer)");
+		const branchEnd = source.indexOf("const chipClass");
+		if (branchOpen === -1 || branchEnd === -1 || branchEnd < branchOpen) {
+			throw new Error(
+				`${IDENTITY}: could not bound the signed-out JOIN branch between ` +
+					`\`if (!viewer)\` and \`const chipClass\`. If the component was ` +
+					`restructured, re-derive these anchors rather than deleting the ` +
+					`guard — the containment claim is the load-bearing half.`,
+			);
+		}
+		const joinBranch = source.slice(branchOpen, branchEnd);
+		const afterBranch = source.slice(branchEnd);
+		for (const token of [HIDE_BELOW_640, TOUCH_PRIMARY_HIDE]) {
+			expect(
+				joinBranch.includes(token),
+				`${IDENTITY}: \`${token}\` is not inside the \`if (!viewer)\` JOIN ` +
+					`branch. That anchor IS the CTA ADR-0045 gates.`,
+			).toBe(true);
+			expect(
+				afterBranch.includes(token),
+				`${IDENTITY}: \`${token}\` appears on an identity-chip branch. Only ` +
+					`the signed-out JOIN CTA is gated — a participant who signed in on ` +
+					`a computer and opens the site on their phone must keep their own ` +
+					`identity link (MOBILE-1 §3 "Scope", §6).`,
+			).toBe(false);
+		}
+
+		// ⛔ AND NO `mobileResponsive` — THE ABSENCE IS THE CORRECT STATE HERE.
+		// Everywhere else in this file the prop is what keeps a reflow class off
+		// `(auth)`. This hide is the GATE, not a reflow, and ADR-0045 puts it on
+		// every route; gating it would leave JOIN visible at phone width on
+		// `/sign-in`, the page a blocked device is sent to.
+		expect(
+			source.includes("mobileResponsive"),
+			`${IDENTITY}: now carries \`mobileResponsive\`. The JOIN hide is ` +
+				`ADR-0045's gate ("global JOIN, mounted via GlobalHeader on every ` +
+				`route"), not a Phase A reflow — gating it would leave the CTA ` +
+				`visible at phone width on /sign-in and /sign-in/otp, which is ` +
+				`exactly where a device-blocked visitor is redirected.`,
+		).toBe(false);
 	});
 
 	it("header-mobile::the-header-tag-and-its-60px-row-take-ZERO-diff", () => {

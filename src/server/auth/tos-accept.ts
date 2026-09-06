@@ -7,6 +7,10 @@ import { v7 as uuidv7 } from "uuid";
 import { db } from "@/db";
 import { users } from "@/db/schema/auth";
 import { auth } from "@/server/auth";
+import {
+	classifyDevice,
+	isAuthBlockedDevice,
+} from "@/server/auth/device-class";
 import { verifyOnboardingRef } from "@/server/auth/onboarding-ref";
 import {
 	PRIVACY_VERSION_HASH,
@@ -14,6 +18,7 @@ import {
 } from "@/server/auth/tos-versions";
 import { grantInitialDharma } from "@/server/dharma/grant";
 import { insertEvent } from "@/server/events/insert";
+import { logDeviceGateReject } from "@/server/middleware/logging";
 import { safeCaptureException } from "@/server/observability/safe-capture";
 
 // F-AUTH-4 ToS acceptance Server Action per SPEC.1 §13 + SPEC.2 §3.5 line
@@ -94,6 +99,45 @@ function getUserAgent(headerStore: {
 export async function acceptTosAction(
 	formData: FormData,
 ): Promise<AcceptTosResult> {
+	// ⛔⛔ MOBILE-1 · Phase B — ADR-0045's Join/Login exclusion, call site 2, AT
+	// FUNCTION ENTRY. This is the first-time-signup COMPLETION path, and the
+	// route wrapper does not cover it: this action issues its session in-process
+	// through a `SERVER_ONLY` Better Auth endpoint that never travels over HTTP
+	// and therefore never passes through `/api/auth/[...all]` at all (plan §3
+	// call site 2 / M1-2). A gate on the route alone would have let a blocked
+	// device complete signup outright.
+	//
+	// ⛔ AND "FUNCTION ENTRY" IS LOAD-BEARING, NOT TIDINESS. The obvious placing
+	// — just before `issueOnboardingSession` — is too late by an entire
+	// transaction. Below this point the tx grants the user's once-per-user
+	// initial Dharma and writes the append-only `user.tos_accepted` event, so a
+	// late gate would deny the SESSION while the GRANT had already committed:
+	// an orphaned, ToS-accepted, permanently unsessionable user row holding a
+	// consumed one-shot `initial_grant` slot
+	// (`dharma_ledger_initial_grant_user_uq`) for nothing, with no way to give it
+	// back — the ledger is append-only by construction (INV-2). Refusing here,
+	// above the cookie read and above the transaction, is what makes that
+	// unreachable rather than merely unlikely.
+	// `tests/integration/device-gate-tos-accept.integration.test.ts` asserts the
+	// zero-write property directly, with a desktop positive control beside it so
+	// it cannot pass vacuously.
+	//
+	// `redirect("/sign-in")` is this function's OWN existing failure shape — the
+	// one it already uses for a missing or invalid `onboarding_ref` cookie — so
+	// this is that shape applied one condition earlier, not a new arm. `/sign-in`
+	// renders the "computer only" message on exactly the devices this refuses.
+	const headerStore = await headers();
+	const gateUserAgent = headerStore.get("user-agent");
+	if (isAuthBlockedDevice(gateUserAgent)) {
+		logDeviceGateReject({
+			callSite: "tos-accept",
+			deviceClass: classifyDevice(gateUserAgent),
+			userAgent: gateUserAgent,
+			route: "/onboarding",
+		});
+		redirect("/sign-in");
+	}
+
 	const cookieStore = await cookies();
 	const refCookie = cookieStore.get(ONBOARDING_REF_COOKIE);
 	const refToken = refCookie?.value;
@@ -115,7 +159,7 @@ export async function acceptTosAction(
 		return TOS_ACCEPTANCE_REQUIRED;
 	}
 
-	const headerStore = await headers();
+	// `headerStore` is read once, at function entry, for the device gate above.
 	const ip = getIp(headerStore);
 	const ua = getUserAgent(headerStore);
 

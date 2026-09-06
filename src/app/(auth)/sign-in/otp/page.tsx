@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
+import { MOBILE_AUTH_MESSAGE } from "@/lib/copy/device-gate";
 
 // F-AUTH-2 OTP code entry per plan §4 page inventory.
 // Client component (per SCAFFOLD.3-FOLLOWUP-1 §2 + Plan-Q5 +
@@ -144,13 +145,59 @@ function OtpForm(): ReactElement {
 				    1.5px rung (`--ring-active`) is Discovery's and borrowing it here
 				    would be a cross-surface primitive reach. Flagged for Gate C.
 				    Decorative: the title beside it carries the meaning. */}
-				<div className="mx-auto mt-0.5 mb-3.5 flex size-10 items-center justify-center rounded-full [border:var(--hairline)]">
+				{/* ⛔ MOBILE-1 · Phase B — THE INSTRUCTIONAL TRIO HIDES WITH THE FORM,
+				    UNLIKE `/sign-in`'S HEADER, AND THE DIFFERENCE IS WHAT THE HEADER
+				    SAYS. That page's header is a brand lockup — a mark and an
+				    `sr-only` name — so it is not part of what is being refused and
+				    stays at every width. THIS header is an instruction: "Enter your
+				    verification code" / "Check your email for a 6-digit code" sitting
+				    above "Sign-up only works on a computer right now." tells a
+				    blocked visitor to do a thing the card beneath it just said they
+				    cannot do. Same argument as the form field below — an instruction
+				    that cannot be followed is a worse answer than the message.
+
+				    ⚠ Hidden PER ELEMENT, never by wrapping them. `CardHeader` is a
+				    `grid auto-rows-min gap-1`, so folding three grid children into
+				    one wrapper would move the DESKTOP layout — and zero desktop
+				    regression is the property this whole task is built on.
+
+				    ⚠ The back link above deliberately stays: it is the only way out
+				    of this route that is not browser chrome, and it is not an
+				    instruction to do anything impossible. Consequence, stated rather
+				    than discovered later: below the breakpoint this card renders no
+				    `CardTitle`, so it carries no accessible name — acceptable on a
+				    surface that is a dead end by construction (the OTP that would
+				    bring anyone here cannot be sent to these devices at all). */}
+				<div className="mx-auto mt-0.5 mb-3.5 flex size-10 items-center justify-center rounded-full max-mobile:hidden touch-primary:hidden [border:var(--hairline)]">
 					<Mail aria-hidden className="size-[18px] text-ink" />
 				</div>
-				<CardTitle className="text-lg">Enter your verification code</CardTitle>
-				<CardDescription>Check your email for a 6-digit code.</CardDescription>
+				<CardTitle className="text-lg max-mobile:hidden touch-primary:hidden">
+					Enter your verification code
+				</CardTitle>
+				<CardDescription className="max-mobile:hidden touch-primary:hidden">
+					Check your email for a 6-digit code.
+				</CardDescription>
 			</CardHeader>
-			<CardContent>
+			{/* MOBILE-1 · Phase B — the same two-sibling pure-CSS toggle as
+			    `/sign-in`; that page's block carries the full reasoning. Both
+			    conditions, in mirror: the form hides under either, the message
+			    appears under either.
+
+			    ⚠ THIS PAGE IS ALREADY UNREACHABLE ON A BLOCKED DEVICE AND IS GATED
+			    ANYWAY. Landing here needs an OTP to have been sent, and
+			    `email-otp/send-verification-otp` is refused at the route wrapper
+			    (`src/app/api/auth/[...all]/route.ts`) for exactly these devices. So
+			    this is the direct-URL arm — the surface someone reaches by pasting a
+			    link, not by walking the flow. Left ungated it would offer a code
+			    field that cannot succeed, which is a worse answer than the message.
+
+			    The footer's phishing-safety note hides with the form rather than
+			    beside the message: it warns about a code this visitor was never
+			    sent. */}
+			<CardContent
+				data-testid="otp-form-block"
+				className="max-mobile:hidden touch-primary:hidden"
+			>
 				<form onSubmit={handleSubmit} className="flex flex-col gap-3">
 					<Input
 						type="email"
@@ -205,7 +252,13 @@ function OtpForm(): ReactElement {
 					) : null}
 				</div>
 			</CardContent>
-			<CardFooter className="justify-center">
+			<CardContent
+				data-testid="mobile-auth-unavailable"
+				className="hidden flex-col items-center gap-2 text-center text-sm text-n5 max-mobile:flex touch-primary:flex"
+			>
+				{MOBILE_AUTH_MESSAGE}
+			</CardContent>
+			<CardFooter className="justify-center max-mobile:hidden touch-primary:hidden">
 				{/* Phishing-safety note (W2.1 .otp-safety, design-source copy). The
 				    "Secured by Cloudflare Turnstile" line is deliberately omitted —
 				    Turnstile is not wired yet (plan §8; anchor only). */}

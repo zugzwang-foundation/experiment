@@ -11,6 +11,24 @@ import { AUTH_GATE_COPY } from "./copy";
  * signed out opens THIS in the opposite slot instead of the composer. Copy is
  * d5-verbatim; both actions link to the existing unstyled auth route (A7 owns
  * the auth skin — no auth-route edits here, §8).
+ *
+ * ⛔ MOBILE-1 · Phase B — the two actions are ADR-0045's second client-side CTA
+ * surface, hidden under BOTH conditions (`max-mobile:` phone width AND the
+ * width-independent `touch-primary:`). The hide sits on the single wrapper that
+ * holds both links rather than on each `<Button>`: two class strings on two
+ * siblings are two things that can drift apart, and half a hidden CTA pair is
+ * worse than either state.
+ *
+ * This slot is reached only from `/m/[slug]`, a `(public)` surface, so unlike
+ * `IdentityCluster` there is no `(auth)` mount to reason about here.
+ *
+ * ⚠ KNOWN WART, DELIBERATELY NOT FIXED HERE. Below the breakpoint this panel
+ * keeps its heading, body and micro copy while losing its actions — an
+ * instruction with no affordance. The obvious repair is to show the
+ * founder-ratified "Sign-up only works on a computer right now." line in their
+ * place, and that string is scoped by decision to the two sign-in pages
+ * (MOBILE-1 Decisions received #5). Choosing where product copy appears is not
+ * an executor's call (CLAUDE.md §3), so it is raised rather than taken.
  */
 export function AuthGateSlot({
 	side,
@@ -38,7 +56,7 @@ export function AuthGateSlot({
 				{AUTH_GATE_COPY.heading(side)}
 			</h3>
 			<p className="max-w-sm text-sm text-n5">{AUTH_GATE_COPY.body}</p>
-			<div className="flex items-center gap-2">
+			<div className="flex items-center gap-2 max-mobile:hidden touch-primary:hidden">
 				<Button asChild size="sm">
 					<Link href="/sign-in">{AUTH_GATE_COPY.signUp}</Link>
 				</Button>

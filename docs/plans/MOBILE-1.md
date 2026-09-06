@@ -303,6 +303,17 @@ addition (the function-entry classifier check above); its transaction,
 Dharma-grant, and event-emission logic are otherwise unchanged. New file:
 `src/server/auth/device-class.ts` (the shared classifier).
 
+**One more file than this map named, added at execute and recorded rather
+than absorbed (CLAUDE.md §5.4):** `src/lib/copy/device-gate.ts`, holding the
+single exported `MOBILE_AUTH_MESSAGE`. §4 ratifies one verbatim string on
+**two** surfaces, and the test that asserts the two pages cannot drift apart
+is only a real property while there is one source for them to share. One
+exported constant is the minimum mechanism for that; two literals would be
+two things that can disagree, silently, in shipped copy. Placement follows
+`src/lib/copy/glossary.ts`, the existing home for founder-ratified strings —
+and it must not live under `src/server/`, since both consumers are
+`"use client"` pages.
+
 ## 4. UI / user flow
 
 **Breakpoint token** (Phase A) — `src/app/globals.css`, `@theme` block:
@@ -398,6 +409,38 @@ completely ordinary Windows/desktop string, so their actual sign-up would
 still succeed server-side if they reach `/sign-in` some other way (e.g. a
 direct link). Not fixed; documented.
 
+⚠⚠ **THE PARAGRAPH ABOVE IS WRONG IN BOTH DIRECTIONS, AND IT WAS RATIFIED
+THAT WAY. Corrected at the Phase B `@code-reviewer` pass, 2026-09-06, from
+what shipped — this needs re-ratification, not silent inheritance.**
+
+**Overstated, on WHO is caught — the accepted false positive is much smaller
+than ratified.** `(hover: none) and (pointer: coarse)` tests the **primary**
+input mechanism. A Windows touchscreen laptop with a trackpad reports
+`hover: hover` / `pointer: fine` and does **not** match — which is exactly
+why the combined form was chosen over bare `pointer-coarse:`. "Surface-class
+devices will be caught" describes a Surface **in detached tablet mode**, not
+a laptop that happens to have a touchscreen. Good news, and it makes the
+accepted risk narrower than the founder was told.
+
+**Understated, on the CONSEQUENCE for whoever is caught — the escape hatch
+this paragraph mitigates with does not exist.** "Their actual sign-up would
+still succeed server-side if they reach `/sign-in` some other way (e.g. a
+direct link)" is **false as built**: the sign-in page's form block carries
+`touch-primary:hidden` as well as `max-mobile:hidden`, so a direct link to
+`/sign-in` on a touch-primary device renders the message, not the form.
+`display: none` is not focusable and not submittable. **There is no UI path
+to sign up at all**, at any width.
+
+**That implementation is right and the sentence is what was wrong.** The
+`touch-primary` rule *must* apply at any width, because an iPad at 1024px
+would otherwise sail past a width-only rule and the server-side gate cannot
+see it at all (§3 "Consequence"). But §4's own sign-in-page paragraph says
+"below 640px, both pages render the plain message" — the width-only reading
+— and the mitigation sentence was written on that basis. ⇒ What the founder
+accepted was *"loses a button, can still sign up via a direct link."* What
+ships is *"no signup path at all, for a narrower set of devices than
+described."* Both halves of that trade moved; neither was re-put.
+
 **Sign-in destination pages (Phase B):** below 640px, both pages render the
 plain message **"Sign-up only works on a computer right now."** in place of
 the real form, reusing the existing `Card`/`CardHeader`/`CardContent`
@@ -435,7 +478,32 @@ normal use, so it needs no gate and no responsive treatment.
   slipping through.
 - **Unexpected exception inside the classifier itself** → wrapped in
   try/catch, logged, fail open. A bug in a peripheral UA check must never
-  take down real signups. **Correction (M1-3): this does not cover
+  take down real signups.
+
+  ⚠⚠ **CORRECTED AT EXECUTE (Phase B, 2026-09-06): THERE IS NO try/catch AT
+  EITHER CALL SITE, DELIBERATELY, AND THIS BULLET WAS ASSERTING A MECHANISM
+  THE CODE DOES NOT HAVE.** As built, `classifyDevice` is `slice` /
+  `toLowerCase` / `includes` over `string | null | undefined` and **cannot
+  throw** — so a catch block here would be error handling for an impossible
+  scenario, which CLAUDE.md §5.2 forbids outright. Wrapping it would also be
+  weaker than what ships: a wrapper catches the throw that happens, while
+  totality forecloses it.
+
+  **But the dependency is real and is now enforced rather than assumed.**
+  `classifyDevice` is the FIRST statement of both `handleAuth` and
+  `acceptTosAction`, so a future edit that gives it a throw — a regex, a
+  UA-parsing library, a client-hints lookup — would not degrade one feature.
+  It would 500 **every** `/api/auth/*` request and every ToS acceptance at
+  once, on the one path with no fallback. So the totality the missing
+  try/catch relies on is asserted directly, in
+  `tests/unit/auth/device-class.test.ts`
+  (`device-class::classifyDevice-never-throws-on-any-input`), against lone
+  surrogates, astral-plane input straddling the 256-char boundary, null bytes
+  and 350k-char strings. Structural beats procedural (O-1). *(Raised by
+  `@security-auditor` at Phase B; the resolution is to keep the code and fix
+  this claim, not the reverse.)*
+
+  **Correction (M1-3): this does not cover
   catastrophic-backtracking/ReDoS hangs** — a pathological regex match
   doesn't throw, it never returns, and try/catch has nothing to catch. The
   actual ReDoS mitigation is structural, specified in §3: a bounded input

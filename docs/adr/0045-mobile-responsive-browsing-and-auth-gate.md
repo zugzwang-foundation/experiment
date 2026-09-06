@@ -134,3 +134,32 @@ This ADR does **not** decide:
 **D-28 row 19 rules one cohesive formatting pass over all 44 ADR `Status` fields, and this file was the outlier.** Its Status read *"accepted — approved by Hrishikesh, 2026-09-01 (relayed; formal repo trail to follow at commit)"* — a sentence in a field the template defines as one of four words. **The approval is not withdrawn and the caveat is not dropped; both are moved here, which is where a qualification belongs.** The distinction is worth stating: a `Status` cell is read by anything scanning the ADR set for what is load-bearing, and a cell that has to be parsed rather than matched breaks every such scan silently. A patch record is read by a person, who is the only reader the caveat was ever for.
 
 **The caveat, preserved verbatim in substance:** this ADR was **approved by Hrishikesh on 2026-09-01**, relayed rather than committed at the time, with the formal repository trail to follow at commit. That trail is this file's own history. ⚠ **The decision, its drivers and its outcome are untouched by this pass** — nothing here re-opens the mobile gate.
+
+---
+
+## Patch record — 2026-09-06 · the single-source-of-truth file map, corrected against what shipped (MOBILE-1 Phase B)
+
+**The decision is unchanged. Its file map was wrong in both rows the moment Phase B landed, and that map is load-bearing** — the Consequences/Negative section mitigates "two places that must be kept in sync if new join/login entry points are added later" with *"the file map above being the enumerated, single source of truth for both."* A mitigation that points at the wrong files is not a mitigation. Corrected in place per CLAUDE.md §5.12 (decision unchanged, consumer surface needs scoping → patch record, not a supersession).
+
+**Server-side row — it named a file with no gate in it, and omitted both files that carry one.** It read `src/server/auth/index.ts`, which takes **zero diff**: the route-wrapper mechanism was chosen specifically so that file would not be touched. As shipped:
+
+| Concern | Source-of-truth file |
+|---|---|
+| Device classification (the ONE classifier, both call sites) | `src/server/auth/device-class.ts` |
+| Server-side reject — call site 1, the HTTP surface | `src/app/api/auth/[...all]/route.ts` |
+| Server-side reject — call site 2, the in-process signup completion | `src/server/auth/tos-accept.ts` |
+| Reject observability | `src/server/middleware/logging.ts` (`logDeviceGateReject`) |
+
+⚠ **The `tos-accept.ts` row is the one this correction exists for.** That path issues its session through an in-process `SERVER_ONLY` endpoint that never travels over HTTP, so the route wrapper does not cover it — a reader trusting the old map would have found no gate there and concluded none was needed. It was found at MOBILE-1's second-pass plan review (M1-2), and the map is exactly where the next person would look.
+
+**Client-side row — the citations were fenced by LINE and were already stale when written.** `IdentityCluster.tsx:30-35` and `AuthGateSlot.tsx:42-47` no longer point at the CTAs; MOBILE-1 §4 noted the drift before Phase B and O-8 forbids the form. Re-fenced by symbol, which cannot drift with an edit above it:
+
+| Surface | Anchor |
+|---|---|
+| `src/components/shell/IdentityCluster.tsx` | the `<Link href="/sign-in">` JOIN inside the `if (!viewer)` branch — **that branch only**; the signed-in identity chip is deliberately untouched |
+| `src/components/debate/composer/AuthGateSlot.tsx` | the single element wrapping the two `AUTH_GATE_COPY.signUp` / `.signIn` links |
+| `src/app/(auth)/sign-in/page.tsx`, `src/app/(auth)/sign-in/otp/page.tsx` | the `sign-in-form-block` / `otp-form-block` and `mobile-auth-unavailable` siblings |
+| `src/app/globals.css` | `--breakpoint-mobile` (Phase A) and `@custom-variant touch-primary` (Phase B) |
+| `src/lib/copy/device-gate.ts` | `MOBILE_AUTH_MESSAGE` — the one ratified string, shared so the two pages cannot drift |
+
+⚠ **One thing the Decision text implies that the build does not, recorded rather than quietly diverged from.** The decision calls the client-side layer "cosmetic… not the enforcement mechanism, since it's trivially bypassed." That is true for phones and Android tablets, where the server gate is the real backstop. It is **false for a default-mode iPad**, where the server layer provides no enforcement at all (the UA is byte-identical to macOS Safari) and the client-side `touch-primary:` rule is the *only* layer that device class ever meets. The plan carries this as Self-critique #1, rated high; it is repeated here because this file is what a future reader reaches first, and "cosmetic" would tell them the wrong thing about which layer they are editing.

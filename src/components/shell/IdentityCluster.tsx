@@ -23,6 +23,36 @@ import { GLOSSARY } from "@/lib/copy/glossary";
  *
  * Signed-in/out selection is server-side in the layouts (plan §4.2) — this
  * component just renders the given viewer.
+ *
+ * ⛔⛔ MOBILE-1 · Phase B — THE JOIN CTA IS HIDDEN ON PHONES AND ON
+ * TOUCH-PRIMARY DEVICES, AND THE HIDE IS **UNGATED BY `mobileResponsive`** ON
+ * PURPOSE. Everything else in this header's subtree gates its breakpoint
+ * classes on that prop, because a REFLOW class must not reach `(auth)` —
+ * ADR-0045 leaves auth/join surfaces "gated, not made responsive," and
+ * `tests/unit/shell/global-header-mobile-reflow.test.ts` enforces it.
+ *
+ * This class is not a reflow. It IS that gate, and ADR-0045 names this surface
+ * as the "global JOIN, mounted via `GlobalHeader` on every route." Threading
+ * the prop here would leave the JOIN button visible at phone width on
+ * `/sign-in` and `/sign-in/otp` — the very pages Phase B swaps for "Sign-up
+ * only works on a computer right now.", and where a device-blocked visitor is
+ * redirected. A button offering the thing the page beneath it just refused.
+ * ⇒ The two rules do not conflict; they govern different kinds of class. The
+ * guard row named above was INVERTED rather than deleted to record exactly
+ * that, and it reddens on a third token or on any `mobileResponsive` here.
+ *
+ * ⛔ ONLY THE SIGNED-OUT BRANCH. The identity chip below carries neither token:
+ * a participant who signed up on a computer and opens the site on their phone
+ * keeps their own identity link. Phase B blocks NEW sign-in attempts and
+ * touches no existing session (plan §3 "Scope", §6).
+ *
+ * ⚠ TWO CONDITIONS, INDEPENDENT, BOTH REQUIRED. `max-mobile:` is the 640px
+ * phone-width rule; `touch-primary:` is width-independent and is the ONLY layer
+ * a default-mode iPad ever meets, because that device sends a User-Agent
+ * byte-identical to a real Mac and the server-side gate therefore cannot see it
+ * at all (`src/server/auth/device-class.ts`). Neither is cosmetic decoration on
+ * top of the other. And neither is enforcement: the server gate is
+ * (plan §4, ADR-0045).
  */
 export type HeaderViewer = {
 	pseudonym: string | null;
@@ -35,7 +65,7 @@ export function IdentityCluster({ viewer }: { viewer: HeaderViewer | null }) {
 		return (
 			<Link
 				href="/sign-in"
-				className="flex h-[34px] shrink-0 items-center rounded-(--r) bg-ink px-5 text-xs font-bold tracking-[0.12em] text-ground uppercase outline-none select-none [transition:all_var(--dur-hover)] hover:bg-n7 active:bg-n6 focus-visible:shadow-(--state-focus-ring)"
+				className="flex h-[34px] shrink-0 items-center rounded-(--r) bg-ink px-5 text-xs font-bold tracking-[0.12em] text-ground uppercase outline-none select-none [transition:all_var(--dur-hover)] max-mobile:hidden touch-primary:hidden hover:bg-n7 active:bg-n6 focus-visible:shadow-(--state-focus-ring)"
 			>
 				JOIN
 			</Link>
