@@ -3632,3 +3632,19 @@ resolvable from this tree. The two citations above are.
 ## PROMOTE-GAP — production is 316 commits behind, on a 2026-07-02 build
 
 **Measured 2026-09-01 (STATE-RECON):** `zugzwangworld.com/api/health` serves canary `a61859ae92362d20fab27174bf8c842b555505bb` and returns **no `region` field at all**, against staging's `bom1`. `origin/main` and `origin/staging` are both `4c041633`. The distance is **316 commits**. ⚠ **Every gate this project has measured — every register repaired, every surface polished, every invariant asserted — has been measured on staging against a production that has received none of it.** The first promote will surface what staging structurally cannot: prod-only environment variables, the prod migration delta, the drift guard against real prod schema, and any behaviour that differs because prod data is not staging data. ⇒ **Sequencing is ADR-0024's, and this is a founder-present operation in daylight — not an overnight or autonomous task.** Go-live is 2026-09-15; the precursor freeze is 2026-09-10. The promote wants to happen with days of slack behind it, not hours.
+
+---
+
+## LIQ-1 / ADR-0047 — three drift rows recorded, not acted on (2026-09-06)
+
+Surfaced by `LIQ-RECON-2` and carried into ADR-0047's *Drift recorded, not acted
+on* list. Each is a documented claim that measures false today. None is
+load-bearing for LIQ-1 Phase 1; each is recorded here so the next reader of the
+stated document does not inherit it. **Status OPEN, no owner** — a row leaves
+this table when someone rules on it, not when someone notices it again.
+
+| # | Row | Status | Owner |
+|---|---|---|---|
+| **LIQ-1 L-1** | `AGENTS.md` §9:445 says of `I-GENESIS-001` *"Staging is in that state on all eight markets, because they reached `Open` outside the product"* — i.e. no `market.opened`, therefore a blank chart. **Measured 2026-09-06: all twelve `Open` staging markets carry one**; the absence predicate returns 0 rows. A `chart-4-genesis-backfill` (the arbiter is `events.metadata.request_id`, not UUIDv7 id arithmetic) closed the gap after CHART-3 wrote the sentence — **`O-14`, the ground moved**; the doc was true when written. ⚠ **Corrected against ADR-0047 and RECON-2 §4.5, which both say `CLAUDE.md` §2 states this too: it does not, and `git log -S` shows it never has.** One site, not two. | OPEN | — |
+| **LIQ-1 L-2** | `ADR-0013` §2 pins the canonical lock order as `pools → positions → dharma_ledger → friendly_fire_events → events` and devotes a whole decision (T2) to placing `friendly_fire_events` in it — a table **dropped at migration `0018`** (DEBATE.9). The order that actually runs has four links, not five. ADR substance is immutable once accepted (SPEC.2 §22.4), so this wants a Patch record or a superseding ADR, not an edit. | OPEN | — |
+| **LIQ-1 L-3** | `drizzle/migrations/0007_pg_cron_jobs.sql:16` runs `CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;` — **`pg_cron` installs into `pg_catalog`**, so the requested schema is not where it lives. Inert today: CI strips every `cron.*` statement from `*pg_cron*.sql` before applying, and the extension is already present on both environments. Bites the first time a migration is applied to a database where `pg_cron` is *absent*. Migrations are append-only — a new migration, never an edit to `0007`. | OPEN | — |
