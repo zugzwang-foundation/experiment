@@ -651,26 +651,138 @@ export const POSTS: readonly PostFixture[] = [
 	// for the gate: an opposing bet arriving before yours is the ordinary case,
 	// and it is the ONLY case in which a winning position is worth writing home
 	// about.
+	//
+	// ⚠ THE FIGURES IN THE TWO PARAGRAPHS ABOVE ARE STALE AND THE ARGUMENT IS
+	// NOT. They were written against a p = 0.5 market on a 5,000 seed; M7 now
+	// opens at `openingPriceYes` 0.10 into a `tank` of 100,000, so the pool
+	// starts at yes = 90,000 / no = 10,000 and the NO bet moves YES DOWN to
+	// ~0.098 rather than up to ~0.47. The mechanism is unchanged — an opposing
+	// bet landing first makes the winning side cheaper — but every number
+	// attached to it describes a market that is no longer in this table. Left in
+	// place rather than rewritten, because the reasoning is the load-bearing part
+	// and someone ratified it; the measurement is what follows. Measured on the
+	// local dry run at LIQ-1-FIX-2, and it is also the proof that splitting these
+	// bets is free:
+	//
+	//     final pool   yes 82561.307901907356948233
+	//                  no  10900.990099009900990102
+	//     positions    NO   999.009900990099009898  (P-crowd-1, 900 Đ)
+	//                  YES 9338.692098092643051767  (P-owner, 1000 Đ)
+	//
+	// Against the closed form for the SAME totals placed as single bets —
+	// k = 9e8, so `no` = 10000 + 900 − 9e8/90900 + 1000 and `yes` =
+	// 9e8/10900.9900990099… — every figure agrees to 18 decimals. Four bets and
+	// one bet land in the same place, which is what the split needed to be true.
+	//
+	// ⚠ IT IS FOUR BETS, NOT ONE, AND THAT IS THE PARITY FIX (L-6). ADR-0047
+	// capped a single bet at `BET_MAX_STAKE` = 250, so a lone 900 Đ stake is a
+	// position no participant can now build through the product — on a replica
+	// whose entire purpose is to look like production. The generator never saw
+	// it because the cap lives at the place route's step 5d and the generator
+	// drives the SERVICE, so the fixture landed happily and lied quietly.
+	//
+	// ⚠ SPLITTING COSTS NOTHING ARITHMETICALLY, AND THAT IS NOT AN ASSUMPTION.
+	// A CPMM buy adds the stake to both reserves and removes shares from one, so
+	// after a stake M the long reserve is `y + M` and the short is `k / (y + M)`
+	// — both functions of the TOTAL only. Splitting M into steps leaves the
+	// final reserves identical, and the shares telescope: each step's `k/(y+…)`
+	// term cancels the next step's, leaving `n + M − k/(y + M)`, which is the
+	// single-bet result exactly. Same entry price, same shares, same settlement.
+	// What changes is the number of ARGUMENTS, which is the honest part: the
+	// product makes you say four things to stake 900 Đ.
 	{
-		key: "M7-P1",
+		key: "M7-P1a",
 		market: "M7",
 		author: "P-crowd-1",
 		side: "NO",
-		stake: "900",
+		stake: "250",
 		phase: "main",
-		body: "PLACEHOLDER staging fixture argument on the losing side of the market that resolves YES. It settles to a total loss, which is what a resolved market has to be able to show.",
+		body: "PLACEHOLDER staging fixture argument opening the losing side of the market that resolves YES. It settles to a total loss, which is what a resolved market has to be able to show.",
 		serves:
 			"the losing side of M7 (a settled position worth zero); and it is what makes G5.6's four-digit P/L reachable at all — see the block above",
 	},
 	{
-		key: "M7-P2",
+		key: "M7-P1b",
+		market: "M7",
+		author: "P-crowd-1",
+		side: "NO",
+		stake: "250",
+		phase: "main",
+		body: "PLACEHOLDER staging fixture argument, the second of four adding to the same NO position. A participant who wants depth on one side now has to argue for it more than once.",
+		serves:
+			"the 900 Đ NO position, step 2 of 4 (L-6: every step <= BET_MAX_STAKE)",
+	},
+	{
+		key: "M7-P1c",
+		market: "M7",
+		author: "P-crowd-1",
+		side: "NO",
+		stake: "250",
+		phase: "main",
+		body: "PLACEHOLDER staging fixture argument, the third of four adding to the same NO position. Each step moves the price, which is what makes M7 carry a multi-point chart rather than a single tick.",
+		serves: "the 900 Đ NO position, step 3 of 4",
+	},
+	{
+		key: "M7-P1d",
+		market: "M7",
+		author: "P-crowd-1",
+		side: "NO",
+		stake: "150",
+		phase: "main",
+		body: "PLACEHOLDER staging fixture argument closing out the 900 Đ NO position. The last step is smaller than the cap because the total is what was calibrated, not the step count.",
+		serves:
+			"the 900 Đ NO position, step 4 of 4 — 250+250+250+150; the remainder is deliberate and still clears BET_MIN_STAKE_POST",
+	},
+	// ⚠ FOUR BETS, ONE EPISODE, AND G5.3 SURVIVES BECAUSE OF THE SECOND HALF.
+	// The §23 Positions "Staked" column is Đa — the final SideEpisode's
+	// `stakedBasis` — and `episodes.ts` accumulates `basis = basis.plus(stake)`
+	// on every buy while the episode stays open. P-owner never sells M7, so all
+	// four steps sit in ONE episode and Đa is 1000 exactly, as it was when this
+	// was a single bet. Had the reader taken the LAST bet's stake instead, this
+	// split would have dropped G5.3 to 250 and the gate would have caught it —
+	// which is why the shape was measured rather than assumed.
+	{
+		key: "M7-P2a",
 		market: "M7",
 		author: "P-owner",
 		side: "YES",
-		stake: "1000",
+		stake: "250",
 		phase: "main",
-		body: "PLACEHOLDER staging fixture argument. This four-digit stake exists so a settled position carries a four-digit realised P/L on the profile tiles.",
-		serves: "G5.3 positions staked >= 1000; G5.6 four-digit lifetime net P/L",
+		body: "PLACEHOLDER staging fixture argument opening the winning side of M7. The position it starts is what carries a four-digit realised P/L onto the profile tiles.",
+		serves:
+			"G5.3 positions staked >= 1000 (Đa over the whole episode); G5.6 four-digit lifetime net P/L",
+	},
+	{
+		key: "M7-P2b",
+		market: "M7",
+		author: "P-owner",
+		side: "YES",
+		stake: "250",
+		phase: "main",
+		body: "PLACEHOLDER staging fixture argument, the second of four building the winning M7 position. Four steps of 250 reach the same 1000 Đ basis a single bet used to.",
+		serves:
+			"the 1000 Đ YES position, step 2 of 4 (L-6: every step <= BET_MAX_STAKE)",
+	},
+	{
+		key: "M7-P2c",
+		market: "M7",
+		author: "P-owner",
+		side: "YES",
+		stake: "250",
+		phase: "main",
+		body: "PLACEHOLDER staging fixture argument, the third of four building the winning M7 position. The daily credit accrues on the first of these only, so the 1010 Đ opening balance still runs down to 10.",
+		serves: "the 1000 Đ YES position, step 3 of 4",
+	},
+	{
+		key: "M7-P2d",
+		market: "M7",
+		author: "P-owner",
+		side: "YES",
+		stake: "250",
+		phase: "main",
+		body: "PLACEHOLDER staging fixture argument completing the winning M7 position. Its settlement is what funds the after-settlement replies further down this table.",
+		serves:
+			"the 1000 Đ YES position, step 4 of 4; the payout that funds the after-settlement phase",
 	},
 	{
 		key: "M2-P1",
@@ -1020,36 +1132,127 @@ export const REPLIES: readonly ReplyFixture[] = [
 	},
 
 	// ── M2-P3 · the value carrier. D 2500 against a second place of 280. ──
+	// ⚠ THE THREE HEAVY REPLIES BELOW ARE EIGHT BETS SINCE L-6, AND THE LANE
+	// CALIBRATION IS UNMOVED. `substrateFor` builds `supportCount` /
+	// `counterCount` as DISTINCT AUTHORS (RANK-3 R-2) and the Dharma fields as
+	// the SUM of reply stakes — so splitting a reply into same-author,
+	// same-side steps changes neither. M2-P3 still reads n = 3, D = 2500,
+	// n^b = 1.732, and still fires the one Highest Stakes badge. Only
+	// `supportCountTotal` / `counterCountTotal` move, and those are display
+	// figures the badge model never reads.
+	//
+	// Had `n` still counted REPLIES, this split would have pushed M2-P3 to
+	// n = 10 and over `floor_lane(n) = 5` — inventing a Most Debated badge on
+	// the post whose whole job is to carry the STAKE lane. RANK-3's redefinition
+	// is what makes the split free, and the fixture-table test is what proves it
+	// rather than this comment.
 	{
-		key: "M2-P3-R1",
+		key: "M2-P3-R1a",
 		parent: "M2-P3",
 		author: "P-removed",
 		side: "NO",
-		stake: "500",
+		stake: "250",
 		phase: "main",
 		body: "PLACEHOLDER Support reply carrying real weight. Attracted Dharma, not reply count, is what fires the value lane.",
 		serves: "C3 Highest Stakes",
 	},
 	{
-		key: "M2-P3-R2",
+		key: "M2-P3-R1b",
+		parent: "M2-P3",
+		author: "P-removed",
+		side: "NO",
+		stake: "250",
+		phase: "main",
+		body: "PLACEHOLDER Support reply, the second half of the same 500 Đ backing. Same author and same side, so the distinct-person count the lanes read is unchanged.",
+		serves: "C3 Highest Stakes — the 500 Đ backing, step 2 of 2 (L-6)",
+	},
+	{
+		key: "M2-P3-R2a",
 		parent: "M2-P3",
 		author: "P-banned",
 		side: "NO",
-		stake: "500",
+		stake: "250",
 		phase: "main",
-		body: "PLACEHOLDER Support reply, second of the heavy pair. Two replies keep n at 3 — well under the traction floor.",
+		body: "PLACEHOLDER Support reply, second of the heavy pair. Two PEOPLE keep n at 3 — well under the traction floor, however many times each of them speaks.",
 		serves: "C3 Highest Stakes; holds M2-P3 OFF the traction lane",
 	},
 	{
-		key: "M2-P3-R3",
+		key: "M2-P3-R2b",
+		parent: "M2-P3",
+		author: "P-banned",
+		side: "NO",
+		stake: "250",
+		phase: "main",
+		body: "PLACEHOLDER Support reply, the second half of the heavy pair's backing. A third distinct person would move the lane; a second argument from the same one does not.",
+		serves: "C3 Highest Stakes — the second 500 Đ backing, step 2 of 2 (L-6)",
+	},
+	// ⚠ THE AFTER-SETTLEMENT BUDGET IS NOW A TOTAL, NOT A ROW. When this was
+	// one 1500 Đ reply, `fixture-table.test.ts` bounded it per row against the
+	// M7 payout. Six rows of 250 each pass that bound trivially while the sum
+	// they add up to is unchecked — so the assertion was moved to a per-author
+	// TOTAL in the same commit. A split that silently disarms the test guarding
+	// it is not a fix.
+	{
+		key: "M2-P3-R3a",
 		parent: "M2-P3",
 		author: "P-owner",
 		side: "YES",
-		stake: "1500",
+		stake: "250",
 		phase: "after-settlement",
-		body: "PLACEHOLDER Counter reply funded by the M7 settlement. Its size is what makes an open four-digit holding representable at all.",
+		body: "PLACEHOLDER Counter reply funded by the M7 settlement. The holding these six steps build is what makes an open four-digit position representable at all.",
 		serves:
 			"G5.5 header Portfolio >= 1000 (P-owner's OPEN M2 YES holding); deepens C3 Highest Stakes",
+	},
+	{
+		key: "M2-P3-R3b",
+		parent: "M2-P3",
+		author: "P-owner",
+		side: "YES",
+		stake: "250",
+		phase: "after-settlement",
+		body: "PLACEHOLDER Counter reply, the second of six. The payout arrived as one number; the product makes spending it an argument at a time.",
+		serves: "the 1500 Đ after-settlement holding, step 2 of 6 (L-6)",
+	},
+	{
+		key: "M2-P3-R3c",
+		parent: "M2-P3",
+		author: "P-owner",
+		side: "YES",
+		stake: "250",
+		phase: "after-settlement",
+		body: "PLACEHOLDER Counter reply, the third of six. Every step is a separate bet against the same pool, so each writes its own price point.",
+		serves: "the 1500 Đ after-settlement holding, step 3 of 6",
+	},
+	{
+		key: "M2-P3-R3d",
+		parent: "M2-P3",
+		author: "P-owner",
+		side: "YES",
+		stake: "250",
+		phase: "after-settlement",
+		body: "PLACEHOLDER Counter reply, the fourth of six. Six steps of 250 reach the 1500 Đ this position was calibrated at.",
+		serves: "the 1500 Đ after-settlement holding, step 4 of 6",
+	},
+	{
+		key: "M2-P3-R3e",
+		parent: "M2-P3",
+		author: "P-owner",
+		side: "YES",
+		stake: "250",
+		phase: "after-settlement",
+		body: "PLACEHOLDER Counter reply, the fifth of six. One author on one side, so the counter-side person count the lanes read stays at one.",
+		serves: "the 1500 Đ after-settlement holding, step 5 of 6",
+	},
+	{
+		key: "M2-P3-R3f",
+		parent: "M2-P3",
+		author: "P-owner",
+		side: "YES",
+		stake: "250",
+		phase: "after-settlement",
+		body: "PLACEHOLDER Counter reply, the last of six. Together they are the OPEN M2 YES holding the header Portfolio figure is measured on.",
+		serves:
+			"the 1500 Đ after-settlement holding, step 6 of 6 — 6 x 250, the same total the single bet carried",
 	},
 
 	// ── M2-P4 · the contestation carrier. 2 support + 2 counter = n^b 4. ──

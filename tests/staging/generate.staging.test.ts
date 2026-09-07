@@ -151,7 +151,7 @@ import { moderateComment } from "@/server/admin/moderation/act";
 import { canonicalizeAmount18 } from "@/server/admin/wire";
 import { auth } from "@/server/auth/index";
 import { acceptTosAction } from "@/server/auth/tos-accept";
-import { assertStakeFloor } from "@/server/bets/floors";
+import { assertStakeFloor, clampStakeToMax } from "@/server/bets/floors";
 import { place } from "@/server/bets/place";
 import { sell } from "@/server/bets/sell";
 import { runBetTransaction } from "@/server/bets/transaction";
@@ -452,6 +452,25 @@ async function placeComment(args: {
 		parentCommentId: args.parentCommentId,
 		stake: args.stake,
 	});
+	// ⛔ AND THE CEILING, WHICH IS THE OTHER SHELL LAYER (L-6). `BET_MAX_STAKE`
+	// is applied at the place ROUTE's step 5d; this runner drives the SERVICE,
+	// so an over-cap fixture stake does not fail here — it LANDS, and staging
+	// ends up holding a position no participant could build through the product.
+	// That is exactly how five of them shipped unnoticed on a replica whose
+	// whole purpose is to look like production.
+	//
+	// It REFUSES rather than clamping. `clampStakeToMax` is reused as the
+	// oracle — so a change to the constant propagates without anyone editing
+	// this line — but its return value is compared, never used: silently
+	// shrinking a stake would produce a green run whose calibrated positions
+	// were quietly smaller than the fixture table says, which is a worse lie
+	// than the one this replaces.
+	if (clampStakeToMax(args.stake) !== args.stake) {
+		throw new Error(
+			`REFUSED — fixture ${args.key} stakes ${args.stake}, above BET_MAX_STAKE. ` +
+				"A participant cannot place this through the product; split it into steps in fixtures.ts.",
+		);
+	}
 	const image = args.image ? await uploadFixtureImage(args.userId) : null;
 	// `api/bets/place/route.ts:173` — the SAME expression, for both the retry
 	// tag and the persisted `metadata.flow_id`. A reply is F-COMMENT-2 on the

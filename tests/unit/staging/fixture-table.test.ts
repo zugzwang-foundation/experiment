@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { type Badge, badgeFor, type PostSubstrate } from "@/lib/ranking";
 import { DEFAULT_RANKING_CONFIG } from "@/lib/ranking.config";
 import {
+	BET_MAX_STAKE,
 	BET_MIN_STAKE_POST,
 	BET_MIN_STAKE_REPLY,
 	DAILY_CREDIT_DHARMA,
@@ -148,6 +149,31 @@ describe("the fixture table is internally consistent", () => {
 		}
 	});
 
+	it("respects the stake CEILING, read from the shipped constant", () => {
+		// L-6. `BET_MAX_STAKE` is enforced at the place ROUTE's step 5d, and the
+		// generator drives the SERVICE — so an over-cap fixture does not fail
+		// loudly, it LANDS, and staging ends up holding a single-bet position no
+		// participant could build through the product. On a replica whose whole
+		// purpose is to look like production, that is the parity break that leaves
+		// no trace: the run is green, the row is there, and only someone who
+		// happens to compare a stake against a constant ever finds out.
+		//
+		// The reviewer LOW that opened this named two stakes (900, 1000). There
+		// were FIVE — three more sat among M2-P3's replies, 500/500/1500 — which
+		// is the argument for asserting over the whole table instead of fixing the
+		// rows someone spotted.
+		const overCap = [...POSTS, ...REPLIES]
+			.filter((f) => Number(f.stake) > Number(BET_MAX_STAKE))
+			.map((f) => `${f.key}=${f.stake}`);
+		expect(overCap).toEqual([]);
+		// Non-vacuous, and pointed: the split reaches the cap EXACTLY, so a
+		// tightening of BET_MAX_STAKE turns this assertion from a pass into a
+		// list rather than leaving the table quietly far below the bound.
+		expect([...POSTS, ...REPLIES].some((f) => f.stake === BET_MAX_STAKE)).toBe(
+			true,
+		);
+	});
+
 	it("holds ONE side per (user, market) — I-SINGLE-SIDE-001", () => {
 		// P-flipped is the sole exception BY CONSTRUCTION: it sells its entire YES
 		// holding before buying NO, which is what `SELLS` exists to do. Every other
@@ -214,12 +240,26 @@ describe("the fixture table is internally consistent", () => {
 			(r) => r.phase === "after-settlement",
 		);
 		expect(afterSettlement.length).toBeGreaterThan(0);
+		// ⚠ A TOTAL, NOT A ROW — and the change is L-6's, not a tidy-up. This
+		// bounded each reply individually, which was the same thing while the
+		// phase held ONE 1500 Đ reply. Splitting it into six of 250 would have
+		// left every row passing an 1800 bound with the 1500 they sum to
+		// unchecked: a green assertion measuring nothing, produced by the very
+		// commit that was meant to make the fixture honest. The payout funds the
+		// SUM, so the sum is what has to fit inside it.
+		const afterByAuthor = new Map<ParticipantRole, number>();
 		for (const r of afterSettlement) {
-			expect({
-				key: r.key,
-				role: r.author,
-				fits: Number(r.stake) <= 1800,
-			}).toEqual({ key: r.key, role: "P-owner", fits: true });
+			afterByAuthor.set(
+				r.author,
+				(afterByAuthor.get(r.author) ?? 0) + Number(r.stake),
+			);
+		}
+		for (const [role, total] of afterByAuthor) {
+			expect({ role, total, fits: total <= 1800 }).toEqual({
+				role: "P-owner",
+				total,
+				fits: true,
+			});
 		}
 	});
 
