@@ -123,8 +123,15 @@ import {
 // than inherited, because a guard you cannot see in the file you are reading is
 // a guard the next editor will not know to keep.
 //
-// `requireWriteIntent: true` — this run creates markets and opens pools. The
-// read-only variant would skip the G-5 analogue entirely.
+// `requireWriteIntent: true` — UNCONDITIONALLY, including on the read-only
+// `--media` phase, and that is deliberate rather than sloppy. `_lib/client.ts`
+// resolves with the write variant the moment it is imported, so a phase-varying
+// call here would leave the two guards disagreeing about the same run. And the
+// decay ADR-0035's Addendum warns about — an operator exporting the token into
+// their shell to stop retyping it, which is why the READ-ONLY gates runner
+// deliberately does not ask for one — cannot happen here: the CLI sets the
+// token, so nobody ever types it. The read-only variant would skip the G-5
+// analogue entirely for the two phases that write.
 const target = resolveRunnerTarget(process.env, { requireWriteIntent: true });
 if (!target.ok) {
 	throw new Error(
@@ -223,14 +230,23 @@ async function verifyMediaObjects(
 			checked += 1;
 			try {
 				await s3.send(new HeadObjectCommand({ Bucket, Key: m.key }));
-			} catch {
-				missing.push(`${spec.slug}  ${m.key}`);
+			} catch (err) {
+				// O-3: the REASON travels with the refusal. A `NotFound` and an
+				// expired credential both stop this run, and they want opposite
+				// responses — one means go find the object, the other means fix
+				// the Doppler config. A bare "missing" would report the second as
+				// the first, which is a true refusal with a misleading cause.
+				const name = (err as Error)?.name ?? "unknown";
+				missing.push(`${spec.slug}  ${m.key}  (${name})`);
 			}
 		}
 	}
 	if (missing.length > 0) {
 		throw new Error(
-			`REFUSED — ${missing.length} of ${checked} media object(s) are missing from ${Bucket}:\n` +
+			`REFUSED — ${missing.length} of ${checked} media object(s) did not answer in ${Bucket}. ` +
+				"The bracketed name is the AWS error class: NotFound means the object is gone; " +
+				"anything else (credentials, network, a wrong bucket) means this run learned nothing " +
+				"about whether it is there.\n" +
 				missing.map((m) => `  · ${m}`).join("\n"),
 		);
 	}
