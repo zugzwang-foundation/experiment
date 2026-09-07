@@ -29,7 +29,14 @@ unnecessary rewrite.
 - **Removed:** §2 (Architectural Blockers Register — a historical register) and §23 (Tracker Task
   Gating Map — the tracker is last on the D-22 ladder and is operator-maintained). No ruling names
   either.
-- **Untouched:** §1, §6, §7, §9, §14, §16, §20. §14 carries INV-1…INV-4 verbatim, per D-23.
+- **Untouched:** §1, §6, §7, §9, §16, §20. §14's four invariant *statements* are carried verbatim
+  per D-23 and are byte-identical to `origin/main` (INV-2, INV-3 and INV-4 unchanged in full). Two
+  clauses inside §14 necessarily moved and are declared here rather than left to the diff: INV-1's
+  mechanism clause (iii) described the superseded pre-commit gate (*"moderation runs OUTSIDE the
+  transaction so a Track A / Track B verdict means the transaction never opens"*), which ADR-0046
+  replaces — the invariant is unchanged, the mechanism by which it holds is not; and §14's ADR
+  footer carries the ADR-0014 supersession marker. Carrying clause (iii) verbatim would have left
+  an assertion of the superseded gate inside the invariant contract.
 - **Kept deliberately:** Appendix B. It carries no `MUST` line, but it decides which columns about
   real participants are published on 2026-11-06. That is a privacy contract, not a catalogue.
 - Change log reset; the `v0.1-outline`–`1.0.27` line stays in git history. Version 2.0.0. Section
@@ -63,9 +70,15 @@ identity landed in ADR-0047 §E. The third inverts — a seed fixed at creation 
 signal as turnout grows (undefended launch price 0.787 at 5k signups/hour against 0.994 at 40k,
 LIQ-SIM-2 §3b) — so depth that scales with participation serves K·n > C rather than weakening it.
 
-**Condition.** The backing identity holds no row in `users` and no participant-shaped account. If it
-does, this ruling does not apply and the design returns for a further ruling: *the admin is not a
-participant* is structural and is not traded against liquidity depth.
+**Condition, discharged 2026-09-07.** The ruling was made conditional on the backing identity
+holding no row in `users` and no participant-shaped account. Measured and discharged by the LIQ
+lane: `src/server/markets/backing.ts` imports the `events` schema and nothing else — no `users`,
+`positions`, `pools` or `dharma_ledger` — and derives the discards arithmetically from the
+`market.opened` payload, returning a number rather than a balance; `src/server/cpmm/calculate.ts`
+records that the short side's excess is *"DISCARDED — destroyed, held by no one, in no position"*;
+`src/server/markets/open.ts` writes `pools` and `events` and no `users` or `dharma_ledger` row; and
+the Phase 2 injector's only contact with `users` is `count(*)`, a cardinality read. *The admin is
+not a participant* holds structurally and is not traded against liquidity depth.
 
 **Consequences.** ADR-0047's plan to strike §10.6 inside a code PR is void — an ADR does not amend
 `SPEC.1` (D-22). The amendment lands by this ruling; the Phase 2 PR carries the `SPEC.1` text and
