@@ -13,6 +13,7 @@ import { assertAdminActor } from "@/server/admin/actor";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { appendLedgerRow, readBalance } from "@/server/dharma/persist";
 import { insertEvent } from "@/server/events/insert";
+import { requireMarketDiscards } from "@/server/markets/backing";
 
 import { applySideBasis, assertStrictlyPositive } from "./basis";
 import {
@@ -25,9 +26,16 @@ import {
  * the R-9.8 pro-rata basis, losers' 0-amount settlement records (R-9.2), the
  * pool unwind recorded as the `poolUnwindAmount` payload field on the
  * terminal `market.resolved` events row (R-9.5/R-9.5e — no `pools` write, no
- * ledger row, no admin account; the untouched winning-side reserve IS the
- * audit source). Positions are NEVER touched (drift-D1 derived constraint);
- * comments are never touched (the lock is emergent).
+ * ledger row, no admin account; the untouched winning-side reserve PLUS that
+ * side's cumulative discard is the audit source). Positions are NEVER touched
+ * (drift-D1 derived constraint); comments are never touched (the lock is
+ * emergent).
+ *
+ * ⚠ The discard term is new at ADR-0047 §E and it moves a real number. On the
+ * D-14 markets the long side is YES, so `D_yes = 0` and a YES outcome is
+ * unchanged — but a NO outcome under-reported the residual by exactly `D_no`,
+ * 80,000 Đ on a 90,000/10,000 open. That failure had no throw and no alarm
+ * attached to it: a wrong number that reconciled against nothing.
  */
 export async function settleMarket(args: {
 	marketId: string;
@@ -184,10 +192,21 @@ export async function settleMarket(args: {
 				);
 			}
 
-			// Unwind (R-9.5/R-9.5e): the winning-side reserve of the LOCKED pool
-			// row — by (♦) exactly the residual, with zero rounding gap.
-			const poolUnwindAmount =
+			// Unwind (R-9.5/R-9.5e): the winning-side reserve of the LOCKED pool row
+			// PLUS that side's cumulative discard. The (♦) claim that the reserve
+			// alone IS the residual held only while every discard was zero, which
+			// was true of every symmetric seed and is false the moment a market
+			// opens at a price (ADR-0047 §E). Discarded shares left the pool without
+			// entering any position, so the Đ backing them is residual too — it has
+			// no holder to pay and nowhere else to go.
+			//
+			// Same tx, same held pool lock as void's read, for the same reason.
+			const discards = await requireMarketDiscards(tx, args.marketId);
+			const winningReserve =
 				args.winningSide === "YES" ? pool.yesReserves : pool.noReserves;
+			const poolUnwindAmount = new CpmmDecimal(winningReserve)
+				.plus(args.winningSide === "YES" ? discards.yes : discards.no)
+				.toFixed(18);
 			if (new CpmmDecimal(poolUnwindAmount).lessThan(0)) {
 				throw new Error(
 					`settleMarket: negative unwind ${poolUnwindAmount} (economics bug)`,

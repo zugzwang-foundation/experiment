@@ -258,6 +258,12 @@ const RATIFIED_SERVER_IMPORTS = new Set([
 	// Ratification Record §7 — the real engine functions.
 	"@/server/auth/index", // auth.$context.internalAdapter.createOAuthUser
 	"@/server/auth/tos-accept", // acceptTosAction
+	// ADR-0047 / R1: `readOpenedReserves` is the ONE reader of the
+	// `market.opened` payload union, and gate 2 must read through it rather
+	// than discriminate the union itself. Pure reader plus one SELECT — it
+	// writes nothing, so it widens no write capability, which is the
+	// property this allowlist exists to protect.
+	"@/server/markets/backing", // readOpenedReserves + openingBacking
 	"@/server/markets/create", // createMarket
 	"@/server/markets/open", // openMarket
 	"@/server/markets/close", // closeMarket

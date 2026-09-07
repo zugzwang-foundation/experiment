@@ -663,13 +663,17 @@ describe("staging fixture generation", () => {
 
 			// ── 4 · POOLS — openMarket ×14 (M1 stays Draft) ─────────────────
 			// `canonicalizeAmount18` is the REAL wire helper. Q1: "the generator
-			// must canonicalize seedAmount itself since that step lived in the
-			// wire" — so it calls the shipped function rather than restating it.
+			// must canonicalize the open's amounts itself since that step lived in
+			// the wire" — so it calls the shipped function rather than restating
+			// it. BOTH fields go through it, as the admin action does: an
+			// over-precision price is a `seed_invalid` at the boundary, not a
+			// silent rounding into a market that opened somewhere else.
 			for (const m of MARKETS) {
 				if (!m.open) continue;
 				await openMarket({
 					marketId: requireMarket(m.key),
-					seedAmount: canonicalizeAmount18(m.seedAmount),
+					openingPriceYes: canonicalizeAmount18(m.openingPriceYes),
+					tank: canonicalizeAmount18(m.tank),
 					now,
 					metadata: adminMetadata("F-ADMIN-2"),
 				});

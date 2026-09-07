@@ -606,6 +606,98 @@ describe("insertEvent — driver (ENGINE.6 §F + §B)", () => {
 		expect(rows.length).toBe(2);
 	});
 
+	// === LIQ-1 Phase 1 · T2 — the market.opened payload union ================
+	//
+	// Plan §4 T2 / contract §2 / R1. `market.opened` becomes a `z.union` of the
+	// LEGACY variant `{ marketId, seedAmount }` and the ADR-0047 §B variant
+	// carrying seven keys. BOTH must round-trip through `insertEvent` — a union
+	// is two claims and each needs its own witness.
+	//
+	// ⛔ NOT six added required keys, and this is the highest-risk decision in
+	// Phase 1 (plan §10 OD-1). Every historical `market.opened` row on staging
+	// and in ~20 fixture files carries `seedAmount` alone, and
+	// `price-series.ts:199` `.parse()`s that payload on EVERY Discovery and
+	// debate page load — required keys would turn twelve live markets and
+	// twenty test files into hard parse failures at once.
+
+	it("events::market-opened-legacy-payload-round-trips", async () => {
+		// ⚠ GREEN ON DAY ONE, AND CORRECTLY SO. This is a `_probe-*`-posture
+		// REGRESSION GUARD, not a TDD driver (AGENTS.md §9, the distinction
+		// CLAUDE.md §5.6 draws). Plan §9 R1 calls the legacy case "the
+		// load-bearing half — a union with no legacy test is a union nobody
+		// proved": it passes now, it must STILL pass after T2, and if T2 lands
+		// as required keys rather than a union THIS is the assertion that reds.
+		const eventId = uuidv7();
+		const marketId = uuidv7();
+		const payload = { marketId, seedAmount: "1000.000000000000000000" };
+
+		await testDb.transaction(async (tx) => {
+			await insertEvent(tx, {
+				eventId,
+				eventType: "market.opened",
+				aggregateType: "market",
+				aggregateId: marketId,
+				payload,
+				metadata: baseMetadata(null, "admin-singleton"),
+			});
+		});
+
+		const rows = await testClient<
+			{ payload: Record<string, unknown> }[]
+		>`SELECT payload FROM events WHERE event_id = ${eventId}`;
+		expect(rows.length).toBe(1);
+		// `toEqual` on the whole object, not key-by-key: the failure this guards
+		// against is the union's OTHER branch bleeding in — six `undefined`s, or
+		// a defaulted `yesReserves`, padded onto a legacy row that never had
+		// them. A key-by-key read would not see that.
+		expect(rows[0]?.payload).toEqual(payload);
+	});
+
+	it("events::market-opened-asymmetric-payload-round-trips", async () => {
+		// ⛔ RED-FIRST. Today `market.opened` is a bare
+		// `z.object({ marketId, seedAmount })`, so this payload fails
+		// `safeParse` and `insertEvent` throws `InvalidEventPayloadError` with
+		// NO DB I/O at all — the zero-row assertion below would be unreachable.
+		const eventId = uuidv7();
+		const marketId = uuidv7();
+		const payload = {
+			marketId,
+			yesReserves: "90000.000000000000000000",
+			noReserves: "10000.000000000000000000",
+			openingPriceYes: "0.100000000000000000",
+			backingMinted: "90000.000000000000000000",
+			discardedYes: "0.000000000000000000",
+			discardedNo: "80000.000000000000000000",
+		};
+
+		await testDb.transaction(async (tx) => {
+			await insertEvent(tx, {
+				eventId,
+				eventType: "market.opened",
+				aggregateType: "market",
+				aggregateId: marketId,
+				// `as never` — the same cast the CASES driver above uses and for
+				// the same reason: until T2 widens the schema, the parameter's
+				// inferred type is the LEGACY shape, and the point of this test
+				// is the runtime validator, not the compiler. The cast is
+				// type-level only; the object reaching zod is exactly the seven
+				// keys above.
+				payload: payload as never,
+				metadata: baseMetadata(null, "admin-singleton"),
+			});
+		});
+
+		const rows = await testClient<
+			{ payload: Record<string, unknown> }[]
+		>`SELECT payload FROM events WHERE event_id = ${eventId}`;
+		expect(rows.length).toBe(1);
+		// All SEVEN keys survive. `z.object` STRIPS unknown keys by default, so
+		// a union whose branches are ordered or shaped wrong would silently
+		// store a two-key row here and every downstream discard would read 0 —
+		// which is precisely the arithmetic ADR-0047 §E exists to fix.
+		expect(rows[0]?.payload).toEqual(payload);
+	});
+
 	// === EVENT_TYPES inventory floor =========================================
 
 	it("events::canonical-event-types-inventory-shape", async () => {

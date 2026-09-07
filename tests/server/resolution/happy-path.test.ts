@@ -26,6 +26,7 @@ import { ResolutionStateError } from "@/server/resolution/errors";
 import { settleMarket } from "@/server/resolution/settle";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { attachGenesisEvent } from "../../db/_fixtures/genesis";
 import { truncateTables } from "../../db/_fixtures/truncate";
 
 // ENGINE.9 §5.6 tests-first (S2, plan §Test plan) —
@@ -53,6 +54,15 @@ import { truncateTables } from "../../db/_fixtures/truncate";
 
 const SEED = "100.000000000000000000";
 const REASON = "Criterion met: documented evidence attached.";
+
+// LIQ-1 Phase 1 · T8b — D-14's own open (ADR-0047 §B / plan §2).
+const ASYM_YES = "90000.000000000000000000";
+const ASYM_NO = "10000.000000000000000000";
+const ASYM_PRICE_YES = "0.100000000000000000";
+const ASYM_BACKING = "90000.000000000000000000";
+const ASYM_D_YES = "0.000000000000000000";
+const ASYM_D_NO = "80000.000000000000000000";
+const ASYM_OPENED_AT = new Date("2026-09-01T00:00:00.000Z");
 
 function adminMetadata(flowId: string) {
 	return {
@@ -115,6 +125,11 @@ async function seedOpenMarketWithPool(slug: string): Promise<string> {
 		yesReserves: SEED,
 		noReserves: SEED,
 	});
+	// The genesis event a directly-inserted pool would otherwise lack.
+	// `settleMarket`/`voidMarket` read the ADR-0047 discard terms from it
+	// and fail closed without it — a fixture with no `market.opened` is a
+	// state `openMarket` cannot produce (I-GENESIS-001).
+	await attachGenesisEvent({ marketId: marketId, seedAmount: SEED });
 	return marketId;
 }
 
@@ -144,6 +159,46 @@ async function placeBet(args: {
 			}),
 	);
 	return result.betId;
+}
+
+/**
+ * LIQ-1 Phase 1 · T8b — an Open market opened ASYMMETRICALLY, with the
+ * `market.opened` row that carries its discards. The event goes in through the
+ * DRIZZLE builder, not `insertEvent`: the payload union is T2's subject
+ * (`tests/server/events/insert.test.ts`), and routing this fixture through the
+ * validator would red the test below for T2's reason instead of T8's.
+ */
+async function seedAsymmetricOpenMarket(slug: string): Promise<string> {
+	const [market] = await testDb
+		.insert(markets)
+		.values({
+			slug,
+			title: "Settle Market",
+			status: "Open",
+			resolutionDeadline: new Date("2026-11-01T00:00:00Z"),
+		})
+		.returning({ id: markets.id });
+	const marketId = market?.id ?? "";
+	await testDb.insert(pools).values({
+		marketId,
+		yesReserves: ASYM_YES,
+		noReserves: ASYM_NO,
+	});
+	// Through the shared fixture, not a fourth hand-rolled copy of the
+	// payload — the helper exists so the shape has ONE maintenance site.
+	await attachGenesisEvent({
+		marketId,
+		createdAt: ASYM_OPENED_AT,
+		reserves: {
+			yes: ASYM_YES,
+			no: ASYM_NO,
+			openingPriceYes: ASYM_PRICE_YES,
+			backingMinted: ASYM_BACKING,
+			discardedYes: ASYM_D_YES,
+			discardedNo: ASYM_D_NO,
+		},
+	});
+	return marketId;
 }
 
 async function setStatus(marketId: string, status: string): Promise<void> {
@@ -474,6 +529,108 @@ describe("ENGINE.9 F-RESOLVE-1 — settleMarket (W-3b)", () => {
 			.from(markets)
 			.where(eq(markets.id, marketId));
 		expect(marketRow?.status).toBe("Resolved");
+	});
+
+	it("resolution::asymmetric-no-outcome-residual-is-N-plus-D-no", async () => {
+		// LIQ-1 Phase 1 · T8b — ADR-0047 §Acceptance row "Settle, NO outcome":
+		// residual = `N + D_no`, and `totalPaidOut + residual` = deposited.
+		// Plan §9 R5.
+		//
+		// ⚠ WHY THE **NO** OUTCOME, AND WHY THE YES OUTCOME IS UNCHANGED.
+		// At a 10% open the LARGE reserve is on YES, so YES is the long side and
+		// `D_yes = 0`. `settle.ts:189` takes the bare winning-side reserve, and
+		// for a YES outcome that IS `Y + D_yes` — the number does not move, and
+		// every existing YES-outcome test in this file stays green with no edit.
+		// NO is the ONLY branch where it moves, and it moves by exactly
+		// `D_no = 80,000`. That is why the acceptance table names the NO branch
+		// and why this is the only new case here.
+		//
+		// ⛔ RED-FIRST ON A NUMBER, NOT A THROW — and that is the danger the
+		// test is written for. Today `settleMarket` returns cleanly with a
+		// residual short by 80,000: nothing errors, the market resolves, and the
+		// books simply do not close. Plan §9 R5: "Not a throw — a wrong number
+		// that reconciles nothing."
+		const userC = await seedUser("settle-asym-c", "1000");
+		const userD = await seedUser("settle-asym-d", "1000");
+		const marketId = await seedAsymmetricOpenMarket("settle-asym-no");
+		await placeBet({ userId: userC, marketId, side: "NO", stake: "100" });
+		await placeBet({ userId: userD, marketId, side: "YES", stake: "50" });
+		await setStatus(marketId, "Resolving");
+
+		const result = await settleMarket({
+			marketId,
+			winningSide: "NO",
+			reason: REASON,
+			settleEventId: uuidv7(),
+			metadata: adminMetadata("F-RESOLVE-1"),
+		});
+
+		// The pool is never written by settle, so this is the same row the
+		// transaction read under the lock.
+		const [poolRow] = await testDb
+			.select({
+				yesReserves: pools.yesReserves,
+				noReserves: pools.noReserves,
+			})
+			.from(pools)
+			.where(eq(pools.marketId, marketId));
+		const positionRows = await testDb
+			.select({ side: positions.side, quantity: positions.quantity })
+			.from(positions)
+			.where(eq(positions.marketId, marketId));
+		const held = new Map(positionRows.map((p) => [p.side, p.quantity]));
+
+		// (a) The residual is the winning reserve PLUS the winning side's
+		//     cumulative discard. Derived from the live row, not restated.
+		const expectedResidual = new CpmmDecimal(poolRow?.noReserves ?? "0")
+			.plus(ASYM_D_NO)
+			.toFixed(18);
+		expect(new CpmmDecimal(result.poolUnwindAmount).toFixed(18)).toBe(
+			expectedResidual,
+		);
+		// …and it is NOT the bare reserve, stated explicitly so the failure names
+		// itself if the discard term is dropped again.
+		expect(new CpmmDecimal(result.poolUnwindAmount).toFixed(18)).not.toBe(
+			new CpmmDecimal(poolRow?.noReserves ?? "0").toFixed(18),
+		);
+
+		// (b) Gross winner payouts = the whole NO position (no sells ⇒ f = 1).
+		expect(new CpmmDecimal(result.totalPaidOut).toFixed(18)).toBe(
+			new CpmmDecimal(held.get("NO") ?? "0").toFixed(18),
+		);
+
+		// (c) THE CONSERVATION LINE: totalPaidOut + residual == total Đ
+		//     deposited == backing 90,000 + Σ stakes 150. Every Đ that entered
+		//     the market either went to a winner or exited circulation.
+		const deposited = new CpmmDecimal(ASYM_BACKING).plus("150").toFixed(18);
+		expect(
+			new CpmmDecimal(result.totalPaidOut)
+				.plus(result.poolUnwindAmount)
+				.toFixed(18),
+		).toBe(deposited);
+
+		// (d) The same number rides the terminal emit (R-9.5e) — a return value
+		//     that is right while the append-only row is wrong would be worse
+		//     than both being wrong.
+		const eventRows = await testDb
+			.select({ payload: events.payload })
+			.from(events)
+			.where(eq(events.eventType, "market.resolved"));
+		expect(eventRows.length).toBe(1);
+		const payload = eventRows[0]?.payload as Record<string, unknown>;
+		expect(new CpmmDecimal(String(payload.poolUnwindAmount)).toFixed(18)).toBe(
+			expectedResidual,
+		);
+
+		// (e) And the backing identity itself still closes on the losing side —
+		//     Y + H_yes + D_yes == deposited — so (c) is not an accident of the
+		//     NO side's arithmetic alone.
+		expect(
+			new CpmmDecimal(poolRow?.yesReserves ?? "0")
+				.plus(held.get("YES") ?? "0")
+				.plus(ASYM_D_YES)
+				.toFixed(18),
+		).toBe(deposited);
 	});
 
 	for (const status of ["Open", "Closed", "Resolved"] as const) {

@@ -10,10 +10,11 @@ import {
 	computeSell,
 	getPrices,
 	type Reserves,
-	seedPool,
+	seedReserves,
 } from "@/server/cpmm/calculate";
 import { CpmmDecimal, toFixed18 } from "@/server/cpmm/decimal";
 import { eventPayloadSchemas } from "@/server/events/schemas";
+import { readOpenedReserves } from "@/server/markets/backing";
 import { safeCaptureMessage } from "@/server/observability/safe-capture";
 
 /** A bound read client — top-level `db` OR a caller's transaction. */
@@ -164,7 +165,8 @@ function canonical18(value: string): string {
 
 /**
  * The pure §22 reserve walk (UI-A5 OQ-2 B additive export): the `market.opened`
- * seed (`seedPool(payload.seedAmount)`) walked across the market's
+ * reserves (`readOpenedReserves`, which normalises the legacy symmetric payload
+ * and the ADR-0047 asymmetric one to one pair) walked across the market's
  * `bet.placed` / `bet.sold` events in `created_at` ASC order via the pure CPMM
  * `computeBuy`/`computeSell`, one reserve step per event. NO downsampling, NO
  * drift check, NO pool read — the raw walk, so a consumer can read `reserves(t)`
@@ -189,19 +191,27 @@ export async function replayReserveSeries(
 				eq(events.eventType, "market.opened"),
 			),
 		)
-		.orderBy(asc(events.createdAt))
+		// `event_id` tiebreaks a `created_at` tie — ms precision, and a backfill
+		// can write several rows in one millisecond. `markets/backing.ts` carries
+		// the identical pair: these two reads must never pick different rows.
+		.orderBy(asc(events.createdAt), asc(events.eventId))
 		.limit(1);
 
-	const opened = openedRows[0];
-	if (!opened) {
+	const openedRow = openedRows[0];
+	if (!openedRow) {
 		return [];
 	}
-	const openedPayload = eventPayloadSchemas["market.opened"].parse(
-		opened.payload,
-	);
+	// ⛔ THE PAYLOAD UNION IS NOT DISCRIMINATED HERE. `readOpenedReserves` is
+	// the one reader (ADR-0047, `markets/backing.ts`), and this walk takes the
+	// pair it returns whichever shape the row is. Seeding a SYMMETRIC pair for
+	// an asymmetric market is the failure this call exists to prevent, and it
+	// is a SILENT one: the F-1 drift check below WARNs and always serves, so
+	// the wrong price line would render on every Discovery card and every
+	// debate page with nothing but a log line nobody is watching.
+	const opened = readOpenedReserves(openedRow.payload);
 
-	let reserves: Reserves = seedPool(openedPayload.seedAmount);
-	const walk: ReservePoint[] = [{ at: opened.createdAt, reserves }];
+	let reserves: Reserves = seedReserves(opened.yes, opened.no);
+	const walk: ReservePoint[] = [{ at: openedRow.createdAt, reserves }];
 
 	// The emitter↔replay aggregate contract: `bet.placed` rides the BET
 	// aggregate — `(aggregate_type 'bet', aggregate_id = bets.id)`
@@ -268,7 +278,8 @@ export async function replayReserveSeries(
 /**
  * The Discovery price-series (SPEC.1 §22 "Price series (no new store)"): the
  * §22 reserve walk (`replayReserveSeries`) mapped to one `getPrices` YES-spot
- * point per step (first point exactly 0.5 for a symmetric seed). There is NO
+ * point per step. The first point is the market's OPENING price — exactly 0.5
+ * for a legacy symmetric seed, `openingPriceYes` for an ADR-0047 open. There is NO
  * materialized series. Returns `[]` when the market has no `market.opened`.
  *
  * **F-1 (soft consistency check):** the walk's final reserves are compared

@@ -6,6 +6,7 @@ import { v7 as uuidv7 } from "uuid";
 
 import { markets, pools } from "@/db/schema";
 import { assertAdminActor } from "@/server/admin/actor";
+import { openingReserves } from "@/server/cpmm/calculate";
 import { insertEvent } from "@/server/events/insert";
 
 import { MarketDeadlineInPastError, MarketSeedInvalidError } from "./errors";
@@ -16,29 +17,72 @@ import {
 import { transition } from "./transitions";
 
 /**
- * F-ADMIN-2 seed validation: a POSITIVE NUMERIC(38,18) decimal string —
- * ≤20 integer digits, ≤18 fractional digits, no sign, no exponent (the
- * `numericString` bounds, positive-only). Pure string math: no float, no
- * parse — the value flows to both reserve columns verbatim.
+ * F-ADMIN-2 open validation. `tank` is a POSITIVE NUMERIC(38,18) decimal string
+ * — ≤20 integer digits, ≤18 fractional digits, no sign, no exponent (the
+ * `numericString` bounds, positive-only). Pure string math: no float, no parse.
+ *
+ * `openingPriceYes` is stricter: it must sit strictly INSIDE (0,1), so the
+ * regex admits only a leading `0.` — which excludes 1 and everything above by
+ * construction — and the all-zeros form is rejected on top of it. BOTH
+ * endpoints are excluded because either produces a zero reserve, and a market
+ * with an empty side is not a market.
+ *
+ * ⚠ This paragraph used to justify the guard by claiming the alternative was a
+ * throw from INSIDE the W-4 transaction — a rolled-back write and a 500. That
+ * was wrong on all three counts, and it is corrected rather than left because a
+ * reader relies on a stated control flow (`@security-auditor` LOW-1, O-9):
+ * `openingReserves` is called BEFORE `runLifecycleTransaction` opens, so nothing
+ * rolls back; the zero-reserve case is caught by `openingReserves`' own explicit
+ * reserve check, not by `requirePositive`, which only validates the two inputs;
+ * and a `CpmmInputError` from this flow now maps to `seed_invalid` regardless.
+ * The guard is correct and triple-layered — the wire canonicaliser, these
+ * regexes, and the pure module's own check — and it earns its place by rejecting
+ * at the boundary in a form the admin can act on, not by preventing a rollback
+ * that never happens.
  */
 const SEED_RE = /^\d{1,20}(?:\.\d{1,18})?$/;
 const ZERO_SEED_RE = /^0+(?:\.0+)?$/;
+const PRICE_RE = /^0\.\d{1,18}$/;
+const ZERO_PRICE_RE = /^0\.0+$/;
 
 /**
  * F-ADMIN-2 — the seeded `Draft → Open` commit (SPEC.1 §15 :869-875 +
- * cpmm.md §7.1 "symmetric initialisation, exactly once"). ONE W-4 locked
- * transaction (`expectedStatus ['Draft']`): lock markets → D-14.c expiry
- * guard on the LOCKED row's deadline → defensive pure-graph consult →
- * INSERT the `pools` row with y₀ = n₀ = seedAmount (THE one production
- * pools INSERT — both columns from the SAME string binding, carry-forward 2
- * preserved by construction) → UPDATE status 'Open' → emit `market.opened`
- * carrying `seedAmount` (R-14.1). NO `dharma_ledger` row — R-2 stands;
- * `pool_seed` stays dormant (`POOL_DORMANT_TAGS` untouched). Seed magnitude
- * is a service input; `POOL_SEED_PER_MARKET_DEFAULT` stays TBD (R-14.1).
+ * cpmm.md §7.1 "asymmetric initialisation at a chosen price, exactly once,
+ * with the excess discarded"). ONE W-4 locked transaction (`expectedStatus
+ * ['Draft']`): lock markets → D-14.c expiry guard on the LOCKED row's
+ * deadline → defensive pure-graph consult → INSERT the `pools` row with the
+ * TWO DISTINCT reserves `openingReserves` computes (THE one production pools
+ * INSERT) → UPDATE status 'Open' → emit `market.opened` carrying both
+ * reserves, the price, the backing and both discards (R-14.1, ADR-0047 §B).
+ * NO `dharma_ledger` row — R-2 stands; `pool_seed` stays dormant
+ * (`POOL_DORMANT_TAGS` untouched). Tank magnitude is a service input;
+ * `POOL_SEED_PER_MARKET_DEFAULT` is retired (ADR-0047 §Consequences).
+ *
+ * ⚠ THE RESERVES ARE ASYMMETRIC AND THE DIRECTION IS THE WHOLE POINT. A side's
+ * price is proportional to the OPPOSITE reserve, so `openingPriceYes = 0.10`
+ * over a tank of 100,000 writes yes = 90,000 and no = 10,000. The former
+ * "symmetric by code shape — both columns bind the SAME string" property
+ * (carry-forward 2) is GONE BY DESIGN; `max(y₀,n₀) − min(y₀,n₀)` shares are
+ * discarded on the short side, 88.9% of the mint at a 10% open. The discards
+ * ride the payload because they are the term that keeps the backing identity
+ * closing for the rest of the market's life — `markets/backing.ts` reads them
+ * back, and `void.ts` and `settle.ts` cannot balance their books without them.
  */
 export async function openMarket(args: {
 	marketId: string;
-	seedAmount: string;
+	/** p_yes at open, strictly inside (0,1). */
+	openingPriceYes: string;
+	/**
+	 * T — the reserve TANK: `yes + no` sums to exactly this.
+	 *
+	 * ⚠ NOT the Đ deposited. The open mints `max(yes, no)` pairs, so at
+	 * `p = 0.10, T = 100,000` the admin commits 90,000 Đ and the reserves sum
+	 * to 100,000 — the other 80,000 NO shares are discarded, never bought.
+	 * `backingMinted` is the Đ figure and the one the backing identity uses.
+	 * Phase 2's target rule compares against the TANK (`tank = yes + no`), so
+	 * reading this as Đ sizes FLOOR and COEFF against the wrong quantity.
+	 */
+	tank: string;
 	/** D-14.e: the clock is an argument — never read internally. */
 	now: Date;
 	metadata: LifecycleEventMetadata;
@@ -46,16 +90,36 @@ export async function openMarket(args: {
 	marketId: string;
 	poolId: string;
 	status: "Open";
-	seedAmount: string;
+	yesReserves: string;
+	noReserves: string;
+	openingPriceYes: string;
+	backingMinted: string;
+	discardedYes: string;
+	discardedNo: string;
 	openedEventId: string;
 }> {
-	// Validation order per plan §Flows: actor → seed; D-14.c rides the tx.
+	// Validation order per plan §Flows: actor → tank → price; D-14.c rides
+	// the tx. Both amount guards run BEFORE `openingReserves`, so a malformed
+	// input is a typed product error rather than a CpmmInputError escaping the
+	// pure module.
 	assertAdminActor(args.metadata);
-	if (!SEED_RE.test(args.seedAmount) || ZERO_SEED_RE.test(args.seedAmount)) {
+	if (!SEED_RE.test(args.tank) || ZERO_SEED_RE.test(args.tank)) {
 		throw new MarketSeedInvalidError(
-			`invalid seed amount ${JSON.stringify(args.seedAmount)} (positive NUMERIC(38,18) string required)`,
+			`invalid tank ${JSON.stringify(args.tank)} (positive NUMERIC(38,18) string required)`,
 		);
 	}
+	if (
+		!PRICE_RE.test(args.openingPriceYes) ||
+		ZERO_PRICE_RE.test(args.openingPriceYes)
+	) {
+		throw new MarketSeedInvalidError(
+			`invalid opening price ${JSON.stringify(args.openingPriceYes)} (NUMERIC(38,18) string strictly inside (0,1) required)`,
+		);
+	}
+	const opening = openingReserves({
+		openingPriceYes: args.openingPriceYes,
+		tank: args.tank,
+	});
 
 	// Minted internally ONCE at entry (gate ruling), closed over (ADR-0016 D1).
 	const openedEventId = uuidv7();
@@ -84,14 +148,14 @@ export async function openMarket(args: {
 				);
 			}
 
-			// THE one production pools INSERT: symmetric by code shape — both
-			// columns bind the SAME string (cpmm.md §7.1; carry-forward 2).
+			// THE one production pools INSERT. Two DISTINCT values now, computed
+			// outside the transaction by the pure primitive (cpmm.md §7.1).
 			const insertedPool = await tx
 				.insert(pools)
 				.values({
 					marketId: args.marketId,
-					yesReserves: args.seedAmount,
-					noReserves: args.seedAmount,
+					yesReserves: opening.reserves.yes,
+					noReserves: opening.reserves.no,
 				})
 				.returning({ id: pools.id });
 			const poolId = insertedPool[0]?.id;
@@ -115,7 +179,15 @@ export async function openMarket(args: {
 				eventType: "market.opened",
 				aggregateType: "market",
 				aggregateId: args.marketId,
-				payload: { marketId: args.marketId, seedAmount: args.seedAmount },
+				payload: {
+					marketId: args.marketId,
+					yesReserves: opening.reserves.yes,
+					noReserves: opening.reserves.no,
+					openingPriceYes: args.openingPriceYes,
+					backingMinted: opening.backingMinted,
+					discardedYes: opening.discardedYes,
+					discardedNo: opening.discardedNo,
+				},
 				metadata: args.metadata,
 			});
 
@@ -123,7 +195,12 @@ export async function openMarket(args: {
 				marketId: args.marketId,
 				poolId,
 				status: "Open" as const,
-				seedAmount: args.seedAmount,
+				yesReserves: opening.reserves.yes,
+				noReserves: opening.reserves.no,
+				openingPriceYes: args.openingPriceYes,
+				backingMinted: opening.backingMinted,
+				discardedYes: opening.discardedYes,
+				discardedNo: opening.discardedNo,
 				openedEventId,
 			};
 		},

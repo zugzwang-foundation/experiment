@@ -31,6 +31,7 @@ import { settleMarket } from "@/server/resolution/settle";
 import { voidMarket } from "@/server/resolution/void";
 
 import { testClient, testDb } from "../db/_fixtures/db";
+import { attachGenesisEvent } from "../db/_fixtures/genesis";
 import { truncateTables } from "../db/_fixtures/truncate";
 
 // ENGINE.9 §5.6 tests-first (I1, plan §Test plan) — the three conservation
@@ -53,6 +54,15 @@ import { truncateTables } from "../db/_fixtures/truncate";
 //  (iii) void:    Σ FLOW == seed − unwind                       (★ unchanged)
 
 const SEED = "100.000000000000000000";
+/**
+ * The Đ deposited at open — the term the conservation identity starts from
+ * (ADR-0047 §E). These fixtures insert a SYMMETRIC pool row directly
+ * (`yesReserves = noReserves = SEED`) with a matching LEGACY genesis row, so
+ * nothing is discarded and the backing equals the per-side reserve. Named separately
+ * anyway: the identity is written in backing, and the two coincide only while
+ * the open is symmetric.
+ */
+const SEED_BACKING = SEED;
 const REASON = "Conservation fixture reason.";
 const FLOW_SET = new Set<DharmaEntryType>(FLOW_TAGS);
 
@@ -115,6 +125,11 @@ async function seedOpenMarketWithPool(slug: string): Promise<string> {
 		yesReserves: SEED,
 		noReserves: SEED,
 	});
+	// The genesis event a directly-inserted pool would otherwise lack.
+	// `settleMarket`/`voidMarket` read the ADR-0047 discard terms from it
+	// and fail closed without it — a fixture with no `market.opened` is a
+	// state `openMarket` cannot produce (I-GENESIS-001).
+	await attachGenesisEvent({ marketId: marketId, seedAmount: SEED });
 	return marketId;
 }
 
@@ -207,7 +222,7 @@ describe("ENGINE.9 — resolution conservation identities (i)/(ii)/(iii)", () =>
 		});
 
 		const ledgerFlows = await gatherBetTiedFlows(marketId);
-		const netAdminPoolInjection = new CpmmDecimal(SEED)
+		const netAdminPoolInjection = new CpmmDecimal(SEED_BACKING)
 			.minus(result.poolUnwindAmount)
 			.toFixed(18);
 		expect(netAdminPoolInjection).toBe("50.000000000000000000");
@@ -291,7 +306,7 @@ describe("ENGINE.9 — resolution conservation identities (i)/(ii)/(iii)", () =>
 		expect(uncollectableTotal).toBe("110.000000000000000000");
 
 		const ledgerFlows = await gatherBetTiedFlows(marketId);
-		const netAdminPoolInjection = new CpmmDecimal(SEED)
+		const netAdminPoolInjection = new CpmmDecimal(SEED_BACKING)
 			.minus(settled.poolUnwindAmount)
 			.toFixed(18);
 		expect(
@@ -337,7 +352,7 @@ describe("ENGINE.9 — resolution conservation identities (i)/(ii)/(iii)", () =>
 		expect(
 			checkMarketConservation({
 				ledgerFlows,
-				netAdminPoolInjection: new CpmmDecimal(SEED)
+				netAdminPoolInjection: new CpmmDecimal(SEED_BACKING)
 					.minus(result.poolUnwindAmount)
 					.toFixed(18),
 			}),
@@ -394,7 +409,7 @@ describe("ENGINE.9 — resolution conservation identities (i)/(ii)/(iii)", () =>
 		expect(
 			checkMarketConservation({
 				ledgerFlows: [...betTied, ...saleProceeds],
-				netAdminPoolInjection: new CpmmDecimal(SEED)
+				netAdminPoolInjection: new CpmmDecimal(SEED_BACKING)
 					.minus(result.poolUnwindAmount)
 					.toFixed(18),
 			}),
