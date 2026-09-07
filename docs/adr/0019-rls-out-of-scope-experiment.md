@@ -12,6 +12,29 @@
 
 ---
 
+## Patch record
+
+**P1 (2026-09-07, LIQ-1 Phase 2).** In-place Patch record per CLAUDE.md §5.12 (consumer-surface
+scoping, **not** supersession). **The load-bearing decision is unchanged** — RLS remains out of
+scope for the experiment phase, and the tripwire below stands exactly as written.
+
+Migration `0030` (LIQ-1 Phase 2, 2026-09-07) revokes `EXECUTE` on `run_liquidity_injection`,
+`check_liquidity_alarms` and `zz_add_liquidity` from `PUBLIC`, `anon` and `authenticated` —
+**defence in depth.** The tripwire condition, a public Data API on the hosted projects, is
+**NOT ESTABLISHED** (`docs/parked.md` LIQ-1 L-10).
+
+⚠ Both halves of that sentence are load-bearing and the second is why this is a patch rather than
+a tripwire firing. The revoke was taken **because the grants were measured and found broad**, not
+because a client-direct path was found: `anon` held explicit `EXECUTE` on all three functions from
+Supabase's `ALTER DEFAULT PRIVILEGES`, so revoking `PUBLIC` alone would have looked right and
+changed nothing. Whether anything can reach those grants over the network is a separate question
+this lane could not answer, and did not. `service_role` deliberately keeps `EXECUTE` — it is a
+secret-holder, not a browser-reachable role. Narrowing a grant that no one has been shown to be
+able to use is cheap; recording it as proof the surface is closed would not be, which is the
+distinction `O-13` exists to hold.
+
+---
+
 ## Context and Problem Statement
 
 The SYNC recon (SYNC.2/SYNC.3) found **Row-Level Security (RLS) absent everywhere** in the experiment codebase, and flagged it (drift signal D4; open ruling #1) as needing an explicit decision: *is the absence intentional for the experiment phase, or a gap?* A related drift note (D4) observed that a `supabase/migrations/` directory is referenced but does not exist — the place RLS policies would conventionally live.
