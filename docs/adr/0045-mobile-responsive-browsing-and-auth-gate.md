@@ -8,7 +8,7 @@
 | **Tracker task** | MOBILE-1 (ad hoc — not a SCALE-TRACKER or UI-LANE row; ownership assigned to this pod directly) |
 | **Frame document** | `design-language §1.7` |
 | **Supersedes** | — |
-| **Superseded-by** | — |
+| **Superseded-by** | ADR-0048 (partial — the auth/join carve-out only: `:52`, `:113`, and the two gate layers at `:55`/`:64`) |
 
 ---
 
