@@ -2,6 +2,10 @@ import postgres from "postgres";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { markets, pools, users } from "@/db/schema";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
+import {
+	eventMetadataSchema,
+	eventPayloadSchemas,
+} from "@/server/events/schemas";
 import { testClient, testDb } from "./_fixtures/db";
 import { truncateTables } from "./_fixtures/truncate";
 
@@ -456,7 +460,24 @@ describe("run_liquidity_injection — the sweep", () => {
 		);
 		expect(afterDelta.equals(beforeDelta)).toBe(true);
 
-		// The system-actor metadata set (sweep-orphans precedent).
+		// ⛔ THE WRITER↔READER BRIDGE, MECHANICALLY (@db-migration-reviewer
+		// MEDIUM-2). `pool.liquidity_added` is the FIRST event type whose writer
+		// is not `insertEvent`, so none of that function's three guarantees —
+		// payload Zod, metadata Zod, uuidv7 check — runs on this path. Everything
+		// else in this case hand-checks individual keys, which leaves the six
+		// remaining SHIP keys (`target`, `tankBefore`, `tankAfter`,
+		// `backingMinted`, `priceYesBefore`, `priceYesAfter`) asserted by nobody.
+		//
+		// Parsing the REAL emitted row through the REAL schema is what closes it:
+		// two hand-copies of a key list with nothing between them is precisely the
+		// defect this task already caught once, in the plan's own T8 sketch —
+		// green tests, silent under-report on a terminal payout row.
+		expect(() =>
+			eventPayloadSchemas["pool.liquidity_added"].parse(p),
+		).not.toThrow();
+
+		// The system-actor metadata set (sweep-orphans precedent), through the
+		// shipped metadata schema for the same reason.
 		const meta = await testClient.unsafe<Array<{ m: Record<string, unknown> }>>(
 			`SELECT metadata AS m FROM events
 			 WHERE aggregate_id = $1 AND event_type = 'pool.liquidity_added'`,
@@ -468,6 +489,107 @@ describe("run_liquidity_injection — the sweep", () => {
 			user_id: null,
 			ip: "pg_cron",
 		});
+		expect(() => eventMetadataSchema.parse(meta[0]?.m)).not.toThrow();
+	});
+
+	it("liquidity-injector::status-is-re-read-INSIDE-the-lock", async () => {
+		// ⛔ @db-migration-reviewer MEDIUM-1, and it is a money-path fix rather
+		// than tidying. The loop's cursor takes a READ COMMITTED snapshot at loop
+		// start; migration 0027 then locked the market row and DISCARDED every
+		// column of it. A market that moved `Open → Resolving / Closed / Voided`
+		// between snapshot and lock was still injected — and `settleMarket` /
+		// `voidMarket` sum `pool.liquidity_added` under the pool lock, so an
+		// injection landing after that sum adds backing the terminal, append-only
+		// payout row does not account for. There is no edge out of `Resolved`.
+		//
+		// ⚠ 0027's own `only-Open-markets-are-touched` exercises the CURSOR
+		// FILTER, not the TRANSITION, which is exactly why it passed against the
+		// gap. This case drives the transition itself: a second session holds the
+		// market row and flips its status while the sweep is already running and
+		// blocked on that very row.
+		await seedUsers(4, "transition");
+		const marketId = await seedMarket("inj-transition", {
+			yes: "9000",
+			no: "1000",
+		});
+		await seedPolicy(V(16), { lockTimeoutMs: 250 });
+
+		const holder = await contender.reserve();
+		try {
+			await holder.unsafe(`BEGIN`);
+			// Take the markets row FIRST — the same lock the sweep wants, in the
+			// same canonical order — then flip the status inside that transaction.
+			await holder.unsafe(
+				`SELECT 1 FROM markets WHERE id = $1 FOR NO KEY UPDATE`,
+				[marketId],
+			);
+			await holder.unsafe(
+				`UPDATE markets SET status = 'Closed' WHERE id = $1`,
+				[marketId],
+			);
+
+			// ⚠ `.execute()` IS LOAD-BEARING. A postgres.js query is LAZY — it is
+			// not sent until awaited — so `const p = client.unsafe(...)` without it
+			// starts nothing, the sweep runs after the COMMIT below, and its cursor
+			// sees the CLOSED status. That version passes for the wrong reason: it
+			// proves the cursor filter, which 0027 already had, and says nothing
+			// about the re-read. Measured: `considered: 0` instead of 1.
+			const sweeping = testClient
+				.unsafe(`SELECT run_liquidity_injection()`)
+				.execute();
+			// Let it reach the lock before the holder lets go.
+			await new Promise((r) => setTimeout(r, 20));
+			// Release well inside the 250 ms lock_timeout so the sweep ACQUIRES the
+			// row rather than timing out — a timeout would prove nothing about the
+			// re-read.
+			await new Promise((r) => setTimeout(r, 40));
+			await holder.unsafe(`COMMIT`);
+			await sweeping;
+		} finally {
+			holder.release();
+		}
+
+		// ⛔ THE ASSERTION. The sweep got the lock, saw the CURRENT status, and
+		// declined. Against 0027 this market would carry an injection.
+		expect(await injectionCount(marketId)).toBe(0);
+		const pool = await readPool(marketId);
+		expect(pool).toEqual({
+			yes: "9000.000000000000000000",
+			no: "1000.000000000000000000",
+		});
+		// Considered, not injected — the skip is a decision the heartbeat records.
+		const hb = await heartbeats();
+		expect(hb[0]).toEqual({ considered: 1, injected: 0, policy: V(16) });
+	});
+
+	it("liquidity-injector::sweep-duration-bounded", async () => {
+		// ⛔ PLAN §9 R-11's SECOND PROOF OBLIGATION, which was named and not met
+		// (@db-migration-reviewer HIGH-2). R8 put the whole sweep in ONE
+		// transaction, so a pool row locked at the first market stays locked until
+		// the LAST one finishes. The bet path waiting on that row has a 1,000 ms
+		// non-retryable statement_timeout, and the plan's bound is arithmetic:
+		// (open_markets − 1) × lock_timeout_ms.
+		//
+		// ⚠ THAT ARITHMETIC HAS ALREADY DRIFTED ONCE. The plan reasons from EIGHT
+		// markets; staging carries TEN (measured 2026-09-07). This case pins the
+		// uncontended sweep well inside the budget so a regression that made the
+		// per-market work expensive is visible before it reaches a bet.
+		await seedUsers(4, "duration");
+		for (let i = 0; i < 8; i++) {
+			await seedMarket(`inj-dur-${i}`, { yes: "9000", no: "1000" });
+		}
+		await seedPolicy(V(17));
+
+		const started = Date.now();
+		await sweep();
+		const elapsed = Date.now() - started;
+
+		// Uncontended, eight markets, all injecting. The generous ceiling is
+		// deliberate: this is a REGRESSION bound on the sweep's own cost, not a
+		// performance target, and a tight one would flake on a loaded machine.
+		expect(elapsed).toBeLessThan(1000);
+		const hb = await heartbeats();
+		expect(hb[0]).toEqual({ considered: 8, injected: 8, policy: V(17) });
 	});
 
 	it("liquidity-injector::created_at-is-derived-from-the-event-id", async () => {

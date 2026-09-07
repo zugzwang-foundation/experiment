@@ -261,17 +261,29 @@ describe("k changes only through a named door (ADR-0047 §Acceptance, R2)", () =
 			"server/markets/open.ts",
 		]);
 
-		// And the migrations: the ONLY raw `UPDATE pools` in the whole migration
-		// set is the injector's. A second one would be a fourth door nobody
-		// declared.
+		// And the migrations: every raw `UPDATE pools` in the whole migration set
+		// belongs to the INJECTOR. A write in any other file would be a fourth
+		// door nobody declared.
+		//
+		// ⚠ ASSERTED BY FILE, NOT BY COUNT. `0028` REPLACES
+		// `run_liquidity_injection` (the `0015` precedent), so the same statement
+		// legitimately appears twice — once in the original and once in the
+		// replacement — and migrations are append-only, so that duplication only
+		// grows. A count would red on the next correction to a function that is
+		// working exactly as intended; the FILE SET is what the claim is actually
+		// about.
 		const migrationWrites = execSync(
-			`grep -rn -E '^[[:space:]]*UPDATE pools' ${MIGRATIONS} || true`,
+			`grep -rln -E '^[[:space:]]*UPDATE pools' ${MIGRATIONS} || true`,
 			{ encoding: "utf8" },
 		)
 			.split("\n")
-			.filter(Boolean);
-		expect(migrationWrites).toHaveLength(1);
-		expect(migrationWrites[0]).toContain("0027_liquidity_injector_pg_cron.sql");
+			.filter(Boolean)
+			.map((f) => f.replace(MIGRATIONS, ""))
+			.sort();
+		expect(migrationWrites).toEqual([
+			"0027_liquidity_injector_pg_cron.sql",
+			"0028_liquidity_policy_ceilings.sql",
+		]);
 	});
 
 	it("k-door::the-injector-is-the-only-pg_cron-job-that-writes-a-money-table", async () => {

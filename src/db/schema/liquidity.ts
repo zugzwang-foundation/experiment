@@ -127,6 +127,42 @@ export const liquidityPolicy = pgTable(
 				AND ${table.guardLow} < ${table.guardHigh}
 				AND ${table.endgameHours} >= 0 AND ${table.lockTimeoutMs} > 0`,
 		),
+		// ⛔ THE CEILING, ADDED AT MIGRATION 0028 (@db-migration-reviewer HIGH-1).
+		//
+		// The bounds CHECK above bounds every parameter from BELOW and only one
+		// from above. `lock_timeout_ms` is the one that needed both, because it is
+		// the single number the whole one-transaction sweep's safety argument
+		// rests on: the sweep holds a pool row from the moment it locks it until
+		// the sweep ENDS, and the bet path waiting on that row has a 1,000 ms
+		// `statement_timeout` whose `57014` is NOT retryable. A bet that loses
+		// that race does not retry — it 500s.
+		//
+		// The real invariant is `(open_markets − 1) × lock_timeout_ms < 1000`, and
+		// a CHECK cannot express it because it cannot see the market count. So
+		// this is a TYPO CEILING rather than a proof: it catches the extra zero
+		// and the ms/s unit slip, which are the realistic ways an operator typing
+		// a bare INSERT — no PR, no CI, no reviewer — breaks the money path.
+		// ⚠ Measured 2026-09-07: `lock_timeout_ms = 2147483647` was ACCEPTED.
+		//
+		// ⚠ AND THE ARITHMETIC BOUND HAS ALREADY DRIFTED ONCE. The plan reasons
+		// from "eight markets"; staging carries **ten** `Open` markets today, so
+		// the safe ceiling there is 111 ms and the shipped 100 ms holds with
+		// almost no room. The exact invariant belongs in the ADR §Runbook, where
+		// the operator reads it before typing — this constraint is the backstop,
+		// not the argument.
+		check(
+			"liquidity_policy_lock_timeout_ceiling",
+			sql`${table.lockTimeoutMs} <= 250`,
+		),
+		// `endgame_hours` had no ceiling either. Measured: 2147483647 is accepted
+		// and `now() + make_interval(hours => 2147483647)` evaluates cleanly to
+		// the year 247010 — every market skipped forever, silently, with the
+		// undershoot alarm as the only signal that anything is wrong. One year is
+		// far past any plausible tuning and far short of that.
+		check(
+			"liquidity_policy_endgame_ceiling",
+			sql`${table.endgameHours} <= 8760`,
+		),
 	],
 );
 

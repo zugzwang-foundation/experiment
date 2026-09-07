@@ -197,6 +197,13 @@
       "when": 1788773989058,
       "tag": "0027_liquidity_injector_pg_cron",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1788779924431,
+      "tag": "0028_liquidity_policy_ceilings",
+      "breakpoints": true
     }
   ]
 }

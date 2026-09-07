@@ -211,16 +211,56 @@ describe("liquidity_policy — the bounds CHECK is the only review there is", ()
 			"a zero lock_timeout_ms — the sweep waits forever on a contended pool",
 			{ lock_timeout_ms: 0 },
 		],
+		// ⛔ THE CEILING (@db-migration-reviewer HIGH-1, migration 0028). The
+		// bounds CHECK bounded every parameter from BELOW and only one from above,
+		// and `lock_timeout_ms` is the one the whole one-transaction sweep's safety
+		// argument rests on: the sweep holds a pool row from lock to sweep-end, and
+		// a bet waiting on it has a 1,000 ms statement_timeout whose 57014 is NOT
+		// retryable. A bet that loses that race does not retry — it 500s.
+		//
+		// Measured before 0028: `lock_timeout_ms = 2147483647` was ACCEPTED. These
+		// are the two realistic ways an operator typing a bare INSERT gets there.
+		[
+			"an extra zero on lock_timeout_ms — 8 markets × 1 s against a 1 s bet budget",
+			{ lock_timeout_ms: 1000 },
+		],
+		["a ms/s unit slip on lock_timeout_ms", { lock_timeout_ms: 100000 }],
+		[
+			"an int4-max lock_timeout_ms — the value that was accepted before 0028",
+			{ lock_timeout_ms: 2147483647 },
+		],
+		// L-8. Measured: `now() + make_interval(hours => 2147483647)` evaluates
+		// cleanly to the year 247010 — every market skipped forever, silently, with
+		// the undershoot alarm as the only sign anything is wrong.
+		[
+			"an endgame_hours past any plausible tuning — every market skipped forever",
+			{ endgame_hours: 8761 },
+		],
 	];
 
 	for (const [name, overrides] of REJECTED) {
 		it(`rejects ${name}`, async () => {
+			// ⚠ The constraint NAME is deliberately not asserted here any more.
+			// `0028` splits the ceilings into their own constraints
+			// (`liquidity_policy_lock_timeout_ceiling`,
+			// `liquidity_policy_endgame_ceiling`), and pinning one name would have
+			// made this loop assert WHICH constraint caught the typo rather than
+			// THAT one did — the operator does not care, and a future split would
+			// red a test about nothing.
 			await expect(insertPolicy(9100, overrides)).rejects.toMatchObject({
 				code: "23514",
-				constraint_name: "liquidity_policy_bounds",
 			});
 		});
 	}
+
+	it("accepts lock_timeout_ms exactly at the 0028 ceiling", async () => {
+		// The boundary is inclusive: 250 is a legal tuning, 251 is not. Pinned as
+		// its own case because a reviewer tightening `<=` to `<` would silently
+		// forbid a value the ADR Runbook names as available.
+		await expect(
+			insertPolicy(9102, { lock_timeout_ms: 250 }),
+		).resolves.toBeTruthy();
+	});
 
 	it("accepts trigger_ratio exactly 1 — the boundary is inclusive by design", async () => {
 		// At 1.0 the injector chases the target continuously. That is legal and
