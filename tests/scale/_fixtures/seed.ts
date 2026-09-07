@@ -15,6 +15,7 @@ import { markets, pools, users } from "@/db/schema";
 import type { BetEventMetadata } from "@/server/bets/endpoint";
 
 import { testDb } from "../../db/_fixtures/db";
+import { attachGenesisEvent } from "../../db/_fixtures/genesis";
 import {
 	SYNTHETIC_MARKETS,
 	SYNTHETIC_RESOLUTION_DEADLINE,
@@ -115,6 +116,11 @@ export async function seedOpenMarketWithPool(slug: string): Promise<string> {
 		yesReserves: SYNTHETIC_SEED_RESERVES,
 		noReserves: SYNTHETIC_SEED_RESERVES,
 	});
+	// The genesis event a directly-inserted pool would otherwise lack.
+	// `settleMarket`/`voidMarket` read the ADR-0047 discard terms from it and
+	// fail closed without it — a fixture with no `market.opened` builds a state
+	// `openMarket` cannot produce (I-GENESIS-001).
+	await attachGenesisEvent({ marketId, seedAmount: SYNTHETIC_SEED_RESERVES });
 	return marketId;
 }
 

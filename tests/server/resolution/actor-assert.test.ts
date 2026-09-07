@@ -15,6 +15,7 @@ import { triggerResolution } from "@/server/resolution/trigger";
 import { voidMarket } from "@/server/resolution/void";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { attachGenesisEvent } from "../../db/_fixtures/genesis";
 import { truncateTables } from "../../db/_fixtures/truncate";
 
 // ENGINE.15 S1 tests-first (charter file 3 — CF-6 belt, §Actor retrofit). The
@@ -99,6 +100,11 @@ async function seedMarketWithPool(
 		yesReserves: SEED,
 		noReserves: SEED,
 	});
+	// The genesis event a directly-inserted pool would otherwise lack.
+	// `settleMarket`/`voidMarket` read the ADR-0047 discard terms from it
+	// and fail closed without it — a fixture with no `market.opened` is a
+	// state `openMarket` cannot produce (I-GENESIS-001).
+	await attachGenesisEvent({ marketId: marketId, seedAmount: SEED });
 	return marketId;
 }
 

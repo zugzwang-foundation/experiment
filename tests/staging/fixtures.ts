@@ -208,8 +208,20 @@ export interface MarketFixture {
 	readonly description: string;
 	/** `false` for M1 only — the Draft market, which is never opened. */
 	readonly open: boolean;
-	/** Raw seed; the generator canonicalises it with the REAL `canonicalizeAmount18`. */
-	readonly seedAmount: string;
+	/**
+	 * The ADR-0047 open: a YES price strictly inside (0,1) and a tank of Đ.
+	 * Raw; the generator canonicalises both with the REAL
+	 * `canonicalizeAmount18`, exactly as the admin wire does.
+	 *
+	 * Uniform across the table at 0.10 / 100,000 ⇒ 90,000 YES / 10,000 NO,
+	 * which is what the 7-day soak needs to exercise: a symmetric fixture set
+	 * would leave every asymmetric code path — the void cross-assert, the
+	 * settle residual, the chart's seed — unexercised on staging while
+	 * looking like a full rehearsal. The former per-market seeds (100, and
+	 * 5000 on M7 and M10) are gone with the single-scalar shape.
+	 */
+	readonly openingPriceYes: string;
+	readonly tank: string;
 	/**
 	 * Milliseconds after the generation instant at which `resolution_deadline`
 	 * falls.
@@ -255,7 +267,8 @@ export const MARKETS: readonly MarketFixture[] = [
 		description:
 			"PLACEHOLDER resolution criterion for a Draft staging fixture. Not real market content.",
 		open: false,
-		seedAmount: "100",
+		openingPriceYes: "0.10",
+		tank: "100000",
 		deadlineOffsetMs: LONG_DEADLINE_MS,
 		terminal: "none",
 		serves: "Draft — admin surface; /m/sp-m1-draft must 404 for participants",
@@ -276,7 +289,8 @@ export const MARKETS: readonly MarketFixture[] = [
 		// at all — gate 5's G5.5 would be unsatisfiable for a reason that is a
 		// fixture choice, not a product fact. 5000 keeps prices in a sane band while
 		// still moving them enough for C11's multi-point chart.
-		seedAmount: "5000",
+		openingPriceYes: "0.10",
+		tank: "100000",
 		deadlineOffsetMs: LONG_DEADLINE_MS,
 		terminal: "none",
 		serves:
@@ -289,7 +303,8 @@ export const MARKETS: readonly MarketFixture[] = [
 		description:
 			"PLACEHOLDER resolution criterion for the graceful-degradation case. Not real market content.",
 		open: true,
-		seedAmount: "100",
+		openingPriceYes: "0.10",
+		tank: "100000",
 		deadlineOffsetMs: LONG_DEADLINE_MS,
 		terminal: "none",
 		serves:
@@ -302,7 +317,8 @@ export const MARKETS: readonly MarketFixture[] = [
 		description:
 			"PLACEHOLDER resolution criterion for a market with no activity. Not real market content.",
 		open: true,
-		seedAmount: "100",
+		openingPriceYes: "0.10",
+		tank: "100000",
 		deadlineOffsetMs: LONG_DEADLINE_MS,
 		terminal: "none",
 		serves: "Open, brand new — ZERO posts, both EmptySideCTA slots",
@@ -314,7 +330,8 @@ export const MARKETS: readonly MarketFixture[] = [
 		description:
 			"PLACEHOLDER resolution criterion for the Closed state. Not real market content.",
 		open: true,
-		seedAmount: "100",
+		openingPriceYes: "0.10",
+		tank: "100000",
 		deadlineOffsetMs: SHORT_DEADLINE_MS,
 		terminal: "close",
 		serves: "Closed — read-only; write affordances gated",
@@ -326,7 +343,8 @@ export const MARKETS: readonly MarketFixture[] = [
 		description:
 			"PLACEHOLDER resolution criterion for the Resolving state. Not real market content.",
 		open: true,
-		seedAmount: "100",
+		openingPriceYes: "0.10",
+		tank: "100000",
 		deadlineOffsetMs: SHORT_DEADLINE_MS,
 		terminal: "resolving",
 		serves: "Resolving — read-only; distinct badge",
@@ -342,7 +360,8 @@ export const MARKETS: readonly MarketFixture[] = [
 		// 1000 Đ YES post into a 5000 seed returns a FOUR-DIGIT payout. That is
 		// gate 5's G5.6 carrier, and M7 is terminal in THIS slice — a magnitude
 		// not placed here can never be placed later.
-		seedAmount: "5000",
+		openingPriceYes: "0.10",
+		tank: "100000",
 		deadlineOffsetMs: SHORT_DEADLINE_MS,
 		terminal: "resolve-yes",
 		serves:
@@ -355,7 +374,8 @@ export const MARKETS: readonly MarketFixture[] = [
 		description:
 			"PLACEHOLDER resolution criterion for the Voided state. Not real market content.",
 		open: true,
-		seedAmount: "100",
+		openingPriceYes: "0.10",
+		tank: "100000",
 		// `voidMarket` accepts Open or Closed, so no deadline pressure.
 		deadlineOffsetMs: LONG_DEADLINE_MS,
 		terminal: "void",
@@ -369,7 +389,8 @@ export const MARKETS: readonly MarketFixture[] = [
 		description:
 			"PLACEHOLDER resolution criterion for Discovery filler. Not real market content.",
 		open: true,
-		seedAmount: "100",
+		openingPriceYes: "0.10",
+		tank: "100000",
 		deadlineOffsetMs: LONG_DEADLINE_MS,
 		terminal: "none",
 		serves:
@@ -382,7 +403,8 @@ export const MARKETS: readonly MarketFixture[] = [
 		description:
 			"PLACEHOLDER resolution criterion for Discovery filler. Not real market content.",
 		open: true,
-		seedAmount: "100",
+		openingPriceYes: "0.10",
+		tank: "100000",
 		deadlineOffsetMs: LONG_DEADLINE_MS,
 		terminal: "none",
 		serves: "Open filler",
@@ -394,7 +416,8 @@ export const MARKETS: readonly MarketFixture[] = [
 		description:
 			"PLACEHOLDER resolution criterion for Discovery filler. Not real market content.",
 		open: true,
-		seedAmount: "100",
+		openingPriceYes: "0.10",
+		tank: "100000",
 		deadlineOffsetMs: LONG_DEADLINE_MS,
 		terminal: "none",
 		serves: "Open filler",
@@ -406,7 +429,8 @@ export const MARKETS: readonly MarketFixture[] = [
 		description:
 			"PLACEHOLDER resolution criterion for Discovery filler. Not real market content.",
 		open: true,
-		seedAmount: "100",
+		openingPriceYes: "0.10",
+		tank: "100000",
 		deadlineOffsetMs: LONG_DEADLINE_MS,
 		terminal: "none",
 		serves: "Open filler",
@@ -418,7 +442,8 @@ export const MARKETS: readonly MarketFixture[] = [
 		description:
 			"PLACEHOLDER resolution criterion for Discovery filler. Not real market content.",
 		open: true,
-		seedAmount: "100",
+		openingPriceYes: "0.10",
+		tank: "100000",
 		deadlineOffsetMs: LONG_DEADLINE_MS,
 		terminal: "none",
 		serves: "Open filler",
@@ -430,7 +455,8 @@ export const MARKETS: readonly MarketFixture[] = [
 		description:
 			"PLACEHOLDER resolution criterion for Discovery filler. Not real market content.",
 		open: true,
-		seedAmount: "100",
+		openingPriceYes: "0.10",
+		tank: "100000",
 		deadlineOffsetMs: LONG_DEADLINE_MS,
 		terminal: "none",
 		serves: "Open filler",
@@ -442,7 +468,8 @@ export const MARKETS: readonly MarketFixture[] = [
 		description:
 			"PLACEHOLDER resolution criterion for Discovery filler. Not real market content.",
 		open: true,
-		seedAmount: "100",
+		openingPriceYes: "0.10",
+		tank: "100000",
 		deadlineOffsetMs: LONG_DEADLINE_MS,
 		terminal: "none",
 		serves: "Open filler",

@@ -51,6 +51,7 @@ import {
 import { settleMarket } from "@/server/resolution/settle";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { attachGenesisEvent } from "../../db/_fixtures/genesis";
 import { truncateTables } from "../../db/_fixtures/truncate";
 
 const SEED = "100.000000000000000000";
@@ -116,6 +117,11 @@ async function seedOpenMarketWithPool(slug: string): Promise<string> {
 		yesReserves: SEED,
 		noReserves: SEED,
 	});
+	// The genesis event a directly-inserted pool would otherwise lack.
+	// `settleMarket`/`voidMarket` read the ADR-0047 discard terms from it and
+	// fail closed without it — a fixture with no `market.opened` builds a state
+	// `openMarket` cannot produce (I-GENESIS-001).
+	await attachGenesisEvent({ marketId, seedAmount: SEED });
 	return marketId;
 }
 

@@ -5,8 +5,8 @@
 | Field | Value |
 |---|---|
 | **Document** | `cpmm.md` — CPMM math companion (named in SPEC.2 §0 companion files + §1.4 #2) |
-| **Version** | 2.1.0 (semver; MAJOR on any change to a formula or invariant, MINOR on clarifications) |
-| **Date** | 2026-07-15 |
+| **Version** | 3.0.0 (semver; MAJOR on any change to a formula or invariant, MINOR on clarifications) |
+| **Date** | 2026-09-06 |
 | **Owner** | Hrishikesh Manoj Hundekari |
 | **Status** | Authored at ENGINE.1 (web-authored, founder-ratified, CC-committed) |
 | **Gates** | ENGINE.2 (module `src/server/cpmm/`), ENGINE.3 (property tests); the former DESIGN.4 slippage-modal gate is retired — SPEC.1 §7 (1.0.15) |
@@ -47,11 +47,14 @@ pool once at `Draft → Open` and there are no external liquidity providers and 
 mid-market adjustments (SPEC.1 §10.5, §10.6); **binary single-answer** — no
 multi-outcome machinery; and **weight-pinned** — Manifold's pool weight is fixed at
 p ≡ ½, which collapses their parametrised maker to the pure constant product
-`y · n = k` (§3.3). A direct consequence: every pool *seeds* at probability 0.5.
-The opening price the audience sees is then set deliberately — a standard
-pre-launch curation slate of ordinary commented bets moves the price from 0.5 to a
-per-market level chosen for the question, under full operator control, before
-public availability (§7.2).
+`y · n = k` (§3.3). ⚠ **Note the scope of that stripping: it removes the curve
+WEIGHT, not the ability to open at a chosen price.** Since ADR-0047 a pool seeds
+at whatever probability the operator names, by placing the two reserves
+asymmetrically and discarding the excess side (§7.1) — the weight-pinning is why
+that is done with reserves rather than with an exponent. The pre-launch curation
+slate seeds ARGUMENTS, in stakes deliberately too small to move the price (§7.2);
+it stopped being the price-setting mechanism at ADR-0047, and the sentences here
+that described it walking the price from 0.5 to a chosen level are gone with it.
 
 **Numbers.** This file pins **no magnitudes**. Seed sizes and bet floors
 remain symbolic constants owned by SPEC.1 §16.1 and pin at the
@@ -100,10 +103,21 @@ one (YES, NO) share **pair**. One pair is worth exactly 1 Đ; at resolution each
 winning-side share pays 1 Đ and each losing-side share pays 0 (SPEC.1 §10.3).
 Conversely, every 1 Đ that leaves the pool (sale proceeds, §5) burns one pair. At
 all times every share in existence sits either in the pool reserves or in a user
-position — the admin holds no positions (SPEC.1 §10.1) — and the count of pairs in
-existence equals the Đ the pool holds. Solvency is therefore structural, not
-managed: whichever side wins, the shares users hold are each backed by a Đ already
-inside the pool (stated as an invariant with the residual identity in §8 and §11).
+position — the admin holds no positions (SPEC.1 §10.1) — **or was DISCARDED at
+open (§7.1)**, and **per side**, reserve + user-held + discarded equals the Đ
+deposited (the §7.1 BACKING IDENTITY). ⚠ Both halves are ADR-0047's, and the
+second REPLACES a claim that is now false: this read *"the count of pairs in
+existence equals the Đ the pool holds"*, which holds only while nothing is
+discarded — at a 10% open, pairs in existence are 10,000 against 90,000 Đ. That
+counterexample sat here as a footnote defending the FIRST clause while the
+second still asserted the thing it disproves. ⚠ Note also that *"in existence"*
+is used narrowly from §8.1 onward — a discarded share is destroyed and does NOT
+exist for the resolution arithmetic — so the per-side identity, not a global
+pair count, is what §8 derives from. Solvency is still structural, not managed:
+whichever side wins,
+the shares users hold are each backed by a Đ already inside the pool, and the Đ
+behind the discarded shares is the residual §8.1 returns (stated as an invariant
+with the residual identity in §8 and §11).
 
 ### 3.3 Price
 
@@ -295,68 +309,159 @@ reflect the clamped stake. Presentation precision is a display concern
 
 ### 7.1 Seed mechanism
 
-At the `Draft → Open` transition the admin commits a seed of C Đ to the
-market's pool — recorded as the `seedAmount` payload field on the
-`market.opened` events row plus the `pools` reserve initialisation,
-never a `dharma_ledger` row (R-2; SPEC.1 §10.1). In
-pair-mint terms (§3.2) the seed mints C share pairs, initialising the
-reserves symmetrically:
+At the `Draft → Open` transition the admin opens the market at a chosen
+price over a reserve TANK of size T — the two reserves sum to exactly T —
+recorded as the
+`yesReserves`, `noReserves`, `openingPriceYes`, `backingMinted`,
+`discardedYes` and `discardedNo` payload fields on the `market.opened`
+events row plus the `pools` reserve initialisation, never a
+`dharma_ledger` row (R-2; SPEC.1 §10.1). Given an opening price
+p = p_yes ∈ (0,1), the reserves initialise ASYMMETRICALLY:
 
-    (y0, n0) = (C, C)        ⇒        p_yes = p_no = 0.5 at seed
+    (y0, n0) = ((1 − p) · T,  p · T)      ⇒      p_yes = p at seed
 
-C > 0 is a parameter of market creation; magnitude and policy are owned by
-SPEC.1 §10.5/§16.1 and pin at number-tuning. This file fixes the mechanism:
-symmetric initialisation, exactly once. There is no asymmetric seed and no
-curve-weight dial — upstream's `p` parameter (which lets Manifold open at an
-arbitrary probability with equal reserves, since equal reserves give
-prob = p exactly) is stripped (§1, §2).
+since a side's price is proportional to the OPPOSITE reserve (§3.3): a
+LOW p_yes means a LARGE yes-reserve. At p = ½ this reduces to the
+symmetric (T/2, T/2) and everything below is a no-op — the symmetric seed
+is the special case, not the rule.
 
-### 7.2 Opening price — the pre-launch curation slate
+In pair-mint terms (§3.2) the open mints B = max(y0, n0) share pairs, of
+which min(y0, n0) of the short side enter the pool and the remaining
+B − min(y0, n0) are DISCARDED — permanently destroyed, held by no one,
+in no position. Discards are what let a price be set with no holder for
+the excess side, which is the constraint §7.2 describes. They are
+LARGE: the discard fraction is 1 − min(p, 1−p) / max(p, 1−p), which is
+88.9% at a 10% open.
 
-The probability at seed is 0.5 structurally: opening elsewhere via reserves
-would require a holder for the excess side, and the admin cannot hold
-positions (SPEC.1 §10.1); opening elsewhere via the curve would require the
-stripped weight.
+Because discarded shares leave the pool without entering a position, the
+pair-mint accounting of §3.2 is completed by the BACKING IDENTITY, which
+holds per side at every instant of a market's life:
 
-The price the audience sees at public launch is **not** 0.5 by default —
-it is set deliberately. **Standard launch procedure for every market:**
-after seed and before public availability, a **curation slate** executes on
-the curve — a set of ordinary, fully-commented bets (§4 buys under INV-1,
-every stake carrying its argument) on both sides, curated per-market, that
-(a) skews the price from 0.5 to the chosen opening level for the question
-asked, and (b) kickstarts the debate with substantive commentary on each
-side. The pre-launch phase is under complete operator control: which
-arguments, which sides, which stakes, what opening level. The slate rides
-**operator-controlled participant accounts** — never the admin ledger
-account, which structurally cannot bet or comment (SPEC.1 §10.1) — so the
-data model's admin/participant separation is preserved while the operator
-retains full control of the launch state.
+    Y + H_yes + D_yes  ==  N + H_no + D_no  ==  total Đ deposited
+
+where Y, N are the reserves, H_x the sum of user-held shares on side x,
+and D_x the cumulative discards on side x. D is summed from events —
+`market.opened` and, from ADR-0047 Phase 2, `pool.liquidity_added` —
+and is the term that makes §8's unwind and void arithmetic close on an
+asymmetric market. A symmetric seed has D_yes = D_no = 0, which is why
+the identity was invisible before this section was written.
+
+T > 0 and p ∈ (0,1) are parameters of market opening; magnitude and
+policy are owned by SPEC.1 §10.5/§16.1 and by ADR-0047. ⚠ **T is the
+reserve SUM, not the Đ deposited.** The Đ deposited is B = max(y0, n0) —
+90,000 at p = 0.10, T = 100,000 — and B is what the identity above equates
+to AT OPEN. Thereafter it equates to §8.1's D = B + Σ stakes − Σ proceeds:
+the identity holds at every instant, but the constant it holds against
+grows with the book. Reading T as Đ overstates the deposit by the discard,
+and Phase 2's target rule compares against T, so the two must not be
+conflated. This file fixes
+the mechanism: asymmetric initialisation at a chosen price, exactly
+once, with the excess discarded. There is still no curve-weight dial —
+upstream's `p` parameter (which lets Manifold open at an arbitrary
+probability with equal reserves, since equal reserves give prob = p
+exactly) remains stripped (§1, §2), and is a different mechanism from
+the p above: this p is a target price, not an exponent. The
+reserve-placement primitive that computes the pair, and the
+price-preserving addition that §7.4 will admit, are one function —
+`openingReserves` / `addLiquidity` in `src/server/cpmm/calculate.ts`,
+derived from upstream's `addCpmmLiquidityFixedP` under the §2 MIT
+attribution.
+
+### 7.2 The pre-launch curation slate — arguments, not price
+
+**AMENDED by ADR-0047 (2026-09-06). This section previously made the slate
+the price-setting mechanism. It is not, and it does not set price again.**
+
+Price is set structurally, by the two opening reserves (§7.1). The slate's
+only remaining job is the one it was always better at: giving a market a
+debate to arrive into.
+
+The paragraph that stood here opened "the probability at seed is 0.5
+structurally", and that sentence held for exactly as long as the seed was
+symmetric. §7.1 now opens the market at a chosen p and DISCARDS the excess
+side rather than finding a holder for it — which is precisely the
+impossibility this section used to rest on.
+
+**Standard launch procedure for every market:** after the open and before
+public availability, a **curation slate** posts a small number of sincere,
+fully-argued bets on each side (§4 buys under INV-1, every stake carrying
+its argument), curated per-market. Its purpose is (a) that a market does
+not go live with an empty debate, and (b) that both sides are represented
+by an argument someone can answer. **Stakes are deliberately small enough
+not to move the price** — the opening price is §7.1's, and a slate that
+moved it would be re-introducing the mechanism ADR-0047 removed.
+
+Why this changed is worth recording, because the old design was not
+obviously wrong. Reaching a 10% open by slate required operator-controlled
+participant accounts to hold NO positions worth twice the seed, riding to
+resolution, each carrying a mandatory argument under INV-1 that the
+operator does not hold — arguments by fiat, with stake, taking real
+payouts and real leaderboard rows. That is strictly further from an honest
+book than a discard, which has no holder, no position, no vote, no payout
+and no leaderboard row. Setting the price structurally and letting the
+slate seed ARGUMENTS ONLY separates the two things this section used to
+conflate. See ADR-0047 §Decision Outcome B and §Consequences.
 
 To this file a slate bet is indistinguishable from any other bet: same
 formulas, same rounding, same ledger flows, same k-preservation; slate
 positions are real positions, exposed to §8 resolution like any other.
-**No special math exists or is needed.** What the slate requires is product
+**No special math exists or is needed** — and now that the slate does not
+set price, none is implied either. What the slate requires is product
 definition, owned by SPEC.1 and deferred to the debate-phase market design:
 the curation-account model and Dharma provenance, the lifecycle window in
 which the slate executes (a SPEC.1 §6 definition — bets currently exist
 only in `Open`, so pre-launch implies a visibility gate or a defined
-sub-state), per-market opening levels and the curation process itself,
-dataset labeling/disclosure of slate bets, and leaderboard treatment of
-slate accounts.
+sub-state), dataset labeling/disclosure of slate bets, and leaderboard
+treatment of slate accounts. **Per-market opening levels are no longer on
+that list**: they are a parameter of market opening (§7.1), not a curation
+outcome.
 
 ### 7.3 Rejected reserve-side alternatives (recorded)
 
-Asymmetric open via one-sided share burn at seed — mint C pairs, burn x of
-one side for reserves (C, C − x) — is solvency-safe but rejected: it sets a
-price by fiat with no stake and no argument behind it, exactly what the
-curation-slate route avoids. Reintroducing the upstream `p` weight is
-rejected for the same reason plus the added curve complexity. Either
-revisit is an ADR, not an edit.
+**AMENDED by ADR-0047 (2026-09-06). The first rejection below is
+REVERSED; it is kept in place, struck, because the reasoning that
+overturned it is the substance of the amendment.**
+
+~~Asymmetric open via one-sided share burn at seed — mint C pairs, burn
+x of one side for reserves (C, C − x) — is solvency-safe but rejected:
+it sets a price by fiat with no stake and no argument behind it, exactly
+what the curation-slate route avoids.~~
+
+**ACCEPTED, and it is now the only open mechanism (§7.1).** The
+objection was that a burn sets a price "by fiat with no stake and no
+argument behind it". Measured, the alternative it protected does worse
+on its own terms: reaching a 10% open by curation slate requires
+operator-controlled participant accounts to hold NO positions worth
+twice the seed, riding to resolution, each carrying a mandatory argument
+under INV-1 that the operator does not hold — arguments by fiat, with
+stake, which is strictly further from an honest book than a discard
+nobody holds. A discard has no holder, no position, no vote, no payout
+and no leaderboard row; it is an accounting fact, disclosed in the
+dataset. Setting the price structurally and letting the slate seed
+ARGUMENTS ONLY — with stakes too small to move the price — separates the
+two things the slate was conflating. See ADR-0047 §Decision Outcome B
+and §Consequences.
+
+Reintroducing the upstream `p` weight **remains rejected**, and ADR-0047
+re-examined it against a measurement rather than inheriting this
+sentence: it rewrites every function in `src/server/cpmm/` around
+fractional powers, weakens the exact-arithmetic contract of §10, needs a
+column on `pools`, buys no discarded shares — worthless to a mint that
+can simply not mint them — and yields a curve that measures equally
+lopsided at a 10/90 open (YES:NO impact 14:1 against fixed-p's 12:1).
+Upstream itself runs fixed-`p` with discards for its multi-choice
+markets. Either revisit is an ADR, not an edit; the `p`-weight revisit
+is reasonable at testnet and out of scope for the experiment.
 
 ### 7.4 No liquidity operations exist
 
 Per SPEC.1 §10.6, the seed is fixed for the market's life. This module
-exposes no add/remove-liquidity operation; upstream's liquidity functions
+exposes no add/remove-liquidity operation IN ANY RUNTIME PATH — ⚠ but
+`addLiquidity` IS an export of `src/server/cpmm/calculate.ts` as of ADR-0047
+Phase 1, with no caller: it is the specification and differential-fuzz oracle the
+Phase-2 SQL injector is pinned against. This section's rewrite rides Phase 2 with
+SPEC.1 §10.6; until then, read it as "no operation is WIRED", not "no function
+exists". Upstream's liquidity functions
 are stripped (§2). Reserves change through exactly three doors: §4 buy,
 §5 sell, §8 terminal unwind.
 
@@ -374,18 +479,39 @@ single terminal `market.resolved` events row; per-bet payouts live in the
 - **Payout rule.** Each user-held winning-side share pays exactly 1 Đ; each
   losing-side share pays 0 (SPEC.1 §10.3, reconciled in §9). Per-bet deltas
   are independent (§9.3).
-- **Residual identity (the audit crux).** Let w = the winning-side reserve
-  at freeze and D = the pool's Đ balance (= seed + Σ stakes − Σ proceeds).
-  By pair accounting (§3.2), winning shares in existence = D, so user-held
-  winning shares = D − w, the pool pays out D − w, and the residual
-  returned to the admin via `pool_unwind` is **exactly w — the winning-side
-  reserve**. The unwind is therefore auditable from the public frozen
-  reserves alone. The identity is exact at 18 dp: §10's rounding leaves all
-  dust inside the reserves, so reserves + user holdings sum to D to the
-  last digit. (Instance from §12: seed 100, one YES buy of 10 → user holds
-  19.090909090909090909 YES, pool YES reserve 90.909090909090909091; the
-  two sum to 110.000000000000000000 = D. YES wins ⇒ unwind = the YES
-  reserve; NO wins ⇒ unwind = 110 = the NO reserve.)
+- **Residual identity (the audit crux). AMENDED by ADR-0047 — the unwind is
+  no longer the winning reserve alone.** Let w = the winning-side reserve at
+  freeze, D_W = the cumulative DISCARD on the winning side (§7.1), and D =
+  the pool's Đ balance (= backing + Σ stakes − Σ proceeds). By pair
+  accounting (§3.2) the winning shares that ever existed number D, but D_W
+  of them were destroyed at open and are held by no one, so winning shares
+  IN EXISTENCE are D − D_W and user-held winning shares are D − w − D_W.
+  The pool pays out D − w − D_W, and the residual returned via `pool_unwind`
+  is
+
+      unwind = w + D_W
+
+  because the Đ backing a discarded share has no holder to pay and nowhere
+  else to go. ⛔ **The unwind is therefore NOT auditable from the frozen
+  reserves alone** — it needs D_W, which is read from the market's
+  `market.opened` event (and, from ADR-0047 Phase 2, its
+  `pool.liquidity_added` events). That sentence stood here until ADR-0047
+  and is now false; `src/server/resolution/settle.ts` is the shipped
+  arithmetic.
+
+  A SYMMETRIC open has D_yes = D_no = 0 and every clause above degenerates
+  to the pre-ADR-0047 form, which is why this was invisible: `unwind = w`
+  was not an approximation, it was the D_W = 0 special case.
+
+  The identity stays exact at 18 dp: §10's rounding leaves all dust inside
+  the reserves, and the discard is carried as a residual (§7.1) rather than
+  a separately rounded product, so reserves + user holdings + discards sum
+  to D to the last digit. (Instance from §12, a symmetric seed so D_W = 0:
+  seed 100, one YES buy of 10 → user holds 19.090909090909090909 YES, pool
+  YES reserve 90.909090909090909091; the two sum to 110.000000000000000000
+  = D. YES wins ⇒ unwind = the YES reserve; NO wins ⇒ unwind = 110 = the NO
+  reserve. On an ASYMMETRIC open the same market would add D_W to whichever
+  side won.)
 - The losing-side reserve is informational only — those shares expire
   worthless inside the pool; no flow corresponds to them.
 
@@ -407,10 +533,16 @@ discipline (SPEC.1 §10.7 per B4) belongs to the **correction** path
 (§8.3) and has **no void leg**.
 
 **Residual.** The pool's remaining Đ after refunds — D − Σ `void_refund`,
-with D = seed + Σ stakes − Σ proceeds (§8.1) — is **not in general the
-seed**: it differs from the seed by exactly the users' net realized sale
+with D = **backing** + Σ stakes − Σ proceeds (§8.1) — is **not in general the
+backing**: it differs from it by exactly the users' net realized sale
 P&L (a seller's gain stayed with the seller, so the pool carries the
-mirror; a seller's loss likewise stayed in the pool). The residual exits
+mirror; a seller's loss likewise stayed in the pool). ⚠ **`backing`, not
+`seed`** — this clause said *seed* on both sides until ADR-0047's third sweep.
+The Đ deposited is `B = max(y0, n0)`, not the tank `T`, and on an asymmetric
+market the two differ by exactly the discard: an auditor reconciling a D-14
+void from `T` lands 10,000 Đ high and reports `void.ts` as under-refunding.
+`voidMarket` computes `D` as `Y + H_yes + D_yes`, which is `B` + net flows.
+The residual exits
 circulation as `poolUnwindAmount` on the terminal `market.voided` events
 row (R-9.5/R-9.5e) via `pool_unwind`; there is no admin balance. Shares
 are extinguished without payout; comments lock `voided`. **Audit path:**
@@ -429,9 +561,13 @@ positions. The CPMM state is never recomputed or mutated by a correction.
 
 The reserve pair at the moment the market enters `Resolved` or `Voided` is
 permanent. The module performs no computation against a terminal market
-except pure reads. From the frozen (y, n), the bets, and the ledger, every
-§8 quantity — each payout, the unwind, the residual — is exactly
-reproducible by any auditor. The pool account row dissolves at `→ Frozen`
+except pure reads. From the frozen (y, n), the bets, the ledger **and the
+market's `market.opened` payload**, every §8 quantity — each payout, the
+unwind, the residual — is exactly reproducible by any auditor. ⚠ The genesis
+payload is REQUIRED, and this sentence omitted it until ADR-0047 was swept
+through: the discard terms live there, not in `pools`, and the unwind is
+`w + D_W` (§8.1). All four inputs ship in the dataset (SPEC.2 §19.3 row 1 +
+§19.4.1), so the reproducibility claim holds — what changed is the input list. The pool account row dissolves at `→ Frozen`
 (SPEC.1 §10.1); the frozen reserve values persist for the dataset.
 
 ## §9 Award-rule reconciliation (SPEC.1 §10.3)
@@ -551,10 +687,14 @@ numbered property in §4.2 and §5.2.
   the reserves.
 - **INV-C3 — Domain.** y > 0 and n > 0 always; probabilities strictly
   inside (0, 1); s > S on every buy; 0 < M < min(s, b) on every sell.
-- **INV-C4 — Solvency / residual identity.** User-held shares of side X
-  equal D − x_reserve (D = pool Đ balance). **Resolved:** payout = D − w,
-  unwind = w (the winning reserve) — auditable from the frozen reserves
-  alone (§8.1). **Voided:** unwind (`poolUnwindAmount`) = D − Σ
+- **INV-C4 — Solvency / residual identity. AMENDED by ADR-0047.** User-held
+  shares of side X equal D − x_reserve − D_X, where D_X is the cumulative
+  discard on side X (§7.1) and D = pool Đ balance. **Resolved:** payout =
+  D − w − D_W, unwind = w + D_W (the winning reserve PLUS the winning side's
+  discard) — ⛔ **NOT auditable from the frozen reserves alone**; D_W comes
+  from the market's `market.opened` event. The prior form (`unwind = w`,
+  reserves-only audit) is the D_W = 0 special case that every symmetric seed
+  satisfies. **Voided:** unwind (`poolUnwindAmount`) = D − Σ
   `void_refund` on the R-9.8 f × stake basis (§8.2); it equals the seed
   **only** when no realized sale P&L exists across users, and it audits
   from the shipped ledger (`bets`, `positions`, `dharma_ledger`) plus the
@@ -562,6 +702,11 @@ numbered property in §4.2 and §5.2.
 - **INV-C5 — Frozen determinism.** Terminal CPMM state is immutable; the
   module is pure and deterministic (§10.4); every §8 quantity is exactly
   reproducible by an auditor from the frozen state (upholds INV-4).
+  ⚠ Since ADR-0047 the frozen state that an auditor needs is the reserves
+  **and the market's `market.opened` payload** — the discard terms live
+  there, not in `pools`. Both ship in the dataset (SPEC.2 §19.3 row 1 +
+  §19.4.1), so the reproducibility claim holds; what changed is which rows
+  the auditor has to read.
 
 ## §12 Worked examples
 
@@ -618,7 +763,14 @@ low-p bet, with no bonus term anywhere.
 - NO wins: user holds no NO shares; payouts = D − n = 110 − 110 = 0;
   `pool_unwind` = 110 (the NO reserve) ✓.
 
-The §8.1 residual identity, demonstrated on both branches.
+The §8.1 residual identity, demonstrated on both branches. ⚠ E5 is a
+SYMMETRIC seed, so `D_yes = D_no = 0` and the unwind equals the winning
+reserve exactly. That is the special case, not the rule: since ADR-0047 the
+identity is `unwind = w + D_W`, and on a market opened at a price the winning
+side's discard is added. E1–E5 are deliberately left on the symmetric seed —
+they are ENGINE.3's fixed vectors and rewriting them would rewrite the
+`tests/unit/cpmm/vectors.test.ts` suite in a task with no mandate to. An
+asymmetric worked example is owed and belongs with Phase 2.
 
 ## §13 Module API (ENGINE.2 contract)
 
@@ -633,7 +785,27 @@ changing meaning.
     type Reserves = { yes: string; no: string }
 
     seedPool(seed: string): Reserves
-      // {yes: seed, no: seed}; requires seed > 0  (§7.1)
+      // {yes: seed, no: seed}; requires seed > 0. ⚠ The p = ½ SPECIAL CASE of
+      // §7.1, not the open mechanism — `openingReserves` is. Kept because every
+      // historical market.opened row is this shape and §12's vectors pin it.
+
+    seedReserves(yes: string, no: string): Reserves
+      // Seed from two explicit reserves; both > 0  (§7.1)
+
+    openingReserves(args: { openingPriceYes: string; tank: string }):
+      { reserves: Reserves; backingMinted: string;
+        discardedYes: string; discardedNo: string }
+      // THE open mechanism (§7.1, ADR-0047 §B). no = floor18(p·T),
+      // yes = T − no, so yes + no == T exactly; mints max(yes,no) pairs and
+      // discards max − min on the short side. p strictly inside (0,1).
+
+    addLiquidity(args: { reserves: Reserves; amount: string }):
+      { reserves: Reserves; backingMinted: string;
+        discardedYes: string; discardedNo: string }
+      // Price-preserving addition (ADR-0047 §A). L' = L + a,
+      // S' = floor18(S + a·S/L), discarded = a − (S'−S) as a RESIDUAL so the
+      // backing identity closes exactly. NO runtime caller in Phase 1 — it is
+      // the oracle the Phase-2 SQL injector is differentially fuzzed against.
 
     getPrices(reserves: Reserves): { yes: string; no: string }
       // §3.3; 18 dp HALF_EVEN
@@ -648,8 +820,13 @@ changing meaning.
 
     computeResolvedUnwind(args: { reserves: Reserves; outcome: Side }):
       { residual: string }
-      // = winning-side reserve (§8.1). Void residual is a ledger identity
-      // (§8.2), not a curve computation — no function exists for it.
+      // ⛔ SUPERSEDED BY ADR-0047 §E AS THE RESOLVED UNWIND, and it has no
+      // src/ caller. Returns the bare winning-side reserve, which was the
+      // residual only while every discard was zero. The shipped resolved
+      // unwind is `w + D_W` (§8.1) and lives in resolution/settle.ts, not
+      // here — this function would under-pay every asymmetric winning side.
+      // Kept because §12's vectors pin it; its removal is a Phase-2 call.
+      // Void residual is a ledger identity (§8.2), not a curve computation.
 
     CpmmDecimal   // the §10.2 cloned constructor, exported for ENGINE.5
 
@@ -663,7 +840,8 @@ module reads no clock, no environment, no randomness.
 ## §14 Non-goals
 
 Fees of any kind; order books and limit orders; multi-outcome markets;
-curve weights (p ≠ ½) and asymmetric seeds (§7.3 — reopening is an ADR);
+curve weights (p ≠ ½) — asymmetric seeds are NO LONGER a non-goal; ADR-0047
+made them the only open mechanism (§7.1, §7.3);
 mid-market liquidity operations (SPEC.1 §10.6); slippage tolerance,
 auto-abort, or per-trade warning — retired by ruling, not open (design-canon
 §4 ruling 2, W2.10 Option A: deep-liquidity seeding + the SPEC.1 §16.1
@@ -681,3 +859,8 @@ the curation slate's product definition (§7.2 — SPEC.1, debate phase).
 | 1.0.0 | 2026-06-04 | HMH | Initial authoring at ENGINE.1. Lineage pinned to `zugzwang-foundation/manifold-reference` @ `d5b55cf9` (tag `ref-2026-04-28-found5`), MIT notice landed in `THIRD_PARTY_NOTICES.md` same-commit. Decimal arithmetic pinned: decimal.js ^10.6, precision 50, 18-dp directional boundary rounding (floor on user-credited quantities; resolves ADR-0008 §8; binds ENGINE.2 + ENGINE.5). Slippage pinned as absolute probability-point impact, strict-> threshold trigger (F-BET-9; gates DESIGN.4). §7.2 pre-launch curation slate recorded as standard launch procedure (product definition deferred to SPEC.1 / debate phase). Worked examples E1–E5 are ENGINE.3 fixed vectors. |
 | 2.0.0 | 2026-07-07 | HMH | **§8.2 + INV-C4 rewritten to the founder-ratified R-9.8 void basis** (AUDIT.1 finding D1; canonical sources: SPEC.1/SPEC.2 v1.0.3 ENGINE.9 riders + shipped `resolution/void.ts`): refund = f × stake per bet, sale proceeds stand, no negative compensating entries, no void-leg `uncollectable`; residual (`poolUnwindAmount`, R-9.5e) = D − Σ `void_refund`, equal to seed only absent realized sale P&L; void auditing is ledger-based, not reserve-alone. §13 contract comment verified current (void stays ledger arithmetic, no curve function — unchanged). MAJOR per §0 semver (formula/invariant change). Also records the previously-unlogged ENGINE.14 amendment (`a29ef7e`, pool-seed payload recording form — no version bump was made at the time). |
 | 2.1.0 | 2026-07-15 | HMH | **Slippage warning trigger retired** (F-BET-9; SPEC.1 1.0.15; basis design-canon §4 ruling 2 — W2.10 Option A, operator-ratified 2026-06-27). §6.2 trigger removed (threshold, strict->, pre-confirm modal); its probability-points rationale relocated to §6.1 as the impact-unit definition. §6.4 consumable reframed from the pre-confirm modal to the non-blocking preview (price / shares / cost-or-proceeds; `threshold` dropped from the bundle; the caller-side SPEC.1 §16.1 per-bet stake cap is reflected in the preview figures — the cap constant itself deliberately lives only in SPEC.1: app-layer guard, the pure functions stay pure). §0 gates / §1 / §4.4 / §14 warning references scrubbed. MINOR per §0 semver: no change to the §6.1 impact formula, §6.3 preview semantics, §13 returns, or the worked examples — consumer-scope change, not a formula/invariant change. |
+| 3.0.0 | 2026-09-06 | HMH | **ADR-0047 Phase 1 — asymmetric open at a chosen price (LIQ-1).** **§7.1** rewritten: the `Draft → Open` seed commits a TANK of T Đ at an opening price p ∈ (0,1) and initialises the reserves ASYMMETRICALLY at `(y0, n0) = ((1 − p)·T, p·T)`, replacing the symmetric `(y0, n0) = (C, C)`; the symmetric seed is now the p = ½ special case, not the rule. The pair-mint account is completed by the **backing identity** `Y + H_yes + D_yes == N + H_no + D_no == total Đ deposited`, where `D_x` is the cumulative DISCARD per side — summed from `market.opened` (and, from ADR-0047 Phase 2, `pool.liquidity_added`). Discards are large by construction: the fraction is `1 − min(p,1−p)/max(p,1−p)`, 88.9% at a 10% open. **§7.3** the recorded rejection of asymmetric open is REVERSED and kept in place, struck, with the measurement that overturned it (a curation slate reaching 10% needs operator-held NO positions carrying mandatory arguments the operator does not hold — arguments by fiat, with stake, which is further from an honest book than a discard nobody holds); the upstream `p`-weight rejection STANDS and is re-derived rather than inherited. **MAJOR per §0 semver** — `(y0,n0) = (C,C)` is a formula this changes, and the backing identity is a new invariant. §7.2's slate paragraph is narrowed by §7.1's new closing sentence rather than rewritten; §7.4 and §14 are Phase 2 and deliberately untouched here. Paired: SPEC.2 §19.4.1 `market.opened` SHIP row (same commit), `src/server/cpmm/calculate.ts` `openingReserves`/`addLiquidity`/`seedReserves`, `src/server/markets/open.ts`. |
+| 3.0.0 | 2026-09-06 | HMH | **§7.2 rewritten under the same version (LIQ-1 Phase 1 addendum D3).** The row above deliberately left §7.2 alone, which put a flat "the probability at seed is 0.5 structurally" one section below a §7.1 that had just made it false — a reader landing on §7.2 first met the superseded claim, with the correction in a section they had not opened (`O-4`). §7.2 no longer sets price: the slate seeds ARGUMENTS ONLY, in stakes deliberately too small to move the curve, and every sentence describing operator-controlled accounts walking the price to a chosen level is DELETED rather than qualified. The reasoning that overturned it is kept, because the old design was not obviously wrong and a reversal with no argument teaches a later reader nothing. "Per-market opening levels" is struck from §7.2's deferred-product list — it is a parameter of market opening now, not a curation outcome. **No version bump: 3.0.0 is the ADR-0047 version and this is that same amendment finishing its job**, not a second one. |
+| 3.0.0 | 2026-09-06 | HMH | **§8.1, §11 INV-C4 and §11 INV-C5 amended; §7.1's `T` disambiguated (LIQ-1 Phase 1, `@code-reviewer` HIGH-3 and MEDIUM-5).** §8.1 and INV-C4 still said the resolved unwind is **exactly the winning-side reserve, auditable from the frozen reserves alone** — true only while every discard was zero, and CONTRADICTING the shipped `resolution/settle.ts` as of this same version. On a spec↔code conflict the spec wins, so a later session reading INV-C4 would have "corrected" settle.ts back and silently under-paid every asymmetric winning side by its discard. Now: `unwind = w + D_W`, payout = `D − w − D_W`, and the reserves-only audit claim is struck — D_W is read from `market.opened`. INV-C5's determinism claim SURVIVES and is scoped: the auditor needs the reserves AND the genesis payload, both of which ship (SPEC.2 §19.3 row 1 + §19.4.1). **The plan's T11 only ever scoped §7.1 and §7.3, so §8/§11 were a plan gap rather than an execution slip.** §7.1 additionally: `T` is the reserve SUM, not the Đ deposited (that is `B = max(y0,n0)`, 90,000 against T = 100,000) — the original wording conflated the two in the same section that equates the backing identity to Đ deposited, and Phase 2's target rule compares against T. |
+| 3.0.0 | 2026-09-06 | HMH | **§13 and §12 E5 — the two sites the §8.1 amendment above MISSED (self-grep, LIQ-1 Phase 1).** O-4 says a durable amendment lands at every site that states the superseded position, and the row above corrected §8.1 and §11 while leaving two others asserting it. **§13** — the module API contract — still documented `computeResolvedUnwind` as `= winning-side reserve (§8.1)`, which is a contract line directly contradicting `resolution/settle.ts`; it now carries the supersession, the reason it is kept (§12's vectors pin it) and the warning that reaching for it by name under-pays every asymmetric winning side. **§12 E5** was not wrong — it is a symmetric seed, so `D_W = 0` and its figures stand — but it closed "the §8.1 residual identity, demonstrated on both branches", from which a reader concludes the identity is reserves-only. E1–E5 stay on the symmetric seed deliberately: they are ENGINE.3's fixed vectors and rewriting them rewrites `tests/unit/cpmm/vectors.test.ts`, which this task has no mandate to do. An asymmetric worked example is OWED and belongs with Phase 2. |
+| 3.0.0 | 2026-09-07 | HMH | **§3.2, §8.2 and §8.4 — the THIRD sweep, and the sites the second one missed (`@code-reviewer` pass 3).** **§3.2** kept *"the count of pairs in existence equals the Đ the pool holds"* while the previous pass added a discard clause to the sentence before it AND a footnote supplying the counterexample — 10,000 pairs against 90,000 Đ — so the section carried its own disproof as a defence. Replaced with the per-side backing identity, which is what §8 derives from; *"in existence"* is scoped too, because §8.1 counts a discarded share as destroyed while §3.2 was counting it as existing. **§8.4** was the THIRD site asserting the reserves-only audit (after §8.1 and INV-C4, both already struck): its input list omitted the `market.opened` payload, where the discard terms live. **§8.2** defined `D` from *seed* while citing §8.1, which defines it from *backing* — on an asymmetric market those differ by the discard, so an auditor reconciling a void from the tank lands 10,000 Đ high on the D-14 example and reports `void.ts` as under-refunding. ⚠ **Three sweeps, three sets of missed sites, every one traceable to the plan's T11 scoping only §7.1 and §7.3.** Recorded as a plan gap for the third time rather than absorbed — the amendment was under-scoped at ratification, and each pass found the next layer of what that left standing. |

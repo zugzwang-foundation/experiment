@@ -43,9 +43,13 @@ import {
 	checkMarketConservation,
 } from "@/server/dharma/conservation";
 import { type DharmaEntryType, FLOW_TAGS } from "@/server/dharma/tags";
+import { requireMarketDiscards } from "@/server/markets/backing";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
-import { SYNTHETIC_SEED_RESERVES } from "../_fixtures/markets";
+import {
+	SYNTHETIC_SEED_BACKING,
+	SYNTHETIC_SEED_RESERVES,
+} from "../_fixtures/markets";
 
 /** A bet-tied flow row, as the per-market conservation checker consumes it. */
 export interface LedgerFlow {
@@ -258,8 +262,8 @@ async function gatherMarketFlows(marketId: string): Promise<LedgerFlow[]> {
 /**
  * Gather a `ConservationSnapshot` from the live DB (all markets + global). Each
  * market's net admin pool injection is computed from its TERMINAL state:
- *  - resolve/correct → SEED − poolUnwindAmount (the `market.resolved` payload);
- *  - void           → SEED − poolUnwindAmount (the `market.voided` payload);
+ *  - resolve/correct → BACKING − poolUnwindAmount (`market.resolved` payload);
+ *  - void           → BACKING − poolUnwindAmount (`market.voided` payload);
  *  - open           → (Y₀+N₀) − (Y+N), the reserves the pool absorbed from net
  *                     stakes (the hot-row identity).
  * Sells are attributed per-market via the `bet.sold` event (Amendment D). The
@@ -272,7 +276,10 @@ export async function gatherSnapshot(): Promise<ConservationSnapshot> {
 
 	const marketSnapshots: MarketSnapshot[] = [];
 	let sumPoolUnwindExits = new CpmmDecimal(0);
-	const seed = new CpmmDecimal(SYNTHETIC_SEED_RESERVES);
+	// The Đ deposited, not a reserve. Equal here only because these fixtures
+	// are symmetric (ADR-0047 §E); naming it `seed` is what let the two
+	// concepts share one variable for as long as every open was symmetric.
+	const seedBacking = new CpmmDecimal(SYNTHETIC_SEED_BACKING);
 
 	for (const mkt of marketRows) {
 		const marketId = mkt.id;
@@ -326,7 +333,7 @@ export async function gatherSnapshot(): Promise<ConservationSnapshot> {
 			marketSnapshots.push({
 				marketId,
 				ledgerFlows,
-				netAdminPoolInjection: seed.minus(unwind).toFixed(18),
+				netAdminPoolInjection: seedBacking.minus(unwind).toFixed(18),
 				reverseRecordedTotal: reverseRec.toFixed(18),
 				applyRecordedTotal: applyRec.toFixed(18),
 				uncollectableTotal,
@@ -337,7 +344,7 @@ export async function gatherSnapshot(): Promise<ConservationSnapshot> {
 			marketSnapshots.push({
 				marketId,
 				ledgerFlows,
-				netAdminPoolInjection: seed.minus(unwind).toFixed(18),
+				netAdminPoolInjection: seedBacking.minus(unwind).toFixed(18),
 			});
 		} else if (kinds.has("void")) {
 			const unwind = await poolUnwindFromEvent(marketId, "market.voided");
@@ -345,7 +352,7 @@ export async function gatherSnapshot(): Promise<ConservationSnapshot> {
 			marketSnapshots.push({
 				marketId,
 				ledgerFlows,
-				netAdminPoolInjection: seed.minus(unwind).toFixed(18),
+				netAdminPoolInjection: seedBacking.minus(unwind).toFixed(18),
 			});
 		} else {
 			// Open: the pool's CASH backing = Y + Σ(YES positions) = seed + Σstakes
@@ -358,13 +365,23 @@ export async function gatherSnapshot(): Promise<ConservationSnapshot> {
 				.select({ yesReserves: pools.yesReserves })
 				.from(pools)
 				.where(eq(pools.marketId, marketId));
+			// Y + H_yes + D_yes. `D_yes` is 0 for every fixture in this battery —
+			// they open symmetrically, so their genesis row discards nothing — so the
+			// term is written rather than assumed away: the identity is about
+			// backing, and a harness that only holds on symmetric pools is one that
+			// stops holding the first time a pool is not. (These fixtures DO carry a
+			// genesis row since the LIQ-1 fixture repair — a legacy symmetric one,
+			// so `D` reads 0 rather than being absent.)
+			const discards = await requireMarketDiscards(testDb, marketId);
 			const cash = new CpmmDecimal(
 				poolRow[0]?.yesReserves ?? SYNTHETIC_SEED_RESERVES,
-			).plus(await sumYesPositions(marketId));
+			)
+				.plus(await sumYesPositions(marketId))
+				.plus(discards.yes);
 			marketSnapshots.push({
 				marketId,
 				ledgerFlows,
-				netAdminPoolInjection: seed.minus(cash).toFixed(18),
+				netAdminPoolInjection: seedBacking.minus(cash).toFixed(18),
 			});
 		}
 	}

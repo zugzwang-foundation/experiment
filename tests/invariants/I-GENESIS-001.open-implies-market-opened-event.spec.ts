@@ -37,8 +37,8 @@ import { truncateTables } from "../db/_fixtures/truncate";
 //   markets::open-implies-market-opened-event
 //
 // ⭐ WHY THIS EXISTS, AND WHY IT IS WORTH MORE THAN THE FEATURE IT CAME FROM.
-// The §9 price chart replays a market's reserve walk from the `seedAmount` on
-// its `market.opened` event. No event, no seed, no walk — `replayReserveSeries`
+// The §9 price chart replays a market's reserve walk from the reserves on its
+// `market.opened` event. No event, no seed, no walk — `replayReserveSeries`
 // returns `[]` and the surface renders NOTHING. That is the entire failure
 // signature: a blank rectangle, which is indistinguishable from a market nobody
 // has bet on. It cost two diagnostic sessions to name, on staging, where all
@@ -77,6 +77,11 @@ import { truncateTables } from "../db/_fixtures/truncate";
 const FIXTURE_DEADLINE = new Date("2026-12-01T00:00:00.000Z");
 const NOW = new Date("2026-07-01T00:00:00.000Z");
 const SEED = "1000.000000000000000000";
+// A symmetric open, so the reserves this file writes stay (SEED, SEED) and
+// nothing here depends on ADR-0047 asymmetry. This file is about the EVENT
+// existing, not about where the price lands.
+const OPENING_PRICE_YES = "0.5";
+const TANK = "2000.000000000000000000";
 
 /**
  * ⭐ THE INVARIANT, as one storage-layer predicate. Every arm below runs THIS
@@ -232,7 +237,8 @@ describe("I-GENESIS-001: every Open market carries a market.opened event", () =>
 
 		const result = await openMarket({
 			marketId,
-			seedAmount: SEED,
+			openingPriceYes: OPENING_PRICE_YES,
+			tank: TANK,
 			now: NOW,
 			metadata: adminMetadata(),
 		});
@@ -256,7 +262,11 @@ describe("I-GENESIS-001: every Open market carries a market.opened event", () =>
 			[marketId],
 		);
 		expect(payload).toHaveLength(1);
-		expect(payload[0]?.payload).toMatchObject({ marketId, seedAmount: SEED });
+		expect(payload[0]?.payload).toMatchObject({
+			marketId,
+			yesReserves: SEED,
+			noReserves: SEED,
+		});
 	});
 
 	it("open-implies-market-opened::a-market-CANNOT-reach-Open-when-its-genesis-event-fails", async () => {
@@ -284,7 +294,8 @@ describe("I-GENESIS-001: every Open market carries a market.opened event", () =>
 		await expect(
 			openMarket({
 				marketId,
-				seedAmount: SEED,
+				openingPriceYes: OPENING_PRICE_YES,
+				tank: TANK,
 				now: NOW,
 				metadata: metadataThatFailsTheEventWrite(),
 			}),
@@ -338,7 +349,8 @@ describe("I-GENESIS-001: every Open market carries a market.opened event", () =>
 		// that the rollback left the row usable rather than wedged.
 		const result = await openMarket({
 			marketId,
-			seedAmount: SEED,
+			openingPriceYes: OPENING_PRICE_YES,
+			tank: TANK,
 			now: NOW,
 			metadata: adminMetadata(),
 		});

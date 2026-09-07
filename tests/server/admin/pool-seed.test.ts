@@ -34,6 +34,7 @@ vi.mock("next/cache", () => ({
 import { events, markets, pools } from "@/db/schema";
 import { seedPoolAction } from "@/server/admin/markets/seed";
 import { canonicalizeAmount18 } from "@/server/admin/wire";
+import { CpmmDecimal } from "@/server/cpmm/decimal";
 import {
 	MarketDeadlineInPastError,
 	MarketLifecycleStateError,
@@ -64,24 +65,61 @@ function withoutAdminSession(): void {
 }
 
 // ENGINE.14 §5.6 tests-first (S1, plan §Test plan charter) — the F-ADMIN-2
-// seed/open acceptance home (P1–P5). Greenfield VALUE imports from
-// `@/server/markets/open` (+ the lifecycle error taxonomy in
-// `@/server/markets/errors`) RED at collection until S2 lands. DB-BACKED
-// (local Postgres :54322).
+// seed/open acceptance home (P1–P5). DB-BACKED (local Postgres :54322).
 //
-// Contract pins (plan §Flows + R-14.1 + D-14.c/f + carry-forward 2 + L-E9.3):
+// ⚠ AMENDED BY LIQ-1 PHASE 1 · T3b (ADR-0047 §B; plan §4 T3/T3b). ENGINE.14's
+// carry-forward 2 — "y₀ = n₀, symmetric by code shape" — is SUPERSEDED. The
+// admin no longer names one seed scalar; it names an OPENING PRICE and a TANK,
+// and `openMarket` writes two DIFFERENT reserves:
+//
+//     yes = (1 − p) · T ,  no = p · T        p = openingPriceYes ∈ (0,1)
+//
+// The two symmetric assertions ENGINE.14 left behind (the `:185` exact payload
+// equality and the P4 "Carry-forward 2 (Y₀ = N₀)" block) are INVERTED here
+// rather than deleted, per plan §4 T3 — a regression to symmetric reserves must
+// REDDEN, and a deleted assertion cannot redden.
+//
+// ⚠ DIRECTION. A side's price is proportional to the OPPOSITE reserve
+// (calculate.ts:36-37), so p_yes = 0.10 means the YES reserve is the LARGE one:
+// 90,000 / 10,000 at T = 100,000. Both orderings type-check and both make a
+// valid pool; getting it backwards opens every market on the platform at 90%
+// YES with nothing to error on (plan §9 R2).
+//
+// Contract pins (plan §Flows + R-14.1 + D-14.c/f + L-E9.3 + contract §4):
 //   - W-4 locked branch, expectedStatus ['Draft']: ONE tx inserts the
-//     symmetric pools row (y₀ = n₀ = seedAmount), flips Draft → Open, and
-//     emits market.opened with payload EXACTLY { marketId, seedAmount };
+//     ASYMMETRIC pools row, flips Draft → Open, and emits market.opened with
+//     the SEVEN-key payload { marketId, yesReserves, noReserves,
+//     openingPriceYes, backingMinted, discardedYes, discardedNo };
 //   - NO eventId parameter — minted internally ONCE at service entry;
-//   - seedAmount is an exact-decimal STRING end to end (numericString > 0,
+//   - `tank` keeps SEED_RE / ZERO_SEED_RE; a new PRICE_RE rejects any
+//     openingPriceYes outside the OPEN interval (0,1) at the BOUNDARY — 0 and 1
+//     each produce a zero reserve, and requirePositive would then throw from
+//     INSIDE the transaction instead;
+//   - every quantity is an exact-decimal STRING end to end (numericString > 0,
 //     scale ≤ 18); string identity asserted with toBe, never closeness;
 //   - openMarket rejects now ≥ resolution_deadline (D-14.c);
 //   - NO dharma_ledger row, ever (R-14.1 / R-2 — not re-asserted here; the
 //     conservation suites own it).
 
 const SEED = "100.000000000000000000";
-const SEED_1000 = "1000.000000000000000000";
+
+// D-14's own open, and the numbers plan §2 tabulates.
+const OPENING_PRICE_YES = "0.100000000000000000";
+const TANK = "100000.000000000000000000";
+const YES_RESERVES = "90000.000000000000000000";
+const NO_RESERVES = "10000.000000000000000000";
+const BACKING_MINTED = "90000.000000000000000000";
+const DISCARDED_YES = "0.000000000000000000";
+const DISCARDED_NO = "80000.000000000000000000";
+
+// A second, differently-skewed open for P4 — so the inverted pin is not
+// satisfiable by a hardcoded 90,000/10,000.
+const TANK_1000 = "1000.000000000000000000";
+const P4_PRICE = "0.250000000000000000";
+const P4_YES = "750.000000000000000000";
+const P4_NO = "250.000000000000000000";
+const P4_BACKING = "750.000000000000000000";
+const P4_DISCARDED_NO = "500.000000000000000000";
 const NOW = new Date("2026-07-01T00:00:00.000Z");
 const FIXTURE_DEADLINE = new Date("2026-08-01T00:00:00.000Z");
 
@@ -156,7 +194,8 @@ describe("ENGINE.14 F-ADMIN-2 — openMarket (W-4 locked, Draft → Open)", () =
 
 		const result = await openMarket({
 			marketId,
-			seedAmount: SEED,
+			openingPriceYes: OPENING_PRICE_YES,
+			tank: TANK,
 			now: NOW,
 			metadata: adminMetadata("F-ADMIN-2"),
 		});
@@ -164,15 +203,21 @@ describe("ENGINE.14 F-ADMIN-2 — openMarket (W-4 locked, Draft → Open)", () =
 		// Status flipped Draft → Open.
 		expect(await marketStatus(marketId)).toBe("Open");
 
-		// Exactly ONE pools row; symmetric reserves equal the seed.
+		// Exactly ONE pools row; ASYMMETRIC reserves — (1−p)·T on YES, p·T on
+		// NO, summing to the tank exactly.
 		const poolRows = await poolRowsFor(marketId);
 		expect(poolRows.length).toBe(1);
-		expect(poolRows[0]?.yesReserves).toBe(SEED);
-		expect(poolRows[0]?.noReserves).toBe(SEED);
+		expect(poolRows[0]?.yesReserves).toBe(YES_RESERVES);
+		expect(poolRows[0]?.noReserves).toBe(NO_RESERVES);
+		// THE INVERSION of ENGINE.14 carry-forward 2. Left as a standalone
+		// assertion on purpose: the two `toBe`s above would still pass if a
+		// future edit made both constants equal, and this one would not.
+		expect(poolRows[0]?.yesReserves).not.toBe(poolRows[0]?.noReserves);
 
-		// Exactly ONE market.opened events row; payload EXACT
-		// { marketId, seedAmount } (R-14.1 — the seed rides opened, not
-		// created); admin actor metadata (R-14.5).
+		// Exactly ONE market.opened events row; payload EXACT — the SEVEN-key
+		// new variant (ADR-0047 §B / contract §2). `toEqual` on the whole object
+		// is the pin: an extra key, a missing key, or a lingering `seedAmount`
+		// all redden. Admin actor metadata (R-14.5).
 		const eventRows = await testDb
 			.select({
 				eventId: events.eventId,
@@ -182,7 +227,15 @@ describe("ENGINE.14 F-ADMIN-2 — openMarket (W-4 locked, Draft → Open)", () =
 			.from(events)
 			.where(eq(events.eventType, "market.opened"));
 		expect(eventRows.length).toBe(1);
-		expect(eventRows[0]?.payload).toEqual({ marketId, seedAmount: SEED });
+		expect(eventRows[0]?.payload).toEqual({
+			marketId,
+			yesReserves: YES_RESERVES,
+			noReserves: NO_RESERVES,
+			openingPriceYes: OPENING_PRICE_YES,
+			backingMinted: BACKING_MINTED,
+			discardedYes: DISCARDED_YES,
+			discardedNo: DISCARDED_NO,
+		});
 		const metadata = eventRows[0]?.metadata as {
 			actor_id?: unknown;
 			user_id?: unknown;
@@ -196,7 +249,12 @@ describe("ENGINE.14 F-ADMIN-2 — openMarket (W-4 locked, Draft → Open)", () =
 			marketId,
 			poolId: poolRows[0]?.id,
 			status: "Open",
-			seedAmount: SEED,
+			yesReserves: YES_RESERVES,
+			noReserves: NO_RESERVES,
+			openingPriceYes: OPENING_PRICE_YES,
+			backingMinted: BACKING_MINTED,
+			discardedYes: DISCARDED_YES,
+			discardedNo: DISCARDED_NO,
 			openedEventId: eventRows[0]?.eventId,
 		});
 		expect(result.openedEventId).not.toBe(marketId);
@@ -211,7 +269,8 @@ describe("ENGINE.14 F-ADMIN-2 — openMarket (W-4 locked, Draft → Open)", () =
 
 		const caught = await openMarket({
 			marketId,
-			seedAmount: SEED,
+			openingPriceYes: OPENING_PRICE_YES,
+			tank: TANK,
 			now: NOW,
 			metadata: adminMetadata("F-ADMIN-2"),
 		}).catch((e: unknown) => e);
@@ -226,7 +285,8 @@ describe("ENGINE.14 F-ADMIN-2 — openMarket (W-4 locked, Draft → Open)", () =
 
 		const caught = await openMarket({
 			marketId,
-			seedAmount: SEED,
+			openingPriceYes: OPENING_PRICE_YES,
+			tank: TANK,
 			now: NOW,
 			metadata: adminMetadata("F-ADMIN-2"),
 		}).catch((e: unknown) => e);
@@ -236,15 +296,17 @@ describe("ENGINE.14 F-ADMIN-2 — openMarket (W-4 locked, Draft → Open)", () =
 		expect((await allEventRows()).length).toBe(0);
 	});
 
-	it("pool-seed::P3-rejects-invalid-seed", async () => {
-		// Four invalid seeds in sequence on ONE Draft fixture: zero, negative,
+	it("pool-seed::P3-rejects-invalid-tank", async () => {
+		// Four invalid tanks in sequence on ONE Draft fixture: zero, negative,
 		// 19-dp scale, malformed — each MarketSeedInvalidError, nothing written.
-		const marketId = await seedMarket("placeholder-p3-seed", "Draft");
+		// SEED_RE / ZERO_SEED_RE keep guarding this argument; only its NAME moves.
+		const marketId = await seedMarket("placeholder-p3-tank", "Draft");
 
 		for (const bad of ["0", "-5", "1.0000000000000000001", "abc"]) {
 			const caught = await openMarket({
 				marketId,
-				seedAmount: bad,
+				openingPriceYes: OPENING_PRICE_YES,
+				tank: bad,
 				now: NOW,
 				metadata: adminMetadata("F-ADMIN-2"),
 			}).catch((e: unknown) => e);
@@ -254,31 +316,141 @@ describe("ENGINE.14 F-ADMIN-2 — openMarket (W-4 locked, Draft → Open)", () =
 		expect((await poolRowsFor(marketId)).length).toBe(0);
 		expect((await allEventRows()).length).toBe(0);
 		expect(await marketStatus(marketId)).toBe("Draft");
+
+		// ⛔ POSITIVE CONTROL, and it is the whole reason this test is not
+		// vacuous. Every rejection above is ALSO produced by an `openMarket` that
+		// simply does not know what a `tank` is — so without an accept case the
+		// four `toBeInstanceOf`s certify a guard they never exercised. A VALID
+		// tank must OPEN.
+		const control = await seedMarket("placeholder-p3-tank-ok", "Draft");
+		await openMarket({
+			marketId: control,
+			openingPriceYes: OPENING_PRICE_YES,
+			tank: TANK,
+			now: NOW,
+			metadata: adminMetadata("F-ADMIN-2"),
+		});
+		expect(await marketStatus(control)).toBe("Open");
 	});
 
-	it("pool-seed::P4-symmetric-seed-pin", async () => {
-		// Carry-forward 2 (Y₀ = N₀): the input seedAmount, BOTH numeric(38,18)
-		// reserve readbacks, and the market.opened payload seedAmount are
+	it("pool-seed::P3b-rejects-opening-price-outside-the-open-interval", async () => {
+		// PRICE_RE + the zero check (contract §4): p ∈ (0,1), OPEN at both ends.
+		// `0` and `1` are rejected because either produces a ZERO reserve, and
+		// `requirePositive` throughout calculate.ts would then throw from INSIDE
+		// the W-4 transaction rather than at the boundary — an economics bug
+		// wearing a lifecycle error's clothes.
+		const marketId = await seedMarket("placeholder-p3b-price", "Draft");
+
+		for (const bad of ["0", "1", "1.0", "2", "0.000000000000000000"]) {
+			const caught = await openMarket({
+				marketId,
+				openingPriceYes: bad,
+				tank: TANK,
+				now: NOW,
+				metadata: adminMetadata("F-ADMIN-2"),
+			}).catch((e: unknown) => e);
+			expect(caught).toBeInstanceOf(MarketSeedInvalidError);
+		}
+
+		expect((await poolRowsFor(marketId)).length).toBe(0);
+		expect((await allEventRows()).length).toBe(0);
+		expect(await marketStatus(marketId)).toBe("Draft");
+
+		// The guard is at the BOUNDARY, not inside the transaction — proved by
+		// ORDERING rather than asserted. This market's deadline has already
+		// passed, so the in-transaction D-14.c guard would answer
+		// MarketDeadlineInPastError; a boundary guard answers
+		// MarketSeedInvalidError first and never opens the transaction at all.
+		const expired = await seedMarket("placeholder-p3b-expired", "Draft");
+		const caughtExpired = await openMarket({
+			marketId: expired,
+			openingPriceYes: "1",
+			tank: TANK,
+			now: new Date("2026-08-02T00:00:00.000Z"),
+			metadata: adminMetadata("F-ADMIN-2"),
+		}).catch((e: unknown) => e);
+		expect(caughtExpired).toBeInstanceOf(MarketSeedInvalidError);
+		expect(caughtExpired).not.toBeInstanceOf(MarketDeadlineInPastError);
+
+		// ⛔ POSITIVE CONTROLS at BOTH open-interval edges — the assertions that
+		// stop the five rejections above from passing vacuously, and the pin that
+		// the interval is OPEN rather than closed at 18-dp resolution.
+		const nearZero = await seedMarket("placeholder-p3b-near-zero", "Draft");
+		await openMarket({
+			marketId: nearZero,
+			openingPriceYes: "0.000000000000000001",
+			tank: TANK,
+			now: NOW,
+			metadata: adminMetadata("F-ADMIN-2"),
+		});
+		expect(await marketStatus(nearZero)).toBe("Open");
+
+		const nearOne = await seedMarket("placeholder-p3b-near-one", "Draft");
+		await openMarket({
+			marketId: nearOne,
+			openingPriceYes: "0.999999999999999999",
+			tank: TANK,
+			now: NOW,
+			metadata: adminMetadata("F-ADMIN-2"),
+		});
+		expect(await marketStatus(nearOne)).toBe("Open");
+	});
+
+	it("pool-seed::P4-asymmetric-seed-pin", async () => {
+		// ⚠ THE INVERSION of ENGINE.14's "Carry-forward 2 (Y₀ = N₀)" pin, kept in
+		// place rather than deleted so that a regression to symmetric reserves
+		// REDDENS here (plan §4 T3). Different price and tank from P1 so the pin
+		// cannot be satisfied by a hardcoded 90,000/10,000:
+		//   p = 0.25, T = 1,000  ⇒  yes = 750, no = 250, backing = 750, D_no = 500.
+		// Both numeric(38,18) reserve readbacks and the market.opened payload are
 		// STRING-IDENTICAL at 18 dp (toBe — never numeric closeness).
-		const marketId = await seedMarket("placeholder-p4-sym", "Draft");
+		const marketId = await seedMarket("placeholder-p4-asym", "Draft");
 
 		await openMarket({
 			marketId,
-			seedAmount: SEED_1000,
+			openingPriceYes: P4_PRICE,
+			tank: TANK_1000,
 			now: NOW,
 			metadata: adminMetadata("F-ADMIN-2"),
 		});
 
 		const [poolRow] = await poolRowsFor(marketId);
-		expect(poolRow?.yesReserves).toBe(SEED_1000);
-		expect(poolRow?.noReserves).toBe(SEED_1000);
+		expect(poolRow?.yesReserves).toBe(P4_YES);
+		expect(poolRow?.noReserves).toBe(P4_NO);
+		expect(poolRow?.yesReserves).not.toBe(poolRow?.noReserves);
 
 		const [eventRow] = await testDb
 			.select({ payload: events.payload })
 			.from(events)
 			.where(eq(events.eventType, "market.opened"));
-		const payload = eventRow?.payload as { seedAmount?: unknown };
-		expect(payload.seedAmount).toBe(SEED_1000);
+		const payload = eventRow?.payload as {
+			seedAmount?: unknown;
+			yesReserves?: unknown;
+			noReserves?: unknown;
+			openingPriceYes?: unknown;
+			backingMinted?: unknown;
+			discardedYes?: unknown;
+			discardedNo?: unknown;
+		};
+		expect(payload.yesReserves).toBe(P4_YES);
+		expect(payload.noReserves).toBe(P4_NO);
+		expect(payload.openingPriceYes).toBe(P4_PRICE);
+		expect(payload.backingMinted).toBe(P4_BACKING);
+		expect(payload.discardedYes).toBe(DISCARDED_YES);
+		expect(payload.discardedNo).toBe(P4_DISCARDED_NO);
+		// The superseded field is GONE, not merely unread — a payload still
+		// carrying `seedAmount` beside the new keys would satisfy every
+		// assertion above and quietly keep the legacy reader alive.
+		expect(payload.seedAmount).toBeUndefined();
+
+		// The backing identity at open (ADR-0047 §E), read off the row that
+		// actually landed: yes + D_yes == no + D_no == backingMinted.
+		expect(new CpmmDecimal(P4_YES).plus(DISCARDED_YES).toFixed(18)).toBe(
+			P4_BACKING,
+		);
+		expect(new CpmmDecimal(P4_NO).plus(P4_DISCARDED_NO).toFixed(18)).toBe(
+			P4_BACKING,
+		);
 	});
 
 	it("pool-seed::P5-rejects-expired-deadline-open", async () => {
@@ -288,7 +460,8 @@ describe("ENGINE.14 F-ADMIN-2 — openMarket (W-4 locked, Draft → Open)", () =
 
 		const caughtEq = await openMarket({
 			marketId,
-			seedAmount: SEED,
+			openingPriceYes: OPENING_PRICE_YES,
+			tank: TANK,
 			now: FIXTURE_DEADLINE,
 			metadata: adminMetadata("F-ADMIN-2"),
 		}).catch((e: unknown) => e);
@@ -296,7 +469,8 @@ describe("ENGINE.14 F-ADMIN-2 — openMarket (W-4 locked, Draft → Open)", () =
 
 		const caughtGt = await openMarket({
 			marketId,
-			seedAmount: SEED,
+			openingPriceYes: OPENING_PRICE_YES,
+			tank: TANK,
 			now: new Date("2026-08-02T00:00:00.000Z"),
 			metadata: adminMetadata("F-ADMIN-2"),
 		}).catch((e: unknown) => e);
@@ -310,11 +484,15 @@ describe("ENGINE.14 F-ADMIN-2 — openMarket (W-4 locked, Draft → Open)", () =
 
 // ENGINE.15 S1 tests-first (charter file 2) — the `seedPoolAction` wire surface
 // (F-ADMIN-2; seed rides Draft → Open, R-14.1, via the `openMarket` service).
-// VALUE import from `@/server/admin/markets/seed` resolves against the S1 stub,
-// which returns { ok: false, error: { code: "stub_not_implemented" } } — every
-// assertion below is RED on the ASSERTION. S2 wires per D-15.a:
-// requireAdminSession → canonicalizeAmount18(seedAmount) → openMarket → map.
 // DB-BACKED (:54322).
+//
+// ⚠ AMENDED BY LIQ-1 PHASE 1 · T4b (plan §4 T4; contract §5). The form now
+// posts TWO fields — `openingPriceYes` and `tank` — and BOTH go through
+// `canonicalizeAmount18` before the service, exactly as `seedAmount` did
+// (CR-3/SA-I-3), so an over-precision value still throws
+// MarketSeedInvalidError → `seed_invalid` at the wire with NO silent rounding.
+// The ActionResult now reports the two reserves that LANDED rather than the
+// value that was typed, so the admin sees the pool, not the input.
 
 // Far-future deadline so the S2-injected `now: new Date()` never trips
 // openMarket's `now >= deadline` reject on the wire happy path.
@@ -354,10 +532,15 @@ async function seedOpenFixtureWithPool(slug: string): Promise<string> {
 	return marketId;
 }
 
-function seedFormData(marketId: string, seedAmount: string): FormData {
+function seedFormData(
+	marketId: string,
+	openingPriceYes: string,
+	tank: string,
+): FormData {
 	const fd = new FormData();
 	fd.append("marketId", marketId);
-	fd.append("seedAmount", seedAmount);
+	fd.append("openingPriceYes", openingPriceYes);
+	fd.append("tank", tank);
 	return fd;
 }
 
@@ -388,24 +571,42 @@ describe("seedPoolAction wire surface", () => {
 		await withAdminSession();
 		const marketId = await seedDraftFixture("wire-seed-happy");
 
-		// Loose form "100" must canonicalize to 18-dp before openMarket.
-		const result = await seedPoolAction(seedFormData(marketId, "100"));
+		// Loose forms "0.1" and "100000" must BOTH canonicalize to 18 dp before
+		// openMarket — one canonicalizer, two fields.
+		const result = await seedPoolAction(
+			seedFormData(marketId, "0.1", "100000"),
+		);
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error("unreachable — asserted ok above");
 		expect(typeof result.data.poolId).toBe("string");
-		expect(result.data.seedAmount).toBe("100.000000000000000000");
+		// The DTO reports what LANDED — the two reserves — not the two numbers
+		// the admin typed. Seeing 90,000/10,000 come back is the admin's only
+		// confirmation that the direction is the one they meant.
+		expect(result.data.yesReserves).toBe(YES_RESERVES);
+		expect(result.data.noReserves).toBe(NO_RESERVES);
 
 		// Market flipped Draft → Open.
 		expect(await marketStatus(marketId)).toBe("Open");
 
-		// market.opened payload carries the CANONICAL 18-dp string (CR-3).
+		// market.opened payload carries the CANONICAL 18-dp strings (CR-3).
 		const eventRows = await openedEventRows();
 		expect(eventRows.length).toBe(1);
 		expect(eventRows[0]?.payload).toEqual({
 			marketId,
-			seedAmount: "100.000000000000000000",
+			yesReserves: YES_RESERVES,
+			noReserves: NO_RESERVES,
+			openingPriceYes: OPENING_PRICE_YES,
+			backingMinted: BACKING_MINTED,
+			discardedYes: DISCARDED_YES,
+			discardedNo: DISCARDED_NO,
 		});
+
+		// …and the pool row matches the DTO exactly (the DTO is a report of the
+		// row, never a second derivation of it).
+		const poolRows = await poolRowsFor(marketId);
+		expect(poolRows[0]?.yesReserves).toBe(result.data.yesReserves);
+		expect(poolRows[0]?.noReserves).toBe(result.data.noReserves);
 	});
 
 	it("seed-pool::rejects-double-seed-with-market-not-draft", async () => {
@@ -413,7 +614,9 @@ describe("seedPoolAction wire surface", () => {
 		// An Open fixture already carries its pool — double-seed must reject.
 		const marketId = await seedOpenFixtureWithPool("wire-seed-double");
 
-		const result = await seedPoolAction(seedFormData(marketId, "100"));
+		const result = await seedPoolAction(
+			seedFormData(marketId, "0.1", "100000"),
+		);
 
 		expect(result.ok).toBe(false);
 		if (result.ok) throw new Error("unreachable — asserted not-ok above");
@@ -428,16 +631,55 @@ describe("seedPoolAction wire surface", () => {
 		await withAdminSession();
 		const marketId = await seedDraftFixture("wire-seed-19dp");
 
-		// 19 fractional digits — rejected at the wire (pre-service), seed_invalid.
+		// 19 fractional digits on the TANK — rejected at the wire (pre-service),
+		// seed_invalid, no rounding (money never rounds at the wire).
+		const tankResult = await seedPoolAction(
+			seedFormData(marketId, "0.1", "1.2345678901234567891"),
+		);
+		expect(tankResult.ok).toBe(false);
+		if (tankResult.ok) throw new Error("unreachable — asserted not-ok above");
+		expect(tankResult.error.code).toBe("seed_invalid");
+
+		// …and the SAME on the PRICE. Both fields go through
+		// canonicalizeAmount18; a wire that canonicalizes one and passes the
+		// other through raw would land an un-canonicalized price in an
+		// append-only event row.
+		const priceResult = await seedPoolAction(
+			seedFormData(marketId, "0.1234567890123456789", "100000"),
+		);
+		expect(priceResult.ok).toBe(false);
+		if (priceResult.ok) throw new Error("unreachable — asserted not-ok above");
+		expect(priceResult.error.code).toBe("seed_invalid");
+
+		// Nothing written by either: still Draft, no pool, no event.
+		expect(await marketStatus(marketId)).toBe("Draft");
+		expect((await poolRowsFor(marketId)).length).toBe(0);
+		expect((await openedEventRows()).length).toBe(0);
+	});
+
+	it("seed-pool::tiny-tank-is-seed-invalid-not-an-internal-error", async () => {
+		// ⛔ THE POINT IS THE ERROR CODE, NOT THE REFUSAL. `p = 1e-18` over a
+		// tank of 0.5 floors the NO reserve to zero, so `openingReserves` throws
+		// `CpmmInputError` — correctly. But that pair passes EVERY guard above it:
+		// `canonicalizeAmount18`, `PRICE_RE` and `SEED_RE` all accept both values.
+		// Before the `CpmmInputError` arm in `toActionError` the throw fell
+		// through to `error_internal` AND fired the Sentry capture reserved for
+		// unrecognised errors, reporting a valid-shaped admin input as a wire bug.
+		// O-3: a true refusal reported with a false cause is a defect.
+		await withAdminSession();
+		const marketId = await seedDraftFixture("wire-seed-tiny-tank");
+
 		const result = await seedPoolAction(
-			seedFormData(marketId, "1.2345678901234567891"),
+			seedFormData(marketId, "0.000000000000000001", "0.5"),
 		);
 
 		expect(result.ok).toBe(false);
-		if (result.ok) throw new Error("unreachable — asserted not-ok above");
+		if (result.ok) return;
 		expect(result.error.code).toBe("seed_invalid");
+		expect(result.error.code).not.toBe("error_internal");
 
-		// Nothing written: still Draft, no pool, no event.
+		// The market must be untouched — the throw happens before the W-4
+		// transaction opens, so there is no partial write to roll back.
 		expect(await marketStatus(marketId)).toBe("Draft");
 		expect((await poolRowsFor(marketId)).length).toBe(0);
 		expect((await openedEventRows()).length).toBe(0);
@@ -447,7 +689,9 @@ describe("seedPoolAction wire surface", () => {
 		withoutAdminSession();
 		const marketId = await seedDraftFixture("wire-seed-no-session");
 
-		const result = await seedPoolAction(seedFormData(marketId, "100"));
+		const result = await seedPoolAction(
+			seedFormData(marketId, "0.1", "100000"),
+		);
 
 		expect(result.ok).toBe(false);
 		if (result.ok) throw new Error("unreachable — asserted not-ok above");

@@ -39,9 +39,8 @@ export const numericString = z
  *
  * Enum-hygiene contract (plan §G): adding a new event_type is a one-line
  * edit to `EVENT_TYPES` + one new `z.object()` entry in
- * `eventPayloadSchemas`. The `as const satisfies Record<EventType,
- * z.ZodObject<z.ZodRawShape>>` clause catches step-2 omission at TypeScript
- * compile time — adding to the enum without a matching schema fails
+ * `eventPayloadSchemas`. The `as const satisfies Record<EventType, …>` clause
+ * catches step-2 omission at TypeScript compile time — adding to the enum without a matching schema fails
  * `tsc --noEmit`. AGENTS.md inclusion of this contract is deferred per
  * project memory (`project_adr_catalogue_framing`); this docstring is the
  * stopgap.
@@ -109,12 +108,33 @@ export type EventType = (typeof EVENT_TYPES)[number];
  * (`market.resolved`/`corrected`/`voided`); per-bet payouts are rows in the
  * `payout_events` TABLE, not generic events (D-B reversed pre-merge).
  *
- * `as const satisfies Record<EventType, z.ZodObject<z.ZodRawShape>>` is
- * load-bearing: `as const` preserves per-key narrowing so
+ * The `as const satisfies Record<EventType, …>` clause is load-bearing:
+ * `as const` preserves per-key narrowing so
  * `eventPayloadSchemas['user.signed_out']` is the specific
- * `z.ZodObject<{ userId: ZodString }>`, NOT widened to
- * `z.ZodObject<z.ZodRawShape>`. `satisfies` enforces the closed-enum
- * coverage at compile time.
+ * `z.ZodObject<{ userId: ZodString }>`, NOT widened. `satisfies` enforces the
+ * closed-enum coverage at compile time — adding a type to `EVENT_TYPES` without
+ * a schema here fails `tsc`.
+ *
+ * ⚠ The bound reads "an object schema, OR a union of object schemas", and both
+ * halves are deliberate. It was a bare `z.ZodObject<z.ZodRawShape>` until
+ * ADR-0047; `market.opened` is now a `z.ZodUnion` of two object schemas, and a
+ * union is not a `ZodObject` — tsc is unambiguous (TS2740: `missing the
+ * following properties: _cached, _getCached, shape, strict, and 14 more`).
+ *
+ * The obvious repair is `z.ZodTypeAny`, and it is too loose: it admits a
+ * `z.string()` or a `z.array()` here, which would break `insert.ts`'s
+ * `JSON.stringify(payload)::jsonb` write and its `Record<string, unknown>`
+ * compare. What every payload must be is a JSON OBJECT, and this bound says
+ * exactly that while allowing an event type to carry more than one object
+ * shape.
+ *
+ * ⚠ Two forms this bound REJECTS, measured — and neither is a reason to reach
+ * for `ZodTypeAny`: a NESTED union (a union with a union arm), and
+ * `z.discriminatedUnion` (`ZodDiscriminatedUnion` is not assignable to
+ * `ZodUnion`). If you need either, ADD AN ARM to this bound rather than
+ * widening it — the width is what stops a `z.string()` reaching `insert.ts`'s
+ * jsonb write. A three-arm plain union, `.strict()`, `.passthrough()`,
+ * `.extend()` and `.merge()` all satisfy it as-is.
  */
 export const eventPayloadSchemas = {
 	"image_upload.sign_requested": z.object({
@@ -179,8 +199,9 @@ export const eventPayloadSchemas = {
 	}),
 	// === ENGINE.0 forward-stratum types (10 — plan §3) =======================
 	// market lifecycle. resolutionDeadline is an ISO-8601 instant with offset.
-	// seedAmount (the CPMM seed, numericString) rides market.opened — the
-	// seed instant is Draft → Open, not creation (R-14.1, ENGINE.14).
+	// The CPMM open rides market.opened — the seed instant is Draft → Open,
+	// not creation (R-14.1, ENGINE.14). Its payload is a UNION as of ADR-0047:
+	// legacy `seedAmount` (a symmetric seed) or the asymmetric reserve set.
 	// MEDIA.1 (OD-2): the media manifest rides the EXISTING market.created event
 	// — NO new EVENT_TYPE, NO new aggregate_type (no EVENT_TYPES delta at MEDIA.1). `media`
 	// is the at-create image set (object key + carousel order + default flag;
@@ -202,10 +223,33 @@ export const eventPayloadSchemas = {
 			.min(1),
 		mediaVideoUrl: z.string().nullable(),
 	}),
-	"market.opened": z.object({
-		marketId: z.string().uuid(),
-		seedAmount: numericString,
-	}),
+	// ADR-0047 §B — market.opened carries TWO payload shapes, and the union is
+	// the whole design decision rather than an implementation detail. The
+	// LEGACY arm is every historical row: twelve on staging and ~20 fixture
+	// files, all `{ marketId, seedAmount }`. `price-series.ts` .parse()s this
+	// payload on EVERY Discovery and debate page load, so six required new keys
+	// would turn every one of those rows into a hard parse failure at once —
+	// and the alternative, back-filling them, is a data migration over an
+	// append-only Bucket-A table, which is not a thing that can happen.
+	// The two arms are disjoint (`seedAmount` XOR `yesReserves`), so parse
+	// order is not load-bearing. ⛔ Exactly ONE place discriminates them:
+	// `readOpenedReserves` in `src/server/markets/backing.ts`. A second reader
+	// is a second thing that can drift, silently, on a money path.
+	"market.opened": z.union([
+		z.object({
+			marketId: z.string().uuid(),
+			seedAmount: numericString,
+		}),
+		z.object({
+			marketId: z.string().uuid(),
+			yesReserves: numericString,
+			noReserves: numericString,
+			openingPriceYes: numericString,
+			backingMinted: numericString,
+			discardedYes: numericString,
+			discardedNo: numericString,
+		}),
+	]),
 	"market.closed": z.object({
 		marketId: z.string().uuid(),
 	}),
@@ -308,7 +352,11 @@ export const eventPayloadSchemas = {
 		banned: z.boolean(),
 		uploadId: z.string().uuid().nullable(),
 	}),
-} as const satisfies Record<EventType, z.ZodObject<z.ZodRawShape>>;
+} as const satisfies Record<
+	EventType,
+	| z.ZodObject<z.ZodRawShape>
+	| z.ZodUnion<[z.ZodObject<z.ZodRawShape>, ...z.ZodObject<z.ZodRawShape>[]]>
+>;
 
 /**
  * Canonical 7-field metadata set per SPEC.2 §3.7. Stored in

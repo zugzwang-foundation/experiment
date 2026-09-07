@@ -13,6 +13,7 @@ import { assertAdminActor } from "@/server/admin/actor";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { appendLedgerRow, readBalance } from "@/server/dharma/persist";
 import { insertEvent } from "@/server/events/insert";
+import { requireMarketDiscards } from "@/server/markets/backing";
 import { transition } from "@/server/markets/transitions";
 
 import { assertStrictlyPositive, refundBasis } from "./basis";
@@ -171,10 +172,23 @@ export async function voidMarket(args: {
 				}
 			}
 
-			// Unwind: cash = Y + Σ(YES positions) — cross-asserted against
-			// N + Σ(NO positions) EXACTLY (both equal seed + Σ stakes − Σ
-			// proceeds, (♦); assumes the symmetric seed Y₀ = N₀ — an asymmetric
-			// ENGINE.14 seed breaks this loudly, never silently).
+			// Unwind: cash = Y + H_yes + D_yes — cross-asserted against
+			// N + H_no + D_no EXACTLY. Both equal the Đ deposited (the cpmm.md
+			// §7.1 backing identity), which is what makes this a real check rather
+			// than a restatement of one number.
+			//
+			// The D terms are why this function used to THROW on any asymmetric
+			// market. Without them the two sides differ by exactly the discard —
+			// 80,000 Đ on a 90,000/10,000 open — and the comment that stood here
+			// predicted it exactly: "an asymmetric ENGINE.14 seed breaks this
+			// loudly, never silently". It was right, and ADR-0047 §E is the fix.
+			// The assert stays, and stays fatal: it is the only place the books
+			// are checked against themselves.
+			//
+			// Read on THIS tx, under the pool lock already held (§Wrapper b). A
+			// second connection would read outside the lock and could see a
+			// different world than the one being voided.
+			const discards = await requireMarketDiscards(tx, args.marketId);
 			let yesHeld = new CpmmDecimal(0);
 			let noHeld = new CpmmDecimal(0);
 			for (const position of positionRows) {
@@ -184,11 +198,15 @@ export async function voidMarket(args: {
 					noHeld = noHeld.plus(position.quantity);
 				}
 			}
-			const cash = new CpmmDecimal(pool.yesReserves).plus(yesHeld);
-			const crossCash = new CpmmDecimal(pool.noReserves).plus(noHeld);
+			const cash = new CpmmDecimal(pool.yesReserves)
+				.plus(yesHeld)
+				.plus(discards.yes);
+			const crossCash = new CpmmDecimal(pool.noReserves)
+				.plus(noHeld)
+				.plus(discards.no);
 			if (!cash.equals(crossCash)) {
 				throw new Error(
-					`voidMarket: cash cross-assert failed (economics bug): Y+H_yes=${cash.toFixed(18)} != N+H_no=${crossCash.toFixed(18)}`,
+					`voidMarket: cash cross-assert failed (economics bug): Y+H_yes+D_yes=${cash.toFixed(18)} != N+H_no+D_no=${crossCash.toFixed(18)}`,
 				);
 			}
 			const unwind = cash.minus(totalRefunds);

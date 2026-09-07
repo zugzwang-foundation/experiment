@@ -59,6 +59,7 @@ import { getHeaderBalance } from "@/server/dharma/header-balance";
 import { getHeaderPortfolio } from "@/server/dharma/header-portfolio";
 import type { DharmaEntryType } from "@/server/dharma/tags";
 import { FLOW_TAGS } from "@/server/dharma/tags";
+import { openingBacking, readOpenedReserves } from "@/server/markets/backing";
 import { loadProfilePositions } from "@/server/profile/positions";
 import { loadProfileTiles } from "@/server/profile/tiles";
 import {
@@ -415,21 +416,44 @@ describe("gate 2 · conservation", () => {
 		// that reached the checker with actual Dharma flowing.
 		let checkedWithFlows = 0;
 		for (const market of markets) {
-			// The per-market SEED, read from the market.opened payload rather than
-			// a single constant — the fixture table uses different seeds per market
-			// (M7 is deliberately generous so its settlement pays four digits).
-			const openedRows = await gatesClient<{ seed: string | null }[]>`
-				SELECT (payload->>'seedAmount') AS seed
+			// The per-market BACKING — the Đ deposited at open — read from the
+			// market.opened payload rather than a single constant, because the
+			// fixture table opens markets differently from one another.
+			//
+			// ⚠ ALL THREE PREDICATES, ORDERED, LIMIT 1 — byte-for-byte `readGenesisRow`
+			// (`markets/backing.ts`) and `replayReserveSeries`. It was one predicate
+			// with no ordering, taking `openedRows[0]`: on a duplicated genesis row
+			// this gate would have reconciled against a THIRD row, while the chart and
+			// the payout each took the oldest. Three readers, three answers, and this
+			// one is the arbiter of the reseed.
+			//
+			// ⛔ THE WHOLE PAYLOAD, NOT `payload->>'seedAmount'`. An ADR-0047 open
+			// carries no `seedAmount` key at all, so the old SQL returned NULL for
+			// every asymmetric market — and the `continue` below reads NULL as
+			// "Draft, nothing to conserve". This gate would have gone GREEN having
+			// checked no Open market at all. `checkedWithFlows` is the only thing
+			// standing between that and a silent pass, which is exactly what it was
+			// added for.
+			const openedRows = await gatesClient<
+				{ payload: Record<string, unknown> | null }[]
+			>`
+				SELECT payload
 				FROM events
-				WHERE event_type = 'market.opened' AND aggregate_id = ${market.id}
+				WHERE aggregate_type = 'market'
+				  AND event_type = 'market.opened'
+				  AND aggregate_id = ${market.id}
+				ORDER BY created_at ASC, event_id ASC
+				LIMIT 1
 			`;
-			const seedRaw = openedRows[0]?.seed;
-			if (seedRaw == null) {
+			const openedPayload = openedRows[0]?.payload;
+			if (openedPayload == null) {
 				// Draft: never opened, no pool, no bets. Nothing to conserve, and
 				// asserting an identity over an absent pool would be noise.
 				continue;
 			}
-			const seed = new CpmmDecimal(seedRaw);
+			// The ONE reader (ADR-0047). Legacy and asymmetric rows both land here.
+			const opened = readOpenedReserves(openedPayload);
+			const seed = new CpmmDecimal(openingBacking(opened));
 			const flows = await gatherMarketFlows(market.id);
 
 			let injection: string;
@@ -453,9 +477,14 @@ describe("gate 2 · conservation", () => {
 					SELECT COALESCE(SUM(quantity), 0)::text AS total
 					FROM positions WHERE market_id = ${market.id} AND side = 'YES'
 				`;
-				const cash = new CpmmDecimal(poolRows[0]?.yes ?? "0").plus(
-					yesPositions[0]?.total ?? "0",
-				);
+				// Y + H_yes + D_yes — the backing identity's yes side. The discard
+				// term is zero on a legacy market and 80,000 on a 10% open; without
+				// it this reads a 90,000-reserve pool as holding 90,000 of backing
+				// when the deposit was 90,000 and the identity would still close —
+				// by coincidence, on the long side only.
+				const cash = new CpmmDecimal(poolRows[0]?.yes ?? "0")
+					.plus(yesPositions[0]?.total ?? "0")
+					.plus(opened.dYes);
 				injection = seed.minus(cash).toFixed(18);
 			}
 

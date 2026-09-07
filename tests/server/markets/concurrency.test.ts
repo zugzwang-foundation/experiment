@@ -38,6 +38,10 @@ import { truncateTables } from "../../db/_fixtures/truncate";
 // one test via Promise.allSettled (fileParallelism:false — ENGINE.7 style).
 
 const SEED = "100.000000000000000000";
+// Symmetric, so both reserves land on SEED exactly as before — this file is
+// about the W-4 lock, not about opening price.
+const OPENING_PRICE_YES = "0.5";
+const TANK = "200.000000000000000000";
 const NOW = new Date("2026-07-01T00:00:00.000Z");
 const DEADLINE = new Date("2026-08-01T00:00:00.000Z");
 
@@ -125,7 +129,8 @@ describe("ENGINE.14 W-4 — lifecycle concurrency (X1–X2)", () => {
 		const attempt = () =>
 			openMarket({
 				marketId,
-				seedAmount: SEED,
+				openingPriceYes: OPENING_PRICE_YES,
+				tank: TANK,
 				now: NOW,
 				metadata: adminMetadata("F-ADMIN-2"),
 			});
