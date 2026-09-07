@@ -96,11 +96,28 @@ push `staging` BEFORE the branch (O-10), read `/api/health` `canary` and match i
 to the merge SHA (O-4 is OPEN), then `pnpm staging:rebuild`, then the 7-day soak
 before 15 September. ⛔ **Not reseeded in this session, by instruction.**
 
+⇒ **DISCHARGED 2026-09-07 (LIQ-1-FIX-1).** The reseed could not run as written:
+`LONG_DEADLINE_MS` is 60 days and 60 days now lands past the conclusion freeze,
+so `createMarket` rejected the first market with `MarketDeadlineCeilingError`.
+Fixed by clamping fixture deadlines at their source (#494, merge `18cd027f`),
+then reseeded — `pools` = 14, all fourteen opened at 90,000 / 10,000, chart
+first point 0.10. **Soak day 0 is 2026-09-07.** One gate is red and is NOT this
+fix: gate 4's coverage manifest (`docs/polish/staging-coverage.json`) is stale —
+it still carries `bookmarks` entries ADR-0040 deleted, and the ten participant
+pseudonyms moved when the PFP tuple ordering changed. Founder ruling owed on
+whether that drift is deliberate; the regenerated file is written on disk by the
+gate itself.
+
 ## Context to preserve
 
 - `tests/staging/fixtures.ts` now opens all fifteen market fixtures at
   `openingPriceYes 0.10 / tank 100000`. A symmetric fixture set would leave every
   asymmetric path unexercised through a soak meant to exercise exactly those.
+  ⚠ **Fifteen fixtures, FOURTEEN pools** — M1 alone stays `Draft` and never gets
+  one, so any reseed check that expects twelve, or that counts markets and pools
+  as the same number, is reading the wrong figure. Measured on the 2026-09-07
+  reseed (plan §7, run after the deadline-clamp fix #494): `markets` = 15,
+  `pools` = 14, `market.opened` rows = 14.
 - `requireMarketDiscards` is the ONLY discard read on the money path. Phase 2's
   `pool.liquidity_added` rows sum in a SECOND query — genesis is once per market,
   injections are many, and one query cannot hold both properties. The plan is

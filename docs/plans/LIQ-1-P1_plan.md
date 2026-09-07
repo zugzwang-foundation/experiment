@@ -217,7 +217,7 @@ noReserves, openingPriceYes, backingMinted, discardedYes, discardedNo }`), all
 single highest-risk decision in Phase 1 — see OD-1.** Every historical
 `market.opened` row on staging and in every fixture carries `seedAmount` alone;
 `price-series.ts:199` `.parse()`s that payload on **every Discovery and debate
-page load**, so making the new keys required turns twelve staging markets and
+page load**, so making the new keys required turns fourteen staging markets and
 roughly twenty test files into hard parse failures at once.
 
 **Test that proves it:** `tests/server/events/insert.test.ts` gains a legacy-row
@@ -549,7 +549,10 @@ is reasonable at testnet and out of scope for the experiment.
 
 ## §7 · Staging reseed, post-merge — commands
 
-All twelve markets to `90,000 / 10,000` via the ADR-0035 guarded reset.
+All **fourteen** markets to `90,000 / 10,000` via the ADR-0035 guarded reset.
+⚠ **Fourteen, not twelve** — `tests/staging/fixtures.ts` carries FIFTEEN market
+fixtures and M1 alone stays `Draft`, so exactly one of them never gets a pool.
+Measured on the 2026-09-07 reseed: `markets` = 15, `pools` = 14.
 ⚠ **This is the LIVE staging database** (ADR-0035/0036). Run from the primary
 tree on merged `main`, never from a worktree, and never with another CC session
 on the repo.
@@ -565,7 +568,7 @@ curl -s https://<staging-host>/api/health | jq -r '.canary, .env, .migrations'
 #     across refs; branch-first makes it skip the staging deployment entirely).
 git -C ~/code/zugzwang/experiment push origin origin/main:staging
 
-# 2 · Reserves for all twelve markets, in tests/staging/fixtures.ts.
+# 2 · Reserves for all fourteen opened markets, in tests/staging/fixtures.ts.
 #     seedAmount: "100" | "5000"  →  openingPriceYes: "0.10", tank: "100000".
 #     This is a CODE EDIT in the same PR, not a runtime flag — fixtures.ts is
 #     the literal fixture table (no RNG) and tests/unit/staging/fixture-table.test.ts
@@ -588,13 +591,23 @@ psql "$STAGING_POOLER_URL" -c \
           round(p.no_reserves/(p.yes_reserves+p.no_reserves), 4) AS price_yes
      FROM pools p JOIN markets m ON m.id = p.market_id
     ORDER BY m.slug;"
-#   EXPECT twelve rows, 90000 / 10000, price_yes 0.1000 on every one.
+#   EXPECT fourteen rows.
+#   ⚠ 90000 / 10000 ONLY ON A POOL NOTHING HAS TRADED. `pools` holds CURRENT
+#   reserves and the generator places 43 bets, so on a full rebuild exactly one
+#   row — sp-m4-new, the zero-post fixture — sits on 90000 / 10000 and the other
+#   thirteen have moved. Measured 2026-09-07: 13 of 14 off the opening figure,
+#   every one of them with >= 1 bet. Reading this as a failure is a FALSE HALT.
+#   The OPEN is what this step means to check, and it is the event payload
+#   below, not the pool row.
 
 psql "$STAGING_POOLER_URL" -c \
   "SELECT count(*) FILTER (WHERE payload ? 'yesReserves')  AS new_shape,
           count(*) FILTER (WHERE payload ? 'seedAmount')   AS legacy
      FROM events WHERE event_type = 'market.opened';"
-#   EXPECT new_shape = 12, legacy = 0 after a full reset.
+#   EXPECT new_shape = 14, legacy = 0 after a full reset. THIS is the read that
+#   proves the open landed asymmetric — add yesReserves/noReserves to the select
+#   and every one of the fourteen reads 90000 / 10000 exactly (measured
+#   2026-09-07), whatever the pool rows have since done.
 
 #   Gate 2 (conservation) is the real arbiter and pnpm staging:gates already
 #   ran it; this is the read that says WHY if it went red.
@@ -637,8 +650,8 @@ before. Give each a directed scope, not "review the branch".
 
 | # | risk | why it is real | bounded by |
 |---|---|---|---|
-| **R1** | **Payload change breaks every historical row.** Six required keys would make `price-series.ts:199` `.parse()` throw on all twelve staging markets and ~20 fixture files. | Measured: `seedAmount` appears in 20+ test files; `pool-seed.test.ts:185` asserts payload **exact equality**. | T2's `z.union` + `insert.test.ts` legacy round-trip. **The legacy case is the load-bearing half** — a union with no legacy test is a union nobody proved. |
-| **R2** | **Reserve direction inverted** — writing `yes = p·tank` instead of `(1−p)·tank` opens every market at 90% YES and nothing errors. | A side's price is proportional to the **opposite** reserve (`calculate.ts:36–37`). Both orderings type-check and both produce a valid pool. | T1b property 5 (fixed, non-generative) + §7 step 4's `price_yes = 0.1000` read on all twelve. |
+| **R1** | **Payload change breaks every historical row.** Six required keys would make `price-series.ts:199` `.parse()` throw on all fourteen staging markets and ~20 fixture files. | Measured: `seedAmount` appears in 20+ test files; `pool-seed.test.ts:185` asserts payload **exact equality**. | T2's `z.union` + `insert.test.ts` legacy round-trip. **The legacy case is the load-bearing half** — a union with no legacy test is a union nobody proved. |
+| **R2** | **Reserve direction inverted** — writing `yes = p·tank` instead of `(1−p)·tank` opens every market at 90% YES and nothing errors. | A side's price is proportional to the **opposite** reserve (`calculate.ts:36–37`). Both orderings type-check and both produce a valid pool. | T1b property 5 (fixed, non-generative) + §7 step 4's `price_yes = 0.1000` read on all fourteen (read at the OPEN — §7 step 4). |
 | **R3** | **Chart replays symmetrically and warns instead of failing.** | `price-series.ts:274–278` WARNs on drift and *"ALWAYS serves the computed series"*. Wrong line, no alarm. | T10b's drift-= 0 assertion + §7 step 5's first-point read. |
 | **R4** | **`voidMarket` throws on the first asymmetric market.** | `void.ts:189` cross-assert; its own comment predicts it. | T7b, **red before T7** — if it passes against `main`, it is not exercising the defect. |
 | **R5** | **Settle silently under-reports on NO.** Not a throw — a wrong number that reconciles nothing. | `settle.ts:189` reads the bare winning reserve; on D-14 markets `D_no = 80,000`. | T8b's NO-outcome case: `residual == N + D_no` **and** `totalPaidOut + residual == deposited`. |
@@ -656,7 +669,7 @@ Three, and **OD-1 is the one that changes the shape of the work**.
 
 - **OD-1 · The `market.opened` payload is a `z.union`, not six added keys.**
   Recommended, and §4 T2 is written for it. The ADR says the payload "gains"
-  the fields and does not address the ~20 fixture files and twelve live staging
+  the fields and does not address the ~20 fixture files and fourteen live staging
   rows that carry the old shape. The alternative — required keys plus a
   data migration over historical rows — is a migration, which would pull
   `@db-migration-reviewer` in and make §0's central claim false. **If the
