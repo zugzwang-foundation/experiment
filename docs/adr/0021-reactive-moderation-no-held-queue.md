@@ -10,7 +10,24 @@
 | **Supersedes** | ADR-0020 (held queue removed in full) |
 | **Superseded-by** | — |
 | **Amends** | ADR-0014 (Track B verdict *consequence* only — §85 + the §154 verdict-router `track_b` outcome; the gate architecture is otherwise unchanged) |
-| **Amended-by** | ADR-0046 (Track B consequence: publish, then flag) |
+| **Amended-by** | ADR-0046 (Track B consequence: publish, then flag) · D-32 (Track A auto-ban reversed; moderation consequences advisory) |
+
+> ⚠ **Reversed in its consequences. Read this before the body.**
+>
+> **D-32** (2026-09-07, `docs/decisions/RECORD-v2.6-amendment.md`) rules moderation consequences
+> **advisory**: no content is auto-removed, no participant is auto-banned, nothing is blocked at
+> submission. **ADR-0046** had already replaced this ADR's **Track B** consequence with
+> *publish, then flag*; **D-32 extends the same reversal to Track A's auto-ban**, which this
+> ADR's `Amended-by` row did not previously cover.
+>
+> The single exception is the CSAM-adjacent image set, which is not **served** until screened.
+> That is a serving hold, not a submission block.
+>
+> Everything below is the decision **as taken on 2026-06-18** and is preserved unchanged — including
+> Option 3's *publish-flagged-then-remove* being recorded as **rejected**, which is the
+> disposition ADR-0046 has since ratified. It is history. It is **not** a description of how the
+> system behaves. The live contract is `ADR-0046` + **D-32**; the shipped code is `MOD-1`'s to
+> change.
 
 ---
 
@@ -275,3 +292,30 @@ the audit record all stand unchanged and are not in scope to relax.
 debate or composer surfaces, and its absence is this ratified scope decision,
 not a defect.** An inspection that rediscovers it files
 `duplicate-of-known` and cites this patch record. It does not open a row.
+
+---
+
+## Patch record — 2026-09-08 · D-32 reverses Track A; the body is preserved (ADR-1)
+
+The ADR-1 recon measured **22** present-tense assertions in this file that the gate blocks content
+and auto-bans its author: `:23`, `:40`, `:41`, `:43`, `:55`, `:59`, `:60`, `:71`, `:75`, `:77`,
+`:79`, `:92`, `:94`, `:101`, `:107`, `:110`, `:119`, `:166`, `:172`, `:175`, `:199`, `:220`,
+`:231`. It is the largest concentration in the corpus and the only one recorded nowhere as
+reversed.
+
+Per **D-33 R3** none of those lines is rewritten. The callout above carries the correction.
+
+Three specifics a reader should not have to derive:
+
+1. `:60` — *"Track A … → block + auto-ban author + CSAM auto-report. The bet+comment transaction
+   never opens"* — is the exact clause **D-32** reverses.
+2. `:50` proposes *"publish-flagged-then-remove"* and `:152` rejects it — *"If the classifier is
+   confident enough to flag it, block it."* That rejected option **is** ADR-0046's ruling. The
+   argument stands as the record of a decision since overturned.
+3. `:77` and `:107` state *"ADR-0014's gate architecture is unchanged / otherwise untouched."*
+   ADR-0046 has since superseded that architecture.
+
+`:60`'s citation `ADR-0014 §84`, and the `§85` / `§154` / `§190` family, resolve to nothing —
+ADR-0014 has no `§`-numbered headings (**D-33 R4**). Preserved per **D-33 R1**.
+
+Status remains `accepted`. No text above this record is changed.

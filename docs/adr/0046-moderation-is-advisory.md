@@ -80,3 +80,25 @@ This ADR settles both.
 | **Lock 3** — append-only | Unchanged. A dropped image is a fact recorded forward, never an edit |
 | **Lock 5** — moderation safety-critical | Preserved. Screening still precedes serving; only the wait is removed |
 | `SPEC.1` §16.5 — CSAM legal floor | Preserved. Nothing is served unscreened; the report obligation is unchanged |
+
+---
+
+## Patch record — 2026-09-08 · D-32 extends this ADR from timing to consequences (ADR-1)
+
+This ADR states at `:14` that it does **not** decide *"the auto-ban policy in `SPEC.1` §16.4."*
+**D-32** (`docs/decisions/RECORD-v2.6-amendment.md:96`) now decides it: moderation consequences
+are advisory — no auto-removal, no auto-ban, every consequence routed to the admin — with one
+exception, the CSAM-adjacent image set, which is not served until screened.
+
+Two things a reader of this file should be told:
+
+1. **`:14`'s carve-out is discharged.** The auto-ban policy is decided, by ruling. (`SPEC.1` §16.4
+   was itself removed at 2.0.0 by D-29; per **D-33 R1** the citation stands as written.)
+2. **This ADR's stated follow-on at `:70` is discharged, not outstanding.** It asked that
+   *"`ADR-0014` gains an `Amended-by` row."* What shipped is a **`Superseded-by`** row
+   (`0014:11`), which is the repo's own convention for a *partial* supersession — `ADR-0022`,
+   `ADR-0026`, `ADR-0031` and `ADR-0045` all carry a scoped `Superseded-by` with `Status`
+   `accepted`. The relationship is recorded and reciprocal. No further row is added.
+
+`ADR-0028`'s byte-identity binding remains unchanged, per `:62`. No text above this record is
+changed.
