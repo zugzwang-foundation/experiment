@@ -637,42 +637,33 @@ export const POSTS: readonly PostFixture[] = [
 	// ⚠ M7-P1 RUNS BEFORE M7-P2, AND THE ORDER IS THE WHOLE POINT.
 	//
 	// The §23 net-P/L tile is `(wallet + Σ Đb over OPEN holdings) − Σ issuance`
-	// — LIFETIME, not per-market. A lone 1000 Đ winning stake CANNOT make it
-	// four-digit, and the arithmetic says so rather than the fixture: a CPMM buy
-	// of S into a pool at price p yields S/p shares, and at a fair p = 0.5 with
-	// any finite depth that is strictly under 2S. So the realised gain is
-	// strictly under S — under 1000 — no matter how generous the seed is.
-	// (Measured: seed 5000 -> 833.33 gain; seed 100000 -> 990.10. The ceiling is
-	// approached, never crossed.)
+	// — LIFETIME, not per-market. What makes it four-digit is the ENTRY PRICE:
+	// an opposing bet landing first makes the winning side cheaper, so the same
+	// stake buys more shares and the settlement pays more. Nothing here is
+	// contrived for the gate — an opposing bet arriving before yours is the
+	// ordinary case, and it is the only case in which a winning position is
+	// worth writing home about.
 	//
-	// The lever is the ENTRY PRICE, not the seed. This 900 Đ NO bet lands first
-	// and moves YES to ~0.47, so P-owner's 1000 Đ buys 2126.89 shares instead of
-	// 1833.33 and the settlement clears four digits. Nothing here is contrived
-	// for the gate: an opposing bet arriving before yours is the ordinary case,
-	// and it is the ONLY case in which a winning position is worth writing home
-	// about.
+	// ⚠ THIS BLOCK'S FIGURES DESCRIBED A DIFFERENT MARKET, AND THEY ARE
+	// REPLACED RATHER THAN ANNOTATED. `O-5`: an appendix reverses nothing a
+	// reader reaches first, so a correction written underneath the superseded
+	// text is not a correction. What stood here argued from a fair p = 0.5 on a
+	// 5,000 seed and quoted "2126.89 shares instead of 1833.33". M7 opens at
+	// `openingPriceYes` 0.10 into a `tank` of 100,000, so the pool starts
+	// yes 90,000 / no 10,000 and the NO bet moves YES DOWN to ~0.098 rather than
+	// up to ~0.47. Measured through the shipped `computeBuy` at LIQ-1-FIX-2:
 	//
-	// ⚠ THE FIGURES IN THE TWO PARAGRAPHS ABOVE ARE STALE AND THE ARGUMENT IS
-	// NOT. They were written against a p = 0.5 market on a 5,000 seed; M7 now
-	// opens at `openingPriceYes` 0.10 into a `tank` of 100,000, so the pool
-	// starts at yes = 90,000 / no = 10,000 and the NO bet moves YES DOWN to
-	// ~0.098 rather than up to ~0.47. The mechanism is unchanged — an opposing
-	// bet landing first makes the winning side cheaper — but every number
-	// attached to it describes a market that is no longer in this table. Left in
-	// place rather than rewritten, because the reasoning is the load-bearing part
-	// and someone ratified it; the measurement is what follows. Measured on the
-	// local dry run at LIQ-1-FIX-2, and it is also the proof that splitting these
-	// bets is free:
-	//
+	//     P-crowd-1's  900 Đ NO   →   999.009900990099009898 shares
+	//     P-owner's   1000 Đ YES  →  9338.692098092643051767 shares
 	//     final pool   yes 82561.307901907356948233
 	//                  no  10900.990099009900990102
-	//     positions    NO   999.009900990099009898  (P-crowd-1, 900 Đ)
-	//                  YES 9338.692098092643051767  (P-owner, 1000 Đ)
 	//
-	// Against the closed form for the SAME totals placed as single bets —
-	// k = 9e8, so `no` = 10000 + 900 − 9e8/90900 + 1000 and `yes` =
-	// 9e8/10900.9900990099… — every figure agrees to 18 decimals. Four bets and
-	// one bet land in the same place, which is what the split needed to be true.
+	// ⛔ AND THE OPPOSING BET IS NO LONGER LOAD-BEARING FOR G5.6. At p = 0.5 it
+	// was — a lone winning stake could not clear 1000. At 0.10 it can: 1000 Đ
+	// alone into (90000, 10000) buys 9181.82 shares. The M7-P1 rows still carry
+	// the losing side of a settled market, which is their real job; they are not
+	// what makes the four-digit P/L reachable, and a later reader must not
+	// re-scope them on a reason that has expired.
 	//
 	// ⚠ IT IS FOUR BETS, NOT ONE, AND THAT IS THE PARITY FIX (L-6). ADR-0047
 	// capped a single bet at `BET_MAX_STAKE` = 250, so a lone 900 Đ stake is a
@@ -681,15 +672,33 @@ export const POSTS: readonly PostFixture[] = [
 	// it because the cap lives at the place route's step 5d and the generator
 	// drives the SERVICE, so the fixture landed happily and lied quietly.
 	//
-	// ⚠ SPLITTING COSTS NOTHING ARITHMETICALLY, AND THAT IS NOT AN ASSUMPTION.
-	// A CPMM buy adds the stake to both reserves and removes shares from one, so
-	// after a stake M the long reserve is `y + M` and the short is `k / (y + M)`
-	// — both functions of the TOTAL only. Splitting M into steps leaves the
-	// final reserves identical, and the shares telescope: each step's `k/(y+…)`
-	// term cancels the next step's, leaving `n + M − k/(y + M)`, which is the
-	// single-bet result exactly. Same entry price, same shares, same settlement.
-	// What changes is the number of ARGUMENTS, which is the honest part: the
-	// product makes you say four things to stake 900 Đ.
+	// ⚠ SPLITTING COSTS ALMOST NOTHING, AND THE "ALMOST" IS THE PART WORTH
+	// WRITING DOWN. In exact arithmetic it costs nothing: a CPMM buy adds the
+	// stake to both reserves and removes shares from one, so after a stake M the
+	// long reserve is `y + M` and the short is `k / (y + M)` — both functions of
+	// the TOTAL only — and the shares telescope, each step's `k/(y+…)` term
+	// cancelling the next step's to leave `n + M − k/(y + M)`.
+	//
+	// ⛔ BUT THE SHIPPED BUY FLOORS, AND THIS FILE SAID "IDENTICAL" UNTIL
+	// `@code-reviewer` CHECKED. `calculate.ts` takes `shares = floor18(sExact)`
+	// and then `aPrime = a + S − shares`, so every step leaves up to 1e-18 of
+	// dust in the bought reserve and the next step inherits it. Measured, the
+	// same totals down both paths:
+	//
+	//                    split (4+4 bets)            single (1+1 bets)
+	//     pool yes   82561.307901907356948233   82561.307901907356948230
+	//     pool no    10900.990099009900990102   10900.990099009900990100
+	//     NO shares    999.009900990099009898     999.009900990099009900
+	//     YES shares  9338.692098092643051767    9338.692098092643051770
+	//
+	// The divergence is bounded by (#steps) × 1e-18 and is MONOTONE IN THE
+	// POOL'S FAVOUR — a participant receives fewer shares, never more, so INV-C2
+	// (`k` only grows) holds by construction. That bound is the thing to
+	// re-check if a step count ever grows; "identical" told a later reader there
+	// was nothing to check, which is the more expensive kind of wrong.
+	//
+	// What else changes is the number of ARGUMENTS, which is the honest part:
+	// the product makes you say four things to stake 900 Đ.
 	{
 		key: "M7-P1a",
 		market: "M7",
@@ -699,7 +708,7 @@ export const POSTS: readonly PostFixture[] = [
 		phase: "main",
 		body: "PLACEHOLDER staging fixture argument opening the losing side of the market that resolves YES. It settles to a total loss, which is what a resolved market has to be able to show.",
 		serves:
-			"the losing side of M7 (a settled position worth zero); and it is what makes G5.6's four-digit P/L reachable at all — see the block above",
+			"the losing side of M7 — a settled position worth zero, which is what a resolved market has to be able to show. ⚠ It used to say this bet is what makes G5.6's four-digit P/L reachable AT ALL; that was true at p = 0.5 and is false at M7's 0.10 — see the block above",
 	},
 	{
 		key: "M7-P1b",
@@ -733,14 +742,20 @@ export const POSTS: readonly PostFixture[] = [
 		serves:
 			"the 900 Đ NO position, step 4 of 4 — 250+250+250+150; the remainder is deliberate and still clears BET_MIN_STAKE_POST",
 	},
-	// ⚠ FOUR BETS, ONE EPISODE, AND G5.3 SURVIVES BECAUSE OF THE SECOND HALF.
-	// The §23 Positions "Staked" column is Đa — the final SideEpisode's
-	// `stakedBasis` — and `episodes.ts` accumulates `basis = basis.plus(stake)`
-	// on every buy while the episode stays open. P-owner never sells M7, so all
-	// four steps sit in ONE episode and Đa is 1000 exactly, as it was when this
-	// was a single bet. Had the reader taken the LAST bet's stake instead, this
-	// split would have dropped G5.3 to 250 and the gate would have caught it —
-	// which is why the shape was measured rather than assumed.
+	// ⚠ FOUR BETS, FOUR LOTS, AND G5.3 SURVIVES BECAUSE OF THE SECOND HALF.
+	// The §23 Positions "Staked" column is Đa = Σ `lots.surviving_basis`
+	// (`src/server/lots/basis.ts`), so each 250 Đ step mints its own lot at
+	// basis 250 and P-owner — who never sells M7 — carries 1000 exactly, as it
+	// did when this was a single bet. Had the reader taken the LAST bet's stake
+	// instead, this split would have dropped G5.3 to 250, which is why the
+	// reader was read rather than assumed.
+	//
+	// ⚠ THE READER NAMED HERE WAS THE SUPERSEDED ONE UNTIL `@code-reviewer`
+	// CHECKED. This said "the final SideEpisode's `stakedBasis`" and pointed at
+	// `episodes.ts` — the authority until LOTS-1 / ADR-0039, and
+	// `profile/positions.ts` says so in as many words. The conclusion was right
+	// and the citation was not, which is `O-3`: a true finding reported with a
+	// wrong cause is still a defect, because the next reader follows the cause.
 	{
 		key: "M7-P2a",
 		market: "M7",
@@ -1132,20 +1147,33 @@ export const REPLIES: readonly ReplyFixture[] = [
 	},
 
 	// ── M2-P3 · the value carrier. D 2500 against a second place of 280. ──
-	// ⚠ THE THREE HEAVY REPLIES BELOW ARE EIGHT BETS SINCE L-6, AND THE LANE
-	// CALIBRATION IS UNMOVED. `substrateFor` builds `supportCount` /
-	// `counterCount` as DISTINCT AUTHORS (RANK-3 R-2) and the Dharma fields as
-	// the SUM of reply stakes — so splitting a reply into same-author,
-	// same-side steps changes neither. M2-P3 still reads n = 3, D = 2500,
-	// n^b = 1.732, and still fires the one Highest Stakes badge. Only
-	// `supportCountTotal` / `counterCountTotal` move, and those are display
-	// figures the badge model never reads.
+	// ⚠ THE THREE HEAVY REPLIES BELOW ARE TEN BETS SINCE L-6, AND THE LANE
+	// CALIBRATION IS UNMOVED. The shipped aggregate
+	// (`debate-view/ranking-substrate.ts`) counts `COUNT(DISTINCT rc.user_id)`
+	// per side (RANK-3 R-2) and sums `COALESCE(rl.surviving_basis, rb.stake)`
+	// for the Dharma fields (ADR-0039 R4+R5) — so splitting a reply into
+	// same-author, same-side steps changes neither. M2-P3 still reads n = 3,
+	// D = 2500, n^b = 1.732, and still fires the one Highest Stakes badge.
+	//
+	// ⚠ THE D HALF HOLDS ONLY WHILE NOBODY SELLS AGAINST THESE REPLIES, and
+	// this comment said "the SUM of reply stakes" until `@code-reviewer`
+	// checked. Surviving basis and frozen stake coincide here because `SELLS`
+	// states no sell against a reply's own entry bet — the same condition
+	// `fixture-table.test.ts` already knew it had to state, and this block did
+	// not. A future fixture that sells one down moves D and moves the lane.
 	//
 	// Had `n` still counted REPLIES, this split would have pushed M2-P3 to
 	// n = 10 and over `floor_lane(n) = 5` — inventing a Most Debated badge on
 	// the post whose whole job is to carry the STAKE lane. RANK-3's redefinition
 	// is what makes the split free, and the fixture-table test is what proves it
 	// rather than this comment.
+	//
+	// ⚠ `supportCountTotal` / `counterCountTotal` DO move, 3 → 10, and they are
+	// not inert: `discovery/hero.ts` renders `replyCount = supportCountTotal +
+	// counterCountTotal`, so M2-P3's Discovery card will read "Replies · 10".
+	// No gate moves — the badge model never reads them — but an inspector's
+	// expectation does, which is worth knowing before someone files it as a
+	// bug.
 	{
 		key: "M2-P3-R1a",
 		parent: "M2-P3",

@@ -232,10 +232,18 @@ describe("the fixture table is internally consistent", () => {
 			.map(([role, total]) => `${role}=${total}`);
 		expect(overspent).toEqual([]);
 
-		// P-owner's after-settlement reply must fit inside the M7 payout. The
-		// payout is the engine's (shares bought = 1833.33… against a 5000 seed);
-		// this asserts the fixture stays well under a conservative floor rather
-		// than restating the CPMM identity, which is `place`'s job, not ours.
+		// P-owner's after-settlement replies must fit inside the M7 payout. This
+		// asserts the fixture stays under a conservative floor rather than
+		// restating the CPMM identity, which is `place`'s job, not ours.
+		//
+		// ⚠ THE FLOOR IS DELIBERATELY TIGHT AND ITS DERIVATION WAS STALE. This
+		// read "shares bought = 1833.33… against a 5000 seed"; M7 opens at
+		// `openingPriceYes` 0.10 into a `tank` of 100,000 and the real payout is
+		// ~9338.69 (measured through the shipped `computeBuy`). 1800 therefore
+		// errs by a factor of five in the SAFE direction — it can only produce a
+		// false RED, never a false green — and it is left where it is precisely
+		// for that: at 1500 it leaves room for one more 250 Đ step and reds on
+		// the eighth, which is a useful place to stop.
 		const afterSettlement = REPLIES.filter(
 			(r) => r.phase === "after-settlement",
 		);

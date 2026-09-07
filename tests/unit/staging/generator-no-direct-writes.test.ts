@@ -293,7 +293,7 @@ const RATIFIED_SERVER_IMPORTS = new Set([
 	"@/server/storage/verify-object", // verifyUploadedObject
 	"@/server/storage/r2", // mintPutUrl (HTTP, outside the tx — ADR-0014)
 	// Pure, write-free, and required by Q1's shell-skip table.
-	"@/server/bets/floors", // assertStakeFloor
+	"@/server/bets/floors", // assertStakeFloor + clampStakeToMax (L-6 ceiling)
 	"@/server/admin/wire", // canonicalizeAmount18 + the mocked requireAdminSession
 	"@/server/config/limits", // PUT_URL_TTL_SECONDS — a constant, not a writer
 	// Pure value/verification helpers the GATES use. No writes.

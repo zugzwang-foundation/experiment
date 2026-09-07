@@ -465,6 +465,13 @@ async function placeComment(args: {
 	// shrinking a stake would produce a green run whose calibrated positions
 	// were quietly smaller than the fixture table says, which is a worse lie
 	// than the one this replaces.
+	//
+	// ⚠ THE ORDER HERE IS FLOOR-THEN-CEILING; THE ROUTE'S IS CLAMP-THEN-FLOOR.
+	// Immaterial while this refuses instead of clamping — a stake that trips
+	// either check never reaches the other — but it is NOT a reproduction of
+	// the shell layer's sequence, and `floors.ts` explains why the route's
+	// order matters (the floor asserts on the CLAMPED value, so a misconfigured
+	// max below the floor rejects loudly rather than executing below it).
 	if (clampStakeToMax(args.stake) !== args.stake) {
 		throw new Error(
 			`REFUSED — fixture ${args.key} stakes ${args.stake}, above BET_MAX_STAKE. ` +
@@ -585,6 +592,23 @@ beforeAll(async () => {
 	// while the connection says otherwise, and this runner writes ~440 rows.
 	// Throwing here fails every test in the suite WITHOUT executing any of them.
 	await assertRunnerLiveConnection();
+
+	// ⛔ PRE-FLIGHT THE STAKE CEILING TOO, AND FOR THE REASON THE LINE BELOW
+	// ALREADY GIVES. `placeComment` refuses an over-cap fixture (L-6), but it
+	// refuses MID-RUN — after earlier fixtures have committed — which leaves
+	// staging half-built and costs a full reset. A whole-table scan is free and
+	// belongs here beside the identity-pool check, where a blocked run is
+	// surfaced before anything is written. The per-call throw stays as the
+	// backstop; this is the control. (`@code-reviewer`, LIQ-1-FIX-2.)
+	const overCap = [...POSTS, ...REPLIES]
+		.filter((f) => clampStakeToMax(f.stake) !== f.stake)
+		.map((f) => `${f.key}=${f.stake}`);
+	if (overCap.length > 0) {
+		throw new Error(
+			`REFUSED — ${overCap.length} fixture stake(s) above BET_MAX_STAKE: ${overCap.join(", ")}. ` +
+				"A participant cannot place these through the product; split them into steps in fixtures.ts.",
+		);
+	}
 
 	// Pre-flight. Surface a blocked run BEFORE writing half a fixture set.
 	const [poolRow] = await readOnly
