@@ -69,7 +69,6 @@ SPEC.2 owns, as a **frame document**:
 - The public-dataset export pipeline contract for the 2026-11-06 release (§19).
 - The conclusion-event freeze contract (§20).
 - The operational runbook *slots* — cron schedule, deployment, rollback, dataset release (§21, substance lives in `HARDEN.*` task outputs).
-- The open-blockers register (§2 + §21 mirror).
 - The ADR index (§22).
 
 ### §1.4 Non-goals (what SPEC.2 explicitly does NOT cover)
@@ -101,7 +100,7 @@ SPEC.2 MUST NOT contain:
 
 A "perfect" SPEC.2 + ADR bundle has the following properties, jointly verified by PRECURSOR.4:
 
-1. **Coverage.** Every flow named in SPEC.1 (`F-*`) has a technical contract in `docs/specs/flows/F-*.md`. Every invariant in SPEC.1 §5 (`INV-1` through `INV-4`) has a named technical mechanism in SPEC.2 §14 + a named test file path. Every constant slot in SPEC.1 Appendix B has an owning ADR or section. Every error case in any `F-*` flow maps to a stable error code in `docs/specs/error-codes.md`.
+1. **Coverage.** Every flow named in SPEC.1 (`F-*`) has a technical contract in `docs/specs/flows/F-*.md`. Every invariant in SPEC.1 §5 (`INV-1` through `INV-4`) has a named technical mechanism in SPEC.2 §14 + a named test file path. Every constant slot in SPEC.1 Appendix B has an owning ADR or section. Every error case in any `F-*` flow maps to a stable error code in §15.4.
 2. **No drift.** Every claim "X is the single source of truth for concern Y" in SPEC.2 has a corresponding `docs/specs/...` or `src/server/...` file path; the file exists; CI greps SPEC.2 for these claims and fails if any path is missing.
 3. **No ambiguity.** Every architectural decision is either ratified in SPEC.2 / a dependent ADR, or carried as an explicit `BLOCKER:` in §2. There is no third state.
 4. **No re-entry.** Substance is named in exactly one place. A reader looking for the bet retry policy reads ADR-0013 (SPEC.14); SPEC.2 §9 references it but does not duplicate the value. SPEC.2 changes do not silently invalidate ADR substance, and ADR changes that affect SPEC.2 carry a same-commit SPEC.2 update.
@@ -223,7 +222,7 @@ Single source of truth: `src/server/resolution/trigger.ts` (F-ADMIN-3), `src/ser
 
 ### §3.7 Events-row contract (per-write discipline)
 
-Every state-mutating data flow MUST emit at least one `events` row in the same transaction (Pattern A per ADR-0005). The events log is the canonical audit ledger; current-state tables are co-maintained inside the same transaction for read access; the public dataset release on 2026-11-06 is structurally a `pg_dump` over a deterministic view across the events log + current-state tables (per SPEC.1 §12.2 + §19). Per SPEC.1 G3, the dataset is the *only* surface from which `K_eff(t)` is derived — post-hoc, out-of-band, against the released archive — so the events log's completeness and the metadata field set below are the architectural mechanism by which G3 is satisfied.
+Every state-mutating data flow MUST emit at least one `events` row in the same transaction (Pattern A per ADR-0005). The events log is the canonical audit ledger; current-state tables are co-maintained inside the same transaction for read access; the public dataset release on 2026-11-06 is structurally a `pg_dump` over a deterministic view across the events log + current-state tables (per SPEC.1 §12.2). Per SPEC.1 G3, the dataset is the *only* surface from which `K_eff(t)` is derived — post-hoc, out-of-band, against the released archive — so the events log's completeness and the metadata field set below are the architectural mechanism by which G3 is satisfied.
 
 **Canonical `events.metadata` field set** (per §17 observability tag set):
 
@@ -261,7 +260,7 @@ ADRs consumed by §3: ADR-0003 (framework + runtime), ADR-0004 (Better Auth + se
 
 ## §4 API Surface
 
-§4 owns the *HTTP / RPC surface inventory* for the experiment-phase build — every endpoint that crosses a process boundary, with its method (or Server Action signature), path, runtime, auth class, idempotency requirement, rate-limit class, and the SPEC.1 `F-*` flow it implements. SPEC.1 §7–§15 owns the per-`F-*` product behaviour; §15 (Error Code Envelope Shape) owns the codes catalogue at `docs/specs/error-codes.md`; this §4 sits between them at the *surface inventory* layer. The discipline is strict: §4 names what endpoint exists, where it lives, and how clients invoke it; it does NOT mint error codes (deferred to §15), it does NOT pick URL slug formats (deferred to ADR-0016 / §16), and it does NOT specify per-action input schemas (deferred to ADR-0008 + the per-flow contract files at §13).
+§4 owns the *HTTP / RPC surface inventory* for the experiment-phase build — every endpoint that crosses a process boundary, with its method (or Server Action signature), path, runtime, auth class, idempotency requirement, rate-limit class, and the SPEC.1 `F-*` flow it implements. SPEC.1 §7–§15 owns the per-`F-*` product behaviour; §15 (Error Code Envelope Shape) owns the codes catalogue at §15.4; this §4 sits between them at the *surface inventory* layer. The discipline is strict: §4 names what endpoint exists, where it lives, and how clients invoke it; it does NOT mint error codes (deferred to §15), it does NOT pick URL slug formats (deferred to ADR-0016 / §16), and it does NOT specify per-action input schemas (deferred to ADR-0008 + the per-flow contract files at §13).
 
 **Surface principle.** Server Actions are the default mutation contract per ADR-0003 §Primitive 4 — typed, zod-validated, transactional, idempotency-aware via natural-key uniqueness. Route Handlers carve out three categories: (i) external-facing endpoints (OAuth callbacks, R2 signed-PUT URL mint, Vercel Cron HTTP-fanout target, Better Auth's mounted routes); (ii) **bet endpoints F-BET-1 / F-BET-2 / F-BET-3** (the D3 carve-out — per ADR-0015 the `Idempotency-Key` HTTP header is the request-level contract surface, and per the May 2026 Next.js 16.2.x evidence Server Actions cannot natively read custom HTTP headers from the client — Discussion #74255 and the absence of a header-passing API on the `serverActions` config page); (iii) public-read JSON endpoints (`/api/health`, `/api/dataset/manifest`). F-AUTH-ADMIN stays a Server Action behind the `/admin/login` page route per ADR-0010 + D3 — admin auth has no HTTP-header-shaped contract surface that a Route Handler would honor better.
 
@@ -339,7 +338,7 @@ Eleven Route Handlers in v1 (ten built; `GET /api/dataset/manifest` is pending-b
 
 ### §4.4 Request / response envelope
 
-**Route Handler envelope.** JSON over HTTPS. Success: `{ ok: true, data: <flow-specific-shape> }`. Error: `{ ok: false, error: { code: <stable-string>, message: <display-template>, retry_after?: <seconds> } }`. The `code` field references `docs/specs/error-codes.md` per §15; `message` is the display template (interpolated client-side); `retry_after` is present iff the HTTP status is 429 / 503. HTTP status carries equal weight to `ok` — clients SHOULD branch on status, then on `ok`.
+**Route Handler envelope.** JSON over HTTPS. Success: `{ ok: true, data: <flow-specific-shape> }`. Error: `{ ok: false, error: { code: <stable-string>, message: <display-template>, retry_after?: <seconds> } }`. The `code` field references §15.4 per §15; `message` is the display template (interpolated client-side); `retry_after` is present iff the HTTP status is 429 / 503. HTTP status carries equal weight to `ok` — clients SHOULD branch on status, then on `ok`.
 
 **Server Action return shape.** Discriminated union `{ ok: true; data: T } | { ok: false; error: { code: string; message: string; field_errors?: Record<string, string[]> } }`. The `field_errors` shape is the React 19.2 `useActionState` contract for surfacing per-field validation errors (e.g., "comment too long," "stake exceeds balance"). Server Actions don't return HTTP status to user code — the framework wraps the action call in its own protocol; per-action error class is encoded in `error.code`.
 
@@ -1018,9 +1017,9 @@ pools → positions → dharma_ledger → events
 
 **Idempotency-key cache lookup is the FIRST authenticated step in every bet handler** — before the SERIALIZABLE transaction opens, before the pool lock is acquired. Cache hit (completed entry) returns the cached `(status, body)` and exits the handler; no OpenAI call, no Postgres transaction. This protects against non-deterministic OpenAI moderation re-runs on completed-but-network-dropped bets and bounds OpenAI cost by unique requests, not retry count. Storage substrate, key envelope, body-hash discipline, lock-vs-result TTL split, and error-envelope shapes for in-flight and body-mismatch cases are ratified in ADR-0015 (SPEC.16) and substantively absorbed at §11 — Redis SETNX-with-pending-sentinel substrate, global key scoping, RFC 8785 canonical-JSON full-body SHA-256 fingerprint, 30-second pending TTL + 24-hour completed-response TTL, HTTP 409 with `error_idempotency_key_reused` for body-mismatch, HTTP 409 with `error_idempotency_in_flight + Retry-After: 2` for in-flight collision (mirrors §10's moderation-reservation-collision shape verbatim).
 
-**OpenAI moderation runs after this transaction commits, never inside it** (per §10 + ADR-0014 — superseded by ADR-0046). The bet transaction wrapper is moderation-unaware; under reply-as-bet every comment-bearing bet (F-BET-1, F-BET-2, F-COMMENT-1/2/3) dispatches moderation before calling the wrapper, and the comment-free sell F-BET-3 skips it. Holding a Postgres transaction open across the 200–2000 ms moderation HTTP call is a `REFUSAL:`.
+**OpenAI moderation runs after this transaction commits, never inside it** (per §10 + ADR-0014 — superseded by ADR-0046). The bet transaction wrapper is moderation-unaware; under reply-as-bet every comment-bearing bet (F-BET-1, F-BET-2, F-COMMENT-1/2/3) dispatches moderation after the wrapper commits, and the comment-free sell F-BET-3 skips it. Holding a Postgres transaction open across the 200–2000 ms moderation HTTP call is a `REFUSAL:`.
 
-**Retry exhaustion response shape**: HTTP 503 with `error_code: bet_serialization_exhausted`, `error_type: temporary_unavailable`, `Retry-After: 1`. Distinct from F-BET-5 (HTTP 400 `market_closed_at`) and F-BET-6 (HTTP 400 `in_flight_timeout`). Lands in `docs/specs/error-codes.md` when that file is drafted (SPEC.2 §15 owns the envelope shape; the codes list lives in `error-codes.md`).
+**Retry exhaustion response shape**: HTTP 503 with `error_code: bet_serialization_exhausted`, `error_type: temporary_unavailable`, `Retry-After: 1`. Distinct from F-BET-5 (HTTP 400 `market_closed_at`) and F-BET-6 (HTTP 400 `in_flight_timeout`). Lands in §15.4's catalogue.
 
 **Single source of truth**: the bet transaction wrapper at `src/server/bets/transaction.ts` exposes a single helper that opens the SERIALIZABLE transaction, acquires the pool-row lock via Drizzle's `.for('no key update')` (per ADR-0008), runs the per-flow callback containing the lock-order chain, applies the retry policy (`BACKOFF_BASES_MS`, `RETRYABLE_SQLSTATES` co-located with the wrapper as decision parameters of ADR-0013, NOT tunables), and emits the alarm-3 custom event on terminal exhaustion. ENGINE.7 implements (Ultrathink mandatory).
 
@@ -1446,7 +1445,7 @@ ADRs consumed by §14: ADR-0004 (Better Auth session-deferral hook backing INV-3
 
 ## §15 Error Code Envelope Shape
 
-§15 owns the *error-envelope contract* for the experiment-phase build — the six-field envelope shape every error response carries (HTTP layer for Route Handlers + discriminated-union layer for Server Actions per §4.4), the closed nine-value `error_type` enum that classifies every code, the three-value `retry_semantics` enum that signals client retry behaviour, the catalogue file at `docs/specs/error-codes.md` that mints every named code, and the cross-reference invariant that ties Errors blocks in flow files (§13) to catalogue rows. SPEC.1 §13 + §16.4 own the *per-flow* error-code references in product behaviour; ADR-0013 / ADR-0014 — superseded by ADR-0046 / ADR-0015 / ADR-0010 own the *operational* codes minted in their respective decisions; this §15 sits at the *envelope contract layer*, naming the shape every error code conforms to without enumerating the codes themselves (the catalogue does that).
+§15 owns the *error-envelope contract* for the experiment-phase build — the six-field envelope shape every error response carries (HTTP layer for Route Handlers + discriminated-union layer for Server Actions per §4.4), the closed nine-value `error_type` enum that classifies every code, the three-value `retry_semantics` enum that signals client retry behaviour, §15.4, which mints every named code, and the cross-reference invariant that ties Errors blocks in flow files (§13) to catalogue rows. SPEC.1 §13 + §16.2 own the *per-flow* error-code references in product behaviour; ADR-0013 / ADR-0014 — superseded by ADR-0046 / ADR-0015 / ADR-0010 own the *operational* codes minted in their respective decisions; this §15 sits at the *envelope contract layer*, naming the shape every error code conforms to without enumerating the codes themselves (the catalogue does that).
 
 The discipline is strict: §15 names the envelope, the enums, the catalogue file, and the cross-reference invariant; it does NOT enumerate codes (the catalogue file does), it does NOT pick HTTP status mappings per code (each code's catalogue row does), and it does NOT decide retry policy per code (the catalogue row's `retry_semantics` field does).
 
@@ -1456,7 +1455,7 @@ Every error response carries exactly six fields:
 
 | Field | Type | Notes |
 |---|---|---|
-| `code` | `string` (snake_case) | Stable identifier from the catalogue at `docs/specs/error-codes.md`. Never includes HTTP status, version, or trailing identifiers — bare snake_case names. The prefix discipline (bare vs `error_`) is locked at PRECURSOR.4 per §15.6 carry-forward. |
+| `code` | `string` (snake_case) | Stable identifier from the catalogue at §15.4. Never includes HTTP status, version, or trailing identifiers — bare snake_case names. The prefix discipline (bare vs `error_`) is locked at PRECURSOR.4 per §15.6 carry-forward. |
 | `message` | `string` | Display template, interpolated client-side. May contain `{placeholder}` substitution points populated from `field_errors` or contextual handler data. NEVER carries dynamic user-input or PII — templates are static at build time. |
 | `error_type` | enum (closed 9-value, §15.2) | Classification axis: which response category does this code belong to (validation / auth / not_found / conflict / rate_limited / unavailable / gone / internal / forbidden). |
 | `retry_semantics` | enum (closed 3-value, §15.3) | Client retry hint: `retry_safe` / `retry_after` / `do_not_retry`. |
@@ -1497,7 +1496,7 @@ Three canonical retry modes. Every code in the catalogue MUST carry exactly one.
 | `retry_after` | Client MUST wait at least `retry_after` seconds before retrying. Codes: `error_rate_limit_exceeded`, `error_idempotency_in_flight`, `error_idempotency_unavailable`, `error_bet_serialization_exhausted`. |
 | `do_not_retry` | Client MUST NOT retry the same request. Either the request is permanently invalid (most `validation` + `auth` + `forbidden` + `gone` codes), or retrying would corrupt state (most `conflict` codes — fix the parameters first), or retrying would cost a quota tick without changing the outcome (most `not_found` codes). |
 
-The asymmetry between `retry_safe` (rare) and `do_not_retry` (default for most codes) is deliberate: SPEC.1 §13 + §16.4's product behaviour favours explicit user action on most error paths over silent client retry, on the principle that the user benefits from seeing the error and choosing whether to proceed (rather than the client silently retrying and the user not learning what went wrong).
+The asymmetry between `retry_safe` (rare) and `do_not_retry` (default for most codes) is deliberate: SPEC.1 §13 + §16.2's product behaviour favours explicit user action on most error paths over silent client retry, on the principle that the user benefits from seeing the error and choosing whether to proceed (rather than the client silently retrying and the user not learning what went wrong).
 
 ### §15.4 The catalogue baseline — 39 codes (38 at SPEC.2 v1.0 lock + AUDIT-FIX-B3)
 
@@ -1543,7 +1542,7 @@ Two-direction invariant between flow files and catalogue:
 | Six-field envelope shape | §15.1 |
 | Closed 9-value `error_type` enum | §15.2 |
 | Closed 3-value `retry_semantics` enum | §15.3 |
-| Canonical 39-code catalogue (38 at v1.0 lock + `error_position_conflict`, AUDIT-FIX-B3 / ADR-0031) | **§15.4 source-breakdown table** (`docs/specs/error-codes.md` is the forward materialization — ENGINE error-envelope work) |
+| Canonical 39-code catalogue (38 at v1.0 lock + `error_position_conflict`, AUDIT-FIX-B3 / ADR-0031) | **§15.4 source-breakdown table** |
 | Per-flow Errors blocks | `docs/specs/flows/F-*.md` (per §13) |
 | Bare-vs-`error_`-prefix decision | PRECURSOR.4 carry-forward (per §0.1 row) |
 | Admin-only flow code completeness | PRECURSOR.4 carry-forward (per §0.1 row) |
