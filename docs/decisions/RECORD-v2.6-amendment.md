@@ -30,13 +30,16 @@ unnecessary rewrite.
   Gating Map — the tracker is last on the D-22 ladder and is operator-maintained). No ruling names
   either.
 - **Untouched:** §1, §6, §7, §9, §16, §20. §14's four invariant *statements* are carried verbatim
-  per D-23 and are byte-identical to `origin/main` (INV-2, INV-3 and INV-4 unchanged in full). Two
-  clauses inside §14 necessarily moved and are declared here rather than left to the diff: INV-1's
-  mechanism clause (iii) described the superseded pre-commit gate (*"moderation runs OUTSIDE the
-  transaction so a Track A / Track B verdict means the transaction never opens"*), which ADR-0046
-  replaces — the invariant is unchanged, the mechanism by which it holds is not; and §14's ADR
-  footer carries the ADR-0014 supersession marker. Carrying clause (iii) verbatim would have left
-  an assertion of the superseded gate inside the invariant contract.
+  per D-23 and are byte-identical to `origin/main` — INV-2, INV-3 and INV-4 unchanged in full,
+  INV-1's statement column md5-identical. Five clauses inside §14 moved, and all five are declared
+  here rather than left to the diff: INV-1's mechanism clause (iii), which described the
+  superseded pre-commit gate (*"moderation runs OUTSIDE the transaction so a Track A / Track B
+  verdict means the transaction never opens"*) and which ADR-0046 replaces — the invariant is
+  unchanged, the mechanism by which it holds is not; §14's ADR footer, carrying the ADR-0014
+  supersession marker; a broken citation corrected from `SPEC.1 §11` to `SPEC.1 §5`, §11 being
+  Resolution and §5 the invariants, an error predating this pass; and two cross-references to §23,
+  which cannot survive the section's removal ruled three bullets above. Carrying clause (iii)
+  verbatim would have left an assertion of the superseded gate inside the invariant contract.
 - **Kept deliberately:** Appendix B. It carries no `MUST` line, but it decides which columns about
   real participants are published on 2026-11-06. That is a privacy contract, not a catalogue.
 - Change log reset; the `v0.1-outline`–`1.0.27` line stays in git history. Version 2.0.0. Section
