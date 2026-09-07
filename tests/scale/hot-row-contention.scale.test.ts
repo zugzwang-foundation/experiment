@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -8,7 +8,14 @@ vi.mock("@sentry/nextjs", () => ({
 	captureException: vi.fn(),
 }));
 
-import { bets, comments, dharmaLedger, pools, positions } from "@/db/schema";
+import {
+	bets,
+	comments,
+	dharmaLedger,
+	events,
+	pools,
+	positions,
+} from "@/db/schema";
 import { place } from "@/server/bets/place";
 import { runBetTransaction } from "@/server/bets/transaction";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
@@ -273,7 +280,28 @@ describe("scale — hot-row contention (axes 1,2,3)", () => {
 			)
 				.plus(yesHeld)
 				.plus(discards.yes);
+			// ⚠ THE DEPOSIT IS THE OPEN PLUS EVERY INJECTION (ADR-0047 §E). Zero
+			// here — this battery drives no injector — and written anyway, for the
+			// same reason the harness carries it: an identity that has no place to
+			// put injected backing cannot fail when that backing goes missing, and
+			// this assertion's whole job is to fail when Dharma leaks. Note that
+			// `cash` above already picks up the injection side through
+			// `requireMarketDiscards`, so omitting this term would leave the two
+			// halves of one identity counting different worlds.
+			const injectedRows = await testDb
+				.select({
+					total: sql<string>`COALESCE(SUM((${events.payload}->>'backingMinted')::numeric), 0)::text`,
+				})
+				.from(events)
+				.where(
+					and(
+						eq(events.aggregateType, "market"),
+						eq(events.aggregateId, marketId),
+						eq(events.eventType, "pool.liquidity_added"),
+					),
+				);
 			const netAdminPoolInjection = new CpmmDecimal(SYNTHETIC_SEED_BACKING)
+				.plus(injectedRows[0]?.total ?? "0")
 				.minus(cash)
 				.toFixed(18);
 			const result: ConservationResult = checkMarketConservation({

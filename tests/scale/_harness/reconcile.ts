@@ -24,7 +24,7 @@
 // `gatherSnapshot` does the live-DB gathering. `walkLedgerChain` is the pure
 // per-user ledger-chain walk, likewise injectable with a synthetic broken chain.
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import {
 	bets,
@@ -281,9 +281,43 @@ export async function gatherSnapshot(): Promise<ConservationSnapshot> {
 	// concepts share one variable for as long as every open was symmetric.
 	const seedBacking = new CpmmDecimal(SYNTHETIC_SEED_BACKING);
 
+	/**
+	 * Σ `backingMinted` over the market's `pool.liquidity_added` rows —
+	 * ADR-0047 §E's second depositor.
+	 *
+	 * ⚠ **IT IS ZERO FOR EVERY FIXTURE IN THIS BATTERY, AND IT IS HERE ANYWAY.**
+	 * The synthetic pools are built by direct INSERT and no injector runs against
+	 * them, so every call below returns 0 and every arithmetic result is
+	 * unchanged. Adding it is not defensive padding: a harness whose model of
+	 * conservation has no place to put injected backing cannot FAIL when that
+	 * backing goes unaccounted, and this harness exists precisely to be the thing
+	 * that notices. The day a scale fixture drives the injector, the term is
+	 * already where it belongs rather than being discovered by a red gate on
+	 * staging.
+	 */
+	async function injectedBacking(marketId: string): Promise<string> {
+		const rows = await testDb
+			.select({
+				total: sql<string>`COALESCE(SUM((${events.payload}->>'backingMinted')::numeric), 0)::text`,
+			})
+			.from(events)
+			.where(
+				and(
+					eq(events.aggregateType, "market"),
+					eq(events.aggregateId, marketId),
+					eq(events.eventType, "pool.liquidity_added"),
+				),
+			);
+		// Returned as a STRING: `CpmmDecimal` is a cloned constructor (a value),
+		// so naming it in a type position is a TS2749.
+		return rows[0]?.total ?? "0";
+	}
+
 	for (const mkt of marketRows) {
 		const marketId = mkt.id;
 		const ledgerFlows = await gatherMarketFlows(marketId);
+		// The market's TOTAL admin deposit: the open, plus every injection.
+		const deposited = seedBacking.plus(await injectedBacking(marketId));
 
 		const resKinds = await testDb
 			.select({ eventKind: resolutionEvents.eventKind })
@@ -333,7 +367,7 @@ export async function gatherSnapshot(): Promise<ConservationSnapshot> {
 			marketSnapshots.push({
 				marketId,
 				ledgerFlows,
-				netAdminPoolInjection: seedBacking.minus(unwind).toFixed(18),
+				netAdminPoolInjection: deposited.minus(unwind).toFixed(18),
 				reverseRecordedTotal: reverseRec.toFixed(18),
 				applyRecordedTotal: applyRec.toFixed(18),
 				uncollectableTotal,
@@ -344,7 +378,7 @@ export async function gatherSnapshot(): Promise<ConservationSnapshot> {
 			marketSnapshots.push({
 				marketId,
 				ledgerFlows,
-				netAdminPoolInjection: seedBacking.minus(unwind).toFixed(18),
+				netAdminPoolInjection: deposited.minus(unwind).toFixed(18),
 			});
 		} else if (kinds.has("void")) {
 			const unwind = await poolUnwindFromEvent(marketId, "market.voided");
@@ -352,7 +386,7 @@ export async function gatherSnapshot(): Promise<ConservationSnapshot> {
 			marketSnapshots.push({
 				marketId,
 				ledgerFlows,
-				netAdminPoolInjection: seedBacking.minus(unwind).toFixed(18),
+				netAdminPoolInjection: deposited.minus(unwind).toFixed(18),
 			});
 		} else {
 			// Open: the pool's CASH backing = Y + Σ(YES positions) = seed + Σstakes
@@ -381,7 +415,7 @@ export async function gatherSnapshot(): Promise<ConservationSnapshot> {
 			marketSnapshots.push({
 				marketId,
 				ledgerFlows,
-				netAdminPoolInjection: seedBacking.minus(cash).toFixed(18),
+				netAdminPoolInjection: deposited.minus(cash).toFixed(18),
 			});
 		}
 	}

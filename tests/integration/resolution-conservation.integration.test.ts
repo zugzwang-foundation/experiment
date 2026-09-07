@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -11,6 +11,7 @@ vi.mock("@sentry/nextjs", () => ({
 import {
 	bets,
 	dharmaLedger,
+	events,
 	markets,
 	payoutEvents,
 	pools,
@@ -201,6 +202,35 @@ describe("ENGINE.9 — resolution conservation identities (i)/(ii)/(iii)", () =>
 		vi.clearAllMocks();
 	});
 
+	/**
+	 * Σ `backingMinted` over a market's `pool.liquidity_added` rows — ADR-0047
+	 * §E's SECOND depositor into the same pool.
+	 *
+	 * Every branch of the conservation identity starts from what the admin put
+	 * in. Before Phase 2 that was the open alone; it is now the open plus every
+	 * injection, and a branch that omits the term is wrong by exactly the
+	 * injected amount — reporting a market that conserves perfectly as leaking.
+	 *
+	 * Its own query rather than a widened genesis read, for the reason
+	 * `markets/backing.ts` records at length: genesis is once and capped,
+	 * injections are many and uncapped, and one query cannot hold both.
+	 */
+	async function injectedBacking(marketId: string): Promise<string> {
+		const rows = await testDb
+			.select({
+				total: sql<string>`COALESCE(SUM((${events.payload}->>'backingMinted')::numeric), 0)::text`,
+			})
+			.from(events)
+			.where(
+				and(
+					eq(events.aggregateType, "market"),
+					eq(events.aggregateId, marketId),
+					eq(events.eventType, "pool.liquidity_added"),
+				),
+			);
+		return rows[0]?.total ?? "0";
+	}
+
 	it("resolution-conservation::identity-i-settle-closes-via-shipped-checker", async () => {
 		// S2 shape: A YES 100 + YES 100 (winner), B NO 50 (loser).
 		// Σ FLOW = −250 + 300 = 50 == seed − unwind = 100 − 50. (★) closes
@@ -223,8 +253,11 @@ describe("ENGINE.9 — resolution conservation identities (i)/(ii)/(iii)", () =>
 
 		const ledgerFlows = await gatherBetTiedFlows(marketId);
 		const netAdminPoolInjection = new CpmmDecimal(SEED_BACKING)
+			.plus(await injectedBacking(marketId))
 			.minus(result.poolUnwindAmount)
 			.toFixed(18);
+		// Unchanged at 50: this market has no injections, which is what makes the
+		// pinned figure a control on the new term rather than a value it moved.
 		expect(netAdminPoolInjection).toBe("50.000000000000000000");
 		expect(
 			checkMarketConservation({ ledgerFlows, netAdminPoolInjection }),
@@ -307,6 +340,7 @@ describe("ENGINE.9 — resolution conservation identities (i)/(ii)/(iii)", () =>
 
 		const ledgerFlows = await gatherBetTiedFlows(marketId);
 		const netAdminPoolInjection = new CpmmDecimal(SEED_BACKING)
+			.plus(await injectedBacking(marketId))
 			.minus(settled.poolUnwindAmount)
 			.toFixed(18);
 		expect(
@@ -353,6 +387,7 @@ describe("ENGINE.9 — resolution conservation identities (i)/(ii)/(iii)", () =>
 			checkMarketConservation({
 				ledgerFlows,
 				netAdminPoolInjection: new CpmmDecimal(SEED_BACKING)
+					.plus(await injectedBacking(marketId))
 					.minus(result.poolUnwindAmount)
 					.toFixed(18),
 			}),
@@ -410,6 +445,7 @@ describe("ENGINE.9 — resolution conservation identities (i)/(ii)/(iii)", () =>
 			checkMarketConservation({
 				ledgerFlows: [...betTied, ...saleProceeds],
 				netAdminPoolInjection: new CpmmDecimal(SEED_BACKING)
+					.plus(await injectedBacking(marketId))
 					.minus(result.poolUnwindAmount)
 					.toFixed(18),
 			}),

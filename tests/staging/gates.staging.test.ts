@@ -453,7 +453,29 @@ describe("gate 2 · conservation", () => {
 			}
 			// The ONE reader (ADR-0047). Legacy and asymmetric rows both land here.
 			const opened = readOpenedReserves(openedPayload);
-			const seed = new CpmmDecimal(openingBacking(opened));
+
+			// ⚠ THE ADMIN'S DEPOSIT IS NO LONGER THE OPENING BACKING ALONE.
+			// ADR-0047 Phase 2 makes the injector a SECOND depositor into the same
+			// pool: every `pool.liquidity_added` mints `backingMinted` Đ of pairs,
+			// exactly as the open does. All three branches below start from the
+			// deposit, so all three are wrong by the whole injected amount without
+			// this term — and wrong SILENTLY, because a gate that under-states the
+			// deposit reports a conserving market as leaking.
+			//
+			// Its own query, not a widening of the genesis read above: that read is
+			// `LIMIT 1` on purpose (a duplicate genesis row must not double the
+			// seed) and this one has no limit on purpose (every injection counts).
+			// Same reasoning as `markets/backing.ts`, one surface over.
+			const injectedRows = await gatesClient<{ total: string }[]>`
+				SELECT COALESCE(SUM((payload->>'backingMinted')::numeric), 0)::text AS total
+				FROM events
+				WHERE aggregate_type = 'market'
+				  AND aggregate_id = ${market.id}
+				  AND event_type = 'pool.liquidity_added'
+			`;
+			const seed = new CpmmDecimal(openingBacking(opened)).plus(
+				injectedRows[0]?.total ?? "0",
+			);
 			const flows = await gatherMarketFlows(market.id);
 
 			let injection: string;
@@ -482,9 +504,29 @@ describe("gate 2 · conservation", () => {
 				// it this reads a 90,000-reserve pool as holding 90,000 of backing
 				// when the deposit was 90,000 and the identity would still close —
 				// by coincidence, on the long side only.
+				//
+				// ⚠ The discard term now has TWO sources. `opened.dYes` is the
+				// open's; every injection adds its own on whichever side was short
+				// at the time, and on a YES-long market that is the NO side — which
+				// is why the sum below filters on `discardedSide`, rather than
+				// assuming the injector always discards where the open did.
+				//
+				// ⚠ AND THIS BRANCH USES POOL CASH, NOT THE RESERVE SUM. A
+				// constant-product buy barely moves `Y + N`, so a reserve-sum delta
+				// is not the Dharma the pool absorbed. Do not "simplify" it; that
+				// has bitten this repo before.
+				const injectedDiscardYes = await gatesClient<{ total: string }[]>`
+					SELECT COALESCE(SUM((payload->>'discardedShares')::numeric)
+					         FILTER (WHERE payload->>'discardedSide' = 'YES'), 0)::text AS total
+					FROM events
+					WHERE aggregate_type = 'market'
+					  AND aggregate_id = ${market.id}
+					  AND event_type = 'pool.liquidity_added'
+				`;
 				const cash = new CpmmDecimal(poolRows[0]?.yes ?? "0")
 					.plus(yesPositions[0]?.total ?? "0")
-					.plus(opened.dYes);
+					.plus(opened.dYes)
+					.plus(injectedDiscardYes[0]?.total ?? "0");
 				injection = seed.minus(cash).toFixed(18);
 			}
 

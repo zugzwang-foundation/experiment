@@ -1,6 +1,14 @@
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
-import { bets, comments, dharmaLedger, markets, users } from "@/db/schema";
+import {
+	bets,
+	comments,
+	dharmaLedger,
+	events,
+	markets,
+	users,
+} from "@/db/schema";
+import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { checkMarketConservation } from "@/server/dharma/conservation";
 import { appendLedgerRow, readBalance } from "@/server/dharma/persist";
 import { testClient, testDb } from "../db/_fixtures/db";
@@ -240,7 +248,7 @@ describe("INV-2: dharma_ledger persistence (appendLedgerRow)", () => {
 	it("dharma-ledger-persist::conservation-reconciliation-ok", async () => {
 		// Insert a small set of bet-tied flow rows, gather them, and assert the
 		// conservation checker balances against a matching netAdminPoolInjection.
-		const { userId, betId } = await seedBetChain({
+		const { userId, betId, marketId } = await seedBetChain({
 			emailTag: "persist-cons",
 			pseudonym: "persist-cons",
 			slug: "persist-cons-market",
@@ -281,10 +289,33 @@ describe("INV-2: dharma_ledger persistence (appendLedgerRow)", () => {
 			.where(eq(dharmaLedger.betId, betId));
 
 		// Σ(flow tags) = (-10) + 25 = 15 == injection 15.
+		//
+		// ⚠ THE ADMIN DEPOSIT IS THE OPEN PLUS EVERY INJECTION (ADR-0047 §E), so
+		// the literal above is only the whole answer while the market has no
+		// `pool.liquidity_added` rows. This one has none — it is seeded by direct
+		// INSERT and no injector runs — and the term is READ rather than assumed
+		// so the identity is stated in the form it actually takes. A hardcoded
+		// figure beside an identity that grew a term is how a test keeps passing
+		// against arithmetic that has moved on.
+		const injectedRows = await testDb
+			.select({
+				total: sql<string>`COALESCE(SUM((${events.payload}->>'backingMinted')::numeric), 0)::text`,
+			})
+			.from(events)
+			.where(
+				and(
+					eq(events.aggregateType, "market"),
+					eq(events.aggregateId, marketId),
+					eq(events.eventType, "pool.liquidity_added"),
+				),
+			);
+		expect(injectedRows[0]?.total).toBe("0");
 		expect(
 			checkMarketConservation({
 				ledgerFlows: flowRows,
-				netAdminPoolInjection: "15",
+				netAdminPoolInjection: new CpmmDecimal("15")
+					.plus(injectedRows[0]?.total ?? "0")
+					.toFixed(18),
 			}),
 		).toEqual({ ok: true });
 	});
