@@ -190,6 +190,7 @@ import {
 	POSTS,
 	REPLIES,
 	RESOLVE_REASON,
+	resolutionDeadlineFor,
 	SELLS,
 	SYNTHETIC_TOS_IP,
 	SYNTHETIC_TOS_USER_AGENT,
@@ -639,7 +640,7 @@ describe("staging fixture generation", () => {
 					slug: m.slug,
 					title: m.title,
 					description: m.description,
-					resolutionDeadline: new Date(now.getTime() + m.deadlineOffsetMs),
+					resolutionDeadline: resolutionDeadlineFor(m, now),
 					// MEDIA.1 §15: a market REQUIRES >= 1 image with exactly one
 					// default, and the key must be the server-minted
 					// `m/<marketId>/<mediaId>.<ext>` shape. `createMarket` validates
@@ -738,12 +739,17 @@ describe("staging fixture generation", () => {
 			// One millisecond past the latest deadline among the markets that
 			// close, so every one of them is legally closable — derived from the
 			// fixture table rather than hard-coded beside it.
-			const latestClosingDeadline = Math.max(
+			//
+			// ⚠ Read through `resolutionDeadlineFor`, not off `deadlineOffsetMs`.
+			// The ceiling clamp can lower a deadline below its raw offset, and a
+			// max taken over the raw offsets would then describe an instant no
+			// market actually carries.
+			const latestClosingDeadlineMs = Math.max(
 				...MARKETS.filter(
 					(m) => m.terminal !== "none" && m.terminal !== "void",
-				).map((m) => m.deadlineOffsetMs),
+				).map((m) => resolutionDeadlineFor(m, now).getTime()),
 			);
-			const closeAt = new Date(now.getTime() + latestClosingDeadline + 1);
+			const closeAt = new Date(latestClosingDeadlineMs + 1);
 
 			for (const m of MARKETS) {
 				if (m.terminal === "none" || m.terminal === "void") continue;
