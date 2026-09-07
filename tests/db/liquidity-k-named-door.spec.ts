@@ -288,20 +288,46 @@ describe("k changes only through a named door (ADR-0047 §Acceptance, R2)", () =
 	});
 
 	it("k-door::the-injector-is-the-only-pg_cron-job-that-writes-a-money-table", async () => {
-		// The registrations are stripped on this substrate, so the migration text
-		// is the authority. `0007` and `0011` alarm and diagnose; neither writes a
-		// reserve, a position or a ledger row — which is what makes the injector's
-		// arrival a genuinely new class of writer rather than one more of the same.
-		const sql = readFileSync(
+		// `0007` and `0011` alarm and diagnose; neither writes a reserve, a
+		// position or a ledger row — which is what makes the injector a genuinely
+		// new class of writer rather than one more of the same.
+		//
+		// ⛔ THE REGISTRATIONS ARE READ FROM GIT, NOT FROM DISK, AND THAT IS THE
+		// WHOLE POINT OF THIS COMMENT. `ci.yml` runs a `sed -i` over every
+		// `*pg_cron*.sql` BEFORE the test step, deleting exactly these two blocks
+		// from the WORKDIR copy — the substrate has no pg_cron, so they cannot be
+		// applied. An earlier version of this case read the file and asserted the
+		// registrations were in it: green locally against an untouched tree, RED
+		// on CI against the stripped one. The comment above it even said the
+		// registrations are stripped on this substrate, and the assertion three
+		// lines down contradicted it.
+		//
+		// The claim is about what the REPOSITORY contains, so the repository is
+		// what it asks. `git show` reads the committed blob, which no CI step
+		// mutates.
+		const { execSync } = await import("node:child_process");
+		const committed = execSync(
+			"git show HEAD:drizzle/migrations/0027_liquidity_injector_pg_cron.sql",
+			{
+				encoding: "utf8",
+				cwd: fileURLToPath(new URL("../../", import.meta.url)),
+			},
+		);
+		expect(committed).toContain("SELECT run_liquidity_injection()");
+		expect(committed).toContain("SELECT check_liquidity_alarms()");
+
+		// The alarms function must NEVER write a money table — it is a reader.
+		// Read from DISK deliberately: the function bodies SURVIVE the strip (that
+		// is what makes them testable on this substrate at all), so asserting the
+		// on-disk copy checks the thing CI will actually execute.
+		const onDisk = readFileSync(
 			`${MIGRATIONS}0027_liquidity_injector_pg_cron.sql`,
 			"utf8",
 		);
-		expect(sql).toContain("SELECT run_liquidity_injection()");
-		expect(sql).toContain("SELECT check_liquidity_alarms()");
-		// The alarms function must NEVER write a money table — it is a reader.
-		const alarmsBody = sql.slice(
-			sql.indexOf("CREATE OR REPLACE FUNCTION check_liquidity_alarms"),
+		const alarmsBody = onDisk.slice(
+			onDisk.indexOf("CREATE OR REPLACE FUNCTION check_liquidity_alarms"),
 		);
+		expect(alarmsBody).toContain("check_liquidity_alarms");
 		expect(alarmsBody).not.toMatch(/UPDATE pools/);
 		expect(alarmsBody).not.toMatch(/INSERT INTO dharma_ledger/);
 		expect(alarmsBody).not.toMatch(/INSERT INTO positions/);
