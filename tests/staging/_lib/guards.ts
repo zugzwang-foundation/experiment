@@ -234,6 +234,18 @@ export const NOT_TRUNCATED_UNRATIFIED: readonly string[] = [
 	"admin_sessions",
 	"cron_alarms",
 	"watermark_state",
+	// LIQ-1 Phase 2 / ADR-0047. Operational, on the `cron_alarms` /
+	// `watermark_state` precedent two lines up: it records that the injector's
+	// sweep RAN, which is an operations fact with no participant in it. It
+	// survives a reset for the same reason they do, carries no trigger to
+	// disable, and appears in no dataset (SPEC.2 §19.3 excluded-entirely).
+	//
+	// ⚠ It is `liquidity_HEARTBEAT` here and `liquidity_POLICY` in
+	// TRUNCATE_EXCLUSIONS above — two tables from one migration landing in two
+	// different lists, deliberately. The policy is protected because losing it
+	// stops every injection silently; the heartbeat is merely left alone because
+	// nothing depends on its contents surviving.
+	"liquidity_heartbeat",
 ];
 
 /**

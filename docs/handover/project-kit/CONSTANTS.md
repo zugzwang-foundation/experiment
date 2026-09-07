@@ -1,6 +1,6 @@
 # CONSTANTS.md — pinned vs deferred-to-tuning
 
-**Dated:** 2026-07-15 · **Pinned to:** `e28d4b6`
+**Dated:** 2026-07-15, amended 2026-09-07 (LIQ-1 Phase 2 / ADR-0047) · **Pinned to:** `e28d4b6`
 **Derived from:** SPEC.1 §16.1 / §19 (Q1, Q4, Q16) / Appendix B · RANKING.md §12 ·
 cpmm.md §10 · `src/server/config/limits.ts` · `src/server/cpmm/decimal.ts` ·
 `src/server/auth/index.ts`.
@@ -19,6 +19,7 @@ retune — operational, not economic).
 |---|---|---|
 | `BET_MIN_STAKE_REPLY` | `"50"` Đ (decimal string) | `src/server/config/limits.ts` · ADR-0018 · SPEC.1 App-B |
 | `REPLY_DEPTH_MAX` | `1` (flat replies; a reply can't be replied to) | `src/server/config/limits.ts` · ADR-0017 · SPEC.1 §8 |
+| `BET_MAX_STAKE` | `"250"` Đ — **PINNED by ADR-0047**, moved out of DEFERRED at LIQ-1 Phase 2. It shipped as `"10000"` until then, so a repo reading `10000` is stale rather than un-tuned | `src/server/config/limits.ts` · ADR-0047 · SPEC.1 §16.1/App-B |
 | Money/Dharma column type | `NUMERIC(38,18)` everywhere; app side is exact decimal strings, never JS floats | `src/db/schema/*` · CLAUDE.md §2 |
 | `CpmmDecimal` precision | `Decimal.clone({ precision: 50, rounding: ROUND_HALF_EVEN })` — the single arithmetic authority, reused by the ledger | `src/server/cpmm/decimal.ts` · cpmm.md §10.2 |
 | Boundary rounding | every quantity leaving CPMM quantized to 18 dp; user-credited quantities ROUND_DOWN, prices ROUND_HALF_EVEN, reserves exact by construction | cpmm.md §10.3 |
@@ -40,12 +41,22 @@ retune — operational, not economic).
 SPEC.1 §19 Q4/Q16 and Appendix B hold this list as `TBD`. Where code ships a number today,
 it is a **labelled placeholder** (JSDoc in `limits.ts` names the tuning owner per value).
 
+⚠ **One block below has a home this file has never had before: a DATABASE ROW.** The injector's
+parameters live in `liquidity_policy`, and changing one is an INSERT of a new version — no PR, no
+deploy, no review (ADR-0047 §G). They are listed here so a reader stops looking for them in
+`limits.ts`, and they are the one class in this document where finding a *different* value in
+production is **not** a finding: a later row superseding an earlier one is the mechanism working.
+What WOULD be a finding is a value outside the `liquidity_policy_bounds` CHECK, which is the only
+review those numbers ever get.
+
 | Constant | Shipped placeholder | Lives at |
 |---|---|---|
 | `INITIAL_USER_DHARMA` (equal grant) | `"1000"` (ranged 1,000–2,000) | `limits.ts` · SPEC.1 §10.1/§16.1 |
 | `DAILY_CREDIT_DHARMA` | `"10"` | `limits.ts` · SPEC.1 §10.4 |
 | `ADMIN_INITIAL_DHARMA` | — (spec-only symbol) | SPEC.1 §16.1/App-B |
-| `POOL_SEED_PER_MARKET_DEFAULT` (seed magnitude) | — (admin enters per market) | SPEC.1 §10.5/§16.1 · cpmm.md §7 |
+| `MARKET_OPENING_PRICE_YES` / `MARKET_OPENING_TANK` | `0.10` / `100000` for all eight — **per-call arguments to `openMarket`**, not deploy-time values | SPEC.1 §16.1/App-B · cpmm.md §7.1 · ADR-0047 §B |
+| ~~`POOL_SEED_PER_MARKET_DEFAULT`~~ | ⛔ **RETIRED by ADR-0047 §B.** A market opens at a chosen price over a chosen tank; there is no default seed magnitude, and there never was one in `src/` | — |
+| `FLOOR` · `COEFF` · `TRIGGER` · `GUARD_LOW`/`GUARD_HIGH` · `ENDGAME_HOURS` · `LOCK_TIMEOUT_MS` | `100000` · `500` · `0.80` · `0.02`/`0.95` · `72` · `100` — **seeded by migration `0027`** | ⚠ **the `liquidity_policy` TABLE**, not `limits.ts` · ADR-0047 §G |
 | `BET_MIN_STAKE_POST` (post floor) | `"10"` | `limits.ts` · ADR-0018 (only the reply floor is pinned) |
 | `COMMENT_MAX_LENGTH` | `5000` chars | `limits.ts` · SPEC.1 §10.9 |
 | `MARKET_TITLE_MAX_CHARS` / `MARKET_DESCRIPTION_MAX_CHARS` / `RESOLUTION_REASON_MAX_CHARS` | 200 / 4000 / 1000 (admin form-boundary ceilings) | `limits.ts` · SPEC.1 App-B (R-15-G) |

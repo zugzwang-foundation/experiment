@@ -8,8 +8,8 @@
 
 *Thesis relevance: (b) operationally enabling.*
 
-- **Version:** 2.0.0 (semver; bump major on invariant changes)
-- **Last updated:** 2026-09-06
+- **Version:** 2.0.1 (semver; bump major on invariant changes)
+- **Last updated:** 2026-09-07
 - **Authors:** The Zugzwang Authors
 - **Status:** Approved — rebaselined at 2.0.0 by D-29 (decision record amendment 2.5, 2026-09-06). The 1.0.0–1.0.49 line and its change log are retained in git history; last 1.0.x commit `e193cfb6`.
 - **Sections:** §0–§16, §20, Appendices A–B. §17–§19 and §21–§23 are intentionally absent (D-29); numbering is retained for cross-reference stability.
@@ -112,7 +112,7 @@ Drift between this glossary and code identifiers is a bug — a column rename, a
 - **NG10.** No free or no-stake reactions. Support and Counter are aggregates over reply-bets; every expression is a stake (§8, §9).
 - **NG11.** No "vindicated" or track-record ordering before resolution, no shuffled default, no online-learned weights (ADR-0017).
 - **NG12.** No synthetic Dharma and no separate liquidity ledger. One ledger, Path A (§10.2).
-- **NG13.** No mid-market liquidity adjustments. Pool seed is fixed at creation (§10.6).
+- **NG13.** No **user-provided** liquidity and no limit orders. No participant may add or remove pool depth, and there is no order book (per `B6`, and out of scope by ruling). ⚠ The system's own signup-pegged injector is **not** a user surface and is no longer a non-goal — §10.6, ADR-0047. *(This bullet read "No mid-market liquidity adjustments. Pool seed is fixed at creation (§10.6)" until 2026-09-07. It keeps its NUMBER deliberately: `NG13` is cited from `docs/plans/SPEC-1-PASS.md` §P-1 and renumbering the list to record a reversal would silently repoint every such citation at the wrong bullet.)*
 - **NG14.** No Brier overlay or time-weighted bonus. The award is CPMM-native (§10.3).
 - **NG15.** No escalating or streak-based Daily Credit and no referral grants (ADR-0018, §10.4).
 
@@ -601,11 +601,19 @@ Per `B5`: pools are seeded *abundantly, finitely, criterion-based*:
 - Typical individual trades produce small but visible price impact.
 - Cumulative informed activity over the market's lifetime moves the price meaningfully toward truth.
 
-Specific seed magnitudes are deferred to the number-tuning pass. Solvency is structural: CPMM mechanics guarantee the pool can pay all winners regardless of bet distribution (share issuance prices in late entry). The seed's job is *price quality*, not payout coverage. Over-collateralising flattens price discovery in the normal case to defend an extreme case the pool already handles. Infinite liquidity flattens the price entirely and kills the K_eff signal — explicitly rejected.
+Specific seed magnitudes are deferred to the number-tuning pass. Solvency is structural: CPMM mechanics guarantee the pool can pay all winners regardless of bet distribution (share issuance prices in late entry). The seed's job is *price quality*, not payout coverage. Over-collateralising flattens price discovery in the normal case to defend an extreme case the pool already handles. Infinite liquidity flattens the price entirely and kills the K_eff signal — explicitly rejected, **and the §10.6 injector is not it.** The injector pegs depth to circulation rather than removing the bound, which is the opposite operation: an 8× change in signup rate moves the closing price by 1.75 points with it and by 20.7 points without (measured). What actually flattens the K_eff signal as turnout grows is a **FIXED** seed — `flow ÷ depth` climbs for the whole window until the closing price measures the crowd's size rather than the question (0.787 at 5,000 signups/hour, 0.994 at 40,000, same market). ⚠ This sentence is a SEPARATE argument from §10.6's three grounds and is answered separately on purpose; it is not one of them, and reading it as one is how it gets treated as already dealt with.
 
-### 10.6 No mid-market liquidity adjustments
+### 10.6 Signup-pegged liquidity injection
 
-Per `B6`: pool seed is fixed at market creation. Mid-market injections re-price existing positions retroactively and break audit-trail and CPMM-math integrity. Not v1.
+**Pool depth is pegged to circulation, not fixed at creation.** A `pg_cron` job sizes every `Open` market's tank to `max(FLOOR, COEFF × signups)` every 60 seconds and tops it up with a price-preserving placement, recording each application as a `pool.liquidity_added` events row (ADR-0047 §A/§C/§D/§F; `cpmm.md` §7.4/§7.5). Parameters live in the `liquidity_policy` table and are changed by INSERT, never by deploy. There is **no user-facing add- or remove-liquidity operation** and no external liquidity provider — §3.2 `NG14`.
+
+⚠ **This section previously said the opposite, and the reversal is recorded rather than quietly overwritten**, because the sentence it replaces was true for the life of the module and is the one ADR-0047 exists to reverse. It read: *"Per `B6`: pool seed is fixed at market creation. Mid-market injections re-price existing positions retroactively and break audit-trail and CPMM-math integrity. Not v1."* Its three grounds were re-examined **against measurement rather than against the ADR's paraphrase of them**, and they did not fare alike:
+
+- *"re-prices existing positions retroactively"* — **FALSE against a fixed-`p` placement.** `p_yes` reads `0.100000000000000000` before and after a 500 Đ injection, exactly; across ≥ 10,000 fuzzed reserve pairs the price moves by at most one ulp, measured maximum `1.22e-20`. The ground DOES hold against the naive *equal-add* injection, which moved the price by up to 12.5 points — and that is the version this section was written against. The objection was sound; it was aimed at a different mechanism.
+- *"break audit-trail integrity"* — **STOOD, and was the real objection.** All three `netAdminPoolInjection` derivations began from the single `market.opened` seed and nothing recorded a refill, so an injected Đ would simply have gone unaccounted. ADR-0047 §E/§F is its fix, not its dismissal: every application is an events row carrying `backingMinted` and the discard, every parameter change is a `liquidity_policy` row, and both ship in the public dataset.
+- *"break CPMM-math integrity"* — **PARTLY, and now scoped.** The repo has never asserted `k` constant; the invariant is `k′ ≥ k`, and the live staging pools already measure above their opening `k` from `floor18` dust on ordinary buys. What was true is that no test SHAPE existed for a fourth door. ADR-0047's acceptance battery is that shape: `k` changes only through a named door, every reserve write has exactly one event row, and between consecutive events `k` does not move.
+
+⚠ **The fourth argument against injection is at §10.5, not here**, and is answered there — conflating the two is how a separate objection gets treated as already disposed of.
 
 ### 10.7 Edge cases
 
@@ -1080,10 +1088,11 @@ There is no Analytics tab and no analytics surface. The analytics deliverable is
 ### F-ADMIN-2 — Pool seed (Hub: Markets tab)
 
 - **Pre.** Market in `Draft`. Admin commits to open it.
-- **System.** Admin enters seed magnitude. Single W-4 transaction (`expectedStatus ['Draft']`): the `pools` row is inserted with symmetric reserves `y₀ = n₀ = seedAmount` (cpmm.md §7.1 — symmetric initialisation, exactly once), the market transitions `Draft → Open`, and the seed is recorded as the `seedAmount` payload field on the `market.opened` events row. The admin acts as an events-log actor; never a `dharma_ledger` row (R-2; not a `users` row). Initial price determined by reserve split (50/50 by default for binary markets). Per `B5`, criterion-based sizing — number-tuning pass owns specific magnitude.
+- **System.** Admin enters **opening price and tank**. Single W-4 transaction (`expectedStatus ['Draft']`): the `pools` row is inserted with the **two reserves** `openingReserves` computes — `yes = (1 − p) · T`, `no = p · T` (cpmm.md §7.1, asymmetric initialisation) — the market transitions `Draft → Open`, and the `market.opened` events row carries the six ADR-0047 §B fields (`yesReserves`, `noReserves`, `openingPriceYes`, `backingMinted`, `discardedYes`, `discardedNo`). The legacy `seedAmount` shape is the **historical arm** of the `market.opened` payload union and is what every pre-Phase-1 row carries. The admin acts as an events-log actor; never a `dharma_ledger` row (R-2; not a `users` row). Initial price is the admin's input, not a consequence of the split. Per `B5`, criterion-based sizing — the number-tuning pass owns the tank magnitude.
+  ⚠ **This bullet described symmetric seeding until 2026-09-07, and that was a PHASE-1 DEBT rather than a Phase-2 change.** `openMarket` has written two distinct reserves since ADR-0047 Phase 1; that phase amended `cpmm.md` and SPEC.2 and touched SPEC.1 not at all. On a spec↔code conflict the spec wins, so a later session reading this bullet would have "corrected" working code back to a symmetric seed — which is exactly what `cpmm.md` paid for at its own §8.1, one document over. Found by the LIQ-1-P2 census, which is scoped by predicate rather than by section number for this reason.
 - **Response.** Market `Open` with seeded pool.
 - **Errors.** `market_not_draft` · `seed_invalid` · `deadline_in_past` · `admin_actor`.
-- **Invariants.** Carry-forward 2 (`Y₀ = N₀`): the seed is symmetric by construction — one production `pools` INSERT site, both reserve columns bound from the same string; void's cash cross-assert depends on it. INV-4 (`market.opened` is an append-only events row).
+- **Invariants.** ⛔ **Carry-forward 2 (`Y₀ = N₀`) is RETIRED by ADR-0047 §B.** There is still exactly ONE production `pools` INSERT site, and it now binds two distinct values — `open.ts` says so in as many words (*"GONE BY DESIGN"*), and `tests/server/admin/pool-seed.test.ts` records the inversion twice. `voidMarket`'s cash cross-assert no longer depends on symmetry: it depends on the backing identity `Y + H_yes + D_yes == N + H_no + D_no`, with `D` read from `src/server/markets/backing.ts` — from `market.opened` (Phase 1) and, from Phase 2, summed over the market's `pool.liquidity_added` rows as well. ⚠ **This was the worse half of the B-3 debt precisely because it was filed as an invariant**: a stale sentence in a flow description invites a wrong edit, and a stale sentence in an invariant list commissions one. INV-4 (`market.opened` is an append-only events row) is unaffected and stands.
 - **Surface.** Standalone pre-live route under `/admin/markets/*`. **Not part of the Admin Control Centre** (§15.3) — pool seed is the pre-live market-maker workflow. The route stays functional and unstyled; it is required for the September market build-out. No inline equivalent.
 - **Acceptance.** `tests/server/admin/pool-seed.test.ts::seed-flow-and-state-transition`.
 
@@ -1163,12 +1172,15 @@ Symbolic only. Specific values pin at the number-tuning pass.
 | `INITIAL_USER_DHARMA` | Equal initial grant at signup — a single flat amount, identical for every user account (ADR-0018). |
 | `ADMIN_INITIAL_DHARMA` | Operational seed for admin account, abundantly sized. |
 | `DAILY_CREDIT_DHARMA` | Flat (non-escalating) Daily Credit, paid once per UTC day **only on a day the user places a commented bet** (ADR-0018). Use-or-lose. |
-| `POOL_SEED_PER_MARKET` | Default pool seed; criterion: typical trade → small price impact, cumulative activity → meaningful drift. |
+| `POOL_SEED_PER_MARKET` | ⛔ **RETIRED by ADR-0047 §B.** A market opens with an **opening price** and a **tank**, both per-call arguments to `openMarket`; there is no default seed magnitude and there never was one in `src/`. |
+| `MARKET_OPENING_PRICE_YES` | The `p_yes` a market opens at. **Per-call**, not a deploy-time default; pinned at **0.10** for all eight launch markets by D-14 + ADR-0047. |
+| `MARKET_OPENING_TANK` | The reserve tank `T = y₀ + n₀` a market opens with. **Per-call**; pinned at **100,000** for all eight (ADR-0047 §B). |
+| `FLOOR` · `COEFF` | The injector's target rule `max(FLOOR, COEFF × signups)`. ⚠ **These are not constants in this file's sense and are listed only so a reader stops looking**: they are COLUMNS of the `liquidity_policy` table (ADR-0047 §G), changed by INSERT and never by deploy, along with `TRIGGER`, `GUARD_LOW`/`GUARD_HIGH`, `ENDGAME_HOURS` and `LOCK_TIMEOUT_MS`. Listing them as number-tuning constants would say the opposite of what §10.6 decides. |
 | `BET_MIN_STAKE_POST` | Minimum stake on a top-level bet (a post). Low; keeps entry accessible (ADR-0018). |
 | `BET_MIN_STAKE_REPLY` | Minimum stake on a reply-bet. **Pinned at 50** (higher than the post floor; the lever on ADR-0017's reply-level C > n, per ADR-0018). |
 | `COMMENT_MAX_LENGTH` | Maximum comment text length. |
 | `REPLY_DEPTH_MAX` | Maximum reply nesting depth. Pinned to 1 by ADR-0017 (flat replies — a reply cannot itself be replied to). Not deferred to number-tuning pass. |
-| `BET_MAX_STAKE` | Maximum Dharma stake accepted per bet. Buy/add stake above this is clamped to `BET_MAX_STAKE` before the CPMM computation; sell is never clamped. The overspend guard replacing the retired slippage warning (§7); the clamped result is surfaced in the non-blocking preview (cpmm.md §6.3). Value pins at the number-tuning pass. |
+| `BET_MAX_STAKE` | Maximum Dharma stake accepted per bet. Buy/add stake above this is clamped to `BET_MAX_STAKE` before the CPMM computation; sell is never clamped. The overspend guard replacing the retired slippage warning (§7); the clamped result is surfaced in the non-blocking preview (cpmm.md §6.3). **PINNED at 250 Đ by ADR-0047** — the one Appendix B constant that ADR pins, landed in `limits.ts` at LIQ-1 Phase 2. It no longer waits on the number-tuning pass. |
 | `IN_FLIGHT_BET_TIMEOUT_SEC` | Window during which `Resolving`-state in-flight bets may commit (per `G6`). |
 | `POLL_INTERVAL_MS_DEBATE_VIEW` | Debate-view poll interval in milliseconds (per C7) — the cadence at which `/m/[slug]` re-invokes its server read (§9 F-DEBATE-4). **Pinned provisionally at 15000.** Unlike the pinned design constants above, this one **remains deferred to the number-tuning pass** (SPEC.2 §4.3 assigns the tune to HARDEN.6); the pin exists only because the flow is unbuildable without a value and go-live precedes that pass. Sized against the measured shape of one tick: because the refresh re-executes the route's **layout as well as its page**, a tick costs twelve to fourteen sequential database round-trips per open tab — including **two** session reads — and nothing throttles it per tab. **Three of those round-trips are not constant:** `listMarketComments` carries no `LIMIT` and the price-series replay walks the market's whole event history, so per-tick cost **scales with the market and grows monotonically across the live window**, most steeply on the markets carrying the most viewers. The quantity to size against is therefore **ticks × concurrent tabs × round-trips × O(market events)**, not the interval alone; visibility suspension is the larger lever, and a cap or keyset on `listMarketComments` is a HARDEN.6 **prerequisite**, not an optimisation. The value is read from the constant at every call site and never inlined, so the HARDEN.6 tune is a one-line change. |
 | `DISCOVERY_GRID_SIZE` | Number of market-card slots on the Discovery front page; the hero rotates through this set (the Discovery hero). **Set to 8** by design-canon §2 — a fixed design value, not deferred to number-tuning. |
@@ -1215,6 +1227,7 @@ Each F-flow already names its errors inline. This subsection is a cross-referenc
 
 | Date | Version | Change | Ruling |
 |---|---|---|---|
+| 2026-09-07 | 2.0.1 | **LIQ-1 Phase 2 (ADR-0047) — the injector, and two Phase-1 debts this census found.** **§10.6** struck and replaced in place: *No mid-market liquidity adjustments* → **Signup-pegged liquidity injection**, with the section's three original grounds re-examined against measurement — *re-prices positions retroactively* is FALSE against a fixed-`p` placement (≤ 1 ulp, measured max `1.22e-20`) though TRUE against the naive equal-add it was written about; *breaks audit-trail integrity* STOOD and ADR-0047 §E/§F is its fix; *breaks CPMM-math integrity* is scoped to `k′ ≥ k` through a named door. **§10.5**'s K_eff sentence answered in place — it is a SEPARATE argument from §10.6's three and had been folded into them. **§3.2 NG13** keeps its number and now forbids USER-provided liquidity only. **§16.1 + Appendix B**: `POOL_SEED_PER_MARKET` retired (it never existed in `src/`); `MARKET_OPENING_PRICE_YES` and `MARKET_OPENING_TANK` minted as per-call values; `FLOOR`/`COEFF` listed as POINTERS at the `liquidity_policy` table and deliberately carrying no number; **`BET_MAX_STAKE` pinned at 250** — the one Appendix B constant ADR-0047 pins, landed in `limits.ts` this phase. ⛔ **§15 F-ADMIN-2 is a PHASE-1 DEBT, not a Phase-2 change**: its System bullet and its Carry-forward-2 INVARIANT both still described symmetric seeding, which shipped code contradicted since Phase 1 — and on a spec↔code conflict the spec wins, so a later session would have "corrected" `open.ts` back. That distinction is the point of recording it here. ⚠ **One census row is VOID**: B-8 asked for two spec rules in §17, and D-29 removed §17 at 2.0.0; the rules land as `cpmm.md` §7.5's contract and the tests that pin them instead, and nothing was invented to fill the gap. | ADR-0047; LIQ-1-P2 rulings R1–R10 |
 | 2026-09-06 | 2.0.0 | Rebaselined. Moderation restated as advisory — text fire-and-forget, images screened at attach, no post ever blocked (§2, §6, §7, §8, §14, §15, §16.2, Appendix A); F-MOD-4 retired; no automated CSAM reporting. §16.3–§16.5, §17–§19, §21–§23 removed; five prescriptive sentences relocated (§3.2 NG6–NG15, §13 F-AUTH-4, §15). Devcon struck; "by 1 September" claims repointed at the number-tuning pass; seven `AI_FLAG_THRESHOLD_*`, `OTP_TTL_MIN`, `PROFILE_GRAPH_Y_MAX` removed; reader contract aligned to D-22. **Code conformance for moderation: MOD-1, pending** — until it lands, `src/` implements the superseded gate. | D-20, D-21/D-26, D-22, D-24, D-28, D-29; ADR-0046 |
 
 ---
@@ -1256,7 +1269,14 @@ This appendix is the structural placeholder for the number-tuning pass. Each con
 INITIAL_USER_DHARMA = TBD  # equal flat grant for every user (ADR-0018)
 ADMIN_INITIAL_DHARMA = TBD
 DAILY_CREDIT_DHARMA = TBD  # flat, non-escalating; paid only on a commented-bet day (ADR-0018)
-POOL_SEED_PER_MARKET_DEFAULT = TBD
+# POOL_SEED_PER_MARKET_DEFAULT — RETIRED by ADR-0047 §B (never existed in src/)
+MARKET_OPENING_PRICE_YES = 0.10  # per-call to openMarket; ADR-0047, D-14, all eight
+MARKET_OPENING_TANK = 100000  # per-call to openMarket; ADR-0047 §B
+# FLOOR, COEFF — and TRIGGER, GUARD_LOW/GUARD_HIGH, ENDGAME_HOURS,
+#   LOCK_TIMEOUT_MS — are COLUMNS of the liquidity_policy table (ADR-0047 §G),
+#   tuned by INSERT and never by deploy. No value is written here on purpose:
+#   a number in this file would be a second home for a figure the table owns,
+#   and the second home is the one that goes stale.
 BET_MIN_STAKE_POST = TBD  # post floor, low (ADR-0018)
 BET_MIN_STAKE_REPLY = 50  # reply floor, pinned > post floor (ADR-0018)
 COMMENT_MAX_LENGTH = TBD
@@ -1264,7 +1284,7 @@ MARKET_TITLE_MAX_CHARS = TBD  # admin market title (question) ceiling — SA-L-1
 MARKET_DESCRIPTION_MAX_CHARS = TBD  # admin market description (resolution criterion) ceiling — SA-L-1 (ENGINE.15 R-15-G)
 RESOLUTION_REASON_MAX_CHARS = TBD  # resolution/correction/void reason ceiling — SA-L-1 (ENGINE.15 R-15-G)
 REPLY_DEPTH_MAX = 1  # pinned by ADR-0017 (flat replies; not deferred to tuning pass)
-BET_MAX_STAKE = TBD
+BET_MAX_STAKE = 250  # PINNED by ADR-0047 (limits.ts); was 10000 in src/ until LIQ-1 Phase 2
 IN_FLIGHT_BET_TIMEOUT_SEC = TBD
 POLL_INTERVAL_MS_DEBATE_VIEW = 15000  # provisional pin (§9 F-DEBATE-4 — the flow is unbuildable without a value); STILL deferred to the number-tuning pass / HARDEN.6
 DISCOVERY_GRID_SIZE = 8  # pinned by design-canon §2 (Discovery front-page card slots; hero rotates this set; not deferred to tuning)

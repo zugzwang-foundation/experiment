@@ -5,8 +5,8 @@
 | Field | Value |
 |---|---|
 | **Document** | `cpmm.md` — CPMM math companion (named in SPEC.2 §0 companion files + §1.4 #2) |
-| **Version** | 3.0.0 (semver; MAJOR on any change to a formula or invariant, MINOR on clarifications) |
-| **Date** | 2026-09-06 |
+| **Version** | 4.0.0 (semver; MAJOR on any change to a formula or invariant, MINOR on clarifications) |
+| **Date** | 2026-09-07 |
 | **Owner** | Hrishikesh Manoj Hundekari |
 | **Status** | Authored at ENGINE.1 (web-authored, founder-ratified, CC-committed) |
 | **Gates** | ENGINE.2 (module `src/server/cpmm/`), ENGINE.3 (property tests); the former DESIGN.4 slippage-modal gate is retired — SPEC.1 §7 (1.0.15) |
@@ -35,16 +35,22 @@ and moderation are upstream concerns — they live in SPEC.2 and the flow contra
 never here.
 
 **Trading window.** CPMM trades occur only while the market is `Open` (SPEC.1 §6).
-Reserves are immutable from the `Open → Closed` transition onward; the only
+Reserves are immutable from the `Open → Closed` transition onward (the §7.5
+injector also stops there — it selects on `status = 'Open'`); the only
 post-`Closed` pool operation is the terminal unwind (§8). After `Resolved` or
 `Voided` the CPMM state is frozen permanently and must remain auditor-reproducible
 (INV-4; §11).
 
 **Pinned model (deltas vs upstream).** Relative to the Manifold source (§2), this
 maker is: **fee-less** — no fee term exists anywhere in the share or price math
-(SPEC.1 §10 and §16.1 define no fee constant); **single-MM** — the admin seeds the
-pool once at `Draft → Open` and there are no external liquidity providers and no
-mid-market adjustments (SPEC.1 §10.5, §10.6); **binary single-answer** — no
+(SPEC.1 §10 and §16.1 define no fee constant); **single-MM** — the admin opens the
+pool at `Draft → Open`, there are no external liquidity providers and no
+user-facing liquidity operations, and the system's own signup-pegged injector is
+the one exception (§7.4, §7.5; ADR-0047). ⚠ *This clause read "seeds the pool once
+… and no mid-market adjustments (SPEC.1 §10.5, §10.6)" until Phase 2. It is a §1
+SCOPE sentence, nowhere near §7.4 — exactly the class Phase 1's section-scoped
+amendment missed three times running, which is why this census is scoped by
+PREDICATE instead.* **binary single-answer** — no
 multi-outcome machinery; and **weight-pinned** — Manifold's pool weight is fixed at
 p ≡ ½, which collapses their parametrised maker to the pure constant product
 `y · n = k` (§3.3). ⚠ **Note the scope of that stripping: it removes the curve
@@ -356,7 +362,9 @@ grows with the book. Reading T as Đ overstates the deposit by the discard,
 and Phase 2's target rule compares against T, so the two must not be
 conflated. This file fixes
 the mechanism: asymmetric initialisation at a chosen price, exactly
-once, with the excess discarded. There is still no curve-weight dial —
+once, with the excess discarded — ⚠ where *once* scopes the
+INITIALISATION and not the reserves: §7.4's fourth door moves them
+again while the market is `Open`. There is still no curve-weight dial —
 upstream's `p` parameter (which lets Manifold open at an arbitrary
 probability with equal reserves, since equal reserves give prob = p
 exactly) remains stripped (§1, §2), and is a different mechanism from
@@ -467,17 +475,74 @@ Upstream itself runs fixed-`p` with discards for its multi-choice
 markets. Either revisit is an ADR, not an edit; the `p`-weight revisit
 is reasonable at testnet and out of scope for the experiment.
 
-### 7.4 No liquidity operations exist
+### 7.4 The four doors
 
-Per SPEC.1 §10.6, the seed is fixed for the market's life. This module
-exposes no add/remove-liquidity operation IN ANY RUNTIME PATH — ⚠ but
-`addLiquidity` IS an export of `src/server/cpmm/calculate.ts` as of ADR-0047
-Phase 1, with no caller: it is the specification and differential-fuzz oracle the
-Phase-2 SQL injector is pinned against. This section's rewrite rides Phase 2 with
-SPEC.1 §10.6; until then, read it as "no operation is WIRED", not "no function
-exists". Upstream's liquidity functions
-are stripped (§2). Reserves change through exactly three doors: §4 buy,
-§5 sell, §8 terminal unwind.
+Reserves change through exactly **FOUR** doors: §4 buy, §5 sell, **§7.5 liquidity
+injection**, §8 terminal unwind.
+
+The fourth is ADR-0047's signup-pegged injector: a `pg_cron` job sizes each `Open`
+market's depth to `max(FLOOR, COEFF × signups)` and applies §7.5's price-preserving
+placement, recording every application as a `pool.liquidity_added` events row. It
+is price-neutral by construction, and it is the **only writer of `pools` outside
+the bet transaction and the terminal unwind** — a property a source scan pins
+(`tests/db/liquidity-k-named-door.spec.ts`), because "there are no other writers"
+is not something a behavioural test can establish.
+
+There is still **no user-facing add- or remove-liquidity operation** and no
+external liquidity provider; upstream's liquidity functions remain stripped (§2).
+
+⚠ **The three-door sentence this replaces was true for the life of the module,
+and it is the sentence ADR-0047 reverses.** It read: *"Per SPEC.1 §10.6, the seed
+is fixed for the market's life… Reserves change through exactly three doors: §4
+buy, §5 sell, §8 terminal unwind."* SPEC.1 §10.6 is struck and replaced in the
+same commit; if you are reading a copy of either document that still says three,
+the two have drifted and this one is the one with the tests behind it.
+
+⚠ **`k` is no longer preserved across a market's life, and it never was.** INV-C2
+is `k′ ≥ k`, not `k′ = k`: `floor18` dust accrues to the pool on ordinary buys and
+sells, which is why §12 E2 — a *buy* — moves `k` from `10000` to
+`10000.000000000000000010`, and why all fourteen live staging pools measure above
+their opening `k`. What the fourth door changes is not that `k` moves but that it
+can now move by a *large* amount, so the invariant is stated as the door rather
+than as the direction: **`k` changes only through a named door; every reserve
+write has exactly one event row behind it, and between consecutive events `k` is
+unchanged.**
+
+### 7.5 The reserve-placement primitive
+
+Given reserves `(L, S)` with `L ≥ S` and an amount `a`:
+
+```
+L' = L + a
+S' = floor18( S + a · S / L )
+discarded = a − (S′ − S)        ← a RESIDUAL, on the S side
+```
+
+Both reserves scale by `(L + a) / L`, so `S′ / (L′ + S′) == S / (L + S)` up to the
+one ulp the short side's floor can cost — measured maximum `1.22e-20` over 12,000
+fuzzed pairs. The discard is taken as what is left over rather than as an
+independently rounded `a · (1 − S/L)`, which is what makes `(S′ − S) + discarded
+== a` EXACT and what the §7.1 backing identity rests on.
+
+⚠ **The whole bracket is evaluated at 120 significant digits, not the module's 50
+(§10.2)** — see §7.1 for the measurement and the proof that 120 suffices. Leaving
+either half at 50 puts the result one ulp off, in opposite directions.
+
+**Two implementations, one definition.** `addLiquidity` in
+`src/server/cpmm/calculate.ts` is the SPECIFICATION and the test oracle;
+`zz_add_liquidity` in migration `0027` is the RUNTIME. They are pinned to each
+other by a differential fuzz over ≥ 10,000 vectors
+(`tests/db/cpmm/liquidity-differential.spec.ts`) carrying a negative control, so
+the test cannot degenerate into a function compared against itself. ⚠ The SQL uses
+exact integer division (`div(a·S·1e18, L) · 1e-18`) rather than `trunc(a·S/L, 18)`:
+PostgreSQL selects a division's scale from its operands, so the guard digits the
+`trunc` form appears to have are an accident of the inputs rather than a
+guarantee.
+
+**The target and the parameters are not constants.** `FLOOR`, `COEFF`, the trigger
+ratio, the guard band, the endgame window and the lock timeout are COLUMNS of the
+append-only `liquidity_policy` table (ADR-0047 §G), changed by INSERT and never by
+deploy. See ADR-0047 §A/§C/§D/§G.
 
 ## §8 Resolution, void & freeze
 
@@ -576,7 +641,9 @@ positions. The CPMM state is never recomputed or mutated by a correction.
 The reserve pair at the moment the market enters `Resolved` or `Voided` is
 permanent. The module performs no computation against a terminal market
 except pure reads. From the frozen (y, n), the bets, the ledger **and the
-market's `market.opened` payload**, every §8 quantity — each payout, the
+market's `market.opened` payload **and its `pool.liquidity_added` rows**
+(ADR-0047 §E — the injection discards are part of `D` and an auditor without
+them lands short)**, every §8 quantity — each payout, the
 unwind, the residual — is exactly reproducible by any auditor. ⚠ The genesis
 payload is REQUIRED, and this sentence omitted it until ADR-0047 was swept
 through: the discard terms live there, not in `pools`, and the unwind is
@@ -705,8 +772,12 @@ numbered property in §4.2 and §5.2.
   shares of side X equal D − x_reserve − D_X, where D_X is the cumulative
   discard on side X (§7.1) and D = pool Đ balance. **Resolved:** payout =
   D − w − D_W, unwind = w + D_W (the winning reserve PLUS the winning side's
-  discard) — ⛔ **NOT auditable from the frozen reserves alone**; D_W comes
-  from the market's `market.opened` event. The prior form (`unwind = w`,
+  discard) — ⛔ **NOT auditable from the frozen reserves alone**; D_W is
+  summed from the market's `market.opened` event **AND every
+  `pool.liquidity_added` row** (ADR-0047 §E; `markets/backing.ts`). ⚠ The
+  second term arrived with Phase 2 and this clause named only the first until
+  then — an omission in the direction that UNDER-states the unwind, on a
+  terminal append-only row, by exactly the injected discard. The prior form (`unwind = w`,
   reserves-only audit) is the D_W = 0 special case that every symmetric seed
   satisfies. **Voided:** unwind (`poolUnwindAmount`) = D − Σ
   `void_refund` on the R-9.8 f × stake basis (§8.2); it equals the seed
@@ -717,7 +788,8 @@ numbered property in §4.2 and §5.2.
   module is pure and deterministic (§10.4); every §8 quantity is exactly
   reproducible by an auditor from the frozen state (upholds INV-4).
   ⚠ Since ADR-0047 the frozen state that an auditor needs is the reserves
-  **and the market's `market.opened` payload** — the discard terms live
+  **and the market's `market.opened` payload plus its `pool.liquidity_added`
+  rows** — the discard terms live
   there, not in `pools`. Both ship in the dataset (SPEC.2 §19.3 row 1 +
   §19.4.1), so the reproducibility claim holds; what changed is which rows
   the auditor has to read.
@@ -786,6 +858,81 @@ they are ENGINE.3's fixed vectors and rewriting them would rewrite the
 `tests/unit/cpmm/vectors.test.ts` suite in a task with no mandate to. An
 asymmetric worked example is owed and belongs with Phase 2.
 
+### E6 — asymmetric open, one buy, one injection, both outcomes
+
+**The worked example §12 E5 said was owed and belongs with Phase 2.** E1–E5 all
+sit on a symmetric seed, where `D_X = 0` and the §8.1 residual identity is
+indistinguishable from the reserves-only form it replaced. This is the one where
+the discard terms carry weight — and where the NO branch shows what omitting them
+would cost.
+
+Every figure is computed by `openingReserves` / `computeBuy` / `addLiquidity` and
+pinned in `tests/unit/cpmm/vectors.test.ts`.
+
+**1 · Open** at `p = 0.10` over a tank `T = 100,000` (§7.1, D-14):
+
+```
+yes = 90000.000000000000000000     no  = 10000.000000000000000000
+B (Đ deposited) = max(yes, no)    = 90000.000000000000000000
+D_yes = 0                          D_no = 80000.000000000000000000
+p_yes = 0.100000000000000000       ← exact
+```
+
+⚠ **The deposit is 90,000, not 100,000.** `T` is the reserve SUM; the open mints
+`max(yes,no)` pairs and DISCARDS 80,000 NO shares — held by nobody, in no
+position. That is 88.9% of the short side, and it is the discard fraction
+`1 − min(p,1−p)/max(p,1−p)` at a 10% open.
+
+**2 · One 100 Đ YES buy** (§4):
+
+```
+shares  = 991.089108910891089108
+yes     = 89108.910891089108910892     no = 10100.000000000000000000
+p_yes   = 0.101805371203880201
+```
+
+**3 · One injection** to a target tank of 200,000 (§7.5). `a = L · (target/tank − 1)`
+with `L` the long (YES) reserve:
+
+```
+a       = 90530.014868134850929828
+yes     = 179638.925759223959840720
+no      =  20361.074240776040159279
+p_yes   = 0.101805371203880201      ← UNCHANGED, exactly, to all 18 places
+tank    = 199999.999999999999999999 ← one ulp short of target: the floor, not an error
+D_no   += 80268.940627358810770549  ⇒ D_no = 160268.940627358810770549
+```
+
+**4 · The backing identity closes, per side** (§7.1). Total Đ deposited is the
+open's 90,000 **plus the bettor's 100 plus the injection's 90,530.0148…**:
+
+```
+YES:  Y + H_yes + D_yes
+   =  179638.925759223959840720 + 991.089108910891089108 + 0
+   =  180630.014868134850929828
+
+NO:   N + H_no + D_no
+   =   20361.074240776040159279 + 0 + 160268.940627358810770549
+   =  180630.014868134850929828        ← equal, exactly
+```
+
+**5 · Both outcomes** (§8.1), with `D = 180630.014868134850929828`:
+
+| outcome | `w` (winning reserve) | `D_W` | `unwind = w + D_W` | `payout = D − w − D_W` |
+|---|---|---|---|---|
+| **YES** | `179638.925759223959840720` | `0` | `179638.925759223959840720` | `991.089108910891089108` |
+| **NO** | `20361.074240776040159279` | `160268.940627358810770549` | `180630.014868134850929828` | `0` |
+
+The YES payout is exactly the shares held — one Đ per winning share, and the only
+holder is the bettor. The NO payout is zero because nobody holds a NO share.
+
+⛔ **THE NO ROW IS WHY `unwind = w + D_W` AND NOT `unwind = w`.** The superseded
+form would return **20,361.07 Đ** to the admin and strand **160,268.94 Đ** in a
+resolved market with no holder and no path out — 89% of everything deposited,
+silently, on a terminal append-only row. On a symmetric seed the two forms agree,
+which is exactly why five worked examples could stand for as long as they did
+without the error showing.
+
 ## §13 Module API (ENGINE.2 contract)
 
 Pure TypeScript at `src/server/cpmm/` (`import 'server-only'` per ADR-0008
@@ -846,7 +993,12 @@ changing meaning.
       // residual only while every discard was zero. The shipped resolved
       // unwind is `w + D_W` (§8.1) and lives in resolution/settle.ts, not
       // here — this function would under-pay every asymmetric winning side.
-      // Kept because §12's vectors pin it; its removal is a Phase-2 call.
+      // Kept because §12's vectors pin it; **RULED at Phase 2: kept, and
+      // marked `@deprecated` in source.** The tag is the point — everything
+      // above is already written down, and a docblock is only read by someone
+      // who has already opened the file. `@deprecated` says it in the editor at
+      // the CALL SITE, to the one reader who has not read any of this, which is
+      // exactly the reader who would reach for it by name.
       // Void residual is a ledger identity (§8.2), not a curve computation.
 
     CpmmDecimal   // the §10.2 cloned constructor, exported for ENGINE.5
@@ -863,7 +1015,10 @@ module reads no clock, no environment, no randomness.
 Fees of any kind; order books and limit orders; multi-outcome markets;
 curve weights (p ≠ ½) — asymmetric seeds are NO LONGER a non-goal; ADR-0047
 made them the only open mechanism (§7.1, §7.3);
-mid-market liquidity operations (SPEC.1 §10.6); slippage tolerance,
+**user-provided** liquidity operations and limit orders — ⚠ *mid-market liquidity
+operations are NO LONGER a non-goal; ADR-0047 makes the signup-pegged injector the
+fourth door (§7.4, §7.5), and what remains a non-goal is a PARTICIPANT adding or
+removing depth* (SPEC.1 §3.2 NG13); slippage tolerance,
 auto-abort, or per-trade warning — retired by ruling, not open (design-canon
 §4 ruling 2, W2.10 Option A: deep-liquidity seeding + the SPEC.1 §16.1
 per-bet stake cap; SPEC.1 §7, 1.0.15); numeric magnitudes (seed C, floors,
@@ -880,6 +1035,7 @@ the curation slate's product definition (§7.2 — SPEC.1, debate phase).
 | 1.0.0 | 2026-06-04 | HMH | Initial authoring at ENGINE.1. Lineage pinned to `zugzwang-foundation/manifold-reference` @ `d5b55cf9` (tag `ref-2026-04-28-found5`), MIT notice landed in `THIRD_PARTY_NOTICES.md` same-commit. Decimal arithmetic pinned: decimal.js ^10.6, precision 50, 18-dp directional boundary rounding (floor on user-credited quantities; resolves ADR-0008 §8; binds ENGINE.2 + ENGINE.5). Slippage pinned as absolute probability-point impact, strict-> threshold trigger (F-BET-9; gates DESIGN.4). §7.2 pre-launch curation slate recorded as standard launch procedure (product definition deferred to SPEC.1 / debate phase). Worked examples E1–E5 are ENGINE.3 fixed vectors. |
 | 2.0.0 | 2026-07-07 | HMH | **§8.2 + INV-C4 rewritten to the founder-ratified R-9.8 void basis** (AUDIT.1 finding D1; canonical sources: SPEC.1/SPEC.2 v1.0.3 ENGINE.9 riders + shipped `resolution/void.ts`): refund = f × stake per bet, sale proceeds stand, no negative compensating entries, no void-leg `uncollectable`; residual (`poolUnwindAmount`, R-9.5e) = D − Σ `void_refund`, equal to seed only absent realized sale P&L; void auditing is ledger-based, not reserve-alone. §13 contract comment verified current (void stays ledger arithmetic, no curve function — unchanged). MAJOR per §0 semver (formula/invariant change). Also records the previously-unlogged ENGINE.14 amendment (`a29ef7e`, pool-seed payload recording form — no version bump was made at the time). |
 | 2.1.0 | 2026-07-15 | HMH | **Slippage warning trigger retired** (F-BET-9; SPEC.1 1.0.15; basis design-canon §4 ruling 2 — W2.10 Option A, operator-ratified 2026-06-27). §6.2 trigger removed (threshold, strict->, pre-confirm modal); its probability-points rationale relocated to §6.1 as the impact-unit definition. §6.4 consumable reframed from the pre-confirm modal to the non-blocking preview (price / shares / cost-or-proceeds; `threshold` dropped from the bundle; the caller-side SPEC.1 §16.1 per-bet stake cap is reflected in the preview figures — the cap constant itself deliberately lives only in SPEC.1: app-layer guard, the pure functions stay pure). §0 gates / §1 / §4.4 / §14 warning references scrubbed. MINOR per §0 semver: no change to the §6.1 impact formula, §6.3 preview semantics, §13 returns, or the worked examples — consumer-scope change, not a formula/invariant change. |
+| 4.0.0 | 2026-09-07 | HMH | **ADR-0047 Phase 2 — the signup-pegged injector (LIQ-1). MAJOR per §0: §7.4 changes an invariant statement.** **§7.4** retitled *The four doors* and rewritten — reserves change through §4 buy, §5 sell, **§7.5 injection** and §8 unwind; the three-door sentence it replaces is quoted in place, because it was true for the life of the module and is the one ADR-0047 reverses. **§7.5 MINTED** — the reserve-placement primitive, its two implementations (`calculate.ts` = spec + oracle, migration `0027`'s `zz_add_liquidity` = runtime), the differential fuzz that pins them, and why the SQL uses exact integer division rather than `trunc(a·S/L, 18)`. **§7.1** records that the quotient is taken at **120 significant digits**, not the module's 50: at 50 the result is one ulp LOW wherever the exact quotient lands on an 18-dp boundary and `a·S` exceeds 50 digits (0% below 1e7 reserves, ~6.5% at and above 1e8) — and, measured at execute, one ulp HIGH if only the DIVISION is widened and the addition is left behind. **§1** scope sentence, **§3.1** parenthetical (still TRUE — the injector selects on `status = 'Open'`, so `Open → Closed` remains the instant reserves stop moving), **§7.2**'s *exactly once* (it scopes the INITIALISATION, not the reserves), **§13**'s `addLiquidity` and `computeResolvedUnwind` entries, **§14** non-goals (mid-market liquidity is no longer one; USER-provided liquidity still is). **§12 E6 MINTED** — the asymmetric worked example E5 said was owed: 90,000/10,000 open, one 100 Đ buy, one injection to a 200,000 tank, both outcomes. Its NO branch is the demonstration that `unwind = w + D_W` matters: the superseded form strands **160,268.94 Đ** of a **180,630.01 Đ** deposit. E1–E5 untouched — `vectors.test.ts` pins them. ⚠ **Predicate 6 caught three sites the plan's census did not list**: INV-C4, §8's auditor-input list and INV-C5 all sourced `D` from `market.opened` ALONE, which Phase 2 makes incomplete in the direction that UNDER-states a payout. `D` is now summed from the genesis row AND every `pool.liquidity_added`. That is the FOURTH sweep this document has needed for one amendment, and the reason is unchanged from the previous three: the original Phase-1 plan scoped by section number instead of by predicate. |
 | 3.0.0 | 2026-09-06 | HMH | **ADR-0047 Phase 1 — asymmetric open at a chosen price (LIQ-1).** **§7.1** rewritten: the `Draft → Open` seed commits a TANK of T Đ at an opening price p ∈ (0,1) and initialises the reserves ASYMMETRICALLY at `(y0, n0) = ((1 − p)·T, p·T)`, replacing the symmetric `(y0, n0) = (C, C)`; the symmetric seed is now the p = ½ special case, not the rule. The pair-mint account is completed by the **backing identity** `Y + H_yes + D_yes == N + H_no + D_no == total Đ deposited`, where `D_x` is the cumulative DISCARD per side — summed from `market.opened` (and, from ADR-0047 Phase 2, `pool.liquidity_added`). Discards are large by construction: the fraction is `1 − min(p,1−p)/max(p,1−p)`, 88.9% at a 10% open. **§7.3** the recorded rejection of asymmetric open is REVERSED and kept in place, struck, with the measurement that overturned it (a curation slate reaching 10% needs operator-held NO positions carrying mandatory arguments the operator does not hold — arguments by fiat, with stake, which is further from an honest book than a discard nobody holds); the upstream `p`-weight rejection STANDS and is re-derived rather than inherited. **MAJOR per §0 semver** — `(y0,n0) = (C,C)` is a formula this changes, and the backing identity is a new invariant. §7.2's slate paragraph is narrowed by §7.1's new closing sentence rather than rewritten; §7.4 and §14 are Phase 2 and deliberately untouched here. Paired: SPEC.2 §19.4.1 `market.opened` SHIP row (same commit), `src/server/cpmm/calculate.ts` `openingReserves`/`addLiquidity`/`seedReserves`, `src/server/markets/open.ts`. |
 | 3.0.0 | 2026-09-06 | HMH | **§7.2 rewritten under the same version (LIQ-1 Phase 1 addendum D3).** The row above deliberately left §7.2 alone, which put a flat "the probability at seed is 0.5 structurally" one section below a §7.1 that had just made it false — a reader landing on §7.2 first met the superseded claim, with the correction in a section they had not opened (`O-4`). §7.2 no longer sets price: the slate seeds ARGUMENTS ONLY, in stakes deliberately too small to move the curve, and every sentence describing operator-controlled accounts walking the price to a chosen level is DELETED rather than qualified. The reasoning that overturned it is kept, because the old design was not obviously wrong and a reversal with no argument teaches a later reader nothing. "Per-market opening levels" is struck from §7.2's deferred-product list — it is a parameter of market opening now, not a curation outcome. **No version bump: 3.0.0 is the ADR-0047 version and this is that same amendment finishing its job**, not a second one. |
 | 3.0.0 | 2026-09-06 | HMH | **§8.1, §11 INV-C4 and §11 INV-C5 amended; §7.1's `T` disambiguated (LIQ-1 Phase 1, `@code-reviewer` HIGH-3 and MEDIUM-5).** §8.1 and INV-C4 still said the resolved unwind is **exactly the winning-side reserve, auditable from the frozen reserves alone** — true only while every discard was zero, and CONTRADICTING the shipped `resolution/settle.ts` as of this same version. On a spec↔code conflict the spec wins, so a later session reading INV-C4 would have "corrected" settle.ts back and silently under-paid every asymmetric winning side by its discard. Now: `unwind = w + D_W`, payout = `D − w − D_W`, and the reserves-only audit claim is struck — D_W is read from `market.opened`. INV-C5's determinism claim SURVIVES and is scoped: the auditor needs the reserves AND the genesis payload, both of which ship (SPEC.2 §19.3 row 1 + §19.4.1). **The plan's T11 only ever scoped §7.1 and §7.3, so §8/§11 were a plan gap rather than an execution slip.** §7.1 additionally: `T` is the reserve SUM, not the Đ deposited (that is `B = max(y0,n0)`, 90,000 against T = 100,000) — the original wording conflated the two in the same section that equates the backing identity to Đ deposited, and Phase 2's target rule compares against T. |

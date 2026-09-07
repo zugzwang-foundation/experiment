@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+	addLiquidity,
 	computeBuy,
 	computeResolvedUnwind,
 	computeSell,
 	getPrices,
+	openingReserves,
 	type Reserves,
 	seedPool,
 } from "@/server/cpmm/calculate";
@@ -219,5 +221,121 @@ describe("E5 — resolution residual on E2's post-state, both branches (cpmm.md 
 		expect(residual).toBe("110.000000000000000000");
 		expect(BigInt(0) + toUnits(residual)).toBe(D); // 0 NO holdings + unwind = D
 		expectAll18dp(residual);
+	});
+});
+
+describe("E6 — asymmetric open, one buy, one injection, both outcomes (cpmm.md §12)", () => {
+	// The example E5 said was owed. E1–E5 all sit on a SYMMETRIC seed, where
+	// `D_X = 0` and the §8.1 residual identity is indistinguishable from the
+	// reserves-only form it replaced. This is the one where the discard terms
+	// carry weight — and the NO branch is what shows the cost of omitting them.
+	//
+	// Every figure is a module OUTPUT re-encoded verbatim, exactly as E1–E5 are.
+	// Nothing here is hand-arithmetic.
+
+	const open = openingReserves({
+		openingPriceYes: "0.100000000000000000",
+		tank: "100000.000000000000000000",
+	});
+	const buy = computeBuy({
+		reserves: open.reserves,
+		side: "yes",
+		stake: "100.000000000000000000",
+	});
+	const A = "90530.014868134850929828"; // a = L·(200000/tank − 1)
+	const inj = addLiquidity({ reserves: buy.reserves, amount: A });
+
+	it("E6.1: the open places 90,000 / 10,000 and discards 80,000 NO", () => {
+		expect(open.reserves).toEqual({
+			yes: "90000.000000000000000000",
+			no: "10000.000000000000000000",
+		});
+		// ⚠ THE DEPOSIT IS 90,000, NOT THE 100,000 TANK. The open mints
+		// max(yes,no) pairs; the other 80,000 NO shares are destroyed — held by
+		// nobody, in no position. That is 88.9% of the short side.
+		expect(open.backingMinted).toBe("90000.000000000000000000");
+		expect(open.discardedNo).toBe("80000.000000000000000000");
+		expect(open.discardedYes).toBe("0.000000000000000000");
+		expect(getPrices(open.reserves).yes).toBe("0.100000000000000000");
+	});
+
+	it("E6.2: a 100 Đ YES buy moves p_yes to 0.101805371203880201", () => {
+		expect(buy.shares).toBe("991.089108910891089108");
+		expect(buy.reserves).toEqual({
+			yes: "89108.910891089108910892",
+			no: "10100.000000000000000000",
+		});
+		expectAll18dp(buy.shares, buy.reserves.yes, buy.reserves.no);
+	});
+
+	it("E6.3: the injection preserves the price EXACTLY, to all 18 places", () => {
+		// The design claim, on a concrete vector rather than a fuzz bound. Here it
+		// is not merely within one ulp — it is identical.
+		expect(getPrices(inj.reserves).yes).toBe(getPrices(buy.reserves).yes);
+		expect(inj.reserves).toEqual({
+			yes: "179638.925759223959840720",
+			no: "20361.074240776040159279",
+		});
+		expect(inj.discardedNo).toBe("80268.940627358810770549");
+		expect(inj.discardedYes).toBe("0.000000000000000000");
+	});
+
+	it("E6.4: the tank lands one ulp short of target — the floor, not an error", () => {
+		// 199999.999999999999999999. The short side is floored, so the sum cannot
+		// reach the target exactly; pinning it stops a later reader "fixing" a
+		// rounding that is the specification.
+		const tank = toUnits(inj.reserves.yes) + toUnits(inj.reserves.no);
+		expect(tank).toBe(toUnits("200000.000000000000000000") - BigInt(1));
+	});
+
+	it("E6.5: the backing identity closes per side, EXACTLY", () => {
+		// Y + H_yes + D_yes == N + H_no + D_no == total Đ deposited, where the
+		// deposit is the open's 90,000 PLUS the bettor's 100 PLUS the injection.
+		const dYes = toUnits(open.discardedYes) + toUnits(inj.discardedYes);
+		const dNo = toUnits(open.discardedNo) + toUnits(inj.discardedNo);
+
+		const yesSide = toUnits(inj.reserves.yes) + toUnits(buy.shares) + dYes;
+		const noSide = toUnits(inj.reserves.no) + BigInt(0) + dNo;
+		expect(yesSide).toBe(noSide);
+
+		const deposited =
+			toUnits(open.backingMinted) +
+			toUnits("100.000000000000000000") +
+			toUnits(inj.backingMinted);
+		expect(yesSide).toBe(deposited);
+		expect(deposited).toBe(toUnits("180630.014868134850929828"));
+	});
+
+	it("E6.6: NO outcome — unwind = w + D_W, and w ALONE would strand 160,268.94", () => {
+		// ⛔ THE POINT OF THE WHOLE EXAMPLE. On the NO branch the winning reserve
+		// is 20,361.07 and the winning side's cumulative discard is 160,268.94.
+		// The SUPERSEDED form (`unwind = w`) returns the first and abandons the
+		// second: 89% of everything deposited, in a resolved market, with no
+		// holder and no path out, on a terminal append-only row.
+		//
+		// On a symmetric seed the two forms agree — which is exactly why five
+		// worked examples stood as long as they did without the error showing.
+		const D = toUnits("180630.014868134850929828");
+		const w = toUnits(inj.reserves.no);
+		const dW = toUnits(open.discardedNo) + toUnits(inj.discardedNo);
+
+		expect(w + dW).toBe(D); // unwind == D: nobody holds a NO share
+		expect(D - w - dW).toBe(BigInt(0)); // payout == 0
+
+		// And the superseded form, measured: what it would have left behind.
+		expect(D - w).toBe(toUnits("160268.940627358810770549"));
+
+		// ⚠ `computeResolvedUnwind` returns the BARE reserve — which is why it is
+		// @deprecated. Pinned here as the COUNTEREXAMPLE, not as the answer.
+		expect(
+			computeResolvedUnwind({ reserves: inj.reserves, outcome: "no" }).residual,
+		).toBe(inj.reserves.no);
+	});
+
+	it("E6.7: YES outcome — payout is exactly the shares held", () => {
+		const D = toUnits("180630.014868134850929828");
+		const w = toUnits(inj.reserves.yes);
+		const dW = toUnits(open.discardedYes) + toUnits(inj.discardedYes); // 0
+		expect(D - w - dW).toBe(toUnits(buy.shares));
 	});
 });
