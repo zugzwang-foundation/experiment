@@ -305,8 +305,14 @@ describe("UI.A2 slice 1 — BET_MAX_STAKE clamp on the place path (SPEC.1 §16.1
 		// ("insufficient dharma: balance <b> < required <r>", errors.ts).
 		const userId = await seedUser("clamp-poor", "clamp-poor");
 		const marketId = await seedOpenMarketWithPool("clamp-poor-market");
-		// 1000 — well above the post floor, far below the max (post-credit 1010).
-		await seedDharmaGrant(userId, "1000");
+		// ⚠ THE BALANCE MUST SIT BELOW THE CLAMPED STAKE OR THIS CASE TESTS
+		// NOTHING. It was 1000 against a cap of 10000; at the ADR-0047 cap of 250
+		// that balance is ABOVE the clamp, so the bet succeeds and the case
+		// asserts a 400 that cannot happen. 100 → 110 post-credit: comfortably
+		// above the post floor, comfortably below the cap. Derived from the
+		// constants below rather than pinned, so the next cap change does not
+		// silently re-break it.
+		await seedDharmaGrant(userId, "100");
 		mockGetSession.mockResolvedValue({ user: { id: userId } });
 
 		const res = await placePOST(
@@ -326,8 +332,9 @@ describe("UI.A2 slice 1 — BET_MAX_STAKE clamp on the place path (SPEC.1 §16.1
 		const payload = await res.json();
 		expect(payload.ok).toBe(false);
 		expect(payload.error.code).toBe("insufficient_dharma");
-		// required == the CLAMPED stake, byte-form "10000" (the constant string
-		// clampStakeToMax returns, passed through to place()).
+		// required == the CLAMPED stake — the constant STRING `clampStakeToMax`
+		// returns, passed through to place() byte-for-byte. Asserted against the
+		// live constant, never against a literal, so it survives a tuning pass.
 		expect(payload.error.message.endsWith(`required ${BET_MAX_STAKE}`)).toBe(
 			true,
 		);
