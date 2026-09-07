@@ -362,10 +362,24 @@ probability with equal reserves, since equal reserves give prob = p
 exactly) remains stripped (§1, §2), and is a different mechanism from
 the p above: this p is a target price, not an exponent. The
 reserve-placement primitive that computes the pair, and the
-price-preserving addition that §7.4 will admit, are one function —
+price-preserving addition that §7.4 admits, are one function —
 `openingReserves` / `addLiquidity` in `src/server/cpmm/calculate.ts`,
 derived from upstream's `addCpmmLiquidityFixedP` under the §2 MIT
 attribution.
+
+⚠ **The quotient `a·S/L` is taken at 120 significant digits before
+`floor18`, not at the module's 50 (§10.2).** Measured: at 50 the value is
+one ulp LOW wherever the exact quotient lands on an 18-dp boundary and
+`a·S` needs more than 50 digits — 0% below 1e7 reserves, ~6.5% at and
+above 1e8, 0 of 50,000 at a 90:1 skew. 120 is provably enough rather than
+merely large: the quotient is rational with denominator `L ≤ 1e38`, so its
+distance from an 18-dp boundary is zero or at least `1e-56`, while a
+120-digit rounding of a quantity below `1e20` perturbs by at most
+`1e-100`. ⚠ **The ADDITION is inside that bracket too, not outside it** —
+`floor18(S + a·S/L)` evaluated with the sum at 50 is one ulp HIGH on a
+different input class, which is the same defect wearing the opposite sign.
+The clone is local to the function: precision 50 remains the module's
+arithmetic authority and every other function is measured correct at it.
 
 ### 7.2 The pre-launch curation slate — arguments, not price
 
@@ -804,8 +818,15 @@ changing meaning.
         discardedYes: string; discardedNo: string }
       // Price-preserving addition (ADR-0047 §A). L' = L + a,
       // S' = floor18(S + a·S/L), discarded = a − (S'−S) as a RESIDUAL so the
-      // backing identity closes exactly. NO runtime caller in Phase 1 — it is
-      // the oracle the Phase-2 SQL injector is differentially fuzzed against.
+      // backing identity closes exactly. The WHOLE bracket is evaluated on a
+      // local precision-120 clone, not at the module's 50 — see §7.1; at 50
+      // the result is one ulp off on reachable inputs, in either direction
+      // depending on which half you leave behind. NO runtime caller: it is
+      // the SPECIFICATION and the oracle that migration 0027's SQL
+      // zz_add_liquidity is differentially fuzzed against
+      // (tests/db/cpmm/liquidity-differential.spec.ts, 12,000 vectors, with
+      // a negative control so it cannot degenerate into a function compared
+      // against itself).
 
     getPrices(reserves: Reserves): { yes: string; no: string }
       // §3.3; 18 dp HALF_EVEN
