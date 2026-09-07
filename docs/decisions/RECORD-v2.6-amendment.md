@@ -1,7 +1,7 @@
 # DECISION RECORD — amendment 2.6
 
 **Amends** `RECORD-v2.0.md` · follows 2.1, 2.2, 2.3, 2.4, 2.5 · **Opened** 2026-09-07
-**Rulings** D-30, D-31, D-32
+**Rulings** D-30, D-31, D-32 · **D-33 … D-47** (the LIQ-1 lane, ratified as a batch 2026-09-08)
 
 ---
 
@@ -117,6 +117,57 @@ PhotoDNA or a dedicated image classifier is onboarded.
 **Consequences.** Amends `SPEC.1` §2 (Track A/B glossary rows), §14 (track table, F-MOD-1, F-MOD-2),
 §15 F-ADMIN-4, §16.2 and Appendix A; and `SPEC.2` §10's category-routing paragraph. That text lands
 with `MOD-1`, not in this pull request. Detection is unchanged and unweakened.
+
+---
+
+---
+
+## D-33 … D-47 · The LIQ-1 lane, ratified as a batch
+
+**Records** the decisions taken across the LIQ-1 lane (2026-09-05 → 2026-09-08), closed at
+`LIQ-1-SOAK-CLOSE`. 2026-09-08.
+
+⚠ **These are RECORDS, not fresh rulings.** Each was decided in its own session, defended in a
+report or an ADR, and is already built. They are numbered here because a decision that lives only
+in a `~/Downloads` report and a plan file is a decision the repository cannot arbitrate — the
+`O-15` shape, one register over. D-31 already carries the *authorisation*; these carry the
+*shape*. Where a row's evidence is a report rather than a file, the report is named in full and
+ships in the LIQ-1 PK bundle.
+
+| # | Decision | Why, in one line | Evidence |
+|---|---|---|---|
+| **D-33** | **ADR-0047 accepted** — asymmetric open plus signup-pegged injection | A market that opens at 50/50 says nothing, and one that opens where the operator believes is worthless if the first bet moves it twenty points | `docs/adr/0047-…md`; PRs #491 `e25fa277`, #496 `67ceb6b5` |
+| **D-34** | **p-weight rejected for the experiment** | The curve was measured equally lopsided either way, and the exact-arithmetic contract is worth more than a weighting nobody could defend from data | `zz_LIQ-SIM-2_measure_2026-09-06T1444.md`; ADR-0047 *Closed by plan-mode* |
+| **D-35** | **Limit orders and user-supplied liquidity are out of scope for the experiment** | Both change what a participant *is*; the thesis is argued commentary priced by a single MM, not a venue | ADR-0047 *Closed by plan-mode*; `docs/plans/LIQ-1-P2_plan.md` |
+| **D-36** | **D-14 held at 10/90; the per-market bettor term rejected; the velocity guard rejected** | The bettor term is `O(total bets)` per tick, and the velocity guard measured *anti-correlated* with the trigger — it suppressed seven of eight injections at 40k signups/hour | `zz_LIQ-RECON-2_measure_2026-09-06T1314.md` §10.6; ADR-0047 §D |
+| **D-37** | **Phased across two PRs** — #491 (open + identity + replay), #496 (injector) | Phase 1 changes `settle`/`void`/`openMarket`; Phase 2 adds a new `pools` writer. Reviewing them together would have put a money-path correction and a cron sweep under one diff read | ADR-0047 *Execution*; PRs #491, #496 |
+| **D-38** | **`D` is summed from events; `readGenesisRow` takes `LIMIT 1`; injections are a second query** | No migration on `pools` for ~30 rows a market, and the events are the audit trail regardless — but the genesis row is *one* row, not a sum, and conflating the two was a real defect caught by mutation | ADR-0047 §E; `src/server/markets/backing.ts`; `zz_LIQ-1-P1_exec_2026-09-06T1009.md` §7 |
+| **D-39** | **The injector is a `FUNCTION`, `SELECT`-invoked, one subtransaction per market, with a 600 ms lock-hold budget (`0029`) and a status re-read under lock (`0028`)** | A function invoked by `cron.schedule` is one transaction, which is what makes the advisory lock and the per-market isolation mean anything; the budget is what holds the bound at **any** market count, which a CHECK cannot do | ADR-0047 §D; migrations `0027`, `0028`, `0029` |
+| **D-40** | **The seeded policy row is `enabled = false`; arming is one operator INSERT after the promote** | ADR-0024 applies the migration *before* the new code is promoted, so a row seeded `true` would let the injector write rows the running code cannot read — under-reporting a terminal settle on an append-only row | ADR-0047 §G; migration `0027` |
+| **D-41** | **`BET_MAX_STAKE` = 250, and the staging fixture generator is bound to it** | A replica whose purpose is to look like production held five bets no participant could place | ADR-0047 *Constants*; `src/server/config/limits.ts`; `tests/staging/generate.staging.test.ts` |
+| **D-42** | **`openMarket` is freeze-gated** | A market opened after the 2026-11-05 freeze can take no bets, so it would exist only as an un-actionable row in the public dataset. Resolution's exemption is deliberate and untouched | `docs/parked.md` LIQ-1 L-4 (**PAID**); `tests/server/markets/freeze-gate.test.ts` |
+| **D-43** | **Migration `0030` revokes `EXECUTE` on all three liquidity functions from `PUBLIC`, `anon` and `authenticated`** | Defence in depth under ADR-0019's no-RLS premise; `service_role` keeps it, being a secret-holder rather than a browser-reachable role | migration `0030`; `tests/db/liquidity-grants.spec.ts`; `docs/parked.md` LIQ-1 L-10 (function arm **closed**) |
+| **D-44** | **G5.7b is restated as two assertions: the cap on live data, and a surviving four-digit *holding*** | With the cap at 250 a four-digit single `bets.stake` is unsatisfiable by any fixture — the old gate was green only because the fixtures violated the product's own cap | `docs/parked.md` LIQ-1-FIX-2 H-1 (**CLOSED**); `tests/staging/gates.staging.test.ts` |
+| **D-45** | **The staging reset is guarded against destroying content markets, and the eight are recreated by a seeder that is also the production seeding tool** | The 2026-09-07 reset deleted eight founder-authored markets, recoverable only because a snapshot had been committed first. One tool, used twice, is a tool that gets exercised | ADR-0035; `tests/staging/_lib/content-guard.ts`; `scripts/seed-content-markets.ts`; PR #499 `5052ae80` |
+| **D-46** | **The seven Phase-2 open deviations stand as ruled, including R-1's four-case split** | Each was surfaced at kickoff and answered before execution rather than absorbed silently | `docs/plans/LIQ-1-P2_plan.md`; `zz_LIQ-1-P2_exec_2026-09-07T0920.md` |
+| **D-47** | **The deploy runbook's migrate log-reading test is replaced by post-migrate database probes** | drizzle-kit echoes nothing and `CREATE TABLE`/`CREATE FUNCTION`/`cron.schedule()` raise no NOTICE, so a no-op and a four-migration apply print an identical log — *a check that answers the same for both outcomes is not a check* | PR #500 `da9979b9`; `docs/runbooks/deploy-pipeline.md` §2 |
+
+### Two corrections this batch owes its reader
+
+⚠ **D-41 was relayed as *"the fixture generator clamps to it"*, and the shipped behaviour is to
+REFUSE, not to clamp.** The distinction is deliberate and was `@code-reviewer`'s at LIQ-1-FIX-2:
+`clampStakeToMax` is reused as the **oracle**, so a change to the constant propagates without
+anyone editing the line, but its return value is compared and never used. Silently shrinking a
+fixture stake would produce a green run whose calibrated positions were quietly smaller than the
+fixture table declares — *a worse lie than the one it replaces*. Two layers enforce it: a
+whole-table pre-flight in `beforeAll` that refuses before a row is written, and a per-call
+backstop. Recorded in the built form rather than the relayed one.
+
+⚠ **D-43's verification is now measured on hosted staging, which it previously was not.**
+`docs/parked.md` L-10 records that *"nothing automated asserts `0030` took effect on the hosted
+projects"* — `tests/db/liquidity-grants.spec.ts` reads `DATABASE_URL` and CI's substrate carries
+neither app role. `LIQ-1-SOAK-CLOSE` §A6 is that hand check for **staging**: all seven
+`has_function_privilege` reads return FALSE. **Production is still owed.**
 
 ---
 

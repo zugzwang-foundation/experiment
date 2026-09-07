@@ -1,8 +1,8 @@
 # STATE — where Zugzwang is
 
-**Generated** 2026-09-03 from `origin/main` @ `ead741577b89849560ab3d3222a48b2a69bf18b7`
+**Generated** 2026-09-08 from `origin/main` @ `da9979b9c61254f3f3bb8c585c817e1970ecfda1`
 **Regenerate** per `docs/records/README.md` · **Lane detail** in `docs/records/`
-**Go-live** 2026-09-15 — **12 days from this generation**
+**Go-live** 2026-09-15 — **7 days from this generation**
 
 > This file is an **index and a measurement**. It carries no rule of its own; if a sentence
 > here reads as normative, that is a defect. The rules live where §5 points.
@@ -12,27 +12,28 @@
 ## §1 · Measured ceilings
 
 ⛔ **These decay. Re-measure them; never read them.** Every row carries the command that
-produced it, which is the only thing about this section that stays true. This is the fifth
+produced it, which is the only thing about this section that stays true. This is the **sixth**
 consecutive documentation pass at which a *copied* ceiling has been found stale — including
-passes whose own prose contained the instruction not to copy one.
+passes whose own prose contained the instruction not to copy one. ⚠ **This pass found EIGHT of the
+sixteen rows below stale in five days**, and two of them were stale by a whole major version.
 
 | Quantity | Value | Command |
 |---|---|---|
-| **ADR ceiling** | **0045** (`0045-mobile-responsive-browsing-and-auth-gate.md`) · next free **0046** | `ls docs/adr/ \| sort \| tail -1` |
-| ADR files | **44** = 43 ADRs + `_template.md`; `0002` and `0012` never used | `ls docs/adr/ \| wc -l` |
-| **SPEC.1** | **1.0.49** (2026-09-03) | `grep -m1 '^- \*\*Version:' docs/specs/SPEC.1.md` |
-| **SPEC.2** | **1.0.27** (dated 2026-08-27 — but see `F-22`) | `grep -m1 '^\| \*\*Version\*\* \|' docs/specs/SPEC.2.md` |
-| **cpmm.md** | **2.1.0** (2026-07-15) | same shape |
-| **Migration head** | **`0026_lots_no_delete`** · 27 `.sql` files · journal 27 entries | `ls drizzle/migrations/*.sql \| sort \| tail -1` |
-| **`EVENT_TYPES`** | **24** — `src/server/events/schemas.ts:54` | `awk '/export const EVENT_TYPES = \[/,/\] as const;/' … \| grep -cE '^\s+"'` |
-| **Test files** | **462** — unit 227 · server 157 · integration 36 · db 18 · invariants 13 · scale 8 · staging 3 | `find tests -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' \) \| wc -l` |
-| Suite actually run by `vitest run` | **451** — scale (8) and staging (3) are config-excluded | `pnpm vitest run` |
+| **ADR ceiling** | **0048** (`0048-phone-responsive-auth-surfaces-and-the-focus-mode-row.md`) · next free **0049** | `ls docs/adr/ \| sort \| tail -1` |
+| ADR files | **47** = 46 ADRs + `_template.md`; `0002` and `0012` never used | `ls docs/adr/ \| wc -l` |
+| **SPEC.1** | **2.0.1** — rebaselined at 2.0.0 per D-29 (#490) | `grep -m1 '^- \*\*Version:' docs/specs/SPEC.1.md` |
+| **SPEC.2** | **2.0.2** — rebaselined at 2.0.0 per D-30 (#493); `F-22` is thereby discharged | `grep -m1 '^\| \*\*Version\*\* \|' docs/specs/SPEC.2.md` |
+| **cpmm.md** | **4.0.0** | same shape |
+| **Migration head** | **`0030_liquidity_revoke_app_roles`** · 31 `.sql` files · journal 31 entries | `ls drizzle/migrations/*.sql \| sort \| tail -1` |
+| **`EVENT_TYPES`** | **25** — `pool.liquidity_added` added by ADR-0047 | `awk '/export const EVENT_TYPES = \[/,/\] as const;/' … \| grep -cE '^\s+"'` |
+| **Test files** | **489** — unit 243 · server 160 · integration 36 · db 25 · invariants 13 · scale 8 · staging 4 | `find tests -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' \) \| wc -l` |
+| Suite actually run by `vitest run` | **477** — scale (8) and staging (4) are config-excluded | `pnpm vitest run` |
 | **Invariant specs** | **13** | `ls tests/invariants/ \| wc -l` |
 | **O-space** | **O-15** | `grep -oE '\*\*O-[0-9]+ ·' CLAUDE.md \| sort -u -t- -k2 -n \| tail -1` |
 | **V-space** | **V-21** ⚠ `V-15` is deliberately reserved; `V-22` appears only in a sentence saying a row does *not* take it | `grep -oE '\*\*V-[0-9]+ ·' docs/polish/POLISH-0_data-manifest.md \| …` |
 | **L-space** | **L-10** — and see `F-23` | `grep -oE '\bL-[0-9]+\b' docs/polish/POLISH-register-ADDITIONS.md \| …` |
-| Merged PRs | **449** (15 closed-unmerged, 3 open, 467 total) · first merge PR #1, 2026-04-23 | `gh pr list --state merged --limit 600 --json number --jq length` |
-| `docs/logs/` + `docs/plans/` | **366** (236 + 130) — the corpus `docs/records/` replaces | `ls docs/logs \| wc -l` · `ls docs/plans \| wc -l` |
+| Merged PRs | **478** · first merge PR #1, 2026-04-23 · newest `#500` `da9979b9` | `gh pr list --state merged --limit 600 --json number --jq length` |
+| `docs/logs/` + `docs/plans/` | **179** (95 + 84) — the corpus `docs/records/` replaces. ⚠ **Down from 366 (236 + 130) on 2026-09-03: 188 files pruned in five days**, which is D-18 being carried out rather than drift | `ls docs/logs \| wc -l` · `ls docs/plans \| wc -l` |
 
 ---
 
@@ -55,21 +56,30 @@ passes whose own prose contained the instruction not to copy one.
 
 | | Staging | Production |
 |---|---|---|
-| Served SHA | `e193cfb` = `origin/staging` | **`a61859a`** — 2026-07-02, **326 commits behind `main`** |
+| Served SHA | **`da9979b9`** = `origin/main` = `origin/staging` | **`a61859a`** — 2026-07-02, **356 commits behind `main`** |
 | `/api/health` | `env:staging · region:bom1 · db:ok · migrations:ok` | `env:prod · db:ok · migrations:ok` · **no `region` key** |
-| Migrations applied | **27 / 27** — `IN SYNC ✓` | **20 / 27** — ⛔ `DRIFT ✗` |
-| `identity_pool` total / unassigned | 1,070 / **548** | ⛔ **0 / 0** |
-| `users` | 321 | ⛔ **0** |
-| `markets` | 12, all `Open` (8 content + 4 load fixtures) | ⛔ **0** |
-| `comments` / `bets` | **1,692 / 1,692** | 0 / 0 |
+| Migrations applied | **31 / 31** — `IN SYNC ✓` | **20 / 31** — ⛔ `DRIFT ✗`, eleven behind |
+| `identity_pool` total / unassigned | 871 / **861** | ⛔ **0 / 0** |
+| `users` | 10 | ⛔ **0** |
+| `markets` | 23 — 15 `Open`, 7 content + 8 fixture families | ⛔ **0** |
+| `comments` / `bets` | **56 / 56** | 0 / 0 |
 
-✅ **`comments` = `bets` exactly, on 1,692 live participant rows.** That is INV-1 — no bet
-without a comment, no comment without a bet — holding on real data. The pair moved from
-1,689 to 1,692 during this generation and stayed equal across the change.
+✅ **`comments` = `bets` exactly.** INV-1 — no bet without a comment, no comment without a bet —
+holding on live data.
 
-⛔ **Production is empty, seven migrations behind, and serving a build from 2 July.** Three
-separate gaps on one database, twelve days out. None is a defect in shipped code; all three are
-work not yet done. `docs/runbooks/deploy-pipeline.md` §3 owns the sequence.
+⚠ **The staging figures are DELIBERATELY SMALLER than the 2026-09-03 generation's, and that is
+not a regression.** `LIQ-1-SOAK-CLOSE` rebuilt the replica from scratch under the final LIQ-1
+code: the reset truncated the fixture surface and re-seeded `identity_pool` at its 871
+deterministic tuples, the generator rebuilt the fixture set, and the eight content markets were
+recreated through the shipped admin engine. **`users` 321 → 10 and `comments`/`bets` 1,692 → 56
+are the rebuild, not attrition.** The `markets` count went the other way (12 → 23) because the
+fixture families grew.
+
+⛔ **Production is empty, ELEVEN migrations behind, and serving a build from 2 July.** Three
+separate gaps on one database, seven days out. None is a defect in shipped code; all three are
+work not yet done. `docs/runbooks/deploy-pipeline.md` §3 owns the sequence — and §2 of it was
+corrected at PR #500, because the check it told you to run could not tell the two outcomes
+apart.
 
 ---
 
@@ -85,9 +95,9 @@ left blank for the founder.
 
 | ID | Finding | Evidence | Owner |
 |---|---|---|---|
-| **F-1** | **Production is 7 migrations behind the code** — `0020_dharma_ledger_seq` … `0026_lots_no_delete`, including `bet_receipts` (the `I-IDEM-ONCE-001` durable backstop), the TRUNCATE guards and `lots` | `doppler run --config prd -- pnpm db:check-drift` → `20 applied` vs journal `27` | |
+| **F-1** | **Production is 11 migrations behind the code** — `0020_dharma_ledger_seq` … `0030_liquidity_revoke_app_roles`, including `bet_receipts` (the `I-IDEM-ONCE-001` durable backstop), the TRUNCATE guards, `lots`, and now the whole LIQ-1 set (`0027`–`0030`: the injector, its two CHECK-ceiling tightenings and the app-role revokes). ⚠ **The gap grew by four during LIQ-1, which is expected and is why the row is re-measured rather than carried** | `SELECT count(*) FROM drizzle.__drizzle_migrations` → prd `20`, stg `31`; journal `31` entries | |
 | **F-2** | **The production database is empty** — no identity pool, no users, no markets | `SELECT count(*)` ×3 against `prd` → `0 0 0` | |
-| **F-3** | **The number-tuning pass has not run.** SPEC.1 Appendix B carries **26** `TBD` constants; `src/server/config/limits.ts` ships **13** of them as values whose own JSDoc reads `PLACEHOLDER VALUE — tuned by HARDEN.5`, dated **~2026-09-01** in five comments | `awk 'NR>=1975' docs/specs/SPEC.1.md \| grep -cE '^[A-Z_0-9]+ = TBD'` → 26; no number-tuning ADR exists | |
+| **F-3** | **The number-tuning pass has not run in general — but the LIQUIDITY subset is now pinned by decision.** ADR-0047 pins `FLOOR` 100,000 · `COEFF` 500 · `TRIGGER` 0.80 · `GUARD_LOW`/`GUARD_HIGH` 0.02/0.95 · `ENDGAME_HOURS` 72 · `INTERVAL` 60 s · `LOCK_TIMEOUT_MS` 100 · `BET_MAX_STAKE` 250, and every one but the last lives in `liquidity_policy`, adjustable by INSERT rather than by deploy. ⚠ **`COEFF` was explicitly NOT swept** (LIQ-SIM-2 §6.5) — it is a starting value with a Runbook row for tuning it against real deployment on 15 Sep. **`TBD` remaining: 16.** ⚠ **This row read 26 on 2026-09-03 and the SOAK measured 16** — ten were pinned across the SPEC.1 2.0.0 rebaseline and ADR-0047. *(⚠ The `LIQ-1-SOAK-CLOSE` kickoff estimated 22 remaining; the measurement is 16. Recorded as measured — `O-2`.)* | `grep -cE '^[A-Z_0-9]+ = TBD' docs/specs/SPEC.1.md` → 16; no general number-tuning ADR exists | |
 | **F-15** | ⚠ **RECLASSIFIED — by design, not a blocker (D-28 row 5).** The dataset pipeline (PR **#435**, 57 files, `ci=SUCCESS`, base `main`) is **deliberately held open until after 5 November**. Its being unmerged is the plan, not a gap in it: the artifact the experiment exists to publish is published *after* the experiment ends, so landing it before the freeze would gate nothing and risk something. **Reclassified, not discharged** — the PR is open and still has to land, which is why the row stays. | `gh pr view 435` | D-28 (reclassified) |
 | **F-11** | ⚠ **RECLASSIFIED — in flight, not a documented gate (D-28 row 6).** Mobile is decided (ADR-0045, accepted 2026-09-01) and `docs/plans/MOBILE-1.md` landed 2026-09-03; the implementation **PR is to come**. What D-28 rules here is the classification and not the work: a decision with a plan and a PR coming is a lane in progress, and calling it a go-live gate asserted a dependency the founder does not hold. | `ls docs/plans/MOBILE-1.md`; PR search returns only #467 (the plan) | D-28 (reclassified) |
 | **F-9** | ✅ **DISCHARGED by D-28 row 4.** The pool is **1,070 by decision, not by shortfall** — 1,070 PFPs × numeric suffixes, the seeding PR merged, and D-11's stated size *superseded*. ADR-0011's 50,000 and ADR-0016:161's restatement of it are the figures that lost, not a target the pool is failing to reach. ⚠ **The ruling closes the question; the count is still a fact, so SYNC-11 re-measured it (2026-09-05):** staging **1,070** rows — **520** unassigned, **550** assigned; production **0**. This row read *548 unassigned* when it was written on 2026-09-03: 28 identities consumed in two days, which is live participant signup and not drift. **Production's zero belongs to `F-2`, not here** — the pool is sized; production has no data of any kind yet. | `doppler run --project zugzwang-experiment --config <stg\|prd> -- psql "$DATABASE_URL" -Atc "SELECT count(*), count(*) FILTER (WHERE assigned_at IS NULL) FROM identity_pool"` → stg `1070\|520`, prd `0\|0` | D-28 · SYNC-11 |
