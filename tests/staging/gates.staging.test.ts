@@ -50,6 +50,7 @@ import {
 	isDurableIdempotencyConflict,
 	loadDurableReplay,
 } from "@/server/bets/replay";
+import { BET_MAX_STAKE } from "@/server/config/limits";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 import {
 	checkCorrectedMarketConservation,
@@ -1122,22 +1123,75 @@ describe("gate 5 · magnitudes", () => {
 		).toBe(false);
 	});
 
-	it("G5.7b · the generated set carries four-digit stakes at all", async () => {
-		// The live-data half of the old G5.7, kept as its own criterion under the
-		// name of what it actually checks. Before STAGING-PARITY, `max(stake)` on
-		// staging was 300 and `four_digit_stakes` was 0 — gate 5 had never had a
-		// chance to be true.
-		const [row] = await gatesClient<
-			{ max_stake: string; four_digit: number }[]
-		>`
-			SELECT COALESCE(MAX(stake), 0)::text AS max_stake,
-			       count(*) FILTER (WHERE stake >= 1000)::int AS four_digit
+	it("G5.7b · stakes obey the cap, and a four-digit HOLDING still exists", async () => {
+		// The live-data half of the old G5.7, restated (LIQ-1-FIX-2 H-1).
+		//
+		// It used to assert `count(*) FILTER (WHERE stake >= 1000) > 0` over
+		// `bets`. ADR-0047 pinned BET_MAX_STAKE at 250, and `place.ts` holds the
+		// only `insert(bets)` in the tree — so a four-digit single stake is not
+		// merely absent from the fixtures, it is UNREACHABLE THROUGH THE PRODUCT.
+		// The old criterion was green only because the fixtures exceeded the cap;
+		// a gate that asserts a state the product forbids is a gate that will be
+		// satisfied by fixing the wrong thing.
+		//
+		// What gate 5 is actually for is that the generated set reaches FOUR-DIGIT
+		// MAGNITUDES at all — without them G5.3–G5.6 exercise arithmetic no
+		// participant will ever produce. That magnitude survives the cap; it just
+		// lives one level up, at the HOLDING rather than the single stake. So the
+		// criterion splits in two, and both halves are load-bearing:
+		//
+		//   (a) the cap HOLDS — max(bets.stake) <= BET_MAX_STAKE. This is the
+		//       assertion whose absence let the old fixtures violate the product's
+		//       own limit for the whole of STAGING-PARITY without anything
+		//       reddening (L-6).
+		//   (b) the MAGNITUDE survives — at least one HOLDING carries a four-digit
+		//       basis, ADR-0039's Da, now reached by repeated 250-Đ stakes instead
+		//       of one oversized one.
+		//
+		// ⚠ (b) IS A GROUPED SUM, NOT A ROW PREDICATE, AND THE DIFFERENCE IS THE
+		// WHOLE POINT. Da is `Σ lots.surviving_basis` per (user, market) —
+		// `src/server/lots/basis.ts:13` says so, and ADR-0039 R1 mints ONE lot per
+		// bet, so a lot's basis is a single stake and can never exceed
+		// BET_MAX_STAKE. `count(*) FILTER (WHERE surviving_basis >= 1000)` over
+		// `lots` rows would therefore be UNSATISFIABLE for exactly the reason the
+		// old stake predicate was — the same defect one layer down, wearing the
+		// new column's name. The carrier is P-owner's M7 YES holding: four 250 Đ
+		// lots, never sold, summing to 1000 exactly (fixtures.ts M7-P2a..d).
+		//
+		// (b) is the non-vacuous half and (a) is the one that can now go red for a
+		// real reason. Asserting only (a) would pass perfectly against an empty
+		// table, which is the failure mode gate 5 exists to catch.
+		const [bets] = await gatesClient<{ max_stake: string }[]>`
+			SELECT COALESCE(MAX(stake), 0)::text AS max_stake
 			FROM bets
 		`;
+		const [holdings] = await gatesClient<
+			{ max_basis: string; four_digit: number }[]
+		>`
+			SELECT COALESCE(MAX(basis), 0)::text AS max_basis,
+			       count(*) FILTER (WHERE basis >= 1000)::int AS four_digit
+			FROM (
+				SELECT SUM(surviving_basis) AS basis
+				FROM lots
+				GROUP BY user_id, market_id, side
+			) h
+		`;
 		console.log(
-			`[gate5] G5.7b live bets: max_stake=${row?.max_stake} four_digit_stakes=${row?.four_digit}`,
+			`[gate5] G5.7b live bets: max_stake=${bets?.max_stake} cap=${BET_MAX_STAKE} | ` +
+				`holdings: max_basis=${holdings?.max_basis} four_digit_holdings=${holdings?.four_digit}`,
 		);
-		expect(row?.four_digit ?? 0).toBeGreaterThan(0);
+
+		// (a) — exact decimal comparison, never a JS float (CLAUDE.md §2), and the
+		// cap is READ from the shipped constant so a later re-tune cannot leave
+		// this gate asserting a number the product no longer uses.
+		expect(
+			new CpmmDecimal(bets?.max_stake ?? "0").lte(
+				new CpmmDecimal(BET_MAX_STAKE),
+			),
+		).toBe(true);
+
+		// (b)
+		expect(holdings?.four_digit ?? 0).toBeGreaterThan(0);
 	});
 });
 

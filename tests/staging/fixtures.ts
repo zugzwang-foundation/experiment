@@ -765,7 +765,7 @@ export const POSTS: readonly PostFixture[] = [
 		phase: "main",
 		body: "PLACEHOLDER staging fixture argument opening the winning side of M7. The position it starts is what carries a four-digit realised P/L onto the profile tiles.",
 		serves:
-			"G5.3 positions staked >= 1000 (Đa over the whole episode); G5.6 four-digit lifetime net P/L",
+			"G5.3 positions staked >= 1000 (Đa over the whole episode); G5.6 four-digit lifetime net P/L; G5.7b the four-digit HOLDING — Σ surviving_basis over M7-P2a..d, never sold",
 	},
 	{
 		key: "M7-P2b",
