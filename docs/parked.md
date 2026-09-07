@@ -111,7 +111,45 @@ anything that would need a browser. jsdom performs no layout, so these are
 source scans like every other guard in `tests/unit/design/` — the work is
 volume, not difficulty.
 
-**Source:** `MOBILE-1A_dev-handover_PR-486.md` Block D; PR #486.
+### ⚠ DEEPENED, NOT DISCHARGED, BY MOBILE-1 · JOB A (2026-09-07, ADR-0048 item 3)
+
+Job A appends `max-mobile:flex-col` to `PostFocusHeader.tsx`'s `.hleft` row — the
+focus-mode header Phase A missed. **The trigger above fired and the row is
+updated rather than closed.**
+
+**Census re-run at commit time**, with this section's own command, rather than
+copied from the plan — self-critique #15 exists because writing the number from a
+plan is a claim about a tree nobody re-read:
+
+| Measured 2026-09-07 | Value |
+|---|---|
+| distinct `max-mobile:` tokens shipped in `src/` | **12** — *unchanged*, because Job A mints none |
+| `max-mobile:flex-col` authoring sites in `src/` | **4**, up from 3 |
+| files carrying it | **3** (`DebateView.tsx` ×2, `MarketHeader.tsx`, `PostFocusHeader.tsx`), up from 2 |
+
+**What Job A discharges:** `PostFocusHeader.tsx` alone. Its guard
+(`debate-mobile::the-focus-mode-row-stacks-below-640-and-keeps-the-desktop-row`)
+opens **that file by name**, so its token cannot be deleted and stay green on the
+strength of a string living elsewhere. That is the shape `MarketHeader.tsx:290`
+still lacks.
+
+**What it makes worse, and this is the honest half.** `MarketHeader.tsx:290` was
+already "guarded by coincidence" — `DebateView.tsx` carries the identical string,
+so a scan for the STRING finds it while no test opens the FILE. Job A adds a
+**third** file carrying that same string, and every one of the four sites carries
+the same base `flex min-h-0 flex-1 gap-4`. **So `MarketHeader` now has one more
+file to hide behind, and a token census gets less informative with each addition
+rather than more.** Widening Job A to pin `MarketHeader` was ruled out
+deliberately (OQ-5 — *"the trigger authorises it" is how a two-item job becomes
+three*), so the cost is recorded here and paid later.
+
+**Also unchanged:** `max-mobile:w-full` stays at `MarketMediaPanel.tsx:128`, still
+unguarded. Job A's R1 measurement came back clean, so **no arm token shipped** and
+that token gained no second site — the one place this row could have grown and
+did not.
+
+**Source:** `MOBILE-1A_dev-handover_PR-486.md` Block D; PR #486; deepened by
+MOBILE-1 · Job A (`docs/plans/MOBILE-1-JOB-A.md`, OI-6).
 
 ---
 

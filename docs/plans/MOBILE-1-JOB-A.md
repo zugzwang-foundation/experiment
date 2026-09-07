@@ -234,7 +234,7 @@ effect of a fix.
 
 | # | Failure | Detect | Recover |
 |---|---|---|---|
-| **F-1** | **Stale compiled stylesheet.** A `max-mobile:` utility present in source and in the DOM but absent from the built CSS reproduces the exact before-state, and the measurement is then ambiguous between *"my fix does not work"* and *"my CSS never built"* (AGENTS.md §9; Phase A hit this twice, Phase B reproduced it). | §7's two-part probe: static grep of `.next/static/css/*.css` for the **escaped class selector**, plus the in-page injection probe reading back `flexDirection`. | `just clean` then rebuild. A hard reload and a dev-server restart do **not** clear it. |
+| **F-1** | **Stale compiled stylesheet.** A `max-mobile:` utility present in source and in the DOM but absent from the built CSS reproduces the exact before-state, and the measurement is then ambiguous between *"my fix does not work"* and *"my CSS never built"* (AGENTS.md §9; Phase A hit this twice, Phase B reproduced it). | §7's two-part probe: static grep of **`.next/static/chunks/*.css`** for the **escaped class selector**, plus the in-page injection probe reading back `flexDirection`. ⚠ **Corrected at Phase 2 — this cell said `.next/static/css/*.css`, which does not exist in this build.** | `just clean` then rebuild. A hard reload and a dev-server restart do **not** clear it. |
 | **F-2** | **Document-level probe reports green on item 3 by construction.** `Card`'s base `overflow-hidden` (`ui/card.tsx:16`) clips *inside* the card, so `documentElement.scrollWidth` stays exactly 0. | §7 R1 measures the **clipping ancestor** — `[data-slot="card"]` — and its descendants' `scrollWidth` vs `clientWidth`, never the document. | n/a — this is the design of the check, not a repair path. |
 | **F-3** | **The measurement runs on an un-revealed page.** A CDP-driven tab is `document.hidden`, React 19's `$RC` reveal is rAF-gated, and every box reads `0×0` with no error. | Assert `document.querySelectorAll('div[hidden][id^="S:"]').length` before and after the hand-reveal; assert `stillHidden === 0`; assert a **non-zero box on the element being measured**. | Perform `$RC`'s DOM operation, matching the pending-marker **set** `{"$?", "$~"}` — `$~` alone is what silently revealed nothing at BLOCK-5a. |
 | **F-4** | ⛔ **The inverted guard is inverted wrongly, in the passing direction.** A naive flip to `.toMatch(/\bmobileResponsive\b/)` on the `(auth)` tag **also passes on `mobileResponsive={false}`** — i.e. on a tree where item 1 has been reverted. | §7 asserts both halves: the token is present **and** the tag does not match `mobileResponsive=\{(false\|undefined)\}`. | Fix in-session before PR (§5.10 FAIL). |
@@ -332,8 +332,24 @@ no clipping ancestor): `documentElement.scrollWidth - clientWidth` at 375px on
 
 ```bash
 # static — the escaped selector, in the emitted CSS. Never `640px`, never `coarse`.
-grep -o 'max-mobile\\:[a-zA-Z0-9\\.:_-]*' .next/static/css/*.css | sort -u
+grep -o 'max-mobile\\:[a-zA-Z0-9\\.:_-]*' .next/static/chunks/*.css | sort -u
 ```
+
+⛔ **`chunks/`, NOT `css/` — corrected at Phase 2, and the correction is worth
+more than the path.** This command was written as `.next/static/css/*.css`, a
+directory **Next 16 with Turbopack does not create**: the app stylesheet is
+emitted alongside the JS chunks. So the documented command matched no files and
+printed nothing — **and nothing is exactly what a clean pass looks like on a
+grep.** ⚠ That is the **O-13** shape landing on the one check written to catch
+the failure that shipped Phase A inert twice: an instruction that cannot answer,
+read as the answer. Run it and confirm it returns a **non-empty** list; a silent
+zero here means the path is wrong, not that the utility is absent.
+
+⚠ **The repo already knew.** `scripts/chart-6-contact-sheet.tsx:87` carries the
+identical warning — *"`.next/static/chunks/`, NOT `.next/static/css/`"* — logged
+under **O-3** after the same lookup reported "run pnpm build first" on a tree
+that had just been built. Neither `CLAUDE.md` nor `AGENTS.md` records the path,
+so the knowledge sat in one script and this plan re-derived the bug.
 
 ```js
 // runtime, at 375px — AGENTS.md §9's probe
@@ -453,6 +469,43 @@ Each is named so it can be closed by someone other than this job.
 - **OI-6 · `docs/parked.md`'s MOBILE-1 Block D coverage backlog** is deepened, not
   discharged: `PostFocusHeader.tsx` becomes a third file carrying
   `max-mobile:flex-col` guarded only by a string scan. Recorded in commit 2.
+
+- **OI-7 · Five `src/` passages still state ADR-0045's superseded "gated, not
+  made responsive" position.** ⚠ **This item exists because OQ-6a was ruled on a
+  wrong inventory and has been RE-RULED** (2026-09-07, Phase 2). The original
+  ruling deferred *"the four component prop docblocks"*; the real surface is
+  **seven passages across four files, three of which are not prop docblocks** —
+  so a later job discharging OQ-6a literally would have left three behind. The
+  corrected inventory, measured at Phase 2 and **stated here so nobody re-derives
+  it**:
+
+  | # | Site | Kind | Status |
+  |--:|---|---|---|
+  | 1 | `src/components/onboarding/OnboardingDeck.tsx` — the inline `//` above the `cn()` call | inline comment | ✅ **FIXED in commit 2** |
+  | 2 | `src/components/shell/GlobalHeader.tsx:32` (block `:29-35`) | **component** docblock | deferred |
+  | 3 | `src/components/shell/GlobalHeader.tsx:181,183` (block `:178-187`) | prop docblock | deferred |
+  | 4 | `src/components/shell/RulesControl.tsx:63` (block `:57-66`) | prop docblock | deferred |
+  | 5 | `src/components/onboarding/OnboardingDeck.tsx:59` (block `:53-62`) | **component** docblock | deferred |
+  | 6 | `src/components/onboarding/OnboardingDeck.tsx:107-108` (block `:101-112`) | prop docblock | deferred |
+  | 7 | `BrandCluster.tsx:48-50` · `VisitorCounter.tsx:39-41` | pointer docblocks | **no edit owed** — they say only *"see `GlobalHeader`'s own prop docblock"*, so they state no position and self-correct once #3 lands |
+
+  **Why #1 was fixed and the rest were not.** It sits **directly above the `cn()`
+  call whose `max-mobile:` classes now reach `(auth)` by founder ruling, and it
+  said they must not** — a false record at an operative site, immediately above
+  changed behaviour. That is O-5's exact shape and the same defect ADR-0048 `:88`
+  names one file over. The other five are docblocks describing the mechanism
+  rather than gating it; they are false, but nothing reads them at the moment a
+  class is applied.
+
+  ⛔ **Every one of the five asserts something the tree now contradicts** —
+  *"`(auth)/layout.tsx` passes nothing"*, *"renders BYTE-IDENTICAL to before this
+  task"*, *"stays governed by §1.7 as originally written"*. **Do not repair them
+  by deleting the `mobileResponsive` prop**: ADR-0048 `:84` weighs that (path
+  (ii)) and rejects it, and the `= false` default still protects a future third
+  mount. The repair is to restate which mounts opt in, not to remove the gate.
+  ⚠ `AGENTS.md:375` stated the same superseded position and **was** fixed in
+  commit 2 — no ruling covered it, and it loads in full every session.
+  **Owner: separate job.**
 
 ## ADRs needed
 
