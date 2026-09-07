@@ -4,12 +4,16 @@ import { and, eq } from "drizzle-orm";
 import { revalidateTag } from "next/cache";
 import { v7 as uuidv7 } from "uuid";
 
-import { markets, pools } from "@/db/schema";
+import { markets, pools, systemState } from "@/db/schema";
 import { assertAdminActor } from "@/server/admin/actor";
 import { openingReserves } from "@/server/cpmm/calculate";
 import { insertEvent } from "@/server/events/insert";
 
-import { MarketDeadlineInPastError, MarketSeedInvalidError } from "./errors";
+import {
+	MarketDeadlineInPastError,
+	MarketFrozenError,
+	MarketSeedInvalidError,
+} from "./errors";
 import {
 	type LifecycleEventMetadata,
 	runLifecycleTransaction,
@@ -136,6 +140,33 @@ export async function openMarket(args: {
 			if (args.now.getTime() >= market.resolutionDeadline.getTime()) {
 				throw new MarketDeadlineInPastError(
 					`market deadline ${market.resolutionDeadline.toISOString()} is not after now ${args.now.toISOString()} (D-14.c)`,
+				);
+			}
+
+			// THE FREEZE GATE (SPEC.1 §12; `docs/parked.md` LIQ-1 L-4). Post-freeze
+			// the experiment is read-only, and opening a market is the most
+			// clearly-new thing this surface can do.
+			//
+			// ⛔ READ `system_state` ON `tx`, NEVER VIA `isFrozen()`. That helper's
+			// own docblock says why: it is a plain, NON-LOCKING read that opens its
+			// own connection off the top-level `db`, so calling it here would read
+			// OUTSIDE the W-4 lock — it could see a freeze that this transaction's
+			// snapshot does not, or miss one it should. It is the same objection
+			// `requireMarketDiscards` records for taking an explicit client, and
+			// the reason both take one.
+			//
+			// Placed AFTER the markets lock so the check and the write see one
+			// world, and BEFORE the pools INSERT so a refusal writes nothing at
+			// all — no pool row, no status flip, no event. The transaction would
+			// roll all three back anyway; ordering it here means the cheapest
+			// refusal is also the earliest.
+			const frozen = await tx
+				.select({ frozenAt: systemState.frozenAt })
+				.from(systemState)
+				.limit(1);
+			if (frozen[0]?.frozenAt != null) {
+				throw new MarketFrozenError(
+					`openMarket: refusing to open ${args.marketId} — the conclusion freeze is set (frozen_at ${frozen[0].frozenAt.toISOString()}). Recovery is BREAK_GLASS.md only.`,
 				);
 			}
 

@@ -354,11 +354,19 @@ export function computeSell({
  * three `tests/unit/cpmm/` files pin it, including the §12 worked vectors. But
  * it is the obviously-named function for a job it no longer does, so a future
  * caller reaching for it by name would silently under-pay every asymmetric NO
- * outcome. Flagged by `@code-reviewer` MEDIUM-3; its fate is a Phase-2 decision
- * alongside the §8.1 amendment, not an edit to make here.
+ * outcome. Flagged by `@code-reviewer` MEDIUM-3; RULED at Phase 2 — deleting it
+ * would break the §12 vector pins, which are worth more than the name is.
  *
  * Both reserves are validated (§3.4: y, n > 0 always). The void residual is a
  * ledger identity (§8.2) — no curve function exists for it.
+ *
+ * @deprecated Superseded as the resolved unwind by ADR-0047 §E. The tag is the
+ * whole point of the Phase-2 decision: everything above was already true and
+ * already written down, and a docblock is only read by someone who has already
+ * decided to open the file. `@deprecated` says it at the CALL SITE, in the
+ * editor, to the one person who has not read any of this — which is exactly the
+ * reader who would reach for it by name. Use `settleMarket`'s residual, which is
+ * the winning reserve plus that side's cumulative discard.
  */
 export function computeResolvedUnwind({
 	reserves,

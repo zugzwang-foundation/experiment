@@ -66,6 +66,26 @@ export class MarketSeedInvalidError extends Error {
 	}
 }
 
+/**
+ * `openMarket` refused because the conclusion freeze is set (SPEC.1 §12,
+ * `system_state.frozen_at`; `docs/parked.md` LIQ-1 L-4, ruled at Phase 2).
+ *
+ * ⚠ SCOPE IS `openMarket` ALONE, and the narrowness is the ruling rather than
+ * an omission. The RESOLUTION flows are deliberately exempt and tested as such
+ * (`tests/server/resolution/freeze-exemption.test.ts`): a market already in
+ * flight must be able to FINISH after the freeze, or the freeze strands money
+ * in a pool nobody can settle. What must not happen post-freeze is something
+ * NEW starting. `createMarket` and `closeMarket` were not ruled on and are left
+ * alone — closing is the same "let it finish" argument, and widening a ruling
+ * to the cases it did not name is how a scoped decision becomes an unscoped one.
+ */
+export class MarketFrozenError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "MarketFrozenError";
+	}
+}
+
 export class MarketLifecycleStateError extends Error {
 	constructor(message: string) {
 		super(message);
