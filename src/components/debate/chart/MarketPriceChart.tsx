@@ -225,6 +225,16 @@ export function MarketPriceChart({
 	// property read per render and cannot vary with the data.
 	const grid = gridlinesFor(mode);
 
+	// ⛔ THE X AXIS'S DATES, RESOLVED ONCE AND SPENT TWICE (CHART-8). The row
+	// itself needs the list, and the FRAME needs to know whether there is a row at
+	// all, because the strip the row now occupies is space the frame has to leave
+	// beneath the plot. Those are two consumers of one question — "is there an
+	// axis?" — and this component has already paid once for answering it twice: the
+	// clamp's band prop called `drawsTimeAxis` where the row called `axisDatesFor`,
+	// so under a window containing no anchor the clamp reserved a band beneath a
+	// row that did not exist. Computed here, passed down, never re-derived.
+	const axisDates = axisDatesFor(mode, series, startMs, endMs);
+
 	return (
 		/* ⛔ THE LABELS ARE HTML AND NOT SVG `<text>`, AND THAT IS THE HALF OF THE
 		   CHART-2 FIX THAT SURVIVES (`C-CHART-2` clause 2). A `<text>` inside the
@@ -269,6 +279,32 @@ export function MarketPriceChart({
 				mode === "expanded"
 					? "flex w-full items-stretch"
 					: "flex h-full w-full items-stretch"
+			}
+			/* ⛔ THE DATE STRIP'S ROOM, AND IT IS TAKEN FROM THE FRAME RATHER THAN
+			   FROM ANY CELL (CHART-8). The row moved OUT of the plot and beneath it,
+			   so the space it occupies has to come from somewhere; taking it here —
+			   on the flex CONTAINER — is the one place that leaves the row's three
+			   in-flow cells exactly as tall as each other. `items-stretch` sizes
+			   every cell to the container's CONTENT box, so a padding here shortens
+			   the plot, the marks column and the reserve by the same amount, in the
+			   same layout pass, with nothing to keep in step by hand.
+			   ⚠ THE ALTERNATIVES BOTH BREAK THE ALIGNMENT CHAIN, and saying which is
+			   the point. Making the plot CELL a column (plot above, strip below)
+			   grows that cell by the band while the marks column stretches to the
+			   taller line, so every `top: X%` mark drifts off its own gridline by up
+			   to 16px — the exact failure `alignment-chain.test.tsx` link 1 exists to
+			   catch. Adding the strip as a fourth in-flow cell puts it in the ROW,
+			   where it would take WIDTH from the plot instead of height beneath it.
+			   ⛔ AND IT IS CONDITIONAL FOR THE REASON THE OLD BAND PROP WAS: reserving
+			   a strip under a row that is not drawn moves the plot's floor for a
+			   reason no reader could see. Same list, same gate, one answer.
+			   ⚠ INLINE, NOT `pb-[16px]`. The band is COMPOSED from the row's own type
+			   and offset, so a class literal here would be a threshold chosen against
+			   one date size — the CHART-2 defect this file records twice. */
+			style={
+				axisDates.length > 0
+					? { paddingBottom: `${AXIS_DATE_BAND_PX}px` }
+					: undefined
 			}
 		>
 			{grid.length > 0 && <YMarks marks={grid} />}
@@ -520,39 +556,24 @@ export function MarketPriceChart({
 				    gutter is an x anchored to the plot's right EDGE — which is where
 				    the dot sits only on a market that has traded to the window end. */}
 				{terminalYes !== null && (
-					<TerminalLabels
-						yes={terminalYes}
-						mode={mode}
-						terminalX={terminalX}
-						// ⛔ THE SAME EXPRESSION `AxisDates` GATES ON, NOT A COARSER ONE.
-						// This read `drawsTimeAxis(...)`, which answers "may this mode draw
-						// an axis" — while the ROW additionally requires an anchor inside
-						// the window. Under a window containing none, `drawsTimeAxis` is
-						// still true, so the clamp reserved a band beneath a row that does
-						// not exist: the very case this prop's own docblock says it avoids.
-						// `drawsTimeAxis`'s docblock names the rule that leaked — "the two
-						// halves of one axis must not be able to disagree" — and the band is
-						// a THIRD consumer of that question. Caught by `@code-reviewer`.
-						bandPx={
-							axisDatesFor(mode, series, startMs, endMs).length > 0
-								? AXIS_DATE_BAND_PX
-								: 0
-						}
-					/>
+					<TerminalLabels yes={terminalYes} mode={mode} terminalX={terminalX} />
 				)}
-				{/* ⛔ INSIDE THE PLOT BOX FOR `TerminalLabels`' REASON EXACTLY (CHART-7).
-				    A date label's x is a position in the plot's own domain, so it has to
-				    resolve against the same rectangle `preserveAspectRatio="none"`
-				    stretches the viewBox onto — which is this box and not a strip
-				    beneath it. `labelLeftPct` is CHART-6's own conversion, reused rather
-				    than re-derived, so the date and the tick it names cannot come to
-				    disagree about where that x is. */}
-				<AxisDates
-					mode={mode}
-					series={series}
-					startMs={startMs}
-					endMs={endMs}
-				/>
+				{/* ⛔ STILL A CHILD OF THE PLOT, AND NO LONGER *IN* IT (CHART-8). The
+				    row hangs off the plot's bottom edge — `top-full` — so its box begins
+				    where the drawing area ends and no label can sit over the 0 gridline
+				    any more. ⚠ IT REMAINS THE PLOT'S CHILD ON PURPOSE, and this is the
+				    half that looks wrong and is not: a date label's x is a position in
+				    the plot's own domain, so it has to resolve against the same
+				    rectangle `preserveAspectRatio="none"` stretches the viewBox onto.
+				    Moving the element to a strip BESIDE the row would give it a
+				    different width — the frame's, marks column included — and every
+				    `labelLeftPct` percentage would silently mean something else. So the
+				    containing block stays the plot and only the vertical offset moves,
+				    which is exactly the scope this change is allowed: horizontal
+				    anchoring is byte-identical, `labelLeftPct` is untouched, and the
+				    date still cannot disagree with the tick it names.
+				    ⚠ THE LIST IS PASSED, NOT RECOMPUTED — see `axisDates` above. */}
+				<AxisDates dates={axisDates} />
 			</div>
 			<LabelReserve mode={mode} />
 		</div>
@@ -683,7 +704,6 @@ function TerminalLabels({
 	yes,
 	mode,
 	terminalX,
-	bandPx,
 }: {
 	yes: string;
 	mode: ChartMode;
@@ -694,14 +714,6 @@ function TerminalLabels({
 	 * only plausible default is `VIEWBOX_W`, which is the pre-CHART-6 defect
 	 * spelled out as a value. */
 	terminalX: number;
-	/** The height of the X-axis date row, in CSS px, or `0` on a render that draws
-	 * no axis — `C-CHART-2` clause 3's reserved band (RF-5).
-	 * ⛔ PASSED, NEVER RE-DERIVED. Whether an axis is drawn depends on the mode AND
-	 * the series, which this component does not see; computing it here would mean a
-	 * second copy of `drawsTimeAxis`'s per-mode gates, and two copies of a gate are
-	 * two answers to "is there a date row?" — one held by the row and one by the
-	 * clamp meant to clear it. */
-	bandPx: number;
 }): React.JSX.Element {
 	const labelY = terminalLabelYs(yes);
 	// Which of the two clause-4 already put on top. Read off its OUTPUT rather
@@ -790,9 +802,7 @@ function TerminalLabels({
 				}`}
 				style={{
 					left,
-					top: yesOnTop
-						? lowerTop(lowerPct, half, bandPx)
-						: upperTop(upperPct, half),
+					top: yesOnTop ? lowerTop(lowerPct, half) : upperTop(upperPct, half),
 				}}
 			>
 				<LabelParts
@@ -810,9 +820,7 @@ function TerminalLabels({
 				}`}
 				style={{
 					left,
-					top: yesOnTop
-						? upperTop(upperPct, half)
-						: lowerTop(lowerPct, half, bandPx),
+					top: yesOnTop ? upperTop(upperPct, half) : lowerTop(lowerPct, half),
 				}}
 			>
 				<LabelParts
@@ -1351,30 +1359,35 @@ function upperTop(pct: number, half: number): string {
 }
 
 /**
- * ⛔ THE THIRD TERM IS THE DATE ROW, AND IT IS ONE MORE MEASURED INPUT TO THIS
- * CLAMP RATHER THAN A SECOND RULE (`C-CHART-2` clause 3, RF-5). The bottom bound
- * was `100% - half`, which keeps the label's box inside the PLOT; the plot's floor
- * is also where the X-axis dates sit, so at the window end with an extreme price
- * the lower label came to rest exactly on top of its own date label. Measured at
- * CHART-6 and reproduced on this branch before the change: **19.99 × 16.00 px** on
- * the expanded overlay, **4.54 × 7.70 px** on the collapsed card.
+ * The lower label's `top` — `upperTop`'s mirror, and NOTHING ELSE SINCE CHART-8.
  *
- * ⚠ IT NEEDS BOTH CONDITIONS AT ONCE — a series reaching the window end AND a
- * price at an extreme — which is why it is invisible today and is what every
- * market looks like on 2026-11-05.
+ * ⛔ IT CARRIED A THIRD TERM AND THE TERM IS REMOVED RATHER THAN ZEROED, because
+ * the thing it protected against is no longer reachable. RF-5 added
+ * `- AXIS_DATE_BAND_PX` to the bottom bound because the plot's floor was also
+ * where the X-axis dates sat, so at the window end with an extreme price the lower
+ * label came to rest exactly on top of its own date label — measured at CHART-6 at
+ * **19.99 × 16.00 px** on the expanded overlay and **4.54 × 7.70 px** on the card.
+ * **CHART-8 moves the date row out of the plot entirely**, to a strip beneath the
+ * baseline, so the two elements no longer share a rectangle and there is no
+ * overlap left for a clamp term to prevent.
  *
- * ⛔ THE BAND IS COMPOSED, NOT WRITTEN DOWN. `AXIS_DATE_BAND_PX` is
- * `AXIS_DATE_PX + AXIS_DATE_BOTTOM_PX` — the row's own type plus its own offset —
- * so changing either moves the clamp with it. A literal here would be a threshold
- * chosen against one date size, which is the CHART-2 defect this file records
- * twice.
+ * ⚠ THE CLAUSE THIS DISCHARGES IS `C-CHART-2` CLAUSE 3, and it is a DISCHARGE
+ * rather than a repeal: the clause's rule — "one clamp, one more measured input,
+ * never a second rule" — was right, and what changed is that the input became
+ * zero for every render. **A clamp term that can only ever subtract nothing is a
+ * term a later reader has to reason about for no return**, and keeping it as a
+ * literal `0` would leave the file asserting a collision surface it no longer has.
+ * The band constant itself is NOT deleted: the frame still spends it to leave the
+ * strip its room, so the row's height is still composed from the row's own type
+ * and offset, in one place.
  *
- * ⚠ AND IT IS `0` ON A RENDER THAT DRAWS NO AXIS, passed in rather than assumed.
- * Reserving a band under a row that is not there would push the lower label up on
- * a degenerate market for no reason a reader could see.
+ * ⚠ WHAT SURVIVES IS BOTH PLOT-EDGE TERMS, UNCHANGED — the `half`px floor and the
+ * `100% - half` ceiling that keep the label's box inside the plot, and the
+ * `50% + half` pivot that is clause 4's collision floor. This function's shape is
+ * otherwise byte-identical to what CHART-7 shipped.
  */
-function lowerTop(pct: number, half: number, bandPx: number): string {
-	return `clamp(${half}px, max(${pct}%, calc(50% + ${half}px)), calc(100% - ${half}px - ${bandPx}px))`;
+function lowerTop(pct: number, half: number): string {
+	return `clamp(${half}px, max(${pct}%, calc(50% + ${half}px)), calc(100% - ${half}px))`;
 }
 
 /**
@@ -1584,8 +1597,15 @@ function drawnAnchors(
 }
 
 /**
- * The X axis's date labels — HTML text layered over the plot, outside the `<svg>`
- * (CHART-7, RF-3).
+ * The X axis's date labels — HTML text in a strip BENEATH the plot, outside the
+ * `<svg>` (CHART-7 took them out of the viewBox; CHART-8 took them out of the
+ * drawing area).
+ *
+ * ⚠ THIS SENTENCE READ "layered over the plot" AND THAT IS EXACTLY WHAT CHART-8
+ * ENDED. The row was an `inset-0` overlay on the plot box, so three dates sat
+ * inside the drawing area, above the 0 gridline, sharing a rectangle with the two
+ * price lines and with the end labels the clamp had to hold clear of them. It is a
+ * `top-full` strip below the baseline now, and the frame leaves it the room.
  *
  * ⛔ THEY WERE THE LAST TEXT INSIDE THE STRETCHED VIEWBOX, AND THAT IS THE WHOLE
  * REASON THEY MOVED. `C-CHART-2` clause 2 sent `YES`/`NO` out at CHART-2 because
@@ -1611,22 +1631,21 @@ function drawnAnchors(
  * Inside the `aria-hidden` `<svg>` these strings were excluded from every
  * accessible name; out here they are ordinary HTML inside the collapsed card's
  * `<button>`, so they would JOIN its accessible name and read three bare dates in
- * front of the sentence that IS the readout. And this layer covers the plot,
- * which on that card and on the hero IS the affordance, so without
- * `pointer-events-none` it would swallow clicks.
+ * front of the sentence that IS the readout.
+ * ⚠ THE CLICK HALF OF THAT REASON NARROWED AT CHART-8 AND STILL HOLDS, which is
+ * why the attribute stays. It used to be that this layer COVERED the plot — the
+ * affordance itself on the card and the hero — so a bare 12px word would swallow
+ * a click anywhere on the graph. The layer is a 16px strip beneath the plot now,
+ * so the surface at risk is smaller; it is still inside the same `<button>` and
+ * the same `<Link>`, and a dead 39px-wide patch on a control is a defect at any
+ * size. Corrected rather than deleted: an attribute kept for a reason that has
+ * stopped being true is the next reader's licence to remove it.
  */
 function AxisDates({
-	mode,
-	series,
-	startMs,
-	endMs,
+	dates,
 }: {
-	mode: ChartMode;
-	series: PricePoint[];
-	startMs: number;
-	endMs: number;
+	dates: readonly AxisDate[];
 }): React.JSX.Element | null {
-	const dates = axisDatesFor(mode, series, startMs, endMs);
 	if (dates.length === 0) {
 		return null;
 	}
@@ -1634,8 +1653,30 @@ function AxisDates({
 		<div
 			data-testid="axis-date-row"
 			aria-hidden="true"
-			className="pointer-events-none absolute inset-0 leading-none text-n5 tabular-nums"
-			style={{ fontSize: `${AXIS_DATE_PX}px` }}
+			/* ⛔ `top-full`, AND IT IS THE WHOLE OF CHART-8 (`C-CHART-2` clause 3 as
+			   amended). This was `inset-0` — the plot's own rectangle — so the labels
+			   sat INSIDE the drawing area, above the 0 gridline, in the same box as
+			   the lines they annotate. `top-full` puts the strip's top edge exactly on
+			   the plot's bottom edge, which is where `y = VIEWBOX_H` renders and
+			   therefore where the 0 gridline is: no label can be over the plot any
+			   more, at any mode or width, because the strip does not begin until the
+			   plot ends.
+			   ⚠ `inset-x-0` AND NOT `inset-0`, and the asymmetry is the point. The
+			   HORIZONTAL half must still be the plot's own width — that is what makes
+			   `labelLeftPct` mean the same thing it means for the terminal dots, and
+			   the reason this element stays a child of the plot rather than becoming a
+			   sibling row beneath it. Only the vertical binding is severed.
+			   ⚠ THE HEIGHT IS DECLARED because an absolutely-positioned box with no
+			   bottom inset sizes to its content, and the content is two or three
+			   absolutely-positioned spans — i.e. nothing. The frame reserves exactly
+			   this many pixels beneath the plot, so the strip and the room made for it
+			   are the same composed constant rather than two numbers that agree
+			   today. */
+			className="pointer-events-none absolute inset-x-0 top-full leading-none text-n5 tabular-nums"
+			style={{
+				height: `${AXIS_DATE_BAND_PX}px`,
+				fontSize: `${AXIS_DATE_PX}px`,
+			}}
 		>
 			{dates.map((d) => (
 				<span
@@ -1649,9 +1690,22 @@ function AxisDates({
 								? " -translate-x-1/2"
 								: ""
 					}`}
+					/* ⚠ `top`, WHERE IT WAS `bottom`, AND THE CONSTANT DID NOT CHANGE.
+					   `AXIS_DATE_BOTTOM_PX` is the row's offset from the plot's floor;
+					   the floor used to be BELOW the type and is now ABOVE it, so the
+					   same 4px is measured from the same edge in the other direction.
+					   Expressed as `bottom` inside this strip it would be the air under
+					   the dates instead of the air over them — the same number saying
+					   something else.
+					   ⛔ THE `left` IS UNTOUCHED, DELIBERATELY AND UNDER INSTRUCTION.
+					   `labelLeftPct` resolves against `inset-x-0`, which is still the
+					   plot's width, so every date sits at exactly the x it sat at
+					   before this change — including on staging, where the calendar
+					   anchors fall inside the plot rather than on its edges because the
+					   staging window is deliberately wider than the experiment. */
 					style={{
 						left: `${labelLeftPct(d.x)}%`,
-						bottom: `${AXIS_DATE_BOTTOM_PX}px`,
+						top: `${AXIS_DATE_BOTTOM_PX}px`,
 					}}
 				>
 					{fmtUtcDay(d.at)}
@@ -1675,20 +1729,35 @@ function AxisDates({
  * for — and the expanded overlay's come DOWN from 16.00, which is not a
  * regression but the removal of a distortion nobody chose.
  *
- * ⚠ `AXIS_DATE_BOTTOM_PX` IS THE ROW'S OWN OFFSET FROM THE PLOT'S FLOOR, and it
- * is load-bearing beyond spacing: `lowerTop` reserves `AXIS_DATE_PX +
- * AXIS_DATE_BOTTOM_PX` as a band the lower end label may not enter, so this pair
- * is the measured input to `C-CHART-2` clause 3's date-row clearance. Change
- * either and the clamp follows, because the band is composed from them rather
- * than written down a second time.
+ * ⚠ `AXIS_DATE_BOTTOM_PX` IS THE ROW'S OWN OFFSET FROM THE PLOT'S FLOOR, and
+ * CHART-8 moved which SIDE of the floor it falls on without changing the number.
+ * It used to be the air between the dates and the plot's bottom edge with the
+ * dates ABOVE that edge; the dates are below it now, so it is the air between the
+ * edge and the top of the type. Same quantity, same edge, other direction —
+ * which is why the name still reads correctly and the value did not move.
+ *
+ * ⚠ AND IT IS STILL LOAD-BEARING BEYOND SPACING, for a different consumer. The
+ * pair composes `AXIS_DATE_BAND_PX`, which used to be the band `lowerTop` kept
+ * the lower end label out of; that term is gone with the overlap it prevented,
+ * and the band is now the room the FRAME leaves beneath the plot for the strip to
+ * occupy. Change either constant and the strip and its room still move together,
+ * because they are still composed rather than written down twice.
  */
 const AXIS_DATE_PX = 12;
 const AXIS_DATE_BOTTOM_PX = 4;
 
-/** The whole height the date row occupies above the plot's floor — the band
- * `lowerTop` may not put a label into (`C-CHART-2` clause 3, RF-5). Composed from
- * the two constants above rather than written as a third number, so the clamp and
- * the row can never disagree about how tall the row is. */
+/** The whole height the date row occupies BELOW the plot's floor (CHART-8) — the
+ * strip's own height, and the padding the frame leaves beneath the plot so that
+ * strip has somewhere to be. Composed from the two constants above rather than
+ * written as a third number, so the row and the room made for it can never
+ * disagree about how tall the row is.
+ *
+ * ⚠ IT READ "above the plot's floor" AND NAMED `lowerTop` AS ITS CONSUMER, both
+ * true until CHART-8 and neither true now. The row is beneath the floor, and the
+ * clamp that used to subtract this no longer has a collision to prevent — see
+ * `lowerTop`. Corrected in place rather than annotated, because a constant whose
+ * docblock names a caller it no longer has is how the next reader "restores" a
+ * term that was deliberately removed. */
 const AXIS_DATE_BAND_PX = AXIS_DATE_PX + AXIS_DATE_BOTTOM_PX;
 
 /** An SVG `points` string for one line. With fewer than two points OR a

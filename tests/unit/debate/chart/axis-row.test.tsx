@@ -164,15 +164,23 @@ describe("debate-view::price-chart-axis-date-sits-on-its-own-tick — RF-3/RF-4"
 		});
 
 		it(`${mode}: the row declares \`leading-none\`, which is what makes its band term true`, () => {
-			// ⛔ `AXIS_DATE_BAND_PX` = `AXIS_DATE_PX + AXIS_DATE_BOTTOM_PX`, and
-			// `lowerTop` subtracts it so the lower end label stops exactly at the row's
-			// top edge. Evaluated as CSS at every shipped plot height, that clearance
-			// is **0.00 px** — the label's bottom edge lands ON the row, by
-			// construction. So the band is only correct while the row's rendered box
-			// IS `AXIS_DATE_PX`, and an inline `font-size` does not reset the inherited
+			// ⛔ `AXIS_DATE_BAND_PX` = `AXIS_DATE_PX + AXIS_DATE_BOTTOM_PX`, and the
+			// FRAME reserves exactly that many pixels beneath the plot for this row to
+			// sit in (CHART-8). So the band is only the row's real height while its
+			// line-height is 1, and an inline `font-size` does not reset the inherited
 			// line-height (AGENTS.md §8). Without `leading-none` the row is taller than
-			// the band reserves and the CHART-6 overlap RF-5 closed re-opens, with no
-			// margin to absorb it.
+			// the room made for it and the dates spill past the frame — over the
+			// collapsed card's padding, and outside the hero's bordered box.
+			//
+			// ⚠ THE CONSUMER NAMED HERE CHANGED AT CHART-8 AND THE ASSERTION DID NOT.
+			// This paragraph read that `lowerTop` subtracts the band "so the lower end
+			// label stops exactly at the row's top edge", with a measured clearance of
+			// **0.00 px** — true while the row was an `inset-0` overlay INSIDE the
+			// plot, and the reason RF-5 added the term. CHART-8 moves the row below the
+			// baseline, so the end label and the dates no longer share a rectangle and
+			// the clamp term is gone (see `lowerTop`). Corrected rather than left
+			// standing: a case whose stated reason names a mechanism that no longer
+			// exists is one a later reader deletes along with the mechanism.
 			const root = dom(markup(mode));
 			const row = root.querySelector('[data-testid="axis-date-row"]');
 			expect(row, `${mode}: no date row`).not.toBeNull();

@@ -493,86 +493,148 @@ describe("debate-view::price-chart-label-clears-date-row — RF-5, the right res
 		).toBeNull();
 	});
 
-	it("the lower label is clamped clear of the DATE ROW, and only where a row is drawn", () => {
-		// ⛔ THE CHART-6 OVERLAP, CLOSED. At the window end with an extreme price the
-		// lower label came to rest on its own date label — measured 19.99 × 16.00 px
-		// on the overlay and 4.54 × 7.70 px on the card, on this branch, before the
-		// change. The repair is ONE MORE TERM in the clamp that already holds the
-		// label inside the plot, never a second rule (`C-CHART-2` clause 3).
-		const lowerTopOf = (
-			mode: "collapsed" | "expanded" | "hero",
-			yes: string,
-		) => {
-			const html = renderToStaticMarkup(
-				<MarketPriceChart
-					series={seriesEndingAtFraction(1, yes)}
-					mode={mode}
-					isOpen={true}
-				/>,
-			);
-			// The LOWER label is whichever carries the `max(` arm — read off the
-			// markup rather than assumed from the price, so clause 4's tie-break stays
-			// clause 4's.
-			// The LOWER label is whichever carries the `max(` arm, found by scanning
-			// every `top:` in the markup rather than by a single nested-paren regex —
-			// `clamp(… max(… calc(…)))` nests three deep and a lazy match stops at the
-			// first close-paren, returning a truncated string that then fails to match
-			// anything downstream. Read the whole declaration, then pick.
-			return (
-				[...html.matchAll(/top:([^";]*)/g)]
-					.map((m) => m[1])
-					.find((t) => t.includes("max(")) ?? ""
-			);
-		};
+	it("the lower label's clamp carries the plot's edges ONLY — CHART-8 removed the band", () => {
+		// ⛔ THE CASE THIS REPLACES ASSERTED THE OPPOSITE, AND IT WAS RIGHT WHEN IT
+		// WAS WRITTEN. RF-5 gave `lowerTop` a third term — `- AXIS_DATE_BAND_PX` —
+		// because the X-axis dates sat INSIDE the plot, on its floor, so at the
+		// window end with an extreme price the lower end label came to rest on top of
+		// its own date label: measured at CHART-6 at 19.99 × 16.00 px on the overlay
+		// and 4.54 × 7.70 px on the card. CHART-8 moves the date row out of the plot
+		// to a strip beneath the baseline, so the two no longer share a rectangle and
+		// there is no overlap left for a clamp term to prevent.
+		//
+		// ⇒ The rule `C-CHART-2` clause 3 states is DISCHARGED, not repealed: "one
+		// clamp, one more measured input, never a second rule" was correct, and what
+		// changed is that the input is zero for every render. This case pins that the
+		// term is GONE rather than zeroed, because a `- 0px` left in the string is a
+		// collision surface the file would still be claiming to have.
+		const BAND_TERM = /calc\(100% - [\d.]+px - [\d.]+px\)/;
+		const ceilOf = (t: string) => t.match(/calc\(100% - ([\d.]+)px\)/)?.[1];
 
 		for (const mode of MODES) {
-			const top = lowerTopOf(mode, "0.960000000000000000");
-			expect(top, `${mode}: no lower label found`).not.toBe("");
-			// The bottom bound carries BOTH terms: half the label's own box, and the
-			// date row's height.
-			expect(top).toMatch(/calc\(100% - \d+(?:\.\d+)?px - \d+px\)/);
-			const band = Number(top.match(/calc\(100% - [\d.]+px - (\d+)px\)/)?.[1]);
-			expect(band, `${mode}: the band is not a number`).toBeGreaterThan(0);
-			// ⚠ COMPOSED FROM THE ROW'S OWN TYPE AND OFFSET, not written down twice.
-			// Read the row's declared size out of the same markup so a change to
-			// either moves both.
-			const html = renderToStaticMarkup(
-				<MarketPriceChart
-					series={seriesEndingAtFraction(1, "0.960000000000000000")}
-					mode={mode}
-					isOpen={true}
-				/>,
+			const container = markup(
+				seriesEndingAtFraction(1, "0.960000000000000000"),
+				mode,
 			);
-			const rowPx = Number(
-				html.match(/axis-date-row"[^>]*style="[^"]*font-size:(\d+)px/)?.[1],
+			// The row IS drawn here — the case only means something where the band
+			// used to be non-zero.
+			expect(
+				container.querySelector('[data-testid="axis-date-row"]'),
+				`${mode}: no date row, so this case proves nothing`,
+			).not.toBeNull();
+
+			const tops = [
+				...container.querySelectorAll('[data-testid^="terminal-label-"]'),
+			].map((el) => el.getAttribute("style")?.match(/top:([^;]*)/)?.[1] ?? "");
+			const lower = tops.find((t) => t.includes("max(")) ?? "";
+			const upper = tops.find((t) => t.includes("min(")) ?? "";
+			expect(lower, `${mode}: no lower label`).not.toBe("");
+			expect(upper, `${mode}: no upper label`).not.toBe("");
+
+			expect(lower, `${mode}: the band term is back`).not.toMatch(BAND_TERM);
+			// The positive half: both labels now stop at the same distance from their
+			// own plot edge. Read from the two strings, never mirrored as a literal.
+			expect(ceilOf(lower), `${mode}: no plot-edge ceiling`).toBeDefined();
+			expect(ceilOf(lower)).toBe(ceilOf(upper));
+
+			// POSITIVE CONTROL — the matcher fires on THIS run's own string with the
+			// removed term spliced back in, so the absence above is a reading.
+			const reintroduced = lower.replace(
+				/calc\(100% - ([\d.]+)px\)/,
+				"calc(100% - $1px - 16px)",
 			);
-			expect(rowPx, `${mode}: the date row declares no size`).toBeGreaterThan(
-				0,
-			);
-			expect(band).toBeGreaterThan(rowPx);
+			expect(reintroduced).not.toBe(lower);
+			expect(reintroduced).toMatch(BAND_TERM);
 		}
 	});
 
-	it("reserves NO band on a render that draws no date row", () => {
-		// ⚠ THE ARM THAT MAKES THE BAND HONEST. A band reserved under a row that is
-		// not there pushes the lower label up for a reason no reader can see. The
-		// collapsed card draws no axis below two points — its shipped gate since
-		// HTML-FINISH R8 — so that is the case to check.
-		const html = renderToStaticMarkup(
-			<MarketPriceChart
-				series={[
-					{ at: MARKET_CHART_WINDOW_START, yes: "0.960000000000000000" },
-				]}
-				mode="collapsed"
-				isOpen={true}
-			/>,
+	it("the date row hangs BELOW the plot, and the frame leaves it exactly its own height", () => {
+		// ⛔⛔ THE STRUCTURAL HALF OF CHART-8, AND THE HALF A UNIT TEST CAN ACTUALLY
+		// SEE. jsdom performs no layout, so "the label's top edge is at or below the
+		// 0 gridline" is a browser measurement and lives in the run report. What is
+		// checkable here is the mechanism that makes it true, and it is two claims:
+		// the row is anchored to the plot's BOTTOM EDGE rather than filling the plot,
+		// and the frame reserves exactly the strip's own height beneath it.
+		//
+		// ⚠ THE SECOND CLAIM IS THE ONE WITH TEETH. `top-full` alone would hang the
+		// dates outside the frame — over the card's padding, and outside the hero's
+		// bordered box — which looks like an overflow bug rather than an axis. The
+		// room and the strip are the SAME composed constant, so a change to the date
+		// type or its offset moves both; asserting them as two numbers read from two
+		// elements is what proves they have not drifted apart.
+		for (const mode of MODES) {
+			const container = markup(seriesEndingAtFraction(0.6), mode);
+			const row = container.querySelector('[data-testid="axis-date-row"]');
+			expect(row, `${mode}: no date row`).not.toBeNull();
+			const cls = (row?.getAttribute("class") ?? "").split(/\s+/);
+
+			// ⛔ `top-full` PUTS THE STRIP'S TOP EDGE ON THE PLOT'S BOTTOM EDGE, which
+			// is where `y = VIEWBOX_H` renders and therefore where the 0 gridline is.
+			expect(
+				cls,
+				`${mode}: the row is not anchored to the plot's floor`,
+			).toContain("top-full");
+			// ⛔ AND `inset-0` IS THE THING IT MUST NOT BE — that was the shipped
+			// arrangement, and it is what put the dates inside the drawing area.
+			expect(cls, `${mode}: the row still fills the plot`).not.toContain(
+				"inset-0",
+			);
+			// …while the HORIZONTAL binding stays the plot's own width, which is what
+			// keeps `labelLeftPct` meaning the same thing it means for the dots.
+			expect(cls).toContain("inset-x-0");
+
+			const style = row?.getAttribute("style") ?? "";
+			const stripPx = Number(style.match(/height:\s*(\d+)px/)?.[1]);
+			const typePx = Number(style.match(/font-size:\s*(\d+)px/)?.[1]);
+			expect(stripPx, `${mode}: the strip declares no height`).toBeGreaterThan(
+				0,
+			);
+			expect(typePx, `${mode}: the row declares no type size`).toBeGreaterThan(
+				0,
+			);
+
+			const frame = container.querySelector(
+				'[data-testid="market-price-chart-frame"]',
+			);
+			const roomPx = Number(
+				(frame?.getAttribute("style") ?? "").match(
+					/padding-bottom:\s*(\d+)px/,
+				)?.[1],
+			);
+			expect(
+				roomPx,
+				`${mode}: the frame leaves no room beneath the plot`,
+			).toBeGreaterThan(0);
+			// THE identity: the room and the strip are one constant, not two.
+			expect(roomPx).toBe(stripPx);
+			// …and the strip is the type plus the air over it, so a label's box
+			// cannot exceed the room the frame made.
+			const airPx = Number(
+				container
+					.querySelector('[data-testid^="axis-x-anchor-"]')
+					?.getAttribute("style")
+					?.match(/top:\s*(\d+)px/)?.[1],
+			);
+			expect(airPx, `${mode}: no offset on the date label`).toBeGreaterThan(0);
+			expect(typePx + airPx).toBe(stripPx);
+		}
+	});
+
+	it("reserves NO room on a render that draws no date row", () => {
+		// ⚠ THE ARM THAT MAKES THE RESERVATION HONEST, CARRIED OVER FROM THE BAND IT
+		// USED TO GUARD. Room left beneath a row that is not there shortens the plot
+		// for a reason no reader can see — the same objection the zeroed band term
+		// answered, one element over. The collapsed card draws no axis below two
+		// points, its shipped gate since HTML-FINISH R8, so that is the case to check.
+		const container = markup(
+			[{ at: MARKET_CHART_WINDOW_START, yes: "0.960000000000000000" }],
+			"collapsed",
 		);
-		expect(html).not.toContain('data-testid="axis-date-row"');
-		const top =
-			[...html.matchAll(/top:([^";]*)/g)]
-				.map((m) => m[1])
-				.find((t) => t.includes("max(")) ?? "";
-		expect(top).not.toBe("");
-		expect(top).toMatch(/calc\(100% - \d+(?:\.\d+)?px - 0px\)/);
+		expect(container.querySelector('[data-testid="axis-date-row"]')).toBeNull();
+		const frame = container.querySelector(
+			'[data-testid="market-price-chart-frame"]',
+		);
+		expect(frame).not.toBeNull();
+		expect(frame?.getAttribute("style") ?? "").not.toMatch(/padding-bottom/);
 	});
 });
