@@ -297,7 +297,7 @@ not a defect.** An inspection that rediscovers it files
 
 ## Patch record — 2026-09-08 · D-32 reverses Track A; the body is preserved (ADR-1)
 
-The ADR-1 recon measured **22** present-tense assertions in this file that the gate blocks content
+The ADR-1 recon measured **23** present-tense assertions in this file that the gate blocks content
 and auto-bans its author: `:23`, `:40`, `:41`, `:43`, `:55`, `:59`, `:60`, `:71`, `:75`, `:77`,
 `:79`, `:92`, `:94`, `:101`, `:107`, `:110`, `:119`, `:166`, `:172`, `:175`, `:199`, `:220`,
 `:231`. It is the largest concentration in the corpus and the only one recorded nowhere as
