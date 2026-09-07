@@ -685,6 +685,52 @@ describe("seedPoolAction wire surface", () => {
 		expect((await openedEventRows()).length).toBe(0);
 	});
 
+	it("seed-pool::post-freeze-is-market_frozen-not-an-internal-error", async () => {
+		// ⛔ THE SAME DEFECT AS THE CASE ABOVE, ONE ERROR CLASS OVER
+		// (@code-reviewer H-2), and the repetition is the point. That case exists
+		// because `CpmmInputError` had no arm in `toActionError` and a true
+		// refusal surfaced as `error_internal` plus the Sentry capture reserved
+		// for UNRECOGNISED wire errors — telling the admin the system is broken
+		// while it is working, and paging the on-call for a guard doing its job.
+		//
+		// LIQ-1 Phase 2 minted `MarketFrozenError` and did not add an arm, so the
+		// identical defect arrived again. O-3: a true refusal reported with a
+		// false cause is a defect. A plan that mints an error type and does not
+		// name the wire map produces this every time — plan §3 T11 says only
+		// "throw a new `MarketFrozenError`".
+		await withAdminSession();
+		const marketId = await seedDraftFixture("wire-seed-frozen");
+
+		// `frozen_at` is a ONE-SHOT Bucket-B transition — it cannot go back to
+		// NULL by UPDATE — so the teardown below truncates and reseeds it.
+		await testClient.unsafe(
+			`UPDATE system_state SET frozen_at = '2026-11-05T23:59:00Z' WHERE id = 'system'`,
+		);
+
+		try {
+			const result = await seedPoolAction(
+				seedFormData(marketId, "0.1", "100000"),
+			);
+
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			// THE assertion: a code that NAMES the refusal.
+			expect(result.error.code).toBe("market_frozen");
+			expect(result.error.code).not.toBe("error_internal");
+
+			// ...and the market is untouched. The throw is inside the W-4
+			// transaction, so this is a rollback rather than an early return.
+			expect(await marketStatus(marketId)).toBe("Draft");
+			expect((await poolRowsFor(marketId)).length).toBe(0);
+			expect((await openedEventRows()).length).toBe(0);
+		} finally {
+			await truncateTables(testClient, ["system_state"]);
+			await testClient.unsafe(
+				`INSERT INTO system_state (id, frozen_at) VALUES ('system', NULL)`,
+			);
+		}
+	});
+
 	it("seed-pool::rejects-without-admin-session", async () => {
 		withoutAdminSession();
 		const marketId = await seedDraftFixture("wire-seed-no-session");

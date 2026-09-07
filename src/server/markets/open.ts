@@ -160,9 +160,27 @@ export async function openMarket(args: {
 			// all — no pool row, no status flip, no event. The transaction would
 			// roll all three back anyway; ordering it here means the cheapest
 			// refusal is also the earliest.
+			//
+			// ⛔ `WHERE id = 'system'` IS LOAD-BEARING, AND WITHOUT IT THIS GATE
+			// FAILS **OPEN** (@code-reviewer H-1). `system_state` is a singleton by
+			// CONVENTION, not by constraint: the Bucket-B guards reject UPDATE,
+			// DELETE and TRUNCATE — they do not reject INSERT — and no CHECK or
+			// unique index makes a second row impossible. Flipping the freeze is an
+			// UPDATE, which writes a new heap tuple, so an unqualified seq scan
+			// with `LIMIT 1` can return the OTHER row. Measured on a second row:
+			// this read saw `null` while `isFrozen()` and the injector's own
+			// `EXISTS` both saw the freeze — i.e. the market opens after the
+			// conclusion freeze, which is the CLAUDE.md §3 refusal trigger this
+			// gate exists to hold.
+			//
+			// Its two siblings were already right: `isFrozen()` filters on the id,
+			// and migration `0027`/`0028` use `EXISTS (… WHERE frozen_at IS NOT
+			// NULL)`, which is safe on any number of rows. This was the cheapest
+			// possible divergence from both.
 			const frozen = await tx
 				.select({ frozenAt: systemState.frozenAt })
 				.from(systemState)
+				.where(eq(systemState.id, "system"))
 				.limit(1);
 			if (frozen[0]?.frozenAt != null) {
 				throw new MarketFrozenError(

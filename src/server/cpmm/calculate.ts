@@ -175,10 +175,14 @@ export function addLiquidity({
 	// 120 is PROVABLY enough, not merely large. The exact quotient is rational
 	// with denominator `L`, an integer once scaled by 10^18 and bounded by
 	// NUMERIC(38,18) at 10^38 — so its distance from any 18-dp boundary is
-	// either exactly zero or at least 1e-56. A 120-significant-digit rounding of
-	// a quantity below 1e20 perturbs by at most 1e-100, and 1e-100 < 1e-56, so
-	// the rounding cannot cross a boundary. `floor18` is therefore the EXACT
-	// floor for every input the column can hold.
+	// either exactly zero or at least 1e-56. There are TWO roundings here, not
+	// one — the division and then the addition — and the sum reaches ~2e20, one
+	// exponent bucket above the quotient, so the honest total perturbation bound
+	// is ~1e-99 rather than the 1e-100 a single rounding would give. Either way
+	// it is 43 orders of magnitude clear of 1e-56, so the rounding cannot cross a
+	// boundary and `floor18` is the EXACT floor for every input the column can
+	// hold. Stated at the true figure because a later reader re-derives from the
+	// number written here, not from the one that was meant.
 	//
 	// ⚠ THE ADDITION IS INSIDE THE HIGH-PRECISION BRACKET, NOT OUTSIDE IT, and
 	// that is not cosmetic — it was measured. Taking only the quotient at 120

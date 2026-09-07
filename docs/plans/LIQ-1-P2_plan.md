@@ -1483,6 +1483,28 @@ doppler run --project zugzwang-experiment --config stg --command '
 **GREEN =** `liquidity-injector` and `liquidity-alarms` both present and
 `active = t`; `liquidity_policy` has exactly one row, `enabled = false`.
 
+⛔ **THE ORDER OF §8.2 AND §8.3 IS LOAD-BEARING, AND THE RESET WILL NOT SAVE YOU**
+(`@db-migration-reviewer`, round 1). `liquidity_policy` is a TRUNCATE **exclusion**
+(that is the point of it — §3 T6), so **`staging:rebuild` does NOT disarm the
+injector.** An `enabled = true` row from a previous soak survives the reset, and the
+generator then drives `place` / `sell` / `settle` against the same pools while a
+60-second cron is injecting into them. Conservation is covered — G2.1 gained
+`Σ backingMinted` — but the coverage and magnitude gates were built against fixtures
+nothing else was writing to, and whether they tolerate a concurrent injector is
+**unmeasured**.
+
+⇒ **Always REBUILD FIRST, ARM SECOND.** If a soak is being restarted and an armed row
+already exists, INSERT a disabling version *before* the rebuild:
+
+```sql
+INSERT INTO liquidity_policy (version, coefficient, floor, trigger_ratio, guard_low,
+  guard_high, endgame_hours, lock_timeout_ms, enabled, effective_from)
+VALUES (<next>, 500, 100000, 0.80, 0.02, 0.95, 72, 100, false, now());
+```
+
+…then rebuild, then arm. **Never an UPDATE** — the table is Bucket A and the trigger
+rejects one, which is the mechanism rather than an obstacle.
+
 ### 8.3 Arm it — the INSERT that turns it on
 
 ```bash
@@ -1495,6 +1517,25 @@ doppler run --project zugzwang-experiment --config stg --command '
 
 ⚠ **A new row, never an UPDATE.** The table is Bucket A and the trigger will
 reject an UPDATE — which is the mechanism, not an obstacle.
+
+⚠ **`lock_timeout_ms` NOW HAS A CEILING, AND THE CEILING IS NOT THE INVARIANT.**
+Migration `0028` rejects anything above **250** (`@db-migration-reviewer` HIGH-1 —
+`2147483647` was accepted before it). That catches a typo; it does not prove safety,
+because a CHECK cannot see the market count. The real inequality is
+**`(open_markets − 1) × lock_timeout_ms < 1000`**, against the bet path's
+non-retryable 1,000 ms `statement_timeout`. ⚠ **Measured 2026-09-07: staging carries
+TEN `Open` markets, not the eight this plan reasons from** — safe ceiling 111 ms,
+shipped 100 ms. **Re-derive before adding markets, not after.**
+
+**Then verify the heartbeat within 120 s** (ADR §Runbook), which is the check that
+closes the window in which `liquidity_silence` is deliberately not evaluated:
+
+```bash
+doppler run --project zugzwang-experiment --config stg --command '
+  psql "$DATABASE_URL_STAGING" -c "
+    SELECT max(ran_at), now() - max(ran_at) AS age, max(policy_version)
+    FROM liquidity_heartbeat;"'
+```
 
 ### 8.4 The three-day watch — one command, run daily
 

@@ -18,7 +18,8 @@ import { CpmmDecimal } from "@/server/cpmm/decimal";
 // local executable receipt the parent runs to capture RED.
 //
 // PINNED PUBLIC-API CONTRACT (the implementer matches these names exactly):
-//   BET_MAX_STAKE: string — "10000" (ratified OQ-1; 10× the initial grant,
+//   BET_MAX_STAKE: string — "250" (PINNED by ADR-0047; a quarter of the
+//   initial grant). It was "10000" until LIQ-1 Phase 2 —
 //     economically inert by design), a NUMERIC(38,18) DECIMAL STRING in
 //     src/server/config/limits.ts; PLACEHOLDER JSDoc naming SPEC.1 §16.1 +
 //     number-tuning ~2026-09-01 (HARDEN.5) as the value owner.

@@ -157,6 +157,45 @@ describe("markets/open — the conclusion-freeze gate (LIQ-1 T11 / L-4)", () => 
 		vi.clearAllMocks();
 	});
 
+	it("freeze-gate::the-read-is-pinned-to-the-system-row", async () => {
+		// ⛔ @code-reviewer H-1, AND THE OTHER CASES IN THIS FILE CANNOT SEE IT.
+		// They truncate and re-insert exactly ONE `system_state` row, so an
+		// unqualified `SELECT … LIMIT 1` and a correctly-filtered one return the
+		// same thing and both implementations pass.
+		//
+		// `system_state` is a singleton by CONVENTION, not by constraint: the
+		// Bucket-B guards reject UPDATE, DELETE and TRUNCATE but NOT INSERT, and
+		// no CHECK or unique index forbids a second row. Flipping the freeze is an
+		// UPDATE, which writes a new heap tuple — so an unqualified seq scan can
+		// return the OTHER row and the gate fails **OPEN**, letting a market open
+		// after the conclusion freeze. That is the CLAUDE.md §3 refusal trigger
+		// this gate exists to hold, so the failure direction is the worst one.
+		await testClient.unsafe(
+			`INSERT INTO system_state (id, frozen_at) VALUES ('shadow', NULL)`,
+		);
+		await testClient.unsafe(
+			`UPDATE system_state SET frozen_at = $1 WHERE id = 'system'`,
+			[FROZEN_AT],
+		);
+
+		const marketId = await seedDraftMarket("freeze-two-rows");
+		await expect(
+			openMarket({
+				marketId,
+				openingPriceYes: OPENING_PRICE_YES,
+				tank: TANK,
+				now: NOW,
+				metadata: adminMetadata(),
+			}),
+		).rejects.toMatchObject({ name: "MarketFrozenError" });
+
+		// ...and it still wrote nothing.
+		const after = await writesFor(marketId);
+		expect(after.status).toBe("Draft");
+		expect(after.poolRows).toBe(0);
+		expect(after.openedEvents).toBe(0);
+	});
+
 	it("freeze-gate::open-refuses-and-writes-nothing-when-frozen", async () => {
 		const marketId = await seedDraftMarket("freeze-gate-refused");
 		expect(marketId).not.toBe("");

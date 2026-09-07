@@ -20,7 +20,7 @@ import {
 // masking the debate view already reads (`loadRemovedSet`).
 //
 // Invariant posture (mirrors `recordGateBlock`, MINUS the events emit + image
-// flip — D-6/R3: reactive Remove/Ban mint NO event, EVENT_TYPES stays 24):
+// flip — D-6/R3: reactive Remove/Ban mint NO event, EVENT_TYPES stays 25 (24 until LIQ-1 Phase 2 added `pool.liquidity_added`; this file's own count-pin moved with it, and the prose had not)):
 //   - Remove → append ONE `content_removed` row; ZERO writes to `comments`
 //     (Bucket-A append-only; the comment is hidden read-side via masking, never
 //     mutated). INV-3 (comments immutable) holds by construction.

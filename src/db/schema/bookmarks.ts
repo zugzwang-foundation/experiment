@@ -19,7 +19,7 @@ import { comments } from "./comments";
 // is unchanged). Carries `user_id` (the viewer) unlike `market_media`.
 //
 // INV surface: none. No `events` / `dharma_ledger` / `bets` / `comments` /
-// `resolution` write rides a bookmark; EVENT_TYPES stays 24 (ADR-0032 Option 1
+// `resolution` write rides a bookmark; EVENT_TYPES stays 25 (24 until LIQ-1 Phase 2 added `pool.liquidity_added`; this file's own count-pin moved with it, and the prose had not) (ADR-0032 Option 1
 // is event-free). The write path is two idempotent Server Actions (add/remove);
 // the read is a cross-author list rendered in the Profile surface's
 // forced-visitor mode (§4 of the plan).

@@ -200,13 +200,21 @@ export async function requireMarketDiscards(
  *
  * Two queries, two contracts. One query cannot hold both.
  *
- * ⚠ COST (plan §9 R-6, re-measured at execute — see the report). This runs
- * inside the same W-3 transaction, under the pool lock, inside a 5 s
- * `statement_timeout` whose `57014` is NOT retryable. It filters
- * `pool.liquidity_added` over the same `(market, marketId)` range as the genesis
- * read and inherits the same missing-`event_type`-index shape — but at roughly
- * 30 rows per market against the genesis probe's measured 15.2 ms at 200,000
- * `bet.sold` rows, three orders of magnitude below its worst case.
+ * ⚠ COST (plan §9 R-6). This runs inside the same W-3 transaction, under the
+ * pool lock, inside a 5 s `statement_timeout` whose `57014` is NOT retryable.
+ *
+ * ⚠ **AND IT IS NOT DRIVEN BY THE INJECTION COUNT.** An earlier version of this
+ * note reasoned from "roughly 30 injection rows per market", which is the wrong
+ * quantity: `event_type` is not in `events_aggregate_idx (aggregate_type,
+ * aggregate_id, created_at)`, so it is applied as a FILTER and this aggregate
+ * has NO EARLY EXIT — it scans the market's whole `(market, marketId)` range
+ * across every partition, exactly as the genesis read does, and is therefore
+ * driven by the same `bet.sold` VOLUME. The verdict is unchanged (~2 × the
+ * genesis probe's measured 15.2 ms at 200,000 `bet.sold` rows, against a
+ * 5,000 ms budget), but the reason now supports it.
+ *
+ * ⚠ `requireMarketDiscards` is now TWO round trips while the pool lock is held.
+ * On `bom1` that is ~5 ms of added lock hold on the settlement path.
  *
  * `COALESCE(…, 0)` is load-bearing: `SUM` over zero rows is NULL, and a market
  * with no injections is the normal case for the whole of Phase 1's history.
