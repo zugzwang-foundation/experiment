@@ -164,7 +164,30 @@ export default async function AuthLayout({
 			>
 				<WarliHero className="h-full w-full" />
 			</div>
-			<GlobalHeader viewer={viewer} stars={stars} />
+			{/* MOBILE-1 · Job A item 1 — ADR-0048. This one prop is the whole of the
+			    fix for all three auth routes: it threads `GlobalHeader` →
+			    `BrandCluster` / `VisitorCounter`, and `GlobalHeader` →
+			    `RulesControl` → the onboarding deck. Every class it switches on is
+			    `max-mobile:`-prefixed, so ≥640px is untouched.
+
+			    ⚠ THAT DECK IS NAMED IN PROSE HERE, NOT BY ITS IDENTIFIER, AND THAT
+			    IS DELIBERATE. `global-header-mobile-reflow.test.ts`'s D-4 guard
+			    asserts this file contains no such string ANYWHERE — a plain
+			    substring scan, comments included — because a direct mount here
+			    could be passed `onComplete` and let a signed-out visitor write the
+			    completion marker, suppressing their own first-login deck later.
+			    Writing the identifier in a comment reddens it. The guard is right
+			    and it is left exactly as it is.
+
+			    ⚠ IT REVERSES A RULING RATHER THAN FILLING A GAP. ADR-0045 held
+			    auth/join surfaces "gated, not made responsive", and Phase A's
+			    `mobileResponsive = false` default exists precisely so this mount
+			    could not reflow by accident. ADR-0048 supersedes that carve-out —
+			    a phone participant is allowed to join — so the omission here
+			    became the defect. The prop and its default SURVIVE: `(auth)`
+			    opts in, it is not that the gate was deleted (ADR-0048 `:84`
+			    rejects deleting the prop for now). */}
+			<GlobalHeader viewer={viewer} stars={stars} mobileResponsive />
 			{/* A7 seam — horizontal-center + max-width + vertical padding on the
 			    branded ground. Vertical placement is per-surface: short surfaces
 			    (sign-in, otp) add `my-auto` to center; onboarding omits it and

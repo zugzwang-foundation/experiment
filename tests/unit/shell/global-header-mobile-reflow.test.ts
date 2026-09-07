@@ -3,35 +3,74 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * MOBILE-1 · Phase A — THE HEADER'S 60px ROW AT PHONE WIDTH: what drops, what
- * survives, and what this task is FORBIDDEN to touch.
+ * MOBILE-1 — THE HEADER'S 60px ROW AT PHONE WIDTH: what drops, what survives,
+ * and what this task is FORBIDDEN to touch.
+ *
+ * ⚠⚠ REWRITTEN AT MOBILE-1 · JOB A, UNDER ADR-0048. Three passages in this
+ * file quoted ADR-0045's auth/join carve-out — auth surfaces "remain governed
+ * by the original constraint… gated, not made responsive" — as LIVE DOCTRINE.
+ * ADR-0048 (§Supersession scope) supersedes exactly that clause. So those
+ * passages were not merely stale, they were a FALSE RECORD: they described a
+ * property the tree below no longer asserts, in a file whose whole job is to
+ * make that property checkable. O-5 — a durable amendment is applied at every
+ * site that states the superseded position, in the same commit as the code —
+ * so all three are rewritten here, at `:5-89`, at the `(auth)` assertion's
+ * failure message, and at the seam docblock near the foot of the file.
+ *
+ * ⛔ WHAT DID **NOT** CHANGE, because the obvious reading of the above is
+ * wrong: the `mobileResponsive` prop and its `= false` default SURVIVE.
+ * ADR-0048 (§Phase A architecture — the unwind) considers deleting the prop
+ * ("path (ii)") and REJECTS it for now — five files, ~8 assertions, three of
+ * them `= false` default pins. The gate is still the mechanism. What changed
+ * is which mounts opt in: `(auth)` now does. A reader who takes this docblock
+ * to mean "the gate is gone" will delete a default that is still load-bearing.
  *
  * WHAT THIS GUARD IS FOR. `GlobalHeader` is a `1fr auto 1fr` grid with a
- * 1440px cap and — by design-language §1.7 — no responsive breakpoints at all.
- * Its two side zones carry seven controls between them. At 1440 the left zone
- * uses 427.20px of a 568.00px track; every control carries `shrink-0`, so that
- * is a HARD-OVERFLOW budget rather than a compression budget (the component's
- * own docblock measures it). At 375px the same row is asked to hold the same
- * seven controls in ~327px of content box, and nothing degrades gracefully:
- * they overflow, and the page gains a horizontal scrollbar on every route.
+ * 1440px cap, authored with no responsive breakpoints at all. Its two side
+ * zones carry seven controls between them. At 1440 the left zone uses
+ * 427.20px of a 568.00px track; every control carries `shrink-0`, so that is a
+ * HARD-OVERFLOW budget rather than a compression budget (the component's own
+ * docblock measures it). At 375px the same row is asked to hold the same seven
+ * controls in ~327px of content box, and nothing degrades gracefully: they
+ * overflow, and the page gains a horizontal scrollbar on every route.
+ *
+ * ⚠ NO `design-language.md` §1.7 CITATION HERE, DELIBERATELY — this paragraph
+ * used to derive that no-breakpoints property from it. §1.7 still reads
+ * "Desktop-only… no responsive variants this phase", and ADR-0048 (§Spec
+ * impact) rules it must be REDRAFTED against ADR-0048's scope rather than
+ * ratified as written. That redraft is a founder-ruling surface and this job
+ * does not perform it (plan OI-3). Citing a document known to disagree with
+ * the tree, in either direction, is the O-9 defect this rewrite exists to
+ * clear — so the property is stated as what the component IS, and pinned by
+ * this file's own assertions rather than by a reference.
  *
  * ⇒ So four things are hidden below 640px: the two off-site/decorative
- * left-zone controls (Radio · GitHub stars) behind one wrapper, the §21.1
- * register divider, the visitor counter, and the brand cluster's
- * wordmark+countdown text block.
+ * left-zone controls (Radio · GitHub stars) behind one wrapper, the register
+ * divider, the visitor counter, and the brand cluster's wordmark+countdown
+ * text block.
  *
  * ⛔⛔ EVERY ONE OF THOSE FOUR HIDES IS GATED ON A `mobileResponsive` PROP,
- * NOT UNCONDITIONAL. `GlobalHeader` is mounted by BOTH `(public)/layout.tsx`
- * (Discovery, `/m/[slug]`) and `(auth)/layout.tsx` (`/sign-in`,
- * `/sign-in/otp`, `/onboarding`) — and ADR-0045 is explicit that auth/join
- * surfaces "remain governed by the original constraint... gated, not made
- * responsive." A class applied unconditionally in `GlobalHeader.tsx` reaches
- * BOTH mounts. So every reflow class in this file, `BrandCluster.tsx` and
- * `VisitorCounter.tsx` is wrapped in
- * `cn(base, mobileResponsive && "max-mobile:hidden")`, the prop defaults
- * `false`, and only `(public)/layout.tsx` passes it. This describe block's
- * first test is the one that makes that call-site asymmetry itself a
- * guarded fact rather than a claim in a comment.
+ * NOT UNCONDITIONAL — AND THAT IS STILL TRUE AFTER ADR-0048. `GlobalHeader`
+ * is mounted by BOTH `(public)/layout.tsx` (Discovery, `/m/[slug]`) and
+ * `(auth)/layout.tsx` (`/sign-in`, `/sign-in/otp`, `/onboarding`), and a class
+ * applied unconditionally in `GlobalHeader.tsx` reaches BOTH mounts. So every
+ * reflow class in this file, `BrandCluster.tsx` and `VisitorCounter.tsx` stays
+ * wrapped in `cn(base, mobileResponsive && "max-mobile:hidden")` and the prop
+ * still defaults `false`. What ADR-0048 changes is the CALL SITES: both
+ * layouts pass it now, where Phase A had only `(public)` passing it. This
+ * describe block's first test is the one that makes those call sites a guarded
+ * fact rather than a claim in a comment — and under ADR-0048 it has TWO halves
+ * on the `(auth)` mount, because a bare presence check on the prop name also
+ * passes on `mobileResponsive={false}`, i.e. on a tree where the opt-in has
+ * been reverted (plan F-4).
+ *
+ * ⚠ WHY THE GATE IS KEPT AT ALL NOW THAT BOTH MOUNTS OPT IN. AGENTS.md §8's
+ * second rule: gate it on a prop and thread the prop the whole way down, so
+ * that a mount which forgets it inherits the DESKTOP render rather than an
+ * accidental reflow. That polarity is a property of the default, not of who
+ * currently passes it, and it is what makes a future third mount safe by
+ * omission. Deleting the prop because two of two callers now pass it removes
+ * the safe default for the third.
  *
  * ⛔⛔ AND `GlobalHeader.tsx` IS NOT THE ONLY SEAM — THIS GUARD ONCE SAID IT
  * WAS. The claim above used to end "there is no other seam between them," and
@@ -44,7 +83,10 @@ import { describe, expect, it } from "vitest";
  * which knows nothing about who mounted it. So the prop is threaded the whole
  * way down and the seam is CHECKED, in the last describe block of this file —
  * a completeness claim nobody verifies is the exact failure this file exists
- * to prevent elsewhere.
+ * to prevent elsewhere. ⚠ Under ADR-0048 the deck reflowing on the three auth
+ * routes is FOUNDER-RATIFIED and intended (plan §4, Founder ruling 1); the
+ * seam check survives because the obligation it enforces is the threading
+ * discipline, not the exclusion it was originally written to police.
  *
  * ⚠ THE SEAM IS THE PROP CHAIN, NOT THE FILE BOUNDARY. Anything added under
  * `GlobalHeader` that carries a breakpoint class inherits the same obligation,
@@ -52,24 +94,64 @@ import { describe, expect, it } from "vitest";
  *
  * ⛔⛔ THE NEGATIVE HALF IS THE LOAD-BEARING HALF OF THIS FILE. Five elements
  * must stay visible at EVERY width and each is pinned by an explicit negative:
- * `HeaderNav` (the only navigation), `RulesControl` (SPEC.1 §21.9 — the
- * onboarding deck's only re-show entry point, "present for every viewer,
- * authenticated or not" — unconditional in the SPEC, so it cannot be hidden
- * at any width, not even conditionally), `BrandCluster` (the home link),
- * and `DharmaCluster` + `IdentityCluster` (balance and identity).
+ * `HeaderNav` (the only navigation), `RulesControl` (the onboarding deck's
+ * only re-show entry point — present for every viewer, authenticated or not,
+ * so it cannot be hidden at any width, not even conditionally),
+ * `BrandCluster` (the home link), and `DharmaCluster` + `IdentityCluster`
+ * (balance and identity).
+ *
+ * ⚠ THE `RulesControl` DOCTRINE IS RE-ATTRIBUTED, NOT DROPPED. It used to
+ * cite `SPEC.1 §21.9`. SPEC.1 was rebaselined to 2.0.0 (D-29) and §17–§19 and
+ * §21–§23 are INTENTIONALLY ABSENT — the ruling was REMOVED, not relocated, so
+ * there is no live section to repoint at. Its surviving homes are ADR-0037
+ * (the deck's seen-marker decision, which exists only because the deck must be
+ * shown once and stay re-reachable afterwards) and this file's own assertions:
+ * `header-mobile::RulesControl-is-mounted-exactly-once-outside-any-hidden-wrapper`
+ * and the `RulesControl` row of
+ * `header-mobile::HeaderNav-RulesControl-BrandCluster-DharmaCluster-IdentityCluster-are-never-hidden`.
+ * ⚠ SCOPE: only this docblock's citations are re-anchored. Everything else is
+ * a separate job (plan OI-5) and is deliberately untouched. ⛔ AND OI-5 IS
+ * BIGGER THAN THE PLAN'S FIGURE, WHICH MATTERS TO WHOEVER PICKS IT UP —
+ * measured across `src/` and `tests/`, excluding this file:
+ *
+ *   §21.9 citations   26   ← the plan's "the other 25" counts FILES, not sites
+ *   §21.x citations   53   ← the whole of §21 is absent, so ALL of these are dead
+ *
+ * The plan scoped OI-5 to `§21.9`; the true surface is twice that, because
+ * D-29 removed §17–§19 and §21–§23 wholesale rather than removing one ruling.
+ * ⚠ Seven of the `§21.x` sites are further down THIS file, inside tests Job A
+ * must leave byte-identical — so they are named here rather than fixed, and
+ * their survival is a scope decision, not an oversight.
+ *
  * ⚠ `IdentityCluster` especially: it hosts the JOIN CTA, which is PHASE B's
  * subject and is governed by two independent conditions ruled there (a width
  * rule AND a touch-primary rule — MOBILE-1 §4). Phase A adding a width-only
  * hide to it would land half of Phase B's mechanism under Phase A's review,
  * on a critical-path surface Phase A is explicitly not cleared for. This
  * guard reddens if it does.
+ * ⚠⚠ AND THAT PARAGRAPH IS LEFT AS PHASE A WROTE IT, WHICH IS A DECISION
+ * RATHER THAN AN OVERSIGHT. ADR-0048 reverses the exclusion the JOIN CTA hide
+ * was for — a phone participant may now join, so the CTA must render at every
+ * width and the hide must never land. The RULE this guard enforces is
+ * therefore unchanged and, if anything, stronger; only its stated MOTIVE is
+ * superseded. Rewriting the motive here would put this docblock out of step
+ * with the failure message inside
+ * `header-mobile::IdentityCluster.tsx-carries-no-responsive-token-at-all`,
+ * which carries the same framing and which Job A is scoped not to touch. The
+ * divergence is recorded here rather than created silently; closing it is
+ * ADR-0048 path (ii)'s job, not this one's.
  *
- * ⛔⛔ THE §21.1 REGISTER DIVIDER CARRIES NO `data-testid`, EVER (SG6). It is
+ * ⛔⛔ THE REGISTER DIVIDER CARRIES NO `data-testid`, EVER (SG6). It is
  * a named untouchable — `docs/plans/HEADER-PORTFOLIO.md`'s SG6: "The divider
  * is a named untouchable. It carries no `data-testid` and must not gain
  * one." `tests/unit/shell/dharma-cluster.test.tsx`'s T4 guard locates it by
  * its `w-px` class among the right zone's direct children, and this file
  * does the same rather than adding a hook that guard already forbids.
+ * ⚠ The `SPEC.1 §21.1` label this paragraph used to carry is dropped for the
+ * same reason as §21.9 above — §21 is absent from SPEC.1 2.0.0 in its
+ * entirety, so §21.1 is as dead as §21.9. The anti-conflation rule it named
+ * (engine-derived Đ figures left of the divider, the vanity visitor count
+ * right of it) survives in HEADER-PORTFOLIO's SG6 and in that T4 guard.
  *
  * ⚠ THE `<header>` TAG AND ITS `h-[60px]` ROW ARE READ, NEVER WRITTEN.
  * `tests/unit/design/discovery-height-chain.test.ts` derives `(public)/layout.tsx`'s
@@ -82,8 +164,35 @@ import { describe, expect, it } from "vitest";
  * resolves no media query or Tailwind utility, so "hidden below 640px" is
  * invisible to a render test. `discovery-height-chain.test.ts:19-24` states the
  * same limit for the same reason. Whether the shortened row actually fits 375px
- * without horizontal overflow is measurable in a real browser and only there —
- * measured this session: 394px of overflow before this diff, 0px after.
+ * without horizontal overflow is measurable in a real browser and only there.
+ *
+ * ⛔ AND THE TWO ROUTE GROUPS HAVE TWO SEPARATE MEASUREMENTS — DO NOT READ
+ * EITHER ONTO THE OTHER. `(public)`: 394px of overflow before Phase A's diff,
+ * 0px after, measured at Phase A.
+ *
+ * `(auth)`, measured at Job A on a production build after `just clean`, served
+ * against the staging database, in a 375px in-page frame — BEFORE and AFTER on
+ * the SAME rig, because a pair drawn from two rigs is not a comparison:
+ *
+ *   /sign-in · /sign-in/otp · /onboarding   379px document overflow → 0px
+ *   this header's scrollWidth               754px min-content       → 375px
+ *   elements escaping the 375px viewport    8                       → 0
+ *
+ * ⚠ ALL THREE ROUTES WERE REACHED DIRECTLY — plan F-9 did NOT fire, and
+ * `/onboarding` is not an inference from the other two. It renders signed-out
+ * (this layout's own docblock records why) and served a full header. ⛔ WHAT
+ * THAT DOES NOT COVER: the SIGNED-IN `/onboarding` render, where
+ * `IdentityCluster` shows a pseudonym and avatar instead of the JOIN CTA — a
+ * different, likely narrower row, and unmeasured.
+ *
+ * ⚠ The BEFORE figures reproduced ADR-0048's exactly (379 / 754), which is
+ * worth one line because it was not guaranteed: they came from a different rig
+ * and the plan required re-taking rather than adopting them.
+ *
+ * ⛔ NONE OF THAT IS OBSERVABLE FROM THIS FILE. jsdom performs no layout, so a
+ * source scan can neither supply those numbers nor imply them; they are
+ * recorded here so the assertions below have a stated purpose, not so this
+ * suite can be read as having checked them.
  *
  * ⚠ V-REGISTER DISCIPLINE. This reads the SHIPPED FILES.
  */
@@ -393,7 +502,50 @@ describe("global header mobile reflow — the mobileResponsive prop, not an unco
 		).toMatch(/mobileResponsive\s*=\s*false/);
 	});
 
-	it("header-mobile::ONLY-the-public-layout-mount-passes-mobileResponsive", () => {
+	/**
+	 * ⚠⚠ INVERTED AT JOB A, NEVER DELETED — the WARLI-MOUNT precedent, which
+	 * ADR-0048 (§Phase A architecture — the unwind) names explicitly. Phase A
+	 * shipped this test asserting that `(auth)/layout.tsx` does NOT pass
+	 * `mobileResponsive`, with a failure message quoting ADR-0045. ADR-0048
+	 * reverses the ruling, so the assertion is turned round rather than removed:
+	 * a deleted guard proves nothing in either direction, while an inverted one
+	 * reddens the moment somebody reverts the opt-in.
+	 *
+	 * ⛔⛔ THREE HALVES ON THE `(auth)` TAG, AND ONLY THE FIRST IS THE OBVIOUS
+	 * ONE. The naive inversion is `.toMatch(/\bmobileResponsive\b/)` — and it
+	 * passes on `<GlobalHeader … mobileResponsive={false} />`, i.e. on a tree
+	 * where item 1 has been reverted with the prop name left behind. That is not
+	 * a hypothetical spelling: it is precisely how a reverting edit reads when
+	 * someone wants to keep the call site documented, and it renders the
+	 * pre-ADR-0048 header on all three auth routes. So the name must be PRESENT
+	 * (half one), must carry no value other than `{true}` (half two), and must
+	 * be a real JSX ATTRIBUTE rather than a name occurring inside a spread
+	 * (half three). Three messages, because they catch three different mistakes
+	 * and a reader who hits one should not have to guess which.
+	 *
+	 * ⚠⚠ HALF TWO WAS A DENYLIST FOR ONE REVIEW CYCLE AND IS NOW AN ALLOWLIST —
+	 * the correction is worth more than the rule. It enumerated `{false}` and
+	 * `{undefined}`, which is a guess at how somebody will spell "off", and the
+	 * ways to spell it are unbounded: mutation testing walked five TS-legal
+	 * reverts straight through it, `={SOME_FLAG}` among them. An enumeration
+	 * over a VALUE position goes stale silently, in the passing direction —
+	 * which is the same argument this file already makes for
+	 * `ungatedBreakpointClasses` being an absence scan rather than a list of
+	 * expected classes, one register over. So the accepted set is closed and
+	 * everything else reddens, INCLUDING spellings nobody has thought of.
+	 *
+	 * ⚠ HONEST NOTE ON WHAT EACH HALF CAN CATCH TODAY. Half one is the RED that
+	 * drives item 1: on the pre-implementation tree the `(auth)` mount carries
+	 * no such prop and it fails. Halves two and three CANNOT be red on that
+	 * tree — the strings they forbid do not exist there — so they are regression
+	 * guards in the `_probe-*` posture (AGENTS.md §9), not TDD drivers.
+	 *
+	 * ⚠ THE `(public)` HALF IS UNCHANGED, INCLUDING ITS SINGLE-HALF SHAPE.
+	 * `{false}` on that mount would be the same defect one route group over and
+	 * is not asserted against here, because Job A's scope is the `(auth)` mount
+	 * (plan §7). Recorded, not fixed.
+	 */
+	it("header-mobile::BOTH-layout-mounts-pass-mobileResponsive-and-neither-passes-false", () => {
 		const publicSrc = read(PUBLIC_LAYOUT);
 		const authSrc = read(AUTH_LAYOUT);
 
@@ -420,13 +572,68 @@ describe("global header mobile reflow — the mobileResponsive prop, not an unco
 		if (!authTag) {
 			throw new Error(`${AUTH_LAYOUT}: no <GlobalHeader ... /> tag found.`);
 		}
+
+		// HALF ONE — the prop is PRESENT on the (auth) mount.
 		expect(
 			authTag[0],
-			`${AUTH_LAYOUT}: its <GlobalHeader> mount now passes ` +
-				`\`mobileResponsive\`. ADR-0045 leaves auth/join surfaces gated, not ` +
-				`made responsive — /sign-in, /sign-in/otp and /onboarding must ` +
-				`render this header exactly as before MOBILE-1.`,
-		).not.toMatch(/\bmobileResponsive\b/);
+			`${AUTH_LAYOUT}: its <GlobalHeader> mount does not pass ` +
+				`\`mobileResponsive\`. ADR-0048 supersedes ADR-0045's auth/join ` +
+				`carve-out: /sign-in, /sign-in/otp and /onboarding are phone- ` +
+				`responsive at the existing 640px tier, and this one prop is the ` +
+				`whole of the fix for all three routes — ADR-0048 measured +379px of ` +
+				`document overflow at 375x812 on those routes, 100% of it this ` +
+				`header (min-content 754px). Without it a phone visitor cannot read ` +
+				`the join surface they are being asked to join from, which is the ` +
+				`ADR-0038 signup target ADR-0045 knowingly traded against and ` +
+				`ADR-0048 stops trading against.`,
+		).toMatch(/\bmobileResponsive\b/);
+
+		// HALF TWO — and it is not switched OFF by any spelling. Without this,
+		// half one passes on a REVERTED tree that kept the prop name.
+		//
+		// ⛔⛔ THE ENUMERATION OF BAD VALUES WAS THE WRONG SHAPE, AND IT SHIPPED
+		// THAT WAY FOR ONE REVIEW CYCLE. This read `.not.toMatch(/…=\{(false|
+		// undefined)\}/)`, which is a DENYLIST — and a denylist over a value
+		// position is exactly the thing that goes stale silently, in the passing
+		// direction, because the ways to spell "off" are unbounded. Mutation-tested
+		// against the real file, FIVE TS-legal reverts sailed through it:
+		// `={!true}`, `={PHONE_OK}` where the const is false, `={false as
+		// boolean}`, `={ /* on */ false}`, and `{...{ mobileResponsive: false }}` —
+		// which defeats half ONE as well, since the name is present in an object
+		// literal rather than as an attribute. ⚠ The flag-shaped one is not exotic:
+		// `={SOME_FLAG}` is precisely how "turn mobile auth back off" gets written.
+		//
+		// ⇒ SO IT IS AN ALLOWLIST NOW. Exactly two spellings are accepted — the
+		// bare shorthand `mobileResponsive` and the explicit `mobileResponsive=
+		// {true}` — and every other value form reddens, INCLUDING ones nobody has
+		// thought of. That is the direction a polarity guard has to fail in: a
+		// spelling it does not recognise must be a failure rather than a pass.
+		expect(
+			authTag[0],
+			`${AUTH_LAYOUT}: its <GlobalHeader> mount spells \`mobileResponsive\` ` +
+				`with a value that is not literally \`{true}\`. Only the bare ` +
+				`shorthand or \`={true}\` is accepted here, and the restriction is ` +
+				`the point: \`={false}\`, \`={undefined}\`, \`={!true}\` and — the ` +
+				`realistic one — \`={SOME_FLAG}\` all render the pre-ADR-0048 header ` +
+				`on all three auth routes while leaving a call site that reads like ` +
+				`an opt-in. A value this guard cannot evaluate is treated as a ` +
+				`revert. If the opt-in is genuinely being reverted, revert this ` +
+				`assertion with it and name the ADR that supersedes ADR-0048.`,
+		).not.toMatch(/\bmobileResponsive\s*=(?!\s*\{\s*true\s*\})/);
+
+		// HALF THREE — the prop is a real JSX ATTRIBUTE, not a name that merely
+		// occurs in the tag. `{...{ mobileResponsive: false }}` puts the string
+		// inside the tag while switching the feature off, and half one is a
+		// substring check, so it passes. The object-literal form is what
+		// distinguishes them.
+		expect(
+			authTag[0],
+			`${AUTH_LAYOUT}: \`mobileResponsive\` appears in the <GlobalHeader> ` +
+				`tag as an object property (\`mobileResponsive:\`) rather than as a ` +
+				`JSX attribute — a spread like \`{...{ mobileResponsive: false }}\` ` +
+				`satisfies a bare name check while rendering the header exactly as ` +
+				`it did before ADR-0048. Pass the prop directly.`,
+		).not.toMatch(/\bmobileResponsive\s*:/);
 	});
 });
 
@@ -882,18 +1089,40 @@ describe("global header mobile reflow — what this task may NOT touch", () => {
  *
  * The chain is three static hops with no conditional on any of them:
  *
- *   (auth)/layout.tsx  →  <GlobalHeader viewer stars />     ← no prop
- *   GlobalHeader.tsx   →  <RulesControl />                  ← outside the
- *                                                             gated wrapper,
- *                                                             deliberately,
- *                                                             per SPEC.1 §21.9
+ *   (auth)/layout.tsx  →  <GlobalHeader viewer stars           ← ADR-0048:
+ *                                       mobileResponsive />      it opts in
+ *   GlobalHeader.tsx   →  <RulesControl />                     ← outside the
+ *                                                                gated wrapper,
+ *                                                                deliberately
  *   RulesControl.tsx   →  <OnboardingDeck context="reshow" …/>
  *
- * So an unconditional `max-mobile:` class in `OnboardingDeck.tsx` renders a
- * responsive deck to anyone who opens RULES on `/sign-in`, `/sign-in/otp` or
- * `/onboarding` — which ADR-0045 rules out in as many words: auth/join
- * surfaces "remain governed by the original constraint… gated, not made
- * responsive." Three such classes shipped that way.
+ * ⚠⚠ THE FIRST ARROW READ `← no prop` UNTIL JOB A, AND IT WAS THE FALSEST
+ * LINE IN THE FILE — a diagram is read before prose and believed longer. Under
+ * ADR-0048 the `(auth)` layout opts in, so the deck DOES reflow when a visitor
+ * opens RULES on `/sign-in`, `/sign-in/otp` or `/onboarding`. That is
+ * FOUNDER-RATIFIED and intended, not a leak (plan §4, Founder ruling 1): the
+ * deck clipped 33px of every body line at 375px, and an auth surface a phone
+ * participant is invited to join from has no business rendering it clipped.
+ *
+ * ⛔ `RulesControl` SITS OUTSIDE THE GATED WRAPPER FOR AN UNRELATED REASON, AND
+ * THAT REASON SURVIVES. It is the onboarding deck's only re-show entry point
+ * and is present for every viewer, authenticated or not, so it cannot be hidden
+ * at any width — a rule this file pins directly (see the negative half in the
+ * head docblock) and whose surviving ADR home is ADR-0037. The `SPEC.1 §21.9`
+ * citation this diagram used to carry is dropped rather than repointed: §21 is
+ * intentionally absent from SPEC.1 2.0.0 (D-29), which REMOVED the ruling
+ * rather than relocating it, so there is no live section to cite.
+ *
+ * ⇒ WHAT THE SEAM CHECK IS FOR, RESTATED. It is no longer "nothing responsive
+ * reaches `(auth)`" — ADR-0048 retires that property. It is now the threading
+ * discipline itself (AGENTS.md §8): every breakpoint class under `GlobalHeader`
+ * is GATED ON THE PROP and the prop is threaded the whole way down, so that
+ * which surfaces reflow stays a decision a layout makes, not an accident a
+ * class two files away imposes. An unconditional `max-mobile:` class in
+ * `OnboardingDeck.tsx` takes that decision away from every present and future
+ * mount at once — including any mount that has NOT opted in, which is what the
+ * `= false` default exists to protect. Three such classes shipped that way and
+ * this is what caught them.
  *
  * ⚠ `context` CANNOT GATE IT, and this is the part worth reading twice. The
  * obvious fix is to key off `context === "reshow"`, and it is wrong: the
@@ -901,13 +1130,20 @@ describe("global header mobile reflow — what this task may NOT touch", () => {
  * first-login mount legitimately wants those classes. `context` describes WHICH
  * DECK, never WHICH SURFACE. Only the layout knows the surface, so only a
  * threaded prop can carry the distinction — no `usePathname`, no route
- * special-case, and nothing the deck can work out for itself.
+ * special-case, and nothing the deck can work out for itself. ⚠ This holds
+ * with FORCE UNCHANGED after ADR-0048, and is worth saying because the obvious
+ * inference from "both mounts opt in" is that the distinction stopped
+ * mattering. It did not: the two mounts opting in is a fact about today's two
+ * call sites, and `context` still cannot tell them apart if a third arrives.
  *
- * ⚠ WHY AN ABSENCE SCAN RATHER THAN A LIST OF EXPECTED CLASSES. The property
- * ADR-0045 needs is "nothing responsive reaches `(auth)`". An enumeration of
- * today's three classes would go stale the first time a fourth is added — and
- * would go stale SILENTLY, in the passing direction. `ungatedBreakpointClasses`
- * stays true however many there are.
+ * ⚠ WHY AN ABSENCE SCAN RATHER THAN A LIST OF EXPECTED CLASSES. An enumeration
+ * of today's three classes would go stale the first time a fourth is added —
+ * and would go stale SILENTLY, in the passing direction.
+ * `ungatedBreakpointClasses` stays true however many there are. ⚠ Its cost is
+ * stated in `docs/parked.md` (MOBILE-1 Block D) and is unchanged by this job:
+ * an absence scan does not assert the three classes are PRESENT, so deleting
+ * them re-breaks the 375px clipping and stays green. A presence pin is owed
+ * there, not here.
  */
 describe("global header mobile reflow — the RulesControl → OnboardingDeck seam", () => {
 	it("header-mobile::RulesControl-receives-the-prop-and-passes-it-to-OnboardingDeck", () => {

@@ -133,7 +133,32 @@ export function PostFocusHeader({
 					    `.mmedia`. It used to render INLINE, between the title and the
 					    body, which pushed the argument down the column on every post that
 					    carried one. */}
-					<div className="flex min-h-0 flex-1 gap-4">
+					{/* MOBILE-1 · Job A item 3 — ADR-0048. This row carried NO
+					    breakpoint variant at any width, and it is the one place on
+					    `/m/[slug]` Phase A missed: `DebateView.tsx:1040`, `:1235` and
+					    `MarketHeader.tsx:290` are the same shape and all three received
+					    the same token then. (Named once, on the node below, and not
+					    repeated here — `docs/parked.md`'s Block D census greps `src/`
+					    for these strings, and a class written into a comment inflates
+					    the site count it reports.)
+
+					    ⚠ AND IT DEGRADED IN THE WRONG DIRECTION, WHICH IS WHY A WIDTH
+					    TWEAK WOULD NOT HAVE DONE. Both image arms are `shrink-0` and the
+					    placeholder's width derives from the row's HEIGHT (`self-stretch`
+					    + `aspect-[16/9]`), so it demands ~147px of a 285px row REGARDLESS
+					    of viewport width — narrowing the phone makes it proportionally
+					    worse, and 100% of the deficit lands on the argument text. The text
+					    stack is not at fault: it already carries `min-w-0` and shrinks
+					    correctly. This is a row that must become a column.
+
+					    ⛔ AND THE FAILURE WAS INVISIBLE TO THE CHECK THAT CLEARED IT.
+					    `<Card>` is `overflow-hidden`, so the clipping happens INSIDE the
+					    card and `documentElement.scrollWidth` stays exactly 0px while
+					    content is destroyed — the Counter button cut 24px, the Exited
+					    badge cut 33px, eight elements with `scrollWidth > clientWidth`.
+					    Anything measuring this row measures the clipping ancestor's
+					    descendants, never the document. */}
+					<div className="flex min-h-0 flex-1 gap-4 max-mobile:flex-col">
 						{/* HTML-FINISH · MARKET DETAIL round 2 · R2 — d5 fills the
 						    post-focus `.hpimg` with its `POST IMAGE · 640:586` box
 						    (`d5:1491-1492`) whenever the focused post has no real

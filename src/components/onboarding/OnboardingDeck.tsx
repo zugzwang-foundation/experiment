@@ -212,8 +212,28 @@ export function OnboardingDeck({
 				// the comment above records.
 				// ⚠ GATED BY `mobileResponsive`, not unconditional. This deck is
 				// reachable from the `(auth)` layout's own header through
-				// `RulesControl`, and ADR-0045 leaves those surfaces gated rather
-				// than responsive — see the prop's own note above.
+				// `RulesControl`, so a class written here unconditionally reaches
+				// `/sign-in`, `/sign-in/otp` and `/onboarding` as surely as one
+				// written in that layout — the gate is the prop chain, not the file
+				// boundary (AGENTS.md §8).
+				//
+				// ⚠⚠ AND THESE CLASSES NOW DO REACH `(auth)`, BY RULING — WHICH IS
+				// WHY THIS NOTE CHANGED. It read: "ADR-0045 leaves those surfaces
+				// gated rather than responsive." **ADR-0048 supersedes exactly that
+				// clause** (MOBILE-1 · Job A): `(auth)/layout.tsx` passes
+				// `mobileResponsive`, and Hrishikesh ratified the deck reflowing on
+				// the three auth routes as intended rather than as a side effect. A
+				// phone participant is allowed to join, and the deck they open from
+				// the join surface should not clip 33px off every line.
+				//
+				// ⛔ SO THE GATE IS NOT DEAD AND MUST NOT BE REMOVED. What changed
+				// is which mounts opt in, never whether the classes are gated. The
+				// `= false` default is what makes a mount that FORGETS the prop
+				// inherit the desktop render rather than an accidental reflow, and
+				// that property belongs to the default rather than to today's two
+				// callers — ADR-0048 `:84` weighs deleting the prop and rejects it.
+				// ⚠ The prop's own docblock above still states the superseded
+				// position; it is deferred, not overlooked — see the plan's OI-7.
 				className={cn(
 					"grid max-h-[90vh] w-[513px] max-w-[calc(100vw-88px)] gap-0 overflow-y-auto rounded-(--r) border border-ink bg-n0 p-[30px] ring-0 motion-reduce:animate-none!",
 					mobileResponsive &&
