@@ -75,6 +75,15 @@ export const EVENT_TYPES = [
 	"market.resolved",
 	"market.corrected",
 	"market.voided",
+	// pool domain (1) — ADR-0047 §F, LIQ-1 Phase 2. Rides aggregate_type
+	// "market", NOT a new aggregate: the injection is a fact about a market,
+	// and the closed 9-value AggregateType set in insert.ts is untouched.
+	// ⚠ Written by migration 0027's plpgsql, not by insertEvent — so the SQL
+	// there has to reproduce this module's contract by hand (uuidv7 id,
+	// created_at DERIVED from its first 48 bits, payload_version 1, the
+	// seven-field metadata set). This schema is what the READERS parse it
+	// with, which is what makes the two halves checkable against each other.
+	"pool.liquidity_added",
 	// bet domain (2) — ENGINE.0
 	"bet.placed",
 	"bet.sold",
@@ -225,7 +234,8 @@ export const eventPayloadSchemas = {
 	}),
 	// ADR-0047 §B — market.opened carries TWO payload shapes, and the union is
 	// the whole design decision rather than an implementation detail. The
-	// LEGACY arm is every historical row: twelve on staging and ~20 fixture
+	// LEGACY arm is every historical row: FOURTEEN on staging (re-measured
+	// 2026-09-07 — the pool count moved from twelve) and ~20 fixture
 	// files, all `{ marketId, seedAmount }`. `price-series.ts` .parse()s this
 	// payload on EVERY Discovery and debate page load, so six required new keys
 	// would turn every one of those rows into a hard parse failure at once —
@@ -235,20 +245,32 @@ export const eventPayloadSchemas = {
 	// order is not load-bearing. ⛔ Exactly ONE place discriminates them:
 	// `readOpenedReserves` in `src/server/markets/backing.ts`. A second reader
 	// is a second thing that can drift, silently, on a money path.
+	//
+	// ⚠ `.strict()` ON BOTH ARMS IS LOAD-BEARING, NOT TIDINESS. `z.object`
+	// STRIPS unknown keys rather than rejecting them, so without it a payload
+	// carrying BOTH `seedAmount` and the asymmetric keys parses cleanly as the
+	// legacy arm — silently reading back a symmetric seed for a market that
+	// opened at 90,000/10,000, on a money path, with nothing to see. The arms
+	// are disjoint on `seedAmount` XOR `yesReserves` only while a stray key
+	// cannot be ignored. Measured safe against the `satisfies` bound below.
 	"market.opened": z.union([
-		z.object({
-			marketId: z.string().uuid(),
-			seedAmount: numericString,
-		}),
-		z.object({
-			marketId: z.string().uuid(),
-			yesReserves: numericString,
-			noReserves: numericString,
-			openingPriceYes: numericString,
-			backingMinted: numericString,
-			discardedYes: numericString,
-			discardedNo: numericString,
-		}),
+		z
+			.object({
+				marketId: z.string().uuid(),
+				seedAmount: numericString,
+			})
+			.strict(),
+		z
+			.object({
+				marketId: z.string().uuid(),
+				yesReserves: numericString,
+				noReserves: numericString,
+				openingPriceYes: numericString,
+				backingMinted: numericString,
+				discardedYes: numericString,
+				discardedNo: numericString,
+			})
+			.strict(),
 	]),
 	"market.closed": z.object({
 		marketId: z.string().uuid(),
@@ -285,6 +307,34 @@ export const eventPayloadSchemas = {
 	// bet domain. side mirrors the `side` pgEnum. stake/shares/price are exact
 	// NUMERIC(38,18) strings. parentCommentId null = top-level post-bet;
 	// uuid = reply-bet.
+	// ADR-0047 §F — the injection record. EVERY field is SHIP under SPEC.2
+	// §19.4.1: there is no PII-class key here, the reserves and target are
+	// public CPMM state, and `backingMinted` + `discardedShares` are exactly
+	// as load-bearing for a dataset reader as `market.opened`'s discards —
+	// without them the per-side share counts do not close and ADR §E's
+	// backing identity cannot be verified from the export at all.
+	// `policyVersion` joins the `liquidity_policy` row that produced it, which
+	// is the only way a reader reproduces the target: the target rule is not
+	// derivable from the events alone.
+	//
+	// `reservesAfter` is what `price-series.ts` SETS the walk to — never
+	// recomputes from (ADR §I). It is what the pool actually holds, and the
+	// chart's job is to say so rather than to become a second implementation
+	// of the placement primitive with its own rounding.
+	"pool.liquidity_added": z.object({
+		marketId: z.string().uuid(),
+		policyVersion: z.number().int(),
+		target: numericString,
+		tankBefore: numericString,
+		tankAfter: numericString,
+		reservesBefore: z.object({ yes: numericString, no: numericString }),
+		reservesAfter: z.object({ yes: numericString, no: numericString }),
+		backingMinted: numericString,
+		discardedSide: z.enum(["YES", "NO"]),
+		discardedShares: numericString,
+		priceYesBefore: numericString,
+		priceYesAfter: numericString,
+	}),
 	"bet.placed": z.object({
 		betId: z.string().uuid(),
 		marketId: z.string().uuid(),

@@ -510,6 +510,6 @@ describe("UI-6 S3 moderateComment — reactive Remove/Ban (ADR-0020/0021)", () =
 			await testDb.select({ id: events.eventId }).from(events)
 		).length;
 		expect(eventsAfter).toBe(eventsBefore);
-		expect(EVENT_TYPES.length).toBe(24);
+		expect(EVENT_TYPES.length).toBe(25);
 	});
 });
