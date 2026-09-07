@@ -100,6 +100,18 @@ One `pg_cron` job (1.6.4 on both environments, ADR-0006, registration pattern `0
  9. insert heartbeat
 ```
 
+**A `FUNCTION`, invoked with `SELECT` from `cron.schedule()`** — the `0007`/`0011`
+registration pattern, so the whole sweep is one transaction and the body carries no
+`COMMIT`. Each market runs inside its own `BEGIN … EXCEPTION … END` subtransaction:
+`lock_not_available` is a skip (a bet holds the row; the trigger is still true and the
+next tick is 60 s away, so a skipped market self-heals), and `WHEN OTHERS` records the
+`SQLSTATE` to `cron_alarms` and moves on, so one bad market cannot cost the sweep.
+`SET LOCAL lock_timeout` is issued **once at the top** — there is no `COMMIT` to reset
+it, and a rolled-back subtransaction does not clear it either (both measured against
+PostgreSQL 17.6 at execute). The overlap guard is `pg_try_advisory_xact_lock`, which
+releases on error as well as on commit, so a hand-run that throws — the recovery path
+the Runbook itself prescribes — cannot wedge the scheduled job.
+
 **No velocity guard.** Measured anti-correlated with the trigger: the fast minute that drains the tank is the minute the guard forbids refilling it; at 40,000 signups/hour it suppressed seven of eight injections (RECON-2 §10.6).
 
 **Frequency, measured.** At 10,000 signups/hour: fires at minutes 2, 3, 4, 5, 7, 9, 12, 15, 19, 24, 30, 37, 46, 57 — fourteen in the hour, gaps growing 2 → 11 minutes, self-quieting (SIM-2 §2b). Each is one UPDATE; a colliding bet retries on the existing three-attempt budget.
@@ -145,10 +157,30 @@ priceYesBefore · priceYesAfter
 | `guard_low` / `guard_high` | 0.02 / 0.95 |
 | `endgame_hours` | 72 |
 | `lock_timeout_ms` | 100 |
-| `enabled` | true |
+| `enabled` | **false** — see below |
 | `effective_from` | migration timestamp |
 
 Changing any parameter is one INSERT. The history ships in the dataset.
+
+**The seeded row is `enabled = false`, and arming is a separate operator step.**
+ADR-0024 applies the migration to production *before* the new code is promoted, so a
+row seeded `true` would let the injector write `pool.liquidity_added` rows into a
+database whose running code cannot read them — under-reporting `settleMarket`'s
+residual by the injected discard, on a terminal append-only row. The window is
+minutes and the fix costs one INSERT, which is the mechanism this section already
+prescribes rather than a workaround for it. **Arm after the promote:**
+
+```sql
+INSERT INTO liquidity_policy
+  (version, coefficient, floor, trigger_ratio, guard_low, guard_high,
+   endgame_hours, lock_timeout_ms, enabled, effective_from)
+VALUES (2, 500, 100000, 0.80, 0.02, 0.95, 72, 100, true, now());
+```
+
+then **verify a heartbeat row appears within 120 s** —
+`SELECT max(ran_at) FROM liquidity_heartbeat;`. The heartbeat is written on every
+tick regardless of `enabled`, so a heartbeat that is already current before the arming
+INSERT proves the *job* is alive; the one after it proves the *policy* was read.
 
 ### H · Heartbeat and alarms
 
@@ -160,6 +192,15 @@ Through the existing `cron_alarms` path (RECON-2 §8a, §8d):
 | `liquidity_undershoot` | any `Open` market below 60% of target for 60 minutes |
 
 The first is the one that matters. A stopped job produces no error.
+
+**The heartbeat is written on every tick, including the disabled, frozen and
+no-policy paths** — it is evidence the *job* ran, never evidence it injected, and
+conflating those two makes a stopped cron indistinguishable from a quiet one.
+**`liquidity_silence` evaluates only while the newest policy row has
+`enabled = true`**, so the deliberate gap between the migration applying and the
+arming INSERT does not alarm. The cost of that gate is that a registration which
+failed before arming is not caught by the alarm; the Runbook's 120-second heartbeat
+check after the arming INSERT is what closes it.
 
 ### I · Chart replay
 
@@ -200,7 +241,7 @@ The first is the one that matters. A stopped job produces no error.
 
 **Discards are large.** The discard fraction is `1 − min(p,1−p) / max(p,1−p)`: 88.9% at the 10/90 open, ~75% across a launch hour (SIM-2 §2c). At 10,000 signups/hour one market commits ~4M Đ and discards ~3M of it; eight markets, ~32M/hour. The currency is minted, soulbound, and dispensable — the cost is bookkeeping. But the numbers will look strange to a reader of the dataset cold; the export carries a one-line explanation of what a discard is, and the `D` identity exists so the books close.
 
-**`k` is no longer preserved across a market's life.** It was never asserted constant — INV-C2 is `k′ ≥ k`, and all twelve staging pools already measure `k > seed²` (RECON-2 §2, §4.3). The invariant becomes: `k` changes only through `pool.liquidity_added` events. Any other change is a named bug.
+**`k` is no longer preserved across a market's life.** It was never asserted constant — INV-C2 is `k′ ≥ k`, and the staging pools already measure it: **14 pools, 13 with `k > k_at_open`, one exactly at it (a market nobody has bet), none below** (measured 2026-09-07 at LIQ-1-P2 execute; RECON-2 §2/§4.3 measured the same property on the twelve that then existed). ⚠ The pool count is **14**, not twelve — 15 staging fixtures, one of which drops its pool. The invariant becomes: `k` changes only through `pool.liquidity_added` events. Any other change is a named bug.
 
 **Three critical-path functions are touched** — `openMarket`, `voidMarket`, `settleMarket` — plus the chart walker. The bet transaction is not.
 
@@ -210,7 +251,7 @@ The first is the one that matters. A stopped job produces no error.
 
 ## Execution
 
-Two phases, each its own PR, each reviewed at Gate C by the senior reviewer assigned on the PR, with this ADR and the three measurement reports in hand. Ratified as below.
+Two phases, each its own PR, each reviewed at Gate C by the orchestrator's diff read, with this ADR and the three measurement reports in hand. Ratified as below.
 
 | | Phase 1 — open where you say | Phase 2 — depth follows signups |
 |---|---|---|
@@ -229,7 +270,7 @@ Plan-mode precedes each phase from this ADR. A fresh session executes each ratif
 |---|---|
 | Price invariance | A moves price by ≤ 1e-18 across ≥ 10,000 fuzzed reserve pairs, including 90:1 |
 | Differential | SQL and TypeScript A agree across the same fuzz |
-| `k` monotone with named door | `k′ ≥ k` across buy/sell/inject; `k′ > k` only on inject |
+| `k` changes only through a named door | every reserve write has exactly one event row; between consecutive events `k` is unchanged; buy/sell `k′ ≥ k`; inject `k′ > k` by the computed amount; open sets `k` |
 | Backing identity | E holds after open, after N buys and sells, after N injections, on both outcomes |
 | Void, asymmetric | `voidMarket` on a 90,000/10,000 market with positions returns and reconciles |
 | Settle, NO outcome | residual = `N + D_no` after injections; `totalPaidOut + residual` = deposited |
@@ -245,20 +286,52 @@ Plan-mode precedes each phase from this ADR. A fresh session executes each ratif
 
 | when | what |
 |---|---|
+| After the prod promote | **Arm it.** `INSERT INTO liquidity_policy (…) VALUES (…, enabled = true, now());` then verify a `liquidity_heartbeat` row within **120 s**. The migration seeds `enabled = false` on purpose (§G) — until this INSERT runs, the injector is a no-op and `liquidity_silence` is not evaluated |
 | 15 Sep, 00:00 UTC | Seed all eight at 90,000 / 10,000 — on the day, not before (chart axis clips a pre-window genesis) |
 | 15 Sep, 18:00 UTC | Measure real deployment from the ledger. If it differs from staging's 18% by more than 2×, INSERT a new `coefficient` |
 | `liquidity_silence` fires | Call the injector function by hand — same body the cron runs. Then find out why the cron stopped |
 | `liquidity_undershoot` fires | A market is stuck at a guard or the lock. Look; it is information |
 | Any tuning | INSERT into `liquidity_policy`. Never UPDATE. Never a deploy |
 
-## Open for plan-mode
+## Closed by plan-mode
 
-- Where the backing-identity function lives (events sum is decided; only its file location is open).
-- Whether the injector's `count(*) FROM users` needs `pg_class.reltuples` at 100k rows (it is an index-only scan; probably not).
-- The exact name of the migration, which must not match `*pg_cron*` unless it carries the `cron.schedule` line (RECON-2 §8c rule 3).
+All three were open questions for plan-mode and plan-mode has run. Answered here so a
+later reader does not re-derive them, and so this section stops describing as undecided
+three things that are decided and shipped.
+
+- **Where the backing-identity function lives.** `src/server/markets/backing.ts` —
+  `requireMarketDiscards`, landed in Phase 1. Phase 2 adds a *second* query beside the
+  genesis read rather than widening it.
+- **Whether `count(*) FROM users` needs `pg_class.reltuples` at 100k rows.** **No — and
+  the premise above was wrong.** Measured on 100,000 rows: `Aggregate … actual
+  time=8.075..8.075`, **Seq Scan**, 736 shared buffers. It is not an index-only scan; the
+  conclusion was right for the wrong reason (`O-13`). 8.1 ms is 0.013% of the 60 s
+  interval. `reltuples` is refused separately: it is ANALYZE-lagged, which would make the
+  target irreproducible for a dataset reader (Driver 6).
+- **The exact name of the migration.** `0027_liquidity_injector_pg_cron.sql`. It **does**
+  match `*pg_cron*`, and must: it carries the `cron.schedule` registrations, so CI's
+  `^`-anchored strip has to find it. The rule reads *must not match unless it carries the
+  line* — this file carries the line.
+
+## Patch record
+
+**P1 · 2026-09-07 · LIQ-1-P2 execute.** Seven founder rulings taken at the Phase-2
+kickoff. The decision is unchanged; what moved is the consumer surface, so this is an
+in-place patch and not a supersession (CLAUDE.md §5.12). **Each correction is written
+into the section that carried the superseded text** — this block records the change, it
+does not deliver it (`O-5`).
+
+| ruling | section | what changed |
+|---|---|---|
+| R2 | §Acceptance | the `k` row asserted `k′ > k` only on inject. **False as written** — `cpmm.md` §12 E2 is a *buy* that raises `k` by `floor18` dust, and INV-C2 is `k′ ≥ k`. Restated as the named-door property the §Consequences paragraph already carried. |
+| R4 | §G, §H, §Runbook | the seeded policy row becomes `enabled = false`, armed by an operator INSERT after the promote; the heartbeat writes on every tick regardless of `enabled`; `liquidity_silence` evaluates only while the newest policy is enabled. |
+| R8 | §D | the injector is a `FUNCTION` invoked with `SELECT`, matching `0007`/`0011`, with a per-market subtransaction and no `COMMIT` in the body. Recorded here; the body lives in the plan's §4 and migration `0027`. |
+| R9 | §Execution | Gate C is *the orchestrator's diff read*, not a senior reviewer assigned on the PR. |
+| R9 | §Consequences, §Drift | the staging pool count is **14**, not twelve — re-measured. |
+| R9 | §Open for plan-mode | retitled **Closed by plan-mode**; all three answered, the `count(*)` one with the measurement that contradicts its stated premise. |
 
 ## Drift recorded, not acted on
 
-- `AGENTS.md` §9:445 says staging's markets carry no `market.opened`; all twelve do (`chart-4-genesis-backfill`).
+- `AGENTS.md` §9:445 says staging's markets carry no `market.opened`; **all fourteen do** (`chart-4-genesis-backfill`; re-measured 2026-09-07 — 14 pools, 0 without a genesis row).
 - ADR-0013 §2's lock order names `friendly_fire_events`, dropped at `0018`.
 - `0007` asks for pg_cron `WITH SCHEMA extensions`; it lives in `pg_catalog`.
