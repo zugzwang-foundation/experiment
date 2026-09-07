@@ -169,6 +169,25 @@ export const NEVER_DISABLED_GUARD_NAMES: readonly string[] = [
  * the still-live trigger aborts the whole batch instead of quietly wiping it.
  * That refusal is proven by the atomicity test.
  *
+ * `liquidity_policy` — THE SECOND ONE, and its argument is `system_state`'s
+ * verbatim in shape. It carries a `bucket_a_no_truncate` guard in 0027, so the
+ * guard list makes it look truncatable in exactly the same misleading way. Its
+ * seed row is written by migration 0027, which drizzle believes is applied and
+ * will never re-run; `db:seed:staging` seeds only identity_pool. And the
+ * injector's read is `SELECT … LIMIT 1` followed by `IF NOT FOUND OR NOT
+ * p.enabled THEN RETURN` — so a MISSING ROW FAILS CLOSED SILENTLY: the injector
+ * would stop injecting forever, look exactly like a quiet market, and report
+ * nothing, because the heartbeat it still writes says only that the job ran.
+ * Leaving its guard enabled turns the omission into an active defence, the same
+ * way `system_state`'s does: a future edit that adds it to the truncate set
+ * aborts the whole batch instead of quietly wiping the policy.
+ *
+ * ⚠ `liquidity_heartbeat` is in NEITHER list and carries no guard at all — it
+ * is operational, on the `watermark_state` / `cron_alarms` precedent. It is
+ * therefore not in DISABLED_TRUNCATE_GUARDS either, and the parity test's
+ * "guards outside the bucket_% catalog are named, not forgotten" case is
+ * unaffected (`lots_no_delete` remains the only entry).
+ *
  * `drizzle.__drizzle_migrations` is excluded structurally rather than by name:
  * it lives in the `drizzle` schema, appears in no guard list, and is not
  * FK-reachable from `public`, so CASCADE cannot reach it and an unqualified
@@ -177,7 +196,10 @@ export const NEVER_DISABLED_GUARD_NAMES: readonly string[] = [
  * populated schema; /api/health would report drift. verifyPostReset checks its
  * row count for exactly that reason.
  */
-export const TRUNCATE_EXCLUSIONS: readonly string[] = ["system_state"];
+export const TRUNCATE_EXCLUSIONS: readonly string[] = [
+	"system_state",
+	"liquidity_policy",
+];
 
 /**
  * Public tables that are in neither TRUNCATE_SET nor TRUNCATE_EXCLUSIONS.
@@ -268,14 +290,19 @@ export const TRUNCATE_SET: readonly string[] = [
 
 /**
  * Rows the `bucket_%` catalog query returns when every guard is present:
- * 23 relations × 3 Bucket-A families + 3 relations × 3 Bucket-B families.
+ * 24 relations × 3 Bucket-A families + 3 relations × 3 Bucket-B families.
+ *
+ * 78 → 81 at LIQ-1 Phase 2: `liquidity_policy` is the 24th Bucket-A relation
+ * and 0027 attaches all three families to it, reusing the shared 0003/0021
+ * functions. `liquidity_heartbeat` adds NOTHING here — it is operational and
+ * carries no trigger, which is the whole reason it must not be `bucket_%`-named.
  *
  * FORWARD OBLIGATION (ADR-0030): any migration that adds an `events` partition
  * or a new protected table must add the matching triggers — and this number
  * moves with it. It is pinned so that drift fails loudly here rather than
  * silently narrowing what the reset verifies.
  */
-export const EXPECTED_GUARD_CATALOG_ROWS = 78;
+export const EXPECTED_GUARD_CATALOG_ROWS = 81;
 
 export type StagingTarget =
 	| { readonly ok: true; readonly url: string; readonly fragment: string }

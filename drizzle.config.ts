@@ -10,7 +10,15 @@ export default defineConfig({
 	},
 	// events table is hand-written (PARTITION BY RANGE) per ADR-0005 §5.
 	// Excluded from drizzle-kit auto-generation; ships in 0002_events_partitioning.sql.
-	tablesFilter: ["!events"],
+	//
+	// liquidity_heartbeat is OPERATIONAL, not a domain table — the
+	// watermark_state / cron_alarms precedent from 0007, neither of which is
+	// declared in Drizzle either. It is hand-written in
+	// 0027_liquidity_injector_pg_cron.sql. Without this entry `db:check-drift`
+	// reports a table Drizzle does not know about and CI reds on a table that is
+	// exactly where it is meant to be. `liquidity_policy` IS declared
+	// (src/db/schema/liquidity.ts) and is deliberately absent from this list.
+	tablesFilter: ["!events", "!liquidity_heartbeat"],
 	casing: "snake_case",
 	strict: true,
 	verbose: true,
