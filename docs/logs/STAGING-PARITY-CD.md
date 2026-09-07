@@ -243,7 +243,12 @@ G5.3 positions staked (P-owner/M7) = 1000.000000000000000000
 G5.4 discovery staked total (M2)   = 3420.000000000000000000
 G5.5 header portfolio (P-owner)    = 1508.488877872174201787
 G5.6 profile tiles netPL (P-owner) = 1125.026094700653166188
-G5.7 live bets: max_stake=1500, four_digit_stakes=2
+G5.7b live bets: max_stake=250, cap=250 | holdings: max_basis=1000, four_digit_holdings=1
+     ⚠ was `max_stake=1500, four_digit_stakes=2` until 2026-09-07. Both figures were
+     the fixtures breaking BET_MAX_STAKE (L-6); the criterion they satisfied was
+     unsatisfiable through the product (LIQ-1-FIX-2 H-1). G5.7b now asserts the cap
+     HOLDS and that a four-digit HOLDING — Σ lots.surviving_basis per (user, market,
+     side) — still exists. Carrier: P-owner/M7/YES, 4 x 250 Đ, never sold.
 ```
 
 ---

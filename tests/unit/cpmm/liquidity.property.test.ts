@@ -382,3 +382,235 @@ describe("liquidity.property — ADR-0047 §A/§B reserve placement (T1b)", () =
 		expect(getPrices(out.reserves).yes).toBe("0.500000000000000000");
 	});
 });
+
+// ─── LIQ-1 Phase 2 · T1 — the EXACTNESS contract (plan §3 T1; OD-1 / R1) ────
+//
+// Everything above is Phase 1's suite and stays green UNCHANGED. Those
+// properties are RELATIONS over the module's own outputs — the price moves by
+// at most one ulp, the backing closes exactly — and a body that is one ulp low
+// satisfies every one of them. That is precisely why they did not catch M-1,
+// and it is why this is a new block rather than a tightened tolerance up there.
+//
+// The claim here is different in KIND: `floor18(S + a·S/L)` must be the EXACT
+// floor, not the floor of a precision-50 approximation. Measured (plan §9 M-1):
+// where the true quotient lands on an 18-dp boundary AND `a·S` needs more than
+// 50 significant digits, decimal.js rounds the PRODUCT first, the quotient
+// reads `…09799999999999999999999` instead of `…098`, and `floor18` drops a
+// whole ulp — 0.000% below 1e7 reserves, 6.2–6.9% at and above 1e8 in the
+// `S == L` family, 0 of 50,000 at the D-14 90:1 skew.
+//
+// ⛔ THE ORACLE IS INTEGER ARITHMETIC, NOT A SECOND DECIMAL.JS CALL. Checking
+// `addLiquidity` against a differently-configured decimal.js would compare one
+// approximation against another and agree on every vector where both happen to
+// round the same way — the shape of a test that cannot fail. `exactShortAfter`
+// is exact by construction: every quantity is an exact multiple of 1e-18 (the
+// NUMERIC(38,18) column), so the whole formula is integer arithmetic on scaled
+// units, and BigInt division truncates toward zero — which IS floor for the
+// strictly-positive operands `requirePositive` admits. There is no ulp for it
+// to be low by.
+//
+// This file is also the reason the T5 SQL↔TS differential
+// (`tests/db/cpmm/liquidity-differential.spec.ts`) is allowed to use
+// `addLiquidity` as its oracle at all: ADR §A's "two implementations, one
+// definition" only means something if the definition side is pinned to
+// something that is not an implementation.
+
+/** The vector, measured. `yes = no`, both above 1e8 — the `S == L` family at
+ * the magnitude where M-1 bites. */
+const M1_RESERVE = "412210715.000275296202860772";
+const M1_AMOUNT = "259972213.000482476402074098";
+/** `S + a`, exactly. At `S == L` the quotient `a·S/L` IS `a`, so the short side
+ * absorbs the whole amount and both reserves land here. */
+const M1_EXPECTED = "672182928.000757772604934870";
+/** What the shipped precision-50 body answers instead: one ulp low, with a
+ * 1e-18 discard that ADR §A's own definition (`discarded = a·(1 − S/L)`) says
+ * cannot exist at `S/L = 1`. */
+const M1_SHIPPED_WRONG = "672182928.000757772604934869";
+
+/** The EXACT `floor18(S + a·S/L)` in scaled 1e-18 units — integer arithmetic
+ * only. BigInt `/` truncates toward zero; all three operands are strictly
+ * positive, so truncation is floor. */
+function exactShortAfter(l: bigint, s: bigint, a: bigint): bigint {
+	return s + (a * s) / l;
+}
+
+/** ≥ 10,000 cases (plan §3 T1). Its own literal seed, distinct from the shared
+ * `SEED` above — a fuzz that names a defect RATE has to be replayable for the
+ * same reason a differential does. */
+const P2_SEED = 20260907;
+const P2_NUM_RUNS = 10_000;
+/** `[1e2, 1e18)` in whole Đ, decade-stratified. `fc.bigInt` draws LINEAR-
+ * uniformly, so an unstratified 16-decade window would put ~90% of its mass in
+ * the top decade and never visit the magnitudes where M-1 does NOT fire — half
+ * of what this property claims. */
+const P2_DECADE_MIN = 2;
+const P2_DECADE_MAX = 17;
+
+/**
+ * The three adversarial families, FORCED rather than hoped for.
+ *
+ * `S == L` is the one that found M-1, and a run without it agrees everywhere.
+ * `L == 2S` is its nearest neighbour with a terminating quotient. `90:1` is ADR
+ * §Acceptance's named skew, where the measured M-1 rate is 0 of 50,000 — i.e.
+ * the family that must STAY exact, so a fix cannot buy correctness at one ratio
+ * by losing it at another. `free` is the unconstrained control.
+ */
+type ExactFamily = "S==L" | "L==2S" | "90:1" | "free";
+const EXACT_FAMILIES: readonly ExactFamily[] = [
+	"S==L",
+	"L==2S",
+	"90:1",
+	"free",
+];
+
+/** A whole-Đ magnitude in `[1e2, 1e18)` with an arbitrary 18-dp tail, as scaled
+ * units. The fractional tail is not decoration: an integer-valued reserve keeps
+ * `a·S` inside 50 significant digits and hides the defect entirely. */
+const magnitudeUnitsArb: fc.Arbitrary<bigint> = fc
+	.integer({ min: P2_DECADE_MIN, max: P2_DECADE_MAX })
+	.chain((d) =>
+		fc.tuple(
+			fc.bigInt({ min: pow10(d), max: pow10(d + 1) - BigInt(1) }),
+			fc.bigInt({ min: BigInt(0), max: SCALE - BigInt(1) }),
+		),
+	)
+	.map(([whole, frac]) => whole * SCALE + frac);
+
+/** Place a family's `(L, S)` onto the `(yes, no)` columns. `yesIsLong` runs
+ * BOTH orientations through every family: long/short selection is a branch in
+ * the subject, and a fuzz that only ever made `yes` long leaves half of it
+ * unexercised. */
+function placePair(
+	family: ExactFamily,
+	base: bigint,
+	other: bigint,
+	yesIsLong: boolean,
+): { yes: bigint; no: bigint } {
+	let long: bigint;
+	let short: bigint;
+	if (family === "S==L") {
+		long = base;
+		short = base;
+	} else if (family === "L==2S") {
+		long = base;
+		short = base / BigInt(2);
+	} else if (family === "90:1") {
+		long = base;
+		short = base / BigInt(90);
+	} else {
+		long = base >= other ? base : other;
+		short = base >= other ? other : base;
+	}
+	// Unreachable at these magnitudes (base ≥ 1e2 Đ = 1e20 units), but a zero
+	// reserve is a `requirePositive` THROW rather than a wrong answer, and a
+	// generator that can produce one turns a value assertion into a crash.
+	if (short <= BigInt(0)) {
+		short = BigInt(1);
+	}
+	return yesIsLong ? { yes: long, no: short } : { yes: short, no: long };
+}
+
+describe("liquidity.property — ADR-0047 §A is EXACT, not precision-50 (T1)", () => {
+	it("liquidity::exact-at-symmetric-reserves-above-1e8", () => {
+		const out = addLiquidity({
+			reserves: { yes: M1_RESERVE, no: M1_RESERVE },
+			amount: M1_AMOUNT,
+		});
+
+		// THE assertion. At `S == L` the quotient `a·S/L` is `a` exactly, so the
+		// short side absorbs the whole amount and BOTH reserves land on `S + a`.
+		// There is nothing to round here at all, which is what makes this the
+		// clearest available statement of the defect: the answer is not a
+		// question of tolerance, it is an addition.
+		expect(out.reserves.no).toBe(M1_EXPECTED);
+		expect(out.reserves.yes).toBe(M1_EXPECTED);
+
+		// …and therefore NOTHING is discarded. A non-zero discard at `S/L = 1`
+		// contradicts ADR §A's own definition of the discard.
+		expect(out.discardedNo).toBe("0.000000000000000000");
+		expect(out.discardedYes).toBe("0.000000000000000000");
+
+		// Derived rather than transcribed: the constant above is a convenience
+		// for the reader, and THIS is the claim.
+		expect(toUnits(out.reserves.no)).toBe(
+			toUnits(M1_RESERVE) + toUnits(M1_AMOUNT),
+		);
+
+		// ⛔ THE SHIPPED ANSWER, NAMED. Without this line a future body wrong in
+		// some NEW way could still be one ulp low here, and the failure would
+		// read as an arbitrary numeric mismatch. Pinned as the value being
+		// rejected, so the diagnosis outlives the fix.
+		expect(out.reserves.no).not.toBe(M1_SHIPPED_WRONG);
+	});
+
+	it("liquidity::floor-is-exact-across-magnitudes", () => {
+		const drawn: Record<ExactFamily, number> = {
+			"S==L": 0,
+			"L==2S": 0,
+			"90:1": 0,
+			free: 0,
+		};
+
+		fc.assert(
+			fc.property(
+				fc.constantFrom(...EXACT_FAMILIES),
+				magnitudeUnitsArb,
+				magnitudeUnitsArb,
+				magnitudeUnitsArb,
+				fc.boolean(),
+				(family, base, other, amountUnits, yesIsLong) => {
+					drawn[family] += 1;
+					const pair = placePair(family, base, other, yesIsLong);
+
+					const out = addLiquidity({
+						reserves: {
+							yes: decimalString(pair.yes),
+							no: decimalString(pair.no),
+						},
+						amount: decimalString(amountUnits),
+					});
+
+					// Ties go to `yes` — the subject's own rule, not a guess. At
+					// `S == L` both branches agree, so this only decides which
+					// COLUMN carries the (zero) discard.
+					const yesLong = pair.yes >= pair.no;
+					const l = yesLong ? pair.yes : pair.no;
+					const s = yesLong ? pair.no : pair.yes;
+					const sPrime = exactShortAfter(l, s, amountUnits);
+
+					const afterLong = toUnits(
+						yesLong ? out.reserves.yes : out.reserves.no,
+					);
+					const afterShort = toUnits(
+						yesLong ? out.reserves.no : out.reserves.yes,
+					);
+					const discardLong = toUnits(
+						yesLong ? out.discardedYes : out.discardedNo,
+					);
+					const discardShort = toUnits(
+						yesLong ? out.discardedNo : out.discardedYes,
+					);
+
+					// The long side takes the whole amount — exact add, no rounding.
+					expect(afterLong).toBe(l + amountUnits);
+					// ⛔ THE LOAD-BEARING LINE: the short side is the EXACT floor.
+					expect(afterShort).toBe(sPrime);
+					// The discard is the residual OF THE EXACT FLOOR, so the backing
+					// identity closes on the corrected value and not on the old one.
+					expect(discardLong).toBe(BigInt(0));
+					expect(discardShort).toBe(amountUnits - (sPrime - s));
+					expect(toUnits(out.backingMinted)).toBe(amountUnits);
+				},
+			),
+			{ seed: P2_SEED, numRuns: P2_NUM_RUNS },
+		);
+
+		// ⭐ THE COVERAGE CONTROL. "Forced" is a claim about the RUN, not about
+		// the generator's type. A `constantFrom` that silently stopped drawing
+		// `S==L` would leave this property green while the only family that finds
+		// M-1 went unexercised — a green test proving nothing. Asserted.
+		for (const family of EXACT_FAMILIES) {
+			expect(drawn[family]).toBeGreaterThan(0);
+		}
+	});
+});

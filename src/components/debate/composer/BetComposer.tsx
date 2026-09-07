@@ -509,7 +509,8 @@ export function BetComposer(props: {
 	 * ⛔ C2 AND OVER-CAP ARE PROVABLY EXCLUSIVE, so their relative order can
 	 * never be observed: `assessAmount` clamps to `spendableToday` BEFORE reading
 	 * the cap, so in the C2 state the clamped amount is ≤ spendable < floor
-	 * (50) ≪ `BET_MAX_STAKE` (10,000) and `overCap` cannot be true. Stated
+	 * (50) ≪ `BET_MAX_STAKE` (250 since ADR-0047; 10,000 before it — the
+	 * ARGUMENT is unchanged, the figure was not) and `overCap` cannot be true. Stated
 	 * because it is the reason this chain needs no tie-break between them.
 	 *
 	 * ⛔ THE C2 SENTENCE SHIPS VERBATIM from `c2Sentence` — not shortened, not

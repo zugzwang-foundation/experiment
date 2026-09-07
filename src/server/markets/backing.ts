@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 
 import type { DbClient, DbTransaction } from "@/db";
 import { events } from "@/db/schema";
@@ -174,28 +174,109 @@ export async function requireMarketDiscards(
 		);
 	}
 	const opened = readOpenedReserves(genesis);
+	const injected = await sumInjectionDiscards(client, marketId);
+
 	return {
-		yes: toFixed18(new CpmmDecimal(opened.dYes)),
-		no: toFixed18(new CpmmDecimal(opened.dNo)),
+		yes: toFixed18(new CpmmDecimal(opened.dYes).plus(injected.yes)),
+		no: toFixed18(new CpmmDecimal(opened.dNo).plus(injected.no)),
 	};
 }
 
 /**
- * ⚠ PHASE 2 OWES A SECOND, SUMMING QUERY HERE — and the ratified plan says the
- * opposite, so read this before following it. `docs/plans/LIQ-1-P1_plan.md` §4
- * T6 instructs that this function SUM, "so Phase 2 adds `pool.liquidity_added`
- * to the same `WHERE event_type IN (...)` and no call site changes". Executing
- * that reintroduces the defect `@code-reviewer` found at HIGH-1: genesis is once
- * per market and `I-GENESIS-001` is a `NOT EXISTS` predicate with no unique index
- * behind it, so summing lets a duplicate genesis row double `D`. The plan was
- * amended at the LIQ-1-P1-EXEC close; if you are reading a copy that still says
- * "sum", it is stale.
+ * The injection half of `D` (ADR-0047 §E), and the reason it is a SEPARATE
+ * query from the genesis read.
  *
- * ADR-0047 §E defines `D` as summed from `market.opened` AND every
- * `pool.liquidity_added`. Injections ARE many and DO sum — in their own query,
- * added alongside this one. A Phase-2 injector that lands without it makes
- * `settleMarket` under-report by the whole injected discard, silently, on a
- * terminal row.
+ * ⛔ DO NOT MERGE THIS INTO `readGenesisRow` BY WIDENING ITS `event_type`
+ * PREDICATE. That is the shape LIQ-1 Phase 1's plan prescribed and the shape
+ * `@code-reviewer` rejected at HIGH-1: genesis is once per market, injections
+ * are many, and a single summing query gives the two opposite treatments no way
+ * to coexist. `I-GENESIS-001` is a `NOT EXISTS` predicate with no unique index
+ * behind it, so a duplicate `market.opened` row — a restored snapshot, a
+ * hand-fixed status, a replayed backfill — would DOUBLE `D` on a terminal,
+ * append-only payout row, silently. The genesis read stays `LIMIT 1` precisely
+ * so that a duplicate is ignored rather than counted twice; the injection read
+ * has no `LIMIT` and no `ORDER BY` precisely because summing is order-free and
+ * every row must count.
+ *
+ * Two queries, two contracts. One query cannot hold both.
+ *
+ * ⚠ COST (plan §9 R-6). This runs inside the same W-3 transaction, under the
+ * pool lock, inside a 5 s `statement_timeout` whose `57014` is NOT retryable.
+ *
+ * ⚠ **AND IT IS NOT DRIVEN BY THE INJECTION COUNT.** An earlier version of this
+ * note reasoned from "roughly 30 injection rows per market", which is the wrong
+ * quantity: `event_type` is not in `events_aggregate_idx (aggregate_type,
+ * aggregate_id, created_at)`, so it is applied as a FILTER and this aggregate
+ * has NO EARLY EXIT — it scans the market's whole `(market, marketId)` range
+ * across every partition, exactly as the genesis read does, and is therefore
+ * driven by the same `bet.sold` VOLUME. The verdict is unchanged (~2 × the
+ * genesis probe's measured 15.2 ms at 200,000 `bet.sold` rows, against a
+ * 5,000 ms budget), but the reason now supports it.
+ *
+ * ⚠ `requireMarketDiscards` is now TWO round trips while the pool lock is held.
+ * On `bom1` that is ~5 ms of added lock hold on the settlement path.
+ *
+ * `COALESCE(…, 0)` is load-bearing: `SUM` over zero rows is NULL, and a market
+ * with no injections is the normal case for the whole of Phase 1's history.
+ */
+async function sumInjectionDiscards(
+	client: DbClient | DbTransaction,
+	marketId: string,
+): Promise<{ yes: string; no: string }> {
+	const rows = await client
+		.select({
+			// A bare `sql<T>` fragment has NO decoder — the value arrives as a
+			// wire string while tsc stays green — so these are read as strings
+			// and re-parsed by CpmmDecimal, never by JS number arithmetic.
+			// ⚠ THE PAYLOAD DOES NOT CARRY `discardedYes`/`discardedNo`. ADR-0047
+			// §F names ONE amount, `discardedShares`, plus the side it fell on,
+			// `discardedSide` — because an injection discards on exactly one side
+			// by construction (the SHORT one), where an open discards on both.
+			// The plan's T8 sketch copied `market.opened`'s two key names and
+			// would have summed two keys that are never present, returning 0 for
+			// every market forever: green tests, silent under-report on a
+			// terminal payout row. Caught by the T8 fixture, which was written
+			// from the ADR rather than from the plan.
+			yes: sql<string>`COALESCE(SUM((${events.payload}->>'discardedShares')::numeric) FILTER (WHERE ${events.payload}->>'discardedSide' = 'YES'), 0)::text`,
+			no: sql<string>`COALESCE(SUM((${events.payload}->>'discardedShares')::numeric) FILTER (WHERE ${events.payload}->>'discardedSide' = 'NO'), 0)::text`,
+		})
+		.from(events)
+		.where(
+			and(
+				eq(events.aggregateType, "market"),
+				eq(events.aggregateId, marketId),
+				eq(events.eventType, "pool.liquidity_added"),
+			),
+		);
+
+	// Returned as STRINGS, not as CpmmDecimal instances: `CpmmDecimal` is a
+	// cloned constructor (a value), so naming it in a type position is a
+	// TS2749, and the caller re-enters exact arithmetic anyway.
+	return { yes: rows[0]?.yes ?? "0", no: rows[0]?.no ?? "0" };
+}
+
+/**
+ * ✅ THE PHASE-2 DEBT IS PAID: the second query is `sumInjectionDiscards`, above,
+ * and this block is kept as the record of why it is second rather than merged.
+ *
+ * It read "PHASE 2 OWES A SECOND, SUMMING QUERY HERE", against a ratified Phase-1
+ * plan that said the opposite — `docs/plans/LIQ-1-P1_plan.md` §4 T6 instructed
+ * that THIS function sum, "so Phase 2 adds `pool.liquidity_added` to the same
+ * `WHERE event_type IN (...)` and no call site changes". Following that would
+ * have reintroduced the defect `@code-reviewer` found at HIGH-1: genesis is once
+ * per market, `I-GENESIS-001` is a `NOT EXISTS` predicate with no unique index
+ * behind it, and summing lets a duplicate genesis row double `D` on a terminal,
+ * append-only payout row.
+ *
+ * What landed instead: `requireMarketDiscards` composes a capped genesis read
+ * and an uncapped injection sum, and **its two call sites — `settle.ts` and
+ * `void.ts` — did not change at all**, which was the point. The money path keeps
+ * exactly one discard reader.
+ *
+ * ⚠ **`readGenesisRow` BELOW IS UNTOUCHED BY PHASE 2** — same three predicates,
+ * same `LIMIT 1`, same `(created_at, event_id)` tiebreak, still byte-identical
+ * to `replayReserveSeries`'s. Widening it is the halt condition this block
+ * exists to name.
  *
  * ⚠ COST, MEASURED (`@security-auditor` HIGH-1, 2026-09-07). `event_type` is
  * NOT in `events_aggregate_idx (aggregate_type, aggregate_id, created_at)`, so

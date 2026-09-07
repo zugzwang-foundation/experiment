@@ -34,6 +34,19 @@ const TRUNCATE_GUARDS: ReadonlyArray<
 	["admin_events", "bucket_a_no_truncate"],
 	["user_events", "bucket_a_no_truncate"],
 	["bet_receipts", "bucket_a_no_truncate"],
+	// LIQ-1 Phase 2 / 0027. ⚠ It carries no inbound FK, so no CASCADE reaches
+	// it and no existing teardown needs it — it is here for the ONE test that
+	// truncates it by name: the append-only spec, which cannot use DELETE
+	// (0003 rejects it) and so has no other way to clean up after proving the
+	// guards reject what they are meant to. That spec re-INSERTs 0027's seed
+	// row afterwards, because the migration will never re-run to restore it.
+	//
+	// ⚠ On STAGING it is the opposite: `liquidity_policy` is a
+	// TRUNCATE_EXCLUSION with its guard left ARMED (tests/staging/_lib/guards.ts).
+	// The two lists disagree on purpose — this one is a local teardown for a
+	// database that is rebuilt at will, that one governs the live staging
+	// database where losing the policy row silently stops every injection.
+	["liquidity_policy", "bucket_a_no_truncate"],
 	// events family — parent + all 13 partitions (statement triggers do not
 	// clone to partitions; each carries its own).
 	["events", "bucket_a_no_truncate"],

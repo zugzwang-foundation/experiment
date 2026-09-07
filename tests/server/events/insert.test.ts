@@ -746,9 +746,15 @@ describe("insertEvent — driver (ENGINE.6 §F + §B)", () => {
 				"market.resolving",
 				// AUDIT-FIX-B5 (1) — the gate-block consequence emit (A13)
 				"moderation.blocked",
+				// ADR-0047 §F / LIQ-1 Phase 2 (1) — the injector's record.
+				// Written by migration 0027's plpgsql rather than by insertEvent,
+				// which is exactly why it has to appear in THIS enumeration: the
+				// only thing tying the SQL writer to the TS readers is that both
+				// sides agree the type exists and what its payload holds.
+				"pool.liquidity_added",
 			].sort(),
 		);
-		expect((EVENT_TYPES as readonly string[]).length).toBe(24);
+		expect((EVENT_TYPES as readonly string[]).length).toBe(25);
 		expect(EVENT_TYPES).not.toContain("image_upload.r2_delete_failed");
 	});
 });

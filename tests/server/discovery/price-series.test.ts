@@ -57,13 +57,18 @@ import { bets, comments, events, markets, pools, users } from "@/db/schema";
 // RED imports: the greenfield constant + loader under test.
 import { DISCOVERY_SERIES_MAX_POINTS } from "@/server/config/limits";
 import {
+	addLiquidity,
 	computeBuy,
 	computeSell,
 	getPrices,
 	type Reserves,
 	seedPool,
 } from "@/server/cpmm/calculate";
-import { loadPriceSeries } from "@/server/discovery/price-series";
+import { CpmmDecimal } from "@/server/cpmm/decimal";
+import {
+	loadPriceSeries,
+	replayReserveSeries,
+} from "@/server/discovery/price-series";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
 import { truncateTables } from "../../db/_fixtures/truncate";
@@ -98,6 +103,10 @@ function asymmetricOpenedPayload(marketId: string): Record<string, unknown> {
 const OPENED_AT = new Date("2026-09-10T00:00:00.000Z");
 const EVENT_1_AT = new Date("2026-09-10T00:05:00.000Z");
 const EVENT_2_AT = new Date("2026-09-10T00:10:00.000Z");
+// LIQ-1 Phase 2 · T10 — a FOURTH instant, so the injected fixture can put a bet
+// strictly AFTER the injection. A walk that skipped the injection would then be
+// applying that bet to the wrong curve, not merely dropping a point.
+const EVENT_3_AT = new Date("2026-09-10T00:15:00.000Z");
 
 async function seedMarket(slug: string): Promise<string> {
 	const [market] = await testDb
@@ -127,7 +136,12 @@ type NewEventRow = typeof events.$inferInsert;
 /** aggregate.type/.id mirror the LIVE emitters: market.opened + bet.sold →
  * ("market", marketId); bet.placed → ("bet", betId). */
 function eventRow(
-	eventType: "market.opened" | "bet.placed" | "bet.sold",
+	eventType:
+		| "market.opened"
+		| "bet.placed"
+		| "bet.sold"
+		// LIQ-1 Phase 2 · T10 — rides the MARKET aggregate, like `bet.sold`.
+		| "pool.liquidity_added",
 	aggregate: { type: "market" | "bet"; id: string },
 	payload: Record<string, unknown>,
 	createdAt: Date,
@@ -746,5 +760,292 @@ describe("UI.A4 §22 — discovery price-series replay (OQ-2 A + F-1)", () => {
 
 		// No pools row seeded → the F-1 check never runs → no warn.
 		expect(vi.mocked(captureMessage)).not.toHaveBeenCalled();
+	});
+
+	// ─── LIQ-1 Phase 2 · T10 — injection replay (plan §3 T10; ADR-0047 §I) ───
+	//
+	// `pool.liquidity_added` rides the MARKET aggregate — the same branch
+	// `bet.sold` uses — so the replay's sold-branch predicate widens from
+	// `eq(eventType, "bet.sold")` to `inArray(eventType, ["bet.sold",
+	// "pool.liquidity_added"])`, and the walk gains a third arm that SETS
+	// reserves to the payload's `reservesAfter`.
+	//
+	// ⛔ SET, NEVER RECOMPUTE (ADR §I). Re-running `addLiquidity` inside the
+	// walk would make the chart a SECOND implementation of the placement
+	// primitive with its own rounding — the exact drift `readOpenedReserves`'s
+	// ⛔ block exists to prevent, one function over. `reservesAfter` is what the
+	// pool actually holds; the chart's job is to say so. These two cases
+	// therefore write the payload and the `pools` row from ONE `addLiquidity`
+	// call, so they assert the WALK and are independent of whether that
+	// primitive is itself exact (which is T1's subject, not this one).
+	//
+	// ⚠ BOTH CASES MOUNT `replayReserveSeries` RATHER THAN SCANNING THE SOURCE.
+	// A mount-position guard has passed the exact defect it named twice in this
+	// repo (`feedback_source_scan_position_is_a_proxy_render_proves_it`), and a
+	// source scan for `pool.liquidity_added` in `price-series.ts` would be
+	// satisfied by an arm that parses the payload and does nothing with it.
+	//
+	// ⚠ The failure without this is SILENT (plan §9 R-3, and the same shape as
+	// the asymmetric-open case above): the F-1 drift check WARNs and always
+	// serves, so an unhandled injection draws a wrong price line on every
+	// Discovery card and every debate page with nothing but a log line behind it.
+
+	/** An ADR §F `pool.liquidity_added` payload, built from a real
+	 * `addLiquidity` result so `reservesAfter` is the pool's actual post-state
+	 * rather than a hand-typed pair the replay could never have produced. */
+	function injectionPayload(args: {
+		marketId: string;
+		before: Reserves;
+		amount: string;
+		out: ReturnType<typeof addLiquidity>;
+	}): Record<string, unknown> {
+		const tankBefore = new CpmmDecimal(args.before.yes)
+			.plus(args.before.no)
+			.toFixed(18);
+		const tankAfter = new CpmmDecimal(args.out.reserves.yes)
+			.plus(args.out.reserves.no)
+			.toFixed(18);
+		const yesIsLong = new CpmmDecimal(args.before.yes).greaterThanOrEqualTo(
+			args.before.no,
+		);
+		return {
+			marketId: args.marketId,
+			policyVersion: 1,
+			target: tankAfter,
+			tankBefore,
+			tankAfter,
+			reservesBefore: { yes: args.before.yes, no: args.before.no },
+			reservesAfter: {
+				yes: args.out.reserves.yes,
+				no: args.out.reserves.no,
+			},
+			backingMinted: args.out.backingMinted,
+			discardedSide: yesIsLong ? "NO" : "YES",
+			discardedShares: yesIsLong ? args.out.discardedNo : args.out.discardedYes,
+			priceYesBefore: getPrices(args.before).yes,
+			priceYesAfter: getPrices(args.out.reserves).yes,
+		};
+	}
+
+	/**
+	 * open → buy → INJECT → buy, at four ascending instants, with the live
+	 * `pools` row carrying the walk's true final reserves.
+	 *
+	 * The second buy is computed off the POST-INJECTION reserves, which is what
+	 * makes the final pool row unreachable by a walk that skipped the injection:
+	 * a replay that drops the injection step does not merely lose a point, it
+	 * applies every later bet to the wrong curve.
+	 */
+	async function seedInjectedMarket(slug: string): Promise<{
+		marketId: string;
+		steps: { at: Date; reserves: Reserves }[];
+		injectedAt: Date;
+		beforeInjection: Reserves;
+		afterInjection: Reserves;
+	}> {
+		const marketId = await seedMarket(slug);
+		const userId = await seedUser(slug);
+
+		// D-14's own open — the 90:1-adjacent shape the injector actually runs
+		// against, and (plan §9 M-1) a magnitude where `addLiquidity` is exact
+		// today, so this fixture does not depend on T1.
+		const r0: Reserves = { yes: ASYM_YES, no: ASYM_NO };
+		const buy1 = computeBuy({
+			reserves: r0,
+			side: "yes",
+			stake: "250.000000000000000000",
+		});
+		const injectAmount = "400000.000000000000000000";
+		const injection = addLiquidity({
+			reserves: buy1.reserves,
+			amount: injectAmount,
+		});
+		const buy2 = computeBuy({
+			reserves: injection.reserves,
+			side: "no",
+			stake: "100.000000000000000000",
+		});
+
+		const b1 = await seedBetRow({
+			userId,
+			marketId,
+			side: "YES",
+			stake: "250.000000000000000000",
+			shares: buy1.shares,
+			price: buy1.pEff,
+			createdAt: EVENT_1_AT,
+		});
+		const b2 = await seedBetRow({
+			userId,
+			marketId,
+			side: "NO",
+			stake: "100.000000000000000000",
+			shares: buy2.shares,
+			price: buy2.pEff,
+			createdAt: EVENT_3_AT,
+		});
+
+		await testDb.insert(events).values([
+			eventRow(
+				"market.opened",
+				{ type: "market", id: marketId },
+				asymmetricOpenedPayload(marketId),
+				OPENED_AT,
+			),
+			eventRow(
+				"bet.placed",
+				{ type: "bet", id: b1.betId },
+				betPlacedPayload({
+					betId: b1.betId,
+					marketId,
+					userId,
+					commentId: b1.commentId,
+					side: "YES",
+					stake: "250.000000000000000000",
+					shares: buy1.shares,
+					price: buy1.pEff,
+				}),
+				EVENT_1_AT,
+			),
+			// The injection rides the MARKET aggregate, exactly as `bet.sold`
+			// does. A row written under the BET aggregate would be invisible to
+			// the market-scoped branch, which is a live way to get this wrong.
+			eventRow(
+				"pool.liquidity_added",
+				{ type: "market", id: marketId },
+				injectionPayload({
+					marketId,
+					before: buy1.reserves,
+					amount: injectAmount,
+					out: injection,
+				}),
+				EVENT_2_AT,
+			),
+			eventRow(
+				"bet.placed",
+				{ type: "bet", id: b2.betId },
+				betPlacedPayload({
+					betId: b2.betId,
+					marketId,
+					userId,
+					commentId: b2.commentId,
+					side: "NO",
+					stake: "100.000000000000000000",
+					shares: buy2.shares,
+					price: buy2.pEff,
+				}),
+				EVENT_3_AT,
+			),
+		]);
+
+		// The live pool carries the TRUE final reserves — post-injection,
+		// post-second-buy.
+		await seedPoolRow(marketId, buy2.reserves.yes, buy2.reserves.no);
+
+		return {
+			marketId,
+			steps: [
+				{ at: OPENED_AT, reserves: r0 },
+				{ at: EVENT_1_AT, reserves: buy1.reserves },
+				{ at: EVENT_2_AT, reserves: injection.reserves },
+				{ at: EVENT_3_AT, reserves: buy2.reserves },
+			],
+			injectedAt: EVENT_2_AT,
+			beforeInjection: buy1.reserves,
+			afterInjection: injection.reserves,
+		};
+	}
+
+	it("price-series::injection-preserves-price", async () => {
+		const fixture = await seedInjectedMarket("disc-series-inject-price");
+
+		// MOUNTED, not scanned: the walk itself.
+		const walk = await replayReserveSeries(testDb, fixture.marketId);
+
+		// FOUR steps — open, buy, INJECT, buy. Today's walk has three, because
+		// the injection is not in the event scan at all; that is the first thing
+		// that reds, and it is the right first thing: a missing step is a missing
+		// point on the chart before it is a wrong number.
+		expect(walk).toHaveLength(4);
+		expect(walk.map((s) => s.at.toISOString())).toEqual(
+			fixture.steps.map((s) => s.at.toISOString()),
+		);
+
+		// ⛔ THE ADR §A CLAIM, AT THE CHART: the injection moves DEPTH and not
+		// PRICE. Driver 3 forbids any operation in this ADR from changing the
+		// value of any participant's position by any amount, and the chart is
+		// where a violation would be seen — a visible step in the line at an
+		// instant no participant traded.
+		const injectionStep = walk[2];
+		expect(injectionStep.at.toISOString()).toBe(
+			fixture.injectedAt.toISOString(),
+		);
+		const before = new CpmmDecimal(getPrices(fixture.beforeInjection).yes);
+		const after = new CpmmDecimal(getPrices(injectionStep.reserves).yes);
+		// ≤ 1e-18, not `<`: `S′` is floored, so one ulp is attainable and `<`
+		// would red a correct implementation (the R4 tolerance, as in the
+		// Phase-1 liquidity property suite).
+		expect(after.minus(before).abs().lessThanOrEqualTo("1e-18")).toBe(true);
+
+		// …and the reserves really did GROW, so the step is an injection and not
+		// a no-op that trivially preserves the price. Without this the assertion
+		// above passes against a walk that ignored the event entirely and simply
+		// repeated the previous reserves.
+		expect(
+			new CpmmDecimal(injectionStep.reserves.yes).greaterThan(
+				fixture.beforeInjection.yes,
+			),
+		).toBe(true);
+		expect(
+			new CpmmDecimal(injectionStep.reserves.no).greaterThan(
+				fixture.beforeInjection.no,
+			),
+		).toBe(true);
+
+		// SET, not recomputed: the step is byte-identical to the payload's
+		// `reservesAfter`. A walk that re-derived it through `addLiquidity` would
+		// usually agree — and the day it did not, the chart would disagree with
+		// the pool with nothing to say why.
+		expect(injectionStep.reserves).toEqual(fixture.afterInjection);
+	});
+
+	it("price-series::replay-matches-pool-after-injection", async () => {
+		const fixture = await seedInjectedMarket("disc-series-inject-pool");
+
+		const walk = await replayReserveSeries(testDb, fixture.marketId);
+		const replayed = walk[walk.length - 1].reserves;
+
+		const [poolRow] = await testDb
+			.select({
+				yesReserves: pools.yesReserves,
+				noReserves: pools.noReserves,
+			})
+			.from(pools)
+			.where(eq(pools.marketId, fixture.marketId));
+
+		// ADR §Acceptance "Replay": chart reserves match the live row after open
+		// + buys + injections, drift = 0. Asserted on the RESERVES, not on the
+		// price — two different reserve pairs can round to the same 18-dp price,
+		// so a price-only assertion would tolerate real drift.
+		expect(replayed.yes).toBe(poolRow?.yesReserves);
+		expect(replayed.no).toBe(poolRow?.noReserves);
+
+		// The same claim through the SHIPPED consistency check, which is the only
+		// signal production has. `loadPriceSeries` WARNs and always serves on
+		// drift (F-1), so this is the arm that says the warn stays silent — and
+		// it must stay a WARN: a concurrent injection between the events scan and
+		// the pool read is now a second legal race alongside a concurrent bet
+		// (plan §3 T10, "do not tighten it").
+		const series = await loadPriceSeries(testDb, fixture.marketId);
+		expect(series).toHaveLength(4);
+		expect(vi.mocked(captureMessage)).not.toHaveBeenCalled();
+
+		// The last point is the post-injection, post-second-buy price — pinned so
+		// a walk that got the right FINAL reserves by some other route (e.g. by
+		// reading the pool row directly) still has to have replayed the steps.
+		expect(series[series.length - 1]).toEqual({
+			at: EVENT_3_AT.toISOString(),
+			yes: getPrices(fixture.steps[3].reserves).yes,
+		});
 	});
 });

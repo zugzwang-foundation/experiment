@@ -143,12 +143,23 @@ export const BET_MIN_STAKE_REPLY = "50";
  * reject; no error code); sell is NEVER clamped. Enforced by `clampStakeToMax`
  * (src/server/bets/floors.ts) at the place route's step 5d ONLY — the constant
  * never enters src/server/cpmm/ (cpmm.md 2.1.0 §13: app-layer guard, the pure
- * functions stay pure). PLACEHOLDER VALUE ("10000", ratified UI-A2 OQ-1 — 10×
- * the initial grant, economically inert by design) — tuned by HARDEN.5 per
- * SPEC.1 §16.1 (number-tuning, ~2026-09-01). Decimal string — never a JS float
- * (CLAUDE.md §2). Coherence (max > reply floor > post floor > 0) is pinned by
- * tests/unit/bets/clamp.test.ts. */
-export const BET_MAX_STAKE = "10000";
+ * functions stay pure).
+ *
+ * ⚠ **PINNED at 250 by ADR-0047 — no longer a HARDEN.5 placeholder.** It was
+ * `"10000"` (ratified UI-A2 OQ-1 as 10× the initial grant, "economically inert
+ * by design") until LIQ-1 Phase 2. The ADR's constants table calls this "the ONE
+ * Appendix B constant this ADR pins", and the reason it belongs to a LIQUIDITY
+ * decision is that the two numbers are one number: a market's depth and the
+ * largest single bite anyone can take out of it are the same question asked
+ * twice. At a 100,000 tank a 10,000 Đ bet is a tenth of the book in one
+ * transaction — the price impact that makes a market read as manipulable rather
+ * than as informative. 250 is a quarter of the initial grant, which keeps a
+ * single bet a contribution rather than an event.
+ *
+ * Decimal string — never a JS float (CLAUDE.md §2). Coherence
+ * (max > reply floor > post floor > 0) is pinned by tests/unit/bets/clamp.test.ts,
+ * and 250 > 50 > 10 > 0 still holds with room to spare. */
+export const BET_MAX_STAKE = "250";
 
 /** Comment body max length (characters). PLACEHOLDER VALUE — tuned by HARDEN.5 per SPEC.1 §10.9 / §16.1. Step-5 body validation maps length > this to `comment_too_long`. */
 export const COMMENT_MAX_LENGTH = 5000;

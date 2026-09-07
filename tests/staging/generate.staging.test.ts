@@ -151,7 +151,7 @@ import { moderateComment } from "@/server/admin/moderation/act";
 import { canonicalizeAmount18 } from "@/server/admin/wire";
 import { auth } from "@/server/auth/index";
 import { acceptTosAction } from "@/server/auth/tos-accept";
-import { assertStakeFloor } from "@/server/bets/floors";
+import { assertStakeFloor, clampStakeToMax } from "@/server/bets/floors";
 import { place } from "@/server/bets/place";
 import { sell } from "@/server/bets/sell";
 import { runBetTransaction } from "@/server/bets/transaction";
@@ -452,6 +452,32 @@ async function placeComment(args: {
 		parentCommentId: args.parentCommentId,
 		stake: args.stake,
 	});
+	// ⛔ AND THE CEILING, WHICH IS THE OTHER SHELL LAYER (L-6). `BET_MAX_STAKE`
+	// is applied at the place ROUTE's step 5d; this runner drives the SERVICE,
+	// so an over-cap fixture stake does not fail here — it LANDS, and staging
+	// ends up holding a position no participant could build through the product.
+	// That is exactly how five of them shipped unnoticed on a replica whose
+	// whole purpose is to look like production.
+	//
+	// It REFUSES rather than clamping. `clampStakeToMax` is reused as the
+	// oracle — so a change to the constant propagates without anyone editing
+	// this line — but its return value is compared, never used: silently
+	// shrinking a stake would produce a green run whose calibrated positions
+	// were quietly smaller than the fixture table says, which is a worse lie
+	// than the one this replaces.
+	//
+	// ⚠ THE ORDER HERE IS FLOOR-THEN-CEILING; THE ROUTE'S IS CLAMP-THEN-FLOOR.
+	// Immaterial while this refuses instead of clamping — a stake that trips
+	// either check never reaches the other — but it is NOT a reproduction of
+	// the shell layer's sequence, and `floors.ts` explains why the route's
+	// order matters (the floor asserts on the CLAMPED value, so a misconfigured
+	// max below the floor rejects loudly rather than executing below it).
+	if (clampStakeToMax(args.stake) !== args.stake) {
+		throw new Error(
+			`REFUSED — fixture ${args.key} stakes ${args.stake}, above BET_MAX_STAKE. ` +
+				"A participant cannot place this through the product; split it into steps in fixtures.ts.",
+		);
+	}
 	const image = args.image ? await uploadFixtureImage(args.userId) : null;
 	// `api/bets/place/route.ts:173` — the SAME expression, for both the retry
 	// tag and the persisted `metadata.flow_id`. A reply is F-COMMENT-2 on the
@@ -566,6 +592,23 @@ beforeAll(async () => {
 	// while the connection says otherwise, and this runner writes ~440 rows.
 	// Throwing here fails every test in the suite WITHOUT executing any of them.
 	await assertRunnerLiveConnection();
+
+	// ⛔ PRE-FLIGHT THE STAKE CEILING TOO, AND FOR THE REASON THE LINE BELOW
+	// ALREADY GIVES. `placeComment` refuses an over-cap fixture (L-6), but it
+	// refuses MID-RUN — after earlier fixtures have committed — which leaves
+	// staging half-built and costs a full reset. A whole-table scan is free and
+	// belongs here beside the identity-pool check, where a blocked run is
+	// surfaced before anything is written. The per-call throw stays as the
+	// backstop; this is the control. (`@code-reviewer`, LIQ-1-FIX-2.)
+	const overCap = [...POSTS, ...REPLIES]
+		.filter((f) => clampStakeToMax(f.stake) !== f.stake)
+		.map((f) => `${f.key}=${f.stake}`);
+	if (overCap.length > 0) {
+		throw new Error(
+			`REFUSED — ${overCap.length} fixture stake(s) above BET_MAX_STAKE: ${overCap.join(", ")}. ` +
+				"A participant cannot place these through the product; split them into steps in fixtures.ts.",
+		);
+	}
 
 	// Pre-flight. Surface a blocked run BEFORE writing half a fixture set.
 	const [poolRow] = await readOnly

@@ -159,7 +159,55 @@ export function addLiquidity({
 	const S = yesIsLong ? n : y;
 
 	const lPrime = L.plus(a);
-	const sPrime = new CpmmDecimal(floor18(S.plus(a.times(S).dividedBy(L))));
+
+	// ⚠ THE QUOTIENT IS TAKEN AT 120 SIGNIFICANT DIGITS, NOT AT THE MODULE'S 50,
+	// and that is a correctness fix rather than caution (ADR-0047; OD-1).
+	//
+	// Measured: at precision 50 this line is ONE ULP LOW on a reachable input
+	// class. Where the exact quotient lands on an 18-dp boundary AND `a·S` needs
+	// more than 50 significant digits, decimal.js rounds the PRODUCT first, so
+	// the quotient reads `…09799999999999999999999` instead of `…098` and
+	// `floor18` drops a whole ulp. Rate at `S == L`: 0.000% below 1e7 reserves,
+	// 6.2–6.9% at and above 1e8, and 0 of 50,000 at the D-14 90:1 skew. Today's
+	// markets do not reach it; one `coefficient` INSERT does, and `p = 0.5` sits
+	// inside the guard band.
+	//
+	// 120 is PROVABLY enough, not merely large. The exact quotient is rational
+	// with denominator `L`, an integer once scaled by 10^18 and bounded by
+	// NUMERIC(38,18) at 10^38 — so its distance from any 18-dp boundary is
+	// either exactly zero or at least 1e-56. There are TWO roundings here, not
+	// one — the division and then the addition — and the sum reaches ~2e20, one
+	// exponent bucket above the quotient, so the honest total perturbation bound
+	// is ~1e-99 rather than the 1e-100 a single rounding would give. Either way
+	// it is 43 orders of magnitude clear of 1e-56, so the rounding cannot cross a
+	// boundary and `floor18` is the EXACT floor for every input the column can
+	// hold. Stated at the true figure because a later reader re-derives from the
+	// number written here, not from the one that was meant.
+	//
+	// ⚠ THE ADDITION IS INSIDE THE HIGH-PRECISION BRACKET, NOT OUTSIDE IT, and
+	// that is not cosmetic — it was measured. Taking only the quotient at 120
+	// and then adding at 50 moves the defect rather than fixing it: `S + q` can
+	// need more than 50 significant digits, decimal.js rounds the SUM, and the
+	// result comes out one ulp HIGH where the old code came out one ulp low.
+	// Counterexample found by the fuzz at `L == 2S`, `S = 100`,
+	// `a ≈ 1e17`. Both halves of `floor18(S + a·S/L)` have to be exact for the
+	// floor to be the floor.
+	//
+	// The clone is local rather than a change to CpmmDecimal: precision 50 is
+	// the module's ratified arithmetic authority (cpmm.md §10.2) and every other
+	// function is measured correct at it. Widening the shared constructor to fix
+	// one line would re-open all of them.
+	const HI = CpmmDecimal.clone({ precision: 120 });
+	const sPrimeExact = new HI(S.toString()).plus(
+		new HI(a.toString())
+			.times(new HI(S.toString()))
+			.dividedBy(new HI(L.toString())),
+	);
+	const sPrime = new CpmmDecimal(floor18(sPrimeExact));
+
+	// The discard is a RESIDUAL, never an independently rounded product — which
+	// is what keeps `(S′ − S) + discarded == a` exact whichever way S′ lands,
+	// and the backing identity rests on that.
 	const discarded = a.minus(sPrime.minus(S));
 
 	const ZERO = toFixed18(new CpmmDecimal(0));
@@ -310,11 +358,19 @@ export function computeSell({
  * three `tests/unit/cpmm/` files pin it, including the §12 worked vectors. But
  * it is the obviously-named function for a job it no longer does, so a future
  * caller reaching for it by name would silently under-pay every asymmetric NO
- * outcome. Flagged by `@code-reviewer` MEDIUM-3; its fate is a Phase-2 decision
- * alongside the §8.1 amendment, not an edit to make here.
+ * outcome. Flagged by `@code-reviewer` MEDIUM-3; RULED at Phase 2 — deleting it
+ * would break the §12 vector pins, which are worth more than the name is.
  *
  * Both reserves are validated (§3.4: y, n > 0 always). The void residual is a
  * ledger identity (§8.2) — no curve function exists for it.
+ *
+ * @deprecated Superseded as the resolved unwind by ADR-0047 §E. The tag is the
+ * whole point of the Phase-2 decision: everything above was already true and
+ * already written down, and a docblock is only read by someone who has already
+ * decided to open the file. `@deprecated` says it at the CALL SITE, in the
+ * editor, to the one person who has not read any of this — which is exactly the
+ * reader who would reach for it by name. Use `settleMarket`'s residual, which is
+ * the winning reserve plus that side's cumulative discard.
  */
 export function computeResolvedUnwind({
 	reserves,

@@ -15,6 +15,7 @@ import {
 	MarketDeadlineCeilingError,
 	MarketDeadlineInPastError,
 	MarketDeadlineNotReachedError,
+	MarketFrozenError,
 	MarketIdConflictError,
 	MarketLifecycleStateError,
 	MarketSeedInvalidError,
@@ -283,6 +284,29 @@ export function toActionError(
 		return err(
 			"seed_invalid",
 			"That opening price and tank produce an empty reserve on one side. Raise the tank, or move the price away from 0 or 1.",
+		);
+	}
+	// LIQ-1 Phase 2 (ADR-0047, `docs/parked.md` L-4) — `openMarket` refuses after
+	// the conclusion freeze. Without this arm the refusal fell through to
+	// `error_internal` and fired the Sentry capture reserved for UNRECOGNISED
+	// wire errors: the admin is told the system is broken while the system is
+	// working, and the on-call is paged for a guard doing its job.
+	//
+	// ⛔ THIS IS THE SAME DEFECT THE `CpmmInputError` ARM ABOVE WAS ADDED TO FIX,
+	// reproduced one error class over — O-3, a true refusal reported with a false
+	// cause. Recorded plainly because the repetition is the interesting part: the
+	// arm above documents the failure mode at length, and the next new error
+	// class still arrived without one. A plan that mints an error type and does
+	// not name the wire map produces this every time (plan §3 T11 says only
+	// "throw a new `MarketFrozenError`").
+	//
+	// Unscoped by flow, unlike the `CpmmInputError` arm: `MarketFrozenError` is
+	// thrown from exactly one place and means exactly one thing wherever it
+	// surfaces, so there is no second form for the message to mislead.
+	if (error instanceof MarketFrozenError) {
+		return err(
+			"market_frozen",
+			"The conclusion freeze is set — no new market can be opened. Recovery is BREAK_GLASS.md only.",
 		);
 	}
 	if (error instanceof MarketDeadlineNotReachedError) {

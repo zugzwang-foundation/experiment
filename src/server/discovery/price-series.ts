@@ -227,10 +227,14 @@ export async function replayReserveSeries(
 		.where(eq(bets.marketId, marketId));
 	const betIds = betIdRows.map((r) => r.id);
 
+	// `pool.liquidity_added` rides the MARKET aggregate too (migration 0027's
+	// INSERT), so it joins this branch rather than needing a third. The name
+	// stays `soldBranch` deliberately: it is the market-aggregate branch, and
+	// renaming it would touch a symbol two other comments in this file name.
 	const soldBranch = and(
 		eq(events.aggregateType, "market"),
 		eq(events.aggregateId, marketId),
-		eq(events.eventType, "bet.sold"),
+		inArray(events.eventType, ["bet.sold", "pool.liquidity_added"]),
 	);
 	const placedBranch =
 		betIds.length > 0
@@ -261,6 +265,19 @@ export async function replayReserveSeries(
 				side: p.side === "YES" ? "yes" : "no",
 				stake: p.stake,
 			}).reserves;
+		} else if (ev.eventType === "pool.liquidity_added") {
+			// ⛔ SET, NEVER RECOMPUTE (ADR-0047 §I). Re-running `addLiquidity`
+			// here would make the chart a SECOND implementation of the placement
+			// primitive, with its own rounding — the exact drift
+			// `readOpenedReserves`'s ⛔ block exists to prevent, one function
+			// over. `reservesAfter` is what the pool actually holds; the chart's
+			// job is to say so, not to derive it again and hope the two agree.
+			//
+			// It is also the only arm here that does not need the previous
+			// reserves at all, which is what makes an injection a safe
+			// resynchronisation point in a walk that is otherwise cumulative.
+			const p = eventPayloadSchemas["pool.liquidity_added"].parse(ev.payload);
+			reserves = seedReserves(p.reservesAfter.yes, p.reservesAfter.no);
 		} else {
 			const p = eventPayloadSchemas["bet.sold"].parse(ev.payload);
 			reserves = computeSell({

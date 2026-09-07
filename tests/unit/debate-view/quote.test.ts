@@ -91,7 +91,9 @@ describe("buildBuyQuote — E4 vector (cpmm.md §12: (150,50) buy YES S=10)", ()
 
 describe("buildBuyQuote — §16.1 clamp surface (plan §3.2/§6; cpmm.md §6.4)", () => {
 	it("quote-buy::over-max-clamps-stake-and-figures-reflect-the-clamped-stake", () => {
-		// "15000" is strictly above the ratified BET_MAX_STAKE ("10000", OQ-1).
+		// "15000" is strictly above BET_MAX_STAKE ("250", PINNED by ADR-0047;
+		// "10000" under the retired OQ-1 ratification). The vectors below derive
+		// from the LIVE constant, which is why the case survived the change.
 		// §6.4: the caller applies the cap BEFORE computeBuy — every figure in
 		// the DTO must be the max-stake computation, never the submitted one.
 		const dto = buildBuyQuote({

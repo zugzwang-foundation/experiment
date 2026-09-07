@@ -67,10 +67,20 @@ function intOf(value: string): bigint {
 }
 
 // Derived fixtures (values under today's constants in trailing comments).
-const SPEND_ABOVE_CAP = String(intOf(BET_MAX_STAKE) + BigInt(5000)); // "15000"
-const AMOUNT_OVER_EVERYTHING = String(intOf(BET_MAX_STAKE) + BigInt(10000)); // "20000"
-const SPEND_BELOW_CAP = String(intOf(BET_MAX_STAKE) - BigInt(2000)); // "8000"
-const CAP_PLUS_ONE = String(intOf(BET_MAX_STAKE) + ONE); // "10001"
+// ⚠ THE OFFSETS ARE PROPORTIONAL, NOT ABSOLUTE, and that is the LIQ-1 Phase 2
+// repair. They were `± 5000 / 10000 / 2000` against a cap of 10000; at the
+// ADR-0047 cap of 250 the "below cap" fixture computed to NEGATIVE 1750, which
+// is not a spendable balance and made the matrix assert nothing about the case
+// it names. Deriving them from the cap keeps the SHAPE — one above, one far
+// above, one below — true at whatever the cap becomes next.
+const SPEND_ABOVE_CAP = String(
+	intOf(BET_MAX_STAKE) + intOf(BET_MAX_STAKE) / BigInt(2),
+);
+const AMOUNT_OVER_EVERYTHING = String(intOf(BET_MAX_STAKE) * BigInt(2));
+const SPEND_BELOW_CAP = String(
+	intOf(BET_MAX_STAKE) - intOf(BET_MAX_STAKE) / BigInt(5),
+);
+const CAP_PLUS_ONE = String(intOf(BET_MAX_STAKE) + ONE);
 const POST_FLOOR_MINUS_ONE = String(intOf(BET_MIN_STAKE_POST) - ONE); // "9"
 const REPLY_EPS_BELOW = `${String(intOf(BET_MIN_STAKE_REPLY) - ONE)}.999999999999999999`; // "49.999999999999999999"
 const POST_EPS_ABOVE = `${BET_MIN_STAKE_POST}.000000000000000001`; // "10.000000000000000001"
@@ -135,8 +145,10 @@ describe("assessAmount — clamp-then-evaluate matrix (T3 / W2.10-D)", () => {
 	});
 
 	it("gating::t3-balance-bound-wins-over-the-cap", () => {
-		// Plan §6 edge: amount 20000, spendable 8000 → the T3 clamp lands
-		// UNDER the cap, so overCap is FALSE and submit is enabled (post kind).
+		// Plan §6 edge: an amount above EVERYTHING against a spendable balance
+		// BELOW the cap → the T3 clamp lands under the cap, so overCap is FALSE
+		// and submit is enabled (post kind). Both fixtures are derived from the
+		// live cap, so the edge stays the same edge when the cap moves.
 		expect(
 			assessAmount({
 				kind: "post",

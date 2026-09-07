@@ -290,6 +290,207 @@ describe("markets/backing — the single market.opened reader (LIQ-1 T6b)", () =
 		expect(eq(after.no, "80000")).toBe(true);
 	});
 
+	// ─── LIQ-1 Phase 2 · T8 — the SECOND query (plan §3 T8; ADR-0047 §E) ─────
+	//
+	// ADR §E defines `D` as summed from `market.opened` AND every
+	// `pool.liquidity_added` for the market. Phase 1 pays only the first half,
+	// and the file's own ⚠ PHASE-2-OWES block is the specification for the
+	// second: *"Injections ARE many and DO sum — in their own query, added
+	// alongside this one."*
+	//
+	// ⛔ THE TWO HALVES MUST NOT MERGE BACK INTO ONE QUERY, and the case above
+	// (`require-discards-reads-the-OLDEST-genesis-row-never-their-sum`) is the
+	// half that says so. `I-GENESIS-001` is a `NOT EXISTS` predicate with no
+	// unique index behind it, so a duplicate genesis row is possible and summing
+	// would double `D` on a terminal, append-only `poolUnwindAmount`. The three
+	// cases below add the opposite obligation — injections sum, all of them —
+	// and together they pin `requireMarketDiscards` to exactly one shape:
+	// capped read + summing read, composed.
+	//
+	// ⚠ The failure this bounds is SILENT and terminal (plan §9 R-6): an
+	// injector that lands without the second query makes `settleMarket`
+	// under-report the residual by the whole injected discard, on a row INV-4
+	// forbids correcting, with no cross-assert behind it.
+	//
+	// Events go in through the DRIZZLE builder, not `insertEvent` — same reason
+	// as the cases above: the payload schema is T2's subject, and going through
+	// `insertEvent` would make this file red for T2's reason instead of T8's.
+
+	/** An ADR §F `pool.liquidity_added` payload. Only the two discard fields
+	 * are load-bearing here; the rest ride so the row is the shape the injector
+	 * actually writes rather than a two-key stub the reader could not parse. */
+	function injectionPayload(
+		marketId: string,
+		discarded: { side: "YES" | "NO"; shares: string },
+	): Record<string, unknown> {
+		return {
+			marketId,
+			policyVersion: 1,
+			target: "500000.000000000000000000",
+			tankBefore: "100000.000000000000000000",
+			tankAfter: "500000.000000000000000000",
+			reservesBefore: { yes: YES_RESERVES, no: NO_RESERVES },
+			reservesAfter: {
+				yes: "450000.000000000000000000",
+				no: "50000.000000000000000000",
+			},
+			backingMinted: "360000.000000000000000000",
+			discardedSide: discarded.side,
+			discardedShares: discarded.shares,
+			priceYesBefore: OPENING_PRICE_YES,
+			priceYesAfter: OPENING_PRICE_YES,
+		};
+	}
+
+	async function insertInjectionRow(
+		marketId: string,
+		discarded: { side: "YES" | "NO"; shares: string },
+		createdAt: Date,
+	): Promise<void> {
+		await testDb.insert(events).values({
+			eventType: "pool.liquidity_added",
+			aggregateType: "market",
+			aggregateId: marketId,
+			payload: injectionPayload(marketId, discarded),
+			payloadVersion: 1,
+			metadata: {},
+			createdAt,
+		});
+	}
+
+	const INJECT_AT_1 = new Date("2026-09-01T01:00:00.000Z");
+	const INJECT_AT_2 = new Date("2026-09-01T02:00:00.000Z");
+	const INJECT_AT_3 = new Date("2026-09-01T03:00:00.000Z");
+
+	it("backing::injections-sum-genesis-does-not", async () => {
+		// ⛔ THE HIGH-1 REGRESSION GUARD, AND IT MUST RED ON A SINGLE-QUERY
+		// IMPLEMENTATION IN EITHER DIRECTION. Two genesis rows and three
+		// injections, deliberately in one fixture, because the two failure modes
+		// are opposite and a test that seeds only one of them can be satisfied by
+		// the wrong fix:
+		//
+		//   · a read that KEEPS `LIMIT 1` and merely widens `event_type IN (...)`
+		//     sees the genesis row and DROPS all three injections → 80,000;
+		//   · a read that drops the cap and sums everything doubles the genesis
+		//     → 80,000 + 500 (the second genesis row) + the injections;
+		//   · only genesis-once + injections-summed lands on the expected value.
+		//
+		// The newer genesis row carries DIFFERENT discards (125 / 500) so that
+		// double-counting it is visible in the number rather than absorbed.
+		const marketId = uuidv7();
+		await insertOpenedRow(
+			marketId,
+			asymmetricPayload(marketId, {
+				discardedYes: "125.000000000000000000",
+				discardedNo: "500.000000000000000000",
+			}),
+			OPENED_AT_2,
+		);
+		await insertOpenedRow(marketId, asymmetricPayload(marketId), OPENED_AT);
+
+		// Three injections on the NO side — a 10% market is YES-long, so every
+		// injection discards NO, which is the production direction.
+		await insertInjectionRow(
+			marketId,
+			{ side: "NO", shares: "1000.000000000000000000" },
+			INJECT_AT_1,
+		);
+		await insertInjectionRow(
+			marketId,
+			{ side: "NO", shares: "250.500000000000000000" },
+			INJECT_AT_2,
+		);
+		await insertInjectionRow(
+			marketId,
+			{ side: "NO", shares: "0.000000000000000001" },
+			INJECT_AT_3,
+		);
+
+		// A NEIGHBOUR market with its own genesis and its own injection. The
+		// existing `is-scoped-to-its-own-market` case beside this one covers the
+		// genesis read only, so without this row a summing query that forgot its
+		// `aggregate_id` predicate would pass every case in this file — and the
+		// symptom would be one market's residual inflated by another's discards,
+		// on a terminal row.
+		const neighbour = uuidv7();
+		await insertOpenedRow(neighbour, asymmetricPayload(neighbour), OPENED_AT);
+		await insertInjectionRow(
+			neighbour,
+			{ side: "NO", shares: "9999.000000000000000000" },
+			INJECT_AT_1,
+		);
+
+		const discards = await requireMarketDiscards(testDb, marketId);
+
+		// Genesis ONCE (80,000 from the OLDEST row, never 80,500) plus ALL THREE
+		// injections. The third is a single ulp: it is there so that a summation
+		// that silently floors, or that skips a "negligible" row, is visible.
+		expect(eq(discards.no, "81250.500000000000000001")).toBe(true);
+		// The YES side takes the OLDEST genesis row's zero and nothing else — a
+		// duplicate-genesis double-count would put 125 here.
+		expect(eq(discards.yes, "0")).toBe(true);
+	});
+
+	it("backing::zero-injections-is-genesis-alone", async () => {
+		// ⭐ THE CONTROL, and it is why the case above means what it says. Same
+		// market shape, no injection rows: `D` must be Phase 1's answer, to the
+		// digit. Without it, a broken second query that returned a constant, or
+		// that failed closed and threw, would still let the case above pass on
+		// some other arrangement of the same total.
+		//
+		// This case is GREEN TODAY and is expected to stay green — it pins that
+		// T8 is ADDITIVE. A change here means the genesis read moved, which is
+		// the one thing plan §3 T8 forbids ("`readGenesisRow` is untouched").
+		const marketId = uuidv7();
+		await insertOpenedRow(marketId, asymmetricPayload(marketId), OPENED_AT);
+
+		const discards = await requireMarketDiscards(testDb, marketId);
+
+		expect(eq(discards.yes, "0")).toBe(true);
+		expect(eq(discards.no, "80000")).toBe(true);
+	});
+
+	it("backing::injection-discards-are-side-scoped", async () => {
+		// A market whose long side FLIPS mid-life — YES-long at open, then bet far
+		// enough NO-ward that the injector's short side becomes YES. Both sides
+		// then carry injection discards, and they must not pool.
+		//
+		// ⛔ THE FAILURE THIS CATCHES IS A SIGN ERROR THAT BALANCES. A sum that
+		// added `discardedShares` to whichever side without reading
+		// `discardedSide`, or that put both on `no`, produces the same GRAND
+		// TOTAL and a wrong per-side split — and `void.ts`'s cross-assert
+		// (`cash = Y + H_yes + D_yes`) is per-side, so it would settle the wrong
+		// number on one outcome and the right one on the other.
+		const marketId = uuidv7();
+		await insertOpenedRow(marketId, asymmetricPayload(marketId), OPENED_AT);
+
+		await insertInjectionRow(
+			marketId,
+			{ side: "NO", shares: "700.000000000000000000" },
+			INJECT_AT_1,
+		);
+		await insertInjectionRow(
+			marketId,
+			{ side: "YES", shares: "11.000000000000000000" },
+			INJECT_AT_2,
+		);
+		await insertInjectionRow(
+			marketId,
+			{ side: "YES", shares: "0.000000000000000009" },
+			INJECT_AT_3,
+		);
+
+		const discards = await requireMarketDiscards(testDb, marketId);
+
+		// YES: genesis 0 + the two YES injections.
+		expect(eq(discards.yes, "11.000000000000000009")).toBe(true);
+		// NO: genesis 80,000 + the one NO injection.
+		expect(eq(discards.no, "80700")).toBe(true);
+		// …and the two sides are DIFFERENT numbers, so a reader that returned the
+		// same total twice cannot pass by coincidence.
+		expect(eq(discards.yes, discards.no)).toBe(false);
+	});
+
 	it("backing::require-discards-is-scoped-to-its-own-market", async () => {
 		const mine = uuidv7();
 		const theirs = uuidv7();

@@ -264,7 +264,7 @@ describe("quote route — advisory quotes against a seeded (100,100) Open pool",
 		});
 	});
 
-	it("market-quote::clamped-buy-stake-15000-returns-effective-10000-clamped-true", async () => {
+	it("market-quote::clamped-buy-stake-above-cap-returns-the-cap-clamped-true", async () => {
 		await seedMarket({ slug: "quote-clamped", status: "Open" });
 		signedIn(await seedUser("uclamp"));
 
@@ -275,7 +275,7 @@ describe("quote route — advisory quotes against a seeded (100,100) Open pool",
 		expect(body.ok).toBe(true);
 		expect(body.data).toMatchObject({
 			kind: "buy",
-			stake: "10000", // the EFFECTIVE stake (== BET_MAX_STAKE, OQ-1)
+			stake: "250", // the EFFECTIVE stake (== BET_MAX_STAKE, ADR-0047)
 			clamped: true, // §16.1: surfaced in the non-blocking preview
 		});
 		expect(body.data?.stake).toBe(BET_MAX_STAKE);

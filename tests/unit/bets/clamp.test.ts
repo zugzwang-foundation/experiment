@@ -18,7 +18,8 @@ import { CpmmDecimal } from "@/server/cpmm/decimal";
 // local executable receipt the parent runs to capture RED.
 //
 // PINNED PUBLIC-API CONTRACT (the implementer matches these names exactly):
-//   BET_MAX_STAKE: string — "10000" (ratified OQ-1; 10× the initial grant,
+//   BET_MAX_STAKE: string — "250" (PINNED by ADR-0047; a quarter of the
+//   initial grant). It was "10000" until LIQ-1 Phase 2 —
 //     economically inert by design), a NUMERIC(38,18) DECIMAL STRING in
 //     src/server/config/limits.ts; PLACEHOLDER JSDoc naming SPEC.1 §16.1 +
 //     number-tuning ~2026-09-01 (HARDEN.5) as the value owner.
@@ -128,11 +129,19 @@ describe("config coherence — BET_MAX_STAKE > BET_MIN_STAKE_REPLY > BET_MIN_STA
 		expect(new CpmmDecimal(BET_MIN_STAKE_POST).greaterThan(0)).toBe(true);
 	});
 
-	it("bet-clamp::max-is-pinned-10000", () => {
-		// Ratified OQ-1: BET_MAX_STAKE = "10000" is the PLACEHOLDER value owned
-		// by number-tuning (~2026-09-01, HARDEN.5). If a future PR moves it off
-		// 10000, this surfaces loud (mirrors the reply-floor-is-pinned-50
-		// precedent in floors.test.ts).
-		expect(BET_MAX_STAKE).toBe("10000");
+	it("bet-clamp::max-is-pinned-250", () => {
+		// ⚠ PINNED at 250 by ADR-0047 — no longer a HARDEN.5 placeholder.
+		//
+		// This pin did exactly its job: it was written against the ratified
+		// placeholder "10000" and said "if a future PR moves it off 10000, this
+		// surfaces loud". LIQ-1 Phase 2 moved it, and it surfaced. What changes
+		// here is the VALUE and its STATUS, not the assertion's purpose.
+		//
+		// Why a liquidity ADR pins a bet constant: the two numbers are one
+		// question asked twice. At a 100,000 tank a 10,000 Đ bet is a tenth of
+		// the book in a single transaction — the price impact that makes a market
+		// read as manipulable rather than informative. 250 is a quarter of the
+		// initial grant, which keeps one bet a contribution rather than an event.
+		expect(BET_MAX_STAKE).toBe("250");
 	});
 });
