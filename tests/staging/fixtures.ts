@@ -27,6 +27,8 @@
 // content shapes on M2, the flip/exit sequences, bookmarks and moderation by
 // APPENDING rows and a `replies` table — never by re-keying what is here.
 
+import { FREEZE_INSTANT_UTC } from "@/server/markets/create";
+
 /** Roles, per manifest §2.2. Ten participants. */
 export type ParticipantRole =
 	| "P-owner"
@@ -233,16 +235,74 @@ export interface MarketFixture {
 	 * calendar date cannot satisfy both for a run whose `now` moves. It is the
 	 * same class as the UUIDv7 and timestamp non-determinism Q4 already accepts,
 	 * and it is NOT backdating: every stored `created_at` is the engine's own.
+	 *
+	 * ⚠ NEVER ADD THIS TO `now` YOURSELF — call `resolutionDeadlineFor(m, now)`.
+	 * The raw offset walks past the conclusion freeze, and the ceiling clamp
+	 * that keeps it legal lives in that function.
 	 */
 	readonly deadlineOffsetMs: number;
 	readonly terminal: TerminalAction;
 	readonly serves: string;
 }
 
-/** A deadline far enough out that an Open market never reads as expired. */
-const LONG_DEADLINE_MS = 60 * 24 * 60 * 60 * 1000; // 60 days
+/**
+ * A deadline far enough out that an Open market never reads as expired.
+ *
+ * ⚠ 60 days ago passed the conclusion freeze on 2026-09-06, so from that date
+ * onward this offset alone produces an ILLEGAL deadline. It is not lowered,
+ * because "far enough out that an Open market never reads as expired" is the
+ * property the fixture set needs and a shorter offset would break it sooner in
+ * a quieter way. The ceiling is enforced by `resolutionDeadlineFor` instead.
+ */
+export const LONG_DEADLINE_MS = 60 * 24 * 60 * 60 * 1000; // 60 days
 /** Just past `now`, so the close call in the same run is legal. */
-const SHORT_DEADLINE_MS = 60 * 1000; // 1 minute
+export const SHORT_DEADLINE_MS = 60 * 1000; // 1 minute
+
+/**
+ * How far short of `FREEZE_INSTANT_UTC` a clamped deadline lands.
+ *
+ * `createMarket` accepts `deadline == FREEZE_INSTANT_UTC` (SPEC.1 §12.1 reads
+ * "≤"), so zero margin would be legal. An hour is taken anyway: a deadline
+ * sitting exactly on the freeze instant is indistinguishable from a fixture
+ * that MEANT to sit there, and the one hour makes the clamp legible in the
+ * data — a staging market whose deadline is 22:59 on 5 November is one this
+ * function moved.
+ */
+export const DEADLINE_CEILING_MARGIN_MS = 60 * 60 * 1000; // 1 hour
+
+/**
+ * A fixture's `resolution_deadline`, CLAMPED to the freeze ceiling.
+ *
+ * ⚠ THE CLAMP LIVES HERE, AT THE SOURCE, AND NOT AT THE CALLER. Every deadline
+ * in this table is an offset from the run instant (see `deadlineOffsetMs`), so
+ * every one of them walks toward `FREEZE_INSTANT_UTC` as the experiment
+ * approaches its conclusion and eventually crosses it. `createMarket` rejects
+ * that with `MarketDeadlineCeilingError`, which is correct behaviour by the
+ * engine and a broken fixture table by us — and it broke on 2026-09-06, the
+ * day `now + LONG_DEADLINE_MS` first passed 2026-11-05T23:59Z.
+ *
+ * A caller-side `Math.min` would have fixed the one call site that failed and
+ * left `SHORT_DEADLINE_MS`, and every offset added later, to fail the same way
+ * on its own schedule. Routing every deadline through one function means the
+ * next offset added to this table inherits the ceiling without anyone
+ * remembering it exists.
+ *
+ * ⚠ RESIDUAL, stated rather than defended: inside the final
+ * `DEADLINE_CEILING_MARGIN_MS` before the freeze, the clamped deadline is no
+ * longer after `now`, and `createMarket` then raises
+ * `MarketDeadlineInPastError`. Generating fixtures in the last hour before the
+ * conclusion freeze is not a thing this repo needs to support, and a fixture
+ * run at that moment SHOULD fail loudly.
+ */
+export function resolutionDeadlineFor(
+	fixture: Pick<MarketFixture, "deadlineOffsetMs">,
+	now: Date,
+): Date {
+	const ceilingMs = FREEZE_INSTANT_UTC.getTime() - DEADLINE_CEILING_MARGIN_MS;
+	return new Date(
+		Math.min(now.getTime() + fixture.deadlineOffsetMs, ceilingMs),
+	);
+}
 
 /**
  * FIFTEEN markets — created in this order, M1 alone left in Draft.
