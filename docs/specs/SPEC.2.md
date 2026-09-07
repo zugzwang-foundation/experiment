@@ -218,7 +218,7 @@ Resolution is architecturally distinct from per-row write flows because it fans 
 
 **F-RESOLVE-2 (correction) and F-RESOLVE-3 (void) follow the same fan-out shape**, with two differences: F-RESOLVE-2 writes paired `correction_reverse` + `correction_apply` `payout_events` rows per affected bet (floored at zero per SPEC.1 §10.7) and references the prior `resolution_events.id` via `corrects_event_id`; F-RESOLVE-3 writes `void_refund` `dharma_ledger` rows refunding `f × stake` per bet (sale proceeds stand — R-9.8) and emits `event_type = 'market.voided'` with the admin's free-text reason and the `poolUnwindAmount` in the payload. INV-4 is preserved in both: corrections are new rows, never updates of prior rows.
 
-Single source of truth: `src/server/resolution/trigger.ts` (F-ADMIN-3), `src/server/resolution/settle.ts` (F-RESOLVE-1), `src/server/resolution/correct.ts` (F-RESOLVE-2), `src/server/resolution/void.ts` (F-RESOLVE-3). All four invoke a shared `runResolutionTransaction()` wrapper (`src/server/resolution/transaction.ts` — W-3) that applies the SERIALIZABLE + retry policy from §9 / ADR-0013 — same retry shape as the bet wrapper, parameterised by the per-flow callback, locking `markets` FIRST then `pools` (ADR-0013 §5.12 P2; statement_timeout parameterised — 1 000 ms default, 5 000 ms for the fan-out flows).
+Single source of truth: `src/server/resolution/trigger.ts` (F-ADMIN-3), `src/server/resolution/settle.ts` (F-RESOLVE-1), `src/server/resolution/correct.ts` (F-RESOLVE-2), `src/server/resolution/void.ts` (F-RESOLVE-3). All four invoke a shared `runResolutionTransaction()` wrapper (`src/server/resolution/transaction.ts` — W-3) that applies the SERIALIZABLE + retry policy from §9 / ADR-0013 — same retry shape as the bet wrapper, parameterised by the per-flow callback, locking `markets` FIRST then `pools` (ADR-0013 Patch record P2; statement_timeout parameterised — 1 000 ms default, 5 000 ms for the fan-out flows).
 
 ### §3.7 Events-row contract (per-write discipline)
 
@@ -242,7 +242,7 @@ Every state-mutating data flow MUST emit at least one `events` row in the same t
 
 ### §3.8 Market lifecycle writes (W-4)
 
-The lifecycle half of the market state machine — F-ADMIN-1 creation into `Draft`, the F-ADMIN-2 seeded `Draft → Open` commit, and the clock-driven `Open → Closed` cutoff — runs through a fourth write wrapper, W-4 (`runLifecycleTransaction()`), duplicating the W-3 spine per the C-3 no-extraction doctrine (W-1 and W-3 byte-untouched; ADR-0013 §5.12 P3). Open and close lock the `markets` row FIRST (`FOR NO KEY UPDATE`) with an `expectedStatus` precondition (`['Draft']` for open, `['Open']` for close); create acquires no row lock — no row exists yet, and SSI's predicate handling covers the slug race (a surfaced 23505 signals a logic bug, not a handled path).
+The lifecycle half of the market state machine — F-ADMIN-1 creation into `Draft`, the F-ADMIN-2 seeded `Draft → Open` commit, and the clock-driven `Open → Closed` cutoff — runs through a fourth write wrapper, W-4 (`runLifecycleTransaction()`), duplicating the W-3 spine per the C-3 no-extraction doctrine (W-1 and W-3 byte-untouched; ADR-0013 Patch record P3). Open and close lock the `markets` row FIRST (`FOR NO KEY UPDATE`) with an `expectedStatus` precondition (`['Draft']` for open, `['Open']` for close); create acquires no row lock — no row exists yet, and SSI's predicate handling covers the slug race (a surfaced 23505 signals a logic bug, not a handled path).
 
 **One emit per flow, inside the W-4 transaction.** `market.created` (payload `marketId` + `resolutionDeadline` + `media[]` + `mediaVideoUrl` — extended at MEDIA.1, OD-2) · `market.opened` (payload `marketId` + `seedAmount` — the seed instant is `Draft → Open`, not creation; R-14.1) · `market.closed` (payload `marketId`). Event ids resolve once at service entry and are closed over across retries (ADR-0016 D1), so a retried attempt re-emits the same id and the §3.7 helper's `ON CONFLICT (event_id, created_at)` dedupes. Callers supplying `eventId` to `createMarket` MUST mint a fresh UUIDv7 per logical create — the §3.7 dedupe is retry-purity for the *same* operation, not cross-create replay protection (insertion is not verified); ENGINE.15's wire layer mints server-side only.
 
@@ -702,7 +702,7 @@ Per §17.5's fail-open posture for observability, a Sentry outage does not affec
 | Trigger SQL (all bucket A + bucket B trigger functions + trigger declarations) | `drizzle/migrations/<NNNN>_append_only_triggers.sql` |
 | Per-table append-only test suites | `tests/db/triggers/<table>-append-only.spec.ts` (twelve files) |
 | Sentry alarm 1 catalogue row | §17.2 master table |
-| `BREAK_GLASS.md` admin-bypass procedure (catastrophic-failure recovery only) | `docs/runbooks/BREAK_GLASS.md` (HARDEN.10-owned per §21.3 + ADR-0010) |
+| `BREAK_GLASS.md` admin-bypass procedure (catastrophic-failure recovery only) | `docs/runbooks/BREAK_GLASS.md` (HARDEN.10-owned per ADR-0010) |
 | Bucket classification of each table | §5.1 inventory + §5.2 summary |
 
 ADRs consumed by §6: ADR-0005 (Bucket A/B/C classification + ground-truth-trigger discipline + same-migration-file convention), ADR-0008 (Drizzle migration set + raw-SQL migrations alongside drizzle-kit-generated `.sql` files), ADR-0010 (`BREAK_GLASS.md` procedure flag), ADR-0014 (`mod_actions` Bucket A — moderation audit-trail integrity rides on this). 3-B §12-R1 (`image_uploads` Bucket B with two-column atomic transition) and 3-E §20-1 (`system_state` Bucket B with `frozen_at` NULL → timestamp) absorbed in this commit; cross-reference renumber from "ADR-0007 catalogue entry #1" to "§17 alarm 1" applied per 3-D R2.
@@ -993,7 +993,7 @@ The asymmetry is enforced at the route-handler-file level, not the URL parser. S
 | Participant logout Server Action | `src/server/auth/logout.ts` |
 | Middleware (Layer 1 redirect UX, NOT security boundary) | `proxy.ts` (formerly `middleware.ts`) at repo root |
 | Acceptance test for raw-UUID-not-in-participant-URLs | `tests/server/identity/no-raw-uuid-in-urls.test.ts` |
-| `BREAK_GLASS.md` admin-rotation procedure (suspected-compromise + scheduled rotation) | `docs/runbooks/BREAK_GLASS.md` (HARDEN.10-owned per §21.3 + ADR-0010) |
+| `BREAK_GLASS.md` admin-rotation procedure (suspected-compromise + scheduled rotation) | `docs/runbooks/BREAK_GLASS.md` (HARDEN.10-owned per ADR-0010) |
 
 ADRs consumed by §8: ADR-0004 (Better Auth library + Drizzle adapter + database session strategy + session-deferral hook + Email-OTP plugin + Cloudflare Turnstile via `hooks.before` + cookie naming + UUIDv7 generateId override), ADR-0010 (hand-rolled admin auth + static-password timing-safe comparison + transactional DELETE+INSERT + two-layer defense-in-depth per CVE-2025-29927 + identical-401 information-leak avoidance + three-column `admin_sessions` schema + `BREAK_GLASS.md` rotation), ADR-0011 (pseudonym pool consumption at F-AUTH-3 transaction within `identity_pool` Bucket-B `assigned_at` whitelisted transition), ADR-0014 (auth gate as first step of every state-mutating handler — handler-stack step 1 per §3.1), ADR-0016 D4 (UUIDv7 column-type override across all four Better Auth tables) + D6 (URL-exposure rule on participant vs admin vs dataset routes). 3-A R1 absorbs `accounts` as fourth Better Auth table in §5.1; 3-A R2 + §3.7 provides canonical seven-field `events.metadata` set consumed by §8.8 auth-flow writes.
 
@@ -1629,8 +1629,8 @@ The alarm catalogue consolidates every Sentry alarm fired across the codebase. N
 | **4** | OpenAI moderation upstream failure rate | Volume/rate threshold (HARDEN.* per §17.7) over OpenAI moderation vendor-boundary terminal-failure events, fired at `src/server/moderation/openai.ts`: `safeCaptureException(err, { tags: { kind: "openai_moderation_upstream_failure" } })` on the non-transient and retries-exhausted arms, plus `safeCaptureException(err, { tags: { kind: "openai_moderation_auth_failure" } })` on the 4xx auth-error sub-class (failed-closed without retry). Both are fail-open side-effects: a capture that cannot be written is logged and dropped. Moderation itself has no failure posture on the request path (§10), so there is no `ModerationUnavailableError` seam to fail at. | §10, ADR-0014 — superseded by ADR-0046 |
 | **5** | Identity-pool low-watermark | `identity_pool` row count drops below 5% of initial 50,000 — fired by `pg_cron` meta-query per §3.4 Pattern A-1 | §3.5, SPEC.1 §15.2, ADR-0011 |
 | **6** | Per-vendor unavailability + cron job failure | Five sub-IDs per §17.3 — Upstash rate-limit, Upstash idempotency, R2, pg_cron job-run failures, Vercel Cron R2-orphan-sweep handler 5xx | §10, §11, §12, §17.6 |
-| **7** | 40001-retry exhaustion (resolution transaction wrapper) | W-3 wrapper at `src/server/resolution/transaction.ts` exhausts 3 retries on SQLSTATE 40001 / 40P01 — Sentry event `resolution_serialization_exhausted`, tags `{ sqlstate, flow }` (ENGINE.9, rider R-K) | §3.6, §9, ADR-0013 §5.12 P2 |
-| **8** | 40001-retry exhaustion (lifecycle transaction wrapper) | W-4 wrapper at `src/server/markets/transaction.ts` exhausts 3 retries on SQLSTATE 40001 / 40P01 — Sentry event `lifecycle_serialization_exhausted`, tags `{ sqlstate, flow }` (ENGINE.14, S5 disposition CR-1, gate-ratified 2026-06-12) | §3.8, §9, ADR-0013 §5.12 P3 |
+| **7** | 40001-retry exhaustion (resolution transaction wrapper) | W-3 wrapper at `src/server/resolution/transaction.ts` exhausts 3 retries on SQLSTATE 40001 / 40P01 — Sentry event `resolution_serialization_exhausted`, tags `{ sqlstate, flow }` (ENGINE.9, rider R-K) | §3.6, §9, ADR-0013 Patch record P2 |
+| **8** | 40001-retry exhaustion (lifecycle transaction wrapper) | W-4 wrapper at `src/server/markets/transaction.ts` exhausts 3 retries on SQLSTATE 40001 / 40P01 — Sentry event `lifecycle_serialization_exhausted`, tags `{ sqlstate, flow }` (ENGINE.14, S5 disposition CR-1, gate-ratified 2026-06-12) | §3.8, §9, ADR-0013 Patch record P3 |
 | **9** | Bet-handler internal error (caught 500) | Bet endpoint catch (`src/server/bets/endpoint.ts`) converts an unrecognized failure to a `500 error_internal` envelope — `safeCaptureException(err, { tags: { kind: "bet_handler_internal_error" } })` fires only on that fallthrough arm (the 503 paths are captured at their own sources). The original `err` is preserved, so a caught append-only `RAISE` reaches Sentry with its message intact (available to alarm-1 tuning at HARDEN.*). Covers `/api/bets/place` + `/api/bets/sell` (shared catch) (AUDIT-FIX-B1 / A5). **AUDIT-FIX-B3 / ADR-0031** adds two *sibling tagged captures* on the bet path — **not** numbered master alarms (tag notes, recorded here beside their shared catch): (a) `position_oversell_backstop` — fires in the same endpoint catch when a `PositionOversellError` storage-backstop reaches it *after* the `sell()` product pre-check should have caught it; it maps to `400 insufficient_shares` (not 500), so it is distinct from this alarm's fallthrough arm; (b) `durable_replay_precheck_failed` — the durable receipt pre-check fails **open** on a DB error in `src/server/bets/replay.ts` (correctness is backstopped by the tx-level unique per §9). | §9, ADR-0005, ADR-0013, ADR-0031 |
 
 Alarm rows 1-5, 7, and 9 are consumed by single citation surfaces; alarm 6's sub-IDs are consumed across multiple citation surfaces (§10 cites 6c, §11 cites 6a + 6b, §12 cites 6c + 6e, §17.6 cites 6d), warranting the structuring elaboration.
@@ -1806,7 +1806,7 @@ Per **ADR-0019**. Row-Level Security (RLS) is **deliberately out of scope** for 
 | Data-access architecture / RLS posture + tripwire | §18.5 (per ADR-0019) |
 | Per-IP rate-limit constants | `src/server/config/limits.ts` (per §11 + SPEC.1 §16.1) |
 | `BET_ATTEMPTS_PER_IP_PER_MIN` + `IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN` numeric values | HARDEN.6 (per §11.6) |
-| `BREAK_GLASS.md` admin-key rotation runbook | `docs/runbooks/BREAK_GLASS.md` (HARDEN.10-owned per §21.3 + ADR-0010) |
+| `BREAK_GLASS.md` admin-key rotation runbook | `docs/runbooks/BREAK_GLASS.md` (HARDEN.10-owned per ADR-0010) |
 | Admin-actor encoding to `admin_events` | §8.8 + §3.6 |
 | Append-only trigger SQL backing audit-trail integrity | `drizzle/migrations/<NNNN>_append_only_triggers.sql` (per §6 + ADR-0005) |
 
@@ -1996,7 +1996,7 @@ The endpoint is a thin static-file pointer; it does not serve the tarball itself
 | Concern | Source-of-truth file |
 |---|---|
 | Release date + GitHub artifact location | §19.1 + SPEC.1 §12.2 |
-| Build pipeline (one-shot Postgres point-in-time recovery + pg_dump + post-process + tarball) | HARDEN.10 (per §21.3 + ADR-0006) |
+| Build pipeline (one-shot Postgres point-in-time recovery + pg_dump + post-process + tarball) | HARDEN.10 (per ADR-0006) |
 | Tables-shipped vs not-shipped policy | §19.3 |
 | PII strip-not-hash policy + ten PII columns dropped | §19.4 |
 | Export-time JOIN pseudonymization | §19.5 |
@@ -2063,14 +2063,14 @@ The asymmetric live-vs-frozen posture across the three actor classes — partici
 | `system_state` Bucket-B trigger function | `drizzle/migrations/<NNNN>_append_only_triggers.sql` (per §6.3) |
 | `system_state` row mint at deploy | `drizzle/migrations/<NNNN>_seed_system_state.sql` (provisional path under SCAFFOLD.2) |
 | `pg_cron` Path-A scheduled freeze job | `drizzle/migrations/<NNNN>_freeze_cron.sql` (HARDEN.10 territory) |
-| Path-B manual `psql` runbook | `docs/runbooks/conclusion-event-freeze.md` (HARDEN.10-owned per §21.3) |
+| Path-B manual `psql` runbook | `docs/runbooks/conclusion-event-freeze.md` (HARDEN.10-owned) |
 | `isFrozen()` middleware helper | `src/server/system/is-frozen.ts` |
 | CI lint enforcing `isFrozen()` presence on state-mutating handlers | HARDEN.* (per §17.7's deferred items list pattern) |
 | `error_experiment_concluded` catalogue row | §15.4 |
 | Read-paths-still-live posture | §3.3 R-1 / R-2 / R-3 (none of these patterns calls `isFrozen()`) |
 | Auth-paths-still-live posture | §8 (none of F-AUTH-* calls `isFrozen()`) |
 | Admin-paths-still-live posture | §3.6 + §8.4 (none of F-RESOLVE-* / F-ADMIN-* calls `isFrozen()`) |
-| Catastrophic-failure thaw procedure | `docs/runbooks/BREAK_GLASS.md` (HARDEN.10-owned per §21.3 + ADR-0010) |
+| Catastrophic-failure thaw procedure | `docs/runbooks/BREAK_GLASS.md` (HARDEN.10-owned per ADR-0010) |
 
 ADRs consumed by §20: ADR-0005 (Bucket-B append-only-with-whitelisted-transition discipline backing `system_state.frozen_at`), ADR-0006 (Supabase + `pg_cron` substrate for Path A scheduled freeze), ADR-0010 (admin auth path remaining live post-freeze + `BREAK_GLASS.md` thaw procedure scope). 3-E A1 absorbs the 2026-11-05 23:59 UTC instant correction; 3-E §20-1 absorbs `system_state.frozen_at` Bucket B classification with NULL → timestamp transition; 3-E A8 mints the `error_experiment_concluded` HTTP 410 `error_type: gone` row in §15.4's 38-code baseline.
 
@@ -2268,9 +2268,9 @@ Constraints (migration `0014_resolution_constraints.sql`, ENGINE.9): `resolution
 | `target_comment_id` | uuid \| null | SHIP | FK to `comments.id` for F-COMMENT-* moderations; NULL for F-BET-* moderations |
 | `target_bet_id` | uuid \| null | SHIP | FK to `bets.id` for F-BET-1 entry-comment moderations; NULL otherwise |
 | `target_market_id` | uuid \| null | SHIP | FK to `markets.id` — the market the flagged submission targeted (a flagged submission has a comment row; this column records the market it targeted); powers F-ADMIN-5 market search + the dashboard market filter (DEBATE.7). NULL when a comment/bet target is present |
-| `reason` | mod_reason | SHIP | The action reason (DEBATE.7 / ADR-0021 §78 ∪ §84): `track_a_auto_ban` / `track_b_flagged` / `sexual_minors_text_flagged` / `image_rejected` / `image_screening_failed` (classifier-written); `content_removed` / `user_banned` (admin-written). NOT NULL |
+| `reason` | mod_reason | SHIP | The action reason (DEBATE.7 / ADR-0021): `track_a_auto_ban` / `track_b_flagged` / `sexual_minors_text_flagged` / `image_rejected` / `image_screening_failed` (classifier-written); `content_removed` / `user_banned` (admin-written). NOT NULL |
 | `verdict` | text \| null | SHIP | `pass` / `track_a` / `track_b`; NULL for reactive admin-action rows (`content_removed` / `user_banned`) which carry no gate verdict (DEBATE.7) |
-| `categories` | jsonb | SHIP | Full OpenAI moderation response (category scores + applied-input-types) at decision time; the §786 "source layer" is derivable from `category_applied_input_types` |
+| `categories` | jsonb | SHIP | Full OpenAI moderation response (category scores + applied-input-types) at decision time; the "source layer" is derivable from `category_applied_input_types` |
 | `blocked_text` | text \| null | STRIP | Retained text of a submission the classifier flagged, where one exists. Under advisory moderation the comment row also exists; this column is a forensic copy, not the only record. Populated by the superseded gate until MOD-1. |
 | `image_r2_key` | text \| null | STRIP | Operational; per §19.4 — column removed from released schema |
 | `actor_id` | text | SHIP | `'system'` for every classifier-written row (classifier-written rows); `'admin-singleton'` for reactive Remove/Ban (dashboard stratum) |
