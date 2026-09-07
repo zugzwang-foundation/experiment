@@ -41,6 +41,38 @@ when it closes; a row enters it when its trigger fires.*
 
 ---
 
+## LIQ-1-RESTORE — the staging reset deleted the eight content markets — ✅ **CLOSED 2026-09-07**
+
+> **CLOSED — recreated and guarded in the same PR.** On **2026-09-07** a staging
+> reset truncated `markets`, taking all eight founder-authored content markets
+> with it. They were recreated through the shipped engine by
+> `scripts/seed-content-markets.ts`, and the reset now REFUSES to run again with
+> content markets present (C1).
+>
+> **Recreated, not restored.** The content came from
+> `docs/data/staging-markets-snapshot.json` — the read-only capture committed for
+> exactly this event — and was replayed through `createMarket` and `openMarket`,
+> the same server functions the admin form calls. No snapshot row was ever
+> INSERTed: the rows arrive with their `market.created` and `market.opened`
+> events inside the shipped W-4 transaction, which since ADR-0047 §E is what
+> makes a market settleable at all. Verified byte-identical to the snapshot on
+> all six columns for all eight markets, and 16/16 `market_media` rows.
+>
+> **Reset guarded (C1).** `tests/staging/reset.staging.test.ts`'s pre-flight now
+> reads `SELECT slug FROM markets` and refuses — naming every slug — when it
+> finds one no fixture family claims (`sp-m*`, `volume-fixture-*`). Acknowledge
+> with `ZUGZWANG_STAGING_INCLUDE_CONTENT_MARKETS=include-content-markets`; a
+> boolean-shaped value fails closed. Predicate at
+> `tests/staging/_lib/content-guard.ts`, exercised by
+> `tests/unit/staging/content-market-reset-guard.test.ts`.
+>
+> **What this row leaves behind, and it is not work:** the eight markets are
+> still authored nowhere but staging, so the snapshot remains their only source.
+> Refreshing it after a content edit is the operator's, and the guard is what
+> buys the time to notice.
+
+---
+
 ## MOBILE-1 Phase A (PR #486) — seven shipped `max-mobile:` tokens have no assertion (2026-09-05)
 
 **Deferred on purpose, with the overstating claims corrected now.** PR #486's

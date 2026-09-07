@@ -1,6 +1,10 @@
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+	assessContentMarkets,
+	CONTENT_MARKET_OVERRIDE_ENV,
+} from "./_lib/content-guard";
+import {
 	EXPECTED_GUARD_CATALOG_ROWS,
 	resolveStagingTarget,
 	TRUNCATE_EXCLUSIONS,
@@ -65,6 +69,13 @@ import {
 //   G-4 post-run    — every bucket_% guard back at tgenabled='O';
 //                     system_state's singleton row present with frozen_at
 //                     NULL; drizzle.__drizzle_migrations RETAINS its row count.
+//
+// THE CONTENT-MARKET REFUSAL (LIQ-1-RESTORE C1) is a SIXTH gate, and it is the
+// only one that asks about DATA rather than about where or whether you meant
+// it: if `markets` holds a slug no fixture family claims, the pre-flight
+// refuses and names it. `markets` is in TRUNCATE_SET, and on 2026-09-07 that
+// cost eight founder-authored markets which survived only because a snapshot
+// had been committed. Acknowledge with ZUGZWANG_STAGING_INCLUDE_CONTENT_MARKETS.
 //
 // NEVER DISABLED: bucket_a_no_update · bucket_a_no_delete · bucket_b_no_delete
 // · bucket_b_update_check. Only the *_no_truncate guards, only for the one
@@ -134,6 +145,40 @@ beforeAll(async () => {
 				`REFUSED — TRUNCATE_SET names the excluded table "${excluded}"`,
 			);
 		}
+	}
+
+	// ── LIQ-1-RESTORE C1 · THE CONTENT-MARKET REFUSAL ───────────────────────
+	//
+	// `markets` is in TRUNCATE_SET, so this runner empties it. For the fifteen
+	// `sp-m*` fixtures that is the point. For a market whose copy is the
+	// founder's and whose only source is a snapshot somebody remembered to
+	// commit, it is a loss the reset cannot undo and does not currently
+	// mention — on 2026-09-07 it took all eight content markets, and the
+	// recovery existed only because `docs/data/staging-markets-snapshot.json`
+	// happened to be on `main`.
+	//
+	// Placed HERE, in the pre-flight, for the reason the header gives: a
+	// throwing `beforeAll` fails every test in the suite WITHOUT executing any
+	// of them, so the destructive batch is unreachable. A refusal written as an
+	// assertion would report and then wipe.
+	//
+	// It reads the LIVE table rather than a list, because the whole failure
+	// mode is a market the repository does not know about.
+	const marketSlugRows = await client<{ slug: string }[]>`
+		SELECT slug FROM markets ORDER BY slug
+	`;
+	const verdict = assessContentMarkets({
+		slugs: marketSlugRows.map((r) => r.slug),
+		override: process.env[CONTENT_MARKET_OVERRIDE_ENV],
+	});
+	if (!verdict.ok) {
+		throw new Error(verdict.reason);
+	}
+	if (verdict.overridden) {
+		console.warn(
+			`[staging:reset] ${CONTENT_MARKET_OVERRIDE_ENV} acknowledged — DESTROYING ${verdict.found.length} content market(s):\n` +
+				verdict.found.map((slug) => `  · ${slug}`).join("\n"),
+		);
 	}
 
 	migrationsBefore = await countMigrations(client);
