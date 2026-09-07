@@ -85,20 +85,90 @@ Uniform across every `Open` market. Circulation is 1,000 per user by constructio
 
 ### D · The injector
 
-One `pg_cron` job (1.6.4 on both environments, ADR-0006, registration pattern `0011`, amendment pattern `0015` — RECON-2 §8), every 60 s, per `Open` market, in this order:
+One `pg_cron` job (1.6.4 on both environments, ADR-0006, registration pattern `0011`, amendment pattern `0015` — RECON-2 §8), every 60 s. The whole sweep, in the order it runs — the per-market work is step 7, and steps 1–6 and 8 happen once:
 
 ```
- 1. exit if system_state.frozen_at is set
- 2. read the newest liquidity_policy row; exit if not enabled
- 3. skip if within ENDGAME_HOURS of the market's deadline
- 4. tank = yes + no ; skip if tank ≥ TRIGGER × target
- 5. price = no / tank ; skip if price > GUARD_HIGH or price < GUARD_LOW
- 6. SET LOCAL lock_timeout = LOCK_TIMEOUT_MS ; lock the pools row
-    (markets → pools, the canonical order) ; skip on timeout
- 7. a = L × (target / tank − 1) ; apply A
- 8. insert pool.liquidity_added
- 9. insert heartbeat
+ 1. pg_try_advisory_xact_lock('zugzwang.liquidity_injector') — RETURN if held
+ 2. read the newest liquidity_policy row
+    (effective_from ≤ now(), ORDER BY effective_from DESC, version DESC LIMIT 1)
+ 3. if NOT FOUND, or not enabled, or a system_state row has frozen_at set:
+      write the heartbeat (0 considered, 0 injected) and RETURN
+ 4. SET LOCAL lock_timeout = policy.lock_timeout_ms          ← once, at the top
+ 5. target = GREATEST(floor, coefficient × count(*) FROM users)
+ 6. start the lock-hold budget clock — clock_timestamp(), not now()
+ 7. per Open market, ORDER BY id:
+      a. EXIT when clock_timestamp() − started > 600 ms         ← 0029
+      b. considered += 1
+      c. CONTINUE when now() + endgame_hours ≥ resolution_deadline
+      d. subtransaction:
+           i.   lock the markets row FOR NO KEY UPDATE, and RE-READ status  ← 0028
+           ii.  only if status is still 'Open': lock the pools row FOR NO KEY
+                UPDATE — and skip the market if there is no such row
+           iii. tank = yes + no ; price = no / tank
+                — proceed only while tank < TRIGGER × target
+                  and GUARD_LOW ≤ price ≤ GUARD_HIGH
+           iv.  a = L × (target / tank − 1) ; proceed only while a > 0
+           v.   apply A through zz_add_liquidity ; UPDATE pools
+           vi.  INSERT pool.liquidity_added ; injected += 1
+         EXCEPTION: lock_not_available → skip this market
+                    OTHERS            → record SQLSTATE to cron_alarms, continue
+ 8. insert the heartbeat (considered, injected)
 ```
+
+⚠ **THE LIST ABOVE WAS REWRITTEN AT LIQ-1-FIX-2 TO MATCH THE SHIPPED FUNCTION, and
+four of the differences were not cosmetic.**
+
+**The lock now precedes the reads it protects.** The original list skipped on `tank`
+and on `price` at steps 4–5 and locked the pool at step 6 — an unlocked read followed
+by a locked write, which is the TOCTOU this whole design exists to avoid. A bet
+committing between the two would have the injector top up against a tank that no
+longer exists. The shipped order takes the lock first and evaluates every trigger and
+guard underneath it, so the numbers the decision is made on are the numbers that are
+still true when it acts.
+
+**Three steps left the per-market loop.** `SET LOCAL lock_timeout`, the `count(*)` and
+the target were written as though they ran per market. They run once, at the top, and
+for `lock_timeout` that is not a preference: the sweep is one transaction with no
+`COMMIT` to reset the setting, and a rolled-back subtransaction does not clear it
+either (both measured on PostgreSQL 17.6). A list that implies otherwise invites
+someone to move it inside the loop, where it would be a no-op after the first
+iteration.
+
+**The disabled and frozen paths write a heartbeat and then return.** The original list
+exited bare, and the heartbeat appeared only at the end. R4 had already ruled that the
+tick is evidence the JOB RAN rather than evidence it injected — but §D's list still
+showed the shape R4 replaced, which is precisely the failure `O-5` names. Corrected
+here, at the site that carried it.
+
+**The overlap guard is step 1, not prose.** `pg_try_advisory_xact_lock` was described
+in the paragraph below and absent from the sequence, so a reader working from the list
+alone would build an injector two of which could run at once.
+
+**Migration `0028` is step 7-d-i, and it exists because the cursor's snapshot predates
+every lock the sweep takes.** `FOR m IN SELECT … WHERE status = 'Open'` is evaluated
+before the loop acquires anything, so a market can move `Open → Resolving`, `Closed` or
+`Voided` in the interval between being enumerated and being locked. Injecting into a
+market that has left `Open` puts reserves behind a pool that is settling. So the status
+is re-read from the `markets` row **inside** the lock and the injection proceeds only
+while it still reads `Open` — the read is what makes the lock mean something.
+
+**Migration `0029` is step 6 and step 7-a, and it exists because a CHECK could not
+reach the thing that breaks.** `0028` had capped `lock_timeout_ms` at 100 ms, which
+looked sufficient and was not. The sweep is one transaction (R8), so a pool row locked
+at the first market stays locked until the last one finishes, and a bet waiting on it
+carries a 1,000 ms `statement_timeout` whose `57014` is **not** in
+`RETRYABLE_SQLSTATES` — the bet does not retry, it fails. Measured at execute: eight
+Open markets with seven pool rows held ran 735 ms at 100 ms, and 1,776 ms at 250 ms;
+extrapolated to staging's ten Open markets, ~945 ms against a 1,000 ms budget, with the
+remaining ~55 ms reachable by a participant keeping bets in flight. A CHECK cannot see
+the market count, and the count is not the ADR's to fix — it has already drifted from
+the planned eight to ten. So the bound moved into the sweep itself as a 600 ms
+lock-hold budget, checked before taking each further lock, where it holds for any
+market count and any legal timeout. **The cost is stated rather than hidden:** under
+sustained contention the sweep stops early and the markets after the cut-off wait for
+the next tick. `ORDER BY id` makes it the same late markets each time, so a sustained
+squeeze could keep one thin — which is what `liquidity_undershoot` is for, and why that
+alarm is not decoration.
 
 **A `FUNCTION`, invoked with `SELECT` from `cron.schedule()`** — the `0007`/`0011`
 registration pattern, so the whole sweep is one transaction and the body carries no
@@ -331,6 +401,22 @@ does not deliver it (`O-5`).
 | R9 | §Execution | Gate C is *the orchestrator's diff read*, not a senior reviewer assigned on the PR. |
 | R9 | §Consequences, §Drift | the staging pool count is **14**, not twelve — re-measured. |
 | R9 | §Open for plan-mode | retitled **Closed by plan-mode**; all three answered, the `count(*)` one with the measurement that contradicts its stated premise. |
+
+**P2 · 2026-09-07 · LIQ-1-FIX-2.** §D's step list is amended to the function that
+actually shipped. The decision is untouched — target rule, guards, event, backing
+identity and policy table all stand — so this is an in-place patch and not a
+supersession (CLAUDE.md §5.12). The rewrite is in §D itself, above; this block records
+that it happened (`O-5`).
+
+| change | section | why |
+|---|---|---|
+| the sequence is rewritten end to end | §D | it described the design as planned, not the function as built, and had diverged in four ways that a reader building from the list would have reproduced. |
+| trigger and guards move UNDER the lock | §D | as listed, `tank` and `price` were read before the pool row was locked. An unlocked read feeding a locked write is exactly the race the lock is for. |
+| `lock_timeout`, `count(*)`, target hoisted out of the loop | §D | they run once at the top. `SET LOCAL` has no `COMMIT` to reset it and a rolled-back subtransaction does not clear it, so inside the loop it would be a silent no-op after the first pass. |
+| the disabled / frozen path writes a heartbeat, then returns | §D | R4 ruled the tick is evidence the JOB RAN. §D's list still showed the bare exit R4 replaced — an amendment recorded but not delivered. |
+| `pg_try_advisory_xact_lock` becomes step 1 | §D | it was prose beside the list, so the list alone described an injector two of which could run at once. |
+| migration `0028` named at its step | §D | the cursor's snapshot predates every lock, so a market can leave `Open` between enumeration and locking. The status is re-read inside the lock. |
+| migration `0029` named at its steps | §D | the `0028` ceiling was above the value that breaks a bet — ~945 ms of lock-holding at ten Open markets against a non-retryable 1,000 ms `statement_timeout`. A CHECK cannot see the market count, so the bound became a 600 ms lock-hold budget inside the sweep. |
 
 ## Drift recorded, not acted on
 
