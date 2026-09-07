@@ -211,6 +211,13 @@
       "when": 1788783876628,
       "tag": "0029_liquidity_policy_ceilings_tightened",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1788787963903,
+      "tag": "0030_liquidity_revoke_app_roles",
+      "breakpoints": true
     }
   ]
 }
