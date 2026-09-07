@@ -329,6 +329,101 @@ describe("the injector and the bet path share the pool row", () => {
 		expect(Number(injections[0]?.n)).toBeGreaterThanOrEqual(1);
 	});
 
+	it("liquidity-contention::a-bet-survives-a-sweep-across-many-contended-markets", async () => {
+		// ⛔ THE CASE THAT WOULD HAVE CAUGHT H-1, AND DID NOT EXIST
+		// (@security-auditor M-2). Every other case in this file uses ONE market,
+		// and `sweep-duration-bounded` uses eight but holds no locks — so the
+		// property the whole `lock_timeout_ms` ceiling exists to protect was
+		// asserted nowhere, and a policy row at the old 250 ms ceiling reddened
+		// nothing.
+		//
+		// The measurement that made this necessary: at 8 markets with 7 pool rows
+		// held, the sweep took 735 ms at 100 ms and 1,776 ms at 250 ms, and a
+		// bet-shaped statement against the FIRST market died at 1,004 ms with
+		// `57014` — which is NOT in RETRYABLE_SQLSTATES, so the bet does not
+		// retry. It fails.
+		//
+		// What this asserts is the invariant that survives a changing market
+		// count: the sweep gives up its remaining locks inside the budget, so a
+		// bet on the first market — the one that waits longest — still completes.
+		const marketIds: string[] = [];
+		for (let i = 0; i < 8; i++) {
+			marketIds.push(await seedMarket(`contend-many-${i}`));
+		}
+		marketIds.sort(); // the sweep iterates ORDER BY id
+		const first = marketIds[0] ?? "";
+		const held = marketIds.slice(1);
+		await seedPolicy(9705, 100);
+		// ⚠ 100 is BOTH the shipped value and the 0029 ceiling. Proven to catch
+		// H-1: with 0028's body (no sweep budget) and the old 250 ms ceiling this
+		// case fails on the bet's own `SELECT … FOR NO KEY UPDATE` — the 57014 the
+		// bet path does not retry.
+		const bettor = await seedUser("many");
+
+		// Hold every pool row EXCEPT the first, so the sweep burns its
+		// `lock_timeout` on each of them in turn while a bet waits on the first.
+		const holder = await contender.reserve();
+		let elapsed = -1;
+		let betId = "";
+		try {
+			await holder.unsafe(`BEGIN`);
+			for (const id of held) {
+				await holder.unsafe(
+					`SELECT 1 FROM pools WHERE market_id = $1 FOR NO KEY UPDATE`,
+					[id],
+				);
+			}
+
+			// Fire the sweep, let it reach the first market and take its lock,
+			// then race a real bet against that same row.
+			const sweeping = testClient
+				.unsafe(`SELECT run_liquidity_injection()`)
+				.execute();
+			await new Promise((r) => setTimeout(r, 30));
+
+			const started = Date.now();
+			betId = await placeTask({
+				userId: bettor,
+				marketId: first,
+				side: "YES",
+				stake: "10",
+			})();
+			elapsed = Date.now() - started;
+
+			await sweeping;
+		} finally {
+			await holder.unsafe(`ROLLBACK`);
+			holder.release();
+		}
+
+		// ⛔ THE ASSERTION: the bet LANDED. Not "no error was thrown somewhere" —
+		// a bet id, and a position behind it.
+		expect(betId).toBeTruthy();
+		const held2 = await testDb
+			.select({ quantity: positions.quantity })
+			.from(positions)
+			.where(and(eq(positions.marketId, first), eq(positions.userId, bettor)));
+		expect(held2).toHaveLength(1);
+
+		// ...and it did so inside the bet path's own non-retryable budget. The
+		// margin is what the ceiling and the sweep budget are FOR, so it is
+		// asserted rather than assumed.
+		expect(elapsed).toBeLessThan(1000);
+
+		// The sweep completed and said so: a heartbeat exists. A sweep that
+		// aborted would roll its heartbeat back, and the only symptom would be a
+		// silence alarm pointing at a scheduler that is running perfectly.
+		const hb = await testClient.unsafe<Array<{ c: number; i: number }>>(
+			`SELECT markets_considered AS c, markets_injected AS i
+			 FROM liquidity_heartbeat ORDER BY id DESC LIMIT 1`,
+		);
+		expect(hb).toHaveLength(1);
+		// It may have stopped early under the budget — that is the design, not a
+		// failure — so `considered` is bounded rather than pinned.
+		expect(hb[0]?.c ?? 0).toBeGreaterThan(0);
+		expect(hb[0]?.c ?? 99).toBeLessThanOrEqual(8);
+	});
+
 	it("liquidity-contention::a-bet-holding-the-row-makes-the-injector-yield-not-fail", async () => {
 		// The direction assertion, in isolation and deterministically rather than
 		// by racing. A held pool row must make the sweep SKIP — returning

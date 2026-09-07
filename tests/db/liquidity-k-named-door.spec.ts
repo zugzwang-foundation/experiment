@@ -283,6 +283,7 @@ describe("k changes only through a named door (ADR-0047 §Acceptance, R2)", () =
 		expect(migrationWrites).toEqual([
 			"0027_liquidity_injector_pg_cron.sql",
 			"0028_liquidity_policy_ceilings.sql",
+			"0029_liquidity_policy_ceilings_tightened.sql",
 		]);
 	});
 

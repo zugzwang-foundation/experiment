@@ -67,9 +67,18 @@ export const liquidityPolicy = pgTable(
 		// qualified (`p.floor`), or the parser resolves the function and the
 		// error arrives at runtime rather than at CREATE.
 		floor: numeric("floor", { precision: 38, scale: 18 }).notNull(),
-		// Inject only while `tank < trigger_ratio × target`. Bounded (0,1] below:
-		// at 1 the injector chases the target continuously, which is legal and
-		// deliberate; above 1 it would inject a market that is already at target.
+		// Inject only while `tank < trigger_ratio × target`. Bounded (0,1) —
+		// STRICTLY below 1 as of 0029 (@security-auditor M-4).
+		//
+		// ⚠ THIS COMMENT USED TO BLESS 1 AS "legal and deliberate". It is not.
+		// `floor18` truncation leaves the tank a hair short of target after every
+		// injection, so at exactly 1 the trigger is true again immediately and the
+		// injector emits one row per market PER MINUTE, forever — ~14,400/day at
+		// ten markets, ~750,000 over the window. Three consumers pay: the chart
+		// walks every one on EVERY Discovery card and debate page load,
+		// `sumInjectionDiscards` scans them inside the W-3 settlement transaction
+		// under the pool lock against a non-retryable 5,000 ms budget, and the
+		// dataset ships all of them. Nothing needs the boundary.
 		triggerRatio: numeric("trigger_ratio", {
 			precision: 38,
 			scale: 18,
@@ -122,7 +131,7 @@ export const liquidityPolicy = pgTable(
 		check(
 			"liquidity_policy_bounds",
 			sql`${table.coefficient} > 0 AND ${table.floor} > 0
-				AND ${table.triggerRatio} > 0 AND ${table.triggerRatio} <= 1
+				AND ${table.triggerRatio} > 0 AND ${table.triggerRatio} < 1
 				AND ${table.guardLow} > 0 AND ${table.guardHigh} < 1
 				AND ${table.guardLow} < ${table.guardHigh}
 				AND ${table.endgameHours} >= 0 AND ${table.lockTimeoutMs} > 0`,
@@ -150,18 +159,65 @@ export const liquidityPolicy = pgTable(
 		// almost no room. The exact invariant belongs in the ADR §Runbook, where
 		// the operator reads it before typing — this constraint is the backstop,
 		// not the argument.
+		// ⚠ 250 → 100 at migration 0029 (@security-auditor H-1). 250 was the
+		// migration reviewer's suggestion and I took it without doing the
+		// arithmetic against the MEASURED market count. The auditor did:
+		//
+		//   8 Open markets, 7 pool rows held by a concurrent session
+		//     lock_timeout_ms = 100  → sweep 735 ms
+		//     lock_timeout_ms = 250  → sweep 1,776.8 ms
+		//   ...and a bet-shaped statement against the FIRST market's pool row
+		//   died at 1,004.8 ms with `canceling statement due to statement timeout`.
+		//
+		// So the ceiling BLESSED a value that deterministically breaks the money
+		// path. `57014` is not in RETRYABLE_SQLSTATES — the bet does not retry, it
+		// fails. A guard that permits the failure it was added to prevent is worse
+		// than no guard, because it reads as one.
 		check(
 			"liquidity_policy_lock_timeout_ceiling",
-			sql`${table.lockTimeoutMs} <= 250`,
+			sql`${table.lockTimeoutMs} <= 100`,
+		),
+		// ⛔ H-2 — THE PARAMETERS WHOSE FAILURE IS IRREVERSIBLE HAD NO CEILING AT
+		// ALL, and `0028` ceilinged the two whose failure is RECOVERABLE while
+		// leaving these open.
+		//
+		// Measured: `floor = 99999999999999999999` is accepted by every CHECK,
+		// and one tick turns a 100,000 tank into 1e20 on EVERY Open market at
+		// once, silently, price-preserving as designed. **There is no drain
+		// path** — `pools` has no reduce-liquidity writer, `events` is Bucket A,
+		// and `k` only grows. The markets become permanently price-inelastic and
+		// the experiment's instrument is destroyed with no way back. Realistically
+		// it is the three-extra-zeros typo, which the same mechanism delivers.
+		//
+		// The opposite direction already fails SAFE and is worth stating so
+		// nobody "fixes" it: an over-large `coefficient × users` overflows the
+		// numeric(38,18) cast inside the subtransaction, is caught by
+		// `WHEN OTHERS`, writes a `liquidity_injection_error` alarm and leaves the
+		// pool untouched. The dangerous band is precisely "large enough to matter,
+		// small enough not to overflow".
+		//
+		// Sized from the values ADR-0047 actually pins: 100× the D-14 opening tank
+		// (100,000) and 100× the initial grant (1,000). Room for any plausible
+		// tuning; no room for a typo.
+		check("liquidity_policy_floor_ceiling", sql`${table.floor} <= 10000000`),
+		check(
+			"liquidity_policy_coefficient_ceiling",
+			sql`${table.coefficient} <= 100000`,
 		),
 		// `endgame_hours` had no ceiling either. Measured: 2147483647 is accepted
 		// and `now() + make_interval(hours => 2147483647)` evaluates cleanly to
 		// the year 247010 — every market skipped forever, silently, with the
 		// undershoot alarm as the only signal that anything is wrong. One year is
 		// far past any plausible tuning and far short of that.
+		// ⚠ 8760 → 168 at 0029 (@security-auditor M-5). One year did not bound the
+		// failure mode the constraint's own comment names: the experiment window
+		// is ~1,250 hours, so ANY value at or above that skips every market for
+		// the whole experiment — silently — and 8,760 permitted it seven times
+		// over. One week is far past any plausible endgame and far short of the
+		// window.
 		check(
 			"liquidity_policy_endgame_ceiling",
-			sql`${table.endgameHours} <= 8760`,
+			sql`${table.endgameHours} <= 168`,
 		),
 	],
 );

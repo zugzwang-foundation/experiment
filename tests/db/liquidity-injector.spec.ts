@@ -512,7 +512,10 @@ describe("run_liquidity_injection — the sweep", () => {
 			yes: "9000",
 			no: "1000",
 		});
-		await seedPolicy(V(16), { lockTimeoutMs: 250 });
+		// ⚠ 100, not 250: `0029` tightened the ceiling and 250 is now REJECTED —
+		// the constraint doing its job on this test's own fixture. The holder
+		// below releases at 40 ms, comfortably inside 100.
+		await seedPolicy(V(16), { lockTimeoutMs: 100 });
 
 		const holder = await contender.reserve();
 		try {

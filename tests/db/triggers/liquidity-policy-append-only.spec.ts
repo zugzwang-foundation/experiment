@@ -234,7 +234,35 @@ describe("liquidity_policy — the bounds CHECK is the only review there is", ()
 		// the undershoot alarm as the only sign anything is wrong.
 		[
 			"an endgame_hours past any plausible tuning — every market skipped forever",
-			{ endgame_hours: 8761 },
+			{ endgame_hours: 169 },
+		],
+		// ⛔ H-2 (@security-auditor), and these are the ones whose failure is
+		// IRREVERSIBLE. `0028` ceilinged the two RECOVERABLE parameters and left
+		// these open. Measured before `0029`: `floor = 99999999999999999999` was
+		// ACCEPTED, and one tick turned a 100,000 tank into 1e20 on every Open
+		// market at once — silently, price-preserving as designed. **There is no
+		// drain path**: `pools` has no reduce-liquidity writer, `events` is
+		// Bucket A, and `k` only grows. The markets become permanently
+		// price-inelastic and the experiment's instrument is destroyed with no way
+		// back. Realistically it is the three-extra-zeros typo below.
+		[
+			"three extra zeros on the floor — every market's depth ×100, unrecoverably",
+			{ floor: "100000000" },
+		],
+		[
+			"an absurd floor — the value measured as accepted before 0029",
+			{ floor: "99999999999999999999" },
+		],
+		["a coefficient far above any plausible tuning", { coefficient: "100001" }],
+		// M-4. At exactly 1 the trigger is true again immediately after every
+		// injection (floor18 leaves the tank a hair short), so the injector emits
+		// one row per market PER MINUTE forever — ~750,000 over the window, walked
+		// by the chart on every page load and scanned inside the settlement
+		// transaction under the pool lock. It used to be blessed as "legal and
+		// deliberate"; nothing needs the boundary.
+		[
+			"a trigger_ratio of exactly 1 — dust injections forever",
+			{ trigger_ratio: "1" },
 		],
 	];
 
@@ -253,21 +281,36 @@ describe("liquidity_policy — the bounds CHECK is the only review there is", ()
 		});
 	}
 
-	it("accepts lock_timeout_ms exactly at the 0028 ceiling", async () => {
-		// The boundary is inclusive: 250 is a legal tuning, 251 is not. Pinned as
-		// its own case because a reviewer tightening `<=` to `<` would silently
-		// forbid a value the ADR Runbook names as available.
+	it("accepts lock_timeout_ms exactly at the ceiling — which is now 100, not 250", async () => {
+		// ⚠ THE CEILING MOVED, AND THE REASON IS THE POINT. `0028` set it to 250
+		// on a suggestion; `@security-auditor` measured that 250 BREAKS the money
+		// path — 8 markets with 7 pool rows held gives a 1,776 ms sweep, and a
+		// bet-shaped statement on the first market dies at 1,004 ms with a `57014`
+		// the bet path does not retry. `0029` tightens it to 100, which is also
+		// the shipped value.
+		//
+		// A ceiling that blesses the failure it was added to prevent is worse than
+		// no ceiling, because it reads as a guard.
 		await expect(
-			insertPolicy(9102, { lock_timeout_ms: 250 }),
+			insertPolicy(9102, { lock_timeout_ms: 100 }),
 		).resolves.toBeTruthy();
 	});
 
-	it("accepts trigger_ratio exactly 1 — the boundary is inclusive by design", async () => {
-		// At 1.0 the injector chases the target continuously. That is legal and
-		// deliberate, so the CHECK is `<= 1`. Pinned as a case because a reviewer
-		// tightening it to `< 1` would break a valid tuning with no test to say so.
+	it("accepts a trigger_ratio just below 1", async () => {
+		// The boundary moved from inclusive to exclusive (M-4), so the nearest
+		// legal value is pinned instead — otherwise tightening `< 1` would leave
+		// no positive case at all and the rejection above could pass against a
+		// constraint that rejected everything.
 		await expect(
-			insertPolicy(9101, { trigger_ratio: "1" }),
+			insertPolicy(9103, { trigger_ratio: "0.999999999999999999" }),
 		).resolves.toBeTruthy();
+	});
+
+	it("accepts the seeded ADR-0047 §G row unchanged", async () => {
+		// The positive control for the whole ceiling block: five CHECKs, and the
+		// values the ADR actually pins must still pass all of them. Without it,
+		// every rejection above is satisfiable by a constraint that rejects
+		// everything — which is the failure mode a wall of negative cases invites.
+		await expect(insertPolicy(9101)).resolves.toBeTruthy();
 	});
 });
