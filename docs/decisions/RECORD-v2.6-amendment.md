@@ -1,7 +1,7 @@
 # DECISION RECORD — amendment 2.6
 
 **Amends** `RECORD-v2.0.md` · follows 2.1, 2.2, 2.3, 2.4, 2.5 · **Opened** 2026-09-07
-**Ruling** D-30
+**Rulings** D-30, D-31, D-32
 
 ---
 
@@ -42,6 +42,65 @@ residue (`SPEC.1:1155`) and the superseded ladders in `docs/decisions/README.md`
 `docs/STATE.md` are a separate hygiene commit, not this one.
 
 **Enforced at** `SPEC.2` §0 and its change log.
+
+---
+
+## D-31 · Mid-market liquidity injection authorised (ADR-0047 Phase 2)
+
+**Amends** `SPEC.1` §10.6 and §3.2 NG15. 2026-09-07.
+
+**Ruling.** The pool seed remains fixed at creation — written once at `Draft → Open`, one
+`market.opened` event. Pool **depth** may be increased after open by one named mechanism and no
+other: the ADR-0047 §D injector. It is price-neutral by construction (measured |Δp| ≤ 1e-18 at 18
+decimal places, LIQ-SIM-2 §0a), admin-side, touches no participant balance and writes no
+`dharma_ledger` row, and records each change as one `pool.liquidity_added` event carrying reserves
+before and after, the target, and the discards. `SPEC.1` §10.6 and the corresponding non-goal are
+amended to state exactly that. No other mid-market liquidity change is permitted.
+
+**Grounds.** §10.6 banned injection on three grounds. Two no longer hold: retroactive re-pricing is
+false against this primitive (measured), and audit-trail integrity is restored by the backing
+identity landed in ADR-0047 §E. The third inverts — a seed fixed at creation flattens the K_eff
+signal as turnout grows (undefended launch price 0.787 at 5k signups/hour against 0.994 at 40k,
+LIQ-SIM-2 §3b) — so depth that scales with participation serves K·n > C rather than weakening it.
+
+**Condition.** The backing identity holds no row in `users` and no participant-shaped account. If it
+does, this ruling does not apply and the design returns for a further ruling: *the admin is not a
+participant* is structural and is not traded against liquidity depth.
+
+**Consequences.** ADR-0047's plan to strike §10.6 inside a code PR is void — an ADR does not amend
+`SPEC.1` (D-22). The amendment lands by this ruling; the Phase 2 PR carries the `SPEC.1` text and
+cites this row, and does not merge before that text does. `SPEC.2` 2.0.0 is unaffected; Phase 2's
+`SPEC.2` changes are additive rows on top of it.
+
+**Evidence.** `zz_LIQ-RECON-2_measure_2026-09-06T1314.md`,
+`zz_LIQ-SIM-2_measure_2026-09-06T1444.md`; ADR-0047 §A, §D, §E.
+
+---
+
+## D-32 · Moderation consequences are advisory; the pre-serve hold is retained for the CSAM-adjacent image set
+
+**Extends** D-20 and ADR-0046 from the *timing* of moderation to its *consequences*. 2026-09-07.
+
+**Ruling.** No content is auto-removed and no participant is auto-banned by a classifier verdict.
+Every verdict routes to the admin, who decides on removal and on ban. This reverses the retained
+Track A auto-ban.
+
+**One exception, and it is not a moderation gate.** An image in the CSAM-adjacent set — CSAM hash,
+`sexual/minors`, adult `sexual`, `nsfw` — is not served until its verdict has returned. Every image
+is screened before first serve regardless, since a file cannot be known not to be CSAM without
+looking at it; what this ruling changes is only the consequence. Images flagged violence, weapons,
+harassment, hate or self-harm publish immediately and are flagged. No post is blocked and no
+participant waits, in any case.
+
+**Grounds.** PhotoDNA is parked. On `omni-moderation-2024-09-26` the `sexual/minors` category scores
+on text only; image-borne child sexual abuse material is scored as adult `sexual`. The
+adult-`sexual`-on-an-image predicate (`SPEC.2` §10, A2) is therefore the only mechanism in the
+product that catches it. Making that category publish-then-flag would serve it. The hold lifts when
+PhotoDNA or a dedicated image classifier is onboarded.
+
+**Consequences.** Amends `SPEC.1` §2 (Track A/B glossary rows), §14 (track table, F-MOD-1, F-MOD-2),
+§15 F-ADMIN-4, §16.2 and Appendix A; and `SPEC.2` §10's category-routing paragraph. That text lands
+with `MOD-1`, not in this pull request. Detection is unchanged and unweakened.
 
 ---
 
