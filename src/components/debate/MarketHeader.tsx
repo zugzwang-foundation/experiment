@@ -1,4 +1,4 @@
-import { Download } from "lucide-react";
+import { Download, Maximize2, Minimize2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -154,6 +154,8 @@ export function MarketHeader({
 	market,
 	priceChart,
 	pick,
+	compact = false,
+	onToggleCompact,
 }: {
 	market: DebateMarketHeader;
 	priceChart: { series: PricePoint[] } | null;
@@ -171,93 +173,107 @@ export function MarketHeader({
 		suspended: boolean;
 		onPick: (side: Side) => void;
 	};
+	/**
+	 * Compact mode: collapses media, question title, chart, and resolver cards
+	 * into a high-signal slim status strip containing volume stats, status badges,
+	 * and the probability split bar (ideal for focused bidding/composing).
+	 */
+	compact?: boolean;
+	/**
+	 * Optional handler to toggle between compact focus mode and standard view.
+	 */
+	onToggleCompact?: () => void;
 }) {
 	return (
 		<HeadZone
-			// HTML-FINISH · MARKET DETAIL row 4 — THE PRICE CHART IS THE RAIL'S
-			// content, and since RESO-1 it is the rail's ONLY content. The chart used
-			// to render in the left column between the criterion and the price bar,
-			// which put the market's shape INSIDE the reading column instead of
-			// beside it; that move stands.
-			// ⚠ THE SENTENCE "the mockup's `.hright` holds exactly `.graph` +
-			// `.barrow f` in the market arm (`d5:1007`, `:1037`)" USED TO STAND HERE
-			// AS THIS PROP'S JUSTIFICATION. It is still true OF d5 and is no longer
-			// true of this build: R-4 moves `.barrow` out. Recorded rather than
-			// deleted, because the divergence from the mockup is deliberate and a
-			// later reader comparing the two should find it named.
-			// ⚠ `null` WHEN THE SERIES READ FAILED is the pre-existing contract, not
-			// a new one: a null `priceChart` is non-fatal and the rest of the header
-			// stands. `MarketPriceChartHost` itself also returns null for an empty
-			// series, so both null paths agree.
-			// ⛔⛔ RESO-1 · R-4 — THE RAIL IS THE CHART, AND NOTHING ELSE. The price
-			// bar has moved into the reading column (see `left`), and the rail
-			// returns to `null` when there is no chart to put in it.
-			//
-			// ⚠⚠ THE `null` IS NOT TIDINESS — IT IS THE DEFECT R-4 WOULD OTHERWISE
-			// CREATE, AND IT IS MEASURED. This prop used to be a FRAGMENT, which is
-			// never `null`, and the block that stood here said so in terms: "THE RAIL
-			// IS NOW ALWAYS RENDERED on the market arm: `PriceBar` returns its
-			// 'Pricing unavailable' stub rather than null, so there is no market-arm
-			// state with an empty rail." That sentence was true only because the bar
-			// was in here. Take the bar out and leave the fragment, and every market
-			// with no chart renders a 340px column containing nothing — which is
-			// `PD-3-09` / `OD-6` verbatim, the ruling that deleted the deferred-work
-			// placeholder box from this very component.
-			// ⇒ AND IT IS NOT HYPOTHETICAL. Measured at RESO-1 recon against the base
-			// build: `market-price-chart-card` renders on ZERO of the eight staging
-			// markets — the fixtures are raw-INSERT rather than event-backed, so the
-			// price series is empty and `MarketPriceChartHost` returns null for all of
-			// them. On today's data the fragment version of this prop would have
-			// shipped an empty rail on EVERY market, not an edge case.
-			// ⚠ This restores the contract `HeadZone`'s own docblock describes ("A
-			// consumer with no rail content passes `null` and the surface is one
-			// column"), which the bar's arrival had quietly suspended.
-			//
-			// ⛔⛔ AND THE CONDITION IS `series.length`, NOT `priceChart != null` —
-			// THE FIRST VERSION OF THIS LINE TESTED THE WRONG NULL AND SHIPPED THE
-			// EXACT DEFECT THE PARAGRAPH ABOVE EXISTS TO PREVENT. Measured on the
-			// deployed RESO-1 preview at `38213de`: `headzone-right` present,
-			// 340×188, `innerHTML === ""` — an empty column on EVERY market.
-			// ⇒ THE MECHANISM, because it is subtle and it will recur. `priceChart`
-			// is NOT null on a market with no price history — the read model returns
-			// `{ series: [] }`, which is TRUTHY. The emptiness is decided
-			// one level DOWN, inside `MarketPriceChartHost`, which returns `null` for
-			// an empty series. So `priceChart ? <Host/> : null` hands `HeadZone` a
-			// non-null React element that renders NOTHING, and `HeadZone` — correctly,
-			// by its own contract — draws the column around it.
-			// ⇒ THE RAIL'S CONDITION IS NOW LITERALLY THE HOST'S OWN CONDITION —
-			// `hasRenderableSeries`, exported from the host for exactly this, so the
-			// two cannot drift. It was a HAND-COPY of that test first; @code-reviewer
-			// flagged that a second null path in the host would re-open the defect,
-			// and a copied condition is a proxy
-			// for it. Two components deciding "is there a chart?" by DIFFERENT tests
-			// is what produced the gap; the fix is to ask the same question, not to
-			// ask a different question more carefully.
-			// ⚠ AND THE UNIT GUARD COULD NOT SEE IT. It rendered `priceChart={null}`,
-			// a shape production never produces, so it was green throughout.
-			// `market-header.test.tsx` now also exercises `{ series: [] }`.
-			// ⚠ THE SHAPE LOST ITS `nodes` AT CHART-NODE-REMOVE AND THE LESSON DID
-			// NOT: `{ series: [] }` is still truthy, so the condition is still
-			// `hasRenderableSeries(...)` and never `priceChart != null`.
+			fit={compact}
 			right={
-				priceChart && hasRenderableSeries(priceChart.series) ? (
+				!compact && priceChart && hasRenderableSeries(priceChart.series) ? (
 					<MarketPriceChartHost
 						series={priceChart.series}
-						// C-CHART-2 clause 1 (CHART-2) — the terminal pulse. READ
-						// from the market's own status, never assumed: this is the
-						// ONE surface where a non-`Open` market renders a chart at
-						// all (Discovery lists only `Open` ones), so it is the one
-						// place the frozen branch is reachable. A pulse on a
-						// `Closed`, `Resolving`, `Resolved` or `Voided` market
-						// asserts it is live, which is false where stake is
-						// committed and runs at INV-4 — the same reason
-						// `withLiveTail` reads `market.status` here and nowhere else.
 						isOpen={market.status === "Open"}
 					/>
 				) : null
 			}
 			left={
-				/* HTML-FINISH · MARKET DETAIL row 2 — `.hleft` IS A ROW (`d5:448`),
+				compact ? (
+					<div className="flex min-h-0 flex-1 items-center justify-between gap-4 rounded-[var(--r)] border border-[var(--hairline)] bg-[var(--color-n0)]/70 backdrop-blur-md shadow-[0_2px_12px_rgba(0,0,0,0.3)] px-4 py-2">
+						{/* Left: Staked totals + post/reply counts */}
+						<div className="hidden min-w-0 shrink-0 items-center gap-1 text-xs text-muted-foreground font-medium sm:flex">
+							<InfoTip
+								content={joinGloss(
+									GLOSSARY.stakedMarket,
+									dharmaExactHint(
+										market.totals.dharmaStaked,
+										COMPACT_FROM_MARKET_TOTAL,
+									),
+								)}
+								asChild
+							>
+								<span className="cursor-help text-ink font-semibold">
+									Đ{" "}
+									{formatDharmaCompact(
+										market.totals.dharmaStaked,
+										COMPACT_FROM_MARKET_TOTAL,
+									)}{" "}
+									staked
+								</span>
+							</InfoTip>
+							<AttrSep />
+							<span>
+								{market.totals.postCount}{" "}
+								{noun(market.totals.postCount, "post", "posts")}
+							</span>
+							<AttrSep />
+							<span>
+								{market.totals.replyCount}{" "}
+								{noun(market.totals.replyCount, "reply", "replies")}
+							</span>
+						</div>
+
+						{/* Center: Market Question */}
+						<h1
+							title={market.title}
+							className="min-w-0 flex-1 truncate text-center text-[15px] sm:text-[17.5px] leading-tight font-bold tracking-tight text-ink px-2"
+						>
+							{market.title}
+						</h1>
+
+						{/* Right: Actions and badges */}
+						<div className="flex shrink-0 items-center justify-end gap-2.5">
+							<LifecycleBadge status={market.status} />
+							<InfoTip content={GLOSSARY.downloadMd} asChild>
+								<a
+									download
+									href={`/m/${market.slug}/export`}
+									aria-label="AI mode — download this debate as Markdown"
+									className={cn(
+										buttonVariants({ variant: "outline", size: "xs" }),
+										"h-5 rounded-4xl text-[11px] gap-1 px-2.5 text-muted-foreground hover:text-ink hover:border-ink/40 transition-all",
+									)}
+								>
+									<Download />
+									AI mode
+								</a>
+							</InfoTip>
+							{onToggleCompact && (
+								<button
+									type="button"
+									onClick={onToggleCompact}
+									aria-label="Exit focus view"
+									className={cn(
+										buttonVariants({ variant: "secondary", size: "xs" }),
+										"h-5 rounded-4xl text-[11px] gap-1 px-2.5 font-medium text-ink bg-n1 hover:bg-n2 border border-[var(--hairline)] shadow-xs cursor-pointer transition-all",
+									)}
+								>
+									<Minimize2 />
+									Exit Focus
+								</button>
+							)}
+						</div>
+					</div>
+				) : (
+					/* HTML-FINISH · MARKET DETAIL row 2 — `.hleft` IS A ROW (`d5:448`),
 				   holding `.mmedia` then `.hstack`. The market arm's media panel takes
 				   the same slot the post arm gives the focused post's image, so the two
 				   arms swap contents inside one identical frame.
@@ -275,7 +291,7 @@ export function MarketHeader({
 				   where its band is 217.8px and 188px respectively — the extra height
 				   was going nowhere. The fix is on the ONE child that actually needs it
 				   — see `MarketMediaPanel.tsx`'s `self-start`. */
-				/* MOBILE-1 Phase A — STACKS BELOW 640px. This row is the media
+					/* MOBILE-1 Phase A — STACKS BELOW 640px. This row is the media
 				   panel beside the text stack, and `MarketMediaPanel`'s frame is
 				   `w-1/3 shrink-0`: at 375px that leaves the stack 197px of a
 				   319px row, which is not a narrow column but a broken one —
@@ -287,13 +303,13 @@ export function MarketHeader({
 				   (`MarketMediaPanel.tsx`) — a `w-1/3` panel in a stacked column
 				   would be a third-width letterbox floating over full-width text.
 				   ⚠ >=640px is byte-identical: `flex` + `gap-4` are unprefixed. */
-				<div className="flex min-h-0 flex-1 gap-4 max-mobile:flex-col">
-					<MarketMediaPanel
-						imageUrl={market.mediaImageUrl}
-						videoUrl={market.mediaVideoUrl}
-						title={market.title}
-					/>
-					{/* `.hstack` (`d5:462`) — everything that is not the media.
+					<div className="flex min-h-0 flex-1 gap-4 max-mobile:flex-col">
+						<MarketMediaPanel
+							imageUrl={market.mediaImageUrl}
+							videoUrl={market.mediaVideoUrl}
+							title={market.title}
+						/>
+						{/* `.hstack` (`d5:462`) — everything that is not the media.
 					    ⚠ `min-h-0` is this node's link in the one-screen chain: without
 					    it the stack refuses to shrink below its content and pushes the
 					    declared band taller.
@@ -371,11 +387,11 @@ export function MarketHeader({
 					    content), so the 45px these gaps gain is drawn from a row that was
 					    only ever holding air. The band, the arena and the media panel are
 					    all untouched by this. */}
-					<div
-						data-testid="headzone-stack"
-						className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto"
-					>
-						{/* `.question` (`d5:463`) — `font-size:21px;font-weight:700;
+						<div
+							data-testid="headzone-stack"
+							className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto"
+						>
+							{/* `.question` (`d5:463`) — `font-size:21px;font-weight:700;
 							    line-height:1.24`, and SINGLE LINE with an ellipsis
 							    (`white-space:nowrap;overflow:hidden;text-overflow:ellipsis`,
 							    ruled at D5-02 / v0.9: "Market title → single line (no wrap;
@@ -397,13 +413,13 @@ export function MarketHeader({
 							    D5-02 / v0.9 ruled the market title to a single line with an
 							    ellipsis — and that ruling is untouched by RESO-1. Recorded
 							    rather than quietly re-justified. */}
-						{/* ⚠ `min-w-0 flex-1` — `.question` (`d5:463`) is a BLOCK filling
+							{/* ⚠ `min-w-0 flex-1` — `.question` (`d5:463`) is a BLOCK filling
 							    `.hstack`, and `truncate` only ellipsises what it is given. As a
 							    shrink-to-fit flex item beside the badge cluster the heading
 							    measured 501px against d5's 674px at the pinned 1440×777
 							    (−12.0pp), so it truncated far earlier than the mockup does and
 							    left the row's spare width unused. */}
-						{/* ⛔⛔ `shrink-0` IS LOAD-BEARING AND ITS ABSENCE MADE THE QUESTION
+							{/* ⛔⛔ `shrink-0` IS LOAD-BEARING AND ITS ABSENCE MADE THE QUESTION
 						    INVISIBLE. Measured on staging at `6190a90`: the `<h1>` rendered
 						    698px wide and **0px TALL**. `truncate` carries `overflow:hidden`,
 						    which sets this item's automatic minimum size to 0 — so once Q-1's
@@ -418,13 +434,13 @@ export function MarketHeader({
 						    ⚠ A class-string reading could not have found this: every class
 						    involved was correct in isolation. It took a box measurement in a
 						    browser. */}
-						<h1
-							title={market.title}
-							className="shrink-0 truncate text-[21px] leading-[1.24] font-bold tracking-normal"
-						>
-							{market.title}
-						</h1>
-						{/* HTML-FINISH · MARKET DETAIL row 6 — THE ATTRS STRIP SITS DIRECTLY
+							<h1
+								title={market.title}
+								className="shrink-0 truncate text-[21px] leading-[1.24] font-bold tracking-normal"
+							>
+								{market.title}
+							</h1>
+							{/* HTML-FINISH · MARKET DETAIL row 6 — THE ATTRS STRIP SITS DIRECTLY
 					    UNDER THE QUESTION. The mockup's `.hstack` orders its `vm` children
 					    `.question` -> `.attrs` -> `.criterion` -> `.rescards`
 					    (`d5:958-985`); this strip used to render LAST, below the chart and
@@ -441,7 +457,7 @@ export function MarketHeader({
 					    `Đ ` grammar and the same PD-3-08 plural rule, all still pinned by
 					    `market-header.test.tsx`. `.attrs`'s bold numerals and `·`
 					    separators are a different row's subject and are not taken here. */}
-						{/* ⚠ `.attrs` (`d5:500-502`) — `font-size:12px;font-weight:700;
+							{/* ⚠ `.attrs` (`d5:500-502`) — `font-size:12px;font-weight:700;
 						    color:var(--ink)`, its three fields joined by a `.sep` middle dot
 						    (`color:var(--n3);font-weight:400;margin:0 6px`). The shipped
 						    strip was `text-muted-foreground` at normal weight with the
@@ -454,7 +470,7 @@ export function MarketHeader({
 						    ⚠ THE PD-3-08 PLURAL RULE IS UNTOUCHED — same `noun()`, same
 						    three fields, same order. Only weight, colour and the
 						    separators change. */}
-						{/* ⚠⚠ RESO-1 · R-3 — THE META LINE AND THE ACTIONS ARE NOW ONE ROW,
+							{/* ⚠⚠ RESO-1 · R-3 — THE META LINE AND THE ACTIONS ARE NOW ONE ROW,
 						    AND Q-1's RULING IS NARROWED RATHER THAN REVERSED. Q-1 moved the
 						    lifecycle marker and the `.md` export OFF the question's row,
 						    founder-ruled, because as `shrink-0` siblings of the `<h1>` they
@@ -489,8 +505,8 @@ export function MarketHeader({
 						    the two containers merge into one. `market-header.test.tsx`
 						    asserts both by text and role rather than by position, so those
 						    guards read this unchanged. */}
-						<div className="flex items-center gap-3">
-							{/* ⚠ `min-w-0` — this is the row's flexible child now, and without
+							<div className="flex items-center gap-3">
+								{/* ⚠ `min-w-0` — this is the row's flexible child now, and without
 							    it a long attrs strip sets the row's automatic minimum and
 							    pushes the actions off the right edge instead of wrapping.
 							    ⚠⚠ BLOCK-3 §2 — `text-xs` (12px) → `text-[13px]`, this task's
@@ -500,8 +516,8 @@ export function MarketHeader({
 							    a shared shadcn primitive, left untouched rather than resized
 							    for one call site — so this bump reads as denser, more legible
 							    figures within the SAME row height, not a taller row. */}
-							<div className="flex min-w-0 flex-wrap items-center gap-y-1 text-[13px] font-bold text-ink">
-								{/* ⚠⚠ UI-FOLLOWUP A — THE EXACT FIGURE RIDES THE GLOSS RATHER THAN A
+								<div className="flex min-w-0 flex-wrap items-center gap-y-1 text-[13px] font-bold text-ink">
+									{/* ⚠⚠ UI-FOLLOWUP A — THE EXACT FIGURE RIDES THE GLOSS RATHER THAN A
 								    SECOND TOOLTIP, AND THAT IS THE ONE THING THIS SITE DOES DIFFERENTLY
 								    FROM `StatLine` AND `FocusMarketCard`. Both of those hang the exact
 								    value on the NUMBER, because the number is a free element there. Here
@@ -517,41 +533,41 @@ export function MarketHeader({
 								    `getByText("Đ 150 staked")` DOM-walk anchors and its two `innerHTML`
 								    ordering assertions matching. Splitting it would have reddened them for
 								    a reason unrelated to anything they guard. */}
-								<InfoTip
-									content={joinGloss(
-										GLOSSARY.stakedMarket,
-										dharmaExactHint(
-											market.totals.dharmaStaked,
-											COMPACT_FROM_MARKET_TOTAL,
-										),
-									)}
-									asChild
-								>
+									<InfoTip
+										content={joinGloss(
+											GLOSSARY.stakedMarket,
+											dharmaExactHint(
+												market.totals.dharmaStaked,
+												COMPACT_FROM_MARKET_TOTAL,
+											),
+										)}
+										asChild
+									>
+										<span>
+											Đ{" "}
+											{formatDharmaCompact(
+												market.totals.dharmaStaked,
+												COMPACT_FROM_MARKET_TOTAL,
+											)}{" "}
+											staked
+										</span>
+									</InfoTip>
+									<AttrSep />
 									<span>
-										Đ{" "}
-										{formatDharmaCompact(
-											market.totals.dharmaStaked,
-											COMPACT_FROM_MARKET_TOTAL,
-										)}{" "}
-										staked
+										{market.totals.postCount}{" "}
+										{noun(market.totals.postCount, "post", "posts")}
 									</span>
-								</InfoTip>
-								<AttrSep />
-								<span>
-									{market.totals.postCount}{" "}
-									{noun(market.totals.postCount, "post", "posts")}
-								</span>
-								<AttrSep />
-								<span>
-									{market.totals.replyCount}{" "}
-									{noun(market.totals.replyCount, "reply", "replies")}
-								</span>
-							</div>
-							{/* `shrink-0` — the actions are fixed-content chrome; the meta line
+									<AttrSep />
+									<span>
+										{market.totals.replyCount}{" "}
+										{noun(market.totals.replyCount, "reply", "replies")}
+									</span>
+								</div>
+								{/* `shrink-0` — the actions are fixed-content chrome; the meta line
 							    is what gives way when the row runs out of width. */}
-							<div className="ml-auto flex shrink-0 items-center gap-2">
-								<LifecycleBadge status={market.status} />
-								{/* EXPORT.1 — native download of the debate `.md` (server-mediated
+								<div className="ml-auto flex shrink-0 items-center gap-2">
+									<LifecycleBadge status={market.status} />
+									{/* EXPORT.1 — native download of the debate `.md` (server-mediated
 								    GET); plain anchor, no client boundary, works signed-out.
 								    ⛔ IT STAYS AN `<a>`, AND AIMODE-1 DID NOT CHANGE THAT. The
 								    brief said "rendered as a button, not a text link" — which is
@@ -642,17 +658,17 @@ export function MarketHeader({
 								    most likely carries it (the badge is the nearest target, a
 								    `gap-2` away), but the geometry match was ratified knowing
 								    this rather than in ignorance of it. */}
-								<InfoTip content={GLOSSARY.downloadMd} asChild>
-									<a
-										download
-										href={`/m/${market.slug}/export`}
-										aria-label="AI mode — download this debate as Markdown"
-										className={cn(
-											buttonVariants({ variant: "outline", size: "xs" }),
-											"h-5 rounded-4xl",
-										)}
-									>
-										{/* Bare, like the two sibling call sites (`ArgProfile`,
+									<InfoTip content={GLOSSARY.downloadMd} asChild>
+										<a
+											download
+											href={`/m/${market.slug}/export`}
+											aria-label="AI mode — download this debate as Markdown"
+											className={cn(
+												buttonVariants({ variant: "outline", size: "xs" }),
+												"h-5 rounded-4xl",
+											)}
+										>
+											{/* Bare, like the two sibling call sites (`ArgProfile`,
 										    `DownloadStub`). The glyph IS hidden from AT — lucide
 										    adds `aria-hidden="true"` itself — but it does so
 										    CONDITIONALLY: `!children && !hasA11yProp(rest)`
@@ -663,13 +679,27 @@ export function MarketHeader({
 										    glyph. That is a vendor contract, so it is pinned as one
 										    in `market-header.test.tsx` rather than restated here as
 										    a prop that only looks like it is doing the work. */}
-										<Download />
-										AI mode
-									</a>
-								</InfoTip>
+											<Download />
+											AI mode
+										</a>
+									</InfoTip>
+									{onToggleCompact && (
+										<button
+											type="button"
+											onClick={onToggleCompact}
+											aria-label="Enter focus view"
+											className={cn(
+												buttonVariants({ variant: "outline", size: "xs" }),
+												"h-5 rounded-4xl text-xs gap-1 cursor-pointer",
+											)}
+										>
+											<Maximize2 />
+											Focus
+										</button>
+									)}
+								</div>
 							</div>
-						</div>
-						{/* ⛔⛔ RESO-1 · R-1 + R-2 — THE `RESOLUTION` SECTION LABEL AND THE
+							{/* ⛔⛔ RESO-1 · R-1 + R-2 — THE `RESOLUTION` SECTION LABEL AND THE
 						    CLAMPED CRITERION EXCERPT ARE GONE, AND THE RULING THAT PUT THEM
 						    HERE IS SUPERSEDED IN PLACE RATHER THAN LEFT STANDING (O-4).
 						    What stood here was `.criterion` (`d5:974-977`) — a top hairline
@@ -720,7 +750,7 @@ export function MarketHeader({
 						    `DebateView`, reads it. The field stopped being a dead wire and
 						    became load-bearing, which is exactly why keeping it on the type
 						    was right). */}
-						{/* ⛔⛔ RESO-1 · R-4 — THE PRICE BAR NOW LIVES HERE, IN THE READING
+							{/* ⛔⛔ RESO-1 · R-4 — THE PRICE BAR NOW LIVES HERE, IN THE READING
 						    COLUMN, DIRECTLY ABOVE THE BLOCK ROW. It was the rail's second
 						    occupant, under the chart, on the argument that "the bar and the
 						    chart above it read the SAME price, so standing them in one
@@ -747,17 +777,18 @@ export function MarketHeader({
 						    silently turn the live percent labels back into plain text, which
 						    reads as a styling regression rather than the lost affordance it
 						    would be. */}
-						<PriceBar pricing={market.pricing} size="detail" pick={pick} />
-						{/* RESO-1 · R-7 — `.rescards` (`d5:986`) is now the FOUR-block row
+							<PriceBar pricing={market.pricing} size="detail" pick={pick} />
+							{/* RESO-1 · R-7 — `.rescards` (`d5:986`) is now the FOUR-block row
 						    and the LAST child of `.hstack`, directly under the price bar
 						    R-4 moved in above it. It used to sit after the criterion; the
 						    criterion is gone, so "after the criterion" is corrected here
 						    rather than left describing a neighbour that no longer exists.
 						    ⛔ The blocks still carry NO market data — see `ResolverCards.tsx`
 						    for why that half did not reverse. */}
-						<ResolverCards market={market} />
+							<ResolverCards market={market} />
+						</div>
 					</div>
-				</div>
+				)
 			}
 		/>
 	);

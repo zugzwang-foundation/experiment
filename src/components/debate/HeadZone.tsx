@@ -256,10 +256,12 @@ export function HeadZone({
 			    ⛔ THE CHART COMPONENT AND THE RAIL'S POSITION ARE UNTOUCHED (CHANGE 2)
 			    — when `right` is non-null this branch does not run at all. */}
 			{right === null ? (
-				<div
-					aria-hidden="true"
-					className="hidden w-[340px] shrink-0 lg:block"
-				/>
+				fit ? null : (
+					<div
+						aria-hidden="true"
+						className="hidden w-[340px] shrink-0 lg:block"
+					/>
+				)
 			) : (
 				<div
 					// ⛔⛔ THE RAIL IS d5's LITERAL `340px`, AND THE PREVIOUS RULING IS

@@ -1215,3 +1215,29 @@ describe("BLOCK-4 §3 — the header stack's three gaps are equal", () => {
 		}
 	});
 });
+
+describe("MarketHeader compact mode", () => {
+	it("market-header::compact-mode-renders-title-and-attrs-strip-without-media-resolver-cards-or-price-bar", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} compact />,
+		);
+		// Heading and attributes strip are rendered
+		const heading = screen.getByRole("heading", { level: 1 });
+		expect(heading).toBeTruthy();
+		expect(heading.textContent).toBe("Attrs Strip Market Question");
+		expect(screen.getByText("Đ 150 staked")).toBeTruthy();
+		expect(screen.getByText("3 posts")).toBeTruthy();
+		expect(screen.getByText("5 replies")).toBeTruthy();
+
+		// Bulky media, resolver cards and price bar are omitted for maximum space
+		expect(
+			container.querySelector('[role="img"][aria-label^="YES"]'),
+		).toBeNull();
+		expect(
+			container.querySelector('[data-testid="resolver-cards"]'),
+		).toBeNull();
+		expect(
+			container.querySelector('[data-testid="market-media-panel"]'),
+		).toBeNull();
+	});
+});
