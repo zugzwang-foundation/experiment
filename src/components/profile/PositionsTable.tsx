@@ -836,7 +836,41 @@ export function PositionsTable({
 						e.preventDefault();
 						stepRow(e.key === "ArrowUp" ? -1 : 1);
 					}}
-					className="w-full table-fixed text-left text-sm"
+					/* ⚠⚠ MOBILE-1 · JOB B — BELOW 640px THIS STOPS BEING A TABLE BOX.
+					   ADR-0048 item 2. ⛔ THE TWO TABS BREAK DIFFERENTLY AND THE DIFFERENCE
+					   IS STATED RATHER THAN AVERAGED — measured at 375px on staging and on
+					   a local rig against the staging DB, both tabs separately:
+					     · OPEN — `96 · 0 · 124 · 104` = 324px of fixed columns inside a
+					       293px content box. `Argument` computes to ZERO, the argument
+					       renders at width 0, `ARGUMENT` and `CURRENT` overprint at l=137,
+					       and the panel becomes a nested horizontal scroller (348 vs 317)
+					       with 12 descendants escaping its right edge by 19px.
+					     · CLOSED — `96 · 13 · 92 · 92` = 293px, which FITS. There is no
+					       overflow, no nested scroller and nothing escapes; the failure is
+					       an `Argument` column 13px wide, which cannot render a word.
+					   ⚠ ADR-0048 `:62` measured the OPEN tab only and RECON's "same shape"
+					   was carried into a ratified document as though it had been measured —
+					   the defect this job's correction 1 exists for. Repeating it here would
+					   be worse than in the ADR, because nothing regenerates a docblock: a
+					   later reader debugging Closed would hunt a 31px overflow that has
+					   never existed on that tab. ⛔ ADR-0048's owed patch record (OI-1)
+					   takes the CLOSED figures above — 13px inside 293 — and not the
+					   `≈37px inside 317` arithmetic, which subtracted from the panel's
+					   `clientWidth` and missed this body's own `p-3`.
+					   ⛔ THE THREE TOKENS ARE APPENDED, NEVER SUBSTITUTED (ADR-0045's
+					   override-never-replace). `w-full`, `table-fixed` and the four `<th>`
+					   widths all stay exactly where they are and simply STOP BEING
+					   CONSULTED below 640px, because `table-layout` applies only to table
+					   boxes. That is what makes zero desktop regression structural rather
+					   than a thing to re-measure — a `max-mobile:` token cannot match at
+					   ≥640px — and it is measured anyway by stripping these tokens off the
+					   live nodes at 1440 and 641 and asserting byte-identical boxes.
+					   ⚠ `gap-3` HERE IS THE INTER-GROUP GAP — the space between two
+					   MARKETS. Its sibling on the `<tbody>` below is a DIFFERENT
+					   declaration covering two arguments in ONE market, and either can
+					   fail alone. Both byte-carry `ArgumentList.tsx`'s `flex flex-col
+					   gap-3` so a card here and a card there sit at the same rhythm. */
+					className="w-full table-fixed text-left text-sm max-mobile:flex max-mobile:flex-col max-mobile:gap-3"
 				>
 					{/* ⚠⚠ POSREV-1 RF-4 — FOUR COLUMNS, AND THE OLD `STAKED` IS GONE.
 					    Open reads `Position · Argument · Current · Sell`; Closed reads
@@ -854,7 +888,23 @@ export function PositionsTable({
 					    `textContent` is still `Position` / `Argument` / `Current` — the
 					    column-ORDER guards read those and a retyped literal would have
 					    moved the assertion where a transform cannot. */}
-					<thead className="sticky top-0 z-10 bg-n0 shadow-[0_calc(var(--spacing)*-3)_0_0_var(--color-n0)] text-[8.5px] leading-[1.2] font-extrabold tracking-[0.12em] text-n4 uppercase">
+					{/* ⚠ MOBILE-1 · JOB B — THE HEADER ROW DROPS OUT BELOW 640px. Once
+					    the table is a flex column the header is just another stacked
+					    child, and a row of four column names above a stack of cards names
+					    nothing. ⛔ THIS IS WHAT COSTS THE TWO Closed-tab LABELS: with the
+					    `<th>`s gone, `Staked` and `Opened` are bare figures, so each cell
+					    below re-states its own header at phone width — byte-carried from
+					    these exact strings, never authored. The Open tab needs no such
+					    thing: `Đ 227 ↑12%` beside a Sell button is self-describing where
+					    `Đ 100` above a bare date is not.
+					    ⚠ AND IT IS WHAT LOSES THE `Current` InfoTip (GLOSSARY.currentValue)
+					    at phone width — ruled an accepted cost, not repaired, because the
+					    repair is an Open-tab label and that is copy authoring. The sting is
+					    real and stated rather than buried: INFO-1 built `InfoTip`
+					    specifically to open on touch as well as hover, so this drops a
+					    touch affordance on the touch surface. The `Staked` tip survives by
+					    riding its new label below. */}
+					<thead className="sticky top-0 z-10 bg-n0 shadow-[0_calc(var(--spacing)*-3)_0_0_var(--color-n0)] text-[8.5px] leading-[1.2] font-extrabold tracking-[0.12em] text-n4 uppercase max-mobile:hidden">
 						<tr>
 							<th className="w-[96px] px-2 pt-0 pb-2 text-center">Position</th>
 							<th className="px-2 pt-0 pb-2 text-center">Argument</th>
@@ -882,7 +932,21 @@ export function PositionsTable({
 						</tr>
 					</thead>
 					{groups.map((group) => (
-						<tbody key={group.marketId}>
+						<tbody
+							key={group.marketId}
+							/* ⚠ MOBILE-1 · JOB B — THE ONLY ONE OF THE FOUR EDIT SITES THAT
+							   ADDS A `className` RATHER THAN APPENDING TO ONE, which is why
+							   it can fail differently from the other three: there is no
+							   existing declaration here to override, so nothing about the
+							   desktop render depends on this attribute existing.
+							   ⚠ THIS `gap-3` IS THE INTRA-GROUP GAP — two ARGUMENTS in ONE
+							   market — and is a DIFFERENT declaration from the identical
+							   token on the `<table>` above, which spaces one market from the
+							   next. Two markets can be correctly spaced while two arguments
+							   inside one market are not; that is why both are written and
+							   both are measured. */
+							className="max-mobile:flex max-mobile:flex-col max-mobile:gap-3"
+						>
 							{/* ⛔⛔ POSREV-POLISH P-1 — THE MARKET GROUP HEADER IS GONE, AND THIS
 							    `<tbody>` IS WHAT SURVIVES IT. RF-3 gave each market a sticky header
 							    carrying `Đa → Đb`; the founder has ruled it out because it ate the
@@ -1053,7 +1117,28 @@ function TileRow({
 					onPick(tile.key);
 				}
 			}}
-			className={`cursor-pointer rounded-(--r) focus-visible:shadow-(--state-focus-ring) ${
+			/* ⚠⚠ MOBILE-1 · JOB B — THE TILE BECOMES A COLUMN, AND THIS IS THE TOKEN
+			   THAT ACTUALLY REACHES THE CELLS. A flex container BLOCKIFIES its
+			   children — `display: table-cell` on a flex item computes to `block` —
+			   so making this `<tr>` a flex column stacks all six `<td>` variants
+			   (Position · Argument · Current · Sell on Open; Position · Argument ·
+			   Staked · Opened on Closed) WITHOUT OPENING A SINGLE `<td>`. The same
+			   rule cascades from the `<table>` down through each `<tbody>`.
+			   ⛔ THE TOKENS SIT IN THE STATIC HEAD, NOT INSIDE THE `selected ? … : …`
+			   INTERPOLATION. Authored in either branch they would apply only while a
+			   tile is selected — a card that stacks when you click it and is a broken
+			   row otherwise — and the source-scan guard reads only the static parts
+			   of this template precisely so that placement reddens rather than passes.
+			   ⚠ WHAT IS TRADED, RECORDED AS A COST RATHER THAN DISCOVERED: `display:
+			   flex` on table-internal boxes strips the implicit ARIA `table`/`row`/
+			   `cell` roles, so below 640px a screen reader stops announcing "row 2 of
+			   7, Current". The obvious repair is blocked — explicit `role="table"` is
+			   redundant-role, which Biome rejects, and disabling a Biome rule is
+			   ask-first (AGENTS.md §11) — the same wall `aria-current` above already
+			   hit over `role="grid"`. It is a cost and not a regression because the
+			   CURRENT state is worse: the argument column measures 0px today, so no
+			   phone reader can reach the content those roles describe at all. */
+			className={`cursor-pointer rounded-(--r) focus-visible:shadow-(--state-focus-ring) max-mobile:flex max-mobile:flex-col ${
 				selected
 					? "bg-n1 [outline-offset:-2px] [outline:var(--ring-active)]"
 					: "[outline-offset:-1px] [outline:var(--hairline)] hover:bg-n1"
@@ -1279,6 +1364,28 @@ function TileRow({
 						data-testid={`tile-staked-${tile.key}`}
 						className="p-2 text-center align-middle whitespace-nowrap tabular-nums text-ink"
 					>
+						{/* ⚠⚠ MOBILE-1 · JOB B — THE PHONE'S COLUMN LABEL, AND THE STRING IS
+						    CARRIED, NEVER AUTHORED. Below 640px the `<thead>` is hidden, so this
+						    cell would render `Đ 100` with nothing naming it. The word is the SAME
+						    word the `<th>` uses, and that is what makes "no copy was authored for
+						    the phone" checkable rather than claimed: the guard reads the `<th>`
+						    text out of this file and asserts byte-identity against this span, so a
+						    paraphrase reddens.
+						    ⛔ `hidden` IS LOAD-BEARING, NOT DECORATION. A `<span>` is inline
+						    ALREADY, so the phone variant alone would be a no-op and this label
+						    would print beside the `<th>` that already says it at 1440px — the
+						    desktop regression this convention exists to prevent, shipped by the
+						    mechanism meant to prevent it. The base `hidden` is what gives the
+						    variant something to override.
+						    ⚠ THE `Staked` TIP RIDES THE LABEL. `GLOSSARY.stakedOwn` hangs off the
+						    `<th>`, which the phone no longer renders, so it is re-attached here.
+						    That is the only reason this cell's label carries an `InfoTip` and
+						    `Opened`'s does not — that column never had one. ⛔ The Open tab's
+						    `Current` tip is NOT rescued this way: that needs an Open-tab label,
+						    which is copy authoring, and it is ruled LOST instead. */}
+						<InfoTip content={GLOSSARY.stakedOwn} asChild>
+							<span className="hidden max-mobile:inline">Staked</span>
+						</InfoTip>{" "}
 						Đ {formatDharma(tile.valueDisplay)}
 					</td>
 					{/* ⚠ `OPENED`, NOT `EXITED`, AND THE DTO IS WHY. `ProfilePositionLot`
@@ -1294,6 +1401,14 @@ function TileRow({
 						data-testid={`tile-opened-${tile.key}`}
 						className="p-2 text-center align-middle whitespace-nowrap text-n5"
 					>
+						{/* ⚠ THE PHONE'S COLUMN LABEL (MOBILE-1 · JOB B), same mechanism and same
+						    rule as `Staked` above: the word is byte-carried from this column's own
+						    `<th>`, and the base `hidden` is what stops a span that is already
+						    inline from printing at desktop beside the header it duplicates.
+						    ⚠ NO `InfoTip` HERE, AND THE ABSENCE IS DELIBERATE. `Opened`'s `<th>`
+						    carries no tip to re-attach — adding one would be authoring a glossary
+						    entry the desktop surface never had, on the narrower surface. */}
+						<span className="hidden max-mobile:inline">Opened</span>{" "}
 						{tile.placedAt === null ? "—" : fmtUtcDay(tile.placedAt)}
 					</td>
 				</>
