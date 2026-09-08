@@ -158,3 +158,19 @@ Consequences for adjacent spec (same commit): SPEC.2 §12.3 (write-once binding 
 ---
 
 *ADR-0028 ratifies that a participant image is bound to its moderated bytes by write-once immutability on first write (`If-None-Match: *` conditional PUT), so moderated bytes ≡ rendered bytes by construction, with a pre-transaction fail-closed `HeadObject` enforcing the real object-size backstop (A10) and recording the ETag forensic fingerprint into the append-only `image_upload.committed` event. Security rests solely on write-once immutability; the ETag is never a security control. The decision body and the constraints minted in §Decision Outcome are immutable; superseding requires a new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy.*
+
+---
+
+## Patch record — 2026-09-08 · the pre-commit gate this file describes is superseded (ADR-1)
+
+**ADR-0046** supersedes `ADR-0014`'s gate architecture and **D-32** makes moderation consequences
+advisory. Lines `:25`, `:32`, `:33`, `:143`, `:160` of this file describe that gate — its ordering, its fail-closed posture,
+or its blocking verdict — in the **present tense**.
+
+Per **D-33 R3** they are preserved as written. They record this ADR's decision against the
+architecture as it then stood; they are not a description of current behaviour. The live contract
+is `ADR-0046` + **D-32**.
+
+**This ADR's own decision is unchanged.** `ADR-0046:62` explicitly preserves this ADR's byte-identity binding: the moderated bytes must be the served bytes. Only the gate's blocking property moves; the binding does not.
+
+Status remains `accepted`. No text above this record is changed.

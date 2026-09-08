@@ -11,6 +11,23 @@
 | **Superseded-by** | ADR-0046 (partial — the gate architecture only) |
 | **Amended-by** | ADR-0021 (Track B verdict consequence only — held → block; reactive moderation; text-only `sexual/minors` carve-out. Gate architecture, vendor, fail-closed, Redis reservation, idempotency-first, CSAM short-circuit, F-MOD-4 atomicity unchanged.) |
 
+> ⚠ **Gate architecture superseded. Read this before the body.**
+>
+> **ADR-0046** supersedes this ADR's gate architecture — the pre-commit ordering, the fail-closed
+> terminal posture, and the blocking verdict. **D-32** extends that to consequences: nothing is
+> auto-removed and no participant is auto-banned. The `Superseded-by` row above records the first;
+> **D-32** is a ruling, and is recorded in `docs/decisions/RECORD-v2.6-amendment.md`.
+>
+> The body below describes the gate in the **present tense** throughout — 60 lines of it — because
+> it was written while the gate was the design. It is preserved unchanged as the record of that
+> decision. It is **not** a description of how the system behaves.
+>
+> **D-2** (`docs/decisions/RECORD-v2.0.md:504`) had already noted that this ADR's title *"produces
+> a picture of a gate content must pass through before being accepted. **It is not one.**"* The
+> title and filename are left as written; they are part of the record.
+>
+> The live contract is `ADR-0046` + **D-32**. The shipped code is `MOD-1`'s to change.
+
 ---
 
 ## Patch record
