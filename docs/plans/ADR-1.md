@@ -582,3 +582,8 @@ execution, the sixth line being the `docs/decisions/README.md` v2.6 handoff row.
 present-tense assertions was ruled to be `23`** — the recon's table held 22 rows across 23 line
 numbers, one row carrying two. This file, `docs/plans/ADR-1.md`, is the thirteenth path in the PR
 and was ratified after the plan was written; §1's twelve-file table predates it.
+
+**Struck at review:** D-33 **R5**'s fourth bullet — the `docs/specs/SPEC.2.md:2089` claim —
+was struck from `RECORD-v2.7-amendment.md`. The cited line is complete, and byte-identical at both
+SHAs; only its number moved (`:2089` → `:2104`). It is left standing in the body above, which is the
+record of what was ratified.

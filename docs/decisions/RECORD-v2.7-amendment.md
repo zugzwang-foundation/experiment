@@ -57,8 +57,6 @@ Recorded so no future pass measures it again.
 - `ADR-0047`'s D-31 item — the voided plan to strike `SPEC.1` §10.6 inside a code PR, still stated
   at `0047:207` and `:219` — is **owned by the LIQ-1 Phase 2 closeout**, not by ADR-1.
 - `docs/plans/DEBATE.7.md:7` names `SPEC.1` and `SPEC.2` at **v1.0.7** against live 2.0.0.
-- `docs/specs/SPEC.2.md:2089` ends mid-sentence — *"A per-file index in a specification is a"* —
-  with no terminal clause. A spec defect; ADR-1 does not amend specs.
 - `docs/records/` (9 files) was never swept for inbound ADR citations. `docs/lanes/`, named in the
   ADR-1 kickoff, does not exist on `origin/main`.
 - Eight bare pointers in contract files (`SPEC.1`, `SPEC.2`, `AGENTS.md`, `RANKING.md`) name an
