@@ -156,7 +156,7 @@ plan is a claim about a tree nobody re-read:
 | Measured 2026-09-07 | Value |
 |---|---|
 | distinct `max-mobile:` tokens shipped in `src/` | **12** — *unchanged*, because Job A mints none |
-| `max-mobile:flex-col` authoring sites in `src/` | **4**, up from 3 |
+| `max-mobile:flex-&#8203;col` authoring sites in `src/` | **4**, up from 3 |
 | files carrying it | **3** (`DebateView.tsx` ×2, `MarketHeader.tsx`, `PostFocusHeader.tsx`), up from 2 |
 
 **What Job A discharges:** `PostFocusHeader.tsx` alone. Its guard
@@ -179,6 +179,57 @@ three*), so the cost is recorded here and paid later.
 unguarded. Job A's R1 measurement came back clean, so **no arm token shipped** and
 that token gained no second site — the one place this row could have grown and
 did not.
+
+### ⚠ DEEPENED AGAIN BY MOBILE-1 · JOB B (2026-09-08, ADR-0048 item 2)
+
+Job B is the first MOBILE-1 job to **MINT** tokens rather than reuse them, so the
+trigger fires again and the row is updated rather than closed.
+
+**Census re-run at commit time with this section's own command**, never copied
+from the plan (Job A self-critique #15):
+
+| Measured 2026-09-08 | Value |
+|---|---|
+| distinct `max-mobile:` tokens shipped in `src/` | **15**, up from 12 — Job B mints `flex`, `gap-3`, `inline` |
+| `max-mobile:flex-&#8203;col` authoring sites in `src/` | **7**, up from 4 |
+| files carrying it | **4** (`DebateView.tsx` ×2, `MarketHeader.tsx`, `PostFocusHeader.tsx`, `PositionsTable.tsx`) |
+
+**What Job B discharges:** its own five tokens, all guarded by
+`tests/unit/design/profile-mobile-reflow.test.ts`, which opens
+`PositionsTable.tsx` **by name** — the shape `MarketHeader.tsx:290` still lacks.
+
+**What it makes worse, stated as Job A stated it:** `MarketHeader.tsx:290` gains a
+**fourth** file to hide behind. A token census gets less informative with each
+addition, not more.
+
+⛔ **AND JOB B FOUND THAT THIS ROW'S CENSUS METHOD IS UNSOUND — a new finding,
+not a deepening.** The command above counts tokens in `src/` and compares against
+coverage in `tests/`. **It never asks which tokens in the BUILT SHEET come from
+NEITHER** — and that is precisely the set that makes any built-stylesheet grep
+unreliable, because **Tailwind v4's source detection scans `tests/` exactly as it
+scans `docs/`**.
+
+**Measured, with a positive control:** `max-mobile:opacity-&#8203;0` is **present in
+`.next/static/chunks/*.css`**, present in `tests/`
+(`global-header-mobile-reflow.test.ts`), and present in **no `src/` file**. A
+class-shaped string in a guard emits a real production utility — so a guard
+asserting a class is present in a component **can emit that class itself**, and
+any verification downstream of the built sheet is self-fulfilling.
+
+⚠ **`opacity-0` is the FIRST KNOWN MEMBER of that set and its SIZE IS UNKNOWN.**
+Nobody has enumerated built-sheet tokens with no `src/` origin. Until someone
+does, the count in the table above is a count of what `src/` authors, **not** a
+description of what ships.
+
+Job B sidestepped this for its own new guard only — that file assembles every
+variant prefix at runtime, so it contributes no scannable token — and did **not**
+clean the existing guards, which do carry clean literals. **Both remain owed and
+are a decision rather than an edit:** rewriting the existing guards touches
+assertions across several suites, and enumerating the orphan set is real work
+with no tooling behind it today.
+
+**Source:** MOBILE-1 · Job B (`docs/plans/MOBILE-1-JOB-B.md`), and this session's
+`claude-progress.md` entry of the same date.
 
 **Source:** `MOBILE-1A_dev-handover_PR-486.md` Block D; PR #486; deepened by
 MOBILE-1 · Job A (`docs/plans/MOBILE-1-JOB-A.md`, OI-6).
