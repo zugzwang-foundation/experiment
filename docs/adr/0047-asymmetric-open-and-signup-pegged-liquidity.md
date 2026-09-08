@@ -7,7 +7,7 @@
 | **Deciders** | Hrishikesh (founder) |
 | **Tracker task** | Number-tuning (SPEC.1 Appendix B, STATE.md F-3) — liquidity subset. Working ID LIQ-1. |
 | **Frame document** | Decision record D-14 (opening price); `SPEC.1` §10.1, §10.5, §10.6, §16.1; `docs/specs/cpmm.md` §3, §7, §8, §14; `SPEC.2` §19.4.1 |
-| **Supersedes** | ⚠ **The `SPEC.1` half of this row is void — D-31** (2026-09-07, `docs/decisions/RECORD-v2.6-amendment.md`): an ADR does not amend `SPEC.1` (D-22), so the `SPEC.1` §10.6 / §10.5 / §16.1 text landed in #496 (`67ceb6b5`) under D-31's authority rather than this ADR's. **The `cpmm.md` and `SPEC.2` clauses are NOT void** — they landed exactly as written. **The row as written, preserved:** — (no ADR; the spec sections below are amended in the same commit) |
+| **Supersedes** | — (no ADR. ⚠ **The `SPEC.1` half of this row is void — D-31** (2026-09-07, `docs/decisions/RECORD-v2.6-amendment.md`): an ADR does not amend `SPEC.1` (D-22), so the `SPEC.1` §10.6 / §10.5 / §16.1 text landed in #496 (`67ceb6b5`) under D-31's authority rather than this ADR's. **The `cpmm.md` and `SPEC.2` clauses are NOT void** — they landed exactly as written. **The row as written, preserved:** the spec sections below are amended in the same commit.) |
 | **Superseded-by** | — |
 | **Amends** | — |
 | **Amended-by** | D-31 (2026-09-07, `docs/decisions/RECORD-v2.6-amendment.md` — voids this ADR's claim to amend `SPEC.1`; the `SPEC.1` §10.6 / §10.5 / §16.1 text landed in #496 under D-31's authority. `cpmm.md` and `SPEC.2` unaffected) |
@@ -479,6 +479,18 @@ this record is changed"* — would be false here, and is deliberately not borrow
 above **are** changed. What is true, and is the guarantee actually on offer: **no original word
 was removed.** Every corrected line still carries its full prior text, and the only deletions in
 the diff are those four lines being replaced by themselves-plus-a-prefix.
+
+**The row reads answer-first, and the receipt is a tree hash.** The founder ruled that the
+`Supersedes` row should answer before it warns, so its parenthetical is split at the semicolon and
+the two halves placed around the correction — the row now opens `— (no ADR.` and closes
+`the spec sections below are amended in the same commit.)`, with no word removed. ⚠ **That
+landing cannot be proved by a three-dot diff.** A squash merge mints a commit with no parent link
+to the branch, so the merge base of the branch tip and the squash stays at the *pre-merge* tip of
+`main`, and `git diff <branch tip>...origin/main` therefore re-reports the entire change however
+correctly it landed — measured at #505: merge base `69513a0c`, three-dot 51 insertions, two-dot
+empty. The instrument for two pinned SHAs is tree-hash equality, `git rev-parse '<sha>^{tree}'`,
+which read `a81432c3` on both `d31563a7` and `97d4e3ca`; `AGENTS.md` §10 carries the general
+form.
 
 ## Drift recorded, not acted on
 
