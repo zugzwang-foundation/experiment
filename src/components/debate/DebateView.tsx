@@ -145,6 +145,7 @@ export function DebateView({
 	// betting side S renders the composer in the OPPOSITE slot; opening the
 	// other side closes the first — the d5 slot model, toggle-to-close).
 	const [openSide, setOpenSide] = useState<Side | null>(null);
+	const [focusMode, setFocusMode] = useState(false);
 	// UI.A3 slice 3 — the post-view reply composer (v0.10: Support OR Counter
 	// opens in the slot OPPOSITE THE POST; toggle-to-close).
 	const [openReply, setOpenReply] = useState<"support" | "counter" | null>(
@@ -176,6 +177,8 @@ export function DebateView({
 	 * arm-swap reset below is the same behaviour without the second copy.
 	 */
 	const [pickedSide, setPickedSide] = useState<Side | null>(null);
+
+	const isFocused = focusMode || openSide !== null;
 
 	/**
 	 * ⚠⚠ THE COLUMNS' `step` FUNCTIONS, REGISTERED UP. d5's `onKey` calls
@@ -269,6 +272,20 @@ export function DebateView({
 		}
 		setOpenSide((cur) => (cur === side ? null : side));
 	};
+
+	const toggleFocusMode = useCallback(() => {
+		if (composerBusy) {
+			return;
+		}
+		if (isFocused) {
+			setFocusMode(false);
+			setOpenSide(null);
+		} else {
+			setFocusMode(true);
+			const sideToOpen = heldSide ?? pickedSide ?? "YES";
+			setOpenSide(sideToOpen);
+		}
+	}, [composerBusy, isFocused, heldSide, pickedSide]);
 
 	/**
 	 * HTML-FINISH · MARKET DETAIL round 2 · R3 — THE SURFACE IS FROZEN while a
@@ -1226,6 +1243,8 @@ export function DebateView({
 						market={market}
 						priceChart={priceChart}
 						pick={{ heldSide, marketOpen, suspended, onPick: toggleEntry }}
+						compact={isFocused}
+						onToggleCompact={toggleFocusMode}
 					/>
 					{/* MOBILE-1 Phase A — the fixed two-column YES/NO arena stacks
 					    below 640px (plan §4: "not preserved at phone width"); the
