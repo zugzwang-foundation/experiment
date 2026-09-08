@@ -7,10 +7,10 @@
 | **Deciders** | Hrishikesh (founder) |
 | **Tracker task** | Number-tuning (SPEC.1 Appendix B, STATE.md F-3) — liquidity subset. Working ID LIQ-1. |
 | **Frame document** | Decision record D-14 (opening price); `SPEC.1` §10.1, §10.5, §10.6, §16.1; `docs/specs/cpmm.md` §3, §7, §8, §14; `SPEC.2` §19.4.1 |
-| **Supersedes** | — (no ADR; the spec sections below are amended in the same commit) |
+| **Supersedes** | ⚠ **The `SPEC.1` half of this row is void — D-31** (2026-09-07, `docs/decisions/RECORD-v2.6-amendment.md`): an ADR does not amend `SPEC.1` (D-22), so the `SPEC.1` §10.6 / §10.5 / §16.1 text landed in #496 (`67ceb6b5`) under D-31's authority rather than this ADR's. **The `cpmm.md` and `SPEC.2` clauses are NOT void** — they landed exactly as written. **The row as written, preserved:** — (no ADR; the spec sections below are amended in the same commit) |
 | **Superseded-by** | — |
 | **Amends** | — |
-| **Amended-by** | — |
+| **Amended-by** | D-31 (2026-09-07, `docs/decisions/RECORD-v2.6-amendment.md` — voids this ADR's claim to amend `SPEC.1`; the `SPEC.1` §10.6 / §10.5 / §16.1 text landed in #496 under D-31's authority. `cpmm.md` and `SPEC.2` unaffected) |
 
 **This ADR does not decide:** the opening price itself (D-14 stands at 10% YES) · the Dharma economy (grant 1,000, credit 10/day, floors) · bet throughput on a hot market (D-4, SCALE lane) · read-path polling cost (POLISH/SCALE) · the other 22 `TBD` constants in SPEC.1 Appendix B · a `p` curve-weight (rejected below; a testnet ADR if ever) · limit orders or user-provided liquidity (out of scope for the experiment by ruling).
 
@@ -315,7 +315,7 @@ check after the arming INSERT is what closes it.
 
 **Three critical-path functions are touched** — `openMarket`, `voidMarket`, `settleMarket` — plus the chart walker. The bet transaction is not.
 
-**Spec amendments ride in the same commit** (CLAUDE.md §5.12): `cpmm.md` §7.1 (symmetric-only), §7.3 (asymmetric-open rejection), §7.4 (three doors → four), §14 (mid-market liquidity non-goal); SPEC.1 §10.6 (no mid-market adjustment), §10.5/§16.1 (`POOL_SEED_PER_MARKET_DEFAULT` — exists nowhere in `src/`, retired). Of SPEC.1 §10.6's three grounds: "re-prices positions retroactively" is false against A (measured exact); "breaks audit-trail integrity" stood, and E is its fix; "kills the K_eff signal" argues *for* this ADR — a fixed seed is what flattens the signal as turnout grows (RECON-2 §11a).
+⚠ **The `SPEC.1` clause of this paragraph is void — D-31** (2026-09-07, `docs/decisions/RECORD-v2.6-amendment.md`): *"an ADR does not amend `SPEC.1` (D-22). The amendment lands by this ruling."* The `SPEC.1` §10.6 / §10.5 / §16.1 text did land, in #496 (`67ceb6b5`), and reads correctly at `SPEC.1` 2.0.1 — §10.6 is now *Signup-pegged liquidity injection* and §3.2 `NG13` is user-provided liquidity only, **both citing D-31**. So the correction is one of ATTRIBUTION, not of outcome: the instrument was the ruling, not this ADR. ⚠ **The four `cpmm.md` clauses below are NOT void** — they landed as stated — and D-31 leaves `SPEC.2` explicitly standing. **The paragraph as written, preserved:** **Spec amendments ride in the same commit** (CLAUDE.md §5.12): `cpmm.md` §7.1 (symmetric-only), §7.3 (asymmetric-open rejection), §7.4 (three doors → four), §14 (mid-market liquidity non-goal); SPEC.1 §10.6 (no mid-market adjustment), §10.5/§16.1 (`POOL_SEED_PER_MARKET_DEFAULT` — exists nowhere in `src/`, retired). Of SPEC.1 §10.6's three grounds: "re-prices positions retroactively" is false against A (measured exact); "breaks audit-trail integrity" stood, and E is its fix; "kills the K_eff signal" argues *for* this ADR — a fixed seed is what flattens the signal as turnout grows (RECON-2 §11a).
 
 **What this does not fix.** Every bet on a market still serialises on one row (D-4); the YES:NO impact asymmetry at 10/90 remains ~12:1 and is intrinsic to any market at 10%; polling cost still grows with market age. None is a liquidity property.
 
@@ -340,7 +340,7 @@ Two phases, each its own PR, each reviewed at Gate C by the orchestrator's diff 
 |---|---|---|
 | **Lands** | 8 September | 12 September |
 | **Primitives** | B · E (with `D` from `market.opened` only) · I (two reserves) · A in TypeScript | A in SQL · C · D · F · G · H · I (injection replay) · E (injection events) · export rule · conservation callers |
-| **Spec** | `cpmm.md` §7.1, §7.3 | `cpmm.md` §7.4, §14; SPEC.1 §10.6, §10.5/§16.1 |
+| **Spec** | `cpmm.md` §7.1, §7.3 | ⚠ **The `SPEC.1` items landed under D-31, not under this ADR** (D-22; text in #496, correct at `SPEC.1` 2.0.1). The `cpmm.md` items landed as stated. **Cell as written, preserved:** `cpmm.md` §7.4, §14; SPEC.1 §10.6, §10.5/§16.1 |
 | **Critical-path touches** | `void.ts`, `settle.ts`, `openMarket` | new `pools` writer; extends `D` |
 | **If the other slips** | Markets open at 10/90 on a fixed seed with no slate — today minus the staged bets | — |
 | **Soak before the 15th** | 7 days, twelve staging markets reseeded at 10/90 | 3 days |
@@ -432,6 +432,53 @@ that it happened (`O-5`).
 | `pg_try_advisory_xact_lock` becomes step 1 | §D | it was prose beside the list, so the list alone described an injector two of which could run at once. |
 | migration `0028` named at its step | §D | the cursor's snapshot predates every lock, so a market can leave `Open` between enumeration and locking. The status is re-read inside the lock. |
 | migration `0029` named at its steps | §D | the `0028` ceiling was above the value that breaks a bet — ~945 ms of lock-holding at ten Open markets against a non-retryable 1,000 ms `statement_timeout`. A CHECK cannot see the market count, so the bound became a 600 ms lock-hold budget inside the sweep. |
+
+**P3 · 2026-09-08 · ADR-0047 D-31 repair.** **D-31** (`docs/decisions/RECORD-v2.6-amendment.md`,
+2026-09-07) authorised the injector and, in the same ruling, struck this ADR's plan to amend
+`SPEC.1` itself: *"ADR-0047's plan to strike §10.6 inside a code PR is void — an ADR does not
+amend `SPEC.1` (D-22). The amendment lands by this ruling."* **D-33 R5** (amendment 2.7,
+2026-09-08) docketed that repair here rather than to the ADR-1 pass. This block discharges the
+docket and mints no new D-number.
+
+⚠ **The correction is one of ATTRIBUTION, not of outcome, and nothing here says the spec change
+is still owed — it is not.** `SPEC.1` 2.0.1 carries §10.6 as *Signup-pegged liquidity injection*
+and §3.2 `NG13` as user-provided liquidity only, and **both cite D-31 as their authority**. That
+text landed in #496 (`67ceb6b5`), which is exactly what D-31 required of the Phase 2 PR. What was
+never corrected is this file's account of *which instrument* amended the spec.
+
+⚠ **Scope: `SPEC.1` only.** D-31 leaves `SPEC.2` explicitly standing — *"Phase 2's `SPEC.2`
+changes are additive rows on top of it"* — and says nothing at all about `docs/specs/cpmm.md`,
+which is not a rung on D-22's ladder. The four `cpmm.md` clauses in §Consequences landed as
+written, and §F's *"a SPEC.2 §19.4.1 SHIP declaration … land in the same commit"* is a real CI
+coupling this ruling does not touch. A correction reading as though the whole sentence were void
+would be wrong, and is the thing this block exists to prevent a later reader from concluding.
+
+**Three sites, not two.** D-33 R5 named `0047:207` and `:219`, measured against `origin/main`
+`941e9888`. Located by content at `origin/main` `69513a0c`, the file carries **three**: the
+metadata `Supersedes` row (`:10`), the §Consequences paragraph (`:318`), and the §Execution phase
+table's **Phase 2** `Spec` cell (`:343`). The third is the one a line-number docket could not
+reach, because it sits *above* the two that moved. Those coordinates are evidence read at that
+SHA, not addresses (`O-8`).
+
+**No callout, and that was a decision.** PR #498 gave a top-of-file callout to exactly two of the
+ten ADRs it repaired — `ADR-0014` and `ADR-0021` — both files whose bodies describe *live
+behaviour* that has since reversed. This body describes live behaviour **correctly**; only its
+attribution was wrong, and attribution is repaired at the site that carries it. The instrument
+used instead is `ADR-0026`'s: the correction is prefixed, and the original words are kept.
+
+| ruling | section | what changed |
+|---|---|---|
+| D-31 | §Metadata | `Supersedes` — the parenthetical's `SPEC.1` half is marked void and the real instrument named; the row as written follows, preserved. |
+| D-31 | §Metadata | `Amended-by` — `—` → **D-31**, scoped. It is the only ruling that changes what this ADR asserts: **D-34…D-48 record this ADR rather than amend it** (*"these are RECORDS, not fresh rulings … D-31 already carries the authorisation; these carry the shape"*), and D-33 dockets the repair without altering a word, so neither takes a row. |
+| D-31 | §Consequences | the *"Spec amendments ride in the same commit"* paragraph gains a prefix scoping the void to `SPEC.1` and naming #496 as where the text landed. The sentence, all four `cpmm.md` clauses and the three-grounds analysis survive verbatim after it. |
+| D-31 | §Execution | the phase table's **Phase 2** `Spec` cell gains the same correction, cell-sized. Phase 1's cell is `cpmm.md` only and does not move. |
+| D-33 R5 | §Patch record | this block. |
+
+**Status remains `accepted`.** ⚠ The receipt this file's siblings close with — *"No text above
+this record is changed"* — would be false here, and is deliberately not borrowed: four lines
+above **are** changed. What is true, and is the guarantee actually on offer: **no original word
+was removed.** Every corrected line still carries its full prior text, and the only deletions in
+the diff are those four lines being replaced by themselves-plus-a-prefix.
 
 ## Drift recorded, not acted on
 
