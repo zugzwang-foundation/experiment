@@ -140,10 +140,22 @@ export default async function PublicLayout({
 				portfolio={portfolio}
 				spendable={spendable}
 				stars={stars}
-				// MOBILE-1 Phase A — this mount backs Discovery and /m/[slug],
-				// the two ADR-0045 read surfaces; the (auth) mount deliberately
-				// omits this prop, so /sign-in, /sign-in/otp and /onboarding
-				// keep rendering the header exactly as before this task.
+				// MOBILE-1 — this mount backs Discovery and /m/[slug], the two
+				// ADR-0045 read surfaces. ⚠ THE SECOND HALF OF THIS COMMENT WAS
+				// FALSE AND IS DELETED RATHER THAN SOFTENED: it said "the (auth)
+				// mount deliberately omits this prop, so /sign-in, /sign-in/otp
+				// and /onboarding keep rendering the header exactly as before
+				// this task." ADR-0048 superseded that carve-out and (auth) has
+				// opted in since MOBILE-1 · Job A. BOTH mounts pass it; the
+				// `= false` default survives for a future third one.
+				//
+				// ⛔ AND WHAT IT SWITCHES ON IS NOT ONLY LAYOUT. ADR-0049 makes
+				// this prop viewer-visible on THIS mount specifically: below
+				// 640px it drops the Đ cluster and the identity chip's pseudonym
+				// text. The two Đ reads above are unchanged and deliberately so
+				// — a server component cannot know the viewport, so the read
+				// happens either way and "hidden on phones, skip the fetch" is a
+				// category error rather than an optimisation.
 				mobileResponsive
 			/>
 			{/* HTML-FINISH row 8 — the surface column fills the viewport BELOW the

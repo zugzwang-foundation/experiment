@@ -93,6 +93,34 @@ function rightZoneChildren(): Element[] {
 	const cluster = screen.getByTestId("dharma-cluster");
 	const zone = cluster.parentElement;
 	expect(zone).not.toBeNull();
+	// ⛔⛔ THE ZONE IS THE RIGHT ZONE, NOT MERELY THE CLUSTER'S PARENT — AND
+	// WITHOUT THIS LINE T4 HAS A HOLE BIG ENOUGH TO HIDE THE WHOLE ZONE IN.
+	//
+	// Deriving `zone` as `cluster.parentElement` makes T4's own
+	// `expect(cluster).toBeGreaterThanOrEqual(0)` VACUOUS: the cluster is
+	// necessarily among its own parent's children, so that assertion cannot fail
+	// by construction. A wrapper around ONE child still reddens T4 — `identity`,
+	// `visitor` and `divider` all resolve to `-1` — which is why the guard has
+	// held so far. But wrap ALL FOUR right-zone children in a single
+	// `max-mobile:hidden` div and every index resolves, every ordering assertion
+	// passes, T4 reports GREEN, and the entire right zone — `VisitorCounter`
+	// included — disappears below 640px.
+	//
+	// Pinning the zone by its own class closes that: the wrapper is not the node
+	// carrying `justify-self-end`, so the substitution is caught. Added at
+	// MOBILE-1-HEADER (plan §4.3/§4.4 E), which is a task that moves TWO of this
+	// zone's children and therefore had every reason to reach for a wrapper.
+	//
+	// ⚠ REGRESSION GUARD, NOT A TDD DRIVER — green the day it was written
+	// (`_probe-*` posture, AGENTS.md §9). Said plainly so the suite's green is not
+	// overread, exactly as `I-IDEM-NOMASK-001` states it of itself.
+	expect(
+		zone?.getAttribute("class"),
+		"the node holding `dharma-cluster` is not the header's right zone. Either " +
+			"something now wraps the cluster — which breaks every index below — or " +
+			"the zone lost `justify-self-end`, which is how `GlobalHeader` and " +
+			"`global-header-mobile-reflow.test.ts` both locate it.",
+	).toContain("justify-self-end");
 	return Array.from(zone?.children ?? []);
 }
 

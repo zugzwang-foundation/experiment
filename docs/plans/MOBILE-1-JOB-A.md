@@ -130,6 +130,16 @@ CTA**, which is now correct rather than merely untouched: ADR-0048's whole point
 is that a phone participant may join. `IdentityCluster.tsx` still carries **zero**
 responsive tokens and this job adds none.
 
+⚠ **SUPERSEDED BY ADR-0049 — recorded here rather than rewritten, because this
+paragraph was TRUE of Job A and describing what Job A did is this document's
+job.** Two of those five no longer stay visible: below 640px `DharmaCluster` is
+not rendered at all and `IdentityCluster` reduces to its avatar, the pseudonym
+text hidden. `IdentityCluster.tsx` therefore carries exactly **one** responsive
+token now, not zero, and the guard that banned them all is inverted into a closed
+allowlist. **The JOIN CTA half survives untouched and is now asserted
+explicitly** — it was previously held only as a side effect of that blanket ban.
+See `docs/plans/MOBILE-1-HEADER.md` and ADR-0049.
+
 **Construction support, independent of measurement.** `(auth)` passes no
 `portfolio` and no `spendable`; `DharmaCluster.tsx:74` returns `null` when
 `spendable === null`, so that cluster renders nothing on all three auth routes
@@ -470,40 +480,66 @@ Each is named so it can be closed by someone other than this job.
   discharged: `PostFocusHeader.tsx` becomes a third file carrying
   `max-mobile:flex-col` guarded only by a string scan. Recorded in commit 2.
 
-- **OI-7 · Five `src/` passages still state ADR-0045's superseded "gated, not
+- **OI-7 · `src/` passages still stating ADR-0045's superseded "gated, not
   made responsive" position.** ⚠ **This item exists because OQ-6a was ruled on a
   wrong inventory and has been RE-RULED** (2026-09-07, Phase 2). The original
-  ruling deferred *"the four component prop docblocks"*; the real surface is
+  ruling deferred *"the four component prop docblocks"*; the real surface was
   **seven passages across four files, three of which are not prop docblocks** —
-  so a later job discharging OQ-6a literally would have left three behind. The
-  corrected inventory, measured at Phase 2 and **stated here so nobody re-derives
-  it**:
+  so a later job discharging OQ-6a literally would have left three behind.
+
+  ⛔⛔ **AND IT HAPPENED AGAIN, ONE SITE OVER. THE CENSUS IS NOW EIGHT.**
+  MOBILE-1-HEADER's Phase 1 found an **eighth** site this table missed —
+  `src/app/(public)/layout.tsx`'s inline comment on the `mobileResponsive` prop,
+  which asserted *"the (auth) mount deliberately omits this prop, so /sign-in,
+  /sign-in/otp and /onboarding keep rendering the header exactly as before this
+  task."* False since ADR-0048. **That is the second time this inventory has been
+  wrong in the same direction**, in the very item whose own text records the first
+  time — which is the argument for updating the table here rather than noting the
+  find in a plan nobody will open next. A census corrected in a document that is
+  not the census is not corrected.
+
+  The inventory as it stands after MOBILE-1-HEADER:
 
   | # | Site | Kind | Status |
   |--:|---|---|---|
-  | 1 | `src/components/onboarding/OnboardingDeck.tsx` — the inline `//` above the `cn()` call | inline comment | ✅ **FIXED in commit 2** |
-  | 2 | `src/components/shell/GlobalHeader.tsx:32` (block `:29-35`) | **component** docblock | deferred |
-  | 3 | `src/components/shell/GlobalHeader.tsx:181,183` (block `:178-187`) | prop docblock | deferred |
-  | 4 | `src/components/shell/RulesControl.tsx:63` (block `:57-66`) | prop docblock | deferred |
-  | 5 | `src/components/onboarding/OnboardingDeck.tsx:59` (block `:53-62`) | **component** docblock | deferred |
-  | 6 | `src/components/onboarding/OnboardingDeck.tsx:107-108` (block `:101-112`) | prop docblock | deferred |
-  | 7 | `BrandCluster.tsx:48-50` · `VisitorCounter.tsx:39-41` | pointer docblocks | **no edit owed** — they say only *"see `GlobalHeader`'s own prop docblock"*, so they state no position and self-correct once #3 lands |
+  | 1 | `src/components/onboarding/OnboardingDeck.tsx` — the inline `//` above the `cn()` call | inline comment | ✅ **FIXED in Job A commit 2** |
+  | 2 | `src/components/shell/GlobalHeader.tsx` — the **component** docblock's `MOBILE-1 Phase A amends design-language §1.7…` paragraph | **component** docblock | ✅ **FIXED at MOBILE-1-HEADER** |
+  | 3 | `src/components/shell/GlobalHeader.tsx` — the `mobileResponsive` **prop** docblock | prop docblock | ✅ **FIXED at MOBILE-1-HEADER** |
+  | 4 | `src/components/shell/RulesControl.tsx` — the `mobileResponsive` prop docblock | prop docblock | ⛔ **still parked** |
+  | 5 | `src/components/onboarding/OnboardingDeck.tsx` — the **component** docblock | **component** docblock | ⛔ **still parked** |
+  | 6 | `src/components/onboarding/OnboardingDeck.tsx` — the `mobileResponsive` prop docblock | prop docblock | ⛔ **still parked** |
+  | 7 | `BrandCluster.tsx` · `VisitorCounter.tsx` — the pointer docblocks | pointer docblocks | **no edit owed** — they say only *"see `GlobalHeader`'s own prop docblock"*, so they state no position and self-corrected the moment #3 landed. **Checked at MOBILE-1-HEADER, not assumed.** |
+  | **8** | `src/app/(public)/layout.tsx` — the inline `//` on the `<GlobalHeader>` mount's `mobileResponsive` prop | inline comment | ✅ **FIXED at MOBILE-1-HEADER** |
 
-  **Why #1 was fixed and the rest were not.** It sits **directly above the `cn()`
-  call whose `max-mobile:` classes now reach `(auth)` by founder ruling, and it
-  said they must not** — a false record at an operative site, immediately above
-  changed behaviour. That is O-5's exact shape and the same defect ADR-0048 `:88`
-  names one file over. The other five are docblocks describing the mechanism
+  ⚠ **Sites are fenced by SYMBOL, not by line (O-8).** This table carried line
+  numbers until MOBILE-1-HEADER and three of the seven had already drifted — a
+  fence that names a line goes stale from the very edit it guards, and half of
+  these sites are in files this lane keeps editing.
+
+  **Why #1 was fixed at Job A and the rest were not.** It sits **directly above
+  the `cn()` call whose `max-mobile:` classes now reach `(auth)` by founder
+  ruling, and it said they must not** — a false record at an operative site,
+  immediately above changed behaviour. That is O-5's exact shape and the same
+  defect ADR-0048 `:88` names one file over. The others describe the mechanism
   rather than gating it; they are false, but nothing reads them at the moment a
   class is applied.
 
-  ⛔ **Every one of the five asserts something the tree now contradicts** —
+  **Why #2, #3 and #8 were taken at MOBILE-1-HEADER (plan Q3).** That task
+  rewrites `GlobalHeader`'s prop docblock anyway, to describe two new consumers.
+  *"A false sentence inside a docblock you are editing is O-5 in its purest
+  form."* #8 came with them because it states the same superseded position about
+  the same prop, on the mount that now carries the visible consequence.
+
+  ⛔ **Do not repair #4–#6 by deleting the `mobileResponsive` prop**: ADR-0048
+  `:84` weighs that (path (ii)) and rejects it, and the `= false` default still
+  protects a future third mount. ⚠ MOBILE-1-HEADER makes path (ii) **larger**,
+  not smaller — it adds two more consumers. The repair is to restate which mounts
+  opt in, not to remove the gate.
+
+  The three that remain each assert something the tree contradicts —
   *"`(auth)/layout.tsx` passes nothing"*, *"renders BYTE-IDENTICAL to before this
-  task"*, *"stays governed by §1.7 as originally written"*. **Do not repair them
-  by deleting the `mobileResponsive` prop**: ADR-0048 `:84` weighs that (path
-  (ii)) and rejects it, and the `= false` default still protects a future third
-  mount. The repair is to restate which mounts opt in, not to remove the gate.
-  ⚠ `AGENTS.md:375` stated the same superseded position and **was** fixed in
+  task"*, *"stays governed by §1.7 as originally written"*.
+  ⚠ `AGENTS.md` stated the same superseded position and **was** fixed in Job A's
   commit 2 — no ruling covered it, and it loads in full every session.
   **Owner: separate job.**
 
