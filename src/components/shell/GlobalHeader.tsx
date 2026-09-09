@@ -22,17 +22,41 @@ import { VisitorCounter } from "./VisitorCounter";
  * 60px band on the values-log `--bar-block` register (a design register,
  * not a repo token — component-local literal by design; zero globals.css
  * edits): bg-n0, top+bottom hairline, tier-1 elevation ("the top bar" is
- * tier 1), 3-zone `1fr auto 1fr` grid — equal side tracks keep the brand
- * cluster absolutely centred — fixed desktop max-width 1440 / 24px side
+ * tier 1), 3-zone `1fr auto 1fr` grid, fixed desktop max-width 1440 / 24px side
  * padding.
  *
- * MOBILE-1 Phase A amends design-language §1.7 for THIS component only when
- * `mobileResponsive` is true (see the prop below) — the same narrowing
- * ADR-0045 makes for Discovery and `/m/[slug]`, never for the `(auth)`
- * mount, which stays governed by §1.7 as originally written (ADR-0045:
- * "auth/join surfaces remain governed by the original constraint... gated,
- * not made responsive"). No breakpoint-scoped class in this file is
- * unconditional; every one is gated by that prop.
+ * ⛔ THE SIDE TRACKS ARE NOT EQUAL AT EVERY WIDTH, AND THIS SENTENCE USED TO SAY
+ * THEY WERE. It read "equal side tracks keep the brand cluster absolutely
+ * centred". `1fr` is `minmax(auto, 1fr)`, so a side track never shrinks below its
+ * own min-content: once the LEFT zone freezes at its 157.13px min-content, all
+ * remaining free space lands on the right and the cluster is pushed off centre.
+ * Measured on the live build, signed out: **11.63px right of true centre at
+ * 375px**. The claim holds at 1440 and fails below roughly 364px, which is
+ * exactly the band this component now renders in.
+ *
+ * ⛔⛔ AND THE CONSEQUENCE IS WORSE THAN A DISPLACEMENT — THE MARK IS THIS
+ * HEADER'S SHOCK ABSORBER. The brand mark is the one control in either side zone
+ * with NO `shrink-0`; it computes `flex-shrink: 1`, `min-width: auto`. So when
+ * the row runs out of room the layout buys the absence of a scrollbar by
+ * spending the logo, silently and continuously, with `document.scrollWidth ==
+ * clientWidth` throughout. Measured signed out on staging: at 375px the mark is
+ * 48.00px; at 320px it is **3.75px, with ZERO reported document overflow**. There
+ * is no error, no scrollbar, and the `<a>` and its `aria-label` are still present
+ * and still measurable — the only evidence is that the logo is gone.
+ * ⇒ Any change that grows a side zone must re-measure the MARK's own computed
+ * width. Nothing else will report it (ADR-0049 OI-A, deliberately left open: the
+ * founder chose the shrunken logo over a scrollbar).
+ *
+ * MOBILE-1 Phase A amends design-language §1.7 for THIS component when
+ * `mobileResponsive` is true (see the prop below) — the same narrowing ADR-0045
+ * makes for Discovery and `/m/[slug]`. ⚠ THIS PARAGRAPH USED TO END "never for
+ * the `(auth)` mount, which stays governed by §1.7 as originally written",
+ * quoting ADR-0045's "gated, not made responsive" carve-out as live doctrine.
+ * **ADR-0048 supersedes exactly that carve-out** — a phone participant is allowed
+ * to join — so `(auth)/layout.tsx` opts in too and all three auth routes reflow
+ * at the 640px tier. Both mounts opt in today. No breakpoint-scoped class in this
+ * file is unconditional; every one is gated by that prop, and the gate is what
+ * keeps "which surfaces reflow" a decision a layout makes.
  *
  * ⚠ AND THAT OBLIGATION DOES NOT STOP AT THIS FILE. `RulesControl` is a static
  * child of both mounts and `OnboardingDeck` is a static child of it, so a
@@ -95,13 +119,22 @@ import { VisitorCounter } from "./VisitorCounter";
  *     two side tracks are `1fr`, so they stay equal and the cluster stays at
  *     true centre for as long as neither side zone overflows its own track.
  *
- * The tolerance, stated so the claim survives the arm that was not measured: the
- * side tracks share 1136px, so the left track is `1136 − right`. This content
- * only becomes binding once the RIGHT zone passes **708.80px**; it measures
- * 176.03px signed-out, and the signed-in arm adds only the Đ cluster. Every
- * control carries `shrink-0`, so that is a hard-overflow budget, not a
- * compression budget — nothing here degrades gracefully, which is exactly why
- * the number was re-measured rather than inherited.
+ * The tolerance, stated so the claim survives the arm that was not measured —
+ * ⚠ AND IT IS A 1440px TOLERANCE, WHICH IS THE CAVEAT THIS PASSAGE SHIPPED
+ * WITHOUT AND NOW NEEDS: the side tracks share 1136px only at the 1440 cap, so
+ * the left track is `1136 − right` only there. This content becomes binding once
+ * the RIGHT zone passes **708.80px**; it measures 176.03px signed-out, and the
+ * signed-in arm adds only the Đ cluster. At phone width the arithmetic is a
+ * different one entirely — see the shock-absorber paragraph at the head of this
+ * docblock.
+ *
+ * ⛔ TWO CORRECTIONS TO WHAT THIS PARAGRAPH USED TO ASSERT, BOTH MEASURED. It
+ * said *"every control carries `shrink-0`, so that is a hard-overflow budget,
+ * not a compression budget — nothing here degrades gracefully."* **The brand mark
+ * does not carry `shrink-0`**, and the consequence is the opposite of the one
+ * stated: the row does not hard-overflow, it silently compresses the mark to
+ * nothing while reporting zero overflow. The rest of the sentence is true of
+ * every OTHER control, and the exception is the whole story.
  *
  * §21.1 ANTI-CONFLATION — the divider below is the register boundary, not
  * decoration. `VisitorCounter` "reads nothing from the ledger / engine" and its
@@ -176,14 +209,35 @@ export function GlobalHeader({
 	spendable?: string | null;
 	stars?: number | null;
 	/**
-	 * MOBILE-1 Phase A — the ADR-0045 read-surface amendment, threaded down
-	 * rather than assumed. `(public)/layout.tsx` passes `true` (its mount
-	 * backs Discovery and `/m/[slug]`); `(auth)/layout.tsx` passes nothing,
-	 * so `/sign-in`, `/sign-in/otp` and `/onboarding` render this component
-	 * BYTE-IDENTICAL to before this task — those are auth/join surfaces,
-	 * which ADR-0045 explicitly leaves gated rather than made responsive.
-	 * `BrandCluster` and `VisitorCounter` take the same prop for the same
-	 * reason; nothing here infers "which route" from anything but this flag.
+	 * MOBILE-1 — the read-surface amendment, threaded down rather than assumed.
+	 * **BOTH mounts opt in.** `(public)/layout.tsx` passes it (its mount backs
+	 * Discovery and `/m/[slug]`), and `(auth)/layout.tsx` passes it too, so
+	 * `/sign-in`, `/sign-in/otp` and `/onboarding` reflow at the 640px tier as
+	 * well.
+	 *
+	 * ⚠ THIS DOCBLOCK SAID THE OPPOSITE UNTIL ADR-0049 AND WAS FLATLY FALSE FOR
+	 * THE WHOLE OF THAT TIME. It read *"`(auth)/layout.tsx` passes nothing, so
+	 * those three routes render this component BYTE-IDENTICAL to before this
+	 * task"*, citing ADR-0045's auth/join carve-out. **ADR-0048 superseded that
+	 * carve-out and `(auth)` has opted in since MOBILE-1 · Job A** — a phone
+	 * participant is allowed to join, and a join surface rendering 379px wider
+	 * than the phone reading it is the defect, not the fix.
+	 *
+	 * ⛔ THE PROP AND ITS `= false` DEFAULT SURVIVE, AND "both callers pass it,
+	 * so delete it" IS THE WRONG INFERENCE. The polarity is a property of the
+	 * DEFAULT, not of who currently passes it: it is what makes a future THIRD
+	 * mount safe by omission, inheriting the desktop render rather than an
+	 * accidental reflow (AGENTS.md §8). ADR-0048 `:84` weighs deleting the prop
+	 * (path (ii)) and rejects it.
+	 *
+	 * ⚠ THE GATE IS THE PROP CHAIN, NOT THE FILE BOUNDARY, and this prop now
+	 * threads SIX hides across FIVE files. `BrandCluster`, `VisitorCounter` and
+	 * `RulesControl` take it from Phase A; `DharmaCluster` and `IdentityCluster`
+	 * take it from ADR-0049. A breakpoint class left unconditional anywhere in
+	 * that subtree reaches every mount at once — which is how three ungated
+	 * classes once shipped onto `/sign-in` through `RulesControl` →
+	 * `OnboardingDeck`. Nothing here infers "which route" from anything but this
+	 * flag, and nothing downstream may either.
 	 */
 	mobileResponsive?: boolean;
 }) {
@@ -220,8 +274,24 @@ export function GlobalHeader({
 					/>
 				</div>
 				<div className="flex items-center justify-self-end">
-					<DharmaCluster portfolio={portfolio} spendable={spendable} />
-					<IdentityCluster viewer={viewer} />
+					{/* ADR-0049 — the two hides below 640px live in the COMPONENTS, not
+					    here, and the asymmetry with the divider two nodes down is
+					    deliberate rather than untidy. `dharma-cluster.test.tsx`'s T4
+					    guard walks THIS div's direct `.children`, so a wrapper around
+					    either mount makes the real node a grandchild and every index in
+					    that guard resolves to `-1`. The divider has no component of its
+					    own to carry a token, so it takes one here; these two do, and
+					    `VisitorCounter` below already ships that shape for this reason.
+					    ⇒ Do not "tidy" either token up into this file. */}
+					<DharmaCluster
+						portfolio={portfolio}
+						spendable={spendable}
+						mobileResponsive={mobileResponsive}
+					/>
+					<IdentityCluster
+						viewer={viewer}
+						mobileResponsive={mobileResponsive}
+					/>
 					{/* §21.1 register divider — a NAMED UNTOUCHABLE (SG6): no
 					    data-testid, ever. Located by its `w-px` class, exactly as
 					    `tests/unit/shell/dharma-cluster.test.tsx`'s T4 guard already

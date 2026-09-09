@@ -44,10 +44,18 @@ import { describe, expect, it } from "vitest";
  * clear — so the property is stated as what the component IS, and pinned by
  * this file's own assertions rather than by a reference.
  *
- * ⇒ So four things are hidden below 640px: the two off-site/decorative
- * left-zone controls (Radio · GitHub stars) behind one wrapper, the register
- * divider, the visitor counter, and the brand cluster's wordmark+countdown
- * text block.
+ * ⇒ So SIX things are hidden below 640px. Four from Phase A: the two
+ * off-site/decorative left-zone controls (Radio · GitHub stars) behind one
+ * wrapper, the register divider, the visitor counter, and the brand cluster's
+ * wordmark+countdown text block. Two from ADR-0049, and only these two are
+ * viewer-dependent: the whole Đ cluster, and the identity chip's pseudonym text.
+ *
+ * ⚠ THE PHASE A FOUR ARE GATED IN THIS FILE, `BrandCluster.tsx` AND
+ * `VisitorCounter.tsx`; THE ADR-0049 TWO ARE GATED IN `DharmaCluster.tsx` AND
+ * `IdentityCluster.tsx`. Six hides, five files, one prop chain. That spread is
+ * not sprawl — it is the T4 DOM-order guard's requirement (no wrappers in the
+ * right zone) meeting AGENTS.md §8's (gate on the prop, thread it the whole way
+ * down). Where a component exists to carry its own token, it carries it.
  *
  * ⛔⛔ EVERY ONE OF THOSE FOUR HIDES IS GATED ON A `mobileResponsive` PROP,
  * NOT UNCONDITIONAL — AND THAT IS STILL TRUE AFTER ADR-0048. `GlobalHeader`
@@ -92,13 +100,24 @@ import { describe, expect, it } from "vitest";
  * `GlobalHeader` that carries a breakpoint class inherits the same obligation,
  * whichever file it lives in.
  *
- * ⛔⛔ THE NEGATIVE HALF IS THE LOAD-BEARING HALF OF THIS FILE. Five elements
+ * ⛔⛔ THE NEGATIVE HALF IS THE LOAD-BEARING HALF OF THIS FILE. THREE elements
  * must stay visible at EVERY width and each is pinned by an explicit negative:
  * `HeaderNav` (the only navigation), `RulesControl` (the onboarding deck's
  * only re-show entry point — present for every viewer, authenticated or not,
- * so it cannot be hidden at any width, not even conditionally),
- * `BrandCluster` (the home link), and `DharmaCluster` + `IdentityCluster`
- * (balance and identity).
+ * so it cannot be hidden at any width, not even conditionally), and
+ * `BrandCluster` (the home link).
+ *
+ * ⚠⚠ IT WAS FIVE UNTIL ADR-0049, AND THE TWO THAT LEFT DID NOT LEAVE QUIETLY.
+ * `DharmaCluster` and `IdentityCluster` were in this list — "balance and
+ * identity" — and ADR-0049 reverses exactly that: below 640px the Đ cluster is
+ * not rendered and the identity chip reduces to its avatar alone. The founder
+ * ruled it on an informed basis, and the argument is RELOCATION rather than
+ * removal — the avatar still links to the profile, where balance, portfolio and
+ * pseudonym all render. Their guards were MOVED to the ADR-0049 describe block,
+ * not deleted, because the hides live on those components' own roots in their own
+ * files and this file's assertions read only `GlobalHeader.tsx`. ⛔ Measured, not
+ * argued: with both behaviours reversed, the never-hidden test was still GREEN
+ * under its old five-row form. The relocation is what makes its name true.
  *
  * ⚠ THE `RulesControl` DOCTRINE IS RE-ATTRIBUTED, NOT DROPPED. It used to
  * cite `SPEC.1 §21.9`. SPEC.1 was rebaselined to 2.0.0 (D-29) and §17–§19 and
@@ -108,7 +127,8 @@ import { describe, expect, it } from "vitest";
  * shown once and stay re-reachable afterwards) and this file's own assertions:
  * `header-mobile::RulesControl-is-mounted-exactly-once-outside-any-hidden-wrapper`
  * and the `RulesControl` row of
- * `header-mobile::HeaderNav-RulesControl-BrandCluster-DharmaCluster-IdentityCluster-are-never-hidden`.
+ * `header-mobile::HeaderNav-RulesControl-BrandCluster-are-never-hidden`
+ * (renamed from the five-component form at ADR-0049 — see the note on that test).
  * ⚠ SCOPE: only this docblock's citations are re-anchored. Everything else is
  * a separate job (plan OI-5) and is deliberately untouched. ⛔ AND OI-5 IS
  * BIGGER THAN THE PLAN'S FIGURE, WHICH MATTERS TO WHOEVER PICKS IT UP —
@@ -123,23 +143,24 @@ import { describe, expect, it } from "vitest";
  * must leave byte-identical — so they are named here rather than fixed, and
  * their survival is a scope decision, not an oversight.
  *
- * ⚠ `IdentityCluster` especially: it hosts the JOIN CTA, which is PHASE B's
- * subject and is governed by two independent conditions ruled there (a width
- * rule AND a touch-primary rule — MOBILE-1 §4). Phase A adding a width-only
- * hide to it would land half of Phase B's mechanism under Phase A's review,
- * on a critical-path surface Phase A is explicitly not cleared for. This
- * guard reddens if it does.
- * ⚠⚠ AND THAT PARAGRAPH IS LEFT AS PHASE A WROTE IT, WHICH IS A DECISION
- * RATHER THAN AN OVERSIGHT. ADR-0048 reverses the exclusion the JOIN CTA hide
- * was for — a phone participant may now join, so the CTA must render at every
- * width and the hide must never land. The RULE this guard enforces is
- * therefore unchanged and, if anything, stronger; only its stated MOTIVE is
- * superseded. Rewriting the motive here would put this docblock out of step
- * with the failure message inside
- * `header-mobile::IdentityCluster.tsx-carries-no-responsive-token-at-all`,
- * which carries the same framing and which Job A is scoped not to touch. The
- * divergence is recorded here rather than created silently; closing it is
- * ADR-0048 path (ii)'s job, not this one's.
+ * ⚠ `IdentityCluster` IS THE ONE THAT CHANGED SHAPE RATHER THAN MERELY LEAVING
+ * THE LIST, AND ITS RULE NOW HAS TWO HALVES THAT PULL IN OPPOSITE DIRECTIONS.
+ * The signed-in chip REDUCES below 640px — pseudonym text gone, avatar kept
+ * (ADR-0049). The signed-out JOIN CTA does NOT: ADR-0048's whole point is that a
+ * phone participant may join, so it renders at every width on every route. One
+ * file, one branch hiding and one branch pinned, which is why
+ * `header-mobile::IdentityCluster-reduces-to-the-avatar-below-640-and-the-JOIN-CTA-never-hides`
+ * asserts BOTH and why its vocabulary check is a closed allowlist of exactly one
+ * token rather than the blanket ban it replaces.
+ *
+ * ⚠⚠ THIS PARAGRAPH PREVIOUSLY CARRIED PHASE B's MOTIVE AND A NOTE EXPLAINING
+ * WHY IT WAS LEFT STALE. That note said rewriting it would put the docblock out
+ * of step with the failure message inside the blanket-ban guard, which Job A was
+ * scoped not to touch. ADR-0049 touches that guard — it inverts it — so the
+ * reason for the divergence is spent and both sites are corrected in the same
+ * commit (O-5). Recorded because the shape is worth keeping: a deliberate,
+ * documented staleness is only defensible while the thing it was keeping step
+ * with still exists.
  *
  * ⛔⛔ THE REGISTER DIVIDER CARRIES NO `data-testid`, EVER (SG6). It is
  * a named untouchable — `docs/plans/HEADER-PORTFOLIO.md`'s SG6: "The divider
@@ -180,10 +201,26 @@ import { describe, expect, it } from "vitest";
  *
  * ⚠ ALL THREE ROUTES WERE REACHED DIRECTLY — plan F-9 did NOT fire, and
  * `/onboarding` is not an inference from the other two. It renders signed-out
- * (this layout's own docblock records why) and served a full header. ⛔ WHAT
- * THAT DOES NOT COVER: the SIGNED-IN `/onboarding` render, where
- * `IdentityCluster` shows a pseudonym and avatar instead of the JOIN CTA — a
- * different, likely narrower row, and unmeasured.
+ * (this layout's own docblock records why) and served a full header.
+ *
+ * ⛔⛔ AND THE "WHAT THAT DOES NOT COVER" NOTE THAT USED TO SIT HERE NAMED THE
+ * WRONG ROUTE — CORRECTED AT ADR-0049 BY GREP RATHER THAN BY REASONING. It said
+ * the uncovered case was a SIGNED-IN `/onboarding` render. There is no such
+ * render: `onboarding/page.tsx` redirects to `/sign-in` without a valid
+ * `onboarding_ref`, redirects to `/` once `tosAcceptedAt` is set, and
+ * `session-gate.ts` throws `ONBOARDING_REQUIRED` before any `sessions` row is
+ * written while either field is NULL. Both arms are closed.
+ *
+ * ⇒ **The uncovered case is `/sign-in` and `/sign-in/otp`, which have NO session
+ * redirect at all** — this layout reads `auth.api.getSession` and builds a
+ * non-null viewer from it, so a fully-onboarded viewer who navigates there gets
+ * the SIGNED-IN header. Below 640px they now lose their pseudonym text
+ * (ADR-0049, inherited by ruling: the prop must not mean different things by
+ * caller). They do NOT lose a Đ cluster — this layout deliberately passes neither
+ * `portfolio` nor `spendable`, so `DharmaCluster` returns `null` on all three
+ * auth routes at every width and its new token is inert there. ⚠ The
+ * geometry of that render is still unmeasured; what changed is that the route it
+ * lives on is now known.
  *
  * ⚠ The BEFORE figures reproduced ADR-0048's exactly (379 / 754), which is
  * worth one line because it was not guaranteed: they came from a different rig
@@ -204,6 +241,7 @@ const HEADER = "src/components/shell/GlobalHeader.tsx";
 const BRAND = "src/components/shell/BrandCluster.tsx";
 const VISITOR = "src/components/shell/VisitorCounter.tsx";
 const IDENTITY = "src/components/shell/IdentityCluster.tsx";
+const DHARMA = "src/components/shell/DharmaCluster.tsx";
 const PUBLIC_LAYOUT = "src/app/(public)/layout.tsx";
 const AUTH_LAYOUT = "src/app/(auth)/layout.tsx";
 /** The seam: the two files between `GlobalHeader` and the `(auth)` reach. */
@@ -812,6 +850,260 @@ describe("global header mobile reflow — the right zone sheds its anti-conflati
 	});
 });
 
+/**
+ * ADR-0049 — WHAT A SIGNED-IN PHONE USER STOPS SEEING, AND WHERE THE HIDE LIVES.
+ *
+ * Phase A ruled that five header components stay visible at EVERY width and
+ * pinned it in the negative half of this file. ADR-0049 REVERSES that for two of
+ * them: below 640px the Đ cluster is not rendered at all, and the identity chip
+ * reduces to the avatar alone. The information is RELOCATED, not removed — the
+ * avatar still links to the viewer's own profile, where balance, portfolio and
+ * pseudonym all render. The founder ratified the cost on an informed basis: a
+ * signed-in phone user browsing markets does not see their stakeable balance
+ * without navigating away.
+ *
+ * ⛔⛔ THESE TWO TESTS ARE A RELOCATION, NOT AN ADDITION, AND THAT IS THE WHOLE
+ * REASON THEY EXIST. The hide lands on each component's OWN ROOT —
+ * `DharmaCluster.tsx`'s root span and `IdentityCluster.tsx`'s pseudonym span —
+ * never on a wrapper. A wrapper `<div className="max-mobile:hidden">` would push
+ * the real node down one level and break `dharma-cluster.test.tsx`'s T4 DOM-order
+ * guard, which is exactly what happened the first time this header was reflowed;
+ * the `VisitorCounter` row above ships this same own-root shape for this same
+ * reason and says so. This is not a third pattern, it is the shipped one.
+ *
+ * ⚠⚠ AND BECAUSE THE HIDE LIVES OUTSIDE `GlobalHeader.tsx`, G1 CANNOT SEE IT.
+ * The never-hidden guard below reads ONLY `GlobalHeader.tsx`; both new tokens
+ * live in other files. Its `DharmaCluster` and `IdentityCluster` rows would have
+ * stayed GREEN while both behaviours reversed — a guard whose name promises
+ * *never hidden* passing over two components that are now hidden. That is a
+ * certainty by construction, not a risk to manage, which is why those two rows
+ * are MOVED HERE rather than left to redden, and why that guard is renamed to the
+ * three components it still asserts.
+ *
+ * ⛔ THE RESIDUAL, STATED BECAUSE IT IS NOT CLOSED. G1's file scope is still a
+ * hole: a hide placed on `HeaderNav.tsx`'s or `RulesControl.tsx`'s own root — or
+ * on `BrandCluster.tsx`'s root rather than its inner span — still passes G1
+ * silently, exactly as `DharmaCluster`'s would have. Closing that generally was
+ * ruled OUT of this task (plan Q4) as a new absence check over files the task
+ * does not touch. What changed is that G1's promise is now TRUE of the three
+ * components it names, where before it was false about two it also named.
+ *
+ * ⚠ THE SECOND TEST IS AN INVERSION, NOT A NEW GUARD. It carries what
+ * `header-mobile::IdentityCluster.tsx-carries-no-responsive-token-at-all` used to
+ * assert, turned round — the WARLI-MOUNT precedent ADR-0048 `:82` names: a
+ * deleted guard proves nothing in either direction, an inverted one reddens the
+ * moment somebody reverts. Its old form banned the whole responsive vocabulary
+ * from this file on a Phase B motive that ADR-0048 already superseded; its new
+ * form is a CLOSED ALLOWLIST — exactly one token, exactly `max-mobile:hidden` —
+ * so every other spelling still reddens, including ones nobody has thought of.
+ * The JOIN CTA's never-hides rule survives ADR-0048 and becomes an EXPLICIT
+ * assertion here, because it was previously held only as a side effect of the
+ * blanket ban that is being inverted away.
+ */
+describe("global header mobile reflow — ADR-0049: the signed-in right zone reduces to the avatar below 640px", () => {
+	it("header-mobile::DharmaCluster-hides-below-640-on-its-own-root-with-NO-wrapper", () => {
+		const source = read(DHARMA);
+
+		// 1 — POLARITY. The default is what makes a future third mount safe by
+		// omission (AGENTS.md §8); it is not dead just because both of today's
+		// callers pass the prop.
+		expect(
+			source,
+			`${DHARMA}: no \`mobileResponsive = false\` default. The hide must be OFF ` +
+				`unless a caller opts in — a mount that forgets the prop has to inherit ` +
+				`the DESKTOP render, never an accidental reflow.`,
+		).toMatch(/mobileResponsive\s*=\s*false/);
+
+		// 2 — THE DESKTOP RENDER IS UNCHANGED, ASSERTED RATHER THAN ASSUMED.
+		// ADR-0049 changes nothing at or above 640px, and "override, never
+		// replace" (AGENTS.md §8) is only structural if the base survives.
+		const [classes, ...extra] = nodeClasses(source, DHARMA, "dharma-cluster");
+		expect(extra).toEqual([]);
+		for (const token of ["mr-3.5", "flex", "h-11", "shrink-0"]) {
+			expect(
+				classes,
+				`${DHARMA}: the cluster's base class list lost \`${token}\`. The hide is ` +
+					`an ADDITIVE max-mobile: override; the ≥640px render takes zero diff.`,
+			).toContain(token);
+		}
+
+		// 3 — THE HIDE IS PRESENT AND GATED. Same window idiom the visitor-counter
+		// row uses: bounded by the next `<`, which is this node's first child.
+		const at = source.indexOf('data-testid="dharma-cluster"');
+		const window = source.slice(at, source.indexOf("<", at));
+		expect(
+			window,
+			`${DHARMA}: the cluster's own root cn() call carries no \`${GATED_HIDE}\`. ` +
+				`ADR-0049 drops this cluster below 640px; an ungated hide would also ` +
+				`reach the (auth) mount, and no hide at all leaves the signed-in header ` +
+				`overflowing on every phone.`,
+		).toContain(GATED_HIDE);
+
+		// 4 — NO WRAPPER, UNDER ANY NAME. This is the assertion that protects T4's
+		// real dependency, and it is the VisitorCounter row's idiom verbatim.
+		expect(
+			depthWithin(read(HEADER), HEADER, "justify-self-end", "<DharmaCluster"),
+			`${HEADER}: <DharmaCluster> is no longer a DIRECT child of the right ` +
+				`zone — something wraps it. dharma-cluster.test.tsx's T4 guard walks ` +
+				`this node's parent's direct \`.children\`; a wrapper makes the cluster ` +
+				`a grandchild and every index in that guard resolves to -1.`,
+		).toBe(0);
+
+		// 5 — THE MOUNT PASSES THE PROP, AS THE EXACT LITERAL. An allowlist over
+		// the value position, for the reason the (auth) mount's half two records:
+		// `={false}`, `={SOME_FLAG}` and `={!true}` are all TS-legal reverts that
+		// leave a call site reading like an opt-in.
+		const tag = /<DharmaCluster\b[\s\S]*?\/>/.exec(read(HEADER));
+		if (!tag) {
+			throw new Error(`${HEADER}: no <DharmaCluster ... /> mount found.`);
+		}
+		expect(
+			tag[0],
+			`${HEADER}: <DharmaCluster> is not passed ` +
+				`\`mobileResponsive={mobileResponsive}\` as that exact literal. Any ` +
+				`other spelling either switches the hide off or hard-codes it on for ` +
+				`both mounts.`,
+		).toMatch(/mobileResponsive=\{mobileResponsive\}/);
+
+		// 6 — AND THE HIDE IS DELIBERATELY *NOT* IN THIS FILE. Recorded as an
+		// assertion so a later reader does not "helpfully" move it back up to the
+		// header, where it would need a wrapper and would break T4.
+		expect(
+			tag[0].includes("max-mobile:"),
+			`${HEADER}: the <DharmaCluster> mount carries a \`max-mobile:\` token. ` +
+				`The hide belongs on the cluster's OWN ROOT in ${DHARMA} — putting it ` +
+				`here needs a wrapper element, and a wrapper breaks T4.`,
+		).toBe(false);
+	});
+
+	it("header-mobile::IdentityCluster-reduces-to-the-avatar-below-640-and-the-JOIN-CTA-never-hides", () => {
+		const raw = read(IDENTITY);
+		const source = stripComments(raw);
+
+		// 1 — POLARITY.
+		expect(
+			raw,
+			`${IDENTITY}: no \`mobileResponsive = false\` default.`,
+		).toMatch(/mobileResponsive\s*=\s*false/);
+
+		// 2 — THE PSEUDONYM SPAN CARRIES THE GATED HIDE. Located by the class that
+		// makes it the pseudonym rather than by position: `max-w-40 truncate` is
+		// what handles a long pseudonym above 640px and is untouched by this task.
+		const pseudoAt = source.indexOf("max-w-40 truncate");
+		if (pseudoAt === -1) {
+			throw new Error(
+				`${IDENTITY}: the pseudonym span's \`max-w-40 truncate\` classes are ` +
+					`gone. That is the anchor for this assertion and the mechanism that ` +
+					`handles a long pseudonym above 640px — re-derive, do not delete.`,
+			);
+		}
+		const openTag = source.slice(
+			source.lastIndexOf("<", pseudoAt),
+			source.indexOf(">", pseudoAt),
+		);
+		expect(
+			openTag,
+			`${IDENTITY}: the pseudonym <span>'s cn() call carries no ` +
+				`\`${GATED_HIDE}\`. ADR-0049 reduces the signed-in chip to the avatar ` +
+				`alone below 640px; the avatar stays, the text goes.`,
+		).toContain(GATED_HIDE);
+
+		// 3 — A CLOSED ALLOWLIST OVER THE WHOLE FILE, NOT A DENYLIST.
+		//
+		// ⛔⛔ THIS IS THE INVERTED HALF OF THE OLD GUARD AND IT KEEPS THAT GUARD'S
+		// HARDEST-WON PROPERTY. The old one banned the entire variant vocabulary
+		// here; the naive inversion is "it now contains max-mobile:hidden", which
+		// passes on a file that ALSO gained `max-sm:hidden`, `mobile:flex` or
+		// `max-mobile:opacity-0`. An enumeration over what is FORBIDDEN goes stale
+		// silently in the passing direction — the same argument this file already
+		// makes for `ungatedBreakpointClasses` and for the (auth) mount's half two.
+		// So: the file's responsive vocabulary must be EXACTLY ONE token and it
+		// must be exactly this one. Everything else reddens, including spellings
+		// nobody has thought of.
+		//
+		// ⚠ The regex matches the variant PREFIX plus its utility, where the old
+		// one matched the prefix alone — the whole token is what has to be pinned
+		// for "exactly one, and exactly this" to mean anything.
+		const VARIANTS =
+			/(?:\b(?:max-)?(?:mobile|sm|md|lg|xl|2xl):|\b(?:max|min)-\[[^\]]+\]:)[^\s"'`]*/g;
+		const tokens = source.match(VARIANTS) ?? [];
+		expect(
+			tokens,
+			`${IDENTITY}: its responsive vocabulary is [${tokens.join(", ")}]. ` +
+				`ADR-0049 permits EXACTLY ONE token in this file — ` +
+				`\`${HIDE_BELOW_640}\` on the pseudonym span — and nothing else at any ` +
+				`breakpoint under any variant. A second token here is either a second ` +
+				`behaviour nobody ruled on, or the same one spelled twice.`,
+		).toEqual([HIDE_BELOW_640]);
+		expect(
+			ungatedBreakpointClasses(raw),
+			`${IDENTITY}: carries a breakpoint class that is not wrapped in ` +
+				`\`mobileResponsive && "…"\`. An unconditional hide here reaches the ` +
+				`(auth) mount and every future mount at once.`,
+		).toEqual([]);
+
+		// 4 — THE JOIN BRANCH CARRIES NO RESPONSIVE TOKEN, EXPLICITLY.
+		//
+		// ⚠ THIS OBLIGATION USED TO BE HELD BY ACCIDENT. It fell out of the blanket
+		// ban being inverted away, so inverting without this line would stop
+		// asserting it at all. ADR-0048's whole point is that a phone participant
+		// may join: the CTA renders at every width, on every route.
+		const joinAt = source.indexOf('href="/sign-in"');
+		if (joinAt === -1) {
+			throw new Error(
+				`${IDENTITY}: the JOIN CTA's \`href="/sign-in"\` is gone.`,
+			);
+		}
+		const joinTag = source.slice(
+			source.lastIndexOf("<", joinAt),
+			source.indexOf(">", joinAt),
+		);
+		expect(
+			joinTag.match(VARIANTS) ?? [],
+			`${IDENTITY}: the signed-out JOIN <Link> carries a responsive token. ` +
+				`ADR-0048 supersedes the ADR-0045 carve-out precisely so a phone ` +
+				`visitor can join from the surface they are being asked to join from; ` +
+				`ADR-0049 reduces the SIGNED-IN chip and touches this branch not at all.`,
+		).toEqual([]);
+
+		// 5 — THE AVATAR IS NOT INSIDE THE HIDDEN REGION. This is what makes the
+		// test's name ("reduces to the avatar") true of what it does, rather than a
+		// claim in its title. `hiddenRegions` is file-agnostic and reused unchanged.
+		for (const region of hiddenRegions(raw, IDENTITY)) {
+			expect(
+				region.includes("<Avatar"),
+				`${IDENTITY}: an <Avatar> is INSIDE an element carrying ` +
+					`\`${HIDE_BELOW_640}\`, so the chip renders EMPTY below 640px rather ` +
+					`than reducing to the avatar. ADR-0049 keeps the avatar — it is the ` +
+					`link to the profile where the hidden figures are relocated TO, so ` +
+					`hiding it removes the affordance the whole ruling rests on.`,
+			).toBe(false);
+		}
+
+		// 6 — THE MOUNT: exact literal, and depth zero in the right zone.
+		const tag = /<IdentityCluster\b[\s\S]*?\/>/.exec(read(HEADER));
+		if (!tag) {
+			throw new Error(`${HEADER}: no <IdentityCluster ... /> mount found.`);
+		}
+		expect(
+			tag[0],
+			`${HEADER}: <IdentityCluster> is not passed ` +
+				`\`mobileResponsive={mobileResponsive}\` as that exact literal.`,
+		).toMatch(/mobileResponsive=\{mobileResponsive\}/);
+		expect(
+			tag[0].includes("max-mobile:"),
+			`${HEADER}: the <IdentityCluster> mount carries a \`max-mobile:\` token. ` +
+				`The hide belongs on the pseudonym span in ${IDENTITY}; here it would ` +
+				`take the avatar and the profile link with it.`,
+		).toBe(false);
+		expect(
+			depthWithin(read(HEADER), HEADER, "justify-self-end", "<IdentityCluster"),
+			`${HEADER}: <IdentityCluster> is no longer a DIRECT child of the right ` +
+				`zone — something wraps it, and T4 walks direct children.`,
+		).toBe(0);
+	});
+});
+
 describe("global header mobile reflow — BrandCluster and VisitorCounter gate their own hide", () => {
 	it("header-mobile::GlobalHeader-passes-mobileResponsive-to-BrandCluster", () => {
 		const source = read(HEADER);
@@ -933,10 +1225,37 @@ describe("global header mobile reflow — BrandCluster and VisitorCounter gate t
 });
 
 describe("global header mobile reflow — what this task may NOT touch", () => {
-	it("header-mobile::HeaderNav-RulesControl-BrandCluster-DharmaCluster-IdentityCluster-are-never-hidden", () => {
+	/**
+	 * ⚠⚠ RENAMED AT MOBILE-1-HEADER, AND THE RENAME IS THE POINT OF THE EDIT.
+	 * This was `…-BrandCluster-DharmaCluster-IdentityCluster-are-never-hidden`.
+	 * ADR-0049 rules that below 640px the Đ cluster is not rendered and the
+	 * identity chip reduces to its avatar, so two of the five rows below assert a
+	 * position the product has reversed. They are RELOCATED — to
+	 * `header-mobile::DharmaCluster-hides-below-640-on-its-own-root-with-NO-wrapper`
+	 * and
+	 * `header-mobile::IdentityCluster-reduces-to-the-avatar-below-640-and-the-JOIN-CTA-never-hides`
+	 * — in the ADR-0049 describe block above, where the behaviour now lives.
+	 *
+	 * ⛔⛔ THEY HAD TO BE MOVED BECAUSE THEY COULD NOT REDDEN. This test reads
+	 * ONLY `GlobalHeader.tsx`, and both new hides live on the components' own
+	 * roots in their own files. MEASURED at MOBILE-1-HEADER, not predicted: with
+	 * the implementation landed and both behaviours reversed, this test was still
+	 * GREEN under its old name and its old five rows. A guard promising *never
+	 * hidden* passed over two components that are now hidden. ⇒ Renaming it is not
+	 * cosmetic — it is what makes the name true of what the body checks.
+	 *
+	 * ⛔ AND THE FILE-SCOPE HOLE ITSELF IS NOT CLOSED. A hide placed on
+	 * `HeaderNav.tsx`'s or `RulesControl.tsx`'s own root — or on
+	 * `BrandCluster.tsx`'s root rather than its inner span — still passes here
+	 * silently, exactly as `DharmaCluster`'s did. Closing that generally was ruled
+	 * OUT of MOBILE-1-HEADER (plan Q4) as a new absence check over files it does
+	 * not touch. Stated so the next reader inherits the limit rather than the
+	 * impression of coverage.
+	 */
+	it("header-mobile::HeaderNav-RulesControl-BrandCluster-are-never-hidden", () => {
 		const source = read(HEADER);
 
-		// Five separate assertions, five separate messages: each of these is
+		// Three separate assertions, three separate messages: each of these is
 		// essential for a different reason, and a single loop with one message
 		// would tell the reader which line failed but not why it matters.
 		const cases: ReadonlyArray<readonly [string, string]> = [
@@ -956,18 +1275,6 @@ describe("global header mobile reflow — what this task may NOT touch", () => {
 				"the home link and the freeze countdown's accessible name. The 48px " +
 					"mark stays visible and linked at every width; only its text block " +
 					"conditionally hides, and that override lives in BrandCluster.tsx.",
-			],
-			[
-				"DharmaCluster",
-				"the viewer's own Đ balance and portfolio — engine-derived figures, " +
-					"not chrome.",
-			],
-			[
-				"IdentityCluster",
-				"identity, and the JOIN CTA inside it. ⛔ PHASE B TERRITORY: the CTA " +
-					"is governed by TWO independent conditions ruled there (a width " +
-					"rule AND a touch-primary rule). Phase A must add no responsive " +
-					"behaviour to it at all.",
 			],
 		];
 
@@ -994,7 +1301,10 @@ describe("global header mobile reflow — what this task may NOT touch", () => {
 				expect(
 					line.includes(HIDE_BELOW_640),
 					`${HEADER}: \`<${component}\` carries a hide token directly on its ` +
-						`mount line. It must render at every width — ${why}`,
+						`mount line. It is one of the THREE components that must render ` +
+						`at every width — ${why} ⚠ The list is three, not the five it was ` +
+						`before ADR-0049: the Đ cluster and the identity chip's pseudonym ` +
+						`now hide below 640px, on their own roots, in their own files.`,
 				).toBe(false);
 			}
 			for (const region of regions) {
@@ -1021,34 +1331,34 @@ describe("global header mobile reflow — what this task may NOT touch", () => {
 		// proves that, and it does so without caring how the prop travels.
 	});
 
-	it("header-mobile::IdentityCluster.tsx-carries-no-responsive-token-at-all", () => {
-		// ⚠ "AT ALL" NOW MEANS AT ALL. This checked two literals —
-		// `max-mobile:hidden` and `mobileResponsive` — so `max-sm:hidden`,
-		// `mobile:flex`, `max-[640px]:hidden` and `max-mobile:opacity-0` every
-		// one of them passed a test whose name promises exhaustiveness. The
-		// point of this guard is that Phase A adds NO responsive behaviour to
-		// the file carrying the JOIN CTA, and "no responsive behaviour" is a
-		// property of the whole variant vocabulary, not of the one variant this
-		// task happened to use. Anything that would land half of Phase B's
-		// two-condition mechanism here reddens now, whatever it is spelled.
-		const source = stripComments(read(IDENTITY));
-		const VARIANTS =
-			/\b(?:max-)?(?:mobile|sm|md|lg|xl|2xl):|\b(?:max|min)-\[[^\]]+\]:/;
-		const offender =
-			VARIANTS.exec(source)?.[0] ??
-			(source.includes("mobileResponsive") ? "mobileResponsive" : null);
-		expect(
-			offender,
-			`${IDENTITY}: carries the responsive token \`${offender}\`. This file ` +
-				`is Phase B's subject and Phase A must not add ANY hide or ` +
-				`responsive behaviour to it — conditional or not, at any breakpoint, ` +
-				`under any variant. The JOIN CTA it hosts is governed by two ` +
-				`independent conditions ruled in Phase B (a width rule AND a ` +
-				`touch-primary rule); landing either one here puts half of a ` +
-				`critical-path mechanism under Phase A's review.`,
-		).toBe(null);
-	});
-
+	/**
+	 * ⚠⚠ `header-mobile::IdentityCluster.tsx-carries-no-responsive-token-at-all`
+	 * WAS HERE AND IS NOT DELETED — IT IS INVERTED, AND IT MOVED.
+	 *
+	 * It banned the ENTIRE responsive vocabulary from `IdentityCluster.tsx`, on
+	 * the stated motive that the JOIN CTA it hosts was Phase B's subject and
+	 * governed by two conditions ruled there. ADR-0048 superseded that motive (a
+	 * phone participant may join, so the CTA must never hide) and ADR-0049
+	 * supersedes the ban itself (the signed-in chip reduces to its avatar below
+	 * 640px). A blanket ban cannot survive a ruling that requires exactly one
+	 * token in the file it bans tokens from.
+	 *
+	 * ⇒ It is now
+	 * `header-mobile::IdentityCluster-reduces-to-the-avatar-below-640-and-the-JOIN-CTA-never-hides`
+	 * in the ADR-0049 describe block above — the WARLI-MOUNT precedent ADR-0048
+	 * `:82` names: a deleted guard proves nothing in either direction, an inverted
+	 * one reddens the moment somebody reverts. Two of its properties are carried
+	 * forward deliberately rather than rebuilt: the vocabulary check is still
+	 * EXHAUSTIVE (a closed allowlist of exactly one token, not a denylist of
+	 * remembered spellings), and the JOIN branch's cleanliness is now asserted
+	 * EXPLICITLY, where the ban held it only as a side effect.
+	 *
+	 * ✅ IT DID ITS JOB ON THE WAY OUT, WHICH IS WHY THIS NOTE IS HERE. Measured
+	 * at MOBILE-1-HEADER: it went RED on the implementation — first on the bare
+	 * prop name, then on `max-mobile:` — while the never-hidden guard beside it
+	 * stayed green through the same change. The un-dodgeable guard fired and the
+	 * dodgeable one did not, exactly as ADR-0049 §Guards predicted of each.
+	 */
 	it("header-mobile::the-header-tag-and-its-60px-row-take-ZERO-diff", () => {
 		const source = read(HEADER);
 

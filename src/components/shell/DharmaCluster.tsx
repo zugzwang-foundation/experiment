@@ -3,6 +3,7 @@
 import { formatDharma } from "@/components/debate/format";
 import { InfoTip } from "@/components/ui/info-tip";
 import { GLOSSARY } from "@/lib/copy/glossary";
+import { cn } from "@/lib/utils";
 
 /**
  * The signed-in Đ cluster — the locked W2.4/.5/.14 anatomy (mockup v0_2
@@ -57,6 +58,24 @@ import { GLOSSARY } from "@/lib/copy/glossary";
  * ON. Grouping is a property of the shared formatter, never a per-surface
  * choice (D2), so nothing here selects it and nothing here may opt out.
  *
+ * ⛔ AND BELOW 640px THIS CLUSTER IS NOT RENDERED AT ALL (ADR-0049). That
+ * reverses MOBILE-1 Phase A, which ruled this component visible at EVERY width;
+ * the reversal is the founder's, taken on an informed basis, and the cost is
+ * stated rather than softened — a signed-in phone user browsing markets does not
+ * see their stakeable balance without navigating away. What makes it acceptable
+ * is that the information is RELOCATED, not removed: the identity chip beside
+ * this one still links to the viewer's own profile, where balance and portfolio
+ * both render. The same relocation argument hid the Discovery hero at Phase A.
+ *
+ * ⚠ THE HIDE LIVES HERE, ON THIS COMPONENT'S OWN ROOT, AND NOT IN THE HEADER.
+ * A wrapper `<div className="max-mobile:hidden">` in `GlobalHeader` would push
+ * this node down one level, and `tests/unit/shell/dharma-cluster.test.tsx`'s T4
+ * guard walks the right zone's DIRECT children — a wrapper makes every index in
+ * that guard resolve to `-1`. `VisitorCounter` ships this same own-root shape for
+ * this same reason. It is gated on `mobileResponsive` like every other reflow
+ * class in this subtree, so the gate stays the prop chain rather than the file
+ * boundary (AGENTS.md §8).
+ *
  * SEMANTIC TIER, NOT RAW PRIMITIVE (POLISH-1a V9). `bg-(--btn-fill)` and
  * `text-muted-foreground` resolve to the SAME literals as the `bg-ground` /
  * `text-n5` they replace — the change is which tier the cluster binds, matching
@@ -67,9 +86,18 @@ import { GLOSSARY } from "@/lib/copy/glossary";
 export function DharmaCluster({
 	portfolio,
 	spendable,
+	mobileResponsive = false,
 }: {
 	portfolio: string | null;
 	spendable: string | null;
+	/**
+	 * ADR-0049 — when true, this cluster is not rendered below 640px. Threaded
+	 * from the layout through `GlobalHeader`; it defaults `false` so a mount that
+	 * does not pass it inherits the DESKTOP render rather than an accidental
+	 * reflow (AGENTS.md §8). Both of today's mounts opt in, and the default is
+	 * still what makes a future third mount safe by omission.
+	 */
+	mobileResponsive?: boolean;
 }): React.JSX.Element | null {
 	if (spendable === null) {
 		return null;
@@ -78,7 +106,10 @@ export function DharmaCluster({
 	return (
 		<span
 			data-testid="dharma-cluster"
-			className="mr-3.5 flex h-11 shrink-0 items-center gap-[13px] rounded-(--r) bg-(--btn-fill) pr-3.5 pl-3 select-none [border:var(--hairline)]"
+			className={cn(
+				"mr-3.5 flex h-11 shrink-0 items-center gap-[13px] rounded-(--r) bg-(--btn-fill) pr-3.5 pl-3 select-none [border:var(--hairline)]",
+				mobileResponsive && "max-mobile:hidden",
+			)}
 		>
 			<InfoTip content={GLOSSARY.dharma} asChild>
 				<span className="text-[17px] font-bold text-ink">Đ</span>
