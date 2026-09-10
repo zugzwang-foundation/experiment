@@ -8,6 +8,7 @@ import { markets, pools, systemState } from "@/db/schema";
 import { assertAdminActor } from "@/server/admin/actor";
 import { openingReserves } from "@/server/cpmm/calculate";
 import { insertEvent } from "@/server/events/insert";
+import { recordInvalidation } from "@/server/observability/cache-metrics";
 
 import {
 	MarketDeadlineInPastError,
@@ -269,6 +270,7 @@ export async function openMarket(args: {
 	// know that, and `updateTag` throws outside a Server Action. Matching
 	// `closeMarket`'s form rather than relying on today's one caller.
 	revalidateTag("discovery", { expire: 0 });
+	await recordInvalidation("discovery");
 
 	return result;
 }

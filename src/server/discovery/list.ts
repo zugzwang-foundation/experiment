@@ -12,6 +12,7 @@ import {
 import type { Reserves } from "@/server/cpmm/calculate";
 import { getMarketPricingAndReserves } from "@/server/debate-view/market-pricing";
 import { getMarketTotals } from "@/server/debate-view/market-totals";
+import { recordCacheMiss } from "@/server/observability/cache-metrics";
 
 import { getCachedReserveWalk } from "./cached-series";
 import { type HeroTopPosts, selectHeroTopPosts } from "./hero";
@@ -131,12 +132,14 @@ export async function getCachedDiscoveryMarketIds(): Promise<
 	cacheLife("minutes");
 	cacheTag("discovery");
 
-	return db
+	const rows = await db
 		.select({ id: markets.id, slug: markets.slug, title: markets.title })
 		.from(markets)
 		.where(eq(markets.status, "Open"))
 		.orderBy(desc(markets.createdAt))
 		.limit(DISCOVERY_GRID_SIZE);
+	await recordCacheMiss("discovery-list", null);
+	return rows;
 }
 
 /** One market's cached Discovery data — everything the pack calls "shared"
@@ -239,5 +242,6 @@ export async function getCachedMarketDiscoveryData(
 	);
 	const topPosts = await selectHeroTopPosts(db, marketId, reserves);
 
+	await recordCacheMiss("market-data", marketId);
 	return { totals, imageUrl, series, topPosts };
 }

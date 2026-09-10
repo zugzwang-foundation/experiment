@@ -67,6 +67,15 @@ vi.mock("@/server/discovery/list", () => ({
 vi.mock("@/server/debate-view/market-pricing", () => ({
 	getMarketPricingAndReserves: vi.fn(),
 }));
+// RELAY C2 — the page's new attempt-counter call (`recordCacheAttempt`) is a
+// fourth thing the page itself touches directly (the other three above are
+// the read-model loaders). Left unmocked it reaches the real
+// `@upstash/redis` singleton, which makes a real network call inside this
+// jsdom render test — no other suite exercises that path, so nothing but
+// this file needs to know it exists.
+vi.mock("@/server/observability/cache-metrics", () => ({
+	recordCacheAttempt: vi.fn(),
+}));
 
 import { Suspense } from "react";
 

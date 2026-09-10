@@ -11,6 +11,7 @@ import {
 	getCachedMarketDiscoveryData,
 } from "@/server/discovery/list";
 import { withLiveTail } from "@/server/discovery/price-series";
+import { recordCacheAttempt } from "@/server/observability/cache-metrics";
 
 /**
  * OQ-1 A (ratified §16): Discovery's R-2 cache retrofit landed at S-4 Phase C
@@ -101,10 +102,12 @@ export default function DiscoveryPage() {
 export async function DiscoveryContent() {
 	let views: DiscoveryMarketView[];
 	try {
+		await recordCacheAttempt("discovery-list", null);
 		const marketIds = await getCachedDiscoveryMarketIds();
 		views = [];
 		for (const m of marketIds) {
 			const priced = await getMarketPricingAndReserves(db, m.id);
+			await recordCacheAttempt("market-data", m.id);
 			const data = await getCachedMarketDiscoveryData(
 				m.id,
 				priced?.reserves ?? null,

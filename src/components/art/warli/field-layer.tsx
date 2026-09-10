@@ -181,17 +181,27 @@ function Ground({ mark }: { readonly mark: GroundMark }) {
  * because the border must overlap anything that strays toward the edge rather
  * than be overlapped by it, or the frame stops reading as a frame.
  */
+// P2.1 — `FieldLayer` takes no props and this call never varies (no
+// Math.random, no clock, anywhere in this layer — see `scene.ts`), so
+// computing it once at module load rather than on every render is
+// constant-folding, not memoization: there is no cache, no key, nothing to
+// go stale. This is the fix for the sign-in page's collapse under
+// concurrent load — this scene-placement math is synchronous CPU work that,
+// unlike every other page's DB-await cost, blocks Node's single event loop
+// on every request when computed fresh each time.
+const FIELD_SCENE = buildFieldScene({
+	figures: FIELD_FIGURE_COUNT,
+	motifs: MOTIF_COUNT,
+	ground: GROUND_MARK_COUNT,
+});
+
 export function FieldLayer() {
 	// ⚠ BUILT THROUGH `buildFieldScene`, NOT ASSEMBLED HERE. The occupancy list
 	// used to be threaded at this call site, which meant the guard could thread it
 	// correctly while the component quietly stopped — dropping 29 of 104 motifs on
 	// top of figures with nothing red. The shared builder is what makes the guard
 	// and the drawing the same scene rather than two scenes that happen to agree.
-	const { figures, motifs, ground } = buildFieldScene({
-		figures: FIELD_FIGURE_COUNT,
-		motifs: MOTIF_COUNT,
-		ground: GROUND_MARK_COUNT,
-	});
+	const { figures, motifs, ground } = FIELD_SCENE;
 
 	return (
 		<g data-warli-field-layer="">

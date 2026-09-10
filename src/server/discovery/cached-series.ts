@@ -4,6 +4,7 @@ import { cacheLife, cacheTag } from "next/cache";
 
 import { db } from "@/db";
 import { MARKET_SERIES_MIN_WINDOW_MS } from "@/server/config/limits";
+import { recordReserveWalkDerivation } from "@/server/observability/cache-metrics";
 
 import {
 	replayReserveSeries,
@@ -111,5 +112,7 @@ export async function getCachedReserveWalk(
 	});
 	cacheTag(`market:${marketId}`);
 
-	return toWireWalk(await replayReserveSeries(db, marketId));
+	const walk = toWireWalk(await replayReserveSeries(db, marketId));
+	await recordReserveWalkDerivation(marketId);
+	return walk;
 }

@@ -167,6 +167,13 @@ export function MarketThumb({
 		// inline-literal case only. Spreading first is also what keeps the shipped
 		// attribute order byte for byte — the hero post image's `data-testid` must
 		// serialize ahead of `alt`/`class`.
+		// P3.1 — `loading="lazy"` + `decoding="async"` are native browser hints,
+		// not a loader swap: they defer the actual fetch for an off-screen thumb
+		// until it nears the viewport, which is exactly the class of fix the
+		// signed-URL constraint below still allows. Spread BEFORE these two so
+		// neither can be silently overridden by `passthrough` the way `ref`/
+		// `src`/`alt`/`className`/`onError` already can't be (see the docblock
+		// above on spread ordering).
 		// biome-ignore lint/performance/noImgElement: presigned R2 GET URLs are short-lived and per-load — next/image optimization would re-fetch through the loader and break the signed query (the CommentImage precedent).
 		<img
 			{...passthrough}
@@ -174,6 +181,8 @@ export function MarketThumb({
 			src={src}
 			alt={alt}
 			className={className}
+			loading="lazy"
+			decoding="async"
 			onError={() => setFailedSrc(src)}
 		/>
 	);

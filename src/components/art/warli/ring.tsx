@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import { type Density, Figure, type FigureSpec } from "./figures";
 import {
+	type Chord,
 	type Facing,
 	interstitialAngles,
+	type Placement,
 	type Point,
 	pointOnRing,
 	ringLinks,
@@ -137,16 +139,63 @@ const FIELD_SPARE: readonly FieldMotif[] = [
 	(t, w) => <Bird transform={t} weight={w} />,
 ];
 
-export function Ring({
-	centre,
-	radius,
-	figures,
-	density,
-	facing,
-	phaseDeg,
-	name,
-	showField = true,
-}: RingProps) {
+/**
+ * P2.1 — the sign-in page's server render blocks Node's single event loop on
+ * this exact math, recomputed synchronously on every request, unlike every
+ * other page's DB-await (event-loop-yielding) cost. `ringPlacements` /
+ * `ringLinks` / `interstitialAngles` / `bowedCircle` are pure functions of
+ * `Ring`'s props, so the result is cacheable — this is the memo for it.
+ *
+ * ⚠ KEYED ON EXACTLY THE VALUES THE MATH DEPENDS ON, AND NOTHING ELSE. `name`
+ * and `showField` never enter the key — not narrowed out, structurally
+ * absent — so a caller reusing a `name` with different geometry-relevant
+ * props cannot collide with a stale entry; there is no code path by which
+ * `name` could select a cache slot. Outer level is a `WeakMap` on the
+ * `figures` array's own reference (the two production call sites in
+ * `hero.tsx` pass stable module-level arrays, so this alone already
+ * separates the two rings); inner level is a string of the remaining
+ * primitives. A caller passing a fresh `figures` array literal each render
+ * just misses the cache — never returns a wrong answer.
+ *
+ * `dense` (not raw `density`) is in the key deliberately: `"dense"` and
+ * `"solid"` produce byte-identical geometry here — the three-value register
+ * only affects `weight`/`cycle`, picked outside this cache from `density`
+ * directly, still recomputed every render (a ternary, not worth caching).
+ * Collapsing them to one slot is a bigger win, not a shortcut.
+ */
+type RingGeometry = {
+	readonly placements: readonly Placement[];
+	readonly links: readonly Chord[];
+	readonly fieldAngles: readonly number[];
+	readonly groundPath: string | null;
+};
+
+const ringGeometryCache = new WeakMap<
+	readonly FigureSpec[],
+	Map<string, RingGeometry>
+>();
+
+function computeRingGeometry(params: {
+	readonly centre: Point;
+	readonly radius: number;
+	readonly figures: readonly FigureSpec[];
+	readonly facing: Facing;
+	readonly phaseDeg: number;
+	readonly dense: boolean;
+	readonly name: string;
+}): RingGeometry {
+	const { centre, radius, figures, facing, phaseDeg, dense, name } = params;
+	let byKey = ringGeometryCache.get(figures);
+	if (byKey === undefined) {
+		byKey = new Map();
+		ringGeometryCache.set(figures, byKey);
+	}
+	const key = `${centre.x}:${centre.y}:${radius}:${phaseDeg}:${facing}:${dense}`;
+	const cached = byKey.get(key);
+	if (cached !== undefined) {
+		return cached;
+	}
+
 	const count = figures.length;
 	const placements = ringPlacements({
 		centre,
@@ -170,9 +219,30 @@ export function Ring({
 		}
 		return spec.handRight;
 	};
-
 	const links = ringLinks(placements, handLeftOf, handRightOf, facing);
 	const fieldAngles = interstitialAngles(count, phaseDeg);
+	const groundPath = dense
+		? bowedCircle(centre.x, centre.y, radius, 4_099, {
+				samples: 96,
+				amplitude: 1.4,
+			})
+		: null;
+
+	const geometry: RingGeometry = { placements, links, fieldAngles, groundPath };
+	byKey.set(key, geometry);
+	return geometry;
+}
+
+export function Ring({
+	centre,
+	radius,
+	figures,
+	density,
+	facing,
+	phaseDeg,
+	name,
+	showField = true,
+}: RingProps) {
 	// ⚠ `solid` COUNTS AS DENSE HERE. WARLI-2 split the old two-value register
 	// into three, and this line is the one place the ring cares: the ground
 	// treatment — the drawn baseline and its comb — belongs to the LOUD ring,
@@ -183,6 +253,16 @@ export function Ring({
 	const dense = density === "dense" || density === "solid";
 	const cycle = dense ? FIELD_DENSE : FIELD_SPARE;
 	const weight = dense ? WEIGHT_DENSE : WEIGHT_SPARE;
+
+	const { placements, links, fieldAngles, groundPath } = computeRingGeometry({
+		centre,
+		radius,
+		figures,
+		facing,
+		phaseDeg,
+		dense,
+		name,
+	});
 
 	// The comb run is a straight tangent standing in for an arc.
 	//
@@ -212,10 +292,7 @@ export function Ring({
 					    drawn without them. Sampled densely, because at this radius a
 					    coarse polygon would read as a polygon. */}
 					<path
-						d={bowedCircle(centre.x, centre.y, radius, 4_099, {
-							samples: 96,
-							amplitude: 1.4,
-						})}
+						d={groundPath ?? ""}
 						fill="none"
 						stroke="currentColor"
 						strokeWidth={WEIGHT_DENSE}

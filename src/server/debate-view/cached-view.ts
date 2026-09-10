@@ -6,6 +6,7 @@ import { db } from "@/db";
 import type { Reserves } from "@/server/cpmm/calculate";
 import { getCachedReserveWalk } from "@/server/discovery/cached-series";
 import type { MarketSummary } from "@/server/markets/get-by-slug";
+import { recordCacheMiss } from "@/server/observability/cache-metrics";
 
 import { type DebateViewModel, loadDebateView } from "./load-debate-view";
 
@@ -116,5 +117,6 @@ export async function getCachedDebateView(
 	// (**INV-4**).
 	const walk = await getCachedReserveWalk(market.id);
 
+	await recordCacheMiss("debate-view", market.id);
 	return loadDebateView(db, { market, walk });
 }
