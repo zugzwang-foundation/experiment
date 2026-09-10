@@ -597,8 +597,11 @@ export function MarketHeader({
 								    (`ui/badge.tsx`). Left at `xs` this control would set the
 								    row's height instead of the badge, growing it 4px — and the
 								    note at the top of this row records that the row tracks the
-								    badge's fixed `h-5`, inside a `basis-[24.2dvh] overflow-hidden`
-								    band whose interior budget is already fully allocated. So the
+								    badge's fixed `h-5` (inside what was then a `basis-[24.2dvh]`
+								    band; the band is content-sized since the header-fit change,
+								    and the contract holds regardless — a 4px taller row is now
+								    4px taken from the arena below rather than from the resolution
+								    row). So the
 								    override is a height CONTRACT with the element beside it, not
 								    a nudge: `h-5 rounded-4xl` reproduces the badge's box exactly
 								    (h-5 · gap-1 · rounded-4xl · px-2 · text-xs · svg size-3) and
@@ -731,9 +734,9 @@ export function MarketHeader({
 						    middle one is what the surface now has.
 						    ⛔ DO NOT "restore" it HERE, and that half is UNCHANGED. The
 						    criterion's home is the disclosure below the band, not this
-						    header: the band is `shrink-0 basis-[24.2dvh]` and its interior
-						    budget is fully allocated, so anything re-added inside this stack
-						    comes straight back out of the four-block row. Re-adding it here
+						    header: the band is content-sized since the header-fit change (it
+						    was `shrink-0 basis-[24.2dvh]`), so anything re-added inside this
+						    stack is height taken straight from the arena. Re-adding it here
 						    would also give the surface TWO copies of the binding text.
 						    ⚠ What is discharged is the measure-and-report deferral, not the
 						    fence. See `docs/plans/CRIT-1.md`.

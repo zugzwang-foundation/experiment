@@ -3,9 +3,10 @@ import type { ReactNode } from "react";
 /**
  * ⚠⚠ UI-OVERNIGHT entry 3 — THE TWO BANDS, AND WHY THERE ARE TWO.
  *
- * `BAND_DECLARED` is the shipped market-arm band, byte-for-byte: a fraction of
- * the viewport that does not grow, does not shrink, and contains its own
- * content. Every word of the reasoning below it belongs to that string.
+ * `BAND_DECLARED` is the market-arm band. It WAS a fraction of the viewport
+ * that did not grow, did not shrink, and contained its own content; it is now
+ * content-sized like the post arm's, and the docblock directly above the
+ * constants says why. The name is kept because three guards read it by name.
  *
  * `BAND_CONTENT_SIZED` is the POST arm's, and it exists because the post arm
  * put something inside the band that a declared height cannot hold. The market
@@ -52,20 +53,37 @@ import type { ReactNode } from "react";
  * both are still absent, so the band is still sized by its content.
  */
 /**
- * MOBILE-1 Phase A — `max-mobile:basis-auto max-mobile:overflow-visible` is
- * appended here rather than at the call site, because the two overrides only
- * mean anything against THIS constant: `BAND_CONTENT_SIZED` declares neither
- * `basis-[24.2dvh]` nor `overflow-hidden`, so the same pair would be inert
- * noise on the post arm.
+ * THE MARKET ARM IS CONTENT-SIZED TOO, AND THE FRACTION IS GONE.
  *
- * Below 640px the arena stacks (`DebateView`'s two `arena` divs), so a band
- * pinned to a viewport FRACTION and clipping its own overflow no longer has
- * the two-column layout it was sized to protect — it just truncates a column
- * that is now full-width. Released to content height and ordinary flow.
- * >=640px both tokens are inert and the band is byte-unchanged.
+ * `basis-[24.2dvh]` was a bet that the market arm's stack fits inside 24.2% of
+ * any viewport. It lost the same way the post arm's did, and it lost PER
+ * MARKET: at a 700–780px window the fraction is ~170–190px while the stack
+ * (question + attrs row + price bar + four resolution blocks + three `gap-5`
+ * spacers) is ~180–200px BEFORE anything wraps. A market whose title and attrs
+ * line happened to be short fitted; one with a longer title or a wrapped attrs
+ * row pushed its badge row, price bar and resolution blocks past the band edge
+ * — first clipped (`overflow-hidden`), then behind a band-level scrollbar
+ * (`overflow-y-auto`, the interim fix this replaces). Either way two markets
+ * at the SAME viewport rendered two different headers, and on the longer one
+ * the badge, the AI-mode link and the Focus button looked cut.
+ *
+ * ⇒ The band is its content's height at every width. `shrink-0` and `min-h-0`
+ * stay — the one-screen chain's link: the band never grows INTO the arena, and
+ * the arena below is still `flex-1 min-h-0` and still the only scroller. What
+ * moves is a few pixels of arena height, on exactly the markets whose header
+ * used to be cut.
+ *
+ * ⚠ THE MOBILE-1 TOKENS LEFT WITH THE FRACTION. `max-mobile:basis-auto` and
+ * `max-mobile:overflow-visible` released a basis and a clip that no longer
+ * exist, so they would be inert; the phone-width outcome they bought (band =
+ * content height, nothing clipped) is now what every width gets.
+ *
+ * ⚠ `BAND_CONTENT_SIZED` still differs, by one token: `lg:items-start`, which
+ * the post arm needs for its reading column (measured above) and which the
+ * market arm has no reason to carry — its rail stretches by name either way.
+ * Two constants, one real difference.
  */
-const BAND_DECLARED =
-	"flex min-h-0 shrink-0 basis-[24.2dvh] flex-col gap-5 overflow-hidden lg:flex-row max-mobile:basis-auto max-mobile:overflow-visible";
+const BAND_DECLARED = "flex min-h-0 shrink-0 flex-col gap-5 lg:flex-row";
 const BAND_CONTENT_SIZED =
 	"flex min-h-0 shrink-0 flex-col gap-5 lg:flex-row lg:items-start";
 
@@ -108,8 +126,8 @@ const BAND_CONTENT_SIZED =
  *
  * ⚠ `min-h-0` IS A CHAIN LINK, and dropping it is invisible: a flex item's
  * automatic minimum size is its CONTENT, so without it a node refuses to shrink
- * below what it holds and the band silently reverts to content height. Pinned by
- * name in `tests/unit/design/debate-height-chain.test.ts`.
+ * below what it holds. Pinned by name in
+ * `tests/unit/design/debate-height-chain.test.ts`.
  *
  * ⚠ THE RIGHT RAIL IS NOT RENDERED WHEN IT HAS NOTHING TO HOLD. An empty 25%
  * column is visible empty chrome, which is `PD-3-09` / `OD-6` — the ruling that
@@ -126,103 +144,43 @@ export function HeadZone({
 	/** `null` ⇒ no rail is rendered at all (see the docblock's last paragraph). */
 	right: ReactNode | null;
 	/**
-	 * UI-OVERNIGHT entry 3 — size the band to its CONTENT instead of to a
-	 * fraction of the viewport, and stop stretching the rail. Opt-in, and the
-	 * post arm is the only caller: see `BAND_CONTENT_SIZED` for why the two arms
-	 * genuinely differ rather than one of them being behind.
+	 * UI-OVERNIGHT entry 3 — take the post arm's band, whose one remaining
+	 * difference from the market arm's is `lg:items-start` (both are
+	 * content-sized now). Opt-in, and the post arm is the only caller: see
+	 * `BAND_CONTENT_SIZED`'s docblock for the measurement behind that token.
 	 */
 	fit?: boolean;
 }) {
 	return (
 		<section
-			// ⚠ EVERYTHING IN THIS COMMENT DESCRIBES `BAND_DECLARED` — the market
-			// arm's band. The post arm takes `BAND_CONTENT_SIZED` instead, and that
-			// constant's own docblock says why the reasoning below does not reach it.
-			// ⚠⚠ THE BAND IS A FRACTION OF THE VIEWPORT — not d5's literal `188px`,
-			// and NOT a percentage of the container. `.headzone{flex:0 0 188px}`
-			// (`d5:447`) is 188/777 = **24.2%** of the viewport at the pinned
-			// 1440×777.
-			// ⛔ A CONTAINER PERCENTAGE WAS TRIED FIRST AND IS WRONG, MEASURED: at
-			// 1800×971 the container's content box is 877px, so d5's band is 21.4%
-			// of it; at 1440×777 that box is 683px and the SAME 188px band is 27.5%.
-			// One number cannot be both — a container percentage drifts with the
-			// container's own padding and chrome, while a viewport percentage is the
-			// ratio the mockup's fixed px actually encodes. Shipping 21.4% measured
-			// the band at 146px on staging: a −5.4pp miss that dragged the media
-			// panel (−5.2pp) and the arena (+5.1pp) with it.
-			// ⚠ `dvh`, not `vh` — same reason as the container's own band.
-			// `shrink-0` is the `0 0` half of `flex:0 0`.
+			// ⚠ THIS COMMENT DESCRIBES `BAND_DECLARED` — the market arm's band. The
+			// post arm takes `BAND_CONTENT_SIZED`; both constants' docblocks say why.
 			// ⚠ `gap-5` = 20px is d5's `.headzone{gap:20px}` (`:447`), the gap
-			// between the text column and the chart rail.
-			// ⚠⚠ `overflow-hidden` — UI-QUICK change set 4 §C. THE BAND NOW CONTAINS
-			// ITS OWN CONTENT, and without it the resolver cards painted over the top
-			// border of both debate columns.
-			// MEASURED on staging, and the cause is arithmetic rather than a stray
-			// margin: `basis-[24.2dvh]` is a VIEWPORT FRACTION while the stack's
-			// content has an INTRINSIC height (~185px from the band's top). Below a
-			// viewport height of ~715px the fraction is smaller than the content, and
-			// with nothing containing it the excess simply painted downward onto the
-			// arena — 3.64px at 1440×700, and 29.14px before §B removed the `Know
-			// more` trigger.
-			// ⛔ THE THREE ALTERNATIVES WERE EACH RULED OUT, not overlooked:
-			//   · restore `overflow-y-auto` on the stack — that is precisely what
-			//     change set 1 removed by ruling (its scrollbar collided with the
-			//     sticky header), so it cannot come back here.
-			//   · drop `min-h-0` / add a `min-h-[…]` floor — `min-h-0` is pinned BY
-			//     NAME by `debate-height-chain.test.ts` as the link that lets the band
-			//     shrink; a floor would contradict it and re-open the one-screen
-			//     ruling.
-			//   · leave it — the exit bar is zero overlap at every tested width.
-			// ⇒ Containment matches what the chain ALREADY does one level up:
-			// `PageContainer` declares one screen and hides its own overflow, on the
-			// stated ground that content spilling out of a declared box "is the same
-			// page scroll under a different name". The band is a declared box too.
-			// ⚠ THE COST, MEASURED AND REPORTED: below ~715px of viewport height the
-			// resolver-card row is now CLIPPED rather than overlapping. That is worse
-			// than fitting and better than painting over the arena, and those were the
-			// only two options left once the scroller was ruled out. Both cards are
-			// empty placeholder chrome docketed for removal before the DP.2 promote
-			// (`docs/parked.md` HTML-FINISH-MD-PLACEHOLDERS), so nothing a
-			// participant can read is being cut.
+			// between the text column and the chart rail. `shrink-0` is the `0 0`
+			// half of `flex:0 0`; `min-h-0` is the chain link pinned by name in
+			// `debate-height-chain.test.ts`.
 			//
-			// ⛔⛔ EVERYTHING ABOVE IS CONTESTED AT HEAD AND MUST NOT BE READ AS LIVE
-			// DOCTRINE — RECONCILE-1 OWED-4, awaiting a founder ruling. The
-			// main→staging merge took `main`'s components alongside this block, and
-			// they DO two of the three things it rules out:
-			//   · `MarketHeader.tsx` — the `headzone-stack` carries `overflow-y-auto`,
-			//     the exact class bullet 1 says "cannot come back here".
-			//   · `ResolverCards.tsx` — carries a `min-h-[78px]` floor (BLOCK-3 §2; was
-			//     `min-h-[84px]` — the exact number moved, the contradiction below did
-			//     not), which bullet 2 says would "contradict" the `min-h-0` pin; its
-			//     own comment calls the previous `min-h-0` a defect that silently
-			//     disabled the scroll backstop. The two rulings are in direct
-			//     opposition.
-			// Also stale by consequence: the row renders FOUR blocks, not "both
-			// cards", and per `ResolverCards.tsx` the stack SCROLLS rather than clips.
-			// ⚠ And the arithmetic above ("3.64px", "29.14px") was measured against a
-			// stack that still contained staging's `ResolutionCriterion` block, which
-			// this merge removed — the numbers no longer describe the tree they
-			// annotate.
-			// ⛔ NEITHER SUITE CAN SEE ANY OF THIS: jsdom performs no layout, and the
-			// height chain scans only `headzone`, `-left`, `-right`, `arena` and
-			// `column-scroll`. Green here proves nothing about the conflict.
-			// ⇒ The prose is marked rather than rewritten, because choosing which
-			// ruling governs is a founder call and a merge is not the place to make
-			// it. When it is ruled, correct THIS block in place (O-5).
-			// ═══ END OF THE CONTESTED BLOCK (RECONCILE-1 OWED-4) — everything
-			// below this line is MOBILE-1 Phase A, live doctrine, unrelated to
-			// the dispute above. ═══
-			// MOBILE-1 Phase A — the viewport-fraction band and its
-			// overflow-hidden exist to protect the one-screen /m/[slug]
-			// composition (PageContainer, DebateView.tsx), which is itself
-			// released below 640px. Below lg the rail already renders nothing
-			// (headzone-right is `hidden ... lg:flex`, BLOCK-3), so at phone
-			// width this band holds headzone-left ALONE — question, price bar,
-			// resolver row — and that content's own height at a typical phone
-			// viewport (e.g. ~812px tall) exceeds 24.2dvh (~197px) on its own,
-			// with no rail contributing to it. Releasing basis/overflow here
-			// is what stops that content being clipped, matching the page
-			// around it going to ordinary scroll instead of clipping.
+			// ⛔ THE VIEWPORT FRACTION IS GONE, AND SO IS EVERYTHING THAT EXISTED TO
+			// CONTAIN IT. The history is kept short, because each step is why the
+			// next one happened: d5's `.headzone{flex:0 0 188px}` became
+			// `basis-[24.2dvh]` (188/777 at the pinned 1440×777 — a viewport
+			// fraction, because a container percentage drifts with the container's
+			// own chrome and measured 146px on staging). Below ~715px of viewport
+			// height that fraction was smaller than the stack's own content and the
+			// excess painted over the arena (UI-QUICK change set 4 §C), so
+			// `overflow-hidden` was added and the resolution row was clipped
+			// instead. RECONCILE-1 OWED-4 recorded that clip as contested against
+			// `MarketHeader`'s `headzone-stack` scroll and `ResolverCards`' floor;
+			// the interim answer swapped the clip for `overflow-y-auto`, which put a
+			// scrollbar on the band and still cut the badge row on any market whose
+			// title or attrs line wrapped — so two markets at the same viewport
+			// rendered two different headers. Content-sizing retires all of it:
+			// nothing overflows a box sized to what it holds, so there is nothing
+			// to clip, scroll, or contest. `headzone-stack`'s own `overflow-y-auto`
+			// is left where it is and is now inert, since that box is never
+			// smaller than its content either.
+			// MOBILE-1 Phase A's phone-width release of the basis and the clip is
+			// subsumed for the same reason — see the constant's docblock.
 			data-testid="headzone"
 			className={fit ? BAND_CONTENT_SIZED : BAND_DECLARED}
 		>
@@ -280,7 +238,7 @@ export function HeadZone({
 					// ⛔⛔ BLOCK-3 — `hidden lg:flex` IS NEW, AND IT CLOSES A GAP THIS
 					// BRANCH NEVER HAD TO FACE UNTIL NOW. Below `lg`, `headzone` is
 					// `flex-col`: `headzone-left` and this rail stack VERTICALLY,
-					// sharing one `basis-[24.2dvh]` band instead of standing side by
+					// sharing one band (then a viewport fraction) instead of standing side by
 					// side. This rail is content-sized (no `flex-1`), so it simply
 					// takes whatever height its chart needs FIRST, and `headzone-left`
 					// — which holds the market question, the stats line, the price bar
