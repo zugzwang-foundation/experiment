@@ -43,7 +43,7 @@ sixteen rows below stale in five days**, and two of them were stale by a whole m
 |---|---|---|
 | Auth, identity, onboarding | [`records/AUTH-record.md`](records/AUTH-record.md) | **SHIPPED** |
 | Debate, moderation, ranking | [`records/DEBATE-record.md`](records/DEBATE-record.md) | **SHIPPED** |
-| Participant surfaces | [`records/SURFACES-record.md`](records/SURFACES-record.md) | **SHIPPED** — mobile NOT BUILT |
+| Participant surfaces | [`records/SURFACES-record.md`](records/SURFACES-record.md) | **SHIPPED** — mobile BUILT on every read surface; `/m/[slug]`'s phone tier is MOBILE-2, open as a draft PR |
 | Admin Control Centre | [`records/ADMIN-record.md`](records/ADMIN-record.md) | **SHIPPED** |
 | Platform, deploy, observability | [`records/PLATFORM-record.md`](records/PLATFORM-record.md) | **SHIPPED** — production not promoted |
 | Scale programme | [`records/SCALE-record.md`](records/SCALE-record.md) | **PARTIAL** — S-5 unmerged |

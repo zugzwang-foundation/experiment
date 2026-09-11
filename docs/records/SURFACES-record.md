@@ -40,7 +40,7 @@ learn that from a record rather than from a fruitless search for code that is go
 | Visitor counter POST | SHIPPED | `src/app/api/visits/route.ts`, `src/components/shell/VisitorCounter.tsx` | SPEC.1 §21.1 | — | route: `tests/server/visitors/{route,counter}.test.ts` · component: `tests/unit/shell/` | — |
 | ⛔ **Bookmarks** `/bookmarks` | **REMOVED** | — | — | **0040** | **none** — searched; no coverage exists under another name | table + migration retained |
 | ⛔ **Profile Dharma graph** | **REMOVED** | — | — | **0040** | **none** — searched; no coverage exists under another name | — |
-| Mobile-responsive read surfaces | **NOT BUILT** | — | — | **0045** (accepted 2026-09-01) | none | plan at `docs/plans/MOBILE-1.md`; no PR |
+| Mobile-responsive read surfaces | **BUILT** — Discovery #486 · profile #509 · auth #497/#510 · header #511 · `/m/[slug]` phone tier MOBILE-2 (draft PR, unmerged) | — | — | **0045** · **0048** · **0049** · **0050** | `tests/unit/design/{discovery,profile,phone}-*` · `tests/unit/shell/global-header-mobile-reflow` · `tests/unit/debate/phone/*` | ⚠ This row read **NOT BUILT** with "no PR" until 2026-09-12 while five PRs had merged. `/m/[slug]` is the last surface and is the only one still unmerged |
 
 ### 2.2 · Components, by directory
 
@@ -135,7 +135,9 @@ is not closed.
 | `cacheComponents` + reserves-keyed caching | ADR-0041 | PPR by default; a bet invalidates what it changed |
 | Presigned-URL hold budgeted against the downstream cache | ADR-0042 | image URL lifetimes are a cache decision, not a convenience one |
 | Market media, admin-set per market | ADR-0026 | the header's media panel and its empty state |
-| **Mobile-responsive read surfaces + hard auth gate on mobile** | **ADR-0045** | accepted 2026-09-01; **nothing built yet** |
+| **Mobile-responsive read surfaces + hard auth gate on mobile** | **ADR-0045** | accepted 2026-09-01; **built across #486 / #497 / #509 / #510 / #511** |
+| **Phone surfaces the header stands down for** | **ADR-0048**, **ADR-0049** | 0048 reverses 0045's auth carve-out (a phone participant is allowed to join); 0049 drops the Đ cluster and turns the chip into an avatar at phone width |
+| **The phone tier of market detail is a PRESENTATION, not a reflow** | **ADR-0050** | Proposed 2026-09-11 (MOBILE-2). Below 640px the desktop tree hides and `debate/phone/` renders over the same four props; writes go through the reused `BetComposer` / `AuthGateSlot` |
 
 ## 4 · Invariants and guards this lane carries
 
@@ -266,7 +268,11 @@ searching for the component will find the comments first.
 | BLOCK-3 / -4 / -5b | #452, #454, #461 | `7155cf1`, `47c3f86`, `340f31d` | 2026-09-01/02 | resolution block refinements, one-line blocks, the glyph |
 | CHART-NODE-REMOVE | #457 | `4c04163` | 2026-09-01 | the post nodes come off every surface |
 | **AIMODE-1** | **#466** | `e193cfb` | **2026-09-03** | the `.md` export becomes the AI-mode button |
-| **ADR-0045 + MOBILE-1 plan** | **#467** | `ead7415` | **2026-09-03** | the decision and the plan. **No implementation PR exists** |
+| **ADR-0045 + MOBILE-1 plan** | **#467** | `ead7415` | **2026-09-03** | the decision and the plan |
+| **MOBILE-1 Phase A** | **#486** | `4133338` | **2026-09-06** | the read surfaces reflow at phone width |
+| **MOBILE-1 Job A** | **#497**, **#510**, **#511** | `73593f5`, `b19bb43`, `080a798` | **2026-09-07/11** | auth surfaces (ADR-0048) and the signed-in header (ADR-0049) |
+| **MOBILE-1 Job B** | **#509** | `7ffc18c` | **2026-09-11** | the phone reads and sells its own positions |
+| **MOBILE-2** | *(draft, unmerged)* | — | **2026-09-12** | the phone tier of `/m/[slug]` (ADR-0050) |
 
 ⚠ **Four merged PRs in this lane carry the retired `⛔ LEAVE UNMERGED` / `DO NOT MERGE`
 marker** — #254, #336, #403, #448. CLAUDE.md §5.13.2 explains why a marker on `main` is not

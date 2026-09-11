@@ -202,6 +202,56 @@ from the plan (Job A self-critique #15):
 **fourth** file to hide behind. A token census gets less informative with each
 addition, not more.
 
+### MOBILE-2 (2026-09-12) — the trigger fires a third time, and the shape changes
+
+**Census re-run at commit time with this section's own command**, never copied
+from the plan (Job A self-critique #15):
+
+| Measured 2026-09-12 | Value |
+|---|---|
+| distinct `max-mobile:` tokens shipped in `src/` | **27**, up from 14 — MOBILE-2 mints **13** |
+| authoring sites in `src/` | **55**, up from 34 |
+| `max-mobile:hidden` sites | **11**, up from 9 |
+
+⚠ **THE ROW BEFORE THIS ONE SAID 15 AND `main` WAS AT 14.** PR #512
+(`Fix/headzone scrollbar padding`) deleted `max-mobile:basis-auto` from
+`HeadZone.tsx` and changed **no document at all** — its file list contains no
+`docs/` entry. Corrected here rather than carried: the figure a census row
+carries is the whole of its value.
+
+⛔⛔ **AND MOBILE-2 CHANGES WHAT THIS CENSUS MEANS, WHICH IS WORTH MORE THAN THE
+NUMBER.** Every token counted before tonight was an OVERRIDE on a desktop
+component — the census was a census of exceptions, and it got less informative
+with each one because the population it measured was "places the desktop rule
+did not hold". MOBILE-2's thirteen new tokens split into two populations that
+should never again be added together:
+
+- **Eleven are still overrides** on reused desktop components — nine on
+  `ArgProfile` (the two-line phone identity block and its 40px avatar step), one
+  on `BetComposer` (`grid-cols-1`) and one on `ImageAttach` (`min-h-24`). Those
+  are the ones this docket row was written about.
+- **Two are the TIER GATE itself** — `max-mobile:hidden` on `DebateView`'s root
+  and the phone root's display token. They are not exceptions to ADR-0045; they
+  are the boundary between two presentations, and counting them beside the others
+  makes the number say less than it did.
+
+⇒ **The seven unguarded tokens this row names are unchanged.** MOBILE-2 guards
+every token it mints (`phone-market-detail.test.ts` for the pair,
+`composer-fit.test.ts` for the image slot's two, `page-container.test.ts` for the
+root), and adds none to the unguarded set. `MarketHeader.tsx:290` now has a
+**fifth** file to hide behind.
+
+⚠ **PHASE A'S FOUR TOKENS ON `DebateView` ARE NOW REDUNDANT AND ARE KEPT
+DELIBERATELY.** `max-mobile:flex-col` ×2, `max-mobile:h-auto` and
+`max-mobile:overflow-visible` release the one-screen band and stack the arena
+below 640px — where that tree is now `display:none`, so none of them can affect
+a rendered pixel. They stay for two reasons, and neither is inertia: their guards
+(`debate-mobile-reflow.test.ts`, `page-container.test.ts`) are live and would red
+on removal, and removing a token from a desktop component is a desktop edit that
+MOBILE-2's wall forbids. **If the phone tier is ever reverted they are load-bearing
+again**, which is the honest argument for leaving them rather than the convenient
+one.
+
 ⛔ **AND JOB B FOUND THAT THIS ROW'S CENSUS METHOD IS UNSOUND — a new finding,
 not a deepening.** The command above counts tokens in `src/` and compares against
 coverage in `tests/`. **It never asks which tokens in the BUILT SHEET come from
