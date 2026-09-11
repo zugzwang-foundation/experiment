@@ -445,6 +445,8 @@ export function PhoneDebateView({
 					}
 					busy={composerBusy}
 					fullHeight={viewer !== null}
+					// Both branches below open with their own heading — see PhoneSheet.
+					titleHidden
 					onClose={closeSheet}
 				>
 					{/* ⛔⛔ THE SHEET'S ENTIRE CONTENT SET IS THESE TWO COMPONENTS, and

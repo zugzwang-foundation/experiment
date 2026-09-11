@@ -714,6 +714,18 @@ export function BetComposer(props: {
 					    own content height instead of forcing this whole column — and
 					    the grid row it sits in — to stay at full size regardless of the
 					    space actually available. */}
+					{/* ⚠⚠ MOBILE-2 — NO `order-*` TOKEN HERE, AND THE ABSENCE IS MEASURED
+					    RATHER THAN OVERLOOKED. Stacked below 640px the grid renders source
+					    order, so the image slot sits ABOVE the argument fields. `order-first`
+					    on this column was tried and REVERTED after looking at it: it moves
+					    the WHOLE column, and this column holds the money row and
+					    `PLACE Đ BET` as well as the fields — so the attachment landed AFTER
+					    the submit, which is worse than landing before the fields. The ruled
+					    composition (R2 · S4) puts the image BETWEEN body and money, and that
+					    is not expressible by reordering two grid children; it would need the
+					    footblock to leave this column, which is RPLY-3 · R1 in reverse and is
+					    not a token. ⇒ The image leads and the submit stays last. Flagged for
+					    the founder in the run report. */}
 					<div className="flex min-h-0 min-w-0 flex-col gap-2">
 						{/* `.fieldscroll` — RPLY-3 · R1. THE SCROLLER, AND THE REASON THE
 						    FOOTBLOCK CAN COME BACK INTO THIS COLUMN AT ALL.

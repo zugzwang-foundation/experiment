@@ -37,6 +37,7 @@ export function PhoneSheet({
 	title,
 	busy,
 	fullHeight,
+	titleHidden,
 	onClose,
 	children,
 }: {
@@ -46,6 +47,16 @@ export function PhoneSheet({
 	busy: boolean;
 	/** RF-6's composer sheet is full-height; RF-7's details sheet is ~96vh. */
 	fullHeight: boolean;
+	/**
+	 * ⚠ THE TITLE IS HIDDEN, NEVER DROPPED, when the content carries its own
+	 * heading. `BetComposer` and `AuthGateSlot` both open with their own — so the
+	 * sheet printed `Place your Đ BET` directly above `Place your Đ BET`, and
+	 * `Sign in to bet YES` above itself. Deleting the string instead would take
+	 * the dialog's ACCESSIBLE NAME with it, which is the one a screen reader
+	 * announces on open and the one thing here that is not decoration. `sr-only`
+	 * keeps the name and drops the duplicate words.
+	 */
+	titleHidden?: boolean;
 	onClose: () => void;
 	children: ReactNode;
 }) {
@@ -111,8 +122,25 @@ export function PhoneSheet({
 				<div className="flex shrink-0 justify-center pt-2" aria-hidden="true">
 					<span className="h-1 w-9 rounded-full bg-n3" />
 				</div>
-				<div className="flex shrink-0 items-center justify-between gap-2 px-3 py-2">
-					<h2 className="text-sm font-semibold text-ink">{title}</h2>
+				{/* ⚠ `justify-end` WHEN THE TITLE IS HIDDEN. `sr-only` is
+				    `position:absolute`, so a hidden `<h2>` leaves the flow entirely and
+				    `justify-between` then has ONE in-flow child — which it parks at the
+				    START, putting the close control on the wrong side of the sheet.
+				    Measured, not predicted. */}
+				<div
+					className={`flex shrink-0 items-center gap-2 px-3 py-2 ${
+						titleHidden === true ? "justify-end" : "justify-between"
+					}`}
+				>
+					<h2
+						className={
+							titleHidden === true
+								? "sr-only"
+								: "text-sm font-semibold text-ink"
+						}
+					>
+						{title}
+					</h2>
 					<button
 						type="button"
 						data-testid="phone-sheet-close"

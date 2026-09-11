@@ -186,14 +186,26 @@ describe("RPLY-3 · R1 — the argument fields give way; the money row never doe
 		return cls.split(/\s+/).filter(Boolean);
 	}
 
-	/** Byte offset of the `.compright` column's own declaration. */
+	/**
+	 * Byte offset of the `.compright` column's own declaration.
+	 *
+	 * ⚠ MOBILE-2 — the string is UNCHANGED (an `order-first` token was tried here
+	 * and reverted; see `BetComposer`'s own block for why), but the locator is
+	 * made STRICTER while it is open: a source locator that matches more than
+	 * once is silently ambiguous, and this one is the ordering anchor for three
+	 * other assertions in this file.
+	 */
 	function rightColumnAt(): number {
-		const at = source.indexOf(
-			'<div className="flex min-h-0 min-w-0 flex-col gap-2">',
-		);
+		const NEEDLE = '<div className="flex min-h-0 min-w-0 flex-col gap-2">';
+		const at = source.indexOf(NEEDLE);
 		expect(at, "expected the `.compright` column declaration").toBeGreaterThan(
 			-1,
 		);
+		expect(
+			source.indexOf(NEEDLE, at + 1),
+			"the `.compright` locator matches more than once — it is an ordering " +
+				"anchor and an ambiguous one anchors nothing",
+		).toBe(-1);
 		return at;
 	}
 
