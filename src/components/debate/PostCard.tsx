@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { AggregateFooter } from "./AggregateFooter";
 import { ArgProfile } from "./ArgProfile";
 import { SideBadge } from "./badges";
-import { CommentImage, PostImagePlaceholder } from "./CommentImage";
+import { CommentImage } from "./CommentImage";
 import { hasExtendedText } from "./composer/payload";
 import { KnowMore } from "./KnowMore";
 import { RemovedPlaceholder } from "./placeholders";
@@ -237,14 +237,20 @@ export function PostCard({
 					/>
 				) : null}{" "}
 			</div>
-			{/* HTML-FINISH · MARKET DETAIL round 2 · R2 — d5 substitutes its
-			    `POST IMAGE · 640:586` box into `.argimg` on every card with no real
-			    attachment (`d5:1682`), and the founder ruled that chrome IN. Where
-			    this branch used to render `null`, it now renders the placeholder.
-			    ⚠ THE REMOVED BRANCH ABOVE GETS NOTHING, and that is masking, not an
-			    oversight: a removed post's variant carries no `imageUrl` field at
-			    all, so drawing an image slot there would announce that a withheld
-			    argument HAD an attachment. */}
+			{/* ⛔ QUOTE-1 A — THE EMPTY ARM DRAWS NOTHING AGAIN (founder-ruled
+			    2026-09-11). R2 had substituted d5's `POST IMAGE` box into `.argimg`
+			    on every card with no real attachment (`d5:1682`); the same ruling
+			    docketed it for strip-or-gate before the DP.2 promote, and this is
+			    the STRIP. The branch is back to the `null` it rendered before R2.
+			    ⚠ THE CELL BELOW STAYS. It is not the placeholder's frame — it is the
+			    card's absorber, and `ReplyCard` copies it for exactly that reason.
+			    Deleting it on the empty path would unpin `AggregateFooter` from the
+			    card's foot, which is a layout change nobody asked for.
+			    ⚠ THE REMOVED BRANCH ABOVE STILL GETS NOTHING, and that was always
+			    masking rather than an oversight: a removed post's variant carries no
+			    `imageUrl` field at all, so drawing an image slot there would announce
+			    that a withheld argument HAD an attachment. Unchanged by the strip —
+			    it is now simply the same as every other imageless card. */}
 			{/* ⚠⚠ `.argimg` (`d5:648`) — THE CELL, and the founder's measured defect.
 			    `flex:1 1 auto;min-height:0;display:flex;align-items:center;
 			    justify-content:center`: the attachment takes the card's whole
@@ -261,9 +267,7 @@ export function PostCard({
 			<div className="flex min-h-0 flex-1 items-center justify-center">
 				{post.imageUrl ? (
 					<CommentImage url={post.imageUrl} onOpen={onOpenImage} fill />
-				) : (
-					<PostImagePlaceholder fill />
-				)}
+				) : null}
 			</div>
 
 			{/* Row 23 — `Open debate` is GONE from the present branch: the title

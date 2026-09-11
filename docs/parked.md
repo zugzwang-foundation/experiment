@@ -415,6 +415,35 @@ Corporation", "Monthly operational bulletins", "BMC", "@mybmc" — name a market
 this build does not have, and porting them would be inventing market content
 (CLAUDE.md §3). R2 reversed the CHROME, never that.
 
+**Status (2026-09-11 · QUOTE-1 A · PR #513).** Founder ruling: **STRIP**,
+kinds 1–2. `MarketMediaPanel`'s empty arm and `PostImagePlaceholder`
+(all four mounts) render `null`; both guards are inverted, not deleted,
+so a re-mount reddens. Kinds 3–4 took the third exit at BLOCK-1 (#447).
+Kind 2's null arm is **interim**: QUOTE-1 C replaces it with the
+title-as-quotation well, the kind's permanent exit, which closes this
+row for it. `ships-none-of-the-mockups-MARKET-CONTENT` untouched and
+green.
+
+⚠ **Two clarifications measured at QUOTE-1 A, appended rather than folded into
+the paragraph above, which is the founder's own text.**
+
+1. **"All four mounts" is the combined inventory of both kinds, and the split is
+   3 + 1.** `PostImagePlaceholder` had **THREE** direct mounts — `PostCard.tsx`,
+   `ReplyCard.tsx`, `PostFocusHeader.tsx` — and the fourth site is kind 1's
+   `MarketMediaPanel` empty arm. `docs/records/SURFACES-record.md` §4.1 reads the
+   same way ("TWO kinds, at FOUR mount sites"); its row 3's
+   `ReplyPreview.tsx:122,139,160` are where **`ReplyCard`** is rendered, not where
+   the placeholder is, so they are one mount reached three ways. All four sites
+   are stripped; the component is deleted.
+2. **`ships-none-of-the-mockups-MARKET-CONTENT` was RENAMED, not removed.** It is
+   `resolver-cards::ships-no-invented-content-and-no-market-fields-leak` since
+   `2a70915f` (BLOCK-1 S3) — same test, same claim, untouched by QUOTE-1 A and
+   green. The old name survives at the paragraph above and in this row's guard
+   list, which also still names `renders-BOTH-cards` and
+   `carries-the-byte-carried-chrome-labels`; **those two no longer exist under any
+   name.** Recorded rather than corrected — this row is append-only for QUOTE-1 A,
+   and rewriting a docket's history is the operator's call.
+
 
 ## SCAFFOLD.12 §10.b — Resend domain verification + `RESEND_FROM_EMAIL` flip
 

@@ -129,9 +129,12 @@ describe("R6 — the reply card can absorb its own leftover height", () => {
 
 		// The absorber is the IMAGE cell specifically, not merely some element that
 		// happens to carry `flex-1` — `found[0]` is DOM-order dependent on its own.
-		expect(
-			found[0]?.querySelector('[data-testid="post-image-placeholder"]'),
-		).not.toBeNull();
+		// ⚠ IDENTIFIED BY ITS OWN CLASS SET since QUOTE-1 A, which stripped the
+		// placeholder this used to look inside for. The cell did not move; only the
+		// thing it contained did, so the guard follows the cell.
+		const foundCls = found[0]?.getAttribute("class")?.split(/\s+/) ?? [];
+		expect(foundCls).toContain("items-center");
+		expect(foundCls).toContain("justify-center");
 	});
 
 	it("reply-card-absorber::WITH-an-image-a-descendant-absorbs-too", () => {
@@ -141,18 +144,28 @@ describe("R6 — the reply card can absorb its own leftover height", () => {
 		expect(found.length).toBeGreaterThan(0);
 	});
 
-	it("reply-card-absorber::the-empty-cell-holds-the-placeholder-and-the-full-one-holds-the-image", () => {
+	it("reply-card-absorber::the-empty-cell-holds-NOTHING-and-the-full-one-holds-the-image", () => {
+		// ⚠ THE FIRST HALF IS INVERTED BY QUOTE-1 A; THE SECOND IS UNTOUCHED. The
+		// empty cell used to hold the `POST IMAGE` box and now holds nothing, so
+		// what is asserted is the cell's EMPTINESS rather than its absence — the
+		// cell itself is R6's absorber and must survive.
 		const empty = card(presentReply(null)).container;
+		const emptyCell = empty.querySelector(
+			".flex-1.items-center.justify-center",
+		);
+		expect(emptyCell).not.toBeNull();
+		expect(emptyCell?.innerHTML).toBe("");
 		expect(
 			empty.querySelector('[data-testid="post-image-placeholder"]'),
-		).not.toBeNull();
+		).toBeNull();
 		expect(empty.querySelector("img")).toBeNull();
 		cleanup();
 
 		const full = card(presentReply("https://example.invalid/r.png")).container;
 		expect(full.querySelector("img")).not.toBeNull();
 		// ⛔ Not BOTH — a card drawing a placeholder behind a real attachment would
-		// be two slots where the layout expects one.
+		// be two slots where the layout expects one. Trivially true since the strip;
+		// kept because QUOTE-1 C puts a node back into this arm.
 		expect(
 			full.querySelector('[data-testid="post-image-placeholder"]'),
 		).toBeNull();
@@ -245,13 +258,22 @@ describe("RPLY-3 · R2 — the reply card is a post card minus the split bar", (
 		// middle.
 		// ⇒ So the assertion is placement, not size, because size is what was
 		// already true and placement is what moved.
+		// ⚠ THE CELL IS IDENTIFIED BY WHAT IT IS, NOT BY WHAT IT HELD. This read
+		// `last.querySelector('[data-testid="post-image-placeholder"]')` until
+		// QUOTE-1 A stripped that box — which would have made a PLACEMENT guard
+		// fail for a reason that has nothing to do with placement. The cell is the
+		// thing under test and it is still here; the identification moves onto the
+		// class set this file already uses for it in `absorbers` above.
 		const { container } = card(presentReply(null));
 		const kids = Array.from(root(container).children);
 		const last = kids[kids.length - 1];
-		expect(
-			last?.querySelector('[data-testid="post-image-placeholder"]'),
-		).not.toBeNull();
-		expect(last?.getAttribute("class")?.split(/\s+/)).toContain("flex-1");
+		const cls = last?.getAttribute("class")?.split(/\s+/) ?? [];
+		expect(cls).toContain("flex-1");
+		expect(cls).toContain("items-center");
+		expect(cls).toContain("justify-center");
+		// …and it is EMPTY on this path, which is the QUOTE-1 A half: the cell
+		// absorbs, and it absorbs nothing.
+		expect(last?.innerHTML).toBe("");
 	});
 
 	it("reply-card-absorber::G5-the-image-cell-and-its-contents-are-PostCard-s-chrome-verbatim", () => {
@@ -277,8 +299,16 @@ describe("RPLY-3 · R2 — the reply card is a post card minus the split bar", (
 		).toContain(CELL);
 		// ⚠ MATCHED AS PROP SYNTAX, never the bare word `fill` — which appears in
 		// prose all over both files.
-		expect(post).toContain("<PostImagePlaceholder fill />");
 		expect(post).toMatch(/<CommentImage[^>]*\sfill\s*\/>/);
+		// ⛔ AND THE PLACEHOLDER MOUNT IS PINNED ABSENT, WHICH IS THE INVERSION OF
+		// WHAT THIS LINE USED TO ASSERT. It read `toContain("<PostImagePlaceholder
+		// fill />")`; QUOTE-1 A removed that mount, so the assertion flips rather
+		// than disappearing — a re-mount still reddens here.
+		// ⚠ MATCHED AS JSX-OPEN SYNTAX, never the bare identifier: `PostCard.tsx`
+		// names the component in a comment explaining the strip, and a bare-word
+		// negative would catch the explanation of the absence rather than the
+		// absence. That failure mode has cost this repo six guards.
+		expect(post).not.toContain("<PostImagePlaceholder");
 	});
 });
 

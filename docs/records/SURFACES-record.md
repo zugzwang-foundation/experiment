@@ -205,6 +205,17 @@ exist: `tests/unit/debate/render/{market-media-panel,comment-image,resolver-card
 ⛔ **`docs/parked.md` SEQUENCE row 5 remains open and its trigger is the production promote**,
 not a date: *strip or gate before DP.2*.
 
+✅ **DISCHARGED for both kinds, 2026-09-11 — QUOTE-1 A (PR #513) took the STRIP exit.** The
+table above is now history: `MarketMediaPanel`'s empty arm returns `null`, `PostImagePlaceholder`
+is deleted and all three of its mounts render nothing, so **the inventory this section counts is
+ZERO**. Every guard was INVERTED rather than removed — a re-mount reds six named tests, verified
+by mutation — and the two design-ratified null states listed apart are untouched, which is why
+they were listed apart. ⚠ Kind 2's null arm is **interim**: QUOTE-1 C replaces it with the
+argument title rendered as a quotation well. ⚠ The docket's guard names are stale and were left
+so: `ships-none-of-the-mockups-MARKET-CONTENT` is
+`ships-no-invented-content-and-no-market-fields-leak` since `2a70915f`, and `renders-BOTH-cards`
+/ `carries-the-byte-carried-chrome-labels` no longer exist under any name.
+
 ### 4.2 · Removed surfaces, and what survives them
 
 | Surface | Removed by | What is gone | What survives |
