@@ -216,6 +216,20 @@ so: `ships-none-of-the-mockups-MARKET-CONTENT` is
 `ships-no-invented-content-and-no-market-fields-leak` since `2a70915f`, and `renders-BOTH-cards`
 / `carries-the-byte-carried-chrome-labels` no longer exist under any name.
 
+✅ **Kind 2's interim `null` is DISCHARGED ON THE CARD, 2026-09-11 — QUOTE-1 C (PR #PRNUM).**
+`PostCard`'s imageless arm draws the **title-as-quotation well** (design-canon `C-QUOTE-1`,
+SPEC.1 2.0.2) in its `.argimg` cell, and the plain title row does not render on that arm.
+⛔ **The inventory stays ZERO** — a well is not a placeholder: it renders the post's own derived
+title, not byte-carried chrome describing content that does not exist, which is this section's
+own definition. ⚠ **The hero is still pending**: `PostFocusHeader` and `ReplyCard` keep the
+interim `null` by ruling, owed at **QUOTE-1 C2**. ⚠ The well is wrapped in the title row's own
+`onEnter` button — deleting that row removes an imageless card's only path into post-focus, since
+row 23 had already deleted `Open debate →` from the present branch *because* the title carried it.
+Every test in `post-arm-headers` / `history-ladder` / `posted-jump` that enters a post by clicking
+the title heading's enclosing button reds without the wrap and greens with it — **22 failing tests,
+15 / 6 / 1 by file**, counted as failing TESTS rather than as call sites and reproducible by
+reverting the button. Pending founder ratification (`docs/plans/QUOTE-1.md` §8 D).
+
 ### 4.2 · Removed surfaces, and what survives them
 
 | Surface | Removed by | What is gone | What survives |

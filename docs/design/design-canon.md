@@ -424,6 +424,30 @@ Three tiers say *reuse the profile surface in forced-visitor mode*, and `design-
 
 ---
 
+### C-QUOTE-1 · The title-as-quotation well (founder-ruled 2026-09-11 · QUOTE-1)
+
+1. **Trigger.** A top-level post with no image attachment, on the market-view post card (`PostCard`). Reply cards render nothing in the slot. The post-focus hero is not in this clause (owed at QUOTE-1 C2). A removed comment renders its `removed by moderator` placeholder and no well. A pending image is not "no image".
+2. **Composition.** The well **is** the title: it renders the derived title (`deriveTitleTeaser`) once, in the heading element the title row used, and the plain title row does not render on such posts. It mounts in the `.argimg` cell, centred as an attachment would be. `Know more` (when an extended body exists) renders on its own line directly under the well, right-aligned to the well's edge, margin-top 8px. Header row, any teaser, and footer are untouched.
+3. **Geometry — the well is a picture.** A fixed 545 × 272 canvas (2:1), an inline SVG whose `foreignObject` carries the HTML, so it scales like an attachment: `max-width: 100%; max-height: 100%` of the cell, ratio preserved, never clipped by a short viewport. Inside: padding 24px (content 497 × 224), ground `--color-n1`, border 1px `--color-n2`, radius `--imgr`.
+4. **Title type.** `--font-sans`, weight 700, uppercase (a display transform; the DOM keeps the stored case), letter-spacing 0.02em, centred, `--color-ink`, line-height 1.15, `overflow-wrap: anywhere`, `text-wrap: balance`. **Size is a pure function of the title's length** (UTF-16 units — what the composer counts): the largest integer size in [24, 56] px at which the estimated wrapped height plus the marks fits the 224px content height, the estimate using the measured average uppercase advance of the shipped face, 15% wrap slack, and the marks' measured ink height. The function is `quoteTitleSize` in `src/components/debate/quote-well/size.ts`; its named points are pinned by test.
+5. **Marks.** `“` above and `”` below, centred, `aria-hidden`, same family, weight 700, `--color-n4`, size `clamp(60px, 2.5 × title size, 140px)`, ink fully inside the canvas, ≥ 8px clear of the title.
+6. **Degradation.** Titles the estimate cannot fit (pathological glyph runs, non-Latin fallback faces) clip inside the canvas at the last full line; nothing escapes the well and no layout moves. Recorded, not solved.
+7. **Untouched.** `comments.body`, `deriveTitleTeaser`, the removal masking (SC-1), the export, the composer, the real-image arm, the pop-up, `ReplyCard`.
+
+⚠ **Clause 2 carries a consequence it does not state, recorded at execution rather than discovered later: deleting the plain title row removes the card's only `onEnter` control from an imageless post.** Row 23 had already deleted `Open debate →` from the present branch *because* the title carried that destination, so the survivors are the footer's Support/Counter pills, themselves gated on `marketOpen`/`suspended`. The build therefore wraps the well in the same `onEnter` button the row used — the well **is** the title, so it carries the title's destination — with no hover treatment, because a hover state for a picture is a design decision this clause does not make. **The evidence is the pre-existing suite**: every test in `post-arm-headers`, `history-ladder` and `posted-jump` that enters a post by clicking the title heading's enclosing button reds without the wrap and greens with it — 22 failing tests, 15 / 6 / 1 by file. **Pending founder ratification (QUOTE-1 C report §7 OD-1).**
+
+⚠ **And the well's button needs an explicit `aria-label`, which the plain title row does not.** Chrome's name-from-contents does **not** traverse `foreignObject`, so `button > svg > foreignObject > h3` computes an accessible name of `""` while `button > h3` computes the title — measured against the accessibility tree, with controls isolating the SVG boundary as the cause rather than the presentational role or the heading. The build therefore carries `aria-label={post.title}`, which satisfies WCAG 2.5.3 *because* it is the visible text verbatim. Anything else that puts a control's label inside an SVG on this surface inherits the same problem.
+
+⚠ **`pad` in clause 3 is the TOTAL INSET, border included** — the build ships `border: 1px` + `padding: 23px`. Read as 24px of padding *inside* the border, the content box is 495 × 222 and clause 4's budget is optimistic by 2px on a box that clips; the 497 × 224 figures are the ones the sizing function and its tests depend on.
+
+⚠ **Clause 4's `[24, 56] px` are CANVAS units, not CSS px.** The well is an SVG with a `viewBox`, so everything inside is stated in the 545 × 272 coordinate system and then scaled by whatever room the cell has. Measured at a 320px column: the canvas renders at 0.515, so a size-53 title paints at ~27 CSS px. The scaling is the ratified behaviour (clause 3); naming the unit is what stops a reader checking "is the type within [24, 56]" against a screenshot and getting the wrong answer.
+
+⚠ **Clause 6's degradation now has a number.** The estimate holds for any title whose mean uppercase advance is ≤ **0.7076 em** (= the measured 0.6015 ÷ the 0.85 wrap slack). Letters-only prose measures 0.6711, so even a title with no spaces at all still fits; a run of wide capitals (25 × `M` measures 0.9212) does not, and clips. Measured on the shipped face, 2026-09-11.
+
+⚠ **Clause 4's `text-wrap: balance` and a `-webkit-line-clamp` belt are mutually exclusive**, measured in Chrome 152: balance silently stops applying once the clamp bites, while `getComputedStyle` keeps reporting `balance`. The well's `overflow: hidden` is clause 6's mechanism; there is no clamp.
+
+---
+
 ## §11 — Residual open items (properly homed — nothing floating)
 
 | Item | Home | Note |

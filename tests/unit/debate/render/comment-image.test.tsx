@@ -424,11 +424,30 @@ describe("HTML-FINISH · MARKET DETAIL — row 26, the reply's own image", () =>
  * announces that the withheld argument HAD an attachment, which is an inference
  * about removed content leaking off the masked payload. `SC-1`'s framing is what
  * caught it: assert that the removed branch draws nothing, never merely that the
- * present branch draws something. ⚠ That assertion is now trivially true — every
- * imageless card draws nothing — and it is KEPT anyway, because "trivially true
- * today" is a property of the current render and not of the surface. QUOTE-1 C
- * puts content back into this slot, and when it does, this is the test that says
- * the removed branch must not receive it.
+ * present branch draws something.
+ *
+ * ⚠⚠ AND QUOTE-1 C HAS NOW ARRIVED, WHICH IS WHY THE KEEPING MATTERED. This block
+ * said: "That assertion is now trivially true — every imageless card draws
+ * nothing — and it is KEPT anyway, because 'trivially true today' is a property
+ * of the current render and not of the surface. QUOTE-1 C puts content back into
+ * this slot, and when it does, this is the test that says the removed branch must
+ * not receive it." It did, one phase later: the imageless arm now draws the
+ * title-as-quotation well, the removed assertion has stopped being trivial, and
+ * it went on guarding a leak that is now WORSE than an empty box — the well
+ * renders the TITLE, so a well on a removed post would publish the withheld
+ * argument rather than merely imply it had an attachment. The present-branch test
+ * below is inverted to match (it asserts the well); this one is untouched.
+ *
+ * ⛔⛔ AND IT IS BLIND TO THE WELL, WHICH IS MEASURED RATHER THAN SUSPECTED — so
+ * do not read the sentence above as meaning THIS test now guards the new
+ * content. It names two things: the placeholder's `data-testid` and the string
+ * `POST IMAGE`. The well carries neither. Mounting a well on the removed branch
+ * was tried: `quote-well::a-REMOVED-post-gets-NO-well-SC-1` reds and every test
+ * in THIS file stays green. ⇒ `quote-well.test.tsx` is where the well's `SC-1`
+ * lives, and it asserts the absence of the TITLE STRING, not of a testid — which
+ * is the SC-1 rule itself (assert the BODY's absence, never the row's). This
+ * block's value is unchanged and is the placeholder's: it stops d5's mockup box
+ * coming back. It was never going to stretch to content it cannot name.
  *
  * ⚠ It was structurally impossible on the POST path — the removed union variant
  * carries no `imageUrl` field, so `post.imageUrl` does not typecheck in that
@@ -459,7 +478,7 @@ function removedPost(): DebatePost {
 const PH_URL = "https://example.invalid/post-attachment.png";
 
 describe("QUOTE-1 A — no image renders nothing, on every arm", () => {
-	it("no-image-renders-NOTHING::a-present-post-with-no-image-draws-NO-box", () => {
+	it("no-image-renders-NOTHING::a-present-post-with-no-image-draws-THE-WELL", () => {
 		const { container } = render(
 			<PostCard
 				post={focusedPost(null)}
@@ -486,11 +505,24 @@ describe("QUOTE-1 A — no image renders nothing, on every arm", () => {
 		// assertions above pass against a component that rendered nothing at all,
 		// so without this the test certifies a blank card.
 		expect(container.innerHTML).toContain("Fixture argument title.");
-		// …and the absorber cell survives the strip — see the reply test above for
-		// why this is a property and not a leftover.
+		// …and the absorber cell survives — see the reply test above for why this is
+		// a property and not a leftover.
 		const cell = container.querySelector(".flex-1.items-center.justify-center");
 		expect(cell).not.toBeNull();
-		expect(cell?.innerHTML).toBe("");
+		// ⚠⚠ QUOTE-1 C — THE CELL IS NO LONGER EMPTY, AND THE ASSERTION IS INVERTED
+		// RATHER THAN DELETED. It read `toBe("")`, which was the whole point of
+		// Phase A: the placeholder was gone and nothing stood in its place. What
+		// stands there now is the title-as-quotation well, so the claim becomes
+		// EXACTLY the well's stack and nothing else — a mockup box re-mounted
+		// BESIDE the well would defeat a mere non-emptiness check while putting the
+		// identical defect back on the page.
+		expect(cell?.querySelectorAll('[data-testid="quote-well"]').length).toBe(1);
+		expect(cell?.firstElementChild?.getAttribute("class")).toContain("qstack");
+		expect(cell?.querySelector("img")).toBeNull();
+		expect(cell?.innerHTML).not.toContain("POST IMAGE");
+		expect(
+			cell?.querySelector('[data-testid="post-image-placeholder"]'),
+		).toBeNull();
 	});
 
 	it("no-image-renders-NOTHING::a-post-WITH-an-image-still-mounts-it", () => {

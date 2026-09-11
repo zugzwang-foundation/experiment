@@ -128,7 +128,23 @@ experiment/
 │   │                               #   title-as-quotation well), ScrollRail (the rail — and, since R3,
 │   │                               #   the auto-advance countdown). Since HTML-FINISH the
 │   │                               #   directory has ALSO gained CriterionDisclosure (CRIT-1),
-│   │                               #   DebatePoll, and chart/ (CHART-1, the price chart).
+│   │                               #   DebatePoll, chart/ (CHART-1, the price chart), and
+│   │                               #   quote-well/ (QUOTE-1 C — QuoteWell.tsx + size.ts, the
+│   │                               #   title-as-quotation well the line above forecasts. ⚠ THAT
+│   │                               #   FORECAST IS NOW DISCHARGED FOR THE CARD AND ONLY THE
+│   │                               #   CARD: `PostCard`'s imageless arm draws the well in its
+│   │                               #   `.argimg` cell (design-canon C-QUOTE-1, SPEC.1 2.0.2),
+│   │                               #   while `PostFocusHeader` and `ReplyCard` keep the interim
+│   │                               #   `null` by ruling — the hero is owed at QUOTE-1 C2. ⛔ IT
+│   │                               #   MOVES NO PLACEHOLDER COUNT: the count has been ZERO
+│   │                               #   since QUOTE-1 A deleted the component, and a well is not
+│   │                               #   a placeholder — it renders the post's own title, not the
+│   │                               #   words "POST IMAGE". The FIVE/"four" arithmetic above is
+│   │                               #   about a state that no longer exists on this route.
+│   │                               #   ⚠ The well is wrapped in the title row's `onEnter`
+│   │                               #   button, because deleting that row removes an imageless
+│   │                               #   card's only way into post-focus; pending founder
+│   │                               #   ratification, see docs/plans/QUOTE-1.md §8 D).
 │   │   ├── art/warli/              #   WARLI-1/2 — a decorative SVG art layer, MOUNTED
 │   │                               #   AT ONE SITE: `src/app/(auth)/layout.tsx`, as a
 │   │                               #   `pointer-events-none fixed inset-0 -z-10` underlay
