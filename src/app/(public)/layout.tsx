@@ -214,17 +214,30 @@ export default async function PublicLayout({
 				// band and says why; this is the same ruling reaching the element
 				// that actually sets the phone tier's height.
 				//
-				// And `min-h` → `h` below 640 is what makes the market page's two
-				// feed panes into real scrollers. With a minimum, the panes stretch
-				// to their content and the DOCUMENT scrolls — so the two sides share
-				// one scroll position (scroll deep into YES, switch to NO, and you
-				// are the same distance down a shorter column), and the shorter side
-				// is padded out to the taller one's height: measured 2386px of YES
-				// against 1658px of NO, i.e. 728px of blank ground under the short
-				// side. A definite height gives each pane its own `overflow-y-auto`,
-				// which is what `overscroll-contain` on them was written for and
-				// could never do.
-				className="flex min-h-[calc(100vh-60px-2px)] flex-1 flex-col max-mobile:h-[calc(100dvh-60px-2px)] max-mobile:min-h-0 max-mobile:overflow-hidden"
+				// ⛔ WHAT IS DELIBERATELY *NOT* HERE, because it was tried tonight and
+				// measured: turning `min-h` into a definite `h` below 640px, to make
+				// the market page's two feed panes into real scrollers. The symptom
+				// it targets is real — with a minimum the panes stretch to their
+				// content, the DOCUMENT scrolls, and so the two sides of a debate
+				// share one scroll position and the shorter side is padded out to the
+				// taller one's (measured: 2386px of YES against 1658px of NO, i.e.
+				// 728px of blank ground under the short side).
+				//
+				// But `<main>` is `flex-1` inside a column whose own height is not
+				// definite, so `flex-basis: 0%` wins over a `height` and the element
+				// is under-constrained either way. The two engines then disagree about
+				// what to do with that, and they disagree CATASTROPHICALLY: Chromium
+				// kept growing to content (the change was simply inert), and **WebKit
+				// resolved the whole of `<main>` to ZERO HEIGHT** — an entirely blank
+				// market page on the one engine this tier exists for. Reverted here;
+				// carried as OWED, because the fix is a height chain from the layout
+				// root down and not a token on this element.
+				//
+				// ⚠ It passed the sweep. Overflow was 0, the tier gate was correct and
+				// the phone root still had a non-zero WIDTH — a page of nothing scores
+				// perfectly on every check that is not looking for it. The harness now
+				// asserts a non-zero HEIGHT on the tier root for exactly this reason.
+				className="flex min-h-[calc(100vh-60px-2px)] flex-1 flex-col max-mobile:min-h-[calc(100dvh-60px-2px)]"
 			>
 				{children}
 			</main>
