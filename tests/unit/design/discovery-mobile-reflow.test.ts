@@ -248,9 +248,7 @@ describe("discovery mobile reflow — the grid already stacks, and must keep doi
 		// The two responsive steps that DO exist, pinned by name — the grid is two
 		// columns from `sm` and four from `lg`.
 		expect(classes).toContain("sm:grid-cols-2");
-		// DISC-FIT: four columns start at `md` (768px), not `lg`, so tablets
-		// keep two rows and every card stays on the one screen.
-		expect(classes).toContain("md:grid-cols-4");
+		expect(classes).toContain("lg:grid-cols-4");
 
 		// ⛔ AND NOTHING UNPREFIXED. `sm:grid-cols-2` only wins below 640px if
 		// nothing beneath it sets a column count; a base `grid-cols-*` would apply

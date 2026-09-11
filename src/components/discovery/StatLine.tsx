@@ -37,16 +37,7 @@ import { GLOSSARY } from "@/lib/copy/glossary";
  */
 const SIZE = {
 	hero: { text: "text-[11.5px]", sep: "mx-1.5" },
-	// `overflow-hidden whitespace-nowrap` — the card is fixed-height by
-	// design: the grid must fit ≤8 cards in two rows without page scroll.
-	// A wrapped StatLine inflates the card's height and pushes the grid
-	// past the viewport. Single-line is the only safe option; the hero
-	// size is NOT constrained this way because the hero panel's height
-	// is layout-driven (flex-1), not content-driven.
-	card: {
-		text: "text-[11px] overflow-hidden whitespace-nowrap",
-		sep: "mx-[5px]",
-	},
+	card: { text: "text-[11px]", sep: "mx-[5px]" },
 } as const;
 
 /** V48 — the count and its noun agree. `1 post`, not `1 posts`. Returns the

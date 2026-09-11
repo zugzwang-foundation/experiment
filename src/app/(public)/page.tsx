@@ -58,20 +58,7 @@ export default function DiscoveryPage() {
 		// what would let the column shrink below its content and clip. Without
 		// it flex items keep `min-height:auto`, so they grow into slack and the
 		// PAGE scrolls when there is none (RULED A1).
-		// DISC-FIT (founder-ruled 2026-09-11): "all 8 markets, every device, any
-		// size, no page scroll." The A1 floor above is REVERSED for `/`, the same
-		// way it was for `/m/[slug]` — a FIXED `h-[calc(100dvh-60px-2px)]` band
-		// (the header's row + border-y, the exact subtrahends the layout uses)
-		// with `min-h-0` + `overflow-hidden`, so the column can never grow past
-		// the viewport. Nothing is meant to be clipped: when height is short the
-		// hero and the grid SHRINK TOGETHER (both `min-h-0` with an `auto` flex
-		// basis, so the deficit is shared in proportion — see HeroPanels and
-		// DiscoveryGrid), and the hero is only ever hidden below phone width or
-		// on a landscape phone (`short:`). `100dvh`, not
-		// `100vh`, so a collapsing mobile URL bar re-fits instead of clipping.
-		// The inset is narrowed on phones (`max-mobile:px-3`) so two columns of
-		// cards get the width; >=640px keeps the mockup's 28px.
-		<div className="flex h-[calc(100dvh-60px-2px)] min-h-0 flex-col overflow-hidden px-7 pt-4 pb-3 max-mobile:px-3">
+		<div className="flex flex-1 flex-col px-7 pt-4 pb-3">
 			<Suspense fallback={<LoadingSkeleton />}>
 				<DiscoveryContent />
 			</Suspense>

@@ -65,7 +65,7 @@ function fieldClasses(label: string): string[] {
 	const after = source.slice(at, nextLabel === -1 ? undefined : nextLabel);
 	const match = /className=(?:"([^"]*)"|{[\s\S]*?}\n|\n)/.exec(after);
 	const rawCls = match?.[1] || match?.[2] || match?.[0] || "";
-	const cls = rawCls.replace(/[\{\}\`\'\"\?\:\n\r\t]/g, " ");
+	const cls = rawCls.replace(/[{}`'"?:\n\r\t]/g, " ");
 	if (cls.trim() === "") {
 		throw new Error(
 			`${COMPOSER}: the "${label}" field declares no className before the next ` +
@@ -117,8 +117,12 @@ describe("the composer fits without scrolling", () => {
 		// Tailwind's bare `h-N` is the spacing SCALE (N × 4px); the bracket form
 		// `h-[Npx]` is a literal — the two ceilings below use one of each, so
 		// both conversions are exercised rather than assumed to agree.
-		expect(titleFieldClasses().some((c) => c === "h-[72px]" || c === "h-[48px]")).toBe(true);
-		expect(bodyFieldClasses().some((c) => c === "h-32" || c === "h-[80px]")).toBe(true);
+		expect(
+			titleFieldClasses().some((c) => c === "h-[72px]" || c === "h-[48px]"),
+		).toBe(true);
+		expect(
+			bodyFieldClasses().some((c) => c === "h-32" || c === "h-[80px]"),
+		).toBe(true);
 
 		const floorOf = (classes: string[]) => {
 			const floorClass = classes.find((c) => /^min-h-\d+$/.test(c));

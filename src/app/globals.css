@@ -3,18 +3,6 @@
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
-/* DISC-FIT — `short:*` is the LANDSCAPE-PHONE variant: at most 480px tall
- * AND at least 560px wide. Discovery (`/`) is ruled one-screen at every
- * size — all eight market cards on screen with no page scroll — and a
- * 740x360 phone has ~270px of column: the hero cannot be shown legibly
- * alongside eight cards there, so it and its rail step aside and the grid
- * takes the column four across. Width variants (`max-mobile:`, `md:`)
- * cannot express this: that phone is over 640px wide. ⚠ 480px, not 600:
- * a short DESKTOP window (1366x600) keeps its hero — the hero and the grid
- * shrink together instead (HeroPanels / DiscoveryGrid). The `min-width`
- * half keeps a short PORTRAIT phone (320x568) on the `max-mobile:`
- * two-column path — four columns cannot fit in 320px. */
-@custom-variant short (@media (max-height: 480px) and (min-width: 560px));
 
 @theme inline {
 	--font-heading: var(--font-sans);
@@ -276,12 +264,33 @@
 @layer base {
 	* {
 		@apply border-border outline-ring/50;
+		scrollbar-width: thin;
+		scrollbar-color: var(--color-n3) transparent;
+	}
+	::-webkit-scrollbar {
+		width: 6px;
+		height: 6px;
+	}
+	::-webkit-scrollbar-track {
+		background: transparent;
+	}
+	::-webkit-scrollbar-thumb {
+		background: var(--color-n3);
+		border-radius: 9999px;
+	}
+	::-webkit-scrollbar-thumb:hover {
+		background: var(--color-n4);
+	}
+	::-webkit-scrollbar-corner {
+		background: transparent;
 	}
 	body {
 		@apply bg-background text-foreground;
+		color-scheme: dark;
 	}
 	html {
 		@apply font-sans;
+		color-scheme: dark;
 	}
 }
 
@@ -340,35 +349,5 @@
 @media (prefers-reduced-motion: reduce) {
 	.chart-terminal-pulse {
 		animation: none;
-	}
-}
-
-/* DISC-FIT — the Discovery hero chart THINS ITS Y-AXIS MARKS AS IT SHRINKS.
- * The page is one screen at every size, so on a short window the hero (and
- * its chart) gives height up. The chart's eleven ten-step marks are 10px
- * HTML spans; below ~190px of plot they start to overprint and below ~110px
- * they are one smear. A height container query on the chart's own box
- * (`[data-hero-chart]`, HeroPanels.tsx — the absolute box that already has a
- * definite size, so `container-type: size` costs nothing) keeps every other
- * mark first, then only 0 / 50 / 100. The SVG gridlines are untouched — they
- * are dotted hairlines and read fine dense. The chart component is not
- * changed: it still renders all eleven, and only the hero surface hides. */
-[data-hero-chart] {
-	container-type: size;
-}
-@container (max-height: 190px) {
-	[data-hero-chart] [data-pct="10"],
-	[data-hero-chart] [data-pct="30"],
-	[data-hero-chart] [data-pct="70"],
-	[data-hero-chart] [data-pct="90"] {
-		display: none;
-	}
-}
-@container (max-height: 110px) {
-	[data-hero-chart] [data-pct="20"],
-	[data-hero-chart] [data-pct="40"],
-	[data-hero-chart] [data-pct="60"],
-	[data-hero-chart] [data-pct="80"] {
-		display: none;
 	}
 }

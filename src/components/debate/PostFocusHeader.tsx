@@ -70,6 +70,7 @@ export function PostFocusHeader({
 	onOpenPopup: (post: PresentPost) => void;
 }) {
 	const replyCount = post.aggregate.supportCount + post.aggregate.counterCount;
+	const isReplying = activeRelation !== null;
 	return (
 		<HeadZone
 			// ⚠⚠ UI-OVERNIGHT entry 3 — THIS ARM IS CONTENT-SIZED. The band's
@@ -119,13 +120,16 @@ export function PostFocusHeader({
 					pricing={market.pricing}
 					totals={market.totals}
 					onExit={onExit}
+					compact={isReplying}
 				/>
 			}
 			left={
 				/* ⚠ The focused post's card FILLS the headzone band, so `.hpimg` beside
 				   it can be height-driven exactly as the market arm's `.mmedia` is.
 				   `min-h-0` is its link in the one-screen chain. */
-				<Card className="min-h-0 flex-1 gap-3 p-4">
+				<Card
+					className={`min-h-0 flex-1 ${isReplying ? "gap-1 p-2" : "gap-2.5 p-3.5"} [transition:padding_200ms,gap_200ms]`}
+				>
 					{/* HTML-FINISH · MARKET DETAIL row 11 — `.hleft` IS A ROW, NOT A
 					    STACK (`d5:448`, `flex:1 1 auto;min-width:0;display:flex;gap:16px`).
 					    The focused post's image is `.hpimg` (`:956`) — a LEFT SIBLING of
@@ -181,10 +185,20 @@ export function PostFocusHeader({
 							// paused", so the cropping rule is the paused variant, not the
 							// ratified one. `CommentImage` is untouched.
 							<div className="shrink-0">
-								<CommentImage url={post.imageUrl} onOpen={onOpenImage} />
+								<CommentImage
+									url={post.imageUrl}
+									onOpen={onOpenImage}
+									className={
+										isReplying
+											? "h-auto max-h-[44px] w-auto object-contain"
+											: "max-h-[var(--imgmax)]"
+									}
+								/>
 							</div>
 						) : (
-							<div className="aspect-[16/9] w-auto shrink-0 self-stretch">
+							<div
+								className={`aspect-[16/9] ${isReplying ? "max-h-[44px]" : ""} w-auto shrink-0 self-stretch [transition:max-height_200ms]`}
+							>
 								{/* `.hpimg{aspect-ratio:16/9;height:100%;width:auto}` (`d5:787`)
 								    — the same height-driven frame the market arm gives
 								    `.mmedia`.
@@ -215,7 +229,9 @@ export function PostFocusHeader({
 
 						{/* `.hstack` (`d5:462`, `flex:1 1 auto;min-width:0;flex-direction:
 						    column`) — everything that is not the image. */}
-						<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+						<div
+							className={`flex min-h-0 min-w-0 flex-1 flex-col ${isReplying ? "gap-1" : "gap-2"}`}
+						>
 							{post.removed ? (
 								<>
 									<SideBadge side={post.sideAtPostTime} />
@@ -239,7 +255,9 @@ export function PostFocusHeader({
 										createdAt={post.createdAt}
 										badge={post.badge}
 									/>
-									<h2 className="font-heading text-lg leading-snug font-medium">
+									<h2
+										className={`font-heading ${isReplying ? "text-sm line-clamp-1" : "text-lg"} leading-snug font-medium`}
+									>
 										{post.title}
 									</h2>
 									{/* ⚠⚠ UI-OVERNIGHT entry 3 — THE INLINE TEASER IS GONE FROM THIS
@@ -281,7 +299,7 @@ export function PostFocusHeader({
 									    one-child `justify-between` row is a wrapper that does nothing —
 									    except add a `gap-3` of empty space on the posts that render no
 									    control at all. */}
-									{hasExtendedText(post.body) ? (
+									{!isReplying && hasExtendedText(post.body) ? (
 										<KnowMore
 											label="Know more about this argument"
 											onClick={() => onOpenPopup(post)}

@@ -335,7 +335,8 @@ const rawTrusted =
 const trustedOrigins = Array.from(
 	new Set([
 		...rawTrusted,
-		...(process.env.ZUGZWANG_ENV === "preview" || process.env.NODE_ENV === "development"
+		...(process.env.ZUGZWANG_ENV === "preview" ||
+		process.env.NODE_ENV === "development"
 			? ["http://localhost:3000", "http://127.0.0.1:3000"]
 			: []),
 	]),

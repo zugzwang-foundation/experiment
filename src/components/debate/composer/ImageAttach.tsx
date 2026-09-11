@@ -425,7 +425,7 @@ export function ImageAttach({
 	// `preserveAspectRatio="xMidYMid meet"`, so it fits, stays centred, keeps
 	// its ratio, and never clips or scrolls at any height.
 	const panel =
-		"flex h-full min-h-48 min-w-0 flex-col items-center justify-stretch rounded-(--imgr) p-1.5 text-center text-xs [border:var(--hairline)] bg-n1/40 group hover:border-n4 transition-colors cursor-pointer";
+		"flex h-full min-h-40 min-w-0 flex-col items-center justify-stretch rounded-(--imgr) p-1 text-center text-xs [border:var(--hairline)] bg-n1/40 group hover:border-n4 transition-colors cursor-pointer";
 	// `.imgprev` — d5's `width:100%; aspect-ratio:4/5; max-height:calc(100% - 22px)`
 	// ported as PROPORTIONS ONLY: the `- 22px` is a value and is refused, so the
 	// clamp lands as `max-h-full`. Keeping d5's height clamp is what stops the
@@ -456,7 +456,7 @@ export function ImageAttach({
 		// ⛔ STILL A FIXED px CAP, NOT A RATIO OF WIDTH and NOT `max-h-full`.
 		// Width-invariance is what CS10 bought and it is not being traded back —
 		// measured identical at 1440, 1728 and 1920.
-		"aspect-[4/5] h-full max-h-[320px] min-h-0 w-full rounded-(--imgr) bg-n1";
+		"aspect-[4/5] h-full max-h-[192px] max-h-full min-h-0 w-auto max-w-full rounded-(--imgr) bg-n1 object-contain";
 	// The slot's CONTENT — the same node at both render sites below, so the
 	// preview is present while `attaching` too and never waits on the PUT.
 	//

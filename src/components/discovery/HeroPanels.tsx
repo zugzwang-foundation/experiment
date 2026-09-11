@@ -134,7 +134,7 @@ export function HeroPanels({
 			// ⛔ Deleting it because "the hero is hidden on mobile anyway" is the
 			// mistake this paragraph exists to prevent — hidden below 640px is
 			// not hidden at 700px. See discovery-mobile-reflow.test.ts.
-			className="grid min-h-[220px] flex-1 basis-auto grid-cols-1 gap-[14px] md:grid-cols-[1fr_1.9fr_1fr] max-mobile:hidden short:hidden"
+			className="grid flex-1 grid-cols-1 gap-[14px] md:grid-cols-[1fr_1.9fr_1fr] max-mobile:hidden"
 		>
 			<HeroPostPanel side="YES" post={topPosts.yes} slug={card.slug} />
 
@@ -180,7 +180,7 @@ export function HeroPanels({
 				ref={linkRef}
 				data-testid="hero-market-link"
 				href={`/m/${card.slug}`}
-				className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[var(--r)] bg-n0 px-3.5 pt-2.5 pb-2 outline-none [border:var(--border-hero)] focus-visible:shadow-(--state-focus-ring)"
+				className="flex min-w-0 flex-col rounded-[var(--r)] bg-n0 px-4 pt-[14px] pb-3 outline-none [border:var(--border-hero)] focus-visible:shadow-(--state-focus-ring)"
 			>
 				<div className="flex items-center gap-3">
 					{/* The shared `MarketThumb` (PRIMITIVES-2 D2) — one owner of null ·
@@ -230,16 +230,8 @@ export function HeroPanels({
 				    way — `preserveAspectRatio="none"` on `h-full w-full` — so the box,
 				    its border, its `min-h-24` floor and its `flex-1` growth are
 				    untouched. What changed is what the X axis MEANS. */}
-				<div className="relative mt-[11px] min-h-20 flex-1 rounded-[var(--r)] [border:var(--hairline)]">
-					{/* DISC-FIT — the chart sits in an ABSOLUTE box so it contributes
-					    no intrinsic height: the hero-mode `<svg>` carries a viewBox and
-					    would otherwise size this panel to its aspect ratio at
-					    max-content, inflating the hero's `auto` flex basis and pushing
-					    every height deficit onto the card grid. The `min-h-20` floor
-					    is the chart's minimum; above it `flex-1` grows as before. */}
-					<div data-hero-chart="" className="absolute inset-0">
-						<MarketPriceChart series={series} mode="hero" isOpen={isOpen} />
-					</div>
+				<div className="mt-[11px] min-h-24 flex-1 rounded-[var(--r)] [border:var(--hairline)]">
+					<MarketPriceChart series={series} mode="hero" isOpen={isOpen} />
 				</div>
 				{/* SPEC.1 1.0.45 §9 · Accessibility — the hero's readout, the third and
 				    last mode to get one, discharging `PD-3-04`.
@@ -286,7 +278,7 @@ function HeroPostPanel({
 			<div
 				data-testid="hero-side-empty"
 				data-side={side}
-				className="flex min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-[var(--r)] bg-n0 p-4 text-xs text-muted-foreground [border:var(--border-hero)] max-md:hidden"
+				className="flex min-w-0 items-center justify-center rounded-[var(--r)] bg-n0 p-4 text-xs text-muted-foreground [border:var(--border-hero)]"
 			>
 				{HERO_SIDE_EMPTY[side]}
 			</div>
@@ -310,7 +302,7 @@ function HeroPostPanel({
 		<div
 			data-testid="hero-post"
 			data-side={side}
-			className="relative flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[var(--r)] bg-n0 px-3 pt-3 pb-[11px] [border:var(--border-hero)] max-md:hidden"
+			className="relative flex min-w-0 flex-col rounded-[var(--r)] bg-n0 px-3 pt-3 pb-[11px] [border:var(--border-hero)]"
 		>
 			<div className="flex flex-nowrap items-center gap-1.5 overflow-hidden text-[9.5px] whitespace-nowrap">
 				<Avatar size="xs">

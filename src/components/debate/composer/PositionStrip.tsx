@@ -126,7 +126,7 @@ export function PositionStrip({
 	// column is temporarily labelled with instead of the one it actually is.
 	const held = viewer?.position && viewer.position.side === side;
 	return (
-		<div className="flex min-h-12 items-center justify-between gap-2 rounded-(--r) px-3.5 py-3 shadow-(--elev-1) [border:var(--hairline)]">
+		<div className="flex min-h-12 items-center justify-between gap-2 rounded-(--r) px-3.5 py-1.5 shadow-(--elev-1) [border:var(--hairline)]">
 			<span className="flex items-center gap-1 text-[10px] font-bold tracking-[0.1em] text-n5 uppercase">
 				<span>To win</span>
 				<span className="font-mono text-xs tracking-normal text-ink normal-case">

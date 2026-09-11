@@ -90,7 +90,7 @@ export function MarketCard({
 			// the timer needs a client viewport read, which plan §4 rules against
 			// (hydration). Suppressing the only thing it renders is the
 			// pure-CSS answer, and it leaves >=640px byte-identical.
-			className={`flex min-h-0 flex-col justify-between overflow-hidden rounded-[var(--r)] bg-n0 p-2.5 [border:var(--hairline)]${
+			className={`flex flex-col justify-between rounded-[var(--r)] bg-n0 p-[13px] [border:var(--hairline)]${
 				active
 					? " [outline:var(--ring-active)] outline-offset-[3px] max-mobile:outline-none"
 					: ""
@@ -114,14 +114,14 @@ export function MarketCard({
 						</div>
 					}
 				/>
-				<div className="flex min-w-0 flex-col gap-0.5">
-					<h3 className="line-clamp-1 text-[13.5px] leading-[1.32] font-semibold">
+				<div className="flex min-w-0 flex-col gap-1">
+					<h3 className="line-clamp-2 text-[13.5px] leading-[1.32] font-semibold">
 						{card.title}
 					</h3>
 					<StatLine totals={card.totals} size="card" />
 				</div>
 			</div>
-			<div className="mt-1">
+			<div className="mt-[9px]">
 				<PriceBar pricing={card.pricing} size="card" />
 			</div>
 		</Link>

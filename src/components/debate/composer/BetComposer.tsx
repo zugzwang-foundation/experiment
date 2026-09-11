@@ -537,7 +537,7 @@ export function BetComposer(props: {
 			aria-label={`${COMPOSER_COPY.header} — ${props.side}`}
 			// ⚠⚠ RPLY-2 · R1 — `min-h-0`, so THIS section can shrink below its own
 			// content height.
-			className="flex min-h-0 flex-col gap-3 rounded-(--r) p-3.5 shadow-(--elev-1) [border:var(--hairline)]"
+			className="flex min-h-0 shrink-0 flex-col gap-2 rounded-(--r) p-2.5 shadow-(--elev-1) [border:var(--hairline)]"
 		>
 			{/* modhead — side chip (the TRUE bet side) · header · ×. Reply variant
 			    (v0.10): verb line + the full post title; masked parent → canon
@@ -696,7 +696,7 @@ export function BetComposer(props: {
 				    floor, which is what releases that automatic minimum; see its own
 				    `panel` comment for the number and for why the floor sits on the
 				    fieldset rather than on the artwork. */}
-				<div className="grid min-h-0 grid-cols-[2fr_3fr] items-stretch gap-3">
+				<div className="grid min-h-0 grid-cols-[2fr_3fr] items-stretch gap-2.5">
 					<ImageAttach
 						state={image}
 						disabled={floorAbove || inFlight}
@@ -747,8 +747,8 @@ export function BetComposer(props: {
 						    equal negative margin cancels it back out.
 						    ⛔ NOT `flex-1` — same refusal as every other node in this
 						    chain (see the argument region). Shrinking needs no grow. */}
-						<div className="flex min-h-0 -m-0.5 flex-col gap-2 overflow-y-auto p-0.5">
-							<div className="flex min-h-0 flex-col">
+						<div className="flex min-h-0 -m-0.5 flex-col gap-1.5 overflow-y-auto p-0.5">
+							<div className="flex shrink-0 flex-col">
 								{/* ⚠⚠ change set 11 §3 — A TEXTAREA, SO ALL 125 CHARACTERS ARE
 								    VISIBLE AT ONCE. As an `<input>` only the tail showed at
 								    125/125.
@@ -795,7 +795,7 @@ export function BetComposer(props: {
 										onEdit();
 									}}
 								/>
-								<div className="mt-0.5 shrink-0 text-right text-[10px] text-n4 pr-1">
+								<div className="mt-0.5 shrink-0 text-right text-[10.5px] leading-tight text-n4 pr-2">
 									{groupCount(title.length)} / {groupCount(TITLE_MAX_CHARS)}
 								</div>
 							</div>
@@ -819,13 +819,13 @@ export function BetComposer(props: {
 									maxLength={extendedMax}
 									disabled={floorAbove || inFlight}
 									aria-label="Argument body"
-									className="h-32 min-h-14 resize-none field-sizing-fixed"
+									className="h-[80px] min-h-14 resize-none field-sizing-fixed"
 									onChange={(e) => {
 										setExtended(e.target.value);
 										onEdit();
 									}}
 								/>
-								<div className="mt-0.5 shrink-0 text-right text-[10px] text-n4 pr-1">
+								<div className="mt-0.5 shrink-0 text-right text-[10.5px] leading-tight text-n4 pr-2">
 									{groupCount(extended.length)} / {groupCount(extendedMax)}
 									{COMPOSER_COPY.optionalSuffix}
 								</div>
@@ -833,8 +833,8 @@ export function BetComposer(props: {
 						</div>
 
 						{/* `.footblock` (d5) — the money row, and RPLY-3 · R1's whole subject. */}
-						<div className="mt-auto flex shrink-0 items-stretch gap-3">
-							<div className="flex flex-1 flex-col rounded-(--r-chip) px-3 py-2 [border:var(--hairline)]">
+						<div className="mt-auto flex shrink-0 items-stretch gap-2.5">
+							<div className="flex flex-1 flex-col rounded-(--r-chip) px-2.5 py-1.5 [border:var(--hairline)]">
 								<div className="flex items-center justify-between">
 									<span className="text-[9.5px] font-bold tracking-[0.12em] text-n5 uppercase">
 										{COMPOSER_COPY.amountLabel}
@@ -860,13 +860,13 @@ export function BetComposer(props: {
 													setAmount(assess.clampedAmount);
 												}
 											}}
-											className={`h-auto border-none p-0 text-right font-mono text-[22px] font-extrabold tabular-nums shadow-none [border:none] ${
+											className={`h-auto border-none p-0 text-right font-mono text-[20px] font-extrabold tabular-nums shadow-none [border:none] ${
 												assess.overCap ? "text-n4" : ""
 											}`}
 										/>
 									</span>
 								</div>
-								<div className="border-t border-n2 my-1.5" />
+								<div className="border-t border-n2 my-1" />
 								{/* ⚠⚠ RPLY-1 · R3 — THE NOTICE SLOT. TO WIN is meaningless in
 								    all three blocked states — the bet cannot be submitted in
 								    any of them — so the row is free, and a notice written into
@@ -900,12 +900,12 @@ export function BetComposer(props: {
 								aria-disabled={submitDisabled}
 								aria-label={COMPOSER_COPY.submit}
 								onClick={submit}
-								className="h-auto min-h-[52px] flex-col gap-0 self-stretch px-4 py-2"
+								className="h-auto min-h-[44px] flex-col gap-0 self-stretch px-3 py-1"
 							>
-								<span className="text-[11px] leading-tight font-medium">
+								<span className="text-[10px] leading-tight font-medium">
 									Place
 								</span>
-								<span className="text-[15px] leading-tight font-bold">
+								<span className="text-[14px] leading-tight font-bold">
 									Đ BET
 								</span>
 							</Button>
