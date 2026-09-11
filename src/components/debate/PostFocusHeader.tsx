@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 
 import { ArgProfile } from "./ArgProfile";
 import { SideBadge } from "./badges";
-import { CommentImage, PostImagePlaceholder } from "./CommentImage";
+import { CommentImage } from "./CommentImage";
 import { hasExtendedText } from "./composer/payload";
 import { ReplySplitBar } from "./composer/ReplySplitBar";
 import { FocusMarketCard } from "./FocusMarketCard";
@@ -155,6 +155,13 @@ export function PostFocusHeader({
 					    stack is not at fault: it already carries `min-w-0` and shrinks
 					    correctly. This is a row that must become a column.
 
+					    ⚠ READ THE PARAGRAPH ABOVE AS HISTORY, NOT AS THE PRESENT TREE.
+					    QUOTE-1 A removed the placeholder arm it describes, so this row
+					    now has ONE image arm and it is the real-image one. The reflow
+					    ruling is unchanged and the token below stays: the defect was
+					    measured against the arm that is gone, but a real attachment is
+					    `shrink-0` too and the row still has to become a column.
+
 					    ⛔ AND THE FAILURE WAS INVISIBLE TO THE CHECK THAT CLEARED IT.
 					    `<Card>` is `overflow-hidden`, so the clipping happens INSIDE the
 					    card and `documentElement.scrollWidth` stays exactly 0px while
@@ -163,15 +170,23 @@ export function PostFocusHeader({
 					    Anything measuring this row measures the clipping ancestor's
 					    descendants, never the document. */}
 					<div className="flex min-h-0 flex-1 gap-4 max-mobile:flex-col">
-						{/* HTML-FINISH · MARKET DETAIL round 2 · R2 — d5 fills the
-						    post-focus `.hpimg` with its `POST IMAGE · 640:586` box
-						    (`d5:1491-1492`) whenever the focused post has no real
-						    attachment; the founder ruled that chrome IN.
+						{/* ⛔ QUOTE-1 A — THE EMPTY ARM AND ITS WHOLE FRAME ARE GONE
+						    (founder-ruled 2026-09-11). R2 had filled the post-focus
+						    `.hpimg` with d5's `POST IMAGE` box (`d5:1491-1492`) whenever
+						    the focused post had no real attachment, and docketed it at
+						    `docs/parked.md` (`HTML-FINISH-MD-PLACEHOLDERS`) in the same
+						    breath. This is the STRIP exit.
+						    ⚠ THE WRAPPER GOES WITH IT, unlike the card mounts. On
+						    `PostCard` and `ReplyCard` the cell is the card's ABSORBER and
+						    survives; here the `.hpimg` frame existed only to give the
+						    placeholder a shape, and `CommentImage` brings its own. A row
+						    with one child spends no `gap`, so nothing is left behind.
 						    ⚠ THE REMOVED CASE STILL DRAWS NOTHING, deliberately: a removed
 						    post's variant has no `imageUrl` field at the type level, and
 						    an image slot beside a withheld argument would announce that
-						    it had an attachment. Hence `!post.removed` gates BOTH arms
-						    rather than only the real-image one. */}
+						    it had an attachment. That is now the same nothing every
+						    imageless post gets, which is why the branch shape is kept
+						    rather than flattened — the two arms mean different things. */}
 						{post.removed ? null : post.imageUrl ? (
 							// `.hpimg{flex:0 0 auto}` — does not grow, does not shrink,
 							// sized by its own content. `CommentImage` already renders
@@ -195,37 +210,7 @@ export function PostFocusHeader({
 									}
 								/>
 							</div>
-						) : (
-							<div
-								className={`aspect-[16/9] ${isReplying ? "max-h-[44px]" : ""} w-auto shrink-0 self-stretch [transition:max-height_200ms]`}
-							>
-								{/* `.hpimg{aspect-ratio:16/9;height:100%;width:auto}` (`d5:787`)
-								    — the same height-driven frame the market arm gives
-								    `.mmedia`.
-								    ⚠⚠ UI-OVERNIGHT entry 3 — `self-stretch` REPLACES `h-full`,
-								    AND WITHOUT IT THIS BOX WOULD HAVE COLLAPSED SILENTLY. The
-								    superseded note ended "now that the band has a definite
-								    height", which was the load-bearing half: `height:100%`
-								    resolves against a definite parent height, and entry 3 makes
-								    this band CONTENT-SIZED so that its own reply bar stops being
-								    clipped. A percentage height inside a chain that derives its
-								    height from this element is circular, and a browser resolves
-								    it to `auto` — the frame would shrink to one line of
-								    placeholder text with no error anywhere.
-								    ⇒ `self-stretch` takes the height from the SIBLING text stack
-								    instead, which is what actually determines the row: the item
-								    keeps `height:auto`, stretch gives it the line's cross size,
-								    and `aspect-ratio` derives the width from that. The inner
-								    placeholder's own `h-full` then resolves against a height that
-								    is definite after layout. Same rendered geometry, obtained
-								    from the sibling rather than from an ancestor that no longer
-								    declares one.
-								    ⚠ NOT VERIFIABLE IN THIS SUITE — jsdom performs no layout, so
-								    this is a construction argument and a browser check at 1440 is
-								    owed before merge. Reported. */}
-								<PostImagePlaceholder fill />
-							</div>
-						)}
+						) : null}
 
 						{/* `.hstack` (`d5:462`, `flex:1 1 auto;min-width:0;flex-direction:
 						    column`) — everything that is not the image. */}

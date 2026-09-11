@@ -6,10 +6,11 @@ import { Card } from "@/components/ui/card";
 import { AggregateFooter } from "./AggregateFooter";
 import { ArgProfile } from "./ArgProfile";
 import { SideBadge } from "./badges";
-import { CommentImage, PostImagePlaceholder } from "./CommentImage";
+import { CommentImage } from "./CommentImage";
 import { hasExtendedText } from "./composer/payload";
 import { KnowMore } from "./KnowMore";
 import { RemovedPlaceholder } from "./placeholders";
+import { QuoteWell } from "./quote-well/QuoteWell";
 import type { DebatePost, PresentPost, Side } from "./types";
 
 /**
@@ -148,8 +149,29 @@ export function PostCard({
 			    One row, two destinations — read the whole argument in place, or go
 			    to its debate. The title used to open the pop-up; that is now the
 			    `+`'s job alone. */}
-			<div className="relative">
-				{/* HTML-FINISH · MARKET DETAIL round 2 · R6 — THE TITLE ANSWERS THE
+			{/* ⛔⛔ QUOTE-1 C — THE PLAIN TITLE ROW IS THE IMAGE ARM'S ROW NOW
+			    (founder-ruled 2026-09-11, design-canon `C-QUOTE-1` clause 2, SPEC.1
+			    2.0.2). On an imageless post the title is no longer text above an empty
+			    cell — it IS the picture in the cell, so rendering both would put the
+			    same sentence on the card twice.
+			    ⚠ THE CONDITION IS `post.imageUrl`, THE SAME ONE THE CELL BELOW READS,
+			    and deliberately not a second predicate: two tests for "does this post
+			    have an attachment" is how a card ends up with a title row and a well at
+			    once, or with neither.
+			    ⚠⚠ AND IT COSTS AN IMAGELESS CARD ITS PRIMARY NAVIGATION, which is
+			    recorded rather than hidden. This button is the only thing on the present
+			    branch that calls `onEnter` — row 23 deleted `Open debate →` from this
+			    arm BECAUSE the title carried that destination. What remains on an
+			    imageless card is `AggregateFooter`'s Support/Counter pills, which enter
+			    the post and are themselves gated on `marketOpen`/`suspended`. ⇒ THE WELL
+			    INHERITS THE HANDLER rather than the row keeping it — see the button at the
+			    cell below, which records why that is preservation and not a new
+			    affordance. Flagged for the founder either way.
+			    ⚠ THE REMOVED BRANCH IS UNTOUCHED — it returns above and has no title at
+			    the type level. */}
+			{post.imageUrl ? (
+				<div className="relative">
+					{/* HTML-FINISH · MARKET DETAIL round 2 · R6 — THE TITLE ANSWERS THE
 				    POINTER. It is the card's primary navigation (it enters post-focus)
 				    and it carried NO hover state at all, so the one control on the card
 				    that takes you somewhere looked like static text.
@@ -175,7 +197,7 @@ export function PostCard({
 				    the Profile pattern.
 				    ⚠ NO `aria-label` IS ADDED. The visible text IS the accessible name,
 				    and an override would have to contain it to satisfy WCAG 2.5.3. */}
-				{/* ⚠⚠ THE TITLE IS A BLOCK SPANNING THE CARD — `.rtitle` (`d5:841`)
+					{/* ⚠⚠ THE TITLE IS A BLOCK SPANNING THE CARD — `.rtitle` (`d5:841`)
 				    is a block, and `.plust{position:relative;padding-right:19px}`
 				    (`:597`) reserves a gutter for the `+` OVERLAID on it rather than
 				    a flex sibling that steals width. Measured at the pinned
@@ -188,24 +210,24 @@ export function PostCard({
 				    (`:842`). On a one-screen page an unclamped title is what pushes
 				    the card past its column; the full argument stays one click away
 				    on the `+`, and the column scrolls as the backstop. */}
-				<button
-					type="button"
-					// ⚠ UI-OVERNIGHT entry 5 — THE GUTTER IS RESERVED ONLY WHEN THERE IS
-					// SOMETHING TO RESERVE IT FOR. `pr-21` keeps the title clear of the
-					// OVERLAID `Know more`; with no control there it was 84px taken off
-					// every title-only card for a neighbour that never arrives. The title's
-					// LEFT edge does not move either way, so a card with the control and a
-					// card without differ by the control alone.
-					className={`block w-full rounded-(--r-chip) text-left hover:bg-n1 hover:underline${
-						knowMore ? " pr-21" : ""
-					}`}
-					onClick={() => onEnter(post.id)}
-				>
-					<h3 className="line-clamp-2 font-heading text-base leading-snug font-medium">
-						{post.title}
-					</h3>
-				</button>
-				{/* ⚠⚠ UI-QUICK change set 1 items 4 + 5 — THE `+` BECOMES `Know more`
+					<button
+						type="button"
+						// ⚠ UI-OVERNIGHT entry 5 — THE GUTTER IS RESERVED ONLY WHEN THERE IS
+						// SOMETHING TO RESERVE IT FOR. `pr-21` keeps the title clear of the
+						// OVERLAID `Know more`; with no control there it was 84px taken off
+						// every title-only card for a neighbour that never arrives. The title's
+						// LEFT edge does not move either way, so a card with the control and a
+						// card without differ by the control alone.
+						className={`block w-full rounded-(--r-chip) text-left hover:bg-n1 hover:underline${
+							knowMore ? " pr-21" : ""
+						}`}
+						onClick={() => onEnter(post.id)}
+					>
+						<h3 className="line-clamp-2 font-heading text-base leading-snug font-medium">
+							{post.title}
+						</h3>
+					</button>
+					{/* ⚠⚠ UI-QUICK change set 1 items 4 + 5 — THE `+` BECOMES `Know more`
 				    AND GAINS A NEIGHBOUR. The two controls are one right-aligned row in
 				    the gutter the title reserves, download on the LEFT.
 				    ⚠ THE BEHAVIOUR IS UNCHANGED — this is a label swap. The `+` opened
@@ -229,22 +251,44 @@ export function PostCard({
 				    it a flex sibling would reproduce the measured defect row 24 fixed
 				    (title 628px → 104px, the widest delta in the phase-1 table). The
 				    gutter grows; the mechanism does not change. */}
-				{knowMore ? (
-					<KnowMore
-						label="Know more about this argument"
-						onClick={() => onOpenPopup(post)}
-						className="absolute right-0 bottom-0"
-					/>
-				) : null}{" "}
-			</div>
-			{/* HTML-FINISH · MARKET DETAIL round 2 · R2 — d5 substitutes its
-			    `POST IMAGE · 640:586` box into `.argimg` on every card with no real
-			    attachment (`d5:1682`), and the founder ruled that chrome IN. Where
-			    this branch used to render `null`, it now renders the placeholder.
-			    ⚠ THE REMOVED BRANCH ABOVE GETS NOTHING, and that is masking, not an
-			    oversight: a removed post's variant carries no `imageUrl` field at
-			    all, so drawing an image slot there would announce that a withheld
-			    argument HAD an attachment. */}
+					{knowMore ? (
+						<KnowMore
+							label="Know more about this argument"
+							onClick={() => onOpenPopup(post)}
+							className="absolute right-0 bottom-0"
+						/>
+					) : null}{" "}
+				</div>
+			) : null}
+			{/* ⛔⛔ QUOTE-1 C — THE EMPTY ARM DRAWS THE WELL (founder-ruled
+			    2026-09-11, design-canon `C-QUOTE-1`, SPEC.1 2.0.2). ⚠ THIS COMMENT SAID
+			    "THE EMPTY ARM DRAWS NOTHING AGAIN" and it is corrected here rather than
+			    appended to, because a docblock that describes the superseded branch at
+			    the site of the live one is read before any amendment note (`O-5`).
+			    The history it recorded is still the reason this slot has a history: R2
+			    substituted d5's `POST IMAGE` mockup box (`d5:1682`) onto every card with
+			    no real attachment, and QUOTE-1 A (PR #513) stripped it back to `null`.
+			    The docket's kind-2 row offered STRIP or GATE; this is neither — it is the
+			    permanent exit, and what stands here is the post's own title rather than a
+			    picture of the words "POST IMAGE".
+			    ⚠ THE CELL STAYS, and now for two reasons rather than one. It is still the
+			    card's absorber (`ReplyCard` copies it for exactly that) — deleting it on
+			    the empty path would unpin `AggregateFooter` from the card's foot — and it
+			    is now also what gives the well a definite height to scale against.
+			    ⛔ THE REMOVED BRANCH STILL GETS NOTHING, and that is the load-bearing
+			    half of this slot, not a leftover. A removed post's union variant carries
+			    no `imageUrl` AND no `title`, so it cannot reach either arm — but it
+			    returns early above, and an early return is exactly the shape that stops
+			    the type system helping: nothing about an `else` requires a field. A well
+			    beside a withheld argument would publish its title, which is the masked
+			    content itself — a strictly worse leak than the placeholder Phase A reasoned
+			    about, which only IMPLIED an attachment existed. So this is `SC-1` at the
+			    render, and `quote-well.test.tsx` is where it is asserted, on the absence of
+			    the TITLE STRING rather than of a testid. ⚠ NOT `comment-image.test.tsx`,
+			    despite that file's docblock forecasting this phase: it names the
+			    placeholder's testid and the string `POST IMAGE`, and a well carries
+			    neither — mounting one here leaves every test in that file GREEN, which was
+			    measured rather than assumed. */}
 			{/* ⚠⚠ `.argimg` (`d5:648`) — THE CELL, and the founder's measured defect.
 			    `flex:1 1 auto;min-height:0;display:flex;align-items:center;
 			    justify-content:center`: the attachment takes the card's whole
@@ -262,7 +306,104 @@ export function PostCard({
 				{post.imageUrl ? (
 					<CommentImage url={post.imageUrl} onOpen={onOpenImage} fill />
 				) : (
-					<PostImagePlaceholder fill />
+					/* ⚠⚠ `h-full`, NOT `max-h-full`, AND THE DIFFERENCE IS WHETHER THE WELL
+					   SCALES AT ALL. The `<svg>`'s own `max-h-full` is a PERCENTAGE, and a
+					   percentage max-height resolves to `none` unless an ancestor has a
+					   DEFINITE height — the exact failure the cell's own docblock above
+					   records for `<img>`. The cell has a definite height (it is `flex-1` in
+					   a stretched column); this stack takes it with `h-full`, and the row
+					   below takes a share of THAT with `flex-1 min-h-0`, and the button takes
+					   that with `h-full`. ⚠ BREAK A LINK AND THE WELL STOPS SCALING — it does
+					   NOT "render at its intrinsic 545 × 272 and overflow", which is what this
+					   sentence claimed until `@code-reviewer` measured it: `w-auto` resolves to
+					   100% of the parent, so a broken chain gives 532 × 265.5 and overflows
+					   nothing. The real cost is that a SHORT cell stops shrinking it. It is the
+					   attachment's own mechanism, one level deeper: `CommentImage`'s
+					   `max-h-full` sits under the cell, the well's sits under cell → stack →
+					   row → button.
+					   ⚠ `items-end` RIGHT-ALIGNS `Know more` TO THE WELL'S EDGE (canon clause
+					   2), which holds while the well is at its full 545 width. Under
+					   VERTICAL compression the well scales down and its right edge moves in
+					   while this stack's does not, so the control aligns to the stack rather
+					   than to the picture. Measured in the QUOTE-1 C report §4; recorded
+					   because a shrink-to-fit width cannot depend on a height-driven shrink,
+					   so closing it is a composition decision and not an edit.
+					   ⛔ `Know more` IS `shrink-0`: when the stack is too short for both, the
+					   WELL yields (it is the flexible item) and the control never clips. That
+					   is the priority the canon sets — a picture that scales beside a control
+					   that does not. */
+					<div className="qstack flex h-full w-full max-w-[545px] min-h-0 flex-col items-end">
+						{/* ⚠⚠ THE WELL IS THE TITLE, SO IT CARRIES THE TITLE'S DESTINATION —
+						    `onEnter`, the same handler on the same post, lifted off the row
+						    above rather than invented here. Canon clause 2 says the well IS the
+						    title "in the heading element the title row used"; the element and
+						    its job are the same kind of preservation, and dropping the job
+						    would leave an imageless card with NO path into its own debate:
+						    row 23 deleted `Open debate →` from this branch precisely BECAUSE
+						    the title carried that destination, and the only survivor is the
+						    footer's Support/Counter pills, themselves gated on
+						    `marketOpen`/`suspended`. ⛔ THE PRE-EXISTING SUITE IS WHAT ARBITRATES
+						    THIS, not a preference: every test in `post-arm-headers`,
+						    `history-ladder` and `posted-jump` that enters a post by clicking the
+						    heading's enclosing button goes green on this reading and red on the
+						    other — 22 failing tests, 15 / 6 / 1 by file, reproducible by
+						    reverting this button. Flagged in the QUOTE-1 C report §7 as a
+						    founder call.
+						    ⚠ NO HOVER PAINT, deliberately. The row's `hover:bg-n1
+						    hover:underline` (round 2 · R6) are a TEXT treatment — an underline
+						    under a picture means nothing and a highlight behind a filled box is
+						    invisible. Choosing a hover state for a picture is a design decision
+						    and is not this phase's to take, so the button ships with the
+						    pointer cursor it gets for free and the gap is recorded.
+						    ⛔⛔ `aria-label={post.title}` IS REQUIRED HERE AND IS NOT REQUIRED ON
+						    THE ROW ABOVE, AND THE DIFFERENCE IS THE SVG. This block first said the
+						    `<h3>` inside is the accessible name "exactly as on the row above" —
+						    measured false by `@code-reviewer` against Chrome's accessibility tree:
+						    name-from-contents does NOT traverse `foreignObject`, so `button > svg >
+						    foreignObject > h3` computes a name of `""` while the plain
+						    `button > h3` computes `FIXTURE ARGUMENT TITLE.`. Controls in the same
+						    run isolate the cause: dropping `role="presentation"` or setting
+						    `role="img"` changes nothing, and an `aria-label` fixes it — it is the
+						    SVG boundary, not the role and not the heading. ⇒ Unnamed `button`,
+						    WCAG 4.1.2 (A), on what is the ONLY `onEnter` control an imageless card
+						    has. ⚠ WCAG 2.5.3 is satisfied BECAUSE the label is the title verbatim:
+						    the accessible name must CONTAIN the visible text, and here it IS the
+						    visible text. The `<h3>` is still exposed as a heading, so heading
+						    navigation was never broken — only the control was. The sibling arm
+						    already does this: `CommentImage`'s button carries
+						    `aria-label="Open attached image"`.
+						    ⛔ AND THE BUTTON IS `CommentImage`'s CLASS SET, BYTE FOR BYTE, which
+						    is why it sits in a row of its own. As `w-full flex-1` it was a
+						    532 x 520 target around a 532 x 265 picture — half the navigating area
+						    empty, and unlike the image arm, whose button shrink-fits its width.
+						    `flex h-full max-w-full items-center justify-center` is the ratified
+						    precedent and keeps the height chain intact: the ROW carries `flex-1
+						    min-h-0`, the button takes that height with `h-full`, and the svg's
+						    percentage `max-h-full` finally has something definite to resolve
+						    against. Also found by `@code-reviewer`.
+						    ⛔ IT IS ALSO THE FLEX LINK THE WELL SCALES AGAINST — `flex-1
+						    min-h-0` is what gives the `<svg>`'s percentage `max-h-full` a
+						    definite height to resolve against. Wrapping it in a plain `<div>`
+						    and leaving the button outside would add a level with no height and
+						    the well would silently stop scaling. */}
+						<div className="flex min-h-0 w-full flex-1 items-center justify-center">
+							<button
+								type="button"
+								aria-label={post.title}
+								className="flex h-full max-w-full items-center justify-center"
+								onClick={() => onEnter(post.id)}
+							>
+								<QuoteWell title={post.title} />
+							</button>
+						</div>
+						{knowMore ? (
+							<KnowMore
+								label="Know more about this argument"
+								onClick={() => onOpenPopup(post)}
+								className="mt-2 shrink-0"
+							/>
+						) : null}
+					</div>
 				)}
 			</div>
 

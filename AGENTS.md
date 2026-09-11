@@ -118,10 +118,33 @@ experiment/
 │   │                               #   "four" — the docket text is NOT corrected here. It rendered
 │   │                               #   `null` until round 2's R2 reversed OD-2; see
 │   │                               #   docs/parked.md SEQUENCE #5, strip or gate before the
-│   │                               #   DP.2 promote), ScrollRail (the rail — and, since R3,
+│   │                               #   DP.2 promote. ⚠ SUPERSEDED 2026-09-11 — QUOTE-1 A
+│   │                               #   (PR #513) took that docket's STRIP exit for BOTH
+│   │                               #   remaining kinds: the empty arm and all THREE
+│   │                               #   PostImagePlaceholder mounts render `null` and the
+│   │                               #   component is deleted, so /m/[slug] ships ZERO mockup
+│   │                               #   placeholders. Guards INVERTED, not removed. ⚠ Kind 2's
+│   │                               #   null arm is interim — QUOTE-1 C replaces it with the
+│   │                               #   title-as-quotation well), ScrollRail (the rail — and, since R3,
 │   │                               #   the auto-advance countdown). Since HTML-FINISH the
 │   │                               #   directory has ALSO gained CriterionDisclosure (CRIT-1),
-│   │                               #   DebatePoll, and chart/ (CHART-1, the price chart).
+│   │                               #   DebatePoll, chart/ (CHART-1, the price chart), and
+│   │                               #   quote-well/ (QUOTE-1 C — QuoteWell.tsx + size.ts, the
+│   │                               #   title-as-quotation well the line above forecasts. ⚠ THAT
+│   │                               #   FORECAST IS NOW DISCHARGED FOR THE CARD AND ONLY THE
+│   │                               #   CARD: `PostCard`'s imageless arm draws the well in its
+│   │                               #   `.argimg` cell (design-canon C-QUOTE-1, SPEC.1 2.0.2),
+│   │                               #   while `PostFocusHeader` and `ReplyCard` keep the interim
+│   │                               #   `null` by ruling — the hero is owed at QUOTE-1 C2. ⛔ IT
+│   │                               #   MOVES NO PLACEHOLDER COUNT: the count has been ZERO
+│   │                               #   since QUOTE-1 A deleted the component, and a well is not
+│   │                               #   a placeholder — it renders the post's own title, not the
+│   │                               #   words "POST IMAGE". The FIVE/"four" arithmetic above is
+│   │                               #   about a state that no longer exists on this route.
+│   │                               #   ⚠ The well is wrapped in the title row's `onEnter`
+│   │                               #   button, because deleting that row removes an imageless
+│   │                               #   card's only way into post-focus; pending founder
+│   │                               #   ratification, see docs/plans/QUOTE-1.md §8 D).
 │   │   ├── art/warli/              #   WARLI-1/2 — a decorative SVG art layer, MOUNTED
 │   │                               #   AT ONE SITE: `src/app/(auth)/layout.tsx`, as a
 │   │                               #   `pointer-events-none fixed inset-0 -z-10` underlay
@@ -285,6 +308,8 @@ Server-side logic lives under `src/server/`. **Never import from `src/server/**`
 ## 5. Next.js 16 patterns
 
 **Server vs client.** Server Components by default. Add `"use client"` only for hooks, event handlers, browser APIs, or client-only libraries. Pass server-fetched data down as props; keep the client boundary near the leaf.
+
+**⛔ `asChild` ACROSS THE RSC BOUNDARY IS NOT SAFE BY DEFAULT — an element passed from a Server Component into a Client Component's `asChild` slot is USUALLY an element and OCCASIONALLY a `React.lazy`.** React Flight writes a Client Component's props inline until the row it is building passes `MAX_ROW_SIZE` (**3200 bytes**), then defers the NEXT element to a row of its own, where it arrives as `{$$typeof: Symbol.for("react.lazy"), _payload, _init}`. `React.isValidElement` is false for that, and Radix's `Slot` returns **`null`** for a child it cannot clone (`@radix-ui/react-slot` dist `:34-42`) — so the affordance silently **deletes its own child**. ⚠ **Which child is hit is a byte position, not a call site.** Measured on `/` at DIAG-HEADER-BALANCE-HYDRATION: +0 bytes of payload hit `DharmaCluster`'s Balance eyebrow, +300 hit Portfolio, and either side of those hit nobody — so it moves with any unrelated edit anywhere earlier in the page, and no call site is durably safe. ⚠⚠ **AND IT IS INVISIBLE TO A STATIC RENDER**, which is why it shipped: the server takes its own non-element fallback and PAINTS the child, so `renderToString` and every `render()` test look correct; the deletion happens only when the client re-renders onto the Slot. There is no hydration warning and no console error, because neither half is a mismatch — each is a correct render of a different branch. ⇒ **Resolve the child before anything inspects it** (`src/components/ui/info-tip.tsx`'s `isDeferredChild` → `React.use(children._payload)`, which returns synchronously because the row has already arrived), and **test it by HYDRATING, never by rendering** (`tests/unit/ui/info-tip.test.tsx`).
 
 **Server Actions (mutations).** Every action validates input with zod — no naked form data into the DB. Every multi-write action runs inside `db.transaction(...)` (§6). Example shape:
 

@@ -11,26 +11,27 @@ import { MarketMediaPanel } from "@/components/debate/MarketMediaPanel";
  *
  * THREE PROPERTIES, and each exists for a different failure:
  *
- *  1. ⚠⚠ **The mockup's caption IS shipped, on the empty arm only** — REVERSED at
- *     round 2 · R2 (founder-ruled 2026-08-16, the OD-2 reversal). Properties 1
- *     and 2 used to read: "**The mockup's caption is never shipped.** `.mmedia
- *     .cap` reads 'MARKET MEDIA — IMG / VIDEO' … Shipping it would put a
- *     build-time note in front of every participant — `PD-3-09` / `OD-6`
- *     verbatim." and "**No media ⇒ no panel**, never an empty box." Visible
- *     placeholder chrome is now REQUIRED, and the caption is byte-carried from
- *     `d5:953` (em dash U+2014, hexdumped).
- *  2. ⛔ **AND IT APPEARS ONLY WHERE THERE IS NOTHING ELSE TO SHOW.** A panel
- *     with real media must NOT carry it — that arm is not a placeholder and a
- *     caption over a real image would be the `PD-3-09` defect for real. The two
- *     arms are asserted separately below, which is what makes this a scoped
- *     reversal rather than a blanket one.
+ *  1. ⛔ **No media ⇒ no panel, never an empty box** — and this property has now
+ *     been asserted, reversed, and re-asserted, which is why the history stays
+ *     here rather than in a commit nobody will find. It first read "**The
+ *     mockup's caption is never shipped.** `.mmedia .cap` reads 'MARKET MEDIA —
+ *     IMG / VIDEO' … Shipping it would put a build-time note in front of every
+ *     participant — `PD-3-09` / `OD-6` verbatim." Round 2 · R2 reversed it
+ *     (founder-ruled 2026-08-16, the OD-2 reversal) and required the byte-carried
+ *     caption on the empty arm for the REVIEW surface, docketing it at
+ *     `docs/parked.md` (`HTML-FINISH-MD-PLACEHOLDERS`) in the same breath.
+ *     **QUOTE-1 A (founder-ruled 2026-09-11) takes that docket's STRIP exit**, so
+ *     the empty arm renders nothing again.
+ *     ⚠ THE ASSERTION IS INVERTED, NOT DELETED. A test that simply stopped
+ *     checking would let the caption come back silently; this one reddens on a
+ *     re-mount, which is the only reason it is still here.
+ *  2. ⛔ **AND NO OTHER ARM EVER CARRIED IT.** A panel with real media must NOT
+ *     carry the caption — that arm is not a placeholder and a caption over a real
+ *     image would be the `PD-3-09` defect for real. That assertion never changed
+ *     across either reversal, which is what makes it the stable one.
  *  3. **The video is OUTBOUND** (ADR-0026): a new-tab link, never an embedded
  *     player, and never a same-tab navigation that would drop the reader out of
  *     the debate.
- *
- * ⚠⚠ REVIEW-SURFACE ONLY. Docketed at `docs/parked.md`
- * (`HTML-FINISH-MD-PLACEHOLDERS`): strip or gate before the DP.2 production
- * promote.
  *
  * ⚠ O-7 — `innerHTML`, never `textContent`. Two of the three claims are about
  * elements and attributes, which `textContent` erases entirely.
@@ -45,22 +46,23 @@ const VIDEO = "https://example.invalid/watch?v=fixture";
 const TITLE = "Fixture market question.";
 
 describe("MarketMediaPanel — row 2", () => {
-	it("market-media::no-media-renders-THE-PLACEHOLDER", () => {
+	it("market-media::no-media-renders-NOTHING", () => {
 		const { container } = render(
 			<MarketMediaPanel imageUrl={null} videoUrl={null} title={TITLE} />,
 		);
 
-		// ⚠ The superseded assertion was `expect(container.innerHTML).toBe("")`.
-		// R2 requires visible chrome here.
+		// ⛔ THREE ASSERTIONS, NOT ONE, BECAUSE ONE OF THEM CAN GO GREEN WITHOUT
+		// THE OTHERS. `innerHTML === ""` is the whole claim, but a future arm that
+		// rendered a wrapper with the caption inside would break only the third
+		// check, and a future arm that kept the testid on an empty box would break
+		// only the second. The label is asserted by its BYTES — em dash U+2014
+		// (e2 80 94) — because a paraphrase is exactly what a re-mount would reach
+		// for, and a paraphrase that renders is still the defect.
+		expect(container.innerHTML).toBe("");
 		expect(
 			container.querySelector('[data-testid="market-media-placeholder"]'),
-		).not.toBeNull();
-		// ⛔ BYTE-CARRIED FROM `d5:953`, EM DASH U+2014 (bytes e2 80 94). A hyphen
-		// would be a paraphrase, not a carry, and this literal is what catches it.
-		expect(container.innerHTML).toContain("MARKET MEDIA — IMG / VIDEO");
-		// The `.playmark` ring ships with it — the caption alone is a different
-		// composition from the mockup's centred column.
-		expect(container.querySelector("svg")).not.toBeNull();
+		).toBeNull();
+		expect(container.innerHTML).not.toContain("MARKET MEDIA");
 	});
 
 	it("market-media::a-REAL-media-panel-carries-NO-placeholder-caption", () => {
@@ -145,20 +147,26 @@ describe("MarketMediaPanel — row 2", () => {
 		expect(cls).not.toContain("w-auto");
 	});
 
-	it("market-media::the-placeholder-arm-carries-the-SAME-frame-mechanism", () => {
-		// Non-vacuity: the fix lives in a `frame` constant shared by both the
-		// real-media and placeholder branches. Asserting only the real-media
-		// arm (above) would miss a regression that re-introduced `h-full
-		// w-auto` on just the placeholder arm.
+	it("market-media::the-VIDEO-arm-carries-the-SAME-frame-mechanism", () => {
+		// Non-vacuity: the BLOCK-3 fix lives in a `frame` constant shared by every
+		// branch that renders, so asserting one arm would miss a regression that
+		// re-introduced `h-full w-auto` on another.
+		// ⚠ THIS TEST USED TO POINT AT THE PLACEHOLDER ARM, and QUOTE-1 A stripped
+		// that arm — so it is REPOINTED rather than deleted. The property it exists
+		// to protect (every rendering arm shares one frame) is unchanged; what
+		// changed is which arm is the one the sibling test above does not already
+		// cover. That is now the VIDEO arm, which is an `<a>` rather than a `<div>`
+		// and is exactly where a second frame string could be written by hand
+		// without anything noticing.
 		const { container } = render(
-			<MarketMediaPanel imageUrl={null} videoUrl={null} title={TITLE} />,
+			<MarketMediaPanel imageUrl={IMAGE} videoUrl={VIDEO} title={TITLE} />,
 		);
-		const panel = container.querySelector(
-			'[data-testid="market-media-placeholder"]',
-		);
+		const panel = container.querySelector('[data-testid="market-media-panel"]');
+		expect(panel?.tagName).toBe("A");
 		const cls = (panel?.getAttribute("class") ?? "").split(/\s+/);
 		expect(cls).toContain("w-1/3");
 		expect(cls).toContain("self-start");
+		expect(cls).toContain("aspect-[16/9]");
 		expect(cls).not.toContain("h-full");
 		expect(cls).not.toContain("w-auto");
 	});

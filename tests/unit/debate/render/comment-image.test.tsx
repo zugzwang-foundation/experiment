@@ -334,14 +334,18 @@ describe("HTML-FINISH · MARKET DETAIL — row 26, the reply's own image", () =>
 		).not.toBeNull();
 	});
 
-	it("comment-image::a-reply-without-one-mounts-THE-PLACEHOLDER", () => {
-		// ⚠⚠ RPLY-1 · R6 — THIS TEST'S NAME AND CLAIM BOTH CHANGED, AND IT WOULD
-		// HAVE STAYED GREEN WITHOUT NOTICING. It was
+	it("comment-image::a-reply-without-one-renders-NOTHING", () => {
+		// ⚠⚠ THIS TEST'S NAME AND CLAIM HAVE NOW CHANGED TWICE, AND THE FIRST TIME
+		// IS THE REASON THE SECOND ONE IS WRITTEN THE WAY IT IS. It began as
 		// `a-reply-without-one-mounts-nothing`, asserting only
-		// `querySelector("img") === null`. The placeholder is a `<div>`, so that
-		// assertion still passes against a card that now DOES draw an empty image
-		// slot — a test whose name had quietly become false while its colour said
-		// everything was fine. Corrected in place rather than left to mislead.
+		// `querySelector("img") === null`. RPLY-1 · R6 then mounted a placeholder
+		// `<div>` here — which that assertion happily passed, so the test's name
+		// had quietly become false while its colour said everything was fine. R6
+		// corrected it in place to `mounts-THE-PLACEHOLDER`.
+		// ⇒ QUOTE-1 A strips the placeholder again, and the name goes back — but
+		// NOT the original assertion, because the original assertion is precisely
+		// the one that could not see the difference. The claim is asserted on the
+		// BODY of the render, not on the absence of an `<img>`.
 		const { container } = render(
 			<ReplyCard
 				reply={presentReply(null)}
@@ -352,12 +356,20 @@ describe("HTML-FINISH · MARKET DETAIL — row 26, the reply's own image", () =>
 
 		// Still no real image — nothing is invented for an attachment-less reply.
 		expect(container.querySelector("img")).toBeNull();
-		// ⛔ But the SLOT is drawn, which is R6's whole mechanism: the cell is what
-		// absorbs the card's leftover height, and a cell that renders nothing
-		// absorbs nothing.
+		// …and no slot either, by testid AND by label, so a re-mount that renamed
+		// one of the two still reddens on the other.
 		expect(
 			container.querySelector('[data-testid="post-image-placeholder"]'),
-		).not.toBeNull();
+		).toBeNull();
+		expect(container.innerHTML).not.toContain("POST IMAGE");
+		// ⛔ THE CELL IS STILL THERE AND MUST BE. R6's mechanism is the absorber,
+		// not the placeholder: the cell is what takes the card's leftover height,
+		// and stripping the box did not strip the cell. Asserted here so a later
+		// "tidy up the empty div" reddens rather than silently restoring the dead
+		// gap at the card's foot that R6 exists to remove.
+		const cell = container.querySelector(".flex-1.items-center.justify-center");
+		expect(cell).not.toBeNull();
+		expect(cell?.innerHTML).toBe("");
 		// Non-vacuity: the reply itself rendered.
 		expect(container.innerHTML).toContain("Fixture reply body.");
 	});
@@ -396,27 +408,56 @@ describe("HTML-FINISH · MARKET DETAIL — row 26, the reply's own image", () =>
 });
 
 /**
- * HTML-FINISH · MARKET DETAIL round 2 · R2 — the POST-IMAGE PLACEHOLDER, the
- * second of the four the founder ruled in on 2026-08-16 (the OD-2 reversal).
+ * QUOTE-1 A — THE POST-IMAGE PLACEHOLDER IS GONE, AND THIS BLOCK IS THE PROOF
+ * THAT IT STAYS GONE (founder-ruled 2026-09-11, the `docs/parked.md`
+ * `HTML-FINISH-MD-PLACEHOLDERS` docket taking its STRIP exit for kind 2).
  *
- * ⛔⛔ THE MASKING PROPERTY IS THE LOAD-BEARING ONE HERE, and it is the exact
- * hazard this row creates. A placeholder that renders on EVERY card without an
- * image would render beside a REMOVED post too — and a "POST IMAGE" box next to
- * a withheld argument announces that the withheld argument HAD an attachment,
- * which is an inference about removed content leaking off the masked payload.
- * `SC-1`'s own framing catches it: what must be asserted is that the removed
- * branch draws nothing, not merely that the present branch draws something.
+ * ⚠ INVERTED, NOT DELETED, AND THE DIFFERENCE IS THE WHOLE VALUE OF THE BLOCK.
+ * These four tests were written at round 2 · R2 to prove the box RENDERED; they
+ * now prove it does not. Deleting them would have left the surface with no
+ * assertion in either direction, so the next person to reach for d5's mockup
+ * would re-mount it against a green suite.
  *
- * ⚠ It is structurally impossible on the POST path — the removed union variant
+ * ⛔⛔ THE MASKING PROPERTY SURVIVES UNCHANGED AND IS STILL THE LOAD-BEARING ONE.
+ * A placeholder rendering on every card without an image would have rendered
+ * beside a REMOVED post too — and a "POST IMAGE" box next to a withheld argument
+ * announces that the withheld argument HAD an attachment, which is an inference
+ * about removed content leaking off the masked payload. `SC-1`'s framing is what
+ * caught it: assert that the removed branch draws nothing, never merely that the
+ * present branch draws something.
+ *
+ * ⚠⚠ AND QUOTE-1 C HAS NOW ARRIVED, WHICH IS WHY THE KEEPING MATTERED. This block
+ * said: "That assertion is now trivially true — every imageless card draws
+ * nothing — and it is KEPT anyway, because 'trivially true today' is a property
+ * of the current render and not of the surface. QUOTE-1 C puts content back into
+ * this slot, and when it does, this is the test that says the removed branch must
+ * not receive it." It did, one phase later: the imageless arm now draws the
+ * title-as-quotation well, the removed assertion has stopped being trivial, and
+ * it went on guarding a leak that is now WORSE than an empty box — the well
+ * renders the TITLE, so a well on a removed post would publish the withheld
+ * argument rather than merely imply it had an attachment. The present-branch test
+ * below is inverted to match (it asserts the well); this one is untouched.
+ *
+ * ⛔⛔ AND IT IS BLIND TO THE WELL, WHICH IS MEASURED RATHER THAN SUSPECTED — so
+ * do not read the sentence above as meaning THIS test now guards the new
+ * content. It names two things: the placeholder's `data-testid` and the string
+ * `POST IMAGE`. The well carries neither. Mounting a well on the removed branch
+ * was tried: `quote-well::a-REMOVED-post-gets-NO-well-SC-1` reds and every test
+ * in THIS file stays green. ⇒ `quote-well.test.tsx` is where the well's `SC-1`
+ * lives, and it asserts the absence of the TITLE STRING, not of a testid — which
+ * is the SC-1 rule itself (assert the BODY's absence, never the row's). This
+ * block's value is unchanged and is the placeholder's: it stops d5's mockup box
+ * coming back. It was never going to stretch to content it cannot name.
+ *
+ * ⚠ It was structurally impossible on the POST path — the removed union variant
  * carries no `imageUrl` field, so `post.imageUrl` does not typecheck in that
- * branch — but "impossible by type" is what the ELSE arm silently defeats: an
- * `else` needs no field at all. Hence the assertions below on both arms of both
- * surfaces.
+ * branch — but "impossible by type" is what an ELSE arm silently defeats: an
+ * `else` needs no field at all. That is exactly the shape QUOTE-1 C reintroduces.
  */
-/** HTML-FINISH · MARKET DETAIL round 2 · R2 — the REMOVED post variant. It
- * carries NO `imageUrl` field at the type level, which is exactly what makes the
- * placeholder's `else` arm the thing that needs a guard: an `else` needs no
- * field, so the type system stops helping precisely where R2 adds a branch. */
+/** The REMOVED post variant. It carries NO `imageUrl` field at the type level,
+ * which is exactly what made R2's `else` arm the thing that needed a guard: an
+ * `else` needs no field, so the type system stops helping precisely where a
+ * branch is added. Kept for QUOTE-1 C, which adds one back. */
 function removedPost(): DebatePost {
 	return {
 		removed: true,
@@ -436,8 +477,8 @@ function removedPost(): DebatePost {
 
 const PH_URL = "https://example.invalid/post-attachment.png";
 
-describe("HTML-FINISH · MARKET DETAIL round 2 — the post-image placeholder", () => {
-	it("post-image-placeholder::a-present-post-with-no-image-draws-the-box", () => {
+describe("QUOTE-1 A — no image renders nothing, on every arm", () => {
+	it("no-image-renders-NOTHING::a-present-post-with-no-image-draws-THE-WELL", () => {
 		const { container } = render(
 			<PostCard
 				post={focusedPost(null)}
@@ -453,14 +494,38 @@ describe("HTML-FINISH · MARKET DETAIL round 2 — the post-image placeholder", 
 
 		expect(
 			container.querySelector('[data-testid="post-image-placeholder"]'),
-		).not.toBeNull();
-		// ⛔ BYTE-CARRIED FROM `d5:1243`: MIDDLE DOT U+00B7 (bytes c2 b7) and d5's
-		// own demo aspect string. A hyphen, a bullet, or a "truer" caption would be
-		// authored copy; this literal is what catches all three.
-		expect(container.innerHTML).toContain("POST IMAGE · 640:586");
+		).toBeNull();
+		// ⛔ THE LABEL IS ASSERTED SEPARATELY FROM THE TESTID, and by a PREFIX
+		// rather than the full byte-carried literal. R2's box read `POST IMAGE ·
+		// 640:586` (middle dot U+00B7, bytes c2 b7); a re-mount that kept the box
+		// and changed the aspect string would defeat a full-literal check while
+		// putting the identical defect back on the page.
+		expect(container.innerHTML).not.toContain("POST IMAGE");
+		// ⛔ NON-VACUITY, AND IT IS NOT OPTIONAL ON AN ABSENCE TEST. Both
+		// assertions above pass against a component that rendered nothing at all,
+		// so without this the test certifies a blank card.
+		expect(container.innerHTML).toContain("Fixture argument title.");
+		// …and the absorber cell survives — see the reply test above for why this is
+		// a property and not a leftover.
+		const cell = container.querySelector(".flex-1.items-center.justify-center");
+		expect(cell).not.toBeNull();
+		// ⚠⚠ QUOTE-1 C — THE CELL IS NO LONGER EMPTY, AND THE ASSERTION IS INVERTED
+		// RATHER THAN DELETED. It read `toBe("")`, which was the whole point of
+		// Phase A: the placeholder was gone and nothing stood in its place. What
+		// stands there now is the title-as-quotation well, so the claim becomes
+		// EXACTLY the well's stack and nothing else — a mockup box re-mounted
+		// BESIDE the well would defeat a mere non-emptiness check while putting the
+		// identical defect back on the page.
+		expect(cell?.querySelectorAll('[data-testid="quote-well"]').length).toBe(1);
+		expect(cell?.firstElementChild?.getAttribute("class")).toContain("qstack");
+		expect(cell?.querySelector("img")).toBeNull();
+		expect(cell?.innerHTML).not.toContain("POST IMAGE");
+		expect(
+			cell?.querySelector('[data-testid="post-image-placeholder"]'),
+		).toBeNull();
 	});
 
-	it("post-image-placeholder::a-post-WITH-an-image-draws-no-box", () => {
+	it("no-image-renders-NOTHING::a-post-WITH-an-image-still-mounts-it", () => {
 		const { container } = render(
 			<PostCard
 				post={focusedPost(PH_URL)}
@@ -481,7 +546,7 @@ describe("HTML-FINISH · MARKET DETAIL round 2 — the post-image placeholder", 
 		expect(container.innerHTML).not.toContain("POST IMAGE");
 	});
 
-	it("post-image-placeholder::a-REMOVED-post-draws-NO-box-SC-1", () => {
+	it("no-image-renders-NOTHING::a-REMOVED-post-draws-NO-box-SC-1", () => {
 		// ⛔ THE MASKING GUARD. A removed post must not carry an image slot in any
 		// form: its attachment was withheld server-side, and reserving space for one
 		// tells the reader it existed.
@@ -506,10 +571,16 @@ describe("HTML-FINISH · MARKET DETAIL round 2 — the post-image placeholder", 
 		expect(container.innerHTML).not.toContain("POST IMAGE");
 	});
 
-	it("post-image-placeholder::the-post-focus-arm-matches-BOTH-ways", () => {
-		// "Both arms" is the founder's own scope for R2's siblings, and the
-		// post-focus header reaches the placeholder by a different branch shape
-		// (`post.removed ? null : post.imageUrl ? … : …`) than the card does.
+	it("no-image-renders-NOTHING::the-post-focus-arm-draws-NO-box-either-way", () => {
+		// "Both arms" was the founder's own scope for R2's siblings, and the
+		// post-focus header reaches this slot by a different branch shape
+		// (`post.removed ? null : post.imageUrl ? … : null`) than the card does —
+		// which is why it is asserted separately rather than assumed to follow.
+		// ⚠ AND IT IS THE ONE SURFACE WHERE THE STRIP REMOVED A WRAPPER TOO. The
+		// card mounts keep their absorber cell; here the `.hpimg` frame existed
+		// only to shape the placeholder, so the row is left with a single child.
+		// Hence no cell assertion in this test — there is correctly nothing to
+		// assert, and saying so beats a reader concluding it was forgotten.
 		const { container, unmount } = render(
 			<PostFocusHeader
 				post={focusedPost(null)}
@@ -526,7 +597,10 @@ describe("HTML-FINISH · MARKET DETAIL round 2 — the post-image placeholder", 
 		);
 		expect(
 			container.querySelector('[data-testid="post-image-placeholder"]'),
-		).not.toBeNull();
+		).toBeNull();
+		expect(container.innerHTML).not.toContain("POST IMAGE");
+		// Non-vacuity: the header really rendered its argument stack.
+		expect(container.innerHTML).toContain("Fixture argument title.");
 		unmount();
 
 		const { container: removed } = render(
