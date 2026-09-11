@@ -234,7 +234,12 @@ const sourceFiles = readdirSync(join(ROOT, "src"), {
 			entry.isFile() &&
 			(entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")),
 	)
-	.map((entry) => join(entry.parentPath, entry.name).replace(`${ROOT}/`, ""))
+	.map((entry) =>
+		join(entry.parentPath, entry.name)
+			.replace(ROOT, "")
+			.replace(/^[/\\]+/, "")
+			.replace(/\\/g, "/"),
+	)
 	.filter((rel) => !rel.startsWith(ADMIN_EXCLUSION));
 
 /** Every side-keyed expression that RESOLVES TO A COLOUR — pole-bound ones and

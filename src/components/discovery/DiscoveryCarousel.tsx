@@ -205,7 +205,10 @@ export function DiscoveryCarousel({
 			aria-label="Markets"
 			aria-roledescription="carousel"
 			data-testid="discovery-carousel"
-			className="flex flex-1 flex-col"
+			// DISC-FIT — `min-h-0`: inside the page's fixed-height band a flex
+			// item defaults to `min-height:auto` and would grow past it; this is
+			// what lets the hero actually give height up to the grid.
+			className="flex min-h-0 flex-1 flex-col"
 		>
 			{/* ⛔ CS14 §1 — THE SCOPE REGION, AND IT GENERATES NO BOX.
 			    `display:contents` (Tailwind's `contents`) keeps this div a real
@@ -244,7 +247,7 @@ export function DiscoveryCarousel({
 				    discovery-mobile-reflow.test.ts so neither can hide alone. */}
 				<div
 					data-testid="carousel-rail"
-					className="mt-[9px] mb-2 flex h-[18px] flex-none items-center justify-center gap-[7px] max-mobile:hidden"
+					className="mt-0.5 mb-0.5 flex h-[18px] flex-none items-center justify-center gap-[7px] max-mobile:hidden short:hidden"
 				>
 					{/* ⛔ CS14 §3 — THESE TWO CARRY THE RATIFIED FOCUS IDIOM NOW, AND
 					    WHAT THEY HAD BEFORE WAS NOT `:focus`. Measured on staging at

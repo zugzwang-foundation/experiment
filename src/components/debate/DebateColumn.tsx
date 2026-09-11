@@ -192,7 +192,7 @@ export function DebateColumn({
 			    silently. The two declarations are one mechanism, not two. */}
 			<div
 				data-testid="column-scroll"
-				className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+				className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-2 pr-3 [scrollbar-gutter:stable]"
 			>
 				{children}
 			</div>

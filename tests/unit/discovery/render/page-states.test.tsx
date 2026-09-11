@@ -365,7 +365,12 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 		// this line exists to protect and a `toContain` would stop protecting
 		// them. The VALUE half is byte-identical — `px-7 pt-4 pb-3` is
 		// untouched; only topology was added.
-		expect(el.props.className).toBe("flex flex-1 flex-col px-7 pt-4 pb-3");
+		// DISC-FIT (2026-09-11): `flex-1` became the fixed one-screen band
+		// `h-[calc(100dvh-60px-2px)] min-h-0 overflow-hidden` and the phone
+		// inset narrowed (`max-mobile:px-3`); the >=640px inset is untouched.
+		expect(el.props.className).toBe(
+			"flex h-[calc(100dvh-60px-2px)] min-h-0 flex-col overflow-hidden px-7 pt-4 pb-3 max-mobile:px-3",
+		);
 		// The inset triple, asserted separately so a future reorder of the
 		// class string cannot quietly drop one of them.
 		for (const inset of ["px-7", "pt-4", "pb-3"]) {

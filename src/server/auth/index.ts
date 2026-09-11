@@ -327,10 +327,19 @@ const zugzwangOnboardingSession = {
 // docs/parked.md M1/M2 and out of SCAFFOLD.8 scope). Wildcard
 // `*.vercel.app` rejected at plan review on attack-surface + Better
 // Auth #3154 protocol-wildcard reliability grounds.
-const trustedOrigins =
+const rawTrusted =
 	process.env.BETTER_AUTH_TRUSTED_ORIGINS?.split(",")
 		.map((s) => s.trim())
 		.filter((s) => s.length > 0) ?? [];
+
+const trustedOrigins = Array.from(
+	new Set([
+		...rawTrusted,
+		...(process.env.ZUGZWANG_ENV === "preview" || process.env.NODE_ENV === "development"
+			? ["http://localhost:3000", "http://127.0.0.1:3000"]
+			: []),
+	]),
+);
 
 export const auth = betterAuth({
 	database: drizzleAdapter(db, {

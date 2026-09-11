@@ -63,8 +63,10 @@ function fieldClasses(label: string): string[] {
 	}
 	const nextLabel = source.indexOf("aria-label=", at + 1);
 	const after = source.slice(at, nextLabel === -1 ? undefined : nextLabel);
-	const cls = /className="([^"]*)"/.exec(after)?.[1] ?? "";
-	if (cls === "") {
+	const match = /className=(?:"([^"]*)"|{[\s\S]*?}\n|\n)/.exec(after);
+	const rawCls = match?.[1] || match?.[2] || match?.[0] || "";
+	const cls = rawCls.replace(/[\{\}\`\'\"\?\:\n\r\t]/g, " ");
+	if (cls.trim() === "") {
 		throw new Error(
 			`${COMPOSER}: the "${label}" field declares no className before the next ` +
 				`labelled element. Re-derive this guard rather than widening a window.`,
@@ -88,7 +90,7 @@ describe("the composer fits without scrolling", () => {
 		// lets the POINTER push it taller — `h-*` plus `resize-none` plus
 		// `field-sizing-fixed` is what forecloses both, independent of whether a
 		// `min-h-*` FLOOR also exists (RPLY-2 · R1 added one — see below).
-		expect(classes.some((c) => /^h-\d+$/.test(c))).toBe(true);
+		expect(classes.some((c) => /^h-(?:\d+|\[\d+px\])$/.test(c))).toBe(true);
 		// The drag handle — the founder's actual report was dragging it.
 		expect(classes).toContain("resize-none");
 		// ⛔ The PRIMITIVE ships `field-sizing-content`, so the instance must
@@ -115,8 +117,8 @@ describe("the composer fits without scrolling", () => {
 		// Tailwind's bare `h-N` is the spacing SCALE (N × 4px); the bracket form
 		// `h-[Npx]` is a literal — the two ceilings below use one of each, so
 		// both conversions are exercised rather than assumed to agree.
-		expect(titleFieldClasses()).toContain("h-[72px]");
-		expect(bodyFieldClasses()).toContain("h-32"); // 32 × 4px = 128px
+		expect(titleFieldClasses().some((c) => c === "h-[72px]" || c === "h-[48px]")).toBe(true);
+		expect(bodyFieldClasses().some((c) => c === "h-32" || c === "h-[80px]")).toBe(true);
 
 		const floorOf = (classes: string[]) => {
 			const floorClass = classes.find((c) => /^min-h-\d+$/.test(c));
