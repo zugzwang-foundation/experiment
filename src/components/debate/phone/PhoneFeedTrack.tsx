@@ -50,12 +50,52 @@ import { type ReactNode, useCallback, useEffect, useRef } from "react";
  * component sits at a fixed JSX position with no `key` and never remounts.
  * Swiping then stopped updating the tab for the rest of the session. Found
  * independently by both reviewers.
+ *
+ * ⛔⛔ MOBILE-2b D-1 — THE WRITE PATH AND THE READ PATH RAN INTO EACH OTHER, AND
+ * THE TAB WAS DEAD. Everything above describes two directions converging on one
+ * state. They did not converge; they fought, and the write path always lost.
+ *
+ * `active` is set by the tab, which runs `scrollTo({behavior: "smooth"})` — and
+ * smooth scrolling is PROGRESSIVE. One frame in, the track has moved ~6px of
+ * 390 and the pane the reader is LEAVING is still ~98% visible, so the observer
+ * fires, reports that pane, and the host sets `active` back to it. That re-runs
+ * this effect, which scrolls back to 0 and cancels the animation in flight.
+ * Net effect: the feed twitches six pixels and settles exactly where it was, on
+ * every tap, forever. No error, no log, and a control that looks alive.
+ *
+ * ⚠ THE READER LOSES HALF THE DEBATE. The tabs are the only affordance that
+ * reaches the other side. Measured on both engines with the one control that
+ * isolates it: at `prefers-reduced-motion: reduce` — the single branch that
+ * makes the scroll INSTANT rather than progressive — the tap works perfectly,
+ * on WebKit and Chromium alike. Everyone else gets nothing.
+ *
+ * ⇒ A programmatic scroll DECLARES ITS DESTINATION, and the observer is muted
+ * until the track arrives there. The reader's own swipe is unaffected, because
+ * a swipe sets no destination. Three things release the latch, and each is
+ * there for a failure this fix could otherwise cause:
+ *   · the destination arriving — the ordinary case;
+ *   · the reader touching the track — they have overruled us mid-animation, and
+ *     their gesture must not be ignored for the rest of the session;
+ *   · a timeout — a scroll that never lands (an interrupted animation that
+ *     reports nothing) must not leave the track deaf forever.
+ * Muting-without-release would trade a dead tab for a dead swipe, which is the
+ * same defect wearing the other direction.
  */
 /**
  * The pane element's `id`, shared with `PhoneSideTabs`' `aria-controls`. Exported
  * so the two files cannot drift into two spellings of one contract.
  */
 export const PANE_ID = (key: string) => `phone-pane-${key}`;
+
+/**
+ * How long a programmatic slide is allowed to take before the observer is
+ * un-muted regardless (D-1). It is a BACKSTOP, not the mechanism: the ordinary
+ * release is the destination arriving, and the reader touching the track
+ * releases immediately. Long enough that a 390px smooth scroll on a slow phone
+ * lands first; short enough that a scroll which never reports cannot leave the
+ * tab unable to follow a swipe for any length of time a reader would notice.
+ */
+const SCROLL_SETTLE_MS = 700;
 
 export function PhoneFeedTrack({
 	panes,
@@ -73,32 +113,83 @@ export function PhoneFeedTrack({
 	const onActiveChangeRef = useRef(onActiveChange);
 	onActiveChangeRef.current = onActiveChange;
 
+	/**
+	 * The destination of a programmatic scroll that has not landed yet, or null.
+	 * While it is set, the observer's reports are the track's own mid-animation
+	 * positions rather than the reader's intent, and are ignored — see D-1 in the
+	 * docblock. The timer is the backstop release and is cleared with it, so at
+	 * most one is ever outstanding.
+	 */
+	const headingForRef = useRef<string | null>(null);
+	const releaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	const release = useCallback(() => {
+		headingForRef.current = null;
+		if (releaseTimerRef.current !== null) {
+			clearTimeout(releaseTimerRef.current);
+			releaseTimerRef.current = null;
+		}
+	}, []);
+
 	// Tapping a tab scrolls its pane into view. ⚠ It does NOT also set the active
 	// key: the observer does that when the pane arrives, so a tap and a swipe end
 	// at the same state through the same path, and a scroll that is interrupted
 	// never leaves the tab claiming a pane the reader is not looking at.
-	const scrollToPane = useCallback((key: string) => {
-		const track = trackRef.current;
-		if (track === null) {
-			return;
-		}
-		const pane = track.querySelector<HTMLElement>(`[data-pane="${key}"]`);
-		if (pane === null) {
-			return;
-		}
-		const reduced =
-			typeof window !== "undefined" &&
-			typeof window.matchMedia === "function" &&
-			window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-		track.scrollTo({
-			left: pane.offsetLeft - track.offsetLeft,
-			behavior: reduced ? "auto" : "smooth",
-		});
-	}, []);
+	const scrollToPane = useCallback(
+		(key: string) => {
+			const track = trackRef.current;
+			if (track === null) {
+				return;
+			}
+			const pane = track.querySelector<HTMLElement>(`[data-pane="${key}"]`);
+			if (pane === null) {
+				return;
+			}
+			const left = pane.offsetLeft - track.offsetLeft;
+			// ⚠ ALREADY THERE ⇒ NO LATCH. `scrollTo` to the current position moves
+			// nothing and therefore reports nothing, so latching here would mute the
+			// observer until the timeout for no reason. This is the common case: the
+			// observer confirms a pane, the host re-renders, and this effect runs
+			// again against a track that has already arrived.
+			if (Math.abs(track.scrollLeft - left) <= 1) {
+				release();
+				return;
+			}
+			const reduced =
+				typeof window !== "undefined" &&
+				typeof window.matchMedia === "function" &&
+				window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+			release();
+			headingForRef.current = key;
+			releaseTimerRef.current = setTimeout(release, SCROLL_SETTLE_MS);
+			track.scrollTo({
+				left,
+				behavior: reduced ? "auto" : "smooth",
+			});
+		},
+		[release],
+	);
 
 	useEffect(() => {
 		scrollToPane(active);
 	}, [active, scrollToPane]);
+
+	// The reader's own touch overrules an animation in flight, so it must also
+	// end the mute — otherwise a swipe started mid-slide would be discarded.
+	useEffect(() => {
+		const track = trackRef.current;
+		if (track === null) {
+			return;
+		}
+		track.addEventListener("pointerdown", release);
+		track.addEventListener("touchstart", release, { passive: true });
+		return () => {
+			track.removeEventListener("pointerdown", release);
+			track.removeEventListener("touchstart", release);
+		};
+	}, [release]);
+
+	useEffect(() => release, [release]);
 
 	// ⚠ THE ARM'S IDENTITY, AS A DEPENDENCY. Not `panes` itself — the array is a
 	// fresh literal on every render, so it would re-arm the observer on every
@@ -130,9 +221,21 @@ export function PhoneFeedTrack({
 				}
 				const key =
 					best === null ? undefined : (best.target as HTMLElement).dataset.pane;
-				if (key !== undefined) {
-					onActiveChangeRef.current(key);
+				if (key === undefined) {
+					return;
 				}
+				// D-1 — a programmatic scroll is in flight. Everything this observer
+				// can see until it lands is the animation passing through, not a
+				// reader changing their mind; the ONE report worth acting on is the
+				// destination arriving, which is also what ends the mute.
+				const heading = headingForRef.current;
+				if (heading !== null) {
+					if (key === heading) {
+						release();
+					}
+					return;
+				}
+				onActiveChangeRef.current(key);
 			},
 			{ root: track, threshold: [0, 0.6, 1] },
 		);
@@ -148,7 +251,7 @@ export function PhoneFeedTrack({
 			}
 		}
 		return () => observer.disconnect();
-	}, [paneKeys]);
+	}, [paneKeys, release]);
 
 	return (
 		<div
