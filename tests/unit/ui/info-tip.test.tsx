@@ -2,6 +2,9 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { act } from "react";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { InfoTip } from "@/components/ui/info-tip";
@@ -236,6 +239,116 @@ describe("INFO-1 — InfoTip", () => {
 		await waitFor(() => {
 			expect(document.body.textContent).toContain(GLOSS);
 		});
+	});
+
+	/**
+	 * DIAG-HEADER-BALANCE-HYDRATION — the shipped defect this pins.
+	 *
+	 * React Flight defers whatever element straddles its 3200-byte row boundary
+	 * and hands it over as a `react.lazy` reference rather than an element
+	 * (`info-tip.tsx`'s `isDeferredChild` docblock has the mechanism and the
+	 * measurement). On the built app that fell to `DharmaCluster`'s Balance
+	 * eyebrow: the server painted it inside the `<button>` fallback, then the
+	 * `pointerFine` effect swapped in the Tooltip branch, where Radix's `Slot`
+	 * returns `null` for a child it cannot clone — so the label appeared and
+	 * then vanished, about a second in.
+	 *
+	 * ⛔ IT HAS TO BE A HYDRATION TEST, AND THAT IS THE WHOLE POINT. A static
+	 * `render()` only ever sees the branch the server took, which PAINTS the
+	 * child and looks correct; the deletion lives in the swap. Every existing
+	 * test in this file passed throughout.
+	 */
+	function deferredChild(element: React.ReactElement): React.ReactNode {
+		// React Flight's own wire shape for a deferred row, built by hand
+		// because no test double ships it. The chunk carries settled
+		// `status`/`value` because the row HAS arrived by the time the child is
+		// read — which is what lets `use()` return it without suspending.
+		const chunk = Promise.resolve(element) as Promise<React.ReactElement> & {
+			status: string;
+			value: React.ReactElement;
+		};
+		chunk.status = "fulfilled";
+		chunk.value = element;
+		return {
+			$$typeof: Symbol.for("react.lazy"),
+			_payload: chunk,
+			_init: () => element,
+		} as unknown as React.ReactNode;
+	}
+
+	it("a Flight-deferred child SURVIVES hydration on the pointer branch", async () => {
+		mockMatchMedia(true);
+		const tree = (
+			<InfoTip content={GLOSS} asChild>
+				{deferredChild(<span data-testid="eyebrow">Balance</span>)}
+			</InfoTip>
+		);
+
+		// The premise: the server DOES paint it. That is why the defect read as
+		// "it disappears" rather than "it never rendered".
+		const html = renderToString(tree);
+		expect(html).toContain('data-testid="eyebrow"');
+
+		const container = document.createElement("div");
+		container.innerHTML = html;
+		document.body.appendChild(container);
+		// React's act() flag. `@testing-library/react` sets it for its own
+		// renders; this test drives `hydrateRoot` directly, so it sets it by
+		// hand. Narrowed locally rather than via `declare global`, which would
+		// add the symbol to every file in the project (AGENTS.md §4 — one `as`,
+		// at a runtime boundary React owns).
+		const actGlobal = globalThis as typeof globalThis & {
+			IS_REACT_ACT_ENVIRONMENT?: boolean;
+		};
+		const previousActEnv = actGlobal.IS_REACT_ACT_ENVIRONMENT;
+		actGlobal.IS_REACT_ACT_ENVIRONMENT = true;
+		try {
+			await act(async () => {
+				hydrateRoot(container, tree);
+			});
+			// Let the `pointerFine` effect land and swap Popover for Tooltip.
+			await act(async () => {
+				await new Promise((r) => setTimeout(r, 0));
+			});
+		} finally {
+			actGlobal.IS_REACT_ACT_ENVIRONMENT = previousActEnv;
+			container.remove();
+		}
+
+		// THE ASSERTION THAT WOULD HAVE CAUGHT IT, and it is deliberately the
+		// FIRST one after hydration so this test reds on the DELETION rather
+		// than on any tidier proxy for it. Assert the CHILD, not the InfoTip:
+		// the wrapper survived the whole time — it was the thing it was
+		// wrapping that got deleted.
+		expect(
+			container.querySelector('[data-testid="eyebrow"]')?.textContent,
+		).toBe("Balance");
+
+		// Secondary, and only meaningful once the above holds: `asChild` did
+		// not merely survive, it APPLIED — a deferred child that fell to the
+		// `<button>` fallback would still be visible, and still wrong.
+		expect(html).not.toContain("<button");
+	});
+
+	it("positive control: an UNRESOLVABLE non-element child degrades the same way on both branches", () => {
+		// The `canSlot` half of the fix, and its own control. A plain string
+		// can never be cloned, so both branches must fall to the SAME fallback
+		// — the failure being guarded is the server rendering one thing and the
+		// client rendering nothing.
+		mockMatchMedia(false);
+		const touch = renderToString(
+			<InfoTip content={GLOSS} asChild>
+				bare text
+			</InfoTip>,
+		);
+		mockMatchMedia(true);
+		const { container } = render(
+			<InfoTip content={GLOSS} asChild>
+				bare text
+			</InfoTip>,
+		);
+		expect(touch).toContain("bare text");
+		expect(container.textContent).toContain("bare text");
 	});
 
 	it("positive control: mocked matchMedia actually drives a different branch each way", () => {
