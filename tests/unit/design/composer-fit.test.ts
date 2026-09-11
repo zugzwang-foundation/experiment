@@ -34,6 +34,25 @@ const TEXTAREA = "src/components/ui/textarea.tsx";
 const IMAGE_ATTACH = "src/components/debate/composer/ImageAttach.tsx";
 const source = readFileSync(join(ROOT, COMPOSER), "utf8");
 const ATTACH = readFileSync(join(ROOT, IMAGE_ATTACH), "utf8");
+/**
+ * ⛔⛔ THE COMMENT-STRIPPED VIEW, line count preserved — and it exists because a
+ * mutation audit broke this file's own MOBILE-2 rows with it.
+ *
+ * Deleting `max-mobile:hidden` from the real `<EmptySlotFigure …/>` while leaving
+ * the byte-exact string in the comment ABOVE it left every assertion here GREEN,
+ * with the phone tier's image slot fully broken. That is the sixth recorded
+ * instance in this repository of a textual guard matching the comment explaining
+ * the thing rather than the thing — and this file already carries one of the
+ * other five, four lines below, where `preserveAspectRatio` defeated two
+ * successive attempts and was solved by slicing out the `<svg>` tag alone.
+ *
+ * ⚠ SCOPED TO THE MOBILE-2 ROWS. Every pre-existing assertion in this file still
+ * reads `ATTACH` raw, deliberately: several of them are ABOUT prose (the
+ * docblock-quoting rows), and rewriting them is not this task's to do.
+ */
+const ATTACH_CODE = ATTACH.replace(/\/\*[\s\S]*?\*\//g, (m) =>
+	"\n".repeat((m.match(/\n/g) ?? []).length),
+).replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 
 /**
  * The className string on the field instance labelled `label`.
@@ -541,14 +560,24 @@ describe("RPLY-3 · R1 · G2 — the image cell is the shock absorber", () => {
 		// hides the only entry point to attaching an image, which is the functional
 		// regression this row exists to catch. The phone therefore renders the SAME
 		// live constant as text, and both tiers are pinned below rather than one.
-		expect(ATTACH).toContain(
-			"<EmptySlotFigure className={`${preview} max-mobile:hidden`} />",
+		// ⚠ FENCED BY THE SYMBOL, NOT BY THE BYTES (`O-8`). The string it replaces
+		// spanned a template literal and a space, so a Biome line-wrap reddened it
+		// spuriously while a comment satisfied it falsely — wrong in both
+		// directions at once. The element is located by its own name and only its
+		// CLASS TOKENS are asserted.
+		const figureAt = ATTACH_CODE.indexOf("<EmptySlotFigure");
+		expect(figureAt, "expected the EmptySlotFigure mount").toBeGreaterThan(-1);
+		const figureTag = ATTACH_CODE.slice(
+			figureAt,
+			ATTACH_CODE.indexOf("/>", figureAt) + 2,
 		);
+		expect(figureTag).toContain("${preview}");
+		expect(figureTag).toContain(`${"max-mobile"}:hidden`);
 		// THE PHONE'S OWN ENTRY POINT — the same `EMPTY_SLOT_COPY.action`, rendered
 		// as text in a span that is `display:none` at every desktop width. Asserted
 		// as a PAIR with the hide above: either token alone leaves a phone with an
 		// image slot nothing tells you to tap.
-		expect(ATTACH).toMatch(
+		expect(ATTACH_CODE).toMatch(
 			/hidden[^"]*max-mobile:inline"\s*>\s*\{EMPTY_SLOT_COPY\.action\}/,
 		);
 		// ⛔⛔ AND IT CARRIES THE SAME GATE THE FIGURE DOES. The first cut of the
@@ -559,10 +588,10 @@ describe("RPLY-3 · R1 · G2 — the image cell is the shock absorber", () => {
 		// does not watch. `invitesAPick` is the single named condition both tiers
 		// read, so a fourth phase cannot re-open the gap by being forgotten in one
 		// of two places.
-		expect(ATTACH).toContain(
+		expect(ATTACH_CODE).toContain(
 			"const invitesAPick = previewUrl === null && !fileInHand;",
 		);
-		expect(ATTACH).toMatch(
+		expect(ATTACH_CODE).toMatch(
 			/\{invitesAPick \? \(\s*<span className="hidden[^"]*max-mobile:inline"/,
 		);
 		// ⛔ The `<svg>` keeps the two properties that make it SCALE rather than

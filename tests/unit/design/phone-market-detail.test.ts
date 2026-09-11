@@ -60,6 +60,22 @@ function code(src: string): string {
 		.replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 }
 
+describe("phone tier — the scans reach a non-empty file set", () => {
+	/**
+	 * ⛔ EVERY NEGATIVE SCAN BELOW IS `expect(offenders).toEqual([])`, AND AN
+	 * EMPTY `phoneFiles()` SATISFIES ALL OF THEM AT ONCE. Measured: pointing the
+	 * extension filter at `.jsxx` left guards 2, 3, 4 and 5 GREEN — only guard 8
+	 * reddened, and only because its positive control happens to call
+	 * `phoneFiles()` itself. `side-pole-binding.test.ts` in this directory
+	 * carries the same check for the same reason ("a glob that silently matched
+	 * nothing passes vacuously — the recorded POLISH.1 z-index failure"); this
+	 * file shipped without it.
+	 */
+	it("phone-tier::guard-is-alive", () => {
+		expect(phoneFiles().length).toBeGreaterThanOrEqual(8);
+	});
+});
+
 describe("phone tier — the two roots hide together (guard 1)", () => {
 	/**
 	 * ⛔⛔ THE PAIR IS THE UNIT, AND ASSERTING ONE HALF IS WORSE THAN ASSERTING
@@ -69,7 +85,7 @@ describe("phone tier — the two roots hide together (guard 1)", () => {
 	 * only checks the other half.
 	 */
 	it("phone-tier::BOTH-roots-declare-their-side-of-the-640px-gate", () => {
-		const tag = /<PageContainer\b[^>]*>/.exec(read(VIEW));
+		const tag = /<PageContainer\b[^>]*>/.exec(code(read(VIEW)));
 		if (!tag) {
 			throw new Error(`${VIEW}: no PageContainer tag found.`);
 		}
@@ -84,7 +100,7 @@ describe("phone tier — the two roots hide together (guard 1)", () => {
 
 		const root =
 			/data-testid="phone-debate-view"[\s\S]{0,600}?className=\{?"([^"]*)"/.exec(
-				read(`${PHONE_DIR}/PhoneDebateView.tsx`),
+				code(read(`${PHONE_DIR}/PhoneDebateView.tsx`)),
 			);
 		if (!root) {
 			throw new Error("PhoneDebateView: no root className found.");

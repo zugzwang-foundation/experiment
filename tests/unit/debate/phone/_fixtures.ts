@@ -34,6 +34,17 @@ export function post(over: {
 	id: string;
 	ordinal: number;
 	side: Side;
+	/**
+	 * ⚠ PER-POST BY DEFAULT, and that is a discrimination property rather than
+	 * decoration. With one pseudonym on every post, an assertion on the composer's
+	 * reply header (`Support <author>'s argument`) proves only that the composer
+	 * opened against SOME post whose author is that name — a parent mix-up between
+	 * two same-author posts would be invisible. Deriving it from the id makes the
+	 * header name WHICH post.
+	 * ⛔ Still not invented content: the shapes are the identity-pool's own
+	 * (`<Colour><Animal><NNN>`), the same family the shipped fixtures use.
+	 */
+	pseudonym?: string;
 	replies?: { support: DebateReply[]; counter: DebateReply[] };
 }): DebatePost {
 	return {
@@ -48,7 +59,11 @@ export function post(over: {
 		imageUrl: null,
 		marker: "none",
 		badge: null,
-		author: { pseudonym: "AmberFinch404", pfpUrl: "/pfp-placeholder.svg" },
+		author: {
+			pseudonym:
+				over.pseudonym ?? `AmberFinch${String(over.ordinal).padStart(3, "0")}`,
+			pfpUrl: "/pfp-placeholder.svg",
+		},
 		authorStake: "50.000000000000000000",
 		authorStakeOriginal: "50.000000000000000000",
 		authorSold: false,
@@ -129,9 +144,19 @@ export function viewerHolding(side: Side): ViewerMarketContext {
  * in `src/` would be test-environment shape leaking into production code, and
  * the repo's precedent for exactly this is `auto-advance.test.tsx:71`.
  *
- * ⚠ Idempotent and prototype-level on purpose: vitest shares a jsdom instance
- * across the files in a worker, so a per-file assignment would either race or
- * clobber depending on collection order.
+ * ⚠⚠ THE REASON THIS COMMENT FIRST GAVE WAS FALSE, and it is corrected rather
+ * than deleted because the wrong premise is the interesting part. It said vitest
+ * "shares a jsdom instance across the files in a worker", which would make the
+ * idempotence guard load-bearing. `vitest.config.ts:33-34` sets `isolate: true`
+ * and `pool: "forks"`, so every test file gets its OWN process and its own
+ * jsdom, and the stub cannot cross — measured with a probe file run alongside
+ * all three callers, which read `Element.prototype.scrollTo typeof: undefined`.
+ * ⇒ The `if` is cheap belt, not a race guard. What IS load-bearing is the
+ * assignment itself: jsdom defines `window.scrollTo` but ships NO own descriptor
+ * for `scrollTo` on `Element.prototype` or `HTMLElement.prototype`, so the
+ * branch is genuinely taken and the track's tab-to-pane sync would throw on
+ * mount without it. A future reader deciding whether to delete this would have
+ * reasoned from the wrong half.
  */
 export function stubElementScroll(): void {
 	if (typeof Element.prototype.scrollTo !== "function") {

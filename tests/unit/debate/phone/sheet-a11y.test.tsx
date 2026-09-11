@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PhoneDebateView } from "@/components/debate/phone/PhoneDebateView";
+import { PhoneSheet } from "@/components/debate/phone/PhoneSheet";
 
 import { modelWith, post, stubElementScroll, VIEWER } from "./_fixtures";
 
@@ -92,6 +93,52 @@ describe("phone sheet — the strip and the dialog announce themselves (guard 15
 		fireEvent.click(screen.getByTestId("phone-title-strip"));
 		fireEvent.keyDown(document, { key: "a" });
 		expect(screen.queryByTestId("phone-sheet")).not.toBeNull();
+	});
+
+	/**
+	 * ⛔⛔ THE BUSY REFUSAL IS A MONEY RULE AND NOTHING WAS ASSERTING IT.
+	 * `PhoneSheet.tsx`'s own docblock states why: a mid-request unmount followed
+	 * by a re-open mints a FRESH idempotency key over a bet that may already be
+	 * committing, i.e. it converts a retry into a SECOND CHARGE. The sheet has
+	 * three doors the desktop slot does not (`×`, Escape, the backdrop) and all
+	 * three are shut by one flag — so all three are exercised here, plus the
+	 * owner's own `closeSheet`. Measured: stripping `!busyRef.current` from the
+	 * Escape handler, and stripping `!composerBusy` from `closeSheet`, each left
+	 * all twenty-four MOBILE-2 rows green.
+	 */
+	it("phone-sheet::busy-shuts-every-door", () => {
+		const onClose = vi.fn();
+		render(
+			<PhoneSheet open title="Busy" busy fullHeight onClose={onClose}>
+				<p>BUSY-BODY</p>
+			</PhoneSheet>,
+		);
+		fireEvent.keyDown(document, { key: "Escape" });
+		fireEvent.click(screen.getByTestId("phone-sheet-backdrop"));
+		expect(onClose).not.toHaveBeenCalled();
+		// The × is shut by `disabled` rather than by a handler branch, so it is
+		// asserted as an attribute — a click on a disabled control proves nothing.
+		expect(
+			screen.getByTestId("phone-sheet-close").hasAttribute("disabled"),
+		).toBe(true);
+	});
+
+	it("phone-sheet::not-busy-every-door-opens", () => {
+		// POSITIVE CONTROL for the row above — without it, a sheet whose backdrop
+		// and Escape listener were never wired at all would satisfy every
+		// assertion in it.
+		const onClose = vi.fn();
+		render(
+			<PhoneSheet open title="Idle" busy={false} fullHeight onClose={onClose}>
+				<p>IDLE-BODY</p>
+			</PhoneSheet>,
+		);
+		fireEvent.keyDown(document, { key: "Escape" });
+		expect(onClose).toHaveBeenCalledTimes(1);
+		fireEvent.click(screen.getByTestId("phone-sheet-backdrop"));
+		expect(onClose).toHaveBeenCalledTimes(2);
+		fireEvent.click(screen.getByTestId("phone-sheet-close"));
+		expect(onClose).toHaveBeenCalledTimes(3);
 	});
 
 	it("phone-sheet::body-scroll-is-locked-while-open-and-restored-on-close", () => {

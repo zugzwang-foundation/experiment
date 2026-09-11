@@ -40,6 +40,21 @@ afterEach(() => {
  * `${COMPOSER_COPY.header} — ${side}` and is therefore the REAL side the real
  * component received. Asserting on a prop passed to a mock would prove only that
  * the test's mock was called.
+ *
+ * ⛔⛔ AND THE CHAIN IS TWO HOPS, ONLY ONE OF WHICH LIVES HERE. This file proves
+ * *derivation → label*. What proves *label → WIRE* is
+ * `tests/unit/composer/render/side-identity.test.tsx`
+ * (`side-identity::a-YES-composer-shows-YES-and-submits-YES` and its NO twin),
+ * which is the seam's real owner. Measured: mutating `BetComposer`'s
+ * `side: props.side` into `buildPlaceRequest` while leaving the label on
+ * `props.side` keeps every row in THIS file green and reds exactly those two.
+ * ⇒ The soundness of the rows below depends on a file they do not name, so they
+ * name it. A reader who deletes `side-identity.test.tsx` as redundant would
+ * leave this surface asserting a string and nothing else.
+ *
+ * ⚠ The fixture gives each post its OWN pseudonym (`_fixtures.ts`), so the reply
+ * header names WHICH post the composer opened against and not merely that it
+ * opened against one.
  */
 const YES_POST = post({ id: "p1", ordinal: 1, side: "YES" });
 const NO_POST = post({ id: "p2", ordinal: 2, side: "NO" });
@@ -108,6 +123,11 @@ describe("phone thread — the partition is the model's (guard 14)", () => {
 		side: "NO",
 		pseudonym: "IndigoArmadillo000",
 	});
+	const SUPPORTER_2 = reply({
+		id: "r3",
+		side: "NO",
+		pseudonym: "TealPangolin000",
+	});
 	const OPPONENT = reply({
 		id: "r2",
 		side: "YES",
@@ -117,7 +137,7 @@ describe("phone thread — the partition is the model's (guard 14)", () => {
 		id: "p9",
 		ordinal: 9,
 		side: "NO",
-		replies: { support: [SUPPORTER], counter: [OPPONENT] },
+		replies: { support: [SUPPORTER, SUPPORTER_2], counter: [OPPONENT] },
 	});
 
 	function mountThread() {
@@ -136,7 +156,7 @@ describe("phone thread — the partition is the model's (guard 14)", () => {
 		mountThread();
 		expect(screen.getByTestId("phone-debate-view").dataset.arm).toBe("thread");
 		expect(screen.getByTestId("phone-tab-support").textContent).toBe(
-			"Support1",
+			"Support2",
 		);
 		expect(screen.getByTestId("phone-tab-counter").textContent).toBe(
 			"Counter1",

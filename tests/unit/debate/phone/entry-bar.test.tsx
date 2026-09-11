@@ -80,6 +80,23 @@ describe("phone bar — the label follows the active tab (guard 9)", () => {
 			"Bet YES",
 		);
 	});
+
+	it("phone-bar::the-sheet-the-NO-bar-opens-composes-NO", () => {
+		// ⛔ THE LABEL IS NOT THE SIDE. The row above proves the bar RENAMES
+		// itself when the pane changes; it says nothing about what the button
+		// then OPENS. A build that pins `setSheet({kind:"post", side:"YES"})`
+		// keeps every label correct and still hands a NO tapper a YES composer —
+		// measured green against all sixteen render rows before this one existed.
+		mount();
+		fireEvent.click(screen.getByTestId("phone-tab-NO"));
+		fireEvent.click(screen.getByTestId("phone-bar-entry"));
+		const section = screen
+			.getByTestId("phone-sheet")
+			.querySelector("section[aria-label]");
+		expect(section?.getAttribute("aria-label")).toBe(
+			`${COMPOSER_COPY.header} — NO`,
+		);
+	});
 });
 
 describe("phone bar — signed out opens the gate, never the composer (guard 10)", () => {
