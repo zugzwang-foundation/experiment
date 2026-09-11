@@ -68,7 +68,7 @@ export function PhoneTitleStrip({
 					href={backHref}
 					data-testid="phone-strip-back"
 					aria-label="Back to the market"
-					className="flex size-6 shrink-0 items-center justify-center text-[15px] text-ink"
+					className="flex size-11 shrink-0 items-center justify-center text-[15px] text-ink"
 				>
 					<span aria-hidden="true">←</span>
 				</Link>
@@ -81,7 +81,7 @@ export function PhoneTitleStrip({
 					fallback={
 						<div
 							aria-hidden="true"
-							className="flex size-10 shrink-0 items-center justify-center rounded-(--imgr) bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4 [border:var(--avatar-ring)]"
+							className="flex size-10 shrink-0 items-center justify-center rounded-(--imgr) bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n5 [border:var(--avatar-ring)]"
 						>
 							ZZ
 						</div>
@@ -99,7 +99,7 @@ export function PhoneTitleStrip({
 				// of the announcement that was missing (`@code-reviewer`).
 				aria-haspopup="dialog"
 				onClick={onOpen}
-				className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left"
+				className="flex min-h-11 min-w-0 flex-1 flex-col items-start justify-center gap-0.5 text-left"
 			>
 				<span className="w-full text-[13px] leading-[17px] font-bold tracking-tight text-ink">
 					{title}

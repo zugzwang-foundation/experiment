@@ -98,7 +98,7 @@ export function PhoneDetails({ model }: { model: DebateViewModel }) {
 						data-testid="phone-ai-mode"
 						className={cn(
 							buttonVariants({ variant: "outline", size: "xs" }),
-							"h-5 gap-1 rounded-4xl px-2.5 text-[11px] text-muted-foreground",
+							"min-h-8 gap-1 rounded-4xl px-2.5 text-[11px] text-muted-foreground",
 						)}
 					>
 						<Download />

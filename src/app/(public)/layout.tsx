@@ -203,7 +203,29 @@ export default async function PublicLayout({
 			    no-page-scroll composition this paragraph describes releases
 			    to ordinary page flow, same as every other (public) surface.
 			    See debate-mobile-reflow.test.ts. */}
-			<main className="flex min-h-[calc(100vh-60px-2px)] flex-1 flex-col">
+			<main
+				// ⛔ MOBILE-2b D-3/D-11 — TWO ADDITIVE PHONE TOKENS, and the
+				// unprefixed value is untouched, so every width at or above 640px
+				// computes exactly as it did before.
+				//
+				// `100vh` is the LARGE viewport: on a phone with its toolbars
+				// showing, the document is taller than the window by the toolbar
+				// height. `DebateView.tsx:1018` already uses `100dvh` for the same
+				// band and says why; this is the same ruling reaching the element
+				// that actually sets the phone tier's height.
+				//
+				// And `min-h` → `h` below 640 is what makes the market page's two
+				// feed panes into real scrollers. With a minimum, the panes stretch
+				// to their content and the DOCUMENT scrolls — so the two sides share
+				// one scroll position (scroll deep into YES, switch to NO, and you
+				// are the same distance down a shorter column), and the shorter side
+				// is padded out to the taller one's height: measured 2386px of YES
+				// against 1658px of NO, i.e. 728px of blank ground under the short
+				// side. A definite height gives each pane its own `overflow-y-auto`,
+				// which is what `overscroll-contain` on them was written for and
+				// could never do.
+				className="flex min-h-[calc(100vh-60px-2px)] flex-1 flex-col max-mobile:h-[calc(100dvh-60px-2px)] max-mobile:min-h-0 max-mobile:overflow-hidden"
+			>
 				{children}
 			</main>
 			{/* O1-DECK — the first-login deck, a SIBLING of `<main>` and never a

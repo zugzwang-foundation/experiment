@@ -3,6 +3,8 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { useIsPhoneTier } from "./phone-tier";
+
 /**
  * How many steps the countdown fill is drawn in. NOT a duration and not a
  * mockup value — a render granularity. The rail re-renders this many times per
@@ -195,15 +197,24 @@ export function ScrollRail({
  */
 function CountdownFill({ durationMs }: { durationMs: number | null }) {
 	const [step, setStep] = useState(0);
+	// ⛔ RI-3 / ADR-0050 D-2 — BELOW 640px THIS WHOLE TREE IS `display: none`, AND
+	// `display: none` DOES NOT STOP A TIMER. This interval ticks `FILL_STEPS`
+	// times per cycle and calls `setStep` on each, so a phone re-renders a rail
+	// it cannot see, several times a second, for as long as the tab is open.
+	// Measured before the gate: 252 timer callbacks a minute at phone width, all
+	// of them this tree's. Gating the START rather than the render is what keeps
+	// this render- and behaviour-neutral at ≥640: the query is false there and
+	// every line below runs exactly as it did.
+	const hiddenByTier = useIsPhoneTier();
 	useEffect(() => {
-		if (durationMs === null) {
+		if (durationMs === null || hiddenByTier) {
 			return;
 		}
 		const id = setInterval(() => {
 			setStep((s) => (s >= FILL_STEPS ? s : s + 1));
 		}, durationMs / FILL_STEPS);
 		return () => clearInterval(id);
-	}, [durationMs]);
+	}, [durationMs, hiddenByTier]);
 
 	return (
 		<span

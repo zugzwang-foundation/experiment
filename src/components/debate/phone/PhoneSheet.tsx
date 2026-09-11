@@ -215,7 +215,7 @@ export function PhoneSheet({
 				// focusable child yet.
 				tabIndex={-1}
 				className={`relative flex w-full flex-col bg-ground outline-none ${
-					fullHeight ? "h-full" : "max-h-[96vh]"
+					fullHeight ? "h-full" : "max-h-[96dvh]"
 				}`}
 			>
 				{/* The drag handle is VISUAL ONLY and says so: there is no drag
@@ -251,7 +251,7 @@ export function PhoneSheet({
 						aria-label="Close"
 						disabled={busy}
 						onClick={onClose}
-						className="rounded-(--r-chip) px-1 text-sm text-n4 transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
+						className="-mr-1.5 flex size-11 items-center justify-center rounded-(--r-chip) text-lg text-n4 transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
 					>
 						×
 					</button>

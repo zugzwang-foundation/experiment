@@ -1,12 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type ReactNode, useCallback, useState } from "react";
+import {
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 
 import { AuthGateSlot } from "../composer/AuthGateSlot";
 import { BetComposer } from "../composer/BetComposer";
 import { AUTH_GATE_COPY, COMPOSER_COPY } from "../composer/copy";
 import { deriveReplySide } from "../composer/gating";
+import { setPhoneSheetOpen } from "../composer-open-store";
 import { ImageLightbox, PostPopup, ReplyPopup } from "../dialogs";
 import { formatPricePercent } from "../format";
 import { PostCard } from "../PostCard";
@@ -140,6 +147,48 @@ export function PhoneDebateView({
 		}
 	}, []);
 	const [sheet, setSheet] = useState<PhoneSheetState>(null);
+
+	/**
+	 * RI-4 / O-n — tell the poll a sheet is open. `DebatePoll` lives in the
+	 * DESKTOP tree, which is this tree's sibling rather than its parent, so there
+	 * is no prop path between them; the store is the seam. See
+	 * `composer-open-store.ts` for why it is a store and not a context.
+	 *
+	 * ⛔ THE CLEANUP IS THE WHOLE SAFETY ARGUMENT. Publishing `true` from a
+	 * handler and `false` from another handler would leave the flag stuck on any
+	 * path that closes a sheet by unmounting rather than by calling the handler —
+	 * a navigation, an error boundary, React discarding the tree — and a stuck
+	 * `true` silently stops the surface refreshing for the rest of the session,
+	 * with no symptom but stale prices. Published from an effect, the release is
+	 * React's job rather than mine.
+	 */
+	useEffect(() => {
+		setPhoneSheetOpen(sheet !== null);
+		return () => setPhoneSheetOpen(false);
+	}, [sheet]);
+
+	/**
+	 * D-8 — THE BACK GESTURE IS THE PRIMARY NAVIGATION ON A PHONE, and it used to
+	 * leave a sheet floating over the wrong screen. The arm is derived from a
+	 * server prop, so a browser Back out of `?post=` re-renders the feed — but
+	 * `sheet` is client state and survived, leaving a reply composer open and
+	 * still addressed to a post the reader had just left. Keying on the arm's
+	 * own identity covers Back, Forward and a deep link equally, and needs no
+	 * `popstate` listener to do it: if the page the sheet was opened over is
+	 * gone, so is the sheet.
+	 */
+	const armWhenSheetLastReset = useRef(initialPostId);
+	useEffect(() => {
+		// ⚠ COMPARED, NOT MERELY DEPENDED ON. An effect keyed on the arm alone also
+		// fires on mount, which would close a sheet nobody has opened — harmless
+		// today and exactly the kind of thing that stops being harmless when a
+		// future arm seeds one. The ref makes "the arm CHANGED" the condition.
+		if (armWhenSheetLastReset.current === initialPostId) {
+			return;
+		}
+		armWhenSheetLastReset.current = initialPostId;
+		setSheet(null);
+	}, [initialPostId]);
 	/** P2 terminal reached this session — mirrors `DebateView.tsx:155`. */
 	const [suspended, setSuspended] = useState(false);
 	/** Mirrors `DebateView.tsx:160`; see `PhoneSheet` for what it shuts. */
@@ -403,7 +452,7 @@ export function PhoneDebateView({
 		<div
 			data-testid="phone-debate-view"
 			data-arm={focused === null ? "feed" : "thread"}
-			className="hidden w-full min-w-0 max-mobile:flex max-mobile:min-h-0 max-mobile:flex-1 max-mobile:flex-col"
+			className="hidden w-full min-w-0 max-mobile:flex max-mobile:min-h-0 max-mobile:flex-1 max-mobile:flex-col max-mobile:[touch-action:manipulation]"
 		>
 			{/* ⚠ THE STRIP AND THE TABS STICK AS ONE BLOCK, not as two elements with
 			    two offsets. A second `sticky top-[N]` under the first would have to
@@ -563,9 +612,24 @@ export function PhoneDebateView({
 				</PhoneSheet>
 			) : null}
 
-			<PostPopup post={popupPost} onClose={() => setPopupPost(null)} />
-			<ReplyPopup reply={popupReply} onClose={() => setPopupReply(null)} />
-			<ImageLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
+			{/* RI-5 / O-m — these three portal to `document.body`, i.e. OUT of the
+			    subtree the 640px gate hides, so the tier they belong to has to travel
+			    as data rather than as position. `dialogs.tsx` says why. */}
+			<PostPopup
+				post={popupPost}
+				onClose={() => setPopupPost(null)}
+				tier="phone"
+			/>
+			<ReplyPopup
+				reply={popupReply}
+				onClose={() => setPopupReply(null)}
+				tier="phone"
+			/>
+			<ImageLightbox
+				url={lightboxUrl}
+				onClose={() => setLightboxUrl(null)}
+				tier="phone"
+			/>
 		</div>
 	);
 }

@@ -95,9 +95,9 @@ export function PhoneSideTabs({
 							}
 						}}
 						onClick={() => onSelect(option.key)}
-						className={`flex h-[34px] flex-1 items-center justify-center gap-1.5 rounded-(--r) text-xs font-bold tracking-[0.06em] uppercase transition-colors ${
+						className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-(--r) text-xs font-bold tracking-[0.06em] uppercase transition-colors ${
 							on
-								? `${option.activeClass} [border:var(--ring-active)]`
+								? `${option.activeClass} [border:2px_solid_var(--ring)]`
 								: "text-n5 [border:var(--hairline)]"
 						}`}
 					>

@@ -48,9 +48,26 @@ function useScrollTopOnOpen(open: boolean) {
 export function PostPopup({
 	post,
 	onClose,
+	/**
+	 * ⛔ RI-5 / O-m — THE TIER GATE IS A PROPERTY OF DOM POSITION, AND A PORTAL
+	 * LEAVES THE DOM POSITION. Everything under `debate/phone/` is hidden above
+	 * 640px by one `max-mobile:` token on the subtree's root. Radix renders this
+	 * dialog into `document.body`, which is outside that subtree — so a popup
+	 * opened from the phone tree is, structurally, no longer in the phone tree,
+	 * and nothing about where it was opened from survives into the markup.
+	 *
+	 * It is inert today only because the openers all sit inside the hidden
+	 * subtree, which is an argument about who can reach it rather than about what
+	 * it is. `data-tier="phone"` makes the provenance readable in the DOM, which
+	 * is what lets a guard assert that every opener under `phone/` passes it —
+	 * and what lets anyone debugging a stray dialog know which tree put it there.
+	 * Absent on the desktop openers, so the desktop markup is byte-identical.
+	 */
+	tier,
 }: {
 	post: PresentPost | null;
 	onClose: () => void;
+	tier?: "phone" | undefined;
 }) {
 	const scrollRef = useScrollTopOnOpen(post !== null);
 	return (
@@ -70,7 +87,8 @@ export function PostPopup({
 			    primitive keeps its default for every other dialog in the app. */}
 			<DialogContent
 				ref={scrollRef}
-				className="max-h-[90vh] max-w-[720px] overflow-y-auto"
+				data-tier={tier}
+				className="max-h-[90vh] max-w-[720px] overflow-y-auto max-mobile:max-h-[88dvh] max-mobile:w-[calc(100vw-24px)] max-mobile:max-w-[calc(100vw-24px)] max-mobile:p-4"
 			>
 				{post ? (
 					<>
@@ -138,7 +156,7 @@ export function PostPopup({
 							<img
 								src={post.imageUrl}
 								alt="Argument attachment"
-								className="max-h-[60vh] w-full rounded-[var(--imgr)] object-contain [border:var(--hairline)]"
+								className="max-h-[60vh] w-full rounded-[var(--imgr)] object-contain [border:var(--hairline)] max-mobile:max-h-[52dvh]"
 							/>
 						) : null}
 						<p className="text-sm whitespace-pre-line">{post.body}</p>
@@ -179,9 +197,26 @@ export function PostPopup({
 export function ReplyPopup({
 	reply,
 	onClose,
+	/**
+	 * ⛔ RI-5 / O-m — THE TIER GATE IS A PROPERTY OF DOM POSITION, AND A PORTAL
+	 * LEAVES THE DOM POSITION. Everything under `debate/phone/` is hidden above
+	 * 640px by one `max-mobile:` token on the subtree's root. Radix renders this
+	 * dialog into `document.body`, which is outside that subtree — so a popup
+	 * opened from the phone tree is, structurally, no longer in the phone tree,
+	 * and nothing about where it was opened from survives into the markup.
+	 *
+	 * It is inert today only because the openers all sit inside the hidden
+	 * subtree, which is an argument about who can reach it rather than about what
+	 * it is. `data-tier="phone"` makes the provenance readable in the DOM, which
+	 * is what lets a guard assert that every opener under `phone/` passes it —
+	 * and what lets anyone debugging a stray dialog know which tree put it there.
+	 * Absent on the desktop openers, so the desktop markup is byte-identical.
+	 */
+	tier,
 }: {
 	reply: PresentReply | null;
 	onClose: () => void;
+	tier?: "phone" | undefined;
 }) {
 	const scrollRef = useScrollTopOnOpen(reply !== null);
 	return (
@@ -195,7 +230,8 @@ export function ReplyPopup({
 		>
 			<DialogContent
 				ref={scrollRef}
-				className="max-h-[90vh] max-w-[720px] overflow-y-auto"
+				data-tier={tier}
+				className="max-h-[90vh] max-w-[720px] overflow-y-auto max-mobile:max-h-[88dvh] max-mobile:w-[calc(100vw-24px)] max-mobile:max-w-[calc(100vw-24px)] max-mobile:p-4"
 			>
 				{reply ? (
 					<>
@@ -229,7 +265,7 @@ export function ReplyPopup({
 							<img
 								src={reply.imageUrl}
 								alt="Argument attachment"
-								className="max-h-[60vh] w-full rounded-[var(--imgr)] object-contain [border:var(--hairline)]"
+								className="max-h-[60vh] w-full rounded-[var(--imgr)] object-contain [border:var(--hairline)] max-mobile:max-h-[52dvh]"
 							/>
 						) : null}
 						<p className="text-sm whitespace-pre-line">{reply.body}</p>
@@ -314,9 +350,15 @@ export function ResolutionPopup({
 				}
 			}}
 		>
+			{/* ⚠ NO `data-tier` HERE, and that is the point of the attribute. The
+			    resolution popup has no opener under `phone/` — the phone tier never
+			    renders it — so stamping a provenance it does not have would make the
+			    marker mean "a dialog" rather than "a dialog the phone tree opened",
+			    which is the one thing it is for. The phone-width tokens above stay:
+			    they cost nothing, are inert ≥640, and are right if it ever does. */}
 			<DialogContent
 				ref={scrollRef}
-				className="max-h-[90vh] max-w-[720px] overflow-y-auto"
+				className="max-h-[90vh] max-w-[720px] overflow-y-auto max-mobile:max-h-[88dvh] max-mobile:w-[calc(100vw-24px)] max-mobile:max-w-[calc(100vw-24px)] max-mobile:p-4"
 			>
 				{description ? (
 					<>
@@ -345,9 +387,26 @@ export function ResolutionPopup({
 export function ImageLightbox({
 	url,
 	onClose,
+	/**
+	 * ⛔ RI-5 / O-m — THE TIER GATE IS A PROPERTY OF DOM POSITION, AND A PORTAL
+	 * LEAVES THE DOM POSITION. Everything under `debate/phone/` is hidden above
+	 * 640px by one `max-mobile:` token on the subtree's root. Radix renders this
+	 * dialog into `document.body`, which is outside that subtree — so a popup
+	 * opened from the phone tree is, structurally, no longer in the phone tree,
+	 * and nothing about where it was opened from survives into the markup.
+	 *
+	 * It is inert today only because the openers all sit inside the hidden
+	 * subtree, which is an argument about who can reach it rather than about what
+	 * it is. `data-tier="phone"` makes the provenance readable in the DOM, which
+	 * is what lets a guard assert that every opener under `phone/` passes it —
+	 * and what lets anyone debugging a stray dialog know which tree put it there.
+	 * Absent on the desktop openers, so the desktop markup is byte-identical.
+	 */
+	tier,
 }: {
 	url: string | null;
 	onClose: () => void;
+	tier?: "phone" | undefined;
 }) {
 	return (
 		<Dialog
@@ -358,14 +417,17 @@ export function ImageLightbox({
 				}
 			}}
 		>
-			<DialogContent className="max-w-3xl p-2">
+			<DialogContent
+				data-tier={tier}
+				className="max-w-3xl p-2 max-mobile:w-[calc(100vw-16px)] max-mobile:max-w-[calc(100vw-16px)] max-mobile:p-1.5"
+			>
 				<DialogTitle className="sr-only">Argument attachment</DialogTitle>
 				{url ? (
 					// biome-ignore lint/performance/noImgElement: short-TTL presigned R2 URL (D9), not a static asset — plain <img> per plan §4.
 					<img
 						src={url}
 						alt="Argument attachment"
-						className="max-h-[80vh] w-full object-contain"
+						className="max-h-[80vh] w-full object-contain max-mobile:max-h-[78dvh]"
 					/>
 				) : null}
 			</DialogContent>

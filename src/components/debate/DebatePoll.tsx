@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { POLL_INTERVAL_MS_DEBATE_VIEW } from "@/server/config/limits";
+
+import { usePhoneSheetOpen } from "./composer-open-store";
 import { getInitialPollPhaseOffsetMs } from "./poll-phase";
 
 /**
@@ -120,7 +122,15 @@ export function DebatePoll({
 	// returning to `Open`.
 	const stopped = useRef(false);
 
-	const suspended = documentHidden || composerOpen;
+	// ⛔ RI-4 / O-n — THE PHONE COMPOSER IS A SIBLING, NOT A CHILD, so it cannot
+	// reach this through a prop, and before this read the poll would refresh the
+	// page out from under a half-typed argument on a phone. The store's own
+	// docblock carries the reasoning and the stuck-flag posture; what matters
+	// here is that this is an OR over the same signal, not a second mechanism:
+	// "a composer is open on this surface" simply now includes the one the
+	// desktop tree cannot see.
+	const phoneSheetOpen = usePhoneSheetOpen();
+	const suspended = documentHidden || composerOpen || phoneSheetOpen;
 
 	useEffect(() => {
 		if (!marketOpen) {

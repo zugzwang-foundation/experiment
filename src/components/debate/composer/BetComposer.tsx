@@ -798,7 +798,17 @@ export function BetComposer(props: {
 									maxLength={TITLE_MAX_CHARS}
 									disabled={floorAbove || inFlight}
 									aria-label="Argument title"
-									className="h-[72px] min-h-8 resize-none field-sizing-fixed"
+									enterKeyHint="next"
+									// ⛔ MOBILE-2b D-2 — iOS Safari ZOOMS THE VIEWPORT when a focused
+									// field is under 16px, and does not zoom back out on blur. The
+									// reader taps the title and spends the rest of the session on a
+									// page wider than their screen, with the fixed bar off the edge.
+									// `Textarea`'s base is `text-sm` (14px), measured. The leading is
+									// stated with the size because an arbitrary `text-[Npx]` inherits
+									// whatever step was in scope and would otherwise keep `text-sm`'s
+									// 20px — the box is a fixed height either way, so this changes the
+									// text inside it and nothing around it. Additive: inert ≥640.
+									className="h-[72px] min-h-8 resize-none field-sizing-fixed max-mobile:text-[16px] max-mobile:leading-[22px]"
 									onKeyDown={(e) => {
 										// Layer 1, replacing the `<input>`: a newline never gets
 										// typed in the first place.
@@ -837,7 +847,8 @@ export function BetComposer(props: {
 									maxLength={extendedMax}
 									disabled={floorAbove || inFlight}
 									aria-label="Argument body"
-									className="h-[80px] min-h-14 resize-none field-sizing-fixed"
+									// D-2, the other half — same 14px, same zoom, same fix.
+									className="h-[80px] min-h-14 resize-none field-sizing-fixed max-mobile:text-[16px] max-mobile:leading-[22px]"
 									onChange={(e) => {
 										setExtended(e.target.value);
 										onEdit();
@@ -909,6 +920,11 @@ export function BetComposer(props: {
 										<Input
 											value={amount}
 											inputMode="decimal"
+											// D-2 — the amount is already 20px so it does not zoom;
+											// what it lacked was the key that ends entry. `done`
+											// rather than `go`: there is no form to submit and the
+											// reader still has to reach PLACE Đ BET.
+											enterKeyHint="done"
 											disabled={floorAbove || inFlight}
 											aria-label="Stake amount"
 											style={{ width: stakeFieldWidth(amount) }}
