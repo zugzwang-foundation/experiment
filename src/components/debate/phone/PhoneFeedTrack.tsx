@@ -29,10 +29,34 @@ import { type ReactNode, useCallback, useEffect, useRef } from "react";
  * `pan-x` would hand horizontal panning to the browser and TAKE VERTICAL AWAY,
  * which on a feed of posts means the page cannot be read.
  *
- * ⚠ THE OBSERVER'S THRESHOLD IS 0.6 AND NOT 0.5. At exactly one half, a track
- * parked precisely between two panes has both crossing at once and the active
- * tab flickers between them; 0.6 admits one pane at a time by construction.
+ * ⛔⛔ `threshold` DECIDES WHEN THE CALLBACK FIRES; IT DOES NOT DECIDE WHAT AN
+ * ENTRY REPORTS — and this docblock said the opposite, which made the ratio test
+ * below look redundant when it is the whole predicate. `entry.isIntersecting` is
+ * true for ANY ratio above zero. The two panes are exactly root-width, so their
+ * ratios are complementary and BOTH cross 0.6 in the same frame, arriving in one
+ * batch with `isIntersecting: true` on each — and a loop with no tie-break then
+ * takes whichever the batch happened to put last. That is guard 9's stated wrong
+ * answer ("a bar that does not follow the active pane") reached by an ordinary
+ * swipe, with the bet bar naming a side the reader is not looking at. Caught by
+ * `@code-reviewer`.
+ * ⇒ The ratio is read EXPLICITLY, and the batch is reduced to its single
+ * largest rather than iterated — so a frame carrying both panes resolves to one
+ * answer rather than to an ordering accident.
+ *
+ * ⛔ AND THE OBSERVER RE-ARMS WHEN THE PANES CHANGE IDENTITY. The deps were `[]`
+ * while the pane KEYS change with the arm (`YES`/`NO` ⇄ `support`/`counter`), so
+ * after one navigation into a post and back, React had replaced both nodes and
+ * the observer was still watching two detached ones — permanently, because this
+ * component sits at a fixed JSX position with no `key` and never remounts.
+ * Swiping then stopped updating the tab for the rest of the session. Found
+ * independently by both reviewers.
  */
+/**
+ * The pane element's `id`, shared with `PhoneSideTabs`' `aria-controls`. Exported
+ * so the two files cannot drift into two spellings of one contract.
+ */
+export const PANE_ID = (key: string) => `phone-pane-${key}`;
+
 export function PhoneFeedTrack({
 	panes,
 	active,
@@ -76,6 +100,11 @@ export function PhoneFeedTrack({
 		scrollToPane(active);
 	}, [active, scrollToPane]);
 
+	// ⚠ THE ARM'S IDENTITY, AS A DEPENDENCY. Not `panes` itself — the array is a
+	// fresh literal on every render, so it would re-arm the observer on every
+	// keystroke in a sheet. The KEYS are what change when the arm does.
+	const paneKeys = panes.map((pane) => pane.key).join("|");
+
 	useEffect(() => {
 		const track = trackRef.current;
 		// jsdom ships no IntersectionObserver; the guard keeps the render path
@@ -86,23 +115,40 @@ export function PhoneFeedTrack({
 		}
 		const observer = new IntersectionObserver(
 			(entries) => {
+				// THE LARGEST RATIO IN THIS BATCH, not the last intersecting entry.
+				let best: IntersectionObserverEntry | null = null;
 				for (const entry of entries) {
-					if (!entry.isIntersecting) {
+					if (entry.intersectionRatio < 0.6) {
 						continue;
 					}
-					const key = (entry.target as HTMLElement).dataset.pane;
-					if (key !== undefined) {
-						onActiveChangeRef.current(key);
+					if (
+						best === null ||
+						entry.intersectionRatio > best.intersectionRatio
+					) {
+						best = entry;
 					}
 				}
+				const key =
+					best === null ? undefined : (best.target as HTMLElement).dataset.pane;
+				if (key !== undefined) {
+					onActiveChangeRef.current(key);
+				}
 			},
-			{ root: track, threshold: 0.6 },
+			{ root: track, threshold: [0, 0.6, 1] },
 		);
-		for (const pane of track.querySelectorAll("[data-pane]")) {
-			observer.observe(pane);
+		// ⚠ OBSERVED BY THE DECLARED KEYS, not by whatever `[data-pane]` currently
+		// matches — which is also what makes `paneKeys` a REAL dependency rather
+		// than a re-arm trigger the linter has to be told to ignore. The two read
+		// the same source, so the effect cannot observe a pane the props do not
+		// declare, and it re-runs exactly when that set changes.
+		for (const key of paneKeys.split("|")) {
+			const pane = track.querySelector(`[data-pane="${key}"]`);
+			if (pane !== null) {
+				observer.observe(pane);
+			}
 		}
 		return () => observer.disconnect();
-	}, []);
+	}, [paneKeys]);
 
 	return (
 		<div
@@ -111,11 +157,22 @@ export function PhoneFeedTrack({
 			className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden [touch-action:pan-x_pan-y] [scrollbar-width:none]"
 		>
 			{panes.map((pane) => (
+				// ⚠ `role="tabpanel"` + `id` + `aria-labelledby` — the other half of
+				// `PhoneSideTabs`' `aria-controls`. A tablist whose tabs control
+				// nothing is a claim with no referent; these two files hold one
+				// contract between them and `PANE_ID` is where its shape lives.
 				<div
 					key={pane.key}
+					id={PANE_ID(pane.key)}
+					role="tabpanel"
+					aria-labelledby={`phone-tab-${pane.key}`}
+					// ⚠ NO `tabIndex={0}`. The APG gives a tabpanel one only when it
+					// holds nothing focusable — these hold post cards, their Support and
+					// Counter triggers and their `Know more`, so a stop here would be a
+					// stop on the way to a control rather than a way to reach content.
 					data-pane={pane.key}
 					data-testid={`phone-pane-${pane.key}`}
-					className="w-full shrink-0 snap-start snap-always overflow-y-auto overscroll-contain"
+					className="w-full shrink-0 snap-start snap-always overflow-y-auto overscroll-contain outline-none"
 				>
 					{pane.content}
 				</div>

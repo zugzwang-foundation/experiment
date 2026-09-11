@@ -23,6 +23,19 @@ import type { DebateMarketHeader } from "../types";
  * using no default-breakpoint variant. Four rows is not a narrower grid — it is
  * the other arrangement of the same four facts, and it is the one that fits.
  *
+ * ⚠⚠ THE BLAST RADIUS IS NOT THE SAME AS `ResolverCards`', AND THE DIFFERENCE IS
+ * THE BOUNDARY. `ResolverCards` reaches the page through `DebateView`, which is
+ * `"use client"`, so its `captureException` fires in the browser. This is a
+ * SERVER component, and `page.tsx` passes `<PhoneDetails …/>` as an element prop
+ * of a client component — which React renders EAGERLY on every request, at every
+ * width, whether or not the sheet is ever opened. So on a market outside
+ * BLOCK-1's eight this now also throws server-side once per request to
+ * `/m/<slug>`, unauthenticated and GET-triggerable, and again every 15 s per open
+ * tab via `DebatePoll`. The consequence is Sentry quota rather than state
+ * corruption — the catch still holds and the row still degrades — but the
+ * asymmetry is real and was found by `@security-auditor`. Recorded here rather
+ * than claimed equivalent.
+ *
  * ⛔ THE THROW IS CAUGHT HERE FOR THE SAME REASON IT IS CAUGHT THERE, and this
  * is the part that must not be simplified away. `getResolutionBlocks` throws for
  * any slug outside BLOCK-1's eight. A joint @code-reviewer/@security-auditor
@@ -73,7 +86,25 @@ export function PhoneResolverRows({ market }: { market: DebateMarketHeader }) {
 							{entry.href === null ? (
 								entry.line1
 							) : (
-								<a href={entry.href} className="hover:underline">
+								/* ⛔⛔ `target="_blank" rel="noopener noreferrer"`, MATCHING THE
+								   DESKTOP TWIN (`ResolverCards.tsx:501-510`) — and this shipped
+								   as a bare `<a href>` on the belief that every href in the map
+								   was `null`. It is not: SEVEN of the eight markets carry a live
+								   external RESOLVER href (`https://x.com/mybmc`,
+								   `https://coinmarketcap.com/...`, `https://www.oktoberfest.de/en`
+								   …). Caught by `@code-reviewer`.
+								   ⚠ The cost of the belief was not tabnabbing — with no
+								   `target="_blank"` there is no `window.opener` to exploit. It
+								   was that the phone leaked a `Referer` the desktop withholds,
+								   and that a tap navigated the participant OFF the market page
+								   in the same tab while the desktop opened a new one. Two
+								   surfaces, one link, two behaviours. */
+								<a
+									href={entry.href}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="hover:underline"
+								>
 									{entry.line1}
 								</a>
 							)}

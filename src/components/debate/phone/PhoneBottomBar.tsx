@@ -3,7 +3,6 @@
 import Link from "next/link";
 
 import { ThumbGlyph } from "@/components/ui/thumb-glyph";
-
 import {
 	COMPOSER_COPY,
 	c3OppositeSide,
@@ -12,6 +11,7 @@ import {
 } from "../composer/copy";
 import { isEntryDisabled } from "../composer/gating";
 import { formatDharma } from "../format";
+import { LifecycleBadge } from "../MarketHeader";
 import type { DebateMarketHeader, Side, ViewerMarketContext } from "../types";
 
 /**
@@ -95,12 +95,28 @@ export function PhoneBottomBar({
 	}));
 	const firstBlocked = gated.find((row) => row.blocked);
 
+	/**
+	 * ⛔⛔ THE LIFECYCLE IS NAMED BY `LifecycleBadge`, NOT BY A TERNARY OVER
+	 * `STATE_COPY` — and the first cut got this wrong in a way worth recording.
+	 * It fell through `Resolved` and `Voided` to `STATE_COPY.marketClosed.title`,
+	 * so a participant whose position had just SETTLED read "This market is
+	 * closed." Caught by `@code-reviewer`.
+	 * ⚠ `STATE_COPY` IS NOT A MARKET-STATE REGISTER AT ALL. Its only other
+	 * consumer is `ErrorStrip.tsx:54-63`, which maps SERVER ERROR CODES; the
+	 * desktop communicates lifecycle through `LifecycleBadge` in the header. The
+	 * phone's header has no room for it and the details sheet is behind a tap, so
+	 * the bar is where it belongs on this tier — one owner naming the state on
+	 * both surfaces, carrying the terminal `· read-only` wording and the INFO-1
+	 * gloss per state that a hand-written sentence would drop.
+	 * ⚠ `Frozen` KEEPS ITS OWN LINE. The conclusion freeze is not a market
+	 * lifecycle event a badge explains — `STATE_COPY.frozen.lead` is the ratified
+	 * sentence for it ("The experiment has concluded.") and it says something the
+	 * status word does not.
+	 */
 	const notice = !marketOpen
 		? market.status === "Frozen"
 			? STATE_COPY.frozen.lead
-			: market.status === "Resolving"
-				? STATE_COPY.resolving.title
-				: STATE_COPY.marketClosed.title
+			: null
 		: suspended
 			? SUSPENDED_COPY.banned.title
 			: firstBlocked !== undefined && heldSide !== null
@@ -124,6 +140,14 @@ export function PhoneBottomBar({
 					ownPseudonym={ownPseudonym}
 					slug={market.slug}
 				/>
+			) : null}
+			{!marketOpen && market.status !== "Frozen" ? (
+				<p
+					data-testid="phone-bar-notice"
+					className="flex items-center gap-2 px-3 pt-2 text-[11px] leading-[1.4] text-n5"
+				>
+					<LifecycleBadge status={market.status} />
+				</p>
 			) : null}
 			{notice !== null ? (
 				<p

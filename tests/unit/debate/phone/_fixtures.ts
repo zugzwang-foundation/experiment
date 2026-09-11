@@ -163,3 +163,30 @@ export function stubElementScroll(): void {
 		Element.prototype.scrollTo = () => undefined;
 	}
 }
+
+/**
+ * The dialog's RESOLVED ACCESSIBLE NAME, not the attribute that happens to carry
+ * it today.
+ *
+ * ⚠ THE GUARDS USED TO READ `aria-label` DIRECTLY, and went red when the sheet
+ * moved to `aria-labelledby` — correctly, in the sense that they noticed, and
+ * wrongly, in the sense that nothing about the name had changed. An assertion
+ * about WHICH ATTRIBUTE names a dialog is an assertion about a mechanism; what a
+ * reader with a screen reader actually receives is the resolved name, and that
+ * is what these rows are for.
+ */
+export function dialogName(el: Element | null): string | null {
+	if (el === null) {
+		return null;
+	}
+	const direct = el.getAttribute("aria-label");
+	if (direct !== null && direct !== "") {
+		return direct;
+	}
+	const id = el.getAttribute("aria-labelledby");
+	if (id === null) {
+		return null;
+	}
+	// ⚠ The id may name a node ANYWHERE in the document, not only inside `el`.
+	return document.getElementById(id)?.textContent ?? null;
+}

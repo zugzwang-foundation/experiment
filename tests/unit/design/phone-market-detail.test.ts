@@ -158,6 +158,16 @@ describe("phone tier — no write path (guards 3 and 4)", () => {
 		const offenders: string[] = [];
 		for (const { file, src } of phoneFiles()) {
 			const body = code(src);
+			/**
+			 * ⚠⚠ THE RULE IS "NO WRITE PATH"; THE FIRST NEEDLE LIST MEASURED "NO
+			 * `fetch` AND NO DIRECT REQUESTS IMPORT", WHICH IS NARROWER.
+			 * `@security-auditor` enumerated what walked through it: a Server
+			 * Action (`"use server"`, or any `@/server/**` import), a
+			 * `<form action={…}>`, `navigator.sendBeacon`, `XMLHttpRequest`. None
+			 * is exotic — a Server Action in particular is the shape a future
+			 * "just save the draft" convenience takes, and it would have passed a
+			 * guard whose own docblock says no write path exists here.
+			 */
 			for (const needle of [
 				"fetch(",
 				"/api/bets/",
@@ -165,6 +175,12 @@ describe("phone tier — no write path (guards 3 and 4)", () => {
 				"composer/idempotency",
 				"./requests",
 				"./idempotency",
+				'"use server"',
+				"@/server/",
+				"sendBeacon",
+				"XMLHttpRequest",
+				"<form",
+				"formAction",
 			]) {
 				if (body.includes(needle)) {
 					offenders.push(`${file}: ${needle}`);
@@ -179,6 +195,19 @@ describe("phone tier — no write path (guards 3 and 4)", () => {
 		expect(
 			composer.includes("fetch(") || composer.includes("await fetch"),
 		).toBe(true);
+		// ⚠ AND A CONTROL FOR THE WIDENED HALF, on synthetic strings, so the four
+		// new needles are proved to MATCH the shape each one names rather than
+		// merely being absent from a directory that never contained them.
+		for (const [needle, sample] of [
+			['"use server"', 'const a = 1; "use server";'],
+			["@/server/", 'import { x } from "@/server/bets/place";'],
+			["sendBeacon", "navigator.sendBeacon(u, b);"],
+			["<form", "<form action={save}>"],
+		] as const) {
+			expect(sample.includes(needle), `${needle} matches its own shape`).toBe(
+				true,
+			);
+		}
 	});
 
 	it("phone-tier::the-sheet-mounts-only-BetComposer-or-AuthGateSlot", () => {
@@ -333,5 +362,104 @@ describe("phone tier — no viewport branch in JavaScript (guard 8)", () => {
 				code(src).includes('matchMedia("(prefers-reduced-motion: reduce)")'),
 			),
 		).toBe(true);
+	});
+});
+
+describe("phone tier — every host transition consults the busy flag (guard 16)", () => {
+	/**
+	 * ⛔⛔ THE MONEY RULE, AS A SOURCE FACT — because the behavioural version of
+	 * this needs a composer with a request genuinely in flight, and the thing
+	 * that actually goes wrong is a NEW `setSheet` call site written six months
+	 * from now by someone who has not read `DebateView.tsx:155-159`.
+	 *
+	 * `BetComposer`'s `key` in the phone owner carries `kind`, `parentCommentId`
+	 * and `side`, so ANY host transition that changes one remounts it. A fresh
+	 * instance mints a fresh idempotency key; the in-flight `fetch` has no
+	 * `AbortController`; the unmount reports `onBusyChange(false)`. The first
+	 * request still commits and the resubmit carries a key `bet_receipts`' UNIQUE
+	 * cannot dedupe (ADR-0031) — one intent, two charges.
+	 *
+	 * The first cut of this file guarded ONE of seven call sites and both
+	 * reviewers found it. The rule is therefore stated structurally: a
+	 * `setSheet(` that is not inside `guard(` must carry an explicit
+	 * `composerBusy` early-return in the same function.
+	 */
+	it("phone-tier::no-unguarded-sheet-OPEN-in-the-phone-owner", () => {
+		const owner = code(read(`${PHONE_DIR}/PhoneDebateView.tsx`));
+		/**
+		 * ⚠⚠ SCOPED TO THE OPENINGS, AND THE SCOPE IS THE RULE RATHER THAN A
+		 * CONVENIENCE. `setSheet({…})` is what can change `kind`,
+		 * `parentCommentId` or `side` — the three fields in `BetComposer`'s `key`
+		 * — so it is the direction that REMOUNTS a composer mid-request.
+		 * `setSheet(null)` is a CLOSE, and the two closes that are not routed
+		 * through the guarded `closeSheet` are both provably safe: `onPosted`
+		 * fires AFTER the bet has committed (guarding it would leave the sheet
+		 * open on success), and the parent-post sheet's `onEnter` closes a
+		 * read-only sheet that is mutually exclusive with the composer — the slot
+		 * is one union, so a composer cannot be open behind it.
+		 * ⇒ A blanket rule over every `setSheet(` would have had to admit those
+		 * two as exceptions, and an exception list is the thing a later edit
+		 * quietly joins. A rule with no exceptions does not have that failure mode.
+		 */
+		/**
+		 * ⛔⛔ BY BRACE MATCHING, NEVER BY A LOOKBACK WINDOW — and this is the
+		 * second version, because the first did not discriminate. It scanned the
+		 * 400 characters before each call for either `guard((` or an
+		 * `if (composerBusy) return`, which is a DISTANCE fence, i.e. `O-8`'s "a
+		 * character window is a line number wearing a different unit". Measured:
+		 * with `openDetails` and `openReply` each stripped of their guard in turn,
+		 * the row stayed GREEN both times — the window had reached back into a
+		 * NEIGHBOURING function that still carried the busy check.
+		 * ⇒ The enclosing region is computed by matching `guard(`'s own
+		 * parentheses, so a call is inside it or it is not, at any distance.
+		 * ⚠ And the production code was reduced to ONE shape in the same edit:
+		 * `openReply` and `enterPost` used to early-return on `composerBusy`
+		 * directly. Two shapes meant two things for this guard to recognise, which
+		 * is what made a sloppy recogniser tempting.
+		 */
+		const guardRegions: [number, number][] = [];
+		for (const m of owner.matchAll(/guard\(/g)) {
+			const start = m.index ?? 0;
+			let depth = 0;
+			let i = start + "guard".length;
+			for (; i < owner.length; i++) {
+				const ch = owner[i];
+				if (ch === "(") depth++;
+				else if (ch === ")") {
+					depth--;
+					if (depth === 0) break;
+				}
+			}
+			guardRegions.push([start, i]);
+		}
+		expect(
+			guardRegions.length,
+			"the owner still routes transitions through `guard(`",
+		).toBeGreaterThanOrEqual(3);
+
+		const opens = [...owner.matchAll(/setSheet\(\{/g)].map((m) => m.index ?? 0);
+		expect(
+			opens.length,
+			"the owner still opens sheets at all",
+		).toBeGreaterThanOrEqual(3);
+		const unguarded: string[] = [];
+		for (const at of opens) {
+			const inside = guardRegions.some(([lo, hi]) => at > lo && at < hi);
+			if (!inside) {
+				unguarded.push(owner.slice(Math.max(0, at - 70), at + 30));
+			}
+		}
+		expect(
+			unguarded,
+			"a sheet OPEN outside `guard(` can remount BetComposer mid-request " +
+				"and mint a second idempotency key",
+		).toEqual([]);
+		// And the close path keeps its own guard.
+		expect(owner).toMatch(/closeSheet = useCallback\(\(\) => \{\s*guard\(/);
+		// POSITIVE CONTROL — the `guard` helper itself really does consult the
+		// flag, so "inside a guard region" means something.
+		expect(owner).toMatch(
+			/const guard = useCallback\(\s*\(fn: \(\) => void\) => \{\s*if \(composerBusy\) \{/,
+		);
 	});
 });

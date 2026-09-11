@@ -30,8 +30,8 @@ MOBILE-2 RECON (2026-09-11) measured `/m/[slug]` at 375×812 on staging: the mar
 
 ## Consequences
 
-- Phones now hydrate the desktop tree (status quo, hidden) plus the phone tree. Measured JS delta at 375: «bytes». A follow-up may lazy-load the desktop tree's heavy client leaves below 640px; not this ADR.
+- Phones now hydrate the desktop tree (status quo, hidden) plus the phone tree. Measured JS delta at 375: **+4.0 KB gzipped** (452,214 B → 456,218 B transferred, cache disabled, read on two Preview deployments of the same branch back to back). A follow-up may lazy-load the desktop tree's heavy client leaves below 640px; not this ADR.
 - Phase A's `max-mobile:` tokens on the desktop tree and their guards remain; they are redundant below 640px and are noted as such in `docs/parked.md`.
 - `design-language.md §1.7` ("desktop-only") is false as of this ADR; the web lane redrafts it at close-out. Any SPEC.2 sentence the build contradicts is listed in the run report for the same amendment.
 - The 641–1023px band still has no chart (RECON S-7); unchanged, separate item.
-- Verification at the preview: 375 — `scrollWidth` 375, zero clipped elements inside cards, the question unclipped, resolver rows readable, chart visible in the sheet; 1440 — «0 px diff / identical DOM hash» against `origin/main`.
+- Verification at the preview: 375 — `scrollWidth` 375, zero clipped elements inside cards, the question unclipped, resolver rows readable, chart visible in the sheet; 1440 — measured against `origin/main`'s own render: **80 differing pixels on the market view and 27 on the thread view, against a noise floor of 118–156 px** established by reading the SAME build twice; **73 + 12 desktop element boxes byte-identical**, the only two deltas being the price chart's clock-driven right edge (0.01 px) and a live visitor count. ⚠ **The DOM is NOT identical and cannot be**: an additive `max-mobile:` token IS a DOM attribute change, and D-2 requires them on the reused desktop components. What is measured instead, and is the stronger claim: the desktop DOM gains **nine inserted fragments, all nine `max-mobile:` tokens, and zero deletions**.

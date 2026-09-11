@@ -6,7 +6,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { PhoneDebateView } from "@/components/debate/phone/PhoneDebateView";
 import { PhoneSheet } from "@/components/debate/phone/PhoneSheet";
 
-import { modelWith, post, stubElementScroll, VIEWER } from "./_fixtures";
+import {
+	dialogName,
+	modelWith,
+	post,
+	stubElementScroll,
+	VIEWER,
+} from "./_fixtures";
 
 vi.mock("next/navigation", () => ({
 	useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
@@ -63,7 +69,7 @@ describe("phone sheet — the strip and the dialog announce themselves (guard 15
 		const sheet = screen.getByTestId("phone-sheet");
 		expect(sheet.getAttribute("role")).toBe("dialog");
 		expect(sheet.getAttribute("aria-modal")).toBe("true");
-		expect(sheet.getAttribute("aria-label")).toBe("Market");
+		expect(dialogName(sheet)).toBe("Market");
 		// The RSC children reach the sheet body unchanged.
 		expect(screen.getByTestId("phone-sheet-body").textContent).toContain(
 			"DETAILS-SENTINEL",

@@ -875,7 +875,13 @@ export function BetComposer(props: {
 							data-testid="composer-phone-balance"
 							className="mt-1 hidden shrink-0 items-baseline justify-between gap-2 text-[10px] leading-tight text-n5 max-mobile:flex"
 						>
-							<span>{overCapStrip()}</span>
+							{/* ⚠ HIDDEN WHILE THE NOTICE SLOT IS ALREADY SAYING IT. In the
+							    over-cap state `notice` renders `overCapStrip()` a few lines
+							    below, so a phone printed `Max Đ 250 per bet` twice on one
+							    screen (`@code-reviewer`). The BALANCE half is what this line
+							    exists for and it stays in both states — it is the invariant
+							    ADR-0049 left the phone without. */}
+							<span>{assess.overCap ? "" : overCapStrip()}</span>
 							<span>
 								Balance{" "}
 								<span className="font-mono text-ink">

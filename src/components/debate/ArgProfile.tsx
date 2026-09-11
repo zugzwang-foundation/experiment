@@ -245,6 +245,17 @@ export function ArgProfile({
 				    `flex-wrap` alone cannot help while `shrink-0` pins the group at its
 				    362px content width, so releasing the shrink is what lets the wrap
 				    ever engage.
+				    ⛔⛔ MOBILE-2 — BOTH TOKENS ARE NOW INERT ON GROUP A, and the
+				    correction is written here rather than appended below because this is
+				    the paragraph a reader reaches first (`O-5`). `max-mobile:contents`
+				    removes the group's BOX at the same width, and `flex-shrink` /
+				    `flex-wrap` are properties of a box — so neither applies. What
+				    replaced the mechanism is the same outcome one level up: the fields
+				    become items of the ROW and wrap against it, which is what puts the
+				    author on a line of their own. The two tokens are kept rather than
+				    deleted for the reason the ADR gives for Phase A's other redundant
+				    tokens — their guard is live, and removing a token from a desktop
+				    component is a desktop edit. `@code-reviewer` measured the inertness.
 				    ⛔ >=640px IS BYTE-IDENTICAL: both tokens are inert there, so the
 				    desktop row is still one line of two locked groups exactly as
 				    UI-OVERNIGHT 1b designed it, and `arg-profile-row.test.tsx` — which

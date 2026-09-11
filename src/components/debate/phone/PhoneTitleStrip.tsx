@@ -92,6 +92,12 @@ export function PhoneTitleStrip({
 				type="button"
 				data-testid="phone-title-strip"
 				aria-expanded={expanded}
+				// ⚠ BOTH, not one instead of the other. `aria-expanded` is the
+				// disclosure attribute and it is what guard 15 pins; what this control
+				// actually opens is a MODAL DIALOG, and `aria-haspopup="dialog"` is the
+				// attribute that says so. Adding it costs nothing and removes the half
+				// of the announcement that was missing (`@code-reviewer`).
+				aria-haspopup="dialog"
 				onClick={onOpen}
 				className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left"
 			>

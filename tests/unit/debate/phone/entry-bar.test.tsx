@@ -12,6 +12,7 @@ import {
 import { PhoneDebateView } from "@/components/debate/phone/PhoneDebateView";
 
 import {
+	dialogName,
 	modelWith,
 	post,
 	stubElementScroll,
@@ -38,7 +39,7 @@ const POSTS = [
 
 function mount(over?: {
 	viewer?: Parameters<typeof PhoneDebateView>[0]["viewer"];
-	status?: "Open" | "Closed" | "Resolving" | "Resolved";
+	status?: "Open" | "Closed" | "Resolving" | "Resolved" | "Voided";
 }) {
 	return render(
 		<PhoneDebateView
@@ -115,10 +116,8 @@ describe("phone bar — signed out opens the gate, never the composer (guard 10)
 		// sheet `Place your Đ BET` announces an action the reader cannot take and
 		// then shows them why not — two headings disagreeing about what the screen
 		// is for, and the accessible name is the one a screen reader hears FIRST.
-		expect(sheet.getAttribute("aria-label")).toBe(
-			AUTH_GATE_COPY.heading("YES"),
-		);
-		expect(sheet.getAttribute("aria-label")).not.toBe(COMPOSER_COPY.header);
+		expect(dialogName(sheet)).toBe(AUTH_GATE_COPY.heading("YES"));
+		expect(dialogName(sheet)).not.toBe(COMPOSER_COPY.header);
 		// The composer's own argument field is the thing that must NOT be here.
 		expect(sheet.querySelector('[aria-label="Argument title"]')).toBeNull();
 	});
@@ -130,7 +129,7 @@ describe("phone bar — signed out opens the gate, never the composer (guard 10)
 		mount();
 		fireEvent.click(screen.getByTestId("phone-bar-entry"));
 		const sheet = screen.getByTestId("phone-sheet");
-		expect(sheet.getAttribute("aria-label")).toBe(COMPOSER_COPY.header);
+		expect(dialogName(sheet)).toBe(COMPOSER_COPY.header);
 		expect(
 			sheet.querySelector("section[aria-label]")?.getAttribute("aria-label"),
 		).toBe(`${COMPOSER_COPY.header} — YES`);
@@ -166,11 +165,20 @@ describe("phone bar — a settled market is read-locked (guard 13)", () => {
 	 * market still says "you could bet here", which is not true and will not
 	 * become true (design-language §1.8).
 	 */
+	/**
+	 * ⚠⚠ THE STATE IS NAMED BY `LifecycleBadge`, AND THESE ROWS USED TO ASSERT
+	 * `STATE_COPY` INSTEAD. That was wrong in a way the rows themselves could not
+	 * show: `STATE_COPY` has no entry for `Resolved` or `Voided`, so both fell
+	 * through to `marketClosed.title` and a participant whose position had just
+	 * settled read "This market is closed." `@code-reviewer` caught it. The
+	 * assertions now read the badge, which is the desktop's own owner for this
+	 * fact and which carries the terminal `· read-only` wording per state.
+	 */
 	it("phone-bar::a-Closed-market-renders-the-state-and-no-entry-control", () => {
 		mount({ status: "Closed" });
 		expect(screen.queryByTestId("phone-bar-entry")).toBeNull();
 		expect(screen.getByTestId("phone-bar-notice").textContent).toBe(
-			STATE_COPY.marketClosed.title,
+			"Closed · read-only",
 		);
 	});
 
@@ -178,8 +186,20 @@ describe("phone bar — a settled market is read-locked (guard 13)", () => {
 		mount({ status: "Resolving" });
 		expect(screen.queryByTestId("phone-bar-entry")).toBeNull();
 		expect(screen.getByTestId("phone-bar-notice").textContent).toBe(
-			STATE_COPY.resolving.title,
+			"Resolving · read-only",
 		);
+	});
+
+	it("phone-bar::a-RESOLVED-market-does-not-read-as-merely-closed", () => {
+		// ⛔ THE ROW THAT WOULD HAVE CAUGHT THE DEFECT. `Resolved` and `Voided`
+		// have no `STATE_COPY` entry at all, so any build that routes lifecycle
+		// through that register tells a settled participant their market is
+		// "closed" — a different and less final thing than what happened.
+		mount({ status: "Resolved" });
+		expect(screen.queryByTestId("phone-bar-entry")).toBeNull();
+		const notice = screen.getByTestId("phone-bar-notice").textContent ?? "";
+		expect(notice).toBe("Resolved · read-only");
+		expect(notice).not.toBe(STATE_COPY.marketClosed.title);
 	});
 
 	it("phone-bar::an-Open-market-DOES-render-the-entry-control", () => {

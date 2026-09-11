@@ -10,7 +10,11 @@ import { deriveReplySide } from "../composer/gating";
 import { ImageLightbox, PostPopup, ReplyPopup } from "../dialogs";
 import { formatPricePercent } from "../format";
 import { PostCard } from "../PostCard";
-import { EmptySideCTA } from "../placeholders";
+// ⚠ THE CONSTANT, NOT A FOURTH COPY OF THE STRING. `REMOVED_STUB_TEXT` is
+// "the ONE masking-variant string, reused across every removal surface"
+// (`placeholders.tsx:3-7`); a private literal here is the SEP-1 drift story this
+// task argues against two files over. Caught by `@code-reviewer`.
+import { EmptySideCTA, REMOVED_STUB_TEXT } from "../placeholders";
 import { ReplyCard } from "../ReplyCard";
 import type {
 	DebatePost,
@@ -21,7 +25,7 @@ import type {
 	ViewerMarketContext,
 } from "../types";
 import { type PhoneBarAction, PhoneBottomBar } from "./PhoneBottomBar";
-import { PhoneFeedTrack } from "./PhoneFeedTrack";
+import { PANE_ID, PhoneFeedTrack } from "./PhoneFeedTrack";
 import { PhoneSheet } from "./PhoneSheet";
 import { PhoneSideTabs } from "./PhoneSideTabs";
 import { PhoneTitleStrip } from "./PhoneTitleStrip";
@@ -84,9 +88,17 @@ export function PhoneDebateView({
 	initialPostId: string | null;
 	ownPseudonym: string | null;
 	/**
-	 * RF-7 — the details sheet's body, rendered on the SERVER and passed down. It
-	 * is not rendered until the sheet has been opened once, so a reader who never
-	 * opens it never mounts the price chart inside it.
+	 * RF-7 — the details sheet's body, rendered on the SERVER and passed down.
+	 *
+	 * ⚠ IT IS NOT **MOUNTED** UNTIL THE SHEET IS FIRST OPENED — and this line
+	 * used to say "not RENDERED", which is a different and false claim. As an
+	 * element prop of a client component it is rendered SERVER-SIDE on every
+	 * request at every width, and its Flight payload ships either way; what
+	 * `detailsMounted` defers is the client mount, so a reader who never opens
+	 * the sheet never runs the price chart's geometry. Corrected after
+	 * `@security-auditor` and `@code-reviewer` both measured it — the false half
+	 * was also the premise under which `PhoneResolverRows`' server-side throw
+	 * looked unreachable.
 	 */
 	details: ReactNode;
 }) {
@@ -104,8 +116,29 @@ export function PhoneDebateView({
 	 */
 	const focused = posts.find((post) => post.id === initialPostId) ?? null;
 
-	const [activeKey, setActiveKey] = useState<string>("YES");
-	const [threadKey, setThreadKey] = useState<string>("support");
+	/**
+	 * ⛔ TYPED TO THEIR LITERAL UNIONS, and the cast that used to bridge them is
+	 * gone. These were `useState<string>` with an `as Side` at the two sites that
+	 * hand a side to `BetComposer` — correct only by the coincidence of two files
+	 * agreeing on a pane key, with `tsc` green if either drifted. AGENTS.md §4
+	 * admits an `as` cast at a trust boundary; this IS the boundary where a
+	 * string becomes a POLE, which is the one place it must not be used. The
+	 * narrowing happens once, at the seam where the DOM value arrives.
+	 */
+	const [activeSide, setActiveSide] = useState<Side>("YES");
+	const [threadRelation, setThreadRelation] = useState<"support" | "counter">(
+		"support",
+	);
+	const onSideKey = useCallback((key: string) => {
+		if (key === "YES" || key === "NO") {
+			setActiveSide(key);
+		}
+	}, []);
+	const onRelationKey = useCallback((key: string) => {
+		if (key === "support" || key === "counter") {
+			setThreadRelation(key);
+		}
+	}, []);
 	const [sheet, setSheet] = useState<PhoneSheetState>(null);
 	/** P2 terminal reached this session — mirrors `DebateView.tsx:155`. */
 	const [suspended, setSuspended] = useState(false);
@@ -131,26 +164,63 @@ export function PhoneDebateView({
 		router.refresh();
 	}, [router]);
 
+	/**
+	 * ⛔⛔ EVERY HOST TRANSITION CONSULTS `composerBusy`, NOT JUST THE CLOSE —
+	 * and shipping only the close was a real double-charge door, found by
+	 * `@code-reviewer` and `@security-auditor` independently.
+	 *
+	 * `PhoneSheet` shuts the three doors IT owns (`×`, Escape, backdrop) and the
+	 * first cut of this file left the six the HOST owns wide open. The desktop
+	 * guards exactly these — `toggleEntry` (`DebateView.tsx:270`),
+	 * `toggleFocusMode` (`:277`), `enterPost` (`:634`), `replyToPost` (`:673`),
+	 * `exitPost` (`:696`) and the `popstate` listener (`:858`) — each with
+	 * `if (composerBusy) return`, under the rule at `:155-159`.
+	 *
+	 * ⚠ THE MECHANISM, because "it unmounts the composer" understates it.
+	 * `BetComposer`'s `key` here carries `kind`, `parentCommentId` and `side`, so
+	 * a `setSheet` that changes any of them REMOUNTS it. A fresh instance mints a
+	 * fresh idempotency key at mount, the in-flight `fetch` has no
+	 * `AbortController`, and the unmount fires `onBusyChange(false)` — so the
+	 * first request still commits server-side while the host has stopped
+	 * believing anything is in flight, and the resubmit carries a key
+	 * `bet_receipts`' UNIQUE cannot dedupe. One intent, two bets, two charges.
+	 *
+	 * ⚠ IT WAS REACHABLE BY KEYBOARD ALONE. The backdrop blocks the pointer, but
+	 * the background controls stayed in the tab order — on the thread arm the
+	 * other relation button is one Tab from the submit. The focus containment in
+	 * `PhoneSheet` closes that half; this closes the half that does not depend on
+	 * focus behaviour at all.
+	 */
+	const guard = useCallback(
+		(fn: () => void) => {
+			if (composerBusy) {
+				return;
+			}
+			fn();
+		},
+		[composerBusy],
+	);
+
 	const closeSheet = useCallback(() => {
-		if (!composerBusy) {
-			setSheet(null);
-		}
-	}, [composerBusy]);
+		guard(() => setSheet(null));
+	}, [guard]);
 
 	const openReply = useCallback(
 		(parent: DebatePost, relation: "support" | "counter") => {
-			setSheet({
-				kind: "reply",
-				side: deriveReplySide({
-					parentSide: parent.sideAtPostTime,
+			guard(() => {
+				setSheet({
+					kind: "reply",
+					side: deriveReplySide({
+						parentSide: parent.sideAtPostTime,
+						relation,
+					}),
 					relation,
-				}),
-				relation,
-				parentCommentId: parent.id,
-				authorPseudonym: parent.removed ? null : parent.author.pseudonym,
+					parentCommentId: parent.id,
+					authorPseudonym: parent.removed ? null : parent.author.pseudonym,
+				});
 			});
 		},
-		[],
+		[guard],
 	);
 
 	/**
@@ -162,19 +232,25 @@ export function PhoneDebateView({
 	 */
 	const enterPost = useCallback(
 		(postId: string) => {
-			const target = posts.find((post) => post.id === postId);
-			if (target === undefined) {
-				return;
-			}
-			router.push(`/m/${market.slug}?post=${target.ordinal}`);
+			guard(() => {
+				const target = posts.find((post) => post.id === postId);
+				if (target === undefined) {
+					return;
+				}
+				router.push(
+					`/m/${encodeURIComponent(market.slug)}?post=${target.ordinal}`,
+				);
+			});
 		},
-		[posts, router, market.slug],
+		[posts, router, market.slug, guard],
 	);
 
 	const openDetails = useCallback(() => {
-		setDetailsMounted(true);
-		setSheet({ kind: "details" });
-	}, []);
+		guard(() => {
+			setDetailsMounted(true);
+			setSheet({ kind: "details" });
+		});
+	}, [guard]);
 
 	const pricing = market.pricing;
 	const feedTabs = (["YES", "NO"] as const).map((side) => ({
@@ -284,8 +360,8 @@ export function PhoneDebateView({
 			? [
 					{
 						key: "entry",
-						label: `Bet ${activeKey}`,
-						side: activeKey as Side,
+						label: `Bet ${activeSide}`,
+						side: activeSide,
 						filled: true,
 						glyph: true,
 					},
@@ -314,11 +390,13 @@ export function PhoneDebateView({
 				];
 
 	const onBarEntry = (key: string) => {
-		if (focused === null) {
-			setSheet({ kind: "post", side: activeKey as Side });
-			return;
-		}
-		openReply(focused, key === "counter" ? "counter" : "support");
+		guard(() => {
+			if (focused === null) {
+				setSheet({ kind: "post", side: activeSide });
+				return;
+			}
+			openReply(focused, key === "counter" ? "counter" : "support");
+		});
 	};
 
 	return (
@@ -346,17 +424,18 @@ export function PhoneDebateView({
 					/>
 				) : (
 					<PhoneTitleStrip
-						title={focused.removed ? "Removed by moderator" : focused.title}
+						title={focused.removed ? REMOVED_STUB_TEXT : focused.title}
 						subtitle={market.title}
-						backHref={`/m/${market.slug}`}
+						backHref={`/m/${encodeURIComponent(market.slug)}`}
 						expanded={sheet?.kind === "parent"}
-						onOpen={() => setSheet({ kind: "parent" })}
+						onOpen={() => guard(() => setSheet({ kind: "parent" }))}
 					/>
 				)}
 				<PhoneSideTabs
 					options={focused === null ? feedTabs : threadTabs}
-					active={focused === null ? activeKey : threadKey}
-					onSelect={focused === null ? setActiveKey : setThreadKey}
+					active={focused === null ? activeSide : threadRelation}
+					onSelect={focused === null ? onSideKey : onRelationKey}
+					panelIdFor={PANE_ID}
 				/>
 			</div>
 
@@ -372,8 +451,8 @@ export function PhoneDebateView({
 								{ key: "counter", content: threadPane("counter") },
 							]
 				}
-				active={focused === null ? activeKey : threadKey}
-				onActiveChange={focused === null ? setActiveKey : setThreadKey}
+				active={focused === null ? activeSide : threadRelation}
+				onActiveChange={focused === null ? onSideKey : onRelationKey}
 			/>
 
 			<PhoneBottomBar

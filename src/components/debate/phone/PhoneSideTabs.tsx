@@ -28,10 +28,23 @@
  * tab that gained an edge only because YES needed one is the kind of asymmetry
  * nobody can read as deliberate.
  */
+/**
+ * ⛔⛔ THE TAB CONTRACT IS KEPT, NOT MERELY CLAIMED — and the first cut claimed
+ * it. It declared `role="tablist"` / `role="tab"` / `aria-selected` with no
+ * `aria-controls`, no `role="tabpanel"` on the panes, and no roving tabindex, so
+ * AT announced a tab widget whose arrow-key contract did not exist. Caught by
+ * `@code-reviewer`. A half-kept ARIA role is worse than none: it tells an
+ * assistive technology how to drive a control and then does not answer.
+ * ⇒ `aria-controls` points at the pane (`PhoneFeedTrack` gives each one the
+ * matching `id` and `role="tabpanel"`), exactly one tab is in the tab order at a
+ * time, and ArrowLeft/ArrowRight move between them the way a tablist is
+ * supposed to.
+ */
 export function PhoneSideTabs({
 	options,
 	active,
 	onSelect,
+	panelIdFor,
 }: {
 	options: {
 		key: string;
@@ -42,7 +55,16 @@ export function PhoneSideTabs({
 	}[];
 	active: string;
 	onSelect: (key: string) => void;
+	/** The `id` of the pane this tab controls — see `PhoneFeedTrack`. */
+	panelIdFor: (key: string) => string;
 }) {
+	const move = (from: string, delta: number) => {
+		const at = options.findIndex((option) => option.key === from);
+		const next = options[(at + delta + options.length) % options.length];
+		if (next !== undefined) {
+			onSelect(next.key);
+		}
+	};
 	return (
 		<div
 			data-testid="phone-side-tabs"
@@ -56,8 +78,22 @@ export function PhoneSideTabs({
 						key={option.key}
 						type="button"
 						role="tab"
+						id={`phone-tab-${option.key}`}
 						aria-selected={on}
+						aria-controls={panelIdFor(option.key)}
+						// ⚠ ROVING: exactly one tab is tabbable, so Tab enters and leaves
+						// the widget once instead of stopping on every tab in it.
+						tabIndex={on ? 0 : -1}
 						data-testid={`phone-tab-${option.key}`}
+						onKeyDown={(event) => {
+							if (event.key === "ArrowRight") {
+								event.preventDefault();
+								move(option.key, 1);
+							} else if (event.key === "ArrowLeft") {
+								event.preventDefault();
+								move(option.key, -1);
+							}
+						}}
 						onClick={() => onSelect(option.key)}
 						className={`flex h-[34px] flex-1 items-center justify-center gap-1.5 rounded-(--r) text-xs font-bold tracking-[0.06em] uppercase transition-colors ${
 							on

@@ -35,6 +35,7 @@ together and a guard pins that.
 | A-10 | The `AI mode` control in the details sheet | **the same `<a download href={/m/<slug>/export}>` with the same `aria-label`, without the `InfoTip` wrapper** | wrapping it in `InfoTip` as `MarketHeader` does | A hover gloss has no hover on a phone, and `InfoTip`'s `asChild` across the RSC boundary is a documented hazard (AGENTS.md §5) worth not re-entering for no gain. The href, the download attribute and the accessible name — the parts that ARE the affordance — are byte-identical. |
 | A-11 | The description disclosure | **mount the live `CriterionDisclosure`** | a new clamp + `KnowMore` pair | `KnowMore` opens the post pop-up; it is not a description control. `CriterionDisclosure` is the component authored for exactly this string, currently unmounted by a PLACEMENT ruling (`DebateView.tsx:1379-1388` says so in terms). |
 | A-12 | B1/B2/B3 measurement layer | **two Preview deployments of this branch (`P0` docs-only ≡ `origin/main`, `P1` final), read back to back** | the brief's local prod build | The local Postgres holds zero markets; `/m/<slug>` renders `notFound()` locally. See recon P-2. |
+| A-12b | **`side-pole-binding.test.ts`'s CLOSED INVENTORY gains `PhoneDebateView.tsx`** | **widen the enumeration, in the same commit as the code, with the reason in the entry** | relaxing the predicate; or moving the pole mapping down into `PhoneSideTabs` to stay out of the inventory | The tabs resolve a side to a pole token AT THE CALL SITE, which is `AggregateFooter`'s ratified anti-inversion shape (`RR-3`) — and it has to be there, because the same tabs component also renders Support/Counter, which are RELATIONS and have no pole. A component that mapped its own key to a colour would paint a relation in a side colour the first time someone widened it. The price of that correctness is visibility to this guard, which is the trade the inventory exists to make explicit. ⚠ **Added to this register after `@code-reviewer` measured that the entry's own comment cited a plan row that did not exist** — the `O-9` shape, corrected rather than left. |
 | A-13 | `page-container.test.ts` site-9 `now` | **updated in the same commit, with the reason in the row's comment** | loosening the assertion to `toContain` | It is a site pin. It is supposed to red on a deliberate class-set move, and the MOBILE-1 Phase A precedent for updating `now` additively is in the row already. |
 
 ---
@@ -67,10 +68,14 @@ together and a guard pins that.
 | `src/components/debate/composer/PositionStrip.tsx` | `max-mobile:` tokens if measurement shows it clips; **measure first**. |
 | `src/components/debate/MarketHeader.tsx` | `export` on `LifecycleBadge` (A-9). No render change. |
 | `tests/unit/shell/page-container.test.ts` | site-9 `now` += `max-mobile:hidden` (A-13). |
+| `tests/unit/design/side-pole-binding.test.ts` | `PERMITTED_FILES` += the phone owner (A-12b). |
+| `tests/unit/design/composer-fit.test.ts` | the `Add Image` row, rewritten for both tiers and fenced by symbol. |
 
 ### New tests
 
-`tests/unit/design/phone-market-detail.test.ts` (source scans 1–8) ·
+`tests/unit/design/phone-market-detail.test.ts` (source scans 1–8, plus **16** — no sheet OPEN outside the busy guard, added after the reviewer cascade) ·
+`tests/unit/debate/phone/busy-interlock.test.tsx` (the sheet's three doors + focus containment) ·
+`tests/unit/debate/phone/resolver-rows.test.tsx` (the four rows + the catch-and-degrade posture) ·
 `tests/unit/debate/phone/{tabs,gate,entry-gate,reply-relation,market-state,thread-relation,sheet-a11y}.test.tsx` (RTL 9–15).
 
 ### Docs, same commit as S6

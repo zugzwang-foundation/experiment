@@ -371,7 +371,13 @@ const PERMITTED_FILES = [
 	"src/components/debate/composer/ReplySplitBar.tsx",
 	// TENTH ENTRY — MOBILE-2 / ADR-0050, added as a DECISION in the same commit
 	// as the code, with the offender predicate passing and the enumeration named
-	// in `docs/plans/MOBILE-2.md`. The phone tier's side tabs resolve the active
+	// in `docs/plans/MOBILE-2.md` (register row **A-12b**).
+	// ⚠ THAT CITATION WAS FALSE WHEN THIS ENTRY FIRST SHIPPED and `@code-reviewer`
+	// caught it: the plan carried no such row, so a comment asserted the contract
+	// said something it did not — the `O-9` shape. The row was added rather than
+	// the citation removed, because widening a CLOSED inventory is exactly the
+	// kind of decision the register exists to hold.
+	// The phone tier's side tabs resolve the active
 	// tab's fill from the side it names:
 	//   activeClass = side === "YES" ? "bg-yes text-no" : "bg-no text-yes"
 	// ⛔ IT IS HERE RATHER THAN INSIDE `PhoneSideTabs` ON PURPOSE, and that is the

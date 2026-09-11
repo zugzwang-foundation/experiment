@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useId, useRef } from "react";
 
 /**
  * The phone's one overlay primitive — the bottom sheet that stands in for the
@@ -25,12 +25,29 @@ import { type ReactNode, useEffect, useRef } from "react";
  * `""`. A page that sets its own `overflow` would otherwise be silently reset by
  * the first sheet a reader opens.
  *
- * ⚠ NOT `ui/dialog.tsx`. The shadcn dialog is a Radix portal with its own focus
- * trap, overlay animation and `asChild` seams — which is right for the desktop's
- * modals and is more machinery than a full-height sheet needs, and the `asChild`
- * boundary in particular is the one documented in AGENTS.md §5 as silently
- * deleting a deferred child. This is a `fixed` panel with `role="dialog"` and
- * `aria-modal`, which is the whole of what the sheet is.
+ * ⛔⛔ `aria-modal` IS A CLAIM; CONTAINMENT IS THE MECHANISM — and the first cut
+ * made the claim without the mechanism. It declared `role="dialog"
+ * aria-modal="true"` and performed NO focus management at all: focus was not
+ * moved in, not contained, not restored, and the background was neither `inert`
+ * nor `aria-hidden`. `aria-modal` constrains a screen reader's virtual cursor
+ * and has no effect whatever on Tab, so a keyboard or AT user was told the
+ * background was inert and could then tab straight into it.
+ *
+ * ⚠ THAT WAS NOT ONLY AN A11Y DEFECT, WHICH IS WHY IT IS FIXED HERE RATHER THAN
+ * DOCKETED. The busy argument below rests on this sheet actually being modal:
+ * on the thread arm the OTHER relation button sat one Tab from the submit, so a
+ * keyboard user could remount the composer mid-request and mint a fresh
+ * idempotency key over a committing bet. The host now guards that path too
+ * (`PhoneDebateView`'s `guard`), so the two fixes are belt and braces — but a
+ * dialog that lets Tab out is a defect on its own terms. Found by both
+ * reviewers.
+ *
+ * ⚠ STILL NOT `ui/dialog.tsx`. The shadcn dialog is a Radix portal with overlay
+ * animation and `asChild` seams; ⛔ and the portal is the specific reason, not
+ * the machinery: Radix renders to `document.body`, OUTSIDE the 640px tier gate
+ * this whole subtree depends on. The gate is a property of DOM POSITION, and a
+ * portal leaves the DOM position. What is borrowed from it is the focus
+ * discipline, implemented here in about twenty lines.
  */
 export function PhoneSheet({
 	open,
@@ -60,26 +77,98 @@ export function PhoneSheet({
 	onClose: () => void;
 	children: ReactNode;
 }) {
+	// A stable id per mounted sheet — `useId` rather than a literal, because two
+	// sheets can be in the tree at once (the details host stays mounted once
+	// opened) and two nodes sharing an id make `aria-labelledby` ambiguous.
+	const headingId = useId();
 	const closeRef = useRef(onClose);
 	closeRef.current = onClose;
 	const busyRef = useRef(busy);
 	busyRef.current = busy;
 
+	const panelRef = useRef<HTMLDivElement>(null);
+
 	useEffect(() => {
 		if (!open) {
 			return;
 		}
+		const panel = panelRef.current;
+		// ⚠ RESTORED TO THE OPENER, not to `document.body`. The strip and the bar
+		// are the two openers, and losing focus to the top of the document on
+		// close is how a keyboard reader ends up re-traversing the whole page.
+		const opener =
+			document.activeElement instanceof HTMLElement
+				? document.activeElement
+				: null;
+
+		/**
+		 * ⚠⚠ NO `offsetParent` VISIBILITY FILTER, AND THAT IS NOT A SIMPLIFICATION.
+		 * The obvious one — `el.offsetParent !== null` — performs LAYOUT, which
+		 * jsdom does not do: every candidate filters out, the trap silently
+		 * degrades to "focus the panel", and the guard that was written to prove
+		 * containment instead proves the fallback. Measured on the first run.
+		 * ⇒ The exclusion that actually matters is expressible without layout:
+		 * `tabindex="-1"` is what `ImageAttach`'s hidden file input carries, and it
+		 * is the only focusable-by-selector node in this subtree that must not
+		 * receive focus.
+		 */
+		const focusables = () =>
+			panel === null
+				? []
+				: [
+						...panel.querySelectorAll<HTMLElement>(
+							"a[href],button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),[tabindex]",
+						),
+					].filter((el) => el.getAttribute("tabindex") !== "-1");
+
+		// Move focus IN. The panel itself is the fallback target, which is why it
+		// carries `tabIndex={-1}` — a sheet whose body is still loading has no
+		// focusable child yet, and focus must not stay outside it.
+		const first = focusables()[0];
+		(first ?? panel)?.focus({ preventScroll: true });
+
 		const onKey = (event: KeyboardEvent) => {
 			if (event.key === "Escape" && !busyRef.current) {
 				closeRef.current();
+				return;
+			}
+			if (event.key !== "Tab" || panel === null) {
+				return;
+			}
+			// CONTAINMENT. The list is recomputed per keystroke rather than cached:
+			// the composer's own controls appear and disappear with its phase, and
+			// a stale list traps focus on a control that is no longer there.
+			const list = focusables();
+			if (list.length === 0) {
+				event.preventDefault();
+				panel.focus({ preventScroll: true });
+				return;
+			}
+			const firstEl = list[0];
+			const lastEl = list[list.length - 1];
+			const active = document.activeElement;
+			if (event.shiftKey && (active === firstEl || active === panel)) {
+				event.preventDefault();
+				lastEl?.focus();
+			} else if (!event.shiftKey && active === lastEl) {
+				event.preventDefault();
+				firstEl?.focus();
+			} else if (active !== null && !panel.contains(active)) {
+				// Focus escaped some other way (a programmatic move, a click that
+				// landed outside). Pull it back rather than letting Tab continue
+				// from wherever it is.
+				event.preventDefault();
+				firstEl?.focus();
 			}
 		};
+
 		document.addEventListener("keydown", onKey);
 		const previous = document.body.style.overflow;
 		document.body.style.overflow = "hidden";
 		return () => {
 			document.removeEventListener("keydown", onKey);
 			document.body.style.overflow = previous;
+			opener?.focus({ preventScroll: true });
 		};
 	}, [open]);
 
@@ -92,16 +181,25 @@ export function PhoneSheet({
 			data-testid="phone-sheet"
 			role="dialog"
 			aria-modal="true"
-			aria-label={title}
+			// ⚠ NAMED BY THE HEADING, NOT BY BOTH. It carried `aria-label` AND an
+			// `sr-only` <h2> with the same text, so AT announced the name on open
+			// and again on traversal. `aria-labelledby` is one name from one node,
+			// and it keeps working when the heading is visible.
+			aria-labelledby={headingId}
 			className="fixed inset-0 z-50 flex flex-col justify-end"
 		>
-			{/* The backdrop is a BUTTON rather than a div with a click handler: it is
-			    a control (it dismisses), and a control that only a mouse can reach is
-			    not one. Escape above is its keyboard equivalent; this one is labelled
-			    so a screen reader can find it too. */}
+			{/* ⚠ THE BACKDROP IS OUT OF THE TAB ORDER AND UNNAMED, and that is the
+			    correction rather than the original design. It shipped as a labelled,
+			    tab-reachable `Close` — a SECOND control with the identical accessible
+			    name, sitting immediately beside the `×` in the traversal. Two
+			    adjacent controls called "Close" is worse than one, and the keyboard
+			    path this was meant to provide is what Escape already is. It stays a
+			    `<button>` because it is still a pointer control and a `div` with a
+			    click handler is not one. */}
 			<button
 				type="button"
-				aria-label="Close"
+				tabIndex={-1}
+				aria-hidden="true"
 				data-testid="phone-sheet-backdrop"
 				onClick={() => {
 					if (!busy) {
@@ -111,7 +209,12 @@ export function PhoneSheet({
 				className="absolute inset-0 bg-(--overlay)"
 			/>
 			<div
-				className={`relative flex w-full flex-col bg-ground ${
+				ref={panelRef}
+				// ⚠ `-1`, so the panel can receive focus programmatically without
+				// joining the tab order — the fallback target when the sheet has no
+				// focusable child yet.
+				tabIndex={-1}
+				className={`relative flex w-full flex-col bg-ground outline-none ${
 					fullHeight ? "h-full" : "max-h-[96vh]"
 				}`}
 			>
@@ -133,6 +236,7 @@ export function PhoneSheet({
 					}`}
 				>
 					<h2
+						id={headingId}
 						className={
 							titleHidden === true
 								? "sr-only"
