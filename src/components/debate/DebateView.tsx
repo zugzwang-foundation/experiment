@@ -281,11 +281,17 @@ export function DebateView({
 			setFocusMode(false);
 			setOpenSide(null);
 		} else {
+			// ⛔ ENTERING FOCUS OPENS NO COMPOSER. Focus is a READING posture — it
+			// collapses the media, title, chart and resolver cards so the two
+			// columns get the band. It used to also `setOpenSide(heldSide ??
+			// pickedSide ?? "YES")`, which made the Focus button a second, unlabelled
+			// Buy trigger: a reader who wanted the columns bigger got a staking form
+			// over one of them, pre-picked to a side they had not chosen. The
+			// composer has its own doors — the Đ BET entry, the `SlotHeader` Buy and
+			// the rail's percent labels — and all three are labelled for what they do.
 			setFocusMode(true);
-			const sideToOpen = heldSide ?? pickedSide ?? "YES";
-			setOpenSide(sideToOpen);
 		}
-	}, [composerBusy, isFocused, heldSide, pickedSide]);
+	}, [composerBusy, isFocused]);
 
 	/**
 	 * HTML-FINISH · MARKET DETAIL round 2 · R3 — THE SURFACE IS FROZEN while a
