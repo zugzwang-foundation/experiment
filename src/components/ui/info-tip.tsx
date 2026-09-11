@@ -83,6 +83,64 @@ export function contentHashId(content: string): string {
 	return `info-tip-${(hash >>> 0).toString(36)}`;
 }
 
+/**
+ * ⛔ A CHILD THAT CROSSED THE RSC BOUNDARY IS NOT RELIABLY AN ELEMENT, AND
+ * `asChild` IS ENTIRELY BUILT ON THE ASSUMPTION THAT IT IS.
+ *
+ * React Flight serializes a Client Component's props inline — until the row it
+ * is writing passes `MAX_ROW_SIZE` (3200 bytes,
+ * `react-server-dom-turbopack-server`). The FIRST element it meets after that
+ * is deferred to a row of its own and arrives here as
+ * `{$$typeof: Symbol.for("react.lazy"), _payload, _init}` instead of an
+ * element. Nothing about the call site causes this: it is whichever element
+ * happens to straddle the boundary, so the victim moves with any byte written
+ * earlier in the page. MEASURED by padding the payload — at +0 bytes it was
+ * `DharmaCluster`'s Balance eyebrow, at +300 it was Portfolio, and either side
+ * of those it was nobody.
+ *
+ * ⚠ AND THE TWO BRANCHES BELOW DISAGREED ABOUT WHAT TO DO WITH IT, which is
+ * what made this visible rather than merely wrong. `React.isValidElement`
+ * is false for a lazy, so the SERVER fell to the `<button>` fallback and
+ * PAINTED the child; the client then switched to the Tooltip branch on the
+ * `pointerFine` effect, where Radix's `Slot` runs the SAME check and returns
+ * `null` for a child it cannot clone (`@radix-ui/react-slot` dist `:34-42`).
+ * The label painted, then vanished about a second later, on one of two
+ * byte-identical eyebrows, with no hydration warning and no console error —
+ * because neither half is a mismatch. Each is a correct render of a different
+ * branch.
+ *
+ * Resolving it here restores the element BEFORE anything inspects it, so
+ * `asChild` keeps its contract and no fallback has to fire. `use()` is the
+ * supported way to read a value the server has not finished handing over, and
+ * a Flight chunk that has already arrived is a settled thenable, so this
+ * returns synchronously rather than suspending (measured on the built app: the
+ * eyebrow now serializes merged onto its own `<span>`, exactly as its sibling
+ * always did).
+ */
+const REACT_LAZY = Symbol.for("react.lazy");
+
+type DeferredChild = { readonly _payload: PromiseLike<React.ReactNode> };
+
+function isDeferredChild(
+	node: React.ReactNode,
+): node is React.ReactNode & DeferredChild {
+	if (typeof node !== "object" || node === null) {
+		return false;
+	}
+	// Trust boundary (AGENTS.md §4): this is React's own wire shape, not ours,
+	// so it is read defensively and both halves are checked. A lazy whose
+	// payload is not a settled thenable is left exactly as it arrived — the
+	// `canSlot` guard below is what catches that case.
+	const candidate = node as {
+		$$typeof?: unknown;
+		_payload?: { then?: unknown };
+	};
+	return (
+		candidate.$$typeof === REACT_LAZY &&
+		typeof candidate._payload?.then === "function"
+	);
+}
+
 function usePointerFine(): boolean {
 	const [pointerFine, setPointerFine] = React.useState(false);
 
@@ -121,6 +179,20 @@ export function InfoTip({
 	 * fixed, non-reflowing width (AGENTS.md §5.4). */
 	asChild?: boolean;
 }) {
+	// Restore the element before ANYTHING inspects it — see `isDeferredChild`.
+	// `use` is explicitly permitted inside a condition, and on the overwhelming
+	// majority of renders this branch is not taken at all.
+	const child = isDeferredChild(children)
+		? React.use(children._payload)
+		: children;
+	// ONE predicate, read by BOTH branches. It used to be computed inline on
+	// the Popover branch only, and the Tooltip branch handed `asChild` straight
+	// to Radix — so for any child neither of them could clone, the server
+	// rendered the `<button>` fallback and the client rendered `null`. The
+	// resolver above means a deferred child no longer reaches here unclonable;
+	// this is what stops the two branches from EVER disagreeing again, for a
+	// plain string child as much as for a shape React has not invented yet.
+	const canSlot = asChild === true && React.isValidElement(child);
 	const pointerFine = usePointerFine();
 	const contentId = React.useMemo(() => contentHashId(content), [content]);
 	const [open, setOpen] = React.useState(false);
@@ -143,8 +215,8 @@ export function InfoTip({
 		return (
 			<TooltipPrimitive.Provider delayDuration={200}>
 				<TooltipPrimitive.Root>
-					<TooltipPrimitive.Trigger asChild={asChild}>
-						{children}
+					<TooltipPrimitive.Trigger asChild={canSlot}>
+						{child}
 					</TooltipPrimitive.Trigger>
 					<TooltipPrimitive.Portal>
 						<TooltipPrimitive.Content sideOffset={6} className={CONTENT_CLASS}>
@@ -170,14 +242,13 @@ export function InfoTip({
 		onClick: () => setOpen((o) => !o),
 	};
 
-	const trigger =
-		asChild && React.isValidElement(children) ? (
-			<Slot.Root {...triggerProps}>{children}</Slot.Root>
-		) : (
-			<button type="button" {...triggerProps}>
-				{children}
-			</button>
-		);
+	const trigger = canSlot ? (
+		<Slot.Root {...triggerProps}>{child}</Slot.Root>
+	) : (
+		<button type="button" {...triggerProps}>
+			{child}
+		</button>
+	);
 
 	return (
 		<PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
