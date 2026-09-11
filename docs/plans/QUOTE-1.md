@@ -1,6 +1,6 @@
 # QUOTE-1 — the title-as-quotation well
 
-> **Status:** executing · **Date:** 2026-09-11 · **Author:** web Claude (brief) / Claude Code (execution) · **Plan commit:** PLANSHA
+> **Status:** executing · **Date:** 2026-09-11 · **Author:** web Claude (brief) / Claude Code (execution) · **Plan commit:** 636f7df7
 > **Criticality:** ORDINARY (OPERATING.md §4: surfaces). Carried proof obligation: SC-1 — a removed post renders no well.
 
 ## 1 · Approach

@@ -216,7 +216,7 @@ so: `ships-none-of-the-mockups-MARKET-CONTENT` is
 `ships-no-invented-content-and-no-market-fields-leak` since `2a70915f`, and `renders-BOTH-cards`
 / `carries-the-byte-carried-chrome-labels` no longer exist under any name.
 
-✅ **Kind 2's interim `null` is DISCHARGED ON THE CARD, 2026-09-11 — QUOTE-1 C (PR #PRNUM).**
+✅ **Kind 2's interim `null` is DISCHARGED ON THE CARD, 2026-09-11 — QUOTE-1 C (PR #515).**
 `PostCard`'s imageless arm draws the **title-as-quotation well** (design-canon `C-QUOTE-1`,
 SPEC.1 2.0.2) in its `.argimg` cell, and the plain title row does not render on that arm.
 ⛔ **The inventory stays ZERO** — a well is not a placeholder: it renders the post's own derived
