@@ -203,7 +203,17 @@ const SITES: Site[] = [
 		// and tests/unit/design/debate-mobile-reflow.test.ts). Additive only:
 		// every desktop token above is unchanged, so this is a `now` update,
 		// not a new `movedBy` — the preset selection and its ruling are untouched.
-		now: "mx-auto w-full max-w-none px-7 py-4 flex h-[calc(100dvh-60px-2px)] min-h-0 flex-col gap-3 overflow-hidden max-mobile:h-auto max-mobile:overflow-visible",
+		// ⚠ MOBILE-2 / ADR-0050 adds ONE more `max-mobile:` token — `hidden`.
+		// Below 640px this tree does not reflow, it stands down: the phone tier
+		// is a separate presentation (`debate/phone/`) over the same props, and
+		// the two roots hide together. Additive and inert above 640px like Phase
+		// A's pair, so this is a `now` update and NOT a new `movedBy` — the
+		// preset selection and the 2026-08-17 dimensional-parity ruling that
+		// chose it are untouched. ⛔ This row is a SET-EQUALITY pin, which is why
+		// it had to be edited at all: it is the one assertion in the tree that
+		// reddens on a silent class-set drift, and editing it here is the
+		// deliberate move it exists to demand.
+		now: "mx-auto w-full max-w-none px-7 py-4 flex h-[calc(100dvh-60px-2px)] min-h-0 flex-col gap-3 overflow-hidden max-mobile:hidden max-mobile:h-auto max-mobile:overflow-visible",
 		movedBy:
 			"HTML-FINISH · MARKET DETAIL · DIMENSIONAL PARITY — /m/[slug] is a " +
 			"fixed-height one-screen full-bleed grid (founder-ruled 2026-08-17); " +

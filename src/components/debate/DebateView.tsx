@@ -997,7 +997,25 @@ export function DebateView({
 			// band and its clipped overflow no longer have a two-column layout to
 			// protect — released to ordinary page flow/scroll rather than forcing
 			// a stacked arena through a one-screen box it was never sized for.
-			className="flex h-[calc(100dvh-60px-2px)] min-h-0 flex-col gap-3 overflow-hidden max-mobile:h-auto max-mobile:overflow-visible"
+			//
+			// ⛔⛔ MOBILE-2 / ADR-0050 — `max-mobile:hidden` IS THIS COMPONENT'S
+			// WHOLE PART IN THE PHONE TIER, and it supersedes the paragraph above
+			// as the operative rule below 640px without deleting it. Phase A's
+			// stacking tokens are still here and still correct; what changed is
+			// that a stacked arena turned out not to be a phone experience at all,
+			// because the composer opens in the column OPPOSITE the one being bet
+			// and a stacked arena has no opposite column. So the founder ruled a
+			// separate phone presentation (`debate/phone/`), and this tree hides
+			// rather than reflows. The Phase A tokens are now REDUNDANT below
+			// 640px — they are kept, not stripped, because their guards are live
+			// and because removing a token from a desktop component is a desktop
+			// edit; `docs/parked.md` carries the row.
+			// ⚠ THE PAIR IS THE UNIT. `PhoneDebateView`'s root is base-`hidden`
+			// with a `max-mobile:` display token, and one without the other is a
+			// page with two trees or none — invisible at whichever width the
+			// author happens to be looking at. `phone-market-detail.test.ts`
+			// asserts both halves together for exactly that reason.
+			className="flex h-[calc(100dvh-60px-2px)] min-h-0 flex-col gap-3 overflow-hidden max-mobile:hidden max-mobile:h-auto max-mobile:overflow-visible"
 		>
 			{/* F-DEBATE-4 — the polled-on-view refresh. Renders nothing; re-invokes
 			    this page's own server read on an interval, suspended while the

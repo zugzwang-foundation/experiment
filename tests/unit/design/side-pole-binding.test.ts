@@ -369,6 +369,27 @@ const PERMITTED_FILES = [
 	// that follows a deletion, not a weakening of a guard.
 	"src/components/debate/composer/PositionStrip.tsx",
 	"src/components/debate/composer/ReplySplitBar.tsx",
+	// TENTH ENTRY — MOBILE-2 / ADR-0050, added as a DECISION in the same commit
+	// as the code, with the offender predicate passing and the enumeration named
+	// in `docs/plans/MOBILE-2.md`. The phone tier's side tabs resolve the active
+	// tab's fill from the side it names:
+	//   activeClass = side === "YES" ? "bg-yes text-no" : "bg-no text-yes"
+	// ⛔ IT IS HERE RATHER THAN INSIDE `PhoneSideTabs` ON PURPOSE, and that is the
+	// whole reason this file gains an entry instead of staying quiet. The tabs
+	// component is shared with the THREAD arm, whose two tabs are Support and
+	// Counter — RELATIONS, which have no pole (design-canon §3.2, AGENTS.md §8).
+	// A component that mapped its own key to a pole would have to know which of
+	// those two things it was rendering, and would paint a relation in a side
+	// colour the first time someone widened it. So the pole is resolved at the
+	// CALL SITE that knows it is holding a side, which is `AggregateFooter`'s own
+	// ratified anti-inversion shape — and the price of that correctness is
+	// visibility to this guard, which is the trade this inventory exists to make
+	// explicit.
+	// ⛔ THE PREDICATE IS UNTOUCHED. Both `>=` floors, the pole-boundness test and
+	// every `offenders.toEqual([])` are unchanged, and the scanner still walks
+	// `src/` recursively and still reaches this file (it found it — that is why
+	// this entry exists). A widening of an ENUMERATION, never of a GUARD.
+	"src/components/debate/phone/PhoneDebateView.tsx",
 	// SEVENTH ENTRY, added deliberately at the V17 fix — the guard's own
 	// documented mechanism, exercised rather than worked around. V17's
 	// Support/Counter split bar originally used a FIXED `bg-yes` fill over a

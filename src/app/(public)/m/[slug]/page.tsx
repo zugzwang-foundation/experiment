@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { getRequestSession } from "@/app/(public)/_lib/session";
 import { DebateView } from "@/components/debate/DebateView";
+import { PhoneDebateView } from "@/components/debate/phone/PhoneDebateView";
 import { db } from "@/db";
 import { getCachedDebateView } from "@/server/debate-view/cached-view";
 import { getMarketPricingAndReserves } from "@/server/debate-view/market-pricing";
@@ -204,12 +205,34 @@ export default async function MarketPage({
 		}
 	}
 
+	// MOBILE-2 / ADR-0050 — TWO PRESENTATIONS, ONE SET OF PROPS, NO WRAPPER.
+	// ⛔ THE FRAGMENT IS DELIBERATE AND IS NOT A STYLE CHOICE. `DebateView`'s
+	// root is the first link of a height chain that four `*-height-chain` tests
+	// read as source and that `page-container.test.ts` pins by class set; a
+	// wrapping element between `<main>` and it would add a box with no height
+	// declaration in the middle of that chain. A fragment emits no DOM node, so
+	// `main.firstElementChild` is still the same element it was before — which is
+	// also what makes the 1440px DOM-identity measurement checkable at all.
+	// ⚠ The two roots hide together: `DebateView` carries one appended
+	// `max-mobile:hidden`, this one is base-`hidden` with a `max-mobile:` display
+	// token, and `phone-market-detail.test.ts` asserts BOTH halves — either edit
+	// alone leaves the page with two trees or none, at a width the author is not
+	// looking at.
 	return (
-		<DebateView
-			model={model}
-			viewer={viewer}
-			initialPostId={initialPostId}
-			ownPseudonym={session?.user?.pseudonym ?? null}
-		/>
+		<>
+			<DebateView
+				model={model}
+				viewer={viewer}
+				initialPostId={initialPostId}
+				ownPseudonym={session?.user?.pseudonym ?? null}
+			/>
+			<PhoneDebateView
+				model={model}
+				viewer={viewer}
+				initialPostId={initialPostId}
+				ownPseudonym={session?.user?.pseudonym ?? null}
+				details={null}
+			/>
+		</>
 	);
 }
