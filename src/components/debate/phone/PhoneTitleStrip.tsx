@@ -53,7 +53,16 @@ export function PhoneTitleStrip({
 	onOpen: () => void;
 }) {
 	return (
-		<div className="flex items-center gap-2.5 px-3 py-2.5">
+		// ⚠ `items-start` ONCE THERE IS A SUBTITLE. The thread strip is a
+		// three-line block (post title over the market title) and a centred back
+		// arrow lands beside line 2, pointing at the middle of a sentence. R2's
+		// own still carries the same rule (`.strip.thread{align-items:flex-start}`);
+		// measured on the preview before it was applied.
+		<div
+			className={`flex gap-2.5 px-3 py-2.5 ${
+				subtitle === undefined ? "items-center" : "items-start"
+			}`}
+		>
 			{backHref !== undefined ? (
 				<Link
 					href={backHref}

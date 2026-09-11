@@ -5,11 +5,12 @@ import { type ReactNode, useCallback, useState } from "react";
 
 import { AuthGateSlot } from "../composer/AuthGateSlot";
 import { BetComposer } from "../composer/BetComposer";
-import { COMPOSER_COPY } from "../composer/copy";
+import { AUTH_GATE_COPY, COMPOSER_COPY } from "../composer/copy";
 import { deriveReplySide } from "../composer/gating";
 import { ImageLightbox, PostPopup, ReplyPopup } from "../dialogs";
 import { formatPricePercent } from "../format";
 import { PostCard } from "../PostCard";
+import { EmptySideCTA } from "../placeholders";
 import { ReplyCard } from "../ReplyCard";
 import type {
 	DebatePost,
@@ -184,11 +185,20 @@ export function PhoneDebateView({
 		activeClass: side === "YES" ? "bg-yes text-no" : "bg-no text-yes",
 	}));
 
-	const feedPane = (side: Side): ReactNode => (
-		<div className="flex flex-col gap-2.5 px-3 pt-2.5 pb-[140px]">
-			{posts
-				.filter((post) => post.sideAtPostTime === side)
-				.map((post) => (
+	/**
+	 * ⚠ THE EMPTY ARM IS A LIVE COMPONENT, NOT AN INVENTED ONE. `EmptySideCTA`
+	 * is design-language §3.1's `Be the first to argue YES/NO`, and its own
+	 * docblock names both of the cases used here: "a side with no posts
+	 * (market-view) or no replies (post-view)". Measured on the preview first —
+	 * a thread whose two relations are both empty rendered a whole screen of
+	 * nothing, which says less than the desktop's own answer to the same state.
+	 */
+	const feedPane = (side: Side): ReactNode => {
+		const sidePosts = posts.filter((post) => post.sideAtPostTime === side);
+		return (
+			<div className="flex flex-col gap-2.5 px-3 pt-2.5 pb-[140px]">
+				{sidePosts.length === 0 ? <EmptySideCTA side={side} /> : null}
+				{sidePosts.map((post) => (
 					<PostCard
 						key={post.id}
 						post={post}
@@ -206,8 +216,9 @@ export function PhoneDebateView({
 						suspended={suspended}
 					/>
 				))}
-		</div>
-	);
+			</div>
+		);
+	};
 
 	/**
 	 * ⛔⛔ THE THREAD'S PARTITION IS THE MODEL'S OWN, READ OFF
@@ -239,18 +250,34 @@ export function PhoneDebateView({
 					},
 				];
 
-	const threadPane = (relation: "support" | "counter"): ReactNode => (
-		<div className="flex flex-col gap-2.5 px-3 pt-2.5 pb-[140px]">
-			{(focused === null ? [] : focused.replies[relation]).map((reply) => (
-				<ReplyCard
-					key={reply.id}
-					reply={reply}
-					onOpenImage={setLightboxUrl}
-					onOpenPopup={setPopupReply}
-				/>
-			))}
-		</div>
-	);
+	const threadPane = (relation: "support" | "counter"): ReactNode => {
+		const replies = focused === null ? [] : focused.replies[relation];
+		return (
+			<div className="flex flex-col gap-2.5 px-3 pt-2.5 pb-[140px]">
+				{replies.length === 0 && focused !== null ? (
+					// ⚠ THE SIDE, DERIVED — never the relation. `EmptySideCTA` names a
+					// POLE, and a Support reply's pole is the parent's while a Counter
+					// reply's is the opposite. `deriveReplySide` is the one place that
+					// rule lives; asking it here is what keeps `Be the first to argue
+					// NO` from appearing under a tab labelled Support on a YES post.
+					<EmptySideCTA
+						side={deriveReplySide({
+							parentSide: focused.sideAtPostTime,
+							relation,
+						})}
+					/>
+				) : null}
+				{replies.map((reply) => (
+					<ReplyCard
+						key={reply.id}
+						reply={reply}
+						onOpenImage={setLightboxUrl}
+						onOpenPopup={setPopupReply}
+					/>
+				))}
+			</div>
+		);
+	};
 
 	const barActions: PhoneBarAction[] =
 		focused === null
@@ -406,9 +433,18 @@ export function PhoneDebateView({
 			{sheet !== null && sheet.kind !== "details" && sheet.kind !== "parent" ? (
 				<PhoneSheet
 					open
-					title={COMPOSER_COPY.header}
+					// ⚠ THE SHEET IS NAMED BY WHAT IS INSIDE IT. Signed out it holds the
+					// auth gate, and titling that `Place your Đ BET` announces an action
+					// the reader cannot take and then shows them why not — two headings
+					// disagreeing about what the screen is for. Both strings are live and
+					// each is the heading its own component was written with.
+					title={
+						viewer === null
+							? AUTH_GATE_COPY.heading(sheet.side)
+							: COMPOSER_COPY.header
+					}
 					busy={composerBusy}
-					fullHeight
+					fullHeight={viewer !== null}
 					onClose={closeSheet}
 				>
 					{/* ⛔⛔ THE SHEET'S ENTIRE CONTENT SET IS THESE TWO COMPONENTS, and

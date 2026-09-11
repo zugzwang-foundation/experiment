@@ -438,14 +438,24 @@ export function ArgProfile({
 				    ⇒ Canon §3 item 11 is no longer owed an amendment for this row: it
 				    already records the field AND its divider, which is what the three
 				    sibling author rows ship. This row now agrees with them.
-				    ⚠ GROUP B TAKES THE SAME `max-mobile:` PAIR AS GROUP A, and for the
+				    ⛔⛔ MOBILE-2 — GROUP B DOES **NOT** TAKE GROUP A'S `contents`, AND THE
+			    REASON IS A DEFECT I SHIPPED AND THEN MEASURED. Dissolving A is what
+			    lets the pseudonym take a line of its own on a phone. Dissolving B
+			    as well made its leading `│` an independent flex item, so the break
+			    landed BETWEEN the separator and the age it divides — measured at
+			    375px on the preview: `│ YES @ 10% │ Đ 10 │ REPLIES · 0 │` ending in
+			    a pipe that divides nothing, with `3d ago` alone on line 3. That is
+			    precisely the dangle the block above records as fixed, reintroduced
+			    one width down. B keeps its box: it either fits after A's last field
+			    or wraps WHOLE, and its separator cannot be stranded either way.
+			    ⚠ GROUP B TAKES THE SAME `max-mobile:` PAIR AS GROUP A, and for the
 				    same reason — see that group's block above for the full argument.
 				    It is applied here even though group B is the narrower of the two
 				    and does not overflow on today's data: the pair is a property of the
 				    ROW's behaviour at phone width, not of one group's current contents,
 				    and a longer badge string is exactly the kind of change that would
 				    otherwise reintroduce the clip in the half nobody thought to cover. */}
-				<span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap max-mobile:contents max-mobile:shrink max-mobile:flex-wrap">
+				<span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap max-mobile:shrink max-mobile:flex-wrap">
 					{/* TIME-1 · Form B — HOW LONG AGO, AND IT IS THE LAST THING GROUP A
 				    SAYS. The lane badge follows it (entry 1b, rule 5); nothing else
 				    does.

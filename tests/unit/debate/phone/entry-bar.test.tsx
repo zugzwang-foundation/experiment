@@ -94,6 +94,14 @@ describe("phone bar — signed out opens the gate, never the composer (guard 10)
 		const sheet = screen.getByTestId("phone-sheet");
 		expect(sheet.textContent).toContain(AUTH_GATE_COPY.heading("YES"));
 		expect(sheet.textContent).toContain(AUTH_GATE_COPY.micro);
+		// ⚠ AND THE SHEET IS NAMED BY WHAT IS INSIDE IT. Titling the signed-out
+		// sheet `Place your Đ BET` announces an action the reader cannot take and
+		// then shows them why not — two headings disagreeing about what the screen
+		// is for, and the accessible name is the one a screen reader hears FIRST.
+		expect(sheet.getAttribute("aria-label")).toBe(
+			AUTH_GATE_COPY.heading("YES"),
+		);
+		expect(sheet.getAttribute("aria-label")).not.toBe(COMPOSER_COPY.header);
 		// The composer's own argument field is the thing that must NOT be here.
 		expect(sheet.querySelector('[aria-label="Argument title"]')).toBeNull();
 	});
