@@ -6,6 +6,7 @@ import { db } from "@/db";
 import type { Reserves } from "@/server/cpmm/calculate";
 import { getCachedReserveWalk } from "@/server/discovery/cached-series";
 import type { MarketSummary } from "@/server/markets/get-by-slug";
+import { recordCacheMiss } from "@/server/observability/cache-metrics";
 
 import { type DebateViewModel, loadDebateView } from "./load-debate-view";
 
@@ -82,6 +83,13 @@ export async function getCachedDebateView(
 	"use cache";
 	cacheLife("minutes");
 	cacheTag(`market:${market.id}`);
+
+	// RELAY C2 — fires only on a miss, same reasoning as the two Discovery
+	// cached blocks. This is the ADR-0041 OQ-1 / BR-7 surface — the one this
+	// whole instrumentation pass exists to make visible under concurrent
+	// write load, segmented against this market's own bet rate at analysis
+	// time.
+	await recordCacheMiss("debate-view", market.id);
 
 	// `reserves` is a KEY INPUT ONLY — deliberately not forwarded. Forwarding it
 	// would change `loadDebateView`'s pricing semantics, which CHART-1 does not

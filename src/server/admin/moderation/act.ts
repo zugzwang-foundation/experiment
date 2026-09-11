@@ -12,6 +12,7 @@ import {
 	requireAdminSession,
 	validationError,
 } from "@/server/admin/wire";
+import { recordInvalidation } from "@/server/observability/cache-metrics";
 
 // UI.6 S3(b) — the reactive Remove/Ban Server Action (F-ADMIN-4 partial;
 // ADR-0020/0021). Two INDEPENDENT axes, never a combined verb (no
@@ -143,6 +144,10 @@ export async function moderateComment(
 	// body actually stops being served, which is the whole point of this call.
 	if (action === "remove") {
 		updateTag(`market:${comment.marketId}`);
+		// RELAY C2 — timestamp only, joined at analysis time against the next
+		// miss-counter increment for this market to derive invalidation latency
+		// (CM-10). Never blocks, never throws (see recordInvalidation).
+		await recordInvalidation(`market:${comment.marketId}`);
 	}
 	return { ok: true, data: { modActionId, action } };
 }

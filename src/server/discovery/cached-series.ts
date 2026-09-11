@@ -4,6 +4,7 @@ import { cacheLife, cacheTag } from "next/cache";
 
 import { db } from "@/db";
 import { MARKET_SERIES_MIN_WINDOW_MS } from "@/server/config/limits";
+import { recordReserveWalkDerivation } from "@/server/observability/cache-metrics";
 
 import {
 	replayReserveSeries,
@@ -110,6 +111,13 @@ export async function getCachedReserveWalk(
 		expire: EXPIRE_SEC,
 	});
 	cacheTag(`market:${marketId}`);
+
+	// RELAY C2 — this line only ever runs on a miss for THIS function's own
+	// (marketId-only, 60s-floored) cache key, independent of whichever outer
+	// block called it. This IS the "derivations per minute" figure the
+	// tracker asks for: fifty bets in thirty seconds should still cost one
+	// derivation, not fifty.
+	await recordReserveWalkDerivation(marketId);
 
 	return toWireWalk(await replayReserveSeries(db, marketId));
 }

@@ -23,6 +23,8 @@
 		"staging:reset:exec": "ZUGZWANG_STAGING_RESET_ACK=wipe-staging-i-mean-it vitest run --config vitest.staging.config.ts tests/staging/reset.staging.test.ts && pnpm run db:seed:staging",
 		"staging:generate": "doppler run --project zugzwang-experiment --config stg -- pnpm run staging:generate:exec",
 		"staging:generate:exec": "ZUGZWANG_STAGING_TARGET=staging ZUGZWANG_STAGING_WRITE_ACK=generate-staging-fixtures vitest run --config vitest.staging.config.ts tests/staging/generate.staging.test.ts",
+		"staging:generate-volume": "doppler run --project zugzwang-experiment --config stg -- pnpm run staging:generate-volume:exec",
+		"staging:generate-volume:exec": "ZUGZWANG_STAGING_TARGET=staging ZUGZWANG_STAGING_WRITE_ACK=generate-staging-fixtures ZUGZWANG_STAGING_VOLUME_WRITE_ACK=generate-staging-volume-fixture vitest run --config vitest.staging.config.ts tests/staging/generate-volume.staging.test.ts",
 		"staging:gates": "doppler run --project zugzwang-experiment --config stg -- pnpm run staging:gates:exec",
 		"staging:gates:exec": "ZUGZWANG_STAGING_TARGET=staging vitest run --config vitest.staging.config.ts tests/staging/gates.staging.test.ts",
 		"staging:rebuild": "pnpm run staging:reset && pnpm run staging:generate && pnpm run staging:gates",
