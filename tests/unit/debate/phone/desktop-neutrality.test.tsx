@@ -51,7 +51,12 @@ const RAIL_PROPS = {
 	onPrev: () => {},
 	onNext: () => {},
 	durationMs: 1000,
-	progressKey: "k",
+	// progressKey REMOUNTS CountdownFill at the call site, and its type is a
+	// NUMBER. vitest ran this file green with a string in it until `next build`
+	// type-checked the test directory — recorded rather than quietly corrected,
+	// because "the test passed" and "the test type-checked" turn out to be two
+	// different claims and only one of them was being made.
+	progressKey: 0,
 };
 
 beforeEach(() => {

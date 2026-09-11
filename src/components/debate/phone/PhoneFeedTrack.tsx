@@ -151,7 +151,17 @@ export function PhoneFeedTrack({
 			// observer until the timeout for no reason. This is the common case: the
 			// observer confirms a pane, the host re-renders, and this effect runs
 			// again against a track that has already arrived.
-			if (Math.abs(track.scrollLeft - left) <= 1) {
+			// ⚠ ...UNLESS A SLIDE IS ALREADY HEADING SOMEWHERE ELSE. Two taps inside
+			// one frame land here with the track still at the first destination's
+			// start: short-circuiting then releases the mute while the FIRST
+			// smooth scroll is still travelling, and the reader ends up on the tab
+			// they did not pick. D-1 in miniature, one layer down; found by
+			// `@security-auditor`. Re-issuing the scroll cancels the one in flight.
+			const heading = headingForRef.current;
+			if (
+				Math.abs(track.scrollLeft - left) <= 1 &&
+				(heading === null || heading === key)
+			) {
 				release();
 				return;
 			}

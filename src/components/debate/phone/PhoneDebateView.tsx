@@ -163,9 +163,23 @@ export function PhoneDebateView({
 	 * React's job rather than mine.
 	 */
 	useEffect(() => {
-		setPhoneSheetOpen(sheet !== null);
+		// ⚠ A COMPOSER, NOT ANY SHEET. SPEC.1 §9 suspends the poll "while any bet
+		// composer is open on the surface", and the acceptance case is named
+		// `debate-view::poll-suspends-while-hidden-or-composer-open`. Two of this
+		// tier's four sheet shapes — `details` and `parent` — are read-only
+		// screens with nothing to lose, and the details sheet is the one carrying
+		// the PRICE CHART. Publishing `sheet !== null` froze the chart for as long
+		// as somebody read it, which is both a worse product and a divergence from
+		// a ratified sentence. Caught by `@security-auditor`.
+		const composerOpen = sheet?.kind === "post" || sheet?.kind === "reply";
+		setPhoneSheetOpen(composerOpen);
 		return () => setPhoneSheetOpen(false);
 	}, [sheet]);
+
+	/** P2 terminal reached this session — mirrors `DebateView.tsx:155`. */
+	const [suspended, setSuspended] = useState(false);
+	/** Mirrors `DebateView.tsx:160`; see `PhoneSheet` for what it shuts. */
+	const [composerBusy, setComposerBusy] = useState(false);
 
 	/**
 	 * D-8 — THE BACK GESTURE IS THE PRIMARY NAVIGATION ON A PHONE, and it used to
@@ -186,13 +200,30 @@ export function PhoneDebateView({
 		if (armWhenSheetLastReset.current === initialPostId) {
 			return;
 		}
+		// ⛔⛔ THE SEVENTH HOST TRANSITION, AND IT OBEYS THE SAME INTERLOCK AS THE
+		// SIX ABOVE. `@security-auditor` found this as a HIGH and the path is a
+		// DOUBLE CHARGE, not a cosmetic one: the reader taps PLACE Đ BET, the
+		// request is in flight, and they then perform the iOS left-edge back
+		// swipe — on a surface whose entire idiom is horizontal swiping. Without
+		// this check the arm changes, the sheet unmounts, `BetComposer` goes with
+		// it, and its cleanup reports `busy: false`. There is no AbortController,
+		// so the request lands and COMMITS; `onPosted` never runs, so the reader
+		// sees no trace of the bet they just paid for. They open a new composer —
+		// which mints a FRESH idempotency key, one per intent — and submit again.
+		// `bet_receipts`' UNIQUE is on the key, so the durable backstop cannot see
+		// that these are the same intent. Two bets, two comments, two charges.
+		//
+		// ⚠ AND THE BOOKKEEPING MUST NOT ADVANCE EITHER. Returning early while
+		// leaving `armWhenSheetLastReset` updated would record the arm as handled
+		// and never close the stale sheet once the request lands. `composerBusy`
+		// is a dependency so this re-runs the moment it clears — deferred, not
+		// dropped.
+		if (composerBusy) {
+			return;
+		}
 		armWhenSheetLastReset.current = initialPostId;
 		setSheet(null);
-	}, [initialPostId]);
-	/** P2 terminal reached this session — mirrors `DebateView.tsx:155`. */
-	const [suspended, setSuspended] = useState(false);
-	/** Mirrors `DebateView.tsx:160`; see `PhoneSheet` for what it shuts. */
-	const [composerBusy, setComposerBusy] = useState(false);
+	}, [initialPostId, composerBusy]);
 	const [popupPost, setPopupPost] = useState<PresentPost | null>(null);
 	const [popupReply, setPopupReply] = useState<PresentReply | null>(null);
 	const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
