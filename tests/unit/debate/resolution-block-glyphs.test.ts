@@ -429,12 +429,17 @@ describe("BLOCK-5b · G-g — BLOCK-4's geometry must not move", () => {
 			"HeadZone.tsx: BAND_DECLARED changed. This is BLOCK-4 geometry pinned " +
 				"by whole-string equality — if the change is genuinely additive and " +
 				"inert at >=640px, append the new token here and say why, exactly as " +
-				"MOBILE-1's two `max-mobile:` tokens are appended below. Do not " +
+				"MOBILE-1's two `max-mobile:` tokens once were. Do not " +
 				"relax this to token containment: that admits every additional " +
 				"token, including the ones that do move the geometry.",
 		).toBe(
-			"flex min-h-0 shrink-0 basis-[24.2dvh] flex-col gap-5 overflow-hidden " +
-				"lg:flex-row max-mobile:basis-auto max-mobile:overflow-visible",
+			// ⚠ RE-PINNED AT THE HEADER-FIT CHANGE, NOT LOOSENED. The band lost
+			// `basis-[24.2dvh]`, its `overflow-*` and MOBILE-1's two `max-mobile:`
+			// releases together, because a content-sized band has nothing to clip
+			// and nothing to release (`HeadZone.tsx`). `gap-5` — the BLOCK-4
+			// geometry this test exists for — is unchanged, and this is still a
+			// whole-string match.
+			"flex min-h-0 shrink-0 flex-col gap-5 lg:flex-row",
 		);
 		// ⛔ UNCHANGED AND DELIBERATELY STILL A WHOLE-STRING MATCH. MOBILE-1 did
 		// not touch the post arm — it declares neither `basis-` nor

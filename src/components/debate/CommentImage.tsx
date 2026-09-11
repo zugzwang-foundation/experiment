@@ -10,6 +10,7 @@ export function CommentImage({
 	url,
 	onOpen,
 	fill = false,
+	className,
 }: {
 	url: string;
 	onOpen: (url: string) => void;
@@ -56,6 +57,7 @@ export function CommentImage({
 	 * renders it inside its own `shrink-0` wrapper.
 	 */
 	fill?: boolean;
+	className?: string;
 }) {
 	return (
 		<button
@@ -101,8 +103,8 @@ export function CommentImage({
 			<img
 				src={url}
 				alt="Argument attachment"
-				className={`max-w-full rounded-[var(--imgr)] [border:var(--hairline)] ${
-					fill ? "max-h-full" : "max-h-[var(--imgmax)]"
+				className={`max-w-full object-contain rounded-[var(--imgr)] [border:var(--hairline)] ${
+					className ?? (fill ? "max-h-full" : "max-h-[var(--imgmax)]")
 				}`}
 			/>
 		</button>

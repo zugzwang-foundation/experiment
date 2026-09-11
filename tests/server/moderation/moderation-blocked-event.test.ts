@@ -1,4 +1,3 @@
-import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // AUDIT-FIX-B5 (A13) — every gate-block branch emits exactly ONE

@@ -69,6 +69,7 @@ export function FocusMarketCard({
 	pricing,
 	totals,
 	onExit,
+	compact = false,
 }: {
 	title: string;
 	/** UI-FOLLOWUP B — the market's public slug, so the card has a real address. */
@@ -77,6 +78,7 @@ export function FocusMarketCard({
 	pricing: { yes: string; no: string } | null;
 	totals: { dharmaStaked: string; postCount: number; replyCount: number };
 	onExit: () => void;
+	compact?: boolean;
 }) {
 	/**
 	 * ⛔ THE MODIFIER GUARD IS WHAT KEEPS THE `href` HONEST. Without it a
@@ -129,26 +131,38 @@ export function FocusMarketCard({
 			// no focus treatment at all, so a keyboard reader Tabbed an invisible
 			// cursor onto the one control that leaves post focus — CS13 §4's finding
 			// on the hero panel, in the same shape, on a more consequential control.
-			className="flex min-h-0 w-full flex-1 flex-col gap-3 rounded-(--r) p-3 text-left outline-none [border:var(--hairline)] [transition:background-color_var(--dur-hover)] hover:bg-n1 focus-visible:shadow-(--state-focus-ring)"
+			className={`flex min-h-0 w-full flex-1 flex-col ${
+				compact ? "gap-1 p-2" : "gap-3 p-3"
+			} rounded-(--r) text-left outline-none [border:var(--hairline)] [transition:background-color_var(--dur-hover)] hover:bg-n1 focus-visible:shadow-(--state-focus-ring)`}
 		>
 			{/* `.qrow` — thumb + question. The locked composition's first element. */}
-			<span className="flex items-center gap-3">
+			<span className={`flex items-center ${compact ? "gap-2" : "gap-3"}`}>
 				<MarketThumb
 					src={imageUrl}
 					// Decorative — the question is right beside it and carries the
 					// meaning. `discovery/MarketCard.tsx` makes the same call.
 					alt=""
-					className="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover"
+					className={`${
+						compact ? "h-8 w-8" : "h-[52px] w-[52px]"
+					} shrink-0 rounded-[var(--imgr)] object-cover`}
 					fallback={
 						<span
 							aria-hidden="true"
-							className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4"
+							className={`flex ${
+								compact
+									? "h-8 w-8 text-[7px]"
+									: "h-[52px] w-[52px] text-[8.5px]"
+							} shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono tracking-[0.16em] text-n4`}
 						>
 							IMG
 						</span>
 					}
 				/>
-				<span className="line-clamp-2 min-w-0 text-[13.5px] leading-[1.32] font-semibold">
+				<span
+					className={`line-clamp-${compact ? "1" : "2"} min-w-0 ${
+						compact ? "text-[12px]" : "text-[13.5px]"
+					} leading-[1.32] font-semibold`}
+				>
 					{title}
 				</span>
 			</span>
@@ -160,7 +174,9 @@ export function FocusMarketCard({
 			<PriceBar pricing={pricing} size="card" />
 
 			{/* `Đ volume · posts · replies` — the locked composition's third element. */}
-			<span className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+			<span
+				className={`flex flex-wrap ${compact ? "gap-x-2.5 text-[11px]" : "gap-x-4 text-xs"} gap-y-1 text-muted-foreground`}
+			>
 				{/* ⚠ UI-FOLLOWUP A — the same abbreviating figure the discovery tiles
 				    render (`MarketTotalDharma`), because this IS that card: the locked
 				    §3.2 composition, whose third element must be identical everywhere.
@@ -198,7 +214,9 @@ export function FocusMarketCard({
 			    the sibling above) rather than declaring its own: it is chrome about
 			    the card, not a field of the market, and it must not compete with the
 			    figures it sits under. */}
-			<span className="mt-auto text-xs text-muted-foreground">
+			<span
+				className={`mt-auto ${compact ? "text-[10px]" : "text-xs"} text-muted-foreground`}
+			>
 				↩ Click to return to market page
 			</span>
 		</Link>

@@ -121,7 +121,7 @@ export function DebateColumn({
 			// ⚠ The literal prefix `flex min-h-0 flex-1 flex-col gap-3` is PINNED by
 			// `debate-height-chain.test.ts` (`the-pole-column-may-shrink-below-its-
 			// content`), so the additions land AFTER it and the run stays intact.
-			className={`flex min-h-0 flex-1 flex-col gap-3 rounded-(--r) p-2 [border:var(--hairline)] ${
+			className={`flex min-h-0 flex-1 flex-col gap-3 overflow-hidden rounded-(--r) p-2 [border:var(--hairline)] ${
 				engaged
 					? "rounded-(--r) shadow-[0_0_10px_1px_rgba(255,255,255,0.2)]"
 					: ""
@@ -192,7 +192,7 @@ export function DebateColumn({
 			    silently. The two declarations are one mechanism, not two. */}
 			<div
 				data-testid="column-scroll"
-				className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+				className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-2 pr-3 [scrollbar-gutter:stable]"
 			>
 				{children}
 			</div>

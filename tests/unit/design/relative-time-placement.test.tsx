@@ -1313,7 +1313,12 @@ describe("TIME-1 :: the three walls, as structure rather than as review notes", 
 				(e) =>
 					e.isFile() && (e.name.endsWith(".ts") || e.name.endsWith(".tsx")),
 			)
-			.map((e) => join(e.parentPath, e.name).replace(`${ROOT}/`, ""));
+			.map((e) =>
+				join(e.parentPath, e.name)
+					.replace(ROOT, "")
+					.replace(/^[/\\]+/, "")
+					.replace(/\\/g, "/"),
+			);
 
 		// Alive check — a scan that silently matched nothing passes every
 		// assertion below vacuously.

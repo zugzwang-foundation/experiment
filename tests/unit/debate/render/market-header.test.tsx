@@ -446,8 +446,11 @@ describe("AIMODE-1 — the `.md` export is an `AI mode` button", () => {
 
 		// ⛔ THE REGRESSION THIS EXISTS FOR, NAMED. `size="xs"` on its own is
 		// `h-6`; left unoverridden, this control — not the badge — would set the
-		// row's height, growing it 4px inside a `basis-[24.2dvh] overflow-hidden`
-		// band whose interior budget is already fully allocated.
+		// row's height, growing it 4px. (Inside the `basis-[24.2dvh]` band that
+		// held it when this was written, that came out of the resolution row;
+		// the band is content-sized since the header-fit change, so it would
+		// come out of the arena instead. Either way the row's height is the
+		// badge's, by contract.)
 		expect(link.has("h-6")).toBe(false);
 	});
 

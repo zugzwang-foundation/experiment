@@ -110,7 +110,7 @@ function sourceFilesUnder(dir: string): string[] {
 		.filter(
 			(e) => e.isFile() && (e.name.endsWith(".ts") || e.name.endsWith(".tsx")),
 		)
-		.map((e) => join(e.parentPath, e.name));
+		.map((e) => join(e.parentPath, e.name).replace(/\\/g, "/"));
 }
 
 const files = SCAN_DIRS.flatMap(sourceFilesUnder);
