@@ -36,7 +36,11 @@ const TERMINAL: ReadonlySet<string> = new Set([
  * `src/components/discovery/StatLine.tsx`, which is file-private there and so
  * cannot be imported without widening that module's surface.
  */
-const noun = (n: number, one: string, many: string) => (n === 1 ? one : many);
+// ⚠ MOBILE-2 — EXPORTED, not copied. The phone details sheet renders the same
+// three totals, and a second pluralisation ternary is exactly how one surface
+// ends up reading `1 replies`. Exporting changes nothing this file renders.
+export const noun = (n: number, one: string, many: string) =>
+	n === 1 ? one : many;
 
 /**
  * Append an abbreviated figure's exact value to a gloss, or return the gloss
@@ -55,7 +59,10 @@ const joinGloss = (gloss: string, hint: string | null) =>
  * `color:var(--n3)`, normal weight against the bold figures, `margin:0 6px`.
  * `aria-hidden` for the same reason `ArgProfile`'s `Sep` carries it.
  */
-function AttrSep() {
+// ⚠ MOBILE-2 — EXPORTED for the phone details sheet's stats line. The `·` is a
+// SEAM, and three private copies of one seam drifting apart is the story that
+// minted `FieldSeparator` (SEP-1). One owner, two surfaces.
+export function AttrSep() {
 	return (
 		<span aria-hidden="true" className="mx-1.5 font-normal text-n3">
 			·
@@ -87,7 +94,15 @@ const LIFECYCLE_GLOSS: Record<
  * terminal market (Closed/Resolving/Resolved/Voided/Frozen) reads as locked —
  * "read-only" — paired with the literal status (never colour alone, §8).
  */
-function LifecycleBadge({ status }: { status: DebateMarketHeader["status"] }) {
+// ⚠ MOBILE-2 — EXPORTED for the phone details sheet's stats line. It carries
+// the terminal/read-only wording AND the INFO-1 gloss per state; a hand-rolled
+// `<Badge>{status}</Badge>` on the phone would drop both, silently, on exactly
+// the states where "read-only" is the thing a participant needs to be told.
+export function LifecycleBadge({
+	status,
+}: {
+	status: DebateMarketHeader["status"];
+}) {
 	const terminal = TERMINAL.has(status);
 	const badge = (
 		<Badge

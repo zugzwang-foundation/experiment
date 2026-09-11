@@ -696,7 +696,13 @@ export function BetComposer(props: {
 				    floor, which is what releases that automatic minimum; see its own
 				    `panel` comment for the number and for why the floor sits on the
 				    fieldset rather than on the artwork. */}
-				<div className="grid min-h-0 grid-cols-[2fr_3fr] items-stretch gap-2.5">
+				{/* ⚠ MOBILE-2 / ADR-0050 — `max-mobile:grid-cols-1`, ADDITIVE AND INERT
+				    ABOVE 640px. At 375px inside the phone sheet the `2fr_3fr` split
+				    gives the image slot ~138px and the argument fields ~207px, so the
+				    title input and the body textarea — the two things a participant is
+				    here to fill in — get less than half the sheet. Stacking gives both
+				    the full width and costs the desktop nothing. */}
+				<div className="grid min-h-0 grid-cols-[2fr_3fr] items-stretch gap-2.5 max-mobile:grid-cols-1">
 					<ImageAttach
 						state={image}
 						disabled={floorAbove || inFlight}
@@ -832,8 +838,46 @@ export function BetComposer(props: {
 							</div>
 						</div>
 
+						{/* ⛔⛔ MOBILE-2 — THE CAP AND THE BALANCE, PHONE ONLY, AND IT IS
+						    RESTORING AN INVARIANT RATHER THAN DECORATING A SHEET.
+						    design-language §1.8 / ADR-0050 D-5: "the balance visible where a
+						    stake is committed". On the desktop that is held by the GLOBAL
+						    HEADER — `DharmaCluster` renders `Balance` beside `Portfolio`, and
+						    the composer therefore never had to. ⚠ ADR-0049 (#511) hides that
+						    cluster below 640px (`DharmaCluster.tsx:111`,
+						    `mobileResponsive && "max-mobile:hidden"`), which is right for a
+						    354px header and leaves the invariant with nowhere to live on a
+						    phone: MEASURED on `origin/main`, a phone participant composing a
+						    bet can see no balance anywhere on the page. So this line is the
+						    one place it can go, and it appears at exactly the width where the
+						    header stopped carrying it.
+						    ⚠ BOTH HALVES ARE LIVE. `overCapStrip()` is the shipped
+						    `Max Đ 250 per bet` string; the figure is `viewer.spendableToday`
+						    through `formatDharma`, which is the same value `Balance` names in
+						    the header (its ratified gloss is *spendable* —
+						    `DharmaCluster.tsx:26-29`). Nothing is invented and nothing is
+						    recomputed here.
+						    ⚠ `hidden` + `max-mobile:flex` — it is `display:none` at every
+						    desktop width, so the ≥640px render is unchanged to the pixel. */}
+						<p
+							data-testid="composer-phone-balance"
+							className="mt-1 hidden shrink-0 items-baseline justify-between gap-2 text-[10px] leading-tight text-n5 max-mobile:flex"
+						>
+							<span>{overCapStrip()}</span>
+							<span>
+								Balance{" "}
+								<span className="font-mono text-ink">
+									Đ {formatDharma(props.viewer.spendableToday)}
+								</span>
+							</span>
+						</p>
 						{/* `.footblock` (d5) — the money row, and RPLY-3 · R1's whole subject. */}
-						<div className="mt-auto flex shrink-0 items-stretch gap-2.5">
+						{/* ⚠ MOBILE-2 — the money row stacks below 640px: the Amount / To win card
+						    takes the full width and `PLACE Đ BET` sits under it at full
+						    width. Side by side at 375 the submit is a ~120px target beside a
+						    number a participant is reading while they decide. Additive; the
+						    desktop row is unchanged. */}
+						<div className="mt-auto flex shrink-0 items-stretch gap-2.5 max-mobile:flex-col">
 							<div className="flex flex-1 flex-col rounded-(--r-chip) px-2.5 py-1.5 [border:var(--hairline)]">
 								<div className="flex items-center justify-between">
 									<span className="text-[9.5px] font-bold tracking-[0.12em] text-n5 uppercase">
@@ -900,7 +944,7 @@ export function BetComposer(props: {
 								aria-disabled={submitDisabled}
 								aria-label={COMPOSER_COPY.submit}
 								onClick={submit}
-								className="h-auto min-h-[44px] flex-col gap-0 self-stretch px-3 py-1"
+								className="h-auto min-h-[44px] flex-col gap-0 self-stretch px-3 py-1 max-mobile:w-full"
 							>
 								<span className="text-[10px] leading-tight font-medium">
 									Place

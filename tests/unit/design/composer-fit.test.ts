@@ -521,7 +521,38 @@ describe("RPLY-3 · R1 · G2 — the image cell is the shock absorber", () => {
 		// something else.
 		expect(ATTACH).toContain("EMPTY_SLOT_COPY.action");
 		// It lives in the figure, and the figure renders in the empty states.
-		expect(ATTACH).toContain("<EmptySlotFigure className={preview} />");
+		// ⚠⚠ MOBILE-2 — THE PIN MOVED AND THE WALL DID NOT. The figure now carries
+		// `max-mobile:hidden`, because below 640px the founder ruled the empty slot
+		// down to the invitation alone: no 4:5 tile, no `K · n > C`, no `THE GOAL`.
+		// ⛔ That is precisely where THIS assertion earns its keep — `Add Image` is
+		// DRAWN INSIDE the figure (`ImageAttach.tsx:204-230`), so hiding the art
+		// hides the only entry point to attaching an image, which is the functional
+		// regression this row exists to catch. The phone therefore renders the SAME
+		// live constant as text, and both tiers are pinned below rather than one.
+		expect(ATTACH).toContain(
+			"<EmptySlotFigure className={`${preview} max-mobile:hidden`} />",
+		);
+		// THE PHONE'S OWN ENTRY POINT — the same `EMPTY_SLOT_COPY.action`, rendered
+		// as text in a span that is `display:none` at every desktop width. Asserted
+		// as a PAIR with the hide above: either token alone leaves a phone with an
+		// image slot nothing tells you to tap.
+		expect(ATTACH).toMatch(
+			/hidden[^"]*max-mobile:inline"\s*>\s*\{EMPTY_SLOT_COPY\.action\}/,
+		);
+		// ⛔⛔ AND IT CARRIES THE SAME GATE THE FIGURE DOES. The first cut of the
+		// phone label rendered unconditionally, so during `attaching` — and after a
+		// decode failure while `attached` — the phone offered `Add Image` directly
+		// above the filename of the file already uploading. `attach-preview.test.tsx`
+		// caught it; this row is what stops it coming back through a path that file
+		// does not watch. `invitesAPick` is the single named condition both tiers
+		// read, so a fourth phase cannot re-open the gap by being forgotten in one
+		// of two places.
+		expect(ATTACH).toContain(
+			"const invitesAPick = previewUrl === null && !fileInHand;",
+		);
+		expect(ATTACH).toMatch(
+			/\{invitesAPick \? \(\s*<span className="hidden[^"]*max-mobile:inline"/,
+		);
 		// ⛔ The `<svg>` keeps the two properties that make it SCALE rather than
 		// crop: its own coordinate system, and the DEFAULT `meet` fit. An
 		// explicit `preserveAspectRatio="…slice"` would crop it silently.

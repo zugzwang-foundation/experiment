@@ -160,7 +160,21 @@ export function ArgProfile({
 			    thing in Group A. At `h-6` the mark's centre sat 2px below the line
 			    it belongs to. `O-3` — a right call with a wrong stated cause is
 			    still a defect, and here the wrong cause produced a wrong number. */}
-			<Avatar size="sm">
+			{/* ⚠⚠ MOBILE-2 / RF-4 — THE PHONE AVATAR STEP, AND THE SELECTOR IS THE
+			    WHOLE OF WHY IT IS SPELLED LIKE THIS. `ui/avatar.tsx:8-16` records the
+			    trap in terms: the size rules are DATA-VARIANTS, so
+			    `data-[size=sm]:size-6` compiles to `&[data-size=sm]` at specificity
+			    (0,2,0) and beats a bare `size-*` arriving through `className` at
+			    (0,1,0) — REGARDLESS of twMerge ordering. A plain `max-mobile:size-10`
+			    here would therefore be silently inert, which is the worst kind of
+			    wrong: it looks applied in the source and does nothing in the browser.
+			    Matching the data attribute as well brings this rule to the same
+			    specificity and lets the media query decide.
+			    ⚠ MEASURED IN A REAL BROWSER, not reasoned — see the run report's
+			    measured-delta section. The 36px the stills use is not a live step
+			    (`avatar.tsx` ships 16 / 24 / 32 / 40); `lg` = 40 is the nearest that
+			    fills a two-line identity block. */}
+			<Avatar size="sm" className="max-mobile:data-[size=sm]:size-10">
 				<AvatarImage src={author.pfpUrl} alt="" />
 				<AvatarFallback>
 					{author.pseudonym.slice(0, 2).toUpperCase()}
@@ -192,7 +206,16 @@ export function ArgProfile({
 			    download mark keeps its own `ml-auto` instead, which reaches the
 			    trailing edge for exactly the same reason it always did: the row is
 			    `w-full`. */}
-			<div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+			{/* ⚠⚠ MOBILE-2 / RF-4 — THE TWO-LINE IDENTITY BLOCK, and every token here
+			    is additive and inert above 640px.
+			    The phone card wants the author on line 1 and the metadata beneath,
+			    with the avatar spanning both — which is this row's EXISTING shape
+			    (`items-start`, the avatar a sibling of this wrapping area) taken one
+			    step further rather than a new composition. The size step is the
+			    stills' 13px, stated WITH its leading because an arbitrary
+			    `text-[Npx]` inherits whatever line-height was in scope and this
+			    surface has a measured case of exactly that (AGENTS.md §8). */}
+			<div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground max-mobile:gap-y-0.5 max-mobile:text-[13px] max-mobile:leading-[17px]">
 				{/* GROUP A — never wraps internally (rule 2). A pseudonym long enough
 				    to overflow it is preferred to a pseudonym that is cut in half:
 				    identity is not a field this product truncates.
@@ -232,7 +255,7 @@ export function ArgProfile({
 				    enough width that this group fit. Upstream deleted that wrapper
 				    (the better fix for the crowding it addressed) and the coverage went
 				    with it, one level shallower than the real constraint. */}
-				<span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap max-mobile:shrink max-mobile:flex-wrap">
+				<span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap max-mobile:contents max-mobile:shrink max-mobile:flex-wrap">
 					{/* HTML-FINISH · MARKET DETAIL row 42 — the pseudonym navigates to that
 				    author's Profile. SPEC.1 `:1628` already rules exactly this for the
 				    Discovery hero ("an author pseudonym click navigates to that
@@ -256,7 +279,21 @@ export function ArgProfile({
 						// IS a person, and half of one identifies nobody. Group A may
 						// overflow a narrow card instead; that is the trade, made
 						// deliberately.
-						className="text-sm font-medium text-ink hover:underline"
+						// ⚠⚠ MOBILE-2 / RF-4 — `basis-full` IS WHAT PUTS THE AUTHOR ON A
+						// LINE OF THEIR OWN below 640px: the wrapping area is `flex-wrap`,
+						// so a 100% basis pushes every field after it onto line 2. It works
+						// ONLY because both groups dissolve to `display:contents` at the same
+						// width — inside its own group box this element would take a full line
+						// OF THE GROUP and change nothing about the row. The tokens are one
+						// mechanism and none of them does anything alone.
+						// ⚠ `display:contents` KEEPS `whitespace-nowrap` WORKING, which is
+						// why dissolving the groups does not reintroduce the dangling
+						// separator the block above records: `white-space` is INHERITED, so
+						// it still reaches every field even with the box gone, and each
+						// separator still travels inside the span of the field it leads.
+						// ⚠ The size and weight are the stills' (17px / 600); the leading is
+						// stated because the size is arbitrary.
+						className="text-sm font-medium text-ink hover:underline max-mobile:basis-full max-mobile:text-[17px] max-mobile:leading-[22px] max-mobile:font-semibold"
 					>
 						{author.pseudonym}
 					</Link>
@@ -408,7 +445,7 @@ export function ArgProfile({
 				    ROW's behaviour at phone width, not of one group's current contents,
 				    and a longer badge string is exactly the kind of change that would
 				    otherwise reintroduce the clip in the half nobody thought to cover. */}
-				<span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap max-mobile:shrink max-mobile:flex-wrap">
+				<span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap max-mobile:contents max-mobile:shrink max-mobile:flex-wrap">
 					{/* TIME-1 · Form B — HOW LONG AGO, AND IT IS THE LAST THING GROUP A
 				    SAYS. The lane badge follows it (entry 1b, rule 5); nothing else
 				    does.

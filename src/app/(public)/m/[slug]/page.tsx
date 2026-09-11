@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getRequestSession } from "@/app/(public)/_lib/session";
 import { DebateView } from "@/components/debate/DebateView";
 import { PhoneDebateView } from "@/components/debate/phone/PhoneDebateView";
+import { PhoneDetails } from "@/components/debate/phone/PhoneDetails";
 import { db } from "@/db";
 import { getCachedDebateView } from "@/server/debate-view/cached-view";
 import { getMarketPricingAndReserves } from "@/server/debate-view/market-pricing";
@@ -231,7 +232,11 @@ export default async function MarketPage({
 				viewer={viewer}
 				initialPostId={initialPostId}
 				ownPseudonym={session?.user?.pseudonym ?? null}
-				details={null}
+				// RF-7 — SERVER-RENDERED and handed to the client shell as a node.
+				// The sheet's shell is the only client part of it; nothing inside
+				// this tree crosses the boundary, so the phone pays for the details
+				// screen only in payload, and only once.
+				details={<PhoneDetails model={model} />}
 			/>
 		</>
 	);

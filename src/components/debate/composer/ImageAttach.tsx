@@ -425,7 +425,7 @@ export function ImageAttach({
 	// `preserveAspectRatio="xMidYMid meet"`, so it fits, stays centred, keeps
 	// its ratio, and never clips or scrolls at any height.
 	const panel =
-		"flex h-full min-h-40 min-w-0 flex-col items-center justify-stretch rounded-(--imgr) p-1 text-center text-xs [border:var(--hairline)] bg-n1/40 group hover:border-n4 transition-colors cursor-pointer";
+		"flex h-full min-h-40 min-w-0 flex-col items-center justify-stretch rounded-(--imgr) p-1 text-center text-xs [border:var(--hairline)] bg-n1/40 group hover:border-n4 transition-colors cursor-pointer max-mobile:min-h-24";
 	// `.imgprev` — d5's `width:100%; aspect-ratio:4/5; max-height:calc(100% - 22px)`
 	// ported as PROPORTIONS ONLY: the `- 22px` is a value and is refused, so the
 	// clamp lands as `max-h-full`. Keeping d5's height clamp is what stops the
@@ -510,12 +510,39 @@ export function ImageAttach({
 	// and its `-attached-` twin.
 	const emptyBox = <span aria-hidden="true" className={preview} />;
 	const fileInHand = state.phase === "attaching" || state.phase === "attached";
+	/**
+	 * ⛔⛔ MOBILE-2 — THE INVITATION'S OWN CONDITION, HOISTED, BECAUSE THE PHONE
+	 * NEEDED IT AND I SHIPPED IT UNGATED FIRST.
+	 *
+	 * The phone renders `Add Image` as TEXT (the figure that draws it is hidden
+	 * below 640px), and the first cut rendered that span unconditionally inside
+	 * the pick button. `attach-preview.test.tsx` reddened on exactly the case the
+	 * rule above exists for: during `attaching`, and after a decode failure while
+	 * `attached`, the phone offered `Add Image` directly above the filename of the
+	 * file already uploading. That is the slot contradicting the row underneath
+	 * it — the defect the three-arm rule was written to prevent, reproduced one
+	 * tier down.
+	 *
+	 * ⇒ The condition is named ONCE and both tiers read it, so a fourth phase or
+	 * a fifth surface cannot re-open the gap by forgetting to repeat it.
+	 */
+	const invitesAPick = previewUrl === null && !fileInHand;
 	const previewBox =
 		previewUrl === null ? (
 			fileInHand ? (
 				emptyBox
 			) : (
-				<EmptySlotFigure className={preview} />
+				/* ⛔⛔ MOBILE-2 / RF-6 founder amendment (2026-09-11 23:18 IST) — ON A
+				   PHONE THE EMPTY SLOT IS THE INVITATION AND NOTHING ELSE: no 4:5
+				   tile, no balance drawing, no `K · n > C`, no `THE GOAL`.
+				   ⚠ THE BRIEF PRESCRIBED "hide the art, the button becomes full
+				   width", AND THAT MECHANISM CANNOT BE WRITTEN: `Add Image` is drawn
+				   INSIDE this SVG (`:204-230`), so hiding the art hides the
+				   affordance. The ruled OUTCOME is kept and the mechanism replaced —
+				   the figure goes `display:none` below 640px and the pick button
+				   renders the SAME LIVE STRING (`EMPTY_SLOT_COPY.action`) as text
+				   instead. One source for the words either way. */
+				<EmptySlotFigure className={`${preview} max-mobile:hidden`} />
 			)
 		) : (
 			// A local `blob:` object URL for a file that exists only in this tab —
@@ -613,6 +640,19 @@ export function ImageAttach({
 						    field's label — reported for routing, NOT amended (that document
 						    is web-authored). */}
 						{previewBox}
+						{/* ⚠ MOBILE-2 — the phone's whole empty state. `hidden` +
+						    `max-mobile:inline` means it is `display:none` at every desktop
+						    width, so the ≥640px render is unchanged to the pixel; below
+						    640px it is the only thing in the box, because the figure above
+						    is hidden there. It is deliberately the SAME constant the
+						    artwork draws, so the two can never say different words — and
+						    it is gated by the SAME condition, so the two can never
+						    disagree about when to say them either. */}
+						{invitesAPick ? (
+							<span className="hidden text-sm font-semibold text-ink max-mobile:inline">
+								{EMPTY_SLOT_COPY.action}
+							</span>
+						) : null}
 						{state.phase === "attaching" ? (
 							<span className="text-n5">{`${state.name}…`}</span>
 						) : null}
