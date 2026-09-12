@@ -297,7 +297,30 @@ export function PhoneFeedTrack({
 					// stop on the way to a control rather than a way to reach content.
 					data-pane={pane.key}
 					data-testid={`phone-pane-${pane.key}`}
-					className="w-full shrink-0 snap-start snap-always overflow-y-auto overscroll-contain outline-none"
+					// ⛔⛔ NO `overscroll-contain` HERE WHILE THE HEIGHT CHAIN IS
+					// UNBOUNDED, AND THE PAIR IS THE RULE RATHER THAN THE TOKEN.
+					// `overflow-y-auto` below is inert today: `<main>`'s
+					// `min-h-[calc(100dvh-60px-2px)]` is a MINIMUM, nothing above
+					// bounds this box, so the pane grows to its full content height,
+					// `scrollHeight === clientHeight`, and the DOCUMENT is the only
+					// thing that scrolls. `overscroll-behavior: contain` therefore
+					// sits on a box that never scrolls — and its only reachable
+					// effect is the defect it looks like a guard against: an engine
+					// that counts a non-overflowing `overflow:auto` box as a scroll
+					// container refuses to chain the pan out of it, turning the
+					// pane's rectangle into a dead region while the title strip, the
+					// tabs and the fixed bet bar around it keep scrolling the page.
+					// That is the founder's Android report, and it is one browser
+					// judgement away from this build
+					// (`~/Downloads/zz_MOBILE-2c-ANDROID_probe_2026-09-12T1435.md`
+					// §5 and §7.2 — measured: `contain` 0px vs `auto` 402px out of a
+					// pane parked at its scroll end).
+					// ⚠ IT COMES BACK THE MOMENT THE CHAIN IS BOUNDED. Containment
+					// is correct and wanted on a pane that really scrolls; what is
+					// wrong is declaring it on one that cannot. The two halves are
+					// pinned together by `phone-scroll-model.test.ts`, so whichever
+					// moves first reddens.
+					className="w-full shrink-0 snap-start snap-always overflow-y-auto outline-none"
 				>
 					{pane.content}
 				</div>
