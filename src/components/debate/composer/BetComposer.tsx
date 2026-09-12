@@ -714,19 +714,32 @@ export function BetComposer(props: {
 					    own content height instead of forcing this whole column — and
 					    the grid row it sits in — to stay at full size regardless of the
 					    space actually available. */}
-					{/* ⚠⚠ MOBILE-2 — NO `order-*` TOKEN HERE, AND THE ABSENCE IS MEASURED
-					    RATHER THAN OVERLOOKED. Stacked below 640px the grid renders source
-					    order, so the image slot sits ABOVE the argument fields. `order-first`
-					    on this column was tried and REVERTED after looking at it: it moves
-					    the WHOLE column, and this column holds the money row and
-					    `PLACE Đ BET` as well as the fields — so the attachment landed AFTER
-					    the submit, which is worse than landing before the fields. The ruled
-					    composition (R2 · S4) puts the image BETWEEN body and money, and that
-					    is not expressible by reordering two grid children; it would need the
-					    footblock to leave this column, which is RPLY-3 · R1 in reverse and is
-					    not a token. ⇒ The image leads and the submit stays last. Flagged for
-					    the founder in the run report. */}
-					<div className="flex min-h-0 min-w-0 flex-col gap-2">
+					{/* ⛔⛔ MOBILE-2c R-6 — `max-mobile:contents`, AND IT IS THE ANSWER TO
+					    THE PARAGRAPH THAT USED TO STAND HERE.
+					    That paragraph was right about everything except the conclusion. It
+					    recorded that `order-first` on this column had been tried and
+					    reverted because it moves the WHOLE column — fields, money row and
+					    `PLACE Đ BET` together — so the attachment landed after the submit,
+					    which is worse than landing before the fields. It concluded that the
+					    ruled composition "would need the footblock to leave this column,
+					    which is RPLY-3 · R1 in reverse and is not a token."
+					    ⇒ `display: contents` is the token. Below 640px it dissolves this
+					    wrapper's BOX without moving a single node, so the grid's children
+					    become [image, fields, balance, footblock] and `order-*` sequences
+					    those four independently. The desktop keeps the box and the column,
+					    byte-for-byte: `contents` is behind `max-mobile:` and `order` is
+					    inert on a child whose parent is not a flex or grid container at
+					    that width — which it is not, because this div IS the container
+					    above 640px.
+					    ⚠ `gap-2` goes with the box at phone width, and the grid's own
+					    `gap-2.5` (10px) takes over — inside the 8-12px the ruling asks for,
+					    so nothing is restated.
+					    ⚠ `mt-auto` on the footblock is neutralised at phone width. In this
+					    column it pushes the money row to the bottom of a flex column; as a
+					    grid item in an auto-sized row there is no free space for it to
+					    consume, and leaving it would be a declaration that reads as load
+					    bearing while doing nothing. */}
+					<div className="flex min-h-0 min-w-0 flex-col gap-2 max-mobile:contents">
 						{/* `.fieldscroll` — RPLY-3 · R1. THE SCROLLER, AND THE REASON THE
 						    FOOTBLOCK CAN COME BACK INTO THIS COLUMN AT ALL.
 						    ⛔⛔ THE RULING IS "never pushed off-screen", AND A BUDGET
@@ -765,7 +778,7 @@ export function BetComposer(props: {
 						    equal negative margin cancels it back out.
 						    ⛔ NOT `flex-1` — same refusal as every other node in this
 						    chain (see the argument region). Shrinking needs no grow. */}
-						<div className="flex min-h-0 -m-0.5 flex-col gap-1.5 overflow-y-auto p-0.5">
+						<div className="flex min-h-0 -m-0.5 flex-col gap-1.5 overflow-y-auto p-0.5 max-mobile:order-1">
 							<div className="flex shrink-0 flex-col">
 								{/* ⚠⚠ change set 11 §3 — A TEXTAREA, SO ALL 125 CHARACTERS ARE
 								    VISIBLE AT ONCE. As an `<input>` only the tail showed at
@@ -884,7 +897,7 @@ export function BetComposer(props: {
 						    desktop width, so the ≥640px render is unchanged to the pixel. */}
 						<p
 							data-testid="composer-phone-balance"
-							className="mt-1 hidden shrink-0 items-baseline justify-between gap-2 text-[10px] leading-tight text-n5 max-mobile:flex"
+							className="mt-1 hidden shrink-0 items-baseline justify-between gap-2 text-[10px] leading-tight text-n5 max-mobile:order-3 max-mobile:flex"
 						>
 							{/* ⚠ HIDDEN WHILE THE NOTICE SLOT IS ALREADY SAYING IT. In the
 							    over-cap state `notice` renders `overCapStrip()` a few lines
@@ -906,7 +919,7 @@ export function BetComposer(props: {
 						    width. Side by side at 375 the submit is a ~120px target beside a
 						    number a participant is reading while they decide. Additive; the
 						    desktop row is unchanged. */}
-						<div className="mt-auto flex shrink-0 items-stretch gap-2.5 max-mobile:flex-col">
+						<div className="mt-auto flex shrink-0 items-stretch gap-2.5 max-mobile:order-4 max-mobile:mt-0 max-mobile:flex-col">
 							<div className="flex flex-1 flex-col rounded-(--r-chip) px-2.5 py-1.5 [border:var(--hairline)]">
 								<div className="flex items-center justify-between">
 									<span className="text-[9.5px] font-bold tracking-[0.12em] text-n5 uppercase">

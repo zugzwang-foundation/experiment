@@ -75,12 +75,44 @@ export function QuoteWell({
 	const mark = quoteMarkSize(size);
 	const inkHeight = GEIST_QUOTE_INK * mark;
 
-	/** Same for both marks bar the offset — see the docblock. */
+	/**
+	 * Same for both marks bar the offset — see the docblock.
+	 *
+	 * ⛔⛔ THE OPTICAL INSET IS TAKEN WITH MARGINS, NOT WITH `position: relative`,
+	 * AND THE REASON IS A WEBKIT PAINT BUG INSIDE `<foreignObject>` (MOBILE-2c
+	 * R-3, founder-reported on an iPhone, ruled Q3-a).
+	 *
+	 * It used to be `height: inkHeight` with `top: -top*mark` on a
+	 * `position: relative` span — a 67.5px glyph in a 21px box, offset upward.
+	 * On WebKit the opening mark painted **on top of the title's first line and
+	 * right of centre**, and the closing mark did not paint at all. Chromium was
+	 * and is correct.
+	 *
+	 * ⚠ EVERY BOX MEASUREMENT AGREED ACROSS BOTH ENGINES, WHICH IS WHY THIS
+	 * NEEDED A PICTURE. `getBoundingClientRect` on the mark, `getComputedStyle`
+	 * on every declaration, and `Range.getClientRects()` over the glyph's own
+	 * text run returned the same numbers on WebKit and Chromium to within 0.1px
+	 * — the layout box reports the shifted position while the PAINT applies the
+	 * offset somewhere else. A geometry-only instrument reports this defect as
+	 * absent (AGENTS.md §9: the paint is the arbiter).
+	 *
+	 * ⇒ Found by bisection: overriding the marks to `position: static; top: 0`
+	 * live on WebKit renders them correctly, and no other suspect moved anything
+	 * — not `justify-content: safe center`, not `text-wrap: balance`, not the
+	 * well's `overflow: hidden`, not the shrunken height on its own.
+	 *
+	 * ⚠ THE LAYOUT CONTRIBUTION IS UNCHANGED BY CONSTRUCTION, which is what keeps
+	 * Chromium pixel-identical (carve-out 2): the outer box was `inkHeight`, and
+	 * `mark + marginTop + marginBottom` = `mark - top*mark - (mark - inkHeight -
+	 * top*mark)` = `inkHeight`. So `size.ts`'s `2 * GEIST_QUOTE_INK * mark`
+	 * budget still describes the space these two occupy, and the title neither
+	 * moves nor re-wraps.
+	 */
 	const markStyle = (top: number) => ({
 		fontSize: `${mark}px`,
 		lineHeight: 1,
-		height: `${inkHeight}px`,
-		top: `${-top * mark}px`,
+		marginTop: `${-top * mark}px`,
+		marginBottom: `${-(mark - inkHeight - top * mark)}px`,
 	});
 
 	return (
@@ -141,7 +173,7 @@ export function QuoteWell({
 					<span
 						data-testid="quote-well-mark"
 						aria-hidden="true"
-						className="qmark relative block shrink-0 font-sans font-bold text-n4"
+						className="qmark block shrink-0 font-sans font-bold text-n4"
 						style={markStyle(GEIST_QUOTE_TOP)}
 					>
 						{"“"}
@@ -160,7 +192,7 @@ export function QuoteWell({
 					<span
 						data-testid="quote-well-mark"
 						aria-hidden="true"
-						className="qmark relative block shrink-0 font-sans font-bold text-n4"
+						className="qmark block shrink-0 font-sans font-bold text-n4"
 						style={markStyle(GEIST_QUOTE_TOP_CLOSE)}
 					>
 						{"”"}

@@ -208,24 +208,44 @@ describe("RPLY-3 · R1 — the argument fields give way; the money row never doe
 	/**
 	 * Byte offset of the `.compright` column's own declaration.
 	 *
-	 * ⚠ MOBILE-2 — the string is UNCHANGED (an `order-first` token was tried here
-	 * and reverted; see `BetComposer`'s own block for why), but the locator is
-	 * made STRICTER while it is open: a source locator that matches more than
-	 * once is silently ambiguous, and this one is the ordering anchor for three
-	 * other assertions in this file.
+	 * ⚠ MOBILE-2 — the locator was made STRICTER while this file was open: a
+	 * source locator that matches more than once is silently ambiguous, and this
+	 * one is the ordering anchor for three other assertions here.
+	 *
+	 * ⛔⛔ MOBILE-2c — AND IT WAS FENCED BY A WHOLE CLASS LITERAL, WHICH IS O-8's
+	 * SHAPE ONE UNIT OVER. It read
+	 * `'<div className="flex min-h-0 min-w-0 flex-col gap-2">'` — the complete
+	 * attribute, closing quote and bracket included — so ANY additive token on
+	 * this element broke the lookup. R-6 added `max-mobile:contents`, a token
+	 * that is inert above 640px and changes nothing this file asserts, and two
+	 * rows reddened with `expected -1 to be greater than -1`: a message about a
+	 * missing element, produced by a guard whose subject had not moved.
+	 *
+	 * ⇒ The anchor is now the set of class TOKENS that make this element
+	 * `.compright`, in order, with anything allowed after them. A token set is
+	 * what the guard is actually about; the closing bracket never was. The
+	 * uniqueness assertion is kept and is the reason this is still an anchor
+	 * rather than a guess — and it is now expressed as a match COUNT, because a
+	 * regex has no `indexOf(needle, at + 1)`.
+	 *
+	 * ⚠ It still reds if the element loses `min-h-0` or `flex-col` or `gap-2`,
+	 * which is what the three ordering rows below depend on. Widening a locator
+	 * is not weakening a guard; the assertions it anchors are untouched.
 	 */
 	function rightColumnAt(): number {
-		const NEEDLE = '<div className="flex min-h-0 min-w-0 flex-col gap-2">';
-		const at = source.indexOf(NEEDLE);
-		expect(at, "expected the `.compright` column declaration").toBeGreaterThan(
-			-1,
-		);
+		const LOCATOR =
+			/<div className="flex min-h-0 min-w-0 flex-col gap-2(?:[^"]*)">/g;
+		const hits = [...source.matchAll(LOCATOR)];
 		expect(
-			source.indexOf(NEEDLE, at + 1),
+			hits.length,
+			"expected the `.compright` column declaration",
+		).toBeGreaterThan(0);
+		expect(
+			hits.length,
 			"the `.compright` locator matches more than once — it is an ordering " +
 				"anchor and an ambiguous one anchors nothing",
-		).toBe(-1);
-		return at;
+		).toBe(1);
+		return hits[0]?.index ?? -1;
 	}
 
 	/**

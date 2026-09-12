@@ -182,21 +182,45 @@ describe("ImageAttach — the preview draws on SELECT, not on upload", () => {
 		expect(revokeSpy).not.toHaveBeenCalled();
 	});
 
-	it("preview::is-shown-whole-and-lands-inside-the-4-5-slot-box", () => {
-		// `object-contain`, and the reason no longer rests on a caption. Canon §6's
-		// "Shown whole · any orientation" used to sit under this box and carry the
-		// argument; POLISH-4-EMPTYSLOT deleted it, and the obligation outlived the
-		// words. A fixed 4:5 box must crop or letterbox, and the bytes here are
+	it("preview::is-shown-whole-at-its-OWN-aspect-never-inside-a-4-5-box", () => {
+		// ⛔⛔ THIS ROW USED TO PIN THE DEFECT MOBILE-2c R-7 FIXES, and the old
+		// reasoning is kept because only its CONCLUSION was superseded.
+		//
+		// It read: "A fixed 4:5 box must crop or letterbox, and the bytes here are
 		// immutable from first write (ADR-0028) inside an append-only comment
-		// (INV-4) — so a crop nobody chose becomes permanent and public. Letterbox.
-		// The 4:5 box is the slot itself (d5 `.imgprev`), pinned in every phase by
-		// `attach-phases.test.tsx`; the image must land INSIDE it, not replace it.
+		// (INV-4) — so a crop nobody chose becomes permanent and public.
+		// Letterbox." Every clause of that is still true. What it did not ask is
+		// whether the box has to be fixed at all. The founder saw the consequence
+		// on his own screen — a small image centred in a large empty frame, on
+		// DESKTOP as well as on the phone (ruling Q8-a, 2026-09-12) — because a
+		// 16:9 photo fills about 45% of a 4:5 box and the rest is painted ground.
+		//
+		// ⚠ canon §6's "Shown whole · any orientation" IS NOT WEAKENED BY THIS and
+		// no amendment is owed. The promise was previously kept by padding the
+		// picture out to a shape it does not have; it is now kept by showing the
+		// shape it has. Two `max-*` bounds with no fixed dimension is the one
+		// combination that does that — CSS 2.1 §10.4 recomputes the used width
+		// from the constrained height for a replaced element, so the ratio
+		// survives and there is no letterbox area to fill.
+		//
+		// ⚠ THE 4:5 SLOT IS NOT GONE — it is the EMPTY state's shape, and the
+		// three rows below still assert it in every phase where no preview is
+		// present. What changed is that an ATTACHED image no longer wears it.
 		const { container } = mount();
 		pick(container);
 
 		const cls = previewImg()?.getAttribute("class") ?? "";
 		expect(cls).toMatch(/(?:^|\s)object-contain(?:\s|$)/);
-		expect(cls).toMatch(/aspect-\[4\/5\]/);
+		// ⛔ THE ASSERTION IS AN ABSENCE, SO IT CARRIES A POSITIVE CONTROL. Without
+		// the second expectation a class attribute that failed to render at all
+		// would satisfy the first, and this row would pass on an <img> with no
+		// classes.
+		expect(cls).not.toMatch(/aspect-\[/);
+		expect(cls).toMatch(/max-h-\[40dvh\]/);
+		// Bounded on BOTH axes and fixed on neither — the ratio-preserving shape.
+		expect(cls).toMatch(/(?:^|\s)max-w-full(?:\s|$)/);
+		expect(cls).toMatch(/(?:^|\s)w-auto(?:\s|$)/);
+		expect(cls).toMatch(/(?:^|\s)h-auto(?:\s|$)/);
 	});
 
 	it("preview::is-decorative-and-adds-no-accessible-name", () => {

@@ -412,14 +412,30 @@ describe("QUOTE-1 C — the measured constants reach the rendered node", () => {
 		);
 	});
 
-	it("quote-well::each-mark-is-laid-out-as-its-INK-and-shifted-by-its-OWN-top", () => {
-		// ⛔ THE ONE PIECE OF MACHINERY IN THE COMPONENT. A mark's layout box is its
-		// ink (`height = INK × mark`) and a negative `top` shifts the PAINT so the ink
-		// lands on that footprint — which is what makes the column's arithmetic
-		// `2 × ink + 2 × gap + title`, the very sum `quoteTitleSize` fits to 224.
-		// ⚠ The two marks carry DIFFERENT offsets because they sit at different
-		// heights in the face (0.129 em vs 0.145 em); asserting one value for both
-		// would pass against the bug it is here to catch.
+	it("quote-well::each-mark-occupies-its-INK-and-is-inset-by-MARGINS-not-by-position", () => {
+		// ⛔ THE ONE PIECE OF MACHINERY IN THE COMPONENT, and MOBILE-2c R-3 changed
+		// how it is expressed without changing what it computes.
+		//
+		// It used to be `height = INK × mark` with a negative `position: relative`
+		// `top` shifting the PAINT onto that footprint. On WebKit, inside the
+		// well's `<foreignObject>`, that paint landed in the wrong place: the
+		// opening mark rendered on top of the title's first line and right of
+		// centre, and the closing mark did not render at all. Chromium was correct.
+		// Every box measurement agreed across both engines to within 0.1px — the
+		// layout box reported the shifted position while the paint did not use it —
+		// so the defect was invisible to geometry and was found by bisecting the
+		// declarations live on WebKit until one of them moved the picture.
+		//
+		// ⇒ The inset is taken with MARGINS. Same optical result, painted
+		// correctly by both engines, and no reliance on a 67.5px glyph overflowing
+		// a 21px box.
+		//
+		// ⛔⛔ THE ASSERTION THAT MATTERS IS THE SUM, NOT THE MARGINS. What keeps
+		// Chromium pixel-identical — and keeps `quoteTitleSize`'s
+		// `2 × ink + 2 × gap + title` arithmetic true — is that the mark's OUTER
+		// height is still exactly its ink. Two margins that happen to look right
+		// but do not sum to that would move the title and re-wrap it, and no
+		// assertion on the individual values would notice.
 		const { container } = card(presentPost({ imageUrl: null }));
 		const marks = Array.from(
 			container.querySelectorAll<HTMLElement>(
@@ -429,15 +445,28 @@ describe("QUOTE-1 C — the measured constants reach the rendered node", () => {
 		expect(marks.length).toBe(2);
 
 		const mark = quoteMarkSize(quoteTitleSize(TITLE.length));
+		const ink = GEIST_QUOTE_INK * mark;
 		for (const m of marks) {
 			expect(m.style.fontSize).toBe(`${mark}px`);
 			expect(m.style.lineHeight).toBe("1");
-			expect(m.style.height).toBe(`${GEIST_QUOTE_INK * mark}px`);
+			// ⛔ NO `position: relative`, and no `top`. This is the defect's own
+			// shape, asserted as an absence — with the positive control below, so a
+			// mark that rendered no inline style at all cannot satisfy it.
+			expect(m.style.top).toBe("");
+			expect(m.className).not.toMatch(/(?:^|\s)relative(?:\s|$)/);
+			// THE SUM: outer height === the ink footprint.
+			const mt = Number.parseFloat(m.style.marginTop);
+			const mb = Number.parseFloat(m.style.marginBottom);
+			expect(mark + mt + mb).toBeCloseTo(ink, 6);
 		}
-		expect(marks[0]?.style.top).toBe(`${-GEIST_QUOTE_TOP * mark}px`);
-		expect(marks[1]?.style.top).toBe(`${-GEIST_QUOTE_TOP_CLOSE * mark}px`);
-		// …and they are NOT the same value, so a single-constant implementation reds.
-		expect(marks[0]?.style.top).not.toBe(marks[1]?.style.top);
+		// The two marks carry DIFFERENT offsets because they sit at different
+		// heights in the face (0.129 em vs 0.145 em); asserting one value for both
+		// would pass against the bug it is here to catch.
+		expect(marks[0]?.style.marginTop).toBe(`${-GEIST_QUOTE_TOP * mark}px`);
+		expect(marks[1]?.style.marginTop).toBe(
+			`${-GEIST_QUOTE_TOP_CLOSE * mark}px`,
+		);
+		expect(marks[0]?.style.marginTop).not.toBe(marks[1]?.style.marginTop);
 	});
 
 	it("quote-well::the-canvas-carries-its-own-545px-ceiling", () => {

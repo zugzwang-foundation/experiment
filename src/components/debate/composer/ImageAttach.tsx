@@ -424,8 +424,67 @@ export function ImageAttach({
 	// the `<svg>` keeps its `viewBox` and its default
 	// `preserveAspectRatio="xMidYMid meet"`, so it fits, stays centred, keeps
 	// its ratio, and never clips or scrolls at any height.
+	/**
+	 * ⛔ AT PHONE WIDTH THE EMPTY STATE IS THE BUTTON AND NOTHING ELSE — MOBILE-2c
+	 * R-6, founder ruling Q5-a. MOBILE-2b already hid the 4:5 invitation figure
+	 * below 640px and rendered `EMPTY_SLOT_COPY.action` as text in its place, but
+	 * the SLOT stayed: a 96px `min-h-24` panel with a hairline border and a tinted
+	 * ground, sitting above the two fields a participant came here to fill in. The
+	 * ruling is that an empty image state should cost one control, so the box
+	 * collapses and the pick button becomes the whole of it.
+	 * ⚠ Four `max-mobile:` tokens and no desktop change: the panel keeps its
+	 * floor, its border, its ground and its padding at every width ≥640.
+	 */
 	const panel =
-		"flex h-full min-h-40 min-w-0 flex-col items-center justify-stretch rounded-(--imgr) p-1 text-center text-xs [border:var(--hairline)] bg-n1/40 group hover:border-n4 transition-colors cursor-pointer max-mobile:min-h-24";
+		"flex h-full min-h-40 min-w-0 flex-col items-center justify-stretch rounded-(--imgr) p-1 text-center text-xs [border:var(--hairline)] bg-n1/40 group hover:border-n4 transition-colors cursor-pointer max-mobile:order-2 max-mobile:min-h-0 max-mobile:bg-transparent max-mobile:p-0 max-mobile:[border:none]";
+	/**
+	 * ⛔⛔ THE ATTACHED SLOT HUGS ITS IMAGE — MOBILE-2c R-7, founder ruling Q8-a,
+	 * and the founder's note that *"this issue sometimes happens in desktop view
+	 * too"* is why this is a shared change rather than a phone token.
+	 *
+	 * The defect he saw was a big placeholder with a small image centred in it.
+	 * Measured cause: the preview `<img>` was forced to `aspect-[4/5]` — a fixed
+	 * 0.8 portrait box — with `object-contain` over a painted `bg-n1` ground. A
+	 * fixed box must either crop or letterbox, and this file chose letterbox
+	 * DELIBERATELY and said why: the bytes are immutable from first write
+	 * (ADR-0028) inside an append-only comment (INV-4), so a crop nobody asked
+	 * for becomes permanent and public. That argument is still right, and it is
+	 * now unnecessary: a frame that takes the image's own proportions has no
+	 * letterbox area to fill and nothing to crop. A 16:9 photo — the common case
+	 * — occupied about 45% of that box, which is precisely "small image, big
+	 * frame", on both tiers, with no breakpoint anywhere near it.
+	 *
+	 * ⚠ AND IT SERVES canon §6's "Shown whole · any orientation" BETTER, not
+	 * worse. The promise was kept before by padding the picture out to a shape it
+	 * does not have; it is kept now by showing the shape it has.
+	 *
+	 * ⚠ `self-start` IS THE DESKTOP HALF and is listed as carve-out 1. The slot is
+	 * a child of a `grid … items-stretch`, so it is stretched to the argument
+	 * column's height no matter what its own box wants; without this the frame
+	 * keeps the old empty band below the image and only the image changes.
+	 * `h-full` and the `min-h` floors go for the same reason — they exist to hold
+	 * a SLOT open, and an attached slot is not a slot any more.
+	 */
+	const attachedPanel =
+		"flex min-h-0 min-w-0 flex-col items-center gap-1 self-start rounded-(--imgr) p-1 text-center text-xs [border:var(--hairline)] bg-n1/40 group hover:border-n4 transition-colors cursor-pointer max-mobile:order-2";
+	/**
+	 * ⛔ TWO `max-*` BOUNDS AND NO FIXED DIMENSION — which is the one combination
+	 * that preserves the intrinsic ratio without a letterbox. For a replaced
+	 * element CSS 2.1 §10.4 recomputes the used width from the constrained height
+	 * (and vice versa), so the box IS the picture rather than a container the
+	 * picture sits inside. `w-auto` rather than `w-full` is what stops a 64×48
+	 * thumbnail being blown up to the sheet's width — the same refusal
+	 * `CommentImage` makes and for the same reason.
+	 *
+	 * ⚠ 40dvh ON BOTH TIERS, and the brief only ruled the phone. Rather than
+	 * invent a second desktop number I apply the ruled one: it is a fraction of
+	 * the viewport, so it bounds a portrait 1000×4000 on a laptop exactly as it
+	 * bounds one on a phone, and it retires `max-h-[192px]` — which had been DEAD
+	 * since it shipped, because `max-h-full` sat in the same class string and
+	 * Tailwind emits it later.
+	 */
+	const attachedPreview =
+		"h-auto max-h-[40dvh] w-auto max-w-full rounded-(--imgr) object-contain";
 	// `.imgprev` — d5's `width:100%; aspect-ratio:4/5; max-height:calc(100% - 22px)`
 	// ported as PROPORTIONS ONLY: the `- 22px` is a value and is refused, so the
 	// clamp lands as `max-h-full`. Keeping d5's height clamp is what stops the
@@ -508,7 +567,14 @@ export function ImageAttach({
 	// common case. Caught at Gate C; pinned by
 	// `attach-preview.test.tsx::preview::a-decode-failure-while-attaching-does-not-invite-a-second-add`
 	// and its `-attached-` twin.
-	const emptyBox = <span aria-hidden="true" className={preview} />;
+	// ⚠ `max-mobile:hidden` for the same reason `EmptySlotFigure` carries it: this
+	// is the 4:5 SLOT drawn empty, and below 640px there is no slot to draw. Left
+	// visible it would try to resolve `aspect-[4/5]` + `h-full` inside a
+	// now-content-height panel — a circular height that collapses to nothing and
+	// reads as a broken element rather than as an absent one.
+	const emptyBox = (
+		<span aria-hidden="true" className={`${preview} max-mobile:hidden`} />
+	);
 	const fileInHand = state.phase === "attaching" || state.phase === "attached";
 	/**
 	 * ⛔⛔ MOBILE-2 — THE INVITATION'S OWN CONDITION, HOISTED, BECAUSE THE PHONE
@@ -560,7 +626,7 @@ export function ImageAttach({
 				// this covers the window before that and anything it does not catch.
 				// Same shape as `MarketThumb`'s `onError` fallback.
 				onError={() => setPreview(null)}
-				className={`${preview} object-contain`}
+				className={attachedPreview}
 			/>
 		);
 	return (
@@ -597,7 +663,10 @@ export function ImageAttach({
 			    so the target stays panel-sized (d5 `.attach{cursor:pointer}`), and
 			    the status region is the control's SIBLING inside the group.
 			    Caught by `@code-reviewer` (HIGH) on the first draft of this file. */}
-			<fieldset aria-label={ATTACH_LABEL} className={panel}>
+			<fieldset
+				aria-label={ATTACH_LABEL}
+				className={state.phase === "attached" ? attachedPanel : panel}
+			>
 				{state.phase === "attached" ? (
 					<>
 						{previewBox}
@@ -622,7 +691,13 @@ export function ImageAttach({
 						disabled={disabled || state.phase === "attaching"}
 						aria-label={PICK_LABEL}
 						onClick={() => inputRef.current?.click()}
-						className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-2 rounded-(--imgr) transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
+						// ⚠ WHITE FILL, BLACK TEXT, 40px, FULL WIDTH (R-6). `flex-none`
+						// is the load-bearing one of the four: `flex-1` inside the
+						// collapsed panel would hand the button the panel's remaining
+						// height, and the panel's height is now the button's — circular,
+						// and it resolves to whatever the content happens to be rather
+						// than to the ruled 40. `h-10` is 40px on this scale.
+						className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-2 rounded-(--imgr) transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) max-mobile:h-10 max-mobile:flex-none max-mobile:flex-row max-mobile:bg-ink"
 					>
 						{/* ⚠⚠ change set 10 §4 — THE STANDALONE `Image` LABEL IS REMOVED,
 						    founder ruling. The word already appears INSIDE the artwork as
@@ -649,7 +724,12 @@ export function ImageAttach({
 						    it is gated by the SAME condition, so the two can never
 						    disagree about when to say them either. */}
 						{invitesAPick ? (
-							<span className="hidden text-sm font-semibold text-ink max-mobile:inline">
+							// ⚠ `text-ground`, NOT `text-ink`, and the swap is desktop-inert
+							// by construction: this span is `display:none` at every width
+							// ≥640px, so its colour has no desktop render to change. Below
+							// 640px it now sits on a white fill, where `text-ink` (#fafafa)
+							// would be white on white.
+							<span className="hidden text-sm font-semibold text-ground max-mobile:inline">
 								{EMPTY_SLOT_COPY.action}
 							</span>
 						) : null}

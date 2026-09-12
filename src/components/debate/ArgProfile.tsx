@@ -148,7 +148,37 @@ export function ArgProfile({
 		// sits half a line below the row it belongs to — three baselines on a row
 		// that has one thing to say. Starting the row instead pins the mark to
 		// line 1 and leaves it there whether the age wraps or not.
-		<div className="flex w-full items-start gap-2">
+		<div className="flex w-full items-start gap-2 max-mobile:relative">
+			{/* ⛔⛔ MOBILE-2c R-2 — AT PHONE WIDTH THE AVATAR LEAVES THE FLOW, AND
+			    THAT IS WHAT MAKES THE METADATA ROW FULL-WIDTH.
+
+			    Founder ruling Q2-a: avatar 32px beside the pseudonym on line 1, and
+			    the metadata row running the full card width beneath it on one line.
+			    Measured at 360 before the change: the row's left edge sat at x=73
+			    against a card whose content starts at x=25 — 48px of the width the
+			    row needs, spent on an indent under a picture.
+
+			    ⚠ THE INDENT IS NOT A PADDING ANYONE CAN REMOVE. It is the avatar's
+			    own box, and the avatar is a SIBLING of the wrapping area (the
+			    paragraph below says why, and that structure is deliberate). So the
+			    only way to give line 2 the full width is to stop the avatar
+			    occupying line 1's flow: `absolute` on the avatar, `relative` on the
+			    row root, and `ps-10` on the pseudonym to reserve the 32 + 8 the
+			    avatar no longer claims for itself.
+
+			    ⚠ WHAT WAS REJECTED, because it reads like the obvious answer: lifting
+			    the pseudonym out of the metadata container to be the avatar's
+			    sibling. It is a one-node DOM move, and it is NOT desktop-neutral —
+			    the pseudonym would then be separated from the first field by the row
+			    root's `gap-2` instead of the wrapping area's `gap-x-1.5`, moving
+			    every field on the desktop by 2px. B1 is a pixel wall, so the answer
+			    had to be four tokens rather than a better tree.
+
+			    ⚠ AND THE "ONE LINE" HALF WAS ALREADY TRUE. Measured before any
+			    change, at 360/375/390/430, the metadata row was already 1 line at
+			    13px including the sold/exited case — so the ruling's 12px fallback
+			    is NOT applied: acting on it would have been a fix for a state that
+			    does not exist (`OVN-O4`). It is reported as measured instead. */}
 			{/* ⚠ THE AVATAR IS A SIBLING OF THE WRAPPING AREA, NOT A MEMBER OF IT,
 			    and that is the whole reason the mark's wrapper below is `h-5` rather
 			    than `h-6`. This comment said the opposite — that the avatar's 24px
@@ -174,7 +204,10 @@ export function ArgProfile({
 			    measured-delta section. The 36px the stills use is not a live step
 			    (`avatar.tsx` ships 16 / 24 / 32 / 40); `lg` = 40 is the nearest that
 			    fills a two-line identity block. */}
-			<Avatar size="sm" className="max-mobile:data-[size=sm]:size-10">
+			<Avatar
+				size="sm"
+				className="max-mobile:absolute max-mobile:top-0 max-mobile:left-0 max-mobile:data-[size=sm]:size-8"
+			>
 				<AvatarImage src={author.pfpUrl} alt="" />
 				<AvatarFallback>
 					{author.pseudonym.slice(0, 2).toUpperCase()}
@@ -215,7 +248,7 @@ export function ArgProfile({
 			    stills' 13px, stated WITH its leading because an arbitrary
 			    `text-[Npx]` inherits whatever line-height was in scope and this
 			    surface has a measured case of exactly that (AGENTS.md §8). */}
-			<div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground max-mobile:gap-y-0.5 max-mobile:text-[13px] max-mobile:leading-[17px]">
+			<div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground max-mobile:flex-1 max-mobile:gap-y-0.5 max-mobile:text-[13px] max-mobile:leading-[17px]">
 				{/* GROUP A — never wraps internally (rule 2). A pseudonym long enough
 				    to overflow it is preferred to a pseudonym that is cut in half:
 				    identity is not a field this product truncates.
@@ -304,7 +337,7 @@ export function ArgProfile({
 						// separator still travels inside the span of the field it leads.
 						// ⚠ The size and weight are the stills' (17px / 600); the leading is
 						// stated because the size is arbitrary.
-						className="text-sm font-medium text-ink hover:underline max-mobile:basis-full max-mobile:text-[17px] max-mobile:leading-[22px] max-mobile:font-semibold"
+						className="text-sm font-medium text-ink hover:underline max-mobile:basis-full max-mobile:ps-10 max-mobile:text-[17px] max-mobile:leading-[22px] max-mobile:font-semibold"
 					>
 						{author.pseudonym}
 					</Link>
