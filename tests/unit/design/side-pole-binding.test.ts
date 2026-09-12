@@ -377,25 +377,27 @@ const PERMITTED_FILES = [
 	// said something it did not — the `O-9` shape. The row was added rather than
 	// the citation removed, because widening a CLOSED inventory is exactly the
 	// kind of decision the register exists to hold.
-	// The phone tier's side tabs resolve the active
-	// tab's fill from the side it names:
-	//   activeClass = side === "YES" ? "bg-yes text-no" : "bg-no text-yes"
-	// ⛔ IT IS HERE RATHER THAN INSIDE `PhoneSideTabs` ON PURPOSE, and that is the
-	// whole reason this file gains an entry instead of staying quiet. The tabs
-	// component is shared with the THREAD arm, whose two tabs are Support and
-	// Counter — RELATIONS, which have no pole (design-canon §3.2, AGENTS.md §8).
-	// A component that mapped its own key to a pole would have to know which of
-	// those two things it was rendering, and would paint a relation in a side
-	// colour the first time someone widened it. So the pole is resolved at the
-	// CALL SITE that knows it is holding a side, which is `AggregateFooter`'s own
-	// ratified anti-inversion shape — and the price of that correctness is
-	// visibility to this guard, which is the trade this inventory exists to make
-	// explicit.
-	// ⛔ THE PREDICATE IS UNTOUCHED. Both `>=` floors, the pole-boundness test and
-	// every `offenders.toEqual([])` are unchanged, and the scanner still walks
-	// `src/` recursively and still reaches this file (it found it — that is why
-	// this entry exists). A widening of an ENUMERATION, never of a GUARD.
-	"src/components/debate/phone/PhoneDebateView.tsx",
+	// ⛔⛔ THAT ENTRY IS GONE, AND THE INVENTORY NARROWED RATHER THAN WIDENED —
+	// MOBILE-2c R-1, founder ruling Q1-a of 2026-09-12, ADR-0050 A2 D-4(v).
+	//
+	// It read `"src/components/debate/phone/PhoneDebateView.tsx"`, and it was
+	// here because the phone tier's feed tabs resolved the active tab's fill from
+	// the side they named — `side === "YES" ? "bg-yes text-no" : "bg-no text-yes"`
+	// — at the CALL SITE rather than inside `PhoneSideTabs`, so that the shared
+	// component could not paint a THREAD relation in a side colour. That
+	// reasoning was correct and is now moot: the founder ruled the active tab a
+	// white fill on both sides, so there is no side-keyed colour expression left
+	// in this file for the scanner to find.
+	//
+	// ⚠ THE REMOVAL DIRECTION MATTERS AND IS WHY THIS NEEDS NO RULING. The
+	// documented mechanism above governs ADDING to a closed inventory, because an
+	// addition is a file gaining permission to key colour on a side. A REMOVAL is
+	// the inventory getting smaller: one fewer place where a pole can be
+	// inverted, and one more file the `offenders.toEqual([])` arm now holds to
+	// the strict rule. The predicate, both `>=` floors and every offender
+	// assertion are untouched, and the scanner still walks `src/` recursively and
+	// still reaches this file — it simply finds nothing there any more, which is
+	// the fact this deletion records.
 	// SEVENTH ENTRY, added deliberately at the V17 fix — the guard's own
 	// documented mechanism, exercised rather than worked around. V17's
 	// Support/Counter split bar originally used a FIXED `bg-yes` fill over a

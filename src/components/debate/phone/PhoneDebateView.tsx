@@ -340,12 +340,24 @@ export function PhoneDebateView({
 	}, [guard]);
 
 	const pricing = market.pricing;
+	/**
+	 * ⛔⛔ THE TABS NO LONGER CARRY A POLE, BY FOUNDER RULING (Q1-a, ADR-0050 A2
+	 * D-4(v)). They used to resolve one here — `bg-yes text-no` for YES and
+	 * `bg-no text-yes` for NO — and the YES arm was the problem: `--color-yes` is
+	 * `#181818` and so is the page ground, so an active YES tab painted in its
+	 * own pole was invisible and read as "no tab is selected". A 2px ring was
+	 * added to rescue it, which made the selected state a fill on one side and a
+	 * ring on the other.
+	 * ⇒ The active tab is now a white fill with black text on BOTH sides, so the
+	 * selected state is one shape. The pole binding is untouched everywhere it
+	 * carries meaning — side badges, split bars, the bottom bar — and
+	 * `PhoneSideTabs` owns the single style, so there is no per-side value left
+	 * for an edit to get backwards.
+	 */
 	const feedTabs = (["YES", "NO"] as const).map((side) => ({
 		key: side,
 		label: side,
 		trailing: pricing === null ? "—" : formatPricePercent(pricing, side),
-		// The pole is resolved HERE, where the side is known — see PhoneSideTabs.
-		activeClass: side === "YES" ? "bg-yes text-no" : "bg-no text-yes",
 	}));
 
 	/**
@@ -397,19 +409,21 @@ export function PhoneDebateView({
 		focused === null
 			? []
 			: [
+					// ⚠ THESE TWO WERE ALREADY RIGHT, AND THAT IS THE ARGUMENT FOR
+					// R-1 rather than a coincidence: a RELATION HAS NO POLE
+					// (design-canon §3.2), so the thread tabs have always used the
+					// neutral emphasis step. The founder's Q1-a ruling makes the feed
+					// tabs match them, which is why the style moved INTO
+					// `PhoneSideTabs` and neither call site names one now.
 					{
 						key: "support",
 						label: "Support",
 						trailing: String(focused.replies.support.length),
-						// A RELATION HAS NO POLE (design-canon §3.2) — the neutral
-						// emphasis step, never a side colour.
-						activeClass: "bg-ink text-ground",
 					},
 					{
 						key: "counter",
 						label: "Counter",
 						trailing: String(focused.replies.counter.length),
-						activeClass: "bg-ink text-ground",
 					},
 				];
 
@@ -560,7 +574,6 @@ export function PhoneDebateView({
 					open={sheet?.kind === "details"}
 					title="Market"
 					busy={false}
-					fullHeight={false}
 					onClose={closeSheet}
 				>
 					{details}
@@ -576,7 +589,6 @@ export function PhoneDebateView({
 					open={sheet?.kind === "parent"}
 					title="Argument"
 					busy={false}
-					fullHeight={false}
 					onClose={closeSheet}
 				>
 					<div className="pb-3">
@@ -610,8 +622,18 @@ export function PhoneDebateView({
 							: COMPOSER_COPY.header
 					}
 					busy={composerBusy}
-					fullHeight={viewer !== null}
-					// Both branches below open with their own heading — see PhoneSheet.
+					// ⛔ NO HEIGHT PROP ANY MORE, AND ITS REMOVAL IS THE P0 FIX. This
+					// site used to pass `fullHeight={viewer !== null}`, which made the
+					// sheet the height of the viewport for exactly the readers who can
+					// bet — so the backdrop they tap to dismiss it was behind the panel
+					// and unreachable, and a sheet that would not close reads as a page
+					// whose scrolling and tabs have died. `PhoneSheet` says what was
+					// measured.
+					// ⚠ `titleHidden` now also removes the frame's `×` (R-8): both
+					// branches below open with their own heading AND their own close
+					// control (`BetComposer.tsx:589`, `AuthGateSlot.tsx:28`), and the
+					// frame was drawing a second one 51px above it with the identical
+					// accessible name.
 					titleHidden
 					onClose={closeSheet}
 				>

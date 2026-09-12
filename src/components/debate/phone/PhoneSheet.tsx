@@ -1,11 +1,48 @@
 "use client";
 
-import { type ReactNode, useEffect, useId, useRef } from "react";
+import {
+	type ReactNode,
+	type PointerEvent as ReactPointerEvent,
+	useCallback,
+	useEffect,
+	useId,
+	useRef,
+	useState,
+} from "react";
 
 /**
  * The phone's one overlay primitive — the bottom sheet that stands in for the
  * desktop's opposite composer slot, and carries the details and parent-post
  * screens as well.
+ *
+ * ⛔⛔ IT IS AN OVERLAY ON THE MARKET, NEVER A PAGE (ADR-0050 A2, D-3) — AND THE
+ * VERSION THAT WAS A PAGE IS WHAT MADE THE PHONE LOOK DEAD.
+ *
+ * It used to take a `fullHeight` prop, and `PhoneDebateView` passed
+ * `viewer !== null` — so the sheet was `h-full` for exactly the readers who can
+ * bet. Measured on a Pixel-class Chromium with real synthesized touch:
+ *
+ *   panel rect        {x:0, y:0, w:393, h:727}   ← the entire viewport
+ *   backdrop rect     {x:0, y:0, w:393, h:727}   ← the same rect, BEHIND the panel
+ *   exposedBackdrop   null                        ← not one reachable pixel
+ *
+ * A phone reader dismisses a sheet by tapping beside it. There was nothing
+ * beside it. So the tap did nothing, the sheet stayed, and because the sheet is
+ * `fixed inset-0` over a `body{overflow:hidden}` page, the reader then found
+ * that **vertical scrolling and the YES/NO tabs had both stopped working** — two
+ * symptoms of one modal that they had no way to know was still up. That is the
+ * whole of MOBILE-2c's P0, and the details sheet never showed it because
+ * `max-h-[96dvh]` leaves its own backdrop exposed.
+ *
+ * ⚠ NOT AN ANDROID DEFECT. It reproduces identically on WebKit iPhone 13, on
+ * Chromium at 360, 393 and 430, and in the thread arm. Android is where it was
+ * noticed, not where it lived.
+ *
+ * ⇒ There is one shell and no height prop: content-height, bottom-anchored,
+ * `max-h-[92dvh]`, and therefore always something beside it to tap.
+ * `phone-sheet-dismissal.test.tsx` asserts the backdrop is HIT-TESTABLE above
+ * the panel rather than merely present, because "the backdrop exists" was true
+ * the whole time this was broken.
  *
  * ⛔⛔ IT REFUSES TO CLOSE WHILE `busy`, AND THAT IS A MONEY RULE WEARING A UI
  * COSTUME. `DebateView` records why (`:157-160`): while a composer request is in
@@ -13,8 +50,9 @@ import { type ReactNode, useEffect, useId, useRef } from "react";
  * unmount followed by a re-open mints a FRESH idempotency key over a bet that
  * may already be committing — i.e. it converts a retry into a second charge. The
  * desktop enforces that by making its entry toggles no-op; a sheet has three
- * more doors than a slot does (`×`, Escape, the backdrop), so all three are shut
- * by the same flag rather than by remembering to guard each one.
+ * more doors than a slot does (`×`, Escape, the backdrop) and now a fourth (the
+ * handle swipe), so all four are shut by the same flag rather than by
+ * remembering to guard each one.
  *
  * ⚠ ESCAPE IS A DOCUMENT LISTENER, NOT `onKeyDown` ON THE PANEL. Focus may be
  * inside `BetComposer`'s textarea, which stops propagation of nothing but
@@ -47,13 +85,50 @@ import { type ReactNode, useEffect, useId, useRef } from "react";
  * the machinery: Radix renders to `document.body`, OUTSIDE the 640px tier gate
  * this whole subtree depends on. The gate is a property of DOM POSITION, and a
  * portal leaves the DOM position. What is borrowed from it is the focus
- * discipline, implemented here in about twenty lines.
+ * discipline, implemented here in about twenty lines — and now its animation
+ * vocabulary too, which is `tw-animate-css` and is already in the build.
  */
+
+/**
+ * ⚠ 260ms IS CANON AND 200ms IS RULED — and neither is a token, because there
+ * is no motion token in this repository to be. `design-canon.md §5:109`
+ * ratifies `.26 s` for this surface's own motion, and `ComposerSlot.tsx:55`
+ * already declares the same literal as `EXIT_MS = 260` for a composer
+ * appearing. The only duration custom property that exists is
+ * `--dur-hover: 0.12s ease` (`globals.css:261`), which is a compound hover
+ * value and not a slide. The faster close is the founder's 2026-09-12 Q4
+ * ruling: a sheet should leave more briskly than it arrives.
+ *
+ * ⚠ ONLY THE CLOSE IS A CONSTANT, AND THE ASYMMETRY IS FORCED. `CLOSE_MS` is
+ * read by JavaScript — it is how long `onClose` is deferred — so it has to be a
+ * value. The OPEN duration is only ever a Tailwind class, and Tailwind's
+ * scanner needs a LITERAL in the source to emit `duration-[260ms]` at all;
+ * interpolating a constant into the class string produces a utility that
+ * silently does not exist, which is AGENTS.md §9's stale-utility trap in its
+ * purest form. So 260 lives in the class and nowhere else, and there is nothing
+ * for it to fall out of sync with.
+ *
+ * ⛔ `CLOSE_MS` HAS THE OPPOSITE PROBLEM: it appears twice — here, and as
+ * `duration-[200ms]` on the panel below. `phone-sheet-motion.test.tsx` pins the
+ * two together by reading this file, because a close that animates for 200ms
+ * and unmounts after 260 is a flicker nobody would think to look for, and a
+ * comment asking the next reader to keep two numbers in step is not a mechanism.
+ */
+const CLOSE_MS = 200;
+
+/**
+ * Swipe-down-to-dismiss (R-4). Either bound closes: a long enough drag, or a
+ * short flick fast enough to mean it. ⚠ The velocity arm is what makes the
+ * gesture feel like a phone rather than like a slider — without it a reader who
+ * flicks 40px in 60ms gets a snap-back, which reads as the sheet refusing.
+ */
+const SWIPE_CLOSE_PX = 80;
+const SWIPE_CLOSE_VELOCITY = 0.5; // px per ms
+
 export function PhoneSheet({
 	open,
 	title,
 	busy,
-	fullHeight,
 	titleHidden,
 	onClose,
 	children,
@@ -62,8 +137,6 @@ export function PhoneSheet({
 	title: string;
 	/** A composer request is in flight — every door is shut until it lands. */
 	busy: boolean;
-	/** RF-6's composer sheet is full-height; RF-7's details sheet is ~96vh. */
-	fullHeight: boolean;
 	/**
 	 * ⚠ THE TITLE IS HIDDEN, NEVER DROPPED, when the content carries its own
 	 * heading. `BetComposer` and `AuthGateSlot` both open with their own — so the
@@ -72,6 +145,13 @@ export function PhoneSheet({
 	 * the dialog's ACCESSIBLE NAME with it, which is the one a screen reader
 	 * announces on open and the one thing here that is not decoration. `sr-only`
 	 * keeps the name and drops the duplicate words.
+	 *
+	 * ⛔ IT NOW ALSO DECIDES WHETHER THIS FRAME DRAWS A `×` (R-8). The two are
+	 * the same question asked once: content that brings its own heading brings
+	 * its own close control with it, and the sheet was drawing a second one 51px
+	 * above `BetComposer`'s — two adjacent controls with the identical accessible
+	 * name `Close`. The read-only sheets (`details`, `parent`) carry no header of
+	 * their own, so for them this frame IS the header and keeps the one `×`.
 	 */
 	titleHidden?: boolean;
 	onClose: () => void;
@@ -87,6 +167,128 @@ export function PhoneSheet({
 	busyRef.current = busy;
 
 	const panelRef = useRef<HTMLDivElement>(null);
+
+	/**
+	 * ⛔⛔ THE CLOSE IS ANIMATED BY DEFERRING `onClose`, NOT BY HOLDING A CORPSE.
+	 *
+	 * This component returns `null` when `!open` and `PhoneDebateView`
+	 * additionally stops rendering the composer element altogether, so there are
+	 * two synchronous unmount paths and neither leaves a window to animate in.
+	 * `ComposerSlot` solves the same problem by keeping the outgoing element
+	 * mounted for `EXIT_MS` — but that would keep `BetComposer` alive after the
+	 * reader has dismissed it, on the surface that takes money, and the whole
+	 * `busy` argument above is about not having a live composer the host has
+	 * stopped believing in.
+	 *
+	 * ⇒ Every door sets `leaving`, the panel slides down, and `onClose()` is
+	 * called when the animation ends. The parent is not told until then, so the
+	 * element stays mounted for the whole slide while holding nothing. The
+	 * trade-off is real and is the right one: a close is ~200ms later than the
+	 * tap, which is what an animated close means.
+	 */
+	const [leaving, setLeaving] = useState(false);
+	const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const closedRef = useRef(false);
+
+	/** Live drag offset in px while a finger is on the handle, else null. */
+	const [dragY, setDragY] = useState<number | null>(null);
+	const dragStateRef = useRef<{ y0: number; t0: number } | null>(null);
+
+	/**
+	 * ⚠ REDUCED MOTION IS HONOURED IN JS, NOT ONLY IN CSS, for the reason
+	 * `ComposerSlot.tsx:49-53` gives: `motion-reduce:animate-none` suppresses the
+	 * visual motion and leaves the DELAY, so a reader who asked for no motion
+	 * would get a sheet that sits there for 200ms doing nothing before closing.
+	 */
+	const beginClose = useCallback(() => {
+		if (busyRef.current || closedRef.current) {
+			return;
+		}
+		// ⚠ READ AT CALL TIME, INSIDE THE CALLBACK, not hoisted to a helper above
+		// it. A helper would be a dependency this `useCallback` has to declare,
+		// and re-creating `beginClose` on every render re-arms the Escape listener
+		// in the effect below for no reason. Reading the media query here also
+		// honours a reader who changes the OS setting mid-session, which is the
+		// same argument `PhoneFeedTrack` makes for reading it at call time.
+		const reduced =
+			typeof window !== "undefined" &&
+			typeof window.matchMedia === "function" &&
+			window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+		if (reduced) {
+			closedRef.current = true;
+			closeRef.current();
+			return;
+		}
+		setLeaving(true);
+		if (leaveTimerRef.current !== null) {
+			clearTimeout(leaveTimerRef.current);
+		}
+		leaveTimerRef.current = setTimeout(() => {
+			leaveTimerRef.current = null;
+			closedRef.current = true;
+			closeRef.current();
+		}, CLOSE_MS);
+	}, []);
+
+	useEffect(
+		() => () => {
+			if (leaveTimerRef.current !== null) {
+				clearTimeout(leaveTimerRef.current);
+				leaveTimerRef.current = null;
+			}
+		},
+		[],
+	);
+
+	/**
+	 * ⛔⛔ POINTER EVENTS WITH CAPTURE, AND NOT ONE `preventDefault` ON A TOUCH
+	 * EVENT ANYWHERE. A `touchmove` handler that calls `preventDefault` takes
+	 * scrolling away from whatever is under the finger, which is MOBILE-2c's P0
+	 * arriving again under a new name — so `phone-touch-handlers.test.ts` scans
+	 * this directory and forbids it outright.
+	 *
+	 * ⇒ The browser is told what this element is for, declaratively, with
+	 * `touch-action: none` on THE HANDLE ONLY. That is a ~36×20px strip which is
+	 * not a scroller and never was; the sheet body beside it keeps
+	 * `overflow-y-auto` and the page behind it is not reachable while a modal is
+	 * up. `setPointerCapture` then keeps the drag alive when the finger leaves
+	 * the strip, which is most of a real swipe.
+	 */
+	const onHandleDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+		if (busy) {
+			return;
+		}
+		dragStateRef.current = { y0: event.clientY, t0: event.timeStamp };
+		setDragY(0);
+		event.currentTarget.setPointerCapture?.(event.pointerId);
+	};
+
+	const onHandleMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+		const state = dragStateRef.current;
+		if (state === null) {
+			return;
+		}
+		// ⚠ DOWNWARD ONLY. An upward drag must not lift the sheet past its own
+		// top edge — there is nothing above it to reveal, and a sheet that can be
+		// dragged up is a sheet that can be dragged off the screen.
+		setDragY(Math.max(0, event.clientY - state.y0));
+	};
+
+	const onHandleUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+		const state = dragStateRef.current;
+		dragStateRef.current = null;
+		if (state === null) {
+			return;
+		}
+		event.currentTarget.releasePointerCapture?.(event.pointerId);
+		const travelled = Math.max(0, event.clientY - state.y0);
+		const elapsed = Math.max(1, event.timeStamp - state.t0);
+		const velocity = travelled / elapsed;
+		setDragY(null);
+		if (travelled >= SWIPE_CLOSE_PX || velocity >= SWIPE_CLOSE_VELOCITY) {
+			beginClose();
+		}
+	};
 
 	useEffect(() => {
 		if (!open) {
@@ -129,7 +331,7 @@ export function PhoneSheet({
 
 		const onKey = (event: KeyboardEvent) => {
 			if (event.key === "Escape" && !busyRef.current) {
-				closeRef.current();
+				beginClose();
 				return;
 			}
 			if (event.key !== "Tab" || panel === null) {
@@ -170,15 +372,33 @@ export function PhoneSheet({
 			document.body.style.overflow = previous;
 			opener?.focus({ preventScroll: true });
 		};
-	}, [open]);
+	}, [open, beginClose]);
 
 	if (!open) {
 		return null;
 	}
 
+	const dragging = dragY !== null;
+	/**
+	 * ⚠ THE TRANSFORM GOES ON THE PANEL, NEVER ON THE ROOT. The root is the
+	 * `position: fixed` layer, and a transformed ancestor becomes the containing
+	 * block for every fixed descendant inside it — so animating the root would
+	 * silently re-anchor anything fixed in the composer to the sheet instead of
+	 * to the viewport.
+	 */
+	const panelMotion = dragging
+		? "" // a finger is driving; an animation would fight it
+		: leaving
+			? "animate-out slide-out-to-bottom-full duration-[200ms] ease-in motion-reduce:animate-none motion-reduce:duration-0"
+			: "animate-in slide-in-from-bottom-full duration-[260ms] ease-out motion-reduce:animate-none motion-reduce:duration-0";
+	const backdropMotion = leaving
+		? "animate-out fade-out-0 duration-[200ms] ease-in motion-reduce:animate-none motion-reduce:duration-0"
+		: "animate-in fade-in-0 duration-[260ms] ease-out motion-reduce:animate-none motion-reduce:duration-0";
+
 	return (
 		<div
 			data-testid="phone-sheet"
+			data-phase={leaving ? "leaving" : "open"}
 			role="dialog"
 			aria-modal="true"
 			// ⚠ NAMED BY THE HEADING, NOT BY BOTH. It carried `aria-label` AND an
@@ -186,7 +406,13 @@ export function PhoneSheet({
 			// and again on traversal. `aria-labelledby` is one name from one node,
 			// and it keeps working when the heading is visible.
 			aria-labelledby={headingId}
-			className="fixed inset-0 z-50 flex flex-col justify-end"
+			// ⚠ A LEAVING SHEET STOPS TAKING INPUT. Without this a second tap during
+			// the 200ms slide lands on a backdrop that is still there, and
+			// `beginClose` would be asked to close a sheet that is already closing —
+			// `closedRef` makes that idempotent, and this makes it unreachable.
+			className={`fixed inset-0 z-50 flex flex-col justify-end ${
+				leaving ? "pointer-events-none" : ""
+			}`}
 		>
 			{/* ⚠ THE BACKDROP IS OUT OF THE TAB ORDER AND UNNAMED, and that is the
 			    correction rather than the original design. It shipped as a labelled,
@@ -195,18 +421,19 @@ export function PhoneSheet({
 			    adjacent controls called "Close" is worse than one, and the keyboard
 			    path this was meant to provide is what Escape already is. It stays a
 			    `<button>` because it is still a pointer control and a `div` with a
-			    click handler is not one. */}
+			    click handler is not one.
+
+			    ⛔ IT IS ALSO THE ONE CONTROL THIS TASK'S P0 WAS ABOUT. It was always
+			    here and was never reachable, because the panel above it was the
+			    height of the viewport. `--overlay` is already `rgb(10 10 10 / 0.6)`
+			    (`globals.css:232`), so the ruled 60% dim needed no new token. */}
 			<button
 				type="button"
 				tabIndex={-1}
 				aria-hidden="true"
 				data-testid="phone-sheet-backdrop"
-				onClick={() => {
-					if (!busy) {
-						onClose();
-					}
-				}}
-				className="absolute inset-0 bg-(--overlay)"
+				onClick={beginClose}
+				className={`absolute inset-0 bg-(--overlay) ${backdropMotion}`}
 			/>
 			<div
 				ref={panelRef}
@@ -214,48 +441,66 @@ export function PhoneSheet({
 				// joining the tab order — the fallback target when the sheet has no
 				// focusable child yet.
 				tabIndex={-1}
-				className={`relative flex w-full flex-col bg-ground outline-none ${
-					fullHeight ? "h-full" : "max-h-[96dvh]"
-				}`}
+				data-testid="phone-sheet-panel"
+				// ⛔ CONTENT-HEIGHT, WITH A CEILING — and no `fullHeight` branch to
+				// defeat it. `max-h-[92dvh]` is the ruled ceiling (ADR-0050 A2); the
+				// body below carries `overflow-y-auto`, so a composer taller than the
+				// ceiling scrolls INSIDE the sheet and `PLACE Đ BET` stays reachable
+				// with the keyboard up. `dvh` and not `vh` for the reason the whole
+				// tier uses `dvh`: the keyboard changes the viewport and `vh` does not
+				// notice.
+				//
+				// ⚠ `rounded-t-4xl` = `--radius-4xl` = 26px, the largest radius in the
+				// `@theme` scale (`globals.css:47`) and the largest that is actually
+				// used in the tree. The brief's 16px fallback applies only if the
+				// scale has no token ≥12px; it has four.
+				style={
+					dragY === null ? undefined : { transform: `translateY(${dragY}px)` }
+				}
+				className={`relative flex max-h-[92dvh] w-full flex-col rounded-t-4xl bg-ground outline-none ${panelMotion}`}
 			>
-				{/* The drag handle is VISUAL ONLY and says so: there is no drag
-				    gesture behind it. It is the shape a phone reader reads as
-				    "this is a sheet", and inventing a drag-to-dismiss to justify it
-				    would be a gesture handler written for a decoration. */}
-				<div className="flex shrink-0 justify-center pt-2" aria-hidden="true">
-					<span className="h-1 w-9 rounded-full bg-n3" />
-				</div>
-				{/* ⚠ `justify-end` WHEN THE TITLE IS HIDDEN. `sr-only` is
-				    `position:absolute`, so a hidden `<h2>` leaves the flow entirely and
-				    `justify-between` then has ONE in-flow child — which it parks at the
-				    START, putting the close control on the wrong side of the sheet.
-				    Measured, not predicted. */}
+				{/* ⛔ THE HANDLE IS NO LONGER A DECORATION, and its docblock used to say
+				    so proudly: "there is no drag gesture behind it … inventing a
+				    drag-to-dismiss to justify it would be a gesture handler written for
+				    a decoration." That was the right call while the sheet had a
+				    reachable backdrop and the wrong one once it did not — the shape a
+				    reader reads as "this is a sheet" is also the shape they reach for
+				    first, and on this surface it was the only affordance that looked
+				    like a way out. It now is one. */}
 				<div
-					className={`flex shrink-0 items-center gap-2 px-3 py-2 ${
-						titleHidden === true ? "justify-end" : "justify-between"
-					}`}
+					data-testid="phone-sheet-handle"
+					onPointerDown={onHandleDown}
+					onPointerMove={onHandleMove}
+					onPointerUp={onHandleUp}
+					onPointerCancel={onHandleUp}
+					className="flex shrink-0 cursor-grab justify-center pt-2 pb-1 [touch-action:none]"
 				>
-					<h2
-						id={headingId}
-						className={
-							titleHidden === true
-								? "sr-only"
-								: "text-sm font-semibold text-ink"
-						}
-					>
+					<span aria-hidden="true" className="h-1 w-9 rounded-full bg-n3" />
+				</div>
+				{titleHidden === true ? (
+					// ⚠ THE NAME WITHOUT THE ROW. `sr-only` is `position:absolute`, so
+					// this contributes no layout — which is the point: a header row
+					// holding only a hidden heading is an empty band, and R-5 forbids one.
+					<h2 id={headingId} className="sr-only">
 						{title}
 					</h2>
-					<button
-						type="button"
-						data-testid="phone-sheet-close"
-						aria-label="Close"
-						disabled={busy}
-						onClick={onClose}
-						className="-mr-1.5 flex size-11 items-center justify-center rounded-(--r-chip) text-lg text-n4 transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
-					>
-						×
-					</button>
-				</div>
+				) : (
+					<div className="flex shrink-0 items-center justify-between gap-2 px-3 py-2">
+						<h2 id={headingId} className="text-sm font-semibold text-ink">
+							{title}
+						</h2>
+						<button
+							type="button"
+							data-testid="phone-sheet-close"
+							aria-label="Close"
+							disabled={busy}
+							onClick={beginClose}
+							className="-mr-1.5 flex size-11 items-center justify-center rounded-(--r-chip) text-lg text-n4 transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
+						>
+							×
+						</button>
+					</div>
+				)}
 				<div
 					data-testid="phone-sheet-body"
 					className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(12px+env(safe-area-inset-bottom))]"

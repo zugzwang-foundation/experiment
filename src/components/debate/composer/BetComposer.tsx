@@ -972,15 +972,33 @@ export function BetComposer(props: {
 									)}
 								</div>
 							</div>
+							{/* ⚠ ONE LINE ON THE PHONE, TWO ON THE DESKTOP (R-9, founder
+							    ruling Q9-a) — and it is the same two spans either way. The
+							    desktop stacks them because the button is a narrow column
+							    beside the amount card and `PLACE Đ BET` does not fit across
+							    it; on the phone `max-mobile:flex-col` has already turned the
+							    footblock into a column, so the button is full width and has
+							    room for the whole label. `max-mobile:flex-row` puts the two
+							    spans side by side and the size/weight tokens make them read
+							    as the single string `COMPOSER_COPY.submit` already supplies
+							    as the accessible name. No new string: `Place` is
+							    uppercased by the variant token, not rewritten.
+							    ⛔ The disabled treatment is `ui/button.tsx:8`'s
+							    `disabled:pointer-events-none
+							    disabled:opacity-(--state-disabled-opacity)` and is NOT
+							    restated here — `--state-disabled-opacity: 0.5` is the canon's
+							    only disabled treatment (design-language §3 item 9) and every
+							    control in the tree uses exactly it. There is no ghost
+							    outline box to remove; there never was one. */}
 							<Button
 								type="button"
 								disabled={submitDisabled}
 								aria-disabled={submitDisabled}
 								aria-label={COMPOSER_COPY.submit}
 								onClick={submit}
-								className="h-auto min-h-[44px] flex-col gap-0 self-stretch px-3 py-1 max-mobile:w-full"
+								className="h-auto min-h-[44px] flex-col gap-0 self-stretch px-3 py-1 max-mobile:w-full max-mobile:flex-row max-mobile:items-baseline max-mobile:gap-1.5"
 							>
-								<span className="text-[10px] leading-tight font-medium">
+								<span className="text-[10px] leading-tight font-medium max-mobile:text-[14px] max-mobile:font-bold max-mobile:uppercase">
 									Place
 								</span>
 								<span className="text-[14px] leading-tight font-bold">

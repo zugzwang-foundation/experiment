@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	act,
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PhoneSheet } from "@/components/debate/phone/PhoneSheet";
@@ -38,13 +44,7 @@ afterEach(() => {
  */
 function mount(busy: boolean, onClose = vi.fn()) {
 	render(
-		<PhoneSheet
-			open
-			title="Fixture sheet"
-			busy={busy}
-			fullHeight={false}
-			onClose={onClose}
-		>
+		<PhoneSheet open title="Fixture sheet" busy={busy} onClose={onClose}>
 			<button type="button">inside</button>
 		</PhoneSheet>,
 	);
@@ -66,19 +66,81 @@ describe("phone sheet — busy shuts every door the sheet owns", () => {
 		).toBe(true);
 	});
 
+	/**
+	 * ⛔⛔ THE CONTROL, AND IT NOW HAS TO WAIT — which is the behaviour change
+	 * MOBILE-2c R-4 introduced and the reason this row was rewritten rather than
+	 * merely re-typed. `onClose` is DEFERRED by the close animation: a door sets
+	 * the leaving phase, the panel slides down, and the parent is told 200ms
+	 * later. `PhoneSheet` explains why the alternative (holding the outgoing
+	 * children, `ComposerSlot`-style) was rejected on the surface that takes
+	 * money.
+	 *
+	 * ⚠ EACH DOOR GETS ITS OWN SHEET, and the count is 1 rather than 3. Once a
+	 * sheet is leaving it is closed exactly once no matter how many doors are
+	 * pushed — see the row below, which is the assertion that earns this one.
+	 * Counting to 3 against a single sheet would now be asserting a bug.
+	 */
 	it("phone-sheet::NOT-busy-every-one-of-those-doors-opens", () => {
 		// THE CONTROL. Without it the row above passes against a sheet whose
 		// listeners were never armed at all.
-		const onClose = mount(false);
-		fireEvent.keyDown(document, { key: "Escape" });
-		expect(onClose).toHaveBeenCalledTimes(1);
-		fireEvent.click(screen.getByTestId("phone-sheet-backdrop"));
-		expect(onClose).toHaveBeenCalledTimes(2);
-		expect(
-			screen.getByTestId("phone-sheet-close").hasAttribute("disabled"),
-		).toBe(false);
-		fireEvent.click(screen.getByTestId("phone-sheet-close"));
-		expect(onClose).toHaveBeenCalledTimes(3);
+		vi.useFakeTimers();
+		try {
+			for (const push of [
+				() => fireEvent.keyDown(document, { key: "Escape" }),
+				() => fireEvent.click(screen.getByTestId("phone-sheet-backdrop")),
+				() => fireEvent.click(screen.getByTestId("phone-sheet-close")),
+			]) {
+				const onClose = mount(false);
+				expect(
+					screen.getByTestId("phone-sheet-close").hasAttribute("disabled"),
+				).toBe(false);
+				push();
+				// ⚠ NOT YET. The door has been pushed and the sheet is sliding; the
+				// parent has not been told. Asserting this BEFORE advancing is what
+				// proves the deferral exists rather than merely tolerating it.
+				expect(onClose).not.toHaveBeenCalled();
+				expect(
+					screen.getByTestId("phone-sheet").getAttribute("data-phase"),
+				).toBe("leaving");
+				act(() => {
+					vi.advanceTimersByTime(200);
+				});
+				expect(onClose).toHaveBeenCalledTimes(1);
+				cleanup();
+			}
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	/**
+	 * ⛔ A SECOND DOOR DURING THE SLIDE MUST NOT CLOSE IT TWICE. The parent's
+	 * `onClose` is `setSheet(null)` today and is idempotent, but the reason this
+	 * is pinned is the 200ms window itself: it did not exist before R-4, and a
+	 * reader who taps the backdrop and then the `×` inside it is not doing
+	 * anything unusual. The root also goes `pointer-events-none` while leaving,
+	 * so the pointer path is unreachable as well as harmless — belt and braces,
+	 * and this row asserts the braces because jsdom does not enforce the belt.
+	 */
+	it("phone-sheet::a-second-door-pushed-during-the-slide-closes-it-once", () => {
+		vi.useFakeTimers();
+		try {
+			const onClose = mount(false);
+			fireEvent.click(screen.getByTestId("phone-sheet-backdrop"));
+			fireEvent.keyDown(document, { key: "Escape" });
+			fireEvent.click(screen.getByTestId("phone-sheet-close"));
+			act(() => {
+				vi.advanceTimersByTime(200);
+			});
+			expect(onClose).toHaveBeenCalledTimes(1);
+			// ...and still once after the window has fully elapsed twice over.
+			act(() => {
+				vi.advanceTimersByTime(400);
+			});
+			expect(onClose).toHaveBeenCalledTimes(1);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 });
 
@@ -143,13 +205,7 @@ describe("phone sheet — aria-modal is backed by containment, not asserted", ()
 		opener.focus();
 		expect(document.activeElement).toBe(opener);
 		const { unmount } = render(
-			<PhoneSheet
-				open
-				title="Fixture sheet"
-				busy={false}
-				fullHeight={false}
-				onClose={vi.fn()}
-			>
+			<PhoneSheet open title="Fixture sheet" busy={false} onClose={vi.fn()}>
 				<button type="button">inside</button>
 			</PhoneSheet>,
 		);

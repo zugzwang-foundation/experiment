@@ -6,35 +6,35 @@
  * same control with different labels: a pair of equal-width segmented buttons
  * where exactly one is filled and the filled one names what is on screen.
  *
- * ⛔⛔ THE ACTIVE FILL IS RESOLVED AT THE CALL SITE AND PASSED IN, NEVER DERIVED
- * FROM THE KEY HERE. That is `AggregateFooter`'s ratified anti-inversion shape
- * (`RR-3`): a component that maps a side string to a pole token internally is
- * one edit away from painting a NO tab in the YES pole, and nothing about the
- * expression would look wrong. Passing the resolved token means the caller that
- * KNOWS which side it is holding is the one that says so.
+ * ⛔⛔ THE ACTIVE TAB IS A WHITE FILL ON BOTH SIDES, AND THE STYLE LIVES HERE —
+ * founder ruling Q1-a of 2026-09-12, ADR-0050 A2 D-4(v). This is a TAB-CONTROL
+ * exception to the pole binding; black = YES / white = NO remains in force on
+ * side badges, split bars and the bottom bar, which is where it carries meaning.
  *
- * ⚠ IT IS ALSO WHAT KEEPS THE THREAD ARM HONEST. On the feed the tabs ARE sides,
- * so the active one is pole-filled. On the thread they are SUPPORT and COUNTER,
- * which are RELATIONS to a post — a relation has no pole, and painting one would
- * assert that Support is a colour (`AGENTS.md` §8; design-canon §3.2). The
- * thread passes the neutral emphasis step instead, and this component never has
- * to know the difference.
+ * ⚠ THE HISTORY IS THE ARGUMENT, so it is kept rather than deleted. The active
+ * fill used to be resolved at the call site and passed in as `activeClass` —
+ * `AggregateFooter`'s ratified anti-inversion shape (`RR-3`), on the reasoning
+ * that a component mapping a side string to a pole token internally is one edit
+ * away from painting a NO tab in the YES pole. That reasoning was sound and it
+ * is now moot: there is no pole in the answer, so there is nothing to derive and
+ * nothing to get backwards. A prop that must forever carry one value is itself a
+ * way for a later edit to make it carry two, so it is gone.
  *
- * ⚠ THE RING ON THE ACTIVE TAB IS LOAD-BEARING, NOT DECORATION.
- * `--color-yes` is `#181818` and the page ground is `#181818`: an active YES tab
- * painted in its own pole is invisible against the surface behind it and reads
- * as "no tab is selected". The ring is what gives it an edge, and it is applied
- * to every active tab so the selected state is ONE shape rather than two — a NO
- * tab that gained an edge only because YES needed one is the kind of asymmetry
- * nobody can read as deliberate.
+ * ⚠ AND THE THREAD ARM IS WHY THE RULING IS COHERENT RATHER THAN ARBITRARY. On
+ * the thread these tabs are SUPPORT and COUNTER — RELATIONS to a post, and a
+ * relation has no pole (`AGENTS.md` §8; design-canon §3.2), so they have always
+ * used the neutral emphasis step. The feed tabs now match what the thread tabs
+ * already were; the two sets are one control again.
  *
- * ⚠ MOBILE-2b measured it on a phone and the 1.5px `--ring-active` was not
- * enough: 1:1 against the ground is not a contrast the ring can rescue at that
- * weight, in daylight, at arm's length. It is now `2px solid var(--ring)` — the
- * same live token at a weight that reads. RI-11 rules out inventing a colour
- * and this does not; it is the affordance getting heavier, not the palette
- * gaining a member. (This paragraph named `--ring-active` after the code had
- * stopped using it — corrected by `@code-reviewer` rather than left to rot.)
+ * ⛔ THE RING IS GONE, AND ITS WHOLE PURPOSE IS WHY. `--color-yes` is `#181818`
+ * and the page ground is `#181818`, so an active YES tab painted in its own pole
+ * was invisible and read as "no tab is selected". A ring was added to give it an
+ * edge, then thickened to `2px` when MOBILE-2b measured 1.5px as too light at
+ * arm's length — an affordance getting heavier to rescue a 1:1 contrast. A white
+ * fill on the same ground is not 1:1, so the rescue has nothing left to rescue.
+ * The active tab keeps a 2px border in the FILL'S OWN COLOUR: it draws no seam,
+ * and it holds the box geometry the ring established so the label does not shift
+ * by a pixel when a tab is selected.
  */
 /**
  * ⛔⛔ THE TAB CONTRACT IS KEPT, NOT MERELY CLAIMED — and the first cut claimed
@@ -58,8 +58,6 @@ export function PhoneSideTabs({
 		key: string;
 		label: string;
 		trailing: string;
-		/** The resolved fill for THIS option when active — see the docblock. */
-		activeClass: string;
 	}[];
 	active: string;
 	onSelect: (key: string) => void;
@@ -105,7 +103,7 @@ export function PhoneSideTabs({
 						onClick={() => onSelect(option.key)}
 						className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-(--r) text-xs font-bold tracking-[0.06em] uppercase transition-colors ${
 							on
-								? `${option.activeClass} [border:2px_solid_var(--ring)]`
+								? "bg-ink text-ground [border:2px_solid_var(--color-ink)]"
 								: "text-n5 [border:var(--hairline)]"
 						}`}
 					>

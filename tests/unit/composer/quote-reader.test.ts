@@ -155,6 +155,55 @@ describe("quote-reader — constants", () => {
 	});
 });
 
+describe("quote-reader — the first dispatch is immediate", () => {
+	/**
+	 * ⛔⛔ MOBILE-2c R-10. The founder opened the composer on a phone at the Đ10
+	 * floor and `TO WIN` read a bare em-dash. It was not a failure — measured on
+	 * all four arms, the row is `—` at 2ms and numeric at 325-354ms, every quote a
+	 * 200 carrying real `shares`. **The em-dash was this debounce**, applied to a
+	 * request that no keystroke produced: `BetComposer` seeds the stake from the
+	 * floor, so the first request is fully determined before the reader touches
+	 * anything. On the phone that row is the ONLY `TO WIN` there is — the
+	 * desktop's two prop-fed ones are not mounted — so the delay was the whole of
+	 * what the reader saw.
+	 *
+	 * ⚠ These two rows are the ones that pinned the OLD behaviour, and they are
+	 * rewritten rather than deleted: the debounce still exists and still has to be
+	 * proven, it just starts governing from the SECOND request.
+	 */
+	it("quote-reader::the-first-request-of-a-readers-life-fires-without-waiting", async () => {
+		const fetchFn = vi.fn<typeof globalThis.fetch>(async () =>
+			okQuote(BUY_QUOTE),
+		);
+		const reader = createQuoteReader({ fetchFn });
+		const { on } = collector();
+		reader.request(buyReq("10"), on);
+		// Not one tick advanced.
+		expect(fetchFn).toHaveBeenCalledTimes(1);
+		expect(urlOfCall(fetchFn).searchParams.get("stake")).toBe("10");
+	});
+
+	it("quote-reader::cancel-does-NOT-rearm-the-immediate-dispatch", async () => {
+		// ⚠ THE DELIBERATE HALF. `BetComposer` calls `cancel()` when the stake
+		// field is emptied, and typing a new stake after that IS editing — so it
+		// is debounced like any other keystroke. A `cancel()` that rearmed the
+		// immediate path would turn "clear the field and retype" into a request
+		// per digit, which is the cost this debounce exists to avoid.
+		const fetchFn = vi.fn<typeof globalThis.fetch>(async () =>
+			okQuote(BUY_QUOTE),
+		);
+		const reader = createQuoteReader({ fetchFn });
+		const { on } = collector();
+		reader.request(buyReq("10"), on);
+		expect(fetchFn).toHaveBeenCalledTimes(1);
+		reader.cancel();
+		reader.request(buyReq("20"), on);
+		expect(fetchFn).toHaveBeenCalledTimes(1);
+		await vi.advanceTimersByTimeAsync(QUOTE_DEBOUNCE_MS);
+		expect(fetchFn).toHaveBeenCalledTimes(2);
+	});
+});
+
 describe("quote-reader — trailing debounce", () => {
 	it("quote-reader::three-rapid-requests-collapse-to-one-fetch-for-the-last", async () => {
 		const fetchFn = vi.fn<typeof globalThis.fetch>(async () =>
@@ -162,17 +211,28 @@ describe("quote-reader — trailing debounce", () => {
 		);
 		const reader = createQuoteReader({ fetchFn });
 		const { on } = collector();
+		// ⚠ SPEND THE READER'S ONE IMMEDIATE DISPATCH FIRST. Without this the row
+		// measures the R-10 leading edge and reports it as a broken debounce —
+		// which is exactly how it failed when the leading edge landed, and is the
+		// reason the mount request is separated out above rather than folded in.
+		reader.request(buyReq("1"), on);
+		await vi.advanceTimersByTimeAsync(QUOTE_DEBOUNCE_MS);
+		expect(fetchFn).toHaveBeenCalledTimes(1);
+
 		reader.request(buyReq("10"), on);
 		reader.request(buyReq("20"), on);
 		reader.request(buyReq("25"), on);
-		// Trailing: nothing fires inside the window.
-		expect(fetchFn).not.toHaveBeenCalled();
-		await vi.advanceTimersByTimeAsync(QUOTE_DEBOUNCE_MS - 1);
-		expect(fetchFn).not.toHaveBeenCalled();
-		await vi.advanceTimersByTimeAsync(1);
+		// Trailing: nothing more fires inside the window.
 		expect(fetchFn).toHaveBeenCalledTimes(1);
-		// The ONE fetch carries the LAST request's params.
-		expect(urlOfCall(fetchFn).searchParams.get("stake")).toBe("25");
+		await vi.advanceTimersByTimeAsync(QUOTE_DEBOUNCE_MS - 1);
+		expect(fetchFn).toHaveBeenCalledTimes(1);
+		await vi.advanceTimersByTimeAsync(1);
+		expect(fetchFn).toHaveBeenCalledTimes(2);
+		// The ONE additional fetch carries the LAST request's params. ⚠ INDEX 1,
+		// not 0 — call 0 is the reader's immediate mount dispatch (R-10), and
+		// reading index 0 here asserts "25" against "1" and looks like a broken
+		// debounce rather than a mis-indexed assertion.
+		expect(urlOfCall(fetchFn, 1).searchParams.get("stake")).toBe("25");
 	});
 
 	it("quote-reader::custom-debounce-ms-is-honored", async () => {
@@ -181,11 +241,13 @@ describe("quote-reader — trailing debounce", () => {
 		);
 		const reader = createQuoteReader({ fetchFn, debounceMs: 50 });
 		const { on } = collector();
+		reader.request(buyReq("1"), on); // the immediate one
+		expect(fetchFn).toHaveBeenCalledTimes(1);
 		reader.request(buyReq("10"), on);
 		await vi.advanceTimersByTimeAsync(49);
-		expect(fetchFn).not.toHaveBeenCalled();
-		await vi.advanceTimersByTimeAsync(1);
 		expect(fetchFn).toHaveBeenCalledTimes(1);
+		await vi.advanceTimersByTimeAsync(1);
+		expect(fetchFn).toHaveBeenCalledTimes(2);
 	});
 });
 
@@ -322,12 +384,25 @@ describe("quote-reader — cancel()", () => {
 		);
 		const reader = createQuoteReader({ fetchFn });
 		const { results, on } = collector();
+		// ⚠ A PENDING TIMER HAS TO EXIST BEFORE `cancel()` CAN CLEAR ONE, and
+		// since MOBILE-2c R-10 the reader's FIRST request has no timer — it
+		// dispatches at once. So the first request is spent and settled, and the
+		// SECOND is the pending one this row is about. Written this way the claim
+		// in the title is the claim being tested; written the old way it would
+		// have been silently testing the leading edge instead.
+		reader.request(buyReq("1"), on);
+		await vi.advanceTimersByTimeAsync(QUOTE_DEBOUNCE_MS);
+		await flushMicrotasks();
+		expect(fetchFn).toHaveBeenCalledTimes(1);
+		const delivered = results.length;
+
 		reader.request(buyReq("25"), on);
 		reader.cancel();
 		await vi.advanceTimersByTimeAsync(QUOTE_DEBOUNCE_MS * 2);
 		await flushMicrotasks();
-		expect(fetchFn).not.toHaveBeenCalled();
-		expect(results).toEqual([]);
+		// No SECOND fetch — the pending timer was cleared, not merely aborted.
+		expect(fetchFn).toHaveBeenCalledTimes(1);
+		expect(results.length).toBe(delivered);
 	});
 
 	it("quote-reader::cancel-aborts-in-flight-and-suppresses-all-callbacks", async () => {

@@ -9,6 +9,34 @@ import { parseWireResponse } from "./envelope";
  * recorded). Errors degrade to `{kind:"degraded"}` (the preview renders "—")
  * — never a state escalation (plan §5); an aborted fetch is superseded,
  * silent.
+ *
+ * ⛔⛔ THE FIRST REQUEST OF A READER'S LIFE IS NOT DEBOUNCED, AND THE REASON IS A
+ * DEFECT THE FOUNDER REPORTED FROM A PHONE (MOBILE-2c R-10).
+ *
+ * He opened the composer on the NO side at the Đ10 floor and `TO WIN` read a
+ * bare em-dash. It was not a failure: measured locally on all four arms — post
+ * and reply, from the bar and from a card — the row reads `—` at 2ms and becomes
+ * numeric at **325-354ms**, every quote a 200 carrying real `shares`, and NO at
+ * stake 10 is `Đ 12`, which is the number he had seen locally.
+ *
+ * The em-dash WAS the debounce. A trailing debounce exists so that typing a
+ * four-digit stake sends one request instead of four — and a MOUNT is not a
+ * keystroke. `BetComposer` seeds `amount` from the floor, so the very first
+ * request is fully determined before the reader touches anything, and delaying
+ * it buys nothing and costs the only `TO WIN` a phone participant can see
+ * (`SlotHeader` and `PositionStrip`, the desktop's two prop-fed ones, are not
+ * mounted on the phone tree). Add mobile RTT to 300ms and the dead dash is on
+ * screen long enough to photograph.
+ *
+ * ⚠ WHY NOT A PENDING INDICATOR INSTEAD. Because it needs a new string, and new
+ * strings are not this task's to invent. Firing immediately makes the window
+ * ~RTT rather than ~RTT+300ms, which is the part that was actually ours.
+ *
+ * ⚠ IT IS ONE DISPATCH PER READER, NOT A LEADING-EDGE DEBOUNCE. A reader is
+ * created per composer mount (`BetComposer`'s `useMemo(…, [])`), so this fires
+ * once when the composer appears and every subsequent request — every keystroke
+ * — is debounced exactly as before. `cancel()` deliberately does NOT rearm it:
+ * clearing the stake field and typing a new one is editing, not opening.
  */
 
 /** Client-owned cadence constant (plan §3.1 "~300ms") — not a limits.ts value. */
@@ -35,6 +63,8 @@ export function createQuoteReader(deps?: {
 
 	let timer: ReturnType<typeof setTimeout> | null = null;
 	let controller: AbortController | null = null;
+	/** Has this reader ever dispatched? See the docblock's R-10 paragraph. */
+	let dispatched = false;
 	// Generation token: only the newest dispatch may deliver its result —
 	// belt over the abort (a raced already-resolved response stays silent).
 	let generation = 0;
@@ -91,6 +121,12 @@ export function createQuoteReader(deps?: {
 		request(req, onResult): void {
 			if (timer !== null) {
 				clearTimeout(timer);
+				timer = null;
+			}
+			if (!dispatched) {
+				dispatched = true;
+				dispatch(req, onResult);
+				return;
 			}
 			timer = setTimeout(() => {
 				timer = null;
