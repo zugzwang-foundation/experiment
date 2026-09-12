@@ -140,7 +140,7 @@ export function PostCard({
 				replyCount={replyCount}
 				createdAt={post.createdAt}
 				badge={post.badge}
-				download
+				download={{ ordinal: post.ordinal }}
 			/>
 
 			{/* HTML-FINISH · MARKET DETAIL rows 23 + 24 — d5's `.rtitle.plust`

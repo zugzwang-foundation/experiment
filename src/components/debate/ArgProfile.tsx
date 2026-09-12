@@ -1,8 +1,6 @@
-import { Download } from "lucide-react";
 import Link from "next/link";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import { FieldSeparator } from "@/components/ui/field-separator";
 import { InfoTip } from "@/components/ui/info-tip";
 import { RelativeTime } from "@/components/ui/relative-time";
@@ -11,6 +9,7 @@ import type { Badge as BadgeKind } from "@/lib/ranking";
 
 import { LaneBadge, PositionMarker, SideBadge } from "./badges";
 import { CompactDharmaFigure } from "./DharmaFigure";
+import { DownloadPostImage } from "./DownloadPostImage";
 import { formatDharmaCompact } from "./format";
 import type { AuthorIdentity, Marker, Side } from "./types";
 
@@ -43,7 +42,7 @@ export function ArgProfile({
 	createdAt,
 	chipSize,
 	badge = null,
-	download = false,
+	download,
 }: {
 	author: AuthorIdentity;
 	side: Side;
@@ -104,11 +103,15 @@ export function ArgProfile({
 	 */
 	badge?: BadgeKind | null;
 	/**
-	 * ⚠ change set 6 §2 — render the (non-functional) download placeholder at the
-	 * END of this row. OPT-IN: only the post card and the post pop-up pass it, so
-	 * replies and the reply pop-up keep the row they have.
+	 * ⚠ change set 6 §2 — render the download mark at the END of this row.
+	 * OPT-IN: only the post card and the post pop-up pass it, so replies and the
+	 * reply pop-up keep the row they have. Since POST-IMAGE-EXPORT it is a
+	 * WORKING control (`DownloadPostImage`): the value is the post's deep-link
+	 * ordinal, which the `/m/[slug]/export/image?post=N` route resolves exactly
+	 * as the page's `?post=` does. An object rather than a boolean so a mount
+	 * cannot ask for the mark without saying which post it downloads.
 	 */
-	download?: boolean;
+	download?: { ordinal: number };
 	/**
 	 * HTML-FINISH · MARKET DETAIL row 13 — the chip's geometry preset, and it is
 	 * wired at EXACTLY ONE site: the post-focus author row (`d5:964`, the only
@@ -527,13 +530,22 @@ export function ArgProfile({
 			    ⛔ STILL A NON-FUNCTIONAL PLACEHOLDER: no handler, no href, `disabled`
 			    AND `aria-disabled`, so it is unreachable by pointer and keyboard and
 			    announces itself as unavailable rather than promising a download this
-			    build cannot perform. */}
+			    build cannot perform.
+			    ⚠ POST-IMAGE-EXPORT — THE PLACEHOLDER IS NOW A CONTROL. The mark
+			    keeps its position (`ml-auto`, trailing edge), its size (`icon`,
+			    32px / 20px) and its token (`text-ink`); what changed is that it
+			    does something. `DownloadPostImage` owns the fetch, the busy state
+			    and the failure line, and still renders DISABLED when it has no
+			    route slug to build a URL from — so the "inert when it cannot
+			    perform" property above survives, now as a condition rather than a
+			    constant. */}
 			{download ? (
 				/* ⚠⚠ UI-OVERNIGHT entry 1b — `h-5` IS THE WHOLE ALIGNMENT MECHANISM.
 				   Line 1 of the metadata area is 20px, set by the SIDE CHIP's `h-5`
 				   (the tallest thing in Group A — the avatar is a sibling of the
 				   wrapping area and contributes to no line inside it). This wrapper
-				   is that same height and centres the mark inside it, so the mark
+				   — `DownloadPostImage`'s ROOT span, since POST-IMAGE-EXPORT — is that
+				   same height and centres the mark inside it, so the mark
 				   sits on line 1's centre line whether the row is one line or two.
 				   The 32px button overhangs the band by 6px top and bottom, which is
 				   invisible on a ghost control and keeps its box — and therefore the
@@ -546,25 +558,7 @@ export function ArgProfile({
 				   `h-6` on the reasoning that the avatar set the line, and that put
 				   the mark 2px low — jsdom performs no layout, so only the browser
 				   could see it. */
-				<span className="ml-auto flex h-5 shrink-0 items-center">
-					<Button
-						variant="ghost"
-						size="icon"
-						disabled
-						aria-disabled="true"
-						aria-label="Download post image"
-						// ⚠ change set 7 §1 — `text-ink`, the SAME token `Replies · n` uses
-						// two elements to the left, not the muted ramp. The mark and the one
-						// promoted field on this row now sit at the same emphasis.
-						// ⚠ One step larger again: `icon-sm` (28px box / 16px glyph) →
-						// `icon` (32px / 20px). ⛔ `disabled` keeps it inert at every size;
-						// a bigger placeholder reads MORE like a working control, so the
-						// disabled state matters more here than it did at 24px.
-						className="shrink-0 text-ink [&_svg]:size-5"
-					>
-						<Download />
-					</Button>
-				</span>
+				<DownloadPostImage ordinal={download.ordinal} />
 			) : null}
 		</div>
 	);

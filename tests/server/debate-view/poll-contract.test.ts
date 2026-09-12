@@ -148,6 +148,20 @@ const HOST = "src/components/debate/DebateView.tsx";
 const LOADER = "src/server/debate-view/load-debate-view.ts";
 const PAGE = "src/app/(public)/m/[slug]/page.tsx";
 const EXPORT_ROUTE = "src/app/(public)/m/[slug]/export/route.ts";
+/**
+ * POST-IMAGE-EXPORT / ADR-0050 — a new read endpoint under `/m/[slug]`, which
+ * is precisely the shape the two censuses below exist to stop. Admitted here by
+ * the conscious edit those censuses demand, not by widening them quietly.
+ *
+ * ⚠ THE QUESTION THIS GUARD ASKS IS ANSWERED, NOT SILENCED. Its subject is
+ * whether a second endpoint forks the debate read and gives masking a second
+ * place to diverge. This one does not: it reads through `getCachedDebateView`
+ * — `cached-view.ts` wrapping the one loader — so the `loadDebateView` call-site
+ * pin below is UNMOVED at two, and `loadRemovedSet` stays single-sourced. Those
+ * two rows are the load-bearing half of this file and a route that needed them
+ * relaxed would be a different decision entirely.
+ */
+const IMAGE_ROUTE = "src/app/(public)/m/[slug]/export/image/route.ts";
 /** S-4 Phase D — the page's `'use cache'` wrapper around the loader. */
 const CACHED_VIEW = "src/server/debate-view/cached-view.ts";
 
@@ -167,6 +181,29 @@ const CLIENT_FETCH =
  */
 const READ_TREE_EXCLUDES = /\/composer\//;
 
+/**
+ * POST-IMAGE-EXPORT / ADR-0050 — the one client transport in the READ tree that
+ * is not a read of the polled payload.
+ *
+ * ⚠ NAMED AS ONE FILE, NOT FOLDED INTO THE REGEX ABOVE. A directory pattern
+ * would quietly admit whatever lands beside it next; this admits exactly this
+ * module, so a second transport in `src/components/debate` still reddens.
+ *
+ * Why it is not the fork this row exists to catch, in the terms the row cares
+ * about — masking. It fetches a FINISHED JPEG from `/m/[slug]/export/image` and
+ * hands the bytes to a download anchor: nothing from the response is parsed,
+ * stored, or rendered, so there is no second copy of the view model on the
+ * client and no second place for a removed body to surface. The masking
+ * decision stays on the server, where the route performs its own
+ * `getCachedDebateView` read and 404s a removed post BEFORE anything is
+ * composed (SC-1; `tests/server/debate-export/image-route.test.ts`).
+ *
+ * And it is user-initiated — one click, disabled while in flight — which puts
+ * it in the same category as `composer/` above: the poll never reaches it, so
+ * it cannot make the 15s refresh diverge from the first paint.
+ */
+const EXPORT_DOWNLOAD = "src/components/debate/DownloadPostImage.tsx";
+
 describe("debate-view::poll-preserves-removal-masking", () => {
 	it("the poll module exists and refreshes by re-invoking the server read", () => {
 		expect(src(POLL)).not.toBeNull();
@@ -182,15 +219,17 @@ describe("debate-view::poll-preserves-removal-masking", () => {
 	it("no module in the debate READ tree issues a client-side data fetch", () => {
 		const offenders = sourcesUnder("src/components/debate")
 			.filter((file) => !READ_TREE_EXCLUDES.test(file))
+			.filter((file) => file !== EXPORT_DOWNLOAD)
 			.filter((file) => CLIENT_FETCH.test(code(file)));
 		expect(offenders).toEqual([]);
 	});
 
-	it("adds no read endpoint under /m/[slug] — exactly quote/ and export/", () => {
+	it("adds no read endpoint under /m/[slug] — exactly quote/, export/ and export/image/", () => {
 		const routes = sourcesUnder("src/app/(public)/m/[slug]").filter((file) =>
 			file.endsWith("/route.ts"),
 		);
 		expect(routes).toEqual([
+			IMAGE_ROUTE,
 			EXPORT_ROUTE,
 			"src/app/(public)/m/[slug]/quote/route.ts",
 		]);
@@ -202,15 +241,19 @@ describe("debate-view::poll-preserves-removal-masking", () => {
 		// `m/[slug]` — say `src/app/api/debate/[id]/route.ts` — is invisible to the
 		// subtree check above but cannot hide from this one. A future handler is
 		// not forbidden; it must be a conscious edit here.
-		// (On-disk 13 vs the §4.3 table's eleven rows is PRE-EXISTING drift, not
-		// this task's: `api/visits`, `api/cron/alarms-drain` and `m/[slug]/quote`
-		// are built but uncatalogued, and `api/dataset/manifest` is catalogued but
-		// pending-build. Surfaced, deliberately not corrected here.)
+		// (On-disk 14 vs the §4.3 table's eleven rows is mostly PRE-EXISTING drift,
+		// not this task's: `api/visits`, `api/cron/alarms-drain` and
+		// `m/[slug]/quote` are built but uncatalogued, and `api/dataset/manifest`
+		// is catalogued but pending-build. Surfaced, deliberately not corrected
+		// here. The fourteenth — `m/[slug]/export/image` — is NOT drift: it is
+		// ADR-0050's route, added to this list on purpose; see IMAGE_ROUTE above
+		// for why it does not disturb the call-site pin below.)
 		const routes = sourcesUnder("src/app").filter((file) =>
 			file.endsWith("/route.ts"),
 		);
 		expect(routes).toEqual([
 			"src/app/(admin)/admin/markets/media/sign/route.ts",
+			IMAGE_ROUTE,
 			EXPORT_ROUTE,
 			"src/app/(public)/m/[slug]/quote/route.ts",
 			"src/app/api/_smoke-error/route.ts",
