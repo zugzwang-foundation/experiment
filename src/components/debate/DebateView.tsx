@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
 	type ReactNode,
 	useCallback,
@@ -214,6 +214,46 @@ export function DebateView({
 	}, []);
 
 	const router = useRouter();
+	const pathname = usePathname();
+	/**
+	 * ⛔⛔ ARRIVING AT A MARKET SHOWS THE MARKET, NEVER A COMPOSER SOMEBODY LEFT
+	 * OPEN SOMEWHERE ELSE.
+	 *
+	 * Reported from staging: enter focus, open Buy, press Home in the header,
+	 * then open the same market again — and it opens straight into the staking
+	 * form instead of the reading view. The reader never asked for it twice; the
+	 * surface simply remembered a decision they had already navigated away from.
+	 *
+	 * ⚠ THIS EFFECT IS A NO-OP ON THE PATH EVERY READING OF THIS FILE PREDICTS,
+	 * and that is stated rather than hidden. `openSide` and `focusMode` are
+	 * `useState` with no initializer, nothing outside a click handler ever sets
+	 * them, no storage is written anywhere in `src/components/`, the composer is
+	 * absent from the URL sync (only `?post=` is mirrored), and `instant = false`
+	 * on this route rules out Next preserving the tree across a navigation. On a
+	 * genuine remount these setters run against values that are already `null`
+	 * and `false`, React bails out, and nothing re-renders.
+	 *
+	 * ⇒ So this does not fix a mechanism — it removes the CLASS. The invariant is
+	 * "a route change leaves no composer behind", and hanging it on `pathname`
+	 * makes it true whether the tree remounted or survived, without anyone having
+	 * to be right about which happened. A guard that is free when the code is
+	 * already correct is worth having when a user reports otherwise and the
+	 * reading cannot account for it.
+	 *
+	 * ⛔ IT ONLY EVER CLOSES, WHICH IS WHY IT DOES NOT CONSULT `composerBusy`.
+	 * Every other host path in this file no-ops while a request is in flight,
+	 * because unmounting and re-opening would mint a fresh key over a possibly
+	 * committing bet. Nothing here re-opens, and a reader whose route has changed
+	 * has left regardless — so honouring the busy flag here would preserve
+	 * exactly the state this exists to clear. The durable backstop on that seam
+	 * is the `bet_receipts` UNIQUE (ADR-0031), not a flag in the view.
+	 */
+	// biome-ignore lint/correctness/useExhaustiveDependencies: pathname is a re-run TRIGGER, not a read — the same shape `HeaderNav` documents. Biome sees a dependency the body never reads and calls it unnecessary; removing it makes the effect mount-only, which is precisely the case that is already covered and not the one being fixed. Do not remove.
+	useEffect(() => {
+		setOpenSide(null);
+		setFocusMode(false);
+		setOpenReply(null);
+	}, [pathname]);
 	/**
 	 * ⚠⚠ FEED-2 — THE BET THE AUTHOR JUST PLACED, and the model it was placed
 	 * against. Set on a 200; the composer closes immediately, exactly as it did
