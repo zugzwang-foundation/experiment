@@ -125,8 +125,15 @@ export function DownloadPostImage({ ordinal }: { ordinal: number }) {
 				disabled={disabled}
 				aria-disabled={disabled ? "true" : undefined}
 				aria-busy={busy ? "true" : undefined}
+				// ⚠ NO `title` ATTRIBUTE, AND ITS ABSENCE IS A GUARD, NOT AN OVERSIGHT.
+				// TIME-1's G5 bans `[title]` anywhere on a post card, because a native
+				// tooltip is exactly how an absolute timestamp leaks back onto a surface
+				// that is supposed to speak in relative time. This control's tooltip
+				// carried no time and tripped it anyway — which is the guard working: a
+				// blanket ban is the only version of that rule nobody has to police
+				// case by case. `aria-label` already names the control, so what is lost
+				// is a hover hint on an icon whose meaning the label carries.
 				aria-label="Download post image"
-				title="Download post image"
 				onClick={onClick}
 				// ⚠ `text-ink` — the SAME token `Replies · n` uses two elements to the
 				// left, so the mark and the one promoted field on this row sit at the
