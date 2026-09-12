@@ -501,21 +501,80 @@ export function PhoneDebateView({
 	};
 
 	return (
+		/**
+		 * ⛔⛔ MOBILE-2d — THE TIER IS A BOUNDED APP SHELL BELOW 640px, AND THE
+		 * THREE TOKENS BELOW ARE THE WHOLE OF IT.
+		 *
+		 * `h-[calc(100dvh-60px-2px)]` + `flex-none` + `overflow-hidden` replace
+		 * `flex-1`. Everything under this element already declared a bounded
+		 * shell — the track is `min-h-0 flex-1`, the panes are `overflow-y-auto`
+		 * — and none of it did anything, because nothing above gave the chain a
+		 * top. `<main>`'s `min-h-[calc(100dvh-60px-2px)]` is a MINIMUM: every box
+		 * grew to its content, `scrollHeight === clientHeight` on the pane
+		 * forever, `overflow-y: auto` never engaged, and the DOCUMENT was the
+		 * only scroller on the phone tier (measured, both engines, every market:
+		 * pane `client 2587 / scroll 2587` against a document of 2 766).
+		 *
+		 * ⛔ `flex-none` IS NOT TIDINESS AND THIS ELEMENT'S NEIGHBOUR HAS ALREADY
+		 * PAID FOR IT. `flex: 1 1 0%` sets `flex-basis: 0%`, and in a COLUMN flex
+		 * container the basis IS the main size — it beats `height`, and a
+		 * percentage basis against an indefinite parent resolves to `auto`, i.e.
+		 * content. `(public)/layout.tsx` records the same change being tried on
+		 * `<main>` at MOBILE-2b and measured: Chromium kept growing to content
+		 * (the token was simply inert) and **WebKit resolved `<main>` to ZERO
+		 * HEIGHT and painted a blank market page**. The difference here is that
+		 * the height sits on the PHONE ROOT rather than on the shared `<main>`,
+		 * and that `flex-none` stops the basis from winning.
+		 *
+		 * ⛔ `dvh`, NEVER `vh`. `vh` is the LARGE viewport: with a browser toolbar
+		 * showing, `100vh` exceeds the window by the toolbar's height — and with
+		 * `overflow: hidden` here and no document scroll, a bet bar pushed past
+		 * the bottom is not merely off-screen, it is UNREACHABLE. The subtrahend
+		 * is unchanged and is still the header's border-box written as its two
+		 * shipped contributors: `60px` is `GlobalHeader`'s `h-[60px]` inner row,
+		 * `2px` its `border-y`.
+		 *
+		 * ⛔ EVERY TOKEN IS `max-mobile:`-SCOPED. An unprefixed height here would
+		 * be a desktop change on an element the desktop shares the page with, and
+		 * `phone-scroll-model.test.ts` rejects one.
+		 *
+		 * ⛔⛔ AND THE STRIP'S `sticky top-[62px]` HAD TO GO WITH IT — IT IS NOT
+		 * INERT UNDER THIS MODEL, IT IS ACTIVELY WRONG. This docblock said "inert,
+		 * kept on purpose" until the 1440/639/360/375/430 box census measured it:
+		 * `overflow: hidden` makes THIS element a scrollport, a `position: sticky`
+		 * child resolves its offset against the nearest scrollport, and `top: 62px`
+		 * then pushes the whole title-strip-and-tabs block **62px down inside the
+		 * shell** — measured on every phone profile: strip `y 72 → 134`, tabs
+		 * `y 126 → 188`, against a track still starting at `y 179`. Sixty-one
+		 * pixels of the feed end up behind the tabs.
+		 * ⇒ The offset existed to clear the page header while the DOCUMENT
+		 * scrolled. The document does not scroll here any more and the block is
+		 * simply the first row of this column, so `sticky top-[62px]` is deleted
+		 * and `shrink-0` put in its place: in a bounded column a `flex 0 1 auto`
+		 * row is shrinkable, and the one row that must never give up height to the
+		 * feed is the one carrying the market question and the side tabs.
+		 */
 		<div
 			data-testid="phone-debate-view"
 			data-arm={focused === null ? "feed" : "thread"}
-			className="hidden w-full min-w-0 max-mobile:flex max-mobile:min-h-0 max-mobile:flex-1 max-mobile:flex-col max-mobile:[touch-action:manipulation]"
+			className="hidden w-full min-w-0 max-mobile:flex max-mobile:h-[calc(100dvh-60px-2px)] max-mobile:min-h-0 max-mobile:flex-none max-mobile:flex-col max-mobile:overflow-hidden max-mobile:[touch-action:manipulation]"
 		>
-			{/* ⚠ THE STRIP AND THE TABS STICK AS ONE BLOCK, not as two elements with
-			    two offsets. A second `sticky top-[N]` under the first would have to
-			    name the first's HEIGHT — which is set by how many lines the market
-			    question wraps to, i.e. by the content, i.e. by a number no class can
-			    know. One sticky wrapper is what makes a three-line question correct
-			    for free. `top-[62px]` is the header's border-box written as its two
-			    shipped contributors: `60px` is `GlobalHeader`'s `h-[60px]` inner row,
-			    `2px` its `border-y`. `z-30` sits BELOW the header's reserved `z-40`
-			    (`sticky-header.test.ts`) — this strip must never cover the header. */}
-			<div className="sticky top-[62px] z-30 bg-ground [border-bottom:var(--hairline)]">
+			{/* ⚠ THE STRIP AND THE TABS ARE ONE BLOCK, not two elements with two
+			    offsets — and that was true when they were sticky and is still true
+			    now that they are the shell's first row. A second positioned element
+			    under the first would have to name the first's HEIGHT, which is set
+			    by how many lines the market question wraps to, i.e. by the content,
+			    i.e. by a number no class can know. One wrapper is what makes a
+			    three-line question correct for free.
+			    ⛔ MOBILE-2d DELETED `sticky top-[62px]` FROM THIS ELEMENT. See the
+			    tier root's docblock for the measurement: with the root bounded and
+			    `overflow: hidden`, the root IS the scrollport a sticky child
+			    resolves against, and the 62px offset moved this block 62px down
+			    over the feed instead of clearing a header it no longer sits under.
+			    `z-30` stays — it is a flex item, so `z-index` applies — and it
+			    still sits BELOW the header's reserved `z-40`
+			    (`sticky-header.test.ts`). */}
+			<div className="z-30 shrink-0 bg-ground [border-bottom:var(--hairline)]">
 				{focused === null ? (
 					<PhoneTitleStrip
 						title={market.title}
@@ -540,21 +599,47 @@ export function PhoneDebateView({
 				/>
 			</div>
 
-			<PhoneFeedTrack
-				panes={
-					focused === null
-						? [
-								{ key: "YES", content: feedPane("YES") },
-								{ key: "NO", content: feedPane("NO") },
-							]
-						: [
-								{ key: "support", content: threadPane("support") },
-								{ key: "counter", content: threadPane("counter") },
-							]
-				}
-				active={focused === null ? activeSide : threadRelation}
-				onActiveChange={focused === null ? onSideKey : onRelationKey}
-			/>
+			{/* ⛔⛔ THE SCROLL REGION — ONE ELEMENT, AND IT IS THE WHOLE REASON THE
+			    SIDEWAYS SWIPE STAYS RELIABLE IN A BOUNDED SHELL.
+			    The vertical scroller sits ABOVE the horizontal snap track, never
+			    inside it. Nested the other way — a scroller per pane, inside the
+			    track — a swipe that follows a vertical scroll moved NOTHING in 15
+			    of 40 trials on Chromium, across four different input paths; with
+			    the scroller here it is 40 of 40, same machine, same session, with a
+			    no-prior-scroll control at 10/10 in both. `PhoneFeedTrack`'s own
+			    docblock carries the numbers.
+			    ⚠ `min-h-0` because this is the `1fr` row of a bounded column and a
+			    flex child's automatic minimum size is its content — without it the
+			    shell does not bound anything and the document scrolls again.
+			    ⚠ `overscroll-y-contain` is correct HERE and only here: this box
+			    really scrolls, so a pan that reaches the end of the feed has
+			    somewhere it would otherwise chain to. On a pane that could not
+			    scroll the same token was the defect MOBILE-2d opened with.
+			    ⚠ THE PRICE: one vertical position for both sides, and the shorter
+			    side padded to the taller one's height. That is what the document
+			    did before this change, so it is the status quo rather than a
+			    regression — but it is the thing to revisit if per-side scrolling is
+			    ever wanted, and it cannot be got by nesting. */}
+			<div
+				data-testid="phone-scroll-region"
+				className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
+			>
+				<PhoneFeedTrack
+					panes={
+						focused === null
+							? [
+									{ key: "YES", content: feedPane("YES") },
+									{ key: "NO", content: feedPane("NO") },
+								]
+							: [
+									{ key: "support", content: threadPane("support") },
+									{ key: "counter", content: threadPane("counter") },
+								]
+					}
+					active={focused === null ? activeSide : threadRelation}
+					onActiveChange={focused === null ? onSideKey : onRelationKey}
+				/>
+			</div>
 
 			<PhoneBottomBar
 				market={market}

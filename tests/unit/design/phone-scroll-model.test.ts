@@ -43,6 +43,8 @@ const ROOT = process.cwd();
 const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 
 const TRACK = "src/components/debate/phone/PhoneFeedTrack.tsx";
+const SHEET = "src/components/debate/phone/PhoneSheet.tsx";
+const VIEW_SRC = () => code(read(VIEW));
 const VIEW = "src/components/debate/phone/PhoneDebateView.tsx";
 
 const V = "max-mobile";
@@ -168,9 +170,17 @@ describe("phone scroll model — the guard reaches real source", () => {
 		expect(root.length, "the tier root's class list was read").toBeGreaterThan(
 			3,
 		);
-		// ...and the reads landed on the elements they name.
-		expect(pane).toContain("overflow-y-auto");
+		// ...and the reads landed on the elements they name. ⚠ The pane's control
+		// token is `snap-start`, NOT `overflow-y-auto`: MOBILE-2d moved the
+		// vertical scroller off this element entirely, and a liveness check that
+		// asserts the thing the code no longer has is a guard that reddens on its
+		// own subject.
+		expect(pane).toContain("snap-start");
 		expect(root).toContain("hidden");
+		expect(
+			classTokensAfter(VIEW_SRC(), 'data-testid="phone-scroll-region"').length,
+			"the scroll region's class list was read",
+		).toBeGreaterThan(2);
 	});
 });
 
@@ -179,33 +189,103 @@ describe("phone scroll model — containment is paired with the bound (S-1/S-2)"
 	 * ⛔⛔ THE PAIRING, IN BOTH DIRECTIONS. This is one `it` on purpose: two
 	 * separate rules could each be satisfied by deleting the other's subject.
 	 */
-	it("phone-scroll::overscroll-on-the-pane-IFF-the-tier-root-is-bounded", () => {
+	it("phone-scroll::overscroll-lives-on-the-scroller-and-nowhere-else", () => {
 		const pane = classTokensAfter(code(read(TRACK)), "data-pane={pane.key}");
 		const root = classTokensAfter(
-			code(read(VIEW)),
+			VIEW_SRC(),
 			'data-testid="phone-debate-view"',
 		);
-		const containment = overscrollTokens(pane);
 		const bounded = declaresDefiniteHeightBelow640(root);
 
-		if (bounded) {
+		if (!bounded) {
+			// The unbounded model: nothing below the root scrolls, so a containment
+			// declaration anywhere in the track is the 2026-09-12 dead region.
 			expect(
-				containment.length,
-				"the tier root declares a definite height below 640px, so the pane " +
-					"is a real scroller — it MUST declare overscroll containment, or a " +
-					"pan that reaches the end of the feed chains out to whatever is " +
-					"behind it",
-			).toBeGreaterThan(0);
-		} else {
-			expect(
-				containment,
-				"the tier root does NOT declare a definite height below 640px, so " +
-					"nothing bounds the chain, the pane grows to its content and never " +
-					"scrolls — and overscroll containment on a box that never scrolls " +
-					"has exactly one reachable effect, which is the dead region of the " +
-					"2026-09-12 Android report (probe §7.2)",
+				overscrollTokens(pane),
+				"nothing bounds the chain, so the pane grows to its content and " +
+					"never scrolls — and overscroll containment on a box that never " +
+					"scrolls has exactly one reachable effect, which is the dead " +
+					"region of the Android report (probe §7.2)",
 			).toEqual([]);
+			return;
 		}
+
+		/**
+		 * ⛔⛔ THE BOUNDED MODEL, AND THE RULE IS SHARPER THAN "SOMETHING MUST
+		 * DECLARE CONTAINMENT". The vertical scroller is the SCROLL REGION, an
+		 * ANCESTOR of the horizontal snap track — never the pane, and never a
+		 * child of the pane. Measured: with the vertical scroller nested inside
+		 * the track, a sideways swipe that follows a vertical scroll moved
+		 * nothing in 15 of 40 trials across four input paths; with it above the
+		 * track, 40 of 40. So this guard pins the TOPOLOGY, because the topology
+		 * is the finding and the tokens are downstream of it.
+		 */
+		const region = classTokensAfter(
+			VIEW_SRC(),
+			'data-testid="phone-scroll-region"',
+		);
+		expect(
+			region,
+			"the scroll region is the 1fr row of a bounded column; without min-h-0 " +
+				"its automatic minimum size is its content and the shell bounds nothing",
+		).toContain("min-h-0");
+		expect(region).toContain("flex-1");
+		expect(
+			region.some((t) => t.startsWith("overflow-y-")),
+			"the scroll region must be the vertical scroller",
+		).toBe(true);
+		expect(
+			overscrollTokens(region).length,
+			"the scroller must contain its own overscroll, or a pan reaching the " +
+				"end of the feed chains out to whatever is behind the shell",
+		).toBeGreaterThan(0);
+
+		// ...and the pane is a PURE SNAP ITEM.
+		expect(
+			overscrollTokens(pane),
+			"overscroll-behavior on the snap item is what made the sideways swipe " +
+				"unreliable — 15 of 40 dead. It belongs on the scroll region",
+		).toEqual([]);
+		expect(
+			pane.filter((t) => t.startsWith("overflow-")),
+			"the snap item must not be a scroller: the vertical scroller is its " +
+				"ANCESTOR, measured 40/40 against 25/40 for the nested shape",
+		).toEqual([]);
+		expect(
+			pane.filter((t) => t.includes("touch-action")),
+			"touch-action on the snap item is intersected down the chain and stops " +
+				"a horizontal gesture reaching the track at all (0 of 8)",
+		).toEqual([]);
+		// POSITIVE CONTROL — the pane's class list was really read.
+		expect(pane).toContain("snap-start");
+		expect(pane).toContain("shrink-0");
+	});
+
+	/**
+	 * ⛔ AND THE SCROLLER IS NOT INSIDE THE TRACK. Stated as its own rule and as
+	 * a source relationship, because it is the one property nothing else in the
+	 * tree records and the one whose violation is invisible: nesting the
+	 * scroller looks tidier, renders identically, and passes every layout test.
+	 */
+	it("phone-scroll::the-vertical-scroller-is-an-ANCESTOR-of-the-snap-track", () => {
+		const view = VIEW_SRC();
+		const region = view.indexOf('data-testid="phone-scroll-region"');
+		const track = view.indexOf("<PhoneFeedTrack");
+		expect(region, "the scroll region exists").toBeGreaterThan(-1);
+		expect(track, "the track is mounted in this file").toBeGreaterThan(-1);
+		expect(
+			region < track,
+			"the scroll region must OPEN before the track is mounted — it is the " +
+				"track's ancestor, not its child",
+		).toBe(true);
+		// ...and `PhoneFeedTrack` itself declares no vertical scrolling anywhere.
+		const trackSrc = code(read(TRACK));
+		expect(
+			[...trackSrc.matchAll(/overflow-y-(auto|scroll)/g)].map((m) => m[0]),
+			"no element inside the track may be a vertical scroller",
+		).toEqual([]);
+		// POSITIVE CONTROL — the scan sees the one overflow token that IS there.
+		expect(trackSrc).toContain("overflow-x-auto");
 	});
 
 	/**
@@ -230,14 +310,15 @@ describe("phone scroll model — containment is paired with the bound (S-1/S-2)"
 			return;
 		}
 		expect(
-			track,
-			"the track is the 1fr row of a bounded shell; without min-h-0 its " +
-				"automatic minimum size is its content and the bound does nothing",
+			classTokensAfter(VIEW_SRC(), 'data-testid="phone-scroll-region"'),
+			"the scroll region is the 1fr row of a bounded shell; without min-h-0 " +
+				"its automatic minimum size is its content and the bound does nothing",
 		).toContain("min-h-0");
 		expect(
 			track,
-			"…and min-w-0 for the same reason on the inline axis, since the track " +
-				"is itself a horizontal scroller full of full-width panes",
+			"min-w-0 on the track, since it is a horizontal scroller full of " +
+				"full-width panes and its automatic minimum on the inline axis is " +
+				"two viewports",
 		).toContain("min-w-0");
 	});
 
@@ -310,5 +391,60 @@ describe("phone scroll model — containment is paired with the bound (S-1/S-2)"
 				(t) => !t.startsWith(V + S) && /(^|:)(h|min-h|max-h)-\[?.*vh/.test(t),
 			),
 		).toHaveLength(1);
+	});
+});
+
+describe("phone scroll model — what actually holds the feed still behind a sheet", () => {
+	/**
+	 * ⛔⛔ THE MECHANISM IS THE FULL-VIEWPORT LAYER, NOT THE BODY LOCK — AND THIS
+	 * GUARD EXISTS BECAUSE THE OPPOSITE WAS ASSUMED AND MEASURED FALSE.
+	 *
+	 * `PhoneSheet` sets `document.body.style.overflow = "hidden"` while open. The
+	 * expectation going into MOBILE-2d was that a bounded shell makes that a
+	 * no-op and the pane would start scrolling under an open sheet. Measured on
+	 * the bounded build, M3, both sheets, four heights each, with the lock in
+	 * place AND with `document.body.style.overflow` cleared live while the sheet
+	 * was up: **every cell moved 0px in both arms**, and `elementFromPoint` down
+	 * the centre line returned the sheet's own subtree at every height.
+	 *
+	 * ⇒ What keeps the feed still is that the sheet's root is a `fixed inset-0`
+	 * layer with an `inset-0` backdrop under it: the pane is not hit-testable, so
+	 * no gesture ever reaches it. The lock is belt-and-braces for the DOCUMENT
+	 * and it is kept for that. **Shrink the backdrop and the mechanism is gone**,
+	 * silently and with no test failing anywhere else — which is exactly what
+	 * this rule is for. It is pinned by SYMBOL (`data-testid`), never by line.
+	 */
+	it("phone-scroll::the-sheet-is-a-full-viewport-layer-with-a-full-backdrop", () => {
+		const src = code(read(SHEET));
+		const root = classTokensAfter(src, 'data-testid="phone-sheet"');
+		expect(root, "the sheet root must cover the viewport").toContain("fixed");
+		expect(root).toContain("inset-0");
+		const back = classTokensAfter(src, 'data-testid="phone-sheet-backdrop"');
+		expect(
+			back,
+			"the backdrop must fill that layer — it is what the pane is behind",
+		).toContain("inset-0");
+		expect(
+			back.includes("absolute") || back.includes("fixed"),
+			"the backdrop must be positioned, or `inset-0` is inert",
+		).toBe(true);
+		// POSITIVE CONTROL — both reads landed on real class lists.
+		expect(root.length).toBeGreaterThan(3);
+		expect(back.some((t) => t.startsWith("bg-"))).toBe(true);
+	});
+
+	/**
+	 * ⚠ AND THE LOCK STAYS, AND IS NOT THE CLAIM. Removing it would be a change
+	 * with no measured effect below 640px and an unmeasured one above; keeping it
+	 * costs nothing. What must not happen is someone reading the lock as the
+	 * mechanism and shrinking the layer on the strength of it.
+	 */
+	it("phone-scroll::the-body-lock-is-still-there-and-is-still-paired-with-its-restore", () => {
+		const src = code(read(SHEET));
+		expect(src).toContain('document.body.style.overflow = "hidden"');
+		expect(
+			src,
+			"a lock without its restore is a page that never scrolls again",
+		).toContain("document.body.style.overflow = previous");
 	});
 });

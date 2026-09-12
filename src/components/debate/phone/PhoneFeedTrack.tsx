@@ -279,7 +279,41 @@ export function PhoneFeedTrack({
 		<div
 			ref={trackRef}
 			data-testid="phone-feed-track"
-			className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden [touch-action:pan-x_pan-y] [scrollbar-width:none]"
+			// ⛔⛔ THIS TRACK IS CONTENT-HEIGHT AND IS **NOT** THE VERTICAL
+			// SCROLLER'S PARENT — THE VERTICAL SCROLLER IS ITS ANCESTOR, AND THE
+			// ORDER OF THOSE TWO IS THE MOST EXPENSIVE THING MOBILE-2d MEASURED.
+			//
+			// A bounded shell can put the vertical scroller in two places: INSIDE
+			// this track (one scroller per pane, independent positions per side) or
+			// ABOVE it (one scroller for the whole feed, the way the document used
+			// to be). The first is the obvious design and it is the one that breaks:
+			// with a vertical scroller nested inside the snap track, **a sideways
+			// swipe that follows a vertical scroll moved nothing at all in 15 of 40
+			// trials** — sampled every frame, not one pixel, not for one frame, so
+			// it is a routing decision rather than a snap that returned. Measured
+			// across four input paths (10/24/36 hand-dispatched touch moves and
+			// Chrome's own `Input.synthesizeScrollGesture`), all four the same.
+			// With the scroller ABOVE this element: **40 of 40**, on the same
+			// machine, in the same session, with a no-prior-scroll control at 10/10
+			// in both.
+			//
+			// ⇒ `overflow-y` lives on `PhoneDebateView`'s scroll region. This
+			// element scrolls on ONE axis and has no height of its own to give.
+			// ⚠ THE PRICE, STATED: both sides share one vertical position, and the
+			// shorter side is padded out to the taller one's height. That is
+			// exactly what the document-scroll model did before, so it is not a
+			// regression — but it is a real property and it is not free.
+			// ⛔ `overscroll-x-contain` — a swipe past the first or last pane stops
+			// there instead of chaining out. What it chains INTO on a phone is the
+			// browser's own horizontal overscroll navigation, so without it a
+			// reader swiping for the other side at the first pane can leave the
+			// page. The tier carries its own Back affordance in the title strip,
+			// which is why taking this one away is affordable.
+			// ⚠ `x` ONLY. This box does not scroll vertically, and a y-axis
+			// containment on it would be the same mistake MOBILE-2d spent a commit
+			// removing from the pane: a declaration on an axis the box cannot move
+			// in.
+			className="flex w-full min-w-0 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain [touch-action:pan-x_pan-y] [scrollbar-width:none]"
 		>
 			{panes.map((pane) => (
 				// ⚠ `role="tabpanel"` + `id` + `aria-labelledby` — the other half of
@@ -295,32 +329,22 @@ export function PhoneFeedTrack({
 					// holds nothing focusable — these hold post cards, their Support and
 					// Counter triggers and their `Know more`, so a stop here would be a
 					// stop on the way to a control rather than a way to reach content.
+					// ⛔ A PURE SNAP ITEM. No `overflow`, no `overscroll-behavior`,
+					// no `touch-action`, no height — every one of those was tried
+					// here during MOBILE-2d and every one of them is recorded above
+					// on the track as part of the same measurement. The vertical
+					// scrolling this pane appears to need belongs to an ancestor;
+					// putting it here is what made the sideways swipe unreliable.
+					// ⚠ Two declarations are reliably FATAL on this element and are
+					// named so nobody adds them back: `overscroll-behavior-x`
+					// anything but `auto` (0 of 8), and `touch-action: pan-y` (0 of
+					// 8) — both stop a horizontal gesture that begins on a card from
+					// ever reaching the track, because `touch-action` is intersected
+					// down the ancestor chain and containment on the inline axis
+					// forbids the chain.
 					data-pane={pane.key}
 					data-testid={`phone-pane-${pane.key}`}
-					// ⛔⛔ NO `overscroll-contain` HERE WHILE THE HEIGHT CHAIN IS
-					// UNBOUNDED, AND THE PAIR IS THE RULE RATHER THAN THE TOKEN.
-					// `overflow-y-auto` below is inert today: `<main>`'s
-					// `min-h-[calc(100dvh-60px-2px)]` is a MINIMUM, nothing above
-					// bounds this box, so the pane grows to its full content height,
-					// `scrollHeight === clientHeight`, and the DOCUMENT is the only
-					// thing that scrolls. `overscroll-behavior: contain` therefore
-					// sits on a box that never scrolls — and its only reachable
-					// effect is the defect it looks like a guard against: an engine
-					// that counts a non-overflowing `overflow:auto` box as a scroll
-					// container refuses to chain the pan out of it, turning the
-					// pane's rectangle into a dead region while the title strip, the
-					// tabs and the fixed bet bar around it keep scrolling the page.
-					// That is the founder's Android report, and it is one browser
-					// judgement away from this build
-					// (`~/Downloads/zz_MOBILE-2c-ANDROID_probe_2026-09-12T1435.md`
-					// §5 and §7.2 — measured: `contain` 0px vs `auto` 402px out of a
-					// pane parked at its scroll end).
-					// ⚠ IT COMES BACK THE MOMENT THE CHAIN IS BOUNDED. Containment
-					// is correct and wanted on a pane that really scrolls; what is
-					// wrong is declaring it on one that cannot. The two halves are
-					// pinned together by `phone-scroll-model.test.ts`, so whichever
-					// moves first reddens.
-					className="w-full shrink-0 snap-start snap-always overflow-y-auto outline-none"
+					className="w-full shrink-0 snap-start snap-always outline-none"
 				>
 					{pane.content}
 				</div>

@@ -366,6 +366,143 @@ describe("phone tier — not one preventDefault on a touch handler (G4)", () => 
 	});
 });
 
+describe("phone tier — the track and the panes carry NO handler at all (MOBILE-2d)", () => {
+	/**
+	 * ⛔⛔ NOT "NO `preventDefault`" — **NO HANDLER**. The scan above forbids the
+	 * one call that takes scrolling away; this one forbids the listener existing
+	 * on the two elements that are now the tier's scrollers at all.
+	 *
+	 * MOBILE-2d turned the phone tier into a bounded app shell whose momentum,
+	 * rubber-band, axis lock and snapping are the BROWSER's. Every one of those
+	 * is a behaviour a hand-written handler would have to reimplement, and the
+	 * reason this lane has a P0 in its history is that reimplementing them is
+	 * where the mistakes live. So the rule is structural rather than behavioural:
+	 * there is no handler on the track or the panes, therefore there is nothing
+	 * to get wrong.
+	 *
+	 * ⚠ THE ONE EXCEPTION IS NAMED AND IS NOT A WEAKENING. `PhoneFeedTrack`
+	 * registers `pointermove` and `touchmove` on the TRACK — passively, reading
+	 * only — to release the observer mute when the reader overrules a
+	 * programmatic slide (D-1). It neither prevents nor moves anything. So the
+	 * assertion is: the track's listeners are exactly that pair, both passive and
+	 * both resolving to the same `release`; and the PANES carry none.
+	 */
+	const JSX_POINTER = [
+		"onTouchStart",
+		"onTouchMove",
+		"onTouchEnd",
+		"onTouchCancel",
+		"onPointerDown",
+		"onPointerMove",
+		"onPointerUp",
+		"onPointerCancel",
+		"onWheel",
+	];
+
+	/** The JSX attributes on the element whose opening tag contains `anchor`. */
+	function attrsOfElementWith(src: string, anchor: string): string {
+		const at = src.indexOf(anchor);
+		if (at === -1) throw new Error(`no anchor \`${anchor}\``);
+		// walk back to the `<` that opens this tag, then forward to its `>`
+		let open = at;
+		while (open > 0 && src[open] !== "<") open--;
+		let i = at;
+		let depth = 0;
+		let quote: string | null = null;
+		for (; i < src.length; i++) {
+			const ch = src[i] ?? "";
+			if (quote !== null) {
+				if (ch === "\\") i++;
+				else if (ch === quote) quote = null;
+				continue;
+			}
+			if (ch === '"' || ch === "'" || ch === "`") {
+				quote = ch;
+				continue;
+			}
+			if (ch === "{") depth++;
+			else if (ch === "}") depth--;
+			else if (ch === ">" && depth === 0) break;
+		}
+		return src.slice(open, i);
+	}
+
+	it("phone-touch::the-track-and-panes-carry-no-touch-or-pointer-prop", () => {
+		const src = code(read(`${PHONE_DIR}/PhoneFeedTrack.tsx`));
+		const offenders: string[] = [];
+		for (const [label, anchor] of [
+			["track", 'data-testid="phone-feed-track"'],
+			["pane", "data-pane={pane.key}"],
+		] as [string, string][]) {
+			const tag = attrsOfElementWith(src, anchor);
+			for (const prop of JSX_POINTER)
+				if (tag.includes(`${prop}=`)) offenders.push(`${label}: ${prop}`);
+		}
+		expect(
+			offenders,
+			"momentum, rubber-band, axis lock and snapping are the browser's on " +
+				"this tier; a handler here is the only place they can be got wrong",
+		).toEqual([]);
+
+		// POSITIVE CONTROL — the extractor reads a real opening tag, and the
+		// recogniser fires on the shape it rejects.
+		const trackTag = attrsOfElementWith(src, 'data-testid="phone-feed-track"');
+		expect(trackTag).toContain("ref={trackRef}");
+		expect(trackTag).toContain("className=");
+		const sample =
+			'<div data-pane={pane.key} onTouchMove={stop} className="x">';
+		expect(
+			JSX_POINTER.filter((p) =>
+				attrsOfElementWith(sample, "data-pane={pane.key}").includes(`${p}=`),
+			),
+		).toEqual(["onTouchMove"]);
+	});
+
+	it("phone-touch::the-tracks-only-listeners-are-the-passive-mute-release", () => {
+		const src = code(read(`${PHONE_DIR}/PhoneFeedTrack.tsx`));
+		const regs: { name: string; handler: string; opts: string }[] = [];
+		for (const m of src.matchAll(/track\.addEventListener\s*\(/g)) {
+			const paren = src.indexOf("(", m.index ?? 0);
+			const args = splitArgs(balanced(src, paren).body);
+			regs.push({
+				name: (args[0] ?? "").replace(/^["'`]|["'`]$/g, ""),
+				handler: (args[1] ?? "").trim(),
+				opts: (args[2] ?? "").replace(/\s/g, ""),
+			});
+		}
+		expect(
+			regs.map((r) => `${r.name}:${r.handler}`).sort(),
+			"the track's listeners are exactly the D-1 mute release, on movement, " +
+				"both resolving to `release` — anything else is gesture code",
+		).toEqual(["pointermove:release", "touchmove:release"]);
+		for (const r of regs)
+			expect(r.opts, `${r.name} must be passive`).toContain("passive:true");
+	});
+
+	it("phone-touch::no-listener-is-registered-on-a-pane", () => {
+		// The panes are rendered inside `PhoneFeedTrack`; nothing in `phone/` may
+		// reach one and attach to it.
+		const offenders: string[] = [];
+		for (const { file, src } of phoneFiles()) {
+			for (const m of src.matchAll(
+				/querySelector(?:All)?\s*\(\s*[`'"][^`'"]*data-pane[^`'"]*[`'"]\s*\)[\s\S]{0,120}?addEventListener/g,
+			))
+				offenders.push(`${file}: ${String(m[0]).slice(0, 60)}…`);
+		}
+		expect(offenders).toEqual([]);
+		// POSITIVE CONTROL — the pattern fires on the shape it rejects.
+		const sample =
+			'const p = track.querySelector("[data-pane]");\np.addEventListener("touchmove", f);';
+		expect(
+			[
+				...sample.matchAll(
+					/querySelector(?:All)?\s*\(\s*[`'"][^`'"]*data-pane[^`'"]*[`'"]\s*\)[\s\S]{0,120}?addEventListener/g,
+				),
+			].length,
+		).toBe(1);
+	});
+});
+
 describe("phone tier — the three touch-action declarations (G4)", () => {
 	/**
 	 * The class token is assembled from its parts at runtime. Tailwind v4's source
