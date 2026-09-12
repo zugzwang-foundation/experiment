@@ -204,10 +204,26 @@ describe("phone scroll lock — the restore is the whole contract", () => {
 		).toEqual(["", "auto"]);
 	});
 
+	/**
+	 * ⚠ THIS ROW'S PREMISE CHANGED, AND THE CHANGE IS A RULING RATHER THAN A
+	 * WEAKENING. It was written as *"the engine, or anything else, moves it while
+	 * locked — the restore must win"*. `@security-auditor` then found that
+	 * `PhoneDebateView`'s arm-change effect is one of those "anything else"s, and
+	 * that an unconditional restore silently undoes it: the reader opens a post,
+	 * opens a reply sheet, uses the back gesture, and lands at the top of the
+	 * feed with their place lost.
+	 * ⇒ The rule is now: restore what this lock is still holding, and leave what
+	 * another owner has deliberately re-set. The two cases are separated —
+	 * the ENGINE clamping on hide is covered by the `clampOnHide` row below, and
+	 * a deliberate re-set by the row in the next describe.
+	 */
 	it("scroll-lock::restores-the-scroll-position", () => {
 		const el = scroller({ fromClass: true, top: 412 });
 		const unlock = lockPageScroll();
-		el.scrollTop = 0; // the engine, or anything else, moves it while locked
+		expect(
+			el.style.overflowY,
+			"the lock must have taken, or the restore proves nothing",
+		).toBe("hidden");
 		unlock();
 		expect(
 			el.scrollTop,
@@ -247,6 +263,55 @@ describe("phone scroll lock — the restore is the whole contract", () => {
 		).toBe("auto");
 		unlock();
 		expect(still.style.overflowY).toBe("auto");
+	});
+});
+
+describe("phone scroll lock — it does not overrule the other owner of a position", () => {
+	/**
+	 * ⛔⛔ TWO WRITERS OWN `phone-scroll-region.scrollTop`, AND THIS MODULE USED
+	 * TO ALWAYS WIN. `PhoneDebateView` moves it on an arm change — saving the
+	 * feed's place, putting a post at its top, restoring the feed on the way
+	 * back — from a LAYOUT effect. This module restores from a PASSIVE destroy,
+	 * which always runs second, so an unconditional write silently undid the
+	 * whole feature. One gesture reaches it: read a post, open a reply sheet, use
+	 * the back gesture, land at the top of the feed. `@security-auditor` found
+	 * it.
+	 * ⇒ The restore is conditional on the value still being the one this lock
+	 * left. These two rows are the condition, in both polarities.
+	 */
+	it("scroll-lock::restores-a-position-nobody-else-touched", () => {
+		const el = scroller({ top: 300, fromClass: true });
+		const unlock = lockPageScroll();
+		expect(el.style.overflowY).toBe("hidden");
+		unlock();
+		expect(
+			el.scrollTop,
+			"nothing else moved it, so the captured position is the right answer",
+		).toBe(300);
+	});
+
+	it("scroll-lock::leaves-a-position-another-owner-re-set-while-locked", () => {
+		const el = scroller({ top: 300, fromClass: true });
+		const unlock = lockPageScroll();
+		// the arm-change layout effect, running while the lock is held
+		el.scrollTop = 1200;
+		unlock();
+		expect(
+			el.scrollTop,
+			"someone else meant this value; the lock has no business overruling it",
+		).toBe(1200);
+	});
+
+	it("scroll-lock::restores-across-an-engine-that-clamps-on-hide", () => {
+		// POSITIVE CONTROL for the condition's own arithmetic: where hiding the
+		// overflow clamps the position to 0, "what the lock left" is 0, not the
+		// captured value — so the comparison must be against the read-back and not
+		// against the capture, or this restore would be skipped every time.
+		const el = scroller({ top: 300, fromClass: true, clampOnHide: true });
+		const unlock = lockPageScroll();
+		expect(el.scrollTop, "the clamp must be armed").toBe(0);
+		unlock();
+		expect(el.scrollTop).toBe(300);
 	});
 });
 

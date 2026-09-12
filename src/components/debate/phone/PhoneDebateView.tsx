@@ -269,12 +269,48 @@ export function PhoneDebateView({
 			return;
 		}
 		if (leavingFeed) {
-			feedScrollTopRef.current = region.scrollTop;
+			// ⛔ DO NOT SAVE A POSITION READ THROUGH A LOCK. While a sheet is open
+			// `scroll-lock.ts` holds this element at `overflow: hidden`, and an
+			// engine that clamps `scrollTop` on that transition answers 0 — so a
+			// save taken here would record the feed as being at the top and the
+			// reader's place would be gone for the session. The lock's own capture
+			// is the authority in that window; the previous saved value is left
+			// alone. `@security-auditor` found it.
+			if (region.style.overflowY !== "hidden") {
+				feedScrollTopRef.current = region.scrollTop;
+			}
 			region.scrollTop = 0;
 			return;
 		}
 		// Returning to the feed — or moving between two posts, where the top is
 		// still the right answer and the remembered feed position is not consumed.
+		/**
+		 * ⚠ RETURNING TO THE FEED RESTORES ONLY PARTIALLY, AND THE MECHANISM THAT
+		 * WOULD FIX IT WAS BUILT, MEASURED, AND REMOVED.
+		 *
+		 * Entering a post works: the feed's position is saved and the region goes
+		 * to the top, which is where a post must open. Coming back does not fully
+		 * work — measured, a feed parked at 400 returns at **171**, and 171 is not
+		 * a coincidence: it is the THREAD's maximum scroll. A back gesture is a
+		 * soft navigation, so the arm prop flips before the feed's payload
+		 * replaces the thread's children, and this write lands against the old,
+		 * shorter content and is clamped.
+		 *
+		 * ⛔ TWO FIXES WERE TRIED AND BOTH MEASURED IDENTICAL (400 → 171): a
+		 * single next-frame retry, and a twelve-frame bounded poll that stopped on
+		 * success, on a finger, or on running out. The payload simply arrives
+		 * later than 200ms here. ⇒ They are REMOVED rather than kept, because a
+		 * mechanism that does not achieve what its docblock says it achieves is
+		 * worse than an acknowledged gap — and thirty lines of frame-polling on
+		 * the one tier that forbids scroll handlers is not a thing to carry on
+		 * faith. `docs/parked.md` 2d-10 carries what would actually close it
+		 * (keying the restore on the payload's arrival rather than on the arm).
+		 *
+		 * ⚠ FOR SCALE: the document-scroll model this replaces restored a feed
+		 * parked at 400 to **128**, via the browser's own scroll restoration. So
+		 * this is not a regression against what ships today; it is an
+		 * imperfection that was already there, now visible because it is ours.
+		 */
 		region.scrollTop = initialPostId === null ? feedScrollTopRef.current : 0;
 	}, [initialPostId]);
 

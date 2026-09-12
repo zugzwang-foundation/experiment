@@ -523,6 +523,47 @@ describe("phone scroll model — what actually holds the feed still behind a she
 	 * nothing, in a file where it looks like it does something, and no test
 	 * anywhere else would notice.
 	 */
+	/**
+	 * ⛔⛔ THE ARM-CHANGE SAVE MUST NOT READ A POSITION THROUGH A LOCK.
+	 *
+	 * `PhoneDebateView` saves the feed's `scrollTop` when the reader enters a
+	 * post. While a sheet is open, `scroll-lock.ts` holds that same element at
+	 * `overflow: hidden` — and an engine that clamps `scrollTop` on that
+	 * transition answers 0. A save taken in that window records the feed as being
+	 * at the top, and the reader's place is gone for the session with nothing
+	 * logged. `@security-auditor` found it; the reachable sequence is: feed → post
+	 * → Back → open the details sheet → browser Forward.
+	 *
+	 * ⚠ A SOURCE SCAN BECAUSE jsdom PERFORMS NO LAYOUT and the clamp is an engine
+	 * behaviour it does not model. What is holdable in the repository is the
+	 * relationship: the read is guarded by the lock's own marker.
+	 */
+	it("phone-scroll::the-arm-change-save-is-guarded-against-a-held-lock", () => {
+		const src = code(read(VIEW));
+		const at = src.indexOf("feedScrollTopRef.current = ");
+		expect(at, "the arm-change save exists").toBeGreaterThan(-1);
+		// the guard must be the statement immediately enclosing the save
+		const before = src.slice(Math.max(0, at - 400), at);
+		expect(
+			/if\s*\(\s*region\.style\.overflowY\s*!==\s*"hidden"\s*\)\s*\{\s*$/.test(
+				before,
+			),
+			'the save must be inside `if (region.style.overflowY !== "hidden")` — ' +
+				"reading through a lock records the feed as being at the top",
+		).toBe(true);
+		// POSITIVE CONTROL — the recogniser fires on both polarities.
+		expect(
+			/if\s*\(\s*region\.style\.overflowY\s*!==\s*"hidden"\s*\)\s*\{\s*$/.test(
+				'\t\tif (region.style.overflowY !== "hidden") {\n\t\t\t',
+			),
+		).toBe(true);
+		expect(
+			/if\s*\(\s*region\.style\.overflowY\s*!==\s*"hidden"\s*\)\s*\{\s*$/.test(
+				"\t\tconst region = scrollRegionRef.current;\n\t\t",
+			),
+		).toBe(false);
+	});
+
 	it("phone-scroll::no-window-scrollTo-or-scrollIntoView-in-the-phone-tree", () => {
 		const offenders: string[] = [];
 		for (const file of readdirSync(join(ROOT, PHONE_DIR)).filter(

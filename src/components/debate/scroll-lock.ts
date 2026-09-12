@@ -43,6 +43,14 @@
  *     the phone tier is `display: none`, so scoping the walk to it makes the
  *     desktop path reduce to exactly the body lock it always was.
  *
+ * ⚠ THE TIER IS FOUND BY `data-testid`, WHICH MAKES IT A RUNTIME SELECTOR IN
+ * PRODUCTION. ⛔ `next.config.ts` must not gain `compiler.reactRemoveProperties`
+ * without giving this module another way to find the tier: stripping the
+ * attribute reduces the lock to a body-only lock on the one tier whose body does
+ * not scroll, **with every test still green**, because the unit tests build
+ * their own node and the source guards only grep strings. Named by
+ * `@security-auditor`.
+ *
  * ⚠ `document.body` IS STILL LOCKED, UNSCOPED AND FIRST. Above 640px that is
  * the whole of what this does, and it is unchanged from what it replaced.
  *
@@ -91,7 +99,12 @@
 let depth = 0;
 let held: {
 	bodyOverflow: string;
-	containers: { el: HTMLElement; overflow: string; top: number }[];
+	containers: {
+		el: HTMLElement;
+		overflow: string;
+		top: number;
+		leftAt: number;
+	}[];
 } | null = null;
 
 /** Vertical scroll containers inside `root`, excluding anything in `except`. */
@@ -147,11 +160,18 @@ export function lockPageScroll(except: Element | null = null): () => void {
 							// clamped it to, and the restore then puts the reader
 							// somewhere they never were.
 							top: el.scrollTop,
+							// ⛔ WHAT THIS LOCK LEAVES BEHIND, read AFTER the hide — see the
+							// restore for why a second writer makes this necessary.
+							leftAt: 0,
 						})),
 		};
 		document.body.style.overflow = "hidden";
 		for (const c of held.containers) {
 			c.el.style.overflowY = "hidden";
+			// ⚠ READ BACK, NOT ASSUMED. An engine that clamps `scrollTop` when the
+			// overflow goes hidden leaves a different number than one that does
+			// not, and the restore below compares against whichever it actually is.
+			c.leftAt = c.el.scrollTop;
 		}
 	}
 	depth += 1;
@@ -171,10 +191,27 @@ export function lockPageScroll(except: Element | null = null): () => void {
 		document.body.style.overflow = held.bodyOverflow;
 		for (const c of held.containers) {
 			c.el.style.overflowY = c.overflow;
-			// ⚠ ASSIGNED BACK UNCONDITIONALLY, not only when it differs. Reading
-			// `scrollTop` to decide whether to write it is a read of the value the
-			// write exists to guarantee.
-			c.el.scrollTop = c.top;
+			/**
+			 * ⛔⛔ ONLY IF NOBODY ELSE HAS MOVED IT SINCE, AND THAT QUALIFIER IS A
+			 * DEFECT `@security-auditor` FOUND IN THIS MODULE'S FIRST VERSION.
+			 *
+			 * `PhoneDebateView` also owns this element's position: on an arm change
+			 * it saves the feed's place, puts the region at the top of a post, and
+			 * restores the feed on the way back. That runs in a LAYOUT effect and
+			 * this runs in a PASSIVE destroy, so this always runs second and an
+			 * unconditional write always wins — which silently undid the whole
+			 * feature. The scenario is one gesture long: read a post, open a reply
+			 * sheet, use the back gesture, and land at the top of the feed with
+			 * your place lost, from the very code written to keep it.
+			 *
+			 * ⇒ The lock restores only what it is still holding. If the value is
+			 * what this lock left, nothing else has touched it and the captured
+			 * position is the right answer; if it has changed, someone else meant
+			 * it to and this module has no business overruling them.
+			 */
+			if (c.el.scrollTop === c.leftAt) {
+				c.el.scrollTop = c.top;
+			}
 		}
 		held = null;
 	};
