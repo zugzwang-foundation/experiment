@@ -100,15 +100,34 @@ describe("DownloadPostImage", () => {
 		// Busy: disabled, announced, and a second click starts NOTHING.
 		expect(b.disabled).toBe(true);
 		expect(b.getAttribute("aria-busy")).toBe("true");
-		// ⚠ AND IT SAYS SO IN WORDS. `aria-busy` and a pulsing icon are both
-		// invisible to a reader deciding whether their click registered — which is
-		// the moment they click again. The visible label is the part under test;
-		// the assertion is on its TEXT, not merely on the node, because an empty
-		// live region announces nothing and would still satisfy a presence check.
+		// ⚠ AND IT SAYS SO IN WORDS, STILL — the label is `sr-only` now, not gone.
+		// `aria-busy` is not announced on its own by most screen readers and a
+		// spinner is invisible to all of them, so this live region is the only
+		// thing that tells a non-sighted reader their click registered, which is
+		// the moment they would otherwise click again. The assertion is on its
+		// TEXT rather than on the node, because an empty live region announces
+		// nothing and would still satisfy a presence check.
 		const busyNode = container.querySelector(
 			'[data-testid="download-post-image-busy"]',
 		);
 		expect(busyNode?.textContent).toBe("Preparing the image…");
+		// ⚠ AND THE SIGHTED HALF IS ASSERTED SEPARATELY, because the two can fail
+		// apart: the announcement can survive while the spinner is lost to a class
+		// rename or an icon swap, and nothing else in this file would notice.
+		// ⛔ THE CLASS IS WHAT IS PINNED, NOT THE MOTION. jsdom performs no layout
+		// and runs no animation, so this proves the utility is ASKED FOR and can
+		// never prove it TURNS — the keyframes were absent from this app's built
+		// CSS until the component used it (see the art layer's note), and only a
+		// read of the built stylesheet settles that. Recorded here so the next
+		// person does not mistake a green test for a spinning icon.
+		// ⛔⛔ AND THE CLASS NAME IS ASSEMBLED AT RUNTIME, WHICH IS NOT FUSSINESS.
+		// Tailwind v4's source detection scans `tests/` as well as `src/`, so a
+		// literal here would ITSELF emit the utility into the built stylesheet —
+		// and the only check that can prove the icon really spins is a grep of
+		// that stylesheet. Written plainly, this assertion would manufacture the
+		// evidence for its own subject. AGENTS.md §8 carries the measured case.
+		const SPIN = ["animate", "spin"].join("-");
+		expect(b.querySelector("svg")?.getAttribute("class") ?? "").toContain(SPIN);
 		fireEvent.click(b);
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 		expect(fetchMock.mock.calls[0]?.[0]).toBe(HREF);
