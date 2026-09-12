@@ -9,7 +9,7 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { lockPhoneScroll } from "./scroll-lock";
+import { lockPageScroll } from "../scroll-lock";
 
 /**
  * The phone's one overlay primitive — the bottom sheet that stands in for the
@@ -167,6 +167,15 @@ export function PhoneSheet({
 	const busyRef = useRef(busy);
 	busyRef.current = busy;
 
+	/**
+	 * ⛔ THE SHEET'S OWN LAYER, HANDED TO THE SCROLL LOCK SO IT IS LEFT ALONE.
+	 * Without it the lock's walk reaches this sheet's own body — which is
+	 * `overflow-y-auto` and overflows exactly when the reader needs it — and hides
+	 * the price chart below the fold on the details sheet and `PLACE Đ BET` below
+	 * the keyboard on the composer. `@code-reviewer` found it; `scroll-lock.ts`
+	 * carries why the measurement that should have caught it could not.
+	 */
+	const rootRef = useRef<HTMLDivElement>(null);
 	const panelRef = useRef<HTMLDivElement>(null);
 
 	/**
@@ -465,15 +474,19 @@ export function PhoneSheet({
 		};
 
 		document.addEventListener("keydown", onKey);
-		// ⛔ MOBILE-2d — THE LOCK TARGETS THE SCROLL CONTAINER, NOT ONLY THE BODY.
+		// ⛔ MOBILE-2d — THE LOCK TARGETS THE TIER'S SCROLL CONTAINERS, NOT ONLY
+		// THE BODY, AND IT IS PASSED THIS SHEET'S OWN ROOT TO LEAVE ALONE.
 		// Below 640px the tier is a bounded shell and `document.body` no longer
 		// scrolls, so a body-level lock is inert there. What holds the feed still
-		// today is this sheet's own `fixed inset-0` layer — measured, both arms,
-		// with the body lock removed live — and `scroll-lock.ts` says why that
-		// makes this a belt rather than the mechanism. It also restores each
-		// container's `scrollTop` exactly, so a reader keeps their place in the
-		// feed across an open and close.
-		const unlockScroll = lockPhoneScroll();
+		// is this sheet's own `fixed inset-0` layer — measured, both arms, with
+		// the body lock cleared live — and `scroll-lock.ts` says why that makes
+		// this a belt rather than the mechanism.
+		// ⛔⛔ `rootRef.current` IS THE ARGUMENT AND IT IS NOT OPTIONAL. Without
+		// it the walk reaches THIS SHEET'S OWN BODY, which is `overflow-y-auto`
+		// and which overflows exactly when the reader needs it — locking the
+		// price chart below the fold on the details sheet, and `PLACE Đ BET`
+		// below the keyboard on the composer. Found by `@code-reviewer`.
+		const unlockScroll = lockPageScroll(rootRef.current);
 		return () => {
 			document.removeEventListener("keydown", onKey);
 			unlockScroll();
@@ -504,6 +517,7 @@ export function PhoneSheet({
 
 	return (
 		<div
+			ref={rootRef}
 			data-testid="phone-sheet"
 			data-phase={leaving ? "leaving" : "open"}
 			role="dialog"

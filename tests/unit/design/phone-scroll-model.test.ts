@@ -44,7 +44,7 @@ const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 
 const TRACK = "src/components/debate/phone/PhoneFeedTrack.tsx";
 const SHEET = "src/components/debate/phone/PhoneSheet.tsx";
-const LOCK = "src/components/debate/phone/scroll-lock.ts";
+const LOCK = "src/components/debate/scroll-lock.ts";
 const OVERLAY = "src/components/debate/chart/MarketPriceChartOverlay.tsx";
 const VIEW_SRC = () => code(read(VIEW));
 const VIEW = "src/components/debate/phone/PhoneDebateView.tsx";
@@ -457,8 +457,24 @@ describe("phone scroll model — what actually holds the feed still behind a she
 		for (const site of [SHEET, OVERLAY]) {
 			const src = code(read(site));
 			expect(src, `${site} must use the shared lock`).toContain(
-				"lockPhoneScroll()",
+				"lockPageScroll(",
 			);
+			/**
+			 * ⛔⛔ AND IT MUST BE PASSED THE CALLER'S OWN LAYER. A bare
+			 * `lockPageScroll()` is the CRITICAL `@code-reviewer` found: the walk
+			 * reaches the modal's OWN body, which is `overflow-y-auto` and
+			 * overflows exactly when the reader needs it, and hides the price chart
+			 * below the fold on the details sheet and `PLACE Đ BET` below the
+			 * keyboard on the composer. The argument is the fix, so the argument is
+			 * what is pinned — dropping it reds here and nowhere else, which is
+			 * measured: the mutation passed every other row in this directory.
+			 */
+			expect(
+				/lockPageScroll\(\s*\w+Ref\.current\s*\)/.test(src),
+				`${site} must pass its own root to the lock — a bare call locks the ` +
+					"modal's own scrolling body, which is the money-path reachability " +
+					"defect this argument exists to prevent",
+			).toBe(true);
 			expect(
 				src.includes('document.body.style.overflow = "hidden"'),
 				`${site} must not lock the body by hand — below 640px that is inert`,
@@ -476,8 +492,19 @@ describe("phone scroll model — what actually holds the feed still behind a she
 			"the body is still locked too — the desktop tier's rules are not this " +
 				"module's to change",
 		).toContain('body.style.overflow = "hidden"');
-		// POSITIVE CONTROL — the comment stripper left real code behind.
-		expect(lock).toContain("export function lockPhoneScroll");
+		// POSITIVE CONTROL — the comment stripper left real code behind, and the
+		// argument recogniser fires on both polarities rather than on neither.
+		expect(lock).toContain("export function lockPageScroll");
+		expect(
+			/lockPageScroll\(\s*\w+Ref\.current\s*\)/.test(
+				"const u = lockPageScroll(rootRef.current);",
+			),
+		).toBe(true);
+		expect(
+			/lockPageScroll\(\s*\w+Ref\.current\s*\)/.test(
+				"const u = lockPageScroll();",
+			),
+		).toBe(false);
 	});
 
 	/**

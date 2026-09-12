@@ -5,6 +5,7 @@ import {
 	type ReactNode,
 	useCallback,
 	useEffect,
+	useLayoutEffect,
 	useRef,
 	useState,
 } from "react";
@@ -231,6 +232,52 @@ export function PhoneDebateView({
 		armWhenSheetLastReset.current = initialPostId;
 		setSheet(null);
 	}, [initialPostId, composerBusy]);
+	/**
+	 * ⛔⛔ THE FEED'S PLACE, ACROSS AN ARM CHANGE — BOTH HALVES, AND THEY PULL IN
+	 * OPPOSITE DIRECTIONS.
+	 *
+	 * The bounded shell has ONE vertical scroller and it does not remount when
+	 * the arm changes, which is what makes the reader's position survive at all —
+	 * the pane-per-side model rebuilt its scroller on every arm change and lost
+	 * it. But the same persistence is wrong in the other direction: a reader
+	 * scrolled 1 200px down the feed who taps a post must land at the TOP of that
+	 * post, not 1 200px into a thread they have never seen. Under the
+	 * document-scroll model the browser did this; `DebateView`'s `resetPageScroll`
+	 * is the desktop half and is unreachable here (its tree is
+	 * `max-mobile:hidden`), and `window.scrollTo` is a no-op on a page that does
+	 * not scroll. Found by `@code-reviewer`; the round-trip half was measured
+	 * (feed 400 → back 400) and the entry half was not.
+	 *
+	 * ⇒ On an arm change: remember where the FEED was, put the region at the top,
+	 * and on the way back put the feed where it was. Keyed on the arm's own
+	 * identity, exactly as the sheet reset above is, so Back, Forward and a deep
+	 * link are all covered without a `popstate` listener.
+	 * ⚠ A LAYOUT EFFECT, so the write lands before the browser paints — in a
+	 * passive effect the reader sees one frame of the old position in the new arm.
+	 */
+	const scrollRegionRef = useRef<HTMLDivElement>(null);
+	const feedScrollTopRef = useRef(0);
+	const armWhenScrollLastMoved = useRef(initialPostId);
+	useLayoutEffect(() => {
+		if (armWhenScrollLastMoved.current === initialPostId) {
+			return;
+		}
+		const leavingFeed = armWhenScrollLastMoved.current === null;
+		const region = scrollRegionRef.current;
+		armWhenScrollLastMoved.current = initialPostId;
+		if (region === null) {
+			return;
+		}
+		if (leavingFeed) {
+			feedScrollTopRef.current = region.scrollTop;
+			region.scrollTop = 0;
+			return;
+		}
+		// Returning to the feed — or moving between two posts, where the top is
+		// still the right answer and the remembered feed position is not consumed.
+		region.scrollTop = initialPostId === null ? feedScrollTopRef.current : 0;
+	}, [initialPostId]);
+
 	const [popupPost, setPopupPost] = useState<PresentPost | null>(null);
 	const [popupReply, setPopupReply] = useState<PresentReply | null>(null);
 	const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
@@ -621,6 +668,7 @@ export function PhoneDebateView({
 			    regression — but it is the thing to revisit if per-side scrolling is
 			    ever wanted, and it cannot be got by nesting. */}
 			<div
+				ref={scrollRegionRef}
 				data-testid="phone-scroll-region"
 				className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
 			>

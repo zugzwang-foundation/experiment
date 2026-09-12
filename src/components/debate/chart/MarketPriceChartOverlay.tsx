@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import type { PricePoint } from "@/server/discovery/price-series";
-import { lockPhoneScroll } from "../phone/scroll-lock";
+import { lockPageScroll } from "../scroll-lock";
 import { ChartSummary } from "./ChartSummary";
 import { MarketPriceChart } from "./MarketPriceChart";
 
@@ -24,6 +24,8 @@ export function MarketPriceChartOverlay({
 	isOpen: boolean;
 	onClose: () => void;
 }): React.JSX.Element {
+	const rootRef = useRef<HTMLDivElement>(null);
+
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key === "Escape") {
@@ -31,24 +33,39 @@ export function MarketPriceChartOverlay({
 			}
 		};
 		document.addEventListener("keydown", onKey);
-		// ⛔ MOBILE-2d — THE SAME RETARGET AS `PhoneSheet`, AND THIS SITE NEEDS IT
-		// FOR A REASON THAT SITE DOES NOT: this overlay opens from INSIDE the phone
-		// details sheet, so on a phone it is a second modal over a tier whose
-		// `document.body` does not scroll at all. A body-level lock there locks
-		// nothing. `scroll-lock.ts` captures and restores each live container's
-		// `scrollTop`, and nests correctly — the sheet's lock is already in place
-		// when this one is taken, and each unwinds to what it found.
-		// ⚠ The desktop path is unchanged in effect: at >=640px `document.body` IS
-		// the scroller, and it is still locked first.
-		const unlockScroll = lockPhoneScroll();
 		return () => {
 			document.removeEventListener("keydown", onKey);
-			unlockScroll();
 		};
 	}, [onClose]);
 
+	/**
+	 * ⛔⛔ THE LOCK IS ITS OWN EFFECT WITH EMPTY DEPS, AND THAT IS NOT TIDINESS.
+	 * The keydown effect above depends on `onClose`, which `MarketPriceChartHost`
+	 * passes as a fresh arrow on every render — and this component re-renders on
+	 * every `DebatePoll` tick, every 15 s, because the poll is deliberately NOT
+	 * suspended for a read-only sheet. Sharing one effect meant taking and
+	 * releasing the lock, with a DOM walk and a forced `scrollTop` write each
+	 * time, on a timer. `@code-reviewer` found it. Empty deps tie the lock to the
+	 * overlay's mount, which is what "while the overlay is open" means.
+	 *
+	 * ⚠ THIS SITE NEEDS A LOCK FOR A REASON `PhoneSheet` DOES NOT: the overlay
+	 * opens from INSIDE the phone details sheet, so on a phone it is a second
+	 * modal over a tier whose `document.body` does not scroll at all, and a
+	 * body-level lock there locks nothing. The module refcounts, so this lock and
+	 * the sheet's cannot leave the page stuck in whichever order they release.
+	 * ⚠ `rootRef` is passed for the same reason `PhoneSheet` passes its own: this
+	 * panel's own content is the thing that must keep scrolling.
+	 * ⚠ THE DESKTOP PATH IS UNCHANGED IN EFFECT, and now structurally so: the
+	 * module scopes its walk to the phone tier, which is `display: none` at
+	 * >= 640px, so above the breakpoint this reduces to exactly the
+	 * `document.body` lock it replaced — no desktop container is captured and no
+	 * desktop `scrollTop` is written.
+	 */
+	useEffect(() => lockPageScroll(rootRef.current), []);
+
 	return (
 		<div
+			ref={rootRef}
 			data-testid="market-price-chart-overlay"
 			role="dialog"
 			aria-modal="true"
