@@ -218,3 +218,119 @@ Every guard reversal-verified (OVN-V2). Every negative assertion carries a posit
 | A-4 | `scrollend` vs the shipped IntersectionObserver | measure G7 first | rewrite now | `OVN-O4` — the ruled outcome already holds and the mechanism beside it was a suggestion |
 | A-5 | the viewport unit | `dvh` | `svh`, `vh`, `lvh` | §4; `vh`/`lvh` put the bar under the toolbar, `svh` and `dvh` are identical in a shell that never scrolls the document, and `dvh` is what the rest of the chain already declares |
 | A-6 | `-webkit-overflow-scrolling: touch` | omit | add it as the brief lists | removed from WebKit in iOS 13; a dead vendor property that looks like a mechanism |
+
+---
+
+## 8 · ⛔⛔ THE FINDING — THE VERTICAL SCROLLER MUST BE AN **ANCESTOR** OF THE SNAP TRACK
+
+*Written during the run, immediately after it was measured, because it is the thing the night was
+actually for and it existed nowhere but a terminal buffer.*
+
+### The shape of it
+
+A bounded phone shell can put its vertical scroller in two places, and both look correct:
+
+- **INSIDE the horizontal snap track** — one `overflow-y: auto` per pane, so each side of the debate
+  keeps its own reading position. This is the obvious design, it is what `PhoneFeedTrack` was
+  already written as if it had, and it is what the brief's register describes.
+- **ABOVE the track** — one scroll region wrapping the whole track, the way the *document* was the
+  scroller before any of this.
+
+**The first one breaks the sideways swipe, and nothing about the layout shows it.** With a vertical
+scroller nested inside the snap track, a horizontal swipe that follows a vertical scroll **moves
+nothing at all** in roughly a third of attempts. Sampled every frame across the whole gesture, the
+track's `scrollLeft` and the pane's `scrollTop` are both zero for every frame — so it is not a snap
+that travelled and came back, it is a gesture routed to a scroller that cannot take it.
+
+### The numbers
+
+| arm | scroll, then swipe sideways |
+|---|---|
+| **unbounded (the S-1 floor, document scrolls)** | **40 / 40** — 10/10 on each of four input paths |
+| bounded, scroller **inside** the track (per-pane) | **25 / 40** — 6/10, 7/10, 6/10, 6/10 |
+| bounded, scroller **inside the pane** (one level deeper) | 1–5 of 6 per slope; no better |
+| **bounded, scroller ABOVE the track** | **50 / 50** — 10/10 on each of four input paths, plus the control |
+| any arm, with **no** prior scroll | 10 / 10 |
+
+The four input paths are 10, 24 and 36 hand-dispatched `Input.dispatchTouchEvent` moves and Chrome's
+own `Input.synthesizeScrollGesture`. **All four agree**, which is what rules out "my synthetic finger
+is too coarse" as the explanation: a real gesture pipeline fails at the same rate as a hand-built one.
+
+Across slopes, prior-scroll-then-swipe, bounded-nested vs bounded-ancestor:
+
+| slope | nested | ancestor |
+|--:|--:|--:|
+| 60° | 3/6 | **6/6** |
+| 70° | 3/6 | **6/6** |
+| 75° | 3/6 | **6/6** |
+| 80° | 3/6 | **6/6** |
+| 90° | 2/6 | **6/6** |
+
+### What else it decided, which nothing else did
+
+**Your place in the feed survives opening a post and coming back.** The panes are keyed by side
+(`YES`/`NO` ⇄ `support`/`counter`), so React replaces them whenever the arm changes — a scroller
+living on a pane is rebuilt, at zero, every time. A scroll region above the track is one stable
+element and is not.
+
+| model | park the feed at 400, open a post, come back |
+|---|---|
+| unbounded (S-1 floor) | document **400 → 128** — the browser's own scroll restoration, and it is approximate |
+| bounded, scroller on the pane | **400 → 0** — lost |
+| **bounded, scroller above the track** | **400 → 400** — exact |
+
+### The price, stated
+
+**Both sides share one vertical position, and the shorter side is padded out to the taller one's
+height.** That is precisely what the document-scroll model does today, so it is the status quo
+rather than a regression — but it is real, it is the reason the nested design is attractive, and it
+cannot be recovered by nesting. Per-side scroll positions need a different mechanism entirely and
+are not in this task.
+
+### Two declarations that are reliably FATAL on the snap item
+
+Measured 0 of 8, both sweeps, and recorded so nobody adds them back:
+
+- `overscroll-behavior-x` anything other than `auto` on the pane;
+- `touch-action: pan-y` on the pane.
+
+Both stop a horizontal gesture that begins on a card from ever reaching the track — `touch-action`
+is intersected down the ancestor chain, and inline-axis containment forbids the chain. The brief's
+register lists `touch-action: pan-y` on the panes; **it is not applied, and this is why.**
+
+---
+
+## 9 · TWO BUGS IN MY OWN HARNESS, AND WHAT THEY BECAME
+
+Both produced a *plausible wrong number* rather than an error, which is the only kind worth writing
+down.
+
+**9.1 · The precondition check was pane-only, so it discarded an entire arm as unmeasurable.**
+The scroll-then-swipe probe asserts that the *prior* vertical scroll actually happened before it
+counts the swipe. It read `[data-pane], [data-pane-scroll]` scrollTops. On the **unbounded** build
+the reader's vertical position lives in the **document**, so every one of ten trials was discarded
+with "no prior scroll" — on a build where the scroll had worked perfectly. The output was ten
+discards and an empty result set, which reads as *"this arm cannot be measured"* rather than as
+*"my check is looking in the wrong object"*.
+⇒ It now reads `max(window.scrollY, every element's scrollTop)`. The two models keep the reader's
+position in different objects and a third variant kept it in a third; naming them one at a time is
+how a precondition silently deletes an arm.
+
+**9.2 · The box census keyed duplicate `data-testid`s by a GLOBAL index, so inserting one element
+renumbered everything after it.** The desktop non-regression diff for a change that adds exactly one
+node reported **~140 boxes added and ~140 removed**. A diff key has to be stable under insertion or
+the diff is measuring the keying.
+⇒ Keys are now `testid` plus that testid's own ordinal. Re-measured, the honest answer is: **at 1440
+and at 640, zero boxes moved, zero removed, one added** (`phone-scroll-region`, which measures
+`0×0` at both widths because the phone root is `display: none` there).
+
+**And three more of the same family, found the same way and fixed at the source.** Every sampler in
+the harness that NAMED the vertical scroller went silently to zero each time the scroller moved
+element — and zero, on this instrument, is the word for the defect under investigation. Momentum
+reported `NONE`; the tab-agreement cell reported three disagreements on a surface that agreed
+perfectly; the rubber-band cell parked nothing and measured an ordinary scroll. None was a product
+change. ⇒ There is now **one** definition, used by every sampler: *the element that actually
+overflows and actually clips*. The self-test's broken control is computed the same way, for the same
+reason — it used to list selectors, the list went stale when the scroller moved, the "broken" page
+kept scrolling, and the run **refused to report**, which is the only reason that one is a footnote
+instead of a table of numbers taken against a control that controlled nothing.
