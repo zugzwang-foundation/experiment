@@ -115,26 +115,6 @@ import { ACCENT, PALETTE } from "./palette";
  * `post.support.side` / `post.counter.side` therefore stay in the props and
  * stay tested; they are simply no longer consumed here.
  */
-/**
- * The advance of Geist Bold's SPACE glyph, as a fraction of the font size —
- * the inter-word gap for the word-per-item title row below.
- *
- * ⚠ MEASURED, NOT CHOSEN, and the distinction is the whole reason this is a
- * named constant. Splitting the title into one flex item per word throws away
- * the spaces the font would have drawn, so the gap has to put them back at the
- * width the font would have used — and any nearby round number is visibly
- * wrong at 21px. Read off a four-point render sweep against the pre-split
- * render as the control: the line `Math · Will 3 Erdős problems be solved by`
- * ends at x=2283 in the 2400px frame, and gaps of 3/4/5/6 base units end it at
- * 2254/2270/2286/2302 — 16px per unit across its eight spaces, so 4.81 lands
- * on the control and 0.229em is that over a 21px size.
- * ⚠ IT IS AN EM RATHER THAN A PX SO IT SURVIVES A TYPE-SIZE CHANGE. The title
- * has been retuned twice already; a literal here would go silently wrong the
- * third time, and "silently" is the operative word — a too-wide word gap reads
- * as bad typography, never as a bug.
- */
-const GEIST_BOLD_SPACE_EM = 0.229;
-
 export function MarketPostExport(props: PostExportProps) {
 	const s = props.width / 1200;
 	const u = (n: number) => n * s;
@@ -525,7 +505,9 @@ export function MarketPostExport(props: PostExportProps) {
 								border: hairline,
 								backgroundColor: PALETTE.n1,
 								color: PALETTE.n6,
-								fontSize: u(20),
+								// Sized off the circle rather than stated, so the initials keep
+								// their proportion the next time the avatar moves.
+								fontSize: u(AVATAR * 0.31),
 								fontWeight: 700,
 							}}
 						>
@@ -543,43 +525,40 @@ export function MarketPostExport(props: PostExportProps) {
 						<span style={{ fontSize: u(22), fontWeight: 500, lineHeight: 1 }}>
 							{post.pseudonym}
 						</span>
-						{/* ⚠ NO `|` SEPARATORS — operator ruling. The pipes were doing the
-				    work that spacing does here, and at export size they read as a
-				    sixth kind of mark in a row that already carries five. */}
-						<div
-							style={{
-								display: "flex",
-								alignItems: "center",
-								flexWrap: "wrap",
-								gap: u(9),
-								minWidth: 0,
-							}}
-						>
-							{/* ⚠ NO AVATAR AND NO PSEUDONYM HERE — they are in the band
-					    (above). This row is now the POSITION alone: which side, at
-					    what price, for how much, answered how often, how long ago.
-					    That is a cleaner division than the one it replaces, where
-					    the author appeared once in each half of the image. */}
+						{/* ⛔⛔ TWO ROWS, AND THE FIRST ONE NEVER MOVES — operator ruling,
+						    revision 9. These chips were one `flexWrap` row, and wrapping is
+						    what made the author's own facts wander: the optional chips sit
+						    BETWEEN the fixed ones in reading order, so a post carrying a
+						    badge pushed `2d ago` onto a second line while a post without one
+						    kept all three together. Same post, same facts, different picture
+						    — and the reader comparing two exports has no way to know the
+						    difference is a badge rather than something about the position.
+
+						    ⇒ The three chips EVERY post carries — side at entry price, stake,
+						    age — are their own row, in a fixed order, and nothing optional is
+						    allowed into it. Whatever else a post wears goes underneath. A
+						    fourth kind of chip added later lands on the second row too, and
+						    the first row still does not move; that is the property being
+						    bought, and it is worth more than the tighter packing wrapping
+						    gave.
+
+						    ⚠ THE SECOND ROW STILL WRAPS WITHIN ITSELF. It can hold marker,
+						    badge, a struck-through original stake and SOLD at once, which is
+						    past this slot's width — so it wraps rather than overflowing the
+						    band. It is the FIRST row that is pinned, not the block.
+
+						    ⚠ NO AVATAR AND NO PSEUDONYM HERE — they are in the band above.
+						    These rows are the POSITION alone: which side, at what price, for
+						    how much, how long ago. That is a cleaner division than the one it
+						    replaces, where the author appeared once in each half of the
+						    image.
+
+						    ⚠ NO `|` SEPARATORS — operator ruling. The pipes were doing the
+						    work that spacing does here, and at export size they read as a
+						    sixth kind of mark in a row that already carries five. */}
+						<div style={{ display: "flex", alignItems: "center", gap: u(9) }}>
 							<div style={chipSide}>{`${post.side} @ ${post.entryPct}`}</div>
-							{post.marker !== "none" && <div style={tag}>{post.marker}</div>}
-							{post.badge !== null && <div style={outline}>{post.badge}</div>}
 							<div style={chipStake}>{`Đ ${post.stake}`}</div>
-							{post.stakeOriginal !== null && (
-								<span
-									style={{
-										...mono,
-										color: PALETTE.n4,
-										textDecoration: "line-through",
-									}}
-								>
-									{`Đ ${post.stakeOriginal}`}
-								</span>
-							)}
-							{post.sold && (
-								<div style={{ ...tag, fontWeight: 700, letterSpacing: u(1) }}>
-									SOLD
-								</div>
-							)}
 							{/* ⛔ THE REPLY COUNT STOOD HERE AND IS GONE — operator ruling,
 							    revision 7. It was the loudest thing in this row: ink-white
 							    and bold where its neighbours are chips and grey, so a
@@ -595,6 +574,39 @@ export function MarketPostExport(props: PostExportProps) {
 							    should not have to re-derive it from the aggregate. */}
 							<div style={chipAge}>{post.age}</div>
 						</div>
+						{(post.marker !== "none" ||
+							post.badge !== null ||
+							post.stakeOriginal !== null ||
+							post.sold) && (
+							<div
+								style={{
+									display: "flex",
+									alignItems: "center",
+									flexWrap: "wrap",
+									gap: u(9),
+									minWidth: 0,
+								}}
+							>
+								{post.marker !== "none" && <div style={tag}>{post.marker}</div>}
+								{post.badge !== null && <div style={outline}>{post.badge}</div>}
+								{post.stakeOriginal !== null && (
+									<span
+										style={{
+											...mono,
+											color: PALETTE.n4,
+											textDecoration: "line-through",
+										}}
+									>
+										{`Đ ${post.stakeOriginal}`}
+									</span>
+								)}
+								{post.sold && (
+									<div style={{ ...tag, fontWeight: 700, letterSpacing: u(1) }}>
+										SOLD
+									</div>
+								)}
+							</div>
+						)}
 						{/* ⛔ THE GENERATION TIMESTAMP STOOD HERE AND IS GONE — operator
 						    ruling, revision 6. It was provenance, and provenance was
 						    losing an argument it should not have been in: it sat under
@@ -864,12 +876,29 @@ export function MarketPostExport(props: PostExportProps) {
 								IMG
 							</div>
 						)}
-						{/* ⛔ THE CHIPS RUN ON FROM THE QUESTION MARK — operator ruling,
-						    revision 5. The flavour used to sit on its own line under the
-						    title, where it read as a second, lesser heading; the question
-						    and its labels are one thing being said, so
-						    `Will 3 Erdős problems be solved by 5th November? MATH
-						    INNOVATION` is the line.
+						{/* ⛔⛔ THE CHIPS SIT ON THEIR OWN LINE UNDER THE QUESTION — operator
+						    ruling, revision 9, which REVERSES revision 5. They ran on from the
+						    question mark; they now stand below it.
+
+						    ⚠ AND REVISION 5's REASONING IS LEFT STANDING HERE ON PURPOSE,
+						    because it was not wrong — it is outranked. It held that the
+						    question and its labels are one thing being said, and that a
+						    chip on its own line reads as a second, lesser heading. What
+						    changed is the judgement of which cost is worth paying, and that
+						    is the founder's call to make twice if he wants to.
+
+						    ⚠⚠ THIS IS WHAT RETIRES THE WORD-BY-WORD TITLE, and the two are
+						    one decision rather than a tidy-up riding along. Satori has no
+						    inline formatting context: a text node claims the full container
+						    width the moment it needs a second line, so a chip after it fell
+						    to the next flex line. Splitting the title into one item per word
+						    was the only way to keep a chip in the same wrapping flow as the
+						    final `?` — it bought the inline arrangement and nothing else. The
+						    moment the chips are meant to be on their own line, the title can
+						    be a text node again, which is also why `GEIST_BOLD_SPACE_EM` is
+						    gone: it existed to reproduce, by hand, the word gap the renderer
+						    now supplies itself. A measured constant that no longer measures
+						    anything is worse than no constant.
 
 						    ⛔ AND THE TOPIC IS A CHIP NOW, NOT THE TITLE'S FIRST WORD.
 						    Every live title is written `Math · <question>`, so the
@@ -889,78 +918,62 @@ export function MarketPostExport(props: PostExportProps) {
 						    ⇒ If either is ever retuned, keep the STRUCTURAL difference;
 						    matching their hues apart is not enough on its own.
 
-						    ⚠⚠ THE TITLE IS SPLIT INTO ONE FLEX ITEM PER WORD, AND THAT IS
-						    FORCED RATHER THAN CLEVER. Satori has no inline formatting
-						    context: a text node is measured and wrapped as a single atomic
-						    item that claims the full container width the moment it needs a
-						    second line, so a chip placed after it lands on the next FLEX
-						    line — i.e. back under the title, which is the arrangement this
-						    change exists to end. Words as items put the chip in the same
-						    wrapping flow as the last word, so it follows the `?` wherever
-						    the `?` happens to land. `columnGap` is the inter-word space
-						    (Geist's own is ~0.26em at this weight) and `rowGap` the leading
-						    between wrapped lines; `lineHeight` no longer has any run of two
-						    lines to act on, so the row gap is what sets the leading.
-
-						    ⚠ `lineClamp: 2` GOES WITH IT AND CANNOT BE KEPT. It clamps a
-						    text node, and there is no longer a text node to clamp — the
-						    title is n items. The eight live titles run to two lines at this
-						    width and the card has ~30px of vertical slack (`BODY_H` less
-						    the header, the chart and the split row), so a three-line title
-						    fits; a fourth would squeeze the chart rather than truncate.
-						    That is a real trade and it is the ruling's cost. */}
+						    ⚠ THE CHIP ROW IS CONDITIONAL ON THERE BEING A CHIP. Both are
+						    nullable — a market whose title is not written `Topic · Question?`
+						    yields no category, and the flavour register covers only the eight
+						    live markets — so an unconditional row would leave the question
+						    sitting above an empty band of its own gap. */}
 						<div
 							style={{
 								display: "flex",
-								flexWrap: "wrap",
-								alignItems: "center",
-								columnGap: u(TITLE_FS * GEIST_BOLD_SPACE_EM),
-								rowGap: u(3),
+								flexDirection: "column",
+								alignItems: "flex-start",
+								gap: u(9),
 								width: u(INNER_W - THUMB - 14),
 							}}
 						>
-							{market.title.split(" ").map((word, i) => (
-								<span
-									// biome-ignore lint/suspicious/noArrayIndexKey: positional word slots in a fixed string — the position IS the identity.
-									key={i}
-									style={{
-										fontSize: u(TITLE_FS),
-										// ⚠ 700 IS THE HEAVIEST THIS EXPORT HAS, AND THIS READ 800
-										// WHILE RENDERING AT 700. `fonts.ts` vendors Geist 400 /
-										// 500 / 700 only, so Satori resolved 800 to the nearest
-										// face it was given and drew exactly what 700 draws. The
-										// number is corrected rather than the font added: a
-										// declared weight nobody ships is a lie the render cannot
-										// contradict, and the next person asking for "bolder"
-										// deserves to find out here that the answer is a new
-										// `.ttf`, not a larger number.
-										fontWeight: 700,
-										lineHeight: 1.22,
-									}}
-								>
-									{word}
-								</span>
-							))}
-							{market.category !== null && (
-								<div
-									style={{
-										...marketChip,
-										backgroundColor: ACCENT.category,
-										color: ACCENT.categoryInk,
-									}}
-								>
-									{market.category.toUpperCase()}
-								</div>
-							)}
-							{market.flavour !== null && (
-								<div
-									style={{
-										...marketChip,
-										backgroundColor: ACCENT.flavour,
-										color: PALETTE.ink,
-									}}
-								>
-									{market.flavour.toUpperCase()}
+							<div
+								style={{
+									display: "block",
+									fontSize: u(TITLE_FS),
+									// ⚠ 700 IS THE HEAVIEST THIS EXPORT HAS, AND THIS READ 800
+									// WHILE RENDERING AT 700. `fonts.ts` vendors Geist 400 / 500 /
+									// 700 only, so Satori resolved 800 to the nearest face it was
+									// given and drew exactly what 700 draws. The number is
+									// corrected rather than the font added: a declared weight
+									// nobody ships is a lie the render cannot contradict, and the
+									// next person asking for "bolder" deserves to find out here
+									// that the answer is a new `.ttf`, not a larger number.
+									fontWeight: 700,
+									lineHeight: 1.22,
+								}}
+							>
+								{market.title}
+							</div>
+							{(market.category !== null || market.flavour !== null) && (
+								<div style={{ display: "flex", gap: u(8) }}>
+									{market.category !== null && (
+										<div
+											style={{
+												...marketChip,
+												backgroundColor: ACCENT.category,
+												color: ACCENT.categoryInk,
+											}}
+										>
+											{market.category.toUpperCase()}
+										</div>
+									)}
+									{market.flavour !== null && (
+										<div
+											style={{
+												...marketChip,
+												backgroundColor: ACCENT.flavour,
+												color: PALETTE.ink,
+											}}
+										>
+											{market.flavour.toUpperCase()}
+										</div>
+									)}
 								</div>
 							)}
 						</div>
@@ -1146,8 +1159,17 @@ const CD_CELL = 32;
 const BRAND_MARK = 80;
 const BRAND_GAP = 16;
 
-/** The author's avatar, and the air between it and their name. */
-const AVATAR = 64;
+/**
+ * The author's avatar, and the air between it and their name.
+ *
+ * ⚠ THE CEILING IS THE BAND, NOT TASTE — operator ruling, revision 9 raised this
+ * from 64. `BAND_H` is 96 with `8` of padding top and bottom, so 80 is the
+ * largest circle that can sit inside the strip without the band having to grow,
+ * and growing it would take the height out of `BODY_H` and therefore off the two
+ * cards. 76 leaves two units of air against each edge, which is what keeps it
+ * reading as placed rather than as jammed.
+ */
+const AVATAR = 76;
 const AVATAR_GAP = 12;
 
 /**
