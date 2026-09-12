@@ -21,6 +21,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // No jest-dom in this repo (AGENTS.md §9) — plain DOM assertions only.
 
 vi.mock("next/navigation", () => ({
+	// POST-IMAGE-EXPORT — `DownloadPostImage` reads the market slug from the
+	// route; a mock without `useParams` throws at the first post card render.
+	useParams: () => ({ slug: "bitcoin-price-50k" }),
 	useRouter: () => ({
 		refresh: () => undefined,
 		push: () => undefined,

@@ -9,6 +9,8 @@
 | **Frame document** | SPEC.1 §21.3 (Download debate → `.md` — amended by this ADR); SPEC.2 §3.3 (read-pattern R-1), §4 (API Surface — the export route lands here at build time); `docs/specs/debate-export.md` (companion serialization schema); `public/zugzwang.md` (shipped context asset); SPEC.2 §22 (ADR Index) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
+| **Amends** | — |
+| **Amended-by** | ADR-0050 — the `.md` export is no longer the only way a debate leaves the product |
 
 ---
 

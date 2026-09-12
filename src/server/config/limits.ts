@@ -396,8 +396,39 @@ const PRODUCTION_CHART_WINDOW: ChartWindow = {
  * renders, and the only symptom is two labels pointing at marks that are not
  * there. A reader arriving in November needs the mechanism, not just the date.
  */
+/**
+ * ── RE-MEASURED 2026-09-11 · `2026-08-17` → `2026-09-07` ───────────────────
+ *
+ * ⛔ THE OLD FLOOR WAS MEASURED AGAINST MARKETS THAT NO LONGER EXIST. The
+ * 2026-09-07 staging reset destroyed all eight content markets and
+ * `LIQ-1-RESTORE` recreated them through `createMarket` / `openMarket`, minting
+ * a fresh `market.opened` for each. Every renderable event on staging is
+ * therefore younger than the window that was supposed to contain it, and the
+ * window opened **twenty-one days before any data existed**.
+ *
+ * ⚠ THE SYMPTOM IS NOT AN EMPTY CHART — IT IS A CHART THAT LOOKS FINE AND LIES
+ * ABOUT WHEN THE MARKET STARTED. `xPx` maps the window's start to x=0, so the
+ * series was drawn as a short nub beginning a third of the way across an
+ * otherwise empty plot, reading as "this market sat still for three weeks and
+ * then traded" rather than "this market opened four days ago". Nothing errors,
+ * nothing clips, and both the debate page and the JPEG export render it.
+ *
+ * ⚠ MEASURED THE WAY THE DOCBLOCK ABOVE INSISTS — the earliest of
+ * `market.opened` · `bet.placed` · `bet.sold`, not of any one of them, read off
+ * the live staging database:
+ *   market.opened  n= 24  first = 2026-09-07T20:18:13.954Z
+ *   bet.placed     n=388  first = 2026-09-07T20:18:16.131Z
+ *   bet.sold       n= 16  first = 2026-09-07T20:18:35.118Z
+ *   latest of all              = 2026-09-11T05:32:18.582Z  (well inside `end`)
+ * Floored to its UTC day, as before.
+ *
+ * ⚠ AND THE FAILURE IS PERIODIC, NOT ONE-OFF: every staging reset that
+ * recreates the markets moves this floor forward, and nothing re-reads it. The
+ * previous entry warned that its own `end` would go stale silently; this is the
+ * same class of decay at the other edge, and it arrived first.
+ */
 const STAGING_CHART_WINDOW: ChartWindow = {
-	start: "2026-08-17T00:00:00.000Z",
+	start: "2026-09-07T00:00:00.000Z",
 	end: "2026-11-05T23:45:00.000Z",
 };
 

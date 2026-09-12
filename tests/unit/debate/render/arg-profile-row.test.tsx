@@ -40,7 +40,10 @@ const CREATED_AT = "2026-07-30T00:00:00.000Z";
  * carry, at its widest, plus a badge. It is the arrangement that has to wrap
  * cleanly, so it is the one the structural assertions run against.
  */
-function widestRow(extra?: { badge?: "Highest Stakes"; download?: boolean }) {
+function widestRow(extra?: {
+	badge?: "Highest Stakes";
+	download?: { ordinal: number };
+}) {
 	return render(
 		<ArgProfile
 			author={{ pseudonym: "fixture-author-2026x", pfpUrl: "" }}
@@ -53,7 +56,7 @@ function widestRow(extra?: { badge?: "Highest Stakes"; download?: boolean }) {
 			replyCount={999}
 			createdAt={CREATED_AT}
 			badge={extra?.badge ?? null}
-			download={extra?.download ?? false}
+			download={extra?.download}
 		/>,
 	);
 }
@@ -169,7 +172,7 @@ describe("UI-OVERNIGHT 1b — the identity row wraps in two units", () => {
 		// rather than a matter of which utilities happen to win.
 		const { container } = widestRow({
 			badge: "Highest Stakes",
-			download: true,
+			download: { ordinal: 1 },
 		});
 		const mark = container.querySelector('[aria-label="Download post image"]');
 		expect(mark).not.toBeNull();
@@ -192,8 +195,11 @@ describe("UI-OVERNIGHT 1b — the identity row wraps in two units", () => {
 		// The acceptance criterion, stated as a diff: adding a badge must change
 		// the row by exactly one element and move nothing else. This is what was
 		// false before — a badge used to relocate the age and the mark too.
-		const withBadge = widestRow({ badge: "Highest Stakes", download: true });
-		const withoutBadge = widestRow({ download: true });
+		const withBadge = widestRow({
+			badge: "Highest Stakes",
+			download: { ordinal: 1 },
+		});
+		const withoutBadge = widestRow({ download: { ordinal: 1 } });
 		const strip = (c: HTMLElement) =>
 			(c.textContent ?? "").replace("Highest Stakes", "");
 		expect(strip(withBadge.container)).toBe(strip(withoutBadge.container));
