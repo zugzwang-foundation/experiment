@@ -248,7 +248,31 @@ export function ArgProfile({
 			    stills' 13px, stated WITH its leading because an arbitrary
 			    `text-[Npx]` inherits whatever line-height was in scope and this
 			    surface has a measured case of exactly that (AGENTS.md §8). */}
-			<div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground max-mobile:flex-1 max-mobile:gap-y-0.5 max-mobile:text-[13px] max-mobile:leading-[17px]">
+			{/* ⛔⛔ 13px, AND 12px WHEN A SOLD POSITION IS ON THE ROW — the founder's
+			    Q2-a fallback, and it IS needed. ADR-0050 A2: "13px; 12px only when
+			    the sold-position labels overflow at 360".
+
+			    ⚠ I FIRST RECORDED THIS AS NOT NEEDED, ON A MEASUREMENT THAT COULD NOT
+			    SEE IT. The probe counted this element's ELEMENT CHILDREN — but Group A
+			    below is `display: contents`, so its box is 0×0 and the metadata items
+			    are its GRANDCHILDREN. The count saw `[GroupA(0×0), GroupB]`, reported
+			    ONE line for every card at every width, and I logged the ruling's
+			    fallback as a fix for a state that does not exist. Walking THROUGH the
+			    zero-size boxes: **2 of 11 cards wrap to two lines at 360, 375, 390 and
+			    430 — and the sold card is one of them.**
+
+			    ⚠ `Exited` and `Sold` are two extra chips on a row that already carries
+			    four fields and three separators, which is why this case and no other
+			    needs the step. Keyed on the props rather than on a width, so it is one
+			    token pair on the cards that have the labels instead of a size change
+			    for every reader. */}
+			<div
+				className={`flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground max-mobile:flex-1 max-mobile:gap-y-0.5 ${
+					sold || marker === "Exited"
+						? "max-mobile:text-[12px] max-mobile:leading-[16px]"
+						: "max-mobile:text-[13px] max-mobile:leading-[17px]"
+				}`}
+			>
 				{/* GROUP A — never wraps internally (rule 2). A pseudonym long enough
 				    to overflow it is preferred to a pseudonym that is cut in half:
 				    identity is not a field this product truncates.
@@ -337,7 +361,16 @@ export function ArgProfile({
 						// separator still travels inside the span of the field it leads.
 						// ⚠ The size and weight are the stills' (17px / 600); the leading is
 						// stated because the size is arbitrary.
-						className="text-sm font-medium text-ink hover:underline max-mobile:basis-full max-mobile:ps-10 max-mobile:text-[17px] max-mobile:leading-[22px] max-mobile:font-semibold"
+						// ⛔ `min-h-8` — MOBILE-2c, found by `@code-reviewer`. The avatar is
+						// `absolute` at phone width and is 32px tall from y=0; this line's
+						// own box is 22px (`leading-[22px]`) and the wrapping area's
+						// `gap-y-0.5` adds 2px, so metadata line 2 began at y=24 and the
+						// avatar's lower 8px painted over the pipe and the side badge —
+						// the avatar being the only positioned element in the row, it wins
+						// the paint. Matching line 1's minimum to the avatar's own height
+						// is the additive fix; jsdom cannot see it and B12 counts LINES,
+						// not overlap, so the measurement is a browser one.
+						className="text-sm font-medium text-ink hover:underline max-mobile:basis-full max-mobile:min-h-8 max-mobile:ps-10 max-mobile:text-[17px] max-mobile:leading-[22px] max-mobile:font-semibold"
 					>
 						{author.pseudonym}
 					</Link>

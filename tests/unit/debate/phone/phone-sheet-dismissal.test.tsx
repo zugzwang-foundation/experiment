@@ -10,6 +10,7 @@ import {
 	render,
 	screen,
 } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PhoneSheet } from "@/components/debate/phone/PhoneSheet";
@@ -21,6 +22,14 @@ stubElementScroll();
 afterEach(() => {
 	cleanup();
 	vi.clearAllMocks();
+	// ⛔ AND UNSTUB GLOBALS. The reduced-motion row below stubs `matchMedia`, and
+	// without this the stub LEAKS into every later row in the file: the next
+	// sheet takes the synchronous reduced-motion path, never enters the leaving
+	// phase, and a row asserting `data-phase === "leaving"` fails with
+	// `expected 'open' to be 'leaving'` — a message about the component, produced
+	// by residue from a different test. Measured, on the first run of the
+	// busy-window row.
+	vi.unstubAllGlobals();
 });
 
 /**
@@ -247,6 +256,244 @@ describe("phone sheet — the panel has a ceiling, so the backdrop has an outsid
 			expect(panel.contains(screen.getByTestId("phone-sheet-body"))).toBe(true);
 			// ...and the tap a phone reader performs first actually closes it.
 			fireEvent.click(backdrop);
+			act(() => {
+				vi.advanceTimersByTime(200);
+			});
+			expect(onClose).toHaveBeenCalledTimes(1);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+});
+
+/**
+ * ⛔⛔ THE SECOND OPEN — the row this suite did not have, and the reason it did
+ * not catch a HIGH that reintroduced MOBILE-2c's own P0.
+ *
+ * `@security-auditor` found it: the close was made idempotent by a `closedRef`
+ * that nothing ever reset, and two of the three `PhoneSheet` mount sites OUTLIVE
+ * an open/close cycle (`detailsMounted` only ever becomes `true`; `focused !==
+ * null` is stable for the whole thread arm). `if (!open) return null` hides
+ * those instances without unmounting them, so React keeps the state — and the
+ * second open rendered already in the leaving phase, with the root
+ * `pointer-events-none`, the body locked and every door dead.
+ *
+ * ⚠ EVERY ROW IN THIS FILE PASSED THROUGH THAT. The reason is precise and worth
+ * keeping: they all hard-code `open`, so not one of them ever toggled it. And
+ * `sheet-a11y`'s own re-open row asserted `queryByTestId("phone-sheet")` is
+ * `not.toBeNull()` — which is TRUE of a bricked sheet, because a sheet that
+ * will not close is very much in the document. That is `SC-1`'s shape one
+ * surface over: the assertion was about the row's PRESENCE and the claim is
+ * about a PROPERTY.
+ *
+ * ⇒ These rows push a door AFTER the second open and assert the sheet LEAVES.
+ */
+describe("phone sheet — a second open is a new sheet (the re-open brick)", () => {
+	const mountToggle = (busy = false) => {
+		const onClose = vi.fn();
+		function Host() {
+			const [open, setOpen] = useState(true);
+			return (
+				<div>
+					<button
+						type="button"
+						data-testid="reopen"
+						onClick={() => setOpen(true)}
+					>
+						open
+					</button>
+					<PhoneSheet
+						open={open}
+						title="Toggling"
+						busy={busy}
+						onClose={() => {
+							onClose();
+							setOpen(false);
+						}}
+					>
+						<p>BODY</p>
+					</PhoneSheet>
+				</div>
+			);
+		}
+		render(<Host />);
+		return onClose;
+	};
+
+	it("phone-sheet::a-sheet-re-opened-on-the-SAME-instance-is-dismissable-again", () => {
+		vi.useFakeTimers();
+		try {
+			const onClose = mountToggle();
+			// close once, the animated way
+			fireEvent.click(screen.getByTestId("phone-sheet-backdrop"));
+			act(() => {
+				vi.advanceTimersByTime(200);
+			});
+			expect(onClose).toHaveBeenCalledTimes(1);
+			expect(screen.queryByTestId("phone-sheet")).toBeNull();
+
+			// re-open the SAME instance — React keeps its state
+			fireEvent.click(screen.getByTestId("reopen"));
+			const sheet = screen.getByTestId("phone-sheet");
+			// ⛔ THE THREE FACTS THAT MADE IT A BRICK, each asserted directly rather
+			// than inferred from "the sheet is present".
+			expect(sheet.getAttribute("data-phase")).toBe("open");
+			expect(sheet.getAttribute("class")).not.toMatch(
+				/(?:^|\s)pointer-events-none(?:\s|$)/,
+			);
+			expect(
+				screen.getByTestId("phone-sheet-panel").getAttribute("class"),
+			).not.toMatch(/animate-out/);
+
+			// ...and the door works a second time, which is the whole claim.
+			fireEvent.click(screen.getByTestId("phone-sheet-backdrop"));
+			act(() => {
+				vi.advanceTimersByTime(200);
+			});
+			expect(onClose).toHaveBeenCalledTimes(2);
+			expect(screen.queryByTestId("phone-sheet")).toBeNull();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("phone-sheet::Escape-also-survives-a-re-open-under-reduced-motion", () => {
+		// ⚠ THE WORSE ARM. Under reduced motion the old latch was set with NO
+		// leaving phase, so the second open looked completely normal — no
+		// animation, full pointer events — and no door worked. Nothing on screen
+		// would have told the reader why, and on a touch phone there is no Escape
+		// key to fall back on. The control is the row above: same sequence, the
+		// animated path.
+		const mm = vi.fn().mockReturnValue({
+			matches: true,
+			media: "(prefers-reduced-motion: reduce)",
+			addEventListener: vi.fn(),
+			removeEventListener: vi.fn(),
+			addListener: vi.fn(),
+			removeListener: vi.fn(),
+			onchange: null,
+			dispatchEvent: vi.fn(),
+		});
+		vi.stubGlobal("matchMedia", mm);
+		const onClose = mountToggle();
+		// reduced motion closes with no timer at all
+		fireEvent.keyDown(document, { key: "Escape" });
+		expect(onClose).toHaveBeenCalledTimes(1);
+		expect(screen.queryByTestId("phone-sheet")).toBeNull();
+
+		fireEvent.click(screen.getByTestId("reopen"));
+		expect(screen.getByTestId("phone-sheet")).not.toBeNull();
+		fireEvent.keyDown(document, { key: "Escape" });
+		expect(onClose).toHaveBeenCalledTimes(2);
+		expect(screen.queryByTestId("phone-sheet")).toBeNull();
+		// POSITIVE CONTROL — the stub was actually consulted, so "reduced motion"
+		// is a fact about this run rather than about jsdom having no matchMedia.
+		expect(mm).toHaveBeenCalled();
+		// ⚠ UNSTUBBED HERE TOO, not only in `afterEach`. A row that depends on a
+		// hook for its own isolation is a row that breaks when somebody reorders
+		// the file.
+		vi.unstubAllGlobals();
+	});
+
+	it("phone-sheet::a-close-abandoned-by-the-host-does-not-fire-later", () => {
+		// ⛔ THE ORPHANED TIMER — `@security-auditor` (MEDIUM). `open → false` by a
+		// path that is not this component's own door used to clear nothing, so the
+		// armed timer survived and fired against whatever sheet had been opened in
+		// the meantime: tap the details backdrop, tap through the now
+		// `pointer-events-none` layer onto the bottom bar within 200ms, and the
+		// details sheet's timer closes the composer the reader just opened.
+		vi.useFakeTimers();
+		try {
+			const onClose = vi.fn();
+			function Host() {
+				const [open, setOpen] = useState(true);
+				return (
+					<div>
+						<button
+							type="button"
+							data-testid="hostclose"
+							onClick={() => setOpen(false)}
+						>
+							host closes it
+						</button>
+						<PhoneSheet
+							open={open}
+							title="Abandoned"
+							busy={false}
+							onClose={onClose}
+						>
+							<p>BODY</p>
+						</PhoneSheet>
+					</div>
+				);
+			}
+			render(<Host />);
+			// a door is pushed — the timer is armed
+			fireEvent.click(screen.getByTestId("phone-sheet-backdrop"));
+			// ...and the HOST closes the sheet by another path before it fires
+			fireEvent.click(screen.getByTestId("hostclose"));
+			act(() => {
+				vi.advanceTimersByTime(400);
+			});
+			// the abandoned close must not arrive late and close something else
+			expect(onClose).not.toHaveBeenCalled();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("phone-sheet::a-busy-sheet-that-goes-busy-INSIDE-the-window-stays-dismissable", () => {
+		// ⛔ THE OTHER HALF OF THE SAME DEFECT. `beginClose` read `busy` at call
+		// time and handed off to a timer that re-checked nothing, so a request
+		// going in flight inside the 200ms answered a close the reader asked for
+		// before it existed — and the sheet was left `leaving`, locked and
+		// un-tappable when the submit ERRORED. The timer now aborts AND releases.
+		vi.useFakeTimers();
+		try {
+			const onClose = vi.fn();
+			function Host() {
+				const [busy, setBusy] = useState(false);
+				return (
+					<div>
+						<button
+							type="button"
+							data-testid="gobusy"
+							onClick={() => setBusy(true)}
+						>
+							busy
+						</button>
+						<button
+							type="button"
+							data-testid="idle"
+							onClick={() => setBusy(false)}
+						>
+							idle
+						</button>
+						<PhoneSheet open title="Busy window" busy={busy} onClose={onClose}>
+							<p>BODY</p>
+						</PhoneSheet>
+					</div>
+				);
+			}
+			render(<Host />);
+			fireEvent.click(screen.getByTestId("phone-sheet-backdrop"));
+			expect(screen.getByTestId("phone-sheet").getAttribute("data-phase")).toBe(
+				"leaving",
+			);
+			// the flight starts INSIDE the window
+			fireEvent.click(screen.getByTestId("gobusy"));
+			act(() => {
+				vi.advanceTimersByTime(200);
+			});
+			// the close was refused, not deferred-and-committed
+			expect(onClose).not.toHaveBeenCalled();
+			// ...and the sheet is RELEASED rather than left leaving forever
+			expect(screen.getByTestId("phone-sheet").getAttribute("data-phase")).toBe(
+				"open",
+			);
+			// when the flight lands, the door works again
+			fireEvent.click(screen.getByTestId("idle"));
+			fireEvent.click(screen.getByTestId("phone-sheet-backdrop"));
 			act(() => {
 				vi.advanceTimersByTime(200);
 			});

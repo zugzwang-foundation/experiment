@@ -594,7 +594,16 @@ export function PhoneDebateView({
 					<div className="pb-3">
 						<PostCard
 							post={focused}
-							onEnter={() => setSheet(null)}
+							// ⚠ `guard`-WRAPPED LIKE EVERY OTHER HOST TRANSITION. This was
+							// the one `setSheet` in the file that was not, and it is
+							// unreachable while busy today — `sheet` is a single
+							// discriminated union, so a `parent` sheet and a live composer
+							// are mutually exclusive states. But the rule this file states
+							// at :255 is "EVERY host transition consults `composerBusy`",
+							// and an exception that happens to be unreachable is the door a
+							// future change opens without noticing. `@security-auditor`
+							// (LOW).
+							onEnter={() => guard(() => setSheet(null))}
 							onOpenPopup={setPopupPost}
 							onOpenImage={setLightboxUrl}
 							onReplyToPost={(_id, relation) => {

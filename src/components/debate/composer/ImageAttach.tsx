@@ -425,6 +425,30 @@ export function ImageAttach({
 	// `preserveAspectRatio="xMidYMid meet"`, so it fits, stays centred, keeps
 	// its ratio, and never clips or scrolls at any height.
 	/**
+	 * ⛔⛔ THE COLLAPSED PILL IS THE **EMPTY** STATE'S SHAPE, AND GATING IT ON
+	 * `invitesAPick` IS NOT A REFINEMENT — the ungated version had two defects,
+	 * both found by `@code-reviewer`.
+	 *
+	 * `attaching` renders the BUTTON branch (only `attached` takes the other one),
+	 * and during `attaching` `previewUrl` is already non-null — `setPreview` runs
+	 * before `onPick`. So the button contained a live `attachedPreview` image
+	 * while pinned to `max-mobile:h-10 flex-none`, with the panel's border,
+	 * padding and floor all collapsed and nothing clipping: a 4000×1500 pick at a
+	 * ~345px sheet renders ~129px tall inside a 40px box and spills ±44px over
+	 * the argument fields above it and the balance row below, for the whole sign
+	 * + PUT round trip.
+	 *
+	 * ⚠ AND THE SAME PIN MADE THE ONLY FEEDBACK THAT PHASE HAS UNREADABLE. The
+	 * filename readout is `text-n5` (`#989898`); on `max-mobile:bg-ink`
+	 * (`#fafafa`) that is 2.77:1, and the button is `disabled` while attaching so
+	 * `--state-disabled-opacity: 0.5` composites the pair down to roughly 1.9:1.
+	 * ⛔ **B8 cannot catch it** — axe has no way to reach a phase that requires a
+	 * picked file, so this would have shipped behind a green accessibility audit.
+	 *
+	 * ⇒ Gated, the `attaching` button is transparent again: `text-n5` on the page
+	 * ground is 6.1:1, and the panel keeps its own box so the preview has
+	 * somewhere to be.
+	 *
 	 * ⛔ AT PHONE WIDTH THE EMPTY STATE IS THE BUTTON AND NOTHING ELSE — MOBILE-2c
 	 * R-6, founder ruling Q5-a. MOBILE-2b already hid the 4:5 invitation figure
 	 * below 640px and rendered `EMPTY_SLOT_COPY.action` as text in its place, but
@@ -432,7 +456,9 @@ export function ImageAttach({
 	 * ground, sitting above the two fields a participant came here to fill in. The
 	 * ruling is that an empty image state should cost one control, so the box
 	 * collapses and the pick button becomes the whole of it.
-	 * ⚠ Four `max-mobile:` tokens and no desktop change: the panel keeps its
+	 * ⚠ FIVE `max-mobile:` tokens and no desktop change (`order-2`, `min-h-0`,
+	 * `bg-transparent`, `p-0`, `[border:none]` — this said four, which is O-15's
+	 * shape inside a docblock written by the same diff): the panel keeps its
 	 * floor, its border, its ground and its padding at every width ≥640.
 	 */
 	const panel =
@@ -697,7 +723,11 @@ export function ImageAttach({
 						// height, and the panel's height is now the button's — circular,
 						// and it resolves to whatever the content happens to be rather
 						// than to the ruled 40. `h-10` is 40px on this scale.
-						className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-2 rounded-(--imgr) transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) max-mobile:h-10 max-mobile:flex-none max-mobile:flex-row max-mobile:bg-ink"
+						className={`flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-2 rounded-(--imgr) transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)${
+							invitesAPick
+								? " max-mobile:h-10 max-mobile:flex-none max-mobile:flex-row max-mobile:bg-ink"
+								: ""
+						}`}
 					>
 						{/* ⚠⚠ change set 10 §4 — THE STANDALONE `Image` LABEL IS REMOVED,
 						    founder ruling. The word already appears INSIDE the artwork as

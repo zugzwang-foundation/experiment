@@ -188,11 +188,68 @@ export function PhoneSheet({
 	 */
 	const [leaving, setLeaving] = useState(false);
 	const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-	const closedRef = useRef(false);
+	/**
+	 * ⛔⛔ THE IDEMPOTENCY LATCH IS `leaving` ITSELF, AND IT USED TO BE A SEPARATE
+	 * `closedRef` THAT NOTHING EVER RESET — which reintroduced this task's own P0
+	 * on a different route. `@security-auditor` found it and the path needs no
+	 * race:
+	 *
+	 * Two of the three `PhoneSheet` mount sites OUTLIVE an open/close cycle —
+	 * `detailsMounted` only ever becomes `true`, and `focused !== null` is stable
+	 * for the whole thread arm — so `if (!open) return null` hides those
+	 * instances WITHOUT unmounting them. React keeps the state. So: open the
+	 * details sheet, dismiss it (the gesture this whole task exists to make
+	 * work), and the instance is left with `leaving: true` and the latch set.
+	 * Open it again and it renders ALREADY LEAVING: the root carries
+	 * `pointer-events-none`, the panel carries `animate-out`, `tw-animate-css`
+	 * leaves fill-mode at `none` so the panel snaps back fully visible — and
+	 * every door is gone. Backdrop, `×` and handle are un-hit-testable; Escape
+	 * reaches `beginClose` and returns on the latch. **A visible modal that will
+	 * not close, over a page whose scroll is locked.** Reload only.
+	 *
+	 * ⚠ AND THE `prefers-reduced-motion` ARM WAS STRICTLY WORSE, because it set
+	 * the latch and never set `leaving`: the second open looked and behaved
+	 * completely normal, with no animation and full pointer events, and no door
+	 * worked. Nothing on screen would have told the reader why.
+	 *
+	 * ⇒ Idempotency is now derived from `leaving`, which is per-CLOSE rather than
+	 * per-instance, mirrored into a ref so `beginClose` can stay a stable
+	 * callback. The reduced-motion arm needs no latch at all: it calls `onClose`
+	 * synchronously, `open` goes false in the same commit, and this component
+	 * returns `null` — there is no second door left to push.
+	 */
+	const leavingRef = useRef(false);
+	leavingRef.current = leaving;
+
+	/**
+	 * ⛔ A NEW OPEN IS A NEW SHEET, even when React has kept the instance.
+	 * Adjusted during render rather than in an effect, deliberately: an effect
+	 * runs AFTER the commit, so the first painted frame of the second open would
+	 * be the stale leaving frame — a flash of a sheet sliding out at the moment
+	 * the reader asked for one to slide in.
+	 */
+	const prevOpenRef = useRef(open);
+	if (prevOpenRef.current !== open) {
+		prevOpenRef.current = open;
+		// ⚠ CLEARED IN BOTH DIRECTIONS. `open → false` by a path that is not this
+		// component's own door (the host closing the sheet, a navigation, the arm
+		// changing) used to leave the timer armed, and it then fired against
+		// whatever sheet had been opened in the meantime — closing a composer the
+		// reader had just opened.
+		if (leaveTimerRef.current !== null) {
+			clearTimeout(leaveTimerRef.current);
+			leaveTimerRef.current = null;
+		}
+		if (open && leaving) {
+			setLeaving(false);
+		}
+	}
 
 	/** Live drag offset in px while a finger is on the handle, else null. */
 	const [dragY, setDragY] = useState<number | null>(null);
-	const dragStateRef = useRef<{ y0: number; t0: number } | null>(null);
+	const dragStateRef = useRef<{ id: number; y0: number; t0: number } | null>(
+		null,
+	);
 
 	/**
 	 * ⚠ REDUCED MOTION IS HONOURED IN JS, NOT ONLY IN CSS, for the reason
@@ -201,7 +258,7 @@ export function PhoneSheet({
 	 * would get a sheet that sits there for 200ms doing nothing before closing.
 	 */
 	const beginClose = useCallback(() => {
-		if (busyRef.current || closedRef.current) {
+		if (busyRef.current || leavingRef.current) {
 			return;
 		}
 		// ⚠ READ AT CALL TIME, INSIDE THE CALLBACK, not hoisted to a helper above
@@ -215,7 +272,6 @@ export function PhoneSheet({
 			typeof window.matchMedia === "function" &&
 			window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 		if (reduced) {
-			closedRef.current = true;
 			closeRef.current();
 			return;
 		}
@@ -225,7 +281,23 @@ export function PhoneSheet({
 		}
 		leaveTimerRef.current = setTimeout(() => {
 			leaveTimerRef.current = null;
-			closedRef.current = true;
+			// ⛔⛔ RE-CHECKED, NOT TAKEN FROM THE CALL. `busy` is read when a door is
+			// pushed and the close lands 200ms later, so a request that goes in
+			// flight INSIDE that window would otherwise be answered by a close the
+			// reader asked for before it existed — and the sheet's refusal to close
+			// while busy is a money rule, not a motion one (see the header).
+			// ⚠ The host's own `guard` also blocks it, and `@security-auditor`
+			// confirmed the double charge is unreachable for that reason. This is
+			// the sheet holding its own half rather than borrowing the host's: a
+			// future call site passing a non-guarded `onClose` would otherwise turn
+			// this timer into a money door with no second line.
+			// ⇒ Abort AND release, so the sheet is dismissable again the moment the
+			// flight lands. Committing here and leaving `leaving` set is what left a
+			// composer visible, locked and un-tappable when a submit ERRORED.
+			if (busyRef.current) {
+				setLeaving(false);
+				return;
+			}
 			closeRef.current();
 		}, CLOSE_MS);
 	}, []);
@@ -248,24 +320,42 @@ export function PhoneSheet({
 	 * this directory and forbids it outright.
 	 *
 	 * ⇒ The browser is told what this element is for, declaratively, with
-	 * `touch-action: none` on THE HANDLE ONLY. That is a ~36×20px strip which is
-	 * not a scroller and never was; the sheet body beside it keeps
-	 * `overflow-y-auto` and the page behind it is not reachable while a modal is
-	 * up. `setPointerCapture` then keeps the drag alive when the finger leaves
-	 * the strip, which is most of a real swipe.
+	 * `touch-action: none` on THE HANDLE ONLY. ⚠ **That region is the full width
+	 * of the sheet's top edge and about 16px tall** (`pt-2 pb-1` around a 4px
+	 * bar) — this said "a ~36×20px strip", which is the visible `<span>` rather
+	 * than the box that takes the touch, and the size was the load-bearing half
+	 * of the claim that it is not a scroller. Corrected by `@code-reviewer`. The
+	 * claim itself survives on the right ground: a 16px strip at the top edge of
+	 * a sheet holds no scrollable content, the sheet body beside it keeps
+	 * `overflow-y-auto`, and the page behind is unreachable while a modal is up.
+	 * `setPointerCapture` then keeps the drag alive when the finger leaves the
+	 * strip, which is most of a real swipe.
 	 */
 	const onHandleDown = (event: ReactPointerEvent<HTMLDivElement>) => {
 		if (busy) {
 			return;
 		}
-		dragStateRef.current = { y0: event.clientY, t0: event.timeStamp };
+		// ⚠ KEYED BY POINTER, AND A SECOND FINGER IS IGNORED RATHER THAN
+		// OVERWRITING THE FIRST. Re-seeding `{y0, t0}` from a second pointer means
+		// lifting the FIRST one measures its travel against the second's origin
+		// with a `t0` a millisecond old — and `travelled / max(1, elapsed)` then
+		// clears the 0.5 px/ms arm on the handle's own height. A two-finger tap
+		// dismissed the sheet. `@security-auditor` (LOW).
+		if (dragStateRef.current !== null) {
+			return;
+		}
+		dragStateRef.current = {
+			id: event.pointerId,
+			y0: event.clientY,
+			t0: event.timeStamp,
+		};
 		setDragY(0);
 		event.currentTarget.setPointerCapture?.(event.pointerId);
 	};
 
 	const onHandleMove = (event: ReactPointerEvent<HTMLDivElement>) => {
 		const state = dragStateRef.current;
-		if (state === null) {
+		if (state === null || state.id !== event.pointerId) {
 			return;
 		}
 		// ⚠ DOWNWARD ONLY. An upward drag must not lift the sheet past its own
@@ -276,11 +366,20 @@ export function PhoneSheet({
 
 	const onHandleUp = (event: ReactPointerEvent<HTMLDivElement>) => {
 		const state = dragStateRef.current;
-		dragStateRef.current = null;
-		if (state === null) {
+		if (state === null || state.id !== event.pointerId) {
 			return;
 		}
-		event.currentTarget.releasePointerCapture?.(event.pointerId);
+		dragStateRef.current = null;
+		// ⚠ `?.` GUARDS AN ABSENT METHOD, NOT A THROW. This handler doubles as
+		// `onPointerCancel`, and the spec has `releasePointerCapture` raise
+		// `NotFoundError` for a pointer that is no longer active — which is
+		// precisely what a cancel means. Cheaper to catch than to reason about
+		// per-engine. (`@code-reviewer`, LOW.)
+		try {
+			event.currentTarget.releasePointerCapture?.(event.pointerId);
+		} catch {
+			// the pointer is already gone; nothing to release
+		}
 		const travelled = Math.max(0, event.clientY - state.y0);
 		const elapsed = Math.max(1, event.timeStamp - state.t0);
 		const velocity = travelled / elapsed;
@@ -409,7 +508,9 @@ export function PhoneSheet({
 			// ⚠ A LEAVING SHEET STOPS TAKING INPUT. Without this a second tap during
 			// the 200ms slide lands on a backdrop that is still there, and
 			// `beginClose` would be asked to close a sheet that is already closing —
-			// `closedRef` makes that idempotent, and this makes it unreachable.
+			// the `leaving` gate makes that idempotent, and this makes it
+			// unreachable by pointer. ⚠ It does NOT gate the keyboard, which is why
+			// the gate is the mechanism and this is the belt.
 			className={`fixed inset-0 z-50 flex flex-col justify-end ${
 				leaving ? "pointer-events-none" : ""
 			}`}
@@ -443,12 +544,27 @@ export function PhoneSheet({
 				tabIndex={-1}
 				data-testid="phone-sheet-panel"
 				// ⛔ CONTENT-HEIGHT, WITH A CEILING — and no `fullHeight` branch to
-				// defeat it. `max-h-[92dvh]` is the ruled ceiling (ADR-0050 A2); the
-				// body below carries `overflow-y-auto`, so a composer taller than the
-				// ceiling scrolls INSIDE the sheet and `PLACE Đ BET` stays reachable
-				// with the keyboard up. `dvh` and not `vh` for the reason the whole
-				// tier uses `dvh`: the keyboard changes the viewport and `vh` does not
-				// notice.
+				// defeat it. `max-h-[92dvh]` is the ruled ceiling (ADR-0050 A2), and
+				// the body below carries `overflow-y-auto`, so a composer taller than
+				// the ceiling scrolls INSIDE the sheet.
+				//
+				// ⚠⚠ AND WHAT KEEPS `PLACE Đ BET` REACHABLE WITH THE KEYBOARD UP IS
+				// THAT SCROLLER, NOT THIS UNIT. This comment used to say "`dvh` and
+				// not `vh` … the keyboard changes the viewport and `vh` does not
+				// notice", and `@code-reviewer` measured that the mechanism does not
+				// exist: there is no `interactive-widget` key anywhere in this app's
+				// viewport meta (`grep -rn 'interactive-widget' src/` → nothing), so
+				// the default `resizes-visual` applies — the keyboard shrinks the
+				// VISUAL viewport and leaves the LAYOUT viewport, and therefore every
+				// `vh`/`svh`/`dvh` unit, untouched. `dvh` tracks retractable browser
+				// chrome, which is a different thing and is why the tier uses it.
+				// ⇒ The unit is still right for its own reason. The keyboard claim
+				// belongs to the body's `overflow-y-auto` alone, and **a real
+				// on-screen keyboard has not been measured** — a resized desktop
+				// window has none, so the run reports that as owed rather than as
+				// verified. R-6 moved the submit to `order-4`, the bottom of the
+				// sheet, which is the worst place for a keyboard overlay and is the
+				// reason this paragraph is not being left to read as a guarantee.
 				//
 				// ⚠ `rounded-t-4xl` = `--radius-4xl` = 26px, the largest radius in the
 				// `@theme` scale (`globals.css:47`) and the largest that is actually

@@ -726,11 +726,17 @@ export function BetComposer(props: {
 					    ⇒ `display: contents` is the token. Below 640px it dissolves this
 					    wrapper's BOX without moving a single node, so the grid's children
 					    become [image, fields, balance, footblock] and `order-*` sequences
-					    those four independently. The desktop keeps the box and the column,
-					    byte-for-byte: `contents` is behind `max-mobile:` and `order` is
-					    inert on a child whose parent is not a flex or grid container at
-					    that width — which it is not, because this div IS the container
-					    above 640px.
+					    those four independently. The desktop keeps the box and the column
+					    byte-for-byte — but ⛔ **NOT for the reason this paragraph used to
+					    give.** It said `order` is "inert on a child whose parent is not a flex
+					    or grid container at that width — which it is not, because this div IS
+					    the container above 640px", and that is backwards: above 640px this div
+					    IS `flex flex-col`, so its children ARE flex items and an unprefixed
+					    `order-*` on them WOULD reorder the desktop column. What protects the
+					    desktop is only that all four tokens carry `max-mobile:`, so the
+					    declarations do not exist at ≥640px at all. Corrected by
+					    `@code-reviewer` — this is the sentence a later editor would have
+					    relied on while dropping a prefix.
 					    ⚠ `gap-2` goes with the box at phone width, and the grid's own
 					    `gap-2.5` (10px) takes over — inside the 8-12px the ruling asks for,
 					    so nothing is restated.
@@ -738,7 +744,16 @@ export function BetComposer(props: {
 					    column it pushes the money row to the bottom of a flex column; as a
 					    grid item in an auto-sized row there is no free space for it to
 					    consume, and leaving it would be a declaration that reads as load
-					    bearing while doing nothing. */}
+					    bearing while doing nothing.
+					    ⚠ AND `min-w-0` GOES WITH THE BOX, which is the one release this
+					    mechanism gives up. It is here because this div was the grid item;
+					    below 640px it has none, and no new grid item declares one. Nothing
+					    overflows today — both textareas carry `field-sizing-fixed`, so their
+					    min-content contribution is the cols-based intrinsic width rather than
+					    the longest word — but if that ever changes the `1fr` track widens and
+					    the symptom is a HORIZONTAL SCROLLBAR INSIDE THE SHEET (its body's
+					    `overflow-y-auto` computes `overflow-x: auto`), which is not something
+					    B2's document-overflow check can see. (`@code-reviewer`, LOW.) */}
 					<div className="flex min-h-0 min-w-0 flex-col gap-2 max-mobile:contents">
 						{/* `.fieldscroll` — RPLY-3 · R1. THE SCROLLER, AND THE REASON THE
 						    FOOTBLOCK CAN COME BACK INTO THIS COLUMN AT ALL.

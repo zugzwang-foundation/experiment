@@ -284,3 +284,106 @@ describe("phone sheet — the handle is a gesture, and both of its arms are live
 		}
 	});
 });
+
+/**
+ * ⛔ A TWO-FINGER TAP MUST NOT DISMISS — `@security-auditor` (LOW), and the
+ * arithmetic is why it was not obvious. `onHandleDown` used to overwrite the
+ * drag state unconditionally, so a second pointer re-seeded `{y0, t0}` from
+ * itself; lifting the FIRST finger then measured its travel against the
+ * second's origin with a `t0` a millisecond old, and
+ * `travelled / max(1, elapsed)` clears the 0.5 px/ms arm on an offset the size
+ * of the handle itself. The reader performed a two-finger tap and the sheet
+ * left.
+ */
+/**
+ * A pointer event with an EXPLICIT id, for the two-pointer row. The file's
+ * `pointer()` hardcodes `POINTER_ID` because every other row is one finger.
+ */
+function pointerWithId(
+	type: string,
+	clientY: number,
+	timeStamp: number,
+	pointerId: number,
+): Event {
+	const Ctor = (window as unknown as { PointerEvent?: PointerCtor })
+		.PointerEvent;
+	if (typeof Ctor !== "function") {
+		throw new Error("jsdom has no PointerEvent");
+	}
+	const event = new Ctor(type, {
+		bubbles: true,
+		cancelable: true,
+		clientY,
+		pointerId,
+	});
+	Object.defineProperty(event, "timeStamp", {
+		value: timeStamp,
+		configurable: true,
+	});
+	return event;
+}
+
+/**
+ * ⛔ A TWO-FINGER TAP MUST NOT DISMISS — `@security-auditor` (LOW), and the
+ * arithmetic is why it was not obvious. `onHandleDown` used to overwrite the
+ * drag state unconditionally, so a second pointer re-seeded `{y0, t0}` from
+ * itself; lifting the FIRST finger then measured its travel against the
+ * second's origin with a `t0` a millisecond old, and
+ * `travelled / max(1, elapsed)` clears the 0.5 px/ms arm on an offset the size
+ * of the handle itself. The reader performed a two-finger tap and the sheet
+ * left.
+ *
+ * ⚠⚠ THIS ROW'S FIRST TWO DRAFTS BOTH COULD NOT FAIL, and both failures are
+ * worth keeping because they are different.
+ *
+ * Draft one used `fireEvent.pointerDown(el, { timeStamp })` — discarded,
+ * exactly as this file's header already documents and measures. Rewritten
+ * against the forced constructor.
+ *
+ * ⛔ Draft two had the GEOMETRY INVERTED and passed against the defect. It put
+ * finger 2 BELOW finger 1, so lifting finger 1 gave
+ * `travelled = max(0, 102 − 116) = 0` — a zero-pixel drag, which of course does
+ * not close, on the fixed build AND on a build with both pointer guards
+ * removed. Verified by reversal, which is the only reason it is not still in
+ * the file: with both guards stripped the row stayed **green**.
+ * ⇒ For `travelled` to be positive the second finger must land ABOVE the first,
+ * so that the first finger's release is BELOW the origin it is being measured
+ * against. That is the whole mechanism, and getting its sign wrong produces a
+ * row that reads exactly like a passing one.
+ */
+describe("phone sheet — the handle drag belongs to one pointer", () => {
+	it("phone-sheet-swipe::a-second-pointer-does-not-dismiss-on-the-first-lift", () => {
+		vi.useFakeTimers();
+		try {
+			const onClose = mount();
+			// finger 1 goes down and stays put for two seconds
+			fireEvent(handle(), pointerWithId("pointerdown", 120, T0, 1));
+			// finger 2 lands 16px ABOVE it — the handle's own height
+			fireEvent(handle(), pointerWithId("pointerdown", 104, T0 + 2000, 2));
+			// finger 1 lifts where it was, 1ms after finger 2 arrived. Measured
+			// against finger 2's origin that is 16px of travel in 1ms = 16 px/ms,
+			// thirty-two times the 0.5 threshold.
+			fireEvent(handle(), pointerWithId("pointerup", 120, T0 + 2001, 1));
+			act(() => {
+				vi.advanceTimersByTime(CLOSE_MS);
+			});
+			expect(
+				onClose,
+				"a two-finger tap must not be read as a flick",
+			).not.toHaveBeenCalled();
+
+			// POSITIVE CONTROL — the same handle DOES dismiss a single pointer that
+			// travels, so the row above is about the second pointer and not about a
+			// handle that stopped responding.
+			fireEvent(handle(), pointerWithId("pointerdown", 100, T0 + 5000, 3));
+			fireEvent(handle(), pointerWithId("pointermove", 220, T0 + 5100, 3));
+			fireEvent(handle(), pointerWithId("pointerup", 220, T0 + 5100, 3));
+			act(() => {
+				vi.advanceTimersByTime(CLOSE_MS);
+			});
+			expect(onClose).toHaveBeenCalledTimes(1);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+});
