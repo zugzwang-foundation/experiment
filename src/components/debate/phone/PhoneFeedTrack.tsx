@@ -191,11 +191,23 @@ export function PhoneFeedTrack({
 		if (track === null) {
 			return;
 		}
-		track.addEventListener("pointerdown", release);
-		track.addEventListener("touchstart", release, { passive: true });
+		// ⛔ ON MOVEMENT, NOT ON TOUCH — and releasing on `pointerdown` put D-1's
+		// symptom straight back under a sequence readers perform constantly.
+		// `@code-reviewer` found it: tap NO, then within the ~300ms slide touch
+		// the feed (to scroll it, or on empty ground, or on a card). A `down`
+		// listener releases the mute mid-slide; the very next observer batch is
+		// the OLD pane crossing 0.6 downward while the new one sits at 0.4 and is
+		// filtered out — so the batch resolves to the pane being left, the host
+		// believes it, and the reader who tapped NO ends up on YES.
+		//
+		// A finger that has not MOVED has not overruled anything. Movement is the
+		// signal that the reader is driving, and the 700ms backstop already
+		// covers the only case `down` was there for — a slide that never lands.
+		track.addEventListener("pointermove", release, { passive: true });
+		track.addEventListener("touchmove", release, { passive: true });
 		return () => {
-			track.removeEventListener("pointerdown", release);
-			track.removeEventListener("touchstart", release);
+			track.removeEventListener("pointermove", release);
+			track.removeEventListener("touchmove", release);
 		};
 	}, [release]);
 

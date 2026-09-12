@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 
 import { POLL_INTERVAL_MS_DEBATE_VIEW } from "@/server/config/limits";
-
 import { PostCard } from "./PostCard";
+import { useIsPhoneTier } from "./phone-tier";
 import { EmptySideCTA } from "./placeholders";
 import { ReplyCard } from "./ReplyCard";
 import { ScrollRail } from "./ScrollRail";
@@ -165,8 +165,19 @@ function usePagedColumn(
 	// but pressing an arrow also PICKS the column (`auto.onPick()`), which flips
 	// `paused` and tears this effect down entirely. There is no state in which a
 	// pre-empted timer survives to advance past the card the reader just chose.
+	// ⛔ RI-3, THE OTHER HALF — and the half with teeth. `ScrollRail`'s fill
+	// interval was gated first because it is the loud one (four ticks a second),
+	// but THIS is the expensive one: every advance calls `setIndex` and
+	// `setProgressKey`, which re-renders the whole hidden `DebateColumn` and
+	// REMOUNTS `CountdownFill` via its `key` — and the fill's own docblock says
+	// its state is local precisely so that a tick does not re-render the card
+	// beside it, which is exactly what an ungated advance does anyway. Below
+	// 640px the entire tree is `display: none`, so all of that work is spent on
+	// a two-column arena the reader cannot see. Found by BOTH reviewers
+	// independently, after the first gate had been called done.
+	const hiddenByTier = useIsPhoneTier();
 	useEffect(() => {
-		if (paused || total <= 1) {
+		if (paused || total <= 1 || hiddenByTier) {
 			return;
 		}
 		const delay = stagger && !staggered.current ? STAGGER_MS : ADVANCE_MS;
@@ -186,7 +197,7 @@ function usePagedColumn(
 				clearInterval(interval);
 			}
 		};
-	}, [paused, total, stagger]);
+	}, [paused, total, stagger, hiddenByTier]);
 
 	return {
 		index: total === 0 ? 0 : Math.min(index, total - 1),

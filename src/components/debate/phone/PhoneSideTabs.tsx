@@ -20,13 +20,21 @@
  * thread passes the neutral emphasis step instead, and this component never has
  * to know the difference.
  *
- * ⚠ `--ring-active` ON THE ACTIVE TAB IS LOAD-BEARING, NOT DECORATION.
+ * ⚠ THE RING ON THE ACTIVE TAB IS LOAD-BEARING, NOT DECORATION.
  * `--color-yes` is `#181818` and the page ground is `#181818`: an active YES tab
  * painted in its own pole is invisible against the surface behind it and reads
  * as "no tab is selected". The ring is what gives it an edge, and it is applied
  * to every active tab so the selected state is ONE shape rather than two — a NO
  * tab that gained an edge only because YES needed one is the kind of asymmetry
  * nobody can read as deliberate.
+ *
+ * ⚠ MOBILE-2b measured it on a phone and the 1.5px `--ring-active` was not
+ * enough: 1:1 against the ground is not a contrast the ring can rescue at that
+ * weight, in daylight, at arm's length. It is now `2px solid var(--ring)` — the
+ * same live token at a weight that reads. RI-11 rules out inventing a colour
+ * and this does not; it is the affordance getting heavier, not the palette
+ * gaining a member. (This paragraph named `--ring-active` after the code had
+ * stopped using it — corrected by `@code-reviewer` rather than left to rot.)
  */
 /**
  * ⛔⛔ THE TAB CONTRACT IS KEPT, NOT MERELY CLAIMED — and the first cut claimed

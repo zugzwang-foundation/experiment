@@ -185,7 +185,7 @@ describe("PhoneFeedTrack · D-1 · a programmatic scroll is not a reader changin
 		expect(onActiveChange).toHaveBeenCalledWith("NO");
 	});
 
-	it("releases the mute when the reader touches the track mid-slide", () => {
+	it("releases the mute when the reader MOVES on the track mid-slide, and not merely on touch", () => {
 		const onActiveChange = vi.fn();
 		const { container, rerender } = render(
 			<PhoneFeedTrack
@@ -205,7 +205,101 @@ describe("PhoneFeedTrack · D-1 · a programmatic scroll is not a reader changin
 		report("YES", 0.98);
 		expect(onActiveChange).not.toHaveBeenCalledWith("YES");
 
+		// ⛔ A TOUCH THAT HAS NOT MOVED HAS NOT OVERRULED ANYTHING, and releasing
+		// on `pointerdown` put D-1's symptom straight back: tap NO, then touch the
+		// feed inside the ~300ms slide — which is what a reader does next — and
+		// the very next batch is the OLD pane crossing 0.6 downward while the new
+		// one sits at 0.4 and is filtered out. The batch resolves to the pane
+		// being left. Tap NO, land on YES. (`@code-reviewer`.)
 		fireEvent.pointerDown(track);
+		report("YES", 0.98);
+		expect(onActiveChange).not.toHaveBeenCalledWith("YES");
+
+		// MOVEMENT is the signal that the reader is driving.
+		fireEvent.pointerMove(track);
+		report("YES", 0.98);
+		expect(onActiveChange).toHaveBeenCalledWith("YES");
+	});
+
+	it("holds the mute for longer than a slide takes — the backstop must not expire mid-animation", () => {
+		// ⛔ THE `releases the mute on a timeout` ROW PINS ONLY THE CEILING. It
+		// advances 1000ms and demands a release, so `SCROLL_SETTLE_MS` cannot grow
+		// without bound — but nothing stopped it SHRINKING, and shrinking is the
+		// direction that undoes D-1 completely. Measured, not supposed: set to `0`
+		// the constant leaves every other row in this file green, because none of
+		// them advances a clock while the mute is meant to be held. In a browser a
+		// 0ms backstop fires on the next task, some four milliseconds in, and the
+		// observer is listening again long before the slide's ~300ms has played —
+		// which is the whole defect back, with a green suite over it.
+		// ⇒ Advance a realistic slide's worth of time and demand the mute SURVIVE
+		//   it. This row and that one together box the constant into
+		//   (300ms, 1000ms] behaviourally, without either naming its value.
+		vi.useFakeTimers();
+		const onActiveChange = vi.fn();
+		const { container, rerender } = render(
+			<PhoneFeedTrack
+				panes={PANES}
+				active="YES"
+				onActiveChange={onActiveChange}
+			/>,
+		);
+		giveTrackLayout(container, 0);
+		rerender(
+			<PhoneFeedTrack
+				panes={PANES}
+				active="NO"
+				onActiveChange={onActiveChange}
+			/>,
+		);
+
+		vi.advanceTimersByTime(300);
+		report("YES", 0.98);
+		expect(onActiveChange).not.toHaveBeenCalledWith("YES");
+
+		// ── the positive control, in the same shape the rest of this file uses: a
+		//    component that ignored the observer outright would pass the line
+		//    above. The destination's own arrival must still get through, and must
+		//    still end the mute.
+		report("NO", 1);
+		onActiveChange.mockClear();
+		report("YES", 0.99);
+		expect(onActiveChange).toHaveBeenCalledWith("YES");
+	});
+
+	it("releases on `touchmove` as well as `pointermove` — both pointer families", () => {
+		// ⚠ THE `releases the mute when the reader touches the track` ROW FIRES
+		// ONLY `pointerdown`, AND THE SOURCE REGISTERS TWO LISTENERS. Deleting
+		// the `touchstart` one left all five
+		// original rows green — measured. That is not a claim about which event a
+		// given engine sends first (modern iOS Safari does send `pointerdown`); it
+		// is that a listener no test exercises is a listener the next edit can
+		// remove for free, and this one is the only release path that survives a
+		// tree where pointer events are swallowed before they reach the track.
+		const onActiveChange = vi.fn();
+		const { container, rerender } = render(
+			<PhoneFeedTrack
+				panes={PANES}
+				active="YES"
+				onActiveChange={onActiveChange}
+			/>,
+		);
+		const track = giveTrackLayout(container, 0);
+		rerender(
+			<PhoneFeedTrack
+				panes={PANES}
+				active="NO"
+				onActiveChange={onActiveChange}
+			/>,
+		);
+		report("YES", 0.98);
+		expect(onActiveChange).not.toHaveBeenCalledWith("YES");
+
+		// Same contract on the touch pair: `touchstart` alone is not a release.
+		fireEvent.touchStart(track);
+		report("YES", 0.98);
+		expect(onActiveChange).not.toHaveBeenCalledWith("YES");
+
+		fireEvent.touchMove(track);
 		report("YES", 0.98);
 		expect(onActiveChange).toHaveBeenCalledWith("YES");
 	});
@@ -246,8 +340,18 @@ describe("PhoneFeedTrack · D-1 · a programmatic scroll is not a reader changin
 			/>,
 		);
 		// The observer has just confirmed NO and the host re-rendered; the track is
-		// ALREADY at 390, so this render must arm no mute at all.
-		giveTrackLayout(container, 390);
+		// ALREADY at the destination, so this render must arm no mute at all.
+		//
+		// ⚠ 390.4, NOT 390, AND THE FRACTION IS THE POINT. `scrollLeft` is a
+		// double, and a settled snap on a 3× screen lands a few tenths off the
+		// pane's `offsetLeft`; that is why the source compares with a ±1 tolerance
+		// rather than for equality. An exact 390 here made the tolerance
+		// decorative — measured: tightening it to `<= 0` left all five original
+		// rows green, while in a browser it would arm a pointless mute on every
+		// at-rest re-render and swallow the reader's next swipe for the whole
+		// backstop. That is D-1 wearing the other direction, which this file's
+		// own docblock names as the thing the fix must not trade for.
+		giveTrackLayout(container, 390.4);
 		rerender(
 			<PhoneFeedTrack
 				panes={PANES}

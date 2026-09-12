@@ -171,7 +171,14 @@ export function PhoneDebateView({
 		// the PRICE CHART. Publishing `sheet !== null` froze the chart for as long
 		// as somebody read it, which is both a worse product and a divergence from
 		// a ratified sentence. Caught by `@security-auditor`.
-		const composerOpen = sheet?.kind === "post" || sheet?.kind === "reply";
+		// ⚠ AN EXCLUSION, NOT AN ALLOWLIST. Naming the two composer kinds makes a
+		// future composer-bearing shape fail OPEN — the poll would refresh under
+		// a draft, which is the exact harm this suspend exists to prevent. Naming
+		// the two READ-ONLY kinds fails closed instead: an unrecognised shape
+		// suspends, and the worst case is a refresh that does not happen.
+		// (`@code-reviewer`.)
+		const composerOpen =
+			sheet !== null && sheet.kind !== "details" && sheet.kind !== "parent";
 		setPhoneSheetOpen(composerOpen);
 		return () => setPhoneSheetOpen(false);
 	}, [sheet]);

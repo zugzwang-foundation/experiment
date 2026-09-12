@@ -20,10 +20,20 @@ import { useSyncExternalStore } from "react";
  *
  * ⚠ WHY A MEDIA QUERY AND NOT A WIDTH READ. `window.innerWidth` would have to
  * be polled or listened for on `resize`, and would drift from the CSS gate the
- * moment either changed. `--breakpoint-mobile` generates `max-mobile:` at
- * `max-width: 639.98px`, and this subscribes to the SAME query, so the two
- * cannot disagree about where the boundary is. The `.98` is Tailwind's own
- * exclusive-bound spelling and is copied, not invented.
+ * moment either changed. This subscribes to the query Tailwind actually emits,
+ * so the two cannot disagree about where the boundary is.
+ *
+ * ⛔ AND THAT QUERY IS NOT WHAT THIS PARAGRAPH FIRST CLAIMED. It said
+ * `max-width: 639.98px` and called the `.98` "Tailwind's own exclusive-bound
+ * spelling, copied not invented". Measured in this repo's own compiled
+ * stylesheet (`.next/static/chunks/*.css`): `not all and (min-width:640px)`
+ * appears once and the string `639.98` appears **zero** times, against a
+ * positive control of three `min-width:640px` occurrences — so the pattern does
+ * find media queries in that file and the `.98` was simply absent. Caught by
+ * `@code-reviewer`. The 0.02px disagreement was harmless; what was not is that
+ * a change to `--breakpoint-mobile` would have moved the CSS gate and left the
+ * literal behind, silently, which is the whole failure this hook exists to
+ * prevent.
  *
  * ⛔ READ THROUGH `useSyncExternalStore`, NEVER DURING RENDER. A bare
  * `matchMedia(...).matches` in a component body is a hydration mismatch waiting
@@ -39,7 +49,7 @@ import { useSyncExternalStore } from "react";
  * render is unchanged. The neutrality test asserts that directly rather than
  * trusting this paragraph.
  */
-const QUERY = "(max-width: 639.98px)";
+const QUERY = "not all and (min-width: 640px)";
 
 function subscribe(listener: () => void): () => void {
 	if (
