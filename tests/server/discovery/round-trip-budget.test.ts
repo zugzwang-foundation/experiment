@@ -195,7 +195,7 @@ async function composeDiscovery(): Promise<void> {
 	}
 }
 
-describe("Discovery round-trip budget — 1 + 11N (plan §3a, the binding constraint)", () => {
+describe("Discovery round-trip budget — 2 + 10N (plan §3a, the binding constraint)", () => {
 	afterEach(async () => {
 		await truncateTables(testClient, [
 			"events",
@@ -215,7 +215,7 @@ describe("Discovery round-trip budget — 1 + 11N (plan §3a, the binding constr
 		vi.clearAllMocks();
 	});
 
-	it("discovery::round-trip-count-is-1-plus-11N", async () => {
+	it("discovery::round-trip-count-is-2-plus-10N", async () => {
 		// TWO markets, so a per-market cost is distinguishable from a fixed one:
 		// a guard at N=1 cannot tell 1+12N from 13, and would miss a regression
 		// that adds a constant read.
@@ -227,12 +227,28 @@ describe("Discovery round-trip budget — 1 + 11N (plan §3a, the binding constr
 		await composeDiscovery();
 		const N = 2;
 
-		// 1 outer market list
-		//   + N getMarketPricingAndReserves + N getMarketTotals + N media
+		// 1 outer market list + 1 BATCHED pricing read
+		//   + N getMarketTotals + N media
 		//   + 3N replayReserveSeries (events·opened / bets / events·bet.*)
 		//   + 5N selectHeroTopPosts (substrate / removedSet / picked / authors
 		//                            / ordinals)
-		// = 1 + 11N. 23 at N=2.
+		// = 2 + 10N. 22 at N=2.
+		//
+		// ⚠ THE PIN MOVED AGAIN AT T-03 — 1+11N → 2+10N — AND THE SHAPE OF THE
+		// MOVE MATTERS MORE THAN ITS SIZE. A per-market term became a CONSTANT:
+		// `getMarketPricingAndReserves` was called once per market and awaited in
+		// series, so the live price cost one round trip per market, every render,
+		// uncacheably. `getMarketPricingAndReservesBatch` reads every pool in one
+		// `IN (…)`. At N=2 that is a single statement saved and looks trivial; at
+		// the shipped `DISCOVERY_GRID_SIZE` of 8 it is seven statements and, more
+		// to the point, EIGHT SEQUENTIAL ROUND TRIPS COLLAPSED INTO ONE.
+		//
+		// ⚠ AND IT WAS DELIBERATELY NOT DONE WITH `Promise.all`. Parallelising the
+		// singular read would have fixed the same latency while making the open
+		// connection bottleneck worse — eight concurrent reads per visitor against
+		// a pool capped at four per instance. The batch takes one connection once.
+		// A future change that "simplifies" this back to a per-market read inside
+		// the loop reddens here, which is the point of pinning a decrease.
 		//
 		// ⚠ THE PIN MOVED DOWN BY N AT CHART-1 — 1+12N → 1+11N — AND A DECREASE
 		// IS RE-PINNED DELIBERATELY RATHER THAN LEFT SLACK. The dropped statement
@@ -251,7 +267,7 @@ describe("Discovery round-trip budget — 1 + 11N (plan §3a, the binding constr
 		// can move, so it is derived once per window instead of once per bet, and
 		// no statement-count assertion can see that. Stated here so the modest
 		// −N is not mistaken for the whole result.
-		expect(executed).toBe(1 + 11 * N);
+		expect(executed).toBe(2 + 10 * N);
 	});
 
 	it("discovery::the-V13-lateral-is-not-a-round-trip", async () => {
@@ -314,7 +330,14 @@ function functionBlock(source: string, name: string): string {
 describe("Discovery cache boundary — R3 (price/reserves never cached)", () => {
 	it("card.pricing is assigned from the LIVE read, never from the cached one", () => {
 		const page = read("src/app/(public)/page.tsx");
-		expect(page).toContain("getMarketPricingAndReserves(db, m.id)");
+		// T-03 — the live read is now BATCHED ahead of the loop rather than
+		// issued per market inside it. What R3 actually protects is unchanged and
+		// is the second assertion: `pricing` is assigned from the LIVE read,
+		// never from the cached block. The first assertion pins the batch call so
+		// a revert to a per-market read inside the loop reddens here as well as
+		// in the round-trip count above.
+		expect(page).toContain("getMarketPricingAndReservesBatch(");
+		expect(page).toContain("priceByMarket.get(m.id) ?? null");
 		expect(page).toContain("pricing: priced?.pricing ?? null");
 		// The negative half: the cached call's result must never feed `pricing`.
 		expect(page).not.toMatch(/pricing:\s*data\./);

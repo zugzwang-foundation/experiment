@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/discovery/EmptyState";
 import { ErrorState } from "@/components/discovery/ErrorState";
 import { LoadingSkeleton } from "@/components/discovery/LoadingSkeleton";
 import { db } from "@/db";
-import { getMarketPricingAndReserves } from "@/server/debate-view/market-pricing";
+import { getMarketPricingAndReservesBatch } from "@/server/debate-view/market-pricing";
 import {
 	getCachedDiscoveryMarketIds,
 	getCachedMarketDiscoveryData,
@@ -104,9 +104,22 @@ export async function DiscoveryContent() {
 	try {
 		await recordCacheAttempt("discovery-list", null);
 		const marketIds = await getCachedDiscoveryMarketIds();
+		// T-03 — ONE pool read for every market on the surface, not one per
+		// market in series. This read is deliberately never cached (it is the
+		// live price), so before batching every visitor paid one round trip per
+		// open market, sequentially, before the page could render. Batching is
+		// the right shape rather than `Promise.all` precisely because the open
+		// connection bottleneck is what hurts here: this takes ONE connection
+		// once, where concurrent singular reads would take one per market at the
+		// worst possible moment. `priceByMarket.get(id) ?? null` below reproduces
+		// the singular read's defensive-null contract for a market with no pool.
+		const priceByMarket = await getMarketPricingAndReservesBatch(
+			db,
+			marketIds.map((m) => m.id),
+		);
 		views = [];
 		for (const m of marketIds) {
-			const priced = await getMarketPricingAndReserves(db, m.id);
+			const priced = priceByMarket.get(m.id) ?? null;
 			await recordCacheAttempt("market-data", m.id);
 			const data = await getCachedMarketDiscoveryData(
 				m.id,

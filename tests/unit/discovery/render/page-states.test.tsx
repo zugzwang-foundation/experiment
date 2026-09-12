@@ -64,8 +64,10 @@ vi.mock("@/server/discovery/list", () => ({
 	getCachedDiscoveryMarketIds: vi.fn(),
 	getCachedMarketDiscoveryData: vi.fn(),
 }));
+// T-03 — the page now takes ONE batched pricing read ahead of the loop instead
+// of one per market inside it, so this is the name the page imports.
 vi.mock("@/server/debate-view/market-pricing", () => ({
-	getMarketPricingAndReserves: vi.fn(),
+	getMarketPricingAndReservesBatch: vi.fn(),
 }));
 // RELAY C2 — the page's new attempt-counter call (`recordCacheAttempt`) is a
 // fourth thing the page itself touches directly (the other three above are
@@ -84,7 +86,7 @@ import * as page from "@/app/(public)/page";
 import { EMPTY_COPY } from "@/components/discovery/EmptyState";
 import { ERROR_COPY } from "@/components/discovery/ErrorState";
 import { LoadingSkeleton } from "@/components/discovery/LoadingSkeleton";
-import { getMarketPricingAndReserves } from "@/server/debate-view/market-pricing";
+import { getMarketPricingAndReservesBatch } from "@/server/debate-view/market-pricing";
 import type { HeroTopPosts } from "@/server/discovery/hero";
 import {
 	type DiscoveryCard,
@@ -174,16 +176,30 @@ function primeHappyLoaders(n: number): DiscoveryCard[] {
 	vi.mocked(getCachedDiscoveryMarketIds).mockResolvedValue(
 		list.map((c) => ({ id: c.id, slug: c.slug, title: c.title })),
 	);
-	vi.mocked(getMarketPricingAndReserves).mockImplementation(
-		async (_client, marketId) => {
-			const card = list.find((c) => c.id === marketId);
-			return card?.pricing
-				? {
+	// T-03 — one batched read returning a Map. A card with no `pricing` is
+	// simply ABSENT from the map, which is how the batch reproduces the singular
+	// read's defensive-null contract (`map.get(id) ?? null` at the call site).
+	vi.mocked(getMarketPricingAndReservesBatch).mockImplementation(
+		async (_client, marketIds) => {
+			const byMarket = new Map<
+				string,
+				{
+					pricing: { yes: string; no: string };
+					reserves: { yes: string; no: string };
+					unitToWin: { yes: string; no: string };
+				}
+			>();
+			for (const id of marketIds) {
+				const card = list.find((c) => c.id === id);
+				if (card?.pricing) {
+					byMarket.set(id, {
 						pricing: card.pricing,
 						reserves: { yes: "1", no: "1" },
 						unitToWin: { yes: "1", no: "1" },
-					}
-				: null;
+					});
+				}
+			}
+			return byMarket;
 		},
 	);
 	vi.mocked(getCachedMarketDiscoveryData).mockImplementation(
@@ -242,10 +258,18 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 			{ yes: "1", no: "1" },
 		);
 
-		// R3 — pricing is read LIVE, once per market, OUTSIDE the cached block.
-		// If this ever stopped being called per market, price would be coming
-		// from cache, which is the one thing the boundary exists to prevent.
-		expect(vi.mocked(getMarketPricingAndReserves)).toHaveBeenCalledTimes(2);
+		// R3 — pricing is read LIVE, OUTSIDE the cached block. T-03 made that one
+		// batched read rather than one per market, so the assertion moved from
+		// "called twice" to "called once, for both markets": what R3 protects is
+		// that price comes from a live read at all, not how many statements it
+		// takes. Asserting the id list is what keeps a batch that silently
+		// dropped a market from passing.
+		expect(vi.mocked(getMarketPricingAndReservesBatch)).toHaveBeenCalledTimes(
+			1,
+		);
+		expect(
+			vi.mocked(getMarketPricingAndReservesBatch).mock.calls[0]?.[1],
+		).toHaveLength(2);
 
 		// Neither sibling state leaks into the happy path.
 		expect(screen.queryByTestId("discovery-empty")).toBeNull();
@@ -264,9 +288,14 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 		// No hero, no grid (plan §5 zero-markets row)…
 		expect(screen.queryByTestId("discovery-carousel")).toBeNull();
 		expect(screen.queryAllByTestId("market-card")).toHaveLength(0);
-		// …and NEITHER per-market read runs on an empty list — the live pricing
-		// read included, which is new at Phase C and must not fire either.
-		expect(vi.mocked(getMarketPricingAndReserves)).not.toHaveBeenCalled();
+		// …and NEITHER read runs on an empty list. ⚠ T-03 note: the batched
+		// pricing read IS now called on an empty list — with an empty array,
+		// which it short-circuits without touching the database — so the
+		// assertion is about the STATEMENT, not the call: it must receive no
+		// market ids, which is what makes "no query issued" true.
+		expect(
+			vi.mocked(getMarketPricingAndReservesBatch).mock.calls[0]?.[1] ?? [],
+		).toHaveLength(0);
 		expect(vi.mocked(getCachedMarketDiscoveryData)).not.toHaveBeenCalled();
 	});
 
@@ -305,11 +334,18 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 		vi.mocked(getCachedDiscoveryMarketIds).mockResolvedValue(
 			list.map((c) => ({ id: c.id, slug: c.slug, title: c.title })),
 		);
-		vi.mocked(getMarketPricingAndReserves).mockResolvedValue({
-			pricing: { yes: "0.5", no: "0.5" },
-			reserves: { yes: "1", no: "1" },
-			unitToWin: { yes: "1", no: "1" },
-		});
+		vi.mocked(getMarketPricingAndReservesBatch).mockResolvedValue(
+			new Map(
+				list.map((c) => [
+					c.id,
+					{
+						pricing: { yes: "0.5", no: "0.5" },
+						reserves: { yes: "1", no: "1" },
+						unitToWin: { yes: "1", no: "1" },
+					},
+				]),
+			),
+		);
 		vi.mocked(getCachedMarketDiscoveryData)
 			.mockResolvedValueOnce({
 				totals: list[0].totals,

@@ -113,7 +113,14 @@ describe("V13 reserves never cross the client boundary", () => {
 		// serialize an internal `pools` row into the browser.
 
 		// Read live, into a local — never onto the view.
-		expect(page).toContain("getMarketPricingAndReserves(db, m.id)");
+		// ⚠ T-03 changed the SHAPE of this read, not the property. The
+		// per-market `getMarketPricingAndReserves(db, m.id)` became one batched
+		// read ahead of the loop, with each market's row taken from a
+		// server-local Map. Reserves still land in a server-local binding
+		// (`priced`), still reach only a server function, and still never touch
+		// the card — which is the whole of what this guard protects.
+		expect(page).toContain("getMarketPricingAndReservesBatch(");
+		expect(page).toContain("priceByMarket.get(m.id) ?? null");
 		// …and passed to the cached server function as an argument. Matched
 		// whitespace-insensitively on purpose: pinning exact indentation here
 		// would make this guard fail on a Biome reformat, which is noise rather

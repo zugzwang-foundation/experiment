@@ -193,7 +193,16 @@ export async function getCachedMarketDiscoveryData(
 ): Promise<CachedMarketDiscoveryData> {
 	"use cache";
 	cacheLife("minutes");
-	cacheTag("discovery");
+	// ⚠ NO `cacheTag("discovery")` HERE, DELIBERATELY — and the asymmetry with
+	// `getCachedDiscoveryMarketIds` above is the point. `revalidateTag("discovery")`
+	// fires on market open / close / void (`markets/open.ts`, `markets/close.ts`,
+	// `admin/markets/void.ts`), all of which change WHICH markets the listing
+	// carries — that is the listing's business and the listing block above is
+	// tagged for it. None of them changes ANOTHER market's totals, media, series
+	// or top posts, which is all this block holds. Carrying the tag here meant one
+	// admin opening one market evicted every market's cached block site-wide.
+	// A market whose own lifecycle moved simply leaves the listing, so its entry
+	// here goes unread and expires on its own — there is no staleness to bust.
 	cacheTag(`market:${marketId}`);
 
 	const totals = await getMarketTotals(db, marketId);
