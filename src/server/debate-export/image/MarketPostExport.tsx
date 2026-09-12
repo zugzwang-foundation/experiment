@@ -1,5 +1,15 @@
 import type { CSSProperties } from "react";
 
+import {
+	GEIST_QUOTE_INK,
+	GEIST_QUOTE_TOP,
+	GEIST_QUOTE_TOP_CLOSE,
+	QUOTE_CANVAS,
+	QUOTE_TYPE,
+	quoteMarkSize,
+	quoteTitleSize,
+} from "@/components/debate/quote-well/size";
+
 import type { PostExportProps } from "./compose";
 import { CHART_Y_GUTTER, PriceHistorySvg } from "./PriceHistorySvg";
 import { ACCENT, PALETTE } from "./palette";
@@ -705,18 +715,29 @@ export function MarketPostExport(props: PostExportProps) {
 					    ⚠ BOLD, AND `AVG_ADVANCE` ABOVE IS PAIRED TO IT: bold glyphs are
 					    wider, so the weight is not a free change — move it and the fit
 					    is wrong until the advance moves with it. */}
-					<div
-						style={{
-							display: "block",
-							fontSize: u(quoteType),
-							fontWeight: 700,
-							lineHeight: 1.25,
-							lineClamp: QUOTE_LINES,
-							overflow: "hidden",
-						}}
-					>
-						{`“${post.title}”`}
-					</div>
+					{/* ⛔⛔ THE TITLE ROW IS THE IMAGE ARM'S ROW, exactly as it is on the
+					    card (QUOTE-1 C, design-canon `C-QUOTE-1` clause 2, founder-ruled
+					    2026-09-11). An imageless post does not get a title here AND a well
+					    below it — that would put the same sentence on the picture twice,
+					    which is the defect `PostCard.tsx` names in the same words.
+					    ⚠ THE CONDITION IS `post.imageUrl`, THE SAME ONE THE CELL BELOW
+					    READS, and deliberately not a second predicate — two tests for "does
+					    this post have an attachment" is how a card ends up with both or
+					    with neither. The page makes the same choice off the same field. */}
+					{post.imageUrl ? (
+						<div
+							style={{
+								display: "block",
+								fontSize: u(quoteType),
+								fontWeight: 700,
+								lineHeight: 1.25,
+								lineClamp: QUOTE_LINES,
+								overflow: "hidden",
+							}}
+						>
+							{`“${post.title}”`}
+						</div>
+					) : null}
 
 					{/* ⛔ THE ARGUMENT TEXT STOOD HERE AND IS GONE — operator ruling,
 					    revision 5. It was clamped to three lines beside an image and
@@ -781,12 +802,18 @@ export function MarketPostExport(props: PostExportProps) {
 								}}
 							/>
 						) : (
-							/* The placeholder fills the same box. It gives up the 640:586
-							   shape the fixed version drew, and the LABEL is what carried
-							   that information anyway. */
-							<div style={{ ...placeholderBox, width: "100%", height: "100%" }}>
-								POST IMAGE · 640:586
-							</div>
+							/* ⛔ `POST IMAGE · 640:586` STOOD HERE AND IS GONE. It was the last
+							   mockup placeholder left anywhere in this product: QUOTE-1 A
+							   deleted the component from the page, and the export kept a copy
+							   of a box the page had already stopped drawing — so an imageless
+							   post exported a label naming a picture that does not exist.
+							   The well is what the page puts there instead. */
+							<QuoteWell
+								title={post.title}
+								width={INNER_W}
+								u={u}
+								hairline={hairline}
+							/>
 						)}
 					</div>
 
@@ -1328,6 +1355,116 @@ function Countdown({
 					</div>
 				))}
 			</div>
+		</div>
+	);
+}
+
+/**
+ * THE TITLE-AS-QUOTATION WELL — the picture an imageless post brings with it.
+ *
+ * ⛔ THE GEOMETRY IS IMPORTED, NOT RESTATED. `quote-well/size.ts` is pure
+ * arithmetic with no React in it, so the canvas, the type ramp, the mark
+ * multiplier and the three measured font constants all come from the file the
+ * page sizes its own well with. That is the same discipline the chart follows
+ * with `geometry.ts`, and for the same reason: a well in the export that is a
+ * SECOND implementation of the page's well is a well that will one day size the
+ * same title differently, and the export is the copy that travels.
+ *
+ * ⚠ ONE SCALE FACTOR, AND IT IS VERY NEARLY ONE. The well is authored at 545
+ * units wide; this card's inner column is 548. So `k` is 1.0055 and the picture
+ * is essentially the page's at 1:1 — which is luck rather than design, and is
+ * written as a ratio anyway so that retuning `PAD`, `GAP` or the frame does not
+ * silently stretch the type.
+ *
+ * ⚠ THE UPPERCASE IS APPLIED TO THE STRING, NOT TO A STYLE, and that inverts
+ * the page's choice for a reason the page states: it keeps `post.title` verbatim
+ * in the DOM so that a copy-paste, a screen reader AND THIS EXPORT get what the
+ * author wrote. Here there is no DOM to preserve — the output is a picture — so
+ * the transform happens where it can be seen to happen.
+ *
+ * ⛔⛔ EACH MARK'S BOX IS ITS INK, WHICH IS THE ONE PIECE OF MACHINERY, and it
+ * is transposed rather than copied. A `“` at `lineHeight: 1` occupies a full em
+ * of layout for 0.311 em of ink, so laying this column out on line boxes would
+ * spend most of the content height on whitespace and pay for it in type size —
+ * the page's `quoteTitleSize` budget assumes the ink model, so using anything
+ * else here would make the imported arithmetic describe a render that does not
+ * exist. The page shifts the paint with `position: relative; top`, which has no
+ * flow effect. Satori's support for that is not something a deterministic export
+ * should rest on, so the shift is a NEGATIVE `marginTop` with the same figure
+ * added back as `marginBottom`: the paint moves up, the flow contribution stays
+ * exactly the ink. The two marks carry different offsets because they sit at
+ * different heights — 0.129 em against 0.145 em, which `size.ts` measured.
+ */
+function QuoteWell({
+	title,
+	width,
+	u,
+	hairline,
+}: {
+	title: string;
+	/** The card's inner column, in base units — the well's width. */
+	width: number;
+	u: (n: number) => number;
+	hairline: string;
+}) {
+	const k = width / QUOTE_CANVAS.w;
+	const authored = quoteTitleSize(title.length);
+	const size = authored * k;
+	const mark = quoteMarkSize(authored) * k;
+	const ink = GEIST_QUOTE_INK * mark;
+
+	/** Same for both marks bar the offset — see the docblock. */
+	const markStyle = (top: number): CSSProperties => ({
+		display: "flex",
+		fontSize: u(mark),
+		lineHeight: 1,
+		height: u(ink),
+		marginTop: u(-top * mark),
+		marginBottom: u(top * mark),
+		fontWeight: 700,
+		color: PALETTE.n4,
+	});
+
+	return (
+		<div
+			style={{
+				display: "flex",
+				flexDirection: "column",
+				alignItems: "center",
+				justifyContent: "center",
+				width: u(width),
+				height: u(QUOTE_CANVAS.h * k),
+				// ⚠ `pad` IS THE TOTAL INSET, so the hairline is inside it — 23 + 1,
+				// exactly as the page writes it. Taking the padding at face value makes
+				// the content box two units bigger than the budget believes, on a box
+				// that clips.
+				padding: u((QUOTE_CANVAS.pad - 1) * k),
+				gap: u(QUOTE_TYPE.gap * k),
+				backgroundColor: PALETTE.n1,
+				border: hairline,
+				borderRadius: u(6),
+				// The page's backstop, kept: a title that beats the estimate clips
+				// inside the canvas rather than growing the box and pushing the split
+				// bar off the card.
+				overflow: "hidden",
+				flexShrink: 0,
+			}}
+		>
+			<div style={markStyle(GEIST_QUOTE_TOP)}>{"“"}</div>
+			<div
+				style={{
+					display: "block",
+					textAlign: "center",
+					fontSize: u(size),
+					fontWeight: 700,
+					lineHeight: QUOTE_TYPE.lineHeight,
+					letterSpacing: u(QUOTE_TYPE.tracking * size),
+					color: PALETTE.ink,
+				}}
+			>
+				{title.toUpperCase()}
+			</div>
+			<div style={markStyle(GEIST_QUOTE_TOP_CLOSE)}>{"”"}</div>
 		</div>
 	);
 }
