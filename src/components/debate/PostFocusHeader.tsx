@@ -70,7 +70,6 @@ export function PostFocusHeader({
 	onOpenPopup: (post: PresentPost) => void;
 }) {
 	const replyCount = post.aggregate.supportCount + post.aggregate.counterCount;
-	const isReplying = activeRelation !== null;
 	return (
 		<HeadZone
 			// ⚠⚠ UI-OVERNIGHT entry 3 — THIS ARM IS CONTENT-SIZED. The band's
@@ -120,16 +119,14 @@ export function PostFocusHeader({
 					pricing={market.pricing}
 					totals={market.totals}
 					onExit={onExit}
-					compact={isReplying}
+					compact={true}
 				/>
 			}
 			left={
 				/* ⚠ The focused post's card FILLS the headzone band, so `.hpimg` beside
 				   it can be height-driven exactly as the market arm's `.mmedia` is.
 				   `min-h-0` is its link in the one-screen chain. */
-				<Card
-					className={`min-h-0 flex-1 ${isReplying ? "gap-1 p-2" : "gap-2.5 p-3.5"} [transition:padding_200ms,gap_200ms]`}
-				>
+				<Card className="min-h-0 flex-1 gap-2 p-3 bg-gradient-to-b from-card to-card/90 border border-white/10 shadow-sm">
 					{/* HTML-FINISH · MARKET DETAIL row 11 — `.hleft` IS A ROW, NOT A
 					    STACK (`d5:448`, `flex:1 1 auto;min-width:0;display:flex;gap:16px`).
 					    The focused post's image is `.hpimg` (`:956`) — a LEFT SIBLING of
@@ -169,7 +166,7 @@ export function PostFocusHeader({
 					    badge cut 33px, eight elements with `scrollWidth > clientWidth`.
 					    Anything measuring this row measures the clipping ancestor's
 					    descendants, never the document. */}
-					<div className="flex min-h-0 flex-1 gap-4 max-mobile:flex-col">
+					<div className="flex min-h-0 flex-1 gap-4 items-center max-mobile:flex-col max-mobile:items-start">
 						{/* ⛔ QUOTE-1 A — THE EMPTY ARM AND ITS WHOLE FRAME ARE GONE
 						    (founder-ruled 2026-09-11). R2 had filled the post-focus
 						    `.hpimg` with d5's `POST IMAGE` box (`d5:1491-1492`) whenever
@@ -189,34 +186,21 @@ export function PostFocusHeader({
 						    rather than flattened — the two arms mean different things. */}
 						{post.removed ? null : post.imageUrl ? (
 							// `.hpimg{flex:0 0 auto}` — does not grow, does not shrink,
-							// sized by its own content. `CommentImage` already renders
-							// `block w-fit` around a height-bounded image, so `shrink-0` is
-							// the whole port.
-							// ⛔ `aspect-ratio:16/9` + `overflow:hidden` are NOT taken. That
-							// pair CROPS, and T2 (§17 H-T2, RULED 2026-08-13) binds BOTH
-							// axes as bounds so the image is "shown whole · any orientation"
-							// (canon §107, the promise to the author). d5 AGREES: its own
-							// comment at `:955` reads "shown whole at its own aspect; flag 1
-							// paused", so the cropping rule is the paused variant, not the
-							// ratified one. `CommentImage` is untouched.
-							<div className="shrink-0">
+							// sized by its own content. Framed in a clean preview thumbnail
+							// that respects any orientation (portrait, landscape, square)
+							// without clipping or awkward sliver sizing.
+							<div className="shrink-0 flex items-center justify-center self-center overflow-hidden rounded-[var(--imgr)] bg-n1/60 [border:var(--hairline)]">
 								<CommentImage
 									url={post.imageUrl}
 									onOpen={onOpenImage}
-									className={
-										isReplying
-											? "h-auto max-h-[44px] w-auto object-contain"
-											: "max-h-[var(--imgmax)]"
-									}
+									className="h-16 w-16 sm:h-[72px] sm:w-[72px] object-contain p-0.5 transition-transform hover:scale-105"
 								/>
 							</div>
 						) : null}
 
 						{/* `.hstack` (`d5:462`, `flex:1 1 auto;min-width:0;flex-direction:
 						    column`) — everything that is not the image. */}
-						<div
-							className={`flex min-h-0 min-w-0 flex-1 flex-col ${isReplying ? "gap-1" : "gap-2"}`}
-						>
+						<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 justify-center">
 							{post.removed ? (
 								<>
 									<SideBadge side={post.sideAtPostTime} />
@@ -240,57 +224,18 @@ export function PostFocusHeader({
 										createdAt={post.createdAt}
 										badge={post.badge}
 									/>
-									<h2
-										className={`font-heading ${isReplying ? "text-sm line-clamp-1" : "text-lg"} leading-snug font-medium`}
-									>
-										{post.title}
-									</h2>
-									{/* ⚠⚠ UI-OVERNIGHT entry 3 — THE INLINE TEASER IS GONE FROM THIS
-									    HEADER, and what it cost is the reason. d5's `.tease` (`:972`)
-									    is a two-line body teaser, and row 15 had already narrowed it
-									    from the whole body to a clamped preview because an unclamped
-									    one pushed the reply arena below the fold. The clamp bought
-									    room; it did not buy enough. The band this header sits in is a
-									    fraction of the viewport, and with a title, an author row, two
-									    lines of teaser and a split bar inside it, the bar and the stake
-									    summary under it were CLIPPED — the reader saw an argument and
-									    no way to answer it.
-									    ⇒ Post-focus is where you READ an argument and then reply. Two
-									    lines of preview are not reading, and they were being paid for
-									    with the control that makes the surface work.
-									    ⚠ THE FULL BODY IS NOT LOST — one click away in the pop-up, and
-									    still whole in the ADR-0025 `.md` export.
-									    ⛔ `post.teaser` IS STILL ON THE WIRE and still derived; nothing
-									    server-side changes, and a surface that wants it back needs only
-									    to render it. Same posture `HeroPanels` took when its own teaser
-									    was removed. */}
-									{/* ⚠⚠ UI-QUICK change set 2 item 2 — `Know more` REPLACES THE
-									    GLYPH, and the superseded note is the reason it had to. It read:
-									    "Byte-carried from the mockup's own control (`d5:972`,
-									    `aria-label='Show more'`) — the same string the card's `+`
-									    carries, because it is the same action." The second clause is the
-									    binding one: it IS the same action, so once the card's control
-									    became text this one had to follow or the claim stopped being
-									    true. ⛔ The byte-carried label does not survive the relabel — a
-									    button reading `Know more` named `Show more` fails WCAG 2.5.3
-									    (Label in Name). Mockup fidelity loses to the success criterion;
-									    `KnowMore.tsx` owns the rule for every mount.
-									    ⚠ UI-OVERNIGHT entry 5 — ONLY WHEN THERE IS MORE TO SHOW, and
-									    that reverses d5's "hidden-but-reserved when bodyless". On a
-									    post with no second paragraph the full body IS the title, so the
-									    pop-up showed the reader the sentence they had just read.
-									    ⚠ `self-end` REPLACES the flex row this control shared with the
-									    teaser. With the teaser gone that row held one child, and a
-									    one-child `justify-between` row is a wrapper that does nothing —
-									    except add a `gap-3` of empty space on the posts that render no
-									    control at all. */}
-									{!isReplying && hasExtendedText(post.body) ? (
-										<KnowMore
-											label="Know more about this argument"
-											onClick={() => onOpenPopup(post)}
-											className="self-end"
-										/>
-									) : null}
+									<div className="flex items-baseline justify-between gap-2 min-w-0">
+										<h2 className="font-heading text-sm leading-snug font-medium line-clamp-1 min-w-0 flex-1">
+											{post.title}
+										</h2>
+										{hasExtendedText(post.body) ? (
+											<KnowMore
+												label="Know more about this argument"
+												onClick={() => onOpenPopup(post)}
+												className="shrink-0"
+											/>
+										) : null}
+									</div>
 								</>
 							)}
 

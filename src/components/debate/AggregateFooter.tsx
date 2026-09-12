@@ -311,13 +311,11 @@ function TriggerPill({
 		oppositeHeld && heldSide !== null
 			? c3OppositeSide({ held: heldSide, resulting: resultingSide })
 			: null;
-	// Black-pill exception: 0.5px n2 edge (values-log §1 item 8) — `--color-yes`
-	// is #181818 against a #212121 card, so the pole needs its own edge to have
-	// any visible extent at all.
+	// Black-pill exception: 0.5px n2 edge (values-log §1 item 8).
 	const pole =
 		resultingSide === "YES"
-			? "bg-yes text-no border-[0.5px] border-n2"
-			: "bg-no text-yes [border:var(--hairline)]";
+			? "bg-yes text-no border-[0.5px] border-n2 shadow-xs hover:bg-neutral-200 hover:text-black cursor-pointer active:scale-95"
+			: "bg-no text-yes border border-white/25 shadow-xs hover:bg-neutral-800 hover:border-white/60 hover:text-white cursor-pointer active:scale-95";
 	// C3 precedence (INFO-1 §3.4): a viewer blocked by the single-side rule is
 	// told why they are blocked, not given the relation's definition. The
 	// glossary gloss fills the null branch only — c3 still wins outright.
@@ -336,7 +334,7 @@ function TriggerPill({
 				}
 				onClick={() => onReply(relation)}
 				className={cn(
-					"rounded-(--r-chip) px-3 py-1 text-xs font-bold transition-all hover:shadow-(--state-hover-glow-pole) focus-visible:shadow-(--state-focus-ring) active:shadow-(--state-pressed-glow-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)",
+					"w-[78px] h-6 flex items-center justify-center rounded-(--r-chip) text-xs font-bold transition-all hover:shadow-(--state-hover-glow-pole) focus-visible:shadow-(--state-focus-ring) active:shadow-(--state-pressed-glow-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)",
 					pole,
 				)}
 			>
