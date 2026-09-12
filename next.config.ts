@@ -61,6 +61,15 @@ const nextConfig: NextConfig = {
 		// request time (context.ts, runtime-computed path @vercel/nft cannot trace).
 		// Force it into the route's traced bundle, mirroring the /api/health key.
 		"/m/[slug]/export": ["./public/zugzwang.md"],
+		// POST-IMAGE-EXPORT — the PNG export route reads its Geist TTFs from
+		// disk at request time (`fonts.ts`, `process.cwd()`-rooted path). Same
+		// mechanism, same reason as the two keys above.
+		"/m/[slug]/export/image": [
+			"./src/server/debate-export/image/fonts/*.ttf",
+			// The band's Zugzwang mark (`logo.ts`), read from `public/brand/` at
+			// request time for the same reason and by the same mechanism.
+			"./public/brand/zugzwang-mark.svg",
+		],
 	},
 };
 

@@ -86,6 +86,9 @@ importers:
       shadcn:
         specifier: ^4.7.0
         version: 4.7.0(@types/node@20.19.39)(typescript@5.9.3)
+      sharp:
+        specifier: 0.35.3
+        version: 0.35.3(@types/node@20.19.39)
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
@@ -6758,8 +6761,7 @@ snapshots:
     dependencies:
       hono: 4.12.18
 
-  '@img/colour@1.1.0':
-    optional: true
+  '@img/colour@1.1.0': {}
 
   '@img/sharp-darwin-arm64@0.35.3':
     optionalDependencies:
@@ -10551,8 +10553,7 @@ snapshots:
 
   semver@7.7.4: {}
 
-  semver@7.8.5:
-    optional: true
+  semver@7.8.5: {}
 
   send@1.2.1:
     dependencies:
@@ -10660,7 +10661,6 @@ snapshots:
       '@img/sharp-win32-ia32': 0.35.3
       '@img/sharp-win32-x64': 0.35.3
       '@types/node': 20.19.39
-    optional: true
 
   shebang-command@2.0.0:
     dependencies:

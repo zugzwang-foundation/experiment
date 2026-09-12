@@ -45,6 +45,9 @@ const { refreshMock, routerMock } = vi.hoisted(() => {
 });
 
 vi.mock("next/navigation", () => ({
+	// POST-IMAGE-EXPORT — `DownloadPostImage` reads the market slug from the
+	// route; a mock without `useParams` throws at the first post card render.
+	useParams: () => ({ slug: "bitcoin-price-50k" }),
 	useRouter: () => routerMock,
 	usePathname: () => "/m/bitcoin-price-50k",
 	useSearchParams: () => new URLSearchParams(),

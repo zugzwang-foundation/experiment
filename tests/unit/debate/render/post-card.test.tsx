@@ -180,11 +180,14 @@ describe("POLISH.3 PR 2 — PostCard's disabled write triggers and Read more", (
 		).toBe(false);
 	});
 
-	it("post-card::the-download-placeholder-sits-left-of-Know-more-and-is-inert", () => {
-		// UI-QUICK change set 1 item 5. ⛔ A PLACEHOLDER THAT READS AS A WORKING
-		// CONTROL IS THE DEFECT — it must be inert to the pointer, inert to the
-		// keyboard, and announced as unavailable, or it promises a download this
-		// build cannot perform.
+	it("post-card::the-download-mark-sits-left-of-Know-more-and-is-inert-without-a-route", () => {
+		// UI-QUICK change set 1 item 5, amended at POST-IMAGE-EXPORT. The mark is
+		// a WORKING control now (`DownloadPostImage`), but the property this test
+		// pinned survives as a CONDITION: with no `/m/[slug]` route params — which
+		// is what this harness has — it cannot build a URL, so it must be inert to
+		// the pointer, inert to the keyboard, and announced as unavailable rather
+		// than promise a download it cannot perform. The working case, with a
+		// route, is `download-post-image.test.tsx`.
 		const { container } = renderCard();
 
 		const download = container.querySelector<HTMLButtonElement>(
@@ -193,8 +196,8 @@ describe("POLISH.3 PR 2 — PostCard's disabled write triggers and Read more", (
 		expect(download).not.toBeNull();
 		expect(download?.disabled).toBe(true);
 		expect(download?.getAttribute("aria-disabled")).toBe("true");
-		// No handler and no navigation — a placeholder with an href would be a
-		// working control wearing a disabled costume.
+		// Never navigation — the download is a fetch, not an anchor, so a 404
+		// page can never be saved as a `.png`.
 		expect(download?.getAttribute("href")).toBeNull();
 
 		// ⚠ ORDER IS PART OF THE ASK ("to the LEFT of Know more, same row"), and
