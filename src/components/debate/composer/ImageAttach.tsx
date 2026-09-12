@@ -202,7 +202,17 @@ function EmptySlotFigure({ className }: { className: string }) {
 			>
 				{headTwo}
 			</text>
-			{/* The instruction. Separated, not stacked — see the docblock. */}
+			{/* The instruction. Styled as a sleek button pill affordance. */}
+			<rect
+				x="40"
+				y="204"
+				width="120"
+				height="26"
+				rx="6"
+				fill="var(--color-n2)"
+				stroke="var(--color-n3)"
+				strokeWidth="1"
+			/>
 			<text
 				x="100"
 				y="221"
@@ -210,7 +220,7 @@ function EmptySlotFigure({ className }: { className: string }) {
 				fontSize="11"
 				fontWeight="700"
 				letterSpacing="0.6"
-				fill="var(--color-n6)"
+				fill="var(--color-ink)"
 			>
 				{EMPTY_SLOT_COPY.action}
 			</text>
@@ -415,38 +425,13 @@ export function ImageAttach({
 	// `preserveAspectRatio="xMidYMid meet"`, so it fits, stays centred, keeps
 	// its ratio, and never clips or scrolls at any height.
 	const panel =
-		"flex h-full min-h-48 min-w-0 flex-col items-center justify-center gap-2 rounded-(--imgr) p-3 text-center text-xs [border:var(--hairline)]";
+		"flex h-full min-h-40 min-w-0 flex-col items-center justify-between rounded-(--imgr) p-1 text-center text-xs [border:var(--hairline)] bg-n1/40 group hover:border-n4 transition-colors cursor-pointer";
 	// `.imgprev` — d5's `width:100%; aspect-ratio:4/5; max-height:calc(100% - 22px)`
 	// ported as PROPORTIONS ONLY: the `- 22px` is a value and is refused, so the
-	// clamp lands as `max-h-full`. Keeping d5's height clamp is what stops the
+	// clamp lands as `max-h-[192px]`. Keeping d5's height clamp is what stops the
 	// preview from driving the composer's height off the grid row.
 	const preview =
-		// ⚠⚠ change set 10 §1 — THE ART'S HEIGHT IS CAPPED AND NO LONGER TRACKS
-		// THE PANEL'S WIDTH. `aspect-[4/5] w-full` made height a FUNCTION of
-		// width, so the composer grew taller on wider screens: measured 239.5px
-		// at 1280 and 279.5px at 1440, which is why the panel out-grew the right
-		// column and set the grid row.
-		// ⇒ `max-h-[224px]` CAPS it. ⛔ `aspect-[4/5]` STAYS — it is a ratified
-		// PROPORTION (this file's own docblock files it under "arrangement, not
-		// values") and it is pinned by `attach-preview.test.tsx`. Removing it was
-		// my first attempt and it reddened four guards, correctly: the fix is to
-		// bound the box, not to stop declaring its shape. Width still drives the
-		// height until the cap, and the cap replaces the looser `max-h-full`.
-		// The `<svg>` keeps its own `viewBox` and its
-		// DEFAULT `preserveAspectRatio="xMidYMid meet"`, so the drawing scales
-		// DOWN to fit, stays centred, and keeps its ratio — letterboxed, never
-		// stretched or squashed. ⛔ Not one coordinate, text node or viewBox value
-		// is touched; only the box the artwork is asked to fit into.
-		// ⚠ THE CAP IS DERIVED FROM THE RIGHT COLUMN, AND IT MOVED AT CS11.
-		// panel = 2 (border) + 24 (`p-3`) + art. The right column grew when the
-		// title went to three lines (+40) and the description to 128px (+32),
-		// from 262 to 334 — so a 224 cap would have left the panel 72px short and
-		// letterboxing inside a stretched box. 308 puts the panel at 334, level
-		// with the column: neither drives the row alone.
-		// ⛔ STILL A FIXED px CAP, NOT A RATIO OF WIDTH and NOT `max-h-full`.
-		// Width-invariance is what CS10 bought and it is not being traded back —
-		// measured identical at 1440, 1728 and 1920.
-		"aspect-[4/5] max-h-[308px] min-h-0 w-full rounded-(--imgr) bg-n1";
+		"aspect-[4/5] max-h-[192px] min-h-0 w-auto max-w-full rounded-(--imgr) object-contain self-center";
 	// The slot's CONTENT — the same node at both render sites below, so the
 	// preview is present while `attaching` too and never waits on the PUT.
 	//
@@ -498,7 +483,7 @@ export function ImageAttach({
 	// common case. Caught at Gate C; pinned by
 	// `attach-preview.test.tsx::preview::a-decode-failure-while-attaching-does-not-invite-a-second-add`
 	// and its `-attached-` twin.
-	const emptyBox = <span aria-hidden="true" className={preview} />;
+	const emptyBox = <span aria-hidden="true" className={`${preview} bg-n1`} />;
 	const fileInHand = state.phase === "attaching" || state.phase === "attached";
 	const previewBox =
 		previewUrl === null ? (
@@ -523,7 +508,7 @@ export function ImageAttach({
 				// this covers the window before that and anything it does not catch.
 				// Same shape as `MarketThumb`'s `onError` fallback.
 				onError={() => setPreview(null)}
-				className={`${preview} object-contain`}
+				className={`${preview} object-contain object-center`}
 			/>
 		);
 	return (
@@ -563,8 +548,10 @@ export function ImageAttach({
 			<fieldset aria-label={ATTACH_LABEL} className={panel}>
 				{state.phase === "attached" ? (
 					<>
-						{previewBox}
-						<span className="flex max-w-full items-center gap-1">
+						<div className="flex min-h-0 flex-1 w-full items-center justify-center">
+							{previewBox}
+						</div>
+						<span className="flex max-w-full shrink-0 items-center justify-center gap-1">
 							<span className="min-w-0 truncate font-mono text-ink">
 								{state.name}
 							</span>

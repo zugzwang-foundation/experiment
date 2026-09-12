@@ -1,6 +1,6 @@
 import { ArgProfile } from "./ArgProfile";
 import { SideBadge } from "./badges";
-import { CommentImage, PostImagePlaceholder } from "./CommentImage";
+import { CommentImage } from "./CommentImage";
 import { hasExtendedText } from "./composer/payload";
 import { KnowMore } from "./KnowMore";
 import { RemovedPlaceholder } from "./placeholders";
@@ -189,23 +189,21 @@ export function ReplyCard({
 			    percentage and resolves to `none` without a definite height above it.
 			    Break the chain and the image silently reverts to intrinsic size. */}
 			<div className="flex min-h-0 flex-1 items-center justify-center">
+				{/* ⛔ QUOTE-1 A — THE EMPTY ARM DRAWS NOTHING (founder-ruled
+				    2026-09-11). This card reused the post placeholder verbatim rather
+				    than minting a "REPLY IMAGE" variant, because inventing a second
+				    label would have been authoring product copy; the docket at
+				    `docs/parked.md` (`HTML-FINISH-MD-PLACEHOLDERS`) covered both mounts
+				    together, and both take its STRIP exit together.
+				    ⚠ THE CELL ABOVE IS NOT PART OF THE STRIP. It is byte-carried from
+				    `PostCard`'s `.argimg` and is this card's ONLY absorber (RPLY-1 ·
+				    R6) — the whole reason the reply card stopped growing a dead gap at
+				    its foot. It stays on both arms, empty on this one. (The class
+				    string is deliberately not repeated here: it sits five lines up, and
+				    Tailwind's source scan reads comments.) */}
 				{reply.imageUrl ? (
 					<CommentImage url={reply.imageUrl} onOpen={onOpenImage} fill />
-				) : (
-					/* ⚠ REUSED VERBATIM, `POST IMAGE · 640:586` CHROME AND ALL. Minting
-					   a "REPLY IMAGE" variant would be authoring product copy, which
-					   needs a founder ruling; the label is one string to change in the
-					   morning if he wants it different. ⚠⚠ It remains REVIEW-SURFACE
-					   ONLY — docketed at `docs/parked.md` (`HTML-FINISH-MD-PLACEHOLDERS`)
-					   to be stripped or gated before the DP.2 production promote, and
-					   this is now a FOURTH mount that docket covers.
-					   ⚠ THE CHROME IS ALREADY `PostCard`'S, VERIFIED RATHER THAN
-					   ASSUMED (RPLY-3 · R2): both cards render the SAME two components
-					   with the SAME `fill` prop inside the SAME cell class string, so
-					   "the image renders in the same chrome as PostCard's" needed no
-					   edit — only the check that said so. */
-					<PostImagePlaceholder fill />
-				)}
+				) : null}
 			</div>
 		</div>
 	);

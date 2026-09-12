@@ -95,7 +95,15 @@ const FORMATTER_MODULE = "src/components/debate/format.ts";
 // ⛔ THE PLAN NARROWS THE CENSUS, NEVER THE PREDICATE. `UNPAIRED_CALL`,
 // `ALLOW_MARKER`, `FLOAT_PERCENT`, `SCAN_DIRS`, the liveness floor and
 // `expect(offenders).toEqual([])` are all UNTOUCHED.
-const EXPECTED_ALLOW_MARKERS = 3;
+// ── POST-IMAGE-EXPORT (2026-09-03) — THE CENSUS WIDENS, 3 → 4 ───────────────
+//
+// `src/server/debate-export/image/compose.ts` maps a post to the PNG export
+// and prints the post's ENTRY price on it — the SAME figure, on the SAME
+// grounds, as `badges.tsx`'s side chip: one historical single-side value,
+// already side-scoped by `bets.price_at_bet`, which the paired formatter would
+// invert for a NO author. The marker sits on the call; the predicate is
+// untouched. 1 + 2 + 1 = 4.
+const EXPECTED_ALLOW_MARKERS = 4;
 
 const UNPAIRED_CALL = /formatPercentUnpaired\s*\(/;
 const ALLOW_MARKER = /pctround-allow:/;
@@ -110,7 +118,7 @@ function sourceFilesUnder(dir: string): string[] {
 		.filter(
 			(e) => e.isFile() && (e.name.endsWith(".ts") || e.name.endsWith(".tsx")),
 		)
-		.map((e) => join(e.parentPath, e.name));
+		.map((e) => join(e.parentPath, e.name).replace(/\\/g, "/"));
 }
 
 const files = SCAN_DIRS.flatMap(sourceFilesUnder);

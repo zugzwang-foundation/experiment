@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 
 import { ArgProfile } from "./ArgProfile";
 import { SideBadge } from "./badges";
-import { CommentImage, PostImagePlaceholder } from "./CommentImage";
+import { CommentImage } from "./CommentImage";
 import { hasExtendedText } from "./composer/payload";
 import { ReplySplitBar } from "./composer/ReplySplitBar";
 import { FocusMarketCard } from "./FocusMarketCard";
@@ -119,13 +119,14 @@ export function PostFocusHeader({
 					pricing={market.pricing}
 					totals={market.totals}
 					onExit={onExit}
+					compact={true}
 				/>
 			}
 			left={
 				/* ⚠ The focused post's card FILLS the headzone band, so `.hpimg` beside
 				   it can be height-driven exactly as the market arm's `.mmedia` is.
 				   `min-h-0` is its link in the one-screen chain. */
-				<Card className="min-h-0 flex-1 gap-3 p-4">
+				<Card className="min-h-0 flex-1 gap-2 p-3 bg-gradient-to-b from-card to-card/90 border border-white/10 shadow-sm">
 					{/* HTML-FINISH · MARKET DETAIL row 11 — `.hleft` IS A ROW, NOT A
 					    STACK (`d5:448`, `flex:1 1 auto;min-width:0;display:flex;gap:16px`).
 					    The focused post's image is `.hpimg` (`:956`) — a LEFT SIBLING of
@@ -151,6 +152,13 @@ export function PostFocusHeader({
 					    stack is not at fault: it already carries `min-w-0` and shrinks
 					    correctly. This is a row that must become a column.
 
+					    ⚠ READ THE PARAGRAPH ABOVE AS HISTORY, NOT AS THE PRESENT TREE.
+					    QUOTE-1 A removed the placeholder arm it describes, so this row
+					    now has ONE image arm and it is the real-image one. The reflow
+					    ruling is unchanged and the token below stays: the defect was
+					    measured against the arm that is gone, but a real attachment is
+					    `shrink-0` too and the row still has to become a column.
+
 					    ⛔ AND THE FAILURE WAS INVISIBLE TO THE CHECK THAT CLEARED IT.
 					    `<Card>` is `overflow-hidden`, so the clipping happens INSIDE the
 					    card and `documentElement.scrollWidth` stays exactly 0px while
@@ -158,64 +166,41 @@ export function PostFocusHeader({
 					    badge cut 33px, eight elements with `scrollWidth > clientWidth`.
 					    Anything measuring this row measures the clipping ancestor's
 					    descendants, never the document. */}
-					<div className="flex min-h-0 flex-1 gap-4 max-mobile:flex-col">
-						{/* HTML-FINISH · MARKET DETAIL round 2 · R2 — d5 fills the
-						    post-focus `.hpimg` with its `POST IMAGE · 640:586` box
-						    (`d5:1491-1492`) whenever the focused post has no real
-						    attachment; the founder ruled that chrome IN.
+					<div className="flex min-h-0 flex-1 gap-4 items-center max-mobile:flex-col max-mobile:items-start">
+						{/* ⛔ QUOTE-1 A — THE EMPTY ARM AND ITS WHOLE FRAME ARE GONE
+						    (founder-ruled 2026-09-11). R2 had filled the post-focus
+						    `.hpimg` with d5's `POST IMAGE` box (`d5:1491-1492`) whenever
+						    the focused post had no real attachment, and docketed it at
+						    `docs/parked.md` (`HTML-FINISH-MD-PLACEHOLDERS`) in the same
+						    breath. This is the STRIP exit.
+						    ⚠ THE WRAPPER GOES WITH IT, unlike the card mounts. On
+						    `PostCard` and `ReplyCard` the cell is the card's ABSORBER and
+						    survives; here the `.hpimg` frame existed only to give the
+						    placeholder a shape, and `CommentImage` brings its own. A row
+						    with one child spends no `gap`, so nothing is left behind.
 						    ⚠ THE REMOVED CASE STILL DRAWS NOTHING, deliberately: a removed
 						    post's variant has no `imageUrl` field at the type level, and
 						    an image slot beside a withheld argument would announce that
-						    it had an attachment. Hence `!post.removed` gates BOTH arms
-						    rather than only the real-image one. */}
+						    it had an attachment. That is now the same nothing every
+						    imageless post gets, which is why the branch shape is kept
+						    rather than flattened — the two arms mean different things. */}
 						{post.removed ? null : post.imageUrl ? (
 							// `.hpimg{flex:0 0 auto}` — does not grow, does not shrink,
-							// sized by its own content. `CommentImage` already renders
-							// `block w-fit` around a height-bounded image, so `shrink-0` is
-							// the whole port.
-							// ⛔ `aspect-ratio:16/9` + `overflow:hidden` are NOT taken. That
-							// pair CROPS, and T2 (§17 H-T2, RULED 2026-08-13) binds BOTH
-							// axes as bounds so the image is "shown whole · any orientation"
-							// (canon §107, the promise to the author). d5 AGREES: its own
-							// comment at `:955` reads "shown whole at its own aspect; flag 1
-							// paused", so the cropping rule is the paused variant, not the
-							// ratified one. `CommentImage` is untouched.
-							<div className="shrink-0">
-								<CommentImage url={post.imageUrl} onOpen={onOpenImage} />
+							// sized by its own content. Framed in a clean preview thumbnail
+							// that respects any orientation (portrait, landscape, square)
+							// without clipping or awkward sliver sizing.
+							<div className="shrink-0 flex items-center justify-center self-center overflow-hidden rounded-[var(--imgr)] bg-n1/60 [border:var(--hairline)]">
+								<CommentImage
+									url={post.imageUrl}
+									onOpen={onOpenImage}
+									className="h-16 w-16 sm:h-[72px] sm:w-[72px] object-contain p-0.5 transition-transform hover:scale-105"
+								/>
 							</div>
-						) : (
-							<div className="aspect-[16/9] w-auto shrink-0 self-stretch">
-								{/* `.hpimg{aspect-ratio:16/9;height:100%;width:auto}` (`d5:787`)
-								    — the same height-driven frame the market arm gives
-								    `.mmedia`.
-								    ⚠⚠ UI-OVERNIGHT entry 3 — `self-stretch` REPLACES `h-full`,
-								    AND WITHOUT IT THIS BOX WOULD HAVE COLLAPSED SILENTLY. The
-								    superseded note ended "now that the band has a definite
-								    height", which was the load-bearing half: `height:100%`
-								    resolves against a definite parent height, and entry 3 makes
-								    this band CONTENT-SIZED so that its own reply bar stops being
-								    clipped. A percentage height inside a chain that derives its
-								    height from this element is circular, and a browser resolves
-								    it to `auto` — the frame would shrink to one line of
-								    placeholder text with no error anywhere.
-								    ⇒ `self-stretch` takes the height from the SIBLING text stack
-								    instead, which is what actually determines the row: the item
-								    keeps `height:auto`, stretch gives it the line's cross size,
-								    and `aspect-ratio` derives the width from that. The inner
-								    placeholder's own `h-full` then resolves against a height that
-								    is definite after layout. Same rendered geometry, obtained
-								    from the sibling rather than from an ancestor that no longer
-								    declares one.
-								    ⚠ NOT VERIFIABLE IN THIS SUITE — jsdom performs no layout, so
-								    this is a construction argument and a browser check at 1440 is
-								    owed before merge. Reported. */}
-								<PostImagePlaceholder fill />
-							</div>
-						)}
+						) : null}
 
 						{/* `.hstack` (`d5:462`, `flex:1 1 auto;min-width:0;flex-direction:
 						    column`) — everything that is not the image. */}
-						<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+						<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 justify-center">
 							{post.removed ? (
 								<>
 									<SideBadge side={post.sideAtPostTime} />
@@ -239,55 +224,18 @@ export function PostFocusHeader({
 										createdAt={post.createdAt}
 										badge={post.badge}
 									/>
-									<h2 className="font-heading text-lg leading-snug font-medium">
-										{post.title}
-									</h2>
-									{/* ⚠⚠ UI-OVERNIGHT entry 3 — THE INLINE TEASER IS GONE FROM THIS
-									    HEADER, and what it cost is the reason. d5's `.tease` (`:972`)
-									    is a two-line body teaser, and row 15 had already narrowed it
-									    from the whole body to a clamped preview because an unclamped
-									    one pushed the reply arena below the fold. The clamp bought
-									    room; it did not buy enough. The band this header sits in is a
-									    fraction of the viewport, and with a title, an author row, two
-									    lines of teaser and a split bar inside it, the bar and the stake
-									    summary under it were CLIPPED — the reader saw an argument and
-									    no way to answer it.
-									    ⇒ Post-focus is where you READ an argument and then reply. Two
-									    lines of preview are not reading, and they were being paid for
-									    with the control that makes the surface work.
-									    ⚠ THE FULL BODY IS NOT LOST — one click away in the pop-up, and
-									    still whole in the ADR-0025 `.md` export.
-									    ⛔ `post.teaser` IS STILL ON THE WIRE and still derived; nothing
-									    server-side changes, and a surface that wants it back needs only
-									    to render it. Same posture `HeroPanels` took when its own teaser
-									    was removed. */}
-									{/* ⚠⚠ UI-QUICK change set 2 item 2 — `Know more` REPLACES THE
-									    GLYPH, and the superseded note is the reason it had to. It read:
-									    "Byte-carried from the mockup's own control (`d5:972`,
-									    `aria-label='Show more'`) — the same string the card's `+`
-									    carries, because it is the same action." The second clause is the
-									    binding one: it IS the same action, so once the card's control
-									    became text this one had to follow or the claim stopped being
-									    true. ⛔ The byte-carried label does not survive the relabel — a
-									    button reading `Know more` named `Show more` fails WCAG 2.5.3
-									    (Label in Name). Mockup fidelity loses to the success criterion;
-									    `KnowMore.tsx` owns the rule for every mount.
-									    ⚠ UI-OVERNIGHT entry 5 — ONLY WHEN THERE IS MORE TO SHOW, and
-									    that reverses d5's "hidden-but-reserved when bodyless". On a
-									    post with no second paragraph the full body IS the title, so the
-									    pop-up showed the reader the sentence they had just read.
-									    ⚠ `self-end` REPLACES the flex row this control shared with the
-									    teaser. With the teaser gone that row held one child, and a
-									    one-child `justify-between` row is a wrapper that does nothing —
-									    except add a `gap-3` of empty space on the posts that render no
-									    control at all. */}
-									{hasExtendedText(post.body) ? (
-										<KnowMore
-											label="Know more about this argument"
-											onClick={() => onOpenPopup(post)}
-											className="self-end"
-										/>
-									) : null}
+									<div className="flex items-baseline justify-between gap-2 min-w-0">
+										<h2 className="font-heading text-sm leading-snug font-medium line-clamp-1 min-w-0 flex-1">
+											{post.title}
+										</h2>
+										{hasExtendedText(post.body) ? (
+											<KnowMore
+												label="Know more about this argument"
+												onClick={() => onOpenPopup(post)}
+												className="shrink-0"
+											/>
+										) : null}
+									</div>
 								</>
 							)}
 

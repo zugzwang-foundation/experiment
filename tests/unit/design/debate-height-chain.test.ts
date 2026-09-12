@@ -6,13 +6,15 @@ import { describe, expect, it } from "vitest";
  * HTML-FINISH · MARKET DETAIL — THE DEBATE SURFACE'S HEIGHT CHAIN, asserted node
  * by node.
  *
- * WHAT THIS GUARD IS FOR. Row 1 makes the headzone a band that is DECLARED and
- * does not grow, sitting above an arena band that takes everything left over.
- * That only holds if every node in the chain is wired, and a chain is only as
- * good as its weakest link. Break ANY link and nothing visibly errors: the band
- * silently reverts to content height, the two-column composition drifts, and the
- * surface looks merely "a bit long" rather than broken. There is no type error,
- * no console warning, and no render test that can see it.
+ * WHAT THIS GUARD IS FOR. Row 1 makes the headzone a band that does not grow,
+ * sitting above an arena band that takes everything left over. (The band was a
+ * DECLARED viewport fraction until the header-fit change; it is content-sized
+ * now, on both arms — `HeadZone.tsx` says why.) That only holds if every node
+ * in the chain is wired, and a chain is only as good as its weakest link. Break
+ * ANY link and nothing visibly errors: the band starts growing into the arena,
+ * the two-column composition drifts, and the surface looks merely "a bit long"
+ * rather than broken. There is no type error, no console warning, and no render
+ * test that can see it.
  *
  * THE CHAIN, and what each node contributes:
  *
@@ -21,7 +23,7 @@ import { describe, expect, it } from "vitest";
  *                   only to prove the source still exists)
  *   PageContainer   h-[calc(100dvh-60px-2px)] min-h-0 flex flex-col overflow-hidden
  *                                                     ← ONE SCREEN, declared
- *   headzone band   min-h-0, shrink-0, basis-%, NO flex-1  ← declared, does NOT grow
+ *   headzone band   min-h-0, shrink-0, NO basis, NO flex-1 ← content-sized, does NOT grow
  *   arena band      flex-1 min-h-0                    ← takes ALL the leftover
  *   pole columns    min-h-0 flex-col                  ← may be shorter than content
  *   column scroll   flex-1 min-h-0 overflow-y-auto    ← THE ONLY SCROLLER
@@ -229,13 +231,11 @@ describe("debate height chain — the source", () => {
 });
 
 describe("debate height chain — the headzone band does not grow", () => {
-	it("debate-height::headzone-is-declared-and-does-NOT-grow", () => {
+	it("debate-height::headzone-is-content-sized-and-does-NOT-grow", () => {
 		// ⚠⚠ THE MARKET ARM'S BAND, READ OFF ITS CONSTANT. Until UI-OVERNIGHT
 		// entry 3 this was a literal `className` on the element; the frame now
 		// serves two bands and the element chooses between them, so the string is
-		// read where it is now written. ⛔ The assertions below are UNCHANGED —
-		// every one of them still holds of this band, and the post arm's band is
-		// held to its own set in the test after this one.
+		// read where it is now written.
 		const classes = constClasses(read(HEADZONE), HEADZONE, "BAND_DECLARED");
 
 		// One frame, ONE authoring site per arm. A second literal `className` on
@@ -251,9 +251,9 @@ describe("debate height chain — the headzone band does not grow", () => {
 				"belongs in its constant, where both arms can be read",
 		).toBeNull();
 
-		// The mockup's `.headzone{flex:0 0 …}` — it does not grow and it does not
-		// shrink. The LENGTH is deliberately not carried (it is a mockup value);
-		// the SHAPE is.
+		// The mockup's `.headzone{flex:0 0 …}` — it does not grow. The LENGTH was
+		// never carried (it is a mockup value); since the header-fit change the
+		// FRACTION it was translated into is not carried either.
 		expect(classes).toContain("shrink-0");
 		expect(classes).not.toContain("flex-1");
 		expect(classes).not.toContain("grow");
@@ -262,53 +262,40 @@ describe("debate height chain — the headzone band does not grow", () => {
 		expect(classes).toContain("flex");
 		expect(classes.filter((c) => FORBIDDEN_HEIGHT.test(c))).toEqual([]);
 
-		// ⛔⛔ UI-QUICK change set 4 §C — THE BAND CONTAINS ITS OWN CONTENT, and
-		// this line is the guard for a defect that shipped to staging and that
-		// NOTHING in this file could previously see.
-		//
-		// `basis-[24.2dvh]` is a viewport FRACTION; the stack inside it has an
-		// INTRINSIC height. Below ~715px of viewport height the fraction is the
-		// smaller of the two, and with no containment the excess painted downward
-		// over the top border of both debate columns — measured at 1440×700 on
-		// staging, and worse before the resolution trigger came out.
-		//
-		// ⚠ WHY THE REST OF THIS FILE COULD NOT CATCH IT. Every other assertion
-		// here checks that a DECLARATION is present, and every declaration WAS
-		// present and correct: the band declared its fraction, the arena took the
-		// leftover, the column scrolled. The defect was that the declared band was
-		// smaller than its own content at a viewport height nobody had measured —
-		// a layout FACT, not a missing class. This file is a source scan (jsdom
-		// performs no layout, as the header says), so the only thing it can pin is
-		// the containment that makes the fact harmless. That is what this line is.
-		//
-		// ⛔ Do not "simplify" this away as redundant with `PageContainer`'s own
-		// `overflow-hidden`. That one keeps content inside the PAGE; this one keeps
-		// the headzone's content inside the HEADZONE, one level down, and the
-		// overlap happened with the page-level rule already in force.
-		expect(classes).toContain("overflow-hidden");
-		// ⚠ THE BAND IS A FRACTION OF THE VIEWPORT, never d5's literal `188px` and
-		// never a percentage of the CONTAINER. `.headzone{flex:0 0 188px}` is
-		// 188/777 = 24.2% of the viewport at the pinned 1440×777.
-		// ⛔ `dvh`, NOT `%`, and this assertion was written the wrong way first: a
-		// container percentage is 21.4% at 1800×971 and 27.5% at 1440×777 for the
-		// SAME 188px band, because it drifts with the container's own padding and
-		// chrome. Shipping the percentage measured 146px on staging. A viewport
-		// fraction is the ratio d5's fixed px actually encodes, so the unit is
-		// pinned here and not just the shape.
-		expect(classes.some((c) => /^basis-\[\d+(\.\d+)?dvh\]$/.test(c))).toBe(
-			true,
-		);
+		// ⛔⛔ NO VIEWPORT FRACTION, AND NO CONTAINMENT — the two that together
+		// were the clip. This assertion used to require BOTH (`basis-[24.2dvh]`
+		// plus `overflow-hidden`, briefly `overflow-y-auto`), on the ground that a
+		// declared band must contain its own overflow or paint over the arena
+		// (UI-QUICK change set 4 §C, measured at 1440×700 on staging). That was
+		// true, and it was the wrong layer: below ~715px of viewport height the
+		// fraction was smaller than the stack's own content, so the band clipped
+		// (then scrolled) its badge row, price bar and resolution blocks — on SOME
+		// markets, depending on whether the title and attrs line wrapped, and not
+		// on others at the same viewport. A box sized to what it holds has no
+		// overflow to contain. The one-screen ruling is untouched: `PageContainer`
+		// still declares one screen and the arena is still the only scroller in
+		// this chain; what the band no longer clips, the arena yields.
+		// ⚠ Asserted as ABSENCE, not as a different value: a `basis-[…]` of any
+		// unit, or any `overflow-*` on this band, is the clip coming back.
+		expect(classes.some((c) => /^basis-\[/.test(c))).toBe(false);
+		expect(classes.some((c) => /^overflow-/.test(c))).toBe(false);
+		// ⚠ AND NO `max-mobile:` RELEASE. MOBILE-1 Phase A released the basis and
+		// the clip below 640px; with neither present at any width those tokens
+		// would be inert, and an inert token on a chain node reads as a live rule.
+		expect(classes.some((c) => c.startsWith("max-mobile:"))).toBe(false);
 	});
 
 	it("debate-height::the-POST-arm-band-is-content-sized-and-still-does-not-grow", () => {
-		// ⚠⚠ THE SECOND BAND, ADDED AT UI-OVERNIGHT entry 3, AND IT IS A REAL
-		// DIVERGENCE RATHER THAN A COPY. The declared band is a bet that the arm's
-		// content fits inside a fraction of the viewport. The market arm can make
-		// that bet — its contents are chrome, and a clipped resolver card costs a
-		// reader nothing. The post arm cannot: its contents END IN A CONTROL, the
-		// Support/Counter bar plus the stake summary under it, and the band's own
-		// `overflow-hidden` removed them from the surface whose purpose is
-		// replying. Silently, because a full-looking band looks correct.
+		// ⚠⚠ THE SECOND BAND, ADDED AT UI-OVERNIGHT entry 3. It was the first to
+		// stop being a viewport fraction, because its contents END IN A CONTROL —
+		// the Support/Counter bar plus the stake summary under it — and the band's
+		// own `overflow-hidden` removed them from the surface whose purpose is
+		// replying. Silently, because a full-looking band looks correct. The
+		// market arm made the same bet ("its contents are chrome, a clipped
+		// resolver card costs a reader nothing") and lost it too, once the
+		// resolution blocks carried real values and the badge row was what got
+		// cut — so both arms are content-sized now, and what still differs is
+		// only the alignment asserted at the foot of this test.
 		const classes = constClasses(
 			read(HEADZONE),
 			HEADZONE,

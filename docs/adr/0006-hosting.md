@@ -546,3 +546,19 @@ seeder against this ADR.
 ## Patch record — 2026-09-05 · Axiom leaves the vendor enumerations (D-28 row 20)
 
 **D-28 row 20 strikes Axiom from this ADR.** ADR-0007 rejected it at genesis — Vercel runtime logs already carry the per-request data the §16.3 H3 contract needs — and the stack has been two-vendor ever since. ⚠ **The ruling cites `ADR-0006:34`, and that line was already repaired at SYNC-10**; the two enumerations still naming Axiom were the §4 topology row and the ADR-0007 gating row in the *Flow & invariant constraints absorbed* table, both far below it. A line number in a ruling ages exactly like a line number in a fence (`CLAUDE.md` §8, **O-8**) — the claim was right and the coordinate was not. ⚠ **Axiom is deliberately NOT struck from `ADR-0007`**, where every remaining mention is the argument for rejecting it. Deleting the vendor from the record of why it was rejected would leave a verdict with no case behind it.
+
+---
+
+## Patch record — 2026-09-08 · the pre-commit gate this file describes is superseded (ADR-1)
+
+**ADR-0046** supersedes `ADR-0014`'s gate architecture and **D-32** makes moderation consequences
+advisory. Lines `:184`, `:189`, `:216`, `:350` of this file describe that gate — its ordering, its fail-closed posture,
+or its blocking verdict — in the **present tense**.
+
+Per **D-33 R3** they are preserved as written. They record this ADR's decision against the
+architecture as it then stood; they are not a description of current behaviour. The live contract
+is `ADR-0046` + **D-32**.
+
+**This ADR's own decision is unchanged.** The hosting topology, the vendor set and the failure-mode profile are untouched. Only the pre-commit-moderation reservation's fail-closed property moves; idempotency-fails-closed is unaffected.
+
+Status remains `accepted`. No text above this record is changed.

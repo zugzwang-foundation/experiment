@@ -33,6 +33,30 @@ secret-holder, not a browser-reachable role. Narrowing a grant that no one has b
 able to use is cheap; recording it as proof the surface is closed would not be, which is the
 distinction `O-13` exists to hold.
 
+**P2 (2026-09-08, `LIQ-1-SOAK-CLOSE`).** Two measurements against the **hosted staging** database,
+where P1 had only the local stack. **The decision is unchanged; what changes is the evidence.**
+
+**`0030` is in effect.** `has_function_privilege` returns **FALSE** for all seven of
+`anon`/`authenticated`/`public` × the three functions. This matters because P1 itself records that
+a `REVOKE` issued by a non-grantor is a *silent success* — `drizzle-kit migrate` exiting 0 proved
+nothing, and this is the reading that does. **Production is still owed** and cannot be taken until
+the migration applies there.
+
+**The table grants are now READ rather than inferred, and they are what the local stack predicted.**
+`information_schema.role_table_grants` on hosted staging returns
+`DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE` for **both** `anon` and `authenticated` on
+**all seven** of `bets`, `dharma_ledger`, `events`, `liquidity_policy`, `markets`, `pools`, `users`
+— fourteen rows, no exceptions.
+
+⛔ **The tripwire is still NOT ESTABLISHED, and this measurement does not move it one inch.** What
+was unknown at P1 was *"are the hosted grants as broad as the local ones"*; that is now answered,
+yes. What remains unknown is the question the tripwire actually asks — **whether a public Data API
+exposes those grants to a browser** — and no privilege read can answer it, because the grant and
+the route to it are different facts. The check ADR-0019 prescribes is unchanged: the Supabase
+dashboard's API settings, then a `curl` against `/rest/v1/pools` with the anon key. ⚠ This is the
+`O-13` shape from the other side — an endpoint that *did* answer, answering a question adjacent to
+the one that matters, which is the more comfortable way to be wrong.
+
 ---
 
 ## Context and Problem Statement

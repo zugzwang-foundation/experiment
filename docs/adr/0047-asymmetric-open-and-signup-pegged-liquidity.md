@@ -7,10 +7,10 @@
 | **Deciders** | Hrishikesh (founder) |
 | **Tracker task** | Number-tuning (SPEC.1 Appendix B, STATE.md F-3) — liquidity subset. Working ID LIQ-1. |
 | **Frame document** | Decision record D-14 (opening price); `SPEC.1` §10.1, §10.5, §10.6, §16.1; `docs/specs/cpmm.md` §3, §7, §8, §14; `SPEC.2` §19.4.1 |
-| **Supersedes** | — (no ADR; the spec sections below are amended in the same commit) |
+| **Supersedes** | — (no ADR. ⚠ **The `SPEC.1` half of this row is void — D-31** (2026-09-07, `docs/decisions/RECORD-v2.6-amendment.md`): an ADR does not amend `SPEC.1` (D-22), so the `SPEC.1` §10.6 / §10.5 / §16.1 text landed in #496 (`67ceb6b5`) under D-31's authority rather than this ADR's. **The `cpmm.md` and `SPEC.2` clauses are NOT void** — they landed exactly as written. **The row as written, preserved:** the spec sections below are amended in the same commit.) |
 | **Superseded-by** | — |
 | **Amends** | — |
-| **Amended-by** | — |
+| **Amended-by** | D-31 (2026-09-07, `docs/decisions/RECORD-v2.6-amendment.md` — voids this ADR's claim to amend `SPEC.1`; the `SPEC.1` §10.6 / §10.5 / §16.1 text landed in #496 under D-31's authority. `cpmm.md` and `SPEC.2` unaffected) |
 
 **This ADR does not decide:** the opening price itself (D-14 stands at 10% YES) · the Dharma economy (grant 1,000, credit 10/day, floors) · bet throughput on a hot market (D-4, SCALE lane) · read-path polling cost (POLISH/SCALE) · the other 22 `TBD` constants in SPEC.1 Appendix B · a `p` curve-weight (rejected below; a testnet ADR if ever) · limit orders or user-provided liquidity (out of scope for the experiment by ruling).
 
@@ -315,11 +315,24 @@ check after the arming INSERT is what closes it.
 
 **Three critical-path functions are touched** — `openMarket`, `voidMarket`, `settleMarket` — plus the chart walker. The bet transaction is not.
 
-**Spec amendments ride in the same commit** (CLAUDE.md §5.12): `cpmm.md` §7.1 (symmetric-only), §7.3 (asymmetric-open rejection), §7.4 (three doors → four), §14 (mid-market liquidity non-goal); SPEC.1 §10.6 (no mid-market adjustment), §10.5/§16.1 (`POOL_SEED_PER_MARKET_DEFAULT` — exists nowhere in `src/`, retired). Of SPEC.1 §10.6's three grounds: "re-prices positions retroactively" is false against A (measured exact); "breaks audit-trail integrity" stood, and E is its fix; "kills the K_eff signal" argues *for* this ADR — a fixed seed is what flattens the signal as turnout grows (RECON-2 §11a).
+⚠ **The `SPEC.1` clause of this paragraph is void — D-31** (2026-09-07, `docs/decisions/RECORD-v2.6-amendment.md`): *"an ADR does not amend `SPEC.1` (D-22). The amendment lands by this ruling."* The `SPEC.1` §10.6 / §10.5 / §16.1 text did land, in #496 (`67ceb6b5`), and reads correctly at `SPEC.1` 2.0.1 — §10.6 is now *Signup-pegged liquidity injection* and §3.2 `NG13` is user-provided liquidity only, **both citing D-31**. So the correction is one of ATTRIBUTION, not of outcome: the instrument was the ruling, not this ADR. ⚠ **The four `cpmm.md` clauses below are NOT void** — they landed as stated — and D-31 leaves `SPEC.2` explicitly standing. **The paragraph as written, preserved:** **Spec amendments ride in the same commit** (CLAUDE.md §5.12): `cpmm.md` §7.1 (symmetric-only), §7.3 (asymmetric-open rejection), §7.4 (three doors → four), §14 (mid-market liquidity non-goal); SPEC.1 §10.6 (no mid-market adjustment), §10.5/§16.1 (`POOL_SEED_PER_MARKET_DEFAULT` — exists nowhere in `src/`, retired). Of SPEC.1 §10.6's three grounds: "re-prices positions retroactively" is false against A (measured exact); "breaks audit-trail integrity" stood, and E is its fix; "kills the K_eff signal" argues *for* this ADR — a fixed seed is what flattens the signal as turnout grows (RECON-2 §11a).
 
 **What this does not fix.** Every bet on a market still serialises on one row (D-4); the YES:NO impact asymmetry at 10/90 remains ~12:1 and is intrinsic to any market at 10%; polling cost still grows with market age. None is a liquidity property.
 
 ## Execution
+
+**Landed: Phase 1 #491 `e25fa277` · Phase 2 #496 `67ceb6b5` · RESTORE #499 `5052ae80` · SOAK 2026-09-08, staging.**
+Status stays **accepted**. `LIQ-1-SOAK-CLOSE` armed the injector on staging and drove it end to
+end: 18 of 18 `Open` markets injected in a single 60 s tick at `N = 18`, `|Δp|` measured exactly
+zero on all of them, `discardedShares == backingMinted − (S′ − S)` exact on all of them, chart
+replay drift zero on all of them, the NO-outcome settle returning `no_reserves + D_no` with `D_no`
+carrying both the open and the injection discard, `voidMarket` returning on an asymmetric pool,
+and both alarms firing once each without repeating. Two findings recorded rather than acted on —
+`docs/parked.md` **LIQ-1 L-11** (`tank′` lands on `target` to a relative 2.4e-19, not exactly:
+`select_div_scale` caps the amount's quotient at scale 18) and **L-12** (staging now carries 18
+`Open` markets, not the ten the `lock_timeout` row was re-derived against; the 600 ms budget is
+what holds the bound, and this is its first test above eight). Full record:
+`docs/logs/LIQ-1.md`.
 
 Two phases, each its own PR, each reviewed at Gate C by the orchestrator's diff read, with this ADR and the three measurement reports in hand. Ratified as below.
 
@@ -327,7 +340,7 @@ Two phases, each its own PR, each reviewed at Gate C by the orchestrator's diff 
 |---|---|---|
 | **Lands** | 8 September | 12 September |
 | **Primitives** | B · E (with `D` from `market.opened` only) · I (two reserves) · A in TypeScript | A in SQL · C · D · F · G · H · I (injection replay) · E (injection events) · export rule · conservation callers |
-| **Spec** | `cpmm.md` §7.1, §7.3 | `cpmm.md` §7.4, §14; SPEC.1 §10.6, §10.5/§16.1 |
+| **Spec** | `cpmm.md` §7.1, §7.3 | ⚠ **The `SPEC.1` items landed under D-31, not under this ADR** (D-22; text in #496, correct at `SPEC.1` 2.0.1). The `cpmm.md` items landed as stated. **Cell as written, preserved:** `cpmm.md` §7.4, §14; SPEC.1 §10.6, §10.5/§16.1 |
 | **Critical-path touches** | `void.ts`, `settle.ts`, `openMarket` | new `pools` writer; extends `D` |
 | **If the other slips** | Markets open at 10/90 on a fixed seed with no slate — today minus the staged bets | — |
 | **Soak before the 15th** | 7 days, twelve staging markets reseeded at 10/90 | 3 days |
@@ -363,6 +376,8 @@ Plan-mode precedes each phase from this ADR. A fresh session executes each ratif
 | `liquidity_undershoot` fires | A market is stuck at a guard or the lock. Look; it is information. ⚠ **The alarm is ONE GLOBAL watermark, so the payload's `markets` count is a SNAPSHOT taken at the transition and a SECOND market going under emits nothing.** Recovery needs ALL markets to clear. And the endgame window makes this routine rather than exceptional: a market inside its last `endgame_hours` is deliberately not topped up, will predictably drain below 60%, and will hold the global state at `below` — masking a genuine undershoot elsewhere for the rest of that window. Read the alarm as *at least one market*, and query the live pools for the current set |
 | Any tuning | INSERT into `liquidity_policy`. Never UPDATE. Never a deploy |
 | Tuning `lock_timeout_ms` | ⛔ **THE INVARIANT IS `≈ 2 × (open_markets − 1) × lock_timeout_ms + overheads < 1000`.** ⚠ *It was stated as `(N−1) × T` and that UNDERSTATES the worst case by up to 2×*: there are **two** lock acquisitions per market — `markets` then `pools` — and `lock_timeout` is **per statement**, so a markets lock that succeeds just under the budget hands the pools lock a fresh full one. Add `count(*) FROM users` (8.1 ms at 100k, growing), ~5 ms of per-market work, and the final heartbeat INSERT. The participant-reachable case is the 1× form (a bet holds `pools`, never `markets`); the 2× form needs concurrent admin lifecycle actions. The sweep is ONE transaction, so a pool row locked at the first market stays locked until the last finishes, and a bet waiting on it has a **1,000 ms `statement_timeout` whose `57014` is NOT retryable** — a bet that loses that race does not retry, it fails. ⛔ **Migration `0029` tightens the CHECK ceiling to 100 ms — `0028`'s 250 was measured to BREAK the money path** (8 markets, 7 pool rows held: sweep 1,776 ms, and a bet-shaped statement died at 1,004 ms with a `57014` the bet path does not retry). A ceiling that blesses the failure it was added to prevent is worse than none, because it reads as a guard. ⚠ **And the ceiling is still not a proof** — a CHECK cannot see the market count. What makes the bound hold at ANY count is `0029`'s **total-sweep budget**: the loop stops taking new locks after 600 ms, so the worst-case hold is ~750 ms whatever `N` is. The cost is that markets after the cut-off wait a tick, which is the design's own self-healing argument, and `liquidity_undershoot` is the signal if one waits repeatedly. ⚠ **Measured 2026-09-07: staging carries TEN `Open` markets, not the eight this ADR reasons from** — so the safe ceiling there is 111 ms and the shipped 100 ms holds with almost no room. **Re-derive this before adding markets, not after** |
+| Before any `pnpm staging:rebuild` | ⛔ **NEVER REBUILD WHILE THE INJECTOR IS ARMED.** INSERT a policy row with `enabled = false` and confirm a heartbeat carrying `markets_injected = 0` before the reset runs. A rebuild truncates `pools` and `markets` under a sweep that is enumerating them; the advisory lock serialises two *sweeps*, not a sweep against a TRUNCATE. The heartbeat is the confirmation, not the INSERT — the policy is re-read once per tick, so `enabled = false` does not take effect at the moment you write it |
+| After any rebuild | ⛔ **A REBUILD ALWAYS WIPES THE CONTENT MARKETS, AND THE C1 GUARD MAKES A FIXTURES-ONLY RESET IMPOSSIBLE.** `markets` is in `TRUNCATE_SET` and the guard refuses rather than filters, so the only two outcomes are *refuse* or *destroy all eight*. Recreate them afterwards: `pnpm exec tsx scripts/seed-content-markets.ts --env staging --create`, then `… --open --price 0.1 --tank 100000`. Both phases are idempotent (a second pass reports `0 created, 8 already present` / `0 opened, 8 already open`), so re-running is safe and is the cheapest way to check |
 | Any alarm titled `liquidity_injection_error` | A market's subtransaction raised something other than a lock timeout; the row carries `sqlstate`, `message` and `market_id`. ⚠ Not in §H's table because it is not a monitored CONDITION — it is the `WHEN OTHERS` arm making a swallowed error visible. Its durability is conditional on the rest of the sweep committing |
 
 ## Closed by plan-mode
@@ -417,6 +432,65 @@ that it happened (`O-5`).
 | `pg_try_advisory_xact_lock` becomes step 1 | §D | it was prose beside the list, so the list alone described an injector two of which could run at once. |
 | migration `0028` named at its step | §D | the cursor's snapshot predates every lock, so a market can leave `Open` between enumeration and locking. The status is re-read inside the lock. |
 | migration `0029` named at its steps | §D | the `0028` ceiling was above the value that breaks a bet — ~945 ms of lock-holding at ten Open markets against a non-retryable 1,000 ms `statement_timeout`. A CHECK cannot see the market count, so the bound became a 600 ms lock-hold budget inside the sweep. |
+
+**P3 · 2026-09-08 · ADR-0047 D-31 repair.** **D-31** (`docs/decisions/RECORD-v2.6-amendment.md`,
+2026-09-07) authorised the injector and, in the same ruling, struck this ADR's plan to amend
+`SPEC.1` itself: *"ADR-0047's plan to strike §10.6 inside a code PR is void — an ADR does not
+amend `SPEC.1` (D-22). The amendment lands by this ruling."* **D-33 R5** (amendment 2.7,
+2026-09-08) docketed that repair here rather than to the ADR-1 pass. This block discharges the
+docket and mints no new D-number.
+
+⚠ **The correction is one of ATTRIBUTION, not of outcome, and nothing here says the spec change
+is still owed — it is not.** `SPEC.1` 2.0.1 carries §10.6 as *Signup-pegged liquidity injection*
+and §3.2 `NG13` as user-provided liquidity only, and **both cite D-31 as their authority**. That
+text landed in #496 (`67ceb6b5`), which is exactly what D-31 required of the Phase 2 PR. What was
+never corrected is this file's account of *which instrument* amended the spec.
+
+⚠ **Scope: `SPEC.1` only.** D-31 leaves `SPEC.2` explicitly standing — *"Phase 2's `SPEC.2`
+changes are additive rows on top of it"* — and says nothing at all about `docs/specs/cpmm.md`,
+which is not a rung on D-22's ladder. The four `cpmm.md` clauses in §Consequences landed as
+written, and §F's *"a SPEC.2 §19.4.1 SHIP declaration … land in the same commit"* is a real CI
+coupling this ruling does not touch. A correction reading as though the whole sentence were void
+would be wrong, and is the thing this block exists to prevent a later reader from concluding.
+
+**Three sites, not two.** D-33 R5 named `0047:207` and `:219`, measured against `origin/main`
+`941e9888`. Located by content at `origin/main` `69513a0c`, the file carries **three**: the
+metadata `Supersedes` row (`:10`), the §Consequences paragraph (`:318`), and the §Execution phase
+table's **Phase 2** `Spec` cell (`:343`). The third is the one a line-number docket could not
+reach, because it sits *above* the two that moved. Those coordinates are evidence read at that
+SHA, not addresses (`O-8`).
+
+**No callout, and that was a decision.** PR #498 gave a top-of-file callout to exactly two of the
+ten ADRs it repaired — `ADR-0014` and `ADR-0021` — both files whose bodies describe *live
+behaviour* that has since reversed. This body describes live behaviour **correctly**; only its
+attribution was wrong, and attribution is repaired at the site that carries it. The instrument
+used instead is `ADR-0026`'s: the correction is prefixed, and the original words are kept.
+
+| ruling | section | what changed |
+|---|---|---|
+| D-31 | §Metadata | `Supersedes` — the parenthetical's `SPEC.1` half is marked void and the real instrument named; the row as written follows, preserved. |
+| D-31 | §Metadata | `Amended-by` — `—` → **D-31**, scoped. It is the only ruling that changes what this ADR asserts: **D-34…D-48 record this ADR rather than amend it** (*"these are RECORDS, not fresh rulings … D-31 already carries the authorisation; these carry the shape"*), and D-33 dockets the repair without altering a word, so neither takes a row. |
+| D-31 | §Consequences | the *"Spec amendments ride in the same commit"* paragraph gains a prefix scoping the void to `SPEC.1` and naming #496 as where the text landed. The sentence, all four `cpmm.md` clauses and the three-grounds analysis survive verbatim after it. |
+| D-31 | §Execution | the phase table's **Phase 2** `Spec` cell gains the same correction, cell-sized. Phase 1's cell is `cpmm.md` only and does not move. |
+| D-33 R5 | §Patch record | this block. |
+
+**Status remains `accepted`.** ⚠ The receipt this file's siblings close with — *"No text above
+this record is changed"* — would be false here, and is deliberately not borrowed: four lines
+above **are** changed. What is true, and is the guarantee actually on offer: **no original word
+was removed.** Every corrected line still carries its full prior text, and the only deletions in
+the diff are those four lines being replaced by themselves-plus-a-prefix.
+
+**The row reads answer-first, and the receipt is a tree hash.** The founder ruled that the
+`Supersedes` row should answer before it warns, so its parenthetical is split at the semicolon and
+the two halves placed around the correction — the row now opens `— (no ADR.` and closes
+`the spec sections below are amended in the same commit.)`, with no word removed. ⚠ **That
+landing cannot be proved by a three-dot diff.** A squash merge mints a commit with no parent link
+to the branch, so the merge base of the branch tip and the squash stays at the *pre-merge* tip of
+`main`, and `git diff <branch tip>...origin/main` therefore re-reports the entire change however
+correctly it landed — measured at #505: merge base `69513a0c`, three-dot 51 insertions, two-dot
+empty. The instrument for two pinned SHAs is tree-hash equality, `git rev-parse '<sha>^{tree}'`,
+which read `a81432c3` on both `d31563a7` and `97d4e3ca`; `AGENTS.md` §10 carries the general
+form.
 
 ## Drift recorded, not acted on
 

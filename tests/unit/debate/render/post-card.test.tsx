@@ -83,6 +83,27 @@ function presentPost(): DebatePost {
 
 const noop = () => {};
 
+/**
+ * ⚠⚠ QUOTE-1 C — THE PLAIN TITLE ROW IS THE IMAGE ARM'S ROW NOW, so a test whose
+ * SUBJECT is that row has to render a post that has one (design-canon
+ * `C-QUOTE-1` clause 2, SPEC.1 2.0.2: on an imageless post the title renders as
+ * the quotation well in the attachment cell and the row does not render at all).
+ *
+ * ⛔ THIS IS A CHANGE OF FIXTURE, NOT OF CLAIM, and the distinction is the whole
+ * reason it is a helper rather than an edit to `presentPost()`. Row 6's hover
+ * treatment and row 24's `pr-21` gutter are properties OF THE ROW; they did not
+ * stop being true, they stopped being reachable through an imageless fixture.
+ * Re-pointing those two tests at the arm that carries the row keeps both
+ * assertions exactly as written. Relaxing them to "the row, if present" would
+ * have gone green against a card that had lost the hover state outright.
+ *
+ * ⚠ Every OTHER test in this file keeps the imageless `presentPost()`, so the
+ * file now exercises both arms — and the `Know more` presence suite below now
+ * reads the control at its new mount (under the well) with its predicate
+ * unchanged, which is the useful half of that.
+ */
+const FIXTURE_IMAGE = "https://example.invalid/post-attachment.png";
+
 function renderCard() {
 	return render(
 		<PostCard
@@ -159,11 +180,14 @@ describe("POLISH.3 PR 2 — PostCard's disabled write triggers and Read more", (
 		).toBe(false);
 	});
 
-	it("post-card::the-download-placeholder-sits-left-of-Know-more-and-is-inert", () => {
-		// UI-QUICK change set 1 item 5. ⛔ A PLACEHOLDER THAT READS AS A WORKING
-		// CONTROL IS THE DEFECT — it must be inert to the pointer, inert to the
-		// keyboard, and announced as unavailable, or it promises a download this
-		// build cannot perform.
+	it("post-card::the-download-mark-sits-left-of-Know-more-and-is-inert-without-a-route", () => {
+		// UI-QUICK change set 1 item 5, amended at POST-IMAGE-EXPORT. The mark is
+		// a WORKING control now (`DownloadPostImage`), but the property this test
+		// pinned survives as a CONDITION: with no `/m/[slug]` route params — which
+		// is what this harness has — it cannot build a URL, so it must be inert to
+		// the pointer, inert to the keyboard, and announced as unavailable rather
+		// than promise a download it cannot perform. The working case, with a
+		// route, is `download-post-image.test.tsx`.
 		const { container } = renderCard();
 
 		const download = container.querySelector<HTMLButtonElement>(
@@ -172,8 +196,8 @@ describe("POLISH.3 PR 2 — PostCard's disabled write triggers and Read more", (
 		expect(download).not.toBeNull();
 		expect(download?.disabled).toBe(true);
 		expect(download?.getAttribute("aria-disabled")).toBe("true");
-		// No handler and no navigation — a placeholder with an href would be a
-		// working control wearing a disabled costume.
+		// Never navigation — the download is a fetch, not an anchor, so a 404
+		// page can never be saved as a `.png`.
 		expect(download?.getAttribute("href")).toBeNull();
 
 		// ⚠ ORDER IS PART OF THE ASK ("to the LEFT of Know more, same row"), and
@@ -226,11 +250,22 @@ describe("POLISH.3 PR 2 — PostCard's disabled write triggers and Read more", (
 		// Row 23 — d5's `.rtitle.plust` (`:1077`): the title carries
 		// `enterPost(…)`, the `+` carries `openPostPop(…)`. Two destinations, one
 		// row, and no third control duplicating either.
+		// ⚠ QUOTE-1 C — ON THE IMAGE ARM, and this one is a change of CLAIM as well
+		// as of fixture, so it is called out rather than folded in with the two
+		// above. Left on the imageless fixture the test still PASSED — but
+		// `querySelector("h3").closest("button")` resolved to the WELL's button, so
+		// it silently became a test of the well and NOTHING asserted that the image
+		// arm's title row still enters post-focus. A green test measuring the wrong
+		// element is worse than a red one. Found by `@code-reviewer`; the well's own
+		// click is asserted in `quote-well.test.tsx`, so both arms are now covered.
 		const onEnter = vi.fn();
 		const onOpenPopup = vi.fn();
+		const withRow = presentPost();
 		const { container } = render(
 			<PostCard
-				post={presentPost()}
+				post={
+					withRow.removed ? withRow : { ...withRow, imageUrl: FIXTURE_IMAGE }
+				}
 				onEnter={onEnter}
 				onOpenPopup={onOpenPopup}
 				onOpenImage={noop}
@@ -265,9 +300,17 @@ describe("POLISH.3 PR 2 — PostCard's disabled write triggers and Read more", (
 		// layout and resolves no Tailwind, so `getComputedStyle` here would report
 		// the absence of everything and pass a component that shipped nothing (O-7's
 		// genus — assert on the markup that carries the meaning).
+		//
+		// ⚠ QUOTE-1 C — RENDERED ON THE IMAGE ARM, because that is where the row
+		// under test lives; see `FIXTURE_IMAGE`. The imageless arm's title is the
+		// quotation well, which is a picture and deliberately carries no hover
+		// treatment at all (`PostCard`'s well button records why).
+		const withRow = presentPost();
 		const { container } = render(
 			<PostCard
-				post={presentPost()}
+				post={
+					withRow.removed ? withRow : { ...withRow, imageUrl: FIXTURE_IMAGE }
+				}
 				onEnter={noop}
 				onOpenPopup={noop}
 				onOpenImage={noop}
@@ -457,12 +500,18 @@ describe("HTML-FINISH · MARKET DETAIL — row 25, the card sheds teaser + repli
  * the body is the field that decides and the teaser is downstream of it.
  */
 describe("UI-OVERNIGHT 5 — Know more is presence-driven", () => {
-	function cardWithBody(body: string) {
+	function cardWithBody(body: string, imageUrl: string | null = null) {
 		// ⚠ NARROWED, NOT CAST. `presentPost()` is typed `DebatePost` — the
 		// masking union — and the removed variant carries no `body` at all, which
 		// is the SC-1 guarantee working rather than a nuisance.
+		//
+		// ⚠ QUOTE-1 C — `imageUrl` DEFAULTS TO NULL, so every presence test below
+		// keeps reading the control on the arm it was written against (it now sits
+		// under the quotation well rather than in the title row's gutter, with the
+		// predicate untouched). Only the GUTTER test passes an image, because a
+		// gutter is a property of a row the imageless arm no longer renders.
 		const base = presentPost();
-		const post: DebatePost = base.removed ? base : { ...base, body };
+		const post: DebatePost = base.removed ? base : { ...base, body, imageUrl };
 		return render(
 			<PostCard
 				post={post}
@@ -519,10 +568,16 @@ describe("UI-OVERNIGHT 5 — Know more is presence-driven", () => {
 		// of the OVERLAID control; with no control it was 84px of width taken off
 		// every title-only card for a neighbour that never arrives. The brief:
 		// "no button and no reserved space — the title row uses the full width".
+		// ⚠ QUOTE-1 C — BOTH ON THE IMAGE ARM. The gutter is `pr-21` on the title
+		// row, and the imageless arm has no title row to reserve anything in; its
+		// `Know more` sits on its own line under the well, which is a different
+		// mechanism with nothing to keep clear. Asserting the gutter's ABSENCE on an
+		// imageless card would pass for the wrong reason — there is no row.
 		const withMore = cardWithBody(
 			"Fixture argument title.\n\nFixture extended text.",
+			FIXTURE_IMAGE,
 		);
-		const titleOnly = cardWithBody("Fixture argument title.");
+		const titleOnly = cardWithBody("Fixture argument title.", FIXTURE_IMAGE);
 		const titleButton = (c: HTMLElement) =>
 			Array.from(c.querySelectorAll("button")).find(
 				(b) => b.querySelector("h3") !== null,

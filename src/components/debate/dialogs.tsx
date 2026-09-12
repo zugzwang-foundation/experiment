@@ -110,7 +110,7 @@ export function PostPopup({
 										sold={post.authorSold}
 										createdAt={post.createdAt}
 										badge={post.badge}
-										download
+										download={{ ordinal: post.ordinal }}
 									/>
 								</div>
 							</DialogDescription>

@@ -9,6 +9,8 @@
 | **Frame document** | SPEC.1 §21.3 (Download debate → `.md` — amended by this ADR); SPEC.2 §3.3 (read-pattern R-1), §4 (API Surface — the export route lands here at build time); `docs/specs/debate-export.md` (companion serialization schema); `public/zugzwang.md` (shipped context asset); SPEC.2 §22 (ADR Index) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
+| **Amends** | — |
+| **Amended-by** | ADR-0050 — the `.md` export is no longer the only way a debate leaves the product |
 
 ---
 
@@ -175,3 +177,21 @@ build time.
 one-line "holding / flipped / exited" marker gloss folded into `zugzwang.md` at finalization; the SPEC.1
 §21 amendment pass (this §21.3 amendment + the §21.6 descope); the SPEC.2 §22 ADR-Index row for
 ADR-0025.
+
+---
+
+## Patch record — 2026-09-08 · the D-6 withdrawal is recorded; the §21 target is gone (ADR-1)
+
+**D-6** (`docs/decisions/RECORD-v2.0.md:200`) rules: *"Withdrawn. The ADR-0025 export amendment
+existed to protect a Devcon-day spike. No Devcon, no spike."* Nothing in this file recorded it.
+This file carries no `Amends` or `Amended-by` row at all.
+
+⚠ **Which amendment D-6 withdraws is NOT ESTABLISHED.** This ADR names three — *"amendment 1"*
+(`:138`), a *"§21.3 pointer-amendment"* (`:142`–`:144`), and a *"§21 amendment pass"* (`:176`) —
+and D-6 names none of them by number. Recorded as an open cross-reference. Not resolved by guess.
+
+⚠ Independently: **`SPEC.1` §21 was removed at 2.0.0** (D-29). The §21-family citations in this
+file, and the 20 non-resolving tokens the ADR-1 recon measured here, point at sections that no
+longer exist. Preserved as written per **D-33 R1**.
+
+Status remains `accepted`. No text above this record is changed.

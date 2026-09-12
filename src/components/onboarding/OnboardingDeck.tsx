@@ -235,7 +235,7 @@ export function OnboardingDeck({
 				// ⚠ The prop's own docblock above still states the superseded
 				// position; it is deferred, not overlooked — see the plan's OI-7.
 				className={cn(
-					"grid max-h-[90vh] w-[513px] max-w-[calc(100vw-88px)] gap-0 overflow-y-auto rounded-(--r) border border-ink bg-n0 p-[30px] ring-0 motion-reduce:animate-none!",
+					"grid max-h-[94vh] w-[513px] max-w-[calc(100vw-88px)] gap-0 overflow-y-auto rounded-(--r) border border-ink bg-n0 px-[30px] py-[22px] ring-0 motion-reduce:animate-none!",
 					mobileResponsive &&
 						"max-mobile:max-w-[calc(100vw-24px)] max-mobile:p-4",
 				)}
@@ -245,7 +245,7 @@ export function OnboardingDeck({
 				{/* Progress — dots left, step count right. BOTH derive from the
 				    array; a literal count here is a defect the copy register names
 				    explicitly. */}
-				<div className="mb-[20px] flex items-center gap-[10px]">
+				<div className="mb-[16px] flex items-center gap-[10px]">
 					<div className="flex gap-[6px]">
 						{cards.map((card, i) => (
 							<span
@@ -358,7 +358,7 @@ export function OnboardingDeck({
 					))}
 				</div>
 
-				<div className="mt-[24px] flex items-center gap-[12px]">
+				<div className="mt-[18px] flex items-center gap-[12px]">
 					<button
 						type="button"
 						data-slot="onboarding-back"

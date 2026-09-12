@@ -10,6 +10,7 @@ export function CommentImage({
 	url,
 	onOpen,
 	fill = false,
+	className,
 }: {
 	url: string;
 	onOpen: (url: string) => void;
@@ -56,6 +57,7 @@ export function CommentImage({
 	 * renders it inside its own `shrink-0` wrapper.
 	 */
 	fill?: boolean;
+	className?: string;
 }) {
 	return (
 		<button
@@ -106,8 +108,8 @@ export function CommentImage({
 			<img
 				src={url}
 				alt="Argument attachment"
-				className={`max-w-full rounded-[var(--imgr)] [border:var(--hairline)] ${
-					fill ? "max-h-full" : "max-h-[var(--imgmax)]"
+				className={`max-w-full object-contain rounded-[var(--imgr)] [border:var(--hairline)] ${
+					className ?? (fill ? "max-h-full" : "max-h-[var(--imgmax)]")
 				}`}
 				loading="lazy"
 				decoding="async"
@@ -116,71 +118,27 @@ export function CommentImage({
 	);
 }
 
-/**
- * HTML-FINISH · MARKET DETAIL round 2 · R2 — THE POST-IMAGE PLACEHOLDER, the
- * second of the four the founder ruled in on 2026-08-16 (the OD-2 reversal).
+/*
+ * ⛔ `PostImagePlaceholder` LIVED HERE AND IS GONE (QUOTE-1 A, founder-ruled
+ * 2026-09-11). It rendered d5's `.media.rdt` box carrying the byte-carried
+ * literal `POST IMAGE · 640:586` into `.argimg` (`d5:1682`) and into the
+ * post-focus `.hpimg` (`d5:1491-1492`) for every card with no real attachment
+ * — HTML-FINISH · MARKET DETAIL round 2 · R2, the second of the four
+ * placeholders the founder ruled IN on 2026-08-16 (the OD-2 reversal), and
+ * docketed in the same breath at `docs/parked.md`
+ * (`HTML-FINISH-MD-PLACEHOLDERS`) to be stripped or gated before the DP.2
+ * production promote. This is that docket taking its STRIP exit.
  *
- * d5's `.media.rdt` box carrying `<span class="ph">POST IMAGE · 640:586</span>`
- * — the literal it substitutes into `.argimg` (`d5:1682`) and into the
- * post-focus `.hpimg` (`d5:1491-1492`) for every card with no real attachment.
+ * ⚠ THE NAME IS RECORDED RATHER THAN ERASED because every mount site and every
+ * render guard on this surface referred to it by name, and a reader arriving
+ * from any of them needs to land somewhere that says what happened. An
+ * imageless post now renders NOTHING where the attachment would be; the cell
+ * that held it survives in `PostCard` and `ReplyCard`, because that cell is
+ * what absorbs the card's leftover height (RPLY-1 · R6) and has nothing to do
+ * with the placeholder.
  *
- * ⛔ THE LABEL IS BYTE-CARRIED, hexdumped from `d5:1243`: middle dot U+00B7 at
- * bytes `c2 b7`, and the literal aspect string `640:586`. ⛔ No copy is authored
- * and none is paraphrased — `640:586` is d5's own demo aspect and means nothing
- * for a real post, which is precisely why it is carried rather than replaced:
- * inventing a truer-sounding caption would be authoring product copy.
- *
- * ⛔ IT IS NOT `aria-hidden`, and it carries no `alt`-like name either — it is a
- * `<div>` with visible text, so a screen reader reads exactly what a sighted
- * reviewer sees. Hiding it would make the placeholder invisible to the one
- * audience most likely to be confused by it.
- *
- * ⚠⚠ REVIEW-SURFACE ONLY. Docketed at `docs/parked.md`
- * (`HTML-FINISH-MD-PLACEHOLDERS`): strip or gate all four before the DP.2
- * production promote. A real participant must never meet this box.
- *
- * ⚠ TOPOLOGY AND LABEL ONLY. d5's `8.5px` / `.16em` / `var(--n5)` / `640/586`
- * aspect are VALUES; the box reuses the glyph-box recipe already shipped in
- * `MarketMediaPanel` (itself byte-carried from `discovery/MarketCard.tsx`) and
- * the same `--imgr` / hairline pair `CommentImage` uses above, so no new type
- * size, colour or radius enters the build.
+ * ⚠ IT IS INTERIM FOR THIS KIND, NOT FINAL. QUOTE-1 C replaces the null arm
+ * with the argument title rendered as a quotation well — the kind's permanent
+ * exit, and the reason the strip ships first: it is insurance before the
+ * promote, and the well is the product decision behind it.
  */
-export function PostImagePlaceholder({
-	fill = false,
-}: {
-	/**
-	 * ⚠ THE `.argimg` ARM — the same swap `CommentImage` documents above, and the
-	 * other half of the founder's "~¼ size, left-aligned" measurement: the box was
-	 * `aspect-[16/9] w-full max-w-[var(--imgmax)]`, so it rendered 160 × 90 flush
-	 * left on staging while the mockup's fills the card and centres. The 160px
-	 * WIDTH cap goes from both arms: in the post-focus arm it left a 160px box
-	 * sitting inside the 1/3-width slot `PostFocusHeader` gives it, which is the
-	 * same defect one component over.
-	 *
-	 * ⛔ THE ASPECT BECOMES `640/586` IN THIS ARM, AND THAT IS THE LABEL'S OWN
-	 * NUMBER. d5's box is `.media.rdt{aspect-ratio:640/586}` (`d5:653`) and the
-	 * caption it carries literally reads `640:586` — so the shipped `16/9` box was
-	 * a placeholder whose shape contradicted its own text. Not a value taken from
-	 * the mockup so much as the value already printed inside the component.
-	 *
-	 * ⚠ `h-full w-auto` here, unlike `CommentImage`: a placeholder has no
-	 * intrinsic content to distort, so d5's `height:100%` is safe on it — the
-	 * upscaling objection applies only to a real attachment. With the `640/586`
-	 * aspect this reproduces d5's own box: at the pinned 1800×971 the mockup's
-	 * `.media.rdt` measures 476 × 436, height-driven off a 597px card.
-	 */
-	fill?: boolean;
-}) {
-	return (
-		<div
-			data-testid="post-image-placeholder"
-			className={
-				fill
-					? "flex aspect-[640/586] h-full max-h-full w-auto max-w-full items-center justify-center rounded-[var(--imgr)] bg-n1 px-2 text-center font-mono text-[8.5px] tracking-[0.16em] text-n4 [border:var(--hairline)]"
-					: "flex aspect-[16/9] w-full items-center justify-center rounded-[var(--imgr)] bg-n1 px-2 text-center font-mono text-[8.5px] tracking-[0.16em] text-n4 [border:var(--hairline)]"
-			}
-		>
-			POST IMAGE · 640:586
-		</div>
-	);
-}

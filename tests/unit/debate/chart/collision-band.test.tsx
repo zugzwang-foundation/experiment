@@ -251,30 +251,58 @@ describe("debate-view::price-chart-terminal-labels-never-overlap — the CSS-pix
 		});
 	}
 
-	it("the date-row band cannot invert the lower clamp on the shortest plot the product renders", () => {
-		// ⛔ A BOUND RF-5 INTRODUCED AND NOTHING STATES. `lowerTop`'s upper limit is
-		// `100% - half - band` while `upperTop`'s is `100% - half`, so on a SHORT plot
-		// the lower label's ceiling drops below the `50% + half` pivot and the pair
-		// collapses. Measured with the evaluator: at half = 8 and band = 16 the two
-		// labels overlap by 2 px at a 60 px plot and by 7 px at 50 px, and the
-		// threshold is `H >= 4·half + 2·band` = **64 px**. Before RF-5 (band = 0) the
-		// same threshold was 32 px.
+	it("the lower clamp carries the plot's own edges and NOTHING else — CHART-8", () => {
+		// ⛔ THE BOUND RF-5 INTRODUCED IS DISCHARGED, AND THE CASE IS REWRITTEN
+		// RATHER THAN DELETED. `lowerTop`'s ceiling was `100% - half - band` while
+		// `upperTop`'s was `100% - half`, so on a SHORT plot the lower label's
+		// ceiling dropped below the `50% + half` pivot and the pair collapsed:
+		// measured with the evaluator, at half = 8 and band = 16 the two overlapped
+		// by 2 px at a 60 px plot and by 7 px at 50 px, and the threshold was
+		// `H >= 4·half + 2·band` = **64 px**.
 		//
-		// ⚠ NOT LIVE — the hero's `min-h-24` floor is 96 px and the overlay's aspect
-		// lock keeps it far above — which is exactly why it is worth pinning: the
-		// margin is a layout constant in another file, and nothing connects the two.
+		// CHART-8 moves the date row OUT of the plot, so the band term is gone and
+		// the threshold returns to `4·half` = **32 px**. What this case now pins is
+		// the REMOVAL — that the lower bound is the plot's edge and not the plot's
+		// edge minus something — because a reinstated band would silently restore an
+		// inversion the shortest surface (`min-h-24` = 96 px) has no margin to
+		// absorb once the type grows.
 		const m = markup("expanded", 0.5);
-		const half = Number(
-			topOf(m, "yes").match(/clamp\((\d+(?:\.\d+)?)px,/)?.[1],
-		);
-		const band = Number(
-			topOf(m, "no").match(/calc\(100% - [\d.]+px - (\d+)px\)/)?.[1],
-		);
+		const upper = topOf(m, "yes");
+		const lower = topOf(m, "no");
+		const half = Number(upper.match(/clamp\((\d+(?:\.\d+)?)px,/)?.[1]);
 		expect(half, "no half-box in the clamp").toBeGreaterThan(0);
-		expect(band, "no date-row band in the lower clamp").toBeGreaterThan(0);
+
+		// ⛔ NO THIRD TERM. This is the assertion the change is about.
+		const BAND_TERM = /calc\(100% - [\d.]+px - [\d.]+px\)/;
+		expect(
+			lower,
+			"the lower clamp still subtracts a date-row band",
+		).not.toMatch(BAND_TERM);
+		// …and the two ceilings AGREE, which is the positive form of the same claim:
+		// the lower label may now reach exactly as far down as the upper one may
+		// reach up. Read off both strings rather than asserted as a literal.
+		const ceil = (t: string) => t.match(/calc\(100% - ([\d.]+)px\)/)?.[1];
+		expect(
+			ceil(lower),
+			"no plot-edge ceiling on the lower label",
+		).toBeDefined();
+		expect(ceil(lower)).toBe(ceil(upper));
+
+		// POSITIVE CONTROL — the band matcher fires on the shipped string with the
+		// removed term spliced back in, so `not.toMatch` above means "absent" rather
+		// than "a regex that matches nothing".
+		const reintroduced = lower.replace(
+			/calc\(100% - ([\d.]+)px\)/,
+			"calc(100% - $1px - 16px)",
+		);
+		expect(reintroduced).not.toBe(lower);
+		expect(reintroduced).toMatch(BAND_TERM);
+
+		// The threshold the removal restores, asserted against the shortest plot the
+		// product renders rather than against a number written here.
 		expect(
 			Math.min(...HEIGHTS),
-			`the shortest plot must clear 4·half + 2·band = ${4 * half + 2 * band}px`,
-		).toBeGreaterThanOrEqual(4 * half + 2 * band);
+			`the shortest plot must clear 4·half = ${4 * half}px`,
+		).toBeGreaterThanOrEqual(4 * half);
 	});
 });

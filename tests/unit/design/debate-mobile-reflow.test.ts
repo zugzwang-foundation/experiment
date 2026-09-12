@@ -21,9 +21,11 @@ import { describe, expect, it } from "vitest";
  *   PageContainer   max-mobile:h-auto  max-mobile:overflow-visible
  *                   ← the page may grow and scroll again, as every OTHER
  *                     `(public)` surface always could
- *   headzone band   max-mobile:basis-auto  max-mobile:overflow-visible
- *                   ← the band is its content's height, not 24.2% of a phone
- *                     viewport, and stops clipping what it holds
+ *   headzone band   (no `max-mobile:` token any more)
+ *                   ← the band is its content's height at EVERY width since
+ *                     the header-fit change, so the release MOBILE-1 appended
+ *                     here is subsumed; the describe block "the headzone band
+ *                     is content-sized at every width" below pins its absence
  *   arena band      max-mobile:flex-col
  *                   ← the two poles stack instead of splitting 375px
  *
@@ -318,84 +320,84 @@ describe("debate mobile reflow — the arena stacks below 640px, in BOTH arms", 
 	});
 });
 
-describe("debate mobile reflow — the headzone band stops being a viewport fraction", () => {
-	it("debate-mobile::headzone-keeps-its-24.2dvh-band-and-releases-it-below-640", () => {
+describe("debate mobile reflow — the headzone band is content-sized at every width", () => {
+	it("debate-mobile::headzone-carries-no-fraction-to-release-below-640", () => {
 		const source = read(HEADZONE);
 
-		// ⚠⚠ RE-DERIVED AT THE REBASE ONTO `main`, NOT WEAKENED — this guard's
-		// own throw message asked for exactly that. Upstream (HTML-FINISH ·
-		// MARKET DETAIL) split this band into two NAMED CONSTANTS selected by the
-		// `fit` prop, so the node now reads
+		// ⚠⚠ RE-DERIVED TWICE, NOT WEAKENED — this guard's own throw message asked
+		// for exactly that. First at the rebase onto `main`, when HTML-FINISH ·
+		// MARKET DETAIL split the band into two NAMED CONSTANTS selected by the
+		// `fit` prop, so the node reads
 		// `className={fit ? BAND_CONTENT_SIZED : BAND_DECLARED}` and carries no
-		// literal for `bandClasses` to find. The tokens did not leave the surface;
-		// they moved into the constant, so the guard follows them there.
+		// literal for `bandClasses` to find. Then at the header-fit change, when
+		// the tokens this test was written to pin left the constant altogether —
+		// see below.
 		//
 		// ⛔ TWO CLAIMS, because either alone is satisfiable by a broken tree.
 		// The constant alone would pass while nothing rendered it; the wiring
-		// alone would pass while the constant had lost the mobile half.
+		// alone would pass while the constant had regained a fraction.
 		const wiring =
 			/"headzone"\s+className=\{fit \? BAND_CONTENT_SIZED : BAND_DECLARED\}/;
 		expect(
 			wiring.test(source),
 			`${HEADZONE}: the headzone node no longer selects between ` +
-				`BAND_CONTENT_SIZED and BAND_DECLARED. MOBILE-1's phone-width ` +
-				`overrides live on BAND_DECLARED; if the frame was restructured ` +
+				`BAND_CONTENT_SIZED and BAND_DECLARED. If the frame was restructured ` +
 				`again, re-derive this guard rather than deleting it.`,
 		).toBe(true);
 
-		// ⚠ `BAND_DECLARED`, NOT `BAND_CONTENT_SIZED`, and the choice is load-
-		// bearing. Only the market arm's band declares `basis-[24.2dvh]` and
-		// `overflow-hidden`; the post arm declares neither, so releasing them
-		// there would be inert noise. The mobile half is asserted against the one
-		// constant it can actually mean anything against.
 		const declared = /const BAND_DECLARED =\s*"([^"]*)"/.exec(source);
 		if (!declared) {
 			throw new Error(
 				`${HEADZONE}: BAND_DECLARED is not a single string literal any ` +
-					`more. MOBILE-1's phone-width overrides live on it; re-derive ` +
-					`this guard rather than deleting it.`,
+					`more. Re-derive this guard rather than deleting it.`,
 			);
 		}
 		// ONE authoring site, as before — the constant is declared exactly once.
 		expect(source.match(/const BAND_DECLARED =/g)).toHaveLength(1);
 		const classes = (declared[1] ?? "").split(/\s+/).filter(Boolean);
 
-		// ⛔ THE DESKTOP/TABLET HALF, PINNED BY NAME. `shrink-0 basis-[24.2dvh]`
-		// is d5's `.headzone{flex:0 0 188px}` expressed as the viewport fraction
-		// that literal actually encodes; `overflow-hidden` is UI-QUICK change set
-		// 4 §C's containment; `lg:flex-row` is the ≥1024px two-column frame.
+		// ⛔ WHAT MOBILE-1 PHASE A RELEASED IS GONE AT EVERY WIDTH. This test used
+		// to pin `basis-[24.2dvh]` + `overflow-hidden` above 640px and
+		// `max-mobile:basis-auto` + `max-mobile:overflow-visible` below it: the
+		// phone got a content-sized band because 24.2% of a phone viewport could
+		// not hold a question, a stat line, a price bar and a four-block resolver
+		// row. The desktop lost the same fight one market at a time — a wrapped
+		// attrs line pushed the badge row and the price bar out of the band on
+		// some markets and not others at the same viewport — so the fraction and
+		// its clip are now absent outright (`HeadZone.tsx`).
+		// ⇒ The phone-width OUTCOME is unchanged: band = content height, nothing
+		// clipped, ordinary page flow around it. What changed is that it no
+		// longer needs an override to get there, and an override for a token that
+		// is not present would be inert — a `max-mobile:` release here would read
+		// as a live rule and be noise.
 		// ⚠ `lg:flex-row` IS ASSERTED AND THE OTHER `lg:*` TOKENS IN THIS FILE ARE
 		// NOT. They live on the rail and its spacer, are none of MOBILE-1's
 		// business, and are deliberately left alone — the tablet band between 640
-		// and 1024 is unchanged by this task.
+		// and 1024 is unchanged.
 		expect(classes).toContain("flex");
 		expect(classes).toContain("min-h-0");
 		expect(classes).toContain("shrink-0");
-		expect(classes).toContain("basis-[24.2dvh]");
 		expect(classes).toContain("flex-col");
 		expect(classes).toContain("gap-5");
-		expect(classes).toContain("overflow-hidden");
 		expect(classes).toContain("lg:flex-row");
-
-		// ⚠ THE MOBILE HALF, AND THE TWO TOKENS ARE ONE MECHANISM. `basis-auto`
-		// makes the band its CONTENT's height instead of 24.2% of a phone
-		// viewport — 24.2% of 844px is 204px for a question, a stat line, a price
-		// bar and a four-block resolver row. `overflow-visible` is what stops the
-		// remainder being clipped: the band's own docblock already records that
-		// below ~715px of viewport height the fraction is smaller than the content
-		// and the excess is CUT. A phone is permanently in that regime.
 		expect(
-			classes,
-			`${HEADZONE}: the headzone band never releases \`basis-[24.2dvh]\` ` +
-				`below 640px, so at phone width it is a fixed fraction of a short ` +
-				`viewport holding content that does not fit.`,
-		).toContain("max-mobile:basis-auto");
+			classes.some((c) => /^basis-\[/.test(c)),
+			`${HEADZONE}: the headzone band declares a basis again. At phone width ` +
+				`that is a fixed fraction of a short viewport holding content that ` +
+				`does not fit; re-derive this guard rather than re-adding a ` +
+				`\`max-mobile:basis-auto\` release on top of it.`,
+		).toBe(false);
 		expect(
-			classes,
-			`${HEADZONE}: the headzone band keeps \`overflow-hidden\` at phone ` +
-				`width. Releasing the basis without releasing the clip leaves the ` +
-				`overflow cut at whatever height the content resolves to.`,
-		).toContain("max-mobile:overflow-visible");
+			classes.some((c) => /^overflow-/.test(c)),
+			`${HEADZONE}: the headzone band contains its own overflow again, which ` +
+				`at phone width means clipping or scrolling a full-width column.`,
+		).toBe(false);
+		expect(
+			classes.filter((c) => c.startsWith("max-mobile:")),
+			`${HEADZONE}: the headzone band carries a \`max-mobile:\` token. It is ` +
+				`content-sized at every width, so there is no basis or clip for a ` +
+				`phone-width release to act on; an inert override reads as a rule.`,
+		).toEqual([]);
 	});
 });
 

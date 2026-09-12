@@ -90,7 +90,11 @@ describe("chart-window::staging and preview share the fixture window", () => {
 		// CHART-4's backfilled `market.opened` seeds are four days earlier, and the
 		// series starts from that seed, so the old value clipped the genesis point
 		// of all eight markets. Now the earliest event of ANY type, floored.
-		const STG_START = "2026-08-17T00:00:00.000Z";
+		// ⚠ RE-MEASURED 2026-09-11 — was 2026-08-17T00:00Z. The 2026-09-07 reset
+		// destroyed the eight content markets and LIQ-1-RESTORE recreated them, so
+		// every renderable event on staging is now younger than the window that
+		// held them, and the plot opened three weeks before any data existed.
+		const STG_START = "2026-09-07T00:00:00.000Z";
 		// ⚠ CHART-4 D11 — was 2026-09-10T23:45Z, now production's own end. The
 		// start is still staging's (measured from its own data), so the two
 		// windows share an end and differ only in where they begin.
@@ -212,8 +216,25 @@ describe("chart-window::staging and preview share the fixture window", () => {
 		// 2026-09-01 against the live staging database:
 		//   earliest  2026-08-17T20:55:20.712Z  (market.opened, mumbai-bmc-…)
 		//   latest    2026-09-01T07:30:30.139Z  (image_upload.sign_requested)
-		const EARLIEST_MEASURED_EVENT = Date.parse("2026-08-17T20:55:20.712Z");
-		const LATEST_MEASURED_EVENT = Date.parse("2026-09-01T07:30:30.139Z");
+		//
+		// ⛔ RE-MEASURED 2026-09-11, AND THE RE-MEASUREMENT IS THE POINT. Those two
+		// instants describe markets that no longer exist: the 2026-09-07 reset
+		// dropped all eight and LIQ-1-RESTORE recreated them through
+		// `createMarket` / `openMarket`, minting fresh `market.opened` rows. A pin
+		// taken against destroyed data does not go red — it goes QUIETLY WRONG in
+		// the permissive direction, because a floor that is too early still
+		// "contains" everything while the plot it describes opens on three weeks of
+		// nothing. Read off the live staging database, same predicate as above —
+		// the earliest of `market.opened` · `bet.placed` · `bet.sold`:
+		//   market.opened  n= 24  first 2026-09-07T20:18:13.954Z
+		//   bet.placed     n=388  first 2026-09-07T20:18:16.131Z
+		//   bet.sold       n= 16  first 2026-09-07T20:18:35.118Z
+		//   latest of all         2026-09-11T05:32:18.582Z
+		// ⚠ THIS WILL GO STALE AGAIN ON THE NEXT RESET THAT RECREATES THE MARKETS,
+		// and nothing re-reads it. Treat a reset as a trigger to re-measure both
+		// this pin and `STAGING_CHART_WINDOW`.
+		const EARLIEST_MEASURED_EVENT = Date.parse("2026-09-07T20:18:13.954Z");
+		const LATEST_MEASURED_EVENT = Date.parse("2026-09-11T05:32:18.582Z");
 		const w = resolveChartWindow("staging");
 
 		expect(Date.parse(w.start)).toBeLessThanOrEqual(EARLIEST_MEASURED_EVENT);
@@ -239,25 +260,50 @@ describe("debate-view::price-chart-window-contains-all-data — RF-5, against th
 	// is precisely how this defect survived: the render guards derive from the
 	// constants and therefore followed the wrong value without a word.
 
-	/** The genesis instant of every staging market: the `market.opened` seed
-	 * `replayReserveSeries` starts its walk from, which CHART-4 backfilled as the
-	 * pool's own `created_at`. Verified equal (to the millisecond) against the live
-	 * database on 2026-09-01. */
+	/**
+	 * The genesis instant of every content market: the `market.opened` seed
+	 * `replayReserveSeries` starts its walk from.
+	 *
+	 * ⛔⛔ PINNED FROM A LIVE READING, NO LONGER DERIVED FROM
+	 * `staging-markets-snapshot.json`, AND THE OLD SOURCE HAD BECOME A LIE. That
+	 * file's `pools[].created_at` was the live genesis when this guard was
+	 * written; the 2026-09-07 reset then destroyed every pool and LIQ-1-RESTORE
+	 * recreated the markets from that same snapshot — reusing their original
+	 * UUIDv7 **ids** so the surviving R2 objects stayed addressable, but minting
+	 * brand-new pools. So the ids still match and the timestamps no longer do,
+	 * which is the worst shape a fixture can take: it joins cleanly and reports
+	 * on rows that are gone.
+	 *
+	 * ⚠ THE SNAPSHOT IS NOT AT FAULT AND MUST NOT BE "FIXED". It is the RESTORE
+	 * SOURCE — the founder's own market copy, replayed to rebuild staging — and
+	 * editing its timestamps to satisfy a test would corrupt the one artifact
+	 * that can rebuild the slate. The guard was reading it for something it never
+	 * claimed to be: a description of the CURRENT database.
+	 *
+	 * Read 2026-09-11 against the live staging database, one row per content
+	 * market, ordered as measured. ⚠ Re-measure after any reset that recreates
+	 * the markets; see `EARLIEST_MEASURED_EVENT` above for the same warning.
+	 */
 	function stagingGenesisInstants(): { slug: string; at: string }[] {
-		const snap: {
-			markets: { id: string; slug: string }[];
-			pools: { market_id: string; created_at: string }[];
-		} = JSON.parse(
-			readFileSync(
-				join(REPO_ROOT, "docs/data/staging-markets-snapshot.json"),
-				"utf8",
-			),
-		);
-		const slugOf = new Map(snap.markets.map((m) => [m.id, m.slug]));
-		return snap.pools.map((p) => ({
-			slug: slugOf.get(p.market_id) ?? p.market_id,
-			at: p.created_at,
-		}));
+		return [
+			{
+				slug: "mumbai-bmc-pink-october-disclosure",
+				at: "2026-09-07T20:19:24.814Z",
+			},
+			{
+				slug: "oktoberfest-munich-beer-volume",
+				at: "2026-09-07T20:19:24.942Z",
+			},
+			{ slug: "chess-fide-tiebreak-response", at: "2026-09-07T20:19:25.124Z" },
+			{ slug: "bitcoin-price-50k", at: "2026-09-07T20:19:25.244Z" },
+			{
+				slug: "math-erdos-contribution-response",
+				at: "2026-09-07T20:19:25.415Z",
+			},
+			{ slug: "claude-bundle-response", at: "2026-09-07T20:19:25.614Z" },
+			{ slug: "yc-paper-club-response", at: "2026-09-07T20:19:25.765Z" },
+			{ slug: "github-zugzwang-repo-stars", at: "2026-09-07T20:19:25.887Z" },
+		];
 	}
 
 	it("places every staging market's GENESIS point inside the plot — the CHART-6 defect", () => {
@@ -286,23 +332,35 @@ describe("debate-view::price-chart-window-contains-all-data — RF-5, against th
 		}
 	});
 
-	it("REDS on the pre-CHART-6 staging start — the control that proves the guard can fire", () => {
+	it("REDS on the PRODUCTION window — the control that proves the guard can fire", () => {
 		// ⛔ OVN-V2 IN THE FILE RATHER THAN IN A REPORT. The assertion above is
 		// written against code that is now correct, so on its own it has never seen
-		// the defect and could be asserting something unrelated. This restores the
-		// exact superseded constant and requires the SAME projection to reject it.
+		// the defect and could be asserting something unrelated. This runs the SAME
+		// projection over a window that genuinely clips, and requires it to reject.
 		//
-		// ⚠ It pins the DEFECT, not the fix, so it does not go stale when the
-		// staging window moves again — which it will, the next time the fixtures do.
-		const SUPERSEDED_START = Date.parse("2026-08-21T00:00:00.000Z");
+		// ⛔⛔ THE CONTROL USED TO BE THE PRE-CHART-6 START (2026-08-21) AND IT
+		// STOPPED CONTROLLING ANYTHING. Its own comment claimed it "pins the DEFECT,
+		// not the fix, so it does not go stale when the staging window moves" — true
+		// of the window, and false of the DATA. The 2026-09-07 reset moved every
+		// genesis to September, which is AFTER that superseded start, so the dead
+		// constant stopped clipping and the control silently reported zero. ⚠ A
+		// positive control that can no longer fire is worse than none: the guard
+		// above still passes, and nothing says its proof of life has expired.
+		//
+		// ⇒ The window used here is now PRODUCTION's, which is both a LIVE constant
+		// and the real hazard: `resolveChartWindow`'s `preview` arm exists precisely
+		// so a preview build pointed at the staging database does not take
+		// production's start and crush every line against the left edge. If that arm
+		// were ever dropped, this is the assertion that would say so.
+		const prodStartMs = Date.parse(resolveChartWindow("production").start);
 		const endMs = Date.parse(resolveChartWindow("staging").end);
 
 		const clipped = stagingGenesisInstants().filter(
-			(g) => xPx(g.at, SUPERSEDED_START, endMs) < 0,
+			(g) => xPx(g.at, prodStartMs, endMs) < 0,
 		);
 		expect(
 			clipped.length,
-			"the superseded window must clip all eight genesis points; if it does not, this guard is measuring the wrong quantity",
+			"production's window must clip all eight staging genesis points; if it does not, this guard is measuring the wrong quantity",
 		).toBe(8);
 	});
 

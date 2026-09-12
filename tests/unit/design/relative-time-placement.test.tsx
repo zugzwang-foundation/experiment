@@ -89,6 +89,8 @@ const stripComments = (source: string): string =>
 const code = (rel: string) => stripComments(read(rel));
 
 const LEAF = "src/components/ui/relative-time.tsx";
+/** The JPEG export's pure mapper — the one non-DOM reader of the formatter. */
+const EXPORT_MAPPER = "src/server/debate-export/image/compose.ts";
 const FORMATTER = "src/lib/relative-time.ts";
 const ARGPROFILE = "src/components/debate/ArgProfile.tsx";
 const HERO = "src/components/discovery/HeroPanels.tsx";
@@ -1313,7 +1315,12 @@ describe("TIME-1 :: the three walls, as structure rather than as review notes", 
 				(e) =>
 					e.isFile() && (e.name.endsWith(".ts") || e.name.endsWith(".tsx")),
 			)
-			.map((e) => join(e.parentPath, e.name).replace(`${ROOT}/`, ""));
+			.map((e) =>
+				join(e.parentPath, e.name)
+					.replace(ROOT, "")
+					.replace(/^[/\\]+/, "")
+					.replace(/\\/g, "/"),
+			);
 
 		// Alive check — a scan that silently matched nothing passes every
 		// assertion below vacuously.
@@ -1323,10 +1330,24 @@ describe("TIME-1 :: the three walls, as structure rather than as review notes", 
 		const importing = (needle: string) =>
 			tree.filter((rel) => code(rel).includes(needle)).sort();
 
+		// ⚠ THE EXPORT MAPPER IS THE SECOND IMPORTER, AND IT SERVES THIS RULE
+		// RATHER THAN BREAKING IT. The rule exists so a formatter is not
+		// re-implemented per surface and four surfaces cannot disagree about where
+		// a bucket edge falls. `compose.ts` maps a post to the JPEG export's props
+		// and prints the post's age on it — importing THIS formatter is precisely
+		// the behaviour being protected; re-deriving "2d ago" beside it is the
+		// failure.
+		//
+		// ⛔ IT CANNOT MOUNT THE LEAF INSTEAD, which is why the letter of the rule
+		// has to widen rather than the export bending to it. The leaf is a
+		// `"use client"` React component and the export is drawn by Satori from a
+		// server render; there is no DOM for it to mount into. The leaf assertion
+		// below is untouched and still pins the three ratified identity rows —
+		// which is the half of this rule that is about placement.
 		expect(
-			importing("@/lib/relative-time"),
-			"the formatter is imported outside the leaf",
-		).toEqual([LEAF]);
+			importing("@/lib/relative-time").sort(),
+			"the formatter is imported outside the leaf and the export mapper",
+		).toEqual([LEAF, EXPORT_MAPPER].sort());
 		expect(
 			importing("@/components/ui/relative-time"),
 			"the leaf is mounted outside the three ratified identity rows",

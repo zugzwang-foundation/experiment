@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { InfoTip } from "@/components/ui/info-tip";
 import { GLOSSARY } from "@/lib/copy/glossary";
+import { cn } from "@/lib/utils";
 
 /**
  * Right-zone identity affordance. Signed-out → the JOIN entry (mockup v0_2,
@@ -23,6 +24,29 @@ import { GLOSSARY } from "@/lib/copy/glossary";
  *
  * Signed-in/out selection is server-side in the layouts (plan §4.2) — this
  * component just renders the given viewer.
+ *
+ * ⛔ BELOW 640px THE SIGNED-IN CHIP REDUCES TO THE AVATAR ALONE (ADR-0049). The
+ * pseudonym text is not rendered; the avatar stays, and it stays because it is
+ * the LINK to the profile where the hidden pseudonym — and the balance and
+ * portfolio the Đ cluster stops showing — all render. Hiding the avatar would
+ * remove the affordance the whole ruling rests on, so the hide is on the
+ * pseudonym `<span>` and on nothing else. This reverses MOBILE-1 Phase A's
+ * never-hidden ruling for this component; ADR-0049 is the record.
+ *
+ * ⛔⛔ THE SIGNED-OUT JOIN BRANCH TAKES ZERO DIFF, AND THAT IS A RULE RATHER THAN
+ * AN OMISSION. ADR-0048's whole point is that a phone participant may join, so
+ * the CTA renders at every width on every route. This file once carried a blanket
+ * ban on ANY responsive token precisely to keep that true; the ban is now an
+ * allowlist of exactly one token, and `header-mobile::IdentityCluster-reduces-to-
+ * the-avatar-below-640-and-the-JOIN-CTA-never-hides` asserts the JOIN branch's
+ * cleanliness EXPLICITLY, because the old shape held it only as a side effect.
+ *
+ * ⚠ THE PSEUDONYM'S `InfoTip` GOES WITH THE TEXT, DELIBERATELY. Hiding the
+ * trigger removes the `pseudonym` glossary tip on phones — accepted under the
+ * same relocation argument. `asChild` is `Slot`-merged and adds no DOM node, so
+ * the class lands on the span and nothing else moves. `max-w-40 truncate` is
+ * untouched: it handles a long pseudonym above 640px, and below 640px the span
+ * is `display:none`, so truncation is moot rather than removed.
  */
 export type HeaderViewer = {
 	pseudonym: string | null;
@@ -30,7 +54,20 @@ export type HeaderViewer = {
 	pfpUrl: string;
 };
 
-export function IdentityCluster({ viewer }: { viewer: HeaderViewer | null }) {
+export function IdentityCluster({
+	viewer,
+	mobileResponsive = false,
+}: {
+	viewer: HeaderViewer | null;
+	/**
+	 * ADR-0049 — when true, the signed-in chip's pseudonym text is not rendered
+	 * below 640px and the chip reduces to its avatar. Threaded from the layout
+	 * through `GlobalHeader`; it defaults `false` so a mount that does not pass it
+	 * inherits the DESKTOP render rather than an accidental reflow (AGENTS.md §8).
+	 * It never reaches the signed-out JOIN branch, which renders at every width.
+	 */
+	mobileResponsive?: boolean;
+}) {
 	if (!viewer) {
 		return (
 			<Link
@@ -70,7 +107,12 @@ export function IdentityCluster({ viewer }: { viewer: HeaderViewer | null }) {
 				<AvatarFallback>{viewer.pseudonym.charAt(0)}</AvatarFallback>
 			</Avatar>
 			<InfoTip content={GLOSSARY.pseudonym} asChild>
-				<span className="max-w-40 truncate text-xs font-semibold text-ink">
+				<span
+					className={cn(
+						"max-w-40 truncate text-xs font-semibold text-ink",
+						mobileResponsive && "max-mobile:hidden",
+					)}
+				>
 					{viewer.pseudonym}
 				</span>
 			</InfoTip>

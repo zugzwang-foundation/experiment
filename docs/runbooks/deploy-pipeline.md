@@ -131,7 +131,9 @@ separate the cases — 29 commits and 1 commit can encode an identical tree, and
 2026-08-18 they did. Direction counts cannot either — the same day `main..staging`
 read 141 insertions against 3,381 deletions while `staging` held **zero** content
 of its own. This is the shortest test that answers the actual question.
-- **(c) Migration delta.** **EMPTY → a fast-forward; continue in this section.** **NOT EMPTY → this is a sequenced deploy governed by ADR-0024 and §3, *not* a §2.5 advance — stop here and use §3.** This check is also the only thing that tells you **which green to expect** from the migrate job below, and it only tells you **beforehand**.
+- **(c) Migration delta.** ⛔ **BOTH results continue in THIS section. A staging advance is §2.5 whether or not migrations are in the delta.** EMPTY → the migrate job will be a no-op. NOT EMPTY → it will apply DDL, and the **production** half of this deploy — whenever it is taken — is what §3 governs.
+  ⚠ **This bullet used to route a migration-bearing staging advance to §3, and that was wrong.** **§3 is production-only**: every one of its steps is `--config prd`, `<staged-url>`, `vercel promote`, or `zugzwangworld.com`. A staging advance sent there finds no instruction it can execute, so the reader either improvises or stalls. **ADR-0024 settles it** — item 2 makes staging a git-auto-deploy sandbox that *"tolerates a migrate/deploy race"*, item 3 states *"Staging migrate = automatic GHA on push to `staging`"*, and migrate-before-serve is scoped to **production** at item 5. §0's topology table says the same thing in one word: staging's migrate path is `auto`. This file's header defers to the ADR on conflict, which is the authority this correction rests on. *(Corrected 2026-09-08 at LIQ-1-PROMOTE, where migrations `0027`–`0030` made (c) NOT EMPTY and the old wording sent a correct, healthy staging advance into a section with no staging step in it.)*
+  **What (c) does NOT do is verify anything.** It sets the expectation *beforehand*; **the post-migrate check below is what confirms the outcome**, and it is a positive test against the database rather than a reading of the log.
 
 > **An EMPTY result from (a), (b) or (c) is a REAL result — none of them can fail open.** Worth stating because the question comes up: if a ref does not resolve, `git log`/`git diff` **abort loudly** (`fatal: bad revision`, `fatal: ambiguous argument … unknown revision`) and print nothing to stdout. They cannot silently report "no commits" against a ref that is missing. The `git fetch origin --prune` above is what keeps the refs current; the checks themselves are safe.
 >
@@ -159,16 +161,54 @@ curl -s https://staging.zugzwangworld.com/api/health | jq
 
 **Gate on `canary` == the merged SHA.** `canary` is the **bare 40-character commit SHA** — no `sha-` or `g` prefix, no short form, no `v`. Compare it verbatim against `git rev-parse origin/main`. A mismatch means the Vercel build has not finished or has not taken the alias yet: the step is **not** done, poll again. `env` must read `"staging"`; `db` and `migrations` must both read `"ok"`.
 
-**What green looks like — a no-op and an applied migration are nearly indistinguishable.** Both end in `[✓] migrations applied successfully!` and both mark the job green. The log does not announce "nothing to do". **Precondition (c) is what tells you which one to expect, and it only tells you beforehand** — read it as the expectation, then read the log against it.
+**What green looks like — and why the LOG cannot tell you what ran.** A no-op and a full DDL apply both end in `[✓] migrations applied successfully!`, both mark the job green, and ⛔ **both produce the same log.** `drizzle-kit migrate` does not echo the statements it executes, and `CREATE TABLE`, `CREATE FUNCTION` and `cron.schedule()` raise **no** NOTICE — only the `IF NOT EXISTS` bookkeeping does. **Log volume is not evidence. Do not infer success, or a no-op, from it.**
 
-On a **fast-forward with no migration delta**, the *Migrate staging DB* step emits exactly two idempotent NOTICEs and **no DDL**:
+Against an already-initialised database the *Migrate staging DB* step emits exactly two idempotent NOTICEs on **every** run:
 
 ```
 code: '42P06',  message: 'schema "drizzle" already exists, skipping'
 code: '42P07',  message: 'relation "__drizzle_migrations" already exists, skipping'
 ```
 
-**These are expected output, not errors.** They are Postgres reporting that `CREATE SCHEMA IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS` found their objects already present — drizzle's own bookkeeping, re-run against an already-initialised database. A first read mistakes them for failures because they arrive as structured error-shaped objects with a `severity` field; `severity: 'NOTICE'` is the tell. If you see these two and nothing else, the run was a **no-op** and precondition (c) should have been EMPTY. Anything beyond them — `CREATE TABLE`, `ALTER TABLE`, a new `__drizzle_migrations` row — means DDL ran, and (c) should have been NOT EMPTY. **A mismatch between the two is the signal to stop and reconcile**, not to proceed to the health curl.
+**These are expected output, not errors.** Postgres is reporting that `CREATE SCHEMA IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS` found their objects already present — drizzle's own bookkeeping, re-run. A first read mistakes them for failures because they arrive as structured error-shaped objects with a `severity` field; `severity: 'NOTICE'` is the tell. **They say nothing whatever about whether your migrations applied.**
+
+⚠ **This paragraph used to say the opposite, and the opposite nearly halted a correct promote.** It read: *"If you see these two and nothing else, the run was a **no-op** and precondition (c) should have been EMPTY … **A mismatch between the two is the signal to stop and reconcile**."* On **2026-09-08** (LIQ-1-PROMOTE) a run carrying four migrations printed exactly those two NOTICEs and nothing else — the documented mismatch, which is to say the documented instruction to stop — while `0027`–`0030` had in fact applied: the `liquidity_policy` row that `0027` seeds carries `created_at 19:41:41.428Z`, inside that same step's 19:41:38–19:41:51 window. **A test that returns the same answer for both outcomes is not a test**, and this one returned *stop* for the healthy case.
+
+#### The post-migrate check — positive, run AFTER migrate, against the target
+
+Three probes. **1 and 2 always run. 3 runs when the migration names one.**
+
+**1. Journal head == the highest file in `drizzle/migrations/`.** Read the head; never count entries.
+
+```bash
+ls drizzle/migrations/*.sql | sort | tail -1                       # highest file on disk
+jq -r '.entries[-1].tag' drizzle/migrations/meta/_journal.json     # journal head
+```
+
+**2. Per-hash parity — every journal row's hash matches the file on disk.** This is *exactly* the comparison `/api/health` performs (§1: `"ok"` iff the applied-hash multiset equals the journal-hash multiset), so **`migrations:"ok"` from the health gate discharges this probe** and no separate command is owed. Recompute it locally only when you want it independent of the surface being gated:
+
+```bash
+# sha256 each drizzle/migrations/*.sql, compare the multiset against
+# SELECT hash FROM drizzle.__drizzle_migrations — expect equal counts,
+# zero MISSING (in journal, not applied) and zero EXTRA (applied, not in journal).
+```
+
+⚠ **Row `id`s are not a check.** They carry gaps from earlier resets; on 2026-09-08 staging held **31 rows with a maximum `id` of 36** and was perfectly correct. The multiset reconciles; the sequence does not have to.
+
+**3. One existence probe per object-creating migration, named in that migration's own header.** ⛔ **A migration whose header names no probe carries no probe** — do not invent one, and do not fall back to reading the log. This is a convention for migrations written from 2026-09-08 onward; `drizzle/migrations/` is append-only, so the existing set cannot be retrofitted and none of them names one.
+
+Worked example — what `0027_liquidity_injector_pg_cron`'s probe would say, taken from the LIQ-1-PROMOTE verification that proved it applied:
+
+```sql
+SELECT to_regclass('public.liquidity_policy') IS NOT NULL       AS table_exists;
+SELECT count(*) = 3 AS functions_exist FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+  WHERE n.nspname = 'public'
+    AND p.proname IN ('zz_add_liquidity','run_liquidity_injection','check_liquidity_alarms');
+SELECT count(*) = 2 AS crons_registered FROM cron.job
+  WHERE jobname IN ('liquidity-injector','liquidity-alarms') AND active;
+```
+
+**Only then read the health gate.** The three probes above answer *did the objects land*; `/api/health` answers *does the DB match the committed set*. Neither substitutes for the other, and neither is the log.
 
 **The health endpoint is the authority — not the migrate exit code.** `drizzle-kit migrate` can exit `0` with a migration unapplied (drizzle-orm #5769 — the silent high-water-mark skip), so a green `staging-migrate.yml` run is a **signal, not a verdict**. Only `migrations:"ok"` from `/api/health` proves the DB matches the committed set. This is the same rule §3 enforces at the production promote gate; staging earns no exemption from it for being resettable.
 

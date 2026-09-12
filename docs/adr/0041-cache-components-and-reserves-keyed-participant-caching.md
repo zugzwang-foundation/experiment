@@ -9,6 +9,7 @@
 | **Frame document** | SPEC.2 §4.3 (this ADR's same-commit rider, 1.0.26) · CLAUDE.md §5.14 SC-1 (masking is a property of every read over `comments.body`) · CLAUDE.md §3 (no live in-product K_eff surface — unaffected, noted for completeness) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
+| **Amended-by** | ADR-0042 (D-6 only — does not supersede it; the 7200 s TTL stands, on a premise ADR-0042 restores. `D-6` is a decision *inside this ADR*, not decision-record D-6) |
 
 ---
 

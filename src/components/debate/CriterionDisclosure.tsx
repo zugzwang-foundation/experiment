@@ -149,8 +149,10 @@ export function CriterionDisclosure({
 			    ⇒ The body scrolls INSIDE itself instead, which is this surface's
 			    ruled overflow posture everywhere else (the debate columns' own
 			    `column-scroll`): the page never scrolls, regions do.
-			    ⚠ `dvh`, NOT px — the band above it is `basis-[24.2dvh]`, so this
-			    surface already sizes by viewport fraction. A pixel cap would be
+			    ⚠ `dvh`, NOT px — `PageContainer` is `100dvh`-derived, so this
+			    surface already sizes by viewport fraction (the header band above
+			    it no longer does — it is content-sized since the header-fit
+			    change — but the page it sits in still is). A pixel cap would be
 			    correct at exactly one viewport height. */}
 			<div
 				data-testid="criterion-body"

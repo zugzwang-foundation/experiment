@@ -119,7 +119,12 @@ const viewLayerFiles = readdirSync(join(ROOT, "src"), {
 			entry.isFile() &&
 			(entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")),
 	)
-	.map((entry) => join(entry.parentPath, entry.name).replace(`${ROOT}/`, ""));
+	.map((entry) =>
+		join(entry.parentPath, entry.name)
+			.replace(ROOT, "")
+			.replace(/^[/\\]+/, "")
+			.replace(/\\/g, "/"),
+	);
 
 describe("emphasis ladder — rungs 2 and 3 are named tokens", () => {
 	it("tree-scan-is-alive", () => {

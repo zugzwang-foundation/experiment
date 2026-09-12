@@ -490,3 +490,19 @@ Ten new rows under the `bets::concurrency-*` family in SPEC.1 §17:
 ---
 
 *ADR-0013 ratifies the bet transaction concurrency model for the Zugzwang experiment phase: Postgres SERIALIZABLE isolation, pool-row pessimistic lock via `SELECT … FOR NO KEY UPDATE`, canonical lock order `pools → positions → dharma_ledger → friendly_fire_events → events`, full-jitter retry on SQLSTATE 40001 and 40P01 with bases [50, 100, 200] ms and a 3-retry budget, Sentry breadcrumb per attempt with custom event (alarm 3) on exhaustion, idempotency-key cache lookup as the first authenticated step in every bet handler short-circuiting both moderation and transaction on completed-cache hit, and OpenAI moderation outside the transaction per ADR-0014. The bet transaction wrapper at `src/server/bets/transaction.ts` is the single source of truth; ENGINE.7 implements. The decision body and the file-map subsection are immutable; superseding requires a new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy.*
+
+---
+
+## Patch record — 2026-09-08 · the pre-commit gate this file describes is superseded (ADR-1)
+
+**ADR-0046** supersedes `ADR-0014`'s gate architecture and **D-32** makes moderation consequences
+advisory. Lines `:171`, `:234`, `:330`, `:469` of this file describe that gate — its ordering, its fail-closed posture,
+or its blocking verdict — in the **present tense**.
+
+Per **D-33 R3** they are preserved as written. They record this ADR's decision against the
+architecture as it then stood; they are not a description of current behaviour. The live contract
+is `ADR-0046` + **D-32**.
+
+**This ADR's own decision is unchanged.** The `SERIALIZABLE` bet transaction, its retry policy, its Sentry alarm-3 emission and its step ordering are untouched. Only the moderation step's blocking property moves.
+
+Status remains `accepted`. No text above this record is changed.

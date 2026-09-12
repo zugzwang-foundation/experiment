@@ -446,8 +446,11 @@ describe("AIMODE-1 — the `.md` export is an `AI mode` button", () => {
 
 		// ⛔ THE REGRESSION THIS EXISTS FOR, NAMED. `size="xs"` on its own is
 		// `h-6`; left unoverridden, this control — not the badge — would set the
-		// row's height, growing it 4px inside a `basis-[24.2dvh] overflow-hidden`
-		// band whose interior budget is already fully allocated.
+		// row's height, growing it 4px. (Inside the `basis-[24.2dvh]` band that
+		// held it when this was written, that came out of the resolution row;
+		// the band is content-sized since the header-fit change, so it would
+		// come out of the arena instead. Either way the row's height is the
+		// badge's, by contract.)
 		expect(link.has("h-6")).toBe(false);
 	});
 
@@ -1213,5 +1216,31 @@ describe("BLOCK-4 §3 — the header stack's three gaps are equal", () => {
 				expect(t).not.toMatch(/^-?m([tby])?-/);
 			}
 		}
+	});
+});
+
+describe("MarketHeader compact mode", () => {
+	it("market-header::compact-mode-renders-title-and-attrs-strip-without-media-resolver-cards-or-price-bar", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} compact />,
+		);
+		// Heading and attributes strip are rendered
+		const heading = screen.getByRole("heading", { level: 1 });
+		expect(heading).toBeTruthy();
+		expect(heading.textContent).toBe("Attrs Strip Market Question");
+		expect(screen.getByText("Đ 150 staked")).toBeTruthy();
+		expect(screen.getByText("3 posts")).toBeTruthy();
+		expect(screen.getByText("5 replies")).toBeTruthy();
+
+		// Bulky media, resolver cards and price bar are omitted for maximum space
+		expect(
+			container.querySelector('[role="img"][aria-label^="YES"]'),
+		).toBeNull();
+		expect(
+			container.querySelector('[data-testid="resolver-cards"]'),
+		).toBeNull();
+		expect(
+			container.querySelector('[data-testid="market-media-panel"]'),
+		).toBeNull();
 	});
 });
