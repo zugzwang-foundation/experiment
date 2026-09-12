@@ -269,40 +269,67 @@ describe("debate-view::poll-preserves-removal-masking", () => {
 		]);
 	});
 
-	it("produces the debate view model at exactly two call sites — no third reader", () => {
+	it("produces the debate view model at exactly four call sites — no fifth reader", () => {
 		// SPEC.2 §4.3's catalogue is closed at eleven and F-DEBATE-4 adds no
-		// twelfth. A dedicated poll endpoint would necessarily surface here as a
-		// third `loadDebateView(` call site.
+		// twelfth. A dedicated poll endpoint would necessarily surface here as an
+		// extra `loadDebateView(` call site.
 		//
 		// ⚠ THE SECOND ENTRY MOVED AT S-4 PHASE D, and the count did not. The
-		// page no longer calls `loadDebateView` itself: it calls
-		// `getCachedDebateView` (`debate-view/cached-view.ts`), which is the one
-		// carrying `'use cache'`. So the two callers are now the export route
-		// (DIRECT and uncached — ADR-0025 forbids caching the `.md` export) and
-		// the cached wrapper (the page's path).
+		// page stopped calling `loadDebateView` itself and called
+		// `getCachedDebateView` (`debate-view/cached-view.ts`) instead, which is
+		// the one carrying `'use cache'`.
 		//
-		// ⛔ WHAT THIS GUARD PROTECTS IS UNCHANGED: still exactly two readers,
-		// still ONE masking implementation, still no third path that could fork
-		// `loadRemovedSet`. The entry is edited here, in the same commit as the
-		// change, rather than the assertion being loosened — a `toEqual` on an
-		// explicit list is what makes a genuine third reader impossible to add
+		// ⚠⚠ THE COUNT MOVED AT CACHE-KEY-1 (ADR-0051), 2 → 4, AND THE PROPERTY
+		// THIS GUARD PROTECTS DID NOT. Removing `reserves` from the cache key took
+		// with it something nobody had written down: because every comment rides a
+		// bet (**INV-1**), a poster's own post used to bust their own entry, so
+		// their refresh carried it back. A clock has no such side effect, so both
+		// participant surfaces now read UNCACHED for a viewer who posted inside
+		// the last window (`viewer-freshness.ts`). That is two more callers —
+		// `page.tsx` and the image route — and they are the SAME
+		// `loadDebateView`, with `loadRemovedSet` applied inside it.
+		//
+		// ⛔ SO: FOUR READERS, STILL ONE MASKING IMPLEMENTATION, STILL NO PATH
+		// THAT COULD FORK `loadRemovedSet`. That last clause is what this test is
+		// actually for, and it is why a fourth CALLER is not a fourth READER in
+		// the sense that matters. The entry is edited here, in the same commit as
+		// the change, rather than the assertion being loosened — a `toEqual` on an
+		// explicit list is what makes a genuine new path impossible to add
 		// silently, and relaxing it to a length check would give that up.
 		const callers = sourcesUnder("src")
 			// The loader's own `export async function loadDebateView(` is the
 			// definition, not a call site.
 			.filter((file) => file !== LOADER)
 			.filter((file) => /loadDebateView\s*\(/.test(code(file)));
-		expect(callers).toEqual([EXPORT_ROUTE, CACHED_VIEW]);
+		// Directory order, not importance order — `sourcesUnder` sorts, and
+		// `export/image/route.ts` sorts before `export/route.ts`.
+		expect(callers).toEqual([IMAGE_ROUTE, EXPORT_ROUTE, PAGE, CACHED_VIEW]);
 	});
 
-	it("the cached wrapper is the page's ONLY route to the debate model", () => {
-		// The other half of the move above: the page must reach the model through
-		// the cached wrapper and never around it. A page that called both would
-		// issue the shared reads twice — once cached, once not — and the uncached
-		// copy would quietly become the one rendered.
-		const page = code(PAGE);
-		expect(page).toContain("getCachedDebateView(");
-		expect(page).not.toMatch(/loadDebateView\s*\(/);
+	it("the page reaches the model by exactly ONE of its two routes per render", () => {
+		// The other half of the move above. Before CACHE-KEY-1 this asserted the
+		// page never mentioned `loadDebateView` at all, because calling both would
+		// issue the shared reads TWICE — once cached, once not — and the uncached
+		// copy would quietly become the one rendered. That risk is unchanged; what
+		// changed is that the page now legitimately names both.
+		//
+		// ⛔ MUTUAL EXCLUSION IS WHAT REPLACES ABSENCE, and a source scan can
+		// assert it only by pinning the SHAPE: the two calls must be the two arms
+		// of one conditional expression, not two statements. Two independent
+		// `await`s would satisfy any weaker check while doubling every read on the
+		// surface this task exists to make cheaper.
+		for (const rel of [PAGE, IMAGE_ROUTE]) {
+			const src = code(rel);
+			expect(src).toContain("getCachedDebateView(");
+			// Exactly one mention of each, so neither can appear a second time
+			// outside the ternary.
+			expect(src.match(/loadDebateView\s*\(/g)).toHaveLength(1);
+			expect(src.match(/getCachedDebateView\s*\(/g)).toHaveLength(1);
+			// …and they really are the two arms of one conditional.
+			expect(src.replace(/\s+/g, " ")).toMatch(
+				/readsUncached \?[^:]*loadDebateView\(db, \{ market, walk: await getCachedReserveWalk\(market\.id\), \}\) : (await )?getCachedDebateView\(market\)/,
+			);
+		}
 	});
 
 	it("keeps loadDebateView's viewer-independent signature (ADR-0034 D-1)", () => {

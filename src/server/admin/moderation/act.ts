@@ -144,7 +144,7 @@ export async function moderateComment(
 	// body actually stops being served, which is the whole point of this call.
 	if (action === "remove") {
 		updateTag(`market:${comment.marketId}`);
-		await recordInvalidation(`market:${comment.marketId}`);
+		recordInvalidation(`market:${comment.marketId}`);
 	}
 	return { ok: true, data: { modActionId, action } };
 }

@@ -52,7 +52,7 @@ vi.mock("@/server/storage/r2", () => ({
 
 import * as schema from "@/db/schema";
 import { bets, comments, events, markets, pools, users } from "@/db/schema";
-import { getMarketPricingAndReserves } from "@/server/debate-view/market-pricing";
+import { getMarketPricingAndReservesBatch } from "@/server/debate-view/market-pricing";
 import { getMarketTotals } from "@/server/debate-view/market-totals";
 import { selectHeroTopPosts } from "@/server/discovery/hero";
 import { getDefaultMarketMediaUrl } from "@/server/discovery/media";
@@ -179,8 +179,19 @@ async function composeDiscovery(): Promise<void> {
 		.select({ id: markets.id, slug: markets.slug, title: markets.title })
 		.from(markets)
 		.orderBy(markets.createdAt);
+	// ⛔ THE BATCH IS ONE STATEMENT FOR THE WHOLE SURFACE, AND IT BELONGS AHEAD
+	// OF THE LOOP — T-03's actual shape. ⚠ THIS LINE WAS THE BUG THAT MADE THIS
+	// FILE RED ON ITS OWN BRANCH: T-03 moved the page to
+	// `getMarketPricingAndReservesBatch` and moved the assertion below from
+	// `1 + 11N` to `2 + 10N`, but left the singular per-market read HERE. The
+	// guard then measured 23 against an expected 22 and shipped failing — a
+	// replication that had stopped replicating, which is the one way this file
+	// can be wrong without being obviously wrong. Fixed at CACHE-KEY-1.
+	await getMarketPricingAndReservesBatch(
+		countingDb,
+		rows.map((m) => m.id),
+	);
 	for (const m of rows) {
-		await getMarketPricingAndReserves(countingDb, m.id);
 		await getMarketTotals(countingDb, m.id);
 		await getDefaultMarketMediaUrl(countingDb, m.id);
 		// CHART-1 — the hero's series now rides `getCachedReserveWalk`, which wraps
@@ -191,7 +202,11 @@ async function composeDiscovery(): Promise<void> {
 		// — so this line replicates what it wraps, exactly as the rest of this
 		// function replicates the cached block around it.
 		await replayReserveSeries(countingDb, m.id);
-		await selectHeroTopPosts(countingDb, m.id, null);
+		// CACHE-KEY-1 — two arguments, no `reserves`. The statement count is
+		// unchanged by that: dropping a parameter removes no read. What moved out
+		// of this function is one pure `computeSell`, which never touched the
+		// database and therefore never appeared in this budget.
+		await selectHeroTopPosts(countingDb, m.id);
 	}
 }
 
@@ -284,10 +299,7 @@ describe("Discovery round-trip budget — 2 + 10N (plan §3a, the binding constr
 			.limit(1);
 
 		executed = 0;
-		await selectHeroTopPosts(countingDb, market?.id ?? "", {
-			yes: POOL_SEED,
-			no: POOL_SEED,
-		});
+		await selectHeroTopPosts(countingDb, market?.id ?? "");
 		expect(executed).toBe(5);
 	});
 });
@@ -343,20 +355,34 @@ describe("Discovery cache boundary — R3 (price/reserves never cached)", () => 
 		expect(page).not.toMatch(/pricing:\s*data\./);
 	});
 
-	it("getCachedMarketDiscoveryData never fetches its own reserves", () => {
-		// The whole reserves-keyed-cache mechanism (see that function's own
-		// docstring) depends on `reserves` being a value the CALLER observed
-		// live — a function that re-fetched reserves internally would let a
-		// stale value hide behind a key the caller never actually saw.
+	it("getCachedMarketDiscoveryData never reads reserves, and never keys on them", () => {
+		// ⛔ THE REASON FLIPPED AT CACHE-KEY-1 AND THE ASSERTION GOT STRONGER.
+		// It used to be: `reserves` must be a value the CALLER observed live,
+		// because an internally-fetched one would hide behind a key the caller
+		// never saw. Now `reserves` is not a parameter at all — the block is keyed
+		// on the market id with a window — so an internal pool read would be
+		// CACHED, and any figure derived from it would be stale money on the most
+		// public surface in the product. Both halves are pinned: no read, and no
+		// parameter to smuggle one back through.
 		const block = functionBlock(
 			read("src/server/discovery/list.ts"),
 			"getCachedMarketDiscoveryData",
 		);
 		expect(block).toContain('"use cache"');
 		expect(block).not.toContain("getMarketPricingAndReserves");
+
+		const list = read("src/server/discovery/list.ts");
+		const sig = list.slice(
+			list.indexOf("export async function getCachedMarketDiscoveryData("),
+			list.indexOf("): Promise<CachedMarketDiscoveryData>"),
+		);
+		expect(sig).not.toContain("reserves");
+		// POSITIVE CONTROL — the slice really is the signature, so the negative
+		// above is not passing against an empty string.
+		expect(sig).toContain("marketId: string");
 	});
 
-	it("getCachedMarketDiscoveryData and getCachedDiscoveryMarketIds carry an explicit cacheLife", () => {
+	it("both cached discovery blocks carry an explicit cacheLife, and the per-market one is windowed", () => {
 		const list = read("src/server/discovery/list.ts");
 		for (const name of [
 			"getCachedDiscoveryMarketIds",
@@ -366,19 +392,67 @@ describe("Discovery cache boundary — R3 (price/reserves never cached)", () => 
 			expect(block).toContain('"use cache"');
 			// Explicit at the call site — never left to inherit the default
 			// profile (Phase C self-check item 1).
-			expect(block).toMatch(/cacheLife\(\s*["']minutes["']\s*\)/);
+			expect(block).toMatch(/cacheLife\(/);
 		}
+
+		// ⚠ THE TWO ARE DELIBERATELY DIFFERENT AND THE ASYMMETRY IS THE POINT.
+		// The market-ID listing keeps the named `"minutes"` profile: it holds
+		// WHICH markets are open, it is invalidated by the `discovery` tag on
+		// open/close/void, and nothing about it decays on a clock. The per-market
+		// block holds arguments, which do — so it takes the explicit
+		// `SHARED_VIEW_MIN_WINDOW_MS` window (CACHE-KEY-1, ADR-0051).
+		expect(functionBlock(list, "getCachedDiscoveryMarketIds")).toMatch(
+			/cacheLife\(\s*["']minutes["']\s*\)/,
+		);
+		const perMarket = functionBlock(list, "getCachedMarketDiscoveryData");
+		expect(perMarket).toMatch(/cacheLife\(\s*\{/);
+		expect(perMarket).toContain("SHARED_VIEW_WINDOW_SEC");
+		// Bound to the constant, never a literal — so the tune stays a one-line
+		// change at `limits.ts` (the `cached-series.ts` rule, applied here).
+		expect(list).toContain("SHARED_VIEW_MIN_WINDOW_MS / 1000");
+		expect(perMarket).not.toMatch(/cacheLife\(\s*\{[^}]*\b15\b/);
 	});
 
-	it("hero.ts and its test suite are untouched by the cache retrofit", () => {
-		// Design B's whole point: selectHeroTopPosts keeps taking `reserves` and
-		// computing `currentValue` exactly as before — the caching lives around
-		// it, not inside it. This is a canary, not a strict diff guard: it just
-		// confirms the signature contract this file's own `composeDiscovery`
-		// depends on hasn't drifted.
+	it("hero.ts takes no reserves and withholds the one reserve-derived field", () => {
+		// ⚠ REWRITTEN AT CACHE-KEY-1. This canary used to assert the opposite —
+		// "selectHeroTopPosts keeps taking `reserves` and computing `currentValue`
+		// exactly as before" — which was Design B's point while the block around it
+		// was keyed on reserves. Once that key became a clock, a `currentValue`
+		// computed inside the window would be a Đ amount derived from a pool that
+		// has since moved. So the arithmetic moved OUT to `hero-value.ts`, and the
+		// type is what enforces it: `HeroPostBase` omits the field, so a
+		// `DiscoveryMarketView` cannot be built without composing it (**O-1**).
 		const hero = read("src/server/discovery/hero.ts");
 		expect(hero).toContain(
-			"reserves: Reserves | null,\n): Promise<HeroTopPosts> {",
+			"	marketId: string,\n): Promise<{ posts: HeroTopPostsBase; shares: HeroPostShares }> {",
 		);
+		expect(hero).toContain(
+			'export type HeroPostBase = Omit<HeroPost, "currentValue">;',
+		);
+		// The arithmetic really is gone from this module, not merely unused.
+		// ⚠ MATCHED ON THE IMPORT, NOT THE BARE NAME: this file's docblocks
+		// legitimately say the word `computeSell` while explaining where the
+		// figure went, and a scan that reddened on its own explanation would get
+		// suppressed (the `cached-view-contract.test.ts` lesson).
+		expect(hero).not.toContain('from "@/server/cpmm/calculate"');
+
+		// …and really is present in the module that now owns it, so the negative
+		// above cannot pass by the figure having been deleted outright.
+		const value = read("src/server/discovery/hero-value.ts");
+		expect(value).toContain("computeSell(");
+		expect(value).toContain("export function valueHeroPosts(");
+	});
+
+	it("the page composes currentValue from the LIVE reserves, never from the cached block", () => {
+		// The other half of the split: the omission above is only a safety
+		// property if something puts the figure back from a live read. Without
+		// this, a page that dropped `valueHeroPosts` would fail to compile — but a
+		// page that passed it CACHED reserves would compile perfectly and render
+		// stale money.
+		const page = read("src/app/(public)/page.tsx");
+		expect(page.replace(/\s+/g, " ")).toContain(
+			"valueHeroPosts( data.topPosts, data.heroShares, priced?.reserves ?? null, )",
+		);
+		expect(page).not.toMatch(/valueHeroPosts\([^)]*data\.reserves/);
 	});
 });

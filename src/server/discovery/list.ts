@@ -8,16 +8,25 @@ import { markets } from "@/db/schema";
 import {
 	DISCOVERY_GRID_SIZE,
 	DISCOVERY_SERIES_MAX_POINTS,
+	SHARED_VIEW_EXPIRE_SEC,
+	SHARED_VIEW_MIN_WINDOW_MS,
 } from "@/server/config/limits";
-import type { Reserves } from "@/server/cpmm/calculate";
 import { getMarketPricingAndReserves } from "@/server/debate-view/market-pricing";
 import { getMarketTotals } from "@/server/debate-view/market-totals";
 import { recordCacheMiss } from "@/server/observability/cache-metrics";
 
 import { getCachedReserveWalk } from "./cached-series";
-import { type HeroTopPosts, selectHeroTopPosts } from "./hero";
+import {
+	type HeroPostShares,
+	type HeroTopPostsBase,
+	selectHeroTopPosts,
+} from "./hero";
 import { getDefaultMarketMediaUrl } from "./media";
 import { mapWalkToSeries, type PricePoint } from "./price-series";
+
+/** `SHARED_VIEW_MIN_WINDOW_MS` in the seconds `cacheLife` speaks. Derived,
+ * never a second literal — the `cached-series.ts` convention. */
+const SHARED_VIEW_WINDOW_SEC = SHARED_VIEW_MIN_WINDOW_MS / 1000;
 
 /** A bound read client — top-level `db` OR a caller's transaction. */
 type DiscoveryReader = DbClient | DbTransaction;
@@ -138,7 +147,7 @@ export async function getCachedDiscoveryMarketIds(): Promise<
 		.where(eq(markets.status, "Open"))
 		.orderBy(desc(markets.createdAt))
 		.limit(DISCOVERY_GRID_SIZE);
-	await recordCacheMiss("discovery-list", null);
+	recordCacheMiss("discovery-list", null);
 	return rows;
 }
 
@@ -148,51 +157,73 @@ export type CachedMarketDiscoveryData = {
 	totals: { dharmaStaked: string; postCount: number; replyCount: number };
 	imageUrl: string | null;
 	series: PricePoint[];
-	topPosts: HeroTopPosts;
+	/** ⚠ `Base` — WITHOUT `currentValue`, which the page composes from its own
+	 * live reserve read (`hero-value.ts`). See `HeroPost.currentValue`. */
+	topPosts: HeroTopPostsBase;
+	/**
+	 * CACHE-KEY-1 — the per-side share count `currentValue` is computed from.
+	 *
+	 * ⚠ A SERVER-LOCAL SIBLING OF `topPosts`, NEVER A FIELD ON A HERO POST —
+	 * the same shape `DiscoveryListing` uses for `reserves` above, and for the
+	 * same reason: a hero post crosses into `DiscoveryCarousel` (`"use client"`),
+	 * and a raw `lots`/`positions` share quantity is an internal row value that
+	 * must not serialize into the RSC payload (AGENTS.md §6). It travels from
+	 * here to `valueHeroPosts` inside the server component and is discarded.
+	 */
+	heroShares: HeroPostShares;
 };
 
 /**
- * S-4 Phase C — one market's cached Discovery block, KEYED ON `reserves`.
+ * S-4 Phase C — one market's cached Discovery block, KEYED ON `marketId` ALONE
+ * with a `SHARED_VIEW_MIN_WINDOW_MS` window (CACHE-KEY-1, ADR-0051).
  *
- * The caller (`DiscoveryContent`, `(public)/page.tsx`) fetches `reserves` LIVE
- * via `getMarketPricingAndReserves` every render, then passes it in here. Since
- * the cache key IS that exact value, a hit can only occur when reserves are
- * PROVABLY EQUAL TO A PREVIOUSLY OBSERVED VALUE — the one that generated the
- * entry — because a bet moving the pool changes the key and forces a miss.
- * This is why `selectHeroTopPosts`'s `currentValue` (the Đb execution-value
- * figure, `computeSell(reserves, ...)`) is safe to let ride this cache even
- * though R3 (CLAUDE.md-adjacent S-4 pack decision) says price/reserves are
- * "never cached": `currentValue` is a pure function of the reserves that
- * matched, so it is never STALE, which is the property R3 actually protects —
- * not literal cache-boundary avoidance.
+ * ⛔⛔ IT WAS KEYED ON `reserves`, AND THAT IS WHAT THIS CHANGE UNDID. The old
+ * argument was sound and defended the wrong mechanism: a `'use cache'` key is
+ * its serialized argument list, so a hit proved the live reserves equalled the
+ * ones that generated the entry, which made `currentValue` provably non-stale
+ * by purity. The cost of buying that guarantee was that **every bet changed the
+ * key**, so every bet forced a full miss for every reader — the block helped
+ * least exactly when the market was busiest, which is the failure SPEC.1 §9
+ * *Refresh* names. `getCachedReserveWalk` was already keyed on identity alone
+ * for this reason; this block now matches it.
  *
- * ⚠ Key equality is STRICTLY WEAKER than "unchanged since the last write",
- * and on a fee-less CPMM the gap is reachable: a buy-then-sell-back of the
- * same shares restores the exact prior 18-dp reserve pair, so the key matches
- * an entry generated before either bet. `currentValue` and price stay correct
- * (purity, above); `totals` and `topPosts`'s membership/order can lag by one
- * cache lifetime, since every bet rides a comment (INV-1). ADR-0041 OQ-1 —
- * OPEN, two candidate fixes named there, not fixed here.
- * Flagged explicitly for a Gate C ruling on whether this satisfies R3's intent
- * (see the Phase C plan / session log).
+ * ⛔ WHAT REPLACES THE PURITY ARGUMENT, because something had to. `currentValue`
+ * no longer ships from here at all: this returns `HeroTopPostsBase` (the field
+ * omitted) plus `heroShares`, and `(public)/page.tsx` composes the figure with
+ * `valueHeroPosts` against the live batched pool read it already performs. R3's
+ * real property — a rendered Đ figure is never computed from stale reserves —
+ * is therefore held by WHERE the arithmetic happens rather than by what the key
+ * proves. Everything still inside the window (totals, media, series membership,
+ * top-post order) is content or a count, and lagging by one window is what a
+ * window is for.
  *
- * ⚠ MUST NOT call `getMarketPricingAndReserves` (or read `reserves` any other
- * way) internally — that would defeat the whole mechanism by letting a stale
- * reserves value hide behind a fresh-looking cache key the caller didn't
- * actually observe. `reserves` is a parameter for exactly this reason, never
- * fetched here.
+ * ⛔ AND ADR-0041 OQ-1 IS CLOSED RATHER THAN INHERITED. That open question was
+ * that key equality is STRICTLY WEAKER than "unchanged since the last write" —
+ * on a fee-less CPMM a buy-then-sell-back restores the exact prior 18-dp pair,
+ * so the key could match an entry predating two bets and the comments they
+ * minted (INV-1). With no `reserves` in the key there is no equality to be
+ * weaker than anything; the window bounds staleness directly, for every cause
+ * at once.
  *
- * `selectHeroTopPosts`'s call here is BYTE-IDENTICAL to how `listOpenMarkets`
- * already calls it — no signature change, no behavior change to that
- * safety-critical (masking) function, whose own test suite is unverifiable in
- * this environment.
+ * ⚠ MUST NOT read `reserves` internally BY ANY ROUTE — still true, and now for
+ * a different reason. It used to be that an internal read would let a stale
+ * value hide behind a fresh-looking key. Now it would be worse: a pool read
+ * inside this window would be CACHED, and any figure derived from it would be
+ * exactly the stale money the split above exists to prevent. Pinned by
+ * `tests/server/discovery/round-trip-budget.test.ts`.
+ *
+ * `selectHeroTopPosts`'s selection, masking and statement count are unchanged —
+ * only the one pure arithmetic step left it (see `hero-value.ts`).
  */
 export async function getCachedMarketDiscoveryData(
 	marketId: string,
-	reserves: Reserves | null,
 ): Promise<CachedMarketDiscoveryData> {
 	"use cache";
-	cacheLife("minutes");
+	cacheLife({
+		stale: SHARED_VIEW_WINDOW_SEC,
+		revalidate: SHARED_VIEW_WINDOW_SEC,
+		expire: SHARED_VIEW_EXPIRE_SEC,
+	});
 	// ⚠ NO `cacheTag("discovery")` HERE, DELIBERATELY — and the asymmetry with
 	// `getCachedDiscoveryMarketIds` above is the point. `revalidateTag("discovery")`
 	// fires on market open / close / void (`markets/open.ts`, `markets/close.ts`,
@@ -208,11 +239,15 @@ export async function getCachedMarketDiscoveryData(
 	const totals = await getMarketTotals(db, marketId);
 	const imageUrl = await getDefaultMarketMediaUrl(db, marketId);
 
-	// CHART-1 — the hero's series now rides `getCachedReserveWalk`, keyed on the
+	// CHART-1 — the hero's series rides `getCachedReserveWalk`, keyed on the
 	// market id ALONE, instead of `loadPriceSeries`, which replayed inside this
-	// reserves-keyed block. This block misses on every bet; that one does not, so
-	// the walk is derived once per `MARKET_SERIES_MIN_WINDOW_MS` however busy the
-	// market gets (SPEC.1 1.0.45 §9 *Refresh*). The hero's own cap is unchanged.
+	// block. ⚠ THE ASYMMETRY THAT MADE THAT URGENT IS GONE AS OF CACHE-KEY-1:
+	// this block used to miss on every bet while that one did not. Both are
+	// windowed now, so the separate key buys the smaller thing it was also always
+	// buying — a LONGER window for history (`MARKET_SERIES_MIN_WINDOW_MS`, 60 s)
+	// than for the block around it (15 s), because a picture of the past does not
+	// need re-drawing four times a minute (SPEC.1 1.0.45 §9 *Refresh*). The
+	// hero's own cap is unchanged.
 	//
 	// ⚠ THE F-1 DRIFT WARN IS DELIBERATELY GONE FROM THIS PATH, AND IT IS A
 	// SUPERSESSION RATHER THAN AN OVERSIGHT. `loadPriceSeries` spends a fourth
@@ -249,8 +284,14 @@ export async function getCachedMarketDiscoveryData(
 		await getCachedReserveWalk(marketId),
 		DISCOVERY_SERIES_MAX_POINTS,
 	);
-	const topPosts = await selectHeroTopPosts(db, marketId, reserves);
+	const hero = await selectHeroTopPosts(db, marketId);
 
-	await recordCacheMiss("market-data", marketId);
-	return { totals, imageUrl, series, topPosts };
+	recordCacheMiss("market-data", marketId);
+	return {
+		totals,
+		imageUrl,
+		series,
+		topPosts: hero.posts,
+		heroShares: hero.shares,
+	};
 }

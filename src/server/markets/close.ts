@@ -106,7 +106,7 @@ export async function closeMarket(args: {
 	// `closeDueMarkets` directly from a Route Handler — `updateTag` throws
 	// outside a Server Action, so the call site must work from any caller.
 	revalidateTag("discovery", { expire: 0 });
-	await recordInvalidation("discovery");
+	recordInvalidation("discovery");
 
 	return result;
 }

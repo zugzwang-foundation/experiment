@@ -30,15 +30,25 @@ const EXPIRE_SEC = WINDOW_SEC * 60;
  * live edge*; founder-ruled at CHART-1).
  *
  * ⛔ **KEYED ON `marketId` AND NOTHING ELSE, AND THAT IS THE WHOLE MECHANISM.**
- * A `'use cache'` function's key is its serialized arguments. The two blocks
- * that already wrap these surfaces — `getCachedDebateView` and
- * `getCachedMarketDiscoveryData` — key on `reserves`, which every bet moves, so
- * every bet forces a full miss for every reader. That is the failure mode
- * SPEC.1 §9 *Refresh* names: invalidation coupled to activity performs WORST
- * exactly when load is highest. Keying on market identity alone is what lets the
- * window COALESCE — fifty bets in thirty seconds cost one derivation instead of
- * fifty — and it is why this read is a sibling of those blocks rather than a
- * line inside one of them.
+ * A `'use cache'` function's key is its serialized arguments, so a key
+ * containing `reserves` is busted by every bet — invalidation coupled to
+ * activity, which SPEC.1 §9 *Refresh* names as performing WORST exactly when
+ * load is highest. Keying on market identity alone is what lets the window
+ * COALESCE: fifty bets in thirty seconds cost one derivation instead of fifty.
+ *
+ * ⚠ **THIS PARAGRAPH USED TO CITE ITS OWN SIBLINGS AS THE LIVE COUNTER-EXAMPLE**
+ * — *"the two blocks that already wrap these surfaces … key on `reserves`"* —
+ * and CACHE-KEY-1 (ADR-0051) made that false by fixing them. Both
+ * `getCachedDebateView` and `getCachedMarketDiscoveryData` are keyed on identity
+ * plus `SHARED_VIEW_MIN_WINDOW_MS` now. Corrected in place rather than appended
+ * to (**O-5**); the argument is unchanged and is simply general again.
+ *
+ * ⚠ **AND THIS READ STAYS A SIBLING RATHER THAN A LINE INSIDE ONE OF THEM**,
+ * for a smaller reason than the one that first justified it. It is no longer
+ * rescuing a replay from a block that missed on every bet; it is holding a
+ * LONGER window (60 s) than the blocks around it (15 s), because a picture of
+ * the past does not need re-drawing four times a minute while an argument
+ * somebody just posted does.
  *
  * ⛔ **NOTHING VIEWER-SCOPED CAN ENTER HERE, BY CONSTRUCTION RATHER THAN BY
  * DISCIPLINE.** The function takes one parameter and it is a market id. There is
@@ -72,11 +82,20 @@ const EXPIRE_SEC = WINDOW_SEC * 60;
  * inventing an invalidation nobody fires.
  *
  * ⚠ **BETS DELIBERATELY FIRE NO TAG AND MUST NOT START.** `bets/place.ts` and
- * `bets/sell.ts` call neither `revalidateTag` nor `updateTag` (verified at
- * CHART-1). If a future change adds one on the bet path, this window stops
- * coalescing and silently reverts to per-bet recomputation — the chart would
- * still be correct, and the entire cost argument would be gone with no test
- * going red. Read that as a constraint on the bet path, not a fragility here.
+ * `bets/sell.ts` call neither `revalidateTag` nor `updateTag` — asserted, with a
+ * positive control, by `tests/server/discovery/cached-series-contract.test.ts`.
+ * If a future change adds one on the bet path, this window stops coalescing and
+ * silently reverts to per-bet recomputation — the chart would still be correct,
+ * and the entire cost argument would be gone with no test going red. Read that
+ * as a constraint on the bet path, not a fragility here.
+ *
+ * ⛔ **AND THE CONSTRAINT BINDS HARDER SINCE CACHE-KEY-1**, because it now
+ * guards three windows rather than this one. "Fire a tag when a bet commits" is
+ * the obvious-looking fix for a poster not seeing their own comment, and it is
+ * the wrong one: every comment rides a bet (**INV-1**), so it would invalidate
+ * exactly as often as the old `reserves` key did — the same miss rate, for more
+ * code. That case is handled by a page-level bypass instead
+ * (`debate-view/viewer-freshness.ts`).
  *
  * ⛔ `marketId` MUST BE A DATABASE-RESOLVED ID, NEVER A REQUEST PARAMETER, and
  * nothing but this sentence says so. Both call sites resolve it first —
@@ -113,6 +132,6 @@ export async function getCachedReserveWalk(
 	cacheTag(`market:${marketId}`);
 
 	const walk = toWireWalk(await replayReserveSeries(db, marketId));
-	await recordReserveWalkDerivation(marketId);
+	recordReserveWalkDerivation(marketId);
 	return walk;
 }

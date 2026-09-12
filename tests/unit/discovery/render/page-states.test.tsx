@@ -215,6 +215,11 @@ function primeHappyLoaders(n: number): DiscoveryCard[] {
 				series: SEED_SERIES,
 				topPosts:
 					marketId === list[0].id ? HERO_TOP_POSTS : { yes: null, no: null },
+				// CACHE-KEY-1 — the share counts `currentValue` is composed from.
+				// `null` throughout: these are page-state tests (Empty/Error/
+				// Loading), not V13 valuation tests, and a null share is the shipped
+				// "no honest figure" answer rather than a missing fixture.
+				heroShares: { yes: null, no: null },
 			};
 		},
 	);
@@ -244,18 +249,21 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 		// each listed market gets its cached block exactly ONCE, keyed by that
 		// market's id, in list order (the plan-§3 sequential per-market walk).
 		expect(vi.mocked(getCachedMarketDiscoveryData)).toHaveBeenCalledTimes(2);
+		// ⛔ ONE ARGUMENT, AND THE SECOND ONE'S ABSENCE IS THE ASSERTION
+		// (CACHE-KEY-1, ADR-0051). This used to pin `reserves` as the second
+		// argument and called it "the cache KEY — which is what makes a hit
+		// impossible once a bet has moved the pool". That sentence was true and
+		// described the defect: a key that every bet busts is a cache that stops
+		// working on exactly the market everyone is reading. `toHaveBeenNthCalledWith`
+		// asserts the FULL argument list, so a reserves argument creeping back
+		// reddens here.
 		expect(vi.mocked(getCachedMarketDiscoveryData)).toHaveBeenNthCalledWith(
 			1,
 			list[0].id,
-			// S-4 Phase C: the SECOND argument is the market's live pool reserves,
-			// and it is the cache KEY — which is what makes a hit impossible once a
-			// bet has moved the pool. The fixture's pricing mock supplies these.
-			{ yes: "1", no: "1" },
 		);
 		expect(vi.mocked(getCachedMarketDiscoveryData)).toHaveBeenNthCalledWith(
 			2,
 			list[1].id,
-			{ yes: "1", no: "1" },
 		);
 
 		// R3 — pricing is read LIVE, OUTSIDE the cached block. T-03 made that one
@@ -352,6 +360,7 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 				imageUrl: null,
 				series: SEED_SERIES,
 				topPosts: HERO_TOP_POSTS,
+				heroShares: { yes: null, no: null },
 			})
 			.mockRejectedValueOnce(new Error("simulated masking read failure"));
 

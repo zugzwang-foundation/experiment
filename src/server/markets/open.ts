@@ -270,7 +270,7 @@ export async function openMarket(args: {
 	// know that, and `updateTag` throws outside a Server Action. Matching
 	// `closeMarket`'s form rather than relying on today's one caller.
 	revalidateTag("discovery", { expire: 0 });
-	await recordInvalidation("discovery");
+	recordInvalidation("discovery");
 
 	return result;
 }

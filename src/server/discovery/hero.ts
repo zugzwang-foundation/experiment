@@ -6,7 +6,10 @@ import type { DbClient, DbTransaction } from "@/db";
 import { bets, comments, imageUploads, lots, positions } from "@/db/schema";
 import { type PostSubstrate, type Side, topOrder } from "@/lib/ranking";
 import { RENDER_IMAGE_CACHE_CONTROL } from "@/server/config/limits";
-import { computeSell, type Reserves } from "@/server/cpmm/calculate";
+// ⚠ NO `@/server/cpmm/calculate` IMPORT SINCE CACHE-KEY-1, and its absence is
+// asserted rather than incidental (`round-trip-budget.test.ts`). This module
+// reads the database and withholds the one field that needs a pool; the pool
+// arithmetic lives in `hero-value.ts`, outside the cache.
 import { CpmmDecimal, toFixed18 } from "@/server/cpmm/decimal";
 import {
 	deriveTitleTeaser,
@@ -112,6 +115,23 @@ export type HeroPost = {
 	 * V13 — the current Đ value of **THIS POST's OWN** stake, or `null` when no
 	 * honest figure exists. Founder ruling OD-1 = Option B, POST-ANCHORED.
 	 *
+	 * ⛔⛔ COMPOSED AT THE PAGE SINCE CACHE-KEY-1, NOT HERE (ADR-0051). This file
+	 * produces `HeroPostBase` — this field REMOVED — plus the share count it
+	 * would have been computed from, and `hero-value.ts` applies `computeSell`
+	 * against the page's own LIVE reserve read. The reason is that
+	 * `getCachedMarketDiscoveryData` no longer keys on `reserves`: a figure
+	 * derived inside that window would be a Đ amount, on the most public surface
+	 * in the product, computed from a pool that has since moved. Every other
+	 * field in this type is content or a count and is allowed to lag by a
+	 * window; this one is money and is not.
+	 *
+	 * ⛔ THE `Omit` IS THE ENFORCEMENT, and it is why this is a type split
+	 * rather than a `null` passthrough (**O-1**). A `HeroPostBase` cannot
+	 * satisfy `DiscoveryMarketView.topPosts`, so a composition that forgets this
+	 * field is a COMPILE ERROR. Emitting `currentValue: null` from here would
+	 * have type-checked perfectly and silently deleted a founder-ruled figure
+	 * from the hero panels.
+	 *
 	 * **Both figures are POST-scoped**: `authorStake` is the Đ this post staked
 	 * and this is what this post's shares are worth now — the same quantity at
 	 * two times, which is what makes the arrow between them mean anything. It is
@@ -134,6 +154,39 @@ export type HeroPost = {
 export type HeroTopPosts = { yes: HeroPost | null; no: HeroPost | null };
 
 /**
+ * CACHE-KEY-1 — what this module actually returns: a `HeroPost` with the one
+ * reserve-derived field withheld. See `HeroPost.currentValue` for why the split
+ * exists and why it is an `Omit` rather than a nullable passthrough.
+ */
+export type HeroPostBase = Omit<HeroPost, "currentValue">;
+export type HeroTopPostsBase = {
+	yes: HeroPostBase | null;
+	no: HeroPostBase | null;
+};
+
+/**
+ * The per-side share count `currentValue` is computed FROM — this post's own
+ * surviving lot shares, clamped by the author's held quantity on the side they
+ * argued (RANK-1), or `null` when no honest figure exists.
+ *
+ * ⚠ A SERVER-LOCAL SIBLING, NEVER A FIELD ON `HeroPost`, and the distinction is
+ * the same one `DiscoveryListing` draws for `reserves`: anything on `HeroPost`
+ * rides `DiscoveryMarketView` into `DiscoveryCarousel`, a `"use client"`
+ * component, and therefore serializes into the RSC payload. A raw share
+ * quantity is an internal `lots`/`positions` value (AGENTS.md §6). It exists
+ * here only to travel from this read to `hero-value.ts` inside the server
+ * component, and it is discarded there.
+ */
+export type HeroPostShares = { yes: string | null; no: string | null };
+
+/** The "this market has no eligible hero post" answer, in one place so the two
+ * early returns cannot drift apart. */
+const EMPTY_HERO: { posts: HeroTopPostsBase; shares: HeroPostShares } = {
+	posts: { yes: null, no: null },
+	shares: { yes: null, no: null },
+};
+
+/**
  * The Discovery hero's top post per side (SPEC.1 §22 F-DISC-2; plan §3,
  * OQ-3 = B — the LEAN selector): `loadRankingSubstrate` → the pure §9
  * **Top** order (`topOrder` — NOT `buildTopList`: the ADR-0017 P2
@@ -149,21 +202,21 @@ export type HeroTopPosts = { yes: HeroPost | null; no: HeroPost | null };
  * are resolved ONLY for the ≤2 picked (non-removed) posts — a Track-B-hidden
  * post's argument or author cannot serialize into this DTO because it is
  * never read. Read-only; viewer-independent (the public render, no session).
+ *
+ * ⚠ TAKES NO `reserves` SINCE CACHE-KEY-1 (ADR-0051), and returns a PAIR: the
+ * posts, and the per-side share count `currentValue` is computed from. The
+ * selection, the masking and the five statements are all untouched — the only
+ * thing that left is one pure arithmetic step, which moved to `hero-value.ts`
+ * so it can be applied against the page's live pool read instead of a cached
+ * one. See `HeroPost.currentValue` for why that had to move at all.
  */
 export async function selectHeroTopPosts(
 	client: DiscoveryReader,
 	marketId: string,
-	/**
-	 * V13 — the market's pool reserves, threaded from the read
-	 * `listOpenMarkets` already performs. REQUIRED and explicitly nullable: a
-	 * missing required argument is a compile error, a defaulted one silently
-	 * drops the progression figure (O-1). `null` ⇒ every `currentValue` is null.
-	 */
-	reserves: Reserves | null,
-): Promise<HeroTopPosts> {
+): Promise<{ posts: HeroTopPostsBase; shares: HeroPostShares }> {
 	const substrate = await loadRankingSubstrate(client, { marketId });
 	if (substrate.length === 0) {
-		return { yes: null, no: null };
+		return EMPTY_HERO;
 	}
 
 	const removedSet = await loadRemovedSet(
@@ -177,7 +230,7 @@ export async function selectHeroTopPosts(
 	const yesPick = pick("YES");
 	const noPick = pick("NO");
 	if (!yesPick && !noPick) {
-		return { yes: null, no: null };
+		return EMPTY_HERO;
 	}
 
 	// Body + author for the PICKED (non-removed) posts only.
@@ -318,7 +371,11 @@ export async function selectHeroTopPosts(
 	const ordinalById = new Map(ordinalRows.map((r, i) => [r.id, i + 1]));
 
 	/**
-	 * V13 — the current value of **THIS POST's OWN** stake, POST-SCOPED.
+	 * V13 — the shares **THIS POST's OWN** stake still holds, POST-SCOPED. The
+	 * `currentValue` figure is `computeSell` over exactly this number, applied
+	 * at the page against its own live reserves (`hero-value.ts`); this half is
+	 * the part that comes out of the database and is therefore the part that may
+	 * ride the cache.
 	 *
 	 * Founder ruling OD-1 = Option B, post-anchored: *two numbers joined by an
 	 * arrow must be the same quantity at two times.* So the left figure is
@@ -350,19 +407,18 @@ export async function selectHeroTopPosts(
 	 * figure incapable of over-claiming against a real position, which is the
 	 * property this whole docblock exists to guarantee.
 	 *
-	 * Every guard returns null rather than throwing. `computeSell` calls
-	 * `requirePositive` on shares and reserves, and a throw here would escape
+	 * Every guard returns null rather than throwing — the non-positive and
+	 * missing-row cases are "there is no honest figure", which the panel renders
+	 * as a single number with no arrow. `hero-value.ts` keeps the same posture on
+	 * the arithmetic half, and for the same reason: a throw here would escape
 	 * into `DiscoveryContent`'s ONE whole-surface catch and flip the ENTIRE page
-	 * to `ErrorState` over one author's row. Deliberately NOT the
-	 * `figures.ts:130` posture, which throws under a held-position precondition
-	 * this does not have.
+	 * to `ErrorState` over one author's row.
 	 */
-	const currentValueFor = (
-		side: Side,
+	const sellableSharesFor = (
 		betShares: string | null,
 		heldQuantity: string | null,
 	): string | null => {
-		if (reserves === null || betShares === null || heldQuantity === null) {
+		if (betShares === null || heldQuantity === null) {
 			return null;
 		}
 		const held = new CpmmDecimal(heldQuantity);
@@ -373,16 +429,18 @@ export async function selectHeroTopPosts(
 		if (!shares.greaterThan(0)) {
 			return null;
 		}
-		return computeSell({
-			reserves,
-			// The CPMM's own side literals are lowercase (calculate.ts), the
-			// schema enum's are upper — the `bets/place.ts:123` conversion.
-			side: side === "YES" ? "yes" : "no",
-			shares: toFixed18(shares),
-		}).proceeds;
+		return toFixed18(shares);
 	};
 
-	const toHeroPost = (p: PostSubstrate | null): HeroPost | null => {
+	const sharesFor = (p: PostSubstrate | null): string | null => {
+		if (!p) {
+			return null;
+		}
+		const row = rowById.get(p.id);
+		return row ? sellableSharesFor(row.betShares, row.heldQuantity) : null;
+	};
+
+	const toHeroPost = (p: PostSubstrate | null): HeroPostBase | null => {
 		if (!p) {
 			return null;
 		}
@@ -422,14 +480,12 @@ export async function selectHeroTopPosts(
 			supportDharma: toFixed18(new CpmmDecimal(p.supportDharma)),
 			counterDharma: toFixed18(new CpmmDecimal(p.counterDharma)),
 			imageUrl: urlById.get(p.id) ?? null,
-			currentValue: currentValueFor(
-				p.parentSide,
-				row.betShares,
-				row.heldQuantity,
-			),
 			createdAt: row.createdAt.toISOString(),
 		};
 	};
 
-	return { yes: toHeroPost(yesPick), no: toHeroPost(noPick) };
+	return {
+		posts: { yes: toHeroPost(yesPick), no: toHeroPost(noPick) },
+		shares: { yes: sharesFor(yesPick), no: sharesFor(noPick) },
+	};
 }
