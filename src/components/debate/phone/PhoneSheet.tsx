@@ -9,6 +9,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { lockPhoneScroll } from "./scroll-lock";
 
 /**
  * The phone's one overlay primitive — the bottom sheet that stands in for the
@@ -464,11 +465,18 @@ export function PhoneSheet({
 		};
 
 		document.addEventListener("keydown", onKey);
-		const previous = document.body.style.overflow;
-		document.body.style.overflow = "hidden";
+		// ⛔ MOBILE-2d — THE LOCK TARGETS THE SCROLL CONTAINER, NOT ONLY THE BODY.
+		// Below 640px the tier is a bounded shell and `document.body` no longer
+		// scrolls, so a body-level lock is inert there. What holds the feed still
+		// today is this sheet's own `fixed inset-0` layer — measured, both arms,
+		// with the body lock removed live — and `scroll-lock.ts` says why that
+		// makes this a belt rather than the mechanism. It also restores each
+		// container's `scrollTop` exactly, so a reader keeps their place in the
+		// feed across an open and close.
+		const unlockScroll = lockPhoneScroll();
 		return () => {
 			document.removeEventListener("keydown", onKey);
-			document.body.style.overflow = previous;
+			unlockScroll();
 			opener?.focus({ preventScroll: true });
 		};
 	}, [open, beginClose]);

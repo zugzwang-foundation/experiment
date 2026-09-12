@@ -260,7 +260,33 @@ explicitly neutralised (`max-mobile:mt-0`) rather than left to look load-bearing
 | **2c-2** | **A CONFLICTING PR RUNS NO CI, AND THE PR PAGE SHOWS NO FAILING CHECK — IT SHOWS NO CHECK.** `ci.yml` triggers on `pull_request`, which GitHub evaluates against a merge ref; `origin/main` moved three commits during this run, PR #517 went `mergeStateStatus: DIRTY`, and **not one `ci.yml` run exists for any of this run's three commits**. | The full gate was run locally instead and is reported as a proxy, with the evidence that it is a faithful one (the diff touches no `drizzle/`, `src/db/`, `src/server/`, `src/app/api/` or lockfile path, so CI's two migration steps have nothing to act on — positive control: the same pattern finds 16 such paths in main's own diff). ⚠ **It is a proxy and not the gate**, and the fix is a founder merge decision, not a session's. |
 | **2c-3** | the touch-handler source scan covers `touchstart`/`touchmove` and **not** `touchend`/`touchcancel` | Those two suppress click synthesis, which is a different defect from suppressing scroll, and the plan's guard table rules on the scrolling pair. Widening it is one array entry and was left as a decision rather than taken unverified. |
 
+
 ---
+
+### MOBILE-2d (2026-09-13) — the bounded shell, and the one result that outlives it
+
+**Census re-run at commit time with this section's own command**, never copied from the plan:
+
+| Measured 2026-09-13 | Value |
+|---|---|
+| distinct `max-mobile:` tokens in `src/` | `grep -ohrE 'max-mobile:[a-z0-9:.\[\]()_/%-]+' src/ \| sort -u \| wc -l` |
+| files under `src/components/debate/phone/` | `ls src/components/debate/phone/ \| wc -l` — **9** since `scroll-lock.ts` |
+
+**Discharged by MOBILE-2d, from MOBILE-2c's list:**
+
+| # | what | how |
+|--:|---|---|
+| 2c-3 | the touch scan covered `touchstart`/`touchmove` and not the pointer family | ⛔ **SUPERSEDED BY A STRONGER RULE rather than widened.** The track and the panes now carry **no touch or pointer prop at all** — nine names scanned (`onTouchStart/Move/End/Cancel`, `onPointerDown/Move/Up/Cancel`, `onWheel`) — and the track's `addEventListener` set is pinned to exactly `pointermove:release` + `touchmove:release`, both passive. `touchend`/`touchcancel` are covered by the first rule as a side effect of forbidding the whole family on those two elements; they remain unrestricted elsewhere under `phone/`, which is still a decision rather than an omission. |
+
+**Newly owed by MOBILE-2d:**
+
+| # | what | why it is owed rather than done |
+|--:|---|---|
+| **2d-1** | ⛔ **PER-SIDE VERTICAL SCROLL POSITIONS.** The bounded shell has ONE vertical scroller above the snap track, so both sides of a debate share a scroll position and the shorter side is padded to the taller one's height. | This is what the document-scroll model did before, so nothing a reader has today is taken away — but it is the thing the obvious design would have given, and **it cannot be got by nesting the scroller**: measured, a vertical scroller inside the snap track kills the sideways swipe after any vertical scroll (15 of 40 trials dead, four input paths). Per-side positions need a different mechanism entirely — most plausibly one scroller with two remembered offsets, restored on a side change — and that is a feature, not a consequence. |
+| **2d-2** | **A REAL ON-SCREEN KEYBOARD IS STILL NOT MEASURED** (inherited from MOBILE-2c O-2, second miss). | Playwright has no on-screen keyboard. What WAS measured: the viewport meta is `width=device-width, initial-scale=1` with **no `interactive-widget`**, so a keyboard shrinks the VISUAL viewport only and `dvh` — and therefore the shell's height — does not change; and with the composer open at simulated viewport heights of 400px and 327px, `PLACE Đ BET` is off-screen but **reachable by scrolling the sheet body**, which is the mechanism MOBILE-2c identified. The real-device check is §0.2 of the run report. |
+| **2d-3** | **THE DESKTOP TIER HAS NO SCROLLER AT ALL ON A TOUCH DEVICE** — re-reported so it is not lost. | Another lane's, and launch-relevant: Android Chrome's "Desktop site" checkbox, a large foldable or a tablet lands on the DESKTOP tree with `hasTouch: true`, where the 2c Android probe measured **45 cells, 0 WORKS** — 30/30 vertical DEAD and 15/15 horizontal DEAD. Nothing in MOBILE-2d touches that tier. |
+| **2d-4** | **WEBKIT HAS NO GESTURE NUMBER IN EITHER DIRECTION**, before or after. | Playwright exposes CDP on Chromium only; WebKit's `page.touchscreen` has `tap` and nothing else, and a page-constructed `TouchEvent` is untrusted and drives no native scrolling. So a WebKit "momentum: 0" would measure the harness. The WebKit arm reports MECHANISM only — computed styles, real scrollability, programmatic scroll and snap — and every gesture cell there is `N/A (no input API)`. |
+| **2d-5** | the 51%-of-a-pane snap cell is marginal and reads either way between runs | It lands ON a snap boundary every time (`onBoundary: true` in all eight G5 cells), so it is a legitimate browser decision at the threshold rather than a defect. Recorded because a future run will see it flip and should not chase it. |
 
 ### MOBILE-2 (2026-09-12) — the trigger fires a third time, and the shape changes
 

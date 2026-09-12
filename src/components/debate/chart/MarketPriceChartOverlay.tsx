@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 import type { PricePoint } from "@/server/discovery/price-series";
-
+import { lockPhoneScroll } from "../phone/scroll-lock";
 import { ChartSummary } from "./ChartSummary";
 import { MarketPriceChart } from "./MarketPriceChart";
 
@@ -31,11 +31,19 @@ export function MarketPriceChartOverlay({
 			}
 		};
 		document.addEventListener("keydown", onKey);
-		const previousOverflow = document.body.style.overflow;
-		document.body.style.overflow = "hidden";
+		// ⛔ MOBILE-2d — THE SAME RETARGET AS `PhoneSheet`, AND THIS SITE NEEDS IT
+		// FOR A REASON THAT SITE DOES NOT: this overlay opens from INSIDE the phone
+		// details sheet, so on a phone it is a second modal over a tier whose
+		// `document.body` does not scroll at all. A body-level lock there locks
+		// nothing. `scroll-lock.ts` captures and restores each live container's
+		// `scrollTop`, and nests correctly — the sheet's lock is already in place
+		// when this one is taken, and each unwinds to what it found.
+		// ⚠ The desktop path is unchanged in effect: at >=640px `document.body` IS
+		// the scroller, and it is still locked first.
+		const unlockScroll = lockPhoneScroll();
 		return () => {
 			document.removeEventListener("keydown", onKey);
-			document.body.style.overflow = previousOverflow;
+			unlockScroll();
 		};
 	}, [onClose]);
 

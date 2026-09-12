@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -44,8 +44,11 @@ const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 
 const TRACK = "src/components/debate/phone/PhoneFeedTrack.tsx";
 const SHEET = "src/components/debate/phone/PhoneSheet.tsx";
+const LOCK = "src/components/debate/phone/scroll-lock.ts";
+const OVERLAY = "src/components/debate/chart/MarketPriceChartOverlay.tsx";
 const VIEW_SRC = () => code(read(VIEW));
 const VIEW = "src/components/debate/phone/PhoneDebateView.tsx";
+const PHONE_DIR = "src/components/debate/phone";
 
 const V = "max-mobile";
 const S = ":";
@@ -439,12 +442,90 @@ describe("phone scroll model — what actually holds the feed still behind a she
 	 * costs nothing. What must not happen is someone reading the lock as the
 	 * mechanism and shrinking the layer on the strength of it.
 	 */
-	it("phone-scroll::the-body-lock-is-still-there-and-is-still-paired-with-its-restore", () => {
-		const src = code(read(SHEET));
-		expect(src).toContain('document.body.style.overflow = "hidden"');
+	it("phone-scroll::every-hand-rolled-lock-goes-through-the-shared-module", () => {
+		/**
+		 * ⛔ TWO SITES, AND THE SECOND IS THE ONE PEOPLE FORGET.
+		 * `PhoneSheet` is obvious. `MarketPriceChartOverlay` opens from INSIDE the
+		 * phone details sheet, so on a phone it is a second modal over a tier whose
+		 * `document.body` does not scroll — a body-level lock there locks nothing
+		 * at all. Both must go through `scroll-lock.ts`, which targets the live
+		 * scroll containers and restores each one's `scrollTop`.
+		 * ⚠ Radix dialogs are NOT in this set and that is measured rather than
+		 * assumed: `react-remove-scroll` blocks by event interception, not by
+		 * `body{overflow}`, so it keeps working on an inner scroller.
+		 */
+		for (const site of [SHEET, OVERLAY]) {
+			const src = code(read(site));
+			expect(src, `${site} must use the shared lock`).toContain(
+				"lockPhoneScroll()",
+			);
+			expect(
+				src.includes('document.body.style.overflow = "hidden"'),
+				`${site} must not lock the body by hand — below 640px that is inert`,
+			).toBe(false);
+		}
+		// ...and the module does what its callers are relying on.
+		const lock = code(read(LOCK));
+		expect(lock).toContain("scrollTop");
 		expect(
-			src,
-			"a lock without its restore is a page that never scrolls again",
-		).toContain("document.body.style.overflow = previous");
+			lock,
+			"the restore must put the scroll position back, not merely the overflow",
+		).toMatch(/\.scrollTop = c\.top/);
+		expect(
+			lock,
+			"the body is still locked too — the desktop tier's rules are not this " +
+				"module's to change",
+		).toContain('body.style.overflow = "hidden"');
+		// POSITIVE CONTROL — the comment stripper left real code behind.
+		expect(lock).toContain("export function lockPhoneScroll");
+	});
+
+	/**
+	 * ⛔ NO `window.scrollTo` OR `scrollIntoView` ANYWHERE IN THE PHONE TREE.
+	 *
+	 * There is none today — measured by census across the whole of `src/`: the
+	 * only callers are `DebateView.tsx`'s `resetPageScroll` (the DESKTOP tree,
+	 * whose root is `max-mobile:hidden`, so it is unreachable below 640px) and
+	 * `PositionsTable.tsx` (the profile surface). `PhoneDebateView`'s `onPosted`
+	 * deliberately registers no scroller at all and its own docblock says why.
+	 *
+	 * ⇒ So this guard protects a property that currently holds for free, and it
+	 * is worth writing precisely because of that: under a bounded shell
+	 * `window.scrollTo(0, 0)` is a NO-OP on this tier — the document does not
+	 * scroll — so the first person to add one would be writing a line that does
+	 * nothing, in a file where it looks like it does something, and no test
+	 * anywhere else would notice.
+	 */
+	it("phone-scroll::no-window-scrollTo-or-scrollIntoView-in-the-phone-tree", () => {
+		const offenders: string[] = [];
+		for (const file of readdirSync(join(ROOT, PHONE_DIR)).filter(
+			(n) => n.endsWith(".ts") || n.endsWith(".tsx"),
+		)) {
+			const src = code(read(`${PHONE_DIR}/${file}`));
+			for (const m of src.matchAll(/window\.scrollTo|scrollIntoView/g)) {
+				offenders.push(`${PHONE_DIR}/${file}: ${m[0]}`);
+			}
+		}
+		expect(
+			offenders,
+			"the document does not scroll on this tier, so window.scrollTo is a " +
+				"no-op that reads as an action; scroll the region by name instead",
+		).toEqual([]);
+
+		// POSITIVE CONTROLS — the corpus is non-empty, and the recogniser fires.
+		expect(
+			readdirSync(join(ROOT, PHONE_DIR)).filter((n) => n.endsWith(".tsx"))
+				.length,
+		).toBeGreaterThanOrEqual(8);
+		expect(
+			[
+				...code("window.scrollTo({ top: 0 });").matchAll(
+					/window\.scrollTo|scrollIntoView/g,
+				),
+			].length,
+		).toBe(1);
+		// ...and the ONE horizontal scroll the tier does make is still there, so
+		// the scan is not passing because it reads nothing.
+		expect(code(read(TRACK))).toContain("track.scrollTo(");
 	});
 });
