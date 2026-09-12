@@ -20,8 +20,18 @@ import {
 	viewerHolding,
 } from "./_fixtures";
 
+// ⚠ `useParams` IS NOT SPARE — a factory mock REPLACES the module, so every
+// export the tree reaches has to be listed here or the import throws. The phone
+// bar's tree reaches `DownloadPostImage`, which reads the slug off the route,
+// and this file mocked `useRouter` alone: the whole suite died on
+// `No "useParams" export is defined on the "next/navigation" mock`.
+// ⚠ IT RETURNS THE FIXTURE'S OWN SLUG rather than an empty object, because the
+// control renders as an inert, disabled placeholder when there is no slug —
+// which would quietly test the wrong branch of a component these guards mount
+// but do not otherwise exercise.
 vi.mock("next/navigation", () => ({
 	useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+	useParams: () => ({ slug: "bitcoin-price-50k" }),
 }));
 
 stubElementScroll();
