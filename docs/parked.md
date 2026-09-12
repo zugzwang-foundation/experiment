@@ -202,6 +202,66 @@ from the plan (Job A self-critique #15):
 **fourth** file to hide behind. A token census gets less informative with each
 addition, not more.
 
+### MOBILE-2c (2026-09-12) — the fourth firing, and the census disagrees with the row below it
+
+**Re-run at commit time with the command stated, never copied.** The pattern is
+`max-mobile:[A-Za-z0-9_=\[\]\(\)\.\/%:,~&-]+` over `src/`, and the BEFORE side is an
+archive of `6f345639` rather than `git grep` against the commit — because
+`git grep -hoE <pat> <sha> -- src/` returned **zero**, and the positive control
+(does the pre-existing `max-mobile:grid-cols-1` appear in the before set?) is what
+said so. A zero there is a broken measurement, not an empty population.
+
+| Measured 2026-09-12 | before (`6f345639`) | after (`69508dc6`) |
+|---|--:|--:|
+| distinct `max-mobile:` tokens in `src/` | **40** | **61** |
+| authoring sites in `src/` | **103** | **134** |
+| `max-mobile:hidden` sites | **17** | **19** |
+
+MOBILE-2c mints **23** distinct tokens and **retires 2** —
+`max-mobile:data-[size=sm]:size-10` (the avatar step goes 40px → 32px, R-2) and
+`max-mobile:min-h-24` (the image slot's phone floor, R-6: the empty state is the
+button and nothing else, so there is no slot to hold open).
+
+⚠ **AND THESE FIGURES DISAGREE WITH THE ROW BELOW, WHICH SAYS 27 / 55 / 11 AT THE
+SAME TIP.** They are not reconciled here and neither is corrected, for two
+reasons: the row below already records that **its own census method was found
+unsound** at MOBILE-1 Job B, and a number measured by an unstated method cannot be
+reconciled with one measured by a stated one — only replaced. ⇒ **The command is
+the claim.** Anyone comparing the two rows is comparing two methods, not two
+builds.
+
+⛔⛔ **THE INTERESTING POPULATION IS NOT THE COUNT — IT IS THAT FOUR OF THE 23 ARE
+`order-*` AND ONE IS `contents`.** MOBILE-2c's R-6 needed the composer's phone
+order to put the image BETWEEN the body and the money, and `BetComposer` carried a
+measured note saying that was *"not expressible by reordering two grid children;
+it would need the footblock to leave this column … and is not a token."* That was
+right about the constraint. `max-mobile:contents` dissolves the wrapper's BOX
+below 640px without moving a node, which promotes its three children to the grid
+and makes `order-1..4` sequence four items instead of two. ⇒ **A `contents` token
+is the general escape from "the ruled composition needs a different tree"**, and
+it is worth knowing before the next lane reaches for the scoped exception.
+⚠ It is not free: `display: contents` removes the box, so `gap`, `min-h-0`,
+`min-w-0` and `mt-auto` on that wrapper stop applying below 640px. `mt-auto` is
+explicitly neutralised (`max-mobile:mt-0`) rather than left to look load-bearing.
+
+**Discharged by MOBILE-2c, from MOBILE-2b's OWED list:**
+
+| # | what | how |
+|--:|---|---|
+| O-1 | **D-15 — a post image at its real intrinsic size widens the phone layout.** | ⛔ **DOES NOT REPRODUCE, and is pinned rather than fixed.** With a real 4000×1500 object actually served through the shipped R2 chain, measured on feed, thread AND the post sheet at 360 and 375: `documentElement.scrollWidth === innerWidth` at every cell, **zero** offenders wider than the viewport, and the image renders 310×118 / 325×123 under `max-w-full`. 2b's 569px reading was taken on `CommentImage`'s **fill** arm, which none of these three surfaces mounts. ⚠ **LIMIT, stated rather than buried: ONE image, not eight.** `comments` is Bucket-A append-only, so a second attachment cannot be added by fixture — it needs a real bet through the composer, which this run did not place. The multi-image case is **still open**. |
+| O-6 | the B10 timer census after-figure was never re-measured | ⚠ **STILL OWED.** MOBILE-2c did not re-measure it either; it is named here so the second miss is recorded rather than inherited silently. |
+| O-7 | RI-1 (the composer's attachment order) and RI-2 (the identity block) | ⛔ **BOTH SHIPPED** as R-6 and R-2. RI-8 (bring a placed argument into view) and the REEL are untouched. |
+
+**Newly owed by MOBILE-2c:**
+
+| # | what | why it is owed rather than done |
+|--:|---|---|
+| **2c-1** | ⛔ **`ADR-0050` IS ALLOCATED TWICE.** `origin/main` carries `docs/adr/0050-post-image-export.md`; this branch carries `docs/adr/0050-phone-market-detail-presentation.md`. Two decisions, one number, and **git merges them cleanly** because the filenames differ. | ⚠ **This is a counter-example to `CLAUDE.md` §8 `O-15`, which says an identifier allocated by FILENAME *cannot* collide** — its argument is that "two lanes adding `0045-*.md` produce an add/add conflict a merge cannot silently resolve". That holds only when the two lanes choose the same SLUG. Different slugs at the same number are different paths, so there is no conflict, no duplicate to census, and nothing on either side that reads wrong. **Renumbering is a founder call and an amendment to a numbered durable rule is the web lane's** (doctrine §10), so this run flags it and touches neither. |
+| **2c-2** | **A CONFLICTING PR RUNS NO CI, AND THE PR PAGE SHOWS NO FAILING CHECK — IT SHOWS NO CHECK.** `ci.yml` triggers on `pull_request`, which GitHub evaluates against a merge ref; `origin/main` moved three commits during this run, PR #517 went `mergeStateStatus: DIRTY`, and **not one `ci.yml` run exists for any of this run's three commits**. | The full gate was run locally instead and is reported as a proxy, with the evidence that it is a faithful one (the diff touches no `drizzle/`, `src/db/`, `src/server/`, `src/app/api/` or lockfile path, so CI's two migration steps have nothing to act on — positive control: the same pattern finds 16 such paths in main's own diff). ⚠ **It is a proxy and not the gate**, and the fix is a founder merge decision, not a session's. |
+| **2c-3** | the touch-handler source scan covers `touchstart`/`touchmove` and **not** `touchend`/`touchcancel` | Those two suppress click synthesis, which is a different defect from suppressing scroll, and the plan's guard table rules on the scrolling pair. Widening it is one array entry and was left as a decision rather than taken unverified. |
+
+---
+
 ### MOBILE-2 (2026-09-12) — the trigger fires a third time, and the shape changes
 
 **Census re-run at commit time with this section's own command**, never copied
