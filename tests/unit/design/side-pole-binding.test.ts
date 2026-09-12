@@ -369,7 +369,7 @@ const PERMITTED_FILES = [
 	// that follows a deletion, not a weakening of a guard.
 	"src/components/debate/composer/PositionStrip.tsx",
 	"src/components/debate/composer/ReplySplitBar.tsx",
-	// TENTH ENTRY — MOBILE-2 / ADR-0050, added as a DECISION in the same commit
+	// TENTH ENTRY — MOBILE-2 / ADR-0051, added as a DECISION in the same commit
 	// as the code, with the offender predicate passing and the enumeration named
 	// in `docs/plans/MOBILE-2.md` (register row **A-12b**).
 	// ⚠ THAT CITATION WAS FALSE WHEN THIS ENTRY FIRST SHIPPED and `@code-reviewer`
@@ -378,7 +378,7 @@ const PERMITTED_FILES = [
 	// the citation removed, because widening a CLOSED inventory is exactly the
 	// kind of decision the register exists to hold.
 	// ⛔⛔ THAT ENTRY IS GONE, AND THE INVENTORY NARROWED RATHER THAN WIDENED —
-	// MOBILE-2c R-1, founder ruling Q1-a of 2026-09-12, ADR-0050 A2 D-4(v).
+	// MOBILE-2c R-1, founder ruling Q1-a of 2026-09-12, ADR-0051 A2 D-4(v).
 	//
 	// It read `"src/components/debate/phone/PhoneDebateView.tsx"`, and it was
 	// here because the phone tier's feed tabs resolved the active tab's fill from

@@ -462,7 +462,7 @@ export function ImageAttach({
 	 * floor, its border, its ground and its padding at every width ≥640.
 	 */
 	const panel =
-		"flex h-full min-h-40 min-w-0 flex-col items-center justify-stretch rounded-(--imgr) p-1 text-center text-xs [border:var(--hairline)] bg-n1/40 group hover:border-n4 transition-colors cursor-pointer max-mobile:order-2 max-mobile:min-h-0 max-mobile:bg-transparent max-mobile:p-0 max-mobile:[border:none]";
+		"flex h-full min-h-40 min-w-0 flex-col items-center justify-between rounded-(--imgr) p-1 text-center text-xs [border:var(--hairline)] bg-n1/40 group hover:border-n4 transition-colors cursor-pointer max-mobile:order-2 max-mobile:min-h-0 max-mobile:bg-transparent max-mobile:p-0 max-mobile:[border:none]";
 	/**
 	 * ⛔⛔ THE ATTACHED SLOT HUGS ITS IMAGE — MOBILE-2c R-7, founder ruling Q8-a,
 	 * and the founder's note that *"this issue sometimes happens in desktop view
@@ -505,43 +505,24 @@ export function ImageAttach({
 	 * ⚠ 40dvh ON BOTH TIERS, and the brief only ruled the phone. Rather than
 	 * invent a second desktop number I apply the ruled one: it is a fraction of
 	 * the viewport, so it bounds a portrait 1000×4000 on a laptop exactly as it
-	 * bounds one on a phone, and it retires `max-h-[192px]` — which had been DEAD
-	 * since it shipped, because `max-h-full` sat in the same class string and
-	 * Tailwind emits it later.
+	 * bounds one on a phone.
+	 *
+	 * ⚠ THIS PARAGRAPH SAID `max-h-[192px]` WAS DEAD AND MAIN HAS SINCE MADE IT
+	 * LIVE — corrected at the merge rather than carried. It WAS dead when MOBILE-2c
+	 * measured it: `max-h-full` sat in the same class string and Tailwind emits it
+	 * later, so the looser bound won. **#518 independently removed `max-h-full`**,
+	 * which is a genuine convergence rather than a conflict — the cap now governs
+	 * the EMPTY arms, and this const governs the attached one, so neither claim
+	 * reaches the other.
 	 */
 	const attachedPreview =
 		"h-auto max-h-[40dvh] w-auto max-w-full rounded-(--imgr) object-contain";
 	// `.imgprev` — d5's `width:100%; aspect-ratio:4/5; max-height:calc(100% - 22px)`
 	// ported as PROPORTIONS ONLY: the `- 22px` is a value and is refused, so the
-	// clamp lands as `max-h-full`. Keeping d5's height clamp is what stops the
+	// clamp lands as `max-h-[192px]`. Keeping d5's height clamp is what stops the
 	// preview from driving the composer's height off the grid row.
 	const preview =
-		// ⚠⚠ change set 10 §1 — THE ART'S HEIGHT IS CAPPED AND NO LONGER TRACKS
-		// THE PANEL'S WIDTH. `aspect-[4/5] w-full` made height a FUNCTION of
-		// width, so the composer grew taller on wider screens: measured 239.5px
-		// at 1280 and 279.5px at 1440, which is why the panel out-grew the right
-		// column and set the grid row.
-		// ⇒ `max-h-[224px]` CAPS it. ⛔ `aspect-[4/5]` STAYS — it is a ratified
-		// PROPORTION (this file's own docblock files it under "arrangement, not
-		// values") and it is pinned by `attach-preview.test.tsx`. Removing it was
-		// my first attempt and it reddened four guards, correctly: the fix is to
-		// bound the box, not to stop declaring its shape. Width still drives the
-		// height until the cap, and the cap replaces the looser `max-h-full`.
-		// The `<svg>` keeps its own `viewBox` and its
-		// DEFAULT `preserveAspectRatio="xMidYMid meet"`, so the drawing scales
-		// DOWN to fit, stays centred, and keeps its ratio — letterboxed, never
-		// stretched or squashed. ⛔ Not one coordinate, text node or viewBox value
-		// is touched; only the box the artwork is asked to fit into.
-		// ⚠ THE CAP IS DERIVED FROM THE RIGHT COLUMN, AND IT MOVED AT CS11.
-		// panel = 2 (border) + 24 (`p-3`) + art. The right column grew when the
-		// title went to three lines (+40) and the description to 128px (+32),
-		// from 262 to 334 — so a 224 cap would have left the panel 72px short and
-		// letterboxing inside a stretched box. 308 puts the panel at 334, level
-		// with the column: neither drives the row alone.
-		// ⛔ STILL A FIXED px CAP, NOT A RATIO OF WIDTH and NOT `max-h-full`.
-		// Width-invariance is what CS10 bought and it is not being traded back —
-		// measured identical at 1440, 1728 and 1920.
-		"aspect-[4/5] h-full max-h-[192px] max-h-full min-h-0 w-auto max-w-full rounded-(--imgr) bg-n1 object-contain";
+		"aspect-[4/5] max-h-[192px] min-h-0 w-auto max-w-full rounded-(--imgr) object-contain self-center";
 	// The slot's CONTENT — the same node at both render sites below, so the
 	// preview is present while `attaching` too and never waits on the PUT.
 	//
@@ -595,11 +576,15 @@ export function ImageAttach({
 	// and its `-attached-` twin.
 	// ⚠ `max-mobile:hidden` for the same reason `EmptySlotFigure` carries it: this
 	// is the 4:5 SLOT drawn empty, and below 640px there is no slot to draw. Left
-	// visible it would try to resolve `aspect-[4/5]` + `h-full` inside a
-	// now-content-height panel — a circular height that collapses to nothing and
-	// reads as a broken element rather than as an absent one.
+	// visible it would try to resolve `aspect-[4/5]` inside a now-content-height
+	// panel — a circular height that collapses to nothing and reads as a broken
+	// element rather than as an absent one.
+	// ⚠ MERGE (MOBILE-2c ← main): `bg-n1` is #518's, and the two are additive to
+	// different things rather than in conflict. #518 took the painted ground OFF
+	// `preview` and put it HERE, because the ground belongs to the empty slot and
+	// not to an image; MOBILE-2c hides the empty slot on a phone. Both kept.
 	const emptyBox = (
-		<span aria-hidden="true" className={`${preview} max-mobile:hidden`} />
+		<span aria-hidden="true" className={`${preview} bg-n1 max-mobile:hidden`} />
 	);
 	const fileInHand = state.phase === "attaching" || state.phase === "attached";
 	/**
@@ -652,6 +637,13 @@ export function ImageAttach({
 				// this covers the window before that and anything it does not catch.
 				// Same shape as `MarketThumb`'s `onError` fallback.
 				onError={() => setPreview(null)}
+				// ⚠ MERGE (MOBILE-2c ← main): `attachedPreview` (R-7) replaces
+				// `preview` here, which is the whole of R-7 — the attached image
+				// takes its own proportions instead of a fixed 4:5 box. #518's
+				// `object-center` is not carried across and does not need to be:
+				// with two `max-*` bounds and no fixed dimension there is no
+				// letterbox area for `object-position` to position anything within.
+				// #518's `preview` still governs the EMPTY arms, untouched.
 				className={attachedPreview}
 			/>
 		);
@@ -695,8 +687,10 @@ export function ImageAttach({
 			>
 				{state.phase === "attached" ? (
 					<>
-						{previewBox}
-						<span className="flex max-w-full items-center gap-1">
+						<div className="flex min-h-0 flex-1 w-full items-center justify-center">
+							{previewBox}
+						</div>
+						<span className="flex max-w-full shrink-0 items-center justify-center gap-1">
 							<span className="min-w-0 truncate font-mono text-ink">
 								{state.name}
 							</span>

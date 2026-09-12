@@ -1,5 +1,5 @@
 /**
- * MOBILE-2b · RI-5 / O-m — the guard ADR-0050 Amendment A1 promises.
+ * MOBILE-2b · RI-5 / O-m — the guard ADR-0051 Amendment A1 promises.
  *
  * A1's second Consequence says, in terms: *"the tier gate is a property of DOM
  * position, and a portal leaves the DOM position: portal content opened from the
@@ -73,7 +73,7 @@ describe("phone-tier::every portal opener under phone/ declares its tier", () =>
 				const element = code.slice(at, close);
 				expect(
 					element,
-					`${file}: <${component}> portals to document.body and must declare tier="phone" (ADR-0050 A1)`,
+					`${file}: <${component}> portals to document.body and must declare tier="phone" (ADR-0051 A1)`,
 				).toContain('tier="phone"');
 			}
 		}

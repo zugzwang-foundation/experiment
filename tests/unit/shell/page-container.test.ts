@@ -203,7 +203,7 @@ const SITES: Site[] = [
 		// and tests/unit/design/debate-mobile-reflow.test.ts). Additive only:
 		// every desktop token above is unchanged, so this is a `now` update,
 		// not a new `movedBy` — the preset selection and its ruling are untouched.
-		// ⚠ MOBILE-2 / ADR-0050 adds ONE more `max-mobile:` token — `hidden`.
+		// ⚠ MOBILE-2 / ADR-0051 adds ONE more `max-mobile:` token — `hidden`.
 		// Below 640px this tree does not reflow, it stands down: the phone tier
 		// is a separate presentation (`debate/phone/`) over the same props, and
 		// the two roots hide together. Additive and inert above 640px like Phase

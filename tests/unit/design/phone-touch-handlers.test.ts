@@ -429,7 +429,7 @@ describe("phone tier — the three touch-action declarations (G4)", () => {
 	it("phone-touch::the-tier-root-declares-manipulation-below-640-only", () => {
 		// ⚠ VARIANT-PREFIXED, so it is inert on the desktop tree. The token is the
 		// tap-delay removal for the whole phone subtree; unprefixed it would be a
-		// desktop change, which ADR-0050 D-2 does not permit here.
+		// desktop change, which ADR-0051 D-2 does not permit here.
 		const V = "max-mobile";
 		const S = ":";
 		const cls = tokens(

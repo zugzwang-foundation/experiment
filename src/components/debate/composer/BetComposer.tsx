@@ -696,7 +696,7 @@ export function BetComposer(props: {
 				    floor, which is what releases that automatic minimum; see its own
 				    `panel` comment for the number and for why the floor sits on the
 				    fieldset rather than on the artwork. */}
-				{/* ⚠ MOBILE-2 / ADR-0050 — `max-mobile:grid-cols-1`, ADDITIVE AND INERT
+				{/* ⚠ MOBILE-2 / ADR-0051 — `max-mobile:grid-cols-1`, ADDITIVE AND INERT
 				    ABOVE 640px. At 375px inside the phone sheet the `2fr_3fr` split
 				    gives the image slot ~138px and the argument fields ~207px, so the
 				    title input and the body textarea — the two things a participant is
@@ -891,7 +891,7 @@ export function BetComposer(props: {
 
 						{/* ⛔⛔ MOBILE-2 — THE CAP AND THE BALANCE, PHONE ONLY, AND IT IS
 						    RESTORING AN INVARIANT RATHER THAN DECORATING A SHEET.
-						    design-language §1.8 / ADR-0050 D-5: "the balance visible where a
+						    design-language §1.8 / ADR-0051 D-5: "the balance visible where a
 						    stake is committed". On the desktop that is held by the GLOBAL
 						    HEADER — `DharmaCluster` renders `Balance` beside `Portfolio`, and
 						    the composer therefore never had to. ⚠ ADR-0049 (#511) hides that

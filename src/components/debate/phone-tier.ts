@@ -6,7 +6,7 @@ import { useSyncExternalStore } from "react";
  * RI-3 / O-l — "is this reader below the tier boundary", for the tree that is
  * hidden when they are.
  *
- * ADR-0050's gate is CSS: below 640px the desktop tree is `display: none` and
+ * ADR-0051's gate is CSS: below 640px the desktop tree is `display: none` and
  * the phone tree renders. `display: none` stops painting; it does not stop
  * JavaScript. So every interval the desktop tree arms keeps firing on a phone,
  * setting state and re-rendering a two-column arena nobody can see. Measured on
@@ -44,7 +44,7 @@ import { useSyncExternalStore } from "react";
  * value after hydration, which is exactly the documented shape for this.
  *
  * ⚠ NEUTRAL AT AND ABOVE 640px BY CONSTRUCTION, which is what makes it legal
- * under ADR-0050 D-2's scoped exception rather than a desktop edit: the query is
+ * under ADR-0051 D-2's scoped exception rather than a desktop edit: the query is
  * false there, every caller takes the branch it took before, and the desktop
  * render is unchanged. The neutrality test asserts that directly rather than
  * trusting this paragraph.

@@ -15,7 +15,7 @@ import {
  * desktop's opposite composer slot, and carries the details and parent-post
  * screens as well.
  *
- * ⛔⛔ IT IS AN OVERLAY ON THE MARKET, NEVER A PAGE (ADR-0050 A2, D-3) — AND THE
+ * ⛔⛔ IT IS AN OVERLAY ON THE MARKET, NEVER A PAGE (ADR-0051 A2, D-3) — AND THE
  * VERSION THAT WAS A PAGE IS WHAT MADE THE PHONE LOOK DEAD.
  *
  * It used to take a `fullHeight` prop, and `PhoneDebateView` passed
@@ -544,7 +544,7 @@ export function PhoneSheet({
 				tabIndex={-1}
 				data-testid="phone-sheet-panel"
 				// ⛔ CONTENT-HEIGHT, WITH A CEILING — and no `fullHeight` branch to
-				// defeat it. `max-h-[92dvh]` is the ruled ceiling (ADR-0050 A2), and
+				// defeat it. `max-h-[92dvh]` is the ruled ceiling (ADR-0051 A2), and
 				// the body below carries `overflow-y-auto`, so a composer taller than
 				// the ceiling scrolls INSIDE the sheet.
 				//

@@ -1,4 +1,4 @@
-# ADR-0050 — The phone tier of market detail is a presentation, not a reflow
+# ADR-0051 — The phone tier of market detail is a presentation, not a reflow
 
 - **Status:** Proposed — web-authored 2026-09-11 (MOBILE-2), to be Accepted at MOBILE-2 close-out after founder refinements
 - **Date:** 2026-09-11

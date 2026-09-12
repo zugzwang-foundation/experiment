@@ -143,7 +143,7 @@ were split to satisfy. **The order of work does not move.**
 | `src/components/debate/ArgProfile.tsx` | R-2 — additive `max-mobile:` tokens on the identity row | shared, additive |
 | `src/components/debate/CommentImage.tsx` | R-11 — **only if a real overflow is measured** | shared, conditional |
 | `tests/unit/debate/phone/*`, `tests/unit/design/*` | the guards in §5 | tests |
-| `docs/adr/0050-phone-market-detail-presentation.md` | Amendment A2, brief §9 **verbatim** | doc |
+| `docs/adr/0051-phone-market-detail-presentation.md` | Amendment A2, brief §9 **verbatim** | doc |
 | `AGENTS.md` | the scroll model and the sheet shell (S5) | doc |
 
 ---

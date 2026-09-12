@@ -147,5 +147,5 @@ strip, tabs, track, panes, bar and sheet — never by a styling class (OVN-V5).
 ⛔ Desktop ≥640px pixel- and DOM-identical (B1 is the instrument; if B1 ≠ 0 at the end, revert until it is).
 ⛔ No path to a bet without an argument — the sheet mounts `BetComposer` or `AuthGateSlot` and nothing else.
 ⛔ No merge, no push to `main`/`staging`, no production touch, no `vercel promote`.
-⛔ No authoring of ADRs/SPECs/design-language — `docs/adr/0050-*.md` is committed verbatim from the brief.
+⛔ No authoring of ADRs/SPECs/design-language — `docs/adr/0051-*.md` is committed verbatim from the brief. (Renumbered 0050 → 0051 at the MOBILE-2c merge: `main`'s #518 had taken 0050 for the post-image export.)
 ⛔ No Phase A `max-mobile:` token or guard removed.

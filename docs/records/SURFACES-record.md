@@ -137,7 +137,7 @@ is not closed.
 | Market media, admin-set per market | ADR-0026 | the header's media panel and its empty state |
 | **Mobile-responsive read surfaces + hard auth gate on mobile** | **ADR-0045** | accepted 2026-09-01; **built across #486 / #497 / #509 / #510 / #511** |
 | **Phone surfaces the header stands down for** | **ADR-0048**, **ADR-0049** | 0048 reverses 0045's auth carve-out (a phone participant is allowed to join); 0049 drops the Đ cluster and turns the chip into an avatar at phone width |
-| **The phone tier of market detail is a PRESENTATION, not a reflow** | **ADR-0050** | Proposed 2026-09-11 (MOBILE-2). Below 640px the desktop tree hides and `debate/phone/` renders over the same four props; writes go through the reused `BetComposer` / `AuthGateSlot` |
+| **The phone tier of market detail is a PRESENTATION, not a reflow** | **ADR-0051** | Proposed 2026-09-11 (MOBILE-2). Below 640px the desktop tree hides and `debate/phone/` renders over the same four props; writes go through the reused `BetComposer` / `AuthGateSlot` |
 
 ## 4 · Invariants and guards this lane carries
 
@@ -272,7 +272,7 @@ searching for the component will find the comments first.
 | **MOBILE-1 Phase A** | **#486** | `4133338` | **2026-09-06** | the read surfaces reflow at phone width |
 | **MOBILE-1 Job A** | **#497**, **#510**, **#511** | `73593f5`, `b19bb43`, `080a798` | **2026-09-07/11** | auth surfaces (ADR-0048) and the signed-in header (ADR-0049) |
 | **MOBILE-1 Job B** | **#509** | `7ffc18c` | **2026-09-11** | the phone reads and sells its own positions |
-| **MOBILE-2** | *(draft, unmerged)* | — | **2026-09-12** | the phone tier of `/m/[slug]` (ADR-0050) |
+| **MOBILE-2** | *(draft, unmerged)* | — | **2026-09-12** | the phone tier of `/m/[slug]` (ADR-0051) |
 
 ⚠ **Four merged PRs in this lane carry the retired `⛔ LEAVE UNMERGED` / `DO NOT MERGE`
 marker** — #254, #336, #403, #448. CLAUDE.md §5.13.2 explains why a marker on `main` is not

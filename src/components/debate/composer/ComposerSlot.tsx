@@ -258,7 +258,36 @@ export function ComposerSlot({
 			// arbitrary values because the scale steps do not carry them:
 			// `slide-in-from-bottom-14` is 14 × 0.25rem = 56px, four times the
 			// ratified distance.
-			className="flex min-h-0 flex-1 flex-col duration-[260ms] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-bottom-[14px] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-[14px] motion-reduce:animate-none motion-reduce:duration-0"
+			// ⛔⛔ `safe center` — WHERE THE LEFTOVER HEIGHT GOES ON A TALL SCREEN,
+			// AND WHY IT IS NOT PLAIN `justify-center`.
+			//
+			// This slot is `flex-1` and grows with the arena, which is
+			// `h-[calc(100dvh-60px-2px)]`; `BetComposer`'s section root is
+			// `shrink-0` and content-sized, and deliberately refuses `flex-1` (its
+			// own docblock: "nothing above ever has spare room to hand down"). That
+			// sentence is true at the viewports the composer was measured against —
+			// 1280×800 and the 900/800/750/700/650 ladder — and false above them.
+			// On a 1080p laptop the column runs ~820px against a ~430px composer,
+			// so ~350px of slack landed under it as dead space, because a flex
+			// column with no `justify-content` packs to the start. REPORTED from a
+			// 15" screen; the same gap is ~95px at the pinned 1440×777, which is
+			// small enough to read as padding and is why it was never seen.
+			//
+			// ⛔ PLAIN `justify-center` WOULD TRADE THE BUG FOR A WORSE ONE. When
+			// the composer is TALLER than the slot — the entire short-viewport case
+			// this component was tuned for — centring overflows it equally in both
+			// directions, so the top of the form is pushed out of the clip rect and
+			// cannot be scrolled back to. The bottom being clipped is survivable;
+			// the title field being unreachable is not.
+			//
+			// ⇒ `safe center` centres only while the content FITS and falls back to
+			// `flex-start` the moment it would overflow — so every viewport at or
+			// below the measured ladder behaves exactly as it does today, byte for
+			// byte, and only screens with genuine slack change. A browser without
+			// `safe` support drops the declaration entirely and also lands on
+			// today's behaviour, which makes this a change that cannot regress
+			// anything it does not improve.
+			className="flex min-h-0 flex-1 flex-col [justify-content:safe_center] duration-[260ms] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-bottom-[14px] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-[14px] motion-reduce:animate-none motion-reduce:duration-0"
 		>
 			{open ? composer : held.current}
 		</div>

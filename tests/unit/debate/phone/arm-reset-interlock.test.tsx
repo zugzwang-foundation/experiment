@@ -36,6 +36,12 @@ import { PhoneDebateView } from "@/components/debate/phone/PhoneDebateView";
 import { modelWith, post, stubElementScroll, VIEWER } from "./_fixtures";
 
 vi.mock("next/navigation", () => ({
+	// ⚠ MERGE (MOBILE-2c ← main) — POST-IMAGE-EXPORT. #518 replaced
+	// `ArgProfile`'s disabled download placeholder with the real
+	// `DownloadPostImage`, which reads the market slug off the route, so a
+	// `next/navigation` mock without `useParams` now THROWS at the first post
+	// card render. Same idiom and same fixture slug as main's own render tests.
+	useParams: () => ({ slug: "bitcoin-price-50k" }),
 	useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 

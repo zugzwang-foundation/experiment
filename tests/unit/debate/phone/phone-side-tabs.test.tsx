@@ -13,6 +13,12 @@ import { PhoneSideTabs } from "@/components/debate/phone/PhoneSideTabs";
 import { modelWith, post, stubElementScroll, VIEWER } from "./_fixtures";
 
 vi.mock("next/navigation", () => ({
+	// ⚠ MERGE (MOBILE-2c ← main) — POST-IMAGE-EXPORT. #518 replaced
+	// `ArgProfile`'s disabled download placeholder with the real
+	// `DownloadPostImage`, which reads the market slug off the route, so a
+	// `next/navigation` mock without `useParams` now THROWS at the first post
+	// card render. Same idiom and same fixture slug as main's own render tests.
+	useParams: () => ({ slug: "bitcoin-price-50k" }),
 	useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
@@ -33,7 +39,7 @@ afterEach(() => {
  * it an edge, then thickened to 2px when MOBILE-2b measured 1.5px as too light
  * at arm's length — an affordance getting heavier to rescue a colour that could
  * not be seen. A white fill has nothing left to rescue, so founder ruling Q1-a
- * of 2026-09-12 (ADR-0050 A2 D-4(v)) makes the active tab `bg-ink` / `text-ground`
+ * of 2026-09-12 (ADR-0051 A2 D-4(v)) makes the active tab `bg-ink` / `text-ground`
  * on both sides, and both the ring and the per-side colour are gone.
  *
  * ⚠ THIS IS A TAB-CONTROL EXCEPTION TO THE POLE BINDING, NOT A REPEAL OF IT.

@@ -206,7 +206,7 @@ export default async function MarketPage({
 		}
 	}
 
-	// MOBILE-2 / ADR-0050 — TWO PRESENTATIONS, ONE SET OF PROPS, NO WRAPPER.
+	// MOBILE-2 / ADR-0051 — TWO PRESENTATIONS, ONE SET OF PROPS, NO WRAPPER.
 	// ⛔ THE FRAGMENT IS DELIBERATE AND IS NOT A STYLE CHOICE. `DebateView`'s
 	// root is the first link of a height chain that four `*-height-chain` tests
 	// read as source and that `page-container.test.ts` pins by class set; a

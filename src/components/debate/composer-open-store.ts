@@ -12,7 +12,7 @@ import { useSyncExternalStore } from "react";
  * prop handed down by `DebateView` — which works exactly as long as the only
  * composer on the surface is `DebateView`'s own.
  *
- * Since ADR-0050 it is not. The phone tier is a SIBLING of `DebateView`, not a
+ * Since ADR-0051 it is not. The phone tier is a SIBLING of `DebateView`, not a
  * child, so a phone sheet holding a half-typed argument is invisible to the
  * poll, and the reader's draft is one interval away from being discarded. Props
  * cannot cross between siblings; lifting the state into `DebateView` would make

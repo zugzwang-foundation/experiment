@@ -7,7 +7,7 @@
  * where exactly one is filled and the filled one names what is on screen.
  *
  * ⛔⛔ THE ACTIVE TAB IS A WHITE FILL ON BOTH SIDES, AND THE STYLE LIVES HERE —
- * founder ruling Q1-a of 2026-09-12, ADR-0050 A2 D-4(v). This is a TAB-CONTROL
+ * founder ruling Q1-a of 2026-09-12, ADR-0051 A2 D-4(v). This is a TAB-CONTROL
  * exception to the pole binding; black = YES / white = NO remains in force on
  * side badges, split bars and the bottom bar, which is where it carries meaning.
  *

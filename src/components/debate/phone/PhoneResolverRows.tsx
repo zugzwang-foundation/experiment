@@ -18,7 +18,7 @@ import type { DebateMarketHeader } from "../types";
  * `scrollWidth > clientWidth` — `RESOL… / RESOL… / CLOSE… / FLAVO…` over
  * `GitHub / GitHub / 5 Nov … / Callout`. Not truncated; destroyed.
  *
- * ⇒ ADR-0050 D-2 permits a phone-only leaf exactly here: a desktop composition
+ * ⇒ ADR-0051 D-2 permits a phone-only leaf exactly here: a desktop composition
  * with no phone shape, consuming only the read model, holding no write path, and
  * using no default-breakpoint variant. Four rows is not a narrower grid — it is
  * the other arrangement of the same four facts, and it is the one that fits.

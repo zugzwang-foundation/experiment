@@ -71,7 +71,7 @@ does not.
 
 ## 3 · THE DESKTOP-TREE EDITS I INTEND TO MAKE, and why each is inside the scoped exception
 
-ADR-0050 D-2 (amended today) permits a logic edit outside `phone/` only when it fixes a phone defect, is
+ADR-0051 D-2 (amended today) permits a logic edit outside `phone/` only when it fixes a phone defect, is
 render- and behaviour-neutral at ≥640px, is covered by a test that fails if the desktop path changes, and
 is listed individually. Tokens that are additive `max-mobile:` are *not* logic edits and are the ordinary
 ADR-0045 convention; they are listed anyway, because B1 is a pixel claim and the reader deserves the set.

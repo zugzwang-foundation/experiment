@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * MOBILE-2 / ADR-0050 — the source-scan half of the phone tier's guard family.
+ * MOBILE-2 / ADR-0051 — the source-scan half of the phone tier's guard family.
  *
  * ⛔⛔ WHAT THIS FILE IS FOR, STATED ONCE. Every rule below describes a property
  * of the phone tier that is TRUE TODAY and that nothing in the type system, the

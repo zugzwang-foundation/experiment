@@ -142,7 +142,7 @@ const tokens = (s: string) =>
  */
 const H = "h-";
 const VIEWPORT_FILL = [`${H}full`, `${H}dvh`, `${H}screen`];
-/** The ruled ceiling (ADR-0050 A2). Already in `src/`, so the literal is inert. */
+/** The ruled ceiling (ADR-0051 A2). Already in `src/`, so the literal is inert. */
 const CEILING = "max-h-[92dvh]";
 
 describe("phone sheet — the panel has a ceiling, so the backdrop has an outside (G1)", () => {

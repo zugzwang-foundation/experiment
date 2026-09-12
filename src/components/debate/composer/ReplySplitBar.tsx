@@ -196,13 +196,15 @@ export function ReplySplitBar({
 						aria-hidden="true"
 					>
 						<span
-							className={`block h-full ${postSide === "YES" ? "bg-yes" : "bg-no"}`}
+							className={`block h-full transition-[width] duration-300 ${postSide === "YES" ? "bg-yes" : "bg-no"}`}
 							style={{ width: supportPct }}
 						/>
 					</span>
 				</span>
 				<span className="text-n5">
-					<b className="text-sm text-ink">Đ {formatDharma(displayedTotal)}</b>{" "}
+					<b className="text-xs text-ink font-mono">
+						Đ {formatDharma(displayedTotal)}
+					</b>{" "}
 					{/* `.sb2.mid` (`d5:620`) — the figure stays cased; the WORD is the
 					    overline. Ported from the card so the two bars read alike. */}
 					<span className="tracking-[0.1em] uppercase">staked</span>
@@ -222,7 +224,7 @@ export function ReplySplitBar({
 					active={activeRelation === "counter"}
 					onToggle={onToggleRelation}
 				/>
-				<span className="text-n5">
+				<span className="text-n5 font-mono text-[11px] font-medium">
 					Đ {formatDharma(aggregate.counterDharma)}
 				</span>
 			</span>
@@ -259,8 +261,8 @@ function TriggerPill({
 	const pole =
 		resultingSide === "YES"
 			? // Black-pill exception: 0.5px n2 edge (values-log §1 item 8).
-				"bg-yes text-no border-[0.5px] border-n2"
-			: "bg-no text-yes [border:var(--hairline)]";
+				"bg-yes text-no border-[0.5px] border-n2 shadow-xs hover:bg-neutral-200 hover:text-black cursor-pointer active:scale-95"
+			: "bg-no text-yes border border-white/25 shadow-xs hover:bg-neutral-800 hover:border-white/60 hover:text-white cursor-pointer active:scale-95";
 	// C3 precedence (INFO-1 §3.4): a viewer blocked by the single-side rule is
 	// told why they are blocked, not given the relation's definition. The
 	// glossary gloss fills the null branch only — c3 still wins outright.
@@ -278,7 +280,7 @@ function TriggerPill({
 					`${relation === "support" ? "Support" : "Counter"} — bet ${resultingSide}`
 				}
 				onClick={() => onToggle(relation)}
-				className={`rounded-(--r-chip) px-3 py-1 text-xs font-bold transition-all hover:shadow-(--state-hover-glow-pole) focus-visible:shadow-(--state-focus-ring) active:shadow-(--state-pressed-glow-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) ${pole}`}
+				className={`w-[78px] h-6 flex items-center justify-center rounded-(--r-chip) text-xs font-bold transition-all hover:shadow-(--state-hover-glow-pole) focus-visible:shadow-(--state-focus-ring) active:shadow-(--state-pressed-glow-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) ${active ? "ring-2 ring-white/40" : ""} ${pole}`}
 			>
 				{relation === "support" ? "Support" : "Counter"}
 			</button>

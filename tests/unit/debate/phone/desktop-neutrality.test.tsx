@@ -2,7 +2,7 @@
 /**
  * MOBILE-2b — THE NEUTRALITY TESTS FOR THE TWO LOGIC EDITS OUTSIDE `phone/`.
  *
- * ADR-0050 D-2 (amendment A1) permits a logic edit to a desktop-tree file only
+ * ADR-0051 D-2 (amendment A1) permits a logic edit to a desktop-tree file only
  * when four things hold, and the third is that a test fails if the DESKTOP
  * path's behaviour changes. Both edits below stop something from running on a
  * phone, and the failure mode of "stop something from running" is stopping it

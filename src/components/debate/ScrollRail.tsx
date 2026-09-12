@@ -197,7 +197,7 @@ export function ScrollRail({
  */
 function CountdownFill({ durationMs }: { durationMs: number | null }) {
 	const [step, setStep] = useState(0);
-	// ⛔ RI-3 / ADR-0050 D-2 — BELOW 640px THIS WHOLE TREE IS `display: none`, AND
+	// ⛔ RI-3 / ADR-0051 D-2 — BELOW 640px THIS WHOLE TREE IS `display: none`, AND
 	// `display: none` DOES NOT STOP A TIMER. This interval ticks `FILL_STEPS`
 	// times per cycle and calls `setStep` on each, so a phone re-renders a rail
 	// it cannot see, several times a second, for as long as the tab is open.

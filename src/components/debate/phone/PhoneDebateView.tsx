@@ -39,7 +39,7 @@ import { PhoneTitleStrip } from "./PhoneTitleStrip";
 
 /**
  * ⛔⛔ THE PHONE PRESENTATION OF `/m/[slug]` — A SECOND TREE OVER THE SAME DATA,
- * NOT A REFLOW OF THE FIRST (ADR-0050 D-1).
+ * NOT A REFLOW OF THE FIRST (ADR-0051 D-1).
  *
  * Every phone change in this repository before this one followed ADR-0045:
  * desktop stays the unprefixed default and a phone rule is an additive
@@ -341,7 +341,7 @@ export function PhoneDebateView({
 
 	const pricing = market.pricing;
 	/**
-	 * ⛔⛔ THE TABS NO LONGER CARRY A POLE, BY FOUNDER RULING (Q1-a, ADR-0050 A2
+	 * ⛔⛔ THE TABS NO LONGER CARRY A POLE, BY FOUNDER RULING (Q1-a, ADR-0051 A2
 	 * D-4(v)). They used to resolve one here — `bg-yes text-no` for YES and
 	 * `bg-no text-yes` for NO — and the YES arm was the problem: `--color-yes` is
 	 * `#181818` and so is the page ground, so an active YES tab painted in its

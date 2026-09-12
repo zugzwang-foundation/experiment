@@ -52,7 +52,7 @@ const ROOT = process.cwd();
 const SHEET = "src/components/debate/phone/PhoneSheet.tsx";
 const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 
-/** ADR-0050 A2 / R-4. Pinned as literals so a silent threshold change reddens. */
+/** ADR-0051 A2 / R-4. Pinned as literals so a silent threshold change reddens. */
 const SWIPE_CLOSE_PX = 80;
 const SWIPE_CLOSE_VELOCITY = 0.5;
 /** The deferral window — the same one `phone-sheet-motion.test.tsx` pins. */
