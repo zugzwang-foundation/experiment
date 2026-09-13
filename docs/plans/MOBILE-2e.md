@@ -73,13 +73,26 @@ current line numbers.
 | `src/components/profile/ArgumentList.tsx` | R-P2 — the viewer panel is not rendered below 640px | one additive `max-mobile·hidden` on the panel root |
 | `src/components/profile/phone/PhoneSellSheet.tsx` | **NEW** — the phone's sell surface | a phone-only leaf under `profile/phone/` (ADR-0051 A4 D-2) |
 
-### Guards (new)
+### Guards (new) — ⚠ CORRECTED IN PLACE AFTER THE BUILD
 
-`tests/unit/design/phone-tooltip-gate.test.ts` · `tests/unit/design/composer-submit-phone.test.ts` ·
-`tests/unit/design/split-bar-phone.test.ts` · `tests/unit/design/arg-profile-phone-lines.test.ts` ·
-`tests/unit/debate/phone/phone-sheet-swipe.test.tsx` (+rows) ·
-`tests/unit/profile/render/phone-sell-sheet.test.tsx` ·
-`tests/unit/design/profile-phone-rows.test.ts`
+This section planned five separate design-guard files, one per register item. **They shipped as ONE**,
+`tests/unit/design/phone-round-five.test.ts`, and the reason is worth keeping: every one of them
+would have opened the same handful of source files, re-declared the same runtime-assembled variant
+prefix and the same comment stripper, and re-proved the same recognisers. Five files would have been
+five copies of the apparatus and one assertion each.
+
+What actually shipped:
+
+| file | rows | what it is |
+|---|--:|---|
+| `tests/unit/design/phone-round-five.test.ts` | **20** | NEW — source scans for R-M1 · R-M2 · R-M3 · R-Q1 · R-P1 · R-P2 · R-P3 · R-P4, plus two positive-control rows that prove the recognisers fire before any of them runs |
+| `tests/unit/profile/render/phone-sell-sheet.test.tsx` | **8** | NEW — jsdom, mounting the leaf DIRECTLY, because its host gates it on the tier and jsdom is always the desktop branch |
+| `tests/unit/design/profile-mobile-reflow.test.ts` | 4 changed, 1 added | MOBILE-1 Job B's guards, INVERTED for round five |
+| `tests/unit/debate/phone/phone-sheet-swipe.test.tsx` | +2 | the 24px travel floor, with its own control at 24px exactly |
+| `tests/unit/ui/info-tip.test.tsx` | +3 | the tier gate, plus a per-query `matchMedia` stub (a blanket one had been answering the pointer question AND the viewport question with one value) |
+| `tests/unit/design/composer-fit.test.ts` | 1 changed | its 400-character window widened to 1200 and its silent-degradation arm removed |
+
+**29 mutations, 29 reds** — every guard verified by reverting the fix it exists to catch.
 
 Every new guard **assembles the `max-mobile` prefix at runtime** (`const V = "max-mobile"; const S = ":"`),
 per `profile-mobile-reflow.test.ts:112-115`, so no guard emits a utility into the built sheet.

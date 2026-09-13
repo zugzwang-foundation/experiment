@@ -703,9 +703,26 @@ export function PositionsTable({
 							className="max-mobile:min-w-0 max-mobile:shrink max-mobile:overflow-hidden"
 							onClick={() => setFilterOpen((o) => !o)}
 						>
-							{marketOptions.find(([id]) => id === market)?.[1] ??
-								"All markets"}{" "}
-							▾
+							{/* ⛔ THE LABEL IS WRAPPED SO IT CAN ELLIPSIZE, and the wrapper
+							    is what makes the clip READ as a clip. `text-overflow` applies
+							    to a BLOCK container of inline text; on the button itself it
+							    reaches nothing, because contiguous text inside a flex
+							    container becomes an ANONYMOUS flex item and the declaration
+							    never gets to it. MEASURED before this wrapper existed: at
+							    375px the label ended mid-word — `All market` — with the
+							    caret gone and no ellipsis, 8px short of the Open pill. There
+							    was no overlap and no missing gap; there was simply nothing
+							    saying the text continued.
+							    ⚠ ONE span around BOTH the label and the caret, so the
+							    button still has exactly one flex item and the desktop's
+							    intrinsic width is unchanged — and so `textContent` is still
+							    `<market title> ▾`, which `arrangement.test.tsx` asserts by
+							    equality and which a JS slice would have made a lie. */}
+							<span className="min-w-0 max-mobile:truncate">
+								{marketOptions.find(([id]) => id === market)?.[1] ??
+									"All markets"}{" "}
+								▾
+							</span>
 						</Button>
 						{filterOpen && (
 							<div
