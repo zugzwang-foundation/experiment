@@ -170,11 +170,29 @@ describe("MOBILE-2e — the phone sell sheet", () => {
 		expect(field.value, "the field is not seeded with the rounded figure").toBe(
 			"31",
 		);
+		const ceiling = screen.getByTestId(`phone-sell-ceiling-${KEY}`);
 		expect(
-			screen.getByTestId(`phone-sell-ceiling-${KEY}`).contains(field),
+			ceiling.contains(field),
 			"the ceiling line contains the field — they are one element, so the " +
 				"assertion above says nothing about a line beneath the figure",
 		).toBe(false);
+		// ⛔⛔ *BENEATH*, ON THE RENDERED DOM. This row's NAME said beneath and nothing
+		// checked it: moving the ceiling span above the field satisfied every other
+		// assertion here and in the design scan. A6 D-2 names the position — "with the
+		// holding stated beneath it as the ceiling" — because a bound printed OVER a
+		// number reads as that number's label, which is exactly what the withdrawn
+		// `Current` overline was. `@code-reviewer`, MEDIUM.
+		// ⚠ `DOCUMENT_POSITION_FOLLOWING` is asked of the FIELD about the CEILING, so
+		// it reads "the ceiling comes after the field" — the direction is the half of
+		// this API that is easy to invert without the test noticing.
+		// ⚠ EQUALITY RATHER THAN A MASK TEST, and the row above is what makes that
+		// safe: neither element contains the other, so the comparison cannot also
+		// carry CONTAINED_BY or CONTAINS and the result is exactly FOLLOWING.
+		expect(
+			field.compareDocumentPosition(ceiling),
+			"the ceiling is rendered BEFORE the amount field, so the sheet states a " +
+				"bound above the figure it bounds",
+		).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 	});
 
 	/**

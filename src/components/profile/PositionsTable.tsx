@@ -1399,10 +1399,10 @@ function TileRow({
 			{/* ⚠ MOBILE-2h · R-2 — COLUMN 1, ROW 1, AND NO WIDTH. Round five gave this
 			    cell `w-12` because it was a flex item competing with three others for
 			    278px; in a grid it is an `auto` track that takes exactly what it
-			    renders, so a declared width would only be a floor the 24px type could
+			    renders, so a declared width would only be a floor the phone's type could
 			    overrun. `shrink-0` goes with it — there is nothing to shrink against. */}
 			<td className="p-2 align-middle max-mobile:col-start-1 max-mobile:row-start-1 max-mobile:p-0">
-				{/* ⚠ 24px ON THE PHONE, AND THE GLYPH GOES UP WITH IT VIA CSS RATHER
+				{/* ⚠ 18px ON THE PHONE, AND THE GLYPH GOES UP WITH IT VIA CSS RATHER
 				    THAN VIA THE PROP. `ThumbGlyph` takes a `size` NUMBER, so re-pointing
 				    it per tier would need a `useIsPhoneTier()` branch in the render —
 				    and the hook's server snapshot is `false`, so the phone would paint a
@@ -1433,19 +1433,24 @@ function TileRow({
 					<ThumbGlyph side={tile.side} size={15} />
 				</span>
 			</td>
-			{/* ⚠ `min-w-0` IS THE ONE THAT MATTERS. A flex item will not shrink below
-			    its content without it, and the argument is the only cell here whose
-			    content is unbounded — without it the row overflows instead of the
-			    title clamping. */}
-			{/* ⚠⚠ MOBILE-2h · R-2 — ROW 2, SPANNING THE WHOLE TILE, AND THE ONLY
-			    STRETCHING CELL. `grid-rows-[auto_1fr]` hands every leftover pixel to
-			    row 2; `self-stretch` is what lets this cell take it, because the grid
-			    is `items-center` for the three cells on row 1. `min-w-0` survives
-			    round five unchanged and for the same reason: a grid item's automatic
-			    minimum is its content, and the argument is the only unbounded text
-			    here, so without it the TILE widens instead of the text wrapping.
-			    ⛔ `flex-1` IS GONE, not forgotten — it was a flex declaration and this
-			    is no longer a flex container, so it named nothing. */}
+			{/* ⚠⚠ ROW 2, SPANNING THE WHOLE TILE. `col-span-3` is the token the whole
+			    composition rests on: without it the title and the complete market
+			    question render inside the side marker's own ~70px track with two thirds
+			    of row 2 empty, on both tabs, and the suite stays green unless something
+			    asserts it (it does — `phone-position-tile.test.ts`).
+			    ⚠ `min-w-0` IS THE OTHER ONE THAT MATTERS, and it survives every axis
+			    change this cell has been through: a grid item's automatic minimum is
+			    its content just as a flex item's is, and the argument is the only cell
+			    here whose content is unbounded — so without it the TILE widens instead
+			    of the text wrapping.
+			    ⛔ `self-stretch` IS GONE, AND THIS NOTE USED TO REQUIRE IT. It let this
+			    cell take the `1fr` row's leftover height so the distributed `mt-auto`
+			    below had slack; MOBILE-2j withdraws the viewport-tall tile, so there is
+			    no leftover height and nothing to opt into. `phone-position-tile.test.ts`
+			    now FORBIDS it — a reader restoring it from this paragraph would have
+			    been fighting the suite. `@code-reviewer`, HIGH.
+			    ⛔ `flex-1` IS GONE for the older reason — it was a flex declaration and
+			    this is no longer a flex container, so it named nothing. */}
 			<td className="p-2 align-middle max-mobile:col-span-3 max-mobile:col-start-1 max-mobile:row-start-2 max-mobile:min-w-0 max-mobile:p-0">
 				<TileArgumentCell
 					cell={tile.argument}
@@ -1479,7 +1484,7 @@ function TileRow({
 					    eye can run down. */}
 					{/* ⚠ MOBILE-2h · R-2 — COLUMN 2, ROW 1, HUGGING THE SELL BUTTON.
 					    Round five's `w-16` was 64px for a 17px figure; the tile prints it
-					    at 24px, where 64px would clip a five-figure Đ value. The column
+					    at 18px, where a fixed 64px would clip a five-figure Đ value. The column
 					    is `1fr` and this cell is `justify-self-end`, so the figure sits
 					    against Sell and the side marker keeps the left edge — the width
 					    is whatever the number needs and never a cap. */}
@@ -1507,18 +1512,19 @@ function TileRow({
 							/* ⚠ MOBILE-2h · R-2 — THE VALUE AND ITS MOVEMENT SHARE A LINE ON
 							   THE PHONE. Stacked, they would be two of the tile's three bands
 							   and the top cluster would read as four lines rather than two.
-							   `items-baseline` rather than `items-center`: a 13px percentage
-							   beside a 24px figure looks dropped when it is centred. */
+							   `items-baseline` rather than `items-center`: an 11px percentage
+							   beside an 18px figure looks dropped when it is centred. */
 							<span className="flex flex-col items-center leading-[1.35] max-mobile:flex-row max-mobile:items-baseline max-mobile:justify-end max-mobile:gap-1.5">
 								{/* ⚠ P-3 — 17px. It was inheriting the table's `text-sm`, so the
 								    figure the column is named after was set at the same size as
 								    the argument title beside it and smaller than nothing on the
 								    row. Leading restated with the size, per AGENTS.md §8. */}
-								{/* ⚠ MOBILE-2h · R-2 — 24px, the largest thing on the tile. The
-								    leading is restated with the size because an arbitrary
-								    `text-[Npx]` inherits whatever leading was in scope
-								    (AGENTS.md §8) — here `leading-[1.35]`, which at 24px is a
-								    32px line and pushes the whole cluster down. */}
+								{/* ⚠ 18px — the largest thing on the tile, and 24px until MOBILE-2j
+								    took the tile's height away and the type with it. The leading is
+								    restated with the size because an arbitrary `text-[Npx]` inherits
+								    whatever leading was in scope (AGENTS.md §8) — here
+								    `leading-[1.35]`, which at 18px is a 24px line and pushes the
+								    whole cluster down. */}
 								<span className="text-[17px] leading-[1.35] font-bold max-mobile:text-[18px] max-mobile:leading-[1.2]">
 									Đ {formatDharma(tile.valueDisplay)}
 								</span>
@@ -1640,12 +1646,18 @@ function TileRow({
 											size="xs"
 											variant="outline"
 											data-testid={`tile-sell-${tile.key}`}
-											/* ⚠ MOBILE-2h · R-2 — 16px on the phone, up from `size="xs"`'s
-											   `text-xs`. `min-h-11` (44px) is round five's floor and is
-											   unchanged; the label grows inside it rather than the target
-											   growing with the label. `px-3` because a 16px word inside
-											   `size="xs"`'s `px-2` reads as a label with a box drawn round
-											   it rather than as a button. */
+											/* ⚠ 12px on the phone (MOBILE-2j · R-1; it was 16px while the tile
+											   was a screen). `min-h-11` (44px) is round five's floor and is
+											   UNCHANGED through both moves — the label changes size inside
+											   the target, never the target with the label.
+											   ⚠ AT A 16px ROOT THIS RESOLVES TO THE SAME 12px AS
+											   `size="xs"`'s own `text-xs`, so the token's effect is now the
+											   leading beside it rather than the size. It is written out
+											   anyway: `text-xs` carries a 16px line-height and the tile's
+											   money line wants 1.2, and an explicit figure is what tells the
+											   next reader that 12 was chosen rather than inherited.
+											   `px-3` stays: a word inside `size="xs"`'s `px-2` reads as a
+											   label with a box drawn round it rather than as a button. */
 											className="font-extrabold tracking-[0.08em] uppercase [border:var(--ring-active)] max-mobile:min-h-11 max-mobile:w-full max-mobile:px-3 max-mobile:text-[12px] max-mobile:leading-[1.2] max-mobile:[touch-action:manipulation]"
 											onClick={() => sell.arm(tile.key)}
 										>
@@ -1728,7 +1740,7 @@ function TileRow({
 					    the `<tr>` was a flex ROW and a cell without a declared share left
 					    the `flex-1` argument beside it resolving to 0px. There is no such
 					    row any more: these are grid items in `auto` tracks, where a width
-					    is a floor rather than a share and 64px would clip a 24px figure. */}
+					    is a floor rather than a share and 64px would clip the figure. */}
 					<td
 						data-testid={`tile-staked-${tile.key}`}
 						className="p-2 text-center align-middle whitespace-nowrap tabular-nums text-ink max-mobile:col-start-2 max-mobile:row-start-1 max-mobile:justify-self-end max-mobile:p-0 max-mobile:text-right max-mobile:text-[18px] max-mobile:leading-[1.2]"
@@ -1753,10 +1765,10 @@ function TileRow({
 						    `Current` tip is NOT rescued this way: that needs an Open-tab label,
 						    which is copy authoring, and it is ruled LOST instead. */}
 						{/* ⚠ MOBILE-2h — THE LABEL IS AN EYEBROW, NOT PART OF THE FIGURE. The
-						    cell now prints at 24px, and the carried `<th>` word would print at
-						    24px with it — a column name as loud as the number it names. It
-						    takes the same 13px muted step the Open tab's movement line takes,
-						    so the two tabs' right-hand clusters read at the same two weights.
+						    cell prints at 18px, and the carried `<th>` word would print at 18px
+						    with it — a column name as loud as the number it names. It takes the
+						    same 11px muted step the Open tab's movement line takes, so the two
+						    tabs' right-hand clusters read at the same two weights.
 						    ⛔ THE STRING IS STILL BYTE-CARRIED FROM THE `<th>`; only its size
 						    moved, which is what keeps "no copy was authored for the phone"
 						    checkable. */}
@@ -1859,22 +1871,25 @@ function TileArgumentCell({
 	   "…5 Nov 2026? · staked Đ 100" would name a destination it does not go to,
 	   which is why the two were siblings rather than nested. */
 	const marketLine = (
-		// ⚠⚠ MOBILE-2h · R-2 — THE CLAMP IS GONE AND THE QUESTION IS THE TILE'S
-		// BOTTOM BAND. Round five clamped it to ONE line, and the reason it gave was
-		// sound for what it was describing: the question was unbounded text in an
-		// ~90px column of a 44px-tall list row, and unclamped it made the row twice
-		// as tall as the title above it. A tile is a screen, not a row — there is no
-		// height left to protect, and a market question a reader cannot finish is
-		// the one thing a full-screen view has no excuse for.
-		// ⛔ `mt-auto` IS THE TILE'S ONLY GAP, AND THAT IS THE RULING. The cell above
-		// is `grid-rows-[auto_1fr]`'s stretching row, this element is the last child
-		// of a flex column inside it, so every leftover pixel in the tile collects
-		// HERE — between the title and the question — and nowhere else. Distribute
-		// it any other way (`justify-between`, a spacer per band) and a short tile
-		// and a tall one stop looking like the same object.
-		// ⚠ `pt-3` IS A FLOOR, NOT THE GAP. When the question is long enough to grow
-		// the tile past a screen the auto margin resolves to zero, and without a
-		// floor the question would touch the title it is meant to sit apart from.
+		// ⚠⚠ THE CLAMP IS GONE AND THE QUESTION IS COMPLETE. Round five clamped it to
+		// ONE line, and the reason it gave was sound for what it was describing: the
+		// question was unbounded text in an ~90px column of a 44px-tall list row, and
+		// unclamped it made the row twice as tall as the title above it. The tile
+		// gives the question the full width now, so it wraps to two or three lines
+		// rather than five — and a market question a reader cannot finish is the one
+		// thing this surface has no excuse for. A6 D-1 rules it complete.
+		// ⛔⛔ `mt-auto` AND `pt-3` ARE GONE, AND THIS NOTE USED TO CALL THE FIRST OF
+		// THEM "THE TILE'S ONLY GAP, AND THAT IS THE RULING". It was, while the tile
+		// was one viewport tall: the cell above stretched to a `1fr` row and every
+		// leftover pixel collected here. MOBILE-2j withdraws that height, so there is
+		// no leftover to distribute and an auto margin resolves to zero anyway; `pt-3`
+		// was that mechanism's floor and not a chosen gap.
+		// ⇒ THE TILE'S ONE GAP IS NOW `gap-y-[7px]` ON THE `<tr>`, between the money
+		// line and the title, and the question sits directly under the title — where
+		// it sits at every width above 640 and where it sat before MOBILE-2h.
+		// `phone-position-tile.test.ts` FORBIDS both tokens here, so a reader
+		// restoring one from this paragraph would have been fighting the suite.
+		// `@code-reviewer`, HIGH.
 		<span className="block text-[11px] leading-[1.35] font-semibold text-n5 max-mobile:line-clamp-none">
 			<Link
 				data-testid={`tile-market-${tileKey}`}
@@ -1905,10 +1920,15 @@ function TileArgumentCell({
 		);
 	}
 	return (
-		// ⚠ MOBILE-2h · R-2 — THE CELL'S OWN COLUMN. The `<td>` above stretches to
-		// the grid's `1fr` row; `h-full` is what passes that height down to this
-		// span, and without it `mt-auto` on the market line has no slack to take and
-		// the question sits under the title instead of at the tile's foot.
+		// ⚠ THE CELL'S OWN COLUMN — the title and the market question stack, and this
+		// is where that is declared.
+		// ⛔ `h-full` IS GONE, AND THIS NOTE USED TO REQUIRE IT and to describe the
+		// shipped behaviour as the failure: it read "without it `mt-auto` on the
+		// market line has no slack to take AND THE QUESTION SITS UNDER THE TITLE
+		// INSTEAD OF AT THE TILE'S FOOT" — which is now exactly what A6 D-1 rules.
+		// It passed the `1fr` row's height down for a gap that no longer exists, and
+		// `height: 100%` against an auto-height parent resolves to `auto` regardless.
+		// `phone-position-tile.test.ts` forbids it. `@code-reviewer`, HIGH.
 		<span
 			data-testid={`tile-arg-${tileKey}`}
 			className="text-ink max-mobile:flex max-mobile:flex-col"
@@ -1940,7 +1960,7 @@ function TileArgumentCell({
 				// protection. `line-clamp-none` is what undoes `-webkit-box` — a bare
 				// override of the line count would leave the box intact and the clamp
 				// live. ⚠ `font-medium` steps DOWN from the desktop's `font-bold`: at
-				// 18px, bold competes with the 24px value beside it, and the ruling
+				// 15px, bold competes with the 18px value beside it, and the ruling
 				// puts the value first.
 				className="line-clamp-4 text-[15px] leading-[1.35] font-bold hover:underline max-mobile:line-clamp-none max-mobile:text-[15px] max-mobile:leading-[1.35] max-mobile:font-medium"
 			>

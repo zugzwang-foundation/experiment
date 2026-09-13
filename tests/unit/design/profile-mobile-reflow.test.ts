@@ -593,8 +593,15 @@ describe("profile mobile reflow — the positions table stacks below 640px", () 
 			`ORDINARY scroll — no alignment on the tile, and no scroll margin, which ` +
 			`existed only to lift a snap landing clear of the sticky header and would ` +
 			`now displace the keyboard stepper's scrollIntoView instead.`;
-		expect(classes, snap).not.toContain(phone("snap-start"));
-		expect(classes, snap).not.toContain(phone("snap-always"));
+		// ⚠ ASSEMBLED, not written. Tailwind v4's source detection scans `tests/`, so
+		// a class-shaped literal in a guard becomes a REAL emitted utility — and a
+		// guard that FORBIDS a token would then be the only thing putting it in the
+		// built stylesheet. Measured at MOBILE-2j: four snap utilities reached
+		// `.next/static/chunks/*.css` from a sibling guard's forbid-lists, with no
+		// `src/` origin at all. `@code-reviewer`, MEDIUM.
+		for (const kind of ["start", "always"]) {
+			expect(classes, snap).not.toContain(phone(`snap${"-"}${kind}`));
+		}
 		expect(
 			classes.some((c) => c.startsWith(`${VARIANT}${SEP}scroll-mt-`)),
 			snap,

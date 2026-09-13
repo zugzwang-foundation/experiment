@@ -17,6 +17,17 @@ import { formatDharma } from "@/components/debate/format";
  * is the action; the side is what the position IS. The movement is the only one of
  * the four that can be read from the figures on the other tabs.
  *
+ * ⚠⚠ **SO THIS RULE REACHES THE OPEN TAB AND ONLY THE OPEN TAB, WHICH IS WORTH
+ * SAYING BECAUSE THE MEASUREMENT ABOVE WAS TAKEN ON THE OTHER ONE.** The 328px
+ * figure is a CLOSED-tab row (`Staked Đ 14,260` beside `Opened <date>`), and the
+ * Closed tab has no movement chip — its two slots are the staked figure and the
+ * date. Nothing there yields, and the section's `overflow: clip` remains its whole
+ * defence: measured after this round's type step-down, that row still needs 284.3px
+ * of a 278px line at 360, contained by the clip with the layout viewport holding
+ * 360 and nothing reaching the frame (`docs/parked.md` 2j-5). Extending the yield to
+ * the `Opened` date, or to the byte-carried `Staked` eyebrow, is a composition
+ * ruling and not this module's to take. `@code-reviewer`, LOW.
+ *
  * ⛔⛔ **A DATA RULE, NOT A LAYOUT OBSERVER, AND THE DIFFERENCE IS LOAD-BEARING.**
  * The obvious implementation measures the rendered row and drops the chip when it
  * does not fit. That needs a `ResizeObserver` — which ADR-0051 A6's brief forbids
@@ -89,6 +100,14 @@ export const PHONE_MONEY_LINE_MAX_VALUE_CHARS = 6;
  * Does the movement chip fit beside this value at phone width?
  *
  * `true` ⇒ render it. `false` ⇒ it is the thing that yields.
+ *
+ * ⚠ IT IS TOTAL, AND DELIBERATELY CARRIES NO `try`. `formatDharma` cannot throw —
+ * `round0Dharma` catches an unparseable value and falls back to
+ * `formatDharmaExact` — so a bad string degrades to a LONG one, the predicate
+ * returns `false`, and the chip hides. That is the safe direction: the one thing
+ * this rule must never do is let a figure it could not measure push SELL off the
+ * line. A defensive wrapper here would add a branch no input can reach and would
+ * have to choose a default, which is the interesting decision it would hide.
  *
  * ⚠ `<=`, NOT `<`. The constant is the longest length MEASURED TO FIT, so the
  * comparison that matches the measurement includes it. Reading the ruling's

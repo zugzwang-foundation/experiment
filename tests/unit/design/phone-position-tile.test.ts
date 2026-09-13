@@ -40,6 +40,19 @@ const V = "max-mobile";
 const S = ":";
 /** `max-mobile:<utility>`, assembled so this file emits nothing. */
 const phone = (utility: string) => `${V}${S}${utility}`;
+/**
+ * ⛔⛔ AND THE SNAP FAMILY IS ASSEMBLED TOO, WHICH IT WAS NOT — this file's own
+ * header promised "no scannable token" and then wrote `snap​-y`, `snap​-proximity`,
+ * `snap​-center` and `snap​-end` as bare literals in two forbid-lists. MEASURED in
+ * `.next/static/chunks/*.css`: all four were present in the BUILT STYLESHEET, and
+ * `grep -rIl` found them in no `src/` file — their only origin was this file. The
+ * round had published the withdrawn mechanism's utilities into production CSS, by
+ * means of the guards that exist to keep it withdrawn. `@code-reviewer`, MEDIUM.
+ * ⚠ The CSS was inert. The cost is the one AGENTS.md §8 names: the built sheet
+ * stops being evidence of what components use.
+ */
+const SNAP = "snap";
+const snap = (kind: string) => `${SNAP}${S === ":" ? "-" : "-"}${kind}`;
 
 const TABLE = "src/components/profile/PositionsTable.tsx";
 const SHEET = "src/components/profile/phone/PhoneSellSheet.tsx";
@@ -168,7 +181,7 @@ function cellClassesWrapping(source: string, anchor: string): string[] {
 
 // ── 0 · the guards fire at all ───────────────────────────────────────────────
 
-describe("MOBILE-2h — positive controls first", () => {
+describe("MOBILE-2j — positive controls first", () => {
 	it("tile::the-readers-find-something", () => {
 		const source = stripComments(read(TABLE));
 		expect(tileRowClasses(source).length).toBeGreaterThan(5);
@@ -179,14 +192,18 @@ describe("MOBILE-2h — positive controls first", () => {
 	});
 
 	it("tile::stripComments-really-strips", () => {
-		const withComment = "a\n/* max-mobile:snap-start */\nb";
-		expect(stripComments(withComment)).not.toContain("snap-start");
+		// ⚠ ASSEMBLED, because Tailwind's extractor cannot tell that this string
+		// REPRESENTS a comment — it read `max-mobile:snap​-start` out of this fixture
+		// and emitted the utility. The one place a test file's own prose about a
+		// banned token becomes the token.
+		const withComment = `a\n/* ${phone(snap("start"))} */\nb`;
+		expect(stripComments(withComment)).not.toContain(snap("start"));
 		// and it preserves the line count, so a reported line still points at source
 		expect(stripComments(withComment).split("\n")).toHaveLength(3);
 	});
 });
 
-// ── 1 · the tile is a screen ─────────────────────────────────────────────────
+// ── 1 · the tile is a LIST ROW ───────────────────────────────────────────────
 
 describe("A6 D-1 — a list row of natural height", () => {
 	it("tile::the-height-is-NATURAL-and-NO-height-token-survives", () => {
@@ -241,12 +258,7 @@ describe("A6 D-1 — a list row of natural height", () => {
 	it("tile::it-does-NOT-snap-and-carries-NO-scroll-margin", () => {
 		const cls = tileRowClasses(stripComments(read(TABLE)));
 		// ⛔⛔ INVERTED FROM A5. These three were REQUIRED at MOBILE-2h.
-		for (const token of [
-			"snap-start",
-			"snap-always",
-			"snap-center",
-			"snap-end",
-		]) {
+		for (const token of ["start", "always", "center", "end"].map(snap)) {
 			expect(
 				cls,
 				`${TABLE}: the tile still declares a scroll-snap alignment. A6 D-1 ` +
@@ -312,6 +324,40 @@ describe("A6 D-1 — a list row of natural height", () => {
 		// enough to span BOTH arms, so the moved arm's token satisfied an assertion
 		// about the flat one. Measured: putting the flat arm back to 13px SURVIVED the
 		// battery.
+		// ⛔⛔ AND THE CLOSED TAB'S THREE TYPE SITES, WHICH NOTHING READ AT ALL. Plan
+		// R-1 steps them down by name — the `Staked` figure 24 → 18 and both eyebrows
+		// 13 → 11 — and reverting all three left 723/723 green. This file congratulates
+		// itself a hundred lines up for closing exactly this gap one tab across, for
+		// `justify-self-end`; it had reproduced it for the type. `@code-reviewer`,
+		// MEDIUM.
+		for (const [anchor, want, what] of [
+			["data-testid={`tile-staked-", "text-[18px]", "the Closed tab's value"],
+			[
+				"data-testid={`tile-opened-",
+				"text-[11px]",
+				"the Closed tab's Opened date",
+			],
+		] as const) {
+			expect(
+				cellClassesWrapping(source, anchor),
+				`${TABLE}: ${what} is not at the ruled step. The Closed tab shares the ` +
+					`tile and takes the same two slots the Open tab gives the value and ` +
+					`SELL, so a reader who has learned one tab has learned the other — ` +
+					`which stops being true the moment one steps and the other does not.`,
+			).toContain(phone(want));
+		}
+		// the `Staked` eyebrow, read off its own span rather than off its cell
+		const stakedAt = source.indexOf("data-testid={`tile-staked-");
+		const eyebrow = source.slice(
+			stakedAt,
+			source.indexOf("</InfoTip>", stakedAt),
+		);
+		expect(
+			eyebrow,
+			`${TABLE}: the Closed tab's 'Staked' eyebrow did not step down with its ` +
+				`figure, so a carried column name prints as loud as the number it names.`,
+		).toContain(phone("text-[11px]"));
+
 		const arms = [...source.matchAll(/data-testid={`tile-pl-/g)].map(
 			(m) => m.index,
 		);
@@ -362,7 +408,7 @@ describe("A6 D-1 — a list row of natural height", () => {
 	});
 });
 
-// ── 1a · the long-value rule ─────────────────────────────────────────────────
+// ── 2 · the long-value rule ─────────────────────────────────────────────────
 
 describe("A6 D-1 — the movement chip is the one element that yields", () => {
 	it("tile::the-rule-is-WIRED-to-both-movement-arms", () => {
@@ -399,6 +445,8 @@ describe("A6 D-1 — the movement chip is the one element that yields", () => {
 		).toContain('"max-mobile:hidden"');
 	});
 });
+
+// ── 3 · every cell is PLACED, on BOTH tabs ──────────────────────────────────
 
 describe("A6 D-1 — the four cells are placed, on both tabs", () => {
 	/**
@@ -520,7 +568,7 @@ describe("A6 D-1 — the four cells are placed, on both tabs", () => {
 	});
 });
 
-// ── 3 · the three bands, and the ONE gap ─────────────────────────────────────
+// ── 4 · the three bands, and the ONE gap ────────────────────────────────────
 
 describe("A6 D-1 — three bands, and the distributed gap is gone", () => {
 	it("tile::the-argument-cell-is-a-column-and-is-NOT-full-height", () => {
@@ -627,7 +675,7 @@ describe("A6 D-1 — three bands, and the distributed gap is gone", () => {
 	});
 });
 
-// ── 4 · what has to stand down for the DOCUMENT to be the scroller ───────────
+// ── 5 · what stands down so the PAGE is the scroller ────────────────────────
 
 describe("A6 D-1 — the list scrolls with the PAGE, and one box contains it", () => {
 	it("tile::the-section-KEEPS-its-clip-and-the-BODY-has-no-phone-override", () => {
@@ -679,6 +727,18 @@ describe("A6 D-1 — the list scrolls with the PAGE, and one box contains it", (
 				`overflow-y-auto: that is the desktop's panel-scoped scroll, and below ` +
 				`640px nothing gives the box a definite height so it cannot engage.`,
 		).toContain("overflow-y-auto");
+		// ⛔ AND NO PHONE-TIER TOKEN AT ALL, not merely no overflow one. The row above
+		// forbade `max-mobile:overflow-*` by prefix, so restoring `max-mobile:min-w-0`
+		// alone passed — and that token only ever existed to pair with the overflow
+		// release (an overflow other than `visible` already zeroes a box's automatic
+		// minimum, so with `overflow-y-auto` back it names nothing). Half of a
+		// withdrawn pair is the shape this file exists to catch. `@code-reviewer`, LOW.
+		expect(
+			body.filter((c) => c.startsWith(`${V}${S}`)),
+			`${TABLE}: the positions body carries a phone-tier override again. It has ` +
+				`no phone behaviour of its own under A6 D-1 — it is the desktop's ` +
+				`panel-scoped scroller and nothing more.`,
+		).toEqual([]);
 		// ⛔ AND IT MUST NEVER CLIP. `sticky-header-strip.test.ts` forbids it by name
 		// — the sticky <thead>'s negative-offset shadow covers this body's own top
 		// padding, and a clipped body cannot scroll under it. Re-asserted here so a
@@ -732,7 +792,7 @@ describe("A6 D-1 — the list scrolls with the PAGE, and one box contains it", (
 	});
 });
 
-// ── 5 · the snap type, and the census that keeps it inert elsewhere ──────────
+// ── 6 · the snap census, now that nothing here snaps ────────────────────────
 
 describe("A6 D-1 — nothing on this surface snaps, at all", () => {
 	it("tile::the-root-element-carries-NO-snap-type", () => {
@@ -741,19 +801,14 @@ describe("A6 D-1 — nothing on this surface snaps, at all", () => {
 			"<html",
 			ROOT_LAYOUT,
 		);
-		// ⛔⛔ INVERTED FROM A5. MOBILE-2h armed `snap-y snap-proximity` HERE,
+		// ⛔⛔ INVERTED FROM A5. MOBILE-2h armed `snap​-y snap​-proximity` HERE,
 		// because the viewport's snap type can only be set on the root — `<body>`
 		// does not propagate it and no descendant can reach up to it. A6 withdraws
 		// the snap, so the root goes back to the class string it carried before, and
 		// this row is what keeps it there: a snap type on `<html>` is GLOBAL, so
 		// restoring it silently would arm Discovery, the auth routes and the admin
 		// tree the moment anything anywhere declared an alignment.
-		for (const token of [
-			"snap-y",
-			"snap-x",
-			"snap-proximity",
-			"snap-mandatory",
-		]) {
+		for (const token of ["y", "x", "proximity", "mandatory"].map(snap)) {
 			expect(
 				cls,
 				`${ROOT_LAYOUT}: the root element arms a scroll-snap type. A6 D-1 ` +
@@ -808,7 +863,7 @@ describe("A6 D-1 — nothing on this surface snaps, at all", () => {
 		// ⛔⛔ THE BOUNDARY IS A NEGATIVE LOOKBEHIND, NOT `(?:^|\s|:)`, AND THE
 		// DIFFERENCE IS A HOLE THIS ROUND'S OWN MUTATION BATTERY FOUND. The older form
 		// required whitespace, a line start or a variant colon before the token — so an
-		// alignment written as the FIRST class in a string (`className="snap-start …"`)
+		// alignment written as the FIRST class in a string (`className="snap​-start …"`)
 		// is preceded by a QUOTE and matched nothing at all. The census read clean with
 		// a second snap target live in the tree: injecting `snap-start` at the head of a
 		// `MarketCard.tsx` className SURVIVED the whole battery.
@@ -846,7 +901,7 @@ describe("A6 D-1 — nothing on this surface snaps, at all", () => {
 	});
 });
 
-// ── 6 · R-1 · the head on one line ───────────────────────────────────────────
+// ── 7 · R-1 · the head on one line ──────────────────────────────────────────
 
 describe("R-1 — the positions head clears itself at 360px", () => {
 	it("head::the-filter-button-is-capped-to-its-own-wrapper", () => {
@@ -896,7 +951,7 @@ describe("R-1 — the positions head clears itself at 360px", () => {
 	});
 });
 
-// ── 7 · R-2 / R-3 · the sheet's amount, and the sheet's type ────────────────
+// ── 8 · R-2 / R-3 · the sheet's amount, and the sheet's type ────────────────
 
 describe("A6 D-2 — the sell sheet's amount IS the number", () => {
 	it("sell::the-shared-field-gained-a-variant-that-DEFAULTS-to-the-row", () => {
@@ -951,12 +1006,33 @@ describe("A6 D-2 — the sell sheet's amount IS the number", () => {
 					`it instead.`,
 			).not.toContain(forbidden);
 		}
+		// ⛔ EVERY PADDING SPELLING, NOT TWO PREFIXES. The earlier form filtered `px-`
+		// and `py-` only, so restoring `p-2`, `pt-*`, `pb-*` or an arbitrary
+		// `[padding:…]` satisfied a row whose message claims the box has no padding at
+		// all. `@code-reviewer`, MEDIUM.
 		expect(
 			(wrapper ?? "")
 				.split(/\s+/)
-				.filter((c) => c.startsWith("px-") || c.startsWith("py-")),
+				.filter((c) => /^p[trblxy]?-/.test(c) || c.startsWith("[padding")),
 			`${INLINE}: the sheet's amount wrapper still has padding, which is the ` +
 				`box's last visible edge once the border is gone.`,
+		).toEqual([]);
+		// ⛔ AND THE FRAME BY FAMILY, NOT BY SPELLING. The `not.toContain` rows above
+		// name exact tokens, so a re-bordering as `border`, `border-n3` or `ring-1`
+		// passes them. This catches the family instead.
+		expect(
+			(wrapper ?? "")
+				.split(/\s+/)
+				.filter(
+					(c) =>
+						/^(?:border|rounded|ring|shadow|bg-)/.test(c) ||
+						c.includes("[border") ||
+						c.includes("shadow-(") ||
+						c.includes(":shadow"),
+				),
+			`${INLINE}: the sheet's amount wrapper draws a frame of some kind. R-2 ` +
+				`rules the number ITSELF the input — no border, no radius, no ring and ` +
+				`no background, in any state.`,
 		).toEqual([]);
 		// ⛔ AND THE INPUT'S OWN RING. `ui/input.tsx` ships
 		// `focus-visible:shadow-(--state-focus-ring)` in its base class; `cn()` is
@@ -1040,7 +1116,21 @@ describe("A6 D-2 — the sell sheet's amount IS the number", () => {
 				`that a bound existed at all and R-2 takes the chip away — and ` +
 				`useInlineSell's edit() DISCARDS a draft above the seed, so a reader who ` +
 				`types too much watches the field snap back with nothing saying why.`,
-		).toMatch(/of Đ \{props\.seedDisplay}/);
+		).toMatch(/of Đ \{formatDharma\(props\.seedDisplay\)}/);
+		// ⛔⛔ THROUGH THE SHARED FORMATTER, AND THE RAW FORM IS FORBIDDEN BY NAME
+		// BECAUSE IT SHIPPED FOR A COMMIT. `tile.valueDisplay` is whole-Đ and
+		// UNGROUPED — grouping lives in `groupInteger`, private to `format.ts` — so
+		// `of Đ {props.seedDisplay}` prints `of Đ 14260` beneath a tile rendering
+		// `Đ 14,260`. Invisible in every fixture, because the QA participant's
+		// holdings are all under a thousand. `@code-reviewer`, HIGH;
+		// `no-raw-dharma-render.test.ts` now carries `seedDisplay` too.
+		expect(
+			source,
+			`${SHEET}: the ceiling line interpolates the display value RAW. It is ` +
+				`ungrouped, so above Đ 999 it prints a second display variant beneath a ` +
+				`grouped figure — SPEC.1 §10.8's one-formatter property, broken on the ` +
+				`one surface where a reader is comparing two numbers.`,
+		).not.toMatch(/of Đ \{props\.seedDisplay}/);
 		// ⛔ THE DISPLAY VALUE, NOT THE WIRE ONE. `seedExact` carries up to eighteen
 		// decimal places; printing it would put `of Đ 31.000000000000000000` under a
 		// figure reading `31`.
@@ -1049,6 +1139,23 @@ describe("A6 D-2 — the sell sheet's amount IS the number", () => {
 			`${SHEET}: the ceiling line renders the EXACT seed. That is an 18-decimal ` +
 				`string under a rounded figure — the two would visibly disagree.`,
 		).not.toMatch(/of Đ \{props\.seedExact}/);
+		// ⛔⛔ AND IT IS *BENEATH*, WHICH THIS ROW'S NAME CLAIMED AND NOTHING CHECKED.
+		// A6 D-2 names the POSITION — "with the holding stated beneath it as the
+		// ceiling" — and moving the span above the field satisfied every other
+		// assertion here. `@code-reviewer`, MEDIUM. Source order is the proxy a scan
+		// can see; `phone-sell-sheet.test.tsx` asserts it on the rendered DOM.
+		const fieldAt = source.indexOf("<InlineSellAmount");
+		const ceilingAt = source.indexOf("of Đ {formatDharma");
+		expect(
+			fieldAt,
+			`${SHEET}: the shared amount field is not mounted`,
+		).toBeGreaterThan(-1);
+		expect(
+			ceilingAt,
+			`${SHEET}: the ceiling is stated ABOVE the figure. A6 D-2 puts it beneath — ` +
+				`a bound printed over a number reads as that number's label, which is ` +
+				`what the withdrawn 'Current' overline was.`,
+		).toBeGreaterThan(fieldAt);
 	});
 
 	it("sell::the-sheet-s-two-context-lines-step-to-17-and-13-and-STAY-clamped", () => {

@@ -54,7 +54,7 @@ ruled and is correct; the width at which it engages moved because the type did.
 ## Items
 
 - **R-1 · the tile returns to a list.** Deleted: `max-mobile:min-h-[calc(100dvh-60px-2px)]`,
-  `snap-start`, `snap-always`, `scroll-mt-[62px]` on the `<tr>`; `snap-y snap-proximity`
+  `snap​-start`, `snap​-always`, `scroll​-mt-[62px]` on the `<tr>`; `snap​-y snap​-proximity`
   on `<html>` (which is now byte-identical to its pre-2h form); `mt-auto` + `pt-3` on
   the market line; `self-stretch` on the argument `<td>`; `h-full` on both argument
   spans. Kept: the grid and both track lists, the hairline, `py-2.5`, the no-selected-

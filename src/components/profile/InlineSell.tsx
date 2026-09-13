@@ -92,9 +92,22 @@ const SOLD_DWELL_MS = 900;
  * a borderless field cannot show it, but a 3ch floor on a two-digit value would
  * have widened the box by a whole glyph for nothing.
  */
-function sellFieldWidth(value: string, floorCh = 2): string {
-	return `${Math.max(floorCh, value.length)}ch`;
+function sellFieldWidth(value: string): string {
+	return `${Math.max(FIELD_FLOOR_CH, value.length)}ch`;
 }
+
+/**
+ * The floor, as a named constant rather than a default parameter.
+ *
+ * ⚠ IT WAS A PARAMETER UNTIL MOBILE-2j, and the parameter was the interesting
+ * part: the sheet passed 3 and the row passed 2, because `2ch` of 32px mono
+ * measured ~38px and the sheet keeps a 44px floor on everything. At R-2's 48px,
+ * `2ch` is ~58px and the third `ch` stopped buying a target. With both callers on
+ * the same value the parameter had no second caller left — an orphan the change
+ * created (§5.3), found by `@code-reviewer`. A constant says the same thing and
+ * cannot drift back into two.
+ */
+const FIELD_FLOOR_CH = 2;
 
 export type InlineSellController = ReturnType<typeof useInlineSell>;
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDharma } from "@/components/debate/format";
 import { PhoneSheet } from "@/components/debate/phone/PhoneSheet";
 import { Button } from "@/components/ui/button";
 
@@ -163,20 +164,37 @@ export function PhoneSellSheet(props: {
 					    chip was the only hint that a bound existed at all, and R-2 takes the chip
 					    away; a bound nobody can see, enforced by a control that reverts in
 					    silence, is the worst of the three available shapes. So it is said.
-					    ⚠ IT SHOWS `seedDisplay`, THE ROUNDED FIGURE — the same string the field
-					    itself shows at rest, which is what makes the two agree on screen. The
-					    EXACT ceiling is `seedExact` and is up to eighteen decimal places larger;
+					    ⚠ IT SHOWS `seedDisplay`, THE ROUNDED FIGURE, rather than `seedExact`. The
+					    EXACT ceiling is up to eighteen decimal places larger;
 					    a reader typing the displayed figure is under it, and an untouched field
 					    submits the exact one. That asymmetry is SPEC.1 §10.8's sanctioned seed
 					    exception, and it is why this line renders the DISPLAY value and not the
 					    wire one — a ceiling a reader cannot type is not a ceiling they can use.
 					    ⚠ NO NEW DATA REACHES THE SHEET FOR THIS: `seedDisplay` is already a prop
-					    and is already what the field is seeded with. */}
+					    and is already what the field is seeded with.
+					    ⛔⛔ AND IT GOES THROUGH `formatDharma`, WHICH THE FIRST FORM OF THIS LINE DID
+					    NOT. `tile.valueDisplay` is a whole-Đ string that `allocateDisplayed` returns
+					    UNGROUPED — grouping lives in `groupInteger`, which is private to `format.ts`
+					    and reached only through the shared formatter. So the raw interpolation
+					    printed `of Đ 14260` beneath a tile rendering `Đ 14,260`: the second display
+					    variant PRIMITIVES-1 C3 deleted and SPEC.1 §10.8 forbids, on the one surface
+					    where a reader is comparing two figures.
+					    ⚠ THE NOTE HERE ARGUED THE OPPOSITE and is deleted rather than kept. It said
+					    the raw form was right because it is the same string the field shows at rest,
+					    *"which is what makes the two agree on screen"*. The FIELD is an input and its
+					    value is deliberately ungrouped — a controlled numeric field carrying commas
+					    cannot be typed into — while this is RENDERED TEXT, and §10.8 is about
+					    rendered figures. Above Đ 999 the two now differ by a comma, which is
+					    correct: one is a number to read, the other is a box to type in.
+					    ⚠ Found by `@code-reviewer`, HIGH, and invisible in every fixture and
+					    screenshot because this participant's holdings are all under a thousand.
+					    `tests/unit/design/no-raw-dharma-render.test.ts` now carries `seedDisplay` in
+					    its allow-list, so the next one reddens instead. */}
 					<span
 						data-testid={`phone-sell-ceiling-${props.tileKey}`}
 						className="text-[12px] leading-[1.2] text-n5 tabular-nums"
 					>
-						of Đ {props.seedDisplay}
+						of Đ {formatDharma(props.seedDisplay)}
 					</span>
 				</div>
 				{/* ⛔⛔ THERE IS NO CANCEL BUTTON HERE, AND ITS ABSENCE IS A CORRECTION

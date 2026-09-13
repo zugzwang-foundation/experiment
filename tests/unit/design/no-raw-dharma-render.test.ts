@@ -62,6 +62,19 @@ const MONEY_IDS = [
 	"dharmaStaked",
 	"proceeds",
 	"authorDharma",
+	// MOBILE-2j / ADR-0051 A6 D-2 — the phone sell sheet's ceiling line
+	// (`PhoneSellSheet.tsx`, "of Đ <holding>"). It renders `tile.valueDisplay`,
+	// which `allocateDisplayed` returns as a whole-Đ UNGROUPED string, so an
+	// unwrapped render prints `of Đ 14260` beneath a tile showing `Đ 14,260` —
+	// exactly the ungrouped-beside-grouped pair this file's `round0Dharma` note
+	// above describes, arriving by a different route. ⚠ It shipped for one commit
+	// and was invisible in every fixture and screenshot, because the QA
+	// participant's holdings are all under a thousand. `@code-reviewer`, HIGH.
+	// ⛔ THE `(?<!=)` EXCLUSION IS WHAT KEEPS THIS SAFE TO ADD: the same
+	// identifier is threaded as an ATTRIBUTE in three places
+	// (`seedDisplay={tile.valueDisplay}`, `seedDisplay={props.seedDisplay}`), and
+	// an attribute value is a string being PASSED, not a figure being rendered.
+	"seedDisplay",
 	// The §23 profile tiles' two aggregate Đ figures (PRIMITIVES-1 R4c). Both
 	// are rendered through `formatDharma` today; neither name was in this list,
 	// so unwrapping either passed silently — proven at P1 / P2.
