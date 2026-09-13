@@ -430,8 +430,14 @@ describe("R-M3 — no info affordance mounts below 640px", () => {
 			`the desktop also renders, and five of the six carriers are server ` +
 			`components that cannot take a hook without a boundary change.`;
 		expect(source, why).toContain("useIsPhoneTier");
+		// ⚠ BRACES OPTIONAL. This required them, so the functionally identical
+		// `if (phoneTier) return <>{child}</>;` reddened a guard about behaviour on
+		// a question of style. It still catches the one that matters — a `<span>`
+		// wrapper instead of a fragment — which the render tests do NOT: a wrapper
+		// passes every behavioural row in `info-tip.test.tsx`, so this regex is the
+		// only thing holding "bare".
 		expect(source, why).toMatch(
-			/if\s*\(\s*phoneTier\s*\)\s*\{\s*return\s*<>\{child\}<\/>;/,
+			/if\s*\(\s*phoneTier\s*\)\s*\{?\s*return\s*<>\{child\}<\/>;/,
 		);
 	});
 

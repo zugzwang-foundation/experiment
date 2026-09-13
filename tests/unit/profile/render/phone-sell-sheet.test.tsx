@@ -13,22 +13,30 @@ import { PhoneSellSheet } from "@/components/profile/phone/PhoneSellSheet";
 /**
  * MOBILE-2e · R-P3 — the phone's sell sheet, mounted DIRECTLY.
  *
- * ⚠⚠ **DIRECTLY IS THE POINT, AND IT IS A DEPARTURE.** Every one of the
- * forty-three shipped sell tests renders `<PositionsTable>` and reaches the sell
- * controller through it — which is right, because the controller is what those
- * tests are about. This sheet cannot be reached that way at all: the host gates
- * it on `useIsPhoneTier()`, which is `false` in jsdom by construction (there is
- * no media-query API here for it to read). A test that rendered the table would
- * observe the in-row arm and report passing rows about a component it never
- * mounted — the exact shape of a guard that cannot fail.
+ * ⚠⚠ **DIRECTLY IS A CHOICE, AND THIS DOCBLOCK USED TO CALL IT A NECESSITY.**
  *
- * So this file mounts the leaf and hands it the controller's state as props.
- * What it can prove is everything the leaf itself owns: which doors `busy`
- * shuts, what `canSubmit` gates, and that every dismissal route lands on the one
- * callback that cancels the arm. What it cannot prove is the containment
- * argument — that the sheet sits inside the armed row, so the outside-click
- * predicate does not cancel on the first tap — which is a source fact and is
- * pinned in `tests/unit/design/phone-round-five.test.ts`.
+ * ⛔ It said the sheet "cannot be reached that way at all", because the host
+ * gates it on `useIsPhoneTier()`, which reads a media-query API jsdom does not
+ * have. **That is false, and the same branch disproves it.** `useIsPhoneTier`
+ * reads `window.matchMedia`; a PER-QUERY stub — the exact technique this branch
+ * adds to `tests/unit/ui/info-tip.test.tsx` — answers the tier question `true`
+ * and mounts the phone arm through its real host.
+ * `tests/unit/profile/render/phone-sell-host.test.tsx` does precisely that.
+ *
+ * ⛔⛔ The cost of the false premise was not stylistic. It is what let the
+ * containment argument be filed as "a source fact", and the source guard that
+ * inherited the job did not establish containment at all — a reviewer lifted
+ * the sheet clean out of its row and the guard stayed green. **A claim that
+ * something is unprovable is a claim with a shelf life, and this one was
+ * inherited for two rounds without being retested.**
+ *
+ * ⇒ What this file is FOR, now that the host file exists: the leaf's own
+ * contract, in isolation, where a failure names the leaf rather than the table.
+ * Which doors `busy` shuts, what `canSubmit` gates, what the title block bounds,
+ * and that every dismissal route lands on the one callback that cancels the arm.
+ * The containment argument, the exclusivity of the two arms and the figure that
+ * reaches the wire are the HOST file's, and they are runtime assertions there —
+ * not source scans anywhere.
  *
  * ⛔ No jest-dom (AGENTS.md §9) — plain DOM assertions only.
  */
@@ -110,13 +118,19 @@ describe("MOBILE-2e — the phone sell sheet", () => {
 			marketTitle: "y".repeat(4000),
 		});
 		const body = screen.getByTestId("phone-sheet-body");
-		const clamped = [...body.querySelectorAll("span")].filter((el) =>
-			el.className.split(/\s+/).some((c) => c.startsWith("line-clamp-")),
-		);
+		// ⛔ LOCATED, not counted. Two `line-clamp-*` classes on ONE span reads as
+		// two clamped elements and leaves the other block unbounded.
+		const clampedText = [...body.querySelectorAll("span")]
+			.filter((el) =>
+				el.className.split(/\s+/).some((c) => c.startsWith("line-clamp-")),
+			)
+			.map((el) => (el.textContent ?? "")[0]);
 		expect(
-			clamped.length,
-			"the argument title and the market question must BOTH clamp",
-		).toBe(2);
+			clampedText.sort(),
+			"the argument title and the market question must BOTH clamp, and be two " +
+				"DIFFERENT elements — the fixtures are all-x and all-y so this says " +
+				"which block each clamp landed on",
+		).toEqual(["x", "y"]);
 	});
 
 	it("phone-sell::it-says-CURRENT-and-not-a-phrase-invented-for-this-sheet", () => {
@@ -181,34 +195,54 @@ describe("MOBILE-2e — the phone sell sheet", () => {
 	});
 
 	it("phone-sell::BUSY-shuts-every-door-in-the-sheet", () => {
+		// ⛔ `try/finally`, like the two rows either side of it. Without it a
+		// failure HERE leaks fake timers into every later row in the file, so the
+		// first real failure arrives wearing a train of false ones and the
+		// diagnosis names the wrong row (O-3).
 		vi.useFakeTimers();
-		const { onClose, onSubmit } = mount({ busy: true });
-		// ⛔ Not a new mechanism: `PhoneSheet` already re-checks `busy` at each of
-		// its doors, and the two buttons here are disabled by the same flag. What
-		// this row proves is that the flag was WIRED, which is the part that can be
-		// forgotten in a way nothing else observes.
-		const confirm = screen.getByTestId(
-			`phone-sell-confirm-${KEY}`,
-		) as HTMLButtonElement;
-		const close = screen.getByTestId("phone-sheet-close") as HTMLButtonElement;
-		expect(confirm.disabled, "Confirm stays live during a sell").toBe(true);
-		expect(close.disabled, "the frame's × stays live during a sell").toBe(true);
-		fireEvent.click(screen.getByTestId("phone-sheet-backdrop"));
-		fireEvent.keyDown(document, { key: "Escape" });
-		expect(
-			onClose,
-			"a sell in flight can still be dismissed out from under itself",
-		).not.toHaveBeenCalled();
-		fireEvent.click(confirm);
-		act(() => {
-			vi.advanceTimersByTime(CLOSE_MS * 4);
-		});
-		expect(onSubmit, "a disabled Confirm still fired").not.toHaveBeenCalled();
-		expect(
-			onClose,
-			"the deferred close committed anyway once the timer landed",
-		).not.toHaveBeenCalled();
-		vi.useRealTimers();
+		try {
+			const { onClose, onSubmit } = mount({ busy: true });
+			// ⛔ Not a new mechanism: `PhoneSheet` already re-checks `busy` at each of
+			// its doors, and the two buttons here are disabled by the same flag. What
+			// this row proves is that the flag was WIRED, which is the part that can be
+			// forgotten in a way nothing else observes.
+			const confirm = screen.getByTestId(
+				`phone-sell-confirm-${KEY}`,
+			) as HTMLButtonElement;
+			const close = screen.getByTestId(
+				"phone-sheet-close",
+			) as HTMLButtonElement;
+			expect(confirm.disabled, "Confirm stays live during a sell").toBe(true);
+			expect(close.disabled, "the frame's × stays live during a sell").toBe(
+				true,
+			);
+			fireEvent.click(screen.getByTestId("phone-sheet-backdrop"));
+			fireEvent.keyDown(document, { key: "Escape" });
+			expect(
+				onClose,
+				"a sell in flight can still be dismissed out from under itself",
+			).not.toHaveBeenCalled();
+			fireEvent.click(confirm);
+			act(() => {
+				vi.advanceTimersByTime(CLOSE_MS * 4);
+			});
+			expect(onSubmit, "a disabled Confirm still fired").not.toHaveBeenCalled();
+			expect(
+				onClose,
+				"the deferred close committed anyway once the timer landed",
+			).not.toHaveBeenCalled();
+			// ⛔ AND THE FIELD ITSELF. `disabled={props.busy}` on the shared amount
+			// input can be set `false` with every other assertion in this row still
+			// passing — the figure stays editable while the request that quotes it is
+			// in flight, so the reader edits a number that has already been sent.
+			expect(
+				(screen.getByTestId(`tile-sell-amount-${KEY}`) as HTMLInputElement)
+					.disabled,
+				"the amount is still editable mid-request",
+			).toBe(true);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("phone-sell::POSITIVE-CONTROL-the-same-doors-are-OPEN-when-it-is-not-busy", () => {

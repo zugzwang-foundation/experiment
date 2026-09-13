@@ -456,6 +456,16 @@ describe("INFO-1 — InfoTip", () => {
 			</InfoTip>,
 		);
 		const trigger = container.querySelector("button");
+		// ⛔⛔ THE NON-NULL ASSERTION FIRST, AND IT IS THE WHOLE POINT OF THIS ROW.
+		// This read `expect(trigger?.getAttribute(…)).not.toBeNull()`, which with a
+		// null `trigger` is `expect(undefined).not.toBeNull()` — a PASS. Measured:
+		// making the desktop branch `return null` reds four other rows in this file
+		// and left this one green, so the control whose entire job is anti-vacuity
+		// was the one row that could not detect the emptiness.
+		expect(
+			trigger,
+			"the desktop branch rendered nothing at all",
+		).not.toBeNull();
 		// The Tooltip branch hands Radix the child through `asChild`, which stamps
 		// its own attributes on it — the observable difference from the bare
 		// pass-through above.

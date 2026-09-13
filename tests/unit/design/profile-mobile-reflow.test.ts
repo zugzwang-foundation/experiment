@@ -542,6 +542,26 @@ describe("profile mobile reflow — the positions table stacks below 640px", () 
 		expect(classes, why).toContain(phone("flex"));
 		expect(classes, why).not.toContain(phone("flex-col"));
 		expect(classes, why).toContain(phone("items-center"));
+		// ⛔⛔ AND NOT INSIDE THE ROW'S INTERPOLATION EITHER, which is what the
+		// paragraph above already says and what neither reader could see.
+		// `classTokensOf` strips the `selected ? … : …` branch BY DESIGN, and the
+		// other file's reader splits on whitespace and receives the token with its
+		// quote still attached (`"max-mobile:flex-col`), so `toContain` misses it.
+		// Two readers, opposite blind spots, one hole — and re-adding the token in
+		// the selected branch (a centred tile that returns the moment a reader
+		// clicks one) was GREEN across the whole unit suite.
+		// ⚠ SCOPED TO THIS ROW'S OPENING TAG, not to the file: the `<table>` and
+		// the `<tbody>` ARE columns at phone width, correctly and deliberately, so
+		// a file-wide negative here asserts the opposite of what the round ruled.
+		expect(
+			openingTagOf(
+				source,
+				keyedTestid("position-tile-"),
+				"the argument tile row",
+			).includes(phone("flex-col")),
+			`${why} ⚠ This form reads the row's WHOLE opening tag, so it fires on ` +
+				`the token hidden inside the interpolation too.`,
+		).toBe(false);
 
 		const sep =
 			`${TABLE_FILE}: the phone row separator is incomplete. Below 640px the ` +
