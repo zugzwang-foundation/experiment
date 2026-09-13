@@ -111,7 +111,7 @@ describe("MOBILE-2e — the guards fire at all (positive controls first)", () =>
 	it("round5::the-recognisers-fire", () => {
 		// The variant assembler, the comment stripper and the class reader, each
 		// proven on a shape it must accept and a shape it must reject.
-		expect(phone("h-8")).toBe("max-mobile:h-8");
+		expect(phone("h-8")).toBe(`${V}${S}h-8`);
 		const withComment = `a\n// ${phone("h-8")} in prose\nb`;
 		expect(stripComments(withComment)).not.toContain(phone("h-8"));
 		expect(stripComments(withComment).split("\n")).toHaveLength(3);
@@ -184,7 +184,8 @@ describe("R-M1 — the composer's submit is the phone's primary, and its disable
 		expect(source, why).toContain(phone("flex-row"));
 		expect(source, why).toContain(phone("items-center"));
 		// Both label spans carry the phone weight — two occurrences, not one.
-		const weights = source.match(/max-mobile:font-extrabold/g) ?? [];
+		const weights =
+			source.match(new RegExp(phone("font-extrabold"), "g")) ?? [];
 		expect(weights.length, why).toBeGreaterThanOrEqual(2);
 		// ⛔ The accessible name is the whole phrase and a dozen tests bind it.
 		expect(source).toContain("aria-label={COMPOSER_COPY.submit}");
@@ -210,15 +211,24 @@ describe("R-M2 — the split bar is 32/6 on a phone, and the tap area is a pseud
 		expect(cls, why).toContain(phone("relative"));
 		expect(cls, why).toContain(phone("after:absolute"));
 		expect(cls, why).toContain(phone("after:inset-x-0"));
-		expect(cls, why).toContain(phone("after:-inset-y-1.5"));
+		expect(cls, why).toContain(phone("after:-top-2"));
+		expect(cls, why).toContain(phone("after:-bottom-1"));
 		expect(cls, why).toContain(phone("after:content-['']"));
 		// ⛔ THE ARITHMETIC, DERIVED FROM THE TOKENS RATHER THAN ASSERTED BESIDE
-		// THEM. `h-8` is 32px and `-inset-y-1.5` is 6px each side on Tailwind's
-		// 4px scale, so a future edit that changes either number has to keep the
-		// sum at the 44 the accessibility floor asks for.
+		// THEM. On Tailwind's 4px scale `h-8` is 32px, `-top-2` is 8 and
+		// `-bottom-1` is 4 — so a future edit to any of the three has to keep the
+		// sum at the 44 a finger needs.
+		// ⚠ THE ASYMMETRY IS PART OF THE ASSERTION, not a detail: a symmetric 6/6
+		// sums to 44 too and reaches 2px past the `Đ n` figure 4px below, so a tap
+		// on that figure opens a reply composer on a side nobody chose.
 		const height = 8 * 4;
-		const inset = 1.5 * 4;
-		expect(height + inset * 2, "the hit area no longer reaches 44px").toBe(44);
+		const up = 2 * 4;
+		const down = 1 * 4;
+		expect(height + up + down, "the hit area no longer reaches 44px").toBe(44);
+		expect(
+			down,
+			"the downward extension reaches past the figure below it",
+		).toBeLessThanOrEqual(4);
 	});
 
 	it("round5::the-44px-MIN-HEIGHT-is-gone-because-it-is-what-broke-the-line", () => {
@@ -320,7 +330,7 @@ describe("R-Q1 — the chips ride line 1, and they get there by ORDER", () => {
 
 	it("round5::every-chip-that-belongs-on-line-1-carries-the-lift", () => {
 		const source = stripComments(read(ARGPROFILE));
-		const lift = source.match(/max-mobile:-order-2/g) ?? [];
+		const lift = source.match(new RegExp(phone("-order-2"), "g")) ?? [];
 		expect(
 			lift.length,
 			`${ARGPROFILE}: line 1 has FOUR passengers — the pseudonym itself and the ` +
@@ -334,7 +344,7 @@ describe("R-Q1 — the chips ride line 1, and they get there by ORDER", () => {
 		// it is a property of flex ITEMS, and until the wrapper is `display:contents`
 		// a chip is a child of a nested row where reordering moves it beside its
 		// sibling and nowhere else.
-		const dissolved = source.match(/max-mobile:contents/g) ?? [];
+		const dissolved = source.match(new RegExp(phone("contents"), "g")) ?? [];
 		expect(
 			dissolved.length,
 			`${ARGPROFILE}: three wrappers must dissolve at phone width — group A, ` +
@@ -581,5 +591,76 @@ describe("R-P3 — the phone's sell sheet carries no write path of its own", () 
 		// duplicated testid is a guard reading the wrong node.
 		expect(source).toMatch(/const armedInRow = armed && !isPhone;/);
 		expect(source).toMatch(/const armedInSheet = armed && isPhone;/);
+	});
+
+	it("round5::the-CLOSED-tab-s-cells-declare-a-share-TOO", () => {
+		// ⛔⛔ THE ROW IS A FLEX ROW ON BOTH TABS, AND THE FIRST PASS GAVE ONLY THE
+		// OPEN TAB'S FOUR CELLS A WIDTH. The Closed tab's `Staked` and `Opened`
+		// kept `whitespace-nowrap` with `min-width: auto`, so their automatic
+		// minimum was the full unbreakable string — while the Argument cell beside
+		// them is `flex-1`, i.e. `flex: 1 1 0%`, whose shrink CONTRIBUTION is
+		// `1 × 0 = 0`. It absorbs none of the negative free space, resolves to
+		// **0px**, and the row overflows: verbatim the condition this refinement
+		// was ruled to remove, one tab across.
+		// ⚠ Nothing measured it — B13 reads the Open tab and the cell-share row
+		// above asserts on the side cell alone. Found by `@code-reviewer`.
+		const source = stripComments(read(TABLE));
+		for (const [testid, want] of [
+			["tile-staked-", phone("w-16")],
+			["tile-opened-", phone("w-20")],
+		] as const) {
+			const at = source.indexOf(`data-testid={\`${testid}`);
+			expect(at, `${TABLE}: the ${testid} cell was not found`).toBeGreaterThan(
+				-1,
+			);
+			const tokens = (/className="([^"]*)"/.exec(source.slice(at))?.[1] ?? "")
+				.split(/\s+/)
+				.filter(Boolean);
+			const why =
+				`${TABLE}: the Closed tab's ${testid} cell claims no width at phone ` +
+				`width, so the Argument cell beside it resolves to 0px and the row ` +
+				`overflows — the defect R-P3 exists to remove, on the other tab.`;
+			expect(tokens, why).toContain(want);
+			expect(tokens, why).toContain(phone("shrink-0"));
+			expect(tokens, why).toContain(phone("p-0"));
+		}
+	});
+
+	it("round5::the-row-s-key-activation-stands-down-for-anything-activatable", () => {
+		// ⛔⛔ THE SHEET IS MOUNTED INSIDE THE `<tr>` — which is what the
+		// outside-click predicate needs — so the row's own Enter/Space handler sits
+		// ABOVE the sheet's `Confirm` and the frame's `×`. Its bail used to name
+		// `input` alone; for a `<button>`, activation IS the keydown's default
+		// action, so `preventDefault()` there means Enter and Space produce no
+		// click and the money control is unreachable by keyboard — on a modal that
+		// spends twenty lines on focus containment precisely so it would be.
+		// ⚠ jsdom synthesises no click from key activation, and the leaf's own
+		// render test mounts it OUTSIDE any row, so the one context in which this
+		// fires is the one no shipped test can reproduce. Found INDEPENDENTLY by
+		// `@code-reviewer` and `@security-auditor`.
+		const source = stripComments(read(TABLE));
+		// ⚠ ANCHORED ON THE ROW, NOT ON THE FIRST `onKeyDown` IN THE FILE. There
+		// are several, and the first belongs to the table-level stepper — reading
+		// that one returned `['input']` and reported the row's widened bail as
+		// missing, which is a guard measuring a neighbour (OVN-V5's shape, one
+		// element over).
+		const rowAt = source.indexOf("data-testid={`position-tile-");
+		expect(rowAt, `${TABLE}: the tile row is gone`).toBeGreaterThan(-1);
+		const at = source.indexOf("onKeyDown={(e) => {", rowAt);
+		expect(at, `${TABLE}: the row's keydown handler is gone`).toBeGreaterThan(
+			-1,
+		);
+		const sel =
+			/closest\(\s*\n?\s*"([^"]*)"\s*,?\s*\n?\s*\)/.exec(
+				source.slice(at, at + 900),
+			)?.[1] ?? "";
+		const why =
+			`${TABLE}: the row's Enter/Space handler does not stand down for every ` +
+			`activatable descendant, so it cancels the activation of the sell ` +
+			`sheet's own controls.`;
+		const named = sel.split(",").map((x) => x.trim());
+		for (const tag of ["a", "button", "input", "textarea", "select"]) {
+			expect(named, why).toContain(tag);
+		}
 	});
 });

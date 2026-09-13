@@ -51,26 +51,70 @@ import { useSyncExternalStore } from "react";
  */
 const QUERY = "not all and (min-width: 640px)";
 
-function subscribe(listener: () => void): () => void {
+/**
+ * ⛔⛔ ONE `MediaQueryList` FOR THE WHOLE MODULE, AND IT IS A COST FIX RATHER
+ * THAN A TIDY-UP.
+ *
+ * `subscribe` and `getSnapshot` each used to call `window.matchMedia(QUERY)`
+ * themselves — which means a fresh MQL object per subscriber AND a fresh one on
+ * every `getSnapshot`, i.e. on every render of every consumer and on every
+ * store-change check. That was affordable while this hook had two consumers,
+ * both of them single instances in the desktop tree.
+ *
+ * MOBILE-2e made it thirty-five: `ui/info-tip.tsx` now asks the tier question,
+ * and `InfoTip` has 34 call sites, most of them PER POST — three in `badges.tsx`
+ * alone, plus `ArgProfile` and `AggregateFooter` — and one more per position row
+ * on the profile. ⚠ **And below 640px BOTH trees are mounted** (the desktop one
+ * is `display:none`, which is this module's own founding premise), so a phone
+ * pays for both. That is new per-render allocation on precisely the device class
+ * the docblock above says this module exists to protect, which would have made
+ * it the thing it was written to prevent.
+ *
+ * ⚠ The listener is still per-subscriber, and that is `useSyncExternalStore`'s
+ * contract rather than an oversight — each subscriber must be able to unsubscribe
+ * independently. What is shared is the OBJECT they all listen to, which is the
+ * expensive half. Found by `@code-reviewer` and `@security-auditor`
+ * independently.
+ */
+let mediaQuery: MediaQueryList | null = null;
+/**
+ * ⚠⚠ THE MEMO IS KEYED ON `matchMedia` ITSELF, AND THAT IS SOUNDNESS RATHER THAN
+ * TEST CONVENIENCE. A cached `MediaQueryList` is a memo OF a call to
+ * `window.matchMedia`; if that function is replaced, the memo is stale and the
+ * module answers a question nobody asked any more. In a browser it is never
+ * replaced, so this costs one reference comparison. In a test it is replaced
+ * constantly — `tests/unit/ui/info-tip.test.tsx` stubs it per case to drive the
+ * pointer answer and the viewport answer independently — and a memo that could
+ * not see that would have made this module untestable, which is a worse property
+ * than the allocation it was added to remove.
+ */
+let mediaQueryFor: typeof window.matchMedia | null = null;
+
+function media(): MediaQueryList | null {
 	if (
 		typeof window === "undefined" ||
 		typeof window.matchMedia !== "function"
 	) {
+		return null;
+	}
+	if (mediaQuery === null || mediaQueryFor !== window.matchMedia) {
+		mediaQuery = window.matchMedia(QUERY);
+		mediaQueryFor = window.matchMedia;
+	}
+	return mediaQuery;
+}
+
+function subscribe(listener: () => void): () => void {
+	const mql = media();
+	if (mql === null) {
 		return () => {};
 	}
-	const mql = window.matchMedia(QUERY);
 	mql.addEventListener("change", listener);
 	return () => mql.removeEventListener("change", listener);
 }
 
 function getSnapshot(): boolean {
-	if (
-		typeof window === "undefined" ||
-		typeof window.matchMedia !== "function"
-	) {
-		return false;
-	}
-	return window.matchMedia(QUERY).matches;
+	return media()?.matches ?? false;
 }
 
 const getServerSnapshot = (): boolean => false;

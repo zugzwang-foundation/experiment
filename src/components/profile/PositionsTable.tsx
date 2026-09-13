@@ -1187,7 +1187,25 @@ function TileRow({
 			}}
 			onKeyDown={(e) => {
 				if (e.key === "Enter" || e.key === " ") {
-					if ((e.target as HTMLElement).closest("input")) {
+					// ⛔⛔ THE SAME `closest` AS THE CLICK GUARD THREE LINES ABOVE, and it
+					// used to be narrower — `input` alone. That gap was survivable while
+					// the only buttons inside this row were the row's own; MOBILE-2e
+					// mounts the phone's SELL SHEET inside this `<tr>` (the containment
+					// the outside-click predicate needs), so `Confirm` and the sheet's
+					// `×` are now descendants too. `preventDefault()` on keydown
+					// suppresses the browser's activation behaviour, so Enter or Space on
+					// either produced NO click and the money control was unreachable by
+					// keyboard — on a modal that spends twenty lines on focus containment
+					// precisely so it would be.
+					// ⚠ Found by `@code-reviewer`. jsdom synthesises no click from key
+					// activation, and the leaf's own render test mounts it OUTSIDE any
+					// `<tr>` — the one context in which this fires is the one that test
+					// cannot reproduce.
+					if (
+						(e.target as HTMLElement).closest(
+							"a,button,input,textarea,select,[contenteditable]",
+						)
+					) {
 						return;
 					}
 					e.preventDefault();
@@ -1398,78 +1416,90 @@ function TileRow({
 					    cancel too (wired in `useInlineSell`). */}
 					<td className="p-2 text-center align-middle max-mobile:shrink-0 max-mobile:p-0">
 						{tile.sellable && !sold && (
-							<span className="inline-flex items-center gap-1">
-								{armedInRow ? (
-									<>
+							<>
+								<span className="inline-flex items-center gap-1">
+									{armedInRow ? (
+										<>
+											<Button
+												type="button"
+												size="xs"
+												variant="outline"
+												disabled={
+													sell.busy ||
+													!sell.canSubmit(tile.currentExact, tile.shares)
+												}
+												data-testid={`tile-confirm-${tile.key}`}
+												// ⚠⚠ R-1 — SIZED DOWN SO THE ✕ FITS. The Sell column is
+												// `w-[104px]` and the cell's own `p-2` leaves 88px of
+												// content; `CONFIRM` at `text-xs` with `px-2` and
+												// `tracking-[0.08em]` measured ~75px, plus a 4px gap and
+												// the 24px `icon-xs` ✕ — 103px into 88, so the ✕ was
+												// clipped at the tile's right edge. At `text-[10px]` /
+												// `px-1.5` / `tracking-[0.04em]` the word is ~58px and the
+												// cluster clears the column with room to spare.
+												// ⛔ THE HEIGHT IS UNCHANGED (`size="xs"` is `h-6`), so the
+												// tap target does not shrink with the label.
+												className="px-1.5 text-[10px] font-extrabold tracking-[0.04em] uppercase [border:var(--ring-active)]"
+												onClick={() => sell.confirm(tile.key, sellArgs)}
+											>
+												{sell.busy ? "…" : sell.failed ? "Retry" : "Confirm"}
+											</Button>
+											<Button
+												type="button"
+												size="icon-xs"
+												variant="ghost"
+												aria-label="Cancel sell"
+												// ⛔ DISABLED IN FLIGHT, like Confirm and the field.
+												// ⚠⚠ THE REASON WRITTEN HERE WAS TRUE ONCE AND IS NOT NOW, and a
+												// stated cause that does not exist is a defect in its own right
+												// (O-3): the next reader deciding whether the phone's SHEET needs an
+												// equivalent guard would reason from a mechanism that has since been
+												// closed. It said — cancelling mid-request lets another tile arm,
+												// which replaces the key state with a fresh one whose `inFlight` is
+												// false, so the live request's outcome is silently dropped.
+												// `arm()` now short-circuits while `unsettledKeyRef` matches the live
+												// key, which it does by construction during a flight, so the key
+												// state is NOT replaced.
+												// ⇒ The disable stays, on the plainer ground: a control that can be
+												// pressed while its own request is in the air invites a second intent
+												// over the first, and nothing downstream should have to be clever
+												// about that. `@security-auditor`, LOW.
+												disabled={sell.busy}
+												data-testid={`tile-cancel-${tile.key}`}
+												onClick={sell.cancel}
+											>
+												✕
+											</Button>
+										</>
+									) : (
 										<Button
 											type="button"
 											size="xs"
 											variant="outline"
-											disabled={
-												sell.busy ||
-												!sell.canSubmit(tile.currentExact, tile.shares)
-											}
-											data-testid={`tile-confirm-${tile.key}`}
-											// ⚠⚠ R-1 — SIZED DOWN SO THE ✕ FITS. The Sell column is
-											// `w-[104px]` and the cell's own `p-2` leaves 88px of
-											// content; `CONFIRM` at `text-xs` with `px-2` and
-											// `tracking-[0.08em]` measured ~75px, plus a 4px gap and
-											// the 24px `icon-xs` ✕ — 103px into 88, so the ✕ was
-											// clipped at the tile's right edge. At `text-[10px]` /
-											// `px-1.5` / `tracking-[0.04em]` the word is ~58px and the
-											// cluster clears the column with room to spare.
-											// ⛔ THE HEIGHT IS UNCHANGED (`size="xs"` is `h-6`), so the
-											// tap target does not shrink with the label.
-											className="px-1.5 text-[10px] font-extrabold tracking-[0.04em] uppercase [border:var(--ring-active)]"
-											onClick={() => sell.confirm(tile.key, sellArgs)}
+											data-testid={`tile-sell-${tile.key}`}
+											className="font-extrabold tracking-[0.08em] uppercase [border:var(--ring-active)] max-mobile:min-h-11 max-mobile:w-full max-mobile:[touch-action:manipulation]"
+											onClick={() => sell.arm(tile.key)}
 										>
-											{sell.busy ? "…" : sell.failed ? "Retry" : "Confirm"}
+											Sell
 										</Button>
-										<Button
-											type="button"
-											size="icon-xs"
-											variant="ghost"
-											aria-label="Cancel sell"
-											// ⛔ DISABLED IN FLIGHT, like Confirm and the field. Cancelling
-											// mid-request lets another tile arm, which replaces the key state
-											// with a fresh one whose `inFlight` is false — so the live
-											// request's OUTCOME is silently dropped and the NEXT tile shows
-											// this one's failure.
-											disabled={sell.busy}
-											data-testid={`tile-cancel-${tile.key}`}
-											onClick={sell.cancel}
-										>
-											✕
-										</Button>
-									</>
-								) : (
-									<Button
-										type="button"
-										size="xs"
-										variant="outline"
-										data-testid={`tile-sell-${tile.key}`}
-										className="font-extrabold tracking-[0.08em] uppercase [border:var(--ring-active)] max-mobile:min-h-11 max-mobile:w-full max-mobile:[touch-action:manipulation]"
-										onClick={() => sell.arm(tile.key)}
-									>
-										Sell
-									</Button>
-								)}
+									)}
+								</span>
 								{/* ⛔⛔ MOUNTED INSIDE THIS CELL, AND THE POSITION IS THE POINT.
-								    `useInlineSell` arms a document-level `pointerdown` whose
-								    predicate is `armedRowRef.current?.contains(target)`, and
-								    `armedRowRef` is this `<tr>`. A sheet rendered anywhere else
-								    in the tree is not contained by the row, so the FIRST tap
-								    inside it — the tap on `Confirm` included — cancels the arm
-								    and closes the sheet. A `<div>` inside a `<td>` is valid HTML
-								    and `position: fixed` lifts the sheet out of the cell
-								    visually, so the DOM position costs nothing and buys the
-								    containment without widening `InlineSell`'s ref type.
-								    ⚠ `onClose` CANCELS. Every route the sheet can close by — the
-								    backdrop, the handle, Escape and the frame's own `×` — lands
-								    there, and leaving the arm set behind a closed sheet would
-								    strand a controller nothing on screen could reach. (The sheet
-								    draws no Cancel of its own; it did in a draft, and that put a
-								    SECOND close control beside the frame's.) */}
+							    `useInlineSell` arms a document-level `pointerdown` whose
+							    predicate is `armedRowRef.current?.contains(target)`, and
+							    `armedRowRef` is this `<tr>`. A sheet rendered anywhere else
+							    in the tree is not contained by the row, so the FIRST tap
+							    inside it — the tap on `Confirm` included — cancels the arm
+							    and closes the sheet. A `<div>` inside a `<td>` is valid HTML
+							    and `position: fixed` lifts the sheet out of the cell
+							    visually, so the DOM position costs nothing and buys the
+							    containment without widening `InlineSell`'s ref type.
+							    ⚠ `onClose` CANCELS. Every route the sheet can close by — the
+							    backdrop, the handle, Escape and the frame's own `×` — lands
+							    there, and leaving the arm set behind a closed sheet would
+							    strand a controller nothing on screen could reach. (The sheet
+							    draws no Cancel of its own; it did in a draft, and that put a
+							    SECOND close control beside the frame's.) */}
 								{armedInSheet ? (
 									<PhoneSellSheet
 										tileKey={tile.key}
@@ -1494,7 +1524,7 @@ function TileRow({
 										onClose={sell.cancel}
 									/>
 								) : null}
-							</span>
+							</>
 						)}
 					</td>
 				</>
@@ -1504,9 +1534,24 @@ function TileRow({
 					    every single row. ⛔ NO `Sell` — there is nothing to sell.
 					    `Staked` is `originalBasis`: what they put in, which is the only
 					    figure on a closed argument that is not zero. */}
+					{/* ⛔⛔ MOBILE-2e · R-P3 — THE CLOSED TAB'S TWO CELLS TAKE PHONE
+					    WIDTHS TOO, and this was MISSED in the first pass in a way that
+					    reproduced the exact defect the refinement exists to remove.
+					    The `<tr>` is a flex ROW below 640px now. The Open tab's four cells
+					    each declare a share; these two did not — so they kept
+					    `min-width: auto`, which for `whitespace-nowrap` content is the
+					    full unbreakable string. The Argument cell beside them is
+					    `flex-1`, i.e. `flex: 1 1 0%`, so its shrink CONTRIBUTION is
+					    `1 × 0 = 0`: it absorbs none of the negative free space, resolves
+					    to **0px**, and the row overflows. That is verbatim the condition
+					    this refinement was ruled to fix, moved one tab across.
+					    ⚠ Nothing measured it: B13 reads the OPEN tab, the new guard
+					    asserted on the side cell only, and the shipped reflow guard NAMES
+					    all six cell variants in prose while asserting none of them. Found
+					    by `@code-reviewer`. */}
 					<td
 						data-testid={`tile-staked-${tile.key}`}
-						className="p-2 text-center align-middle whitespace-nowrap tabular-nums text-ink"
+						className="p-2 text-center align-middle whitespace-nowrap tabular-nums text-ink max-mobile:w-16 max-mobile:shrink-0 max-mobile:p-0 max-mobile:text-right"
 					>
 						{/* ⚠⚠ MOBILE-1 · JOB B — THE PHONE'S COLUMN LABEL, AND THE STRING IS
 						    CARRIED, NEVER AUTHORED. Below 640px the `<thead>` is hidden, so this
@@ -1541,9 +1586,13 @@ function TileRow({
 					    ⚠ `fmtUtcDay` is the SHIPPED formatter — UTC and locale-free, so
 					    the server and client renders cannot disagree. `toLocaleDateString`
 					    resolves per-runtime and would be a hydration mismatch. */}
+					{/* ⚠ 80px rather than the Staked cell's 64: this one carries a date
+					    (`15 Sep 2026`), which is wider than a Đ figure and is the reason
+					    the two shares differ. See the Staked cell above for why they need
+					    one at all. */}
 					<td
 						data-testid={`tile-opened-${tile.key}`}
-						className="p-2 text-center align-middle whitespace-nowrap text-n5"
+						className="p-2 text-center align-middle whitespace-nowrap text-n5 max-mobile:w-20 max-mobile:shrink-0 max-mobile:p-0 max-mobile:text-right"
 					>
 						{/* ⚠ THE PHONE'S COLUMN LABEL (MOBILE-1 · JOB B), same mechanism and same
 						    rule as `Staked` above: the word is byte-carried from this column's own

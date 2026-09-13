@@ -377,9 +377,18 @@ function TriggerPill({
 					// ⚠ It needs `relative` to position against, and it must stay
 					// INSIDE the card's 12px gutter — `<Card>` is `overflow-hidden` and
 					// a clipped region is not hit-testable, so an extension wider than
-					// the padding would silently buy no tap area at all. 6px vertical
-					// inside 12px clears it.
-					"w-[78px] h-6 flex items-center justify-center rounded-(--r-chip) text-xs font-bold transition-all hover:shadow-(--state-hover-glow-pole) focus-visible:shadow-(--state-focus-ring) active:shadow-(--state-pressed-glow-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) max-mobile:relative max-mobile:h-8 max-mobile:text-[13px] max-mobile:font-semibold max-mobile:[touch-action:manipulation] max-mobile:after:absolute max-mobile:after:inset-x-0 max-mobile:after:-inset-y-1.5 max-mobile:after:content-['']",
+					// the padding would silently buy no tap area at all.
+					// ⛔⛔ AND IT IS ASYMMETRIC — 8px UP, 4px DOWN — which is the whole
+					// of the second thought. A symmetric 6/6 also sums to 44, and it
+					// reached 2px PAST the top edge of the `Đ n` figure four pixels
+					// below (the flank column's `gap-1`), so a tap on that figure fired
+					// Support or Counter and opened a reply composer ON A SIDE the
+					// reader never chose. Above the pill there is the card's own 10px
+					// `gap-2.5` and nothing in it; below there is a figure at 4px. So
+					// the extension takes what is free and stops exactly where the
+					// figure starts: 8 + 32 + 4 = 44, and the region ends on the seam
+					// rather than across it. `@security-auditor`, LOW.
+					"w-[78px] h-6 flex items-center justify-center rounded-(--r-chip) text-xs font-bold transition-all hover:shadow-(--state-hover-glow-pole) focus-visible:shadow-(--state-focus-ring) active:shadow-(--state-pressed-glow-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) max-mobile:relative max-mobile:h-8 max-mobile:text-[13px] max-mobile:font-semibold max-mobile:[touch-action:manipulation] max-mobile:after:absolute max-mobile:after:inset-x-0 max-mobile:after:-top-2 max-mobile:after:-bottom-1 max-mobile:after:content-['']",
 					pole,
 				)}
 			>

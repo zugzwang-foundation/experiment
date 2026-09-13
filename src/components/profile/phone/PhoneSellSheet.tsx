@@ -47,6 +47,18 @@ import { InlineSellAmount } from "../InlineSell";
  * value, so a sell in flight cannot be dismissed out from under itself and no
  * new mechanism was invented for a hazard that already had one.
  *
+ * ⚠ **ESCAPE CLOSES THIS SHEET INSTANTLY, WITH NO EXIT ANIMATION, AND THAT IS
+ * ACCEPTED RATHER THAN UNNOTICED.** Two document-level Escape listeners are live
+ * while the sheet is open — `PhoneSheet`'s, which begins a 200ms animated close,
+ * and `useInlineSell`'s, which cancels the arm. Neither calls `stopPropagation`.
+ * The controller's runs second in effect order but its `cancel()` nulls
+ * `armedLotId`, which unmounts this component in the same commit, and
+ * `PhoneSheet`'s unmount cleanup clears the pending timer — so nothing fires
+ * late and nothing double-closes. The backdrop, the handle and the `×` all still
+ * animate. **It is a cosmetic inconsistency on one of four routes**, and closing
+ * it would mean one of the two owners silently swallowing a key the other is
+ * entitled to see. `@code-reviewer`, LOW.
+ *
  * ⚠ **This leaf holds no write path** (ADR-0051 A4 D-2). It renders a field and
  * two buttons and calls the callbacks it is handed; the `fetch`, the
  * idempotency key and the unsettled-key law all stay in `useInlineSell`, one

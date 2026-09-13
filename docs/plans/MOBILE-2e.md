@@ -72,6 +72,8 @@ current line numbers.
 | `src/components/profile/PositionsTable.tsx` | R-P1 (one header row), R-P3 (desktop-shaped rows + SELL 44px + the sheet mount), R-P5 (order) | additive `max-mobile·` tokens on the head, the `<tr>` and each `<td>`; one `useIsPhoneTier()` branch that mounts the sell sheet |
 | `src/components/profile/ArgumentList.tsx` | R-P2 — the viewer panel is not rendered below 640px | one additive `max-mobile·hidden` on the panel root |
 | `src/components/profile/phone/PhoneSellSheet.tsx` | **NEW** — the phone's sell surface | a phone-only leaf under `profile/phone/` (ADR-0051 A4 D-2) |
+| `src/components/debate/badges.tsx` | R-Q1 — the chips need a `className` to carry their order token | ⚠ **MISSING FROM THIS MAP UNTIL `@code-reviewer` NAMED IT.** An optional prop merged through `cn`, so an absent one is byte-identical; required by R-Q1 and reachable nowhere else |
+| `src/components/debate/phone-tier.ts` | the tier hook gains 33 consumers this round | ⚠ **ALSO MISSING.** One shared `MediaQueryList` instead of one per subscriber AND one per render — see §4 A-12 |
 
 ### Guards (new) — ⚠ CORRECTED IN PLACE AFTER THE BUILD
 
@@ -253,8 +255,15 @@ this work without editing `InlineSell.tsx`:
    `sell.busy` is the value.
 
 ⚠ `lockPageScroll` looks for `[data-testid="phone-debate-view"]`, which does not exist on the
-profile — so on this surface it locks `document.body` and nothing else, which is correct here because
-the document IS the scroller. Measured, not assumed.
+profile — so on this surface it locks `document.body` and nothing else. ⛔ **AND THE JUSTIFICATION
+FIRST WRITTEN HERE WAS CONTRADICTED BY THIS RUN'S OWN SIBLING MEASUREMENT.** It said *"which is
+correct here because the document IS the scroller"*. R-P2 hides the arguments panel, which is what
+made the phone profile page FIT its viewport at 375/390/430 — that is the whole reason the row
+equaliser had to be gated. If the document does not scroll there, `document.body` is not the
+scroller; `positions-panel-body` is, and it is not locked. **Nothing breaks**, because ADR-0051 D-5
+already names the sheet's `fixed inset-0` geometry as the mechanism and the lock as a BELT — but the
+belt is inert on this surface, and that is the honest statement rather than the comfortable one.
+Found by `@code-reviewer`.
 ⚠ The 900ms `Sold` dwell carries the only `router.refresh()` for a full exit and is cleared on
 unmount. The sheet must NOT unmount within that window: `onClose` cancels the arm but the host keeps
 the controller, and the dwell lives in the controller, not in the sheet.

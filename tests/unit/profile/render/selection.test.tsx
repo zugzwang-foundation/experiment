@@ -412,6 +412,19 @@ describe("item 6 — the row is a bordered card, and the two states differ", () 
 		// not merely ambiguous, one of them is dead.
 		render(<PositionsTable payload={PAYLOAD} />);
 		const borderCount = (n: number) =>
+			// ⚠⚠ MOBILE-2e — THIS PREDICATE IS PREFIX-ONLY AND THEREFORE NO LONGER
+			// MEANS WHAT THE PARAGRAPH ABOVE SAYS. `startsWith("[outline:")` does not
+			// see `max-mobile:[outline:none]`, which round five adds to the same row —
+			// so the file now ships exactly two arbitrary utilities for one property
+			// and this counter reports one.
+			// ⛔ IT IS LEFT AS IT IS, DELIBERATELY. The construction it was written to
+			// forbid is two UNPREFIXED competitors resolved by stylesheet order, where
+			// one is silently dead. A media-scoped override is the opposite: the two
+			// are disjoint by viewport and exactly one applies at any width, which is
+			// the additive convention the whole mobile tier is built on. Widening the
+			// predicate to catch it would redden the correct mechanism.
+			// ⇒ What is recorded here instead is that the SENTENCE is narrower than it
+			// reads: "exactly one" means exactly one at a given width. `@code-reviewer`.
 			classesOf(n).filter((c) => c.startsWith("[outline:")).length;
 		expect(borderCount(1)).toBe(1);
 		fireEvent.click(rowEl(1));
