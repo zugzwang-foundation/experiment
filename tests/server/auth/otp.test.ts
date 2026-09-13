@@ -279,6 +279,49 @@ describe("Email-OTP send + verify (F-AUTH-2)", () => {
 		expect(mockCheckRateLimit).not.toHaveBeenCalled();
 	});
 
+	// === Fail-closed — no token at all =====================================
+
+	it("otp::turnstile-missing-token-rejects-without-calling-siteverify", async () => {
+		// The widget hands up `null` on expiry/error and the client refuses to
+		// send, but the server must not rely on that: a request with no
+		// `x-turnstile-token` header is refused before siteverify or any
+		// rate-limit check runs.
+		const opts = (
+			auth as {
+				options?: {
+					plugins?: Array<{
+						id?: string;
+						hooks?: {
+							before?: Array<{
+								matcher: (ctx: { path?: string }) => boolean;
+								handler: (ctx: unknown) => Promise<unknown>;
+							}>;
+						};
+					}>;
+				};
+			}
+		).options;
+		const otpHook = opts?.plugins
+			?.find((p) => p.id === "zugzwang-otp-gate")
+			?.hooks?.before?.find((h) =>
+				h.matcher({ path: "/email-otp/send-verification-otp" }),
+			);
+		if (!otpHook) throw new Error("OTP turnstile hook not registered");
+
+		await expect(
+			otpHook.handler({
+				path: "/email-otp/send-verification-otp",
+				body: { email: "user@example.com" },
+				request: {
+					headers: new Headers({ "x-forwarded-for": "1.2.3.4" }),
+				},
+			}),
+		).rejects.toMatchObject({ body: { message: "turnstile_required" } });
+
+		expect(fetchSpy).not.toHaveBeenCalled();
+		expect(mockCheckRateLimit).not.toHaveBeenCalled();
+	});
+
 	// === Plan §5 failure-mode #2 — Turnstile unavailable ===================
 
 	it("otp::turnstile-unavailable-fails-closed", async () => {

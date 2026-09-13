@@ -64,6 +64,10 @@ import { eq } from "drizzle-orm";
 
 import { users } from "@/db/schema";
 import { acceptTosAction } from "@/server/auth/tos-accept";
+import {
+	PRIVACY_VERSION_HASH,
+	TOS_VERSION_HASH,
+} from "@/server/auth/tos-versions";
 import { testClient, testDb } from "../../db/_fixtures/db";
 import { truncateTables } from "../../db/_fixtures/truncate";
 
@@ -156,8 +160,10 @@ describe("acceptTosAction emits user.tos_accepted (ENGINE.6 §D.2)", () => {
 		expect(ev.aggregate_id).toBe(userId);
 		// Payload per plan §A: { userId, tosVersionHash, privacyVersionHash, ip, userAgent }.
 		expect(ev.payload.userId).toBe(userId);
-		expect(ev.payload.tosVersionHash).toBe("placeholder-tos-v0");
-		expect(ev.payload.privacyVersionHash).toBe("placeholder-privacy-v0");
+		// The event records the same content hashes the users row does
+		// (LEGAL.1 — SHA-256 of the committed documents, not the Q4 placeholders).
+		expect(ev.payload.tosVersionHash).toBe(TOS_VERSION_HASH);
+		expect(ev.payload.privacyVersionHash).toBe(PRIVACY_VERSION_HASH);
 		expect(ev.payload.ip).toBe("1.2.3.4");
 		expect(ev.payload.userAgent).toBe("Mozilla/5.0 (test)");
 		// Metadata: flow_id='F-AUTH-4', user_id=userId, actor_id=userId

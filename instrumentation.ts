@@ -13,6 +13,7 @@
 // LD-10) or a mis-routed Sentry event.
 
 import { isSandboxFrom } from "@/server/auth/resend-from";
+import { turnstileProdKeyProblem } from "@/server/auth/turnstile-keys";
 
 const VALID_ENVS = ["prod", "staging", "preview"] as const;
 
@@ -60,6 +61,24 @@ export async function register(): Promise<void> {
 		if (!from || isSandboxFrom(from)) {
 			throw new Error(
 				`instrumentation.register: RESEND_FROM_EMAIL must be a real verified sender when ZUGZWANG_ENV="${env}" — an unset or Resend-sandbox (resend.dev) sender delivers only to the operator inbox (AUTH-OTP-DELIVERY / ADR-0033)`,
+			);
+		}
+	}
+
+	// AUTH-TURNSTILE-WIRE: the F-AUTH-2 Turnstile keys, PRODUCTION ONLY. Staging
+	// deliberately runs Cloudflare's always-pass test keys, which is why this
+	// scope does not include it. In production a test secret makes siteverify
+	// accept any token, and a missing key makes every email sign-in fail closed.
+	// Neither is visible from a green /api/health, so both fail the cold boot
+	// here (same posture as the gates above).
+	if (env === "prod") {
+		const problem = turnstileProdKeyProblem(
+			process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+			process.env.TURNSTILE_SECRET_KEY,
+		);
+		if (problem) {
+			throw new Error(
+				`instrumentation.register: ${problem} when ZUGZWANG_ENV="prod" (AUTH-TURNSTILE-WIRE)`,
 			);
 		}
 	}

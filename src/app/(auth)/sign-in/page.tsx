@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, type ReactElement, useState } from "react";
 import { AuthAlert } from "@/app/(auth)/_components/AuthAlert";
+import { TurnstileWidget } from "@/app/(auth)/_components/TurnstileWidget";
 import { Wordmark } from "@/components/shell/Wordmark";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +26,11 @@ export default function SignInPage(): ReactElement {
 	const [emailError, setEmailError] = useState<string | null>(null);
 	const [googleLoading, setGoogleLoading] = useState(false);
 	const [googleError, setGoogleError] = useState<string | null>(null);
+	// F-AUTH-2 Turnstile. The token the widget handed up (`null` until solved,
+	// and again on expiry or error), and the widget's key: a token is
+	// single-use, so every send that reaches the server remounts the widget.
+	const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+	const [turnstileKey, setTurnstileKey] = useState(0);
 
 	async function handleGoogle(
 		event: FormEvent<HTMLFormElement>,
@@ -53,10 +59,15 @@ export default function SignInPage(): ReactElement {
 	): Promise<void> {
 		event.preventDefault();
 		setEmailError(null);
-		setEmailLoading(true);
 		const formData = new FormData(event.currentTarget);
 		const email = String(formData.get("email") ?? "");
-		const turnstileToken = String(formData.get("turnstileToken") ?? "");
+		const token = String(formData.get("turnstileToken") ?? "");
+		// FAIL CLOSED, as the server does: no solved challenge, no request.
+		if (!token) {
+			setEmailError("turnstile_required");
+			return;
+		}
+		setEmailLoading(true);
 		try {
 			// Plan-Q6 + §15 MEDIUM-1: Form A SDK call shape — second
 			// positional arg is `FetchOptions` directly (NOT wrapped in
@@ -65,7 +76,7 @@ export default function SignInPage(): ReactElement {
 			// `ctx.request.headers` per src/server/auth/index.ts.
 			const { error } = await authClient.emailOtp.sendVerificationOtp(
 				{ email, type: "sign-in" },
-				{ headers: { "x-turnstile-token": turnstileToken } },
+				{ headers: { "x-turnstile-token": token } },
 			);
 			if (error) {
 				setEmailError(error.message ?? "send_failed");
@@ -76,6 +87,10 @@ export default function SignInPage(): ReactElement {
 			setEmailError(err instanceof Error ? err.message : "send_failed");
 		} finally {
 			setEmailLoading(false);
+			// The token went to siteverify and cannot be spent twice; a retry
+			// (after `turnstile_failed`, a rate limit, anything) needs a new one.
+			setTurnstileToken(null);
+			setTurnstileKey((key) => key + 1);
 		}
 	}
 
@@ -147,11 +162,11 @@ export default function SignInPage(): ReactElement {
 					<Separator className="flex-1" />
 				</div>
 
-				{/* F-AUTH-2 — Email + OTP. Hidden `turnstileToken` input retained
-				    per Plan-Q7 sub-verdict (anchor for future Cloudflare Turnstile
-				    widget mount once DESIGN.* lands). The onSubmit handler reads
-				    it from form data and passes the value as the
-				    `x-turnstile-token` HEADER on the SDK call. */}
+				{/* F-AUTH-2 — Email + OTP. The Cloudflare Turnstile widget mounts
+				    inside this form and hands its token to the hidden
+				    `turnstileToken` input; the onSubmit handler reads it from form
+				    data and passes it as the `x-turnstile-token` HEADER on the SDK
+				    call. */}
 				<form onSubmit={handleEmailOtp} className="flex flex-col gap-3">
 					{/* POLISH.7a D03 — the W2.1 `.emailrow`: the field and its submit
 					    share ONE row (mockup `:318-322`, CSS `:154`
@@ -174,16 +189,18 @@ export default function SignInPage(): ReactElement {
 							{emailLoading ? "Sending…" : "Send code"}
 						</Button>
 					</div>
-					{/* TODO(DESIGN.*): Cloudflare Turnstile widget client-side. */}
+					<TurnstileWidget key={turnstileKey} onToken={setTurnstileToken} />
 					{/* ⚠ SEAM CONTRACT (UI-A7 §3.1): this hidden anchor MUST SURVIVE —
-					    `handleEmailOtp` reads `formData.get("turnstileToken")`. It sits
-					    beside the row rather than in it because a hidden input is not a
-					    flex child worth laying out; it is still inside the same <form>,
-					    which is what `new FormData(event.currentTarget)` reads. */}
+					    `handleEmailOtp` reads `formData.get("turnstileToken")`. It now
+					    carries the widget's token, and is empty until the challenge is
+					    solved. It sits beside the row rather than in it because a hidden
+					    input is not a flex child worth laying out; it is still inside
+					    the same <form>, which is what `new FormData(event.currentTarget)`
+					    reads. */}
 					<input
 						type="hidden"
 						name="turnstileToken"
-						value="placeholder-token"
+						value={turnstileToken ?? ""}
 					/>
 					{emailError ? (
 						<AuthAlert className="mt-3">{emailError}</AuthAlert>

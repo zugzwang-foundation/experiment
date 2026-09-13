@@ -206,7 +206,10 @@ export default async function LegalPage(): Promise<React.ReactElement> {
 				    load-bearing rather than decorative, and removing it would take
 				    the version label out of the product entirely. */}
 				<p className="pt-4 [border-top:var(--hairline)]">
-					<small className="text-xs text-n5">
+					{/* `break-all`: since LEGAL.1 each identifier is a 64-character
+					    SHA-256 with no break opportunity, which would overflow the
+					    column on a phone. */}
+					<small className="text-xs break-all text-n5">
 						ToS {TOS_VERSION_HASH} · Privacy {PRIVACY_VERSION_HASH}
 					</small>
 				</p>

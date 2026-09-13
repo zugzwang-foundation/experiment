@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import {
+	act,
 	cleanup,
 	fireEvent,
 	render,
@@ -47,14 +48,33 @@ vi.mock("@/lib/auth-client", () => ({
 
 import OtpPage from "@/app/(auth)/sign-in/otp/page";
 
+// Resend is Turnstile-gated like the sign-in send. `window.turnstile` is a stub
+// (Cloudflare's script cannot load under jsdom) whose captured callback lets a
+// test solve the challenge; `turnstile-widget.test.tsx` owns the widget itself.
+let solveTurnstile: ((token: string) => void) | null = null;
+
+async function solveChallenge(token = "test-token"): Promise<void> {
+	await waitFor(() => expect(solveTurnstile).not.toBeNull());
+	act(() => solveTurnstile?.(token));
+}
+
 beforeEach(() => {
 	mocks.emailOtp.mockResolvedValue({ error: null });
 	mocks.sendVerificationOtp.mockResolvedValue({ error: null });
+	solveTurnstile = null;
+	window.turnstile = {
+		render: (_el, opts) => {
+			solveTurnstile = opts.callback;
+			return "widget";
+		},
+		remove: () => {},
+	};
 });
 
 afterEach(() => {
 	cleanup();
 	vi.clearAllMocks();
+	delete window.turnstile;
 });
 
 describe("UI-A7 otp skin — seam contract (§3.2 GUARDRAIL, green both ways)", () => {
@@ -146,6 +166,7 @@ describe("AUTH-OTP-DELIVERY fix (b) — resend + back affordance (DRIVER, RED pr
 
 	it("otp-resend::clicking-resend-calls-send-verification-otp-with-turnstile-header", async () => {
 		render(<OtpPage />);
+		await solveChallenge("resend-widget-token");
 		fireEvent.click(screen.getByRole("button", { name: /resend/i }));
 
 		await waitFor(() =>
@@ -153,16 +174,14 @@ describe("AUTH-OTP-DELIVERY fix (b) — resend + back affordance (DRIVER, RED pr
 		);
 		// First arg: the { email, type } body (email from ?email= via
 		// useSearchParams). Second arg: FetchOptions carrying the x-turnstile-token
-		// header (the OTP gate rejects a missing token) — the same non-empty
-		// placeholder the sign-in page sends until Turnstile is wired.
+		// header (the OTP gate rejects a missing token) — the token THIS page's
+		// widget handed up, not a fixed placeholder.
 		const [body, opts] = mocks.sendVerificationOtp.mock.calls[0] as [
 			{ email: string; type: string },
 			{ headers?: Record<string, string> },
 		];
 		expect(body).toEqual({ email: "you@example.com", type: "sign-in" });
-		const token = opts.headers?.["x-turnstile-token"];
-		expect(typeof token).toBe("string");
-		expect((token ?? "").length).toBeGreaterThan(0);
+		expect(opts.headers?.["x-turnstile-token"]).toBe("resend-widget-token");
 	});
 
 	it("otp-resend::resend-error-renders-in-the-shared-alert", async () => {
@@ -173,6 +192,7 @@ describe("AUTH-OTP-DELIVERY fix (b) — resend + back affordance (DRIVER, RED pr
 			error: { message: "otp_rate_limited" },
 		});
 		render(<OtpPage />);
+		await solveChallenge();
 		fireEvent.click(screen.getByRole("button", { name: /resend/i }));
 
 		const alert = await screen.findByRole("alert");
@@ -190,6 +210,7 @@ describe("AUTH-OTP-DELIVERY fix (b) — resend + back affordance (DRIVER, RED pr
 		// confirmation must be role="status" (NOT a second role="alert"), so the
 		// invalid-OTP findByRole("alert") test above stays unambiguous.
 		render(<OtpPage />);
+		await solveChallenge();
 		fireEvent.click(screen.getByRole("button", { name: /resend/i }));
 
 		expect(await screen.findByRole("status")).toBeTruthy();

@@ -22,6 +22,21 @@ export type SendVerificationOTPArgs = {
 export async function sendVerificationOTP(
 	args: SendVerificationOTPArgs,
 ): Promise<void> {
+	// ⛔ SIGN-IN ONLY, AND REFUSED HERE BECAUSE THIS IS THE ONE SHARED BOUNDARY.
+	// Better Auth's email-OTP plugin mounts more senders than this product uses:
+	// `/email-otp/request-password-reset` and `/forget-password/email-otp` call
+	// this function with `type: "forget-password"`, need no session, and sit
+	// outside the Turnstile gate (which matches `/email-otp/send-verification-otp`
+	// only). There are no passwords here, so every non-sign-in email is one this
+	// product never asked for — and a script could otherwise make the app mail any
+	// participant's address on repeat and burn the Resend quota sign-in depends
+	// on. The type is checked FIRST and against an allow-list of one, so a type
+	// the library adds later is refused rather than delivered.
+	if (args.type !== "sign-in") {
+		throw new Error(
+			`sendVerificationOTP: refusing OTP type "${String(args.type)}" — only "sign-in" codes are sent`,
+		);
+	}
 	const apiKey = process.env.RESEND_API_KEY;
 	if (!apiKey) {
 		throw new Error("RESEND_API_KEY not set; cannot send verification OTP");

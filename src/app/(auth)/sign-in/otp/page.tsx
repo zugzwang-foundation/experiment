@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, type ReactElement, Suspense, useState } from "react";
 import { AuthAlert } from "@/app/(auth)/_components/AuthAlert";
+import { TurnstileWidget } from "@/app/(auth)/_components/TurnstileWidget";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -43,6 +44,10 @@ function OtpForm(): ReactElement {
 	const [error, setError] = useState<string | null>(null);
 	const [resendLoading, setResendLoading] = useState(false);
 	const [resent, setResent] = useState(false);
+	// Resend asks the server for another email, so it passes the same
+	// Turnstile gate as the sign-in send — with its own single-use token.
+	const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+	const [turnstileKey, setTurnstileKey] = useState(0);
 
 	async function handleSubmit(
 		event: FormEvent<HTMLFormElement>,
@@ -90,19 +95,24 @@ function OtpForm(): ReactElement {
 	// AUTH-OTP-DELIVERY fix (b): resend recourse for the optimistic-navigation
 	// gap — Better Auth returns 200 even when delivery fails (ADR-0033), so a
 	// stranded user needs a way to retry / go back. Replicates the sign-in page's
-	// send call verbatim, incl. the placeholder Turnstile token (real widget:
-	// AUTH-TURNSTILE-WIRE). Any returned {error} (rate_limited, turnstile_*) reuses
-	// the shared error surface below — no new error branch; humanized copy deferred
-	// to AUTH-ERROR-COPY.
+	// send call verbatim, incl. the Turnstile token — here from this page's own
+	// widget, since a token is single-use and the sign-in page's was spent. Any
+	// returned {error} (rate_limited, turnstile_*) reuses the shared error surface
+	// below — no new error branch; humanized copy deferred to AUTH-ERROR-COPY.
 	async function handleResend(): Promise<void> {
 		setError(null);
 		setResent(false);
+		// FAIL CLOSED, as the server does: no solved challenge, no request.
+		if (!turnstileToken) {
+			setError("turnstile_required");
+			return;
+		}
 		setResendLoading(true);
 		try {
 			const { error: sendError } =
 				await authClient.emailOtp.sendVerificationOtp(
 					{ email, type: "sign-in" },
-					{ headers: { "x-turnstile-token": "placeholder-token" } },
+					{ headers: { "x-turnstile-token": turnstileToken } },
 				);
 			if (sendError) {
 				setError(sendError.message ?? "resend_failed");
@@ -113,6 +123,9 @@ function OtpForm(): ReactElement {
 			setError(err instanceof Error ? err.message : "resend_failed");
 		} finally {
 			setResendLoading(false);
+			// Spent at siteverify either way; the next resend needs a new token.
+			setTurnstileToken(null);
+			setTurnstileKey((key) => key + 1);
 		}
 	}
 
@@ -189,6 +202,7 @@ function OtpForm(): ReactElement {
 				    are still required by ADR-0033; only the back link's position
 				    changed. */}
 				<div className="mt-4 flex flex-col items-center gap-1">
+					<TurnstileWidget key={turnstileKey} onToken={setTurnstileToken} />
 					<Button
 						type="button"
 						variant="ghost"
@@ -207,8 +221,9 @@ function OtpForm(): ReactElement {
 			</CardContent>
 			<CardFooter className="justify-center">
 				{/* Phishing-safety note (W2.1 .otp-safety, design-source copy). The
-				    "Secured by Cloudflare Turnstile" line is deliberately omitted —
-				    Turnstile is not wired yet (plan §8; anchor only). */}
+				    "Secured by Cloudflare Turnstile" line is still omitted: the
+				    widget above carries Cloudflare's own attribution, and adding
+				    copy is outside the wiring change that mounted it. */}
 				<p className="text-center text-xs text-n5">
 					Zugzwang will never ask you for this code. If someone asks you for it,
 					it's a scam — don't share it.

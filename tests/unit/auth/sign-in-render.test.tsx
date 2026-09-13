@@ -1,6 +1,13 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	act,
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // UI-A7 — Auth skin (§9 TEST PLAN, surface 1). Tests-FIRST driver for the
@@ -38,16 +45,31 @@ vi.mock("@/lib/auth-client", () => ({
 
 import SignInPage from "@/app/(auth)/sign-in/page";
 
+// The Turnstile widget renders through `window.turnstile` (Cloudflare's script
+// cannot load under jsdom). The stub captures the success callback so a test
+// can solve the challenge; `tests/unit/auth/turnstile-widget.test.tsx` owns
+// the widget's own behaviour.
+let solveTurnstile: ((token: string) => void) | null = null;
+
 beforeEach(() => {
 	// Sane defaults so a bare render never rejects on destructuring the SDK
 	// result. Individual tests override as needed.
 	mocks.signInSocial.mockResolvedValue(undefined);
 	mocks.sendVerificationOtp.mockResolvedValue({ error: null });
+	solveTurnstile = null;
+	window.turnstile = {
+		render: (_el, opts) => {
+			solveTurnstile = opts.callback;
+			return "widget";
+		},
+		remove: () => {},
+	};
 });
 
 afterEach(() => {
 	cleanup();
 	vi.clearAllMocks();
+	delete window.turnstile;
 });
 
 describe("UI-A7 sign-in skin — seam contract (§3.1 GUARDRAIL, green both ways)", () => {
@@ -58,13 +80,18 @@ describe("UI-A7 sign-in skin — seam contract (§3.1 GUARDRAIL, green both ways
 		const email = container.querySelector('input[name="email"]');
 		expect(email).not.toBeNull();
 
-		// The hidden Turnstile anchor MUST survive with its placeholder value
-		// (future Cloudflare widget mounts here; handleEmailOtp reads it).
+		// The hidden Turnstile anchor MUST survive (handleEmailOtp reads it). It
+		// is EMPTY until the widget hands up a token — the fixed placeholder it
+		// used to carry is gone, and a non-empty value here before any challenge
+		// is solved would be that placeholder coming back.
 		const turnstile = container.querySelector<HTMLInputElement>(
 			'input[name="turnstileToken"]',
 		);
 		expect(turnstile).not.toBeNull();
-		expect(turnstile?.value).toBe("placeholder-token");
+		expect(turnstile?.value).toBe("");
+		expect(
+			container.querySelector('[data-testid="turnstile-widget"]'),
+		).not.toBeNull();
 
 		// Both submit paths render with their labels intact.
 		expect(
@@ -109,6 +136,10 @@ describe("UI-A7 sign-in skin — branded presentation (DRIVER, RED pre-skin)", (
 			error: { message: "otp_rate_limited" },
 		});
 		const { container } = render(<SignInPage />);
+		// Solve the challenge first: without a token the page refuses to send
+		// and this test would see `turnstile_required` instead.
+		await waitFor(() => expect(solveTurnstile).not.toBeNull());
+		act(() => solveTurnstile?.("test-token"));
 
 		const email = container.querySelector<HTMLInputElement>(
 			'input[name="email"]',
