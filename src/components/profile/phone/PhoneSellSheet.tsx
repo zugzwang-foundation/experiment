@@ -116,22 +116,44 @@ export function PhoneSellSheet(props: {
 						{props.marketTitle}
 					</span>
 				</div>
-				<div className="flex items-center justify-between gap-3">
+				{/* ⚠⚠ MOBILE-2h · R-4 — THE FIGURE IS THE SHEET'S SUBJECT, SO IT STOPS
+				    SHARING A LINE WITH ITS OWN LABEL. This block was `justify-between`:
+				    the word `Current` at one end of the sheet and the amount at the
+				    other, the two reading as a table row that had wandered into a modal
+				    — which is exactly what it was, the row's own cell lifted out of the
+				    row. A label ABOVE the thing it names, both centred, is what a sheet
+				    with one subject looks like; and it is what lets the figure take the
+				    width it needs instead of half of it.
+				    ⛔ `items-center` ON THE COLUMN, NOT `text-center` ON THE CHILDREN.
+				    The amount is an `inline-flex` chip whose width tracks its digits, so
+				    centring its TEXT would centre nothing — the box has to be centred
+				    inside the column. */}
+				<div className="flex flex-col items-center gap-1.5 py-1">
 					{/* ⚠ `Current` IS THE OPEN TAB'S OWN COLUMN HEADER, byte-for-byte
 					    (`PositionsTable.tsx`'s `<th>`), not a phrase written for this
 					    sheet. The sheet covers the row it came from, so the column head
 					    the figure sat under has to come with it — and no new string
 					    crosses into the product to do that. ⚠ It is also the header the
 					    phone LOSES when `<thead>` goes hidden below 640px, so this is the
-					    one place on the phone where that word is still said. */}
+					    one place on the phone where that word is still said.
+					    ⚠ MOBILE-2h — IT STAYS AT 10px WHILE THE FIGURE GOES TO 32. The
+					    ruling is that the field is the largest thing in the sheet; a
+					    label that grew with it would be competing with its own subject,
+					    and the word is already carrying an `InfoTip`-less overline's job
+					    of naming a column nobody can see. */}
 					<span className="text-[10px] leading-[1.2] font-extrabold tracking-[0.12em] text-n4 uppercase">
 						Current
 					</span>
-					{/* The SAME field the desktop row arms — not a copy of it. */}
+					{/* ⛔ THE SAME FIELD THE DESKTOP ROW ARMS — one instance, not a copy,
+					    asked to present itself differently. `variant="sheet"` reaches type
+					    sizes, padding and the width floor; the ceiling, the exact-seed
+					    submit and the draft discipline are the ones `useInlineSell` owns
+					    and are untouched by it. */}
 					<InlineSellAmount
 						tileKey={props.tileKey}
 						seedDisplay={props.seedDisplay}
 						seedExact={props.seedExact}
+						variant="sheet"
 						draft={props.draft}
 						disabled={props.busy}
 						onEdit={props.onEdit}
@@ -157,7 +179,13 @@ export function PhoneSellSheet(props: {
 						variant="outline"
 						disabled={props.busy || !props.canSubmit}
 						data-testid={`phone-sell-confirm-${props.tileKey}`}
-						className="h-11 w-full font-extrabold tracking-[0.06em] uppercase [border:var(--ring-active)]"
+						// ⚠ MOBILE-2h · R-4 — 48px, up from 44. The ruling is that CONFIRM
+						// keeps its WIDTH and gains a little height: the sheet grew to pay
+						// for a 32px figure, and a button left at the bare 44px minimum
+						// under it reads as the smaller of the two decisions on screen.
+						// `w-full` is unchanged, so the edge alignment ADR-0051 A4 rules
+						// for every block in a phone sheet is unchanged with it.
+						className="h-12 w-full font-extrabold tracking-[0.06em] uppercase [border:var(--ring-active)]"
 						onClick={props.onSubmit}
 					>
 						{props.busy ? "…" : props.failed ? "Retry" : "Confirm"}

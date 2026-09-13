@@ -71,8 +71,8 @@ const SOLD_DWELL_MS = 900;
  * silent break of this, not a restyle: jsdom performs no layout, so the width
  * string is unchanged and nothing reddens.
  */
-function sellFieldWidth(value: string): string {
-	return `${Math.max(2, value.length)}ch`;
+function sellFieldWidth(value: string, floorCh = 2): string {
+	return `${Math.max(floorCh, value.length)}ch`;
 }
 
 export type InlineSellController = ReturnType<typeof useInlineSell>;
@@ -522,6 +522,7 @@ export function InlineSellAmount({
 	onEdit,
 	onSubmit,
 	draft,
+	variant = "row",
 }: {
 	tileKey: string;
 	seedDisplay: string;
@@ -530,8 +531,33 @@ export function InlineSellAmount({
 	draft: string | null;
 	onEdit: (value: string, seedExact: string) => void;
 	onSubmit: () => void;
+	/**
+	 * ⛔⛔ MOBILE-2h · R-4/R-5 — WHICH PRESENTATION, AND WHY THIS IS A PROP RATHER
+	 * THAN A SECOND COMPONENT.
+	 *
+	 * The phone's sell sheet wants this field to be the largest thing on screen —
+	 * 32px, a label above it, both centred. The desktop's in-row arm wants it to
+	 * be a 15px figure inside a 64px table cell. Those are two presentations of
+	 * ONE control, and the control is a money control: `InlineSell`'s ceiling, its
+	 * exact-seed submit and its draft discipline all live in this file and are
+	 * shared by both arms. A forked copy would be a second money field free to
+	 * drift from the first, which is precisely what "money components are reused
+	 * as instances, never forked" forbids.
+	 *
+	 * ⚠ DEFAULTS `"row"`, SO THE DESKTOP IS UNTOUCHED BY CONSTRUCTION and its
+	 * class strings are byte-identical to the shipped ones — the same polarity
+	 * ADR-0045 gives `mobileResponsive`, and for the same reason: a caller that
+	 * forgets the prop inherits the established render rather than a new one.
+	 *
+	 * ⛔ IT CHANGES NOTHING ABOUT THE MONEY. `seedExact` is still the ceiling and
+	 * still what an untouched field submits; `onEdit` still receives the raw typed
+	 * string; `disabled` still freezes the field mid-request. This prop reaches
+	 * type sizes, padding and the width floor and nothing else.
+	 */
+	variant?: "row" | "sheet";
 }): React.JSX.Element {
 	const shown = draft ?? seedDisplay;
+	const sheet = variant === "sheet";
 	return (
 		/* ⚠⚠ POSREV-POLISH-2 R-1 — THIS IS THE BUY COMPOSER'S AMOUNT FIELD, RE-CUT
 		   TO A TABLE CELL. `BetComposer.tsx:555-593` (`.amtval`) is the shipped
@@ -554,15 +580,34 @@ export function InlineSellAmount({
 		   ROUNDED figure, the exact value still lives in state, and an untouched
 		   field still submits the EXACT one through `confirm`. R-1 is appearance and
 		   geometry only. */
-		<span className="inline-flex min-w-0 items-baseline justify-end gap-1 rounded-(--r-chip) px-1.5 py-0.5 [border:var(--hairline)] focus-within:shadow-(--state-focus-ring)">
-			<span className="text-[11px] leading-[1.35] text-n5">Đ</span>
+		<span
+			className={
+				sheet
+					? "inline-flex min-w-0 items-baseline justify-center gap-2 rounded-(--r-chip) px-4 py-2.5 [border:var(--hairline)] focus-within:shadow-(--state-focus-ring)"
+					: "inline-flex min-w-0 items-baseline justify-end gap-1 rounded-(--r-chip) px-1.5 py-0.5 [border:var(--hairline)] focus-within:shadow-(--state-focus-ring)"
+			}
+		>
+			{/* ⚠ THE Đ GOES UP WITH THE DIGITS. Left at 11px beside a 32px figure it
+			    stops reading as the figure's unit and starts reading as a footnote. */}
+			<span
+				className={
+					sheet
+						? "text-[20px] leading-[1.2] text-n5"
+						: "text-[11px] leading-[1.35] text-n5"
+				}
+			>
+				Đ
+			</span>
 			<Input
 				value={shown}
 				inputMode="decimal"
 				disabled={disabled}
 				aria-label="Amount to sell"
 				data-testid={`tile-sell-amount-${tileKey}`}
-				style={{ width: sellFieldWidth(shown) }}
+				// ⚠ A THREE-`ch` FLOOR IN THE SHEET, TWO IN THE ROW. An emptied field
+				// still has to be a target a thumb can find, and `2ch` of 32px mono is
+				// ~38px — under the 44px floor every other control on that sheet keeps.
+				style={{ width: sellFieldWidth(shown, sheet ? 3 : 2) }}
 				onChange={(e) => onEdit(e.target.value, seedExact)}
 				onKeyDown={(e) => {
 					if (e.key === "Enter") {
@@ -570,7 +615,17 @@ export function InlineSellAmount({
 						onSubmit();
 					}
 				}}
-				className="h-auto border-none p-0 text-right font-mono text-[15px] font-extrabold tabular-nums shadow-none [border:none]"
+				// ⚠ 32px CLEARS iOS's 16px ZOOM-ON-FOCUS THRESHOLD with room to spare —
+				// a phone money field below 16px makes the browser scale the page on
+				// focus, which moves every box the reader was just looking at.
+				// ⚠ The leading is restated with the size (AGENTS.md §8): the arbitrary
+				// form inherits whatever step was in scope, and `text-sm`'s 20px leading
+				// under a 32px figure clips its own descenders.
+				className={
+					sheet
+						? "h-auto border-none p-0 text-right font-mono text-[32px] leading-[1.2] font-extrabold tabular-nums shadow-none [border:none]"
+						: "h-auto border-none p-0 text-right font-mono text-[15px] font-extrabold tabular-nums shadow-none [border:none]"
+				}
 			/>
 		</span>
 	);
