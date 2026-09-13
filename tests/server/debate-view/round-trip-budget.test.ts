@@ -240,18 +240,25 @@ describe("/m/[slug] read budget — the polled surface (S-4 Phase E)", () => {
 	// ⛔ THE TOTAL DID NOT MOVE, AND THAT IS THE FINDING, NOT A DISAPPOINTMENT.
 	// A cold render still pays 12. What changed is that 3 of those 12 — the
 	// reserve replay behind the price chart — moved onto `getCachedReserveWalk`,
-	// which is keyed on the MARKET ID ALONE. The block around it is keyed on
-	// `(market, reserves)`, so every bet changes that key and forces a miss; no
-	// bet touches the walk's key. So the 9 are re-paid per bet and the 3 are
-	// re-paid once per `MARKET_SERIES_MIN_WINDOW_MS`, however busy the market is
-	// (SPEC.1 1.0.45 §9 *Refresh*).
+	// which is keyed on the MARKET ID ALONE.
 	//
-	// ⚠ A STATEMENT COUNT CANNOT SEE THAT, WHICH IS EXACTLY WHY THE SPLIT IS
-	// PINNED AND NOT JUST THE TOTAL. Pinning 12 alone would stay green if
-	// someone moved the replay back inside the reserves-keyed block — the
-	// regression this task exists to prevent — because the sum is identical
-	// either way. The two assertions below fail on that change; the one above
-	// does not.
+	// ⚠ THE SENTENCE THAT FOLLOWED IS SUPERSEDED AND IS REWRITTEN RATHER THAN
+	// APPENDED TO (O-5). It read: "The block around it is keyed on `(market,
+	// reserves)`, so every bet changes that key and forces a miss; no bet touches
+	// the walk's key. So the 9 are re-paid per bet and the 3 are re-paid once per
+	// `MARKET_SERIES_MIN_WINDOW_MS`." That was an accurate description of a
+	// defect. CACHE-KEY-1 (ADR-0051) re-keyed the block around it on `market`
+	// alone with a `SHARED_VIEW_MIN_WINDOW_MS` window, so the 9 are now re-paid
+	// once per 15 s and the 3 once per 60 s, and NEITHER is re-paid per bet
+	// (SPEC.1 1.0.45 §9 *Refresh*). The split still buys the longer window for
+	// history; it no longer has to rescue the history from an invalidation
+	// coupled to activity, because there is no longer one.
+	//
+	// ⚠ A STATEMENT COUNT CANNOT SEE ANY OF THAT, WHICH IS EXACTLY WHY THE SPLIT
+	// IS PINNED AND NOT JUST THE TOTAL. Pinning 12 alone would stay green if
+	// someone moved the replay back inside the block around it — the regression
+	// this task exists to prevent — because the sum is identical either way. The
+	// two assertions below fail on that change; the one above does not.
 	it("debate-view::price-chart-history-floored-to-min-window — the walk is 3 of the 12", async () => {
 		const { marketId } = await seedMarket();
 

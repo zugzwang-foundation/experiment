@@ -5,12 +5,20 @@ import { DebateView } from "@/components/debate/DebateView";
 import { PhoneDebateView } from "@/components/debate/phone/PhoneDebateView";
 import { PhoneDetails } from "@/components/debate/phone/PhoneDetails";
 import { db } from "@/db";
+import { SHARED_VIEW_MIN_WINDOW_MS } from "@/server/config/limits";
 import { getCachedDebateView } from "@/server/debate-view/cached-view";
+import { loadDebateView } from "@/server/debate-view/load-debate-view";
 import { getMarketPricingAndReserves } from "@/server/debate-view/market-pricing";
 import { resolvePostParam } from "@/server/debate-view/resolve-post-param";
 import { loadViewerMarketContext } from "@/server/debate-view/viewer-context";
+import {
+	loadViewerLatestCommentAt,
+	postedWithinWindow,
+} from "@/server/debate-view/viewer-freshness";
+import { getCachedReserveWalk } from "@/server/discovery/cached-series";
 import { withLiveTail } from "@/server/discovery/price-series";
 import { getMarketBySlug } from "@/server/markets/get-by-slug";
+import { recordCacheAttempt } from "@/server/observability/cache-metrics";
 
 /**
  * F-DEBATE-4 — the route's dynamism, stated explicitly. Originally
@@ -75,27 +83,83 @@ export default async function MarketPage({
 	}
 
 	// S-4 Phase D — THE LIVE READ, and it is deliberately first. One indexed
-	// pool row, never cached in any form. Its `reserves` become the cache key
-	// below, so a hit proves the live reserves are provably equal to a
-	// previously observed value — the one that generated the entry — because a
-	// bet moves the pool and forces a recompute. ⚠ Weaker than "no bet has
-	// intervened": the CPMM is fee-less, so a buy-then-sell-back restores the
-	// exact prior pair (ADR-0041 OQ-1, open). The PRICED fields are unaffected
-	// either way, and they are the ones this page renders — see the override
-	// below, which is what makes that independent of the cache entirely.
+	// pool row, never cached in any form.
+	//
+	// ⚠ IT IS NO LONGER THE CACHE KEY, AND THAT IS CACHE-KEY-1's WHOLE SUBJECT
+	// (ADR-0051). This comment used to argue that a cache HIT proved the live
+	// reserves equalled a previously observed value, so the cached price could
+	// not be stale. The argument was sound and the mechanism it defended was
+	// not: keying on `reserves` meant every bet busted every reader's entry, so
+	// the cache helped least exactly when the market was busiest. What this read
+	// is FOR is unchanged and is stated where it is spent — the explicit
+	// override below, which is what makes the rendered price independent of the
+	// cache entirely, rather than dependent on a key nobody reading this file
+	// can see.
 	const priced = await getMarketPricingAndReserves(db, market.id);
+
+	// S-4 Phase D — `getRequestSession()` replaces a direct `auth.api.getSession`:
+	// the layout already read the session this request, and React's `cache()`
+	// collapses the two into ONE database lookup. That matters most here, because
+	// `DebatePoll` re-invokes BOTH the layout and this page every 15 s per open
+	// tab.
+	//
+	// ⚠ HOISTED ABOVE THE CACHED CALL AT CACHE-KEY-1, and it costs nothing to do
+	// so precisely BECAUSE of the `cache()` memo — this is the same lookup the
+	// layout already paid for, read earlier in the same request. It has to be up
+	// here now because the freshness question below needs a viewer id, and that
+	// question decides which read produces the model.
+	const session = await getRequestSession();
+
+	// CACHE-KEY-1 — THE POSTER'S OWN ARGUMENT (ADR-0051, `viewer-freshness.ts`).
+	//
+	// ⛔ EVERY COMMENT RIDES A BET (**INV-1**), so while the block below was
+	// keyed on `reserves`, an author's own post busted their own cache entry and
+	// their `router.refresh()` carried the comment back. That was never a
+	// designed behaviour — it was a side effect of the key, and it does not
+	// survive the key becoming a clock. Worse, it fails SILENTLY: `DebateView`'s
+	// `landed` still fires (a cache hit still deserializes a fresh payload
+	// object), `findPostedNode` then searches a model without the comment and
+	// returns `null`, and the author gets no card and no error.
+	//
+	// ⇒ One indexed read, signed-in viewers ONLY, and for a viewer who posted
+	// inside the last window the page reads UNCACHED. Bounded by the clock, so
+	// it stops on its own; a reader who is only reading never takes this branch
+	// and never pays for it.
+	const viewerPostedAt =
+		session?.user?.id !== undefined
+			? await loadViewerLatestCommentAt(db, {
+					userId: session.user.id,
+					marketId: market.id,
+				})
+			: null;
+	const readsUncached = postedWithinWindow(
+		viewerPostedAt,
+		Date.now(),
+		SHARED_VIEW_MIN_WINDOW_MS,
+	);
 
 	// S-4 Phase D — the SHARED block (comments, ranking, replies, totals, media,
 	// chart geometry): one cached render per market, shared by every reader.
-	// Keyed on `(market, reserves)`; `market.status` rides the key so a lifecycle
-	// change auto-misses, and content removal busts the `market:<id>` tag from
+	// Keyed on `market` ALONE plus a `SHARED_VIEW_MIN_WINDOW_MS` window
+	// (CACHE-KEY-1); `market.status` rides the key so a lifecycle change
+	// auto-misses, and content removal busts the `market:<id>` tag from
 	// `admin/moderation/act.ts`. ⛔ The `.md` export route still calls
 	// `loadDebateView` DIRECTLY and uncached — ADR-0025 forbids caching it. See
 	// `cached-view.ts` for why that boundary is a separate file.
-	const cachedModel = await getCachedDebateView(
-		market,
-		priced?.reserves ?? null,
-	);
+	//
+	// ⚠ THE BYPASS PASSES THE CACHED WALK THROUGH rather than omitting it. Omit
+	// it and `deriveMarketPriceChart` replays the reserve series itself — three
+	// statements, on the one path taken by the person who is already waiting.
+	// `getCachedReserveWalk` is keyed on the market id alone, so it is unaffected
+	// by this branch and hits either way; this is the same argument
+	// `getCachedDebateView` makes for passing it.
+	recordCacheAttempt("debate-view", market.id);
+	const cachedModel = readsUncached
+		? await loadDebateView(db, {
+				market,
+				walk: await getCachedReserveWalk(market.id),
+			})
+		: await getCachedDebateView(market);
 
 	// Gate C fix — the price rendered on this page is `priced`'s, not the
 	// cached model's own internal computation. `loadDebateView` still derives
@@ -170,13 +234,11 @@ export default async function MarketPage({
 	// null. Banned users still receive it: ban removes voice, not reads
 	// (ADR-0021 posture; the write path holds the 403).
 	//
-	// S-4 Phase D — `getRequestSession()` replaces a direct
-	// `auth.api.getSession`: the layout already read the session this request,
-	// and React's `cache()` collapses the two into ONE database lookup. That
-	// matters most here, because `DebatePoll` re-invokes BOTH the layout and
-	// this page every 15 s per open tab. ⛔ Everything below this line is
-	// viewer-scoped and NEVER cached.
-	const session = await getRequestSession();
+	// ⚠ `session` IS READ ONCE, ABOVE — hoisted at CACHE-KEY-1 so the freshness
+	// question could reach it (see there). It is deliberately NOT re-read here:
+	// `getRequestSession` is React-`cache()`d, so a second call would be free and
+	// would still be a second place a reader has to check for the same value.
+	// ⛔ Everything below this line is viewer-scoped and NEVER cached.
 	const viewer = session?.user?.id
 		? await loadViewerMarketContext(db, {
 				userId: session.user.id,

@@ -5,12 +5,14 @@ import { EmptyState } from "@/components/discovery/EmptyState";
 import { ErrorState } from "@/components/discovery/ErrorState";
 import { LoadingSkeleton } from "@/components/discovery/LoadingSkeleton";
 import { db } from "@/db";
-import { getMarketPricingAndReserves } from "@/server/debate-view/market-pricing";
+import { getMarketPricingAndReservesBatch } from "@/server/debate-view/market-pricing";
+import { valueHeroPosts } from "@/server/discovery/hero-value";
 import {
 	getCachedDiscoveryMarketIds,
 	getCachedMarketDiscoveryData,
 } from "@/server/discovery/list";
 import { withLiveTail } from "@/server/discovery/price-series";
+import { recordCacheAttempt } from "@/server/observability/cache-metrics";
 
 /**
  * OQ-1 A (ratified §16): Discovery's R-2 cache retrofit landed at S-4 Phase C
@@ -75,19 +77,23 @@ export default function DiscoveryPage() {
  * S-4 Phase C — split into a CACHED half and a LIVE half, never a single
  * uncached loop the way this used to read:
  *   - `getCachedDiscoveryMarketIds()` — cached, the Open-markets set.
- *   - per market, `getMarketPricingAndReserves` — LIVE, every render, never
- *     cached in any form. `pricing` goes straight onto `card` from here.
- *   - `getCachedMarketDiscoveryData(id, reserves)` — cached, KEYED on the
- *     `reserves` value just read live, so a hit is only possible when
- *     reserves are provably equal to a previously observed value (see that
- *     function's docstring for why this makes `topPosts[].currentValue` safe
- *     to cache without ever being stale — purity, not pool stillness; and
- *     for ADR-0041 OQ-1, the open fee-less-CPMM ABA gap that makes those two
- *     different claims). `reserves` itself stays a server-local binding —
- *     never pushed onto `card`, which crosses into the `"use client"`
- *     carousel (C8/V13).
- * Still sequential per market (the bounded ≤8-market cost the plan accepts;
- * batching is the OQ-1 C follow-up).
+ *   - `getMarketPricingAndReservesBatch` — LIVE, every render, never cached in
+ *     any form, one statement for the whole surface (T-03). `pricing` goes
+ *     straight onto `card` from here.
+ *   - `getCachedMarketDiscoveryData(id)` — cached, keyed on the market id
+ *     ALONE with a `SHARED_VIEW_MIN_WINDOW_MS` window (CACHE-KEY-1,
+ *     ADR-0051). ⚠ IT USED TO TAKE `reserves` AS A SECOND ARGUMENT, and that
+ *     is what this task removed: a `'use cache'` key is its argument list, so
+ *     every bet moved the pool, changed the key, and forced a miss for every
+ *     reader — the cache worked on quiet markets and not at all on busy ones.
+ *   - `valueHeroPosts(...)` — the one figure that could NOT simply move
+ *     behind the window. `topPosts[].currentValue` is `computeSell` over the
+ *     live pool, i.e. money on a public surface, so the cached block returns
+ *     the share counts and the figure is composed HERE against the batched
+ *     live read. The type enforces it: `HeroTopPostsBase` omits the field.
+ * `reserves` itself stays a server-local binding throughout — never pushed
+ * onto `card`, which crosses into the `"use client"` carousel (C8/V13), and
+ * neither is `heroShares`, for the same reason.
  *
  * ONE whole-surface try/catch: ANY read-model throw — including the masking
  * read inside `selectHeroTopPosts` (now reached via `getCachedMarketDiscoveryData`)
@@ -101,14 +107,26 @@ export default function DiscoveryPage() {
 export async function DiscoveryContent() {
 	let views: DiscoveryMarketView[];
 	try {
+		recordCacheAttempt("discovery-list", null);
 		const marketIds = await getCachedDiscoveryMarketIds();
+		// T-03 — ONE pool read for every market on the surface, not one per
+		// market in series. This read is deliberately never cached (it is the
+		// live price), so before batching every visitor paid one round trip per
+		// open market, sequentially, before the page could render. Batching is
+		// the right shape rather than `Promise.all` precisely because the open
+		// connection bottleneck is what hurts here: this takes ONE connection
+		// once, where concurrent singular reads would take one per market at the
+		// worst possible moment. `priceByMarket.get(id) ?? null` below reproduces
+		// the singular read's defensive-null contract for a market with no pool.
+		const priceByMarket = await getMarketPricingAndReservesBatch(
+			db,
+			marketIds.map((m) => m.id),
+		);
 		views = [];
 		for (const m of marketIds) {
-			const priced = await getMarketPricingAndReserves(db, m.id);
-			const data = await getCachedMarketDiscoveryData(
-				m.id,
-				priced?.reserves ?? null,
-			);
+			const priced = priceByMarket.get(m.id) ?? null;
+			recordCacheAttempt("market-data", m.id);
+			const data = await getCachedMarketDiscoveryData(m.id);
 			views.push({
 				card: {
 					id: m.id,
@@ -156,7 +174,22 @@ export async function DiscoveryContent() {
 					nowIso: new Date().toISOString(),
 					isOpen: true,
 				}),
-				topPosts: data.topPosts,
+				// CACHE-KEY-1 — the hero's `Đ staked → Đ now` right-hand figure,
+				// composed HERE from `priced`, the same live pool read that already
+				// fills `card.pricing` two lines above. Zero additional queries.
+				//
+				// ⛔ IT CANNOT BE SKIPPED BY ACCIDENT (**O-1**). `data.topPosts` is
+				// `HeroTopPostsBase` — `currentValue` OMITTED — so assigning it
+				// directly is a type error rather than a silently missing figure.
+				// That omission is the whole reason the cached block may now be
+				// keyed on identity: everything it still carries is content or a
+				// count and may lag one window, while a Đ amount on the most public
+				// surface in the product may not. See `hero-value.ts`.
+				topPosts: valueHeroPosts(
+					data.topPosts,
+					data.heroShares,
+					priced?.reserves ?? null,
+				),
 				// CHART-2 — `C-CHART-2` clause 1's terminal pulse, carried to the
 				// hero chart. ⛔ THE SECOND SPENDING OF THE SAME LICENCE, and it is
 				// deliberately written adjacent to the first so the two are read

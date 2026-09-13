@@ -17,6 +17,10 @@ const {
 	mockRender,
 	mockResolveImages,
 	mockGetThumb,
+	mockGetRequestSession,
+	mockViewerLatestCommentAt,
+	mockLoadDebateView,
+	mockGetCachedWalk,
 } = vi.hoisted(() => ({
 	mockGetMarketBySlug: vi.fn(),
 	mockResolvePostParam: vi.fn(),
@@ -25,6 +29,10 @@ const {
 	mockRender: vi.fn(),
 	mockResolveImages: vi.fn(),
 	mockGetThumb: vi.fn(),
+	mockGetRequestSession: vi.fn(),
+	mockViewerLatestCommentAt: vi.fn(),
+	mockLoadDebateView: vi.fn(),
+	mockGetCachedWalk: vi.fn(),
 }));
 
 vi.mock("@/db", () => ({ db: {} }));
@@ -46,6 +54,26 @@ vi.mock("@/server/discovery/media", () => ({
 vi.mock("@/server/debate-export/image/render", () => ({
 	renderPostExportJpeg: mockRender,
 	resolveExportImages: mockResolveImages,
+}));
+
+// CACHE-KEY-1 (ADR-0051) — the poster bypass this route shares with the page.
+// A viewer who posted inside the last window reads UNCACHED, because a cached
+// model minted before their post does not contain it and `composePostExport`
+// would 404 a post its author is looking at. Mocked at the module seam like
+// every other read here; `postedWithinWindow` runs UNMOCKED because it is pure,
+// so the branch is exercised rather than asserted.
+vi.mock("@/app/(public)/_lib/session", () => ({
+	getRequestSession: mockGetRequestSession,
+}));
+vi.mock("@/server/debate-view/viewer-freshness", async (importOriginal) => ({
+	...(await importOriginal<object>()),
+	loadViewerLatestCommentAt: mockViewerLatestCommentAt,
+}));
+vi.mock("@/server/debate-view/load-debate-view", () => ({
+	loadDebateView: mockLoadDebateView,
+}));
+vi.mock("@/server/discovery/cached-series", () => ({
+	getCachedReserveWalk: mockGetCachedWalk,
 }));
 
 import { GET } from "@/app/(public)/m/[slug]/export/image/route";
@@ -74,6 +102,12 @@ beforeEach(() => {
 	mockGetPricing.mockReset().mockResolvedValue(null);
 	mockGetCachedView.mockReset().mockResolvedValue(mumbaiMetroModel);
 	mockGetThumb.mockReset().mockResolvedValue("https://r2.test/m/default.webp");
+	// Signed out by default — the ordinary case for a download link, and the
+	// branch that must go through the cache.
+	mockGetRequestSession.mockReset().mockResolvedValue(null);
+	mockViewerLatestCommentAt.mockReset().mockResolvedValue(null);
+	mockLoadDebateView.mockReset().mockResolvedValue(mumbaiMetroModel);
+	mockGetCachedWalk.mockReset().mockResolvedValue([]);
 	mockResolveImages.mockReset().mockImplementation(async (p) => p);
 	mockRender
 		.mockReset()
@@ -117,6 +151,52 @@ describe("GET /m/[slug]/export/image", () => {
 		// `withLiveTail` on an Open market appends the spot at `now`.
 		expect(props.chart.series).toHaveLength(2);
 		expect(props.chart.series[1].yes).toBe("0.700000000000000000");
+	});
+
+	it("reads UNCACHED for an author who just posted — otherwise their own download 404s", async () => {
+		// CACHE-KEY-1 (ADR-0051). The download affordance lives on a post's card,
+		// so an author reaches this route seconds after posting. `resolvePostParam`
+		// resolves the ordinal straight from the database and succeeds — then
+		// `composePostExport` looks the id up in the MODEL, and a cached entry
+		// minted before the post does not contain it. Without this branch the
+		// author 404s downloading a post they are looking at.
+		mockGetRequestSession.mockResolvedValue({ user: { id: "u-1" } });
+		mockViewerLatestCommentAt.mockResolvedValue(new Date());
+
+		const res = await GET(request("2"), ctx);
+		expect(res.status).toBe(200);
+		expect(mockLoadDebateView).toHaveBeenCalledTimes(1);
+		expect(mockGetCachedView).not.toHaveBeenCalled();
+		// The cached WALK is still passed through, so a bypass does not also pay
+		// for a reserve replay — three statements, on the one path taken by the
+		// person already waiting.
+		expect(mockGetCachedWalk).toHaveBeenCalledWith(MARKET.id);
+		expect(mockLoadDebateView.mock.calls[0]?.[1]).toMatchObject({
+			market: MARKET,
+			walk: [],
+		});
+	});
+
+	it("a signed-in viewer who did NOT just post still reads through the cache", async () => {
+		// The other half, and the one that keeps the bypass bounded: being signed
+		// in is not the condition — having posted inside the window is. A reader
+		// who is only reading must never take the uncached path, or the window
+		// stops coalescing for every authenticated visitor at once.
+		mockGetRequestSession.mockResolvedValue({ user: { id: "u-1" } });
+		mockViewerLatestCommentAt.mockResolvedValue(
+			new Date(Date.now() - 60 * 60 * 1000),
+		);
+
+		const res = await GET(request("2"), ctx);
+		expect(res.status).toBe(200);
+		expect(mockGetCachedView).toHaveBeenCalledTimes(1);
+		expect(mockLoadDebateView).not.toHaveBeenCalled();
+	});
+
+	it("a signed-OUT viewer never pays for the freshness read at all", async () => {
+		await GET(request("2"), ctx);
+		expect(mockViewerLatestCommentAt).not.toHaveBeenCalled();
+		expect(mockGetCachedView).toHaveBeenCalledTimes(1);
 	});
 
 	it("404s an unknown market", async () => {
