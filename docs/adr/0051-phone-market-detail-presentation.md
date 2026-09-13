@@ -99,3 +99,27 @@ Escape/Tab focus trap in `PhoneSheet` — do, and are permitted.
 Measurements: B13 (equal column x's, row height) is retired, replaced by the tile
 baseline — tile height against viewport at 360/375/390/430, snap landing, question
 never clamped. B2 is measured on both tabs.
+
+### A6 — 2026-09-14 · The tile is full width in a scrolling list; A5 D-1 is withdrawn
+
+Supersedes A5 D-1. A5 D-2 and D-3 stand.
+
+D-1. Below `--breakpoint-mobile`, `/u/[pseudonym]`'s positions render as full-width
+tiles of natural height in the page's ordinary scroll — no viewport-height sizing, no
+scroll-snap, no distributed gap. Composition is A5's: side, value, movement and SELL
+on one line; the argument title; the market question, complete and never clamped.
+When the money line cannot fit at the viewport width, the movement chip yields and
+is not rendered; the side, the value and SELL never yield. The section keeps
+`overflow: clip` as containment. Tiles are separated by a hairline. No tile carries a
+selected visual below 640; selection state is retained for the sell sheet.
+
+D-2. The sell sheet's amount is a single borderless figure — currency mark and digits
+in one visual unit, centred, the largest element in the sheet — with the holding
+stated beneath it as the ceiling. It remains a real input whose width hugs its
+content and which carries no frame of its own. The ceiling and wire figure are
+unchanged.
+
+Measurements: A5's tile baseline is retired with its geometry. Replaced by: natural
+tile height at 360/375/390/412/430; zero `scroll-snap-type` in `src/`; at Đ 14,260
+the money line fits with the chip hidden and the layout viewport holds its nominal
+width.

@@ -133,14 +133,48 @@ describe("MOBILE-2e — the phone sell sheet", () => {
 		).toEqual(["x", "y"]);
 	});
 
-	it("phone-sell::it-says-CURRENT-and-not-a-phrase-invented-for-this-sheet", () => {
+	it("phone-sell::it-states-the-CEILING-beneath-the-figure-and-nothing-above-it", () => {
+		// ⛔⛔ INVERTED AT MOBILE-2j / ADR-0051 A6 D-2. This row REQUIRED the word
+		// `Current` — the Open tab's own `<th>`, carried here byte-for-byte because
+		// the phone loses that header when `<thead>` goes hidden below 640px. R-2
+		// replaces the framed field with a borderless 48px figure and states the
+		// bound BENEATH it instead, so the overline goes: at rest an untouched field
+		// shows the whole holding, and keeping both would print `Current` / `Đ 31` /
+		// `of Đ 31` — the same fact three times, the middle one forty-eight pixels
+		// tall.
+		// ⚠ WHAT IS LOST IS RECORDED, HERE AND IN docs/parked.md 2j-3: that word is
+		// now said nowhere on the phone. What replaces it is better for the job it
+		// was doing — a reader about to type into a field needs the bound, not the
+		// column name.
 		mount();
-		// `Current` is the Open tab's own `<th>`, byte-for-byte — the column head
-		// the phone LOSES when `<thead>` goes hidden. No new string crosses into
-		// the product to give the figure its name back.
 		const body = screen.getByTestId("phone-sheet-body");
-		expect(body.textContent).toContain("Current");
-		expect(body.textContent).not.toContain("Current value");
+		expect(
+			body.textContent,
+			"the sheet still prints the `Current` overline above the figure, so the " +
+				"ceiling line beneath it says the same thing twice",
+		).not.toContain("Current");
+		// ⛔ THE CEILING IS ASSERTED AS TEXT, not as a testid, because what matters
+		// is that a reader can READ the bound. `31` is the mount's `seedDisplay`.
+		expect(
+			body.textContent,
+			"the ceiling is not stated. `useInlineSell`'s edit() DISCARDS a draft " +
+				"above the seed, so a reader who types too much watches the field snap " +
+				"back — and R-2 removed the bordered chip that was the only hint a " +
+				"bound existed at all",
+		).toContain("of Đ 31");
+		// ⛔ POSITIVE CONTROL: the figure and its ceiling are DIFFERENT elements, or
+		// this row would pass against a single span reading `of Đ 31` and no field.
+		const field = screen.getByTestId(
+			`tile-sell-amount-${KEY}`,
+		) as HTMLInputElement;
+		expect(field.value, "the field is not seeded with the rounded figure").toBe(
+			"31",
+		);
+		expect(
+			screen.getByTestId(`phone-sell-ceiling-${KEY}`).contains(field),
+			"the ceiling line contains the field — they are one element, so the " +
+				"assertion above says nothing about a line beneath the figure",
+		).toBe(false);
 	});
 
 	/**

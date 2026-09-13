@@ -98,8 +98,15 @@ export function PhoneSellSheet(props: {
 				    lines the reader is asked to confirm a number with nothing on screen
 				    saying which of five positions it belongs to.
 				    ⚠ No new strings — both are data the row already renders. */}
+				{/* ⚠ MOBILE-2j · R-3 — 17px AND 13px, UP FROM 15 AND 11. The sheet's own
+				    hierarchy moved when the figure went to 48px: at 15px the argument being
+				    sold read as a caption under the `Sell` heading rather than as the subject
+				    the figure belongs to, and the question under it rises with it so the pair
+				    keeps its two-step relation. The grey and BOTH two-line clamps are
+				    unchanged — the clamps are the load-bearing half here, per this block's own
+				    note above, and a size change must not quietly take one with it. */}
 				<div className="flex flex-col gap-0.5">
-					<span className="line-clamp-2 text-[15px] leading-[1.35] font-bold text-ink">
+					<span className="line-clamp-2 text-[17px] leading-[1.35] font-bold text-ink">
 						{props.argumentTitle}
 					</span>
 					{/* ⛔ CLAMPED, because an unbounded string in a title block on a
@@ -112,43 +119,34 @@ export function PhoneSellSheet(props: {
 					    to act. Two lines here rather than the row's one: the sheet has
 					    the width, and the question is the thing telling the reader WHICH
 					    of five positions this is. */}
-					<span className="line-clamp-2 text-[11px] leading-[1.35] font-semibold text-n5">
+					<span className="line-clamp-2 text-[13px] leading-[1.35] font-semibold text-n5">
 						{props.marketTitle}
 					</span>
 				</div>
-				{/* ⚠⚠ MOBILE-2h · R-4 — THE FIGURE IS THE SHEET'S SUBJECT, SO IT STOPS
-				    SHARING A LINE WITH ITS OWN LABEL. This block was `justify-between`:
-				    the word `Current` at one end of the sheet and the amount at the
-				    other, the two reading as a table row that had wandered into a modal
-				    — which is exactly what it was, the row's own cell lifted out of the
-				    row. A label ABOVE the thing it names, both centred, is what a sheet
-				    with one subject looks like; and it is what lets the figure take the
-				    width it needs instead of half of it.
-				    ⛔ `items-center` ON THE COLUMN, NOT `text-center` ON THE CHILDREN.
-				    The amount is an `inline-flex` chip whose width tracks its digits, so
-				    centring its TEXT would centre nothing — the box has to be centred
-				    inside the column. */}
+				{/* ⚠⚠ MOBILE-2j · R-2 — **THE NUMBER IS THE INPUT, AND THE LABEL ABOVE IT IS
+				    GONE.** MOBILE-2h put `Current` over the figure as a 10px overline; R-2
+				    replaces the framed field with a borderless 48px figure and states the
+				    ceiling BENEATH it instead. The overline goes rather than stacking with it,
+				    and the reason is arithmetic rather than taste: at rest an untouched field
+				    shows the whole holding, so the eyebrow, the figure and the ceiling line
+				    would have printed `Current` / `Đ 31` / `of Đ 31` — the same fact three
+				    times, the middle one forty-eight pixels tall. R-2 describes two elements
+				    and two is what this block renders.
+				    ⚠ WHAT IS LOST, RECORDED RATHER THAN ABSORBED: `Current` was the Open tab's
+				    own `<th>` carried here byte-for-byte, and it was the one place on the phone
+				    that word was still said once `<thead>` went hidden below 640px. It is said
+				    nowhere on the phone now. The FIGURE it named is still named — `of Đ
+				    <holding>` gives the number its bound, which is what a reader about to type
+				    into it actually needs from a word above it.
+				    ⛔ `items-center` ON THE COLUMN, NOT `text-center` ON THE CHILDREN. The
+				    amount is an `inline-flex` unit whose width tracks its digits, so centring
+				    its TEXT would centre nothing — the box has to be centred in the column. */}
 				<div className="flex flex-col items-center gap-1.5 py-1">
-					{/* ⚠ `Current` IS THE OPEN TAB'S OWN COLUMN HEADER, byte-for-byte
-					    (`PositionsTable.tsx`'s `<th>`), not a phrase written for this
-					    sheet. The sheet covers the row it came from, so the column head
-					    the figure sat under has to come with it — and no new string
-					    crosses into the product to do that. ⚠ It is also the header the
-					    phone LOSES when `<thead>` goes hidden below 640px, so this is the
-					    one place on the phone where that word is still said.
-					    ⚠ MOBILE-2h — IT STAYS AT 10px WHILE THE FIGURE GOES TO 32. The
-					    ruling is that the field is the largest thing in the sheet; a
-					    label that grew with it would be competing with its own subject,
-					    and the word is already carrying an `InfoTip`-less overline's job
-					    of naming a column nobody can see. */}
-					<span className="text-[10px] leading-[1.2] font-extrabold tracking-[0.12em] text-n4 uppercase">
-						Current
-					</span>
-					{/* ⛔ THE SAME FIELD THE DESKTOP ROW ARMS — one instance, not a copy,
-					    asked to present itself differently. `variant="sheet"` reaches type
-					    sizes, padding and the width floor; the ceiling, the exact-seed
-					    submit and the draft discipline are the ones `useInlineSell` owns
-					    and are untouched by it. */}
+					{/* ⛔ THE SAME FIELD THE DESKTOP ROW ARMS — one instance, not a copy, asked
+					    to present itself differently. `variant="sheet"` reaches type sizes,
+					    borders, alignment and the keyboard hint; the ceiling, the exact-seed
+					    submit and the draft discipline are the ones `useInlineSell` owns and are
+					    untouched by it. */}
 					<InlineSellAmount
 						tileKey={props.tileKey}
 						seedDisplay={props.seedDisplay}
@@ -159,6 +157,27 @@ export function PhoneSellSheet(props: {
 						onEdit={props.onEdit}
 						onSubmit={props.onSubmit}
 					/>
+					{/* ⛔⛔ THE CEILING, STATED. `seedExact` is the most this control accepts —
+					    `useInlineSell`'s `edit()` DISCARDS a draft above it, so a reader who types
+					    too much watches the field snap back with nothing saying why. The bordered
+					    chip was the only hint that a bound existed at all, and R-2 takes the chip
+					    away; a bound nobody can see, enforced by a control that reverts in
+					    silence, is the worst of the three available shapes. So it is said.
+					    ⚠ IT SHOWS `seedDisplay`, THE ROUNDED FIGURE — the same string the field
+					    itself shows at rest, which is what makes the two agree on screen. The
+					    EXACT ceiling is `seedExact` and is up to eighteen decimal places larger;
+					    a reader typing the displayed figure is under it, and an untouched field
+					    submits the exact one. That asymmetry is SPEC.1 §10.8's sanctioned seed
+					    exception, and it is why this line renders the DISPLAY value and not the
+					    wire one — a ceiling a reader cannot type is not a ceiling they can use.
+					    ⚠ NO NEW DATA REACHES THE SHEET FOR THIS: `seedDisplay` is already a prop
+					    and is already what the field is seeded with. */}
+					<span
+						data-testid={`phone-sell-ceiling-${props.tileKey}`}
+						className="text-[12px] leading-[1.2] text-n5 tabular-nums"
+					>
+						of Đ {props.seedDisplay}
+					</span>
 				</div>
 				{/* ⛔⛔ THERE IS NO CANCEL BUTTON HERE, AND ITS ABSENCE IS A CORRECTION
 				    RATHER THAN AN OMISSION. A draft of this file shipped one, and it was

@@ -32,6 +32,7 @@ import type {
 import { PROFILE_COPY } from "./copy";
 
 import { InlineSellAmount, useInlineSell } from "./InlineSell";
+import { phoneMoneyLineFitsMovement } from "./money-line";
 import { argumentCurrentExact, sumExact } from "./partition";
 import { PhoneSellSheet } from "./phone/PhoneSellSheet";
 import { useDocumentRowStepper } from "./row-stepper";
@@ -542,22 +543,27 @@ export function PositionsTable({
 		rowCount: visibleTiles.length,
 		enabled: !isPhoneTable,
 	});
-	// ⛔⛔ MOBILE-2h · R-2 — THE THREE-TILE WINDOW STANDS DOWN ON A PHONE, AND
-	// THIS GATE IS THE SECOND HALF OF THE EQUALISER'S. `useEqualRowThirds` was
-	// given `enabled: !isPhoneTable` at round five; this effect — the OTHER
-	// mechanism in RF-10's pair — never was, because its own gate ("can the
-	// DOCUMENT scroll") happened to read false on a phone page that fitted its
-	// viewport. A viewport-tall tile makes the page scroll at every width, so the
-	// gate flips true, the cap fires, and the panel resolves to exactly three
-	// tiles — MEASURED before this gate existed: `positions-panel-body` at 2370px
-	// against 3140px of content at 390x844, i.e. one tile hanging outside the
-	// panel's own border, and a `max-height` on the very box the tiles have to
-	// escape for the DOCUMENT to be their scroller.
-	// ⚠ IT CLEARS ON THE WAY OUT rather than merely returning. An `overflow:
-	// visible` box with a stale inline `max-height` still clips nothing and still
-	// ends early — the height outlives the stand-down exactly as the equaliser's
-	// inline row heights would, which is the lesson `row-thirds.ts`'s own
-	// `!enabled` branch already records.
+	// ⛔⛔ THE THREE-TILE WINDOW STANDS DOWN ON A PHONE, AND THIS GATE IS THE
+	// SECOND HALF OF THE EQUALISER'S. `useEqualRowThirds` was given
+	// `enabled: !isPhoneTable` at round five; this effect — the OTHER mechanism in
+	// RF-10's pair — never was, because its own gate ("can the DOCUMENT scroll")
+	// happened to read false on a phone page that fitted its viewport. MOBILE-2h
+	// found it by making tiles a screen tall; MEASURED there before the gate
+	// existed, `positions-panel-body` capped at 2370px against 3140px of content
+	// at 390x844, i.e. one tile hanging outside the panel's own border.
+	// ⚠⚠ MOBILE-2j WITHDREW THE VIEWPORT-TALL TILE AND THE GATE STAYS, because
+	// what makes the cap fire was never the tile's height — it is that the page
+	// SCROLLS. A list of three-line tiles under an identity card scrolls at every
+	// phone width too, so the gate would flip true here just as it did there, and
+	// the cap would bound the panel at three tiles and scroll the rest INSIDE it.
+	// ADR-0051 A6 D-1 puts the list in the page's ordinary scroll; a nested
+	// scroller is the one shape that cannot satisfy it. The stated cause has
+	// moved one step further back and the token is unchanged — recording that is
+	// cheaper than re-deriving it (`O-3`).
+	// ⚠ IT CLEARS ON THE WAY OUT rather than merely returning. A box with a stale
+	// inline `max-height` still ends early whatever its overflow is — the height
+	// outlives the stand-down exactly as the equaliser's inline row heights would,
+	// which is the lesson `row-thirds.ts`'s own `!enabled` branch already records.
 	useEffect(() => {
 		const body = bodyRef.current;
 		const table = tableRef.current;
@@ -1188,6 +1194,12 @@ function TileRow({
 	const armedInRow = armed && !isPhone;
 	const armedInSheet = armed && isPhone;
 	const move = tileMove(tile.basis, tile.currentExact);
+	// MOBILE-2j · R-1 — whether the movement chip fits beside this value at phone
+	// width. It is the ONE element on the money line that yields; the rule, the
+	// measurement behind it and why it is data rather than an observer are in
+	// `money-line.ts`. Applied as a CLASS, so the desktop is untouched by
+	// construction and nothing flips on hydration.
+	const movementFitsOnPhone = phoneMoneyLineFitsMovement(tile.valueDisplay);
 	const sellArgs = {
 		marketId: tile.row.marketId,
 		// ⚠ `undefined` ON THE FALLBACK TILE — `buildSellRequest` DROPS the key
@@ -1294,37 +1306,43 @@ function TileRow({
 			   SUPPRESSED at phone width and a top border takes over. The selected arm
 			   keeps its `bg-n1`, which is what still says "this one" once the outline
 			   is gone. */
-			/* ⚠⚠ MOBILE-2h · R-2 — THE PHONE ROW BECOMES A TILE: ONE POSITION, ONE
-			   SCREEN. Round five made this `<tr>` a flex ROW of four cells, which was
-			   right for a list and is wrong for a tile — a tile has a top cluster, a
-			   gap, and a line anchored to its bottom, and those are three bands rather
-			   than one line.
-			   ⛔ GRID RATHER THAN FLEX, AND THE REASON IS THE DOM ORDER. The cells are
-			   fixed at side · argument · value · Sell, and the tile wants side and
-			   value and Sell on ONE line with the argument BELOW them. A flex row
-			   cannot do that without `flex-wrap`, and a wrapped flex line's height is
-			   governed by `align-content`, which stretches EVERY line equally — so the
-			   top cluster would take half the screen. `order` does not help: it moves
-			   items within lines, not lines. Grid places all four by coordinate
-			   without opening a single `<td>`, and `grid-rows-[auto_1fr]` gives the
-			   leftover height to row 2 alone, which is exactly the ruling.
-			   ⛔ `min-h`, NEVER `h`. A market question longer than a screen must GROW
-			   the tile; a definite height would clamp it or scroll it inside itself,
-			   both of which the ruling forbids.
-			   ⚠ THE HEIGHT IS `<main>`'s OWN EXPRESSION, NOT A NUMBER CHOSEN HERE.
-			   `(public)/layout.tsx` sizes `<main>` at `calc(100dvh-60px-2px)` below
-			   640px: `60px` is `GlobalHeader`'s inner row and `2px` its `border-y`.
-			   That header is `sticky top-0`, so it is the only fixed chrome above this
-			   list, and the viewport minus it is the visible area a tile has to fill.
-			   MEASURED at three widths: 782 at 390x844, 738 at 360x800, 870 at
-			   430x932 — the viewport height minus 62 exactly, every time.
-			   ⚠ `scroll-mt-[62px]` IS THE SAME 62px SAID TO THE SNAP ENGINE. Without
-			   it `snap-start` rests the tile's top at the SCROLLPORT's top, which the
-			   sticky header covers; with it the tile lands immediately below the
-			   header and fills the screen exactly. Measured: tile top = 62 at every
-			   width, against 107 without it.
-			   ⚠ `snap-always` is what makes it "one at a time" — a proximity snap
-			   alone lets a fast flick pass several tiles.
+			/* ⚠⚠ MOBILE-2j · R-1 — THE TILE GOES BACK TO BEING A FULL-WIDTH ROW IN THE
+			   PAGE'S ORDINARY SCROLL, AND THE WORK IS A DELETION RATHER THAN AN
+			   ADDITION (ADR-0051 A6 D-1, which supersedes A5 D-1). MOBILE-2h made this
+			   `<tr>` one visual viewport tall and snapped it to its own top edge; the
+			   founder walked that build and rejected it. So the HEIGHT, the SNAP
+			   ALIGNMENT, the scroll margin that lifted the snap landing clear of the
+			   sticky header, and the distributed gap inside the argument cell are all
+			   gone — and the page's snap TYPE went with them, which is why
+			   `src/app/layout.tsx` is byte-identical to its pre-2h form again. A tile
+			   now takes exactly the height its three lines need.
+			   ⛔ WHAT STAYS IS THE GRID, AND IT STAYS FOR THE REASON IT ARRIVED — which
+			   was never about height. The four `<td>`s are fixed in DOM order at side ·
+			   argument · value · Sell, and the composition wants side, value and Sell on
+			   ONE line with the argument BELOW them. `flex-wrap` cannot do that: a
+			   wrapped flex line's cross size is governed by `align-content`, which
+			   stretches every line equally. `order` moves items within lines, not lines.
+			   Grid places all four by coordinate without opening a single `<td>`, and
+			   that is as true of a three-line list row as it was of a full screen.
+			   ⚠ `grid-rows-[auto_1fr]` SURVIVES AND IS NOW INERT BY ARITHMETIC, which is
+			   the reason it is kept rather than tidied away: with no definite height an
+			   `fr` track resolves to its own max-content, so row 2 measures exactly what
+			   `auto` would. It costs nothing and it is the only place the two-band
+			   structure is written down — delete it and the placement tokens on the cells
+			   (`row-start-2`, `col-span-3`) name tracks no track list declares.
+			   ⚠ `gap-y-[7px]` IS THE COMPOSITION'S ONE STATED GAP: 7px between the money
+			   line and the argument title, down from 2h's `gap-y-2`. It is also the tile's
+			   ONLY gap now. The market question sits directly under the title, which is
+			   where it sits at every width above 640 and where it sat before 2h — the
+			   distributed `mt-auto` had nothing left to distribute the moment the height
+			   became natural, and the `pt-3` beside it was that mechanism's floor rather
+			   than a chosen gap.
+			   ⛔ AND THE TYPE COMES DOWN WITH THE HEIGHT, ON EVERY LINE. 24px of value
+			   and 18px of title were sized against a screen; at a list row's scale the
+			   ruling is 18 / 18 / 11 on the money line, 15px medium for the title, and the
+			   question at the token it already had. ⚠ THE STEP-DOWN IS ALSO WHAT MAKES A
+			   FIVE-FIGURE FIGURE FIT — see `phoneMoneyLineFitsMovement` above for the
+			   measurement and for the one element that yields when it does not.
 			   ⛔⛔ MOBILE-2h · R-3 — NO SELECTED VISUAL BELOW 640, AND THE STATE IS
 			   KEPT. `bg-transparent` overrides the selected arm's `bg-n1` and the
 			   resting arm's `hover:bg-n1` — the same mechanism the shipped
@@ -1342,7 +1360,7 @@ function TileRow({
 			   80392, both inside a hover media query. The token is correct and correctly
 			   ordered for a sub-640 pointer-capable window, which is the case it is
 			   actually for. `@code-reviewer`, LOW. */
-			className={`cursor-pointer rounded-(--r) focus-visible:shadow-(--state-focus-ring) max-mobile:grid max-mobile:min-h-[calc(100dvh-60px-2px)] max-mobile:snap-start max-mobile:snap-always max-mobile:scroll-mt-[62px] max-mobile:grid-cols-[auto_1fr_auto] max-mobile:grid-rows-[auto_1fr] max-mobile:items-center max-mobile:gap-x-2 max-mobile:gap-y-2 max-mobile:rounded-none max-mobile:bg-transparent max-mobile:px-0 max-mobile:py-2.5 max-mobile:[border-top:var(--hairline)] max-mobile:[outline:none] max-mobile:hover:bg-transparent ${
+			className={`cursor-pointer rounded-(--r) focus-visible:shadow-(--state-focus-ring) max-mobile:grid max-mobile:grid-cols-[auto_1fr_auto] max-mobile:grid-rows-[auto_1fr] max-mobile:items-center max-mobile:gap-x-2 max-mobile:gap-y-[7px] max-mobile:rounded-none max-mobile:bg-transparent max-mobile:px-0 max-mobile:py-2.5 max-mobile:[border-top:var(--hairline)] max-mobile:[outline:none] max-mobile:hover:bg-transparent ${
 				selected
 					? "bg-n1 [outline-offset:-2px] [outline:var(--ring-active)]"
 					: "[outline-offset:-1px] [outline:var(--hairline)] hover:bg-n1"
@@ -1402,7 +1420,7 @@ function TileRow({
 				    span contains. */}
 				<span
 					data-testid={`tile-side-${tile.key}`}
-					className="flex items-center justify-center gap-[5px] text-[15px] leading-[1.35] font-extrabold text-ink max-mobile:gap-2 max-mobile:text-[24px] max-mobile:leading-[1.2] max-mobile:[&_svg]:size-6"
+					className="flex items-center justify-center gap-[5px] text-[15px] leading-[1.35] font-extrabold text-ink max-mobile:gap-2 max-mobile:text-[18px] max-mobile:leading-[1.2] max-mobile:[&_svg]:size-[18px]"
 				>
 					{tile.side === "YES" ? "Yes" : "No"}
 					{/* ⚠ 15, AND DELIBERATELY NOT 16. P-3 raises the side marker with the
@@ -1428,7 +1446,7 @@ function TileRow({
 			    here, so without it the TILE widens instead of the text wrapping.
 			    ⛔ `flex-1` IS GONE, not forgotten — it was a flex declaration and this
 			    is no longer a flex container, so it named nothing. */}
-			<td className="p-2 align-middle max-mobile:col-span-3 max-mobile:col-start-1 max-mobile:row-start-2 max-mobile:min-w-0 max-mobile:self-stretch max-mobile:p-0">
+			<td className="p-2 align-middle max-mobile:col-span-3 max-mobile:col-start-1 max-mobile:row-start-2 max-mobile:min-w-0 max-mobile:p-0">
 				<TileArgumentCell
 					cell={tile.argument}
 					tileKey={tile.key}
@@ -1501,7 +1519,7 @@ function TileRow({
 								    `text-[Npx]` inherits whatever leading was in scope
 								    (AGENTS.md §8) — here `leading-[1.35]`, which at 24px is a
 								    32px line and pushes the whole cluster down. */}
-								<span className="text-[17px] leading-[1.35] font-bold max-mobile:text-[24px] max-mobile:leading-[1.2]">
+								<span className="text-[17px] leading-[1.35] font-bold max-mobile:text-[18px] max-mobile:leading-[1.2]">
 									Đ {formatDharma(tile.valueDisplay)}
 								</span>
 								{/* ⚠⚠ R-2 — THE MOVEMENT LINE. Three renderable outcomes and one
@@ -1520,7 +1538,9 @@ function TileRow({
 										data-testid={`tile-pl-${tile.key}`}
 										role="img"
 										aria-label="unchanged"
-										className="text-[10.5px] leading-[1.2] font-bold text-n5 max-mobile:text-[13px]"
+										className={`text-[10.5px] leading-[1.2] font-bold text-n5 max-mobile:text-[11px] ${
+											movementFitsOnPhone ? "" : "max-mobile:hidden"
+										}`}
 									>
 										—
 									</span>
@@ -1530,7 +1550,9 @@ function TileRow({
 										data-testid={`tile-pl-${tile.key}`}
 										role="img"
 										aria-label={move.words}
-										className="flex items-center gap-0.5 text-[10.5px] leading-[1.2] font-bold text-n5 max-mobile:text-[13px]"
+										className={`flex items-center gap-0.5 text-[10.5px] leading-[1.2] font-bold text-n5 max-mobile:text-[11px] ${
+											movementFitsOnPhone ? "" : "max-mobile:hidden"
+										}`}
 									>
 										{move.up ? (
 											<TrendingUp
@@ -1624,7 +1646,7 @@ function TileRow({
 											   growing with the label. `px-3` because a 16px word inside
 											   `size="xs"`'s `px-2` reads as a label with a box drawn round
 											   it rather than as a button. */
-											className="font-extrabold tracking-[0.08em] uppercase [border:var(--ring-active)] max-mobile:min-h-11 max-mobile:w-full max-mobile:px-3 max-mobile:text-[16px] max-mobile:leading-[1.2] max-mobile:[touch-action:manipulation]"
+											className="font-extrabold tracking-[0.08em] uppercase [border:var(--ring-active)] max-mobile:min-h-11 max-mobile:w-full max-mobile:px-3 max-mobile:text-[12px] max-mobile:leading-[1.2] max-mobile:[touch-action:manipulation]"
 											onClick={() => sell.arm(tile.key)}
 										>
 											Sell
@@ -1709,7 +1731,7 @@ function TileRow({
 					    is a floor rather than a share and 64px would clip a 24px figure. */}
 					<td
 						data-testid={`tile-staked-${tile.key}`}
-						className="p-2 text-center align-middle whitespace-nowrap tabular-nums text-ink max-mobile:col-start-2 max-mobile:row-start-1 max-mobile:justify-self-end max-mobile:p-0 max-mobile:text-right max-mobile:text-[24px] max-mobile:leading-[1.2]"
+						className="p-2 text-center align-middle whitespace-nowrap tabular-nums text-ink max-mobile:col-start-2 max-mobile:row-start-1 max-mobile:justify-self-end max-mobile:p-0 max-mobile:text-right max-mobile:text-[18px] max-mobile:leading-[1.2]"
 					>
 						{/* ⚠⚠ MOBILE-1 · JOB B — THE PHONE'S COLUMN LABEL, AND THE STRING IS
 						    CARRIED, NEVER AUTHORED. Below 640px the `<thead>` is hidden, so this
@@ -1739,7 +1761,7 @@ function TileRow({
 						    moved, which is what keeps "no copy was authored for the phone"
 						    checkable. */}
 						<InfoTip content={GLOSSARY.stakedOwn} asChild>
-							<span className="hidden max-mobile:inline max-mobile:text-[13px] max-mobile:leading-[1.2] max-mobile:font-bold max-mobile:text-n5">
+							<span className="hidden max-mobile:inline max-mobile:text-[11px] max-mobile:leading-[1.2] max-mobile:font-bold max-mobile:text-n5">
 								Staked
 							</span>
 						</InfoTip>{" "}
@@ -1763,7 +1785,7 @@ function TileRow({
 					    is only true of a closed tile: when it was opened. */}
 					<td
 						data-testid={`tile-opened-${tile.key}`}
-						className="p-2 text-center align-middle whitespace-nowrap text-n5 max-mobile:col-start-3 max-mobile:row-start-1 max-mobile:p-0 max-mobile:text-right max-mobile:text-[13px] max-mobile:leading-[1.2]"
+						className="p-2 text-center align-middle whitespace-nowrap text-n5 max-mobile:col-start-3 max-mobile:row-start-1 max-mobile:p-0 max-mobile:text-right max-mobile:text-[11px] max-mobile:leading-[1.2]"
 					>
 						{/* ⚠ THE PHONE'S COLUMN LABEL (MOBILE-1 · JOB B), same mechanism and same
 						    rule as `Staked` above: the word is byte-carried from this column's own
@@ -1853,7 +1875,7 @@ function TileArgumentCell({
 		// ⚠ `pt-3` IS A FLOOR, NOT THE GAP. When the question is long enough to grow
 		// the tile past a screen the auto margin resolves to zero, and without a
 		// floor the question would touch the title it is meant to sit apart from.
-		<span className="block text-[11px] leading-[1.35] font-semibold text-n5 max-mobile:mt-auto max-mobile:line-clamp-none max-mobile:pt-3">
+		<span className="block text-[11px] leading-[1.35] font-semibold text-n5 max-mobile:line-clamp-none">
 			<Link
 				data-testid={`tile-market-${tileKey}`}
 				href={`/m/${cell.marketSlug}`}
@@ -1873,9 +1895,9 @@ function TileArgumentCell({
 			// shape from every other.
 			<span
 				data-testid={`tile-arg-removed-${tileKey}`}
-				className="max-mobile:flex max-mobile:h-full max-mobile:flex-col"
+				className="max-mobile:flex max-mobile:flex-col"
 			>
-				<span className="text-[11px] leading-[1.35] font-semibold text-n5 italic max-mobile:text-[18px] max-mobile:leading-[1.35]">
+				<span className="text-[11px] leading-[1.35] font-semibold text-n5 italic max-mobile:text-[15px] max-mobile:leading-[1.35]">
 					{REMOVED_STUB_TEXT}
 				</span>
 				{marketLine}
@@ -1889,7 +1911,7 @@ function TileArgumentCell({
 		// the question sits under the title instead of at the tile's foot.
 		<span
 			data-testid={`tile-arg-${tileKey}`}
-			className="text-ink max-mobile:flex max-mobile:h-full max-mobile:flex-col"
+			className="text-ink max-mobile:flex max-mobile:flex-col"
 		>
 			{/* `line-clamp-4` is the other half of RF-10's equal-height rule: a `<tr>`
 			    height is a FLOOR and cannot cap content, so this is what stops one long
@@ -1920,7 +1942,7 @@ function TileArgumentCell({
 				// live. ⚠ `font-medium` steps DOWN from the desktop's `font-bold`: at
 				// 18px, bold competes with the 24px value beside it, and the ruling
 				// puts the value first.
-				className="line-clamp-4 text-[15px] leading-[1.35] font-bold hover:underline max-mobile:line-clamp-none max-mobile:text-[18px] max-mobile:leading-[1.35] max-mobile:font-medium"
+				className="line-clamp-4 text-[15px] leading-[1.35] font-bold hover:underline max-mobile:line-clamp-none max-mobile:text-[15px] max-mobile:leading-[1.35] max-mobile:font-medium"
 			>
 				{cell.title}
 			</Link>
@@ -1980,65 +2002,68 @@ function TileArgumentCell({
  * className out of a 400-CHARACTER WINDOW after the `data-testid` — a fence by
  * DISTANCE (O-8 in a different unit), which a comment in the gap defeats.
  *
- * ⛔⛔ MOBILE-2h · R-2 — BOTH BOXES RELEASE `overflow` BELOW 640px, AND BOTH NEED
- * `min-w-0` BESIDE IT. This is the note the paragraph above is about, and it is
- * here because putting it beside either class string is what reddened
- * `profile-height-chain` on the first attempt: the fence fired on the very
- * change whose explanation overran it.
+ * ⛔⛔ MOBILE-2j — THE SECTION KEEPS ITS PHONE `overflow` OVERRIDE AND THE BODY
+ * LOSES ITS OWN. This is the note the paragraph above is about, and it is here
+ * rather than beside either class string because putting it there is what
+ * reddened `profile-height-chain` at MOBILE-2h: that guard fences by a
+ * 400-character window and the fence fired on the very change whose explanation
+ * overran it (`O-8`, in a different unit).
  *
- * **Why change them at all.** A snap alignment resolves against the nearest
- * SCROLL-CONTAINER ancestor, and both of these boxes were scroll containers — the
- * body by `overflow-y-auto`, the section by `overflow-hidden`, which per CSS
- * Overflow is a scroll container that simply cannot be scrolled by hand. So with
- * either one live, the phone's viewport-tall tiles snap against a panel instead
- * of against the page. MEASURED at 360/390/430: changing the body alone moves a
- * tile's nearest scroller from `positions-panel-body` to `positions-panel` and
- * the landing still misses by 45px; changing both moves it to the VIEWPORT and
- * the tile lands exactly, its top edge at 62px. Neither is sufficient alone.
+ * **What MOBILE-2h did, and why only half of it survives.** A snap alignment
+ * resolves against the nearest SCROLL-CONTAINER ancestor, and both of these
+ * boxes were one — the body by `overflow-y-auto`, the section by
+ * `overflow-hidden`, which per CSS Overflow is a scroll container that simply
+ * cannot be scrolled by hand. So while either was live, viewport-tall tiles
+ * snapped against a panel instead of against the page (MEASURED at 360/390/430:
+ * releasing the body alone moved the nearest scroller to `positions-panel` and
+ * the landing still missed by 45px; releasing both reached the VIEWPORT).
+ * ADR-0051 A6 D-1 withdraws the snap entirely, so **the body goes back to a plain
+ * `overflow-y-auto` at every width** — there is no longer anything it has to
+ * escape, and a scroll container with an auto height cannot overflow itself.
  *
- * ⛔⛔ **`clip`, NOT `visible`, AND THE DIFFERENCE IS A REGRESSION THIS ROUND
- * SHIPPED AND THEN MEASURED.** The first form released these to `visible`, which
- * does reach the viewport — and also gives up the CLIP. `overflow: hidden` was
- * containing more than the round had noticed: row 1 of the tile is three
- * `whitespace-nowrap` cells in tracks that cannot shrink below their min-content,
- * so a five-figure Đ figure makes the row wider than the tile. MEASURED at 360 on
- * the Closed tab with `Staked Đ 14,260`: the row needs **328px against 278px**,
- * and with the clip gone that 50px reached the document — the layout viewport
- * widened 360 → 369 and the page gained horizontal scroll. `@code-reviewer`, HIGH.
- * ⇒ **`overflow: clip` clips exactly as `hidden` does and, per CSS Overflow 3, is
- * NOT a scroll container.** MEASURED: with `clip` the tile's nearest scroller is
- * still the VIEWPORT and the snap still lands at 62px, while the frame holds its
- * 360 and the page gains no horizontal scroll. It restores precisely the
- * containment `hidden` was providing and gives up only the part that was in the way.
+ * **The SECTION's `clip` stays, and it stays for the OTHER reason — the one that
+ * has nothing to do with snapping.** Row 1 of a tile is three `whitespace-nowrap`
+ * cells in tracks that cannot shrink below min-content, and `formatDharma` never
+ * abbreviates, so a five-figure Đ figure can make the row wider than the tile.
+ * MEASURED at MOBILE-2h at 360 on the Closed tab with `Staked Đ 14,260`: the row
+ * needed **328px against 278px**, and with the clip released that 50px reached the
+ * document — the layout viewport widened 360 → 369 and the page gained horizontal
+ * scroll. The money line still exists at the same width, so the backstop stays.
  *
- * ⛔⛔ **AND THE TWO BOXES TAKE DIFFERENT VALUES, WHICH A SHIPPED GUARD IS WHAT
- * FOUND.** The first form clipped BOTH, and `sticky-header-strip.test.ts:134`
- * went red: it forbids `overflow-hidden|clip` on this BODY by name, because the
- * sticky `<thead>`'s negative-offset shadow is what covers the body's own top
- * padding and a clipped body cannot scroll under it. The guard is right, and its
- * red is the better shape rather than an obstacle:
- *   · the **body** only has to stop being a SCROLL CONTAINER, which `visible` does,
- *     and it needs no clip of its own because
- *   · the **section** clips at its border box, which is where the containment was
- *     always taken.
- * Both boxes leave the snap chain and exactly one of them clips — which is what
- * `overflow: hidden` was doing before this round, expressed once instead of twice.
- * ⚠ **WHAT IS THEREFORE UNCHANGED, AND IS NOT THIS ROUND'S TO FIX:** a five-figure
- * figure at 360 is CLIPPED rather than wrapped — exactly as it was before this
- * round, when the same content overflowed a 64px cell and was clipped at this same
- * panel edge. The regression was the frame giving way; the clip is the status quo.
- * Widening the cells or letting them wrap is a composition change and a ruling,
- * not a repair (`docs/parked.md` 2h-7).
+ * ⚠⚠ **AND WITH THE SNAP GONE, `clip` AND `hidden` ARE EQUIVALENT HERE — THE
+ * OVERRIDE IS BELT, NOT MECHANISM, AND SAYING SO IS THE POINT.** `clip` was
+ * chosen over the inherited `overflow-hidden` for exactly one property: per CSS
+ * Overflow 3 it is NOT a scroll container, which is what let the tiles snap past
+ * it. Nothing snaps now, so the base `overflow-hidden` would clip identically.
+ * It is kept because ADR-0051 A6 D-1 names the containment and because a box that
+ * creates no scroll container is the cheaper of two identical options — NOT
+ * because it is doing work `hidden` could not. A later reader deciding whether it
+ * is load-bearing should read this paragraph as the answer: it is not, and the
+ * clip it provides is.
  *
- * **Why `min-w-0` is not tidying.** `overflow: hidden` does TWO jobs and only one
- * of them is clipping: per CSS Sizing, an `overflow` other than `visible` also
- * zeroes a box's AUTOMATIC MINIMUM SIZE. Releasing it therefore restored
- * `min-width: auto` — min-content — on a box whose widest unbreakable content is
- * the market filter's `whitespace-nowrap` label. MEASURED after shipping the
- * release without it: at 360px with a market selected the panel went 324px →
- * **533px**, carrying the head, the body and the empty state off the right of
- * the screen. `min-w-0` restores the constraint the clip was silently providing,
- * without restoring the scroll container the tiles have to escape.
+ * ⛔ **THE BODY MUST NOT TAKE THE CLIP, WHICH A SHIPPED GUARD IS WHAT FOUND.**
+ * MOBILE-2h's first form clipped BOTH and `sticky-header-strip.test.ts:134` went
+ * red: it forbids `overflow-hidden|clip` on this BODY by name, because the sticky
+ * `<thead>`'s negative-offset shadow is what covers the body's own top padding and
+ * a clipped body cannot scroll under it. The guard is right, and it is why the
+ * body's revert lands on `overflow-y-auto` rather than on anything tidier.
+ *
+ * ⚠ **WHAT IS THEREFORE UNCHANGED, AND IS NOT THIS ROUND'S TO FIX:** a figure too
+ * wide for row 1 at 360 is CLIPPED rather than wrapped. ⚠ MOBILE-2j's type
+ * step-down moves the width at which that begins — the money line is now 18/18/11
+ * where it was 24/24/13 — and `phoneMoneyLineFitsMovement` is the measured rule
+ * that keeps it off the boundary by dropping the movement chip. Widening the cells
+ * or letting them wrap remains a composition change and a ruling, not a repair
+ * (`docs/parked.md` 2h-7).
+ *
+ * **Why `min-w-0` is not tidying.** `overflow` other than `visible` does TWO jobs
+ * and only one of them is clipping: per CSS Sizing it also zeroes a box's
+ * AUTOMATIC MINIMUM SIZE. MOBILE-2h released the section to `visible` WITHOUT
+ * restoring that, and MEASURED at 360 with a market selected the panel went 324px
+ * → **533px**, carrying the head, the body and the empty state off the right of
+ * the screen. The section is back to a non-visible overflow, so the zeroing comes
+ * free again and this token is belt beside `clip` — kept, because the two arrived
+ * as one decision and half of that decision was a regression.
  *
  * ⚠⚠ AND THE OVERFLOW INSTRUMENT READ ZERO THROUGHOUT THAT. Under mobile
  * emulation the LAYOUT VIEWPORT widens to fit overflowing content, so the usual
@@ -2071,9 +2096,9 @@ function PositionsPanel({
 		<section
 			data-testid="positions-panel"
 			aria-label="Positions"
-			// `min-h-0`: the panel can be SHORTER than its content. MOBILE-2h's phone
-			// pair — `min-w-0` + `overflow-visible` — is explained in this component's
-			// docblock and deliberately NOT here; see its last two paragraphs.
+			// `min-h-0`: the panel can be SHORTER than its content. The phone pair is
+			// explained in this component's docblock and deliberately NOT here — the
+			// height-chain guard fences by DISTANCE from this testid.
 			className="flex min-h-0 flex-col overflow-hidden rounded-[var(--r)] bg-n0 [border:var(--hairline)] max-mobile:min-w-0 max-mobile:overflow-clip"
 		>
 			{/* `relative` is the market popover's POSITIONING CONTEXT, and it lives
@@ -2107,27 +2132,24 @@ function PositionsPanel({
 			    the arrow keys about what "next" means — the stepper moves the
 			    SELECTION and scrolls it into view at `block:"nearest"`, which snap
 			    would then override with its own idea of a resting position.
-			    ⚠⚠ MOBILE-2h · R-2 — THAT RULING IS UNCHANGED AND THE PHONE DOES SNAP,
-			    which is not a contradiction because it is a different scroller. RF-10
-			    is about THIS box, the panel-scoped scroller, which exists only at
-			    `lg`+ and is released below 640px (`max-mobile:overflow-visible`). The
-			    phone's snap lives on the DOCUMENT, which is a different scroller.
-			    Nothing on THIS element snaps at any width.
-			    ⚠⚠ AND THE REASON IS NOT "A PHONE HAS NO KEYS", WHICH IS WHAT THIS NOTE
-			    SAID. `max-mobile` is a WIDTH query, so a desktop window narrower than
-			    640px is inside the phone tier with a keyboard and a trackpad attached:
-			    `useDocumentRowStepper` is live there and RF-10's objection applies
-			    verbatim. It is not broken there, and the reason is a coincidence worth
-			    writing down rather than a design: the tile is `100dvh - 62` tall and
-			    carries a matching `scroll-mt`, so its scroll-margin-adjusted box is
-			    exactly one viewport and `scrollIntoView({block:"nearest"})` lands on the
-			    same position `snap-start` would choose. The trackpad half does change —
-			    one tile per gesture on a narrow desktop window. `@code-reviewer`,
-			    MEDIUM: the token is right and the stated cause was not the cause. */}
+			    ⚠⚠ MOBILE-2j — AND NOW NOTHING ANYWHERE SNAPS ON THIS SURFACE. MOBILE-2h
+			    put a `y proximity` snap type on `<html>` and an alignment on every
+			    tile, and had to release BOTH of this panel's boxes so the tiles could
+			    reach the viewport to snap against it. ADR-0051 A6 D-1 withdraws all of
+			    that, so this box goes back to the value it has carried since the
+			    mockup: `overflow-y-auto`, at every width, with no phone override.
+			    ⛔ THAT IS SAFE ONLY BECAUSE NOTHING GIVES THIS BOX A DEFINITE HEIGHT
+			    BELOW 640px, AND IT IS THE THING TO RE-MEASURE IF THE PAGE CHROME EVER
+			    MOVES. A scroll container with an auto height cannot overflow itself, so
+			    the list scrolls with the PAGE, which is what A6 D-1 asks for. The two
+			    mechanisms that COULD bound it both stand down on the tier — the
+			    three-tile `max-height` cap and `useEqualRowThirds` — and `<main>`'s own
+			    phone height is a `min-h`, not a height. MEASURED at 360 / 390 / 430:
+			    this body's scrollHeight equals its clientHeight and the document is the
+			    thing that scrolls. */}
 			<div
 				data-testid="positions-panel-body"
-				// MOBILE-2h · R-2 — `visible` here, `clip` on the `<section>`; docblock.
-				className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 max-mobile:min-w-0 max-mobile:overflow-visible"
+				className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3"
 				ref={bodyRef}
 			>
 				{children}

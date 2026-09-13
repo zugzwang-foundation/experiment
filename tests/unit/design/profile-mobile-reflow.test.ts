@@ -508,13 +508,18 @@ describe("profile mobile reflow — the positions table stacks below 640px", () 
 	 * Edit site 4 — the load-bearing one, and the one MOBILE-2h turns around a
 	 * SECOND time.
 	 *
-	 * ⚠⚠ **JOB B MADE THIS ROW A COLUMN; ROUND FIVE MADE IT A ROW; MOBILE-2h
-	 * MAKES IT A GRID.** Each reversal was right about the surface it was aimed
-	 * at, and the surface kept moving: Job B stacked four cells and got a centred
-	 * tile nobody wanted, round five put them back on one line and got a 44px
-	 * summary of an argument, and the founder's ruling is that a position is worth
-	 * a screen. A screen is three BANDS — a top cluster, a gap, and a line anchored
-	 * to the bottom — and three bands is not one flex line however it is wrapped.
+	 * ⚠⚠ **JOB B MADE THIS ROW A COLUMN; ROUND FIVE MADE IT A ROW; MOBILE-2h MADE
+	 * IT A GRID AND A SCREEN; MOBILE-2j KEEPS THE GRID AND TAKES THE SCREEN BACK.**
+	 * Each reversal was right about the surface it was aimed at, and the surface
+	 * kept moving: Job B stacked four cells and got a centred tile nobody wanted,
+	 * round five put them back on one line and got a 44px summary of an argument,
+	 * MOBILE-2h gave each position a whole viewport and snapped through them — and
+	 * the founder walked THAT and rejected it. ADR-0051 A6 D-1 is where it settles:
+	 * three bands, at their natural height, in the page's ordinary scroll.
+	 *
+	 * ⛔ THE GRID IS THE PART THAT SURVIVES ALL OF IT, because its reason was never
+	 * height. Three bands is not one flex line however it is wrapped, and the four
+	 * `<td>`s are fixed in DOM order.
 	 *
 	 * ⛔ THE `<td>`s ARE FIXED IN DOM ORDER (side · argument · value · Sell) AND
 	 * THE TILE WANTS THE ARGUMENT BELOW THE OTHER THREE. `flex-wrap` cannot do it:
@@ -561,24 +566,47 @@ describe("profile mobile reflow — the positions table stacks below 640px", () 
 				`— two display utilities on one element resolve by emission order.`,
 		).not.toContain(phone("flex"));
 
+		// ⛔⛔ INVERTED AT MOBILE-2j, NOT DELETED. These two blocks REQUIRED the
+		// viewport height and the snap at MOBILE-2h. A6 D-1 withdraws both, and a
+		// guard that was merely removed would let the shape the founder walked and
+		// rejected come back without a single test going red. The full contract —
+		// including the 7px gap that replaced the distributed one — is in
+		// `phone-position-tile.test.ts`; this file holds the half a reader lands on
+		// when they come here to change the reflow.
 		const size =
-			`${TABLE_FILE}: the tile is no longer one screen tall. The height is ` +
-			`${phone("min-h-[calc(100dvh-60px-2px)]")} — <main>'s own expression, the ` +
-			`viewport minus the sticky header's 60px row and 2px border — and it is a ` +
-			`MIN, so a market question longer than a screen grows the tile instead of ` +
-			`being clamped by it.`;
-		expect(classes, size).toContain(phone("min-h-[calc(100dvh-60px-2px)]"));
+			`${TABLE_FILE}: the tile declares a phone-tier HEIGHT. A6 D-1 rules it a ` +
+			`full-width row of NATURAL height — the three lines it renders are what ` +
+			`set it. ${phone("min-h-[calc(100dvh-60px-2px)]")} is exactly what was ` +
+			`withdrawn.`;
+		expect(
+			classes.filter(
+				(c) =>
+					c.startsWith(`${VARIANT}${SEP}min-h-`) ||
+					c.startsWith(`${VARIANT}${SEP}h-`) ||
+					c.startsWith(`${VARIANT}${SEP}max-h-`),
+			),
+			size,
+		).toEqual([]);
 
 		const snap =
-			`${TABLE_FILE}: the tile does not snap, or snaps under the header. ` +
-			`${phone("snap-start")} is the alignment, ${phone("snap-always")} is what ` +
-			`makes it one at a time rather than one per flick, and ` +
-			`${phone("scroll-mt-[62px]")} is the same 62px said to the snap engine — ` +
-			`without it the tile rests at the scrollport top, which the sticky header ` +
-			`covers (measured: top at 107px instead of 62px).`;
-		expect(classes, snap).toContain(phone("snap-start"));
-		expect(classes, snap).toContain(phone("snap-always"));
-		expect(classes, snap).toContain(phone("scroll-mt-[62px]"));
+			`${TABLE_FILE}: the tile still snaps. A6 D-1 puts the list in the page's ` +
+			`ORDINARY scroll — no alignment on the tile, and no scroll margin, which ` +
+			`existed only to lift a snap landing clear of the sticky header and would ` +
+			`now displace the keyboard stepper's scrollIntoView instead.`;
+		expect(classes, snap).not.toContain(phone("snap-start"));
+		expect(classes, snap).not.toContain(phone("snap-always"));
+		expect(
+			classes.some((c) => c.startsWith(`${VARIANT}${SEP}scroll-mt-`)),
+			snap,
+		).toBe(false);
+
+		// ⚠ AND THE ONE GAP THE COMPOSITION STATES, asserted here too because it is
+		// what replaced the distributed one: 7px between the money line and the
+		// argument title, and nothing between the title and the question.
+		expect(
+			classes,
+			`${TABLE_FILE}: the tile's row gap is not the ruled 7px.`,
+		).toContain(phone("gap-y-[7px]"));
 
 		const sep =
 			`${TABLE_FILE}: the phone row separator is incomplete. Below 640px the ` +
