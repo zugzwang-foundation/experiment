@@ -7,9 +7,14 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { PFP_PLACEHOLDER, pfpUrl } from "@/server/identity-pool/pfp-url";
+import {
+	PFP_ASSET_VERSION,
+	PFP_PLACEHOLDER,
+	pfpUrl,
+} from "@/server/identity-pool/pfp-url";
 
 const BASE = "https://pub-abc123.r2.dev";
+const V = `?v=${PFP_ASSET_VERSION}`;
 let original: string | undefined;
 
 beforeEach(() => {
@@ -24,11 +29,11 @@ afterEach(() => {
 
 describe("pfpUrl", () => {
 	it("composes the v1-prefixed public URL", () => {
-		expect(pfpUrl("gold-zebra.webp")).toBe(`${BASE}/v1/gold-zebra.webp`);
+		expect(pfpUrl("gold-zebra.webp")).toBe(`${BASE}/v1/gold-zebra.webp${V}`);
 	});
 
 	it("carries a variant filename through unchanged", () => {
-		expect(pfpUrl("gold-cat-v3.webp")).toBe(`${BASE}/v1/gold-cat-v3.webp`);
+		expect(pfpUrl("gold-cat-v3.webp")).toBe(`${BASE}/v1/gold-cat-v3.webp${V}`);
 	});
 
 	// A scrubbed row (SPEC.1 §23) has pfp_filename NULL and must still render.
@@ -72,12 +77,27 @@ describe("pfpUrl", () => {
 	// need a change here.
 	it("accepts the numbered filename shape ADR-0011 will introduce", () => {
 		expect(pfpUrl("gold-zebra-007.webp")).toBe(
-			`${BASE}/v1/gold-zebra-007.webp`,
+			`${BASE}/v1/gold-zebra-007.webp${V}`,
 		);
 	});
 
 	it("does not double the slash when the base carries a trailing one", () => {
 		process.env.R2_PUBLIC_URL_PFP = `${BASE}/`;
-		expect(pfpUrl("gold-zebra.webp")).toBe(`${BASE}/v1/gold-zebra.webp`);
+		expect(pfpUrl("gold-zebra.webp")).toBe(`${BASE}/v1/gold-zebra.webp${V}`);
+	});
+
+	// R2-REPLACE-IN-PLACE — the objects carry a one-year immutable header, so an
+	// in-place replacement is invisible to any browser that already cached the
+	// old bytes. Only a different URL reaches that copy; this is what makes one.
+	it("appends the cache-busting asset version to every real PFP URL", () => {
+		expect(PFP_ASSET_VERSION).toMatch(/^\d{8}$/);
+		expect(pfpUrl("gold-zebra.webp")).toMatch(
+			new RegExp(`\\?v=${PFP_ASSET_VERSION}$`),
+		);
+	});
+
+	it("never versions the local placeholder", () => {
+		expect(pfpUrl(null)).toBe(PFP_PLACEHOLDER);
+		expect(PFP_PLACEHOLDER).not.toContain("?v=");
 	});
 });

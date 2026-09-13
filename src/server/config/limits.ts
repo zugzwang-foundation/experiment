@@ -64,12 +64,41 @@ export const READ_URL_TTL_SECONDS_MODERATION = 60;
  * from the client, which in turn needs `cache-control` on the bucket's CORS
  * allow-list. That asymmetry is the whole reason this direction is cheaper.
  *
- * `immutable` is honest here because keys are minted per upload and never
- * reused, so a given URL's bytes genuinely cannot change. ⚠ A future
- * replace-image feature that REUSES a key would break that promise and must
- * change this constant, not work around it.
+ * ⛔ R2-REPLACE-IN-PLACE — THIS USED TO BE `public, max-age=31536000, immutable`,
+ * AND THE PROMISE THAT MADE IT HONEST WAS BROKEN BY USE, NOT BY CODE. It rested
+ * on "keys are minted per upload and never reused, so a given URL's bytes
+ * genuinely cannot change", and this paragraph said a feature that reused a key
+ * must change this constant. Images were then replaced in place from the R2
+ * dashboard, at their existing keys. R2 served the new bytes at once — measured,
+ * no CDN in the path — but every browser that had seen the old ones held a
+ * one-year copy it had been told never to recheck, so the new image appeared
+ * only after a hard refresh. Nothing was stale on the server; the header was a
+ * lie the browser correctly believed.
+ *
+ * ⇒ FIVE MINUTES, NO `immutable`. That bounds how long a replaced image can
+ * stay stale, and it costs far less than it looks, for two measured reasons:
+ *   1. When the five minutes lapse the browser REVALIDATES rather than
+ *      re-downloads. R2 answers `If-None-Match` with `304` and a zero-byte
+ *      body, so an unchanged image costs one round trip, not its bytes.
+ *   2. The year was mostly fictional anyway. The signed URL itself rotates
+ *      every hold window (`read-url-memo.ts`, 2750 s at the shipped TTL),
+ *      and a new URL is a new cache entry — so no signed image was ever held
+ *      longer than about 46 minutes. What `immutable` actually bought was
+ *      skipping a revalidation inside one window.
+ *
+ * ⚠ CHANGING THIS VALUE ALSO RE-KEYS EVERY SIGNED URL, AND THAT IS WHAT FIXES
+ * BROWSERS THAT ALREADY HOLD THE OLD COPY. The directive is a signed query
+ * parameter, so a new value is a different URL and a guaranteed cache miss. A
+ * shorter header alone could never reach a copy cached under the old header;
+ * a different URL can.
+ *
+ * ⛔ DO NOT RAISE THIS BACK TO A YEAR, OR RE-ADD `immutable`, WITHOUT FIRST
+ * MAKING IN-PLACE REPLACEMENT IMPOSSIBLE. `tests/server/storage/
+ * render-cache-control.test.ts` bounds the value from both sides for that
+ * reason. Profile pictures are a separate path with their own fix — see
+ * `PFP_ASSET_VERSION` in `src/server/identity-pool/pfp-url.ts`.
  */
-export const RENDER_IMAGE_CACHE_CONTROL = "public, max-age=31536000, immutable";
+export const RENDER_IMAGE_CACHE_CONTROL = "public, max-age=300";
 
 // READ_URL_TTL_SECONDS_RENDER (3600s render-side TTL per SCAFFOLD.15 Q3) is
 // documented but NOT exported — SCAFFOLD.15 doesn't ship a render-side

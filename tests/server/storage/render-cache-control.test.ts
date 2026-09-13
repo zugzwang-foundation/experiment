@@ -1,7 +1,7 @@
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Rendered images must be served with a long-lived `Cache-Control`, applied via
+// Rendered images must be served with a bounded `Cache-Control`, applied via
 // the presigned URL's `response-cache-control` parameter rather than stored on
 // the object.
 //
@@ -124,9 +124,35 @@ describe("render read URLs carry a serve-time Cache-Control", () => {
 	it("the directive is a real caching instruction, not an empty string", () => {
 		// Guards the constant itself: a blank or `no-cache` value would satisfy
 		// every assertion above while serving nothing cacheable.
-		expect(RENDER_IMAGE_CACHE_CONTROL).toMatch(/max-age=\d{4,}/);
+		expect(RENDER_IMAGE_CACHE_CONTROL).toMatch(/max-age=\d+/);
 		expect(RENDER_IMAGE_CACHE_CONTROL).not.toMatch(
-			/no-cache|no-store|max-age=0/,
+			/no-cache|no-store|max-age=0\b/,
 		);
+	});
+
+	// R2-REPLACE-IN-PLACE — the UPPER bound, and the half this guard used to be
+	// missing. It asserted `max-age=\d{4,}` — "long-lived" — and that shape is
+	// exactly what shipped `max-age=31536000, immutable`: correct only while no
+	// object is ever overwritten at its key. Images were then replaced in place
+	// from the R2 dashboard, and every browser that had seen the old bytes kept
+	// them until a hard refresh, having been told never to recheck. A lower bound
+	// alone cannot see that failure, so the guard now brackets the value.
+	//
+	// The ceiling is one hour. That is the most a replaced image may stay stale,
+	// and it sits comfortably under the ~46-minute signed-URL rotation that
+	// already bounds the entry's real life — so the cap costs nothing the
+	// rotation had not already spent. Revalidation past it is cheap: R2 answers
+	// `If-None-Match` with a zero-byte `304` (measured 2026-09-13).
+	it("the directive lets a replaced image refresh — bounded, and never immutable", () => {
+		const match = RENDER_IMAGE_CACHE_CONTROL.match(/max-age=(\d+)/);
+		if (!match) {
+			throw new Error("RENDER_IMAGE_CACHE_CONTROL carries no max-age");
+		}
+		const maxAge = Number(match[1]);
+		expect(maxAge).toBeGreaterThanOrEqual(60);
+		expect(maxAge).toBeLessThanOrEqual(3600);
+		// `immutable` tells a browser to skip revalidation even on reload, which is
+		// the precise mechanism that made a hard refresh the only way through.
+		expect(RENDER_IMAGE_CACHE_CONTROL).not.toMatch(/immutable/);
 	});
 });
