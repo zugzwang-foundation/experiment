@@ -108,6 +108,7 @@ export function useEqualRowThirds({
 	extraHeadSelector,
 	rowWindow,
 	rowCount,
+	enabled = true,
 }: {
 	/** The scroll container whose height the third is taken from. */
 	bodyRef: RefObject<HTMLDivElement | null>;
@@ -131,11 +132,44 @@ export function useEqualRowThirds({
 	 * is a smell the linter is right to reject.
 	 */
 	rowCount: number;
+	/**
+	 * ⛔⛔ MOBILE-2e — THE STAND-DOWN THE PAGE TEST BELOW STOPPED BEING ABLE TO
+	 * MAKE, AND WHY IT NEEDED A SECOND ONE.
+	 *
+	 * This hook's own gate is "can the DOCUMENT still scroll" — a growable page
+	 * has no definite region, so there is no third to take. That was an exact
+	 * proxy for "we are below `lg`" right up until round five hid the arguments
+	 * panel below 640px. With that block gone the phone's own page became short
+	 * enough to FIT its viewport, the gate read "definite region", and the hook
+	 * began equalising phone rows against a THIRD of the screen: measured 76px at
+	 * 360 (where the page still grew) against 133 / 144 / 178 at 375 / 390 / 430,
+	 * which is a row getting TALLER as the phone gets bigger.
+	 *
+	 * ⚠ The proxy was not wrong when it was written; the thing it stood for moved.
+	 * So the caller states the condition it actually means, and the page test
+	 * stays for the case it was always for — a desktop window short enough to
+	 * scroll.
+	 *
+	 * Defaults `true`, so every existing caller means exactly what it meant.
+	 * Turning it off CLEARS the inline heights rather than leaving whatever was
+	 * last written — an equaliser that stops equalising has to give the rows back.
+	 */
+	enabled?: boolean;
 }): void {
 	useEffect(() => {
 		const body = bodyRef.current;
 		const table = tableRef.current;
 		if (body === null || table === null) {
+			return;
+		}
+		if (!enabled) {
+			for (const row of table.querySelectorAll<HTMLTableRowElement>(
+				`tbody > tr[data-testid^="${testidPrefix}"]`,
+			)) {
+				if (row.style.height !== "") {
+					row.style.height = "";
+				}
+			}
 			return;
 		}
 		if (rowCount === 0) {
@@ -222,5 +256,13 @@ export function useEqualRowThirds({
 		const observer = new ResizeObserver(measure);
 		observer.observe(table);
 		return () => observer.disconnect();
-	}, [bodyRef, tableRef, testidPrefix, extraHeadSelector, rowWindow, rowCount]);
+	}, [
+		bodyRef,
+		tableRef,
+		testidPrefix,
+		extraHeadSelector,
+		rowWindow,
+		rowCount,
+		enabled,
+	]);
 }

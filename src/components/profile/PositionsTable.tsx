@@ -13,6 +13,7 @@ import {
 import { fmtUtcDay } from "@/components/debate/chart/geometry";
 import { ComposerDecimal } from "@/components/debate/composer/sell-convert";
 import { allocateDisplayed, formatDharma } from "@/components/debate/format";
+import { useIsPhoneTier } from "@/components/debate/phone-tier";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { Button } from "@/components/ui/button";
 import { EmptyBlock } from "@/components/ui/empty-block";
@@ -29,8 +30,10 @@ import type {
 	ProfilePositionRow,
 } from "@/server/profile/positions";
 import { PROFILE_COPY } from "./copy";
+
 import { InlineSellAmount, useInlineSell } from "./InlineSell";
 import { argumentCurrentExact, sumExact } from "./partition";
+import { PhoneSellSheet } from "./phone/PhoneSellSheet";
 import { useDocumentRowStepper } from "./row-stepper";
 import { useEqualRowThirds } from "./row-thirds";
 import {
@@ -243,6 +246,12 @@ export function PositionsTable({
 	const [filterOpen, setFilterOpen] = useState(false);
 	const filterRef = useRef<HTMLDivElement | null>(null);
 	const sell = useInlineSell();
+	/**
+	 * The tier, read once at the table. `TileRow` reads it too — the hook is a
+	 * shared external store, so two readers are one subscription's worth of work
+	 * and never two answers.
+	 */
+	const isPhoneTable = useIsPhoneTier();
 
 	// Canon §5 (Profile) rules the dismissal grammar for a popover on this
 	// surface: "ESC / click-out closes". Both are wired here rather than left to
@@ -518,12 +527,20 @@ export function PositionsTable({
 	// scroll region is `<thead>`, which the hook already subtracts on its own.
 	// Passing a selector that matches nothing would be the same arithmetic wearing
 	// a dead argument.
+	// ⚠⚠ MOBILE-2e · R-P3 — THE EQUALISER STANDS DOWN ON A PHONE, EXPLICITLY.
+	// Its own gate is "can the document still scroll", which was an exact proxy
+	// for "below `lg`" until R-P2 hid the arguments panel: with that block gone
+	// the phone page fits its viewport, the gate reads "definite region", and the
+	// rows were equalised to a THIRD of the screen — 76px at 360 against 133 /
+	// 144 / 178 at 375 / 390 / 430, a row growing taller as the phone gets bigger.
+	// The proxy was not wrong when it was written; what it stood for moved.
 	useEqualRowThirds({
 		bodyRef,
 		tableRef,
 		testidPrefix: "position-tile-",
 		rowWindow: ROW_WINDOW,
 		rowCount: visibleTiles.length,
+		enabled: !isPhoneTable,
 	});
 	useEffect(() => {
 		const body = bodyRef.current;
@@ -663,7 +680,19 @@ export function PositionsTable({
 					    TRIGGER: measured at 1440, `min-w-full` against a 107px button
 					    produced a 107 × 590 column in which every market question wrapped
 					    over ~6 lines. The positioning context lives on the header bar. */}
-					<div ref={filterRef}>
+					{/* ⚠ MOBILE-2e · R-P1 — `min-w-0` ON THE WRAPPER AND THE TRIGGER BOTH,
+					    and neither alone is enough. A flex item's default
+					    `min-width: auto` refuses to shrink below its content, and
+					    `buttonVariants` adds `whitespace-nowrap shrink-0` on top — so
+					    without all three the button keeps its full intrinsic width, pushes
+					    the pills out of the row, and the head's `flex-nowrap` turns a wrap
+					    into an overflow instead of fixing it.
+					    ⛔ THE CLIP IS CSS AND NEVER A JS SLICE. `arrangement.test.tsx`
+					    asserts this button's whole `textContent` equals
+					    `<market title> ▾`, and it is right to: truncating in JavaScript
+					    would make the accessible name lie about which market is
+					    selected. */}
+					<div ref={filterRef} className="max-mobile:min-w-0">
 						<Button
 							type="button"
 							size="xs"
@@ -671,6 +700,7 @@ export function PositionsTable({
 							data-testid="positions-market-filter"
 							aria-haspopup="listbox"
 							aria-expanded={filterOpen}
+							className="max-mobile:min-w-0 max-mobile:shrink max-mobile:overflow-hidden"
 							onClick={() => setFilterOpen((o) => !o)}
 						>
 							{marketOptions.find(([id]) => id === market)?.[1] ??
@@ -870,7 +900,16 @@ export function PositionsTable({
 					   declaration covering two arguments in ONE market, and either can
 					   fail alone. Both byte-carry `ArgumentList.tsx`'s `flex flex-col
 					   gap-3` so a card here and a card there sit at the same rhythm. */
-					className="w-full table-fixed text-left text-sm max-mobile:flex max-mobile:flex-col max-mobile:gap-3"
+					/* ⚠ MOBILE-2e · R-P3 — THE TWO PHONE GAPS ARE GONE, BOTH OF THEM, and
+					   that is the separator changing MECHANISM rather than a tidy-up.
+					   Job B's `gap-3` — here between MARKETS, and on each `<tbody>`
+					   between ARGUMENTS — was the space that made a stack of outlined
+					   cards read as separate cards. The ruled phone row is a
+					   hairline-divided list, so the space closes and the hairline on each
+					   row's top edge does the dividing instead. Leaving the gaps would put
+					   12px of ground between every pair of hairlines, which reads as
+					   neither one thing nor the other. */
+					className="w-full table-fixed text-left text-sm max-mobile:flex max-mobile:flex-col"
 				>
 					{/* ⚠⚠ POSREV-1 RF-4 — FOUR COLUMNS, AND THE OLD `STAKED` IS GONE.
 					    Open reads `Position · Argument · Current · Sell`; Closed reads
@@ -945,7 +984,7 @@ export function PositionsTable({
 							   next. Two markets can be correctly spaced while two arguments
 							   inside one market are not; that is why both are written and
 							   both are measured. */
-							className="max-mobile:flex max-mobile:flex-col max-mobile:gap-3"
+							className="max-mobile:flex max-mobile:flex-col"
 						>
 							{/* ⛔⛔ POSREV-POLISH P-1 — THE MARKET GROUP HEADER IS GONE, AND THIS
 							    `<tbody>` IS WHAT SURVIVES IT. RF-3 gave each market a sticky header
@@ -1065,6 +1104,27 @@ function TileRow({
 }): React.JSX.Element {
 	const armed = sell.armedLotId === tile.key;
 	const sold = sell.soldLotId === tile.key;
+	/**
+	 * MOBILE-2e · R-P3 — WHERE THE ARMED STATE LIVES, AND WHY IT IS A JS BRANCH
+	 * RATHER THAN A CLASS.
+	 *
+	 * On the desktop the armed state replaces two cells IN the row. On a phone
+	 * those cells are 64px and ~52px, which is not room for an editable figure
+	 * beside `Confirm` and a cancel — so the phone arms a SHEET instead. Both
+	 * sets of controls cannot exist at once: they share `data-testid`s, and a
+	 * duplicated testid is a guard reading the wrong node rather than a cosmetic
+	 * problem.
+	 *
+	 * The tier hook is `false` at and above 640px BY CONSTRUCTION — its query is
+	 * the negation of a 640px min-width and its server snapshot is `false` — and
+	 * `false` in jsdom, which does not implement the media-query API at all. So
+	 * the desktop render is untouched and every one of the forty-three shipped
+	 * sell tests keeps observing the in-row arm it was written against; none of
+	 * them ever reaches the sheet.
+	 */
+	const isPhone = useIsPhoneTier();
+	const armedInRow = armed && !isPhone;
+	const armedInSheet = armed && isPhone;
 	const move = tileMove(tile.basis, tile.currentExact);
 	const sellArgs = {
 		marketId: tile.row.marketId,
@@ -1137,8 +1197,24 @@ function TileRow({
 			   ask-first (AGENTS.md §11) — the same wall `aria-current` above already
 			   hit over `role="grid"`. It is a cost and not a regression because the
 			   CURRENT state is worse: the argument column measures 0px today, so no
-			   phone reader can reach the content those roles describe at all. */
-			className={`cursor-pointer rounded-(--r) focus-visible:shadow-(--state-focus-ring) max-mobile:flex max-mobile:flex-col ${
+			   phone reader can reach the content those roles describe at all.
+			   ⚠⚠ MOBILE-2e · R-P3 — THE PHONE READS THE DESKTOP ROW NOW, NOT A CARD.
+			   Job B's `max-mobile:flex-col` stacked the four cells and let each keep
+			   its inherited `text-center`, which is what produced a centred tile — and
+			   centred tiles are what this refinement replaces. The direction flips to
+			   a row and each cell takes a phone width below; the cells' own `p-2` goes
+			   with it, because four cells' worth of horizontal padding is 64 of the
+			   278px a 360px phone has for the whole row, and the argument is what
+			   would have paid for it.
+			   ⛔ THE SEPARATOR CHANGES MECHANISM AND THE OUTLINE COUNT DOES NOT. Every
+			   tile is an individually outlined, radiused card today, separated by
+			   `gap-3`. A hairline BETWEEN rows is a different construction, and
+			   `selection.test.tsx` counts `[outline:` utilities and requires EXACTLY
+			   ONE in either state — so the outline is not joined by a border, it is
+			   SUPPRESSED at phone width and a top border takes over. The selected arm
+			   keeps its `bg-n1`, which is what still says "this one" once the outline
+			   is gone. */
+			className={`cursor-pointer rounded-(--r) focus-visible:shadow-(--state-focus-ring) max-mobile:flex max-mobile:items-center max-mobile:gap-1.5 max-mobile:rounded-none max-mobile:px-0 max-mobile:py-2.5 max-mobile:[border-top:var(--hairline)] max-mobile:[outline:none] ${
 				selected
 					? "bg-n1 [outline-offset:-2px] [outline:var(--ring-active)]"
 					: "[outline-offset:-1px] [outline:var(--hairline)] hover:bg-n1"
@@ -1171,7 +1247,10 @@ function TileRow({
 			    ⚠ THE SIDE AND THE TITLE NO LONGER SHARE A BASELINE, which is what was
 			    traded away. With both cells centred they share a CENTRE instead, and
 			    that reads as deliberate at every title length rather than only at one. */}
-			<td className="p-2 align-middle">
+			{/* ⚠ 48px — the natural width of `Yes` plus its glyph at 15px, not a
+			    number chosen against the column. `shrink-0` is what stops the flexible
+			    argument beside it borrowing from the side. */}
+			<td className="p-2 align-middle max-mobile:w-12 max-mobile:shrink-0 max-mobile:p-0">
 				<span
 					data-testid={`tile-side-${tile.key}`}
 					className="flex items-center justify-center gap-[5px] text-[15px] leading-[1.35] font-extrabold text-ink"
@@ -1187,7 +1266,11 @@ function TileRow({
 					<ThumbGlyph side={tile.side} size={15} />
 				</span>
 			</td>
-			<td className="p-2 align-middle">
+			{/* ⚠ `min-w-0` IS THE ONE THAT MATTERS. A flex item will not shrink below
+			    its content without it, and the argument is the only cell here whose
+			    content is unbounded — without it the row overflows instead of the
+			    title clamping. */}
+			<td className="p-2 align-middle max-mobile:min-w-0 max-mobile:flex-1 max-mobile:p-0">
 				<TileArgumentCell
 					cell={tile.argument}
 					tileKey={tile.key}
@@ -1214,7 +1297,11 @@ function TileRow({
 					    sale carries no tag and that "figures reduce" is the whole signal;
 					    an immutable base cannot reduce, and the reduction would leave no
 					    trace on the surface at all. */}
-					<td className="p-2 text-center align-middle whitespace-nowrap tabular-nums text-ink">
+					{/* ⚠ 64px and RIGHT-aligned at phone width. The desktop centres this
+					    cell over a 124px column; in 64px beside a flexible argument,
+					    centring reads as drift and the figures stop forming a column an
+					    eye can run down. */}
+					<td className="p-2 text-center align-middle whitespace-nowrap tabular-nums text-ink max-mobile:w-16 max-mobile:shrink-0 max-mobile:p-0 max-mobile:text-right">
 						{sold ? (
 							<InfoTip content={GLOSSARY.sold} asChild>
 								<span
@@ -1224,7 +1311,7 @@ function TileRow({
 									{SOLD_LABEL}
 								</span>
 							</InfoTip>
-						) : armed ? (
+						) : armedInRow ? (
 							<InlineSellAmount
 								tileKey={tile.key}
 								seedDisplay={tile.valueDisplay}
@@ -1292,10 +1379,10 @@ function TileRow({
 					    beside a `✕`. ⛔ THE ✕ IS NOT OPTIONAL — a two-step cushion with
 					    no exit is a trap, not a cushion. Escape and a click outside
 					    cancel too (wired in `useInlineSell`). */}
-					<td className="p-2 text-center align-middle">
+					<td className="p-2 text-center align-middle max-mobile:shrink-0 max-mobile:p-0">
 						{tile.sellable && !sold && (
 							<span className="inline-flex items-center gap-1">
-								{armed ? (
+								{armedInRow ? (
 									<>
 										<Button
 											type="button"
@@ -1344,12 +1431,50 @@ function TileRow({
 										size="xs"
 										variant="outline"
 										data-testid={`tile-sell-${tile.key}`}
-										className="font-extrabold tracking-[0.08em] uppercase [border:var(--ring-active)]"
+										className="font-extrabold tracking-[0.08em] uppercase [border:var(--ring-active)] max-mobile:min-h-11 max-mobile:w-full max-mobile:[touch-action:manipulation]"
 										onClick={() => sell.arm(tile.key)}
 									>
 										Sell
 									</Button>
 								)}
+								{/* ⛔⛔ MOUNTED INSIDE THIS CELL, AND THE POSITION IS THE POINT.
+								    `useInlineSell` arms a document-level `pointerdown` whose
+								    predicate is `armedRowRef.current?.contains(target)`, and
+								    `armedRowRef` is this `<tr>`. A sheet rendered anywhere else
+								    in the tree is not contained by the row, so the FIRST tap
+								    inside it — the tap on `Confirm` included — cancels the arm
+								    and closes the sheet. A `<div>` inside a `<td>` is valid HTML
+								    and `position: fixed` lifts the sheet out of the cell
+								    visually, so the DOM position costs nothing and buys the
+								    containment without widening `InlineSell`'s ref type.
+								    ⚠ `onClose` CANCELS. Every route the sheet can close by — the
+								    backdrop, the handle, Escape, its own Cancel — lands there,
+								    and leaving the arm set behind a closed sheet would strand a
+								    controller nothing on screen could reach. */}
+								{armedInSheet ? (
+									<PhoneSellSheet
+										tileKey={tile.key}
+										seedDisplay={tile.valueDisplay}
+										seedExact={tile.currentExact}
+										// ⚠ SG-3 MASKING IS A TYPE FACT HERE, not a check: the
+										// removed variant carries NO `title` field at all, so the
+										// stub is the only thing this branch CAN pass and a leak
+										// would be a compile error rather than a review catch.
+										argumentTitle={
+											tile.argument.removed
+												? REMOVED_STUB_TEXT
+												: tile.argument.title
+										}
+										marketTitle={tile.row.marketTitle}
+										draft={sell.draft}
+										busy={sell.busy}
+										failed={sell.failed}
+										canSubmit={sell.canSubmit(tile.currentExact, tile.shares)}
+										onEdit={sell.edit}
+										onSubmit={() => sell.confirm(tile.key, sellArgs)}
+										onClose={sell.cancel}
+									/>
+								) : null}
 							</span>
 						)}
 					</td>
@@ -1473,7 +1598,12 @@ function TileArgumentCell({
 	   "…5 Nov 2026? · staked Đ 100" would name a destination it does not go to,
 	   which is why the two were siblings rather than nested. */
 	const marketLine = (
-		<span className="block text-[11px] leading-[1.35] font-semibold text-n5">
+		// ⚠ MOBILE-2e · R-P3 — ONE LINE ON A PHONE (ruled). The market question is
+		// unbounded text in an ~90px column; unclamped it wrapped to four or five
+		// lines and made the argument cell — and therefore the row — twice as tall
+		// as the title it is supposed to sit under. `line-clamp-1` rather than
+		// `truncate`, so it stays in the same family as the title above it.
+		<span className="block text-[11px] leading-[1.35] font-semibold text-n5 max-mobile:line-clamp-1">
 			<Link
 				data-testid={`tile-market-${tileKey}`}
 				href={`/m/${cell.marketSlug}`}
@@ -1506,7 +1636,16 @@ function TileArgumentCell({
 			    whatever leading was in scope (AGENTS.md §8). */}
 			<Link
 				href={`/m/${cell.marketSlug}?post=${cell.postOrdinal}`}
-				className="line-clamp-4 text-[15px] leading-[1.35] font-bold hover:underline"
+				// MOBILE-2e · R-P3 — TWO LINES ON A PHONE, four on the desktop. The
+				// desktop's four is the other half of RF-10's equal-height rule; at phone
+				// width the thirds hook stands down (the page grows, so there is no
+				// definite region to divide) and the clamp is free to be what the row
+				// needs. In ~90px of flexible column, four lines of a 15px title is most
+				// of a screen for one row.
+				// NEVER ADD `block` BESIDE A `line-clamp-*`: the clamp already implies
+				// `-webkit-box`, and a `display:block` alongside makes it INERT, silently
+				// — measured once already on this very cell.
+				className="line-clamp-4 text-[15px] leading-[1.35] font-bold hover:underline max-mobile:line-clamp-2"
 			>
 				{cell.title}
 			</Link>
@@ -1548,6 +1687,23 @@ function TileArgumentCell({
  * `overflow-hidden` is the mockup's `.deb{overflow:hidden}` — topology, and it
  * is what keeps the rounded corner from being squared off by the header bar's
  * own background.
+ *
+ * ⚠⚠ MOBILE-2e · R-P1 — THE HEAD IS ONE ROW BELOW 640px (`max-mobile:flex-nowrap`).
+ * MEASURED before changing it: at 360px this head is 82px tall — `Positions` and
+ * the market filter share the first line and the `Open (5) / Closed (1)` pair
+ * drops to a second — and it does that with the SHORT `All markets` label, i.e.
+ * in the best case rather than the worst. `flex-wrap` is what allows it, and
+ * `ml-auto` on the pill cluster stops meaning "right" the moment the container
+ * is no longer one line.
+ * ⇒ The market filter is the child that gives, because it is the only one whose
+ * label is variable-length — it becomes a whole market question once a market is
+ * picked — so it is the only honest place to take the width from. Its own
+ * `min-w-0` tokens are at its call site.
+ * ⚠ The `min-h-[52px]` FLOOR is untouched: it is shared with the arguments
+ * panel's head and `profile-height-chain.test.ts` pins the two as ONE value.
+ * ⚠ The note is here rather than beside the class because that guard reads the
+ * className out of a 400-CHARACTER WINDOW after the `data-testid` — a fence by
+ * DISTANCE (O-8 in a different unit), which a comment in the gap defeats.
  */
 function PositionsPanel({
 	controls,
@@ -1579,7 +1735,7 @@ function PositionsPanel({
 			    the two side-by-side bodies start level. */}
 			<div
 				data-testid="positions-panel-head"
-				className="relative flex min-h-[52px] flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
+				className="relative flex min-h-[52px] flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)] max-mobile:flex-nowrap"
 			>
 				{/* ⛔ `uppercase` IS A TRANSFORM: `textContent` is still `Positions`, so
 				    every consumer that reads this head by text keeps its handle. */}

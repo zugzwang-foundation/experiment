@@ -414,10 +414,16 @@ function gatedLabelIn(
 
 describe("profile mobile reflow — the positions table stacks below 640px", () => {
 	/**
-	 * Edit site 1. `gap-3` is byte-carried from `ArgumentList.tsx:153`'s
-	 * `flex flex-col gap-3`, so two markets sit the same 12px apart as two
-	 * arguments within one market — the plan's whole spacing argument, and the
-	 * reason the same three tokens appear again on the `<tbody>` below.
+	 * Edit site 1. ⚠⚠ **MOBILE-2e · R-P3 — `gap-3` IS GONE FROM BOTH SITES AND
+	 * THIS ROW NOW ASSERTS ITS ABSENCE.** Job B byte-carried a 12px gap from
+	 * `ArgumentList.tsx` so two markets sat as far apart as two arguments within
+	 * one market — correct for a stack of individually outlined CARDS, which is
+	 * what Job B shipped. Round five replaces the cards with a hairline-divided
+	 * LIST: the separator moves onto each row's top edge, and 12px of ground
+	 * between every pair of hairlines would read as neither a list nor cards.
+	 * ⚠ The guard is INVERTED rather than deleted, so a revert to the gap reddens
+	 * here instead of passing a looser pattern — these were the developer's
+	 * guards and they are this lane's now.
 	 */
 	it("profile-mobile::the-table-becomes-a-column-of-market-groups-below-640", () => {
 		const source = stripComments(read(TABLE_FILE));
@@ -433,10 +439,13 @@ describe("profile mobile reflow — the positions table stacks below 640px", () 
 			`body, which computes the Argument column to 0px — the argument text is ` +
 			`in the DOM at width zero, and the ARGUMENT and CURRENT headers ` +
 			`overprint. Append ${phone("flex")}, ${phone("flex-col")} and ` +
-			`${phone("gap-3")} — do not replace \`table-fixed\` or \`w-full\`.`;
+			`${phone("flex")} and ${phone("flex-col")} — do not replace ` +
+			`\`table-fixed\` or \`w-full\`, and do NOT re-add ${phone("gap-3")}: ` +
+			`round five divides rows by a hairline on each row's own top edge, and a ` +
+			`gap between them puts ground between every pair of hairlines.`;
 		expect(classes, why).toContain(phone("flex"));
 		expect(classes, why).toContain(phone("flex-col"));
-		expect(classes, why).toContain(phone("gap-3"));
+		expect(classes, why).not.toContain(phone("gap-3"));
 	});
 
 	/**
@@ -460,10 +469,9 @@ describe("profile mobile reflow — the positions table stacks below 640px", () 
 
 	/**
 	 * Edit site 3 — the ADD rather than an append, and the one that can fail
-	 * alone. The `<table>`-level `gap-3` puts space between MARKETS; this one
-	 * puts the same space between two arguments in ONE market. Two different
-	 * declarations producing one rhythm, so a tree carrying only the first
-	 * renders correctly-spaced markets full of touching tiles.
+	 * alone. ⚠ MOBILE-2e: its `gap-3` is gone for the same reason as the
+	 * table-level one above; the stacking tokens stay, because the `<tbody>`
+	 * still has to become a flex column for the rows inside it to be items.
 	 */
 	it("profile-mobile::each-market-group-stacks-its-own-tiles-below-640", () => {
 		const source = stripComments(read(TABLE_FILE));
@@ -487,26 +495,35 @@ describe("profile mobile reflow — the positions table stacks below 640px", () 
 			`so the tiles inside one market never become a stack. This site is an ` +
 			`ADD, not an append — the element carries no className at all today — ` +
 			`which is why it can be missed while the other three land. Add ` +
-			`${phone("flex")}, ${phone("flex-col")} and ${phone("gap-3")}: the ` +
-			`table-level gap separates MARKETS, this one separates two arguments ` +
-			`within one market, and a tree with only the first renders ` +
-			`correctly-spaced markets full of touching tiles.`;
+			`${phone("flex")} and ${phone("flex-col")} — and NOT ${phone("gap-3")}, ` +
+			`which round five removed when the row separator became a hairline on ` +
+			`each row's own top edge.`;
 		expect(classes, why).not.toBeNull();
 		expect(classes ?? [], why).toContain(phone("flex"));
 		expect(classes ?? [], why).toContain(phone("flex-col"));
-		expect(classes ?? [], why).toContain(phone("gap-3"));
+		expect(classes ?? [], why).not.toContain(phone("gap-3"));
 	});
 
 	/**
-	 * Edit site 4 — the load-bearing one. This is the node whose axis change is
-	 * supposed to blockify all six `<td>` variants (Position · Argument ·
-	 * Current · Sell on Open; Position · Argument · Staked · Opened on Closed)
-	 * without opening a single `<td>`. ⛔ That blockification is the plan's
-	 * central bet and NOTHING HERE OBSERVES IT — F-2's fallback is
-	 * `block` under this variant on each of the six cells, and it is
-	 * deliberately not pre-empted by an assertion here.
+	 * Edit site 4 — the load-bearing one, and the one MOBILE-2e turns around.
+	 *
+	 * ⚠⚠ **JOB B MADE THIS ROW A COLUMN; ROUND FIVE MAKES IT A ROW AGAIN.** Job
+	 * B's bet was that `flex-col` on the `<tr>` blockifies all six `<td>`
+	 * variants without opening a single cell — which it does, and which is
+	 * exactly why every cell then kept its inherited `text-center` and the phone
+	 * got a stack of centred tiles. The founder's ruling is that the phone should
+	 * read the DESKTOP row: side glyph │ argument │ value │ SELL. So the axis
+	 * stays flex and the DIRECTION goes back to row, and the cells ARE opened —
+	 * each takes a phone width, because a four-column row inside 278px cannot be
+	 * derived from cells that were never given one.
+	 *
+	 * ⛔ THE SEPARATOR IS ASSERTED HERE TOO, because it is the other half of the
+	 * same decision and it is the half that can silently not happen: the outline
+	 * must be SUPPRESSED and a top border must take over, or the rows are
+	 * individually outlined cards with no space between them — worse than either
+	 * shape on its own.
 	 */
-	it("profile-mobile::a-tile-becomes-a-column-so-its-cells-stop-sharing-a-band", () => {
+	it("profile-mobile::a-tile-is-the-DESKTOP-row-below-640-not-a-centred-tile", () => {
 		const source = stripComments(read(TABLE_FILE));
 		const classes = classesOf(
 			source,
@@ -515,13 +532,56 @@ describe("profile mobile reflow — the positions table stacks below 640px", () 
 		);
 
 		const why =
-			`${TABLE_FILE}: the tile <tr> stays a table row below 640px, so its ` +
-			`cells keep sharing one horizontal band and the argument keeps ` +
-			`computing to 0px. Append ${phone("flex")} and ${phone("flex-col")} to ` +
-			`the row's own class string — not inside the \`selected ? … : …\` ` +
-			`interpolation, where it would apply only while a tile is selected.`;
+			`${TABLE_FILE}: the tile <tr> is no longer the DESKTOP row at phone ` +
+			`width. It must carry ${phone("flex")} WITHOUT ${phone("flex-col")} — ` +
+			`round five reverses Job B's axis, because a column of cells inherits ` +
+			`each cell's \`text-center\` and produces the centred tile this ` +
+			`refinement replaces. The tokens belong in the row's own class string, ` +
+			`not inside the \`selected ? … : …\` interpolation, where they would ` +
+			`apply only while a tile is selected.`;
 		expect(classes, why).toContain(phone("flex"));
-		expect(classes, why).toContain(phone("flex-col"));
+		expect(classes, why).not.toContain(phone("flex-col"));
+		expect(classes, why).toContain(phone("items-center"));
+
+		const sep =
+			`${TABLE_FILE}: the phone row separator is incomplete. Below 640px the ` +
+			`outline must be SUPPRESSED (${phone("[outline:none]")}) and a hairline ` +
+			`must take over on the row's own top edge ` +
+			`(${phone("[border-top:var(--hairline)]")}). Half of this pair is worse ` +
+			`than neither: the outline alone leaves individually boxed rows with no ` +
+			`gap between them, and the border alone leaves two edges per seam.`;
+		expect(classes, sep).toContain(phone("[outline:none]"));
+		expect(classes, sep).toContain(phone("[border-top:var(--hairline)]"));
+	});
+
+	/**
+	 * ⛔ THE CELLS ARE OPENED, AND THAT IS THE LINE JOB B DELIBERATELY DID NOT
+	 * CROSS — so it is asserted rather than assumed. A four-column row inside
+	 * 278px needs each cell to declare its share; without the widths the row is
+	 * four cells fighting over one line and the argument is what loses.
+	 */
+	it("profile-mobile::each-cell-declares-its-share-of-the-phone-row", () => {
+		const source = stripComments(read(TABLE_FILE));
+		const side = classesOf(
+			source,
+			keyedTestid("tile-side-"),
+			"the side cell's own span",
+		);
+		// The cell is the <td> WRAPPING that span, so read the tag before it.
+		const at = source.indexOf(keyedTestid("tile-side-"));
+		const tdAt = source.lastIndexOf("<td", at);
+		const tdClasses = classTokensOf(
+			source.slice(tdAt, source.indexOf(">", tdAt) + 1),
+		);
+		const why =
+			`${TABLE_FILE}: the side cell does not claim a width at phone tier, so ` +
+			`the argument beside it cannot be the flexible one. It needs a ` +
+			`phone-tier width and ${phone("shrink-0")}.`;
+		expect(tdClasses ?? [], why).toContain(phone("w-12"));
+		expect(tdClasses ?? [], why).toContain(phone("shrink-0"));
+		expect(tdClasses ?? [], why).toContain(phone("p-0"));
+		// POSITIVE CONTROL — the reader above really does find a class list.
+		expect(side, "the side span itself is still readable").not.toBeNull();
 	});
 });
 

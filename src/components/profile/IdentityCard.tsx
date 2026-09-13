@@ -41,7 +41,21 @@ export function IdentityCard({
 	return (
 		<div
 			data-testid="identity-card"
-			className="flex min-w-0 flex-row items-center gap-[18px]"
+			// ⚠⚠ MOBILE-2e · R-P4 — BELOW 640px THIS IS TWO ROWS, NOT TWO COLUMNS,
+			// and it gets there by WRAPPING rather than by re-nesting. The ruled phone
+			// header is: the PFP beside the pseudonym, then the six tiles across the
+			// full width. Today the tiles live in the column to the RIGHT of a 56px
+			// avatar, so at 360px they are squeezed into 230px — two columns of 110px,
+			// which is why four of the six labels already wrap to two lines there.
+			// Giving the identity column `display:contents` at phone width dissolves
+			// it, the pseudonym row and the tile grid become items of THIS row, and a
+			// `basis-full` on the grid sends it to a line of its own with the whole
+			// 304px to spend. Nothing moves in the DOM, so ≥640px is untouched.
+			// ⚠ `gap-y-3` replaces what the dissolved column's own `gap-3` used to
+			// supply; without it the 18px horizontal gap would set the vertical rhythm
+			// too, and the tiles would sit 6px lower than the mockup for no reason
+			// anyone could find later.
+			className="flex min-w-0 flex-row items-center gap-[18px] max-mobile:flex-wrap max-mobile:gap-y-3"
 		>
 			{/* ⚠⚠⚠ PROFILE-FULL · D-1 IS CLOSED AT THE BAND, AND PARTLY AT THE PFP.
 			    Founder-ruled REOPENED: "the 188px band is unreachable" held only
@@ -194,7 +208,10 @@ export function IdentityCard({
 			    `gap-3` is the mockup's `.idcol{gap:12px}` (`:194`) AND
 			    `ProfileTiles.tsx`'s own grid gap — the two agree, so one token
 			    serves both. */}
-			<div className="flex min-w-0 flex-1 flex-col gap-3">
+			{/* ⚠ `max-mobile:contents` — see the root's note. The box goes away below
+			    640px so its two children become the wrapping row's own items; above it
+			    the column is exactly what it was. */}
+			<div className="flex min-w-0 flex-1 flex-col gap-3 max-mobile:contents">
 				{/* ⚠⚠ PROFILE-FULL — `.unamerow` IS ONE ROW, not a two-line stack.
 				    The mockup's is `display:flex; align-items:center; gap:10px`
 				    (`:197`) holding `.uname` and the `.idacts` cluster, and its height

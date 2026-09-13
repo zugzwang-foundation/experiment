@@ -264,6 +264,30 @@ export function ArgumentList({
  * of each token. ⚠ ATTRIBUTED DUPLICATION, ROUTED NOT ABSORBED: lifting the
  * shared shell into `ui/**` would mint a new primitive, which this task
  * forbids. Filed as a widening.
+ *
+ * ⛔⛔ MOBILE-2e · R-P2 / ADR-0051 A4 — THIS PANEL IS NOT RENDERED BELOW 640px.
+ * It is the desktop's RIGHT COLUMN: it shows the argument the positions table
+ * has SELECTED, and selection is a two-column idea. Stacked under the rows on a
+ * phone it is a second copy of a row the reader has just scrolled past, with
+ * nothing on screen relating it to the thing that chose it — and it was the LAST
+ * block on the page, so the phone's profile ended on a duplicate. The rows carry
+ * the navigation instead now: a row title is a link to the post, which is the
+ * phone's whole substitute for a selection panel.
+ *
+ * ⚠ HIDDEN (`max-mobile:hidden`), NOT UNMOUNTED, and that is the additive rule
+ * rather than a preference: `ProfileArena` returns a FRAGMENT so both panels
+ * stay direct children of the arena grid, and a conditional render here would be
+ * a client-side viewport branch in a component whose selection state the desktop
+ * still needs.
+ *
+ * ⚠⚠ THE NOTE IS HERE AND NOT BESIDE THE CLASS, for two separate reasons both
+ * measured on this file. `profile-height-chain.test.ts` reads this node's
+ * className out of a 400-CHARACTER WINDOW after its `data-testid` — a fence by
+ * DISTANCE, O-8 in a different unit — so a comment between the two pushes the
+ * class out of reach and the guard reports a restructure that never happened.
+ * And a `{/* … *\/}` immediately after `return (` is a SECOND ROOT: the
+ * formatter then rewrites the element's attributes as statements and the file
+ * stops parsing.
  */
 function ArgumentsPanel({
 	title,
@@ -279,7 +303,7 @@ function ArgumentsPanel({
 		<section
 			data-testid="arguments-panel"
 			aria-label="Arguments"
-			className="flex min-h-0 flex-col overflow-hidden rounded-[var(--r)] bg-n0 [border:var(--hairline)]"
+			className="flex min-h-0 flex-col overflow-hidden rounded-[var(--r)] bg-n0 [border:var(--hairline)] max-mobile:hidden"
 		>
 			{/* ⚠⚠ THE `.colhead` FLOOR — the mockup's literal, and what makes the two
 			    side-by-side panel bodies START ON THE SAME LINE.

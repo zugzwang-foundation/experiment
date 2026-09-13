@@ -42,7 +42,19 @@ export function ProfileTiles({
 			// columns, so it is 2px of band height and 4px of column width — small on
 			// its own, and part of the arithmetic that brought the band to the
 			// mockup's 188 (see `IdentityCard.tsx`'s D-1 block for the table).
-			className="grid auto-rows-fr grid-cols-2 gap-[10px] sm:grid-cols-3"
+			// ⚠⚠ MOBILE-2e · R-P4 — THREE ACROSS AND TWO DOWN BELOW 640px, on a line
+			// of its own. `max-mobile:basis-full` is what claims that line: once
+			// `IdentityCard`'s identity column dissolves at phone width this grid
+			// becomes a flex ITEM of the wrapping header row, and an item that does
+			// not claim the line sits beside a 56px avatar in 230px — which is the
+			// 2×110px it gets today, and why four of the six labels already wrap there.
+			// ⛔ `max-mobile:grid-cols-3` AND `sm:grid-cols-3` ARE NOT THE SAME RULE
+			// AND BOTH ARE KEPT. `sm` is 40rem and the mobile token is 640px — equal
+			// only at a 16px root font size. A reader who has enlarged their text sits
+			// between the two boundaries, and there the base `grid-cols-2` applies,
+			// exactly as it does today. Deleting either would change a width neither
+			// was measured at.
+			className="grid auto-rows-fr grid-cols-2 gap-[10px] sm:grid-cols-3 max-mobile:basis-full max-mobile:grid-cols-3 max-mobile:gap-2"
 		>
 			{/* FOUNDER EYE PASS item 1 — Đ ON EVERY Đ VALUE. The mockup's tiles read
 			    `Đ 2,430` / `Đ 2,668` / `Đ 8,640` / `Đ 5,210` (`:440-445`); the build
@@ -182,12 +194,23 @@ function Tile({
 		// minted and none is needed; the 0.5px split is the mockup's, kept.
 		<Card
 			data-testid={testid}
-			className="justify-center gap-[3px] px-[13px] py-[9px]"
+			// ⚠ MOBILE-2e · R-P4 — 8px of side padding on a phone, from 13. Three
+			// columns across 304px give each tile 96px, and 13px a side leaves 70 for
+			// a 22-character uppercase label — which is what pushes
+			// `Total Support received` onto a third line. The label is the thing
+			// being scanned, so the width goes to it.
+			className="justify-center gap-[3px] px-[13px] py-[9px] max-mobile:px-2"
 		>
 			<span className="text-[14px] leading-[1.2] font-extrabold text-ink tabular-nums">
 				{children}
 			</span>
-			<span className="text-[8px] leading-[1.2] font-extrabold tracking-[0.12em] text-n4 uppercase">
+			{/* ⚠ MOBILE-2e · R-P4 — 10px on a phone, from 8. Three columns across the
+			    full width give each tile ~96px instead of 110, and an 8px label at
+			    0.12em tracking in that box is small enough to be scanned past rather
+			    than read. The ruling accepts two-line labels here, which is what buys
+			    the size: the constraint was never the height. The VALUE keeps its own
+			    size on both tiers — it is the thing being read, not scanned. */}
+			<span className="text-[8px] leading-[1.2] font-extrabold tracking-[0.12em] text-n4 uppercase max-mobile:text-[10px]">
 				{label}
 			</span>
 		</Card>
