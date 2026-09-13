@@ -37,6 +37,7 @@ import { PANE_ID, PhoneFeedTrack } from "./PhoneFeedTrack";
 import { PhoneSheet } from "./PhoneSheet";
 import { PhoneSideTabs } from "./PhoneSideTabs";
 import { PhoneTitleStrip } from "./PhoneTitleStrip";
+import { PhoneTopPill } from "./PhoneTopPill";
 
 /**
  * ⛔⛔ THE PHONE PRESENTATION OF `/m/[slug]` — A SECOND TREE OVER THE SAME DATA,
@@ -657,7 +658,20 @@ export function PhoneDebateView({
 			    `z-30` stays — it is a flex item, so `z-index` applies — and it
 			    still sits BELOW the header's reserved `z-40`
 			    (`sticky-header.test.ts`). */}
-			<div className="z-30 shrink-0 bg-ground [border-bottom:var(--hairline)]">
+			{/* ⛔⛔ MOBILE-2k — `relative` IS LOAD-BEARING AND IT IS THE ONLY CLASS
+			    THIS ROUND ADDS TO AN EXISTING ELEMENT. `PhoneTopPill` sits `top-full
+			    mt-3` below this block, which is how "12px under the YES/NO tabs"
+			    becomes a structural distance rather than a guessed number: this
+			    block's height is set by how many lines the market question wraps to,
+			    so nothing else in the tree can name its bottom edge. `top-full`
+			    resolves against the nearest POSITIONED ancestor, and without this
+			    token that ancestor would be `<body>` — the pill would land 12px below
+			    the bottom of the DOCUMENT, i.e. off screen, with no error anywhere.
+			    ⚠ It does not change the stacking: `z-30` already made this element a
+			    stacking context as a flex item, and `position: relative` is not a
+			    containing block for `fixed` descendants (only a transform is), so
+			    `PhoneSheet`'s full-viewport layer is untouched. */}
+			<div className="relative z-30 shrink-0 bg-ground [border-bottom:var(--hairline)]">
 				{focused === null ? (
 					<PhoneTitleStrip
 						title={market.title}
@@ -680,6 +694,26 @@ export function PhoneDebateView({
 					onSelect={focused === null ? onSideKey : onRelationKey}
 					panelIdFor={PANE_ID}
 				/>
+				{/* ⛔ MOBILE-2k · F-1 — THE FEED ARM ONLY, GATED AT THE MOUNT. The
+				    bounded shell took pull-to-refresh away (the document no longer
+				    scrolls below 640, so the browser's overscroll gesture has nothing
+				    to fire from); this is its replacement. A thread is short and was
+				    navigated INTO, so it gets none — and the gate being the MOUNT
+				    rather than a test inside the component is what stops a future edit
+				    from getting the arm backwards.
+				    ⚠ `sheet !== null` IS THE LOCK, NOT AN APPROXIMATION OF IT. The
+				    tier's only two lock holders are `PhoneSheet` and
+				    `MarketPriceChartOverlay`, and the overlay is reachable only INSIDE
+				    the details sheet — so every held lock on this tier is a sheet.
+				    `PhoneTopPill` consults `isPageScrollLocked()` as well, at tap
+				    time, for the day that stops being true. */}
+				{focused === null ? (
+					<PhoneTopPill
+						regionRef={scrollRegionRef}
+						locked={sheet !== null}
+						busy={composerBusy}
+					/>
+				) : null}
 			</div>
 
 			{/* ⛔⛔ THE SCROLL REGION — ONE ELEMENT, AND IT IS THE WHOLE REASON THE

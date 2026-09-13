@@ -216,3 +216,27 @@ export function lockPageScroll(except: Element | null = null): () => void {
 		held = null;
 	};
 }
+
+/**
+ * ⛔ WHETHER A LOCK IS CURRENTLY HELD — a READ of the refcount above, and
+ * deliberately not a subscription.
+ *
+ * `PhoneTopPill` needs this at the ONE moment a subscription could not help it:
+ * inside the tap handler, as the last thing checked before a refetch. Its
+ * RENDER gate is React state (`PhoneDebateView`'s `sheet !== null`), because a
+ * module-level integer is not reactive and a pill that hid only when this
+ * function changed would never re-render to notice. So the two are a pair by
+ * design: the state decides what is on screen, this decides whether a refetch
+ * may fire, and the second is what still answers correctly if some future
+ * lock-holder is not routed through that state.
+ *
+ * ⚠ IT IS A BELT AND IS DOCUMENTED AS ONE. Today the phone tier's only lock
+ * holders are `PhoneSheet` and `MarketPriceChartOverlay`, and the chart overlay
+ * is only reachable INSIDE the details sheet — so `sheet !== null` already
+ * covers both and this can never be the thing that stops a refetch. That is the
+ * argument for having it rather than against: a third holder added later reaches
+ * this function for free, and reaches the render gate only if someone remembers.
+ */
+export function isPageScrollLocked(): boolean {
+	return depth > 0;
+}

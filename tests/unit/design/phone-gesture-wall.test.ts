@@ -151,6 +151,35 @@ function listeners(src: string): string[] {
  */
 const RATIFIED_LISTENERS = [
 	"document::keydown::onKey::",
+	/**
+	 * ⛔⛔ THE FOURTH ROW, ADDED AT MOBILE-2k BY FOUNDER RULING (ADR-0051 A7 D-1)
+	 * — AND THE PARAGRAPH ABOVE SAYS THIS IS A DECISION, SO HERE IS THE DECISION.
+	 *
+	 * `PhoneTopPill` reads the feed region's scroll to decide whether it is on
+	 * screen: shown above one viewport while the reader moves UP, hidden on the
+	 * way down. It exists because MOBILE-2d's bounded shell took the browser's
+	 * pull-to-refresh away — the document no longer scrolls below 640px, so the
+	 * overscroll that fires that gesture cannot happen — and a reader deep in a
+	 * feed had no way back to the top and no way to ask for fresh prices.
+	 *
+	 * ⚠ IT IS ADMITTED BECAUSE IT IS A READ, AND THE DISTINCTION IS THE WHOLE
+	 * REASON THIS ALLOWLIST IS SHAPED AS ONE. Every listener this rule exists to
+	 * keep out reimplements something the browser already does — momentum,
+	 * rubber-band, axis lock, snapping — and the way it does so is by taking a
+	 * gesture over. This one takes nothing: `scroll` is not a cancelable event, so
+	 * a `preventDefault` inside it is inert by specification, and the handler
+	 * writes no scroll position of its own. The pill's TAP writes one, through
+	 * `region.scrollTo` — an ordinary call, not a listener, and the same call
+	 * `PhoneFeedTrack` already makes on the track.
+	 *
+	 * ⚠ `{ passive: true }` IS PART OF THE ROW RATHER THAN A DETAIL. It changes
+	 * nothing about a non-cancelable event; it is here so that "this handler
+	 * cannot take scrolling away" is a fact a scan can READ off the registration,
+	 * instead of a property of whatever the handler's body happens to contain
+	 * today. The passive census below was widened to cover `scroll` in the same
+	 * commit for exactly that reason.
+	 */
+	"region::scroll::evaluate::{passive:true}",
 	"track::pointermove::release::{passive:true}",
 	"track::touchmove::release::{passive:true}",
 ].sort();
@@ -288,7 +317,20 @@ describe("phone gesture wall — the listener set is closed", () => {
 	 * outside it — and `wheel` is the one a desktop-minded edit reaches for.
 	 */
 	it("phone-gesture::no-scroll-bearing-listener-opts-out-of-passive", () => {
-		const SCROLL_BEARING = /^(touchstart|touchmove|wheel|mousewheel)$/;
+		/**
+		 * ⚠ `scroll` JOINED THE SET AT MOBILE-2k, AND NOT BECAUSE IT IS CANCELABLE
+		 * — IT IS NOT. A `preventDefault` inside a `scroll` handler is inert by
+		 * specification, so unlike the four above, `{ passive: false }` here could
+		 * not kill a scroll even deliberately. It is in the set so that the ONE
+		 * `scroll` listener this tier is allowed (`PhoneTopPill`'s, in the
+		 * allowlist above) has its harmlessness recorded at the REGISTRATION rather
+		 * than argued from its body: the row states the fact, and a future edit
+		 * that drops the option reddens here instead of quietly making the claim
+		 * unverifiable. A guard whose coverage is unstated will be read as total —
+		 * so this states that, for `scroll`, the option is a declaration of intent
+		 * and not a safety mechanism.
+		 */
+		const SCROLL_BEARING = /^(touchstart|touchmove|wheel|mousewheel|scroll)$/;
 		const offenders: string[] = [];
 		for (const { file, src } of phoneFiles()) {
 			for (const l of listeners(src)) {

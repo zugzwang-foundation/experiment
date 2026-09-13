@@ -68,9 +68,16 @@ export function CommentImage({
 			// `max-h-full` is a PERCENTAGE and resolves to `none` unless every
 			// ancestor between it and the definite height carries one. The
 			// `.argimg` cell in `PostCard` is the flex item that has it.
+			// ⚠ MOBILE-2k · F-2 — `max-mobile:w-full` MAKES THE BOX THE CARD'S CONTENT
+			// WIDTH, so the image is centred IN the card rather than the box
+			// shrink-wrapping the image. Visually the two are identical while the box is
+			// transparent and borderless — which it is — but the box is what a later
+			// aspect-ratio reservation would have to size, and a shrink-to-fit box cannot
+			// be reserved. Stated here so the width is the card's by declaration rather
+			// than by coincidence.
 			className={
 				fill
-					? "flex h-full max-w-full items-center justify-center"
+					? "flex h-full max-w-full items-center justify-center max-mobile:w-full"
 					: "block w-fit"
 			}
 		>
@@ -102,6 +109,55 @@ export function CommentImage({
 			    itself sized by this image. The parent stays `w-fit` and shrinks around
 			    the height-bounded image. (Corrected post-review: the call was right and
 			    its stated cause was not — `O-3`.) */}
+			{/* ⛔⛔ MOBILE-2k · F-2 — BELOW 640 THE ATTACHMENT IS CAPPED AT 60% OF THE
+			    VISUAL VIEWPORT, ON THE CARD'S OWN GROUND, WITH NO EDGE. Three tokens,
+			    all `max-mobile:`-scoped and all gated on `fill`, and each closes a
+			    different half-measure.
+
+			    ⚠ THE CAP IS THE ROUND'S SUBSTANCE, because `max-h-full` DOES NOTHING
+			    HERE. It is a percentage, and a percentage max-height resolves to
+			    `none` unless an ancestor carries a DEFINITE height — which is exactly
+			    what the cell's own docblock in `PostCard` says. On the DESKTOP the
+			    founder's 2026-08-17 fixed-height grid supplies one and the bound
+			    bites. On the PHONE the feed pane is a column of content-sized cards
+			    inside a scroller, so `flex-1` resolves to content, `max-h-full`
+			    resolves to `none`, and a portrait attachment renders at its INTRINSIC
+			    height — bounded on width alone, pushing the argument and the footer a
+			    whole screen down. `60dvh` is a definite length and is the first bound
+			    this arm has actually had below 640.
+
+			    ⚠ `dvh`, NOT `vh` — the same choice the tier root makes and for the
+			    same reason: `vh` is the LARGE viewport, so with a browser toolbar
+			    showing a `60vh` box exceeds 60% of what the reader can see. `dvh`
+			    tracks the viewport that is actually there, which is what "60% of the
+			    visual viewport" names.
+
+			    ⛔ `max-mobile:[border:none]` RATHER THAN `border-none`, AND THE
+			    SPELLING IS THE MECHANISM. The base token is the arbitrary property
+			    `[border:var(--hairline)]`; Tailwind orders a variant AFTER its
+			    unprefixed peer within the same utility kind, so an arbitrary property
+			    is what reliably overrides an arbitrary property. `border-none` sets
+			    `border-style` — a different declaration whose position relative to a
+			    `border` shorthand is not a thing to assume. Measured in the compiled
+			    sheet and in `getComputedStyle`, not inferred.
+
+			    ⚠ THE RADIUS BECOMES THE CARD'S `--r` (8px) AND LEAVES THE RATIFIED
+			    `--imgr` (6px) BEHIND — founder-ruled for this round. `--imgr` is
+			    ratified for images (values-log §3 item 2) and still governs
+			    everywhere else, desktop included; the phone feed is the one place the
+			    picture is edge-to-edge inside its card with no border between them, so
+			    a 6px corner inside an 8px corner reads as a misregistration rather
+			    than as two radii. Recorded as a divergence from a ratified token, not
+			    as a correction of one.
+
+			    ⛔ NO ASPECT-RATIO RESERVATION, AND IT IS NOT AN OMISSION. The read
+			    model carries no dimensions to reserve with: `DebatePost.imageUrl` is a
+			    `string | null` and nothing else, `load-debate-view.ts` mints it from
+			    `image_uploads`, and that table carries `content_type` and `byte_size`
+			    and NO width or height (`0006`, and the schema at HEAD). A reservation
+			    would have to invent a ratio, and an invented ratio is a layout shift
+			    with extra steps. So the feed does jump as an image decodes, and that
+			    is owed work with a name rather than a thing quietly not done. */}
 			{/* biome-ignore lint/performance/noImgElement: a short-TTL presigned R2
 			    GET URL (D9), not a static asset — next/image optimization would
 			    proxy a 3600s-expiring URL; plain <img> is the plan's choice (§4). */}
@@ -109,8 +165,10 @@ export function CommentImage({
 				src={url}
 				alt="Argument attachment"
 				className={`max-w-full object-contain rounded-[var(--imgr)] [border:var(--hairline)] ${
-					className ?? (fill ? "max-h-full" : "max-h-[var(--imgmax)]")
-				}`}
+					fill
+						? "max-mobile:max-h-[60dvh] max-mobile:rounded-(--r) max-mobile:[border:none] "
+						: ""
+				}${className ?? (fill ? "max-h-full" : "max-h-[var(--imgmax)]")}`}
 				loading="lazy"
 				decoding="async"
 			/>
