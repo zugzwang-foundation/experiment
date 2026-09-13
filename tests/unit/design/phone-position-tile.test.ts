@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -92,14 +92,23 @@ function classesAfter(source: string, anchor: string, what: string): string[] {
 	const at = source.indexOf(anchor);
 	expect(at, `${what}: anchor ${anchor} not found`).toBeGreaterThan(-1);
 	const openAt = source.lastIndexOf("<", at);
-	const tag =
+	// ⛔⛔ NO DISTANCE FALLBACK. An earlier form of this reader fell back to "the
+	// first className within 600 characters" for anchors that are not tags — and a
+	// 600-character window is the same bet about future prose the O-8 note above is
+	// about, sitting inside the file that makes it. It had exactly one user and 77
+	// characters of headroom. An anchor that is not itself a tag now reads the
+	// element that FOLLOWS it, so every path here is a symbol fence.
+	// `@code-reviewer`, MEDIUM.
+	const tagOpen =
 		openAt >= 0 && /[A-Za-z]/.test(source[openAt + 1] ?? "")
-			? openingTagFrom(source, openAt, what)
-			: // `const marketLine = (` and friends are not tags; fall back to the
-				// first className after the anchor, which is what those anchors mean.
-				(/className=(?:"[^"]*"|\{`[^`]*`)/.exec(
-					source.slice(at, at + 600),
-				)?.[0] ?? "");
+			? openAt
+			: source.indexOf("<", at);
+	expect(
+		tagOpen,
+		`${what}: ${anchor} is not followed by an element, so there is no opening ` +
+			`tag to read a className out of. Re-derive this anchor.`,
+	).toBeGreaterThan(-1);
+	const tag = openingTagFrom(source, tagOpen, what);
 	const m = /className=(?:"([^"]*)"|\{`([^`]*)`)/.exec(tag);
 	const cls = m?.[1] ?? m?.[2];
 	expect(
@@ -183,8 +192,11 @@ describe("A5 D-1 — one position, one screen", () => {
 		// ⛔ A MIN, NEVER A DEFINITE HEIGHT. A5 D-1: a market question longer than a
 		// screen GROWS the tile. A definite height would clamp it or scroll it
 		// inside itself, and the ruling forbids both.
+		// ⚠ MATCHES THE PREFIX, NOT ONE SPELLING. An earlier form forbade exactly
+		// `h-[calc(100dvh-60px-2px)]`, so the identical clamp written
+		// `h-[calc(100dvh-62px)]` passed straight through. `@code-reviewer`, LOW.
 		expect(
-			cls.some((c) => c === phone("h-[calc(100dvh-60px-2px)]")),
+			cls.some((c) => c.startsWith(`${V}${S}h-[`)),
 			`${TABLE}: the tile declares a DEFINITE height. A5 D-1 rules the tile ` +
 				`grows past a screen when the question requires it, which a fixed ` +
 				`height cannot do — it would clamp the question or scroll it inside ` +
@@ -312,6 +324,42 @@ describe("A5 D-1 — the four cells are placed, on both tabs", () => {
 		);
 	});
 
+	it("tile::the-Closed-tab-s-value-cell-hugs-its-neighbour-TOO", () => {
+		// ⚠ The same token, on the same slot, one tab across — and only the Open
+		// tab's was asserted. Delete it here and the 24px Staked figure floats at
+		// the left of the `1fr` track with `Opened` hard right, on a tab no earlier
+		// round ever opened. `@code-reviewer`, MEDIUM.
+		const cls = cellClassesWrapping(
+			stripComments(read(TABLE)),
+			"data-testid={`tile-staked-",
+		);
+		expect(
+			cls,
+			`${TABLE}: the Closed tab's value cell no longer hugs the Opened column, ` +
+				`so the figure drifts in a 1fr track instead of sitting against it.`,
+		).toContain(phone("justify-self-end"));
+	});
+
+	it("tile::the-argument-cell-SPANS-the-whole-tile", () => {
+		// ⛔⛔ THE TOKEN THE WHOLE COMPOSITION RESTS ON, AND NOTHING ASSERTED IT.
+		// Delete the span and the cell is placed at col 1 / row 2 with an implicit
+		// span of ONE: the argument title and the complete market question render
+		// inside the `auto` track sized to `Yes` plus its glyph — about 70px — while
+		// columns 2 and 3 of row 2 stay empty. The tile is destroyed, on both tabs,
+		// and the whole suite stays green. `@code-reviewer`, HIGH; it was not among
+		// the first battery's thirty mutations either.
+		const cls = cellClassesWrapping(
+			stripComments(read(TABLE)),
+			"<TileArgumentCell",
+		);
+		expect(
+			cls,
+			`${TABLE}: the argument cell no longer spans the tile's three columns, so ` +
+				`the title and the market question are rendered inside the side ` +
+				`marker's own track — about 70px — with two thirds of row 2 empty.`,
+		).toContain(phone("col-span-3"));
+	});
+
 	it("tile::the-argument-cell-is-the-ONLY-one-that-stretches", () => {
 		const cls = cellClassesWrapping(
 			stripComments(read(TABLE)),
@@ -435,7 +483,21 @@ describe("A5 D-1 — the phone's scroller is the page, and three things release"
 					`and overflow:hidden makes a box one just as overflow-y:auto does — ` +
 					`so with either live the tiles snap against a panel instead of ` +
 					`against the page (measured: the landing misses by 45px).`,
-			).toContain(phone("overflow-visible"));
+			).toContain(phone("overflow-clip"));
+			// ⛔ AND `visible` IS FORBIDDEN, because it was the first fix and it gave
+			// up the CLIP as well as the scroll container: measured at 360 on the
+			// Closed tab, a five-figure figure made row 1 328px wide against 278px
+			// available and that 50px reached the document, widening the layout
+			// viewport 360 → 369. `clip` contains it and is still not a scroll
+			// container. `@code-reviewer`, HIGH.
+			expect(
+				cls,
+				`${TABLE}: ${anchor} releases overflow to \`visible\`, which reaches the ` +
+					`viewport AND gives up the clip. Row 1's three cells are ` +
+					`whitespace-nowrap in tracks that cannot shrink below min-content, so ` +
+					`a five-figure Đ figure then reaches the document and the page gains ` +
+					`horizontal scroll. \`clip\` is not a scroll container either.`,
+			).not.toContain(phone("overflow-visible"));
 			expect(
 				cls,
 				`${TABLE}: ${anchor} releases overflow WITHOUT restoring min-w-0. ` +
@@ -524,45 +586,57 @@ describe("A5 D-1 — the document's snap type is armed once and targets nothing 
 		 * adding a snap alignment inherits the behaviour silently. So the census is
 		 * pinned, and a new one has to come here and say so.
 		 *
+		 * ⛔⛔ AND IT WALKS THE WHOLE OF `src/`, WHICH THE FIRST VERSION DID NOT. That
+		 * one iterated a hard-coded list of eleven paths, so a `snap-start` added to
+		 * a discovery card — or to any file outside the eleven — was invisible: the
+		 * list was unchanged, the found set was unchanged, the test was green. And
+		 * `src/app/layout.tsx`'s own docblock promises that a third target "ANYWHERE"
+		 * reddens, so the guard did not have the reach the code claimed for it.
+		 * `@code-reviewer`, HIGH — an O-3 defect in a stated mechanism.
+		 *
 		 * ⚠ `PhoneFeedTrack` is the other member and is NOT a counter-example: its
 		 * panes' nearest scroll container is that track's own horizontal scroller,
 		 * so the viewport never sees them.
 		 */
-		const FILES = [TABLE, FEED_TRACK];
-		const found: string[] = [];
-		for (const rel of [
-			TABLE,
-			FEED_TRACK,
-			SHEET,
-			INLINE,
-			ROOT_LAYOUT,
-			"src/components/profile/ProfileTiles.tsx",
-			"src/components/profile/IdentityCard.tsx",
-			"src/components/profile/ArgumentList.tsx",
-			"src/components/debate/phone/PhoneDebateView.tsx",
-			"src/components/debate/phone/PhoneSheet.tsx",
-			"src/app/(public)/page.tsx",
-		]) {
-			const src = stripComments(read(rel));
-			if (
-				src.includes(`${V}${S}snap-start`) ||
-				src.includes(`${V}${S}snap-center`) ||
-				src.includes(`${V}${S}snap-end`) ||
-				/\bsnap-(start|center|end)\b/.test(src) ||
-				src.includes("scrollSnapAlign")
-			) {
-				found.push(rel);
+		const EXPECTED = [TABLE, FEED_TRACK];
+		const files: string[] = [];
+		const walk = (dir: string): void => {
+			for (const entry of readdirSync(join(ROOT, dir), {
+				withFileTypes: true,
+			})) {
+				const rel = `${dir}/${entry.name}`;
+				if (entry.isDirectory()) walk(rel);
+				else if (/\.tsx?$/.test(entry.name)) files.push(rel);
 			}
-		}
+		};
+		walk("src");
+		// POSITIVE CONTROL — the walk really reaches the tree, and reaches the two
+		// files the census is about. A walk that found nothing would pass vacuously.
+		expect(
+			files.length,
+			"the walk found almost no files — it is not reaching src/",
+		).toBeGreaterThan(200);
+		expect(files, "the walk did not reach the position tile").toContain(TABLE);
+		expect(files, "the walk did not reach the phone feed track").toContain(
+			FEED_TRACK,
+		);
+
+		const ALIGN = /(?:^|\s|:)snap-(?:start|center|end|align-none)\b/;
+		const found = files.filter((rel) => {
+			const src = stripComments(read(rel));
+			return ALIGN.test(src) || src.includes("scrollSnapAlign");
+		});
 		expect(
 			found.sort(),
 			`the set of files declaring a scroll-snap ALIGNMENT has changed. The ` +
 				`document's snap type is armed globally on <html> and is inert only ` +
 				`while this set is exactly the position tile and the phone feed track. ` +
-				`A new member inherits page-level snapping silently — if that is ` +
-				`wanted, say so here; if it is not, scope the alignment to its own ` +
-				`scroll container as PhoneFeedTrack does.`,
-		).toEqual([...FILES].sort());
+				`A new member inherits page-level snapping silently — and this round ` +
+				`measured what that costs: Chrome's proximity pull reaches ~291px, so ` +
+				`every rest position within that of the new target slides to it. If ` +
+				`that is wanted, say so here; if it is not, scope the alignment to its ` +
+				`own scroll container as PhoneFeedTrack does.`,
+		).toEqual([...EXPECTED].sort());
 	});
 });
 
@@ -645,11 +719,21 @@ describe("R-4/R-5 — the sell sheet's amount is the sheet's subject", () => {
 	});
 
 	it("sell::the-label-sits-ABOVE-the-field-and-both-are-centred", () => {
+		// ⚠ ANCHORED ON THE ELEMENT, NOT ON ITS INDENTATION. An earlier form searched
+		// for a literal `>` plus a newline plus six tabs plus `Current`; nest this
+		// block one level, or let Biome re-indent it, and the anchor vanishes and the
+		// row fails with "the Current label is gone" — a true red with a false cause,
+		// which is the O-3 shape. `@code-reviewer`, MEDIUM.
 		const source = stripComments(read(SHEET));
-		const at = source.indexOf(">\n\t\t\t\t\t\tCurrent\n");
+		const at = source.indexOf("Current\n");
 		expect(at, `${SHEET}: the Current label is gone`).toBeGreaterThan(-1);
+		const divAt = source.lastIndexOf("<div", at);
+		expect(
+			divAt,
+			`${SHEET}: the Current label is not inside a <div>`,
+		).toBeGreaterThan(-1);
 		const m = /className="([^"]*)"/.exec(
-			source.slice(source.lastIndexOf("<div", at), at),
+			openingTagFrom(source, divAt, `${SHEET}: the amount block`),
 		);
 		const cls = (m?.[1] ?? "").split(/\s+/).filter(Boolean);
 		const why =
@@ -700,17 +784,36 @@ describe("R-4/R-5 — the sell sheet's amount is the sheet's subject", () => {
 			`${INLINE}: the amount field lost its inputMode, so a phone offers a ` +
 				`full alphabetic keyboard for a money figure.`,
 		).toMatch(/inputMode="decimal"/);
+		// ⛔⛔ TIED TO THE INPUT'S OWN SHEET BRANCH, NOT TO THE FILE. An earlier form
+		// was a file-wide match on the 32px token, which passes if it is anywhere at
+		// all — including on the `Đ` glyph beside the figure — so it did not say the
+		// FIELD is 32px. `@code-reviewer`, MEDIUM.
+		const inputAt = source.indexOf("<Input");
+		expect(inputAt, `${INLINE}: the amount field is gone`).toBeGreaterThan(-1);
+		const inputTag = source.slice(inputAt, source.indexOf("/>", inputAt));
+		const sheetBranch = /\?\s*"([^"]*text-\[32px\][^"]*)"/.exec(inputTag)?.[1];
+		expect(
+			sheetBranch,
+			`${INLINE}: the input's SHEET branch is not 32px. iOS scales the whole ` +
+				`page on focus below 16px, and the ruling puts this field first in the ` +
+				`sheet — a 32px token elsewhere in the file does not make it so.`,
+		).toBeDefined();
+		expect(
+			sheetBranch ?? "",
+			`${INLINE}: the sheet branch states a size without its leading, so the ` +
+				`figure clips its own descenders and the tap target is 38px rather than ` +
+				`44 (AGENTS.md §8).`,
+		).toContain("leading-[1.375]");
+		// ⛔ AND THE MONEY IS UNTOUCHED. This is the ONE assertion here about the
+		// wire, so it names the CALL rather than the identifier: an earlier form
+		// matched a bare `seedExact`, which occurs six times in this file and
+		// therefore could not fail for the reason its own message gave.
+		// `@code-reviewer`, MEDIUM.
 		expect(
 			source,
-			`${INLINE}: the sheet's figure dropped below 16px, so iOS scales the ` +
-				`whole page on focus and moves every box the reader was looking at.`,
-		).toMatch(/text-\[32px\]/);
-		// ⛔ AND THE MONEY IS UNTOUCHED — the prop reaches presentation only.
-		expect(
-			source,
-			`${INLINE}: the untouched field no longer submits the EXACT seed. The ` +
-				`presentation prop reaches type sizes, padding and the width floor and ` +
-				`nothing else; the ceiling and the exact-seed submit are useInlineSell's.`,
-		).toMatch(/seedExact/);
+			`${INLINE}: the untouched field no longer hands the EXACT seed back on ` +
+				`edit, so a field nobody typed in would submit the ROUNDED figure and ` +
+				`strand the remainder as unsellable dust.`,
+		).toMatch(/onEdit\(e\.target\.value,\s*seedExact\)/);
 	});
 });

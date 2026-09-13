@@ -1332,7 +1332,16 @@ function TileRow({
 			   measured for `bg-(--btn-fill)` against `max-mobile:bg-ink`. ⚠ THE
 			   SELECTION ITSELF IS UNTOUCHED: `aria-current`, `tabIndex` and the sell
 			   sheet's `armedLotId` all still read it. Only the paint goes, and only
-			   here — scrolling past a tile must leave nothing behind. */
+			   here — scrolling past a tile must leave nothing behind.
+			   ⚠ THE HOVER HALF IS FOR A NARROW DESKTOP WINDOW, NOT FOR A TAP, AND THE
+			   FIRST VERSION OF THIS NOTE SAID OTHERWISE. Tailwind v4 emits every
+			   `hover:` rule inside `@media (hover: hover)`, so on a touch-only phone
+			   NEITHER `hover:bg-n1` nor its override can match and the "`:hover` sticks
+			   after a tap" argument describes something that cannot happen. Measured in
+			   the compiled sheet: `.hover\:bg-n1:hover` at byte 63728, the override at
+			   80392, both inside a hover media query. The token is correct and correctly
+			   ordered for a sub-640 pointer-capable window, which is the case it is
+			   actually for. `@code-reviewer`, LOW. */
 			className={`cursor-pointer rounded-(--r) focus-visible:shadow-(--state-focus-ring) max-mobile:grid max-mobile:min-h-[calc(100dvh-60px-2px)] max-mobile:snap-start max-mobile:snap-always max-mobile:scroll-mt-[62px] max-mobile:grid-cols-[auto_1fr_auto] max-mobile:grid-rows-[auto_1fr] max-mobile:items-center max-mobile:gap-x-2 max-mobile:gap-y-2 max-mobile:rounded-none max-mobile:bg-transparent max-mobile:px-0 max-mobile:py-2.5 max-mobile:[border-top:var(--hairline)] max-mobile:[outline:none] max-mobile:hover:bg-transparent ${
 				selected
 					? "bg-n1 [outline-offset:-2px] [outline:var(--ring-active)]"
@@ -1977,16 +1986,36 @@ function TileArgumentCell({
  * `profile-height-chain` on the first attempt: the fence fired on the very
  * change whose explanation overran it.
  *
- * **Why release at all.** A snap alignment resolves against the nearest
- * SCROLL-CONTAINER ancestor, and both of these boxes are scroll containers — the
+ * **Why change them at all.** A snap alignment resolves against the nearest
+ * SCROLL-CONTAINER ancestor, and both of these boxes were scroll containers — the
  * body by `overflow-y-auto`, the section by `overflow-hidden`, which per CSS
  * Overflow is a scroll container that simply cannot be scrolled by hand. So with
  * either one live, the phone's viewport-tall tiles snap against a panel instead
- * of against the page. MEASURED at 360/390/430: releasing the body alone moves a
+ * of against the page. MEASURED at 360/390/430: changing the body alone moves a
  * tile's nearest scroller from `positions-panel-body` to `positions-panel` and
- * the landing still misses by 45px; releasing both moves it to the VIEWPORT and
- * the tile lands exactly, its top edge at 62px. Neither release is sufficient
- * alone.
+ * the landing still misses by 45px; changing both moves it to the VIEWPORT and
+ * the tile lands exactly, its top edge at 62px. Neither is sufficient alone.
+ *
+ * ⛔⛔ **`clip`, NOT `visible`, AND THE DIFFERENCE IS A REGRESSION THIS ROUND
+ * SHIPPED AND THEN MEASURED.** The first form released these to `visible`, which
+ * does reach the viewport — and also gives up the CLIP. `overflow: hidden` was
+ * containing more than the round had noticed: row 1 of the tile is three
+ * `whitespace-nowrap` cells in tracks that cannot shrink below their min-content,
+ * so a five-figure Đ figure makes the row wider than the tile. MEASURED at 360 on
+ * the Closed tab with `Staked Đ 14,260`: the row needs **328px against 278px**,
+ * and with the clip gone that 50px reached the document — the layout viewport
+ * widened 360 → 369 and the page gained horizontal scroll. `@code-reviewer`, HIGH.
+ * ⇒ **`overflow: clip` clips exactly as `hidden` does and, per CSS Overflow 3, is
+ * NOT a scroll container.** MEASURED: with `clip` the tile's nearest scroller is
+ * still the VIEWPORT and the snap still lands at 62px, while the frame holds its
+ * 360 and the page gains no horizontal scroll. It restores precisely the
+ * containment `hidden` was providing and gives up only the part that was in the way.
+ * ⚠ **WHAT IS THEREFORE UNCHANGED, AND IS NOT THIS ROUND'S TO FIX:** a five-figure
+ * figure at 360 is CLIPPED rather than wrapped — exactly as it was before this
+ * round, when the same content overflowed a 64px cell and was clipped at this same
+ * panel edge. The regression was the frame giving way; the clip is the status quo.
+ * Widening the cells or letting them wrap is a composition change and a ruling,
+ * not a repair (`docs/parked.md` 2h-7).
  *
  * **Why `min-w-0` is not tidying.** `overflow: hidden` does TWO jobs and only one
  * of them is clipping: per CSS Sizing, an `overflow` other than `visible` also
@@ -2032,7 +2061,7 @@ function PositionsPanel({
 			// `min-h-0`: the panel can be SHORTER than its content. MOBILE-2h's phone
 			// pair — `min-w-0` + `overflow-visible` — is explained in this component's
 			// docblock and deliberately NOT here; see its last two paragraphs.
-			className="flex min-h-0 flex-col overflow-hidden rounded-[var(--r)] bg-n0 [border:var(--hairline)] max-mobile:min-w-0 max-mobile:overflow-visible"
+			className="flex min-h-0 flex-col overflow-hidden rounded-[var(--r)] bg-n0 [border:var(--hairline)] max-mobile:min-w-0 max-mobile:overflow-clip"
 		>
 			{/* `relative` is the market popover's POSITIONING CONTEXT, and it lives
 			    here rather than on the trigger — see the ⛔ at the trigger for the
@@ -2069,14 +2098,23 @@ function PositionsPanel({
 			    which is not a contradiction because it is a different scroller. RF-10
 			    is about THIS box, the panel-scoped scroller, which exists only at
 			    `lg`+ and is released below 640px (`max-mobile:overflow-visible`). The
-			    phone's snap lives on the DOCUMENT, where there is no trackpad and no
-			    arrow-key stepper to fight — `useDocumentRowStepper` is a keyboard
-			    mechanism and a phone has no keys. Nothing on this element snaps at any
-			    width. */}
+			    phone's snap lives on the DOCUMENT, which is a different scroller.
+			    Nothing on THIS element snaps at any width.
+			    ⚠⚠ AND THE REASON IS NOT "A PHONE HAS NO KEYS", WHICH IS WHAT THIS NOTE
+			    SAID. `max-mobile` is a WIDTH query, so a desktop window narrower than
+			    640px is inside the phone tier with a keyboard and a trackpad attached:
+			    `useDocumentRowStepper` is live there and RF-10's objection applies
+			    verbatim. It is not broken there, and the reason is a coincidence worth
+			    writing down rather than a design: the tile is `100dvh - 62` tall and
+			    carries a matching `scroll-mt`, so its scroll-margin-adjusted box is
+			    exactly one viewport and `scrollIntoView({block:"nearest"})` lands on the
+			    same position `snap-start` would choose. The trackpad half does change —
+			    one tile per gesture on a narrow desktop window. `@code-reviewer`,
+			    MEDIUM: the token is right and the stated cause was not the cause. */}
 			<div
 				data-testid="positions-panel-body"
 				// MOBILE-2h · R-2 — the same phone pair as the `<section>`; docblock.
-				className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 max-mobile:min-w-0 max-mobile:overflow-visible"
+				className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 max-mobile:min-w-0 max-mobile:overflow-clip"
 				ref={bodyRef}
 			>
 				{children}
