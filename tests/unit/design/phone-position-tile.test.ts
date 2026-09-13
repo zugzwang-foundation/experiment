@@ -1,0 +1,716 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+/**
+ * MOBILE-2h · ADR-0051 A5 D-1 — `/u/[pseudonym]`'s positions are TILES below
+ * 640px: one position, one screen, snapped through one at a time.
+ *
+ * WHAT THIS FILE IS FOR, and why it is a new file rather than more rows in
+ * `phone-round-five.test.ts`. That file is MOBILE-2e's contract and two of its
+ * rows are superseded here; leaving this round's guards inside it would make one
+ * file assert a shape and its replacement. Round five keeps the parts of its
+ * ruling that survive; this file owns the tile.
+ *
+ * ⛔⛔ THE PREFIX IS ASSEMBLED AT RUNTIME AND NEVER WRITTEN AS A LITERAL.
+ * Tailwind v4's source detection scans `tests/` as well as `src/`, so a
+ * class-shaped string in a guard becomes a REAL EMITTED UTILITY — which means a
+ * guard that asserts a component uses a class can EMIT that class itself, and a
+ * check that greps the built sheet to prove it compiled is self-fulfilling
+ * (AGENTS.md §8, measured: `opacity-0` is present in the built sheet, in
+ * `tests/`, and in no `src/` file). Every utility below is built from `V` and
+ * `S`, so this file carries no scannable token.
+ *
+ * ⚠ THESE ARE SOURCE SCANS. jsdom performs no layout, so nothing here can see a
+ * tile's height, a snap landing or an overflow. Those are measured in a real
+ * browser and reported with the run; what a scan CAN hold is that the tokens
+ * which produce them are still on the elements that need them.
+ */
+
+const ROOT = process.cwd();
+const V = "max-mobile";
+const S = ":";
+/** `max-mobile:<utility>`, assembled so this file emits nothing. */
+const phone = (utility: string) => `${V}${S}${utility}`;
+
+const TABLE = "src/components/profile/PositionsTable.tsx";
+const SHEET = "src/components/profile/phone/PhoneSellSheet.tsx";
+const INLINE = "src/components/profile/InlineSell.tsx";
+const ROOT_LAYOUT = "src/app/layout.tsx";
+const FEED_TRACK = "src/components/debate/phone/PhoneFeedTrack.tsx";
+
+const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
+
+/**
+ * Comments out, line count preserved, so a reported line number still points at
+ * the source. ⚠ IT MATTERS MORE HERE THAN USUAL: this file's own prose names
+ * every token it forbids, and a scan that could not tell a mention from a use
+ * would fire on the paragraph explaining the absence — six recorded instances of
+ * that shape in this repository already.
+ */
+function stripComments(source: string): string {
+	return source
+		.replace(/\/\*[\s\S]*?\*\//g, (m) => "\n".repeat(m.split("\n").length - 1))
+		.replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+}
+
+/**
+ * The opening tag that STARTS at `openAt`, ended at the first `>` that is
+ * outside every brace and every quoted string.
+ *
+ * ⛔⛔ A SYMBOL FENCE, NOT A DISTANCE ONE, AND THE FIRST DRAFT OF THIS FILE USED
+ * A DISTANCE. It read the className out of a 900-character window and passed —
+ * which is exactly the shape (O-8) that reddened `profile-height-chain` earlier
+ * in this same round, when a comment written between a `data-testid` and its
+ * className overran that guard's own 400-character window. A window is a bet
+ * about how much prose a future editor will write; the tag's end is a fact about
+ * the tag. ⚠ The quote tracking is not decoration either: an arbitrary variant
+ * containing a closing angle (a child combinator, say) puts that character
+ * inside a `className` string, and a scanner that stops at the first one
+ * truncates the tag mid-attribute and reports the element as declaring no class
+ * at all — measured, on this very file's side cell.
+ */
+function openingTagFrom(source: string, openAt: number, what: string): string {
+	let depth = 0;
+	let quote: string | null = null;
+	for (let i = openAt + 1; i < source.length; i += 1) {
+		const c = source[i];
+		if (quote !== null) {
+			if (c === quote) quote = null;
+			continue;
+		}
+		if (c === '"' || c === "'" || c === "`") quote = c;
+		else if (c === "{") depth += 1;
+		else if (c === "}") depth -= 1;
+		else if (c === ">" && depth === 0) return source.slice(openAt, i + 1);
+	}
+	throw new Error(`${what}: the opening tag at ${openAt} never closes.`);
+}
+
+/** The class tokens declared by the element whose opening tag contains `anchor`. */
+function classesAfter(source: string, anchor: string, what: string): string[] {
+	const at = source.indexOf(anchor);
+	expect(at, `${what}: anchor ${anchor} not found`).toBeGreaterThan(-1);
+	const openAt = source.lastIndexOf("<", at);
+	const tag =
+		openAt >= 0 && /[A-Za-z]/.test(source[openAt + 1] ?? "")
+			? openingTagFrom(source, openAt, what)
+			: // `const marketLine = (` and friends are not tags; fall back to the
+				// first className after the anchor, which is what those anchors mean.
+				(/className=(?:"[^"]*"|\{`[^`]*`)/.exec(
+					source.slice(at, at + 600),
+				)?.[0] ?? "");
+	const m = /className=(?:"([^"]*)"|\{`([^`]*)`)/.exec(tag);
+	const cls = m?.[1] ?? m?.[2];
+	expect(
+		cls,
+		`${what}: no className on the element carrying ${anchor}`,
+	).toBeDefined();
+	return (cls ?? "").split(/\s+/).filter(Boolean);
+}
+
+/** The tile `<tr>`'s static class template. */
+function tileRowClasses(source: string): string[] {
+	const m =
+		/data-testid={`position-tile-\$\{tile\.key}`}[\s\S]*?className={`([^`]*)`/.exec(
+			source,
+		);
+	expect(
+		m?.[1],
+		`${TABLE}: the tile row's class template is unreadable`,
+	).toBeDefined();
+	return (m?.[1] ?? "").split(/\s+/).filter(Boolean);
+}
+
+/**
+ * The `<td>` that WRAPS the element carrying `anchor`.
+ *
+ * ⚠ THE WINDOW IS THE `<td>`'s OWN OPENING TAG, in both directions. Two of the
+ * four cells carry their own `data-testid` — the Closed tab's Staked and Opened —
+ * so their className sits AFTER the anchor rather than before it, and a reader
+ * that stopped at the anchor found nothing and reported the cell as declaring no
+ * className at all. Both shapes are real and the reader has to admit both.
+ */
+function cellClassesWrapping(source: string, anchor: string): string[] {
+	const at = source.indexOf(anchor);
+	expect(at, `${TABLE}: ${anchor} not found`).toBeGreaterThan(-1);
+	const tdAt = source.lastIndexOf("<td", at);
+	expect(tdAt, `${TABLE}: ${anchor} is not inside a <td>`).toBeGreaterThan(-1);
+	const tag = openingTagFrom(
+		source,
+		tdAt,
+		`${TABLE}: the <td> wrapping ${anchor}`,
+	);
+	const m = /className="([^"]*)"/.exec(tag);
+	expect(
+		m?.[1],
+		`${TABLE}: the <td> wrapping ${anchor} declares no className`,
+	).toBeDefined();
+	return (m?.[1] ?? "").split(/\s+/).filter(Boolean);
+}
+
+// ── 0 · the guards fire at all ───────────────────────────────────────────────
+
+describe("MOBILE-2h — positive controls first", () => {
+	it("tile::the-readers-find-something", () => {
+		const source = stripComments(read(TABLE));
+		expect(tileRowClasses(source).length).toBeGreaterThan(5);
+		expect(
+			cellClassesWrapping(source, "data-testid={`tile-side-").length,
+		).toBeGreaterThan(1);
+		expect(stripComments(read(ROOT_LAYOUT)).includes("<html")).toBe(true);
+	});
+
+	it("tile::stripComments-really-strips", () => {
+		const withComment = "a\n/* max-mobile:snap-start */\nb";
+		expect(stripComments(withComment)).not.toContain("snap-start");
+		// and it preserves the line count, so a reported line still points at source
+		expect(stripComments(withComment).split("\n")).toHaveLength(3);
+	});
+});
+
+// ── 1 · the tile is a screen ─────────────────────────────────────────────────
+
+describe("A5 D-1 — one position, one screen", () => {
+	it("tile::the-height-is-the-viewport-minus-the-sticky-header", () => {
+		const cls = tileRowClasses(stripComments(read(TABLE)));
+		const why =
+			`${TABLE}: the tile is no longer one screen tall. The expression is ` +
+			`<main>'s own — the viewport minus the header's 60px row and its 2px ` +
+			`border-y — so the two cannot drift apart; a literal typed here would be ` +
+			`a second number for one fact.`;
+		expect(cls, why).toContain(phone("min-h-[calc(100dvh-60px-2px)]"));
+		// ⛔ A MIN, NEVER A DEFINITE HEIGHT. A5 D-1: a market question longer than a
+		// screen GROWS the tile. A definite height would clamp it or scroll it
+		// inside itself, and the ruling forbids both.
+		expect(
+			cls.some((c) => c === phone("h-[calc(100dvh-60px-2px)]")),
+			`${TABLE}: the tile declares a DEFINITE height. A5 D-1 rules the tile ` +
+				`grows past a screen when the question requires it, which a fixed ` +
+				`height cannot do — it would clamp the question or scroll it inside ` +
+				`the tile, and both are ruled out by name.`,
+		).toBe(false);
+	});
+
+	it("tile::it-is-a-grid-with-BOTH-track-lists", () => {
+		const cls = tileRowClasses(stripComments(read(TABLE)));
+		const why =
+			`${TABLE}: the tile's track lists are incomplete. The column list places ` +
+			`side, value and SELL across one line; the ROW list is what gives every ` +
+			`leftover pixel to row 2 alone — without it the two rows share the ` +
+			`height and the tile has two gaps where the ruling allows one.`;
+		expect(cls, why).toContain(phone("grid"));
+		expect(cls, why).toContain(phone("grid-cols-[auto_1fr_auto]"));
+		expect(cls, why).toContain(phone("grid-rows-[auto_1fr]"));
+	});
+
+	it("tile::it-snaps-to-its-own-top-edge-below-the-header", () => {
+		const cls = tileRowClasses(stripComments(read(TABLE)));
+		expect(
+			cls,
+			`${TABLE}: the tile carries no snap alignment, so the document's snap ` +
+				`type has nothing to snap to.`,
+		).toContain(phone("snap-start"));
+		expect(
+			cls,
+			`${TABLE}: the tile can be flicked past. A proximity snap alone lets a ` +
+				`fast gesture cross several tiles; "one at a time" is the stop.`,
+		).toContain(phone("snap-always"));
+		expect(
+			cls,
+			`${TABLE}: the tile rests at the SCROLLPORT top, which the sticky header ` +
+				`covers. The scroll margin is the same 62px the height subtracts, said ` +
+				`to the snap engine — measured 107px without it against 62px with.`,
+		).toContain(phone("scroll-mt-[62px]"));
+	});
+
+	it("tile::R-3-no-selected-visual-below-640-and-the-STATE-survives", () => {
+		const source = stripComments(read(TABLE));
+		const cls = tileRowClasses(source);
+		const why =
+			`${TABLE}: a tile still paints a selected or hovered background below ` +
+			`640px. BOTH arms need overriding: the selected arm carries bg-n1 and the ` +
+			`resting arm carries a hover fill, and on touch :hover sticks after a tap ` +
+			`— so overriding only the first leaves a tint behind on exactly the ` +
+			`gesture a phone reader uses.`;
+		expect(cls, why).toContain(phone("bg-transparent"));
+		expect(cls, why).toContain(phone("hover:bg-transparent"));
+		// ⛔⛔ THE POSITIVE CONTROL, AND IT IS THE POINT OF THE ROW. R-3 removes the
+		// PAINT and keeps the STATE — the sell sheet is told which position it is
+		// selling by exactly this selection. A guard that only checked for the
+		// absence of a tint would be satisfied by deleting selection altogether.
+		expect(
+			source,
+			`${TABLE}: the selected tile no longer reports itself. R-3 removes the ` +
+				`paint, not the selection.`,
+		).toContain('aria-current={selected ? "true" : undefined}');
+		expect(
+			source,
+			`${TABLE}: the selected tile is no longer keyboard-reachable.`,
+		).toContain("tabIndex={selected ? 0 : -1}");
+	});
+});
+
+// ── 2 · every cell is PLACED, on BOTH tabs ───────────────────────────────────
+
+describe("A5 D-1 — the four cells are placed, on both tabs", () => {
+	/**
+	 * ⛔ AN UNPLACED GRID ITEM IS AUTO-PLACED INTO THE NEXT FREE CELL, so a
+	 * missing coordinate does not error — it silently reflows the tile. That is
+	 * why every cell is read rather than a representative one, and why both tabs
+	 * are read: round five gave the Open tab's four cells a share and missed the
+	 * Closed tab's two entirely, which reproduced the exact defect it existed to
+	 * remove, one tab across.
+	 */
+	const CELLS: ReadonlyArray<readonly [string, string, string]> = [
+		["data-testid={`tile-side-", "col-start-1", "row-start-1"],
+		["<TileArgumentCell", "col-start-1", "row-start-2"],
+		["data-testid={`tile-staked-", "col-start-2", "row-start-1"],
+		["data-testid={`tile-opened-", "col-start-3", "row-start-1"],
+	];
+
+	for (const [anchor, col, row] of CELLS) {
+		it(`tile::${anchor.replace(/[^a-z-]/gi, "")}-declares-its-coordinate`, () => {
+			const cls = cellClassesWrapping(stripComments(read(TABLE)), anchor);
+			const why =
+				`${TABLE}: the cell wrapping ${anchor} declares no grid coordinate, so ` +
+				`it is auto-placed. Auto-placement often lands an item where it was ` +
+				`going to go anyway, which is why this fails invisibly rather than ` +
+				`loudly.`;
+			expect(cls, why).toContain(phone(col));
+			expect(cls, why).toContain(phone(row));
+		});
+	}
+
+	it("tile::the-Open-tab-s-value-and-SELL-are-placed-too", () => {
+		// ⚠ These two have no testid of their own on the cell, so they are located
+		// by the content they wrap rather than by an id — the value cell by the
+		// `sold ?` branch it opens, the Sell cell by the trigger inside it.
+		const source = stripComments(read(TABLE));
+		const value = cellClassesWrapping(source, "{sold ? (");
+		const sell = cellClassesWrapping(source, "data-testid={`tile-sell-");
+		expect(
+			value,
+			`${TABLE}: the Open tab's value cell is auto-placed`,
+		).toContain(phone("col-start-2"));
+		expect(
+			value,
+			`${TABLE}: the Open tab's value cell is auto-placed`,
+		).toContain(phone("row-start-1"));
+		// ⛔ AND IT HUGS SELL. The column is 1fr, so without this the figure floats
+		// in the middle of the tile and stops forming an edge with the button.
+		expect(
+			value,
+			`${TABLE}: the value cell no longer hugs the SELL button, so the figure ` +
+				`drifts in a 1fr column instead of sitting against it.`,
+		).toContain(phone("justify-self-end"));
+		expect(sell, `${TABLE}: the SELL cell is auto-placed`).toContain(
+			phone("col-start-3"),
+		);
+		expect(sell, `${TABLE}: the SELL cell is auto-placed`).toContain(
+			phone("row-start-1"),
+		);
+	});
+
+	it("tile::the-argument-cell-is-the-ONLY-one-that-stretches", () => {
+		const cls = cellClassesWrapping(
+			stripComments(read(TABLE)),
+			"<TileArgumentCell",
+		);
+		expect(
+			cls,
+			`${TABLE}: the argument cell no longer stretches. The grid is centred for ` +
+				`the three cells on row 1, so row 2's item has to opt back into the ` +
+				`stretch or the 1fr track's height goes nowhere and the question sits ` +
+				`under the title instead of at the tile's foot.`,
+		).toContain(phone("self-stretch"));
+		expect(
+			cls,
+			`${TABLE}: the argument cell lost min-w-0. A grid item's automatic ` +
+				`minimum is its content, and this is the only cell whose content is ` +
+				`unbounded — without it the TILE widens instead of the text wrapping.`,
+		).toContain(phone("min-w-0"));
+	});
+});
+
+// ── 3 · the three bands, and the ONE gap ─────────────────────────────────────
+
+describe("A5 D-1 — the leftover height lives in exactly one place", () => {
+	it("tile::the-argument-cell-is-a-full-height-column", () => {
+		const source = stripComments(read(TABLE));
+		// ⚠ ANCHORED BY PREFIX, NOT BY THE FULL EXPRESSION. Writing the testid out
+		// in full would put a template placeholder inside a plain string, and
+		// Biome's `noTemplateCurlyInString` fires on source text being SEARCHED FOR
+		// as though it were a template that forgot its backticks — the same
+		// accommodation `phone-round-five.test.ts` records for its pill anchor.
+		// ⛔ AND THE TWO PREFIXES OVERLAP: `tile-arg-` matches the removed variant
+		// too, and the removed branch comes FIRST in source order. So the live one
+		// is read from the LAST occurrence, which is what makes the pair exact.
+		const ARG = "data-testid={`tile-arg-";
+		const REMOVED = "data-testid={`tile-arg-removed-";
+		const liveAt = source.lastIndexOf(ARG);
+		const removedAt = source.indexOf(REMOVED);
+		expect(removedAt, `${TABLE}: the removed stub is gone`).toBeGreaterThan(-1);
+		expect(
+			liveAt,
+			`${TABLE}: the live argument cell no longer follows the removed stub, so ` +
+				`this reader is pointing at the wrong one. Re-derive the pair.`,
+		).toBeGreaterThan(removedAt);
+		for (const anchor of [
+			source.slice(liveAt, liveAt + ARG.length + 8),
+			REMOVED,
+		]) {
+			const cls = classesAfter(source, anchor, `${TABLE}: ${anchor}`);
+			const why =
+				`${TABLE}: ${anchor} is not a full-height column. The <td> above it ` +
+				`stretches to the grid's 1fr row; h-full is what passes that height ` +
+				`down, and without it the auto margin below has no slack to take. ⚠ ` +
+				`BOTH variants are read: the removed stub is a tile too, and a stub ` +
+				`shaped differently from every other tile is the one tile on the ` +
+				`surface that cannot say where it came from.`;
+			expect(cls, why).toContain(phone("flex"));
+			expect(cls, why).toContain(phone("flex-col"));
+			expect(cls, why).toContain(phone("h-full"));
+		}
+	});
+
+	it("tile::the-market-question-is-anchored-to-the-tile-s-foot", () => {
+		const source = stripComments(read(TABLE));
+		const cls = classesAfter(source, "const marketLine = (", "the market line");
+		expect(
+			cls,
+			`${TABLE}: the market question no longer takes the tile's leftover ` +
+				`height. The auto margin is the tile's ONLY gap — distribute the slack ` +
+				`any other way and a short tile and a tall one stop looking like the ` +
+				`same object.`,
+		).toContain(phone("mt-auto"));
+		expect(
+			cls,
+			`${TABLE}: the market question is clamped again. A5 D-1 rules it ` +
+				`complete and free to wrap; line-clamp-none is what undoes the ` +
+				`-webkit-box a line-clamp establishes, which overriding the line count ` +
+				`alone does not.`,
+		).toContain(phone("line-clamp-none"));
+	});
+
+	it("tile::the-argument-title-is-complete-and-steps-to-18px-medium", () => {
+		const source = stripComments(read(TABLE));
+		const at = source.indexOf("{cell.title}");
+		expect(at, `${TABLE}: the title link is gone`).toBeGreaterThan(-1);
+		const m = /className="([^"]*)"/.exec(
+			source.slice(source.lastIndexOf("<Link", at), at),
+		);
+		const cls = (m?.[1] ?? "").split(/\s+/).filter(Boolean);
+		const why =
+			`${TABLE}: the argument title is clamped or at the wrong step. A5 D-1 ` +
+			`rules it complete at 18px medium — it is the thing the tile is ABOUT, ` +
+			`and at bold it competes with the 24px value beside it.`;
+		expect(cls, why).toContain(phone("line-clamp-none"));
+		expect(cls, why).toContain(phone("text-[18px]"));
+		expect(cls, why).toContain(phone("font-medium"));
+		// ⚠ AGENTS.md §8 — an arbitrary text-[Npx] inherits whatever leading was in
+		// scope, so the leading is restated wherever the size is.
+		expect(
+			cls,
+			`${TABLE}: the title states a size without its leading, so it inherits ` +
+				`whatever step was in scope (AGENTS.md §8).`,
+		).toContain(phone("leading-[1.35]"));
+	});
+});
+
+// ── 4 · what has to stand down for the DOCUMENT to be the scroller ───────────
+
+describe("A5 D-1 — the phone's scroller is the page, and three things release", () => {
+	it("tile::both-panel-boxes-release-overflow-AND-restore-min-w-0", () => {
+		const source = stripComments(read(TABLE));
+		for (const anchor of [
+			'data-testid="positions-panel"',
+			'data-testid="positions-panel-body"',
+		]) {
+			const cls = classesAfter(source, anchor, `${TABLE}: ${anchor}`);
+			expect(
+				cls,
+				`${TABLE}: ${anchor} is still a scroll container below 640px. A snap ` +
+					`alignment resolves against the nearest scroll-container ancestor, ` +
+					`and overflow:hidden makes a box one just as overflow-y:auto does — ` +
+					`so with either live the tiles snap against a panel instead of ` +
+					`against the page (measured: the landing misses by 45px).`,
+			).toContain(phone("overflow-visible"));
+			expect(
+				cls,
+				`${TABLE}: ${anchor} releases overflow WITHOUT restoring min-w-0. ` +
+					`overflow:hidden also zeroes a box's automatic minimum size, so the ` +
+					`release alone restores min-width:auto on a box whose widest ` +
+					`unbreakable content is the market filter's label — measured, the ` +
+					`panel went 324px to 533px inside a 360px phone. The two tokens are ` +
+					`one decision and half of it is a regression.`,
+			).toContain(phone("min-w-0"));
+		}
+	});
+
+	it("tile::the-three-tile-window-cap-is-tier-gated-AND-clears-on-the-way-out", () => {
+		const source = stripComments(read(TABLE));
+		expect(
+			source,
+			`${TABLE}: the ROW_WINDOW max-height cap is no longer gated on the tier. ` +
+				`Its own gate is "can the document scroll", which read false on a phone ` +
+				`page that fitted its viewport and flips TRUE the moment tiles are a ` +
+				`screen tall — capping the panel at exactly three screens and putting a ` +
+				`max-height on the very box the tiles must escape.`,
+		).toMatch(/if\s*\(isPhoneTable\)\s*\{/);
+		// ⛔⛔ SCOPED TO THE BRANCH. The string it looks for occurs elsewhere in the
+		// effect, so a file-wide match would be satisfied by a line the stand-down
+		// never runs — the exact hole `phone-round-five` had to close on the
+		// equaliser's twin of this gate.
+		const gate = source.indexOf("if (isPhoneTable) {");
+		const branch = source.slice(gate, source.indexOf("return;", gate));
+		expect(
+			branch,
+			`${TABLE}: the phone branch returns without clearing the inline ` +
+				`max-height, so whatever the cap last wrote outlives the stand-down — ` +
+				`and an overflow-visible box with a stale max-height still ends early.`,
+		).toMatch(/body\.style\.maxHeight = "";/);
+		// and the effect must re-run when the tier changes, or the gate is decided once
+		expect(
+			source,
+			`${TABLE}: the cap's effect does not depend on the tier, so a viewport ` +
+				`crossing 640px keeps whichever answer the first run gave.`,
+		).toContain("}, [visibleTiles.length, isPhoneTable]);");
+	});
+
+	it("tile::the-row-equaliser-is-STILL-gated-round-five-s-half-of-the-pair", () => {
+		expect(
+			stripComments(read(TABLE)),
+			`${TABLE}: RF-10's pair is two mechanisms and both must stand down. This ` +
+				`is round five's half, re-asserted here because MOBILE-2h adds the ` +
+				`other and a reader fixing one should see both.`,
+		).toMatch(/enabled:\s*!isPhoneTable/);
+	});
+});
+
+// ── 5 · the snap type, and the census that keeps it inert elsewhere ──────────
+
+describe("A5 D-1 — the document's snap type is armed once and targets nothing else", () => {
+	it("tile::the-root-element-carries-the-phone-snap-type", () => {
+		const cls = classesAfter(
+			stripComments(read(ROOT_LAYOUT)),
+			"<html",
+			ROOT_LAYOUT,
+		);
+		const why =
+			`${ROOT_LAYOUT}: the root element no longer arms the phone's snap type. ` +
+			`The viewport's snap type can only be set on the root — body does not ` +
+			`propagate it and no descendant can reach up to it — so this is the one ` +
+			`site where it can live.`;
+		expect(cls, why).toContain(phone("snap-y"));
+		expect(cls, why).toContain(phone("snap-proximity"));
+		// ⛔ PROXIMITY, NEVER MANDATORY. The top half of the profile — identity card
+		// and six tiles — is deliberately NOT a snap target; mandatory forbids
+		// resting between targets and would make that half unreadable.
+		expect(
+			cls,
+			`${ROOT_LAYOUT}: the snap is mandatory. The page's top half carries no ` +
+				`snap alignment by ruling, and mandatory forbids resting between ` +
+				`targets — so the identity card and the six tiles become unreadable.`,
+		).not.toContain(phone("snap-mandatory"));
+	});
+
+	it("tile::the-snap-alignment-census-is-exactly-two-files", () => {
+		/**
+		 * ⛔⛔ THE SNAP TYPE IS GLOBAL AND INERT ONLY WHILE NOTHING ELSE DECLARES AN
+		 * ALIGNMENT. A snap container with no targets does nothing at all, which is
+		 * what makes arming it on `<html>` safe for Discovery, the auth routes and
+		 * the admin tree. That safety is a CENSUS, not a property — a third file
+		 * adding a snap alignment inherits the behaviour silently. So the census is
+		 * pinned, and a new one has to come here and say so.
+		 *
+		 * ⚠ `PhoneFeedTrack` is the other member and is NOT a counter-example: its
+		 * panes' nearest scroll container is that track's own horizontal scroller,
+		 * so the viewport never sees them.
+		 */
+		const FILES = [TABLE, FEED_TRACK];
+		const found: string[] = [];
+		for (const rel of [
+			TABLE,
+			FEED_TRACK,
+			SHEET,
+			INLINE,
+			ROOT_LAYOUT,
+			"src/components/profile/ProfileTiles.tsx",
+			"src/components/profile/IdentityCard.tsx",
+			"src/components/profile/ArgumentList.tsx",
+			"src/components/debate/phone/PhoneDebateView.tsx",
+			"src/components/debate/phone/PhoneSheet.tsx",
+			"src/app/(public)/page.tsx",
+		]) {
+			const src = stripComments(read(rel));
+			if (
+				src.includes(`${V}${S}snap-start`) ||
+				src.includes(`${V}${S}snap-center`) ||
+				src.includes(`${V}${S}snap-end`) ||
+				/\bsnap-(start|center|end)\b/.test(src) ||
+				src.includes("scrollSnapAlign")
+			) {
+				found.push(rel);
+			}
+		}
+		expect(
+			found.sort(),
+			`the set of files declaring a scroll-snap ALIGNMENT has changed. The ` +
+				`document's snap type is armed globally on <html> and is inert only ` +
+				`while this set is exactly the position tile and the phone feed track. ` +
+				`A new member inherits page-level snapping silently — if that is ` +
+				`wanted, say so here; if it is not, scope the alignment to its own ` +
+				`scroll container as PhoneFeedTrack does.`,
+		).toEqual([...FILES].sort());
+	});
+});
+
+// ── 6 · R-1 · the head on one line ───────────────────────────────────────────
+
+describe("R-1 — the positions head clears itself at 360px", () => {
+	it("head::the-filter-button-is-capped-to-its-own-wrapper", () => {
+		const cls = classesAfter(
+			stripComments(read(TABLE)),
+			'data-testid="positions-market-filter"',
+			"the market filter trigger",
+		);
+		const why =
+			`${TABLE}: the market filter can still exceed its wrapper. THE WRAPPER IS ` +
+			`A PLAIN DIV, so it is display:block and this button is an INLINE-LEVEL ` +
+			`box inside it, not a flex item of it — the shrink tokens beside this one ` +
+			`name nothing here and the button keeps its whitespace-nowrap intrinsic ` +
+			`width. MEASURED at 360px with a market selected: the wrapper shrank to ` +
+			`45px and the button rendered 301px, overflowing the panel by 91px and ` +
+			`painting under the Open/Closed pills so the counts were unreadable. The ` +
+			`max-width cap is what makes the shipped truncate measure against the ` +
+			`right box.`;
+		expect(cls, why).toContain(phone("max-w-full"));
+		expect(cls, why).toContain(phone("min-w-0"));
+	});
+
+	it("head::the-pills-keep-their-counts-and-refuse-to-shrink", () => {
+		const source = stripComments(read(TABLE));
+		const cls = classesAfter(
+			source,
+			// ⚠ prefix only — see the note on the argument-cell anchors above.
+			"data-testid={`positions-status-",
+			"the Open/Closed pills",
+		);
+		expect(
+			cls,
+			`${TABLE}: the status pills can shrink. The count is the thing this row ` +
+				`exists to show and a shrinking pill drops it first — R-1 names ` +
+				`"Closed (n) shows its count" as the acceptance.`,
+		).toContain("shrink-0");
+		expect(
+			cls,
+			`${TABLE}: the pills did not step down, so the four items on this line ` +
+				`have no room to clear each other at 360px.`,
+		).toContain(phone("text-[11px]"));
+		// the count node itself must survive — it is what the ruling is about
+		expect(
+			source,
+			`${TABLE}: the bracketed count is gone from the status pills.`,
+		).toMatch(/\(\{s === "Closed" \? closedCount : openCount}\)/);
+	});
+});
+
+// ── 7 · R-4 / R-5 · the sheet's amount ───────────────────────────────────────
+
+describe("R-4/R-5 — the sell sheet's amount is the sheet's subject", () => {
+	it("sell::the-shared-field-gained-a-variant-that-DEFAULTS-to-the-row", () => {
+		const source = stripComments(read(INLINE));
+		expect(
+			source,
+			`${INLINE}: InlineSellAmount's presentation prop is gone or no longer ` +
+				`defaults. The default is what makes the desktop untouched BY ` +
+				`CONSTRUCTION — the same polarity ADR-0045 gives mobileResponsive, and ` +
+				`for the same reason: a caller that forgets it inherits the established ` +
+				`render rather than a new one.`,
+		).toMatch(/variant\s*=\s*"row"/);
+		expect(
+			source,
+			`${INLINE}: the variant no longer names both presentations, so a typo in ` +
+				`a caller is a runtime shrug rather than a type error.`,
+		).toMatch(/variant\?:\s*"row"\s*\|\s*"sheet"/);
+	});
+
+	it("sell::the-sheet-asks-for-the-sheet-presentation", () => {
+		expect(
+			stripComments(read(SHEET)),
+			`${SHEET}: the sheet mounts the field at the row's presentation, so the ` +
+				`32px figure R-4 rules is a 15px one.`,
+		).toMatch(/variant="sheet"/);
+	});
+
+	it("sell::the-label-sits-ABOVE-the-field-and-both-are-centred", () => {
+		const source = stripComments(read(SHEET));
+		const at = source.indexOf(">\n\t\t\t\t\t\tCurrent\n");
+		expect(at, `${SHEET}: the Current label is gone`).toBeGreaterThan(-1);
+		const m = /className="([^"]*)"/.exec(
+			source.slice(source.lastIndexOf("<div", at), at),
+		);
+		const cls = (m?.[1] ?? "").split(/\s+/).filter(Boolean);
+		const why =
+			`${SHEET}: the amount block is not a centred column. R-4 rules the label ` +
+			`directly ABOVE the value, both centred — as a justify-between row the ` +
+			`two read as a table row that had wandered into a modal, which is exactly ` +
+			`what it was. ⛔ items-center on the COLUMN, not text-center on the ` +
+			`children: the amount is an inline-flex chip whose width tracks its ` +
+			`digits, so centring its text centres nothing.`;
+		expect(cls, why).toContain("flex-col");
+		expect(cls, why).toContain("items-center");
+		expect(cls, why).not.toContain("justify-between");
+		// the copy register is unchanged — the word is the Open tab's own <th>
+		expect(
+			source,
+			`${SHEET}: the label is no longer the column header it was carried from.`,
+		).toContain("Current");
+	});
+
+	it("sell::CONFIRM-keeps-its-width-and-gains-height", () => {
+		const cls = classesAfter(
+			stripComments(read(SHEET)),
+			"data-testid={`phone-sell-confirm-",
+			"the sheet's Confirm",
+		);
+		expect(
+			cls,
+			`${SHEET}: Confirm lost its full width. ADR-0051 A4 rules every block in ` +
+				`a phone sheet edge-aligned, and R-4 changes only its height.`,
+		).toContain("w-full");
+		expect(
+			cls,
+			`${SHEET}: Confirm is back at the bare 44px minimum. The sheet grew to ` +
+				`pay for a 32px figure, and a button left at the floor under it reads ` +
+				`as the smaller of the two decisions on screen.`,
+		).toContain("h-12");
+	});
+
+	it("sell::the-field-is-a-REAL-input-above-the-iOS-zoom-threshold", () => {
+		const source = stripComments(read(INLINE));
+		expect(
+			source,
+			`${INLINE}: the amount is no longer an input, so tapping it raises no ` +
+				`keyboard on that field.`,
+		).toMatch(/<Input/);
+		expect(
+			source,
+			`${INLINE}: the amount field lost its inputMode, so a phone offers a ` +
+				`full alphabetic keyboard for a money figure.`,
+		).toMatch(/inputMode="decimal"/);
+		expect(
+			source,
+			`${INLINE}: the sheet's figure dropped below 16px, so iOS scales the ` +
+				`whole page on focus and moves every box the reader was looking at.`,
+		).toMatch(/text-\[32px\]/);
+		// ⛔ AND THE MONEY IS UNTOUCHED — the prop reaches presentation only.
+		expect(
+			source,
+			`${INLINE}: the untouched field no longer submits the EXACT seed. The ` +
+				`presentation prop reaches type sizes, padding and the width floor and ` +
+				`nothing else; the ceiling and the exact-seed submit are useInlineSell's.`,
+		).toMatch(/seedExact/);
+	});
+});

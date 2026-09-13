@@ -41,7 +41,7 @@ export default function RootLayout({
 		 * all, and the only `scroll-snap-align` in the tree outside the position tile
 		 * is on `PhoneFeedTrack`'s two panes — whose own nearest scroll container is
 		 * that track's horizontal scroller, so the viewport never sees them.
-		 * `tests/unit/design/phone-scroll-snap-census.test.ts` pins that set, so a
+		 * `tests/unit/design/phone-position-tile.test.ts` pins that set, so a
 		 * third snap target anywhere reddens rather than inheriting this quietly.
 		 * ⚠ `mandatory` would additionally forbid resting between targets, which on a
 		 * page whose top half (identity card, six tiles) is deliberately NOT a snap

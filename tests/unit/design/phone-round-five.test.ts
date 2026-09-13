@@ -497,7 +497,15 @@ describe("R-P — the profile's phone view", () => {
 		expect(trigger, why).toContain(phone("shrink"));
 	});
 
-	it("round5::the-tile-row-is-a-ROW-with-a-hairline-and-no-gap", () => {
+	// ⚠⚠ SUPERSEDED BY MOBILE-2h · ADR-0051 A5 D-1 AND REWRITTEN RATHER THAN
+	// DELETED. Round five asserted this row was the DESKTOP row at phone width,
+	// against Job B's column; the founder's ruling makes it a TILE — one position,
+	// one screen — so the shape it forbade and the shape it required are both
+	// wrong now. What survives unchanged is the half that was never about the
+	// axis: the separator pair. Inverting rather than deleting is what makes a
+	// revert to round five's row RED here instead of quietly passing a looser
+	// pattern. The full tile contract lives in `phone-position-tile.test.ts`.
+	it("round5::the-tile-row-is-a-TILE-and-no-longer-a-row", () => {
 		const source = stripComments(read(TABLE));
 		const tr =
 			/data-testid={`position-tile-\${tile\.key}`}[\s\S]*?className={`([^`]*)`/.exec(
@@ -506,16 +514,15 @@ describe("R-P — the profile's phone view", () => {
 		expect(tr, "the tile row's class template is unreadable").toBeDefined();
 		const cls = (tr ?? "").split(/\s+/).filter(Boolean);
 		const why =
-			`${TABLE}: the phone tile is not the desktop row. Job B's flex-col let ` +
-			`every cell keep its inherited text-center, which is the centred tile ` +
-			`this refinement replaces.`;
-		expect(cls, why).toContain(phone("flex"));
-		expect(cls, why).not.toContain(phone("flex-col"));
-		expect(cls, why).toContain(phone("items-center"));
+			`${TABLE}: the phone tile is still round five's flex row. A5 D-1 rules ` +
+			`one position per screen, which is three bands — cluster, gap, question ` +
+			`— and three bands is not one flex line however it is wrapped.`;
+		expect(cls, why).toContain(phone("grid"));
+		expect(cls, why).not.toContain(phone("flex"));
 		const sep =
 			`${TABLE}: the phone row separator is half-built. The outline must stand ` +
 			`down and a hairline must take over on the row's own top edge — half of ` +
-			`this pair is worse than neither.`;
+			`this pair is worse than neither. Unchanged by A5.`;
 		expect(cls, sep).toContain(phone("[outline:none]"));
 		expect(cls, sep).toContain(phone("[border-top:var(--hairline)]"));
 	});
@@ -687,40 +694,37 @@ describe("R-P3 — the phone's sell sheet carries no write path of its own", () 
 		expect(source).toMatch(/const armedInSheet = armed && isPhone;/);
 	});
 
-	it("round5::the-OPEN-tab-s-four-cells-and-the-title-declare-their-shares", () => {
-		// ⛔⛔ ALL FOUR OF THESE WERE UNGUARDED AND ALL FOUR SURVIVED A MUTATION
-		// ACROSS THE WHOLE UNIT SUITE. `profile-mobile-reflow`'s cell-share row
-		// reads the SIDE cell only, so the three that carry the row's arithmetic
-		// were held by nothing. Each is here with the consequence of losing it,
-		// because a share without a consequence is a style opinion.
+	// ⚠⚠ SUPERSEDED IN PART BY MOBILE-2h. Three of round five's four cell shares
+	// were WIDTHS on flex items, and A5 D-1 replaces the flex row with a grid: a
+	// width there is a floor rather than a share, and 64px is a floor a 24px value
+	// overruns. What the row was really protecting is unchanged and is asserted
+	// below in its new form — the argument must still be the only cell that can
+	// shrink, and SELL must still be a 44px target.
+	// ⛔ THE CLOSED TAB'S SIBLING ROW IS DELETED OUTRIGHT, not rewritten. It
+	// existed because a Closed cell without a declared share left the `flex-1`
+	// argument beside it resolving to 0px and the row overflowing — a failure mode
+	// that belongs to the flex row and cannot occur in a grid, where both cells sit
+	// in `auto` tracks. Keeping it would be machinery aimed at a layout that no
+	// longer exists. Its replacement is the placement census in
+	// `phone-position-tile.test.ts`, which reads all four cells on BOTH tabs.
+	it("round5::the-argument-still-shrinks-and-SELL-is-still-a-44px-target", () => {
 		const source = stripComments(read(TABLE));
 		expect(
 			source,
-			`${TABLE}: the argument cell lost min-w-0/flex-1. A flex item will not ` +
-				`shrink below its content without min-w-0, and the argument is the ` +
-				`only cell whose content is unbounded — so the ROW overflows instead ` +
-				`of the title clamping. The source comment calls this "the one that ` +
-				`matters"; nothing was checking it.`,
+			`${TABLE}: the argument cell lost min-w-0. A grid item's automatic ` +
+				`minimum is its content just as a flex item's is, and the argument is ` +
+				`the only cell here whose content is unbounded — so without it the TILE ` +
+				`widens instead of the text wrapping. The source comment called this ` +
+				`"the one that matters" when the row was flex; it still is.`,
 		).toMatch(
 			new RegExp(
-				`<td className="[^"]*${phone("min-w-0")} ${phone("flex-1")}[^"]*">\\s*<TileArgumentCell`,
-			),
-		);
-		expect(
-			source,
-			`${TABLE}: the Current cell lost its 64px share or its right alignment. ` +
-				`Centred in 64px beside a flexible argument, the figures stop forming ` +
-				`a column an eye can run down.`,
-		).toMatch(
-			new RegExp(
-				`<td className="[^"]*${phone("w-16")} ${phone("shrink-0")}[^"]*${phone("text-right")}"`,
+				`<td className="[^"]*${phone("min-w-0")}[^"]*">\\s*<TileArgumentCell`,
 			),
 		);
 		expect(
 			classTokensAfter(source, "data-testid={`tile-sell-", "the SELL trigger"),
 			`${TABLE}: the SELL trigger lost its 44px floor or its touch-action. It ` +
-				`is the entry to the one comment-free money action in the product, in ` +
-				`a row 44px tall.`,
+				`is the entry to the one comment-free money action in the product.`,
 		).toEqual(
 			expect.arrayContaining([
 				phone("min-h-11"),
@@ -728,49 +732,22 @@ describe("R-P3 — the phone's sell sheet carries no write path of its own", () 
 				phone("[touch-action:manipulation]"),
 			]),
 		);
+		// ⛔ AND THE TITLE'S CLAMP IS GONE, WHICH REVERSES ROUND FIVE'S OWN
+		// ASSERTION. It required a two-line clamp because four lines of a 15px
+		// title in ~90px of flexible column was most of a screen for one row. The
+		// tile IS a screen; a truncated argument title on the surface whose whole
+		// job is to show one argument is the defect rather than the protection.
 		expect(
 			source,
-			`${TABLE}: the title's phone clamp is gone. Four lines of a 15px title ` +
-				`in ~90px of flexible column is most of a screen for one row — and the ` +
-				`thirds hook has stood down, so nothing else bounds it.`,
+			`${TABLE}: the argument title is still clamped at phone width. A5 D-1 ` +
+				`rules it complete. ${phone("line-clamp-none")} is what undoes the ` +
+				`-webkit-box the desktop's line-clamp-4 establishes — overriding the ` +
+				`line count alone leaves the box intact and the clamp live.`,
 		).toMatch(
 			new RegExp(
-				`className="[^"]*${phone("line-clamp-2")}"\\s*>\\s*\\{cell\\.title\\}`,
+				`${phone("line-clamp-none")}[^"]*"\\s*>\\s*\\{cell\\.title\\}`,
 			),
 		);
-	});
-
-	it("round5::the-CLOSED-tab-s-cells-declare-a-share-TOO", () => {
-		// ⛔⛔ THE ROW IS A FLEX ROW ON BOTH TABS, AND THE FIRST PASS GAVE ONLY THE
-		// OPEN TAB'S FOUR CELLS A WIDTH. The Closed tab's `Staked` and `Opened`
-		// kept `whitespace-nowrap` with `min-width: auto`, so their automatic
-		// minimum was the full unbreakable string — while the Argument cell beside
-		// them is `flex-1`, i.e. `flex: 1 1 0%`, whose shrink CONTRIBUTION is
-		// `1 × 0 = 0`. It absorbs none of the negative free space, resolves to
-		// **0px**, and the row overflows: verbatim the condition this refinement
-		// was ruled to remove, one tab across.
-		// ⚠ Nothing measured it — B13 reads the Open tab and the cell-share row
-		// above asserts on the side cell alone. Found by `@code-reviewer`.
-		const source = stripComments(read(TABLE));
-		for (const [testid, want] of [
-			["tile-staked-", phone("w-16")],
-			["tile-opened-", phone("w-20")],
-		] as const) {
-			const at = source.indexOf(`data-testid={\`${testid}`);
-			expect(at, `${TABLE}: the ${testid} cell was not found`).toBeGreaterThan(
-				-1,
-			);
-			const tokens = (/className="([^"]*)"/.exec(source.slice(at))?.[1] ?? "")
-				.split(/\s+/)
-				.filter(Boolean);
-			const why =
-				`${TABLE}: the Closed tab's ${testid} cell claims no width at phone ` +
-				`width, so the Argument cell beside it resolves to 0px and the row ` +
-				`overflows — the defect R-P3 exists to remove, on the other tab.`;
-			expect(tokens, why).toContain(want);
-			expect(tokens, why).toContain(phone("shrink-0"));
-			expect(tokens, why).toContain(phone("p-0"));
-		}
 	});
 
 	it("round5::the-row-s-key-activation-stands-down-for-anything-activatable", () => {

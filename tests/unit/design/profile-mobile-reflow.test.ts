@@ -505,25 +505,36 @@ describe("profile mobile reflow — the positions table stacks below 640px", () 
 	});
 
 	/**
-	 * Edit site 4 — the load-bearing one, and the one MOBILE-2e turns around.
+	 * Edit site 4 — the load-bearing one, and the one MOBILE-2h turns around a
+	 * SECOND time.
 	 *
-	 * ⚠⚠ **JOB B MADE THIS ROW A COLUMN; ROUND FIVE MAKES IT A ROW AGAIN.** Job
-	 * B's bet was that `flex-col` on the `<tr>` blockifies all six `<td>`
-	 * variants without opening a single cell — which it does, and which is
-	 * exactly why every cell then kept its inherited `text-center` and the phone
-	 * got a stack of centred tiles. The founder's ruling is that the phone should
-	 * read the DESKTOP row: side glyph │ argument │ value │ SELL. So the axis
-	 * stays flex and the DIRECTION goes back to row, and the cells ARE opened —
-	 * each takes a phone width, because a four-column row inside 278px cannot be
-	 * derived from cells that were never given one.
+	 * ⚠⚠ **JOB B MADE THIS ROW A COLUMN; ROUND FIVE MADE IT A ROW; MOBILE-2h
+	 * MAKES IT A GRID.** Each reversal was right about the surface it was aimed
+	 * at, and the surface kept moving: Job B stacked four cells and got a centred
+	 * tile nobody wanted, round five put them back on one line and got a 44px
+	 * summary of an argument, and the founder's ruling is that a position is worth
+	 * a screen. A screen is three BANDS — a top cluster, a gap, and a line anchored
+	 * to the bottom — and three bands is not one flex line however it is wrapped.
 	 *
-	 * ⛔ THE SEPARATOR IS ASSERTED HERE TOO, because it is the other half of the
-	 * same decision and it is the half that can silently not happen: the outline
-	 * must be SUPPRESSED and a top border must take over, or the rows are
-	 * individually outlined cards with no space between them — worse than either
-	 * shape on its own.
+	 * ⛔ THE `<td>`s ARE FIXED IN DOM ORDER (side · argument · value · Sell) AND
+	 * THE TILE WANTS THE ARGUMENT BELOW THE OTHER THREE. `flex-wrap` cannot do it:
+	 * a wrapped line's cross size comes from `align-content`, which stretches every
+	 * line equally, so the top cluster would take half the screen. `order` moves
+	 * items inside lines, not lines. Grid places all four by coordinate without
+	 * opening a single cell — which is the same argument Job B made for `flex-col`,
+	 * one mechanism further on.
+	 *
+	 * ⛔ THE SEPARATOR IS STILL ASSERTED HERE, unchanged from round five: the
+	 * outline must be SUPPRESSED and a hairline must take over on the row's own top
+	 * edge. Half of that pair is worse than neither.
+	 *
+	 * ⛔ AND THE SELECTED VISUAL IS ASSERTED ABSENT (MOBILE-2h R-3). The state is
+	 * kept — `aria-current` and `tabIndex` still read it, and the sell sheet still
+	 * needs to know which position it is selling — but nothing may PAINT it below
+	 * 640px, because a tint left behind on a screen the reader has scrolled past
+	 * reads as a thing still selected rather than a thing already seen.
 	 */
-	it("profile-mobile::a-tile-is-the-DESKTOP-row-below-640-not-a-centred-tile", () => {
+	it("profile-mobile::a-tile-is-a-GRID-below-640-not-a-row", () => {
 		const source = stripComments(read(TABLE_FILE));
 		const classes = classesOf(
 			source,
@@ -532,36 +543,42 @@ describe("profile mobile reflow — the positions table stacks below 640px", () 
 		);
 
 		const why =
-			`${TABLE_FILE}: the tile <tr> is no longer the DESKTOP row at phone ` +
-			`width. It must carry ${phone("flex")} WITHOUT ${phone("flex-col")} — ` +
-			`round five reverses Job B's axis, because a column of cells inherits ` +
-			`each cell's \`text-center\` and produces the centred tile this ` +
-			`refinement replaces. The tokens belong in the row's own class string, ` +
-			`not inside the \`selected ? … : …\` interpolation, where they would ` +
-			`apply only while a tile is selected.`;
-		expect(classes, why).toContain(phone("flex"));
-		expect(classes, why).not.toContain(phone("flex-col"));
-		expect(classes, why).toContain(phone("items-center"));
-		// ⛔⛔ AND NOT INSIDE THE ROW'S INTERPOLATION EITHER, which is what the
-		// paragraph above already says and what neither reader could see.
-		// `classTokensOf` strips the `selected ? … : …` branch BY DESIGN, and the
-		// other file's reader splits on whitespace and receives the token with its
-		// quote still attached (`"max-mobile:flex-col`), so `toContain` misses it.
-		// Two readers, opposite blind spots, one hole — and re-adding the token in
-		// the selected branch (a centred tile that returns the moment a reader
-		// clicks one) was GREEN across the whole unit suite.
-		// ⚠ SCOPED TO THIS ROW'S OPENING TAG, not to the file: the `<table>` and
-		// the `<tbody>` ARE columns at phone width, correctly and deliberately, so
-		// a file-wide negative here asserts the opposite of what the round ruled.
+			`${TABLE_FILE}: the tile <tr> is not a grid at phone width. It must ` +
+			`carry ${phone("grid")} with BOTH track lists — ${phone("grid-cols-[auto_1fr_auto]")} ` +
+			`places side, value and Sell across one line, and ` +
+			`${phone("grid-rows-[auto_1fr]")} is what gives every leftover pixel to ` +
+			`row 2 alone. Without the row list the argument band shares the height ` +
+			`with the cluster above it and the tile has two gaps instead of one.`;
+		expect(classes, why).toContain(phone("grid"));
+		expect(classes, why).toContain(phone("grid-cols-[auto_1fr_auto]"));
+		expect(classes, why).toContain(phone("grid-rows-[auto_1fr]"));
+		// ⛔ AND NOT A FLEX ROW ANY MORE, which is what round five asserted here.
+		// `flex` and `grid` are both display utilities: leaving the old one in the
+		// string makes the winner a question of stylesheet emission order.
 		expect(
-			openingTagOf(
-				source,
-				keyedTestid("position-tile-"),
-				"the argument tile row",
-			).includes(phone("flex-col")),
-			`${why} ⚠ This form reads the row's WHOLE opening tag, so it fires on ` +
-				`the token hidden inside the interpolation too.`,
-		).toBe(false);
+			classes,
+			`${why} ⚠ The round-five ${phone("flex")} must be GONE, not merely joined ` +
+				`— two display utilities on one element resolve by emission order.`,
+		).not.toContain(phone("flex"));
+
+		const size =
+			`${TABLE_FILE}: the tile is no longer one screen tall. The height is ` +
+			`${phone("min-h-[calc(100dvh-60px-2px)]")} — <main>'s own expression, the ` +
+			`viewport minus the sticky header's 60px row and 2px border — and it is a ` +
+			`MIN, so a market question longer than a screen grows the tile instead of ` +
+			`being clamped by it.`;
+		expect(classes, size).toContain(phone("min-h-[calc(100dvh-60px-2px)]"));
+
+		const snap =
+			`${TABLE_FILE}: the tile does not snap, or snaps under the header. ` +
+			`${phone("snap-start")} is the alignment, ${phone("snap-always")} is what ` +
+			`makes it one at a time rather than one per flick, and ` +
+			`${phone("scroll-mt-[62px]")} is the same 62px said to the snap engine — ` +
+			`without it the tile rests at the scrollport top, which the sticky header ` +
+			`covers (measured: top at 107px instead of 62px).`;
+		expect(classes, snap).toContain(phone("snap-start"));
+		expect(classes, snap).toContain(phone("snap-always"));
+		expect(classes, snap).toContain(phone("scroll-mt-[62px]"));
 
 		const sep =
 			`${TABLE_FILE}: the phone row separator is incomplete. Below 640px the ` +
@@ -572,15 +589,42 @@ describe("profile mobile reflow — the positions table stacks below 640px", () 
 			`gap between them, and the border alone leaves two edges per seam.`;
 		expect(classes, sep).toContain(phone("[outline:none]"));
 		expect(classes, sep).toContain(phone("[border-top:var(--hairline)]"));
+
+		// ⛔⛔ R-3 — AND THE TINT IS GONE IN BOTH STATES. The selected arm carries
+		// `bg-n1` and the resting arm `hover:bg-n1`; a phone override of only the
+		// first leaves a tint behind on touch, where `:hover` sticks after a tap.
+		const flat =
+			`${TABLE_FILE}: a tile still paints a selected or hovered background ` +
+			`below 640px. Both arms need overriding — ${phone("bg-transparent")} for ` +
+			`the selected one and ${phone("hover:bg-transparent")} for the resting ` +
+			`one, whose :hover sticks after a tap on touch. R-3 keeps the STATE and ` +
+			`removes only the paint.`;
+		expect(classes, flat).toContain(phone("bg-transparent"));
+		expect(classes, flat).toContain(phone("hover:bg-transparent"));
+
+		// POSITIVE CONTROL for the whole row: the selection STATE survives, so this
+		// guard cannot be satisfied by deleting selection altogether.
+		expect(
+			source,
+			`${TABLE_FILE}: the selected tile no longer reports itself. R-3 removes ` +
+				`the PAINT and keeps the state — the sell sheet needs to know which ` +
+				`position it is selling.`,
+		).toContain('aria-current={selected ? "true" : undefined}');
 	});
 
 	/**
-	 * ⛔ THE CELLS ARE OPENED, AND THAT IS THE LINE JOB B DELIBERATELY DID NOT
-	 * CROSS — so it is asserted rather than assumed. A four-column row inside
-	 * 278px needs each cell to declare its share; without the widths the row is
-	 * four cells fighting over one line and the argument is what loses.
+	 * ⛔ THE CELLS ARE PLACED, AND A PLACEMENT CANNOT BE INFERRED. Round five gave
+	 * each cell a WIDTH because the row was a flex line and a cell without a share
+	 * left the `flex-1` argument beside it resolving to 0px. A grid has no such
+	 * failure: the widths come from the track list. What it has instead is a
+	 * different one — an unplaced item is auto-placed into the next free cell, so
+	 * ONE missing coordinate silently reflows the whole tile rather than erroring.
+	 *
+	 * ⚠ THE SIDE CELL IS THE ONE READ HERE because it is the tile's first item and
+	 * therefore the one whose auto-placement would look most nearly correct.
+	 * `phone-position-tile.test.ts` reads all four.
 	 */
-	it("profile-mobile::each-cell-declares-its-share-of-the-phone-row", () => {
+	it("profile-mobile::the-side-cell-is-PLACED-not-auto-placed", () => {
 		const source = stripComments(read(TABLE_FILE));
 		const side = classesOf(
 			source,
@@ -594,12 +638,21 @@ describe("profile mobile reflow — the positions table stacks below 640px", () 
 			source.slice(tdAt, source.indexOf(">", tdAt) + 1),
 		);
 		const why =
-			`${TABLE_FILE}: the side cell does not claim a width at phone tier, so ` +
-			`the argument beside it cannot be the flexible one. It needs a ` +
-			`phone-tier width and ${phone("shrink-0")}.`;
-		expect(tdClasses ?? [], why).toContain(phone("w-12"));
-		expect(tdClasses ?? [], why).toContain(phone("shrink-0"));
+			`${TABLE_FILE}: the side cell declares no grid coordinate, so it is ` +
+			`auto-placed — and an auto-placed first item lands in exactly the cell ` +
+			`it was going to occupy anyway, which is why this fails invisibly. ` +
+			`It needs ${phone("col-start-1")} and ${phone("row-start-1")}.`;
+		expect(tdClasses ?? [], why).toContain(phone("col-start-1"));
+		expect(tdClasses ?? [], why).toContain(phone("row-start-1"));
 		expect(tdClasses ?? [], why).toContain(phone("p-0"));
+		// ⛔ AND THE ROUND-FIVE WIDTH IS GONE. `w-12` was 48px for a 15px marker;
+		// the tile prints the side at 24px, where 48px is a floor it overruns.
+		expect(
+			tdClasses ?? [],
+			`${TABLE_FILE}: the side cell still declares round five's flex share. In ` +
+				`a grid ${phone("w-12")} is a floor rather than a share, and the 24px ` +
+				`side marker overruns it.`,
+		).not.toContain(phone("w-12"));
 		// POSITIVE CONTROL — the reader above really does find a class list.
 		expect(side, "the side span itself is still readable").not.toBeNull();
 	});

@@ -1380,11 +1380,20 @@ function TileRow({
 				    it per tier would need a `useIsPhoneTier()` branch in the render —
 				    and the hook's server snapshot is `false`, so the phone would paint a
 				    15px glyph and then pop to 24 on hydration. A class on the parent
-				    reaches the `<svg>`'s width/height ATTRIBUTES (CSS wins over
-				    presentational attributes) and is correct in the very first frame. */}
+				    reaches the svg's width/height ATTRIBUTES (CSS wins over
+				    presentational attributes) and is correct in the very first frame.
+				    ⛔ THE DESCENDANT FORM, NEVER THE CHILD COMBINATOR, AND THE REASON IS
+				    A GUARD RATHER THAN A SELECTOR. The child form would be exact here —
+				    the glyph is this span's own child — but it puts a closing-angle
+				    character inside a `className` string, and `profile-mobile-reflow`'s
+				    tag reader ends an opening tag at the first one it meets at brace
+				    depth zero. It truncated this tag mid-attribute and reported the cell
+				    as declaring no className at all. The descendant form is also the
+				    shipped idiom (`ui/button.tsx` uses it) and matches the one svg this
+				    span contains. */}
 				<span
 					data-testid={`tile-side-${tile.key}`}
-					className="flex items-center justify-center gap-[5px] text-[15px] leading-[1.35] font-extrabold text-ink max-mobile:gap-2 max-mobile:text-[24px] max-mobile:leading-[1.2] max-mobile:[&>svg]:size-6"
+					className="flex items-center justify-center gap-[5px] text-[15px] leading-[1.35] font-extrabold text-ink max-mobile:gap-2 max-mobile:text-[24px] max-mobile:leading-[1.2] max-mobile:[&_svg]:size-6"
 				>
 					{tile.side === "YES" ? "Yes" : "No"}
 					{/* ⚠ 15, AND DELIBERATELY NOT 16. P-3 raises the side marker with the
