@@ -198,12 +198,19 @@ export function PhoneSellSheet(props: {
 						variant="outline"
 						disabled={props.busy || !props.canSubmit}
 						data-testid={`phone-sell-confirm-${props.tileKey}`}
-						// ⚠ MOBILE-2h · R-4 — 48px, up from 44. The ruling is that CONFIRM
-						// keeps its WIDTH and gains a little height: the sheet grew to pay
-						// for a 32px figure, and a button left at the bare 44px minimum
-						// under it reads as the smaller of the two decisions on screen.
-						// `w-full` is unchanged, so the edge alignment ADR-0051 A4 rules
-						// for every block in a phone sheet is unchanged with it.
+						// ⚠ 48px TALL, up from 44 at MOBILE-2h. The ruling was, and remains,
+						// that CONFIRM keeps its WIDTH and gains a little height: the sheet
+						// grew to pay for a figure much larger than its own type, and a
+						// button left at the bare 44px minimum under it reads as the
+						// smaller of the two decisions on screen. `w-full` is unchanged,
+						// so the edge alignment ADR-0051 A4 rules for every block in a
+						// phone sheet is unchanged with it.
+						// ⚠ THE FIGURE IT IS SIZED AGAINST IS NOW 48px, NOT THE 32 THIS
+						// NOTE NAMED (MOBILE-2j · R-2). The argument is unaffected and the
+						// height is deliberately unchanged — A6's R-3 says CONFIRM stays —
+						// but a comment that reasons from a number which has moved is the
+						// defect this file records elsewhere, so the number is corrected
+						// rather than left to be reasoned from.
 						className="h-12 w-full font-extrabold tracking-[0.06em] uppercase [border:var(--ring-active)]"
 						onClick={props.onSubmit}
 					>
