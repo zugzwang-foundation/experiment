@@ -294,6 +294,43 @@ explicitly neutralised (`max-mobile:mt-0`) rather than left to look load-bearing
 | **2d-10** | ⚠ **RETURNING FROM A POST RESTORES THE FEED'S POSITION ONLY PARTIALLY** — measured, 400 → **171**, where 171 is the THREAD's maximum scroll. The arm prop flips before the feed's payload replaces the thread's children, so the restore is clamped by content that is about to be replaced | **Two fixes were built and both measured identical**: a next-frame retry and a twelve-frame bounded poll. Both removed rather than kept — the payload arrives later than 200ms and a mechanism that does not do what its docblock says is worse than a stated gap. What would close it is keying the restore on the PAYLOAD's arrival rather than on the arm's, which is a different shape (a derived-state comparison on the model, not a timer). ⚠ For scale: the document-scroll model this replaces restored 400 → **128** via the browser's own restoration, so this is not a regression — it is an imperfection that was already there and is now ours |
 | **2d-5** | the 51%-of-a-pane snap cell is marginal and reads either way between runs | It lands ON a snap boundary every time (`onBoundary: true` in all eight G5 cells), so it is a legitimate browser decision at the threshold rather than a defect. Recorded because a future run will see it flip and should not chase it. |
 
+### MOBILE-2e (2026-09-13) — round five, and the census grows a second directory
+
+**Census re-run at commit time with this section's own commands**, never copied
+from the plan:
+
+| what | command, and the answer |
+|---|---|
+| files under `src/components/debate/phone/` | `ls src/components/debate/phone/ \| wc -l` — **8**, unchanged by this round |
+| files under `src/components/profile/phone/` | `ls src/components/profile/phone/ \| wc -l` — **1**, and the directory is NEW. `PhoneSellSheet.tsx`, minted under ADR-0051 **A4** D-2, which extends the phone-tier convention from `/m/[slug]` to `/u/[pseudonym]` |
+| files under `src/` carrying a `max-mobile:` token | `grep -rln max-mobile src/ --include="*.tsx" --include="*.ts" \| wc -l` — **27** |
+| `tests/unit/design/` | `ls tests/unit/design/ \| wc -l` — **29** (`phone-round-five.test.ts` is this round's) |
+| `tests/unit/debate/phone/` | `ls tests/unit/debate/phone/ \| wc -l` — **15** |
+| `tests/unit/profile/render/` | `ls tests/unit/profile/render/ \| wc -l` — **14** (`phone-sell-sheet.test.tsx` is this round's) |
+| the suite | `pnpm vitest run` — **509 files / 5165 tests** |
+
+**Discharged by MOBILE-2e, from MOBILE-2d's OWED list:**
+
+| # | what | how |
+|--:|---|---|
+| **O-4** | ⚠ **B7 / B8 / B10 were owed three times over.** | ⛔ **B7 AND B10 ARE NOW MEASURED AND ARE UNCHANGED** — 30 interactive targets under 44px before and after, `0` interval and `0` timeout arms in a 20-second window before and after, at all four phone widths, with a POSITIVE CONTROL that arms two timers in-page and throws unless the census counts them. ⚠ **B7's number only survives because the instrument was fixed**: the split bar's 26 pills now paint at 32px and buy 44 back with a transparent `::after`, so a census reading `getBoundingClientRect` alone reported this refinement as a 26-target REGRESSION. The union with the positioned pseudo-elements is what makes it a non-event. **B8 (axe) is still owed** — see the new list below |
+| **O-12** | the `?post=` deep-link entry was never separately measured | ⚠ **STILL OWED.** Not re-attempted this round |
+
+**Newly owed by MOBILE-2e:**
+
+| # | what | note |
+|--:|---|---|
+| **2e-1** | ⚠ **THREE TILE LABELS TAKE THREE LINES AT ≤390px**, not the two the ruling accepts — `Total Support received`, `Total Counter received`, and (at 360 only) `Net profit / loss` | Measured: three columns across 304px give each tile 96px, which is 80px of content after padding, and `TOTAL SUPPORT` alone is ~87px at the ruled 10px. ⚠ **A tracking reduction to 0.08em was tried and REVERTED**: it moved exactly one label on one width and would have overridden a ruled value to buy nothing. At 430px all six are two lines or fewer. Nothing clips and the tiles stay equal-height (`auto-rows-fr`); the cost is band height. A ruling on the label STRINGS would close it; a token cannot |
+| **2e-2** | ⚠ **THE ARGUMENT COLUMN IS ~96px AT 360px** — 35% of the row, against ~51% on the desktop | The ruled row is four columns inside 278px: 48 side + 64 value + 52 SELL + three 6px seams leaves 96 for the argument. The 15px title clamps to two lines there, which is roughly twenty characters. It is what "the desktop row at a third of the width" arithmetically is; recorded so a future round does not rediscover it as a defect |
+| **2e-3** | ⚠ **LINE 1 OF THE IDENTITY ROW WRAPS FOR THE SOLD CASE AT 360px ONLY** — `OliveBeaver000` plus a `Flipped` chip plus a `Sold` chip | Explicitly permitted by the ruling ("line 1 may wrap only when a chip and a 22-char pseudonym cannot share 360px — report the case"). This is the case. Line 2 is still ONE line on every row at every width |
+| **2e-4** | ⚠ **THE NATIVE `title` ATTRIBUTES ARE NOT GATED.** D-4(vi) rules that no tooltip MOUNTS on the phone tier; four native `title`s remain reachable there — `HeaderNav`'s Back and Home, `RulesControl`'s Rules, and `PriceBar`'s price button | Left deliberately. A `title` mounts nothing and Chrome Android never surfaces one, so it is not the affordance the ruling is about; and `PriceBar.tsx:212`'s is pinned by `market-header.test.tsx` as "the ONLY tooltip string in the entire repo under test", so removing it reds a guard this task was told not to touch. A ruling could widen D-4(vi) to cover them |
+| **2e-5** | ⚠ **THE PROFILE'S PSEUDONYM IS STILL A `<span>`, NOT A LINK** (R-P4 says "pseudonym as a link") | On `/u/<pseudonym>` a link on the pseudonym points at the page the reader is already on. The linked pseudonym the register is describing is `ArgProfile`'s, which already IS a link to exactly this page. Built as a span and reported rather than shipped as a self-link; a ruling either way is one token |
+| **2e-6** | **B8 (axe) was not run this round** | Owed for a fourth time. B7 and B10 were taken instead, which is the pair that this round's own changes could plausibly move |
+| **2e-7** | ⚠ **`useEqualRowThirds` NOW TAKES ITS CONDITION FROM THE CALLER**, because its own page test stopped being a proxy for the tier | Hiding the arguments panel below 640px (R-P2) made the phone page short enough to FIT its viewport, so the hook's "can the document scroll" gate read *definite region* and began equalising phone rows to a third of the SCREEN — 76px at 360 against 178px at 430, a row growing taller as the phone gets bigger. The gate was not wrong when it was written; the thing it stood for moved. ⚠ Recorded because the same proxy is used by the panel's separate `maxHeight` window cap, which was NOT changed: it happens to be correct there (a cap on a page that fits is genuinely dead space), but the two now reason differently and a future reader will expect them to agree |
+
+**Source:** MOBILE-2e run report §6 and §10; the guard is
+`tests/unit/design/phone-round-five.test.ts`, 20 rows, every one reversal-verified.
+
 ### MOBILE-2 (2026-09-12) — the trigger fires a third time, and the shape changes
 
 **Census re-run at commit time with this section's own command**, never copied

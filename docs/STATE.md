@@ -43,7 +43,7 @@ sixteen rows below stale in five days**, and two of them were stale by a whole m
 |---|---|---|
 | Auth, identity, onboarding | [`records/AUTH-record.md`](records/AUTH-record.md) | **SHIPPED** |
 | Debate, moderation, ranking | [`records/DEBATE-record.md`](records/DEBATE-record.md) | **SHIPPED** |
-| Participant surfaces | [`records/SURFACES-record.md`](records/SURFACES-record.md) | **SHIPPED** — mobile BUILT on every read surface; `/m/[slug]`'s phone tier is MOBILE-2, open as a draft PR |
+| Participant surfaces | [`records/SURFACES-record.md`](records/SURFACES-record.md) | **SHIPPED** — mobile BUILT on every read surface. The one open piece is **PR #517** (draft): `/m/[slug]`'s phone tier plus, since MOBILE-2e, the phone view of `/u/[pseudonym]`. Five refinement rounds have landed on it (MOBILE-2 · 2b · 2c · 2d · 2e); it is the last surface before the open |
 | Admin Control Centre | [`records/ADMIN-record.md`](records/ADMIN-record.md) | **SHIPPED** |
 | Platform, deploy, observability | [`records/PLATFORM-record.md`](records/PLATFORM-record.md) | **SHIPPED** — production not promoted |
 | Scale programme | [`records/SCALE-record.md`](records/SCALE-record.md) | **PARTIAL** — S-5 unmerged |
