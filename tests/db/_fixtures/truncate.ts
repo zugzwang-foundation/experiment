@@ -88,6 +88,14 @@ export async function truncateTables(
 	const enable = TRUNCATE_GUARDS.map(
 		([table, trigger]) => `ALTER TABLE ${table} ENABLE TRIGGER ${trigger};`,
 	).join("\n");
+	// ⚠ D4 — THE ROLLBACK GUARANTEE IS A PROPERTY OF THIS CALL'S SHAPE, not of
+	// Postgres alone. Disable, TRUNCATE and enable go out as ONE parameterless
+	// `unsafe()` call, which postgres.js sends as a single simple-query message
+	// (`simple: args.length === 0`), and Postgres runs such a message as ONE
+	// implicit transaction: any failure rolls the DISABLE back with it, so the
+	// guards are never left off. There is no `finally` re-enable behind this.
+	// Passing parameters (extended protocol), splitting the batch into separate
+	// calls, or adding a COMMIT inside it silently removes that guarantee.
 	await client.unsafe(
 		`${disable}\nTRUNCATE ${tables.join(", ")} CASCADE;\n${enable}`,
 	);

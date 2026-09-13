@@ -37,6 +37,11 @@ export default defineConfig({
 		isolate: true,
 		pool: "forks",
 		fileParallelism: false,
+		// P-17: refuses to start when any environment variable carries the production
+		// project ref, or any DATABASE_URL* dials a host that is neither loopback nor
+		// Supabase. Runs once in the main process before any test file loads, so it
+		// covers files that read process.env.DATABASE_URL directly, not only the fixture.
+		globalSetup: ["./tests/_setup/production-ref-guard.ts"],
 		setupFiles: ["./tests/_setup/env.ts"],
 		coverage: {
 			enabled: false,

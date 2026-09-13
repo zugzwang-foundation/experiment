@@ -41,7 +41,12 @@ export const GENERATE_INTENT_VALUE = "generate-staging-fixtures";
 export const TARGET_MODE_ENV = "ZUGZWANG_STAGING_TARGET";
 
 /** Hosts `local` mode will accept. Anything else refuses. */
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+export const LOOPBACK_HOSTS = new Set([
+	"localhost",
+	"127.0.0.1",
+	"[::1]",
+	"::1",
+]);
 
 export type RunnerTarget =
 	| {
