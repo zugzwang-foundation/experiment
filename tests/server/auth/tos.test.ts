@@ -151,13 +151,19 @@ describe("ToS gate + acceptance Server Action (F-AUTH-4)", () => {
 	});
 
 	it("tos::version-hash-constants-shape", () => {
-		// Plan §3 file map + Q4: `src/server/auth/tos-versions.ts` exports
-		// `TOS_VERSION_HASH` + `PRIVACY_VERSION_HASH`. Per Q4: placeholder
-		// values `'placeholder-tos-v0'` / `'placeholder-privacy-v0'`. The
-		// constants flow into the acceptance-evidence INSERT and the
-		// onboarding footer.
-		expect(TOS_VERSION_HASH).toBe("placeholder-tos-v0");
-		expect(PRIVACY_VERSION_HASH).toBe("placeholder-privacy-v0");
+		// Plan §3 file map: `src/server/auth/tos-versions.ts` exports
+		// `TOS_VERSION_HASH` + `PRIVACY_VERSION_HASH`, which flow into the
+		// acceptance-evidence write and the `/legal` colophon. Since LEGAL.1 they
+		// are SHA-256 content hashes of the documents (SPEC.1 §13 F-AUTH-4), not
+		// the Q4 placeholders — `tests/unit/auth/tos-version-hashes.test.ts`
+		// pins them to the file bytes; this row pins the shape and that the
+		// placeholders are gone.
+		expect(TOS_VERSION_HASH).toMatch(/^[0-9a-f]{64}$/);
+		expect(PRIVACY_VERSION_HASH).toMatch(/^[0-9a-f]{64}$/);
+		expect(TOS_VERSION_HASH).not.toBe(PRIVACY_VERSION_HASH);
+		expect(`${TOS_VERSION_HASH} ${PRIVACY_VERSION_HASH}`).not.toContain(
+			"placeholder",
+		);
 	});
 
 	// === Plan §4 step 3 + plan §7 — five-column acceptance evidence =========
