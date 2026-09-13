@@ -95,8 +95,15 @@ export function PhoneSellSheet(props: {
 					</span>
 				</div>
 				<div className="flex items-center justify-between gap-3">
+					{/* ⚠ `Current` IS THE OPEN TAB'S OWN COLUMN HEADER, byte-for-byte
+					    (`PositionsTable.tsx`'s `<th>`), not a phrase written for this
+					    sheet. The sheet covers the row it came from, so the column head
+					    the figure sat under has to come with it — and no new string
+					    crosses into the product to do that. ⚠ It is also the header the
+					    phone LOSES when `<thead>` goes hidden below 640px, so this is the
+					    one place on the phone where that word is still said. */}
 					<span className="text-[10px] leading-[1.2] font-extrabold tracking-[0.12em] text-n4 uppercase">
-						Current value
+						Current
 					</span>
 					{/* The SAME field the desktop row arms — not a copy of it. */}
 					<InlineSellAmount
@@ -109,27 +116,26 @@ export function PhoneSellSheet(props: {
 						onSubmit={props.onSubmit}
 					/>
 				</div>
-				{/* ⛔ THE CANCEL IS NOT OPTIONAL AND IT IS NOT THE BACKDROP. A two-step
-				    cushion with no visible exit is a trap; the backdrop and the handle
-				    are gestures a reader has to already know. Both routes land on the
-				    same `onClose`. */}
+				{/* ⛔⛔ THERE IS NO CANCEL BUTTON HERE, AND ITS ABSENCE IS A CORRECTION
+				    RATHER THAN AN OMISSION. A draft of this file shipped one, and it was
+				    wrong twice over. It invented a visible string the product does not
+				    have — the desktop's own cancel is an ICON with
+				    `aria-label="Cancel sell"` — and it put a SECOND close control on a
+				    sheet whose frame already draws one, which is exactly the defect
+				    `phone-sheet-single-close.test.tsx` exists to catch: two controls,
+				    51px apart, both meaning Close.
+				    ⇒ The frame's `×` is the visible exit. It is disabled while a request
+				    is in flight, like everything else here, and it lands on the same
+				    `onClose` the backdrop, the handle and Escape do — which cancels the
+				    arm, because a sheet that closes while the controller stays armed
+				    strands a controller nothing on screen can reach. */}
 				<div className="flex items-center gap-2">
-					<Button
-						type="button"
-						variant="outline"
-						disabled={props.busy}
-						data-testid={`phone-sell-cancel-${props.tileKey}`}
-						className="h-11 flex-1 font-extrabold tracking-[0.06em] uppercase"
-						onClick={props.onClose}
-					>
-						Cancel
-					</Button>
 					<Button
 						type="button"
 						variant="outline"
 						disabled={props.busy || !props.canSubmit}
 						data-testid={`phone-sell-confirm-${props.tileKey}`}
-						className="h-11 flex-1 font-extrabold tracking-[0.06em] uppercase [border:var(--ring-active)]"
+						className="h-11 w-full font-extrabold tracking-[0.06em] uppercase [border:var(--ring-active)]"
 						onClick={props.onSubmit}
 					>
 						{props.busy ? "…" : props.failed ? "Retry" : "Confirm"}

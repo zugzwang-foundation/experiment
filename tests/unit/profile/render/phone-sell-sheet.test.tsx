@@ -73,15 +73,39 @@ describe("MOBILE-2e — the phone sell sheet", () => {
 		expect(body.textContent).toContain("Does the criterion read the revision?");
 	});
 
-	it("phone-sell::CONFIRM-and-CANCEL-both-exist-and-neither-is-the-backdrop", () => {
+	it("phone-sell::there-is-exactly-ONE-close-control-and-it-is-the-frame-s", () => {
 		mount();
-		const confirm = screen.getByTestId(`phone-sell-confirm-${KEY}`);
-		const cancel = screen.getByTestId(`phone-sell-cancel-${KEY}`);
-		expect(confirm.tagName).toBe("BUTTON");
-		expect(cancel.tagName).toBe("BUTTON");
-		// ⛔ A two-step cushion with no VISIBLE exit is a trap. The backdrop and the
-		// handle are gestures a reader has to already know; the button is not.
-		expect(cancel.textContent).toBe("Cancel");
+		expect(screen.getByTestId(`phone-sell-confirm-${KEY}`).tagName).toBe(
+			"BUTTON",
+		);
+		// ⛔⛔ THE SHEET MUST NOT DRAW ITS OWN CANCEL. `PhoneSheet`'s frame already
+		// draws a `×` whenever a title is passed, and a second control beside it is
+		// the exact defect `phone-sheet-single-close.test.tsx` was written for —
+		// two buttons, 51px apart, both named Close. A draft of this file shipped
+		// one, and it also invented a visible `Cancel` string the product does not
+		// have (the desktop's own cancel is an icon labelled `Cancel sell`).
+		const named = [...document.querySelectorAll("button")].filter(
+			(b) =>
+				(b.getAttribute("aria-label") ?? b.textContent ?? "")
+					.trim()
+					.toLowerCase()
+					.includes("close") ||
+				(b.textContent ?? "").trim().toLowerCase() === "cancel",
+		);
+		expect(
+			named.map((b) => b.getAttribute("data-testid") ?? b.textContent),
+			"more than one way out, or none",
+		).toEqual(["phone-sheet-close"]);
+	});
+
+	it("phone-sell::it-says-CURRENT-and-not-a-phrase-invented-for-this-sheet", () => {
+		mount();
+		// `Current` is the Open tab's own `<th>`, byte-for-byte — the column head
+		// the phone LOSES when `<thead>` goes hidden. No new string crosses into
+		// the product to give the figure its name back.
+		const body = screen.getByTestId("phone-sheet-body");
+		expect(body.textContent).toContain("Current");
+		expect(body.textContent).not.toContain("Current value");
 	});
 
 	/**
@@ -98,11 +122,15 @@ describe("MOBILE-2e — the phone sell sheet", () => {
 		try {
 			{
 				const { onClose } = mount();
-				fireEvent.click(screen.getByTestId(`phone-sell-cancel-${KEY}`));
+				fireEvent.click(screen.getByTestId("phone-sheet-close"));
 				expect(
 					onClose,
-					"the Cancel button is the DIRECT route and is not deferred",
-				).toHaveBeenCalledTimes(1);
+					"the frame's × fired before its own animation",
+				).not.toHaveBeenCalled();
+				act(() => {
+					vi.advanceTimersByTime(CLOSE_MS);
+				});
+				expect(onClose, "the frame's ×").toHaveBeenCalledTimes(1);
 				cleanup();
 			}
 			{
@@ -141,11 +169,9 @@ describe("MOBILE-2e — the phone sell sheet", () => {
 		const confirm = screen.getByTestId(
 			`phone-sell-confirm-${KEY}`,
 		) as HTMLButtonElement;
-		const cancel = screen.getByTestId(
-			`phone-sell-cancel-${KEY}`,
-		) as HTMLButtonElement;
+		const close = screen.getByTestId("phone-sheet-close") as HTMLButtonElement;
 		expect(confirm.disabled, "Confirm stays live during a sell").toBe(true);
-		expect(cancel.disabled, "Cancel stays live during a sell").toBe(true);
+		expect(close.disabled, "the frame's × stays live during a sell").toBe(true);
 		fireEvent.click(screen.getByTestId("phone-sheet-backdrop"));
 		fireEvent.keyDown(document, { key: "Escape" });
 		expect(
