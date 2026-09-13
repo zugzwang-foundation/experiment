@@ -606,72 +606,100 @@ describe("global header mobile reflow — the mobileResponsive prop, not an unco
 				`and /m/[slug] — so it must opt in.`,
 		).toMatch(/\bmobileResponsive\b/);
 
-		const authTag = /<GlobalHeader\b[\s\S]*?\/>/.exec(authSrc);
-		if (!authTag) {
+		// ⛔⛔ EVERY MOUNT IN THE FILE, NOT THE FIRST ONE — AND THIS USED TO BE
+		// `.exec()`, WHICH RETURNS EXACTLY ONE MATCH.
+		//
+		// That was correct only by coincidence: it held for as long as
+		// `(auth)/layout.tsx` held exactly one `<GlobalHeader>` tag. AUTH-PRERENDER
+		// (ADR-0052) moved the header behind a `<Suspense>` boundary, and its first
+		// draft made the FALLBACK a second rendered header. That draft was dropped
+		// (the header seeds its countdown from `Date.now()`, which cannot be
+		// prerendered), so today the file holds one mount again — but a Suspense
+		// boundary is exactly where a second mount is the natural next edit.
+		//
+		// ⚠ THE HOLE THAT WOULD OPEN IS THE SAME SHAPE THIS FILE ALREADY WARNS ABOUT
+		// TWICE, one register over: a check that goes stale SILENTLY, in the
+		// PASSING direction. `.exec()` would have read whichever tag appeared
+		// first in source order and certified it as "the (auth) mount", leaving
+		// the other one unexamined — so a fallback that dropped the prop, or a
+		// real mount that dropped it while the fallback kept it, would ship green.
+		// And the consequence is not cosmetic: the two mounts render at DIFFERENT
+		// TIMES on the same page load, so a polarity mismatch between them reflows
+		// one way before hydration and the other way after, at exactly the phone
+		// widths ADR-0048 exists to serve.
+		//
+		// ⇒ All three halves below now run against EVERY mount. The count is
+		// deliberately NOT pinned: one mount or three, the invariant is that each
+		// of them opts in, and a guard that also asserted "there are exactly two"
+		// would redden on a refactor that changed nothing a visitor can see.
+		const authTags = [...authSrc.matchAll(/<GlobalHeader\b[\s\S]*?\/>/g)];
+		if (authTags.length === 0) {
 			throw new Error(`${AUTH_LAYOUT}: no <GlobalHeader ... /> tag found.`);
 		}
 
-		// HALF ONE — the prop is PRESENT on the (auth) mount.
-		expect(
-			authTag[0],
-			`${AUTH_LAYOUT}: its <GlobalHeader> mount does not pass ` +
-				`\`mobileResponsive\`. ADR-0048 supersedes ADR-0045's auth/join ` +
-				`carve-out: /sign-in, /sign-in/otp and /onboarding are phone- ` +
-				`responsive at the existing 640px tier, and this one prop is the ` +
-				`whole of the fix for all three routes — ADR-0048 measured +379px of ` +
-				`document overflow at 375x812 on those routes, 100% of it this ` +
-				`header (min-content 754px). Without it a phone visitor cannot read ` +
-				`the join surface they are being asked to join from, which is the ` +
-				`ADR-0038 signup target ADR-0045 knowingly traded against and ` +
-				`ADR-0048 stops trading against.`,
-		).toMatch(/\bmobileResponsive\b/);
+		for (const authTag of authTags) {
+			// HALF ONE — the prop is PRESENT on the (auth) mount.
+			expect(
+				authTag[0],
+				`${AUTH_LAYOUT}: its <GlobalHeader> mount does not pass ` +
+					`\`mobileResponsive\`. ADR-0048 supersedes ADR-0045's auth/join ` +
+					`carve-out: /sign-in, /sign-in/otp and /onboarding are phone- ` +
+					`responsive at the existing 640px tier, and this one prop is the ` +
+					`whole of the fix for all three routes — ADR-0048 measured +379px of ` +
+					`document overflow at 375x812 on those routes, 100% of it this ` +
+					`header (min-content 754px). Without it a phone visitor cannot read ` +
+					`the join surface they are being asked to join from, which is the ` +
+					`ADR-0038 signup target ADR-0045 knowingly traded against and ` +
+					`ADR-0048 stops trading against.`,
+			).toMatch(/\bmobileResponsive\b/);
 
-		// HALF TWO — and it is not switched OFF by any spelling. Without this,
-		// half one passes on a REVERTED tree that kept the prop name.
-		//
-		// ⛔⛔ THE ENUMERATION OF BAD VALUES WAS THE WRONG SHAPE, AND IT SHIPPED
-		// THAT WAY FOR ONE REVIEW CYCLE. This read `.not.toMatch(/…=\{(false|
-		// undefined)\}/)`, which is a DENYLIST — and a denylist over a value
-		// position is exactly the thing that goes stale silently, in the passing
-		// direction, because the ways to spell "off" are unbounded. Mutation-tested
-		// against the real file, FIVE TS-legal reverts sailed through it:
-		// `={!true}`, `={PHONE_OK}` where the const is false, `={false as
-		// boolean}`, `={ /* on */ false}`, and `{...{ mobileResponsive: false }}` —
-		// which defeats half ONE as well, since the name is present in an object
-		// literal rather than as an attribute. ⚠ The flag-shaped one is not exotic:
-		// `={SOME_FLAG}` is precisely how "turn mobile auth back off" gets written.
-		//
-		// ⇒ SO IT IS AN ALLOWLIST NOW. Exactly two spellings are accepted — the
-		// bare shorthand `mobileResponsive` and the explicit `mobileResponsive=
-		// {true}` — and every other value form reddens, INCLUDING ones nobody has
-		// thought of. That is the direction a polarity guard has to fail in: a
-		// spelling it does not recognise must be a failure rather than a pass.
-		expect(
-			authTag[0],
-			`${AUTH_LAYOUT}: its <GlobalHeader> mount spells \`mobileResponsive\` ` +
-				`with a value that is not literally \`{true}\`. Only the bare ` +
-				`shorthand or \`={true}\` is accepted here, and the restriction is ` +
-				`the point: \`={false}\`, \`={undefined}\`, \`={!true}\` and — the ` +
-				`realistic one — \`={SOME_FLAG}\` all render the pre-ADR-0048 header ` +
-				`on all three auth routes while leaving a call site that reads like ` +
-				`an opt-in. A value this guard cannot evaluate is treated as a ` +
-				`revert. If the opt-in is genuinely being reverted, revert this ` +
-				`assertion with it and name the ADR that supersedes ADR-0048.`,
-		).not.toMatch(/\bmobileResponsive\s*=(?!\s*\{\s*true\s*\})/);
+			// HALF TWO — and it is not switched OFF by any spelling. Without this,
+			// half one passes on a REVERTED tree that kept the prop name.
+			//
+			// ⛔⛔ THE ENUMERATION OF BAD VALUES WAS THE WRONG SHAPE, AND IT SHIPPED
+			// THAT WAY FOR ONE REVIEW CYCLE. This read `.not.toMatch(/…=\{(false|
+			// undefined)\}/)`, which is a DENYLIST — and a denylist over a value
+			// position is exactly the thing that goes stale silently, in the passing
+			// direction, because the ways to spell "off" are unbounded. Mutation-tested
+			// against the real file, FIVE TS-legal reverts sailed through it:
+			// `={!true}`, `={PHONE_OK}` where the const is false, `={false as
+			// boolean}`, `={ /* on */ false}`, and `{...{ mobileResponsive: false }}` —
+			// which defeats half ONE as well, since the name is present in an object
+			// literal rather than as an attribute. ⚠ The flag-shaped one is not exotic:
+			// `={SOME_FLAG}` is precisely how "turn mobile auth back off" gets written.
+			//
+			// ⇒ SO IT IS AN ALLOWLIST NOW. Exactly two spellings are accepted — the
+			// bare shorthand `mobileResponsive` and the explicit `mobileResponsive=
+			// {true}` — and every other value form reddens, INCLUDING ones nobody has
+			// thought of. That is the direction a polarity guard has to fail in: a
+			// spelling it does not recognise must be a failure rather than a pass.
+			expect(
+				authTag[0],
+				`${AUTH_LAYOUT}: its <GlobalHeader> mount spells \`mobileResponsive\` ` +
+					`with a value that is not literally \`{true}\`. Only the bare ` +
+					`shorthand or \`={true}\` is accepted here, and the restriction is ` +
+					`the point: \`={false}\`, \`={undefined}\`, \`={!true}\` and — the ` +
+					`realistic one — \`={SOME_FLAG}\` all render the pre-ADR-0048 header ` +
+					`on all three auth routes while leaving a call site that reads like ` +
+					`an opt-in. A value this guard cannot evaluate is treated as a ` +
+					`revert. If the opt-in is genuinely being reverted, revert this ` +
+					`assertion with it and name the ADR that supersedes ADR-0048.`,
+			).not.toMatch(/\bmobileResponsive\s*=(?!\s*\{\s*true\s*\})/);
 
-		// HALF THREE — the prop is a real JSX ATTRIBUTE, not a name that merely
-		// occurs in the tag. `{...{ mobileResponsive: false }}` puts the string
-		// inside the tag while switching the feature off, and half one is a
-		// substring check, so it passes. The object-literal form is what
-		// distinguishes them.
-		expect(
-			authTag[0],
-			`${AUTH_LAYOUT}: \`mobileResponsive\` appears in the <GlobalHeader> ` +
-				`tag as an object property (\`mobileResponsive:\`) rather than as a ` +
-				`JSX attribute — a spread like \`{...{ mobileResponsive: false }}\` ` +
-				`satisfies a bare name check while rendering the header exactly as ` +
-				`it did before ADR-0048. Pass the prop directly.`,
-		).not.toMatch(/\bmobileResponsive\s*:/);
+			// HALF THREE — the prop is a real JSX ATTRIBUTE, not a name that merely
+			// occurs in the tag. `{...{ mobileResponsive: false }}` puts the string
+			// inside the tag while switching the feature off, and half one is a
+			// substring check, so it passes. The object-literal form is what
+			// distinguishes them.
+			expect(
+				authTag[0],
+				`${AUTH_LAYOUT}: \`mobileResponsive\` appears in the <GlobalHeader> ` +
+					`tag as an object property (\`mobileResponsive:\`) rather than as a ` +
+					`JSX attribute — a spread like \`{...{ mobileResponsive: false }}\` ` +
+					`satisfies a bare name check while rendering the header exactly as ` +
+					`it did before ADR-0048. Pass the prop directly.`,
+			).not.toMatch(/\bmobileResponsive\s*:/);
+		}
 	});
 });
 

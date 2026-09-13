@@ -198,6 +198,53 @@ export function nudgeFor({
 	};
 }
 
+/**
+ * ART-CPU-1 — THE TWO RINGS, BUILT ONCE AT MODULE LOAD.
+ *
+ * Both `<Ring>` call sites take module-level constants for every prop, so the
+ * elements they produce can never differ between renders. Hoisting them here
+ * means React receives the SAME ELEMENT REFERENCE on every render of this hero
+ * and can skip both subtrees by identity — `Ring()` is not re-entered, and the
+ * ~16 figures, their hand-links, the interstitial motifs and the dense ring's
+ * 96-sample bowed baseline are not rebuilt.
+ *
+ * ⚠ THE REFS STAY ON THE WRAPPERS, DELIBERATELY. `innerNudgeRef` and its
+ * siblings are attached to the `<g>` elements AROUND these, which is what lets
+ * the rings be hoisted at all: the pointer-nudge effect mutates the wrapper's
+ * transform, never the ring's own subtree. A ref moved onto a `<Ring>` would
+ * make these elements stateful and this hoist wrong.
+ *
+ * ⚠ AND THIS IS WHY THE HERO CAN STAY A CLIENT COMPONENT. It genuinely needs
+ * one — `useEffect`, `useRef`, and pointer/scroll listeners drive the nudge.
+ * What it does NOT need is to rebuild its artwork on both sides of the
+ * boundary: with the tree hoisted, hydration reconciles against constants
+ * instead of constructing ~8,000 elements a second time in the browser.
+ */
+const INNER_RING_ELEMENT = (
+	<Ring
+		name="inner"
+		centre={CENTRE}
+		radius={R_INNER}
+		figures={INNER_FIGURES}
+		density="solid"
+		facing="outward"
+		phaseDeg={PHASE_DEG}
+	/>
+);
+
+const OUTER_RING_ELEMENT = (
+	<Ring
+		name="outer"
+		centre={CENTRE}
+		radius={R_OUTER}
+		figures={OUTER_FIGURES}
+		density="spare"
+		facing="inward"
+		phaseDeg={PHASE_DEG}
+		showField={false}
+	/>
+);
+
 export type WarliHeroProps = {
 	readonly className?: string;
 	/**
@@ -384,15 +431,7 @@ export function WarliHero({
 			<g transform={`translate(${VIEW_WIDTH / 2} ${VIEW_HEIGHT / 2})`}>
 				<g ref={innerSpinRef} className="warli-spin" data-warli-spin="inner">
 					<g ref={innerNudgeRef} className="warli-nudge">
-						<Ring
-							name="inner"
-							centre={CENTRE}
-							radius={R_INNER}
-							figures={INNER_FIGURES}
-							density="solid"
-							facing="outward"
-							phaseDeg={PHASE_DEG}
-						/>
+						{INNER_RING_ELEMENT}
 					</g>
 				</g>
 				<g
@@ -401,16 +440,7 @@ export function WarliHero({
 					data-warli-spin="outer"
 				>
 					<g ref={outerNudgeRef} className="warli-nudge">
-						<Ring
-							name="outer"
-							centre={CENTRE}
-							radius={R_OUTER}
-							figures={OUTER_FIGURES}
-							density="spare"
-							facing="inward"
-							phaseDeg={PHASE_DEG}
-							showField={false}
-						/>
+						{OUTER_RING_ELEMENT}
 					</g>
 				</g>
 			</g>
