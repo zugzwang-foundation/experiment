@@ -29,6 +29,18 @@ const S = ":";
 /** `phone("h-8")` → the phone-tier spelling of `h-8`, never a scannable token. */
 const phone = (utility: string) => `${V}${S}${utility}`;
 
+/**
+ * The pill's anchor, as a PREFIX of its `data-testid` expression.
+ *
+ * ⚠ The full expression is `data-testid={\`card-trigger-$\{relation}\`}`, and
+ * writing that literally makes Biome's `noTemplateCurlyInString` fire on a
+ * string that is CORRECTLY a placeholder — it is source text being searched
+ * for, not a template that forgot its backticks. The prefix is unique in the
+ * file and carries no `$\{`, so the anchor is exact and the lint has nothing
+ * to object to.
+ */
+const PILL_ANCHOR = "data-testid={`card-trigger-";
+
 const COMPOSER = "src/components/debate/composer/BetComposer.tsx";
 const FOOTER = "src/components/debate/AggregateFooter.tsx";
 const ARGPROFILE = "src/components/debate/ArgProfile.tsx";
@@ -184,7 +196,7 @@ describe("R-M2 — the split bar is 32/6 on a phone, and the tap area is a pseud
 		const source = stripComments(read(FOOTER));
 		const cls = classTokensAfter(
 			source,
-			"data-testid={`card-trigger-${relation}`}",
+			PILL_ANCHOR,
 			"the Support/Counter pill",
 		);
 		const why =
@@ -213,7 +225,7 @@ describe("R-M2 — the split bar is 32/6 on a phone, and the tap area is a pseud
 		const source = stripComments(read(FOOTER));
 		const cls = classTokensAfter(
 			source,
-			"data-testid={`card-trigger-${relation}`}",
+			PILL_ANCHOR,
 			"the Support/Counter pill",
 		);
 		expect(
@@ -517,6 +529,23 @@ describe("R-P3 — the phone's sell sheet carries no write path of its own", () 
 		// POSITIVE CONTROL — the same scan against a term that IS present, so an
 		// empty read cannot pass every row above.
 		expect(source).toContain("InlineSellAmount");
+	});
+
+	it("round5::the-sell-leaf-uses-no-default-breakpoint-variant", () => {
+		// ADR-0051 D-2 condition (d), carried into A4 unchanged. The phone tier
+		// declares its gate ONCE, on the root of the subtree; an `sm:`/`md:`/`lg:`
+		// rule inside it is a SECOND breakpoint system in a tier that already has
+		// one, and the two disagree for any reader who has enlarged their text
+		// (`sm` is 40rem, the mobile token is 640px — equal only at a 16px root).
+		const variant = /\b(sm|md|lg|xl|2xl):[a-z0-9[-]/g;
+		expect(stripComments(read(SHEET)).match(variant) ?? []).toEqual([]);
+		// ⛔ POSITIVE CONTROL: the same regex over a file that DOES carry one, so
+		// the empty match above is a verdict rather than a broken pattern.
+		expect(
+			(stripComments(read(TILES)).match(variant) ?? []).length,
+			"the control file no longer carries a default-breakpoint variant — " +
+				"re-point this control rather than deleting it",
+		).toBeGreaterThan(0);
 	});
 
 	it("round5::the-sheet-is-mounted-INSIDE-the-armed-row-and-busy-is-wired", () => {
