@@ -113,18 +113,75 @@ describe("V13 reserves never cross the client boundary", () => {
 		// serialize an internal `pools` row into the browser.
 
 		// Read live, into a local — never onto the view.
-		expect(page).toContain("getMarketPricingAndReserves(db, m.id)");
-		// …and passed to the cached server function as an argument. Matched
-		// whitespace-insensitively on purpose: pinning exact indentation here
-		// would make this guard fail on a Biome reformat, which is noise rather
-		// than a leak.
+		// ⚠ T-03 changed the SHAPE of this read, not the property. The
+		// per-market `getMarketPricingAndReserves(db, m.id)` became one batched
+		// read ahead of the loop, with each market's row taken from a
+		// server-local Map. Reserves still land in a server-local binding
+		// (`priced`), still reach only a server function, and still never touch
+		// the card — which is the whole of what this guard protects.
+		expect(page).toContain("getMarketPricingAndReservesBatch(");
+		expect(page).toContain("priceByMarket.get(m.id) ?? null");
+		// …and passed to a SERVER function as an argument. ⚠ CACHE-KEY-1 changed
+		// WHICH function: reserves used to be the cached block's second argument
+		// (its cache KEY, which every bet busted); they now go to `valueHeroPosts`,
+		// a pure server helper that composes the hero's Đ figure outside the cache
+		// entirely. Matched whitespace-insensitively on purpose: pinning exact
+		// indentation here would make this guard fail on a Biome reformat, which
+		// is noise rather than a leak.
 		expect(page.replace(/\s+/g, " ")).toContain(
-			"getCachedMarketDiscoveryData( m.id, priced?.reserves ?? null, )",
+			"valueHeroPosts( data.topPosts, data.heroShares, priced?.reserves ?? null, )",
 		);
 		// …and NEVER onto the card that crosses the client boundary. `pricing`
 		// (a derived, public price) does ride the card; the raw reserves do not.
 		expect(page).not.toMatch(/reserves\s*[,:]\s*$/m);
 		expect(page).not.toContain("card.reserves");
 		expect(page).not.toContain("reserves: priced");
+	});
+
+	it("heroShares-never-reaches-the-client-boundary", () => {
+		// CACHE-KEY-1 — THE SECOND SERVER-LOCAL SIBLING, held to the same rule as
+		// `reserves` and for the same reason. Moving `currentValue` out of the
+		// cache meant the cached block had to return the SHARE COUNT the figure is
+		// computed from. A share quantity is an internal `lots` / `positions` row
+		// value (AGENTS.md §6); if it ever landed on `HeroPost` it would serialize
+		// into the RSC payload for every visitor, signed-out included, because
+		// `DiscoveryCarousel` is `"use client"`.
+		//
+		// The design keeps it structural — `heroShares` is a SIBLING of `topPosts`
+		// on `CachedMarketDiscoveryData`, so it cannot ride a post by accident —
+		// and this is the belt against someone later "simplifying" it onto one.
+		const list = read("src/server/discovery/list.ts");
+		const hero = read("src/server/discovery/hero.ts");
+
+		// GUARD IS ALIVE — the sibling really exists under this name.
+		expect(typeBlock(list, "CachedMarketDiscoveryData")).toContain(
+			"heroShares",
+		);
+		expect(hero).toContain("export type HeroPostShares");
+
+		// …and it is NOT a FIELD on the post type that crosses the boundary.
+		// ⚠ MATCHED AS A DECLARATION, NOT A SUBSTRING. `HeroPost`'s docblocks say
+		// "this post's shares" repeatedly while explaining what the figure means,
+		// so a bare `not.toContain("shares")` reddens on the prose that documents
+		// the rule — and the tempting fix for that is deleting the explanation.
+		expect(typeBlock(hero, "HeroPost")).not.toMatch(
+			/^\s*(heroShares|shares|betShares|heldQuantity)\s*[?:]/m,
+		);
+		// POSITIVE CONTROL — the same pattern, against the SAME block, does find a
+		// real declaration. So the negative above is not passing on a regex that
+		// matches nothing.
+		expect(typeBlock(hero, "HeroPost")).toMatch(/^\s*id\s*[?:]/m);
+		expect(
+			read("src/components/discovery/DiscoveryCarousel.tsx"),
+		).not.toContain("heroShares");
+		for (const file of [
+			"src/components/discovery/DiscoveryCarousel.tsx",
+			"src/components/discovery/DiscoveryGrid.tsx",
+			"src/components/discovery/MarketCard.tsx",
+			"src/components/discovery/HeroPanels.tsx",
+			"src/components/discovery/MarketThumb.tsx",
+		]) {
+			expect(read(file)).not.toContain("heroShares");
+		}
 	});
 });

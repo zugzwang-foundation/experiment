@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 
+import { getRequestSession } from "@/app/(public)/_lib/session";
 import { db } from "@/db";
+import { SHARED_VIEW_MIN_WINDOW_MS } from "@/server/config/limits";
 import {
 	composePostExport,
 	exportFilename,
@@ -10,8 +12,14 @@ import {
 	resolveExportImages,
 } from "@/server/debate-export/image/render";
 import { getCachedDebateView } from "@/server/debate-view/cached-view";
+import { loadDebateView } from "@/server/debate-view/load-debate-view";
 import { getMarketPricingAndReserves } from "@/server/debate-view/market-pricing";
 import { resolvePostParam } from "@/server/debate-view/resolve-post-param";
+import {
+	loadViewerLatestCommentAt,
+	postedWithinWindow,
+} from "@/server/debate-view/viewer-freshness";
+import { getCachedReserveWalk } from "@/server/discovery/cached-series";
 import { getDefaultMarketMediaUrl } from "@/server/discovery/media";
 import { withLiveTail } from "@/server/discovery/price-series";
 import { getMarketBySlug } from "@/server/markets/get-by-slug";
@@ -51,9 +59,39 @@ export async function GET(
 		notFound();
 	}
 
+	// CACHE-KEY-1 (ADR-0051) — THE SAME POSTER BYPASS `m/[slug]/page.tsx` TAKES,
+	// and it is here because the alternative is a 404 on the author's own post.
+	//
+	// The download affordance lives on a post's card, so an author who has just
+	// posted can reach this route within seconds. `resolvePostParam` reads the
+	// database directly and resolves the ordinal fine — but `composePostExport`
+	// then looks the id up in the MODEL, and a windowed cache entry minted before
+	// the post does not contain it, so the route would `notFound()` a post the
+	// author is looking at. Reading uncached for a viewer who posted inside the
+	// last window is the same bounded, signed-in-only branch the page takes; see
+	// `viewer-freshness.ts` for why the bypass exists at all.
+	const session = await getRequestSession();
+	const viewerPostedAt =
+		session?.user?.id !== undefined
+			? await loadViewerLatestCommentAt(db, {
+					userId: session.user.id,
+					marketId: market.id,
+				})
+			: null;
+	const readsUncached = postedWithinWindow(
+		viewerPostedAt,
+		Date.now(),
+		SHARED_VIEW_MIN_WINDOW_MS,
+	);
+
 	const priced = await getMarketPricingAndReserves(db, market.id);
 	const [cached, thumbUrl] = await Promise.all([
-		getCachedDebateView(market, priced?.reserves ?? null),
+		readsUncached
+			? loadDebateView(db, {
+					market,
+					walk: await getCachedReserveWalk(market.id),
+				})
+			: getCachedDebateView(market),
 		// The Discovery card's thumbnail — the `is_default` media row — not the
 		// debate page's secondary media panel image the view model carries.
 		getDefaultMarketMediaUrl(db, market.id),

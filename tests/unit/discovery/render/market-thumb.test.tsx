@@ -287,16 +287,29 @@ describe("PRIMITIVES-2 D2/D3 — the three Discovery image sites degrade a 404",
  * captured. The hero POST image's `alt=""` is unchanged and was captured as-is.
  */
 
-/** `MarketCard`'s 52×52 thumb — first child of the `items-center` row. */
+/**
+ * `MarketCard`'s 52×52 thumb — first child of the `items-center` row.
+ *
+ * ⚠ RE-POINTED AT P3.1 — `loading="lazy" decoding="async"` added ahead of
+ * `src` on `MarketThumb`'s `<img>` (native lazy-load hint; the signed-URL
+ * constraint rules out `next/image`, not a plain attribute). Position
+ * measured from React's actual output, not guessed from JSX declaration
+ * order — the two do not match here.
+ */
 const CARD_THUMB_LOADED =
-	'<img alt="" class="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover" src="https://signed.test/market-media/m/x/card.webp">';
+	'<img alt="" class="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover" loading="lazy" decoding="async" src="https://signed.test/market-media/m/x/card.webp">';
 /** 178 bytes as captured. */
 const CARD_THUMB_NULL =
 	'<div aria-hidden="true" class="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4">IMG</div>';
 
-/** `HeroPanels`' 54×54 thumb — first child of the `items-center` row. */
+/**
+ * `HeroPanels`' 54×54 thumb — first child of the `items-center` row.
+ *
+ * ⚠ RE-POINTED AT P3.1 — same `loading`/`decoding` addition as
+ * `CARD_THUMB_LOADED` above, same reason.
+ */
 const HERO_THUMB_LOADED =
-	'<img alt="" class="h-[54px] w-[54px] shrink-0 rounded-[var(--imgr)] object-cover" src="https://signed.test/market-media/m/x/card.webp">';
+	'<img alt="" class="h-[54px] w-[54px] shrink-0 rounded-[var(--imgr)] object-cover" loading="lazy" decoding="async" src="https://signed.test/market-media/m/x/card.webp">';
 /** 178 bytes as captured. */
 const HERO_THUMB_NULL =
 	'<div aria-hidden="true" class="flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4">IMG</div>';
@@ -344,8 +357,10 @@ const HERO_THUMB_NULL =
  * inset-0`, radius, hairline) is still byte-identical across both arms, which
  * is the property that note was protecting.
  */
+// ⚠ RE-POINTED AT P3.1 — same `loading`/`decoding` addition, same reason as
+// the two market thumbs above.
 const POST_IMAGE_LOADED = (side: "YES" | "NO") =>
-	`<img data-testid="hero-post-image-${side}" alt="" class="absolute inset-0 h-full w-full rounded-[var(--imgr)] object-contain [border:var(--hairline)]" src="https://signed.test/uploads/u/x/arg.webp">`;
+	`<img data-testid="hero-post-image-${side}" alt="" class="absolute inset-0 h-full w-full rounded-[var(--imgr)] object-contain [border:var(--hairline)]" loading="lazy" decoding="async" src="https://signed.test/uploads/u/x/arg.webp">`;
 const POST_IMAGE_NULL = (side: "YES" | "NO") =>
 	`<div data-testid="hero-post-image-empty-${side}" aria-hidden="true" class="absolute inset-0 flex items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[9px] tracking-[0.18em] text-n4 [border:var(--hairline)]">IMG</div>`;
 

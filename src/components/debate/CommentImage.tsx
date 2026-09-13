@@ -74,9 +74,11 @@ export function CommentImage({
 					: "block w-fit"
 			}
 		>
-			{/* biome-ignore lint/performance/noImgElement: a short-TTL presigned R2
-			    GET URL (D9), not a static asset — next/image optimization would
-			    proxy a 3600s-expiring URL; plain <img> is the plan's choice (§4). */}
+			{/* P3.1 — `loading="lazy"` + `decoding="async"` below: a native
+			    lazy-load hint, same rationale as MarketThumb's — the presigned-URL
+			    constraint (next comment) rules out next/image, not a plain
+			    attribute. Defers the fetch for an off-screen comment image until
+			    it nears the viewport. */}
 			{/* T2 (§17 H-T2, RULED 2026-08-13) — ASPECT-RESPECTING WITHIN A MAX BOX.
 			    BOTH axes are BOUNDS, never fixed sizes: `--imgmax` on HEIGHT and
 			    100% on WIDTH. With two max-* bounds and no fixed dimension the
@@ -100,12 +102,17 @@ export function CommentImage({
 			    itself sized by this image. The parent stays `w-fit` and shrinks around
 			    the height-bounded image. (Corrected post-review: the call was right and
 			    its stated cause was not — `O-3`.) */}
+			{/* biome-ignore lint/performance/noImgElement: a short-TTL presigned R2
+			    GET URL (D9), not a static asset — next/image optimization would
+			    proxy a 3600s-expiring URL; plain <img> is the plan's choice (§4). */}
 			<img
 				src={url}
 				alt="Argument attachment"
 				className={`max-w-full object-contain rounded-[var(--imgr)] [border:var(--hairline)] ${
 					className ?? (fill ? "max-h-full" : "max-h-[var(--imgmax)]")
 				}`}
+				loading="lazy"
+				decoding="async"
 			/>
 		</button>
 	);

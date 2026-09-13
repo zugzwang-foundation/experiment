@@ -59,11 +59,13 @@ describe("debate-view::price-chart-series-memo-holds-no-viewer-state", () => {
 	it("takes exactly one parameter, and it is a market id", () => {
 		// The strongest form of the guarantee, and the reason this function is a
 		// SIBLING of the two cached blocks rather than a line inside one of them.
-		// `getCachedDebateView` takes a whole `market` object and
-		// `getCachedMarketDiscoveryData` takes `reserves`; each has to argue that
-		// what it is handed carries nothing viewer-scoped. This one cannot be
-		// handed anything else — there is no parameter to smuggle a session
-		// through, so the property holds by construction and not by review.
+		// `getCachedDebateView` takes a whole `market` object; each sibling has to
+		// argue that what it is handed carries nothing viewer-scoped. This one
+		// cannot be handed anything else — there is no parameter to smuggle a
+		// session through, so the property holds by construction and not by
+		// review. ⚠ This comment also named `getCachedMarketDiscoveryData` as
+		// taking `reserves`; CACHE-KEY-1 (ADR-0051) removed that parameter, so
+		// that block now has this same one-argument shape.
 		const signature =
 			code(MODULE).match(
 				/export async function getCachedReserveWalk\([\s\S]*?\)\s*:\s*Promise<WireReservePoint\[\]>/,
@@ -108,11 +110,17 @@ describe("debate-view::price-chart-series-memo-holds-no-viewer-state", () => {
 
 	it("keys the cache on the market id alone — never on reserves", () => {
 		// ⛔ THE POINT OF THE WHOLE MECHANISM. A `'use cache'` key is the
-		// serialized argument list. The two blocks that wrap these surfaces key on
-		// `reserves`, which every bet moves — so every bet forces every reader to
-		// re-derive. Keying on identity is what lets the window coalesce fifty
-		// bets into one derivation. If `reserves` ever appears in this signature,
-		// the window silently stops working while every other test stays green.
+		// serialized argument list, so `reserves` in a key means every bet forces
+		// every reader to re-derive. Keying on identity is what lets the window
+		// coalesce fifty bets into one derivation. If `reserves` ever appears in
+		// this signature, the window silently stops working while every other test
+		// stays green.
+		//
+		// ⚠ THIS FILE USED TO CITE THE TWO BLOCKS AROUND THIS ONE AS THE LIVE
+		// COUNTER-EXAMPLE — "the two blocks that wrap these surfaces key on
+		// `reserves`" — AND CACHE-KEY-1 MADE THAT FALSE BY FIXING THEM (ADR-0051).
+		// Both are keyed on identity plus a window now. The argument is unchanged
+		// and is now general; only the example it cited is gone.
 		const source = code(MODULE);
 		expect(source).not.toMatch(/getCachedReserveWalk\([^)]*reserves/);
 		expect(source).not.toContain("getMarketPricingAndReserves");
@@ -152,6 +160,17 @@ describe("debate-view::price-chart-series-memo-holds-no-viewer-state", () => {
 		// series reverts to per-bet recomputation — the chart stays CORRECT, so no
 		// behavioural test anywhere would notice, and the entire cost argument for
 		// CHART-1 would be gone silently. This is the tripwire for that.
+		//
+		// ⛔ IT NOW GUARDS THREE WINDOWS, NOT ONE (CACHE-KEY-1, ADR-0051). When it
+		// was written, the two blocks around this series were keyed on `reserves`
+		// and already re-derived on every bet, so this tripwire protected the walk
+		// alone. Both are windowed now, which makes "fire a tag when a bet
+		// commits" the obvious-looking fix for the poster-visibility problem —
+		// and it is the wrong one: every comment rides a bet (**INV-1**), so it
+		// would invalidate exactly as often as the `reserves` key used to, for
+		// more code. The poster is handled by a page-level bypass instead
+		// (`viewer-freshness.ts`). This assertion is what stops that mistake from
+		// landing quietly.
 		for (const file of [
 			"src/server/bets/place.ts",
 			"src/server/bets/sell.ts",
