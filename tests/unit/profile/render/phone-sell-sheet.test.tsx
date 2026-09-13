@@ -98,6 +98,27 @@ describe("MOBILE-2e — the phone sell sheet", () => {
 		).toEqual(["phone-sheet-close"]);
 	});
 
+	it("phone-sell::NEITHER-title-block-is-unbounded", () => {
+		// ⛔ The class `@security-auditor` named at MOBILE-2d and left live: an
+		// unbounded participant-or-operator string in a title block on a BOUNDED
+		// shell is a denial of view. The debate side is safe by a server-side cap
+		// on its teaser; the profile's market question has none, so both blocks
+		// clamp here. ⚠ jsdom performs no layout, so what this can check is the
+		// DECLARATION, which is what a later edit would drop.
+		mount({
+			argumentTitle: "x".repeat(4000),
+			marketTitle: "y".repeat(4000),
+		});
+		const body = screen.getByTestId("phone-sheet-body");
+		const clamped = [...body.querySelectorAll("span")].filter((el) =>
+			el.className.split(/\s+/).some((c) => c.startsWith("line-clamp-")),
+		);
+		expect(
+			clamped.length,
+			"the argument title and the market question must BOTH clamp",
+		).toBe(2);
+	});
+
 	it("phone-sell::it-says-CURRENT-and-not-a-phrase-invented-for-this-sheet", () => {
 		mount();
 		// `Current` is the Open tab's own `<th>`, byte-for-byte — the column head

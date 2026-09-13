@@ -90,7 +90,17 @@ export function PhoneSellSheet(props: {
 					<span className="line-clamp-2 text-[15px] leading-[1.35] font-bold text-ink">
 						{props.argumentTitle}
 					</span>
-					<span className="text-[11px] leading-[1.35] font-semibold text-n5">
+					{/* ⛔ CLAMPED, because an unbounded string in a title block on a
+					    BOUNDED shell is a denial of view — the class `@security-auditor`
+					    named at MOBILE-2d and left live. The debate side is safe by a
+					    server-side 125-character cap on its teaser; this text comes from
+					    the PROFILE's read model, which has no such cap, and a market
+					    question long enough to fill the sheet would push `Confirm` below
+					    the fold on the one surface where the reader has already decided
+					    to act. Two lines here rather than the row's one: the sheet has
+					    the width, and the question is the thing telling the reader WHICH
+					    of five positions this is. */}
+					<span className="line-clamp-2 text-[11px] leading-[1.35] font-semibold text-n5">
 						{props.marketTitle}
 					</span>
 				</div>
