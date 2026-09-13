@@ -54,6 +54,7 @@ const CACHED = "src/server/debate-view/cached-view.ts";
 const LOADER = "src/server/debate-view/load-debate-view.ts";
 const PAGE = "src/app/(public)/m/[slug]/page.tsx";
 const EXPORT_ROUTE = "src/app/(public)/m/[slug]/export/route.ts";
+const IMAGE_ROUTE = "src/app/(public)/m/[slug]/export/image/route.ts";
 const SESSION = "src/app/(public)/_lib/session.ts";
 
 describe("Phase D — the comment stripper itself", () => {
@@ -99,23 +100,40 @@ describe("Phase D — the cached debate block", () => {
 		expect(read(SESSION)).toContain("export const getRequestSession");
 	});
 
-	it("carries the directive and an EXPLICIT cacheLife", () => {
+	it("carries the directive and an EXPLICIT, CONSTANT-BOUND cacheLife", () => {
 		const src = read(CACHED);
 		expect(src).toContain('"use cache"');
 		// Explicit at the call site — never left to inherit the default profile.
-		expect(src).toMatch(/cacheLife\(\s*["']minutes["']\s*\)/);
+		// ⚠ THE NAMED `"minutes"` PROFILE IS GONE AS OF CACHE-KEY-1 (ADR-0051).
+		// It was adequate while the KEY did the invalidating; now the clock is the
+		// only thing bounding staleness, so the window is stated explicitly and
+		// bound to `SHARED_VIEW_MIN_WINDOW_MS` rather than to a vendor profile
+		// whose value could move under us.
+		expect(src).toMatch(/cacheLife\(\s*\{/);
+		expect(src).toContain("SHARED_VIEW_MIN_WINDOW_MS / 1000");
+		expect(src).toContain("SHARED_VIEW_EXPIRE_SEC");
+		// No naked seconds: the tune stays a one-line change at `limits.ts`.
+		expect(src).not.toMatch(/cacheLife\(\s*\{[^}]*:\s*\d/);
 		// Tagged per market, so `admin/moderation/act.ts`'s
 		// `revalidateTag(`market:${id}`)` reaches it on content removal.
 		expect(src).toMatch(/cacheTag\(\s*`market:\$\{market\.id\}`\s*\)/);
 	});
 
-	it("takes reserves as a PARAMETER and never fetches them itself", () => {
-		// The whole reserves-keying mechanism depends on `reserves` being a value
-		// the CALLER observed live this request. A function that re-read reserves
-		// internally would let a stale value hide behind a cache key the caller
-		// never actually saw — the key would look fresh while the data was not.
+	it("takes NO reserves, and still never fetches them itself", () => {
+		// ⛔⛔ THE POLARITY OF THIS TEST IS REVERSED AT CACHE-KEY-1, AND THE OLD
+		// VERSION IS WHY. It asserted `reserves: Reserves | null` in the signature
+		// and explained that "the whole reserves-keying mechanism depends on
+		// `reserves` being a value the CALLER observed live". The mechanism was
+		// real and the guarantee it bought was real — and its price was that a
+		// `'use cache'` key IS its argument list, so every bet moved the pool,
+		// changed the key, and forced a full miss for every reader of that market.
+		// A test enforcing that shape was holding the defect in place.
+		//
+		// Both halves are pinned now: the parameter is gone, and no pool read may
+		// appear inside the body — which matters MORE than it did, because a read
+		// inside the window would now be cached rather than merely mis-keyed.
 		const src = read(CACHED);
-		expect(src).toMatch(/reserves:\s*Reserves\s*\|\s*null/);
+		expect(src).not.toMatch(/reserves:\s*Reserves/);
 		expect(src).not.toContain("getMarketPricingAndReserves");
 		expect(src).not.toContain("getMarketPricingAndUnitToWin");
 	});
@@ -150,16 +168,96 @@ describe("Phase D — the cached debate block", () => {
 		expect(found).toEqual([]);
 	});
 
-	it("its only argument surface is the market and its reserves", () => {
+	it("its only argument surface is the market", () => {
 		// Belt to the scan above, from the other direction: the signature itself
-		// admits exactly two inputs, both viewer-independent.
+		// admits exactly ONE input, and it is viewer-independent.
+		//
+		// ⚠ THIS IS A STRONGER GUARANTEE THAN IT WAS, not a weaker one. Two
+		// arguments meant two things to argue about; one market id is the same
+		// shape `getCachedReserveWalk` has, whose own contract test calls that
+		// "the property holds by construction and not by review".
 		const src = read(CACHED);
 		const sig = src.slice(
 			src.indexOf("export async function getCachedDebateView("),
 			src.indexOf("): Promise<DebateViewModel>"),
 		);
 		expect(sig).toContain("market: MarketSummary");
-		expect(sig).toContain("reserves: Reserves | null");
+		expect(sig.split(",").filter((p) => p.includes(":"))).toHaveLength(1);
+	});
+});
+
+/**
+ * CACHE-KEY-1 (ADR-0051) — THE POSTER'S OWN ARGUMENT.
+ *
+ * Removing `reserves` from the key removed something nobody had written down:
+ * because every comment rides a bet (**INV-1**), posting moved the pool, busted
+ * the author's own entry, and their `router.refresh()` came back carrying their
+ * comment. Under a window it does not — and it fails SILENTLY, because
+ * `DebateView`'s `landed` still fires on the freshly deserialized payload while
+ * `findPostedNode` searches a model that lacks the comment and returns `null`.
+ *
+ * These pin the replacement: a bounded, signed-in-only, page-level bypass.
+ */
+describe("CACHE-KEY-1 — the poster bypass", () => {
+	const FRESHNESS = "src/server/debate-view/viewer-freshness.ts";
+
+	it("guard-is-alive", () => {
+		expect(read(FRESHNESS)).toContain(
+			"export async function loadViewerLatestCommentAt(",
+		);
+		expect(read(FRESHNESS)).toContain("export function postedWithinWindow(");
+	});
+
+	it("reads a timestamp and NEVER a body — SC-1 has nothing to mask here", () => {
+		// CLAUDE.md §5.14 SC-1 fires on any PR that adds a read over `comments`.
+		// This one selects `created_at` alone, so there is no body to withhold —
+		// which is a stronger position than masking correctly, and is pinned so a
+		// later "while we're here, return the comment too" is a red test rather
+		// than a masking bypass on a brand-new read path.
+		const src = read(FRESHNESS);
+		expect(src).toContain("comments.createdAt");
+		expect(src).not.toContain("comments.body");
+		expect(src).not.toContain("deriveTitleTeaser");
+	});
+
+	it("the page bypasses the CACHE, never smuggles a viewer INTO it", () => {
+		const src = read(PAGE);
+		// The viewer-scoped read is on the page…
+		expect(src).toContain("loadViewerLatestCommentAt(db, {");
+		expect(src).toContain("postedWithinWindow(");
+		// …and the branch picks between two functions rather than parameterising
+		// one. ⛔ This is the whole reason the ⛔ block in `cached-view.ts` still
+		// holds: the choice is made OUTSIDE the cached boundary.
+		expect(src).toContain("? await loadDebateView(db, {");
+		expect(src).toContain(": await getCachedDebateView(market)");
+		// The cached call takes the market and nothing else.
+		expect(src).not.toMatch(/getCachedDebateView\([^)]*reserves/);
+	});
+
+	it("the bypass passes the CACHED walk through, so history is not re-derived", () => {
+		// Omitting `walk` makes `deriveMarketPriceChart` replay the reserve series
+		// itself — three statements, on the one path taken by the person who is
+		// already waiting. `getCachedReserveWalk` is keyed on the market id alone,
+		// so it is unaffected by this branch and hits either way.
+		expect(read(PAGE)).toMatch(
+			/loadDebateView\(db,\s*\{\s*market,\s*walk:\s*await getCachedReserveWalk\(market\.id\),\s*\}\)/,
+		);
+	});
+
+	it("the image-export route takes the SAME bypass", () => {
+		// Otherwise an author who has just posted, and can SEE their card because
+		// the page bypassed, gets a 404 downloading it: `resolvePostParam` resolves
+		// the ordinal from the database, then `composePostExport` fails to find the
+		// id in a cached model minted before the post existed.
+		const src = read(IMAGE_ROUTE);
+		expect(src).toContain("postedWithinWindow(");
+		expect(src).toContain(": getCachedDebateView(market)");
+	});
+
+	it("the window is the shared constant, never a literal", () => {
+		for (const rel of [PAGE, IMAGE_ROUTE]) {
+			expect(read(rel)).toContain("SHARED_VIEW_MIN_WINDOW_MS");
+		}
 	});
 });
 
@@ -186,11 +284,20 @@ describe("Phase D — the page keeps price live", () => {
 	it("pricing comes from the live read, and the page itself is uncached", () => {
 		const src = read(PAGE);
 		// The live pool read happens on the page, per request, before the cached
-		// call — its `reserves` are what key the cache.
+		// call.
+		//
+		// ⛔ IT IS NO LONGER THE CACHE KEY, AND THAT MAKES THE OVERRIDE BELOW
+		// LOAD-BEARING RATHER THAN BELT-AND-BRACES. This assertion used to also
+		// pin `getCachedDebateView(market, priced?.reserves ?? null)` and this
+		// comment used to end "its `reserves` are what key the cache". At
+		// CACHE-KEY-1 the key became the market plus a window, so cache-key
+		// equality proves nothing about price any more — and the ONLY thing
+		// keeping the rendered price fresh is the explicit assignment two
+		// assertions down. ADR-0041 D-2 added that override so the guarantee would
+		// not rest on reasoning nobody reading the file can see; this is the day
+		// that foresight paid.
 		expect(src).toContain("getMarketPricingAndReserves(db, market.id)");
-		expect(src).toMatch(
-			/getCachedDebateView\(\s*market,\s*priced\?\.reserves\s*\?\?\s*null,?\s*\)/,
-		);
+		expect(src).toContain("getCachedDebateView(market)");
 		// Gate C fix — the cached call's OWN internal pricing/unitToWin no
 		// longer reach the render unexamined: the page explicitly overrides
 		// them with the SAME live read that keyed the cache, so the guarantee

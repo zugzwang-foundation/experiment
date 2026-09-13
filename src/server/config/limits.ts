@@ -274,16 +274,76 @@ export const MARKET_SERIES_MAX_POINTS = 256;
  * inequality is the whole design rather than an oversight. The window exists to
  * COALESCE, not to tolerate staleness: fifty bets in thirty seconds become one
  * derivation instead of fifty, so a busy market's cost stops scaling with how
- * busy it is. Keying invalidation on the pool instead — which is what the
- * surrounding `'use cache'` blocks do, since they key on `reserves` — performs
- * WORST exactly when load is highest, because every bet busts every reader's
- * entry. That is why this series is keyed on market identity alone.
+ * busy it is. Keying invalidation on the POOL instead performs WORST exactly
+ * when load is highest, because every bet busts every reader's entry. That is
+ * why this series is keyed on market identity alone.
+ *
+ * ⚠ THE SENTENCE ABOVE USED TO NAME THE SURROUNDING `'use cache'` BLOCKS AS THE
+ * COUNTER-EXAMPLE — *"which is what they do, since they key on `reserves`"* —
+ * and CACHE-KEY-1 made that false by fixing them. `getCachedDebateView` and
+ * `getCachedMarketDiscoveryData` now key on identity and window on
+ * `SHARED_VIEW_MIN_WINDOW_MS` below. The argument is unchanged and is now
+ * general; only the example it cited is gone. Corrected in place rather than
+ * appended to (**O-5**).
  *
  * A pinned DESIGN value, not a tuned economy value — contrast the poll interval
  * above, which is explicitly provisional. Read from this constant at every call
  * site and never inlined, so the HARDEN.6 tune stays a one-line change. Integer
  * (milliseconds, not Dharma). */
 export const MARKET_SERIES_MIN_WINDOW_MS = 60000;
+
+/**
+ * Minimum interval between derivations of a market's SHARED READ BLOCK — the
+ * debate view's comments/ranking/replies/totals (`getCachedDebateView`) and
+ * Discovery's per-market totals/media/series/top-posts
+ * (`getCachedMarketDiscoveryData`). Within the window a derivation is REUSED
+ * (SPEC.1 §9 *Refresh*; CACHE-KEY-1, ADR-0051).
+ *
+ * ⛔ IT EXISTS BECAUSE THE THING IT REPLACED WAS NOT A WINDOW AT ALL. Both
+ * blocks used to key on `reserves`, and a `'use cache'` key is its serialized
+ * argument list — so every bet moved the pool, changed the key, and forced a
+ * full miss for every reader. The cache worked on quiet markets and stopped
+ * working entirely on the market everyone was betting on. Keying on identity
+ * plus a clock is what lets the window COALESCE.
+ *
+ * ⚠ SHORTER THAN `MARKET_SERIES_MIN_WINDOW_MS` (60000), DELIBERATELY, and the
+ * two are not the same kind of thing. That one floors a price HISTORY — a
+ * picture of the past, legitimately allowed to be a minute old, with its live
+ * right edge recomposed outside the boundary anyway. This one floors
+ * ARGUMENTS, which are the product: a reader waiting a minute to see that
+ * someone answered them is a different cost entirely.
+ *
+ * ⚠ EQUAL TO `POLL_INTERVAL_MS_DEBATE_VIEW` (15000) BUT NOT DERIVED FROM IT.
+ * Two independent tunables that happen to agree today — the
+ * `HEADER_PORTFOLIO_CACHE_TTL_SECONDS` precedent below, which matches the same
+ * number for the same reason and likewise keeps its own constant. Deriving one
+ * from the other would silently couple a cache window to a client cadence, so
+ * that retuning the poll retunes freshness for every reader of every market.
+ *
+ * ⛔ IT IS NOT WHAT MAKES A POSTER SEE THEIR OWN ARGUMENT. Every comment rides
+ * a bet (INV-1), so before CACHE-KEY-1 posting moved the pool, busted the key,
+ * and the author's own refresh carried their comment back — accidentally, and
+ * nowhere written down. A window has no such side effect, so `/m/[slug]`
+ * BYPASSES this cache for a viewer who posted inside the last window
+ * (`viewer-freshness.ts`). Shortening this constant is therefore not a way to
+ * improve that case, and lengthening it does not harm it.
+ *
+ * Read from this constant at every call site and never inlined, so the tune
+ * stays a one-line change. Integer (milliseconds, not Dharma). */
+export const SHARED_VIEW_MIN_WINDOW_MS = 15000;
+
+/**
+ * The outer bound on serving a `SHARED_VIEW_MIN_WINDOW_MS` entry STALE while a
+ * revalidation is in flight — `cacheLife`'s `expire`, in the seconds it speaks.
+ *
+ * ⚠ DELIBERATELY NOT `cached-series.ts`'s `WINDOW × 60` RATIO. That sibling
+ * caches history and can afford an hour's ceiling; reusing the ratio here would
+ * give a 15 s window a 900 s ceiling, so a debate feed in a low-traffic lull
+ * could serve fifteen minutes stale. Pinned instead to
+ * `MARKET_SERIES_MIN_WINDOW_MS` — one minute, the bound already ratified for
+ * this surface's chart — so no shared block is ever older than the oldest thing
+ * rendered beside it. Seconds, not milliseconds: `cacheLife` takes seconds. */
+export const SHARED_VIEW_EXPIRE_SEC = MARKET_SERIES_MIN_WINDOW_MS / 1000;
 
 // === CHART-3: the fixed experiment window (SPEC.1 1.0.48 §9 + §16.1) ======
 

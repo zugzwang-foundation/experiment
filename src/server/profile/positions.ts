@@ -298,80 +298,101 @@ export async function loadProfilePositions(
 	}
 	const marketIdList = [...positionByMarket.keys()];
 
-	// Net Σ payout per (user, market) — the settled-row `current` (OQ-9 A); its
-	// presence for a held market is the Open-vs-Closed settled discriminant.
-	const payoutRows = await client
-		.select({ marketId: payoutEvents.marketId, amount: payoutEvents.amount })
-		.from(payoutEvents)
-		.where(
-			and(
-				eq(payoutEvents.userId, userId),
-				inArray(payoutEvents.marketId, marketIdList),
+	// T-11 — THESE THREE READS ARE ISSUED TOGETHER, NOT ONE AFTER ANOTHER.
+	// Each depends only on `userId` and `marketIdList`, both settled above, and
+	// none consumes another's result — they were sequential by habit rather than
+	// by data dependency, so a profile with holdings in N markets paid three
+	// round trips where one wave does. The statement COUNT is unchanged (same
+	// three queries, same predicates); only the waiting is shared, so any
+	// statement-count budget guard reads exactly as before.
+	//
+	// ⚠ `Promise.all` rather than starting them and awaiting individually: if one
+	// rejects, the others are still awaited here, so a failure cannot leave a
+	// pending promise behind as an unhandled rejection. The function throws on a
+	// read failure exactly as it did before.
+	const [payoutRows, marketRows, poolRows] = await Promise.all([
+		// Net Σ payout per (user, market) — the settled-row `current` (OQ-9 A); its
+		// presence for a held market is the Open-vs-Closed settled discriminant.
+		client
+			.select({ marketId: payoutEvents.marketId, amount: payoutEvents.amount })
+			.from(payoutEvents)
+			.where(
+				and(
+					eq(payoutEvents.userId, userId),
+					inArray(payoutEvents.marketId, marketIdList),
+				),
 			),
-		);
+		client
+			.select({
+				id: markets.id,
+				slug: markets.slug,
+				title: markets.title,
+				status: markets.status,
+			})
+			.from(markets)
+			.where(inArray(markets.id, marketIdList)),
+		client
+			.select({
+				marketId: pools.marketId,
+				yesReserves: pools.yesReserves,
+				noReserves: pools.noReserves,
+			})
+			.from(pools)
+			.where(inArray(pools.marketId, marketIdList)),
+	]);
+
 	const settledNet = new Map<string, InstanceType<typeof CpmmDecimal>>();
 	for (const r of payoutRows) {
 		const prior = settledNet.get(r.marketId) ?? new CpmmDecimal(0);
 		settledNet.set(r.marketId, prior.plus(r.amount));
 	}
-
-	const marketRows = await client
-		.select({
-			id: markets.id,
-			slug: markets.slug,
-			title: markets.title,
-			status: markets.status,
-		})
-		.from(markets)
-		.where(inArray(markets.id, marketIdList));
 	const marketById = new Map(marketRows.map((m) => [m.id, m]));
-
-	const poolRows = await client
-		.select({
-			marketId: pools.marketId,
-			yesReserves: pools.yesReserves,
-			noReserves: pools.noReserves,
-		})
-		.from(pools)
-		.where(inArray(pools.marketId, marketIdList));
 	const poolByMarket = new Map(poolRows.map((p) => [p.marketId, p]));
 
-	// The user's buys across the relevant markets (episode + opener substrate).
-	const userBets = await client
-		.select({
-			id: bets.id,
-			marketId: bets.marketId,
-			side: bets.side,
-			stake: bets.stake,
-			shareQuantity: bets.shareQuantity,
-			commentId: bets.commentId,
-			createdAt: bets.createdAt,
-		})
-		.from(bets)
-		.where(and(eq(bets.userId, userId), inArray(bets.marketId, marketIdList)));
+	// T-11 — the buy and sell substrates, likewise issued together. Same
+	// argument as the three above: both read only `userId` / `marketIdList`,
+	// neither feeds the other, and the trade history cannot be assembled until
+	// both have landed anyway — so waiting for them in series bought nothing.
+	const [userBets, soldEvents] = await Promise.all([
+		// The user's buys across the relevant markets (episode + opener substrate).
+		client
+			.select({
+				id: bets.id,
+				marketId: bets.marketId,
+				side: bets.side,
+				stake: bets.stake,
+				shareQuantity: bets.shareQuantity,
+				commentId: bets.commentId,
+				createdAt: bets.createdAt,
+			})
+			.from(bets)
+			.where(
+				and(eq(bets.userId, userId), inArray(bets.marketId, marketIdList)),
+			),
+		// The user's sells ride the MARKET aggregate (`bet.sold`; no bets row) —
+		// `payload.userId` filtered app-side (no payload index; bounded per market).
+		client
+			.select({
+				payload: events.payload,
+				createdAt: events.createdAt,
+				eventId: events.eventId,
+			})
+			.from(events)
+			.where(
+				and(
+					eq(events.aggregateType, "market"),
+					inArray(events.aggregateId, marketIdList),
+					eq(events.eventType, "bet.sold"),
+				),
+			),
+	]);
+
 	const betsByMarket = new Map<string, BetRow[]>();
 	for (const b of userBets) {
 		const list = betsByMarket.get(b.marketId) ?? [];
 		list.push(b);
 		betsByMarket.set(b.marketId, list);
 	}
-
-	// The user's sells ride the MARKET aggregate (`bet.sold`; no bets row) —
-	// `payload.userId` filtered app-side (no payload index; bounded per market).
-	const soldEvents = await client
-		.select({
-			payload: events.payload,
-			createdAt: events.createdAt,
-			eventId: events.eventId,
-		})
-		.from(events)
-		.where(
-			and(
-				eq(events.aggregateType, "market"),
-				inArray(events.aggregateId, marketIdList),
-				eq(events.eventType, "bet.sold"),
-			),
-		);
 	const sellsByMarket = new Map<string, SellTrade[]>();
 	for (const ev of soldEvents) {
 		const payload = eventPayloadSchemas["bet.sold"].parse(ev.payload);
@@ -389,19 +410,32 @@ export async function loadProfilePositions(
 		sellsByMarket.set(payload.marketId, list);
 	}
 
-	// All comments in the relevant markets — the §9 ordinal domain (top-level,
-	// removed INCLUDED) + the opener/parent body lookups.
-	const marketComments = await client
-		.select({
-			id: comments.id,
-			marketId: comments.marketId,
-			parentCommentId: comments.parentCommentId,
-			body: comments.body,
-			createdAt: comments.createdAt,
-		})
-		.from(comments)
-		.where(inArray(comments.marketId, marketIdList))
-		.orderBy(asc(comments.createdAt), asc(comments.id));
+	// T-11 — the comment domain and the lot basis, the last pair that reads only
+	// `userId` / `marketIdList`. `lotBasis` used to sit four statements further
+	// down, awaited on its own after the ordinal walk had already finished; it
+	// never depended on that walk, so it is started here with the comments read
+	// and simply used where it always was.
+	const [marketComments, lotBasis] = await Promise.all([
+		// All comments in the relevant markets — the §9 ordinal domain (top-level,
+		// removed INCLUDED) + the opener/parent body lookups.
+		client
+			.select({
+				id: comments.id,
+				marketId: comments.marketId,
+				parentCommentId: comments.parentCommentId,
+				body: comments.body,
+				createdAt: comments.createdAt,
+			})
+			.from(comments)
+			.where(inArray(comments.marketId, marketIdList))
+			.orderBy(asc(comments.createdAt), asc(comments.id)),
+		// Đa — Σ surviving lot basis (LOTS-1 / ADR-0039 D-4). The `episodes.ts`
+		// walk is NO LONGER the basis authority; it keeps only the opener job.
+		loadLotBasis(client, {
+			userIds: [userId],
+			marketIds: marketIdList,
+		}),
+	]);
 	const commentById = new Map(marketComments.map((c) => [c.id, c]));
 	// §9 ordinal: 1-based rank by (created_at, id) over TOP-LEVEL comments,
 	// removed included — the array is already in that order.
@@ -415,13 +449,8 @@ export async function loadProfilePositions(
 		}
 	}
 
-	// Đa — Σ surviving lot basis (LOTS-1 / ADR-0039 D-4). The `episodes.ts` walk
-	// is NO LONGER the basis authority; it keeps only the job below, which lots
-	// cannot do (the episode OPENER).
-	const lotBasis = await loadLotBasis(client, {
-		userIds: [userId],
-		marketIds: marketIdList,
-	});
+	// `lotBasis` is already in hand — started alongside the comments read above,
+	// since it never depended on the ordinal walk that used to precede it.
 
 	// Walk each relevant market's episodes ONCE; the current episode's opener is
 	// the N-1a argument-cell substrate + the masking candidate. This is the walk's

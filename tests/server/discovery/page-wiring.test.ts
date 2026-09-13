@@ -57,6 +57,22 @@ vi.mock("next/cache", () => ({
 	cacheLife: vi.fn(),
 }));
 
+// ⛔ THE CACHE COUNTERS ARE STUBBED BECAUSE THEY WERE REAL NETWORK IO, AND THAT
+// IS WHY THIS FILE TIMED OUT AT 10 s ON ITS OWN BRANCH. `DiscoveryContent`
+// calls `recordCacheAttempt` once for the listing and once PER MARKET, and the
+// shipped implementation `await`ed an Upstash REST round trip each time — so a
+// two-market fixture spent seconds of wall clock in the vendor, inside a suite
+// that touches no other network. CACHE-KEY-1 moved those writes behind
+// `next/server`'s `after()` so they no longer block a render; this mock is the
+// test-side half of the same finding, and it stays regardless, because a
+// read-model wiring suite must never depend on a third party being reachable.
+vi.mock("@/server/observability/cache-metrics", () => ({
+	recordCacheAttempt: vi.fn(),
+	recordCacheMiss: vi.fn(),
+	recordReserveWalkDerivation: vi.fn(),
+	recordInvalidation: vi.fn(),
+}));
+
 // RED import: the greenfield Slice-6 page under test (fails collection).
 import { DiscoveryContent } from "@/app/(public)/page";
 import {

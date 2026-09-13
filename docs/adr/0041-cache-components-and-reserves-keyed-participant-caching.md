@@ -8,7 +8,7 @@
 | **Tracker task** | S-4 (read-path collapse, Phases A–F) |
 | **Frame document** | SPEC.2 §4.3 (this ADR's same-commit rider, 1.0.26) · CLAUDE.md §5.14 SC-1 (masking is a property of every read over `comments.body`) · CLAUDE.md §3 (no live in-product K_eff surface — unaffected, noted for completeness) |
 | **Supersedes** | — |
-| **Superseded-by** | — |
+| **Superseded-by** | ADR-0051 (partial — **D-2 only**, the reserves-keyed cache key. D-1, D-3, D-4 and D-5 stand unchanged, and **OQ-1 is closed there**) |
 | **Amended-by** | ADR-0042 (D-6 only — does not supersede it; the 7200 s TTL stands, on a premise ADR-0042 restores. `D-6` is a decision *inside this ADR*, not decision-record D-6) |
 
 ---
@@ -56,6 +56,29 @@ This ADR does **not** decide:
 `next.config.ts`'s `cacheComponents: true` and the `"use cache"` directive on `getCachedDiscoveryMarketIds`, `getCachedMarketDiscoveryData` (`src/server/discovery/list.ts`), and `getCachedDebateView` (`src/server/debate-view/cached-view.ts`) are the shipped, ratified mechanism for the participant read-path cost reduction S-4 set out to achieve. `loadDebateView` and `listOpenMarkets`'s non-cached forms are unaffected in signature; the `.md` export (ADR-0025) continues to call `loadDebateView` directly and uncached, by design — a `'use cache'` directive was deliberately never placed on `loadDebateView` itself, exactly so the export could not silently inherit a cache it is contractually forbidden from having.
 
 ### D-2 · `reserves` as cache key — R3 v2, ratified
+
+> ⛔⛔ **SUPERSEDED BY ADR-0051 (2026-09-12). READ THIS SECTION AS HISTORY.** The
+> reasoning below is sound and the guarantee it describes was real; what it never
+> priced is what that guarantee cost. A `'use cache'` key is its argument list,
+> so keying on `reserves` meant **every bet forced a full miss for every reader of
+> that market** — the cache worked on quiet markets and stopped working entirely
+> on the market everyone was betting on. Both blocks are now keyed on market
+> identity plus a `SHARED_VIEW_MIN_WINDOW_MS` window, and R3's real property — a
+> rendered Đ figure is never computed from stale reserves — is held by the
+> explicit per-call-site override described at the end of this section, plus
+> moving `topPosts[].currentValue` outside the cache entirely.
+>
+> ⚠ **The last paragraph of this section is the part that aged best**, and it is
+> worth reading with that in mind: the override it describes was added so the
+> page's price guarantee would not rest on cache-key reasoning a reader cannot
+> see. That foresight is exactly what let the key be removed without touching a
+> rendered price.
+>
+> **OQ-1 below is CLOSED by ADR-0051**, by dissolution rather than by either
+> candidate fix it names: with no key equality there is nothing for the A → B → A
+> path to defeat, and the window bounds staleness directly for every cause at once.
+>
+> Nothing else in this ADR moves. D-1, D-3, D-4 and D-5 stand.
 
 **Price and pool reserves are never served at a value the pool does not currently hold.** Both cached functions take `reserves` as an explicit parameter and key on it: `getCachedDebateView(market, reserves)` and `getCachedMarketDiscoveryData(marketId, reserves)`. A cache hit is possible only when the live reserves are **provably equal to a previously observed value** — the one that generated the entry — which is a stronger guarantee than a TTL, because it keys on the value that actually determines price rather than on elapsed time. **This is compliance with R3 v2, not an exception to it.**
 
@@ -210,7 +233,28 @@ The Gate C CRITICAL and its adjacent findings are fixed in the same commit that 
 
 ### OQ-1 · ABA — a fee-less CPMM can return the cache key to a previously observed value
 
-**Status: OPEN. Named here, deliberately not fixed in this ADR.**
+**Status: CLOSED by ADR-0051 (2026-09-12) — and by NEITHER of the two candidate
+fixes named below.**
+
+⛔ **It was dissolved rather than solved.** ADR-0051 removed `reserves` from both
+keys, so there is no longer a key equality for an A → B → A round trip to defeat;
+a `SHARED_VIEW_MIN_WINDOW_MS` window now bounds staleness directly, for every
+cause at once. The finding recorded here — that key equality is strictly weaker
+than "no bet has intervened" — remains true and correctly stated, and was part of
+the case for making the change.
+
+⚠ **Both candidates below were considered on their merits and rejected.**
+Candidate 1 (a monotonic discriminator) is the defect made rigorous: a key that
+advances on every write misses on every write, which is the cost that made ABA
+worth caring about in the first place. Candidate 2 (bust the tag from the bet
+path) invalidates exactly as often as the `reserves` key did — every comment
+rides a bet (INV-1) — so it is the same miss rate for more code, and reusing
+`market:${id}` would stop `getCachedReserveWalk` coalescing too. ADR-0051 §D-4
+carries that reasoning and the tripwire that keeps a bet-path tag from landing
+quietly.
+
+**The original text is kept below unedited**, because the analysis is still the
+clearest statement of why the reserves key was weaker than it looked.
 
 **The finding.** D-2's guarantee is *key equality*, which proves the live reserves are **equal to a previously observed value** — not that no bet has intervened. On a fee-less CPMM those are different statements. A buy of *n* shares followed by a sell-back of the same *n* shares returns both reserves to their exact prior `NUMERIC(38,18)` values, so the round trip is **invisible to the key**. The entry that matches was generated before either bet existed.
 

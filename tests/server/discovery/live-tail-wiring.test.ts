@@ -132,7 +132,17 @@ describe("debate-view::price-chart-tail-pinned-to-live-price — the edge is the
 			// GUARD IS ALIVE — every negative below is worthless against a file
 			// that no longer composes a tail at all.
 			expect(src).toContain("withLiveTail(");
-			expect(src).toContain("getMarketPricingAndReserves(db,");
+			// ⚠ THE LIVE POOL READ, MATCHED ON ITS SHARED PREFIX BECAUSE THE TWO
+			// SURFACES SPELL IT DIFFERENTLY. Discovery batches it
+			// (`getMarketPricingAndReservesBatch`, T-03) and `/m/[slug]` reads one
+			// row (`getMarketPricingAndReserves(db, market.id)`). ⛔ THIS LINE PINNED
+			// THE SINGULAR FORM AND WENT RED WHEN T-03 BATCHED DISCOVERY — it
+			// shipped failing on its own branch, so the guard that proves the
+			// terminal comes from a LIVE read was unavailable for the whole of that
+			// work. Repaired at CACHE-KEY-1. What it protects is unchanged: the tail
+			// is composed from a read this file performs, never from the cached
+			// block.
+			expect(src).toContain("getMarketPricingAndReserves");
 
 			// The requirement: the terminal's price is `priced.pricing.yes` —
 			// the same `priced` binding that fills the card / the page's

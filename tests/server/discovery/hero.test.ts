@@ -71,10 +71,15 @@ import {
 	users,
 } from "@/db/schema";
 import { buildTopList, topOrder } from "@/lib/ranking";
+// RED import: the greenfield Slice-3 selector under test (fails collection).
+import type { Reserves } from "@/server/cpmm/calculate";
 import { computeSell } from "@/server/cpmm/calculate";
 import { loadRankingSubstrate } from "@/server/debate-view/ranking-substrate";
-// RED import: the greenfield Slice-3 selector under test (fails collection).
-import { selectHeroTopPosts } from "@/server/discovery/hero";
+import {
+	type HeroTopPosts,
+	selectHeroTopPosts as selectHeroTopPostsBase,
+} from "@/server/discovery/hero";
+import { valueHeroPosts } from "@/server/discovery/hero-value";
 import { listOpenMarkets } from "@/server/discovery/list";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
@@ -89,6 +94,33 @@ const POOL_SEED = "100.000000000000000000";
  * get `currentValue: null` because no holding exists.
  */
 const RESERVES = { yes: POOL_SEED, no: POOL_SEED };
+
+/**
+ * CACHE-KEY-1 (ADR-0051) — the two halves the page composes, composed here too.
+ *
+ * `selectHeroTopPosts` no longer takes `reserves` and no longer emits
+ * `currentValue`: it returns `{posts, shares}`, and `valueHeroPosts` applies the
+ * live pool to produce the figure. The split exists because the cached block
+ * around it stopped keying on `reserves`, and a Đ amount on a public surface
+ * may not lag a cache window.
+ *
+ * ⛔ THIS ADAPTER IS WHY NOT ONE ASSERTION IN THIS FILE MOVED. It restores the
+ * pre-CACHE-KEY-1 call shape over the new pair, so every masking, ordering,
+ * ordinal and `currentValue` expectation below is the SAME expectation it was —
+ * which is what a safety-critical suite is owed when the code under it is
+ * refactored. It also means these tests now exercise BOTH halves against each
+ * other, which is strictly more than the single function they covered before.
+ * ⚠ It is an adapter, not a shim to be deleted: `(public)/page.tsx` performs
+ * exactly this composition, so a change that breaks it here breaks it there.
+ */
+async function selectHeroTopPosts(
+	client: Parameters<typeof selectHeroTopPostsBase>[0],
+	marketId: string,
+	reserves: Reserves | null,
+): Promise<HeroTopPosts> {
+	const hero = await selectHeroTopPostsBase(client, marketId);
+	return valueHeroPosts(hero.posts, hero.shares, reserves);
+}
 
 /** Deterministic distinct timestamps — i seconds past a fixed UTC base. */
 function at(i: number): Date {
