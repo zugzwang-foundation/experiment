@@ -227,11 +227,24 @@ describe("R-M2 — the split bar is 32/6 on a phone, and the tap area is a pseud
 
 	it("round5::the-track-and-its-alignment-box-move-TOGETHER", () => {
 		const source = stripComments(read(FOOTER));
-		const box = classTokensAfter(
-			source,
-			'<span className="flex h-6 w-full items-center',
-			"the track's alignment box",
-		);
+		// ⛔ OVN-V5 — THE BOX IS FOUND BY WALKING BACK FROM THE TRACK'S OWN TESTID,
+		// never by its class string. This row first anchored on
+		// `'<span className="flex h-6 w-full items-center'`, which is selecting the
+		// thing under test BY THE VERY DECLARATION it asserts: change `h-6` and the
+		// anchor stops matching, the reader throws, and the failure reads as "the
+		// bar was restructured" rather than "the box moved". Worse, any sibling
+		// that grew the same three tokens would silently re-point it.
+		const trackAt = source.indexOf('data-testid="aggregate-split-track"');
+		expect(trackAt, "the split track is gone").toBeGreaterThan(-1);
+		const ownTag = source.lastIndexOf("<span", trackAt);
+		const wrapperTag = source.lastIndexOf("<span", ownTag - 1);
+		const boxCls =
+			/className="([^"]*)"/.exec(source.slice(wrapperTag, ownTag))?.[1] ?? "";
+		expect(
+			boxCls,
+			"no readable className on the element wrapping the track",
+		).not.toBe("");
+		const box = boxCls.split(/\s+/).filter(Boolean);
 		const track = classTokensAfter(
 			source,
 			'data-testid="aggregate-split-track"',
