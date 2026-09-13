@@ -269,8 +269,16 @@ export function ArgProfile({
 			    needs the step. Keyed on the props rather than on a width, so it is one
 			    token pair on the cards that have the labels instead of a size change
 			    for every reader. */}
+			{/* ⚠ MOBILE-2e · R-Q1 — `max-mobile:gap-x-1` (4px, from 6). MEASURED, and
+			    the size of the problem is why it is here rather than a type-size
+			    change: at 360px the widest row — a three-digit stake beside a
+			    minutes-old timestamp — ended at x=298.4 in a 295px box. **3.4px**.
+			    Six seams at 2px each buys 12, which clears it with room, and it
+			    costs the row nothing a reader can name. Dropping the metadata from
+			    13px to 12px was the alternative and was rejected: it would have
+			    overridden a ruled type size to win a margin a gap already wins. */}
 			<div
-				className={`flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground max-mobile:flex-1 max-mobile:gap-y-0.5 ${
+				className={`flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground max-mobile:flex-1 max-mobile:gap-x-1 max-mobile:gap-y-0.5 ${
 					sold || marker === "Exited"
 						? "max-mobile:text-[12px] max-mobile:leading-[16px]"
 						: "max-mobile:text-[13px] max-mobile:leading-[17px]"
@@ -434,7 +442,20 @@ export function ArgProfile({
 					    one line at every phone width, so nothing on it wraps at all. The
 					    B12 measurement is the thing that keeps that true. */}
 					<span className="flex shrink-0 items-center gap-1.5 max-mobile:contents">
-						<FieldSeparator />
+						{/* ⚠⚠ MOBILE-2e · R-Q1 — THE LEADING PIPE IS DROPPED BELOW 640px,
+						    and it is dropped because the ruled line 2 is
+						    `SideBadge │ Đ n │ Replies · n │ age` — four fields and THREE
+						    seams, not four. On the desktop this separator divides the
+						    pseudonym from the side badge on one continuous line and it
+						    stays exactly where it is. On a phone the pseudonym is on the
+						    line above, so the same glyph opens a line it divides nothing
+						    at — and it cost the 9px that made the widest row (a five-digit
+						    stake beside a minutes-old timestamp) break at 360px.
+						    ⚠ HIDDEN, NOT REMOVED. Every `|` on this row is asserted to be
+						    the shared primitive carrying `aria-hidden`; a CSS-hidden node
+						    is still that, and a conditional render would be a second
+						    branch for a phone in a component the desktop shares. */}
+						<FieldSeparator className="max-mobile:hidden" />
 						<SideBadge side={side} price={entryPrice} size={chipSize} />
 						<PositionMarker marker={marker} className="max-mobile:-order-2" />
 					</span>
