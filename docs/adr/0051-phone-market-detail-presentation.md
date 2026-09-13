@@ -55,7 +55,7 @@ MOBILE-2 RECON (2026-09-11) measured `/m/[slug]` at 375×812 on staging: the mar
 
 ## Amendment A3 — 2026-09-12 (MOBILE-2d; founder ask: "smooth up-down and right-left movement like iPhone")
 
-- **D-3 scroll model, corrected.** The phone tier is a bounded app shell below 640px: the tier root is `calc(100dvh - 60px - 2px)` tall with `overflow: hidden` and a column of [title strip + tabs][scroll region], with the bet bar `position: fixed` over it; the scroll region carries `min-h-0` and is **the vertical scroller** (`overflow-y: auto`, `overscroll-behavior-y: contain`); inside it sits the content-height horizontal snap track (`scroll-snap-type: x mandatory`, `overscroll-behavior-x: contain`, `min-w-0`), and inside that two panes that are pure snap items with no overflow, no overscroll and no `touch-action`. Momentum, rubber-band, axis lock and snapping are the browser's; **the track and panes carry no touch or pointer handler, and no handler in `phone/` calls `preventDefault`.** Tab state follows the scroller (an IntersectionObserver on the track) and never leads it.
+- **D-3 scroll model, corrected.** The phone tier is a bounded app shell below 640px: the tier root is `calc(100dvh - 60px - 2px)` tall with `overflow: hidden` and a column of [title strip + tabs][scroll region], with the bet bar `position: fixed` over it; the scroll region carries `min-h-0` and is **the vertical scroller** (`overflow-y: auto`, `overscroll-behavior-y: contain`); inside it sits the content-height horizontal snap track (`scroll-snap-type: x mandatory`, `overscroll-behavior-x: contain`, `min-w-0`), and inside that two panes that are pure snap items with no overflow, no overscroll and no `touch-action`. Momentum, rubber-band, axis lock and snapping are the browser's; **the track and panes carry no touch or pointer handler, and no touch or pointer handler in `phone/` calls `preventDefault`.** Tab state follows the scroller (an IntersectionObserver on the track) and never leads it.
 - ⛔⛔ **D-3, THE TOPOLOGY RULE, WHICH IS THE RESULT THIS AMENDMENT EXISTS FOR: the vertical scroller must be an ANCESTOR of the horizontal snap track, never a descendant of it.** A scroller per pane is the obvious design and gives each side its own reading position; it also kills the sideways swipe, invisibly. Measured on Chromium, bounded build, market `sp-m2-active`: with the vertical scroller nested inside the snap track, a horizontal swipe that follows a vertical scroll **moved nothing at all in 15 of 40 trials** — sampled every frame, so a routing decision rather than a snap that returned — across four input paths (10, 24 and 36 hand-dispatched touch moves and Chrome's own `Input.synthesizeScrollGesture`). With the scroller above the track: **40 of 40**, matching the document-scroll model it replaces, with a no-prior-scroll control at 10/10 in both. ⚠ **The price is one shared vertical position for both sides, with the shorter side padded to the taller one's height** — which is exactly what the document did before, so it is the status quo rather than a regression, and it is not recoverable by nesting. ⚠ **Two declarations are fatal on the snap item** and are named so they are not re-added: `overscroll-behavior-x` anything but `auto`, and `touch-action: pan-y` (both 0 of 8) — `touch-action` is intersected down the ancestor chain and inline-axis containment forbids the chain, so a horizontal gesture beginning on a card never reaches the track.
 - ⚠ **D-3 consequence, `position: sticky`.** The title-strip-and-tabs block's `sticky top-[62px]` is deleted. `overflow: hidden` makes the tier root a scrollport; a sticky child resolves its offset against the nearest scrollport, so the 62px offset moved the block 62px DOWN inside the shell — measured on every phone profile, putting 61px of the feed behind the tabs. The offset existed to clear the page header while the document scrolled, and the document does not scroll here.
 - **Why it changed.** As shipped in MOBILE-2c the chain was unbounded — `min-h-[…]` is a minimum, the pane never scrolled, `overflow-y: auto` never engaged, the document scrolled, and `overscroll-behavior: contain` on a non-scrolling box made Chromium refuse to chain the pan, producing a dead region bounded by the pane's rectangle (probe 2026-09-12T1435 §7.2). MOBILE-2d removed that token as a floor, then bounded the chain so the declaration is correct again.
@@ -66,7 +66,7 @@ MOBILE-2 RECON (2026-09-11) measured `/m/[slug]` at 375×812 on staging: the mar
 
 ## Amendment A4 — 2026-09-13 (MOBILE-2e; founder rulings of 2026-09-13)
 
-- **D-2 scope.** The phone tier's rules extend to `/u/[pseudonym]`: phone-only leaves live under `src/components/profile/phone/`, consume the profile's existing read model, and contain no write path; Sell on the phone is reached from the profile's position rows and runs the existing `InlineSell`/`SellModule` instance inside the shared `PhoneSheet`.
+- **D-2 scope.** The phone tier's rules extend to `/u/[pseudonym]`: phone-only leaves live under `src/components/profile/phone/`, consume the profile's existing read model, and contain no write path; Sell on the phone is reached from the profile's position rows and runs the existing `InlineSell` instance inside the shared `PhoneSheet`.
 - **D-3 profile composition.** Header = PFP beside the pseudonym, then six tiles three across in two rows; then the positions block — one header row (`POSITIONS · All markets` / `Open · Closed`) and desktop-shaped rows (side glyph │ argument + market │ current value │ `SELL`). The argument viewer panel is not rendered below 640px; a row's title navigates to the post.
 - **D-3 composer.** `PLACE Đ BET` shares the bottom bar's primary style when enabled and a solid dim fill when disabled; its edges align with every block above it.
 - **D-3 split bar.** Support/Counter buttons 32px, bar 6px, amounts on one line, edges flush with the card; hit areas extended to 44px without handlers.
@@ -74,3 +74,28 @@ MOBILE-2 RECON (2026-09-11) measured `/m/[slug]` at 375×812 on staging: the mar
 - **D-3 identity row.** Position-state chips and lane badges sit on line 1 beside the pseudonym; line 2 is the four metrics, one line at every phone width.
 - **D-3 sheet dismissal.** The velocity arm of swipe-to-dismiss requires ≥ 24px of travel.
 - **Status.** unchanged — Proposed; to be Accepted by the web lane at Gate C
+
+### A5 — 2026-09-13 · The profile's positions are tiles, not rows; two corrections
+
+Supersedes A4 D-3 in full and A4 D-2's `SellModule` reference. Corrects A3 D-3.
+
+D-1 (supersedes A4 D-3). Below `--breakpoint-mobile`, `/u/[pseudonym]`'s positions
+render as one tile per position: one visual viewport tall by default, growing past it
+when the market question requires, never clamping it. Tiles snap to their own top edge
+through CSS `scroll-snap` (`y proximity`) on the page's existing scroller; no new
+scroll container is introduced. Composition: side, value, movement and SELL on one
+line; the argument title; the market question, complete. `useEqualRowThirds` stands
+down below 640 via its `enabled` option and is unchanged on the desktop. The Closed
+tab shares the tile. No tile carries a selected visual below 640; selection state is
+retained for the sell sheet.
+
+D-2 (corrects A4 D-2). Strike `SellModule`; nothing imports it. The phone sell sheet
+mounts `InlineSellAmount` and drives `useInlineSell`, both unchanged.
+
+D-3 (corrects A3 D-3). The claim reads "no touch or pointer handler under `phone/`
+calls `preventDefault`". Keyboard handlers — arrow-key roving in `PhoneSideTabs`, the
+Escape/Tab focus trap in `PhoneSheet` — do, and are permitted.
+
+Measurements: B13 (equal column x's, row height) is retired, replaced by the tile
+baseline — tile height against viewport at 360/375/390/430, snap landing, question
+never clamped. B2 is measured on both tabs.
