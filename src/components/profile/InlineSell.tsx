@@ -615,6 +615,13 @@ export function InlineSellAmount({
 						onSubmit();
 					}
 				}}
+				// ⚠⚠ THE SHEET'S LEADING IS THE TAP TARGET, AND THAT IS WHY IT IS 1.375
+				// RATHER THAN THE 1.2 THIS FIELD SHIPPED WITH. The tappable box is the
+				// INPUT, not the bordered chip around it — tapping the chip's padding
+				// focuses nothing — and 32px at 1.2 measures 38.4px, under the 44px floor
+				// every other control in this sheet keeps. 32 x 1.375 is 44 exactly, so
+				// the target comes out of the type rather than out of a minimum bolted
+				// beside it. MEASURED at 38px before this, in the B7 census.
 				// ⚠ 32px CLEARS iOS's 16px ZOOM-ON-FOCUS THRESHOLD with room to spare —
 				// a phone money field below 16px makes the browser scale the page on
 				// focus, which moves every box the reader was just looking at.
@@ -623,7 +630,7 @@ export function InlineSellAmount({
 				// under a 32px figure clips its own descenders.
 				className={
 					sheet
-						? "h-auto border-none p-0 text-right font-mono text-[32px] leading-[1.2] font-extrabold tabular-nums shadow-none [border:none]"
+						? "h-auto border-none p-0 text-right font-mono text-[32px] leading-[1.375] font-extrabold tabular-nums shadow-none [border:none]"
 						: "h-auto border-none p-0 text-right font-mono text-[15px] font-extrabold tabular-nums shadow-none [border:none]"
 				}
 			/>
