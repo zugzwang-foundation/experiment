@@ -221,14 +221,41 @@ describe("R-M2 — the split bar is 32/6 on a phone, and the tap area is a pseud
 		// ⚠ THE ASYMMETRY IS PART OF THE ASSERTION, not a detail: a symmetric 6/6
 		// sums to 44 too and reaches 2px past the `Đ n` figure 4px below, so a tap
 		// on that figure opens a reply composer on a side nobody chose.
-		const height = 8 * 4;
-		const up = 2 * 4;
-		const down = 1 * 4;
-		expect(height + up + down, "the hit area no longer reaches 44px").toBe(44);
+		// ⛔⛔ THESE THREE NUMBERS ARE READ OFF THE TOKENS. They used to be typed
+		// here as `8 * 4`, `2 * 4`, `1 * 4` — constants folded from literals in the
+		// test, which makes the sum a tautology that cannot fail whatever the
+		// source says. `@test-writer` named it: changing `h-8` to `h-10` reds the
+		// `toContain` above and never this. A derived number is only derived if it
+		// comes from the thing it is about.
+		const step = (token: string | undefined): number => {
+			const m = /-(\d+(?:\.\d+)?)$/.exec(token ?? "");
+			if (m === null) {
+				throw new Error(`no Tailwind step in ${token} — re-derive the fence`);
+			}
+			return Number(m[1]) * 4;
+		};
+		const height = step(cls.find((t) => t.startsWith(phone("h-"))));
+		const up = step(cls.find((t) => t.startsWith(phone("after:-top-"))));
+		const down = step(cls.find((t) => t.startsWith(phone("after:-bottom-"))));
+		expect(
+			height + up + down,
+			`the hit area no longer reaches 44px: ${height} + ${up} + ${down}`,
+		).toBe(44);
 		expect(
 			down,
 			"the downward extension reaches past the figure below it",
 		).toBeLessThanOrEqual(4);
+		// ⛔ AND THE EXTENSION MUST STAY HIT-TESTABLE. Adding
+		// `after:pointer-events-none` paints the same rectangle and takes no taps —
+		// the target silently collapses back to the 32px box with all six token
+		// assertions above still passing. Measured GREEN across the unit suite
+		// before this line existed. ⚠ Assembled, never written: a literal here is a
+		// real utility in the built sheet.
+		const INERT = `after:${["pointer", "events", "none"].join("-")}`;
+		expect(
+			cls.filter((t) => t.includes(INERT)),
+			"the 44px extension paints but cannot be tapped",
+		).toEqual([]);
 	});
 
 	it("round5::the-44px-MIN-HEIGHT-is-gone-because-it-is-what-broke-the-line", () => {
@@ -316,13 +343,13 @@ describe("R-Q1 — the chips ride line 1, and they get there by ORDER", () => {
 		void pseudo;
 		// ⛔ The pseudonym must NOT still claim the whole line, or the chips have
 		// nowhere to sit and the break element is decoration.
-		const link =
-			/href={`\/u\/\${encodeURIComponent\(author\.pseudonym\)}`}[\s\S]{0,900}?className="([^"]*)"/.exec(
-				source,
-			)?.[1];
-		expect(link, "the pseudonym link's className is unreadable").toBeDefined();
+		// ⛔ ANCHORED ON THE SYMBOL, NOT ON A DISTANCE. This read `{0,900}` — a
+		// character window, which is a line number in a different unit (O-8), in
+		// the file whose own docblock says never to use one. Measured headroom at
+		// the time: 296 of 900, i.e. one added comment from a false red.
+		const link = classTokensAfter(source, "href={`/u/$", "the pseudonym link");
 		expect(
-			link?.split(/\s+/),
+			link,
 			`${ARGPROFILE}: the pseudonym still carries basis-full, so it owns line 1 ` +
 				`alone and no chip can join it.`,
 		).not.toContain(phone("basis-full"));
@@ -330,6 +357,32 @@ describe("R-Q1 — the chips ride line 1, and they get there by ORDER", () => {
 
 	it("round5::every-chip-that-belongs-on-line-1-carries-the-lift", () => {
 		const source = stripComments(read(ARGPROFILE));
+		// ⛔⛔ LOCATED, NOT COUNTED — AND THE COUNT ALONE WAS DEMONSTRABLY EMPTY.
+		// This row used to assert `=== 4` occurrences of the lift anywhere in the
+		// file. `@test-writer` gave `LaneBadge` the POSITIVE `order-2` — the badge
+		// then stays on line 2, which is the exact defect R-Q1 exists to fix — and
+		// put the freed fourth token on a `display:contents` wrapper where it is
+		// inert. **Count still four. Still green.** A tally is not a location, and
+		// four somethings is not four right things.
+		//
+		// ⚠ Each anchor is the element's OWN identity (its component name or its
+		// testid), never a class it also declares — selecting a subject by the
+		// declaration under test is how a guard comes to assert itself (OVN-V5).
+		const carriers: [string, string][] = [
+			["the pseudonym link", "href={`/u/$"],
+			["the position marker", "<PositionMarker marker="],
+			["the Sold chip", 'data-testid="argstake-sold"'],
+			["the lane badge", "<LaneBadge badge="],
+		];
+		for (const [what, anchor] of carriers) {
+			expect(
+				classTokensAfter(source, anchor, what),
+				`${ARGPROFILE}: ${what} does not carry the lift, so it stays on line 2 ` +
+					`— which is the arrangement R-Q1 exists to end. ⚠ The lift is a ` +
+					`NEGATIVE order: a positive one sorts it AFTER the default items, ` +
+					`which looks like a token and behaves like the defect.`,
+			).toContain(phone("-order-2"));
+		}
 		const lift = source.match(new RegExp(phone("-order-2"), "g")) ?? [];
 		expect(
 			lift.length,
@@ -338,7 +391,9 @@ describe("R-Q1 — the chips ride line 1, and they get there by ORDER", () => {
 				`its own lift token, because they sit in four different spans and no ` +
 				`single declaration reaches all of them. ⚠ The pseudonym is counted on ` +
 				`purpose: it is what makes the group an ORDER rather than a default, so ` +
-				`a future field inserted before it cannot silently take the first slot.`,
+				`a future field inserted before it cannot silently take the first slot. ` +
+				`⚠ The count is kept BESIDE the four locations above, not instead of ` +
+				`them: it is what catches a FIFTH lift appearing somewhere nobody named.`,
 		).toBe(4);
 		// ⛔ AND THE BOXES AROUND THEM HAVE TO DISSOLVE, or `order` reaches nothing:
 		// it is a property of flex ITEMS, and until the wrapper is `display:contents`
@@ -477,7 +532,18 @@ describe("R-P — the profile's phone view", () => {
 				`out. An equaliser that stops equalising has to give the rows back, or ` +
 				`whatever height it last wrote survives the stand-down.`,
 		).toMatch(/if\s*\(!enabled\)/);
-		expect(thirds).toMatch(/row\.style\.height = "";/);
+		// ⛔⛔ SCOPED TO THE BRANCH, because the string it looks for already occurs
+		// in the unrelated `rowCount === 0` path — so the file-wide match was
+		// satisfied by a line the stand-down never runs. `@test-writer` deleted the
+		// whole clearing loop from this branch and the guard stayed GREEN, which is
+		// the one thing its own message says it exists to prevent.
+		const gate = thirds.indexOf("if (!enabled)");
+		const branch = thirds.slice(gate, thirds.indexOf("return;", gate));
+		expect(
+			branch,
+			`${THIRDS}: the !enabled branch returns without giving the rows back, so ` +
+				`whatever height the equaliser last wrote outlives the stand-down.`,
+		).toMatch(/row\.style\.height = "";/);
 	});
 
 	it("round5::the-header-wraps-so-the-tiles-get-the-whole-width", () => {
@@ -564,16 +630,38 @@ describe("R-P3 — the phone's sell sheet carries no write path of its own", () 
 		expect(at, `${TABLE}: the phone sell sheet is not mounted`).toBeGreaterThan(
 			-1,
 		);
-		// ⛔ INSIDE THE SELL CELL. `useInlineSell`'s outside-click predicate asks
-		// whether the armed `<tr>` CONTAINS the tap; a sheet mounted anywhere else
-		// is not contained, so the first tap inside it — Confirm included — cancels
-		// the arm. The fence is the enclosing `<td>`, found by walking back.
-		const tdAt = source.lastIndexOf("<td", at);
-		const tdClose = source.indexOf("</td>", at);
+		// ⛔⛔ THIS CHECK IS DIRECTIONAL NOW, AND THE VERSION IT REPLACES DID NOT
+		// ESTABLISH WHAT ITS OWN DOCBLOCK CLAIMED. It was
+		// `lastIndexOf("<td", at) > -1 && indexOf("</td>", at) > at` — two searches
+		// over the whole file, which hold for a mount almost anywhere inside a
+		// table component. `@test-writer` hoisted the sheet clean out of the `<tr>`
+		// into a fragment sibling, added one unrelated `<td>` later in the file,
+		// and it stayed GREEN. That is O-8 arriving as a DISTANCE check wearing the
+		// costume of a structural one.
+		// ⇒ Walking FORWARD from the mount, the first tag that closes anything in
+		// the row chain must be `</td>`. If a `</tr>` comes first, the sheet is
+		// outside the cell and outside the row.
+		// ⚠ The proof that actually matters is now a RUNTIME one —
+		// `tests/unit/profile/render/phone-sell-host.test.tsx` asks the row whether
+		// it `contains` the sheet. This row is kept because it names the defect at
+		// the site a reader is editing, and because a source scan reds without a
+		// browser; it is no longer the only thing standing between the mount and
+		// the arm.
+		const nextClose = ["</td>", "</tr>", "</tbody>", "</table>"]
+			.map((tag) => [tag, source.indexOf(tag, at)] as const)
+			.filter(([, i]) => i > -1)
+			.sort((a, b) => a[1] - b[1])[0]?.[0];
 		expect(
-			tdAt > -1 && tdClose > at,
-			`${TABLE}: the sheet is no longer inside a table cell of the tile row. ` +
-				`Outside it, every tap in the sheet cancels the sell it was opened for.`,
+			nextClose,
+			`${TABLE}: the sheet is no longer inside a table CELL of the tile row — ` +
+				`the first closing tag after it is ${nextClose}. Outside the row, ` +
+				`every tap in the sheet cancels the sell it was opened for.`,
+		).toBe("</td>");
+		const openTd = source.lastIndexOf("<td", at);
+		const openTr = source.lastIndexOf("<tr", at);
+		expect(
+			openTd > openTr,
+			`${TABLE}: the nearest enclosing tag is a row, not a cell.`,
 		).toBe(true);
 		const slice = source.slice(at, source.indexOf("/>", at));
 		expect(
@@ -591,6 +679,59 @@ describe("R-P3 — the phone's sell sheet carries no write path of its own", () 
 		// duplicated testid is a guard reading the wrong node.
 		expect(source).toMatch(/const armedInRow = armed && !isPhone;/);
 		expect(source).toMatch(/const armedInSheet = armed && isPhone;/);
+	});
+
+	it("round5::the-OPEN-tab-s-four-cells-and-the-title-declare-their-shares", () => {
+		// ⛔⛔ ALL FOUR OF THESE WERE UNGUARDED AND ALL FOUR SURVIVED A MUTATION
+		// ACROSS THE WHOLE UNIT SUITE. `profile-mobile-reflow`'s cell-share row
+		// reads the SIDE cell only, so the three that carry the row's arithmetic
+		// were held by nothing. Each is here with the consequence of losing it,
+		// because a share without a consequence is a style opinion.
+		const source = stripComments(read(TABLE));
+		expect(
+			source,
+			`${TABLE}: the argument cell lost min-w-0/flex-1. A flex item will not ` +
+				`shrink below its content without min-w-0, and the argument is the ` +
+				`only cell whose content is unbounded — so the ROW overflows instead ` +
+				`of the title clamping. The source comment calls this "the one that ` +
+				`matters"; nothing was checking it.`,
+		).toMatch(
+			new RegExp(
+				`<td className="[^"]*${phone("min-w-0")} ${phone("flex-1")}[^"]*">\\s*<TileArgumentCell`,
+			),
+		);
+		expect(
+			source,
+			`${TABLE}: the Current cell lost its 64px share or its right alignment. ` +
+				`Centred in 64px beside a flexible argument, the figures stop forming ` +
+				`a column an eye can run down.`,
+		).toMatch(
+			new RegExp(
+				`<td className="[^"]*${phone("w-16")} ${phone("shrink-0")}[^"]*${phone("text-right")}"`,
+			),
+		);
+		expect(
+			classTokensAfter(source, "data-testid={`tile-sell-", "the SELL trigger"),
+			`${TABLE}: the SELL trigger lost its 44px floor or its touch-action. It ` +
+				`is the entry to the one comment-free money action in the product, in ` +
+				`a row 44px tall.`,
+		).toEqual(
+			expect.arrayContaining([
+				phone("min-h-11"),
+				phone("w-full"),
+				phone("[touch-action:manipulation]"),
+			]),
+		);
+		expect(
+			source,
+			`${TABLE}: the title's phone clamp is gone. Four lines of a 15px title ` +
+				`in ~90px of flexible column is most of a screen for one row — and the ` +
+				`thirds hook has stood down, so nothing else bounds it.`,
+		).toMatch(
+			new RegExp(
+				`className="[^"]*${phone("line-clamp-2")}"\\s*>\\s*\\{cell\\.title\\}`,
+			),
+		);
 	});
 
 	it("round5::the-CLOSED-tab-s-cells-declare-a-share-TOO", () => {

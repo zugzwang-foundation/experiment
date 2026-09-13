@@ -232,3 +232,72 @@ describe("UI-OVERNIGHT 1b — the identity row wraps in two units", () => {
 		expect(groupB?.textContent).not.toContain("Highest Stakes");
 	});
 });
+
+/**
+ * MOBILE-2e · R-Q1 — **THE LIFT REACHES THE DOM**, which nothing established.
+ *
+ * ⛔⛔ `ArgProfile` hands `PositionMarker` and `LaneBadge` a `className`, and
+ * both are supposed to merge it. `@test-writer` DELETED `className` from the
+ * `cn(...)` call in `badges.tsx` — so the prop is accepted and silently thrown
+ * away, the chips never lift, and the phone's identity row goes back to the
+ * arrangement R-Q1 exists to end — and **all 3 643 unit tests stayed green**,
+ * in both components. Every guard for those tokens read the CALL SITE.
+ *
+ * A prop asserted where it is passed is not a prop asserted where it lands.
+ * This renders the row and asks the DOM.
+ *
+ * ⚠ The token is assembled rather than written: Tailwind v4 scans `tests/`, so
+ * a literal here becomes a real utility in the built stylesheet and the built
+ * sheet stops being evidence of what components use (AGENTS.md §8).
+ */
+describe("MOBILE-2e R-Q1 — the phone lift lands on the nodes, not just in the source", () => {
+	const LIFT = `${["max", "mobile"].join("-")}:-order-2`;
+
+	it("arg-profile-row::all-FOUR-line-1-passengers-carry-the-lift-IN-THE-DOM", () => {
+		const { container } = widestRow({ badge: "Highest Stakes" });
+		const lifted = [...container.querySelectorAll("*")].filter((el) =>
+			(el.getAttribute("class") ?? "").split(/\s+/).includes(LIFT),
+		);
+		expect(
+			lifted.length,
+			"the lift did not reach four rendered nodes. If the count is 2, a " +
+				"`className` prop is being accepted and discarded by a badge — the " +
+				"chips stay on line 2 and every source guard still passes.",
+		).toBe(4);
+	});
+
+	it("arg-profile-row::each-named-passenger-carries-it-where-a-reader-would-look", () => {
+		const { container } = widestRow({ badge: "Highest Stakes" });
+		const has = (el: Element | null) =>
+			(el?.getAttribute("class") ?? "").split(/\s+/).includes(LIFT);
+		expect(
+			has(container.querySelector('[data-testid="argstake-sold"]')),
+			"the Sold chip",
+		).toBe(true);
+		expect(
+			has(container.querySelector('a[href^="/u/"]')),
+			"the pseudonym link",
+		).toBe(true);
+		// The two badges are the ones whose prop was being discarded.
+		const chips = [...container.querySelectorAll("*")].filter(
+			(el) =>
+				el.textContent === "Flipped" || el.textContent === "Highest Stakes",
+		);
+		expect(chips.length, "the marker and the lane badge did not render").toBe(
+			2,
+		);
+		for (const chip of chips) {
+			expect(has(chip), `the ${chip.textContent} chip`).toBe(true);
+		}
+	});
+
+	it("arg-profile-row::POSITIVE-CONTROL-the-lift-is-ABSENT-when-there-is-nothing-to-lift", () => {
+		// ⛔ Without a badge there are three passengers, not four — so the count
+		// above is reading the badge and not a constant.
+		const { container } = widestRow();
+		const lifted = [...container.querySelectorAll("*")].filter((el) =>
+			(el.getAttribute("class") ?? "").split(/\s+/).includes(LIFT),
+		);
+		expect(lifted.length, "a lane badge lifted itself out of nowhere").toBe(3);
+	});
+});
