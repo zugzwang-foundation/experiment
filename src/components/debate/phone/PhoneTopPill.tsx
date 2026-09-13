@@ -158,6 +158,14 @@ export function PhoneTopPill({
 	 * React on the transition, one tick later than the call.
 	 */
 	const firedForThisTap = useRef(false);
+	/**
+	 * ⚠ `refreshing` MIRRORED INTO A REF so `evaluate` can read it without taking
+	 * it as a dependency. The listener is attached in an effect keyed on
+	 * `evaluate`; a dependency on a value that flips twice per tap would detach and
+	 * re-attach the scroll listener in the middle of the scroll it is watching.
+	 */
+	const refreshingRef = useRef(false);
+	refreshingRef.current = refreshing;
 
 	/**
 	 * ⛔⛔ THE VISIBILITY RULE, IN ONE PLACE, DRIVEN BY POSITION AND DIRECTION.
@@ -181,6 +189,35 @@ export function PhoneTopPill({
 		const top = region.scrollTop;
 		const previous = lastScrollTop.current;
 		lastScrollTop.current = top;
+		/**
+		 * ⛔⛔ THE RULE STANDS DOWN WHILE THE PILL'S OWN TAP IS RUNNING, AND THIS
+		 * WAS A MEASURED DEFECT RATHER THAN A PRECAUTION.
+		 *
+		 * The tap smooth-scrolls the region to 0 — which fires scroll events, which
+		 * reach this function, which sees the position fall below half a viewport
+		 * and hides the pill. So the pill left the screen DURING its own scroll,
+		 * before the refetch it had started even began. Measured on the shipped
+		 * build with a 700ms-delayed RSC response: the `Refreshing…` label appeared
+		 * for **one frame out of ~96**, so in practice a reader never saw that
+		 * anything had been refreshed at all — the control did its work and then
+		 * vanished as if nothing had happened.
+		 *
+		 * ⇒ While the arrival poll is running (`rafRef`) or the refetch is in flight
+		 * (`refreshingRef`), position and direction are MINE rather than the
+		 * reader's, and the rule has no business reading them. Both windows close on
+		 * their own — the poll ends at its deadline, the transition settles — and the
+		 * `refreshing` effect calls this function again the moment the second one
+		 * does, so the pill leaves exactly when the refresh lands and not before.
+		 *
+		 * ⚠ `lastScrollTop` IS STILL UPDATED ABOVE, DELIBERATELY. Skipping it would
+		 * leave the reference at wherever the reader was before the tap, and the
+		 * first real scroll after the refresh would compute its direction against a
+		 * position that is a whole screen away — reading as a huge upward movement
+		 * and showing the pill at the top of the feed.
+		 */
+		if (rafRef.current !== null || refreshingRef.current) {
+			return;
+		}
 		const viewport = region.clientHeight;
 		if (top < viewport * 0.5) {
 			setShown(false);
