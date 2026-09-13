@@ -449,7 +449,7 @@ export function ArgProfile({
 						    pseudonym from the side badge on one continuous line and it
 						    stays exactly where it is. On a phone the pseudonym is on the
 						    line above, so the same glyph opens a line it divides nothing
-						    at — and it cost the 9px that made the widest row (a five-digit
+						    at — and it cost the 9px that made the widest row (a three-digit
 						    stake beside a minutes-old timestamp) break at 360px.
 						    ⚠ HIDDEN, NOT REMOVED. Every `|` on this row is asserted to be
 						    the shared primitive carrying `aria-hidden`; a CSS-hidden node

@@ -207,9 +207,16 @@ function Tile({
 			{/* ⚠ MOBILE-2e · R-P4 — 10px on a phone, from 8. Three columns across the
 			    full width give each tile ~96px instead of 110, and an 8px label at
 			    0.12em tracking in that box is small enough to be scanned past rather
-			    than read. The ruling accepts two-line labels here, which is what buys
-			    the size: the constraint was never the height. The VALUE keeps its own
-			    size on both tiers — it is the thing being read, not scanned. */}
+			    than read. The VALUE keeps its own size on both tiers — it is the thing
+			    being read, not scanned.
+			    ⚠⚠ AND THE HEIGHT COST IS REAL AND WAS ACCEPTED, not avoided. The
+			    ruling accepts TWO-line labels; at ≤390px `Total Support received` and
+			    `Total Counter received` take THREE, because 96px of tile leaves 80px
+			    of content and `TOTAL SUPPORT` alone is ~87px at this size. A tracking
+			    reduction to 0.08em was tried and REVERTED — it moved one label at one
+			    width and would have overridden a ruled value to buy nothing. Nothing
+			    clips and `auto-rows-fr` keeps the tiles equal; the cost is band
+			    height. `docs/parked.md 2e-1`. */}
 			<span className="text-[8px] leading-[1.2] font-extrabold tracking-[0.12em] text-n4 uppercase max-mobile:text-[10px]">
 				{label}
 			</span>

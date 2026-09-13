@@ -1465,9 +1465,11 @@ function TileRow({
 								    visually, so the DOM position costs nothing and buys the
 								    containment without widening `InlineSell`'s ref type.
 								    ⚠ `onClose` CANCELS. Every route the sheet can close by — the
-								    backdrop, the handle, Escape, its own Cancel — lands there,
-								    and leaving the arm set behind a closed sheet would strand a
-								    controller nothing on screen could reach. */}
+								    backdrop, the handle, Escape and the frame's own `×` — lands
+								    there, and leaving the arm set behind a closed sheet would
+								    strand a controller nothing on screen could reach. (The sheet
+								    draws no Cancel of its own; it did in a draft, and that put a
+								    SECOND close control beside the frame's.) */}
 								{armedInSheet ? (
 									<PhoneSellSheet
 										tileKey={tile.key}
