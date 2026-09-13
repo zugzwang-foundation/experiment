@@ -69,8 +69,8 @@ const LABEL_BUSY = "Refreshing…";
  * element mounted. Importing `PhoneSheet`'s private constant would make this
  * file depend on a sheet it has nothing to do with, to share a number that is
  * already written twice inside that file for reasons that apply here verbatim.
- * `phone-top-pill.test.tsx` pins this constant against `PhoneSheet`'s by reading
- * both files, exactly as `phone-sheet-motion.test.tsx` pins that file's own pair
+ * `phone-top-pill-motion.test.tsx` pins this constant against `PhoneSheet`'s by
+ * reading both files, exactly as `phone-sheet-motion.test.tsx` pins that file's pair
  * — a comment asking the next reader to keep two numbers in step is not a
  * mechanism.
  */
@@ -152,10 +152,26 @@ export function PhoneTopPill({
 	const lastScrollTop = useRef(0);
 	const rafRef = useRef<number | null>(null);
 	/**
-	 * ⛔ ONE REFETCH PER TAP, ENFORCED HERE RATHER THAN INFERRED. The arrival poll
-	 * and the deadline are two paths to the same call, and a frame in which both
-	 * are true would fire twice. `refreshing` cannot be that latch: it is set by
-	 * React on the transition, one tick later than the call.
+	 * ⛔ ONE REFETCH PER TAP — AND THE REASON WRITTEN HERE FIRST WAS IMPOSSIBLE,
+	 * WHICH IS WORTH RECORDING RATHER THAN QUIETLY REPHRASING.
+	 *
+	 * It said: "the arrival poll and the deadline are two paths to the same call,
+	 * and a frame in which both are true would fire twice." They are not two paths.
+	 * `tick` is ONE `if (arrived || expired) { refetchOnce(); return; }` — one
+	 * branch, one call, and a `return` — so that frame cannot exist, and no
+	 * single-tap test can redden this latch. `@test-writer` measured exactly that
+	 * and said so.
+	 *
+	 * ⇒ What it actually guards is a poll that outlives the refresh it started: a
+	 * frame callback queued before a refetch settled, still holding a live
+	 * `regionRef`, reaching `refetchOnce` after the transition has cleared and
+	 * `evaluate` has resumed. It is also what keeps a FUTURE third arrival signal —
+	 * a `scrollend` listener, say, added beside the poll as the obvious improvement
+	 * — from turning one intent into two payload fetches. A latch whose stated job
+	 * is unreachable is a latch the next reader deletes; this one earns its place on
+	 * the second ground, not the first.
+	 * ⚠ `refreshing` cannot be that latch either way: React sets it on the
+	 * transition, one tick later than the call.
 	 */
 	const firedForThisTap = useRef(false);
 	/**
@@ -166,6 +182,16 @@ export function PhoneTopPill({
 	 */
 	const refreshingRef = useRef(false);
 	refreshingRef.current = refreshing;
+	/**
+	 * ⚠ `locked` AND `busy` MIRRORED FOR THE SAME REASON, and used at a moment the
+	 * props themselves cannot reach: inside a `requestAnimationFrame` callback that
+	 * was queued up to a second ago and closed over the values of that frame. The
+	 * refs are what let it read NOW.
+	 */
+	const lockedRef = useRef(locked);
+	lockedRef.current = locked;
+	const busyRef = useRef(busy);
+	busyRef.current = busy;
 
 	/**
 	 * ⛔⛔ THE VISIBILITY RULE, IN ONE PLACE, DRIVEN BY POSITION AND DIRECTION.
@@ -313,18 +339,68 @@ export function PhoneTopPill({
 		return () => window.clearTimeout(t);
 	}, [shown]);
 
-	/** Cancel any in-flight arrival poll on unmount. */
-	useEffect(
-		() => () => {
-			if (rafRef.current !== null) {
-				cancelAnimationFrame(rafRef.current);
-			}
-		},
-		[],
-	);
+	const cancelPoll = useCallback(() => {
+		if (rafRef.current !== null) {
+			cancelAnimationFrame(rafRef.current);
+			rafRef.current = null;
+		}
+	}, []);
 
+	/**
+	 * ⛔ AN IN-FLIGHT TAP IS ABANDONED THE MOMENT A SHEET OPENS OR THE COMPOSER GOES
+	 * BUSY. The reader has moved on to something else; the scroll they asked for is
+	 * no longer the thing they are doing, and a refresh that arrives under a sheet
+	 * they have since opened is a surprise at best. See `refetchOnce` for the
+	 * measurement — the poll survives `locked` because returning `null` from render
+	 * does not unmount a component, so without this the frame callback simply keeps
+	 * counting down behind the sheet.
+	 */
+	useEffect(() => {
+		if (locked || busy) {
+			cancelPoll();
+		}
+	}, [locked, busy, cancelPoll]);
+
+	/** Cancel any in-flight arrival poll on unmount. */
+	useEffect(() => cancelPoll, [cancelPoll]);
+
+	/**
+	 * ⛔⛔ THE REFUSALS ARE RE-CHECKED HERE, AT FIRE TIME, AND NOT ONLY AT TAP TIME
+	 * — WHICH IS A DEFECT `@test-writer` FOUND AND MEASURED.
+	 *
+	 * `onTap` refuses under `refreshing`, `busy`, `locked` and
+	 * `isPageScrollLocked()`. But a tap does not refetch: it starts a scroll and an
+	 * arrival poll that fires **up to a second later**, and the first cut consulted
+	 * nothing at that point. So the world had a full second to change underneath
+	 * it, and the render gate does not stop it — `locked` makes this component
+	 * return `null`, which does NOT unmount it, so the poll survives the sheet
+	 * opening with its closure intact.
+	 *
+	 * ⚠ IT IS ONE TAP AWAY, NOT A CONTRIVANCE. Tap the pill; the feed begins its
+	 * smooth scroll; tap the market title or the bet bar — well inside a second, on
+	 * a surface where that is an ordinary thing to do — and a `router.refresh()`
+	 * lands underneath an open sheet. Measured at `94fac4ba`:
+	 * `router.refresh()` calls past the deadline with `locked` true: **1**. With
+	 * `busy` true: **1**. The second is the one that matters, because `busy` is the
+	 * flag this file's own docblock calls the money guard, and a refresh under an
+	 * in-flight bet is the shape the seven host transitions in `PhoneDebateView`
+	 * exist to prevent.
+	 *
+	 * ⇒ Two changes, and both are needed. The poll is CANCELLED the moment either
+	 * flag rises (the effect below), so an abandoned tap stops costing frames; and
+	 * the refusals are re-read through refs HERE, so a callback already queued for
+	 * this frame still cannot fire. The first is the mechanism and the second is
+	 * what makes it hold against a frame that was in flight when the flag changed.
+	 *
+	 * ⚠ AN ABANDONED TAP LEAVES THE LATCH DOWN, deliberately: nothing fired, so a
+	 * later tap is a new intent and must work. Setting `firedForThisTap` on refusal
+	 * would silently disarm the control until the next refresh settled.
+	 */
 	const refetchOnce = useCallback(() => {
 		if (firedForThisTap.current) {
+			return;
+		}
+		if (lockedRef.current || busyRef.current || isPageScrollLocked()) {
 			return;
 		}
 		firedForThisTap.current = true;
@@ -433,7 +509,7 @@ export function PhoneTopPill({
 		 * PARENT does, and below `PhoneSheet` (`fixed z-50`) for the same reason. A
 		 * `z-*` token here would resolve inside its parent's context and say
 		 * nothing about either relationship — the mount site is the mechanism.
-		 * `phone-top-pill.test.ts` asserts the pair rather than a token.
+		 * `phone-top-pill.test.tsx` asserts the pair rather than a token.
 		 */
 		<button
 			type="button"
