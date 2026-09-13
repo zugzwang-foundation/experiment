@@ -254,21 +254,15 @@ export function MarketPostExport(props: PostExportProps) {
 		color: PALETTE.n4,
 	};
 
-	/** The market title's type size — the gap below is derived from it. */
 	/**
-	 * The market question's type size.
+	 * The market question's type CEILING — `titleType` below is what renders.
 	 *
-	 * ⛔ 27 IS A CEILING, NOT A PREFERENCE — measured, and the thing it is
-	 * bounded by is the CHIPS rather than the card. The topic and flavour run on
-	 * from the question mark in the same wrapping flow, so as the question grows
-	 * it eventually takes the room they were sitting in: rendered against the
-	 * longest live title, 26 and 27 both keep `MATH` and `INNOVATION` on the
-	 * question's last line and 28 pushes `INNOVATION` onto a third line of its
-	 * own, where it reads as a stray label rather than as part of the heading.
-	 *
-	 * ⚠ SO A BIGGER QUESTION COSTS THE CHIPS THEIR PLACE, and that trade is the
-	 * one to weigh if this is ever raised again — not whether the type fits the
-	 * card, which it does with room to spare.
+	 * ⚠ 27 WAS MEASURED AGAINST A LAYOUT THAT IS GONE. It was the largest size
+	 * that kept the chips on the question's last line while they ran on from the
+	 * `?`. Revision 9 moved them to a line of their own, so that constraint no
+	 * longer binds — the CARD does now, and `titleType`'s docblock carries why.
+	 * The value is kept because the eight live questions were tuned at it, and
+	 * changing the ceiling would restyle every export to fix the two that overflow.
 	 */
 	const TITLE_FS = 27;
 	/**
@@ -398,6 +392,54 @@ export function MarketPostExport(props: PostExportProps) {
 	const POST_IMAGE_FALLBACK_H = 370;
 	const THUMB = 96;
 	const PLOT_H = 320;
+	/**
+	 * The market question's size, FITTED SO IT NEVER TAKES A THIRD LINE — and the
+	 * reason is the split bar, not the typography.
+	 *
+	 * ⛔⛔ THE RIGHT CARD HAS EXACTLY ONE VARIABLE, AND IT WAS UNBOUNDED. The
+	 * chart is a fixed `PLOT_H` — it has to be: the SVG's scales are arithmetic
+	 * on a numeric height, Satori measures nothing back, and stretching the
+	 * viewBox turns the terminal dots into ellipses. The split row seats itself
+	 * on the card's floor with `marginTop: auto`. So everything the header grows
+	 * by comes straight out of the space the split row needs, and once that goes
+	 * negative the row does not squash — it is pushed through the bottom of the
+	 * card. A 55-character question at 27 wraps to three lines; with the chips on
+	 * a line of their own since revision 9, that was ~33 units past the floor,
+	 * and `YES 10% · NO 90%` shipped half outside the image. Revision 9 caused it:
+	 * while the chips ran on from the `?` they rode the last line and cost no
+	 * height, and moving them made the question's line count load-bearing.
+	 *
+	 * ⇒ Two lines, always, which bounds the header at
+	 * `2 × titleType × 1.22 + 9 + a chip` — the height every live market was
+	 * already tuned at. The size comes down to fit rather than the question being
+	 * cut, the same trade `quoteType` makes on the left card.
+	 *
+	 * ⚠ THE ESTIMATE IS SHARED WITH `quoteType` ON PURPOSE. Same face, same
+	 * weight, so `AVG_ADVANCE` and `SAFETY` are one pair of measured numbers, not
+	 * two that can drift. It is pessimistic by ~15% against the render (a line at
+	 * 27 holds ~31 characters; the estimate says 26), which costs a borderline
+	 * question a point or two of size and never costs it the bar.
+	 *
+	 * ⛔ `lineClamp: 2` IS THE BACKSTOP AND THE ONLY THING THAT MAKES "NEVER" TRUE.
+	 * The estimate is an average and the floor stops the shrink somewhere, so a
+	 * question long enough to beat both is truncated rather than allowed to push
+	 * the bar out. Questions are operator-authored; a clipped one is visible and
+	 * fixable, a bar outside the image is neither. None of the eight live
+	 * questions reaches it — two of them (55 and 56 characters) set at 25, the
+	 * rest keep 27.
+	 */
+	const TITLE_LINES = 2;
+	const TITLE_MIN_TYPE = 18;
+	const TITLE_W = INNER_W - THUMB - 14;
+	const titleType = Math.max(
+		TITLE_MIN_TYPE,
+		Math.min(
+			TITLE_FS,
+			Math.floor(
+				(TITLE_LINES * TITLE_W * SAFETY) / (market.title.length * AVG_ADVANCE),
+			),
+		),
+	);
 
 	// ⛔ FIXED, NOT SIDE-DERIVED — the revision-5 ruling in the docblock above.
 	// Kept as two named consts rather than inlined at the call site so the pair
@@ -935,7 +977,7 @@ export function MarketPostExport(props: PostExportProps) {
 							<div
 								style={{
 									display: "block",
-									fontSize: u(TITLE_FS),
+									fontSize: u(titleType),
 									// ⚠ 700 IS THE HEAVIEST THIS EXPORT HAS, AND THIS READ 800
 									// WHILE RENDERING AT 700. `fonts.ts` vendors Geist 400 / 500 /
 									// 700 only, so Satori resolved 800 to the nearest face it was
@@ -946,6 +988,9 @@ export function MarketPostExport(props: PostExportProps) {
 									// that the answer is a new `.ttf`, not a larger number.
 									fontWeight: 700,
 									lineHeight: 1.22,
+									// The backstop `titleType`'s docblock depends on — see there.
+									lineClamp: TITLE_LINES,
+									overflow: "hidden",
 								}}
 							>
 								{market.title}
