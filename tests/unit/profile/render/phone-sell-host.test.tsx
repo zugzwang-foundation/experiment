@@ -254,14 +254,22 @@ describe("MOBILE-2e — the phone sell, through its host", () => {
 	});
 
 	it("phone-host::⛔-MONEY-the-wire-carries-the-EXACT-held-quantity-not-the-displayed-figure", async () => {
-		// ⛔⛔ THE GAP THIS ROW CLOSES WAS A HOST WIRING GAP, NOT A LEAF GAP. The
-		// leaf's own `seedExact={props.seedExact}` IS guarded; mutating the HOST's
-		// `seedExact={tile.currentExact}` to `tile.valueDisplay` — the rounded
-		// figure — passed all 3 643 unit tests. `sellSharesFor` returns the whole
-		// surviving quantity byte-identically only when the submitted figure equals
-		// the current value EXACTLY, so the rounded seed turns "sell everything"
-		// into a division and a floor, and strands dust that can never be sold.
-		// The desktop path has two rows for exactly this; the phone had none.
+		// ⛔⛔ READ THE SCOPE OF THIS ROW BEFORE TRUSTING IT, because the reviewer
+		// finding that prompted it named a consequence the code does not have and I
+		// nearly shipped a guard built on it.
+		//
+		// The claim was: mutate the HOST's `seedExact={tile.currentExact}` to the
+		// rounded `tile.valueDisplay` and the wire strands dust. **Measured: that
+		// mutation leaves this row GREEN**, and correctly so — `confirm` reads
+		// `args.seedExact` off `sellArgs` (`PositionsTable.tsx:1153`), never the
+		// sheet's prop, so an UNTOUCHED field cannot submit the displayed figure by
+		// that route at all. `sellArgs` is shared with the desktop arm, where the
+		// 43 shipped sell rows already guard it.
+		//
+		// ⇒ What this row is, therefore, is the first proof that the law holds on
+		// the PHONE path — the same assertion the desktop has, through the sheet —
+		// and it is deliberately NOT the guard for the sheet's `seedExact` prop.
+		// That prop's real job is the ceiling, and it has its own row below.
 		armOnPhone();
 		fireEvent.click(screen.getByTestId(`phone-sell-confirm-${L1}`));
 		await waitFor(() => expect(calls).toBe(1));
@@ -271,6 +279,56 @@ describe("MOBILE-2e — the phone sell, through its host", () => {
 				"sheet was seeded with the DISPLAYED figure, and the remainder is dust",
 		).toBe(dp18("10"));
 		expect(lastBody?.lotId).toBe(L1);
+	});
+
+	it("phone-host::⛔-the-sheet-s-seedExact-is-the-CEILING-and-the-exact-value-is-under-it", () => {
+		// ⛔⛔ THIS IS WHAT THE SHEET'S `seedExact` PROP ACTUALLY DECIDES, and it
+		// took a mutation that stayed green to find out. `edit()` refuses a typed
+		// figure greater than the seed by DISCARDING the draft
+		// (`InlineSell.tsx:274` — `setDraft(null)`), so the field silently snaps
+		// back to the rounded display. Hand the sheet the ROUNDED figure as its
+		// ceiling and every value between `Đ 31` and the real `Đ 31.4` becomes
+		// unenterable: a reader who types their own current value watches the field
+		// reject it and revert, on the one surface where the sell lives.
+		armOnPhone();
+		const input = screen.getByTestId(
+			`tile-sell-amount-${L1}`,
+		) as HTMLInputElement;
+		fireEvent.change(input, { target: { value: "31.4" } });
+		expect(
+			input.value,
+			"the exact current value was refused as over-max — the sheet was handed " +
+				"the DISPLAYED figure as its ceiling, not the exact one",
+		).toBe("31.4");
+		// ⛔ POSITIVE CONTROL: the ceiling must still REFUSE something above it, or
+		// the row above passes against a field that accepts anything at all.
+		fireEvent.change(input, { target: { value: "31.5" } });
+		expect(
+			input.value,
+			"a figure above the whole holding was accepted — the ceiling is not wired",
+		).toBe("31");
+	});
+
+	it("phone-host::an-EMPTY-amount-cannot-be-confirmed", () => {
+		// ⛔ `canSubmit` is asked of the controller, not hardwired — and hardwiring
+		// it `true` in the host passed the whole unit suite. An empty field makes
+		// `sellSharesFor` throw, which is the belt; the DISABLE is the affordance,
+		// and without it Confirm posts a body the route will refuse.
+		armOnPhone();
+		const confirm = screen.getByTestId(
+			`phone-sell-confirm-${L1}`,
+		) as HTMLButtonElement;
+		expect(
+			confirm.disabled,
+			"Confirm is disabled before anything is typed",
+		).toBe(false);
+		fireEvent.change(screen.getByTestId(`tile-sell-amount-${L1}`), {
+			target: { value: "" },
+		});
+		expect(
+			confirm.disabled,
+			"an empty amount is still submittable — canSubmit is not reaching the sheet",
+		).toBe(true);
 	});
 
 	it("phone-host::the-field-shows-the-ROUNDED-figure-while-submitting-the-exact-one", () => {
