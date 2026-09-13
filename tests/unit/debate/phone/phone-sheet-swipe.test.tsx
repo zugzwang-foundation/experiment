@@ -55,6 +55,8 @@ const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 /** ADR-0051 A2 / R-4. Pinned as literals so a silent threshold change reddens. */
 const SWIPE_CLOSE_PX = 80;
 const SWIPE_CLOSE_VELOCITY = 0.5;
+/** MOBILE-2e · R-Q2 — the velocity arm's minimum travel. */
+const SWIPE_MIN_TRAVEL_PX = 24;
 /** The deferral window — the same one `phone-sheet-motion.test.tsx` pins. */
 const CLOSE_MS = 200;
 
@@ -139,6 +141,9 @@ describe("phone sheet — the handle is a gesture, and both of its arms are live
 		expect(/const SWIPE_CLOSE_VELOCITY = ([\d.]+)/.exec(src)?.[1]).toBe(
 			String(SWIPE_CLOSE_VELOCITY),
 		);
+		expect(/const SWIPE_MIN_TRAVEL_PX = (\d+)/.exec(src)?.[1]).toBe(
+			String(SWIPE_MIN_TRAVEL_PX),
+		);
 	});
 
 	it("phone-sheet-swipe::a-drag-past-the-distance-threshold-closes", () => {
@@ -207,6 +212,73 @@ describe("phone sheet — the handle is a gesture, and both of its arms are live
 				onClose,
 				"30px in 20ms is 1.5 px/ms against a 0.5 threshold — a flick this " +
 					"decisive must not snap back",
+			).toHaveBeenCalledTimes(1);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	/**
+	 * ⛔⛔ MOBILE-2e · R-Q2 — THE SMALL-TRAVEL CORNER, WHICH THE THREE ROWS ABOVE
+	 * CANNOT SEE.
+	 *
+	 * They probe 100px/1000ms, 30px/1000ms and 30px/20ms — the distance arm,
+	 * neither arm, and the velocity arm at a travel far above any floor. The
+	 * defect lived under all three: `elapsed` is floored at 1ms, so a ONE PIXEL
+	 * drag released inside a millisecond computes 1.0 px/ms and cleared a 0.5
+	 * threshold. That is a tap with jitter, and on the composer arm it discards a
+	 * draft.
+	 *
+	 * The pair below is the whole point: the FAST arm must still fire at 30px, or
+	 * this floor has simply disabled the velocity gesture and the guard would be
+	 * certifying a feature it removed.
+	 */
+	it("phone-sheet-swipe::a-one-pixel-jitter-at-any-speed-does-NOT-dismiss", () => {
+		vi.useFakeTimers();
+		try {
+			const onClose = mount();
+			// 1px in 1ms = 1.0 px/ms — DOUBLE the velocity threshold, and the exact
+			// shape that used to close the sheet on a tap.
+			swipe(400, 401, 1);
+			act(() => {
+				vi.advanceTimersByTime(CLOSE_MS);
+			});
+			expect(
+				onClose,
+				"1px is a tap however fast it was; only travel past the floor is a flick",
+			).not.toHaveBeenCalled();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("phone-sheet-swipe::travel-just-under-the-floor-does-NOT-dismiss-and-just-over-DOES", () => {
+		vi.useFakeTimers();
+		try {
+			// 23px in 10ms = 2.3 px/ms: far over the velocity threshold, one pixel
+			// under the travel floor.
+			const under = mount();
+			swipe(400, 400 + SWIPE_MIN_TRAVEL_PX - 1, 10);
+			act(() => {
+				vi.advanceTimersByTime(CLOSE_MS);
+			});
+			expect(
+				under,
+				`${SWIPE_MIN_TRAVEL_PX - 1}px is under the floor and must snap back`,
+			).not.toHaveBeenCalled();
+			cleanup();
+
+			// ⛔ THE CONTROL. Same speed, one pixel over. Without this row the one
+			// above passes just as well against a velocity arm that has been
+			// switched off entirely.
+			const over = mount();
+			swipe(400, 400 + SWIPE_MIN_TRAVEL_PX, 10);
+			act(() => {
+				vi.advanceTimersByTime(CLOSE_MS);
+			});
+			expect(
+				over,
+				`${SWIPE_MIN_TRAVEL_PX}px at 2.4 px/ms is a flick and must close`,
 			).toHaveBeenCalledTimes(1);
 		} finally {
 			vi.useRealTimers();

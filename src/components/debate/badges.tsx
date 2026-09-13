@@ -178,7 +178,19 @@ export function SideBadge({
  * nothing (the default); `Flipped` / `Exited` render a neutral-grey chip. Placed
  * after the side badge, before the stake (D5).
  */
-export function PositionMarker({ marker }: { marker: Marker }) {
+/**
+ * ⚠ `className` IS ADDITIVE AND OPTIONAL, minted at MOBILE-2e · R-Q1 so the
+ * caller can place the chip without this file having to know where. Merged
+ * through `cn`, so an absent prop produces the byte-identical class string it
+ * produced before — which is what keeps the desktop render untouched.
+ */
+export function PositionMarker({
+	marker,
+	className,
+}: {
+	marker: Marker;
+	className?: string;
+}) {
 	if (marker === "none") {
 		return null;
 	}
@@ -187,7 +199,10 @@ export function PositionMarker({ marker }: { marker: Marker }) {
 		<InfoTip content={gloss} asChild>
 			<Badge
 				variant="secondary"
-				className="rounded-sm px-1.5 text-[10px] font-normal text-muted-foreground"
+				className={cn(
+					"rounded-sm px-1.5 text-[10px] font-normal text-muted-foreground",
+					className,
+				)}
 				aria-label={`Author ${marker}`}
 			>
 				{marker}
@@ -208,13 +223,23 @@ const LANE_GLOSS: Record<BadgeKind, string> = {
 	Contested: GLOSSARY.laneContested,
 };
 
-export function LaneBadge({ badge }: { badge: BadgeKind | null }) {
+/** ⚠ `className` additive and optional — see `PositionMarker` for the why. */
+export function LaneBadge({
+	badge,
+	className,
+}: {
+	badge: BadgeKind | null;
+	className?: string;
+}) {
 	if (!badge) {
 		return null;
 	}
 	return (
 		<InfoTip content={LANE_GLOSS[badge]} asChild>
-			<Badge variant="outline" className="rounded-sm text-[10px] font-normal">
+			<Badge
+				variant="outline"
+				className={cn("rounded-sm text-[10px] font-normal", className)}
+			>
 				{badge}
 			</Badge>
 		</InfoTip>

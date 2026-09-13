@@ -7,6 +7,7 @@ import {
 } from "radix-ui";
 import * as React from "react";
 
+import { useIsPhoneTier } from "@/components/debate/phone-tier";
 import { cn } from "@/lib/utils";
 
 /**
@@ -202,6 +203,43 @@ export function InfoTip({
 	// site (`<span>`, `<th>`, `<a>`, `<button>`), but `.contains()` works on
 	// any `Node` regardless of that type parameter.
 	const anchorRef = React.useRef<HTMLDivElement>(null);
+	const phoneTier = useIsPhoneTier();
+
+	// ⛔⛔ MOBILE-2e · R-M3 — NO INFO AFFORDANCE MOUNTS BELOW 640px, AND THIS IS
+	// THE ONLY PLACE IT CAN BE DECIDED.
+	//
+	// The defect is not that a gloss is unwanted on a phone; it is that on touch
+	// this component takes the POPOVER branch, which merges `{onClick: toggle}`
+	// onto the child through `Slot.Root`. So one tap on a Support pill BOTH opens
+	// the reply sheet AND opens the gloss — and with no hover to end it, the gloss
+	// then hangs over the argument field the reader is trying to write in. The
+	// sheet's own header already names the relation in words, so nothing is lost.
+	//
+	// ⚠ WHY HERE AND NOT AT THE CALL SITES. All eight phone-reachable info
+	// affordances live in components the DESKTOP tree also renders — `badges.tsx`
+	// (SideBadge, PositionMarker, LaneBadge), `ArgProfile`, `AggregateFooter`,
+	// `PriceBar`, `DharmaFigure`, `MarketHeader`'s LifecycleBadge — and five of
+	// those six carriers are SERVER components, so they cannot take a hook without
+	// a boundary change. A threaded `noTip` prop would have to reach
+	// PhoneDebateView → PostCard → ArgProfile → badges, and ONE unthreaded hop
+	// leaves a gloss mounted: the exact failure AGENTS.md §8 records for
+	// GlobalHeader → RulesControl → OnboardingDeck.
+	//
+	// ⚠ DESKTOP IS UNTOUCHED BY CONSTRUCTION, not by testing. `useIsPhoneTier`'s
+	// query is `not all and (min-width: 640px)`, its server snapshot is `false`,
+	// and its client snapshot is `false` whenever `window.matchMedia` is absent —
+	// which is jsdom. So the SSR bytes are identical, every render at or above
+	// 640px is identical, and every shipped render test observes the unchanged
+	// branch.
+	//
+	// ⚠ AND IT IS A VIEWPORT QUESTION, DELIBERATELY, NOT THE POINTER QUESTION
+	// `usePointerFine` asks. The two are orthogonal: a narrow desktop WINDOW takes
+	// the tooltip branch, a wide touch TABLET takes the popover branch. The tier
+	// is what the rest of this repo means by "the phone", and below 640px the
+	// phone tree is what renders, so the tier is the honest gate.
+	if (phoneTier) {
+		return <>{child}</>;
+	}
 
 	if (pointerFine) {
 		// No `id`/`aria-describedby` override here: `TooltipTrigger` already

@@ -373,10 +373,32 @@ export function ArgProfile({
 						// the paint. Matching line 1's minimum to the avatar's own height
 						// is the additive fix; jsdom cannot see it and B12 counts LINES,
 						// not overlap, so the measurement is a browser one.
-						className="text-sm font-medium text-ink hover:underline max-mobile:basis-full max-mobile:min-h-8 max-mobile:ps-10 max-mobile:text-[17px] max-mobile:leading-[22px] max-mobile:font-semibold"
+						// ⚠⚠ MOBILE-2e · R-Q1 — `max-mobile:basis-full` IS GONE FROM HERE AND
+						// HAS MOVED TO AN EXPLICIT BREAK, because the two do different jobs
+						// and only one of them is wanted now. `basis-full` on the pseudonym
+						// says "this field owns line 1 alone"; the ruling is that the chips
+						// join it there. A zero-height `basis-full` item ordered between the
+						// two groups says "break HERE" without claiming the line.
+						className="text-sm font-medium text-ink hover:underline max-mobile:-order-2 max-mobile:min-h-8 max-mobile:ps-10 max-mobile:text-[17px] max-mobile:leading-[22px] max-mobile:font-semibold"
 					>
 						{author.pseudonym}
 					</Link>
+					{/* ⛔ THE LINE BREAK, AS AN ELEMENT. Flexbox has no "break before this
+					    item"; the only way to end a line in a wrapping row is an item that
+					    fills it. This one is `display:none` at and above 640px — so it is
+					    not merely inert on the desktop, it is not in the layout at all —
+					    and below 640px it is a zero-height, zero-text box ordered between
+					    the line-1 group and everything else.
+					    ⚠ It lives INSIDE group A rather than beside it, because group A is
+					    `display:contents` at phone width — so its children ARE the row's
+					    flex items and this one lands where it needs to, while at 1440 it is
+					    a hidden child of a group whose composition several guards read by
+					    text content and by no-wrap class. It adds neither. */}
+					<span
+						aria-hidden="true"
+						data-testid="argprofile-line-break"
+						className="hidden max-mobile:-order-1 max-mobile:block max-mobile:h-0 max-mobile:basis-full"
+					/>
 					{/* ⛔⛔ EACH SEPARATOR TRAVELS WITH THE FIELD IT LEADS, IN A SPAN
 					    THAT CANNOT WRAP INTERNALLY — and that span is the whole of this
 					    change. `max-mobile:flex-wrap` above makes every child of group A
@@ -401,13 +423,23 @@ export function ArgProfile({
 					    spans are transparent — one line, same gaps, same order. Group B
 					    is untouched; its separator was already its first child and it
 					    measured no dangle. */}
-					<span className="flex shrink-0 items-center gap-1.5">
+					{/* ⚠ MOBILE-2e · R-Q1 — `max-mobile:contents` HERE IS WHAT LETS THE
+					    CHIP LEAVE. `order` is a property of flex ITEMS, and until this box
+					    dissolves the chip is not one — it is a child of a nested flex row,
+					    where reordering moves it beside the side badge and nowhere else.
+					    Dissolving costs the separator its guaranteed adjacency to the badge
+					    (they become independent items that could wrap apart), which is the
+					    trade group B measured and lost once — and it is acceptable here
+					    only because the whole point of the move is that line 2 now FITS on
+					    one line at every phone width, so nothing on it wraps at all. The
+					    B12 measurement is the thing that keeps that true. */}
+					<span className="flex shrink-0 items-center gap-1.5 max-mobile:contents">
 						<FieldSeparator />
 						<SideBadge side={side} price={entryPrice} size={chipSize} />
-						<PositionMarker marker={marker} />
+						<PositionMarker marker={marker} className="max-mobile:-order-2" />
 					</span>
 					{authorStake !== undefined ? (
-						<span className="flex shrink-0 items-center gap-1.5">
+						<span className="flex shrink-0 items-center gap-1.5 max-mobile:contents">
 							<FieldSeparator />
 							{/* RANK-1 / ADR-0039 R6 — the figure FOLLOWS THE RULER. This is
 						    the stake still held, which is exactly what the lane sorted
@@ -462,7 +494,7 @@ export function ArgProfile({
 								<InfoTip content={GLOSSARY.sold} asChild>
 									<span
 										data-testid="argstake-sold"
-										className="rounded-[var(--r-chip)] bg-n1 px-1.5 py-0.5 font-bold text-[10px] text-n5 uppercase tracking-[0.08em]"
+										className="rounded-[var(--r-chip)] bg-n1 px-1.5 py-0.5 font-bold text-[10px] text-n5 uppercase tracking-[0.08em] max-mobile:-order-2"
 									>
 										{SOLD_LABEL}
 									</span>
@@ -535,7 +567,20 @@ export function ArgProfile({
 				    ROW's behaviour at phone width, not of one group's current contents,
 				    and a longer badge string is exactly the kind of change that would
 				    otherwise reintroduce the clip in the half nobody thought to cover. */}
-				<span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap max-mobile:shrink max-mobile:flex-wrap">
+				{/* ⚠⚠ MOBILE-2e · R-Q1 — GROUP B DISSOLVES AT PHONE WIDTH, AND THE
+				    COMMENT BELOW RECORDS WHY THAT WAS ONCE A DEFECT. It was: with the
+				    chips still on line 2 the row overflowed, the break landed between
+				    this group's leading pipe and the age, and `3d ago` was stranded on a
+				    third line. The condition that produced it is the one this refinement
+				    removes — line 2 carries four fields and no chips now, and it fits on
+				    one line at 360/375/390/430. So the dissolution is safe for the same
+				    reason it was unsafe before, and B12 is what holds the premise.
+				    ⚠ `max-mobile:shrink` and `max-mobile:flex-wrap` are now INERT here
+				    for the same reason they are inert on group A — a `display:contents`
+				    box has no flex behaviour of its own. They are kept rather than
+				    stripped: removing a token from a shared component is a desktop edit,
+				    and these two cost nothing. */}
+				<span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap max-mobile:contents max-mobile:shrink max-mobile:flex-wrap">
 					{/* TIME-1 · Form B — HOW LONG AGO, AND IT IS THE LAST THING GROUP A
 				    SAYS. The lane badge follows it (entry 1b, rule 5); nothing else
 				    does.
@@ -578,7 +623,7 @@ export function ArgProfile({
 					    belongs at that seam, not at this one.
 					    ⚠ A REPLY PASSES NOTHING: lane dominance is a post-ranking
 					    artifact, and `LaneBadge` renders `null` for `null`. */}
-					<LaneBadge badge={badge ?? null} />
+					<LaneBadge badge={badge ?? null} className="max-mobile:-order-2" />
 				</span>
 			</div>
 			{/* ⚠⚠ UI-QUICK change set 6 §2 — THE DOWNLOAD PLACEHOLDER MOVED HERE FROM

@@ -39,9 +39,32 @@ afterEach(() => {
 	window.matchMedia = ORIGINAL_MATCH_MEDIA;
 });
 
-function mockMatchMedia(matches: boolean): void {
+/**
+ * ⛔⛔ THE STUB ANSWERS PER QUERY, AND IT HAS TO — A BLANKET ANSWER IS NOT A
+ * CONTROL, IT IS A SECOND VARIABLE.
+ *
+ * `InfoTip` now asks `window.matchMedia` TWO unrelated questions: the pointer
+ * question `(hover: hover) and (pointer: fine)`, and — through
+ * `useIsPhoneTier` — the viewport question `not all and (min-width: 640px)`.
+ * A stub that returns the same `matches` for every string answers both, so
+ * `mockMatchMedia(true)` used to mean "a fine pointer" and silently also meant
+ * "a phone", which is a device that does not exist and is the one combination
+ * that suppresses the component entirely. Every row below then asserted the
+ * pointer branch against a render the tier gate had already emptied.
+ *
+ * ⚠ This is the V-3 shape (a control that does not exercise the failing
+ * syntax), arriving from the harness rather than from the code: the assertion
+ * was real, the branch under it was not the branch it named.
+ *
+ * `phone` defaults to `false` — at and above 640px, which is where jsdom's
+ * notional viewport sits and where every pre-existing row was written.
+ */
+const POINTER_QUERY = "(hover: hover) and (pointer: fine)";
+const TIER_QUERY = "not all and (min-width: 640px)";
+
+function mockMatchMedia(matches: boolean, phone = false): void {
 	window.matchMedia = ((query: string) => ({
-		matches,
+		matches: query === POINTER_QUERY ? matches : phone,
 		media: query,
 		onchange: null,
 		addEventListener: () => {},
@@ -355,9 +378,87 @@ describe("INFO-1 — InfoTip", () => {
 		// V-3 guard on this file's own mock: prove the two mock calls really
 		// produce different `matches` values before trusting the open/close
 		// tests above to have exercised different code paths.
+		// ⚠ ASKED WITH THE EXACT QUERY THE COMPONENT ASKS. This used to probe
+		// `"(hover: hover)"` — a string no code under test ever passes — which was
+		// harmless only while the stub answered every query identically. It does
+		// not any more, and a control that exercises a query nobody uses is the
+		// same V-3 defect one layer down from the one that made the stub
+		// per-query in the first place.
 		mockMatchMedia(true);
-		expect(window.matchMedia("(hover: hover)").matches).toBe(true);
+		expect(window.matchMedia(POINTER_QUERY).matches).toBe(true);
 		mockMatchMedia(false);
-		expect(window.matchMedia("(hover: hover)").matches).toBe(false);
+		expect(window.matchMedia(POINTER_QUERY).matches).toBe(false);
+	});
+
+	it("positive control: the TIER answer is independent of the POINTER answer", () => {
+		// ⛔ The whole point of the per-query stub. If these two moved together,
+		// every row in this file that sets a pointer would silently also be setting
+		// a viewport, and the tier gate below would be untestable.
+		mockMatchMedia(true, false);
+		expect(window.matchMedia(POINTER_QUERY).matches).toBe(true);
+		expect(window.matchMedia(TIER_QUERY).matches).toBe(false);
+		mockMatchMedia(true, true);
+		expect(window.matchMedia(POINTER_QUERY).matches).toBe(true);
+		expect(window.matchMedia(TIER_QUERY).matches).toBe(true);
+	});
+
+	it("info-tip::NOTHING-MOUNTS-BELOW-640px-on-either-branch", () => {
+		// ⛔⛔ MOBILE-2e · R-M3. The defect this closes is not "a gloss on a phone
+		// is unwanted": it is that the TOUCH branch merges an `onClick` toggle onto
+		// its child, so one tap on a Support pill opened the reply sheet AND the
+		// gloss — and with no hover to end it, the gloss then sat over the argument
+		// field. Asserted on BOTH branches, because the tier gate is a viewport
+		// question and the pointer question is orthogonal to it: a phone-width
+		// window on a machine with a mouse must be just as empty.
+		for (const pointerFine of [true, false]) {
+			const { container, unmount } = render(
+				<InfoTip content={GLOSS} asChild>
+					<button type="button">Trigger</button>
+				</InfoTip>,
+			);
+			unmount();
+			void container;
+			mockMatchMedia(pointerFine, true);
+			const { container: phone } = render(
+				<InfoTip content={GLOSS} asChild>
+					<button type="button">Trigger</button>
+				</InfoTip>,
+			);
+			const trigger = phone.querySelector("button");
+			expect(
+				trigger,
+				`pointerFine=${pointerFine}: the child still renders`,
+			).not.toBeNull();
+			expect(trigger?.textContent).toBe("Trigger");
+			// The child is handed through BARE: no describedby stamped on it, and
+			// no popper layer anywhere in the document.
+			expect(trigger?.getAttribute("aria-describedby")).toBeNull();
+			expect(document.body.textContent).not.toContain(GLOSS);
+			expect(
+				document.querySelectorAll('[role="tooltip"]').length,
+				"no tooltip content",
+			).toBe(0);
+			expect(
+				document.querySelectorAll("[data-radix-popper-content-wrapper]").length,
+				"no popper wrapper of any kind",
+			).toBe(0);
+			cleanup();
+		}
+	});
+
+	it("positive control: the SAME render DOES mount above 640px", () => {
+		// ⛔ Without this the row above passes against a component that renders
+		// nothing anywhere — which is indistinguishable from a working gate.
+		mockMatchMedia(true, false);
+		const { container } = render(
+			<InfoTip content={GLOSS} asChild>
+				<button type="button">Trigger</button>
+			</InfoTip>,
+		);
+		const trigger = container.querySelector("button");
+		// The Tooltip branch hands Radix the child through `asChild`, which stamps
+		// its own attributes on it — the observable difference from the bare
+		// pass-through above.
+		expect(trigger?.getAttribute("data-state")).not.toBeNull();
 	});
 });

@@ -1011,25 +1011,54 @@ export function BetComposer(props: {
 							    as the single string `COMPOSER_COPY.submit` already supplies
 							    as the accessible name. No new string: `Place` is
 							    uppercased by the variant token, not rewritten.
-							    ⛔ The disabled treatment is `ui/button.tsx:8`'s
+							    ⛔ ON THE DESKTOP the disabled treatment is `ui/button.tsx:8`'s
 							    `disabled:pointer-events-none
 							    disabled:opacity-(--state-disabled-opacity)` and is NOT
-							    restated here — `--state-disabled-opacity: 0.5` is the canon's
+							    restated — `--state-disabled-opacity: 0.5` is the canon's
 							    only disabled treatment (design-language §3 item 9) and every
 							    control in the tree uses exactly it. There is no ghost
-							    outline box to remove; there never was one. */}
+							    outline box to remove there; there never was one.
+							    ⚠⚠ MOBILE-2e · R-M1 — AND BELOW 640px IT IS RESTATED, ON
+							    PURPOSE, BECAUSE THE CANON TREATMENT PRODUCES THE WRONG
+							    READING HERE. The `default` cva variant fills with
+							    `bg-(--btn-fill)`, which resolves to `--color-ground`
+							    `#181818` — the same value as the sheet this button sits in.
+							    So the ENABLED button was a dark box on an identically dark
+							    ground, separated from it by one `#404040` hairline, and it
+							    read as an outline rather than as the primary action. The
+							    phone's primary is `PhoneBottomBar`'s `BET YES`
+							    (`bg-ink text-ground`, `text-sm font-extrabold
+							    tracking-[0.06em] uppercase`), and this is the same action
+							    one layer in, so it takes the same treatment.
+							    ⛔ WHICH MEANS THE 0.5 OPACITY HAD TO GO WITH IT. Dimming a
+							    WHITE fill to 50% over a near-black ground lands on mid-grey
+							    with mid-grey text — the hollow reading again, arriving from
+							    the other end. Below 640px disabled is therefore a SOLID
+							    `n2` fill with `n6` text: recessed by ~3.3 stops of contrast
+							    against the enabled state (18:1 → 5.5:1) while staying a
+							    filled box, which is what says "this control exists and is
+							    not ready" rather than "this control is a border".
+							    ⚠ The height is the RULED 52px, not the bar's 46: the base
+							    keeps `h-auto min-h-[44px]`, so `composer-fit.test.ts`'s
+							    floor still reads what it expects, and the phone token sits
+							    beside it rather than replacing it.
+							    ⚠ `bg-(--btn-fill)` is UNPREFIXED on the primitive and
+							    `max-mobile:bg-ink` is a different twMerge group, so BOTH
+							    survive the merge and Tailwind's emitted variant order is
+							    what decides — measured in a real browser at 375, not
+							    assumed from the class string. */}
 							<Button
 								type="button"
 								disabled={submitDisabled}
 								aria-disabled={submitDisabled}
 								aria-label={COMPOSER_COPY.submit}
 								onClick={submit}
-								className="h-auto min-h-[44px] flex-col gap-0 self-stretch px-3 py-1 max-mobile:w-full max-mobile:flex-row max-mobile:items-baseline max-mobile:gap-1.5"
+								className="h-auto min-h-[44px] flex-col gap-0 self-stretch px-3 py-1 max-mobile:h-[52px] max-mobile:w-full max-mobile:flex-row max-mobile:items-center max-mobile:justify-center max-mobile:gap-1.5 max-mobile:[border:none] max-mobile:bg-ink max-mobile:text-ground max-mobile:tracking-[0.06em] max-mobile:uppercase max-mobile:disabled:bg-n2 max-mobile:disabled:text-n6 max-mobile:disabled:opacity-100"
 							>
-								<span className="text-[10px] leading-tight font-medium max-mobile:text-[14px] max-mobile:font-bold max-mobile:uppercase">
+								<span className="text-[10px] leading-tight font-medium max-mobile:text-[14px] max-mobile:font-extrabold max-mobile:uppercase">
 									Place
 								</span>
-								<span className="text-[14px] leading-tight font-bold">
+								<span className="text-[14px] leading-tight font-bold max-mobile:font-extrabold">
 									Đ BET
 								</span>
 							</Button>

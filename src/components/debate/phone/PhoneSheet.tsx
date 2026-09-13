@@ -125,6 +125,28 @@ const CLOSE_MS = 200;
  */
 const SWIPE_CLOSE_PX = 80;
 const SWIPE_CLOSE_VELOCITY = 0.5; // px per ms
+/**
+ * ⛔⛔ MOBILE-2e · R-Q2 — THE VELOCITY ARM NEEDS A FLOOR, AND WITHOUT ONE IT
+ * DISMISSES ON A TAP.
+ *
+ * `elapsed` is floored at 1ms to keep the division safe, which means a ONE
+ * PIXEL drag released inside a millisecond computes 1.0 px/ms — twice the
+ * threshold. A finger that lands on the handle and lifts with a pixel of
+ * jitter is that gesture; so is any coalesced or synthetic pointer sequence
+ * whose timestamps compress. The sheet then closes on what the reader
+ * performed as a tap, and on the composer arm that is a draft discarded.
+ *
+ * ⚠ THE SHIPPED TESTS COULD NOT SEE IT, and that is worth saying rather than
+ * fixing quietly: their three rows are 100px/1000ms, 30px/1000ms and
+ * 30px/20ms — the distance arm, neither arm, and the velocity arm at a
+ * travel well above any floor. Nothing probed the small-travel corner,
+ * because nothing had a reason to think a corner existed there.
+ *
+ * 24px is the ruled figure. It is comfortably above jitter and comfortably
+ * below the 80px distance arm, so the two bounds still describe different
+ * gestures rather than collapsing into one.
+ */
+const SWIPE_MIN_TRAVEL_PX = 24;
 
 export function PhoneSheet({
 	open,
@@ -394,7 +416,14 @@ export function PhoneSheet({
 		const elapsed = Math.max(1, event.timeStamp - state.t0);
 		const velocity = travelled / elapsed;
 		setDragY(null);
-		if (travelled >= SWIPE_CLOSE_PX || velocity >= SWIPE_CLOSE_VELOCITY) {
+		// ⚠ THE FLOOR GATES THE VELOCITY ARM ONLY. A slow drag past 80px is a
+		// deliberate dismissal whatever its speed, and it already clears 24 by
+		// construction — so putting the floor on the `||` as a whole would be the
+		// same condition written less clearly, and would couple two bounds that
+		// are meant to describe two different gestures.
+		const flicked =
+			travelled >= SWIPE_MIN_TRAVEL_PX && velocity >= SWIPE_CLOSE_VELOCITY;
+		if (travelled >= SWIPE_CLOSE_PX || flicked) {
 			beginClose();
 		}
 	};

@@ -186,7 +186,13 @@ export function AggregateFooter({
 				    ⚠ The `items-center` cited in the comment below belongs to d5's
 				    INNER `.sidewrap` columns (`:585-586`) and is NOT authority for
 				    the outer row — it is not read as such here in either direction. */}
-				<span className="flex h-6 w-full items-center">
+				{/* ⚠ MOBILE-2e · R-M2 — `max-mobile:h-8` TRACKS THE PILL, and it has to
+				    move with it or the CS6 fix above stops being true below 640px. The
+				    box exists to put the track's centre on the pill's centre; the pill
+				    is 32px on a phone now, so a box frozen at 24 would put the track 4px
+				    high — the same class of defect CS6 measured at 9.5px, one third the
+				    size and just as invisible in a source scan. */}
+				<span className="flex h-6 w-full items-center max-mobile:h-8">
 					<span
 						data-testid="aggregate-split-track"
 						aria-hidden="true"
@@ -226,7 +232,16 @@ export function AggregateFooter({
 							// is design-language's other half of that same bar family. 18px
 							// still clears the fixed `h-6` (24px) wrapper with 3px to spare on
 							// each side, so the CS6 centring is untouched.
-							"h-[18px] w-full overflow-hidden rounded-[var(--r)] [border:var(--hairline)]",
+							// ⚠⚠ MOBILE-2e · R-M2 — 6px BELOW 640px, ruled. The 18px literal
+							// stays exactly where it is: `split-bar-parity` and
+							// `aggregate-footer-alignment` both re-derive it from
+							// `PriceBar.tsx`'s `detail.bar` and read it out of THIS string,
+							// so the three-way desktop parity is untouched by an additive
+							// phone token. The reason the phone wants a thinner bar is not
+							// taste: at 360px the row is a third of the width it has at
+							// 1440, so an 18px track stops reading as a proportion and
+							// starts reading as a block of colour.
+							"h-[18px] max-mobile:h-[6px] w-full overflow-hidden rounded-[var(--r)] [border:var(--hairline)]",
 							counterPole,
 						)}
 					>
@@ -238,7 +253,14 @@ export function AggregateFooter({
 					</span>
 				</span>
 				<span>
-					<b className="text-sm text-ink">Đ {formatDharma(displayedTotal)}</b>{" "}
+					{/* ⚠ MOBILE-2e · R-M2 — the three amounts are ONE LINE at 12px on a
+					    phone. The two flanks already inherit the row's `text-xs`; only
+					    this one was a step up, and a 14px centre between two 12px flanks
+					    is what made the line read as three separate readouts rather than
+					    one. Desktop keeps the emphasis. */}
+					<b className="text-sm text-ink max-mobile:text-xs">
+						Đ {formatDharma(displayedTotal)}
+					</b>{" "}
 					{/* `.sb2.mid` (`d5:620`) — `letter-spacing:.1em;
 					    text-transform:uppercase`. The figure stays cased; the WORD is
 					    the overline. */}
@@ -338,12 +360,26 @@ function TriggerPill({
 					// two phone tokens re-appended. #523 replaced `px-3 py-1` with
 					// `w-[78px] h-6 flex items-center justify-center`; ours added a
 					// 44px tap-target floor and `touch-action: manipulation` below
-					// 640px. They compose rather than collide — `min-height: 44px`
-					// outranks `height: 24px` when it is the larger, which is exactly
-					// what the tap-target token is for, so the pill is 78×24 on the
-					// desktop and 78×44 on a phone. Nothing of main's was dropped and
-					// nothing of ours was re-derived.
-					"w-[78px] h-6 flex items-center justify-center rounded-(--r-chip) text-xs font-bold transition-all hover:shadow-(--state-hover-glow-pole) focus-visible:shadow-(--state-focus-ring) active:shadow-(--state-pressed-glow-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) max-mobile:min-h-11 max-mobile:[touch-action:manipulation]",
+					// 640px.
+					// ⚠⚠ MOBILE-2e · R-M2 — THE 44px FLOOR IS NO LONGER THE PILL'S OWN
+					// HEIGHT, AND THAT IS THE POINT OF THIS REFINEMENT. `min-h-11` grew
+					// the PAINTED box to 44px while the split track beside it stayed in
+					// its `h-6` alignment box, so the three Đ figures — each the second
+					// child of its own column — stopped sharing a line: the two flanks
+					// sat 20px below the centre one. Measured on the shipped build at
+					// 360/375/390/430.
+					// ⇒ The pill is sized at the RULED 32px and the tap area is bought
+					// back by a transparent `::after` inset 6px above and below, which
+					// is exactly 44 on a 32px box. A pseudo-element is the right
+					// instrument here rather than a handler: it extends the element's
+					// own hit region at the hit-testing layer, so nothing listens,
+					// nothing is prevented, and the phone gesture wall is untouched.
+					// ⚠ It needs `relative` to position against, and it must stay
+					// INSIDE the card's 12px gutter — `<Card>` is `overflow-hidden` and
+					// a clipped region is not hit-testable, so an extension wider than
+					// the padding would silently buy no tap area at all. 6px vertical
+					// inside 12px clears it.
+					"w-[78px] h-6 flex items-center justify-center rounded-(--r-chip) text-xs font-bold transition-all hover:shadow-(--state-hover-glow-pole) focus-visible:shadow-(--state-focus-ring) active:shadow-(--state-pressed-glow-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) max-mobile:relative max-mobile:h-8 max-mobile:text-[13px] max-mobile:font-semibold max-mobile:[touch-action:manipulation] max-mobile:after:absolute max-mobile:after:inset-x-0 max-mobile:after:-inset-y-1.5 max-mobile:after:content-['']",
 					pole,
 				)}
 			>

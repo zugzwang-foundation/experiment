@@ -171,8 +171,22 @@ describe("the composer fits without scrolling", () => {
 		// be given a fixed height that could clip its own two-line label.
 		const at = source.indexOf("aria-label={COMPOSER_COPY.submit}");
 		expect(at).toBeGreaterThan(-1);
-		const cls =
-			/className="([^"]*)"/.exec(source.slice(at, at + 400))?.[1] ?? "";
+		// ⛔⛔ MOBILE-2e — THE WINDOW WAS 400 CHARACTERS AND THE CLASS STRING GREW
+		// PAST IT, WHICH IS O-8 WEARING A DIFFERENT UNIT. A character window fences
+		// by DISTANCE exactly as a line number does, and prose is what moves: R-M1
+		// appended eleven phone tokens to this button and the slice then cut the
+		// `className="…"` mid-string, so the regex matched nothing, `?? ""` turned
+		// that into an empty token list, and the guard reported "the submit has no
+		// `h-auto`" — a defect it invented. Widened, and — the part that matters —
+		// the silent-degradation arm is GONE: a truncated read now throws with a
+		// message naming the cause instead of failing as though the source were
+		// wrong.
+		const matched = /className="([^"]*)"/.exec(source.slice(at, at + 1200));
+		expect(
+			matched,
+			"no complete className= found within 1200 chars of the submit's aria-label — widen the window, do not read the empty match as a missing class",
+		).not.toBeNull();
+		const cls = matched?.[1] ?? "";
 		const classes = cls.split(/\s+/).filter(Boolean);
 		// `h-auto` + a MIN height: the box grows to its label, never crops it.
 		expect(classes).toContain("h-auto");
