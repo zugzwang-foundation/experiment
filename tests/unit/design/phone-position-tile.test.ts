@@ -469,40 +469,44 @@ describe("A5 D-1 — the leftover height lives in exactly one place", () => {
 // ── 4 · what has to stand down for the DOCUMENT to be the scroller ───────────
 
 describe("A5 D-1 — the phone's scroller is the page, and three things release", () => {
-	it("tile::both-panel-boxes-release-overflow-AND-restore-min-w-0", () => {
+	it("tile::both-panel-boxes-leave-the-snap-chain-and-exactly-one-clips", () => {
 		const source = stripComments(read(TABLE));
-		for (const anchor of [
-			'data-testid="positions-panel"',
-			'data-testid="positions-panel-body"',
-		]) {
+		const SPEC = [
+			['data-testid="positions-panel"', "overflow-clip", "overflow-visible"],
+			[
+				'data-testid="positions-panel-body"',
+				"overflow-visible",
+				"overflow-clip",
+			],
+		] as const;
+		for (const [anchor, want, forbid] of SPEC) {
 			const cls = classesAfter(source, anchor, `${TABLE}: ${anchor}`);
 			expect(
 				cls,
-				`${TABLE}: ${anchor} is still a scroll container below 640px. A snap ` +
-					`alignment resolves against the nearest scroll-container ancestor, ` +
-					`and overflow:hidden makes a box one just as overflow-y:auto does — ` +
-					`so with either live the tiles snap against a panel instead of ` +
-					`against the page (measured: the landing misses by 45px).`,
-			).toContain(phone("overflow-clip"));
-			// ⛔ AND `visible` IS FORBIDDEN, because it was the first fix and it gave
-			// up the CLIP as well as the scroll container: measured at 360 on the
-			// Closed tab, a five-figure figure made row 1 328px wide against 278px
-			// available and that 50px reached the document, widening the layout
-			// viewport 360 → 369. `clip` contains it and is still not a scroll
-			// container. `@code-reviewer`, HIGH.
+				`${TABLE}: ${anchor} is still a scroll container below 640px, or took ` +
+					`the other box's value. A snap alignment resolves against the nearest ` +
+					`scroll-container ancestor, and overflow:hidden makes a box one just ` +
+					`as overflow-y:auto does — so with either live the tiles snap against ` +
+					`a panel instead of against the page (measured: the landing misses by ` +
+					`45px). ⛔ THE TWO TAKE DIFFERENT VALUES. The SECTION clips, because ` +
+					`row 1's three whitespace-nowrap cells cannot shrink below ` +
+					`min-content and a five-figure Đ figure otherwise reaches the ` +
+					`document (measured at 360: 328px of row against 278px available, ` +
+					`and the layout viewport widened 360 → 369). The BODY must NOT clip: ` +
+					`sticky-header-strip.test.ts forbids it by name, because the sticky ` +
+					`<thead>'s negative-offset shadow covers this body's own top padding ` +
+					`and a clipped body cannot scroll under it.`,
+			).toContain(phone(want));
 			expect(
 				cls,
-				`${TABLE}: ${anchor} releases overflow to \`visible\`, which reaches the ` +
-					`viewport AND gives up the clip. Row 1's three cells are ` +
-					`whitespace-nowrap in tracks that cannot shrink below min-content, so ` +
-					`a five-figure Đ figure then reaches the document and the page gains ` +
-					`horizontal scroll. \`clip\` is not a scroll container either.`,
-			).not.toContain(phone("overflow-visible"));
+				`${TABLE}: ${anchor} carries ${phone(forbid)}, which belongs to the ` +
+					`other box. See the message above for why each takes the value it does.`,
+			).not.toContain(phone(forbid));
 			expect(
 				cls,
-				`${TABLE}: ${anchor} releases overflow WITHOUT restoring min-w-0. ` +
-					`overflow:hidden also zeroes a box's automatic minimum size, so the ` +
-					`release alone restores min-width:auto on a box whose widest ` +
+				`${TABLE}: ${anchor} changes overflow WITHOUT restoring min-w-0. ` +
+					`overflow:hidden also zeroes a box's automatic minimum size, so ` +
+					`changing it alone restores min-width:auto on a box whose widest ` +
 					`unbreakable content is the market filter's label — measured, the ` +
 					`panel went 324px to 533px inside a 360px phone. The two tokens are ` +
 					`one decision and half of it is a regression.`,

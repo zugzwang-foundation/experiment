@@ -2010,6 +2010,19 @@ function TileArgumentCell({
  * still the VIEWPORT and the snap still lands at 62px, while the frame holds its
  * 360 and the page gains no horizontal scroll. It restores precisely the
  * containment `hidden` was providing and gives up only the part that was in the way.
+ *
+ * ⛔⛔ **AND THE TWO BOXES TAKE DIFFERENT VALUES, WHICH A SHIPPED GUARD IS WHAT
+ * FOUND.** The first form clipped BOTH, and `sticky-header-strip.test.ts:134`
+ * went red: it forbids `overflow-hidden|clip` on this BODY by name, because the
+ * sticky `<thead>`'s negative-offset shadow is what covers the body's own top
+ * padding and a clipped body cannot scroll under it. The guard is right, and its
+ * red is the better shape rather than an obstacle:
+ *   · the **body** only has to stop being a SCROLL CONTAINER, which `visible` does,
+ *     and it needs no clip of its own because
+ *   · the **section** clips at its border box, which is where the containment was
+ *     always taken.
+ * Both boxes leave the snap chain and exactly one of them clips — which is what
+ * `overflow: hidden` was doing before this round, expressed once instead of twice.
  * ⚠ **WHAT IS THEREFORE UNCHANGED, AND IS NOT THIS ROUND'S TO FIX:** a five-figure
  * figure at 360 is CLIPPED rather than wrapped — exactly as it was before this
  * round, when the same content overflowed a 64px cell and was clipped at this same
@@ -2113,8 +2126,8 @@ function PositionsPanel({
 			    MEDIUM: the token is right and the stated cause was not the cause. */}
 			<div
 				data-testid="positions-panel-body"
-				// MOBILE-2h · R-2 — the same phone pair as the `<section>`; docblock.
-				className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 max-mobile:min-w-0 max-mobile:overflow-clip"
+				// MOBILE-2h · R-2 — `visible` here, `clip` on the `<section>`; docblock.
+				className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 max-mobile:min-w-0 max-mobile:overflow-visible"
 				ref={bodyRef}
 			>
 				{children}
