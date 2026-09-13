@@ -87,8 +87,10 @@ What actually shipped:
 
 | file | rows | what it is |
 |---|--:|---|
-| `tests/unit/design/phone-round-five.test.ts` | **20** | NEW — source scans for R-M1 · R-M2 · R-M3 · R-Q1 · R-P1 · R-P2 · R-P3 · R-P4, plus two positive-control rows that prove the recognisers fire before any of them runs |
-| `tests/unit/profile/render/phone-sell-sheet.test.tsx` | **8** | NEW — jsdom, mounting the leaf DIRECTLY, because its host gates it on the tier and jsdom is always the desktop branch |
+| `tests/unit/design/phone-round-five.test.ts` | **24** | NEW — source scans for R-M1 · R-M2 · R-M3 · R-Q1 · R-P1 · R-P2 · R-P3 · R-P4, plus two positive-control rows that prove the recognisers fire before any of them runs. ⚠ It shipped at 20 and gained four at the final gate, after an adversarial pass found seventeen mutations the set could not catch |
+| `tests/unit/profile/render/phone-sell-sheet.test.tsx` | **9** | NEW — jsdom, mounting the leaf DIRECTLY. ⛔ **The reason given here for mounting it directly — that the host cannot be reached in jsdom — was FALSE**, and the file's own docblock now says so. `useIsPhoneTier` reads `window.matchMedia`, and a per-query stub mounts the phone arm through the real host |
+| `tests/unit/profile/render/phone-sell-host.test.tsx` | **9** | NEW, **not planned** — the host-mounted counterpart, written at the final gate. It proves at RUNTIME what this plan filed as source facts: the row `contains` the sheet, the two arms are exclusive, a tap inside does not cancel the arm, the wire carries the exact holding, the seed is the ceiling, an empty amount cannot be confirmed, the body lock goes on and comes off |
+| `tests/unit/debate/render/arg-profile-row.test.tsx` | **+3** | the R-Q1 lift proved to REACH THE DOM rather than to exist at the call site — deleting the `className` merge in `badges.tsx` had been green everywhere |
 | `tests/unit/design/profile-mobile-reflow.test.ts` | 4 changed, 1 added | MOBILE-1 Job B's guards, INVERTED for round five |
 | `tests/unit/debate/phone/phone-sheet-swipe.test.tsx` | +2 | the 24px travel floor, with its own control at 24px exactly |
 | `tests/unit/ui/info-tip.test.tsx` | +3 | the tier gate, plus a per-query `matchMedia` stub (a blanket one had been answering the pointer question AND the viewport question with one value) |
