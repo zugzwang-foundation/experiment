@@ -306,12 +306,34 @@ describe("A6 D-1 — a list row of natural height", () => {
 			source,
 			`${TABLE}: the tile's value is not at the ruled 18px.`,
 		).toMatch(/className="text-\[17px\][^"]*max-mobile:text-\[18px\]/);
-		const flat = source.indexOf("data-testid={`tile-pl-");
-		expect(flat, `${TABLE}: the movement chip is gone`).toBeGreaterThan(-1);
+		// ⛔⛔ EACH ARM IS READ SEPARATELY, AND THE FORM THIS REPLACES IS WHY. It read a
+		// 700-CHARACTER WINDOW from the first `tile-pl-` and asked whether 11px appeared
+		// anywhere inside it — a fence by DISTANCE (`O-8` in a different unit) wide
+		// enough to span BOTH arms, so the moved arm's token satisfied an assertion
+		// about the flat one. Measured: putting the flat arm back to 13px SURVIVED the
+		// battery.
+		const arms = [...source.matchAll(/data-testid={`tile-pl-/g)].map(
+			(m) => m.index,
+		);
 		expect(
-			source.slice(flat, flat + 700),
-			`${TABLE}: the movement chip is not at the ruled 11px.`,
-		).toContain(phone("text-[11px]"));
+			arms.length,
+			`${TABLE}: the movement slot renders ${arms.length} ways and there are TWO ` +
+				`— a "—" when the value has not moved, and a glyph-plus-percentage when ` +
+				`it has. Re-derive this reader rather than loosening it.`,
+		).toBe(2);
+		for (const at of arms) {
+			const tag = openingTagFrom(
+				source,
+				source.lastIndexOf("<", at),
+				`${TABLE}: a movement arm`,
+			);
+			expect(
+				tag,
+				`${TABLE}: a movement arm is not at the ruled 11px. Both are read: they ` +
+					`are twelve lines apart and look nothing alike, which is exactly how ` +
+					`one gets missed.`,
+			).toContain(phone("text-[11px]"));
+		}
 	});
 
 	it("tile::R-3-no-selected-visual-below-640-and-the-STATE-survives", () => {
@@ -783,7 +805,16 @@ describe("A6 D-1 — nothing on this surface snaps, at all", () => {
 		);
 		expect(files, "the walk did not reach the position tile").toContain(TABLE);
 
-		const ALIGN = /(?:^|\s|:)snap-(?:start|center|end|align-none)\b/;
+		// ⛔⛔ THE BOUNDARY IS A NEGATIVE LOOKBEHIND, NOT `(?:^|\s|:)`, AND THE
+		// DIFFERENCE IS A HOLE THIS ROUND'S OWN MUTATION BATTERY FOUND. The older form
+		// required whitespace, a line start or a variant colon before the token — so an
+		// alignment written as the FIRST class in a string (`className="snap-start …"`)
+		// is preceded by a QUOTE and matched nothing at all. The census read clean with
+		// a second snap target live in the tree: injecting `snap-start` at the head of a
+		// `MarketCard.tsx` className SURVIVED the whole battery.
+		// ⇒ `(?<![\w-])` admits a quote, a backtick, a brace or a variant colon, and
+		// still refuses a token that is merely the tail of a longer word.
+		const ALIGN = /(?<![\w-])snap-(?:start|center|end|align-none)\b/;
 		const found = files.filter((rel) => {
 			const src = stripComments(read(rel));
 			return ALIGN.test(src) || src.includes("scrollSnapAlign");
@@ -802,7 +833,8 @@ describe("A6 D-1 — nothing on this surface snaps, at all", () => {
 		// NAME. An alignment with no container does nothing; a container is what
 		// makes one live. `PhoneFeedTrack` declares its own and is the only file that
 		// may.
-		const TYPE = /(?:^|\s|:)snap-(?:x|y|both|proximity|mandatory)\b/;
+		// Same boundary and the same reason — see the ALIGN note above.
+		const TYPE = /(?<![\w-])snap-(?:x|y|both|proximity|mandatory)\b/;
 		const typed = files.filter((rel) => TYPE.test(stripComments(read(rel))));
 		expect(
 			typed.sort(),
