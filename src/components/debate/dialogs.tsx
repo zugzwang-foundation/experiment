@@ -143,31 +143,34 @@ export function PostPopup({
 							    ⛔ The desktop branch is untouched, and `marketQuestion` is
 							    optional precisely so it cannot reach one by omission. */}
 							{tier === "phone" && marketQuestion !== undefined ? (
-								<DialogTitle
-									data-testid="post-popup-market-question"
-									/* ⛔⛔ `min-w-0` AND THE END PADDING ARE BOTH LOAD-BEARING, AND
-									   THE PAINT IS WHAT CAUGHT IT. `truncate` brings
-									   `white-space: nowrap`, which makes this element's INTRINSIC
-									   width its whole text; `DialogHeader` is a flex container and
-									   a flex item's automatic minimum is that intrinsic width, so
-									   the title did not truncate at all — it overflowed the
-									   dialog's content box and ran UNDER the `×`.
-									   ⚠ MEASURED, and the numbers alone said it was fine: the
-									   element reported `scrollWidth === clientWidth` (339 === 339),
-									   i.e. "nothing is clipped", which is exactly what an element
-									   that grew to fit its text reports. It was the SCREENSHOT
-									   that showed the question colliding with the close control.
-									   The paint is the arbiter (AGENTS.md §9).
-									   ⇒ `min-w-0` lets it shrink so `truncate` can bite, and
-									   `pe-7` (28px) keeps the ellipsis clear of the 16px `×` that
-									   sits 16px from the dialog's right edge.
-									   ⚠ The ground render did not have this problem and could not:
-									   its title WRAPPED, so it never needed a width it did not
-									   have. One line is what introduces the constraint. */
-									className="min-w-0 truncate pe-7 text-[13px] leading-[17px] font-normal text-n5"
-								>
-									{marketQuestion}
-								</DialogTitle>
+								<>
+									{/* ⛔⛔ THE NAME AND THE PAINT ARE SEPARATED, AND THE FIRST CUT
+									    CONFLATED THEM. It put the market question IN the
+									    `DialogTitle`, which made the dialog's accessible name the
+									    MARKET — a string that is identical for every argument in
+									    that market. A reader opening `Know more` on three different
+									    posts would be announced the same dialog name three times,
+									    so the name stopped distinguishing the thing it names.
+									    `@code-reviewer` proposed the split and it costs nothing:
+									    Radix requires *a* `DialogTitle`, not a VISIBLE one.
+									    ⇒ The post's own title stays the accessible name, hidden
+									    from the paint; the market question is ordinary styled text
+									    below it. Sighted readers get the context the sheet lacked,
+									    screen-reader users keep the per-post name they had. */}
+									<DialogTitle className="sr-only">{post.title}</DialogTitle>
+									{/* ⛔ `min-w-0` LIVES ON THE HEADER, NOT HERE — see the
+									    `DialogHeader` block above. `truncate` brings
+									    `white-space: nowrap`, so this element's min-content width is
+									    the whole question; only an ancestor that is allowed to
+									    shrink lets it clip. `pe-7` keeps the ellipsis clear of the
+									    16px `×` that sits 16px from the dialog's right edge. */}
+									<p
+										data-testid="post-popup-market-question"
+										className="min-w-0 truncate pe-7 text-[13px] leading-[17px] font-normal text-n5"
+									>
+										{marketQuestion}
+									</p>
+								</>
 							) : (
 								<DialogTitle>{post.title}</DialogTitle>
 							)}

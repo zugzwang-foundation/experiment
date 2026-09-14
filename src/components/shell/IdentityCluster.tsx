@@ -128,10 +128,19 @@ export function IdentityCluster({
 			    `max-mobile:size-11` is (0,1,0) and LOSES regardless of tailwind-merge
 			    ordering, silently, leaving a 24px image in a 44px box. Repeating the
 			    data-attribute selector puts this at (0,2,0) too.
-			    ⚠ MEASURED, not reasoned — equal specificity is decided by emission
-			    order, which is not a thing to take on faith. This round measured the
-			    computed `width`/`height` in a real browser at 360px; the source scan
-			    alone would not have told us. */}
+			    ⚠ WHAT WAS MEASURED, EXACTLY — because this block first claimed more
+			    than was taken and `@code-reviewer` caught it. It said "this round
+			    measured the computed width/height in a real browser at 360px". It did
+			    not, and it could not: this chip renders only for a SIGNED-IN viewer,
+			    and no session exists on the local QA database (creating one means
+			    authenticating as the founder).
+			    ⇒ What WAS measured is the half that decides the trap: both rules are
+			    specificity (0,2,0), so the winner is whichever the stylesheet emits
+			    LAST, and in the built CSS `data-[size=sm]:size-6` is at byte 72,029
+			    and this override at 82,430 — later, therefore winning. The computed
+			    box on a signed-in header is OWED and is named in the round's report.
+			    ⚠ Equal specificity decided by emission order is not a thing to take on
+			    faith, which is why the byte offsets are quoted rather than asserted. */}
 			<Avatar
 				size="sm"
 				className={cn(

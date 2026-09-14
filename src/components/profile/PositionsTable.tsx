@@ -855,7 +855,14 @@ export function PositionsTable({
 							    token, and splitting one text node across two inline spans
 							    changes no metric and no line-breaking. B1-p is the proof. */}
 							<span className="min-w-0 max-mobile:flex max-mobile:items-baseline max-mobile:gap-1">
-								<span className="min-w-0 max-mobile:truncate">
+								{/* ⚠ `max-mobile:` ON BOTH, so this element adds nothing above
+								    640px. The inner span carried a bare `min-w-0` in the first
+								    cut — provably inert there (it is an inline box above the
+								    breakpoint, and `min-width` does not apply to a non-replaced
+								    inline), but the round's wall is that every token is
+								    phone-scoped, and "inert" is a thing a reader has to verify
+								    where "prefixed" is a thing they can see. `@code-reviewer`. */}
+								<span className="max-mobile:min-w-0 max-mobile:truncate">
 									{selectedMarketLabel.tag}
 									<span className="max-mobile:hidden">
 										{selectedMarketLabel.rest}

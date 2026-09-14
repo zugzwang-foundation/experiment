@@ -457,6 +457,26 @@ export function PhoneDebateView({
 		if (landed === null || jumpSide === null) {
 			return;
 		}
+		// ⛔⛔ THE FEED ARM ONLY, AND THIS GUARD IS NOT BELT-AND-BRACES — WITHOUT IT
+		// A THREAD-ARM REPLY SILENTLY FLIPS THE FEED'S POLE. Found by
+		// `@code-reviewer`. On the thread arm `focused` is set, so
+		// `findPostedNode` DOES resolve a reply and `jumpSide` is that reply's own
+		// side — which for a Counter reply is the OPPOSITE pole from the post being
+		// read. The effect would then set `activeSide`, a value this arm never
+		// displays (the tabs here are Support/Counter), find no card to scroll to
+		// because the thread panes render `ReplyCard`s and carry no
+		// `data-phone-post-id`, and return. Nothing visible happens — until the
+		// reader taps Back and lands on a side they did not choose.
+		// ⚠ AND IT WOULD HAVE SPENT THE SHOT DOING IT. `jumpedFor` is stamped
+		// before the scroll, so the same comment could never jump again; a reader
+		// who replied from the thread and then returned to the feed had already
+		// used up the one jump that comment was owed. Returning BEFORE the stamp is
+		// what keeps the shot unspent.
+		// ⚠ The arm is the right axis rather than the card's presence: this is the
+		// only arm that HAS a feed to bring a card to the top of.
+		if (focused !== null) {
+			return;
+		}
 		if (jumpedFor.current === landed.commentId) {
 			return;
 		}
@@ -492,7 +512,7 @@ export function PhoneDebateView({
 			region.scrollTop +
 			(card.getBoundingClientRect().top - region.getBoundingClientRect().top);
 		region.scrollTo({ top });
-	}, [landed, jumpSide]);
+	}, [landed, jumpSide, focused]);
 
 	/**
 	 * ⛔⛔ EVERY HOST TRANSITION CONSULTS `composerBusy`, NOT JUST THE CLOSE —
@@ -622,11 +642,28 @@ export function PhoneDebateView({
 					   `PostCard` is shared with the desktop tree and this round's wall is
 					   a desktop diff of exactly nothing. The wrapper is a phone-tree leaf,
 					   so it cannot reach 1440 at all.
-					   ⚠ IT IS LAYOUT-INERT BY CONSTRUCTION, not by hope: it becomes the
-					   flex item in place of the card, stretches to the same width, and
-					   takes its height from the same child — `PostCard`'s root declares no
-					   `flex-1` and no `self-*`, so nothing it does depends on being the
-					   flex item itself. Measured either way in this round's B1/B2 pass.
+					   ⚠⚠ IT IS LAYOUT-INERT, AND THE FIRST VERSION OF THIS SENTENCE GAVE
+					   THE WRONG REASON FOR IT. It read "`PostCard`'s root declares no
+					   `flex-1` and no `self-*`" — `PostCard.tsx:122` is
+					   `<Card className="min-h-0 flex-1 …">`, so the card DOES carry
+					   `flex: 1 1 0%` and the re-parenting does change its status: it stops
+					   being a flex item of the feed column and becomes a block child of
+					   this div, where `flex-1` names nothing at all. Found by
+					   `@code-reviewer`.
+					   ⇒ THE CONCLUSION SURVIVES ON A PROPERTY OF THE CONTAINER, not of the
+					   card. The feed column is a block-level child of the pane with
+					   `height: auto`, so its main size is indefinite: `flex-basis: 0%`
+					   resolves as `content` and `flex-grow` has no free space to
+					   distribute. `flex-1` was ALREADY inert in that container — which is
+					   why nothing moves — and it would stop being inert the moment anyone
+					   gave the feed column a definite height.
+					   ⚠ AND THE CITED MEASUREMENT DID NOT COVER IT EITHER. This said
+					   "measured either way in this round's B1/B2 pass", whose fingerprints
+					   are at 1440 and 640 — widths at which this whole subtree is
+					   `display:none`. Re-measured at **360**, ground against tip: both
+					   cards at `(11.99, 187.86, 336.02, 308.29)` and
+					   `(11.99, 506.15, …)`, column height `776.582px` on both, identical to
+					   the hundredth of a pixel.
 					   ⚠ AND IT CARRIES THE ID, NOT THE INDEX. An index would couple the
 					   scroll to `sidePosts`' ordering and break the first time the empty
 					   CTA or a ranked re-order moved a row; the comment id is the same key

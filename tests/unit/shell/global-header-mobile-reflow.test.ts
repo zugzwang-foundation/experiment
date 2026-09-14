@@ -930,8 +930,18 @@ describe("global header mobile reflow — the right zone sheds its anti-conflati
  * deleted guard proves nothing in either direction, an inverted one reddens the
  * moment somebody reverts. Its old form banned the whole responsive vocabulary
  * from this file on a Phase B motive that ADR-0048 already superseded; its new
- * form is a CLOSED ALLOWLIST — exactly one token, exactly `max-mobile:hidden` —
- * so every other spelling still reddens, including ones nobody has thought of.
+ * form is a CLOSED ALLOWLIST — so every other spelling still reddens, including
+ * ones nobody has thought of.
+ * ⚠ IT WAS "EXACTLY ONE TOKEN, EXACTLY `max-mobile:hidden`" UNTIL MOBILE-2l, and
+ * that sentence is corrected here rather than below because this is the
+ * paragraph a reader reaches first (`O-5`). ADR-0051 A8 D-5 rules a SECOND
+ * behaviour into this file — the chip becomes a circular avatar — so the list is
+ * now the ruled set in `RULED_PHONE_VOCABULARY`. What did not change is the
+ * property that made the inversion worth doing: the list is CLOSED and exact, so
+ * it is still a set equality and never a denylist.
+ * ⚠ BOTH SIDES OF THAT EQUALITY ARE SORTED, DELIBERATELY. With one token order
+ * meant nothing; with ten, asserting source order would redden on a re-ordering
+ * that changes no behaviour. The SET is the contract; the order is not.
  * The JOIN CTA's never-hides rule survives ADR-0048 and becomes an EXPLICIT
  * assertion here, because it was previously held only as a side effect of the
  * blanket ban that is being inverted away.
@@ -1385,7 +1395,7 @@ describe("global header mobile reflow — what this task may NOT touch", () => {
 	 * `:82` names: a deleted guard proves nothing in either direction, an inverted
 	 * one reddens the moment somebody reverts. Two of its properties are carried
 	 * forward deliberately rather than rebuilt: the vocabulary check is still
-	 * EXHAUSTIVE (a closed allowlist of exactly one token, not a denylist of
+	 * EXHAUSTIVE (a closed CLOSED ALLOWLIST — one token at ADR-0049, ten since ADR-0051 A8 D-5 (`RULED_PHONE_VOCABULARY`), not a denylist of
 	 * remembered spellings), and the JOIN branch's cleanliness is now asserted
 	 * EXPLICITLY, where the ban held it only as a side effect.
 	 *
