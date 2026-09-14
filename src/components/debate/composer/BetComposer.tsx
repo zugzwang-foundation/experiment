@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useFlag } from "@/lib/posthog/use-flag";
 import { COMMENT_MAX_LENGTH } from "@/server/config/limits";
 
 import { SideBadge } from "../badges";
@@ -168,6 +169,27 @@ export function BetComposer(props: {
 	const [authGate, setAuthGate] = useState(false);
 	// Slice 5 — the optional image (sign → PUT → id in the payload).
 	const [image, setImage] = useState<ImageAttachState>({ phase: "none" });
+	/**
+	 * FLAGS-1 / ADR-0052 — the operator's brake on image attach.
+	 *
+	 * ⛔ THE GATE IS HERE RATHER THAN INSIDE `ImageAttach` BECAUSE THIS COMPONENT
+	 * OWNS THE GRID TRACK THE AFFORDANCE SITS IN. A child that returns `null`
+	 * leaves its `2fr` column standing, so the composer would render ~40% of its
+	 * width blank — the `RESO-1 · R-4` / `CRIT-1` empty-column defect, where
+	 * `MarketPriceChartHost` returned `null` inside a rail its caller had already
+	 * decided to draw. The child and the track must come from ONE decision.
+	 *
+	 * ⚠ Named for the FEATURE, defaulting ON: a flag that was never created, a
+	 * PostHog outage, and a not-yet-loaded payload all coerce to `true`, so the
+	 * brake can only ever be applied deliberately. ADR-0007's "`defaultValue`
+	 * MUST encode the safe behaviour" is written for opt-in features and inverts
+	 * for a brake on shipped behaviour — ADR-0052 §Polarity.
+	 *
+	 * ⛔ NOT A SECURITY CONTROL. This hides an affordance; it does not refuse a
+	 * request. `POST /api/uploads/sign` is unchanged and still enforces its own
+	 * auth, type and size rules.
+	 */
+	const imageAttachEnabled = useFlag("image-attach-enabled", true);
 
 	const keyRef = useRef(keyState);
 	keyRef.current = keyState;
@@ -702,13 +724,27 @@ export function BetComposer(props: {
 				    title input and the body textarea — the two things a participant is
 				    here to fill in — get less than half the sheet. Stacking gives both
 				    the full width and costs the desktop nothing. */}
-				<div className="grid min-h-0 grid-cols-[2fr_3fr] items-stretch gap-2.5 max-mobile:grid-cols-1">
-					<ImageAttach
-						state={image}
-						disabled={floorAbove || inFlight}
-						onPick={onPickImage}
-						onRemove={onRemoveImage}
-					/>
+				{/* ⛔ FLAGS-1 — THE TRACK TEMPLATE MOVES WITH THE CHILD, NOT
+				    SEPARATELY FROM IT. Dropping only `<ImageAttach>` would leave the
+				    `2fr` track standing and empty; dropping only the track would
+				    leave the affordance in a column it no longer fits. One
+				    condition drives both, which is the whole reason the flag is read
+				    in this component rather than in the child. */}
+				<div
+					className={
+						imageAttachEnabled
+							? "grid min-h-0 grid-cols-[2fr_3fr] items-stretch gap-2.5 max-mobile:grid-cols-1"
+							: "grid min-h-0 grid-cols-1 items-stretch gap-2.5"
+					}
+				>
+					{imageAttachEnabled && (
+						<ImageAttach
+							state={image}
+							disabled={floorAbove || inFlight}
+							onPick={onPickImage}
+							onRemove={onRemoveImage}
+						/>
+					)}
 					{/* `.compright` (d5) — title → body → the money footblock.
 					    RPLY-2 · R1 — `min-h-0`, so its children can shrink below their
 					    own content height instead of forcing this whole column — and
