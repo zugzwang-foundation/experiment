@@ -9,6 +9,8 @@
 | **Frame document** | SPEC.2 §1.4 #5 (delegation, observability sub-bullet), §18 (Observability Contract — substantively filled), §22 (Operational Runbook Pointers — alarm catalogue feeds), §22 (ADR Index) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
+| **Amends** | — |
+| **Amended-by** | ADR-0052 — the `defaultValue` polarity rule, which inverts for a brake on already-shipped behaviour |
 
 ---
 
@@ -85,7 +87,11 @@ Runtime contract for feature-flag access:
 useFlag(flagName: string, defaultValue: T): T
 ```
 
-Single source of truth: `src/server/flags/use-flag.ts`. Behaviour:
+Single source of truth: **`src/lib/posthog/use-flag.ts`** *(⚠ this line said
+`src/server/flags/use-flag.ts` until FLAGS-1; no such file has ever existed — the
+wrapper shipped at SCAFFOLD.6 under `src/lib/posthog/`, and the file map in
+"Single-source-of-truth file map" below carried the same wrong path. Corrected in
+place rather than in an appendix, per `O-5`.)* Behaviour:
 
 - If PostHog Cloud is reachable and the flag is defined: returns the flag's evaluated value for the current user identity.
 - If PostHog Cloud is unreachable: returns `defaultValue` (fail-open).
@@ -94,7 +100,11 @@ Single source of truth: `src/server/flags/use-flag.ts`. Behaviour:
 
 `defaultValue` MUST encode the safe behaviour — typically "feature disabled." A feature flag whose `defaultValue` exposes unfinished functionality on PostHog outage is a discipline violation.
 
+⚠ **AMENDED BY ADR-0052 — "typically" is doing load-bearing work in that sentence, and the other case is now in use.** The rule above is written for an **opt-in feature**, where the hazard is shipping unfinished functionality on an outage. For a **brake on already-shipped behaviour** the hazard runs the other way: defaulting to "disabled" would let an unreachable PostHog, or a flag nobody has created yet, silently strip a working feature from the live product. Such a flag is named for the FEATURE and defaults **`true`** — `useFlag("image-attach-enabled", true)`. Both halves of the rule are the same principle (`defaultValue` encodes the safe state); they disagree only about which state is safe, and that is decided by whether the feature is already shipped. ⛔ Do not name a brake `kill-*`: read through a `defaultValue`, a kill-flag reverses its meaning at the one moment it matters. ADR-0052 carries the convention.
+
 The v1 feature-flag inventory is **not** locked in this ADR — SCAFFOLD.6 ratifies the launch-day flag list. Beyond launch, individual feature flags are added per-flow as needed; no per-flag ADR required.
+
+⚠ **DISCHARGED AT ADR-0052, and not by SCAFFOLD.6.** SCAFFOLD.6 shipped the transport — SDKs, provider, `useFlag`, env vars — and ratified no flag list, so the inventory stayed empty and the brake this ADR's Consequences section promises had **zero call sites** for sixteen weeks, until the day before launch. ⇒ The deferral above is the shape to avoid repeating: a capability was bought, its enabling work was routed to a task that was not scoped to do it, and nothing detected the gap because an unused wrapper compiles, type-checks and passes review exactly like a used one. **ADR-0052 holds the live inventory.**
 
 Product analytics: PostHog events are emitted at flow boundaries (signup, bet placement, comment posting, market resolution). Specific event-naming convention deferred to SCAFFOLD.6.
 
@@ -182,8 +192,9 @@ Both vendors are designed fail-open at the SDK level. The failure-mode profile:
 | Sentry client + server configuration (DSN, environment, release tagging, sampling rates) | `sentry.client.config.ts` + `sentry.server.config.ts` (per Sentry Next.js convention) |
 | Sentry build-time configuration (source map upload, Vercel deploy-hook integration) | `next.config.js` Sentry webpack plugin block |
 | Sentry custom events emitted for alarms 2–6 | Catalogued by alarm-name comment at the emission site: bet transaction wrapper (ENGINE.7), pre-commit moderation flow (ADR-0014 / SPEC.15), pg_cron jobs file (`drizzle/migrations/<NNNN>_pg_cron_jobs.sql`), R2 orphan sweep handler (`src/app/api/cron/r2-orphan-sweep/route.ts`) |
-| PostHog client + server configuration | `src/server/observability/posthog.ts` |
-| PostHog `useFlag()` runtime contract | `src/server/flags/use-flag.ts` |
+| PostHog client configuration | `instrumentation-client.ts` |
+| PostHog server SDK instance | `src/lib/posthog/server.ts` |
+| PostHog `useFlag()` runtime contract | `src/lib/posthog/use-flag.ts` |
 | Structured-log helper + redaction discipline (the "no request body, no response body" rule) | `src/server/observability/log.ts` (descriptive header comment) + this ADR (substantive contract) + `CLAUDE.md` (developer rule) |
 | v1 feature-flag inventory | SCAFFOLD.6 task output (not pinned in this ADR) |
 | Alarm threshold values (error rates, latency cutoffs, count thresholds) | `HARDEN.*` task outputs (not pinned in this ADR) |
