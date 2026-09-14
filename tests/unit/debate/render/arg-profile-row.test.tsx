@@ -307,17 +307,48 @@ describe("MOBILE-2n R-1 / A10 D-1 — line 1 is the name's, and the chips land a
 		expect(tokens(lane ?? null), "the lane badge").not.toContain(LIFT);
 	});
 
-	it("arg-profile-row::POSITIVE-CONTROL-the-badge-is-what-the-counts-are-reading", () => {
-		// ⛔ Without a badge this row has TWO ordered chips, not three — so the
-		// rows above are reading the lane badge and not a constant. ⚠ The lift
-		// count is unchanged at one, which is the other half of the control: the
-		// badge's presence must not reach line 1 in either direction.
-		const { container } = widestRow();
-		const count = (token: string) =>
-			[...container.querySelectorAll("*")].filter((el) =>
+	it("arg-profile-row::POSITIVE-CONTROL-the-two-renders-genuinely-differ", () => {
+		// ⛔⛔ THIS ROW WAS VACUOUS WHEN IT WAS FIRST WRITTEN AND IS REBUILT RATHER
+		// THAN DELETED. It counted order tokens across the two renders and asserted
+		// 2 and 1 — but A10 D-1 takes the lane badge's `className` away entirely, so
+		// the badge carries NO order token in either arm and BOTH counts are
+		// constants with respect to the thing the control claims to be reading. The
+		// pre-A10 version was a real control (4 against 3) precisely BECAUSE the
+		// badge carried the lift; the inversion kept the name and lost the
+		// mechanism. Found by `@code-reviewer`.
+		//
+		// ⚠ THE FAILURE IT LET THROUGH IS THE ONE THE `describe` ABOVE EXISTS FOR:
+		// delete the `<LaneBadge …/>` mount, or have it render `null` for a live
+		// badge, and every assertion in this block still passes — including the one
+		// whose stated job is to prove the counts are reading the badge.
+		//
+		// ⇒ A control has to read something that VARIES. What varies between these
+		// two renders is whether the badge is on the row at all, so that is what is
+		// read — and it is read as TEXT, which is the one channel a dropped mount
+		// cannot survive.
+		const withBadge = widestRow({ badge: "Highest Stakes" });
+		expect(
+			withBadge.container.textContent,
+			"the lane badge did not render at all, so every count in this block is " +
+				"measuring a row that is missing a field.",
+		).toContain("Highest Stakes");
+		cleanup();
+
+		const without = widestRow();
+		expect(
+			without.container.textContent,
+			"a lane badge appeared on a row that was given none",
+		).not.toContain("Highest Stakes");
+
+		// ⚠ AND THE ORDER TOKENS ARE CONSTANT ACROSS THE TWO, WHICH IS A SEPARATE
+		// CLAIM AND A DELIBERATE ONE. A10 D-1 gives the badge order 0, so its
+		// presence must move NOTHING about line 1 or about where the chips sit. The
+		// counts are asserted here as an invariance rather than as a control.
+		const count = (root: HTMLElement, token: string) =>
+			[...root.querySelectorAll("*")].filter((el) =>
 				(el.getAttribute("class") ?? "").split(/\s+/).includes(token),
 			).length;
-		expect(count(PAST), "a lane badge ordered itself out of nowhere").toBe(2);
-		expect(count(LIFT), "line 1's membership depends on the badge").toBe(1);
+		expect(count(without.container, PAST), "the two chips").toBe(2);
+		expect(count(without.container, LIFT), "line 1's one passenger").toBe(1);
 	});
 });

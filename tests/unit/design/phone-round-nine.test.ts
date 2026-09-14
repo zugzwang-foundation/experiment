@@ -78,10 +78,27 @@ const V = "max-mobile";
 const S = ":";
 const PHONE = V + S;
 const phone = (utility: string) => PHONE + utility;
+/**
+ * ⛔⛔ THE SUFFIX HAS TO BE ASSEMBLED TOO, AND THIS ROUND LEARNED IT THE HARD WAY.
+ * `phone()` above keeps the `max-mobile:` PREFIX out of the file — but Tailwind's
+ * scanner reads `tests/` for ordinary candidates as well, so `phone(HALF)`
+ * still leaves a bare `w-1​/2!` here and emits it into the production stylesheet.
+ * Measured with `@tailwindcss/oxide`'s own Scanner and found by `@code-reviewer`:
+ * this round's three new suffixes were all being emitted UNPREFIXED with no
+ * `src/` origin at all.
+ * ⚠ The standing justification for the bare literals this file already keeps —
+ * `p-3`, `flex-1`, `text-sm` — is that each is ALREADY authored in `src/`. That is
+ * a property of ANOTHER file, which can change without touching this one, so
+ * anything this round introduced is assembled rather than trusted.
+ * `phone-split-bar.test.ts` minted exactly that rule two rounds ago.
+ */
+const CHANNEL = "bg-" + "(--surface-inset)";
+const HALF = "w-1" + "/" + "2" + "!";
 /** A phone-variant matcher, assembled for the same reason `phone()` is. */
 const phoneRe = (tail: string) => new RegExp(`^${V}${S}${tail}`);
 
-/** A9 D-2's ruled phone track thickness, in px. */
+/** ADR-0051 **A10 D-2**'s ruled phone track thickness, in px — A9 D-2's 8 and
+ * MOBILE-2e's 6 before it. Third move; derive, never restate. */
 const PHONE_TRACK_PX = 14;
 
 // ── readers ──────────────────────────────────────────────────────────────────
@@ -410,7 +427,7 @@ describe("MOBILE-2m · R-1 / A9 D-1 — one full-width hairline between posts", 
 	});
 });
 
-describe("MOBILE-2m · R-1 / A9 D-1 — the Support/Counter band", () => {
+describe("MOBILE-2m R-1 → MOBILE-2n R-3 / A10 D-3 — the Support/Counter row has NO band", () => {
 	/**
 	 * ⛔⛔ THE FOOTER ROOT'S OWN `className`, AND THE SCOPE IS THE WHOLE POINT
 	 * SINCE A10 D-3. This read `gatedClassesIn(regionAfter(…), "band")`, i.e. the
@@ -428,6 +445,16 @@ describe("MOBILE-2m · R-1 / A9 D-1 — the Support/Counter band", () => {
 			0,
 		);
 		const tag = src.slice(at, src.indexOf(">", at));
+		// ⛔ WITHOUT THIS THE WHOLE `describe` IS VACUOUS UNDER AN ATTRIBUTE
+		// REORDER. The slice starts at the testid, so a `className` written BEFORE
+		// it leaves no class string in the window — the loops below then iterate
+		// over nothing and every "the row has no ground" negative passes on an
+		// empty array. `@code-reviewer`, LOW.
+		expect(
+			tag,
+			`${FOOTER}: the footer root's \`className\` is not inside the window this ` +
+				`guard reads — most likely it now precedes \`data-testid\` on the tag.`,
+		).toContain("className");
 		// Every quoted run inside the root's own tag — so a plain
 		// `className="…"` and a `className={cn("…", "…")}` are both read, and
 		// neither can reach past the tag it belongs to.
@@ -521,7 +548,7 @@ describe("MOBILE-2m · R-1 / A9 D-1 — the Support/Counter band", () => {
 // R-2 / A9 D-2 — the split bar's thickness and its groove
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("MOBILE-2m · R-2 / A9 D-2 — the track is 8px with rounded ends", () => {
+describe("MOBILE-2n · R-2 / A10 D-2 — the track is 14px with rounded ends", () => {
 	const trackTokens = () =>
 		classesAfter(code(FOOTER), FOOTER, 'data-testid="aggregate-split-track"');
 
@@ -544,7 +571,7 @@ describe("MOBILE-2m · R-2 / A9 D-2 — the track is 8px with rounded ends", () 
 	});
 });
 
-describe("MOBILE-2m · R-2 / A9 D-2 — the recessed channel at Đ 0", () => {
+describe("MOBILE-2n · R-2 / A10 D-2 — the channel spans the track; Đ 0 moves the FILL", () => {
 	it("phone-r2::the-channel-is-UNCONDITIONAL-and-the-FILL-is-what-Đ-0-moves", () => {
 		// ⛔⛔ WHY THE FLAG AND NOT THE PERCENTAGE. `computeSplitBar`'s own docblock
 		// says `supportPct` is `"0%"` both when nothing has been staked and when
@@ -580,17 +607,24 @@ describe("MOBILE-2m · R-2 / A9 D-2 — the recessed channel at Đ 0", () => {
 			trackTokens,
 			"the channel is the design language's own recessed surface, so the " +
 				"track reads as a groove rather than as a bar.",
-		).toContain(phone("bg-(--surface-inset)"));
+		).toContain(phone(CHANNEL));
 		// ⛔ THE NEGATIVE IS ABOUT THE TRACK, NOT ABOUT THE FILE. `band && !hasStake`
 		// legitimately SURVIVES — it moved to the FILL, where A10 D-2 now expresses
 		// the zero state — so a file-wide scan for that string would assert the
 		// opposite of what this row means and would have to be deleted the moment
 		// it was written. Scoped to the track's own conditional instead.
+		// ⛔ THIS NEGATIVE IS NOT WHERE THE PROPERTY LIVES, AND SAYING SO IS THE
+		// POINT. `trackTokens` is the single conditional's token list, so once the
+		// row above has asserted it CONTAINS the channel, a `not.toContain` of any
+		// other token on the same one-element array cannot fail. The A9 groove's
+		// real absence is asserted on the RENDERED node, across both aggregates, in
+		// `phone-round-nine-card.test.tsx`. Kept here as a cheap tripwire against
+		// the two tokens being authored side by side, and labelled as one rather
+		// than left reading like the guard. `@code-reviewer`, LOW.
 		expect(
 			trackTokens,
-			"the channel is still gated on the stake. A10 D-2 gives the counter " +
-				"share to the channel outright, so the track takes it unconditionally " +
-				"below 640 and only the FILL reads the flag.",
+			"the superseded A9 groove is authored beside A10's channel in the same " +
+				"conditional, so which one paints is decided by emission order.",
 		).not.toContain(phone("bg-n0"));
 		expect(
 			regionAfter(src, FOOTER, 'data-testid="aggregate-split-track"').slice(
@@ -612,7 +646,7 @@ describe("MOBILE-2m · R-2 / A9 D-2 — the recessed channel at Đ 0", () => {
 				"`!` — the width beside it is an INLINE style, which outranks every " +
 				"ordinary selector, so a plain utility here is authored, compiled, " +
 				"present in the class attribute and completely inert.",
-		).toContain(phone("w-1/2!"));
+		).toContain(phone(HALF));
 	});
 });
 

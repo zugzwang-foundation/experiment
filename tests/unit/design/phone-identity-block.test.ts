@@ -6,9 +6,16 @@ import { describe, expect, it } from "vitest";
  * MOBILE-2l · R-4 — THE IDENTITY BLOCK IS TWO LINES AT PHONE WIDTH, WITH BOTH
  * CHIPS PRESENT AND A 20-CHARACTER PSEUDONYM.
  *
- * The ruled shape:
- *   line 1 — pseudonym · position chips · the export affordance
- *   line 2 — the meta row (side badge · Đ stake · Replies · age)
+ * The ruled shape, **as ADR-0051 A10 D-1 now rules it**:
+ *   line 1 — avatar · pseudonym · the export affordance, and NOTHING else
+ *   line 2 — the meta row (side badge · Đ stake · Replies · age · the chips)
+ * ⛔ REVERSED AT ROUND TEN AND CORRECTED HERE, at the sentence a reader meets
+ * first (`O-5`). It read `line 1 — pseudonym · position chips · the export
+ * affordance`. `Flipped`/`Exited` and `Sold` now render at the END of the meta
+ * row, after the age. The two-line CEILING is unchanged, and so is the mechanism
+ * that produces it — a negative `order` ahead of a zero-height `basis-full`
+ * break — which is why the rows below still read exactly those two things and
+ * only their membership moved.
  * The PSEUDONYM is the element that yields (`min-width:0` + an ellipsis); the
  * chips and the icon never shrink; and `Flipped`/`Exited` and `Sold` read as ONE
  * chip style at phone — same size, same case, same weight, same tracking, same

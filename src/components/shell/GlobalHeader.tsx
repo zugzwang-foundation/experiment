@@ -79,7 +79,11 @@ import { VisitorCounter } from "./VisitorCounter";
  * Social/Research/Đ-info are ratified omissions (OQ-3/OQ-4 zero-supplied), each
  * a named deviation in the plan. Right zone = the Đ cluster, then JOIN or the identity chip, then a
  * hairline divider + the visitor counter at the far right (UI.13;
- * SPEC.1 §21.1).
+ * SPEC.1 §21.1) — **at and above 640px.** Below `--breakpoint-mobile` the GitHub
+ * icon control named above PRECEDES all four (ADR-0051 A10 D-5) and three of the
+ * four are hidden, so the zone reads `GitHub · avatar-or-JOIN`. ⚠ The §21.1
+ * register boundary is untouched in both directions: the new control is not
+ * engine-derived and nothing crossed the divider.
  *
  * ⇒ TIER-4 DEVIATION — **RULES placement** (O1-DECK, founder-ruled 2026-08-18,
  * D-2). The locked W2.4/.5/.14 mockup places the tab in the CENTRE zone as a

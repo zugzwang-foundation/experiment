@@ -305,6 +305,13 @@ export function AggregateFooter({
 							// taste: at 360px the row is a third of the width it has at
 							// 1440, so an 18px track stops reading as a proportion and
 							// starts reading as a block of colour.
+							// ⚠⚠ MOBILE-2n · R-2 / ADR-0051 A10 D-2 — 8px → 14px. THE PARAGRAPH
+							// BELOW IS A9's AND ITS NUMBER IS HISTORY; the token on the string is
+							// `h-[14px]`. Its two arguments both survive the change and that is
+							// why it is corrected rather than deleted: the 18px desktop literal
+							// is still untouched, and the ends are still DECLARED round rather
+							// than inherited round — at 14px an 8px `--r` would clamp to 7 and
+							// look almost right, which is the same coincidence A9 refused.
 							// ⚠⚠ MOBILE-2m · R-2 / ADR-0051 A9 D-2 — 6px → 8px AND TRUE ROUNDED
 							// ENDS BELOW 640px. The 18px desktop literal is untouched, so
 							// `split-bar-parity` and `aggregate-footer-alignment` — which
@@ -358,6 +365,20 @@ export function AggregateFooter({
 							// `--graph-yes: #737373`, "the black pole cannot render on the dark
 							// ground" — and that is the shape of the answer if the founder
 							// wants one; it is a pole change and this round may not make it.
+							// ⛔⛔ THE PARAGRAPH BELOW IS A9's AND ITS STATE DESCRIPTION IS NOW
+							// WRONG IN THREE PLACES — corrected here, at the top, because this is
+							// what a reader reaches first (`O-5`). Since A10 D-2 the token is
+							// `bg-(--surface-inset)` rather than `bg-n0`; it is UNCONDITIONAL
+							// below 640 rather than gated on `!hasStake`; and the track computes
+							// `rgb(42, 42, 42)` at EVERY stake level rather than two different
+							// values either side of Đ 0.
+							// ⚠⚠ WHAT SURVIVES UNCHANGED IS THE HAZARD AND ITS WARNING, and the
+							// blast radius has WIDENED: the stack now occurs on every feed card
+							// at every stake level rather than only at Đ 0, so if the emission
+							// order ever flips, every phone track reverts to the A9 pole
+							// appearance with NO RED anywhere. Read the ⚠ at the end of the
+							// paragraph below — it is still live and still the thing to check.
+							// `docs/parked.md` **2m-5**. Found by `@code-reviewer`.
 							// ⛔⛔ THIS COMMENT SAID THE TWO BACKGROUNDS WERE MUTUALLY
 							// EXCLUSIVE AND THAT WAS FLATLY FALSE. It read: "NO SECOND `bg-*`
 							// IS STACKED ON A SINGLE ELEMENT AT ONE WIDTH … so nothing here
@@ -399,7 +420,7 @@ export function AggregateFooter({
 								// Đ 0 / Đ 0, AND THE `!` IS THE WHOLE MECHANISM RATHER THAN A
 								// shortcut. The width below is an INLINE style, and an inline
 								// declaration outranks every selector in the stylesheet — so a
-								// plain `max-mobile:w-1/2` here would be authored, compiled,
+								// plain `max-mobile:w-1​/2` here would be authored, compiled,
 								// present in the class attribute and completely inert, which is
 								// the worst shape a phone token can have (it looks applied in
 								// the source and does nothing in the browser). An `!important`
@@ -558,6 +579,14 @@ function TriggerPill({
 					// the extension takes what is free and stops exactly where the
 					// figure starts: 8 + 32 + 4 = 44, and the region ends on the seam
 					// rather than across it. `@security-auditor`, LOW.
+					// ⚠ MOBILE-2n · R-3 — THE UPWARD 8px NOW REACHES EXACTLY TO THE CARD'S
+					// GAP, BECAUSE A10 D-3 REMOVED THE 10px THE BAND HELD ABOVE IT. Two
+					// variants and two figures: `PostCard`'s present branch is `gap-2.5`
+					// (10px), so the extension still stops 2px short of the content above;
+					// its REMOVED branch is `gap-2` (8px), where the extension ends exactly
+					// on the seam. Nothing interactive sits in either gap, so this is a
+					// clearance note rather than a defect — but the paragraph above named
+					// one variant and there are two. `@code-reviewer`, LOW.
 					"w-[78px] h-6 flex items-center justify-center rounded-(--r-chip) text-xs font-bold transition-all hover:shadow-(--state-hover-glow-pole) focus-visible:shadow-(--state-focus-ring) active:shadow-(--state-pressed-glow-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) max-mobile:relative max-mobile:h-8 max-mobile:text-[13px] max-mobile:font-semibold max-mobile:[touch-action:manipulation] max-mobile:after:absolute max-mobile:after:inset-x-0 max-mobile:after:-top-2 max-mobile:after:-bottom-1 max-mobile:after:content-['']",
 					pole,
 				)}

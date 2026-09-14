@@ -51,6 +51,22 @@ afterEach(cleanup);
 const V = "max-mobile";
 const S = ":";
 const phone = (utility: string) => V + S + utility;
+/**
+ * ⛔⛔ THE SUFFIX HAS TO BE ASSEMBLED TOO, AND THIS ROUND LEARNED IT THE HARD WAY.
+ * `phone()` above keeps the `max-mobile:` PREFIX out of the file — but Tailwind's
+ * scanner reads `tests/` for ordinary candidates as well, so `phone(HALF)`
+ * still leaves a bare `w-1​/2!` here and emits it into the production stylesheet.
+ * Measured with `@tailwindcss/oxide`'s own Scanner and found by `@code-reviewer`:
+ * this round's three new suffixes were all being emitted UNPREFIXED with no
+ * `src/` origin at all.
+ * ⚠ The standing justification for the bare literals this file already keeps —
+ * `p-3`, `flex-1`, `text-sm` — is that each is ALREADY authored in `src/`. That is
+ * a property of ANOTHER file, which can change without touching this one, so
+ * anything this round introduced is assembled rather than trusted.
+ * `phone-split-bar.test.ts` minted exactly that rule two rounds ago.
+ */
+const CHANNEL = "bg-" + "(--surface-inset)";
+const HALF = "w-1" + "/" + "2" + "!";
 
 const EMPTY_REPLIES: ReplyGroups = { support: [], counter: [], twoSlot: [] };
 
@@ -227,9 +243,10 @@ describe("MOBILE-2m · R-1 / A9 D-1 — the unboxed card, after composition", ()
 		// ⚠ The band's `-mx-3` bleed is clipped at exactly the card's edge, which
 		// is the extent wanted — so the clip is part of R-1's mechanism, not
 		// incidental.
-		expect(card, "the clip the band's bleed relies on").toContain(
-			"overflow-hidden",
-		);
+		expect(
+			card,
+			"the card's own clip — A10 D-3 removed the bleed that used to rely on it, and the clip is still what keeps a full-bleed card's content inside its edges",
+		).toContain("overflow-hidden");
 
 		const img = root.querySelector("img[alt='Argument attachment']");
 		expect(img, "the attachment renders").not.toBeNull();
@@ -343,7 +360,7 @@ describe("MOBILE-2n · R-2 / A10 D-2 — the channel spans the track, and Đ 0 f
 				),
 				"the channel does not span the track, so the Counter share is still " +
 					"painting a pole on a bar A10 D-2 gives to the groove.",
-			).toContain(phone("bg-(--surface-inset)"));
+			).toContain(phone(CHANNEL));
 		}
 	});
 
@@ -359,7 +376,7 @@ describe("MOBILE-2n · R-2 / A10 D-2 — the channel spans the track, and Đ 0 f
 		const zero = fillTokens(
 			renderCard({ unboxed: true, post: presentPost({ aggregate: UNSTAKED }) }),
 		);
-		expect(zero, "the even split at Đ 0").toContain(phone("w-1/2!"));
+		expect(zero, "the even split at Đ 0").toContain(phone(HALF));
 		// ⛔ THE OPPOSITE CONTROL — without it the row above is satisfied by an
 		// even split that NEVER leaves, i.e. a bar that reads 50/50 at every real
 		// stake. A10 D-2 names the Đ 0 / Đ 0 state and only that state.
@@ -370,7 +387,7 @@ describe("MOBILE-2n · R-2 / A10 D-2 — the channel spans the track, and Đ 0 f
 			staked,
 			"the even split survived into a staked bar, so every post now reads " +
 				"50/50 whatever its replies say.",
-		).not.toContain(phone("w-1/2!"));
+		).not.toContain(phone(HALF));
 		// CONTROL on the negative: the fill still carries its pole either way.
 		expect(staked, "a YES post's fill is the YES pole").toContain("bg-yes");
 	});
@@ -417,7 +434,7 @@ describe("MOBILE-2n · R-2 / A10 D-2 — the channel spans the track, and Đ 0 f
 		for (const aggregate of [UNSTAKED, STAKED]) {
 			expect(
 				trackTokens(renderCard({ post: presentPost({ aggregate }) })),
-			).not.toContain(phone("bg-(--surface-inset)"));
+			).not.toContain(phone(CHANNEL));
 		}
 	});
 

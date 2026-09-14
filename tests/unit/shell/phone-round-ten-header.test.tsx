@@ -49,6 +49,14 @@ afterEach(cleanup);
 const V = "max-mobile";
 const S = ":";
 const phone = (utility: string) => V + S + utility;
+/**
+ * ⛔ THE SUFFIX IS ASSEMBLED TOO. `phone()` keeps the `max-mobile:` prefix out of
+ * the file, but Tailwind's scanner reads `tests/` for ordinary candidates as
+ * well — so `phone(GAP)` still leaves a bare `me-2` here, and `me-2` is
+ * authored nowhere in `src/`. Measured and found by `@code-reviewer`: it was
+ * being emitted into the production stylesheet with no origin.
+ */
+const GAP = "me-" + "2";
 
 const VIEWER = { pseudonym: "RedFox001", pfpUrl: "/pfp-placeholder.svg" };
 
@@ -153,7 +161,11 @@ describe("MOBILE-2n · R-5 / A10 D-5 — one destination, one register, one gap"
 		// display back only under the phone variant. A loop that demanded parity
 		// here would be demanding the defect.
 		for (const token of home) {
-			if (token === phone("hidden")) continue; // Back's hide, not Home's box
+			// ⚠ Home carries a bare `className={ICON_BUTTON}` with no `cn()` and no
+			// hide — only BACK takes the phone hide — so this branch is dead today
+			// and is kept as a guard against Home ever gaining one. Named as dead
+			// rather than left implying a token Home has. `@code-reviewer`, LOW.
+			if (token === phone("hidden")) continue;
 			if (token === "inline-flex") continue; // see above
 			expect(
 				gh,
@@ -169,7 +181,7 @@ describe("MOBILE-2n · R-5 / A10 D-5 — one destination, one register, one gap"
 		// (its spacing is the divider's `mx-3`), so adding one there would move
 		// `DharmaCluster`, `IdentityCluster` and `VisitorCounter` apart at 1440.
 		// A margin on this control alone is the additive form.
-		expect(tokens(control(header()))).toContain(phone("me-2"));
+		expect(tokens(control(header()))).toContain(phone(GAP));
 	});
 
 	it("phone-r5::the-44px-target-is-bought-by-a-pseudo-element-not-by-the-box", () => {
@@ -217,11 +229,45 @@ describe("MOBILE-2n · R-5 / A10 D-5 — the control does not disturb the zone i
 		// ⛔ AND THE NEIGHBOURS ARE STILL DIRECT CHILDREN. T4's indices resolve
 		// only while every right-zone member is one; the identity cluster is the
 		// one that renders in every auth state, so it is the one read here.
+		// ⛔⛔ AND ALL THREE NEIGHBOURS ARE STILL DIRECT CHILDREN — WHICH IS A
+		// COVERAGE HOLE THIS ROUND OPENED AND CLOSES HERE. `dharma-cluster.test.tsx`'s
+		// T4 renders the header with NO `mobileResponsive`, so the mount gate makes
+		// this control absent and T4's relative indices are untouched — sound, but it
+		// now certifies §21.1's anti-conflation order only for a configuration
+		// NEITHER LAYOUT SHIPS. Both real mounts pass the prop. So the direct-child
+		// property T4 depends on is asserted here, under the prop, for every member
+		// of the zone it can see — a wrapper around any of them is the substitution
+		// that makes every index resolve while the whole zone disappears.
+		// ⚠ Read by class rather than by testid for the divider, which is a NAMED
+		// UNTOUCHABLE (SG6) and must never gain one. `@code-reviewer`, MEDIUM.
+		const identity = zone?.querySelector('[data-testid="identity-chip-link"]');
+		const visitor = zone?.querySelector('[data-testid="visitor-counter"]');
+		const divider = [...(zone?.children ?? [])].find((el) =>
+			(el.getAttribute("class") ?? "").includes("w-px"),
+		);
+		expect(identity, "the identity cluster did not render").toBeTruthy();
+		expect(visitor, "the visitor counter did not render").toBeTruthy();
 		expect(
-			zone?.querySelector('[data-testid="identity-chip-link"]')?.parentElement,
-			"the identity cluster became a grandchild of the zone, which is how a " +
-				"wrapper hides an entire zone while every ordering assertion passes.",
-		).toBe(zone);
+			divider,
+			"the §21.1 register divider is gone from the zone",
+		).toBeTruthy();
+		for (const [what, el] of [
+			["the identity cluster", identity],
+			["the visitor counter", visitor],
+		] as [string, Element | null | undefined][]) {
+			expect(
+				el?.parentElement,
+				`${what} became a grandchild of the zone, which is how a wrapper hides ` +
+					`an entire zone while every ordering assertion still passes.`,
+			).toBe(zone);
+		}
+		// The §21.1 boundary itself, under the prop: the counter is the SOLE element
+		// right of the divider, and the new control is left of everything.
+		const kids = [...(zone?.children ?? [])];
+		expect(kids.slice(kids.indexOf(divider as Element) + 1)).toEqual([visitor]);
+		expect(kids.indexOf(gh as Element)).toBeLessThan(
+			kids.indexOf(divider as Element),
+		);
 	});
 
 	it("phone-r5::the-brand-cell-is-STILL-byte-identical-in-both-auth-states", () => {

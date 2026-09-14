@@ -94,6 +94,13 @@ export function GitHubIconControl() {
 			 * open — a Radix modal sets `pointer-events:none` on everything behind it
 			 * by design, so a hit-test under it measures the modal. Remove the z-50
 			 * layers first, then walk `elementFromPoint` outward.
+			 * ⚠⚠ THE EXTENSION'S THREE TOKENS ARE UNPREFIXED AND ARE INERT ONLY
+			 * BECAUSE `hidden` WINS ABOVE 640. If a later round ever shows this
+			 * control at desktop width, a 44px hit region comes with it into a zone
+			 * whose neighbour gap is 8px — so un-hiding it is a geometry decision and
+			 * not a visibility one. Named here rather than prefixed, because
+			 * prefixing would imply the desktop case is handled when it is merely
+			 * absent. `@code-reviewer`, LOW.
 			 * ⚠ IT MUST NOT BE CLIPPED. A clipped region is not hit-testable — the
 			 * rule `AggregateFooter` records — and the header's row has no
 			 * `overflow:hidden`, so the 5px reaches. The 5px it takes on the right is

@@ -17,7 +17,12 @@ import type { AuthorIdentity, Marker, Side } from "./types";
  * A post/reply author header (design-language §3.1 "argprofile"): avatar (PFP
  * placeholder, D8) · pseudonym · frozen SideBadge · live PositionMarker · the
  * author's own stake `a` · reply count.
- * The marker chip sits after the side badge, before the stake (D5).
+ * The marker chip sits after the side badge, before the stake (D5) — **at and
+ * above 640px.** ⛔ BELOW `--breakpoint-mobile` IT IS THE ROW'S LAST FIELD
+ * (ADR-0051 A10 D-1): `Flipped`/`Exited` and `Sold` render at the END of the meta
+ * row, after the age, and line 1 carries the avatar, the pseudonym and the export
+ * mark alone. Said here because this is the paragraph a reader reaches first
+ * (`O-5`), and the phone arrangement is the opposite of the one above it.
  *
  * UNWIRE-1 — the `CardActions` cluster (the bookmark trigger + `showActions`,
  * its caller-side gate) is removed: the bookmark module is unwired
@@ -383,7 +388,10 @@ export function ArgProfile({
 						// stated because the size is arbitrary.
 						// ⛔ `min-h-8` — MOBILE-2c, found by `@code-reviewer`. The avatar is
 						// `absolute` at phone width and is 32px tall from y=0; this line's
-						// own box is 18px (`leading-[18px]`; 22px when this defect was measured) and the wrapping area's
+						// own box WAS 18px (`leading-[18px]`; 22px when the defect was
+						// measured — it is `leading-8`, i.e. 32px, since A10 D-4, so the
+						// arithmetic below is HISTORY and the floor it argues for is what
+						// survives) and the wrapping area's
 						// `gap-y-0.5` adds 2px, so metadata line 2 began at y=24 and the
 						// avatar's lower 8px painted over the pipe and the side badge —
 						// the avatar being the only positioned element in the row, it wins
@@ -806,10 +814,24 @@ export function ArgProfile({
 					    `max-mobile:-order-2`, which put it on line 1 beside the name — and
 					    A10 D-1 gives line 1 to the name, the avatar and the export mark and
 					    to nothing else. Dropping the token returns it to order 0, where it
-					    lands at its own DOM position: immediately after the age. That is
-					    also exactly where canon §3 item 11 puts it ("the age precedes that
-					    cluster"), so the phone row and the desktop row now agree on the
-					    badge's neighbours instead of disagreeing about them.
+					    lands at its own DOM position: immediately after the age — which is
+					    where UI-OVERNIGHT 1b rule 5 puts it and where the DESKTOP row has
+					    always put it. So the two rows now agree on the badge's neighbours
+					    instead of disagreeing about them.
+					    ⛔⛔ AND CANON DOES **NOT** RATIFY THAT ORDER — THIS BLOCK CLAIMED IT
+					    DID, AND THE CLAIM IS WITHDRAWN RATHER THAN SOFTENED (`O-9`). It
+					    cited canon §3 item 11's "the age precedes that cluster" as agreement.
+					    Read at HEAD, "that cluster" is the item's TRAILING-EDGE ACTION
+					    cluster — "a download mark, a menu glyph" — and says nothing about a
+					    lane badge. Worse, the same item's TIME-1 amendment reads the other
+					    way: "Every identity row that names an author ENDS WITH the argument's
+					    age. It is the row's last field, FOLLOWING EVERY EXISTING TAG," which
+					    puts the badge BEFORE the age, not after.
+					    ⇒ **The shipped order is rule 5's and canon disagrees with it, on all
+					    four author rows, and has since TIME-1.** That is pre-existing and is
+					    not this round's to change — what this round may not do is assert a
+					    ratification that does not exist. Docketed at `docs/parked.md` 2n-6.
+					    Found by `@code-reviewer`.
 					    ⚠ IT SITS BEFORE `Flipped`/`Sold`, WHICH ARE `order-1`. A lane badge
 					    is a fact about the argument's RANK; the position chips are facts
 					    about the author's HOLDING. Rank travels with the age it is measured

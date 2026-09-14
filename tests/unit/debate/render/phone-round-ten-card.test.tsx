@@ -150,12 +150,16 @@ describe("MOBILE-2n · R-4 / A10 D-4 — the name's line box IS the avatar's box
 		expect(tokens(name), "the floor it is measured against").toContain(
 			phone("min-h-8"),
 		);
+		// ⛔ A TOKEN, NOT A SUBSTRING. `.join(" ").toContain("size-8")` matches
+		// `size-80` and `size-88` just as happily, so it would pass on an avatar of
+		// any size that happens to start with the same two characters.
+		// `@code-reviewer`, LOW.
 		expect(
-			tokens(avatar).join(" "),
+			tokens(avatar),
 			"the avatar is no longer 8 spacing units, so the name now centres on a " +
 				"box of a different height and the 1px tolerance is spent by " +
 				"arithmetic rather than by rendering.",
-		).toContain("size-8");
+		).toContain(phone("data-[size=sm]:size-8"));
 		// ⛔ AND NO ARBITRARY LEADING CAME BACK BESIDE IT. A `leading-[Npx]` here
 		// would agree with the other two today and drift the first time the
 		// spacing scale or the root font size moves — which is the whole reason

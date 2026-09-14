@@ -121,11 +121,32 @@ describe("the aggregate footer — the track aligns to the pills", () => {
 		const detail = /detail:\s*\{\s*bar:\s*"h-\[(\d+)px\]"/.exec(bar)?.[1];
 		expect(detail).toBeDefined();
 
+		// ⛔⛔ READ STRUCTURALLY, NOT BY DISTANCE. This was
+		// `source.slice(at, at + 4000)`, and MOBILE-2n pushed the class string past
+		// that window by adding comments above it — the regex then matched nothing,
+		// the reader returned `""`, and this guard went red on a property that had
+		// not moved. `O-8`: "a character window — `slice(at, at + N)` — IS A LINE
+		// NUMBER WEARING A DIFFERENT UNIT. Both fence by DISTANCE, and prose is what
+		// moves." Walk to the `cn(` instead, however many comment lines intervene.
 		const at = source.indexOf('data-testid="aggregate-split-track"');
+		expect(
+			at,
+			"the split track's testid is gone — re-derive this fence",
+		).toBeGreaterThan(-1);
+		const open = source.indexOf("className={cn(", at);
+		expect(
+			open,
+			"no `className={cn(` after the split track. If it stopped composing its " +
+				"classes, re-derive this reader rather than widening it.",
+		).toBeGreaterThan(-1);
+		// ⚠ The comment-skipping half of the original regex is kept: a bare
+		// `/"([^"]*)"/` takes the first quoted run after the `cn(`, which on this
+		// element is a phrase inside a `//` comment. Only the window was wrong.
 		const cls =
-			/className=\{cn\(\s*(?:\/\/[^\n]*\n\s*)*"([^"]*)"/.exec(
-				source.slice(at, at + 4000),
+			/^className=\{cn\(\s*(?:\/\/[^\n]*\n\s*)*"([^"]*)"/.exec(
+				source.slice(open),
 			)?.[1] ?? "";
+		expect(cls, "the reader found no class string at all").not.toBe("");
 		expect(cls).toContain(`h-[${detail}px]`);
 		// The superseded thickness, pinned as gone.
 		expect(cls).not.toContain("h-1.5");

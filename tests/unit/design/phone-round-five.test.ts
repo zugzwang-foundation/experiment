@@ -324,7 +324,7 @@ describe("R-M2 — the split bar is 32/6 on a phone, and the tap area is a pseud
 	});
 });
 
-describe("R-Q1 — the chips ride line 1, and they get there by ORDER", () => {
+describe("R-Q1 → A10 D-1 — the chips are placed by ORDER, and round ten reversed which line", () => {
 	it("round5::the-line-break-is-an-ELEMENT-and-the-pseudonym-stopped-being-one", () => {
 		const source = stripComments(read(ARGPROFILE));
 		const brk = classTokensAfter(

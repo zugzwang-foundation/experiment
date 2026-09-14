@@ -3,8 +3,13 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * MOBILE-2m · A9 D-2 — THE SUPPORT/COUNTER SPLIT BAR AT PHONE WIDTH: an 8px
- * track with fully-rounded ends over a recessed channel, and three columns each centring its own stake figure.
+ * MOBILE-2n · A10 D-2 — THE SUPPORT/COUNTER SPLIT BAR AT PHONE WIDTH: a **14px**
+ * track with fully-rounded ends over a recessed channel that spans the WHOLE
+ * track, and three columns each centring its own stake figure.
+ * ⚠ This headline said **8px** (A9 D-2) until round ten, and it is corrected at
+ * the first sentence rather than only in the note below — which is this file's
+ * own §56-68 argument finally applied to itself (`O-5`). `PHONE_TRACK_PX` is the
+ * live value and every assertion here derives from it.
  *
  * ⛔⛔ GREEN ON THE DAY IT WAS WRITTEN, DELIBERATELY, AND THAT IS THE WHOLE
  * POSTURE OF THIS FILE. The plan's recon measured the shipped build at 360px on
