@@ -209,11 +209,20 @@ export function AggregateFooter({
 				    pins that token at zero consumers.
 				    ⚠⚠ MOBILE-2m · R-2 — THE HAIRLINE SURVIVES THE CHANNEL, AND IT WAS
 				    RE-CHECKED RATHER THAN ASSUMED. The reasoning above is a CONTRAST
-				    argument, and R-1 moved the surface it is measured against: the
-				    figures now sit on the band's n1 #2a2a2a instead of the card's n0
-				    #212121. The YES pole is #181818, so the track's worst case against
-				    its own ground goes from ~1.09:1 to ~1.3:1 — better, and nowhere
-				    near enough to see. The border stays. */}
+				    argument, so it has to be re-run whenever the surface it is measured
+				    against moves — and it has moved twice.
+				    ⛔ MOBILE-2m · R-1 put the figures on a band's n1 #2a2a2a instead of
+				    the card's n0 #212121, taking the track's worst case against its own
+				    ground from ~1.09:1 to ~1.3:1. ⚠ THAT SENTENCE IS NOW HISTORY, AND
+				    IT IS CORRECTED HERE RATHER THAN LEFT STANDING (`O-5`): MOBILE-2n ·
+				    R-3 / A10 D-3 takes the band away, so the figures are back on the
+				    card's own n0 and the ~1.09:1 worst case is back with them.
+				    ⇒ THE BORDER STAYS, AND NOW IT IS LOAD-BEARING IN BOTH DIRECTIONS.
+				    Below 640 the track's ground is the channel rather than a pole, and
+				    #2a2a2a against the card's #212121 is ~1.14:1 — so on the phone the
+				    hairline is most of what says where the bar IS. At and above 640 the
+				    original argument is untouched: a NO post's track is `--color-yes`
+				    #181818 on #212121 and would disappear without it. */}
 				{/* ⚠⚠ UI-QUICK change set 6 §1 — THE TRACK NOW OCCUPIES THE PILL'S OWN
 				    BOX, so its centre lands on the Support/Counter centres.
 				    MEASURED before: track centre 696.00 against Support 705.50 and
