@@ -330,12 +330,19 @@ describe("MOBILE-2k — the host wires the two flags it owns (M18)", () => {
 describe("MOBILE-2k — the phone border override keeps its spelling (M21b)", () => {
 	/**
 	 * ⛔⛔ THE SPELLING IS THE MECHANISM, NOT A STYLE. The base token is the
-	 * arbitrary property `[border:var(--hairline)]`. Tailwind orders a variant AFTER
-	 * its unprefixed peer within one utility kind, so an arbitrary property is what
-	 * reliably overrides an arbitrary property — measured in the compiled sheet
-	 * (`.[border:var(--hairline)]` at offset 59 161, `.max-mobile\\:[border:none]` at
-	 * 80 612, the variant later and therefore winning) and confirmed by
-	 * `getComputedStyle` reading `0px none` below 640.
+	 * `[border:var(--hairline)]`. Tailwind orders a variant AFTER its unprefixed peer
+	 * within one utility kind, so an arbitrary property is what reliably overrides an
+	 * arbitrary property.
+	 * ⚠ MEASURED AS AN ORDERING, AND THE BYTE OFFSETS THAT WERE HERE ARE GONE. This
+	 * block quoted the two rules' positions in the compiled chunk to the byte; a
+	 * rebuild moved both within the hour, and `@code-reviewer` caught them already
+	 * stale in the round that wrote them. A byte offset is a distance written into
+	 * prose — `O-8`'s own corollary, "a character window is a line number wearing a
+	 * different unit". What is durable is the RELATION: in the built sheet each
+	 * `max-mobile:` rule appears AFTER its unprefixed peer for all three overrides
+	 * (border, radius, max-height), and `getComputedStyle` below 640 reads
+	 * `0px none`, `8px` and `60dvh` accordingly. The relation was re-verified
+	 * independently by the reviewer; neither of us quotes a number for it.
 	 *
 	 * `border-none` sets `border-style`, a DIFFERENT declaration whose position
 	 * against a `border` shorthand is not a thing to assume. It looks identical in a

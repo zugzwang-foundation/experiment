@@ -123,3 +123,25 @@ Measurements: A5's tile baseline is retired with its geometry. Replaced by: natu
 tile height at 360/375/390/412/430; zero `scroll-snap-type` in `src/`; at Đ 14,260
 the money line fits with the chip hidden and the layout viewport holds its nominal
 width.
+
+### A7 — 2026-09-14 · The feed's top pill and media containment (phone)
+
+D-1. Below `--breakpoint-mobile`, `/m/[slug]`'s feed view carries a single pill,
+`↑ Top`, centred under the side tabs. It appears after the feed region has scrolled
+more than one viewport and the user scrolls upward; it hides on downward scroll,
+above half a viewport from top, and whenever a sheet holds the scroll lock. A tap
+smooth-scrolls the feed region to its top and then refetches the debate view once;
+already at top, it refetches. It is the replacement for pull-to-refresh, which the
+bounded shell (A2) removed. It carries no touch or pointer handler; it observes the
+region's scroll events passively. It reuses `PhoneSheet`'s timing tokens and honours
+`prefers-reduced-motion`. It does not appear on the thread view.
+
+D-2. Below `--breakpoint-mobile`, a post's media in the feed is capped at 60% of the
+visual viewport height and scaled to fit within it, whole and uncropped, on the
+card's own ground with no border, at the card's corner radius, at the card's content
+width. Desktop media and the composer's attached-preview are unchanged.
+
+Measurements: pill appear/hide/hysteresis at 360/390/412/430; scroll-to-top lands at
+0; exactly one refetch per tap; pill absent while any sheet is open; media height ≤
+0.6·viewport for 2:3, 9:16, 1:1 and 16:9 test images with no border; both B1 walls
+unchanged above the same-build floor.

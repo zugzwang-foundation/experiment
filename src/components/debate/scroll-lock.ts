@@ -230,12 +230,20 @@ export function lockPageScroll(except: Element | null = null): () => void {
  * may fire, and the second is what still answers correctly if some future
  * lock-holder is not routed through that state.
  *
- * ⚠ IT IS A BELT AND IS DOCUMENTED AS ONE. Today the phone tier's only lock
- * holders are `PhoneSheet` and `MarketPriceChartOverlay`, and the chart overlay
- * is only reachable INSIDE the details sheet — so `sheet !== null` already
- * covers both and this can never be the thing that stops a refetch. That is the
- * argument for having it rather than against: a third holder added later reaches
- * this function for free, and reaches the render gate only if someone remembers.
+ * ⚠ IT IS A BELT, AND IT HAS A REACHABLE WINDOW — WHICH THIS BLOCK FIRST DENIED.
+ * It said "this can never be the thing that stops a refetch", on the grounds that
+ * the tier's only lock holders are `PhoneSheet` and `MarketPriceChartOverlay` and
+ * the overlay is reachable only INSIDE the details sheet, so `sheet !== null`
+ * covers both. The first half is true and was re-measured; the conclusion was too
+ * strong. `PhoneSheet` DEFERS its children's unmount by `CLOSE_MS`, so for that
+ * window after a sheet begins closing the host's `sheet` is already `null` — the
+ * render gate has opened — while `depth > 0` is still held by the chart overlay
+ * inside it. During those milliseconds this function is the ONLY refusal standing.
+ * Found by `@code-reviewer`.
+ * ⇒ So it is a belt with a window rather than a belt with none, and the argument
+ * for having it is stronger than the one first written: a third holder added later
+ * reaches this function for free, and reaches the render gate only if someone
+ * remembers.
  */
 export function isPageScrollLocked(): boolean {
 	return depth > 0;

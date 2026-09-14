@@ -142,13 +142,25 @@ export function CommentImage({
 			    sheet and in `getComputedStyle`, not inferred.
 
 			    ⚠ THE RADIUS BECOMES THE CARD'S `--r` (8px) AND LEAVES THE RATIFIED
-			    `--imgr` (6px) BEHIND — founder-ruled for this round. `--imgr` is
-			    ratified for images (values-log §3 item 2) and still governs
-			    everywhere else, desktop included; the phone feed is the one place the
-			    picture is edge-to-edge inside its card with no border between them, so
-			    a 6px corner inside an 8px corner reads as a misregistration rather
-			    than as two radii. Recorded as a divergence from a ratified token, not
-			    as a correction of one.
+			    `--imgr` (6px) BEHIND — founder-ruled for this round, and the ruling is
+			    the whole of the reason. `--imgr` is ratified for images (values-log §3
+			    item 2) and still governs everywhere else, desktop included; the brief
+			    says *"Corner radius = the card's existing radius token — read it from
+			    design-language, do not mint one."* Recorded as a divergence from a
+			    ratified token, not as a correction of one.
+			    ⛔ AND THE GEOMETRIC STORY THIS BLOCK USED TO TELL WAS FALSE. It said the
+			    phone feed is "the one place the picture is edge-to-edge inside its card
+			    with no border between them, so a 6px corner inside an 8px corner reads
+			    as a misregistration". Measured by `@code-reviewer`: `PostCard`'s root is
+			    `<Card className="min-h-0 flex-1 gap-2.5 p-3">` and twMerge keeps that
+			    `p-3` over `Card`'s own padding, so the attachment sits **12px inside the
+			    card's border on every side** and its corner is never concentric with the
+			    card's. There is no misregistration to fix. The half that IS true and was
+			    checked: the card's radius really is 8px on both card kinds — `Card` is
+			    `rounded-(--r)` and `ReplyCard`'s root `rounded-md` compiles to
+			    `calc(.625rem * .8)`, also 8px. ⇒ The token is unchanged and the
+			    invented justification is gone: a ruling needs no geometry propping it
+			    up, and a wrong reason is what a later reader reasons from.
 
 			    ⛔ NO ASPECT-RATIO RESERVATION, AND IT IS NOT AN OMISSION. The read
 			    model carries no dimensions to reserve with: `DebatePost.imageUrl` is a

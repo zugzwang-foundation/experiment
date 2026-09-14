@@ -121,6 +121,18 @@ function attributeNames(tag: string): string[] {
  * BEFORE them, which is the only way to break them.
  */
 const RATIFIED_PILL_ATTRIBUTES = [
+	/**
+	 * ⚠ `aria-busy` IS THE SEVENTH, ADMITTED AFTER THIS CENSUS CORRECTLY REFUSED IT.
+	 * `@code-reviewer` found the pill gave a screen-reader user no signal at all that
+	 * a tap had been accepted: the button deliberately stays enabled (`onTap` no-ops
+	 * while refreshing) and `aria-live` is deliberately absent, because a live region
+	 * ANNOUNCES and interrupts a reader over a consequence of their own tap.
+	 * `aria-busy` is a STATE on the control they just pressed, read when they come
+	 * back to it — which is the right shape for this, and is not an event channel.
+	 * ⇒ It is here because the census failed closed on it, which is the census doing
+	 * its job: a seventh attribute is a decision, and this is the decision.
+	 */
+	"aria-busy",
 	"aria-label",
 	"className",
 	"data-phase",
@@ -233,13 +245,13 @@ describe("MOBILE-2k · F-1 — the scan reaches the real pill (controls first)",
 
 describe("MOBILE-2k · F-1 — the pill's input surface is closed (G6)", () => {
 	/**
-	 * ⛔ THE CENSUS. Six attributes, no seventh. A touch or pointer prop here is
+	 * ⛔ THE CENSUS. Seven attributes, no eighth. A touch or pointer prop here is
 	 * MOBILE-2c's P0 arriving on the newest element on the surface — the one that
 	 * floats over the tier's only scroller — through the one channel that is
 	 * neither an `addEventListener` nor a DOM property, and which no rule in this
 	 * directory was watching.
 	 */
-	it("phone-top-pill-listeners::the-pills-attribute-set-is-exactly-the-ratified-six", () => {
+	it("phone-top-pill-listeners::the-pills-attribute-set-is-exactly-the-ratified-set", () => {
 		const tag = openingTag(code(read(PILL)), PILL_ANCHOR);
 		expect(
 			attributeNames(tag).sort(),

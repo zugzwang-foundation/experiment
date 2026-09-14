@@ -147,7 +147,9 @@ experiment/
 │   │                               #   ratification, see docs/plans/QUOTE-1.md §8 D).
 │   │                               #   ⛔ AND phone/ (MOBILE-2 / ADR-0051) — `ls
 │   │                               #   src/components/debate/phone/ | wc -l` is the claim. It
-│   │                               #   is EIGHT: MOBILE-2d added `scroll-lock.ts` here and then
+│   │                               #   is NINE — MOBILE-2k's `PhoneTopPill.tsx` is the ninth,
+│   │                               #   and this line read EIGHT until it landed. MOBILE-2d
+│   │                               #   added `scroll-lock.ts` here and then
 │   │                               #   MOVED it to `debate/`, because the DESKTOP path imports
 │   │                               #   it (MarketPriceChartOverlay) and a module reached from
 │   │                               #   above is a leak out of a subtree whose whole contract is
@@ -156,15 +158,37 @@ experiment/
 │   │                               #   the ONLY subtree in src/ that is a SECOND
 │   │                               #   PRESENTATION rather than an override: below 640px
 │   │                               #   DebateView hides and this renders over the same four
-│   │                               #   props. SIX client (PhoneDebateView · PhoneTitleStrip ·
+│   │                               #   props. SEVEN client (PhoneDebateView · PhoneTitleStrip ·
 │   │                               #   PhoneSideTabs · PhoneFeedTrack · PhoneBottomBar ·
-│   │                               #   PhoneSheet) and TWO SERVER (PhoneDetails ·
+│   │                               #   PhoneSheet · PhoneTopPill) and TWO SERVER (PhoneDetails ·
 │   │                               #   PhoneResolverRows) — the details sheet's body is an
 │   │                               #   RSC node passed down, so the shell is the only client
 │   │                               #   part of it. It contains NO write path: every bet goes
 │   │                               #   through the reused BetComposer. See §8's MOBILE-2
 │   │                               #   bullet for the four conditions a phone-only leaf has
 │   │                               #   to meet, and for the guard family that pins them.
+│   │                               #   ⚠ `PhoneTopPill` (MOBILE-2k, ADR-0051 A7) is the THIRD
+│   │                               #   leaf here to register a DOM listener, and the only one
+│   │                               #   that registers on an element the HOST owns — a passive
+│   │                               #   `scroll` read on the feed region, because the bounded
+│   │                               #   shell of MOBILE-2d took pull-to-refresh away and nothing
+│   │                               #   else can tell it which way the reader is going.
+│   │                               #   ⛔ THIS LINE CLAIMED "the ONE leaf that registers a DOM
+│   │                               #   listener of its own" AND "the fourth and only non-`track`
+│   │                               #   row", AND BOTH WERE FALSE TO A ONE-LINE GREP — caught by
+│   │                               #   `@code-reviewer` in the same round that wrote them.
+│   │                               #   `grep -rn addEventListener src/components/debate/phone/`
+│   │                               #   returns FOUR registrations in THREE files
+│   │                               #   (`PhoneFeedTrack` twice, `PhoneSheet` once, this once),
+│   │                               #   and `RATIFIED_LISTENERS` already held a non-`track` row
+│   │                               #   — `document::keydown::onKey::`, which that guard's own
+│   │                               #   docblock names. Run the grep; it is the claim.
+│   │                               #   It IS the fourth row in
+│   │                               #   `phone-gesture-wall.test.ts`'s CLOSED allowlist, and
+│   │                               #   adding it there was a decision rather than an edit.
+│   │                               #   It holds no write path: its tap calls `router.refresh()`
+│   │                               #   and nothing else, and it refuses even that while the
+│   │                               #   composer reports `busy`.
 │   │                               #   debate/ also holds TWO TIER-CROSSING MODULES, minted at
 │   │                               #   MOBILE-2b because the phone tree is a SIBLING of the
 │   │                               #   desktop tree rather than a child, so no prop path exists

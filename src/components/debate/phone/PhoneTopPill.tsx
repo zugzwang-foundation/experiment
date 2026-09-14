@@ -55,11 +55,21 @@ const LABEL_BUSY = "Refreshing…";
  * ⛔⛔ `CLOSE_MS` IS `PhoneSheet`'s, AND IT IS DUPLICATED HERE RATHER THAN
  * IMPORTED — WHICH IS THE OPPOSITE OF WHAT IT LOOKS LIKE.
  *
- * `PhoneSheet.tsx:118` declares the same 200 and explains why it cannot be a
- * token: there is no motion token in this repository (`--dur-hover` is a
- * compound hover value), `design-canon.md §5:109` ratifies `.26 s` for this
- * surface's motion, and the founder's 2026-09-12 Q4 ruling makes the close
- * brisker at 200. The OPEN duration can only ever be a Tailwind class, because
+ * `PhoneSheet`'s own `CLOSE_MS` declares the same 200 and explains why it cannot
+ * be a token: there is no motion token in this repository (`--dur-hover` is a
+ * compound hover value), and the founder's 2026-09-12 Q4 ruling makes the close
+ * brisker at 200.
+ * ⚠ `PhoneSheet` attributes the 260 to `design-canon.md §5:109`, and that
+ * attribution is INHERITED HERE RATHER THAN ENDORSED: §5:109 is real and does say
+ * `.26 s`, but it ratifies it for the DESKTOP market-detail carousel's card
+ * advance, not for phone sheet or pill motion. So the number's provenance on this
+ * tier is `PhoneSheet`'s precedent — one surface's motion matching its own
+ * neighbour — and not a canon clause about this surface. `@code-reviewer` named
+ * it; recorded rather than propagated, because a second file asserting a
+ * misattribution is how a misattribution becomes a fact.
+ * ⚠ CITED BY SYMBOL (`CLOSE_MS`), never by line — `O-8`. This block named
+ * `PhoneSheet.tsx:118`, which was right on the day and is a fence that goes stale
+ * from the very edit it guards. The OPEN duration can only ever be a Tailwind class, because
  * Tailwind's scanner needs a LITERAL to emit `duration-[260ms]` at all —
  * interpolating a constant produces a utility that silently does not exist
  * (AGENTS.md §9's stale-utility trap).
@@ -120,11 +130,30 @@ export function PhoneTopPill({
 	 * `BetComposer` already publishes `onBusyChange`, `PhoneDebateView` already
 	 * holds it as `composerBusy` for the seven host transitions that must not
 	 * remount a composer mid-request, and this is the eighth consumer of the same
-	 * fact. A `router.refresh()` under an in-flight bet re-renders the tree the
-	 * composer is mounted in; the composer's `key` carries `kind`,
-	 * `parentCommentId` and `side`, so nothing about a refresh SHOULD remount it
-	 * — but "should not" is the wrong strength of claim to put between a
-	 * participant and a double charge, and the check costs one boolean.
+	 * fact.
+	 *
+	 * ⛔⛔ THE REAL GUARANTEE IS TOPOLOGICAL, NOT THE COMPOSER'S `key`, AND THIS
+	 * DOCBLOCK ARGUED FROM THE WEAKER ONE. It said the `key` carries `kind`,
+	 * `parentCommentId` and `side`, none of which a refresh changes — true, and
+	 * beside the point: `PhoneDebateView` branches `viewer === null ?
+	 * <AuthGateSlot/> : <BetComposer/>`, and `viewer` is SERVER data. A refresh
+	 * that returns `viewer: null` — a session expiring mid-request — unmounts the
+	 * composer, fires `onBusyChange(false)`, and leaves an in-flight `fetch` with
+	 * no `AbortController`. That is the double-charge shape exactly, and the `key`
+	 * argument does not see it.
+	 * ⇒ What actually makes the pill safe is that **the composer is mounted iff a
+	 * sheet is open**, and `locked` is `sheet !== null` — a strict superset of "a
+	 * composer exists". So the pill cannot reach that path at all, and `busy` is
+	 * redundant with `locked` in the current topology rather than load-bearing over
+	 * it. It is kept because the topology is not a law: a future shape that mounts
+	 * a composer outside a sheet would break the superset and leave this flag as
+	 * the only thing standing. Found by `@code-reviewer`, which supplied the better
+	 * argument and the counter-example to the worse one.
+	 * ⚠ AND `busyRef` IS THE ONE FLAG WITH NO LIVE BACKSTOP. `lockedRef` is
+	 * shadowed in the same condition by `isPageScrollLocked()`, which reads a module
+	 * refcount and cannot be stale; `busyRef` has nothing beside it. If anyone later
+	 * drives `onBusyChange` through a transition, a render-phase write becomes
+	 * readable from a render React may discard — on the money guard.
 	 */
 	busy: boolean;
 }) {
@@ -172,6 +201,12 @@ export function PhoneTopPill({
 	 * the second ground, not the first.
 	 * ⚠ `refreshing` cannot be that latch either way: React sets it on the
 	 * transition, one tick later than the call.
+	 * ⚠ AND ITS RESET HAS ONE EDGE AND NO TIMEOUT. It is lowered only on
+	 * `refreshing` going true→false. A `router.refresh()` transition that never
+	 * settles therefore leaves the latch armed, `evaluate` standing down forever,
+	 * and the pill stuck on screen reading `Refreshing…` with no way to hide. Not
+	 * reachable through any tested path and not bounded either; said here rather
+	 * than discovered later (`@code-reviewer`, LOW).
 	 */
 	const firedForThisTap = useRef(false);
 	/**
@@ -435,18 +470,26 @@ export function PhoneTopPill({
 			refetchOnce();
 			return;
 		}
-		const reduced = window.matchMedia(
-			"(prefers-reduced-motion: reduce)",
-		).matches;
+		const reduced =
+			window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
 		/**
 		 * ⛔ THE REGION, BY NAME. `scrollTo` on the element the host handed us —
 		 * never `window`, never `scrollIntoView` on a card. Both of those are
 		 * rejected by `phone-scroll-model.test.ts` because the document does not
 		 * scroll here, so either one is a no-op that reads as an action.
-		 * ⚠ `behavior: "auto"` under reduced motion is the ruled instant scroll —
-		 * the same `matchMedia` read `ComposerSlot` and `PhoneSheet` already make,
-		 * and the only `matchMedia` query this tier is allowed
-		 * (`phone-market-detail.test.ts`).
+		 * ⚠ `behavior: "auto"` under reduced motion is the ruled instant scroll, and
+		 * `(prefers-reduced-motion: reduce)` is the only `matchMedia` query this tier
+		 * is allowed (`phone-market-detail.test.ts`).
+		 * ⛔ OPTIONALLY CALLED, AND THIS LINE ONCE CLAIMED PARITY IT DID NOT HAVE. It
+		 * said "the same `matchMedia` read `ComposerSlot` and `PhoneSheet` already
+		 * make" while calling `window.matchMedia(…)` bare — and both siblings guard
+		 * it: `ComposerSlot.tsx:64` uses `window.matchMedia?.(…)` and
+		 * `PhoneSheet.tsx:304` a `typeof … === "function"` test. The read sits inside
+		 * `onTap`, so an absent `matchMedia` throws ON THE TAP. Nil risk in any target
+		 * browser — but jsdom ships none at all, which is why every test of this tap
+		 * needs a stub the two siblings would not have required, and a false parity
+		 * claim is exactly the kind of reassurance that stops the next reader
+		 * checking. Caught by `@code-reviewer`.
 		 */
 		region.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
 		if (rafRef.current !== null) {
@@ -519,6 +562,14 @@ export function PhoneTopPill({
 			// absent: the label change is the consequence of the reader's own tap, and
 			// announcing it is the kind of politeness that interrupts.
 			aria-label={refreshing ? LABEL_BUSY : LABEL_IDLE}
+			// ⚠ `aria-busy` RATHER THAN `aria-live`, and the distinction is the whole
+			// reason there is an attribute here at all. A live region ANNOUNCES, which
+			// interrupts a reader for a consequence of their own tap; `aria-busy` is a
+			// STATE on the control they just pressed, read when they return to it. The
+			// button deliberately stays enabled — `onTap` no-ops while refreshing — so
+			// without this a screen-reader user gets no signal that the tap was
+			// accepted at all. `@code-reviewer` (LOW).
+			aria-busy={refreshing}
 			onClick={onTap}
 			/**
 			 * ⛔⛔ 36px PAINTED, 44px TAPPABLE, AND THE EXTENSION IS A
@@ -546,7 +597,7 @@ export function PhoneTopPill({
 			 */
 			className={`absolute top-full left-1/2 mt-3 flex h-9 -translate-x-1/2 items-center justify-center rounded-full bg-card px-4 text-[13px] leading-[1.2] text-ink shadow-none [border:var(--hairline)] after:absolute after:inset-x-0 after:-top-1 after:-bottom-1 after:content-[''] ${
 				leaving
-					? "animate-out fade-out-0 slide-out-to-top-[6px] duration-[200ms] ease-in motion-reduce:slide-out-to-top-0"
+					? "pointer-events-none animate-out fade-out-0 slide-out-to-top-[6px] duration-[200ms] ease-in motion-reduce:slide-out-to-top-0"
 					: "animate-in fade-in-0 slide-in-from-top-[6px] duration-[260ms] ease-out motion-reduce:slide-in-from-top-0"
 			}`}
 		>

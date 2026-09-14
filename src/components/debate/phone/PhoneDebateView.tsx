@@ -664,9 +664,14 @@ export function PhoneDebateView({
 			    becomes a structural distance rather than a guessed number: this
 			    block's height is set by how many lines the market question wraps to,
 			    so nothing else in the tree can name its bottom edge. `top-full`
-			    resolves against the nearest POSITIONED ancestor, and without this
-			    token that ancestor would be `<body>` — the pill would land 12px below
-			    the bottom of the DOCUMENT, i.e. off screen, with no error anywhere.
+			    resolves against the nearest POSITIONED ancestor, and there is NONE above
+			    this element — `<body>` is `min-h-full flex flex-col` and static
+			    (`src/app/layout.tsx`), so without this token the containing block is
+			    the INITIAL one, i.e. the viewport. The pill would land 12px below the
+			    bottom of the viewport, off screen, with no error anywhere. ⚠ This
+			    comment said the ancestor "would be `<body>`"; `@code-reviewer` walked
+			    the chain and found it static. Same conclusion, wrong mechanism named —
+			    and a wrong mechanism is what a later reader reasons from.
 			    ⚠ It does not change the stacking: `z-30` already made this element a
 			    stacking context as a flex item, and `position: relative` is not a
 			    containing block for `fixed` descendants (only a transform is), so
