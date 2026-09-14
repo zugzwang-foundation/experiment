@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 "use client";
 
+import { useEffect } from "react";
+
 import { PageContainer } from "@/components/shell/PageContainer";
+import { captureBoundaryError } from "@/lib/boundary-capture";
 
 /**
  * The `/m/[slug]` error boundary — POLISH.3 D4 / PD-3-11, following the
@@ -27,9 +30,32 @@ import { PageContainer } from "@/components/shell/PageContainer";
  * precedent found.
  *
  * ⚠ NOTHING FROM `error` IS RENDERED — not `message`, not `stack`, not
- * `digest`, not `cause`. The prop is accepted because Next's contract passes it
- * and is deliberately NOT DESTRUCTURED, so no binding exists to render by
- * accident. Structural, not a rule someone has to remember (CLAUDE.md §8 O-1).
+ * `digest`, not `cause`.
+ *
+ * ⚠⚠ AND THE GUARANTEE BEHIND THAT SENTENCE IS WEAKER THAN IT USED TO BE. SAY
+ * SO PLAINLY RATHER THAN LET THE NEXT READER INHERIT THE OLD ONE. This block
+ * read: *the prop is deliberately NOT DESTRUCTURED, so no binding exists to
+ * render by accident — structural, not a rule someone has to remember
+ * (CLAUDE.md §8 O-1)*. That was true and it was the strongest form available:
+ * no binding implies no read, of any kind, on any node, in any portal, for any
+ * event, forever, and `market-error-boundary.test.tsx` proved it with one
+ * source assertion where seven behavioural probes had not managed it.
+ *
+ * It is gone, deliberately, and O-1 is the reason to be uncomfortable about it
+ * rather than a reason it did not happen. A boundary is the thing that stops a
+ * client-side throw propagating, so nothing else in the stack can report it —
+ * not `onRequestError`, which sees only the server, and not the browser SDK's
+ * global handlers, which never receive an error React has already caught.
+ * Reporting requires a binding. There is no version of this that keeps both.
+ *
+ * WHAT REPLACES IT, since a procedural rule needs stating where a structural
+ * one did not: `error` may reach `captureBoundaryError` and NOTHING ELSE. Not
+ * JSX, not a handler closure, not `document.title`, not a second call. The
+ * source guard in `market-error-boundary.test.tsx` was inverted rather than
+ * deleted — it now pins that single permitted read and fails on a second one —
+ * and the behavioural sweep still asserts no HANDLER on this surface touches
+ * the error, which is the edit the old docblock was really worried about (a
+ * "Show details" affordance) and which is still forbidden.
  *
  * ⚠ AND THE ARM THAT PROTECTS IS NOT THE ONE YOU WOULD GUESS. In a production
  * build React's Flight client already replaces a SERVER-side error with a fixed
@@ -54,11 +80,16 @@ import { PageContainer } from "@/components/shell/PageContainer";
  * product logic.
  */
 export default function DebateRouteError({
+	error,
 	reset,
 }: {
 	error: Error & { digest?: string };
 	reset: () => void;
 }): React.JSX.Element {
+	useEffect(() => {
+		captureBoundaryError(error, "debate");
+	}, [error]);
+
 	return (
 		<PageContainer
 			preset="debate"
