@@ -9,23 +9,17 @@ import type { OnboardingFigure } from "./cards";
  *   · Card 1 — the BRAND MARK, the same `/brand/zugzwang-mark.svg` static asset
  *     `BrandCluster` already renders. Not a port and not new artwork: the card
  *     that states what the product is opens on the product's own mark.
- *   · Card 2 — the SHARED PFP PLACEHOLDER plus the pseudonym-initial fallback,
+ *   · Card 2 — the VIEWER'S LIVE PFP plus the pseudonym-initial fallback,
  *     exactly as `IdentityCluster` renders it.
  *   · Cards 3–7 — the five `FIG` illustrations, ported from the locked W2.2
  *     mockup's inline SVG.
  *
- * ⛔ CARD 2 IS STILL NOT A LIVE PFP, AND THAT IS NOW A CHOICE RATHER THAN A
- * LIMITATION. Live PFPs landed at PFP-1: `pfp_filename` is read by the
- * `resolve*.ts` resolvers and composed into a public R2 URL by
- * `server/identity-pool/pfp-url.ts`, so the profile, debate, discovery and
- * header surfaces all render the real image. This card does not, because it
- * takes no viewer data beyond the pseudonym its title already needs — and
- * adding a deck-local avatar fetch would create a second PFP path beside the
- * one resolver-owned builder. The card keeps the placeholder deliberately.
- *
- * (Until PFP-1 this note said there was no live PFP anywhere in the product and
- * cited `resolve-authors.ts` as saying so in its own words. That file no longer
- * says so.)
+ * Card 2 renders the viewer's real avatar (PD-PFP-10, closed). It still makes
+ * no avatar fetch of its own: the first-login mount in `(public)/layout.tsx`
+ * passes the SAME `pfpUrl` it already hands `GlobalHeader`, built once by
+ * `server/identity-pool/pfp-url.ts`. That keeps one PFP path rather than two,
+ * which was the only reason the card used to keep the placeholder. The re-show
+ * drops this card entirely, so `RulesControl` needs no viewer data.
  *
  * ⚠ COLOURS ARRIVE THROUGH THE TOKEN LAYER, never as literals. The mockup's
  * SVGs reference its own `var(--ink)` / `var(--nN)` names; the built tokens are
@@ -437,18 +431,22 @@ function BrandHero() {
  * frame while the other six sit bare on the card. Sized to 140px to match the
  * figure row on every other card.
  *
- * ⚠ The src is still the PLACEHOLDER, deliberately, while the register at
- * `ZUGZWANG-O1-DECK_copy-register_v1_0.md:80` calls this slot the viewer's live
- * avatar. Reshaping the frame makes that gap more visible, not less — it is
- * parked as `PD-PFP-10` rather than carried silently, because wiring it means
- * giving `CardFigure` viewer data and creating a second PFP path beside the
- * resolver-owned builder (see `:17-28`).
+ * The src is the viewer's live avatar, as the register at
+ * `ZUGZWANG-O1-DECK_copy-register_v1_0.md:80` names this slot. The URL arrives
+ * already resolved from the layout (see the module docblock), so no second PFP
+ * path exists. With no URL the image is omitted and the initial shows.
  */
-function IdentityHero({ pseudonym }: { pseudonym: string | null }) {
+function IdentityHero({
+	pseudonym,
+	pfpUrl,
+}: {
+	pseudonym: string | null;
+	pfpUrl: string | null;
+}) {
 	return (
 		<div className="mb-[18px] flex size-[140px] items-center justify-center">
 			<Avatar className="size-full">
-				<AvatarImage src="/pfp-placeholder.svg" alt="" />
+				{pfpUrl ? <AvatarImage src={pfpUrl} alt="" /> : null}
 				<AvatarFallback className="text-[28px] font-extrabold">
 					{pseudonym?.charAt(0) ?? ""}
 				</AvatarFallback>
@@ -460,9 +458,11 @@ function IdentityHero({ pseudonym }: { pseudonym: string | null }) {
 export function CardFigure({
 	figure,
 	pseudonym,
+	pfpUrl,
 }: {
 	figure: OnboardingFigure;
 	pseudonym: string | null;
+	pfpUrl: string | null;
 }) {
 	// Each figure is returned BARE. The card is already `flex flex-col
 	// items-center`, so the art centres itself with no wrapper — which is what
@@ -472,7 +472,7 @@ export function CardFigure({
 		case "brand":
 			return <BrandHero />;
 		case "identity":
-			return <IdentityHero pseudonym={pseudonym} />;
+			return <IdentityHero pseudonym={pseudonym} pfpUrl={pfpUrl} />;
 		case "goal":
 			return <GoalFigure />;
 		case "voice":
