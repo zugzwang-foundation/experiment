@@ -53,9 +53,15 @@ import type { DebatePost, PresentPost, Side } from "./types";
  * CREATES RATHER THAN SCOPE CREEP. `--elev-1` is `inset 0 1px 0 rgb(255 255 255
  * / 0.04), 0 1px 2px rgb(0 0 0 / 0.4)` — an INSET top-light, i.e. a one-pixel
  * pale line drawn across the top of the card. On a boxed card that line reads as
- * the lit edge of a raised surface. On a full-bleed band it is a second
+ * the lit edge of a raised surface. On a full-bleed card it is a second
  * horizontal rule a pixel below the hairline that separates the posts, and A9
  * D-1 says posts are separated by ONE hairline. Leaving it would ship two.
+ *
+ * ⚠ "band" IN THAT SENTENCE MEANT THE CARD RUNNING EDGE TO EDGE, NOT THE FOOTER.
+ * Worth saying because the word moved: A9 D-1 also gave the Support/Counter
+ * footer a lighter ground, and ADR-0051 A10 D-3 has since taken it away. The
+ * `band` prop passed below still exists and still means "this is the unboxed
+ * feed card" — see `AggregateFooter`'s own note on it.
  *
  * ⚠ THE CARD KEEPS ITS `p-3`, AND THAT IS WHAT "the tier's horizontal padding
  * only" RESOLVES TO. The feed column drops its own `px-3` (see
