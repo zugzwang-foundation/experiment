@@ -70,10 +70,44 @@ const SOLD_DWELL_MS = 900;
  * digits and the Đ drifts off the number. Dropping `font-mono` below is a
  * silent break of this, not a restyle: jsdom performs no layout, so the width
  * string is unchanged and nothing reddens.
+ *
+ * ⚠⚠ **MOBILE-2j · R-2 — THIS *IS* THE MEASURED FALLBACK, AND `field-sizing:
+ * content` IS NOT ADDED BESIDE IT.** R-2 asks for a width that hugs the digits so
+ * the caret sits after the last one, and prescribes `field-sizing: content` where
+ * it works with a measured fallback elsewhere. There is nowhere left for the
+ * fallback to be: an explicit `width` **overrides** `field-sizing` entirely, so
+ * declaring both would leave one of them inert on every engine and a later reader
+ * unable to tell which. `BetComposer.tsx`'s own docblock already ruled this, on
+ * exactly the ground R-2 names — *"its support is partial — where it is
+ * unsupported the field silently falls back to its default size and the Đ stops
+ * travelling, with nothing to detect it"*. One deterministic mechanism, identical
+ * on both engines, jsdom-observable; the prescription's goal is met and its
+ * mechanism is not, and saying which is the point.
+ *
+ * ⚠ THE FLOOR IS THE TAP TARGET AND IT IS THE SAME 2 ON BOTH PRESENTATIONS NOW.
+ * MOBILE-2h gave the sheet a floor of 3 because `2ch` of 32px mono measured ~38px,
+ * under the 44px every other control there keeps. At R-2's 48px, `2ch` is ~58px —
+ * clear of the floor — so the third `ch` stopped buying a target and started
+ * buying a GAP: the sheet is left-aligned now, so slack sits after the caret where
+ * a borderless field cannot show it, but a 3ch floor on a two-digit value would
+ * have widened the box by a whole glyph for nothing.
  */
 function sellFieldWidth(value: string): string {
-	return `${Math.max(2, value.length)}ch`;
+	return `${Math.max(FIELD_FLOOR_CH, value.length)}ch`;
 }
+
+/**
+ * The floor, as a named constant rather than a default parameter.
+ *
+ * ⚠ IT WAS A PARAMETER UNTIL MOBILE-2j, and the parameter was the interesting
+ * part: the sheet passed 3 and the row passed 2, because `2ch` of 32px mono
+ * measured ~38px and the sheet keeps a 44px floor on everything. At R-2's 48px,
+ * `2ch` is ~58px and the third `ch` stopped buying a target. With both callers on
+ * the same value the parameter had no second caller left — an orphan the change
+ * created (§5.3), found by `@code-reviewer`. A constant says the same thing and
+ * cannot drift back into two.
+ */
+const FIELD_FLOOR_CH = 2;
 
 export type InlineSellController = ReturnType<typeof useInlineSell>;
 
@@ -522,6 +556,7 @@ export function InlineSellAmount({
 	onEdit,
 	onSubmit,
 	draft,
+	variant = "row",
 }: {
 	tileKey: string;
 	seedDisplay: string;
@@ -530,8 +565,38 @@ export function InlineSellAmount({
 	draft: string | null;
 	onEdit: (value: string, seedExact: string) => void;
 	onSubmit: () => void;
+	/**
+	 * ⛔⛔ MOBILE-2h · R-4/R-5 — WHICH PRESENTATION, AND WHY THIS IS A PROP RATHER
+	 * THAN A SECOND COMPONENT.
+	 *
+	 * The phone's sell sheet wants this field to BE the figure — 48px, borderless,
+	 * centred, the largest thing on screen, with the ceiling stated beneath it in
+	 * words (MOBILE-2j · R-2; it was 32px inside a bordered chip with a `Current`
+	 * label above at MOBILE-2h). The desktop's in-row arm wants it to be a 15px
+	 * figure inside a bordered chip in a table cell. Those are two presentations of
+	 * ONE control, and the control is a money control: `InlineSell`'s ceiling, its
+	 * exact-seed submit and its draft discipline all live in this file and are
+	 * shared by both arms. A forked copy would be a second money field free to
+	 * drift from the first, which is precisely what "money components are reused
+	 * as instances, never forked" forbids.
+	 *
+	 * ⚠ DEFAULTS `"row"`, SO THE DESKTOP IS UNTOUCHED BY CONSTRUCTION and its
+	 * class strings are byte-identical to the shipped ones — the same polarity
+	 * ADR-0045 gives `mobileResponsive`, and for the same reason: a caller that
+	 * forgets the prop inherits the established render rather than a new one.
+	 *
+	 * ⛔ IT CHANGES NOTHING ABOUT THE MONEY. `seedExact` is still the ceiling and
+	 * still what an untouched field submits; `onEdit` still receives the raw typed
+	 * string; `disabled` still freezes the field mid-request. This prop reaches type
+	 * sizes, borders, alignment and the keyboard HINT — and nothing else. ⚠ The one
+	 * behaviour it does reach is named where it is set: the sheet's `inputMode`
+	 * became `numeric`, which costs a phone reader the decimal separator. That is a
+	 * keypad, not a rule; see the note on the `<Input>` below.
+	 */
+	variant?: "row" | "sheet";
 }): React.JSX.Element {
 	const shown = draft ?? seedDisplay;
+	const sheet = variant === "sheet";
 	return (
 		/* ⚠⚠ POSREV-POLISH-2 R-1 — THIS IS THE BUY COMPOSER'S AMOUNT FIELD, RE-CUT
 		   TO A TABLE CELL. `BetComposer.tsx:555-593` (`.amtval`) is the shipped
@@ -554,14 +619,74 @@ export function InlineSellAmount({
 		   ROUNDED figure, the exact value still lives in state, and an untouched
 		   field still submits the EXACT one through `confirm`. R-1 is appearance and
 		   geometry only. */
-		<span className="inline-flex min-w-0 items-baseline justify-end gap-1 rounded-(--r-chip) px-1.5 py-0.5 [border:var(--hairline)] focus-within:shadow-(--state-focus-ring)">
-			<span className="text-[11px] leading-[1.35] text-n5">Đ</span>
+		/* ⛔⛔ MOBILE-2j · R-2 — **THE SHEET'S FIGURE HAS NO FRAME, IN ANY STATE.**
+		   The row keeps the bordered chip above and the reasoning above is its. The
+		   SHEET gives up the border, the radius, the padding AND the focus ring: the
+		   ruling is that the number IS the input, at 48px, the largest thing on the
+		   sheet — and every one of those four is a mark that says "a field lives
+		   here", which a figure that size does not need and which reads as a box
+		   drawn around the one thing the reader came to act on.
+		   ⚠ THE FOCUS RING IS THE ONE THAT TAKES TWO EDITS, and dropping only this
+		   one would have left a ring behind. `focus-within` goes from HERE, and the
+		   `<Input>` primitive's own `focus-visible:shadow-(--state-focus-ring)` is
+		   overridden on the input below — `cn()` is tailwind-merge, so the later
+		   `focus-visible:shadow-none` replaces it rather than racing it in emission
+		   order. R-2 says "no visible frame in any state — focused or not", and
+		   focused is the state where a half-done job shows.
+		   ⛔ WHAT THE FRAME WAS FOR IS NOT LOST, IT MOVED: the ceiling the border
+		   implied is now STATED, in words, on the line beneath the figure
+		   (`PhoneSellSheet.tsx`). A bound a reader can read beats a box they have to
+		   infer one from. */
+		<span
+			className={
+				sheet
+					? "inline-flex min-w-0 items-baseline justify-center gap-2"
+					: "inline-flex min-w-0 items-baseline justify-end gap-1 rounded-(--r-chip) px-1.5 py-0.5 [border:var(--hairline)] focus-within:shadow-(--state-focus-ring)"
+			}
+		>
+			{/* ⚠ THE Đ GOES UP WITH THE DIGITS. Left at 11px beside a 32px figure it
+			    stops reading as the figure's unit and starts reading as a footnote.
+			    ⚠⚠ MOBILE-2j · R-2 — IN THE SHEET IT IS NOW THE DIGITS' EQUAL: same
+			    48px, same `font-mono`, same weight, same `text-ink`. R-2 asks for ONE
+			    visual unit, and at this size the three ways it used to differ all
+			    became visible — a 20px glyph beside a 48px figure reads as a label,
+			    a proportional face beside a monospace one disagrees in stroke weight,
+			    and a muted glyph beside ink digits reads as chrome rather than as
+			    part of the number. The ROW keeps all three differences, deliberately:
+			    at 11px against 15px they are what stop the unit crowding the figure. */}
+			<span
+				className={
+					sheet
+						? "font-mono text-[48px] leading-[1.2] font-extrabold text-ink"
+						: "text-[11px] leading-[1.35] text-n5"
+				}
+			>
+				Đ
+			</span>
 			<Input
 				value={shown}
-				inputMode="decimal"
+				// ⛔⛔ MOBILE-2j · R-2 — `numeric` + `pattern` IN THE SHEET, `decimal` IN
+				// THE ROW, AND THE DIFFERENCE HAS A COST WORTH NAMING. R-2 prescribes
+				// Polymarket's shape: `inputmode="numeric"` with `pattern="[0-9]*"`, which
+				// is the pair iOS reads to raise a digits-only keypad. ⚠ THAT KEYPAD HAS
+				// NO DECIMAL SEPARATOR, so a phone reader can no longer TYPE a fractional
+				// amount — `Đ 12.5` becomes unenterable where `decimal` allowed it.
+				// ⚠ WHAT IT DOES NOT TOUCH IS THE MONEY, and that is the reason it is
+				// only a cost: both are keyboard HINTS. `pattern` validates nothing
+				// outside form submission and there is no form here; the field still
+				// accepts any string it is given; the ceiling, the exact-seed submit and
+				// `sellSharesFor` are untouched. A FULL exit — the common case — is an
+				// untouched field, which submits `seedExact` to the last of its eighteen
+				// decimal places whatever keypad was on screen.
+				// ⚠ THE ROW KEEPS `decimal` because the desktop has a full keyboard and
+				// because R-2 is scoped to the sheet. Recorded in `docs/parked.md` 2j-2.
+				inputMode={sheet ? "numeric" : "decimal"}
+				pattern={sheet ? "[0-9]*" : undefined}
 				disabled={disabled}
 				aria-label="Amount to sell"
 				data-testid={`tile-sell-amount-${tileKey}`}
+				// ⚠ ONE FLOOR NOW, AND THE DOCBLOCK ON `sellFieldWidth` IS WHY: at 48px
+				// `2ch` is ~58px, clear of the 44px target the sheet keeps everywhere.
 				style={{ width: sellFieldWidth(shown) }}
 				onChange={(e) => onEdit(e.target.value, seedExact)}
 				onKeyDown={(e) => {
@@ -570,7 +695,31 @@ export function InlineSellAmount({
 						onSubmit();
 					}
 				}}
-				className="h-auto border-none p-0 text-right font-mono text-[15px] font-extrabold tabular-nums shadow-none [border:none]"
+				// ⚠⚠ MOBILE-2j · R-2 — 48px, AND THE LEADING GOES BACK TO 1.2 BECAUSE THE
+				// SIZE NOW CARRIES THE TARGET ON ITS OWN. MOBILE-2h needed 1.375 to lift
+				// a 32px field to exactly 44px: the tappable box is the INPUT, not the
+				// chip around it, and 32 x 1.2 measured 38.4. At 48px, 1.2 is 57.6 — well
+				// clear — so the leading returns to the ratio every other arbitrary size
+				// on this surface uses, and the target comes from the ruling rather than
+				// from a ratio tuned to reach a minimum.
+				// ⚠ IT IS RESTATED WITH THE SIZE REGARDLESS (AGENTS.md §8): an arbitrary
+				// `text-[Npx]` inherits whatever step was in scope, and `text-sm`'s 20px
+				// leading under a 48px figure clips its own descenders.
+				// ⚠ 48px CLEARS iOS's 16px ZOOM-ON-FOCUS THRESHOLD three times over — a
+				// phone money field below 16px makes the browser scale the page on focus,
+				// which moves every box the reader was just looking at.
+				// ⛔ AND `text-right` IS GONE FROM THIS BRANCH, WHICH IS NOT A DETAIL.
+				// The width tracks the content with a 2ch floor, so a ONE-character value
+				// leaves a glyph of slack: right-aligned it opens between the `Đ` and the
+				// digit and splits the unit R-2 exists to make; left-aligned it sits
+				// AFTER the caret, where a field with no border and no background cannot
+				// show it. The row keeps `text-right`, where the slack is inside a chip
+				// whose right edge is the thing the figures line up against.
+				className={
+					sheet
+						? "h-auto border-none p-0 font-mono text-[48px] leading-[1.2] font-extrabold tabular-nums shadow-none [border:none] focus-visible:shadow-none"
+						: "h-auto border-none p-0 text-right font-mono text-[15px] font-extrabold tabular-nums shadow-none [border:none]"
+				}
 			/>
 		</span>
 	);

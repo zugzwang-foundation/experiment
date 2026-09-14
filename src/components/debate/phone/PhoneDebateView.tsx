@@ -16,6 +16,7 @@ import { AUTH_GATE_COPY, COMPOSER_COPY } from "../composer/copy";
 import { deriveReplySide } from "../composer/gating";
 import { setPhoneSheetOpen } from "../composer-open-store";
 import { ImageLightbox, PostPopup, ReplyPopup } from "../dialogs";
+import { findPostedNode } from "../find-posted";
 import { formatPricePercent } from "../format";
 import { PostCard } from "../PostCard";
 // ⚠ THE CONSTANT, NOT A FOURTH COPY OF THE STRING. `REMOVED_STUB_TEXT` is
@@ -37,6 +38,7 @@ import { PANE_ID, PhoneFeedTrack } from "./PhoneFeedTrack";
 import { PhoneSheet } from "./PhoneSheet";
 import { PhoneSideTabs } from "./PhoneSideTabs";
 import { PhoneTitleStrip } from "./PhoneTitleStrip";
+import { PhoneTopPill } from "./PhoneTopPill";
 
 /**
  * ⛔⛔ THE PHONE PRESENTATION OF `/m/[slug]` — A SECOND TREE OVER THE SAME DATA,
@@ -320,19 +322,226 @@ export function PhoneDebateView({
 	const [detailsMounted, setDetailsMounted] = useState(false);
 
 	/**
-	 * ⛔ MIRRORS `DebateView`'s `onPosted` (`:251-258`) IN THE HALF THAT IS
-	 * OBSERVABLE, and deliberately not in the half that is not. The desktop also
-	 * stores `{commentId, fromModel}` so its scrollers can jump to the new card
-	 * once the refreshed payload lands; this tree registers no scroller, so
-	 * carrying that state would be a note-to-self nothing ever reads. The refresh
-	 * IS mirrored, and it REPLACES the desktop's rather than adding to it — at
-	 * any one width exactly one of the two trees is interactive, so the
+	 * ⛔⛔ MIRRORS `DebateView`'s `onPosted` (`:291`) IN FULL — AND THIS LINE
+	 * PREVIOUSLY ARGUED THAT IT COULD NOT, WHICH WAS TRUE UNTIL THIS ROUND.
+	 *
+	 * It read: "the desktop also stores `{commentId, fromModel}` so its scrollers
+	 * can jump to the new card once the refreshed payload lands; this tree
+	 * registers no scroller, so carrying that state would be a note-to-self
+	 * nothing ever reads." The premise was right and the conclusion has expired:
+	 * the receipt was dropped because nothing consumed it, and MOBILE-2l gives it
+	 * a consumer — the jump below. What made the desktop's state useless here was
+	 * never the state, it was the absence of anything to point at.
+	 *
+	 * ⚠ THE REFRESH STILL **REPLACES** THE DESKTOP'S RATHER THAN ADDING TO IT —
+	 * at any one width exactly one of the two trees is interactive, so the
 	 * two-refresh budget `posted-refresh-budget.test.tsx` pins is unchanged.
+	 *
+	 * ⛔ THE ID COMES FROM THE BET RESPONSE AND FROM NOWHERE ELSE.
+	 * `BetComposer.tsx:413` calls this with the receipt's `commentId`. "The newest
+	 * post in the market" would be a race: another author's post landing in the
+	 * gap between this submit and this refresh would be pinned as the viewer's
+	 * own. The id is the only thing that makes the card THEIRS.
 	 */
-	const onPosted = useCallback(() => {
-		setSheet(null);
-		router.refresh();
-	}, [router]);
+	const [posted, setPosted] = useState<{
+		commentId: string;
+		fromModel: DebateViewModel;
+	} | null>(null);
+
+	const onPosted = useCallback(
+		({ commentId }: { commentId: string }) => {
+			setPosted({ commentId, fromModel: model });
+			setSheet(null);
+			router.refresh();
+		},
+		[model, router],
+	);
+
+	/**
+	 * ⛔⛔ MOBILE-2l · R-2 — THE JUMP, AND IT IS THE DESKTOP'S, NOT A SECOND ONE.
+	 *
+	 * These three expressions are `DebateView.tsx:940-956` transcribed: the same
+	 * `landed` test, the same `findPostedNode`, the same side derivation. They
+	 * are not "like" the desktop's — they call the same function, so masking,
+	 * fail-closed narrowing and the reply/post split cannot drift between the two
+	 * trees.
+	 *
+	 * ⛔⛔ AND THE BRIEF'S DESCRIPTION OF WHAT THE DESKTOP DOES IS NOT WHAT THE
+	 * DESKTOP DOES — this is the correction the whole item turns on. Round eight
+	 * asked for "the viewer's fresh post at the top of the feed with a just-now
+	 * treatment, pinned, later taking its ranked place". Measured, the desktop
+	 * holds NO pin, NO marker and NO treatment, and its own docblock says so
+	 * (`DebateView.tsx:930`: "NOTHING IS HELD BY ANY OF THIS … the card that
+	 * appears is the column's ordinary card in its true ranked position"). The
+	 * feed is never reordered: `buildTopList` is the ranked spine plus the latest
+	 * interleave, so a fresh post lands where its score puts it.
+	 *
+	 * ⇒ WHY THE FOUNDER NONETHELESS SEES IT AT THE TOP, AND WHY THAT READING IS
+	 * RIGHT. The desktop column is PAGED — `usePagedColumn` renders exactly one
+	 * post (`scrollers.tsx:326`, `posts[index]`) — and the jump sets `index` to
+	 * the posted card. So after a bet the author's own argument IS the card the
+	 * column shows. "At the top of the feed" describes a paged column exactly;
+	 * there is simply no pin underneath it to copy.
+	 *
+	 * ⇒ THE PHONE'S FAITHFUL ANALOGUE OF "index = the posted card" IS "scroll the
+	 * feed region until that card's top is the region's top". A blind
+	 * `scrollTo({top: 0})` was the brief's literal instruction and is REJECTED on
+	 * this measurement: the card is not first in a ranked list, so scrolling to
+	 * zero would show the author somebody else's post and call it their own.
+	 * The instruction's INTENT — the author sees their argument when the sheet
+	 * closes — is what is built.
+	 *
+	 * ⚠ THE SIDE IS THE COMMENT'S OWN, never the composer's column: a composer
+	 * opens on the pane opposite the side being bet, so using it would switch the
+	 * reader to the wrong pole and hide the very card this exists to show.
+	 *
+	 * ⚠ ONE-SHOT, KEYED ON THE COMMENT ID — the desktop's `pickedFor` guard
+	 * (`:983`) and the scroller's `jumped.current` (`scrollers.tsx:139`) are the
+	 * same mechanism. Without it every subsequent payload — DebatePoll's 15s
+	 * refresh, a `PhoneTopPill` refresh — would re-take the pane and re-scroll a
+	 * reader who had moved on. A SECOND bet carries a different id and re-arms it,
+	 * which is why the ref holds the id rather than a boolean.
+	 *
+	 * ⚠ `posted` IS NEVER CLEARED, exactly as on the desktop: clearing it would
+	 * make the jump depend on effect ORDERING between this component and the
+	 * track, which is a property neither can keep.
+	 *
+	 * ⛔⛔ A REPLY PLACED FROM THE **FEED** ARM GETS NO JUMP, DELIBERATELY, AND
+	 * THIS IS AN OPEN RULING RATHER THAN AN OVERSIGHT. Found by `@test-writer`.
+	 * A `PostCard`'s Support/Counter triggers open a reply composer WITHOUT
+	 * entering the post, so `focused` is `null` and `findPostedNode` — which
+	 * searches `parent.replies` and returns `null` for a null parent — cannot
+	 * resolve it. The desktop never meets this case: there the same trigger
+	 * ENTERS the post first, so its `selectedPost` is always the reply's parent.
+	 *
+	 * ⇒ SILENCE IS CHOSEN OVER AN INVENTED SEMANTICS, for two reasons and not
+	 * because it is easier. First, the feed pane renders only TOP-LEVEL posts, so
+	 * a reply has no card there to scroll to — "show the author their argument"
+	 * has no referent on this arm. Second, the reply's own side is frequently the
+	 * OPPOSITE pole from its parent's (that is what a Counter reply is), so
+	 * switching to it would carry the reader away from the post they were reading
+	 * to a pane that does not contain their reply either. Both available
+	 * behaviours are worse than none.
+	 * ⚠ It is also not a regression: nothing jumped here before this round. R-2
+	 * asks for "your own POST at the top after you bet", and that is what is
+	 * built; the reply case is unspecified and is flagged for a ruling rather
+	 * than settled here.
+	 *
+	 * ⛔⛔ `setActiveSide` HERE IS AN EIGHTH HOST MUTATION AND IT DELIBERATELY DOES
+	 * NOT CONSULT `composerBusy` — and that is an exception to this file's own
+	 * stated rule, so the property that makes it safe is written down rather than
+	 * left to be rediscovered. `@security-auditor` (L-1). It IS reachable: bet 1
+	 * submits, the sheet closes, the reader opens a SECOND composer, and bet 1's
+	 * payload lands underneath it.
+	 * ⇒ WHAT KEEPS IT SAFE IS THAT `sheet.side` IS INDEPENDENT OF `activeSide`.
+	 * `BetComposer`'s `key` and its `side` prop both read `sheet.side`, which is
+	 * frozen at `setSheet` time — so moving `activeSide` cannot remount the
+	 * composer, cannot mint a fresh idempotency key, and cannot fire
+	 * `onBusyChange(false)` under an in-flight request. ⚠ THE DAY ANYONE MAKES
+	 * `sheet.side` DERIVE FROM `activeSide`, THIS BECOMES A DOUBLE-CHARGE DOOR and
+	 * must move behind `guard()`.
+	 * ⚠ It is not routed through `guard()` today because `guard` DROPS an action
+	 * rather than deferring it, which would lose the side switch entirely and
+	 * leave the reader looking at the wrong pole with no card. The residue is
+	 * cosmetic and bounded: the bottom bar can read `Bet NO` where the reader left
+	 * `Bet YES`.
+	 *
+	 * ⚠ A JUMP CAN ARRIVE ONE NAVIGATION LATE, AND IT THEN OVERWRITES THE FEED'S
+	 * RESTORED POSITION. `@security-auditor` (L-3). If the reader enters a post
+	 * before the payload lands, the guard above defers the jump WITHOUT spending
+	 * it; on the way back the arm-change layout effect restores
+	 * `feedScrollTopRef` and this effect then scrolls to the posted card instead.
+	 * `feedScrollTopRef` is not corrupted — it is discarded. Deterministic, once
+	 * per bet, and the outcome (landing on your own argument) is the one this
+	 * whole item exists to produce; recorded because the timing claim below
+	 * ("only fires on a payload landing after a bet") does not otherwise cover it.
+	 *
+	 * ⚠ `PhoneTopPill` IS A SECOND WRITER OF THIS SAME SCROLLER (MOBILE-2k · F-1)
+	 * — it takes `regionRef` and calls `scrollTo({top: 0, behavior: "smooth"})`.
+	 * The two cannot both be in flight from one gesture: the pill only fires on a
+	 * tap, and this only fires on a payload landing after a bet, which closes the
+	 * sheet the pill is hidden behind. If they ever do race, the LAST write wins
+	 * and the reader is at the top rather than at their card — a degraded
+	 * outcome, not a broken one. Noted because it is the kind of coupling that
+	 * stops being harmless the moment either side grows a timer.
+	 */
+	const landed = posted !== null && model !== posted.fromModel ? posted : null;
+	const postedNode =
+		landed !== null
+			? findPostedNode({
+					posts,
+					parent: focused,
+					commentId: landed.commentId,
+				})
+			: null;
+	const jumpSide: Side | null =
+		postedNode === null
+			? null
+			: postedNode.kind === "post"
+				? postedNode.post.sideAtPostTime
+				: postedNode.reply.side;
+
+	const jumpedFor = useRef<string | null>(null);
+	useEffect(() => {
+		if (landed === null || jumpSide === null) {
+			return;
+		}
+		// ⛔⛔ THE FEED ARM ONLY, AND THIS GUARD IS NOT BELT-AND-BRACES — WITHOUT IT
+		// A THREAD-ARM REPLY SILENTLY FLIPS THE FEED'S POLE. Found by
+		// `@code-reviewer`. On the thread arm `focused` is set, so
+		// `findPostedNode` DOES resolve a reply and `jumpSide` is that reply's own
+		// side — which for a Counter reply is the OPPOSITE pole from the post being
+		// read. The effect would then set `activeSide`, a value this arm never
+		// displays (the tabs here are Support/Counter), find no card to scroll to
+		// because the thread panes render `ReplyCard`s and carry no
+		// `data-phone-post-id`, and return. Nothing visible happens — until the
+		// reader taps Back and lands on a side they did not choose.
+		// ⚠ AND IT WOULD HAVE SPENT THE SHOT DOING IT. `jumpedFor` is stamped
+		// before the scroll, so the same comment could never jump again; a reader
+		// who replied from the thread and then returned to the feed had already
+		// used up the one jump that comment was owed. Returning BEFORE the stamp is
+		// what keeps the shot unspent.
+		// ⚠ The arm is the right axis rather than the card's presence: this is the
+		// only arm that HAS a feed to bring a card to the top of.
+		if (focused !== null) {
+			return;
+		}
+		if (jumpedFor.current === landed.commentId) {
+			return;
+		}
+		jumpedFor.current = landed.commentId;
+		setActiveSide(jumpSide);
+		const region = scrollRegionRef.current;
+		if (region === null) {
+			return;
+		}
+		// ⚠ BOTH PANES ARE ALWAYS MOUNTED (`PhoneFeedTrack` maps every pane), and
+		// the vertical scroller sits ABOVE the horizontal track — so the card's
+		// vertical offset does not depend on which side is showing, and this read
+		// is correct in the same tick as the side switch rather than a frame later.
+		// ⚠ COMPARED AS AN ATTRIBUTE, NOT INTERPOLATED INTO A SELECTOR. The obvious
+		// spelling is `querySelector('[data-phone-post-id="' + id + '"]')`, which
+		// needs `CSS.escape` to be safe — and `CSS` is UNDEFINED in this repo's
+		// jsdom, so the first cut threw `Cannot read properties of undefined
+		// (reading 'escape')` inside an effect and took every R-2 guard down with
+		// it. Found by `@test-writer`'s suite on its first run. Reading the
+		// attribute back needs no escaping and no global, so it is correct in both
+		// environments rather than correct in one and fatal in the other.
+		const card =
+			[...region.querySelectorAll("[data-phone-post-id]")].find(
+				(el) => el.getAttribute("data-phone-post-id") === landed.commentId,
+			) ?? null;
+		if (card === null) {
+			return;
+		}
+		// ⛔ THE REGION, NEVER `window`. The shell is bounded; the document does
+		// not scroll, so `window.scrollTo` is a no-op here — the same reason
+		// `DebateView`'s `resetPageScroll` is unreachable in this tree.
+		const top =
+			region.scrollTop +
+			(card.getBoundingClientRect().top - region.getBoundingClientRect().top);
+		region.scrollTo({ top });
+	}, [landed, jumpSide, focused]);
 
 	/**
 	 * ⛔⛔ EVERY HOST TRANSITION CONSULTS `composerBusy`, NOT JUST THE CLOSE —
@@ -457,22 +666,54 @@ export function PhoneDebateView({
 			<div className="flex flex-col gap-2.5 px-3 pt-2.5 pb-[140px]">
 				{sidePosts.length === 0 ? <EmptySideCTA side={side} /> : null}
 				{sidePosts.map((post) => (
-					<PostCard
-						key={post.id}
-						post={post}
-						onEnter={enterPost}
-						onOpenPopup={setPopupPost}
-						onOpenImage={setLightboxUrl}
-						onReplyToPost={(id, relation) => {
-							const parent = posts.find((p) => p.id === id);
-							if (parent !== undefined) {
-								openReply(parent, relation);
-							}
-						}}
-						heldSide={heldSide}
-						marketOpen={marketOpen}
-						suspended={suspended}
-					/>
+					/* ⛔ MOBILE-2l · R-2 — THE ANCHOR THE JUMP RESOLVES AGAINST, and it
+					   is a WRAPPER rather than an attribute on `PostCard` because
+					   `PostCard` is shared with the desktop tree and this round's wall is
+					   a desktop diff of exactly nothing. The wrapper is a phone-tree leaf,
+					   so it cannot reach 1440 at all.
+					   ⚠⚠ IT IS LAYOUT-INERT, AND THE FIRST VERSION OF THIS SENTENCE GAVE
+					   THE WRONG REASON FOR IT. It read "`PostCard`'s root declares no
+					   `flex-1` and no `self-*`" — `PostCard.tsx:122` is
+					   `<Card className="min-h-0 flex-1 …">`, so the card DOES carry
+					   `flex: 1 1 0%` and the re-parenting does change its status: it stops
+					   being a flex item of the feed column and becomes a block child of
+					   this div, where `flex-1` names nothing at all. Found by
+					   `@code-reviewer`.
+					   ⇒ THE CONCLUSION SURVIVES ON A PROPERTY OF THE CONTAINER, not of the
+					   card. The feed column is a block-level child of the pane with
+					   `height: auto`, so its main size is indefinite: `flex-basis: 0%`
+					   resolves as `content` and `flex-grow` has no free space to
+					   distribute. `flex-1` was ALREADY inert in that container — which is
+					   why nothing moves — and it would stop being inert the moment anyone
+					   gave the feed column a definite height.
+					   ⚠ AND THE CITED MEASUREMENT DID NOT COVER IT EITHER. This said
+					   "measured either way in this round's B1/B2 pass", whose fingerprints
+					   are at 1440 and 640 — widths at which this whole subtree is
+					   `display:none`. Re-measured at **360**, ground against tip: both
+					   cards at `(11.99, 187.86, 336.02, 308.29)` and
+					   `(11.99, 506.15, …)`, column height `776.582px` on both, identical to
+					   the hundredth of a pixel.
+					   ⚠ AND IT CARRIES THE ID, NOT THE INDEX. An index would couple the
+					   scroll to `sidePosts`' ordering and break the first time the empty
+					   CTA or a ranked re-order moved a row; the comment id is the same key
+					   the receipt carries. */
+					<div key={post.id} data-phone-post-id={post.id}>
+						<PostCard
+							post={post}
+							onEnter={enterPost}
+							onOpenPopup={setPopupPost}
+							onOpenImage={setLightboxUrl}
+							onReplyToPost={(id, relation) => {
+								const parent = posts.find((p) => p.id === id);
+								if (parent !== undefined) {
+									openReply(parent, relation);
+								}
+							}}
+							heldSide={heldSide}
+							marketOpen={marketOpen}
+							suspended={suspended}
+						/>
+					</div>
 				))}
 			</div>
 		);
@@ -657,7 +898,25 @@ export function PhoneDebateView({
 			    `z-30` stays — it is a flex item, so `z-index` applies — and it
 			    still sits BELOW the header's reserved `z-40`
 			    (`sticky-header.test.ts`). */}
-			<div className="z-30 shrink-0 bg-ground [border-bottom:var(--hairline)]">
+			{/* ⛔⛔ MOBILE-2k — `relative` IS LOAD-BEARING AND IT IS THE ONLY CLASS
+			    THIS ROUND ADDS TO AN EXISTING ELEMENT. `PhoneTopPill` sits `top-full
+			    mt-3` below this block, which is how "12px under the YES/NO tabs"
+			    becomes a structural distance rather than a guessed number: this
+			    block's height is set by how many lines the market question wraps to,
+			    so nothing else in the tree can name its bottom edge. `top-full`
+			    resolves against the nearest POSITIONED ancestor, and there is NONE above
+			    this element — `<body>` is `min-h-full flex flex-col` and static
+			    (`src/app/layout.tsx`), so without this token the containing block is
+			    the INITIAL one, i.e. the viewport. The pill would land 12px below the
+			    bottom of the viewport, off screen, with no error anywhere. ⚠ This
+			    comment said the ancestor "would be `<body>`"; `@code-reviewer` walked
+			    the chain and found it static. Same conclusion, wrong mechanism named —
+			    and a wrong mechanism is what a later reader reasons from.
+			    ⚠ It does not change the stacking: `z-30` already made this element a
+			    stacking context as a flex item, and `position: relative` is not a
+			    containing block for `fixed` descendants (only a transform is), so
+			    `PhoneSheet`'s full-viewport layer is untouched. */}
+			<div className="relative z-30 shrink-0 bg-ground [border-bottom:var(--hairline)]">
 				{focused === null ? (
 					<PhoneTitleStrip
 						title={market.title}
@@ -680,6 +939,26 @@ export function PhoneDebateView({
 					onSelect={focused === null ? onSideKey : onRelationKey}
 					panelIdFor={PANE_ID}
 				/>
+				{/* ⛔ MOBILE-2k · F-1 — THE FEED ARM ONLY, GATED AT THE MOUNT. The
+				    bounded shell took pull-to-refresh away (the document no longer
+				    scrolls below 640, so the browser's overscroll gesture has nothing
+				    to fire from); this is its replacement. A thread is short and was
+				    navigated INTO, so it gets none — and the gate being the MOUNT
+				    rather than a test inside the component is what stops a future edit
+				    from getting the arm backwards.
+				    ⚠ `sheet !== null` IS THE LOCK, NOT AN APPROXIMATION OF IT. The
+				    tier's only two lock holders are `PhoneSheet` and
+				    `MarketPriceChartOverlay`, and the overlay is reachable only INSIDE
+				    the details sheet — so every held lock on this tier is a sheet.
+				    `PhoneTopPill` consults `isPageScrollLocked()` as well, at tap
+				    time, for the day that stops being true. */}
+				{focused === null ? (
+					<PhoneTopPill
+						regionRef={scrollRegionRef}
+						locked={sheet !== null}
+						busy={composerBusy}
+					/>
+				) : null}
 			</div>
 
 			{/* ⛔⛔ THE SCROLL REGION — ONE ELEMENT, AND IT IS THE WHOLE REASON THE
@@ -857,6 +1136,7 @@ export function PhoneDebateView({
 				post={popupPost}
 				onClose={() => setPopupPost(null)}
 				tier="phone"
+				marketQuestion={market.title}
 			/>
 			<ReplyPopup
 				reply={popupReply}

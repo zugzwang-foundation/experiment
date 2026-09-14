@@ -254,6 +254,42 @@ const HIDE_BELOW_640 = "max-mobile:hidden";
 const GATED_HIDE = `mobileResponsive && "${HIDE_BELOW_640}"`;
 
 /**
+ * ⛔⛔ THE CLOSED ALLOWLIST — WIDENED BY A RULING, NOT BY A BUILD.
+ *
+ * It was EXACTLY `[max-mobile:hidden]` from ADR-0049 until MOBILE-2l, and the
+ * one-token form is what this file's assertion 3 was written around: a closed
+ * allowlist reddens on spellings nobody has thought of, where a denylist goes
+ * stale silently in the PASSING direction. That property is kept — the list is
+ * still closed and still exact; it simply now names two ruled behaviours.
+ *
+ * ⚠ IT WIDENED BECAUSE ADR-0051 A8 D-5 RULED A SECOND ONE: "The header avatar
+ * below 640 is a circle; the desktop header is unchanged." ADR-0049 reduced the
+ * chip to its avatar and left a 42×34 rounded RECTANGLE holding a 24px image,
+ * under the 44px target. A8 makes that box square, sheds its ground and border,
+ * and fills it. Every token below is that decision and nothing else.
+ *
+ * ⚠ `data-[size=sm]:size-11` REPEATS THE PRIMITIVE'S OWN DATA-VARIANT ON
+ * PURPOSE. `ui/avatar.tsx` ships `data-[size=sm]:size-6` at specificity (0,2,0);
+ * a bare `size-11` is (0,1,0) and loses silently. Both spellings are in the list
+ * because both are on the element — the bare one sizes the chip, the
+ * data-variant one sizes the avatar inside it.
+ */
+const RULED_PHONE_VOCABULARY = [
+	// ADR-0049 D-1 — the pseudonym text goes, the avatar stays.
+	HIDE_BELOW_640,
+	// ADR-0051 A8 D-5 — and what stays becomes a circle.
+	"max-mobile:size-11",
+	"max-mobile:justify-center",
+	"max-mobile:gap-0",
+	"max-mobile:p-0",
+	"max-mobile:[border:none]",
+	"max-mobile:bg-transparent",
+	"max-mobile:hover:bg-transparent",
+	"max-mobile:data-[size=sm]:size-11",
+	"max-mobile:[&_img]:size-full",
+];
+
+/**
  * Every literal className carried by a node bearing `data-testid="<testid>"`, in
  * source order — one entry per occurrence.
  *
@@ -894,8 +930,18 @@ describe("global header mobile reflow — the right zone sheds its anti-conflati
  * deleted guard proves nothing in either direction, an inverted one reddens the
  * moment somebody reverts. Its old form banned the whole responsive vocabulary
  * from this file on a Phase B motive that ADR-0048 already superseded; its new
- * form is a CLOSED ALLOWLIST — exactly one token, exactly `max-mobile:hidden` —
- * so every other spelling still reddens, including ones nobody has thought of.
+ * form is a CLOSED ALLOWLIST — so every other spelling still reddens, including
+ * ones nobody has thought of.
+ * ⚠ IT WAS "EXACTLY ONE TOKEN, EXACTLY `max-mobile:hidden`" UNTIL MOBILE-2l, and
+ * that sentence is corrected here rather than below because this is the
+ * paragraph a reader reaches first (`O-5`). ADR-0051 A8 D-5 rules a SECOND
+ * behaviour into this file — the chip becomes a circular avatar — so the list is
+ * now the ruled set in `RULED_PHONE_VOCABULARY`. What did not change is the
+ * property that made the inversion worth doing: the list is CLOSED and exact, so
+ * it is still a set equality and never a denylist.
+ * ⚠ BOTH SIDES OF THAT EQUALITY ARE SORTED, DELIBERATELY. With one token order
+ * meant nothing; with ten, asserting source order would redden on a re-ordering
+ * that changes no behaviour. The SET is the contract; the order is not.
  * The JOIN CTA's never-hides rule survives ADR-0048 and becomes an EXPLICIT
  * assertion here, because it was previously held only as a side effect of the
  * blanket ban that is being inverted away.
@@ -1028,13 +1074,13 @@ describe("global header mobile reflow — ADR-0049: the signed-in right zone red
 			/(?:\b(?:max-)?(?:mobile|sm|md|lg|xl|2xl):|\b(?:max|min)-\[[^\]]+\]:)[^\s"'`]*/g;
 		const tokens = source.match(VARIANTS) ?? [];
 		expect(
-			tokens,
+			[...tokens].sort(),
 			`${IDENTITY}: its responsive vocabulary is [${tokens.join(", ")}]. ` +
-				`ADR-0049 permits EXACTLY ONE token in this file — ` +
-				`\`${HIDE_BELOW_640}\` on the pseudonym span — and nothing else at any ` +
-				`breakpoint under any variant. A second token here is either a second ` +
-				`behaviour nobody ruled on, or the same one spelled twice.`,
-		).toEqual([HIDE_BELOW_640]);
+				`This file's phone behaviour is RULED, and the allowlist below is the ` +
+				`whole of it: ADR-0049 D-1 (the pseudonym text goes) plus ADR-0051 A8 ` +
+				`D-5 (the chip becomes a circular avatar). Anything else is a third ` +
+				`behaviour nobody ruled on, or one of these two spelled twice.`,
+		).toEqual([...RULED_PHONE_VOCABULARY].sort());
 		expect(
 			ungatedBreakpointClasses(raw),
 			`${IDENTITY}: carries a breakpoint class that is not wrapped in ` +
@@ -1349,7 +1395,7 @@ describe("global header mobile reflow — what this task may NOT touch", () => {
 	 * `:82` names: a deleted guard proves nothing in either direction, an inverted
 	 * one reddens the moment somebody reverts. Two of its properties are carried
 	 * forward deliberately rather than rebuilt: the vocabulary check is still
-	 * EXHAUSTIVE (a closed allowlist of exactly one token, not a denylist of
+	 * EXHAUSTIVE (a closed CLOSED ALLOWLIST — one token at ADR-0049, ten since ADR-0051 A8 D-5 (`RULED_PHONE_VOCABULARY`), not a denylist of
 	 * remembered spellings), and the JOIN branch's cleanliness is now asserted
 	 * EXPLICITLY, where the ban held it only as a side effect.
 	 *

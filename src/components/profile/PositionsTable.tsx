@@ -32,6 +32,7 @@ import type {
 import { PROFILE_COPY } from "./copy";
 
 import { InlineSellAmount, useInlineSell } from "./InlineSell";
+import { phoneMoneyLineFitsMovement } from "./money-line";
 import { argumentCurrentExact, sumExact } from "./partition";
 import { PhoneSellSheet } from "./phone/PhoneSellSheet";
 import { useDocumentRowStepper } from "./row-stepper";
@@ -60,6 +61,39 @@ import {
  * aimed at an element that no longer renders.
  */
 const ROW_WINDOW = 3;
+
+/**
+ * MOBILE-2l · R-1 — THE MARKET TAG, TAKEN FROM THE TITLE BECAUSE THERE IS
+ * NOWHERE ELSE TO TAKE IT FROM.
+ *
+ * ⛔ MEASURED BEFORE IT WAS WRITTEN, because the brief allows either source and
+ * the answer decides the shape: `markets` has **no** `tag` or `category` column
+ * (`src/db/schema/markets.ts:37-53`), and the profile read model carries
+ * `marketTitle` alone (`src/server/profile/arguments.ts:377`). So the leading
+ * segment of the title is the only source, and the brief's fallback is the
+ * path — recorded here as it asks.
+ *
+ * The eight content markets are all `"<Tag> · <Question>"` — `Mumbai ·`,
+ * `Oktoberfest ·`, `Chess ·`, `Bitcoin ·`, `Math ·`, `Claude ·`,
+ * `YCombinator ·`, `GitHub ·` (`docs/data/staging-markets-snapshot.json`).
+ *
+ * ⚠ `rest` KEEPS THE SEPARATOR, so `tag + rest === title` for every input with
+ * no exception. That identity is the whole contract: the caller renders both
+ * halves, so the DOM's text is the title unchanged and the equality assertion in
+ * `arrangement.test.tsx` cannot notice this function exists.
+ *
+ * ⚠ A TITLE WITH NO ` · ` KEEPS ITS WHOLE SELF as the tag — it is not an error
+ * and not a special case at the call site. Every local `sp-m*` fixture is in
+ * that state (`Staging fixture M12 — placeholder filler question`), so the
+ * fallback is the branch the development database exercises, not a rare one.
+ */
+const TAG_SEPARATOR = " · ";
+function splitMarketTag(title: string): { tag: string; rest: string } {
+	const at = title.indexOf(TAG_SEPARATOR);
+	return at === -1
+		? { tag: title, rest: "" }
+		: { tag: title.slice(0, at), rest: title.slice(at) };
+}
 
 /**
  * ⚠⚠ **`signGlyphFor` LIVED HERE AND IS GONE AT POSREV-POLISH-2 R-2.** It made
@@ -303,6 +337,19 @@ export function PositionsTable({
 		return [...seen.entries()];
 	}, [rows]);
 
+	/**
+	 * MOBILE-2l · R-1 — the filter label, split into the part a phone shows and
+	 * the part it hides. `tag + rest === title`, always, so the concatenation the
+	 * DOM carries is the title unchanged.
+	 */
+	const selectedMarketLabel = useMemo(
+		() =>
+			splitMarketTag(
+				marketOptions.find(([id]) => id === market)?.[1] ?? "All markets",
+			),
+		[marketOptions, market],
+	);
+
 	// ── The tab counts, over the MARKET-SCOPED rows ──────────────────────────
 	// RF-13's count badge sits on the Closed label; the Open count is derived
 	// alongside it because the RF-14 empty states need to know whether the OTHER
@@ -542,10 +589,37 @@ export function PositionsTable({
 		rowCount: visibleTiles.length,
 		enabled: !isPhoneTable,
 	});
+	// ⛔⛔ THE THREE-TILE WINDOW STANDS DOWN ON A PHONE, AND THIS GATE IS THE
+	// SECOND HALF OF THE EQUALISER'S. `useEqualRowThirds` was given
+	// `enabled: !isPhoneTable` at round five; this effect — the OTHER mechanism in
+	// RF-10's pair — never was, because its own gate ("can the DOCUMENT scroll")
+	// happened to read false on a phone page that fitted its viewport. MOBILE-2h
+	// found it by making tiles a screen tall; MEASURED there before the gate
+	// existed, `positions-panel-body` capped at 2370px against 3140px of content
+	// at 390x844, i.e. one tile hanging outside the panel's own border.
+	// ⚠⚠ MOBILE-2j WITHDREW THE VIEWPORT-TALL TILE AND THE GATE STAYS, because
+	// what makes the cap fire was never the tile's height — it is that the page
+	// SCROLLS. A list of three-line tiles under an identity card scrolls at every
+	// phone width too, so the gate would flip true here just as it did there, and
+	// the cap would bound the panel at three tiles and scroll the rest INSIDE it.
+	// ADR-0051 A6 D-1 puts the list in the page's ordinary scroll; a nested
+	// scroller is the one shape that cannot satisfy it. The stated cause has
+	// moved one step further back and the token is unchanged — recording that is
+	// cheaper than re-deriving it (`O-3`).
+	// ⚠ IT CLEARS ON THE WAY OUT rather than merely returning. A box with a stale
+	// inline `max-height` still ends early whatever its overflow is — the height
+	// outlives the stand-down exactly as the equaliser's inline row heights would,
+	// which is the lesson `row-thirds.ts`'s own `!enabled` branch already records.
 	useEffect(() => {
 		const body = bodyRef.current;
 		const table = tableRef.current;
 		if (body === null || table === null) {
+			return;
+		}
+		if (isPhoneTable) {
+			if (body.style.maxHeight !== "") {
+				body.style.maxHeight = "";
+			}
 			return;
 		}
 		const measure = () => {
@@ -600,7 +674,7 @@ export function PositionsTable({
 		const observer = new ResizeObserver(measure);
 		observer.observe(table);
 		return () => observer.disconnect();
-	}, [visibleTiles.length]);
+	}, [visibleTiles.length, isPhoneTable]);
 
 	/** `pick(i)` (`:679`) — select a tile. No deselect: the panel always holds a
 	 * selection, so clearing would immediately re-derive to the first visible
@@ -700,7 +774,47 @@ export function PositionsTable({
 							data-testid="positions-market-filter"
 							aria-haspopup="listbox"
 							aria-expanded={filterOpen}
-							className="max-mobile:min-w-0 max-mobile:shrink max-mobile:overflow-hidden"
+							/* ⛔⛔ MOBILE-2h · R-1 — `max-w-full` IS WHAT MAKES THE SHIPPED
+							   TRUNCATE BITE, AND ITS ABSENCE WAS A MEASURED LEAK. Round five
+							   put `min-w-0` and `shrink` here and `min-w-0` on the wrapper,
+							   reasoning about a flex item's automatic minimum — and the
+							   reasoning was about the wrong box. THE WRAPPER IS A PLAIN
+							   `<div>`, so it is `display: block`, so this button is an
+							   INLINE-LEVEL box inside it and not a flex item of it at all:
+							   `flex-shrink` here names nothing, and the button keeps its
+							   `whitespace-nowrap` intrinsic width. MEASURED at 360px with a
+							   market selected: the wrapper shrank correctly to 45px and the
+							   button inside it rendered 301px, overflowing the panel by 91px
+							   and painting under the Open/Closed pills — which is why the
+							   founder sees `Closed (n)` with its count unreadable. The inner
+							   span's `truncate` was live the whole time and measuring against
+							   the button's own 301px, so it had nothing to cut.
+							   ⇒ `max-w-full` caps the button at its wrapper's resolved width,
+							   which is what the shrink was always meant to produce. The other
+							   three tokens stay: they are what shrinks the WRAPPER. */
+							/* ⛔⛔ MOBILE-2l · B7 — THE 44px TOUCH TARGET, GROWN AND THEN CANCELLED
+							   IN LAYOUT. Measured at 360/390/430 this control rendered 23.99px
+							   tall (`buttonVariants` `xs` is an explicit `h-6`), well under the
+							   floor.
+							   ⚠ TWO EARLIER ATTEMPTS WERE MEASURED AND BOTH WERE WRONG, which
+							   is why the spelling is this odd. (1) An `::after` overlay — the
+							   pattern `AggregateFooter`'s `TriggerPill` uses on this tier —
+							   must escape the button's box, so it needs `overflow-visible`;
+							   but `overflow-hidden` is here as half of the MOBILE-2h clip
+							   (the block above), and a hit area is not worth trading a clip
+							   for. (2) `min-h-11` alone grew the target correctly AND grew the
+							   filter head from 51.99px to 68.60px, measured — because
+							   `min-h-[52px]` on that head is a FLOOR, not headroom, and a 44px
+							   child plus the head's own padding clears it. The comment that
+							   shipped with that attempt claimed it "costs the layout nothing";
+							   it cost 16.6px on every phone profile.
+							   ⇒ `h-11` takes the BORDER box to 44 and `-my-2.5` takes the
+							   MARGIN box back to 24, so the target grows and the row does not
+							   move. The overflow stays hidden and the head stays 51.99px —
+							   both measured after. The 20px it reclaims is the head's own
+							   padding, where no other control lives, so the expanded area
+							   steals no neighbour's tap. */
+							className="max-mobile:-my-2.5 max-mobile:h-11 max-mobile:max-w-full max-mobile:min-w-0 max-mobile:shrink max-mobile:overflow-hidden"
 							onClick={() => setFilterOpen((o) => !o)}
 						>
 							{/* ⛔ THE LABEL IS WRAPPED SO IT CAN ELLIPSIZE, and the wrapper
@@ -718,10 +832,43 @@ export function PositionsTable({
 							    intrinsic width is unchanged — and so `textContent` is still
 							    `<market title> ▾`, which `arrangement.test.tsx` asserts by
 							    equality and which a JS slice would have made a lie. */}
-							<span className="min-w-0 max-mobile:truncate">
-								{marketOptions.find(([id]) => id === market)?.[1] ??
-									"All markets"}{" "}
-								▾
+							{/* ⛔⛔ MOBILE-2l · R-1 — THE LABEL IS SPLIT, NEVER SLICED, AND THE
+							    DIFFERENCE IS WHAT LETS THIS BE A PHONE-ONLY CHANGE AT ALL.
+							    The ask is that a selected market shows its TAG alone below
+							    640px (`Claude`, `Math`, `YCombinator`) so the disclosure caret
+							    survives. Text cannot be scoped by a `max-mobile:` token — only
+							    BOXES can — so the title is emitted as two spans and the
+							    remainder is `display:none` on a phone.
+							    ⇒ `textContent` is `<market title> ▾` at EVERY width, byte for
+							    byte. That matters twice over: `arrangement.test.tsx`
+							    (`row7a::the-label-BECOMES-the-chosen-market`) asserts it by
+							    EQUALITY, and this control's own rule — one directly above —
+							    is that a JS slice "would make the accessible name lie about
+							    which market is selected". A split lies to nobody.
+							    ⛔⛔ THE CARET MOVES OUT OF THE TRUNCATING BOX, and that, not
+							    the tag, is the actual defect. `max-mobile:truncate` used to sit
+							    on the span that contained BOTH the label and the caret, so the
+							    ellipsis ate the caret itself — the control lost the one mark
+							    that says it opens. It now clips the label only, and the caret
+							    is a `shrink-0` sibling that cannot be reached.
+							    ⚠ >=640px IS UNCHANGED: the outer span gains no unprefixed
+							    token, and splitting one text node across two inline spans
+							    changes no metric and no line-breaking. B1-p is the proof. */}
+							<span className="min-w-0 max-mobile:flex max-mobile:items-baseline max-mobile:gap-1">
+								{/* ⚠ `max-mobile:` ON BOTH, so this element adds nothing above
+								    640px. The inner span carried a bare `min-w-0` in the first
+								    cut — provably inert there (it is an inline box above the
+								    breakpoint, and `min-width` does not apply to a non-replaced
+								    inline), but the round's wall is that every token is
+								    phone-scoped, and "inert" is a thing a reader has to verify
+								    where "prefixed" is a thing they can see. `@code-reviewer`. */}
+								<span className="max-mobile:min-w-0 max-mobile:truncate">
+									{selectedMarketLabel.tag}
+									<span className="max-mobile:hidden">
+										{selectedMarketLabel.rest}
+									</span>
+								</span>{" "}
+								<span className="max-mobile:shrink-0">▾</span>
 							</span>
 						</Button>
 						{filterOpen && (
@@ -810,7 +957,12 @@ export function PositionsTable({
 									data-testid={`positions-status-${s.toLowerCase()}`}
 									aria-pressed={status === s}
 									onClick={() => setStatus(s)}
-									className={`inline-flex h-6 shrink-0 items-center gap-1 rounded-(--r) px-2 text-xs font-medium transition-all outline-none select-none focus-visible:shadow-(--state-focus-ring) ${
+									/* ⚠ MOBILE-2h · R-1 — 11px and tighter padding on the phone, so
+									   `Open (4)` and `Closed (2)` keep their COUNTS at 360px instead
+									   of being overprinted by the market filter beside them. The
+									   pills stay `shrink-0`: the count is the thing this row exists
+									   to show, and a shrinking pill would drop it first. */
+									className={`inline-flex h-6 shrink-0 items-center gap-1 rounded-(--r) px-2 text-xs font-medium transition-all outline-none select-none focus-visible:shadow-(--state-focus-ring) max-mobile:px-1.5 max-mobile:text-[11px] ${
 										status === s
 											? "bg-n7 text-ground"
 											: "text-n5 [border:var(--hairline)] hover:bg-(--state-hover-fill)"
@@ -1143,6 +1295,12 @@ function TileRow({
 	const armedInRow = armed && !isPhone;
 	const armedInSheet = armed && isPhone;
 	const move = tileMove(tile.basis, tile.currentExact);
+	// MOBILE-2j · R-1 — whether the movement chip fits beside this value at phone
+	// width. It is the ONE element on the money line that yields; the rule, the
+	// measurement behind it and why it is data rather than an observer are in
+	// `money-line.ts`. Applied as a CLASS, so the desktop is untouched by
+	// construction and nothing flips on hydration.
+	const movementFitsOnPhone = phoneMoneyLineFitsMovement(tile.valueDisplay);
 	const sellArgs = {
 		marketId: tile.row.marketId,
 		// ⚠ `undefined` ON THE FALLBACK TILE — `buildSellRequest` DROPS the key
@@ -1249,7 +1407,61 @@ function TileRow({
 			   SUPPRESSED at phone width and a top border takes over. The selected arm
 			   keeps its `bg-n1`, which is what still says "this one" once the outline
 			   is gone. */
-			className={`cursor-pointer rounded-(--r) focus-visible:shadow-(--state-focus-ring) max-mobile:flex max-mobile:items-center max-mobile:gap-1.5 max-mobile:rounded-none max-mobile:px-0 max-mobile:py-2.5 max-mobile:[border-top:var(--hairline)] max-mobile:[outline:none] ${
+			/* ⚠⚠ MOBILE-2j · R-1 — THE TILE GOES BACK TO BEING A FULL-WIDTH ROW IN THE
+			   PAGE'S ORDINARY SCROLL, AND THE WORK IS A DELETION RATHER THAN AN
+			   ADDITION (ADR-0051 A6 D-1, which supersedes A5 D-1). MOBILE-2h made this
+			   `<tr>` one visual viewport tall and snapped it to its own top edge; the
+			   founder walked that build and rejected it. So the HEIGHT, the SNAP
+			   ALIGNMENT, the scroll margin that lifted the snap landing clear of the
+			   sticky header, and the distributed gap inside the argument cell are all
+			   gone — and the page's snap TYPE went with them, which is why
+			   `src/app/layout.tsx` is byte-identical to its pre-2h form again. A tile
+			   now takes exactly the height its three lines need.
+			   ⛔ WHAT STAYS IS THE GRID, AND IT STAYS FOR THE REASON IT ARRIVED — which
+			   was never about height. The four `<td>`s are fixed in DOM order at side ·
+			   argument · value · Sell, and the composition wants side, value and Sell on
+			   ONE line with the argument BELOW them. `flex-wrap` cannot do that: a
+			   wrapped flex line's cross size is governed by `align-content`, which
+			   stretches every line equally. `order` moves items within lines, not lines.
+			   Grid places all four by coordinate without opening a single `<td>`, and
+			   that is as true of a three-line list row as it was of a full screen.
+			   ⚠ `grid-rows-[auto_1fr]` SURVIVES AND IS NOW INERT BY ARITHMETIC, which is
+			   the reason it is kept rather than tidied away: with no definite height an
+			   `fr` track resolves to its own max-content, so row 2 measures exactly what
+			   `auto` would. It costs nothing and it is the only place the two-band
+			   structure is written down — delete it and the placement tokens on the cells
+			   (`row-start-2`, `col-span-3`) name tracks no track list declares.
+			   ⚠ `gap-y-[7px]` IS THE COMPOSITION'S ONE STATED GAP: 7px between the money
+			   line and the argument title, down from 2h's `gap-y-2`. It is also the tile's
+			   ONLY gap now. The market question sits directly under the title, which is
+			   where it sits at every width above 640 and where it sat before 2h — the
+			   distributed `mt-auto` had nothing left to distribute the moment the height
+			   became natural, and the `pt-3` beside it was that mechanism's floor rather
+			   than a chosen gap.
+			   ⛔ AND THE TYPE COMES DOWN WITH THE HEIGHT, ON EVERY LINE. 24px of value
+			   and 18px of title were sized against a screen; at a list row's scale the
+			   ruling is 18 / 18 / 11 on the money line, 15px medium for the title, and the
+			   question at the token it already had. ⚠ THE STEP-DOWN IS ALSO WHAT MAKES A
+			   FIVE-FIGURE FIGURE FIT — see `phoneMoneyLineFitsMovement` above for the
+			   measurement and for the one element that yields when it does not.
+			   ⛔⛔ MOBILE-2h · R-3 — NO SELECTED VISUAL BELOW 640, AND THE STATE IS
+			   KEPT. `bg-transparent` overrides the selected arm's `bg-n1` and the
+			   resting arm's `hover:bg-n1` — the same mechanism the shipped
+			   `[outline:none]` beside it already uses, and the same one MOBILE-2e
+			   measured for `bg-(--btn-fill)` against `max-mobile:bg-ink`. ⚠ THE
+			   SELECTION ITSELF IS UNTOUCHED: `aria-current`, `tabIndex` and the sell
+			   sheet's `armedLotId` all still read it. Only the paint goes, and only
+			   here — scrolling past a tile must leave nothing behind.
+			   ⚠ THE HOVER HALF IS FOR A NARROW DESKTOP WINDOW, NOT FOR A TAP, AND THE
+			   FIRST VERSION OF THIS NOTE SAID OTHERWISE. Tailwind v4 emits every
+			   `hover:` rule inside `@media (hover: hover)`, so on a touch-only phone
+			   NEITHER `hover:bg-n1` nor its override can match and the "`:hover` sticks
+			   after a tap" argument describes something that cannot happen. Measured in
+			   the compiled sheet: `.hover\:bg-n1:hover` at byte 63728, the override at
+			   80392, both inside a hover media query. The token is correct and correctly
+			   ordered for a sub-640 pointer-capable window, which is the case it is
+			   actually for. `@code-reviewer`, LOW. */
+			className={`cursor-pointer rounded-(--r) focus-visible:shadow-(--state-focus-ring) max-mobile:grid max-mobile:grid-cols-[auto_1fr_auto] max-mobile:grid-rows-[auto_1fr] max-mobile:items-center max-mobile:gap-x-2 max-mobile:gap-y-[7px] max-mobile:rounded-none max-mobile:bg-transparent max-mobile:px-0 max-mobile:py-2.5 max-mobile:[border-top:var(--hairline)] max-mobile:[outline:none] max-mobile:hover:bg-transparent ${
 				selected
 					? "bg-n1 [outline-offset:-2px] [outline:var(--ring-active)]"
 					: "[outline-offset:-1px] [outline:var(--hairline)] hover:bg-n1"
@@ -1285,10 +1497,31 @@ function TileRow({
 			{/* ⚠ 48px — the natural width of `Yes` plus its glyph at 15px, not a
 			    number chosen against the column. `shrink-0` is what stops the flexible
 			    argument beside it borrowing from the side. */}
-			<td className="p-2 align-middle max-mobile:w-12 max-mobile:shrink-0 max-mobile:p-0">
+			{/* ⚠ MOBILE-2h · R-2 — COLUMN 1, ROW 1, AND NO WIDTH. Round five gave this
+			    cell `w-12` because it was a flex item competing with three others for
+			    278px; in a grid it is an `auto` track that takes exactly what it
+			    renders, so a declared width would only be a floor the phone's type could
+			    overrun. `shrink-0` goes with it — there is nothing to shrink against. */}
+			<td className="p-2 align-middle max-mobile:col-start-1 max-mobile:row-start-1 max-mobile:p-0">
+				{/* ⚠ 18px ON THE PHONE, AND THE GLYPH GOES UP WITH IT VIA CSS RATHER
+				    THAN VIA THE PROP. `ThumbGlyph` takes a `size` NUMBER, so re-pointing
+				    it per tier would need a `useIsPhoneTier()` branch in the render —
+				    and the hook's server snapshot is `false`, so the phone would paint a
+				    15px glyph and then pop to 24 on hydration. A class on the parent
+				    reaches the svg's width/height ATTRIBUTES (CSS wins over
+				    presentational attributes) and is correct in the very first frame.
+				    ⛔ THE DESCENDANT FORM, NEVER THE CHILD COMBINATOR, AND THE REASON IS
+				    A GUARD RATHER THAN A SELECTOR. The child form would be exact here —
+				    the glyph is this span's own child — but it puts a closing-angle
+				    character inside a `className` string, and `profile-mobile-reflow`'s
+				    tag reader ends an opening tag at the first one it meets at brace
+				    depth zero. It truncated this tag mid-attribute and reported the cell
+				    as declaring no className at all. The descendant form is also the
+				    shipped idiom (`ui/button.tsx` uses it) and matches the one svg this
+				    span contains. */}
 				<span
 					data-testid={`tile-side-${tile.key}`}
-					className="flex items-center justify-center gap-[5px] text-[15px] leading-[1.35] font-extrabold text-ink"
+					className="flex items-center justify-center gap-[5px] text-[15px] leading-[1.35] font-extrabold text-ink max-mobile:gap-2 max-mobile:text-[18px] max-mobile:leading-[1.2] max-mobile:[&_svg]:size-[18px]"
 				>
 					{tile.side === "YES" ? "Yes" : "No"}
 					{/* ⚠ 15, AND DELIBERATELY NOT 16. P-3 raises the side marker with the
@@ -1301,11 +1534,25 @@ function TileRow({
 					<ThumbGlyph side={tile.side} size={15} />
 				</span>
 			</td>
-			{/* ⚠ `min-w-0` IS THE ONE THAT MATTERS. A flex item will not shrink below
-			    its content without it, and the argument is the only cell here whose
-			    content is unbounded — without it the row overflows instead of the
-			    title clamping. */}
-			<td className="p-2 align-middle max-mobile:min-w-0 max-mobile:flex-1 max-mobile:p-0">
+			{/* ⚠⚠ ROW 2, SPANNING THE WHOLE TILE. `col-span-3` is the token the whole
+			    composition rests on: without it the title and the complete market
+			    question render inside the side marker's own ~70px track with two thirds
+			    of row 2 empty, on both tabs, and the suite stays green unless something
+			    asserts it (it does — `phone-position-tile.test.ts`).
+			    ⚠ `min-w-0` IS THE OTHER ONE THAT MATTERS, and it survives every axis
+			    change this cell has been through: a grid item's automatic minimum is
+			    its content just as a flex item's is, and the argument is the only cell
+			    here whose content is unbounded — so without it the TILE widens instead
+			    of the text wrapping.
+			    ⛔ `self-stretch` IS GONE, AND THIS NOTE USED TO REQUIRE IT. It let this
+			    cell take the `1fr` row's leftover height so the distributed `mt-auto`
+			    below had slack; MOBILE-2j withdraws the viewport-tall tile, so there is
+			    no leftover height and nothing to opt into. `phone-position-tile.test.ts`
+			    now FORBIDS it — a reader restoring it from this paragraph would have
+			    been fighting the suite. `@code-reviewer`, HIGH.
+			    ⛔ `flex-1` IS GONE for the older reason — it was a flex declaration and
+			    this is no longer a flex container, so it named nothing. */}
+			<td className="p-2 align-middle max-mobile:col-span-3 max-mobile:col-start-1 max-mobile:row-start-2 max-mobile:min-w-0 max-mobile:p-0">
 				<TileArgumentCell
 					cell={tile.argument}
 					tileKey={tile.key}
@@ -1336,7 +1583,13 @@ function TileRow({
 					    cell over a 124px column; in 64px beside a flexible argument,
 					    centring reads as drift and the figures stop forming a column an
 					    eye can run down. */}
-					<td className="p-2 text-center align-middle whitespace-nowrap tabular-nums text-ink max-mobile:w-16 max-mobile:shrink-0 max-mobile:p-0 max-mobile:text-right">
+					{/* ⚠ MOBILE-2h · R-2 — COLUMN 2, ROW 1, HUGGING THE SELL BUTTON.
+					    Round five's `w-16` was 64px for a 17px figure; the tile prints it
+					    at 18px, where a fixed 64px would clip a five-figure Đ value. The column
+					    is `1fr` and this cell is `justify-self-end`, so the figure sits
+					    against Sell and the side marker keeps the left edge — the width
+					    is whatever the number needs and never a cap. */}
+					<td className="p-2 text-center align-middle whitespace-nowrap tabular-nums text-ink max-mobile:col-start-2 max-mobile:row-start-1 max-mobile:justify-self-end max-mobile:p-0 max-mobile:text-right">
 						{sold ? (
 							<InfoTip content={GLOSSARY.sold} asChild>
 								<span
@@ -1357,12 +1610,23 @@ function TileRow({
 								onSubmit={() => sell.confirm(tile.key, sellArgs)}
 							/>
 						) : (
-							<span className="flex flex-col items-center leading-[1.35]">
+							/* ⚠ MOBILE-2h · R-2 — THE VALUE AND ITS MOVEMENT SHARE A LINE ON
+							   THE PHONE. Stacked, they would be two of the tile's three bands
+							   and the top cluster would read as four lines rather than two.
+							   `items-baseline` rather than `items-center`: an 11px percentage
+							   beside an 18px figure looks dropped when it is centred. */
+							<span className="flex flex-col items-center leading-[1.35] max-mobile:flex-row max-mobile:items-baseline max-mobile:justify-end max-mobile:gap-1.5">
 								{/* ⚠ P-3 — 17px. It was inheriting the table's `text-sm`, so the
 								    figure the column is named after was set at the same size as
 								    the argument title beside it and smaller than nothing on the
 								    row. Leading restated with the size, per AGENTS.md §8. */}
-								<span className="text-[17px] leading-[1.35] font-bold">
+								{/* ⚠ 18px — the largest thing on the tile, and 24px until MOBILE-2j
+								    took the tile's height away and the type with it. The leading is
+								    restated with the size because an arbitrary `text-[Npx]` inherits
+								    whatever leading was in scope (AGENTS.md §8) — here
+								    `leading-[1.35]`, which at 18px is a 24px line and pushes the
+								    whole cluster down. */}
+								<span className="text-[17px] leading-[1.35] font-bold max-mobile:text-[18px] max-mobile:leading-[1.2]">
 									Đ {formatDharma(tile.valueDisplay)}
 								</span>
 								{/* ⚠⚠ R-2 — THE MOVEMENT LINE. Three renderable outcomes and one
@@ -1381,7 +1645,9 @@ function TileRow({
 										data-testid={`tile-pl-${tile.key}`}
 										role="img"
 										aria-label="unchanged"
-										className="text-[10.5px] leading-[1.2] font-bold text-n5"
+										className={`text-[10.5px] leading-[1.2] font-bold text-n5 max-mobile:text-[11px] ${
+											movementFitsOnPhone ? "" : "max-mobile:hidden"
+										}`}
 									>
 										—
 									</span>
@@ -1391,7 +1657,9 @@ function TileRow({
 										data-testid={`tile-pl-${tile.key}`}
 										role="img"
 										aria-label={move.words}
-										className="flex items-center gap-0.5 text-[10.5px] leading-[1.2] font-bold text-n5"
+										className={`flex items-center gap-0.5 text-[10.5px] leading-[1.2] font-bold text-n5 max-mobile:text-[11px] ${
+											movementFitsOnPhone ? "" : "max-mobile:hidden"
+										}`}
 									>
 										{move.up ? (
 											<TrendingUp
@@ -1414,7 +1682,9 @@ function TileRow({
 					    beside a `✕`. ⛔ THE ✕ IS NOT OPTIONAL — a two-step cushion with
 					    no exit is a trap, not a cushion. Escape and a click outside
 					    cancel too (wired in `useInlineSell`). */}
-					<td className="p-2 text-center align-middle max-mobile:shrink-0 max-mobile:p-0">
+					{/* ⚠ MOBILE-2h · R-2 — COLUMN 3, ROW 1. The trailing `auto` track, so
+					    SELL is exactly its own width and the value column takes the rest. */}
+					<td className="p-2 text-center align-middle max-mobile:col-start-3 max-mobile:row-start-1 max-mobile:p-0">
 						{tile.sellable && !sold && (
 							<>
 								<span className="inline-flex items-center gap-1">
@@ -1477,7 +1747,19 @@ function TileRow({
 											size="xs"
 											variant="outline"
 											data-testid={`tile-sell-${tile.key}`}
-											className="font-extrabold tracking-[0.08em] uppercase [border:var(--ring-active)] max-mobile:min-h-11 max-mobile:w-full max-mobile:[touch-action:manipulation]"
+											/* ⚠ 12px on the phone (MOBILE-2j · R-1; it was 16px while the tile
+											   was a screen). `min-h-11` (44px) is round five's floor and is
+											   UNCHANGED through both moves — the label changes size inside
+											   the target, never the target with the label.
+											   ⚠ AT A 16px ROOT THIS RESOLVES TO THE SAME 12px AS
+											   `size="xs"`'s own `text-xs`, so the token's effect is now the
+											   leading beside it rather than the size. It is written out
+											   anyway: `text-xs` carries a 16px line-height and the tile's
+											   money line wants 1.2, and an explicit figure is what tells the
+											   next reader that 12 was chosen rather than inherited.
+											   `px-3` stays: a word inside `size="xs"`'s `px-2` reads as a
+											   label with a box drawn round it rather than as a button. */
+											className="font-extrabold tracking-[0.08em] uppercase [border:var(--ring-active)] max-mobile:min-h-11 max-mobile:w-full max-mobile:px-3 max-mobile:text-[12px] max-mobile:leading-[1.2] max-mobile:[touch-action:manipulation]"
 											onClick={() => sell.arm(tile.key)}
 										>
 											Sell
@@ -1549,9 +1831,20 @@ function TileRow({
 					    asserted on the side cell only, and the shipped reflow guard NAMES
 					    all six cell variants in prose while asserting none of them. Found
 					    by `@code-reviewer`. */}
+					{/* ⚠⚠ MOBILE-2h · R-2 — THE CLOSED TAB RENDERS THE SAME TILE, and its
+					    two cells take the same two slots the Open tab's do: the big figure
+					    in column 2 and the small qualifier in column 3, where `Đ 227 ↗12%`
+					    and `SELL` sit. So a reader who has learned one tab has learned the
+					    other, and the grid needs no empty track.
+					    ⛔ ROUND FIVE'S `w-16` / `w-20` / `shrink-0` ARE DELETED FROM BOTH
+					    CELLS AND THEIR GUARD ROW IS DELETED WITH THEM. They existed because
+					    the `<tr>` was a flex ROW and a cell without a declared share left
+					    the `flex-1` argument beside it resolving to 0px. There is no such
+					    row any more: these are grid items in `auto` tracks, where a width
+					    is a floor rather than a share and 64px would clip the figure. */}
 					<td
 						data-testid={`tile-staked-${tile.key}`}
-						className="p-2 text-center align-middle whitespace-nowrap tabular-nums text-ink max-mobile:w-16 max-mobile:shrink-0 max-mobile:p-0 max-mobile:text-right"
+						className="p-2 text-center align-middle whitespace-nowrap tabular-nums text-ink max-mobile:col-start-2 max-mobile:row-start-1 max-mobile:justify-self-end max-mobile:p-0 max-mobile:text-right max-mobile:text-[18px] max-mobile:leading-[1.2]"
 					>
 						{/* ⚠⚠ MOBILE-1 · JOB B — THE PHONE'S COLUMN LABEL, AND THE STRING IS
 						    CARRIED, NEVER AUTHORED. Below 640px the `<thead>` is hidden, so this
@@ -1572,8 +1865,18 @@ function TileRow({
 						    `Opened`'s does not — that column never had one. ⛔ The Open tab's
 						    `Current` tip is NOT rescued this way: that needs an Open-tab label,
 						    which is copy authoring, and it is ruled LOST instead. */}
+						{/* ⚠ MOBILE-2h — THE LABEL IS AN EYEBROW, NOT PART OF THE FIGURE. The
+						    cell prints at 18px, and the carried `<th>` word would print at 18px
+						    with it — a column name as loud as the number it names. It takes the
+						    same 11px muted step the Open tab's movement line takes, so the two
+						    tabs' right-hand clusters read at the same two weights.
+						    ⛔ THE STRING IS STILL BYTE-CARRIED FROM THE `<th>`; only its size
+						    moved, which is what keeps "no copy was authored for the phone"
+						    checkable. */}
 						<InfoTip content={GLOSSARY.stakedOwn} asChild>
-							<span className="hidden max-mobile:inline">Staked</span>
+							<span className="hidden max-mobile:inline max-mobile:text-[11px] max-mobile:leading-[1.2] max-mobile:font-bold max-mobile:text-n5">
+								Staked
+							</span>
 						</InfoTip>{" "}
 						Đ {formatDharma(tile.valueDisplay)}
 					</td>
@@ -1590,9 +1893,12 @@ function TileRow({
 					    (`15 Sep 2026`), which is wider than a Đ figure and is the reason
 					    the two shares differ. See the Staked cell above for why they need
 					    one at all. */}
+					{/* ⚠ MOBILE-2h · R-2 — COLUMN 3, where the Open tab puts SELL. A closed
+					    argument has nothing to sell, so the slot carries the one fact that
+					    is only true of a closed tile: when it was opened. */}
 					<td
 						data-testid={`tile-opened-${tile.key}`}
-						className="p-2 text-center align-middle whitespace-nowrap text-n5 max-mobile:w-20 max-mobile:shrink-0 max-mobile:p-0 max-mobile:text-right"
+						className="p-2 text-center align-middle whitespace-nowrap text-n5 max-mobile:col-start-3 max-mobile:row-start-1 max-mobile:p-0 max-mobile:text-right max-mobile:text-[11px] max-mobile:leading-[1.2]"
 					>
 						{/* ⚠ THE PHONE'S COLUMN LABEL (MOBILE-1 · JOB B), same mechanism and same
 						    rule as `Staked` above: the word is byte-carried from this column's own
@@ -1666,12 +1972,26 @@ function TileArgumentCell({
 	   "…5 Nov 2026? · staked Đ 100" would name a destination it does not go to,
 	   which is why the two were siblings rather than nested. */
 	const marketLine = (
-		// ⚠ MOBILE-2e · R-P3 — ONE LINE ON A PHONE (ruled). The market question is
-		// unbounded text in an ~90px column; unclamped it wrapped to four or five
-		// lines and made the argument cell — and therefore the row — twice as tall
-		// as the title it is supposed to sit under. `line-clamp-1` rather than
-		// `truncate`, so it stays in the same family as the title above it.
-		<span className="block text-[11px] leading-[1.35] font-semibold text-n5 max-mobile:line-clamp-1">
+		// ⚠⚠ THE CLAMP IS GONE AND THE QUESTION IS COMPLETE. Round five clamped it to
+		// ONE line, and the reason it gave was sound for what it was describing: the
+		// question was unbounded text in an ~90px column of a 44px-tall list row, and
+		// unclamped it made the row twice as tall as the title above it. The tile
+		// gives the question the full width now, so it wraps to two or three lines
+		// rather than five — and a market question a reader cannot finish is the one
+		// thing this surface has no excuse for. A6 D-1 rules it complete.
+		// ⛔⛔ `mt-auto` AND `pt-3` ARE GONE, AND THIS NOTE USED TO CALL THE FIRST OF
+		// THEM "THE TILE'S ONLY GAP, AND THAT IS THE RULING". It was, while the tile
+		// was one viewport tall: the cell above stretched to a `1fr` row and every
+		// leftover pixel collected here. MOBILE-2j withdraws that height, so there is
+		// no leftover to distribute and an auto margin resolves to zero anyway; `pt-3`
+		// was that mechanism's floor and not a chosen gap.
+		// ⇒ THE TILE'S ONE GAP IS NOW `gap-y-[7px]` ON THE `<tr>`, between the money
+		// line and the title, and the question sits directly under the title — where
+		// it sits at every width above 640 and where it sat before MOBILE-2h.
+		// `phone-position-tile.test.ts` FORBIDS both tokens here, so a reader
+		// restoring one from this paragraph would have been fighting the suite.
+		// `@code-reviewer`, HIGH.
+		<span className="block text-[11px] leading-[1.35] font-semibold text-n5 max-mobile:line-clamp-none">
 			<Link
 				data-testid={`tile-market-${tileKey}`}
 				href={`/m/${cell.marketSlug}`}
@@ -1683,8 +2003,17 @@ function TileArgumentCell({
 	);
 	if (cell.removed) {
 		return (
-			<span data-testid={`tile-arg-removed-${tileKey}`}>
-				<span className="text-[11px] leading-[1.35] font-semibold text-n5 italic">
+			// ⚠ MOBILE-2h · R-2 — THE REMOVED STUB IS A TILE TOO, and it takes the
+			// same column treatment as the live variant below. A removed argument
+			// still belongs to a market, and the question is still the band anchored
+			// to the tile's bottom; leaving this arm a plain inline span would give
+			// the one tile on the surface that cannot say what it was a different
+			// shape from every other.
+			<span
+				data-testid={`tile-arg-removed-${tileKey}`}
+				className="max-mobile:flex max-mobile:flex-col"
+			>
+				<span className="text-[11px] leading-[1.35] font-semibold text-n5 italic max-mobile:text-[15px] max-mobile:leading-[1.35]">
 					{REMOVED_STUB_TEXT}
 				</span>
 				{marketLine}
@@ -1692,7 +2021,19 @@ function TileArgumentCell({
 		);
 	}
 	return (
-		<span data-testid={`tile-arg-${tileKey}`} className="text-ink">
+		// ⚠ THE CELL'S OWN COLUMN — the title and the market question stack, and this
+		// is where that is declared.
+		// ⛔ `h-full` IS GONE, AND THIS NOTE USED TO REQUIRE IT and to describe the
+		// shipped behaviour as the failure: it read "without it `mt-auto` on the
+		// market line has no slack to take AND THE QUESTION SITS UNDER THE TITLE
+		// INSTEAD OF AT THE TILE'S FOOT" — which is now exactly what A6 D-1 rules.
+		// It passed the `1fr` row's height down for a gap that no longer exists, and
+		// `height: 100%` against an auto-height parent resolves to `auto` regardless.
+		// `phone-position-tile.test.ts` forbids it. `@code-reviewer`, HIGH.
+		<span
+			data-testid={`tile-arg-${tileKey}`}
+			className="text-ink max-mobile:flex max-mobile:flex-col"
+		>
 			{/* `line-clamp-4` is the other half of RF-10's equal-height rule: a `<tr>`
 			    height is a FLOOR and cannot cap content, so this is what stops one long
 			    argument outgrowing its third. ⛔ `line-clamp-*` already makes the
@@ -1713,7 +2054,16 @@ function TileArgumentCell({
 				// NEVER ADD `block` BESIDE A `line-clamp-*`: the clamp already implies
 				// `-webkit-box`, and a `display:block` alongside makes it INERT, silently
 				// — measured once already on this very cell.
-				className="line-clamp-4 text-[15px] leading-[1.35] font-bold hover:underline max-mobile:line-clamp-2"
+				// ⚠⚠ MOBILE-2h · R-2 — UNCLAMPED AND 18px/medium ON THE PHONE. Round
+				// five's two-line clamp was bounding a 44px list row; the tile has a
+				// screen, and a truncated argument title on the surface whose whole
+				// job is to show one argument would be the defect rather than the
+				// protection. `line-clamp-none` is what undoes `-webkit-box` — a bare
+				// override of the line count would leave the box intact and the clamp
+				// live. ⚠ `font-medium` steps DOWN from the desktop's `font-bold`: at
+				// 15px, bold competes with the 18px value beside it, and the ruling
+				// puts the value first.
+				className="line-clamp-4 text-[15px] leading-[1.35] font-bold hover:underline max-mobile:line-clamp-none max-mobile:text-[15px] max-mobile:leading-[1.35] max-mobile:font-medium"
 			>
 				{cell.title}
 			</Link>
@@ -1772,6 +2122,81 @@ function TileArgumentCell({
  * ⚠ The note is here rather than beside the class because that guard reads the
  * className out of a 400-CHARACTER WINDOW after the `data-testid` — a fence by
  * DISTANCE (O-8 in a different unit), which a comment in the gap defeats.
+ *
+ * ⛔⛔ MOBILE-2j — THE SECTION KEEPS ITS PHONE `overflow` OVERRIDE AND THE BODY
+ * LOSES ITS OWN. This is the note the paragraph above is about, and it is here
+ * rather than beside either class string because putting it there is what
+ * reddened `profile-height-chain` at MOBILE-2h: that guard fences by a
+ * 400-character window and the fence fired on the very change whose explanation
+ * overran it (`O-8`, in a different unit).
+ *
+ * **What MOBILE-2h did, and why only half of it survives.** A snap alignment
+ * resolves against the nearest SCROLL-CONTAINER ancestor, and both of these
+ * boxes were one — the body by `overflow-y-auto`, the section by
+ * `overflow-hidden`, which per CSS Overflow is a scroll container that simply
+ * cannot be scrolled by hand. So while either was live, viewport-tall tiles
+ * snapped against a panel instead of against the page (MEASURED at 360/390/430:
+ * releasing the body alone moved the nearest scroller to `positions-panel` and
+ * the landing still missed by 45px; releasing both reached the VIEWPORT).
+ * ADR-0051 A6 D-1 withdraws the snap entirely, so **the body goes back to a plain
+ * `overflow-y-auto` at every width** — there is no longer anything it has to
+ * escape, and a scroll container with an auto height cannot overflow itself.
+ *
+ * **The SECTION's `clip` stays, and it stays for the OTHER reason — the one that
+ * has nothing to do with snapping.** Row 1 of a tile is three `whitespace-nowrap`
+ * cells in tracks that cannot shrink below min-content, and `formatDharma` never
+ * abbreviates, so a five-figure Đ figure can make the row wider than the tile.
+ * MEASURED at MOBILE-2h at 360 on the Closed tab with `Staked Đ 14,260`: the row
+ * needed **328px against 278px**, and with the clip released that 50px reached the
+ * document — the layout viewport widened 360 → 369 and the page gained horizontal
+ * scroll. The money line still exists at the same width, so the backstop stays.
+ *
+ * ⚠⚠ **AND WITH THE SNAP GONE, `clip` AND `hidden` ARE EQUIVALENT HERE — THE
+ * OVERRIDE IS BELT, NOT MECHANISM, AND SAYING SO IS THE POINT.** `clip` was
+ * chosen over the inherited `overflow-hidden` for exactly one property: per CSS
+ * Overflow 3 it is NOT a scroll container, which is what let the tiles snap past
+ * it. Nothing snaps now, so the base `overflow-hidden` would clip identically.
+ * It is kept because ADR-0051 A6 D-1 names the containment and because a box that
+ * creates no scroll container is the cheaper of two identical options — NOT
+ * because it is doing work `hidden` could not. A later reader deciding whether it
+ * is load-bearing should read this paragraph as the answer: it is not, and the
+ * clip it provides is.
+ *
+ * ⛔ **THE BODY MUST NOT TAKE THE CLIP, WHICH A SHIPPED GUARD IS WHAT FOUND.**
+ * MOBILE-2h's first form clipped BOTH and `sticky-header-strip.test.ts:134` went
+ * red: it forbids `overflow-hidden|clip` on this BODY by name, because the sticky
+ * `<thead>`'s negative-offset shadow is what covers the body's own top padding and
+ * a clipped body cannot scroll under it. The guard is right, and it is why the
+ * body's revert lands on `overflow-y-auto` rather than on anything tidier.
+ *
+ * ⚠ **WHAT IS THEREFORE UNCHANGED, AND IS NOT THIS ROUND'S TO FIX:** a figure too
+ * wide for row 1 at 360 is CLIPPED rather than wrapped. ⚠ MOBILE-2j's type
+ * step-down moves the width at which that begins — the money line is now 18/18/11
+ * where it was 24/24/13 — and `phoneMoneyLineFitsMovement` is the measured rule
+ * that keeps it off the boundary by dropping the movement chip. Widening the cells
+ * or letting them wrap remains a composition change and a ruling, not a repair
+ * (`docs/parked.md` 2h-7).
+ *
+ * **Why `min-w-0` is not tidying.** `overflow` other than `visible` does TWO jobs
+ * and only one of them is clipping: per CSS Sizing it also zeroes a box's
+ * AUTOMATIC MINIMUM SIZE. MOBILE-2h released the section to `visible` WITHOUT
+ * restoring that, and MEASURED at 360 with a market selected the panel went 324px
+ * → **533px**, carrying the head, the body and the empty state off the right of
+ * the screen. The section is back to a non-visible overflow, so the zeroing comes
+ * free again and this token is belt beside `clip` — kept, because the two arrived
+ * as one decision and half of that decision was a regression.
+ *
+ * ⚠⚠ AND THE OVERFLOW INSTRUMENT READ ZERO THROUGHOUT THAT. Under mobile
+ * emulation the LAYOUT VIEWPORT widens to fit overflowing content, so the usual
+ * "scroll width minus window width" stayed 0 while the window itself had grown
+ * to 561 on a 360px device. A B2 that trusts that difference reports a clean page
+ * on a blown-out one; it now asserts the window against the width it asked for,
+ * first, and treats a mismatch as the finding rather than a footnote.
+ *
+ * ⚠ What `overflow-hidden` was FOR is unaffected below 640px: it kept the header
+ * bar's background from squaring off the rounded corner, and that bar declares no
+ * background — only a bottom hairline. The `<thead>` that does carry one is
+ * `max-mobile:hidden`, so there is nothing painting into the corner to clip.
  */
 function PositionsPanel({
 	controls,
@@ -1792,9 +2217,10 @@ function PositionsPanel({
 		<section
 			data-testid="positions-panel"
 			aria-label="Positions"
-			// `min-h-0` so the panel can be SHORTER than its content, which is what
-			// makes the body below scroll instead of the panel growing.
-			className="flex min-h-0 flex-col overflow-hidden rounded-[var(--r)] bg-n0 [border:var(--hairline)]"
+			// `min-h-0`: the panel can be SHORTER than its content. The phone pair is
+			// explained in this component's docblock and deliberately NOT here — the
+			// height-chain guard fences by DISTANCE from this testid.
+			className="flex min-h-0 flex-col overflow-hidden rounded-[var(--r)] bg-n0 [border:var(--hairline)] max-mobile:min-w-0 max-mobile:overflow-clip"
 		>
 			{/* `relative` is the market popover's POSITIONING CONTEXT, and it lives
 			    here rather than on the trigger — see the ⛔ at the trigger for the
@@ -1803,21 +2229,45 @@ function PositionsPanel({
 			    the two side-by-side bodies start level. */}
 			<div
 				data-testid="positions-panel-head"
-				className="relative flex min-h-[52px] flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)] max-mobile:flex-nowrap"
+				// ⚠ MOBILE-2h · R-1 — `gap-1.5` buys back 4px of the 360px line. The
+				// note on this element's `flex-nowrap` (above the component) still
+				// holds; this is the same decision one width further down.
+				className="relative flex min-h-[52px] flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)] max-mobile:flex-nowrap max-mobile:gap-1.5"
 			>
 				{/* ⛔ `uppercase` IS A TRANSFORM: `textContent` is still `Positions`, so
 				    every consumer that reads this head by text keeps its handle. */}
-				<span className="text-[11px] leading-[1.2] font-extrabold tracking-[0.12em] text-ink uppercase">
+				{/* ⚠ MOBILE-2h · R-1 — 10px on the phone. The four things on this line
+				    have to clear each other at 360px and the widest of them is a market
+				    question; the overline is the one that can give a pixel without
+				    losing information, because it names a panel the reader is already
+				    looking at. `tracking` and weight are unchanged, so it is the same
+				    overline one step down rather than a different element. */}
+				<span className="text-[11px] leading-[1.2] font-extrabold tracking-[0.12em] text-ink uppercase max-mobile:text-[10px]">
 					Positions
 				</span>
 				{controls}
 			</div>
 			{/* THE PANEL-SCOPED SCROLL — the mockup's `.colwrap{flex:1 1 auto;
 			    min-height:0; overflow-y:auto}`, topology throughout.
-			    ⛔ NO `scroll-snap` (RF-10): snap fights trackpads, and it fights the
-			    arrow keys about what "next" means — the stepper moves the SELECTION
-			    and scrolls it into view at `block:"nearest"`, which snap would then
-			    override with its own idea of a resting position. */}
+			    ⛔ NO `scroll-snap` HERE (RF-10): snap fights trackpads, and it fights
+			    the arrow keys about what "next" means — the stepper moves the
+			    SELECTION and scrolls it into view at `block:"nearest"`, which snap
+			    would then override with its own idea of a resting position.
+			    ⚠⚠ MOBILE-2j — AND NOW NOTHING ANYWHERE SNAPS ON THIS SURFACE. MOBILE-2h
+			    put a `y proximity` snap type on `<html>` and an alignment on every
+			    tile, and had to release BOTH of this panel's boxes so the tiles could
+			    reach the viewport to snap against it. ADR-0051 A6 D-1 withdraws all of
+			    that, so this box goes back to the value it has carried since the
+			    mockup: `overflow-y-auto`, at every width, with no phone override.
+			    ⛔ THAT IS SAFE ONLY BECAUSE NOTHING GIVES THIS BOX A DEFINITE HEIGHT
+			    BELOW 640px, AND IT IS THE THING TO RE-MEASURE IF THE PAGE CHROME EVER
+			    MOVES. A scroll container with an auto height cannot overflow itself, so
+			    the list scrolls with the PAGE, which is what A6 D-1 asks for. The two
+			    mechanisms that COULD bound it both stand down on the tier — the
+			    three-tile `max-height` cap and `useEqualRowThirds` — and `<main>`'s own
+			    phone height is a `min-h`, not a height. MEASURED at 360 / 390 / 430:
+			    this body's scrollHeight equals its clientHeight and the document is the
+			    thing that scrolls. */}
 			<div
 				data-testid="positions-panel-body"
 				className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3"
