@@ -172,9 +172,17 @@ describe("R5 — the market card's own track still matches PriceBar's detail siz
 	});
 
 	it("split-bar-parity::the-card-keeps-items-start-on-its-row", () => {
-		const row = /data-testid="aggregate-footer"\s+className="([^"]*)"/.exec(
-			card,
-		)?.[1];
+		// ⛔ `cn(...)`-TOLERANT SINCE MOBILE-2m — see the twin of this anchor in
+		// `aggregate-footer-alignment.test.ts` for the whole reasoning. R-1 gave
+		// the row a conditional band; the `items-start gap-2` property is intact
+		// and it is the bare-literal ASSUMPTION that broke. Only the first `cn`
+		// argument is read, so a conditional token cannot satisfy a guard about an
+		// unconditional one.
+		const m =
+			/data-testid="aggregate-footer"\s+className=(?:"([^"]*)"|\{cn\(\s*"([^"]*)")/.exec(
+				card,
+			);
+		const row = m?.[1] ?? m?.[2];
 		expect(row).toBeDefined();
 		expect(row?.split(/\s+/)).toContain("items-start");
 		expect(row?.split(/\s+/)).toContain("gap-2");

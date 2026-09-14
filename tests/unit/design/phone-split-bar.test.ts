@@ -63,7 +63,20 @@ const SEP = ":";
 const phone = (utility: string) => VARIANT + SEP + utility;
 
 /** The phone track thickness this round ratifies, in px. */
-const PHONE_TRACK_PX = 6;
+/**
+ * ⚠⚠ 6 → 8 AT MOBILE-2m (ADR-0051 **A9 D-2**), AND IT MOVES IN THE SAME COMMIT AS
+ * THE CODE RATHER THAN AFTER IT (`O-5`). A9 D-2 rules the phone track "8px tall
+ * with rounded ends over a recessed channel"; leaving this at 6 would have left
+ * two guards in one suite asserting opposite thicknesses, which is worse than
+ * either being wrong — a reader reconciling them has no way to tell which is the
+ * ruling and which is the leftover.
+ *
+ * ⚠ THE RADIUS ASSERTION BELOW IS WHY THIS IS A CONSTANT AND NOT A LITERAL. It
+ * reads `>= PHONE_TRACK_PX / 2`, so moving the thickness moves the pill test with
+ * it and the two cannot drift. A9 D-2's "rounded ends" is satisfied by
+ * `rounded-full`, which clears any such bound.
+ */
+const PHONE_TRACK_PX = 8;
 
 /**
  * The class tokens declared on the element whose `className=` follows `anchor`.

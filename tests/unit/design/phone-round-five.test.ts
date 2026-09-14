@@ -307,8 +307,13 @@ describe("R-M2 — the split bar is 32/6 on a phone, and the tap area is a pseud
 			`just as invisible in a source scan.`;
 		expect(box, why).toContain(phone("h-8"));
 		expect(box, "the desktop box is gone").toContain("h-6");
-		expect(track, `${FOOTER}: the phone track is not 6px`).toContain(
-			phone("h-[6px]"),
+		// ⚠⚠ 6px → 8px AT MOBILE-2m (ADR-0051 A9 D-2). This round-five guard is
+		// about the ALIGNMENT BOX tracking the pill, and the thickness is only
+		// here as the other half of that pair — but a stale literal in a passing
+		// guard is how a ruled value quietly acquires two answers, so it moves
+		// with the ruling rather than being loosened to "some thickness".
+		expect(track, `${FOOTER}: the phone track is not 8px`).toContain(
+			phone("h-[8px]"),
 		);
 		// The desktop literal the three-way parity guard re-derives must survive.
 		expect(track, "the desktop track thickness was replaced").toContain(

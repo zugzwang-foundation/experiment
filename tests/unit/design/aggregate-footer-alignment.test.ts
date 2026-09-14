@@ -81,9 +81,22 @@ describe("the aggregate footer — the track aligns to the pills", () => {
 		// child, landing ~2px off — better than 9.5px, still outside the 1px bar.
 		// If a later reader "simplifies" the wrapper away in favour of that swap,
 		// this assertion is what tells them it was already tried.
-		const row = /data-testid="aggregate-footer"\s+className="([^"]*)"/.exec(
-			source,
-		)?.[1];
+		// ⛔⛔ THE READER TOLERATES `cn(...)`, AND IT HAD TO LEARN TO AT MOBILE-2m.
+		// This anchor read `className="([^"]*)"` and went RED the moment R-1 gave
+		// the row a conditional band — not because the property broke, but because
+		// the row stopped being a bare string literal. That is the failure mode a
+		// source scan has that a render does not: it asserts a SPELLING and calls
+		// it a property. The alternation reads the first `cn` argument, which is
+		// where this file's own convention puts the unconditional base classes.
+		// ⚠ It deliberately does NOT read the later arguments: a token that only
+		// applies under a condition is not "on the row", and matching it here
+		// would let a conditional `items-start` satisfy a guard about the
+		// unconditional one.
+		const m =
+			/data-testid="aggregate-footer"\s+className=(?:"([^"]*)"|\{cn\(\s*"([^"]*)")/.exec(
+				source,
+			);
+		const row = m?.[1] ?? m?.[2];
 		if (!row) {
 			throw new Error(`${FOOTER}: no aggregate-footer row with a className.`);
 		}
