@@ -1,0 +1,4 @@
+# Run output — per-machine, and large.
+results/
+# ⛔ Session pools hold live login cookies. Never commit one.
+*session-pool*.json
