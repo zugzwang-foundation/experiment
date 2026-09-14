@@ -89,15 +89,24 @@ export function AggregateFooter({
 		onReply: (relation: "support" | "counter") => void;
 	};
 	/**
-	 * MOBILE-2m · R-1 / ADR-0051 A9 D-1 — this footer is a BAND below 640px when
-	 * its card has been unboxed, not a strip floating on the card's ground.
+	 * "THIS IS THE UNBOXED PHONE FEED CARD" — which is what the flag has always
+	 * MEANT, and since ADR-0051 A10 D-3 it is no longer what the flag is NAMED.
+	 *
+	 * ⚠ THE NAME IS ONE ROUND STALE AND IS KEPT DELIBERATELY. It arrived at
+	 * MOBILE-2m · R-1 / A9 D-1, where this footer was drawn as a lighter BAND on
+	 * an unboxed card. A10 D-3 takes that ground away — the row sits on the card's
+	 * own ground now — so nothing here draws a band any more. What the flag still
+	 * decides is R-2's channel: the recessed track belongs to the FEED card and
+	 * not to the parent-post sheet, whose card is boxed by definition.
+	 * ⇒ Renaming it is a diff across `PostCard`, this file and two guards to buy
+	 * one word, at the end of an unattended round. Docketed rather than taken.
 	 *
 	 * ⚠ IT IS THE CARD'S DECISION, NOT THIS COMPONENT'S, WHICH IS WHY IT ARRIVES
-	 * AS A PROP. The band only reads as a band because the card around it lost its
-	 * border and its radius; on a boxed card the same ground would be a lighter
-	 * rectangle inside a darker one — the "stray box" A9 D-1 names as the thing to
-	 * avoid. So the two decisions travel together, from the one mount that makes
-	 * them (`PhoneDebateView`'s `feedPane`), and cannot be set apart.
+	 * AS A PROP. A channel reads as a groove cut into a surface only when the
+	 * surface around it is the card's own; inside the sheet's boxed card it would
+	 * be a third rectangle in a stack of two. So the two decisions travel
+	 * together, from the one mount that makes them (`PhoneDebateView`'s
+	 * `feedPane`), and cannot be set apart.
 	 *
 	 * ⛔ DEFAULT `false`, AND EVERY TOKEN IT ADDS IS `max-mobile:`. The read-only
 	 * consumers, the parent-post sheet and every desktop mount are unchanged by
@@ -120,29 +129,31 @@ export function AggregateFooter({
 	const counterPole = postSide === "YES" ? "bg-no" : "bg-yes";
 
 	return (
+		/* ⛔⛔ MOBILE-2n · R-3 / ADR-0051 A10 D-3 — THIS ROW HAS NO GROUND OF ITS
+		    OWN, AND WHAT WAS DELETED IS WHY THE ROW LOOKS FINISHED NOW.
+		    Round nine drew it as a BAND: `max-mobile:-mx-3 max-mobile:bg-n1
+		    max-mobile:px-3 max-mobile:py-2.5` — the negative margin cancelling the
+		    card's `p-3` so an n1 ground reached the screen's edges, the padding
+		    putting the three columns back where they were, and 10px of vertical
+		    padding inside it. All four are gone together, because they were one
+		    decision: a bleed with no ground to bleed is nothing, and padding that
+		    exists to give a band its height is a gap once the band is not there.
+		    ⇒ The row now sits on the CARD's own ground and is separated from the
+		    content above by the card's `gap-2.5` alone, which is what A10 D-3 rules.
+		    ⚠ THE LAST REMNANT OF THE BOXED CARD, NAMED AS SUCH BY THE RULING. A9 D-1
+		    took the card's border, radius and elevation; this row kept a lighter
+		    rectangle inside the result, so the one surface still drawing an edge was
+		    the bet control. Nothing about the CONTROLS moved — `TriggerPill` and the
+		    two Đ figures are untouched — only the rectangle behind them.
+		    ⚠ `band` SURVIVES AS A PROP AND IS NOT DEAD. It never meant "draw a band";
+		    it means "this is the unboxed feed card rather than the sheet's boxed
+		    one", and R-2's channel below still reads it for exactly that. The prop's
+		    name is now one round behind its meaning and is deliberately NOT renamed
+		    here: `PostCard` passes it, two guards read it, and a rename is a diff
+		    across three files to buy a word. Docketed, not taken. */
 		<div
 			data-testid="aggregate-footer"
-			className={cn(
-				"flex items-start gap-2 text-xs text-muted-foreground",
-				// ⛔⛔ MOBILE-2m · R-1 / A9 D-1 — THE BAND, AND THE NEGATIVE MARGIN IS
-				// WHAT MAKES IT ONE. `-mx-3` cancels the card's own `p-3` so the
-				// ground reaches the card's edges — which, on an unboxed card, are the
-				// SCREEN's edges — and `px-3` puts the content back where it was, so
-				// not one of the three columns moves horizontally. The band is drawn
-				// behind the row rather than around it.
-				// ⚠ SAFE UNDER THE CARD'S `overflow-hidden`: the ground is clipped at
-				// exactly the card's edge, which is the extent wanted. Nothing
-				// hit-testable lives in the bled region — `TriggerPill`'s tap
-				// extension is `inset-x-0` on the pill and vertical only, so the rule
-				// that extension records (a clipped region is not hit-testable) is not
-				// in play here.
-				// ⚠ `bg-n1` IS ONE STEP UP FROM THE CARD GROUND, read off the ramp and
-				// not chosen: `Card` is `bg-card` → `--color-n0` #212121, and `n1` is
-				// #2a2a2a, the next rung. The ramp runs dark → bright (AGENTS.md §8),
-				// so "one step up" is n0 → n1 and never the reverse.
-				band &&
-					"max-mobile:-mx-3 max-mobile:bg-n1 max-mobile:px-3 max-mobile:py-2.5",
-			)}
+			className="flex items-start gap-2 text-xs text-muted-foreground"
 		>
 			{/* `.sidewrap` (`d5:585`) — `align-items:center`, on BOTH sides
 			    (`.sidewrap.r{align-items:center}`, `:586`). d5's own comment says it
@@ -295,27 +306,49 @@ export function AggregateFooter({
 							// which is exactly the problem: the shape would then be a
 							// coincidence of two numbers that are free to move apart. A9 D-2
 							// rules ENDS, so the declaration says ends.
-							"h-[18px] max-mobile:h-[8px] w-full overflow-hidden rounded-[var(--r)] max-mobile:rounded-full [border:var(--hairline)]",
+							"h-[18px] max-mobile:h-[14px] w-full overflow-hidden rounded-[var(--r)] max-mobile:rounded-full [border:var(--hairline)]",
 							counterPole,
-							// ⛔⛔ THE RECESSED CHANNEL (A9 D-2), AND `hasStake` IS WHAT
-							// MAKES IT POSSIBLE WITHOUT TOUCHING THE POLES.
-							// `computeSplitBar`'s own docblock says why the flag exists:
-							// `supportPct` is `"0%"` both when nothing has been staked and
-							// when everything staked is Counter, "and those are opposite
-							// facts". This footer destructured only the percentage, so it
-							// painted both identically — and at Đ 0 / Đ 0 on a YES post the
-							// track's counter pole is `--color-no` #fafafa, i.e. a solid
-							// white wire standing in for a bar with nothing in it. MEASURED
-							// on staging at the floor: `rgb(250, 250, 250)`, full width,
-							// beside two figures that both read `Đ 0`.
-							// ⇒ With no stake the phone track takes the muted ground instead
-							// — n0, one step DOWN from the band's n1, so it reads as a groove
-							// cut into the band rather than a bar drawn on it.
-							// ⛔ IT IS CONDITIONAL, AND IT HAS TO BE. The counter share is
-							// the track's OWN ground; a channel that stayed once stake
-							// existed would erase the counter pole and leave the bar showing
-							// one side of a two-sided fact. A9 D-2 names the Đ 0 / Đ 0 state
-							// and only that state, which is the same boundary.
+							// ⛔⛔ THE RECESSED CHANNEL — AND SINCE ADR-0051 A10 D-2 IT IS
+							// UNCONDITIONAL BELOW 640px, WHICH REVERSES THE PARAGRAPH THIS
+							// ONE REPLACES. A9 D-2 painted the groove only at Đ 0 / Đ 0 and
+							// this block argued, in bold, that it "IS CONDITIONAL, AND IT HAS
+							// TO BE", because the counter share WAS the track's own ground and
+							// a groove that stayed would erase the counter pole. A10 D-2 rules
+							// exactly that erasure: the channel spans the full track, the fill
+							// is the Support share drawn over it, and the Counter share IS the
+							// exposed channel. So the `hasStake` gate is gone from this token
+							// and the phone bar no longer carries a pole on its remainder.
+							// ⚠ THE COST, STATED RATHER THAN DISCOVERED LATER: below 640 the
+							// Counter side is no longer colour-coded. The two Đ figures either
+							// side still carry the fact — which is the same reason this track
+							// is `aria-hidden` and has always been decorative.
+							//
+							// ⛔⛔⛔ THE TOKEN IS `--surface-inset` (n1 #2a2a2a) AND THE RULING
+							// SAYS "one step below the card ground". THOSE ARE NOT THE SAME
+							// COLOUR, AND THE DIFFERENCE IS MEASURED, NOT PREFERRED.
+							// R-3 above takes the band away, so the card ground below this row
+							// is `--color-n0` #212121. One step BELOW it on the ramp is
+							// `--color-ground` #181818 — and `--color-ground` and `--color-yes`
+							// are the SAME SIX DIGITS (`globals.css`: `--color-ground: #181818`,
+							// `--color-yes: #181818`). The fill is the Support pole, so on
+							// every YES post the fill would be drawn in the channel's own
+							// colour: a 51% bar and a 0% bar would render identically, and
+							// half the cards in a market are YES posts. MEASURED at ground on
+							// `/m/sp-m2-active` at 390 — a real 51% YES post reads
+							// `fill rgb(24, 24, 24)`, which is #181818 exactly.
+							// ⇒ A10's own acceptance line is "channel colour ≠ fill colour",
+							// and #181818 fails it. `--surface-inset` is the design language's
+							// own name for a recessed surface (`globals.css` "Applied
+							// surfaces"), is muted, and differs from BOTH poles — so it
+							// satisfies every clause of the ruling except the direction of one
+							// step. ⚠ FLAGGED FOR THE FOUNDER rather than settled here: the
+							// second-order consequence is that a #181818 fill on a #2a2a2a
+							// channel is ~1.15:1, so on a YES post the Support share is legible
+							// as a boundary rather than as a colour. The design language has
+							// already solved this exact problem once, for the debate graph —
+							// `--graph-yes: #737373`, "the black pole cannot render on the dark
+							// ground" — and that is the shape of the answer if the founder
+							// wants one; it is a pole change and this round may not make it.
 							// ⛔⛔ THIS COMMENT SAID THE TWO BACKGROUNDS WERE MUTUALLY
 							// EXCLUSIVE AND THAT WAS FLATLY FALSE. It read: "NO SECOND `bg-*`
 							// IS STACKED ON A SINGLE ELEMENT AT ONE WIDTH … so nothing here
@@ -345,12 +378,37 @@ export function AggregateFooter({
 							// `@code-reviewer`, HIGH — and it is exactly the shape this repo
 							// calls out: a wrong reassurance is what stops the next reader
 							// checking.
-							band && !hasStake && "max-mobile:bg-n0",
+							band && "max-mobile:bg-(--surface-inset)",
 						)}
 					>
 						<span
 							data-testid="aggregate-split-fill"
-							className={cn("block h-full", supportPole)}
+							className={cn(
+								"block h-full",
+								supportPole,
+								// ⛔⛔ MOBILE-2n · R-2 / ADR-0051 A10 D-2 — THE EVEN SPLIT AT
+								// Đ 0 / Đ 0, AND THE `!` IS THE WHOLE MECHANISM RATHER THAN A
+								// shortcut. The width below is an INLINE style, and an inline
+								// declaration outranks every selector in the stylesheet — so a
+								// plain `max-mobile:w-1/2` here would be authored, compiled,
+								// present in the class attribute and completely inert, which is
+								// the worst shape a phone token can have (it looks applied in
+								// the source and does nothing in the browser). An `!important`
+								// author rule is the one thing that outranks a non-important
+								// inline one.
+								// ⚠ WHY NOT MOVE THE WIDTH TO A CUSTOM PROPERTY, which would
+								// let two ordinary utilities decide it: that rewrites the
+								// DESKTOP element's class string and inline style, and this
+								// round's wall is a desktop diff of exactly nothing. The
+								// override is additive; the base is untouched.
+								// ⚠ 50% IS A PRESENTATION FACT, NOT A SHARE. `computeSplitBar`
+								// still returns `"0%"` here and the figures either side still
+								// read `Đ 0` — nothing is being claimed about stake. A9 D-2
+								// solved the same zero state by recolouring the track; A10 D-2
+								// solves it by filling half of it, so the bar has presence and
+								// the channel is visible on both sides of the midpoint.
+								band && !hasStake && "max-mobile:w-1/2!",
+							)}
 							style={{ width: supportPct }}
 						/>
 					</span>
