@@ -427,6 +427,35 @@ export function PhoneDebateView({
 	 * built; the reply case is unspecified and is flagged for a ruling rather
 	 * than settled here.
 	 *
+	 * ⛔⛔ `setActiveSide` HERE IS AN EIGHTH HOST MUTATION AND IT DELIBERATELY DOES
+	 * NOT CONSULT `composerBusy` — and that is an exception to this file's own
+	 * stated rule, so the property that makes it safe is written down rather than
+	 * left to be rediscovered. `@security-auditor` (L-1). It IS reachable: bet 1
+	 * submits, the sheet closes, the reader opens a SECOND composer, and bet 1's
+	 * payload lands underneath it.
+	 * ⇒ WHAT KEEPS IT SAFE IS THAT `sheet.side` IS INDEPENDENT OF `activeSide`.
+	 * `BetComposer`'s `key` and its `side` prop both read `sheet.side`, which is
+	 * frozen at `setSheet` time — so moving `activeSide` cannot remount the
+	 * composer, cannot mint a fresh idempotency key, and cannot fire
+	 * `onBusyChange(false)` under an in-flight request. ⚠ THE DAY ANYONE MAKES
+	 * `sheet.side` DERIVE FROM `activeSide`, THIS BECOMES A DOUBLE-CHARGE DOOR and
+	 * must move behind `guard()`.
+	 * ⚠ It is not routed through `guard()` today because `guard` DROPS an action
+	 * rather than deferring it, which would lose the side switch entirely and
+	 * leave the reader looking at the wrong pole with no card. The residue is
+	 * cosmetic and bounded: the bottom bar can read `Bet NO` where the reader left
+	 * `Bet YES`.
+	 *
+	 * ⚠ A JUMP CAN ARRIVE ONE NAVIGATION LATE, AND IT THEN OVERWRITES THE FEED'S
+	 * RESTORED POSITION. `@security-auditor` (L-3). If the reader enters a post
+	 * before the payload lands, the guard above defers the jump WITHOUT spending
+	 * it; on the way back the arm-change layout effect restores
+	 * `feedScrollTopRef` and this effect then scrolls to the posted card instead.
+	 * `feedScrollTopRef` is not corrupted — it is discarded. Deterministic, once
+	 * per bet, and the outcome (landing on your own argument) is the one this
+	 * whole item exists to produce; recorded because the timing claim below
+	 * ("only fires on a payload landing after a bet") does not otherwise cover it.
+	 *
 	 * ⚠ `PhoneTopPill` IS A SECOND WRITER OF THIS SAME SCROLLER (MOBILE-2k · F-1)
 	 * — it takes `regionRef` and calls `scrollTo({top: 0, behavior: "smooth"})`.
 	 * The two cannot both be in flight from one gesture: the pill only fires on a

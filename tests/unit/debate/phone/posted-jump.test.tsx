@@ -89,7 +89,7 @@ import {
 	newRemovedPostCarryingBody,
 	WITHHELD_SENTINEL,
 } from "../render/_posted-fixtures";
-import { modelWith, post, VIEWER } from "./_fixtures";
+import { modelWith, post, reply, VIEWER } from "./_fixtures";
 
 /** The id the BET RESPONSE returns — the only id the jump may key on. */
 const POSTED_ID = "cmt-just-posted";
@@ -597,6 +597,66 @@ describe("MOBILE-2l · R-2 — masking (SC-1)", () => {
 		expect(
 			selectedSide(),
 			"the masked payload neither jumped nor consumed the shot",
+		).toBe("YES");
+	});
+});
+
+// ---------------------------------------------------------------------------
+
+describe("MOBILE-2l · R-2 — the THREAD arm is not the feed", () => {
+	it("phone-posted::a-payload-landing-on-the-thread-arm-does-NOT-spend-the-shot", async () => {
+		// ⛔⛔ THE GUARD THIS ASSERTS HAD NO TEST AT ALL, and `@security-auditor`
+		// measured exactly that: every other `view(...)` call in this suite passes
+		// ONE argument, so `initialPostId` is null throughout and
+		// `if (focused !== null) return;` is never evaluated true. Deleting those
+		// three lines left all nine tests green — a guard the component calls
+		// load-bearing and nothing could fail on.
+		//
+		// ⚠ THE OBSERVABLE IS THE SHOT, NOT THE POLE, and that took a second
+		// attempt to get right. Asserting the active side does not separate the
+		// two builds: with the guard the jump simply happens later, on the return
+		// to the feed, and both end on the same pole. What the guard actually
+		// protects is the ONE-SHOT — `jumpedFor` is stamped before the scroll, so
+		// a payload absorbed on the thread arm (where no `data-phone-post-id`
+		// exists, because the thread renders `ReplyCard`s) would consume the only
+		// jump that comment is ever owed, and the reader would come back to a feed
+		// that never moves.
+		const { rerender } = render(view(modelWith(BASE_POSTS)));
+		await placeBet(POSTED_ID);
+
+		const scroller = region();
+		expect(
+			scroller,
+			"the tier has exactly one vertical scroller",
+		).not.toBeNull();
+		if (scroller === null) return;
+		scroller.scrollTop = 0;
+
+		// The reader walks into a post while their own payload is still in flight —
+		// an ordinary thing to do, and the window is a real one (~200-800ms).
+		rerender(view(modelWith([...BASE_POSTS, postedPost()]), "p1"));
+		expect(
+			scroller.scrollTop,
+			"CONTROL: nothing scrolls on the thread arm — there is no feed card " +
+				"there to bring to the top",
+		).toBe(0);
+
+		// Back to the feed. The jump is owed and must still be available.
+		rerender(view(modelWith([...BASE_POSTS, postedPost()])));
+
+		const expected = syntheticTop(cardOf(POSTED_AUTHOR));
+		expect(
+			expected,
+			"the synthetic geometry gives the card a non-zero top",
+		).toBeGreaterThan(0);
+		expect(
+			scroller.scrollTop,
+			"the shot was NOT spent on the thread arm, so returning to the feed " +
+				"still brings the author to their own argument",
+		).toBe(expected);
+		expect(
+			selectedSide(),
+			"and the side it lands on is still the comment's own",
 		).toBe("YES");
 	});
 });
