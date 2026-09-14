@@ -102,7 +102,23 @@ export function PostPopup({
 			>
 				{post ? (
 					<>
-						<DialogHeader>
+						<DialogHeader
+							/* ⛔⛔ MOBILE-2l · R-6 — THE CONSTRAINT BELONGS ON THIS BOX, AND
+							   MEASURING THE CHAIN IS WHAT FOUND IT. `DialogContent` is a GRID
+							   (336px wide, a 304px content box) and this header is a grid ITEM,
+							   so its automatic minimum is `min-content` — which, once the title
+							   below carries `white-space: nowrap`, is the WHOLE question. The
+							   header therefore grew to 367px, overflowed the dialog, and took
+							   the title with it under the `×`.
+							   ⚠ Putting `min-w-0` on the TITLE alone did nothing and adding its
+							   end padding made it 28px WIDER, because the title was never the
+							   box that refused to shrink. Measured up the chain: title 367.16,
+							   header 367.16, content 336 — the first ancestor whose width was
+							   its own content is the one to fix.
+							   ⚠ PHONE-ONLY, so the desktop header — whose title WRAPS and so
+							   never needs a width it does not have — is untouched. */
+							className="max-mobile:min-w-0"
+						>
 							{/* ⛔⛔ MOBILE-2l · R-6 — ON A PHONE THIS LINE IS THE MARKET
 							    QUESTION, NOT THE POST'S TITLE, AND THE REASON IS THAT THE
 							    TITLE WAS ALREADY THERE TWICE. The sheet opened by a phone
@@ -129,7 +145,26 @@ export function PostPopup({
 							{tier === "phone" && marketQuestion !== undefined ? (
 								<DialogTitle
 									data-testid="post-popup-market-question"
-									className="truncate text-[13px] leading-[17px] font-normal text-n5"
+									/* ⛔⛔ `min-w-0` AND THE END PADDING ARE BOTH LOAD-BEARING, AND
+									   THE PAINT IS WHAT CAUGHT IT. `truncate` brings
+									   `white-space: nowrap`, which makes this element's INTRINSIC
+									   width its whole text; `DialogHeader` is a flex container and
+									   a flex item's automatic minimum is that intrinsic width, so
+									   the title did not truncate at all — it overflowed the
+									   dialog's content box and ran UNDER the `×`.
+									   ⚠ MEASURED, and the numbers alone said it was fine: the
+									   element reported `scrollWidth === clientWidth` (339 === 339),
+									   i.e. "nothing is clipped", which is exactly what an element
+									   that grew to fit its text reports. It was the SCREENSHOT
+									   that showed the question colliding with the close control.
+									   The paint is the arbiter (AGENTS.md §9).
+									   ⇒ `min-w-0` lets it shrink so `truncate` can bite, and
+									   `pe-7` (28px) keeps the ellipsis clear of the 16px `×` that
+									   sits 16px from the dialog's right edge.
+									   ⚠ The ground render did not have this problem and could not:
+									   its title WRAPPED, so it never needed a width it did not
+									   have. One line is what introduces the constraint. */
+									className="min-w-0 truncate pe-7 text-[13px] leading-[17px] font-normal text-n5"
 								>
 									{marketQuestion}
 								</DialogTitle>

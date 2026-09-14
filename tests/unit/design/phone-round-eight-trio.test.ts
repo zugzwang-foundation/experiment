@@ -157,8 +157,36 @@ describe("MOBILE-2l · R-6 — the post sheet's header is the market question", 
 		expect(src).toContain("<DialogTitle>{post.title}</DialogTitle>");
 		// The market-question register, borrowed from `PhoneTitleStrip`: grey,
 		// small, one line.
-		expect(src).toContain("truncate text-[13px] leading-[17px]");
-		expect(src).toContain("text-n5");
+		// ⚠ ASSERTED AS TOKENS, NOT AS A CONTIGUOUS SPELLING (`O-8` again, in this
+		// file). This read `"truncate text-[13px] leading-[17px]"` and reddened the
+		// moment two constraint tokens were inserted between them — a guard fenced
+		// by adjacency is fenced by distance.
+		const title =
+			/data-testid="post-popup-market-question"[\s\S]{0,400}?className="([^"]*)"/.exec(
+				src,
+			);
+		expect(
+			title,
+			"the phone title's className must be findable",
+		).not.toBeNull();
+		const titleTokens = (title?.[1] ?? "").split(/\s+/);
+		for (const t of ["truncate", "text-[13px]", "leading-[17px]", "text-n5"]) {
+			expect(titleTokens, `market-question register: ${t}`).toContain(t);
+		}
+		// ⛔ THE TWO THAT KEEP IT INSIDE THE DIALOG. `truncate` brings
+		// `white-space: nowrap`, which makes the header's min-content width the
+		// whole question; `DialogContent` is a grid and the header is a grid item,
+		// so without `min-w-0` on the HEADER it grew to 367px against a 304px
+		// content box and ran under the `×`. Measured, and only the screenshot
+		// showed it — the element reported nothing clipped the whole time.
+		expect(
+			titleTokens,
+			"the title needs its own end padding to clear the ×",
+		).toContain("pe-7");
+		expect(
+			src,
+			"the HEADER is the box that must be allowed to shrink",
+		).toContain(phone("min-w-0"));
 	});
 
 	it("phone-r6::the-phone-mount-actually-passes-the-question", () => {
