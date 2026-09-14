@@ -89,24 +89,15 @@ export function AggregateFooter({
 		onReply: (relation: "support" | "counter") => void;
 	};
 	/**
-	 * "THIS IS THE UNBOXED PHONE FEED CARD" — which is what the flag has always
-	 * MEANT, and since ADR-0051 A10 D-3 it is no longer what the flag is NAMED.
-	 *
-	 * ⚠ THE NAME IS ONE ROUND STALE AND IS KEPT DELIBERATELY. It arrived at
-	 * MOBILE-2m · R-1 / A9 D-1, where this footer was drawn as a lighter BAND on
-	 * an unboxed card. A10 D-3 takes that ground away — the row sits on the card's
-	 * own ground now — so nothing here draws a band any more. What the flag still
-	 * decides is R-2's channel: the recessed track belongs to the FEED card and
-	 * not to the parent-post sheet, whose card is boxed by definition.
-	 * ⇒ Renaming it is a diff across `PostCard`, this file and two guards to buy
-	 * one word, at the end of an unattended round. Docketed rather than taken.
+	 * MOBILE-2m · R-1 / ADR-0051 A9 D-1 — this footer is a BAND below 640px when
+	 * its card has been unboxed, not a strip floating on the card's ground.
 	 *
 	 * ⚠ IT IS THE CARD'S DECISION, NOT THIS COMPONENT'S, WHICH IS WHY IT ARRIVES
-	 * AS A PROP. A channel reads as a groove cut into a surface only when the
-	 * surface around it is the card's own; inside the sheet's boxed card it would
-	 * be a third rectangle in a stack of two. So the two decisions travel
-	 * together, from the one mount that makes them (`PhoneDebateView`'s
-	 * `feedPane`), and cannot be set apart.
+	 * AS A PROP. The band only reads as a band because the card around it lost its
+	 * border and its radius; on a boxed card the same ground would be a lighter
+	 * rectangle inside a darker one — the "stray box" A9 D-1 names as the thing to
+	 * avoid. So the two decisions travel together, from the one mount that makes
+	 * them (`PhoneDebateView`'s `feedPane`), and cannot be set apart.
 	 *
 	 * ⛔ DEFAULT `false`, AND EVERY TOKEN IT ADDS IS `max-mobile:`. The read-only
 	 * consumers, the parent-post sheet and every desktop mount are unchanged by
@@ -129,31 +120,29 @@ export function AggregateFooter({
 	const counterPole = postSide === "YES" ? "bg-no" : "bg-yes";
 
 	return (
-		/* ⛔⛔ MOBILE-2n · R-3 / ADR-0051 A10 D-3 — THIS ROW HAS NO GROUND OF ITS
-		    OWN, AND WHAT WAS DELETED IS WHY THE ROW LOOKS FINISHED NOW.
-		    Round nine drew it as a BAND: `max-mobile:-mx-3 max-mobile:bg-n1
-		    max-mobile:px-3 max-mobile:py-2.5` — the negative margin cancelling the
-		    card's `p-3` so an n1 ground reached the screen's edges, the padding
-		    putting the three columns back where they were, and 10px of vertical
-		    padding inside it. All four are gone together, because they were one
-		    decision: a bleed with no ground to bleed is nothing, and padding that
-		    exists to give a band its height is a gap once the band is not there.
-		    ⇒ The row now sits on the CARD's own ground and is separated from the
-		    content above by the card's `gap-2.5` alone, which is what A10 D-3 rules.
-		    ⚠ THE LAST REMNANT OF THE BOXED CARD, NAMED AS SUCH BY THE RULING. A9 D-1
-		    took the card's border, radius and elevation; this row kept a lighter
-		    rectangle inside the result, so the one surface still drawing an edge was
-		    the bet control. Nothing about the CONTROLS moved — `TriggerPill` and the
-		    two Đ figures are untouched — only the rectangle behind them.
-		    ⚠ `band` SURVIVES AS A PROP AND IS NOT DEAD. It never meant "draw a band";
-		    it means "this is the unboxed feed card rather than the sheet's boxed
-		    one", and R-2's channel below still reads it for exactly that. The prop's
-		    name is now one round behind its meaning and is deliberately NOT renamed
-		    here: `PostCard` passes it, two guards read it, and a rename is a diff
-		    across three files to buy a word. Docketed, not taken. */
 		<div
 			data-testid="aggregate-footer"
-			className="flex items-start gap-2 text-xs text-muted-foreground"
+			className={cn(
+				"flex items-start gap-2 text-xs text-muted-foreground",
+				// ⛔⛔ MOBILE-2m · R-1 / A9 D-1 — THE BAND, AND THE NEGATIVE MARGIN IS
+				// WHAT MAKES IT ONE. `-mx-3` cancels the card's own `p-3` so the
+				// ground reaches the card's edges — which, on an unboxed card, are the
+				// SCREEN's edges — and `px-3` puts the content back where it was, so
+				// not one of the three columns moves horizontally. The band is drawn
+				// behind the row rather than around it.
+				// ⚠ SAFE UNDER THE CARD'S `overflow-hidden`: the ground is clipped at
+				// exactly the card's edge, which is the extent wanted. Nothing
+				// hit-testable lives in the bled region — `TriggerPill`'s tap
+				// extension is `inset-x-0` on the pill and vertical only, so the rule
+				// that extension records (a clipped region is not hit-testable) is not
+				// in play here.
+				// ⚠ `bg-n1` IS ONE STEP UP FROM THE CARD GROUND, read off the ramp and
+				// not chosen: `Card` is `bg-card` → `--color-n0` #212121, and `n1` is
+				// #2a2a2a, the next rung. The ramp runs dark → bright (AGENTS.md §8),
+				// so "one step up" is n0 → n1 and never the reverse.
+				band &&
+					"max-mobile:-mx-3 max-mobile:bg-n1 max-mobile:px-3 max-mobile:py-2.5",
+			)}
 		>
 			{/* `.sidewrap` (`d5:585`) — `align-items:center`, on BOTH sides
 			    (`.sidewrap.r{align-items:center}`, `:586`). d5's own comment says it

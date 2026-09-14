@@ -299,31 +299,7 @@ describe("MOBILE-2m · R-1 / A9 D-1 — the unboxed card, after composition", ()
 	});
 });
 
-describe("MOBILE-2n · R-3 / A10 D-3 — the footer has no ground on any card", () => {
-	it("phone-card::the-band-is-GONE-on-the-unboxed-card-and-was-never-on-the-boxed-one", () => {
-		// ⛔⛔ INVERTED BY ADR-0051 A10 D-3. This row asserted the band ARRIVED
-		// with the unboxing — `bg-n1` + `-mx-3` + `px-3`, gated on the prop — and
-		// that a boxed card never took it. A10 D-3 removes the ground from both:
-		// the row sits on the card's own ground and is separated from the content
-		// above by the card's `gap-2.5` alone.
-		// ⚠ THE RENDER IS STILL THE RIGHT INSTRUMENT. These tokens arrive through
-		// `cn()`, i.e. `twMerge`, whose whole job is to DELETE classes it judges
-		// redundant — a source scan reads the arguments, only a render reads what
-		// survived. An absence asserted on the source would pass on a token that
-		// was authored and merged away, which is a different fact.
-		for (const [what, tokens] of [
-			["the unboxed feed card", footerTokens(renderCard({ unboxed: true }))],
-			["the boxed sheet card", footerTokens(renderCard())],
-		] as [string, string[]][]) {
-			expect(tokens, `${what}: the ground`).not.toContain(phone("bg-n1"));
-			expect(tokens, `${what}: the bleed`).not.toContain(phone("-mx-3"));
-			expect(tokens, `${what}: the put-back`).not.toContain(phone("px-3"));
-			expect(tokens, `${what}: the band's height`).not.toContain(
-				phone("py-2.5"),
-			);
-		}
-	});
-
+describe("MOBILE-2m · R-1 / A9 D-1 — the footer is a band on an unboxed card", () => {
 	it("phone-card::the-rows-own-alignment-is-untouched-by-the-band", () => {
 		// ⛔⛔ THIS ROW IS HERE BECAUSE R-1 BROKE THE TWO GUARDS THAT USED TO CARRY
 		// IT, AND IT IS NAMED AS AN ADDITION RATHER THAN SLIPPED IN.

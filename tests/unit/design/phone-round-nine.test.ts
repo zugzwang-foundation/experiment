@@ -427,7 +427,7 @@ describe("MOBILE-2m · R-1 / A9 D-1 — one full-width hairline between posts", 
 	});
 });
 
-describe("MOBILE-2m R-1 → MOBILE-2n R-3 / A10 D-3 — the Support/Counter row has NO band", () => {
+describe("MOBILE-2m · R-1 / A9 D-1 — the Support/Counter band", () => {
 	/**
 	 * ⛔⛔ THE FOOTER ROOT'S OWN `className`, AND THE SCOPE IS THE WHOLE POINT
 	 * SINCE A10 D-3. This read `gatedClassesIn(regionAfter(…), "band")`, i.e. the
@@ -463,26 +463,6 @@ describe("MOBILE-2m R-1 → MOBILE-2n R-3 / A10 D-3 — the Support/Counter row 
 			.filter(Boolean);
 	};
 
-	it("phone-r1::the-row-takes-NO-GROUND-AT-ALL-A10-D-3", () => {
-		// ⛔⛔ INVERTED BY ADR-0051 A10 D-3, AND THE INVERSION IS THE POINT.
-		// This row asserted `bg-n1` — "one step up from the card", read off the
-		// ramp. A10 D-3 takes the ground away entirely: the footer sits on the
-		// card's own ground and is separated from the content above by spacing.
-		// The assertion is REVERSED rather than deleted, because "no ground" is a
-		// ruled property and an un-asserted absence is one restyle from coming
-		// back.
-		// ⚠ MATCHED AS A CLASS TOKEN, never as a word in the file: this component's
-		// prose still names `bg-n1` in the paragraph recording what was removed, so
-		// a bare-string scan would be satisfied by the comment and could never fail.
-		for (const token of bandTokens()) {
-			expect(
-				/^bg-|:bg-/.test(token),
-				`the Support/Counter row declares a ground (\`${token}\`). A10 D-3 ` +
-					`gives it none — it sits on the card's.`,
-			).toBe(false);
-		}
-	});
-
 	it("phone-r1::and-NO-BORDER-anywhere-in-it", () => {
 		// ⛔⛔ THE RULED NEGATIVE (A9 D-1: "a lighter ground and no border, so the
 		// bet control reads as one band INSIDE the card"). An edge here would draw
@@ -502,29 +482,6 @@ describe("MOBILE-2m R-1 → MOBILE-2n R-3 / A10 D-3 — the Support/Counter row 
 					`and nothing else.`,
 			).toBe(false);
 		}
-	});
-
-	it("phone-r1::and-the-BLEED-PAIR-goes-with-the-ground-A10-D-3", () => {
-		// ⛔⛔ ALSO INVERTED BY A10 D-3. The pair existed to carry a GROUND to the
-		// card's edges and put the content back: `-mx-3` cancelled the card's `p-3`
-		// and `px-3` restored it, so the ground bled and the three columns did not
-		// move. With no ground the bleed carries nothing, and the two tokens would
-		// be a negative margin and a padding that cancel each other — a no-op that
-		// reads as deliberate and survives every future edit.
-		// ⚠ THE VERTICAL PADDING GOES TOO, and for a different reason worth
-		// separating: `py-2.5` gave the BAND its height. A10 D-3 says the row is
-		// separated from the content above "by the existing gap token only", which
-		// is the card's own `gap-2.5`; keeping the padding would double it.
-		const tokens = bandTokens();
-		expect(tokens, "the bleed outlived its ground").not.toContain(
-			phone("-mx-3"),
-		);
-		expect(tokens, "the put-back outlived its bleed").not.toContain(
-			phone("px-3"),
-		);
-		expect(tokens, "the band's own height outlived the band").not.toContain(
-			phone("py-2.5"),
-		);
 	});
 
 	it("phone-r1::the-band-is-the-CARDS-decision-and-arrives-as-a-prop", () => {

@@ -229,6 +229,9 @@ at zero.
 D-3. The Support/Counter footer carries no ground and no border; the row sits on the
 card ground, separated by spacing.
 
+D-3 is WITHDRAWN (2026-09-14, evening): removing the footer's ground put both bet
+buttons into a low-contrast state on every card; the ground is restored as it was.
+
 D-4. The pseudonym is vertically centred on the avatar.
 
 D-5. Below `--breakpoint-mobile`, the header carries a GitHub icon control between
