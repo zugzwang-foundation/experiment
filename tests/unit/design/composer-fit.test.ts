@@ -367,7 +367,22 @@ describe("RPLY-3 · R1 — the argument fields give way; the money row never doe
 		// column's opening tag and the `.fieldscroll` box's own end, which is
 		// inside that column — a section-level row is after BOTH and fails.
 		expect(footRowAt).toBeGreaterThan(rightColumnAt());
-		const gridAt = source.indexOf('<div className="grid min-h-0 grid-cols-');
+		// ⚠ THE ANCHOR MOVED AT FLAGS-1, THE ASSERTION DID NOT. This read
+		// `source.indexOf('<div className="grid min-h-0 grid-cols-')` — the grid's
+		// opening tag WITH its attribute inline. ADR-0052 made that `className` a
+		// conditional (the image-attach kill switch drops the child and its track
+		// together), so the tag and its class list are no longer adjacent bytes and
+		// the anchor found nothing: `-1`, reported as "expected the `.compgrid`
+		// declaration". ⛔ That was an ANCHOR failure wearing the costume of a
+		// layout regression — `O-8`'s point exactly, one unit over: this scan
+		// fences by BYTE DISTANCE, and prose is what moves. Anchoring on the class
+		// list itself keeps the ordering check intact across either spelling of the
+		// tag, and it is what the assertion was always about.
+		// ⚠ Assembled at runtime, per AGENTS.md §8: a class-shaped literal in a
+		// test file is scanned by Tailwind and EMITS a real utility, so a guard
+		// written as a literal can manufacture the very CSS it claims to observe.
+		const GRID_ANCHOR = ["grid", "min-h-0", "grid-cols-"].join(" ");
+		const gridAt = source.indexOf(GRID_ANCHOR);
 		expect(gridAt, "expected the `.compgrid` declaration").toBeGreaterThan(-1);
 		expect(rightColumnAt()).toBeGreaterThan(gridAt);
 		// ⛔⛔ AND THE REAL CHECK IS A DOM ONE, IN ANOTHER FILE, BY DESIGN. A
