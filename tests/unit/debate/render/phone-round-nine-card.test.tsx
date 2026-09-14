@@ -67,6 +67,16 @@ const phone = (utility: string) => V + S + utility;
  */
 const CHANNEL = "bg-" + "(--surface-inset)";
 const HALF = "w-1" + "/" + "2" + "!";
+/**
+ * MOBILE-2o - A11 D-1's edge and A11 D-3's dim, assembled for the same reason
+ * everything above is: `tests/` is a Tailwind source root, so a class-shaped
+ * literal here is emitted into the production stylesheet. `DESKTOP_DIM` is the
+ * unprefixed token that must SURVIVE beside the phone one, and it is already
+ * authored in `src/`.
+ */
+const HAIRLINE = "[border:var(--hairline)]";
+const DIM = "disabled:opacity-" + "4" + "0";
+const DESKTOP_DIM = "disabled:opacity-(--state-disabled-opacity)";
 
 const EMPTY_REPLIES: ReplyGroups = { support: [], counter: [], twoSlot: [] };
 
@@ -129,6 +139,14 @@ const noopReply = () => {};
 function renderCard(opts?: {
 	unboxed?: boolean;
 	post?: DebatePost;
+	/**
+	 * MOBILE-2o - the viewer's held side, which is the ONLY input that makes a
+	 * trigger render refused. `isEntryDisabled` disables the trigger whose
+	 * RESULTING side is not the held one, so a held YES disables Counter on a YES
+	 * post and Support on a NO post - both of which resolve to the white pole.
+	 * Holding NO is what produces a refused BLACK pill.
+	 */
+	heldSide?: Side | null;
 }): HTMLElement {
 	const { container } = render(
 		<PostCard
@@ -138,7 +156,7 @@ function renderCard(opts?: {
 			onOpenPopup={noop}
 			onOpenImage={noop}
 			onReplyToPost={noopReply}
-			heldSide={null}
+			heldSide={opts?.heldSide ?? null}
 			marketOpen
 			suspended={false}
 		/>,
@@ -322,52 +340,193 @@ describe("MOBILE-2m · R-1 / A9 D-1 — the footer is a band on an unboxed card"
 	});
 });
 
-describe("MOBILE-2n · R-2 / A10 D-2 — the channel spans the track, and Đ 0 fills half", () => {
-	it("phone-split-channel::the-track-takes-the-CHANNEL-whether-or-not-there-is-stake", () => {
-		// ⛔⛔ INVERTED BY A10 D-2. A9 D-2 painted the groove ONLY at Đ 0 and the
-		// row below asserted it DROPPED the moment stake existed, because the
-		// counter share was the track's own ground. A10 D-2 rules that erasure:
-		// the channel spans the full track and the Counter share IS the exposed
-		// channel. So the same token must now survive BOTH aggregates.
+describe("MOBILE-2o · A11 D-2 — the channel is the ZERO state; the remainder is a POLE", () => {
+	it("phone-split-channel::the-channel-appears-ONLY-at-Đ-0-and-the-pole-takes-the-rest", () => {
+		// ⛔⛔ REVERSED FROM A10 D-2, AND THE PARAGRAPH IT REPLACES IS THE RECORD OF
+		// WHAT IS REVERSED. A10 made the channel UNCONDITIONAL and ruled that "the
+		// Counter share IS the exposed channel"; this row asserted the same token
+		// survived BOTH aggregates. A11 D-2 restores the side rule to both halves of
+		// the bar: Support's share is drawn in Support's colour and the remainder is
+		// COUNTER'S OWN POLE, so the channel can only be the Đ 0 / Đ 0 state.
+		// ⚠ MEASURED BEFORE CHANGING IT, on the ground build at 390: every track on
+		// the feed computed `rgb(42, 42, 42)` — a Đ 230 / Đ 50 post and a Đ 0 / Đ 0
+		// post were the same grey, and a NO post whose replies are all Counter (a
+		// 100% BLACK bar under the side rule) rendered as an empty grey trough.
+		// ⛔ BOTH HALVES, because either alone passes on a bug: presence-only is
+		// satisfied by A10's unconditional channel, and absence-only by a component
+		// that lost the token altogether.
+		expect(
+			trackTokens(
+				renderCard({
+					unboxed: true,
+					post: presentPost({ aggregate: UNSTAKED }),
+				}),
+			),
+			"nothing is staked and the track is not the channel, so Đ 0 / Đ 0 is " +
+				"being drawn as a pole.",
+		).toContain(phone(CHANNEL));
+		expect(
+			trackTokens(
+				renderCard({ unboxed: true, post: presentPost({ aggregate: STAKED }) }),
+			),
+			"the channel survived into a staked bar, so the Counter share is a " +
+				"groove again and grey means two different things.",
+		).not.toContain(phone(CHANNEL));
+	});
+
+	it("phone-split-channel::the-FILL-is-the-SHARE-and-carries-no-width-override", () => {
+		// ⛔⛔ A10 D-2's HALF-WIDTH AT ZERO IS WITHDRAWN. It filled half the track so
+		// an empty bar had presence; under the side rule that reads as an even
+		// contest between Đ 0 and Đ 0 — two poles at 50/50 on a post nobody has
+		// replied to. A11 D-2 gives the zero state to the CHANNEL and leaves the
+		// fill to the share alone, so presentation and stake cannot disagree.
+		// ⚠ `computeSplitBar` already returns "0%" here, so the inline width paints
+		// nothing; the override was the only thing making it 50%.
 		for (const aggregate of [UNSTAKED, STAKED]) {
 			expect(
-				trackTokens(
+				fillTokens(
 					renderCard({ unboxed: true, post: presentPost({ aggregate }) }),
 				),
-				"the channel does not span the track, so the Counter share is still " +
-					"painting a pole on a bar A10 D-2 gives to the groove.",
-			).toContain(phone(CHANNEL));
+				"a width override is authored on the fill, so the bar's proportion is " +
+					"a presentation fact rather than the share.",
+			).not.toContain(phone(HALF));
 		}
 	});
 
-	it("phone-split-channel::and-the-FILL-is-an-even-split-at-Đ-0-and-the-share-otherwise", () => {
-		// ⛔⛔ THE ZERO STATE MOVED FROM THE TRACK TO THE FILL, and this is the row
-		// that holds it. At Đ 0 / Đ 0 `computeSplitBar` returns "0%", which the
-		// inline width still carries — so without this token the bar is a channel
-		// with nothing in it, and A10 D-2 wants an even split so the bar has
-		// presence and the channel is visible on both sides of the midpoint.
-		// ⚠ THE `!` IS NOT DECORATION. The width beside it is an INLINE style and
-		// outranks every ordinary selector; a plain `max-mobile:w-1/2` would be
-		// authored, compiled, present on the node and completely inert.
-		const zero = fillTokens(
-			renderCard({ unboxed: true, post: presentPost({ aggregate: UNSTAKED }) }),
-		);
-		expect(zero, "the even split at Đ 0").toContain(phone(HALF));
-		// ⛔ THE OPPOSITE CONTROL — without it the row above is satisfied by an
-		// even split that NEVER leaves, i.e. a bar that reads 50/50 at every real
-		// stake. A10 D-2 names the Đ 0 / Đ 0 state and only that state.
-		const staked = fillTokens(
-			renderCard({ unboxed: true, post: presentPost({ aggregate: STAKED }) }),
-		);
+	it("phone-split-channel::both-halves-of-a-staked-bar-are-POLES-and-they-are-side-bound", () => {
+		// ⛔⛔ THE WHOLE OF F-2, AND IT IS A FOUR-WAY CHECK BECAUSE A TWO-WAY ONE
+		// PASSES ON A SWAPPED PAIR. black = YES / white = NO holds on BOTH halves:
+		// the fill is the post's own side, the track is the opposite. A component
+		// that bound the fill to the RELATION rather than to the SIDE would render
+		// Support black on every post and pass any check that only looked at one
+		// side. (`side-pole-binding.test.ts` calls this its "Route 3" blind spot.)
+		for (const [side, fill, rest] of [
+			["YES", "bg-yes", "bg-no"],
+			["NO", "bg-no", "bg-yes"],
+		] as const) {
+			const root = renderCard({
+				unboxed: true,
+				post: presentPost({ side, aggregate: STAKED }),
+			});
+			expect(
+				fillTokens(root),
+				`Support's share on a ${side} post is not the ${side} pole`,
+			).toContain(fill);
+			expect(
+				trackTokens(root),
+				`the remainder on a ${side} post is not Counter's pole`,
+			).toContain(rest);
+		}
+	});
+});
+
+describe("MOBILE-2o · A11 D-1 / D-3 — the black side gets an edge; the refused side is dimmed", () => {
+	const triggerTokens = (root: HTMLElement, rel: "support" | "counter") =>
+		tokensOf(root, `[data-testid="card-trigger-${rel}"]`);
+
+	it("phone-trigger::the-BLACK-side-declares-the-hairline-and-the-white-side-does-not", () => {
+		// ⛔ A11 D-1 rules the edge on the black side only. `--color-yes` #181818 on
+		// the band's #2a2a2a carries no contrast of its own, so the edge is what says
+		// a control is there; a white fill needs no such help and keeps the
+		// `border-white/25` it already had.
+		// ⚠ WHAT THIS DOES **NOT** PROVE, and the distinction matters: the painted
+		// edge was already 1px #404040 before this token existed, because Chrome
+		// resolves a `0.5px` border to a USED width of 1px at every device scale
+		// factor (measured at 1, 2 and 3). This row holds the DECLARATION, which is
+		// the part that can be read, reasoned about and kept.
+		// ⚠ THE BLACK SIDE IS NOT A FIXED TRIGGER. Support is black on a YES post and
+		// Counter is black on a NO post, so both are read here — a guard that checked
+		// one relation would pass on a pole bound to the relation instead of the side.
+		const yes = renderCard({
+			unboxed: true,
+			post: presentPost({ side: "YES" }),
+		});
 		expect(
-			staked,
-			"the even split survived into a staked bar, so every post now reads " +
-				"50/50 whatever its replies say.",
-		).not.toContain(phone(HALF));
-		// CONTROL on the negative: the fill still carries its pole either way.
-		expect(staked, "a YES post's fill is the YES pole").toContain("bg-yes");
+			triggerTokens(yes, "support"),
+			"Support is the black side on a YES post",
+		).toContain(phone(HAIRLINE));
+		expect(
+			triggerTokens(yes, "counter"),
+			"the white side took the black side's edge",
+		).not.toContain(phone(HAIRLINE));
+
+		const no = renderCard({ unboxed: true, post: presentPost({ side: "NO" }) });
+		expect(
+			triggerTokens(no, "counter"),
+			"Counter is the black side on a NO post",
+		).toContain(phone(HAIRLINE));
+		expect(
+			triggerTokens(no, "support"),
+			"the white side took the black side's edge",
+		).not.toContain(phone(HAIRLINE));
 	});
 
+	it("phone-trigger::a-refused-trigger-is-DIMMED-in-its-own-colour-never-given-a-grey-fill", () => {
+		// ⛔⛔ A11 D-3. The refused side renders at 40% below 640 — and it still
+		// renders in its OWN pole, which is the half that would break silently: a
+		// `disabled:bg-…` anywhere in this chain would satisfy "it looks different"
+		// and destroy the one thing the colour carries.
+		// ⚠ HOLDING YES REFUSES THE WHITE SIDE AND HOLDING NO REFUSES THE BLACK ONE,
+		// so both poles are exercised. The desktop token stays beside the phone one:
+		// ADR-0045's first rule, at the one site this round touches.
+		for (const [held, side, rel, pole] of [
+			["YES", "YES", "counter", "bg-no"],
+			["YES", "NO", "support", "bg-no"],
+			["NO", "YES", "support", "bg-yes"],
+			["NO", "NO", "counter", "bg-yes"],
+		] as const) {
+			const root = renderCard({
+				unboxed: true,
+				heldSide: held,
+				post: presentPost({ side }),
+			});
+			const t = triggerTokens(root, rel);
+			expect(
+				t,
+				`${rel} on a ${side} post is not refused while holding ${held}`,
+			).toContain(phone(DIM));
+			expect(
+				t,
+				"the desktop disabled opacity was REPLACED rather than overridden, " +
+					"which silently re-dims the 1440 control.",
+			).toContain(DESKTOP_DIM);
+			expect(t, `the refused side lost its ${pole} pole`).toContain(pole);
+			expect(
+				t.filter((x) => /^(max-mobile:)?(disabled:)?bg-n\d$/.test(x)),
+				"the refused side carries a neutral-ramp ground, which is the grey " +
+					"fill A11 D-3 exists to forbid.",
+			).toEqual([]);
+		}
+	});
+
+	it("phone-trigger::an-allowed-trigger-is-NOT-dimmed", () => {
+		// CONTROL on the row above: every assertion there is about a token that is
+		// present on the element in EVERY state, because `disabled:` is a modifier
+		// and jsdom resolves no cascade. What distinguishes the two states is the
+		// `disabled` attribute, so that is what is read here.
+		const root = renderCard({
+			unboxed: true,
+			heldSide: "YES",
+			post: presentPost({ side: "YES" }),
+		});
+		const support = root.querySelector('[data-testid="card-trigger-support"]');
+		const counter = root.querySelector('[data-testid="card-trigger-counter"]');
+		expect(
+			support?.hasAttribute("disabled"),
+			"holding YES refused the trigger that BETS YES, which is the rule " +
+				"inverted rather than applied.",
+		).toBe(false);
+		expect(counter?.hasAttribute("disabled")).toBe(true);
+	});
+});
+
+// ⚠ RETITLED AT MOBILE-2o, NOT REPURPOSED. A10 D-2's two behavioural rows moved
+// to the A11 describe above, which reverses them; what is left here are the three
+// CONTROLS that were always true either way — the superseded A9 groove is absent,
+// a boxed card never takes the channel, and the track keeps its thickness and its
+// edge. Leaving the old title on a block that no longer holds the ruling it names
+// is how a reader ends up reconciling two describes that claim the same decision.
+describe("MOBILE-2o · A11 D-2 — the track's standing controls, either side of Đ 0", () => {
 	it("phone-split-channel::the-OLD-groove-token-is-gone-in-both-states", () => {
 		// ⛔⛔ THE OPPOSITE CONTROL, AND WITHOUT IT THE ROW ABOVE IS SATISFIED BY A
 		// GROOVE THAT NEVER LEAVES. The counter share IS the track's own ground, so

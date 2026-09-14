@@ -94,6 +94,10 @@ const phone = (utility: string) => PHONE + utility;
  */
 const CHANNEL = "bg-" + "(--surface-inset)";
 const HALF = "w-1" + "/" + "2" + "!";
+/** MOBILE-2o — A11 D-1's edge and A11 D-3's dim, assembled for the same reason. */
+const HAIRLINE = "[border:var(--hairline)]";
+const DIM = "disabled:opacity-" + "4" + "0";
+const DESKTOP_DIM = "disabled:opacity-(--state-disabled-opacity)";
 /** A phone-variant matcher, assembled for the same reason `phone()` is. */
 const phoneRe = (tail: string) => new RegExp(`^${V}${S}${tail}`);
 
@@ -528,82 +532,125 @@ describe("MOBILE-2n · R-2 / A10 D-2 — the track is 14px with rounded ends", (
 	});
 });
 
-describe("MOBILE-2n · R-2 / A10 D-2 — the channel spans the track; Đ 0 moves the FILL", () => {
-	it("phone-r2::the-channel-is-UNCONDITIONAL-and-the-FILL-is-what-Đ-0-moves", () => {
+describe("MOBILE-2o · A11 D-2 — the channel is gated on Đ 0; the fill is the share", () => {
+	it("phone-r2::the-channel-is-the-ZERO-state-and-the-fill-carries-no-override", () => {
 		// ⛔⛔ WHY THE FLAG AND NOT THE PERCENTAGE. `computeSplitBar`'s own docblock
 		// says `supportPct` is `"0%"` both when nothing has been staked and when
-		// everything staked is Counter, "and those are opposite facts". This footer
-		// destructured only the percentage, so it painted both identically — and at
-		// Đ 0 / Đ 0 on a YES post the track's counter pole is `--color-no` #fafafa,
-		// i.e. a solid WHITE WIRE standing in for a bar with nothing in it.
-		// MEASURED on staging at the floor: `rgb(250, 250, 250)`, full width,
-		// beside two figures that both read `Đ 0`.
-		// ⚠ THE BEHAVIOURAL HALF — that the groove appears at Đ 0 and is GONE the
-		// moment there is stake — cannot be seen in a source scan and is
-		// `phone-round-nine-card.test.tsx`'s two-aggregate render.
-		// ⛔⛔ REVERSED BY ADR-0051 A10 D-2, AND THE PARAGRAPH ABOVE IS THE RECORD
-		// OF WHAT IT REVERSES. A9 D-2 painted the groove ONLY at Đ 0 and this row
-		// asserted, in bold, that it must be `band && !hasStake` — because the
-		// counter share WAS the track's own ground. A10 D-2 rules exactly that
-		// erasure: the channel spans the FULL track, the fill is the Support share
-		// drawn over it, and the Counter share IS the exposed channel. So the flag
-		// leaves the channel and moves to the FILL, which is where the zero state
-		// is now expressed: an even 50% split instead of a recoloured track.
+		// everything staked is Counter, "and those are opposite facts". A footer
+		// keying on the percentage alone paints the two identically.
+		// ⛔⛔ REVERSED FROM A10 D-2, AND THE PARAGRAPH BELOW IS THE RECORD OF WHAT
+		// IS REVERSED. A9 D-2 gated the groove on `!hasStake`; A10 D-2 made it
+		// UNCONDITIONAL and ruled that "the Counter share IS the exposed channel",
+		// and this row then asserted the gate had moved to the FILL as a 50% width.
+		// A11 D-2 corrects A10: the side rule — black = YES, white = NO — holds on
+		// BOTH halves of the bar, so the remainder is Counter's own pole and the
+		// channel can only be the Đ 0 / Đ 0 state. The gate comes back to the track
+		// and the fill's override is gone.
+		// ⚠ THE BEHAVIOURAL HALF cannot be seen in a source scan and is
+		// `phone-round-nine-card.test.tsx`'s two-aggregate render, which asserts the
+		// channel present at Đ 0 and ABSENT once there is stake.
 		const src = code(FOOTER);
 		expect(
 			src,
 			"the footer must still READ the flag — it is what tells Đ 0 / Đ 0 apart " +
 				"from an all-Counter bar, and those are opposite facts.",
 		).toContain("hasStake");
-		const trackTokens = gatedClassesIn(
-			regionAfter(src, FOOTER, 'data-testid="aggregate-split-track"'),
+
+		const trackRegion = regionAfter(
+			src,
 			FOOTER,
-			"band",
+			'data-testid="aggregate-split-track"',
 		);
 		expect(
-			trackTokens,
-			"the channel is the design language's own recessed surface, so the " +
-				"track reads as a groove rather than as a bar.",
+			gatedClassesIn(trackRegion, FOOTER, "band && !hasStake"),
+			"the channel is the design language's own recessed surface, and it is " +
+				"the Đ 0 / Đ 0 state rather than the track's standing ground.",
 		).toContain(phone(CHANNEL));
-		// ⛔ THE NEGATIVE IS ABOUT THE TRACK, NOT ABOUT THE FILE. `band && !hasStake`
-		// legitimately SURVIVES — it moved to the FILL, where A10 D-2 now expresses
-		// the zero state — so a file-wide scan for that string would assert the
-		// opposite of what this row means and would have to be deleted the moment
-		// it was written. Scoped to the track's own conditional instead.
-		// ⛔ THIS NEGATIVE IS NOT WHERE THE PROPERTY LIVES, AND SAYING SO IS THE
-		// POINT. `trackTokens` is the single conditional's token list, so once the
-		// row above has asserted it CONTAINS the channel, a `not.toContain` of any
-		// other token on the same one-element array cannot fail. The A9 groove's
-		// real absence is asserted on the RENDERED node, across both aggregates, in
-		// `phone-round-nine-card.test.tsx`. Kept here as a cheap tripwire against
-		// the two tokens being authored side by side, and labelled as one rather
-		// than left reading like the guard. `@code-reviewer`, LOW.
+
+		// ⛔ THE FILL CARRIES NOTHING. Scoped to the fill's own region so the
+		// negative cannot be satisfied by the track's conditional above it.
+		const fillRegion = regionAfter(
+			src,
+			FOOTER,
+			'data-testid="aggregate-split-fill"',
+		);
 		expect(
-			trackTokens,
-			"the superseded A9 groove is authored beside A10's channel in the same " +
-				"conditional, so which one paints is decided by emission order.",
-		).not.toContain(phone("bg-n0"));
-		expect(
-			regionAfter(src, FOOTER, 'data-testid="aggregate-split-track"').slice(
-				0,
-				src
-					.slice(src.indexOf('data-testid="aggregate-split-track"'))
-					.indexOf('data-testid="aggregate-split-fill"'),
-			),
-			"the track's channel is still written as a `band && !hasStake` " +
-				"conditional.",
-		).not.toContain("band && !hasStake");
+			fillRegion.slice(0, fillRegion.indexOf("/>")),
+			"a phone width override is authored on the fill, so the bar's " +
+				"proportion is a presentation fact rather than the share.",
+		).not.toContain(HALF);
+	});
+
+	it("phone-r2::the-superseded-A9-groove-is-not-authored-beside-the-channel", () => {
+		// ⛔ `bg-n0` WAS A9 D-2's groove and is the CARD's own ground, so a track
+		// still carrying it would be invisible rather than recessed. Cheap tripwire
+		// against the two tokens being authored side by side; the real absence is
+		// asserted on the RENDERED node, across both aggregates, in
+		// `phone-round-nine-card.test.tsx`. Named as a tripwire rather than left
+		// reading like the guard (`@code-reviewer`, LOW — carried forward from the
+		// row this replaces, because the reasoning is unchanged).
 		expect(
 			gatedClassesIn(
-				regionAfter(src, FOOTER, 'data-testid="aggregate-split-fill"'),
+				regionAfter(
+					code(FOOTER),
+					FOOTER,
+					'data-testid="aggregate-split-track"',
+				),
 				FOOTER,
 				"band && !hasStake",
 			),
-			"the FILL must take the even split at Đ 0, and it must take it with " +
-				"`!` — the width beside it is an INLINE style, which outranks every " +
-				"ordinary selector, so a plain utility here is authored, compiled, " +
-				"present in the class attribute and completely inert.",
-		).toContain(phone(HALF));
+		).not.toContain(phone("bg-n0"));
+	});
+});
+
+describe("MOBILE-2o · A11 D-1 / D-3 — the black edge and the refusal, in the source", () => {
+	it("phone-r2::the-hairline-is-declared-on-the-BLACK-branch-of-the-pole-ternary", () => {
+		// ⛔ THE RENDER GUARD OWNS THE BEHAVIOUR; THIS ROW OWNS THE SHAPE. A render
+		// proves the token reaches the right element after `twMerge`; only the source
+		// shows WHICH BRANCH of the pole ternary declares it, and the branch is the
+		// whole of A11 D-1 — the edge belongs to the black side, and to the black
+		// side only.
+		const src = code(FOOTER);
+		const ternary =
+			/resultingSide === "YES"\s*\?\s*"([^"]*)"\s*:\s*"([^"]*)"/.exec(src);
+		expect(ternary, `${FOOTER}: the pole ternary is gone`).not.toBeNull();
+		const [black, white] = [ternary?.[1] ?? "", ternary?.[2] ?? ""];
+		expect(
+			black.split(/\s+/),
+			"the black pole has no phone hairline",
+		).toContain(phone(HAIRLINE));
+		expect(
+			white.split(/\s+/),
+			"the white pole took the black side's edge, which is A11 D-1 applied to " +
+				"the relation instead of to the side.",
+		).not.toContain(phone(HAIRLINE));
+		// ⛔ ADDITIVE, NOT A REPLACEMENT. The desktop declaration stays; replacing it
+		// would be a desktop edit, and this round's wall is a desktop diff of
+		// exactly nothing.
+		expect(
+			black.split(/\s+/),
+			"the desktop border declaration was replaced rather than overridden.",
+		).toContain("border-n2");
+	});
+
+	it("phone-r2::the-refusal-is-an-ADDITIVE-opacity-and-never-a-ground", () => {
+		// ⛔ A11 D-3 — the refused side is its own colour dimmed. The negative is the
+		// half that matters: a `disabled:bg-…` anywhere in this file would satisfy
+		// "it looks different" and destroy the one thing the colour carries.
+		const src = code(FOOTER);
+		expect(
+			src,
+			"the phone refusal opacity is not authored on the trigger",
+		).toContain(phone(DIM));
+		expect(
+			src,
+			"the desktop refusal opacity was replaced rather than overridden.",
+		).toContain(DESKTOP_DIM);
+		expect(
+			src,
+			"a disabled BACKGROUND is authored somewhere in this footer, which is " +
+				"the grey fill A11 D-3 exists to forbid.",
+		).not.toMatch(/disabled:bg-/);
 	});
 });
 

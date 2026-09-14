@@ -313,91 +313,44 @@ export function AggregateFooter({
 							// rules ENDS, so the declaration says ends.
 							"h-[18px] max-mobile:h-[14px] w-full overflow-hidden rounded-[var(--r)] max-mobile:rounded-full [border:var(--hairline)]",
 							counterPole,
-							// ⛔⛔ THE RECESSED CHANNEL — AND SINCE ADR-0051 A10 D-2 IT IS
-							// UNCONDITIONAL BELOW 640px, WHICH REVERSES THE PARAGRAPH THIS
-							// ONE REPLACES. A9 D-2 painted the groove only at Đ 0 / Đ 0 and
-							// this block argued, in bold, that it "IS CONDITIONAL, AND IT HAS
-							// TO BE", because the counter share WAS the track's own ground and
-							// a groove that stayed would erase the counter pole. A10 D-2 rules
-							// exactly that erasure: the channel spans the full track, the fill
-							// is the Support share drawn over it, and the Counter share IS the
-							// exposed channel. So the `hasStake` gate is gone from this token
-							// and the phone bar no longer carries a pole on its remainder.
-							// ⚠ THE COST, STATED RATHER THAN DISCOVERED LATER: below 640 the
-							// Counter side is no longer colour-coded. The two Đ figures either
-							// side still carry the fact — which is the same reason this track
-							// is `aria-hidden` and has always been decorative.
-							//
-							// ⛔⛔⛔ THE TOKEN IS `--surface-inset` (n1 #2a2a2a) AND THE RULING
-							// SAYS "one step below the card ground". THOSE ARE NOT THE SAME
-							// COLOUR, AND THE DIFFERENCE IS MEASURED, NOT PREFERRED.
-							// R-3 above takes the band away, so the card ground below this row
-							// is `--color-n0` #212121. One step BELOW it on the ramp is
-							// `--color-ground` #181818 — and `--color-ground` and `--color-yes`
-							// are the SAME SIX DIGITS (`globals.css`: `--color-ground: #181818`,
-							// `--color-yes: #181818`). The fill is the Support pole, so on
-							// every YES post the fill would be drawn in the channel's own
-							// colour: a 51% bar and a 0% bar would render identically, and
-							// half the cards in a market are YES posts. MEASURED at ground on
-							// `/m/sp-m2-active` at 390 — a real 51% YES post reads
-							// `fill rgb(24, 24, 24)`, which is #181818 exactly.
-							// ⇒ A10's own acceptance line is "channel colour ≠ fill colour",
-							// and #181818 fails it. `--surface-inset` is the design language's
-							// own name for a recessed surface (`globals.css` "Applied
-							// surfaces"), is muted, and differs from BOTH poles — so it
-							// satisfies every clause of the ruling except the direction of one
-							// step. ⚠ FLAGGED FOR THE FOUNDER rather than settled here: the
-							// second-order consequence is that a #181818 fill on a #2a2a2a
-							// channel is ~1.15:1, so on a YES post the Support share is legible
-							// as a boundary rather than as a colour. The design language has
-							// already solved this exact problem once, for the debate graph —
-							// `--graph-yes: #737373`, "the black pole cannot render on the dark
-							// ground" — and that is the shape of the answer if the founder
-							// wants one; it is a pole change and this round may not make it.
-							// ⛔⛔ THE PARAGRAPH BELOW IS A9's AND ITS STATE DESCRIPTION IS NOW
-							// WRONG IN THREE PLACES — corrected here, at the top, because this is
-							// what a reader reaches first (`O-5`). Since A10 D-2 the token is
-							// `bg-(--surface-inset)` rather than `bg-n0`; it is UNCONDITIONAL
-							// below 640 rather than gated on `!hasStake`; and the track computes
-							// `rgb(42, 42, 42)` at EVERY stake level rather than two different
-							// values either side of Đ 0.
-							// ⚠⚠ WHAT SURVIVES UNCHANGED IS THE HAZARD AND ITS WARNING, and the
-							// blast radius has WIDENED: the stack now occurs on every feed card
-							// at every stake level rather than only at Đ 0, so if the emission
-							// order ever flips, every phone track reverts to the A9 pole
-							// appearance with NO RED anywhere. Read the ⚠ at the end of the
-							// paragraph below — it is still live and still the thing to check.
-							// `docs/parked.md` **2m-5**. Found by `@code-reviewer`.
-							// ⛔⛔ THIS COMMENT SAID THE TWO BACKGROUNDS WERE MUTUALLY
-							// EXCLUSIVE AND THAT WAS FLATLY FALSE. It read: "NO SECOND `bg-*`
-							// IS STACKED ON A SINGLE ELEMENT AT ONE WIDTH … so nothing here
-							// resolves by stylesheet emission order". `counterPole` is
-							// UNCONDITIONAL — it is passed to `cn()` on every render — and the
-							// `!hasStake` gate decides only whether this token is added BESIDE
-							// it. So below 640 with no stake the element really does carry both
-							// `bg-no` and `max-mobile:bg-n0`, both match, both are
-							// single-class selectors, a media query adds no specificity, and
-							// `twMerge` keeps both because their modifiers differ.
-							// ⇒ THE GROOVE WINS ON EMISSION ORDER, which is the very trap
-							// `PositionsTable.tsx` records in terms. It is CORRECT today
-							// because Tailwind v4 sorts variant-bearing candidates after bare
-							// ones, so `max-mobile:bg-n0` is emitted later — verified on the
-							// live build: the track computes `rgb(33, 33, 33)` at Đ 0 and
-							// `rgb(250, 250, 250)` with stake.
-							// ⚠ WHAT WOULD BREAK IT: giving `counterPole` a `max-mobile:` arm
-							// for any reason. The two would then land in the same variant
-							// bucket, where order is decided by theme-key position rather than
-							// by variant class, and the white wire A9 D-2 exists to kill comes
-							// back with NO RED — every guard here checks token PRESENCE, and
-							// jsdom resolves no cascade. The durable fix (pairing the variants
-							// so the exclusivity is real) is docketed at `docs/parked.md`
-							// **2m-5** rather than taken at the end of an unattended round,
-							// because it changes the desktop class string and the desktop
-							// non-regression wall had already been measured. Found by
-							// `@code-reviewer`, HIGH — and it is exactly the shape this repo
-							// calls out: a wrong reassurance is what stops the next reader
-							// checking.
-							band && "max-mobile:bg-(--surface-inset)",
+							// ⛔⛔ THE RECESSED CHANNEL, AND SINCE ADR-0051 A11 D-2 IT IS A
+							// ZERO-STATE AGAIN. A10 D-2 made it UNCONDITIONAL below 640 and
+							// ruled that the Counter share IS the exposed channel; A11 D-2
+							// corrects exactly that. The side rule is black = YES / white = NO
+							// on BOTH halves of the bar, so the remainder has to be Counter's
+							// own pole rather than a groove — which is what `counterPole` above
+							// already is, and which this token was painting over at every stake
+							// level.
+							// ⚠ WHAT THAT COST, MEASURED ON THE GROUND BUILD AT 390 BEFORE THE
+							// CHANGE: every track on the feed computed `rgb(42, 42, 42)` — a
+							// Đ 230 / Đ 50 post and a Đ 0 / Đ 0 post were the same grey, and a
+							// NO post whose replies are all Counter (a 100% BLACK bar by the
+							// side rule) rendered as an empty grey trough. Grey now means one
+							// thing: Đ 0 / Đ 0.
+							// ⚠ AND THE GROUND UNDER THIS ROW IS n1, NOT n0 — corrected here
+							// rather than left standing (`O-5`). The paragraph this replaces
+							// said "R-3 above takes the band away, so the card ground below this
+							// row is `--color-n0` #212121"; ADR-0051 A10 D-3 was WITHDRAWN the
+							// same evening and the band is back, so the row sits on
+							// `--surface-inset` #2a2a2a — the channel's own colour. At Đ 0 / Đ 0
+							// the track is therefore 1.00:1 against the band and the 1px #404040
+							// hairline is the whole of what draws it. That is the intended
+							// reading of A11 D-2 rather than a defect — an empty bar should look
+							// like an empty groove — but it is the reason the hairline below is
+							// not decoration.
+							// ⚠⚠ THE STACKING HAZARD IS UNCHANGED AND STILL LIVE, and re-gating
+							// this token NARROWS it rather than removing it. `counterPole` is
+							// unconditional, so at Đ 0 / Đ 0 below 640 the element carries both
+							// `bg-yes`/`bg-no` and this variant token; both are single-class
+							// selectors, a media query adds no specificity, and `twMerge` keeps
+							// both because their modifiers differ. It resolves correctly only
+							// because Tailwind v4 emits variant-bearing candidates AFTER bare
+							// ones — verified on this build, not assumed: the track computes
+							// `rgb(42, 42, 42)` at Đ 0 / Đ 0 and the pole otherwise. What would
+							// break it is giving `counterPole` a `max-mobile:` arm, which would
+							// put the two in one variant bucket where order is decided by theme
+							// key. `docs/parked.md` **2m-5** carries the durable fix.
+							band && !hasStake && "max-mobile:bg-(--surface-inset)",
 						)}
 					>
 						<span
@@ -405,28 +358,24 @@ export function AggregateFooter({
 							className={cn(
 								"block h-full",
 								supportPole,
-								// ⛔⛔ MOBILE-2n · R-2 / ADR-0051 A10 D-2 — THE EVEN SPLIT AT
-								// Đ 0 / Đ 0, AND THE `!` IS THE WHOLE MECHANISM RATHER THAN A
-								// shortcut. The width below is an INLINE style, and an inline
-								// declaration outranks every selector in the stylesheet — so a
-								// plain `max-mobile:w-1​/2` here would be authored, compiled,
-								// present in the class attribute and completely inert, which is
-								// the worst shape a phone token can have (it looks applied in
-								// the source and does nothing in the browser). An `!important`
-								// author rule is the one thing that outranks a non-important
-								// inline one.
-								// ⚠ WHY NOT MOVE THE WIDTH TO A CUSTOM PROPERTY, which would
-								// let two ordinary utilities decide it: that rewrites the
-								// DESKTOP element's class string and inline style, and this
-								// round's wall is a desktop diff of exactly nothing. The
-								// override is additive; the base is untouched.
-								// ⚠ 50% IS A PRESENTATION FACT, NOT A SHARE. `computeSplitBar`
-								// still returns `"0%"` here and the figures either side still
-								// read `Đ 0` — nothing is being claimed about stake. A9 D-2
-								// solved the same zero state by recolouring the track; A10 D-2
-								// solves it by filling half of it, so the bar has presence and
-								// the channel is visible on both sides of the midpoint.
-								band && !hasStake && "max-mobile:w-1/2!",
+								// ⛔⛔ THE FILL IS THE SHARE AND NOTHING ELSE, WHICH IS ADR-0051
+								// A11 D-2 WITHDRAWING A10 D-2's HALF-WIDTH AT ZERO. A10 solved the
+								// zero state by filling half the track so the bar had presence;
+								// under the side rule that reads as "Đ 0 of Support against Đ 0 of
+								// Counter, drawn as an even contest" — two poles at 50/50 on a post
+								// nobody has replied to. The zero state is now the CHANNEL on the
+								// track above, with no segment at all, so presentation and stake
+								// cannot disagree.
+								// ⚠ `supportPct` is already `"0%"` here, so removing the override is
+								// the whole change: the inline width takes over and paints nothing.
+								// The `!` this token carried is gone with it — it existed only
+								// because an inline declaration outranks every author selector, and
+								// there is no longer an author rule that has to beat one.
+								// ⚠ `hasStake` IS STILL READ, one element up: it is what tells
+								// Đ 0 / Đ 0 apart from an all-Counter bar, and `computeSplitBar`
+								// returns `"0%"` for both — "those are opposite facts", as its own
+								// docblock puts it. A11 D-2 keeps the distinction and moves where it
+								// is expressed back to the track.
 							)}
 							style={{ width: supportPct }}
 						/>
@@ -514,9 +463,33 @@ function TriggerPill({
 			? c3OppositeSide({ held: heldSide, resulting: resultingSide })
 			: null;
 	// Black-pill exception: 0.5px n2 edge (values-log §1 item 8).
+	//
+	// ⛔⛔ ADR-0051 A11 D-1 — BELOW 640 THE BLACK SIDE DECLARES THE DESIGN
+	// LANGUAGE'S HAIRLINE, AND THE POLE ITSELF IS NOT LIFTED. `--color-yes` is
+	// #181818 against a #2a2a2a band, so the fill of a black pill carries no
+	// contrast of its own and the edge is the whole of what says a control is
+	// there. A11 D-1 rules the edge; the black stays the YES black.
+	// ⚠⚠ MEASURED BEFORE WRITING IT, AND THE MEASUREMENT IS THE INTERESTING
+	// PART: the computed border was ALREADY `1px solid rgb(64, 64, 64)` — the
+	// hairline exactly — at deviceScaleFactor 1, 2 AND 3. Chrome resolves a
+	// `0.5px` border to a USED width of 1px, so `border-[0.5px]` and a 1px
+	// hairline are the same painted edge and `getComputedStyle` cannot tell
+	// them apart. The values-log's "0.5px n2 edge" is a distinction the browser
+	// does not make.
+	// ⇒ So this token changes no pixel, and it is still worth having: the
+	// declaration now SAYS the hairline instead of landing on it by a rounding
+	// rule, which is what a guard can hold and what the next reader can trust.
+	// The paint this round actually buys is the bar's (A11 D-2) and the
+	// disabled state's (A11 D-3).
+	// ⚠ ADDITIVE, AND THE DESKTOP KEEPS ITS 0.5px DECLARATION. Replacing the
+	// base would be a desktop edit for no reason — the used width there is
+	// already 1px — and this round's wall is a desktop diff of exactly nothing.
+	// ⚠ THE WHITE SIDE IS UNTOUCHED: its `border-white/25` is a different edge
+	// doing a different job (a white fill needs no help being seen), and A11
+	// D-1 names the black side only.
 	const pole =
 		resultingSide === "YES"
-			? "bg-yes text-no border-[0.5px] border-n2 shadow-xs hover:bg-neutral-200 hover:text-black cursor-pointer active:scale-95"
+			? "bg-yes text-no border-[0.5px] border-n2 max-mobile:[border:var(--hairline)] shadow-xs hover:bg-neutral-200 hover:text-black cursor-pointer active:scale-95"
 			: "bg-no text-yes border border-white/25 shadow-xs hover:bg-neutral-800 hover:border-white/60 hover:text-white cursor-pointer active:scale-95";
 	// C3 precedence (INFO-1 §3.4): a viewer blocked by the single-side rule is
 	// told why they are blocked, not given the relation's definition. The
@@ -576,7 +549,33 @@ function TriggerPill({
 					// on the seam. Nothing interactive sits in either gap, so this is a
 					// clearance note rather than a defect — but the paragraph above named
 					// one variant and there are two. `@code-reviewer`, LOW.
-					"w-[78px] h-6 flex items-center justify-center rounded-(--r-chip) text-xs font-bold transition-all hover:shadow-(--state-hover-glow-pole) focus-visible:shadow-(--state-focus-ring) active:shadow-(--state-pressed-glow-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) max-mobile:relative max-mobile:h-8 max-mobile:text-[13px] max-mobile:font-semibold max-mobile:[touch-action:manipulation] max-mobile:after:absolute max-mobile:after:inset-x-0 max-mobile:after:-top-2 max-mobile:after:-bottom-1 max-mobile:after:content-['']",
+					//
+					// ⛔⛔ ADR-0051 A11 D-3 — THE REFUSED SIDE IS ITS OWN COLOUR DIMMED,
+					// AND IT ALREADY WAS; WHAT MOVES IS THE AMOUNT. There is no grey
+					// fill token here and there never was: `disabled:opacity-…` dims the
+					// pole in place, and the grey a reader sees is the COMPOSITE. A11
+					// D-3 rules 40% below 640, so the phone gets an additive override
+					// and the desktop keeps `--state-disabled-opacity` (0.5).
+					// ⚠ THE COMPOSITE IS WHAT THE READER ACTUALLY MEETS, and it is worth
+					// writing down rather than leaving to be rediscovered. Over the
+					// band's #2a2a2a: the white pole #fafafa goes 0.5 → #8d8d8d, 0.4 →
+					// #7d7d7d; the black pole #181818 goes 0.5 → #212121, 0.4 → #232323.
+					// So dimming further makes the refused side DARKER, not less grey —
+					// opacity cannot make a 40%-white pill read as white. What the
+					// change does buy is that the white and black refusals stop meeting
+					// in the middle of the ramp, and — with A11 D-1's hairline — the
+					// black refusal keeps a visible edge at #333333 instead of
+					// disappearing into the band.
+					// ⚠ NOTHING ABOUT THE TAP PATH MOVES. `disabled:pointer-events-none`
+					// and the C3 `aria-label` are untouched, so the "you hold X" refusal
+					// reads exactly as it did.
+					// ⚠ IT RELIES ON EMISSION ORDER, LIKE THE TRACK'S CHANNEL, AND IT WAS
+					// VERIFIED ON THE BUILD RATHER THAN ASSUMED: both tokens are
+					// `disabled:`-modified opacity and `twMerge` keeps both because
+					// their modifier sets differ, so which one lands is decided by the
+					// stylesheet. Measured on this build at 390: a disabled pill computes
+					// `opacity: 0.4`.
+					"w-[78px] h-6 flex items-center justify-center rounded-(--r-chip) text-xs font-bold transition-all hover:shadow-(--state-hover-glow-pole) focus-visible:shadow-(--state-focus-ring) active:shadow-(--state-pressed-glow-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) max-mobile:disabled:opacity-40 max-mobile:relative max-mobile:h-8 max-mobile:text-[13px] max-mobile:font-semibold max-mobile:[touch-action:manipulation] max-mobile:after:absolute max-mobile:after:inset-x-0 max-mobile:after:-top-2 max-mobile:after:-bottom-1 max-mobile:after:content-['']",
 					pole,
 				)}
 			>

@@ -223,8 +223,7 @@ the pseudonym and the export affordance only. No field of the meta row is shorte
 
 D-2. The Support/Counter split bar is 14px tall with rounded ends over a recessed
 channel; the fill is the desktop's computed Support share drawn over the channel. At
-Đ 0 / Đ 0 the fill is 50%, a ruled phone-only difference from the desktop's full bar
-at zero.
+Đ 0 / Đ 0 there is no fill (corrected by A11 D-2).
 
 D-3. The Support/Counter footer carries no ground and no border; the row sits on the
 card ground, separated by spacing.
@@ -244,3 +243,26 @@ at 50% at zero stake and at the desktop's share otherwise; footer background
 transparent, border 0; name centre within 1px of avatar centre; logo, icon and
 avatar centres collinear within 1px; icon→avatar gap equals home→rules; logo centre
 within 1px of header centre in both auth states; B1 walls unchanged above the floor.
+
+### A11 — 2026-09-15 · The footer's colours under the side rule; the X control
+
+D-1. Below `--breakpoint-mobile`, the Support/Counter footer follows black = YES /
+white = NO: on a YES post Support is black and Counter white; on a NO post the
+reverse. Black-side buttons and the bar's track carry the design-language hairline
+so black is visible on the card ground; the black token is unchanged.
+
+D-2 (corrects A10 D-2). The bar's Support share fills from the left in Support's
+side colour; the remainder is Counter's side colour. At Đ 0 / Đ 0 the track shows
+the channel only, with no fill — grey means nothing staked and nothing else.
+
+D-3. A footer button for the side the viewer already holds renders in its own side
+colour at 40% opacity, never as a grey fill.
+
+D-4. Below `--breakpoint-mobile`, the header carries an X control immediately right of
+the GitHub control, before the identity cluster, linking to x.com/zugzwangworld. The
+logo remains pinned to the header's centre in both auth states (A9 D-3 stands).
+
+Measurements: black buttons and the 100%-black bar carry the hairline; segment
+proportions at Đ 100/50, Đ 0/100 and Đ 0/0 on both sides; disabled buttons compute to
+their side token at 0.4 opacity; logo centre within 1px of header centre with both
+controls present in both auth states at 360/390/430; B1 walls unchanged.
