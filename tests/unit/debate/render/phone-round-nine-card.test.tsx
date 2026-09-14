@@ -74,9 +74,9 @@ const HALF = "w-1" + "/" + "2" + "!";
  * unprefixed token that must SURVIVE beside the phone one, and it is already
  * authored in `src/`.
  */
-const HAIRLINE = "[border:var(--hairline)]";
+const HAIRLINE = "[border" + ":var(--hairline)]";
 const DIM = "disabled:opacity-" + "4" + "0";
-const DESKTOP_DIM = "disabled:opacity-(--state-disabled-opacity)";
+const DESKTOP_DIM = "disabled:opacity-" + "(--state-disabled-opacity)";
 
 const EMPTY_REPLIES: ReplyGroups = { support: [], counter: [], twoSlot: [] };
 
@@ -185,7 +185,12 @@ const footerTokens = (root: HTMLElement) =>
 	tokensOf(root, '[data-testid="aggregate-footer"]');
 const trackTokens = (root: HTMLElement) =>
 	tokensOf(root, '[data-testid="aggregate-split-track"]');
-/** MOBILE-2n · R-2 — the Đ 0 state moved from the track to the fill (A10 D-2). */
+/**
+ * MOBILE-2o · A11 D-2 — the Đ 0 state lives on the TRACK. This read "the Đ 0
+ * state moved from the track to the fill (A10 D-2)" until A11 D-2 moved it back,
+ * and the round that moved it rewrote every test around this helper while
+ * leaving the helper's own description asserting the reverse (`O-5`).
+ */
 const fillTokens = (root: HTMLElement) =>
 	tokensOf(root, '[data-testid="aggregate-split-fill"]');
 
@@ -263,7 +268,7 @@ describe("MOBILE-2m · R-1 / A9 D-1 — the unboxed card, after composition", ()
 		// incidental.
 		expect(
 			card,
-			"the card's own clip — A10 D-3 removed the bleed that used to rely on it, and the clip is still what keeps a full-bleed card's content inside its edges",
+			"the card's own clip — the footer's bleed relies on it and A10 D-3, which briefly removed that bleed, was WITHDRAWN the same evening, so the clip is load-bearing again as well as still keeping a full-bleed card's content inside its edges",
 		).toContain("overflow-hidden");
 
 		const img = root.querySelector("img[alt='Argument attachment']");
@@ -383,13 +388,21 @@ describe("MOBILE-2o · A11 D-2 — the channel is the ZERO state; the remainder 
 		// ⚠ `computeSplitBar` already returns "0%" here, so the inline width paints
 		// nothing; the override was the only thing making it 50%.
 		for (const aggregate of [UNSTAKED, STAKED]) {
+			const tokens = fillTokens(
+				renderCard({ unboxed: true, post: presentPost({ aggregate }) }),
+			);
 			expect(
-				fillTokens(
-					renderCard({ unboxed: true, post: presentPost({ aggregate }) }),
-				),
+				tokens,
 				"a width override is authored on the fill, so the bar's proportion is " +
 					"a presentation fact rather than the share.",
 			).not.toContain(phone(HALF));
+			// ⛔ THE CONTROL ON THE NEGATIVE, AT BOTH AGGREGATES. The row this replaces
+			// carried one for the staked case only, and a `not.toContain` is satisfied
+			// by a fill that lost every class it has. `tokensOf` throws on a missing
+			// element, so what is left to catch is an empty class string.
+			expect(tokens, "a YES post's fill is still the YES pole").toContain(
+				"bg-yes",
+			);
 		}
 	});
 
@@ -480,21 +493,36 @@ describe("MOBILE-2o · A11 D-1 / D-3 — the black side gets an edge; the refuse
 				heldSide: held,
 				post: presentPost({ side }),
 			});
-			const t = triggerTokens(root, rel);
+			// ⛔ THE ATTRIBUTE FIRST, AND WITHOUT IT THE REST OF THIS LOOP DESCRIBED
+			// SOMETHING IT DID NOT CHECK. Every token below is `disabled:`-modified
+			// and therefore present on the element in EVERY state, so the four rows
+			// asserted a class string while their message claimed a refusal — and
+			// only one of the four combinations had a refusal assertion anywhere.
+			// `@code-reviewer`, MEDIUM.
 			expect(
-				t,
+				root
+					.querySelector(`[data-testid="card-trigger-${rel}"]`)
+					?.hasAttribute("disabled"),
 				`${rel} on a ${side} post is not refused while holding ${held}`,
-			).toContain(phone(DIM));
+			).toBe(true);
+			const t = triggerTokens(root, rel);
+			expect(t, `${rel} on a ${side} post declares no phone dim`).toContain(
+				phone(DIM),
+			);
 			expect(
 				t,
 				"the desktop disabled opacity was REPLACED rather than overridden, " +
 					"which silently re-dims the 1440 control.",
 			).toContain(DESKTOP_DIM);
 			expect(t, `the refused side lost its ${pole} pole`).toContain(pole);
+			// ⛔ ANY disabled BACKGROUND, not just the neutral ramp. This read
+			// `bg-n<digit>` only, which `disabled:bg-muted`, `disabled:bg-neutral-700`
+			// and `disabled:bg-(--surface-inset)` all walk straight past — three
+			// spellings of exactly the thing A11 D-3 forbids. `@code-reviewer`, LOW.
 			expect(
-				t.filter((x) => /^(max-mobile:)?(disabled:)?bg-n\d$/.test(x)),
-				"the refused side carries a neutral-ramp ground, which is the grey " +
-					"fill A11 D-3 exists to forbid.",
+				t.filter((x) => /(^|:)disabled:bg-/.test(x)),
+				"the refused side carries a disabled GROUND, which is the grey fill " +
+					"A11 D-3 exists to forbid.",
 			).toEqual([]);
 		}
 	});
@@ -564,8 +592,10 @@ describe("MOBILE-2o · A11 D-2 — the track's standing controls, either side of
 		// ⚠ THE CHANNEL IS GATED ON `band`, and that is not belt-and-braces: a
 		// groove reads as a groove only when the surface around it is the card's
 		// own. Inside the parent-post sheet's boxed card it would be a third
-		// rectangle in a stack of two, and the sheet is the mount A10 D-3 leaves
-		// alone.
+		// rectangle in a stack of two, and the sheet is the mount every phone
+		// ground ruling has left alone. (This said "the mount A10 D-3 leaves
+		// alone"; A10 D-3 was withdrawn, and the sentence is true of the band and
+		// of A11 D-2's channel without it.)
 		for (const aggregate of [UNSTAKED, STAKED]) {
 			expect(
 				trackTokens(renderCard({ post: presentPost({ aggregate }) })),

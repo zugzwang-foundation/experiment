@@ -9,6 +9,17 @@ import { formatDharma } from "./format";
 import type { ReplyAggregate, Side } from "./types";
 
 /**
+ * ⛔⛔ DO NOT WRITE `chunks` + SLASH + STAR INSIDE A COMMENT IN THIS FILE, OR IN
+ * ANY FILE `tests/unit/design/phone-round-nine.test.ts` SCANS. Its `code()`
+ * helper strips block comments with a NON-GREEDY `/\*[\s\S]*?\*\//g`, and it
+ * runs BEFORE the line-comment strip — so a `//` comment containing a glob path
+ * opens a block comment at the slash-star and swallows everything up to the next
+ * `*` + `/` in the file. Measured here: two such paths, written to record where
+ * the built stylesheet lives, deleted the `band && !hasStake` conditional forty
+ * lines below them and reddened two guards with "no conditional in this region".
+ * The guards caught it immediately; a scan that had only asserted a NEGATIVE
+ * would have gone green on a file it could no longer see.
+ *
  * The read-time Support/Counter aggregate footer (design-language §3.1 / D12),
  * rendered as the market-view SPLIT BAR (`d5:1099-1102 (.barrow.f2)`; plan §6
  * row T3, Tier B-3). A READ-ONLY aggregate over a post's reply-bets — there is
@@ -196,22 +207,32 @@ export function AggregateFooter({
 				    STRUCTURE, so the border returns via the build's own token.
 				    ⛔ NOT `--border-strong`: `emphasis-ladder-tokens.test.ts:216`
 				    pins that token at zero consumers.
-				    ⚠⚠ MOBILE-2m · R-2 — THE HAIRLINE SURVIVES THE CHANNEL, AND IT WAS
-				    RE-CHECKED RATHER THAN ASSUMED. The reasoning above is a CONTRAST
-				    argument, so it has to be re-run whenever the surface it is measured
-				    against moves — and it has moved twice.
-				    ⛔ MOBILE-2m · R-1 put the figures on a band's n1 #2a2a2a instead of
-				    the card's n0 #212121, taking the track's worst case against its own
-				    ground from ~1.09:1 to ~1.3:1. ⚠ THAT SENTENCE IS NOW HISTORY, AND
-				    IT IS CORRECTED HERE RATHER THAN LEFT STANDING (`O-5`): MOBILE-2n ·
-				    R-3 / A10 D-3 takes the band away, so the figures are back on the
-				    card's own n0 and the ~1.09:1 worst case is back with them.
-				    ⇒ THE BORDER STAYS, AND NOW IT IS LOAD-BEARING IN BOTH DIRECTIONS.
-				    Below 640 the track's ground is the channel rather than a pole, and
-				    #2a2a2a against the card's #212121 is ~1.14:1 — so on the phone the
-				    hairline is most of what says where the bar IS. At and above 640 the
-				    original argument is untouched: a NO post's track is `--color-yes`
-				    #181818 on #212121 and would disappear without it. */}
+				    ⚠⚠ THE HAIRLINE SURVIVES EVERY MOVE OF THE SURFACE UNDER IT, AND
+				    THAT IS RE-CHECKED RATHER THAN ASSUMED. The reasoning above is a
+				    CONTRAST argument, so it has to be re-run whenever the surface it is
+				    measured against moves — and this one has moved four times: MOBILE-2m
+				    · R-1 put the row on a band (n1 #2a2a2a), MOBILE-2n · R-3 took the
+				    band away, the 2n-fix put it back, and MOBILE-2o changed what the
+				    track's own ground IS at each stake level.
+				    ⛔ THE LIVE STATE, MEASURED AT THE TIP RATHER THAN CARRIED FORWARD.
+				    The row sits on the band's n1 #2a2a2a (`:143` — restored, and the
+				    paragraphs that said A10 D-3 had removed it are gone). The track's
+				    ground below 640 is now Counter's POLE wherever there is stake and
+				    `--surface-inset` #2a2a2a only at Đ 0 / Đ 0 (A11 D-2).
+				    ⇒ THE BORDER STAYS, AND IT IS LOAD-BEARING IN THREE DIRECTIONS RATHER
+				    THAN TWO.
+				      · at Đ 0 / Đ 0 the channel #2a2a2a sits on the band #2a2a2a — a
+				        contrast of 1.00:1, so the hairline is the WHOLE of what draws
+				        the bar. This is the strongest case and it is new at A11 D-2.
+				      · with stake, a NO post's track is the YES pole #181818 on that
+				        same #2a2a2a — ~1.09:1, which is the case the border was minted
+				        for.
+				      · at and above 640 the original argument is untouched: the same
+				        YES-pole track on the card's own #212121, ~1.10:1.
+				    ⚠ ONE SURFACE IS NOT THE BAND: the parent-post sheet mounts this
+				    footer with `band` false, so its row sits on the card's #212121. The
+				    figures above move by a point or two there and the conclusion does
+				    not. */}
 				{/* ⚠⚠ UI-QUICK change set 6 §1 — THE TRACK NOW OCCUPIES THE PILL'S OWN
 				    BOX, so its centre lands on the Support/Counter centres.
 				    MEASURED before: track centre 696.00 against Support 705.50 and
@@ -345,11 +366,17 @@ export function AggregateFooter({
 							// selectors, a media query adds no specificity, and `twMerge` keeps
 							// both because their modifiers differ. It resolves correctly only
 							// because Tailwind v4 emits variant-bearing candidates AFTER bare
-							// ones — verified on this build, not assumed: the track computes
-							// `rgb(42, 42, 42)` at Đ 0 / Đ 0 and the pole otherwise. What would
-							// break it is giving `counterPole` a `max-mobile:` arm, which would
-							// put the two in one variant bucket where order is decided by theme
-							// key. `docs/parked.md` **2m-5** carries the durable fix.
+							// ones — read out of the SHIPPED STYLESHEET rather than inferred from
+							// a render: in the built stylesheet under `.next/static/chunks/`,
+							// `.bg-no` sits at byte 33188 and the phone token at 76684. The
+							// render agrees (the track computes `rgb(42, 42, 42)` at Đ 0 / Đ 0
+							// and the pole otherwise) but cannot say why. What would break it is
+							// giving `counterPole` a `max-mobile:` arm, which would put the two
+							// in one variant bucket where order is decided by theme key.
+							// ⚠ `docs/parked.md` **2m-5** carries the durable fix AND ITS BODY IS
+							// TWO ROUNDS STALE — it still describes the channel as unconditional
+							// and spells the fix with `bg-n0`. A dated correction is appended to
+							// that row rather than left for the reader this line sends there.
 							band && !hasStake && "max-mobile:bg-(--surface-inset)",
 						)}
 					>
@@ -466,9 +493,14 @@ function TriggerPill({
 	//
 	// ⛔⛔ ADR-0051 A11 D-1 — BELOW 640 THE BLACK SIDE DECLARES THE DESIGN
 	// LANGUAGE'S HAIRLINE, AND THE POLE ITSELF IS NOT LIFTED. `--color-yes` is
-	// #181818 against a #2a2a2a band, so the fill of a black pill carries no
-	// contrast of its own and the edge is the whole of what says a control is
+	// #181818 against the feed band's #2a2a2a, so the fill of a black pill carries
+	// no contrast of its own and the edge is the whole of what says a control is
 	// there. A11 D-1 rules the edge; the black stays the YES black.
+	// ⚠ THIS TOKEN IS NOT GATED ON `band`, so it also reaches the parent-post
+	// sheet's boxed mount, where the ground is the card's #212121 rather than
+	// #2a2a2a. The arithmetic above is the FEED's; on the sheet the pill is even
+	// closer to its ground, so the edge matters there at least as much. Reaching
+	// both is wanted; only the stated figures are surface-specific.
 	// ⚠⚠ MEASURED BEFORE WRITING IT, AND THE MEASUREMENT IS THE INTERESTING
 	// PART: the computed border was ALREADY `1px solid rgb(64, 64, 64)` — the
 	// hairline exactly — at deviceScaleFactor 1, 2 AND 3. Chrome resolves a
@@ -476,9 +508,16 @@ function TriggerPill({
 	// hairline are the same painted edge and `getComputedStyle` cannot tell
 	// them apart. The values-log's "0.5px n2 edge" is a distinction the browser
 	// does not make.
-	// ⇒ So this token changes no pixel, and it is still worth having: the
-	// declaration now SAYS the hairline instead of landing on it by a rounding
-	// rule, which is what a guard can hold and what the next reader can trust.
+	// ⇒ So this token changes no COMPUTED value, and the honest bound is exactly
+	// that: `getComputedStyle` answers `1px` for both declarations, and the same
+	// sentence says the instrument cannot tell them apart — so it cannot be the
+	// evidence that the PAINT is identical either (AGENTS.md §9 rules the paint
+	// the arbiter for this case, and the two were not photographed side by side).
+	// What can be said: no computed difference at any device scale factor, and
+	// any painted difference is at most sub-device-pixel and in the direction
+	// A11 D-1 wants. It is still worth having: the declaration now SAYS the
+	// hairline instead of landing on it by a rounding rule, which is what a guard
+	// can hold and what the next reader can trust.
 	// The paint this round actually buys is the bar's (A11 D-2) and the
 	// disabled state's (A11 D-3).
 	// ⚠ ADDITIVE, AND THE DESKTOP KEEPS ITS 0.5px DECLARATION. Replacing the
@@ -541,14 +580,16 @@ function TriggerPill({
 					// the extension takes what is free and stops exactly where the
 					// figure starts: 8 + 32 + 4 = 44, and the region ends on the seam
 					// rather than across it. `@security-auditor`, LOW.
-					// ⚠ MOBILE-2n · R-3 — THE UPWARD 8px NOW REACHES EXACTLY TO THE CARD'S
-					// GAP, BECAUSE A10 D-3 REMOVED THE 10px THE BAND HELD ABOVE IT. Two
-					// variants and two figures: `PostCard`'s present branch is `gap-2.5`
-					// (10px), so the extension still stops 2px short of the content above;
-					// its REMOVED branch is `gap-2` (8px), where the extension ends exactly
-					// on the seam. Nothing interactive sits in either gap, so this is a
-					// clearance note rather than a defect — but the paragraph above named
-					// one variant and there are two. `@code-reviewer`, LOW.
+					// ⚠ THE UPWARD 8px DOES NOT REACH THE CARD'S GAP, AND THE SENTENCE
+					// THAT SAID IT DID IS CORRECTED RATHER THAN LEFT STANDING (`O-5`). It
+					// read "THE UPWARD 8px NOW REACHES EXACTLY TO THE CARD'S GAP, BECAUSE
+					// A10 D-3 REMOVED THE 10px THE BAND HELD ABOVE IT" — A10 D-3 was
+					// WITHDRAWN the same evening and the band's `max-mobile:py-2.5` is
+					// back (`:143`), so the extension now terminates inside the band's own
+					// 10px of padding and never reaches the card's gap at all. Nothing
+					// interactive sits in that padding, so this is a clearance note rather
+					// than a defect — and the extension is if anything safer than the
+					// paragraph claimed. `@code-reviewer`, MEDIUM.
 					//
 					// ⛔⛔ ADR-0051 A11 D-3 — THE REFUSED SIDE IS ITS OWN COLOUR DIMMED,
 					// AND IT ALREADY WAS; WHAT MOVES IS THE AMOUNT. There is no grey
@@ -556,25 +597,42 @@ function TriggerPill({
 					// pole in place, and the grey a reader sees is the COMPOSITE. A11
 					// D-3 rules 40% below 640, so the phone gets an additive override
 					// and the desktop keeps `--state-disabled-opacity` (0.5).
-					// ⚠ THE COMPOSITE IS WHAT THE READER ACTUALLY MEETS, and it is worth
-					// writing down rather than leaving to be rediscovered. Over the
-					// band's #2a2a2a: the white pole #fafafa goes 0.5 → #8d8d8d, 0.4 →
-					// #7d7d7d; the black pole #181818 goes 0.5 → #212121, 0.4 → #232323.
-					// So dimming further makes the refused side DARKER, not less grey —
-					// opacity cannot make a 40%-white pill read as white. What the
-					// change does buy is that the white and black refusals stop meeting
-					// in the middle of the ramp, and — with A11 D-1's hairline — the
-					// black refusal keeps a visible edge at #333333 instead of
-					// disappearing into the band.
+					// ⚠⚠ THE COMPOSITE IS WHAT THE READER ACTUALLY MEETS, AND THE FIRST
+					// VERSION OF THIS PARAGRAPH GOT IT WRONG IN A WAY THAT REVERSED ITS
+					// OWN CONCLUSION. It gave the white pole at 0.5 as #8d8d8d, which is
+					// the figure over the CARD's #212121 — the ground this row had
+					// before the band was restored — while the rest of the sentence was
+					// about the band. One sentence, two grounds. Recomputed in sRGB, over
+					// the band's n1 #2a2a2a (42):
+					//   white #fafafa   0.5 → #929292 (146)   0.4 → #7d7d7d (125)
+					//   black #181818   0.5 → #212121  (33)   0.4 → #232323  (35)
+					//   the n2 edge     0.5 → #353535  (53)   0.4 → #333333  (51)
+					// ⛔ AND THE TWO THINGS THE OLD PARAGRAPH SAID 0.4 BUYS ARE BOTH
+					// FALSE. It claimed the refusals "stop meeting in the middle of the
+					// ramp": they do the opposite — the gap between them narrows from 113
+					// to 90 and both move toward mid-grey. It claimed the black refusal
+					// "keeps a visible edge instead of disappearing": its edge-to-band
+					// separation FALLS from 11 to 9.
+					// ⇒ WHAT 0.4 ACTUALLY BUYS, stated as the trade it is: a refusal
+					// becomes MORE distinct from its own ENABLED state (white 104 → 125,
+					// black 9 → 11) and LESS distinct from the ground it sits on (white
+					// +104 → +83, black −9 → −7, edge +11 → +9). Opacity cannot make a
+					// 40%-white pill read as white at any value; what it can do is put
+					// more distance between "you may press this" and "you may not".
 					// ⚠ NOTHING ABOUT THE TAP PATH MOVES. `disabled:pointer-events-none`
 					// and the C3 `aria-label` are untouched, so the "you hold X" refusal
 					// reads exactly as it did.
 					// ⚠ IT RELIES ON EMISSION ORDER, LIKE THE TRACK'S CHANNEL, AND IT WAS
-					// VERIFIED ON THE BUILD RATHER THAN ASSUMED: both tokens are
-					// `disabled:`-modified opacity and `twMerge` keeps both because
-					// their modifier sets differ, so which one lands is decided by the
-					// stylesheet. Measured on this build at 390: a disabled pill computes
-					// `opacity: 0.4`.
+					// VERIFIED IN THE SHIPPED STYLESHEET RATHER THAN INFERRED FROM A
+					// RENDER. `twMerge` keeps both tokens because their modifier sets
+					// differ (`disabled` vs `disabled:max-mobile`), so which one lands is
+					// the cascade's decision. In the built stylesheet under
+					// `.next/static/chunks/`, the desktop token sits at byte 66714 and the
+					// phone token at 80810 — the phone rule is emitted later, so it wins at
+					// equal specificity below 640. The render
+					// agrees (a refused pill computes `opacity: 0.4` at 390), but the
+					// render alone could not tell you WHY, and the why is the part that
+					// breaks silently.
 					"w-[78px] h-6 flex items-center justify-center rounded-(--r-chip) text-xs font-bold transition-all hover:shadow-(--state-hover-glow-pole) focus-visible:shadow-(--state-focus-ring) active:shadow-(--state-pressed-glow-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) max-mobile:disabled:opacity-40 max-mobile:relative max-mobile:h-8 max-mobile:text-[13px] max-mobile:font-semibold max-mobile:[touch-action:manipulation] max-mobile:after:absolute max-mobile:after:inset-x-0 max-mobile:after:-top-2 max-mobile:after:-bottom-1 max-mobile:after:content-['']",
 					pole,
 				)}

@@ -3,13 +3,16 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * MOBILE-2n · A10 D-2 — THE SUPPORT/COUNTER SPLIT BAR AT PHONE WIDTH: a **14px**
- * track with fully-rounded ends over a recessed channel that spans the WHOLE
- * track, and three columns each centring its own stake figure.
- * ⚠ This headline said **8px** (A9 D-2) until round ten, and it is corrected at
- * the first sentence rather than only in the note below — which is this file's
- * own §56-68 argument finally applied to itself (`O-5`). `PHONE_TRACK_PX` is the
- * live value and every assertion here derives from it.
+ * MOBILE-2o · A11 D-2 — THE SUPPORT/COUNTER SPLIT BAR AT PHONE WIDTH: a **14px**
+ * track with fully-rounded ends, filled from the left with Support's own side
+ * pole over Counter's, and three columns each centring its own stake figure.
+ * ⚠ This headline has now been corrected TWICE at its first sentence rather than
+ * only in the note below, which is this file's own §56-68 argument applied to
+ * itself (`O-5`). It said **8px** (A9 D-2) until round ten, and then "a recessed
+ * channel that spans the WHOLE track" (A10 D-2) until round eleven **withdrew
+ * that clause**: the channel is the Đ 0 / Đ 0 state and the remainder of a
+ * staked bar is Counter's pole. `PHONE_TRACK_PX` is the live value and every
+ * assertion here derives from it.
  *
  * ⛔⛔ GREEN ON THE DAY IT WAS WRITTEN, DELIBERATELY, AND THAT IS THE WHOLE
  * POSTURE OF THIS FILE. The plan's recon measured the shipped build at 360px on
@@ -24,8 +27,9 @@ import { describe, expect, it } from "vitest";
  * ⚠⚠ **THOSE FIGURES ARE MOBILE-2l's AND THE THICKNESS HAS MOVED SINCE.** They
  * are kept because the COLUMN geometry they record is untouched and is what the
  * third describe below asserts; the 6.00px track they name was superseded by
- * ADR-0051 A9 D-2, which ruled 8px over a recessed channel, and then by A10 D-2,
- * which rules 14px over a channel that spans the WHOLE track. Read the height
+ * ADR-0051 A9 D-2, which ruled 8px over a recessed channel, then by A10 D-2,
+ * which ruled 14px over a channel spanning the WHOLE track, and then by A11 D-2,
+ * which keeps the 14px and takes the whole-track channel back. Read the height
  * figures as history and `PHONE_TRACK_PX` as the live value — it has now moved
  * three times (6 → 8 → 14), which is the argument for deriving every assertion
  * in this file from it rather than restating the number.

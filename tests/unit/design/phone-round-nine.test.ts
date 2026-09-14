@@ -95,9 +95,9 @@ const phone = (utility: string) => PHONE + utility;
 const CHANNEL = "bg-" + "(--surface-inset)";
 const HALF = "w-1" + "/" + "2" + "!";
 /** MOBILE-2o — A11 D-1's edge and A11 D-3's dim, assembled for the same reason. */
-const HAIRLINE = "[border:var(--hairline)]";
+const HAIRLINE = "[border" + ":var(--hairline)]";
 const DIM = "disabled:opacity-" + "4" + "0";
-const DESKTOP_DIM = "disabled:opacity-(--state-disabled-opacity)";
+const DESKTOP_DIM = "disabled:opacity-" + "(--state-disabled-opacity)";
 /** A phone-variant matcher, assembled for the same reason `phone()` is. */
 const phoneRe = (tail: string) => new RegExp(`^${V}${S}${tail}`);
 
@@ -237,7 +237,17 @@ function gatedClassesIn(region: string, file: string, flag: string): string[] {
 	return (m[1] ?? "").split(/\s+/).filter(Boolean);
 }
 
-/** The region from `anchor` to the end of the enclosing JSX expression. */
+/**
+ * The source from `anchor` to the END OF FILE.
+ *
+ * ⚠ THE NAME AND THE OLD DOCSTRING BOTH OVERSOLD IT. It read "the region from
+ * `anchor` to the end of the enclosing JSX expression"; the body is
+ * `source.slice(at)` and always was, so every caller's negative is really a
+ * negative over the whole tail. Callers that need a BOUND take one explicitly
+ * (see the fill scan below, which slices at the next anchor); callers that do
+ * not are relying on the render guards in `phone-round-nine-card.test.tsx` for
+ * placement, which is where placement belongs. `@code-reviewer`, LOW.
+ */
 function regionAfter(source: string, file: string, anchor: string): string {
 	const at = source.indexOf(anchor);
 	if (at === -1) {
@@ -434,7 +444,11 @@ describe("MOBILE-2m · R-1 / A9 D-1 — one full-width hairline between posts", 
 describe("MOBILE-2m · R-1 / A9 D-1 — the Support/Counter band", () => {
 	/**
 	 * ⛔⛔ THE FOOTER ROOT'S OWN `className`, AND THE SCOPE IS THE WHOLE POINT
-	 * SINCE A10 D-3. This read `gatedClassesIn(regionAfter(…), "band")`, i.e. the
+	 * SINCE A10 D-3 — AND A10 D-3 WAS THEN WITHDRAWN, WHICH LEAVES THE ANCHORING
+	 * CORRECT AND ITS STATED REASON FALSE. The root's `band && "…"` conditional is
+	 * back (`AggregateFooter.tsx:143`), so the hazard below is once again live
+	 * rather than hypothetical, which is a stronger argument for the same code.
+	 * This read `gatedClassesIn(regionAfter(…), "band")`, i.e. the
 	 * first `band && "…"` conditional ANYWHERE after the footer's testid — which
 	 * was the root's while the root had one. A10 D-3 takes the root's conditional
 	 * away, so that search now runs on past it and finds the TRACK's channel
@@ -581,7 +595,7 @@ describe("MOBILE-2o · A11 D-2 — the channel is gated on Đ 0; the fill is the
 		).not.toContain(HALF);
 	});
 
-	it("phone-r2::the-superseded-A9-groove-is-not-authored-beside-the-channel", () => {
+	it("phone-r2::TRIPWIRE-the-superseded-A9-groove-is-not-authored-beside-the-channel", () => {
 		// ⛔ `bg-n0` WAS A9 D-2's groove and is the CARD's own ground, so a track
 		// still carrying it would be invisible rather than recessed. Cheap tripwire
 		// against the two tokens being authored side by side; the real absence is
@@ -638,10 +652,23 @@ describe("MOBILE-2o · A11 D-1 / D-3 — the black edge and the refusal, in the 
 		// half that matters: a `disabled:bg-…` anywhere in this file would satisfy
 		// "it looks different" and destroy the one thing the colour carries.
 		const src = code(FOOTER);
-		expect(
+		// ⚠ THIS ROW IS A PRESENCE SCAN OVER THE WHOLE FILE AND ITS MESSAGE USED TO
+		// CLAIM PLACEMENT ("not authored on the trigger") THAT IT NEVER READS.
+		// Anchored to the trigger's own tag instead, so the claim and the assertion
+		// are the same statement. `@code-reviewer`, LOW.
+		const triggerTag = tagAround(
 			src,
+			FOOTER,
+			"data-testid={`card-trigger-",
+			"button",
+		);
+		expect(
+			triggerTag,
 			"the phone refusal opacity is not authored on the trigger",
 		).toContain(phone(DIM));
+		expect(src, "the token is authored somewhere in the file").toContain(
+			phone(DIM),
+		);
 		expect(
 			src,
 			"the desktop refusal opacity was replaced rather than overridden.",
