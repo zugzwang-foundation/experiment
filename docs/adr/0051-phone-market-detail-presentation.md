@@ -153,11 +153,12 @@ unchanged above the same-build floor.
 Supersedes O-1(c)'s two-line allowance for the identity block. Corrects A6's
 Measurements clause and A7 D-2.
 
-D-1. Below `--breakpoint-mobile`, after a successful bet the feed shows the viewer's
-fresh post at the top of the side just bet, through the desktop's own pin — the same
-state, the same treatment, the same expiry — never through the URL, since `?post=N`
-is the thread view on the phone. The pinned post is keyed by the id the bet returned.
-The active side switches to the side bet and the feed region scrolls to top.
+D-1 (amended 2026-09-14). Below `--breakpoint-mobile`, after a successful bet the
+feed mirrors the desktop's actual mechanism: the desktop holds no pin — it holds a
+paged column whose index moves to the author's card. On the phone, the active side
+switches to the side just bet and the feed region scrolls so the viewer's own fresh
+card, keyed by the id the bet returned, sits at the top of the region. There is no pin
+state and no `scrollTo(0)`; `?post=N` remains the thread view.
 
 D-2. The identity block is two lines at every phone width: line one holds the
 pseudonym, which truncates, the position chips in one style, and the export
@@ -180,6 +181,36 @@ six formatted characters. A7 D-2 is widened: the media cap applies wherever a po
 media renders at phone width — the feed, a reply's attachment, and the parent sheet.
 
 Measurements: identity-block line count at 360/375/390/412/430 with both chips and a
-20-character pseudonym; split-bar height and column alignment; pin present at top
-after a bet on the local QA database, side switched, scrollTop 0; pill and poll
+20-character pseudonym; split-bar height and column alignment; post-bet behaviour proven by ten jsdom guards, eight red against the pre-round tree;
+a live bet on the local QA database was not run, because no session exists there and
+creating one would mean authenticating as the founder; side switched; the viewer's
+card first; scrollTop equals that card's top; pill and poll
 behaviour unchanged; B1 walls unchanged above the floor.
+
+### A9 — 2026-09-14 · Round nine: the unbounded card, the split bar's channel, the header without a back button, the username, the filter pill
+
+D-1. Below `--breakpoint-mobile`, the feed's post card carries no border and no
+corner radius of its own; content runs to the screen edge with the tier's horizontal
+padding only, and posts are separated by a full-width hairline. The Support/Counter
+footer keeps a lighter ground and no border, so the bet control reads as one band
+inside the card.
+
+D-2. The Support/Counter split bar is 8px tall with rounded ends over a recessed
+channel: a muted ground visible at Đ 0, with the fill drawn on top of it.
+
+D-3. Below `--breakpoint-mobile`, the app header carries no back button on any page;
+home and rules sit left, the avatar right, and the logo is positioned against the
+header's own centre in the signed-in and signed-out states alike. The desktop header
+is unchanged.
+
+D-4. The pseudonym in the identity block is 14px.
+
+D-5. The positions filter pill matches the Open/Closed tabs in height, radius, border
+weight and type, with a disclosure caret.
+
+Measurements: card border and radius 0 below 640; hairline full width; media cap
+still binds after the width change; money line at Đ 14,260 at 360 with no overflow;
+identity block two lines at 360/375/390/412/430; bar height 8px with the channel
+visible at Đ 0; logo centre within 1px of the header centre at 360/390/430 in both
+auth states; back button absent below 640 on every route and present at 640 and
+1440; B1 walls unchanged above the floor.

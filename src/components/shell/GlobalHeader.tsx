@@ -314,7 +314,27 @@ export function GlobalHeader({
 						mobileResponsive={mobileResponsive}
 					/>
 				</div>
-				<div className="flex items-center justify-self-end">
+				{/* ⛔⛔ MOBILE-2m · R-3 — `col-start-3` IS THE OTHER HALF OF THE CENTRING,
+				    AND WITHOUT IT THIS ZONE LANDS ON TOP OF THE MARK. Taking the brand
+				    cell out of flow (above) does not merely collapse the `auto` track — it
+				    removes that cell as a grid ITEM, so auto-placement re-flows what is
+				    left: the left zone takes track 1 and THIS zone takes track **2**, the
+				    centre, with track 3 empty. MEASURED at 390 before this token:
+				    `grid-template-columns: 131px 44px 131px`, the identity chip at x 173
+				    w 44 and the mark at x 171 w 48 — both centred on 195, the avatar
+				    painted over the logo. `justify-self-end` was doing its job perfectly;
+				    it was ending this zone at the right edge of the wrong track.
+				    ⚠ AND IT IS INVISIBLE TO EVERY NUMBER THIS ROUND MEASURES. The brand
+				    mark's own centre was 0.00px off the header's, the document did not
+				    overflow, nothing changed at 640 or 1440, and both walls passed. A
+				    screenshot is what found it, which is the argument for taking one.
+				    ⇒ Naming the column explicitly makes the placement independent of how
+				    many siblings are in flow. `max-mobile:` because the wall is that every
+				    token this round adds is phone-scoped — and it would be INERT
+				    unprefixed, since with the brand cell back in flow above 640 this zone
+				    is auto-placed into track 3 anyway. Inert is a thing a reader has to
+				    verify; prefixed is a thing they can see. */}
+				<div className="flex items-center justify-self-end max-mobile:col-start-3">
 					{/* ADR-0049 — the two hides below 640px live in the COMPONENTS, not
 					    here, and the asymmetry with the divider two nodes down is
 					    deliberate rather than untidy. `dharma-cluster.test.tsx`'s T4
