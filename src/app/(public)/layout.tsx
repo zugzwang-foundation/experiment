@@ -273,6 +273,7 @@ export default async function PublicLayout({
 				context="first-login"
 				initialOpen={showOnboardingDeck}
 				pseudonym={viewer?.pseudonym ?? null}
+				pfpUrl={viewer?.pfpUrl ?? null}
 				onComplete={completeOnboardingDeckAction}
 				mobileResponsive
 			/>

@@ -85,6 +85,7 @@ export function OnboardingDeck({
 	context,
 	initialOpen = false,
 	pseudonym = null,
+	pfpUrl = null,
 	open: controlledOpen,
 	onOpenChange,
 	onComplete,
@@ -94,6 +95,12 @@ export function OnboardingDeck({
 	/** Seeds the deck's own state ONCE. Ignored when `open` is supplied. */
 	initialOpen?: boolean;
 	pseudonym?: string | null;
+	/**
+	 * The viewer's avatar URL, already resolved by `pfpUrl` in the layout.
+	 * Only Card 2 reads it, and the re-show drops Card 2, so only the
+	 * first-login mount passes it.
+	 */
+	pfpUrl?: string | null;
 	/** Controlled mode — `RulesControl` drives the re-show this way. */
 	open?: boolean;
 	onOpenChange?: (open: boolean) => void;
@@ -313,7 +320,11 @@ export function OnboardingDeck({
 								i === index ? "" : "invisible pointer-events-none"
 							}`}
 						>
-							<CardFigure figure={card.figure} pseudonym={pseudonym} />
+							<CardFigure
+								figure={card.figure}
+								pseudonym={pseudonym}
+								pfpUrl={pfpUrl}
+							/>
 							{/* ⛔ CARD 1 IS THE DECK'S ONE RULED EXCEPTION (SPEC.1
 							    §21.9): no eyebrow, and the Zugzwang wordmark where the
 							    title string would be. Every other card keeps all four
