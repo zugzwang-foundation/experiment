@@ -38,15 +38,43 @@ function restore(key: keyof typeof SAVED, envName: string): void {
 	else process.env[envName] = saved;
 }
 
+// AUTH-TURNSTILE-WIRE added a THIRD prod-only boot gate: register() refuses
+// Cloudflare Turnstile TEST keys in production. `tests/_setup/env.ts` defaults
+// both keys to those test keys, so every prod case that should RESOLVE here
+// would be refused by that gate instead of exercising the gate it is about —
+// the same isolation the DSN note below does for the A18-DSN gate. These are
+// fake, real-SHAPED values (not the `[123]x0…` test pattern); that gate has its
+// own suite in `tests/unit/auth/turnstile-keys.test.ts`.
+const SAVED_TURNSTILE = {
+	site: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+	secret: process.env.TURNSTILE_SECRET_KEY,
+};
+
+function useRealShapedTurnstileKeys(): void {
+	process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = "0x4AAAAAAAexampleSiteKeyValue";
+	process.env.TURNSTILE_SECRET_KEY = "0x4AAAAAAAexampleSecretKeyValueForTests";
+}
+
+function restoreTurnstileKeys(): void {
+	if (SAVED_TURNSTILE.site === undefined)
+		delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+	else process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = SAVED_TURNSTILE.site;
+	if (SAVED_TURNSTILE.secret === undefined)
+		delete process.env.TURNSTILE_SECRET_KEY;
+	else process.env.TURNSTILE_SECRET_KEY = SAVED_TURNSTILE.secret;
+}
+
 describe("AUDIT-FIX-B1 A18-DSN — instrumentation.register DSN presence gate", () => {
 	beforeEach(() => {
 		// Never let the runtime-specific sentry-config dynamic imports fire.
 		delete process.env.NEXT_RUNTIME;
+		useRealShapedTurnstileKeys();
 	});
 	afterEach(() => {
 		restore("env", "ZUGZWANG_ENV");
 		restore("dsn", "NEXT_PUBLIC_SENTRY_DSN");
 		restore("runtime", "NEXT_RUNTIME");
+		restoreTurnstileKeys();
 		vi.clearAllMocks();
 	});
 
@@ -123,12 +151,14 @@ describe("AUTH-OTP-DELIVERY fix (a) — RESEND_FROM_EMAIL sandbox-rejection gate
 
 	beforeEach(() => {
 		delete process.env.NEXT_RUNTIME;
+		useRealShapedTurnstileKeys();
 	});
 	afterEach(() => {
 		restore("env", "ZUGZWANG_ENV");
 		restore("dsn", "NEXT_PUBLIC_SENTRY_DSN");
 		restore("runtime", "NEXT_RUNTIME");
 		restoreFrom();
+		restoreTurnstileKeys();
 		vi.clearAllMocks();
 	});
 
