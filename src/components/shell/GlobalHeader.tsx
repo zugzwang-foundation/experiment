@@ -4,6 +4,7 @@ import { FREEZE_INSTANT_UTC } from "@/server/markets/create";
 import { BrandCluster } from "./BrandCluster";
 import { formatCountdown } from "./countdown-format";
 import { DharmaCluster } from "./DharmaCluster";
+import { GitHubIconControl } from "./GitHubIconControl";
 import { GitHubStarsView } from "./GitHubStars";
 import { HeaderNav } from "./HeaderNav";
 import { type HeaderViewer, IdentityCluster } from "./IdentityCluster";
@@ -67,6 +68,14 @@ import { VisitorCounter } from "./VisitorCounter";
  *
  * Left zone order Back · Home · Radio · GitHub · RULES (mockup v0_2 for the
  * first three; GitHub and RULES are named deviations — see below).
+ *
+ * ⚠ AND THERE IS A SECOND GITHUB CONTROL, IN THE RIGHT ZONE, BELOW 640px ONLY
+ * (MOBILE-2n · R-5 / ADR-0051 A10 D-5). The left-zone one is inside
+ * `header-secondary-controls`, which hides at phone width — so without it a
+ * phone reader reaches the repository from nowhere. `GitHubIconControl` is the
+ * icon-only form and imports the SAME `GITHUB_REPO_URL`, so the two are one
+ * destination in two registers rather than two links. Named here because a
+ * reader counting GitHub controls in this file will find two.
  * Social/Research/Đ-info are ratified omissions (OQ-3/OQ-4 zero-supplied), each
  * a named deviation in the plan. Right zone = the Đ cluster, then JOIN or the identity chip, then a
  * hairline divider + the visitor counter at the far right (UI.13;
@@ -351,6 +360,27 @@ export function GlobalHeader({
 						mobileResponsive && "max-mobile:col-start-3",
 					)}
 				>
+					{/* ⛔⛔ MOBILE-2n · R-5 / ADR-0051 A10 D-5 — THE PHONE'S GITHUB CONTROL,
+					    FIRST IN THIS ZONE, AND THE MOUNT IS GATED RATHER THAN THE CLASS
+					    ALONE. `mobileResponsive` decides whether the control exists at all,
+					    so a THIRD mount that says nothing inherits the header it has today
+					    — the polarity this file's prop docblock argues for, applied to a
+					    control that is new rather than to a hide that is additive. The
+					    class gate below it is the second half: both current mounts pass the
+					    prop at every width, so `hidden max-mobile:inline-flex` is what
+					    keeps 1440 unchanged.
+					    ⛔ FIRST CHILD, WHICH IS WHAT R-5 RULES AND WHAT T4 SURVIVES.
+					    `dharma-cluster.test.tsx`'s SG5 guard walks this div's direct
+					    `.children` and compares indices RELATIVELY — cluster < identity <
+					    divider < visitor — so a new leaf ahead of all four shifts every
+					    index by one and changes no ordering. It would NOT survive a
+					    wrapper, which is the thing that guard exists to catch; this is a
+					    sibling, not a wrapper.
+					    ⚠ IT SITS LEFT OF THE Đ CLUSTER, WHICH IS HIDDEN AT THIS WIDTH
+					    ANYWAY (ADR-0049). At 1440 this control is `display:none`, so §21.1's
+					    register boundary is untouched in both directions: nothing
+					    engine-derived moved, and nothing crossed the divider. */}
+					{mobileResponsive ? <GitHubIconControl /> : null}
 					{/* ADR-0049 — the two hides below 640px live in the COMPONENTS, not
 					    here, and the asymmetry with the divider two nodes down is
 					    deliberate rather than untidy. `dharma-cluster.test.tsx`'s T4

@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
+import { HEADER_ICON_BUTTON } from "./header-control";
+
 /**
  * Left-zone nav pair — Back (leftmost, the v0.2 swap) then Home. 34×34
  *
@@ -51,8 +53,14 @@ import { cn } from "@/lib/utils";
  * Home carries `aria-current` at `/` — live since UI.A4 put Discovery on `/`
  * inside this shell (it was moot at A1, when no header rendered there).
  */
-const ICON_BUTTON =
-	"inline-flex size-[34px] shrink-0 items-center justify-center rounded-(--r) bg-(--btn-fill) text-ink outline-none select-none [border:var(--hairline)] [transition:all_var(--dur-hover)] hover:[border:1px_solid_var(--ring)] active:bg-(--state-pressed-fill) focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) [&_svg]:size-[15px]";
+/**
+ * ⚠ MOBILE-2n · R-5 — THE REGISTER MOVED OUT OF THIS FILE AND THE ALIAS STAYS.
+ * `header-control.ts` now owns the string, because the phone's GitHub control
+ * wears the same box and "the same box" has to be one literal to stay true. The
+ * local name is kept so the three call sites below take zero diff — the value is
+ * byte-identical, which is what keeps Back and Home unmoved at 1440.
+ */
+const ICON_BUTTON = HEADER_ICON_BUTTON;
 
 export function HeaderNav({
 	mobileResponsive = false,
