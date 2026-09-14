@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 import { AggregateFooter } from "./AggregateFooter";
 import { ArgProfile } from "./ArgProfile";
@@ -37,6 +38,35 @@ import type { DebatePost, PresentPost, Side } from "./types";
  * body/author/marker/badge are absent at the type level on the removed variant,
  * so this component cannot render them.
  */
+/**
+ * MOBILE-2m · R-1 / ADR-0051 A9 D-1 — the three declarations that take the box
+ * off the feed card below `--breakpoint-mobile`, in one place so the present and
+ * the removed branch cannot drift into two answers.
+ *
+ * ⛔ `[border:none]` RATHER THAN `border-0`, for the reason `CommentImage.tsx`
+ * already records on its own phone arm: `Card`'s edge is the SHORTHAND
+ * `[border:var(--hairline)]`, and `border-0` sets `border-width` alone — the
+ * shorthand's colour and style survive it. Only a shorthand overrides a
+ * shorthand.
+ *
+ * ⛔⛔ AND THE ELEVATION GOES WITH THE BORDER, WHICH IS THE ORPHAN THIS CHANGE
+ * CREATES RATHER THAN SCOPE CREEP. `--elev-1` is `inset 0 1px 0 rgb(255 255 255
+ * / 0.04), 0 1px 2px rgb(0 0 0 / 0.4)` — an INSET top-light, i.e. a one-pixel
+ * pale line drawn across the top of the card. On a boxed card that line reads as
+ * the lit edge of a raised surface. On a full-bleed band it is a second
+ * horizontal rule a pixel below the hairline that separates the posts, and A9
+ * D-1 says posts are separated by ONE hairline. Leaving it would ship two.
+ *
+ * ⚠ THE CARD KEEPS ITS `p-3`, AND THAT IS WHAT "the tier's horizontal padding
+ * only" RESOLVES TO. The feed column drops its own `px-3` (see
+ * `PhoneDebateView`'s `feedPane`), so 24px of doubled inset becomes 12px carried
+ * by the card alone: the content box widens by exactly 24px and the card's own
+ * edges reach the screen — which is what lets the hairline beneath it be full
+ * width with no negative margin anywhere.
+ */
+const UNBOXED_CARD =
+	"max-mobile:[border:none] max-mobile:rounded-none max-mobile:shadow-none";
+
 export function PostCard({
 	post,
 	onEnter,
@@ -46,6 +76,7 @@ export function PostCard({
 	heldSide,
 	marketOpen,
 	suspended,
+	unboxed = false,
 }: {
 	post: DebatePost;
 	onEnter: (id: string) => void;
@@ -64,6 +95,28 @@ export function PostCard({
 	heldSide: Side | null;
 	marketOpen: boolean;
 	suspended: boolean;
+	/**
+	 * ⛔⛔ MOBILE-2m · R-1 / ADR-0051 A9 D-1 — THE CARD LOSES ITS BOX BELOW 640,
+	 * AND IT IS A PROP RATHER THAN A `max-mobile:` TOKEN WRITTEN STRAIGHT ONTO
+	 * THE CARD, BECAUSE THIS COMPONENT HAS TWO PHONE MOUNTS AND ONLY ONE OF THEM
+	 * IS RULED. `PhoneDebateView` renders it in the FEED (`feedPane`) and again
+	 * inside the PARENT-POST SHEET. A9 D-1 rules the feed: content to the screen
+	 * edge, no border, no radius, posts separated by a hairline. A sheet is a box
+	 * by definition — backdrop, handle, close control — so a card that unboxed
+	 * itself there would dissolve into the sheet's own ground and lose the one
+	 * edge that says where the argument stops.
+	 *
+	 * ⚠ THE `= false` DEFAULT IS THE POLARITY `GlobalHeader`'s `mobileResponsive`
+	 * ALREADY SHIPS (AGENTS.md §8): a mount that says nothing keeps the box. Every
+	 * desktop mount, the sheet, and any future third mount are safe by omission,
+	 * and unboxing is something a caller has to ASK for.
+	 *
+	 * ⛔ IT REACHES NOTHING AT OR ABOVE 640px. Every token it switches on is
+	 * `max-mobile:`-prefixed, so the desktop render is byte-identical whichever
+	 * way this is passed — which makes B1-p's zero diff a property of the
+	 * construction rather than a thing to re-measure each round.
+	 */
+	unboxed?: boolean;
 }) {
 	const triggers = {
 		heldSide,
@@ -80,7 +133,7 @@ export function PostCard({
 
 	if (post.removed) {
 		return (
-			<Card className="gap-2 p-3">
+			<Card className={cn("gap-2 p-3", unboxed && UNBOXED_CARD)}>
 				<SideBadge side={post.sideAtPostTime} />
 				<RemovedPlaceholder />
 				{/* The removed variant keeps its frozen side (§6 — thread integrity),
@@ -94,6 +147,7 @@ export function PostCard({
 					aggregate={post.aggregate}
 					postSide={post.sideAtPostTime}
 					triggers={triggers}
+					band={unboxed}
 				/>
 				{/* ⚠ A removed POST STILL KEEPS ITS SURVIVING REPLIES (§6 — thread
 				    integrity), and row 25 does not touch that: what changed is only
@@ -119,7 +173,7 @@ export function PostCard({
 		   column, which is what gives `.argimg` below a height to take a share of.
 		   Without it the card is content-sized, `.argimg`'s `flex-1` has nothing to
 		   distribute, and the image falls back to its intrinsic size. */
-		<Card className="min-h-0 flex-1 gap-2.5 p-3">
+		<Card className={cn("min-h-0 flex-1 gap-2.5 p-3", unboxed && UNBOXED_CARD)}>
 			{/* ⚠⚠ UI-OVERNIGHT entry 1b — THE BADGE IS NO LONGER A CORNER SIBLING,
 			    and the wrapper that positioned it goes with it. `ArgProfile` renders
 			    the lane badge inside its own row now, beside the age, because that
@@ -418,6 +472,7 @@ export function PostCard({
 				aggregate={post.aggregate}
 				postSide={post.sideAtPostTime}
 				triggers={triggers}
+				band={unboxed}
 			/>
 		</Card>
 	);

@@ -248,7 +248,13 @@ export function GlobalHeader({
 		<header className="sticky top-0 z-40 border-y bg-n0 shadow-(--elev-1)">
 			<div className="mx-auto grid h-[60px] w-full max-w-[1440px] grid-cols-[1fr_auto_1fr] items-center gap-[18px] px-6">
 				<div className="flex items-center gap-2 justify-self-start">
-					<HeaderNav />
+					{/* MOBILE-2m · R-3 / ADR-0051 A9 D-3 — Back does not render below
+					    640px, and the hide is threaded rather than written into
+					    `HeaderNav` unconditionally: that component is a static child of
+					    BOTH mounts, so an ungated class there reaches `(auth)` too. Home
+					    and RULES shift left by the 42px Back and its gap give up;
+					    nothing is repositioned to make that happen. */}
+					<HeaderNav mobileResponsive={mobileResponsive} />
 					{/* MOBILE-1 Phase A — RULES stays OUTSIDE this wrapper: it is
 					    the onboarding deck's only re-show entry point (SPEC.1
 					    §21.9, "present for every viewer, authenticated or not"),
@@ -266,7 +272,42 @@ export function GlobalHeader({
 					</div>
 					<RulesControl mobileResponsive={mobileResponsive} />
 				</div>
-				<div className="justify-self-center">
+				{/* ⛔⛔ MOBILE-2m · R-3 / ADR-0051 A9 D-3 — THE MARK IS POSITIONED
+				    AGAINST THE HEADER, NOT AGAINST THE SPACE THE BUTTONS LEAVE, AND THAT
+				    DISTINCTION IS THE WHOLE ITEM.
+				    This docblock's third paragraph already states the mechanism: `1fr` is
+				    `minmax(auto, 1fr)`, so once the LEFT zone freezes at its own
+				    min-content every remaining pixel lands on the right and the `auto`
+				    centre track is pushed off true centre. MEASURED at the floor, signed
+				    in: the mark's centre sits at a CONSTANT 223.13px at every phone width,
+				    so the error is simply whatever the viewport's half is — **+43.13px at
+				    360, +35.63 at 375, +28.13 at 390, +8.13 at 430.** Taking Back away
+				    does NOT fix that: it moves the constant, leaving the mark off centre
+				    by a different number at every width.
+				    ⇒ Below 640 the cell leaves the grid entirely and is placed on the
+				    header's own axis. `<header>` is `sticky`, which IS a positioned
+				    element and therefore the containing block — and the grid row inside it
+				    is `mx-auto w-full max-w-[1440px]`, i.e. exactly the header's width at
+				    any phone viewport, so header centre and row centre are the same point
+				    and the choice between them cannot matter. The measurement asserts the
+				    delta against the HEADER's own box rather than trusting that sentence.
+				    ⚠ IT COSTS THE CENTRE TRACK, DELIBERATELY. With the cell absolute the
+				    `auto` track collapses to zero and the two `1fr` tracks split the row —
+				    which is what SHOULD happen: the side zones no longer have to leave a
+				    hole for something that is not in the flow.
+				    ⚠ AND THE MARK STOPS BEING THIS ROW'S SHOCK ABSORBER BELOW 640. Out of
+				    the flex row it can no longer be the item that shrinks when the row runs
+				    out of room, so the 3.75px mark this docblock records at 320px cannot
+				    recur on this tier. That is a consequence worth naming, not a claim that
+				    ADR-0049 OI-A is closed: at and above 640 the mark is still in the grid
+				    and still the absorber. */}
+				<div
+					className={cn(
+						"justify-self-center",
+						mobileResponsive &&
+							"max-mobile:absolute max-mobile:left-1/2 max-mobile:-translate-x-1/2",
+					)}
+				>
 					<BrandCluster
 						targetMs={targetMs}
 						initialDisplay={initialDisplay}

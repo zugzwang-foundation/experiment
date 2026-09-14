@@ -434,11 +434,23 @@ export function ArgProfile({
 						// nothing to cut — the same shape as `MOBILE-2h · R-1`'s `max-w-full`
 						// finding one file over, and for the same reason: the constraint was
 						// on the wrong box.
+						// ⚠⚠ MOBILE-2m · R-4 / ADR-0051 A9 D-4 — 17px → 14px, AND THE
+						// LEADING MOVES WITH IT. An arbitrary `text-[Npx]` does NOT reset
+						// the paired line-height (AGENTS.md §8): it inherits whatever step
+						// was in scope, so stating the size without the leading is how a
+						// 14px name keeps a 22px line box. 18px holds the shipped 17/22
+						// ratio (1.294) at the new size.
+						// ⚠ THE BLOCK DOES NOT GET SHORTER, AND THAT IS THE POINT OF
+						// `max-mobile:min-h-8` ABOVE. The name's row is floored at 32px to
+						// match the avatar beside it, so the type steps down INSIDE a box
+						// whose height is set by something else — which is what lets A9 D-4
+						// say "nothing else in the block moves" and mean it. A8 D-2's
+						// two-line rule is measured again rather than inferred from that.
 						// ⚠ >=640px IS UNTOUCHED: both tokens are `max-mobile:`, so rule 8
 						// still governs the desktop row it was written for, and the
 						// accessible name is the full pseudonym at every width — this
 						// clips in CSS and never slices the string.
-						className="text-sm font-medium text-ink hover:underline max-mobile:-order-2 max-mobile:min-h-8 max-mobile:min-w-0 max-mobile:flex-1 max-mobile:ps-10 max-mobile:truncate max-mobile:text-[17px] max-mobile:leading-[22px] max-mobile:font-semibold"
+						className="text-sm font-medium text-ink hover:underline max-mobile:-order-2 max-mobile:min-h-8 max-mobile:min-w-0 max-mobile:flex-1 max-mobile:ps-10 max-mobile:truncate max-mobile:text-[14px] max-mobile:leading-[18px] max-mobile:font-semibold"
 					>
 						{author.pseudonym}
 					</Link>

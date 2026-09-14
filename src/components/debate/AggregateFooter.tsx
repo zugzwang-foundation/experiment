@@ -68,6 +68,7 @@ export function AggregateFooter({
 	aggregate,
 	postSide,
 	triggers,
+	band = false,
 }: {
 	aggregate: ReplyAggregate;
 	/** The post's frozen side (INV-3) — the bar's pole basis, never a relation. */
@@ -87,8 +88,24 @@ export function AggregateFooter({
 		suspended: boolean;
 		onReply: (relation: "support" | "counter") => void;
 	};
+	/**
+	 * MOBILE-2m · R-1 / ADR-0051 A9 D-1 — this footer is a BAND below 640px when
+	 * its card has been unboxed, not a strip floating on the card's ground.
+	 *
+	 * ⚠ IT IS THE CARD'S DECISION, NOT THIS COMPONENT'S, WHICH IS WHY IT ARRIVES
+	 * AS A PROP. The band only reads as a band because the card around it lost its
+	 * border and its radius; on a boxed card the same ground would be a lighter
+	 * rectangle inside a darker one — the "stray box" A9 D-1 names as the thing to
+	 * avoid. So the two decisions travel together, from the one mount that makes
+	 * them (`PhoneDebateView`'s `feedPane`), and cannot be set apart.
+	 *
+	 * ⛔ DEFAULT `false`, AND EVERY TOKEN IT ADDS IS `max-mobile:`. The read-only
+	 * consumers, the parent-post sheet and every desktop mount are unchanged by
+	 * omission and unchanged above 640px by construction.
+	 */
+	band?: boolean;
 }) {
-	const { supportPct } = computeSplitBar({
+	const { supportPct, hasStake } = computeSplitBar({
 		supportDharma: aggregate.supportDharma,
 		counterDharma: aggregate.counterDharma,
 	});
@@ -105,7 +122,27 @@ export function AggregateFooter({
 	return (
 		<div
 			data-testid="aggregate-footer"
-			className="flex items-start gap-2 text-xs text-muted-foreground"
+			className={cn(
+				"flex items-start gap-2 text-xs text-muted-foreground",
+				// ⛔⛔ MOBILE-2m · R-1 / A9 D-1 — THE BAND, AND THE NEGATIVE MARGIN IS
+				// WHAT MAKES IT ONE. `-mx-3` cancels the card's own `p-3` so the
+				// ground reaches the card's edges — which, on an unboxed card, are the
+				// SCREEN's edges — and `px-3` puts the content back where it was, so
+				// not one of the three columns moves horizontally. The band is drawn
+				// behind the row rather than around it.
+				// ⚠ SAFE UNDER THE CARD'S `overflow-hidden`: the ground is clipped at
+				// exactly the card's edge, which is the extent wanted. Nothing
+				// hit-testable lives in the bled region — `TriggerPill`'s tap
+				// extension is `inset-x-0` on the pill and vertical only, so the rule
+				// that extension records (a clipped region is not hit-testable) is not
+				// in play here.
+				// ⚠ `bg-n1` IS ONE STEP UP FROM THE CARD GROUND, read off the ramp and
+				// not chosen: `Card` is `bg-card` → `--color-n0` #212121, and `n1` is
+				// #2a2a2a, the next rung. The ramp runs dark → bright (AGENTS.md §8),
+				// so "one step up" is n0 → n1 and never the reverse.
+				band &&
+					"max-mobile:-mx-3 max-mobile:bg-n1 max-mobile:px-3 max-mobile:py-2.5",
+			)}
 		>
 			{/* `.sidewrap` (`d5:585`) — `align-items:center`, on BOTH sides
 			    (`.sidewrap.r{align-items:center}`, `:586`). d5's own comment says it
@@ -158,7 +195,14 @@ export function AggregateFooter({
 				    dropped it. Ruling A forbids porting the VALUE, not the
 				    STRUCTURE, so the border returns via the build's own token.
 				    ⛔ NOT `--border-strong`: `emphasis-ladder-tokens.test.ts:216`
-				    pins that token at zero consumers. */}
+				    pins that token at zero consumers.
+				    ⚠⚠ MOBILE-2m · R-2 — THE HAIRLINE SURVIVES THE CHANNEL, AND IT WAS
+				    RE-CHECKED RATHER THAN ASSUMED. The reasoning above is a CONTRAST
+				    argument, and R-1 moved the surface it is measured against: the
+				    figures now sit on the band's n1 #2a2a2a instead of the card's n0
+				    #212121. The YES pole is #181818, so the track's worst case against
+				    its own ground goes from ~1.09:1 to ~1.3:1 — better, and nowhere
+				    near enough to see. The border stays. */}
 				{/* ⚠⚠ UI-QUICK change set 6 §1 — THE TRACK NOW OCCUPIES THE PILL'S OWN
 				    BOX, so its centre lands on the Support/Counter centres.
 				    MEASURED before: track centre 696.00 against Support 705.50 and
@@ -241,8 +285,43 @@ export function AggregateFooter({
 							// taste: at 360px the row is a third of the width it has at
 							// 1440, so an 18px track stops reading as a proportion and
 							// starts reading as a block of colour.
-							"h-[18px] max-mobile:h-[6px] w-full overflow-hidden rounded-[var(--r)] [border:var(--hairline)]",
+							// ⚠⚠ MOBILE-2m · R-2 / ADR-0051 A9 D-2 — 6px → 8px AND TRUE ROUNDED
+							// ENDS BELOW 640px. The 18px desktop literal is untouched, so
+							// `split-bar-parity` and `aggregate-footer-alignment` — which
+							// both re-derive it from `PriceBar.tsx`'s `detail.bar` and read
+							// it out of THIS string — are undisturbed.
+							// ⚠ `rounded-full` RATHER THAN LEANING ON `--r`. At 8px tall an
+							// 8px radius already clamps to 4px and looks identical today,
+							// which is exactly the problem: the shape would then be a
+							// coincidence of two numbers that are free to move apart. A9 D-2
+							// rules ENDS, so the declaration says ends.
+							"h-[18px] max-mobile:h-[8px] w-full overflow-hidden rounded-[var(--r)] max-mobile:rounded-full [border:var(--hairline)]",
 							counterPole,
+							// ⛔⛔ THE RECESSED CHANNEL (A9 D-2), AND `hasStake` IS WHAT
+							// MAKES IT POSSIBLE WITHOUT TOUCHING THE POLES.
+							// `computeSplitBar`'s own docblock says why the flag exists:
+							// `supportPct` is `"0%"` both when nothing has been staked and
+							// when everything staked is Counter, "and those are opposite
+							// facts". This footer destructured only the percentage, so it
+							// painted both identically — and at Đ 0 / Đ 0 on a YES post the
+							// track's counter pole is `--color-no` #fafafa, i.e. a solid
+							// white wire standing in for a bar with nothing in it. MEASURED
+							// on staging at the floor: `rgb(250, 250, 250)`, full width,
+							// beside two figures that both read `Đ 0`.
+							// ⇒ With no stake the phone track takes the muted ground instead
+							// — n0, one step DOWN from the band's n1, so it reads as a groove
+							// cut into the band rather than a bar drawn on it.
+							// ⛔ IT IS CONDITIONAL, AND IT HAS TO BE. The counter share is
+							// the track's OWN ground; a channel that stayed once stake
+							// existed would erase the counter pole and leave the bar showing
+							// one side of a two-sided fact. A9 D-2 names the Đ 0 / Đ 0 state
+							// and only that state, which is the same boundary.
+							// ⚠ NO SECOND `bg-*` IS STACKED ON A SINGLE ELEMENT AT ONE
+							// WIDTH: `counterPole` and this token are mutually exclusive
+							// below 640 by the `!hasStake` gate above, so nothing here
+							// resolves by stylesheet emission order — the trap this file and
+							// `PositionsTable` have both recorded.
+							band && !hasStake && "max-mobile:bg-n0",
 						)}
 					>
 						<span

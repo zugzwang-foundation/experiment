@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { cn } from "@/lib/utils";
+
 /**
  * Left-zone nav pair — Back (leftmost, the v0.2 swap) then Home. 34×34
  * header icon buttons per the values-log register (§3 item 3): rest
@@ -45,7 +47,40 @@ import { useEffect, useState } from "react";
 const ICON_BUTTON =
 	"inline-flex size-[34px] shrink-0 items-center justify-center rounded-(--r) bg-(--btn-fill) text-ink outline-none select-none [border:var(--hairline)] [transition:all_var(--dur-hover)] hover:[border:1px_solid_var(--ring)] active:bg-(--state-pressed-fill) focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) [&_svg]:size-[15px]";
 
-export function HeaderNav() {
+export function HeaderNav({
+	mobileResponsive = false,
+}: {
+	/**
+	 * ⛔⛔ MOBILE-2m · R-3 / ADR-0051 A9 D-3 — BACK IS NOT RENDERED BELOW 640px ON
+	 * ANY ROUTE, AND THE HIDE IS GATED ON THIS PROP RATHER THAN WRITTEN
+	 * UNCONDITIONALLY.
+	 *
+	 * The gate is the prop chain, not the file boundary (AGENTS.md §8). This
+	 * component is a static child of `GlobalHeader`, which BOTH layouts mount — so
+	 * an unconditional `max-mobile:hidden` here would reach `(auth)` exactly as
+	 * surely as `(public)`, which is how three ungated classes once shipped onto
+	 * `/sign-in` through `RulesControl` → `OnboardingDeck`. Both mounts opt in
+	 * today, so the rendered outcome is the same either way; what the gate buys is
+	 * that a THIRD mount inherits the desktop header by omission, and that "which
+	 * surfaces reflow" stays a decision a LAYOUT makes.
+	 *
+	 * ⚠ WHY THE CONTROL CAN GO AT ALL, given this file's own long argument for
+	 * keeping it: Back exists here because the depth heuristic cannot tell an
+	 * in-app step from a cross-origin one, and the control is the hedge. A phone
+	 * has a system back gesture that is strictly better informed than the
+	 * heuristic — it knows the real stack — and the tier already carries its own
+	 * Back in `PhoneTitleStrip` for the one screen that needs an in-page one. So
+	 * below 640 this control is a third answer to a question two better ones
+	 * already answer, occupying 42px of the row whose scarcity is what makes the
+	 * brand mark shrink to nothing (see `GlobalHeader`'s shock-absorber note).
+	 *
+	 * ⛔ HIDDEN, NOT UNMOUNTED. `max-mobile:hidden` is a paint decision; the
+	 * button, its handler and its `history.length` probe are untouched, so nothing
+	 * about the desktop control's behaviour is reachable from this change and a
+	 * resize across the tier restores it with its state intact.
+	 */
+	mobileResponsive?: boolean;
+}) {
 	const router = useRouter();
 	const pathname = usePathname();
 	const [hasHistory, setHasHistory] = useState(false);
@@ -66,7 +101,7 @@ export function HeaderNav() {
 				aria-label="Back"
 				title="Back"
 				onClick={() => router.back()}
-				className={ICON_BUTTON}
+				className={cn(ICON_BUTTON, mobileResponsive && "max-mobile:hidden")}
 			>
 				<ArrowLeft aria-hidden="true" />
 			</button>

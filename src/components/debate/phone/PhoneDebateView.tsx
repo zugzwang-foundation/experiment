@@ -663,8 +663,29 @@ export function PhoneDebateView({
 	const feedPane = (side: Side): ReactNode => {
 		const sidePosts = posts.filter((post) => post.sideAtPostTime === side);
 		return (
-			<div className="flex flex-col gap-2.5 px-3 pt-2.5 pb-[140px]">
-				{sidePosts.length === 0 ? <EmptySideCTA side={side} /> : null}
+			/* ⛔⛔ MOBILE-2m · R-1 / ADR-0051 A9 D-1 — THE COLUMN GIVES UP ITS OWN
+			   HORIZONTAL PADDING AND ITS GAP, AND BOTH ARE THE SAME DECISION.
+			   The card kept `p-3` and this column dropped `px-3`, so the 24px of
+			   DOUBLED inset becomes 12px carried once: the content box widens by
+			   exactly 24px and the card's edges land on the screen's. That is what
+			   makes the separator below full width without a negative margin — the
+			   thing it separates already reaches the edge.
+			   ⚠ THE GAP GOES BECAUSE A HAIRLINE IN THE MIDDLE OF ONE IS NOT A SEAM.
+			   With `gap-2.5` the rule would float 10px away from the card above it
+			   and 0px from the one below, reading as a rule belonging to the lower
+			   post. At gap 0 the card's own `p-3` supplies 12px on each side of it
+			   and the seam is symmetric. Vertical padding on the column is kept: it
+			   is the distance from the tabs and from the bottom bar, not between
+			   posts.
+			   ⚠ THE EMPTY CTA TAKES THE PADDING BACK EXPLICITLY. It is the one child
+			   here that is not a full-bleed card, and a centred call to action
+			   running into both screen edges is not what A9 D-1 rules. */
+			<div className="flex flex-col pt-2.5 pb-[140px]">
+				{sidePosts.length === 0 ? (
+					<div className="px-3">
+						<EmptySideCTA side={side} />
+					</div>
+				) : null}
 				{sidePosts.map((post) => (
 					/* ⛔ MOBILE-2l · R-2 — THE ANCHOR THE JUMP RESOLVES AGAINST, and it
 					   is a WRAPPER rather than an attribute on `PostCard` because
@@ -697,9 +718,26 @@ export function PhoneDebateView({
 					   scroll to `sidePosts`' ordering and break the first time the empty
 					   CTA or a ranked re-order moved a row; the comment id is the same key
 					   the receipt carries. */
-					<div key={post.id} data-phone-post-id={post.id}>
+					/* ⛔ MOBILE-2m · R-1 — AND THE SEAM LIVES ON THE WRAPPER, NOT ON
+					   THE CARD. A9 D-1 says the card carries no border of its own; a
+					   `border-b` written onto the card would be exactly that, and the
+					   next reader would have to hold two contradictory sentences at
+					   once. This element is a phone-tree leaf that already exists for
+					   the R-2 jump anchor, it spans the full column width, and a rule
+					   on it is unambiguously a SEPARATOR between two posts rather than
+					   an edge belonging to either.
+					   ⚠ `last:` DROPS THE TRAILING ONE. "Separated by" is a relation
+					   between two posts; a rule under the final card separates it from
+					   nothing and would read as the feed having a floor it does not
+					   have — the column continues into 140px of scroll runway. */
+					<div
+						key={post.id}
+						data-phone-post-id={post.id}
+						className="[border-bottom:var(--hairline)] last:[border-bottom:none]"
+					>
 						<PostCard
 							post={post}
+							unboxed
 							onEnter={enterPost}
 							onOpenPopup={setPopupPost}
 							onOpenImage={setLightboxUrl}
