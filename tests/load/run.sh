@@ -27,6 +27,8 @@ field() { sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p" <<<"$HEALTH"; }
 CANARY="$(field canary)"
 [[ "$(field status)" == "ok" ]] || { echo "REFUSED — health status is not ok: $HEALTH" >&2; exit 2; }
 
+# Set KIT_COMMIT when running a copied kit outside the repo.
+COMMIT="${KIT_COMMIT:-$(git -C "$DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)}"
 NAME="$(basename "$SCRIPT" .js)"
 RUN_ID="${RUN_ID:-${NAME}-$(field env)-$(date -u +%Y%m%dT%H%M%SZ)}"
 OUT="$DIR/results/$RUN_ID"
@@ -37,7 +39,7 @@ mkdir -p "$OUT"
 	echo "script=$SCRIPT"
 	echo "target_url=$TARGET_URL"
 	echo "health=$HEALTH"
-	echo "git_commit=$(git -C "$DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+	echo "git_commit=$COMMIT"
 	echo "k6=$("$K6" version 2>/dev/null | head -1)"
 	echo "rig=$(hostname) open_files=$(ulimit -n)"
 	echo "started_utc=$(date -u +%FT%TZ)"
@@ -46,7 +48,7 @@ mkdir -p "$OUT"
 
 set +e
 EXPECTED_CANARY="$CANARY" \
-	GIT_COMMIT="$(git -C "$DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)" \
+	GIT_COMMIT="$COMMIT" \
 	K6_VERSION="$("$K6" version 2>/dev/null | head -1)" \
 	RIG="$(hostname)" \
 	RUN_ID="$RUN_ID" \
