@@ -214,3 +214,30 @@ identity block two lines at 360/375/390/412/430; bar height 8px with the channel
 visible at Đ 0; logo centre within 1px of the header centre at 360/390/430 in both
 auth states; back button absent below 640 on every route and present at 640 and
 1440; B1 walls unchanged above the floor.
+
+### A10 — 2026-09-14 · Round ten: chips on the meta row, the bar's channel, the footer's ground, the name, the GitHub control
+
+D-1. Below `--breakpoint-mobile`, the position chips (`Flipped`, `Sold`) render at
+the end of the identity block's meta row, after the age; line one holds the avatar,
+the pseudonym and the export affordance only. No field of the meta row is shortened.
+
+D-2. The Support/Counter split bar is 14px tall with rounded ends over a recessed
+channel; the fill is the desktop's computed Support share drawn over the channel. At
+Đ 0 / Đ 0 the fill is 50%, a ruled phone-only difference from the desktop's full bar
+at zero.
+
+D-3. The Support/Counter footer carries no ground and no border; the row sits on the
+card ground, separated by spacing.
+
+D-4. The pseudonym is vertically centred on the avatar.
+
+D-5. Below `--breakpoint-mobile`, the header carries a GitHub icon control between
+the logo and the identity cluster, reusing the desktop control's href. The logo
+remains pinned to the header's centre in both auth states (A9 D-3 stands).
+
+Measurements: two-line identity block with both chips and a 20-character pseudonym
+at 360/375/390/412/430, `REPLIES · n` intact; bar height 14px, channel visible, fill
+at 50% at zero stake and at the desktop's share otherwise; footer background
+transparent, border 0; name centre within 1px of avatar centre; logo, icon and
+avatar centres collinear within 1px; icon→avatar gap equals home→rules; logo centre
+within 1px of header centre in both auth states; B1 walls unchanged above the floor.
