@@ -316,11 +316,35 @@ export function AggregateFooter({
 							// existed would erase the counter pole and leave the bar showing
 							// one side of a two-sided fact. A9 D-2 names the Đ 0 / Đ 0 state
 							// and only that state, which is the same boundary.
-							// ⚠ NO SECOND `bg-*` IS STACKED ON A SINGLE ELEMENT AT ONE
-							// WIDTH: `counterPole` and this token are mutually exclusive
-							// below 640 by the `!hasStake` gate above, so nothing here
-							// resolves by stylesheet emission order — the trap this file and
-							// `PositionsTable` have both recorded.
+							// ⛔⛔ THIS COMMENT SAID THE TWO BACKGROUNDS WERE MUTUALLY
+							// EXCLUSIVE AND THAT WAS FLATLY FALSE. It read: "NO SECOND `bg-*`
+							// IS STACKED ON A SINGLE ELEMENT AT ONE WIDTH … so nothing here
+							// resolves by stylesheet emission order". `counterPole` is
+							// UNCONDITIONAL — it is passed to `cn()` on every render — and the
+							// `!hasStake` gate decides only whether this token is added BESIDE
+							// it. So below 640 with no stake the element really does carry both
+							// `bg-no` and `max-mobile:bg-n0`, both match, both are
+							// single-class selectors, a media query adds no specificity, and
+							// `twMerge` keeps both because their modifiers differ.
+							// ⇒ THE GROOVE WINS ON EMISSION ORDER, which is the very trap
+							// `PositionsTable.tsx` records in terms. It is CORRECT today
+							// because Tailwind v4 sorts variant-bearing candidates after bare
+							// ones, so `max-mobile:bg-n0` is emitted later — verified on the
+							// live build: the track computes `rgb(33, 33, 33)` at Đ 0 and
+							// `rgb(250, 250, 250)` with stake.
+							// ⚠ WHAT WOULD BREAK IT: giving `counterPole` a `max-mobile:` arm
+							// for any reason. The two would then land in the same variant
+							// bucket, where order is decided by theme-key position rather than
+							// by variant class, and the white wire A9 D-2 exists to kill comes
+							// back with NO RED — every guard here checks token PRESENCE, and
+							// jsdom resolves no cascade. The durable fix (pairing the variants
+							// so the exclusivity is real) is docketed at `docs/parked.md`
+							// **2m-5** rather than taken at the end of an unattended round,
+							// because it changes the desktop class string and the desktop
+							// non-regression wall had already been measured. Found by
+							// `@code-reviewer`, HIGH — and it is exactly the shape this repo
+							// calls out: a wrong reassurance is what stops the next reader
+							// checking.
 							band && !hasStake && "max-mobile:bg-n0",
 						)}
 					>

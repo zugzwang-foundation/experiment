@@ -798,7 +798,17 @@ describe("MOBILE-2m · R-5 / A9 D-5 — the market filter matches the Open/Close
 		// never the load-bearing half: `max-w-full` caps the button at its
 		// wrapper's resolved width, and the label span's own `truncate` carries the
 		// clip.
-		// ⚠ 10px UP AND 10px DOWN ON A 24px BOX IS 44, symmetric, and it stays
+		// ⛔⛔ 11px, NOT 10px — CORRECTED AT THE `@code-reviewer` PASS AND CONFIRMED
+		// BY MEASUREMENT. This guard and the source both said "10px UP AND 10px DOWN
+		// ON A 24px BOX IS 44", and the shipped region was **42px**: an absolutely
+		// positioned element resolves its insets against its ancestor's PADDING box
+		// (CSS 2.1 §10.1), and the button is `h-6` with a 1px hairline top and
+		// bottom, so the box is 22px and 22 + 10 + 10 = 42. Measured on the live
+		// build by painting the pseudo-element: `::after` computed height `42px`.
+		// 22 + 11 + 11 = 44. ⚠ The guard could not have caught this — it asserts
+		// the TOKEN, and jsdom performs no layout — which is exactly why the figure
+		// in the comment is the part that had to be re-derived rather than trusted.
+		// It stays
 		// inside a filter head that is 51.99px around a 24px child.
 		const tokens = pill();
 		expect(
@@ -807,8 +817,8 @@ describe("MOBILE-2m · R-5 / A9 D-5 — the market filter matches the Open/Close
 		).toContain(phone("relative"));
 		expect(tokens).toContain(phone("after:absolute"));
 		expect(tokens).toContain(phone("after:inset-x-0"));
-		expect(tokens).toContain(phone("after:-top-2.5"));
-		expect(tokens).toContain(phone("after:-bottom-2.5"));
+		expect(tokens).toContain(phone("after:-top-[11px]"));
+		expect(tokens).toContain(phone("after:-bottom-[11px]"));
 		// ⛔ WITHOUT `content` A PSEUDO-ELEMENT IS NOT GENERATED AT ALL, so the
 		// other five tokens describe a box that never exists and the target is
 		// silently back to 24px with every other assertion here still green.

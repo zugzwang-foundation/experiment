@@ -9,6 +9,13 @@ import { cn } from "@/lib/utils";
 
 /**
  * Left-zone nav pair — Back (leftmost, the v0.2 swap) then Home. 34×34
+ *
+ * ⚠ **A PAIR ONLY AT AND ABOVE 640px.** Below `--breakpoint-mobile` Back does not
+ * render at all (ADR-0051 A9 D-3) and this is a single control. Everything below
+ * about Back describes the DESKTOP control; the reasoning for the phone is on the
+ * `mobileResponsive` prop. Said here because a reader who stops at the component
+ * docblock — the thing the file is named by — would otherwise carry the
+ * superseded picture into every line under it.
  * header icon buttons per the values-log register (§3 item 3): rest
  * --btn-fill + hairline, hover border → --ring (fill unchanged), pressed
  * --state-pressed-fill, focus the 2px light ring, icon 15px ink.

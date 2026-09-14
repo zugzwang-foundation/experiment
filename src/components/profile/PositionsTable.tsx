@@ -839,13 +839,27 @@ export function PositionsTable({
 							   resolved width, and the label span's own `truncate` carries the clip. So
 							   the clip survives the removal — asserted by measuring the rendered label,
 							   not by this paragraph — and the hit region can extend again.
-							   ⚠ 10px UP AND 10px DOWN ON A 24px BOX IS 44, AND IT STAYS INSIDE THE
-							   HEAD. The filter head is 51.99px tall around a 24px child, so there is
-							   ~14px of its own padding on each side; the extension takes 10 of it and
+							   ⛔⛔ 11px, NOT 10px — AND THE DIFFERENCE IS THE BORDER. This read
+							   "10px UP AND 10px DOWN ON A 24px BOX IS 44" and shipped a **42px**
+							   hit region, two pixels under the floor it exists to reach. An
+							   absolutely-positioned element's containing block is its ancestor's
+							   PADDING box, not its border box (CSS 2.1 §10.1), and this button is
+							   `h-6` carrying a 1px hairline top and bottom — so the box the insets
+							   resolve against is 22px, and 22 + 10 + 10 = 42. MEASURED on the live
+							   build by painting the pseudo-element and reading it back:
+							   `getComputedStyle(el, '::after').height` → **`42px`**. 22 + 11 + 11 = 44.
+							   ⚠ A PROBE THAT ADDS THE INSETS TO THE BORDER BOX RETURNS 44 AND LOOKS
+							   RIGHT, which is how this shipped AND how the round's own B7 census
+							   reported it clean. Found by `@code-reviewer`, MEDIUM; confirmed by
+							   measurement rather than by argument, because the two readings differ
+							   by exactly the quantity neither of them states.
+							   ⚠ IT STILL STAYS INSIDE THE HEAD. The filter head is 51.99px tall
+							   around a 24px child, so there is
+							   ~14px of its own padding on each side; the extension takes 11 of it and
 							   reaches no neighbour. It is SYMMETRIC here, unlike `AggregateFooter`'s
 							   asymmetric 8/4 — that one had a Đ figure 4px below to avoid, and this
 							   control has nothing above or below it but the head's padding. */
-							className="max-mobile:relative max-mobile:max-w-full max-mobile:min-w-0 max-mobile:shrink max-mobile:text-[11px] max-mobile:after:absolute max-mobile:after:inset-x-0 max-mobile:after:-top-2.5 max-mobile:after:-bottom-2.5 max-mobile:after:content-['']"
+							className="max-mobile:relative max-mobile:max-w-full max-mobile:min-w-0 max-mobile:shrink max-mobile:text-[11px] max-mobile:after:absolute max-mobile:after:inset-x-0 max-mobile:after:-top-[11px] max-mobile:after:-bottom-[11px] max-mobile:after:content-['']"
 							onClick={() => setFilterOpen((o) => !o)}
 						>
 							{/* ⛔ THE LABEL IS WRAPPED SO IT CAN ELLIPSIZE, and the wrapper

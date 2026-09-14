@@ -329,12 +329,28 @@ export function GlobalHeader({
 				    overflow, nothing changed at 640 or 1440, and both walls passed. A
 				    screenshot is what found it, which is the argument for taking one.
 				    ⇒ Naming the column explicitly makes the placement independent of how
-				    many siblings are in flow. `max-mobile:` because the wall is that every
-				    token this round adds is phone-scoped — and it would be INERT
-				    unprefixed, since with the brand cell back in flow above 640 this zone
-				    is auto-placed into track 3 anyway. Inert is a thing a reader has to
-				    verify; prefixed is a thing they can see. */}
-				<div className="flex items-center justify-self-end max-mobile:col-start-3">
+				    many siblings are in flow.
+				    ⛔ AND IT IS THREADED ON THE PROP LIKE EVERY OTHER TOKEN IN THIS FILE. It
+				    shipped `max-mobile:`-prefixed but UNGATED for one review cycle, which
+				    made it the only breakpoint class here outside the prop chain — and this
+				    paragraph argued its inertness above 640 INSTEAD of taking the gate. Both
+				    halves were wrong the same way: AGENTS.md §8 states the rule with no
+				    exception, and inertness is a property of today's sibling COUNT, which is
+				    precisely what this fix exists to stop depending on. The divider four
+				    nodes below had the identical "it would be inert" argument available and
+				    takes the gate anyway. `@code-reviewer`, MEDIUM.
+				    ⚠ THE LEFT ZONE IS SAFE BY SPEC, NOT BY LUCK, and is deliberately left
+				    auto-placed: CSS Grid §8.5 step 4 starts the cursor at row 1 column 1 and
+				    walks in order-modified document order, so with two in-flow items the left
+				    zone takes column 1 and this zone's explicit 3 is honoured without
+				    incrementing the row. Naming it too would make the row self-describing and
+				    is docketed as a decision rather than taken as an edit. */}
+				<div
+					className={cn(
+						"flex items-center justify-self-end",
+						mobileResponsive && "max-mobile:col-start-3",
+					)}
+				>
 					{/* ADR-0049 — the two hides below 640px live in the COMPONENTS, not
 					    here, and the asymmetry with the divider two nodes down is
 					    deliberate rather than untidy. `dharma-cluster.test.tsx`'s T4

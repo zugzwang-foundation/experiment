@@ -379,11 +379,11 @@ export function ArgProfile({
 						// separator the block above records: `white-space` is INHERITED, so
 						// it still reaches every field even with the box gone, and each
 						// separator still travels inside the span of the field it leads.
-						// ⚠ The size and weight are the stills' (17px / 600); the leading is
+						// ⚠ The weight is the stills' (600); the size was theirs too (17px) until MOBILE-2m stepped it to 14 — see the R-4 note below; the leading is
 						// stated because the size is arbitrary.
 						// ⛔ `min-h-8` — MOBILE-2c, found by `@code-reviewer`. The avatar is
 						// `absolute` at phone width and is 32px tall from y=0; this line's
-						// own box is 22px (`leading-[22px]`) and the wrapping area's
+						// own box is 18px (`leading-[18px]`; 22px when this defect was measured) and the wrapping area's
 						// `gap-y-0.5` adds 2px, so metadata line 2 began at y=24 and the
 						// avatar's lower 8px painted over the pipe and the side badge —
 						// the avatar being the only positioned element in the row, it wins
