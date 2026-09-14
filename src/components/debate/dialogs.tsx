@@ -64,10 +64,20 @@ export function PostPopup({
 	 * Absent on the desktop openers, so the desktop markup is byte-identical.
 	 */
 	tier,
+	marketQuestion,
 }: {
 	post: PresentPost | null;
 	onClose: () => void;
 	tier?: "phone" | undefined;
+	/**
+	 * MOBILE-2l · R-6 — the market's question, for the PHONE header line only.
+	 *
+	 * ⛔ OPTIONAL AND TIER-GATED, so the desktop pop-up is byte-identical: the
+	 * desktop passes nothing and takes the `post.title` branch it has always
+	 * taken. `markets.title` is market metadata with no masking obligation — SC-1
+	 * governs `comments.body` and its derivations, and this is neither.
+	 */
+	marketQuestion?: string;
 }) {
 	const scrollRef = useScrollTopOnOpen(post !== null);
 	return (
@@ -93,7 +103,39 @@ export function PostPopup({
 				{post ? (
 					<>
 						<DialogHeader>
-							<DialogTitle>{post.title}</DialogTitle>
+							{/* ⛔⛔ MOBILE-2l · R-6 — ON A PHONE THIS LINE IS THE MARKET
+							    QUESTION, NOT THE POST'S TITLE, AND THE REASON IS THAT THE
+							    TITLE WAS ALREADY THERE TWICE. The sheet opened by a phone
+							    card's `Know more` printed the post's title beside its `×` and
+							    then printed the same title again in the card beneath it — one
+							    line of the small screen's height spent restating the line
+							    below it. The market question is the one piece of context the
+							    sheet does NOT otherwise carry: the reader arrived from a feed
+							    that is already scoped to a market, and inside a full-screen
+							    sheet there is nothing left on screen that names it.
+							    ⚠ THE REGISTER IS BORROWED, NOT INVENTED — `PhoneTitleStrip`
+							    (`:110`) already renders `market.title` as
+							    `text-[13px] leading-[17px] font-normal text-n5` in exactly
+							    this relationship (a market question beneath a post title), so
+							    the sheet header now matches the strip the reader tapped from.
+							    `truncate` holds it to one line.
+							    ⚠ IT IS STILL THE DIALOG'S ACCESSIBLE NAME. That is a real
+							    change on the phone branch and is deliberate: the name goes
+							    from "this argument's headline" to "the market being argued",
+							    and the headline is still announced immediately below by the
+							    card. Recorded so it is a decision rather than a side effect.
+							    ⛔ The desktop branch is untouched, and `marketQuestion` is
+							    optional precisely so it cannot reach one by omission. */}
+							{tier === "phone" && marketQuestion !== undefined ? (
+								<DialogTitle
+									data-testid="post-popup-market-question"
+									className="truncate text-[13px] leading-[17px] font-normal text-n5"
+								>
+									{marketQuestion}
+								</DialogTitle>
+							) : (
+								<DialogTitle>{post.title}</DialogTitle>
+							)}
 							{/* HTML-FINISH · MARKET DETAIL row 33 — the pop-up head takes the
 							    mockup's CLUSTER. d5's `fillPop` (`:1628-1637`) writes
 							    `pm-author` · `pm-chip` (SIDE @ entry%) · `pm-stake` ·

@@ -370,7 +370,12 @@ describe("R-Q1 — the chips ride line 1, and they get there by ORDER", () => {
 		// declaration under test is how a guard comes to assert itself (OVN-V5).
 		const carriers: [string, string][] = [
 			["the pseudonym link", "href={`/u/$"],
-			["the position marker", "<PositionMarker marker="],
+			// ⚠ ANCHORED ON THE SYMBOL, NOT THE SPELLING (`O-8`). This read
+			// `"<PositionMarker marker="` until MOBILE-2l gave the call site a
+			// second prop and `biome format` broke it across lines — a formatting
+			// change reddened a behavioural guard. Fencing by distance in another
+			// unit is still fencing by distance.
+			["the position marker", "<PositionMarker"],
 			["the Sold chip", 'data-testid="argstake-sold"'],
 			["the lane badge", "<LaneBadge badge="],
 		];

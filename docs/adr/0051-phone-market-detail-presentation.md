@@ -120,9 +120,9 @@ content and which carries no frame of its own. The ceiling and wire figure are
 unchanged.
 
 Measurements: A5's tile baseline is retired with its geometry. Replaced by: natural
-tile height at 360/375/390/412/430; zero `scroll-snap-type` in `src/`; at Đ 14,260
-the money line fits with the chip hidden and the layout viewport holds its nominal
-width.
+tile height at 360/375/390/412/430; zero `scroll-snap-type` in `src/`; at the 18px
+scale the movement chip is shown at Đ 14,260 and the line fits — the chip yields
+above six formatted characters — and the layout viewport holds its nominal width.
 
 ### A7 — 2026-09-14 · The feed's top pill and media containment (phone)
 
@@ -136,12 +136,50 @@ bounded shell (A2) removed. It carries no touch or pointer handler; it observes 
 region's scroll events passively. It reuses `PhoneSheet`'s timing tokens and honours
 `prefers-reduced-motion`. It does not appear on the thread view.
 
-D-2. Below `--breakpoint-mobile`, a post's media in the feed is capped at 60% of the
-visual viewport height and scaled to fit within it, whole and uncropped, on the
-card's own ground with no border, at the card's corner radius, at the card's content
-width. Desktop media and the composer's attached-preview are unchanged.
+D-2. Below `--breakpoint-mobile`, a post's media is capped at 60% of the visual
+viewport height and scaled to fit within it, whole and uncropped, on the card's own
+ground with no border, at the card's corner radius, at the card's content width. The
+cap applies wherever a post's media renders at phone width — the feed, a reply's
+attachment, and the parent sheet. Desktop media and the composer's attached-preview
+are unchanged.
 
 Measurements: pill appear/hide/hysteresis at 360/390/412/430; scroll-to-top lands at
 0; exactly one refetch per tap; pill absent while any sheet is open; media height ≤
 0.6·viewport for 2:3, 9:16, 1:1 and 16:9 test images with no border; both B1 walls
 unchanged above the same-build floor.
+
+### A8 — 2026-09-14 · Round eight: the post-bet pin, the identity block, the split bar, the filter pill, the avatar, the post sheet header; two corrections
+
+Supersedes O-1(c)'s two-line allowance for the identity block. Corrects A6's
+Measurements clause and A7 D-2.
+
+D-1. Below `--breakpoint-mobile`, after a successful bet the feed shows the viewer's
+fresh post at the top of the side just bet, through the desktop's own pin — the same
+state, the same treatment, the same expiry — never through the URL, since `?post=N`
+is the thread view on the phone. The pinned post is keyed by the id the bet returned.
+The active side switches to the side bet and the feed region scrolls to top.
+
+D-2. The identity block is two lines at every phone width: line one holds the
+pseudonym, which truncates, the position chips in one style, and the export
+affordance; line two holds the meta row. It never wraps to three.
+
+D-3. The Support/Counter split bar is 6px tall with rounded ends; the three stake
+figures sit in three columns beneath the button, the bar, and the button.
+
+D-4. The positions filter's selected state shows the market's tag alone with its
+disclosure arrow; the open list shows full questions.
+
+D-5. The header avatar below 640 is a circle; the desktop header is unchanged.
+
+D-6. The post sheet's header line shows the market question — grey, small, one line,
+truncated — rather than the post's title.
+
+Corrections. A6's Measurements clause is amended to the measurement: at the 18px
+scale the movement chip is shown at Đ 14,260 and the line fits; the chip yields above
+six formatted characters. A7 D-2 is widened: the media cap applies wherever a post's
+media renders at phone width — the feed, a reply's attachment, and the parent sheet.
+
+Measurements: identity-block line count at 360/375/390/412/430 with both chips and a
+20-character pseudonym; split-bar height and column alignment; pin present at top
+after a bet on the local QA database, side switched, scrollTop 0; pill and poll
+behaviour unchanged; B1 walls unchanged above the floor.

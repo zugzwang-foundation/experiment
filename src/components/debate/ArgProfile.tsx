@@ -353,11 +353,20 @@ export function ArgProfile({
 				    satisfy WCAG 2.5.3, and the visible text already says it. */}
 					<Link
 						href={`/u/${encodeURIComponent(author.pseudonym)}`}
-						// ⚠ UI-OVERNIGHT entry 1b rule 8 — NEVER TRUNCATED. `truncate` stood
-						// here since row 42; a pseudonym is the one field on this row that
-						// IS a person, and half of one identifies nobody. Group A may
-						// overflow a narrow card instead; that is the trade, made
-						// deliberately.
+						// ⚠⚠ UI-OVERNIGHT entry 1b rule 8 — NEVER TRUNCATED, **AND THAT NOW
+						// HOLDS ONLY AT AND ABOVE 640px.** The rule as written: "a pseudonym
+						// is the one field on this row that IS a person, and half of one
+						// identifies nobody. Group A may overflow a narrow card instead; that
+						// is the trade, made deliberately." It still governs the desktop row,
+						// where the width to honour it exists.
+						// ⛔ BELOW 640px IT IS WITHDRAWN BY ADR-0051 A8 D-2, and the
+						// correction is written HERE rather than only in the block below
+						// because this is the paragraph a reader reaches first (`O-5`). The
+						// trade rule 8 names — overflow rather than truncate — stopped being
+						// available when round eight made two lines the ceiling: the only
+						// remaining ways to fit are a third line (forbidden) or a shorter
+						// name. See the block on the `className` below for the measurement
+						// that chose between them.
 						// ⚠⚠ MOBILE-2 / RF-4 — `basis-full` IS WHAT PUTS THE AUTHOR ON A
 						// LINE OF THEIR OWN below 640px: the wrapping area is `flex-wrap`,
 						// so a 100% basis pushes every field after it onto line 2. It works
@@ -387,7 +396,49 @@ export function ArgProfile({
 						// says "this field owns line 1 alone"; the ruling is that the chips
 						// join it there. A zero-height `basis-full` item ordered between the
 						// two groups says "break HERE" without claiming the line.
-						className="text-sm font-medium text-ink hover:underline max-mobile:-order-2 max-mobile:min-h-8 max-mobile:ps-10 max-mobile:text-[17px] max-mobile:leading-[22px] max-mobile:font-semibold"
+						// ⛔⛔ MOBILE-2l · R-4 — THE PSEUDONYM IS NOW THE ELEMENT THAT
+						// YIELDS, BELOW 640px ONLY, AND THAT REVERSES THE RULE DIRECTLY
+						// ABOVE. UI-OVERNIGHT 1b rule 8 says NEVER TRUNCATED — "half of one
+						// identifies nobody" — and ADR-0051 O-1(c) then allowed the block a
+						// second line at 360 with two chips. Round eight withdraws that
+						// allowance: two lines is the CEILING at every phone width
+						// (ADR-0051 A8 D-2), and something has to give to hold it.
+						// ⇒ MEASURED, which is what decides WHICH thing gives. At 360 the
+						// wrapping area is 270.79px. A 20-character pseudonym is ~238px
+						// with its `ps-10` reserve, and the two chips are 41.59 + 42.35
+						// with 8px of seams — 329.94px against 270.79. Line 1 wraps, the
+						// block becomes THREE lines, and rule 8's own purpose (the reader
+						// can see who is speaking) is what the third line costs.
+						// ⇒ The chips and the export mark are FIXED-WIDTH facts about the
+						// position; the name is the only elastic field on the line. So the
+						// name ellipsizes and everything else stays whole — the inverse of
+						// the group-wrap remedy `MOBILE-1 Phase A` chose, because that one
+						// bought its width with a line this ruling no longer has.
+						// ⚠ `min-w-0` IS NOT OPTIONAL BESIDE `truncate`. A flex item's
+						// automatic minimum is its content, so `overflow:hidden` alone would
+						// never get the chance to clip — the item would simply refuse to
+						// shrink and the row would overflow exactly as it does now.
+						// ⛔⛔ AND `flex-1` IS THE ONE THAT ACTUALLY DECIDES IT — MEASURED,
+						// after `min-w-0 truncate` ALONE SHIPPED THREE LINES. The container
+						// is `flex-wrap`, and a wrapping flex container does not shrink an
+						// item to avoid a break: it breaks. Line-breaking runs on each item's
+						// HYPOTHETICAL size — its flex-basis — so with the name's basis at
+						// `auto` the browser sized it to its full text (215.60px at 360),
+						// found room for the name and `Exited` and pushed `Sold` onto a third
+						// line. `flex-1` is `flex: 1 1 0%`: the name's hypothetical size
+						// becomes its padding alone, so every chip is placed on line 1 FIRST
+						// and the name then GROWS into whatever is left and truncates there.
+						// ⚠ Measured at 360 with a 20-character pseudonym and both chips:
+						// 3 lines and an unclipped 215.60px name before, 2 lines and a
+						// clipped name after. `truncate` was live the whole time and had
+						// nothing to cut — the same shape as `MOBILE-2h · R-1`'s `max-w-full`
+						// finding one file over, and for the same reason: the constraint was
+						// on the wrong box.
+						// ⚠ >=640px IS UNTOUCHED: both tokens are `max-mobile:`, so rule 8
+						// still governs the desktop row it was written for, and the
+						// accessible name is the full pseudonym at every width — this
+						// clips in CSS and never slices the string.
+						className="text-sm font-medium text-ink hover:underline max-mobile:-order-2 max-mobile:min-h-8 max-mobile:min-w-0 max-mobile:flex-1 max-mobile:ps-10 max-mobile:truncate max-mobile:text-[17px] max-mobile:leading-[22px] max-mobile:font-semibold"
 					>
 						{author.pseudonym}
 					</Link>
@@ -457,7 +508,24 @@ export function ArgProfile({
 						    branch for a phone in a component the desktop shares. */}
 						<FieldSeparator className="max-mobile:hidden" />
 						<SideBadge side={side} price={entryPrice} size={chipSize} />
-						<PositionMarker marker={marker} className="max-mobile:-order-2" />
+						{/* ⛔ MOBILE-2l · R-4 — ONE CHIP STYLE, AND THIS IS ITS HALF OF IT.
+						    `Flipped`/`Exited` and `Sold` were two registers on one line:
+						    this chip is 10px sentence-case normal-weight, and the `Sold`
+						    chip below was 10px UPPERCASE bold with 0.08em tracking. Both
+						    become 11px sentence case at phone width; the ground was already
+						    shared and only looked different (`bg-secondary` resolves to
+						    `var(--color-n1)`, `globals.css:61`, which is the literal the
+						    other chip names — so nothing there had to move).
+						    ⚠ `shrink-0` because R-4 makes the NAME the elastic field: a
+						    chip allowed to shrink would take the ellipsis the pseudonym is
+						    supposed to take, and the line would still wrap.
+						    ⚠ The leading is stated with the size — an arbitrary
+						    `text-[Npx]` inherits whatever line-height was in scope
+						    (AGENTS.md §8), and this surface has a measured case of it. */}
+						<PositionMarker
+							marker={marker}
+							className="max-mobile:-order-2 max-mobile:shrink-0 max-mobile:text-[11px] max-mobile:leading-[16px]"
+						/>
 					</span>
 					{authorStake !== undefined ? (
 						<span className="flex shrink-0 items-center gap-1.5 max-mobile:contents">
@@ -515,7 +583,23 @@ export function ArgProfile({
 								<InfoTip content={GLOSSARY.sold} asChild>
 									<span
 										data-testid="argstake-sold"
-										className="rounded-[var(--r-chip)] bg-n1 px-1.5 py-0.5 font-bold text-[10px] text-n5 uppercase tracking-[0.08em] max-mobile:-order-2"
+										/* ⛔ MOBILE-2l · R-4 — THE OTHER HALF OF THE ONE CHIP STYLE.
+										   This chip is the one that moves, because it is the one
+										   that diverged: 10px BOLD UPPERCASE with 0.08em tracking
+										   beside a `Flipped` chip that was 10px sentence-case and
+										   normal weight. Below 640px both read at 11px, sentence
+										   case, normal weight, no tracking, `rounded-sm`.
+										   ⚠ THE GROUND AND THE PADDING NEEDED NO EDIT AND THAT IS
+										   MEASURED, not assumed: `bg-n1` here and `bg-secondary` on
+										   the Badge are the same colour (`--secondary:
+										   var(--color-n1)`, `globals.css:61`), and both chips
+										   already carry `px-1.5 py-0.5`. Only case, weight,
+										   tracking, size, radius and the text token differed.
+										   ⚠ `SOLD_LABEL` is the string `"Sold"` — the UPPERCASE was
+										   never in the copy, it was this class. Dropping
+										   `uppercase` at phone width therefore changes no text and
+										   no accessible name; `>=640px` still renders `SOLD`. */
+										className="rounded-[var(--r-chip)] bg-n1 px-1.5 py-0.5 font-bold text-[10px] text-n5 uppercase tracking-[0.08em] max-mobile:-order-2 max-mobile:shrink-0 max-mobile:rounded-sm max-mobile:text-[11px] max-mobile:leading-[16px] max-mobile:font-normal max-mobile:tracking-normal max-mobile:text-muted-foreground max-mobile:normal-case"
 									>
 										{SOLD_LABEL}
 									</span>

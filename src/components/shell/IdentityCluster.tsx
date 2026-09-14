@@ -99,10 +99,46 @@ export function IdentityCluster({
 	return (
 		<Link
 			data-testid="identity-chip-link"
+			/* ⛔⛔ MOBILE-2l · R-5 — BELOW 640px THE CHIP STOPS BEING A CHIP AND
+			   BECOMES THE AVATAR. ADR-0049 already hides the pseudonym there, which
+			   left a 42×34 rounded RECTANGLE holding a 24px circle — a pill with
+			   nothing in it but a picture, and a target under the 44px floor.
+			   ⇒ The wrapper's ground, border and padding go, the box becomes square,
+			   and the image fills it. `rounded-full` is already on `chipClass`, so a
+			   square box is all a circle needs.
+			   ⛔ `[border:none]`, NOT `border-none`. `chipClass` sets the border with
+			   the arbitrary property `[border:var(--hairline)]`, and `border-none`
+			   emits `border-style` only — two different declarations at the same
+			   specificity, decided by emission order rather than by intent. Matching
+			   the shorthand is what makes the override certain.
+			   ⚠ THE DESKTOP HEADER IS SHARED WITH THIS COMPONENT, so every token is
+			   `max-mobile:` AND gated on `mobileResponsive`, whose default is `false`
+			   (AGENTS.md §8: a mount that forgets it inherits the desktop render). */
 			href={`/u/${encodeURIComponent(viewer.pseudonym)}`}
-			className={`${chipClass} outline-none [transition:all_var(--dur-hover)] hover:bg-n1 focus-visible:shadow-(--state-focus-ring)`}
+			className={cn(
+				chipClass,
+				"outline-none [transition:all_var(--dur-hover)] hover:bg-n1 focus-visible:shadow-(--state-focus-ring)",
+				mobileResponsive &&
+					"max-mobile:size-11 max-mobile:justify-center max-mobile:gap-0 max-mobile:p-0 max-mobile:[border:none] max-mobile:bg-transparent max-mobile:hover:bg-transparent",
+			)}
 		>
-			<Avatar size="sm">
+			{/* ⛔⛔ THE SIZE OVERRIDE MUST MATCH THE PRIMITIVE'S DATA-VARIANT, AND
+			    THIS IS THE TRAP `ui/avatar.tsx:8-16` EXISTS TO WARN ABOUT. The
+			    primitive ships `data-[size=sm]:size-6`, specificity (0,2,0); a bare
+			    `max-mobile:size-11` is (0,1,0) and LOSES regardless of tailwind-merge
+			    ordering, silently, leaving a 24px image in a 44px box. Repeating the
+			    data-attribute selector puts this at (0,2,0) too.
+			    ⚠ MEASURED, not reasoned — equal specificity is decided by emission
+			    order, which is not a thing to take on faith. This round measured the
+			    computed `width`/`height` in a real browser at 360px; the source scan
+			    alone would not have told us. */}
+			<Avatar
+				size="sm"
+				className={cn(
+					mobileResponsive &&
+						"max-mobile:data-[size=sm]:size-11 max-mobile:[&_img]:size-full",
+				)}
+			>
 				<AvatarImage src={viewer.pfpUrl} alt="" />
 				<AvatarFallback>{viewer.pseudonym.charAt(0)}</AvatarFallback>
 			</Avatar>

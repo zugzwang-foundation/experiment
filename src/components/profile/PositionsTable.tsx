@@ -63,6 +63,39 @@ import {
 const ROW_WINDOW = 3;
 
 /**
+ * MOBILE-2l · R-1 — THE MARKET TAG, TAKEN FROM THE TITLE BECAUSE THERE IS
+ * NOWHERE ELSE TO TAKE IT FROM.
+ *
+ * ⛔ MEASURED BEFORE IT WAS WRITTEN, because the brief allows either source and
+ * the answer decides the shape: `markets` has **no** `tag` or `category` column
+ * (`src/db/schema/markets.ts:37-53`), and the profile read model carries
+ * `marketTitle` alone (`src/server/profile/arguments.ts:377`). So the leading
+ * segment of the title is the only source, and the brief's fallback is the
+ * path — recorded here as it asks.
+ *
+ * The eight content markets are all `"<Tag> · <Question>"` — `Mumbai ·`,
+ * `Oktoberfest ·`, `Chess ·`, `Bitcoin ·`, `Math ·`, `Claude ·`,
+ * `YCombinator ·`, `GitHub ·` (`docs/data/staging-markets-snapshot.json`).
+ *
+ * ⚠ `rest` KEEPS THE SEPARATOR, so `tag + rest === title` for every input with
+ * no exception. That identity is the whole contract: the caller renders both
+ * halves, so the DOM's text is the title unchanged and the equality assertion in
+ * `arrangement.test.tsx` cannot notice this function exists.
+ *
+ * ⚠ A TITLE WITH NO ` · ` KEEPS ITS WHOLE SELF as the tag — it is not an error
+ * and not a special case at the call site. Every local `sp-m*` fixture is in
+ * that state (`Staging fixture M12 — placeholder filler question`), so the
+ * fallback is the branch the development database exercises, not a rare one.
+ */
+const TAG_SEPARATOR = " · ";
+function splitMarketTag(title: string): { tag: string; rest: string } {
+	const at = title.indexOf(TAG_SEPARATOR);
+	return at === -1
+		? { tag: title, rest: "" }
+		: { tag: title.slice(0, at), rest: title.slice(at) };
+}
+
+/**
  * ⚠⚠ **`signGlyphFor` LIVED HERE AND IS GONE AT POSREV-POLISH-2 R-2.** It made
  * every absolute delta carry a sign, spelling zero `±` — introduced one ruling
  * ago and superseded by the next: the absolute delta itself is replaced by a
@@ -303,6 +336,19 @@ export function PositionsTable({
 		}
 		return [...seen.entries()];
 	}, [rows]);
+
+	/**
+	 * MOBILE-2l · R-1 — the filter label, split into the part a phone shows and
+	 * the part it hides. `tag + rest === title`, always, so the concatenation the
+	 * DOM carries is the title unchanged.
+	 */
+	const selectedMarketLabel = useMemo(
+		() =>
+			splitMarketTag(
+				marketOptions.find(([id]) => id === market)?.[1] ?? "All markets",
+			),
+		[marketOptions, market],
+	);
 
 	// ── The tab counts, over the MARKET-SCOPED rows ──────────────────────────
 	// RF-13's count badge sits on the Closed label; the Open count is derived
@@ -746,7 +792,29 @@ export function PositionsTable({
 							   ⇒ `max-w-full` caps the button at its wrapper's resolved width,
 							   which is what the shrink was always meant to produce. The other
 							   three tokens stay: they are what shrinks the WRAPPER. */
-							className="max-mobile:max-w-full max-mobile:min-w-0 max-mobile:shrink max-mobile:overflow-hidden"
+							/* ⛔⛔ MOBILE-2l · B7 — THE 44px TOUCH TARGET, GROWN AND THEN CANCELLED
+							   IN LAYOUT. Measured at 360/390/430 this control rendered 23.99px
+							   tall (`buttonVariants` `xs` is an explicit `h-6`), well under the
+							   floor.
+							   ⚠ TWO EARLIER ATTEMPTS WERE MEASURED AND BOTH WERE WRONG, which
+							   is why the spelling is this odd. (1) An `::after` overlay — the
+							   pattern `AggregateFooter`'s `TriggerPill` uses on this tier —
+							   must escape the button's box, so it needs `overflow-visible`;
+							   but `overflow-hidden` is here as half of the MOBILE-2h clip
+							   (the block above), and a hit area is not worth trading a clip
+							   for. (2) `min-h-11` alone grew the target correctly AND grew the
+							   filter head from 51.99px to 68.60px, measured — because
+							   `min-h-[52px]` on that head is a FLOOR, not headroom, and a 44px
+							   child plus the head's own padding clears it. The comment that
+							   shipped with that attempt claimed it "costs the layout nothing";
+							   it cost 16.6px on every phone profile.
+							   ⇒ `h-11` takes the BORDER box to 44 and `-my-2.5` takes the
+							   MARGIN box back to 24, so the target grows and the row does not
+							   move. The overflow stays hidden and the head stays 51.99px —
+							   both measured after. The 20px it reclaims is the head's own
+							   padding, where no other control lives, so the expanded area
+							   steals no neighbour's tap. */
+							className="max-mobile:-my-2.5 max-mobile:h-11 max-mobile:max-w-full max-mobile:min-w-0 max-mobile:shrink max-mobile:overflow-hidden"
 							onClick={() => setFilterOpen((o) => !o)}
 						>
 							{/* ⛔ THE LABEL IS WRAPPED SO IT CAN ELLIPSIZE, and the wrapper
@@ -764,10 +832,36 @@ export function PositionsTable({
 							    intrinsic width is unchanged — and so `textContent` is still
 							    `<market title> ▾`, which `arrangement.test.tsx` asserts by
 							    equality and which a JS slice would have made a lie. */}
-							<span className="min-w-0 max-mobile:truncate">
-								{marketOptions.find(([id]) => id === market)?.[1] ??
-									"All markets"}{" "}
-								▾
+							{/* ⛔⛔ MOBILE-2l · R-1 — THE LABEL IS SPLIT, NEVER SLICED, AND THE
+							    DIFFERENCE IS WHAT LETS THIS BE A PHONE-ONLY CHANGE AT ALL.
+							    The ask is that a selected market shows its TAG alone below
+							    640px (`Claude`, `Math`, `YCombinator`) so the disclosure caret
+							    survives. Text cannot be scoped by a `max-mobile:` token — only
+							    BOXES can — so the title is emitted as two spans and the
+							    remainder is `display:none` on a phone.
+							    ⇒ `textContent` is `<market title> ▾` at EVERY width, byte for
+							    byte. That matters twice over: `arrangement.test.tsx`
+							    (`row7a::the-label-BECOMES-the-chosen-market`) asserts it by
+							    EQUALITY, and this control's own rule — one directly above —
+							    is that a JS slice "would make the accessible name lie about
+							    which market is selected". A split lies to nobody.
+							    ⛔⛔ THE CARET MOVES OUT OF THE TRUNCATING BOX, and that, not
+							    the tag, is the actual defect. `max-mobile:truncate` used to sit
+							    on the span that contained BOTH the label and the caret, so the
+							    ellipsis ate the caret itself — the control lost the one mark
+							    that says it opens. It now clips the label only, and the caret
+							    is a `shrink-0` sibling that cannot be reached.
+							    ⚠ >=640px IS UNCHANGED: the outer span gains no unprefixed
+							    token, and splitting one text node across two inline spans
+							    changes no metric and no line-breaking. B1-p is the proof. */}
+							<span className="min-w-0 max-mobile:flex max-mobile:items-baseline max-mobile:gap-1">
+								<span className="min-w-0 max-mobile:truncate">
+									{selectedMarketLabel.tag}
+									<span className="max-mobile:hidden">
+										{selectedMarketLabel.rest}
+									</span>
+								</span>{" "}
+								<span className="max-mobile:shrink-0">▾</span>
 							</span>
 						</Button>
 						{filterOpen && (
