@@ -19,8 +19,11 @@ import { describe, expect, it } from "vitest";
  * ⚠⚠ **THOSE FIGURES ARE MOBILE-2l's AND THE THICKNESS HAS MOVED SINCE.** They
  * are kept because the COLUMN geometry they record is untouched and is what the
  * third describe below asserts; the 6.00px track they name was superseded by
- * ADR-0051 A9 D-2, which rules 8px over a recessed channel. Read the height
- * figures as history and `PHONE_TRACK_PX` as the live value.
+ * ADR-0051 A9 D-2, which ruled 8px over a recessed channel, and then by A10 D-2,
+ * which rules 14px over a channel that spans the WHOLE track. Read the height
+ * figures as history and `PHONE_TRACK_PX` as the live value — it has now moved
+ * three times (6 → 8 → 14), which is the argument for deriving every assertion
+ * in this file from it rather than restating the number.
  *
  * The 2l brief asked for "6px, up from ~3", and ~3 matched neither the track
  * (6.00) nor the fill (4.75) — the phone height token landed at MOBILE-2e · R-M2
@@ -95,7 +98,7 @@ const phone = (utility: string) => VARIANT + SEP + utility;
  * it and the two cannot drift. A9 D-2's "rounded ends" is satisfied by
  * `rounded-full`, which clears any such bound.
  */
-const PHONE_TRACK_PX = 8;
+const PHONE_TRACK_PX = 14;
 
 /**
  * The class tokens declared on the element whose `className=` follows `anchor`.

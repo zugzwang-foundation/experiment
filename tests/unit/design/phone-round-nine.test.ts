@@ -82,7 +82,7 @@ const phone = (utility: string) => PHONE + utility;
 const phoneRe = (tail: string) => new RegExp(`^${V}${S}${tail}`);
 
 /** A9 D-2's ruled phone track thickness, in px. */
-const PHONE_TRACK_PX = 8;
+const PHONE_TRACK_PX = 14;
 
 // ── readers ──────────────────────────────────────────────────────────────────
 
@@ -411,19 +411,49 @@ describe("MOBILE-2m · R-1 / A9 D-1 — one full-width hairline between posts", 
 });
 
 describe("MOBILE-2m · R-1 / A9 D-1 — the Support/Counter band", () => {
-	const bandTokens = () =>
-		gatedClassesIn(
-			regionAfter(code(FOOTER), FOOTER, 'data-testid="aggregate-footer"'),
-			FOOTER,
-			"band",
+	/**
+	 * ⛔⛔ THE FOOTER ROOT'S OWN `className`, AND THE SCOPE IS THE WHOLE POINT
+	 * SINCE A10 D-3. This read `gatedClassesIn(regionAfter(…), "band")`, i.e. the
+	 * first `band && "…"` conditional ANYWHERE after the footer's testid — which
+	 * was the root's while the root had one. A10 D-3 takes the root's conditional
+	 * away, so that search now runs on past it and finds the TRACK's channel
+	 * three hundred lines down: a "the row has no ground" assertion would then be
+	 * reading the split bar's ground and failing on the wrong node.
+	 * ⇒ Anchored on the root's own attribute and stopped at the end of its tag.
+	 */
+	const bandTokens = () => {
+		const src = code(FOOTER);
+		const at = src.indexOf('data-testid="aggregate-footer"');
+		expect(at, `${FOOTER}: the footer root's testid is gone`).toBeGreaterThan(
+			0,
 		);
+		const tag = src.slice(at, src.indexOf(">", at));
+		// Every quoted run inside the root's own tag — so a plain
+		// `className="…"` and a `className={cn("…", "…")}` are both read, and
+		// neither can reach past the tag it belongs to.
+		return (tag.match(/"[^"]*"/g) ?? [])
+			.flatMap((quoted) => quoted.slice(1, -1).split(/\s+/))
+			.filter(Boolean);
+	};
 
-	it("phone-r1::the-band-takes-a-GROUND-one-step-up-from-the-card", () => {
-		// ⚠ `bg-n1` IS READ OFF THE RAMP, NOT CHOSEN. `Card` is `bg-card` →
-		// `--color-n0` #212121 and `n1` is #2a2a2a, the next rung. The ramp runs
-		// dark → bright (AGENTS.md §8), so "one step up" is n0 → n1 and never the
-		// reverse.
-		expect(bandTokens()).toContain(phone("bg-n1"));
+	it("phone-r1::the-row-takes-NO-GROUND-AT-ALL-A10-D-3", () => {
+		// ⛔⛔ INVERTED BY ADR-0051 A10 D-3, AND THE INVERSION IS THE POINT.
+		// This row asserted `bg-n1` — "one step up from the card", read off the
+		// ramp. A10 D-3 takes the ground away entirely: the footer sits on the
+		// card's own ground and is separated from the content above by spacing.
+		// The assertion is REVERSED rather than deleted, because "no ground" is a
+		// ruled property and an un-asserted absence is one restyle from coming
+		// back.
+		// ⚠ MATCHED AS A CLASS TOKEN, never as a word in the file: this component's
+		// prose still names `bg-n1` in the paragraph recording what was removed, so
+		// a bare-string scan would be satisfied by the comment and could never fail.
+		for (const token of bandTokens()) {
+			expect(
+				/^bg-|:bg-/.test(token),
+				`the Support/Counter row declares a ground (\`${token}\`). A10 D-3 ` +
+					`gives it none — it sits on the card's.`,
+			).toBe(false);
+		}
 	});
 
 	it("phone-r1::and-NO-BORDER-anywhere-in-it", () => {
@@ -447,16 +477,27 @@ describe("MOBILE-2m · R-1 / A9 D-1 — the Support/Counter band", () => {
 		}
 	});
 
-	it("phone-r1::the-band-BLEEDS-to-the-cards-edge-and-puts-its-content-back", () => {
-		// `-mx-3` cancels the card's own `p-3` so the ground reaches the card's
-		// edges — which, on an unboxed card, are the SCREEN's — and `px-3` puts the
-		// content back where it was, so not one of the three columns moves
-		// horizontally. The band is drawn BEHIND the row rather than around it.
-		// ⛔ Without the pair the ground is a strip inset 12px from an edge that is
-		// no longer there, which reads as the stray box A9 D-1 forbids.
+	it("phone-r1::and-the-BLEED-PAIR-goes-with-the-ground-A10-D-3", () => {
+		// ⛔⛔ ALSO INVERTED BY A10 D-3. The pair existed to carry a GROUND to the
+		// card's edges and put the content back: `-mx-3` cancelled the card's `p-3`
+		// and `px-3` restored it, so the ground bled and the three columns did not
+		// move. With no ground the bleed carries nothing, and the two tokens would
+		// be a negative margin and a padding that cancel each other — a no-op that
+		// reads as deliberate and survives every future edit.
+		// ⚠ THE VERTICAL PADDING GOES TOO, and for a different reason worth
+		// separating: `py-2.5` gave the BAND its height. A10 D-3 says the row is
+		// separated from the content above "by the existing gap token only", which
+		// is the card's own `gap-2.5`; keeping the padding would double it.
 		const tokens = bandTokens();
-		expect(tokens, "the bleed").toContain(phone("-mx-3"));
-		expect(tokens, "and the content put back").toContain(phone("px-3"));
+		expect(tokens, "the bleed outlived its ground").not.toContain(
+			phone("-mx-3"),
+		);
+		expect(tokens, "the put-back outlived its bleed").not.toContain(
+			phone("px-3"),
+		);
+		expect(tokens, "the band's own height outlived the band").not.toContain(
+			phone("py-2.5"),
+		);
 	});
 
 	it("phone-r1::the-band-is-the-CARDS-decision-and-arrives-as-a-prop", () => {
@@ -504,7 +545,7 @@ describe("MOBILE-2m · R-2 / A9 D-2 — the track is 8px with rounded ends", () 
 });
 
 describe("MOBILE-2m · R-2 / A9 D-2 — the recessed channel at Đ 0", () => {
-	it("phone-r2::the-groove-is-gated-on-hasStake-and-NOT-on-the-percentage", () => {
+	it("phone-r2::the-channel-is-UNCONDITIONAL-and-the-FILL-is-what-Đ-0-moves", () => {
 		// ⛔⛔ WHY THE FLAG AND NOT THE PERCENTAGE. `computeSplitBar`'s own docblock
 		// says `supportPct` is `"0%"` both when nothing has been staked and when
 		// everything staked is Counter, "and those are opposite facts". This footer
@@ -516,28 +557,62 @@ describe("MOBILE-2m · R-2 / A9 D-2 — the recessed channel at Đ 0", () => {
 		// ⚠ THE BEHAVIOURAL HALF — that the groove appears at Đ 0 and is GONE the
 		// moment there is stake — cannot be seen in a source scan and is
 		// `phone-round-nine-card.test.tsx`'s two-aggregate render.
+		// ⛔⛔ REVERSED BY ADR-0051 A10 D-2, AND THE PARAGRAPH ABOVE IS THE RECORD
+		// OF WHAT IT REVERSES. A9 D-2 painted the groove ONLY at Đ 0 and this row
+		// asserted, in bold, that it must be `band && !hasStake` — because the
+		// counter share WAS the track's own ground. A10 D-2 rules exactly that
+		// erasure: the channel spans the FULL track, the fill is the Support share
+		// drawn over it, and the Counter share IS the exposed channel. So the flag
+		// leaves the channel and moves to the FILL, which is where the zero state
+		// is now expressed: an even 50% split instead of a recoloured track.
 		const src = code(FOOTER);
 		expect(
 			src,
-			"the footer must READ the flag — it has existed since POSREV-1 for " +
-				"exactly this caller and was never asked.",
+			"the footer must still READ the flag — it is what tells Đ 0 / Đ 0 apart " +
+				"from an all-Counter bar, and those are opposite facts.",
 		).toContain("hasStake");
+		const trackTokens = gatedClassesIn(
+			regionAfter(src, FOOTER, 'data-testid="aggregate-split-track"'),
+			FOOTER,
+			"band",
+		);
+		expect(
+			trackTokens,
+			"the channel is the design language's own recessed surface, so the " +
+				"track reads as a groove rather than as a bar.",
+		).toContain(phone("bg-(--surface-inset)"));
+		// ⛔ THE NEGATIVE IS ABOUT THE TRACK, NOT ABOUT THE FILE. `band && !hasStake`
+		// legitimately SURVIVES — it moved to the FILL, where A10 D-2 now expresses
+		// the zero state — so a file-wide scan for that string would assert the
+		// opposite of what this row means and would have to be deleted the moment
+		// it was written. Scoped to the track's own conditional instead.
+		expect(
+			trackTokens,
+			"the channel is still gated on the stake. A10 D-2 gives the counter " +
+				"share to the channel outright, so the track takes it unconditionally " +
+				"below 640 and only the FILL reads the flag.",
+		).not.toContain(phone("bg-n0"));
+		expect(
+			regionAfter(src, FOOTER, 'data-testid="aggregate-split-track"').slice(
+				0,
+				src
+					.slice(src.indexOf('data-testid="aggregate-split-track"'))
+					.indexOf('data-testid="aggregate-split-fill"'),
+			),
+			"the track's channel is still written as a `band && !hasStake` " +
+				"conditional.",
+		).not.toContain("band && !hasStake");
 		expect(
 			gatedClassesIn(
-				regionAfter(src, FOOTER, 'data-testid="aggregate-split-track"'),
+				regionAfter(src, FOOTER, 'data-testid="aggregate-split-fill"'),
 				FOOTER,
-				"band",
+				"band && !hasStake",
 			),
-			"the groove is one step DOWN from the band's n1, so it reads as a " +
-				"channel cut into the band rather than a bar drawn on it.",
-		).toContain(phone("bg-n0"));
-		expect(
-			src,
-			"and it is CONDITIONAL on there being no stake. The counter share IS " +
-				"the track's own ground, so a channel that stayed once stake existed " +
-				"would erase the counter pole and leave the bar showing one side of a " +
-				"two-sided fact.",
-		).toContain("band && !hasStake");
+			"the FILL must take the even split at Đ 0, and it must take it with " +
+				"`!` — the width beside it is an INLINE style, which outranks every " +
+				"ordinary selector, so a plain utility here is authored, compiled, " +
+				"present in the class attribute and completely inert.",
+		).toContain(phone("w-1/2!"));
 	});
 });
 
@@ -683,28 +758,34 @@ describe("MOBILE-2m · R-4 / A9 D-4 — the pseudonym is 14px with its own leadi
 		// 17px name shipped with — the type shrinks and the row does not, which is
 		// the one outcome A9 D-4 cannot want. State the leading whenever you state
 		// an arbitrary size.
-		// ⚠ THE RELATION IS PINNED, NOT THE NUMBER. 18px holds the shipped 17/22
-		// ratio at the new size; a test that pinned `18` would have to be edited in
-		// the same commit as the token and could therefore never catch anything.
-		// What must never happen is a leading at or below the size, which clips a
-		// name's own descenders.
+		// ⚠⚠ THE LEADING IS NO LONGER AN ARBITRARY px VALUE, AND ADR-0051 A10 D-4
+		// IS WHY. A9 D-4's 18px held the shipped 17/22 ratio at the new size, which
+		// is a correct thing to preserve and the wrong thing to solve for: an 18px
+		// line box inside a 32px `min-h-8` element sits at the TOP of it, so the
+		// name's glyphs landed 7.25px above the avatar's centre (measured at
+		// 360/375/390/412/430 — the same figure at every width, because it is set
+		// by two box heights and not by the width).
+		// ⇒ `leading-8` makes the LINE BOX the element's box, so the half-leading
+		// centres the glyphs in it. The relation that must hold is now between the
+		// leading and the FLOOR rather than between the leading and the size, and
+		// it is asserted as the same spacing step rather than as a number: this
+		// token, `min-h-8` beside it and the avatar's own `size-8` are all
+		// `calc(var(--spacing) * 8)`, so they move together under a changed root
+		// font size instead of drifting apart.
 		const sizeToken = phoneToken("text-[");
-		const leadToken = phoneToken("leading-[");
+		expect(sizeToken, "the name still states its size").toBeDefined();
 		expect(
-			leadToken,
-			"the name states a size but no leading, so it inherits the step that " +
-				"was in scope and keeps a line box sized for the OLD type.",
-		).toBeDefined();
-		const size = Number(/\[(\d+(?:\.\d+)?)px\]/.exec(sizeToken ?? "")?.[1]);
-		const lead = Number(/\[(\d+(?:\.\d+)?)px\]/.exec(leadToken ?? "")?.[1]);
+			phoneToken("leading-["),
+			"the name states an ARBITRARY leading again. A10 D-4 pairs the line box " +
+				"with the avatar's own box by NAME (`leading-8` / `min-h-8` / " +
+				"`size-8`); a px literal here agrees today and drifts the first time " +
+				"the spacing scale or the root font size moves.",
+		).toBeUndefined();
 		expect(
-			Number.isFinite(size) && Number.isFinite(lead),
-			"both the size and the leading are stated in px, so they are comparable",
-		).toBe(true);
-		expect(
-			lead,
-			`a ${size}px name on a ${lead}px line box clips its own descenders.`,
-		).toBeGreaterThan(size);
+			pseudonym(),
+			"the name's line box is not the avatar's box, so its glyphs sit at the " +
+				"top of a 32px element instead of centred in it (A10 D-4).",
+		).toContain(phone("leading-8"));
 	});
 
 	it("phone-r4::the-ROW-does-not-get-shorter-with-the-type", () => {

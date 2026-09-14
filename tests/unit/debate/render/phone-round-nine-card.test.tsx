@@ -151,6 +151,9 @@ const footerTokens = (root: HTMLElement) =>
 	tokensOf(root, '[data-testid="aggregate-footer"]');
 const trackTokens = (root: HTMLElement) =>
 	tokensOf(root, '[data-testid="aggregate-split-track"]');
+/** MOBILE-2n · R-2 — the Đ 0 state moved from the track to the fill (A10 D-2). */
+const fillTokens = (root: HTMLElement) =>
+	tokensOf(root, '[data-testid="aggregate-split-fill"]');
 
 /** The three tokens `UNBOXED_CARD` ships — named here, read there. */
 const UNBOX = [
@@ -279,22 +282,29 @@ describe("MOBILE-2m · R-1 / A9 D-1 — the unboxed card, after composition", ()
 	});
 });
 
-describe("MOBILE-2m · R-1 / A9 D-1 — the footer is a band on an unboxed card", () => {
-	it("phone-card::the-band-arrives-with-the-unboxing-and-not-otherwise", () => {
-		// ⚠ THE TWO DECISIONS TRAVEL TOGETHER. On a BOXED card the same lighter
-		// ground would be a rectangle inside a rectangle; it reads as a band only
-		// because the card around it lost its border. So the prop is threaded and
-		// the pairing is observed here rather than trusted.
-		const banded = footerTokens(renderCard({ unboxed: true }));
-		expect(banded, "the ground").toContain(phone("bg-n1"));
-		expect(banded, "the bleed").toContain(phone("-mx-3"));
-		expect(banded, "the content put back").toContain(phone("px-3"));
-
-		const plain = footerTokens(renderCard());
-		expect(plain, "a boxed card must not take the band").not.toContain(
-			phone("bg-n1"),
-		);
-		expect(plain).not.toContain(phone("-mx-3"));
+describe("MOBILE-2n · R-3 / A10 D-3 — the footer has no ground on any card", () => {
+	it("phone-card::the-band-is-GONE-on-the-unboxed-card-and-was-never-on-the-boxed-one", () => {
+		// ⛔⛔ INVERTED BY ADR-0051 A10 D-3. This row asserted the band ARRIVED
+		// with the unboxing — `bg-n1` + `-mx-3` + `px-3`, gated on the prop — and
+		// that a boxed card never took it. A10 D-3 removes the ground from both:
+		// the row sits on the card's own ground and is separated from the content
+		// above by the card's `gap-2.5` alone.
+		// ⚠ THE RENDER IS STILL THE RIGHT INSTRUMENT. These tokens arrive through
+		// `cn()`, i.e. `twMerge`, whose whole job is to DELETE classes it judges
+		// redundant — a source scan reads the arguments, only a render reads what
+		// survived. An absence asserted on the source would pass on a token that
+		// was authored and merged away, which is a different fact.
+		for (const [what, tokens] of [
+			["the unboxed feed card", footerTokens(renderCard({ unboxed: true }))],
+			["the boxed sheet card", footerTokens(renderCard())],
+		] as [string, string[]][]) {
+			expect(tokens, `${what}: the ground`).not.toContain(phone("bg-n1"));
+			expect(tokens, `${what}: the bleed`).not.toContain(phone("-mx-3"));
+			expect(tokens, `${what}: the put-back`).not.toContain(phone("px-3"));
+			expect(tokens, `${what}: the band's height`).not.toContain(
+				phone("py-2.5"),
+			);
+		}
 	});
 
 	it("phone-card::the-rows-own-alignment-is-untouched-by-the-band", () => {
@@ -319,53 +329,96 @@ describe("MOBILE-2m · R-1 / A9 D-1 — the footer is a band on an unboxed card"
 	});
 });
 
-describe("MOBILE-2m · R-2 / A9 D-2 — the split bar's recessed channel", () => {
-	it("phone-split-channel::the-track-takes-the-GROOVE-when-nothing-is-staked", () => {
-		// A9 D-2's named state: "a muted ground visible at Đ 0".
-		const tokens = trackTokens(
-			renderCard({
-				unboxed: true,
-				post: presentPost({ aggregate: UNSTAKED }),
-			}),
-		);
-		expect(
-			tokens,
-			"at Đ 0 against Đ 0 the track is still painting a pole, so a post " +
-				"nobody has replied to shows a bar that is entirely Counter.",
-		).toContain(phone("bg-n0"));
+describe("MOBILE-2n · R-2 / A10 D-2 — the channel spans the track, and Đ 0 fills half", () => {
+	it("phone-split-channel::the-track-takes-the-CHANNEL-whether-or-not-there-is-stake", () => {
+		// ⛔⛔ INVERTED BY A10 D-2. A9 D-2 painted the groove ONLY at Đ 0 and the
+		// row below asserted it DROPPED the moment stake existed, because the
+		// counter share was the track's own ground. A10 D-2 rules that erasure:
+		// the channel spans the full track and the Counter share IS the exposed
+		// channel. So the same token must now survive BOTH aggregates.
+		for (const aggregate of [UNSTAKED, STAKED]) {
+			expect(
+				trackTokens(
+					renderCard({ unboxed: true, post: presentPost({ aggregate }) }),
+				),
+				"the channel does not span the track, so the Counter share is still " +
+					"painting a pole on a bar A10 D-2 gives to the groove.",
+			).toContain(phone("bg-(--surface-inset)"));
+		}
 	});
 
-	it("phone-split-channel::and-DROPS-IT-the-moment-there-is-stake", () => {
+	it("phone-split-channel::and-the-FILL-is-an-even-split-at-Đ-0-and-the-share-otherwise", () => {
+		// ⛔⛔ THE ZERO STATE MOVED FROM THE TRACK TO THE FILL, and this is the row
+		// that holds it. At Đ 0 / Đ 0 `computeSplitBar` returns "0%", which the
+		// inline width still carries — so without this token the bar is a channel
+		// with nothing in it, and A10 D-2 wants an even split so the bar has
+		// presence and the channel is visible on both sides of the midpoint.
+		// ⚠ THE `!` IS NOT DECORATION. The width beside it is an INLINE style and
+		// outranks every ordinary selector; a plain `max-mobile:w-1/2` would be
+		// authored, compiled, present on the node and completely inert.
+		const zero = fillTokens(
+			renderCard({ unboxed: true, post: presentPost({ aggregate: UNSTAKED }) }),
+		);
+		expect(zero, "the even split at Đ 0").toContain(phone("w-1/2!"));
+		// ⛔ THE OPPOSITE CONTROL — without it the row above is satisfied by an
+		// even split that NEVER leaves, i.e. a bar that reads 50/50 at every real
+		// stake. A10 D-2 names the Đ 0 / Đ 0 state and only that state.
+		const staked = fillTokens(
+			renderCard({ unboxed: true, post: presentPost({ aggregate: STAKED }) }),
+		);
+		expect(
+			staked,
+			"the even split survived into a staked bar, so every post now reads " +
+				"50/50 whatever its replies say.",
+		).not.toContain(phone("w-1/2!"));
+		// CONTROL on the negative: the fill still carries its pole either way.
+		expect(staked, "a YES post's fill is the YES pole").toContain("bg-yes");
+	});
+
+	it("phone-split-channel::the-OLD-groove-token-is-gone-in-both-states", () => {
 		// ⛔⛔ THE OPPOSITE CONTROL, AND WITHOUT IT THE ROW ABOVE IS SATISFIED BY A
 		// GROOVE THAT NEVER LEAVES. The counter share IS the track's own ground, so
 		// a channel that stayed once stake existed would paint over the counter
 		// pole and leave the bar showing one side of a two-sided fact — a bar that
 		// is always 40% Support and never 60% Counter. A9 D-2 names the Đ 0 state
 		// and only that state, which is the same boundary.
-		const tokens = trackTokens(
-			renderCard({ unboxed: true, post: presentPost({ aggregate: STAKED }) }),
-		);
+		// ⚠ `bg-n0` WAS A9 D-2's groove and is now the CARD's own ground, so a
+		// track that still carried it would be invisible rather than recessed.
+		// Asserted in both states because the token was conditional and a leftover
+		// would only show in one of them.
+		for (const aggregate of [UNSTAKED, STAKED]) {
+			expect(
+				trackTokens(
+					renderCard({ unboxed: true, post: presentPost({ aggregate }) }),
+				),
+				"the superseded A9 groove is still authored beside A10's channel, " +
+					"and which one paints is then decided by emission order.",
+			).not.toContain(phone("bg-n0"));
+		}
+		// CONTROL — the track still carries its counter pole unconditionally, which
+		// is what the channel is drawn OVER below 640 and what the desktop still
+		// paints. (`aggregate-footer.test.tsx` owns the four-way pole binding; this
+		// is the one row that keeps THIS file's negatives from passing on an empty
+		// class string.)
 		expect(
-			tokens,
-			"the groove survived into a staked bar and has erased the counter pole.",
-		).not.toContain(phone("bg-n0"));
-		// CONTROL — with stake, the track is the counter remainder and carries the
-		// opposite pole to the post's side. (`aggregate-footer.test.tsx` owns the
-		// four-way pole binding; this is the one row that keeps THIS file's
-		// negative from passing on an empty class string.)
-		expect(tokens, "a YES post's track is the NO pole").toContain("bg-no");
+			trackTokens(
+				renderCard({ unboxed: true, post: presentPost({ aggregate: STAKED }) }),
+			),
+			"a YES post's track is the NO pole",
+		).toContain("bg-no");
 	});
 
-	it("phone-split-channel::a-BOXED-card-never-takes-it-even-at-Đ-0", () => {
-		// ⚠ THE GROOVE IS GATED ON `band` AS WELL AS ON `hasStake`, and that is not
-		// belt-and-braces: n0 is the CARD's own ground, so on a boxed card the
-		// "channel" would be a track the same colour as the surface behind it —
-		// invisible rather than recessed. It reads as a groove only against the
-		// band's n1.
-		const tokens = trackTokens(
-			renderCard({ post: presentPost({ aggregate: UNSTAKED }) }),
-		);
-		expect(tokens).not.toContain(phone("bg-n0"));
+	it("phone-split-channel::a-BOXED-card-never-takes-the-channel", () => {
+		// ⚠ THE CHANNEL IS GATED ON `band`, and that is not belt-and-braces: a
+		// groove reads as a groove only when the surface around it is the card's
+		// own. Inside the parent-post sheet's boxed card it would be a third
+		// rectangle in a stack of two, and the sheet is the mount A10 D-3 leaves
+		// alone.
+		for (const aggregate of [UNSTAKED, STAKED]) {
+			expect(
+				trackTokens(renderCard({ post: presentPost({ aggregate }) })),
+			).not.toContain(phone("bg-(--surface-inset)"));
+		}
 	});
 
 	it("phone-split-channel::the-track-keeps-its-thickness-and-its-edge-either-way", () => {
@@ -376,7 +429,7 @@ describe("MOBILE-2m · R-2 / A9 D-2 — the split bar's recessed channel", () =>
 			const tokens = trackTokens(
 				renderCard({ unboxed: true, post: presentPost({ aggregate }) }),
 			);
-			expect(tokens, "the phone thickness").toContain(phone("h-[8px]"));
+			expect(tokens, "the phone thickness").toContain(phone("h-[14px]"));
 			expect(tokens, "the ruled ends").toContain(phone("rounded-full"));
 			// ⚠ THE DESKTOP THICKNESS IS CHECKED FOR PRESENCE, NEVER FOR ITS VALUE.
 			// `split-bar-parity.test.ts` and `aggregate-footer-alignment.test.ts` own
