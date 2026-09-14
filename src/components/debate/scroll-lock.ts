@@ -235,11 +235,18 @@ export function lockPageScroll(except: Element | null = null): () => void {
  * the tier's only lock holders are `PhoneSheet` and `MarketPriceChartOverlay` and
  * the overlay is reachable only INSIDE the details sheet, so `sheet !== null`
  * covers both. The first half is true and was re-measured; the conclusion was too
- * strong. `PhoneSheet` DEFERS its children's unmount by `CLOSE_MS`, so for that
- * window after a sheet begins closing the host's `sheet` is already `null` — the
- * render gate has opened — while `depth > 0` is still held by the chart overlay
- * inside it. During those milliseconds this function is the ONLY refusal standing.
- * Found by `@code-reviewer`.
+ * strong — but the window is NOT the one first written here, and the correction is
+ * worth keeping because it was wrong twice in one round.
+ * ⛔ IT IS NOT `CLOSE_MS`. That deferral happens BEFORE `onClose` is called, so the
+ * host's `sheet` is still non-null through all 200ms and the render gate has not
+ * opened. The real window is one COMMIT wide: between `setSheet(null)` landing —
+ * at which point `locked` is already `false` — and React flushing `PhoneSheet`'s
+ * passive cleanup, which is what releases this lock. For that commit `depth > 0`
+ * while the render gate is open, and this function is the only refusal standing.
+ * `@code-reviewer` found that the window exists; `@security-auditor` found that the
+ * mechanism first named for it was the wrong one (`O-3`: a true refusal reported
+ * with a misleading cause is a defect, and a wrong mechanism is what the next
+ * reader reasons from).
  * ⇒ So it is a belt with a window rather than a belt with none, and the argument
  * for having it is stronger than the one first written: a third holder added later
  * reaches this function for free, and reaches the render gate only if someone

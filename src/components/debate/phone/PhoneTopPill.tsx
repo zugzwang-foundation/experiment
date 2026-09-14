@@ -141,14 +141,40 @@ export function PhoneTopPill({
 	 * composer, fires `onBusyChange(false)`, and leaves an in-flight `fetch` with
 	 * no `AbortController`. That is the double-charge shape exactly, and the `key`
 	 * argument does not see it.
-	 * ⇒ What actually makes the pill safe is that **the composer is mounted iff a
-	 * sheet is open**, and `locked` is `sheet !== null` — a strict superset of "a
-	 * composer exists". So the pill cannot reach that path at all, and `busy` is
-	 * redundant with `locked` in the current topology rather than load-bearing over
-	 * it. It is kept because the topology is not a law: a future shape that mounts
-	 * a composer outside a sheet would break the superset and leave this flag as
-	 * the only thing standing. Found by `@code-reviewer`, which supplied the better
-	 * argument and the counter-example to the worse one.
+	 * ⇒ What makes the pill safe is that **on THIS TIER the composer is mounted iff
+	 * a sheet is open**, and `locked` is `sheet !== null` — so no interval exists in
+	 * which a phone composer is mounted and `lockedRef.current` is `false`. The ref
+	 * is written during the very render that creates the composer element, and this
+	 * component sits EARLIER in tree order than the sheet, so the write happens
+	 * before the composer exists at all, let alone before it can call `fetch`. No
+	 * lane, microtask or frame gets between them. Found by `@code-reviewer`, which
+	 * supplied the better argument; confirmed by `@security-auditor`, which tried to
+	 * construct the interval six ways and could not.
+	 *
+	 * ⚠⚠ AND THE CLAIM IS ABOUT FIRING, NOT LANDING — a distinction this block first
+	 * elided by saying "the pill cannot reach that path at all". Every refusal is
+	 * evaluated when `router.refresh()` is CALLED. Nothing watches the ~700ms between
+	 * that call and the payload arriving, so a reader can tap the pill with no sheet
+	 * open, then open a composer and submit inside their own round trip, and the
+	 * refresh lands under an in-flight bet. It survives because a landed refresh
+	 * preserves client state — but if that render returns `viewer: null` the host
+	 * flips to `AuthGateSlot`, the composer unmounts, and the un-aborted request
+	 * still commits. `@security-auditor` (MEDIUM). ⇒ Closing it means gating a
+	 * LANDING refresh the way `DebatePoll` is gated, or giving the composer an
+	 * `AbortController`; both are larger than this control and are docketed at
+	 * `docs/parked.md` 2k-7. ⚠ It is also NOT this round's creation: `DebatePoll`
+	 * has the same landing window on a 15-second cadence (2k-8).
+	 *
+	 * ⚠ NOR IS `locked` A SUPERSET OF "A COMPOSER EXISTS ON THE PAGE". `DebateView`
+	 * mounts a SECOND, independent `BetComposer` with its own `composerBusy`, and
+	 * both trees are always mounted — only `display: none` separates them. So
+	 * crossing 640px mid-flight (a rotation, a resize) can put this pill on screen
+	 * with both flags `false` while the DESKTOP composer's request is live. No
+	 * remount follows, so no charge follows, and the thing covering that case is the
+	 * tier gate rather than either flag. ⛔ Which is why `busy` is NOT to be deleted
+	 * as redundant: it is the only flag that would ever see a non-phone composer, and
+	 * an earlier draft of this block called it redundant without that qualification —
+	 * an open invitation to remove it. `@security-auditor` (LOW).
 	 * ⚠ AND `busyRef` IS THE ONE FLAG WITH NO LIVE BACKSTOP. `lockedRef` is
 	 * shadowed in the same condition by `isPageScrollLocked()`, which reads a module
 	 * refcount and cannot be stale; `busyRef` has nothing beside it. If anyone later
@@ -165,6 +191,14 @@ export function PhoneTopPill({
 	 * `isPending` is true for exactly as long as the RSC payload is in flight.
 	 * That is what lets the label go back and the pill leave when the refresh
 	 * lands, rather than after a guessed delay.
+	 * ⛔ AND THAT IS MEASURED, NOT ASSUMED — `@security-auditor` listed it as the one
+	 * thing it could not establish by reading, and it is worth writing down because
+	 * the whole control rests on it. With the RSC response held open for 700ms in a
+	 * real browser, the `Refreshing…` label rendered across **46 consecutive animation
+	 * frames** (≈770ms) and the pill left on the frame the payload landed. `isPending`
+	 * spans the round trip. ⚠ The dependency runs the reassuring way: if it did NOT,
+	 * the latch would clear early and the guards would get WEAKER, not stronger — so
+	 * this is a fact the control needs rather than one it merely prefers.
 	 */
 	const [refreshing, startRefresh] = useTransition();
 
@@ -203,10 +237,13 @@ export function PhoneTopPill({
 	 * transition, one tick later than the call.
 	 * ⚠ AND ITS RESET HAS ONE EDGE AND NO TIMEOUT. It is lowered only on
 	 * `refreshing` going true→false. A `router.refresh()` transition that never
-	 * settles therefore leaves the latch armed, `evaluate` standing down forever,
-	 * and the pill stuck on screen reading `Refreshing…` with no way to hide. Not
-	 * reachable through any tested path and not bounded either; said here rather
-	 * than discovered later (`@code-reviewer`, LOW).
+	 * settles therefore leaves the latch armed AND `evaluate` standing down on
+	 * `refreshingRef`, so the pill does not merely stop refetching — it stays ON
+	 * SCREEN reading `Refreshing…` indefinitely, with `onTap` refusing on
+	 * `refreshing`. The direction is right (it fails CLOSED, refetching nothing) and
+	 * the bound is missing. Not reachable through any tested path; said here rather
+	 * than discovered later. `@code-reviewer` found the latch half and
+	 * `@security-auditor` the on-screen half.
 	 */
 	const firedForThisTap = useRef(false);
 	/**
@@ -465,6 +502,23 @@ export function PhoneTopPill({
 		if (refreshing || busy || locked || isPageScrollLocked()) {
 			return;
 		}
+		/**
+		 * ⛔ THE CANCEL COMES FIRST, AND IT USED TO SIT BELOW THE AT-TOP BRANCH —
+		 * WHICH LEFT AN ARMED POLL ALIVE ON THE ONE PATH THAT RETURNS EARLY.
+		 * `@security-auditor` found it: a second tap landing after the region has
+		 * reached the top but before the previous `tick` has run took the at-top
+		 * branch, refetched, and returned — past the cancel — leaving the earlier
+		 * frame callback scheduled. The only brake was `firedForThisTap`, and that
+		 * latch is lowered when the refresh settles, so a payload that settles inside
+		 * one frame would let the stale `tick` fire a SECOND RSC fetch for one intent.
+		 * Cost only — the stale call still re-reads all three money refusals — but a
+		 * second payload per intent is the exact property this control promises not to
+		 * have. Cancelling before either branch makes the promise structural.
+		 */
+		if (rafRef.current !== null) {
+			cancelAnimationFrame(rafRef.current);
+			rafRef.current = null;
+		}
 		if (region.scrollTop <= AT_TOP_PX) {
 			// Already at the top — there is no scroll to wait for, only the refresh.
 			refetchOnce();
@@ -492,9 +546,6 @@ export function PhoneTopPill({
 		 * checking. Caught by `@code-reviewer`.
 		 */
 		region.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
-		if (rafRef.current !== null) {
-			cancelAnimationFrame(rafRef.current);
-		}
 		/**
 		 * ⛔⛔ ARRIVAL IS POLLED ON `requestAnimationFrame`, NOT AWAITED ON
 		 * `scrollend`. `scrollend` is the obvious answer and it is not portable:
@@ -505,10 +556,24 @@ export function PhoneTopPill({
 		 * deadline above bounds it.
 		 */
 		const startedAt = performance.now();
+		/**
+		 * ⛔⛔ `rafRef` IS HELD NON-NULL ACROSS `refetchOnce`, AND NULLED ONLY AFTER
+		 * IT — WHICH IS NOT TIDINESS. It was cleared at the TOP of this callback, and
+		 * `@security-auditor` found what that opened on the DEADLINE path: there the
+		 * region is still animating when the deadline fires, so `rafRef` was already
+		 * `null` while `refreshing` had not yet been committed by React — and
+		 * `evaluate` stands down on exactly those two terms. A `scroll` event in the
+		 * next frame (the rendering steps run scroll BEFORE rAF) therefore reached the
+		 * rule with both false and hid the pill mid-refresh. That is the same defect
+		 * `94fac4ba` was written to close, on the one branch it did not cover.
+		 * ⇒ Holding the handle until after the call leaves no frame in which neither
+		 * term is true: the two windows now abut inside one synchronous block, with no
+		 * yield to the event loop between them.
+		 */
 		const tick = () => {
-			rafRef.current = null;
 			const node = regionRef.current;
 			if (node === null) {
+				rafRef.current = null;
 				return;
 			}
 			if (
@@ -516,6 +581,7 @@ export function PhoneTopPill({
 				performance.now() - startedAt >= ARRIVAL_DEADLINE_MS
 			) {
 				refetchOnce();
+				rafRef.current = null;
 				return;
 			}
 			rafRef.current = requestAnimationFrame(tick);
