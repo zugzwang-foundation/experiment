@@ -266,3 +266,88 @@ describe("MOBILE-2m — the signed-out header at the floor", () => {
 		).toBe(inCell);
 	});
 });
+
+/**
+ * ⛔⛔ THE GRID FIX HAD NO GUARD, AND THAT IS WORSE THAN IT SOUNDS.
+ *
+ * `3cb63b2d` fixed a defect in which making the brand cell `absolute` removed it
+ * as a grid ITEM, so auto-placement slid the identity zone into the CENTRE track
+ * and the avatar was painted on top of the logo. Measured at 390 before the fix:
+ * `grid-template-columns: 131px 44px 131px`, chip at x 173, mark at x 171, both
+ * centred on 195.
+ *
+ * ⚠⚠ EVERY NUMBER THIS ROUND MEASURES SAID THE HEADER WAS CORRECT. The mark's own
+ * centre was 0.00px from the header's, the document did not overflow, nothing moved
+ * at 640 or 1440, and both walls passed. A SCREENSHOT found it. So the fix is
+ * precisely the kind that regresses silently — and until this block it was pinned
+ * by nothing: deleting `col-start-3` would have restored the defect with all 54 of
+ * this round's other guards green. Named by `@code-reviewer`.
+ *
+ * ⚠ A RENDER, NOT A SOURCE SCAN, and deliberately: jsdom performs no layout, so it
+ * cannot see the collision — but it CAN see that the placement is declared on the
+ * right element, gated on the prop, and absent when the prop is. That is the half a
+ * static check can hold honestly, and the geometry is held by the screenshots and by
+ * the live measurement recorded in the run report. Claiming more here would be a
+ * guard asserting a spelling while naming a property.
+ */
+describe("MOBILE-2m — the identity zone names its column, so a sibling leaving the flow cannot move it", () => {
+	function identityZone(root: HTMLElement): HTMLElement {
+		const cell = brandCell(root);
+		const row = cell.parentElement;
+		if (row === null) {
+			throw new Error("the brand cell has no grid row parent.");
+		}
+		// ⚠ THE LAST DIRECT CHILD OF THE ROW, located structurally rather than by a
+		// testid — this zone deliberately carries none (it is `dharma-cluster`'s and
+		// `IdentityCluster`'s host, and `dharma-cluster.test.tsx`'s T4 guard walks
+		// its `.children` by index, so a testid here invites someone to wrap it).
+		const zone = row.lastElementChild;
+		if (!(zone instanceof HTMLElement)) {
+			throw new Error("the header row has no final zone.");
+		}
+		return zone;
+	}
+
+	it("phone-r3::the-identity-zone-declares-col-start-3-below-640", () => {
+		const zone = identityZone(renderHeader(VIEWER));
+		const tokens = (zone.getAttribute("class") ?? "").split(/\s+/);
+		expect(
+			tokens,
+			"the identity zone no longer names its grid column. With the brand cell " +
+				"absolutely positioned below 640 there are only TWO in-flow items, so " +
+				"auto-placement puts this one in track 2 — the centre — and the avatar " +
+				"lands on top of the logo. Every geometric assertion in this round still " +
+				"passes when that happens; it was found in a screenshot.",
+		).toContain(phone("col-start-3"));
+	});
+
+	it("phone-r3::and-it-is-GATED-so-a-third-mount-inherits-the-desktop-row", () => {
+		// The signed-out arm too: the zone holds JOIN rather than the chip there,
+		// and it is placed by the same declaration.
+		for (const viewer of [VIEWER, null]) {
+			const zone = identityZone(renderHeader(viewer));
+			expect(
+				(zone.getAttribute("class") ?? "").split(/\s+/),
+				`the identity zone lost its column in the ${viewer === null ? "signed-out" : "signed-in"} arm.`,
+			).toContain(phone("col-start-3"));
+			cleanup();
+		}
+	});
+
+	it("phone-r3::a-mount-that-omits-the-prop-gets-NO-column-token", () => {
+		// ⛔ THE POLARITY, WHICH IS THE WHOLE REASON THIS IS A PROP. A mount that
+		// says nothing must inherit the desktop row untouched — including this
+		// token, which would otherwise be the one breakpoint class in the file
+		// reaching every mount at once. It shipped ungated for one review cycle.
+		const root = render(
+			<GlobalHeader viewer={VIEWER} portfolio="10" spendable="10" stars={1} />,
+		).container;
+		const zone = identityZone(root);
+		expect(
+			(zone.getAttribute("class") ?? "").split(/\s+/),
+			"an ungated grid placement here reaches the (auth) mount and every " +
+				"future mount at once — the failure AGENTS.md §8 records for " +
+				"`OnboardingDeck`, one file up the same chain.",
+		).not.toContain(phone("col-start-3"));
+	});
+});
