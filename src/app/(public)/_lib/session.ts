@@ -13,8 +13,8 @@ import { auth } from "@/server/auth";
  * read it AGAIN — layouts cannot pass data to pages, so every one of those
  * three surfaces asks the database "who is this?" twice per render. On
  * `/m/[slug]` that doubles again in effect, because `DebatePoll` re-invokes the
- * layout as well as the page every `POLL_INTERVAL_MS_DEBATE_VIEW` (15 s) for
- * every open tab.
+ * layout as well as the page every `POLL_INTERVAL_MS_DEBATE_VIEW` (30 s) for
+ * every open tab whose reader is active.
  *
  * React's `cache()` memoizes for the lifetime of ONE request, so the layout's
  * call and the page's call return the same resolved promise and only one

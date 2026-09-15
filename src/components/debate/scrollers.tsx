@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { POLL_INTERVAL_MS_DEBATE_VIEW } from "@/server/config/limits";
+import { AUTO_ADVANCE_MS_DEBATE_VIEW } from "@/server/config/limits";
 import { PostCard } from "./PostCard";
 import { useIsPhoneTier } from "./phone-tier";
 import { EmptySideCTA } from "./placeholders";
@@ -36,8 +36,13 @@ import type {
  * carousel. That is the correct direction of travel for the reason above, but a
  * future task that wants them independent should mint its own constant in
  * `@/server/config/limits` rather than hard-code one here.
+ *
+ * ⚠ THAT TASK HAPPENED — POLL-IDLE moved the poll to 30000 and minted
+ * `AUTO_ADVANCE_MS_DEBATE_VIEW` at the carousel's shipped 15000, so the
+ * carousel no longer tracks the poll. The argument above now describes why the
+ * two started equal, not a coupling that still holds.
  */
-const ADVANCE_MS = POLL_INTERVAL_MS_DEBATE_VIEW;
+const ADVANCE_MS = AUTO_ADVANCE_MS_DEBATE_VIEW;
 
 /**
  * The second column starts HALF A CADENCE AHEAD, so the two sides advance

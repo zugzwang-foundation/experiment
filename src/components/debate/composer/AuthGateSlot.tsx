@@ -40,10 +40,14 @@ export function AuthGateSlot({
 			<p className="max-w-sm text-sm text-n5">{AUTH_GATE_COPY.body}</p>
 			<div className="flex items-center gap-2">
 				<Button asChild size="sm">
-					<Link href="/sign-in">{AUTH_GATE_COPY.signUp}</Link>
+					<Link href="/sign-in" prefetch={false}>
+						{AUTH_GATE_COPY.signUp}
+					</Link>
 				</Button>
 				<Button asChild variant="ghost" size="sm">
-					<Link href="/sign-in">{AUTH_GATE_COPY.signIn}</Link>
+					<Link href="/sign-in" prefetch={false}>
+						{AUTH_GATE_COPY.signIn}
+					</Link>
 				</Button>
 			</div>
 			<div className="text-xs font-medium tracking-wide text-n4 uppercase">

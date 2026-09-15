@@ -38,7 +38,7 @@ vi.mock("next/navigation", () => ({
 
 import { DebateView } from "@/components/debate/DebateView";
 import type { DebateViewModel } from "@/components/debate/types";
-import { POLL_INTERVAL_MS_DEBATE_VIEW } from "@/server/config/limits";
+import { AUTO_ADVANCE_MS_DEBATE_VIEW } from "@/server/config/limits";
 
 import { mumbaiMetroModel as mumbaiMetroModelRaw } from "../../debate-export/_fixtures/mumbai-metro.input";
 
@@ -59,11 +59,11 @@ const mumbaiMetroModel: DebateViewModel = {
 /**
  * ⛔ THE CADENCE IS IMPORTED, NEVER RESTATED. Writing `15000` here would pin a
  * literal this suite does not own: `scrollers.tsx` derives the cadence from
- * `POLL_INTERVAL_MS_DEBATE_VIEW`, and a hardcoded copy would keep passing while
+ * `AUTO_ADVANCE_MS_DEBATE_VIEW`, and a hardcoded copy would keep passing while
  * the two silently diverged — the failure mode where a green guard proves
  * nothing about the thing it names.
  */
-const ADVANCE_MS = POLL_INTERVAL_MS_DEBATE_VIEW;
+const ADVANCE_MS = AUTO_ADVANCE_MS_DEBATE_VIEW;
 /** The second column's first-cycle head start — half a cadence, a derivation. */
 const STAGGER_MS = ADVANCE_MS / 2;
 

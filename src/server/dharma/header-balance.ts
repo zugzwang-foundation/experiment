@@ -126,9 +126,9 @@ export async function getHeaderBalance(
 		//
 		// Captured, not swallowed silently — `safeCaptureException` is itself
 		// fail-open (SPEC.2 §17.5), so observing the failure cannot cause one.
-		// NOT deduped or sampled: `DebatePoll` re-runs this layout every 15 s
-		// per open `/m/[slug]` tab, so a deterministic DB failure emits at
-		// 4/min/tab. Same amplification shape as F-DEBATE-4 docket item 10 and
+		// NOT deduped or sampled: `DebatePoll` re-runs this layout every 30 s
+		// per open, active `/m/[slug]` tab, so a deterministic DB failure emits
+		// at 2/min/tab. Same amplification shape as F-DEBATE-4 docket item 10 and
 		// it belongs to the same HARDEN pass, not to this chrome slice.
 		safeCaptureException(err, {
 			tags: { kind: "header_balance_read_failed" },

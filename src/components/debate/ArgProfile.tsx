@@ -360,6 +360,10 @@ export function ArgProfile({
 				    satisfy WCAG 2.5.3, and the visible text already says it. */}
 					<Link
 						href={`/u/${encodeURIComponent(author.pseudonym)}`}
+						// POLL-IDLE 1b — no prefetch: every DebatePoll refresh invalidates the
+						// prefetch cache and re-prefetches every visible link (Next 16.3.2
+						// `pingVisibleLinks`), so this link cost a request per tick, per viewer.
+						prefetch={false}
 						// ⚠⚠ UI-OVERNIGHT entry 1b rule 8 — NEVER TRUNCATED, **AND THAT NOW
 						// HOLDS ONLY AT AND ABOVE 640px.** The rule as written: "a pseudonym
 						// is the one field on this row that IS a person, and half of one

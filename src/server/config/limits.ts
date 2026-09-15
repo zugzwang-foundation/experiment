@@ -270,7 +270,7 @@ export const MARKET_SERIES_MAX_POINTS = 256;
  * there is the correct outcome rather than a defect (**INV-4**; changed at
  * CHART-1.A, which removed the non-`Open` restamp this sentence used to cover).
  *
- * ⚠ DELIBERATELY LONGER THAN `POLL_INTERVAL_MS_DEBATE_VIEW` (15000), and that
+ * ⚠ DELIBERATELY LONGER THAN `POLL_INTERVAL_MS_DEBATE_VIEW` (30000), and that
  * inequality is the whole design rather than an oversight. The window exists to
  * COALESCE, not to tolerate staleness: fifty bets in thirty seconds become one
  * derivation instead of fifty, so a busy market's cost stops scaling with how
@@ -313,8 +313,9 @@ export const MARKET_SERIES_MIN_WINDOW_MS = 60000;
  * ARGUMENTS, which are the product: a reader waiting a minute to see that
  * someone answered them is a different cost entirely.
  *
- * ⚠ EQUAL TO `POLL_INTERVAL_MS_DEBATE_VIEW` (15000) BUT NOT DERIVED FROM IT.
- * Two independent tunables that happen to agree today — the
+ * ⚠ NOT DERIVED FROM `POLL_INTERVAL_MS_DEBATE_VIEW`, and the proof is that the
+ * two no longer agree: the poll moved 15000 → 30000 (POLL-IDLE) and this window
+ * stayed put. Two independent tunables that used to agree — the
  * `HEADER_PORTFOLIO_CACHE_TTL_SECONDS` precedent below, which matches the same
  * number for the same reason and likewise keeps its own constant. Deriving one
  * from the other would silently couple a cache window to a client cadence, so
@@ -631,7 +632,10 @@ export const PROFILE_GRAPH_Y_MAX = 10000;
 /** Debate-view poll interval in milliseconds (SPEC.1 1.0.25 §16.1 + Appendix B
  * + §9 F-DEBATE-4, per `C7`) — the cadence at which `/m/[slug]` re-invokes its
  * own server read via `router.refresh()` (`src/components/debate/DebatePoll.tsx`),
- * NOT a fetch against a read endpoint. **PROVISIONAL PIN at 15000.** Unlike the
+ * NOT a fetch against a read endpoint. **PROVISIONAL PIN at 30000** (raised
+ * from 15000 at POLL-IDLE to halve per-tab server renders; see also
+ * `POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW` below, which stops the poll for an idle
+ * reader). Unlike the
  * pinned design constants above, this one **remains deferred to the
  * number-tuning pass** — SPEC.2 §4.3 assigns the tune to HARDEN.6; the pin
  * exists only because the flow is unbuildable without a value and go-live
@@ -649,15 +653,34 @@ export const PROFILE_GRAPH_Y_MAX = 10000;
  * an optimisation. Read from this constant at every
  * call site and never inlined, so the HARDEN.6 tune is a one-line change.
  * Integer (milliseconds, not Dharma). */
-export const POLL_INTERVAL_MS_DEBATE_VIEW = 15000;
+export const POLL_INTERVAL_MS_DEBATE_VIEW = 30000;
+
+/** POLL-IDLE — how long a reader may go without ANY pointer, touch, wheel,
+ * scroll or keyboard input before `DebatePoll` stops refreshing `/m/[slug]`.
+ * The first input after that refreshes immediately and resumes the
+ * `POLL_INTERVAL_MS_DEBATE_VIEW` cadence. Exists because the poll's other
+ * suspensions (hidden tab, open composer) never fire for a tab left open and
+ * visible, which is exactly the tab that costs a server render per interval
+ * for nobody. Client-side only; changes no server read. Integer (milliseconds,
+ * not Dharma). */
+export const POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW = 300000;
+
+/** The debate view's post-carousel auto-advance cadence (`scrollers.tsx`).
+ * Minted at POLL-IDLE, when the poll moved to 30000: the carousel used to read
+ * `POLL_INTERVAL_MS_DEBATE_VIEW` directly, and that file's own docblock asked
+ * for exactly this constant the day the two needed to differ. Held at the
+ * carousel's shipped 15000 so the refresh change does not slow the carousel.
+ * Integer (milliseconds, not Dharma). */
+export const AUTO_ADVANCE_MS_DEBATE_VIEW = 15000;
 
 // === HEADER-PORTFOLIO-CACHE: header PORTFOLIO figure cache-aside ===========
 
 /** TTL for the Redis cache-aside in front of `getHeaderPortfolio`
  * (`getHeaderPortfolioCached`, `src/server/dharma/header-portfolio.ts`).
- * Matches `POLL_INTERVAL_MS_DEBATE_VIEW` (15000 ms → 15 s) deliberately: that
- * interval is already this product's accepted display-freshness bar (it's the
- * cadence `/m/[slug]` re-renders this exact figure on), so this cache adds no
- * staleness beyond what a viewer already experiences elsewhere. Seconds, not
+ * Set to 15 s to match the debate-view poll's cadence at the time (15000 ms),
+ * the product's accepted display-freshness bar. POLL-IDLE moved that poll to
+ * `POLL_INTERVAL_MS_DEBATE_VIEW` = 30000 and this TTL stayed at 15 s, so it is
+ * now SHORTER than the cadence `/m/[slug]` re-renders this figure on and still
+ * adds no staleness beyond what a viewer already experiences there. Seconds, not
  * milliseconds — Upstash `SET ... EX` takes seconds. */
 export const HEADER_PORTFOLIO_CACHE_TTL_SECONDS = 15;

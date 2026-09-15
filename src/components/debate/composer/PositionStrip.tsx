@@ -155,6 +155,10 @@ export function PositionStrip({
 						<Link
 							data-testid="w210c-sell-link"
 							href={`/u/${encodeURIComponent(ownPseudonym)}?market=${encodeURIComponent(slug)}`}
+							// POLL-IDLE 1b — no prefetch: every DebatePoll refresh invalidates the
+							// prefetch cache and re-prefetches every visible link (Next 16.3.2
+							// `pingVisibleLinks`), so this link cost a request per tick, per viewer.
+							prefetch={false}
 							className="flex items-center gap-1 hover:text-ink"
 						>
 							<span>Your position</span>

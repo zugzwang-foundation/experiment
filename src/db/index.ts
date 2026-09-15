@@ -113,13 +113,15 @@ const client = postgres(connectionString, {
 	// means "never given back", and staging degraded to EMAXCONNSESSION a few
 	// minutes after every redeploy.
 	//
-	// 20 s sits just above POLL_INTERVAL_MS_DEBATE_VIEW = 15000
-	// (src/server/config/limits.ts:262), the only sub-minute cadence on the
-	// participant surface, so an actively-polling viewer keeps its connection
-	// warm instead of re-handshaking through Supavisor every tick. The pool is
-	// FIFO (`open.shift()`): with N connections and interval T each is touched
-	// every N×T, so at the 15 s cadence a full pool collapses back to the one
-	// connection the poller keeps hot.
+	// 20 s was chosen to sit just above the debate-view poll's old 15 s cadence,
+	// so an actively-polling viewer kept its connection warm instead of
+	// re-handshaking through Supavisor every tick. POLL-IDLE moved the poll to
+	// POLL_INTERVAL_MS_DEBATE_VIEW = 30000 and this value deliberately did NOT
+	// follow (ruling 2026-09-15): a lone poller now re-handshakes each tick, and
+	// in exchange connections return to the session pooler sooner, which is the
+	// EMAXCONNSESSION-safe direction. The pool is FIFO (`open.shift()`): with N
+	// connections and interval T each is touched every N×T, so a full pool
+	// drains back once N×T exceeds 20 s, which at 30 s is every idle connection.
 	//
 	// ⚠ MEASURED LIMIT — this does NOT reclaim an abandoned instance's slots.
 	// On Vercel Fluid the instance suspends and the timer stops with it: 620 s

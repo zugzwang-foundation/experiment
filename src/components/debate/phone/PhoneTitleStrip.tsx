@@ -66,6 +66,10 @@ export function PhoneTitleStrip({
 			{backHref !== undefined ? (
 				<Link
 					href={backHref}
+					// POLL-IDLE 1b — no prefetch: every DebatePoll refresh invalidates the
+					// prefetch cache and re-prefetches every visible link (Next 16.3.2
+					// `pingVisibleLinks`), so this link cost a request per tick, per viewer.
+					prefetch={false}
 					data-testid="phone-strip-back"
 					aria-label="Back to the market"
 					className="flex size-11 shrink-0 items-center justify-center text-[15px] text-ink"

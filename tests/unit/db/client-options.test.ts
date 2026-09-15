@@ -72,14 +72,18 @@ describe("db client — postgres.js pool options", () => {
 		expect(options.idle_timeout).toBe(20);
 	});
 
-	it("db-client::idle-timeout-clears-the-debate-view-poll-cadence", () => {
-		// Load-bearing COUPLING, not a restatement of the line above. 20 s is
-		// chosen to sit above POLL_INTERVAL_MS_DEBATE_VIEW so an actively-polling
-		// viewer keeps one warm connection instead of re-handshaking through
-		// Supavisor every tick. If the poll cadence is ever raised past the idle
-		// timeout, that reasoning inverts and this goes RED to force the re-think.
+	it("db-client::idle-timeout-is-below-the-debate-view-poll-cadence", () => {
+		// Load-bearing COUPLING, not a restatement of the line above.
+		//
+		// ⚠ INVERTED AT POLL-IDLE, by founder ruling. 20 s was chosen to sit
+		// ABOVE the old 15 s poll so a lone polling viewer kept one warm
+		// connection. The poll moved to 30 s and the idle timeout deliberately
+		// did NOT follow: a lone poller now re-handshakes through Supavisor each
+		// tick, and in exchange connections go back to the session pooler sooner
+		// — the EMAXCONNSESSION-safe direction. If the two are ever made to agree
+		// again, that is a new decision and this goes RED to force it.
 		const pollSeconds = POLL_INTERVAL_MS_DEBATE_VIEW / 1000;
-		expect(options.idle_timeout).toBeGreaterThan(pollSeconds);
+		expect(options.idle_timeout).toBeLessThan(pollSeconds);
 	});
 
 	it("db-client::pins-max-lifetime-at-600s", () => {

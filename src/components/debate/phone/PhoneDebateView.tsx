@@ -398,7 +398,7 @@ export function PhoneDebateView({
 	 *
 	 * ⚠ ONE-SHOT, KEYED ON THE COMMENT ID — the desktop's `pickedFor` guard
 	 * (`:983`) and the scroller's `jumped.current` (`scrollers.tsx:139`) are the
-	 * same mechanism. Without it every subsequent payload — DebatePoll's 15s
+	 * same mechanism. Without it every subsequent payload — DebatePoll's 30s
 	 * refresh, a `PhoneTopPill` refresh — would re-take the pane and re-scroll a
 	 * reader who had moved on. A SECOND bet carries a different id and re-arms it,
 	 * which is why the ref holds the id rather than a boolean.

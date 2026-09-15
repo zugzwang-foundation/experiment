@@ -100,8 +100,8 @@ export default async function MarketPage({
 	// S-4 Phase D — `getRequestSession()` replaces a direct `auth.api.getSession`:
 	// the layout already read the session this request, and React's `cache()`
 	// collapses the two into ONE database lookup. That matters most here, because
-	// `DebatePoll` re-invokes BOTH the layout and this page every 15 s per open
-	// tab.
+	// `DebatePoll` re-invokes BOTH the layout and this page every 30 s per open,
+	// active tab.
 	//
 	// ⚠ HOISTED ABOVE THE CACHED CALL AT CACHE-KEY-1, and it costs nothing to do
 	// so precisely BECAUSE of the `cache()` memo — this is the same lookup the

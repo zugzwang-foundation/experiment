@@ -5,10 +5,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // S-4 PHASE E — the `/m/[slug]` read budget, pinned.
 //
 // WHY THIS SURFACE NEEDS A GUARD MORE THAN ANY OTHER. `DebatePoll` calls
-// `router.refresh()` every `POLL_INTERVAL_MS_DEBATE_VIEW` (15 s) for every open
+// `router.refresh()` every `POLL_INTERVAL_MS_DEBATE_VIEW` (30 s) for every open
 // tab, and a refresh re-executes the LAYOUT as well as the page. So a single
-// statement added here is not paid once per navigation — it is paid four times
-// a minute, per tab, forever. Discovery's equivalent guard
+// statement added here is not paid once per navigation — it is paid twice a
+// minute, per active tab, forever. Discovery's equivalent guard
 // (`tests/server/discovery/round-trip-budget.test.ts`) calls its own count "THE
 // BINDING CONSTRAINT"; on this surface the same count carries a multiplier.
 //
