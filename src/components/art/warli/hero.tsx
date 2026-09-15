@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-import { FieldLayer } from "./field-layer";
+import { FIELD_ASSET_HREF } from "./field-asset";
 import { INNER_FIGURES, OUTER_FIGURES } from "./figures";
 import { Ring } from "./ring";
 
@@ -54,6 +54,23 @@ export const R_INNER = 330;
 
 /** 500 − 470 = 30 units of margin top and bottom. No clip at any phase. */
 export const R_OUTER = 470;
+
+/**
+ * Where the static field is served from — `public/art/warli-field.<hash>.svg`,
+ * generated from `<FieldLayer />` by `scripts/warli-field-svg.tsx`, which also
+ * writes the URL into `./field-asset.ts`.
+ *
+ * ⚠ THE FIELD IS 86% OF THIS DRAWING'S MARKUP AND NONE OF ITS MOTION. Inline,
+ * it put ~682 KB into the HTML of every auth page, on a document served
+ * `max-age=0`, so every full load paid for it again — measured on prod at
+ * `a7bf4d2`: `/sign-in` 822 KB raw against `/` at 68 KB. As a content-hashed
+ * file it is cached `immutable` for a year (`next.config.ts`) and preloaded by
+ * `(auth)/layout.tsx`, and a crawler that reads only the document never fetches
+ * it at all. `tests/unit/art/field-asset.test.ts` holds the committed file
+ * byte-equal to the component and its URL equal to its hash, so the drawing's
+ * source of truth is still `field-layer.tsx`.
+ */
+export { FIELD_ASSET_HREF };
 
 /** Half a step, so no figure sits at an exact vertical extreme at rest. */
 export const PHASE_DEG = 22.5;
@@ -339,6 +356,20 @@ export function WarliHero({
 			fill="none"
 			stroke="currentColor"
 			data-warli-hero=""
+			/* ⚠ A CSS BACKGROUND, NOT AN SVG `<image>`. `<image` is on the
+			   security audit's sink list in `art-layer-guards.test.ts`, and a
+			   decorative asset is not a reason to open it. `cover` + `center` on a
+			   box whose drawing is 1440 × 1000 is the same geometry as this
+			   element's `xMidYMid slice`, so the field lands on the rings'
+			   frame at every viewport. The URL is a module constant; React writes
+			   it through the style object, never through the `<style>` text. */
+			style={{
+				backgroundImage: `url(${FIELD_ASSET_HREF})`,
+				backgroundPosition: "center",
+				backgroundRepeat: "no-repeat",
+				backgroundSize: "cover",
+			}}
+			data-warli-field-image=""
 		>
 			<title>{label}</title>
 			{/* A `<style>` tag is exactly where someone reaches for
@@ -378,8 +409,12 @@ export function WarliHero({
 
 			    Drawn first because SVG has no z-index and this palette has no value
 			    scale, so paint order is the ONLY depth cue available. The world goes
-			    behind the argument. */}
-			<FieldLayer />
+			    behind the argument.
+
+			    ⚠ SINCE WARLI-FIELD-ASSET THE FIELD IS THIS ELEMENT'S BACKGROUND,
+			    painted beneath every child, so it is still drawn first and still
+			    outside every transform. See `FIELD_ASSET_HREF` for why it is a
+			    file. */}
 
 			<g transform={`translate(${VIEW_WIDTH / 2} ${VIEW_HEIGHT / 2})`}>
 				<g ref={innerSpinRef} className="warli-spin" data-warli-spin="inner">

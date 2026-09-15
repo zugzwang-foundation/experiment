@@ -25,6 +25,8 @@ import {
 } from "@/components/art/warli/hero";
 import { PRIMITIVE_SPECS } from "@/components/art/warli/primitives";
 
+import { WarliComposition } from "./_composition";
+
 /**
  * WARLI-1 — the hero renders, and it renders the thing that was argued for.
  *
@@ -44,7 +46,7 @@ const CENTRE = { x: 0, y: 0 } as const;
 
 describe("warli hero — it renders", () => {
 	it("draws both rings, the static field, and every figure once", () => {
-		const { container } = render(<WarliHero />);
+		const { container } = render(<WarliComposition />);
 
 		expect(container.querySelectorAll("[data-warli-ring]")).toHaveLength(2);
 		expect(
@@ -384,7 +386,7 @@ describe("warli hero — the registers", () => {
 		// mid-air beside a hand that was somewhere else.
 		//
 		// Counting `<g>` elements cannot see this. Reading the drawn endpoint can.
-		const { container } = render(<WarliHero />);
+		const { container } = render(<WarliComposition />);
 
 		for (const spec of ALL_FIGURES) {
 			const node = container.querySelector(`[data-warli-id="${spec.id}"]`);
@@ -513,7 +515,7 @@ describe("warli hero — the registers", () => {
 		// The thesis is that everyone here is the same shape and differs only in
 		// what they carry and how they are dressed, so a bespoke body would
 		// reverse the argument while looking like a styling tweak.
-		const { container } = render(<WarliHero />);
+		const { container } = render(<WarliComposition />);
 		expect(container.querySelectorAll("[data-warli-figure-body]")).toHaveLength(
 			ALL_FIGURES.length,
 		);

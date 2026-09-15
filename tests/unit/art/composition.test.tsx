@@ -17,7 +17,12 @@ import {
 	OPPOSED_PAIRS,
 	OUTER_FIGURES,
 } from "@/components/art/warli/figures";
-import { R_INNER, R_OUTER, WarliHero } from "@/components/art/warli/hero";
+import {
+	FIELD_ASSET_HREF,
+	R_INNER,
+	R_OUTER,
+	WarliHero,
+} from "@/components/art/warli/hero";
 import {
 	BORDER_DEPTH,
 	ORNAMENT_COMBINATIONS,
@@ -33,6 +38,8 @@ import {
 	RING_CLEAR,
 	SCENE_MOTIFS,
 } from "@/components/art/warli/scene";
+
+import { WarliComposition } from "./_composition";
 
 /**
  * WARLI-2 §5 — the four semantic guards, G1 to G4.
@@ -81,7 +88,7 @@ describe("G0 · the RENDERED drawing carries the wobble", () => {
 	 * the drawing.
 	 */
 	const rendered = () => {
-		const { container } = render(<WarliHero />);
+		const { container } = render(<WarliComposition />);
 		const ds = [...container.querySelectorAll("path")]
 			.map((p) => p.getAttribute("d") ?? "")
 			.filter((d) => d.length > 0);
@@ -323,7 +330,7 @@ describe("G2 · every static-field figure faces the centre", () => {
 		// with `.*`, so zeroing every lean — or giving every figure the same lean
 		// regardless of which side it stood on — passed untouched. The placement
 		// being right is worth nothing if the renderer drops it.
-		const { container } = render(<WarliHero />);
+		const { container } = render(<WarliComposition />);
 		const nodes = [...container.querySelectorAll("[data-warli-field-figure]")];
 		expect(nodes).toHaveLength(FIELD_FIGURES.length);
 		let leaned = 0;
@@ -451,7 +458,7 @@ describe("G3 · exactly eight faces, and 45–55 characters in all", () => {
 	});
 
 	it("renders every declared character, not merely declares them", () => {
-		const { container } = render(<WarliHero />);
+		const { container } = render(<WarliComposition />);
 		expect(container.querySelectorAll("[data-warli-figure-body]")).toHaveLength(
 			ALL_FIGURES.length,
 		);
@@ -725,7 +732,7 @@ describe("the static field reaches the DOM, and does not rotate", () => {
 		// layer, the ground layer or the border stack from the render left the
 		// entire suite green, because nothing read them and the composition guard
 		// built its own scene from literals.
-		const { container } = render(<WarliHero />);
+		const { container } = render(<WarliComposition />);
 		expect(container.querySelectorAll("[data-warli-motif]")).toHaveLength(
 			MOTIF_COUNT,
 		);
@@ -751,7 +758,7 @@ describe("the static field reaches the DOM, and does not rotate", () => {
 		// the "visible wallpaper" failure the vocabulary-variety test is docblocked
 		// against, measured from placement objects where a collapse at the renderer
 		// is invisible.
-		const { container } = render(<WarliHero />);
+		const { container } = render(<WarliComposition />);
 		const seen = new Set<string>();
 		for (const node of container.querySelectorAll("[data-warli-motif]")) {
 			const kind = node.getAttribute("data-warli-motif");
@@ -780,21 +787,35 @@ describe("the static field reaches the DOM, and does not rotate", () => {
 		// bare `<g className="warli-spin">` carries no data attribute, so the
 		// attribute selector walked straight past a field that was now rotating.
 		// Assert the property that has the consequence.
+		//
+		// ⚠ WARLI-FIELD-ASSET MOVED THE FIELD INTO A FILE, SO THE THING THAT MUST
+		// NOT ROTATE IS NOW THE ELEMENT WHOSE BACKGROUND DRAWS IT. Inverted rather
+		// than deleted: the claim is unchanged, only its carrier moved. It must be
+		// the hero ROOT — a background on anything inside a spin group turns with it.
 		const { container } = render(<WarliHero />);
-		expect(container.querySelector("[data-warli-field-layer]")).not.toBeNull();
+		const carriers = container.querySelectorAll("[data-warli-field-image]");
+		expect(carriers).toHaveLength(1);
+		const root = container.querySelector("[data-warli-hero]");
+		expect(carriers[0]).toBe(root);
+		expect((root as SVGSVGElement | null)?.style.backgroundImage).toContain(
+			FIELD_ASSET_HREF,
+		);
 		for (const spinning of [".warli-spin", "[data-warli-spin]"]) {
 			expect(
-				container.querySelector(`${spinning} [data-warli-field-layer]`),
+				container.querySelector(`${spinning} [data-warli-field-image]`),
 			).toBeNull();
-			expect(
-				container.querySelector(`${spinning} [data-warli-border]`),
-			).toBeNull();
-			expect(
-				container.querySelector(`${spinning} [data-warli-motif]`),
-			).toBeNull();
-			expect(
-				container.querySelector(`${spinning} [data-warli-ground]`),
-			).toBeNull();
+		}
+		// …and the field is NOT ALSO inline. This is the byte budget: the inline
+		// field was ~682 KB of every auth page, and a hero that both loads the file
+		// and still renders the component would pay twice and look identical.
+		for (const inline of [
+			"[data-warli-field-layer]",
+			"[data-warli-motif]",
+			"[data-warli-ground]",
+			"[data-warli-field-figure]",
+			"[data-warli-border]",
+		]) {
+			expect(container.querySelector(inline)).toBeNull();
 		}
 	});
 });
