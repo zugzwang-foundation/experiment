@@ -15,12 +15,16 @@ import {
 import { formatCountdown } from "@/components/shell/countdown-format";
 import type { Badge } from "@/lib/ranking";
 import { formatRelativeTime } from "@/lib/relative-time";
-import type { DebateViewModel } from "@/server/debate-view/load-debate-view";
+import type {
+	DebateReply,
+	DebateViewModel,
+} from "@/server/debate-view/load-debate-view";
 import type { PricePoint } from "@/server/discovery/price-series";
 import { FREEZE_INSTANT_UTC } from "@/server/markets/create";
 import type { Marker } from "@/server/positions/compute";
 
 type Side = "YES" | "NO";
+type PresentDebateReply = Extract<DebateReply, { removed: false }>;
 
 /**
  * Everything the PNG composition paints, already formatted for display.
@@ -131,6 +135,24 @@ export type PostExportProps = {
 		 */
 		hasStake: boolean;
 	};
+	/**
+	 * REPLY-IMAGE-EXPORT — set when the export is of a REPLY, `null` for a post.
+	 *
+	 * A reply has no replies (`REPLY_DEPTH_MAX = 1`), so it has no split bar to
+	 * show; its row says instead what it answered and how. `post` above then
+	 * describes the REPLY (author, side, stake, age, title, image) — except
+	 * `ordinal`, which stays the PARENT's, because the filename names both — and
+	 * its split fields are an empty aggregate that is not painted.
+	 *
+	 * ⛔ `parentTitle` is only ever a PRESENT parent's title: a reply under a
+	 * removed post is not exportable at all (the mapper returns `null`), because
+	 * a withheld argument's title must not reach an image (SC-1).
+	 */
+	repliedTo: {
+		/** From the list the read model placed the reply in, never re-derived. */
+		relation: "SUPPORT" | "COUNTER";
+		parentTitle: string;
+	} | null;
 	chart: { series: PricePoint[]; isOpen: boolean } | null;
 	/**
 	 * The Zugzwang mark as a data URI, or `null` when it could not be read.
@@ -247,12 +269,32 @@ export function composePostExport(
 	 * the debate page's media panel shows, and the export wants the card's.
 	 */
 	thumbUrl: string | null,
+	/**
+	 * REPLY-IMAGE-EXPORT — the reply's ordinal within the post (`?reply=M`).
+	 * Omitted ⇒ the post export, unchanged.
+	 */
+	replyOrdinal?: number,
 ): PostExportProps | null {
 	const post = model.posts.find((p) => p.id === postId);
 	if (post === undefined || post.removed) {
 		return null;
 	}
 	const { market, priceChart } = model;
+
+	let reply: PresentDebateReply | null = null;
+	let relation: "SUPPORT" | "COUNTER" = "SUPPORT";
+	if (replyOrdinal !== undefined) {
+		const inSupport = post.replies.support.find(
+			(r) => r.ordinal === replyOrdinal,
+		);
+		const found =
+			inSupport ?? post.replies.counter.find((r) => r.ordinal === replyOrdinal);
+		if (found === undefined || found.removed) {
+			return null;
+		}
+		reply = found;
+		relation = inSupport === undefined ? "COUNTER" : "SUPPORT";
+	}
 
 	const yesPct = market.pricing
 		? formatPricePercent(market.pricing, "YES")
@@ -265,12 +307,51 @@ export function composePostExport(
 		? getResolutionBlocks(market.slug)
 		: null;
 
+	// A reply answers nobody's replies, so its (unpainted) split is empty.
+	const aggregate =
+		reply === null
+			? post.aggregate
+			: {
+					supportCount: 0,
+					counterCount: 0,
+					supportDharma: "0",
+					counterDharma: "0",
+				};
+	const subject =
+		reply === null
+			? {
+					side: post.sideAtPostTime,
+					author: post.author,
+					entryPrice: post.entryPrice,
+					marker: post.marker,
+					badge: post.badge,
+					stake: post.authorStake,
+					stakeOriginal: post.authorStakeOriginal,
+					sold: post.authorSold,
+					createdAt: post.createdAt,
+					title: post.title,
+					imageUrl: post.imageUrl,
+				}
+			: {
+					side: reply.side,
+					author: reply.author,
+					entryPrice: reply.entryPrice,
+					marker: reply.marker,
+					badge: null,
+					stake: reply.stake,
+					stakeOriginal: reply.stakeOriginal,
+					sold: reply.sold,
+					createdAt: reply.createdAt,
+					title: reply.title,
+					imageUrl: reply.imageUrl,
+				};
+
 	const { supportPct, hasStake } = computeSplitBar({
-		supportDharma: post.aggregate.supportDharma,
-		counterDharma: post.aggregate.counterDharma,
+		supportDharma: aggregate.supportDharma,
+		counterDharma: aggregate.counterDharma,
 	});
-	const stake = formatDharma(post.authorStake);
-	const original = formatDharma(post.authorStakeOriginal);
+	const stake = formatDharma(subject.stake);
+	const original = formatDharma(subject.stakeOriginal);
 
 	return {
 		width: EXPORT_WIDTH,
@@ -288,48 +369,46 @@ export function composePostExport(
 		},
 		post: {
 			ordinal: post.ordinal,
-			pseudonym: post.author.pseudonym,
-			initials: post.author.pseudonym.slice(0, 2).toUpperCase(),
-			pfpUrl: post.author.pfpUrl,
-			side: post.sideAtPostTime,
+			pseudonym: subject.author.pseudonym,
+			initials: subject.author.pseudonym.slice(0, 2).toUpperCase(),
+			pfpUrl: subject.author.pfpUrl,
+			side: subject.side,
 			// pctround-allow: the post's ENTRY price — the same single historical
 			// value `badges.tsx` prints on the side chip, already scoped to the side
 			// bought (`bets.price_at_bet` = `pEff` for that side), so the paired
 			// formatter would print `100 - x` for a NO author. A point in time, not
 			// one half of a live pair.
-			entryPct: formatPercentUnpaired(post.entryPrice),
-			marker: post.marker,
-			badge: post.badge,
+			entryPct: formatPercentUnpaired(subject.entryPrice),
+			marker: subject.marker,
+			badge: subject.badge,
 			stake,
-			stakeOriginal: !post.authorSold && original !== stake ? original : null,
-			sold: post.authorSold,
-			replyCount: post.aggregate.supportCount + post.aggregate.counterCount,
-			age: formatRelativeTime(nowMs, Date.parse(post.createdAt)),
-			title: post.title,
-			imageUrl: post.imageUrl,
+			stakeOriginal: !subject.sold && original !== stake ? original : null,
+			sold: subject.sold,
+			replyCount: aggregate.supportCount + aggregate.counterCount,
+			age: formatRelativeTime(nowMs, Date.parse(subject.createdAt)),
+			title: subject.title,
+			imageUrl: subject.imageUrl,
 			support: {
 				side: deriveReplySide({
-					parentSide: post.sideAtPostTime,
+					parentSide: subject.side,
 					relation: "support",
 				}),
-				dharma: formatDharma(post.aggregate.supportDharma),
+				dharma: formatDharma(aggregate.supportDharma),
 			},
 			counter: {
 				side: deriveReplySide({
-					parentSide: post.sideAtPostTime,
+					parentSide: subject.side,
 					relation: "counter",
 				}),
-				dharma: formatDharma(post.aggregate.counterDharma),
+				dharma: formatDharma(aggregate.counterDharma),
 			},
 			splitTotal: formatDharma(
-				displaySplitTotal(
-					post.aggregate.supportDharma,
-					post.aggregate.counterDharma,
-				),
+				displaySplitTotal(aggregate.supportDharma, aggregate.counterDharma),
 			),
 			supportBarPct: pctNumber(supportPct),
 			hasStake,
 		},
+		repliedTo: reply === null ? null : { relation, parentTitle: post.title },
 		chart:
 			priceChart === null
 				? null
@@ -340,7 +419,16 @@ export function composePostExport(
 	};
 }
 
-/** `<market-slug>-post-<ordinal>.jpg` — deterministic, one name per post. */
-export function exportFilename(slug: string, ordinal: number): string {
-	return `${slug}-post-${ordinal}.jpg`;
+/**
+ * `<market-slug>-post-<ordinal>.jpg`, or `…-post-<N>-reply-<M>.jpg` for a
+ * reply — deterministic, one name per argument.
+ */
+export function exportFilename(
+	slug: string,
+	ordinal: number,
+	replyOrdinal?: number,
+): string {
+	return replyOrdinal === undefined
+		? `${slug}-post-${ordinal}.jpg`
+		: `${slug}-post-${ordinal}-reply-${replyOrdinal}.jpg`;
 }

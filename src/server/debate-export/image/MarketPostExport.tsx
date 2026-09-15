@@ -441,6 +441,28 @@ export function MarketPostExport(props: PostExportProps) {
 		),
 	);
 
+	/**
+	 * REPLY-IMAGE-EXPORT — the replied-to title's size, the same estimate
+	 * `quoteType` and `titleType` use. It lives in the split row's box, which
+	 * holds the label line plus one 24-unit line: a short title keeps that line
+	 * at up to 24, a longer one shrinks on ONE line down to `REPLIED_TWO_LINE`,
+	 * and past that it takes TWO lines at no more than that size — which is what
+	 * fits two lines into the same box. At the floor a full 125-character title
+	 * (127 with its marks) sets at 14 on two lines, so an ordinary title is never
+	 * cut. (`RepliedToRow` clamps at the line budget of the size chosen here.)
+	 */
+	const repliedChars = (props.repliedTo?.parentTitle.length ?? 0) + 2;
+	const repliedOneLine = Math.floor(
+		(INNER_W * SAFETY) / (repliedChars * AVG_ADVANCE),
+	);
+	const repliedType =
+		repliedOneLine >= REPLIED_TWO_LINE
+			? Math.min(REPLIED_MAX, repliedOneLine)
+			: Math.min(
+					REPLIED_TWO_LINE,
+					Math.floor((2 * INNER_W * SAFETY) / (repliedChars * AVG_ADVANCE)),
+				);
+
 	// ⛔ FIXED, NOT SIDE-DERIVED — the revision-5 ruling in the docblock above.
 	// Kept as two named consts rather than inlined at the call site so the pair
 	// reads as ONE decision, and so restoring the pole law is one edit here
@@ -871,19 +893,34 @@ export function MarketPostExport(props: PostExportProps) {
 						)}
 					</div>
 
-					<SplitRow
-						u={u}
-						hairline={hairline}
-						leftLabel="SUPPORT"
-						leftValue={`Đ ${post.support.dharma}`}
-						leftColor={supportColor}
-						centerLabel={`Đ ${post.splitTotal} STAKED`}
-						rightLabel="COUNTER"
-						rightValue={`Đ ${post.counter.dharma}`}
-						rightColor={counterColor}
-						barLeftPct={post.supportBarPct}
-						neutral={!post.hasStake}
-					/>
+					{props.repliedTo === null ? (
+						<SplitRow
+							u={u}
+							hairline={hairline}
+							leftLabel="SUPPORT"
+							leftValue={`Đ ${post.support.dharma}`}
+							leftColor={supportColor}
+							centerLabel={`Đ ${post.splitTotal} STAKED`}
+							rightLabel="COUNTER"
+							rightValue={`Đ ${post.counter.dharma}`}
+							rightColor={counterColor}
+							barLeftPct={post.supportBarPct}
+							neutral={!post.hasStake}
+						/>
+					) : (
+						<RepliedToRow
+							u={u}
+							hairline={hairline}
+							relation={props.repliedTo.relation}
+							parentTitle={props.repliedTo.parentTitle}
+							relationColor={
+								props.repliedTo.relation === "SUPPORT"
+									? supportColor
+									: counterColor
+							}
+							titleSize={repliedType}
+						/>
+					)}
 				</div>
 
 				{/* ── RIGHT · the market ────────────────────────────────────── */}
@@ -1532,6 +1569,122 @@ function QuoteWell({
 				{title.toUpperCase()}
 			</div>
 			<div style={markStyle(GEIST_QUOTE_TOP_CLOSE)}>{"”"}</div>
+		</div>
+	);
+}
+
+/**
+ * REPLY-IMAGE-EXPORT — what a REPLY's export shows where a post's split row
+ * sits (operator ruling, 2026-09-15): `Replied as SUPPORT to -` in small grey
+ * with the RELATION word alone coloured — SUPPORT green, COUNTER red — over the
+ * parent post's title in bold ink.
+ *
+ * ⛔⛔ IT OCCUPIES THE SPLIT ROW'S EXACT BOX, AND THAT IS BY CONSTRUCTION RATHER
+ * THAN BY A NUMBER. The ruling is that nothing else in the image moves. Satori
+ * measures nothing back, so a hand-copied height would be an estimate of the
+ * row's line boxes — and the right card's bar seats on the same floor, so a
+ * mismatch of even a unit would show as two bars on different baselines. So the
+ * real `SplitRow` is laid out here at `opacity: 0`, which reserves precisely the
+ * space it always takes (its height does not depend on its content), and the
+ * two lines are drawn over it — the label at the top of that box, the title at
+ * the bottom.
+ * ⚠ The ghost row carries placeholder figures only; its text is never painted
+ * and none of it is data about this reply.
+ *
+ * ⚠ THE TITLE IS NOT CUT FOR ANY ORDINARY TITLE: the caller fits its size
+ * (`repliedType`) so a full 125-character title takes two lines of this box.
+ * The clamp is the backstop for glyphs far wider than the estimate (a CJK
+ * title, say), and it follows the size because the box holds TWO lines only at
+ * the two-line size — a second line at a one-line size would be pushed through
+ * the bottom of the card. See `repliedType`.
+ */
+/** The replied-to title's ceiling, and the size at and below which it may take two lines. */
+const REPLIED_MAX = 24;
+const REPLIED_TWO_LINE = 14;
+
+function RepliedToRow({
+	u,
+	hairline,
+	relation,
+	parentTitle,
+	relationColor,
+	titleSize,
+}: {
+	u: (n: number) => number;
+	hairline: string;
+	relation: "SUPPORT" | "COUNTER";
+	parentTitle: string;
+	relationColor: string;
+	/** Fitted by the caller so the quoted title takes at most two lines. */
+	titleSize: number;
+}) {
+	return (
+		<div
+			style={{
+				display: "flex",
+				flexDirection: "column",
+				position: "relative",
+				marginTop: "auto",
+			}}
+		>
+			<div style={{ display: "flex", flexDirection: "column", opacity: 0 }}>
+				<SplitRow
+					u={u}
+					hairline={hairline}
+					leftLabel="SUPPORT"
+					leftValue="Đ 0"
+					leftColor={PALETTE.n4}
+					centerLabel="Đ 0 STAKED"
+					rightLabel="COUNTER"
+					rightValue="Đ 0"
+					rightColor={PALETTE.n4}
+					barLeftPct={0}
+					neutral={true}
+				/>
+			</div>
+			<div
+				style={{
+					display: "flex",
+					flexDirection: "column",
+					justifyContent: "space-between",
+					position: "absolute",
+					top: 0,
+					left: 0,
+					right: 0,
+					bottom: 0,
+				}}
+			>
+				<div
+					style={{
+						display: "flex",
+						gap: u(5),
+						fontSize: u(15),
+						fontWeight: 500,
+						lineHeight: 1.2,
+						color: PALETTE.n5,
+					}}
+				>
+					<span>Replied as</span>
+					<span style={{ color: relationColor }}>{relation}</span>
+					<span>to -</span>
+				</div>
+				<div
+					style={{
+						display: "block",
+						fontSize: u(titleSize),
+						fontWeight: 700,
+						lineHeight: 1.15,
+						color: PALETTE.ink,
+						// Backstop only — `titleSize` is fitted so 125 characters take
+						// two lines. Two lines fit the box only at the two-line size, so
+						// a larger (one-line) size clamps at one.
+						lineClamp: titleSize > REPLIED_TWO_LINE ? 1 : 2,
+						overflow: "hidden",
+					}}
+				>
+					{`“${parentTitle}”`}
+				</div>
+			</div>
 		</div>
 	);
 }

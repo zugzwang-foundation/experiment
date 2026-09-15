@@ -86,6 +86,8 @@ export const mumbaiMetroModel: DebateViewModel = {
 					{
 						removed: false,
 						id: "cmt-r1-1",
+						ordinal: 1,
+						title: "Agreed, and the monsoon multiplier is underrated.",
 						side: "YES",
 						createdAt: "2026-05-19T10:12:00.000Z",
 						body: "Agreed, and the monsoon multiplier is underrated. Once the July flooding starts, the underground line is the only reliable option on this stretch. Last year ridership on the open sections jumped through the wet months.",
@@ -101,6 +103,8 @@ export const mumbaiMetroModel: DebateViewModel = {
 					{
 						removed: false,
 						id: "cmt-r1-2",
+						ordinal: 3,
+						title: "Corporate shuttle replacement is already happening.",
 						side: "YES",
 						createdAt: "2026-05-22T09:00:00.000Z",
 						body: "Corporate shuttle replacement is already happening at a couple of BKC firms I know of. That is hundreds of daily trips moving onto the line per employer.",
@@ -121,6 +125,8 @@ export const mumbaiMetroModel: DebateViewModel = {
 					{
 						removed: false,
 						id: "cmt-r1-3",
+						ordinal: 2,
+						title: "Design intent and realized ridership are different things.",
 						side: "NO",
 						createdAt: "2026-05-20T16:45:00.000Z",
 						body: 'Design intent and realized ridership are different things. Line 1 was projected far above what it actually carried for its first several years. "The corridor is built for it" does not put a 7-day average over a million by November.',
@@ -169,6 +175,8 @@ export const mumbaiMetroModel: DebateViewModel = {
 					{
 						removed: false,
 						id: "cmt-r2-1",
+						ordinal: 1,
+						title: "",
 						side: "NO",
 						createdAt: "2026-05-23T08:20:00.000Z",
 						body: "The last-mile gap is the killer. Half these stations drop you 1.5 km from where you are actually going with no integrated bus feeder. Until that is fixed, people with a direct bus stick to the bus.",
@@ -189,6 +197,8 @@ export const mumbaiMetroModel: DebateViewModel = {
 					{
 						removed: false,
 						id: "cmt-r2-2",
+						ordinal: 1,
+						title: "",
 						side: "YES",
 						createdAt: "2026-05-24T14:10:00.000Z",
 						body: "Doubling current throughput sounds dramatic, but that is literally the normal ramp curve for a line that just completed its full length. The base you are quoting is from before the Colaba extension opened. Forward the trend, do not freeze it at today.",
@@ -238,6 +248,8 @@ export const mumbaiMetroModel: DebateViewModel = {
 					{
 						removed: false,
 						id: "cmt-r3-1",
+						ordinal: 1,
+						title: "",
 						side: "NO",
 						createdAt: "2026-05-25T11:30:00.000Z",
 						body: "Monsoon lifts ridership for days at a time, not a sustained 7-day average over a million. And the surge cuts both ways: severe flooding also shuts stations and snaps the feeder network people use to reach them. It is a spike, not a new baseline.",
@@ -274,6 +286,8 @@ export const mumbaiMetroModel: DebateViewModel = {
 					{
 						removed: false,
 						id: "cmt-r4-1",
+						ordinal: 1,
+						title: "",
 						side: "NO",
 						createdAt: "2026-05-27T07:15:00.000Z",
 						body: "Even setting tone aside, the throughput math in the parent is roughly right: the gap to 1M is large and the clock is short.",
@@ -294,6 +308,8 @@ export const mumbaiMetroModel: DebateViewModel = {
 					{
 						removed: false,
 						id: "cmt-r4-2",
+						ordinal: 1,
+						title: "",
 						side: "YES",
 						createdAt: "2026-05-28T13:40:00.000Z",
 						body: "The gap looks large only if you ignore that two major interchange stations open next month. Interchanges are where ridership compounds.",
@@ -343,6 +359,8 @@ export const mumbaiMetroModel: DebateViewModel = {
 					{
 						removed: false,
 						id: "cmt-r5-1",
+						ordinal: 1,
+						title: "",
 						side: "NO",
 						createdAt: "2026-06-04T17:50:00.000Z",
 						body: 'Fare beats a cab, sure, but most of the "bulk volume" you need is people currently on the suburban locals, which are cheaper than the metro, not pricier. Cost actually cuts against the switch for them.',
@@ -391,6 +409,8 @@ export const mumbaiMetroModel: DebateViewModel = {
 					{
 						removed: false,
 						id: "cmt-r6-1",
+						ordinal: 1,
+						title: "",
 						side: "NO",
 						createdAt: "2026-06-11T09:35:00.000Z",
 						body: "This matches what I am seeing on the ground: packed core stations, empty feeder roads. The line is not the bottleneck, getting to it is.",

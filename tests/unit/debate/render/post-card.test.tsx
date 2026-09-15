@@ -415,6 +415,8 @@ describe("HTML-FINISH · MARKET DETAIL — row 25, the card sheds teaser + repli
 		const reply = {
 			removed: false as const,
 			id: "0199a0c0-0000-7000-8000-00000000ee01",
+			ordinal: 1,
+			title: "",
 			side: "YES" as const,
 			createdAt: "2026-07-30T00:00:00.000Z",
 			body: "Fixture reply body that must not appear on the card.",

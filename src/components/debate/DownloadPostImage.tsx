@@ -6,13 +6,27 @@ import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
-/** `<market-slug>-post-<ordinal>.jpg` — mirrors the route's own naming. */
-export function postImageFilename(slug: string, ordinal: number): string {
-	return `${slug}-post-${ordinal}.jpg`;
+/**
+ * `<market-slug>-post-<ordinal>.jpg` (`…-reply-<M>.jpg` for a reply) — mirrors
+ * the route's own naming.
+ */
+export function postImageFilename(
+	slug: string,
+	ordinal: number,
+	reply?: number,
+): string {
+	return reply === undefined
+		? `${slug}-post-${ordinal}.jpg`
+		: `${slug}-post-${ordinal}-reply-${reply}.jpg`;
 }
 
-export function postImageHref(slug: string, ordinal: number): string {
-	return `/m/${encodeURIComponent(slug)}/export/image?post=${ordinal}`;
+export function postImageHref(
+	slug: string,
+	ordinal: number,
+	reply?: number,
+): string {
+	const base = `/m/${encodeURIComponent(slug)}/export/image?post=${ordinal}`;
+	return reply === undefined ? base : `${base}&reply=${reply}`;
 }
 
 const ERROR_COPY = "Couldn't build the image — try again";
@@ -51,7 +65,14 @@ const BUSY_COPY = "Preparing the image…";
  * there is no slug, and the control renders as the inert, disabled placeholder
  * it used to be rather than a button that promises a download it cannot make.
  */
-export function DownloadPostImage({ ordinal }: { ordinal: number }) {
+export function DownloadPostImage({
+	ordinal,
+	reply,
+}: {
+	ordinal: number;
+	/** REPLY-IMAGE-EXPORT — the reply's ordinal within post `ordinal`. */
+	reply?: number;
+}) {
 	const params = useParams<{ slug?: string }>();
 	const slug = typeof params?.slug === "string" ? params.slug : null;
 	const [phase, setPhase] = useState<"idle" | "busy" | "error">("idle");
@@ -72,7 +93,7 @@ export function DownloadPostImage({ ordinal }: { ordinal: number }) {
 		}
 		setPhase("busy");
 		try {
-			const res = await fetch(postImageHref(slug, ordinal), {
+			const res = await fetch(postImageHref(slug, ordinal, reply), {
 				cache: "no-store",
 			});
 			if (!res.ok) {
@@ -82,7 +103,7 @@ export function DownloadPostImage({ ordinal }: { ordinal: number }) {
 			if (blob.size === 0 || blob.type !== "image/jpeg") {
 				throw new Error("export image: not a jpeg");
 			}
-			saveBlob(blob, postImageFilename(slug, ordinal));
+			saveBlob(blob, postImageFilename(slug, ordinal, reply));
 			if (mounted.current) {
 				setPhase("idle");
 			}
@@ -145,7 +166,9 @@ export function DownloadPostImage({ ordinal }: { ordinal: number }) {
 				// blanket ban is the only version of that rule nobody has to police
 				// case by case. `aria-label` already names the control, so what is lost
 				// is a hover hint on an icon whose meaning the label carries.
-				aria-label="Download post image"
+				aria-label={
+					reply === undefined ? "Download post image" : "Download reply image"
+				}
 				onClick={onClick}
 				// ⚠ `text-ink` — the SAME token `Replies · n` uses two elements to the
 				// left, so the mark and the one promoted field on this row sit at the

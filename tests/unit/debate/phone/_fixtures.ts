@@ -90,6 +90,8 @@ export function reply(over: {
 	return {
 		removed: false,
 		id: over.id,
+		ordinal: 1,
+		title: "",
 		side: over.side,
 		createdAt: "2026-09-18T10:00:00.000Z",
 		body: BODY,

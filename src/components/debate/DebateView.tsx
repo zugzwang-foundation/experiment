@@ -23,6 +23,7 @@ import { findPostedNode } from "./find-posted";
 import { MarketHeader } from "./MarketHeader";
 import { PostFocusHeader } from "./PostFocusHeader";
 import { readPostParam, resolvePostParamClient } from "./post-param";
+import { parentOfReply, replyDownloadOrdinal } from "./reply-download";
 import { PostScroller, ReplyScroller } from "./scrollers";
 import type {
 	DebatePost,
@@ -1270,6 +1271,7 @@ export function DebateView({
 												focusId={jumpSide === side ? focusId : null}
 												onOpenImage={setLightboxUrl}
 												onOpenPopup={setPopupReply}
+												postOrdinal={replyDownloadOrdinal(selectedPost)}
 												// R3 — the post arm's own auto-advance. d5 runs a
 												// SECOND, structurally identical timer over the reply
 												// columns (`:1816-1901`); one hook serves both here.
@@ -1447,7 +1449,15 @@ export function DebateView({
 			    recorded here so the next reader does not "fix" it. */}
 
 			<PostPopup post={popupPost} onClose={() => setPopupPost(null)} />
-			<ReplyPopup reply={popupReply} onClose={() => setPopupReply(null)} />
+			<ReplyPopup
+				reply={popupReply}
+				onClose={() => setPopupReply(null)}
+				postOrdinal={
+					popupReply === null
+						? null
+						: replyDownloadOrdinal(parentOfReply(posts, popupReply.id))
+				}
+			/>
 			<ImageLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
 		</PageContainer>
 	);

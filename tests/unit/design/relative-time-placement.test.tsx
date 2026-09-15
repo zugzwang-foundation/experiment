@@ -212,6 +212,8 @@ function presentReply(): DebateReply {
 	return {
 		removed: false,
 		id: "0199a0c0-0000-7000-8000-0000000009a1",
+		ordinal: 1,
+		title: "",
 		side: "YES",
 		createdAt: WRITTEN_AT,
 		body: "Fixture reply body.",
@@ -784,6 +786,7 @@ describe("TIME-1 :: A8 — a REMOVED card renders no age at all", () => {
 						reply={{
 							removed: true,
 							id: "0199a0c0-0000-7000-8000-00000000000e",
+							ordinal: 1,
 							side: "NO",
 							createdAt: WRITTEN_AT,
 						}}

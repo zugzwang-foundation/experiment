@@ -25,7 +25,15 @@ import { withLiveTail } from "@/server/discovery/price-series";
 import { getMarketBySlug } from "@/server/markets/get-by-slug";
 
 /**
- * `GET /m/[slug]/export/image?post=<ordinal>` — the post + market JPEG.
+ * `?reply=`'s shape — `resolvePostParam`'s own ordinal gate. A local copy rather
+ * than an import: `post-param-parity.test.ts` pins that module's declaration
+ * byte-for-byte, and the route test asserts this gate fires before any read.
+ */
+const REPLY_PARAM_SHAPE = /^[1-9][0-9]{0,4}$/;
+
+/**
+ * `GET /m/[slug]/export/image?post=<ordinal>[&reply=<ordinal>]` — the post (or
+ * one of its replies) + market JPEG.
  *
  * Reads exactly what the page reads: the same cached debate view, the same
  * live pricing overlay and the same live-tail chart pinning `page.tsx`
@@ -34,7 +42,8 @@ import { getMarketBySlug } from "@/server/markets/get-by-slug";
  * `resolvePostParam`, so the deep link and the download name the same
  * argument. A missing, malformed or REMOVED post is a 404 — a removed post's
  * body never reaches the renderer because the mapper returns `null` before
- * anything is drawn (SC-1).
+ * anything is drawn (SC-1). The same holds for `reply`: a malformed, absent or
+ * removed reply, or any reply under a removed post, is a 404.
  *
  * Read-only. Writes nothing, caches nothing beyond the view cache the page
  * already keeps, and never runs external HTTP inside a transaction — the
@@ -50,9 +59,21 @@ export async function GET(
 		notFound();
 	}
 
-	const post = new URL(req.url).searchParams.get("post");
+	const params = new URL(req.url).searchParams;
+	const post = params.get("post");
 	if (post === null) {
 		notFound();
+	}
+	// REPLY-IMAGE-EXPORT — `&reply=M`, the reply's ordinal within post N, under
+	// the SAME shape gate the post ordinal has, checked before any read so a
+	// malformed value costs nothing. Absent ⇒ the post export.
+	const replyParam = params.get("reply");
+	let replyOrdinal: number | undefined;
+	if (replyParam !== null) {
+		if (!REPLY_PARAM_SHAPE.test(replyParam)) {
+			notFound();
+		}
+		replyOrdinal = Number.parseInt(replyParam, 10);
 	}
 	const postId = await resolvePostParam(db, { marketId: market.id, post });
 	if (postId === null) {
@@ -61,6 +82,8 @@ export async function GET(
 
 	// CACHE-KEY-1 (ADR-0051) — THE SAME POSTER BYPASS `m/[slug]/page.tsx` TAKES,
 	// and it is here because the alternative is a 404 on the author's own post.
+	// (A REPLY's author is covered too: the freshness read is any comment of the
+	// viewer's on this market, replies included.)
 	//
 	// The download affordance lives on a post's card, so an author who has just
 	// posted can reach this route within seconds. `resolvePostParam` reads the
@@ -120,7 +143,13 @@ export async function GET(
 					},
 	};
 
-	const props = composePostExport(model, postId, Date.parse(nowIso), thumbUrl);
+	const props = composePostExport(
+		model,
+		postId,
+		Date.parse(nowIso),
+		thumbUrl,
+		replyOrdinal,
+	);
 	if (props === null) {
 		notFound();
 	}
@@ -128,6 +157,6 @@ export async function GET(
 	const resolved = await resolveExportImages(props);
 	return renderPostExportJpeg(
 		resolved,
-		exportFilename(market.slug, props.post.ordinal),
+		exportFilename(market.slug, props.post.ordinal, replyOrdinal),
 	);
 }

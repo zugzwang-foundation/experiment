@@ -49,6 +49,8 @@ function presentReply(imageUrl: string | null): DebateReply {
 	return {
 		removed: false,
 		id: "0199a0c0-0000-7000-8000-00000000db01",
+		ordinal: 1,
+		title: "",
 		side: "YES",
 		createdAt: "2026-07-30T00:00:00.000Z",
 		body: "Fixture reply body.",
@@ -65,6 +67,7 @@ function presentReply(imageUrl: string | null): DebateReply {
 const removedReply: DebateReply = {
 	removed: true,
 	id: "0199a0c0-0000-7000-8000-00000000db02",
+	ordinal: 1,
 	side: "NO",
 	createdAt: "2026-07-30T00:00:00.000Z",
 };

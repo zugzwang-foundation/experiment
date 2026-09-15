@@ -280,4 +280,109 @@ describe("exportFilename", () => {
 			"math-erdos-contribution-response-post-3.jpg",
 		);
 	});
+
+	it("names a reply by its post and its ordinal within that post", () => {
+		expect(exportFilename("math-erdos-contribution-response", 3, 2)).toBe(
+			"math-erdos-contribution-response-post-3-reply-2.jpg",
+		);
+	});
+});
+
+/**
+ * REPLY-IMAGE-EXPORT — `?post=N&reply=M`. The reply is the subject of the
+ * image (author, side, stake, title) and the split row is replaced by what it
+ * answered: the parent's title and the relation, read off the list the read
+ * model placed the reply in.
+ */
+describe("composePostExport — a reply", () => {
+	// cmt-p1 (YES): support r1-1 (#1, YES), r1-2 (#3, YES); counter r1-3 (#2, NO).
+	it("paints the REPLY as the subject and says it SUPPORTED the parent", () => {
+		const props = composePostExport(mumbaiMetroModel, "cmt-p1", NOW, null, 1);
+		expect(props).not.toBeNull();
+		if (props === null) return;
+		expect(props.post.pseudonym).toBe("TealOwl118");
+		expect(props.post.side).toBe("YES");
+		expect(props.post.stake).toBe("180");
+		expect(props.post.title).toBe(
+			"Agreed, and the monsoon multiplier is underrated.",
+		);
+		expect(props.post.badge).toBeNull();
+		// The file still names the PARENT's ordinal; the route appends the reply's.
+		expect(props.post.ordinal).toBe(2);
+		expect(props.repliedTo).toEqual({
+			relation: "SUPPORT",
+			parentTitle: "The corridor is built for this volume",
+		});
+	});
+
+	it("says COUNTER for a reply the read model placed on the counter list", () => {
+		const props = composePostExport(mumbaiMetroModel, "cmt-p1", NOW, null, 2);
+		expect(props?.post.pseudonym).toBe("IndigoWolf355");
+		expect(props?.post.side).toBe("NO");
+		expect(props?.repliedTo?.relation).toBe("COUNTER");
+	});
+
+	it("a post export carries no repliedTo", () => {
+		expect(
+			composePostExport(mumbaiMetroModel, "cmt-p1", NOW, null)?.repliedTo,
+		).toBeNull();
+	});
+
+	it("returns null for a reply ordinal the post does not have", () => {
+		expect(
+			composePostExport(mumbaiMetroModel, "cmt-p1", NOW, null, 9),
+		).toBeNull();
+	});
+
+	it("SC-1 — a REMOVED reply yields null", () => {
+		const first = mumbaiMetroModel.posts[0];
+		if (first === undefined || first.removed) throw new Error("fixture");
+		const model: DebateViewModel = {
+			...mumbaiMetroModel,
+			posts: [
+				{
+					...first,
+					replies: {
+						...first.replies,
+						support: [
+							{
+								removed: true,
+								id: "cmt-r1-1",
+								ordinal: 1,
+								side: "YES",
+								createdAt: "2026-05-19T10:12:00.000Z",
+							},
+						],
+					},
+				},
+				...mumbaiMetroModel.posts.slice(1),
+			],
+		};
+		expect(composePostExport(model, "cmt-p1", NOW, null, 1)).toBeNull();
+	});
+
+	it("SC-1 — a reply under a REMOVED post yields null, so no withheld title reaches an image", () => {
+		const model = withRemovedPost(mumbaiMetroModel);
+		const removed = model.posts.find((p) => p.id === "cmt-removed");
+		if (removed === undefined) throw new Error("fixture");
+		const reply = mumbaiMetroModel.posts[0]?.replies.support[0];
+		if (reply === undefined) throw new Error("fixture");
+		removed.replies = { support: [reply], counter: [], twoSlot: [] };
+		expect(composePostExport(model, "cmt-removed", NOW, null, 1)).toBeNull();
+	});
+
+	it("SC-1 — the reply export carries the reply's TITLE and never its body", () => {
+		const reply = mumbaiMetroModel.posts[0]?.replies.support[0];
+		if (reply === undefined || reply.removed) throw new Error("fixture");
+		const props = composePostExport(mumbaiMetroModel, "cmt-p1", NOW, null, 1);
+		if (props === null) throw new Error("expected props");
+		expect(Object.keys(props.post)).not.toContain("body");
+		const out = JSON.stringify(props);
+		expect(out).toContain(reply.title);
+		expect(out).not.toContain(reply.body);
+		// The text AFTER the title — the part a teaser or snippet would carry.
+		const rest = reply.body.slice(reply.title.length).trim();
+		expect(rest.length).toBeGreaterThan(0);
+		expect(out).not.toContain(rest);
+	});
 });
