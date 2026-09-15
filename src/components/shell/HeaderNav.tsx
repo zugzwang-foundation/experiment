@@ -5,8 +5,19 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { cn } from "@/lib/utils";
+
+import { HEADER_ICON_BUTTON } from "./header-control";
+
 /**
  * Left-zone nav pair — Back (leftmost, the v0.2 swap) then Home. 34×34
+ *
+ * ⚠ **A PAIR ONLY AT AND ABOVE 640px.** Below `--breakpoint-mobile` Back does not
+ * render at all (ADR-0051 A9 D-3) and this is a single control. Everything below
+ * about Back describes the DESKTOP control; the reasoning for the phone is on the
+ * `mobileResponsive` prop. Said here because a reader who stops at the component
+ * docblock — the thing the file is named by — would otherwise carry the
+ * superseded picture into every line under it.
  * header icon buttons per the values-log register (§3 item 3): rest
  * --btn-fill + hairline, hover border → --ring (fill unchanged), pressed
  * --state-pressed-fill, focus the 2px light ring, icon 15px ink.
@@ -42,10 +53,49 @@ import { useEffect, useState } from "react";
  * Home carries `aria-current` at `/` — live since UI.A4 put Discovery on `/`
  * inside this shell (it was moot at A1, when no header rendered there).
  */
-const ICON_BUTTON =
-	"inline-flex size-[34px] shrink-0 items-center justify-center rounded-(--r) bg-(--btn-fill) text-ink outline-none select-none [border:var(--hairline)] [transition:all_var(--dur-hover)] hover:[border:1px_solid_var(--ring)] active:bg-(--state-pressed-fill) focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) [&_svg]:size-[15px]";
+/**
+ * ⚠ MOBILE-2n · R-5 — THE REGISTER MOVED OUT OF THIS FILE AND THE ALIAS STAYS.
+ * `header-control.ts` now owns the string, because the phone's GitHub control
+ * wears the same box and "the same box" has to be one literal to stay true. The
+ * local name is kept so the three call sites below take zero diff — the value is
+ * byte-identical, which is what keeps Back and Home unmoved at 1440.
+ */
+const ICON_BUTTON = HEADER_ICON_BUTTON;
 
-export function HeaderNav() {
+export function HeaderNav({
+	mobileResponsive = false,
+}: {
+	/**
+	 * ⛔⛔ MOBILE-2m · R-3 / ADR-0051 A9 D-3 — BACK IS NOT RENDERED BELOW 640px ON
+	 * ANY ROUTE, AND THE HIDE IS GATED ON THIS PROP RATHER THAN WRITTEN
+	 * UNCONDITIONALLY.
+	 *
+	 * The gate is the prop chain, not the file boundary (AGENTS.md §8). This
+	 * component is a static child of `GlobalHeader`, which BOTH layouts mount — so
+	 * an unconditional `max-mobile:hidden` here would reach `(auth)` exactly as
+	 * surely as `(public)`, which is how three ungated classes once shipped onto
+	 * `/sign-in` through `RulesControl` → `OnboardingDeck`. Both mounts opt in
+	 * today, so the rendered outcome is the same either way; what the gate buys is
+	 * that a THIRD mount inherits the desktop header by omission, and that "which
+	 * surfaces reflow" stays a decision a LAYOUT makes.
+	 *
+	 * ⚠ WHY THE CONTROL CAN GO AT ALL, given this file's own long argument for
+	 * keeping it: Back exists here because the depth heuristic cannot tell an
+	 * in-app step from a cross-origin one, and the control is the hedge. A phone
+	 * has a system back gesture that is strictly better informed than the
+	 * heuristic — it knows the real stack — and the tier already carries its own
+	 * Back in `PhoneTitleStrip` for the one screen that needs an in-page one. So
+	 * below 640 this control is a third answer to a question two better ones
+	 * already answer, occupying 42px of the row whose scarcity is what makes the
+	 * brand mark shrink to nothing (see `GlobalHeader`'s shock-absorber note).
+	 *
+	 * ⛔ HIDDEN, NOT UNMOUNTED. `max-mobile:hidden` is a paint decision; the
+	 * button, its handler and its `history.length` probe are untouched, so nothing
+	 * about the desktop control's behaviour is reachable from this change and a
+	 * resize across the tier restores it with its state intact.
+	 */
+	mobileResponsive?: boolean;
+}) {
 	const router = useRouter();
 	const pathname = usePathname();
 	const [hasHistory, setHasHistory] = useState(false);
@@ -66,7 +116,7 @@ export function HeaderNav() {
 				aria-label="Back"
 				title="Back"
 				onClick={() => router.back()}
-				className={ICON_BUTTON}
+				className={cn(ICON_BUTTON, mobileResponsive && "max-mobile:hidden")}
 			>
 				<ArrowLeft aria-hidden="true" />
 			</button>

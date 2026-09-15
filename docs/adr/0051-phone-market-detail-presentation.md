@@ -50,12 +50,12 @@ MOBILE-2 RECON (2026-09-11) measured `/m/[slug]` at 375×812 on staging: the mar
 - **D-3 Sheets.** All phone sheets share one shell: content-height, bottom-anchored, `max-height: 92dvh`, top corners at `--radius-4xl` (26px), page dimmed 60% behind, open by sliding up (`260ms ease-out`), close by sliding down (`200ms ease-in`), backdrop tap and a swipe-down on the handle dismiss (blocked while submitting), reduced motion honoured. A sheet is an overlay on the market, never a page.
 - **D-3 Composer order on the phone.** Header → argument title → body → `Add Image` (white, 40px, full width) → `Max Đ · Balance` → `Amount / To win` → `PLACE Đ BET` (one line). The empty image state is the button only. Attached images render at natural aspect, `max-height: 40dvh`.
 - **D-3 Identity row on the phone.** Avatar 32px beside the pseudonym; the metadata row runs full card width beneath on one line (13px; 12px only when the sold-position labels overflow at 360).
-- **D-3 Scroll model.** Nested snap track with pane scrollers, chosen because it passed the Android touch matrix (report B11) where the alternative did not; no `touchmove` handler under `phone/` calls `preventDefault`.
+- **D-3 Scroll model.** Nested snap track with pane scrollers, chosen because it passed the Android touch matrix (report B11) where the alternative did not; no `touchmove` handler under `phone/` calls `preventDefault`. [superseded by A3 D-3]
 - **D-2 founder-ruled carve-outs (2026-09-12).** (i) `ImageAttach`'s attached-state preview frame changes on desktop too — its oversized-frame defect was ruled a shared bug (Q8); measured at 1440 before/after. (ii) The shared quote-well's WebKit-only mark misplacement is fixed in the shared component; Chromium rendering at 1440 is unchanged.
 
 ## Amendment A3 — 2026-09-12 (MOBILE-2d; founder ask: "smooth up-down and right-left movement like iPhone")
 
-- **D-3 scroll model, corrected.** The phone tier is a bounded app shell below 640px: the tier root is `calc(100dvh - 60px - 2px)` tall with `overflow: hidden` and a column of [title strip + tabs][scroll region], with the bet bar `position: fixed` over it; the scroll region carries `min-h-0` and is **the vertical scroller** (`overflow-y: auto`, `overscroll-behavior-y: contain`); inside it sits the content-height horizontal snap track (`scroll-snap-type: x mandatory`, `overscroll-behavior-x: contain`, `min-w-0`), and inside that two panes that are pure snap items with no overflow, no overscroll and no `touch-action`. Momentum, rubber-band, axis lock and snapping are the browser's; **the track and panes carry no touch or pointer handler, and no touch or pointer handler in `phone/` calls `preventDefault`.** Tab state follows the scroller (an IntersectionObserver on the track) and never leads it.
+- **D-3 scroll model, corrected.** The phone tier is a bounded app shell below 640px: the tier root is `calc(100dvh - 60px - 2px)` tall with `overflow: hidden` and a column of [title strip + tabs][scroll region], with the bet bar `position: fixed` over it; the scroll region carries `min-h-0` and is **the vertical scroller** (`overflow-y: auto`, `overscroll-behavior-y: contain`); inside it sits the content-height horizontal snap track (`scroll-snap-type: x mandatory`, `overscroll-behavior-x: contain`, `min-w-0`), and inside that two panes that are pure snap items with no overflow, no overscroll and no `touch-action`. Momentum, rubber-band, axis lock and snapping are the browser's; **the track and panes carry no touch or pointer handler, and no touch or pointer handler in `phone/` calls `preventDefault`.** [superseded by A5 D-3] Tab state follows the scroller (an IntersectionObserver on the track) and never leads it.
 - ⛔⛔ **D-3, THE TOPOLOGY RULE, WHICH IS THE RESULT THIS AMENDMENT EXISTS FOR: the vertical scroller must be an ANCESTOR of the horizontal snap track, never a descendant of it.** A scroller per pane is the obvious design and gives each side its own reading position; it also kills the sideways swipe, invisibly. Measured on Chromium, bounded build, market `sp-m2-active`: with the vertical scroller nested inside the snap track, a horizontal swipe that follows a vertical scroll **moved nothing at all in 15 of 40 trials** — sampled every frame, so a routing decision rather than a snap that returned — across four input paths (10, 24 and 36 hand-dispatched touch moves and Chrome's own `Input.synthesizeScrollGesture`). With the scroller above the track: **40 of 40**, matching the document-scroll model it replaces, with a no-prior-scroll control at 10/10 in both. ⚠ **The price is one shared vertical position for both sides, with the shorter side padded to the taller one's height** — which is exactly what the document did before, so it is the status quo rather than a regression, and it is not recoverable by nesting. ⚠ **Two declarations are fatal on the snap item** and are named so they are not re-added: `overscroll-behavior-x` anything but `auto`, and `touch-action: pan-y` (both 0 of 8) — `touch-action` is intersected down the ancestor chain and inline-axis containment forbids the chain, so a horizontal gesture beginning on a card never reaches the track.
 - ⚠ **D-3 consequence, `position: sticky`.** The title-strip-and-tabs block's `sticky top-[62px]` is deleted. `overflow: hidden` makes the tier root a scrollport; a sticky child resolves its offset against the nearest scrollport, so the 62px offset moved the block 62px DOWN inside the shell — measured on every phone profile, putting 61px of the feed behind the tabs. The offset existed to clear the page header while the document scrolled, and the document does not scroll here.
 - **Why it changed.** As shipped in MOBILE-2c the chain was unbounded — `min-h-[…]` is a minimum, the pane never scrolled, `overflow-y: auto` never engaged, the document scrolled, and `overscroll-behavior: contain` on a non-scrolling box made Chromium refuse to chain the pan, producing a dead region bounded by the pane's rectangle (probe 2026-09-12T1435 §7.2). MOBILE-2d removed that token as a floor, then bounded the chain so the declaration is correct again.
@@ -67,9 +67,9 @@ MOBILE-2 RECON (2026-09-11) measured `/m/[slug]` at 375×812 on staging: the mar
 ## Amendment A4 — 2026-09-13 (MOBILE-2e; founder rulings of 2026-09-13)
 
 - **D-2 scope.** The phone tier's rules extend to `/u/[pseudonym]`: phone-only leaves live under `src/components/profile/phone/`, consume the profile's existing read model, and contain no write path; Sell on the phone is reached from the profile's position rows and runs the existing `InlineSell` instance inside the shared `PhoneSheet`.
-- **D-3 profile composition.** Header = PFP beside the pseudonym, then six tiles three across in two rows; then the positions block — one header row (`POSITIONS · All markets` / `Open · Closed`) and desktop-shaped rows (side glyph │ argument + market │ current value │ `SELL`). The argument viewer panel is not rendered below 640px; a row's title navigates to the post.
+- **D-3 profile composition.** Header = PFP beside the pseudonym, then six tiles three across in two rows; then the positions block — one header row (`POSITIONS · All markets` / `Open · Closed`) and desktop-shaped rows (side glyph │ argument + market │ current value │ `SELL`). The argument viewer panel is not rendered below 640px; a row's title navigates to the post. [superseded by A5 D-1]
 - **D-3 composer.** `PLACE Đ BET` shares the bottom bar's primary style when enabled and a solid dim fill when disabled; its edges align with every block above it.
-- **D-3 split bar.** Support/Counter buttons 32px, bar 6px, amounts on one line, edges flush with the card; hit areas extended to 44px without handlers.
+- **D-3 split bar.** Support/Counter buttons 32px, bar 6px, amounts on one line, edges flush with the card; hit areas extended to 44px without handlers. [superseded by A8 D-3]
 - **D-4(vi) Tooltips.** No tooltip mounts on the phone tier; the relation is carried by the sheet header. Triggers are blurred when a sheet opens.
 - **D-3 identity row.** Position-state chips and lane badges sit on line 1 beside the pseudonym; line 2 is the four metrics, one line at every phone width.
 - **D-3 sheet dismissal.** The velocity arm of swipe-to-dismiss requires ≥ 24px of travel.
@@ -87,7 +87,7 @@ scroll container is introduced. Composition: side, value, movement and SELL on o
 line; the argument title; the market question, complete. `useEqualRowThirds` stands
 down below 640 via its `enabled` option and is unchanged on the desktop. The Closed
 tab shares the tile. No tile carries a selected visual below 640; selection state is
-retained for the sell sheet.
+retained for the sell sheet. [superseded by A6 D-1]
 
 D-2 (corrects A4 D-2). Strike `SellModule`; nothing imports it. The phone sell sheet
 mounts `InlineSellAmount` and drives `useInlineSell`, both unchanged.
@@ -98,7 +98,7 @@ Escape/Tab focus trap in `PhoneSheet` — do, and are permitted.
 
 Measurements: B13 (equal column x's, row height) is retired, replaced by the tile
 baseline — tile height against viewport at 360/375/390/430, snap landing, question
-never clamped. B2 is measured on both tabs.
+never clamped. [superseded by A6 D-1] B2 is measured on both tabs.
 
 ### A6 — 2026-09-14 · The tile is full width in a scrolling list; A5 D-1 is withdrawn
 
@@ -153,18 +153,19 @@ unchanged above the same-build floor.
 Supersedes O-1(c)'s two-line allowance for the identity block. Corrects A6's
 Measurements clause and A7 D-2.
 
-D-1. Below `--breakpoint-mobile`, after a successful bet the feed shows the viewer's
-fresh post at the top of the side just bet, through the desktop's own pin — the same
-state, the same treatment, the same expiry — never through the URL, since `?post=N`
-is the thread view on the phone. The pinned post is keyed by the id the bet returned.
-The active side switches to the side bet and the feed region scrolls to top.
+D-1 (amended 2026-09-14). Below `--breakpoint-mobile`, after a successful bet the
+feed mirrors the desktop's actual mechanism: the desktop holds no pin — it holds a
+paged column whose index moves to the author's card. On the phone, the active side
+switches to the side just bet and the feed region scrolls so the viewer's own fresh
+card, keyed by the id the bet returned, sits at the top of the region. There is no pin
+state and no `scrollTo(0)`; `?post=N` remains the thread view.
 
 D-2. The identity block is two lines at every phone width: line one holds the
 pseudonym, which truncates, the position chips in one style, and the export
-affordance; line two holds the meta row. It never wraps to three.
+affordance [superseded by A10 D-1]; line two holds the meta row. It never wraps to three.
 
 D-3. The Support/Counter split bar is 6px tall with rounded ends; the three stake
-figures sit in three columns beneath the button, the bar, and the button.
+figures sit in three columns beneath the button, the bar, and the button. [superseded by A9 D-2]
 
 D-4. The positions filter's selected state shows the market's tag alone with its
 disclosure arrow; the open list shows full questions.
@@ -180,6 +181,107 @@ six formatted characters. A7 D-2 is widened: the media cap applies wherever a po
 media renders at phone width — the feed, a reply's attachment, and the parent sheet.
 
 Measurements: identity-block line count at 360/375/390/412/430 with both chips and a
-20-character pseudonym; split-bar height and column alignment; pin present at top
-after a bet on the local QA database, side switched, scrollTop 0; pill and poll
+20-character pseudonym; split-bar height and column alignment; post-bet behaviour proven by ten jsdom guards, eight red against the pre-round tree;
+a live bet on the local QA database was not run, because no session exists there and
+creating one would mean authenticating as the founder; side switched; the viewer's
+card first; scrollTop equals that card's top; pill and poll
 behaviour unchanged; B1 walls unchanged above the floor.
+
+### A9 — 2026-09-14 · Round nine: the unbounded card, the split bar's channel, the header without a back button, the username, the filter pill
+
+D-1. Below `--breakpoint-mobile`, the feed's post card carries no border and no
+corner radius of its own; content runs to the screen edge with the tier's horizontal
+padding only, and posts are separated by a full-width hairline. The Support/Counter
+footer keeps a lighter ground and no border, so the bet control reads as one band
+inside the card.
+
+D-2. The Support/Counter split bar is 8px tall with rounded ends over a recessed
+channel: a muted ground visible at Đ 0, with the fill drawn on top of it. [superseded by A10 D-2]
+
+D-3. Below `--breakpoint-mobile`, the app header carries no back button on any page;
+home and rules sit left, the avatar right [superseded by A10 D-5], and the logo is
+positioned against the header's own centre in the signed-in and signed-out states alike. The desktop header
+is unchanged.
+
+D-4. The pseudonym in the identity block is 14px.
+
+D-5. The positions filter pill matches the Open/Closed tabs in height, radius, border
+weight and type, with a disclosure caret.
+
+Measurements: card border and radius 0 below 640; hairline full width; media cap
+still binds after the width change; money line at Đ 14,260 at 360 with no overflow;
+identity block two lines at 360/375/390/412/430; bar height 8px with the channel
+visible at Đ 0 [superseded by A10 D-2]; logo centre within 1px of the header centre at 360/390/430 in both
+auth states; back button absent below 640 on every route and present at 640 and
+1440; B1 walls unchanged above the floor.
+
+### A10 — 2026-09-14 · Round ten: chips on the meta row, the bar's channel, the footer's ground, the name, the GitHub control
+
+D-1. Below `--breakpoint-mobile`, the position chips (`Flipped`, `Sold`) render at
+the end of the identity block's meta row, after the age; line one holds the avatar,
+the pseudonym and the export affordance only. No field of the meta row is shortened.
+
+D-2. The Support/Counter split bar is 14px tall with rounded ends over a recessed
+channel; the fill is the desktop's computed Support share drawn over the channel. At
+Đ 0 / Đ 0 there is no fill (corrected by A11 D-2).
+
+D-3. The Support/Counter footer carries no ground and no border; the row sits on the
+card ground, separated by spacing.
+
+D-3 is WITHDRAWN (2026-09-14, evening): removing the footer's ground put both bet
+buttons into a low-contrast state on every card; the ground is restored as it was.
+
+D-4. The pseudonym is vertically centred on the avatar.
+
+D-5. Below `--breakpoint-mobile`, the header carries a GitHub icon control between
+the logo and the identity cluster, reusing the desktop control's href. The logo
+remains pinned to the header's centre in both auth states (A9 D-3 stands).
+
+Measurements: two-line identity block with both chips and a 20-character pseudonym
+at 360/375/390/412/430, `REPLIES · n` intact; bar height 14px, channel visible, fill
+at 50% at zero stake and at the desktop's share otherwise [superseded by A11 D-2]; footer background
+transparent, border 0 [superseded by A10 D-3 withdrawal]; name centre within 1px of avatar centre; logo, icon and
+avatar centres collinear within 1px; icon→avatar gap equals home→rules; logo centre
+within 1px of header centre in both auth states; B1 walls unchanged above the floor.
+
+### A11 — 2026-09-15 · The footer's colours under the side rule; the X control
+
+D-1. Below `--breakpoint-mobile`, the Support/Counter footer follows black = YES /
+white = NO: on a YES post Support is black and Counter white; on a NO post the
+reverse. Black-side buttons and the bar's track carry the design-language hairline
+so black is visible on the card ground; the black token is unchanged.
+
+D-2 (corrects A10 D-2). The bar's Support share fills from the left in Support's
+side colour; the remainder is Counter's side colour. At Đ 0 / Đ 0 the track shows
+the channel only, with no fill — grey means nothing staked and nothing else.
+
+D-3. A footer button for the side the viewer already holds renders in its own side
+colour at 40% opacity, never as a grey fill.
+
+D-4. Below `--breakpoint-mobile`, the header carries an X control immediately right of
+the GitHub control, before the identity cluster, linking to x.com/zugzwangworld. The
+logo remains pinned to the header's centre in both auth states (A9 D-3 stands). [superseded by A12 D-1]
+
+Measurements: black buttons and the 100%-black bar carry the hairline; segment
+proportions at Đ 100/50, Đ 0/100 and Đ 0/0 on both sides; disabled buttons compute to
+their side token at 0.4 opacity; logo centre within 1px of header centre with both
+controls present in both auth states at 360/390/430 [superseded by A12 D-1]; B1 walls unchanged.
+
+### A12 — 2026-09-15 · Close-out of the pre-launch phone lane; the X control is withdrawn; supersession rule
+
+D-1 (withdraws A11 D-4). Below `--breakpoint-mobile` the header carries one
+off-site control, GitHub. The X control was built, measured to overlap the logo by
+27.12px at 360 signed out, reverted, and withdrawn by the founder on 15 September.
+A9 D-3 — the logo pinned to the header's centre — stands.
+
+D-2 (supersession). Where a sentence in A1–A11 is contradicted by a later amendment,
+the later amendment governs. Each such sentence is marked in place with
+"[superseded by A<n> D-<m>]" and is not deleted. The marks added at close-out are
+listed in the close-out record. This rule closes parked 2n-3, 2n-6 and 2o-5.
+
+D-3 (state at close-out). The phone tier ships as measured at the close-out tip:
+rounds one through eleven and two fixes, ADR-0051 A1–A12, the desktop
+pixel-identical at ≥640 on both routes, no file under `src/server/**`, `drizzle/**`,
+`src/db/**` or auth authored by the lane, and the files carried from #521, #525 and
+P-17 named in the squash. Week-one items remain in `docs/parked.md`; none is a
+go-live condition (D-28 r6).

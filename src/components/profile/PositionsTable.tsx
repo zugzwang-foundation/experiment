@@ -814,7 +814,52 @@ export function PositionsTable({
 							   both measured after. The 20px it reclaims is the head's own
 							   padding, where no other control lives, so the expanded area
 							   steals no neighbour's tap. */
-							className="max-mobile:-my-2.5 max-mobile:h-11 max-mobile:max-w-full max-mobile:min-w-0 max-mobile:shrink max-mobile:overflow-hidden"
+							/* ⛔⛔ MOBILE-2m · R-5 / ADR-0051 A9 D-5 — AND THAT IS EXACTLY WHAT IS
+							   BEING UNDONE, BECAUSE THE THING IT GREW WAS THE PAINTED BOX. 2l
+							   reasoned about the MARGIN box and got that right; what it did not weigh
+							   is that `variant="outline"` puts a real hairline and a real fill on this
+							   control, so `h-11` renders a **44px-tall bordered pill** eight pixels
+							   from a 24px tab. MEASURED at the floor, 360px: pill height 44 at y
+							   322.84, Open tab height 24 at y 332.09, type 12px against 11px. A9 D-5
+							   rules them equal in height, radius, border weight and type.
+							   ⇒ Dropping `h-11`/`-my-2.5` returns the control to `buttonVariants`' own
+							   `xs` box — `h-6`, 24px — which already matches the tab; the only other
+							   visual token this round adds is the 11px that matches it in type.
+							   ⚠ RADIUS AND BORDER WERE ALREADY EQUAL AND ARE DELIBERATELY NOT
+							   RESTATED. `xs` is `rounded-[min(var(--radius-md),10px)]`, and
+							   `--radius-md` is `calc(.625rem * .8)` = 8px, which IS `--r`, the tab's
+							   own token — equal by arithmetic rather than by copy, and a copied literal
+							   here would be the thing that drifts. The floor confirms it: 8px against
+							   8px, 1px against 1px.
+							   ⛔⛔ AND THE 44px TARGET COMES BACK AS THE PSEUDO-ELEMENT 2l RULED OUT,
+							   WHICH IS ONLY POSSIBLE BECAUSE `overflow-hidden` LEAVES WITH `h-11`. 2l
+							   rejected `::after` because the overlay must escape the button's box while
+							   `overflow-hidden` was here as half of the MOBILE-2h clip. It was never
+							   the load-bearing half: `max-w-full` caps the button at its wrapper's
+							   resolved width, and the label span's own `truncate` carries the clip. So
+							   the clip survives the removal — asserted by measuring the rendered label,
+							   not by this paragraph — and the hit region can extend again.
+							   ⛔⛔ 11px, NOT 10px — AND THE DIFFERENCE IS THE BORDER. This read
+							   "10px UP AND 10px DOWN ON A 24px BOX IS 44" and shipped a **42px**
+							   hit region, two pixels under the floor it exists to reach. An
+							   absolutely-positioned element's containing block is its ancestor's
+							   PADDING box, not its border box (CSS 2.1 §10.1), and this button is
+							   `h-6` carrying a 1px hairline top and bottom — so the box the insets
+							   resolve against is 22px, and 22 + 10 + 10 = 42. MEASURED on the live
+							   build by painting the pseudo-element and reading it back:
+							   `getComputedStyle(el, '::after').height` → **`42px`**. 22 + 11 + 11 = 44.
+							   ⚠ A PROBE THAT ADDS THE INSETS TO THE BORDER BOX RETURNS 44 AND LOOKS
+							   RIGHT, which is how this shipped AND how the round's own B7 census
+							   reported it clean. Found by `@code-reviewer`, MEDIUM; confirmed by
+							   measurement rather than by argument, because the two readings differ
+							   by exactly the quantity neither of them states.
+							   ⚠ IT STILL STAYS INSIDE THE HEAD. The filter head is 51.99px tall
+							   around a 24px child, so there is
+							   ~14px of its own padding on each side; the extension takes 11 of it and
+							   reaches no neighbour. It is SYMMETRIC here, unlike `AggregateFooter`'s
+							   asymmetric 8/4 — that one had a Đ figure 4px below to avoid, and this
+							   control has nothing above or below it but the head's padding. */
+							className="max-mobile:relative max-mobile:max-w-full max-mobile:min-w-0 max-mobile:shrink max-mobile:text-[11px] max-mobile:after:absolute max-mobile:after:inset-x-0 max-mobile:after:-top-[11px] max-mobile:after:-bottom-[11px] max-mobile:after:content-['']"
 							onClick={() => setFilterOpen((o) => !o)}
 						>
 							{/* ⛔ THE LABEL IS WRAPPED SO IT CAN ELLIPSIZE, and the wrapper

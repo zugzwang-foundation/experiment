@@ -6,9 +6,16 @@ import { describe, expect, it } from "vitest";
  * MOBILE-2l · R-4 — THE IDENTITY BLOCK IS TWO LINES AT PHONE WIDTH, WITH BOTH
  * CHIPS PRESENT AND A 20-CHARACTER PSEUDONYM.
  *
- * The ruled shape:
- *   line 1 — pseudonym · position chips · the export affordance
- *   line 2 — the meta row (side badge · Đ stake · Replies · age)
+ * The ruled shape, **as ADR-0051 A10 D-1 now rules it**:
+ *   line 1 — avatar · pseudonym · the export affordance, and NOTHING else
+ *   line 2 — the meta row (side badge · Đ stake · Replies · age · the chips)
+ * ⛔ REVERSED AT ROUND TEN AND CORRECTED HERE, at the sentence a reader meets
+ * first (`O-5`). It read `line 1 — pseudonym · position chips · the export
+ * affordance`. `Flipped`/`Exited` and `Sold` now render at the END of the meta
+ * row, after the age. The two-line CEILING is unchanged, and so is the mechanism
+ * that produces it — a negative `order` ahead of a zero-height `basis-full`
+ * break — which is why the rows below still read exactly those two things and
+ * only their membership moved.
  * The PSEUDONYM is the element that yields (`min-width:0` + an ellipsis); the
  * chips and the icon never shrink; and `Flipped`/`Exited` and `Sold` read as ONE
  * chip style at phone — same size, same case, same weight, same tracking, same
@@ -283,14 +290,46 @@ describe("MOBILE-2l · R-4 — the two-line mechanism", () => {
 		expect(brk).toContain(phone("basis-full"));
 		expect(brk, "and claims no height of its own").toContain(phone("h-0"));
 
-		// The three line-1 members sit AHEAD of the break.
+		// ⛔⛔ LINE 1's MEMBERSHIP IS NOW ONE, AND ADR-0051 A10 D-1 IS THE REVERSAL.
+		// This block asserted four members ahead of the break — the pseudonym and
+		// the three chips. Round ten gives line 1 to the name, the avatar and the
+		// export mark and to nothing else; `Flipped` and `Sold` render at the END
+		// of the meta row, and the lane badge returns to its own DOM position after
+		// the age. The MECHANISM is untouched (a negative order ahead of a
+		// zero-height `basis-full` break), which is why this row still reads the
+		// break above and only its membership below.
 		expect(pseudonymClasses()).toContain(phone("-order-2"));
-		expect(positionMarkerClasses()).toContain(phone("-order-2"));
-		expect(soldChipClasses()).toContain(phone("-order-2"));
+		for (const [what, classes] of [
+			["the position marker", positionMarkerClasses()],
+			["the Sold chip", soldChipClasses()],
+		] as [string, string[]][]) {
+			expect(
+				classes,
+				`${what} is lifted onto line 1. A10 D-1 gives that line to the name.`,
+			).not.toContain(phone("-order-2"));
+		}
+		// ⛔ THE LANE BADGE CARRIES NO `className` AT ALL NOW, AND THAT ABSENCE IS
+		// THE ASSERTION RATHER THAN AN OBSTACLE TO IT. A9 passed it
+		// `max-mobile:-order-2`; A10 D-1 drops the prop entirely so the badge sits
+		// at order 0, i.e. at its own DOM position immediately after the age. Read
+		// on the MOUNT rather than through the className helper, which would throw
+		// on a prop that is correctly not there.
+		const laneMount = /<LaneBadge badge=\{[^}]*\}\s*\/>/.exec(source);
 		expect(
-			classesAt(source, "<LaneBadge badge="),
-			"the lane badge joins line 1 too",
-		).toContain(phone("-order-2"));
+			laneMount,
+			"the `<LaneBadge …/>` mount moved — re-derive this fence rather than " +
+				"deleting it (`O-8`).",
+		).not.toBeNull();
+		expect(
+			laneMount?.[0] ?? "",
+			"the lane badge took a className back. A10 D-1 leaves it at order 0 so " +
+				"it lands after the age, agreeing with the desktop row.",
+		).not.toContain("className");
+		// ⛔ AND THE TWO CHIPS ARE ORDERED PAST THE ROW, not merely un-lifted. With
+		// no token at all they would land mid-row, between the side badge and the
+		// stake — the ruling says "after the age", which is order 1.
+		expect(positionMarkerClasses()).toContain(phone("order-1"));
+		expect(soldChipClasses()).toContain(phone("order-1"));
 	});
 
 	it("CONTROL — the groups dissolve so the ordering can reach across them", () => {

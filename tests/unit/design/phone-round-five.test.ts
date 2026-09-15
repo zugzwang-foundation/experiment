@@ -307,8 +307,15 @@ describe("R-M2 — the split bar is 32/6 on a phone, and the tap area is a pseud
 			`just as invisible in a source scan.`;
 		expect(box, why).toContain(phone("h-8"));
 		expect(box, "the desktop box is gone").toContain("h-6");
-		expect(track, `${FOOTER}: the phone track is not 6px`).toContain(
-			phone("h-[6px]"),
+		// ⚠⚠ 6px → 8px AT MOBILE-2m (A9 D-2), THEN 8px → 14px AT MOBILE-2n
+		// (A10 D-2). This round-five guard is about the ALIGNMENT BOX tracking the
+		// pill, and the thickness is only here as the other half of that pair — but
+		// a stale literal in a passing guard is how a ruled value quietly acquires
+		// two answers, so it moves with the ruling rather than being loosened to
+		// "some thickness". ⚠ The 32px box still clears a 14px track with 9px a
+		// side, so the pairing this row asserts is unchanged by the growth.
+		expect(track, `${FOOTER}: the phone track is not 14px`).toContain(
+			phone("h-[14px]"),
 		);
 		// The desktop literal the three-way parity guard re-derives must survive.
 		expect(track, "the desktop track thickness was replaced").toContain(
@@ -317,7 +324,7 @@ describe("R-M2 — the split bar is 32/6 on a phone, and the tap area is a pseud
 	});
 });
 
-describe("R-Q1 — the chips ride line 1, and they get there by ORDER", () => {
+describe("R-Q1 → A10 D-1 — the chips are placed by ORDER, and round ten reversed which line", () => {
 	it("round5::the-line-break-is-an-ELEMENT-and-the-pseudonym-stopped-being-one", () => {
 		const source = stripComments(read(ARGPROFILE));
 		const brk = classTokensAfter(
@@ -368,6 +375,13 @@ describe("R-Q1 — the chips ride line 1, and they get there by ORDER", () => {
 		// ⚠ Each anchor is the element's OWN identity (its component name or its
 		// testid), never a class it also declares — selecting a subject by the
 		// declaration under test is how a guard comes to assert itself (OVN-V5).
+		// ⛔⛔ ADR-0051 A10 D-1 REVERSES THE DESTINATION AND THIS ROW IS INVERTED
+		// RATHER THAN DELETED. R-Q1 lifted four passengers ONTO line 1; round ten
+		// gives line 1 to the pseudonym alone and sends the three chips to the END
+		// of the meta row. The MECHANISM is untouched — it is still `order` across
+		// dissolved group boxes — so what changes is which sign each carrier takes,
+		// and that is exactly the thing worth pinning: a chip with the wrong sign
+		// lands on the wrong line and nothing else in the suite can see it.
 		const carriers: [string, string][] = [
 			["the pseudonym link", "href={`/u/$"],
 			// ⚠ ANCHORED ON THE SYMBOL, NOT THE SPELLING (`O-8`). This read
@@ -375,15 +389,12 @@ describe("R-Q1 — the chips ride line 1, and they get there by ORDER", () => {
 			// second prop and `biome format` broke it across lines — a formatting
 			// change reddened a behavioural guard. Fencing by distance in another
 			// unit is still fencing by distance.
-			["the position marker", "<PositionMarker"],
-			["the Sold chip", 'data-testid="argstake-sold"'],
-			["the lane badge", "<LaneBadge badge="],
 		];
 		for (const [what, anchor] of carriers) {
 			expect(
 				classTokensAfter(source, anchor, what),
-				`${ARGPROFILE}: ${what} does not carry the lift, so it stays on line 2 ` +
-					`— which is the arrangement R-Q1 exists to end. ⚠ The lift is a ` +
+				`${ARGPROFILE}: ${what} does not carry the lift, so it falls to the ` +
+					`meta row — and A10 D-1 gives line 1 to the name. ⚠ The lift is a ` +
 					`NEGATIVE order: a positive one sorts it AFTER the default items, ` +
 					`which looks like a token and behaves like the defect.`,
 			).toContain(phone("-order-2"));
@@ -391,15 +402,49 @@ describe("R-Q1 — the chips ride line 1, and they get there by ORDER", () => {
 		const lift = source.match(new RegExp(phone("-order-2"), "g")) ?? [];
 		expect(
 			lift.length,
-			`${ARGPROFILE}: line 1 has FOUR passengers — the pseudonym itself and the ` +
-				`three chips (position marker, Sold tag, lane badge) — and each needs ` +
-				`its own lift token, because they sit in four different spans and no ` +
-				`single declaration reaches all of them. ⚠ The pseudonym is counted on ` +
-				`purpose: it is what makes the group an ORDER rather than a default, so ` +
-				`a future field inserted before it cannot silently take the first slot. ` +
-				`⚠ The count is kept BESIDE the four locations above, not instead of ` +
-				`them: it is what catches a FIFTH lift appearing somewhere nobody named.`,
-		).toBe(4);
+			`${ARGPROFILE}: line 1 has EXACTLY ONE passenger since ADR-0051 A10 D-1 — ` +
+				`the pseudonym. A second lift token means a chip has climbed back onto ` +
+				`the name's line, which is the arrangement round ten exists to end, and ` +
+				`no other guard in this suite counts the lines. ⚠ The pseudonym is ` +
+				`counted on purpose: it is what makes the slot an ORDER rather than a ` +
+				`default, so a future field inserted before it cannot silently take ` +
+				`line 1.`,
+		).toBe(1);
+		// ⛔ AND THE THREE CHIPS TAKE THE OPPOSITE SIGN. A chip with NO order token
+		// would also leave line 1 — and would land in the middle of the meta row,
+		// between the side badge and the stake, rather than after the age. The
+		// ruling says "at the END of the meta row", so the sign is asserted rather
+		// than the absence of one.
+		for (const [what, anchor] of [
+			["the position marker", "<PositionMarker"],
+			["the Sold chip", 'data-testid="argstake-sold"'],
+		] as [string, string][]) {
+			expect(
+				classTokensAfter(source, anchor, what),
+				`${ARGPROFILE}: ${what} is not ordered PAST the meta row's default ` +
+					`items, so it renders between the side badge and the stake instead ` +
+					`of after the age (A10 D-1).`,
+			).toContain(phone("order-1"));
+		}
+		// ⛔ THE LANE BADGE TAKES NO ORDER AT ALL, and that is the third distinct
+		// state. Order 0 puts it at its own DOM position — immediately after the
+		// age — which is where canon §3 item 11 already places it. A token here in
+		// either direction moves it away from the neighbours the desktop row gives
+		// it.
+		// ⚠ READ ON THE MOUNT, not through the className helper: A10 D-1 drops the
+		// prop entirely, and a helper that walks to the next `className=` would
+		// happily find the NEXT element's and assert against the wrong node.
+		const laneMount = /<LaneBadge badge=\{[^}]*\}\s*\/>/.exec(source);
+		expect(
+			laneMount,
+			`${ARGPROFILE}: the \`<LaneBadge …/>\` mount moved — re-derive this ` +
+				`fence rather than deleting it (\`O-8\`).`,
+		).not.toBeNull();
+		expect(
+			laneMount?.[0] ?? "",
+			`${ARGPROFILE}: the lane badge carries a className again. A10 D-1 leaves ` +
+				`it at order 0 so it lands after the age, agreeing with the desktop row.`,
+		).not.toContain("className");
 		// ⛔ AND THE BOXES AROUND THEM HAVE TO DISSOLVE, or `order` reaches nothing:
 		// it is a property of flex ITEMS, and until the wrapper is `display:contents`
 		// a chip is a child of a nested row where reordering moves it beside its

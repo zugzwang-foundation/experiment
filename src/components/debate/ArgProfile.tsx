@@ -17,7 +17,12 @@ import type { AuthorIdentity, Marker, Side } from "./types";
  * A post/reply author header (design-language §3.1 "argprofile"): avatar (PFP
  * placeholder, D8) · pseudonym · frozen SideBadge · live PositionMarker · the
  * author's own stake `a` · reply count.
- * The marker chip sits after the side badge, before the stake (D5).
+ * The marker chip sits after the side badge, before the stake (D5) — **at and
+ * above 640px.** ⛔ BELOW `--breakpoint-mobile` IT IS THE ROW'S LAST FIELD
+ * (ADR-0051 A10 D-1): `Flipped`/`Exited` and `Sold` render at the END of the meta
+ * row, after the age, and line 1 carries the avatar, the pseudonym and the export
+ * mark alone. Said here because this is the paragraph a reader reaches first
+ * (`O-5`), and the phone arrangement is the opposite of the one above it.
  *
  * UNWIRE-1 — the `CardActions` cluster (the bookmark trigger + `showActions`,
  * its caller-side gate) is removed: the bookmark module is unwired
@@ -379,11 +384,14 @@ export function ArgProfile({
 						// separator the block above records: `white-space` is INHERITED, so
 						// it still reaches every field even with the box gone, and each
 						// separator still travels inside the span of the field it leads.
-						// ⚠ The size and weight are the stills' (17px / 600); the leading is
+						// ⚠ The weight is the stills' (600); the size was theirs too (17px) until MOBILE-2m stepped it to 14 — see the R-4 note below; the leading is
 						// stated because the size is arbitrary.
 						// ⛔ `min-h-8` — MOBILE-2c, found by `@code-reviewer`. The avatar is
 						// `absolute` at phone width and is 32px tall from y=0; this line's
-						// own box is 22px (`leading-[22px]`) and the wrapping area's
+						// own box WAS 18px (`leading-[18px]`; 22px when the defect was
+						// measured — it is `leading-8`, i.e. 32px, since A10 D-4, so the
+						// arithmetic below is HISTORY and the floor it argues for is what
+						// survives) and the wrapping area's
 						// `gap-y-0.5` adds 2px, so metadata line 2 began at y=24 and the
 						// avatar's lower 8px painted over the pipe and the side badge —
 						// the avatar being the only positioned element in the row, it wins
@@ -391,14 +399,31 @@ export function ArgProfile({
 						// is the additive fix; jsdom cannot see it and B12 counts LINES,
 						// not overlap, so the measurement is a browser one.
 						// ⚠⚠ MOBILE-2e · R-Q1 — `max-mobile:basis-full` IS GONE FROM HERE AND
-						// HAS MOVED TO AN EXPLICIT BREAK, because the two do different jobs
-						// and only one of them is wanted now. `basis-full` on the pseudonym
-						// says "this field owns line 1 alone"; the ruling is that the chips
-						// join it there. A zero-height `basis-full` item ordered between the
-						// two groups says "break HERE" without claiming the line.
+						// HAS MOVED TO AN EXPLICIT BREAK, because the two do different jobs.
+						// `basis-full` on the pseudonym says "this field owns line 1 alone";
+						// a zero-height `basis-full` item ordered between the two groups says
+						// "break HERE" without claiming the line.
+						// ⚠ THE SENTENCE THAT USED TO END THIS PARAGRAPH — "the ruling is that
+						// the chips join it there" — IS REVERSED BY ADR-0051 A10 D-1, and it
+						// is corrected here rather than below because this is the paragraph a
+						// reader reaches first (`O-5`). Round ten gives line 1 to the name:
+						// the chips are ordered PAST the break instead of ahead of it, so the
+						// explicit-break element is doing MORE work now, not less. It is the
+						// only thing standing between the name and the meta row.
 						// ⛔⛔ MOBILE-2l · R-4 — THE PSEUDONYM IS NOW THE ELEMENT THAT
 						// YIELDS, BELOW 640px ONLY, AND THAT REVERSES THE RULE DIRECTLY
-						// ABOVE. UI-OVERNIGHT 1b rule 8 says NEVER TRUNCATED — "half of one
+						// ABOVE.
+						// ⚠⚠ ADR-0051 A10 D-1 — EVERY MEASUREMENT IN THIS BLOCK WAS TAKEN ON
+						// A LINE 1 THE CHIPS SHARED, AND THEY NO LONGER DO. Round ten moves
+						// `Flipped` and `Sold` past the break to the end of the meta row, so
+						// the 329.94-against-270.79 overflow this block computes cannot arise
+						// from chips any more: at 360 the name is alone on its line with the
+						// export mark beside it. ⛔ THE TOKENS STAY ANYWAY, AND NOT OUT OF
+						// caution — `min-w-0 flex-1 truncate` is what holds A8 D-2's two-line
+						// CEILING for a name longer than the line, which is a property of the
+						// pseudonym and not of what used to sit next to it. What changed is
+						// the cause, not the constraint; the numbers below are kept as the
+						// record of why the mechanism was chosen, not as a live reading. UI-OVERNIGHT 1b rule 8 says NEVER TRUNCATED — "half of one
 						// identifies nobody" — and ADR-0051 O-1(c) then allowed the block a
 						// second line at 360 with two chips. Round eight withdraws that
 						// allowance: two lines is the CEILING at every phone width
@@ -434,11 +459,42 @@ export function ArgProfile({
 						// nothing to cut — the same shape as `MOBILE-2h · R-1`'s `max-w-full`
 						// finding one file over, and for the same reason: the constraint was
 						// on the wrong box.
+						// ⚠⚠ MOBILE-2m · R-4 / ADR-0051 A9 D-4 — 17px → 14px, AND THE
+						// LEADING MOVES WITH IT. An arbitrary `text-[Npx]` does NOT reset
+						// the paired line-height (AGENTS.md §8): it inherits whatever step
+						// was in scope, so stating the size without the leading is how a
+						// 14px name keeps a 22px line box.
+						// ⛔⛔ MOBILE-2n · R-4 / ADR-0051 A10 D-4 — THE LEADING IS NOW THE
+						// AVATAR'S BOX, `leading-8`, AND THE 18px IT REPLACES IS GONE RATHER
+						// THAN AMENDED. 18px held the shipped 17/22 ratio at the new size,
+						// which is a correct thing to preserve and the wrong thing to solve
+						// for: an 18px line box inside a 32px `min-h-8` element sits at the
+						// TOP of that element, so the name's glyphs landed 7.25px ABOVE the
+						// avatar's centre — measured at 360/375/390/412/430, the same figure
+						// at every width because it is set by the two box heights and not by
+						// the width.
+						// ⇒ `leading-8` makes the LINE BOX the element's box, so the
+						// half-leading centres the glyphs in it and the name's centre and the
+						// avatar's centre become the same number by construction.
+						// ⛔ THE THREE TOKENS ARE ONE FACT AND MUST MOVE TOGETHER: `leading-8`
+						// here, `min-h-8` beside it, and the avatar's own `size-8` below. All
+						// three are `calc(var(--spacing) * 8)` — REM, not px — so a reader who
+						// enlarges their root font size keeps the alignment instead of
+						// watching it drift. `leading-[32px]` would have produced the same
+						// pixels today and broken for exactly that reader.
+						// ⚠ THE ELEMENT DOES NOT GROW. It was already floored at 32px by
+						// `min-h-8`; what changed is where inside that 32px the ink sits.
+						// ⚠ THE BLOCK DOES NOT GET SHORTER, AND THAT IS THE POINT OF
+						// `max-mobile:min-h-8` ABOVE. The name's row is floored at 32px to
+						// match the avatar beside it, so the type steps down INSIDE a box
+						// whose height is set by something else — which is what lets A9 D-4
+						// say "nothing else in the block moves" and mean it. A8 D-2's
+						// two-line rule is measured again rather than inferred from that.
 						// ⚠ >=640px IS UNTOUCHED: both tokens are `max-mobile:`, so rule 8
 						// still governs the desktop row it was written for, and the
 						// accessible name is the full pseudonym at every width — this
 						// clips in CSS and never slices the string.
-						className="text-sm font-medium text-ink hover:underline max-mobile:-order-2 max-mobile:min-h-8 max-mobile:min-w-0 max-mobile:flex-1 max-mobile:ps-10 max-mobile:truncate max-mobile:text-[17px] max-mobile:leading-[22px] max-mobile:font-semibold"
+						className="text-sm font-medium text-ink hover:underline max-mobile:-order-2 max-mobile:min-h-8 max-mobile:min-w-0 max-mobile:flex-1 max-mobile:ps-10 max-mobile:truncate max-mobile:text-[14px] max-mobile:leading-8 max-mobile:font-semibold"
 					>
 						{author.pseudonym}
 					</Link>
@@ -483,9 +539,14 @@ export function ArgProfile({
 					    is untouched; its separator was already its first child and it
 					    measured no dangle. */}
 					{/* ⚠ MOBILE-2e · R-Q1 — `max-mobile:contents` HERE IS WHAT LETS THE
-					    CHIP LEAVE. `order` is a property of flex ITEMS, and until this box
-					    dissolves the chip is not one — it is a child of a nested flex row,
+					    CHIP MOVE AT ALL. `order` is a property of flex ITEMS, and until this
+					    box dissolves the chip is not one — it is a child of a nested flex row,
 					    where reordering moves it beside the side badge and nowhere else.
+					    ⚠ THIS PARAGRAPH SAID "LETS THE CHIP LEAVE", MEANING LEAVE FOR LINE 1,
+					    AND THE DESTINATION HAS REVERSED (ADR-0051 A10 D-1). The mechanism is
+					    untouched and that is the point of naming it here: the same dissolution
+					    that once carried the chip UP past the break now carries it DOWN past
+					    it. Only the sign of the `order` changed.
 					    Dissolving costs the separator its guaranteed adjacency to the badge
 					    (they become independent items that could wrap apart), which is the
 					    trade group B measured and lost once — and it is acceptable here
@@ -518,13 +579,35 @@ export function ArgProfile({
 						    other chip names — so nothing there had to move).
 						    ⚠ `shrink-0` because R-4 makes the NAME the elastic field: a
 						    chip allowed to shrink would take the ellipsis the pseudonym is
-						    supposed to take, and the line would still wrap.
+						    supposed to take, and the line would still wrap. ⚠ THAT IS STILL
+						    TRUE AND IS NO LONGER ABOUT THE SAME LINE: since A10 D-1 the chip
+						    sits on the META row, so what `shrink-0` protects now is the four
+						    fields it shares that line with — a chip that shrank would ellipsise
+						    `Flipped` rather than let the row find its own width.
+						    ⛔⛔ MOBILE-2n · R-1 / A10 D-1 — `max-mobile:order-1`, NOT
+						    `-order-2`. Line 1 is the name's alone; `order: 1` places this chip
+						    after every unordered field of the meta row, which is where the
+						    ruling puts it: after the age. The two chips keep their DOM order
+						    between themselves, so the row always reads `… ago [Flipped] [Sold]`
+						    and never the reverse.
+						    ⚠⚠ `max-mobile:px-1` IS THE RULING'S OWN 2px ALLOWANCE, SPENT, AND
+						    IT IS THE ONLY DEPARTURE FROM "same chip style as now". R-1 permits
+						    tightening the chip padding by up to 2px if the row overflows, and
+						    it does: MEASURED at 360 on `/m/sp-m12-fill`, the meta row with both
+						    chips needs 330.12px against a 296.03px wrapping area, so `Sold`
+						    wraps to a third line. 6px → 4px on four chip edges returns 8px,
+						    which is the cap.
+						    ⛔ IT BUYS 375 AND IT DOES NOT BUY 360 — reported, not papered over.
+						    The remaining deficit at 360 is larger than the whole allowance, and
+						    every other lever R-1 names is closed by R-1 itself ("Nothing in the
+						    meta row is shortened or dropped"). That is the founder ruling this
+						    round could not make for itself; see the run report.
 						    ⚠ The leading is stated with the size — an arbitrary
 						    `text-[Npx]` inherits whatever line-height was in scope
 						    (AGENTS.md §8), and this surface has a measured case of it. */}
 						<PositionMarker
 							marker={marker}
-							className="max-mobile:-order-2 max-mobile:shrink-0 max-mobile:text-[11px] max-mobile:leading-[16px]"
+							className="max-mobile:order-1 max-mobile:shrink-0 max-mobile:px-1 max-mobile:text-[11px] max-mobile:leading-[16px]"
 						/>
 					</span>
 					{authorStake !== undefined ? (
@@ -598,8 +681,14 @@ export function ArgProfile({
 										   ⚠ `SOLD_LABEL` is the string `"Sold"` — the UPPERCASE was
 										   never in the copy, it was this class. Dropping
 										   `uppercase` at phone width therefore changes no text and
-										   no accessible name; `>=640px` still renders `SOLD`. */
-										className="rounded-[var(--r-chip)] bg-n1 px-1.5 py-0.5 font-bold text-[10px] text-n5 uppercase tracking-[0.08em] max-mobile:-order-2 max-mobile:shrink-0 max-mobile:rounded-sm max-mobile:text-[11px] max-mobile:leading-[16px] max-mobile:font-normal max-mobile:tracking-normal max-mobile:text-muted-foreground max-mobile:normal-case"
+										   no accessible name; `>=640px` still renders `SOLD`.
+										   ⛔ MOBILE-2n · R-1 / A10 D-1 — `max-mobile:order-1` for the
+										   same reason the marker takes it: this chip is the LAST
+										   thing the meta row says. It is ordered rather than moved
+										   in the DOM because the desktop row's composition is a
+										   wall, and `arg-profile-row` reads that composition by
+										   node order. */
+										className="rounded-[var(--r-chip)] bg-n1 px-1.5 py-0.5 font-bold text-[10px] text-n5 uppercase tracking-[0.08em] max-mobile:order-1 max-mobile:shrink-0 max-mobile:rounded-sm max-mobile:px-1 max-mobile:text-[11px] max-mobile:leading-[16px] max-mobile:font-normal max-mobile:tracking-normal max-mobile:text-muted-foreground max-mobile:normal-case"
 									>
 										{SOLD_LABEL}
 									</span>
@@ -720,7 +809,34 @@ export function ArgProfile({
 				    size per surface is the drift it was lifted to end. */}
 					<FieldSeparator />
 					<RelativeTime createdAt={createdAt} />
-					{/* ⚠ AT MOST ONE BADGE EXISTS TO RENDER. `LaneBadge` takes a single
+					{/* ⛔⛔ MOBILE-2n · R-1 / A10 D-1 — THE LANE BADGE CARRIES NO `order`
+					    TOKEN AT ALL NOW, AND ITS ABSENCE IS THE EDIT. It carried
+					    `max-mobile:-order-2`, which put it on line 1 beside the name — and
+					    A10 D-1 gives line 1 to the name, the avatar and the export mark and
+					    to nothing else. Dropping the token returns it to order 0, where it
+					    lands at its own DOM position: immediately after the age — which is
+					    where UI-OVERNIGHT 1b rule 5 puts it and where the DESKTOP row has
+					    always put it. So the two rows now agree on the badge's neighbours
+					    instead of disagreeing about them.
+					    ⛔⛔ AND CANON DOES **NOT** RATIFY THAT ORDER — THIS BLOCK CLAIMED IT
+					    DID, AND THE CLAIM IS WITHDRAWN RATHER THAN SOFTENED (`O-9`). It
+					    cited canon §3 item 11's "the age precedes that cluster" as agreement.
+					    Read at HEAD, "that cluster" is the item's TRAILING-EDGE ACTION
+					    cluster — "a download mark, a menu glyph" — and says nothing about a
+					    lane badge. Worse, the same item's TIME-1 amendment reads the other
+					    way: "Every identity row that names an author ENDS WITH the argument's
+					    age. It is the row's last field, FOLLOWING EVERY EXISTING TAG," which
+					    puts the badge BEFORE the age, not after.
+					    ⇒ **The shipped order is rule 5's and canon disagrees with it, on all
+					    four author rows, and has since TIME-1.** That is pre-existing and is
+					    not this round's to change — what this round may not do is assert a
+					    ratification that does not exist. Docketed at `docs/parked.md` 2n-6.
+					    Found by `@code-reviewer`.
+					    ⚠ IT SITS BEFORE `Flipped`/`Sold`, WHICH ARE `order-1`. A lane badge
+					    is a fact about the argument's RANK; the position chips are facts
+					    about the author's HOLDING. Rank travels with the age it is measured
+					    over; the holding is the row's last word.
+					    ⚠ AT MOST ONE BADGE EXISTS TO RENDER. `LaneBadge` takes a single
 					    `Badge | null` (a post dominates a lane or it does not), so the
 					    brief's "at most 2" is satisfied by the data shape rather than by
 					    a slice here — writing a cap over a scalar would be code that
@@ -728,7 +844,7 @@ export function ArgProfile({
 					    belongs at that seam, not at this one.
 					    ⚠ A REPLY PASSES NOTHING: lane dominance is a post-ranking
 					    artifact, and `LaneBadge` renders `null` for `null`. */}
-					<LaneBadge badge={badge ?? null} className="max-mobile:-order-2" />
+					<LaneBadge badge={badge ?? null} />
 				</span>
 			</div>
 			{/* ⚠⚠ UI-QUICK change set 6 §2 — THE DOWNLOAD PLACEHOLDER MOVED HERE FROM

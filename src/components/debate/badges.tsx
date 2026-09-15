@@ -176,7 +176,11 @@ export function SideBadge({
  * The live position marker (F-DEBATE-2 / design-language §4.2) — whether the
  * author still holds the side they argued. `none` (still on side) renders
  * nothing (the default); `Flipped` / `Exited` render a neutral-grey chip. Placed
- * after the side badge, before the stake (D5).
+ * after the side badge, before the stake (D5) — **at and above 640px only.**
+ * ⛔ Below `--breakpoint-mobile` the caller orders this chip to the END of the
+ * meta row, after the age (ADR-0051 A10 D-1), through the `className` prop
+ * below. Said at the site rather than only at the call site, because this is
+ * the paragraph a reader of this component reaches first (`O-5`).
  */
 /**
  * ⚠ `className` IS ADDITIVE AND OPTIONAL, minted at MOBILE-2e · R-Q1 so the

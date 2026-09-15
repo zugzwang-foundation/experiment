@@ -64,6 +64,43 @@ if (!DETAIL_PX) {
 }
 const TRACK_CLASS = `h-[${DETAIL_PX}px]`;
 
+/**
+ * ⛔⛔ THE FIRST QUOTED RUN INSIDE THE `cn(` THAT FOLLOWS `anchor` — READ
+ * STRUCTURALLY, BECAUSE THE PREVIOUS READ WAS FENCED BY DISTANCE AND BROKE ON
+ * PROSE. It was `/className=\{cn\(\s*(?:\/\/[^\n]*\n\s*)*"([^"]*)"/` over
+ * `source.slice(at, at + 4000)`, and MOBILE-2n pushed the class string past that
+ * 4000-character window by adding comments above it — the guard then matched
+ * nothing, returned `""`, and went red on a property that had not moved.
+ *
+ * ⚠ `O-8` NAMES THIS EXACTLY: "a character window — `slice(at, at + N)` — IS A
+ * LINE NUMBER WEARING A DIFFERENT UNIT. Both fence by DISTANCE, and prose is what
+ * moves." The fix is to stop measuring distance: walk from the anchor to its
+ * `className={cn(`, then take the first quoted run after it, however many
+ * comment lines intervene.
+ */
+function trackClassAfter(source: string, anchor: string): string {
+	const at = source.indexOf(anchor);
+	if (at === -1) {
+		throw new Error(`anchor not found: ${anchor} — re-derive the fence (O-8)`);
+	}
+	const open = source.indexOf("className={cn(", at);
+	if (open === -1) {
+		throw new Error(
+			`no \`className={cn(\` after ${anchor}. If the track stopped composing ` +
+				`its classes, re-derive this reader rather than widening it.`,
+		);
+	}
+	// ⚠ THE COMMENT-SKIPPING HALF OF THE ORIGINAL REGEX IS KEPT, AND IT HAS TO BE.
+	// A bare `/"([^"]*)"/` takes the first quoted run after the `cn(` — which on
+	// this element is a phrase INSIDE a `//` comment ("the YES/NO bar"), not the
+	// class string. Only the 4000-character window was wrong; stepping over
+	// comment lines was always right.
+	const quoted = /^className=\{cn\(\s*(?:\/\/[^\n]*\n\s*)*"([^"]*)"/.exec(
+		source.slice(open),
+	);
+	return quoted?.[1] ?? "";
+}
+
 /** The class string of the element WRAPPING a bar's track, in either file. */
 function trackWrapper(source: string, testid: string | null): string[] {
 	const at =
@@ -159,12 +196,7 @@ describe("R5 — the market card's own track still matches PriceBar's detail siz
 	// "in parity with the market bar" — and the describe title now says that
 	// instead of the narrower claim it used to make.
 	it("split-bar-parity::the-card-keeps-radius-and-clip-in-parity-with-PriceBar-detail", () => {
-		const at = card.indexOf('data-testid="aggregate-split-track"');
-		expect(at).toBeGreaterThan(-1);
-		const cls =
-			/className=\{cn\(\s*(?:\/\/[^\n]*\n\s*)*"([^"]*)"/.exec(
-				card.slice(at, at + 4000),
-			)?.[1] ?? "";
+		const cls = trackClassAfter(card, 'data-testid="aggregate-split-track"');
 		expect(cls).toContain(TRACK_CLASS);
 		expect(cls).toContain("rounded-[var(--r)]");
 		expect(cls).toContain("overflow-hidden");
@@ -172,9 +204,17 @@ describe("R5 — the market card's own track still matches PriceBar's detail siz
 	});
 
 	it("split-bar-parity::the-card-keeps-items-start-on-its-row", () => {
-		const row = /data-testid="aggregate-footer"\s+className="([^"]*)"/.exec(
-			card,
-		)?.[1];
+		// ⛔ `cn(...)`-TOLERANT SINCE MOBILE-2m — see the twin of this anchor in
+		// `aggregate-footer-alignment.test.ts` for the whole reasoning. R-1 gave
+		// the row a conditional band; the `items-start gap-2` property is intact
+		// and it is the bare-literal ASSUMPTION that broke. Only the first `cn`
+		// argument is read, so a conditional token cannot satisfy a guard about an
+		// unconditional one.
+		const m =
+			/data-testid="aggregate-footer"\s+className=(?:"([^"]*)"|\{cn\(\s*"([^"]*)")/.exec(
+				card,
+			);
+		const row = m?.[1] ?? m?.[2];
 		expect(row).toBeDefined();
 		expect(row?.split(/\s+/)).toContain("items-start");
 		expect(row?.split(/\s+/)).toContain("gap-2");
