@@ -751,25 +751,35 @@ describe("MOBILE-2m · R-3 / A9 D-3 — the mark is centred on the header's own 
 	const brandCell = () =>
 		tagAround(code(HEADER), HEADER, "<BrandCluster", "div");
 
-	it("phone-r3::the-cell-LEAVES-THE-GRID-and-takes-the-headers-midpoint", () => {
-		// ⛔⛔ POSITIONED AGAINST THE HEADER, NOT AGAINST THE SPACE THE BUTTONS
-		// LEAVE — that distinction is the whole item. `1fr` is `minmax(auto, 1fr)`,
-		// so once the LEFT zone freezes at its own min-content every remaining
-		// pixel lands on the right and the `auto` centre track is pushed off true
-		// centre. MEASURED at the floor, signed in: the mark's centre sits at a
-		// CONSTANT 223.13px at every phone width — +43.13px at 360, +35.63 at 375,
-		// +28.13 at 390, +8.13 at 430. Taking Back away does NOT fix that; it moves
-		// the constant, leaving the mark off centre by a DIFFERENT number at every
-		// width.
-		// ⛔ ALL THREE TOKENS OR NONE. `absolute` alone leaves the cell at its
-		// static position; `left-1/2` alone does nothing to a grid item; and
-		// without the translate the mark's LEFT EDGE sits on the midpoint rather
-		// than its centre — half a mark off, which looks like a near miss instead
-		// of a missing rule.
+	it("phone-a13::the-cell-REJOINS-THE-FLOW-and-the-midpoint-tokens-are-withdrawn", () => {
+		// ⛔⛔ INVERTED AT MOBILE-3a. This asserted the three tokens that pinned the
+		// mark to the header's own midpoint under A9 D-3 — `absolute` · `left-1/2`
+		// · `-translate-x-1/2` — against the measurement that justified them: the
+		// mark's centre at a CONSTANT 223.13px at every phone width, i.e. +43.13px
+		// off centre at 360 and +8.13 at 430.
+		// ⛔ **ADR-0051 A13 D-3 withdraws A9 D-3 below 640** and the reason is not
+		// that the measurement was wrong — it is that the requirement changed. A13
+		// D-2 seats a countdown beside the logo, and a logo pinned to the midpoint
+		// has no beside: the digits would straddle the centre and the mark would
+		// read as off centre by half a countdown. The cell becomes `contents`, the
+		// mark flows after RULES, and the row's single gap does the spacing.
+		// ⚠ BOTH HALVES ARE ASSERTED. "The tokens are gone" alone is satisfied by a
+		// cell that is still a BOX, which would give the mark and the countdown a
+		// gap of their own — the one thing "all gaps equal" forbids.
 		const tokens = gatedClassesIn(brandCell(), HEADER, "mobileResponsive");
-		expect(tokens).toContain(phone("absolute"));
-		expect(tokens).toContain(phone("left-1/2"));
-		expect(tokens).toContain(phone("-translate-x-1/2"));
+		for (const withdrawn of ["absolute", "left-1/2", "-translate-x-1/2"]) {
+			expect(
+				tokens,
+				`the brand cell still carries \`${phone(withdrawn)}\`, so A9 D-3 is ` +
+					`still in force below 640 and the countdown beside it cannot be.`,
+			).not.toContain(phone(withdrawn));
+		}
+		expect(
+			tokens,
+			"the brand cell is not `contents` below 640 — the mark and the countdown " +
+				"stay inside a box of their own and take that box's gap instead of the " +
+				"row's.",
+		).toContain(phone("contents"));
 	});
 
 	it("phone-r3::the-desktop-cell-is-UNTOUCHED", () => {
@@ -779,7 +789,18 @@ describe("MOBILE-2m · R-3 / A9 D-3 — the mark is centred on the header's own 
 		expect(brandCell()).toContain('"justify-self-center"');
 	});
 
-	it("phone-r3::the-HEADER-is-the-containing-block-the-centring-resolves-against", () => {
+	it("phone-a13::the-header-is-STILL-sticky-and-the-reason-has-changed", () => {
+		// ⚠ THE CLAIM BELOW SURVIVES A13 WITH A DIFFERENT JUSTIFICATION, WHICH IS
+		// WHY IT IS RE-TITLED RATHER THAN LEFT ALONE. It was here because an
+		// absolute brand cell resolves `left-1/2` against its nearest POSITIONED
+		// ancestor, and `sticky` is what made that `<header>`. With the cell back
+		// in flow (A13 D-3) nothing in this header resolves against it any more —
+		// so this row no longer holds up the centring, and the class it pins is
+		// held up instead by `sticky-header.test.ts`'s STACKING claim and by the
+		// header staying on screen while the page scrolls (ADR-0023 Patch D3).
+		// Kept because deleting it would quietly drop a second reader of the same
+		// declaration; renamed because a guard whose title names a mechanism that
+		// no longer exists is worse than no guard.
 		// ⛔⛔ THE LINK THAT MAKES THE TWO TOKENS ABOVE MEAN "CENTRED". An absolute
 		// child resolves against its nearest POSITIONED ancestor; the grid row
 		// between is static, so the answer is `<header>` — and only because

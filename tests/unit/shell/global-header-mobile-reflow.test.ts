@@ -287,6 +287,31 @@ const RULED_PHONE_VOCABULARY = [
 	"max-mobile:hover:bg-transparent",
 	"max-mobile:data-[size=sm]:size-11",
 	"max-mobile:[&_img]:size-full",
+	// ⛔ ADR-0051 A13 D-4 — THE SIGNED-OUT BRANCH ENTERS THIS LIST, AND UNTIL
+	// MOBILE-3a ITS ENTRY WAS "NOTHING". Assertion 4 below asserted the JOIN
+	// <Link> carried no responsive token at all; A13 D-4 rules its padding,
+	// height and type as the fit ladder's FIRST rung, so that assertion is
+	// inverted rather than deleted (the WARLI-MOUNT precedent this file already
+	// follows twice). What did NOT change is the property the old shape was
+	// protecting: ADR-0048 still forbids hiding the CTA, and assertion 4 now
+	// says so in its own words instead of inheriting it from a blanket ban.
+	"max-mobile:h-[28px]",
+	"max-mobile:px-[5px]",
+	"max-mobile:text-[10px]",
+	// ⚠ NOT DECORATION. An arbitrary `text-[Npx]` keeps the line-height of the
+	// step it displaces (AGENTS.md §8), so without this the type is 11px on
+	// `text-xs`'s 16px leading and the 28px box grows back.
+	"max-mobile:leading-none",
+	// The ≥44px hit region on a 28px painted box, bought at the hit-testing
+	// layer exactly as the retired `GitHubIconControl` and `TriggerPill` buy it.
+	"max-mobile:relative",
+	"max-mobile:after:absolute",
+	"max-mobile:after:-inset-[8px]",
+	// ⚠ TRUNCATED ON PURPOSE. `VARIANTS` stops at the first quote, so
+	// `max-mobile:after:content-['']` is captured without its value. Pinning the
+	// captured form is what keeps this a SET EQUALITY; pinning the full spelling
+	// would make the assertion fail against its own regex.
+	"max-mobile:after:content-[",
 ];
 
 /**
@@ -1088,29 +1113,49 @@ describe("global header mobile reflow — ADR-0049: the signed-in right zone red
 				`(auth) mount and every future mount at once.`,
 		).toEqual([]);
 
-		// 4 — THE JOIN BRANCH CARRIES NO RESPONSIVE TOKEN, EXPLICITLY.
+		// 4 — THE JOIN BRANCH SHRINKS AND NEVER HIDES.
 		//
-		// ⚠ THIS OBLIGATION USED TO BE HELD BY ACCIDENT. It fell out of the blanket
-		// ban being inverted away, so inverting without this line would stop
-		// asserting it at all. ADR-0048's whole point is that a phone participant
-		// may join: the CTA renders at every width, on every route.
+		// ⛔⛔ THIS ASSERTION IS INVERTED AT MOBILE-3a, NOT DELETED. It read "the
+		// JOIN branch carries no responsive token", and that was the right shape
+		// while ADR-0049 touched only the signed-in chip. ADR-0051 A13 D-4 rules
+		// this control's padding, height and type as the fit ladder's first rung —
+		// "JOIN yields first" — so a guard demanding zero tokens here is now a
+		// guard demanding the ruling be reverted.
+		// ⇒ What replaces it is the half that was load-bearing all along, stated
+		// directly: ADR-0048 says a phone participant may join, so this branch may
+		// get SMALLER and may never get HIDDEN. A deleted guard would have left
+		// both halves unasserted; this one reddens the moment anyone hides the CTA,
+		// which the old form could only catch by accident.
 		const joinAt = source.indexOf('href="/sign-in"');
 		if (joinAt === -1) {
 			throw new Error(
 				`${IDENTITY}: the JOIN CTA's \`href="/sign-in"\` is gone.`,
 			);
 		}
+		// ⚠ THE TAG IS BOUNDED BY ITS CHILD, NOT BY THE NEXT ">". A13 gives this
+		// branch a `cn()` call containing `data-[…]`-free but bracket-bearing
+		// arbitrary values, and `indexOf(">")` from the href lands inside the class
+		// string the moment one of them contains a ">" — so the window is taken to
+		// the literal `JOIN` text instead, which is this element's only child.
 		const joinTag = source.slice(
 			source.lastIndexOf("<", joinAt),
-			source.indexOf(">", joinAt),
+			source.indexOf("JOIN", joinAt),
 		);
+		const joinTokens = joinTag.match(VARIANTS) ?? [];
 		expect(
-			joinTag.match(VARIANTS) ?? [],
-			`${IDENTITY}: the signed-out JOIN <Link> carries a responsive token. ` +
+			joinTokens,
+			`${IDENTITY}: the signed-out JOIN <Link> carries \`${HIDE_BELOW_640}\`. ` +
 				`ADR-0048 supersedes the ADR-0045 carve-out precisely so a phone ` +
-				`visitor can join from the surface they are being asked to join from; ` +
-				`ADR-0049 reduces the SIGNED-IN chip and touches this branch not at all.`,
-		).toEqual([]);
+				`visitor can join from the surface they are being asked to join from. ` +
+				`A13 D-4 makes this control smaller; nothing makes it absent.`,
+		).not.toContain(HIDE_BELOW_640);
+		expect(
+			joinTokens.length,
+			`${IDENTITY}: the JOIN branch declares no phone token at all. ADR-0051 ` +
+				`A13 D-4 rules its padding, height and type as the fit ladder's first ` +
+				`rung — without them the 360px row cannot seat the countdown, and the ` +
+				`brand mark pays the difference by silently squashing (ADR-0049 OI-A).`,
+		).toBeGreaterThan(0);
 
 		// 5 — THE AVATAR IS NOT INSIDE THE HIDDEN REGION. This is what makes the
 		// test's name ("reduces to the avatar") true of what it does, rather than a

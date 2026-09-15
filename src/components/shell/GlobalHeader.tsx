@@ -4,7 +4,6 @@ import { FREEZE_INSTANT_UTC } from "@/server/markets/create";
 import { BrandCluster } from "./BrandCluster";
 import { formatCountdown } from "./countdown-format";
 import { DharmaCluster } from "./DharmaCluster";
-import { GitHubIconControl } from "./GitHubIconControl";
 import { GitHubStarsView } from "./GitHubStars";
 import { HeaderNav } from "./HeaderNav";
 import { type HeaderViewer, IdentityCluster } from "./IdentityCluster";
@@ -34,6 +33,13 @@ import { VisitorCounter } from "./VisitorCounter";
  * Measured on the live build, signed out: **11.63px right of true centre at
  * 375px**. The claim holds at 1440 and fails below roughly 364px, which is
  * exactly the band this component now renders in.
+ *
+ * ⚠⚠ AND BELOW 640 NEITHER HALF OF THAT PARAGRAPH IS LIVE ANY MORE — the row is
+ * not a grid there (A13 D-1), so it has no `1fr` tracks to be unequal. The
+ * arithmetic above governs 640 and up, where the grid is untouched; the phone
+ * tier's own arithmetic is the A13 D-4 fit ladder, recorded in this round's
+ * report. Both paragraphs are kept because the desktop one is still true of the
+ * desktop.
  *
  * ⛔⛔ AND THE CONSEQUENCE IS WORSE THAN A DISPLACEMENT — THE MARK IS THIS
  * HEADER'S SHOCK ABSORBER. The brand mark is the one control in either side zone
@@ -69,21 +75,36 @@ import { VisitorCounter } from "./VisitorCounter";
  * Left zone order Back · Home · Radio · GitHub · RULES (mockup v0_2 for the
  * first three; GitHub and RULES are named deviations — see below).
  *
- * ⚠ AND THERE IS A SECOND GITHUB CONTROL, IN THE RIGHT ZONE, BELOW 640px ONLY
- * (MOBILE-2n · R-5 / ADR-0051 A10 D-5). The left-zone one is inside
- * `header-secondary-controls`, which hides at phone width — so without it a
- * phone reader reaches the repository from nowhere. `GitHubIconControl` is the
- * icon-only form and imports the SAME `GITHUB_REPO_URL`, so the two are one
- * destination in two registers rather than two links. Named here because a
- * reader counting GitHub controls in this file will find two.
+ * ⛔ BELOW 640 THE WHOLE ROW READS `home · RULES · logo · countdown · identity`
+ * (ADR-0051 A13 D-1) AND THE ZONES ARE GONE. Back and the secondary controls are
+ * `display:none`, the two remaining zone wrappers are `display:contents`, and
+ * the brand cell rejoins the flow — so the five survivors are direct flex items
+ * of one row with one gap. `ms-auto` on the identity zone is what decides where
+ * spare width goes: all of it, always, between the countdown and the identity,
+ * and none of it between the logo and the countdown.
+ *
+ * ⛔ THERE IS ONE GITHUB CONTROL AGAIN, AND THIS PARAGRAPH USED TO DESCRIBE TWO.
+ * It read: *"AND THERE IS A SECOND GITHUB CONTROL, IN THE RIGHT ZONE, BELOW
+ * 640px ONLY"* — `GitHubIconControl`, the icon-only form, mounted first in the
+ * right zone by ADR-0051 A10 D-5 so that a phone reader could still reach the
+ * repository once `header-secondary-controls` hid. **ADR-0051 A13 D-1 withdraws
+ * it**, along with A12 D-1's "one off-site control" — a 360px row cannot carry
+ * home, rules, the logo, a countdown, an identity cluster AND a repository link,
+ * and of those the repository link is the one a phone reader can do without.
+ * The component file is deleted rather than left unmounted: an unmounted control
+ * with a green guard is a control nobody can tell is gone.
+ * ⇒ The surviving GitHub control is the left zone's `GitHubStarsView`, inside
+ * `header-secondary-controls`, which hides below 640 — so the repository is
+ * reachable at and above 640 and from nowhere in the phone header. That is the
+ * ruling, not an oversight.
  * Social/Research/Đ-info are ratified omissions (OQ-3/OQ-4 zero-supplied), each
  * a named deviation in the plan. Right zone = the Đ cluster, then JOIN or the identity chip, then a
  * hairline divider + the visitor counter at the far right (UI.13;
- * SPEC.1 §21.1) — **at and above 640px.** Below `--breakpoint-mobile` the GitHub
- * icon control named above PRECEDES all four (ADR-0051 A10 D-5) and three of the
- * four are hidden, so the zone reads `GitHub · avatar-or-JOIN`. ⚠ The §21.1
- * register boundary is untouched in both directions: the new control is not
- * engine-derived and nothing crossed the divider.
+ * SPEC.1 §21.1) — **at and above 640px.** Below `--breakpoint-mobile` three of
+ * the four are hidden, so the zone reads `avatar-or-JOIN` alone and is pushed to
+ * the row's right edge by `ms-auto` (A13 D-1). ⚠ The §21.1 register boundary is
+ * untouched in both directions: nothing engine-derived moved, and nothing
+ * crossed the divider.
  *
  * ⇒ TIER-4 DEVIATION — **RULES placement** (O1-DECK, founder-ruled 2026-08-18,
  * D-2). The locked W2.4/.5/.14 mockup places the tab in the CENTRE zone as a
@@ -259,8 +280,42 @@ export function GlobalHeader({
 
 	return (
 		<header className="sticky top-0 z-40 border-y bg-n0 shadow-(--elev-1)">
-			<div className="mx-auto grid h-[60px] w-full max-w-[1440px] grid-cols-[1fr_auto_1fr] items-center gap-[18px] px-6">
-				<div className="flex items-center gap-2 justify-self-start">
+			{/* ⛔⛔ ADR-0051 A13 D-1/D-3 — BELOW 640 THIS ROW IS A FLAT FLEX LINE AND
+			    THE THREE ZONES STOP BEING ZONES. A9 D-3 took the brand cell OUT of
+			    the grid and pinned it to the header's midpoint; A13 D-3 withdraws
+			    that below 640, because a countdown has to sit BESIDE the logo and a
+			    centred logo has no beside. The grid cannot express `home · rules ·
+			    logo · countdown · identity` with one gap: `1fr auto 1fr` decides the
+			    spare width for you, and the founder's instruction is that the spare
+			    width lands in exactly one place — between the countdown and identity.
+			    ⇒ `flex` + `ms-auto` on the last zone says that in two tokens.
+			    ⛔ AND THE TWO ZONE WRAPPERS BECOME `contents`, WHICH IS WHAT MAKES
+			    "ALL GAPS EQUAL" STRUCTURAL RATHER THAN MAINTAINED. Leave them as flex
+			    boxes and the row has THREE gap declarations — this one, the left
+			    zone's `gap-2`, and the brand cell's — that happen to agree today and
+			    must be edited together forever; the A13 D-4 ladder moves the gap
+			    twice, so "forever" starts immediately. With `contents` the wrappers
+			    contribute no box, every control is a direct flex item of THIS row,
+			    and there is one number. A wrapper's own `gap-2` and `items-center`
+			    go inert below 640; `items-center` is on this row too, so nothing is
+			    lost. A hidden child (`max-mobile:hidden`) is `display:none` and so
+			    not a flex item at all — it takes no gap, which is why removing
+			    Back and the secondary controls leaves no hole.
+			    ⚠ ABOVE 640 NOTHING HERE APPLIES: the grid, its three tracks and its
+			    18px gap are the unprefixed default (AGENTS.md §8, override never
+			    replace), and every token below is gated on the prop as well. */}
+			<div
+				className={cn(
+					"mx-auto grid h-[60px] w-full max-w-[1440px] grid-cols-[1fr_auto_1fr] items-center gap-[18px] px-6",
+					mobileResponsive && "max-mobile:flex max-mobile:gap-[5px]",
+				)}
+			>
+				<div
+					className={cn(
+						"flex items-center gap-2 justify-self-start",
+						mobileResponsive && "max-mobile:contents",
+					)}
+				>
 					{/* MOBILE-2m · R-3 / ADR-0051 A9 D-3 — Back does not render below
 					    640px, and the hide is threaded rather than written into
 					    `HeaderNav` unconditionally: that component is a static child of
@@ -285,7 +340,29 @@ export function GlobalHeader({
 					</div>
 					<RulesControl mobileResponsive={mobileResponsive} />
 				</div>
-				{/* ⛔⛔ MOBILE-2m · R-3 / ADR-0051 A9 D-3 — THE MARK IS POSITIONED
+				{/* ⛔⛔ ADR-0051 A13 D-3 WITHDRAWS A9 D-3 BELOW 640: THE MARK IS A FLOW
+				    ITEM AGAIN, AND THE THREE TOKENS THAT PINNED IT TO THE HEADER'S
+				    MIDPOINT ARE GONE.
+				    What follows is the argument A9 made for pinning it, kept because it
+				    is still exactly right ABOVE 640 and because its numbers are the
+				    reason the pin existed at all. What changed is not the arithmetic but
+				    the requirement: A13 D-2 puts a countdown beside the logo, and a logo
+				    pinned to the centre has no beside — whichever side the digits took,
+				    they would straddle the midpoint and the "centred" mark would read as
+				    off-centre by half a countdown.
+				    ⇒ Below 640 the cell is `display:contents` and the mark flows after
+				    RULES. Above 640 it is still `justify-self-center` in the `auto`
+				    track, exactly as before.
+				    ⚠ AND THE MARK IS THIS ROW'S SHOCK ABSORBER AGAIN BELOW 640, which A9
+				    had removed by taking it out of the flow. It is still the one control
+				    here without `shrink-0`, so if the phone row ever runs out of room it
+				    spends the logo silently rather than overflowing — the ADR-0049 OI-A
+				    behaviour, back on this tier. The A13 D-4 ladder is sized so it never
+				    has to: the fit is measured at 360 signed out with the mark at its
+				    full 48px, and that measurement is the guard.
+
+				    ── A9 D-3's argument: superseded below 640, live above it ──
+				    THE MARK IS POSITIONED
 				    AGAINST THE HEADER, NOT AGAINST THE SPACE THE BUTTONS LEAVE, AND THAT
 				    DISTINCTION IS THE WHOLE ITEM.
 				    This docblock's third paragraph already states the mechanism: `1fr` is
@@ -317,8 +394,7 @@ export function GlobalHeader({
 				<div
 					className={cn(
 						"justify-self-center",
-						mobileResponsive &&
-							"max-mobile:absolute max-mobile:left-1/2 max-mobile:-translate-x-1/2",
+						mobileResponsive && "max-mobile:contents",
 					)}
 				>
 					<BrandCluster
@@ -327,7 +403,27 @@ export function GlobalHeader({
 						mobileResponsive={mobileResponsive}
 					/>
 				</div>
-				{/* ⛔⛔ MOBILE-2m · R-3 — `col-start-3` IS THE OTHER HALF OF THE CENTRING,
+				{/* ⛔⛔ `max-mobile:ms-auto` REPLACES `max-mobile:col-start-3` AT A13, AND
+				    THE SWAP IS NOT COSMETIC — THE DEFECT THE OLD TOKEN EXISTED TO STOP
+				    CANNOT OCCUR ANY MORE.
+				    `col-start-3` was a GRID placement, needed only because A9 took the
+				    brand cell out of flow: with two in-flow items left, auto-placement
+				    gave this zone track 2 and the avatar painted over the logo. Below 640
+				    there is no grid now (A13 D-1) and the brand cell is back in flow, so
+				    there is no track to be auto-placed into and nothing for the token to
+				    prevent. Leaving it would be a class whose whole justification had
+				    been withdrawn — inert, and inert for a reason the next reader would
+				    have to reconstruct.
+				    ⇒ What this zone needs instead is a rule for the SPARE WIDTH, which
+				    the grid used to decide by itself. `ms-auto` sends all of it here and
+				    none of it between the logo and the digits, which is the founder's
+				    instruction stated in one token.
+				    ⚠ `justify-self-end` STAYS and is the ≥640 default, untouched;
+				    `dharma-cluster.test.tsx`'s T4 guard locates this zone by it.
+
+				    ── the A9 argument this replaces, kept because its failure mode is
+				       the kind that passes every number ──
+				    `col-start-3` IS THE OTHER HALF OF THE CENTRING,
 				    AND WITHOUT IT THIS ZONE LANDS ON TOP OF THE MARK. Taking the brand
 				    cell out of flow (above) does not merely collapse the `auto` track — it
 				    removes that cell as a grid ITEM, so auto-placement re-flows what is
@@ -361,30 +457,9 @@ export function GlobalHeader({
 				<div
 					className={cn(
 						"flex items-center justify-self-end",
-						mobileResponsive && "max-mobile:col-start-3",
+						mobileResponsive && "max-mobile:ms-auto",
 					)}
 				>
-					{/* ⛔⛔ MOBILE-2n · R-5 / ADR-0051 A10 D-5 — THE PHONE'S GITHUB CONTROL,
-					    FIRST IN THIS ZONE, AND THE MOUNT IS GATED RATHER THAN THE CLASS
-					    ALONE. `mobileResponsive` decides whether the control exists at all,
-					    so a THIRD mount that says nothing inherits the header it has today
-					    — the polarity this file's prop docblock argues for, applied to a
-					    control that is new rather than to a hide that is additive. The
-					    class gate below it is the second half: both current mounts pass the
-					    prop at every width, so `hidden max-mobile:inline-flex` is what
-					    keeps 1440 unchanged.
-					    ⛔ FIRST CHILD, WHICH IS WHAT R-5 RULES AND WHAT T4 SURVIVES.
-					    `dharma-cluster.test.tsx`'s SG5 guard walks this div's direct
-					    `.children` and compares indices RELATIVELY — cluster < identity <
-					    divider < visitor — so a new leaf ahead of all four shifts every
-					    index by one and changes no ordering. It would NOT survive a
-					    wrapper, which is the thing that guard exists to catch; this is a
-					    sibling, not a wrapper.
-					    ⚠ IT SITS LEFT OF THE Đ CLUSTER, WHICH IS HIDDEN AT THIS WIDTH
-					    ANYWAY (ADR-0049). At 1440 this control is `display:none`, so §21.1's
-					    register boundary is untouched in both directions: nothing
-					    engine-derived moved, and nothing crossed the divider. */}
-					{mobileResponsive ? <GitHubIconControl /> : null}
 					{/* ADR-0049 — the two hides below 640px live in the COMPONENTS, not
 					    here, and the asymmetry with the divider two nodes down is
 					    deliberate rather than untidy. `dharma-cluster.test.tsx`'s T4

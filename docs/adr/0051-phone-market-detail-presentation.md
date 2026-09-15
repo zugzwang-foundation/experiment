@@ -200,7 +200,7 @@ channel: a muted ground visible at Đ 0, with the fill drawn on top of it. [supe
 
 D-3. Below `--breakpoint-mobile`, the app header carries no back button on any page;
 home and rules sit left, the avatar right [superseded by A10 D-5], and the logo is
-positioned against the header's own centre in the signed-in and signed-out states alike. The desktop header
+positioned against the header's own centre in the signed-in and signed-out states alike [superseded by A13 D-3]. The desktop header
 is unchanged.
 
 D-4. The pseudonym in the identity block is 14px.
@@ -212,7 +212,7 @@ Measurements: card border and radius 0 below 640; hairline full width; media cap
 still binds after the width change; money line at Đ 14,260 at 360 with no overflow;
 identity block two lines at 360/375/390/412/430; bar height 8px with the channel
 visible at Đ 0 [superseded by A10 D-2]; logo centre within 1px of the header centre at 360/390/430 in both
-auth states; back button absent below 640 on every route and present at 640 and
+auth states [superseded by A13 D-3]; back button absent below 640 on every route and present at 640 and
 1440; B1 walls unchanged above the floor.
 
 ### A10 — 2026-09-14 · Round ten: chips on the meta row, the bar's channel, the footer's ground, the name, the GitHub control
@@ -270,7 +270,7 @@ controls present in both auth states at 360/390/430 [superseded by A12 D-1]; B1 
 ### A12 — 2026-09-15 · Close-out of the pre-launch phone lane; the X control is withdrawn; supersession rule
 
 D-1 (withdraws A11 D-4). Below `--breakpoint-mobile` the header carries one
-off-site control, GitHub. The X control was built, measured to overlap the logo by
+off-site control, GitHub. [superseded by A13 D-1] The X control was built, measured to overlap the logo by
 27.12px at 360 signed out, reverted, and withdrawn by the founder on 15 September.
 A9 D-3 — the logo pinned to the header's centre — stands.
 
@@ -285,3 +285,27 @@ pixel-identical at ≥640 on both routes, no file under `src/server/**`, `drizzl
 `src/db/**` or auth authored by the lane, and the files carried from #521, #525 and
 P-17 named in the squash. Week-one items remain in `docs/parked.md`; none is a
 go-live condition (D-28 r6).
+
+### A13 — 2026-09-15 · The countdown on the phone header; GitHub leaves the phone; the logo leaves the header's centre
+
+Withdraws A9 D-3 below `--breakpoint-mobile` and A12 D-1's "one off-site control".
+
+D-1. Below `--breakpoint-mobile` the header reads, left to right: home · rules ·
+logo · countdown · identity cluster. The GitHub control is not rendered below 640;
+the desktop keeps it. No other control is hidden at any width.
+
+D-2. The countdown is `CountdownDigits` mounted alone — digits only, no wordmark,
+the shipped DD:HH:MM — driven by the tick `BrandCluster` owns, with no second
+interval, re-rendering only itself on each tick.
+
+D-3 (withdraws A9 D-3 below 640). The logo is a flow item after rules in the left
+cluster. It is not centred on the header.
+
+D-4. The row fits every supported width in both auth states with no overflow and no
+clipping, by reductions applied uniformly below 640 and recorded in the round's
+report: JOIN's padding, height and type; the row gap; the countdown's cell and digit
+size; rules' padding.
+
+Measurements: no overflow at 360/390/412/430 in both auth states; adjacent gaps equal
+within 1px; the countdown ticks on one interval and re-renders only itself; the
+desktop header byte-identical at 640 and 1440; B1 walls unchanged above the floor.

@@ -524,9 +524,19 @@ describe("B2 — the container primitive moves nothing", () => {
 		// this one reddens if `GlobalHeader` ever changes its wrapper, which is
 		// exactly when the profile's alignment to its own chrome would break.
 		const header = read("src/components/shell/GlobalHeader.tsx");
-		const wrapper = /<div className="([^"]*max-w-\[[^\]]+\][^"]*)"/.exec(
-			header,
-		);
+		// ⚠ RE-DERIVED AT MOBILE-3a, NOT LOOSENED, AND THE DISTINCTION IS THE POINT.
+		// This read `className="…"` only. ADR-0051 A13 makes the header row's
+		// attribute `className={cn("…", mobileResponsive && "…")}` — the same class
+		// string, in an expression — and the guard went red on the ATTRIBUTE FORM
+		// while both values it exists to protect were still there. The fix accepts
+		// either form and still requires the literal to carry `max-w-[…]`, so the
+		// property asserted is unchanged: a header that stops declaring its own
+		// width still reddens. What it deliberately does NOT do is fall back to
+		// searching the whole file — the class has to be on a `<div`'s className.
+		const wrapper =
+			/<div\s+className=\{?\s*(?:cn\(\s*)?"([^"]*max-w-\[[^\]]+\][^"]*)"/.exec(
+				header,
+			);
 		expect(
 			wrapper,
 			"GlobalHeader no longer renders a max-w-[…] wrapper",

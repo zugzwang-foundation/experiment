@@ -194,23 +194,40 @@ describe("MOBILE-2m · R-3 / A9 D-3 — the mark's cell is viewer-independent", 
 		expect(signedOut).toBe(signedIn);
 	});
 
-	it("phone-r3::and-it-carries-the-headers-own-axis-in-BOTH", () => {
-		// ⛔ ALL THREE TOKENS OR NONE. `absolute` alone leaves the cell at its
-		// static position; `left-1/2` alone does nothing to a grid item; and
-		// without the translate the mark's LEFT EDGE sits on the midpoint rather
-		// than its centre — half a mark off, which reads as a near miss rather
-		// than as a missing rule. `justify-self-center` stays as the ≥640 default
-		// (ADR-0045: override, never replace).
+	it("phone-r3::the-cell-is-BACK-IN-THE-FLOW-below-640-in-BOTH-arms", () => {
+		// ⛔⛔ INVERTED AT MOBILE-3a, NOT DELETED, AND THE INVERSION IS THE WHOLE
+		// VALUE. This row asserted the three tokens that pinned the mark to the
+		// header's midpoint — `absolute` · `left-1/2` · `-translate-x-1/2` —
+		// under A9 D-3. **ADR-0051 A13 D-3 withdraws A9 D-3 below 640**: the
+		// countdown now sits beside the logo, and a logo pinned to the centre has
+		// no beside. Deleting this row would leave the withdrawal unasserted in
+		// both directions; inverting it means a revert reddens here on the next
+		// run, which is the property ADR-0048 `:82` names.
+		// ⚠ WHAT IS ASSERTED IS NOT "the tokens are gone" ALONE. `contents` is
+		// what actually puts the mark back in the row's flow — without it the cell
+		// is still a box and the countdown cannot share the row's one gap — so
+		// both halves are checked. `justify-self-center` is unchanged and is still
+		// the ≥640 placement (ADR-0045: override, never replace).
 		for (const viewer of [VIEWER, null]) {
 			const tokens = (
 				brandCell(renderHeader(viewer)).getAttribute("class") ?? ""
 			).split(/\s+/);
 			const who = viewer === null ? "signed out" : "signed in";
-			expect(tokens, `${who}: out of the grid`).toContain(phone("absolute"));
-			expect(tokens, `${who}: onto the midpoint`).toContain(phone("left-1/2"));
-			expect(tokens, `${who}: and back by its own half`).toContain(
-				phone("-translate-x-1/2"),
-			);
+			for (const withdrawn of ["absolute", "left-1/2", "-translate-x-1/2"]) {
+				expect(
+					tokens,
+					`${who}: the cell still carries \`${phone(withdrawn)}\`. A13 D-3 ` +
+						`withdraws A9 D-3 below 640 — a centred mark leaves the countdown ` +
+						`straddling the midpoint, which reads as a mark half a countdown ` +
+						`off centre.`,
+				).not.toContain(phone(withdrawn));
+			}
+			expect(
+				tokens,
+				`${who}: the cell is not \`contents\` below 640, so the mark and the ` +
+					`countdown are inside a box of their own and answer to that box's ` +
+					`gap rather than the row's single one.`,
+			).toContain(phone("contents"));
 			expect(tokens, `${who}: the 1440 placement survives`).toContain(
 				"justify-self-center",
 			);
@@ -268,29 +285,31 @@ describe("MOBILE-2m — the signed-out header at the floor", () => {
 });
 
 /**
- * ⛔⛔ THE GRID FIX HAD NO GUARD, AND THAT IS WORSE THAN IT SOUNDS.
+ * ⛔⛔ THE GRID FIX HAD NO GUARD, AND THAT IS WORSE THAN IT SOUNDS — AND AT
+ * MOBILE-3a THE DEFECT IT GUARDED AGAINST STOPPED BEING REACHABLE.
  *
  * `3cb63b2d` fixed a defect in which making the brand cell `absolute` removed it
  * as a grid ITEM, so auto-placement slid the identity zone into the CENTRE track
  * and the avatar was painted on top of the logo. Measured at 390 before the fix:
  * `grid-template-columns: 131px 44px 131px`, chip at x 173, mark at x 171, both
- * centred on 195.
+ * centred on 195. ⚠⚠ EVERY NUMBER THAT ROUND MEASURED SAID THE HEADER WAS
+ * CORRECT; a SCREENSHOT found it. That is why `col-start-3` was pinned here.
  *
- * ⚠⚠ EVERY NUMBER THIS ROUND MEASURES SAID THE HEADER WAS CORRECT. The mark's own
- * centre was 0.00px from the header's, the document did not overflow, nothing moved
- * at 640 or 1440, and both walls passed. A SCREENSHOT found it. So the fix is
- * precisely the kind that regresses silently — and until this block it was pinned
- * by nothing: deleting `col-start-3` would have restored the defect with all 54 of
- * this round's other guards green. Named by `@code-reviewer`.
+ * ⛔ ADR-0051 A13 D-1 REMOVES THE GRID FROM THIS TIER ENTIRELY. Below 640 the row
+ * is a flex line, the brand cell is back in flow, and there is no track for
+ * auto-placement to put anything in — so `col-start-3` is not merely unnecessary,
+ * it is a declaration with no grid to apply to. The three rows below are INVERTED
+ * rather than deleted: the token must be ABSENT, and the thing that replaces it
+ * (`ms-auto`, which is what now decides where the row's spare width goes) must be
+ * present and gated.
  *
- * ⚠ A RENDER, NOT A SOURCE SCAN, and deliberately: jsdom performs no layout, so it
- * cannot see the collision — but it CAN see that the placement is declared on the
- * right element, gated on the prop, and absent when the prop is. That is the half a
- * static check can hold honestly, and the geometry is held by the screenshots and by
- * the live measurement recorded in the run report. Claiming more here would be a
- * guard asserting a spelling while naming a property.
+ * ⚠ THE OLD DEFECT CANNOT RECUR ON THIS TIER, AND THAT IS A CLAIM WORTH BOUNDING.
+ * It required an out-of-flow brand cell inside a grid. A13 removes both, so the
+ * collision has no mechanism here — but at and ABOVE 640 the grid is untouched
+ * and the cell is `justify-self-center`, which is a different arrangement that
+ * never had the defect.
  */
-describe("MOBILE-2m — the identity zone names its column, so a sibling leaving the flow cannot move it", () => {
+describe("MOBILE-3a — the identity zone is pushed right by a margin, because there is no column left to name", () => {
 	function identityZone(root: HTMLElement): HTMLElement {
 		const cell = brandCell(root);
 		const row = cell.parentElement;
@@ -308,46 +327,56 @@ describe("MOBILE-2m — the identity zone names its column, so a sibling leaving
 		return zone;
 	}
 
-	it("phone-r3::the-identity-zone-declares-col-start-3-below-640", () => {
+	it("phone-a13::the-identity-zone-declares-ms-auto-and-NOT-col-start-3", () => {
 		const zone = identityZone(renderHeader(VIEWER));
 		const tokens = (zone.getAttribute("class") ?? "").split(/\s+/);
 		expect(
 			tokens,
-			"the identity zone no longer names its grid column. With the brand cell " +
-				"absolutely positioned below 640 there are only TWO in-flow items, so " +
-				"auto-placement puts this one in track 2 — the centre — and the avatar " +
-				"lands on top of the logo. Every geometric assertion in this round still " +
-				"passes when that happens; it was found in a screenshot.",
-		).toContain(phone("col-start-3"));
+			"the identity zone still names a grid column below 640. A13 D-1 makes " +
+				"this row a flex line there, so the declaration has no grid to apply " +
+				"to — it is inert, and inert for a reason the next reader would have " +
+				"to reconstruct from a withdrawn amendment.",
+		).not.toContain(phone("col-start-3"));
+		expect(
+			tokens,
+			"the identity zone has no `ms-auto` below 640. Without it the row's " +
+				"spare width is distributed by the flex line rather than pushed to " +
+				"one end, so at 390+ the gap opens between the LOGO and the countdown " +
+				"instead of between the countdown and the identity — the founder's " +
+				"instruction is that the row stays compact on the left.",
+		).toContain(phone("ms-auto"));
 	});
 
-	it("phone-r3::and-it-is-GATED-so-a-third-mount-inherits-the-desktop-row", () => {
+	it("phone-a13::and-it-is-GATED-so-a-third-mount-inherits-the-desktop-row", () => {
 		// The signed-out arm too: the zone holds JOIN rather than the chip there,
 		// and it is placed by the same declaration.
 		for (const viewer of [VIEWER, null]) {
 			const zone = identityZone(renderHeader(viewer));
 			expect(
 				(zone.getAttribute("class") ?? "").split(/\s+/),
-				`the identity zone lost its column in the ${viewer === null ? "signed-out" : "signed-in"} arm.`,
-			).toContain(phone("col-start-3"));
+				`the identity zone lost its margin in the ${viewer === null ? "signed-out" : "signed-in"} arm.`,
+			).toContain(phone("ms-auto"));
 			cleanup();
 		}
 	});
 
-	it("phone-r3::a-mount-that-omits-the-prop-gets-NO-column-token", () => {
+	it("phone-a13::a-mount-that-omits-the-prop-gets-NEITHER-token", () => {
 		// ⛔ THE POLARITY, WHICH IS THE WHOLE REASON THIS IS A PROP. A mount that
 		// says nothing must inherit the desktop row untouched — including this
 		// token, which would otherwise be the one breakpoint class in the file
-		// reaching every mount at once. It shipped ungated for one review cycle.
+		// reaching every mount at once. Its predecessor shipped ungated for one
+		// review cycle, which is why the polarity is asserted rather than assumed.
 		const root = render(
 			<GlobalHeader viewer={VIEWER} portfolio="10" spendable="10" stars={1} />,
 		).container;
 		const zone = identityZone(root);
+		const tokens = (zone.getAttribute("class") ?? "").split(/\s+/);
 		expect(
-			(zone.getAttribute("class") ?? "").split(/\s+/),
-			"an ungated grid placement here reaches the (auth) mount and every " +
-				"future mount at once — the failure AGENTS.md §8 records for " +
-				"`OnboardingDeck`, one file up the same chain.",
-		).not.toContain(phone("col-start-3"));
+			tokens,
+			"an ungated margin here reaches the (auth) mount and every future mount " +
+				"at once — the failure AGENTS.md §8 records for `OnboardingDeck`, one " +
+				"file up the same chain.",
+		).not.toContain(phone("ms-auto"));
+		expect(tokens).not.toContain(phone("col-start-3"));
 	});
 });

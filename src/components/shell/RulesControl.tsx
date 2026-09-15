@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { OnboardingDeck } from "@/components/onboarding/OnboardingDeck";
 import { HEADER_GLOSSARY } from "@/lib/copy/glossary";
+import { cn } from "@/lib/utils";
 
 /**
  * The header's `RULES` control, and the re-show deck it opens (SPEC.1 §21.9).
@@ -80,11 +81,21 @@ export function RulesControl({
 			    `title` rather than duplicated, and the modal itself explains the
 			    product far more completely than a one-line gloss would, so a
 			    touch user loses nothing real — they get the deck instead. */}
+			{/* ⛔ ADR-0051 A13 D-4, rung four — the tab's side padding drops 3px
+			    BELOW 640 ONLY, and it is the last lever the ladder reaches for
+			    because RULES is the one control here that is neither an icon at a
+			    fixed register nor a countdown whose cells are already at the floor.
+			    ⚠ THIS CONTROL NOW CONSUMES THE PROP FOR ITSELF, WHICH IT DID NOT
+			    BEFORE. Until A13 it took `mobileResponsive` only to hand on to
+			    `OnboardingDeck` — `GlobalHeader`'s docblock said so in those words —
+			    so a reader who remembers that sentence will find it changed there
+			    too. The threading is unchanged; what is new is that this file is
+			    also a consumer. */}
 			<button
 				type="button"
 				onClick={() => setOpen(true)}
 				title={HEADER_GLOSSARY.rules}
-				className={RULES_TAB}
+				className={cn(RULES_TAB, mobileResponsive && "max-mobile:px-[10px]")}
 			>
 				Rules
 			</button>
