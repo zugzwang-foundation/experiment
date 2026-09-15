@@ -9,6 +9,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import DebateRouteError from "@/app/(public)/m/[slug]/error";
 
 /**
+ * ⚠ THE SDK IS MOCKED, AND THAT IS WHAT MAKES THE READ-LOG BELOW MEAN
+ * ANYTHING. Two tests in this file assert exactly WHICH fields of the thrown
+ * error get touched. Against the real `@sentry/nextjs` that measures the SDK's
+ * internals as much as this repo's code: an uninitialised client happens to
+ * read nothing today, but `captureException` building an event off a live
+ * client reads `message` and `stack` by design, so the same assertion would
+ * flip on a change to the test harness rather than to the component. Mocked,
+ * the log records ONLY what this repo's own code read.
+ */
+vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
+
+/**
  * POLISH.3 D4 / PD-3-11 — the `/m/[slug]` error boundary.
  *
  * Gate C read-1 Q1. The boundary shipped at `9468c30` with its no-leak property
@@ -165,7 +177,7 @@ describe("POLISH.3 — /m/[slug] error boundary", () => {
 		}
 	});
 
-	it("market-error::the-error-prop-is-never-read-during-render-effects-or-handlers", async () => {
+	it("market-error::reads-only-digest-and-only-for-the-capture-never-in-a-handler", async () => {
 		// ⚠ THE ARM THAT PROTECTS IS THE CLIENT ONE. In a production build
 		// React's Flight client already replaces a SERVER-side error with a fixed
 		// placeholder, so a server throw has nothing left to leak; an error
@@ -176,17 +188,29 @@ describe("POLISH.3 — /m/[slug] error boundary", () => {
 		// actually matters.
 		//
 		// The structural half, proven at RUNTIME rather than by reading the
-		// source: every field is a getter that THROWS. The component
-		// destructures `{ reset }` only, so it never touches one — if a future
-		// edit reads `error.message` even to log it, this render throws and this
-		// test fails. That is strictly stronger than asserting the four strings
-		// are absent from the DOM: it forbids the READ, not just the render.
+		// source: every field is a getter that THROWS, so a read is a failure
+		// rather than a string this file has to go looking for in the DOM. It
+		// forbids the READ, not just the render.
+		//
+		// ⚠⚠ `digest` IS THE ONE EXEMPTION AND IT IS NARROW ON PURPOSE. The
+		// boundary now reports to Sentry (`captureBoundaryError`), which cannot
+		// happen without touching the error at all — a boundary is the thing
+		// that stops a client throw propagating, so no global handler can see
+		// it and no `onRequestError` covers it. `digest` is the ONLY field the
+		// capture path reads, because it is the join key back to the
+		// server-side event and it carries no message text. The other three
+		// still throw, which is the assertion that matters: after a server
+		// throw React has already reduced this error to a husk plus a digest,
+		// and on the client arm `message` / `stack` / `cause` are exactly the
+		// fields that carry the DB error, the internal, the user's input. If a
+		// later edit tags an event with `error.message` "for context", this
+		// render throws and this test goes RED — which is the point.
 		const booby = {
 			get message(): string {
 				throw new Error("component read error.message");
 			},
 			get digest(): string {
-				throw new Error("component read error.digest");
+				return "DIGEST_READ_IS_PERMITTED";
 			},
 			get stack(): string {
 				throw new Error("component read error.stack");
@@ -242,7 +266,17 @@ describe("POLISH.3 — /m/[slug] error boundary", () => {
 		} as unknown as Error & { digest?: string };
 
 		const swept = render(<DebateRouteError error={tattle} reset={() => {}} />);
-		expect(reads).toEqual([]); // nothing read during render or effects
+		// ⚠ PIN THE PERMITTED READ EXACTLY, rather than relax the assertion to
+		// "some reads happened". `["digest"]` says the capture effect touched
+		// the join key ONCE and touched nothing else — an equality, so adding
+		// `message` to the tag set or reading `stack` to fingerprint the event
+		// fails here even though neither would ever reach the DOM.
+		expect(reads).toEqual(["digest"]);
+
+		// From here the subject is HANDLERS, which are held to the original
+		// zero. Clear the log so the sweep below measures what a click, a key
+		// or a hover does — not what the mount already legitimately did.
+		reads.length = 0;
 
 		// ⚠ EVERY NODE, NOT A SELECTOR OF LIKELY ONES. `expect(reads).toEqual([])`
 		// is an ABSENCE assertion, so PF-7 governs it and its scope must be the
@@ -323,17 +357,28 @@ describe("POLISH.3 — /m/[slug] error boundary", () => {
 	 * PROCEDURAL: enumerate the surfaces, enumerate the events, hope the
 	 * enumeration is complete. It never is.
 	 *
-	 * The component's real property is structural and its own docblock says so:
-	 * the `error` prop is accepted because Next's contract passes it, and is
-	 * deliberately NOT DESTRUCTURED. NO BINDING IMPLIES NO READ — of any kind, on
-	 * any element, in any subtree or portal, for any event, at any time. One
-	 * assertion covers what seven behavioural probes could not
-	 * (@security-auditor, POLISH.3 R7).
+	 * ⚠⚠ THIS TEST USED TO ASSERT THE STRONGEST FORM OF THAT CLAIM AND NO LONGER
+	 * CAN. It read: the `error` prop is deliberately NOT DESTRUCTURED, so NO
+	 * BINDING IMPLIES NO READ — of any kind, on any element, in any subtree or
+	 * portal, for any event, at any time; one assertion covering what seven
+	 * behavioural probes could not (@security-auditor, POLISH.3 R7). The
+	 * boundary now reports to Sentry, and reporting requires a binding, so that
+	 * form is gone. It was not weakened by accident and it is not weakened
+	 * quietly: the component's docblock records the same trade in the same
+	 * commit.
+	 *
+	 * WHAT IT ASSERTS INSTEAD, which is the strongest form still available: the
+	 * binding exists and has EXACTLY ONE destination. `error` flows into
+	 * `captureBoundaryError` and appears nowhere else in the body — not in JSX,
+	 * not in a handler closure, not in a second call. Delete the capture effect
+	 * from the source and every remaining mention of `error` fails this test.
+	 * So the surface is still closed by one source assertion rather than by an
+	 * enumeration; it is closed one call wider than before.
 	 *
 	 * Source-reading is an established idiom here — `page-container.test.ts` and
 	 * `side-badge.test.tsx` both assert over files read off disk.
 	 */
-	it("market-error::the-component-binds-no-reference-to-the-error-prop", () => {
+	it("market-error::binds-the-error-prop-for-the-capture-and-nothing-else", () => {
 		const source = readFileSync(
 			join(process.cwd(), "src/app/(public)/m/[slug]/error.tsx"),
 			"utf8",
@@ -351,28 +396,51 @@ describe("POLISH.3 — /m/[slug] error boundary", () => {
 		expect(sig, "component signature is findable").not.toBeNull();
 		const [pattern = "", types = ""] = (sig?.[1] ?? "").split(/\}\s*:\s*\{/);
 
-		// The DESTRUCTURING PATTERN binds `reset`, and nothing else.
-		expect(pattern.replace(/[{}\s,]/g, "")).toBe("reset");
+		// The DESTRUCTURING PATTERN binds `error` and `reset` — those two, in
+		// that order, and nothing else. An EQUALITY, so a third binding
+		// arriving alongside the capture fails here rather than riding in on
+		// the exemption this test now grants.
+		expect(pattern.replace(/[{}\s,]/g, "")).toBe("errorreset");
 		// POSITIVE CONTROL: the prop IS still declared in the type — Next's
 		// contract passes it — so this test is not passing because the whole
 		// signature vanished, and the matcher demonstrably finds `error` in this
 		// file's own text when it is present.
 		expect(types).toMatch(/\berror\b/);
 
-		// And the BODY never names it. Two things are blanked first, because the
-		// word legitimately appears in both and neither is an identifier:
-		// STRING LITERALS (`data-testid="debate-error"`) and JSX TEXT (the copy
-		// line "An unexpected error stopped this page from loading.").
+		// The BODY names it only inside the capture effect. Two things are
+		// blanked first, because the word legitimately appears in both and
+		// neither is an identifier: STRING LITERALS (`data-testid="debate-error"`)
+		// and JSX TEXT (the copy line "An unexpected error stopped this page
+		// from loading.").
 		const body = code
 			.slice(code.indexOf("React.JSX.Element {"))
 			.replace(/"(?:[^"\\]|\\.)*"/g, '""')
 			.replace(/'(?:[^'\\]|\\.)*'/g, "''")
 			.replace(/`(?:[^`\\]|\\.)*`/g, "``")
 			.replace(/>[^<>{}]*</g, "><");
+
+		// THE ONE PERMITTED DESTINATION. Both mentions inside it are load-bearing
+		// and both are pinned: the argument is what reports, and the `[error]`
+		// dependency is what stops a re-render re-reporting the same failure.
+		const effect = body.match(/useEffect\([\s\S]*?\}, \[error\]\);/);
+		expect(effect, "the capture effect is findable").not.toBeNull();
+		expect(effect?.[0]).toContain("captureBoundaryError(error,");
+
+		// EVERYTHING OUTSIDE IT IS STILL FORBIDDEN. This is the assertion that
+		// replaces "no binding at all": excise the capture and `error` must not
+		// survive anywhere — no JSX interpolation, no handler closure, no second
+		// call, no `document.title`.
+		//
+		// ⚠ ITS BLIND SPOT IS THE EXCISION ITSELF, and the read-log equality in
+		// the test above is what covers it: a second read added INSIDE the
+		// effect (`void error.message` beside the capture) is excised here and
+		// passes, while `reads` there is an equality on `["digest"]` and goes
+		// RED. Measured both ways. Neither test closes this alone.
+		const outside = body.replace(effect?.[0] ?? "", "");
 		// POSITIVE CONTROL: the matcher still finds an identifier read after all
-		// that blanking, so the absence below is an absence and not a scrubbed
-		// haystack (V-2).
-		expect(`${body} error.message`).toMatch(/\berror\b/);
-		expect(body).not.toMatch(/\berror\b/);
+		// that blanking AND after the excision, so the absence below is an
+		// absence and not a scrubbed haystack (V-2).
+		expect(`${outside} error.message`).toMatch(/\berror\b/);
+		expect(outside).not.toMatch(/\berror\b/);
 	});
 });

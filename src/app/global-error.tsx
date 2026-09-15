@@ -2,6 +2,9 @@
 "use client";
 
 import { Geist, Geist_Mono } from "next/font/google";
+import { useEffect } from "react";
+
+import { captureBoundaryError } from "@/lib/boundary-capture";
 
 import "./globals.css";
 
@@ -29,6 +32,24 @@ import "./globals.css";
  * (`m/[slug]/error.tsx`, `u/[pseudonym]/error.tsx`) are untouched and still
  * catch their own subtrees first. (UNWIRE-1: `bookmarks/error.tsx` is deleted
  * along with the rest of the bookmark module; the other two remain.)
+ *
+ * ⚠ `@/lib/boundary-capture` IS AN EXCEPTION TO THE PARAGRAPH ABOVE AND HAS TO
+ * JUSTIFY ITSELF AGAINST IT, rather than be read as a loosening of it. Two
+ * things carry it. First, it adds no module-load failure surface that is not
+ * already there: `instrumentation-client.ts` initialises the same
+ * `@sentry/nextjs` browser SDK on every page, so by the time this boundary can
+ * render, that module is loaded and evaluated. Second, its whole body is
+ * inside a `try`/`catch` that returns `void` — there is no arm on which it
+ * throws. Nothing else earns a place in this import list on that argument.
+ *
+ * ⚠ THE ERROR IS NOW BOUND, AND IT IS STILL NEVER RENDERED. Earlier revisions
+ * of this family did not destructure `error` at all, which made "nothing leaks"
+ * structural — no binding, no read, no leak. Reporting to Sentry is impossible
+ * without a binding, so that guarantee is gone and the weaker rule replaces it:
+ * `error` reaches `captureBoundaryError` and NOTHING ELSE. It is not
+ * interpolated into JSX, not put in `document.title`, not logged. The absence
+ * is now a thing tests assert rather than a thing the signature enforces —
+ * `tests/unit/shell/global-error.test.tsx` holds that line.
  */
 
 const geistSans = Geist({
@@ -42,11 +63,16 @@ const geistMono = Geist_Mono({
 });
 
 export default function GlobalError({
+	error,
 	reset,
 }: {
 	error: Error & { digest?: string };
 	reset: () => void;
 }): React.JSX.Element {
+	useEffect(() => {
+		captureBoundaryError(error, "global");
+	}, [error]);
+
 	return (
 		<html
 			lang="en"

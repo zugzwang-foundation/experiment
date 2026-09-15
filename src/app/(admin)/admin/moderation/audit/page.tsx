@@ -1,6 +1,12 @@
+import { Search, ShieldAlert, UserX } from "lucide-react";
 import Link from "next/link";
 
-import { AdminTabs } from "@/app/(admin)/admin/_components/AdminTabs";
+import { AdminShell } from "@/app/(admin)/admin/_components/AdminShell";
+import { PageHeader } from "@/app/(admin)/admin/_components/PageHeader";
+import { ModerationSubnav } from "@/app/(admin)/admin/moderation/_components/ModerationSubnav";
+import { buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import {
 	type LoadModerationAuditFeedOptions,
 	loadModerationAuditFeed,
@@ -32,6 +38,11 @@ import {
 // login). READ-ONLY: no action/handler; the search form is a GET form. Blocked
 // images are withheld (hasBlockedImage boolean) — never rendered, no r2 key.
 //
+// ADMIN-UI — presentation only. The gate, both reads, the `searchRan` branch,
+// the six GET field names and every row field rendered are unchanged; the
+// search form now reports which filters are active. No image element exists
+// anywhere under this directory (the audit leak guard scans all of it).
+//
 // S-4 Phase B — `instant = false` (below): `requireAdminPage` (`cookies()`)
 // plus this page's own `searchParams` search form are read unwrapped; either
 // errors the `cacheComponents` prerender build otherwise. Deferred, not
@@ -56,6 +67,10 @@ const VERDICT_LABEL: Record<ModVerdict, string> = {
 	track_b: "track_b",
 };
 
+function utcStamp(date: Date): string {
+	return date.toISOString().replace("T", " ").replace(".000Z", "Z");
+}
+
 function ReasonBadge({
 	reason,
 }: {
@@ -64,12 +79,15 @@ function ReasonBadge({
 	const meta = REASON_META[reason];
 	const tone =
 		meta.tone === "severe"
-			? "border-destructive/40 bg-destructive/10 text-destructive"
-			: "border-border bg-muted text-foreground";
+			? "border-n6 bg-n1 font-semibold text-ink"
+			: "border-n3 text-n6";
 	return (
 		<span
-			className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${tone}`}
+			className={`inline-flex items-center gap-1.5 rounded-(--r-chip) border px-2 py-0.5 text-xs ${tone}`}
 		>
+			{meta.tone === "severe" ? (
+				<ShieldAlert aria-hidden className="size-3.5" />
+			) : null}
 			{meta.label}
 		</span>
 	);
@@ -84,8 +102,8 @@ function BanIndicator({
 }): React.ReactElement {
 	if (banned) {
 		return (
-			<span className="inline-flex items-center gap-1.5 rounded-full bg-destructive px-2.5 py-0.5 text-xs font-semibold text-background">
-				<span aria-hidden>●</span>
+			<span className="inline-flex items-center gap-1.5 rounded-(--r-chip) bg-n6 px-2 py-0.5 font-semibold text-ground text-xs">
+				<UserX aria-hidden className="size-3" />
 				BANNED
 				{bannedAt ? (
 					<span className="font-normal opacity-80">
@@ -96,7 +114,7 @@ function BanIndicator({
 		);
 	}
 	return (
-		<span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+		<span className="inline-flex items-center gap-1.5 rounded-(--r-chip) border border-n2 px-2 py-0.5 font-medium text-n5 text-xs">
 			<span aria-hidden>○</span>
 			active
 		</span>
@@ -109,16 +127,16 @@ function CategoryChips({
 	scores: CategoryScore[];
 }): React.ReactElement {
 	if (scores.length === 0) {
-		return <span className="text-xs text-muted-foreground">no scores</span>;
+		return <span className="text-n5 text-xs">no scores</span>;
 	}
 	return (
 		<div className="flex flex-wrap gap-1.5">
 			{scores.map((c) => (
 				<span
 					key={c.name}
-					className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground"
+					className="inline-flex items-center gap-1 rounded-(--r-chip) border border-n2 bg-n1 px-2 py-0.5 font-mono text-n5 text-xs"
 				>
-					<span className="text-foreground">{c.name}</span>
+					<span className="text-ink">{c.name}</span>
 					{c.score.toFixed(3)}
 				</span>
 			))}
@@ -131,7 +149,7 @@ function ImageWithheld(): React.ReactElement {
 		<div
 			role="img"
 			aria-label="Blocked image withheld — never rendered"
-			className="flex items-center gap-2 rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground"
+			className="flex items-center gap-2 rounded-(--r) border border-n3 border-dashed bg-n1 px-3 py-2 text-n5 text-sm"
 		>
 			<span aria-hidden className="font-mono">
 				[×]
@@ -149,12 +167,30 @@ function Field({
 	children: React.ReactNode;
 }): React.ReactElement {
 	return (
-		<div className="flex flex-col gap-1">
-			<dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+		<div className="flex min-w-0 flex-col gap-1">
+			<dt className="font-medium text-n5 text-xs uppercase tracking-wide">
 				{label}
 			</dt>
-			<dd className="text-sm">{children}</dd>
+			<dd className="min-w-0 break-words text-n6 text-sm">{children}</dd>
 		</div>
+	);
+}
+
+function MarketLink({
+	marketId,
+	marketSlug,
+}: {
+	marketId: string | null;
+	marketSlug: string | null;
+}): React.ReactElement {
+	if (!marketId) return <span className="text-n4">—</span>;
+	return (
+		<Link
+			href={`/admin/markets/${marketId}`}
+			className="rounded-(--r-chip) font-mono text-ink text-xs underline underline-offset-2 outline-none hover:no-underline focus-visible:shadow-(--state-focus-ring)"
+		>
+			{marketSlug ?? marketId}
+		</Link>
 	);
 }
 
@@ -164,75 +200,68 @@ function AuditRow({
 	row: ModerationAuditRowView;
 }): React.ReactElement {
 	return (
-		<article className="rounded-lg border border-border bg-card p-5 shadow-sm">
-			<header className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+		<article className="rounded-(--r) border border-n2 bg-n0 shadow-(--elev-1)">
+			<header className="flex flex-wrap items-center justify-between gap-3 border-n2 border-b px-4 py-2.5">
 				<div className="flex flex-wrap items-center gap-2">
 					<ReasonBadge reason={row.reason} />
 					{row.verdict ? (
-						<span className="rounded-full border border-border px-2 py-0.5 font-mono text-xs text-muted-foreground">
+						<span className="rounded-(--r-chip) border border-n2 px-2 py-0.5 font-mono text-n5 text-xs">
 							verdict: {VERDICT_LABEL[row.verdict]}
 						</span>
 					) : null}
 				</div>
 				<time
 					dateTime={row.createdAt.toISOString()}
-					className="font-mono text-xs text-muted-foreground"
+					className="font-mono text-n5 text-xs"
 				>
-					{row.createdAt.toISOString().replace("T", " ").replace(".000Z", "Z")}
+					{utcStamp(row.createdAt)}
 				</time>
 			</header>
 
-			<dl className="grid grid-cols-1 gap-4 py-4 sm:grid-cols-3">
-				<Field label="Market">
-					{row.marketId ? (
-						<Link
-							href={`/admin/markets/${row.marketId}`}
-							className="text-foreground underline underline-offset-2 hover:no-underline"
-						>
-							{row.marketSlug ?? row.marketId}
-						</Link>
-					) : (
-						<span className="text-muted-foreground">—</span>
-					)}
-					{row.marketTitle ? (
-						<span className="mt-0.5 block text-xs text-muted-foreground">
-							{row.marketTitle}
-						</span>
-					) : null}
-				</Field>
+			<div className="flex flex-col gap-4 px-4 py-3">
+				<dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+					<Field label="Market">
+						<MarketLink marketId={row.marketId} marketSlug={row.marketSlug} />
+						{row.marketTitle ? (
+							<span className="mt-0.5 block text-n5 text-xs">
+								{row.marketTitle}
+							</span>
+						) : null}
+					</Field>
 
-				<Field label="Author">
-					<div className="flex flex-col items-start gap-1.5">
-						<span>{row.authorPseudonym ?? "—"}</span>
-						<BanIndicator
-							banned={row.authorBanned}
-							bannedAt={row.authorBannedAt}
-						/>
-					</div>
-				</Field>
+					<Field label="Author">
+						<div className="flex flex-col items-start gap-1.5">
+							<span>{row.authorPseudonym ?? "—"}</span>
+							<BanIndicator
+								banned={row.authorBanned}
+								bannedAt={row.authorBannedAt}
+							/>
+						</div>
+					</Field>
 
-				<Field label="Actor">
-					<span className="font-mono text-xs">{row.actorId}</span>
-				</Field>
-			</dl>
+					<Field label="Actor">
+						<span className="font-mono text-xs">{row.actorId}</span>
+					</Field>
+				</dl>
 
-			<div className="flex flex-col gap-4">
-				<Field label="OpenAI categories">
-					<CategoryChips scores={row.categoryScores} />
-				</Field>
+				<dl>
+					<Field label="OpenAI categories">
+						<CategoryChips scores={row.categoryScores} />
+					</Field>
+				</dl>
 
 				{row.hasBlockedImage ? <ImageWithheld /> : null}
 
 				<div className="flex flex-col gap-1.5">
-					<span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+					<span className="font-medium text-n5 text-xs uppercase tracking-wide">
 						Rejected content · admin-only
 					</span>
 					{row.blockedText ? (
-						<p className="whitespace-pre-wrap break-words rounded-md border border-border bg-muted/40 p-3 text-sm">
+						<p className="whitespace-pre-wrap break-words rounded-(--r) border border-n2 bg-ground p-3 text-ink text-sm">
 							{row.blockedText}
 						</p>
 					) : (
-						<span className="text-sm text-muted-foreground">
+						<span className="text-n5 text-sm">
 							(no text — image-only submission)
 						</span>
 					)}
@@ -247,82 +276,110 @@ const SOURCE_LABEL: Record<AuditLogRowView["source"], string> = {
 	admin_event: "admin event",
 };
 
-function SearchForm({ sp }: { sp: SearchParams }): React.ReactElement {
-	const input =
-		"rounded-md border border-border bg-background px-2 py-1 text-sm";
+const FILTER_LABEL: Record<keyof SearchParams, string> = {
+	from: "From",
+	to: "To",
+	actionType: "Action type",
+	marketId: "Market id",
+	userId: "User id",
+	pseudonym: "Pseudonym",
+};
+
+function SearchForm({
+	sp,
+	activeFilters,
+}: {
+	sp: SearchParams;
+	activeFilters: string[];
+}): React.ReactElement {
+	const field = "flex flex-col gap-1.5 text-n5 text-xs";
 	return (
 		<form
 			method="get"
-			className="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-border bg-card p-4 sm:grid-cols-3"
+			aria-label="Search the audit log"
+			className="mb-4 rounded-(--r) border border-n2 bg-n0 p-4 shadow-(--elev-1)"
 		>
-			<label className="flex flex-col gap-1 text-xs text-muted-foreground">
-				From
-				<input
-					type="date"
-					name="from"
-					defaultValue={sp.from ?? ""}
-					className={input}
-				/>
-			</label>
-			<label className="flex flex-col gap-1 text-xs text-muted-foreground">
-				To
-				<input
-					type="date"
-					name="to"
-					defaultValue={sp.to ?? ""}
-					className={input}
-				/>
-			</label>
-			<label className="flex flex-col gap-1 text-xs text-muted-foreground">
-				Action type
-				<input
-					type="text"
-					name="actionType"
-					placeholder={`${ACTION_TYPE_PLACEHOLDER} …`}
-					defaultValue={sp.actionType ?? ""}
-					className={input}
-				/>
-			</label>
-			<label className="flex flex-col gap-1 text-xs text-muted-foreground">
-				Market id
-				<input
-					type="text"
-					name="marketId"
-					defaultValue={sp.marketId ?? ""}
-					className={input}
-				/>
-			</label>
-			<label className="flex flex-col gap-1 text-xs text-muted-foreground">
-				User id
-				<input
-					type="text"
-					name="userId"
-					defaultValue={sp.userId ?? ""}
-					className={input}
-				/>
-			</label>
-			<label className="flex flex-col gap-1 text-xs text-muted-foreground">
-				Pseudonym
-				<input
-					type="text"
-					name="pseudonym"
-					defaultValue={sp.pseudonym ?? ""}
-					className={input}
-				/>
-			</label>
-			<div className="flex items-end gap-2 sm:col-span-3">
+			<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+				<label htmlFor="audit-from" className={field}>
+					From (UTC day)
+					<Input
+						id="audit-from"
+						type="date"
+						name="from"
+						defaultValue={sp.from ?? ""}
+						className="[color-scheme:dark]"
+					/>
+				</label>
+				<label htmlFor="audit-to" className={field}>
+					To (UTC day)
+					<Input
+						id="audit-to"
+						type="date"
+						name="to"
+						defaultValue={sp.to ?? ""}
+						className="[color-scheme:dark]"
+					/>
+				</label>
+				<label htmlFor="audit-action-type" className={field}>
+					Action type
+					<Input
+						id="audit-action-type"
+						type="text"
+						name="actionType"
+						placeholder={`${ACTION_TYPE_PLACEHOLDER} …`}
+						defaultValue={sp.actionType ?? ""}
+						className="font-mono"
+					/>
+				</label>
+				<label htmlFor="audit-market-id" className={field}>
+					Market id
+					<Input
+						id="audit-market-id"
+						type="text"
+						name="marketId"
+						defaultValue={sp.marketId ?? ""}
+						className="font-mono"
+					/>
+				</label>
+				<label htmlFor="audit-user-id" className={field}>
+					User id
+					<Input
+						id="audit-user-id"
+						type="text"
+						name="userId"
+						defaultValue={sp.userId ?? ""}
+						className="font-mono"
+					/>
+				</label>
+				<label htmlFor="audit-pseudonym" className={field}>
+					Pseudonym
+					<Input
+						id="audit-pseudonym"
+						type="text"
+						name="pseudonym"
+						defaultValue={sp.pseudonym ?? ""}
+					/>
+				</label>
+			</div>
+			<div className="mt-4 flex flex-wrap items-center gap-2">
 				<button
 					type="submit"
-					className="rounded-md border border-border bg-foreground px-4 py-2 text-sm font-medium text-background"
+					className="inline-flex h-9 items-center gap-2 rounded-(--r) bg-ink px-4 font-medium text-ground text-sm outline-none hover:bg-n7 focus-visible:shadow-(--state-focus-ring)"
 				>
+					<Search aria-hidden className="size-4" />
 					Search
 				</button>
 				<Link
 					href="/admin/moderation/audit"
-					className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
+					className={cn(buttonVariants({ size: "lg" }), "px-4")}
 				>
 					Clear
 				</Link>
+				<span className="text-n5 text-xs">
+					{activeFilters.length > 0
+						? `Active: ${activeFilters.join(" · ")}`
+						: "No filters — showing the blocked-submissions feed."}
+				</span>
 			</div>
 		</form>
 	);
@@ -334,64 +391,61 @@ function SearchResultRow({
 	row: AuditLogRowView;
 }): React.ReactElement {
 	return (
-		<article className="rounded-lg border border-border bg-card p-4">
-			<header className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
+		<article className="rounded-(--r) border border-n2 bg-n0 shadow-(--elev-1)">
+			<header className="flex flex-wrap items-center justify-between gap-2 border-n2 border-b px-4 py-2.5">
 				<div className="flex flex-wrap items-center gap-2 text-xs">
-					<span className="rounded-full border border-border bg-muted px-2 py-0.5 font-medium uppercase tracking-wide text-muted-foreground">
+					<span className="rounded-(--r-chip) border border-n2 bg-n1 px-1.5 py-0.5 font-medium text-[11px] text-n5 uppercase leading-4 tracking-wide">
 						{SOURCE_LABEL[row.source]}
 					</span>
-					<span className="font-mono text-foreground">{row.actionType}</span>
+					<span className="font-mono text-ink">{row.actionType}</span>
 				</div>
 				<time
 					dateTime={row.createdAt.toISOString()}
-					className="font-mono text-xs text-muted-foreground"
+					className="font-mono text-n5 text-xs"
 				>
-					{row.createdAt.toISOString().replace("T", " ").replace(".000Z", "Z")}
+					{utcStamp(row.createdAt)}
 				</time>
 			</header>
-			<dl className="grid grid-cols-1 gap-3 py-3 text-sm sm:grid-cols-3">
-				<Field label="Market">
-					{row.marketId ? (
-						<Link
-							href={`/admin/markets/${row.marketId}`}
-							className="text-foreground underline underline-offset-2 hover:no-underline"
-						>
-							{row.marketSlug ?? row.marketId}
-						</Link>
-					) : (
-						<span className="text-muted-foreground">—</span>
-					)}
-				</Field>
-				<Field label="Author">
-					{row.authorPseudonym ? (
-						<span>
-							{row.authorPseudonym}
-							{row.authorBanned ? (
-								<span className="ml-1 text-destructive">· banned</span>
-							) : null}
-						</span>
-					) : (
-						<span className="text-muted-foreground">—</span>
-					)}
-				</Field>
-				<Field label="Actor">
-					<span className="font-mono text-xs">{row.actorId}</span>
-				</Field>
-			</dl>
-			{row.categoryScores.length > 0 ? (
-				<CategoryChips scores={row.categoryScores} />
-			) : null}
-			{row.hasBlockedImage ? (
-				<div className="mt-2">
-					<ImageWithheld />
-				</div>
-			) : null}
-			{row.blockedText ? (
-				<p className="mt-2 whitespace-pre-wrap break-words rounded-md border border-border bg-muted/40 p-3 text-sm">
-					{row.blockedText}
-				</p>
-			) : null}
+			<div className="flex flex-col gap-3 px-4 py-3">
+				<dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+					<Field label="Market">
+						<MarketLink marketId={row.marketId} marketSlug={row.marketSlug} />
+					</Field>
+					<Field label="Author">
+						{row.authorPseudonym ? (
+							<span>
+								{row.authorPseudonym}
+								{row.authorBanned ? (
+									<span className="ml-1 font-semibold text-ink">· banned</span>
+								) : null}
+							</span>
+						) : (
+							<span className="text-n4">—</span>
+						)}
+					</Field>
+					<Field label="Actor">
+						<span className="font-mono text-xs">{row.actorId}</span>
+					</Field>
+				</dl>
+				{row.categoryScores.length > 0 ? (
+					<CategoryChips scores={row.categoryScores} />
+				) : null}
+				{row.hasBlockedImage ? <ImageWithheld /> : null}
+				{row.blockedText ? (
+					<p className="whitespace-pre-wrap break-words rounded-(--r) border border-n2 bg-ground p-3 text-ink text-sm">
+						{row.blockedText}
+					</p>
+				) : null}
+			</div>
 		</article>
+	);
+}
+
+function EmptyResult({ message }: { message: string }): React.ReactElement {
+	return (
+		<div className="rounded-(--r) border border-n2 border-dashed bg-n0 px-6 py-16 text-center">
+			<p className="text-n5 text-sm">{message}</p>
+		</div>
 	);
 }
 
@@ -415,105 +469,90 @@ export default async function ModerationAuditPage(props: {
 		? []
 		: await loadModerationAuditFeed({ limit: ROW_LIMIT });
 
+	// Labels of the predicates that SURVIVED parsing — read off `filters`, the
+	// same object the query receives, so this line cannot claim a filter the
+	// query dropped (a dropped date is named by InvalidDateNote instead).
+	const activeFilters = Object.entries(FILTER_LABEL)
+		.filter(([key]) => key in filters)
+		.map(([, label]) => label);
+
 	return (
-		<main className="min-h-dvh bg-background text-foreground">
-			<div className="mx-auto max-w-5xl px-6 py-10">
-				<AdminTabs active="moderation" />
+		<AdminShell active="moderation">
+			<PageHeader
+				title="Moderation"
+				description="Search across admin events and moderation actions (F-ADMIN-5). With no filters, the gate-blocked submissions feed is shown. Read-only. Per ADR-0021."
+			/>
 
-				<header className="mb-6">
-					<h1 className="text-2xl font-semibold tracking-tight">
-						Moderation · Audit log
-					</h1>
-					<p className="mt-1 text-sm text-muted-foreground">
-						Search across admin events and moderation actions (F-ADMIN-5). With
-						no filters, the gate-blocked submissions feed is shown. Per
-						ADR-0021.
-					</p>
-					<p className="mt-2 text-xs text-muted-foreground">
-						<Link
-							href="/admin/moderation"
-							className="underline underline-offset-2 hover:no-underline"
-						>
-							← Live review feed
-						</Link>
-					</p>
-				</header>
+			<ModerationSubnav active="audit" />
 
-				<div
-					role="note"
-					className="mb-6 rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-foreground"
-				>
+			<div
+				role="note"
+				className="mb-4 flex items-start gap-2 rounded-(--r) border border-n4 bg-n1 px-4 py-3 text-ink text-sm"
+			>
+				<ShieldAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+				<p>
 					<strong className="font-semibold">Admin-only.</strong> Rejected
 					content is shown for review; it is never exposed to participants, and
 					blocked images are withheld — never rendered.
-				</div>
-
-				<SearchForm sp={sp} />
-
-				<InvalidDateNote fields={invalidDateFields(sp)} searchRan={searching} />
-
-				{/* admin_events has no writer yet — make its emptiness legible so an
-				    absent admin-event row reads as "not emitted", never "no match". */}
-				<p
-					role="note"
-					className="mb-4 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
-				>
-					Admin-event rows are{" "}
-					<strong className="font-semibold">not yet emitted</strong> (no{" "}
-					<span className="font-mono">admin_events</span> writer exists), so
-					results currently cover moderation actions only — an absent
-					admin-event row means "not emitted here yet", not "no such admin
-					action occurred".
 				</p>
+			</div>
 
-				{searching ? (
-					searchRows.length === 0 ? (
-						<div className="rounded-lg border border-dashed border-border bg-card px-6 py-16 text-center">
-							<p className="text-sm text-muted-foreground">
-								No audit rows match those filters.
-							</p>
-						</div>
-					) : (
-						<>
-							<p className="mb-4 text-xs text-muted-foreground">
-								{searchRows.length} matching row
-								{searchRows.length === 1 ? "" : "s"}
-								{searchRows.length === ROW_LIMIT
-									? ` (capped at ${ROW_LIMIT})`
-									: ""}
-								.
-							</p>
-							<div className="flex flex-col gap-3">
-								{searchRows.map((row) => (
-									<SearchResultRow key={`${row.source}:${row.id}`} row={row} />
-								))}
-							</div>
-						</>
-					)
-				) : blockedRows.length === 0 ? (
-					<div className="rounded-lg border border-dashed border-border bg-card px-6 py-16 text-center">
-						<p className="text-sm text-muted-foreground">
-							No blocked submissions recorded yet.
-						</p>
-					</div>
+			<SearchForm sp={sp} activeFilters={activeFilters} />
+
+			<InvalidDateNote fields={invalidDateFields(sp)} searchRan={searching} />
+
+			{/* admin_events has no writer yet — make its emptiness legible so an
+			    absent admin-event row reads as "not emitted", never "no match". */}
+			<p
+				role="note"
+				className="mb-4 rounded-(--r) border border-n2 bg-n0 px-3 py-2 text-n5 text-xs"
+			>
+				Admin-event rows are{" "}
+				<strong className="font-semibold text-n6">not yet emitted</strong> (no{" "}
+				<span className="font-mono">admin_events</span> writer exists), so
+				results currently cover moderation actions only — an absent admin-event
+				row means "not emitted here yet", not "no such admin action occurred".
+			</p>
+
+			{searching ? (
+				searchRows.length === 0 ? (
+					<EmptyResult message="No audit rows match those filters." />
 				) : (
 					<>
-						<p className="mb-4 text-xs text-muted-foreground">
-							Showing the {blockedRows.length} most recent blocked submission
-							{blockedRows.length === 1 ? "" : "s"}
-							{blockedRows.length === ROW_LIMIT
+						<p className="mb-3 text-n5 text-xs">
+							{searchRows.length} matching row
+							{searchRows.length === 1 ? "" : "s"}
+							{searchRows.length === ROW_LIMIT
 								? ` (capped at ${ROW_LIMIT})`
 								: ""}
 							.
 						</p>
-						<div className="flex flex-col gap-4">
-							{blockedRows.map((row) => (
-								<AuditRow key={row.id} row={row} />
+						<div className="flex flex-col gap-3">
+							{searchRows.map((row) => (
+								<SearchResultRow key={`${row.source}:${row.id}`} row={row} />
 							))}
 						</div>
 					</>
-				)}
-			</div>
-		</main>
+				)
+			) : blockedRows.length === 0 ? (
+				<EmptyResult message="No blocked submissions recorded yet." />
+			) : (
+				<>
+					<p className="mb-3 text-n5 text-xs">
+						Showing the {blockedRows.length} most recent blocked submission
+						{blockedRows.length === 1 ? "" : "s"}
+						{blockedRows.length === ROW_LIMIT
+							? ` (capped at ${ROW_LIMIT})`
+							: ""}
+						.
+					</p>
+					<div className="flex flex-col gap-3">
+						{blockedRows.map((row) => (
+							<AuditRow key={row.id} row={row} />
+						))}
+					</div>
+				</>
+			)}
+		</AdminShell>
 	);
 }

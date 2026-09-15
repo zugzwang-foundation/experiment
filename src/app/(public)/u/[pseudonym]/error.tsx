@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 "use client";
 
+import { useEffect } from "react";
+
 import { ProfileError } from "@/components/profile/states";
 import { PageContainer } from "@/components/shell/PageContainer";
+import { captureBoundaryError } from "@/lib/boundary-capture";
 
 /** The profile route's error boundary — the route-boundary family block
  * (canon §10 `C-STATES-1`). `notFound()` is handled separately by
@@ -27,19 +30,30 @@ import { PageContainer } from "@/components/shell/PageContainer";
  * ⚠ `m/[slug]/error.tsx` escapes that guard only because POLISH.3 declared it in
  * a separate `GREENFIELD` array — not a precedent this file may follow.
  *
- * ⚠ NOTHING FROM `error` IS RENDERED. The prop is accepted because Next's
- * contract passes it and is deliberately NOT DESTRUCTURED, so no binding exists
- * to render by accident — structural, not a rule someone has to remember
- * (CLAUDE.md §8 `O-1`).
+ * ⚠ NOTHING FROM `error` IS RENDERED — and the mechanism behind that changed
+ * here, so do not read the old one out of a sibling file. This block used to say
+ * the prop was deliberately NOT DESTRUCTURED, so no binding existed to render by
+ * accident — structural, not a rule someone has to remember (CLAUDE.md §8
+ * `O-1`). Reporting a boundary-caught error to Sentry cannot be done without a
+ * binding: nothing else in the stack can see it, because the boundary is what
+ * stopped it propagating. So the binding exists now, `error` goes to
+ * `captureBoundaryError` and NOWHERE else, and the guarantee is procedural
+ * where it used to be structural. That is a real weakening, recorded rather
+ * than papered over — O-1 is why it is worth a paragraph instead of a line.
  *
  * `"use client"` is a Next.js framework requirement for `error.tsx`, not new
  * product logic. */
 export default function ProfileRouteError({
+	error,
 	reset,
 }: {
 	error: Error & { digest?: string };
 	reset: () => void;
 }) {
+	useEffect(() => {
+		captureBoundaryError(error, "profile");
+	}, [error]);
+
 	return (
 		<PageContainer preset="reading">
 			<ProfileError onAction={reset} />

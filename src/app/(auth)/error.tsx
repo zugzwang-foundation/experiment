@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 "use client";
 
+import { useEffect } from "react";
+
+import { captureBoundaryError } from "@/lib/boundary-capture";
+
 /**
  * The `(auth)` route-group error boundary — POLISH.7a D20, ruled at R-C.
  *
@@ -32,8 +36,19 @@
  * ⚠ NOTHING FROM `error` IS RENDERED — not `message`, not `stack`, not
  * `digest`, not `cause`. On a signed-out auth surface the thrown value can
  * carry a DB error, a cookie-verification detail or a Better Auth internal, and
- * none of that is the visitor's. The prop is accepted because Next's contract
- * passes it; it is deliberately unused.
+ * none of that is the visitor's.
+ *
+ * ⚠ IT IS THE VISITOR'S THAT IT IS NOT, WHICH IS NOT THE SAME AS NOBODY'S — and
+ * that distinction is the whole of the change this paragraph records. `error`
+ * used to be accepted-and-unused, so "nothing leaks" needed no test: there was
+ * no binding to leak through. It now goes to `captureBoundaryError`, because a
+ * boundary is precisely the thing that stops a client-side throw from ever
+ * reaching `window.onerror`, and this surface — a signed-out sign-in flow with
+ * an OTP form and a hydrating client page — is one nobody is watching when it
+ * breaks. The material named above is the material the operator needs in order
+ * to fix it, and Sentry already holds the same class of thing from the server
+ * arm via `onRequestError`. What must not change is the destination: the
+ * operator's dashboard, never the DOM.
  *
  * ⚠ AND THE ARM THAT PROTECTS IS NOT THE ONE YOU WOULD GUESS (@security-auditor).
  * In a production build React's Flight client already replaces a SERVER-side
@@ -57,11 +72,16 @@
  * fallback it belongs in-page as `<Suspense>`, which is a different task.
  */
 export default function AuthError({
+	error,
 	reset,
 }: {
 	error: Error & { digest?: string };
 	reset: () => void;
 }): React.JSX.Element {
+	useEffect(() => {
+		captureBoundaryError(error, "auth");
+	}, [error]);
+
 	return (
 		<div data-testid="auth-error" className="my-auto text-center">
 			<h1 className="font-medium text-ink text-lg">Something went wrong.</h1>
