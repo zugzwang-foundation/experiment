@@ -42,7 +42,7 @@ export function MarketPriceChartOverlay({
 	 * ⛔⛔ THE LOCK IS ITS OWN EFFECT WITH EMPTY DEPS, AND THAT IS NOT TIDINESS.
 	 * The keydown effect above depends on `onClose`, which `MarketPriceChartHost`
 	 * passes as a fresh arrow on every render — and this component re-renders on
-	 * every `DebatePoll` tick, every 15 s, because the poll is deliberately NOT
+	 * every `DebatePoll` tick, every 30 s, because the poll is deliberately NOT
 	 * suspended for a read-only sheet. Sharing one effect meant taking and
 	 * releasing the lock, with a DOM walk and a forced `scrollTop` write each
 	 * time, on a timer. `@code-reviewer` found it. Empty deps tie the lock to the

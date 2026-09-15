@@ -163,7 +163,7 @@ export function PhoneTopPill({
 	 * LANDING refresh the way `DebatePoll` is gated, or giving the composer an
 	 * `AbortController`; both are larger than this control and are docketed at
 	 * `docs/parked.md` 2k-7. ⚠ It is also NOT this round's creation: `DebatePoll`
-	 * has the same landing window on a 15-second cadence (2k-8).
+	 * has the same landing window on a 30-second cadence (2k-8).
 	 *
 	 * ⚠ NOR IS `locked` A SUPERSET OF "A COMPOSER EXISTS ON THE PAGE". `DebateView`
 	 * mounts a SECOND, independent `BetComposer` with its own `composerBusy`, and

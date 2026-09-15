@@ -60,11 +60,12 @@ import {
  * to pages). Both are single-row indexed lookups; not optimised here.
  *
  * "PER REQUEST" IS NOT "PER NAVIGATION" ON `/m/[slug]`. `DebatePoll` calls
- * `router.refresh()` every `POLL_INTERVAL_MS_DEBATE_VIEW` (15 s), and a refresh
+ * `router.refresh()` every `POLL_INTERVAL_MS_DEBATE_VIEW` (30 s, while the
+ * reader is active), and a refresh
  * re-executes the LAYOUT as well as the page — `docs/logs/F-DEBATE-4.md:213`
  * measured the tick at 12–14 round-trips "because the refresh re-executes the
  * layout as well as the page". So for a signed-in viewer holding that tab open
- * this pair costs 2 reads / 15 s / tab, not 2 per navigation. Still two
+ * this pair costs 2 reads / 30 s / tab, not 2 per navigation. Still two
  * single-row indexed lookups and still not optimised here, but HARDEN.6 sizes
  * against ticks × tabs × round-trips and must count these two
  * (@code-reviewer, SHELL-COMPLETE).
@@ -113,7 +114,7 @@ export default async function PublicLayout({
 	// not a per-request read: the fetch carries `next: { revalidate: 900 }`, so
 	// this resolves from the Data Cache and reaches GitHub four times an hour
 	// across the whole deployment. That matters on `/m/[slug]`, where
-	// `DebatePoll`'s 15-second `router.refresh()` re-executes this layout (see
+	// `DebatePoll`'s 30-second `router.refresh()` re-executes this layout (see
 	// the note above) — those ticks are cache hits, not API calls.
 	//
 	// Fail-safe like the two reads above: it resolves to `null` on any failure and
@@ -253,11 +254,11 @@ export default async function PublicLayout({
 			    MOUNTED UNCONDITIONALLY, OPENED BY PROP. `initialOpen` seeds the
 			    deck's own `useState` ONCE; the client owns `open` from then on.
 			    That is load-bearing rather than tidy: `DebatePoll` calls
-			    `router.refresh()` every 15 s on `/m/[slug]`, and a refresh
+			    `router.refresh()` every 30 s on `/m/[slug]`, and a refresh
 			    re-executes this LAYOUT as well as the page. Were `open` derived
 			    from this prop on every render, a tick landing in the window
 			    between the optimistic close and the cookie being written would
-			    RE-OPEN a deck the participant had just completed — a 15-second
+			    RE-OPEN a deck the participant had just completed — a 30-second
 			    haunting that reproduces on exactly one route. A closed Radix
 			    dialog portals nothing, so mounting it for a signed-out visitor
 			    costs one unmounted client component and no DOM.

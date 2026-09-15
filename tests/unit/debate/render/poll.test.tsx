@@ -76,7 +76,10 @@ vi.mock("@/components/debate/poll-phase", () => ({
 import { DebatePoll } from "@/components/debate/DebatePoll";
 import { DebateView } from "@/components/debate/DebateView";
 import type { DebateViewModel } from "@/components/debate/types";
-import { POLL_INTERVAL_MS_DEBATE_VIEW } from "@/server/config/limits";
+import {
+	POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW,
+	POLL_INTERVAL_MS_DEBATE_VIEW,
+} from "@/server/config/limits";
 
 import { mumbaiMetroModel as mumbaiMetroModelRaw } from "../../debate-export/_fixtures/mumbai-metro.input";
 
@@ -103,8 +106,22 @@ function setHidden(hidden: boolean): void {
 	document.dispatchEvent(new Event("visibilitychange"));
 }
 
-/** Advance the fake clock by whole poll intervals, flushing React each time. */
+/** A reader input the idle timer counts (POLL-IDLE). */
+function activity(type = "pointermove"): void {
+	act(() => {
+		window.dispatchEvent(new Event(type));
+	});
+}
+
+/**
+ * Advance the fake clock by whole poll intervals, flushing React each time.
+ *
+ * ⚠ POLL-IDLE — the reader is PRESENT: one input is dispatched first, so the
+ * cadence, suspension and stop rules below are tested apart from the idle rule.
+ * Idle has its own describe block, which advances the clock without input.
+ */
 function tick(intervals: number): void {
+	activity();
 	act(() => {
 		vi.advanceTimersByTime(POLL_INTERVAL_MS_DEBATE_VIEW * intervals);
 	});
@@ -302,6 +319,138 @@ describe("F-DEBATE-4 — suspension (RULING C)", () => {
 		fireEvent.click(entry);
 		expect(entry.getAttribute("aria-expanded")).toBe("false");
 		expect(refreshMock).toHaveBeenCalledTimes(2);
+	});
+});
+
+describe("POLL-IDLE — an idle reader stops the poll", () => {
+	/** Advance the clock with NO reader input. */
+	function idleFor(ms: number): void {
+		act(() => {
+			vi.advanceTimersByTime(ms);
+		});
+	}
+
+	it("the constants are what was asked for: 30 s cadence, 5 min idle", () => {
+		expect(POLL_INTERVAL_MS_DEBATE_VIEW).toBe(30_000);
+		expect(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW).toBe(300_000);
+		expect(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW).toBeGreaterThan(
+			POLL_INTERVAL_MS_DEBATE_VIEW,
+		);
+	});
+
+	it("keeps polling up to the idle timeout, then stops refreshing", () => {
+		render(<DebatePoll marketOpen composerOpen={false} />);
+
+		idleFor(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW - 1);
+		const beforeIdle = Math.floor(
+			(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW - 1) / POLL_INTERVAL_MS_DEBATE_VIEW,
+		);
+		expect(refreshMock).toHaveBeenCalledTimes(beforeIdle);
+
+		// Crossing the timeout suspends; a long quiet stretch refreshes nothing.
+		idleFor(1);
+		const atIdle = refreshMock.mock.calls.length;
+		idleFor(POLL_INTERVAL_MS_DEBATE_VIEW * 20);
+		expect(refreshMock).toHaveBeenCalledTimes(atIdle);
+	});
+
+	it("the first input after idling refreshes IMMEDIATELY, then resumes the cadence", () => {
+		render(<DebatePoll marketOpen composerOpen={false} />);
+		idleFor(
+			POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW + POLL_INTERVAL_MS_DEBATE_VIEW * 5,
+		);
+		const idleCount = refreshMock.mock.calls.length;
+
+		activity();
+		expect(refreshMock).toHaveBeenCalledTimes(idleCount + 1);
+
+		idleFor(POLL_INTERVAL_MS_DEBATE_VIEW - 1);
+		expect(refreshMock).toHaveBeenCalledTimes(idleCount + 1);
+		idleFor(1);
+		expect(refreshMock).toHaveBeenCalledTimes(idleCount + 2);
+	});
+
+	it.each([
+		"pointerdown",
+		"pointermove",
+		"touchstart",
+		"wheel",
+		"scroll",
+		"keydown",
+	])("%s counts as activity — it wakes an idle poll", (type) => {
+		render(<DebatePoll marketOpen composerOpen={false} />);
+		idleFor(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW + POLL_INTERVAL_MS_DEBATE_VIEW);
+		const idleCount = refreshMock.mock.calls.length;
+
+		activity(type);
+		expect(refreshMock).toHaveBeenCalledTimes(idleCount + 1);
+	});
+
+	it("a scroll inside an inner scroller is seen (capture phase — scroll does not bubble)", () => {
+		render(<DebatePoll marketOpen composerOpen={false} />);
+		const scroller = document.createElement("div");
+		document.body.appendChild(scroller);
+		try {
+			idleFor(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW + POLL_INTERVAL_MS_DEBATE_VIEW);
+			const idleCount = refreshMock.mock.calls.length;
+
+			act(() => {
+				scroller.dispatchEvent(new Event("scroll", { bubbles: false }));
+			});
+			expect(refreshMock).toHaveBeenCalledTimes(idleCount + 1);
+		} finally {
+			scroller.remove();
+		}
+	});
+
+	it("ongoing activity keeps it polling indefinitely — the timeout restarts on input", () => {
+		render(<DebatePoll marketOpen composerOpen={false} />);
+		// Ten minutes, with input every minute: never idle, every tick lands.
+		for (let minute = 0; minute < 10; minute++) {
+			activity();
+			idleFor(60_000);
+		}
+		expect(refreshMock).toHaveBeenCalledTimes(
+			Math.floor(600_000 / POLL_INTERVAL_MS_DEBATE_VIEW),
+		);
+	});
+
+	it("an idle reader returning to a hidden tab counts as present — resumes on show", () => {
+		render(<DebatePoll marketOpen composerOpen={false} />);
+		act(() => setHidden(true));
+		idleFor(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW * 2);
+		expect(refreshMock).toHaveBeenCalledTimes(0);
+
+		act(() => setHidden(false));
+		expect(refreshMock).toHaveBeenCalledTimes(1);
+		idleFor(POLL_INTERVAL_MS_DEBATE_VIEW);
+		expect(refreshMock).toHaveBeenCalledTimes(2);
+	});
+
+	it("input does NOT override the other suspenders — an open composer still holds it", () => {
+		render(<DebatePoll marketOpen composerOpen={true} />);
+		idleFor(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW + POLL_INTERVAL_MS_DEBATE_VIEW);
+		activity("keydown");
+		idleFor(POLL_INTERVAL_MS_DEBATE_VIEW * 3);
+		expect(refreshMock).toHaveBeenCalledTimes(0);
+	});
+
+	it("input cannot restart a poll the stop rule stopped", () => {
+		const { rerender } = render(<DebatePoll marketOpen composerOpen={false} />);
+		rerender(<DebatePoll marketOpen={false} composerOpen={false} />);
+		idleFor(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW * 2);
+		activity();
+		idleFor(POLL_INTERVAL_MS_DEBATE_VIEW * 3);
+		expect(refreshMock).toHaveBeenCalledTimes(0);
+	});
+
+	it("removes its listeners and idle timer on unmount", () => {
+		const { unmount } = render(<DebatePoll marketOpen composerOpen={false} />);
+		unmount();
+		expect(vi.getTimerCount()).toBe(0);
+		activity();
+		idleFor(POLL_INTERVAL_MS_DEBATE_VIEW * 3);
+		expect(refreshMock).toHaveBeenCalledTimes(0);
 	});
 });
 

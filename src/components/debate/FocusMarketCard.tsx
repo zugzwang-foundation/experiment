@@ -104,6 +104,10 @@ export function FocusMarketCard({
 	return (
 		<Link
 			href={`/m/${slug}`}
+			// POLL-IDLE 1b — no prefetch: every DebatePoll refresh invalidates the
+			// prefetch cache and re-prefetches every visible link (Next 16.3.2
+			// `pingVisibleLinks`), so this link cost a request per tick, per viewer.
+			prefetch={false}
 			data-testid="focus-market-card"
 			onClick={onClick}
 			aria-label="Back to the market"

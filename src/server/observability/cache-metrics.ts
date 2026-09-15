@@ -29,7 +29,7 @@ import { safeCaptureException } from "./safe-capture";
 // PATH. `DiscoveryContent` calls `recordCacheAttempt` once per market inside
 // its loop, so at `DISCOVERY_GRID_SIZE = 8` that was NINE serial network hops
 // added to every Discovery render, and `/m/[slug]` paid one more on every
-// 15 s poll tick per open tab. Measured at CACHE-KEY-1: ~135 ms per round trip,
+// poll tick per open tab (15 s then; 30 s since POLL-IDLE). Measured at CACHE-KEY-1: ~135 ms per round trip,
 // i.e. ~1.2 s added to a surface whose whole post-PERF-1 p50 is 0.692 s.
 // ⇒ An instrument that costs more than the effect it is measuring does not
 // report the system's latency; it reports its own. The counters were also the
@@ -74,12 +74,43 @@ function incr(key: string): void {
 	});
 }
 
-/** Call-site counter — fires on every attempt to read a cached block, hit or miss. */
+/**
+ * POLL-IDLE 1c — the attempt counter is SAMPLED: one render in this many writes,
+ * and that write adds this many, so the stored count stays an unbiased estimate
+ * of every attempt and `1 - misses/attempts` reads exactly as before.
+ *
+ * ⚠ ONLY THE ATTEMPT COUNTER. It is the one that fires on EVERY render — every
+ * `/m/[slug]` poll tick per tab, and nine times per Discovery render — so it was
+ * the per-render Upstash write. The miss counters fire only when a cached body
+ * runs (bounded by the cache windows, not by traffic) and stay exact.
+ *
+ * ⚠ The coin is flipped INSIDE the deferred task, never during render: a
+ * `Math.random()` in a render is a dynamic read under `cacheComponents`, and the
+ * sampling must not be able to change what a page renders or how it caches.
+ */
+export const CACHE_ATTEMPT_SAMPLE_RATE = 10;
+
+/** Call-site counter — records (sampled, see above) every attempt to read a cached block, hit or miss. */
 export function recordCacheAttempt(
 	block: string,
 	marketId: string | null,
 ): void {
-	incr(getRedisKey("cache-metric", block, "attempts", marketId ?? "global"));
+	const key = getRedisKey(
+		"cache-metric",
+		block,
+		"attempts",
+		marketId ?? "global",
+	);
+	schedule(async () => {
+		if (Math.random() >= 1 / CACHE_ATTEMPT_SAMPLE_RATE) {
+			return;
+		}
+		try {
+			await redis.incrby(key, CACHE_ATTEMPT_SAMPLE_RATE);
+		} catch (err) {
+			safeCaptureException(err, { tags: { kind: "cache-metrics-incr" } });
+		}
+	});
 }
 
 /** Body counter — fires only when the cached function's body actually runs, i.e. only on a miss. */

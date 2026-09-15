@@ -297,11 +297,12 @@ export async function loadDebateView(
 	// ⛔ Nothing under `src/server/discovery/**` is written.
 	//
 	// ⚠ THE MULTIPLIER IS WHY THIS IS COUNTED AT ALL. `DebatePoll` re-invokes
-	// this read every `POLL_INTERVAL_MS_DEBATE_VIEW` (15 s) = 4 renders per
-	// minute per viewer, against `src/db/index.ts`'s `max: 10` pool and a
-	// 15-slot session pooler. +1 read is +4 statements/minute/viewer; a per-post
-	// read would have been +4N, and a second image fetched separately would have
-	// been +8 for one picture the first result set already held.
+	// this read every `POLL_INTERVAL_MS_DEBATE_VIEW` (30 s) = 2 renders per
+	// minute per active viewer, against `src/db/index.ts`'s `max: 10` pool and a
+	// 15-slot session pooler. +1 read is +2 statements/minute/viewer; a per-post
+	// read would have been +2N, and a second image fetched separately would have
+	// been +4 for one picture the first result set already held. (Figures were
+	// 4, 4N and 8 at the original 15 s cadence; POLL-IDLE halved them.)
 	//
 	// ⚠⚠ THE TWO SURFACES NO LONGER SHOW THE SAME IMAGE, and this block said
 	// they did. Until entry 4 it read: "It serves BOTH the market arm's media

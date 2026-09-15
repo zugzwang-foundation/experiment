@@ -245,8 +245,16 @@ describe("RI-4 · the poll and the phone sheet", () => {
 			vi.advanceTimersByTime(RUN_MS);
 		});
 		expect(refresh).not.toHaveBeenCalled();
+		// POLL-IDLE — RUN_MS outlasts the idle timeout, so the poll is also idle
+		// by now. Closing a sheet is a tap, so the reader's input is part of the
+		// scenario; without it this row would test the idle rule instead of
+		// whether the sheet flag can stick. Its own `act` so the resume commits
+		// before the clock runs on (and the reader idles out again).
 		act(() => {
 			setPhoneSheetOpen(false);
+			window.dispatchEvent(new Event("pointerdown"));
+		});
+		act(() => {
 			vi.advanceTimersByTime(RUN_MS);
 		});
 		expect(refresh).toHaveBeenCalled();

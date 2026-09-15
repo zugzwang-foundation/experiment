@@ -180,7 +180,7 @@ describe("FEED-2 — server reads per successful bet", () => {
 			vi.advanceTimersByTime(POLL_INTERVAL_MS_DEBATE_VIEW);
 		});
 
-		// ⚠ The third is NOT charged to the bet — it is the 15 s poll doing its
+		// ⚠ The third is NOT charged to the bet — it is the 30 s poll doing its
 		// ordinary job on a surface with nothing held.
 		expect(refreshMock).toHaveBeenCalledTimes(3);
 	});

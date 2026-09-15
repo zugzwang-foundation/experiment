@@ -200,7 +200,7 @@ const READ_TREE_EXCLUDES = /\/composer\//;
  *
  * And it is user-initiated — one click, disabled while in flight — which puts
  * it in the same category as `composer/` above: the poll never reaches it, so
- * it cannot make the 15s refresh diverge from the first paint.
+ * it cannot make the 30s refresh diverge from the first paint.
  */
 const EXPORT_DOWNLOAD = "src/components/debate/DownloadPostImage.tsx";
 
@@ -396,8 +396,8 @@ describe("debate-view::poll-preserves-removal-masking", () => {
 // ── What the poll makes LOAD-BEARING (@security-auditor L-5, L-2) ───────────
 // Neither property is new, and neither is this task's to own. Both are pinned
 // here because the poll multiplies the cost of breaking them: a read path that
-// is re-invoked four times a minute per open tab turns "one spurious write per
-// navigation" into "four per minute", and turns a sliding session re-issue into
+// is re-invoked twice a minute per open, active tab turns "one spurious write
+// per navigation" into "two per minute", and turns a sliding session re-issue into
 // an indefinitely self-renewing cookie for as long as a tab stays open.
 describe("F-DEBATE-4 — properties the poll now depends on", () => {
 	it("the polled read path performs NO write (INV-2-adjacent)", () => {

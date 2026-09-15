@@ -333,7 +333,7 @@ describe("Phase D — session dedupe", () => {
 	it("all three (public) RSC call sites go through the helper", () => {
 		// The layout plus the two surfaces that previously read the session a
 		// SECOND time (layouts cannot pass data to pages). One read per render
-		// now, which on /m/[slug] also divides the 15s poll's cost.
+		// now, which on /m/[slug] also divides the 30s poll's cost.
 		for (const rel of [
 			"src/app/(public)/layout.tsx",
 			"src/app/(public)/m/[slug]/page.tsx",

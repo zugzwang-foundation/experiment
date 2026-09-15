@@ -602,7 +602,7 @@ export function DebateView({
 	//
 	// ⚠ AND IT WAS A REGRESSION, NOT A MISSING FEATURE. The superseded code
 	// passed `null`, which is falsy, so the patch ran. What the spread cost:
-	// `DebatePoll` calls `router.refresh()` every 15s while the market is Open,
+	// `DebatePoll` calls `router.refresh()` every 30s while the market is Open,
 	// and each refresh has `HistoryUpdater` `replaceState` the STALE
 	// `canonicalUrl` — so the address bar silently dropped `?post=N` a few
 	// seconds after entering a post, killing the UI.A2 §3.4 mintable-deep-link
@@ -614,7 +614,7 @@ export function DebateView({
 	// `{...(preserveCustomHistoryState ? history.state : {}), __NA, TREE}` and
 	// every soft navigation — `router.refresh()` included — sets that flag
 	// FALSE (`segment-cache/navigation.js:271,382`). So a custom field is
-	// deleted on the first poll tick, ~15s after it is written. Whatever
+	// deleted on the first poll tick, ~30s after it is written. Whatever
 	// remembers our rungs has to live somewhere Next does not own; see
 	// `pushedRungsRef`.
 	const syncPostParam = (
@@ -757,7 +757,7 @@ export function DebateView({
 		 * is measurably wrong: `HistoryUpdater` rebuilds the entry's state as
 		 * `{...(preserveCustomHistoryState ? history.state : {}), __NA, TREE}`,
 		 * and every soft navigation sets that flag FALSE — so `router.refresh()`,
-		 * which `DebatePoll` fires every 15s, DELETES the marker. The exit would
+		 * which `DebatePoll` fires every 30s, DELETES the marker. The exit would
 		 * then take the fallback branch and ORPHAN the rung it pushed, growing
 		 * `history.length` by one per enter/exit cycle and leaving a dead Back
 		 * step behind — the exact history pollution the superseded comment above
@@ -783,7 +783,7 @@ export function DebateView({
 		 * entirely, losing any argument they had typed — which is precisely the
 		 * defect R2 exists to remove, arriving through R2's own fix.
 		 * ⚠ NOT HYPOTHETICAL AT HUMAN SPEED: a held Enter on a focused `<button>`
-		 * auto-repeats a click roughly every 30ms, and the poll's 15s
+		 * auto-repeats a click roughly every 30ms, and the poll's 30s
 		 * `router.refresh()` is exactly the kind of main-thread work that widens
 		 * the gap. A double-click does it too.
 		 * ⇒ "Pop requested, not yet observed" is a THIRD state the counter cannot

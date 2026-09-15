@@ -161,7 +161,7 @@ describe("R2 · G3 — entering post-focus is a rung on the stack", () => {
 		// `HistoryUpdater` stamps `__NA: true` on first paint. So the spread
 		// guaranteed the skip, `applyUrlFromHistoryPushReplace` never ran, and the
 		// router's `canonicalUrl` never learned about `?post=N`. The next
-		// `router.refresh()` (every 15s, from `DebatePoll`) then `replaceState`d
+		// `router.refresh()` (every 30s, from `DebatePoll`) then `replaceState`d
 		// the STALE url and the address bar silently dropped the param.
 		// ⛔ The old assertion asserted precisely the condition that triggers the
 		// skip. It was green, and it was pinning the bug.
@@ -324,7 +324,7 @@ describe("R2 · G3 — entering post-focus is a rung on the stack", () => {
 		// market entry, off `/m/[slug]`, destroying any argument being typed. That
 		// is the defect R2 exists to remove, arriving through R2's own fix.
 		// ⚠ REACHABLE AT HUMAN SPEED: a held Enter on a focused `<button>` repeats
-		// a click roughly every 30ms, and the poll's 15s `router.refresh()` is
+		// a click roughly every 30ms, and the poll's 30s `router.refresh()` is
 		// exactly the main-thread work that widens the gap. A double-click does it.
 		// ⇒ "Pop requested, not yet observed" is a third state the counter cannot
 		// express, so it has its own latch, cleared by the same `popstate` that
