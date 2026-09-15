@@ -4213,10 +4213,11 @@ asks for), not 4.40px.
 
 **What each further pixel would cost.** None of these was taken; each is a decision.
 
-1. **The row's own side padding, `px-6` → `max-mobile:px-5`** — worth **8px**, which
-   clears the signed-out arm with 5.60px to spare and leaves the signed-IN arm
-   0.87px short, so on its own it is not enough. `px-6` → `max-mobile:px-4` is worth
-   **16px** and clears both (8.87px spare signed in). One gated
+1. **The row's own side padding, `px-6` → `max-mobile:px-5`** — worth **8px**. It
+   CLEARS both arms — 5.60px of spare signed out, **0.87px signed in** — but the
+   signed-in margin is 1.13px under the 2px the brief asks for, so it fits without
+   satisfying the stop rule. `px-6` → `max-mobile:px-4` is worth **16px** and clears
+   both with room (13.60 / **8.87px**). One gated
    token. Cost: the header's phone inset becomes 20px. ⚠ It is NOT in A13 D-4's list
    of levers, which is why it was not taken. Measured against the surface beneath it,
    the header's 24px does not match anything today — `/`'s own container is `px-7`
@@ -4231,9 +4232,10 @@ asks for), not 4.40px.
 3. **Countdown cells 13 → 12px** — worth **8px**. Cost: a 9.5px digit in a 12px cell,
    below the floor the ladder itself stopped at, and the chessboard's cell stops being
    squarer than its glyph.
-4. **Row gap 5 → 4px** — worth **4px**. Clears the signed-out arm with 1.60px to
-   spare and leaves the signed-in arm 3.13px short. Cost: the row's one spacing token
-   drops below the 5px the ladder landed on.
+4. **Row gap 5 → 4px** — worth **4px**. Clears the signed-out arm with 1.60px of
+   spare — itself under the 2px bar — and leaves the signed-in arm **3.13px short**,
+   i.e. still overflowing into the padding. Cost: the row's one spacing token drops
+   below the 5px the ladder landed on.
 
 **The one thing that is NOT an option:** hiding a control, dropping a countdown pair,
 or letting the row scroll. All three are vetoed by the round's brief and none is
