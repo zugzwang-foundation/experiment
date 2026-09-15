@@ -25,8 +25,10 @@ import {
 } from "./guards";
 
 /**
- * G-5 analogue for the WRITING runner. `pnpm staging:generate` sets it and
- * nothing else in the repo does.
+ * G-5 analogue for the WRITING runners. Only the entry points that write set
+ * it, never an operator's shell: `pnpm staging:generate`,
+ * `scripts/seed-content-markets.ts`, and `scripts/seed-prod.ts` in its local
+ * and staging modes (ADR-0053).
  *
  * The gates runner deliberately does NOT require it: gates only read, and
  * demanding a destructive-intent token for a read-only run trains the operator

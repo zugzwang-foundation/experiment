@@ -82,15 +82,29 @@ export interface WriteRecord {
 	readonly caller: string;
 }
 
-/** Absolute path of a V8 frame, `file://` scheme stripped. */
-function framePath(line: string): string | null {
+/**
+ * Absolute path of a V8 frame, `file://` scheme stripped, separators forced to
+ * `/`.
+ *
+ * ⚠ WINDOWS FRAMES START WITH A DRIVE LETTER (`C:\…` or `C:/…`), not `/`. The
+ * pattern accepted only `/` and `file:`, so on Windows EVERY frame — this
+ * module's own included — was unparseable, `immediateCaller` returned `null`,
+ * and the guard refused every engine write as unattributable. Failing closed
+ * was the right direction; failing closed on the platform the operator runs
+ * from made the runners unusable there. Normalising to `/` also keeps the
+ * self-skip prefix comparison and `isEngineCaller`'s markers platform-neutral.
+ */
+export function framePath(line: string): string | null {
 	// Node/V8 frames: "    at fn (/abs/path.ts:12:3)" or "    at /abs/path.ts:12:3".
-	const match = line.match(/\(?((?:\/|file:)[^\s()]+?):\d+:\d+\)?\s*$/);
+	const match = line.match(
+		/\(?((?:\/|file:|[A-Za-z]:[\\/])[^\s()]+?):\d+:\d+\)?\s*$/,
+	);
 	const raw = match?.[1];
 	if (!raw) return null;
-	return raw.startsWith("file://")
+	const path = raw.startsWith("file://")
 		? fileURLToPath(raw.split("?")[0] ?? raw)
 		: raw;
+	return path.replace(/\\/g, "/");
 }
 
 /**
@@ -111,7 +125,7 @@ function framePath(line: string): string | null {
  * the guard's own test. `import.meta.url` cannot be wrong about which file this
  * is.
  */
-const SELF_PATH = fileURLToPath(import.meta.url);
+const SELF_PATH = fileURLToPath(import.meta.url).replace(/\\/g, "/");
 
 function immediateCaller(): string | null {
 	const stack = new Error().stack;

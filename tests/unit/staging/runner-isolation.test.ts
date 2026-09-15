@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { configDefaults } from "vitest/config";
 import defaultConfig from "../../../vitest.config";
+import prodSeedConfig from "../../../vitest.prod-seed.config";
 import stagingConfig from "../../../vitest.staging.config";
 
 // STAGING-PARITY Slice A — ADR-0036 primitive 2: "tests/staging/** is excluded
@@ -114,5 +115,29 @@ describe("the two configs partition the tree", () => {
 		// And it is a *.staging.test.ts, so the staging config's include picks
 		// it up while the default config's exclude drops it.
 		expect(runner.endsWith(".staging.test.ts")).toBe(true);
+	});
+});
+
+// ADR-0053 — the seed runner can write PRODUCTION, so it gets the same
+// structural isolation as the staging runners, asserted the same way.
+describe("vitest.prod-seed.config.ts is isolated like the staging config", () => {
+	const prodSeedTest = testBlock(prodSeedConfig);
+
+	it("the default config excludes tests/prod-seed/**", () => {
+		expect(defaultTest.exclude).toContain("tests/prod-seed/**");
+	});
+
+	it("includes exactly the seed runners, never watches, runs sequentially", () => {
+		expect(prodSeedTest.include).toEqual([
+			"tests/prod-seed/**/*.prod-seed.test.ts",
+		]);
+		expect(prodSeedTest.watch).toBe(false);
+		expect(prodSeedTest.fileParallelism).toBe(false);
+	});
+
+	it("runs the seed target guard as globalSetup", () => {
+		expect(prodSeedTest.globalSetup).toEqual([
+			"./tests/prod-seed/_lib/guard-setup.ts",
+		]);
 	});
 });
