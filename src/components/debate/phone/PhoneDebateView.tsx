@@ -25,6 +25,7 @@ import { PostCard } from "../PostCard";
 // task argues against two files over. Caught by `@code-reviewer`.
 import { EmptySideCTA, REMOVED_STUB_TEXT } from "../placeholders";
 import { ReplyCard } from "../ReplyCard";
+import { parentOfReply, replyDownloadOrdinal } from "../reply-download";
 import type {
 	DebatePost,
 	DebateViewModel,
@@ -812,6 +813,7 @@ export function PhoneDebateView({
 						reply={reply}
 						onOpenImage={setLightboxUrl}
 						onOpenPopup={setPopupReply}
+						postOrdinal={replyDownloadOrdinal(focused)}
 					/>
 				))}
 			</div>
@@ -1180,6 +1182,11 @@ export function PhoneDebateView({
 				reply={popupReply}
 				onClose={() => setPopupReply(null)}
 				tier="phone"
+				postOrdinal={
+					popupReply === null
+						? null
+						: replyDownloadOrdinal(parentOfReply(posts, popupReply.id))
+				}
 			/>
 			<ImageLightbox
 				url={lightboxUrl}

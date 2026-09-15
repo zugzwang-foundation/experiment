@@ -288,6 +288,8 @@ describe("HTML-FINISH · MARKET DETAIL — row 26, the reply's own image", () =>
 		return {
 			removed: false as const,
 			id: "0199a0c0-0000-7000-8000-00000000db01",
+			ordinal: 1,
+			title: "",
 			side: "YES" as const,
 			createdAt: "2026-07-30T00:00:00.000Z",
 			body: "Fixture reply body.",
@@ -383,6 +385,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 26, the reply's own image", () =>
 				reply={{
 					removed: true,
 					id: "0199a0c0-0000-7000-8000-00000000db02",
+					ordinal: 1,
 					side: "YES",
 					createdAt: "2026-07-30T00:00:00.000Z",
 				}}

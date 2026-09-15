@@ -85,6 +85,8 @@ function presentReply(): DebateReply {
 	return {
 		removed: false,
 		id: "0199a0c0-0000-7000-8000-0000000007a1",
+		ordinal: 1,
+		title: "",
 		side: "YES",
 		createdAt: "2026-07-30T00:00:00.000Z",
 		body: "Fixture reply body.",

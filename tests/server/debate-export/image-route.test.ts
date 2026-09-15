@@ -80,10 +80,13 @@ import { GET } from "@/app/(public)/m/[slug]/export/image/route";
 
 const MARKET = mumbaiMetroModel.market;
 
-function request(post: string | null): Request {
+function request(post: string | null, reply?: string): Request {
 	const url = new URL("http://localhost/m/x/export/image");
 	if (post !== null) {
 		url.searchParams.set("post", post);
+	}
+	if (reply !== undefined) {
+		url.searchParams.set("reply", reply);
 	}
 	return new Request(url, { method: "GET" });
 }
@@ -209,6 +212,35 @@ describe("GET /m/[slug]/export/image", () => {
 		await expect404(GET(request(null), ctx));
 		mockResolvePostParam.mockResolvedValue(null);
 		await expect404(GET(request("999"), ctx));
+		expect(mockRender).not.toHaveBeenCalled();
+	});
+
+	it("REPLY-IMAGE-EXPORT — renders a reply under `<slug>-post-<N>-reply-<M>.jpg`", async () => {
+		const res = await GET(request("2", "2"), ctx);
+		expect(res.status).toBe(200);
+		const [props, filename] = mockRender.mock.calls[0] ?? [];
+		expect(filename).toBe("mumbai-metro-line-3-1m-riders-post-2-reply-2.jpg");
+		expect(props.post.pseudonym).toBe("IndigoWolf355");
+		expect(props.repliedTo).toEqual({
+			relation: "COUNTER",
+			parentTitle: "The corridor is built for this volume",
+		});
+	});
+
+	it("REPLY-IMAGE-EXPORT — 404s a MALFORMED reply ordinal before any read", async () => {
+		// ⚠ Each of these PARSES to a real reply (2) — so without the shape gate
+		// they would render reply 2. That is what makes this test the gate's.
+		for (const bad of ["02", "2abc", "+2", " 2", "0"]) {
+			await expect404(GET(request("2", bad), ctx));
+		}
+		expect(mockResolvePostParam).not.toHaveBeenCalled();
+		expect(mockGetRequestSession).not.toHaveBeenCalled();
+		expect(mockGetCachedView).not.toHaveBeenCalled();
+		expect(mockRender).not.toHaveBeenCalled();
+	});
+
+	it("REPLY-IMAGE-EXPORT — 404s a well-formed ordinal the post does not have", async () => {
+		await expect404(GET(request("2", "9"), ctx));
 		expect(mockRender).not.toHaveBeenCalled();
 	});
 

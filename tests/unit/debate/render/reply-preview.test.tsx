@@ -55,6 +55,8 @@ function reply(id: string, side: "YES" | "NO", body: string): DebateReply {
 	return {
 		removed: false,
 		id,
+		ordinal: 1,
+		title: "",
 		side,
 		createdAt: "2026-07-30T00:00:00.000Z",
 		body,

@@ -133,6 +133,7 @@ describe("ReplyCard — row 26, the mockup's anatomy", () => {
 				reply={{
 					removed: true,
 					id: "0199a0c0-0000-7000-8000-00000000ef02",
+					ordinal: 1,
 					side: "NO",
 					createdAt: "2026-07-30T00:00:00.000Z",
 				}}
@@ -200,6 +201,7 @@ describe("ReplyCard — rows 27 + 34, the pop-up and the lightbox", () => {
 				reply={{
 					removed: true,
 					id: "0199a0c0-0000-7000-8000-00000000ef03",
+					ordinal: 1,
 					side: "NO",
 					createdAt: "2026-07-30T00:00:00.000Z",
 				}}
@@ -279,6 +281,7 @@ describe("ReplyCard — row 42, the pseudonym links to the profile", () => {
 				reply={{
 					removed: true,
 					id: "0199a0c0-0000-7000-8000-00000000ef04",
+					ordinal: 1,
 					side: "NO",
 					createdAt: "2026-07-30T00:00:00.000Z",
 				}}
@@ -330,5 +333,43 @@ describe("UI-OVERNIGHT 5 — a reply's Know more is presence-driven too", () => 
 			"Fixture reply argument.\n\nFixture reply extended text.",
 		);
 		expect(hasKnowMore(container)).toBe(true);
+	});
+});
+
+/**
+ * REPLY-IMAGE-EXPORT — the reply card's download mark. It renders ONLY when the
+ * mount supplies the parent post's ordinal, which every mount withholds under a
+ * REMOVED parent: that parent's title is what the export would print, and a
+ * withheld argument's title must not reach an image (SC-1).
+ */
+describe("ReplyCard — REPLY-IMAGE-EXPORT, the download mark", () => {
+	const mark = (c: HTMLElement) =>
+		c.querySelector('button[aria-label="Download reply image"]');
+
+	it("reply-card::renders-the-mark-with-the-parent-ordinal", () => {
+		const { container } = render(
+			<ReplyCard
+				reply={presentReply({ ordinal: 4 })}
+				onOpenImage={noop}
+				onOpenPopup={noopPopup}
+				postOrdinal={2}
+			/>,
+		);
+		expect(mark(container)).not.toBeNull();
+	});
+
+	it("reply-card::no-mark-without-a-parent-ordinal (a removed parent passes null)", () => {
+		for (const postOrdinal of [null, undefined]) {
+			const { container } = render(
+				<ReplyCard
+					reply={presentReply({ ordinal: 4 })}
+					onOpenImage={noop}
+					onOpenPopup={noopPopup}
+					postOrdinal={postOrdinal}
+				/>,
+			);
+			expect(mark(container)).toBeNull();
+			cleanup();
+		}
 	});
 });

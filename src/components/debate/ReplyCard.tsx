@@ -31,6 +31,7 @@ export function ReplyCard({
 	reply,
 	onOpenImage,
 	onOpenPopup,
+	postOrdinal = null,
 }: {
 	reply: DebateReply;
 	/**
@@ -46,6 +47,12 @@ export function ReplyCard({
 	 * reply cannot reach the pop-up even by mistake (H3-e / SC-1).
 	 */
 	onOpenPopup: (reply: PresentReply) => void;
+	/**
+	 * REPLY-IMAGE-EXPORT — the parent post's ordinal, which enables this reply's
+	 * download mark (`?post=N&reply=M`). `null` or omitted ⇒ no mark: the mounts
+	 * pass `null` under a REMOVED parent, whose title the export must not show.
+	 */
+	postOrdinal?: number | null;
 }) {
 	if (reply.removed) {
 		return (
@@ -83,6 +90,11 @@ export function ReplyCard({
 				originalStake={reply.stakeOriginal}
 				sold={reply.sold}
 				createdAt={reply.createdAt}
+				download={
+					postOrdinal === null
+						? undefined
+						: { ordinal: postOrdinal, reply: reply.ordinal }
+				}
 			/>
 			{/* `.rtitle` (`:1550`) — the argument itself. A reply has no separate
 			    title column, so its BODY is its title; `deriveTitleTeaser` is a

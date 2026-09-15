@@ -94,7 +94,14 @@ const CONTENT_KEYS = [
 	"badge",
 	"authorStake",
 ] as const;
-const REPLY_CONTENT_KEYS = ["body", "author", "marker", "stake"] as const;
+// `title` joined at REPLY-IMAGE-EXPORT, which added it to present replies.
+const REPLY_CONTENT_KEYS = [
+	"body",
+	"title",
+	"author",
+	"marker",
+	"stake",
+] as const;
 
 async function seedUser(args: {
 	tag: string;

@@ -172,6 +172,7 @@ describe("findPostedNode — replies under the focused post", () => {
 		const removed = {
 			removed: true as const,
 			id: "cmt-r",
+			ordinal: 1,
 			side: "YES" as const,
 			createdAt: "2026-09-18T09:05:00.000Z",
 		};

@@ -449,4 +449,62 @@ describe("UI.A2 §3.4 — resolvePostParam ordinal resolution (deep-link ?post=)
 			expect(await resolve(market.id, String(post.ordinal))).toBe(post.id);
 		}
 	});
+
+	it("reply-ordinal::per-post-creation-order-removed-included", async () => {
+		// REPLY-IMAGE-EXPORT — `?post=N&reply=M`. M is the reply's rank WITHIN its
+		// post by (created_at, id), removed replies keeping their slot, counted per
+		// post (a sibling post's replies never shift it) and independent of which
+		// relation list the reply lands in.
+		const market = await seedMarket("reply-ordinal");
+		await testDb.insert(pools).values({
+			marketId: market.id,
+			yesReserves: POOL_SEED,
+			noReserves: POOL_SEED,
+		});
+		const author = await seedUser("ReplyOrdinal1");
+		const replier = await seedUser("ReplyOrdinal2");
+		const node = (
+			parentCommentId: string | null,
+			side: "YES" | "NO",
+			body: string,
+			at: number,
+		): Promise<string> =>
+			seedNode({
+				userId: parentCommentId === null ? author : replier,
+				marketId: market.id,
+				parentCommentId,
+				side,
+				body,
+				createdAt: ts(at),
+			});
+
+		const p1 = await node(null, "YES", "Reply-ordinal post one.", 0);
+		const p2 = await node(null, "NO", "Reply-ordinal post two.", 10);
+		const a = await node(p1, "NO", "First reply, a counter.\n\nMore.", 20);
+		await node(p2, "NO", "Sibling post's reply.", 25);
+		const b = await node(p1, "YES", "Second reply — gets removed.", 30);
+		const c = await node(p1, "YES", "Third reply, a support.", 40);
+		await removeComment(b);
+
+		const model = await loadDebateView(testDb, { market });
+		const post = model.posts.find((p) => p.id === p1);
+		if (post === undefined) throw new Error("expected post one");
+		const byId = new Map(
+			[...post.replies.support, ...post.replies.counter].map((r) => [r.id, r]),
+		);
+		expect(byId.get(a)?.ordinal).toBe(1);
+		expect(byId.get(b)?.ordinal).toBe(2);
+		expect(byId.get(b)?.removed).toBe(true);
+		// SC-1 — the removed reply's BODY is absent, not only its row flagged.
+		expect(JSON.stringify(model)).not.toContain("Second reply — gets removed.");
+		expect(byId.get(c)?.ordinal).toBe(3);
+		// The title is the body's first line, never the extended text.
+		const first = byId.get(a);
+		expect(first !== undefined && !first.removed && first.title).toBe(
+			"First reply, a counter.",
+		);
+		const sibling = model.posts.find((p) => p.id === p2);
+		// A NO reply under a NO post is a Support.
+		expect(sibling?.replies.support[0]?.ordinal).toBe(1);
+	});
 });

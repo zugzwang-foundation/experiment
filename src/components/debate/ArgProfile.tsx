@@ -115,8 +115,10 @@ export function ArgProfile({
 	 * ordinal, which the `/m/[slug]/export/image?post=N` route resolves exactly
 	 * as the page's `?post=` does. An object rather than a boolean so a mount
 	 * cannot ask for the mark without saying which post it downloads.
+	 * ⚠ REPLY-IMAGE-EXPORT — replies opt in too now (the reply card and the reply
+	 * pop-up), with `reply` naming the reply's ordinal within post `ordinal`.
 	 */
-	download?: { ordinal: number };
+	download?: { ordinal: number; reply?: number };
 	/**
 	 * HTML-FINISH · MARKET DETAIL row 13 — the chip's geometry preset, and it is
 	 * wired at EXACTLY ONE site: the post-focus author row (`d5:964`, the only
@@ -890,7 +892,7 @@ export function ArgProfile({
 				   `h-6` on the reasoning that the avatar set the line, and that put
 				   the mark 2px low — jsdom performs no layout, so only the browser
 				   could see it. */
-				<DownloadPostImage ordinal={download.ordinal} />
+				<DownloadPostImage ordinal={download.ordinal} reply={download.reply} />
 			) : null}
 		</div>
 	);

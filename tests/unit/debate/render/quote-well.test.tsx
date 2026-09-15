@@ -275,6 +275,8 @@ describe("QUOTE-1 C — the well is on the imageless present post card", () => {
 		const reply: DebateReply = {
 			removed: false,
 			id: "0199a0c0-0000-7000-8000-00000000dd01",
+			ordinal: 1,
+			title: "",
 			side: "YES",
 			createdAt: "2026-07-30T00:00:00.000Z",
 			body: "Fixture reply body.",

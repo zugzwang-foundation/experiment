@@ -393,9 +393,12 @@ export function ReplyScroller({
 	onOpenImage,
 	onOpenPopup,
 	auto,
+	postOrdinal = null,
 }: {
 	replies: DebateReply[];
 	side: Side;
+	/** REPLY-IMAGE-EXPORT — pass-through to `ReplyCard`'s download mark. */
+	postOrdinal?: number | null;
 	/** HTML-FINISH · MARKET DETAIL row 26 — pass-through to the reply's image. */
 	onOpenImage: (url: string) => void;
 	/** HTML-FINISH · MARKET DETAIL row 27 — pass-through to the reply's `+`. */
@@ -438,6 +441,7 @@ export function ReplyScroller({
 					reply={reply}
 					onOpenImage={onOpenImage}
 					onOpenPopup={onOpenPopup}
+					postOrdinal={postOrdinal}
 				/>
 			</div>
 			{replies.length > 1 ? (
