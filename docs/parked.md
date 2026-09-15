@@ -4160,29 +4160,43 @@ is here because the fix belongs to Phase 2, not because the decision is open.
 | **LIQ-1 L-11** | **The injector's `tank′` does not land on `target` exactly. It lands within a relative 2.4e-19.** Measured across all 18 injections at `LIQ-1-SOAK-CLOSE` §C3: `\|tank_after − target\|` ranges `9.02e-15 … 4.83e-14`, never zero. **Root cause, measured on the live database:** `SELECT 200035.556542990446567430::numeric / 100000::numeric` returns `2.000355565429904466` at `scale() = 18` — PostgreSQL's `select_div_scale` truncates the quotient, dropping `3.257e-19`, and `run_liquidity_injection` (`0027:250-251`) then multiplies it by `L`: `v_a := GREATEST(pool_row.yes, pool_row.no) * (v_target / v_tank - 1)`. `90000 × 3.257e-19 = 2.93e-14`, and `(1 + S/L) × Δa = 3.26e-14` reproduces the measured figure to three significant digits. ⚠ **The interesting part is that `zz_add_liquidity`'s own docblock warns about precisely this** — *"`div()` is EXACT integer division: no result scale is selected… the obvious alternative does, since `scale()` of a numeric division is DIVIDEND-dependent"* — so the care taken to make the PRIMITIVE scale-independent is undone one line above the call, where the AMOUNT is computed. **NOT a defect and not filed as one.** Nothing conserved moves: the backing identity is exact because the discard is a residual of whatever `a` actually was (`(S′ − S) + discarded == a`, verified exact on all 18), price invariance measured exactly 0, and `target` is a policy heuristic rather than an invariant — ADR-0047's own acceptance criterion is `tank/target = 1.000000` at six decimals, and 2.4e-19 is eleven orders inside it. ⇒ **Worth one line in ADR-0047 §D so the next reader does not re-derive `select_div_scale`**, which is what this cost. *(`LIQ-1-SOAK-CLOSE` §C3 F-1.)* | OPEN | — |
 | **LIQ-1 L-12** | **Staging carries EIGHTEEN `Open` markets, not the ten the ADR's `lock_timeout` derivation was re-measured against — and the ADR asks to re-derive BEFORE adding markets.** ADR-0047's Runbook row says *"Measured 2026-09-07: staging carries TEN `Open` markets… so the safe ceiling there is 111 ms and the shipped 100 ms holds with almost no room. **Re-derive this before adding markets, not after**"*. That measurement was taken while the eight content markets were destroyed; `LIQ-1-RESTORE` put them back and `LIQ-1-SOAK-CLOSE` measured **18** (10 fixture + 8 content, before §E consumed three). The ADR's own CHECK-side invariant `2 × (N−1) × T + overheads < 1000` then reads `2 × 17 × 100 = 3,400 ms` — **3.4× the bet path's non-retryable 1,000 ms `statement_timeout`.** ✅ **The bound held, and the measurement is the point of this row rather than an alarm.** `0029`'s 600 ms total-sweep lock-hold budget is what carries it at any `N`, and the soak is the first direct test of that claim above eight: **all 18 injected inside a single 60 s tick**, `markets_considered = 18` and `markets_injected = 18` on one heartbeat, no split, no `lock_not_available` skip, and no bet-path `57014`. ⇒ **The row exists because the CEILING is still not a proof and the market count is still free to move.** Anyone adding markets re-derives against the budget, not against the CHECK. *(`LIQ-1-SOAK-CLOSE` §A0.4 surprise, discharged at §C2.)* | **MEASURED — bound holds at N=18** | — |
 
-## 3a-1 — the phone header's last 0.88px (signed out) / 5.60px (signed in) at 360, and what each further pixel costs
+## 3a-1 — the phone header's last 2.40px (signed out) / 7.13px (signed in) at 360, and what each further pixel costs
 
 **Status: a founder ruling is owed. Nothing here is a defect on any width above 360.**
 
 ADR-0051 A13 D-4's fit ladder ran all five rungs and did not reach clear air at the
-floor. Measured on the A13 tip at a pinned 360px same-origin frame, fonts loaded,
-animation killed, every shrinkable item pinned before the natural width was read,
-three identical repeats (same-build floor **0.00px**):
+floor. Measured on the **preview build of PR #544** (`f2470df3`, canary asserted from
+inside the frame in the same call as the geometry) at a pinned 360px same-origin
+frame, fonts loaded, animation killed, **every item and every descendant of the
+countdown pinned to `flex-shrink: 0`** before the natural width was read, repeats
+identical:
 
 | Width | Arm | Natural content | Content box | Deficit | Mark renders |
 |---|---|---:|---:|---:|---:|
-| 360 | signed out | 336.88px | 336px | **+0.88** | 47.13 / 48 |
-| 360 | signed in | 341.60px | 336px | **+5.60** | 42.40 / 48 |
-| 375 | both | 351.01px | 351px | 0.00 | 48 |
-| 390 | both | 366.01px | 366px | 0.00 | 48 |
-| 412 | both | 387.88px | 388px | −0.12 | 48 |
-| 430 | both | — | — | clear | 48 |
+| 360 | signed out | 338.40px | 336px | **+2.40** | 45.60 / 48 |
+| 360 | signed in | 343.13px | 336px | **+7.13** | 40.87 / 48 |
+| 375 | both | 338.40 / 343.13px | 351px | clear | 48 |
+| 390 | both | 338.40 / 343.13px | 366px | clear | 48 |
+| 412 · 430 | both | as above | 388 / 406px | clear | 48 |
+
+The row's parts, so the figure can be checked rather than believed — 24 (left pad) +
+34 (home) + 5 + 67.13 (rules) + 5 + 48 (mark) + 5 + 106 (countdown) + 5 + 39.27
+(JOIN) = **338.40**, and the shipped mark is 48 − 2.40 = **45.60**. The signed-in arm
+swaps JOIN's 39.27 for the avatar's 44.00.
+
+⚠ **AN EARLIER PASS OF THIS SECTION SAID 0.88 AND 5.60, AND IT WAS A HARNESS
+ARTEFACT.** That probe pinned the countdown's `<span>` descendants after they had
+already been laid out shrunken, so it measured a row that was still 0.76px narrower
+than its natural width and attributed the difference to the deficit. The corrected
+figures are the ones whose arithmetic closes against the component widths above. The
+conclusion is unchanged in every respect; only the magnitude moved, and it moved
+against us.
 
 **What actually happens at 360.** `document.scrollWidth === clientWidth` at every
 width and in both arms — there is no overflow, no scrollbar, no clipping, and every
 control renders. The deficit is paid by the brand mark, which is the one control in
 the row without `shrink-0`. ⚠ **The mark is an `<img>` at a fixed 48px height, so
-what it does is SQUASH rather than scale** — 1.8% signed out, 11.7% signed in.
+what it does is SQUASH rather than scale** — **5.0% signed out, 14.9% signed in**.
 
 **⛔ This is not a new decision, and that is why it shipped.** ADR-0049 OI-A records
 the founder choosing exactly this trade at exactly this control: *the shrunken logo
@@ -4194,28 +4208,32 @@ over a scrollbar*, measured then at 3.75px at 320. A13 puts the mark back in the
 ladder's stop condition is written against *360 signed out*. After rung 1 the JOIN CTA
 is **39.27px** and the signed-in avatar is **44px** (ADR-0051 A8 D-5's ruled circle,
 floored by B7), so the signed-in row is 4.73px wider than the signed-out one. Any
-ruling that closes this has to clear 7.60px, not 2.88px.
+ruling that closes this has to clear **9.13px** (7.13 + the 2px of spare the brief
+asks for), not 4.40px.
 
 **What each further pixel would cost.** None of these was taken; each is a decision.
 
 1. **The row's own side padding, `px-6` → `max-mobile:px-5`** — worth **8px**, which
-   clears both arms with 2.40px to spare signed in and 7.12px signed out. One gated
+   clears the signed-out arm with 5.60px to spare and leaves the signed-IN arm
+   0.87px short, so on its own it is not enough. `px-6` → `max-mobile:px-4` is worth
+   **16px** and clears both (8.87px spare signed in). One gated
    token. Cost: the header's phone inset becomes 20px. ⚠ It is NOT in A13 D-4's list
    of levers, which is why it was not taken. Measured against the surface beneath it,
    the header's 24px does not match anything today — `/`'s own container is `px-7`
    (28px) at phone width — so "the inset matches the content" is not a property being
    given up here; it was never true.
 2. **`shrink-0` on the brand mark** — worth **0px** of width and changes who pays.
-   The mark renders at a full 48 and the row's content ends 2.4–5.6px inside the
-   right padding instead (content edge 341.60 against a 360 viewport, so still 18.4px
-   of clearance and still no overflow). Cost: the right inset at 360 becomes 18.4px
-   while the left stays 24. ⚠ This reopens ADR-0049 OI-A, which the founder left open
-   deliberately.
+   The mark renders at a full 48 and the row's content ends 2.40px (out) / 7.13px
+   (in) inside the right padding instead: content edge 343.13 against a 360 viewport,
+   so **16.87px of clearance and still no overflow**. Cost: the right inset at 360
+   becomes 16.87px while the left stays 24. ⚠ This reopens ADR-0049 OI-A, which the
+   founder left open deliberately.
 3. **Countdown cells 13 → 12px** — worth **8px**. Cost: a 9.5px digit in a 12px cell,
    below the floor the ladder itself stopped at, and the chessboard's cell stops being
    squarer than its glyph.
-4. **Row gap 5 → 4px** — worth **4px**. Closes the signed-out arm alone. Cost: the
-   row's one spacing token drops below the 5px the ladder landed on.
+4. **Row gap 5 → 4px** — worth **4px**. Clears the signed-out arm with 1.60px to
+   spare and leaves the signed-in arm 3.13px short. Cost: the row's one spacing token
+   drops below the 5px the ladder landed on.
 
 **The one thing that is NOT an option:** hiding a control, dropping a countdown pair,
 or letting the row scroll. All three are vetoed by the round's brief and none is

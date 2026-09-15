@@ -8,9 +8,9 @@ import { describe, expect, it } from "vitest";
  * LIMIT. jsdom performs no layout, so nothing in this repo's test tree can
  * assert that the phone header FITS. The fit is a browser measurement and lives
  * in the round's report: at 360 signed out the row's natural content width is
- * 336.88px against a 336px content box — a 0.88px deficit the brand mark absorbs
- * (47.13px rather than 48), with the document reporting zero overflow; signed in
- * the deficit is 5.60px and the mark renders 42.40px. At 375 and above both arms
+ * 338.40px against a 336px content box — a 2.40px deficit the brand mark absorbs
+ * (45.60px rather than 48), with the document reporting zero overflow; signed in
+ * the deficit is 7.13px and the mark renders 40.87px. At 375 and above both arms
  * fit with the mark at its full 48px.
  *
  * ⇒ What a scan CAN hold is the input to that measurement: the five reductions
