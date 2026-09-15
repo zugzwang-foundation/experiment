@@ -1,10 +1,14 @@
 import Link from "next/link";
 
-import { AdminTabs } from "@/app/(admin)/admin/_components/AdminTabs";
+import { AdminShell } from "@/app/(admin)/admin/_components/AdminShell";
+import { PageHeader } from "@/app/(admin)/admin/_components/PageHeader";
+import { ModerationSubnav } from "@/app/(admin)/admin/moderation/_components/ModerationSubnav";
 import {
 	ReviewFeed,
 	type ReviewFeedRowView,
 } from "@/app/(admin)/admin/moderation/_components/ReviewFeed";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { loadReviewFeed } from "@/server/admin/moderation/review-feed";
 import { requireAdminPage } from "@/server/admin/page-guards";
 
@@ -16,6 +20,10 @@ import { requireAdminPage } from "@/server/admin/page-guards";
 // LIVE row (Track-C) minus the removed set; the 200-cap truncation surfaces a
 // visible indicator + a "load older" cursor link (pagination is not a filter
 // — the operator always reaches older rows, D-4).
+//
+// ADMIN-UI — presentation only. `parseBefore`, the reader call and the explicit
+// least-exposure projection are unchanged. Added: a "back to newest" link when
+// a cursor is in effect (a plain link to this route, no new read).
 //
 // S-4 Phase B — `instant = false`: `requireAdminPage` (`cookies()`) plus this
 // page's own `searchParams` cursor are read unwrapped; either errors the
@@ -102,50 +110,44 @@ export default async function ModerationPage(props: {
 		: null;
 
 	return (
-		<main className="min-h-dvh bg-background text-foreground">
-			<div className="mx-auto max-w-5xl px-6 py-10">
-				<AdminTabs active="moderation" />
+		<AdminShell active="moderation">
+			<PageHeader
+				title="Moderation"
+				description="Every live post and reply, newest first — no filter, no ranking (ADR-0021). Remove hides content; Ban removes the author's voice (their prior content stays). Reactive actions only; neither touches a position or a balance."
+			/>
 
-				<header className="mb-6">
-					<h1 className="text-2xl font-semibold tracking-tight">
-						Moderation · Live review feed
-					</h1>
-					<p className="mt-1 text-sm text-muted-foreground">
-						Every live post and reply, newest first — no filter, no ranking
-						(ADR-0021). Remove hides content; Ban removes the author's voice
-						(their prior content stays). Reactive actions only.
-					</p>
-					<p className="mt-2 text-xs text-muted-foreground">
-						<Link
-							href="/admin/moderation/audit"
-							className="underline underline-offset-2 hover:no-underline"
-						>
-							Audit log →
-						</Link>
-					</p>
-				</header>
+			<ModerationSubnav active="feed" />
 
-				<p className="mb-4 text-xs text-muted-foreground">
+			<div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+				<p className="text-n5 text-xs">
 					Showing {rows.length} row{rows.length === 1 ? "" : "s"}
 					{feed.truncated
 						? ` (capped at ${feed.cap} newest — older rows exist below)`
 						: ""}
 					.
 				</p>
-
-				<ReviewFeed rows={rows} />
-
-				{olderHref ? (
-					<div className="mt-6 text-center">
-						<Link
-							href={olderHref}
-							className="inline-block rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
-						>
-							Load older →
-						</Link>
-					</div>
+				{before ? (
+					<Link
+						href="/admin/moderation"
+						className="rounded-(--r-chip) text-n5 text-xs underline underline-offset-2 outline-none hover:text-ink focus-visible:shadow-(--state-focus-ring)"
+					>
+						Back to newest
+					</Link>
 				) : null}
 			</div>
-		</main>
+
+			<ReviewFeed rows={rows} />
+
+			{olderHref ? (
+				<div className="mt-6 text-center">
+					<Link
+						href={olderHref}
+						className={cn(buttonVariants({ size: "lg" }), "px-4")}
+					>
+						Load older →
+					</Link>
+				</div>
+			) : null}
+		</AdminShell>
 	);
 }

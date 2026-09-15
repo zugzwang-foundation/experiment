@@ -71,6 +71,26 @@ const nextConfig: NextConfig = {
 			"./public/brand/zugzwang-mark.svg",
 		],
 	},
+	// WARLI-FIELD-ASSET — the auth artwork's static field, a ~680 KB SVG. A
+	// `public/` file is otherwise served `max-age=0`, so every visit would
+	// revalidate it. The filename carries a hash of its own content
+	// (`scripts/warli-field-svg.tsx`), so a changed drawing is a NEW URL and a
+	// year of `immutable` can never serve a stale one. ⚠ The pattern is pinned to
+	// the hashed shape on purpose: an unhashed file under `/art/` must not
+	// inherit a cache it could never be evicted from.
+	async headers() {
+		return [
+			{
+				source: "/art/:file(warli-field\\.[0-9a-f]{10}\\.svg)",
+				headers: [
+					{
+						key: "Cache-Control",
+						value: "public, max-age=31536000, immutable",
+					},
+				],
+			},
+		];
+	},
 };
 
 // `withSentryConfig` wraps the Next.js config with Sentry's build-time

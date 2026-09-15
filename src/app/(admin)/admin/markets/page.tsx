@@ -1,8 +1,19 @@
+import { Plus } from "lucide-react";
 import Link from "next/link";
 
-import { AdminTabs } from "@/app/(admin)/admin/_components/AdminTabs";
+import { AdminShell } from "@/app/(admin)/admin/_components/AdminShell";
+import {
+	formatUtcMinute,
+	relativeSpan,
+} from "@/app/(admin)/admin/_components/format";
+import { MarketStatusBadge } from "@/app/(admin)/admin/_components/MarketStatusBadge";
+import { Notice } from "@/app/(admin)/admin/_components/Notice";
+import { PageHeader } from "@/app/(admin)/admin/_components/PageHeader";
 import { formatCountdown } from "@/app/(admin)/admin/markets/_components/countdown";
 import { NeedsResolutionCount } from "@/app/(admin)/admin/markets/_components/NeedsResolutionCount";
+import { buttonVariants } from "@/components/ui/button";
+import { EmptyBlock } from "@/components/ui/empty-block";
+import { cn } from "@/lib/utils";
 import { loadAdminMarketsOverview } from "@/server/admin/markets/overview";
 import { requireAdminPage } from "@/server/admin/page-guards";
 import { FREEZE_INSTANT_UTC } from "@/server/markets/create";
@@ -14,94 +25,221 @@ import { FREEZE_INSTANT_UTC } from "@/server/markets/create";
 // freeze countdown. The terminal actions (Close / Resolve / Void / Correct)
 // live on `[marketId]/page.tsx` (S2) — this list links through to them.
 //
+// ADMIN-UI — presentation only. The read is the same single
+// `loadAdminMarketsOverview()`; the optional `?status=` param filters the rows
+// that read already returned, IN THE PAGE, and is ignored unless it names a
+// status that read actually counted. The attention column is derived from each
+// row's own status + deadline and the render clock — no new data.
+//
 // S-4 Phase B — `instant = false`: `requireAdminPage` reads `cookies()` and
 // this page reads `searchParams`, both unwrapped; either errors the
 // `cacheComponents` prerender build otherwise. Deferred, not restructured —
 // admin is outside S-4's scope (CLAUDE.md §1).
 export const instant = false;
 
+/** Lifecycle order for the filter chips; unknown statuses follow, as read. */
+const STATUS_ORDER = [
+	"Draft",
+	"Open",
+	"Closed",
+	"Resolving",
+	"Resolved",
+	"Voided",
+	"Frozen",
+];
+
+function attentionFor(
+	status: string,
+	deadlineMs: number,
+	nowMs: number,
+): string | null {
+	if (status === "Closed") return "Needs Resolve / Void";
+	if (status === "Resolving") return "Settlement incomplete";
+	if (status === "Open" && deadlineMs <= nowMs) return "Past deadline";
+	if (status === "Draft") return "Not open — seed to open";
+	return null;
+}
+
+const chip =
+	"inline-flex h-7 items-center gap-1.5 rounded-(--r-chip) border px-2.5 text-xs outline-none focus-visible:shadow-(--state-focus-ring)";
+
 export default async function AdminMarketsPage(props: {
-	searchParams: Promise<{ ok?: string; error?: string }>;
+	searchParams: Promise<{ ok?: string; error?: string; status?: string }>;
 }): Promise<React.ReactElement> {
 	await requireAdminPage();
 
-	const { ok, error } = await props.searchParams;
+	const { ok, error, status } = await props.searchParams;
 	const { rows, statusCounts, needsResolutionCount } =
 		await loadAdminMarketsOverview();
 
+	const nowMs = Date.now();
 	const freezeInstantMs = FREEZE_INSTANT_UTC.getTime();
-	const initialCountdown = formatCountdown(freezeInstantMs - Date.now());
+	const initialCountdown = formatCountdown(freezeInstantMs - nowMs);
+
+	const statuses = [
+		...STATUS_ORDER.filter((s) => statusCounts[s] !== undefined),
+		...Object.keys(statusCounts).filter((s) => !STATUS_ORDER.includes(s)),
+	];
+	const activeStatus =
+		status !== undefined && statusCounts[status] !== undefined ? status : null;
+	const visibleRows = activeStatus
+		? rows.filter((row) => row.status === activeStatus)
+		: rows;
 
 	return (
-		<main className="min-h-dvh bg-background text-foreground">
-			<div className="mx-auto max-w-5xl px-6 py-10">
-				<AdminTabs active="markets" />
-
-				<h1 className="mb-4 text-2xl font-semibold tracking-tight">Markets</h1>
-
-				{ok ? (
-					<p className="mb-4 rounded-md border border-border bg-muted px-3 py-2 text-sm">
-						{ok}
-					</p>
-				) : null}
-				{error ? (
-					<p className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-						{error}
-					</p>
-				) : null}
-
-				<NeedsResolutionCount
-					needsResolutionCount={needsResolutionCount}
-					freezeInstantMs={freezeInstantMs}
-					initialCountdown={initialCountdown}
-				/>
-
-				<p className="mb-4 text-sm text-muted-foreground">
-					{rows.length === 0
-						? "no markets"
-						: Object.entries(statusCounts)
-								.map(([s, n]) => `${s}: ${n}`)
-								.join(" · ")}
-				</p>
-				<p className="mb-4 text-sm">
+		<AdminShell active="markets">
+			<PageHeader
+				title="Markets"
+				description="Every market, newest first. Open a row to seed, close, resolve, void or correct it. All times are UTC."
+				actions={
 					<Link
 						href="/admin/markets/new"
-						className="text-foreground underline underline-offset-2 hover:no-underline"
+						className={cn(buttonVariants({ size: "lg" }), "px-3")}
 					>
-						+ New market
+						<Plus aria-hidden />
+						New market
 					</Link>
-				</p>
+				}
+			/>
 
-				<table className="w-full text-sm">
-					<thead>
-						<tr className="border-b border-border text-left text-muted-foreground">
-							<th className="py-2 font-medium">slug</th>
-							<th className="py-2 font-medium">title</th>
-							<th className="py-2 font-medium">status</th>
-							<th className="py-2 font-medium">deadline</th>
-						</tr>
-					</thead>
-					<tbody>
-						{rows.map((row) => (
-							<tr key={row.id} className="border-b border-border">
-								<td className="py-2">
-									<Link
-										href={`/admin/markets/${row.id}`}
-										className="text-foreground underline underline-offset-2 hover:no-underline"
-									>
-										{row.slug}
-									</Link>
-								</td>
-								<td className="py-2">{row.title}</td>
-								<td className="py-2">{row.status}</td>
-								<td className="py-2 font-mono text-xs text-muted-foreground">
-									{row.resolutionDeadline.toISOString()}
-								</td>
-							</tr>
+			{ok ? (
+				<Notice tone="success" className="mb-4">
+					{ok}
+				</Notice>
+			) : null}
+			{error ? (
+				<Notice tone="error" className="mb-4">
+					{error}
+				</Notice>
+			) : null}
+
+			<NeedsResolutionCount
+				needsResolutionCount={needsResolutionCount}
+				freezeInstantMs={freezeInstantMs}
+				initialCountdown={initialCountdown}
+			/>
+
+			{rows.length === 0 ? (
+				<EmptyBlock
+					message="No markets yet."
+					messageTestId="admin-markets-empty"
+					sub="A new market starts as a Draft; seeding its pool opens it."
+				/>
+			) : (
+				<>
+					<nav
+						aria-label="Filter markets by status"
+						className="mb-3 flex flex-wrap items-center gap-2"
+					>
+						<Link
+							href="/admin/markets"
+							aria-current={activeStatus === null ? "true" : undefined}
+							className={cn(
+								chip,
+								activeStatus === null
+									? "border-n6 bg-n1 font-semibold text-ink"
+									: "border-n2 text-n5 hover:border-n3 hover:text-ink",
+							)}
+						>
+							All
+							<span className="tabular-nums">{rows.length}</span>
+						</Link>
+						{statuses.map((s) => (
+							<Link
+								key={s}
+								href={`/admin/markets?status=${encodeURIComponent(s)}`}
+								aria-current={activeStatus === s ? "true" : undefined}
+								className={cn(
+									chip,
+									activeStatus === s
+										? "border-n6 bg-n1 font-semibold text-ink"
+										: "border-n2 text-n5 hover:border-n3 hover:text-ink",
+								)}
+							>
+								{s}
+								<span className="tabular-nums">{statusCounts[s]}</span>
+							</Link>
 						))}
-					</tbody>
-				</table>
-			</div>
-		</main>
+					</nav>
+
+					<div className="overflow-x-auto rounded-(--r) border border-n2 bg-n0 shadow-(--elev-1)">
+						<table className="w-full min-w-[720px] text-sm">
+							<caption className="sr-only">
+								{activeStatus ? `${activeStatus} markets` : "All markets"}
+							</caption>
+							<thead>
+								<tr className="border-n2 border-b text-left text-n5 text-xs uppercase tracking-wide">
+									<th scope="col" className="w-32 px-4 py-2.5 font-medium">
+										Status
+									</th>
+									<th scope="col" className="px-4 py-2.5 font-medium">
+										Market
+									</th>
+									<th scope="col" className="w-56 px-4 py-2.5 font-medium">
+										Resolution deadline
+									</th>
+									<th scope="col" className="w-48 px-4 py-2.5 font-medium">
+										Attention
+									</th>
+								</tr>
+							</thead>
+							<tbody>
+								{visibleRows.map((row) => {
+									const deadlineMs = row.resolutionDeadline.getTime();
+									const attention = attentionFor(row.status, deadlineMs, nowMs);
+									return (
+										<tr
+											key={row.id}
+											className="border-n2 border-b align-top last:border-b-0 hover:bg-(--state-hover-fill)"
+										>
+											<td className="px-4 py-3">
+												<MarketStatusBadge status={row.status} />
+											</td>
+											<td className="px-4 py-3">
+												<Link
+													href={`/admin/markets/${row.id}`}
+													className="rounded-(--r-chip) font-medium text-ink underline-offset-2 outline-none hover:underline focus-visible:shadow-(--state-focus-ring)"
+												>
+													{row.title}
+												</Link>
+												<span className="mt-0.5 block font-mono text-n5 text-xs">
+													{row.slug}
+												</span>
+											</td>
+											<td className="px-4 py-3">
+												<time
+													dateTime={row.resolutionDeadline.toISOString()}
+													className="block font-mono text-n6 text-xs"
+												>
+													{formatUtcMinute(row.resolutionDeadline)}
+												</time>
+												<span className="mt-0.5 block text-n5 text-xs">
+													{relativeSpan(deadlineMs, nowMs)}
+												</span>
+											</td>
+											<td className="px-4 py-3 text-xs">
+												{attention ? (
+													<span
+														className={cn(
+															row.status === "Draft"
+																? "text-n5"
+																: "font-semibold text-ink",
+														)}
+													>
+														{attention}
+													</span>
+												) : (
+													<span className="text-n4">—</span>
+												)}
+											</td>
+										</tr>
+									);
+								})}
+							</tbody>
+						</table>
+					</div>
+				</>
+			)}
+		</AdminShell>
 	);
 }
