@@ -301,5 +301,6 @@ evidence that unreviewed work landed, and retires the form.
 | `docs/parked.md` — HTML-FINISH · MARKET DETAIL R2 | the full placeholder docket, with the strip-vs-gate choice left to the founder |
 | `docs/parked.md` — RPLY-CLOSE P1 … P4 | seven reply-surface residue rows, severity-labelled |
 | `docs/parked.md` — WARLI-3 | the composition notes |
+| `docs/parked.md` — **3a-1** | **the phone header's last 2.40px (signed out) / 7.13px (signed in) at 360, and what each further pixel costs. A founder ruling is owed; nothing above 360 is affected** |
 | `docs/polish/POLISH-register.md` | the visual defect register for this lane |
 | `docs/design/design-canon.md` · `design-language.md` · `design-token-contract.md` | **the design contract — pointed at, never restated** |
