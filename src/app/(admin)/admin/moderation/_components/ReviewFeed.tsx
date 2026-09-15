@@ -1,9 +1,11 @@
 "use client";
 
+import { Flag, ImageOff, UserX } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { formatDharma } from "@/components/debate/format";
+import { cn } from "@/lib/utils";
 import { moderateComment } from "@/server/admin/moderation/act";
 
 // UI.6 S3(c) — the reactive review-feed affordances (client). Renders each live
@@ -14,6 +16,16 @@ import { moderateComment } from "@/server/admin/moderation/act";
 // component never sees a raw R2 key. Category scores render only where present
 // (v1: none — D-3). The feed is polled-on-view (no websocket): the parent page
 // is `force-dynamic`, and each action calls `router.refresh()` to re-read.
+//
+// ADMIN-UI — the `window.confirm` step is replaced by an INLINE two-step
+// confirm (arm → Confirm / Cancel; Escape cancels; focus lands on Cancel, the
+// safe default). The call is unchanged: one `moderateComment({ commentId,
+// action })` per confirmed decision. Presentation otherwise.
+// ⚠ THE SIDE CHIP IS PINNED, NOT RESTYLED (review-feed-side-chip.component.test
+// — founder ruling D28/CC-9 keeps it hand-rolled). Its two class strings are
+// carried byte-for-byte; nothing else in this file may use a pole class.
+// ⚠ The parent arrow and the removed-parent placeholder appear ONLY in the
+// parent block — a post must render neither (review-feed.component.test).
 
 // The CLIENT view carries only the fields the affordances render — the author's
 // internal user UUID + marketId/marketTitle are resolved server-side and are
@@ -56,18 +68,39 @@ const ERROR_COPY: Record<string, string> = {
 };
 const FALLBACK_COPY = "Could not complete that action — please try again.";
 
+const CONFIRM_COPY: Record<"remove" | "ban", { prompt: string; cta: string }> =
+	{
+		remove: {
+			prompt:
+				"Remove this comment? It is hidden from participants. The author's bet and position are untouched.",
+			cta: "Confirm remove",
+		},
+		ban: {
+			prompt:
+				"Ban this author? Their voice is removed from now on. Prior content stays visible; balances and positions are untouched.",
+			cta: "Confirm ban",
+		},
+	};
+
+const actionButton =
+	"inline-flex h-8 items-center justify-center gap-1.5 rounded-(--r) px-3 font-medium text-xs outline-none transition-colors focus-visible:shadow-(--state-focus-ring) disabled:cursor-not-allowed disabled:opacity-40";
+
 function Row({ row }: { row: ReviewFeedRowView }): React.ReactElement {
 	const router = useRouter();
 	const [pending, setPending] = useState<null | "remove" | "ban">(null);
+	const [confirming, setConfirming] = useState<null | "remove" | "ban">(null);
 	const [note, setNote] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [removed, setRemoved] = useState(false);
 	const [banned, setBanned] = useState(row.authorBanned);
+	const cancelRef = useRef<HTMLButtonElement>(null);
+
+	useEffect(() => {
+		if (confirming) cancelRef.current?.focus();
+	}, [confirming]);
 
 	async function run(action: "remove" | "ban"): Promise<void> {
-		const label =
-			action === "remove" ? "Remove this comment?" : "Ban this author?";
-		if (!window.confirm(label)) return;
+		setConfirming(null);
 		setPending(action);
 		setError(null);
 		setNote(null);
@@ -91,10 +124,16 @@ function Row({ row }: { row: ReviewFeedRowView }): React.ReactElement {
 	}
 
 	return (
-		<article className="rounded-lg border border-border bg-card p-5">
-			<header className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+		<article
+			aria-busy={pending !== null}
+			className={cn(
+				"rounded-(--r) border bg-n0 shadow-(--elev-1)",
+				removed ? "border-n2 border-dashed" : "border-n2",
+			)}
+		>
+			<header className="flex flex-wrap items-center justify-between gap-2 border-n2 border-b px-4 py-2.5">
 				<div className="flex flex-wrap items-center gap-2 text-xs">
-					<span className="rounded-full border border-border bg-muted px-2 py-0.5 font-medium uppercase tracking-wide text-muted-foreground">
+					<span className="rounded-(--r-chip) border border-n2 bg-n1 px-1.5 py-0.5 font-medium text-[11px] text-n5 uppercase leading-4 tracking-wide">
 						{row.kind}
 					</span>
 					<span
@@ -106,91 +145,168 @@ function Row({ row }: { row: ReviewFeedRowView }): React.ReactElement {
 					>
 						{row.side}
 					</span>
-					<span className="text-muted-foreground">
-						{row.marketSlug} · {row.marketStatus}
-					</span>
+					<span className="font-mono text-n6">{row.marketSlug}</span>
+					<span className="text-n4">·</span>
+					<span className="text-n5">{row.marketStatus}</span>
 				</div>
-				<time
-					dateTime={row.createdAt}
-					className="font-mono text-xs text-muted-foreground"
-				>
+				<time dateTime={row.createdAt} className="font-mono text-n5 text-xs">
 					{row.createdAt.replace("T", " ").replace(".000Z", "Z")}
 				</time>
 			</header>
 
-			{row.parent === null ? null : row.parent.removed ? (
-				<p className="mb-2 border-l-2 border-destructive/40 pl-3 text-xs italic text-muted-foreground">
-					↳ <span className="font-medium">{REMOVED_PARENT_PLACEHOLDER}</span>
-				</p>
-			) : (
-				<p className="mb-2 border-l-2 border-border pl-3 text-xs italic text-muted-foreground">
-					↳ {row.parent.snippet}
-				</p>
-			)}
+			<div className="px-4 py-3">
+				{row.parent === null ? null : row.parent.removed ? (
+					<p className="mb-2.5 border-n3 border-l-2 pl-3 text-n5 text-xs italic">
+						↳ <span className="font-medium">{REMOVED_PARENT_PLACEHOLDER}</span>
+					</p>
+				) : (
+					<p className="mb-2.5 border-n2 border-l-2 pl-3 text-n5 text-xs italic">
+						↳ {row.parent.snippet}
+					</p>
+				)}
 
-			<p className="whitespace-pre-wrap break-words text-sm">{row.body}</p>
+				{removed ? (
+					<p className="mb-1.5 font-medium text-[11px] text-n5 uppercase tracking-wide">
+						Removed — hidden from participants
+					</p>
+				) : null}
+				<p
+					className={cn(
+						"whitespace-pre-wrap break-words text-sm leading-6",
+						removed ? "text-n4" : "text-ink",
+					)}
+				>
+					{row.body}
+				</p>
 
-			{row.imageUrl ? (
-				// biome-ignore lint/performance/noImgElement: admin-only moderation review of a short-TTL signed URL; next/image would proxy/cache the moderated object.
-				<img
-					src={row.imageUrl}
-					alt="Attached comment media (moderation review)"
-					className="mt-3 max-h-80 rounded-md border border-border"
-				/>
-			) : row.hasImage ? (
-				// Image present but its short-TTL URL failed to mint — surface it as
-				// unavailable (never let image content read as text-only).
-				<div className="mt-3 flex items-center gap-2 rounded-md border border-dashed border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-muted-foreground">
-					<span aria-hidden className="font-mono">
-						[!]
+				{row.imageUrl ? (
+					// biome-ignore lint/performance/noImgElement: admin-only moderation review of a short-TTL signed URL; next/image would proxy/cache the moderated object.
+					<img
+						src={row.imageUrl}
+						alt="Attached comment media (moderation review)"
+						className="mt-3 max-h-80 rounded-(--imgr) border border-n2"
+					/>
+				) : row.hasImage ? (
+					// Image present but its short-TTL URL failed to mint — surface it as
+					// unavailable (never let image content read as text-only).
+					<div className="mt-3 flex items-center gap-2 rounded-(--r) border border-n4 border-dashed bg-n1 px-3 py-2 text-ink text-sm">
+						<ImageOff aria-hidden className="size-4 shrink-0" />
+						Image present but unavailable — refresh to retry.
+					</div>
+				) : null}
+
+				{row.categoryScores.length > 0 ? (
+					<div className="mt-3 flex flex-wrap gap-1.5">
+						{row.categoryScores.map((c) => (
+							<span
+								key={c.name}
+								className="rounded-(--r-chip) border border-n2 bg-n1 px-2 py-0.5 font-mono text-n5 text-xs"
+							>
+								{c.name} {c.score.toFixed(3)}
+							</span>
+						))}
+					</div>
+				) : null}
+			</div>
+
+			<footer className="flex flex-wrap items-center gap-x-4 gap-y-2 border-n2 border-t px-4 py-2.5 text-xs">
+				<span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-n5">
+					<span className="font-medium text-n6">{row.authorPseudonym}</span>
+					<span className="text-n4">·</span>
+					<span className="tabular-nums">
+						Đ{formatDharma(row.authorDharma)}
 					</span>
-					Image present but unavailable — refresh to retry.
-				</div>
-			) : null}
-
-			{row.categoryScores.length > 0 ? (
-				<div className="mt-3 flex flex-wrap gap-1.5">
-					{row.categoryScores.map((c) => (
-						<span
-							key={c.name}
-							className="rounded-full border border-border bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground"
-						>
-							{c.name} {c.score.toFixed(3)}
-						</span>
-					))}
-				</div>
-			) : null}
-
-			<footer className="mt-4 flex flex-wrap items-center gap-4 border-t border-border pt-3 text-xs">
-				<span className="text-muted-foreground">
-					{row.authorPseudonym} · Đ{formatDharma(row.authorDharma)} ·{" "}
-					{row.priorFlagCount} prior flag{row.priorFlagCount === 1 ? "" : "s"}
+					<span className="text-n4">·</span>
+					<span
+						className={cn(
+							"inline-flex items-center gap-1",
+							row.priorFlagCount > 0 && "font-semibold text-ink",
+						)}
+					>
+						{row.priorFlagCount > 0 ? (
+							<Flag aria-hidden className="size-3" />
+						) : null}
+						{row.priorFlagCount} prior flag
+						{row.priorFlagCount === 1 ? "" : "s"}
+					</span>
 				</span>
 				{banned ? (
-					<span className="rounded-full bg-destructive px-2 py-0.5 font-semibold text-background">
-						BANNED
+					<span className="inline-flex items-center gap-1 rounded-(--r-chip) bg-n6 px-1.5 py-0.5 font-semibold text-[11px] text-ground uppercase leading-4 tracking-wide">
+						<UserX aria-hidden className="size-3" />
+						Banned
 					</span>
 				) : null}
-				<div className="ml-auto flex items-center gap-2">
-					<button
-						type="button"
-						disabled={pending !== null || removed}
-						onClick={() => run("remove")}
-						className="rounded-md border border-border px-3 py-1.5 font-medium hover:bg-muted disabled:opacity-40"
-					>
-						{pending === "remove" ? "Removing…" : "Remove"}
-					</button>
-					<button
-						type="button"
-						disabled={pending !== null || banned}
-						onClick={() => run("ban")}
-						className="rounded-md border border-destructive/40 px-3 py-1.5 font-medium text-destructive hover:bg-destructive/10 disabled:opacity-40"
-					>
-						{pending === "ban" ? "Banning…" : "Ban author"}
-					</button>
+
+				<div className="ml-auto flex flex-wrap items-center gap-2">
+					{note ? (
+						<span role="status" className="text-n6">
+							{note}
+						</span>
+					) : null}
+					{error ? (
+						<span role="alert" className="font-semibold text-ink">
+							{error}
+						</span>
+					) : null}
+					{confirming ? null : (
+						<>
+							<button
+								type="button"
+								disabled={pending !== null || removed}
+								onClick={() => setConfirming("remove")}
+								className={cn(
+									actionButton,
+									"border border-n3 bg-(--btn-fill) text-ink hover:bg-(--state-hover-fill)",
+								)}
+							>
+								{pending === "remove" ? "Removing…" : "Remove"}
+							</button>
+							<button
+								type="button"
+								disabled={pending !== null || banned}
+								onClick={() => setConfirming("ban")}
+								className={cn(
+									actionButton,
+									"border border-n5 bg-(--btn-fill) text-ink hover:bg-(--state-hover-fill)",
+								)}
+							>
+								{pending === "ban" ? "Banning…" : "Ban author"}
+							</button>
+						</>
+					)}
 				</div>
-				{note ? <span className="text-muted-foreground">{note}</span> : null}
-				{error ? <span className="text-destructive">{error}</span> : null}
+
+				{confirming ? (
+					<fieldset
+						aria-label={CONFIRM_COPY[confirming].cta}
+						onKeyDown={(e) => {
+							if (e.key === "Escape") setConfirming(null);
+						}}
+						className="flex w-full min-w-0 flex-wrap items-center gap-2 rounded-(--r) border border-n4 bg-n1 px-3 py-2"
+					>
+						<span className="min-w-0 flex-1 text-ink">
+							{CONFIRM_COPY[confirming].prompt}
+						</span>
+						<button
+							type="button"
+							ref={cancelRef}
+							onClick={() => setConfirming(null)}
+							className={cn(
+								actionButton,
+								"border border-n3 bg-(--btn-fill) text-ink hover:bg-(--state-hover-fill)",
+							)}
+						>
+							Cancel
+						</button>
+						<button
+							type="button"
+							onClick={() => run(confirming)}
+							className={cn(actionButton, "bg-ink text-ground hover:bg-n7")}
+						>
+							{CONFIRM_COPY[confirming].cta}
+						</button>
+					</fieldset>
+				) : null}
 			</footer>
 		</article>
 	);
@@ -203,13 +319,13 @@ export function ReviewFeed({
 }): React.ReactElement {
 	if (rows.length === 0) {
 		return (
-			<div className="rounded-lg border border-dashed border-border bg-card px-6 py-16 text-center text-sm text-muted-foreground">
+			<div className="rounded-(--r) border border-n2 border-dashed bg-n0 px-6 py-16 text-center text-n5 text-sm">
 				No live content to review.
 			</div>
 		);
 	}
 	return (
-		<div className="flex flex-col gap-4">
+		<div className="flex flex-col gap-3">
 			{rows.map((row) => (
 				<Row key={row.id} row={row} />
 			))}
