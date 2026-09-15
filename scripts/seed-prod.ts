@@ -15,9 +15,13 @@
  * outside the repository) · --images · --window-live (honour each row's due
  * offset) · --preflight-only · --limit N (the FIRST N table rows; re-running is
  * a no-op) · --until-done [max attempts, default 5] (re-run after a transient
- * failure; stops on a recorded refusal; resume is by the table's keys).
+ * failure; stops on a recorded refusal; resume is by the table's keys) ·
+ * --ack-injector-target N (required when the liquidity injector is enabled:
+ * N is the target the pre-flight projects) · --ack-unscreened-images (prod
+ * only: the images are operator-curated and are published unscreened).
  */
 import { spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import {
 	closeSync,
 	existsSync,
@@ -98,7 +102,13 @@ async function main(): Promise<void> {
 	// out means "off" — never whatever an earlier session exported.
 	const env: NodeJS.ProcessEnv = { ...process.env };
 	for (const name of Object.keys(env)) {
-		if (name.startsWith("ZUGZWANG_SEED_") || name === "ZUGZWANG_PROD_SEED_ACK")
+		// Upper-cased: Windows env names are case-insensitive, so an inherited
+		// `zugzwang_seed_images` is the same variable (security-auditor L-2).
+		const upper = name.toUpperCase();
+		if (
+			upper.startsWith("ZUGZWANG_SEED_") ||
+			upper === "ZUGZWANG_PROD_SEED_ACK"
+		)
 			delete env[name];
 	}
 	env.ZUGZWANG_SEED_TARGET = environment;
@@ -107,6 +117,10 @@ async function main(): Promise<void> {
 	if (limit) env.ZUGZWANG_SEED_LIMIT = limit;
 	if (preflightOnly) env.ZUGZWANG_SEED_PREFLIGHT_ONLY = "1";
 	if (windowLive) env.ZUGZWANG_SEED_WINDOW_LIVE = "1";
+	const injectorAck = flag(argv, "--ack-injector-target");
+	if (injectorAck) env.ZUGZWANG_SEED_INJECTOR_ACK = injectorAck;
+	if (argv.includes("--ack-unscreened-images"))
+		env.ZUGZWANG_SEED_UNSCREENED_IMAGES_ACK = "operator-curated";
 
 	if (environment === "staging" || environment === "local") {
 		// The staging resolver's own write-intent token, for the same class of act.
@@ -146,7 +160,15 @@ async function main(): Promise<void> {
 			`${lockPath} exists — another run on this table is active. If none is, delete the lock and retry.\n${existsSync(lockPath) ? readFileSync(lockPath, "utf8") : ""}`,
 		);
 	}
-	writeSync(lock, `pid ${process.pid} · ${new Date().toISOString()}\n`);
+	// The runner refuses a prod run without this nonce in the lock (L-1), so the
+	// lock and the typed confirmation cannot be skipped by calling vitest directly.
+	const nonce = randomBytes(16).toString("hex");
+	writeSync(
+		lock,
+		`pid ${process.pid} · ${new Date().toISOString()} · nonce ${nonce}\n`,
+	);
+	env.ZUGZWANG_SEED_LOCK = lockPath;
+	env.ZUGZWANG_SEED_RUN_NONCE = nonce;
 	closeSync(lock);
 	const release = () => rmSync(lockPath, { force: true });
 	process.on("exit", release);

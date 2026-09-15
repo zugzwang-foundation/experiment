@@ -65,10 +65,10 @@ function intIn(rand: () => number, lo: number, hi: number): number {
 
 function body(kind: SeedKind, postNo: number, side: SeedSide): string {
 	if (kind === "post") {
-		return `[DUMMY SEED] Post ${postNo} on this market (${side}). Placeholder text, to be replaced.`;
+		return `[DUMMY SEED] Post ${postNo} on this market (${side}). Dummy seed content, listed in the seed manifest.`;
 	}
 	const role = kind === "support" ? "Support" : "Counter";
-	return `[DUMMY SEED] ${role} on post ${postNo} (${side}). Placeholder text, to be replaced.`;
+	return `[DUMMY SEED] ${role} on post ${postNo} (${side}). Dummy seed content, listed in the seed manifest.`;
 }
 
 interface Slot {

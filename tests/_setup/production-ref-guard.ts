@@ -2,6 +2,11 @@
 // `globalSetup` in all three configs (vitest.config.ts, vitest.scale.config.ts,
 // vitest.staging.config.ts). NEVER import this from src/**.
 //
+// A FOURTH config, vitest.prod-seed.config.ts (ADR-0053), deliberately does NOT
+// register this file: its globalSetup is tests/prod-seed/_lib/guard-setup.ts,
+// which runs `checkTestTargetNotProduction` itself in local and staging modes and
+// admits production only by a positive match. Any fifth config must choose one.
+//
 // WHY A GLOBAL SETUP AND NOT THE FIXTURE. `tests/db/_fixtures/db.ts` refuses
 // only an UNSET `DATABASE_URL`, and `tests/_setup/env.ts` defaults it with
 // `??=`, which keeps any URL already in the environment. So a run launched

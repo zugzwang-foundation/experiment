@@ -27,10 +27,16 @@ export const SEED_MODE = target.mode;
 const TARGET_URL = target.url;
 const TARGET_REF = target.ref;
 
-// `max: 10` matches src/db/index.ts, and `max: 1` deadlocks Better Auth's
+// `max: 4` matches src/db/index.ts's control against the session pooler's
+// pool_size (security-auditor L-5), with an idle timeout so a 24h window does
+// not pin idle connections. `max: 1` deadlocks Better Auth's
 // user create (see tests/staging/_lib/client.ts). `prepare: false` for the
 // Supabase session pooler.
-const client = postgres(TARGET_URL, { max: 10, prepare: false });
+const client = postgres(TARGET_URL, {
+	max: 4,
+	idle_timeout: 20,
+	prepare: false,
+});
 const rawDb = drizzle(client, { schema });
 const guard = createWriteGuard(rawDb);
 

@@ -6,7 +6,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
-import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -145,6 +145,10 @@ if (!TABLE_PATH || !existsSync(TABLE_PATH)) {
 const IMAGES_DIR = process.env.ZUGZWANG_SEED_IMAGES || undefined;
 const WINDOW_LIVE = process.env.ZUGZWANG_SEED_WINDOW_LIVE === "1";
 const PREFLIGHT_ONLY = process.env.ZUGZWANG_SEED_PREFLIGHT_ONLY === "1";
+/** security-auditor H-1: the projected injector target this run was acknowledged against. */
+const INJECTOR_ACK = process.env.ZUGZWANG_SEED_INJECTOR_ACK;
+/** security-auditor M-3: prod images are published unscreened only with this ack. */
+const UNSCREENED_IMAGES_ACK = process.env.ZUGZWANG_SEED_UNSCREENED_IMAGES_ACK;
 const LIMIT = process.env.ZUGZWANG_SEED_LIMIT
 	? Number(process.env.ZUGZWANG_SEED_LIMIT)
 	: null;
@@ -163,7 +167,7 @@ const MANIFEST_PATH = join(RUN_DIR, `manifest-${SEED_MODE}.json`);
 const STATE_PATH = join(RUN_DIR, `state-${SEED_MODE}.json`);
 /** Written on a deterministic refusal, so `--until-done` stops retrying. */
 const REFUSAL_PATH = join(RUN_DIR, `REFUSED-${SEED_MODE}.txt`);
-const KEY_PREFIX = `seed-${TABLE.runId}-`;
+const KEY_PREFIX = `seed.${TABLE.runId}.`;
 const ACCOUNT_PREFIX = `dummy-seed-sub-${TABLE.runId}-`;
 
 /**
@@ -298,6 +302,12 @@ async function acceptTos(userId: string): Promise<void> {
 async function uploadImage(userId: string, filename: string) {
 	if (!IMAGES_DIR) throw new Error("no images folder");
 	const bytes = readFileSync(join(IMAGES_DIR, filename));
+	const hash = createHash("sha256").update(bytes).digest("hex");
+	if (imageHashes.get(filename) !== hash) {
+		refuse(
+			`${filename} changed after pre-flight (sha256 differs); nothing uploaded for it.`,
+		);
+	}
 	const contentType = IMAGE_MIME_BY_EXT[imageExt(filename)] as string;
 	const { uploadId, key } = await guardedDb.transaction((tx) =>
 		signUploadAndInsert(tx, {
@@ -374,6 +384,8 @@ function sleep(ms: number): Promise<void> {
 const marketIdBySlug = new Map<string, string>();
 const userIdByAuthor = new Map<string, string>();
 const tosPending = new Set<string>();
+/** filename -> sha256 captured at pre-flight; uploads must match (M-3). */
+const imageHashes = new Map<string, string>();
 /** Keys whose receipt was VERIFIED against the table. */
 const doneKeys = new Set<string>();
 let neededAuthors: string[] = [];
@@ -402,6 +414,35 @@ beforeAll(async () => {
 		refuse(
 			`images folder (${imageErrors.length}):\n  ${imageErrors.slice(0, 30).join("\n  ")}`,
 		);
+	}
+
+	for (const row of SELECTED) {
+		if (row.image === null || !IMAGES_DIR) continue;
+		imageHashes.set(
+			row.image,
+			createHash("sha256")
+				.update(readFileSync(join(IMAGES_DIR, row.image)))
+				.digest("hex"),
+		);
+	}
+
+	if (SEED_MODE === "prod") {
+		// security-auditor L-1: the runner is reachable only through the CLI's
+		// lock. The CLI mints a nonce into the lock file; env alone is not enough.
+		const lockPath = process.env.ZUGZWANG_SEED_LOCK;
+		const nonce = process.env.ZUGZWANG_SEED_RUN_NONCE;
+		const lockText =
+			lockPath && existsSync(lockPath) ? readFileSync(lockPath, "utf8") : "";
+		if (!nonce || !lockText.includes(`nonce ${nonce}`)) {
+			refuse(
+				"prod runs go through scripts/seed-prod.ts, which holds the run lock; no matching lock nonce found.",
+			);
+		}
+		if (imageHashes.size > 0 && UNSCREENED_IMAGES_ACK !== "operator-curated") {
+			refuse(
+				`${imageHashes.size} images would be published on production WITHOUT moderation screening (ADR-0053 exception). Pass --ack-unscreened-images only for operator-curated files.`,
+			);
+		}
 	}
 
 	await assertNotFrozen();
@@ -456,7 +497,7 @@ beforeAll(async () => {
 	);
 	if (orphans.length > 0) {
 		refuse(
-			`seed user row(s) exist without their Google account (an interrupted create): ${orphans.join(", ")}. Resolve by hand before re-running.`,
+			`seed user row(s) exist without their Google account (an interrupted create): ${orphans.join(", ")}. Do NOT repair it with a direct write: move to a fresh --run-id (new accounts), or recover it through the engine.`,
 		);
 	}
 	const bannedNeeded = banned.filter((a) => neededAuthors.includes(a));
@@ -524,8 +565,20 @@ beforeAll(async () => {
 			coefficient: liquidityPolicy.coefficient,
 		})
 		.from(liquidityPolicy)
-		.orderBy(desc(liquidityPolicy.version))
+		// The injector's own read (migration 0029): the policy IN FORCE, not the
+		// highest version — a future-dated row must not print as current (L-4).
+		.where(lte(liquidityPolicy.effectiveFrom, sql`now()`))
+		.orderBy(desc(liquidityPolicy.effectiveFrom), desc(liquidityPolicy.version))
 		.limit(1);
+	// H-1: the injector's target counts EVERY user row, seed accounts included,
+	// and the liquidity it adds can never be taken back.
+	const usersNow = Number(userCount?.n ?? 0);
+	const projectedTarget = policy
+		? CpmmDecimal.max(
+				new CpmmDecimal(policy.floor),
+				new CpmmDecimal(policy.coefficient).times(usersNow + toCreate),
+			).toFixed(0)
+		: null;
 
 	const pending = SELECTED.filter((r) => !doneKeys.has(r.key));
 	log(
@@ -540,11 +593,16 @@ beforeAll(async () => {
 			`  accounts       ${neededAuthors.length} needed · ${neededAuthors.length - toCreate} exist · ${toCreate} to create · ${tosPending.size} awaiting ToS`,
 			`  identity pool  ${free} free`,
 			`  users in DB    ${userCount?.n ?? "?"}`,
-			`  liquidity      ${policy ? `v${policy.version} enabled=${policy.enabled} floor=${policy.floor} coefficient=${policy.coefficient}` : "(no policy row)"}`,
+			`  liquidity      ${policy ? `v${policy.version} enabled=${policy.enabled} floor=${policy.floor} coefficient=${policy.coefficient} · target after this run ${projectedTarget}` : "(no policy in force)"}`,
 			`  timing         ${WINDOW_LIVE ? `live window, last selected row due +${Math.round(MAX_DUE_MS / 60000)} min` : "immediate"}`,
 		].join("\n"),
 	);
 
+	if (policy?.enabled && toCreate > 0 && INJECTOR_ACK !== projectedTarget) {
+		refuse(
+			`the liquidity injector is ENABLED and these ${toCreate} accounts raise its target to ${projectedTarget} for every Open market — liquidity that can never be removed. Get the ruling, then pass --ack-injector-target ${projectedTarget}.`,
+		);
+	}
 	if (free < toCreate) {
 		refuse(
 			`identity_pool has ${free} free tuples, ${toCreate} accounts still to create.`,
@@ -776,6 +834,14 @@ describe("seed run", () => {
 				.innerJoin(comments, eq(comments.id, bets.commentId))
 				.leftJoin(imageUploads, eq(imageUploads.id, comments.imageUploadsId))
 				.where(sql`starts_with(${bets.idempotencyKey}, ${KEY_PREFIX})`);
+			// Only rows that match the table (key, author's user) are seed content;
+			// anything else under the prefix is listed apart, never as seed.
+			const isSeed = (b: (typeof betRows)[number]) => {
+				const row = b.key ? ROW_BY_KEY.get(b.key) : undefined;
+				return row !== undefined && userIdByAuthor.get(row.author) === b.userId;
+			};
+			const seedBets = betRows.filter(isSeed);
+			const foreignBets = betRows.filter((b) => !isSeed(b));
 			writeFileSync(
 				MANIFEST_PATH,
 				`${JSON.stringify(
@@ -790,17 +856,18 @@ describe("seed run", () => {
 							pseudonym: a.pseudonym,
 							email: a.email,
 						})),
-						bets: betRows,
+						bets: seedBets,
+						foreignUnderPrefix: foreignBets,
 					},
 					null,
 					"\t",
 				)}\n`,
 			);
 			log(
-				`manifest ${MANIFEST_PATH} · ${accountRows.length} accounts · ${betRows.length} bets`,
+				`manifest ${MANIFEST_PATH} · ${accountRows.length} accounts · ${seedBets.length} bets${foreignBets.length ? ` · ${foreignBets.length} FOREIGN under the prefix` : ""}`,
 			);
 
-			const placedKeys = new Set(betRows.map((b) => b.key));
+			const placedKeys = new Set(seedBets.map((b) => b.key));
 			const poolRows = await readOnly
 				.select({
 					marketId: pools.marketId,
@@ -823,8 +890,9 @@ describe("seed run", () => {
 					`${slug.padEnd(40)} posts ${done.filter((r) => r.kind === "post").length}/${rows.filter((r) => r.kind === "post").length} · replies ${done.filter((r) => r.kind !== "post").length}/${rows.filter((r) => r.kind !== "post").length} · YES ${price}`,
 				);
 			}
-			expect(betRows.length).toBe(doneKeys.size);
-			if (LIMIT === null) expect(betRows.length).toBe(TABLE.rows.length);
+			expect(foreignBets).toEqual([]);
+			expect(seedBets.length).toBe(doneKeys.size);
+			if (LIMIT === null) expect(seedBets.length).toBe(TABLE.rows.length);
 		},
 	);
 });

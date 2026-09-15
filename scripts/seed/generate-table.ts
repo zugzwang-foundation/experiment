@@ -6,11 +6,12 @@
  * same options always write the same table, so keys resume rather than duplicate.
  *
  *   pnpm exec tsx scripts/seed/generate-table.ts \
- *     --run-id dummyseed01 --markets bitcoin-price-50k,claude-bundle-response,... \
- *     --users 1000 --posts 100 --coverage 0.5 --out ../seed-runs/dummyseed01
+ *     --markets bitcoin-price-50k,claude-bundle-response,... \
+ *     --users 1000 --posts 100 --coverage 0.5 --out ../seed-runs/<run>
  *
  * Optional: --yes-ratio 0.4 --image-ratio 0.5 --image-ext png --window 0|24h --seed 1
  */
+import { randomBytes } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 
@@ -47,7 +48,8 @@ function windowMs(raw: string | undefined): number {
 }
 
 const argv = process.argv.slice(2);
-const runId = flag(argv, "--run-id") ?? die("--run-id is required");
+// Minted from a CSPRNG unless given, so the run id is never a guessable literal.
+const runId = flag(argv, "--run-id") ?? `seed${randomBytes(8).toString("hex")}`;
 const marketsRaw =
 	flag(argv, "--markets") ??
 	die("--markets is required (comma-separated slugs)");

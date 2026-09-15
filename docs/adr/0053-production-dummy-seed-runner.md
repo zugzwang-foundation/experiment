@@ -135,6 +135,53 @@ This ADR does **not** decide:
 - A failed image PUT after its sign step leaves an orphan upload row. Accepted: harmless, and swept by
   the existing orphan cron.
 
+## Security audit outcome (2026-09-15)
+
+`@security-auditor` found no CRITICAL and no invariant break. INV-1..4, the freeze, HTTP-outside-tx,
+P-17, config isolation, the write-guard change and the Google sub/email collision were all verified
+safe. What changed as a result:
+
+- **H-1 — the injector counts seed accounts.** The liquidity target is
+  `GREATEST(floor, coefficient × count(users))`, with no filter. At coefficient 500, 1000 seed
+  accounts raise every Open market's target to 500,000 or more, and that liquidity can never be
+  removed.
+  - **Built:** pre-flight reads the policy in force (the injector's own `effective_from` read) and
+    projects the target after this run. If the policy is enabled and accounts are still to be
+    created, the run refuses unless `--ack-injector-target <projected>` names that exact number.
+  - **Needs a founder ruling:** whether to seed with the injector enabled, and at what account count.
+- **M-1 — the seed flow is directional.** A float estimate moves p_yes from 10% to about 16% on every
+  market at a 100k tank, so a participant who buys YES as the dummy posts appear and sells afterwards
+  nets about +58%.
+  - **Not built:** it needs a ruling on price-neutral stakes, a per-market impact cap, or seeding
+    before participants can trade. ADR-0047 §B's "stakes too small to move anything" does not hold
+    for this table.
+- **M-2 — seed keys shared the participants' key space.** Fixed:
+  - keys are now `seed.<runId>.<market>.<seq>`, and the `.` is outside the route's idempotency
+    alphabet, so no participant request can hold one;
+  - the run id is minted from a CSPRNG by default;
+  - the manifest lists only rows matching the table, and anything else under the prefix is listed
+    apart.
+- **M-3 — images are published unscreened.**
+  - **Built:** every selected image's sha256 is pinned at pre-flight and re-checked at upload. A prod
+    run with images refuses unless `--ack-unscreened-images` is passed.
+  - **Needs a founder ruling:** whether to run the shipped image moderation on the folder at
+    pre-flight, and EXIF stripping. Both matter before the real seed uses third-party images.
+- **L-1:** the CLI mints a nonce into the lock file, and the runner refuses a prod run without it.
+- **L-2:** the env scrub is case-insensitive.
+- **L-4:** pre-flight reads the policy in force (see H-1).
+- **L-5:** the pool is `max: 4` with an idle timeout.
+- **L-7:** `prepare-images` validates the table.
+- **L-8:** P-17's header names the fourth config.
+- **L-9:** the orphan refusal no longer suggests a direct write.
+- **S-5:** seed bodies no longer say "to be replaced".
+- **Open, recorded:**
+  - **L-3:** local mode does not check the socket (inherited from the staging generator).
+  - **L-6:** 1000 unrevoked 400-day sessions are left behind.
+  - **S-1:** the market resolver controls 1000 accounts holding positions.
+  - **S-2:** the released dataset has no seed label outside the manifest.
+  - **S-3:** a fresh-project cutover would silently disarm `PRODUCTION_PROJECT_REF`.
+  - **S-4:** pre-existing — `api/uploads/sign` checks neither ban nor freeze.
+
 ## Pros and Cons of the Options
 
 ### Option 2 — widen the existing guards

@@ -58,14 +58,23 @@ export interface SeedTable {
 /** SEED-1 §4.3 rule 5 — no account looks all-in: total spend per author. */
 export const AUTHOR_SPEND_CAP = 500;
 
-/** `src/server/idempotency/types.ts` — the key shape the place route enforces. */
+/** `src/server/idempotency/types.ts` — the key shape the place route ACCEPTS. */
 export const IDEMPOTENCY_KEY_RE = /^[A-Za-z0-9_-]{1,255}$/;
+
+/**
+ * The seed key shape: `seed.<runId>.<marketIdx>.<seq>`. The `.` separator is
+ * deliberately OUTSIDE the route's alphabet (security-auditor M-2): both unique
+ * key indexes are global, so a participant who could send a seed key would own
+ * it — wedging the run and landing in its manifest. No participant request can
+ * carry a `.`; the columns are plain text and the engine does not re-check.
+ */
+export const SEED_KEY_RE = /^seed\.[a-z0-9]{8,40}\.\d+\.\d+$/;
+
 /**
  * Lowercase letters and digits only, 8+ characters. Lowercase because the
  * account email is derived from it and emails compare case-insensitively. No
- * `-` or `_`: the run's key prefix
- * `seed-<runId>-` must not also prefix another run's keys (`a` vs `a-b`), and a
- * short guessable id would let anyone pre-place a bet under a seed key.
+ * separator characters, so one run's key prefix `seed.<runId>.` never covers
+ * another run's. The generator mints it from a CSPRNG by default.
  */
 export const RUN_ID_RE = /^[a-z0-9]{8,40}$/;
 export const AUTHOR_RE = /^A\d{4,}$/;
@@ -141,7 +150,7 @@ export function rowFingerprint(row: SeedRow): string {
 }
 
 export function rowKey(runId: string, marketIdx: number, seq: number): string {
-	return `seed-${runId}-${marketIdx}-${seq}`;
+	return `seed.${runId}.${marketIdx}.${seq}`;
 }
 
 export function imageExt(filename: string): string {
@@ -189,7 +198,9 @@ export function validateTable(table: SeedTable): string[] {
 
 		if (marketIdx === -1) fail(at, `market ${row.market} is not in the table`);
 		if (seen.has(row.key)) fail(at, "duplicate key");
-		if (!IDEMPOTENCY_KEY_RE.test(row.key)) fail(at, "key shape");
+		if (!SEED_KEY_RE.test(row.key) || IDEMPOTENCY_KEY_RE.test(row.key)) {
+			fail(at, "key shape (must be seed.<runId>.<market>.<seq>)");
+		}
 		if (
 			marketIdx !== -1 &&
 			row.key !== rowKey(table.runId, marketIdx, row.seq)

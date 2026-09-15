@@ -33,13 +33,13 @@ const base = (): SeedTable => {
 		markets: ["mkt-a", "mkt-b"],
 		rows: [
 			row({
-				key: "seed-testrun1-0-1",
+				key: "seed.testrun1.0.1",
 				market: "mkt-a",
 				seq: 1,
 				author: "A0001",
 			}),
 			row({
-				key: "seed-testrun1-0-2",
+				key: "seed.testrun1.0.2",
 				market: "mkt-a",
 				seq: 2,
 				postNo: 2,
@@ -47,26 +47,26 @@ const base = (): SeedTable => {
 				author: "A0002",
 			}),
 			row({
-				key: "seed-testrun1-0-3",
+				key: "seed.testrun1.0.3",
 				market: "mkt-a",
 				seq: 3,
 				kind: "support",
 				stake: "60",
 				author: "A0003",
-				parentKey: "seed-testrun1-0-1",
+				parentKey: "seed.testrun1.0.1",
 			}),
 			row({
-				key: "seed-testrun1-0-4",
+				key: "seed.testrun1.0.4",
 				market: "mkt-a",
 				seq: 4,
 				kind: "counter",
 				side: "NO",
 				stake: "60",
 				author: "A0004",
-				parentKey: "seed-testrun1-0-1",
+				parentKey: "seed.testrun1.0.1",
 			}),
 			row({
-				key: "seed-testrun1-1-1",
+				key: "seed.testrun1.1.1",
 				market: "mkt-b",
 				seq: 1,
 				author: "A0001",
@@ -134,7 +134,7 @@ describe("validateTable — every rule refuses", () => {
 				"reply parent must precede",
 				(r) =>
 					void Object.assign(r[2] as SeedRow, {
-						parentKey: "seed-testrun1-0-9",
+						parentKey: "seed.testrun1.0.9",
 					}),
 				/does not precede/,
 			],
@@ -162,7 +162,7 @@ describe("validateTable — every rule refuses", () => {
 						...r,
 						{
 							...(r[4] as SeedRow),
-							key: "seed-testrun1-1-2",
+							key: "seed.testrun1.1.2",
 							seq: 2,
 							postNo: 2,
 							stake: "10",
@@ -170,7 +170,7 @@ describe("validateTable — every rule refuses", () => {
 						},
 						{
 							...(r[4] as SeedRow),
-							key: "seed-testrun1-1-3",
+							key: "seed.testrun1.1.3",
 							seq: 3,
 							postNo: 3,
 							stake: "10",
@@ -207,8 +207,14 @@ describe("validateTable — every rule refuses", () => {
 			[
 				"key matches run/market/seq",
 				(r) =>
-					void Object.assign(r[1] as SeedRow, { key: "seed-testrun1-0-99" }),
+					void Object.assign(r[1] as SeedRow, { key: "seed.testrun1.0.99" }),
 				/key does not match/,
+			],
+			[
+				"key outside the route's idempotency alphabet (security-auditor M-2)",
+				(r) =>
+					void Object.assign(r[1] as SeedRow, { key: "seed-testrun1-0-2" }),
+				/key shape/,
 			],
 			[
 				"non-empty body",

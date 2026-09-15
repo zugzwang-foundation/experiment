@@ -13,7 +13,12 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { imageRows, preflightImages } from "../../tests/prod-seed/_lib/images";
-import { imageExt, type SeedTable } from "../../tests/prod-seed/_lib/table";
+import {
+	imageExt,
+	parseTable,
+	type SeedTable,
+	validateTable,
+} from "../../tests/prod-seed/_lib/table";
 
 function die(message: string): never {
 	console.error(`\nREFUSED — ${message}\n`);
@@ -33,7 +38,15 @@ const argv = process.argv.slice(2);
 const tablePath = flag(argv, "--table") ?? die("--table is required");
 const dir = resolve(flag(argv, "--dir") ?? die("--dir is required"));
 const checkOnly = argv.includes("--check-only");
-const table = JSON.parse(readFileSync(tablePath, "utf8")) as SeedTable;
+const table: SeedTable = parseTable(
+	JSON.parse(readFileSync(tablePath, "utf8")),
+);
+const tableErrors = validateTable(table);
+if (tableErrors.length > 0) {
+	die(
+		`table invalid (${tableErrors.length}): ${tableErrors.slice(0, 20).join(" | ")}`,
+	);
+}
 const rows = imageRows(table);
 
 if (!checkOnly) {
