@@ -92,6 +92,8 @@ export type DebateReply =
 			ordinal: number;
 			side: Side;
 			createdAt: string;
+			/** TEST-BRANCH depth-2 (seed-depth2-load) — see the present variant. */
+			subReplies?: DebateReply[];
 	  }
 	| {
 			removed: false;
@@ -128,6 +130,21 @@ export type DebateReply =
 			 * even by mistake.
 			 */
 			imageUrl: string | null;
+			/**
+			 * ⚠ TEST-BRANCH ONLY (`test/seed-depth2-load`, not for merge) — the
+			 * replies TO this reply (depth 2), oldest-first. Set on a DEPTH-1 reply
+			 * only (`[]` when it has none); ABSENT on a depth-2 reply, which is the
+			 * floor. Carried on BOTH variants: a removed depth-1 reply keeps its
+			 * children, exactly as a removed post keeps its replies (thread
+			 * integrity, ADR-0020/0021). Each child is masked by the same
+			 * `buildReply` as every other node, so SC-1 holds by construction.
+			 *
+			 * ⛔ OPTIONAL, NOT REQUIRED, so fixtures that build a `DebateReply` by
+			 * hand still type-check and the revert is a pure deletion. A reply's
+			 * ordinal on a depth-2 child is its rank within ITS depth-1 parent; the
+			 * child carries no download mark, so that number addresses nothing.
+			 */
+			subReplies?: DebateReply[];
 	  };
 
 /** A post's replies, ranked + partitioned by relation, plus the two-slot default. */
@@ -636,7 +653,7 @@ function buildReplyGroups(
 ): ReplyGroups {
 	const ranked = rankReplies(replyMap.get(post.id) ?? [], post.parentSide);
 	const slot = twoSlot(ranked);
-	const toReply = (sub: ReplySubstrate): DebateReply =>
+	const toNode = (sub: ReplySubstrate): DebateReply =>
 		buildReply(
 			sub,
 			commentById.get(sub.id),
@@ -645,6 +662,17 @@ function buildReplyGroups(
 			imageUrlByComment,
 			replyOrdinalById.get(sub.id) ?? 0,
 		);
+	// ⚠ TEST-BRANCH depth-2 (`test/seed-depth2-load`). `replyMap` is keyed by
+	// IMMEDIATE parent, so a depth-2 reply was already loaded — under its depth-1
+	// parent's id, which nothing looked up, so it was silently dropped. It is now
+	// attached to that parent, oldest-first (the substrate's own order). The post
+	// lanes, their ranking and the aggregates are untouched: `rankReplies` above
+	// still sees the post's DIRECT children only. Nothing deeper than depth 2 is
+	// rendered — the children are built with `toNode`, which attaches none.
+	const toReply = (sub: ReplySubstrate): DebateReply => ({
+		...toNode(sub),
+		subReplies: (replyMap.get(sub.id) ?? []).map(toNode),
+	});
 	return {
 		support: ranked.support.map(toReply),
 		counter: ranked.counter.map(toReply),

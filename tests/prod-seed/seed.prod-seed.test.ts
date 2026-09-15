@@ -34,9 +34,19 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 //
 // ⚠ `place()` IS DRIVEN BELOW THE ROUTE, so the route's checks are re-done here
 // explicitly: the conclusion freeze and the author's ban before EVERY row, and
-// `validateReplyParent` before every reply. Stake floors, the ceiling and body
+// a parent check before every reply. Stake floors, the ceiling and body
 // length are the table validator's. Text moderation is not run: SEED-1 D11, the
 // content is the operator's own (ADR-0053).
+//
+// ⚠ SEED-DEPTH2 (branch `test/seed-depth2-load`, a TEST branch that is not
+// merged). Three deliberate departures from ADR-0053 as written:
+//   1. The parent check is SEED-LOCAL (`assertSeedReplyParent`) and admits depth
+//      <= 2. The shipped `validateReplyParent` refuses depth 2 and is left
+//      untouched, so the public route still enforces REPLY_DEPTH_MAX = 1.
+//   2. Accounts are created LAZILY, immediately before an author's first
+//      pending row, so account creation is part of the timed row phase and a
+//      --window-live run's total wall time is the window itself.
+//   3. Every row logs its own timing (progress jsonl + one console line).
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── SHELL MOCKS (ADR-0036 primitive 3 — nothing that writes or moves Dharma) ─
@@ -99,7 +109,6 @@ import { auth } from "@/server/auth/index";
 import { acceptTosAction } from "@/server/auth/tos-accept";
 import { place } from "@/server/bets/place";
 import { runBetTransaction } from "@/server/bets/transaction";
-import { validateReplyParent } from "@/server/comments/reply-validate";
 import { PUT_URL_TTL_SECONDS } from "@/server/config/limits";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { mintPutUrl } from "@/server/storage/r2";
@@ -121,7 +130,9 @@ import {
 	IMAGE_MIME_BY_EXT,
 	imageExt,
 	parseTable,
+	rowDepths,
 	rowFingerprint,
+	SEED_REPLY_DEPTH_MAX,
 	type SeedRow,
 	validateTable,
 } from "./_lib/table";
@@ -177,6 +188,8 @@ const ACCOUNT_PREFIX = `dummy-seed-sub-${TABLE.runId}-`;
  */
 const SELECTED = LIMIT === null ? TABLE.rows : TABLE.rows.slice(0, LIMIT);
 const ROW_BY_KEY = new Map(TABLE.rows.map((r) => [r.key, r]));
+/** SEED-DEPTH2: each row's depth, derived from its parentKey chain. */
+const DEPTH_BY_KEY = rowDepths(TABLE.rows);
 
 const MAX_DUE_MS = SELECTED.reduce((m, r) => Math.max(m, r.dueOffsetMs), 0);
 const RUN_TIMEOUT_MS = (WINDOW_LIVE ? MAX_DUE_MS : 0) + 12 * 60 * 60 * 1000;
@@ -248,6 +261,68 @@ async function assertNotBanned(userId: string, author: string): Promise<void> {
 	if (row?.bannedAt != null) {
 		refuse(
 			`seed account ${author} (${userId}) is banned; its remaining rows will not be placed.`,
+		);
+	}
+}
+
+/**
+ * SEED-DEPTH2 — the seed-local replacement for `validateReplyParent` (which
+ * refuses depth 2 and stays exactly as it is for the public route). Read-only.
+ * The parent must exist, sit in the same market, be at depth <= 1 (so the reply
+ * lands at depth <= SEED_REPLY_DEPTH_MAX), sit at the depth the TABLE says, and
+ * hold the side the row's stance expects of its IMMEDIATE parent. Every miss is
+ * a refusal: the table and the database disagree, and a retry cannot fix that.
+ * Parent existence, market, linkage and side are immutable (append-only +
+ * side-freeze), so a pre-tx read is race-free — the same argument
+ * `validateReplyParent` makes; the FK at commit is the backstop.
+ */
+async function assertSeedReplyParent(
+	row: SeedRow,
+	parentCommentId: string,
+	marketId: string,
+): Promise<void> {
+	const readComment = async (id: string) =>
+		(
+			await readOnly
+				.select({
+					marketId: comments.marketId,
+					parentCommentId: comments.parentCommentId,
+					side: comments.sideAtPostTime,
+				})
+				.from(comments)
+				.where(eq(comments.id, id))
+				.limit(1)
+		)[0];
+	const parent = await readComment(parentCommentId);
+	if (parent === undefined || parent.marketId !== marketId) {
+		refuse(
+			`row ${row.key}: parent comment ${parentCommentId} not found in this market`,
+		);
+	}
+	let parentDepth = 0;
+	if (parent.parentCommentId !== null) {
+		const grandparent = await readComment(parent.parentCommentId);
+		if (grandparent === undefined || grandparent.marketId !== marketId) {
+			refuse(`row ${row.key}: parent's own parent is missing or cross-market`);
+		}
+		parentDepth = grandparent.parentCommentId === null ? 1 : 2;
+	}
+	if (parentDepth + 1 > SEED_REPLY_DEPTH_MAX) {
+		refuse(
+			`row ${row.key}: reply would land at depth ${parentDepth + 1} (> ${SEED_REPLY_DEPTH_MAX})`,
+		);
+	}
+	const tableDepth = DEPTH_BY_KEY.get(row.key);
+	if (tableDepth !== parentDepth + 1) {
+		refuse(
+			`row ${row.key}: table depth ${tableDepth}, database parent implies ${parentDepth + 1}`,
+		);
+	}
+	const want =
+		row.kind === "support" ? row.side : row.side === "YES" ? "NO" : "YES";
+	if (parent.side !== want) {
+		refuse(
+			`row ${row.key}: parent is ${parent.side}, the table expects ${want}`,
 		);
 	}
 }
@@ -359,7 +434,10 @@ async function placeRow(
 		commentEventId: uuidv7(),
 		creditEventId: uuidv7(),
 	};
-	return runBetTransaction({ marketId, flow }, (ctx) =>
+	// SEED-DEPTH2: time the W-1 transaction alone (retries included, image
+	// upload excluded) — that is the load the database sees for this row.
+	const txStart = performance.now();
+	const result = await runBetTransaction({ marketId, flow }, (ctx) =>
 		place(ctx, {
 			userId,
 			marketId,
@@ -374,6 +452,7 @@ async function placeRow(
 			metadata: betMetadata(userId, flow, row.key),
 		}),
 	);
+	return { result, placeMs: Math.round(performance.now() - txStart) };
 }
 
 function sleep(ms: number): Promise<void> {
@@ -628,26 +707,33 @@ describe("seed run", () => {
 		"creates the needed accounts and places every pending selected row through the engine",
 		async () => {
 			try {
-				// ── ACCOUNTS (only the authors of the selected rows) ─────────
+				// ── ACCOUNTS — LAZY (SEED-DEPTH2) ───────────────────────────
+				// Created immediately before an author's FIRST pending row, not all
+				// up front, so account creation sits inside the timed row phase and
+				// a --window-live run lasts the window (not accounts + window).
+				// Resume is unchanged: pre-flight already found existing accounts
+				// by derived sub, refused orphans and bans, counted `toCreate`
+				// against the identity pool and the injector ack. An account left
+				// without ToS by a crash is in `tosPending` and is completed here
+				// before its row.
 				let created = 0;
-				for (const author of neededAuthors) {
+				const ensureAccount = async (
+					author: string,
+				): Promise<{ userId: string; accountMs: number | null }> => {
 					let userId = userIdByAuthor.get(author);
+					if (userId && !tosPending.has(author))
+						return { userId, accountMs: null };
+					const t0 = performance.now();
 					if (!userId) {
 						userId = await createAccount(author);
 						userIdByAuthor.set(author, userId);
 						tosPending.add(author);
 						created += 1;
 					}
-					if (tosPending.has(author)) {
-						await acceptTos(userId);
-						tosPending.delete(author);
-					}
-					if (created > 0 && created % 100 === 0)
-						log(`accounts created ${created}`);
-				}
-				log(
-					`accounts ready · ${neededAuthors.length} (${created} created this run)`,
-				);
+					await acceptTos(userId);
+					tosPending.delete(author);
+					return { userId, accountMs: Math.round(performance.now() - t0) };
+				};
 
 				// ── ROWS ─────────────────────────────────────────────────────
 				const commentByKey = new Map<string, string>();
@@ -694,10 +780,18 @@ describe("seed run", () => {
 							await sleep(wait);
 						}
 					}
-					const userId = userIdByAuthor.get(row.author) as string;
+					const rowStart = Date.now();
 					const marketId = marketIdBySlug.get(row.market) as string;
+					const depth = DEPTH_BY_KEY.get(row.key) as number;
 
+					// Freeze before the account write too: a lazily-created account
+					// is a write, and the freeze forbids every write.
 					await assertNotFrozen();
+					// Ban before ANY write for an existing account (a pending ToS is
+					// a write), and again after, for the one ensureAccount returns.
+					const existingId = userIdByAuthor.get(row.author);
+					if (existingId) await assertNotBanned(existingId, row.author);
+					const { userId, accountMs } = await ensureAccount(row.author);
 					await assertNotBanned(userId, row.author);
 
 					let parentCommentId: string | null = null;
@@ -708,36 +802,44 @@ describe("seed run", () => {
 								`row ${row.key}: parent ${row.parentKey} has not been placed`,
 							);
 						}
-						// The route's parent check — same market, depth 1 — plus the
-						// side the table expects the parent to hold.
-						const parent = await validateReplyParent(guardedDb, {
-							parentCommentId: candidate,
-							marketId,
-						});
-						const want =
-							row.kind === "support"
-								? row.side
-								: row.side === "YES"
-									? "NO"
-									: "YES";
-						if (parent.sideAtPostTime !== want) {
-							refuse(
-								`row ${row.key}: parent is ${parent.sideAtPostTime}, the table expects ${want}`,
-							);
-						}
-						parentCommentId = parent.parentCommentId;
+						// SEED-DEPTH2: the seed-local parent check (depth <= 2, same
+						// market, the table's depth, the side the stance expects of
+						// the IMMEDIATE parent) replaces `validateReplyParent` here.
+						await assertSeedReplyParent(row, candidate, marketId);
+						parentCommentId = candidate;
 					}
 
-					const result = await placeRow(row, userId, marketId, parentCommentId);
+					const { result, placeMs } = await placeRow(
+						row,
+						userId,
+						marketId,
+						parentCommentId,
+					);
 					commentByKey.set(row.key, result.commentId);
 					doneKeys.add(row.key);
 					placedThisRun += 1;
+					// SEED-DEPTH2: per-row timing, for correlating with a load log.
+					// `at` is when the row STARTED (after any window wait); `lagMs`
+					// is how late that start was against its due offset (window
+					// mode only); `accountMs` is null unless this row created or
+					// completed its author's account.
+					const timing = {
+						at: new Date(rowStart).toISOString(),
+						key: row.key,
+						depth,
+						kind: row.kind,
+						accountMs,
+						placeMs,
+						totalMs: Date.now() - rowStart,
+						lagMs: WINDOW_LIVE
+							? rowStart - (startedAt + row.dueOffsetMs)
+							: null,
+					};
 					appendFileSync(
 						PROGRESS_PATH,
 						`${JSON.stringify({
-							key: row.key,
+							...timing,
 							market: row.market,
-							kind: row.kind,
 							side: row.side,
 							stake: row.stake,
 							author: row.author,
@@ -745,8 +847,11 @@ describe("seed run", () => {
 							betId: result.betId,
 							commentId: result.commentId,
 							priceAfter: result.newPrice,
-							at: new Date().toISOString(),
+							doneAt: new Date().toISOString(),
 						})}\n`,
+					);
+					log(
+						`${timing.at} ${row.key} d${depth} ${row.kind} ${row.side} ${row.stake} ${row.author}${accountMs === null ? "" : ` accountMs=${accountMs}`} placeMs=${placeMs} totalMs=${timing.totalMs}${timing.lagMs === null ? "" : ` lagMs=${timing.lagMs}`}`,
 					);
 					if (placedThisRun % 25 === 0) {
 						log(
@@ -754,7 +859,18 @@ describe("seed run", () => {
 						);
 					}
 				}
-				log(`rows placed this run: ${placedThisRun}`);
+				// An author whose rows were all placed but whose ToS is still
+				// pending (only reachable by an out-of-band edit) is completed,
+				// as the eager loop used to.
+				for (const author of neededAuthors) {
+					if (tosPending.has(author) && userIdByAuthor.has(author)) {
+						await assertNotFrozen();
+						await ensureAccount(author);
+					}
+				}
+				log(
+					`rows placed this run: ${placedThisRun} · accounts created this run: ${created}`,
+				);
 			} catch (err) {
 				generationError = err;
 				throw err;
@@ -886,8 +1002,10 @@ describe("seed run", () => {
 							.div(new CpmmDecimal(p.yes).plus(new CpmmDecimal(p.no)))
 							.toFixed(4)
 					: "—";
+				const atDepth = (list: SeedRow[], d: number) =>
+					list.filter((r) => DEPTH_BY_KEY.get(r.key) === d).length;
 				log(
-					`${slug.padEnd(40)} posts ${done.filter((r) => r.kind === "post").length}/${rows.filter((r) => r.kind === "post").length} · replies ${done.filter((r) => r.kind !== "post").length}/${rows.filter((r) => r.kind !== "post").length} · YES ${price}`,
+					`${slug.padEnd(40)} posts ${atDepth(done, 0)}/${atDepth(rows, 0)} · depth-1 ${atDepth(done, 1)}/${atDepth(rows, 1)} · depth-2 ${atDepth(done, 2)}/${atDepth(rows, 2)} · YES ${price}`,
 				);
 			}
 			expect(foreignBets).toEqual([]);

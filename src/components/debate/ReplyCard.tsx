@@ -59,6 +59,13 @@ export function ReplyCard({
 			<div className="flex flex-col gap-1 rounded-md p-2 [border:var(--hairline)]">
 				<SideBadge side={reply.side} />
 				<RemovedPlaceholder />
+				{/* TEST-BRANCH depth-2 — a removed depth-1 reply keeps its children
+				    (thread integrity), exactly as a removed post keeps its replies. */}
+				<SubReplyThread
+					parent={reply}
+					onOpenImage={onOpenImage}
+					onOpenPopup={onOpenPopup}
+				/>
 			</div>
 		);
 	}
@@ -217,6 +224,107 @@ export function ReplyCard({
 					<CommentImage url={reply.imageUrl} onOpen={onOpenImage} fill />
 				) : null}
 			</div>
+			<SubReplyThread
+				parent={reply}
+				onOpenImage={onOpenImage}
+				onOpenPopup={onOpenPopup}
+			/>
 		</div>
+	);
+}
+
+/**
+ * ⚠ TEST-BRANCH ONLY (`test/seed-depth2-load`, not for merge) — the replies TO
+ * a depth-1 reply (depth 2), rendered nested beneath it: indented behind a
+ * hairline rule, smaller type, oldest-first, each labelled Support or Counter
+ * RELATIVE TO THIS PARENT REPLY (same side as the parent = Support), never
+ * relative to the post.
+ *
+ * ⛔ NO REPLY AFFORDANCE, on either level. Participants cannot reply to a reply
+ * (the public route still enforces `REPLY_DEPTH_MAX = 1`), so nothing here opens
+ * a composer, and a child carries no download mark (the image export addresses
+ * depth-1 replies only). `Know more` still opens the read-only reply pop-up —
+ * it takes a `PresentReply`, so a removed child cannot reach it (SC-1).
+ *
+ * Masking is inherited, not re-implemented: every child was built by
+ * `loadDebateView`'s `buildReply`, so a removed child is the body-less variant
+ * and renders only its side and the placeholder.
+ *
+ * Renders nothing when the parent has no children (the common case), so every
+ * existing card is byte-identical. Rendered AFTER the image cell and as
+ * `shrink-0`, so the cell stays the card's only absorber (`RPLY-1 · R6`).
+ */
+export function SubReplyThread({
+	parent,
+	onOpenImage,
+	onOpenPopup,
+}: {
+	parent: DebateReply;
+	onOpenImage: (url: string) => void;
+	onOpenPopup: (reply: PresentReply) => void;
+}) {
+	const children = parent.subReplies ?? [];
+	if (children.length === 0) {
+		return null;
+	}
+	return (
+		<ul
+			data-testid="sub-reply-thread"
+			aria-label={`${children.length} ${children.length === 1 ? "reply" : "replies"} to this reply`}
+			className="ml-2 flex shrink-0 flex-col gap-1.5 pl-3 [border-left:var(--hairline)]"
+		>
+			{children.map((child) => {
+				const relation = child.side === parent.side ? "Support" : "Counter";
+				return (
+					<li
+						key={child.id}
+						data-testid="sub-reply"
+						data-relation={relation.toLowerCase()}
+						className="flex flex-col gap-1"
+					>
+						<span className="text-xs leading-[1.2] font-semibold text-muted-foreground">
+							{relation}
+						</span>
+						{child.removed ? (
+							/* ⚠ The REMOVED child re-enters `ReplyCard`'s own removed branch
+							   rather than a second `SideBadge` mount, so the badge census
+							   (`side-badge.test.tsx`) is unchanged. The child has no
+							   `subReplies`, so that branch's thread renders nothing. */
+							<ReplyCard
+								reply={child}
+								onOpenImage={onOpenImage}
+								onOpenPopup={onOpenPopup}
+							/>
+						) : (
+							<div className="flex flex-col gap-1 rounded-md p-2 [border:var(--hairline)]">
+								<ArgProfile
+									author={child.author}
+									side={child.side}
+									marker={child.marker}
+									entryPrice={child.entryPrice}
+									authorStake={child.stake}
+									originalStake={child.stakeOriginal}
+									sold={child.sold}
+									createdAt={child.createdAt}
+								/>
+								<div className="flex items-start justify-between gap-2">
+									<p className="text-xs whitespace-pre-line">{child.body}</p>
+									{hasExtendedText(child.body) ? (
+										<KnowMore
+											label="Know more about this reply"
+											onClick={() => onOpenPopup(child)}
+											className="shrink-0"
+										/>
+									) : null}
+								</div>
+								{child.imageUrl ? (
+									<CommentImage url={child.imageUrl} onOpen={onOpenImage} />
+								) : null}
+							</div>
+						)}
+					</li>
+				);
+			})}
+		</ul>
 	);
 }

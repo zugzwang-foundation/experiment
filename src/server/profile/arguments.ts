@@ -138,6 +138,10 @@ type ReplyRow = {
 	id: string;
 	market_id: string;
 	parent_comment_id: string;
+	/** TEST-BRANCH depth-2 — the top-level post this reply hangs under (= parent at depth 1). */
+	root_comment_id: string;
+	/** TEST-BRANCH depth-2 — the immediate parent's body; gated on `removedSet` before use (SC-1). */
+	parent_body: string | null;
 	side: "YES" | "NO";
 	created_at: string | Date;
 	body: string;
@@ -287,6 +291,11 @@ export async function loadProfileArguments(
 			rc.id,
 			rc.market_id,
 			rc.parent_comment_id,
+			-- TEST-BRANCH depth-2 (test/seed-depth2-load): a reply to a reply deep-links
+			-- to its ROOT post's ordinal, and names its IMMEDIATE parent as replied-to.
+			-- At depth 1 pc is the post itself, so root = rc.parent_comment_id.
+			COALESCE(pc.parent_comment_id, rc.parent_comment_id) AS root_comment_id,
+			pc.body AS parent_body,
 			rc.side_at_post_time AS side,
 			rc.created_at,
 			rc.body,
@@ -308,6 +317,7 @@ export async function loadProfileArguments(
 			ORDER BY b.created_at ASC, b.id ASC
 			LIMIT 1
 		) rb ON true
+		LEFT JOIN ${comments} pc ON pc.id = rc.parent_comment_id
 		WHERE rc.user_id = ${userId} AND rc.parent_comment_id IS NOT NULL
 	`);
 
@@ -359,6 +369,8 @@ export async function loadProfileArguments(
 			{
 				marketId: r.market_id,
 				parentCommentId: r.parent_comment_id,
+				rootCommentId: r.root_comment_id,
+				parentBody: r.parent_body,
 				body: r.body,
 				createdAt: new Date(r.created_at),
 			},
@@ -555,6 +567,10 @@ export function buildReplyItem(args: {
 		| {
 				marketId: string;
 				parentCommentId: string;
+				/** TEST-BRANCH depth-2 — absent ⇒ the parent IS the root (depth 1). */
+				rootCommentId?: string;
+				/** TEST-BRANCH depth-2 — the immediate parent's body (masked below). */
+				parentBody?: string | null;
 				body: string;
 				createdAt: Date;
 		  }
@@ -577,9 +593,11 @@ export function buildReplyItem(args: {
 	const market = meta ? marketById.get(meta.marketId) : undefined;
 	const marketSlug = market?.slug ?? "";
 	const marketTitle = market?.title ?? "";
-	// A reply deep-links to its PARENT's ordinal (§9).
+	// A reply deep-links to its PARENT's ordinal (§9). TEST-BRANCH depth-2: to its
+	// ROOT post's — a depth-1 parent has no ordinal and would read 0.
 	const parentId = meta?.parentCommentId;
-	const ordinal = parentId ? (ordinalById.get(parentId) ?? 0) : 0;
+	const rootId = meta?.rootCommentId ?? parentId;
+	const ordinal = rootId ? (ordinalById.get(rootId) ?? 0) : 0;
 	const createdAt = (meta?.createdAt ?? reply.createdAt).toISOString();
 
 	if (removedSet.has(reply.id)) {
@@ -597,7 +615,11 @@ export function buildReplyItem(args: {
 	// The parent's title — null when the parent is itself removed (no leak).
 	const repliedToTitle =
 		parentId && !removedSet.has(parentId)
-			? deriveTitleTeaser(topLevelBodyById.get(parentId) ?? "").title
+			? deriveTitleTeaser(
+					// TEST-BRANCH depth-2: a depth-1 parent is not top-level, so its body
+					// comes from the reply row. Still inside the `removedSet` gate (SC-1).
+					topLevelBodyById.get(parentId) ?? meta?.parentBody ?? "",
+				).title
 			: null;
 	const { title, teaser } = deriveTitleTeaser(meta?.body ?? "");
 	return {

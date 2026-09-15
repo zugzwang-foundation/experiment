@@ -34,14 +34,23 @@ export interface SeedRow {
 	/** Which post this row belongs to (a reply carries its parent's number). */
 	readonly postNo: number;
 	readonly kind: SeedKind;
-	/** Resolved side: a support takes its parent's side, a counter the opposite. */
+	/**
+	 * Resolved side, relative to the IMMEDIATE parent: a support takes its
+	 * parent's side, a counter the opposite. For a depth-2 row the parent is the
+	 * depth-1 reply, not the post.
+	 */
 	readonly side: SeedSide;
 	/** Whole-Dharma decimal string, e.g. "25". */
 	readonly stake: string;
 	/** Author label, e.g. "A0017". One label = one seeded account. */
 	readonly author: string;
 	readonly body: string;
-	/** The parent post's key for a reply; null for a post. */
+	/**
+	 * The IMMEDIATE parent's key for a reply — a post (depth 1) or a depth-1
+	 * reply (depth 2); null for a post. Depth is DERIVED from this chain
+	 * (`rowDepths`), never stored, so tables written before depth 2 still parse
+	 * and fingerprint identically.
+	 */
 	readonly parentKey: string | null;
 	/** Image filename in the images folder (posts only), or null. */
 	readonly image: string | null;
@@ -54,6 +63,15 @@ export interface SeedTable {
 	readonly markets: readonly string[];
 	readonly rows: readonly SeedRow[];
 }
+
+/**
+ * SEED-DEPTH2 (test branch `test/seed-depth2-load`, not for merge): the deepest
+ * reply the SEED TABLE may carry. 0 = post, 1 = reply to a post, 2 = reply to a
+ * reply. This is deliberately NOT `REPLY_DEPTH_MAX` from src/server/config/limits
+ * (which stays 1 and still governs the public route): the seed runner drives
+ * `place()` below the route and does its own depth-aware parent check.
+ */
+export const SEED_REPLY_DEPTH_MAX = 2;
 
 /** SEED-1 §4.3 rule 5 — no account looks all-in: total spend per author. */
 export const AUTHOR_SPEND_CAP = 500;
@@ -157,6 +175,25 @@ export function imageExt(filename: string): string {
 	return filename.slice(filename.lastIndexOf(".") + 1).toLowerCase();
 }
 
+/**
+ * Each row's reply depth, derived from the parentKey chain in table order: a
+ * post is 0, a reply is its parent's depth + 1. A reply whose parent does not
+ * PRECEDE it gets NaN (validateTable reports that separately).
+ */
+export function rowDepths(rows: readonly SeedRow[]): Map<string, number> {
+	const depths = new Map<string, number>();
+	for (const row of rows) {
+		if (depths.has(row.key)) continue; // duplicate key; validateTable reports it
+		depths.set(
+			row.key,
+			row.parentKey === null
+				? 0
+				: (depths.get(row.parentKey) ?? Number.NaN) + 1,
+		);
+	}
+	return depths;
+}
+
 /** Stakes in a table are whole numbers, so integer comparison is exact. */
 function stakeValue(stake: string): number | null {
 	return /^[1-9]\d*$/.test(stake) ? Number(stake) : null;
@@ -190,6 +227,7 @@ export function validateTable(table: SeedTable): string[] {
 	const heldSide = new Map<string, SeedSide>();
 	const spend = new Map<string, number>();
 	const images = new Set<string>();
+	const depths = rowDepths(table.rows);
 	let prev: SeedRow | null = null;
 
 	for (const row of table.rows) {
@@ -230,13 +268,21 @@ export function validateTable(table: SeedTable): string[] {
 		if (row.kind === "post") {
 			if (row.parentKey !== null) fail(at, "post carries a parentKey");
 		} else {
-			// Rule 2 — the parent exists, earlier, as a post in the same market.
+			// Rule 2 — the parent exists, earlier, in the same market, and the
+			// reply lands at depth <= SEED_REPLY_DEPTH_MAX (SEED-DEPTH2: a reply to
+			// a depth-1 reply is allowed; a reply to a depth-2 reply is not). Side
+			// and self-reply are judged against the IMMEDIATE parent.
 			const parent =
 				row.parentKey === null ? undefined : seen.get(row.parentKey);
 			if (!parent)
 				fail(at, `reply parent ${row.parentKey} does not precede it`);
 			else {
-				if (parent.kind !== "post") fail(at, "reply parent is not a post");
+				const depth = depths.get(row.key) ?? Number.NaN;
+				if (!(depth <= SEED_REPLY_DEPTH_MAX))
+					fail(
+						at,
+						`reply depth ${depth} exceeds ${SEED_REPLY_DEPTH_MAX} (parent is itself at depth ${depth - 1})`,
+					);
 				if (parent.market !== row.market)
 					fail(at, "reply parent is in another market");
 				if (parent.postNo !== row.postNo)
@@ -249,9 +295,10 @@ export function validateTable(table: SeedTable): string[] {
 							: "YES";
 				if (row.side !== want)
 					fail(at, `${row.kind} side ${row.side}, expected ${want}`);
-				// Rule 3 — nobody supports or counters themselves.
+				// Rule 3 — nobody supports or counters themselves (the immediate
+				// parent; replying under your own post one level down is allowed).
 				if (parent.author === row.author)
-					fail(at, "reply author is the post author");
+					fail(at, "reply author is the parent author");
 			}
 			if (row.image !== null) fail(at, "reply carries an image");
 		}

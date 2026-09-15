@@ -104,8 +104,16 @@ function isTerminalPrice(status: string): boolean {
 }
 
 function replyCount(model: DebateViewModel): number {
+	// TEST-BRANCH depth-2 (`test/seed-depth2-load`) — replies TO replies count as
+	// replies too, matching `getMarketTotals`' `parent_comment_id IS NOT NULL`.
+	// `?? []` keeps a model with no depth-2 rows byte-identical.
 	return model.posts.reduce(
-		(n, p) => n + p.replies.support.length + p.replies.counter.length,
+		(n, p) =>
+			n +
+			[...p.replies.support, ...p.replies.counter].reduce(
+				(m, r) => m + 1 + (r.subReplies?.length ?? 0),
+				0,
+			),
 		0,
 	);
 }
@@ -324,6 +332,53 @@ function replyBlock(
 	return [heading, bullets, reply.body].join("\n\n");
 }
 
+/**
+ * ⚠ TEST-BRANCH ONLY (`test/seed-depth2-load`) — a reply TO a reply (depth 2),
+ * numbered `{post}.{n}.{k}` beneath its depth-1 parent. Its relation is
+ * relative to THAT reply, not to the post. Masking is inherited: a removed
+ * child is the body-less variant and prints only its structure.
+ */
+function subReplyBlock(
+	child: DebateReply,
+	parent: DebateReply,
+	parentLabel: string,
+	k: number,
+): string {
+	const label = `${parentLabel}.${k}`;
+	const relation = child.side === parent.side ? "Support" : "Counter";
+	const relationPhrase =
+		relation === "Support"
+			? "Support (same side as the reply it answers)"
+			: "Counter (opposite side from the reply it answers)";
+	const common = [
+		`- **Replies to:** Reply ${parentLabel}${parent.removed ? " (removed)" : ""}`,
+		`- **Side:** ${child.side}`,
+		`- **Relation:** ${relationPhrase}`,
+	];
+	if (child.removed) {
+		return [
+			`##### Reply ${label} — ${relation} (${child.side}) — [removed by moderator]`,
+			[
+				...common,
+				"- **Status:** removed by moderator — argument text, author, and stake withheld",
+				`- **Time:** ${timeUtc(child.createdAt)}`,
+			].join("\n"),
+			"*[This reply was removed by a moderator. Its text, author, and stake are not shown.]*",
+		].join("\n\n");
+	}
+	return [
+		`##### Reply ${label} — ${relation} (${child.side}) — ${child.author.pseudonym}`,
+		[
+			...common,
+			`- **Stake:** ${formatDharmaExportGrouped(child.stake)} Đ`,
+			`- **Entry price:** ${price2(child.entryPrice)}`,
+			`- **Author status:** ${authorStatus(child.marker)}`,
+			`- **Time:** ${timeUtc(child.createdAt)}`,
+		].join("\n"),
+		child.body,
+	].join("\n\n");
+}
+
 function postGroup(post: DebatePost, rank: number, totalPosts: number): string {
 	const segments: string[] = [];
 	if (post.removed) {
@@ -355,13 +410,21 @@ function postGroup(post: DebatePost, rank: number, totalPosts: number): string {
 	}
 	// Replies: Support group first, then Counter — continuous `{post}.{n}`.
 	let n = 0;
+	// TEST-BRANCH depth-2 — each depth-1 reply is followed by its own replies.
+	const pushSubReplies = (reply: DebateReply) => {
+		(reply.subReplies ?? []).forEach((child, k) => {
+			segments.push(subReplyBlock(child, reply, `${rank}.${n}`, k + 1));
+		});
+	};
 	post.replies.support.forEach((reply, i) => {
 		n += 1;
 		segments.push(replyBlock(reply, post, rank, n, "support", i));
+		pushSubReplies(reply);
 	});
 	post.replies.counter.forEach((reply, i) => {
 		n += 1;
 		segments.push(replyBlock(reply, post, rank, n, "counter", i));
+		pushSubReplies(reply);
 	});
 	return segments.join("\n\n");
 }

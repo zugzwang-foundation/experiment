@@ -111,6 +111,26 @@ async function main(): Promise<void> {
 		)
 			delete env[name];
 	}
+	// SEED-DEPTH2 (test branch): `--env-file <path>` replaces Doppler. KEY=VALUE
+	// lines are merged into the runner's env (never printed), and the runner is
+	// spawned without `doppler run`. The file must live outside the repository.
+	const envFileArg = flag(argv, "--env-file");
+	if (envFileArg) {
+		const envFile = outsideRepo(envFileArg, "--env-file");
+		if (!existsSync(envFile)) die(`env file ${envFile} does not exist`);
+		const loaded: string[] = [];
+		for (const raw of readFileSync(envFile, "utf8").split(/\r?\n/)) {
+			const line = raw.trim();
+			if (line === "" || line.startsWith("#")) continue;
+			const m = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+			if (!m?.[1]) die(`env file ${envFile}: unparseable line (not shown)`);
+			let value = m[2] ?? "";
+			if (/^(['"]).*\1$/.test(value)) value = value.slice(1, -1);
+			env[m[1]] = value;
+			loaded.push(m[1]);
+		}
+		console.log(`[seed-prod] env file loaded: ${loaded.join(", ")}`);
+	}
 	env.ZUGZWANG_SEED_TARGET = environment;
 	env.ZUGZWANG_SEED_TABLE = table;
 	if (images) env.ZUGZWANG_SEED_IMAGES = images;
@@ -179,7 +199,11 @@ async function main(): Promise<void> {
 
 	const vitest = ["exec", "vitest", "run", "--config", CONFIG, RUNNER];
 	const doppler =
-		environment === "local" ? null : environment === "staging" ? "stg" : "prd";
+		environment === "local" || envFileArg
+			? null
+			: environment === "staging"
+				? "stg"
+				: "prd";
 	const [command, args] = doppler
 		? ([
 				"doppler",

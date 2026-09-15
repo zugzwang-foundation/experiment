@@ -7,16 +7,27 @@
  *
  *   pnpm exec tsx scripts/seed/generate-table.ts \
  *     --markets bitcoin-price-50k,claude-bundle-response,... \
- *     --users 1000 --posts 100 --coverage 0.5 --out ../seed-runs/<run>
+ *     --users 100 --posts 8 --replies 10 --depth2 7 --window 14m --out ../seed-runs/<run>
  *
- * Optional: --yes-ratio 0.4 --image-ratio 0.5 --image-ext png --window 0|24h --seed 1
+ * Optional: --yes-ratio 0.4 --image-ratio 0 --image-ext png --spacing even|random
+ * --window 0|<n>h|<n>m|<n>s --seed 1 --run-id <id>
+ *
+ * SEED-DEPTH2 (test branch, not for merge): per market, --posts depth-0 rows,
+ * --replies depth-1 rows (on posts) and --depth2 depth-2 rows (on depth-1
+ * replies). Defaults are the 2026-09-15 load-run spec: 100 users, 8/10/7 per
+ * market (25 rows; 200 over 8 markets), no images, even spacing. `--coverage`
+ * is gone — it described one support + one counter per covered post.
  */
 import { randomBytes } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 
 import { generateTable } from "../../tests/prod-seed/_lib/generate";
-import { AUTHOR_SPEND_CAP, authorsOf } from "../../tests/prod-seed/_lib/table";
+import {
+	AUTHOR_SPEND_CAP,
+	authorsOf,
+	rowDepths,
+} from "../../tests/prod-seed/_lib/table";
 
 function die(message: string): never {
 	console.error(`\nREFUSED — ${message}\n`);
@@ -42,9 +53,11 @@ function num(argv: readonly string[], name: string, fallback: number): number {
 
 function windowMs(raw: string | undefined): number {
 	if (raw === undefined || raw === "0") return 0;
-	const m = raw.match(/^(\d+)(h|m)$/);
-	if (!m) die(`--window must be 0, <n>h or <n>m (saw ${raw})`);
-	return Number(m[1]) * (m[2] === "h" ? 3_600_000 : 60_000);
+	const m = raw.match(/^(\d+)(h|m|s)$/);
+	if (!m) die(`--window must be 0, <n>h, <n>m or <n>s (saw ${raw})`);
+	return (
+		Number(m[1]) * (m[2] === "h" ? 3_600_000 : m[2] === "m" ? 60_000 : 1000)
+	);
 }
 
 const argv = process.argv.slice(2);
@@ -61,16 +74,23 @@ const markets = marketsRaw
 	.split(",")
 	.map((s) => s.trim())
 	.filter(Boolean);
+if (argv.includes("--coverage"))
+	die("--coverage was replaced by --replies / --depth2 (SEED-DEPTH2)");
+const spacing = flag(argv, "--spacing") ?? "even";
+if (spacing !== "even" && spacing !== "random")
+	die(`--spacing must be even | random (saw ${spacing})`);
 const table = generateTable({
 	runId,
 	markets,
-	users: num(argv, "--users", 1000),
-	postsPerMarket: num(argv, "--posts", 100),
-	coverage: num(argv, "--coverage", 0.5),
+	users: num(argv, "--users", 100),
+	postsPerMarket: num(argv, "--posts", 8),
+	repliesPerMarket: num(argv, "--replies", 10),
+	depth2PerMarket: num(argv, "--depth2", 7),
 	yesRatio: num(argv, "--yes-ratio", 0.4),
-	imageRatio: num(argv, "--image-ratio", 0.5),
+	imageRatio: num(argv, "--image-ratio", 0),
 	imageExt: flag(argv, "--image-ext") ?? "png",
 	windowMs: windowMs(flag(argv, "--window")),
+	spacing,
 	seed: num(argv, "--seed", 1),
 });
 
@@ -92,14 +112,21 @@ console.log(`table written: ${path}`);
 console.log(
 	`  run ${runId} · ${markets.length} markets · ${table.rows.length} rows · ${authorsOf(table).length} authors`,
 );
+const depths = rowDepths(table.rows);
+const last = table.rows[table.rows.length - 1];
+console.log(
+	`  timing: last row due +${Math.round((last?.dueOffsetMs ?? 0) / 1000)}s · ${spacing} spacing${table.rows.length > 1 && last && last.dueOffsetMs > 0 ? ` · gap ~${Math.round(last.dueOffsetMs / (table.rows.length - 1))}ms` : ""}`,
+);
 for (const m of markets) {
 	const rows = table.rows.filter((r) => r.market === m);
+	const atDepth = (d: number) =>
+		rows.filter((r) => depths.get(r.key) === d).length;
 	const stake = (side: string) =>
 		rows
 			.filter((r) => r.side === side)
 			.reduce((s, r) => s + Number(r.stake), 0);
 	console.log(
-		`  ${m.padEnd(40)} posts ${rows.filter((r) => r.kind === "post").length} · replies ${rows.filter((r) => r.kind !== "post").length} · images ${rows.filter((r) => r.image).length} · stake YES ${stake("YES")} / NO ${stake("NO")}`,
+		`  ${m.padEnd(40)} posts ${atDepth(0)} · depth-1 ${atDepth(1)} · depth-2 ${atDepth(2)} · images ${rows.filter((r) => r.image).length} · stake YES ${stake("YES")} / NO ${stake("NO")}`,
 	);
 }
 console.log(

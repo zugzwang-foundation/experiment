@@ -35,7 +35,6 @@ const ALLOWED_SERVER_IMPORTS = new Set([
 	"@/server/auth/tos-accept",
 	"@/server/bets/place",
 	"@/server/bets/transaction",
-	"@/server/comments/reply-validate",
 	"@/server/config/limits",
 	"@/server/cpmm/decimal",
 	"@/server/storage/r2",

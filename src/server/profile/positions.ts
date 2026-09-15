@@ -635,9 +635,16 @@ function buildArgumentCell(args: {
 			? commentById.get(opener.parentCommentId)
 			: undefined;
 	// A reply carries its PARENT's ordinal; a post carries its own.
+	// TEST-BRANCH depth-2 (`test/seed-depth2-load`): a reply to a reply carries its
+	// ROOT post's — its parent is a depth-1 reply with no ordinal. One hop up is
+	// enough: depth 2 is the floor the seed writes.
+	const root =
+		parent?.parentCommentId != null
+			? commentById.get(parent.parentCommentId)
+			: parent;
 	const postOrdinal = isReply
-		? parent
-			? (ordinalById.get(parent.id) ?? 0)
+		? root
+			? (ordinalById.get(root.id) ?? 0)
 			: 0
 		: (ordinalById.get(opener.id) ?? 0);
 	// The parent's title — null for a post and for a removed parent (no leak).
