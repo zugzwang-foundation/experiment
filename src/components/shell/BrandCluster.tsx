@@ -125,7 +125,7 @@ export function BrandCluster({
 				</span>
 			</Link>
 			{/* ADR-0051 A13 D-2 — the phone's countdown. `aria-hidden` for the same
-			    reason row 2 of the chessboard is: the `<Link>` above carries the
+			    reason row 2 of the chessboard is: the brand link above carries the
 			    remaining time in words and is the ONLY route by which it reaches a
 			    screen reader, so a second spoken copy would read the freeze twice
 			    with different phrasing. */}
