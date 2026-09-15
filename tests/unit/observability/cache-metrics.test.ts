@@ -18,16 +18,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // response via `after()`, so this mock both keeps the suite off the network and
 // is the thing that makes the deferral observable at all.
 
-const { mockIncr, mockSet, mockSafeCaptureException, mockAfter, scheduled } =
-	vi.hoisted(() => ({
-		mockIncr: vi.fn(),
-		mockSet: vi.fn(),
-		mockSafeCaptureException: vi.fn(),
-		mockAfter: vi.fn(),
-		scheduled: [] as (() => Promise<void>)[],
-	}));
+const {
+	mockIncr,
+	mockIncrBy,
+	mockSet,
+	mockSafeCaptureException,
+	mockAfter,
+	scheduled,
+} = vi.hoisted(() => ({
+	mockIncr: vi.fn(),
+	mockIncrBy: vi.fn(),
+	mockSet: vi.fn(),
+	mockSafeCaptureException: vi.fn(),
+	mockAfter: vi.fn(),
+	scheduled: [] as (() => Promise<void>)[],
+}));
 vi.mock("@/server/upstash/redis", () => ({
-	redis: { incr: mockIncr, set: mockSet },
+	redis: { incr: mockIncr, incrby: mockIncrBy, set: mockSet },
 }));
 vi.mock("@/server/observability/safe-capture", () => ({
 	safeCaptureException: mockSafeCaptureException,
@@ -35,6 +42,7 @@ vi.mock("@/server/observability/safe-capture", () => ({
 vi.mock("next/server", () => ({ after: mockAfter }));
 
 import {
+	CACHE_ATTEMPT_SAMPLE_RATE,
 	recordCacheAttempt,
 	recordCacheMiss,
 	recordInvalidation,
@@ -55,6 +63,11 @@ const flush = () => Promise.all(scheduled.splice(0).map((task) => task()));
 describe("cache-metrics — fail-open, and deferred off the render path", () => {
 	beforeEach(() => {
 		mockIncr.mockReset().mockResolvedValue(1);
+		mockIncrBy.mockReset().mockResolvedValue(1);
+		// POLL-IDLE 1c — the attempt counter is sampled. Pinned to "sampled in"
+		// by default so the key/fail-open rows below stay deterministic; the
+		// sampling rows set it explicitly.
+		vi.spyOn(Math, "random").mockReturnValue(0);
 		mockSet.mockReset().mockResolvedValue("OK");
 		mockSafeCaptureException.mockReset();
 		scheduled.length = 0;
@@ -64,6 +77,7 @@ describe("cache-metrics — fail-open, and deferred off the render path", () => 
 	});
 	afterEach(() => {
 		vi.clearAllMocks();
+		vi.restoreAllMocks();
 	});
 
 	it("cache-metrics::counters-return-void-so-a-caller-cannot-await-one", () => {
@@ -85,22 +99,28 @@ describe("cache-metrics — fail-open, and deferred off the render path", () => 
 		recordCacheAttempt("market-data", "m-1");
 		expect(mockAfter).toHaveBeenCalledTimes(1);
 		expect(mockIncr).not.toHaveBeenCalled();
+		expect(mockIncrBy).not.toHaveBeenCalled();
+		// …and the sampling coin is not flipped during render either.
+		expect(Math.random).not.toHaveBeenCalled();
 	});
 
 	it("cache-metrics::attempt-increments-the-attempts-key-scoped-by-market", async () => {
 		recordCacheAttempt("market-data", "m-123");
 		await flush();
-		expect(mockIncr).toHaveBeenCalledTimes(1);
-		expect(mockIncr).toHaveBeenCalledWith(
+		expect(mockIncrBy).toHaveBeenCalledTimes(1);
+		expect(mockIncrBy).toHaveBeenCalledWith(
 			"prod:cache-metric:market-data:attempts:m-123",
+			CACHE_ATTEMPT_SAMPLE_RATE,
 		);
+		expect(mockIncr).not.toHaveBeenCalled();
 	});
 
 	it("cache-metrics::attempt-with-null-market-falls-back-to-global", async () => {
 		recordCacheAttempt("discovery-list", null);
 		await flush();
-		expect(mockIncr).toHaveBeenCalledWith(
+		expect(mockIncrBy).toHaveBeenCalledWith(
 			"prod:cache-metric:discovery-list:attempts:global",
+			CACHE_ATTEMPT_SAMPLE_RATE,
 		);
 	});
 
@@ -120,6 +140,41 @@ describe("cache-metrics — fail-open, and deferred off the render path", () => 
 		);
 	});
 
+	it("cache-metrics::attempt-sampled-out-writes-nothing", async () => {
+		vi.mocked(Math.random).mockReturnValue(1 / CACHE_ATTEMPT_SAMPLE_RATE);
+		recordCacheAttempt("market-data", "m-1");
+		await flush();
+		expect(mockIncrBy).not.toHaveBeenCalled();
+		expect(mockIncr).not.toHaveBeenCalled();
+	});
+
+	it("cache-metrics::attempt-sampling-is-an-unbiased-estimate-of-every-render", async () => {
+		// A deterministic sweep of the coin across [0, 1): exactly one render in
+		// CACHE_ATTEMPT_SAMPLE_RATE writes, and that write carries the rate — so
+		// the stored total equals the number of renders, and misses/attempts
+		// reads the same as it did unsampled.
+		const renders = CACHE_ATTEMPT_SAMPLE_RATE * 20;
+		let i = 0;
+		vi.mocked(Math.random).mockImplementation(() => (i++ % renders) / renders);
+		for (let r = 0; r < renders; r++) {
+			recordCacheAttempt("debate-view", "m-1");
+		}
+		await flush();
+		expect(mockIncrBy).toHaveBeenCalledTimes(
+			renders / CACHE_ATTEMPT_SAMPLE_RATE,
+		);
+		const total = mockIncrBy.mock.calls.reduce((sum, [, by]) => sum + by, 0);
+		expect(total).toBe(renders);
+	});
+
+	it("cache-metrics::miss-counters-are-never-sampled", async () => {
+		vi.mocked(Math.random).mockReturnValue(0.99);
+		recordCacheMiss("debate-view", "m-1");
+		recordReserveWalkDerivation("m-1");
+		await flush();
+		expect(mockIncr).toHaveBeenCalledTimes(2);
+	});
+
 	it("cache-metrics::invalidation-sets-a-stringified-timestamp-keyed-by-tag", async () => {
 		vi.setSystemTime(new Date("2026-09-09T00:00:00.000Z"));
 		recordInvalidation("market:m-1");
@@ -136,7 +191,7 @@ describe("cache-metrics — fail-open, and deferred off the render path", () => 
 	});
 
 	it("cache-metrics::redis-incr-rejection-is-swallowed-never-propagates", async () => {
-		mockIncr.mockRejectedValue(new Error("redis down"));
+		mockIncrBy.mockRejectedValue(new Error("redis down"));
 		recordCacheAttempt("market-data", "m-1");
 		await expect(flush()).resolves.toBeDefined();
 		expect(mockSafeCaptureException).toHaveBeenCalledTimes(1);

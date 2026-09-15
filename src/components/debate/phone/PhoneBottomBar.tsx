@@ -223,6 +223,10 @@ function PositionReadout({
 			) : (
 				<Link
 					href={`/u/${encodeURIComponent(ownPseudonym)}?market=${encodeURIComponent(slug)}`}
+					// POLL-IDLE 1b — no prefetch: every DebatePoll refresh invalidates the
+					// prefetch cache and re-prefetches every visible link (Next 16.3.2
+					// `pingVisibleLinks`), so this link cost a request per tick, per viewer.
+					prefetch={false}
 					className="flex items-center gap-2 hover:text-ink"
 				>
 					{inner}

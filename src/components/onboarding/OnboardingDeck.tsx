@@ -33,12 +33,12 @@ import { CardFigure } from "./figures";
  * deck needs and Radix already ships.
  *
  * ⛔ THE CLIENT OWNS `open`. THE SERVER PROP IS AN INITIAL VALUE, NEVER A LIVE
- * BINDING. `DebatePoll` calls `router.refresh()` every 15 s on `/m/[slug]` and
+ * BINDING. `DebatePoll` calls `router.refresh()` every 30 s on `/m/[slug]` and
  * a refresh re-executes the LAYOUT as well as the page, so the gate is
  * re-evaluated on every tick. Were `open` derived from that prop each render, a
  * tick landing in the window between the optimistic close and the cookie being
  * written would RE-OPEN a deck the participant had just finished, and a tick
- * landing after would close it mid-animation. Both are 15-second-periodic, both
+ * landing after would close it mid-animation. Both are 30-second-periodic, both
  * look like haunting, and neither reproduces on a route without the poll.
  *
  * ⛔ THE RE-SHOW NEVER WRITES THE MARKER (D-4), and not because of a check

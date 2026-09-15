@@ -2,7 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { POLL_INTERVAL_MS_DEBATE_VIEW } from "@/server/config/limits";
+import {
+	POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW,
+	POLL_INTERVAL_MS_DEBATE_VIEW,
+} from "@/server/config/limits";
 
 import { usePhoneSheetOpen } from "./composer-open-store";
 import { getInitialPollPhaseOffsetMs } from "./poll-phase";
@@ -27,7 +30,7 @@ import { getInitialPollPhaseOffsetMs } from "./poll-phase";
  * correct NET fire rate under React's StrictMode double-mount. What it
  * deliberately does NOT copy: this flow ADDS no `aria-live` to the polled
  * region (the polled value here is the whole debate view; marking it live would
- * make a screen reader announce the entire page every 15 s), no fusing of a
+ * make a screen reader announce the entire page every 30 s), no fusing of a
  * display concern into the poll, and no reliance on the route being dynamic by
  * accident — `/m/[slug]/page.tsx` now carries an explicit `force-dynamic`.
  * Note the polled tree already contains one pre-existing live region — the
@@ -51,6 +54,19 @@ import { getInitialPollPhaseOffsetMs } from "./poll-phase";
  * from. An open-but-empty composer sits in that blast radius identically to a
  * dirty one, so the reader's intent to compose is the correct gate — hence
  * composer-OPEN, never a `trim().length > 0` predicate.
+ *
+ * IDLE (POLL-IDLE) — a THIRD suspender, and the only one about cost rather than
+ * the composer. A tab left open and visible was never suspended by either rule
+ * above, so it rendered the layout and page on the server every interval for a
+ * reader who was not there. After `POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW` with no
+ * pointer, touch, wheel, scroll or key input the poll suspends; the first input
+ * afterwards resumes it through the SAME immediate-refresh path as the other
+ * suspenders. The tab becoming visible counts as input, because a reader
+ * switching back to it is present by definition. Listeners are passive and
+ * window-level in the capture phase (so a scroll inside the phone feed's own
+ * scroller is seen), and they only stamp a time: the idle check is one
+ * `setTimeout`, re-armed for the remaining time when it fires early, never a
+ * timer reset per mouse move.
  *
  * STOP — polling stops PERMANENTLY once the market leaves `Open`; not paused,
  * stopped. The poll carries NO notion of the global conclusion freeze:
@@ -82,6 +98,16 @@ import { getInitialPollPhaseOffsetMs } from "./poll-phase";
  * composer opened during the offset window re-enter the jittered branch on
  * resume, changing the ratified resume semantics above).
  */
+/** POLL-IDLE — the inputs that count as a reader being present. */
+const ACTIVITY_EVENTS = [
+	"pointerdown",
+	"pointermove",
+	"touchstart",
+	"wheel",
+	"scroll",
+	"keydown",
+] as const;
+
 export function DebatePoll({
 	marketOpen,
 	composerOpen,
@@ -130,7 +156,63 @@ export function DebatePoll({
 	// "a composer is open on this surface" simply now includes the one the
 	// desktop tree cannot see.
 	const phoneSheetOpen = usePhoneSheetOpen();
-	const suspended = documentHidden || composerOpen || phoneSheetOpen;
+
+	// POLL-IDLE — see the docblock. Only armed while the market is Open: a
+	// stopped poll has nothing to resume, so it needs no listeners or timer.
+	const [idle, setIdle] = useState(false);
+	useEffect(() => {
+		if (!marketOpen) {
+			return;
+		}
+		let lastActivityAt = Date.now();
+		let isIdle = false;
+		let timer: ReturnType<typeof setTimeout> | undefined;
+
+		const check = () => {
+			const quietFor = Date.now() - lastActivityAt;
+			if (quietFor >= POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW) {
+				isIdle = true;
+				timer = undefined;
+				setIdle(true);
+				return;
+			}
+			timer = setTimeout(check, POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW - quietFor);
+		};
+		const onActivity = () => {
+			lastActivityAt = Date.now();
+			if (isIdle) {
+				isIdle = false;
+				setIdle(false);
+			}
+			if (timer === undefined) {
+				timer = setTimeout(check, POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW);
+			}
+		};
+		const onVisibility = () => {
+			if (!document.hidden) {
+				onActivity();
+			}
+		};
+
+		const options = { capture: true, passive: true } as const;
+		for (const type of ACTIVITY_EVENTS) {
+			window.addEventListener(type, onActivity, options);
+		}
+		document.addEventListener("visibilitychange", onVisibility);
+		timer = setTimeout(check, POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW);
+
+		return () => {
+			for (const type of ACTIVITY_EVENTS) {
+				window.removeEventListener(type, onActivity, options);
+			}
+			document.removeEventListener("visibilitychange", onVisibility);
+			if (timer !== undefined) {
+				clearTimeout(timer);
+			}
+		};
+	}, [marketOpen]);
+
+	const suspended = documentHidden || composerOpen || phoneSheetOpen || idle;
 
 	useEffect(() => {
 		if (!marketOpen) {

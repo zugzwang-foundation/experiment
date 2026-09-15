@@ -347,7 +347,7 @@ describe("DEBATE.4 §6 — loadDebateView removal-masking gate (body/author neve
 		});
 		await removeComment(removed);
 
-		// Four consecutive reads — the shape a 15 s poll produces.
+		// Four consecutive reads — the shape a 30 s poll produces.
 		const runs = [
 			await loadDebateView(testDb, { market }),
 			await loadDebateView(testDb, { market }),
