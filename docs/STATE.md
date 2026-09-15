@@ -1,8 +1,11 @@
 # STATE — where Zugzwang is
 
-**Generated** 2026-09-08 from `origin/main` @ `da9979b9c61254f3f3bb8c585c817e1970ecfda1`
+**Generated** 2026-09-08 · **§1, §2's Surfaces row and §3 re-measured 2026-09-15** at the
+MOBILE-2 close-out, from `origin/main` @ `a7bf4d2d24c3a544cade07f0ebaf34be0a0fb393`
 **Regenerate** per `docs/records/README.md` · **Lane detail** in `docs/records/`
-**Go-live** 2026-09-15 — **7 days from this generation**
+⛔ **Go-live was 2026-09-15 — TODAY. The site is LIVE**: production serves `a7bf4d2d` with
+`env:prod · region:bom1 · db:ok · migrations:ok`, read at 11:21 IST. Every section below that
+was not re-measured at this pass is dated where it stands, and §4's rows are from 2026-09-08.
 
 > This file is an **index and a measurement**. It carries no rule of its own; if a sentence
 > here reads as normative, that is a defect. The rules live where §5 points.
@@ -19,21 +22,21 @@ sixteen rows below stale in five days**, and two of them were stale by a whole m
 
 | Quantity | Value | Command |
 |---|---|---|
-| **ADR ceiling** | **0048** (`0048-phone-responsive-auth-surfaces-and-the-focus-mode-row.md`) · next free **0049** | `ls docs/adr/ \| sort \| tail -1` |
-| ADR files | **47** = 46 ADRs + `_template.md`; `0002` and `0012` never used | `ls docs/adr/ \| wc -l` |
-| **SPEC.1** | **2.0.1** — rebaselined at 2.0.0 per D-29 (#490) | `grep -m1 '^- \*\*Version:' docs/specs/SPEC.1.md` |
+| **ADR ceiling** | **0052** (`0052-v1-feature-flag-kill-switches.md`) · next free **0053** | `ls docs/adr/ \| sort \| tail -1` |
+| ADR files | **52** = 51 ADRs + `_template.md`; `0002` and `0012` never used | `ls docs/adr/ \| wc -l` |
+| **SPEC.1** | **2.0.3** — rebaselined at 2.0.0 per D-29 (#490) | `grep -m1 '^- \*\*Version:' docs/specs/SPEC.1.md` |
 | **SPEC.2** | **2.0.2** — rebaselined at 2.0.0 per D-30 (#493); `F-22` is thereby discharged | `grep -m1 '^\| \*\*Version\*\* \|' docs/specs/SPEC.2.md` |
 | **cpmm.md** | **4.0.0** | same shape |
 | **Migration head** | **`0030_liquidity_revoke_app_roles`** · 31 `.sql` files · journal 31 entries | `ls drizzle/migrations/*.sql \| sort \| tail -1` |
 | **`EVENT_TYPES`** | **25** — `pool.liquidity_added` added by ADR-0047 | `awk '/export const EVENT_TYPES = \[/,/\] as const;/' … \| grep -cE '^\s+"'` |
-| **Test files** | **489** — unit 243 · server 160 · integration 36 · db 25 · invariants 13 · scale 8 · staging 4 | `find tests -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' \) \| wc -l` |
-| Suite actually run by `vitest run` | **477** — scale (8) and staging (4) are config-excluded | `pnpm vitest run` |
+| **Test files** | **555** — unit 301 · server 162 · integration 36 · db 25 · invariants 13 · scale 8 · staging 10 | `find tests -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' \) \| wc -l` |
+| Suite actually run by `vitest run` | **537** (536 passed, 1 skipped) — `tests/scale/**` and `tests/staging/**` are config-excluded | `pnpm vitest run` |
 | **Invariant specs** | **13** | `ls tests/invariants/ \| wc -l` |
 | **O-space** | **O-15** | `grep -oE '\*\*O-[0-9]+ ·' CLAUDE.md \| sort -u -t- -k2 -n \| tail -1` |
 | **V-space** | **V-21** ⚠ `V-15` is deliberately reserved; `V-22` appears only in a sentence saying a row does *not* take it | `grep -oE '\*\*V-[0-9]+ ·' docs/polish/POLISH-0_data-manifest.md \| …` |
 | **L-space** | **L-10** — and see `F-23` | `grep -oE '\bL-[0-9]+\b' docs/polish/POLISH-register-ADDITIONS.md \| …` |
-| Merged PRs | **478** · first merge PR #1, 2026-04-23 · newest `#500` `da9979b9` | `gh pr list --state merged --limit 600 --json number --jq length` |
-| `docs/logs/` + `docs/plans/` | **179** (95 + 84) — the corpus `docs/records/` replaces. ⚠ **Down from 366 (236 + 130) on 2026-09-03: 188 files pruned in five days**, which is D-18 being carried out rather than drift | `ls docs/logs \| wc -l` · `ls docs/plans \| wc -l` |
+| Merged PRs | **512** · first merge PR #1, 2026-04-23 · newest **`#537`** `0f3931c6` | `gh pr list --state merged --limit 700 --json number --jq length` |
+| `docs/logs/` + `docs/plans/` | **196** (96 + 100) — the corpus `docs/records/` replaces | `ls docs/logs \| wc -l` · `ls docs/plans \| wc -l` |
 
 ---
 
@@ -43,7 +46,7 @@ sixteen rows below stale in five days**, and two of them were stale by a whole m
 |---|---|---|
 | Auth, identity, onboarding | [`records/AUTH-record.md`](records/AUTH-record.md) | **SHIPPED** |
 | Debate, moderation, ranking | [`records/DEBATE-record.md`](records/DEBATE-record.md) | **SHIPPED** |
-| Participant surfaces | [`records/SURFACES-record.md`](records/SURFACES-record.md) | **SHIPPED** — mobile BUILT on every read surface. The one open piece is **PR #517** (draft): `/m/[slug]`'s phone tier plus, since MOBILE-2e, the phone view of `/u/[pseudonym]`. Five refinement rounds have landed on it (MOBILE-2 · 2b · 2c · 2d · 2e); it is the last surface before the open |
+| Participant surfaces | [`records/SURFACES-record.md`](records/SURFACES-record.md) · [`records/MOBILE-2-close-out.md`](records/MOBILE-2-close-out.md) | **SHIPPED** — mobile BUILT on every read surface, and the phone lane is **CLOSED**. Sixteen runs (MOBILE-2 → 2o, plus the 2z close-out), ADR-0051 **A1–A12**. ⚠ **PR #517 is no longer the open piece and has not been since 2026-09-13**, when it merged at `9e12fb0d` with a merge commit and the lane kept going on the same branch. What is open is **PR #536**: the last three rounds and the close-out, 25 files, **no file under `src/server/**`, `drizzle/**`, `src/db/**` or auth**, desktop measured identical to `origin/main` at ≥640 on both routes in both auth states |
 | Admin Control Centre | [`records/ADMIN-record.md`](records/ADMIN-record.md) | **SHIPPED** |
 | Platform, deploy, observability | [`records/PLATFORM-record.md`](records/PLATFORM-record.md) | **SHIPPED** — production not promoted |
 | Scale programme | [`records/SCALE-record.md`](records/SCALE-record.md) | **PARTIAL** — S-5 unmerged |
@@ -52,34 +55,35 @@ sixteen rows below stale in five days**, and two of them were stale by a whole m
 
 ---
 
-## §3 · Go-live status — measured today, inherited from no tracker
+## §3 · Go-live status — SHA and health re-measured 2026-09-15 11:21 IST
 
-| | Staging | Production |
-|---|---|---|
-| Served SHA | **`da9979b9`** = `origin/main` = `origin/staging` | **`a61859a`** — 2026-07-02, **356 commits behind `main`** |
-| `/api/health` | `env:staging · region:bom1 · db:ok · migrations:ok` | `env:prod · db:ok · migrations:ok` · **no `region` key** |
-| Migrations applied | **31 / 31** — `IN SYNC ✓` | **20 / 31** — ⛔ `DRIFT ✗`, eleven behind |
-| `identity_pool` total / unassigned | 871 / **861** | ⛔ **0 / 0** |
-| `users` | 10 | ⛔ **0** |
-| `markets` | 23 — 15 `Open`, 7 content + 8 fixture families | ⛔ **0** |
-| `comments` / `bets` | **56 / 56** | 0 / 0 |
+⛔ **THE SITE IS LIVE.** The open was this morning. Production is no longer the July build this
+section described; it serves `origin/main`'s own tip, in `bom1`, with migrations reporting `ok`.
 
-✅ **`comments` = `bets` exactly.** INV-1 — no bet without a comment, no comment without a bet —
-holding on live data.
+| | Staging | Production | Branch `feat/mobile-2-market-detail` |
+|---|---|---|---|
+| Served SHA | **`0f3931c6`** = `origin/staging` — `Feat/admin UI (#537)` | **`a7bf4d2d`** = `origin/main` — `#531`, the error-boundary reporting | — |
+| `/api/health` | `env:staging · region:bom1 · db:ok · migrations:ok` | `env:prod · region:bom1 · db:ok · migrations:ok` | — |
+| vs `origin/main` | **48 ahead, 1 behind** — it carries the whole MOBILE-2 lane through `89a80281` plus #537, and lacks `a7bf4d2d` | — | **49 ahead, 0 behind** |
+| vs the branch | **1 / 1** — staging has #537, the branch has the close-out | — | tip **`f55d738f`** |
+| Migrations ahead of production | — | **none** — `git diff --name-only a7bf4d2d..HEAD -- drizzle/ src/db/` is **EMPTY** | — |
 
-⚠ **The staging figures are DELIBERATELY SMALLER than the 2026-09-03 generation's, and that is
-not a regression.** `LIQ-1-SOAK-CLOSE` rebuilt the replica from scratch under the final LIQ-1
-code: the reset truncated the fixture surface and re-seeded `identity_pool` at its 871
-deterministic tuples, the generator rebuilt the fixture set, and the eight content markets were
-recreated through the shipped admin engine. **`users` 321 → 10 and `comments`/`bets` 1,692 → 56
-are the rebuild, not attrition.** The `markets` count went the other way (12 → 23) because the
-fixture families grew.
+⚠ **`origin/main` and `origin/staging` BOTH MOVED DURING the close-out run** — main gained `#531`
+at 11:20 and staging gained `#537` at 12:01, between this session's first fetch and its last. Both
+are recorded as measured rather than reasoned about (`O-14`); the branch was caught up on `main`
+in the same run, and the desktop wall was re-measured against the new base rather than carried.
 
-⛔ **Production is empty, ELEVEN migrations behind, and serving a build from 2 July.** Three
-separate gaps on one database, seven days out. None is a defect in shipped code; all three are
-work not yet done. `docs/runbooks/deploy-pipeline.md` §3 owns the sequence — and §2 of it was
-corrected at PR #500, because the check it told you to run could not tell the two outcomes
-apart.
+⛔ **Staging cannot be fast-forwarded to the branch tip, and was NOT forced.** #537 is on staging
+and not on the branch; reaching the close-out brief's `0 0` condition would mean either absorbing
+another lane's admin-UI work into PR #536 — scope this run was not given — or a force-push, which
+its walls forbid outright. The lane's own code has been on staging since `89a80281`; what staging
+lacks is this close-out's **documentation**, which changes no build. Recorded as the one gate of
+the close-out that did not pass, and why.
+
+⚠ **The database rows this section used to carry — `identity_pool`, `users`, `markets`,
+`comments`/`bets` on both environments — were NOT re-measured at this pass** and are deliberately
+not reproduced here rather than carried forward stale. This run is read-only on staging by its own
+brief and touches production not at all. The 2026-09-08 figures are in this file's history.
 
 ---
 

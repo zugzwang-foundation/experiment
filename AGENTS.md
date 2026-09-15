@@ -95,6 +95,21 @@ experiment/
 │   │                               #   onboarding/, BOTH had dropped legal/, and main's
 │   │                               #   still named bookmarks/ after ADR-0040 deleted it.
 │   │                               #
+│   │                               #   shell/ gained TWO files at MOBILE-2's round ten
+│   │                               #   (ADR-0051 A10 D-5) and `ls src/components/shell/`
+│   │                               #   is the claim: GitHubIconControl.tsx — the phone's
+│   │                               #   only route to the repository, because the desktop
+│   │                               #   GitHubStars control lives inside the wrapper that
+│   │                               #   hides below 640 — and header-control.ts, which is
+│   │                               #   NOT a component: it is the 34x34 icon-button
+│   │                               #   register lifted out of HeaderNav.tsx so that two
+│   │                               #   controls wear ONE string rather than two literals
+│   │                               #   that agree today. ⛔ A plain .ts module and not an
+│   │                               #   export from HeaderNav, because that file is
+│   │                               #   "use client" and importing a VALUE out of a client
+│   │                               #   module into a Server Component makes it a client
+│   │                               #   reference instead of inlining the string.
+│   │                               #
 │   │                               #   debate/ gained five components at HTML-FINISH ·
 │   │                               #   MARKET DETAIL: HeadZone (the arm-scoped two-column
 │   │                               #   header frame), MarketMediaPanel, FocusMarketCard

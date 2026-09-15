@@ -202,6 +202,32 @@ from the plan (Job A self-critique #15):
 **fourth** file to hide behind. A token census gets less informative with each
 addition, not more.
 
+### MOBILE-2z (2026-09-15) — close-out: four rows discharged, two minted
+
+**Discharged by MOBILE-2z:**
+
+- **`2o-1`** — ⛔ **CLOSED by founder ruling, 2026-09-15.** The row asked a founder to pick one of
+  four ways to fit a second off-site control. The answer is the fourth: *the phone gets one
+  off-site control and X is not it.* ADR-0051 **A12 D-1** withdraws A11 D-4, A11 D-4 now carries
+  the marker saying so, and the four X-1 files stay reverted. The 27.12px overlap at 360 signed out
+  is kept in the record as the measurement that decided it, not as an open defect.
+- **`2n-3`**, **`2n-6`**, **`2o-5`** — ✅ **CLOSED by ADR-0051 A12 D-2.** All three are the same
+  request, made three rounds running and refused three times because each round's prescriptive wall
+  authorised its own amendment verbatim and nothing else: *an amendment that reverses an earlier one
+  must say so where the earlier one is read.* A12 D-2 is that rule, and the fifteen in-place markers
+  are it being carried out. ⚠ **`2n-6` named `A9 D-1` among the sentences needing a marker and it
+  did not get one**, deliberately: A10 D-3 (which superseded it) was **withdrawn** on the evening of
+  09-14 and the footer's ground restored byte-for-byte, so A9 D-1 is true again. A marker there
+  would have outlived the finding by propagating it past its own fix. ⚠ `2n-3`'s *substance* — that
+  A10 D-2 carries no width qualifier, so the parent-post sheet's boxed card still shows a 14px solid
+  pill — is **not** thereby fixed; it is the same missing four words `2n-8` records on the desktop,
+  and both remain open as week-one items.
+
+| # | what | why it is parked and not fixed |
+|---|---|---|
+| **2z-1** | ⛔⛔ **A BROWSER HARNESS'S SIGNED-IN ARM CAN BE SIGNED OUT, AND EVERY NUMBER IT RETURNS IS STILL PLAUSIBLE.** `~/Downloads/zz_MOBILE-2o_qa/session-cookie.json` carried an expired session, so `withPage({signedIn: true})` rendered the signed-out tree. The first B1-p capture of this close-out therefore measured **one auth state twice while reporting two** — eight runs, zero errors, a clean diff. **The tell was in the output and nothing was looking at it:** node counts were IDENTICAL across the two arms (281/281 at 1440, 190/190 on the profile), and a header carrying a Đ cluster and an avatar cannot equal one carrying `JOIN`. After minting a fresh session the arms separate — 296/281 and 208/190 — which is the positive control the run had been missing. | **Fixed in-run and the whole wall re-captured**, so nothing is owed on the measurement. What is parked is the HARNESS: `lib.mjs`'s `settle()` throws on fonts, on stylesheet count, on un-revealed Suspense boundaries, on the canary, on `innerWidth` and on the phone-variant probe — **and asserts nothing about the session it was given**. ⇒ One line in `settle()` would close it: when `signedIn` is true, require an authenticated marker in the DOM (`identity-chip-link`) and throw otherwise. It is not added here because the harness lives outside the repository (`~/Downloads`), which is where this lane's standing rule puts it, and a fix there is not a commit. `O-13`, on a cookie rather than an endpoint. |
+| **2z-2** | ⚠ **THE COMPOSER'S STAKE FIELD IS A 24 × 30 TAP TARGET ON THE PHONE, AND IT IS THE DESKTOP'S OWN.** The B7 census reads `aria-label="Stake amount"` at **23.98 × 30** at 360 and 390, inside the open composer sheet — well under the 44px floor every other control on this tier clears. | **Not this lane's geometry, and that is measurable rather than argued:** the input's class chain (`h-auto border-none p-0 text-right font-mono text-[20px] …`) carries **no `max-mobile:` token**, and its width comes from an inline `stakeFieldWidth(amount)` style, so it renders identically at every width — it is the desktop `BetComposer`'s borderless figure, reused unchanged exactly as ADR-0051 D-1 requires. ⇒ Giving it a floor is a change to a shared composer at both widths, which is a desktop decision and belongs to a round scoped for one. Named here so the next B7 census does not read it as new. |
+
 ### MOBILE-2c (2026-09-12) — the fourth firing, and the census disagrees with the row below it
 
 **Re-run at commit time with the command stated, never copied.** The pattern is
