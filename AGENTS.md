@@ -96,15 +96,24 @@ experiment/
 │   │                               #   still named bookmarks/ after ADR-0040 deleted it.
 │   │                               #
 │   │                               #   shell/ gained TWO files at MOBILE-2's round ten
-│   │                               #   (ADR-0051 A10 D-5) and `ls src/components/shell/`
-│   │                               #   is the claim: GitHubIconControl.tsx — the phone's
-│   │                               #   only route to the repository, because the desktop
-│   │                               #   GitHubStars control lives inside the wrapper that
-│   │                               #   hides below 640 — and header-control.ts, which is
-│   │                               #   NOT a component: it is the 34x34 icon-button
-│   │                               #   register lifted out of HeaderNav.tsx so that two
-│   │                               #   controls wear ONE string rather than two literals
-│   │                               #   that agree today. ⛔ A plain .ts module and not an
+│   │                               #   (ADR-0051 A10 D-5) and LOST ONE OF THEM at
+│   │                               #   MOBILE-3a; `ls src/components/shell/` is the claim.
+│   │                               #   ⛔ GitHubIconControl.tsx IS GONE — ADR-0051 A13 D-1
+│   │                               #   withdraws the phone's GitHub control (and A12 D-1's
+│   │                               #   "one off-site control" with it) to make room for the
+│   │                               #   freeze countdown on the 360px row, so the file is
+│   │                               #   deleted rather than left unmounted. The repository is
+│   │                               #   reachable at >=640 through GitHubStars and from
+│   │                               #   nowhere below it, which is the ruling rather than an
+│   │                               #   oversight. header-control.ts SURVIVES and is NOT a
+│   │                               #   component: it is the 34x34 icon-button register
+│   │                               #   lifted out of HeaderNav.tsx so that two controls wear
+│   │                               #   ONE string rather than two literals that agree today.
+│   │                               #   ⚠ It now has ONE consumer rather than two, which is a
+│   │                               #   reason to leave it alone and not a reason to inline
+│   │                               #   it back: Home and Back are both still in it, and the
+│   │                               #   next control to want the register is why it exists.
+│   │                               #   ⛔ A plain .ts module and not an
 │   │                               #   export from HeaderNav, because that file is
 │   │                               #   "use client" and importing a VALUE out of a client
 │   │                               #   module into a Server Component makes it a client

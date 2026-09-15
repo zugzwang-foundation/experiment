@@ -1,7 +1,9 @@
 # STATE — where Zugzwang is
 
 **Generated** 2026-09-08 · **§1, §2's Surfaces row and §3 re-measured 2026-09-15** at the
-MOBILE-2 close-out, from `origin/main` @ `a7bf4d2d24c3a544cade07f0ebaf34be0a0fb393`
+MOBILE-2 close-out, from `origin/main` @ `a7bf4d2d24c3a544cade07f0ebaf34be0a0fb393`;
+**§1 and §2's Surfaces row re-measured again 2026-09-15** at MOBILE-3a, from
+`origin/main` @ `995d09eb2515c5964372c50fd631aaa0a664ca11`
 **Regenerate** per `docs/records/README.md` · **Lane detail** in `docs/records/`
 ⛔ **Go-live was 2026-09-15 — TODAY. The site is LIVE**: production serves `a7bf4d2d` with
 `env:prod · region:bom1 · db:ok · migrations:ok`, read at 11:21 IST. Every section below that
@@ -29,8 +31,8 @@ sixteen rows below stale in five days**, and two of them were stale by a whole m
 | **cpmm.md** | **4.0.0** | same shape |
 | **Migration head** | **`0030_liquidity_revoke_app_roles`** · 31 `.sql` files · journal 31 entries | `ls drizzle/migrations/*.sql \| sort \| tail -1` |
 | **`EVENT_TYPES`** | **25** — `pool.liquidity_added` added by ADR-0047 | `awk '/export const EVENT_TYPES = \[/,/\] as const;/' … \| grep -cE '^\s+"'` |
-| **Test files** | **555** — unit 301 · server 162 · integration 36 · db 25 · invariants 13 · scale 8 · staging 10 | `find tests -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' \) \| wc -l` |
-| Suite actually run by `vitest run` | **537** (536 passed, 1 skipped) — `tests/scale/**` and `tests/staging/**` are config-excluded | `pnpm vitest run` |
+| **Test files** | **557** — unit 303 · server 162 · integration 36 · db 25 · invariants 13 · scale 8 · staging 10 ⚠ re-measured at MOBILE-3a: two phone-header guards minted, one retired with the control it guarded (ADR-0051 A13 D-1) | `find tests -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' \) \| wc -l` |
+| Suite actually run by `vitest run` | **537** (536 passed, 1 skipped) at the MOBILE-2 close-out ⚠ NOT re-measured at MOBILE-3a, which ran `tests/unit/` only (303 files, 4,100 tests, green) and left the full suite to CI — the local DB was down, so anything under `tests/db/` and `tests/integration/` was unreachable | `pnpm vitest run` |
 | **Invariant specs** | **13** | `ls tests/invariants/ \| wc -l` |
 | **O-space** | **O-15** | `grep -oE '\*\*O-[0-9]+ ·' CLAUDE.md \| sort -u -t- -k2 -n \| tail -1` |
 | **V-space** | **V-21** ⚠ `V-15` is deliberately reserved; `V-22` appears only in a sentence saying a row does *not* take it | `grep -oE '\*\*V-[0-9]+ ·' docs/polish/POLISH-0_data-manifest.md \| …` |
@@ -46,7 +48,7 @@ sixteen rows below stale in five days**, and two of them were stale by a whole m
 |---|---|---|
 | Auth, identity, onboarding | [`records/AUTH-record.md`](records/AUTH-record.md) | **SHIPPED** |
 | Debate, moderation, ranking | [`records/DEBATE-record.md`](records/DEBATE-record.md) | **SHIPPED** |
-| Participant surfaces | [`records/SURFACES-record.md`](records/SURFACES-record.md) · [`records/MOBILE-2-close-out.md`](records/MOBILE-2-close-out.md) | **SHIPPED** — mobile BUILT on every read surface, and the phone lane is **CLOSED**. Sixteen runs (MOBILE-2 → 2o, plus the 2z close-out), ADR-0051 **A1–A12**. ⚠ **PR #517 is no longer the open piece and has not been since 2026-09-13**, when it merged at `9e12fb0d` with a merge commit and the lane kept going on the same branch. What is open is **PR #536**: the last three rounds and the close-out, 25 files, **no file under `src/server/**`, `drizzle/**`, `src/db/**` or auth**, desktop measured identical to `origin/main` at ≥640 on both routes in both auth states |
+| Participant surfaces | [`records/SURFACES-record.md`](records/SURFACES-record.md) · [`records/MOBILE-2-close-out.md`](records/MOBILE-2-close-out.md) | **SHIPPED** — mobile BUILT on every read surface, and the phone lane is **CLOSED**. Sixteen runs (MOBILE-2 → 2o, plus the 2z close-out), ADR-0051 **A1–A13**. ⚠ **AND THE LANE BEING CLOSED DID NOT MEAN THE PHONE TIER STOPPED MOVING** — **A13 (MOBILE-3a, 2026-09-15)** is a header round after the close-out: the freeze countdown returns to the phone header on the tick `BrandCluster` already owns, GitHub leaves the tier, and the logo rejoins the flow (withdrawing A9 D-3 below 640). It carries a recorded residual at the 360px floor, `docs/parked.md` **3a-1**, on which a founder ruling is owed. ⚠ **PR #517 is no longer the open piece and has not been since 2026-09-13**, when it merged at `9e12fb0d` with a merge commit and the lane kept going on the same branch. **PR #536** carried the last three rounds and the close-out |
 | Admin Control Centre | [`records/ADMIN-record.md`](records/ADMIN-record.md) | **SHIPPED** |
 | Platform, deploy, observability | [`records/PLATFORM-record.md`](records/PLATFORM-record.md) | **SHIPPED** — production not promoted |
 | Scale programme | [`records/SCALE-record.md`](records/SCALE-record.md) | **PARTIAL** — S-5 unmerged |
