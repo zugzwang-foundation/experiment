@@ -293,10 +293,16 @@ export function ReplyPopup({
 	 * Absent on the desktop openers, so the desktop markup is byte-identical.
 	 */
 	tier,
+	postOrdinal = null,
 }: {
 	reply: PresentReply | null;
 	onClose: () => void;
 	tier?: "phone" | undefined;
+	/**
+	 * REPLY-IMAGE-EXPORT — the parent post's ordinal, enabling the download
+	 * mark exactly as it does on `ReplyCard`. `null` under a removed parent.
+	 */
+	postOrdinal?: number | null;
 }) {
 	const scrollRef = useScrollTopOnOpen(reply !== null);
 	return (
@@ -336,6 +342,11 @@ export function ReplyPopup({
 										originalStake={reply.stakeOriginal}
 										sold={reply.sold}
 										createdAt={reply.createdAt}
+										download={
+											postOrdinal === null
+												? undefined
+												: { ordinal: postOrdinal, reply: reply.ordinal }
+										}
 									/>
 								</div>
 							</DialogDescription>

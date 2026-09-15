@@ -192,6 +192,8 @@ export function newReply(over: {
 	return {
 		removed: false,
 		id: over.id,
+		ordinal: 1,
+		title: "",
 		side: over.side,
 		createdAt: "2026-09-18T09:05:00.000Z",
 		body: BODY,

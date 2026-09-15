@@ -84,6 +84,32 @@ describe("DownloadPostImage", () => {
 		expect(postImageHref("a b", 1)).toBe("/m/a%20b/export/image?post=1");
 	});
 
+	it("REPLY-IMAGE-EXPORT — a reply's route and file carry its ordinal within the post", () => {
+		expect(postImageHref(SLUG, 3, 2)).toBe(
+			"/m/test-market/export/image?post=3&reply=2",
+		);
+		expect(postImageFilename(SLUG, 3, 2)).toBe(
+			"test-market-post-3-reply-2.jpg",
+		);
+	});
+
+	it("REPLY-IMAGE-EXPORT — a reply's mark fetches the reply route and names itself for a reply", async () => {
+		fetchMock.mockResolvedValue(jpegResponse());
+		const { container } = render(<DownloadPostImage ordinal={3} reply={2} />);
+		const b = container.querySelector<HTMLButtonElement>(
+			'button[aria-label="Download reply image"]',
+		);
+		if (b === null) throw new Error("no reply download button");
+		await act(async () => {
+			fireEvent.click(b);
+		});
+		await flush();
+		expect(fetchMock.mock.calls[0]?.[0]).toBe(
+			"/m/test-market/export/image?post=3&reply=2",
+		);
+		expect(anchorClicks).toEqual(["test-market-post-3-reply-2.jpg"]);
+	});
+
 	it("is enabled under a route and fetches, then saves the JPEG under its name", async () => {
 		let release: (r: Response) => void = () => {};
 		fetchMock.mockReturnValue(

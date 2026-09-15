@@ -75,6 +75,8 @@ function mkReply(o: {
 	return {
 		removed: false,
 		id: o.id ?? `reply-${o.pseudonym ?? "x"}`,
+		ordinal: 1,
+		title: "",
 		side: o.side,
 		createdAt: o.createdAt ?? "2026-05-20T08:00:00.000Z",
 		body: o.body ?? "A staked reply argument.",
@@ -100,6 +102,7 @@ function mkRemovedReply(o: {
 	return {
 		removed: true,
 		id: o.id ?? "reply-removed",
+		ordinal: 1,
 		side: o.side,
 		createdAt: o.createdAt ?? "2026-05-20T08:00:00.000Z",
 	};

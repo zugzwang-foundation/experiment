@@ -12,6 +12,10 @@
 | **Amends** | ADR-0025 — the `.md` export is no longer the only way a debate leaves the product |
 | **Amended-by** | — |
 
+## Patch record
+
+**P1 (2026-09-15, REPLY-IMAGE-EXPORT).** In-place Patch record per CLAUDE.md §5.12 (consumer-surface scoping, **not** supersession). **The decision is unchanged** — one server-rendered JPEG per argument through the same route, mapper and composition. **Extended to replies:** `GET /m/[slug]/export/image?post=<N>&reply=<M>`, where `M` is the reply's 1-based `(created_at, id)` ordinal **within post `N`**, removed replies keeping their slot — the post ordinal's own rule, scoped to a post, so no UUID reaches a participant URL (ADR-0016 D6). It is carried on `DebateReply.ordinal` so the download mark and the route read one number. A malformed, absent or removed reply — or any reply under a **removed** post — is a 404, and such a reply shows no download mark, because the reply image prints the parent's title (SC-1). In a reply's image the post's Support/Counter split row is replaced, in the same box, by `Replied as SUPPORT to -` (the relation word green / red) over the parent's title in bold ink, sized so a 125-character title fits two lines; nothing else in the composition moves. Plan: `docs/plans/REPLY-IMAGE-EXPORT.md`.
+
 ---
 
 ## Context and Problem Statement

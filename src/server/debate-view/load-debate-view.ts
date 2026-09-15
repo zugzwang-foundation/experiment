@@ -78,12 +78,34 @@ export type ReplyAggregate = {
 };
 
 export type DebateReply =
-	| { removed: true; id: string; side: Side; createdAt: string }
+	| {
+			removed: true;
+			id: string;
+			/**
+			 * REPLY-IMAGE-EXPORT — the reply's permanent 1-based ordinal WITHIN its
+			 * post: `(created_at, id)` ascending over the post's replies, removed
+			 * INCLUDED (append-only ⇒ permanent), exactly the rule `DebatePost.ordinal`
+			 * applies to posts. It is how `?post=N&reply=M` addresses a reply without
+			 * a UUID in the URL (ADR-0016 D6). Carried on both variants so a removed
+			 * reply keeps its slot.
+			 */
+			ordinal: number;
+			side: Side;
+			createdAt: string;
+	  }
 	| {
 			removed: false;
 			id: string;
+			/** REPLY-IMAGE-EXPORT — see the removed variant. */
+			ordinal: number;
 			side: Side;
 			createdAt: string;
+			/**
+			 * REPLY-IMAGE-EXPORT — the reply's title line, through the SAME
+			 * `deriveTitleTeaser` posts use (a reply is composed as title + optional
+			 * extended text). The image export quotes this and never the body.
+			 */
+			title: string;
 			body: string;
 			marker: Marker;
 			author: AuthorIdentity;
@@ -363,6 +385,19 @@ export async function loadDebateView(
 		.forEach((c, i) => {
 			ordinalById.set(c.id, i + 1);
 		});
+	// REPLY-IMAGE-EXPORT — the same rank, scoped to each post's replies. The same
+	// Postgres order is what makes it congruent with the post ordinal above.
+	// ⚠ ITS OWN MAP: a reply rank is not a post rank, and one map holding both
+	// would let a future `?post=` link be built from a reply's number.
+	const replyOrdinalById = new Map<string, number>();
+	const replyCountByParent = new Map<string, number>();
+	for (const c of comments) {
+		if (c.parentCommentId !== null) {
+			const n = (replyCountByParent.get(c.parentCommentId) ?? 0) + 1;
+			replyCountByParent.set(c.parentCommentId, n);
+			replyOrdinalById.set(c.id, n);
+		}
+	}
 
 	const posts: DebatePost[] = ordered.map((sub) => {
 		const comment = commentById.get(sub.id);
@@ -388,6 +423,7 @@ export async function loadDebateView(
 			removedSet,
 			authorMap,
 			imageUrlByComment,
+			replyOrdinalById,
 		);
 
 		// Defensive 0 only on the unreachable no-comment branch (the substrate
@@ -596,6 +632,7 @@ function buildReplyGroups(
 	removedSet: Set<string>,
 	authorMap: Map<string, AuthorIdentity>,
 	imageUrlByComment: Map<string, string>,
+	replyOrdinalById: Map<string, number>,
 ): ReplyGroups {
 	const ranked = rankReplies(replyMap.get(post.id) ?? [], post.parentSide);
 	const slot = twoSlot(ranked);
@@ -606,6 +643,7 @@ function buildReplyGroups(
 			removedSet.has(sub.id),
 			authorMap,
 			imageUrlByComment,
+			replyOrdinalById.get(sub.id) ?? 0,
 		);
 	return {
 		support: ranked.support.map(toReply),
@@ -621,11 +659,13 @@ function buildReply(
 	removed: boolean,
 	authorMap: Map<string, AuthorIdentity>,
 	imageUrlByComment: Map<string, string>,
+	ordinal: number,
 ): DebateReply {
 	if (removed || !comment) {
 		return {
 			removed: true,
 			id: sub.id,
+			ordinal,
 			side: sub.side,
 			createdAt: sub.createdAt.toISOString(),
 		};
@@ -633,8 +673,10 @@ function buildReply(
 	return {
 		removed: false,
 		id: sub.id,
+		ordinal,
 		side: sub.side,
 		createdAt: comment.createdAt.toISOString(),
+		title: deriveTitleTeaser(comment.body).title,
 		body: comment.body,
 		marker: comment.marker,
 		author: authorMap.get(comment.userId) ?? UNKNOWN_AUTHOR,
