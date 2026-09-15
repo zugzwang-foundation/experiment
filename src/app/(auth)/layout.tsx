@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import type { ReactNode } from "react";
 
-import { WarliHero } from "@/components/art/warli";
+import { FIELD_ASSET_HREF, WarliHero } from "@/components/art/warli";
 import { GlobalHeader } from "@/components/shell/GlobalHeader";
 import { PageContainer } from "@/components/shell/PageContainer";
 import { auth } from "@/server/auth";
@@ -158,6 +158,25 @@ export default async function AuthLayout({
 			    fix that stays inside the node this task owns: it touches neither
 			    `hero.tsx` nor the `<WarliHero>` call, and the art layer's own
 			    tests mount `<WarliHero />` bare, so none of them observes it. */}
+			{/* WARLI-FIELD-ASSET — the artwork's static field is a CSS background
+			    on the hero, and a CSS background is discovered only once the
+			    stylesheet and the hero have been parsed. React 19 hoists this
+			    `<link>` into `<head>`, so the file starts downloading beside the
+			    document and the field paints with the rings rather than a beat
+			    behind them; on a repeat visit it is served from the immutable
+			    cache and the hint costs nothing.
+
+			    ⚠ A `<link>` ELEMENT, NOT `preload()` FROM `react-dom`. The
+			    function form was tried first, called from this server layout, and
+			    emitted NOTHING — no `<link>` in the HTML, no `HL` hint in the
+			    flight data (measured on a local `next start`). It could not move
+			    into `hero.tsx` either: the art layer is sealed to `react` alone. */}
+			<link
+				rel="preload"
+				as="image"
+				href={FIELD_ASSET_HREF}
+				fetchPriority="high"
+			/>
 			<div
 				aria-hidden="true"
 				className="pointer-events-none fixed inset-0 -z-10 grid place-items-center"

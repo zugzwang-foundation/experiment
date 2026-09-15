@@ -54,7 +54,10 @@
 import { writeFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { MOTIF_RENDERERS } from "../src/components/art/warli/field-layer";
+import {
+	FieldLayer,
+	MOTIF_RENDERERS,
+} from "../src/components/art/warli/field-layer";
 import {
 	FIELD_FIGURES,
 	Figure,
@@ -78,7 +81,19 @@ if (out === undefined) {
 	throw new Error("usage: tsx scripts/warli-preview.tsx <output.html>");
 }
 
-const art = renderToStaticMarkup(<WarliHero />);
+// ⚠ WARLI-FIELD-ASSET — the shipped hero paints its static field as a CSS
+// background loaded from `/art/warli-field.svg`, a URL a double-clicked file
+// cannot resolve. So the preview puts the same component back inline, right
+// after the hero's `<style>` — the paint position it held before it became a
+// file. Throws rather than shipping a preview with no field.
+const heroMarkup = renderToStaticMarkup(<WarliHero />);
+if (heroMarkup.split("</style>").length !== 2) {
+	throw new Error("warli-preview: expected exactly one </style> in the hero");
+}
+const art = heroMarkup.replace(
+	"</style>",
+	`</style>${renderToStaticMarkup(<FieldLayer />)}`,
+);
 
 /**
  * Escape a value on its way into raw HTML.
