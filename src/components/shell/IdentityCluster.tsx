@@ -72,7 +72,31 @@ export function IdentityCluster({
 		return (
 			<Link
 				href="/sign-in"
-				className="flex h-[34px] shrink-0 items-center rounded-(--r) bg-ink px-5 text-xs font-bold tracking-[0.12em] text-ground uppercase outline-none select-none [transition:all_var(--dur-hover)] hover:bg-n7 active:bg-n6 focus-visible:shadow-(--state-focus-ring)"
+				/* ⛔⛔ ADR-0051 A13 D-4 — JOIN YIELDS FIRST, AND THAT IS A FOUNDER
+				   RULING RATHER THAN A CHOICE THIS COMPONENT MADE. The phone row has
+				   to hold home, rules, the logo, a countdown and this control inside
+				   312px of content box at 360, and the ladder's first rung is this
+				   control's padding, height and type. Everything here is ADDITIVE and
+				   `max-mobile:`-scoped: the ≥640 CTA takes zero diff.
+				   ⛔ THE CTA STILL NEVER HIDES. ADR-0048 is untouched — a phone
+				   participant may join, so this branch renders at every width on every
+				   route. A13 makes it SMALLER TO THE EYE and this file's previous
+				   zero-diff rule is what that supersedes; it does not reopen hiding.
+				   ⛔⛔ AND IT IS NOT SMALLER TO THE THUMB. A 30px box is 14px under the
+				   44px floor, so the region is bought back by a transparent `::after`
+				   at the hit-testing layer — `TriggerPill`'s and the retired
+				   `GitHubIconControl`'s shape — which leaves the PAINTED box at 30px
+				   and the TAPPABLE box at 44. `-inset-[7px]` is 30 + 2×7 exactly;
+				   there is no border to subtract, unlike the icon register.
+				   ⚠ `leading-none` IS NOT DECORATION. An arbitrary `text-[11px]` does
+				   NOT reset the line-height it inherits from the `text-xs` step beside
+				   it (AGENTS.md §8), so without it the type is 11px on 16px leading
+				   inside a 30px box, and the control silently grows back. */
+				className={cn(
+					"flex h-[34px] shrink-0 items-center rounded-(--r) bg-ink px-5 text-xs font-bold tracking-[0.12em] text-ground uppercase outline-none select-none [transition:all_var(--dur-hover)] hover:bg-n7 active:bg-n6 focus-visible:shadow-(--state-focus-ring)",
+					mobileResponsive &&
+						"max-mobile:relative max-mobile:h-[28px] max-mobile:px-[5px] max-mobile:text-[10px] max-mobile:leading-none max-mobile:after:absolute max-mobile:after:-inset-[8px] max-mobile:after:content-['']",
+				)}
 			>
 				JOIN
 			</Link>
