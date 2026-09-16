@@ -161,36 +161,94 @@ describe("A13 D-1 — GitHub leaves the phone, and the desktop keeps it", () => 
 	});
 });
 
-describe("A13 D-2 — the countdown is mounted alone below 640", () => {
-	it("phone-a13::the-digits-render-below-640-and-carry-no-wordmark", () => {
+describe("A13 D-2 — the brand block is mounted below 640", () => {
+	it("phone-a13::the-phone-block-is-wordmark-OVER-digits", () => {
+		// ⚠⚠ INVERTED, NEVER DELETED — the WARLI-MOUNT precedent this file's own
+		// header paragraph already invokes for the GitHub row above. This row read
+		// `the-digits-render-below-640-and-carry-no-wordmark` and asserted the
+		// wordmark's ABSENCE, on A13 D-2's reading that the wordmark was the
+		// header's biggest reflow cost at this tier. Measurement says it costs
+		// nothing: row 1 is eight letters over eight characters at ONE cell width,
+		// so the block is the same 106px the digits occupied alone, inside the same
+		// 62px band. The ruling reversed, so the assertion is turned round rather
+		// than removed — a deleted guard proves nothing in either direction, while
+		// an inverted one reddens the moment somebody drops the row again.
+		//
+		// ⛔ THE ROWS ARE LOCATED BY WHAT THEY CONTAIN, NEVER BY INDEX. `children[0]`
+		// and `children[1]` pass unchanged on a block that has them the wrong way
+		// round — digits over letters is a real regression with a real cause (the
+		// `-mt-px` collapse assumes row 2 is the one carrying it) and an index-ordered
+		// assertion is blind to exactly that.
 		const root = header();
 		const cd = root.querySelector('[data-testid="phone-countdown"]');
-		expect(cd, "no phone countdown in the header").not.toBeNull();
-		// DIGITS ONLY. The desktop lockup is wordmark-over-digits; A13 D-2 mounts
-		// the digit row alone, so a wordmark inside this node means the phone got
-		// the whole cluster rather than the countdown.
+		expect(cd, "no phone brand block in the header").not.toBeNull();
+
+		const rows = [...(cd?.children ?? [])];
+		expect(
+			rows.length,
+			"the phone brand block is not two rows. It is the 2×8 chessboard at the " +
+				"phone cell — a wordmark row over a digit row.",
+		).toBe(2);
+
+		const letters = rows.find((r) =>
+			/^[A-Z]+$/.test((r.textContent ?? "").trim()),
+		);
+		const digits = rows.find((r) =>
+			/^[\d:]+$/.test((r.textContent ?? "").trim()),
+		);
+		expect(
+			letters,
+			"no wordmark row inside the phone brand block. A13 D-2 dropped it here " +
+				"and that was reverted: the row is free horizontally and the band did " +
+				"not grow, so dropping it buys nothing and costs the brand.",
+		).toBeTruthy();
+		expect(digits, "no digit row inside the phone brand block").toBeTruthy();
+		expect(
+			(letters?.textContent ?? "").trim(),
+			"the phone wordmark row does not spell the mark.",
+		).toBe("ZUGZWANG");
+		expect(
+			rows.indexOf(letters as Element),
+			"the digit row is above the wordmark row. The lockup is wordmark-OVER-" +
+				"digits at every scale, and row 2 is the one that carries the negative " +
+				"margin collapsing the two hairlines into one.",
+		).toBe(0);
+
+		// ⛔ AND IT IS A SECOND SCALE, NOT THE DESKTOP NODE MOVED DOWN A TIER. The
+		// desktop block is dimensioned against a 48px mark and hides below 640; a
+		// `brand-cluster-text` in here would mean one node was re-parented across
+		// the breakpoint, which takes the ≥640 lockup with it.
 		expect(
 			cd?.querySelector('[data-testid="brand-cluster-text"]'),
-			"the phone countdown contains the desktop brand block.",
+			"the phone block contains the desktop brand block.",
 		).toBeNull();
+
 		// ⚠ THE CELL COUNT IS NOT A CONSTANT AND MUST NOT BE WRITTEN AS ONE. The
 		// ratified OQ-8 rule keys it off the string — 9 cells while days > 99, 8
 		// after — so a literal `8` here is a guard that reddens on a date rather
 		// than on a defect. What A13 D-2 rules is that the string ships AS-IS:
 		// one cell per character, no pair dropped.
-		// ⚠ AND THE SELECTOR IS THE ROW'S CHILDREN, NOT `span > span`. This node
-		// is itself a span wrapping the row span, so a descendant selector counts
-		// the row as one of its own cells and reads one too many.
-		const row = cd?.firstElementChild;
-		const cells = row?.children ?? [];
-		const display = (cd?.textContent ?? "").trim();
+		// ⚠ AND THE COUNT IS TAKEN OFF THE DIGIT ROW, NOT OFF `cd`. Since the
+		// wordmark landed, `cd.textContent` is `ZUGZWANG` + the clock, and a length
+		// read there compares 8 cells against 16 characters.
+		const display = (digits?.textContent ?? "").trim();
 		expect(
-			cells.length,
+			digits?.children.length,
 			"the phone countdown does not render one cell per character of the " +
 				"DD:HH:MM string. A13 D-2 ships the string as-is; dropping a pair is " +
 				"vetoed.",
 		).toBe(display.length);
 		expect(display.replace(/\d/g, "#")).toMatch(/^#{2,3}:##:##$/);
+
+		// ⛔ THE WORDMARK ROW IS EXACTLY AS WIDE AS THE DIGIT ROW IN CELLS ONLY
+		// WHILE DAYS < 100 — so this is deliberately NOT asserted. jsdom performs
+		// no layout and the equality that matters is in PIXELS, which the browser
+		// harness measures (block 37×106 at 320/375/430, both arms). Asserting 8
+		// === 8 here would look like that claim and would go red on 2026-11-06
+		// arithmetic rather than on a defect.
+		expect(letters?.children.length, "the wordmark is not eight letters").toBe(
+			8,
+		);
 	});
 
 	it("phone-a13::the-BASE-display-is-none-and-only-the-phone-arm-restores-it", () => {
