@@ -20,6 +20,7 @@ import { HeadZone } from "./HeadZone";
 import { MarketMediaPanel } from "./MarketMediaPanel";
 import { PriceBar } from "./PriceBar";
 import { ResolverCards } from "./ResolverCards";
+import { MARKET_TITLE_SIZE_OVERRIDES } from "./title-size-overrides";
 import type { DebateMarketHeader, Side } from "./types";
 
 const TERMINAL: ReadonlySet<string> = new Set([
@@ -449,9 +450,19 @@ export function MarketHeader({
 						    ⚠ A class-string reading could not have found this: every class
 						    involved was correct in isolation. It took a box measurement in a
 						    browser. */}
+							{/* ⚠ THE SIZE IS THE BASE, NOT NECESSARILY WHAT RENDERS. One
+						    market — founder-ruled, per market, NOT a length rule — steps
+						    this heading down a scale step so its full question fits the
+						    single line the truncation above leaves it. The exception lives
+						    in `title-size-overrides.ts` with the measurement that chose it;
+						    `cn` resolves the font-size and leading groups, so an absent slug
+						    renders the `text-[21px]` d5 ruled. */}
 							<h1
 								title={market.title}
-								className="shrink-0 truncate text-[21px] leading-[1.24] font-bold tracking-normal"
+								className={cn(
+									"shrink-0 truncate text-[21px] leading-[1.24] font-bold tracking-normal",
+									MARKET_TITLE_SIZE_OVERRIDES[market.slug],
+								)}
 							>
 								{market.title}
 							</h1>
