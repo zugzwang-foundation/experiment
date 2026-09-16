@@ -13,31 +13,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 //
 //   An unconditional rename — fails the production BUILD, because this module
 //   is imported by effectively every server surface, `next build` collects page
-//   data by importing them, and the read is at module scope. `prd` has no
-//   `DATABASE_URL_TXN`.
+//   data by importing them, and the read is at module scope. An environment
+//   that never minted `DATABASE_URL_TXN` would stop building.
 //
-// ⚠ The prod-refusal row is the reason this file is not optional. It is a guard
-// that never fires in practice, which is exactly the guard nobody notices when
-// it regresses — the only thing standing between a config mistake and prod
-// connecting through a pooler no record authorises (ADR-0024 P3 #8).
+// ⚠ Row 4 used to pin a PROD REFUSAL: transaction mode threw at boot when
+// ZUGZWANG_ENV=prod (ADR-0024 P3 #8). Production is now authorised for
+// transaction mode (ADR-0024 Patch P4, ADR-0038 P2), so row 4 is INVERTED
+// rather than deleted: prod with the flag must read DATABASE_URL_TXN, and prod
+// with the flag but no secret must still fail loudly without falling back.
 //
-// ⛔ BUT BE PRECISE ABOUT WHAT THESE ROWS ESTABLISH, because the obvious reading
-// claims more. `ZUGZWANG_ENV` is INLINED AT BUILD TIME by `next.config.ts`'s
-// `env` block, so in the deployed artifact the prod half of the guard is a
-// constant — it compiles to `"prod" === "prod"` for a production build, and to
-// DEAD CODE for any other. Under Vitest no inlining happens and these cases
-// mutate `process.env` at runtime. ⇒ they pin the SOURCE rule, NOT the shipped
-// artifact.
-//
-// That is sound today, for a reason recorded outside this file: the promoted
-// artifact is a production build (docs/runbooks/deploy-pipeline.md), and
-// `vercel promote` swaps an alias over a build that already carried
-// ZUGZWANG_ENV=prod — so the guard is live on every artifact that can serve the
-// production domain. The residual is forward-looking: if the promote path ever
-// promoted a staging- or preview-built artifact, the guard would vanish via
-// dead-code elimination and NOTHING HERE WOULD GO RED. A guard whose protection
-// rests on a deploy-pipeline property that no test observes is worth knowing the
-// shape of, even while the property holds.
+// ⛔ These rows pin the SOURCE rule, not the shipped artifact: `ZUGZWANG_ENV`
+// is inlined at build time by `next.config.ts`'s `env` block, while under
+// Vitest these cases mutate `process.env` at runtime.
 //
 // Approach: mock `postgres` so the module-load construction is captured rather
 // than performed (postgres.js is lazy, but a test must not depend on that), and
@@ -111,7 +98,7 @@ describe("DB_POOLER_MODE — the four rows", () => {
 
 	// ROW 1, the part that makes it load-bearing: prod must not merely PREFER
 	// the session URL, it must not REQUIRE the transaction one. An absent
-	// DATABASE_URL_TXN in prod is the correct steady state, not a failure.
+	// DATABASE_URL_TXN in a session-mode prod is a valid state, not a failure.
 	it("row 1 · prod does not require DATABASE_URL_TXN to exist", async () => {
 		delete process.env.DB_POOLER_MODE;
 		process.env.ZUGZWANG_ENV = "prod";
@@ -184,39 +171,36 @@ describe("DB_POOLER_MODE — the four rows", () => {
 		expect(postgresSpy).not.toHaveBeenCalled();
 	});
 
-	// ROW 4 — the guard that never fires. ADR-0024 P3 decision outcome #8:
-	// every environment stays on :5432 except staging.
-	it("row 4 · transaction mode in prod is refused at boot, citing the ADR", async () => {
+	// ROW 4 — production in transaction mode (ADR-0024 Patch P4). Inverted from
+	// the former boot refusal, so a reintroduced prod guard goes RED here.
+	it("row 4 · transaction mode in prod reads DATABASE_URL_TXN", async () => {
 		process.env.DB_POOLER_MODE = "transaction";
 		process.env.ZUGZWANG_ENV = "prod";
 		process.env.DATABASE_URL = SESSION_URL;
 		process.env.DATABASE_URL_TXN = TXN_URL;
 
-		// BOTH halves are asserted, because the title promises both. The citation
-		// is not decoration: this guard refuses an entire production deploy at
-		// module scope, and the operator who hits it needs the record naming the
-		// decision — otherwise the fastest-looking fix is to delete the guard.
-		// Asserting only the prose would let the citation be dropped while this
-		// test stayed green under a name that had become false.
-		await expect(import("@/db")).rejects.toThrow(/not authorised in prod/);
-		await expect(import("@/db")).rejects.toThrow(/ADR-0024 P3 #8/);
+		const mod = await import("@/db");
+
+		expect(connectedWith()).toBe(TXN_URL);
+		expect(mod.poolerMode).toBe("transaction");
+		expect(mod.connectionVarName).toBe("DATABASE_URL_TXN");
 	});
 
-	it("row 4 · refuses even when the transaction secret IS present", async () => {
+	// The loud-missing-secret property is what now stands between a half-done
+	// prod config and a silent session-mode fallback, so it is pinned in prod too.
+	it("row 4 · prod transaction mode with no DATABASE_URL_TXN throws and connects nowhere", async () => {
 		process.env.DB_POOLER_MODE = "transaction";
 		process.env.ZUGZWANG_ENV = "prod";
 		process.env.DATABASE_URL = SESSION_URL;
-		process.env.DATABASE_URL_TXN = TXN_URL;
+		delete process.env.DATABASE_URL_TXN;
 
-		await expect(import("@/db")).rejects.toThrow();
-		// Refusal means REFUSAL — prod must not connect through :6543 by any
-		// path, including the one where someone helpfully minted the secret.
+		await expect(import("@/db")).rejects.toThrow(/DATABASE_URL_TXN is not set/);
 		expect(postgresSpy).not.toHaveBeenCalled();
 	});
 });
 
 describe("DB_POOLER_MODE — the default", () => {
-	// The default is what carries `prd` and every unconfigured environment. An
+	// The default is what carries every environment without the flag. An
 	// unset flag must mean session mode, never "infer from what exists".
 	it("an unset flag means session mode, even where the txn secret exists", async () => {
 		delete process.env.DB_POOLER_MODE;

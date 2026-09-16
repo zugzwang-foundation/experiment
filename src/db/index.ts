@@ -27,8 +27,8 @@ import * as schema from "./schema";
 // blocked until someone mints the secret. Compare `BETTER_AUTH_URL`, which
 // fails the same way for the same reason.
 //
-// So: default `session`, which makes `prd` byte-identical to what it has always
-// done and requires nothing to be minted there.
+// So: default `session`, which keeps any environment without the flag on what
+// it has always done and requires nothing to be minted there.
 //
 // ⚠ `||`, NOT `??`, and the difference is operational rather than stylistic.
 // `??` catches only null/undefined, so `DB_POOLER_MODE=""` would resolve to `""`
@@ -44,18 +44,11 @@ import * as schema from "./schema";
 // the other thing, which is the point of a default.
 const mode = process.env.DB_POOLER_MODE || "session";
 
-// ADR-0024 Patch P3 decision outcome #8: every environment stays on `:5432`
-// EXCEPT staging. Production is not authorised for transaction mode by any
-// record, and the flag reaching `prd` would mean a config mistake rather than a
-// decision — so this refuses at boot instead of connecting somewhere nobody
-// ratified. A guard that never fires in practice is exactly the guard that goes
-// unnoticed when it regresses, which is why it is pinned by a test.
-if (mode === "transaction" && process.env.ZUGZWANG_ENV === "prod") {
-	throw new Error(
-		`DB_POOLER_MODE=transaction is not authorised in prod (ADR-0024 P3 #8)`,
-	);
-}
-
+// Production is authorised for transaction mode (ADR-0024 Patch P4, ADR-0038
+// P2). This line used to refuse the flag in prod at boot; that refusal is gone,
+// so what keeps prod on the pooler somebody chose is the declared flag plus the
+// loud missing-secret error below — the same two properties staging relies on.
+//
 // A missing secret is LOUD and names the variable it wanted, so it can never be
 // read as "session mode was intended here".
 // EXPORTED so the criterion-6 control reads the resolved name instead of
