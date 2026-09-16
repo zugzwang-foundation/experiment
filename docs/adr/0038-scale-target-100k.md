@@ -6,7 +6,7 @@
 | **Date** | 2026-08-19 |
 | **Supersedes** | — (scopes ADR-0006 §Cost and §Sizing; see below) |
 | **Superseded-by** | — |
-| **Patch records** | P1 |
+| **Patch records** | P1, P2 |
 
 ## Patch record
 
@@ -122,7 +122,7 @@ happened; they are not the fence, and they are expected to drift.
 
 **Production.** Decision 3 authorises the mode; **staging only** is S-1's scope, and all
 production work is after 10 Sep by founder ruling. `prd` stays on `:5432` and is untouched
-(see ADR-0024 Patch P3, same commit).
+(see ADR-0024 Patch P3, same commit). **Superseded for production by P2 below.**
 
 **Pool Size.** Stays **15**. Changing it is decision 2's measurement gate, not this record's
 (watch item W-11).
@@ -163,6 +163,15 @@ and this warns that a *participant's bet* will look slow rather than broken. **A
 a failure mode the bet path previously had**, so no existing halt condition, alarm, or
 runbook names it. S-1's plan §6 criterion-4 halt condition is extended to name it; the
 standing operational gap is S-5's to close.
+
+### P2 — Production allowed on transaction mode (2026-09-17)
+
+In-place Patch record, not supersession. Decision 3 is unchanged; P1.4 had kept its reach to
+staging, and **P2 extends it to `prd`** by the route P1.1 chose: the runtime reads
+`DATABASE_URL_TXN` when `DB_POOLER_MODE=transaction` is declared, and `DATABASE_URL` is not
+repointed. The prod boot refusal in `src/db/index.ts` is removed. P1.2 (`max` stays 4), P1.3
+(the verified preconditions) and decision 2 (sizing from measurement) apply to prod unchanged.
+Execution order and rollback: **ADR-0024 Patch P4**, same change.
 
 ## Context
 
