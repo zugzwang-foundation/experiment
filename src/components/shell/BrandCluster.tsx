@@ -34,11 +34,32 @@ import { Wordmark } from "./Wordmark";
  * — the string (and so the re-render) changes only at minute boundaries.
  *
  * ⛔⛔ BELOW 640 THIS COMPONENT RETURNS TWO ROOTS, AND THE SECOND IS THE PHONE
- * COUNTDOWN (ADR-0051 A13 D-2). It is `CountdownDigits` mounted ALONE — digits
- * only, no wordmark — and it is a SIBLING of the brand link rather than a child
- * of it, deliberately: the cluster's link target is the mark and its label already
- * carries the remaining time in words, so putting the digits inside would give
- * one link two visual subjects and no new information.
+ * BRAND BLOCK (ADR-0051 A13 D-2). It is a SIBLING of the brand link rather than
+ * a child of it, deliberately: the cluster's link target is the mark and its
+ * label already carries the remaining time in words, so putting this inside
+ * would give one link two visual subjects and no new information.
+ *
+ * ⚠ IT IS WORDMARK-OVER-DIGITS NOW, AND THIS PARAGRAPH SAID `digits only, no
+ * wordmark` UNTIL IT WAS. A13 D-2 dropped the wordmark at the phone tier on the
+ * reading that it was the header's biggest reflow cost; it is not. The row is
+ * EIGHT cells wide either way — `Wordmark` is eight letters and the countdown
+ * is eight characters at 13px each — so row 1 costs ZERO horizontal space, and
+ * 37px of block in a 60px band costs no vertical either. Measured on the built
+ * tree at 320/375/430 in both auth arms: band 62 unchanged, block 37×106, every
+ * flex item's x and width byte-identical to the digits-only row.
+ *
+ * ⚠ THE `phone-countdown` TESTID IS NARROWER THAN THE NODE AND IS KEPT ANYWAY.
+ * It names row 2 and the node is now both rows. Renaming it would churn three
+ * guard files for a string, and a testid's job is to be a stable handle rather
+ * than a description; `ResolverCards` carries the same mismatch for the same
+ * reason. Read it as "the phone brand block".
+ *
+ * ⛔ THE GATE HERE IS THE MOUNT, NOT A `cn()`. Every class on that span is
+ * unconditional because the span itself only exists inside the
+ * `mobileResponsive ?` ternary below — a mount that says nothing renders no
+ * node at all, which `phone-a13::a-mount-that-says-nothing-gets-NO-countdown-at-all`
+ * asserts. Wrapping the string in `mobileResponsive && …` inside that ternary
+ * would be provably dead, so the prop chain is honoured one level up instead.
  *
  * ⛔ IT REUSES THIS COMPONENT'S TICK AND ADDS NO SECOND INTERVAL, WHICH IS THE
  * WHOLE REASON IT LIVES HERE RATHER THAN IN `GlobalHeader`. The tick is
@@ -101,17 +122,22 @@ export function BrandCluster({
 					height={48}
 					className="size-12"
 				/>
-				{/* MOBILE-1 Phase A — the mark alone carries the link and the brand
-				    identity below 640px; the wordmark + countdown text is the
-				    header's single biggest reflow cost and is dropped rather than
-				    squeezed. Nothing here is lost to a11y: the outer `<Link>`'s
-				    `aria-label` above already carries the countdown in words, so
-				    hiding this block relocates the information rather than
-				    removing it.
-				    ⚠ A13 D-2 GIVES THE DIGITS BACK BELOW 640 — as a separate mount
-				    outside this link, at the phone cell scale. This block is still
-				    the one that hides: it is the WORDMARK plus a 20px-cell row, and
-				    the row that replaces it is neither. */}
+				{/* MOBILE-1 Phase A — the mark alone carried the link and the brand
+				    identity below 640px, on the reading that the wordmark + countdown
+				    text was the header's single biggest reflow cost. Nothing was lost
+				    to a11y either way: the outer `<Link>`'s `aria-label` above carries
+				    the countdown in words, so hiding this block relocates the
+				    information rather than removing it.
+				    ⚠ THE READING WAS WRONG AND BOTH ROWS ARE BACK BELOW 640 — as a
+				    separate mount outside this link, at the phone cell scale. It never
+				    was a reflow cost: row 1 is eight letters over a row of eight
+				    characters at one cell width, so it is exactly as wide as the
+				    countdown alone and costs ZERO horizontal space.
+				    ⛔ THIS BLOCK STILL HIDES, AND THE DISTINCTION IS THE CELL. What
+				    goes below 640 is the 20px-cell lockup dimensioned against a 48px
+				    mark; what renders there is the 13×17 one. Two scales of the same
+				    rect, never one node moved between tiers — which is why the hide
+				    below is still gated rather than deleted. */}
 				<span
 					aria-hidden="true"
 					data-testid="brand-cluster-text"
@@ -124,17 +150,24 @@ export function BrandCluster({
 					<CountdownDigits display={display} />
 				</span>
 			</Link>
-			{/* ADR-0051 A13 D-2 — the phone's countdown. `aria-hidden` for the same
-			    reason row 2 of the chessboard is: the brand link above carries the
-			    remaining time in words and is the ONLY route by which it reaches a
-			    screen reader, so a second spoken copy would read the freeze twice
-			    with different phrasing. */}
+			{/* ADR-0051 A13 D-2 — the phone's brand block. `aria-hidden` for the
+			    same reason row 2 of the chessboard is: the brand link above carries
+			    the remaining time in words and is the ONLY route by which it reaches
+			    a screen reader, so a second spoken copy would read the freeze twice
+			    with different phrasing. The wordmark is decorative here for the same
+			    reason it is decorative up there — the link is already named.
+			    ⚠ THE COLUMN TOKEN IS PREFIXED RATHER THAN BARE. Above 640 this span
+			    is `display:none` and its direction is inert either way — but "inert
+			    today" is a property of the sibling token that hides it, and AGENTS.md
+			    §8 records that exact reasoning shipping a defect before. The tier says
+			    what the direction is, the same way it says what the display is. */}
 			{mobileResponsive ? (
 				<span
 					aria-hidden="true"
 					data-testid="phone-countdown"
-					className="hidden max-mobile:flex"
+					className="hidden max-mobile:flex max-mobile:flex-col"
 				>
+					<Wordmark scale="phone" />
 					<CountdownDigits display={display} scale="phone" />
 				</span>
 			) : null}
