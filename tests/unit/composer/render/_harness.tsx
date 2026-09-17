@@ -73,6 +73,8 @@ export function wireError(
  * debounced quote GET answers off-shape, degrading the To-win preview to
  * "—" (quote-reader law: degraded, never a state escalation).
  */
+let versionTick = 0;
+
 export function stubWireFetch(
 	betResponses: Array<{ status: number; body: unknown }>,
 ) {
@@ -86,6 +88,18 @@ export function stubWireFetch(
 			}
 			return new Response(JSON.stringify(next.body), {
 				status: next.status,
+				headers: { "content-type": "application/json" },
+			});
+		}
+		// R2-CHEAP-POLL — `DebatePoll` asks `/m/<slug>/version` before it
+		// refreshes, and answers with no token are treated as "nothing changed".
+		// A stub that returned `{}` here would silently suppress every poll
+		// refresh in any suite mounting the debate view, so this answers with a
+		// CHANGING token: callers that count refreshes keep counting them.
+		if (/\/m\/[^/]+\/version$/.test(url)) {
+			versionTick += 1;
+			return new Response(JSON.stringify({ v: `v${versionTick}` }), {
+				status: 200,
 				headers: { "content-type": "application/json" },
 			});
 		}

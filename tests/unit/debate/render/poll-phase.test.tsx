@@ -24,6 +24,16 @@ const { refreshMock, routerMock } = vi.hoisted(() => {
 	};
 });
 
+// R2-CHEAP-POLL — a poll tick now ASKS `/m/<slug>/version` and refreshes only
+// when the answer changed. These tests are about WHEN a tab may refresh, so the
+// stub reports a change every time: each assertion reads as it did before the
+// check existed.
+let versionTick = 0;
+const fetchMock = vi.fn(async () => ({
+	ok: true,
+	json: async () => ({ v: `v${++versionTick}` }),
+}));
+
 vi.mock("next/navigation", () => ({
 	useRouter: () => routerMock,
 	usePathname: () => "/m/mumbai-metro-line-3-1m-riders",
@@ -34,19 +44,23 @@ import { DebatePoll } from "@/components/debate/DebatePoll";
 import { getInitialPollPhaseOffsetMs } from "@/components/debate/poll-phase";
 import { POLL_INTERVAL_MS_DEBATE_VIEW } from "@/server/config/limits";
 
-beforeEach(() => {
+beforeEach(async () => {
+	versionTick = 0;
+	fetchMock.mockClear();
+	vi.stubGlobal("fetch", fetchMock);
 	vi.useFakeTimers();
 	refreshMock.mockReset();
 });
 
 afterEach(() => {
+	vi.unstubAllGlobals();
 	cleanup();
 	vi.useRealTimers();
 	vi.restoreAllMocks();
 });
 
 describe("getInitialPollPhaseOffsetMs", () => {
-	it("is bounded to [0, intervalMs)", () => {
+	it("is bounded to [0, intervalMs)", async () => {
 		vi.spyOn(Math, "random").mockReturnValue(0);
 		expect(getInitialPollPhaseOffsetMs(POLL_INTERVAL_MS_DEBATE_VIEW)).toBe(0);
 
@@ -58,55 +72,55 @@ describe("getInitialPollPhaseOffsetMs", () => {
 });
 
 describe("DebatePoll — a real, non-zero phase offset", () => {
-	it("shifts the FIRST refresh by offset + interval, never fires AT the offset itself", () => {
+	it("shifts the FIRST refresh by offset + interval, never fires AT the offset itself", async () => {
 		const offset = 4000;
 		vi.spyOn(Math, "random").mockReturnValue(
 			offset / POLL_INTERVAL_MS_DEBATE_VIEW,
 		);
 
-		render(<DebatePoll marketOpen composerOpen={false} />);
+		render(<DebatePoll slug="test-market" marketOpen composerOpen={false} />);
 
-		act(() => {
+		await act(async () => {
 			vi.advanceTimersByTime(offset);
 		});
 		// Past the offset alone, nothing has fired — the offset only delays when
 		// the interval ARMS, it is not itself a refresh trigger.
 		expect(refreshMock).toHaveBeenCalledTimes(0);
 
-		act(() => {
+		await act(async () => {
 			vi.advanceTimersByTime(POLL_INTERVAL_MS_DEBATE_VIEW - 1);
 		});
 		expect(refreshMock).toHaveBeenCalledTimes(0);
 
-		act(() => {
+		await act(async () => {
 			vi.advanceTimersByTime(1);
 		});
 		expect(refreshMock).toHaveBeenCalledTimes(1);
 	});
 
-	it("keeps steady-state cadence at exactly the interval once armed", () => {
+	it("keeps steady-state cadence at exactly the interval once armed", async () => {
 		vi.spyOn(Math, "random").mockReturnValue(
 			2000 / POLL_INTERVAL_MS_DEBATE_VIEW,
 		);
-		render(<DebatePoll marketOpen composerOpen={false} />);
+		render(<DebatePoll slug="test-market" marketOpen composerOpen={false} />);
 
-		act(() => {
+		await act(async () => {
 			vi.advanceTimersByTime(2000 + POLL_INTERVAL_MS_DEBATE_VIEW);
 		});
 		expect(refreshMock).toHaveBeenCalledTimes(1);
 
-		act(() => {
+		await act(async () => {
 			vi.advanceTimersByTime(POLL_INTERVAL_MS_DEBATE_VIEW);
 		});
 		expect(refreshMock).toHaveBeenCalledTimes(2);
 
-		act(() => {
+		await act(async () => {
 			vi.advanceTimersByTime(POLL_INTERVAL_MS_DEBATE_VIEW);
 		});
 		expect(refreshMock).toHaveBeenCalledTimes(3);
 	});
 
-	it("holds BOTH boundaries to the millisecond — the phase moved, the period did not", () => {
+	it("holds BOTH boundaries to the millisecond — the phase moved, the period did not", async () => {
 		// The one assertion that separates the ratified design (phase shifted,
 		// period intact) from the period jitter that was rejected.
 		//
@@ -125,39 +139,41 @@ describe("DebatePoll — a real, non-zero phase offset", () => {
 		const offset = POLL_INTERVAL_MS_DEBATE_VIEW / 2;
 		vi.spyOn(Math, "random").mockReturnValue(0.5);
 
-		render(<DebatePoll marketOpen composerOpen={false} />);
+		render(<DebatePoll slug="test-market" marketOpen composerOpen={false} />);
 
 		// FIRST refresh: `offset + interval`, and not one millisecond sooner.
-		act(() => {
+		await act(async () => {
 			vi.advanceTimersByTime(offset + POLL_INTERVAL_MS_DEBATE_VIEW - 1);
 		});
 		expect(refreshMock).toHaveBeenCalledTimes(0);
-		act(() => {
+		await act(async () => {
 			vi.advanceTimersByTime(1);
 		});
 		expect(refreshMock).toHaveBeenCalledTimes(1);
 
 		// EVERY refresh thereafter: exactly one interval apart, both edges.
 		for (const n of [2, 3, 4]) {
-			act(() => {
+			await act(async () => {
 				vi.advanceTimersByTime(POLL_INTERVAL_MS_DEBATE_VIEW - 1);
 			});
 			expect(refreshMock).toHaveBeenCalledTimes(n - 1);
-			act(() => {
+			await act(async () => {
 				vi.advanceTimersByTime(1);
 			});
 			expect(refreshMock).toHaveBeenCalledTimes(n);
 		}
 	});
 
-	it("a resume-from-suspension is never jittered, even with a large first-arm offset still pending", () => {
+	it("a resume-from-suspension is never jittered, even with a large first-arm offset still pending", async () => {
 		vi.spyOn(Math, "random").mockReturnValue(0.9);
-		const { rerender } = render(<DebatePoll marketOpen composerOpen={false} />);
+		const { rerender } = render(
+			<DebatePoll slug="test-market" marketOpen composerOpen={false} />,
+		);
 
 		// The jittered first arm is scheduled (hasStartedOnce is now true) but its
 		// ~13.5s offset hasn't elapsed yet — suspend before it ever fires.
-		rerender(<DebatePoll marketOpen composerOpen={true} />);
-		act(() => {
+		rerender(<DebatePoll slug="test-market" marketOpen composerOpen={true} />);
+		await act(async () => {
 			vi.advanceTimersByTime(POLL_INTERVAL_MS_DEBATE_VIEW * 2);
 		});
 		expect(refreshMock).toHaveBeenCalledTimes(0);
@@ -165,7 +181,13 @@ describe("DebatePoll — a real, non-zero phase offset", () => {
 		// Closing the composer resumes with an IMMEDIATE refresh — unjittered,
 		// per the ratified suspension rule this task must not touch, and
 		// regardless of the first-arm offset this instance already consumed.
-		rerender(<DebatePoll marketOpen composerOpen={false} />);
+		rerender(<DebatePoll slug="test-market" marketOpen composerOpen={false} />);
+		// The resume asks the version route before refreshing.
+		await act(async () => {
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+		});
 		expect(refreshMock).toHaveBeenCalledTimes(1);
 	});
 });

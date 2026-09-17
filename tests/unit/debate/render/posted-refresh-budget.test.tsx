@@ -62,6 +62,15 @@ const { refreshMock, routerMock } = vi.hoisted(() => {
 	};
 });
 
+// R2-CHEAP-POLL — a poll tick asks `/m/<slug>/version` and refreshes only on a
+// change. These tests count refreshes, so the stub reports a change every time
+// and the counts read as they did before the check existed.
+let versionTick = 0;
+const fetchMock = vi.fn(async () => ({
+	ok: true,
+	json: async () => ({ v: `v${++versionTick}` }),
+}));
+
 vi.mock("next/navigation", () => ({
 	// POST-IMAGE-EXPORT — `DownloadPostImage` reads the market slug from the
 	// route; a mock without `useParams` throws at the first post card render.
@@ -81,7 +90,10 @@ import { baseModel, modelWithPost, newPost, placeOk } from "./_posted-fixtures";
 
 const POSTED_ID = "cmt-just-posted";
 
-beforeEach(() => {
+beforeEach(async () => {
+	versionTick = 0;
+	fetchMock.mockClear();
+	vi.stubGlobal("fetch", fetchMock);
 	vi.useFakeTimers();
 	refreshMock.mockReset();
 	refreshMock.mockImplementation(() => undefined);
@@ -136,6 +148,12 @@ describe("FEED-2 — server reads per successful bet", () => {
 		expect(refreshMock).toHaveBeenCalledTimes(0);
 
 		await placeOneBet(wire);
+		// The poll\'s resume now asks the version route before refreshing.
+		await act(async () => {
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+		});
 
 		// ⚠⚠ BOTH, AT THE SUCCESS, and the fact that they are both here is itself
 		// the guard. FEED-1 read **1** at this point, because the arm was held and
@@ -167,6 +185,12 @@ describe("FEED-2 — server reads per successful bet", () => {
 		const wire = stubWireFetch([placeOk(POSTED_ID)]);
 		const { rerender } = render(view(baseModel()));
 		await placeOneBet(wire);
+		// The poll\'s resume now asks the version route before refreshing.
+		await act(async () => {
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+		});
 		rerender(
 			view(
 				modelWithPost(
@@ -176,7 +200,7 @@ describe("FEED-2 — server reads per successful bet", () => {
 		);
 		expect(refreshMock).toHaveBeenCalledTimes(2);
 
-		act(() => {
+		await act(async () => {
 			vi.advanceTimersByTime(POLL_INTERVAL_MS_DEBATE_VIEW);
 		});
 
