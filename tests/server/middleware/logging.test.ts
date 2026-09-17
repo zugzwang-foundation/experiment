@@ -109,3 +109,56 @@ describe("logRequest", () => {
 		expect(row.route).toBe("/api/dataset/manifest");
 	});
 });
+
+/**
+ * AWS-MIGRATION — the IP column behind a load balancer.
+ *
+ * `ipAddress()` reads `x-real-ip`, which Vercel sets and an ALB does not, so
+ * without a fallback this field would quietly become `null` for every
+ * request off-platform — one of the seven §16.3 H3 columns lost, with
+ * nothing failing to announce it.
+ *
+ * ⚠ FIRST HOP ONLY, and it stays DIAGNOSTIC: `x-forwarded-for` is a
+ * client-controllable list, so this value must never gate anything.
+ */
+describe("AWS-MIGRATION — client IP off Vercel", () => {
+	const read = (): Record<string, unknown> =>
+		JSON.parse(consoleLogSpy.mock.calls[0]?.[0] as string) as Record<
+			string,
+			unknown
+		>;
+
+	it("prefers the platform helper when it answers", () => {
+		mockIpAddress.mockReturnValue("203.0.113.42");
+		const request = new Request("https://example.com/api/x", {
+			headers: { "x-forwarded-for": "198.51.100.7" },
+		});
+		logRequest({ request, status: 200, userId: null, startedAt: Date.now() });
+		expect(read().ip).toBe("203.0.113.42");
+	});
+
+	it("falls back to the FIRST hop of x-forwarded-for", () => {
+		mockIpAddress.mockReturnValue(undefined);
+		const request = new Request("https://example.com/api/x", {
+			headers: { "x-forwarded-for": "198.51.100.7, 10.0.0.5, 10.0.0.9" },
+		});
+		logRequest({ request, status: 200, userId: null, startedAt: Date.now() });
+		expect(read().ip).toBe("198.51.100.7");
+	});
+
+	it("falls back to x-real-ip when there is no forwarded chain", () => {
+		mockIpAddress.mockReturnValue(undefined);
+		const request = new Request("https://example.com/api/x", {
+			headers: { "x-real-ip": "198.51.100.9" },
+		});
+		logRequest({ request, status: 200, userId: null, startedAt: Date.now() });
+		expect(read().ip).toBe("198.51.100.9");
+	});
+
+	it("is null when no header carries one — never a fabricated address", () => {
+		mockIpAddress.mockReturnValue(undefined);
+		const request = new Request("https://example.com/api/x");
+		logRequest({ request, status: 200, userId: null, startedAt: Date.now() });
+		expect(read().ip).toBeNull();
+	});
+});

@@ -1,0 +1,21 @@
+{
+	"app": "npx tsx bin/zugzwang.ts",
+	"watch": {
+		"include": ["**"],
+		"exclude": ["README.md", "cdk*.json", "node_modules", "cdk.out"]
+	},
+	"output": "cdk.out",
+	"context": {
+		"@aws-cdk/aws-lambda:recognizeLayerVersion": true,
+		"@aws-cdk/core:checkSecretUsage": true,
+		"@aws-cdk/core:target-partitions": ["aws"],
+		"@aws-cdk/aws-ecs:disableEcsImdsBlocking": true,
+		"@aws-cdk/aws-ec2:ec2SumTImeoutEnabled": true,
+		"@aws-cdk/aws-iam:minimizePolicies": true,
+		"@aws-cdk/core:validateSnapshotRemovalPolicy": true,
+		"@aws-cdk/aws-ecs:removeDefaultDeploymentAlarm": true,
+		"@aws-cdk/core:enablePartitionLiterals": true,
+		"@aws-cdk/aws-elasticloadbalancingv2:albDualstackWithoutPublicIpv4SecurityGroupRulesDefault": true,
+		"@aws-cdk/aws-autoscaling:generateLaunchTemplateInsteadOfLaunchConfig": true
+	}
+}

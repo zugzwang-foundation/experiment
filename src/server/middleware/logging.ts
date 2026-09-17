@@ -33,6 +33,37 @@ interface LogRequestArgs {
 	startedAt: number;
 }
 
+/**
+ * AWS-MIGRATION — the caller's IP, on Vercel and behind an AWS load balancer.
+ *
+ * `ipAddress()` from `@vercel/functions` reads `x-real-ip`, which Vercel sets
+ * and an Application Load Balancer does not — so off-platform this column would
+ * silently become `null` for every request, and the §16.3 H3 log row would lose
+ * one of its seven fields without anything failing.
+ *
+ * ⚠ ONLY THE FIRST HOP OF `x-forwarded-for` IS TRUSTED, and that is the whole
+ * subtlety: the header is a client-controllable list, so a request can arrive
+ * carrying a forged chain. Behind our own ALB the LAST entry is the one the
+ * balancer appended and the earlier ones are whatever the client sent — but the
+ * first is what every other log in this stack means by "the client", and this
+ * value is DIAGNOSTIC ONLY. It gates nothing: rate limiting keys on the user,
+ * never on this. Keep it that way, or this becomes a spoofable control.
+ */
+function clientIp(request: Request): string | null {
+	const vercel = ipAddress(request);
+	if (vercel) {
+		return vercel;
+	}
+	const forwarded = request.headers.get("x-forwarded-for");
+	if (forwarded) {
+		const first = forwarded.split(",")[0]?.trim();
+		if (first) {
+			return first;
+		}
+	}
+	return request.headers.get("x-real-ip") ?? null;
+}
+
 export function logRequest(args: LogRequestArgs): void {
 	const url = new URL(args.request.url);
 	const row = {
@@ -40,7 +71,7 @@ export function logRequest(args: LogRequestArgs): void {
 		user_id: args.userId,
 		route: url.pathname,
 		status_code: args.status,
-		ip: ipAddress(args.request) ?? null,
+		ip: clientIp(args.request),
 		user_agent: args.request.headers.get("user-agent") ?? null,
 		latency_ms: Date.now() - args.startedAt,
 	};

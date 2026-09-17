@@ -1,0 +1,23 @@
+{
+	"name": "zugzwang-infra",
+	"version": "0.1.0",
+	"private": true,
+	"description": "AWS CDK infrastructure for the Zugzwang platform (design only — not deployed)",
+	"scripts": {
+		"synth": "cdk synth --all",
+		"synth:staging": "cdk synth 'Zugzwang-staging-*'",
+		"synth:production": "cdk synth 'Zugzwang-production-*'",
+		"diff": "cdk diff",
+		"deploy:staging": "cdk deploy 'Zugzwang-staging-*' --require-approval broadening",
+		"deploy:production": "cdk deploy 'Zugzwang-production-*' --require-approval broadening",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@types/node": "^24.0.0",
+		"aws-cdk": "^2.1029.0",
+		"aws-cdk-lib": "^2.219.0",
+		"constructs": "^10.4.2",
+		"tsx": "^4.22.0",
+		"typescript": "^5.9.2"
+	}
+}
