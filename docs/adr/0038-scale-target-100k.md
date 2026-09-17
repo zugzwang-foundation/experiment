@@ -6,7 +6,7 @@
 | **Date** | 2026-08-19 |
 | **Supersedes** | — (scopes ADR-0006 §Cost and §Sizing; see below) |
 | **Superseded-by** | — |
-| **Patch records** | P1, P2 |
+| **Patch records** | P1, P2, P3 |
 
 ## Patch record
 
@@ -60,7 +60,7 @@ record here. Under option (e), exit criterion 7 therefore means **two redeployme
 shared staging environment** that two other lanes are measuring against — the scheduling
 window must cover both, not just the flip.
 
-#### P1.2 · `max` stays at 4 — and the client ceiling rising is not a reason to raise it
+#### P1.2 · `max` stays at 4 — and the client ceiling rising is not a reason to raise it *(superseded by P3: it moved to 2, downward, on a measurement)*
 
 `src/db/index.ts` sets `max: 4` per Vercel instance. **It does not change.**
 
@@ -172,6 +172,33 @@ staging, and **P2 extends it to `prd`** by the route P1.1 chose: the runtime rea
 repointed. The prod boot refusal in `src/db/index.ts` is removed. P1.2 (`max` stays 4), P1.3
 (the verified preconditions) and decision 2 (sizing from measurement) apply to prod unchanged.
 Execution order and rollback: **ADR-0024 Patch P4**, same change.
+
+### P3 — `max` moves from 4 to 2, on a production measurement (2026-09-17)
+
+In-place Patch record. Decision 2 (*sizing is decided from measurement*) is what this
+record satisfies rather than bends: P1.2 kept `max` at 4 because no run had produced a
+number, and one now has.
+
+**Measured on production, 2026-09-17, transaction pooler live.** 200 concurrent anonymous
+readers for ~60 s spun up roughly 13 Fluid instances; Supabase reported **52 Shared Pooler
+client connections** (13 × 4) and they stayed allocated after the load ended, because a
+suspended instance runs no idle timer. Over the same window Postgres ran **1–3 queries** and
+held **7–9 backends of 45** (`pg_stat_activity`, sampled every 5 s). The binding ceiling is
+therefore the **client** side — 200 on Micro — and it is spent as *instances × `max`*
+regardless of whether the sockets are used.
+
+**Decision.** `max: 2`. The same 200-connection ceiling now admits ~100 instances instead of
+~50. Two is sufficient for the read paths (their queries are awaited in sequence) and for a bet
+(one transaction on one connection); a third concurrent query on an instance queues in
+postgres.js instead of failing. `scripts/verify-pooler-mode.ts` now reads `CONCURRENCY` from
+the shipped client instead of carrying its own 4, so the probe cannot drift from this value
+again; `tests/integration/oauth-signup-pool-deadlock.integration.test.ts` already
+self-calibrates to `db.$client.options.max` and needs no change.
+
+**Not decided here.** Whether 2 is the *right* number for the 5,000-concurrent target — that is
+still the multi-source load run's to produce (S-5 §8). Pool Size stays 15/45 as configured.
+The Supabase compute tier is a separate lever with a separate bill and is left to the
+operator.
 
 ## Context
 

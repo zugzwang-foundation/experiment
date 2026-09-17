@@ -71,14 +71,21 @@ const client = postgres(connectionString, {
 	// ⚠ This value is NOT derived from the tenant pool any more. Under the
 	// `:6543` transaction pooler the two ceilings decouple — client connections
 	// rise to 200 while backend connections stay at 15 — so the old "15 ÷ 4 means
-	// three instances fit" arithmetic no longer describes what `4` is protecting
-	// against, and a stale derivation is how the next person re-derives the wrong
-	// number (ADR-0038 P1.2).
+	// three instances fit" arithmetic no longer describes what this value is
+	// protecting against, and a stale derivation is how the next person
+	// re-derives the wrong number (ADR-0038 P1.2).
 	//
-	// What `4` actually bounds is what a SUSPENDED instance can STRAND. The
-	// relaxation says a higher `max` is now permissible; it does not say which
-	// value is correct, and ADR-0038 decision 2 forbids acting on that without
-	// measurement. S-5 measures; then it moves.
+	// What this value actually bounds is what a SUSPENDED instance can STRAND,
+	// and that is why it MOVED DOWN, not up (ADR-0038 P3). Measured on
+	// production 2026-09-17: 200 concurrent requests spun up ~13 instances and
+	// the pooler reported 52 client connections — 13 × 4 — while Postgres ran
+	// one to three queries and held 7-9 backends of 45. Under transaction mode
+	// the binding ceiling is the CLIENT side (200 on Micro), and it is consumed
+	// by instance count × this number, whether or not the sockets do anything.
+	// Halving it doubles the instance count the same ceiling admits. Two is
+	// enough for the page reads (sequential awaits) and for a bet (one
+	// transaction, one connection); a third concurrent query on one instance
+	// queues in postgres.js rather than failing.
 	//
 	// THIS is the load-bearing control, not the timeouts below. Measured on
 	// staging: a connection sat idle 620 s with BOTH a 20 s idle_timeout and a
@@ -86,7 +93,7 @@ const client = postgres(connectionString, {
 	// SUSPENDS an instance between requests and a suspended instance runs no
 	// timers. A timer cannot be relied on to hand a slot back; bounding what an
 	// instance can take in the first place does not depend on one running.
-	max: 4,
+	max: 2,
 	// ⚠ NOT defensive any more — this is a HARD PRECONDITION of the mode above.
 	// It was written when a :6543 transaction pooler was hypothetical; S-1
 	// introduces one, so the "forward-safe if ever introduced" framing it used to
