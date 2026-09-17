@@ -371,6 +371,43 @@ export const SHARED_VIEW_MIN_WINDOW_MS = 15000;
  * rendered beside it. Seconds, not milliseconds: `cacheLife` takes seconds. */
 export const SHARED_VIEW_EXPIRE_SEC = MARKET_SERIES_MIN_WINDOW_MS / 1000;
 
+/**
+ * Minimum interval between LIVE POOL PRICE reads on Discovery (`/`) — the
+ * per-market spot price and reserves behind every card, the hero chart's live
+ * tail and the hero's `Đ now` figure (ADR-0055).
+ *
+ * ⛔ THIS IS A MONEY FIGURE BEHIND A WINDOW, WHICH ADR-0051 EXPRESSLY REFUSED,
+ * so read why before touching it. That ADR composed `currentValue` outside the
+ * cache on the rule that "money on a public surface may not lag a window", and
+ * the rule was right about money and wrong about which surface bears the risk.
+ * `/m/[slug]` — the page where a bet is actually placed — has been serving a
+ * PRERENDERED price all along, measured at thirteen hours old on production and
+ * corrected only by the client poll. Discovery, where nobody can bet, was the
+ * one surface paying a live database read per visitor to be stricter than the
+ * page taking the money. The asymmetry, not the freshness, is what was wrong.
+ *
+ * ⚠ FIVE SECONDS IS NOT A PERFORMANCE DIAL — it is the largest lag that keeps
+ * Discovery STRICTER than the surface it links to. Raising it toward
+ * `SHARED_VIEW_MIN_WINDOW_MS` would make a price on the front page older than
+ * the same price one click away, which is the defect this window exists under,
+ * not a cheaper version of it. Lowering it below a second re-opens the
+ * per-visitor read without buying a freshness anyone can perceive.
+ *
+ * Read from this constant at every call site and never inlined. Integer
+ * (milliseconds, not Dharma). */
+export const DISCOVERY_PRICE_MIN_WINDOW_MS = 5000;
+
+/**
+ * The outer bound on serving a `DISCOVERY_PRICE_MIN_WINDOW_MS` entry STALE
+ * while a revalidation is in flight — `cacheLife`'s `expire`, in seconds.
+ *
+ * ⚠ Deliberately NOT `SHARED_VIEW_EXPIRE_SEC` (60 s) and deliberately not the
+ * `cached-series.ts` `window × 60` ratio, which would hand a 5 s window a 300 s
+ * ceiling. This entry holds a PRICE, so its stale ceiling is the number that
+ * actually bounds how wrong the front page can be during a revalidation, and it
+ * is pinned tight for that reason alone. Seconds, not milliseconds. */
+export const DISCOVERY_PRICE_EXPIRE_SEC = 30;
+
 // === CHART-3: the fixed experiment window (SPEC.1 1.0.48 §9 + §16.1) ======
 
 /** The §9 price chart's fixed X axis, as a pair of ISO instants. */

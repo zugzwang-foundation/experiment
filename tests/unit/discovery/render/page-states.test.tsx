@@ -64,10 +64,14 @@ vi.mock("@/server/discovery/list", () => ({
 	getCachedDiscoveryMarketIds: vi.fn(),
 	getCachedMarketDiscoveryData: vi.fn(),
 }));
-// T-03 — the page now takes ONE batched pricing read ahead of the loop instead
-// of one per market inside it, so this is the name the page imports.
-vi.mock("@/server/debate-view/market-pricing", () => ({
-	getMarketPricingAndReservesBatch: vi.fn(),
+// T-03 — the page takes ONE batched pricing read ahead of the loop instead of
+// one per market inside it. ⚠ ADR-0055 moved that read behind a window, so the
+// name the page imports is now `getCachedDiscoveryPricing` and it takes NO
+// database client: a `'use cache'` key is its argument list, so a client
+// parameter would be a connection object in a cache key. The arity change is
+// why the call-site assertions below read `calls[0]?.[0]` and not `[1]`.
+vi.mock("@/server/discovery/cached-pricing", () => ({
+	getCachedDiscoveryPricing: vi.fn(),
 }));
 // RELAY C2 — the page's new attempt-counter call (`recordCacheAttempt`) is a
 // fourth thing the page itself touches directly (the other three above are
@@ -86,7 +90,7 @@ import * as page from "@/app/(public)/page";
 import { EMPTY_COPY } from "@/components/discovery/EmptyState";
 import { ERROR_COPY } from "@/components/discovery/ErrorState";
 import { LoadingSkeleton } from "@/components/discovery/LoadingSkeleton";
-import { getMarketPricingAndReservesBatch } from "@/server/debate-view/market-pricing";
+import { getCachedDiscoveryPricing } from "@/server/discovery/cached-pricing";
 import type { HeroTopPosts } from "@/server/discovery/hero";
 import {
 	type DiscoveryCard,
@@ -176,32 +180,32 @@ function primeHappyLoaders(n: number): DiscoveryCard[] {
 	vi.mocked(getCachedDiscoveryMarketIds).mockResolvedValue(
 		list.map((c) => ({ id: c.id, slug: c.slug, title: c.title })),
 	);
-	// T-03 — one batched read returning a Map. A card with no `pricing` is
-	// simply ABSENT from the map, which is how the batch reproduces the singular
-	// read's defensive-null contract (`map.get(id) ?? null` at the call site).
-	vi.mocked(getMarketPricingAndReservesBatch).mockImplementation(
-		async (_client, marketIds) => {
-			const byMarket = new Map<
-				string,
-				{
-					pricing: { yes: string; no: string };
-					reserves: { yes: string; no: string };
-					unitToWin: { yes: string; no: string };
-				}
-			>();
-			for (const id of marketIds) {
-				const card = list.find((c) => c.id === id);
-				if (card?.pricing) {
-					byMarket.set(id, {
-						pricing: card.pricing,
-						reserves: { yes: "1", no: "1" },
-						unitToWin: { yes: "1", no: "1" },
-					});
-				}
+	// T-03 — one batched read. A card with no `pricing` is simply ABSENT, which
+	// is how the batch reproduces the singular read's defensive-null contract
+	// (`map.get(id) ?? null` at the call site). ⚠ ADR-0055: it returns an ARRAY
+	// OF PAIRS rather than a `Map`, because the value now crosses a cache
+	// serialisation boundary and the page rebuilds the `Map` itself.
+	vi.mocked(getCachedDiscoveryPricing).mockImplementation(async (marketIds) => {
+		const byMarket = new Map<
+			string,
+			{
+				pricing: { yes: string; no: string };
+				reserves: { yes: string; no: string };
+				unitToWin: { yes: string; no: string };
 			}
-			return byMarket;
-		},
-	);
+		>();
+		for (const id of marketIds) {
+			const card = list.find((c) => c.id === id);
+			if (card?.pricing) {
+				byMarket.set(id, {
+					pricing: card.pricing,
+					reserves: { yes: "1", no: "1" },
+					unitToWin: { yes: "1", no: "1" },
+				});
+			}
+		}
+		return [...byMarket];
+	});
 	vi.mocked(getCachedMarketDiscoveryData).mockImplementation(
 		async (marketId) => {
 			const card = list.find((c) => c.id === marketId);
@@ -269,14 +273,13 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 		// R3 — pricing is read LIVE, OUTSIDE the cached block. T-03 made that one
 		// batched read rather than one per market, so the assertion moved from
 		// "called twice" to "called once, for both markets": what R3 protects is
-		// that price comes from a live read at all, not how many statements it
-		// takes. Asserting the id list is what keeps a batch that silently
+		// that price comes from the POOL read at all — never from the cached
+		// market block, which carries no price — not how many statements it
+		// takes, and since ADR-0055 not how fresh it is. Asserting the id list is what keeps a batch that silently
 		// dropped a market from passing.
-		expect(vi.mocked(getMarketPricingAndReservesBatch)).toHaveBeenCalledTimes(
-			1,
-		);
+		expect(vi.mocked(getCachedDiscoveryPricing)).toHaveBeenCalledTimes(1);
 		expect(
-			vi.mocked(getMarketPricingAndReservesBatch).mock.calls[0]?.[1],
+			vi.mocked(getCachedDiscoveryPricing).mock.calls[0]?.[0],
 		).toHaveLength(2);
 
 		// Neither sibling state leaks into the happy path.
@@ -302,7 +305,7 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 		// assertion is about the STATEMENT, not the call: it must receive no
 		// market ids, which is what makes "no query issued" true.
 		expect(
-			vi.mocked(getMarketPricingAndReservesBatch).mock.calls[0]?.[1] ?? [],
+			vi.mocked(getCachedDiscoveryPricing).mock.calls[0]?.[0] ?? [],
 		).toHaveLength(0);
 		expect(vi.mocked(getCachedMarketDiscoveryData)).not.toHaveBeenCalled();
 	});
@@ -342,17 +345,15 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 		vi.mocked(getCachedDiscoveryMarketIds).mockResolvedValue(
 			list.map((c) => ({ id: c.id, slug: c.slug, title: c.title })),
 		);
-		vi.mocked(getMarketPricingAndReservesBatch).mockResolvedValue(
-			new Map(
-				list.map((c) => [
-					c.id,
-					{
-						pricing: { yes: "0.5", no: "0.5" },
-						reserves: { yes: "1", no: "1" },
-						unitToWin: { yes: "1", no: "1" },
-					},
-				]),
-			),
+		vi.mocked(getCachedDiscoveryPricing).mockResolvedValue(
+			list.map((c) => [
+				c.id,
+				{
+					pricing: { yes: "0.5", no: "0.5" },
+					reserves: { yes: "1", no: "1" },
+					unitToWin: { yes: "1", no: "1" },
+				},
+			]),
 		);
 		vi.mocked(getCachedMarketDiscoveryData)
 			.mockResolvedValueOnce({

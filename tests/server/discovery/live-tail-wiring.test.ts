@@ -121,28 +121,31 @@ function spotIsTheLiveYesPrice(args: string): boolean {
 }
 
 describe("debate-view::price-chart-tail-pinned-to-live-price — the edge is the page's own live read", () => {
-	for (const [surface, rel] of [
-		["Discovery", DISCOVERY],
-		["/m/[slug]", DETAIL],
+	for (const [surface, rel, poolRead] of [
+		["Discovery", DISCOVERY, "getCachedDiscoveryPricing"],
+		["/m/[slug]", DETAIL, "getMarketPricingAndReserves"],
 	] as const) {
-		it(`${surface} pins the terminal to the SAME live price it renders in the bar`, () => {
+		it(`${surface} pins the terminal to the SAME price it renders in the bar`, () => {
 			const src = code(rel);
 			const args = liveTailArgs(src);
 
 			// GUARD IS ALIVE — every negative below is worthless against a file
 			// that no longer composes a tail at all.
 			expect(src).toContain("withLiveTail(");
-			// ⚠ THE LIVE POOL READ, MATCHED ON ITS SHARED PREFIX BECAUSE THE TWO
-			// SURFACES SPELL IT DIFFERENTLY. Discovery batches it
-			// (`getMarketPricingAndReservesBatch`, T-03) and `/m/[slug]` reads one
-			// row (`getMarketPricingAndReserves(db, market.id)`). ⛔ THIS LINE PINNED
-			// THE SINGULAR FORM AND WENT RED WHEN T-03 BATCHED DISCOVERY — it
-			// shipped failing on its own branch, so the guard that proves the
-			// terminal comes from a LIVE read was unavailable for the whole of that
-			// work. Repaired at CACHE-KEY-1. What it protects is unchanged: the tail
-			// is composed from a read this file performs, never from the cached
-			// block.
-			expect(src).toContain("getMarketPricingAndReserves");
+			// ⚠ THE POOL READ, NAMED PER SURFACE RATHER THAN BY SHARED PREFIX. It was
+			// a prefix match because the two surfaces spelled one function two ways;
+			// ADR-0055 gave Discovery its own windowed reader
+			// (`getCachedDiscoveryPricing`) and the prefix stopped covering both. ⛔ A
+			// LOOSER MATCH WAS THE WRONG REPAIR: this guard has already shipped RED
+			// once, when T-03 batched Discovery while this line still pinned the
+			// singular form, and it was unavailable for that whole branch. Naming
+			// each surface is what keeps it able to fail per surface.
+			//
+			// What it protects is unchanged, and note it is NOT about freshness: the
+			// tail must come from the pool read THIS FILE performs — the same binding
+			// that fills the price bar — never from the cached market block or from
+			// the series' own terminal.
+			expect(src).toContain(poolRead);
 
 			// The requirement: the terminal's price is `priced.pricing.yes` —
 			// the same `priced` binding that fills the card / the page's
