@@ -382,8 +382,34 @@ export async function runBetEndpoint(
 			return jsonResponse(requestId, 409, body);
 		}
 
-		// 4. Rate-limit (betPerIp; fails OPEN). 429 IS cached per §11.
-		const rl = await checkRateLimit("betPerIp", ipIdentifier(ip));
+		// 4. Rate-limit (both fail OPEN). 429 IS cached per §11.
+		//
+		// ADR-0054 — TWO surfaces, and which one is load-bearing is the point.
+		// `betPerUser` is the fairness cap: this endpoint is unreachable without
+		// a session (step 1 above), so the account is the identity the write is
+		// actually billed to, and the per-minute budget belongs to the person
+		// rather than to the address they happen to arrive from. `betPerIp` is
+		// the abuse backstop at 10x, and only ever fires for a machine working
+		// across accounts — the credential-stuffing threat §11 names.
+		//
+		// Checked CONCURRENTLY so the pair costs one Redis round trip and not
+		// two. Each `limit()` consumes a token, so on a refusal the other
+		// surface is debited too — deliberate, and the conservative direction:
+		// a request that was refused was still a request that was made, and a
+		// serial pair would only have hidden that from whichever check ran
+		// second.
+		//
+		// The per-user identifier is `users.id` and never the pseudonym: the id
+		// is what `bets.user_id` records and it survives an identity change,
+		// whereas keying a quota on a display name would let a rename clear it.
+		const [rlUser, rlIp] = await Promise.all([
+			checkRateLimit("betPerUser", userId),
+			checkRateLimit("betPerIp", ipIdentifier(ip)),
+		]);
+		// One envelope for both, deliberately indistinguishable on the wire:
+		// telling a caller WHICH cap it tripped tells it how to tune around the
+		// one it did not.
+		const rl = rlUser.allowed ? rlIp : rlUser;
 		if (!rl.allowed) {
 			const body = envelope(
 				RATE_LIMIT_ERROR_CODE,

@@ -28,7 +28,7 @@ pin (23 route/page/layout files) + SPEC.2 §4 / §15 + ADR-0031. Route groups `(
 
 | Route | Method | Purpose · auth posture |
 |---|---|---|
-| `/api/bets/place` | POST | W-1 entry: bet + comment, atomic (INV-1). Pipeline: origin allowlist → session → rate limit (`bet-ip`) → **`Idempotency-Key` required** → durable-receipt pre-check → moderation (outside the tx, fail-closed) → SERIALIZABLE tx. |
+| `/api/bets/place` | POST | W-1 entry: bet + comment, atomic (INV-1). Pipeline: origin allowlist → session → rate limit (`bet-user` + `bet-ip`, checked concurrently — ADR-0054) → **`Idempotency-Key` required** → durable-receipt pre-check → moderation (outside the tx, fail-closed) → SERIALIZABLE tx. |
 | `/api/bets/sell` | POST | F-BET-3 in-stream exit (the only comment-free action). Same pipeline as place; oversell pre-check `insufficient_shares` (ADR-0031). |
 | `/api/uploads/sign` | POST | R2 signed-PUT mint for comment images. Session + onboarding-complete gate; rate class `image-put-ip`; MIME/byte caps per `CONSTANTS.md`. |
 

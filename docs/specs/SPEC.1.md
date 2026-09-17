@@ -8,8 +8,8 @@
 
 *Thesis relevance: (b) operationally enabling.*
 
-- **Version:** 2.0.4 (semver; bump major on invariant changes)
-- **Last updated:** 2026-09-15
+- **Version:** 2.0.5 (semver; bump major on invariant changes)
+- **Last updated:** 2026-09-17
 - **Authors:** The Zugzwang Authors
 - **Status:** Approved — rebaselined at 2.0.0 by D-29 (decision record amendment 2.5, 2026-09-06). The 1.0.0–1.0.49 line and its change log are retained in git history; last 1.0.x commit `e193cfb6`.
 - **Sections:** §0–§16, §20, Appendices A–B. §17–§19 and §21–§23 are intentionally absent (D-29); numbering is retained for cross-reference stability.
@@ -383,7 +383,7 @@ existed). Supersedes the former pre-confirm flow. See §16.1
 
 **Every comment rides a bet.** Under the v1.9.0 reply-as-bet model (ADR-0017 / ADR-0018), a comment is never a standalone write — it is the argument carried by a bet (§7). A top-level comment is a **post-bet** (F-BET-1 entry or F-BET-2 subsequent, post floor); a comment with a `parent_comment_id` is a **reply-bet** (F-COMMENT-2, reply floor 50). This section specifies the comment- and reply-facing behaviour of those bets — side-freezing, parent linkage, image attachment, length, and the no-stake-no-voice consequence — while the bet mechanics (price impact, ledger, single-side) live in §7. The two are one atomic action (INV-1). Because a comment is a bet, it can only be written while `market.state = Open`; once a market closes there are no new comments or replies (the debate window is the market-open window).
 
-**Rate-limit posture.** Posts and replies are bets, so their anti-abuse posture is the bet posture (per-IP burst caps via `BET_ATTEMPTS_PER_IP_PER_MIN`, §16.1), not a separate per-market comment/vote budget. Whether reply-bets additionally carry a per-market productive cap distinct from top-level bets is deferred to SPEC.2 §11 + the number-tuning pass; the R2 signed-PUT-URL mint endpoint keeps its own per-IP cap (`IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN`). There is no standalone comment or vote rate-limit budget in v1.9.0.
+**Rate-limit posture.** Posts and replies are bets, so their anti-abuse posture is the bet posture — **a per-ACCOUNT write cap (`BET_ATTEMPTS_PER_USER_PER_MIN`, §16.1) with a looser per-IP backstop behind it (`BET_ATTEMPTS_PER_IP_PER_MIN`), per ADR-0054** — not a separate per-market comment/vote budget. ⚠ This read *"per-IP burst caps"* alone until ADR-0054: a bet endpoint is unreachable without a session, so the address was never the identity the write belonged to, and one shared address made one participant's writing into everybody else's refusal. Whether reply-bets additionally carry a per-market productive cap distinct from top-level bets is deferred to SPEC.2 §11 + the number-tuning pass; the R2 signed-PUT-URL mint endpoint keeps its own per-IP cap (`IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN`). There is no standalone comment or vote rate-limit budget in v1.9.0.
 
 **Argument text = title + body (SCL-1).** A comment's argument is a single `comments.body` text field. By composition convention the `body` carries a **title** (its leading segment) followed by an optional **extended body**; the composer joins them into `body`, and read models derive the title + a teaser back via `deriveTitleTeaser` for card, hero, and list rendering (§9). There is **no separate title column** — the split is a read-time derivation; `COMMENT_MAX_LENGTH` bounds the whole `body`. This reconciles the spec to the shipped composer (the field was previously specified as an undifferentiated argument).
 
@@ -1210,7 +1210,8 @@ Symbolic only. Specific values pin at the number-tuning pass.
 | `ADMIN_LOGIN_ATTEMPTS_PER_IP_PER_HOUR` | Per-IP rate limit on `/admin/login` POST attempts. Brute-force guard for the static-password admin path (per `K1`, F-AUTH-ADMIN). |
 | `RATE_LIMIT_PER_MARKET_PER_DAY` | Per-user, per-market productive write cap. In v1.9.0 posts and replies are bets; whether reply-bets carry this per-market productive cap in addition to the per-IP bet burst cap is **deferred to SPEC.2 §11 + number-tuning**. No friendly-fire surface exists. Top-level bets remain unbound by a per-day productive cap. |
 | `RATE_LIMIT_BURST_PER_MIN` | Per-user burst cap on the reply-bet write surface (the v1.9.0 successor to the v1.8 comment write surface); exact applicability per SPEC.2 §11. |
-| `BET_ATTEMPTS_PER_IP_PER_MIN` | Per-IP anti-abuse burst cap on bet `place` / `sell` endpoints — the primary anti-abuse posture for posts and replies (both bets). A credential-stuffed bot can hammer the bet endpoint at network speed without this cap. Per ADR-0015 / SPEC.16. |
+| `BET_ATTEMPTS_PER_USER_PER_MIN` | Per-ACCOUNT write cap on bet `place` / `sell` endpoints — **the fairness control**, and the primary posture for posts and replies (both bets). The endpoint is unreachable without a session, so the account is the identity a write is billed to, and one participant may not out-post the room whichever address they arrive from. Per ADR-0054 / SPEC.2 §11. |
+| `BET_ATTEMPTS_PER_IP_PER_MIN` | Per-IP anti-abuse **backstop** behind the per-account cap above — a credential-stuffed bot driving many compromised accounts from one machine can hammer the bet endpoint at network speed without it. ⚠ Deliberately **looser than** `BET_ATTEMPTS_PER_USER_PER_MIN` (10x): below ten accounts sharing one address it can never fire first, so a NAT — an office, a campus, a carrier — meets the per-account cap it can understand rather than an address-shaped one it cannot see. It was the *primary* cap until ADR-0054 re-scoped it. Per ADR-0015 / ADR-0054 / SPEC.16. |
 | `IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN` | Per-IP anti-abuse burst cap on the R2 signed-PUT URL mint endpoint. The URL-mint endpoint can be hit independently of bet posting and is not bound by any per-market comment cap; an abusive client can request thousands of signed URLs without ever committing a bet. Per ADR-0015 / SPEC.16. |
 
 ### 16.2 Error Handling and Failure Modes
@@ -1242,6 +1243,7 @@ Each F-flow already names its errors inline. This subsection is a cross-referenc
 
 | Date | Version | Change | Ruling |
 |---|---|---|---|
+| 2026-09-17 | 2.0.5 | **ADR-0054 — the bet write cap belongs to the ACCOUNT, not the address.** §8's *Rate-limit posture* and §16.1 both stated the posture for posts and replies as a *per-IP burst cap*; it is now a per-ACCOUNT cap (`BET_ATTEMPTS_PER_USER_PER_MIN`, minted here) with the per-IP cap kept behind it as a looser abuse backstop. ⚠ **The correction is written INTO both operative sections rather than appended (`O-5`)** — an appendix reverses nothing a reader reaches first. The reasoning: a bet endpoint is unreachable without a session, so the address was never the identity a write belonged to, and one shared address turned one participant's writing into everybody else's refusal — an office, a campus, a carrier NAT. The credential-stuffing threat that justified the per-IP key is still answered, by the backstop, which is why it was demoted rather than deleted. §16.1's constants block gains the new name and records that the backstop **MUST exceed** the per-account cap, so a HARDEN.5 retune that inverts them reddens a test rather than a NAT in production. Numeric values stay deferred to HARDEN.5/6. | ADR-0054, 2026-09-17 |
 | 2026-09-15 | 2.0.4 | **POLL-IDLE — the debate-view poll costs less per tab.** §9 F-DEBATE-4 gains a third suspension: an idle reader (no pointer, touch, wheel, scroll or keyboard input for 5 minutes) stops the poll, and the first input refreshes immediately. Appendix B: `POLL_INTERVAL_MS_DEBATE_VIEW` 15000 → 30000; new `POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW` = 300000; new `AUTO_ADVANCE_MS_DEBATE_VIEW` = 15000, split out so the post auto-advance keeps its cadence; `SHARED_VIEW_MIN_WINDOW_MS` row corrected (no longer equal to the poll). Client-only: no server read, cache, API or database change | ruling 2026-09-15 (Option C) |
 | 2026-09-12 | 2.0.3 | **CACHE-KEY-1 (ADR-0051) — the shared read blocks stop being invalidated by activity.** §9 *Refresh* extended from the price series to the two participant shared read blocks, which were keyed on the pool `reserves` and therefore missed on every bet, for every reader, on exactly the busiest markets. **§16.1 + Appendix B** mint `SHARED_VIEW_MIN_WINDOW_MS` (15000, design pin) and the derived `SHARED_VIEW_EXPIRE_SEC`. Two consequences are recorded rather than left implicit: the hero's `currentValue` is computed **outside** the cache from the live pool, because it is money on a public surface and may not lag a window; and a poster's own argument, which the old key returned **by accident** of INV-1, is now returned by a bounded per-viewer bypass with a decision record behind it. ⚠ ADR-0041 **OQ-1 is closed by dissolution**, not by either candidate fix it named. | ADR-0051; founder rulings 2026-09-12 (window length · bypass over optimistic render · live `currentValue`) |
 | 2026-09-11 | 2.0.2 | QUOTE-1 · §9 imageless posts render the title-as-quotation well (design-canon C-QUOTE-1); presentation only | founder ruling 2026-09-11, PR #515 |
@@ -1318,7 +1320,8 @@ OTP_REQUESTS_PER_IP_BURST_PER_MIN = TBD
 ADMIN_LOGIN_ATTEMPTS_PER_IP_PER_HOUR = TBD
 RATE_LIMIT_PER_MARKET_PER_DAY = TBD
 RATE_LIMIT_BURST_PER_MIN = TBD
-BET_ATTEMPTS_PER_IP_PER_MIN = TBD
+BET_ATTEMPTS_PER_USER_PER_MIN = TBD  # the fairness cap (ADR-0054)
+BET_ATTEMPTS_PER_IP_PER_MIN = TBD  # the backstop; MUST exceed the per-user cap (ADR-0054)
 IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN = TBD
 ```
 
