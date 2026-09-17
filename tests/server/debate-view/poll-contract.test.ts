@@ -162,6 +162,30 @@ const EXPORT_ROUTE = "src/app/(public)/m/[slug]/export/route.ts";
  * relaxed would be a different decision entirely.
  */
 const IMAGE_ROUTE = "src/app/(public)/m/[slug]/export/image/route.ts";
+/**
+ * F-DEBATE-4b / ADR-0053 — the poll's "has anything changed?" probe, and the
+ * second endpoint admitted under `/m/[slug]` by the conscious edit these
+ * censuses demand rather than by widening them quietly (the IMAGE_ROUTE
+ * precedent, one row up).
+ *
+ * ⚠ THE QUESTION THESE GUARDS ASK IS ANSWERED, NOT SILENCED, and the answer is
+ * shorter than ADR-0050's. Their subject is whether a second endpoint FORKS the
+ * debate read and gives removal-masking a second place to diverge. This one
+ * cannot, because **it carries no content at all**: it returns
+ * `{"v": "<hash>"}` — a token over the market's status, its two pool reserves
+ * and a moderation-action count. No body, no teaser, no author, no post id.
+ * There is nothing in the response for masking to be wrong ABOUT (SC-1), and no
+ * second copy of the view model reaches the client.
+ *
+ * ⛔ AND THE REFRESH PATH IS UNCHANGED, which is the half that actually matters.
+ * A changed token still causes `router.refresh()` — the SAME re-invocation of
+ * the SAME composed server read, with masking applied where it always was. The
+ * probe decides only WHETHER to refresh, never WHAT the refresh returns. That is
+ * why SPEC.2 §4.3's closed catalogue is narrowed to CONTENT-BEARING endpoints
+ * rather than abandoned: an endpoint that cannot carry a body cannot fork a
+ * masking decision.
+ */
+const VERSION_ROUTE = "src/app/(public)/m/[slug]/version/route.ts";
 /** S-4 Phase D — the page's `'use cache'` wrapper around the loader. */
 const CACHED_VIEW = "src/server/debate-view/cached-view.ts";
 
@@ -211,15 +235,52 @@ describe("debate-view::poll-preserves-removal-masking", () => {
 		expect(code(POLL)).toMatch(/router\.refresh\(\)/);
 	});
 
-	it("the poll issues no client-side data fetch of its own", () => {
+	it("the poll fetches the version probe and nothing else", () => {
+		// ⛔ INVERTED BY ADR-0053, NOT RETIRED. This asserted the poll issued NO
+		// client fetch at all, which was the cheapest encoding of "the read never
+		// forks" while the poll's only move was `router.refresh()`. The poll now
+		// asks a question first — but the protection is unchanged and is pinned
+		// below: what it may fetch is the VERSION probe, which carries no content,
+		// and never a payload it could render.
 		expect(src(POLL)).not.toBeNull();
-		expect(CLIENT_FETCH.test(code(POLL))).toBe(false);
+		const poll = code(POLL);
+
+		// It does fetch, and the fetch is the version probe.
+		expect(CLIENT_FETCH.test(poll)).toBe(true);
+		expect(poll).toMatch(/\/version\b/);
+
+		// ⛔ THE LOAD-BEARING HALF: the refresh path is untouched. A changed token
+		// re-invokes the composed server read, where masking lives. Losing this
+		// would mean the poll had started rendering its own payload — the fork
+		// this file exists to prevent.
+		expect(poll).toMatch(/router\.refresh\(\)/);
+
+		// And it reaches NO other endpoint. Naming each one is deliberate: a
+		// blanket "only one fetch(" count would pass a poll that swapped the probe
+		// for a content read.
+		for (const forbidden of [
+			"/export",
+			"/quote",
+			"/api/bets",
+			"/api/uploads",
+		]) {
+			expect(poll).not.toContain(forbidden);
+		}
+		// POSITIVE CONTROL — the scan must be able to see a path at all, or every
+		// negative above passes against a file that fetches nothing.
+		expect(poll).toContain("/version");
 	});
 
 	it("no module in the debate READ tree issues a client-side data fetch", () => {
 		const offenders = sourcesUnder("src/components/debate")
 			.filter((file) => !READ_TREE_EXCLUDES.test(file))
 			.filter((file) => file !== EXPORT_DOWNLOAD)
+			// ADR-0053 — the poll's version probe. NAMED AS ONE FILE for the same
+			// reason `EXPORT_DOWNLOAD` is: a directory pattern would quietly admit
+			// whatever lands beside it next. What the probe may fetch is pinned by
+			// "the poll fetches the version probe and nothing else" above; this
+			// line only keeps the census from double-reporting it.
+			.filter((file) => file !== POLL)
 			.filter((file) => CLIENT_FETCH.test(code(file)));
 		expect(offenders).toEqual([]);
 	});
@@ -232,6 +293,7 @@ describe("debate-view::poll-preserves-removal-masking", () => {
 			IMAGE_ROUTE,
 			EXPORT_ROUTE,
 			"src/app/(public)/m/[slug]/quote/route.ts",
+			VERSION_ROUTE,
 		]);
 	});
 
@@ -256,6 +318,7 @@ describe("debate-view::poll-preserves-removal-masking", () => {
 			IMAGE_ROUTE,
 			EXPORT_ROUTE,
 			"src/app/(public)/m/[slug]/quote/route.ts",
+			VERSION_ROUTE,
 			"src/app/api/_smoke-error/route.ts",
 			"src/app/api/auth/[...all]/route.ts",
 			"src/app/api/bets/place/route.ts",
