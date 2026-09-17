@@ -2904,6 +2904,25 @@ HTML-FINISH row 7 wraps the hero post's argument text in straight ASCII quotes (
 
 ⚠ **A live instance was measured at SYNC-2:** the bare identifier `O-10` named two different rules simultaneously — one minted in `CLAUDE.md` §8, one cited six times across three files. Resolved at SYNC-2 by minting `O-12`; the row stays open because the namespace problem is general and the ADR it calls for is unwritten.
 
+⚠⚠ **A SECOND LIVE INSTANCE, MEASURED AT MOBILE-SIDESCROLL, 2026-09-17 — and it is in the one space `CLAUDE.md` §8 `O-15` names as collision-proof.** `git ls-tree --name-only origin/main docs/adr/` lists **two `0051`s and two `0052`s**:
+
+```
+0051-phone-market-detail-presentation.md
+0051-windowed-shared-read-caches-and-the-poster-bypass.md
+0052-prerendering-the-auth-shell-by-hoisting-its-two-request-reads.md
+0052-v1-feature-flag-kill-switches.md
+```
+
+`O-15` argues that a filename-allocated identifier *cannot* collide, because two lanes adding `0045-*.md` produce an add/add conflict a merge cannot silently resolve. That is true only when the two lanes choose the same **slug**. Two lanes that agree on the number and differ on the slug produce two different paths, git merges both cleanly, and nothing anywhere reports a problem. ⇒ **The mechanism `O-15` relies on is the FILENAME, not the NUMBER, and the number is the part that is cited.**
+
+⚠ **The recon that found this saw only half of it, and the reason is worth keeping.** It read the ceiling with `ls docs/adr/ | tail -5`, which showed `0051`'s pair because they sort adjacently — and hid `0052`'s, because `0052-p…` sorts before `0052-v…` and only the second survives a tail. A tail cannot answer a duplicate question. `cut -c1-4 | sort | uniq -d` can, and is what measured this.
+
+**Measured at `e326ad08`:** 56 numbered files, numbers `0001`–`0056`, `0002` and `0012` unused, two numbers doubly allocated — which is the arithmetic that closes (56 − 2 unused + 2 duplicates = 56 files). Ceiling `0056`; **next free `0057`**.
+
+⚠ **Trigger, and it is nearer than this row's general one:** the next lane to allocate an ADR number is trusting a mechanism that has now failed twice. Two things are owed and they are separable — **(1)** a one-line `O-15` correction, in the next commit that touches `CLAUDE.md` §8: same number AND same slug conflicts, same number alone does not; **(2)** a ruling on which `0051` and which `0052` move, then a `chore/` that renumbers them and every citation, grep-verified. (1) is cheap and stops the bleeding; (2) is a ruling and waits for one.
+
+**Evidence.** `zz_MOBILE-SIDESCROLL_recon_2026-09-17T2021.md` §R9 for the `0051` half; the `0052` half and the census arithmetic were measured at MOBILE-SIDESCROLL execute and are in `zz_MOBILE-SIDESCROLL_execute_2026-09-17T2107.md` §STEP 3.
+
 ---
 
 ## LANE-PLANS-ABSENT — GH-STAR and VIEWS-1 shipped to `src/` with no plan on `main`
@@ -4240,3 +4259,34 @@ asks for), not 4.40px.
 **The one thing that is NOT an option:** hiding a control, dropping a countdown pair,
 or letting the row scroll. All three are vetoed by the round's brief and none is
 needed — the row fits without them at every width at and above 375.
+
+---
+
+## PHONE-PANE-VOID — the short side of a phone market carries the tall side's scroll extent
+
+**Originating task:** MOBILE-SIDESCROLL, 2026-09-17. Measured on the production
+build (`canary 7f73454c`) at 375×812.
+
+**The measurement.** Both feed panes are always mounted in the snap track
+(`PhoneFeedTrack.tsx:316`), declare no height, and flex cross-axis stretch pads
+the shorter to the taller. `phone-scroll-region`'s `scrollHeight` is therefore
+`max(YES, NO)` and never changes with the active side. On
+`/m/chess-fide-tiebreak-response`: YES 57 posts / 15,710px, NO 2 posts / 702px —
+**15,008px of empty stretched box** (~24 viewports) below the last NO argument.
+Six of eight live markets are lopsided; two have an empty side.
+
+**Why deferred.** `PhoneFeedTrack.tsx:302-305` states this in writing as an
+accepted price; changing it is an ADR against a ratified position, not a fix.
+MOBILE-SIDESCROLL resets the region to the top on a side switch, which removes
+the landing-in-the-void symptom. The extent itself is untouched.
+
+**Conditional trigger.** The next phone-tier pass, or the first participant
+report of "nothing below the arguments" on a lopsided market.
+
+**Expected next task.** Own recon, then an ADR bounding the region's scrollable
+extent to the active pane. ⚠ A listener reds `phone-gesture-wall.test.ts:297`;
+a scroller inside a pane reds `phone-shell-bound.test.ts:459`. A cosmetic
+end-of-list marker was considered and rejected — 24 viewports down, nobody
+sees it.
+
+**Evidence.** `zz_MOBILE-SIDESCROLL_recon_2026-09-17T2021.md` §R5.

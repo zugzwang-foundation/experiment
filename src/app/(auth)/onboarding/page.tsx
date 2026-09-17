@@ -56,6 +56,35 @@ import { pfpUrl } from "@/server/identity-pool/pfp-url";
 // unassigned or unconfigured one falls back to /public/pfp-placeholder.svg
 // wires the R2 URL builder.
 
+/**
+ * AUTH-PRERENDER (ADR-0052) — THIS OPT-OUT ARRIVED FROM `(auth)/layout.tsx`,
+ * and the move is the point rather than a relocation.
+ *
+ * It used to sit on the LAYOUT, where it covered all three routes in the group
+ * and left every one of them with an empty shell — including the ~30 ms WARLI
+ * artwork the layout mounts, re-serialized per request on the surface least
+ * able to afford it. The layout's two awaits are now behind a Suspense
+ * boundary, so `/sign-in` and `/sign-in/otp` prerender whole and the opt-out
+ * narrows to the one page that genuinely still needs it: THIS one.
+ *
+ * ⚠ IT IS NOT DEFERRAL-BY-HABIT. Under `cacheComponents` an unwrapped
+ * `cookies()` read errors the prerender build, and the read below is the
+ * onboarding gate — it drives four `redirect()` calls, which is the whole
+ * reason this page exists and is not a thing to restructure for a rendering
+ * benefit. This page is reached once per participant, by a visitor who has
+ * just come back from an OAuth round trip; per-request cost is not its
+ * problem the way it is `/sign-in`'s.
+ *
+ * ⚠ AND IT CARRIES A KNOWN COST WORTH RE-CHECKING RATHER THAN INHERITING.
+ * `docs/logs/S4-PHASE-B.md:29-45` records that under `cacheComponents` +
+ * `instant = false`, `redirect()` degrades from a real 307 to a
+ * `<meta http-equiv="refresh">`. The four redirects below are exactly that
+ * shape, so the exit criterion recorded there applies here: verify with
+ * `curl -D -` for a real `307` and a `Location` header, never a `200` that
+ * happens to carry the right markup.
+ */
+export const instant = false;
+
 async function submitTosAcceptance(formData: FormData): Promise<void> {
 	"use server";
 	await acceptTosAction(formData);

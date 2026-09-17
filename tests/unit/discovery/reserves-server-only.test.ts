@@ -119,7 +119,11 @@ describe("V13 reserves never cross the client boundary", () => {
 		// server-local Map. Reserves still land in a server-local binding
 		// (`priced`), still reach only a server function, and still never touch
 		// the card — which is the whole of what this guard protects.
-		expect(page).toContain("getMarketPricingAndReservesBatch(");
+		// ADR-0055 renamed the read this page performs — the pool batch now goes
+		// through `getCachedDiscoveryPricing`. What this line pins is unchanged:
+		// the page performs the pool read ITSELF, so `reserves` is a binding here
+		// and never a prop.
+		expect(page).toContain("getCachedDiscoveryPricing(");
 		expect(page).toContain("priceByMarket.get(m.id) ?? null");
 		// …and passed to a SERVER function as an argument. ⚠ CACHE-KEY-1 changed
 		// WHICH function: reserves used to be the cached block's second argument

@@ -52,6 +52,12 @@ vi.mock("@/server/storage/r2", () => ({
 
 import * as schema from "@/db/schema";
 import { bets, comments, events, markets, pools, users } from "@/db/schema";
+import {
+	DISCOVERY_PRICE_EXPIRE_SEC,
+	DISCOVERY_PRICE_MIN_WINDOW_MS,
+	SHARED_VIEW_EXPIRE_SEC,
+	SHARED_VIEW_MIN_WINDOW_MS,
+} from "@/server/config/limits";
 import { getMarketPricingAndReservesBatch } from "@/server/debate-view/market-pricing";
 import { getMarketTotals } from "@/server/debate-view/market-totals";
 import { selectHeroTopPosts } from "@/server/discovery/hero";
@@ -339,16 +345,24 @@ function functionBlock(source: string, name: string): string {
 	throw new Error(`unbalanced braces reading ${name}`);
 }
 
-describe("Discovery cache boundary — R3 (price/reserves never cached)", () => {
-	it("card.pricing is assigned from the LIVE read, never from the cached one", () => {
+describe("Discovery cache boundary — R3 (price comes from the pool read, never from the market block)", () => {
+	it("card.pricing is assigned from the pricing read, never from the cached market block", () => {
 		const page = read("src/app/(public)/page.tsx");
-		// T-03 — the live read is now BATCHED ahead of the loop rather than
-		// issued per market inside it. What R3 actually protects is unchanged and
-		// is the second assertion: `pricing` is assigned from the LIVE read,
-		// never from the cached block. The first assertion pins the batch call so
-		// a revert to a per-market read inside the loop reddens here as well as
-		// in the round-trip count above.
-		expect(page).toContain("getMarketPricingAndReservesBatch(");
+		// ⛔ R3 IS INVERTED BY ADR-0055, NOT RETIRED, and the distinction is the
+		// whole reason this block still exists. R3 was "price/reserves NEVER
+		// cached" — Discovery paid a live pool read per visitor so the front page
+		// could never show a stale price. That is now a windowed read
+		// (`getCachedDiscoveryPricing`), because `/m/[slug]` — the page that
+		// actually takes the bet — has been serving a PRERENDERED price all along,
+		// so the old rule made Discovery stricter than the surface it links to at
+		// the cost of a connection per arrival.
+		//
+		// ⚠ WHAT R3 PROTECTED IS UNCHANGED AND IS THE REST OF THIS TEST: `pricing`
+		// comes from the POOL read and never from `getCachedMarketDiscoveryData`.
+		// Those are two different caches with two different windows, and the
+		// market block carries no price at all — sourcing `pricing` from it would
+		// be wrong at any freshness. The negative half below is that guard.
+		expect(page).toContain("getCachedDiscoveryPricing(");
 		expect(page).toContain("priceByMarket.get(m.id) ?? null");
 		expect(page).toContain("pricing: priced?.pricing ?? null");
 		// The negative half: the cached call's result must never feed `pricing`.
@@ -411,6 +425,63 @@ describe("Discovery cache boundary — R3 (price/reserves never cached)", () => 
 		// change at `limits.ts` (the `cached-series.ts` rule, applied here).
 		expect(list).toContain("SHARED_VIEW_MIN_WINDOW_MS / 1000");
 		expect(perMarket).not.toMatch(/cacheLife\(\s*\{[^}]*\b15\b/);
+	});
+
+	it("the pool read is windowed, tighter than the block beside it, and takes no db client", () => {
+		// ADR-0055 — the third cached block, and the one that carries money.
+		// Every assertion here is shaped by a way this fix can silently rot back
+		// into the per-visitor read it replaced.
+		const pricing = read("src/server/discovery/cached-pricing.ts");
+		const block = functionBlock(pricing, "getCachedDiscoveryPricing");
+
+		// 1. It is actually a cache. Without this the whole change is a rename.
+		expect(block).toContain('"use cache"');
+		expect(block).toMatch(/cacheLife\(\s*\{/);
+
+		// 2. Bound to the constants, never a literal — the `cached-series.ts`
+		//    rule, so the tune stays a one-line change at `limits.ts`.
+		expect(block).toContain("PRICE_WINDOW_SEC");
+		expect(block).toContain("DISCOVERY_PRICE_EXPIRE_SEC");
+		expect(pricing).toContain("DISCOVERY_PRICE_MIN_WINDOW_MS / 1000");
+		expect(block).not.toMatch(/cacheLife\(\s*\{[^}]*\b5\b/);
+
+		// 3. ⛔ NO DATABASE CLIENT IN THE SIGNATURE. A `'use cache'` key IS the
+		//    argument list, so a client parameter would put a connection object
+		//    into a cache key — unserialisable, and wrong even if it serialised,
+		//    because two callers' clients would mint two entries for one answer.
+		//    The uncached `getMarketPricingAndReservesBatch` keeps its client for
+		//    `/m/[slug]`, which reads inside a transaction; this one must not.
+		const signature = pricing.slice(
+			pricing.indexOf("export async function getCachedDiscoveryPricing"),
+			pricing.indexOf("{", pricing.indexOf('"use cache"') - 200),
+		);
+		expect(signature).not.toMatch(/\bDbClient\b|\bclient\s*:/);
+
+		// 4. ⛔ MONEY IS FRESHER THAN THE CONTENT BESIDE IT. The price window must
+		//    stay strictly tighter than the per-market block's, so a figure a
+		//    reader can act on is never older than the arguments around it. This
+		//    is the invariant ADR-0055 trades against ADR-0051's flat refusal, and
+		//    a HARDEN retune that relaxes it reddens here rather than on the
+		//    product's front page.
+		expect(DISCOVERY_PRICE_MIN_WINDOW_MS).toBeLessThan(
+			SHARED_VIEW_MIN_WINDOW_MS,
+		);
+		expect(DISCOVERY_PRICE_EXPIRE_SEC).toBeLessThan(SHARED_VIEW_EXPIRE_SEC);
+	});
+
+	it("the page no longer performs the uncached pool read", () => {
+		// ⛔ THE REGRESSION THIS FIX EXISTS TO PREVENT, stated as its own case.
+		// Re-importing `getMarketPricingAndReservesBatch` here would restore the
+		// per-visitor database read and drop Discovery back out of the prerender
+		// — with every other assertion in this file still green, because they all
+		// check that `pricing` comes from a pool read and say nothing about which
+		// one. That is exactly the shape that shipped the old defect.
+		const page = read("src/app/(public)/page.tsx");
+		expect(page).not.toContain("getMarketPricingAndReservesBatch");
+		expect(page).not.toContain("debate-view/market-pricing");
+		// POSITIVE CONTROL — the scan must be able to see the real thing, or the
+		// two negatives above pass against a file that was renamed or moved.
+		expect(page).toContain("getCachedDiscoveryPricing(");
 	});
 
 	it("hero.ts takes no reserves and withholds the one reserve-derived field", () => {

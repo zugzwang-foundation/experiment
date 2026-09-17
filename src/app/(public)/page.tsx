@@ -4,8 +4,7 @@ import { DiscoveryCarousel } from "@/components/discovery/DiscoveryCarousel";
 import { EmptyState } from "@/components/discovery/EmptyState";
 import { ErrorState } from "@/components/discovery/ErrorState";
 import { LoadingSkeleton } from "@/components/discovery/LoadingSkeleton";
-import { db } from "@/db";
-import { getMarketPricingAndReservesBatch } from "@/server/debate-view/market-pricing";
+import { getCachedDiscoveryPricing } from "@/server/discovery/cached-pricing";
 import { valueHeroPosts } from "@/server/discovery/hero-value";
 import {
 	getCachedDiscoveryMarketIds,
@@ -17,9 +16,9 @@ import { recordCacheAttempt } from "@/server/observability/cache-metrics";
 /**
  * OQ-1 A (ratified §16): Discovery's R-2 cache retrofit landed at S-4 Phase C
  * — `getCachedDiscoveryMarketIds` / `getCachedMarketDiscoveryData`
- * (`server/discovery/list.ts`) carry `'use cache'`; this page itself stays
- * uncached, composing them plus a live per-market pricing read (see
- * `DiscoveryContent` below). S-4 Phase B enabled `cacheComponents`, under
+ * (`server/discovery/list.ts`) carry `'use cache'`; since ADR-0055 the
+ * per-market pricing read is windowed too (`cached-pricing.ts`), so every
+ * read this page composes is now cached (see `DiscoveryContent` below). S-4 Phase B enabled `cacheComponents`, under
  * which `force-dynamic` is redundant (Next.js: "all pages are dynamic by
  * default") and errors the build if left in place. `instant = false`
  * replaces it here as the equivalent opt-out — this route still isn't
@@ -77,20 +76,27 @@ export default function DiscoveryPage() {
  * S-4 Phase C — split into a CACHED half and a LIVE half, never a single
  * uncached loop the way this used to read:
  *   - `getCachedDiscoveryMarketIds()` — cached, the Open-markets set.
- *   - `getMarketPricingAndReservesBatch` — LIVE, every render, never cached in
- *     any form, one statement for the whole surface (T-03). `pricing` goes
- *     straight onto `card` from here.
+ *   - `getCachedDiscoveryPricing` — the pool read, one statement for the whole
+ *     surface (T-03), behind a `DISCOVERY_PRICE_MIN_WINDOW_MS` window since
+ *     ADR-0055. ⚠ THIS BULLET READ "LIVE, every render, never cached in any
+ *     form" and that was the single await keeping Discovery out of the
+ *     prerender. `pricing` still goes straight onto `card` from here.
  *   - `getCachedMarketDiscoveryData(id)` — cached, keyed on the market id
  *     ALONE with a `SHARED_VIEW_MIN_WINDOW_MS` window (CACHE-KEY-1,
  *     ADR-0051). ⚠ IT USED TO TAKE `reserves` AS A SECOND ARGUMENT, and that
  *     is what this task removed: a `'use cache'` key is its argument list, so
  *     every bet moved the pool, changed the key, and forced a miss for every
  *     reader — the cache worked on quiet markets and not at all on busy ones.
- *   - `valueHeroPosts(...)` — the one figure that could NOT simply move
- *     behind the window. `topPosts[].currentValue` is `computeSell` over the
- *     live pool, i.e. money on a public surface, so the cached block returns
- *     the share counts and the figure is composed HERE against the batched
- *     live read. The type enforces it: `HeroTopPostsBase` omits the field.
+ *   - `valueHeroPosts(...)` — `topPosts[].currentValue` is `computeSell` over
+ *     the pool, so the cached block returns the share COUNTS and the figure is
+ *     composed HERE against the batched read. The type enforces it:
+ *     `HeroTopPostsBase` omits the field. ⚠ THE COMPOSITION SURVIVES ADR-0055
+ *     AND ITS ORIGINAL REASON DOES NOT. It read "the one figure that could NOT
+ *     simply move behind the window… money on a public surface"; the figure now
+ *     lags `DISCOVERY_PRICE_MIN_WINDOW_MS` like every price beside it. What
+ *     keeps the composition is the OTHER half of ADR-0051's argument, untouched:
+ *     `currentValue` must not be keyed on `reserves`, because that is what made
+ *     every bet evict every reader's entry.
  * `reserves` itself stays a server-local binding throughout — never pushed
  * onto `card`, which crosses into the `"use client"` carousel (C8/V13), and
  * neither is `heroShares`, for the same reason.
@@ -110,17 +116,26 @@ export async function DiscoveryContent() {
 		recordCacheAttempt("discovery-list", null);
 		const marketIds = await getCachedDiscoveryMarketIds();
 		// T-03 — ONE pool read for every market on the surface, not one per
-		// market in series. This read is deliberately never cached (it is the
-		// live price), so before batching every visitor paid one round trip per
-		// open market, sequentially, before the page could render. Batching is
-		// the right shape rather than `Promise.all` precisely because the open
-		// connection bottleneck is what hurts here: this takes ONE connection
-		// once, where concurrent singular reads would take one per market at the
-		// worst possible moment. `priceByMarket.get(id) ?? null` below reproduces
-		// the singular read's defensive-null contract for a market with no pool.
-		const priceByMarket = await getMarketPricingAndReservesBatch(
-			db,
-			marketIds.map((m) => m.id),
+		// market in series. Batching is the right shape rather than
+		// `Promise.all` precisely because the open connection bottleneck is what
+		// hurts here: this takes ONE connection, where concurrent singular reads
+		// would take one per market at the worst possible moment.
+		// `priceByMarket.get(id) ?? null` below reproduces the singular read's
+		// defensive-null contract for a market with no pool.
+		//
+		// ⛔ ADR-0055 — THIS READ IS NOW WINDOWED, AND THE COMMENT THAT STOOD
+		// HERE SAID THE OPPOSITE ("deliberately never cached (it is the live
+		// price)"). It is corrected rather than deleted because the old sentence
+		// was true and load-bearing for two ADRs: this single uncached await was
+		// the ONLY reason Discovery re-rendered per visitor, every sibling read
+		// being cached already, so it alone kept the surface out of the prerender
+		// and took a connection for every arrival. What changed is not the
+		// importance of a live price but WHERE the risk of a stale one lives:
+		// `/m/[slug]`, the page that actually takes a bet, serves a PRERENDERED
+		// price corrected by the poll, so Discovery was paying per visitor to be
+		// stricter than the surface it links to. See `cached-pricing.ts`.
+		const priceByMarket = new Map(
+			await getCachedDiscoveryPricing(marketIds.map((m) => m.id)),
 		);
 		views = [];
 		for (const m of marketIds) {
@@ -138,10 +153,12 @@ export async function DiscoveryContent() {
 				},
 				// CHART-1 — the hero chart's live right edge (SPEC.1 1.0.45 §9).
 				// `data.series` is floored history from `getCachedReserveWalk`; the
-				// terminal point is composed HERE from `priced`, the same live pool
-				// read two lines above that already fills `card.pricing` and renders
-				// in the price bar. Zero additional queries — that is the only reason
-				// the history is allowed to be a minute old.
+				// terminal point is composed HERE from `priced`, the same pool read two
+				// lines above that already fills `card.pricing` and renders in the
+				// price bar. Zero additional queries — that is the only reason the
+				// history is allowed to be a minute old. (ADR-0055 windows that read at
+				// `DISCOVERY_PRICE_MIN_WINDOW_MS`; the tail is that much behind, against
+				// a history floored at a minute and an axis that runs to November.)
 				//
 				// ⚠ `nowIso` is read at RENDER, never inside the cache: a clock read
 				// behind a cached boundary freezes for the whole window, which would
@@ -175,16 +192,22 @@ export async function DiscoveryContent() {
 					isOpen: true,
 				}),
 				// CACHE-KEY-1 — the hero's `Đ staked → Đ now` right-hand figure,
-				// composed HERE from `priced`, the same live pool read that already
-				// fills `card.pricing` two lines above. Zero additional queries.
+				// composed HERE from `priced`, the same pool read that already fills
+				// `card.pricing` two lines above. Zero additional queries.
 				//
 				// ⛔ IT CANNOT BE SKIPPED BY ACCIDENT (**O-1**). `data.topPosts` is
 				// `HeroTopPostsBase` — `currentValue` OMITTED — so assigning it
 				// directly is a type error rather than a silently missing figure.
-				// That omission is the whole reason the cached block may now be
-				// keyed on identity: everything it still carries is content or a
-				// count and may lag one window, while a Đ amount on the most public
-				// surface in the product may not. See `hero-value.ts`.
+				// ⚠ THE CLAUSE THAT FOLLOWED THIS IS REVERSED BY ADR-0055 and is
+				// corrected here rather than left to an appendix (`O-5`): it said the
+				// omission was licensed because "a Đ amount on the most public surface
+				// in the product may not" lag a window. It now lags
+				// `DISCOVERY_PRICE_MIN_WINDOW_MS`, because `/m/[slug]` — where the bet
+				// is actually placed — has been serving a prerendered price all along,
+				// so this surface was the stricter of the two for no one's benefit.
+				// The omission still earns its place: it keeps `currentValue` off the
+				// cache KEY, which is the half of ADR-0051 that stands. See
+				// `hero-value.ts`.
 				topPosts: valueHeroPosts(
 					data.topPosts,
 					data.heroShares,

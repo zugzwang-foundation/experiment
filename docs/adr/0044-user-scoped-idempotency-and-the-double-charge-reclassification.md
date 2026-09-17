@@ -9,6 +9,8 @@
 | **Frame document** | `ZUGZWANG_S-7_BRIEF_v2_0.md` + `ZUGZWANG_S-7_BRIEF_v2_0_ADDENDUM-A.md`; `docs/plans/S-7.md` |
 | **Supersedes** | ADR-0031, partial — only the "receipt keyed by `idempotency_key` alone" risk-acceptance bullet (§ Reviewer notes). The rest of ADR-0031 (the receipt table, the terminal-error-mapping contract) stands unamended. |
 | **Superseded-by** | — |
+| **Amends** | — |
+| **Amended-by** | ADR-0054 — the §Consequences/Negative bullet accepting the transaction-reaching cross-user collision as *"bounded by the existing `bet-ip` rate limit"*. That bound moved: the bet write cap is re-keyed to the account, and `bet-ip` is demoted to a 10x backstop. ⚠ **Read that mitigation as: one machine driving MANY accounts is now bounded at 300/min rather than 30/min, while the same machine on ONE account is unchanged at 30/min and the previously-unbounded many-machine case gains a per-account bound it never had.** ADR-0054 §"The ADR-0044 bound" carries the full three-row table and the argument for accepting the middle row. The decision this ADR makes is untouched; only this mitigation's strength moves. |
 
 **This ADR does not decide:** `PENDING_TTL_SECONDS`'s value (parked for S-5's load run — ADR-0038 forbids acting on an unmeasured number); same-user cross-*endpoint* confusion, i.e. one key reused across `place` and `sell` (the flow axis — `docs/parked.md` D-8 stays open on this point, amended not discharged, below); ADR-0013's lock order, isolation level, or retry budget; whether to add a `noCache` escape to the thrown error channel (DC-b, deferred — reason below).
 

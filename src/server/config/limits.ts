@@ -25,8 +25,33 @@ export const OTP_REQUESTS_PER_IP_BURST_PER_MIN = 10;
 /** Per-IP rate limit on /admin/login POST attempts. PLACEHOLDER VALUE — tuned by HARDEN.5 per SPEC.1 §16.1 + ADR-0010. */
 export const ADMIN_LOGIN_ATTEMPTS_PER_IP_PER_HOUR = 10;
 
-/** Per-IP anti-abuse burst cap on bet place/sell. PLACEHOLDER VALUE — tuned by HARDEN.5 per SPEC.1 §16.1 + ADR-0015 D7. */
-export const BET_ATTEMPTS_PER_IP_PER_MIN = 30;
+/**
+ * Per-ACCOUNT write cap on bet place/sell — the fairness control, and the one
+ * that fires in normal operation. Per ADR-0054: a bet endpoint is reachable
+ * only behind a session, so the account is the identity the product actually
+ * bills the write to, and one participant may not out-post the room whichever
+ * address they arrive from. Carries the value `BET_ATTEMPTS_PER_IP_PER_MIN`
+ * held before ADR-0054, because the number was always meant as "how fast may
+ * one person write" — it was the KEY that was wrong, not the figure.
+ */
+export const BET_ATTEMPTS_PER_USER_PER_MIN = 30;
+
+/**
+ * Per-IP anti-abuse BACKSTOP on bet place/sell — deliberately loose, and no
+ * longer the fairness control (ADR-0054 moved that to the per-account cap
+ * above). It exists so one machine cannot hammer the endpoint across many
+ * accounts, which is the credential-stuffing threat SPEC.2 §11 names.
+ *
+ * ⚠ 10x the per-account cap is the whole design, not a round number: below ten
+ * accounts sharing an address it can never fire FIRST, so a NAT — an office, a
+ * campus, a carrier — reaches the per-account cap it should reach rather than
+ * an address-shaped one it cannot see or explain. Above that it bounds a single
+ * machine at 5 writes/second, which the bet path's SERIALIZABLE pool-row lock
+ * already answers for.
+ *
+ * PLACEHOLDER VALUE — tuned by HARDEN.5 per SPEC.1 §16.1 + ADR-0015 D7.
+ */
+export const BET_ATTEMPTS_PER_IP_PER_MIN = 300;
 
 /** Per-IP anti-abuse burst cap on R2 signed-PUT URL mint. PLACEHOLDER VALUE — tuned by HARDEN.5 per SPEC.1 §16.1 + ADR-0015 D7. */
 export const IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN = 10;
@@ -345,6 +370,43 @@ export const SHARED_VIEW_MIN_WINDOW_MS = 15000;
  * this surface's chart — so no shared block is ever older than the oldest thing
  * rendered beside it. Seconds, not milliseconds: `cacheLife` takes seconds. */
 export const SHARED_VIEW_EXPIRE_SEC = MARKET_SERIES_MIN_WINDOW_MS / 1000;
+
+/**
+ * Minimum interval between LIVE POOL PRICE reads on Discovery (`/`) — the
+ * per-market spot price and reserves behind every card, the hero chart's live
+ * tail and the hero's `Đ now` figure (ADR-0055).
+ *
+ * ⛔ THIS IS A MONEY FIGURE BEHIND A WINDOW, WHICH ADR-0051 EXPRESSLY REFUSED,
+ * so read why before touching it. That ADR composed `currentValue` outside the
+ * cache on the rule that "money on a public surface may not lag a window", and
+ * the rule was right about money and wrong about which surface bears the risk.
+ * `/m/[slug]` — the page where a bet is actually placed — has been serving a
+ * PRERENDERED price all along, measured at thirteen hours old on production and
+ * corrected only by the client poll. Discovery, where nobody can bet, was the
+ * one surface paying a live database read per visitor to be stricter than the
+ * page taking the money. The asymmetry, not the freshness, is what was wrong.
+ *
+ * ⚠ FIVE SECONDS IS NOT A PERFORMANCE DIAL — it is the largest lag that keeps
+ * Discovery STRICTER than the surface it links to. Raising it toward
+ * `SHARED_VIEW_MIN_WINDOW_MS` would make a price on the front page older than
+ * the same price one click away, which is the defect this window exists under,
+ * not a cheaper version of it. Lowering it below a second re-opens the
+ * per-visitor read without buying a freshness anyone can perceive.
+ *
+ * Read from this constant at every call site and never inlined. Integer
+ * (milliseconds, not Dharma). */
+export const DISCOVERY_PRICE_MIN_WINDOW_MS = 5000;
+
+/**
+ * The outer bound on serving a `DISCOVERY_PRICE_MIN_WINDOW_MS` entry STALE
+ * while a revalidation is in flight — `cacheLife`'s `expire`, in seconds.
+ *
+ * ⚠ Deliberately NOT `SHARED_VIEW_EXPIRE_SEC` (60 s) and deliberately not the
+ * `cached-series.ts` `window × 60` ratio, which would hand a 5 s window a 300 s
+ * ceiling. This entry holds a PRICE, so its stale ceiling is the number that
+ * actually bounds how wrong the front page can be during a revalidation, and it
+ * is pinned tight for that reason alone. Seconds, not milliseconds. */
+export const DISCOVERY_PRICE_EXPIRE_SEC = 30;
 
 // === CHART-3: the fixed experiment window (SPEC.1 1.0.48 §9 + §16.1) ======
 

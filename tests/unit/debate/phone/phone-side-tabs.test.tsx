@@ -353,3 +353,142 @@ describe("phone side tabs — the restyle does not drop the tab contract (G5)", 
 		expect(onSelect).not.toHaveBeenCalled();
 	});
 });
+
+/**
+ * MOBILE-SIDESCROLL — A SIDE SWITCH LANDS AT THE TOP OF THE LIST.
+ *
+ * The bounded shell has ONE vertical scroller above the horizontal track, so
+ * both panes share a scroll position and the shorter side is stretched to the
+ * taller one's height. Measured on production: a market with 57 YES arguments
+ * and 2 NO ones gives the NO pane a 15,710px box holding 702px of content, and
+ * a reader parked deep in YES who taps NO keeps the offset — landing 8,298px
+ * below the last NO argument, on four of five vertical sample points of bare
+ * pane. Nothing clamps it because no height ever changes.
+ *
+ * ⛔⛔ THE RESET IS WIRED AT THE TAP CALLSITE AND NOWHERE ELSE, WHICH IS WHY
+ * THIS IS THREE ROWS RATHER THAN ONE. `onSideKey` is ALSO the snap track's
+ * `onActiveChange` — `PhoneFeedTrack` calls it from an IntersectionObserver
+ * when a pane arrives — so a reset placed inside it fires on every sideways
+ * swipe, and again on the observer confirming the tab's own programmatic slide.
+ * And `setActiveSide` has a THIRD writer, the posted-card jump, which does its
+ * own `region.scrollTo` to bring a freshly-posted argument to the top; a reset
+ * keyed on `activeSide` races that jump and wins, sending an author who just
+ * argued to the top of a feed instead of to their own argument.
+ *
+ * ⚠ jsdom cannot fire an IntersectionObserver, so that invariant is not
+ * behaviourally reachable here. It is a WIRING fact and T3 asserts it as one.
+ *
+ * ⚠ NO PAIRED DESKTOP CONTROL, AND THAT IS A READING OF THE RULE RATHER THAN AN
+ * EXEMPTION FROM IT. `desktop-neutrality.test.tsx` pins logic edits in PAIRS
+ * because ADR-0051 D-2/A1 governs edits to DESKTOP-TREE files, where "stop
+ * something running on a phone" is satisfied by stopping it everywhere. This
+ * edit is inside `phone/`, and the desktop tree does not import it:
+ * `PhoneDebateView`'s only mount is `page.tsx`, BESIDE `DebateView` rather than
+ * within it, so there is no desktop path for it to reach.
+ */
+describe("phone side tabs — a side switch resets the reader's place", () => {
+	const FEED = [
+		post({ id: "p1", ordinal: 1, side: "YES" }),
+		post({ id: "p2", ordinal: 2, side: "NO" }),
+	];
+
+	it("phone-side-tabs::a-feed-tab-tap-puts-the-region-back-at-the-top", () => {
+		render(
+			<PhoneDebateView
+				model={modelWith(FEED)}
+				viewer={VIEWER}
+				initialPostId={null}
+				ownPseudonym={null}
+				details={null}
+			/>,
+		);
+		const region = screen.getByTestId("phone-scroll-region");
+		const scrollTo = vi.spyOn(region, "scrollTo");
+
+		fireEvent.click(screen.getByTestId("phone-tab-NO"));
+
+		// POSITIVE CONTROL — a real side switch happened. Without it this row
+		// asserts only that clicking a button scrolls something, which a build
+		// that had stopped switching sides entirely would still satisfy.
+		expect(
+			screen.getByTestId("phone-tab-NO").getAttribute("aria-selected"),
+			"CONTROL: the tap really moved the pole",
+		).toBe("true");
+		expect(
+			scrollTo,
+			"the TIER'S ONE SCROLLER goes to the top, instantly — `auto` IS the " +
+				"reduced-motion form, so there is no matchMedia to get wrong",
+		).toHaveBeenCalledWith({ top: 0, behavior: "auto" });
+		expect(
+			scrollTo,
+			"once per tap — a reset that also rode a render would fire on the " +
+				"swipe observer's confirmation of this very slide",
+		).toHaveBeenCalledTimes(1);
+	});
+
+	it("phone-side-tabs::a-thread-relation-tap-puts-the-region-back-at-the-top", () => {
+		// The thread arm shares the scroller, the track and the stretch, so it
+		// carries the same defect between Support and Counter. One component, two
+		// option sets — so the fix has to be wired on both arms or on neither.
+		render(
+			<PhoneDebateView
+				model={modelWith([post({ id: "p9", ordinal: 9, side: "NO" })])}
+				viewer={VIEWER}
+				initialPostId="p9"
+				ownPseudonym={null}
+				details={null}
+			/>,
+		);
+		expect(
+			screen.getByTestId("phone-debate-view").dataset.arm,
+			"CONTROL: this is the thread arm, where the tabs are Support/Counter",
+		).toBe("thread");
+		const region = screen.getByTestId("phone-scroll-region");
+		const scrollTo = vi.spyOn(region, "scrollTo");
+
+		fireEvent.click(screen.getByTestId("phone-tab-counter"));
+
+		expect(
+			screen.getByTestId("phone-tab-counter").getAttribute("aria-selected"),
+			"CONTROL: the tap really moved the relation",
+		).toBe("true");
+		expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "auto" });
+		expect(scrollTo).toHaveBeenCalledTimes(1);
+	});
+
+	it("phone-side-tabs::the-reset-is-wired-at-the-tap-and-nowhere-else", () => {
+		const raw = read(OWNER);
+		const owner = code(raw);
+		// POSITIVE CONTROL for the STRIPPER, not for the claim. The comment above
+		// the wrappers names `onSideKey` twice, so a `code()` that had gone inert
+		// would leave those mentions in and this scan would be reading prose about
+		// the wiring instead of the wiring. Six scans in this repository have
+		// matched their own comment; this is the cheapest way to know it did not.
+		expect(
+			raw.split("onSideKey").length,
+			"CONTROL: comments were stripped before the scan",
+		).toBeGreaterThan(owner.split("onSideKey").length);
+
+		expect(
+			owner,
+			"the snap track's onActiveChange still takes the BARE setters — an " +
+				"IntersectionObserver report is a SWIPE, and a swipe must not " +
+				"throw away the reader's place",
+		).toContain(
+			"onActiveChange={focused === null ? onSideKey : onRelationKey}",
+		);
+		expect(
+			owner,
+			"the tabs' onSelect is what carries the resetting wrappers",
+		).toContain("onSelect={focused === null ? onSideTap : onRelationTap}");
+
+		for (const name of ["onSideTap", "onRelationTap"]) {
+			expect(
+				owner.split(name).length - 1,
+				`${name} appears exactly twice: its own definition and the onSelect ` +
+					"line. A third occurrence is a second caller, which is the D3 " +
+					"violation this row exists to catch",
+			).toBe(2);
+		}
+	});
+});

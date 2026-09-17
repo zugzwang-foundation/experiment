@@ -150,6 +150,27 @@ export function PhoneDebateView({
 			setThreadRelation(key);
 		}
 	}, []);
+	// The reset lives at the TAP callsite, never in onSideKey. onSideKey is
+	// also the snap track's onActiveChange, and setActiveSide has a third
+	// writer at the posted-card jump, which does its own region.scrollTo.
+	// Keying a reset on activeSide fires on a swipe and destroys that jump.
+	const resetRegionToTop = useCallback(() => {
+		scrollRegionRef.current?.scrollTo({ top: 0, behavior: "auto" });
+	}, []);
+	const onSideTap = useCallback(
+		(key: string) => {
+			onSideKey(key);
+			resetRegionToTop();
+		},
+		[onSideKey, resetRegionToTop],
+	);
+	const onRelationTap = useCallback(
+		(key: string) => {
+			onRelationKey(key);
+			resetRegionToTop();
+		},
+		[onRelationKey, resetRegionToTop],
+	);
 	const [sheet, setSheet] = useState<PhoneSheetState>(null);
 
 	/**
@@ -976,7 +997,7 @@ export function PhoneDebateView({
 				<PhoneSideTabs
 					options={focused === null ? feedTabs : threadTabs}
 					active={focused === null ? activeSide : threadRelation}
-					onSelect={focused === null ? onSideKey : onRelationKey}
+					onSelect={focused === null ? onSideTap : onRelationTap}
 					panelIdFor={PANE_ID}
 				/>
 				{/* ⛔ MOBILE-2k · F-1 — THE FEED ARM ONLY, GATED AT THE MOUNT. The

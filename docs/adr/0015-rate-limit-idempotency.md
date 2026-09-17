@@ -9,6 +9,8 @@
 | **Frame document** | SPEC.2 §1.4 #5 (delegation), §11 (Rate-Limit & Idempotency Contract), §15 (Error Envelope), §22 (ADR Index) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
+| **Amends** | — |
+| **Amended-by** | ADR-0054 — D7's `BET_ATTEMPTS_PER_IP_PER_MIN` stays minted and keeps its name, but stops being the *fairness* control on bet writes: the budget is re-keyed to the signed-in account (`bet-user`) and this cap is demoted to a looser cross-account abuse backstop behind it. ⚠ The §11 table below, and the sentence in this ADR reading the bet surfaces as per-IP, describe the **pre-0054** shape; the reasoning that justified a per-IP cap against credential stuffing is unchanged and is what the backstop still discharges. `IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN` is untouched. |
 
 ---
 

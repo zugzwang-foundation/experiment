@@ -93,7 +93,7 @@ describe("db client — postgres.js pool options", () => {
 		expect(options.max_lifetime).toBeLessThan(1800);
 	});
 
-	it("db-client::pins-pool-max-at-4 (the load-bearing control)", () => {
+	it("db-client::pins-pool-max-at-2 (the load-bearing control)", () => {
 		// Pins the VALUE, deliberately — not a derivation of it.
 		//
 		// This assertion used to be a pair: `max === 4`, plus `max * 3 <= 15`
@@ -104,24 +104,24 @@ describe("db client — postgres.js pool options", () => {
 		// 15" no longer describes what 4 is protecting against. A derivation
 		// that has stopped describing its subject does not merely go quiet; it
 		// fails for the wrong reason and teaches the next reader the wrong
-		// ceiling. S-5 raising `max` must go RED here as a decision that needs
-		// an ADR touch, never as arithmetic against a phantom 15-slot bound.
+		// ceiling. Moving `max` must go RED here as a decision that needs an
+		// ADR touch, never as arithmetic against a phantom 15-slot bound. It
+		// went RED exactly once so far — at ADR-0038 P3, which moved 4 → 2 on a
+		// production measurement — and that is the mechanism working.
 		expect(
 			options.max,
-			"`max` is pinned at 4 by ADR-0038 P1.2, for two reasons, and neither " +
-				"is the tenant-pool arithmetic this test used to assert. (1) It " +
-				"bounds what a SUSPENDED Vercel Fluid instance can STRAND: measured " +
-				"on staging, a connection sat idle 620 s with BOTH a 20 s " +
-				"idle_timeout and a 600 s max_lifetime configured and verified " +
-				"live, because a suspended instance runs no timers — so a timer " +
-				"cannot be relied on to hand a slot back, and bounding what an " +
-				"instance can take in the first place does not depend on one " +
-				"running. (2) ADR-0038 decision 2 forbids acting without " +
-				"measurement: transaction mode makes a higher `max` PERMISSIBLE, " +
-				"it does not say which value is CORRECT. S-5 measures; then it " +
-				"moves, with the ADR. Changing this number is an ADR edit, not a " +
-				"test edit.",
-		).toBe(4);
+			"`max` is pinned at 2 by ADR-0038 P3, on a measurement, and neither " +
+				"reason is the tenant-pool arithmetic this test used to assert. " +
+				"(1) It bounds what a SUSPENDED Vercel Fluid instance can STRAND: " +
+				"a suspended instance keeps its sockets and runs no idle timer " +
+				"(620 s idle measured against a 20 s idle_timeout). (2) Under the " +
+				"transaction pooler the binding ceiling is CLIENT connections " +
+				"(200 on Micro), spent as instances × max: on production, " +
+				"2026-09-17, 200 concurrent readers → ~13 instances → 52 client " +
+				"connections while Postgres held 7-9 backends of 45. Halving max " +
+				"doubles the instances the same ceiling admits. Changing this " +
+				"number is an ADR edit, not a test edit.",
+		).toBe(2);
 	});
 
 	it("db-client::pins-prepare-false", () => {

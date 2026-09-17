@@ -140,11 +140,11 @@ const SAMPLES = 5;
  * More cannot help: postgres.js will not open past `max`, so the extra work
  * queues behind the same sockets and adds latency, not discrimination.
  *
- * ⚠ IF `max` MOVES, THIS MOVES WITH IT. S-5 is authorised to raise `max` once it
- * has measured (ADR-0038 P1.2, decision 2), and this constant is a silent
- * dependency on that number.
+ * Read from the shipped client rather than copied, so a change to `max`
+ * (ADR-0038 P3 lowered it to 2) cannot leave this probe priming the wrong
+ * number of sockets.
  */
-const CONCURRENCY = 4;
+const CONCURRENCY = db.$client.options.max;
 
 /**
  * Which verdict this run asserts. `transaction` is the default because the named
