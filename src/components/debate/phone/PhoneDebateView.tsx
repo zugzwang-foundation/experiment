@@ -171,6 +171,33 @@ export function PhoneDebateView({
 		},
 		[onRelationKey, resetRegionToTop],
 	);
+	// ⛔ A SLIDE IS A TAP THE READER MADE WITH A FINGER, and it lands in the same
+	// place. The reset cannot move INTO `onSideKey`: that callback is also how the
+	// track CONFIRMS a slide the host asked for, and the posted-card jump sets the
+	// side first, then scrolls to its own card. So the rule is a comparison, not a
+	// flag — reset only when the ARRIVING pane is one the state had not reached.
+	const activeKeyRef = useRef<string>(activeSide);
+	activeKeyRef.current = focused === null ? activeSide : threadRelation;
+	const onSideSlide = useCallback(
+		(key: string) => {
+			const reached = activeKeyRef.current === key;
+			onSideKey(key);
+			if (!reached) {
+				resetRegionToTop();
+			}
+		},
+		[onSideKey, resetRegionToTop],
+	);
+	const onRelationSlide = useCallback(
+		(key: string) => {
+			const reached = activeKeyRef.current === key;
+			onRelationKey(key);
+			if (!reached) {
+				resetRegionToTop();
+			}
+		},
+		[onRelationKey, resetRegionToTop],
+	);
 	const [sheet, setSheet] = useState<PhoneSheetState>(null);
 
 	/**
@@ -1061,7 +1088,7 @@ export function PhoneDebateView({
 								]
 					}
 					active={focused === null ? activeSide : threadRelation}
-					onActiveChange={focused === null ? onSideKey : onRelationKey}
+					onActiveChange={focused === null ? onSideSlide : onRelationSlide}
 				/>
 			</div>
 
