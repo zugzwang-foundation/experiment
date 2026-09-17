@@ -63,14 +63,21 @@ export async function GET(
 	// runs about once per market per 5 s however many viewers are watching, and
 	// one slightly wider query beats two narrow ones holding the connection
 	// twice.
+	//
+	// ⛔ THE SUBQUERY NAMES ITS COLUMNS THROUGH ALIASES, NOT `${comments.id}`.
+	// In a single-table select Drizzle renders an embedded column WITHOUT its
+	// table, so the interpolated form became `join "comments" on "id" = …`,
+	// which Postgres rejects as ambiguous (`mod_actions` has an `id` too).
+	// Every call 500'd in production and the mocked unit tests could not see
+	// it; tests/integration/market-version.integration.test.ts runs it for real.
 	const [row] = await db
 		.select({
 			yes: pools.yesReserves,
 			no: pools.noReserves,
 			moderations: sql<number>`(
-				select count(*) from ${modActions}
-				join ${comments} on ${comments.id} = ${modActions.targetCommentId}
-				where ${comments.marketId} = ${market.id}
+				select count(*) from ${modActions} as ma
+				join ${comments} as c on c.id = ma.target_comment_id
+				where c.market_id = ${market.id}
 			)`,
 		})
 		.from(pools)
