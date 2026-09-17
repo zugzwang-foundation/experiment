@@ -31,11 +31,47 @@ export interface LockedPool {
 
 /**
  * Full-jitter backoff bases (ms), one per retry. Budget = 1 initial attempt +
- * `BACKOFF_BASES_MS.length` retries = 4 attempts. These are ADR-0013 DECISION
- * PARAMETERS, NOT tunables (SPEC.2 §9:1003) — co-located here, not in config.
- * Reference: Marc Brooker, "Exponential Backoff And Jitter" (AWS, 2015).
+ * `BACKOFF_BASES_MS.length` retries = **6 attempts**. These are ADR-0013
+ * DECISION PARAMETERS, NOT tunables (SPEC.2 §9) — co-located here, not in
+ * config. Reference: Marc Brooker, "Exponential Backoff And Jitter" (AWS, 2015).
+ *
+ * ⛔ WIDENED FROM `[50, 100, 200]` (4 attempts) BY ADR-0056, AND THE NUMBER IS A
+ * MEASUREMENT RATHER THAN AN ESTIMATE — which is the only reason it moved at
+ * all. ADR-0038 decision 2 forbids sizing from estimate, and a sibling
+ * recommendation to retune `max` in `src/db/index.ts` was withdrawn in the same
+ * session precisely because nobody had measured it.
+ *
+ * What was measured (`tests/scale/_measure-write-ceiling.scale.test.ts`, a
+ * barrier-released storm of N concurrent `place()` calls onto ONE pool row,
+ * local Postgres 15):
+ *
+ * | concurrent writers | refused @ 4 attempts | refused @ 6 |
+ * |---|---|---|
+ * | 8 · 16 · 24 · 32 | 0 % | 0 % |
+ * | 48 | 10.4 % | **0 %** |
+ * | 64 | 10.9 % | **0 %** |
+ *
+ * ⚠ THE REFUSAL WAS NEVER THE DATABASE FAILING. Postgres was serving the queue
+ * the whole time; writers were giving up while their turn was still coming. So
+ * the cost of the wider budget is LATENCY, not load: the 64-way storm went from
+ * ~356 ms to 595 ms–1.0 s end to end across repeated runs, and nobody was told to
+ * try again. ⚠ The RANGE is recorded rather than the best run; quoting the
+ * favourable number is how the ~25 estimate this replaces got its confidence.
+ *
+ * ⚠ LOCAL POSTGRES, NOT SUPABASE. Production holds this lock across a network
+ * round trip, so each attempt is longer and the absolute figures will be worse.
+ * The SHAPE is what transfers — a graceful ~10 % refusal rather than a cliff,
+ * with the budget as the lever — and the multi-machine run against production is
+ * what would replace the table above.
+ *
+ * ⛔ THE TWO SIBLING WRAPPERS ARE DELIBERATELY NOT CHANGED.
+ * `resolution/transaction.ts` (W-3) and `markets/transaction.ts` (W-4) still
+ * carry `[50, 100, 200]`, so the three no longer mirror each other. That is a
+ * decision, not drift: both are admin-triggered and single-writer, neither was
+ * measured, and widening an unmeasured budget is the exact failure ADR-0038
+ * decision 2 names. W-1 is the only one a crowd contends for.
  */
-const BACKOFF_BASES_MS = [50, 100, 200] as const;
+const BACKOFF_BASES_MS = [50, 100, 200, 400, 800] as const;
 
 /** serialization_failure + deadlock_detected — the only retryable SQLSTATEs. */
 const RETRYABLE_SQLSTATES = new Set(["40001", "40P01"]);

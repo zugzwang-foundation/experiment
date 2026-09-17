@@ -408,8 +408,10 @@ describe("ENGINE.7 W-1 runBetTransaction — concurrency + retry", () => {
 			},
 		).catch((e: unknown) => e);
 
-		// Budget = 4 attempts (1 + 3 retries).
-		expect(attempts).toBe(4);
+		// Budget = 6 attempts (1 + 5 retries) since ADR-0056 — widened on a
+		// measurement, not an estimate; see `BACKOFF_BASES_MS`. The W-3 mirror in
+		// tests/server/resolution/concurrency.test.ts deliberately still says 4.
+		expect(attempts).toBe(6);
 
 		expect(caught).toBeInstanceOf(BetSerializationExhaustedError);
 		const err = caught as BetSerializationExhaustedError;

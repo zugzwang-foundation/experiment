@@ -9,6 +9,8 @@
 | **Frame document** | SPEC.2 §1.4 #5 (delegation), §9 (Concurrency & Transactions), §14 (Invariant Contract), §15 (Error Envelope), §22 (ADR Index) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
+| **Amends** | — |
+| **Amended-by** | ADR-0056 — the **W-1 backoff bases only**: `[50, 100, 200]` (4 attempts) → `[50, 100, 200, 400, 800]` (6), sized from a measured collision sweep showing that refusals at 48–64 concurrent writers on one pool row were this budget expiring rather than Postgres failing. ⚠ Everything else here stands: isolation level, lock order, retryable SQLSTATEs, the full-jitter formula, and the fail-closed exhaustion error. ⚠ **W-3 and W-4 keep the original bases**, so the three wrappers deliberately no longer mirror each other — they were not measured, and ADR-0038 decision 2 forbids sizing an unmeasured budget. The *"DECISION PARAMETERS, NOT tunables"* framing is kept rather than relaxed: the value moved once, by ADR, on a measurement. |
 
 ---
 
