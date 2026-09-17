@@ -195,51 +195,75 @@ const FIELD_SCENE = buildFieldScene({
 	ground: GROUND_MARK_COUNT,
 });
 
+/**
+ * ART-CPU-1 — THE ELEMENT TREE, BUILT ONCE AT MODULE LOAD.
+ *
+ * ⛔ P2.1 HOISTED THE ARITHMETIC AND LEFT THIS BEHIND, AND THAT WAS THE LARGER
+ * HALF. `FIELD_SCENE` above stopped the *placement maths* re-running per
+ * render — measured at 1.367 ms. What kept running was this: ~460 `.map()`
+ * iterations building the React elements those positions describe, on every
+ * request, and then again in the browser at hydration because the hero is a
+ * client component. The benchmark that produced 1.367 ms measured
+ * `buildFieldScene` alone, so it was blind to the cost sitting directly beside
+ * it — an instrument pointed only at the part already being fixed.
+ *
+ * ⚠ THIS IS STRONGER THAN `React.memo`, NOT A CHEAPER VERSION OF IT. The
+ * component returns the SAME ELEMENT REFERENCE on every call, so React's
+ * reconciler can skip the whole subtree by identity rather than by comparing
+ * props. `memo` would still rebuild the tree whenever the component was
+ * invoked; this never builds it a second time at all.
+ *
+ * It is sound for exactly the reason `FIELD_SCENE` is: the layer takes no
+ * props and contains no `Math.random` and no clock (see `scene.ts`), so a
+ * second render could only ever produce a byte-identical tree. Adding a prop
+ * to this component would break that, and is the one change that must not be
+ * made without moving this back inside the function.
+ */
+const FIELD_ELEMENT = (
+	<g data-warli-field-layer="">
+		<g data-warli-ground-layer="">
+			{FIELD_SCENE.ground.map((mark) => (
+				<Ground key={mark.index} mark={mark} />
+			))}
+		</g>
+
+		<g data-warli-motif-layer="">
+			{FIELD_SCENE.motifs.map((placed) => (
+				<Motif key={placed.index} placed={placed} />
+			))}
+		</g>
+
+		<g data-warli-field-figures="">
+			{FIELD_SCENE.figures.map((placed, i) => {
+				const spec = FIELD_FIGURES[i];
+				if (spec === undefined) {
+					return null;
+				}
+				return (
+					<g
+						key={spec.id}
+						data-warli-field-figure={spec.label}
+						data-warli-mirror={placed.mirror}
+						transform={`translate(${placed.x} ${placed.y}) rotate(${placed.leanDeg.toFixed(2)}) scale(${(placed.mirror * placed.scale).toFixed(3)} ${placed.scale.toFixed(3)})`}
+					>
+						<Figure
+							spec={spec}
+							density={placed.x <= FRAME.width / 2 ? "dense" : "spare"}
+						/>
+					</g>
+				);
+			})}
+		</g>
+
+		<BorderStack width={FRAME.width} height={FRAME.height} seed={31} />
+	</g>
+);
+
 export function FieldLayer() {
 	// ⚠ BUILT THROUGH `buildFieldScene`, NOT ASSEMBLED HERE. The occupancy list
 	// used to be threaded at this call site, which meant the guard could thread it
 	// correctly while the component quietly stopped — dropping 29 of 104 motifs on
 	// top of figures with nothing red. The shared builder is what makes the guard
 	// and the drawing the same scene rather than two scenes that happen to agree.
-	const { figures, motifs, ground } = FIELD_SCENE;
-
-	return (
-		<g data-warli-field-layer="">
-			<g data-warli-ground-layer="">
-				{ground.map((mark) => (
-					<Ground key={mark.index} mark={mark} />
-				))}
-			</g>
-
-			<g data-warli-motif-layer="">
-				{motifs.map((placed) => (
-					<Motif key={placed.index} placed={placed} />
-				))}
-			</g>
-
-			<g data-warli-field-figures="">
-				{figures.map((placed, i) => {
-					const spec = FIELD_FIGURES[i];
-					if (spec === undefined) {
-						return null;
-					}
-					return (
-						<g
-							key={spec.id}
-							data-warli-field-figure={spec.label}
-							data-warli-mirror={placed.mirror}
-							transform={`translate(${placed.x} ${placed.y}) rotate(${placed.leanDeg.toFixed(2)}) scale(${(placed.mirror * placed.scale).toFixed(3)} ${placed.scale.toFixed(3)})`}
-						>
-							<Figure
-								spec={spec}
-								density={placed.x <= FRAME.width / 2 ? "dense" : "spare"}
-							/>
-						</g>
-					);
-				})}
-			</g>
-
-			<BorderStack width={FRAME.width} height={FRAME.height} seed={31} />
-		</g>
-	);
+	return FIELD_ELEMENT;
 }
