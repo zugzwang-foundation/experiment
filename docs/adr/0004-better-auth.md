@@ -9,6 +9,8 @@
 | **Frame document** | SPEC.2 §1.4 #5 (delegation), §8 (Authentication & Sessions shape), §22 (ADR Index) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
+| **Amends** | — |
+| **Amended-by** | ADR-0057 — session **READS** only: Better Auth's `session.cookieCache` is enabled for 300 s, so `getSession()` is served from the signed session-data cookie instead of a Postgres round trip on every call. ⚠ Session CREATION, the `session.create.before` onboarding gate, the 400-day cap, `disableSessionRefresh`, Turnstile and the OTP flow are untouched. ⛔ The cost is CHROME, not ACTION — a revoked session keeps rendering as signed-in for at most the window, while every write re-reads `users.banned_at` from Postgres inside the request, so a ban takes effect on the next bet/sell/post/reply regardless of the cookie. |
 
 ---
 

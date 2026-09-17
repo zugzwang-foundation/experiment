@@ -68,6 +68,43 @@ if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
 // `sessions` row + per-visit cookie re-issue) are out of scope (SPEC.2 §8.2).
 const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 400;
 
+/**
+ * How long a signed session payload may be served from the session-data COOKIE
+ * before Better Auth goes back to Postgres for it (ADR-0057).
+ *
+ * ⛔ THE DEFAULT IS OFF, AND OFF MEANS EVERY `getSession()` IS A DATABASE ROUND
+ * TRIP. Verified in the shipped package rather than inferred from docs:
+ * `better-auth/dist/api/routes/session.mjs:93` returns the cookie payload and
+ * skips the adapter read only when `cookieCache.enabled` is set. The
+ * `(public)` layout calls `getRequestSession()` on every render, so without
+ * this **a signed-in reader paid one Postgres query per page view** — on the
+ * surfaces that the CDN work (#526/#551/#554) had just finished making free for
+ * everyone else. It was the last per-visitor database read on the read path.
+ *
+ * ⚠ WHAT IT COSTS, stated plainly because it is a security property and not a
+ * performance one: a session revoked server-side keeps RENDERING as signed-in
+ * until the cached copy expires — at most `SESSION_COOKIE_CACHE_MAX_AGE_SEC`.
+ *
+ * ⛔ IT DOES NOT LET A REVOKED OR BANNED PARTICIPANT ACT, and the distinction is
+ * the whole reason the trade is acceptable. Every write re-reads the user row
+ * from Postgres inside the request: `runBetEndpoint` reads `users.bannedAt`
+ * (plus pseudonym/tos) directly before anything else, so a ban takes effect on
+ * the very next bet, sell, post or reply regardless of what the cookie says.
+ * The exposure is confined to CHROME — a header that still shows a name — never
+ * to money, moderation or the ledger.
+ *
+ * ⚠ `session.create.before` (the onboarding gate, `session-gate.ts`) is
+ * untouched: it runs at session CREATION and reads the user row itself, and this
+ * caches session READS only.
+ *
+ * 300 s is the dial. It is chosen against the read pattern rather than picked
+ * round: a reader moving through the site every ~30 s pays one session read per
+ * ten page views instead of one per view, while bounding the stale-chrome window
+ * to five minutes. Shorten it if that window is ever judged too long — the cost
+ * is linear and nothing else depends on the value.
+ */
+const SESSION_COOKIE_CACHE_MAX_AGE_SEC = 300;
+
 // === Custom plugin: Turnstile + rate-limit on email-OTP send ================
 //
 // Plugin form because: (a) Better Auth's top-level `hooks.before` is a single
@@ -348,6 +385,13 @@ export const auth = betterAuth({
 	session: {
 		expiresIn: SESSION_MAX_AGE_SEC,
 		disableSessionRefresh: true,
+		// ADR-0057 — serve the session from its signed cookie for this long
+		// instead of reading Postgres on every `getSession()`. See the constant
+		// for what this costs and for why a ban is unaffected.
+		cookieCache: {
+			enabled: true,
+			maxAge: SESSION_COOKIE_CACHE_MAX_AGE_SEC,
+		},
 	},
 	// FIX-AUTH-SIGNUP — declare the three custom `users` columns the
 	// databaseHooks populate so Better Auth's drizzle adapter actually writes
