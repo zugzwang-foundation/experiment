@@ -44,6 +44,26 @@ def call(path, body, extra=None, method="POST", raw=None, timeout=60):
         return 0, str(e), time.time() - t0
 
 
+def attach_body(out, status, raw):
+    """Keep the raw response whenever the status is not 2xx.
+
+    Three separate paths in this file used to lose the body of a failing
+    response, and the 2026-09-15 production campaign paid for it: 22 bets, 7
+    upload-signs and 3 sells returned HTTP 500 and not one byte of explanation
+    survived the run. A burst that reports `{"place:500": 22}` and nothing else
+    tells you that something broke and refuses to tell you what.
+
+    `body_len` is recorded SEPARATELY from the truncated body, because "the
+    server sent nothing" and "we cut it off" are different findings and the
+    earlier campaign could not tell them apart — it described those 500s as
+    having empty bodies without being able to show it.
+    """
+    if not (200 <= status < 300):
+        out["body"] = raw[:2000]
+        out["body_len"] = len(raw)
+    return out
+
+
 def place(stake, body, image_path=None, parent=None):
     payload = {"marketId": MARKET, "side": "YES", "stake": str(stake), "body": body}
     if parent:
@@ -69,9 +89,12 @@ def place(stake, body, image_path=None, parent=None):
         if j.get("ok"):
             out["shares"] = j["data"]["sharesBought"]
             out["price"] = j["data"]["newPrice"]
-    except Exception:
-        out["body"] = b[:120]
-    return out
+    except Exception as err:
+        # The parse failure is itself evidence — an unparseable 500 is a
+        # different defect from a named refusal, and the reason it would not
+        # parse is worth keeping.
+        out["parse_error"] = str(err)[:120]
+    return attach_body(out, s, b)
 
 
 def burst(name, n, fn):
@@ -85,6 +108,15 @@ def burst(name, n, fn):
     ok = sum(1 for r in results if r.get("code") == "ok")
     ms = sorted(r["ms"] for r in results if "ms" in r)
     p50 = ms[len(ms) // 2] if ms else None
+    # Emit every non-ok attempt as its own line BEFORE the summary. The summary
+    # is a tally and a tally cannot be investigated: `results` already held each
+    # failure's body and this function used to return it to a caller that
+    # discarded it, so the bodies were collected and then thrown away on the one
+    # run where they mattered. A named refusal is a result and needs no line;
+    # anything else does.
+    for i, r in enumerate(results):
+        if r.get("code") != "ok":
+            print(json.dumps({"test": name, "attempt": i + 1, "failure": r}))
     summary = {"test": name, "attempted": n, "succeeded": ok, "outcomes": codes,
                "wall_s": round(time.time() - t0, 1), "p50_ms": p50, "max_ms": ms[-1] if ms else None}
     print(json.dumps(summary))
@@ -109,8 +141,9 @@ if __name__ == "__main__":
                        "body": f"Support reply {i + 1}/3 under load.", "parentCommentId": PARENT}
             s, b, dt = call("/api/bets/place", payload, {"Idempotency-Key": str(uuid.uuid4())})
             j = json.loads(b) if b.startswith("{") else {}
-            r = {"stage": "place", "status": s, "ms": round(dt * 1000),
-                 "code": "ok" if j.get("ok") else j.get("error", {}).get("code", f"http{s}")}
+            r = attach_body({"stage": "place", "status": s, "ms": round(dt * 1000),
+                             "code": "ok" if j.get("ok") else j.get("error", {}).get("code", f"http{s}")},
+                            s, b)
         return r
     burst("reply_burst_3", 3, reply)
     time.sleep(65)
@@ -118,7 +151,8 @@ if __name__ == "__main__":
     def sell(i):
         s, b, dt = call("/api/bets/sell", {"marketId": MARKET, "shares": "5"}, {"Idempotency-Key": str(uuid.uuid4())})
         j = json.loads(b) if b.startswith("{") else {}
-        return {"stage": "sell", "status": s, "ms": round(dt * 1000),
-                "code": "ok" if j.get("ok") else j.get("error", {}).get("code", f"http{s}")}
+        return attach_body({"stage": "sell", "status": s, "ms": round(dt * 1000),
+                            "code": "ok" if j.get("ok") else j.get("error", {}).get("code", f"http{s}")},
+                           s, b)
     burst("sell_burst_5", 5, sell)
     print(json.dumps({"end": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}))
