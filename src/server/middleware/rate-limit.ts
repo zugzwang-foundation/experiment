@@ -4,6 +4,7 @@ import { Ratelimit } from "@upstash/ratelimit";
 import {
 	ADMIN_LOGIN_ATTEMPTS_PER_IP_PER_HOUR,
 	BET_ATTEMPTS_PER_IP_PER_MIN,
+	BET_ATTEMPTS_PER_USER_PER_MIN,
 	IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN,
 	OTP_REQUESTS_PER_EMAIL_PER_HOUR,
 	OTP_REQUESTS_PER_IP_BURST_PER_MIN,
@@ -16,7 +17,7 @@ import { redis } from "@/server/upstash/redis";
  * ¶"Per-surface rate-limit table" + ADR-0015 D6 (sliding-window via
  * `@upstash/ratelimit` v2.0.8 `Ratelimit.slidingWindow(maxRequests, window)`).
  *
- * Six Ratelimit instances, one per surface row in §11. Each instance is
+ * Seven Ratelimit instances, one per surface row in §11. Each instance is
  * constructed once at module-load with a distinct `prefix` (load-bearing
  * for the disjointness invariant per SPEC.2 §11 ¶"Distinction from §10";
  * also disjoint from `cache.ts`'s `idem:*` key space). Identifier-extraction
@@ -56,6 +57,16 @@ export const adminLoginPerIp = new Ratelimit({
 	analytics: false,
 });
 
+// ADR-0054 — the bet write cap is counted against the ACCOUNT, and the per-IP
+// instance below is demoted to a loose backstop behind it. Two surfaces, two
+// prefixes (the §11 disjointness invariant), checked together at one call site.
+export const betPerUser = new Ratelimit({
+	redis,
+	limiter: Ratelimit.slidingWindow(BET_ATTEMPTS_PER_USER_PER_MIN, "1 m"),
+	prefix: getRedisKey("ratelimit", "bet-user"),
+	analytics: false,
+});
+
 export const betPerIp = new Ratelimit({
 	redis,
 	limiter: Ratelimit.slidingWindow(BET_ATTEMPTS_PER_IP_PER_MIN, "1 m"),
@@ -89,13 +100,14 @@ export const adminMediaPutUrlPerIp = new Ratelimit({
 
 /**
  * String-literal union of valid surface keys consumed by `checkRateLimit`.
- * Each value maps 1:1 to one of the six Ratelimit instances declared above,
+ * Each value maps 1:1 to one of the seven Ratelimit instances declared above,
  * one per SPEC.2 §11 per-surface-table row.
  */
 export type RateLimitSurface =
 	| "otpRequestPerEmail"
 	| "otpRequestPerIpBurst"
 	| "adminLoginPerIp"
+	| "betPerUser"
 	| "betPerIp"
 	| "imagePutUrlPerIp"
 	| "adminMediaPutUrlPerIp";
@@ -104,6 +116,7 @@ const SURFACE_INSTANCES: Record<RateLimitSurface, Ratelimit> = {
 	otpRequestPerEmail,
 	otpRequestPerIpBurst,
 	adminLoginPerIp,
+	betPerUser,
 	betPerIp,
 	imagePutUrlPerIp,
 	adminMediaPutUrlPerIp,
@@ -125,6 +138,16 @@ export type RateLimitDecision =
  * the configured `prefix` itself (via `${prefix}:${identifier}`), so these
  * helpers return bare values, not prefixed Redis keys. Naming mirrors
  * SPEC.2 §11's per-surface table identifier column for greppability.
+ *
+ * ⚠ ADR-0054 adds the `bet-user` surface and deliberately mints NO
+ * `userIdentifier` helper to go with it. These helpers are `(x) => x`; their
+ * only product is the name at the call site, and `checkRateLimit("betPerUser",
+ * userId)` already reads as the §11 row it implements. Against that cosmetic
+ * gain, the cost was measured rather than guessed: **39 test files replace this
+ * whole module with a `vi.mock` factory**, so every export the endpoint imports
+ * has to be hand-written into 39 factories, and the next surface pays it again.
+ * A pass-through is not worth re-arming that. The asymmetry with `ipIdentifier`
+ * below is therefore a decision; do not "fix" it by adding the fourth helper.
  */
 export const ipIdentifier = (ip: string): string => ip;
 export const otpEmailIdentifier = (email: string): string => email;

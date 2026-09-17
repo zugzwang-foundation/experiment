@@ -25,8 +25,33 @@ export const OTP_REQUESTS_PER_IP_BURST_PER_MIN = 10;
 /** Per-IP rate limit on /admin/login POST attempts. PLACEHOLDER VALUE — tuned by HARDEN.5 per SPEC.1 §16.1 + ADR-0010. */
 export const ADMIN_LOGIN_ATTEMPTS_PER_IP_PER_HOUR = 10;
 
-/** Per-IP anti-abuse burst cap on bet place/sell. PLACEHOLDER VALUE — tuned by HARDEN.5 per SPEC.1 §16.1 + ADR-0015 D7. */
-export const BET_ATTEMPTS_PER_IP_PER_MIN = 30;
+/**
+ * Per-ACCOUNT write cap on bet place/sell — the fairness control, and the one
+ * that fires in normal operation. Per ADR-0054: a bet endpoint is reachable
+ * only behind a session, so the account is the identity the product actually
+ * bills the write to, and one participant may not out-post the room whichever
+ * address they arrive from. Carries the value `BET_ATTEMPTS_PER_IP_PER_MIN`
+ * held before ADR-0054, because the number was always meant as "how fast may
+ * one person write" — it was the KEY that was wrong, not the figure.
+ */
+export const BET_ATTEMPTS_PER_USER_PER_MIN = 30;
+
+/**
+ * Per-IP anti-abuse BACKSTOP on bet place/sell — deliberately loose, and no
+ * longer the fairness control (ADR-0054 moved that to the per-account cap
+ * above). It exists so one machine cannot hammer the endpoint across many
+ * accounts, which is the credential-stuffing threat SPEC.2 §11 names.
+ *
+ * ⚠ 10x the per-account cap is the whole design, not a round number: below ten
+ * accounts sharing an address it can never fire FIRST, so a NAT — an office, a
+ * campus, a carrier — reaches the per-account cap it should reach rather than
+ * an address-shaped one it cannot see or explain. Above that it bounds a single
+ * machine at 5 writes/second, which the bet path's SERIALIZABLE pool-row lock
+ * already answers for.
+ *
+ * PLACEHOLDER VALUE — tuned by HARDEN.5 per SPEC.1 §16.1 + ADR-0015 D7.
+ */
+export const BET_ATTEMPTS_PER_IP_PER_MIN = 300;
 
 /** Per-IP anti-abuse burst cap on R2 signed-PUT URL mint. PLACEHOLDER VALUE — tuned by HARDEN.5 per SPEC.1 §16.1 + ADR-0015 D7. */
 export const IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN = 10;

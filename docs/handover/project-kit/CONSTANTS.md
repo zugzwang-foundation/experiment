@@ -66,7 +66,8 @@ review those numbers ever get.
 | `OTP_TTL_MIN` | 5 min (the Better Auth plugin default rides today) | SPEC.1 §16.1/§19 Q16 · `src/server/auth/email-otp.ts` |
 | OTP caps: `OTP_REQUESTS_PER_EMAIL_PER_HOUR` / `OTP_REQUESTS_PER_IP_BURST_PER_MIN` | 5 / 10 | `limits.ts` · SPEC.1 §19 Q16 |
 | `ADMIN_LOGIN_ATTEMPTS_PER_IP_PER_HOUR` | 10 | `limits.ts` · ADR-0010 |
-| `BET_ATTEMPTS_PER_IP_PER_MIN` | 30 | `limits.ts` · ADR-0015 D7 |
+| `BET_ATTEMPTS_PER_USER_PER_MIN` | 30 | `limits.ts` · **ADR-0054** — the fairness cap on bet writes, keyed on `users.id` |
+| `BET_ATTEMPTS_PER_IP_PER_MIN` | 300 | `limits.ts` · ADR-0015 D7, re-scoped by **ADR-0054** — the abuse backstop behind the per-account cap, deliberately 10x it. ⚠ It was **30 and the primary cap** until ADR-0054. |
 | `IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN` | 10 | `limits.ts` · ADR-0015 D7 |
 | `RATE_LIMIT_PER_MARKET_PER_DAY` / `RATE_LIMIT_BURST_PER_MIN` | — (spec-only; whether reply-bets carry a per-market productive cap is itself deferred) | SPEC.1 §16.1 · SPEC.2 §4.6/§11 |
 | `AI_FLAG_THRESHOLD_TRACK_A_*` / `AI_FLAG_THRESHOLD_TRACK_B_*` | — (per-category; shipped gate is boolean category flags, no score floors, per SCAFFOLD.16 LD-3) | SPEC.1 §19 Q1/App-B · `docs/briefs/SCAFFOLD.16-…` |

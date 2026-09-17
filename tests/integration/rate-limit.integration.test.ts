@@ -97,12 +97,14 @@ vi.mock("@sentry/nextjs", () => ({
 import {
 	ADMIN_LOGIN_ATTEMPTS_PER_IP_PER_HOUR,
 	BET_ATTEMPTS_PER_IP_PER_MIN,
+	BET_ATTEMPTS_PER_USER_PER_MIN,
 	IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN,
 	OTP_REQUESTS_PER_EMAIL_PER_HOUR,
 	OTP_REQUESTS_PER_IP_BURST_PER_MIN,
 } from "@/server/config/limits";
 import {
 	betPerIp,
+	betPerUser,
 	checkRateLimit,
 	imagePutUrlPerIp,
 	ipIdentifier,
@@ -178,6 +180,44 @@ describe("rate-limit middleware", () => {
 
 		expect(result.allowed).toBe(false);
 		expect(BET_ATTEMPTS_PER_IP_PER_MIN).toBeGreaterThan(0);
+	});
+
+	// === ADR-0054 ===========================================================
+
+	it("rate-limit::bet-per-user-throttles", async () => {
+		// Surface betPerUser; identifier the bare `users.id`. The per-ACCOUNT
+		// cap is the one that fires in normal operation (ADR-0054) — the per-IP
+		// instance beside it is a 10x backstop, so a single participant meets
+		// this one first whichever address they arrive from.
+		const limitFn = ratelimitInstances["bet-user"]?.limit;
+		expect(limitFn).toBeDefined();
+		limitFn?.mockResolvedValueOnce({
+			success: false,
+			remaining: 0,
+			reset: Date.now() + 60_000,
+		});
+
+		// The identifier is a bare `users.id` — ADR-0054 mints no pass-through
+		// helper for it; see the rate-limit module docblock for why.
+		const result = await checkRateLimit(
+			"betPerUser",
+			"01a0a0bb-4e2f-722e-96d4-62139198223a",
+		);
+
+		expect(result.allowed).toBe(false);
+		expect(BET_ATTEMPTS_PER_USER_PER_MIN).toBeGreaterThan(0);
+	});
+
+	it("rate-limit::bet-per-ip-backstop-is-looser-than-per-account", async () => {
+		// ⛔ THE ORDERING IS THE DESIGN, NOT AN ARTEFACT OF TODAY'S NUMBERS.
+		// The backstop must never be able to fire before the per-account cap for
+		// a single participant — that is what keeps a shared address (an office,
+		// a campus, a carrier NAT) from refusing a person who is inside their
+		// own budget, with a reason they cannot see. A HARDEN.5 retune that
+		// inverts these two reddens here rather than on a NAT in production.
+		expect(BET_ATTEMPTS_PER_IP_PER_MIN).toBeGreaterThan(
+			BET_ATTEMPTS_PER_USER_PER_MIN,
+		);
 	});
 
 	// === §7.3 row 4 =========================================================
@@ -308,6 +348,7 @@ describe("rate-limit middleware", () => {
 			"otp-email",
 			"otp-ip",
 			"admin-login-ip",
+			"bet-user",
 			"bet-ip",
 			"image-put-ip",
 		];
@@ -331,6 +372,7 @@ describe("rate-limit middleware", () => {
 		// the consumer side).
 		expect(otpRequestPerEmail).toBeDefined();
 		expect(otpRequestPerIpBurst).toBeDefined();
+		expect(betPerUser).toBeDefined();
 		expect(betPerIp).toBeDefined();
 		expect(imagePutUrlPerIp).toBeDefined();
 	});
