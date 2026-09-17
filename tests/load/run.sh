@@ -13,6 +13,32 @@ SCRIPT="${1:?usage: TARGET_URL=... tests/load/run.sh <read/NN-name.js|write/NN-n
 K6="${K6_BIN:-k6}"
 command -v "$K6" >/dev/null || { echo "REFUSED — k6 not found (set K6_BIN)" >&2; exit 2; }
 
+# ⛔ THE INSTRUMENT CHECK — refuse to run with compression off.
+#
+# k6 sends no `Accept-Encoding` unless the kit sets one, and without it every
+# run measures RAW HTML instead of what a browser receives. That is not a
+# rounding error: measured 2026-09-17, it is 5.6x on `/` and 18.4x on a seeded
+# market page, which is enough to make a healthy server look bandwidth-bound and
+# did exactly that to half the 2026-09-15 campaign.
+#
+# ⚠ THIS EXISTS BECAUSE THE FIX DELETED ITSELF ONCE ALREADY. It lived only in
+# the rig's working copy and was overwritten by the `scp -r tests/load ...`
+# refresh the runbook prescribes — so the repair vanished precisely when someone
+# followed the instructions, and nothing said so. A preflight travels with the
+# kit and fires on every run, which a comment cannot.
+# ⚠ MATCHES THE CODE, NOT THE PROSE. The docblock above the header names
+# `accept-encoding` several times, so a bare `grep -q accept-encoding` passes on
+# a file whose header has been deleted and whose comment survives — measured:
+# the first version of this guard did exactly that. The quoted-key-and-colon
+# form appears only in the object literal.
+grep -qE '"accept-encoding"[[:space:]]*:' "$DIR/lib/source-ip.js" || {
+	echo "REFUSED — lib/source-ip.js sends no accept-encoding header." >&2
+	echo "          Every number from this run would measure raw HTML, not what a" >&2
+	echo "          browser receives (5.6x-18.4x too large). Restore the header" >&2
+	echo "          before running; see that file's docblock for why." >&2
+	exit 2
+}
+
 # The rig silently capped itself at 1,024 open connections for the whole
 # staging campaign (correction C-01). Raise it, and say so when it cannot.
 if ! ulimit -n 65536 2>/dev/null; then
