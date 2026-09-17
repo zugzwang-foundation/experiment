@@ -10,7 +10,7 @@
 | **Supersedes** | ADR-0041 (partial — **D-2 only**, the reserves-keyed cache key on the two participant read blocks. D-1, D-3, D-4 and D-5 stand unchanged) |
 | **Superseded-by** | — |
 | **Amends** | — |
-| **Amended-by** | — |
+| **Amended-by** | ADR-0055 — rider (1) only: the hero's `currentValue` and Discovery's other priced figures are no longer computed from a LIVE pool read on every render. Discovery's pool read now rides a 5 s window (`DISCOVERY_PRICE_MIN_WINDOW_MS`). ⚠ **The rule that justified rider (1) — "money on a public surface may not lag a window" — was measured and found to govern composition ORDER rather than freshness:** `/m/[slug]`, the surface that actually takes a bet, is prerendered and was serving a thirteen-hour-old price, so Discovery was paying a database connection per visitor to be stricter than the page taking the money. **Everything else in this ADR stands and is what ADR-0055 relies on** — the identity keying, the poster bypass, the `after()` instrumentation, and `HeroTopPostsBase` omitting `currentValue` (whose reason changes from "must be live" to "must stay off the cache KEY", the half of this ADR that is untouched). |
 
 ---
 
