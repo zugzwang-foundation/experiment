@@ -41,20 +41,43 @@ export const TARGET_ENV = (() => {
 /**
  * Production read-rate ceiling.
  *
- * ⚠ ABOVE ~600-700 req/s FROM ONE MACHINE, VERCEL'S ABUSE PROTECTION RESETS
- * CONNECTIONS (staging correction C-03). Past that point a run measures the
- * platform's defence, not the app, and on production it also risks the rig's
- * IP being challenged while real visitors are arriving. The default cap keeps
- * a production ladder under that line; raise it deliberately, never by default.
+ * ⛔ THE OLD FIGURE WAS WRONG BY 5x AND THE DEFAULT SAT ON THE WRONG SIDE OF
+ * THE LINE. This block read "above ~600-700 req/s from one machine Vercel's
+ * abuse protection resets connections (staging correction C-03)" and capped at
+ * 600 as though that were safe.
+ *
+ * Measured against production 2026-09-17: 24 concurrent readers from ONE ip —
+ * ~127 req/s — served 300 requests and were then challenged. 12,390 of 12,690
+ * requests came back HTTP 403 carrying Vercel's `Security Checkpoint` page, and
+ * the IP stayed blocked for the rest of the session, /api/health included.
+ *
+ * ⚠ IT IS A BURST DETECTOR, NOT A SUSTAINED-RATE THRESHOLD. It fired 2.4
+ * seconds in. What matters is how many requests arrive at once from one
+ * address, so a ramp that looks gentle in req/s still arrives as a burst and
+ * this cap cannot see that shape at all — it only bounds the rate you ask for.
+ *
+ * ⚠ AND THE FAILURE IS DISGUISED: a challenged request returns in ~300 ms, so
+ * it reads as a fast rejection by the app unless something inspects the body.
+ * That is very likely what `read/11-ceiling.js` recorded — 2,500 req/s offered,
+ * ~59 achieved, 267,184 "dropped iterations", cause never identified. It was
+ * the platform, and a checkpoint page is neither a dropped iteration nor an app
+ * failure.
+ *
+ * 100 is chosen to sit well under the measured trip point rather than just
+ * below an unmeasured one. Raising it needs a reason, and "the old default was
+ * 600" is not one. Real capacity testing needs several machines AND an email to
+ * Vercel support naming the window and the source IPs.
  */
-export const PRODUCTION_MAX_RATE = Number(__ENV.PRODUCTION_MAX_RATE || "600");
+export const PRODUCTION_MAX_RATE = Number(__ENV.PRODUCTION_MAX_RATE || "100");
 
 export function assertRateAllowed(rate) {
 	if (TARGET_ENV === "production" && rate > PRODUCTION_MAX_RATE) {
 		throw new Error(
 			`REFUSED — rate ${rate} req/s exceeds PRODUCTION_MAX_RATE=${PRODUCTION_MAX_RATE}. ` +
-				"Above ~600-700 req/s from one machine Vercel's abuse protection answers, not the app. " +
-				"Set PRODUCTION_MAX_RATE higher only on purpose.",
+				"Measured 2026-09-17: ~127 req/s from one IP was challenged after 300 requests, " +
+				"and the IP stayed blocked for the session. Above this you measure Vercel's " +
+				"Security Checkpoint, not the app. Several machines + an email to Vercel support " +
+				"is the supported path. Set PRODUCTION_MAX_RATE higher only on purpose.",
 		);
 	}
 }

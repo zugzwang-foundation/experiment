@@ -54,7 +54,13 @@ Staging runs the same code as production. To re-check write paths after a produc
 2. **Production is healthy.** Check that `https://zugzwangworld.com/api/health` returns `"status":"ok"`, `"db":"ok"` and `"migrations":"ok"`. `run.sh` refuses to start otherwise.
 3. **Pick the window.** Real visitors share the capacity you are consuming. Run before the public launch, or at the quietest hour, and tell the team first.
 4. **Have the dashboards open:** Vercel for functions, errors and spend; Supabase for connections and CPU; Upstash for commands. Stop the run if real users start seeing errors.
-5. **Know the ceiling.** Past about 600 to 700 req/s from one machine, Vercel's abuse protection resets connections (staging correction C-03). Production runs are capped at `PRODUCTION_MAX_RATE`, 600 by default. Going higher from one machine measures Vercel, not the app, and may get the rig's IP challenged.
+5. ⛔ **Know the ceiling — and it is FIVE TIMES LOWER THAN THIS FILE USED TO SAY.** It read "past about 600 to 700 req/s from one machine, Vercel's abuse protection resets connections", with `PRODUCTION_MAX_RATE` defaulting to 600 as if that were the safe side of the line. **Measured against production on 2026-09-17: 24 concurrent readers from one IP — about 127 req/s — served 300 requests and then every subsequent request returned HTTP 403 carrying Vercel's `Security Checkpoint` page. 12,390 of 12,690 requests were challenged, and the machine's IP stayed blocked for the rest of the session, `/api/health` included.**
+
+   **It is a BURST detector, not a sustained-rate threshold.** It tripped **2.4 seconds** in, after ~300 requests — so the figure that matters is how many requests arrive at once from one address, not the req/s you asked for. A ramp that looks gentle in req/s still arrives as a burst.
+
+   ⚠ **A challenged request fails in ~300 ms with a 403, which is indistinguishable from a fast app rejection unless you read the body** — and until 2026-09-17 `write-tests.py` discarded bodies (fixed, PR #559). **This is almost certainly what row 11 of the table above is recording:** `read/11-ceiling.js` offered up to 2,500 req/s, achieved ≈59, logged 267,184 dropped iterations, and its note says *"cause never separated between rig, app pool and platform."* It was the platform. A checkpoint page is not a dropped iteration and not an app failure.
+
+   ⇒ **From one machine, treat ~50 req/s as the working limit against production** and label anything above it as measuring Vercel. Real capacity testing needs several machines **and** an email to Vercel support naming the window and the source IPs — that email is not paperwork, it is the difference between a measurement and a self-inflicted block. `PRODUCTION_MAX_RATE` now defaults to **100**; raising it needs a reason, and the reason cannot be "the old default was 600".
 6. **One test at a time,** with a minute of quiet between batches, so each result belongs to one test.
 
 ---
