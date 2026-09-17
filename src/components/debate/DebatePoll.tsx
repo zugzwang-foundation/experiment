@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW,
 	POLL_INTERVAL_MS_DEBATE_VIEW,
@@ -111,13 +111,81 @@ const ACTIVITY_EVENTS = [
 export function DebatePoll({
 	marketOpen,
 	composerOpen,
+	slug,
 }: {
 	/** `model.market.status === "Open"` — the sole stop signal (SPEC.1 §9). */
 	marketOpen: boolean;
 	/** Any composer slot open on the surface — `openSide` or `openReply`. */
 	composerOpen: boolean;
+	/** Identifies the market whose version this poll asks about. */
+	slug: string;
 }): null {
 	const router = useRouter();
+	// The version this tab has already rendered. `null` until the first answer:
+	// the page was server-rendered moments ago, so that first answer is a
+	// BASELINE and must not trigger a refresh of its own.
+	const lastVersion = useRef<string | null>(null);
+
+	// ⚠ ASK, THEN REFRESH — the whole point of this component's rewrite. It used
+	// to call `router.refresh()` on every tick, re-invoking the full
+	// `/m/[slug]` read path (~5 uncached queries, ~250 ms CPU, one pooled
+	// connection held throughout) whether or not anything had changed. Measured
+	// on production 2026-09-16: the market page broke at 50 req/s offered with
+	// the connection pool pinned at 53 of 60 while Postgres itself ran only 1-3
+	// queries — so the site ran out of CONNECTIONS, and idle viewers were what
+	// consumed them. At 3,000 viewers this poll alone was ~100 renders/s.
+	//
+	// `/m/[slug]/version` is edge-cached for 5 s, so most of these never reach a
+	// server, and a tab that sees no change does no work anywhere.
+	//
+	// ⛔ NEVER REFRESH ON A FAILED CHECK. A transient error leaves `lastVersion`
+	// untouched and the next tick asks again. Refreshing on failure would
+	// restore the behaviour this replaces at exactly the moment the site is
+	// least able to serve it.
+	// One read of the market's version token, or `null` if the answer did not
+	// arrive. Never throws: a transient failure is a non-answer, not an event.
+	const readVersion = useCallback(async (): Promise<string | null> => {
+		try {
+			const res = await fetch(`/m/${slug}/version`);
+			if (!res.ok) {
+				return null;
+			}
+			const body: unknown = await res.json();
+			const value =
+				typeof body === "object" && body !== null
+					? (body as { v?: unknown }).v
+					: undefined;
+			return typeof value === "string" ? value : null;
+		} catch {
+			return null;
+		}
+	}, [slug]);
+
+	// ⛔ RECORDS, NEVER REFRESHES — and that is what makes it safe to run twice.
+	// React re-runs mount effects in development's StrictMode, and an
+	// implementation that compared on the second run would see its own first
+	// answer as a change and refresh for no reason.
+	const captureBaseline = useCallback(async () => {
+		const version = await readVersion();
+		if (version !== null) {
+			lastVersion.current = version;
+		}
+	}, [readVersion]);
+
+	const checkForChange = useCallback(async () => {
+		const version = await readVersion();
+		if (version === null) {
+			return;
+		}
+		if (lastVersion.current === null) {
+			lastVersion.current = version;
+			return;
+		}
+		if (version !== lastVersion.current) {
+			lastVersion.current = version;
+			router.refresh();
+		}
+	}, [router, readVersion]);
 	const [documentHidden, setDocumentHidden] = useState(false);
 
 	// Computed once per component instance — "one-time... per client mount".
@@ -128,6 +196,17 @@ export function DebatePoll({
 		);
 	}
 	const hasStartedOnce = useRef(false);
+
+	// ⚠ ESTABLISH THE BASELINE AT MOUNT, NOT AT THE FIRST TICK. The page was
+	// server-rendered a moment ago; without a baseline taken now, the first tick
+	// would have nothing to compare against, would record whatever it saw as the
+	// baseline, and would therefore MISS any bet, post or removal that landed
+	// between the render and that tick — a freshness hole the unconditional
+	// refresh never had. One extra request per page view buys it back, and it is
+	// answered by the edge cache rather than the database.
+	useEffect(() => {
+		void captureBaseline();
+	}, [captureBaseline]);
 
 	// Mirror page visibility into state. The initial `false` matches the server
 	// render; the mount call below adopts the real value post-hydration, which
@@ -227,17 +306,18 @@ export function DebatePoll({
 		}
 		if (wasSuspended.current) {
 			wasSuspended.current = false;
-			router.refresh();
+			// Back from idle or a hidden tab: ask first, like every other tick.
+			// The market may well be unchanged.
+			void checkForChange();
 		}
 
 		if (!hasStartedOnce.current) {
 			hasStartedOnce.current = true;
 			let interval: ReturnType<typeof setInterval> | undefined;
 			const arm = setTimeout(() => {
-				interval = setInterval(
-					() => router.refresh(),
-					POLL_INTERVAL_MS_DEBATE_VIEW,
-				);
+				interval = setInterval(() => {
+					void checkForChange();
+				}, POLL_INTERVAL_MS_DEBATE_VIEW);
 			}, phaseOffsetMs.current);
 			return () => {
 				clearTimeout(arm);
@@ -247,12 +327,11 @@ export function DebatePoll({
 			};
 		}
 
-		const timer = setInterval(
-			() => router.refresh(),
-			POLL_INTERVAL_MS_DEBATE_VIEW,
-		);
+		const timer = setInterval(() => {
+			void checkForChange();
+		}, POLL_INTERVAL_MS_DEBATE_VIEW);
 		return () => clearInterval(timer);
-	}, [marketOpen, suspended, router]);
+	}, [marketOpen, suspended, checkForChange]);
 
 	return null;
 }

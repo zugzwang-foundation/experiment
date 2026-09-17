@@ -21,6 +21,16 @@ import { DebatePoll } from "@/components/debate/DebatePoll";
 import { ScrollRail } from "@/components/debate/ScrollRail";
 
 const refresh = vi.fn();
+// R2-CHEAP-POLL — a poll tick now ASKS `/m/<slug>/version` and refreshes only
+// when the answer changed. These tests are about WHEN a tab may refresh, so the
+// stub reports a change every time: each assertion reads as it did before the
+// check existed.
+let versionTick = 0;
+const fetchMock = vi.fn(async () => ({
+	ok: true,
+	json: async () => ({ v: `v${++versionTick}` }),
+}));
+
 vi.mock("next/navigation", () => ({
 	useRouter: () => ({ refresh: (...a: unknown[]) => refresh(...a) }),
 }));
@@ -106,7 +116,10 @@ const RAIL_PROPS = {
 	progressKey: 0,
 };
 
-beforeEach(() => {
+beforeEach(async () => {
+	versionTick = 0;
+	fetchMock.mockClear();
+	vi.stubGlobal("fetch", fetchMock);
 	refresh.mockClear();
 	mqlListeners = [];
 	setPhoneSheetOpen(false);
@@ -124,11 +137,11 @@ describe("RI-3 · the hidden desktop tree's countdown", () => {
 		c.querySelector<HTMLElement>('[data-testid="scroll-rail-fill"]')?.style
 			.height ?? null;
 
-	it("DESKTOP CONTROL — still ticks at ≥640px, exactly as before", () => {
+	it("DESKTOP CONTROL — still ticks at ≥640px, exactly as before", async () => {
 		setViewport(false);
 		const { container } = render(<ScrollRail {...RAIL_PROPS} />);
 		expect(fillHeight(container)).toBe("0%");
-		act(() => {
+		await act(async () => {
 			vi.advanceTimersByTime(1000);
 		});
 		// If this stops advancing, the fix has taken the desktop's auto-advance
@@ -137,10 +150,10 @@ describe("RI-3 · the hidden desktop tree's countdown", () => {
 		expect(fillHeight(container)).not.toBe("0%");
 	});
 
-	it("does not tick below 640px, where the whole tree is display:none", () => {
+	it("does not tick below 640px, where the whole tree is display:none", async () => {
 		setViewport(true);
 		const { container } = render(<ScrollRail {...RAIL_PROPS} />);
-		act(() => {
+		await act(async () => {
 			vi.advanceTimersByTime(5000);
 		});
 		expect(fillHeight(container)).toBe("0%");
@@ -159,7 +172,7 @@ describe("RI-3 · the hidden desktop tree's countdown", () => {
 	// renders, which is the only question RI-3 ever asked.
 	const armedTimers = () => vi.getTimerCount();
 
-	it("DESKTOP CONTROL — an interval IS armed at ≥640px, which is what makes the zero below mean something", () => {
+	it("DESKTOP CONTROL — an interval IS armed at ≥640px, which is what makes the zero below mean something", async () => {
 		setViewport(false);
 		render(<ScrollRail {...RAIL_PROPS} />);
 		// Without this row a broken instrument — a timer registry that reads 0 for
@@ -168,13 +181,13 @@ describe("RI-3 · the hidden desktop tree's countdown", () => {
 		expect(armedTimers()).toBe(1);
 	});
 
-	it("arms NO interval below 640px — the cost RI-3 removes is a live timer, not a painted height", () => {
+	it("arms NO interval below 640px — the cost RI-3 removes is a live timer, not a painted height", async () => {
 		setViewport(true);
 		render(<ScrollRail {...RAIL_PROPS} />);
 		expect(armedTimers()).toBe(0);
 	});
 
-	it("follows the reader across the tier boundary — the gate is a SUBSCRIPTION, not a mount-time reading", () => {
+	it("follows the reader across the tier boundary — the gate is a SUBSCRIPTION, not a mount-time reading", async () => {
 		// ⚠ `phone-tier` reads the query through `useSyncExternalStore` rather than
 		// during render, and its docblock gives two reasons: SSR honesty, and
 		// re-evaluation on change. Nothing asserted the second, so a `subscribe`
@@ -189,7 +202,7 @@ describe("RI-3 · the hidden desktop tree's countdown", () => {
 		render(<ScrollRail {...RAIL_PROPS} />);
 		expect(armedTimers()).toBe(1);
 
-		act(() => {
+		await act(async () => {
 			crossTierBoundary(true);
 		});
 		expect(armedTimers()).toBe(0);
@@ -197,7 +210,7 @@ describe("RI-3 · the hidden desktop tree's countdown", () => {
 		// ── and back: the DESKTOP half of the pair. A teardown that never re-arms
 		//    would satisfy the line above and take the desktop's auto-advance with
 		//    it the moment anyone resized a window.
-		act(() => {
+		await act(async () => {
 			crossTierBoundary(false);
 		});
 		expect(armedTimers()).toBe(1);
@@ -209,39 +222,47 @@ describe("RI-4 · the poll and the phone sheet", () => {
 	// past both is what makes "did it refresh" a question with an answer.
 	const RUN_MS = 400_000;
 
-	it("DESKTOP CONTROL — still polls when nothing is open", () => {
+	it("DESKTOP CONTROL — still polls when nothing is open", async () => {
 		setViewport(false);
-		render(<DebatePoll marketOpen={true} composerOpen={false} />);
-		act(() => {
+		render(
+			<DebatePoll slug="test-market" marketOpen={true} composerOpen={false} />,
+		);
+		await act(async () => {
 			vi.advanceTimersByTime(RUN_MS);
 		});
 		expect(refresh).toHaveBeenCalled();
 	});
 
-	it("DESKTOP CONTROL — still suspends for the desktop's own composer", () => {
+	it("DESKTOP CONTROL — still suspends for the desktop's own composer", async () => {
 		setViewport(false);
-		render(<DebatePoll marketOpen={true} composerOpen={true} />);
-		act(() => {
+		render(
+			<DebatePoll slug="test-market" marketOpen={true} composerOpen={true} />,
+		);
+		await act(async () => {
 			vi.advanceTimersByTime(RUN_MS);
 		});
 		expect(refresh).not.toHaveBeenCalled();
 	});
 
-	it("suspends for a phone sheet the desktop tree cannot see", () => {
+	it("suspends for a phone sheet the desktop tree cannot see", async () => {
 		setViewport(true);
 		setPhoneSheetOpen(true);
-		render(<DebatePoll marketOpen={true} composerOpen={false} />);
-		act(() => {
+		render(
+			<DebatePoll slug="test-market" marketOpen={true} composerOpen={false} />,
+		);
+		await act(async () => {
 			vi.advanceTimersByTime(RUN_MS);
 		});
 		expect(refresh).not.toHaveBeenCalled();
 	});
 
-	it("resumes once the phone sheet closes — the flag cannot stick on", () => {
+	it("resumes once the phone sheet closes — the flag cannot stick on", async () => {
 		setViewport(true);
 		setPhoneSheetOpen(true);
-		render(<DebatePoll marketOpen={true} composerOpen={false} />);
-		act(() => {
+		render(
+			<DebatePoll slug="test-market" marketOpen={true} composerOpen={false} />,
+		);
+		await act(async () => {
 			vi.advanceTimersByTime(RUN_MS);
 		});
 		expect(refresh).not.toHaveBeenCalled();
@@ -250,11 +271,11 @@ describe("RI-4 · the poll and the phone sheet", () => {
 		// scenario; without it this row would test the idle rule instead of
 		// whether the sheet flag can stick. Its own `act` so the resume commits
 		// before the clock runs on (and the reader idles out again).
-		act(() => {
+		await act(async () => {
 			setPhoneSheetOpen(false);
 			window.dispatchEvent(new Event("pointerdown"));
 		});
-		act(() => {
+		await act(async () => {
 			vi.advanceTimersByTime(RUN_MS);
 		});
 		expect(refresh).toHaveBeenCalled();

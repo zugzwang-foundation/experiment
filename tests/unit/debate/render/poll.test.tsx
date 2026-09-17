@@ -55,6 +55,19 @@ const { refreshMock, routerMock } = vi.hoisted(() => {
 	};
 });
 
+// R2-CHEAP-POLL — a tick now ASKS `/m/<slug>/version` and refreshes only when
+// the answer changed. Every test in this file is about WHEN a tab may refresh —
+// cadence, suspension, idle, the stop rule — not about change detection, so this
+// stub answers with a NEW version every time. The market is therefore always
+// "changed" and each assertion below reads exactly as it did before the check
+// existed. Change detection has its own describe block at the foot of the file,
+// where an UNCHANGED answer must produce no refresh at all.
+let versionTick = 0;
+const fetchMock = vi.fn(async () => ({
+	ok: true,
+	json: async () => ({ v: `v${++versionTick}` }),
+}));
+
 vi.mock("next/navigation", () => ({
 	// POST-IMAGE-EXPORT — `DownloadPostImage` reads the market slug from the
 	// route; a mock without `useParams` throws at the first post card render.
@@ -107,8 +120,8 @@ function setHidden(hidden: boolean): void {
 }
 
 /** A reader input the idle timer counts (POLL-IDLE). */
-function activity(type = "pointermove"): void {
-	act(() => {
+async function activity(type = "pointermove"): Promise<void> {
+	await act(async () => {
 		window.dispatchEvent(new Event(type));
 	});
 }
@@ -120,9 +133,9 @@ function activity(type = "pointermove"): void {
  * cadence, suspension and stop rules below are tested apart from the idle rule.
  * Idle has its own describe block, which advances the clock without input.
  */
-function tick(intervals: number): void {
-	activity();
-	act(() => {
+async function tick(intervals: number): Promise<void> {
+	await activity();
+	await act(async () => {
 		vi.advanceTimersByTime(POLL_INTERVAL_MS_DEBATE_VIEW * intervals);
 	});
 }
@@ -172,127 +185,151 @@ function PolledHost({
 	);
 }
 
-beforeEach(() => {
+beforeEach(async () => {
 	vi.useFakeTimers();
 	refreshMock.mockReset();
 	refreshMock.mockImplementation(() => undefined);
+	versionTick = 0;
+	fetchMock.mockClear();
+	vi.stubGlobal("fetch", fetchMock);
 	setHidden(false);
 	applyNextPayload = null;
 });
 
-afterEach(() => {
+afterEach(async () => {
 	cleanup();
 	vi.useRealTimers();
+	vi.unstubAllGlobals();
 	Reflect.deleteProperty(document, "hidden");
 });
 
 describe("F-DEBATE-4 — the debate-view poll (cadence)", () => {
-	it("debate-view::poll-interval", () => {
-		render(<DebatePoll marketOpen composerOpen={false} />);
+	it("debate-view::poll-interval", async () => {
+		render(<DebatePoll slug="test-market" marketOpen composerOpen={false} />);
 
 		// The initial-mount guard: the server render is already fresh.
 		expect(refreshMock).toHaveBeenCalledTimes(0);
 
-		act(() => {
+		await act(async () => {
 			vi.advanceTimersByTime(POLL_INTERVAL_MS_DEBATE_VIEW - 1);
 		});
 		expect(refreshMock).toHaveBeenCalledTimes(0);
 
-		act(() => {
+		await act(async () => {
 			vi.advanceTimersByTime(1);
 		});
 		expect(refreshMock).toHaveBeenCalledTimes(1);
 
-		tick(3);
+		await tick(3);
 		expect(refreshMock).toHaveBeenCalledTimes(4);
 	});
 
-	it("clears its interval on unmount — no leaked timer", () => {
-		const { unmount } = render(<DebatePoll marketOpen composerOpen={false} />);
-		tick(1);
+	it("clears its interval on unmount — no leaked timer", async () => {
+		const { unmount } = render(
+			<DebatePoll slug="test-market" marketOpen composerOpen={false} />,
+		);
+		await tick(1);
 		expect(refreshMock).toHaveBeenCalledTimes(1);
 
 		unmount();
-		tick(5);
+		await tick(5);
 		expect(refreshMock).toHaveBeenCalledTimes(1);
 	});
 
-	it("fires at the net production rate under a StrictMode double-mount", () => {
+	it("fires at the net production rate under a StrictMode double-mount", async () => {
 		render(
 			<StrictMode>
-				<DebatePoll marketOpen composerOpen={false} />
+				<DebatePoll slug="test-market" marketOpen composerOpen={false} />
 			</StrictMode>,
 		);
-		tick(3);
+		await tick(3);
 		// Dev double-invokes the mount effect and runs the cleanup between the two
 		// invocations, so the net live interval count is 1 (recon R3, measured).
 		expect(refreshMock).toHaveBeenCalledTimes(3);
 	});
 
-	it("fires NO refresh on initial mount, nor on a re-render that never suspended", () => {
-		const { rerender } = render(<DebatePoll marketOpen composerOpen={false} />);
+	it("fires NO refresh on initial mount, nor on a re-render that never suspended", async () => {
+		const { rerender } = render(
+			<DebatePoll slug="test-market" marketOpen composerOpen={false} />,
+		);
 		expect(refreshMock).toHaveBeenCalledTimes(0);
 
-		rerender(<DebatePoll marketOpen composerOpen={false} />);
+		rerender(<DebatePoll slug="test-market" marketOpen composerOpen={false} />);
+		// The resume asks the version route first, so let that settle.
+		await act(async () => {
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+		});
 		expect(refreshMock).toHaveBeenCalledTimes(0);
 	});
 });
 
 describe("F-DEBATE-4 — suspension (RULING C)", () => {
-	it("debate-view::poll-suspends-while-hidden-or-composer-open", () => {
-		const { rerender } = render(<DebatePoll marketOpen composerOpen={false} />);
+	it("debate-view::poll-suspends-while-hidden-or-composer-open", async () => {
+		const { rerender } = render(
+			<DebatePoll slug="test-market" marketOpen composerOpen={false} />,
+		);
 
 		// (a) document.hidden suspends; becoming visible resumes IMMEDIATELY.
-		act(() => setHidden(true));
-		tick(4);
+		await act(async () => setHidden(true));
+		await tick(4);
 		expect(refreshMock).toHaveBeenCalledTimes(0);
 
-		act(() => setHidden(false));
+		await act(async () => setHidden(false));
 		expect(refreshMock).toHaveBeenCalledTimes(1);
-		tick(1);
+		await tick(1);
 		expect(refreshMock).toHaveBeenCalledTimes(2);
 
 		// (b) an open composer suspends; the last composer closing resumes
 		//     IMMEDIATELY. Composer-OPEN, not composer-dirty (ratified): a refresh
 		//     whose render throws destroys the whole tree, and an open-but-empty
 		//     composer sits in that blast radius identically to a dirty one.
-		rerender(<DebatePoll marketOpen composerOpen={true} />);
-		tick(4);
+		rerender(<DebatePoll slug="test-market" marketOpen composerOpen={true} />);
+		await tick(4);
 		expect(refreshMock).toHaveBeenCalledTimes(2);
 
-		rerender(<DebatePoll marketOpen composerOpen={false} />);
+		rerender(<DebatePoll slug="test-market" marketOpen composerOpen={false} />);
+		// The resume asks the version route first, so let that settle.
+		await act(async () => {
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+		});
 		expect(refreshMock).toHaveBeenCalledTimes(3);
-		tick(1);
+		await tick(1);
 		expect(refreshMock).toHaveBeenCalledTimes(4);
 	});
 
-	it("stays suspended while EITHER suspender holds — clearing one is not enough", () => {
-		const { rerender } = render(<DebatePoll marketOpen composerOpen={true} />);
-		act(() => setHidden(true));
-		tick(4);
+	it("stays suspended while EITHER suspender holds — clearing one is not enough", async () => {
+		const { rerender } = render(
+			<DebatePoll slug="test-market" marketOpen composerOpen={true} />,
+		);
+		await act(async () => setHidden(true));
+		await tick(4);
 		expect(refreshMock).toHaveBeenCalledTimes(0);
 
 		// Composer closes, tab still hidden → still suspended.
-		rerender(<DebatePoll marketOpen composerOpen={false} />);
-		tick(4);
+		rerender(<DebatePoll slug="test-market" marketOpen composerOpen={false} />);
+		await tick(4);
 		expect(refreshMock).toHaveBeenCalledTimes(0);
 
 		// Tab becomes visible → the single resume refresh fires, once.
-		act(() => setHidden(false));
+		await act(async () => setHidden(false));
 		expect(refreshMock).toHaveBeenCalledTimes(1);
 	});
 
-	it("adopts an already-hidden document at mount and never polls until it is shown", () => {
+	it("adopts an already-hidden document at mount and never polls until it is shown", async () => {
 		setHidden(true);
-		render(<DebatePoll marketOpen composerOpen={false} />);
-		tick(4);
+		render(<DebatePoll slug="test-market" marketOpen composerOpen={false} />);
+		await tick(4);
 		expect(refreshMock).toHaveBeenCalledTimes(0);
 
-		act(() => setHidden(false));
+		await act(async () => setHidden(false));
 		expect(refreshMock).toHaveBeenCalledTimes(1);
 	});
 
-	it("suspends through DebateView's OWN openSide state — no BetComposer change", () => {
+	it("suspends through DebateView's OWN openSide state — no BetComposer change", async () => {
 		render(
 			<DebateView
 				model={modelWithChart(
@@ -304,7 +341,7 @@ describe("F-DEBATE-4 — suspension (RULING C)", () => {
 				ownPseudonym={null}
 			/>,
 		);
-		tick(1);
+		await tick(1);
 		expect(refreshMock).toHaveBeenCalledTimes(1);
 
 		// Open the market-view composer slot the way a participant does.
@@ -312,25 +349,32 @@ describe("F-DEBATE-4 — suspension (RULING C)", () => {
 		fireEvent.click(entry);
 		expect(entry.getAttribute("aria-expanded")).toBe("true");
 
-		tick(4);
+		await tick(4);
 		expect(refreshMock).toHaveBeenCalledTimes(1);
 
 		// Toggle it closed → the immediate resume refresh.
 		fireEvent.click(entry);
 		expect(entry.getAttribute("aria-expanded")).toBe("false");
+		// Closing the composer resumes the poll, which asks the version route
+		// before it refreshes; let that answer land.
+		await act(async () => {
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+		});
 		expect(refreshMock).toHaveBeenCalledTimes(2);
 	});
 });
 
 describe("POLL-IDLE — an idle reader stops the poll", () => {
 	/** Advance the clock with NO reader input. */
-	function idleFor(ms: number): void {
-		act(() => {
+	async function idleFor(ms: number): Promise<void> {
+		await act(async () => {
 			vi.advanceTimersByTime(ms);
 		});
 	}
 
-	it("the constants are what was asked for: 30 s cadence, 5 min idle", () => {
+	it("the constants are what was asked for: 30 s cadence, 5 min idle", async () => {
 		expect(POLL_INTERVAL_MS_DEBATE_VIEW).toBe(30_000);
 		expect(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW).toBe(300_000);
 		expect(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW).toBeGreaterThan(
@@ -338,35 +382,35 @@ describe("POLL-IDLE — an idle reader stops the poll", () => {
 		);
 	});
 
-	it("keeps polling up to the idle timeout, then stops refreshing", () => {
-		render(<DebatePoll marketOpen composerOpen={false} />);
+	it("keeps polling up to the idle timeout, then stops refreshing", async () => {
+		render(<DebatePoll slug="test-market" marketOpen composerOpen={false} />);
 
-		idleFor(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW - 1);
+		await idleFor(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW - 1);
 		const beforeIdle = Math.floor(
 			(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW - 1) / POLL_INTERVAL_MS_DEBATE_VIEW,
 		);
 		expect(refreshMock).toHaveBeenCalledTimes(beforeIdle);
 
 		// Crossing the timeout suspends; a long quiet stretch refreshes nothing.
-		idleFor(1);
+		await idleFor(1);
 		const atIdle = refreshMock.mock.calls.length;
-		idleFor(POLL_INTERVAL_MS_DEBATE_VIEW * 20);
+		await idleFor(POLL_INTERVAL_MS_DEBATE_VIEW * 20);
 		expect(refreshMock).toHaveBeenCalledTimes(atIdle);
 	});
 
-	it("the first input after idling refreshes IMMEDIATELY, then resumes the cadence", () => {
-		render(<DebatePoll marketOpen composerOpen={false} />);
-		idleFor(
+	it("the first input after idling refreshes IMMEDIATELY, then resumes the cadence", async () => {
+		render(<DebatePoll slug="test-market" marketOpen composerOpen={false} />);
+		await idleFor(
 			POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW + POLL_INTERVAL_MS_DEBATE_VIEW * 5,
 		);
 		const idleCount = refreshMock.mock.calls.length;
 
-		activity();
+		await activity();
 		expect(refreshMock).toHaveBeenCalledTimes(idleCount + 1);
 
-		idleFor(POLL_INTERVAL_MS_DEBATE_VIEW - 1);
+		await idleFor(POLL_INTERVAL_MS_DEBATE_VIEW - 1);
 		expect(refreshMock).toHaveBeenCalledTimes(idleCount + 1);
-		idleFor(1);
+		await idleFor(1);
 		expect(refreshMock).toHaveBeenCalledTimes(idleCount + 2);
 	});
 
@@ -377,24 +421,28 @@ describe("POLL-IDLE — an idle reader stops the poll", () => {
 		"wheel",
 		"scroll",
 		"keydown",
-	])("%s counts as activity — it wakes an idle poll", (type) => {
-		render(<DebatePoll marketOpen composerOpen={false} />);
-		idleFor(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW + POLL_INTERVAL_MS_DEBATE_VIEW);
+	])("%s counts as activity — it wakes an idle poll", async (type) => {
+		render(<DebatePoll slug="test-market" marketOpen composerOpen={false} />);
+		await idleFor(
+			POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW + POLL_INTERVAL_MS_DEBATE_VIEW,
+		);
 		const idleCount = refreshMock.mock.calls.length;
 
-		activity(type);
+		await activity(type);
 		expect(refreshMock).toHaveBeenCalledTimes(idleCount + 1);
 	});
 
-	it("a scroll inside an inner scroller is seen (capture phase — scroll does not bubble)", () => {
-		render(<DebatePoll marketOpen composerOpen={false} />);
+	it("a scroll inside an inner scroller is seen (capture phase — scroll does not bubble)", async () => {
+		render(<DebatePoll slug="test-market" marketOpen composerOpen={false} />);
 		const scroller = document.createElement("div");
 		document.body.appendChild(scroller);
 		try {
-			idleFor(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW + POLL_INTERVAL_MS_DEBATE_VIEW);
+			await idleFor(
+				POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW + POLL_INTERVAL_MS_DEBATE_VIEW,
+			);
 			const idleCount = refreshMock.mock.calls.length;
 
-			act(() => {
+			await act(async () => {
 				scroller.dispatchEvent(new Event("scroll", { bubbles: false }));
 			});
 			expect(refreshMock).toHaveBeenCalledTimes(idleCount + 1);
@@ -403,76 +451,90 @@ describe("POLL-IDLE — an idle reader stops the poll", () => {
 		}
 	});
 
-	it("ongoing activity keeps it polling indefinitely — the timeout restarts on input", () => {
-		render(<DebatePoll marketOpen composerOpen={false} />);
+	it("ongoing activity keeps it polling indefinitely — the timeout restarts on input", async () => {
+		render(<DebatePoll slug="test-market" marketOpen composerOpen={false} />);
 		// Ten minutes, with input every minute: never idle, every tick lands.
 		for (let minute = 0; minute < 10; minute++) {
-			activity();
-			idleFor(60_000);
+			await activity();
+			await idleFor(60_000);
 		}
 		expect(refreshMock).toHaveBeenCalledTimes(
 			Math.floor(600_000 / POLL_INTERVAL_MS_DEBATE_VIEW),
 		);
 	});
 
-	it("an idle reader returning to a hidden tab counts as present — resumes on show", () => {
-		render(<DebatePoll marketOpen composerOpen={false} />);
-		act(() => setHidden(true));
-		idleFor(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW * 2);
+	it("an idle reader returning to a hidden tab counts as present — resumes on show", async () => {
+		render(<DebatePoll slug="test-market" marketOpen composerOpen={false} />);
+		await act(async () => setHidden(true));
+		await idleFor(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW * 2);
 		expect(refreshMock).toHaveBeenCalledTimes(0);
 
-		act(() => setHidden(false));
+		await act(async () => setHidden(false));
 		expect(refreshMock).toHaveBeenCalledTimes(1);
-		idleFor(POLL_INTERVAL_MS_DEBATE_VIEW);
+		await idleFor(POLL_INTERVAL_MS_DEBATE_VIEW);
 		expect(refreshMock).toHaveBeenCalledTimes(2);
 	});
 
-	it("input does NOT override the other suspenders — an open composer still holds it", () => {
-		render(<DebatePoll marketOpen composerOpen={true} />);
-		idleFor(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW + POLL_INTERVAL_MS_DEBATE_VIEW);
-		activity("keydown");
-		idleFor(POLL_INTERVAL_MS_DEBATE_VIEW * 3);
+	it("input does NOT override the other suspenders — an open composer still holds it", async () => {
+		render(<DebatePoll slug="test-market" marketOpen composerOpen={true} />);
+		await idleFor(
+			POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW + POLL_INTERVAL_MS_DEBATE_VIEW,
+		);
+		await activity("keydown");
+		await idleFor(POLL_INTERVAL_MS_DEBATE_VIEW * 3);
 		expect(refreshMock).toHaveBeenCalledTimes(0);
 	});
 
-	it("input cannot restart a poll the stop rule stopped", () => {
-		const { rerender } = render(<DebatePoll marketOpen composerOpen={false} />);
-		rerender(<DebatePoll marketOpen={false} composerOpen={false} />);
-		idleFor(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW * 2);
-		activity();
-		idleFor(POLL_INTERVAL_MS_DEBATE_VIEW * 3);
+	it("input cannot restart a poll the stop rule stopped", async () => {
+		const { rerender } = render(
+			<DebatePoll slug="test-market" marketOpen composerOpen={false} />,
+		);
+		rerender(
+			<DebatePoll slug="test-market" marketOpen={false} composerOpen={false} />,
+		);
+		await idleFor(POLL_IDLE_TIMEOUT_MS_DEBATE_VIEW * 2);
+		await activity();
+		await idleFor(POLL_INTERVAL_MS_DEBATE_VIEW * 3);
 		expect(refreshMock).toHaveBeenCalledTimes(0);
 	});
 
-	it("removes its listeners and idle timer on unmount", () => {
-		const { unmount } = render(<DebatePoll marketOpen composerOpen={false} />);
+	it("removes its listeners and idle timer on unmount", async () => {
+		const { unmount } = render(
+			<DebatePoll slug="test-market" marketOpen composerOpen={false} />,
+		);
 		unmount();
 		expect(vi.getTimerCount()).toBe(0);
-		activity();
-		idleFor(POLL_INTERVAL_MS_DEBATE_VIEW * 3);
+		await activity();
+		await idleFor(POLL_INTERVAL_MS_DEBATE_VIEW * 3);
 		expect(refreshMock).toHaveBeenCalledTimes(0);
 	});
 });
 
 describe("F-DEBATE-4 — the stop rule (RULING D, client half)", () => {
-	it("never starts on a market that is already non-Open at first paint", () => {
-		render(<DebatePoll marketOpen={false} composerOpen={false} />);
-		tick(5);
+	it("never starts on a market that is already non-Open at first paint", async () => {
+		render(
+			<DebatePoll slug="test-market" marketOpen={false} composerOpen={false} />,
+		);
+		await tick(5);
 		expect(refreshMock).toHaveBeenCalledTimes(0);
 	});
 
-	it("stops PERMANENTLY when the market leaves Open — cleared, never restarted", () => {
-		const { rerender } = render(<DebatePoll marketOpen composerOpen={false} />);
-		tick(2);
+	it("stops PERMANENTLY when the market leaves Open — cleared, never restarted", async () => {
+		const { rerender } = render(
+			<DebatePoll slug="test-market" marketOpen composerOpen={false} />,
+		);
+		await tick(2);
 		expect(refreshMock).toHaveBeenCalledTimes(2);
 
-		rerender(<DebatePoll marketOpen={false} composerOpen={false} />);
-		tick(5);
+		rerender(
+			<DebatePoll slug="test-market" marketOpen={false} composerOpen={false} />,
+		);
+		await tick(5);
 		expect(refreshMock).toHaveBeenCalledTimes(2);
 
 		// Stopped, not paused: even a later payload claiming Open cannot restart it.
-		rerender(<DebatePoll marketOpen composerOpen={false} />);
-		tick(5);
+		rerender(<DebatePoll slug="test-market" marketOpen composerOpen={false} />);
+		await tick(5);
 		expect(refreshMock).toHaveBeenCalledTimes(2);
 	});
 });
@@ -492,7 +554,7 @@ describe("F-DEBATE-4 — the stop rule (RULING D, client half)", () => {
 // re-pointed at the row it was always evidence for, rather than deleted along
 // with the row it was named after.
 describe("F-DEBATE-4 — the price chart's terminal rides the poll (F-DEBATE-5)", () => {
-	it("debate-view::price-chart-tail-pinned-to-live-price", () => {
+	it("debate-view::price-chart-tail-pinned-to-live-price", async () => {
 		const first = modelWithChart(
 			"0.500000000000000000",
 			"2026-09-15T00:00:00.000Z",
@@ -509,14 +571,25 @@ describe("F-DEBATE-4 — the price chart's terminal rides the poll (F-DEBATE-5)"
 		render(<PolledHost first={first} second={second} />);
 		expect(chartSummary()).toContain("current 50%");
 
-		tick(1);
+		await tick(1);
 
 		expect(refreshMock).toHaveBeenCalledTimes(1);
 		expect(chartSummary()).toContain("current 80%");
 	});
 
-	it("renders the chart from props alone — the tree issues no client-side fetch", () => {
-		const fetchSpy = vi.fn();
+	it("renders the chart from props alone — the tree issues no client-side fetch", async () => {
+		// R2-CHEAP-POLL — this guard's subject is the CHART, which must render
+		// from props and fetch nothing of its own. The poll's version check is a
+		// legitimate request that did not exist when this was written, so the
+		// assertion below pins WHICH requests the tree may make rather than that
+		// it makes none. A chart that fetched its own series would still fail it.
+		const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+			void input;
+			return {
+				ok: true,
+				json: async () => ({ v: `v${++versionTick}` }),
+			};
+		});
 		vi.stubGlobal("fetch", fetchSpy);
 		try {
 			render(
@@ -530,9 +603,11 @@ describe("F-DEBATE-4 — the price chart's terminal rides the poll (F-DEBATE-5)"
 					ownPseudonym={null}
 				/>,
 			);
-			tick(3);
+			await tick(3);
 			expect(refreshMock).toHaveBeenCalledTimes(3);
-			expect(fetchSpy).not.toHaveBeenCalled();
+			for (const [url] of fetchSpy.mock.calls) {
+				expect(String(url)).toMatch(/^\/m\/[^/]+\/version$/);
+			}
 		} finally {
 			vi.unstubAllGlobals();
 		}

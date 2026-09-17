@@ -44,6 +44,15 @@ const { refreshMock, routerMock } = vi.hoisted(() => {
 	};
 });
 
+// R2-CHEAP-POLL — a poll tick asks `/m/<slug>/version` and refreshes only on a
+// change. These tests count refreshes, so the stub reports a change every time
+// and the counts read as they did before the check existed.
+let versionTick = 0;
+const fetchMock = vi.fn(async () => ({
+	ok: true,
+	json: async () => ({ v: `v${++versionTick}` }),
+}));
+
 vi.mock("next/navigation", () => ({
 	// POST-IMAGE-EXPORT — `DownloadPostImage` reads the market slug from the
 	// route; a mock without `useParams` throws at the first post card render.
@@ -86,16 +95,19 @@ const ADVANCE_MS = POLL_INTERVAL_MS_DEBATE_VIEW;
  * `auto-advance.test.tsx`, where it cost two false REDs.
  */
 const STEP_MS = ADVANCE_MS / 60;
-function advance(ms: number) {
+async function advance(ms: number): Promise<void> {
 	const steps = Math.round(ms / STEP_MS);
 	for (let i = 0; i < steps; i++) {
-		act(() => {
+		await act(async () => {
 			vi.advanceTimersByTime(STEP_MS);
 		});
 	}
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+	versionTick = 0;
+	fetchMock.mockClear();
+	vi.stubGlobal("fetch", fetchMock);
 	vi.useFakeTimers();
 	refreshMock.mockReset();
 	refreshMock.mockImplementation(() => undefined);
@@ -286,7 +298,7 @@ describe("FEED-2 — a post that is not there produces silence", () => {
 				),
 			),
 		);
-		act(() => {
+		await act(async () => {
 			vi.advanceTimersByTime(400);
 		});
 
@@ -304,7 +316,7 @@ describe("FEED-2 — a post that is not there produces silence", () => {
 		const before = readoutOn("YES");
 
 		rerender(view(modelUnchanged()));
-		act(() => {
+		await act(async () => {
 			vi.advanceTimersByTime(400);
 		});
 
@@ -322,7 +334,7 @@ describe("FEED-2 — the reader moves it, not a clock", () => {
 		expect(cardOn("YES")).toBe(MODEL_TITLE);
 		const held = readoutOn("YES");
 
-		advance(ADVANCE_MS * 2);
+		await advance(ADVANCE_MS * 2);
 
 		expect(cardOn("YES"), "two full cadences and it has not moved").toBe(
 			MODEL_TITLE,
@@ -346,7 +358,7 @@ describe("FEED-2 — the reader moves it, not a clock", () => {
 		// A click outside both columns — the surface's own release for a picked
 		// column. No dismissal, no exit state: an ordinary click anywhere else.
 		fireEvent.click(document.body);
-		advance(ADVANCE_MS);
+		await advance(ADVANCE_MS);
 
 		expect(
 			readoutOn("YES"),
@@ -366,7 +378,7 @@ describe("FEED-2 — nothing new is held", () => {
 		const { rerender } = render(view(baseModel()));
 
 		fireEvent.click(screen.getByLabelText("Buy YES"));
-		advance(ADVANCE_MS * 2);
+		await advance(ADVANCE_MS * 2);
 		expect(
 			refreshMock,
 			"POSITIVE CONTROL: an OPEN composer really does suspend the poll",
@@ -376,7 +388,7 @@ describe("FEED-2 — nothing new is held", () => {
 		rerender(view(modelWithPost(postedPost())));
 		const afterJump = refreshMock.mock.calls.length;
 
-		advance(ADVANCE_MS * 2);
+		await advance(ADVANCE_MS * 2);
 
 		expect(
 			refreshMock.mock.calls.length,
@@ -411,7 +423,7 @@ describe("FEED-2 — nothing new is held", () => {
 		// The reader releases the column and it resumes — the ordinary behaviour
 		// this test then checks is not silently undone.
 		fireEvent.click(document.body);
-		advance(ADVANCE_MS);
+		await advance(ADVANCE_MS);
 		expect(positionOn("YES")).not.toBe("3");
 
 		// Out of the post, and back into it.
@@ -427,7 +439,7 @@ describe("FEED-2 — nothing new is held", () => {
 		// that it stops the column: if the effect fired again this column is
 		// picked, and a picked column does not advance on its own.
 		const before = positionOn("YES");
-		advance(ADVANCE_MS);
+		await advance(ADVANCE_MS);
 		expect(
 			positionOn("YES"),
 			"the column was not silently re-taken — it still advances",
@@ -455,7 +467,7 @@ describe("FEED-2 — nothing new is held", () => {
 		// common case, not the exotic one. Measured: with the guard keyed on the
 		// index this test goes red and every other one in the file stays green.
 		fireEvent.click(document.body);
-		advance(ADVANCE_MS);
+		await advance(ADVANCE_MS);
 		const movedTo = positionOn("YES");
 		expect(movedTo).not.toBe("");
 		rerender(
@@ -470,7 +482,7 @@ describe("FEED-2 — nothing new is held", () => {
 				),
 			),
 		);
-		act(() => {
+		await act(async () => {
 			vi.advanceTimersByTime(400);
 		});
 

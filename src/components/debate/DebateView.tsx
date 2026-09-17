@@ -1071,6 +1071,7 @@ export function DebateView({
 			<DebatePoll
 				marketOpen={marketOpen}
 				composerOpen={openSide !== null || openReply !== null}
+				slug={market.slug}
 			/>
 
 			{/* HTML-FINISH · MARKET DETAIL row 1 — THE HEADZONE IS INSIDE THE
