@@ -1,6 +1,8 @@
 import "server-only";
 
 import {
+	DISCOVERY_PRICE_EXPIRE_SEC,
+	DISCOVERY_PRICE_MIN_WINDOW_MS,
 	MARKET_SERIES_MIN_WINDOW_MS,
 	READ_URL_TTL_SECONDS_MODERATION,
 } from "@/server/config/limits";
@@ -148,6 +150,22 @@ export const DOWNSTREAM_CACHED_MINUTES =
 export const DOWNSTREAM_CACHED_SERIES =
 	SERIES_WINDOW_SECONDS * 60 + SERIES_WINDOW_SECONDS;
 
+/**
+ * The ADR-0055 Discovery pricing boundary (`discovery/cached-pricing.ts`),
+ * DERIVED from its two constants rather than copied from them — the same rule
+ * as `DOWNSTREAM_CACHED_SERIES` above, and for the same reason: both are
+ * advertised as tunable, so deriving means a tune arrives here by itself and
+ * the budget test re-checks the invariant against the new number.
+ *
+ * ⚠ No presigned URL rides this boundary, and none can: the entry holds pricing,
+ * reserves and `unitToWin` — decimal STRINGS, no media, no URL of any kind. It
+ * is declared anyway because this registry's whole mechanism is that a boundary
+ * cannot appear without someone writing its ceiling down. A boundary that
+ * carries no URL today is one refactor away from carrying one.
+ */
+export const DOWNSTREAM_CACHED_DISCOVERY_PRICE =
+	DISCOVERY_PRICE_EXPIRE_SEC + DISCOVERY_PRICE_MIN_WINDOW_MS / 1000;
+
 /** No cache between the mint and the consumer. */
 export const DOWNSTREAM_NONE = 0;
 
@@ -171,6 +189,7 @@ export const DOWNSTREAM_ADMIN_FEED_FETCH = 30;
  */
 export const CACHE_BOUNDARY_CEILINGS: Readonly<Record<string, number>> = {
 	"src/server/debate-view/cached-view.ts": DOWNSTREAM_CACHED_MINUTES,
+	"src/server/discovery/cached-pricing.ts": DOWNSTREAM_CACHED_DISCOVERY_PRICE,
 	"src/server/discovery/cached-series.ts": DOWNSTREAM_CACHED_SERIES,
 	"src/server/discovery/list.ts": DOWNSTREAM_CACHED_MINUTES,
 };
@@ -240,8 +259,14 @@ export const SHIPPED_HOLD_BUDGET: ReadonlyArray<{
  * ceiling of its own. Pinning the count is what makes that visible. A boundary
  * added to an existing file is exactly as capable of re-opening C-1 as one in a
  * new file, and considerably easier to miss.
+ *
+ * ⚠ 4 → 5 at ADR-0055 (`discovery/cached-pricing.ts`). ⛔ THE MECHANISM WORKED
+ * EXACTLY AS WRITTEN AND IS WORTH RECORDING: that change was developed with the
+ * discovery and unit suites green and this guard never run, and CI is what
+ * refused it — which is the whole argument for a registry asserted against the
+ * source tree rather than a convention about remembering.
  */
-export const CACHE_BOUNDARY_DIRECTIVE_COUNT = 4;
+export const CACHE_BOUNDARY_DIRECTIVE_COUNT = 5;
 
 type MemoEntry = { url: string; holdUntilMs: number };
 
