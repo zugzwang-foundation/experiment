@@ -73,6 +73,29 @@ function AvatarImage({
 				"aspect-square size-full rounded-full object-cover",
 				className,
 			)}
+			// R2-AVATAR-LAZY — the same two native hints `MarketThumb` and
+			// `CommentImage` carry (P3.1), applied here because avatars are the one
+			// image family that never got them and are the slowest thing on the page.
+			//
+			// ⚠ THE COST IS PER AVATAR AND THE PAGES CARRY MANY. Measured against
+			// production 2026-09-17: a 6 KB avatar takes 0.37-1.17 s, because the
+			// bucket is served from `pub-*.r2.dev`, which Cloudflare does not edge-
+			// cache — the response carries no `cf-cache-status` at all, while the
+			// object's own `max-age=31536000, immutable` is already correct. A debate
+			// page renders one avatar per post, so without this every one of them is
+			// fetched before the reader has scrolled to it.
+			//
+			// ⛔ THIS IS A MITIGATION, NOT THE FIX. The fix is a custom domain on the
+			// PFP bucket so the edge caches it; that needs no code, only
+			// `R2_PUBLIC_URL_PFP` repointed. Deleting these attributes once that
+			// lands would still be wrong: lazy loading stops a page fetching images
+			// nobody scrolls to, which is true of a fast origin too.
+			//
+			// Defaults, not impositions — `{...props}` spreads after them, so a
+			// caller that must load eagerly (an avatar known to be above the fold)
+			// can still say so.
+			loading="lazy"
+			decoding="async"
 			{...props}
 		/>
 	);
