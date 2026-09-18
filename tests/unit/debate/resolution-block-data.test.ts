@@ -10,9 +10,9 @@ import stagingSnapshot from "../../../docs/data/staging-markets-snapshot.json";
 const KNOWN_SLUGS = [
 	"chess-fide-tiebreak-response",
 	"bitcoin-price-50k",
-	"math-erdos-contribution-response",
+	"math-erdos-solved-on-zugzwang",
 	"claude-bundle-response",
-	"yc-paper-club-response",
+	"yc-w27-acceptance",
 	"github-zugzwang-repo-stars",
 ] as const;
 
@@ -128,20 +128,48 @@ describe("resolution-block-data — G1, exhaustive + fails loud on an unknown sl
  * two by subtraction rather than by that miscount returning.
  */
 describe("resolution-block-data — content matches the ratified register", () => {
-	it("resolution-block-data::RESOLUTION-is-Response-on-X-for-the-four-account-watching-markets", () => {
+	it("resolution-block-data::RESOLUTION-is-Response-on-X-for-the-three-account-watching-markets", () => {
 		// ⚠⚠ BLOCK-3 · MKT-SLATE v1.1 — "X" → "Response on X". RESOLUTION
 		// redefined from "the surface" to "the thing read to settle the
-		// market"; for these four the thing is a response POST, not the bare
+		// market"; for these three the thing is a response POST, not the bare
 		// platform name. See the data file's own docblock.
+		// ⛔⛔ D-50 — THERE WERE FOUR AND `yc-w27-acceptance` LEFT THE SET. Its
+		// v3.0 criterion settles on YC's written decision to the applicant, so
+		// nothing about it is read off X; it is pinned on its own below. The
+		// count in this test's NAME moved with the list deliberately — a name
+		// that says "four" over a three-element array is the drift this file
+		// exists to catch, one level up.
+		let checked = 0;
 		for (const slug of [
 			"chess-fide-tiebreak-response",
-			"math-erdos-contribution-response",
+			"math-erdos-solved-on-zugzwang",
 			"claude-bundle-response",
-			"yc-paper-club-response",
 		] as const) {
 			expect(RESOLUTION_BLOCKS[slug].resolution.line1).toBe("Response on X");
 			expect(RESOLUTION_BLOCKS[slug].resolution.href).toBeNull();
+			checked += 1;
 		}
+		// ⛔ NON-VACUITY — three is now the whole set, so an empty array would
+		// satisfy every assertion above while proving nothing.
+		expect(checked).toBe(3);
+	});
+
+	it("resolution-block-data::YCP-01-is-the-only-market-NOT-settled-on-X", () => {
+		// ⛔⛔ D-50 — the roster's first non-X resolution type. RESOLUTION is the
+		// DOCUMENT read ("YC decision"), RESOLVER the institution that issues it,
+		// and they are deliberately NOT the same string — which makes this the
+		// one market where the two values diverge while sharing one glyph. The
+		// href is the application page v3.0 §3 cites by name and date for YC's
+		// own timing statement, not an X profile.
+		const blocks = RESOLUTION_BLOCKS["yc-w27-acceptance"];
+		expect(blocks.resolution.line1).toBe("YC decision");
+		expect(blocks.resolution.href).toBeNull();
+		expect(blocks.resolver.line1).toBe("Y Combinator");
+		expect(blocks.resolver.href).toBe("https://www.ycombinator.com/apply");
+		// ⛔ The guard with teeth: "Response on X" must not come back here by a
+		// fixture copied forward from before D-50.
+		expect(blocks.resolution.line1).not.toBe("Response on X");
+		expect(blocks.resolver.href).not.toMatch(/x\.com/);
 	});
 
 	it("resolution-block-data::RESOLUTION-names-the-institution-for-the-other-two", () => {
@@ -177,15 +205,66 @@ describe("resolution-block-data — content matches the ratified register", () =
 		});
 	});
 
-	it("resolution-block-data::CLA-01-RESOLVER-is-deliberately-single-account-not-an-oversight", () => {
-		// ⚠ BLOCK-2 — founder-ruled. The live criterion qualifies three
-		// accounts (@AnthropicAI, @claudeai, @ClaudeDevs); this chip stays a
-		// single named pointer, not an exhaustive citation. Guards against a
-		// future "completion" adding a second account or a `+2` marker.
+	it("resolution-block-data::CLA-01-RESOLVER-is-the-SOLE-qualifying-account", () => {
+		// ⚠⚠ D-50 INVERTS THIS GUARD'S REASON WHILE KEEPING ITS ASSERTION, and
+		// the old text is replaced rather than annotated (§8 O-5). It read:
+		// "BLOCK-2 — founder-ruled. The live criterion qualifies three accounts
+		// (@AnthropicAI, @claudeai, @ClaudeDevs); this chip stays a single named
+		// pointer, not an exhaustive citation."
+		// v3.0 §3 makes @ClaudeDevs the ONLY account that can resolve this
+		// market — "Posts by @claudeai, @AnthropicAI or any other account do not
+		// count" — so one name is now the exhaustive citation rather than an
+		// abbreviation of three. Same shape, opposite justification.
 		const resolver = RESOLUTION_BLOCKS["claude-bundle-response"].resolver;
-		expect(resolver.line1).toBe("@claudeai");
+		expect(resolver.line1).toBe("@ClaudeDevs");
 		expect(resolver.line2).toBeNull();
-		expect(resolver.href).toBe("https://x.com/claudeai");
+		expect(resolver.href).toBe("https://x.com/ClaudeDevs");
+		// ⛔ The two accounts v3.0 explicitly EXCLUDES must not reappear here —
+		// this is the assertion that would have caught a fixture copied forward.
+		expect(resolver.line1).not.toBe("@claudeai");
+		expect(resolver.href).not.toBe("https://x.com/claudeai");
+	});
+
+	it("resolution-block-data::CHE-01-RESOLVER-is-Anand-in-person-at-the-11px-floor", () => {
+		// ⛔⛔ D-50 — the resolver is a PERSON, not the federation. v3.0 §3 binds
+		// to Viswanathan Anand "whatever office he holds or ceases to hold during
+		// the window", and rules that a post by @FIDE_chess does not count "even
+		// one that speaks for him" — so restoring the federation account here
+		// would contradict the criterion, not merely abbreviate it.
+		// ⛔ AND THIS IS THE MAP'S ONLY 11px ENTRY, pinned so that a "tidy-up"
+		// to the 12–14 band cannot silently make it overflow: fifteen characters
+		// need 95.01px at 12 against a 90.664px column. Measured on the deployed
+		// build 2026-09-18, with BLOCK-4's four published figures reproduced
+		// first as a positive control.
+		const resolver = RESOLUTION_BLOCKS["chess-fide-tiebreak-response"].resolver;
+		expect(resolver.line1).toBe("@vishy64theking");
+		expect(resolver.href).toBe("https://x.com/vishy64theking");
+		expect(resolver.fontSize).toBe(11);
+		expect(resolver.line1).not.toBe("@FIDE_chess");
+		expect(resolver.href).not.toMatch(/FIDE/);
+	});
+
+	it("resolution-block-data::the-11px-floor-is-occupied-exactly-ONCE", () => {
+		// ⛔⛔ D-50 — the data file asserted "no entry in this map is at the 11px
+		// floor as shipped" until this ruling, and that sentence is now corrected
+		// there. This is the mechanical half of the correction: exactly one entry
+		// may sit on the floor, and it is CHE's resolver. A second arrival is a
+		// signal that a value outgrew the column and wants re-measuring in a real
+		// browser rather than a step down.
+		const atFloor: string[] = [];
+		for (const slug of KNOWN_SLUGS) {
+			for (const key of [
+				"resolution",
+				"resolver",
+				"closes",
+				"flavour",
+			] as const) {
+				if (RESOLUTION_BLOCKS[slug][key].fontSize === 11) {
+					atFloor.push(`${slug}.${key}`);
+				}
+			}
+		}
+		expect(atFloor).toEqual(["chess-fide-tiebreak-response.resolver"]);
 	});
 
 	it("resolution-block-data::RESOLVER-hrefs-are-real-absolute-URLs", () => {
@@ -297,9 +376,9 @@ describe("resolution-block-data — content matches the ratified register", () =
 		const expected: Record<(typeof KNOWN_SLUGS)[number], string> = {
 			"chess-fide-tiebreak-response": "Petition",
 			"bitcoin-price-50k": "Sentiment",
-			"math-erdos-contribution-response": "Innovation",
+			"math-erdos-solved-on-zugzwang": "Innovation",
 			"claude-bundle-response": "Feedback",
-			"yc-paper-club-response": "Showcase",
+			"yc-w27-acceptance": "Showcase",
 			"github-zugzwang-repo-stars": "Callout",
 		};
 		// ⛔ THE SUPERSEDED PAIR, ASSERTED ABSENT. The map above would still pass

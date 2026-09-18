@@ -312,17 +312,26 @@ describe("debate-view::price-chart-window-contains-all-data — RF-5, against th
 	 * Read against the live staging database, one row per content market, ordered
 	 * as measured. ⚠ Re-measure after any reset that recreates the markets; see
 	 * `EARLIEST_MEASURED_EVENT` above for the same warning.
+	 * ⚠⚠ D-50 RE-KEYED TWO OF THESE SLUGS AND DID **NOT** MOVE A SINGLE
+	 * INSTANT, which is the one thing worth saying here. That ruling edits
+	 * `markets.title`, `.description` and `.slug` IN PLACE — it does not
+	 * recreate a row, so no new `market.opened` was minted and every
+	 * timestamp below is still the 2026-09-18 restore's. ⇒ a slug change in
+	 * this list is NOT the trigger the warning above describes; a RESET is.
+	 * Renaming the keys and re-measuring the instants are separate acts, and
+	 * conflating them would have replaced six measured values with six
+	 * fresh ones for no reason.
 	 */
 	function stagingGenesisInstants(): { slug: string; at: string }[] {
 		return [
 			{ slug: "chess-fide-tiebreak-response", at: "2026-09-18T10:57:34.675Z" },
 			{ slug: "bitcoin-price-50k", at: "2026-09-18T10:57:34.858Z" },
 			{
-				slug: "math-erdos-contribution-response",
+				slug: "math-erdos-solved-on-zugzwang",
 				at: "2026-09-18T10:57:34.992Z",
 			},
 			{ slug: "claude-bundle-response", at: "2026-09-18T10:57:35.161Z" },
-			{ slug: "yc-paper-club-response", at: "2026-09-18T10:57:35.295Z" },
+			{ slug: "yc-w27-acceptance", at: "2026-09-18T10:57:35.295Z" },
 			{ slug: "github-zugzwang-repo-stars", at: "2026-09-18T10:57:35.436Z" },
 		];
 	}

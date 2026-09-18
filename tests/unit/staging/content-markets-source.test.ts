@@ -169,16 +169,28 @@ describe("description lengths", () => {
 	 * ⚠ THE KICKOFF SAID 700–800 CHARACTERS. THE CONTENT DOES NOT.
 	 *
 	 * Measured against the committed snapshot, re-measured 2026-09-18 after
-	 * MKT-ROSTER-1 took the slate to six:
+	 * MKT-ROSTER-1 took the slate to six, and AGAIN after D-50 overlaid five
+	 * markets' v3.0 wording onto it:
 	 *
-	 *   chess-fide-tiebreak-response         3609
-	 *   bitcoin-price-50k                    3795
-	 *   math-erdos-contribution-response     3836
-	 *   claude-bundle-response               3733
-	 *   yc-paper-club-response                789
-	 *   github-zugzwang-repo-stars            794
+	 *   slug                                 v2.2    v3.0
+	 *   chess-fide-tiebreak-response         3609 -> 1903
+	 *   bitcoin-price-50k                    3795 -> 3795   (MKT-BTC-01 untouched)
+	 *   math-erdos-solved-on-zugzwang        3836 -> 2852   (re-slugged)
+	 *   claude-bundle-response               3733 -> 2169
+	 *   yc-w27-acceptance                     789 -> 1658   (re-slugged)
+	 *   github-zugzwang-repo-stars            794 ->  792
 	 *
-	 * FOUR of the six carry a long, fully-structured criterion and two do not.
+	 * ⚠⚠ D-50 MOVED EVERY FIGURE EXCEPT BITCOIN'S, AND FOUR OF THE FIVE WENT
+	 * DOWN — which is the direction the bound below is least able to see. The
+	 * v3.0 criteria are tighter, not longer: staging had been carrying pre-v2.2
+	 * copy (chess lost 1 706 characters), so the drop is a market catching up to
+	 * the founder's current wording rather than a truncation. The 700-character
+	 * floor still holds on all six, by a margin of 92 at the tightest (github's
+	 * 792). ⇒ if a future edit takes any description under ~800, the floor is no
+	 * longer a comfortable guard and wants raising to sit under the real minimum.
+	 *
+	 * FOUR of the six carried a long, fully-structured criterion and two did not;
+	 * after v3.0 the spread is narrower and the shape of the argument is the same.
 	 * A test written to 700–800 would be red on arrival for those four, and the
 	 * only way to make it green is to edit founder-authored market copy — which
 	 * is a CLAUDE.md §3 refusal, not a fix.
@@ -205,12 +217,12 @@ describe("description lengths", () => {
 		expect(
 			Object.fromEntries(SPECS.map((s) => [s.slug, s.description.length])),
 		).toEqual({
-			"chess-fide-tiebreak-response": 3609,
+			"chess-fide-tiebreak-response": 1903,
 			"bitcoin-price-50k": 3795,
-			"math-erdos-contribution-response": 3836,
-			"claude-bundle-response": 3733,
-			"yc-paper-club-response": 789,
-			"github-zugzwang-repo-stars": 794,
+			"math-erdos-solved-on-zugzwang": 2852,
+			"claude-bundle-response": 2169,
+			"yc-w27-acceptance": 1658,
+			"github-zugzwang-repo-stars": 792,
 		});
 	});
 });

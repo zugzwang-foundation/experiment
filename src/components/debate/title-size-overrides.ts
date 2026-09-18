@@ -63,6 +63,53 @@
  * characters that make the heading read as a question at all. That was the cost
  * the ruling paid to remove, not the aesthetics of a clipped line.
  *
+ * ## ⛔⛔ D-50 — FOUR OF THOSE SIX TITLES ARE GONE, AND ONE OF THE NEW ONES DOES
+ * ## NOT FIT
+ *
+ * The table above is **anchored, not rewritten** — it is a measurement of titles
+ * that shipped, and re-deriving its rows for copy that has changed would
+ * fabricate history. What follows is a SECOND measurement, of the v3.0 titles,
+ * taken the same way and reported beside it.
+ *
+ * ⚠ Read on **production**, canary `207a6155…`, `env:prod`, in the live
+ * `headzone-stack` column — `clientWidth` **667** (the stack's own box is
+ * 666.67; the heading's content box rounds to 667, which is the number the fit
+ * is actually against). A clone of the real `<h1>` at `width:max-content`, so
+ * weight 700, Geist and `tracking:normal` are inherited rather than restated.
+ * ⛔ **THE FOUR SURVIVING v2.2 ROWS WERE RE-MEASURED FIRST AS A POSITIVE
+ * CONTROL AND ALL FOUR REPRODUCED TO THE HUNDREDTH OF A PIXEL** — 573.91,
+ * 652.75, 588.17, 549.51 against the table above. That is what makes the rows
+ * below measurements rather than estimates; a probe that cannot reproduce a
+ * known figure is not measuring the thing it claims to.
+ *
+ * ```
+ *   v3.0 title                              chars    ink @21px   margin
+ *   Math · Will 3 Erdős problems … on Z…       67      728.19    −61.19   ⛔ CLIPS
+ *   Chess · Will Vishy Anand answer …          61      654.57    +12.43
+ *   Claude · Will Anthropic reply 👍 …         61      635.94    +31.06   (unchanged)
+ *   YCombinator · Will Zugzwang get into …     60      637.20    +29.80
+ *   GitHub · Will the Zugzwang repo … 50,…     51      539.33   +127.67
+ * ```
+ *
+ * ⛔ **`math-erdos-solved-on-zugzwang` IS THE FIRST TENANT THIS MAP HAS EVER
+ * HAD, AND IT EARNS THE ENTRY THE SAME WAY THE REMOVED ONE DID.** At 21px it
+ * overflows by 61.19px and `truncate` eats **`mber?`** — the question mark
+ * included, which is the exact failure the paragraph above describes as the cost
+ * of the removed market. 19px is the largest ratified scale step (15 · 17 · 19 ·
+ * 22 · 24) that fits, at 658.84px, clearing the column by **8.16px** — above the
+ * same 8px bar the old ruling used to choose 19 over 20. So the entry is not a
+ * new judgement: it is this file's own precedent applied to the one title that
+ * now needs it.
+ * ⚠ **THE OTHER FOUR NEED NOTHING AND MUST NOT BE GIVEN ANYTHING.** `Chess` is
+ * now the tightest heading on the roster at **+12.43px** — tighter than the
+ * +13.92 that row above records for the old YCP title — and it still clears the
+ * 8px bar, so it fits at the base size. An override added "to be safe" would
+ * shrink a heading that does not need shrinking, and this file's whole argument
+ * is that an entry is added by measurement rather than by inference.
+ * ⚠ The **21 → 19** step is paired with `leading-[1.24]` for the reason the
+ * arbitrary-leading warning below gives; the two are written as one literal so
+ * they cannot be separated by omission.
+ *
  * ⚠ **THE TIGHTEST SURVIVOR IS BELOW THE BAR THE OLD RULING USED, AND THAT IS A
  * MEASUREMENT AND NOT A LICENCE.** The removed entry stepped 21 → 19 because 19
  * was the largest ratified scale step (… 15 · 17 · 19 · 22 · 24) clearing an 8px
@@ -110,12 +157,23 @@
  *
  * Composed with `cn()`, so an entry wins the font-size and line-height groups and
  * the heading's other classes are untouched. A slug that is absent reads
- * `undefined` and the heading keeps its `text-[21px]`. Every slug is absent today.
+ * `undefined` and the heading keeps its `text-[21px]`.
+ * ⚠ "Every slug is absent today" was true until D-50 and is corrected here
+ * rather than left standing beside an entry that contradicts it (§8 O-5). **One
+ * slug is present**; the other five markets read `undefined` and keep 21px.
  *
  * ⚠ The value type is explicitly `| undefined`: `noUncheckedIndexedAccess` is not
  * set in this repo (AGENTS.md §4), so a bare `Record<string, string>` would tell
- * every caller it always gets a string when no market gets anything.
+ * every caller it always gets a string when only one market gets anything.
  */
 export const MARKET_TITLE_SIZE_OVERRIDES: Readonly<
 	Record<string, string | undefined>
-> = {};
+> = {
+	// D-50 · 67 characters is 728.19px against a 667px column — it clips `mber?`,
+	// the question mark included. 19px is the largest ratified step that fits
+	// (658.84px, +8.16px), which is the same bar the removed entry cleared. The
+	// leading travels WITH the size as one literal: an arbitrary `text-[Npx]`
+	// does not reset the line-height the surrounding step brought with it
+	// (AGENTS.md §8), and a literal is what Tailwind's scanner can actually see.
+	"math-erdos-solved-on-zugzwang": "text-[19px] leading-[1.24]",
+};
