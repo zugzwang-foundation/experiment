@@ -1,28 +1,43 @@
 # Staging markets — snapshot
 
-> **Why this file exists.** The eight markets below were authored by hand and
+> **Why this file exists.** The markets below were authored by hand and
 > exist NOWHERE but the staging database. Everything else in the LOTS-1 lane is
 > reversible; losing these is not. `pnpm staging:reset` truncates `markets`, so a
 > rebuild without this file destroys the copy that took the longest to make and
 > the shortest to lose. This is the artifact that makes a future rebuild
-> survivable — it is a RECORD, not a seeder, and nothing reads it at runtime.
+> survivable.
+>
+> ⚠ **This `.md` is a RECORD and nothing reads it. Its JSON sibling is NOT** —
+> `tests/staging/content-markets.ts:45` loads `staging-markets-snapshot.json` at
+> runtime and hands its values to `createMarket` / `openMarket` unchanged. That
+> became true at LIQ-1-RESTORE (2026-09-07), after this file first said otherwise.
+> Edit the JSON and you have edited the seeder's source of truth.
 
-**Captured:** `2026-08-31T17:26:51.058Z` (read-only) · **Source:** `aws-1-ap-south-1.pooler.supabase.com` / `postgres`
+**Captured:** `2026-09-18T09:59:09.212Z` (read-only) · **Source:** `aws-1-ap-south-1.pooler.supabase.com` / `postgres`
 **Machine-fidelity copy:** [`staging-markets-snapshot.json`](./staging-markets-snapshot.json) — every column, verbatim.
 
 | rows | count |
 |---|---|
-| `markets` | **8** |
-| `pools` | **8** |
-| `market_media` | **16** |
+| `markets` | **6** |
+| `pools` | **6** |
+| `market_media` | **12** |
 
-⚠ **The reserves are NOT all `10000` any more.** The LOTS-1 S6 record reads
-`10000.000000000000000000` across all eight because that was the seeded state the
-moment after the wipe. Pools may have since moved under real bets. The seeded
-value is the number to restore; the CURRENT value is the number below, and the
-two are recorded separately so a restore is never mistaken for a rollback.
+⚠ **MKT-ROSTER-1 (2026-09-18, D-49) removed two markets from the roster** —
+`mumbai-bmc-pink-october-disclosure` and `oktoberfest-munich-beer-volume`. This
+capture is the six that remain. The two removed markets' copy survives in
+`docs/markets/MKT-MUM-01.md` and `docs/markets/MKT-OKT-01.md`, which the ruling
+leaves untouched; nothing else anywhere retains them.
 
-**Seeded reserves (the restore target):** `yes_reserves = no_reserves = 10000.000000000000000000` for all eight.
+⚠ **The reserves below are CURRENT, not seeded.** Pools move under every bet, so a
+restore must never read them. The seeded value is the number to restore, the
+current value is the number below, and the two are recorded separately so a
+restore is never mistaken for a rollback.
+
+**Seeded reserves (the restore target), measured from each market's own**
+**`market.opened` payload, 2026-09-18:** `openingPriceYes = 0.1`,
+`yes_reserves = 90000.000000000000000000`, `no_reserves = 10000.000000000000000000`,
+tank `100000` — identical on all six, and identical on production's six.
+⇒ one `--price 0.1 --tank 100000` restores the whole slate.
 
 ⚠ **BLOCK-1 (2026-08-31) renamed YCP-01's (`yc-paper-club-response`) artifact
 noun "paper" → "pitch" too broadly — BLOCK-2 (2026-08-31) repaired it to the
@@ -32,117 +47,7 @@ The text below is CURRENT (post-repair).
 
 ---
 
-## 1. `mumbai-bmc-pink-october-disclosure`
-
-**Mumbai · Will BMC report 10,000 Pink October breast cancer tests?**
-
-| field | value |
-|---|---|
-| `id` | `01a01181-bb3c-7443-bc4d-35938c65bde9` |
-| `slug` | `mumbai-bmc-pink-october-disclosure` |
-| `status` | `Open` |
-| `resolution_deadline` | `2026-11-05T23:45:00.000Z` |
-| `resolved_at` | `NULL` |
-| `resolution_outcome` | `NULL` |
-| `media_video_url` | `NULL` |
-| `created_by` | `admin-singleton` |
-| `created_at` | `2026-08-17T20:55:10.942Z` |
-| `pools.yes_reserves` (current) | `10400.000000000000000003` |
-| `pools.no_reserves` (current) | `9615.384615384615384619` |
-| `pools.id` | `01a01181-e624-7891-a15b-6b17cfb3b9be` |
-
-**Resolution text (`markets.description`), verbatim:**
-
-```text
-Will BMC publicly disclose on X by 5 November 2026 that at least 10,000 women were screened for breast cancer in BMC public health facilities in Mumbai during Pink October 2026 (1–31 October)? Resolves YES if @mybmc posts, within the observation window, a figure of 10,000 or more women screened for breast cancer at BMC public health facilities in Mumbai during 1–31 October 2026. Resolves NO in every other case — including if BMC posts nothing, posts a lower figure, posts only from another handle, or discloses the number anywhere other than X.
-
-Resolution type. Resolves on a numeric disclosure published by BMC on X, not on screening volume. If BMC screens the women but posts no figure, this resolves NO. Silence resolves NO, never Void.
-
-Source. Only posts from @mybmc can resolve this market. A qualifying post must, within the window, state a figure of 10,000 or more women screened for breast cancer at BMC public health facilities in Greater Mumbai during 1-31 October 2026. BMC must assert the figure itself; a relayed or inferred figure does not qualify, and a repost without comment does not qualify. The figure may appear in text or in a legible image. No other account qualifies, including BMC's own health handles @mybmchealth and @mybmcHealthDept, other BMC accounts on X, BMC accounts on other platforms, and state or national accounts. Nor does any disclosure off X: press releases, portal.mcgm.gov.in, media, RTI.
-
-Numeric. A specific integer (12,348), a range bounded at or above 10,000 (12,000-15,000), or a comparative bounded at or above 10,000 (more than 10,000 qualifies, more than 8,000 does not). Not numeric: thousands, record numbers, targets met.
-
-Scope. A figure combining breast with cervical, women with men, BMC with non-BMC facilities, or October with a longer period qualifies only if the qualifying component is separately stated by @mybmc within the window. Targets and projections do not qualify; the figure must report completed screening. A third-party dispute over BMC's methodology does not change the outcome.
-
-Deadline. 5 November 2026, 23:45 UTC (05:15 IST, 6 November). The window opens 1 October 2026, 00:00 IST (30 September, 18:30 UTC). UTC is the binding clock. Only posts timestamped at or before the deadline count, whenever the operator resolves. No extensions.
-
-Trigger. Latching. The first qualifying post at or above 10,000 resolves YES irreversibly. Where qualifying posts conflict, the highest figure binds.
-
-Deletion. If a qualifying post is deleted or the handle suspended before the deadline, an independent archive capture timestamped within the window is admissible; a screenshot is not. Without one, this resolves NO.
-
-Void. None. Silence resolves NO and the source can only fail closed.
-
-Evidence. The operator publishes the source URL, post timestamp, the figure verbatim, an archive capture, and the clause satisfied.
-
-Operator intervention. None. The Foundation takes no action directed at the resolver of this market.
-```
-
-**`market_media` (2):**
-
-| order | default | `r2_object_key` | `id` |
-|---|---|---|---|
-| 0 | **yes** | `m/01a01181-bb3c-7443-bc4d-35938c65bde9/01a01181-bb3c-7443-bc4d-3ac9c9c837d7.png` | `01a01181-c018-7b35-b469-cc609d33045b` |
-| 1 | no | `m/01a01181-bb3c-7443-bc4d-35938c65bde9/01a02370-fead-73de-87ae-ac7c023511f8.webp` | `01a02370-ff6d-7be5-9060-c64be711012b` |
-
----
-
-## 2. `oktoberfest-munich-beer-volume`
-
-**Oktoberfest · Will the 7.5M litre beer record be broken in 2026?**
-
-| field | value |
-|---|---|
-| `id` | `01a01181-c07c-765a-9664-c065540c173d` |
-| `slug` | `oktoberfest-munich-beer-volume` |
-| `status` | `Open` |
-| `resolution_deadline` | `2026-10-04T21:59:00.000Z` |
-| `resolved_at` | `NULL` |
-| `resolution_outcome` | `NULL` |
-| `media_video_url` | `NULL` |
-| `created_by` | `admin-singleton` |
-| `created_at` | `2026-08-17T20:55:12.152Z` |
-| `pools.yes_reserves` (current) | `10010.000000000000000000` |
-| `pools.no_reserves` (current) | `9990.009990009990009991` |
-| `pools.id` | `01a01181-e755-74f0-bafa-983e44792a10` |
-
-**Resolution text (`markets.description`), verbatim:**
-
-```text
-Will oktoberfest.de's preliminary final report for Oktoberfest 2026 state a total beer figure above 7.5 million litres for the official 16-day festival, 19 September to 4 October 2026? Resolves YES if that report states a figure above 7.5 million litres, observed within the window below. At the 0.1 million granularity the report uses, the lowest qualifying figure is 7.6 million litres. Resolves NO in every other case — including 7.5 million or lower, a non-numeric statement, a partial-festival figure, or no qualifying report.
-
-Resolution type. Resolves on the beer figure printed in one named annual report, not on how much beer is drunk. That report publishes every year without fail, so the uncertainty is the number, not the publication. Silence resolves NO, never Void.
-
-Source. Only the preliminary final report for Oktoberfest 2026, published by the Landeshauptstadt München (City of Munich) on oktoberfest.de in the Oktoberfest News section of that site's magazine index, can resolve this market. Either the German or the English edition qualifies, and whichever publishes a qualifying figure first binds. No other source qualifies, including the @oktoberfest Instagram account, the official Oktoberfest Facebook page, any X account, the City of Munich's own press releases and PDFs on muenchen.de and stadt.muenchen.de including its English Preliminary Final Report, any report by Süddeutsche Zeitung, BR, Münchner Merkur, Bild, Reuters, AP, dpa or any other outlet, the mid-term report (Halbzeitbilanz) published around the festival's midpoint, and the Stadtrat Schlussbericht published in 2027.
-
-Numeric. A number above 7.5 million litres qualifies: 7.6 million does, 7.5 million does not. A range qualifies only on its stated lower bound: between 7.6 and 8.0 million litres qualifies, between 7.4 and 7.9 million litres does not. A comparative qualifies only if its bound is above 7.5 million litres: more than 7.5 million litres qualifies, more than 7 million litres does not. Non-numeric statements never qualify: record-breaking, more than last year, millions of litres.
-
-Units. The record is 7.5 million litres = 7.5 million Maß = 75,000 hectolitres. Liters and litres are the same unit. A German decimal comma reads as a decimal point, so 7,6 Mio. Liter means 7.6 million litres.
-
-Scope. The figure must cover the full official 16 days, 19 September to 4 October 2026. A figure scoped to one tent, one brewery, or the Oide Wiesn alone does not qualify. Where a breakdown is published alongside a festival-wide total, the festival-wide total binds. A dispute over how the figure was estimated does not change the outcome; the published figure stands.
-
-Window. The observation window opens at the close of the festival on 4 October 2026 and ends 5 November 2026 at 23:45 UTC. UTC is the binding clock. Only a publication observed at or before that instant counts, whenever the operator resolves.
-
-Trigger. Latching. The first qualifying figure above 7.5 million litres resolves YES irreversibly. A report stating a figure at or below the threshold does not close this market, and a later qualifying figure inside the window still resolves YES. Where two figures published inside the window conflict, the highest binds.
-
-Void. None. If Oktoberfest 2026 is cancelled, curtailed or closed for any period, this market resolves on whatever qualifying figure is published, and if none is published it resolves NO.
-
-Betting and settlement. Betting closes on 4 October 2026 at 23:59 Munich time, when the festival ends — before the figure is published, so nobody trades on the answer. The market settles on 5 November 2026 together with every other Zugzwang market.
-
-Evidence. The operator publishes the source URL, the publication date observed, the figure verbatim, an independent archive capture, and the clause satisfied.
-
-Operator intervention. None. The Foundation takes no action directed at the resolver of this market.
-```
-
-**`market_media` (2):**
-
-| order | default | `r2_object_key` | `id` |
-|---|---|---|---|
-| 0 | **yes** | `m/01a01181-c07c-765a-9664-c065540c173d/01a01181-c07c-765a-9664-c51443d18741.png` | `01a01181-c4f5-7db7-a789-2a737b3c80d8` |
-| 1 | no | `m/01a01181-c07c-765a-9664-c065540c173d/01a02370-fead-73de-87ae-aa1b2628b887.webp` | `01a02370-ff61-70c3-a2b7-1406b9896158` |
-
----
-
-## 3. `chess-fide-tiebreak-response`
+## 1. `chess-fide-tiebreak-response`
 
 **Chess · Will FIDE answer Zugzwang's tiebreak proposal?**
 
@@ -156,10 +61,10 @@ Operator intervention. None. The Foundation takes no action directed at the reso
 | `resolution_outcome` | `NULL` |
 | `media_video_url` | `NULL` |
 | `created_by` | `admin-singleton` |
-| `created_at` | `2026-08-17T20:55:13.427Z` |
-| `pools.yes_reserves` (current) | `9781.108346915877093135` |
-| `pools.no_reserves` (current) | `10223.790234521982946587` |
-| `pools.id` | `01a01181-e8a4-7dfa-b90f-0e92e9235e61` |
+| `created_at` | `2026-09-07T20:19:18.412Z` |
+| `pools.yes_reserves` (current) | `374534.883294403978371636` |
+| `pools.no_reserves` (current) | `42465.116705596021471870` |
+| `pools.id` | `01a07d86-8db5-7b07-9a51-c12315a5e53c` |
 
 **Resolution text (`markets.description`), verbatim:**
 
@@ -193,12 +98,12 @@ Operator intervention. Declared. The Zugzwang Foundation published the ten-post 
 
 | order | default | `r2_object_key` | `id` |
 |---|---|---|---|
-| 0 | **yes** | `m/01a01181-c54b-71b9-a77f-d6e11d373a69/01a01181-c54b-71b9-a77f-d922fe9fa1ec.png` | `01a01181-c9f0-7e99-90f2-a3ad88d9d9c1` |
-| 1 | no | `m/01a01181-c54b-71b9-a77f-d6e11d373a69/01a02370-fead-73de-87ae-9a4dd08b48db.webp` | `01a02370-ff2a-704d-8b66-c2f82dfab2b3` |
+| 0 | **yes** | `m/01a01181-c54b-71b9-a77f-d6e11d373a69/01a01181-c54b-71b9-a77f-d922fe9fa1ec.png` | `01a07d86-734d-7623-9566-7afc86612059` |
+| 1 | no | `m/01a01181-c54b-71b9-a77f-d6e11d373a69/01a02370-fead-73de-87ae-9a4dd08b48db.webp` | `01a07d86-734d-7bd4-9118-e4d83c5c49ee` |
 
 ---
 
-## 4. `bitcoin-price-50k`
+## 2. `bitcoin-price-50k`
 
 **Bitcoin · Will BTC ever go below $60,000 by 5th November?**
 
@@ -212,10 +117,10 @@ Operator intervention. Declared. The Zugzwang Foundation published the ten-post 
 | `resolution_outcome` | `NULL` |
 | `media_video_url` | `NULL` |
 | `created_by` | `admin-singleton` |
-| `created_at` | `2026-08-17T20:55:14.902Z` |
-| `pools.yes_reserves` (current) | `9990.009990009990009991` |
-| `pools.no_reserves` (current) | `10010.000000000000000000` |
-| `pools.id` | `01a01181-ea2a-79be-a601-ebf85610a1ef` |
+| `created_at` | `2026-09-07T20:19:18.505Z` |
+| `pools.yes_reserves` (current) | `374369.168257923831749677` |
+| `pools.no_reserves` (current) | `42630.831742076168353121` |
+| `pools.id` | `01a07d86-8e35-7981-96f4-ceeca222bbb9` |
 
 **Resolution text (`markets.description`), verbatim:**
 
@@ -247,12 +152,12 @@ DISCLOSURE. No operator intervention. The Foundation takes no action directed at
 
 | order | default | `r2_object_key` | `id` |
 |---|---|---|---|
-| 0 | **yes** | `m/01a01181-ca40-725f-895c-270b2190c3ee/01a01181-ca40-725f-895c-28376ec9d2fe.png` | `01a01181-cfd1-7caf-b282-8c5fd865f0b2` |
-| 1 | no | `m/01a01181-ca40-725f-895c-270b2190c3ee/01a02370-fead-73de-87ae-944e9e7b5515.webp` | `01a02370-ff1e-7082-8d34-9c5a467606f1` |
+| 0 | **yes** | `m/01a01181-ca40-725f-895c-270b2190c3ee/01a01181-ca40-725f-895c-28376ec9d2fe.png` | `01a07d86-73f4-7018-98cf-59e79fe51314` |
+| 1 | no | `m/01a01181-ca40-725f-895c-270b2190c3ee/01a02370-fead-73de-87ae-944e9e7b5515.webp` | `01a07d86-73f5-74fc-bb67-12460fab6757` |
 
 ---
 
-## 5. `math-erdos-contribution-response`
+## 3. `math-erdos-contribution-response`
 
 **Math · Will 3 Erdős problems be solved by 5th November?**
 
@@ -266,10 +171,10 @@ DISCLOSURE. No operator intervention. The Foundation takes no action directed at
 | `resolution_outcome` | `NULL` |
 | `media_video_url` | `NULL` |
 | `created_by` | `admin-singleton` |
-| `created_at` | `2026-08-17T20:55:16.212Z` |
-| `pools.yes_reserves` (current) | `10060.000000000000000002` |
-| `pools.no_reserves` (current) | `9940.357852882703777339` |
-| `pools.id` | `01a01181-eb6a-74a6-8e72-b3355e8362ad` |
+| `created_at` | `2026-09-07T20:19:18.674Z` |
+| `pools.yes_reserves` (current) | `369396.935625441926243475` |
+| `pools.no_reserves` (current) | `42603.064374558073840363` |
+| `pools.id` | `01a07d86-8ede-747d-8924-22297e540f50` |
 
 **Resolution text (`markets.description`), verbatim:**
 
@@ -307,12 +212,12 @@ Operator intervention. Declared. The Zugzwang Foundation published a ten-card de
 
 | order | default | `r2_object_key` | `id` |
 |---|---|---|---|
-| 0 | **yes** | `m/01a01181-d035-714a-b735-5d282576d0a3/01a01181-d035-714a-b735-61bf2fd26c5d.png` | `01a01181-d4ae-7674-9e88-e855992b0918` |
-| 1 | no | `m/01a01181-d035-714a-b735-5d282576d0a3/01a02370-fead-73de-87ae-a78500f73a81.webp` | `01a02370-ff57-742e-8f10-177d6b556f53` |
+| 0 | **yes** | `m/01a01181-d035-714a-b735-5d282576d0a3/01a01181-d035-714a-b735-61bf2fd26c5d.png` | `01a07d86-7461-7595-afb6-f4f88b71f4c6` |
+| 1 | no | `m/01a01181-d035-714a-b735-5d282576d0a3/01a02370-fead-73de-87ae-a78500f73a81.webp` | `01a07d86-7461-77a5-8a5a-ee5ad629f31d` |
 
 ---
 
-## 6. `claude-bundle-response`
+## 4. `claude-bundle-response`
 
 **Claude · Will Anthropic reply to Zugzwang's Bundle feature on X?**
 
@@ -326,10 +231,10 @@ Operator intervention. Declared. The Zugzwang Foundation published a ten-card de
 | `resolution_outcome` | `NULL` |
 | `media_video_url` | `NULL` |
 | `created_by` | `admin-singleton` |
-| `created_at` | `2026-08-17T20:55:17.432Z` |
-| `pools.yes_reserves` (current) | `10089.809292614459396013` |
-| `pools.no_reserves` (current) | `9910.990099009900990102` |
-| `pools.id` | `01a01181-ecaa-7116-abe8-37a4d3d0e554` |
+| `created_at` | `2026-09-07T20:19:18.784Z` |
+| `pools.yes_reserves` (current) | `369068.959486833834134098` |
+| `pools.no_reserves` (current) | `42931.040513166165861480` |
+| `pools.id` | `01a07d86-8fc1-7b96-93da-4beccb39a16f` |
 
 **Resolution text (`markets.description`), verbatim:**
 
@@ -363,12 +268,12 @@ Operator intervention. Declared. The Zugzwang Foundation authored the entire sti
 
 | order | default | `r2_object_key` | `id` |
 |---|---|---|---|
-| 0 | **yes** | `m/01a01181-d508-7288-b996-36ec427a9d2f/01a01181-d508-7288-b996-38044d147135.png` | `01a01181-d9d6-73a0-8f21-aee38ff1a161` |
-| 1 | no | `m/01a01181-d508-7288-b996-36ec427a9d2f/01a02370-fead-73de-87ae-9fdbf8e7fa25.webp` | `01a02370-ff34-7689-ba7f-641de743b11a` |
+| 0 | **yes** | `m/01a01181-d508-7288-b996-36ec427a9d2f/01a01181-d508-7288-b996-38044d147135.png` | `01a07d86-74e7-794b-b3ac-d664c030b8dd` |
+| 1 | no | `m/01a01181-d508-7288-b996-36ec427a9d2f/01a02370-fead-73de-87ae-9fdbf8e7fa25.webp` | `01a07d86-74e7-7c76-905a-50c439cca95c` |
 
 ---
 
-## 7. `yc-paper-club-response`
+## 5. `yc-paper-club-response`
 
 **YCombinator · Will YC reply to Zugzwang's pitch by 5 Nov 2026?**
 
@@ -382,10 +287,10 @@ Operator intervention. Declared. The Zugzwang Foundation authored the entire sti
 | `resolution_outcome` | `NULL` |
 | `media_video_url` | `NULL` |
 | `created_by` | `admin-singleton` |
-| `created_at` | `2026-08-17T20:55:18.757Z` |
-| `pools.yes_reserves` (current) | `10391.847662188968043673` |
-| `pools.no_reserves` (current) | `9622.927822917654136330` |
-| `pools.id` | `01a01181-ee0d-771d-bbc1-3d08b7bf753e` |
+| `created_at` | `2026-09-07T20:19:18.920Z` |
+| `pools.yes_reserves` (current) | `374514.416928275111913871` |
+| `pools.no_reserves` (current) | `42485.583071724887931262` |
+| `pools.id` | `01a07d86-903c-7ac5-95f8-3cb1781018e4` |
 
 **Resolution text (`markets.description`), verbatim:**
 
@@ -403,12 +308,12 @@ Deadline 5 November 2026, 23:45 UTC.
 
 | order | default | `r2_object_key` | `id` |
 |---|---|---|---|
-| 0 | **yes** | `m/01a01181-da63-738b-a3ea-8da89299bc53/01a01181-da63-738b-a3ea-9270f9f87ba9.png` | `01a01181-decc-7171-a75d-026fdcbdd589` |
-| 1 | no | `m/01a01181-da63-738b-a3ea-8da89299bc53/01a02370-fead-73de-87ae-b35295fac49b.webp` | `01a02370-ff7e-7b86-bd37-db54a1f5361b` |
+| 0 | **yes** | `m/01a01181-da63-738b-a3ea-8da89299bc53/01a01181-da63-738b-a3ea-9270f9f87ba9.png` | `01a07d86-754b-7f09-adb4-0b69b7f27db5` |
+| 1 | no | `m/01a01181-da63-738b-a3ea-8da89299bc53/01a02370-fead-73de-87ae-b35295fac49b.webp` | `01a07d86-754b-773e-99d2-454a0bcbef0d` |
 
 ---
 
-## 8. `github-zugzwang-repo-stars`
+## 6. `github-zugzwang-repo-stars`
 
 **GitHub · Will the Zugzwang repo reach 100,000 stars?**
 
@@ -422,10 +327,10 @@ Deadline 5 November 2026, 23:45 UTC.
 | `resolution_outcome` | `NULL` |
 | `media_video_url` | `NULL` |
 | `created_by` | `admin-singleton` |
-| `created_at` | `2026-08-17T20:55:20.397Z` |
-| `pools.yes_reserves` (current) | `10663.103455656465157032` |
-| `pools.no_reserves` (current) | `9378.132774933635171730` |
-| `pools.id` | `01a01181-ef57-7912-9040-8d9752270049` |
+| `created_at` | `2026-09-07T20:19:19.017Z` |
+| `pools.yes_reserves` (current) | `368697.447124170594807246` |
+| `pools.no_reserves` (current) | `43302.552875829405333773` |
+| `pools.id` | `01a07d86-90b5-7a6f-b577-1cf0be719206` |
 
 **Resolution text (`markets.description`), verbatim:**
 
@@ -445,8 +350,7 @@ Deadline 5 November 2026, 23:45 UTC.
 
 | order | default | `r2_object_key` | `id` |
 |---|---|---|---|
-| 0 | **yes** | `m/01a01181-df3a-747f-b154-e79a4a416b51/01a01181-df3a-747f-b154-eb03baee542f.png` | `01a01181-e515-7588-bf31-4105534f71d5` |
-| 1 | no | `m/01a01181-df3a-747f-b154-e79a4a416b51/01a02370-fead-73de-87ae-a04ecdbc9359.webp` | `01a02370-ff4c-7adf-9129-28c1b401149f` |
+| 0 | **yes** | `m/01a01181-df3a-747f-b154-e79a4a416b51/01a01181-df3a-747f-b154-eb03baee542f.png` | `01a07d86-75bd-7491-b502-fabc603ce183` |
+| 1 | no | `m/01a01181-df3a-747f-b154-e79a4a416b51/01a02370-fead-73de-87ae-a04ecdbc9359.webp` | `01a07d86-75bd-79db-9090-3ee1fa2ef08b` |
 
 ---
-

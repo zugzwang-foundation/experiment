@@ -29,11 +29,8 @@ const FIXTURE_MARKETS = [
 	"sp-m16-fill",
 ];
 
-/** Two of the eight the 2026-09-07 reset actually destroyed. */
-const CONTENT_MARKETS = [
-	"mumbai-bmc-pink-october-disclosure",
-	"bitcoin-price-50k",
-];
+/** Two of the content markets the 2026-09-07 reset actually destroyed. */
+const CONTENT_MARKETS = ["chess-fide-tiebreak-response", "bitcoin-price-50k"];
 
 describe("the fixture-prefix predicate", () => {
 	it("claims every fixture family and nothing else", () => {
@@ -64,9 +61,9 @@ describe("the fixture-prefix predicate", () => {
 				"sp-m1-draft",
 				"bitcoin-price-50k",
 				"sp-m2-active",
-				"mumbai-bmc-pink-october-disclosure",
+				"chess-fide-tiebreak-response",
 			]),
-		).toEqual(["bitcoin-price-50k", "mumbai-bmc-pink-october-disclosure"]);
+		).toEqual(["bitcoin-price-50k", "chess-fide-tiebreak-response"]);
 	});
 });
 
@@ -103,10 +100,8 @@ describe("the reset's verdict", () => {
 		expect(verdict.reason).toContain("scripts/seed-content-markets.ts");
 	});
 
-	it("REFUSES on all eight and lists every one", () => {
-		const eight = [
-			"mumbai-bmc-pink-october-disclosure",
-			"oktoberfest-munich-beer-volume",
+	it("REFUSES on the whole slate and lists every one", () => {
+		const slate = [
 			"chess-fide-tiebreak-response",
 			"bitcoin-price-50k",
 			"math-erdos-contribution-response",
@@ -115,13 +110,13 @@ describe("the reset's verdict", () => {
 			"github-zugzwang-repo-stars",
 		];
 		const verdict = assessContentMarkets({
-			slugs: [...FIXTURE_MARKETS, ...eight],
+			slugs: [...FIXTURE_MARKETS, ...slate],
 			override: undefined,
 		});
 		expect(verdict.ok).toBe(false);
-		expect(verdict.found).toEqual(eight);
+		expect(verdict.found).toEqual(slate);
 		if (verdict.ok) throw new Error("unreachable — narrowing");
-		for (const slug of eight) expect(verdict.reason).toContain(slug);
+		for (const slug of slate) expect(verdict.reason).toContain(slug);
 	});
 
 	it("PROCEEDS with the acknowledgement token, and marks the run overridden", () => {

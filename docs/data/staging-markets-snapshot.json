@@ -1,42 +1,16 @@
 {
-	"capturedAt": "2026-08-31T17:26:51.058Z",
+	"capturedAt": "2026-09-18T09:59:09.212Z",
 	"source": {
 		"host": "aws-1-ap-south-1.pooler.supabase.com",
 		"database": "postgres",
 		"user": "postgres.rwfdoqzsghqhhdapxafg"
 	},
 	"counts": {
-		"markets": 8,
-		"pools": 8,
-		"market_media": 16
+		"markets": 6,
+		"pools": 6,
+		"market_media": 12
 	},
 	"markets": [
-		{
-			"id": "01a01181-bb3c-7443-bc4d-35938c65bde9",
-			"slug": "mumbai-bmc-pink-october-disclosure",
-			"title": "Mumbai · Will BMC report 10,000 Pink October breast cancer tests?",
-			"description": "Will BMC publicly disclose on X by 5 November 2026 that at least 10,000 women were screened for breast cancer in BMC public health facilities in Mumbai during Pink October 2026 (1–31 October)? Resolves YES if @mybmc posts, within the observation window, a figure of 10,000 or more women screened for breast cancer at BMC public health facilities in Mumbai during 1–31 October 2026. Resolves NO in every other case — including if BMC posts nothing, posts a lower figure, posts only from another handle, or discloses the number anywhere other than X.\n\nResolution type. Resolves on a numeric disclosure published by BMC on X, not on screening volume. If BMC screens the women but posts no figure, this resolves NO. Silence resolves NO, never Void.\n\nSource. Only posts from @mybmc can resolve this market. A qualifying post must, within the window, state a figure of 10,000 or more women screened for breast cancer at BMC public health facilities in Greater Mumbai during 1-31 October 2026. BMC must assert the figure itself; a relayed or inferred figure does not qualify, and a repost without comment does not qualify. The figure may appear in text or in a legible image. No other account qualifies, including BMC's own health handles @mybmchealth and @mybmcHealthDept, other BMC accounts on X, BMC accounts on other platforms, and state or national accounts. Nor does any disclosure off X: press releases, portal.mcgm.gov.in, media, RTI.\n\nNumeric. A specific integer (12,348), a range bounded at or above 10,000 (12,000-15,000), or a comparative bounded at or above 10,000 (more than 10,000 qualifies, more than 8,000 does not). Not numeric: thousands, record numbers, targets met.\n\nScope. A figure combining breast with cervical, women with men, BMC with non-BMC facilities, or October with a longer period qualifies only if the qualifying component is separately stated by @mybmc within the window. Targets and projections do not qualify; the figure must report completed screening. A third-party dispute over BMC's methodology does not change the outcome.\n\nDeadline. 5 November 2026, 23:45 UTC (05:15 IST, 6 November). The window opens 1 October 2026, 00:00 IST (30 September, 18:30 UTC). UTC is the binding clock. Only posts timestamped at or before the deadline count, whenever the operator resolves. No extensions.\n\nTrigger. Latching. The first qualifying post at or above 10,000 resolves YES irreversibly. Where qualifying posts conflict, the highest figure binds.\n\nDeletion. If a qualifying post is deleted or the handle suspended before the deadline, an independent archive capture timestamped within the window is admissible; a screenshot is not. Without one, this resolves NO.\n\nVoid. None. Silence resolves NO and the source can only fail closed.\n\nEvidence. The operator publishes the source URL, post timestamp, the figure verbatim, an archive capture, and the clause satisfied.\n\nOperator intervention. None. The Foundation takes no action directed at the resolver of this market.",
-			"status": "Open",
-			"resolution_deadline": "2026-11-05T23:45:00.000Z",
-			"resolved_at": null,
-			"resolution_outcome": null,
-			"media_video_url": null,
-			"created_by": "admin-singleton",
-			"created_at": "2026-08-17T20:55:10.942Z"
-		},
-		{
-			"id": "01a01181-c07c-765a-9664-c065540c173d",
-			"slug": "oktoberfest-munich-beer-volume",
-			"title": "Oktoberfest · Will the 7.5M litre beer record be broken in 2026?",
-			"description": "Will oktoberfest.de's preliminary final report for Oktoberfest 2026 state a total beer figure above 7.5 million litres for the official 16-day festival, 19 September to 4 October 2026? Resolves YES if that report states a figure above 7.5 million litres, observed within the window below. At the 0.1 million granularity the report uses, the lowest qualifying figure is 7.6 million litres. Resolves NO in every other case — including 7.5 million or lower, a non-numeric statement, a partial-festival figure, or no qualifying report.\n\nResolution type. Resolves on the beer figure printed in one named annual report, not on how much beer is drunk. That report publishes every year without fail, so the uncertainty is the number, not the publication. Silence resolves NO, never Void.\n\nSource. Only the preliminary final report for Oktoberfest 2026, published by the Landeshauptstadt München (City of Munich) on oktoberfest.de in the Oktoberfest News section of that site's magazine index, can resolve this market. Either the German or the English edition qualifies, and whichever publishes a qualifying figure first binds. No other source qualifies, including the @oktoberfest Instagram account, the official Oktoberfest Facebook page, any X account, the City of Munich's own press releases and PDFs on muenchen.de and stadt.muenchen.de including its English Preliminary Final Report, any report by Süddeutsche Zeitung, BR, Münchner Merkur, Bild, Reuters, AP, dpa or any other outlet, the mid-term report (Halbzeitbilanz) published around the festival's midpoint, and the Stadtrat Schlussbericht published in 2027.\n\nNumeric. A number above 7.5 million litres qualifies: 7.6 million does, 7.5 million does not. A range qualifies only on its stated lower bound: between 7.6 and 8.0 million litres qualifies, between 7.4 and 7.9 million litres does not. A comparative qualifies only if its bound is above 7.5 million litres: more than 7.5 million litres qualifies, more than 7 million litres does not. Non-numeric statements never qualify: record-breaking, more than last year, millions of litres.\n\nUnits. The record is 7.5 million litres = 7.5 million Maß = 75,000 hectolitres. Liters and litres are the same unit. A German decimal comma reads as a decimal point, so 7,6 Mio. Liter means 7.6 million litres.\n\nScope. The figure must cover the full official 16 days, 19 September to 4 October 2026. A figure scoped to one tent, one brewery, or the Oide Wiesn alone does not qualify. Where a breakdown is published alongside a festival-wide total, the festival-wide total binds. A dispute over how the figure was estimated does not change the outcome; the published figure stands.\n\nWindow. The observation window opens at the close of the festival on 4 October 2026 and ends 5 November 2026 at 23:45 UTC. UTC is the binding clock. Only a publication observed at or before that instant counts, whenever the operator resolves.\n\nTrigger. Latching. The first qualifying figure above 7.5 million litres resolves YES irreversibly. A report stating a figure at or below the threshold does not close this market, and a later qualifying figure inside the window still resolves YES. Where two figures published inside the window conflict, the highest binds.\n\nVoid. None. If Oktoberfest 2026 is cancelled, curtailed or closed for any period, this market resolves on whatever qualifying figure is published, and if none is published it resolves NO.\n\nBetting and settlement. Betting closes on 4 October 2026 at 23:59 Munich time, when the festival ends — before the figure is published, so nobody trades on the answer. The market settles on 5 November 2026 together with every other Zugzwang market.\n\nEvidence. The operator publishes the source URL, the publication date observed, the figure verbatim, an independent archive capture, and the clause satisfied.\n\nOperator intervention. None. The Foundation takes no action directed at the resolver of this market.",
-			"status": "Open",
-			"resolution_deadline": "2026-10-04T21:59:00.000Z",
-			"resolved_at": null,
-			"resolution_outcome": null,
-			"media_video_url": null,
-			"created_by": "admin-singleton",
-			"created_at": "2026-08-17T20:55:12.152Z"
-		},
 		{
 			"id": "01a01181-c54b-71b9-a77f-d6e11d373a69",
 			"slug": "chess-fide-tiebreak-response",
@@ -48,7 +22,7 @@
 			"resolution_outcome": null,
 			"media_video_url": null,
 			"created_by": "admin-singleton",
-			"created_at": "2026-08-17T20:55:13.427Z"
+			"created_at": "2026-09-07T20:19:18.412Z"
 		},
 		{
 			"id": "01a01181-ca40-725f-895c-270b2190c3ee",
@@ -61,7 +35,7 @@
 			"resolution_outcome": null,
 			"media_video_url": null,
 			"created_by": "admin-singleton",
-			"created_at": "2026-08-17T20:55:14.902Z"
+			"created_at": "2026-09-07T20:19:18.505Z"
 		},
 		{
 			"id": "01a01181-d035-714a-b735-5d282576d0a3",
@@ -74,7 +48,7 @@
 			"resolution_outcome": null,
 			"media_video_url": null,
 			"created_by": "admin-singleton",
-			"created_at": "2026-08-17T20:55:16.212Z"
+			"created_at": "2026-09-07T20:19:18.674Z"
 		},
 		{
 			"id": "01a01181-d508-7288-b996-36ec427a9d2f",
@@ -87,7 +61,7 @@
 			"resolution_outcome": null,
 			"media_video_url": null,
 			"created_by": "admin-singleton",
-			"created_at": "2026-08-17T20:55:17.432Z"
+			"created_at": "2026-09-07T20:19:18.784Z"
 		},
 		{
 			"id": "01a01181-da63-738b-a3ea-8da89299bc53",
@@ -100,7 +74,7 @@
 			"resolution_outcome": null,
 			"media_video_url": null,
 			"created_by": "admin-singleton",
-			"created_at": "2026-08-17T20:55:18.757Z"
+			"created_at": "2026-09-07T20:19:18.920Z"
 		},
 		{
 			"id": "01a01181-df3a-747f-b154-e79a4a416b51",
@@ -113,211 +87,161 @@
 			"resolution_outcome": null,
 			"media_video_url": null,
 			"created_by": "admin-singleton",
-			"created_at": "2026-08-17T20:55:20.397Z"
+			"created_at": "2026-09-07T20:19:19.017Z"
 		}
 	],
 	"pools": [
 		{
-			"id": "01a01181-e624-7891-a15b-6b17cfb3b9be",
-			"market_id": "01a01181-bb3c-7443-bc4d-35938c65bde9",
-			"yes_reserves": "10400.000000000000000003",
-			"no_reserves": "9615.384615384615384619",
-			"created_at": "2026-08-17T20:55:20.712Z"
-		},
-		{
-			"id": "01a01181-e755-74f0-bafa-983e44792a10",
-			"market_id": "01a01181-c07c-765a-9664-c065540c173d",
-			"yes_reserves": "10010.000000000000000000",
-			"no_reserves": "9990.009990009990009991",
-			"created_at": "2026-08-17T20:55:21.012Z"
-		},
-		{
-			"id": "01a01181-e8a4-7dfa-b90f-0e92e9235e61",
+			"id": "01a07d86-8db5-7b07-9a51-c12315a5e53c",
 			"market_id": "01a01181-c54b-71b9-a77f-d6e11d373a69",
-			"yes_reserves": "9781.108346915877093135",
-			"no_reserves": "10223.790234521982946587",
-			"created_at": "2026-08-17T20:55:21.302Z"
+			"yes_reserves": "374534.883294403978371636",
+			"no_reserves": "42465.116705596021471870",
+			"created_at": "2026-09-07T20:19:25.171Z"
 		},
 		{
-			"id": "01a01181-ea2a-79be-a601-ebf85610a1ef",
+			"id": "01a07d86-8e35-7981-96f4-ceeca222bbb9",
 			"market_id": "01a01181-ca40-725f-895c-270b2190c3ee",
-			"yes_reserves": "9990.009990009990009991",
-			"no_reserves": "10010.000000000000000000",
-			"created_at": "2026-08-17T20:55:21.698Z"
+			"yes_reserves": "374369.168257923831749677",
+			"no_reserves": "42630.831742076168353121",
+			"created_at": "2026-09-07T20:19:25.288Z"
 		},
 		{
-			"id": "01a01181-eb6a-74a6-8e72-b3355e8362ad",
+			"id": "01a07d86-8ede-747d-8924-22297e540f50",
 			"market_id": "01a01181-d035-714a-b735-5d282576d0a3",
-			"yes_reserves": "10060.000000000000000002",
-			"no_reserves": "9940.357852882703777339",
-			"created_at": "2026-08-17T20:55:22.052Z"
+			"yes_reserves": "369396.935625441926243475",
+			"no_reserves": "42603.064374558073840363",
+			"created_at": "2026-09-07T20:19:25.460Z"
 		},
 		{
-			"id": "01a01181-ecaa-7116-abe8-37a4d3d0e554",
+			"id": "01a07d86-8fc1-7b96-93da-4beccb39a16f",
 			"market_id": "01a01181-d508-7288-b996-36ec427a9d2f",
-			"yes_reserves": "10089.809292614459396013",
-			"no_reserves": "9910.990099009900990102",
-			"created_at": "2026-08-17T20:55:22.372Z"
+			"yes_reserves": "369068.959486833834134098",
+			"no_reserves": "42931.040513166165861480",
+			"created_at": "2026-09-07T20:19:25.658Z"
 		},
 		{
-			"id": "01a01181-ee0d-771d-bbc1-3d08b7bf753e",
+			"id": "01a07d86-903c-7ac5-95f8-3cb1781018e4",
 			"market_id": "01a01181-da63-738b-a3ea-8da89299bc53",
-			"yes_reserves": "10391.847662188968043673",
-			"no_reserves": "9622.927822917654136330",
-			"created_at": "2026-08-17T20:55:22.702Z"
+			"yes_reserves": "374514.416928275111913871",
+			"no_reserves": "42485.583071724887931262",
+			"created_at": "2026-09-07T20:19:25.809Z"
 		},
 		{
-			"id": "01a01181-ef57-7912-9040-8d9752270049",
+			"id": "01a07d86-90b5-7a6f-b577-1cf0be719206",
 			"market_id": "01a01181-df3a-747f-b154-e79a4a416b51",
-			"yes_reserves": "10663.103455656465157032",
-			"no_reserves": "9378.132774933635171730",
-			"created_at": "2026-08-17T20:55:23.052Z"
+			"yes_reserves": "368697.447124170594807246",
+			"no_reserves": "43302.552875829405333773",
+			"created_at": "2026-09-07T20:19:25.932Z"
 		}
 	],
 	"market_media": [
 		{
-			"id": "01a01181-c018-7b35-b469-cc609d33045b",
-			"market_id": "01a01181-bb3c-7443-bc4d-35938c65bde9",
-			"r2_object_key": "m/01a01181-bb3c-7443-bc4d-35938c65bde9/01a01181-bb3c-7443-bc4d-3ac9c9c837d7.png",
-			"display_order": 0,
-			"is_default": true,
-			"created_by": "admin-singleton",
-			"created_at": "2026-08-17T20:55:10.942Z"
-		},
-		{
-			"id": "01a02370-ff6d-7be5-9060-c64be711012b",
-			"market_id": "01a01181-bb3c-7443-bc4d-35938c65bde9",
-			"r2_object_key": "m/01a01181-bb3c-7443-bc4d-35938c65bde9/01a02370-fead-73de-87ae-ac7c023511f8.webp",
-			"display_order": 1,
-			"is_default": false,
-			"created_by": "admin-singleton",
-			"created_at": "2026-08-21T08:30:03.117Z"
-		},
-		{
-			"id": "01a01181-c4f5-7db7-a789-2a737b3c80d8",
-			"market_id": "01a01181-c07c-765a-9664-c065540c173d",
-			"r2_object_key": "m/01a01181-c07c-765a-9664-c065540c173d/01a01181-c07c-765a-9664-c51443d18741.png",
-			"display_order": 0,
-			"is_default": true,
-			"created_by": "admin-singleton",
-			"created_at": "2026-08-17T20:55:12.152Z"
-		},
-		{
-			"id": "01a02370-ff61-70c3-a2b7-1406b9896158",
-			"market_id": "01a01181-c07c-765a-9664-c065540c173d",
-			"r2_object_key": "m/01a01181-c07c-765a-9664-c065540c173d/01a02370-fead-73de-87ae-aa1b2628b887.webp",
-			"display_order": 1,
-			"is_default": false,
-			"created_by": "admin-singleton",
-			"created_at": "2026-08-21T08:30:03.104Z"
-		},
-		{
-			"id": "01a01181-c9f0-7e99-90f2-a3ad88d9d9c1",
+			"id": "01a07d86-734d-7623-9566-7afc86612059",
 			"market_id": "01a01181-c54b-71b9-a77f-d6e11d373a69",
 			"r2_object_key": "m/01a01181-c54b-71b9-a77f-d6e11d373a69/01a01181-c54b-71b9-a77f-d922fe9fa1ec.png",
 			"display_order": 0,
 			"is_default": true,
 			"created_by": "admin-singleton",
-			"created_at": "2026-08-17T20:55:13.427Z"
+			"created_at": "2026-09-07T20:19:18.412Z"
 		},
 		{
-			"id": "01a02370-ff2a-704d-8b66-c2f82dfab2b3",
+			"id": "01a07d86-734d-7bd4-9118-e4d83c5c49ee",
 			"market_id": "01a01181-c54b-71b9-a77f-d6e11d373a69",
 			"r2_object_key": "m/01a01181-c54b-71b9-a77f-d6e11d373a69/01a02370-fead-73de-87ae-9a4dd08b48db.webp",
 			"display_order": 1,
 			"is_default": false,
 			"created_by": "admin-singleton",
-			"created_at": "2026-08-21T08:30:03.050Z"
+			"created_at": "2026-09-07T20:19:18.412Z"
 		},
 		{
-			"id": "01a01181-cfd1-7caf-b282-8c5fd865f0b2",
+			"id": "01a07d86-73f4-7018-98cf-59e79fe51314",
 			"market_id": "01a01181-ca40-725f-895c-270b2190c3ee",
 			"r2_object_key": "m/01a01181-ca40-725f-895c-270b2190c3ee/01a01181-ca40-725f-895c-28376ec9d2fe.png",
 			"display_order": 0,
 			"is_default": true,
 			"created_by": "admin-singleton",
-			"created_at": "2026-08-17T20:55:14.902Z"
+			"created_at": "2026-09-07T20:19:18.505Z"
 		},
 		{
-			"id": "01a02370-ff1e-7082-8d34-9c5a467606f1",
+			"id": "01a07d86-73f5-74fc-bb67-12460fab6757",
 			"market_id": "01a01181-ca40-725f-895c-270b2190c3ee",
 			"r2_object_key": "m/01a01181-ca40-725f-895c-270b2190c3ee/01a02370-fead-73de-87ae-944e9e7b5515.webp",
 			"display_order": 1,
 			"is_default": false,
 			"created_by": "admin-singleton",
-			"created_at": "2026-08-21T08:30:03.025Z"
+			"created_at": "2026-09-07T20:19:18.505Z"
 		},
 		{
-			"id": "01a01181-d4ae-7674-9e88-e855992b0918",
+			"id": "01a07d86-7461-7595-afb6-f4f88b71f4c6",
 			"market_id": "01a01181-d035-714a-b735-5d282576d0a3",
 			"r2_object_key": "m/01a01181-d035-714a-b735-5d282576d0a3/01a01181-d035-714a-b735-61bf2fd26c5d.png",
 			"display_order": 0,
 			"is_default": true,
 			"created_by": "admin-singleton",
-			"created_at": "2026-08-17T20:55:16.212Z"
+			"created_at": "2026-09-07T20:19:18.674Z"
 		},
 		{
-			"id": "01a02370-ff57-742e-8f10-177d6b556f53",
+			"id": "01a07d86-7461-77a5-8a5a-ee5ad629f31d",
 			"market_id": "01a01181-d035-714a-b735-5d282576d0a3",
 			"r2_object_key": "m/01a01181-d035-714a-b735-5d282576d0a3/01a02370-fead-73de-87ae-a78500f73a81.webp",
 			"display_order": 1,
 			"is_default": false,
 			"created_by": "admin-singleton",
-			"created_at": "2026-08-21T08:30:03.094Z"
+			"created_at": "2026-09-07T20:19:18.674Z"
 		},
 		{
-			"id": "01a01181-d9d6-73a0-8f21-aee38ff1a161",
+			"id": "01a07d86-74e7-794b-b3ac-d664c030b8dd",
 			"market_id": "01a01181-d508-7288-b996-36ec427a9d2f",
 			"r2_object_key": "m/01a01181-d508-7288-b996-36ec427a9d2f/01a01181-d508-7288-b996-38044d147135.png",
 			"display_order": 0,
 			"is_default": true,
 			"created_by": "admin-singleton",
-			"created_at": "2026-08-17T20:55:17.432Z"
+			"created_at": "2026-09-07T20:19:18.784Z"
 		},
 		{
-			"id": "01a02370-ff34-7689-ba7f-641de743b11a",
+			"id": "01a07d86-74e7-7c76-905a-50c439cca95c",
 			"market_id": "01a01181-d508-7288-b996-36ec427a9d2f",
 			"r2_object_key": "m/01a01181-d508-7288-b996-36ec427a9d2f/01a02370-fead-73de-87ae-9fdbf8e7fa25.webp",
 			"display_order": 1,
 			"is_default": false,
 			"created_by": "admin-singleton",
-			"created_at": "2026-08-21T08:30:03.060Z"
+			"created_at": "2026-09-07T20:19:18.784Z"
 		},
 		{
-			"id": "01a01181-decc-7171-a75d-026fdcbdd589",
+			"id": "01a07d86-754b-7f09-adb4-0b69b7f27db5",
 			"market_id": "01a01181-da63-738b-a3ea-8da89299bc53",
 			"r2_object_key": "m/01a01181-da63-738b-a3ea-8da89299bc53/01a01181-da63-738b-a3ea-9270f9f87ba9.png",
 			"display_order": 0,
 			"is_default": true,
 			"created_by": "admin-singleton",
-			"created_at": "2026-08-17T20:55:18.757Z"
+			"created_at": "2026-09-07T20:19:18.920Z"
 		},
 		{
-			"id": "01a02370-ff7e-7b86-bd37-db54a1f5361b",
+			"id": "01a07d86-754b-773e-99d2-454a0bcbef0d",
 			"market_id": "01a01181-da63-738b-a3ea-8da89299bc53",
 			"r2_object_key": "m/01a01181-da63-738b-a3ea-8da89299bc53/01a02370-fead-73de-87ae-b35295fac49b.webp",
 			"display_order": 1,
 			"is_default": false,
 			"created_by": "admin-singleton",
-			"created_at": "2026-08-21T08:30:03.134Z"
+			"created_at": "2026-09-07T20:19:18.920Z"
 		},
 		{
-			"id": "01a01181-e515-7588-bf31-4105534f71d5",
+			"id": "01a07d86-75bd-7491-b502-fabc603ce183",
 			"market_id": "01a01181-df3a-747f-b154-e79a4a416b51",
 			"r2_object_key": "m/01a01181-df3a-747f-b154-e79a4a416b51/01a01181-df3a-747f-b154-eb03baee542f.png",
 			"display_order": 0,
 			"is_default": true,
 			"created_by": "admin-singleton",
-			"created_at": "2026-08-17T20:55:20.397Z"
+			"created_at": "2026-09-07T20:19:19.017Z"
 		},
 		{
-			"id": "01a02370-ff4c-7adf-9129-28c1b401149f",
+			"id": "01a07d86-75bd-79db-9090-3ee1fa2ef08b",
 			"market_id": "01a01181-df3a-747f-b154-e79a4a416b51",
 			"r2_object_key": "m/01a01181-df3a-747f-b154-e79a4a416b51/01a02370-fead-73de-87ae-a04ecdbc9359.webp",
 			"display_order": 1,
 			"is_default": false,
 			"created_by": "admin-singleton",
-			"created_at": "2026-08-21T08:30:03.084Z"
+			"created_at": "2026-09-07T20:19:19.017Z"
 		}
 	]
 }

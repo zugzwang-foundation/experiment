@@ -89,9 +89,10 @@ describe("chart-window::staging and preview share the fixture window", () => {
 		// ⚠ CHART-6 — was 2026-08-21T00:00Z, measured from the earliest `bet.placed`.
 		// CHART-4's backfilled `market.opened` seeds are four days earlier, and the
 		// series starts from that seed, so the old value clipped the genesis point
-		// of all eight markets. Now the earliest event of ANY type, floored.
+		// of every market. Now the earliest event of ANY type, floored.
 		// ⚠ RE-MEASURED 2026-09-11 — was 2026-08-17T00:00Z. The 2026-09-07 reset
-		// destroyed the eight content markets and LIQ-1-RESTORE recreated them, so
+		// destroyed the then-eight content markets and LIQ-1-RESTORE recreated
+		// them, so
 		// every renderable event on staging is now younger than the window that
 		// held them, and the plot opened three weeks before any data existed.
 		const STG_START = "2026-09-07T00:00:00.000Z";
@@ -110,9 +111,9 @@ describe("chart-window::staging and preview share the fixture window", () => {
 	it("the PRODUCTION window contains every ratified market's resolution deadline", () => {
 		// ⛔ THE STAGING ARM IS TIED TO ITS DATA TWO TESTS DOWN; THE PRODUCTION ARM
 		// WAS TIED ONLY TO ITS OWN LITERALS. `2026-11-05T23:45:00Z` is the ratified
-		// `resolution_deadline` shared by all eight markets — but "shared by all
-		// eight" was an assertion in a docblock, not a measurement, and SPEC.1 §9
-		// explicitly permits a market to carry `23:59` instead.
+		// `resolution_deadline`, and "shared by every market" was an assertion in a
+		// docblock rather than a measurement — SPEC.1 §9 explicitly permits a
+		// market to carry `23:59` instead, so it is still measured here.
 		//
 		// A market whose deadline sat past this constant would trade its final
 		// minutes off the right of the axis, with its terminal dot clipped out of
@@ -129,13 +130,13 @@ describe("chart-window::staging and preview share the fixture window", () => {
 		);
 		const slate = snapshot.markets;
 
-		// Non-vacuity: the slate was read, and it is the slate — eight markets,
+		// Non-vacuity: the slate was read, and it is the slate — six markets,
 		// each carrying a deadline. A parse that yielded [] would satisfy the
 		// loop below without looking at anything. ⚠ This control has already
 		// earned itself once: the first version of this test read the file as a
 		// bare array, got `undefined`, and reddened here rather than passing
 		// vacuously over nothing.
-		expect(slate.length).toBe(8);
+		expect(slate.length).toBe(6);
 		expect(slate.every((m) => typeof m.resolution_deadline === "string")).toBe(
 			true,
 		);
@@ -148,23 +149,26 @@ describe("chart-window::staging and preview share the fixture window", () => {
 			).toBeLessThanOrEqual(windowEnd);
 		}
 
-		// ⚠ AND THE MEASUREMENT THAT MAKES THIS GUARD WORTH ITS LINES. The
-		// deadline is NOT "shared by all eight markets" — that phrase reached
-		// SPEC.1 §16.1 from the CHART-3 brief and the slate contradicts it.
-		// SEVEN carry 2026-11-05T23:45Z; `oktoberfest-munich-beer-volume` carries
-		// 2026-10-04T21:59:00Z, a month earlier and not on the ratified instant.
-		//
-		// It changes nothing about the window — Oct 4 is comfortably inside it —
-		// but it means the fixed axis has a REAL production case from day one: a
-		// market that closes a month before the others and whose series then
-		// freezes (**INV-4**) while the axis keeps running to Nov 5. That is the
-		// "axis fixed, line not" rendering, in production, not a hypothetical.
+		// ⚠⚠ MKT-ROSTER-1 REMOVED THE ONE MARKET THAT MADE THIS INTERESTING, AND
+		// THE REVERSAL IS WRITTEN HERE RATHER THAN LEFT AS A DEAD PARAGRAPH (O-5).
+		// Through CHART-3 the slate carried TWO distinct deadlines: seven on
+		// 2026-11-05T23:45Z and one a month earlier on 2026-10-04T21:59Z, which was
+		// the standing counter-example to SPEC.1 §16.1's "shared by all" and the
+		// slate's only REAL "axis fixed, line not" case — a market whose series
+		// freezes (**INV-4**) while the axis keeps running to Nov 5. That market is
+		// gone, so the slate is now uniform and that rendering has NO production
+		// case, hypothetical again until another market is ruled onto a different
+		// instant.
+		// ⛔ THE ASSERTION IS KEPT AND INVERTED, NOT DELETED. Uniformity is now the
+		// measured fact, so it is what gets pinned: the day a market lands on a
+		// different deadline, this reddens and whoever wrote it is told that the
+		// chart has a case it has not had since 2026-09-18.
 		const distinct = new Set(slate.map((m) => m.resolution_deadline));
-		expect(distinct.size).toBe(2);
+		expect(distinct.size).toBe(1);
 		expect(
 			slate.filter((m) => m.resolution_deadline === "2026-11-05T23:45:00.000Z")
 				.length,
-		).toBe(7);
+		).toBe(6);
 	});
 
 	it("⏰ EXPIRY ALARM — the staging window has not yet run out", () => {
@@ -206,20 +210,20 @@ describe("chart-window::staging and preview share the fixture window", () => {
 	it("starts no later than staging's earliest measured EVENT, so no real data is clipped", () => {
 		// ⛔ MEASURED, NOT CHOSEN — AND THE QUANTITY MEASURED CHANGED AT CHART-6.
 		// This asserted the earliest `bet.placed` (2026-08-21T05:29:29.430Z, read at
-		// CHART-3) and passed every day for two weeks while the genesis point of all
-		// eight markets sat OUTSIDE the window. `replayReserveSeries` walks from the
+		// CHART-3) and passed every day for two weeks while the genesis point of
+		// every market sat OUTSIDE the window. `replayReserveSeries` walks from the
 		// `market.opened` seed, and CHART-4 backfilled those seeds four days earlier
 		// than the first bet — so the guard was measuring one of the three event
 		// types the chart renders and reporting on all of them.
 		//
 		// ⇒ The floor is now the earliest event of ANY type on the slate, read
 		// 2026-09-01 against the live staging database:
-		//   earliest  2026-08-17T20:55:20.712Z  (market.opened, mumbai-bmc-…)
+		//   earliest  2026-08-17T20:55:20.712Z  (market.opened)
 		//   latest    2026-09-01T07:30:30.139Z  (image_upload.sign_requested)
 		//
 		// ⛔ RE-MEASURED 2026-09-11, AND THE RE-MEASUREMENT IS THE POINT. Those two
 		// instants describe markets that no longer exist: the 2026-09-07 reset
-		// dropped all eight and LIQ-1-RESTORE recreated them through
+		// dropped the whole slate and LIQ-1-RESTORE recreated it through
 		// `createMarket` / `openMarket`, minting fresh `market.opened` rows. A pin
 		// taken against destroyed data does not go red — it goes QUIETLY WRONG in
 		// the permissive direction, because a floor that is too early still
@@ -245,7 +249,7 @@ describe("chart-window::staging and preview share the fixture window", () => {
 describe("debate-view::price-chart-window-contains-all-data — RF-5, against the real constants", () => {
 	// ⭐ THE GUARD THAT WOULD HAVE CAUGHT CHART-6's DEFECT, and the reason it is
 	// worth its lines is the reason it did not exist: nothing in a 4 249-test suite
-	// compared the window to the data. The failure was silent on eight markets
+	// compared the window to the data. The failure was silent on every market
 	// across two environments for two weeks and was found by a founder looking at a
 	// screen.
 	//
@@ -286,14 +290,6 @@ describe("debate-view::price-chart-window-contains-all-data — RF-5, against th
 	 */
 	function stagingGenesisInstants(): { slug: string; at: string }[] {
 		return [
-			{
-				slug: "mumbai-bmc-pink-october-disclosure",
-				at: "2026-09-07T20:19:24.814Z",
-			},
-			{
-				slug: "oktoberfest-munich-beer-volume",
-				at: "2026-09-07T20:19:24.942Z",
-			},
 			{ slug: "chess-fide-tiebreak-response", at: "2026-09-07T20:19:25.124Z" },
 			{ slug: "bitcoin-price-50k", at: "2026-09-07T20:19:25.244Z" },
 			{
@@ -309,10 +305,10 @@ describe("debate-view::price-chart-window-contains-all-data — RF-5, against th
 	it("places every staging market's GENESIS point inside the plot — the CHART-6 defect", () => {
 		const genesis = stagingGenesisInstants();
 
-		// Non-vacuity: eight markets, eight parseable instants. An empty read would
+		// Non-vacuity: six markets, six parseable instants. An empty read would
 		// satisfy the loop below while looking at nothing — the failure mode the
 		// deadline guard above has already been bitten by once.
-		expect(genesis.length).toBe(8);
+		expect(genesis.length).toBe(6);
 		expect(genesis.every((g) => !Number.isNaN(Date.parse(g.at)))).toBe(true);
 
 		const w = resolveChartWindow("staging");
@@ -360,15 +356,21 @@ describe("debate-view::price-chart-window-contains-all-data — RF-5, against th
 		);
 		expect(
 			clipped.length,
-			"production's window must clip all eight staging genesis points; if it does not, this guard is measuring the wrong quantity",
-		).toBe(8);
+			"production's window must clip every staging genesis point; if it does not, this guard is measuring the wrong quantity",
+		).toBe(6);
 	});
 
 	it("places every ratified market's resolution deadline inside the PRODUCTION plot", () => {
 		// The right-hand half of the same rule, on the environment whose window is
 		// load-bearing. The staging arm above covers the left edge; the deadlines
-		// cover the right, and `oktoberfest-munich-beer-volume`'s 2026-10-04 deadline
-		// makes that a real case rather than a boundary one.
+		// cover the right.
+		// ⚠ THIS USED TO BE A REAL CASE AND IS NOW A BOUNDARY ONE. A market with a
+		// 2026-10-04 deadline sat comfortably inside the axis and made this an
+		// interior test; MKT-ROSTER-1 removed it, so every remaining deadline is
+		// the axis END and this asserts `<=` against equality on all six. Still
+		// worth its lines — the failure it catches is a deadline PAST the end —
+		// but it no longer has any slack, and that is worth knowing before
+		// someone reads a green tick as proof the interior case works.
 		const snap: { markets: { slug: string; resolution_deadline: string }[] } =
 			JSON.parse(
 				readFileSync(
@@ -376,7 +378,7 @@ describe("debate-view::price-chart-window-contains-all-data — RF-5, against th
 					"utf8",
 				),
 			);
-		expect(snap.markets.length).toBe(8);
+		expect(snap.markets.length).toBe(6);
 
 		const w = resolveChartWindow("prod");
 		const startMs = Date.parse(w.start);

@@ -12,9 +12,9 @@ import {
  * operator-uploaded market imagery: the sign route mints an opaque
  * `m/<marketId>/<mediaId>.<ext>` key (ADR-0026), the object is per-market by
  * construction, and its MIME allowlist and 8 MiB cap exist to bound an upload
- * a human performs. None of that describes a glyph. These thirteen are
+ * a human performs. None of that describes a glyph. These ten are
  * build-time constants, shared across markets — `response-on-x.png` serves
- * five of the eight — and a taxonomy entry has no market to be keyed by at
+ * four of the six — and a taxonomy entry has no market to be keyed by at
  * all. They ship from `public/`, whose precedent is
  * `public/brand/zugzwang-mark.svg`.
  *
@@ -22,12 +22,12 @@ import {
  * IT. The sources arrived as opaque marks on a baked plate whose colour was
  * measured, per file, at `#232323`–`#2E2E2E` — an eleven-level spread
  * straddling the `#2A2A2A` the span itself paints, which rendered as a visible
- * square inside the block's own frame on eight of the thirteen. Rather than
- * repaint thirteen plates to match a token (and re-acquire the same drift the
- * moment that token moves), the plate was keyed out: the mark is flat
- * `#FAFAFA` carried entirely by an alpha channel, and the span's `bg-n1`
- * behind it IS the plate. The seam cannot come back, because there is no
- * second copy of the colour to disagree with.
+ * square inside the block's own frame on eight of the thirteen assets that
+ * then shipped. Rather than repaint thirteen plates to match a token (and
+ * re-acquire the same drift the moment that token moves), the plate was keyed
+ * out: the mark is flat `#FAFAFA` carried entirely by an alpha channel, and
+ * the span's `bg-n1` behind it IS the plate. The seam cannot come back,
+ * because there is no second copy of the colour to disagree with.
  * ⇒ `ResolverCards.tsx` must keep `bg-n1` on the glyph span. It is not a
  * loading fallback any more; removing it renders the mark on whatever happens
  * to be behind.
@@ -48,12 +48,10 @@ const GLYPH_DIR = "/brand/blocks";
 /**
  * RESOLUTION and RESOLVER take the SAME asset on every market — after BLOCK-4
  * their values coincide (RESOLUTION names the thing read, RESOLVER who
- * publishes it, and for all eight markets that is one source with one mark).
+ * publishes it, and for all six markets that is one source with one mark).
  * One map, consulted twice, rather than two identical maps that could drift.
  */
 const MARKET_GLYPHS: Record<KnownMarketSlug, string> = {
-	"mumbai-bmc-pink-october-disclosure": "response-on-x.png",
-	"oktoberfest-munich-beer-volume": "oktoberfest.png",
 	"chess-fide-tiebreak-response": "response-on-x.png",
 	"bitcoin-price-50k": "coinmarketcap.png",
 	"math-erdos-contribution-response": "response-on-x.png",
@@ -64,12 +62,10 @@ const MARKET_GLYPHS: Record<KnownMarketSlug, string> = {
 
 /**
  * FLAVOUR keys off the flavour STRING, never the market slug — see
- * `FlavourName`'s own note. `Record<FlavourName, string>` is what makes a ninth
- * flavour a `tsc` error instead of a missing glyph.
+ * `FlavourName`'s own note. `Record<FlavourName, string>` is what makes a
+ * seventh flavour a `tsc` error instead of a missing glyph.
  */
 const FLAVOUR_GLYPHS: Record<FlavourName, string> = {
-	Pressure: "pressure.png",
-	Consumption: "consumption.png",
 	Petition: "petition.png",
 	Sentiment: "sentiment.png",
 	Innovation: "innovation.png",
@@ -78,7 +74,7 @@ const FLAVOUR_GLYPHS: Record<FlavourName, string> = {
 	Callout: "callout.png",
 };
 
-/** CLOSES ON is one date treatment for all eight — one asset, no map. */
+/** CLOSES ON is one date treatment for all six — one asset, no map. */
 const CLOSES_GLYPH = "closes-on.png";
 
 /** The four block keys, mirroring `ResolverCards`' own `BLOCKS` fixture. */
@@ -106,7 +102,7 @@ export function getResolutionBlockGlyphs(
 	if (!isKnownMarketSlug(slug)) {
 		throw new Error(
 			`ResolverCards: no resolution-block glyph for market slug "${slug}". ` +
-				"BLOCK-5b ships a static, per-slug glyph map for exactly the eight " +
+				"BLOCK-5b ships a static, per-slug glyph map for exactly the six " +
 				"known markets — add an entry to MARKET_GLYPHS before this market " +
 				"can render its resolution row.",
 		);

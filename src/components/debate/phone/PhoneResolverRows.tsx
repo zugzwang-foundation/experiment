@@ -89,10 +89,10 @@ export function PhoneResolverRows({ market }: { market: DebateMarketHeader }) {
 								/* ⛔⛔ `target="_blank" rel="noopener noreferrer"`, MATCHING THE
 								   DESKTOP TWIN (`ResolverCards.tsx:501-510`) — and this shipped
 								   as a bare `<a href>` on the belief that every href in the map
-								   was `null`. It is not: SEVEN of the eight markets carry a live
-								   external RESOLVER href (`https://x.com/mybmc`,
-								   `https://coinmarketcap.com/...`, `https://www.oktoberfest.de/en`
-								   …). Caught by `@code-reviewer`.
+								   was `null`. It is not: EVERY market carries a live external
+								   RESOLVER href (`https://x.com/FIDE_chess`,
+								   `https://coinmarketcap.com/...`,
+								   `https://github.com/...` …). Caught by `@code-reviewer`.
 								   ⚠ The cost of the belief was not tabnabbing — with no
 								   `target="_blank"` there is no `window.opener` to exploit. It
 								   was that the phone leaked a `Referer` the desktop withholds,

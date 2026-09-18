@@ -1,0 +1,247 @@
+{
+	"capturedAt": "2026-09-18T09:59:09.212Z",
+	"source": {
+		"host": "aws-1-ap-south-1.pooler.supabase.com",
+		"database": "postgres",
+		"user": "postgres.zbvprdcyxhlguxbostdj"
+	},
+	"counts": {
+		"markets": 6,
+		"pools": 6,
+		"market_media": 12
+	},
+	"markets": [
+		{
+			"id": "01a0a0ba-c700-77bf-8395-7f6bd429e53f",
+			"slug": "bitcoin-price-50k",
+			"title": "Bitcoin · Will BTC ever go below $60,000 by 5th November?",
+			"description": "Will Bitcoin trade below USD 60,000 at any point between 15th September 2026 and 5th November 2026, as measured by the published daily low of Bitcoin (BTC) on CoinMarketCap?\n\nResolves YES if the daily low published by CoinMarketCap for Bitcoin (BTC) is below USD 60,000 on any date from 15 September to 5 November 2026 inclusive.\n\nResolves NO in every other case.\n\nSOURCE. Exhaustive source set: CoinMarketCap only — its published historical daily record for Bitcoin (BTC), the Low field.\n\nCRITERION. \"Below USD 60,000\" means strictly less than USD 60,000.00, read to two decimal places. A published low of exactly USD 60,000.00 does not qualify. \"Daily low\" means the Low field of CoinMarketCap's published daily record for a UTC calendar date. The window is the 52 UTC calendar dates from 15 September 2026 to 5 November 2026 inclusive.\n\nDEADLINE. Trading closes and settlement occurs at 2026-11-05T23:45:00Z. The window opens at 2026-09-15T00:00:00Z. UTC is the binding clock throughout.\n\nTRIGGER. Latching. The first published daily low below USD 60,000 resolves this market YES irreversibly. A later recovery above USD 60,000 does not un-trigger it, and no subsequent observation changes the outcome. On multiple qualifying dates, the earliest binds.\n\nEDGE CASES. (a) UTC is binding; dates are UTC calendar dates. (b) A published low of exactly USD 60,000.00 resolves NO. (c) The 5 November daily low is binding as published; the final fifteen minutes of that date fall after the settlement instant, and this over-inclusion is accepted in advance.\n\nVOID. This market voids only if CoinMarketCap permanently ceases publishing Bitcoin historical daily data before resolution and no archive of the window is retrievable. Ambiguity, a temporary outage, a methodology change, a data revision, an unwelcome outcome, low participation, and Bitcoin approaching but not crossing the level are not void conditions.\n\nEVIDENCE. At resolution the operator records and publishes the source URL, the full daily-low series for all 52 dates in the window, the qualifying date and value if any, an independent archive capture taken at resolution time, and the criterion clause satisfied.\n\nDISCLOSURE. No operator intervention. The Foundation takes no action directed at CoinMarketCap or at any venue constituent to its Bitcoin price, and has no relationship with any of them. Neither the Zugzwang Foundation nor the operator holds Bitcoin or any cryptocurrency position.",
+			"status": "Open",
+			"resolution_deadline": "2026-11-05T23:45:00.000Z",
+			"resolved_at": null,
+			"resolution_outcome": null,
+			"media_video_url": null,
+			"created_by": "admin-singleton",
+			"created_at": "2026-09-14T16:23:12.402Z"
+		},
+		{
+			"id": "01a0a0ba-d969-7613-a701-0f140bd224b1",
+			"slug": "chess-fide-tiebreak-response",
+			"title": "Chess · Will FIDE answer Zugzwang's tiebreak proposal?",
+			"description": "Will FIDE respond publicly on X by 5 November 2026 to Zugzwang's published proposal to abolish rapid and blitz tiebreaks from the World Chess Championship match?\n\nResolves YES if @FIDE_chess publishes a post on X, within the observation window, that names Zugzwang or links, quotes or reproduces any post in the Zugzwang thread. A reply, a repost, a quote-post and a standalone post all qualify. Resolves NO in every other case.\n\nResolution type. Resolves on whether FIDE publicly acknowledges the proposal, not on whether it agrees and not on whether the rule changes. A refusal, a dismissal, or a statement that it will not be considered all resolve YES. Silence resolves NO, never Void.\n\nSource. Only posts from @FIDE_chess on X can resolve this market.\n\nWindow. Opens at the root post's timestamp, ends 5 November 2026 at 23:45 UTC. UTC is the binding clock. Only posts timestamped at or before that instant count, whenever the operator resolves. No extensions.\n\nTrigger. Latching. The first qualifying post resolves YES irreversibly. If FIDE later deletes it, this market stays YES.\n\nDeletion. If a qualifying post is deleted or @FIDE_chess suspended, an independent archive capture timestamped within the window is admissible; a screenshot is not. If the root post is removed, by anyone for any reason, this resolves NO. If other posts are removed, the market stands.\n\nVoid. None. Silence resolves NO, and removal of the root post resolves NO rather than voiding.\n\nEvidence. The operator publishes the source URL, the post timestamp, the text verbatim, an independent archive capture, and the clause satisfied.",
+			"status": "Open",
+			"resolution_deadline": "2026-11-05T23:45:00.000Z",
+			"resolved_at": null,
+			"resolution_outcome": null,
+			"media_video_url": null,
+			"created_by": "admin-singleton",
+			"created_at": "2026-09-14T16:23:18.141Z"
+		},
+		{
+			"id": "01a0a0ba-f3bd-70fe-b5fd-70426431e314",
+			"slug": "claude-bundle-response",
+			"title": "Claude · Will Anthropic reply 👍 to Zugzwang's Bundle feature?",
+			"description": "Will @claudeai reply thumbs up to the Zugzwang thread presenting the Bundle feature specification, on X, between 15 September and 5 November 2026?\n\nResolves YES if @claudeai publishes on X, within the observation window, a reply to any post in the Zugzwang Bundle thread, or a quote-post of any post in it, that contains a thumbs-up and does not contain a thumbs-down. Resolves NO in every other case - including a reply containing a thumbs-down, a reply containing both, a reply containing neither, a like, a bookmark, and a repost without comment.\n\nThumbs. A thumbs-up is the thumbs-up emoji in any skin tone, or the words thumbs up in any letter case. A thumbs-down is the thumbs-down emoji in any skin tone, or the words thumbs down in any letter case. Nothing else counts as either. The token must appear in the post's own text, not in an image, video or link preview. Any other text in the post is not read.\n\nThe point. This market runs for the whole window so that participants can argue for and against the feature, with a stake behind every argument. At resolution Anthropic sees what users want. Both outcomes are equally useful to the experiment.\n\nDeadline. 5 November 2026, 23:45 UTC. The window opens at market open on 15 September 2026. UTC is the binding clock. Only posts timestamped at or before the deadline count, whenever the operator resolves. No extensions.\n\nTrigger. Latching on YES only. The first qualifying thumbs-up reply resolves YES irreversibly; later deletion, retraction or a subsequent thumbs-down does not un-resolve it. A thumbs-down reply does not close this market - a later qualifying thumbs-up inside the window still resolves YES. NO is reached only at the deadline.\n\nVoid. None. Silence resolves NO.\n\nEvidence. The operator publishes the source URL, the post timestamp, the text verbatim, which token it contains, an independent archive capture, and the clause satisfied. On a NO, an archive capture of the @claudeai timeline covering the window.",
+			"status": "Open",
+			"resolution_deadline": "2026-11-05T23:45:00.000Z",
+			"resolved_at": null,
+			"resolution_outcome": null,
+			"media_video_url": null,
+			"created_by": "admin-singleton",
+			"created_at": "2026-09-14T16:23:24.378Z"
+		},
+		{
+			"id": "01a0a0bb-0dfb-7793-9ff3-057e1a53c10a",
+			"slug": "github-zugzwang-repo-stars",
+			"title": "GitHub · Will the Zugzwang repo reach 100,000 stars?",
+			"description": "Will the Zugzwang repository reach 100,000 GitHub stars by 5 November 2026?\n\nDeclared: the Zugzwang Foundation owns this repository, is publicly campaigning for the YES outcome, and is also the sole resolver.\n\nResolves YES if the star count for zugzwang-foundation/experiment is observed at 100,000 or more at any point in the window, as published by GitHub on the repository page or its REST API, and preserved by an independent archive capture timestamped inside the window. A count that crosses and later falls back still resolves YES.\n\nResolves NO in every other case — no qualifying observation, stars on a fork or mirror, any other GitHub metric, third-party star trackers, or a reading with no independent capture. Anyone may produce an observation.\n\nDeadline 5 November 2026, 23:45 UTC.",
+			"status": "Open",
+			"resolution_deadline": "2026-11-05T23:45:00.000Z",
+			"resolved_at": null,
+			"resolution_outcome": null,
+			"media_video_url": null,
+			"created_by": "admin-singleton",
+			"created_at": "2026-09-14T16:23:30.032Z"
+		},
+		{
+			"id": "01a0a0bb-3141-71ce-9843-2d98002f8c87",
+			"slug": "math-erdos-contribution-response",
+			"title": "Math · Will 3 Erdős problems be solved by 5th November?",
+			"description": "Will Thomas Bloom, owner and maintainer of erdosproblems.com, publicly confirm on X that at least three distinct Erdős problems, open on 15 September 2026, have been solved, proved or disproved by 5 November 2026?\n\nResolves YES if posts published by @thomasfbloom on X, within the observation window, state of at least three distinct numbered Erdős problems that the problem is solved, proved or disproved. Each problem counts once. A problem must have been listed as open on erdosproblems.com at market open to count. Resolves NO in every other case - including fewer than three, posts reporting partial progress or reporting someone's claim without stating the problem is solved, and silence. A status change on erdosproblems.com itself does not resolve this market, and neither does a comment on its forum. Only a post by @thomasfbloom on X does.\n\nCriterion. A qualifying post must identify an Erdős problem by its number and state that it is solved, proved or disproved. Both elements must appear in a post authored by @thomasfbloom. There is no test of importance, difficulty or significance.\n\nDistinct. Three posts about one problem count once. Three problems in one post count three. A thread counts as its component posts.\n\nOpen. A problem counts only if erdosproblems.com listed it as open at market open, established by an archive capture at open. Roughly twenty problems will change status on the site in this window; that alone resolves nothing.\n\nSource. @thomasfbloom on X only.\n\nDeadline. 5 November 2026, 23:45 UTC. The window opens at market open on 15 September 2026. UTC is the binding clock. Only posts timestamped at or before the deadline count, whenever the operator resolves. No extensions.\n\nTrigger. Latching. The third distinct qualifying confirmation resolves YES irreversibly. Later deletion does not un-resolve it, and neither does a subsequent reversal by him.\n\nNear miss. Fewer than three resolves NO. No partial credit.\n\nDeletion. If a qualifying post is deleted or the account suspended, an independent archive capture timestamped within the window is admissible; a screenshot is not. Without one, it does not count.\n\nVoid. None. Silence resolves NO.\n\nEvidence. For each of the three confirmations the operator publishes the source URL, post timestamp, the text verbatim, an archive capture, and the clause satisfied, plus the market-open capture establishing each problem was open.",
+			"status": "Open",
+			"resolution_deadline": "2026-11-05T23:45:00.000Z",
+			"resolved_at": null,
+			"resolution_outcome": null,
+			"media_video_url": null,
+			"created_by": "admin-singleton",
+			"created_at": "2026-09-14T16:23:40.794Z"
+		},
+		{
+			"id": "01a0a0bb-7e0b-7182-9944-bba33914d94b",
+			"slug": "yc-paper-club-response",
+			"title": "YCombinator · Will YC reply to Zugzwang's pitch by 5 Nov 2026?",
+			"description": "Will @ycombinator reply to or quote-post any post in the Zugzwang thread submitting its pitch to Y Combinator, on X, between 15 September and 5 November 2026?\n\nResolves YES if a post by @ycombinator is a reply to any post in the Zugzwang thread, or a quote-post of one. What the post says is never read: approval, rejection and dismissal all resolve YES identically.\n\nResolves NO in every other case, and this market is deliberately narrow. A standalone post naming Zugzwang resolves NO.\n\nDeadline 5 November 2026, 23:45 UTC.",
+			"status": "Open",
+			"resolution_deadline": "2026-11-05T23:45:00.000Z",
+			"resolved_at": null,
+			"resolution_outcome": null,
+			"media_video_url": null,
+			"created_by": "admin-singleton",
+			"created_at": "2026-09-14T16:23:57.941Z"
+		}
+	],
+	"pools": [
+		{
+			"id": "01a0a0ba-d3ec-7986-bfb9-d4f17022902e",
+			"market_id": "01a0a0ba-c700-77bf-8395-7f6bd429e53f",
+			"yes_reserves": "74169.019873149021295974",
+			"no_reserves": "19136.208960883857864413",
+			"created_at": "2026-09-14T16:23:13.301Z"
+		},
+		{
+			"id": "01a0a0ba-ef76-7bf9-9bc7-34c6a03654bf",
+			"market_id": "01a0a0ba-d969-7613-a701-0f140bd224b1",
+			"yes_reserves": "76020.010010828157043923",
+			"no_reserves": "18632.044135492930354751",
+			"created_at": "2026-09-14T16:23:20.193Z"
+		},
+		{
+			"id": "01a0a0bb-0949-7d4b-a01e-f40b70e9c65f",
+			"market_id": "01a0a0ba-f3bd-70fe-b5fd-70426431e314",
+			"yes_reserves": "71450.223155776418961940",
+			"no_reserves": "21535.997682451900548816",
+			"created_at": "2026-09-14T16:23:26.500Z"
+		},
+		{
+			"id": "01a0a0bb-2cd2-7620-8508-ed3c88674b61",
+			"market_id": "01a0a0bb-0dfb-7793-9ff3-057e1a53c10a",
+			"yes_reserves": "75786.069703603557673778",
+			"no_reserves": "18738.952188515463747402",
+			"created_at": "2026-09-14T16:23:31.422Z"
+		},
+		{
+			"id": "01a0a0bb-4897-7c3a-8ff5-af7661518ff1",
+			"market_id": "01a0a0bb-3141-71ce-9843-2d98002f8c87",
+			"yes_reserves": "73130.281164674556986681",
+			"no_reserves": "19241.396298063274023349",
+			"created_at": "2026-09-14T16:23:42.670Z"
+		},
+		{
+			"id": "01a0a0bb-84a4-7aec-91f0-ca869a6ec91f",
+			"market_id": "01a0a0bb-7e0b-7182-9944-bba33914d94b",
+			"yes_reserves": "78764.773194669008231168",
+			"no_reserves": "18468.988858044876212554",
+			"created_at": "2026-09-14T16:23:58.433Z"
+		}
+	],
+	"market_media": [
+		{
+			"id": "01a0a0ba-d14a-7e6f-882c-9e15af42bbde",
+			"market_id": "01a0a0ba-c700-77bf-8395-7f6bd429e53f",
+			"r2_object_key": "m/01a0a0ba-c700-77bf-8395-7f6bd429e53f/01a0a0ba-c700-77bf-8395-822deed65cd3.png",
+			"display_order": 0,
+			"is_default": true,
+			"created_by": "admin-singleton",
+			"created_at": "2026-09-14T16:23:12.402Z"
+		},
+		{
+			"id": "01a0a0ba-d14a-7608-afb7-ab497a1fc595",
+			"market_id": "01a0a0ba-c700-77bf-8395-7f6bd429e53f",
+			"r2_object_key": "m/01a0a0ba-c700-77bf-8395-7f6bd429e53f/01a0a0ba-cdf3-771f-9122-9d66ad04c60b.webp",
+			"display_order": 1,
+			"is_default": false,
+			"created_by": "admin-singleton",
+			"created_at": "2026-09-14T16:23:12.402Z"
+		},
+		{
+			"id": "01a0a0ba-ecdc-78bd-82e0-73aab03c7bac",
+			"market_id": "01a0a0ba-d969-7613-a701-0f140bd224b1",
+			"r2_object_key": "m/01a0a0ba-d969-7613-a701-0f140bd224b1/01a0a0ba-d969-7613-a701-13be0a8fb2c4.png",
+			"display_order": 0,
+			"is_default": true,
+			"created_by": "admin-singleton",
+			"created_at": "2026-09-14T16:23:18.141Z"
+		},
+		{
+			"id": "01a0a0ba-ecdc-7cf6-a61b-afe48e4b93a8",
+			"market_id": "01a0a0ba-d969-7613-a701-0f140bd224b1",
+			"r2_object_key": "m/01a0a0ba-d969-7613-a701-0f140bd224b1/01a0a0ba-deaa-70b9-b6f2-5defa204e64d.webp",
+			"display_order": 1,
+			"is_default": false,
+			"created_by": "admin-singleton",
+			"created_at": "2026-09-14T16:23:18.141Z"
+		},
+		{
+			"id": "01a0a0bb-035b-733d-ae0e-72c2681cb78c",
+			"market_id": "01a0a0ba-f3bd-70fe-b5fd-70426431e314",
+			"r2_object_key": "m/01a0a0ba-f3bd-70fe-b5fd-70426431e314/01a0a0ba-f3bd-70fe-b5fd-7709711df229.png",
+			"display_order": 0,
+			"is_default": true,
+			"created_by": "admin-singleton",
+			"created_at": "2026-09-14T16:23:24.378Z"
+		},
+		{
+			"id": "01a0a0bb-035b-7ad9-b756-b770110bb0a3",
+			"market_id": "01a0a0ba-f3bd-70fe-b5fd-70426431e314",
+			"r2_object_key": "m/01a0a0ba-f3bd-70fe-b5fd-70426431e314/01a0a0ba-f789-73fa-a477-0abd937e6ae0.webp",
+			"display_order": 1,
+			"is_default": false,
+			"created_by": "admin-singleton",
+			"created_at": "2026-09-14T16:23:24.378Z"
+		},
+		{
+			"id": "01a0a0bb-1757-76f1-bbb0-55e211019a61",
+			"market_id": "01a0a0bb-0dfb-7793-9ff3-057e1a53c10a",
+			"r2_object_key": "m/01a0a0bb-0dfb-7793-9ff3-057e1a53c10a/01a0a0bb-0dfb-7793-9ff3-0a4f1133aae7.png",
+			"display_order": 0,
+			"is_default": true,
+			"created_by": "admin-singleton",
+			"created_at": "2026-09-14T16:23:30.032Z"
+		},
+		{
+			"id": "01a0a0bb-1757-742a-aff1-ef29f73cd907",
+			"market_id": "01a0a0bb-0dfb-7793-9ff3-057e1a53c10a",
+			"r2_object_key": "m/01a0a0bb-0dfb-7793-9ff3-057e1a53c10a/01a0a0bb-14aa-709d-93b2-7e2068647e08.webp",
+			"display_order": 1,
+			"is_default": false,
+			"created_by": "admin-singleton",
+			"created_at": "2026-09-14T16:23:30.032Z"
+		},
+		{
+			"id": "01a0a0bb-43b0-7eff-b166-ae5b80235308",
+			"market_id": "01a0a0bb-3141-71ce-9843-2d98002f8c87",
+			"r2_object_key": "m/01a0a0bb-3141-71ce-9843-2d98002f8c87/01a0a0bb-3141-71ce-9843-31686808a1c5.png",
+			"display_order": 0,
+			"is_default": true,
+			"created_by": "admin-singleton",
+			"created_at": "2026-09-14T16:23:40.794Z"
+		},
+		{
+			"id": "01a0a0bb-43b0-7627-a1bd-9e80fa04a69c",
+			"market_id": "01a0a0bb-3141-71ce-9843-2d98002f8c87",
+			"r2_object_key": "m/01a0a0bb-3141-71ce-9843-2d98002f8c87/01a0a0bb-3367-75fe-8e10-0fed80704edf.webp",
+			"display_order": 1,
+			"is_default": false,
+			"created_by": "admin-singleton",
+			"created_at": "2026-09-14T16:23:40.794Z"
+		},
+		{
+			"id": "01a0a0bb-8244-7055-8b10-790f7ff590f2",
+			"market_id": "01a0a0bb-7e0b-7182-9944-bba33914d94b",
+			"r2_object_key": "m/01a0a0bb-7e0b-7182-9944-bba33914d94b/01a0a0bb-7e0b-7182-9944-bf108e9a9471.png",
+			"display_order": 0,
+			"is_default": true,
+			"created_by": "admin-singleton",
+			"created_at": "2026-09-14T16:23:57.941Z"
+		},
+		{
+			"id": "01a0a0bb-8244-7041-86cd-acb06c2ce771",
+			"market_id": "01a0a0bb-7e0b-7182-9944-bba33914d94b",
+			"r2_object_key": "m/01a0a0bb-7e0b-7182-9944-bba33914d94b/01a0a0bb-8059-7078-b958-3d01e94339ab.webp",
+			"display_order": 1,
+			"is_default": false,
+			"created_by": "admin-singleton",
+			"created_at": "2026-09-14T16:23:57.941Z"
+		}
+	]
+}

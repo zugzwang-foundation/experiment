@@ -9,6 +9,18 @@
 | **Frame document** | `docs/plans/STAGING-PARITY.md` Q1, S1, S3 + Ratification Record §7 (deviation record); `docs/polish/POLISH-0_data-manifest.md` §0 A4, §1.1, §1.3; AGENTS.md (test layout); ADR-0014 (moderation outside the transaction); ADR-0011 (identity pool); SPEC.2 ADR Index |
 | **Supersedes** | — |
 | **Superseded-by** | — |
+| **Amended-by** | D-49 (one pre-launch production restore — MKT-ROSTER-1; every other clause stands) |
+
+> ⚠ **One production use is authorised. Read this before the body.**
+>
+> **D-49** (2026-09-18, `docs/decisions/RECORD-v2.8-amendment.md`) authorises a single
+> pre-launch production run of an operational runner — the six-market restore through
+> `createMarket` / `openMarket` — while all production data is test data. It runs once, under its
+> own opt-in config so no bare `vitest run` can reach production, from a branch that is never
+> merged, then closed.
+>
+> That is the only exception. Primitive 6 — *"Staging only. Never production."* — stands for
+> everything else, and the body below is unchanged.
 
 ---
 
