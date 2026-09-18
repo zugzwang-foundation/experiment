@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import { FREEZE_INSTANT_UTC } from "@/server/markets/create";
@@ -9,7 +12,7 @@ import {
 } from "../../staging/content-markets";
 
 // ═══════════════════════════════════════════════════════════════════════════
-// LIQ-1-RESTORE B2 — the eight content markets parse, and parse into something
+// LIQ-1-RESTORE B2 — the content markets parse, and parse into something
 // `createMarket` will actually accept.
 //
 // This runs in CI on every PR and touches no database. It reads the REAL
@@ -24,7 +27,7 @@ const SPECS = loadContentMarkets();
 describe("the source is real", () => {
 	// CONTROL — every assertion below loops over SPECS, and a loop over an
 	// empty array asserts nothing. Prove the read found something first.
-	it("reads all eight markets out of the committed snapshot", () => {
+	it("reads every market out of the committed snapshot", () => {
 		expect(SPECS).toHaveLength(CONTENT_MARKET_COUNT);
 		expect(CONTENT_MARKET_SOURCE_PATH).toMatch(
 			/docs\/data\/staging-markets-snapshot\.json$/,
@@ -165,10 +168,9 @@ describe("description lengths", () => {
 	/**
 	 * ⚠ THE KICKOFF SAID 700–800 CHARACTERS. THE CONTENT DOES NOT.
 	 *
-	 * Measured against the committed snapshot on 2026-09-07:
+	 * Measured against the committed snapshot, re-measured 2026-09-18 after
+	 * MKT-ROSTER-1 took the slate to six:
 	 *
-	 *   mumbai-bmc-pink-october-disclosure   2990
-	 *   oktoberfest-munich-beer-volume       3939
 	 *   chess-fide-tiebreak-response         3609
 	 *   bitcoin-price-50k                    3795
 	 *   math-erdos-contribution-response     3836
@@ -176,10 +178,10 @@ describe("description lengths", () => {
 	 *   yc-paper-club-response                789
 	 *   github-zugzwang-repo-stars            794
 	 *
-	 * Six of the eight carry an appended "Resolution type. …" passage the other
-	 * two do not. A test written to 700–800 would be red on arrival for those
-	 * six, and the only way to make it green is to edit founder-authored market
-	 * copy — which is a CLAUDE.md §3 refusal, not a fix.
+	 * FOUR of the six carry a long, fully-structured criterion and two do not.
+	 * A test written to 700–800 would be red on arrival for those four, and the
+	 * only way to make it green is to edit founder-authored market copy — which
+	 * is a CLAUDE.md §3 refusal, not a fix.
 	 *
 	 * So the bound below is the MEASURED one, and it is deliberately loose at the
 	 * top and tight at the bottom: the failure worth catching is a description
@@ -203,8 +205,6 @@ describe("description lengths", () => {
 		expect(
 			Object.fromEntries(SPECS.map((s) => [s.slug, s.description.length])),
 		).toEqual({
-			"mumbai-bmc-pink-october-disclosure": 2990,
-			"oktoberfest-munich-beer-volume": 3939,
 			"chess-fide-tiebreak-response": 3609,
 			"bitcoin-price-50k": 3795,
 			"math-erdos-contribution-response": 3836,
@@ -212,5 +212,120 @@ describe("description lengths", () => {
 			"yc-paper-club-response": 789,
 			"github-zugzwang-repo-stars": 794,
 		});
+	});
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ⛔⛔ THE PRODUCTION SNAPSHOT, GUARDED HERE BECAUSE NOTHING ELSE GUARDS IT.
+//
+// `docs/data/prod-markets-snapshot.json` arrived with MKT-ROSTER-1 and shipped
+// with no parse guard at all (`@code-reviewer`, HIGH). Its staging sibling has
+// had one since LIQ-1-RESTORE — the block above — and the asymmetry matters more
+// for the production file than for staging's, for two reasons:
+//
+//   1 · It is the ONLY committed copy of production's own description text.
+//       Production was built fresh on 2026-09-14, not restored from staging, so
+//       SEVEN of the eight descriptions and one title differ between the two
+//       environments (plan §A1.2, measured). Nothing else in the repository can
+//       reconstruct it.
+//   2 · It is the input to the one irreversible step in the task. A short or
+//       malformed snapshot would first surface at the production RESTORE — that
+//       is, after the wipe.
+//
+// ⚠ IT VALIDATES SHAPE DIRECTLY, NOT THROUGH THE LOADER. `loadProdContentMarkets`
+// lives on the never-merged one-time branch; this guard has to survive on `main`,
+// where that module does not exist. So it reads the committed bytes and asserts
+// the properties `createMarket` will actually require, which is what the loader
+// would have checked anyway.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("the production snapshot is well-formed", () => {
+	const PROD_PATH = fileURLToPath(
+		new URL("../../../docs/data/prod-markets-snapshot.json", import.meta.url),
+	);
+	type SnapMarket = {
+		id: string;
+		slug: string;
+		title: string;
+		description: string;
+		resolution_deadline: string;
+		media_video_url: string | null;
+	};
+	type SnapMedia = {
+		market_id: string;
+		r2_object_key: string;
+		display_order: number;
+		is_default: boolean;
+	};
+	const snap = JSON.parse(readFileSync(PROD_PATH, "utf8")) as {
+		source?: { user?: string };
+		counts?: Record<string, number>;
+		markets: SnapMarket[];
+		market_media: SnapMedia[];
+	};
+
+	it("prod-snapshot::holds exactly six markets and twelve media rows", () => {
+		// CONTROL FIRST — a parse that yielded an empty array would satisfy every
+		// loop below while looking at nothing.
+		expect(snap.markets.length).toBe(6);
+		expect(snap.market_media.length).toBe(12);
+		expect(snap.counts).toEqual({ markets: 6, pools: 6, market_media: 12 });
+	});
+
+	it("prod-snapshot::records PRODUCTION as its source, not staging", () => {
+		// ⛔ THE LOAD-BEARING LINE. Seeding production from the staging capture
+		// would replace the founder's production copy and orphan every R2 object,
+		// and every other assertion here would still pass — both files now hold
+		// six markets, so a count cannot tell them apart.
+		expect(snap.source?.user).toContain("zbvprdcyxhlguxbostdj");
+		expect(snap.source?.user).not.toContain("rwfdoqzsghqhhdapxafg");
+	});
+
+	it("prod-snapshot::ids are production's own and overlap staging's nowhere", () => {
+		const prodIds = new Set(snap.markets.map((m) => m.id));
+		const stagingIds = new Set(SPECS.map((s) => s.marketId));
+		for (const id of prodIds) expect(stagingIds.has(id)).toBe(false);
+		expect(prodIds.size).toBe(6);
+	});
+
+	it("prod-snapshot::every market is createMarket-acceptable", () => {
+		let checked = 0;
+		for (const m of snap.markets) {
+			expect(m.id, m.slug).toMatch(
+				/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+			);
+			expect(m.slug.length, m.slug).toBeGreaterThan(0);
+			expect(m.title.length, m.slug).toBeGreaterThan(0);
+			// A short description is a market nobody can adjudicate.
+			expect(m.description.length, m.slug).toBeGreaterThan(400);
+			const deadline = Date.parse(m.resolution_deadline);
+			expect(Number.isNaN(deadline), m.slug).toBe(false);
+			// Never past the conclusion freeze.
+			expect(deadline, m.slug).toBeLessThanOrEqual(
+				FREEZE_INSTANT_UTC.getTime(),
+			);
+			checked += 1;
+		}
+		expect(checked).toBe(6);
+	});
+
+	it("prod-snapshot::media keys are market-id-scoped with a uuid stem", () => {
+		let checked = 0;
+		for (const m of snap.markets) {
+			const mine = snap.market_media.filter((x) => x.market_id === m.id);
+			// ⚠ PER-MARKET, not just a file total. A snapshot with three on one
+			// market and one on another sums to twelve and is still broken.
+			expect(mine.length, m.slug).toBe(2);
+			expect(mine.filter((x) => x.is_default).length, m.slug).toBe(1);
+			for (const x of mine) {
+				// The same exact shape `createMarket` validates — an exact match,
+				// never a prefix, so `m/<id>/../<other>/x.jpg` cannot pass.
+				expect(x.r2_object_key, m.slug).toMatch(
+					new RegExp(`^m/${m.id}/[0-9a-f-]{36}\\.[a-z0-9]+$`),
+				);
+				checked += 1;
+			}
+		}
+		expect(checked).toBe(12);
 	});
 });

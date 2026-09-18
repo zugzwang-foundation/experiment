@@ -8,8 +8,6 @@ import {
 import stagingSnapshot from "../../../docs/data/staging-markets-snapshot.json";
 
 const KNOWN_SLUGS = [
-	"mumbai-bmc-pink-october-disclosure",
-	"oktoberfest-munich-beer-volume",
 	"chess-fide-tiebreak-response",
 	"bitcoin-price-50k",
 	"math-erdos-contribution-response",
@@ -19,9 +17,9 @@ const KNOWN_SLUGS = [
 ] as const;
 
 /**
- * G1 — the map is exhaustive over the eight known slugs, and an unknown slug
+ * G1 — the map is exhaustive over the six known slugs, and an unknown slug
  * fails loud rather than falling back to a silent empty bar. The
- * compile-time half (an object literal missing one of the eight keys is a
+ * compile-time half (an object literal missing one of the six keys is a
  * `tsc` error) is not itself vitest-testable — it's a property of
  * `RESOLUTION_BLOCKS`'s own `Record<KnownMarketSlug, …>` annotation, verified
  * once by deleting an entry and confirming `tsc --noEmit` reports it, then
@@ -29,7 +27,7 @@ const KNOWN_SLUGS = [
  * covers the runtime half.
  */
 describe("resolution-block-data — G1, exhaustive + fails loud on an unknown slug", () => {
-	it("resolution-block-data::G1-all-eight-known-slugs-resolve", () => {
+	it("resolution-block-data::G1-all-six-known-slugs-resolve", () => {
 		for (const slug of KNOWN_SLUGS) {
 			expect(isKnownMarketSlug(slug)).toBe(true);
 			const blocks = getResolutionBlocks(slug);
@@ -55,11 +53,11 @@ describe("resolution-block-data — G1, exhaustive + fails loud on an unknown sl
 		expect(() => getResolutionBlocks("resolver-cards-fixture-market")).toThrow(
 			/no resolution-block data/,
 		);
-		expect(() => getResolutionBlocks("some-future-ninth-market")).toThrow();
+		expect(() => getResolutionBlocks("some-future-seventh-market")).toThrow();
 	});
 
-	it("resolution-block-data::exactly-eight-entries-no-more-no-less", () => {
-		// ⛔ Guards against a ninth slug being silently added (or one dropped)
+	it("resolution-block-data::exactly-six-entries-no-more-no-less", () => {
+		// ⛔ Guards against a seventh slug being silently added (or one dropped)
 		// without anyone updating this test's own KNOWN_SLUGS list.
 		expect(Object.keys(RESOLUTION_BLOCKS).sort()).toEqual(
 			[...KNOWN_SLUGS].sort(),
@@ -73,7 +71,7 @@ describe("resolution-block-data — G1, exhaustive + fails loud on an unknown sl
 		// compares against `docs/data/staging-markets-snapshot.json` instead —
 		// zero IO (the file is committed, refreshed by S1/S5 of this same
 		// branch), and it's the one comparison that can catch the case that can
-		// actually occur: a real ninth market landing in the live DB with no
+		// actually occur: a real seventh market landing in the live DB with no
 		// corresponding map entry.
 		const liveSlugs = stagingSnapshot.markets.map((m) => m.slug).sort();
 		expect(Object.keys(RESOLUTION_BLOCKS).sort()).toEqual(liveSlugs);
@@ -83,12 +81,18 @@ describe("resolution-block-data — G1, exhaustive + fails loud on an unknown sl
 		// ⛔⛔ CLOSES duplicates `markets.resolution_deadline` with no foreign-key
 		// or shared-source mechanism keeping the two in sync — this file's own
 		// docblock says a wrong value here "would tell a participant they can
-		// still trade for another month" (the Oktoberfest exception). This
-		// assertion is the sync mechanism: it fails the moment the map and the
-		// live column disagree, for any of the eight markets.
+		// still trade for another month". This assertion is the sync mechanism:
+		// it fails the moment the map and the live column disagree, for any of
+		// the six markets.
+		// ⚠⚠ MKT-ROSTER-1 MAKES THIS THE WHOLE OF G3. The market that closed a
+		// month early was one of the two removed, so the map now holds a single
+		// date; the literal-date test further down no longer has an exception to
+		// distinguish and is a plain pin. THIS test is the one that still derives
+		// its expectation from the live column, so it is the only one that can
+		// catch a deadline moving. Do not delete it as a duplicate of that one.
 		// ⚠⚠ BLOCK-4 — THE TIME HALF OF THIS GUARD IS RETIRED, THE DATE HALF IS
 		// NOT, AND THE ASYMMETRY IS DELIBERATE. `line2` used to carry the UTC
-		// time ("23:45Z" / "21:59Z") and was asserted against the same deadline;
+		// time ("23:45Z") and was asserted against the same deadline;
 		// every `line2` in the map is now `null` (§1). What made this guard worth
 		// having was never the time — it was the DATE, which is the field that
 		// can tell a participant the wrong month. That half is unchanged and is
@@ -108,28 +112,28 @@ describe("resolution-block-data — G1, exhaustive + fails loud on an unknown sl
 		// ⛔ NON-VACUITY — the loop is over the snapshot, and an empty or
 		// truncated snapshot file would make every assertion above run zero
 		// times. Pin the count the rest of this file already expects.
-		expect(stagingSnapshot.markets.length).toBe(8);
+		expect(stagingSnapshot.markets.length).toBe(6);
 	});
 });
 
 /**
  * Content spot-check against the ratified register — doubles as regression
- * coverage for the whole map (RF-2), and specifically pins the THREE rows
- * (oktoberfest, bitcoin, github) whose RESOLUTION text intentionally
- * diverges from the "X" pattern (see the data file's own docblock) so a
- * future "cleanup" can't silently normalize them away. An earlier version of
- * this comment said "two rows" — @code-reviewer caught that github is a
- * third, and the test two lines down was already correctly named
- * `...-for-the-other-three`, so the miscount was in the prose, not the code.
+ * coverage for the whole map (RF-2), and specifically pins the TWO rows
+ * (bitcoin, github) whose RESOLUTION text intentionally diverges from the "X"
+ * pattern (see the data file's own docblock) so a future "cleanup" can't
+ * silently normalize them away.
+ * ⚠ There were THREE until MKT-ROSTER-1; the third was a removed market. An
+ * earlier version of this comment said "two rows" for a DIFFERENT reason —
+ * @code-reviewer caught that github had been missed — and the number is back at
+ * two by subtraction rather than by that miscount returning.
  */
 describe("resolution-block-data — content matches the ratified register", () => {
-	it("resolution-block-data::RESOLUTION-is-Response-on-X-for-the-five-account-watching-markets", () => {
+	it("resolution-block-data::RESOLUTION-is-Response-on-X-for-the-four-account-watching-markets", () => {
 		// ⚠⚠ BLOCK-3 · MKT-SLATE v1.1 — "X" → "Response on X". RESOLUTION
 		// redefined from "the surface" to "the thing read to settle the
-		// market"; for these five the thing is a response POST, not the bare
+		// market"; for these four the thing is a response POST, not the bare
 		// platform name. See the data file's own docblock.
 		for (const slug of [
-			"mumbai-bmc-pink-october-disclosure",
 			"chess-fide-tiebreak-response",
 			"math-erdos-contribution-response",
 			"claude-bundle-response",
@@ -140,51 +144,25 @@ describe("resolution-block-data — content matches the ratified register", () =
 		}
 	});
 
-	it("resolution-block-data::RESOLUTION-names-the-institution-for-the-other-three", () => {
-		// ⚠ BLOCK-2 — the literal surface "oktoberfest.de", not the brand name
-		// "Oktoberfest" BLOCK-1 shipped. Founder-ruled (AMEND-1 item 15); see
-		// this file's own docblock. RESOLVER keeps "Oktoberfest" — only
-		// RESOLUTION changed.
-		// ⚠⚠ BLOCK-3 · MKT-SLATE v1.1 gave oktoberfest's RESOLUTION a line2
-		// ("report" — the THING read, not just the surface it's published at);
-		// BLOCK-4 §1 takes it back with every other second line. `line1` is
-		// UNCHANGED across both tasks and is the half this test is really for.
-		// ⛔ THE LOWERCASE `o` IS THE DATA'S JOB. `oktoberfest.de` is a domain;
-		// a CSS `capitalize` would render it `Oktoberfest.de`. Pinned here at the
-		// data level and again at render level in `resolver-cards.test.tsx`.
-		expect(
-			RESOLUTION_BLOCKS["oktoberfest-munich-beer-volume"].resolution,
-		).toEqual({
-			line1: "oktoberfest.de",
-			line2: null,
-			href: null,
-			fontSize: 13,
-		});
+	it("resolution-block-data::RESOLUTION-names-the-institution-for-the-other-two", () => {
+		// ⚠ These two name a PUBLISHER rather than a post: the thing read to
+		// settle them is a published series and a star count, so RESOLUTION and
+		// RESOLVER coincide (see the data file's own docblock) and a "cleanup"
+		// that normalised them to "Response on X" would be wrong on both.
+		// ⚠⚠ MKT-ROSTER-1 — A THIRD ROW STOOD HERE AND WENT WITH ITS MARKET. It
+		// carried a lowercase DOMAIN as its RESOLUTION value, which is why this
+		// test and its render-level twin pinned case so hard: a CSS `capitalize`
+		// would have rendered a different domain. That specific hazard is gone
+		// with the value, but the case rule is NOT retired — "Response on X"
+		// becomes "Response On X" under `capitalize`, on four markets, so the
+		// rule still has a subject and the render-level guard was re-homed onto
+		// it rather than deleted.
 		expect(RESOLUTION_BLOCKS["bitcoin-price-50k"].resolution.line1).toBe(
 			"CoinMarketCap",
 		);
 		expect(
 			RESOLUTION_BLOCKS["github-zugzwang-repo-stars"].resolution.line1,
 		).toBe("GitHub");
-	});
-
-	it("resolution-block-data::OKT-01-RESOLVER-loses-management-and-keeps-its-href", () => {
-		// ⚠⚠ REVERSED IN PLACE, NOT DELETED (§8 O-5). BLOCK-3 shipped this row as
-		// "Oktoberfest" / "management" and this test was named
-		// `...-gains-management-as-line2`; BLOCK-4 §1 rules every second line off
-		// the surface, so the same row is now single-line. Kept as a positive
-		// assertion rather than dropped, because it is the guard that stops the
-		// removed line reappearing from an older fixture — the exact way
-		// `bitcoin-price-50k`'s "Low" could have come back at BLOCK-3.
-		// ⛔ `href` IS THE HALF THAT DID NOT MOVE, across both tasks.
-		expect(
-			RESOLUTION_BLOCKS["oktoberfest-munich-beer-volume"].resolver,
-		).toEqual({
-			line1: "Oktoberfest",
-			line2: null,
-			href: "https://www.oktoberfest.de/en",
-			fontSize: 14,
-		});
 	});
 
 	it("resolution-block-data::BTC-01-RESOLVER-no-longer-carries-a-Low-subvalue", () => {
@@ -243,26 +221,31 @@ describe("resolution-block-data — content matches the ratified register", () =
 		expect(resolver.href).not.toBe("https://github.com/");
 	});
 
-	it("resolution-block-data::CLOSES-is-4-Oct-for-oktoberfest-and-5-Nov-for-the-rest", () => {
-		// ⛔⛔ G3. BLOCK-4 §1 drops the time line from all eight; the DATES are
-		// untouched and are the whole point of this test. A block reading
-		// "5 Nov 2026" on oktoberfest would tell a participant they can trade for
-		// another month after the festival has ended.
-		expect(RESOLUTION_BLOCKS["oktoberfest-munich-beer-volume"].closes).toEqual({
-			line1: "4 Oct 2026",
-			line2: null,
-			href: null,
-			fontSize: 14,
-		});
+	it("resolution-block-data::CLOSES-is-5-Nov-on-every-market", () => {
+		// ⛔⛔ G3, AND IT HAS LOST ITS EXCEPTION. This test existed because ONE
+		// market closed a month before the rest, and a block reading "5 Nov 2026"
+		// on it would have told a participant they could still trade for another
+		// month. MKT-ROSTER-1 removed that market, so every remaining CLOSES is
+		// the same date and this is now a literal pin rather than a
+		// distinguishing test.
+		// ⚠ THAT MAKES IT THE WEAKER HALF OF G3, NOT THE WHOLE OF IT. The half
+		// with teeth is `CLOSES-matches-the-LIVE-resolution_deadline-for-every-market`
+		// above, which derives its expectation from the snapshot instead of
+		// hardcoding it — that one still catches a deadline that moves. Keep both:
+		// this one catches a map edited away from the live column in the same
+		// commit as the snapshot, which the derived test cannot see.
+		let checked = 0;
 		for (const slug of KNOWN_SLUGS) {
-			if (slug === "oktoberfest-munich-beer-volume") continue;
 			expect(RESOLUTION_BLOCKS[slug].closes).toEqual({
 				line1: "5 Nov 2026",
 				line2: null,
 				href: null,
 				fontSize: 14,
 			});
+			checked += 1;
 		}
+		// ⛔ NON-VACUITY — an empty KNOWN_SLUGS would satisfy the loop above.
+		expect(checked).toBe(6);
 	});
 
 	it("resolution-block-data::BLOCK-4-no-entry-on-any-market-carries-a-line2", () => {
@@ -272,11 +255,11 @@ describe("resolution-block-data — content matches the ratified register", () =
 		// from something other than `line2`, and that one cannot see a map entry
 		// whose second line is restored but happens not to be rendered by the
 		// fixture a given test picked.
-		// ⚠ THIS IS THE GUARD THE §1 BRIEF IS MOST AT RISK FROM: four separate
-		// second lines were removed (two on oktoberfest, one on github, one on
-		// every CLOSES), and the cheapest way to reintroduce any of them is to
-		// copy an older map entry forward. Sweeping all 32 catches that wherever
-		// it lands, not only on the rows this file names individually.
+		// ⚠ THIS IS THE GUARD THE §1 BRIEF IS MOST AT RISK FROM: BLOCK-4 removed
+		// four separate second lines, and the cheapest way to reintroduce any of
+		// them is to copy an older map entry forward. Sweeping every block on
+		// every market catches that wherever it lands, not only on the rows this
+		// file names individually.
 		let checked = 0;
 		for (const slug of KNOWN_SLUGS) {
 			for (const key of [
@@ -289,20 +272,22 @@ describe("resolution-block-data — content matches the ratified register", () =
 				checked += 1;
 			}
 		}
-		// ⛔ NON-VACUITY — eight markets × four blocks. A loop that ran over an
+		// ⛔ NON-VACUITY — six markets × four blocks. A loop that ran over an
 		// empty map would satisfy every assertion above.
-		expect(checked).toBe(32);
+		expect(checked).toBe(24);
 	});
 
 	it("resolution-block-data::FLAVOUR-is-sentence-case-IN-THE-DATA-and-href-is-null", () => {
 		// ⚠⚠ BLOCK-3 — lowercase → sentence case, and it happens HERE, never via
 		// a CSS `capitalize` on the rendered value. `capitalize` transforms the
-		// first letter of every WORD, and the case that makes it unsafe is now
-		// RESOLUTION's `oktoberfest.de` rather than the two-word value this
-		// comment used to cite ("oktoberfest.de report", whose second line
-		// BLOCK-4 §1 removed): `capitalize` renders it `Oktoberfest.de`, which is
-		// a DIFFERENT DOMAIN. The data is the only place this can be gotten right
-		// per-string, and the risk got sharper rather than softer.
+		// first letter of every WORD.
+		// ⚠⚠ MKT-ROSTER-1 MOVED THE WORKED EXAMPLE AND NOT THE RULE. The value
+		// this comment used to cite was a lowercase domain on a market that has
+		// been removed — `capitalize` would have rendered a DIFFERENT DOMAIN. The
+		// surviving unsafe value is RESOLUTION's `"Response on X"`, which
+		// `capitalize` renders `"Response On X"`, on four of the six markets. The
+		// hazard is milder and it is not gone, so the data is still the only
+		// place this can be gotten right per-string.
 		// ⚠⚠ BLOCK-4 §1 — TWO FLAVOUR CHANGES, founder-ruled, and they are the
 		// only values in this map that are neither a name, a date nor a URL:
 		// `claude-bundle-response` "Suggestion" → "Feedback" (the criterion
@@ -310,8 +295,6 @@ describe("resolution-block-data — content matches the ratified register", () =
 		// rejections it resolves YES on), `bitcoin-price-50k` "Barrier" →
 		// "Sentiment" (named the $50k threshold; now names the market).
 		const expected: Record<(typeof KNOWN_SLUGS)[number], string> = {
-			"mumbai-bmc-pink-october-disclosure": "Pressure",
-			"oktoberfest-munich-beer-volume": "Consumption",
 			"chess-fide-tiebreak-response": "Petition",
 			"bitcoin-price-50k": "Sentiment",
 			"math-erdos-contribution-response": "Innovation",

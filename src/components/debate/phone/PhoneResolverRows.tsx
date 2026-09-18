@@ -29,7 +29,7 @@ import type { DebateMarketHeader } from "../types";
  * SERVER component, and `page.tsx` passes `<PhoneDetails …/>` as an element prop
  * of a client component — which React renders EAGERLY on every request, at every
  * width, whether or not the sheet is ever opened. So on a market outside
- * BLOCK-1's eight this now also throws server-side once per request to
+ * BLOCK-1's six this now also throws server-side once per request to
  * `/m/<slug>`, unauthenticated and GET-triggerable, and again every 15 s per open
  * tab via `DebatePoll`. The consequence is Sentry quota rather than state
  * corruption — the catch still holds and the row still degrades — but the
@@ -38,7 +38,7 @@ import type { DebateMarketHeader } from "../types";
  *
  * ⛔ THE THROW IS CAUGHT HERE FOR THE SAME REASON IT IS CAUGHT THERE, and this
  * is the part that must not be simplified away. `getResolutionBlocks` throws for
- * any slug outside BLOCK-1's eight. A joint @code-reviewer/@security-auditor
+ * any slug outside BLOCK-1's six. A joint @code-reviewer/@security-auditor
  * finding on `ResolverCards`' first cut was that letting it propagate took the
  * WHOLE `/m/[slug]` route down — unauthenticated, GET-triggerable, repeatably —
  * for a failure that only needs one row to degrade. A second component reading
@@ -89,10 +89,10 @@ export function PhoneResolverRows({ market }: { market: DebateMarketHeader }) {
 								/* ⛔⛔ `target="_blank" rel="noopener noreferrer"`, MATCHING THE
 								   DESKTOP TWIN (`ResolverCards.tsx:501-510`) — and this shipped
 								   as a bare `<a href>` on the belief that every href in the map
-								   was `null`. It is not: SEVEN of the eight markets carry a live
-								   external RESOLVER href (`https://x.com/mybmc`,
-								   `https://coinmarketcap.com/...`, `https://www.oktoberfest.de/en`
-								   …). Caught by `@code-reviewer`.
+								   was `null`. It is not: EVERY market carries a live external
+								   RESOLVER href (`https://x.com/FIDE_chess`,
+								   `https://coinmarketcap.com/...`,
+								   `https://github.com/...` …). Caught by `@code-reviewer`.
 								   ⚠ The cost of the belief was not tabnabbing — with no
 								   `target="_blank"` there is no `window.opener` to exploit. It
 								   was that the phone leaked a `Referer` the desktop withholds,

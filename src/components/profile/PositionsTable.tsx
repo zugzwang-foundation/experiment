@@ -73,9 +73,9 @@ const ROW_WINDOW = 3;
  * segment of the title is the only source, and the brief's fallback is the
  * path — recorded here as it asks.
  *
- * The eight content markets are all `"<Tag> · <Question>"` — `Mumbai ·`,
- * `Oktoberfest ·`, `Chess ·`, `Bitcoin ·`, `Math ·`, `Claude ·`,
- * `YCombinator ·`, `GitHub ·` (`docs/data/staging-markets-snapshot.json`).
+ * The six content markets are all `"<Tag> · <Question>"` — `Chess ·`,
+ * `Bitcoin ·`, `Math ·`, `Claude ·`, `YCombinator ·`, `GitHub ·`
+ * (`docs/data/staging-markets-snapshot.json`).
  *
  * ⚠ `rest` KEEPS THE SEPARATOR, so `tag + rest === title` for every input with
  * no exception. That identity is the whole contract: the caller renders both

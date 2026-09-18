@@ -295,36 +295,50 @@ describe("BLOCK-1 — G2, every value line is real content, never an empty bar",
 		}
 	});
 
-	it("resolver-cards::G3-oktoberfest-closes-4-Oct-not-5-Nov-slate-wide", () => {
-		const { container } = render(
-			<ResolverCards
-				market={marketFixture("oktoberfest-munich-beer-volume")}
-			/>,
-		);
-		expect(
-			container.querySelector('[data-testid="resolution-block-value-closes"]')
-				?.textContent,
-		).toBe("4 Oct 2026");
-		// ⚠⚠ BLOCK-4 §1 — the time line ("21:59Z") is gone from every market, so
-		// this asserts the subvalue's ABSENCE where it used to assert its text.
-		// The DATE is what G3 is about and it is untouched: oktoberfest's trading
-		// close is a month before everything else, and a block reading 5 Nov here
-		// locks a participant out early.
-		expect(
-			container.querySelector(
-				'[data-testid="resolution-block-subvalue-closes"]',
-			),
-		).toBeNull();
-
-		// Positive control: a different market on the SAME test run reads 5 Nov,
-		// proving the assertion above isn't vacuously true of every market.
-		const { container: other } = render(
-			<ResolverCards market={marketFixture("bitcoin-price-50k")} />,
-		);
-		expect(
-			other.querySelector('[data-testid="resolution-block-value-closes"]')
-				?.textContent,
-		).toBe("5 Nov 2026");
+	it("resolver-cards::G3-CLOSES-renders-the-MAP-date-on-every-market", () => {
+		// ⚠⚠ MKT-ROSTER-1 TOOK THIS TEST'S SUBJECT. It was named for the one
+		// market that closed 4 Oct rather than 5 Nov, and it asserted that the
+		// render did not flatten that exception to the slate-wide date — a block
+		// reading 5 Nov there would have locked a participant out early. That
+		// market was removed, so there is no longer a second date to confuse.
+		// ⛔ RE-AIMED RATHER THAN RETIRED — and the honest accounting is that ONE
+		// half of the re-aim is a strengthening and the other is not yet.
+		//   · STRONGER, today: the sweep. One market became all six, with a
+		//     non-vacuity count, so a component that rendered the date correctly
+		//     on one market and wrongly on another can no longer pass.
+		//   · NOT stronger, today: the DERIVATION. Every `closes.line1` in the map
+		//     is now the same string, so reading it out of the map is byte-identical
+		//     to hardcoding "5 Nov 2026" and cannot distinguish a component that
+		//     ignores the map from one that reads it. It buys something only when a
+		//     second date exists again.
+		// ⚠ An earlier version of this comment claimed the derivation was
+		// "strictly stronger", which contradicted this test's own data-level twin
+		// in the same commit — `resolution-block-data.test.ts` correctly calls the
+		// loss "THE WEAKER HALF OF G3". Two self-assessments of one loss disagreeing
+		// is worse than either being wrong (`@code-reviewer`).
+		let checked = 0;
+		for (const slug of Object.keys(RESOLUTION_BLOCKS) as Array<
+			keyof typeof RESOLUTION_BLOCKS
+		>) {
+			const { container, unmount } = render(
+				<ResolverCards market={marketFixture(slug)} />,
+			);
+			expect(
+				container.querySelector('[data-testid="resolution-block-value-closes"]')
+					?.textContent,
+			).toBe(RESOLUTION_BLOCKS[slug].closes.line1);
+			// ⚠⚠ BLOCK-4 §1 — the time line is gone from every market, so this
+			// asserts the subvalue's ABSENCE where it used to assert its text.
+			expect(
+				container.querySelector(
+					'[data-testid="resolution-block-subvalue-closes"]',
+				),
+			).toBeNull();
+			checked += 1;
+			unmount();
+		}
+		// ⛔ NON-VACUITY — an empty map would satisfy every assertion above.
+		expect(checked).toBe(6);
 	});
 
 	it("resolver-cards::G4-no-rendered-anchor-ever-has-an-empty-hash-or-placeholder-href", () => {
@@ -418,7 +432,7 @@ describe("BLOCK-1 — G2, every value line is real content, never an empty bar",
 		// re-asserted here. What changed is `ResolverCards`, the caller: it now
 		// catches that throw, captures it once, and renders nothing.
 		vi.mocked(captureException).mockClear();
-		const unknown = { ...BASE, slug: "not-one-of-the-eight" };
+		const unknown = { ...BASE, slug: "not-one-of-the-six" };
 		const { container } = render(<ResolverCards market={unknown} />);
 
 		// ⛔ NOTHING renders — no row, no partial chrome, no empty bar (the
@@ -439,7 +453,7 @@ describe("BLOCK-1 — G2, every value line is real content, never an empty bar",
 		const captured = vi.mocked(captureException).mock.calls[0]?.[0];
 		expect(captured).toBeInstanceOf(Error);
 		expect((captured as Error).message).toMatch(
-			/no resolution-block data for market slug "not-one-of-the-eight"/,
+			/no resolution-block data for market slug "not-one-of-the-six"/,
 		);
 	});
 
@@ -486,10 +500,9 @@ describe("BLOCK-1 — R-12 reversed for RESOLVER only; G7/G8 on the split", () =
 
 	it("resolver-cards::G7-RESOLVER-is-ONE-anchor-wrapping-glyph-label-AND-value", () => {
 		// ⚠⚠ THE FIXTURE HAS MOVED TWICE AND THE SUBJECT NARROWED ONCE. BLOCK-3
-		// moved it from bitcoin to oktoberfest because §4c dropped bitcoin's
-		// RESOLVER subvalue ("Low") and oktoberfest had just gained one
-		// ("management"), making it the only market whose RESOLVER carried both
-		// an href and a subvalue. BLOCK-4 §1 removes every second line on every
+		// moved it off bitcoin because §4c dropped bitcoin's RESOLVER subvalue
+		// ("Low") and another market had just gained one, making that one the
+		// only market whose RESOLVER carried both an href and a subvalue. BLOCK-4 §1 removes every second line on every
 		// market, so NO fixture can exercise the subvalue-inside-the-anchor
 		// branch — it moves back to PRIMARY_MARKET and asserts the three
 		// descendants that still exist.
@@ -713,38 +726,40 @@ describe("BLOCK-3 §3 — value/subvalue read ink, sized per block from the map"
 });
 
 /**
- * BLOCK-3 §5 — the render-level half of the FLAVOUR sentence-case guard.
+ * BLOCK-3 §5 — the render-level half of the sentence-case guard.
  * `resolution-block-data.test.ts` already proves the DATA is sentence-cased;
- * this proves nothing at RENDER TIME undoes that — the specific regression
- * the data file's own docblock warns against is a future `capitalize` class
- * on the value span, which would turn "oktoberfest.de report" into
- * "Oktoberfest.de Report" (capitalizing the second word, exactly what
- * sentence case forbids) without touching the data at all.
+ * this proves nothing at RENDER TIME undoes that — the specific regression the
+ * data file's own docblock warns against is a future `capitalize` class on the
+ * value span, which uppercases the first letter of EVERY WORD.
+ *
+ * ⚠⚠ MKT-ROSTER-1 RE-HOMED THIS GUARD AND DID NOT RETIRE IT. Its subject was a
+ * lowercase DOMAIN carried as a removed market's RESOLUTION value, where
+ * `capitalize` would have printed a DIFFERENT DOMAIN as the market's resolving
+ * source. That value is gone with its market — but the hazard is not, because
+ * `"Response on X"` renders `"Response On X"` under the same class, on FOUR of
+ * the six remaining markets. Milder than a wrong domain, still wrong, and still
+ * invisible to any assertion over `textContent`.
+ * ⛔ The alternative re-home the plan suggested — `coinmarketcap.com` — does NOT
+ * work, and it is worth saying why so nobody tries it again: that string is an
+ * `href`, never rendered text, and the value that IS rendered for that market is
+ * `"CoinMarketCap"`, which `capitalize` leaves byte-identical. A guard aimed
+ * there would have been green forever and proved nothing.
  */
-describe("BLOCK-3 §5 — FLAVOUR/oktoberfest sentence case survives to the DOM", () => {
-	it("resolver-cards::oktoberfest-de-renders-a-lowercase-o-in-the-DOM", () => {
-		// ⚠⚠ RETARGETED AT BLOCK-4 §1, AND THE GUARD GOT SHARPER RATHER THAN
-		// WEAKER. This used to read the SUBVALUE line ("report", whose lowercase
-		// `r` a `capitalize` class would have raised); §1 removes that line, so
-		// the target moves up to the VALUE line — `oktoberfest.de`, where the same
-		// class would render `Oktoberfest.de`. That is not a styling wobble, it is
-		// a DIFFERENT DOMAIN printed as the market's resolving source, which is
-		// the reason the §1 brief rules sentence case into the data and out of CSS
-		// in the first place.
+describe("BLOCK-3 §5 — RESOLUTION sentence case survives to the DOM", () => {
+	it("resolver-cards::Response-on-X-renders-a-lowercase-on-in-the-DOM", () => {
 		const { container } = render(
-			<ResolverCards
-				market={marketFixture("oktoberfest-munich-beer-volume")}
-			/>,
+			<ResolverCards market={marketFixture("chess-fide-tiebreak-response")} />,
 		);
 		const value = container.querySelector(
 			'[data-testid="resolution-block-value-resolution"]',
 		);
-		expect(value?.textContent).toBe("oktoberfest.de");
-		expect(value?.textContent?.[0]).toBe("o");
+		// The subject: a multi-word value whose second word is lowercase.
+		expect(value?.textContent).toBe("Response on X");
+		expect(value?.textContent?.split(" ")[1]).toBe("on");
 		// ⛔⛔ THE STRING CHECK ABOVE CANNOT CATCH THE REGRESSION THIS TEST IS
 		// FOR. CSS `text-transform` does not touch the DOM text node, so
-		// `textContent` stays "oktoberfest.de" while the participant reads
-		// "Oktoberfest.de". The class-list check is the one that fires.
+		// `textContent` stays "Response on X" while the participant reads
+		// "Response On X". The class-list check is the one that fires.
 		const cls = (value?.getAttribute("class") ?? "").split(/\s+/);
 		expect(cls).not.toContain("capitalize");
 		expect(cls).not.toContain("uppercase");
@@ -811,7 +826,7 @@ describe("BLOCK-4 §1 — no second line ships, and the two-line path stays aliv
 			}
 			unmount();
 		}
-		expect(checked).toBe(32);
+		expect(checked).toBe(24);
 	});
 
 	it("resolver-cards::a-SYNTHETIC-two-line-entry-still-renders-BOTH-lines", async () => {
@@ -839,8 +854,8 @@ describe("BLOCK-4 §1 — no second line ships, and the two-line path stays aliv
 					...entry("SYNTHETIC-RESOLVER-1", "SYNTHETIC-RESOLVER-2"),
 					// ⛔ AN href TOO — the branch that matters is a subvalue rendered
 					// INSIDE the anchor rather than beside it, which is the half G7
-					// used to cover with oktoberfest's "management" line and can no
-					// longer reach.
+					// used to cover with a since-removed market's RESOLVER subvalue
+					// and can no longer reach.
 					href: "https://example.invalid/synthetic",
 				},
 				closes: entry("SYNTHETIC-CLOSES", null),
@@ -944,7 +959,7 @@ describe("BLOCK-5b · G-d — every block on every market renders a real glyph i
 	// and decodes nothing, so `naturalWidth` here is 0 for every image no matter
 	// what — asserting it non-zero in this environment would be asserting a
 	// constant, and would keep passing over a `src` that 404s. So the guarantee
-	// is split: this file proves all 32 images render with the RIGHT `src`, and
+	// is split: this file proves all 24 images render with the RIGHT `src`, and
 	// that each `src` resolves to a file on disk whose PNG header declares
 	// non-zero dimensions (decoded from the real shipped bytes); the browser's
 	// own decode is measured against the deployed build at close.
@@ -952,7 +967,7 @@ describe("BLOCK-5b · G-d — every block on every market renders a real glyph i
 		RESOLUTION_BLOCKS,
 	) as (keyof typeof RESOLUTION_BLOCKS)[];
 
-	it("finds EXACTLY 32 glyph images across the eight markets — 8 x 4", () => {
+	it("finds EXACTLY 24 glyph images across the six markets — 6 x 4", () => {
 		// ⛔⛔ THE POSITIVE CONTROL, AND IT COMES FIRST ON PURPOSE. Every assertion
 		// below iterates a NodeList; a selector that matched nothing would make all
 		// of them pass vacuously and report "0 broken" as success. The count is
@@ -968,11 +983,11 @@ describe("BLOCK-5b · G-d — every block on every market renders a real glyph i
 			).length;
 			cleanup();
 		}
-		expect(slugs).toHaveLength(8);
-		expect(total).toBe(32);
+		expect(slugs).toHaveLength(6);
+		expect(total).toBe(24);
 	});
 
-	it("gives every one of the 32 a src that resolves to a non-empty 512x512 PNG", () => {
+	it("gives every one of the 24 a src that resolves to a non-empty 512x512 PNG", () => {
 		const seen = new Set<string>();
 		let checked = 0;
 		for (const slug of slugs) {
@@ -998,10 +1013,10 @@ describe("BLOCK-5b · G-d — every block on every market renders a real glyph i
 			}
 			cleanup();
 		}
-		expect(checked).toBe(32);
-		// 32 slots, 13 distinct assets — RESOLUTION/RESOLVER share, CLOSES is one
-		// for all eight, and five markets share `response-on-x`.
-		expect(seen.size).toBe(13);
+		expect(checked).toBe(24);
+		// 24 slots, 10 distinct assets — RESOLUTION/RESOLVER share, CLOSES is one
+		// for all six, and four markets share `response-on-x`.
+		expect(seen.size).toBe(10);
 	});
 
 	it("puts the image INSIDE the aria-hidden span that carries bg-n1", () => {
@@ -1049,7 +1064,7 @@ describe("BLOCK-5b · G-d — every block on every market renders a real glyph i
 		// half-rendered state with chrome but no glyph.
 		vi.mocked(captureException).mockClear();
 		const { container } = render(
-			<ResolverCards market={{ ...BASE, slug: "not-one-of-the-eight" }} />,
+			<ResolverCards market={{ ...BASE, slug: "not-one-of-the-six" }} />,
 		);
 		expect(
 			container.querySelectorAll(

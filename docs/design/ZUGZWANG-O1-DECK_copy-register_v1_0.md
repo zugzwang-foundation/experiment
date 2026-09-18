@@ -2,13 +2,26 @@
 
 | | |
 |---|---|
-| **Doc** | `ZUGZWANG-O1-DECK_copy-register_v1_0.md` · web-authored · founder-ratified 2026-08-18 · amended 2026-08-18 (O1-DECK-R2) |
+| **Doc** | `ZUGZWANG-O1-DECK_copy-register_v1_0.md` · web-authored · founder-ratified 2026-08-18 · amended 2026-08-18 (O1-DECK-R2) · amended 2026-09-18 (MKT-ROSTER-1, **D-49**) |
 | **Status** | **RATIFIED.** This is the string source of record for the onboarding deck |
 | **Supersedes** | The provisional six-card copy in `docs/design/mockups/DESIGN_W2_2_onboarding-deck_mockup-v0_1.html` (`var CARDS`, lines 231–243, md5 `420c5e800a3dbe3de57662f0d8f6c102`), self-labelled *"provisional copy"* |
 | **Consumers** | The O1 build (component strings) · SPEC.1 §21.6 amendment · `DESIGN-copy-register-consolidated.md` |
 
 > **Precedence.** SPEC.1 / SPEC.2 > ADR > this document. Where a card asserts a
 > product fact, the spec wins and this file is amended — never the reverse.
+>
+> ⚠ **Amended 2026-09-18 under that rule.** D-49 (`docs/decisions/RECORD-v2.8-amendment.md`)
+> removed two markets from the roster, so Card 2's `8 markets` — asserted twice —
+> became a false product fact. It now reads `6 markets`. Nothing else in this
+> register changed, and the wording is otherwise untouched: only the count moved,
+> because only the count was falsified.
+>
+> ⛔ The tripwire in `tests/unit/onboarding/copy-drift.test.ts` is what surfaced
+> this. Its own docblock calls it *"a tripwire, not a verification"* — there is no
+> machine-readable market slate to assert against — and its stated purpose is to
+> make a slate change *"force a deliberate edit to a test that says why, instead
+> of leaving the card to drift silently."* It did exactly that: the edit to the
+> component reddened it, and this amendment is the deliberate edit it demanded.
 
 ---
 
@@ -165,7 +178,7 @@ You’re {pseudonym}
 
 **Subtext:**
 ```
-This pseudonym is your identity for the length of the experiment. The experiment has 8 markets with unique flavours and defined resolutions. The experiment runs from 15th September 2026 to 5th November 2026. Dharma is your betting instrument for raising arguments in any of the 8 markets.
+This pseudonym is your identity for the length of the experiment. The experiment has 6 markets with unique flavours and defined resolutions. The experiment runs from 15th September 2026 to 5th November 2026. Dharma is your betting instrument for raising arguments in any of the 6 markets.
 ```
 
 > ⚠ **This card carries two hard dates and a market count.** `15th September 2026`,
