@@ -301,12 +301,21 @@ describe("BLOCK-1 — G2, every value line is real content, never an empty bar",
 		// render did not flatten that exception to the slate-wide date — a block
 		// reading 5 Nov there would have locked a participant out early. That
 		// market was removed, so there is no longer a second date to confuse.
-		// ⛔ RE-AIMED RATHER THAN RETIRED, AND AT SOMETHING STRICTLY STRONGER. It
-		// now reads the expectation OUT OF THE MAP for every market instead of
-		// hardcoding one date and spot-checking a second. A hardcoded "5 Nov 2026"
-		// here would pass against a component that ignored the map entirely and
-		// printed a constant; deriving it cannot. If a per-market date is ever
-		// ruled again, this test covers it on the day it lands with no edit.
+		// ⛔ RE-AIMED RATHER THAN RETIRED — and the honest accounting is that ONE
+		// half of the re-aim is a strengthening and the other is not yet.
+		//   · STRONGER, today: the sweep. One market became all six, with a
+		//     non-vacuity count, so a component that rendered the date correctly
+		//     on one market and wrongly on another can no longer pass.
+		//   · NOT stronger, today: the DERIVATION. Every `closes.line1` in the map
+		//     is now the same string, so reading it out of the map is byte-identical
+		//     to hardcoding "5 Nov 2026" and cannot distinguish a component that
+		//     ignores the map from one that reads it. It buys something only when a
+		//     second date exists again.
+		// ⚠ An earlier version of this comment claimed the derivation was
+		// "strictly stronger", which contradicted this test's own data-level twin
+		// in the same commit — `resolution-block-data.test.ts` correctly calls the
+		// loss "THE WEAKER HALF OF G3". Two self-assessments of one loss disagreeing
+		// is worse than either being wrong (`@code-reviewer`).
 		let checked = 0;
 		for (const slug of Object.keys(RESOLUTION_BLOCKS) as Array<
 			keyof typeof RESOLUTION_BLOCKS
@@ -423,7 +432,7 @@ describe("BLOCK-1 — G2, every value line is real content, never an empty bar",
 		// re-asserted here. What changed is `ResolverCards`, the caller: it now
 		// catches that throw, captures it once, and renders nothing.
 		vi.mocked(captureException).mockClear();
-		const unknown = { ...BASE, slug: "not-one-of-the-eight" };
+		const unknown = { ...BASE, slug: "not-one-of-the-six" };
 		const { container } = render(<ResolverCards market={unknown} />);
 
 		// ⛔ NOTHING renders — no row, no partial chrome, no empty bar (the
@@ -444,7 +453,7 @@ describe("BLOCK-1 — G2, every value line is real content, never an empty bar",
 		const captured = vi.mocked(captureException).mock.calls[0]?.[0];
 		expect(captured).toBeInstanceOf(Error);
 		expect((captured as Error).message).toMatch(
-			/no resolution-block data for market slug "not-one-of-the-eight"/,
+			/no resolution-block data for market slug "not-one-of-the-six"/,
 		);
 	});
 
@@ -1055,7 +1064,7 @@ describe("BLOCK-5b · G-d — every block on every market renders a real glyph i
 		// half-rendered state with chrome but no glyph.
 		vi.mocked(captureException).mockClear();
 		const { container } = render(
-			<ResolverCards market={{ ...BASE, slug: "not-one-of-the-eight" }} />,
+			<ResolverCards market={{ ...BASE, slug: "not-one-of-the-six" }} />,
 		);
 		expect(
 			container.querySelectorAll(

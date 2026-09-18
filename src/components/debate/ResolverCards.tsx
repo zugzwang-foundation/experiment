@@ -33,8 +33,8 @@ import type { DebateMarketHeader } from "./types";
  * Through RESO-1→4 this read: "the CHROME and the LABELS land and the values
  * do not" — `markets` carries no resolver name, logo, source or X handle, and
  * RESO-1 shipped no migration, so every value stayed an empty placeholder bar.
- * ⇒ BLOCK-1 fills the VALUE and SUBVALUE lines for real, for all eight live
- * markets, WITHOUT a migration — the eight markets' resolution data is frozen
+ * ⇒ BLOCK-1 fills the VALUE and SUBVALUE lines for real, for all six live
+ * markets, WITHOUT a migration — the six markets' resolution data is frozen
  * at pre-registration and never changes during the live window, so it ships
  * as a static, per-slug map (`resolution-block-data.ts`) keyed on
  * `market.slug`, not a new column. `markets` is still 11 columns; nothing
@@ -43,7 +43,7 @@ import type { DebateMarketHeader } from "./types";
  * the only route in. A logo asset is still absent — the glyph square stays a
  * plain decorative placeholder, unchanged by this task.
  * ⛔ WHAT DID NOT CHANGE: nothing here PORTS d5's demo copy or invents market
- * content. The eight strings are the operator-ratified resolver register, one
+ * content. The six strings are the operator-ratified resolver register, one
  * static map entry per market, reviewed the same way any other pre-registered
  * market fact is — the CLAUDE.md §3 refusal this paragraph used to cite was
  * always about INVENTING content, not about a legitimate operator-supplied
@@ -98,7 +98,7 @@ export function ResolverCards({
 	// uncaught. `getResolutionBlocks` ITSELF still throws (unchanged,
 	// `resolution-block-data.test.ts`'s G1 still exercises that directly) —
 	// the failure mode that changed is what a CALLER does with it. Before this
-	// fix, a market slug with no map entry (a ninth market admin-created
+	// fix, a market slug with no map entry (a seventh market admin-created
 	// during the live window, or any drift between what's served and this
 	// task's static map) took the WHOLE `/m/[slug]` route down via the nearest
 	// error boundary — unauthenticated, GET-triggerable, repeatably, no
@@ -109,7 +109,7 @@ export function ResolverCards({
 	// render nothing for this market's resolution row — the rest of the page,
 	// including the market's own bet/comment surface, stays fully functional.
 	// ⚠ BLOCK-5b — THE GLYPH LOOKUP RIDES THE SAME `try`, ON PURPOSE. It mirrors
-	// `getResolutionBlocks`' contract (throws for a slug outside the eight), so
+	// `getResolutionBlocks`' contract (throws for a slug outside the six), so
 	// the degradation above covers both without a second failure mode, and the
 	// error the participant's Sentry event carries is still the FIRST thing that
 	// went wrong rather than a downstream symptom of it.
@@ -168,10 +168,10 @@ export function ResolverCards({
 			// rounding. Corrected in place.
 			// ⚠ AND THE FLOOR IS WHAT MAKES §2's UNIFORMITY EXACT. A block's
 			// natural height tracks its OWN `fontSize` — 53.25px at 14, 51.75 at
-			// 13, 50.25 at 12 — so content alone would give the eight markets three
+			// 13, 50.25 at 12 — so content alone would give the markets three
 			// different row heights. The grid's default `align-items: stretch`
 			// levels the four blocks within a market to the tallest, and this floor,
-			// sitting 0.75px ABOVE even the 14px case, levels the eight markets to
+			// sitting 0.75px ABOVE even the 14px case, levels the markets to
 			// each other: **54px on every block, every market, every viewport.**
 			// ⚠ THE OLD NUMBERS, AND WHY THEY DO NOT TRANSFER: 84px was RESO-2's
 			// (48px glyph, `py-2`); 78px was BLOCK-3's (36px glyph, `py-1.5`, but
@@ -287,7 +287,7 @@ const LINK_AFFORDANCE =
  * posts these would target do not exist yet." BLOCK-1 · RF-3a/RF-2 reverses
  * that for the RESOLVER block ONLY: RESOLVER's authoritative source (an X
  * account, or the institution's own site/data page) exists and is linkable
- * TODAY, for all eight markets. RESOLUTION, CLOSES and FLAVOUR carry
+ * TODAY, for all six markets. RESOLUTION, CLOSES and FLAVOUR carry
  * `href: null` — RESOLUTION because the X post it will eventually link to
  * (U-3) is not published yet, CLOSES and FLAVOUR because they're facts, not
  * references, and stay `null` permanently. A block with `href: null` renders
@@ -410,7 +410,8 @@ function ResolutionBlock({
 				    plate the mark composites onto. Delete `bg-n1` and the mark renders on
 				    whatever happens to sit behind the block. The sources shipped with a
 				    baked plate instead, measured per file at `#232323`–`#2E2E2E` against
-				    the `#2A2A2A` this span paints, and eight of the thirteen read as a
+				    the `#2A2A2A` this span paints, and eight of the thirteen that then
+				    shipped read as a
 				    visible square inside the block's own frame; keying the plate out is
 				    what dissolved that rather than papering over it, and it is why there
 				    is no second copy of the colour left to drift.
@@ -469,7 +470,7 @@ function ResolutionBlock({
 				    ⚠⚠ BLOCK-4 §1 — THAT CONDITION IS NOW FALSE FOR EVERY SHIPPED
 				    ENTRY, NOT FIVE OF THEM. This read "for the five map entries whose
 				    second line is genuinely absent"; `line2` is `null` on all
-				    thirty-two (eight markets × four blocks), so this branch never runs
+				    twenty-four (six markets × four blocks), so this branch never runs
 				    against production data and the count is retired rather than
 				    re-typed.
 				    ⛔ IT IS NOT DEAD CODE, AND DELETING IT WOULD COST A FUTURE TASK

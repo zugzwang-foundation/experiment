@@ -53,7 +53,7 @@ describe("resolution-block-data — G1, exhaustive + fails loud on an unknown sl
 		expect(() => getResolutionBlocks("resolver-cards-fixture-market")).toThrow(
 			/no resolution-block data/,
 		);
-		expect(() => getResolutionBlocks("some-future-ninth-market")).toThrow();
+		expect(() => getResolutionBlocks("some-future-seventh-market")).toThrow();
 	});
 
 	it("resolution-block-data::exactly-six-entries-no-more-no-less", () => {

@@ -149,9 +149,21 @@ describe("MarketHeader — per-market title size override", () => {
 		// (AGENTS.md §8), so a class-shaped literal in THIS FILE becomes a real
 		// emitted utility in the built stylesheet with no component behind it —
 		// at which point the built sheet stops being evidence of what components
-		// use. Measured before choosing this shape: `text-[17px]` happens to have
+		// use. Measured before choosing this shape: the 17px size happens to have
 		// four live consumers in `src/` and would have emitted nothing new, but
-		// the 1.31 leading has NONE and would have. Split so neither is scannable.
+		// the 1.31 leading has NONE and would have.
+		// ⛔⛔ AND THIS COMMENT USED TO SPELL THE SIZE OUT, WHICH MADE THE COMMENT
+		// ITSELF THE LEAK IT DESCRIBES. Measured with `@tailwindcss/oxide`'s
+		// Scanner (AGENTS.md §8's own method): this file emitted the 17px size
+		// utility from THE PROSE, not from the assembled constant below — so the
+		// claim "split so neither is scannable" was false for one of the two.
+		// ⚠ AND THE FIRST CORRECTION RE-INTRODUCED IT, by quoting the offending
+		// class inside the sentence explaining that it must not be quoted. The
+		// Scanner caught that too. There is no way to name one of these safely in
+		// prose: describe it, or emit it.
+		// Harmless here in itself, since that size has four live `src/` consumers;
+		// the cost is the next reader copying the pattern with a class that has
+		// none. Both halves are now described rather than written.
 		const SZ = `text-[${17}px]`;
 		const LD = `leading-[${1.31}]`;
 		const SYNTHETIC = `${SZ} ${LD}`;

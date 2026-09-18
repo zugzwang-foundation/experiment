@@ -9,7 +9,7 @@
  *
  * ⚠⚠ TWO DIFFERENT GUARANTEES, AND NEITHER ALONE IS "fail the build" LITERALLY.
  * `market.slug` is DB-sourced `string` — no TypeScript mechanism can prove an
- * arbitrary runtime string is a member of an 8-element literal union, so a
+ * arbitrary runtime string is a member of a 6-element literal union, so a
  * strict compile-time guarantee against LIVE DATA is not achievable here
  * without an unjustified `as` cast. What IS achievable, and what this file
  * provides:
