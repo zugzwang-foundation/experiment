@@ -237,9 +237,20 @@ describe("description lengths", () => {
 //
 //   1 · It is the ONLY committed copy of production's own description text.
 //       Production was built fresh on 2026-09-14, not restored from staging, so
-//       SEVEN of the eight descriptions and one title differ between the two
-//       environments (plan §A1.2, measured). Nothing else in the repository can
-//       reconstruct it.
+//       the two environments' copy diverged. Nothing else in the repository can
+//       reconstruct production's.
+//       ⚠⚠ THE FIGURE THAT USED TO STAND HERE — "SEVEN of the eight
+//       descriptions and one title" — WAS ALREADY WRONG BEFORE D-50 (measured:
+//       FIVE of six descriptions and one title, the slate having gone to six at
+//       D-49), and D-50 makes it wrong in the other direction too: ruling 3
+//       aligns the five it touches, so the divergence is now ONE description
+//       (`bitcoin-price-50k`, which ruling 4 leaves at v2.2) and ZERO titles.
+//       ⇒ NO COUNT IS WRITTEN HERE. It has been wrong at two different values
+//       for two different reasons, which is `O-15`: a number in prose decays
+//       whatever the prose says about it. The live figure is asserted rather
+//       than described — `tests/unit/staging/market-spec-snapshot-parity.test.ts`
+//       pins the five as identical across both files and `bitcoin-price-50k` as
+//       deliberately not.
 //   2 · It is the input to the one irreversible step in the task. A short or
 //       malformed snapshot would first surface at the production RESTORE — that
 //       is, after the wipe.

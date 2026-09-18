@@ -5,6 +5,7 @@ import {
 	isKnownMarketSlug,
 	RESOLUTION_BLOCKS,
 } from "@/components/debate/resolution-block-data";
+import prodSnapshot from "../../../docs/data/prod-markets-snapshot.json";
 import stagingSnapshot from "../../../docs/data/staging-markets-snapshot.json";
 
 const KNOWN_SLUGS = [
@@ -75,6 +76,27 @@ describe("resolution-block-data — G1, exhaustive + fails loud on an unknown sl
 		// corresponding map entry.
 		const liveSlugs = stagingSnapshot.markets.map((m) => m.slug).sort();
 		expect(Object.keys(RESOLUTION_BLOCKS).sort()).toEqual(liveSlugs);
+		// ⛔⛔ AND AGAINST PRODUCTION, WHICH THIS COMPARISON DID NOT COVER UNTIL
+		// D-50. The staging snapshot was the only one pinned here, and the two
+		// files are not interchangeable: they hold different ids, and before this
+		// ruling they held different WORDING. A slug present in production and
+		// absent from this map is not a degraded render — `getResolutionBlocks`
+		// THROWS, `ResolverCards` catches and drops one row, but the slug would
+		// also have no `market_media`, no glyph and no flavour, and the market a
+		// participant actually opens is production's. Pinning one environment and
+		// inferring the other is the shape that let a prod-only divergence be
+		// invisible for a whole ruling (`@code-reviewer` MEDIUM).
+		// ⚠ Asserted as EQUALITY against prod too, not as a subset: a map that is
+		// a superset would mean an entry for a market nobody can reach, which is
+		// the state BLOCK-1's throw exists to make impossible.
+		const prodSlugs = prodSnapshot.markets.map((m) => m.slug).sort();
+		expect(Object.keys(RESOLUTION_BLOCKS).sort()).toEqual(prodSlugs);
+		// ⛔ NON-VACUITY, and it is not decorative here: if a future edit pointed
+		// both imports at the same file, every assertion above would still pass
+		// and the coverage would silently halve.
+		expect(liveSlugs).toHaveLength(6);
+		expect(prodSlugs).toHaveLength(6);
+		expect(stagingSnapshot.markets[0].id).not.toBe(prodSnapshot.markets[0].id);
 	});
 
 	it("resolution-block-data::CLOSES-matches-the-LIVE-resolution_deadline-for-every-market", () => {

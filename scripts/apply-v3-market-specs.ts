@@ -67,7 +67,11 @@ const TARGET_SLUGS = [
 	"yc-w27-acceptance",
 ] as const;
 
-interface Environment {
+/** Exported so every guard-4 refusal is reachable without a database.
+ * `rename-ycp01-artifact.ts` exports its pure transform for the same reason;
+ * this script is the one that can write to PRODUCTION, so the argument is
+ * stronger here, not weaker. (`@code-reviewer` MEDIUM.) */
+export interface Environment {
 	readonly name: "staging" | "prod";
 	readonly dsnVar: "DATABASE_URL_STAGING" | "DATABASE_URL_PROD";
 	readonly dopplerConfig: "stg" | "prd";
@@ -76,7 +80,7 @@ interface Environment {
 	readonly snapshot: string;
 }
 
-const ENVIRONMENTS: Record<string, Environment> = {
+export const ENVIRONMENTS: Record<string, Environment> = {
 	staging: {
 		name: "staging",
 		dsnVar: "DATABASE_URL_STAGING",
@@ -95,7 +99,7 @@ const ENVIRONMENTS: Record<string, Environment> = {
 	},
 };
 
-interface TargetRow {
+export interface TargetRow {
 	readonly id: string;
 	readonly slug: string;
 	readonly title: string;
@@ -119,7 +123,7 @@ function flag(argv: readonly string[], name: string): string | undefined {
  * otherwise edit four and report success, and the fifth would only be noticed by
  * a reader on the live site.
  */
-function loadTargets(env: Environment): TargetRow[] {
+export function loadTargets(env: Environment): TargetRow[] {
 	const path = fileURLToPath(
 		new URL(`../docs/data/${env.snapshot}`, import.meta.url),
 	);
@@ -185,10 +189,16 @@ async function main() {
 				"  --env staging | --env prod   [--dry-run]",
 		);
 	}
-	const env = ENVIRONMENTS[envArg];
-	if (!env) {
+	// ⚠ `Object.hasOwn`, not a truthiness check on the lookup: a plain object
+	// literal reaches `Object.prototype`, so `--env constructor` (or `toString`,
+	// `valueOf`) yields a truthy value and sails past `if (!env)`. It was traced
+	// to a safe refusal three lines later — `env.dsnVar` is undefined, so guard 3
+	// fails — but a refusal that happens at the wrong line tells the operator the
+	// wrong thing about what is wrong (`@code-reviewer` LOW, O-3).
+	if (!Object.hasOwn(ENVIRONMENTS, envArg)) {
 		fail(`--env must be staging | prod (saw ${JSON.stringify(envArg)}).`);
 	}
+	const env = ENVIRONMENTS[envArg] as Environment;
 
 	// ── GUARD 2 · intent ────────────────────────────────────────────────────
 	if (process.env.APPLY_V3_INTENT !== INTENT_TOKEN) {
@@ -223,7 +233,19 @@ async function main() {
 	const targets = loadTargets(env);
 	console.log(`✓ guard 4 — ${env.snapshot} yields 5 targets, source verified`);
 
-	const sql = postgres(dsn, { max: 1 });
+	// ⚠ `lock_timeout` is the one option this script adds over its two
+	// predecessors, and it is here because of what it is about to lock. The
+	// precondition takes `FOR UPDATE` on five market rows, and an FK child INSERT
+	// from a live bet holds `FOR KEY SHARE` on the parent — so a concurrent W-1
+	// transaction blocks us. Without a timeout that block is indefinite and is
+	// INDISTINGUISHABLE FROM A HANG, which is the worst thing an operator can be
+	// handed halfway through a production edit. 10 s is far above any healthy
+	// W-1 (the bet path's own non-retryable `statement_timeout` is 1 s) and far
+	// below anyone's patience. `@code-reviewer` LOW.
+	const sql = postgres(dsn, {
+		max: 1,
+		connection: { lock_timeout: 10_000 },
+	});
 	try {
 		// ── The read, reported in full before anything is written ────────────
 		const before = await sql<
@@ -259,6 +281,24 @@ async function main() {
 			console.log(`       -> ${t?.title}`);
 			console.log(
 				`    desc  ${r.description?.length ?? 0} chars -> ${t?.description.length} chars`,
+			);
+		}
+
+		// ⛔⛔ THE DRY RUN'S OWN LENGTH ASSERTION, AND IT IS NOT A DUPLICATE OF THE
+		// PRECONDITION'S. The real run is safe without it — the in-transaction
+		// precondition rolls back on a short read — but the dry run is the step
+		// whose ENTIRE PURPOSE is pre-flight verification, and it was the one step
+		// with no length check. Against a database whose markets were recreated
+		// with fresh ids (which has happened twice: the 2026-09-07 reset and
+		// MKT-ROSTER-1), `before` is `[]`, the report loop above prints nothing,
+		// and the output is four green guard lines, an empty table and
+		// "nothing written" at exit 0 — silence reading as corroboration, which is
+		// exactly `O-13`. `@code-reviewer` MEDIUM.
+		if (before.length !== 5) {
+			fail(
+				`read ${before.length} of 5 markets by id on ${env.name}. The ids in ` +
+					`${env.snapshot} do not match this database — nothing was written, and a ` +
+					"zero-row read must not look like a clean rehearsal.",
 			);
 		}
 
@@ -373,6 +413,49 @@ async function main() {
 					);
 				}
 			}
+			// ⛔⛔ THE ACTIVITY COUNTS ARE RE-ASSERTED HERE, AND THIS CLOSES A WINDOW
+			// `FOR UPDATE` DOES NOT. The lock is acquired BY the precondition
+			// statement, so if that statement has to WAIT — a concurrent W-1 holding
+			// `FOR KEY SHARE` on a market row while it inserts its own bet and
+			// comment — the three count subqueries still evaluate against the READ
+			// COMMITTED statement snapshot taken BEFORE the wait. A child INSERT does
+			// not update the parent row, so there is no EvalPlanQual re-check to
+			// refresh them: the bet commits, our lock is granted, and our counts
+			// still read zero. We would then change the question under an argument
+			// somebody had just staked on — the one outcome D-50 ruling 2 forbids.
+			// ⚠ A FRESH STATEMENT under READ COMMITTED *does* see that committed
+			// bet, which is why re-reading is the fix rather than a second lock.
+			// The window is one W-1 long and the primary guard does hold; this is
+			// the belt, and it costs one statement. `@code-reviewer` MEDIUM.
+			const activity = await tx<
+				{ slug: string; bets: number; comments: number; positions: number }[]
+			>`
+				SELECT m.slug,
+				       (SELECT count(*) FROM bets      b WHERE b.market_id = m.id)::int AS bets,
+				       (SELECT count(*) FROM comments  c WHERE c.market_id = m.id)::int AS comments,
+				       (SELECT count(*) FROM positions p WHERE p.market_id = m.id)::int AS positions
+				  FROM markets m
+				 WHERE m.id = ANY(${targets.map((t) => t.id)}::uuid[])
+			`;
+			if (activity.length !== 5) {
+				throw new Error(
+					`POSTCONDITION: activity re-read returned ${activity.length} of 5. Rolling back.`,
+				);
+			}
+			const arrived = activity.filter(
+				(r) => r.bets > 0 || r.comments > 0 || r.positions > 0,
+			);
+			if (arrived.length > 0) {
+				throw new Error(
+					`POSTCONDITION: participant activity ARRIVED DURING this transaction — ${arrived
+						.map(
+							(r) =>
+								`${r.slug}(bets=${r.bets} comments=${r.comments} positions=${r.positions})`,
+						)
+						.join(", ")}. D-50 ruling 2: the edit stops. Rolling back.`,
+				);
+			}
+
 			// ⚠ And the market this ruling does NOT touch must still be there,
 			// under its own slug — a slug UPDATE that collided would surface here.
 			const untouched = await tx<{ slug: string }[]>`
@@ -385,12 +468,29 @@ async function main() {
 			}
 			console.log(
 				"✓ postcondition (in-transaction) — all five byte-equal to the snapshot; " +
-					`${NOT_TOUCHED} present and untouched`,
+					`zero activity re-read; ${NOT_TOUCHED} present and untouched`,
 			);
 		});
 
+		// ⚠ A SECOND RUN IS IDEMPOTENT AND MUST NOT REPORT LIKE A FIRST ONE. The
+		// compare-and-swap predicate matches the already-written values, so
+		// `count` is 1 and every assertion passes — the log would otherwise say
+		// "5 rows updated" for a run that changed nothing. `alreadyApplied` is
+		// computed from the PRE-READ, which is the only place the distinction
+		// still exists. `@code-reviewer` LOW.
+		const alreadyApplied = targets.every((t) => {
+			const row = before.find((r) => r.id === t.id);
+			return (
+				row !== undefined &&
+				row.slug === t.slug &&
+				row.title === t.title &&
+				row.description === t.description
+			);
+		});
 		console.log(
-			`\nOK — ${env.name}: 5 rows updated, read-back matched, committed.\n`,
+			alreadyApplied
+				? `\nOK — ${env.name}: already at v3.0 before this run; 5 rows re-asserted, nothing changed.\n`
+				: `\nOK — ${env.name}: 5 rows updated, read-back matched, committed.\n`,
 		);
 	} finally {
 		await sql.end();
