@@ -14,9 +14,9 @@
  * without an unjustified `as` cast. What IS achievable, and what this file
  * provides:
  *   1. `RESOLUTION_BLOCKS` is typed `Record<KnownMarketSlug, ResolutionBlockSet>`
- *      — omitting one of the eight known slugs from the object literal below
+ *      — omitting one of the six known slugs from the object literal below
  *      is a `tsc` error. `just verify` genuinely fails the build for that case.
- *   2. `getResolutionBlocks` throws for any slug outside the eight — never a
+ *   2. `getResolutionBlocks` throws for any slug outside the six — never a
  *      silent empty bar, which is exactly the state this task exists to
  *      remove. ⚠ THIS FUNCTION'S OWN THROW IS UNCHANGED, but its CALLER
  *      (`ResolverCards`) no longer lets it propagate to `m/[slug]/error.tsx`
@@ -29,7 +29,7 @@
  *      component's own docblock for the full reasoning; this function's
  *      contract (throw on an unknown slug) is what every test against it
  *      still exercises directly.
- * Given the code freeze, these eight markets are the only ones this
+ * Given the code freeze, these six markets are the only ones this
  * deployment will ever have — the distinction between "fails at tsc time" and
  * "fails loud at render time for a slug that cannot occur" is not a practical
  * gap, only a naming one.
@@ -41,7 +41,7 @@
  * redefines it as "the thing that is read to settle the market" (a
  * document, a post, an act of publication) — related to the old
  * definition, not identical to it, and every value below reflects the NEW
- * one. For the five markets resolved by watching a named X account,
+ * one. For the four markets resolved by watching a named X account,
  * RESOLUTION now reads "Response on X" — the THING read is a response
  * post, found on the platform X, where BLOCK-1/2 read bare "X" (the
  * platform alone, under the old surface-only definition).
@@ -52,22 +52,20 @@
  * ⚠ RESOLVER is a DIFFERENT question — who or what publishes the thing —
  * and v1.1 does not touch it. It stays "who resolves", independent of
  * RESOLUTION's "what is read" — never a mirror of it.
- * RESOLUTION's `href` is `null` on all eight today (U-3's eventual target —
+ * RESOLUTION's `href` is `null` on all six today (U-3's eventual target —
  * Zugzwang's own X post per market — doesn't exist yet); the seam for wiring
  * it later is one value per market, right here, with zero component changes.
  *
- * ⛔⛔ BLOCK-4 — EVERY `line2` IN THIS MAP IS NOW `null`, ON ALL EIGHT MARKETS
- * AND ALL FOUR BLOCKS. Founder-ruled: no block renders a second line. Four
+ * ⛔⛔ BLOCK-4 — EVERY `line2` IN THIS MAP IS NOW `null`, ON EVERY MARKET AND
+ * ALL FOUR BLOCKS. Founder-ruled: no block renders a second line. Four
  * paragraphs above this one used to describe two-line values as live content
  * and are corrected in place rather than left standing beside data that
  * contradicts them (§8 O-5) — the superseded shapes were
- * `oktoberfest-munich-beer-volume`'s RESOLUTION ("oktoberfest.de" / "report")
- * and RESOLVER ("Oktoberfest" / "management"), `github-zugzwang-repo-stars`'s
- * RESOLVER ("Zugzwang" / "repo", now the single word "GitHub"), and CLOSES's
- * time line on all eight ("23:45Z", and "21:59Z" for oktoberfest).
+ * `github-zugzwang-repo-stars`'s RESOLVER ("Zugzwang" / "repo", now the single
+ * word "GitHub") and CLOSES's time line on every market ("23:45Z").
  * ⚠⚠ THE DROPPED LINES ARE NOT THE SAME KIND OF LOSS, AND THAT IS WORTH
- * SAYING ONCE. "report", "management" and "repo" were REFINEMENTS — they
- * narrowed a value that reads correctly without them. The CLOSES times were
+ * SAYING ONCE. "repo" was a REFINEMENT — it narrowed a value that reads
+ * correctly without it. The CLOSES times were
  * INFORMATION: "5 Nov 2026" no longer says WHEN on that day trading stops.
  * That is a deliberate founder ruling, not an oversight, and the exact
  * instant survives in `markets.resolution_deadline` (which this map is
@@ -116,32 +114,30 @@ export type ResolutionBlockEntry = {
 	 * but the column is not guaranteed to stay exactly 91px forever. Full
 	 * per-block, per-market table in BLOCK-3's run report.
 	 *
-	 * ⚠⚠ BLOCK-4 RE-MEASURED ALL TWENTY VALUES AGAINST THE SINGLE-LINE LAYOUT
-	 * AND NOT ONE SIZE MOVED. That is a reportable NEGATIVE result, not a
-	 * skipped step: the brief expected several values to size UP, and the
-	 * measurement says they cannot, because §2 shrinks the block's HEIGHT and
-	 * the fit is a function of its WIDTH. The three dimensions that set this
-	 * column — `px-[11px]`, the 36px glyph, the `gap-2.5` between them — are
-	 * all untouched by BLOCK-4, so the column is still 90.672px, and BLOCK-3
-	 * had already fitted every value to exactly that. Dropping `line2` cannot
-	 * free width either: the shared size was always the largest that fits BOTH
-	 * lines, and on every two-line entry the BINDING line was `line1`
-	 * ("oktoberfest.de" over "report", "5 Nov 2026" over "23:45Z"), so
-	 * removing the shorter line relaxes nothing.
+	 * ⚠⚠ BLOCK-4 RE-MEASURED ALL TWENTY VALUES THEN IN THIS MAP AGAINST THE
+	 * SINGLE-LINE LAYOUT AND NOT ONE SIZE MOVED. That is a reportable NEGATIVE
+	 * result, not a skipped step: the brief expected several values to size
+	 * UP, and the measurement says they cannot, because §2 shrinks the block's
+	 * HEIGHT and the fit is a function of its WIDTH. The three dimensions that
+	 * set this column — `px-[11px]`, the 36px glyph, the `gap-2.5` between
+	 * them — are all untouched by BLOCK-4, so the column is still 90.672px,
+	 * and BLOCK-3 had already fitted every value to exactly that. Dropping
+	 * `line2` cannot free width either: the shared size was always the largest
+	 * that fits BOTH lines, and on every two-line entry the BINDING line was
+	 * `line1` ("5 Nov 2026" over "23:45Z"), so removing the shorter line
+	 * relaxes nothing.
 	 * ⚠ Measured sub-pixel on the deployed staging build at 1440×900, real
 	 * Geist 400, `getBoundingClientRect().width` at `width:max-content` against
 	 * the 90.672px column (the integer `scrollWidth <= clientWidth` test agrees
 	 * exactly, and was run first). Headroom at the shipped size, tightest
 	 * first: `@thomasfbloom` 0.37px @12 · `@FIDE_chess` 2.77 @14 ·
-	 * `Response on X` 2.80 @13 · `oktoberfest.de` 4.22 @13 · `@ycombinator`
-	 * 4.71 @13 · `CoinMarketCap` 4.87 @12 · `Consumption` 5.44 @14; every other
-	 * value clears 14px by 14px or more.
-	 * ⚠ `oktoberfest.de` DOES sit one step below its neighbours (13 against the
-	 * 14 its own RESOLVER "Oktoberfest" takes), which is what the brief
-	 * predicted — but it is NOT the tightest string in the map, and the guess
-	 * and the measurement agreeing on the conclusion while disagreeing on the
-	 * reason is exactly why it was measured. `@thomasfbloom` is tightest, by an
-	 * order of magnitude.
+	 * `Response on X` 2.80 @13 · `@ycombinator` 4.71 @13 · `CoinMarketCap`
+	 * 4.87 @12; every other value clears 14px by 14px or more.
+	 * ⚠ `@thomasfbloom` is the tightest string in the map, by an order of
+	 * magnitude — 0.37px of headroom at 12px against 2.77px for the next
+	 * tightest. MKT-ROSTER-1 removed two markets and neither was the binding
+	 * case, so no size was re-measured: the column is 90.672px wide whatever it
+	 * holds, and every surviving value was already fitted to exactly that.
 	 */
 	fontSize: 11 | 12 | 13 | 14;
 };
@@ -150,20 +146,18 @@ export type ResolutionBlockEntry = {
  * BLOCK-5b — the FLAVOUR taxonomy, promoted from a bare `string` to a closed
  * union.
  *
- * ⚠⚠ FLAVOUR IS A TAXONOMY THAT HAPPENS TO MAP 1:1 TO EIGHT MARKETS TODAY, AND
+ * ⚠⚠ FLAVOUR IS A TAXONOMY THAT HAPPENS TO MAP 1:1 TO SIX MARKETS TODAY, AND
  * THE TYPE IS WHAT KEEPS THOSE TWO FACTS APART. Every other block keys off
  * `market.slug`; FLAVOUR keys off the STRING, so two markets that later share a
  * flavour share its glyph with no second entry anywhere. Widening this back to
  * `string` would silently re-admit that duplication and, worse, make
  * `FLAVOUR_GLYPHS`'s `Record<FlavourName, …>` exhaustiveness check vacuous —
- * the whole point of which is that adding a ninth flavour must fail `tsc`
+ * the whole point of which is that adding a seventh flavour must fail `tsc`
  * rather than fall through to a missing glyph.
  * ⛔ THE ORDER HERE IS THE `RESOLUTION_BLOCKS` ORDER, not alphabetical, so the
  * two literals read side by side.
  */
 const FLAVOUR_NAMES = [
-	"Pressure",
-	"Consumption",
 	"Petition",
 	"Sentiment",
 	"Innovation",
@@ -190,8 +184,6 @@ export type ResolutionBlockSet = {
 };
 
 const KNOWN_SLUGS = [
-	"mumbai-bmc-pink-october-disclosure",
-	"oktoberfest-munich-beer-volume",
 	"chess-fide-tiebreak-response",
 	"bitcoin-price-50k",
 	"math-erdos-contribution-response",
@@ -219,81 +211,7 @@ const CLOSES_DEFAULT: ResolutionBlockEntry = {
 	fontSize: 14,
 };
 
-/**
- * ⚠⚠ THE ONLY EXCEPTION, AND IT IS LOAD-BEARING. `oktoberfest-munich-beer-volume`
- * trades closes 2026-10-04T21:59:00Z (23:59 Munich, the festival's last day);
- * it SETTLES on 5 Nov with the seven others because the resolving report
- * publishes after the festival ends. A block reading "5 Nov 2026" here would
- * tell a participant they can still trade for another month — G3 pins this.
- * ⚠ BLOCK-4 drops `line2: "21:59Z"` in step with `CLOSES_DEFAULT`. This entry
- * exists for its DATE, which is the month-early one, so the field that carries
- * the whole exception is the one BLOCK-4 does not touch.
- */
-const OKTOBERFEST_CLOSES: ResolutionBlockEntry = {
-	line1: "4 Oct 2026",
-	line2: null,
-	href: null,
-	fontSize: 14,
-};
-
 export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
-	"mumbai-bmc-pink-october-disclosure": {
-		resolution: {
-			line1: "Response on X",
-			line2: null,
-			href: null,
-			fontSize: 13,
-		},
-		resolver: {
-			line1: "@mybmc",
-			line2: null,
-			href: "https://x.com/mybmc",
-			fontSize: 14,
-		},
-		closes: CLOSES_DEFAULT,
-		flavour: { line1: "Pressure", line2: null, href: null, fontSize: 14 },
-	},
-	"oktoberfest-munich-beer-volume": {
-		// ⚠⚠ BLOCK-2 · founder-ruled correction. AMEND-1 item 15 (§0)
-		// ratified RESOLUTION as the literal resolving SURFACE — "X /
-		// oktoberfest.de / CoinMarketCap / GitHub" — and this row shipped
-		// the brand name "Oktoberfest" at BLOCK-1 instead, picked for
-		// column-fit before BLOCK-1's own S4 measured how this surface's
-		// `truncate` recipe actually degrades. It degrades gracefully (full
-		// text stays in the DOM, ellipsis only — see BLOCK-2's run report),
-		// so there's no fit reason left to prefer the brand name over the
-		// ruled literal. RESOLVER keeps "Oktoberfest" — that field was never
-		// in question, only RESOLUTION was.
-		// ⚠⚠ BLOCK-3 · MKT-SLATE v1.1 GAVE BOTH FIELDS A SECOND LINE; BLOCK-4
-		// TAKES BOTH BACK, AND v1.1's REDEFINITION SURVIVES THE REMOVAL. v1.1
-		// redefines RESOLUTION as "the thing that is read to settle the market",
-		// and BLOCK-3 spelled that out as "oktoberfest.de" / "report" (the
-		// surface, then the thing) with RESOLVER matching at "Oktoberfest" /
-		// "management" (who, then which part of who). Both second lines are now
-		// `null`. The redefinition is unaffected: "oktoberfest.de" already names
-		// a publication rather than a place in the way v1.1 means, and this is
-		// the one RESOLUTION value that reads as a source you could go and open.
-		// ⛔ THE DOMAIN IS THE VALUE AND ITS CASE IS DATA. `oktoberfest.de` is
-		// lowercase because that is the domain; a CSS `capitalize` on this
-		// column would render `Oktoberfest.de`, which is a different string and
-		// arguably a different domain. That is why sentence case lives here and
-		// never in a class — pinned at render level by
-		// `resolver-cards.test.tsx`'s lowercase-`o` guard. hrefs unchanged.
-		resolution: {
-			line1: "oktoberfest.de",
-			line2: null,
-			href: null,
-			fontSize: 13,
-		},
-		resolver: {
-			line1: "Oktoberfest",
-			line2: null,
-			href: "https://www.oktoberfest.de/en",
-			fontSize: 14,
-		},
-		closes: OKTOBERFEST_CLOSES,
-		flavour: { line1: "Consumption", line2: null, href: null, fontSize: 14 },
-	},
 	"chess-fide-tiebreak-response": {
 		resolution: {
 			line1: "Response on X",
@@ -454,7 +372,7 @@ export function getResolutionBlocks(slug: string): ResolutionBlockSet {
 	if (!isKnownMarketSlug(slug)) {
 		throw new Error(
 			`ResolverCards: no resolution-block data for market slug "${slug}". ` +
-				"BLOCK-1 ships a static, per-slug map for exactly the eight known " +
+				"BLOCK-1 ships a static, per-slug map for exactly the six known " +
 				"markets — add an entry to RESOLUTION_BLOCKS before this market can " +
 				"render its resolution row.",
 		);

@@ -297,7 +297,8 @@ const LINK_AFFORDANCE =
  * ⇒ THE RESOLVER LINK IS THE WHOLE BLOCK, NOT THE VALUE TEXT ALONE (RF-3a):
  * one `<a>` wraps the glyph and the full text stack, `target="_blank"
  * rel="noopener noreferrer"`, so the accessible name reads as the label plus
- * the value text ("Resolver @mybmc") with no separate `aria-label` needed —
+ * the value text ("Resolver @FIDE_chess") with no separate `aria-label`
+ * needed —
  * the glyph stays `aria-hidden`, contributing nothing to it. The seam for
  * wiring RESOLUTION's href later (once Zugzwang's own resolution posts
  * publish, per U-3) is exactly this same mechanism: one value per market in
@@ -427,8 +428,8 @@ function ResolutionBlock({
 				    only loses size.
 				    ⚠ DECORATIVE TWICE OVER, DELIBERATELY. `aria-hidden` stays on the span
 				    (BLOCK-1 put it there so the glyph contributes nothing to the RESOLVER
-				    anchor's accessible name, which reads "Resolver @mybmc" off the label
-				    and value beside it) AND the image carries `alt=""`. The span's
+				    anchor's accessible name, which reads "Resolver @FIDE_chess" off the
+				    label and value beside it) AND the image carries `alt=""`. The span's
 				    attribute is what actually removes it from the tree today; `alt=""` is
 				    the per-element declaration that keeps it decorative if the span's ever
 				    goes. Neither is redundant with the other — one is a subtree removal,

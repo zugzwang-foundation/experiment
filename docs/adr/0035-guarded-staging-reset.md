@@ -9,6 +9,17 @@
 | **Frame document** | SPEC.2 §6 (append-only buckets); SPEC.1 INV-2, INV-4; `docs/plans/STAGING-PARITY.md` Q3 + Ratification Record §5 W-B; `docs/polish/POLISH-0_data-manifest.md` §1.9; ADR-0030 (TRUNCATE rejection); ADR-0024 (deploy pipeline / drift guard); SPEC.2 ADR Index |
 | **Supersedes** | — |
 | **Superseded-by** | — |
+| **Amended-by** | D-49 (one pre-launch production run — MKT-ROSTER-1; every other clause stands) |
+
+> ⚠ **One production run is authorised. Read this before the body.**
+>
+> **D-49** (2026-09-18, `docs/decisions/RECORD-v2.8-amendment.md`) authorises a single
+> pre-launch wipe of **production**, while all production data is test data: an exact mirror of
+> this ADR's batch, run once from a branch that is never merged, then closed. Only the
+> `*_no_truncate` guards are lifted; primitives 2, 3 and 4 and guard G-4 hold unchanged.
+>
+> That is the only exception. *"No production analogue is designed, deferred, or implied"*
+> stands for everything else, and the body below is unchanged.
 
 ---
 

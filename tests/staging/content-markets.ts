@@ -1,4 +1,4 @@
-// LIQ-1-RESTORE — the eight CONTENT markets, read from the committed snapshot.
+// LIQ-1-RESTORE — the CONTENT markets, read from the committed snapshot.
 // NEVER import this from src/**. It is an operational artifact under tests/.
 //
 // ═══════════════════════════════════════════════════════════════════════════
@@ -6,7 +6,7 @@
 //
 // `fixtures.ts` beside this file is a LITERAL table: fifteen `sp-m*` markets
 // whose copy exists to exercise shapes, invented for that job and free to
-// change. These eight are the opposite. Their questions, resolution criteria
+// change. The content markets are the opposite. Their questions, criteria
 // and settlement dates are the FOUNDER'S — CLAUDE.md §3 makes inventing them a
 // refusal trigger — and they were authored directly against staging, which
 // means the repository never held them as source. The 2026-09-07 staging reset
@@ -32,22 +32,23 @@
 // `createMarket` takes a caller-supplied UUIDv7 PK (MEDIA.1 / Q3) and validates
 // every media key against `^m/<thatMarketId>/<uuid>\.<ext>$`. All sixteen R2
 // objects survived the reset under the ORIGINAL ids (LIQ-1-RESTORE A2, measured
-// 2026-09-07: 16/16 present in `zugzwang-market-media`). Minting fresh ids
-// would orphan all sixteen and require a re-upload of bytes nobody has. Reusing
-// them makes the images reachable with no key rewrite — and the ids are free,
+// 2026-09-07: 16/16 present in `zugzwang-market-media`) — twelve of them now,
+// MKT-ROSTER-1 having taken two markets and their four objects. Minting fresh
+// ids would orphan every one and require a re-upload of bytes nobody has.
+// Reusing them makes the images reachable with no key rewrite — and the ids are free,
 // because the rows they named are gone.
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-/** The committed capture. The single source for all eight markets' content. */
+/** The committed capture. The single source for every market's content. */
 export const CONTENT_MARKET_SOURCE_PATH = fileURLToPath(
 	new URL("../../docs/data/staging-markets-snapshot.json", import.meta.url),
 );
 
 /** How many markets the snapshot must hold. A short read is a broken read. */
-export const CONTENT_MARKET_COUNT = 8;
+export const CONTENT_MARKET_COUNT = 6;
 
 /** One image in a market's at-create manifest — `MarketMediaInput`'s shape. */
 export interface ContentMarketMedia {
@@ -120,13 +121,13 @@ function mediaIdFromKey(key: string, marketId: string): string {
 }
 
 /**
- * Read the eight markets out of the committed snapshot.
+ * Read the content markets out of the committed snapshot.
  *
  * Pure apart from the one file read, so the unit suite exercises the real
  * parse against the real bytes rather than a fixture of them.
  *
  * REFUSES rather than returns a short list: a snapshot that has lost a market
- * would otherwise seed seven and report success, and the missing one would only
+ * would otherwise seed short and report success, and the missing one would only
  * surface as a 404 on a slug somebody had already shared.
  */
 export function loadContentMarkets(): readonly ContentMarketSpec[] {

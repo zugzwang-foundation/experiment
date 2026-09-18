@@ -9,7 +9,7 @@ import {
 } from "../../staging/content-markets";
 
 // ═══════════════════════════════════════════════════════════════════════════
-// LIQ-1-RESTORE B2 — the eight content markets parse, and parse into something
+// LIQ-1-RESTORE B2 — the content markets parse, and parse into something
 // `createMarket` will actually accept.
 //
 // This runs in CI on every PR and touches no database. It reads the REAL
@@ -24,7 +24,7 @@ const SPECS = loadContentMarkets();
 describe("the source is real", () => {
 	// CONTROL — every assertion below loops over SPECS, and a loop over an
 	// empty array asserts nothing. Prove the read found something first.
-	it("reads all eight markets out of the committed snapshot", () => {
+	it("reads every market out of the committed snapshot", () => {
 		expect(SPECS).toHaveLength(CONTENT_MARKET_COUNT);
 		expect(CONTENT_MARKET_SOURCE_PATH).toMatch(
 			/docs\/data\/staging-markets-snapshot\.json$/,
@@ -165,10 +165,9 @@ describe("description lengths", () => {
 	/**
 	 * ⚠ THE KICKOFF SAID 700–800 CHARACTERS. THE CONTENT DOES NOT.
 	 *
-	 * Measured against the committed snapshot on 2026-09-07:
+	 * Measured against the committed snapshot, re-measured 2026-09-18 after
+	 * MKT-ROSTER-1 took the slate to six:
 	 *
-	 *   mumbai-bmc-pink-october-disclosure   2990
-	 *   oktoberfest-munich-beer-volume       3939
 	 *   chess-fide-tiebreak-response         3609
 	 *   bitcoin-price-50k                    3795
 	 *   math-erdos-contribution-response     3836
@@ -176,10 +175,10 @@ describe("description lengths", () => {
 	 *   yc-paper-club-response                789
 	 *   github-zugzwang-repo-stars            794
 	 *
-	 * Six of the eight carry an appended "Resolution type. …" passage the other
-	 * two do not. A test written to 700–800 would be red on arrival for those
-	 * six, and the only way to make it green is to edit founder-authored market
-	 * copy — which is a CLAUDE.md §3 refusal, not a fix.
+	 * FOUR of the six carry a long, fully-structured criterion and two do not.
+	 * A test written to 700–800 would be red on arrival for those four, and the
+	 * only way to make it green is to edit founder-authored market copy — which
+	 * is a CLAUDE.md §3 refusal, not a fix.
 	 *
 	 * So the bound below is the MEASURED one, and it is deliberately loose at the
 	 * top and tight at the bottom: the failure worth catching is a description
@@ -203,8 +202,6 @@ describe("description lengths", () => {
 		expect(
 			Object.fromEntries(SPECS.map((s) => [s.slug, s.description.length])),
 		).toEqual({
-			"mumbai-bmc-pink-october-disclosure": 2990,
-			"oktoberfest-munich-beer-volume": 3939,
 			"chess-fide-tiebreak-response": 3609,
 			"bitcoin-price-50k": 3795,
 			"math-erdos-contribution-response": 3836,

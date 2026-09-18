@@ -77,7 +77,7 @@ function inkBox(png: Decoded) {
  *
  * ⛔ THIS IS THE FUNCTION UNDER TEST IN THE POSITIVE CONTROL. It is applied
  * unchanged to the shipped assets and to the synthetic chromatic fixture, which
- * is the only thing that makes "all 13 are achromatic" mean anything.
+ * is the only thing that makes "all 10 are achromatic" mean anything.
  */
 function maxChroma(png: Decoded, alphaMin = 8): number {
 	let worst = 0;
@@ -119,13 +119,13 @@ function cornerAlphaMax(png: Decoded, size = 48): number {
 	return worst;
 }
 
-describe("BLOCK-5b · G-a — the thirteen assets exist and carry real alpha", () => {
-	it("ships exactly thirteen distinct glyph files", () => {
+describe("BLOCK-5b · G-a — the ten assets exist and carry real alpha", () => {
+	it("ships exactly ten distinct glyph files", () => {
 		// The inventory is DERIVED from the maps, never re-typed here: the maps
 		// are the source of truth for what must ship, so a map edit that adds an
 		// asset cannot leave this list behind.
-		expect(ALL_GLYPH_FILES).toHaveLength(13);
-		expect(new Set(ALL_GLYPH_FILES).size).toBe(13);
+		expect(ALL_GLYPH_FILES).toHaveLength(10);
+		expect(new Set(ALL_GLYPH_FILES).size).toBe(10);
 	});
 
 	it.each([
@@ -165,16 +165,16 @@ describe("BLOCK-5b · G-a — the thirteen assets exist and carry real alpha", (
 	});
 });
 
-describe("BLOCK-5b · G-b — all thirteen are achromatic", () => {
+describe("BLOCK-5b · G-b — all ten are achromatic", () => {
 	it.each([...ALL_GLYPH_FILES])("%s is achromatic (R == G == B)", (name) => {
 		expect(maxChroma(readGlyph(name))).toBeLessThanOrEqual(CHROMA_TOLERANCE);
 	});
 
 	it("POSITIVE CONTROL — the same check FAILS on a synthetic chromatic fixture", () => {
-		// ⛔⛔ WITHOUT THIS THE GUARD ABOVE PROVES NOTHING. Thirteen files that are
+		// ⛔⛔ WITHOUT THIS THE GUARD ABOVE PROVES NOTHING. Ten files that are
 		// already monochrome pass an achromatic check whether or not that check can
 		// see colour at all — a decoder bug, a wrong channel offset, or an alpha
-		// filter that skips every pixel would all read as thirteen green ticks.
+		// filter that skips every pixel would all read as ten green ticks.
 		//
 		// ⚠ SYNTHETIC AND IN-REPO, DELIBERATELY. An earlier draft of this task
 		// proposed pointing the control at a coloured file in ~/Downloads. That is
@@ -185,9 +185,9 @@ describe("BLOCK-5b · G-b — all thirteen are achromatic", () => {
 		const size = 8;
 		const rgba = new Uint8Array(size * size * 4);
 		for (let i = 0; i < rgba.length; i += 4) {
-			// #FBA70C — the gold actually measured in the Discovery-set Oktoberfest
-			// thumbnail, used here as a realistic chromatic value rather than a
-			// cartoon one. Chroma = 0xFB - 0x0C = 239.
+			// #FBA70C — a gold measured off a Discovery-set thumbnail, used here as a
+			// realistic chromatic value rather than a cartoon one. Chroma =
+			// 0xFB - 0x0C = 239.
 			rgba[i] = 0xfb;
 			rgba[i + 1] = 0xa7;
 			rgba[i + 2] = 0x0c;
@@ -203,7 +203,7 @@ describe("BLOCK-5b · G-b — all thirteen are achromatic", () => {
 		expect(control.data[2]).toBe(0x0c);
 
 		// THE POINT: the same function, applied to colour, reports colour — far
-		// above the tolerance the thirteen shipped assets clear.
+		// above the tolerance the ten shipped assets clear.
 		expect(maxChroma(control)).toBe(239);
 		expect(maxChroma(control)).toBeGreaterThan(CHROMA_TOLERANCE);
 	});
@@ -244,7 +244,7 @@ describe("BLOCK-5b · G-e — optical size is normalised to 70% by HEIGHT", () =
 		const boxes = ALL_GLYPH_FILES.map((n) => inkBox(readGlyph(n))).filter(
 			(b): b is NonNullable<typeof b> => b !== null,
 		);
-		expect(boxes).toHaveLength(13);
+		expect(boxes).toHaveLength(10);
 
 		const heights = boxes.map((b) => b.height);
 		expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(2);
@@ -255,8 +255,11 @@ describe("BLOCK-5b · G-e — optical size is normalised to 70% by HEIGHT", () =
 
 	it("keeps every mark inside the canvas — nothing is clipped by the square", () => {
 		// §1c pads to square rather than centre-cropping, so no mark may touch an
-		// edge. `oktoberfest` is the tight one (504px wide of 512) and is exactly
-		// why this is asserted rather than assumed.
+		// edge. ⚠ RE-MEASURED AT MKT-ROSTER-1: the tight one used to be a glyph
+		// belonging to a removed market (504px wide of 512); with it gone
+		// `sentiment` is the widest at 476px of 512, clearing each edge by 18px.
+		// Still the reason this is asserted rather than assumed — the margin got
+		// bigger, not infinite.
 		for (const name of ALL_GLYPH_FILES) {
 			const box = inkBox(readGlyph(name));
 			expect(box).not.toBeNull();
@@ -274,8 +277,8 @@ describe("BLOCK-5b · G-c — both maps are exhaustive", () => {
 		RESOLUTION_BLOCKS,
 	) as (keyof typeof RESOLUTION_BLOCKS)[];
 
-	it("covers all eight known market slugs", () => {
-		expect(slugs).toHaveLength(8);
+	it("covers all six known market slugs", () => {
+		expect(slugs).toHaveLength(6);
 	});
 
 	it.each(
@@ -319,17 +322,20 @@ describe("BLOCK-5b · G-c — both maps are exhaustive", () => {
 	});
 
 	it("keys FLAVOUR on the flavour STRING, so a shared flavour shares its asset", () => {
-		// ⚠ The taxonomy maps 1:1 to eight markets TODAY. This asserts the
+		// ⚠ The taxonomy maps 1:1 to six markets TODAY. This asserts the
 		// MECHANISM rather than that coincidence: two calls with the same flavour
-		// string return the same asset even for different slugs, so a ninth market
-		// reusing a flavour needs no second entry anywhere.
-		const a = getResolutionBlockGlyphs("bitcoin-price-50k", "Pressure");
+		// string return the same asset even for different slugs, so a seventh
+		// market reusing a flavour needs no second entry anywhere.
+		// ⛔ "Petition" is deliberately NEITHER market's own flavour (bitcoin is
+		// Sentiment, github is Callout), so a lookup that secretly keyed off the
+		// SLUG would return two different assets here and fail.
+		const a = getResolutionBlockGlyphs("bitcoin-price-50k", "Petition");
 		const b = getResolutionBlockGlyphs(
 			"github-zugzwang-repo-stars",
-			"Pressure",
+			"Petition",
 		);
 		expect(a.flavour).toBe(b.flavour);
-		expect(a.flavour).toBe("/brand/blocks/pressure.png");
+		expect(a.flavour).toBe("/brand/blocks/petition.png");
 	});
 
 	it("throws on an unknown slug rather than falling back to no glyph", () => {
@@ -337,7 +343,7 @@ describe("BLOCK-5b · G-c — both maps are exhaustive", () => {
 		// would be indistinguishable from the pre-BLOCK-5b state, so it must be
 		// loud. `ResolverCards` catches this, captures once, and degrades one row.
 		expect(() =>
-			getResolutionBlockGlyphs("not-one-of-the-eight", "Pressure"),
+			getResolutionBlockGlyphs("not-one-of-the-six", "Petition"),
 		).toThrow(/no resolution-block glyph/);
 	});
 
