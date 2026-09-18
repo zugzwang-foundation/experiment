@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import { FREEZE_INSTANT_UTC } from "@/server/markets/create";
@@ -166,16 +169,28 @@ describe("description lengths", () => {
 	 * ⚠ THE KICKOFF SAID 700–800 CHARACTERS. THE CONTENT DOES NOT.
 	 *
 	 * Measured against the committed snapshot, re-measured 2026-09-18 after
-	 * MKT-ROSTER-1 took the slate to six:
+	 * MKT-ROSTER-1 took the slate to six, and AGAIN after D-50 overlaid five
+	 * markets' v3.0 wording onto it:
 	 *
-	 *   chess-fide-tiebreak-response         3609
-	 *   bitcoin-price-50k                    3795
-	 *   math-erdos-contribution-response     3836
-	 *   claude-bundle-response               3733
-	 *   yc-paper-club-response                789
-	 *   github-zugzwang-repo-stars            794
+	 *   slug                                 v2.2    v3.0
+	 *   chess-fide-tiebreak-response         3609 -> 1903
+	 *   bitcoin-price-50k                    3795 -> 3795   (MKT-BTC-01 untouched)
+	 *   math-erdos-solved-on-zugzwang        3836 -> 2852   (re-slugged)
+	 *   claude-bundle-response               3733 -> 2169
+	 *   yc-w27-acceptance                     789 -> 1658   (re-slugged)
+	 *   github-zugzwang-repo-stars            794 ->  792
 	 *
-	 * FOUR of the six carry a long, fully-structured criterion and two do not.
+	 * ⚠⚠ D-50 MOVED EVERY FIGURE EXCEPT BITCOIN'S, AND FOUR OF THE FIVE WENT
+	 * DOWN — which is the direction the bound below is least able to see. The
+	 * v3.0 criteria are tighter, not longer: staging had been carrying pre-v2.2
+	 * copy (chess lost 1 706 characters), so the drop is a market catching up to
+	 * the founder's current wording rather than a truncation. The 700-character
+	 * floor still holds on all six, by a margin of 92 at the tightest (github's
+	 * 792). ⇒ if a future edit takes any description under ~800, the floor is no
+	 * longer a comfortable guard and wants raising to sit under the real minimum.
+	 *
+	 * FOUR of the six carried a long, fully-structured criterion and two did not;
+	 * after v3.0 the spread is narrower and the shape of the argument is the same.
 	 * A test written to 700–800 would be red on arrival for those four, and the
 	 * only way to make it green is to edit founder-authored market copy — which
 	 * is a CLAUDE.md §3 refusal, not a fix.
@@ -202,12 +217,138 @@ describe("description lengths", () => {
 		expect(
 			Object.fromEntries(SPECS.map((s) => [s.slug, s.description.length])),
 		).toEqual({
-			"chess-fide-tiebreak-response": 3609,
+			"chess-fide-tiebreak-response": 1903,
 			"bitcoin-price-50k": 3795,
-			"math-erdos-contribution-response": 3836,
-			"claude-bundle-response": 3733,
-			"yc-paper-club-response": 789,
-			"github-zugzwang-repo-stars": 794,
+			"math-erdos-solved-on-zugzwang": 2852,
+			"claude-bundle-response": 2169,
+			"yc-w27-acceptance": 1658,
+			"github-zugzwang-repo-stars": 792,
 		});
+	});
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ⛔⛔ THE PRODUCTION SNAPSHOT, GUARDED HERE BECAUSE NOTHING ELSE GUARDS IT.
+//
+// `docs/data/prod-markets-snapshot.json` arrived with MKT-ROSTER-1 and shipped
+// with no parse guard at all (`@code-reviewer`, HIGH). Its staging sibling has
+// had one since LIQ-1-RESTORE — the block above — and the asymmetry matters more
+// for the production file than for staging's, for two reasons:
+//
+//   1 · It is the ONLY committed copy of production's own description text.
+//       Production was built fresh on 2026-09-14, not restored from staging, so
+//       the two environments' copy diverged. Nothing else in the repository can
+//       reconstruct production's.
+//       ⚠⚠ THE FIGURE THAT USED TO STAND HERE — "SEVEN of the eight
+//       descriptions and one title" — WAS ALREADY WRONG BEFORE D-50 (measured:
+//       FIVE of six descriptions and one title, the slate having gone to six at
+//       D-49), and D-50 makes it wrong in the other direction too: ruling 3
+//       aligns the five it touches, so the divergence is now ONE description
+//       (`bitcoin-price-50k`, which ruling 4 leaves at v2.2) and ZERO titles.
+//       ⇒ NO COUNT IS WRITTEN HERE. It has been wrong at two different values
+//       for two different reasons, which is `O-15`: a number in prose decays
+//       whatever the prose says about it. The live figure is asserted rather
+//       than described — `tests/unit/staging/market-spec-snapshot-parity.test.ts`
+//       pins the five as identical across both files and `bitcoin-price-50k` as
+//       deliberately not.
+//   2 · It is the input to the one irreversible step in the task. A short or
+//       malformed snapshot would first surface at the production RESTORE — that
+//       is, after the wipe.
+//
+// ⚠ IT VALIDATES SHAPE DIRECTLY, NOT THROUGH THE LOADER. `loadProdContentMarkets`
+// lives on the never-merged one-time branch; this guard has to survive on `main`,
+// where that module does not exist. So it reads the committed bytes and asserts
+// the properties `createMarket` will actually require, which is what the loader
+// would have checked anyway.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("the production snapshot is well-formed", () => {
+	const PROD_PATH = fileURLToPath(
+		new URL("../../../docs/data/prod-markets-snapshot.json", import.meta.url),
+	);
+	type SnapMarket = {
+		id: string;
+		slug: string;
+		title: string;
+		description: string;
+		resolution_deadline: string;
+		media_video_url: string | null;
+	};
+	type SnapMedia = {
+		market_id: string;
+		r2_object_key: string;
+		display_order: number;
+		is_default: boolean;
+	};
+	const snap = JSON.parse(readFileSync(PROD_PATH, "utf8")) as {
+		source?: { user?: string };
+		counts?: Record<string, number>;
+		markets: SnapMarket[];
+		market_media: SnapMedia[];
+	};
+
+	it("prod-snapshot::holds exactly six markets and twelve media rows", () => {
+		// CONTROL FIRST — a parse that yielded an empty array would satisfy every
+		// loop below while looking at nothing.
+		expect(snap.markets.length).toBe(6);
+		expect(snap.market_media.length).toBe(12);
+		expect(snap.counts).toEqual({ markets: 6, pools: 6, market_media: 12 });
+	});
+
+	it("prod-snapshot::records PRODUCTION as its source, not staging", () => {
+		// ⛔ THE LOAD-BEARING LINE. Seeding production from the staging capture
+		// would replace the founder's production copy and orphan every R2 object,
+		// and every other assertion here would still pass — both files now hold
+		// six markets, so a count cannot tell them apart.
+		expect(snap.source?.user).toContain("zbvprdcyxhlguxbostdj");
+		expect(snap.source?.user).not.toContain("rwfdoqzsghqhhdapxafg");
+	});
+
+	it("prod-snapshot::ids are production's own and overlap staging's nowhere", () => {
+		const prodIds = new Set(snap.markets.map((m) => m.id));
+		const stagingIds = new Set(SPECS.map((s) => s.marketId));
+		for (const id of prodIds) expect(stagingIds.has(id)).toBe(false);
+		expect(prodIds.size).toBe(6);
+	});
+
+	it("prod-snapshot::every market is createMarket-acceptable", () => {
+		let checked = 0;
+		for (const m of snap.markets) {
+			expect(m.id, m.slug).toMatch(
+				/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+			);
+			expect(m.slug.length, m.slug).toBeGreaterThan(0);
+			expect(m.title.length, m.slug).toBeGreaterThan(0);
+			// A short description is a market nobody can adjudicate.
+			expect(m.description.length, m.slug).toBeGreaterThan(400);
+			const deadline = Date.parse(m.resolution_deadline);
+			expect(Number.isNaN(deadline), m.slug).toBe(false);
+			// Never past the conclusion freeze.
+			expect(deadline, m.slug).toBeLessThanOrEqual(
+				FREEZE_INSTANT_UTC.getTime(),
+			);
+			checked += 1;
+		}
+		expect(checked).toBe(6);
+	});
+
+	it("prod-snapshot::media keys are market-id-scoped with a uuid stem", () => {
+		let checked = 0;
+		for (const m of snap.markets) {
+			const mine = snap.market_media.filter((x) => x.market_id === m.id);
+			// ⚠ PER-MARKET, not just a file total. A snapshot with three on one
+			// market and one on another sums to twelve and is still broken.
+			expect(mine.length, m.slug).toBe(2);
+			expect(mine.filter((x) => x.is_default).length, m.slug).toBe(1);
+			for (const x of mine) {
+				// The same exact shape `createMarket` validates — an exact match,
+				// never a prefix, so `m/<id>/../<other>/x.jpg` cannot pass.
+				expect(x.r2_object_key, m.slug).toMatch(
+					new RegExp(`^m/${m.id}/[0-9a-f-]{36}\\.[a-z0-9]+$`),
+				);
+				checked += 1;
+			}
+		}
+		expect(checked).toBe(12);
 	});
 });

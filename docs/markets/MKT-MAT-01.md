@@ -1,30 +1,32 @@
-# Math · Will 3 Erdős problems be solved by 5th November?
+# Math · Will 3 Erdős problems be solved on Zugzwang by 5th November?
 
-**MKT-MAT-01** · `/m/math-erdos-contribution-response` · **v2.2** · 2026-09-08  
-**Subject** Thomas Bloom's public confirmation of Erdős problem solutions · Math  
-**Supersedes** `MKT-MAT-01_market-spec_v2_1.md (v2.1, 2026-09-08)`
+**MKT-MAT-01** · `/m/math-erdos-solved-on-zugzwang` · **v3.0** · 2026-09-18  
+**Subject** Erdős problems solved on Zugzwang, as confirmed by Thomas Bloom · Math  
+**Supersedes** `MKT-MAT-01_market-spec_v2_2.md (v2.2, 2026-09-08)`
 
 ---
 
 ## 1 · The question
 
-Will Thomas Bloom, owner and maintainer of erdosproblems.com, publicly confirm on X that at least three distinct Erdős problems, open on 15 September 2026, have been solved, proved or disproved by 5 November 2026?
+Will Thomas Bloom, owner and maintainer of erdosproblems.com, publicly confirm on X by 5 November 2026 that at least three distinct Erdős problems, listed as open on erdosproblems.com when this market opened, have been solved on Zugzwang?
 
 ## 2 · How it resolves
 
-Resolves YES if posts published by @thomasfbloom on X, within the observation window, state of at least three distinct numbered Erdős problems that the problem is solved, proved or disproved. Each problem counts once. A problem must have been listed as open on erdosproblems.com at market open to count. Resolves NO in every other case - including fewer than three, posts reporting partial progress or reporting someone's claim without stating the problem is solved, and silence. A status change on erdosproblems.com itself does not resolve this market, and neither does a comment on its forum. Only a post by @thomasfbloom on X does.
+Resolves YES if posts published by @thomasfbloom on X, within the observation window, state of at least three distinct numbered Erdős problems that the problem is solved, proved or disproved, and for each one link to the Zugzwang argument carrying the solution or name Zugzwang as where it was published. Each problem counts once. A problem must have been listed as open on erdosproblems.com at market open to count. Resolves NO in every other case - including confirmations that neither link to nor name Zugzwang, posts reporting partial progress or reporting someone's claim without stating the problem is solved, and silence. A status change on erdosproblems.com itself does not resolve this market, and neither does a comment on its forum. Only posts by @thomasfbloom on X do.
 
 ## 3 · The rules
 
-Criterion. A qualifying post must identify an Erdős problem by its number and state that it is solved, proved or disproved. Both elements must appear in a post authored by @thomasfbloom. There is no test of importance, difficulty or significance.
+On Zugzwang. A solution is on Zugzwang when it is published in an argument - a post or a reply - on this market, inside the window: in the argument's text, in its image, or through a link in it. Like every argument here, it carries a stake. Who or what produced the solution is not tested.
+
+Criterion. A qualifying confirmation identifies an Erdős problem by its number, states that it is solved, proved or disproved, and links to the Zugzwang argument or names Zugzwang. All three elements must appear in posts authored by @thomasfbloom. There is no test of importance, difficulty or significance.
 
 Distinct. Three posts about one problem count once. Three problems in one post count three. A thread counts as its component posts.
 
-Open. A problem counts only if erdosproblems.com listed it as open at market open, established by an archive capture at open. Roughly twenty problems will change status on the site in this window; that alone resolves nothing.
+Open. A problem counts only if erdosproblems.com listed it as open at market open, established by an archive capture at open.
 
 Source. @thomasfbloom on X only.
 
-Deadline. 5 November 2026, 23:45 UTC. The window opens at market open on 15 September 2026. UTC is the binding clock. Only posts timestamped at or before the deadline count, whenever the operator resolves. No extensions.
+Deadline. 5 November 2026, 23:45 UTC. The window opens at market open. UTC is the binding clock. Only posts timestamped at or before the deadline count, whenever the operator resolves. No extensions.
 
 Trigger. Latching. The third distinct qualifying confirmation resolves YES irreversibly. Later deletion does not un-resolve it, and neither does a subsequent reversal by him.
 
@@ -34,7 +36,7 @@ Deletion. If a qualifying post is deleted or the account suspended, an independe
 
 Void. None. Silence resolves NO.
 
-Evidence. For each of the three confirmations the operator publishes the source URL, post timestamp, the text verbatim, an archive capture, and the clause satisfied, plus the market-open capture establishing each problem was open.
+Evidence. For each of the three confirmations the operator publishes the source URL, post timestamp, the text verbatim, an archive capture, the Zugzwang argument it points to, and the clause satisfied, plus the market-open capture establishing each problem was open.
 
 ## 4 · The facts
 
@@ -54,13 +56,13 @@ Display block: **RESOLUTION** Response on X · **RESOLVER** @thomasfbloom → `h
 **Slug**
 
 ```
-math-erdos-contribution-response
+math-erdos-solved-on-zugzwang
 ```
 
-**Title** — 55 characters
+**Title** — 67 characters
 
 ```
-Math · Will 3 Erdős problems be solved by 5th November?
+Math · Will 3 Erdős problems be solved on Zugzwang by 5th November?
 ```
 
 **Deadline** — typed digits are read as UTC verbatim. No trailing `Z`.

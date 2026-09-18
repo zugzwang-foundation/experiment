@@ -301,12 +301,21 @@ describe("BLOCK-1 — G2, every value line is real content, never an empty bar",
 		// render did not flatten that exception to the slate-wide date — a block
 		// reading 5 Nov there would have locked a participant out early. That
 		// market was removed, so there is no longer a second date to confuse.
-		// ⛔ RE-AIMED RATHER THAN RETIRED, AND AT SOMETHING STRICTLY STRONGER. It
-		// now reads the expectation OUT OF THE MAP for every market instead of
-		// hardcoding one date and spot-checking a second. A hardcoded "5 Nov 2026"
-		// here would pass against a component that ignored the map entirely and
-		// printed a constant; deriving it cannot. If a per-market date is ever
-		// ruled again, this test covers it on the day it lands with no edit.
+		// ⛔ RE-AIMED RATHER THAN RETIRED — and the honest accounting is that ONE
+		// half of the re-aim is a strengthening and the other is not yet.
+		//   · STRONGER, today: the sweep. One market became all six, with a
+		//     non-vacuity count, so a component that rendered the date correctly
+		//     on one market and wrongly on another can no longer pass.
+		//   · NOT stronger, today: the DERIVATION. Every `closes.line1` in the map
+		//     is now the same string, so reading it out of the map is byte-identical
+		//     to hardcoding "5 Nov 2026" and cannot distinguish a component that
+		//     ignores the map from one that reads it. It buys something only when a
+		//     second date exists again.
+		// ⚠ An earlier version of this comment claimed the derivation was
+		// "strictly stronger", which contradicted this test's own data-level twin
+		// in the same commit — `resolution-block-data.test.ts` correctly calls the
+		// loss "THE WEAKER HALF OF G3". Two self-assessments of one loss disagreeing
+		// is worse than either being wrong (`@code-reviewer`).
 		let checked = 0;
 		for (const slug of Object.keys(RESOLUTION_BLOCKS) as Array<
 			keyof typeof RESOLUTION_BLOCKS
@@ -423,7 +432,7 @@ describe("BLOCK-1 — G2, every value line is real content, never an empty bar",
 		// re-asserted here. What changed is `ResolverCards`, the caller: it now
 		// catches that throw, captures it once, and renders nothing.
 		vi.mocked(captureException).mockClear();
-		const unknown = { ...BASE, slug: "not-one-of-the-eight" };
+		const unknown = { ...BASE, slug: "not-one-of-the-six" };
 		const { container } = render(<ResolverCards market={unknown} />);
 
 		// ⛔ NOTHING renders — no row, no partial chrome, no empty bar (the
@@ -444,7 +453,7 @@ describe("BLOCK-1 — G2, every value line is real content, never an empty bar",
 		const captured = vi.mocked(captureException).mock.calls[0]?.[0];
 		expect(captured).toBeInstanceOf(Error);
 		expect((captured as Error).message).toMatch(
-			/no resolution-block data for market slug "not-one-of-the-eight"/,
+			/no resolution-block data for market slug "not-one-of-the-six"/,
 		);
 	});
 
@@ -672,25 +681,37 @@ describe("BLOCK-3 §3 — value/subvalue read ink, sized per block from the map"
 		}
 	});
 
-	it("resolver-cards::no-entry-ships-at-the-11px-floor-after-BLOCK-3-§2-widened-the-column", () => {
+	it("resolver-cards::the-11px-floor-carries-exactly-ONE-entry-and-it-is-CHE-RESOLVER", () => {
 		// ⚠⚠ THIS TEST USED TO BE "math-erdos-RESOLVER-hits-the-11px-floor-and-
 		// still-truncates" — "@thomasfbloom" did not fit the column §3 first
 		// measured against (79px) even at the 11px floor. §2 then shrank the
 		// glyph for an unrelated reason (reducing block height) and widened
 		// that column to 91px as a side effect; re-measured before shipping,
 		// every entry that had been pinned to 11px moved up, including this
-		// one (now 12px, fits cleanly, no truncation needed). Recorded as a
-		// positive assertion rather than deleted outright (O-4): the floor and
-		// `truncate` stay in the type and the render path regardless — this
-		// proves the CURRENT map doesn't need them, not that it never will.
+		// one (now 12px, fits cleanly, no truncation needed). It then became
+		// "no-entry-ships-at-the-11px-floor", a blanket `fontSize > 11`.
+		// ⛔⛔ D-50 MADE THAT BLANKET FALSE AND IT IS INVERTED HERE, NOT REMOVED
+		// AND NOT LOOSENED. `@vishy64theking` is fifteen characters — 95.01px at
+		// 12 against a 90.664px column — so 11 is the only size it fits, and CHE's
+		// RESOLVER is now the floor's single tenant. A bare `>= 11` would have
+		// been the lazy repair and would assert nothing at all; an exact
+		// inventory still fails the day a SECOND entry arrives there, which is
+		// the signal that a value outgrew the column and wants re-measuring in a
+		// real browser rather than a silent step down.
+		// ⚠ It FITS — 3.57px of headroom — so the sibling
+		// `truncate-still-ships-unconditionally` guard below still describes a
+		// pure backstop, and nothing in the shipped map ellipsizes.
+		const atFloor: string[] = [];
 		for (const slug of Object.keys(RESOLUTION_BLOCKS) as Array<
 			keyof typeof RESOLUTION_BLOCKS
 		>) {
 			const data = RESOLUTION_BLOCKS[slug];
 			for (const k of KEYS) {
-				expect(data[k].fontSize).toBeGreaterThan(11);
+				expect(data[k].fontSize).toBeGreaterThanOrEqual(11);
+				if (data[k].fontSize === 11) atFloor.push(`${slug}.${k}`);
 			}
 		}
+		expect(atFloor).toEqual(["chess-fide-tiebreak-response.resolver"]);
 	});
 
 	it("resolver-cards::truncate-still-ships-unconditionally-as-the-backstop", () => {
@@ -700,9 +721,7 @@ describe("BLOCK-3 §3 — value/subvalue read ink, sized per block from the map"
 		// this component needing to change. Asserted directly on the entry
 		// that most recently exercised this path.
 		const { container } = render(
-			<ResolverCards
-				market={marketFixture("math-erdos-contribution-response")}
-			/>,
+			<ResolverCards market={marketFixture("math-erdos-solved-on-zugzwang")} />,
 		);
 		const value = container.querySelector(
 			'[data-testid="resolution-block-value-resolver"]',
@@ -711,7 +730,7 @@ describe("BLOCK-3 §3 — value/subvalue read ink, sized per block from the map"
 		expect(cls).toContain("text-[12px]");
 		expect(cls).toContain("truncate");
 		expect(
-			RESOLUTION_BLOCKS["math-erdos-contribution-response"].resolver.fontSize,
+			RESOLUTION_BLOCKS["math-erdos-solved-on-zugzwang"].resolver.fontSize,
 		).toBe(12);
 	});
 });
@@ -1055,7 +1074,7 @@ describe("BLOCK-5b · G-d — every block on every market renders a real glyph i
 		// half-rendered state with chrome but no glyph.
 		vi.mocked(captureException).mockClear();
 		const { container } = render(
-			<ResolverCards market={{ ...BASE, slug: "not-one-of-the-eight" }} />,
+			<ResolverCards market={{ ...BASE, slug: "not-one-of-the-six" }} />,
 		);
 		expect(
 			container.querySelectorAll(

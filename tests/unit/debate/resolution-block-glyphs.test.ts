@@ -301,8 +301,13 @@ describe("BLOCK-5b · G-c — both maps are exhaustive", () => {
 	});
 
 	it("gives RESOLUTION and RESOLVER the same asset on every market", () => {
-		// After BLOCK-4 their values coincide; one map consulted twice is what
-		// keeps them from drifting apart silently.
+		// ⚠⚠ D-50 — THE ASSERTION IS UNCHANGED AND THE REASON UNDER IT IS NOT.
+		// This comment read "after BLOCK-4 their values coincide", which was a
+		// claim about the TEXT and is now false: `yc-w27-acceptance` reads
+		// "YC decision" against "Y Combinator". One asset still serves both,
+		// because a written decision and the institution issuing it are the same
+		// SOURCE even when they are not the same words.
+		// One map consulted twice is what keeps them from drifting apart silently.
 		for (const slug of slugs) {
 			const g = getResolutionBlockGlyphs(
 				slug,
@@ -345,6 +350,56 @@ describe("BLOCK-5b · G-c — both maps are exhaustive", () => {
 		expect(() =>
 			getResolutionBlockGlyphs("not-one-of-the-six", "Petition"),
 		).toThrow(/no resolution-block glyph/);
+	});
+
+	it("YCP-01 took petition.png and must NOT fall back to the X wordmark", () => {
+		// ⛔⛔ D-50 — this market is no longer settled on X, so `response-on-x.png`
+		// would now point at the wrong instrument entirely. The asset is REUSED
+		// rather than minted (no new image was in scope), and `petition.png` is a
+		// signed document — very nearly a picture of "YC's written decision to the
+		// applicant". Pinned because the cheapest regression is a map entry copied
+		// forward from before the ruling.
+		const g = getResolutionBlockGlyphs("yc-w27-acceptance", "Showcase");
+		expect(g.resolution).toBe("/brand/blocks/petition.png");
+		expect(g.resolver).toBe("/brand/blocks/petition.png");
+		expect(g.resolution).not.toBe("/brand/blocks/response-on-x.png");
+		// ⚠⚠ THREE DISTINCT ASSETS ACROSS FOUR BLOCKS IS THE CEILING FOR EVERY
+		// MARKET, NOT A PROPERTY OF THIS ONE — RESOLUTION and RESOLVER are one
+		// map consulted twice, so they always share. An earlier draft of this
+		// guard asserted FOUR and went red on its first run; four is unreachable
+		// by construction and the assertion was the thing that was wrong.
+		// ⛔ THE ARGUMENT AGAINST `showcase.png` SURVIVES THE CORRECTED NUMBER,
+		// which is the only reason it is worth stating: this market's own FLAVOUR
+		// is Showcase, so taking `showcase.png` for the source too would collapse
+		// the set to TWO and paint three of the four blocks with one mark.
+		// `petition.png` holds it at the three-asset ceiling.
+		expect(new Set(Object.values(g)).size).toBe(3);
+		// And the ceiling is the general rule, asserted so the claim above is not
+		// just a comment: no market reaches four.
+		for (const slug of slugs) {
+			const all = getResolutionBlockGlyphs(
+				slug,
+				RESOLUTION_BLOCKS[slug].flavour.line1,
+			);
+			expect(all.resolution).toBe(all.resolver);
+			expect(new Set(Object.values(all)).size).toBeLessThanOrEqual(3);
+		}
+	});
+
+	it("response-on-x.png now serves THREE markets, not four", () => {
+		// ⛔ D-50 — the count is asserted rather than described, because the glyph
+		// file's docblock states it in prose and prose goes stale silently. YCP
+		// left this set; CHE, MAT and CLA remain.
+		const onX = slugs.filter(
+			(slug) =>
+				getResolutionBlockGlyphs(slug, RESOLUTION_BLOCKS[slug].flavour.line1)
+					.resolution === "/brand/blocks/response-on-x.png",
+		);
+		expect(onX.sort()).toEqual([
+			"chess-fide-tiebreak-response",
+			"claude-bundle-response",
+			"math-erdos-solved-on-zugzwang",
+		]);
 	});
 
 	it("every flavour string in the data file has a glyph", () => {

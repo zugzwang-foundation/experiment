@@ -101,12 +101,18 @@ describe("the reset's verdict", () => {
 	});
 
 	it("REFUSES on the whole slate and lists every one", () => {
+		// ⚠ D-50 re-slugged two of these. The predicate under test is
+		// slug-AGNOSTIC — it claims a fixture PREFIX and calls everything else
+		// content — so this list is a fixture rather than a dependency and the
+		// test would have stayed green with the old names. Re-keyed anyway,
+		// because the assertion below is that a refusal NAMES the whole slate,
+		// and a slate naming two markets that no longer exist is not the slate.
 		const slate = [
 			"chess-fide-tiebreak-response",
 			"bitcoin-price-50k",
-			"math-erdos-contribution-response",
+			"math-erdos-solved-on-zugzwang",
 			"claude-bundle-response",
-			"yc-paper-club-response",
+			"yc-w27-acceptance",
 			"github-zugzwang-repo-stars",
 		];
 		const verdict = assessContentMarkets({

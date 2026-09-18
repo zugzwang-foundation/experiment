@@ -86,7 +86,7 @@ the social network spreads the truth freely.`,
 		figure: "identity",
 		eyebrow: "WELCOME",
 		title: "You’re {pseudonym}",
-		sub: "This pseudonym is your identity for the length of the experiment. The experiment has 8 markets with unique flavours and defined resolutions. The experiment runs from 15th September 2026 to 5th November 2026. Dharma is your betting instrument for raising arguments in any of the 8 markets.",
+		sub: "This pseudonym is your identity for the length of the experiment. The experiment has 6 markets with unique flavours and defined resolutions. The experiment runs from 15th September 2026 to 5th November 2026. Dharma is your betting instrument for raising arguments in any of the 6 markets.",
 	},
 	{
 		figure: "goal",

@@ -92,8 +92,7 @@ describe("chart-window::staging and preview share the fixture window", () => {
 		// of every market. Now the earliest event of ANY type, floored.
 		// ⚠ RE-MEASURED 2026-09-11 — was 2026-08-17T00:00Z. The 2026-09-07 reset
 		// destroyed the then-eight content markets and LIQ-1-RESTORE recreated
-		// them, so
-		// every renderable event on staging is now younger than the window that
+		// them, so every renderable event on staging is now younger than the window that
 		// held them, and the plot opened three weeks before any data existed.
 		const STG_START = "2026-09-07T00:00:00.000Z";
 		// ⚠ CHART-4 D11 — was 2026-09-10T23:45Z, now production's own end. The
@@ -313,17 +312,26 @@ describe("debate-view::price-chart-window-contains-all-data — RF-5, against th
 	 * Read against the live staging database, one row per content market, ordered
 	 * as measured. ⚠ Re-measure after any reset that recreates the markets; see
 	 * `EARLIEST_MEASURED_EVENT` above for the same warning.
+	 * ⚠⚠ D-50 RE-KEYED TWO OF THESE SLUGS AND DID **NOT** MOVE A SINGLE
+	 * INSTANT, which is the one thing worth saying here. That ruling edits
+	 * `markets.title`, `.description` and `.slug` IN PLACE — it does not
+	 * recreate a row, so no new `market.opened` was minted and every
+	 * timestamp below is still the 2026-09-18 restore's. ⇒ a slug change in
+	 * this list is NOT the trigger the warning above describes; a RESET is.
+	 * Renaming the keys and re-measuring the instants are separate acts, and
+	 * conflating them would have replaced six measured values with six
+	 * fresh ones for no reason.
 	 */
 	function stagingGenesisInstants(): { slug: string; at: string }[] {
 		return [
 			{ slug: "chess-fide-tiebreak-response", at: "2026-09-18T10:57:34.675Z" },
 			{ slug: "bitcoin-price-50k", at: "2026-09-18T10:57:34.858Z" },
 			{
-				slug: "math-erdos-contribution-response",
+				slug: "math-erdos-solved-on-zugzwang",
 				at: "2026-09-18T10:57:34.992Z",
 			},
 			{ slug: "claude-bundle-response", at: "2026-09-18T10:57:35.161Z" },
-			{ slug: "yc-paper-club-response", at: "2026-09-18T10:57:35.295Z" },
+			{ slug: "yc-w27-acceptance", at: "2026-09-18T10:57:35.295Z" },
 			{ slug: "github-zugzwang-repo-stars", at: "2026-09-18T10:57:35.436Z" },
 		];
 	}
@@ -417,9 +425,15 @@ describe("debate-view::price-chart-window-contains-all-data — RF-5, against th
 			xs.filter((x) => x < 0).length,
 			"a window opening after the newest genesis instant must clip every one of them; if it does not, this guard is measuring the wrong quantity",
 		).toBe(genesis.length);
-		// ⛔ AND BY A VISIBLE PIXEL, not by a rounding artefact. Without this, a
-		// future change to `round` could shrink every clip to −0 and the count
-		// above would still read six.
+		// ⛔ AND BY A VISIBLE PIXEL, not by a rounding artefact — it catches a clip
+		// that is genuinely negative but sub-pixel (−0.3, say), which the count
+		// above would happily accept as six clips nobody can see.
+		// ⚠ ITS ORIGINAL JUSTIFICATION WAS WRONG AND IS CORRECTED RATHER THAN
+		// QUIETLY DROPPED: it claimed a future `round` returning −0 everywhere
+		// would still satisfy the count. It would not — in JS `-0 < 0` is FALSE,
+		// so an all-−0 result makes the filter empty and the `toBe(6)` above REDs
+		// first. That case was already covered; this assertion earns its lines for
+		// the sub-pixel one (`@code-reviewer`).
 		expect(
 			Math.max(...xs),
 			"every clipped x must be at most −1px",

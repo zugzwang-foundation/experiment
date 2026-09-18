@@ -210,8 +210,25 @@ describe("O1-DECK — copy drift against the ratified register", () => {
 	});
 
 	it("pins Card 2's market count and window start as literals (tripwire)", () => {
+		// ⚠⚠ MOVED 8 → 6 BY D-49 (MKT-ROSTER-1, 2026-09-18), AND THE MOVE IS THE
+		// TRIPWIRE WORKING RATHER THAN BEING DEFEATED. This assertion verifies
+		// nothing on its own — the docblock above says so, because there is no
+		// machine-readable slate to compare a count against. What it buys is that
+		// changing the slate cannot happen silently: it must pass through THIS
+		// line, in a file that says why.
+		//
+		// It earned that. MKT-ROSTER-1's own plan swept for the removed markets'
+		// slugs and titles and never looked for the word "markets", so the
+		// onboarding deck — which tells every new participant how many there are,
+		// twice — was missed by the plan, by the execute, and by three reviewers.
+		// This test is what caught it. The copy register was amended under its own
+		// precedence rule ("where a card asserts a product fact, the spec wins and
+		// this file is amended").
 		const welcome = ONBOARDING_CARDS.find((c) => c.eyebrow === "WELCOME");
-		expect((welcome?.sub.match(/8 markets/g) ?? []).length).toBe(2);
+		expect((welcome?.sub.match(/6 markets/g) ?? []).length).toBe(2);
+		// ⛔ AND THE OLD COUNT ASSERTED ABSENT, so a revert of the component alone
+		// cannot pass by leaving both counts in the string.
+		expect(welcome?.sub).not.toContain("8 markets");
 		expect(welcome?.sub).toContain("15th September 2026");
 	});
 });

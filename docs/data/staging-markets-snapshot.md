@@ -39,6 +39,30 @@ restore is never mistaken for a rollback.
 tank `100000` — identical on all six, and identical on production's six.
 ⇒ one `--price 0.1 --tank 100000` restores the whole slate.
 
+⛔⛔ **D-50 (2026-09-18) OVERLAID FIVE MARKETS' WORDING ONTO THIS CAPTURE, SO**
+**THE `title` / `slug` / DESCRIPTION BELOW ARE NO LONGER WHAT THE 09:59:09Z READ**
+**RETURNED.** `docs/decisions/RECORD-v2.9-amendment.md`. `MKT-CHE-01`,
+`MKT-CLA-01`, `MKT-GIT-01`, `MKT-MAT-01` and `MKT-YCP-01` took their v3.0 specs;
+two of them re-slugged (`math-erdos-contribution-response` →
+`math-erdos-solved-on-zugzwang`, `yc-paper-club-response` → `yc-w27-acceptance`).
+**Every other row is the capture, untouched** — ids, status, deadlines,
+`created_at`, pools and `market_media` are all still the 2026-09-18 read.
+⚠ **Read the five sections below as the INTENDED state, not as an observation.**
+They are what the edit transaction asserts as its postcondition, and until that
+transaction commits against staging they do not describe the live database. The
+sixth, `bitcoin-price-50k`, is a pure capture: D-50 ruling 4 leaves MKT-BTC-01 at
+v2.2 and nothing here touched it.
+⚠ **This matters more for the JSON than for this file.** The sibling is the
+seeder's source (`tests/staging/content-markets.ts:45`), so a future
+`staging:rebuild` now recreates the slate at **v3.0** — which is the point of
+editing it rather than leaving the pair to disagree. The source of the wording is
+`docs/markets/MKT-*-01.md`; this is a copy of a copy and the specs win.
+⚠ **Staging had never received v2.2.** Measured at D-50: before this overlay,
+five of the six descriptions and one title differed between the two environments,
+staging carrying the older and longer copy (e.g. chess 3 609 characters against
+production's 1 616). Ruling 3 is what closes that for the five — and only for the
+five.
+
 ⚠ **BLOCK-1 (2026-08-31) renamed YCP-01's (`yc-paper-club-response`) artifact
 noun "paper" → "pitch" too broadly — BLOCK-2 (2026-08-31) repaired it to the
 actual founder-ruled scope** (only "submitting its research paper to" →
@@ -49,7 +73,7 @@ The text below is CURRENT (post-repair).
 
 ## 1. `chess-fide-tiebreak-response`
 
-**Chess · Will FIDE answer Zugzwang's tiebreak proposal?**
+**Chess · Will Vishy Anand answer Zugzwang's tiebreak proposal?**
 
 | field | value |
 |---|---|
@@ -69,29 +93,25 @@ The text below is CURRENT (post-repair).
 **Resolution text (`markets.description`), verbatim:**
 
 ```text
-Will FIDE respond publicly on X by 5 November 2026 to Zugzwang's published proposal to abolish rapid and blitz tiebreaks from the World Chess Championship match? Resolves YES if @FIDE_chess publishes a post on X, within the observation window, that names Zugzwang or links, quotes or reproduces any post in the Zugzwang thread. A reply, a repost, a quote-post and a standalone post all qualify. Resolves NO in every other case — including if FIDE posts nothing, responds only from another account, responds anywhere other than X, or writes about tiebreaks without referring to Zugzwang.
+Will Viswanathan Anand respond publicly on X by 5 November 2026 to Zugzwang's published proposal to abolish rapid and blitz tiebreaks from the World Chess Championship match?
 
-Resolution type. Resolves on whether FIDE publicly acknowledges the proposal, not on whether it agrees and not on whether the rule changes. A refusal, a dismissal, or a statement that it will not be considered all resolve YES. Silence resolves NO, never Void.
+Resolves YES if @vishy64theking publishes a post on X, within the observation window, that names Zugzwang or links, quotes or reproduces any post in the Zugzwang thread. A reply, a repost, a quote-post and a standalone post all qualify. Resolves NO in every other case.
 
-The stimulus. A thread of ten consecutive Zugzwang posts, one card each. Engagement with any of the ten qualifies. The root post is the anchor: its permalink is published here and its timestamp opens the window. The thread is committed in full in the public campaign spec before open; it will not be revised, extended or reordered, and no post will be removed by the Foundation.
+Resolution type. Resolves on whether Anand publicly acknowledges the proposal, not on whether he agrees and not on whether the rule changes. A refusal, a dismissal, or a statement that it will not be considered all resolve YES. Silence resolves NO, never Void.
 
-Source. Only posts from @FIDE_chess on X can resolve this market. No other account qualifies, including @FideWomen, @FideOnlineArena, the unrelated @FideChess, every FIDE official in any capacity including the President, Interim President and CEO, and FIDE on Instagram, Facebook, TikTok, YouTube, LinkedIn and Twitch. Nor the European Chess Union, World Chess, or any national federation. Nor any surface off X: fide.com news, Council decisions, General Assembly minutes, handbook.fide.com, rcc.fide.com, press conferences, broadcasts, interviews and media reports.
+Resolver. Viswanathan Anand in person, whatever office he holds or ceases to hold during the window, including after the FIDE presidential election of 26 September 2026. A post by @FIDE_chess or any other account does not count, even one that speaks for him.
 
-Regulations. Publication of the 2026 Match Regulations, or any FIDE Handbook amendment, does not resolve this market — whatever it says and wherever it appears. Only a post referring to Zugzwang resolves it.
-
-Naming. A qualifying post must contain the word Zugzwang, or link to, quote-post or reproduce a post in the thread. There is no test of substance and no test of which post was engaged. A repost without comment does not qualify; a quote-post carrying @FIDE_chess's own text does. Any language qualifies. One qualifying post resolves this market and the first binds.
+Source. Only posts from @vishy64theking on X can resolve this market.
 
 Window. Opens at the root post's timestamp, ends 5 November 2026 at 23:45 UTC. UTC is the binding clock. Only posts timestamped at or before that instant count, whenever the operator resolves. No extensions.
 
-Trigger. Latching. The first qualifying post resolves YES irreversibly. If FIDE later deletes it, this market stays YES.
+Trigger. Latching. The first qualifying post resolves YES irreversibly. If Anand later deletes it, this market stays YES.
 
-Deletion. If a qualifying post is deleted or @FIDE_chess suspended, an independent archive capture timestamped within the window is admissible; a screenshot is not. If the root post is removed, by anyone for any reason, this resolves NO. If other posts are removed, the market stands.
+Deletion. If a qualifying post is deleted or @vishy64theking suspended, an independent archive capture timestamped within the window is admissible; a screenshot is not. If the root post is removed, by anyone for any reason, this resolves NO. If other posts are removed, the market stands.
 
 Void. None. Silence resolves NO, and removal of the root post resolves NO rather than voiding.
 
 Evidence. The operator publishes the source URL, the post timestamp, the text verbatim, an independent archive capture, and the clause satisfied.
-
-Operator intervention. Declared. The Zugzwang Foundation published the ten-post thread this market resolves on. Beyond it the Foundation takes no action directed at FIDE, its officials, the Council or any federation: no further posts, no eleventh post, no direct contact, no intermediaries. No post will be removed. An archive capture covering all ten was taken at publication.
 ```
 
 **`market_media` (2):**
@@ -157,14 +177,14 @@ DISCLOSURE. No operator intervention. The Foundation takes no action directed at
 
 ---
 
-## 3. `math-erdos-contribution-response`
+## 3. `math-erdos-solved-on-zugzwang`
 
-**Math · Will 3 Erdős problems be solved by 5th November?**
+**Math · Will 3 Erdős problems be solved on Zugzwang by 5th November?**
 
 | field | value |
 |---|---|
 | `id` | `01a01181-d035-714a-b735-5d282576d0a3` |
-| `slug` | `math-erdos-contribution-response` |
+| `slug` | `math-erdos-solved-on-zugzwang` |
 | `status` | `Open` |
 | `resolution_deadline` | `2026-11-05T23:45:00.000Z` |
 | `resolved_at` | `NULL` |
@@ -179,21 +199,21 @@ DISCLOSURE. No operator intervention. The Foundation takes no action directed at
 **Resolution text (`markets.description`), verbatim:**
 
 ```text
-Will Thomas Bloom, owner and maintainer of erdosproblems.com, publicly confirm on X that at least three distinct Erdős problems, open on 15 September 2026, have been solved, proved or disproved by 5 November 2026?
+Will Thomas Bloom, owner and maintainer of erdosproblems.com, publicly confirm on X by 5 November 2026 that at least three distinct Erdős problems, listed as open on erdosproblems.com when this market opened, have been solved on Zugzwang?
 
-Resolves YES if posts published by @thomasfbloom on X, within the observation window, state of at least three distinct numbered Erdős problems that the problem is solved, proved or disproved. Each problem counts once. A problem must have been listed as open on erdosproblems.com at market open to count. Resolves NO in every other case - including fewer than three, posts reporting partial progress or reporting someone's claim without stating the problem is solved, and silence. A status change on erdosproblems.com itself does not resolve this market, and neither does a comment on its forum. Only a post by @thomasfbloom on X does.
+Resolves YES if posts published by @thomasfbloom on X, within the observation window, state of at least three distinct numbered Erdős problems that the problem is solved, proved or disproved, and for each one link to the Zugzwang argument carrying the solution or name Zugzwang as where it was published. Each problem counts once. A problem must have been listed as open on erdosproblems.com at market open to count. Resolves NO in every other case - including confirmations that neither link to nor name Zugzwang, posts reporting partial progress or reporting someone's claim without stating the problem is solved, and silence. A status change on erdosproblems.com itself does not resolve this market, and neither does a comment on its forum. Only posts by @thomasfbloom on X do.
 
-Criterion. A qualifying post must identify an Erdős problem by its number and state that it is solved, proved or disproved. Both elements must appear in a post authored by @thomasfbloom. There is no test of importance, difficulty or significance.
+On Zugzwang. A solution is on Zugzwang when it is published in an argument - a post or a reply - on this market, inside the window: in the argument's text, in its image, or through a link in it. Like every argument here, it carries a stake. Who or what produced the solution is not tested.
 
-Not qualifying. Partial progress, an improved bound, a promising approach. Reporting someone's claim without stating the problem is solved. A Lean formalisation with no statement of resolution. Commentary naming no numbered problem. A post about Zugzwang or this market resolves nothing by itself; if it also meets this criterion, it qualifies - content is read, never motive.
+Criterion. A qualifying confirmation identifies an Erdős problem by its number, states that it is solved, proved or disproved, and links to the Zugzwang argument or names Zugzwang. All three elements must appear in posts authored by @thomasfbloom. There is no test of importance, difficulty or significance.
 
 Distinct. Three posts about one problem count once. Three problems in one post count three. A thread counts as its component posts.
 
-Open. A problem counts only if erdosproblems.com listed it as open at market open, established by an archive capture at open. Roughly twenty problems will change status on the site in this window; that alone resolves nothing.
+Open. A problem counts only if erdosproblems.com listed it as open at market open, established by an archive capture at open.
 
-Source. @thomasfbloom on X only. Excluded: the erdosproblems.com forum and every comment on it including his own, the site's proof-claim mechanism, the homepage and its OPEN to SOLVED log, problem pages and status badges, the blog, tags, prizes and lists, and thomasbloom.org. Excluded: his arXiv postings, Terence Tao's blog, the teorth/erdosproblems and formal-conjectures repositories, Quanta, and all media. Excluded: every other account on every platform. Excluded: email, direct message, talks, podcasts and interviews. A laboratory announcing a result does not resolve this market; only Bloom posting about it does.
+Source. @thomasfbloom on X only.
 
-Deadline. 5 November 2026, 23:45 UTC. The window opens at market open on 15 September 2026. UTC is the binding clock. Only posts timestamped at or before the deadline count, whenever the operator resolves. No extensions.
+Deadline. 5 November 2026, 23:45 UTC. The window opens at market open. UTC is the binding clock. Only posts timestamped at or before the deadline count, whenever the operator resolves. No extensions.
 
 Trigger. Latching. The third distinct qualifying confirmation resolves YES irreversibly. Later deletion does not un-resolve it, and neither does a subsequent reversal by him.
 
@@ -203,9 +223,7 @@ Deletion. If a qualifying post is deleted or the account suspended, an independe
 
 Void. None. Silence resolves NO.
 
-Evidence. For each of the three confirmations the operator publishes the source URL, post timestamp, the text verbatim, an archive capture, and the clause satisfied, plus the market-open capture establishing each problem was open.
-
-Operator intervention. Declared. The Zugzwang Foundation published a ten-card deck announcing this market, on X, on <date> at <permalink>, archived at <archive URL>. Its text is committed in the public spec and will not be revised or removed. It asks the resolver for nothing. Beyond that one publication the Foundation takes no action directed at Thomas Bloom: no further posts or replies, no forum registration, no private contact, no intermediaries.
+Evidence. For each of the three confirmations the operator publishes the source URL, post timestamp, the text verbatim, an archive capture, the Zugzwang argument it points to, and the clause satisfied, plus the market-open capture establishing each problem was open.
 ```
 
 **`market_media` (2):**
@@ -219,7 +237,7 @@ Operator intervention. Declared. The Zugzwang Foundation published a ten-card de
 
 ## 4. `claude-bundle-response`
 
-**Claude · Will Anthropic reply to Zugzwang's Bundle feature on X?**
+**Claude · Will Anthropic reply 👍 to Zugzwang's Bundle feature?**
 
 | field | value |
 |---|---|
@@ -239,29 +257,23 @@ Operator intervention. Declared. The Zugzwang Foundation published a ten-card de
 **Resolution text (`markets.description`), verbatim:**
 
 ```text
-Will @AnthropicAI, @claudeai or @ClaudeDevs publicly reply to, repost, quote-post, or name the Zugzwang thread presenting the Bundle feature specification, between 15 September and 5 November 2026?
+Will @ClaudeDevs reply thumbs up to the Zugzwang thread presenting the Bundle feature specification, on X, between 15 September and 5 November 2026?
 
-Resolves YES if a post published by one of those three accounts on X, within the observation window, is a reply to any post in the Zugzwang Bundle thread, or a repost of any post in it, or a quote-post of any post in it, or a standalone post that names Zugzwang or links to any post in it. What the post says is never read. Approval, rejection, dismissal, correction and a legal objection all resolve YES identically. Resolves NO in every other case - including likes, bookmarks, reposts without comment, posts from any other account including those of Anthropic staff, replies through private channels, Anthropic shipping a similar feature without posting, and silence.
+Resolves YES if @ClaudeDevs publishes on X, within the observation window, a reply to any post in the Zugzwang Bundle thread, or a quote-post of any post in it, that contains a thumbs-up and does not contain a thumbs-down. Resolves NO in every other case - including a reply containing a thumbs-down, a reply containing both, a reply containing neither, a like, a bookmark, and a repost without comment.
 
-Criterion. Reproducing a post in the thread as an image also qualifies. There is no test of substance, sentiment or seriousness.
+Source. Only posts from @ClaudeDevs, Anthropic's official developer account on X, can resolve this market. Posts by @claudeai, @AnthropicAI or any other account do not count.
 
-The thread. Ten consecutive posts by the Zugzwang account, one deck card each, published at market open. The root post is the anchor and its permalink is <root permalink>. Engagement with any of the ten qualifies.
+Thumbs. A thumbs-up is the thumbs-up emoji in any skin tone, or the words thumbs up in any letter case. A thumbs-down is the thumbs-down emoji in any skin tone, or the words thumbs down in any letter case. Nothing else counts as either. The token must appear in the post's own text, not in an image, video or link preview. Any other text in the post is not read.
 
-Not qualifying. A like or bookmark - X has shown likes only to their author since 12 June 2024, so a like is not observable by a stranger applying this criterion. A repost without comment. A post by any Anthropic employee, officer, contractor, adviser or investor, in personal or official capacity. Any other Anthropic account or surface, including anthropic.com, claude.com, the changelog, docs, support, status, and the GitHub organisations. Anthropic on any other platform. Claude itself - a conversation, artifact or API output discussing Zugzwang resolves nothing. Email, direct message, private legal notice, talks, podcasts and interviews.
-
-Shipping. If Anthropic ships automatic chat grouping during the window, under any name, that alone resolves NO. Only a post from one of the three accounts resolves this market.
+The point. This market runs for the whole window so that participants can argue for and against the feature, with a stake behind every argument. At resolution Anthropic sees what users want. Both outcomes are equally useful to the experiment.
 
 Deadline. 5 November 2026, 23:45 UTC. The window opens at market open on 15 September 2026. UTC is the binding clock. Only posts timestamped at or before the deadline count, whenever the operator resolves. No extensions.
 
-Trigger. Latching. The first qualifying post resolves YES irreversibly. Later deletion, retraction or contradiction does not un-resolve it. Where two qualify, the earlier by UTC timestamp binds.
-
-Deletion. If a qualifying post is deleted or an account suspended, an independent archive capture timestamped within the window is admissible; a screenshot is not. Without one, it does not count.
+Trigger. Latching on YES only. The first qualifying thumbs-up reply resolves YES irreversibly; later deletion, retraction or a subsequent thumbs-down does not un-resolve it. A thumbs-down reply does not close this market - a later qualifying thumbs-up inside the window still resolves YES. NO is reached only at the deadline.
 
 Void. None. Silence resolves NO.
 
-Evidence. The operator publishes the source URL, the publishing account, the post timestamp local and UTC, the text verbatim, an independent archive capture, and which limb of the criterion is satisfied. On a NO, the operator publishes archive captures of all three timelines covering the window.
-
-Operator intervention. Declared. The Zugzwang Foundation authored the entire stimulus for this market: a ten-card deck published as a thread on X on <date> at <root permalink>, archived at <archive URL>; a 21-page feature specification, Bundle, document ZW-FS-001 v1.0, published at <website URL>; and an operational prototype at the same address. The deck text is committed in the public spec and will not be revised or removed. It asks Anthropic for nothing and both polarities of reply count equally. Beyond that one publication the Foundation takes no action directed at Anthropic or its people: no further posts, no replies, no tagging employees, no private contact, no intermediaries, no press outreach, and no legal or regulatory filing.
+Evidence. The operator publishes the source URL, the post timestamp, the text verbatim, which token it contains, an independent archive capture, and the clause satisfied. On a NO, an archive capture of the @ClaudeDevs timeline covering the window.
 ```
 
 **`market_media` (2):**
@@ -273,14 +285,14 @@ Operator intervention. Declared. The Zugzwang Foundation authored the entire sti
 
 ---
 
-## 5. `yc-paper-club-response`
+## 5. `yc-w27-acceptance`
 
-**YCombinator · Will YC reply to Zugzwang's pitch by 5 Nov 2026?**
+**YCombinator · Will Zugzwang get into YC's Winter 2027 batch?**
 
 | field | value |
 |---|---|
 | `id` | `01a01181-da63-738b-a3ea-8da89299bc53` |
-| `slug` | `yc-paper-club-response` |
+| `slug` | `yc-w27-acceptance` |
 | `status` | `Open` |
 | `resolution_deadline` | `2026-11-05T23:45:00.000Z` |
 | `resolved_at` | `NULL` |
@@ -295,13 +307,25 @@ Operator intervention. Declared. The Zugzwang Foundation authored the entire sti
 **Resolution text (`markets.description`), verbatim:**
 
 ```text
-Will @ycombinator reply to or quote-post any post in the Zugzwang thread submitting its pitch to YC Paper Club, on X, between 15 September and 5 November 2026?
+Will Y Combinator accept Zugzwang into its Winter 2027 batch by 5 November 2026?
 
-Resolves YES if a post by @ycombinator is a reply to any post in the Zugzwang Paper Club thread, or a quote-post of one. What the post says is never read: approval, rejection and dismissal all resolve YES identically.
+Declared: the operator is the applicant, knows the application's status before anyone else, and is also the sole resolver.
 
-Resolves NO in every other case, and this market is deliberately narrow. A standalone post naming Zugzwang resolves NO. A Paper Club recap or announcement naming Zugzwang resolves NO. The paper being selected, scheduled or presented resolves NO absent a qualifying post — the outcome the submission wants is not the criterion. So do likes, any other account, and silence.
+Resolves YES if, within the window, Y Combinator offers Zugzwang a place in its Winter 2027 batch, as shown by YC's written decision to the applicant, published by the operator within 24 hours of receipt with personal data redacted, and preserved by an independent archive capture. A public statement by Y Combinator naming Zugzwang as a Winter 2027 company also qualifies.
 
-Deadline 5 November 2026, 23:45 UTC.
+Resolves NO in every other case — including a rejection, no decision by the deadline, an offer for any other batch, and no application.
+
+Zugzwang. The application the operator submits for the Zugzwang project, under whatever company name it is filed.
+
+Timing. Y Combinator states that applicants who apply by its on-time deadline of 2 November 2026 hear back by 11 December 2026 (ycombinator.com/apply, read 18 September 2026). Only a decision received at or before this market's deadline counts; a later decision does not, whichever way it goes.
+
+Deadline. 5 November 2026, 23:45 UTC. The window opens at market open on 15 September 2026. UTC is the binding clock. No extensions.
+
+Trigger. Latching. An offer received inside the window resolves YES irreversibly. A later deferral, withdrawal or declined offer does not un-resolve it.
+
+Void. None. No decision by the deadline resolves NO.
+
+Evidence. The operator publishes YC's decision verbatim with personal data redacted, the time it was received, an independent archive capture of the publication, and the clause satisfied.
 ```
 
 **`market_media` (2):**
@@ -315,7 +339,7 @@ Deadline 5 November 2026, 23:45 UTC.
 
 ## 6. `github-zugzwang-repo-stars`
 
-**GitHub · Will the Zugzwang repo reach 100,000 stars?**
+**GitHub · Will the Zugzwang repo reach 50,000 stars?**
 
 | field | value |
 |---|---|
@@ -335,11 +359,11 @@ Deadline 5 November 2026, 23:45 UTC.
 **Resolution text (`markets.description`), verbatim:**
 
 ```text
-Will the Zugzwang repository reach 100,000 GitHub stars by 5 November 2026?
+Will the Zugzwang repository reach 50,000 GitHub stars by 5 November 2026?
 
 Declared: the Zugzwang Foundation owns this repository, is publicly campaigning for the YES outcome, and is also the sole resolver.
 
-Resolves YES if the star count for zugzwang-foundation/experiment is observed at 100,000 or more at any point in the window, as published by GitHub on the repository page or its REST API, and preserved by an independent archive capture timestamped inside the window. A count that crosses and later falls back still resolves YES.
+Resolves YES if the star count for zugzwang-foundation/experiment is observed at 50,000 or more at any point in the window, as published by GitHub on the repository page or its REST API, and preserved by an independent archive capture timestamped inside the window. A count that crosses and later falls back still resolves YES.
 
 Resolves NO in every other case — no qualifying observation, stars on a fork or mirror, any other GitHub metric, third-party star trackers, or a reading with no independent capture. Anyone may produce an observation.
 
