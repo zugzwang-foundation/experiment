@@ -169,16 +169,28 @@ describe("description lengths", () => {
 	 * ⚠ THE KICKOFF SAID 700–800 CHARACTERS. THE CONTENT DOES NOT.
 	 *
 	 * Measured against the committed snapshot, re-measured 2026-09-18 after
-	 * MKT-ROSTER-1 took the slate to six:
+	 * MKT-ROSTER-1 took the slate to six, and AGAIN after D-50 overlaid five
+	 * markets' v3.0 wording onto it:
 	 *
-	 *   chess-fide-tiebreak-response         3609
-	 *   bitcoin-price-50k                    3795
-	 *   math-erdos-contribution-response     3836
-	 *   claude-bundle-response               3733
-	 *   yc-paper-club-response                789
-	 *   github-zugzwang-repo-stars            794
+	 *   slug                                 v2.2    v3.0
+	 *   chess-fide-tiebreak-response         3609 -> 1903
+	 *   bitcoin-price-50k                    3795 -> 3795   (MKT-BTC-01 untouched)
+	 *   math-erdos-solved-on-zugzwang        3836 -> 2852   (re-slugged)
+	 *   claude-bundle-response               3733 -> 2169
+	 *   yc-w27-acceptance                     789 -> 1658   (re-slugged)
+	 *   github-zugzwang-repo-stars            794 ->  792
 	 *
-	 * FOUR of the six carry a long, fully-structured criterion and two do not.
+	 * ⚠⚠ D-50 MOVED EVERY FIGURE EXCEPT BITCOIN'S, AND FOUR OF THE FIVE WENT
+	 * DOWN — which is the direction the bound below is least able to see. The
+	 * v3.0 criteria are tighter, not longer: staging had been carrying pre-v2.2
+	 * copy (chess lost 1 706 characters), so the drop is a market catching up to
+	 * the founder's current wording rather than a truncation. The 700-character
+	 * floor still holds on all six, by a margin of 92 at the tightest (github's
+	 * 792). ⇒ if a future edit takes any description under ~800, the floor is no
+	 * longer a comfortable guard and wants raising to sit under the real minimum.
+	 *
+	 * FOUR of the six carried a long, fully-structured criterion and two did not;
+	 * after v3.0 the spread is narrower and the shape of the argument is the same.
 	 * A test written to 700–800 would be red on arrival for those four, and the
 	 * only way to make it green is to edit founder-authored market copy — which
 	 * is a CLAUDE.md §3 refusal, not a fix.
@@ -205,12 +217,12 @@ describe("description lengths", () => {
 		expect(
 			Object.fromEntries(SPECS.map((s) => [s.slug, s.description.length])),
 		).toEqual({
-			"chess-fide-tiebreak-response": 3609,
+			"chess-fide-tiebreak-response": 1903,
 			"bitcoin-price-50k": 3795,
-			"math-erdos-contribution-response": 3836,
-			"claude-bundle-response": 3733,
-			"yc-paper-club-response": 789,
-			"github-zugzwang-repo-stars": 794,
+			"math-erdos-solved-on-zugzwang": 2852,
+			"claude-bundle-response": 2169,
+			"yc-w27-acceptance": 1658,
+			"github-zugzwang-repo-stars": 792,
 		});
 	});
 });
@@ -225,9 +237,20 @@ describe("description lengths", () => {
 //
 //   1 · It is the ONLY committed copy of production's own description text.
 //       Production was built fresh on 2026-09-14, not restored from staging, so
-//       SEVEN of the eight descriptions and one title differ between the two
-//       environments (plan §A1.2, measured). Nothing else in the repository can
-//       reconstruct it.
+//       the two environments' copy diverged. Nothing else in the repository can
+//       reconstruct production's.
+//       ⚠⚠ THE FIGURE THAT USED TO STAND HERE — "SEVEN of the eight
+//       descriptions and one title" — WAS ALREADY WRONG BEFORE D-50 (measured:
+//       FIVE of six descriptions and one title, the slate having gone to six at
+//       D-49), and D-50 makes it wrong in the other direction too: ruling 3
+//       aligns the five it touches, so the divergence is now ONE description
+//       (`bitcoin-price-50k`, which ruling 4 leaves at v2.2) and ZERO titles.
+//       ⇒ NO COUNT IS WRITTEN HERE. It has been wrong at two different values
+//       for two different reasons, which is `O-15`: a number in prose decays
+//       whatever the prose says about it. The live figure is asserted rather
+//       than described — `tests/unit/staging/market-spec-snapshot-parity.test.ts`
+//       pins the five as identical across both files and `bitcoin-price-50k` as
+//       deliberately not.
 //   2 · It is the input to the one irreversible step in the task. A short or
 //       malformed snapshot would first surface at the production RESTORE — that
 //       is, after the wipe.

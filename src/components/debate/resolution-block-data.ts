@@ -107,11 +107,19 @@ export type ResolutionBlockEntry = {
 	 * before shipping rather than left at the first pass's numbers: every
 	 * `"Response on X"` RESOLUTION moved 11→13, most single-line RESOLVER
 	 * values moved up one or two steps, and the one entry that had been AT the
-	 * 11px floor and still truncating — `math-erdos-contribution-response`'s
-	 * `@thomasfbloom` — now fits cleanly at 12px. No entry in this map is at
-	 * the 11px floor as shipped; the floor and the `truncate` backstop stay in
-	 * the type and the render path regardless, because the content is frozen
-	 * but the column is not guaranteed to stay exactly 91px forever. Full
+	 * 11px floor and still truncating — `math-erdos-solved-on-zugzwang`'s
+	 * `@thomasfbloom` — now fits cleanly at 12px.
+	 * ⛔⛔ D-50 — "No entry in this map is at the 11px floor as shipped" WAS
+	 * TRUE WHEN BLOCK-4 WROTE IT AND IS NOW FALSE, so it is corrected here
+	 * rather than contradicted by the data below (§8 O-5). `@vishy64theking`
+	 * SITS ON THE FLOOR: fifteen characters need 95.01px at 12 against a
+	 * 90.664px column, and 11 is the only size that fits. ⚠ It FITS — 3.57px
+	 * of headroom — so `truncate` is still a pure backstop and nothing in the
+	 * shipped map ellipsizes. ⚠ A FLOOR ENTRY AND A TIGHT ENTRY ARE DIFFERENT
+	 * PROPERTIES: the tightest value here is still `@thomasfbloom` at 0.36px,
+	 * at 12px, one step ABOVE the floor. The floor and the `truncate` backstop
+	 * stay in the type and the render path regardless, because the content is
+	 * frozen but the column is not guaranteed to stay exactly 91px forever. Full
 	 * per-block, per-market table in BLOCK-3's run report.
 	 *
 	 * ⚠⚠ BLOCK-4 RE-MEASURED ALL TWENTY VALUES THEN IN THIS MAP AGAINST THE
@@ -129,15 +137,25 @@ export type ResolutionBlockEntry = {
 	 * ⚠ Measured sub-pixel on the deployed staging build at 1440×900, real
 	 * Geist 400, `getBoundingClientRect().width` at `width:max-content` against
 	 * the 90.672px column (the integer `scrollWidth <= clientWidth` test agrees
-	 * exactly, and was run first). Headroom at the shipped size, tightest
-	 * first: `@thomasfbloom` 0.37px @12 · `@FIDE_chess` 2.77 @14 ·
-	 * `Response on X` 2.80 @13 · `@ycombinator` 4.71 @13 · `CoinMarketCap`
-	 * 4.87 @12; every other value clears 14px by 14px or more.
-	 * ⚠ `@thomasfbloom` is the tightest string in the map, by an order of
-	 * magnitude — 0.37px of headroom at 12px against 2.77px for the next
-	 * tightest. MKT-ROSTER-1 removed two markets and neither was the binding
-	 * case, so no size was re-measured: the column is 90.672px wide whatever it
-	 * holds, and every surviving value was already fitted to exactly that.
+	 * exactly, and was run first).
+	 * ⚠⚠ D-50 RE-MEASURED THE FOUR STRINGS IT INTRODUCES, on production's
+	 * deployed build (canary asserted in the same call as the geometry) against
+	 * a re-read column of 90.664–90.672px. Headroom at the shipped size,
+	 * tightest first: `@thomasfbloom` 0.36px @12 · `@ClaudeDevs` 1.31 @14 ·
+	 * `@FIDE_chess`→`@vishy64theking` 3.57 @11 · `Y Combinator` 4.14 @14 ·
+	 * `CoinMarketCap` 4.87 @12 · `YC decision` 16.70 @14; every other value
+	 * clears 14px by 14px or more. ⚠ `Response on X` is 2.80 @13 and still
+	 * binds on THREE markets rather than four — YCP left that set.
+	 * ⛔ THE FOUR BLOCK-4 FIGURES WERE REPRODUCED FIRST AS A POSITIVE CONTROL
+	 * and all four agreed (2.77 / 0.37→0.36 / 2.80 / 4.71→4.70, the last two
+	 * decimals being rounding), which is what makes the six above measurements
+	 * rather than estimates. A probe that cannot reproduce a known figure is
+	 * not measuring the thing it claims to.
+	 * ⚠ `@thomasfbloom` is STILL the tightest string in the map, and the margin
+	 * has narrowed rather than gone: 0.36px at 12px against `@ClaudeDevs`'s
+	 * 1.31px at 14. MKT-ROSTER-1 removed two markets and neither was the
+	 * binding case, so nothing was re-measured then; D-50 changes four values
+	 * and therefore did.
 	 */
 	fontSize: 11 | 12 | 13 | 14;
 };
@@ -186,9 +204,9 @@ export type ResolutionBlockSet = {
 const KNOWN_SLUGS = [
 	"chess-fide-tiebreak-response",
 	"bitcoin-price-50k",
-	"math-erdos-contribution-response",
+	"math-erdos-solved-on-zugzwang",
 	"claude-bundle-response",
-	"yc-paper-club-response",
+	"yc-w27-acceptance",
 	"github-zugzwang-repo-stars",
 ] as const;
 
@@ -220,10 +238,26 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 			fontSize: 13,
 		},
 		resolver: {
-			line1: "@FIDE_chess",
+			// ⚠⚠ D-50 — THE RESOLVER IS A PERSON NOW, NOT AN ORGANISATION, AND
+			// THAT IS THE WHOLE OF v3.0's CHANGE HERE. @FIDE_chess could speak
+			// for FIDE and still not resolve this market; the v3.0 criterion
+			// binds to Viswanathan Anand in person, "whatever office he holds
+			// or ceases to hold during the window, including after the FIDE
+			// presidential election of 26 September 2026", and says in terms
+			// that a post by @FIDE_chess does not count "even one that speaks
+			// for him". So this chip is not a relabelled institution — do not
+			// "restore" the federation account beside it.
+			// ⛔⛔ THE ONLY ENTRY IN THIS MAP AT THE 11px HARD FLOOR. Fifteen
+			// characters do not fit 90.664px at any size above it — 95.01px at
+			// 12 — and 11 clears the column by 3.57px, so nothing truncates.
+			// Measured 2026-09-18 the way every other size here was: a clone of
+			// the live value span at `width:max-content`, real Geist 400, on the
+			// deployed build (canary asserted), with BLOCK-4's own four
+			// published headroom figures reproduced first as a positive control.
+			line1: "@vishy64theking",
 			line2: null,
-			href: "https://x.com/FIDE_chess",
-			fontSize: 14,
+			href: "https://x.com/vishy64theking",
+			fontSize: 11,
 		},
 		closes: CLOSES_DEFAULT,
 		flavour: { line1: "Petition", line2: null, href: null, fontSize: 14 },
@@ -255,7 +289,7 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 		// the register this column is for. Sentence case is in the DATA (§1).
 		flavour: { line1: "Sentiment", line2: null, href: null, fontSize: 14 },
 	},
-	"math-erdos-contribution-response": {
+	"math-erdos-solved-on-zugzwang": {
 		resolution: {
 			line1: "Response on X",
 			line2: null,
@@ -289,17 +323,24 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 			href: null,
 			fontSize: 13,
 		},
-		// ⚠ FOUNDER-RULED, BLOCK-2. The live criterion qualifies three accounts
-		// (@AnthropicAI, @claudeai, @ClaudeDevs) — @security-auditor flagged
-		// that showing only one here could read as excluding the other two.
-		// Ruled: this chip stays a single named pointer, not an exhaustive
-		// citation of the criterion (the full three-account list is in the
-		// market's own description, untouched by this map). Not an oversight
-		// — do not "complete" this to a `+2` marker or a second account.
+		// ⛔⛔ D-50 REVERSES THE PREMISE OF BLOCK-2's RULING HERE, AND THE OLD
+		// TEXT IS REPLACED RATHER THAN LEFT STANDING (§8 O-5). It read: "the
+		// live criterion qualifies three accounts (@AnthropicAI, @claudeai,
+		// @ClaudeDevs) — @security-auditor flagged that showing only one here
+		// could read as excluding the other two. Ruled: this chip stays a
+		// single named pointer, not an exhaustive citation of the criterion."
+		// ⚠ THE RULING'S OUTCOME SURVIVES AND ITS REASON DOES NOT. v3.0 §3
+		// makes @ClaudeDevs the SOLE resolver — "Posts by @claudeai,
+		// @AnthropicAI or any other account do not count" — so a single named
+		// pointer is now the exhaustive citation, and the auditor's worry
+		// (that one name under-reports a three-account criterion) has no
+		// subject left. Still do not add a second account: there is one, and
+		// naming another would now contradict the criterion rather than
+		// merely abbreviate it.
 		resolver: {
-			line1: "@claudeai",
+			line1: "@ClaudeDevs",
 			line2: null,
-			href: "https://x.com/claudeai",
+			href: "https://x.com/ClaudeDevs",
 			fontSize: 14,
 		},
 		closes: CLOSES_DEFAULT,
@@ -311,18 +352,34 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 		// dismissal identically, which is what the criterion actually says.
 		flavour: { line1: "Feedback", line2: null, href: null, fontSize: 14 },
 	},
-	"yc-paper-club-response": {
+	"yc-w27-acceptance": {
+		// ⛔⛔ D-50 — THE FIRST MARKET ON THE ROSTER THAT IS NOT SETTLED BY
+		// WATCHING AN X ACCOUNT, WHICH IS WHY BOTH VALUES MOVE TOGETHER.
+		// v3.0 replaces "reply to Zugzwang's pitch" with acceptance into YC's
+		// Winter 2027 batch, and the thing READ to settle it is YC's written
+		// decision to the applicant (§2) — a document, not a post. So
+		// RESOLUTION is "YC decision" under BLOCK-3 v1.1's definition (the
+		// thing read, not the surface), and RESOLVER is the institution that
+		// issues it. ⚠ The href is the APPLICATION page rather than an X
+		// profile: it is the page v3.0 §3 cites by name and date for YC's own
+		// timing statement ("ycombinator.com/apply, read 18 September 2026"),
+		// so it is the one URL a reader can check the criterion against.
+		// ⚠ `Response on X` here would now be simply false, and this is the
+		// one market where the two RESOLUTION-value tests in
+		// `resolution-block-data.test.ts` had to change shape rather than
+		// re-key: it left the four-account-watching set and joins neither of
+		// the other two, so it is pinned on its own.
 		resolution: {
-			line1: "Response on X",
+			line1: "YC decision",
 			line2: null,
 			href: null,
-			fontSize: 13,
+			fontSize: 14,
 		},
 		resolver: {
-			line1: "@ycombinator",
+			line1: "Y Combinator",
 			line2: null,
-			href: "https://x.com/ycombinator",
-			fontSize: 13,
+			href: "https://www.ycombinator.com/apply",
+			fontSize: 14,
 		},
 		closes: CLOSES_DEFAULT,
 		flavour: { line1: "Showcase", line2: null, href: null, fontSize: 14 },

@@ -1,20 +1,22 @@
 # Claude · Will Anthropic reply 👍 to Zugzwang's Bundle feature?
 
-**MKT-CLA-01** · `/m/claude-bundle-response` · **v2.2** · 2026-09-08  
+**MKT-CLA-01** · `/m/claude-bundle-response` · **v3.0** · 2026-09-18  
 **Subject** Anthropic's thumbs-up or thumbs-down on a published Bundle feature specification · Claude  
-**Supersedes** `MKT-CLA-01_market-spec_v2_1.md (v2.1, 2026-09-08)`
+**Supersedes** `MKT-CLA-01_market-spec_v2_2.md (v2.2, 2026-09-08)`
 
 ---
 
 ## 1 · The question
 
-Will @claudeai reply thumbs up to the Zugzwang thread presenting the Bundle feature specification, on X, between 15 September and 5 November 2026?
+Will @ClaudeDevs reply thumbs up to the Zugzwang thread presenting the Bundle feature specification, on X, between 15 September and 5 November 2026?
 
 ## 2 · How it resolves
 
-Resolves YES if @claudeai publishes on X, within the observation window, a reply to any post in the Zugzwang Bundle thread, or a quote-post of any post in it, that contains a thumbs-up and does not contain a thumbs-down. Resolves NO in every other case - including a reply containing a thumbs-down, a reply containing both, a reply containing neither, a like, a bookmark, and a repost without comment.
+Resolves YES if @ClaudeDevs publishes on X, within the observation window, a reply to any post in the Zugzwang Bundle thread, or a quote-post of any post in it, that contains a thumbs-up and does not contain a thumbs-down. Resolves NO in every other case - including a reply containing a thumbs-down, a reply containing both, a reply containing neither, a like, a bookmark, and a repost without comment.
 
 ## 3 · The rules
+
+Source. Only posts from @ClaudeDevs, Anthropic's official developer account on X, can resolve this market. Posts by @claudeai, @AnthropicAI or any other account do not count.
 
 Thumbs. A thumbs-up is the thumbs-up emoji in any skin tone, or the words thumbs up in any letter case. A thumbs-down is the thumbs-down emoji in any skin tone, or the words thumbs down in any letter case. Nothing else counts as either. The token must appear in the post's own text, not in an image, video or link preview. Any other text in the post is not read.
 
@@ -26,7 +28,7 @@ Trigger. Latching on YES only. The first qualifying thumbs-up reply resolves YES
 
 Void. None. Silence resolves NO.
 
-Evidence. The operator publishes the source URL, the post timestamp, the text verbatim, which token it contains, an independent archive capture, and the clause satisfied. On a NO, an archive capture of the @claudeai timeline covering the window.
+Evidence. The operator publishes the source URL, the post timestamp, the text verbatim, which token it contains, an independent archive capture, and the clause satisfied. On a NO, an archive capture of the @ClaudeDevs timeline covering the window.
 
 ## 4 · The facts
 
@@ -35,11 +37,11 @@ Evidence. The operator publishes the source URL, the post timestamp, the text ve
 | Opens | 15 September 2026 |
 | Trading closes | `2026-11-05T23:45:00Z` |
 | Settles | `2026-11-05T23:45:00Z` — with all other markets |
-| Resolver | Anthropic PBC, through @claudeai on X |
+| Resolver | Anthropic PBC, through @ClaudeDevs on X |
 | Resolution | Response on X |
 | Flavour | Feedback |
 
-Display block: **RESOLUTION** Response on X · **RESOLVER** @claudeai → `https://x.com/claudeai` · **CLOSES ON** 5 Nov 2026 / 23:45Z · **FLAVOUR** Feedback
+Display block: **RESOLUTION** Response on X · **RESOLVER** @ClaudeDevs → `https://x.com/ClaudeDevs` · **CLOSES ON** 5 Nov 2026 / 23:45Z · **FLAVOUR** Feedback
 
 ## 5 · Operator entry
 

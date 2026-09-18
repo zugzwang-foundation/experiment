@@ -681,25 +681,37 @@ describe("BLOCK-3 §3 — value/subvalue read ink, sized per block from the map"
 		}
 	});
 
-	it("resolver-cards::no-entry-ships-at-the-11px-floor-after-BLOCK-3-§2-widened-the-column", () => {
+	it("resolver-cards::the-11px-floor-carries-exactly-ONE-entry-and-it-is-CHE-RESOLVER", () => {
 		// ⚠⚠ THIS TEST USED TO BE "math-erdos-RESOLVER-hits-the-11px-floor-and-
 		// still-truncates" — "@thomasfbloom" did not fit the column §3 first
 		// measured against (79px) even at the 11px floor. §2 then shrank the
 		// glyph for an unrelated reason (reducing block height) and widened
 		// that column to 91px as a side effect; re-measured before shipping,
 		// every entry that had been pinned to 11px moved up, including this
-		// one (now 12px, fits cleanly, no truncation needed). Recorded as a
-		// positive assertion rather than deleted outright (O-4): the floor and
-		// `truncate` stay in the type and the render path regardless — this
-		// proves the CURRENT map doesn't need them, not that it never will.
+		// one (now 12px, fits cleanly, no truncation needed). It then became
+		// "no-entry-ships-at-the-11px-floor", a blanket `fontSize > 11`.
+		// ⛔⛔ D-50 MADE THAT BLANKET FALSE AND IT IS INVERTED HERE, NOT REMOVED
+		// AND NOT LOOSENED. `@vishy64theking` is fifteen characters — 95.01px at
+		// 12 against a 90.664px column — so 11 is the only size it fits, and CHE's
+		// RESOLVER is now the floor's single tenant. A bare `>= 11` would have
+		// been the lazy repair and would assert nothing at all; an exact
+		// inventory still fails the day a SECOND entry arrives there, which is
+		// the signal that a value outgrew the column and wants re-measuring in a
+		// real browser rather than a silent step down.
+		// ⚠ It FITS — 3.57px of headroom — so the sibling
+		// `truncate-still-ships-unconditionally` guard below still describes a
+		// pure backstop, and nothing in the shipped map ellipsizes.
+		const atFloor: string[] = [];
 		for (const slug of Object.keys(RESOLUTION_BLOCKS) as Array<
 			keyof typeof RESOLUTION_BLOCKS
 		>) {
 			const data = RESOLUTION_BLOCKS[slug];
 			for (const k of KEYS) {
-				expect(data[k].fontSize).toBeGreaterThan(11);
+				expect(data[k].fontSize).toBeGreaterThanOrEqual(11);
+				if (data[k].fontSize === 11) atFloor.push(`${slug}.${k}`);
 			}
 		}
+		expect(atFloor).toEqual(["chess-fide-tiebreak-response.resolver"]);
 	});
 
 	it("resolver-cards::truncate-still-ships-unconditionally-as-the-backstop", () => {
@@ -709,9 +721,7 @@ describe("BLOCK-3 §3 — value/subvalue read ink, sized per block from the map"
 		// this component needing to change. Asserted directly on the entry
 		// that most recently exercised this path.
 		const { container } = render(
-			<ResolverCards
-				market={marketFixture("math-erdos-contribution-response")}
-			/>,
+			<ResolverCards market={marketFixture("math-erdos-solved-on-zugzwang")} />,
 		);
 		const value = container.querySelector(
 			'[data-testid="resolution-block-value-resolver"]',
@@ -720,7 +730,7 @@ describe("BLOCK-3 §3 — value/subvalue read ink, sized per block from the map"
 		expect(cls).toContain("text-[12px]");
 		expect(cls).toContain("truncate");
 		expect(
-			RESOLUTION_BLOCKS["math-erdos-contribution-response"].resolver.fontSize,
+			RESOLUTION_BLOCKS["math-erdos-solved-on-zugzwang"].resolver.fontSize,
 		).toBe(12);
 	});
 });

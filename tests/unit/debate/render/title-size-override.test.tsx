@@ -9,8 +9,7 @@ import { MARKET_TITLE_SIZE_OVERRIDES } from "@/components/debate/title-size-over
 import type { DebateMarketHeader } from "@/components/debate/types";
 
 /**
- * The per-market title-size override mechanism, and the fact that no market
- * currently uses it.
+ * The per-market title-size override mechanism, and the one market that uses it.
  *
  * ⚠⚠ MKT-ROSTER-1 (D-49) EMPTIED THE MAP, AND THIS FILE WAS REWRITTEN RATHER
  * THAN DELETED. Its whole subject was the one market that carried an entry, and
@@ -21,10 +20,22 @@ import type { DebateMarketHeader } from "@/components/debate/types";
  * Both are still live code with a scheduled consumer (the next ruling), and a
  * deleted file guards neither.
  *
- * So the three arms below are: the map is empty (the shipped state), every live
- * market therefore renders the base size (the scoping arm), and a SYNTHETIC
- * entry still reaches the heading and still resolves the base away (the
- * mechanism arm). The third is the one that would otherwise rot.
+ * ⛔⛔ THE SCHEDULED CONSUMER ARRIVED. D-50 gave `math-erdos-solved-on-zugzwang`
+ * a v3.0 title of 67 characters, which measures 728.19px against a 667px column
+ * and clips `mber?` — the question mark included, the same tail the removed
+ * market lost. So the map has ONE entry again, and this file's framing is
+ * corrected in place rather than left describing an empty map (§8 O-5).
+ * ⚠⚠ THE PREDICTION IN THE PARAGRAPH ABOVE IS WHY THIS FILE EXISTED AT ALL, AND
+ * IT PAID OFF EXACTLY AS WRITTEN: both scoping arms went RED the moment the
+ * entry landed, before any browser was opened, and the file that explains the
+ * rule was one import away. Rewriting rather than deleting was the right call
+ * and this is the receipt.
+ *
+ * So the arms below are: the map holds exactly the one ruled entry · every
+ * market WITHOUT an entry renders the base size (the scoping arm) · the one
+ * WITH an entry renders it and resolves the base away (the real mechanism arm)
+ * · and a SYNTHETIC entry does the same on a market that has none (the arm that
+ * survives the map being emptied again).
  *
  * ⚠ THE ASSERTION IS ON THE COMPOSED CLASS, WHICH IS THE ONE THING THAT COULD
  * SILENTLY NOT HAPPEN. The override is merged by `cn()` (twMerge), which resolves
@@ -57,6 +68,9 @@ afterEach(cleanup);
 
 /** A live market, used as the arm that proves the base size renders. */
 const CONTROL_SLUG = "bitcoin-price-50k";
+
+/** The one market D-50 gave an entry. Named once so the arms below agree. */
+const OVERRIDDEN_SLUG = "math-erdos-solved-on-zugzwang";
 
 /** The heading's base size, as `MarketHeader` composes it. */
 const BASE_SIZE = "text-[21px]";
@@ -95,20 +109,28 @@ const headingClasses = (slug: string): string => {
 };
 
 describe("MarketHeader — per-market title size override", () => {
-	it("market-header::the-override-map-is-empty", () => {
-		// The shipped state after D-49. Stated as its own assertion so that
-		// adding an entry without a ruling reddens here first, where the file
-		// that explains the rule is one import away.
-		expect(Object.keys(MARKET_TITLE_SIZE_OVERRIDES)).toEqual([]);
+	it("market-header::the-override-map-holds-exactly-the-one-ruled-entry", () => {
+		// ⚠ This arm read `toEqual([])` until D-50 and is INVERTED, not relaxed.
+		// An exact inventory is what makes an unruled entry redden here first,
+		// where the file explaining the rule is one import away; a `length <= 1`
+		// or a `toContain` would let a second one in silently, and a second entry
+		// is the signal that a title outgrew the column and wants measuring in a
+		// real browser rather than a quiet step down.
+		expect(Object.keys(MARKET_TITLE_SIZE_OVERRIDES)).toEqual([OVERRIDDEN_SLUG]);
 	});
 
-	it("market-header::every-live-market-renders-the-base-size", () => {
-		// ⛔ THE SCOPING ARM, SWEPT RATHER THAN SPOT-CHECKED. With the map empty
-		// the interesting failure is no longer "the entry leaked to a second
-		// market" — it is a component that hard-codes a size for somebody. One
-		// market proves nothing about the others, so this walks all of them.
+	it("market-header::every-market-WITHOUT-an-entry-renders-the-base-size", () => {
+		// ⛔ THE SCOPING ARM, SWEPT RATHER THAN SPOT-CHECKED — the failure it
+		// catches is a component that hard-codes a size for somebody, and one
+		// market proves nothing about the others.
+		// ⚠ It swept ALL SIX while the map was empty; with one entry live it
+		// sweeps the OTHER FIVE and the entry's own market is asserted separately
+		// below. Excluding it by name rather than by "skip anything in the map"
+		// is deliberate: the latter would go vacuously green if the map ever grew
+		// to all six.
 		let checked = 0;
 		for (const slug of Object.keys(RESOLUTION_BLOCKS)) {
+			if (slug === OVERRIDDEN_SLUG) continue;
 			const { container, unmount } = render(
 				<MarketHeader market={market(slug)} priceChart={null} />,
 			);
@@ -118,8 +140,40 @@ describe("MarketHeader — per-market title size override", () => {
 			checked += 1;
 			unmount();
 		}
-		// ⛔ NON-VACUITY — an empty slug list would satisfy the loop above.
-		expect(checked).toBe(6);
+		// ⛔ NON-VACUITY — an empty slug list would satisfy the loop above. Six
+		// markets minus the one overridden.
+		expect(checked).toBe(5);
+	});
+
+	it("market-header::the-OVERRIDDEN-market-steps-down-and-resolves-the-base-away", () => {
+		// ⛔⛔ THE REAL MECHANISM ARM — the synthetic one below proves the branch
+		// works, this proves the SHIPPED entry reaches the heading. Both are
+		// wanted: this one goes green-by-accident if the map is emptied, and that
+		// one cannot see a value that never made it into the map.
+		// ⛔ ASSEMBLED AT RUNTIME, for the reason the synthetic arm's own comment
+		// gives at length: Tailwind v4's scanner reads `tests/` as well as `src/`,
+		// so a class-shaped literal here becomes a real emitted utility with no
+		// component behind it. ⚠ BOTH of these classes DO have live `src/`
+		// consumers today — the 19px size in `composer/PositionStrip.tsx` and
+		// `composer/SlotHeader.tsx`, the 1.24 leading on `MarketHeader`'s own base
+		// class — so writing them plainly would emit nothing new. The pattern is
+		// kept anyway, because the cost of a literal is never in the file that
+		// writes it; it is in the next file that copies the shape with a class
+		// that has no consumer.
+		const SZ = `text-[${19}px]`;
+		const LD = `leading-[${1.24}]`;
+		expect(MARKET_TITLE_SIZE_OVERRIDES[OVERRIDDEN_SLUG]).toBe(`${SZ} ${LD}`);
+		const cls = headingClasses(OVERRIDDEN_SLUG);
+		expect(cls).toContain(SZ);
+		expect(cls).toContain(LD);
+		// ⛔ The base size must be RESOLVED AWAY by twMerge, not out-ranked by
+		// source order — two font sizes on one element render at the LARGER, which
+		// is the 21px clip this entry exists to stop. ⚠ `LEADING` is NOT asserted
+		// absent here the way the synthetic arm does it: this entry's leading is
+		// the same 1.24 the base carries, so twMerge keeps one copy of an
+		// identical value and `not.toContain(LEADING)` would be false for a
+		// correct render. That is a property of THIS value, not of the mechanism.
+		expect(cls).not.toContain(BASE_SIZE);
 	});
 
 	it("market-header::the-control-slug-has-no-entry-and-takes-the-base", () => {
@@ -130,12 +184,19 @@ describe("MarketHeader — per-market title size override", () => {
 	});
 
 	it("market-header::a-SYNTHETIC-entry-reaches-the-heading-and-resolves-the-base-away", async () => {
-		// ⛔⛔ THE MECHANISM ARM, AND THE ONLY TEST LEFT THAT REACHES THE OVERRIDE
-		// BRANCH AT ALL. No shipped market can reach it, so this mocks the map.
-		// Without this arm the whole override path is untested code that looks
-		// tested, and the twMerge behaviour the docblock above warns about would
-		// regress silently — the heading would clip again and every other
-		// assertion in this file would stay green.
+		// ⛔⛔ THE MECHANISM ARM. ⚠ It used to say it was "THE ONLY TEST LEFT THAT
+		// REACHES THE OVERRIDE BRANCH AT ALL" and that "no shipped market can
+		// reach it" — both false since D-50, and corrected rather than left
+		// standing. `math-erdos-solved-on-zugzwang` reaches the branch with real
+		// data, asserted above.
+		// ⚠ THIS ARM IS STILL WANTED, AND FOR A SHARPER REASON THAN BEFORE. It is
+		// the one that survives the map being emptied again by a future ruling —
+		// at which point the real arm above goes green by having nothing to
+		// assert, and this is all that stops the override path becoming untested
+		// code that looks tested. It also asserts the LEADING is resolved away,
+		// which the real entry cannot show: that entry's leading is identical to
+		// the base's, so there is nothing to displace. A synthetic value that
+		// differs in BOTH groups is what exercises both halves of twMerge.
 		// ⚠ `doMock` + `resetModules` + a dynamic import, rather than a top-level
 		// `vi.mock`: the latter is hoisted to the whole FILE and would replace the
 		// real map for the three tests above, every one of which exists to assert

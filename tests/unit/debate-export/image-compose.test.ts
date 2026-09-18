@@ -276,14 +276,14 @@ describe("splitMarketTitle", () => {
 
 describe("exportFilename", () => {
 	it("is the market slug plus the post ordinal", () => {
-		expect(exportFilename("math-erdos-contribution-response", 3)).toBe(
-			"math-erdos-contribution-response-post-3.jpg",
+		expect(exportFilename("math-erdos-solved-on-zugzwang", 3)).toBe(
+			"math-erdos-solved-on-zugzwang-post-3.jpg",
 		);
 	});
 
 	it("names a reply by its post and its ordinal within that post", () => {
-		expect(exportFilename("math-erdos-contribution-response", 3, 2)).toBe(
-			"math-erdos-contribution-response-post-3-reply-2.jpg",
+		expect(exportFilename("math-erdos-solved-on-zugzwang", 3, 2)).toBe(
+			"math-erdos-solved-on-zugzwang-post-3-reply-2.jpg",
 		);
 	});
 });

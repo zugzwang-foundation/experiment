@@ -297,7 +297,7 @@ const LINK_AFFORDANCE =
  * ⇒ THE RESOLVER LINK IS THE WHOLE BLOCK, NOT THE VALUE TEXT ALONE (RF-3a):
  * one `<a>` wraps the glyph and the full text stack, `target="_blank"
  * rel="noopener noreferrer"`, so the accessible name reads as the label plus
- * the value text ("Resolver @FIDE_chess") with no separate `aria-label`
+ * the value text ("Resolver @vishy64theking") with no separate `aria-label`
  * needed —
  * the glyph stays `aria-hidden`, contributing nothing to it. The seam for
  * wiring RESOLUTION's href later (once Zugzwang's own resolution posts
@@ -335,7 +335,17 @@ const LINK_AFFORDANCE =
  * and it clears the column by 0.37px. `truncate` is therefore a pure BACKSTOP —
  * it ships unconditionally on every value and subvalue, so a future map entry
  * with a longer string degrades to an ellipsis instead of overflowing the
- * block, and so the 11px floor never has to be broken by a fifth, smaller size.
+ * block.
+ * ⛔⛔ D-50 — THE CLAUSE THAT USED TO END THAT SENTENCE ("and so the 11px floor
+ * never has to be broken by a fifth, smaller size") IS NOW HALF WRONG AND IS
+ * REPLACED RATHER THAN LEFT (§8 O-5). The floor still does not have to be
+ * BROKEN — but it is now OCCUPIED: `@vishy64theking` fits at 11 and at no size
+ * above it. ⚠ That entry is still not a truncating one — 3.57px of headroom —
+ * so "nothing in the shipped map truncates" holds, and the backstop stays a
+ * backstop. ⚠ The slug named above is `math-erdos-solved-on-zugzwang` since
+ * D-50; the OLD name is left inside the quotation because the quotation is of
+ * a sentence that was written when that was the slug, and editing a quote to
+ * agree with the present makes it evidence of nothing.
  * A guard that asserts nothing currently truncates and a class that handles it
  * if something ever does are both correct at once; only the claim that
  * something DOES truncate today was wrong.
@@ -429,8 +439,8 @@ function ResolutionBlock({
 				    only loses size.
 				    ⚠ DECORATIVE TWICE OVER, DELIBERATELY. `aria-hidden` stays on the span
 				    (BLOCK-1 put it there so the glyph contributes nothing to the RESOLVER
-				    anchor's accessible name, which reads "Resolver @FIDE_chess" off the
-				    label and value beside it) AND the image carries `alt=""`. The span's
+				    anchor's accessible name, which reads "Resolver @vishy64theking"
+				    off the label and value beside it) AND the image carries `alt=""`. The span's
 				    attribute is what actually removes it from the tree today; `alt=""` is
 				    the per-element declaration that keeps it decorative if the span's ever
 				    goes. Neither is redundant with the other — one is a subtree removal,

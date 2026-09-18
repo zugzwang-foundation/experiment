@@ -14,9 +14,22 @@ import {
  * construction, and its MIME allowlist and 8 MiB cap exist to bound an upload
  * a human performs. None of that describes a glyph. These ten are
  * build-time constants, shared across markets — `response-on-x.png` serves
- * four of the six — and a taxonomy entry has no market to be keyed by at
+ * three of the six — and a taxonomy entry has no market to be keyed by at
  * all. They ship from `public/`, whose precedent is
  * `public/brand/zugzwang-mark.svg`.
+ * ⛔⛔ D-50 — `MARKET_GLYPHS` AND `FLAVOUR_GLYPHS` ARE NO LONGER DISJOINT,
+ * AND THAT IS A PROPERTY GIVEN UP DELIBERATELY RATHER THAN OVERLOOKED.
+ * Through BLOCK-5b the two maps drew from separate halves of the ten: markets
+ * took `response-on-x` / `coinmarketcap` / `github`, flavours took the other
+ * six. `yc-w27-acceptance` now takes `petition.png`, which is also the
+ * `Petition` flavour's asset. ⚠ No market renders it twice — YCP's own
+ * flavour is `Showcase`, so its four blocks are still four distinct marks —
+ * and no asset count moved: ten files before, ten after, because
+ * `ALL_GLYPH_FILES` is a Set and `petition.png` was already in it. What is
+ * gone is the guarantee that an asset's filename tells you which register it
+ * belongs to. Nothing asserted that guarantee, which is why it cost nothing
+ * to lose; it is recorded here so the next reader does not infer it from the
+ * shape of the two maps.
  *
  * ⛔⛔ THE ASSETS ARE TRANSPARENT PNGs AND `bg-n1` IS LOAD-BEARING BECAUSE OF
  * IT. The sources arrived as opaque marks on a baked plate whose colour was
@@ -46,17 +59,42 @@ import {
 const GLYPH_DIR = "/brand/blocks";
 
 /**
- * RESOLUTION and RESOLVER take the SAME asset on every market — after BLOCK-4
- * their values coincide (RESOLUTION names the thing read, RESOLVER who
- * publishes it, and for all six markets that is one source with one mark).
- * One map, consulted twice, rather than two identical maps that could drift.
+ * RESOLUTION and RESOLVER take the SAME asset on every market — RESOLUTION
+ * names the thing read, RESOLVER who publishes it, and on every market that is
+ * one source with one mark. One map, consulted twice, rather than two
+ * identical maps that could drift.
+ * ⚠⚠ D-50 — THE ASSET IS STILL SHARED WHERE THE TWO *VALUES* NO LONGER ARE,
+ * and the distinction matters because the old wording rested on the wrong one.
+ * It read "after BLOCK-4 their values coincide", which was a claim about the
+ * TEXT: `yc-w27-acceptance` now reads "YC decision" against "Y Combinator",
+ * so on that market they do not. One asset still serves both, because a
+ * written decision and the institution that issues it are the same SOURCE
+ * even when they are not the same words — which is the justification this
+ * comment should have carried all along. `github-zugzwang-repo-stars` is the
+ * market where the two values genuinely do coincide ("GitHub" / "GitHub"), and
+ * the data file's own docblock already explains why that is not a slip.
  */
 const MARKET_GLYPHS: Record<KnownMarketSlug, string> = {
 	"chess-fide-tiebreak-response": "response-on-x.png",
 	"bitcoin-price-50k": "coinmarketcap.png",
-	"math-erdos-contribution-response": "response-on-x.png",
+	"math-erdos-solved-on-zugzwang": "response-on-x.png",
 	"claude-bundle-response": "response-on-x.png",
-	"yc-paper-club-response": "response-on-x.png",
+	// ⛔⛔ D-50 — REUSED, NOT MINTED, AND THE CHOICE IS THE FOUNDER'S TO
+	// OVERRULE. v3.0 settles this market on "YC's written decision to the
+	// applicant" (§2), so `response-on-x.png` — the X wordmark — would now
+	// point at the wrong instrument entirely: nothing about this market is read
+	// off X any more. No new asset is in scope, so the ten on disk were the
+	// whole candidate set, and `petition.png` is a SIGNED DOCUMENT — a page of
+	// ruled lines under a signature, which is very nearly a picture of what
+	// this market now resolves on.
+	// ⚠ THE RUNNER-UP WAS `showcase.png` AND IT WAS REJECTED ON RENDER, NOT
+	// MEANING: YCP's own FLAVOUR is `Showcase`, so taking it here would paint
+	// three of this market's four blocks with one mark. `petition.png` keeps
+	// all four distinct. The other eight are brand marks for other companies
+	// (`coinmarketcap`, `github`), the X wordmark, a date treatment, or
+	// flavour marks whose subjects — megaphone, lightbulb, rising arrow, reply
+	// bubble — say nothing about an institutional decision.
+	"yc-w27-acceptance": "petition.png",
 	"github-zugzwang-repo-stars": "github.png",
 };
 
