@@ -234,11 +234,28 @@ describe("chart-window::staging and preview share the fixture window", () => {
 		//   bet.placed     n=388  first 2026-09-07T20:18:16.131Z
 		//   bet.sold       n= 16  first 2026-09-07T20:18:35.118Z
 		//   latest of all         2026-09-11T05:32:18.582Z
+		//
+		// ⛔⛔ RE-MEASURED AGAIN 2026-09-18, AFTER MKT-ROSTER-1. Staging now holds
+		// SIX markets, zero participants and zero bets, so the whole renderable
+		// corpus is six `market.opened` rows inside one second:
+		//   market.opened  n=  6  first 2026-09-18T10:57:34.675Z
+		//   bet.placed     n=  0
+		//   bet.sold       n=  0
+		//   latest of all         2026-09-18T10:57:35.436Z
+		// ⚠⚠ AND THE PIN BELOW STILL PASSES WHILE BEING WRONG IN THE PERMISSIVE
+		// DIRECTION, WHICH IS EXACTLY WHAT THIS DOCBLOCK WARNED ABOUT. `STG_START`
+		// is 2026-09-07T00:00Z, so the staging plot now opens **eleven days**
+		// before any data exists — the same defect CHART-6 fixed at three weeks,
+		// recurring at eleven days. A floor that is too early still "contains"
+		// everything, so `w.start <= EARLIEST_MEASURED_EVENT` is green.
+		// ⛔ NOT FIXED HERE, DELIBERATELY: `STAGING_CHART_WINDOW` lives in
+		// `src/server/config/limits.ts`, and MKT-ROSTER-1's walls forbid a
+		// `src/server` change. Recorded so it is a known debt rather than drift.
 		// ⚠ THIS WILL GO STALE AGAIN ON THE NEXT RESET THAT RECREATES THE MARKETS,
 		// and nothing re-reads it. Treat a reset as a trigger to re-measure both
 		// this pin and `STAGING_CHART_WINDOW`.
-		const EARLIEST_MEASURED_EVENT = Date.parse("2026-09-07T20:18:13.954Z");
-		const LATEST_MEASURED_EVENT = Date.parse("2026-09-11T05:32:18.582Z");
+		const EARLIEST_MEASURED_EVENT = Date.parse("2026-09-18T10:57:34.675Z");
+		const LATEST_MEASURED_EVENT = Date.parse("2026-09-18T10:57:35.436Z");
 		const w = resolveChartWindow("staging");
 
 		expect(Date.parse(w.start)).toBeLessThanOrEqual(EARLIEST_MEASURED_EVENT);
@@ -284,21 +301,30 @@ describe("debate-view::price-chart-window-contains-all-data — RF-5, against th
 	 * that can rebuild the slate. The guard was reading it for something it never
 	 * claimed to be: a description of the CURRENT database.
 	 *
-	 * Read 2026-09-11 against the live staging database, one row per content
-	 * market, ordered as measured. ⚠ Re-measure after any reset that recreates
-	 * the markets; see `EARLIEST_MEASURED_EVENT` above for the same warning.
+	 * ⚠⚠ RE-MEASURED 2026-09-18, AFTER MKT-ROSTER-1's STAGING WIPE AND RESTORE —
+	 * and the re-measurement is the whole reason this function has a docblock.
+	 * The instants below moved from 2026-09-07 to 2026-09-18 because the restore
+	 * recreated every market through `createMarket` / `openMarket`, minting fresh
+	 * `market.opened` rows. ⛔ NOTHING WENT RED WHEN THEY MOVED: this is a
+	 * hardcoded list, so between the restore and this edit the file asserted a
+	 * property of rows that no longer existed and reported success. That is what
+	 * the warning below is for, and it has now fired twice.
+	 *
+	 * Read against the live staging database, one row per content market, ordered
+	 * as measured. ⚠ Re-measure after any reset that recreates the markets; see
+	 * `EARLIEST_MEASURED_EVENT` above for the same warning.
 	 */
 	function stagingGenesisInstants(): { slug: string; at: string }[] {
 		return [
-			{ slug: "chess-fide-tiebreak-response", at: "2026-09-07T20:19:25.124Z" },
-			{ slug: "bitcoin-price-50k", at: "2026-09-07T20:19:25.244Z" },
+			{ slug: "chess-fide-tiebreak-response", at: "2026-09-18T10:57:34.675Z" },
+			{ slug: "bitcoin-price-50k", at: "2026-09-18T10:57:34.858Z" },
 			{
 				slug: "math-erdos-contribution-response",
-				at: "2026-09-07T20:19:25.415Z",
+				at: "2026-09-18T10:57:34.992Z",
 			},
-			{ slug: "claude-bundle-response", at: "2026-09-07T20:19:25.614Z" },
-			{ slug: "yc-paper-club-response", at: "2026-09-07T20:19:25.765Z" },
-			{ slug: "github-zugzwang-repo-stars", at: "2026-09-07T20:19:25.887Z" },
+			{ slug: "claude-bundle-response", at: "2026-09-18T10:57:35.161Z" },
+			{ slug: "yc-paper-club-response", at: "2026-09-18T10:57:35.295Z" },
+			{ slug: "github-zugzwang-repo-stars", at: "2026-09-18T10:57:35.436Z" },
 		];
 	}
 
@@ -328,36 +354,76 @@ describe("debate-view::price-chart-window-contains-all-data — RF-5, against th
 		}
 	});
 
-	it("REDS on the PRODUCTION window — the control that proves the guard can fire", () => {
+	it("REDS on a window that CLIPS — the control that proves the guard can fire", () => {
 		// ⛔ OVN-V2 IN THE FILE RATHER THAN IN A REPORT. The assertion above is
 		// written against code that is now correct, so on its own it has never seen
 		// the defect and could be asserting something unrelated. This runs the SAME
 		// projection over a window that genuinely clips, and requires it to reject.
 		//
-		// ⛔⛔ THE CONTROL USED TO BE THE PRE-CHART-6 START (2026-08-21) AND IT
-		// STOPPED CONTROLLING ANYTHING. Its own comment claimed it "pins the DEFECT,
-		// not the fix, so it does not go stale when the staging window moves" — true
-		// of the window, and false of the DATA. The 2026-09-07 reset moved every
-		// genesis to September, which is AFTER that superseded start, so the dead
-		// constant stopped clipping and the control silently reported zero. ⚠ A
-		// positive control that can no longer fire is worse than none: the guard
-		// above still passes, and nothing says its proof of life has expired.
+		// ⛔⛔ THIS CONTROL HAS NOW LOST ITS LIVE WINDOW TWICE, AND THE SECOND TIME
+		// IS WHY IT IS SYNTHETIC. It first used the pre-CHART-6 staging start, and
+		// the 2026-09-07 reset moved every genesis point past it, so it silently
+		// clipped nothing. It was then re-based on PRODUCTION's start — a LIVE
+		// constant, which was the point — and MKT-ROSTER-1's restore moved every
+		// genesis point to 2026-09-18, past production's 2026-09-15 start, so it
+		// silently clipped nothing again. Both times the guard above stayed green
+		// and nothing said its proof of life had expired.
 		//
-		// ⇒ The window used here is now PRODUCTION's, which is both a LIVE constant
-		// and the real hazard: `resolveChartWindow`'s `preview` arm exists precisely
-		// so a preview build pointed at the staging database does not take
-		// production's start and crush every line against the left edge. If that arm
-		// were ever dropped, this is the assertion that would say so.
-		const prodStartMs = Date.parse(resolveChartWindow("production").start);
+		// ⇒ The window is now DERIVED FROM THE DATA rather than borrowed from a
+		// constant: it opens a day after the newest genesis instant, so every
+		// point clips BY CONSTRUCTION and no future reset can un-clip them. A
+		// control that has to be re-based every time the data moves is a control
+		// that will one day not be.
+		//
+		// ⛔⛔ THE OFFSET IS A DAY AND NOT A MILLISECOND, AND THAT IS NOT
+		// ARBITRARY. `xPx` ends in `round(frac * VIEWBOX_W)` with `VIEWBOX_W` 640.
+		// A start one millisecond after the newest instant gives `frac ≈ −2.4e−10`,
+		// which over a 48-day window rounds to **0** — the point is genuinely left
+		// of the plot and the projection reports it at the origin. It was written
+		// that way first and failed 0-against-6, which is the control doing its job
+		// on itself: "outside the window" is a claim about TIME, the assertion is
+		// about a PIXEL, and between them sits a rounding step. A day is ≈13px
+		// here — unambiguous, and still nothing to do with where any real window
+		// happens to start.
+		//
+		// ⚠ THE COST IS NAMED RATHER THAN HIDDEN. The production-window version
+		// also guarded `resolveChartWindow`'s `preview` arm — the arm that stops a
+		// preview build pointed at the staging database from taking production's
+		// start and crushing every line against the left edge. That guarantee does
+		// NOT live here any more. It lives in
+		// `chart-window::staging and preview share the fixture window` above, which
+		// asserts the preview arm directly by its own property instead of inferring
+		// it from where the data happens to sit. Deleting THAT test now removes a
+		// guarantee this one used to duplicate.
+		const genesis = stagingGenesisInstants();
+		const newest = Math.max(...genesis.map((g) => Date.parse(g.at)));
+		const clippingStartMs = newest + 24 * 60 * 60 * 1000;
 		const endMs = Date.parse(resolveChartWindow("staging").end);
 
-		const clipped = stagingGenesisInstants().filter(
-			(g) => xPx(g.at, prodStartMs, endMs) < 0,
+		// POSITIVE CONTROL ON THE CONTROL — the same points must NOT clip under
+		// the real staging window. Without this, a projection that returned a
+		// negative x for everything would satisfy the assertion below.
+		const underReal = genesis.filter(
+			(g) =>
+				xPx(g.at, Date.parse(resolveChartWindow("staging").start), endMs) < 0,
 		);
 		expect(
-			clipped.length,
-			"production's window must clip every staging genesis point; if it does not, this guard is measuring the wrong quantity",
-		).toBe(6);
+			underReal.length,
+			"no genesis point may clip under the REAL staging window",
+		).toBe(0);
+
+		const xs = genesis.map((g) => xPx(g.at, clippingStartMs, endMs));
+		expect(
+			xs.filter((x) => x < 0).length,
+			"a window opening after the newest genesis instant must clip every one of them; if it does not, this guard is measuring the wrong quantity",
+		).toBe(genesis.length);
+		// ⛔ AND BY A VISIBLE PIXEL, not by a rounding artefact. Without this, a
+		// future change to `round` could shrink every clip to −0 and the count
+		// above would still read six.
+		expect(
+			Math.max(...xs),
+			"every clipped x must be at most −1px",
+		).toBeLessThanOrEqual(-1);
 	});
 
 	it("places every ratified market's resolution deadline inside the PRODUCTION plot", () => {
