@@ -49,8 +49,17 @@ export function LoadingSkeleton() {
 			    BOTH axes. The column count follows `DiscoveryGrid` from four to
 			    three, and the block height follows `MarketCard`'s xl anatomy: above
 			    1280 the tile is a 96px picture inside 13px of padding, so 122px is
-			    its floor and `h-36` (144) would reserve a shape the grid never
+			    its FLOOR — and `h-36` (144) would reserve a shape the grid never
 			    takes. Below xl the tile is unchanged and so is the block.
+			    ⚠ 124, NOT THE 122px FLOOR, AND THE 2px IS WHY THIS WAS MEASURED
+			    RATHER THAN DERIVED. The floor is what the PICTURE imposes; the tile
+			    is as tall as its taller side, and the text column comes to 98px — a
+			    two-line title, the stat row, the 9px rhythm and the price bar.
+			    Measured in a real browser on the deployed branch at BOTH ends of the
+			    tier, 1280 and 1440: all six tiles render 124.00px. ⛔ It is a LITERAL
+			    and it will drift if the tile's type or rhythm changes. That is the
+			    honest cost of a fallback that reserves a real shape; deriving it from
+			    the floor would reserve a height no tile actually takes.
 			    ⚠ THIS IS THE DEFECT THIS COMPONENT ALREADY HAS A PARAGRAPH ABOUT —
 			    point 2 above records the card COUNT being hard-coded at four against
 			    an eight-slot grid, and calls that "structurally lying about the
@@ -64,7 +73,7 @@ export function LoadingSkeleton() {
 			    and left, rather than missed. */}
 			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 				{CARD_SLOTS.map((slot) => (
-					<LoadingBlock key={slot} className="h-36 xl:h-[122px]" />
+					<LoadingBlock key={slot} className="h-36 xl:h-[124px]" />
 				))}
 			</div>
 		</div>
