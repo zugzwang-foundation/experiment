@@ -189,6 +189,18 @@ export function MarketCard({
 					    under the box. So the type rises out of slack the layout was
 					    already holding open, and it is the BOX, never the type, that sets
 					    the tile's height.
+					    ⚠ `xl:text-balance` IS A BREAK-POINT RULE, NOT A SIZE RULE, AND IT
+					    MOVES NOTHING THIS TILE IS MEASURED BY. `text-wrap: balance` asks the
+					    browser to even out the LINES of a short block — here it pulls a
+					    widow up off line two — while the line COUNT, the type, the box and
+					    the tile's 112px floor are all untouched. Verified on the deployed
+					    branch by reading `getComputedStyle(h3).textWrapStyle` on a real
+					    tile, not by reading this class back: the property is inert if the
+					    element inherits a `white-space` that forbids wrapping, and a class
+					    string cannot tell you whether that happened.
+					    ⚠ It is `xl:`-scoped because below the tier the title is still
+					    `line-clamp-2`, and balancing the lines of a block that is about to
+					    be truncated changes which words the reader loses.
 					    ⛔ 14px IS THE FLOOR AND IT IS NOT AN AESTHETIC ONE. The stat row
 					    below the title is 12px; a 13px title is level with its own
 					    metadata, which makes the question read as another tag rather than
@@ -220,7 +232,7 @@ export function MarketCard({
 					    Both halves are stated for that reason, and the unitless 1.3
 					    scales with the size rather than pinning a px that would have to
 					    move again. */}
-					<h3 className="line-clamp-2 text-[13.5px] leading-[1.32] font-semibold xl:line-clamp-none xl:text-[14px] xl:leading-[1.3]">
+					<h3 className="line-clamp-2 text-[13.5px] leading-[1.32] font-semibold xl:line-clamp-none xl:text-[14px] xl:leading-[1.3] xl:text-balance">
 						{card.title}
 					</h3>
 					<StatLine totals={card.totals} size="card" />
