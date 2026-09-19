@@ -241,26 +241,88 @@ describe("discovery mobile reflow — the carousel rail hides with its hero", ()
  */
 describe("discovery mobile reflow — the grid already stacks, and must keep doing so", () => {
 	it("discovery-mobile::discovery-grid-declares-NO-unprefixed-grid-cols", () => {
-		const [classes, ...extra] = nodeClasses(read(GRID), GRID, "discovery-grid");
+		// ⚠⚠ THIS ASSERTS ACROSS **EVERY** `discovery-grid` NODE, WHERE IT USED TO
+		// DESTRUCTURE ONE AND REQUIRE `extra` EMPTY. MKT-ROSTER-1-P3 ships two
+		// literal JSX branches behind one `GRID_VARIANT` const so the founder can
+		// photograph both candidate desktop shapes from a single commit, and a
+		// second literal className is exactly what the old form rejected.
+		//
+		// ⛔ ITERATING IS NOT A LOOSENING. The old `extra` check bought "one class
+		// string, so two cannot drift apart"; every property below is now asserted
+		// on EACH string independently, so a second node that drifted would red on
+		// its own row rather than slipping through the first. What is genuinely
+		// given up is the count itself — and it comes back in Phase 2, when the
+		// unchosen variant is deleted and this reverts to the single-node form.
+		const nodes = nodeClasses(read(GRID), GRID, "discovery-grid");
+		expect(nodes.length).toBeGreaterThan(0);
 
-		expect(extra).toEqual([]);
+		for (const classes of nodes) {
+			// The two responsive steps that DO exist, pinned by name — the grid is
+			// two columns from `sm`, and THREE from `lg` since the D-49 six-market
+			// roster (it was four; four rendered six markets as 4 + 2).
+			expect(classes).toContain("sm:grid-cols-2");
+			expect(
+				classes.some((c) => /^lg:grid-cols-/.test(c)),
+				`${GRID}: a market-grid node declares no \`lg:grid-cols-*\` at all, ` +
+					`so the desktop tier falls back to the \`sm\` two-column step.`,
+			).toBe(true);
 
-		// The two responsive steps that DO exist, pinned by name — the grid is two
-		// columns from `sm` and four from `lg`.
-		expect(classes).toContain("sm:grid-cols-2");
-		expect(classes).toContain("lg:grid-cols-4");
-
-		// ⛔ AND NOTHING UNPREFIXED. `sm:grid-cols-2` only wins below 640px if
-		// nothing beneath it sets a column count; a base `grid-cols-*` would apply
-		// at EVERY width and phone-width stacking would silently end.
-		const unprefixed = classes.filter((c) => /^grid-cols-/.test(c));
-		expect(
-			unprefixed,
-			`${GRID}: the market grid declares unprefixed ${JSON.stringify(
+			// ⛔ AND NOTHING UNPREFIXED. `sm:grid-cols-2` only wins below 640px if
+			// nothing beneath it sets a column count; a base `grid-cols-*` would
+			// apply at EVERY width and phone-width stacking would silently end.
+			const unprefixed = classes.filter((c) => /^grid-cols-/.test(c));
+			expect(
 				unprefixed,
-			)}. An unprefixed grid-cols applies at every width, so the phone-width ` +
-				`single-column default is gone — the cards render multi-column at ` +
-				`375px. Add the column count at a breakpoint (\`sm:\`/\`lg:\`) instead.`,
-		).toEqual([]);
+				`${GRID}: the market grid declares unprefixed ${JSON.stringify(
+					unprefixed,
+				)}. An unprefixed grid-cols applies at every width, so the ` +
+					`phone-width single-column default is gone — the cards render ` +
+					`multi-column at 375px. Add the column count at a breakpoint ` +
+					`(\`sm:\`/\`lg:\`) instead.`,
+			).toEqual([]);
+		}
+	});
+
+	/**
+	 * ⛔ MKT-ROSTER-1-P3 — THE DESKTOP TIER IS THREE COLUMNS IN BOTH VARIANTS, AND
+	 * NEITHER MAY REACH BELOW 640px. The centred variant buys its equal side
+	 * margins with `lg:justify-center` on the grid itself; an UNPREFIXED
+	 * `justify-center` would centre the phone tier's single column too, shrinking
+	 * every card to its own content width on a device — the same silent,
+	 * device-only failure the unprefixed `grid-cols` guard above exists for.
+	 */
+	it("discovery-mobile::the-desktop-column-count-is-three-and-stays-above-640", () => {
+		// ⚠ ASSEMBLED AT RUNTIME, NOT WRITTEN AS A LITERAL (AGENTS.md §8).
+		// Tailwind v4's source detection scans `tests/` as well as `src/`, so a
+		// class-shaped string here EMITS a real utility into the built stylesheet —
+		// and in Phase 2 exactly one of these two variants survives in `src/`. A
+		// literal would keep the loser's utility alive with no component behind it,
+		// which is precisely how the built sheet stops being evidence of what the
+		// components use.
+		const LG = "lg";
+		const S = ":";
+		const THREE = `${LG}${S}grid-cols-3`;
+		const CENTRED = `${LG}${S}grid-cols-[repeat(3,`;
+		const PREFIX = new RegExp(`^${LG}${S}grid-cols-`);
+
+		for (const classes of nodeClasses(read(GRID), GRID, "discovery-grid")) {
+			const cols = classes.filter((c) => PREFIX.test(c));
+			expect(cols.length).toBe(1);
+			expect(
+				cols[0] === THREE || cols[0]?.startsWith(CENTRED),
+				`${GRID}: the desktop grid declares ${JSON.stringify(cols[0])}. ` +
+					`The D-49 roster is six markets and the founder ruled 3 × 2; a ` +
+					`fourth column renders them 4 + 2 again.`,
+			).toBe(true);
+
+			const bareJustify = classes.filter((c) => /^justify-/.test(c));
+			expect(
+				bareJustify,
+				`${GRID}: the market grid declares unprefixed ${JSON.stringify(
+					bareJustify,
+				)}. Centring applies at every width, so the phone tier's single ` +
+					`column stops filling the viewport.`,
+			).toEqual([]);
+		}
 	});
 });

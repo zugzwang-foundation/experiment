@@ -59,10 +59,10 @@ Display block: **RESOLUTION** Response on X · **RESOLVER** @thomasfbloom → `h
 math-erdos-solved-on-zugzwang
 ```
 
-**Title** — 67 characters
+**Title** — 55 characters
 
 ```
-Math · Will 3 Erdős problems be solved on Zugzwang by 5th November?
+Math · Will 3 Erdős problems be solved by 5th November?
 ```
 
 **Deadline** — typed digits are read as UTC verbatim. No trailing `Z`.
