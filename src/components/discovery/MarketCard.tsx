@@ -175,22 +175,33 @@ export function MarketCard({
 					    seventh market with a longer question grows its tile instead of
 					    silently losing the end of its own sentence. Below 1280 the
 					    clamp stands — there the column is too narrow to take the risk.
-					    ⛔⛔ AND THE TYPE GOES TO 20px AT xl, WHICH COSTS NOTHING. The
-					    tile's height is `max(96, column)` and the 96px picture was the
+					    ⛔⛔ AND THE TYPE GOES TO 18px AT xl, WHICH COSTS NOTHING. The
+					    tile's height is `max(96, column)` and the 96px picture is the
 					    taller side: at 13.5px the text column came to 81.63px and the
-					    grid spent 14.37px of it on dead space. A 20px title takes the
-					    column to exactly 96.00 — measured, not derived — so the tile
-					    stays **124px**, the same number it has today, with a title half
-					    again as large. The slack was already paid for; this spends it.
-					    ⚠ `xl:leading-[1.25]` IS NOT OPTIONAL BESIDE `xl:text-[20px]`.
+					    grid spent 14.37px of it on dead space. 18px/1.3 takes the column
+					    to ~92.8 — still UNDER the picture's 96 — so the tile stays
+					    **124px** and the whole rise is paid for out of slack the layout
+					    was already holding open.
+					    ⚠ IT WAS 20px FOR ONE ROUND, AND THE TIER FLOOR IS WHY IT MOVED.
+					    20/1.25 landed the column on exactly 96.00 and held two lines at
+					    1440; at 1280, where the title column is 276px rather than 329px,
+					    FOUR of the six questions took a third line and the tile grew to
+					    148.5. 18/1.3 halves that — measured at 1280: TWO still take a
+					    third line (YCombinator, Chess) and the tile is 143.7.
+					    ⛔ SO "THE TILE IS 124" IS A PROPERTY OF 1440, NOT OF THE TIER,
+					    and no type size closes that gap: the column is 53px narrower at
+					    the floor and the questions are the length they are. Stated here
+					    rather than rounded off, because the next reader will otherwise
+					    measure at one width and conclude the tile has a single height.
+					    ⚠ `xl:leading-[1.3]` IS NOT OPTIONAL BESIDE `xl:text-[18px]`.
 					    An arbitrary `text-[Npx]` does NOT reset the line-height it
 					    inherits from the step in scope (AGENTS.md §8) — without it the
-					    type would be 20px on `leading-[1.32]`'s 17.82px, which is
+					    type would be 18px on `leading-[1.32]`'s 17.82px, which is
 					    leading TIGHTER than the glyphs and silently overlapping lines.
-					    Both halves are stated for that reason, and the unitless 1.25
+					    Both halves are stated for that reason, and the unitless 1.3
 					    scales with the size rather than pinning a px that would have to
 					    move again. */}
-					<h3 className="line-clamp-2 text-[13.5px] leading-[1.32] font-semibold xl:line-clamp-none xl:text-[20px] xl:leading-[1.25]">
+					<h3 className="line-clamp-2 text-[13.5px] leading-[1.32] font-semibold xl:line-clamp-none xl:text-[18px] xl:leading-[1.3]">
 						{card.title}
 					</h3>
 					<StatLine totals={card.totals} size="card" />
