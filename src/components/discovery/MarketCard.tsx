@@ -175,33 +175,40 @@ export function MarketCard({
 					    seventh market with a longer question grows its tile instead of
 					    silently losing the end of its own sentence. Below 1280 the
 					    clamp stands — there the column is too narrow to take the risk.
-					    ⛔⛔ AND THE TYPE GOES TO 18px AT xl, WHICH COSTS NOTHING. The
+					    ⛔⛔ AND THE TYPE GOES TO 16px AT xl, WHICH COSTS NOTHING. The
 					    tile's height is `max(96, column)` and the 96px picture is the
 					    taller side: at 13.5px the text column came to 81.63px and the
-					    grid spent 14.37px of it on dead space. 18px/1.3 takes the column
-					    to ~92.8 — still UNDER the picture's 96 — so the tile stays
+					    grid spent 14.37px of it on dead space. 16px/1.3 takes the column
+					    to 87.00 — still UNDER the picture's 96 — so the tile stays
 					    **124px** and the whole rise is paid for out of slack the layout
 					    was already holding open.
-					    ⚠ IT WAS 20px FOR ONE ROUND, AND THE TIER FLOOR IS WHY IT MOVED.
-					    20/1.25 landed the column on exactly 96.00 and held two lines at
-					    1440; at 1280, where the title column is 276px rather than 329px,
-					    FOUR of the six questions took a third line and the tile grew to
-					    148.5. 18/1.3 halves that — measured at 1280: TWO still take a
-					    third line (YCombinator, Chess) and the tile is 143.7.
-					    ⛔ SO "THE TILE IS 124" IS A PROPERTY OF 1440, NOT OF THE TIER,
-					    and no type size closes that gap: the column is 53px narrower at
-					    the floor and the questions are the length they are. Stated here
-					    rather than rounded off, because the next reader will otherwise
-					    measure at one width and conclude the tile has a single height.
-					    ⚠ `xl:leading-[1.3]` IS NOT OPTIONAL BESIDE `xl:text-[18px]`.
+					    ⚠ IT WAS 20px, THEN 18px, AND THE TIER FLOOR IS WHY IT MOVED TWICE.
+					    The title column is 329px at 1440 and 276px at 1280, so a size that
+					    holds two lines at one end can wrap at the other — and a third line
+					    lifts the tile off its floor. Measured at 1280: 20/1.25 wrapped FOUR
+					    of the six questions (tile 148.5), 18/1.3 wrapped TWO (tile 143.7),
+					    16/1.3 wraps NONE.
+					    ⛔ A PREVIOUS VERSION OF THIS BLOCK SAID "NO TYPE SIZE CLOSES THAT
+					    GAP" AND THAT WAS WRONG — corrected here rather than left standing.
+					    16px closes it: every question holds two lines at BOTH ends, so the
+					    tile is 124 across the whole tier instead of at one width.
+					    ⚠ AND THE TILE IS FLOORED BY THE PICTURE, NOT BY THIS TYPE. At 16px
+					    the text column measures 87.00 — NINE pixels UNDER the 96px image —
+					    so the size below which the tile stops shrinking was already reached
+					    before this change and cannot be reached again by shrinking type or
+					    by trimming the column's `gap-1`/`mt-[9px]` (measured: trimming both
+					    to zero moves the tile not at all). ⇒ 124 is the floor while the
+					    picture is 96. Anything that wants a shorter tile has to move the
+					    picture.
+					    ⚠ `xl:leading-[1.3]` IS NOT OPTIONAL BESIDE `xl:text-[16px]`.
 					    An arbitrary `text-[Npx]` does NOT reset the line-height it
 					    inherits from the step in scope (AGENTS.md §8) — without it the
-					    type would be 18px on `leading-[1.32]`'s 17.82px, which is
-					    leading TIGHTER than the glyphs and silently overlapping lines.
+					    type would be 16px on `leading-[1.32]`'s 17.82px — barely more
+					    than the glyphs, and tighter than them the moment the size rises.
 					    Both halves are stated for that reason, and the unitless 1.3
 					    scales with the size rather than pinning a px that would have to
 					    move again. */}
-					<h3 className="line-clamp-2 text-[13.5px] leading-[1.32] font-semibold xl:line-clamp-none xl:text-[18px] xl:leading-[1.3]">
+					<h3 className="line-clamp-2 text-[13.5px] leading-[1.32] font-semibold xl:line-clamp-none xl:text-[16px] xl:leading-[1.3]">
 						{card.title}
 					</h3>
 					<StatLine totals={card.totals} size="card" />
