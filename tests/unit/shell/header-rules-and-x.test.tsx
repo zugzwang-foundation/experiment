@@ -151,6 +151,41 @@ describe("MKT-ROSTER-1-P3 — the X control takes the vacated left-zone slot", (
 		expect(x?.getAttribute("aria-label")).toBe(
 			"Zugzwang on X (opens in a new tab)",
 		);
+
+		// ⛔ THE MARK IS AN `<svg>`, NOT THE LETTER X. A one-character text label
+		// was the interim; MKT-ROSTER-1-P3 ships X's own logo from its brand
+		// toolkit. Asserted as a SET of properties rather than a snapshot of the
+		// path, because the path is 293 bytes of geometry whose correctness is a
+		// provenance question (recorded in the component's docblock with the source
+		// and its md5) and not something a diff can adjudicate.
+		const svg = x?.querySelector("svg");
+		expect(
+			svg,
+			"the X control renders no <svg> — it is text again",
+		).not.toBeNull();
+		expect(svg?.getAttribute("viewBox")).toBe("0 0 1200 1227");
+		expect(svg?.getAttribute("fill")).toBe("currentColor");
+		// ⛔ `aria-hidden` AND `focusable="false"` TOGETHER. The first keeps the
+		// glyph out of the accessible name, which the link's `aria-label` already
+		// carries; the second keeps it out of the TAB ORDER, which `aria-hidden`
+		// alone does not guarantee — a decorative mark that takes a tab stop is a
+		// stop that announces nothing.
+		expect(svg?.getAttribute("aria-hidden")).toBe("true");
+		expect(svg?.getAttribute("focusable")).toBe("false");
+		expect(svg?.querySelectorAll("path").length).toBe(1);
+		// ⛔ NO HARD-CODED COLOUR ANYWHERE INSIDE IT. The official file ships
+		// `fill="white"` on its path; shipping that would put a raw colour in a tree
+		// whose whole token layer names colours by role, and it would be invisible
+		// on a light surface if one ever existed.
+		expect(svg?.innerHTML).not.toContain("white");
+		// ⛔ THE ONLY TEXT IS THE CLIPPED FALLBACK, AND IT IS NOT THE ANNOUNCED
+		// NAME. `aria-label` wins the accessible-name computation, so a reader
+		// hears the destination and the new-tab warning; this span exists because
+		// an anchor whose every child is `aria-hidden` has a name and no CONTENT.
+		// Asserted as `sr-only` rather than merely present — an unclipped "X" here
+		// would paint a letter beside the mark.
+		const srOnly = x?.querySelector(".sr-only");
+		expect(srOnly?.textContent).toBe("X");
 		expect((x?.textContent ?? "").trim()).toBe("X");
 	});
 
@@ -166,11 +201,17 @@ describe("MKT-ROSTER-1-P3 — the X control takes the vacated left-zone slot", (
 		const tokens = (el: Element | null) =>
 			new Set((el?.getAttribute("class") ?? "").split(/\s+/).filter(Boolean));
 		const xTokens = tokens(x);
+		// ⚠ TWO TOKENS ARE PERMITTED TO DIFFER, AND BOTH ARE OVERRIDES RATHER THAN
+		// OMISSIONS. `mr-3.5` is RULES' own right margin — the right zone declares
+		// no `gap`, so every separation in it is a margin on the control that owns
+		// it. `px-[13px]` is the register's text padding, which X zeroes to make a
+		// 34×34 square around a 15px mark; `px-0` is asserted on X below rather
+		// than merely excused here.
+		const OVERRIDDEN = new Set(["mr-3.5", "px-[13px]"]);
+		expect(xTokens.has("px-0")).toBe(true);
+		expect(xTokens.has("w-[34px]")).toBe(true);
 		for (const t of tokens(rules)) {
-			// RULES additionally carries its own right margin — the right zone
-			// declares no `gap`, so every separation in it is a margin on the
-			// control that owns it. That token is the ONE difference permitted.
-			if (t === "mr-3.5") continue;
+			if (OVERRIDDEN.has(t)) continue;
 			expect(
 				xTokens.has(t),
 				`the X pill is missing \`${t}\`, which RULES carries. Both must read ` +

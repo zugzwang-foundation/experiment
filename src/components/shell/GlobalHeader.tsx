@@ -160,7 +160,7 @@ import { XLink } from "./XLink";
  * ⚠ "between Radio and RULES" until MKT-ROSTER-1-P3 — RULES left the zone and
  * `XLink` took its slot, so this control's own neighbours changed without it
  * moving. The measurements below were taken with RULES still present and are
- * therefore a LOWER BOUND on today's headroom, X being 39px narrower.
+ * therefore a LOWER BOUND on today's headroom, X being 39.13px narrower.
  * Measured at 1440 against the real compiled CSS, in a pinned same-origin frame,
  * against a staging build whose `/api/health` canary was asserted equal to the
  * measured commit in the same call as the geometry:
@@ -208,8 +208,9 @@ import { XLink } from "./XLink";
  * and the left zone is where this header keeps those. It wears
  * `HEADER_PILL_BUTTON`, the same string RULES wears, so the two are the same box
  * by construction rather than by inspection.
- * ⚠ NET EFFECT ON THE LEFT ZONE'S BUDGET: RULES (73.13px) out, X (a 12px capital
- * in 13px of padding either side of a hairline) in — strictly narrower, so the
+ * ⚠ NET EFFECT ON THE LEFT ZONE'S BUDGET: RULES (73.13px) out, X (a 34x34
+ * square — the pill register with its padding zeroed around a 15px mark) in
+ * — strictly narrower by 39.13px, so the
  * headroom figures above can only improve. The RIGHT zone gains RULES plus its
  * 14px margin and must be RE-MEASURED, which is what the brand mark's
  * shock-absorber paragraph at the head of this docblock demands of any change

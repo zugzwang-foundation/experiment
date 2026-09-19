@@ -90,7 +90,35 @@ export function MarketCard({
 			// the timer needs a client viewport read, which plan §4 rules against
 			// (hydration). Suppressing the only thing it renders is the
 			// pure-CSS answer, and it leaves >=640px byte-identical.
-			className={`flex flex-col justify-between rounded-[var(--r)] bg-n0 p-[13px] [border:var(--hairline)]${
+			// ⛔⛔ MKT-ROSTER-1-P3 · THE xl (>=1280) ANATOMY, AND IT IS A GRID RATHER
+			// THAN THE FLEX COLUMN BELOW IT. Three columns of six markets gave every
+			// tile ~116px it did not have, and the founder spent it on the picture:
+			// a 96x96 image on the left with the title, stats and price bar stacked
+			// beside it, instead of a 52px thumb above a full-width bar.
+			//
+			// ⚠ WHY GRID, WHEN THE TARGET IS DESCRIBED AS "a row with a column in
+			// it". The bar and the title block are SIBLINGS in this DOM — the bar is
+			// full-card-width below xl and must sit INSIDE the right column above it,
+			// and one node cannot have two parents. `xl:contents` on the title row
+			// dissolves it, which makes the thumb and the text block direct children
+			// here; auto-placement then puts the thumb at (1,1) spanning both rows,
+			// the text block at (1,2) and the bar at (2,2). No DOM moved.
+			//
+			// ⛔ `content-between`, NOT `grid-rows-[1fr_auto]`, AND THE DIFFERENCE IS
+			// THE 96px FLOOR. An item spanning a FLEXIBLE track is excluded from that
+			// track's intrinsic sizing, so with a `1fr` first row the 96px image
+			// contributes nothing to the height and overflows its own area when the
+			// text is short. Two AUTO rows size to content — the spanning image is
+			// counted, which is what makes "tile height = max(96, column)" true by
+			// construction — and `align-content: space-between` then hands every
+			// spare pixel to the gap BETWEEN them, which is what pins the bar to the
+			// floor when a taller row-mate stretches the tile.
+			//
+			// ⚠ `justify-between` above is INERT at xl, not contradictory: on a grid
+			// it distributes TRACKS along the inline axis, and `1fr` already consumes
+			// the free space there. Left unprefixed so the sub-xl render takes zero
+			// diff, which is the whole of ADR-0045's override-never-replace rule.
+			className={`flex flex-col justify-between rounded-[var(--r)] bg-n0 p-[13px] [border:var(--hairline)] xl:grid xl:grid-cols-[96px_1fr] xl:content-between xl:gap-x-3${
 				active
 					? " [outline:var(--ring-active)] outline-offset-[3px] max-mobile:outline-none"
 					: ""
@@ -100,22 +128,42 @@ export function MarketCard({
 			    not top-aligned. The mockup uses ONE `.qrow` class for the tile and
 			    the hero alike (`align-items:center`, :122) and the hero already
 			    shipped `items-center`; the tile was the odd one out. */}
-			<div className="flex items-center gap-3">
+			{/* ⛔ `xl:contents` DISSOLVES THIS ROW ABOVE 1280 — see the root. Its
+			    `items-center` and `gap-3` go inert with it, which is correct: the
+			    picture is `self-start` at xl and the column gap is the grid's. */}
+			<div className="flex items-center gap-3 xl:contents">
 				<MarketThumb
 					src={card.imageUrl}
 					alt=""
-					className="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover"
+					// ⛔ `xl:object-contain` REVERSES THIS SITE'S `object-cover` ABOVE
+					// 1280, and only above it. `cover` is right for a 52px thumb, where
+					// a crop reads as a detail; at 96px the picture is the tile's
+					// subject and a crop is a decision nobody made — the same founder
+					// wall `HeroPanels`' post image already carries. `xl:self-start`
+					// because the image spans both grid rows and is a fixed 96, so it
+					// aligns with the title's cap rather than floating in the slack.
+					className="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover xl:row-span-2 xl:h-24 xl:w-24 xl:self-start xl:object-contain"
 					fallback={
 						<div
 							aria-hidden="true"
-							className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4"
+							// Tracks the image's geometry exactly — it stands in the same
+							// grid area. No `object-*`: this is a div with a word in it.
+							className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4 xl:row-span-2 xl:h-24 xl:w-24 xl:self-start"
 						>
 							IMG
 						</div>
 					}
 				/>
 				<div className="flex min-w-0 flex-col gap-1">
-					<h3 className="line-clamp-2 text-[13.5px] leading-[1.32] font-semibold">
+					{/* ⛔ THE CLAMP IS RELEASED AT xl, FOUNDER-RULED — no clamp, no
+					    truncation. Measured at 1440 on the deployed branch: the widest
+					    of the six titles wraps to TWO lines inside the 319px the right
+					    column gives it, so releasing the clamp changes nothing the
+					    reader sees today. What it changes is the failure mode: a
+					    seventh market with a longer question grows its tile instead of
+					    silently losing the end of its own sentence. Below 1280 the
+					    clamp stands — there the column is too narrow to take the risk. */}
+					<h3 className="line-clamp-2 text-[13.5px] leading-[1.32] font-semibold xl:line-clamp-none">
 						{card.title}
 					</h3>
 					<StatLine totals={card.totals} size="card" />

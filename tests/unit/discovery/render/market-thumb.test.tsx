@@ -295,12 +295,21 @@ describe("PRIMITIVES-2 D2/D3 — the three Discovery image sites degrade a 404",
  * constraint rules out `next/image`, not a plain attribute). Position
  * measured from React's actual output, not guessed from JSX declaration
  * order — the two do not match here.
+ *
+ * ⚠⚠ RE-POINTED AGAIN AT MKT-ROSTER-1-P3, and the addition is FIVE `xl:`
+ * tokens on each — `row-span-2 h-24 w-24 self-start` on both, plus
+ * `object-contain` on the image alone. Above 1280 the tile's picture is the
+ * 96px subject of a grid row rather than a 52px thumb above a bar; below it
+ * NOTHING changes, which is the claim these byte-exact literals are here to
+ * make. jsdom resolves no media query, so what is pinned is that the sub-xl
+ * render is byte-identical and that the xl tokens are ADDITIVE (ADR-0045
+ * override-never-replace) — a replacement would have deleted `object-cover`
+ * or `h-[52px]` from these strings and reddened here.
  */
 const CARD_THUMB_LOADED =
-	'<img alt="" class="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover" loading="lazy" decoding="async" src="https://signed.test/market-media/m/x/card.webp">';
-/** 178 bytes as captured. */
+	'<img alt="" class="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover xl:row-span-2 xl:h-24 xl:w-24 xl:self-start xl:object-contain" loading="lazy" decoding="async" src="https://signed.test/market-media/m/x/card.webp">';
 const CARD_THUMB_NULL =
-	'<div aria-hidden="true" class="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4">IMG</div>';
+	'<div aria-hidden="true" class="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4 xl:row-span-2 xl:h-24 xl:w-24 xl:self-start">IMG</div>';
 
 /**
  * `HeroPanels`' 54×54 thumb — first child of the `items-center` row.
@@ -336,9 +345,17 @@ const HERO_THUMB_NULL =
  * exactly the drift §3 exists to prevent — while a substring assertion on each
  * would still pass.
  *
- * ⛔ The 52px/54px MARKET thumbs above KEEP `object-cover`, deliberately. They
- * are small fixed-size squares where filling the frame is right and there is no
- * height to protect; only the post attachment — the box that grows — changed.
+ * ⛔ The 52px/54px MARKET thumbs above KEEP `object-cover` AT THEIR OWN SIZE,
+ * deliberately. They are small fixed-size squares where filling the frame is
+ * right and there is no height to protect; only the post attachment — the box
+ * that grows — changed at CS13.
+ * ⚠ HALF OF THAT IS NOW CONDITIONAL, corrected here rather than left standing.
+ * MKT-ROSTER-1-P3 takes the CARD thumb to 96px above 1280 and gives it
+ * `xl:object-contain` there: at that size the picture is the tile's subject and
+ * a crop is a decision nobody made. The sentence still holds wherever the thumb
+ * is actually 52 or 54px — which is the hero at every width, and the card below
+ * 1280. What changed is that "small fixed-size square" stopped being true of the
+ * card at one tier, not that the reasoning was wrong.
  *
  * ⚠⚠ RE-POINTED AGAIN AT UI-QUICK CS14 §4, and ONLY the LOADED literal moved:
  * `bg-n1` is gone from the image and STAYS on the placeholder. That asymmetry
