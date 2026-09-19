@@ -246,14 +246,41 @@ export function MarketCard({
 					      1366  inner 400.66   14px -> 375.43  (+25.23)   15px by -1.58
 					      1280  inner 372.00   13px -> 348.61  (+23.39)   14px by -3.43
 					    So 13 at the tier floor, 14 from 1366, 15 from 1440.
-					    ⚠ `min-[1366px]` AND `min-[1440px]` ARE ARBITRARY VARIANTS, NOT
-					    MINTED BREAKPOINTS. They add no `--breakpoint-*` token and
-					    generate no utility family — they are one-off measured media
-					    queries in exactly the sense `text-[15px]` is a one-off measured
-					    size, so ADR-0045's "one minted breakpoint" is untouched. The
-					    three sizes are probed by computed value at all three widths,
-					    because their ORDER is a Tailwind sorting fact and a class string
-					    cannot tell you which one won.
+					    ⚠ THE THREE STEPS ARE ARBITRARY VARIANTS, NOT MINTED BREAKPOINTS.
+					    They add no `--breakpoint-*` token and generate no utility family —
+					    they are one-off measured media queries in exactly the sense
+					    `text-[15px]` is a one-off measured size, so ADR-0045's "one minted
+					    breakpoint" is untouched.
+					    ⛔⛔ ALL THREE ARE `min-[…]`, INCLUDING THE FLOOR, AND WRITING THE
+					    FLOOR AS `xl:` SHIPPED THE WRONG SIZE. Tailwind emits EVERY
+					    arbitrary `min-[…]` variant in one block and the NAMED breakpoints
+					    in a later one — measured in the built sheet at
+					    `min-[1366px]` byte 87128, `min-[1440px]` byte 87201, the named
+					    block byte 90238. The two arbitrary steps sort correctly against
+					    each other; the floor, written as a named step, then landed 3,000
+					    bytes after both and won the cascade at every width — so the
+					    deployed tile rendered 13px at 1440 with all three rules present and
+					    each one correct in isolation. ⇒ A LADDER MUST BE WRITTEN IN ONE
+					    IDIOM — mixing a named breakpoint with arbitrary ones sorts by
+					    bucket, not by width. Caught only by reading the computed
+					    `font-size` off a real tile; every class was in the DOM.
+					    ⛔ THE SUPERSEDED FLOOR IS DESCRIBED AND NEVER QUOTED, and that is
+					    load-bearing rather than fastidious: Tailwind's scanner reads THIS
+					    COMMENT, so spelling the old class out emits it — and because it
+					    sorts into the later block it would win the cascade again and undo
+					    the fix from inside the paragraph explaining it. Measured: the
+					    scanner returned it as a live candidate while no element carried it
+					    (AGENTS.md §8, `docs/` and `tests/` emit utilities too).
+					    ⚠ THE FLOOR IS `1280px` WHERE THE COMPOSITION AROUND IT IS `xl`
+					    (`80rem`). They are the same width at this app's 16px root and
+					    diverge only if a reader enlarges their browser's default type —
+					    the same px-vs-rem trade `--breakpoint-mobile: 640px` already makes
+					    against `sm: 40rem` (AGENTS.md §8), taken here for the same reason:
+					    this ladder is measured against DEVICE widths, which do not grow
+					    with the root font. The cost in that band is half a pixel of type on
+					    the sub-xl composition, not a broken layout.
+					    ⚠ Every step is probed by computed value at every width, because
+					    which rule won is a sorting fact and a class string cannot tell you.
 					    ⛔ `xl:min-h-[28px]` IS WHAT KEEPS THE TILE AT 112 ACROSS THE
 					    WHOLE TIER. The three sizes give three different line boxes
 					    (19.5 / 18.2 / 16.9 at 1.3), so without a floor the tile would
@@ -282,7 +309,7 @@ export function MarketCard({
 					    on the same element scales with whichever size wins, where a px
 					    leading would have had to be restated at every tier and would
 					    have gone stale at one of them. */}
-					<h3 className="line-clamp-2 text-[13.5px] leading-[1.32] font-semibold xl:col-span-2 xl:row-start-1 xl:line-clamp-none xl:min-h-[28px] xl:text-[13px] xl:leading-[1.3] xl:text-balance min-[1366px]:text-[14px] min-[1440px]:text-[15px]">
+					<h3 className="line-clamp-2 text-[13.5px] leading-[1.32] font-semibold xl:col-span-2 xl:row-start-1 xl:line-clamp-none xl:min-h-[28px] xl:leading-[1.3] xl:text-balance min-[1280px]:text-[13px] min-[1366px]:text-[14px] min-[1440px]:text-[15px]">
 						{/* ⛔⛔ THE TOPIC IS NOT LOST — IT IS MOVED OFF THE LINE, NOT OFF
 						    THE PAGE. The `sr-only` span carries the WHOLE title, so the
 						    heading's accessible name is unchanged and the category is
