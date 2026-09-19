@@ -296,32 +296,39 @@ describe("PRIMITIVES-2 D2/D3 — the three Discovery image sites degrade a 404",
  * measured from React's actual output, not guessed from JSX declaration
  * order — the two do not match here.
  *
- * ⚠⚠ RE-POINTED AGAIN AT MKT-ROSTER-1-P3, and the addition is FOUR `xl:`
- * tokens on each — `row-span-2 h-[84px] w-[84px] self-start`. ⚠ THE BOX SIZE IN
- * THEM IS THE PART THAT MOVES: it was `h-24 w-24` (96px) for three rounds and is
- * 84 now, because the picture is what sets the tile's height and the founder is
- * spending it down a step at a time. Re-point the two literals together — the
- * loaded image and the null placeholder stand in the same grid area, and a change
- * to one alone would leave the two cases different boxes. Above 1280 the tile's
- * picture is the 84px subject of a grid row rather than a 52px thumb above a
- * bar; below it NOTHING changes, which is the claim these byte-exact literals
- * are here to make. jsdom resolves no media query, so what is pinned is that
+ * ⚠⚠ RE-POINTED AGAIN AT MKT-ROSTER-1-P3 · OPTION B, and the addition is now SIX
+ * `xl:` tokens on each — `col-start-1 row-span-2 row-start-2 h-[56px] w-[56px]
+ * self-start`. TWO THINGS MOVED AND THEY ARE DIFFERENT KINDS OF THING.
+ * ⚠ THE BOX SIZE IS THE PART THAT KEEPS MOVING: `h-24 w-24` (96px) for three
+ * rounds, then 84, and 56 now. It is not a taste number — the tile is pinned at
+ * 112 and the question's own full-width row takes a 28px band, so 112 - 28 - 26
+ * of inset - 2 of hairline leaves exactly 56. The picture is what the tile
+ * spends, and Option B spent it on the question.
+ * ⚠ THE PLACEMENT TOKENS ARE NEW: the picture used to be auto-placed at (1,1);
+ * it now names row 2 explicitly and spans rows 2-3, because row 1 belongs to the
+ * question across BOTH columns. `row-span-2` alone would have put it back on the
+ * title's row.
+ * Re-point the two literals together — the loaded image and the null placeholder
+ * stand in the same grid area, and a change to one alone would leave the two
+ * cases different boxes. Above 1280 the tile's picture is the 56px left column
+ * of a three-row grid rather than a 52px thumb above a bar; below it NOTHING
+ * changes, which is the claim these byte-exact literals are here to make. jsdom resolves no media query, so what is pinned is that
  * the sub-xl render is byte-identical and that the xl tokens are ADDITIVE
  * (ADR-0045 override-never-replace) — a replacement would have deleted
  * `object-cover` or `h-[52px]` from these strings and reddened here.
  *
  * ⚠ IT WAS FIVE FOR ONE ROUND: a fifth token, `xl:object-contain`, sat on the
  * image and is now GONE rather than moved. Measured on the deployed branch,
- * every market image is 1200x675, so `contain` painted 96x54 inside the 96px
- * box and left 21px of dead band top and bottom — the subject got smaller, not
+ * every market image is 1200x675, so `contain` painted a 16:9 letterbox inside
+ * the square box and left a dead band top and bottom — the subject got smaller, not
  * more complete. `cover` is the shipped value at EVERY width again, which is
  * why this literal carries exactly one `object-*` token and why its absence
  * above `xl` is the thing to check if it ever comes back.
  */
 const CARD_THUMB_LOADED =
-	'<img alt="" class="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover xl:row-span-2 xl:h-[84px] xl:w-[84px] xl:self-start" loading="lazy" decoding="async" src="https://signed.test/market-media/m/x/card.webp">';
+	'<img alt="" class="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover xl:col-start-1 xl:row-span-2 xl:row-start-2 xl:h-[56px] xl:w-[56px] xl:self-start" loading="lazy" decoding="async" src="https://signed.test/market-media/m/x/card.webp">';
 const CARD_THUMB_NULL =
-	'<div aria-hidden="true" class="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4 xl:row-span-2 xl:h-[84px] xl:w-[84px] xl:self-start">IMG</div>';
+	'<div aria-hidden="true" class="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4 xl:col-start-1 xl:row-span-2 xl:row-start-2 xl:h-[56px] xl:w-[56px] xl:self-start">IMG</div>';
 
 /**
  * `HeroPanels`' 54×54 thumb — first child of the `items-center` row.

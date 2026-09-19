@@ -119,6 +119,40 @@ describe("UI.A4 §4 — MarketCard (the §3.2 locked composition)", () => {
 		expect(screen.getByTestId("market-card")).toBeTruthy();
 	});
 
+	// ── MKT-ROSTER-1-P3 · Option B ──────────────────────────────────────────
+	// The tile renders the QUESTION; the topic it was prefixed with moves off
+	// the line and into an `sr-only` span carrying the WHOLE title, so the
+	// heading's accessible name and the document's own text are unchanged.
+	// Pinned here because the fixture above has no separator and therefore
+	// never exercises the split — every assertion in this suite would pass
+	// against a component that had silently stopped splitting at all.
+	it("render::prefixed-title-shows-question-and-keeps-whole-title-in-the-dom", () => {
+		const TITLE = "GitHub · Will the Zugzwang repo reach 50,000 stars?";
+		const QUESTION = "Will the Zugzwang repo reach 50,000 stars?";
+		const split = render(<MarketCard card={cardFixture({ title: TITLE })} />);
+		const h3 = screen.getByRole("heading", { level: 3 });
+		// The eye gets the question only, and it is the `aria-hidden` half so the
+		// two spans are never announced twice.
+		const visible = h3.querySelector('[aria-hidden="true"]');
+		expect(visible?.textContent).toBe(QUESTION);
+		// The topic is not lost — real DOM text, not an aria-label, so a crawler
+		// reads it too.
+		const srOnly = h3.querySelector(".sr-only");
+		expect(srOnly?.textContent).toBe(TITLE);
+		expect(srOnly?.getAttribute("aria-hidden")).toBeNull();
+		split.unmount();
+
+		// POSITIVE CONTROL — a title with no separator renders ONE bare string
+		// and no pair at all. Without this arm the assertions above would be
+		// satisfied by a component that wrapped every title in both spans, which
+		// is the shape that makes `getByText` resolve to two elements and throw.
+		render(<MarketCard card={cardFixture()} />);
+		const plain = screen.getByRole("heading", { level: 3 });
+		expect(plain.textContent).toBe(MARKET_TITLE);
+		expect(plain.querySelector(".sr-only")).toBeNull();
+		expect(plain.querySelector('[aria-hidden="true"]')).toBeNull();
+	});
+
 	it("render::null-image-renders-placeholder-no-img", () => {
 		const { container } = render(
 			<MarketCard card={cardFixture({ imageUrl: null })} />,
