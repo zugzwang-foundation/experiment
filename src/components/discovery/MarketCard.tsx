@@ -135,14 +135,26 @@ export function MarketCard({
 				<MarketThumb
 					src={card.imageUrl}
 					alt=""
-					// ⛔ `xl:object-contain` REVERSES THIS SITE'S `object-cover` ABOVE
-					// 1280, and only above it. `cover` is right for a 52px thumb, where
-					// a crop reads as a detail; at 96px the picture is the tile's
-					// subject and a crop is a decision nobody made — the same founder
-					// wall `HeroPanels`' post image already carries. `xl:self-start`
-					// because the image spans both grid rows and is a fixed 96, so it
-					// aligns with the title's cap rather than floating in the slack.
-					className="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover xl:row-span-2 xl:h-24 xl:w-24 xl:self-start xl:object-contain"
+					// ⛔⛔ `object-cover` AT EVERY WIDTH, AND THE `xl:object-contain` THAT
+					// STOOD HERE IS DELETED RATHER THAN OVERRIDDEN. It reversed this
+					// site's `cover` above 1280 on the reasoning that at 96px the
+					// picture is the tile's subject and a crop is a decision nobody
+					// made. ⚠ THE REASONING WAS RIGHT AND THE PREMISE WAS WRONG:
+					// `contain` does not show more of a picture, it fits the picture to
+					// the LIMITING axis. Measured on the deployed branch at 1440 — every
+					// market image is 1200x675, so `contain` painted **96 wide x 54.0
+					// tall** inside a 96px box and left 21px of dead band above and
+					// below. The subject got SMALLER, not more complete, and 44% of the
+					// box it was given rendered nothing. `cover` fills the square from a
+					// source 12.5x its width, so nothing is upscaled and the crop is off
+					// the sides of a 16:9 frame rather than out of the middle.
+					// ⚠ It is also what ships below 1280, so this class is now one
+					// value at every width — the tier no longer changes what the
+					// picture does, only how big it is.
+					// `xl:self-start` stays: the image spans both grid rows and is a
+					// fixed 96, so it aligns with the title's cap rather than floating
+					// in the slack. `--imgr` is untouched.
+					className="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover xl:row-span-2 xl:h-24 xl:w-24 xl:self-start"
 					fallback={
 						<div
 							aria-hidden="true"
@@ -157,13 +169,28 @@ export function MarketCard({
 				<div className="flex min-w-0 flex-col gap-1">
 					{/* ⛔ THE CLAMP IS RELEASED AT xl, FOUNDER-RULED — no clamp, no
 					    truncation. Measured at 1440 on the deployed branch: the widest
-					    of the six titles wraps to TWO lines inside the 319px the right
-					    column gives it, so releasing the clamp changes nothing the
+					    of the six titles wraps to TWO lines inside the column the right
+					    side gives it, so releasing the clamp changes nothing the
 					    reader sees today. What it changes is the failure mode: a
 					    seventh market with a longer question grows its tile instead of
 					    silently losing the end of its own sentence. Below 1280 the
-					    clamp stands — there the column is too narrow to take the risk. */}
-					<h3 className="line-clamp-2 text-[13.5px] leading-[1.32] font-semibold xl:line-clamp-none">
+					    clamp stands — there the column is too narrow to take the risk.
+					    ⛔⛔ AND THE TYPE GOES TO 20px AT xl, WHICH COSTS NOTHING. The
+					    tile's height is `max(96, column)` and the 96px picture was the
+					    taller side: at 13.5px the text column came to 81.63px and the
+					    grid spent 14.37px of it on dead space. A 20px title takes the
+					    column to exactly 96.00 — measured, not derived — so the tile
+					    stays **124px**, the same number it has today, with a title half
+					    again as large. The slack was already paid for; this spends it.
+					    ⚠ `xl:leading-[1.25]` IS NOT OPTIONAL BESIDE `xl:text-[20px]`.
+					    An arbitrary `text-[Npx]` does NOT reset the line-height it
+					    inherits from the step in scope (AGENTS.md §8) — without it the
+					    type would be 20px on `leading-[1.32]`'s 17.82px, which is
+					    leading TIGHTER than the glyphs and silently overlapping lines.
+					    Both halves are stated for that reason, and the unitless 1.25
+					    scales with the size rather than pinning a px that would have to
+					    move again. */}
+					<h3 className="line-clamp-2 text-[13.5px] leading-[1.32] font-semibold xl:line-clamp-none xl:text-[20px] xl:leading-[1.25]">
 						{card.title}
 					</h3>
 					<StatLine totals={card.totals} size="card" />
