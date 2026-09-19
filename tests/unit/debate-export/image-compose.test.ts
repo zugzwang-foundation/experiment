@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
-
+import { splitMarketTitle } from "@/lib/market-title";
 import {
 	composePostExport,
 	EXPORT_HEIGHT,
 	EXPORT_WIDTH,
 	exportFilename,
-	splitMarketTitle,
 } from "@/server/debate-export/image/compose";
 import type {
 	DebatePost,

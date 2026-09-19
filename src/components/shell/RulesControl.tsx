@@ -6,6 +6,8 @@ import { OnboardingDeck } from "@/components/onboarding/OnboardingDeck";
 import { HEADER_GLOSSARY } from "@/lib/copy/glossary";
 import { cn } from "@/lib/utils";
 
+import { HEADER_PILL_BUTTON } from "./header-control";
+
 /**
  * The header's `RULES` control, and the re-show deck it opens (SPEC.1 §21.9).
  *
@@ -34,22 +36,36 @@ import { cn } from "@/lib/utils";
  * deck "a modal card sequence… not a route and not a page", so minting a
  * `/rules` route to hang this off would contradict both.
  *
- * ⚠ PLACED IN THE LEFT ZONE, AFTER RADIO — a named tier-4 deviation from the
- * locked mockup, which puts the tab in the centre zone beside the wordmark.
- * The reason is measured and is recorded in `GlobalHeader`'s own deviation
- * register: the mockup's placement moves the brand cluster 41.57px off true
- * centre, and the left zone costs 0.00px.
+ * ⛔⛔ PLACED FIRST IN THE **RIGHT** ZONE SINCE MKT-ROSTER-1-P3 — FOUNDER-RULED,
+ * AND THIS PARAGRAPH SAID "LEFT ZONE, AFTER RADIO" UNTIL THEN. The control now
+ * opens the identity side: `RULES · Đ cluster · avatar` signed in, `RULES ·
+ * JOIN` signed out. The tier-4 deviation it recorded is unchanged in substance
+ * — the tab is still NOT in the centre zone beside the wordmark, which is where
+ * the locked mockup puts it, and the measured reason still holds (the mockup's
+ * placement moves the brand cluster 41.57px off true centre). What changed is
+ * which side zone hosts it.
+ *
+ * ⚠ THE PHONE ROW ORDER MOVES WITH IT, AND THAT SUPERSEDES ADR-0051 A13 D-1.
+ * That decision rules the sub-640 row `home · rules · logo · countdown ·
+ * identity`; RULES now lands between the countdown and identity, because below
+ * 640 the LEFT zone flattens to `contents` and the right zone does not. §21.9
+ * is untouched — the control renders at every width, on every route, for every
+ * viewer, and is not inside any hidden wrapper. Only its position moved.
  */
 
 /**
  * The mockup's `.tab` composition — 13px x-padding, 12px/700/.1em uppercase —
- * on the repo's 34px control register and in the left zone's own idiom, so it
- * reads as a sibling of Back, Home and Radio rather than as an import. The
- * mockup is the LIGHT-theme prototype, so its colours are matched BY ROLE and
- * never by lightness: this build's ramp is inverted against that one.
+ * on the repo's 34px control register. The mockup is the LIGHT-theme prototype,
+ * so its colours are matched BY ROLE and never by lightness: this build's ramp
+ * is inverted against that one.
+ *
+ * ⚠ MKT-ROSTER-1-P3 — THE REGISTER MOVED OUT OF THIS FILE AND THE ALIAS STAYS,
+ * exactly as `HeaderNav`'s `ICON_BUTTON` did at MOBILE-2n. `header-control.ts`
+ * owns the string now, because the X link wears the same pill and "the same
+ * pill" has to be one literal to stay true. The value is byte-identical, which
+ * is what keeps RULES unmoved at 1440 through a task that also relocates it.
  */
-const RULES_TAB =
-	"inline-flex h-[34px] shrink-0 items-center rounded-(--r) bg-(--btn-fill) px-[13px] text-[12px] leading-[1.2] font-bold tracking-[0.1em] text-ink uppercase outline-none select-none [border:var(--hairline)] [transition:all_var(--dur-hover)] hover:[border:1px_solid_var(--ring)] active:bg-(--state-pressed-fill) focus-visible:shadow-(--state-focus-ring)";
+const RULES_TAB = HEADER_PILL_BUTTON;
 
 export function RulesControl({
 	mobileResponsive = false,
@@ -95,7 +111,17 @@ export function RulesControl({
 				type="button"
 				onClick={() => setOpen(true)}
 				title={HEADER_GLOSSARY.rules}
-				className={cn(RULES_TAB, mobileResponsive && "max-mobile:px-[10px]")}
+				/* ⚠ `mr-3.5` IS THE RIGHT ZONE'S OWN RHYTHM, NOT A NUMBER PICKED HERE.
+				   That zone is a bare `flex` with NO `gap`: every separation in it is
+				   a margin on the control that owns it (`DharmaCluster`'s `mr-3.5`,
+				   the §21.1 divider's `mx-3`). Adding a `gap` to the zone instead
+				   would compound with all three and move Đ, the chip and the counter
+				   at 1440 — the one thing this task must not do. */
+				className={cn(
+					RULES_TAB,
+					"mr-3.5",
+					mobileResponsive && "max-mobile:px-[10px]",
+				)}
 			>
 				Rules
 			</button>

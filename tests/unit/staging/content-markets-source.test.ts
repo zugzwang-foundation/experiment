@@ -172,13 +172,24 @@ describe("description lengths", () => {
 	 * MKT-ROSTER-1 took the slate to six, and AGAIN after D-50 overlaid five
 	 * markets' v3.0 wording onto it:
 	 *
-	 *   slug                                 v2.2    v3.0
+	 *   slug                                 v2.2    v3.0    v3.1
 	 *   chess-fide-tiebreak-response         3609 -> 1903
 	 *   bitcoin-price-50k                    3795 -> 3795   (MKT-BTC-01 untouched)
-	 *   math-erdos-solved-on-zugzwang        3836 -> 2852   (re-slugged)
+	 *   math-erdos-solved-on-zugzwang        3836 -> 2852 -> 2293
 	 *   claude-bundle-response               3733 -> 2169
 	 *   yc-w27-acceptance                     789 -> 1658   (re-slugged)
 	 *   github-zugzwang-repo-stars            794 ->  792
+	 *
+	 * ⚠ THE THIRD COLUMN IS ONE MARKET AND ONE RULING. MKT-MAT-01 goes to v3.1
+	 * (2026-09-19): the market reverts to its ratified v2.2 rule, so every clause
+	 * carrying the "solved ON ZUGZWANG" condition leaves — the question, the YES
+	 * and NO conditions, the whole `On Zugzwang.` paragraph, the third element of
+	 * the criterion, and the evidence pointer. 559 characters, all of them one
+	 * idea. ⛔ The title had ALREADY dropped the words a day earlier, which is
+	 * what made this necessary rather than optional: a title asking whether three
+	 * Erdős problems get solved, over a description resolving only if they are
+	 * solved here, is a resolution dispute waiting for a reader who trusts the
+	 * title. The two now ask the same question.
 	 *
 	 * ⚠⚠ D-50 MOVED EVERY FIGURE EXCEPT BITCOIN'S, AND FOUR OF THE FIVE WENT
 	 * DOWN — which is the direction the bound below is least able to see. The
@@ -219,7 +230,7 @@ describe("description lengths", () => {
 		).toEqual({
 			"chess-fide-tiebreak-response": 1903,
 			"bitcoin-price-50k": 3795,
-			"math-erdos-solved-on-zugzwang": 2852,
+			"math-erdos-solved-on-zugzwang": 2293,
 			"claude-bundle-response": 2169,
 			"yc-w27-acceptance": 1658,
 			"github-zugzwang-repo-stars": 792,

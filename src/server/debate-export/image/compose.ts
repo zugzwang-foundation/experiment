@@ -13,6 +13,7 @@ import {
 	isKnownMarketSlug,
 } from "@/components/debate/resolution-block-data";
 import { formatCountdown } from "@/components/shell/countdown-format";
+import { splitMarketTitle } from "@/lib/market-title";
 import type { Badge } from "@/lib/ranking";
 import { formatRelativeTime } from "@/lib/relative-time";
 import type {
@@ -203,46 +204,6 @@ export function formatGeneratedAt(ms: number): string {
 	const hh = String(d.getUTCHours()).padStart(2, "0");
 	const mm = String(d.getUTCMinutes()).padStart(2, "0");
 	return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()} · ${hh}:${mm} UTC`;
-}
-
-/**
- * The topic separator the eight live titles are written with — a MIDDLE DOT
- * (U+00B7) with a space either side, not a hyphen and not a bullet.
- */
-const TITLE_SEPARATOR = " · ";
-
-/**
- * `Math · Will 3 Erdős problems be solved by 5th November?` → its topic and
- * its question.
- *
- * ⛔ THE SPLIT LIVES HERE, NOT IN THE COMPOSITION, and that is the same rule
- * every other display string in this file follows: the renderer receives
- * finished strings and never parses one. A topic chip derived inside the JSX
- * would be a second place that knows what a title looks like, and the one that
- * nothing tests.
- *
- * ⚠ `indexOf`, SO ONLY THE FIRST SEPARATOR SPLITS. A question is free to
- * contain its own middle dot — `Bitcoin · Will BTC ever go below $60,000` is
- * one topic and one question however many dots follow, and splitting on the
- * last would hand the chip a sentence.
- *
- * ⚠ `at <= 0` COVERS TWO CASES WITH ONE COMPARISON: no separator at all
- * (`-1`), and a title that OPENS with one (`0`), which would otherwise mint an
- * empty chip. Both pass the title through untouched, which is the safe
- * direction — a missing chip loses a word, a wrong split loses the question.
- */
-export function splitMarketTitle(title: string): {
-	category: string | null;
-	question: string;
-} {
-	const at = title.indexOf(TITLE_SEPARATOR);
-	if (at <= 0) {
-		return { category: null, question: title };
-	}
-	return {
-		category: title.slice(0, at),
-		question: title.slice(at + TITLE_SEPARATOR.length),
-	};
 }
 
 function pctNumber(pct: string): number {

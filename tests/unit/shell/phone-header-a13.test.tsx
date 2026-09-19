@@ -58,6 +58,13 @@ import { GlobalHeader } from "@/components/shell/GlobalHeader";
  * withdraws A9 D-3's centred logo there. D-2 rules the countdown onto the tick
  * `BrandCluster` already owns.
  *
+ * ⚠ THE ORDER IN THAT SENTENCE IS SUPERSEDED AND THE SENTENCE IS KEPT, because
+ * it is what A13 D-1 says and this file's job is to hold the product against the
+ * rulings rather than to restate them. MKT-ROSTER-1-P3 moves RULES into the
+ * identity zone, so the live row is `home · logo · countdown · rules ·
+ * identity`; the third describe block below carries the change, the argument and
+ * the scope of the supersession. Nothing else in A13 moves.
+ *
  * ⛔⛔ THIS FILE REPLACES `phone-round-ten-header.test.tsx`, WHICH GUARDED THE
  * CONTROL A13 D-1 WITHDRAWS. That file's nine rows were about
  * `GitHubIconControl` — its href, its register, its `::after` hit region, its
@@ -303,7 +310,30 @@ describe("A13 D-2 — the brand block is mounted below 640", () => {
 	});
 });
 
-describe("A13 D-1 — the row reads home · rules · logo · countdown · identity", () => {
+/**
+ * ⛔⛔ THE ROW READS `home · logo · countdown · RULES · identity` SINCE
+ * MKT-ROSTER-1-P3, AND THIS BLOCK IS UPDATED RATHER THAN DELETED.
+ *
+ * ADR-0051 A13 D-1 rules `home · rules · logo · countdown · identity`. The
+ * founder has since moved RULES out of the left zone and into the identity zone
+ * as its first child, so below 640 it travels with the identity cluster: the
+ * left zone flattens to `display:contents` at this tier and the right zone does
+ * not, which is the whole mechanism. **That supersedes A13 D-1 on the ORDER and
+ * on nothing else.** The survivor set is the same five, the flattening is
+ * unchanged, every A13 D-4 fit-ladder rung still applies, and RULES is still
+ * present at every width per SPEC.1 §21.9.
+ *
+ * ⚠ ADR-0051 IS NOT AMENDED HERE — it is web-authored and read-only to this
+ * lane. The divergence is reported to the founder in the MKT-ROSTER-1-P3 report
+ * and is recorded in `RulesControl.tsx`'s own docblock; this comment exists so
+ * the next reader finds the two disagreeing on purpose rather than by accident.
+ *
+ * ⛔ THE GUARD IS INVERTED, NOT WEAKENED — the WARLI-MOUNT precedent. It still
+ * asserts five nodes in one total order, located by what each control IS; only
+ * the expected order moved. A revert of the move reddens it immediately, which a
+ * deleted row could not do in either direction.
+ */
+describe("MKT-ROSTER-1-P3 — the row reads home · logo · countdown · rules · identity", () => {
 	it("phone-a13::all-five-render-in-that-DOM-order-in-both-arms", () => {
 		for (const viewer of [VIEWER, null]) {
 			const root = header({ viewer });
@@ -311,19 +341,19 @@ describe("A13 D-1 — the row reads home · rules · logo · countdown · identi
 			if (!row) throw new Error("the header row is unreachable.");
 			// Located by what each control IS, never by index: an index-ordered
 			// assertion passes on a row whose members have been swapped for
-			// lookalikes, and this is the one claim A13 D-1 makes in one sentence.
+			// lookalikes, and this is the one claim the row's order makes.
 			const nodes = [
 				row.querySelector('[aria-label="Home"]'),
+				row.querySelector('img[src*="zugzwang-mark"]'),
+				row.querySelector('[data-testid="phone-countdown"]'),
 				[...row.querySelectorAll("button")].find(
 					(b) => (b.textContent ?? "").trim().toLowerCase() === "rules",
 				),
-				row.querySelector('img[src*="zugzwang-mark"]'),
-				row.querySelector('[data-testid="phone-countdown"]'),
 				viewer === null
 					? row.querySelector('a[href="/sign-in"]')
 					: row.querySelector('[data-testid="identity-chip-link"]'),
 			];
-			const names = ["home", "rules", "logo", "countdown", "identity"];
+			const names = ["home", "logo", "countdown", "rules", "identity"];
 			nodes.forEach((n, i) => {
 				expect(n, `${names[i]} does not render below 640`).toBeTruthy();
 			});
@@ -332,9 +362,12 @@ describe("A13 D-1 — the row reads home · rules · logo · countdown · identi
 					// biome-ignore lint/style/noNonNullAssertion: asserted truthy above.
 					nodes[i - 1]!.compareDocumentPosition(nodes[i] as Node) &
 						Node.DOCUMENT_POSITION_FOLLOWING,
-					`${names[i]} does not follow ${names[i - 1]} in the row. A13 D-1 ` +
-						`rules the order left to right, and DOM order is what a flex ` +
-						`line renders — nothing here re-orders visually.`,
+					`${names[i]} does not follow ${names[i - 1]} in the row. The row ` +
+						`order is ruled left to right, and DOM order is what a flex ` +
+						`line renders — nothing here re-orders visually. ⚠ RULES moved ` +
+						`from second to fourth at MKT-ROSTER-1-P3 (it is now the ` +
+						`identity zone's first child); A13 D-1's original order is ` +
+						`superseded on that point.`,
 				).toBeTruthy();
 			}
 			cleanup();
@@ -359,8 +392,8 @@ describe("A13 D-1 — the row reads home · rules · logo · countdown · identi
 		const left = row?.firstElementChild;
 		expect(
 			tokens(left),
-			"the left zone is still a box below 640, so home→rules takes its gap " +
-				"and rules→logo takes the row's — two numbers, equal by hand.",
+			"the left zone is still a box below 640, so home→logo takes its gap " +
+				"and logo→countdown takes the row's — two numbers, equal by hand.",
 		).toContain(phone("contents"));
 	});
 

@@ -295,12 +295,40 @@ describe("PRIMITIVES-2 D2/D3 — the three Discovery image sites degrade a 404",
  * constraint rules out `next/image`, not a plain attribute). Position
  * measured from React's actual output, not guessed from JSX declaration
  * order — the two do not match here.
+ *
+ * ⚠⚠ RE-POINTED AGAIN AT MKT-ROSTER-1-P3 · OPTION B, and the addition is now SIX
+ * `xl:` tokens on each — `col-start-1 row-span-2 row-start-2 h-[56px] w-[56px]
+ * self-start`. TWO THINGS MOVED AND THEY ARE DIFFERENT KINDS OF THING.
+ * ⚠ THE BOX SIZE IS THE PART THAT KEEPS MOVING: `h-24 w-24` (96px) for three
+ * rounds, then 84, and 56 now. It is not a taste number — the tile is pinned at
+ * 112 and the question's own full-width row takes a 28px band, so 112 - 28 - 26
+ * of inset - 2 of hairline leaves exactly 56. The picture is what the tile
+ * spends, and Option B spent it on the question.
+ * ⚠ THE PLACEMENT TOKENS ARE NEW: the picture used to be auto-placed at (1,1);
+ * it now names row 2 explicitly and spans rows 2-3, because row 1 belongs to the
+ * question across BOTH columns. `row-span-2` alone would have put it back on the
+ * title's row.
+ * Re-point the two literals together — the loaded image and the null placeholder
+ * stand in the same grid area, and a change to one alone would leave the two
+ * cases different boxes. Above 1280 the tile's picture is the 56px left column
+ * of a three-row grid rather than a 52px thumb above a bar; below it NOTHING
+ * changes, which is the claim these byte-exact literals are here to make. jsdom resolves no media query, so what is pinned is that
+ * the sub-xl render is byte-identical and that the xl tokens are ADDITIVE
+ * (ADR-0045 override-never-replace) — a replacement would have deleted
+ * `object-cover` or `h-[52px]` from these strings and reddened here.
+ *
+ * ⚠ IT WAS FIVE FOR ONE ROUND: a fifth token, `xl:object-contain`, sat on the
+ * image and is now GONE rather than moved. Measured on the deployed branch,
+ * every market image is 1200x675, so `contain` painted a 16:9 letterbox inside
+ * the square box and left a dead band top and bottom — the subject got smaller, not
+ * more complete. `cover` is the shipped value at EVERY width again, which is
+ * why this literal carries exactly one `object-*` token and why its absence
+ * above `xl` is the thing to check if it ever comes back.
  */
 const CARD_THUMB_LOADED =
-	'<img alt="" class="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover" loading="lazy" decoding="async" src="https://signed.test/market-media/m/x/card.webp">';
-/** 178 bytes as captured. */
+	'<img alt="" class="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover xl:col-start-1 xl:row-span-2 xl:row-start-2 xl:h-[56px] xl:w-[56px] xl:self-start" loading="lazy" decoding="async" src="https://signed.test/market-media/m/x/card.webp">';
 const CARD_THUMB_NULL =
-	'<div aria-hidden="true" class="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4">IMG</div>';
+	'<div aria-hidden="true" class="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4 xl:col-start-1 xl:row-span-2 xl:row-start-2 xl:h-[56px] xl:w-[56px] xl:self-start">IMG</div>';
 
 /**
  * `HeroPanels`' 54×54 thumb — first child of the `items-center` row.
@@ -336,9 +364,23 @@ const HERO_THUMB_NULL =
  * exactly the drift §3 exists to prevent — while a substring assertion on each
  * would still pass.
  *
- * ⛔ The 52px/54px MARKET thumbs above KEEP `object-cover`, deliberately. They
- * are small fixed-size squares where filling the frame is right and there is no
- * height to protect; only the post attachment — the box that grows — changed.
+ * ⛔ The 52px/54px MARKET thumbs above KEEP `object-cover` AT THEIR OWN SIZE,
+ * deliberately. They are small fixed-size squares where filling the frame is
+ * right and there is no height to protect; only the post attachment — the box
+ * that grows — changed at CS13.
+ * ⚠ "SMALL FIXED-SIZE SQUARE" STOPPED BEING TRUE OF THE CARD AT ONE TIER, and
+ * the rest of the sentence survived it. MKT-ROSTER-1-P3 takes the CARD thumb to
+ * 96px above 1280 — but `object-cover` is what it wears there too, so the claim
+ * "the MARKET thumbs keep `object-cover`" is now unconditional again.
+ * ⛔ THAT IS A CORRECTION OF THIS NOTE'S OWN PREVIOUS CORRECTION. For one round
+ * it read that the 96px thumb takes `xl:object-contain` because "at that size
+ * the picture is the tile's subject and a crop is a decision nobody made". The
+ * reasoning was right and the premise was wrong: `contain` does not show more of
+ * a picture, it fits it to the limiting axis, and every market image is 1200x675
+ * — so it painted 96x54 in a 96px box and shrank the subject it was meant to
+ * serve. The distinction this note draws is therefore between the market thumbs
+ * (cover, every size, every width) and the POST ATTACHMENT (contain, because
+ * that box grows and its content is a participant's own picture).
  *
  * ⚠⚠ RE-POINTED AGAIN AT UI-QUICK CS14 §4, and ONLY the LOADED literal moved:
  * `bg-n1` is gone from the image and STAYS on the placeholder. That asymmetry

@@ -10,6 +10,7 @@ import { type HeaderViewer, IdentityCluster } from "./IdentityCluster";
 import { RadioSlot } from "./RadioSlot";
 import { RulesControl } from "./RulesControl";
 import { VisitorCounter } from "./VisitorCounter";
+import { XLink } from "./XLink";
 
 /**
  * The branded global header (UI.A1 — W2.4/.5/.14 mockup v0_2 structure on
@@ -72,16 +73,29 @@ import { VisitorCounter } from "./VisitorCounter";
  * consumes it for nothing else. Anything added to this subtree inherits the same
  * rule — the gate is the prop chain, not the file boundary.
  *
- * Left zone order Back · Home · Radio · GitHub · RULES (mockup v0_2 for the
- * first three; GitHub and RULES are named deviations — see below).
+ * Left zone order Back · Home · Radio · GitHub · X (mockup v0_2 for the first
+ * three; GitHub and X are named deviations — see below).
+ * ⚠ IT READ `… · GitHub · RULES` UNTIL MKT-ROSTER-1-P3, which moves RULES to the
+ * right zone on a founder ruling and gives its slot to `XLink`. The count is
+ * unchanged at five, so a reader checking the zone's width budget against the
+ * measurements below is still reading about five controls — but they are not the
+ * same five, and X is 34.14px where RULES was 73.13px.
  *
- * ⛔ BELOW 640 THE WHOLE ROW READS `home · RULES · logo · countdown · identity`
- * (ADR-0051 A13 D-1) AND THE ZONES ARE GONE. Back and the secondary controls are
- * `display:none`, the two remaining zone wrappers are `display:contents`, and
- * the brand cell rejoins the flow — so the five survivors are direct flex items
- * of one row with one gap. `ms-auto` on the identity zone is what decides where
- * spare width goes: all of it, always, between the countdown and the identity,
- * and none of it between the logo and the countdown.
+ * ⛔ BELOW 640 THE WHOLE ROW READS `home · logo · countdown · RULES · identity`
+ * AND THE ZONES ARE GONE. Back and the secondary controls are `display:none`,
+ * the two remaining zone wrappers are `display:contents`, and the brand cell
+ * rejoins the flow — so the five survivors are direct flex items of one row with
+ * one gap. `ms-auto` on the identity zone is what decides where spare width
+ * goes: all of it, always, between the countdown and the identity zone, and none
+ * of it between the logo and the countdown.
+ * ⚠⚠ ADR-0051 A13 D-1 RULES THIS ROW `home · RULES · logo · countdown ·
+ * identity`, AND MKT-ROSTER-1-P3 SUPERSEDES IT ON EXACTLY THAT POINT. RULES is
+ * now inside the identity zone, which does NOT flatten to `contents`, so it
+ * travels with the identity cluster instead of staying beside Home. The
+ * SURVIVOR SET is unchanged and so is every A13 D-4 fit-ladder rung; what moved
+ * is one control's position in the line. ⛔ The spare width now opens between the
+ * countdown and RULES rather than between the countdown and the avatar — the
+ * `ms-auto` node is the same node, and RULES is simply its first child.
  *
  * ⛔ THERE IS ONE GITHUB CONTROL AGAIN, AND THIS PARAGRAPH USED TO DESCRIBE TWO.
  * It read: *"AND THERE IS A SECOND GITHUB CONTROL, IN THE RIGHT ZONE, BELOW
@@ -98,18 +112,30 @@ import { VisitorCounter } from "./VisitorCounter";
  * reachable at and above 640 and from nowhere in the phone header. That is the
  * ruling, not an oversight.
  * Social/Research/Đ-info are ratified omissions (OQ-3/OQ-4 zero-supplied), each
- * a named deviation in the plan. Right zone = the Đ cluster, then JOIN or the identity chip, then a
- * hairline divider + the visitor counter at the far right (UI.13;
- * SPEC.1 §21.1) — **at and above 640px.** Below `--breakpoint-mobile` three of
- * the four are hidden, so the zone reads `avatar-or-JOIN` alone and is pushed to
- * the row's right edge by `ms-auto` (A13 D-1). ⚠ The §21.1 register boundary is
- * untouched in both directions: nothing engine-derived moved, and nothing
- * crossed the divider.
+ * a named deviation in the plan. Right zone = RULES, then the Đ cluster, then
+ * JOIN or the identity chip, then a hairline divider + the visitor counter at
+ * the far right (UI.13; SPEC.1 §21.1) — **at and above 640px.** Below
+ * `--breakpoint-mobile` three of the five are hidden, so the zone reads `RULES ·
+ * avatar-or-JOIN` and is pushed to the row's right edge by `ms-auto` (A13 D-1).
+ * ⚠ RULES JOINED THIS ZONE AT MKT-ROSTER-1-P3 and this sentence opened with the
+ * Đ cluster until then. ⛔ THE §21.1 REGISTER BOUNDARY IS UNTOUCHED IN BOTH
+ * DIRECTIONS, and that is the claim to check rather than the order: nothing
+ * engine-derived moved, and nothing crossed the divider. RULES lands on the
+ * cluster's side of it, which is correct — it is a control, not a figure, and
+ * §21.1 partitions FIGURES. The visitor counter is still the sole element to the
+ * divider's right.
  *
  * ⇒ TIER-4 DEVIATION — **RULES placement** (O1-DECK, founder-ruled 2026-08-18,
- * D-2). The locked W2.4/.5/.14 mockup places the tab in the CENTRE zone as a
- * sibling of the wordmark (`mockup-v0_2:208`, close-out `:31`). It ships in the
- * LEFT zone, after Radio. Measured at 1440 against the real compiled CSS: the
+ * D-2; RE-RULED at MKT-ROSTER-1-P3). The locked W2.4/.5/.14 mockup places the
+ * tab in the CENTRE zone as a sibling of the wordmark (`mockup-v0_2:208`,
+ * close-out `:31`). ⚠ IT SHIPS FIRST IN THE **RIGHT** ZONE; this sentence read
+ * "the LEFT zone, after Radio" until the founder moved it to the identity side.
+ * The deviation from the mockup is unchanged in kind — still not the centre zone
+ * — and the measurement below is what ruled the centre zone OUT, so it still
+ * governs. What it does not decide, and never did, is which SIDE zone hosts the
+ * control: both cost 0.00px of brand displacement while their track has
+ * headroom, so that choice was always free and is now the founder's. Measured at
+ * 1440 against the real compiled CSS: the
  * mockup's placement moves the brand cluster **41.57px** left of true centre
  * (a 73.13px control plus a 10px gap, halved — `justify-self:center` centres
  * the TRACK, never the brand inside it), which is 19% of the cluster's own
@@ -129,8 +155,12 @@ import { VisitorCounter } from "./VisitorCounter";
  * comparing the two will find the header carrying one control the mockup does
  * not. That divergence is deliberate and is here.
  *
- * It ships in the LEFT zone, between Radio and RULES, because it is a utility
+ * It ships in the LEFT zone, between Radio and X, because it is a utility
  * control pointing off-site and the left zone is where this header keeps those.
+ * ⚠ "between Radio and RULES" until MKT-ROSTER-1-P3 — RULES left the zone and
+ * `XLink` took its slot, so this control's own neighbours changed without it
+ * moving. The measurements below were taken with RULES still present and are
+ * therefore a LOWER BOUND on today's headroom, X being 39.13px narrower.
  * Measured at 1440 against the real compiled CSS, in a pinned same-origin frame,
  * against a staging build whose `/api/health` canary was asserted equal to the
  * measured commit in the same call as the geometry:
@@ -169,6 +199,23 @@ import { VisitorCounter } from "./VisitorCounter";
  * stated: the row does not hard-overflow, it silently compresses the mark to
  * nothing while reporting zero overflow. The rest of the sentence is true of
  * every OTHER control, and the exception is the whole story.
+ *
+ * ⇒ TIER-4 DEVIATION — **the X control** (MKT-ROSTER-1-P3, founder-ruled
+ * 2026-09-19). Like the GitHub control it does not appear in the locked
+ * W2.4/.5/.14 mockup at all, and the mockup is NOT being amended — so this
+ * register is again the record. It takes the left-zone slot RULES vacated, for
+ * the reason the GitHub entry gives: it is a utility control pointing off-site,
+ * and the left zone is where this header keeps those. It wears
+ * `HEADER_PILL_BUTTON`, the same string RULES wears, so the two are the same box
+ * by construction rather than by inspection.
+ * ⚠ NET EFFECT ON THE LEFT ZONE'S BUDGET: RULES (73.13px) out, X (a 34x34
+ * square — the pill register with its padding zeroed around a 15px mark) in
+ * — strictly narrower by 39.13px, so the
+ * headroom figures above can only improve. The RIGHT zone gains RULES plus its
+ * 14px margin and must be RE-MEASURED, which is what the brand mark's
+ * shock-absorber paragraph at the head of this docblock demands of any change
+ * that grows a side zone. ⛔ The mark is the only control in either zone without
+ * `shrink-0`, and it reports no overflow while it disappears.
  *
  * §21.1 ANTI-CONFLATION — the divider below is the register boundary, not
  * decoration. `VisitorCounter` "reads nothing from the ledger / engine" and its
@@ -323,11 +370,15 @@ export function GlobalHeader({
 					    and RULES shift left by the 42px Back and its gap give up;
 					    nothing is repositioned to make that happen. */}
 					<HeaderNav mobileResponsive={mobileResponsive} />
-					{/* MOBILE-1 Phase A — RULES stays OUTSIDE this wrapper: it is
-					    the onboarding deck's only re-show entry point (SPEC.1
-					    §21.9, "present for every viewer, authenticated or not"),
-					    so it is never optional the way Radio/GitHub are. Only the
-					    two off-site/decorative utility controls hide below 640px. */}
+					{/* MOBILE-1 Phase A — the off-site/decorative utility controls, and
+					    the ONLY things in this zone that hide below 640px.
+					    ⚠ RULES USED TO BE THE SIBLING BELOW THIS WRAPPER, and the note
+					    that stood here explained why it was outside rather than in:
+					    SPEC.1 §21.9 makes it the onboarding deck's only re-show entry
+					    point, "present for every viewer, authenticated or not". That
+					    reasoning is unchanged and has simply moved with the control —
+					    MKT-ROSTER-1-P3 puts RULES first in the RIGHT zone, which is
+					    likewise never hidden. `XLink` takes the vacated slot. */}
 					<div
 						data-testid="header-secondary-controls"
 						className={cn(
@@ -338,7 +389,15 @@ export function GlobalHeader({
 						<RadioSlot />
 						<GitHubStarsView stars={stars} />
 					</div>
-					<RulesControl mobileResponsive={mobileResponsive} />
+					{/* ⛔ X IS A SIBLING OF THE WRAPPER, NOT A CHILD OF IT, AND CARRIES
+					    ITS OWN GATED HIDE. Two reasons, and neither is tidiness: that
+					    wrapper is guarded as holding Radio and GitHub ONLY, and the
+					    ADR-0049 convention for "hides at the tier" is a token on the
+					    component's own root behind `mobileResponsive` — the shape
+					    `VisitorCounter`, `DharmaCluster` and `IdentityCluster` all
+					    already ship. The rendered outcome is GitHub's exactly: visible
+					    at ≥640, `display:none` below it. */}
+					<XLink mobileResponsive={mobileResponsive} />
 				</div>
 				{/* ⛔⛔ ADR-0051 A13 D-3 WITHDRAWS A9 D-3 BELOW 640: THE MARK IS A FLOW
 				    ITEM AGAIN, AND THE THREE TOKENS THAT PINNED IT TO THE HEADER'S
@@ -460,6 +519,19 @@ export function GlobalHeader({
 						mobileResponsive && "max-mobile:ms-auto",
 					)}
 				>
+					{/* ⛔⛔ MKT-ROSTER-1-P3 — RULES OPENS THE IDENTITY SIDE, FOUNDER-RULED.
+					    Signed out the zone reads `RULES · JOIN · | · visitors`; signed
+					    in, `RULES · Đ cluster · avatar · | · visitors`. It is FIRST so
+					    that the two arms differ only by what follows it.
+					    ⛔ NO WRAPPER, EVER. `dharma-cluster.test.tsx`'s T4 guard walks
+					    THIS div's direct `.children` to prove the §21.1 divider has the
+					    engine-derived figures on one side and the visitor count on the
+					    other; a wrapper around any of these makes the real node a
+					    grandchild and every index in that guard resolves to `-1`.
+					    ⚠ Its separation from what follows is a `mr-3.5` on the control
+					    itself — this zone declares no `gap`, and adding one would move
+					    Đ, the chip and the counter at 1440. */}
+					<RulesControl mobileResponsive={mobileResponsive} />
 					{/* ADR-0049 — the two hides below 640px live in the COMPONENTS, not
 					    here, and the asymmetry with the divider two nodes down is
 					    deliberate rather than untidy. `dharma-cluster.test.tsx`'s T4
