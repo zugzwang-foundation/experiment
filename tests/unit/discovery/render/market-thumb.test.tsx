@@ -297,8 +297,13 @@ describe("PRIMITIVES-2 D2/D3 — the three Discovery image sites degrade a 404",
  * order — the two do not match here.
  *
  * ⚠⚠ RE-POINTED AGAIN AT MKT-ROSTER-1-P3, and the addition is FOUR `xl:`
- * tokens on each — `row-span-2 h-24 w-24 self-start`. Above 1280 the tile's
- * picture is the 96px subject of a grid row rather than a 52px thumb above a
+ * tokens on each — `row-span-2 h-[84px] w-[84px] self-start`. ⚠ THE BOX SIZE IN
+ * THEM IS THE PART THAT MOVES: it was `h-24 w-24` (96px) for three rounds and is
+ * 84 now, because the picture is what sets the tile's height and the founder is
+ * spending it down a step at a time. Re-point the two literals together — the
+ * loaded image and the null placeholder stand in the same grid area, and a change
+ * to one alone would leave the two cases different boxes. Above 1280 the tile's
+ * picture is the 84px subject of a grid row rather than a 52px thumb above a
  * bar; below it NOTHING changes, which is the claim these byte-exact literals
  * are here to make. jsdom resolves no media query, so what is pinned is that
  * the sub-xl render is byte-identical and that the xl tokens are ADDITIVE
@@ -314,9 +319,9 @@ describe("PRIMITIVES-2 D2/D3 — the three Discovery image sites degrade a 404",
  * above `xl` is the thing to check if it ever comes back.
  */
 const CARD_THUMB_LOADED =
-	'<img alt="" class="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover xl:row-span-2 xl:h-24 xl:w-24 xl:self-start" loading="lazy" decoding="async" src="https://signed.test/market-media/m/x/card.webp">';
+	'<img alt="" class="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover xl:row-span-2 xl:h-[84px] xl:w-[84px] xl:self-start" loading="lazy" decoding="async" src="https://signed.test/market-media/m/x/card.webp">';
 const CARD_THUMB_NULL =
-	'<div aria-hidden="true" class="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4 xl:row-span-2 xl:h-24 xl:w-24 xl:self-start">IMG</div>';
+	'<div aria-hidden="true" class="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4 xl:row-span-2 xl:h-[84px] xl:w-[84px] xl:self-start">IMG</div>';
 
 /**
  * `HeroPanels`' 54×54 thumb — first child of the `items-center` row.

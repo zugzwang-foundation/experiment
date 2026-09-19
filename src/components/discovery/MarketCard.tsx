@@ -93,8 +93,14 @@ export function MarketCard({
 			// ⛔⛔ MKT-ROSTER-1-P3 · THE xl (>=1280) ANATOMY, AND IT IS A GRID RATHER
 			// THAN THE FLEX COLUMN BELOW IT. Three columns of six markets gave every
 			// tile ~116px it did not have, and the founder spent it on the picture:
-			// a 96x96 image on the left with the title, stats and price bar stacked
+			// an 84x84 image on the left with the title, stats and price bar stacked
 			// beside it, instead of a 52px thumb above a full-width bar.
+			// ⚠ THE BOX WAS 96 FOR THREE ROUNDS AND IS 84 NOW, because the picture is
+			// this tile's height: `max(picture, column)`, and the column has never
+			// been the taller side at this tier. Every pixel off the box comes off the
+			// tile, twice (two rows), and lands in the hero — which is the column's
+			// only flexible item, so the grid and the hero are one number split two
+			// ways. 96 -> 84 is -12 a tile, -24 of grid, +24 of hero.
 			//
 			// ⚠ WHY GRID, WHEN THE TARGET IS DESCRIBED AS "a row with a column in
 			// it". The bar and the title block are SIBLINGS in this DOM — the bar is
@@ -118,7 +124,7 @@ export function MarketCard({
 			// it distributes TRACKS along the inline axis, and `1fr` already consumes
 			// the free space there. Left unprefixed so the sub-xl render takes zero
 			// diff, which is the whole of ADR-0045's override-never-replace rule.
-			className={`flex flex-col justify-between rounded-[var(--r)] bg-n0 p-[13px] [border:var(--hairline)] xl:grid xl:grid-cols-[96px_1fr] xl:content-between xl:gap-x-3${
+			className={`flex flex-col justify-between rounded-[var(--r)] bg-n0 p-[13px] [border:var(--hairline)] xl:grid xl:grid-cols-[84px_1fr] xl:content-between xl:gap-x-3${
 				active
 					? " [outline:var(--ring-active)] outline-offset-[3px] max-mobile:outline-none"
 					: ""
@@ -150,17 +156,18 @@ export function MarketCard({
 					// the sides of a 16:9 frame rather than out of the middle.
 					// ⚠ It is also what ships below 1280, so this class is now one
 					// value at every width — the tier no longer changes what the
-					// picture does, only how big it is.
+					// picture does, only how big it is. At 84 the source is ~14x the
+					// rendered box, so nothing is upscaled at this size either.
 					// `xl:self-start` stays: the image spans both grid rows and is a
 					// fixed 96, so it aligns with the title's cap rather than floating
 					// in the slack. `--imgr` is untouched.
-					className="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover xl:row-span-2 xl:h-24 xl:w-24 xl:self-start"
+					className="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover xl:row-span-2 xl:h-[84px] xl:w-[84px] xl:self-start"
 					fallback={
 						<div
 							aria-hidden="true"
 							// Tracks the image's geometry exactly — it stands in the same
 							// grid area. No `object-*`: this is a div with a word in it.
-							className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4 xl:row-span-2 xl:h-24 xl:w-24 xl:self-start"
+							className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4 xl:row-span-2 xl:h-[84px] xl:w-[84px] xl:self-start"
 						>
 							IMG
 						</div>
@@ -175,32 +182,37 @@ export function MarketCard({
 					    seventh market with a longer question grows its tile instead of
 					    silently losing the end of its own sentence. Below 1280 the
 					    clamp stands — there the column is too narrow to take the risk.
-					    ⛔⛔ AND THE TYPE GOES TO 16px AT xl, WHICH COSTS NOTHING. The
-					    tile's height is `max(96, column)` and the 96px picture is the
-					    taller side: at 13.5px the text column came to 81.63px and the
-					    grid spent 14.37px of it on dead space. 16px/1.3 takes the column
-					    to 87.00 — still UNDER the picture's 96 — so the tile stays
-					    **124px** and the whole rise is paid for out of slack the layout
-					    was already holding open.
-					    ⚠ IT WAS 20px, THEN 18px, AND THE TIER FLOOR IS WHY IT MOVED TWICE.
+					    ⛔⛔ AND THE TYPE GOES TO 14px AT xl, WHICH COSTS NOTHING. The
+					    tile's height is `max(picture, column)` and the picture is the
+					    taller side at every size this tile has worn: at 13.5px the column
+					    came to 81.63, at 16px to 87.00, at 14px to ~81.8 — all of them
+					    under the box. So the type rises out of slack the layout was
+					    already holding open, and it is the BOX, never the type, that sets
+					    the tile's height.
+					    ⛔ 14px IS THE FLOOR AND IT IS NOT AN AESTHETIC ONE. The stat row
+					    below the title is 12px; a 13px title is level with its own
+					    metadata, which makes the question read as another tag rather than
+					    as the thing the tile is about. Do not step it down again to buy
+					    height — there is none to buy (see above), and the next pixel has
+					    to come off the picture.
+					    ⚠ IT WAS 20px, THEN 18, THEN 16, AND THE TIER FLOOR IS WHY IT MOVED.
 					    The title column is 329px at 1440 and 276px at 1280, so a size that
 					    holds two lines at one end can wrap at the other — and a third line
 					    lifts the tile off its floor. Measured at 1280: 20/1.25 wrapped FOUR
 					    of the six questions (tile 148.5), 18/1.3 wrapped TWO (tile 143.7),
-					    16/1.3 wraps NONE.
+					    16/1.3 wrapped none, and 14/1.3 has more room still.
 					    ⛔ A PREVIOUS VERSION OF THIS BLOCK SAID "NO TYPE SIZE CLOSES THAT
 					    GAP" AND THAT WAS WRONG — corrected here rather than left standing.
-					    16px closes it: every question holds two lines at BOTH ends, so the
-					    tile is 124 across the whole tier instead of at one width.
-					    ⚠ AND THE TILE IS FLOORED BY THE PICTURE, NOT BY THIS TYPE. At 16px
-					    the text column measures 87.00 — NINE pixels UNDER the 96px image —
-					    so the size below which the tile stops shrinking was already reached
-					    before this change and cannot be reached again by shrinking type or
-					    by trimming the column's `gap-1`/`mt-[9px]` (measured: trimming both
-					    to zero moves the tile not at all). ⇒ 124 is the floor while the
-					    picture is 96. Anything that wants a shorter tile has to move the
-					    picture.
-					    ⚠ `xl:leading-[1.3]` IS NOT OPTIONAL BESIDE `xl:text-[16px]`.
+					    16px closed it: every question holds two lines at BOTH ends, so the
+					    tile is one height across the whole tier instead of at one width.
+					    ⚠ AND THE TILE IS FLOORED BY THE PICTURE, NOT BY THIS TYPE. Measured
+					    at 16px the column was 87.00 against a 96px box — nine pixels of
+					    headroom — and trimming the column's `gap-1` and `mt-[9px]` BOTH to
+					    zero moved the tile not at all. That is why this round moved the box
+					    instead: 84 + 26 of inset + 2 of hairline = a **112px** tile, and
+					    the column at 14px is ~81.8, still under it. ⇒ the floor is the box
+					    plus the inset, always; type and internal spacing are spare.
+					    ⚠ `xl:leading-[1.3]` IS NOT OPTIONAL BESIDE `xl:text-[14px]`.
 					    An arbitrary `text-[Npx]` does NOT reset the line-height it
 					    inherits from the step in scope (AGENTS.md §8) — without it the
 					    type would be 16px on `leading-[1.32]`'s 17.82px — barely more
@@ -208,7 +220,7 @@ export function MarketCard({
 					    Both halves are stated for that reason, and the unitless 1.3
 					    scales with the size rather than pinning a px that would have to
 					    move again. */}
-					<h3 className="line-clamp-2 text-[13.5px] leading-[1.32] font-semibold xl:line-clamp-none xl:text-[16px] xl:leading-[1.3]">
+					<h3 className="line-clamp-2 text-[13.5px] leading-[1.32] font-semibold xl:line-clamp-none xl:text-[14px] xl:leading-[1.3]">
 						{card.title}
 					</h3>
 					<StatLine totals={card.totals} size="card" />
