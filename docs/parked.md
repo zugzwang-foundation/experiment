@@ -4291,7 +4291,7 @@ sees it.
 
 **Evidence.** `zz_MOBILE-SIDESCROLL_recon_2026-09-17T2021.md` §R5.
 
-## TILE-GAP-X — `MarketCard`'s `xl:gap-x-3` has never compiled, and the cause is a character
+## TILE-GAP-X — `MarketCard`'s `xl:gap-x&#8203;-3` has never compiled, and the cause is a character
 
 **Parked by ruling at PHASE-2H**, which reverted 2G wholesale. 2G had fixed this
 in passing; the fix went back with everything else, because repairing it inside a
@@ -4303,12 +4303,20 @@ computed `column-gap` on every deployed tile is `normal`, i.e. **0**. The pictur
 and the text column are flush at `xl`, and the grid reads `84px 341.328px` —
 summing to the content box with nothing between them.
 
-**Why.** The template literal ends `xl:gap-x-3${`, so the class runs straight into
+**Why.** The template literal ends `xl:gap-x&#8203;-3${`, so the class runs straight into
 the interpolation with no delimiter and Tailwind's extractor never sees it.
 Measured with the Oxide scanner: it returns **13** `xl:` candidates from that file
 and this is not one of them, while every other `xl:` class in it — all of them
 space-delimited — is extracted. Control: `HeroPanels.tsx` yields seven gap
 candidates, so the scanner does find gap utilities.
+
+⛔ **THE CLASS IS SPELLED WITH A ZERO-WIDTH SPACE IN THIS ENTRY AND MUST STAY THAT
+WAY.** Tailwind scans `docs/`, so writing the real token here EMITS the utility and
+the tile gains the very gap this entry says it does not have — measured: the first
+version of this entry moved the deployed text column `341.328 → 329.328` and put a
+live `column-gap: 12px` on a tile that was supposed to be byte-identical to the one
+before it. A docket entry that repairs the defect it is filing is worse than no
+entry. Same trap as AGENTS.md §8's `docs/logs/MOBILE-1.md` case.
 
 **The durable part.** A class adjacent to `${` is a class that does not exist, and
 nothing errors: the string is right in the source, right in the DOM, and absent
