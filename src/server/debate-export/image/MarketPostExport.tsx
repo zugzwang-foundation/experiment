@@ -984,9 +984,7 @@ export function MarketPostExport(props: PostExportProps) {
 						    heading spent its most prominent position on a word that is a
 						    category rather than part of the question — and then repeated
 						    the same kind of information in a chip two inches away.
-						    `@/lib/market-title`'s `splitMarketTitle` does the cutting (it
-					    moved out of `compose.ts` so the Discovery tile could share it
-					    without dragging the `server-only` chain into the browser); this file
+						    `compose.ts`'s `splitMarketTitle` does the cutting; this file
 						    only ever renders finished strings.
 						    ⚠ THE TWO CHIPS ARE INVERSES OF EACH OTHER, and that is what
 						    keeps them apart — operator ruling, revision 7, against a
