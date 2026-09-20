@@ -1,5 +1,10 @@
 /**
- * The header's 34×34 icon-button register (values-log §3 item 3) — rest
+ * The header's two shared control registers — the 34×34 ICON button below, and
+ * the 34px-high TEXT PILL beneath it. One module, because both answer the same
+ * question ("what box does a header control wear?") and both have to be
+ * readable from a Server Component.
+ *
+ * The 34×34 icon-button register (values-log §3 item 3) — rest
  * `--btn-fill` + hairline, hover border → `--ring` with the fill unchanged,
  * pressed `--state-pressed-fill`, focus the 2px light ring, icon 15px ink.
  *
@@ -24,3 +29,27 @@
  */
 export const HEADER_ICON_BUTTON =
 	"inline-flex size-[34px] shrink-0 items-center justify-center rounded-(--r) bg-(--btn-fill) text-ink outline-none select-none [border:var(--hairline)] [transition:all_var(--dur-hover)] hover:[border:1px_solid_var(--ring)] active:bg-(--state-pressed-fill) focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) [&_svg]:size-[15px]";
+
+/**
+ * The header's TEXT-pill register — the mockup's `.tab` composition (13px
+ * x-padding, 12px/700/.1em uppercase) on the same 34px box, hairline, fill and
+ * interactive states as the icon register above.
+ *
+ * ⛔ IT MOVED HERE AT MKT-ROSTER-1-P3 FOR THE REASON THE MODULE HEADER ALREADY
+ * GIVES, ONE REGISTER OVER. It was private to `RulesControl.tsx`; the X link is
+ * founder-ruled "styled exactly like the RULES pill", and "exactly" is either
+ * one string or two literals somebody re-checks forever. The icon register was
+ * lifted at MOBILE-2n on that identical argument.
+ *
+ * ⚠ THE STRING IS BYTE-FOR-BYTE `RulesControl`'s `RULES_TAB`. Moving a literal
+ * is not the moment to improve it — RULES is a pixel-measured control in a
+ * header whose zones are a hard-overflow budget, and one changed token here
+ * moves it at 1440.
+ *
+ * ⚠ `GitHubStars.tsx`'s `GITHUB_TAB` is deliberately NOT folded in. It is a
+ * DIFFERENT box — `px-3` and a `gap-2` for its icon and count — so unifying the
+ * two would mean changing one of them, which is a visual decision and not a
+ * de-duplication. Left as a named divergence rather than absorbed silently.
+ */
+export const HEADER_PILL_BUTTON =
+	"inline-flex h-[34px] shrink-0 items-center rounded-(--r) bg-(--btn-fill) px-[13px] text-[12px] leading-[1.2] font-bold tracking-[0.1em] text-ink uppercase outline-none select-none [border:var(--hairline)] [transition:all_var(--dur-hover)] hover:[border:1px_solid_var(--ring)] active:bg-(--state-pressed-fill) focus-visible:shadow-(--state-focus-ring)";

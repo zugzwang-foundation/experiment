@@ -295,12 +295,33 @@ describe("PRIMITIVES-2 D2/D3 — the three Discovery image sites degrade a 404",
  * constraint rules out `next/image`, not a plain attribute). Position
  * measured from React's actual output, not guessed from JSX declaration
  * order — the two do not match here.
+ *
+ * ⚠⚠ RE-POINTED AGAIN AT MKT-ROSTER-1-P3, and the addition is FOUR `xl:`
+ * tokens on each — `row-span-2 h-[84px] w-[84px] self-start`. ⚠ THE BOX SIZE IN
+ * THEM IS THE PART THAT MOVES: it was `h-24 w-24` (96px) for three rounds and is
+ * 84 now, because the picture is what sets the tile's height and the founder is
+ * spending it down a step at a time. Re-point the two literals together — the
+ * loaded image and the null placeholder stand in the same grid area, and a change
+ * to one alone would leave the two cases different boxes. Above 1280 the tile's
+ * picture is the 84px subject of a grid row rather than a 52px thumb above a
+ * bar; below it NOTHING changes, which is the claim these byte-exact literals
+ * are here to make. jsdom resolves no media query, so what is pinned is that
+ * the sub-xl render is byte-identical and that the xl tokens are ADDITIVE
+ * (ADR-0045 override-never-replace) — a replacement would have deleted
+ * `object-cover` or `h-[52px]` from these strings and reddened here.
+ *
+ * ⚠ IT WAS FIVE FOR ONE ROUND: a fifth token, `xl:object-contain`, sat on the
+ * image and is now GONE rather than moved. Measured on the deployed branch,
+ * every market image is 1200x675, so `contain` painted 96x54 inside the 96px
+ * box and left 21px of dead band top and bottom — the subject got smaller, not
+ * more complete. `cover` is the shipped value at EVERY width again, which is
+ * why this literal carries exactly one `object-*` token and why its absence
+ * above `xl` is the thing to check if it ever comes back.
  */
 const CARD_THUMB_LOADED =
-	'<img alt="" class="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover" loading="lazy" decoding="async" src="https://signed.test/market-media/m/x/card.webp">';
-/** 178 bytes as captured. */
+	'<img alt="" class="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover xl:row-span-2 xl:h-[84px] xl:w-[84px] xl:self-start" loading="lazy" decoding="async" src="https://signed.test/market-media/m/x/card.webp">';
 const CARD_THUMB_NULL =
-	'<div aria-hidden="true" class="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4">IMG</div>';
+	'<div aria-hidden="true" class="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4 xl:row-span-2 xl:h-[84px] xl:w-[84px] xl:self-start">IMG</div>';
 
 /**
  * `HeroPanels`' 54×54 thumb — first child of the `items-center` row.
@@ -336,9 +357,23 @@ const HERO_THUMB_NULL =
  * exactly the drift §3 exists to prevent — while a substring assertion on each
  * would still pass.
  *
- * ⛔ The 52px/54px MARKET thumbs above KEEP `object-cover`, deliberately. They
- * are small fixed-size squares where filling the frame is right and there is no
- * height to protect; only the post attachment — the box that grows — changed.
+ * ⛔ The 52px/54px MARKET thumbs above KEEP `object-cover` AT THEIR OWN SIZE,
+ * deliberately. They are small fixed-size squares where filling the frame is
+ * right and there is no height to protect; only the post attachment — the box
+ * that grows — changed at CS13.
+ * ⚠ "SMALL FIXED-SIZE SQUARE" STOPPED BEING TRUE OF THE CARD AT ONE TIER, and
+ * the rest of the sentence survived it. MKT-ROSTER-1-P3 takes the CARD thumb to
+ * 96px above 1280 — but `object-cover` is what it wears there too, so the claim
+ * "the MARKET thumbs keep `object-cover`" is now unconditional again.
+ * ⛔ THAT IS A CORRECTION OF THIS NOTE'S OWN PREVIOUS CORRECTION. For one round
+ * it read that the 96px thumb takes `xl:object-contain` because "at that size
+ * the picture is the tile's subject and a crop is a decision nobody made". The
+ * reasoning was right and the premise was wrong: `contain` does not show more of
+ * a picture, it fits it to the limiting axis, and every market image is 1200x675
+ * — so it painted 96x54 in a 96px box and shrank the subject it was meant to
+ * serve. The distinction this note draws is therefore between the market thumbs
+ * (cover, every size, every width) and the POST ATTACHMENT (contain, because
+ * that box grows and its content is a participant's own picture).
  *
  * ⚠⚠ RE-POINTED AGAIN AT UI-QUICK CS14 §4, and ONLY the LOADED literal moved:
  * `bg-n1` is gone from the image and STAYS on the placeholder. That asymmetry

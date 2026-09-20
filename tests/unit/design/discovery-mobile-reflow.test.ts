@@ -243,12 +243,25 @@ describe("discovery mobile reflow — the grid already stacks, and must keep doi
 	it("discovery-mobile::discovery-grid-declares-NO-unprefixed-grid-cols", () => {
 		const [classes, ...extra] = nodeClasses(read(GRID), GRID, "discovery-grid");
 
+		// ⚠ THE COUNT CHECK IS BACK. MKT-ROSTER-1-P3 briefly shipped TWO literal
+		// JSX branches behind one const so the founder could photograph both
+		// candidate desktop shapes from a single commit, and this row iterated for
+		// exactly one commit to allow it. The unchosen branch is deleted, so one
+		// class string is the invariant again — which is the stronger claim, since
+		// two strings can drift apart and one cannot.
 		expect(extra).toEqual([]);
 
 		// The two responsive steps that DO exist, pinned by name — the grid is two
-		// columns from `sm` and four from `lg`.
+		// columns from `sm`, and THREE from `lg` since the D-49 six-market roster
+		// (it was four; four rendered six markets as 4 + 2).
 		expect(classes).toContain("sm:grid-cols-2");
-		expect(classes).toContain("lg:grid-cols-4");
+		// ⚠ A LITERAL IS SAFE HERE AND IT WAS NOT LAST COMMIT. AGENTS.md §8's rule
+		// is that a class-shaped string in `tests/` EMITS a real utility, so a
+		// literal must never name a class no component ships. `lg:grid-cols-3` is
+		// now the shipped one, so this file adds nothing to the built sheet — the
+		// runtime-assembled form was needed only while the losing variant was
+		// still in the tree.
+		expect(classes).toContain("lg:grid-cols-3");
 
 		// ⛔ AND NOTHING UNPREFIXED. `sm:grid-cols-2` only wins below 640px if
 		// nothing beneath it sets a column count; a base `grid-cols-*` would apply
@@ -261,6 +274,22 @@ describe("discovery mobile reflow — the grid already stacks, and must keep doi
 			)}. An unprefixed grid-cols applies at every width, so the phone-width ` +
 				`single-column default is gone — the cards render multi-column at ` +
 				`375px. Add the column count at a breakpoint (\`sm:\`/\`lg:\`) instead.`,
+		).toEqual([]);
+
+		// ⛔ AND NO UNPREFIXED `justify-*` EITHER. The rejected variant bought its
+		// equal side margins with `lg:justify-center`; written without the prefix
+		// that would centre the phone tier's single column too, shrinking every
+		// card to its own content width on a device — the same silent, device-only
+		// failure the rule above exists for. Kept as a standing guard rather than
+		// deleted with the variant, because the next person reaching for centring
+		// will reach for the unprefixed form first.
+		const bareJustify = classes.filter((c) => /^justify-/.test(c));
+		expect(
+			bareJustify,
+			`${GRID}: the market grid declares unprefixed ${JSON.stringify(
+				bareJustify,
+			)}. Centring applies at every width, so the phone tier's single column ` +
+				`stops filling the viewport.`,
 		).toEqual([]);
 	});
 });

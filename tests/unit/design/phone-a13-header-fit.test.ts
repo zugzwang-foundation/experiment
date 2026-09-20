@@ -32,6 +32,19 @@ const read = (p: string) => readFileSync(p, "utf8");
 const HEADER = "src/components/shell/GlobalHeader.tsx";
 const IDENTITY = "src/components/shell/IdentityCluster.tsx";
 const RULES = "src/components/shell/RulesControl.tsx";
+/**
+ * ⚠ THE DESKTOP PILL REGISTER MOVED OUT OF `RulesControl.tsx` AT
+ * MKT-ROSTER-1-P3, so the ≥640 half of the RULES row below reads THIS file
+ * instead. `HEADER_PILL_BUTTON` is the byte-identical string RULES declared
+ * privately, lifted so the new `X` control can wear the same pill — the same
+ * move `HEADER_ICON_BUTTON` made out of `HeaderNav.tsx` at MOBILE-2n.
+ * ⛔ THE ROW IS RE-POINTED, NOT RELAXED: `px-[13px]` is still asserted as a
+ * literal, still against a shipped source file, and the phone half still reads
+ * `RulesControl.tsx` because that is where the `max-mobile:` override lives.
+ * Deleting the desktop half on the grounds that "it moved" is what would make
+ * A13 D-4's additivity unguarded.
+ */
+const PILL = "src/components/shell/header-control.ts";
 const DIGITS = "src/components/shell/CountdownDigits.tsx";
 
 const V = "max-mobile";
@@ -99,13 +112,25 @@ describe("A13 D-4 — the ladder's five reductions are on disk at their landed v
 	});
 
 	it("phone-a13::RULES-gives-3px-a-side-and-the-desktop-keeps-13", () => {
-		const source = read(RULES);
-		expect(source).toContain(phone(util("px", px("10"))));
+		// The phone override stays where the control is — it is `RulesControl`'s
+		// own `cn()` arm, gated on `mobileResponsive`.
+		expect(read(RULES)).toContain(phone(util("px", px("10"))));
+		// …and the ≥640 value now lives in the shared register (see PILL above).
 		expect(
-			source,
-			`${RULES}: the desktop tab lost its 13px sides. A13 D-4 is ADDITIVE — ` +
-				`the ≥640 control takes zero diff (AGENTS.md §8).`,
+			read(PILL),
+			`${PILL}: the desktop tab lost its 13px sides. A13 D-4 is ADDITIVE — ` +
+				`the ≥640 control takes zero diff (AGENTS.md §8). ⚠ This register was ` +
+				`private to ${RULES} until MKT-ROSTER-1-P3 lifted it so the X control ` +
+				`could wear the same pill; the assertion followed the string.`,
 		).toContain(util("px", px("13")));
+		// ⛔ AND THE CONTROL STILL WEARS IT. Re-pointing the scan to the register
+		// proves the VALUE survived; this proves RULES is still the thing wearing
+		// it, which the two halves apart could not say.
+		expect(
+			read(RULES),
+			`${RULES}: the RULES tab no longer reads the shared pill register, so ` +
+				`the 13px asserted above is a value nothing on this control uses.`,
+		).toContain("HEADER_PILL_BUTTON");
 	});
 
 	it("phone-a13::the-countdown-cell-is-13x17-at-9.5px-and-the-desktop-cell-is-untouched", () => {
