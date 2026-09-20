@@ -4290,3 +4290,36 @@ end-of-list marker was considered and rejected — 24 viewports down, nobody
 sees it.
 
 **Evidence.** `zz_MOBILE-SIDESCROLL_recon_2026-09-17T2021.md` §R5.
+
+## TILE-GAP-X — `MarketCard`'s `xl:gap-x-3` has never compiled, and the cause is a character
+
+**Parked by ruling at PHASE-2H**, which reverted 2G wholesale. 2G had fixed this
+in passing; the fix went back with everything else, because repairing it inside a
+revert would have made the revert untrue — the tile would no longer be the layout
+that shipped. It is a real defect and it is on the docket on its own merits.
+
+**What is wrong.** The class is in `MarketCard.tsx`'s root `className` and the
+computed `column-gap` on every deployed tile is `normal`, i.e. **0**. The picture
+and the text column are flush at `xl`, and the grid reads `84px 341.328px` —
+summing to the content box with nothing between them.
+
+**Why.** The template literal ends `xl:gap-x-3${`, so the class runs straight into
+the interpolation with no delimiter and Tailwind's extractor never sees it.
+Measured with the Oxide scanner: it returns **13** `xl:` candidates from that file
+and this is not one of them, while every other `xl:` class in it — all of them
+space-delimited — is extracted. Control: `HeroPanels.tsx` yields seven gap
+candidates, so the scanner does find gap utilities.
+
+**The durable part.** A class adjacent to `${` is a class that does not exist, and
+nothing errors: the string is right in the source, right in the DOM, and absent
+from the stylesheet. ⇒ Read a gap's **computed value**, never its class string.
+A one-space edit is the whole repair.
+
+**⚠ Fixing it MOVES THE TILE**, which is why it is not a trivial follow-up. A real
+12px gap narrows the text column `341.328 → 329.328`, and `MarketCard.tsx`'s own
+docblock already quotes 329 as the title column — a figure that has only ever
+existed on paper. Any repair has to be re-measured against the title's two-line
+wrap at 1280 and 1440, not applied and assumed.
+
+**Evidence.** `zz_MKT-ROSTER-1-P3_PHASE2G_2026-09-19T1811.md`; scanner probe and
+the before/after `column-gap` reads are in its §Gap probe.
