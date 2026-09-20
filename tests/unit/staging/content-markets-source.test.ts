@@ -172,24 +172,35 @@ describe("description lengths", () => {
 	 * MKT-ROSTER-1 took the slate to six, and AGAIN after D-50 overlaid five
 	 * markets' v3.0 wording onto it:
 	 *
-	 *   slug                                 v2.2    v3.0    v3.1
+	 *   slug                                 v2.2    v3.0    v3.1    v3.2
 	 *   chess-fide-tiebreak-response         3609 -> 1903
 	 *   bitcoin-price-50k                    3795 -> 3795   (MKT-BTC-01 untouched)
-	 *   math-erdos-solved-on-zugzwang        3836 -> 2852 -> 2293
+	 *   math-erdos-solved-on-zugzwang        3836 -> 2852 -> 2293 -> 2852
 	 *   claude-bundle-response               3733 -> 2169
 	 *   yc-w27-acceptance                     789 -> 1658   (re-slugged)
 	 *   github-zugzwang-repo-stars            794 ->  792
 	 *
-	 * ⚠ THE THIRD COLUMN IS ONE MARKET AND ONE RULING. MKT-MAT-01 goes to v3.1
-	 * (2026-09-19): the market reverts to its ratified v2.2 rule, so every clause
-	 * carrying the "solved ON ZUGZWANG" condition leaves — the question, the YES
-	 * and NO conditions, the whole `On Zugzwang.` paragraph, the third element of
-	 * the criterion, and the evidence pointer. 559 characters, all of them one
-	 * idea. ⛔ The title had ALREADY dropped the words a day earlier, which is
-	 * what made this necessary rather than optional: a title asking whether three
-	 * Erdős problems get solved, over a description resolving only if they are
-	 * solved here, is a resolution dispute waiting for a reader who trusts the
-	 * title. The two now ask the same question.
+	 * ⚠ COLUMNS THREE AND FOUR ARE ONE MARKET AND TWO RULINGS, AND THE SECOND
+	 * UNDOES THE FIRST. MKT-MAT-01 went to v3.1 (2026-09-19) to revert to its
+	 * ratified v2.2 rule: every clause carrying the "solved ON ZUGZWANG"
+	 * condition left — the question, the YES and NO conditions, the whole
+	 * `On Zugzwang.` paragraph, the third element of the criterion, and the
+	 * evidence pointer, 559 characters of one idea. The reason was sound: the
+	 * title had dropped those words a day earlier, and a title asking whether
+	 * three Erdős problems get solved, over a description resolving only if they
+	 * are solved here, is a resolution dispute waiting for a reader who trusts
+	 * the title.
+	 *
+	 * ⛔⛔ v3.2 (2026-09-20) WITHDRAWS v3.1 AND RESTORES v3.0 IN FULL, AND THE
+	 * REASON IS NOT EDITORIAL. Between the two rulings the production market took
+	 * a bet — Đ 10 on NO, 2026-09-19T14:13:43Z — and it still holds the stake,
+	 * its comment and its position. `scripts/apply-v3-market-specs.ts` refuses to
+	 * edit a market holding any of the three (D-50 ruling 2), because no event
+	 * carries a market's wording: change the question and nothing records what
+	 * the author of that argument actually staked on. So the DATABASE keeps v3.0
+	 * and the canon comes back to meet it, rather than the other way round. The
+	 * v3.1 objection is real and remains open — it is a question about wording
+	 * that can only be settled by a ruling on the stake, not by an edit.
 	 *
 	 * ⚠⚠ D-50 MOVED EVERY FIGURE EXCEPT BITCOIN'S, AND FOUR OF THE FIVE WENT
 	 * DOWN — which is the direction the bound below is least able to see. The
@@ -230,7 +241,7 @@ describe("description lengths", () => {
 		).toEqual({
 			"chess-fide-tiebreak-response": 1903,
 			"bitcoin-price-50k": 3795,
-			"math-erdos-solved-on-zugzwang": 2293,
+			"math-erdos-solved-on-zugzwang": 2852,
 			"claude-bundle-response": 2169,
 			"yc-w27-acceptance": 1658,
 			"github-zugzwang-repo-stars": 792,
