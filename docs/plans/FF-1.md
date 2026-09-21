@@ -50,7 +50,7 @@ One boolean on `comments`, `friendly_fire`, set in the same INSERT as `side_at_p
 `POST /api/bets/place` (existing; auth: participant session; rate-limit class unchanged):
 - Request body: `placeBodySchema` gains `friendlyFire: z.boolean().optional()` (absent ⇒ `false`).
 - Validation (pre-tx, in the route, before moderation): `friendlyFire === true && parentCommentId === null` → 400 `friendly_fire_requires_reply`; `friendlyFire === true && validatedParent.sideAtPostTime !== side` → 400 `friendly_fire_requires_support`. Both throw before any write and before `precommitModerate`.
-- In-tx guard (`place.ts`, after the position/balance reads, before any write): when `friendlyFire === true`, read the parent's `side_at_post_time` inside the tx and re-apply both checks; throw the same two errors. Gated on the flag so the unflagged path issues no extra statement.
+- In-tx guard (`place.ts`, after the position read and BEFORE `readBalance` / the accrual / any write — corrected per `@code-reviewer` LOW-2): when `friendlyFire === true`, read the parent's `side_at_post_time` inside the tx and re-apply both checks; throw the same two errors. Gated on the flag so the unflagged path issues no extra statement. Pinned by two direct-`place()` tests (H-1) whose mutation proof is in the run report.
 - Response: `PlaceResult` gains `friendlyFire: boolean` (stored verbatim in `bet_receipts.result`, so a replay echoes it).
 - Idempotency: the fingerprint already covers the whole body (A1-d); a replay with the flag flipped is a fingerprint mismatch → 409 `error_idempotency_key_reused` (G7).
 - Client: `PlaceBody` gains `friendlyFire?: boolean`; `buildPlaceRequest` emits the key only when `true` (key-by-key rebuild, the file's own law).
@@ -131,13 +131,14 @@ Full suite (`ZUGZWANG_ENV=preview just verify` + `pnpm vitest run`, DB suites fr
 | `docs/specs/SPEC.1.md`, `SPEC.2.md`, `RANKING.md`, `docs/design/design-language.md`, `docs/adr/0017-ranking-modes-and-top-composite.md` | S0, amendment blocks |
 | `src/db/schema/comments.ts`, `drizzle/migrations/0031_comments_friendly_fire.sql`, `meta/0031_snapshot.json`, `meta/_journal.json` | S1 |
 | `tests/db/comments-friendly-fire.spec.ts` | G1, G2 |
-| `src/server/bets/errors.ts` (two classes), `src/app/api/bets/place/route.ts`, `src/server/bets/place.ts`, `src/server/events/schemas.ts`, `src/server/comments/foreclosure.ts`, `src/components/debate/composer/requests.ts` (type + key) | S2 |
+| `src/server/bets/errors.ts` (two classes), `src/app/api/bets/place/route.ts`, `src/server/bets/place.ts`, `src/server/events/schemas.ts`, `src/server/comments/foreclosure.ts` | S2 |
+| `src/components/debate/composer/requests.ts` (type + key), `composer/state-map.ts` (+ its guard) | S6 / PR-B — client files; this row read "S2" until `@code-reviewer` M-2/M-1, and the mis-slice was the plan's, not the branch's |
 | `tests/server/comments/friendly-fire.test.ts`, `tests/unit/comments/foreclosure.test.ts` (extend) | G3–G8 |
-| `src/server/debate-view/{ranking-substrate,reply-substrate}.ts`, `src/server/profile/arguments.ts`, `scripts/verify-ranking-staging.ts`, `src/lib/ranking.ts`, `src/server/debate-export/image/compose.ts` (literal) | S3 |
+| `src/server/debate-view/{ranking-substrate,reply-substrate}.ts`, `src/server/profile/arguments.ts`, `scripts/verify-ranking-staging.ts`, `src/lib/ranking.ts` | S3 — `src/server/debate-export/image/compose.ts` was listed here and is deliberately NOT touched: its literal is a `ReplyAggregate` DTO, not a `PostSubstrate`, and the share image carries no friendly-fire element (D-51 R5; `@code-reviewer` LOW-3) |
 | `tests/server/debate-view/reply-substrate.integration.test.ts` (extend), `tests/unit/ranking/{contested,substrate-site-parity}.test.ts` (extend), `tests/unit/ranking/friendly-fire-purity.property.test.ts` (new), ranking fixtures needing the two new fields | G9–G11 |
 | `src/server/debate-view/load-debate-view.ts`, `src/server/debate-export/serialize.ts`, `tests/unit/debate-export/*` fixtures | S4, G13 |
 | `src/components/debate/composer/BetComposer.tsx`, `ArgProfile.tsx`, `ReplyCard.tsx`, `composer/ReplySplitBar.tsx`, phone `PhoneDebateView.tsx` (+ a meter component) | S6/S7 |
-| `AGENTS.md` §6, `CLAUDE.md` §1, `docs/records/DEBATE-record.md` §2, `docs/parked.md` | RF-11 (S8, on `feat/ff-1-ui`; the two contract files are descriptive) |
+| `AGENTS.md` §6, `CLAUDE.md` §1, `docs/records/DEBATE-record.md` §2, `docs/parked.md` | RF-11 — landed on `feat/ff-1` (PR-A, commit `89cc9c6a`) rather than at S8 on the UI branch: all four are server-side facts (migration head, write path, aggregates), and a UI branch stating them would leave PR-A's own record incomplete (`@code-reviewer` LOW-4 records the re-slice) |
 
 ## Ambiguity register (kept current; mirrored in the run report)
 

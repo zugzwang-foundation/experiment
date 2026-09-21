@@ -57,7 +57,8 @@ export const comments = pgTable(
 		// ADR-0058 / D-51 — the friendly-fire TOGGLE: a compose-time declaration on
 		// a SUPPORT reply-bet that the replier backs the side but contests THIS
 		// argument. Written in the same INSERT as `side_at_post_time` and never
-		// updated (the Bucket-A trigger above is the immutability enforcement —
+		// updated (the Bucket-A `bucket_a_no_update` trigger from migration 0003 —
+		// the one the file's header note names — is the immutability enforcement;
 		// no new invariant is minted). The stake it rides is an ordinary own-side
 		// buy; nothing about the bet reads this column.
 		//

@@ -3,6 +3,10 @@ import { v7 as uuidv7 } from "uuid";
 import { afterEach, describe, expect, it } from "vitest";
 import { db } from "@/db";
 import { comments, lots, markets, pools, users } from "@/db/schema";
+import {
+	FriendlyFireRequiresReplyError,
+	FriendlyFireRequiresSupportError,
+} from "@/server/bets/errors";
 import { place } from "@/server/bets/place";
 import { sell } from "@/server/bets/sell";
 import { runBetTransaction } from "@/server/bets/transaction";
@@ -416,5 +420,115 @@ describe("FF-1 G9 — the friendly-fire aggregates on engine-written rows", () =
 		expect(JSON.stringify(item)).not.toContain("endorseCount");
 		expect(JSON.stringify(item)).not.toContain("contestCount");
 		expect(JSON.stringify(item)).not.toContain("friendlyFireDharma");
+	});
+});
+
+// ── @code-reviewer H-1 + M-3 (FF-1 S5) — the two claims the suite above did not
+// exercise, added after the review and flagged as such in the run report.
+//
+// H-1 · THE IN-TX GUARD HAD NO TEST THAT COULD FAIL. Every rejection test drives
+// the ROUTE, whose frontstops throw first; `place()` itself was only ever handed
+// legal combinations, so inverting the guard's `!==` — or deleting it — left the
+// whole suite green. The same-side half has NO storage backstop by design
+// (ADR-0058 outcome 1: it needs the parent row), so a non-route caller is the
+// exact path it exists for. These two cases call `place()` directly with the
+// illegal combinations and assert the throw AND that nothing landed.
+//
+// M-3 · ADR-0058's "a person who both plain-supports and friendly-fires the same
+// post appears on both pans of b … pinned by test" named a test that did not
+// exist: every replier in the fixture above is a distinct person. A fifth user
+// who does both is what makes the double count observable.
+describe("FF-1 — the in-tx guard (H-1) and the both-pans double count (M-3)", () => {
+	afterEach(async () => {
+		await truncateTables(testClient, TABLES);
+	});
+
+	async function countRows(marketId: string) {
+		const [c] = await testClient.unsafe(
+			`SELECT count(*)::int AS n FROM comments WHERE market_id = $1`,
+			[marketId],
+		);
+		const [b] = await testClient.unsafe(
+			`SELECT count(*)::int AS n FROM bets WHERE market_id = $1`,
+			[marketId],
+		);
+		return { comments: c?.n as number, bets: b?.n as number };
+	}
+
+	it("in-tx-guard::a-flagged-COUNTER-handed-straight-to-place()-is-refused-with-zero-rows", async () => {
+		const f = await seedFixture("ff-guard-counter");
+		const before = await countRows(f.marketId);
+		const rogue = await seedUser("ff-guard-rogue");
+		await expect(
+			placeBet({
+				userId: rogue,
+				marketId: f.marketId,
+				side: "NO", // the parent is YES — a Counter
+				stake: "50",
+				parentCommentId: f.post.commentId,
+				friendlyFire: true,
+			}),
+		).rejects.toBeInstanceOf(FriendlyFireRequiresSupportError);
+		expect(await countRows(f.marketId)).toEqual(before);
+		// POSITIVE CONTROL — the identical call without the flag lands as a Counter.
+		await placeBet({
+			userId: rogue,
+			marketId: f.marketId,
+			side: "NO",
+			stake: "50",
+			parentCommentId: f.post.commentId,
+			friendlyFire: false,
+		});
+		const after = await countRows(f.marketId);
+		expect(after.comments).toBe(before.comments + 1);
+		expect(after.bets).toBe(before.bets + 1);
+	});
+
+	it("in-tx-guard::a-flagged-TOP-LEVEL-post-handed-straight-to-place()-is-refused-with-zero-rows", async () => {
+		const f = await seedFixture("ff-guard-post");
+		const before = await countRows(f.marketId);
+		const rogue = await seedUser("ff-guard-poster");
+		await expect(
+			placeBet({
+				userId: rogue,
+				marketId: f.marketId,
+				side: "YES",
+				stake: "50",
+				parentCommentId: null,
+				friendlyFire: true,
+			}),
+		).rejects.toBeInstanceOf(FriendlyFireRequiresReplyError);
+		expect(await countRows(f.marketId)).toEqual(before);
+	});
+
+	it("both-pans::a-person-who-plain-supports-AND-friendly-fires-counts-in-endorse-AND-contest", async () => {
+		const f = await seedFixture("ff-both-pans");
+		const both = await seedUser("ff-both");
+		await placeBet({
+			userId: both,
+			marketId: f.marketId,
+			side: "YES",
+			stake: "50",
+			parentCommentId: f.post.commentId,
+			friendlyFire: false,
+		});
+		await placeBet({
+			userId: both,
+			marketId: f.marketId,
+			side: "YES",
+			stake: "50",
+			parentCommentId: f.post.commentId,
+			friendlyFire: true,
+		});
+		const [p] = await loadRankingSubstrate(db, { marketId: f.marketId });
+		// Fixture: A endorses; B contests (flag); C contests (side); P excluded.
+		// `both` adds ONE person to EACH pan — endorse 1 → 2, contest 2 → 3 —
+		// while the people-counts by SIDE gain one person on the support side.
+		expect(p?.endorseCount).toBe(2);
+		expect(p?.contestCount).toBe(3);
+		expect(p?.supportCount).toBe(3);
+		expect(p?.counterCount).toBe(1);
+		// …and the meter numerator takes only the FLAGGED stake of that person.
+		expect(units(p?.friendlyFireDharma ?? "0")).toBe(units(dp18("100")));
 	});
 });
