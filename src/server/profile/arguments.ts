@@ -132,6 +132,9 @@ type PostAggRow = {
 	counter_count: string | number;
 	support_dharma: string;
 	counter_dharma: string;
+	endorse_count: string | number;
+	contest_count: string | number;
+	friendly_fire_dharma: string;
 };
 
 type ReplyRow = {
@@ -145,6 +148,7 @@ type ReplyRow = {
 	original_stake: string;
 	sold: boolean;
 	price_at_bet: string;
+	friendly_fire: boolean;
 };
 
 /**
@@ -259,7 +263,29 @@ export async function loadProfileArguments(
 			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (
 				WHERE rc.side_at_post_time <> p.side_at_post_time
 					AND rc.user_id <> p.user_id
-			), 0) AS counter_dharma
+			), 0) AS counter_dharma,
+			-- FF-1 / ADR-0058 — the declared-stance inputs and the meter numerator,
+			-- byte-mirrored from ranking-substrate.ts (which carries the argument;
+			-- substrate-site-parity.test.ts pins the spelling here). This surface
+			-- ranks by D and reads none of the three, but PostSubstrate is one
+			-- shape and every site fills it the same way.
+			COUNT(DISTINCT rc.user_id) FILTER (
+				WHERE rc.side_at_post_time = p.side_at_post_time
+					AND NOT rc.friendly_fire
+					AND rc.user_id <> p.user_id
+					AND rb.id IS NOT NULL
+			) AS endorse_count,
+			COUNT(DISTINCT rc.user_id) FILTER (
+				WHERE (rc.side_at_post_time <> p.side_at_post_time OR rc.friendly_fire)
+					AND rc.user_id <> p.user_id
+					AND rb.id IS NOT NULL
+			) AS contest_count,
+			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (
+				WHERE rc.side_at_post_time = p.side_at_post_time
+					AND rc.friendly_fire
+					AND rc.user_id <> p.user_id
+					AND rb.id IS NOT NULL
+			), 0) AS friendly_fire_dharma
 		FROM ${comments} p
 		JOIN LATERAL (
 			SELECT
@@ -294,7 +320,9 @@ export async function loadProfileArguments(
 			rb.stake,
 			rb.original_stake,
 			rb.sold,
-			rb.price_at_bet
+			rb.price_at_bet,
+			-- FF-1 / ADR-0058 — the toggle, per reply, for the tag; nothing sorts on it.
+			rc.friendly_fire
 		FROM ${comments} rc
 		JOIN LATERAL (
 			SELECT
@@ -326,6 +354,9 @@ export async function loadProfileArguments(
 		counterCountTotal: Number(r.counter_count_total),
 		supportDharma: toFixed18(new CpmmDecimal(r.support_dharma)),
 		counterDharma: toFixed18(new CpmmDecimal(r.counter_dharma)),
+		endorseCount: Number(r.endorse_count),
+		contestCount: Number(r.contest_count),
+		friendlyFireDharma: toFixed18(new CpmmDecimal(r.friendly_fire_dharma)),
 		createdAt: new Date(r.created_at),
 		authorStake: r.author_stake,
 		authorStakeOriginal: r.author_stake_original,
@@ -340,6 +371,7 @@ export async function loadProfileArguments(
 		sold: r.sold,
 		createdAt: new Date(r.created_at),
 		priceAtBet: r.price_at_bet,
+		friendlyFire: r.friendly_fire,
 	}));
 
 	// Per-item metadata (market + body + the reply→parent linkage).

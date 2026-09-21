@@ -69,6 +69,17 @@ function substrateFor(marketKey: string): PostSubstrate[] {
 			// so it is computed the way the SQL computes it.
 			supportCount: new Set(support.map((r) => r.author)).size,
 			counterCount: new Set(counter.map((r) => r.author)).size,
+			// FF-1 / ADR-0058 — the declared-stance pair. The staging fixture
+			// table states no `friendlyFire` on any reply, so `endorse_count` is
+			// `support_count` and `contest_count` is `counter_count` by the zero-
+			// flag identity, and every lane calibration below is unmoved by the
+			// ADR. ⚠ If a future fixture DOES flag a reply, this is the line that
+			// has to compute the split — and the `laneOf` record further down is
+			// the one that has to read it.
+			endorseCount: new Set(support.map((r) => r.author)).size,
+			contestCount: new Set(counter.map((r) => r.author)).size,
+			// The Support-lane meter's numerator: no flag, so nothing in it.
+			friendlyFireDharma: "0",
 			// The DISPLAY totals: every reply, self-authored and removed included.
 			// The fixture table contains no self-replies (verified), so these differ
 			// from the counts above only where one person replied more than once.
