@@ -269,6 +269,41 @@ export class ReplyDepthExceededError extends BetProductError {
 }
 
 /**
+ * FF-1 / ADR-0058 / SPEC.1 §8 F-COMMENT-2 → 400. `friendlyFire = true` on a
+ * TOP-LEVEL post. A post has no argument above it to contest, so the flag has
+ * nothing to mean; the `comments` CHECK `comments_friendly_fire_requires_parent`
+ * is the storage backstop, this is the frontstop. Thrown before any write and
+ * before moderation.
+ */
+export class FriendlyFireRequiresReplyError extends BetProductError {
+	static readonly httpStatus = 400;
+	static readonly code = "friendly_fire_requires_reply";
+	constructor() {
+		super("friendly fire requires a reply (a top-level post cannot carry it)");
+		this.name = "FriendlyFireRequiresReplyError";
+	}
+}
+
+/**
+ * FF-1 / ADR-0058 / SPEC.1 §8 F-COMMENT-2 → 400. `friendlyFire = true` on a
+ * reply whose side is NOT the parent's frozen side — i.e. on a Counter. The
+ * toggle declares "I back this side and contest this argument"; a Counter
+ * already contests by side and cannot ALSO back it. Checked pre-tx (needs the
+ * parent row, so it is not DDL) and again inside W-1 after the in-tx parent
+ * read. Thrown before any write and before moderation.
+ */
+export class FriendlyFireRequiresSupportError extends BetProductError {
+	static readonly httpStatus = 400;
+	static readonly code = "friendly_fire_requires_support";
+	constructor() {
+		super(
+			"friendly fire requires a Support reply (the reply's side must equal the parent's side)",
+		);
+		this.name = "FriendlyFireRequiresSupportError";
+	}
+}
+
+/**
  * DEBATE.2 / SPEC.1 §8 F-COMMENT-2 → 404. The parent comment is absent OR in a
  * different market than the reply targets (a reply must reference an existing
  * comment in the same market).

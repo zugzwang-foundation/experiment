@@ -74,12 +74,6 @@ export const comments = pgTable(
 			.defaultNow(),
 	},
 	(table) => [
-		// ADR-0058 — `friendly_fire = true` requires a parent (a reply); the
-		// same-side half is the write path's (see the column note).
-		check(
-			"comments_friendly_fire_requires_parent",
-			sql`${table.parentCommentId} IS NOT NULL OR ${table.friendlyFire} = false`,
-		),
 		index("comments_user_id_idx").on(table.userId),
 		index("comments_market_id_idx").on(table.marketId),
 		index("comments_parent_idx").on(table.parentCommentId),
@@ -90,6 +84,13 @@ export const comments = pgTable(
 		),
 		index("comments_image_uploads_idx").on(table.imageUploadsId),
 		index("comments_bet_id_idx").on(table.betId),
+		// ADR-0058 — `friendly_fire = true` requires a parent (a reply); the
+		// same-side half is the write path's (see the column note). Last in the
+		// array, after the indexes, as every other check-bearing table does.
+		check(
+			"comments_friendly_fire_requires_parent",
+			sql`${table.parentCommentId} IS NOT NULL OR ${table.friendlyFire} = false`,
+		),
 	],
 );
 
