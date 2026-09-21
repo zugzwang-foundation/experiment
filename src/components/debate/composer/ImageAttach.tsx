@@ -300,6 +300,19 @@ export function ImageAttach({
 	onRemove: () => void;
 }) {
 	const inputRef = useRef<HTMLInputElement | null>(null);
+	/**
+	 * DND-1 — whether a file is currently being dragged over this panel.
+	 *
+	 * ⛔ SET ON `dragover`, NOT ON `dragenter`, and that is the whole reason
+	 * there is no enter/leave counter here. `dragenter`/`dragleave` fire as the
+	 * pointer crosses EVERY descendant, so the naive pair blinks the highlight
+	 * off each time the drag passes over the artwork inside the box; the usual
+	 * repair is a depth counter that has to be kept balanced against events the
+	 * browser may drop. `dragover` fires continuously for as long as the pointer
+	 * is over the element, so setting it there is self-correcting — and the
+	 * `relatedTarget` check on leave is then the only bookkeeping needed.
+	 */
+	const [dragging, setDragging] = useState(false);
 	// POLISH-4-PREVIEW — the LOCAL preview of the file the user just picked.
 	//
 	// ⛔ WHY THIS EXISTS AT ALL. The R2 object is immutable from first write
@@ -462,7 +475,7 @@ export function ImageAttach({
 	 * floor, its border, its ground and its padding at every width ≥640.
 	 */
 	const panel =
-		"flex h-full min-h-40 min-w-0 flex-col items-center justify-between rounded-(--imgr) p-1 text-center text-xs [border:var(--hairline)] bg-n1/40 group hover:border-n4 transition-colors cursor-pointer max-mobile:order-2 max-mobile:min-h-0 max-mobile:bg-transparent max-mobile:p-0 max-mobile:[border:none]";
+		"flex h-full min-h-40 min-w-0 flex-col items-center justify-between rounded-(--imgr) p-1 text-center text-xs [border:var(--hairline)] bg-n1/40 group hover:border-n4 data-[dragging=true]:border-n4 transition-colors cursor-pointer max-mobile:order-2 max-mobile:min-h-0 max-mobile:bg-transparent max-mobile:p-0 max-mobile:[border:none]";
 	/**
 	 * ⛔⛔ THE ATTACHED SLOT HUGS ITS IMAGE — MOBILE-2c R-7, founder ruling Q8-a,
 	 * and the founder's note that *"this issue sometimes happens in desktop view
@@ -492,7 +505,7 @@ export function ImageAttach({
 	 * a SLOT open, and an attached slot is not a slot any more.
 	 */
 	const attachedPanel =
-		"flex min-h-0 min-w-0 flex-col items-center gap-1 self-start rounded-(--imgr) p-1 text-center text-xs [border:var(--hairline)] bg-n1/40 group hover:border-n4 transition-colors cursor-pointer max-mobile:order-2";
+		"flex min-h-0 min-w-0 flex-col items-center gap-1 self-start rounded-(--imgr) p-1 text-center text-xs [border:var(--hairline)] bg-n1/40 group hover:border-n4 data-[dragging=true]:border-n4 transition-colors cursor-pointer max-mobile:order-2";
 	/**
 	 * ⛔ TWO `max-*` BOUNDS AND NO FIXED DIMENSION — which is the one combination
 	 * that preserves the intrinsic ratio without a letterbox. For a replaced
@@ -647,6 +660,27 @@ export function ImageAttach({
 				className={attachedPreview}
 			/>
 		);
+	/**
+	 * DND-1 — the drag gate, and it is a GATE rather than a blanket.
+	 *
+	 * ⛔ ONLY A DRAG CARRYING FILES IS EVER INTERCEPTED. The argument textarea
+	 * sits one grid track over, so dragging selected text around the composer is
+	 * ordinary editing and must keep its native behaviour; a `preventDefault`
+	 * that did not read `types` would quietly break it, and every file-arm test
+	 * would still pass. `Array.from` because `types` is an array-like the spec
+	 * has spelled two different ways.
+	 */
+	const carriesFiles = (e: React.DragEvent) =>
+		Array.from(e.dataTransfer?.types ?? []).includes("Files");
+	/**
+	 * The same condition the pick BUTTON is disabled by, named once so the two
+	 * doors into this component cannot drift apart. A drop during `attaching`
+	 * would start a second sign + PUT behind the first and race the composer's
+	 * own `uploadId`; a drop while `disabled` is the composer in flight, where
+	 * `onPickImage` returns early anyway (`BetComposer.tsx:310-313`) — refusing
+	 * here as well means the panel never highlights an action it will not take.
+	 */
+	const dropBlocked = disabled || state.phase === "attaching";
 	return (
 		<>
 			<input
@@ -681,8 +715,80 @@ export function ImageAttach({
 			    so the target stays panel-sized (d5 `.attach{cursor:pointer}`), and
 			    the status region is the control's SIBLING inside the group.
 			    Caught by `@code-reviewer` (HIGH) on the first draft of this file. */}
+			{/* ⛔ DND-1 — THE PANEL IS THE DROP TARGET, AND `preventDefault` ON
+			    `dragover` IS WHAT MAKES IT ONE. HTML's drag model treats every
+			    element as refusing a drop until `dragover` is cancelled, so a
+			    `drop` handler alone is dead code in a real browser while still
+			    firing under jsdom — a fix that passes its own tests and does
+			    nothing on the site. Both are cancelled together, deliberately.
+
+			    ⚠ THE HIGHLIGHT IS A DATA VARIANT, NOT A BARE `border-n4`. This
+			    panel's edge comes from the arbitrary shorthand
+			    `[border:var(--hairline)]`; a plain `border-n4` is a base utility
+			    at equal specificity, so which of the two paints depends on the
+			    order Tailwind happens to emit them in. `data-[dragging=true]:`
+			    lands in a later variant group and wins the same way the
+			    `hover:border-n4` already beside it does. */}
 			<fieldset
 				aria-label={ATTACH_LABEL}
+				data-dragging={dragging ? "true" : undefined}
+				onDragOver={(e) => {
+					if (!carriesFiles(e)) {
+						return;
+					}
+					e.preventDefault();
+					// Say so in the cursor: `none` while blocked, so an in-flight
+					// composer looks refused rather than broken.
+					e.dataTransfer.dropEffect = dropBlocked ? "none" : "copy";
+					setDragging(!dropBlocked);
+				}}
+				onDragLeave={(e) => {
+					// A drag crossing onto one of this panel's own children fires
+					// `dragleave` HERE, with the child as `relatedTarget`. Clearing on
+					// that is the flicker the `dragover` comment above describes.
+					//
+					// ⚠ BEST-EFFORT, AND SAFE BECAUSE `dragover` IS THE SOURCE OF
+					// TRUTH. Not every engine populates `relatedTarget` on a drag
+					// leave (WebKit has historically sent null), so this check can
+					// miss and clear the mark while the pointer is still over the
+					// panel. The next `dragover` — which fires continuously for as
+					// long as it is — puts it straight back, so the worst case is one
+					// frame of flicker rather than a highlight stuck off. Written the
+					// other way round, with leave as the authority, a missed event
+					// would strand the mark ON.
+					if (
+						e.relatedTarget instanceof Node &&
+						e.currentTarget.contains(e.relatedTarget)
+					) {
+						return;
+					}
+					setDragging(false);
+				}}
+				onDrop={(e) => {
+					if (!carriesFiles(e)) {
+						return;
+					}
+					// Cancelled BEFORE the block check: a refused drop must still not
+					// reach the browser, whose default is to navigate the tab to the
+					// file and take the typed argument with it.
+					e.preventDefault();
+					setDragging(false);
+					if (dropBlocked) {
+						return;
+					}
+					// One comment carries one image (SPEC.1 §8 F-COMMENT-3), so a
+					// multi-file drag attaches the first and drops the rest rather
+					// than picking silently among them.
+					const file = e.dataTransfer.files[0];
+					if (file) {
+						// The dialog path draws the preview before `onPick` for the
+						// reason stated on the `<input>` above — the confirmation must
+						// not wait on the network. A drop is the same act by another
+						// gesture, so it takes the same order.
+						setPreview(URL.createObjectURL(file));
+						onPick(file);
+					}
+				}}
 				className={state.phase === "attached" ? attachedPanel : panel}
 			>
 				{state.phase === "attached" ? (
