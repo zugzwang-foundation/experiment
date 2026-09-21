@@ -283,6 +283,53 @@ export function BetComposer(props: {
 		return () => document.removeEventListener("keydown", onKey);
 	}, [inFlightNow]);
 
+	/**
+	 * DND-1 — A FILE DROPPED ANYWHERE BUT THE IMAGE PANEL DOES NOTHING.
+	 *
+	 * ⛔ THIS IS NOT POLISH ON THE DRAG-AND-DROP FEATURE; IT IS THE HALF THAT
+	 * STOPS A MISS BEING EXPENSIVE. With no handler on the document, the
+	 * browser's own default for a dropped file is to NAVIGATE THE TAB TO IT —
+	 * and mandatory commentary (INV-1) means this composer is never open
+	 * without a typed argument in it, so a drag that lands two inches wide of
+	 * the panel costs a participant the whole post. That was the behaviour on
+	 * the live site before this: not "the box ignores the drop", but the page
+	 * going away.
+	 *
+	 * ⚠ SCOPED TO AN OPEN COMPOSER, NOT TO THE ROUTE GROUP'S LAYOUT. The
+	 * argument is the only thing on this surface a stray drop can destroy, so
+	 * the listener exists exactly while there is something to protect and
+	 * nothing has to be reasoned about the rest of the site (§5.3). The
+	 * negative arm of `attach-drop.test.tsx` asserts the release, because the
+	 * failure mode of getting this wrong is invisible: a listener left behind
+	 * by every composer ever opened, changing pages that never asked.
+	 *
+	 * ⚠ REGISTERED INDEPENDENTLY OF `imageAttachEnabled` (ADR-0052). With the
+	 * brake applied there is nowhere to drop a file — but losing a typed
+	 * argument is still the worse of the two outcomes, and a flag that hides an
+	 * affordance should not re-arm a way to lose work.
+	 *
+	 * The `types` read is the same gate `ImageAttach` uses: a text drag is left
+	 * alone, so dragging a selection into the argument textarea below still
+	 * behaves natively.
+	 */
+	useEffect(() => {
+		const swallowStrayFileDrag = (e: DragEvent) => {
+			if (!Array.from(e.dataTransfer?.types ?? []).includes("Files")) {
+				return;
+			}
+			e.preventDefault();
+		};
+		// BOTH, and neither alone: cancelling `drop` without `dragover` leaves
+		// the document refusing the drag in the first place, so the drop the
+		// handler was written for never arrives.
+		document.addEventListener("dragover", swallowStrayFileDrag);
+		document.addEventListener("drop", swallowStrayFileDrag);
+		return () => {
+			document.removeEventListener("dragover", swallowStrayFileDrag);
+			document.removeEventListener("drop", swallowStrayFileDrag);
+		};
+	}, []);
+
 	const inFlight = status.phase === "in_flight";
 	const errorState = status.phase === "error" ? status.state : null;
 	const terminalLocked =
