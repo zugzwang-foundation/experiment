@@ -61,6 +61,25 @@ export function computeReplyAffordance(
 }
 
 /**
+ * FF-1 / ADR-0058 — whether the composer OFFERS the friendly-fire switch.
+ *
+ * `P` = parent.side_at_post_time; `S` = the side the reply will BUY — the
+ * viewer's held side when they hold one, the side they chose when the reply is
+ * their entry (D-51 R2: an entry reply placed as Support is eligible, which is
+ * why this takes the side being bought and not `H`). True exactly when the
+ * reply would be a Support. Pure, `===`, total over its inputs.
+ *
+ * UI guidance ONLY. The guard is the write path: `place.ts` rejects
+ * `friendly_fire = true` on an opposite-side reply (`friendly_fire_requires_
+ * support`) and on a top-level post (`friendly_fire_requires_reply`), and the
+ * `comments` CHECK backs the second half. `computeReplyAffordance` above is
+ * unchanged by ADR-0058 — this sits beside it, not inside it.
+ */
+export function friendlyFireEligible(P: Side, S: Side): boolean {
+	return P === S;
+}
+
+/**
  * Thin reader: pulls `H` via `heldSideOrNull` (ENGINE.11) for the viewer in the
  * parent's market, reads `P` off the parent comment's frozen side, and delegates
  * to the pure `computeReplyAffordance`. No write, no render.
