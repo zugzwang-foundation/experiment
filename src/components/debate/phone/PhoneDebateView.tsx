@@ -14,10 +14,19 @@ import { AuthGateSlot } from "../composer/AuthGateSlot";
 import { BetComposer } from "../composer/BetComposer";
 import { AUTH_GATE_COPY, COMPOSER_COPY } from "../composer/copy";
 import { deriveReplySide } from "../composer/gating";
+// FF-1 / ADR-0058 — the Support-lane meter's two pieces (D-51 R5), resolved
+// in the file that already resolves the split track's pole; this owner only
+// places them. `computeFriendlyFireMeter` is the pure arithmetic that decides
+// whether there is a meter to place at all (none while Support Đ is zero).
+import {
+	FriendlyFireMeterBar,
+	FriendlyFireMeterFigure,
+} from "../composer/ReplySplitBar";
+import { computeFriendlyFireMeter } from "../composer/split-bar";
 import { setPhoneSheetOpen } from "../composer-open-store";
 import { ImageLightbox, PostPopup, ReplyPopup } from "../dialogs";
 import { findPostedNode } from "../find-posted";
-import { formatPricePercent } from "../format";
+import { formatDharma, formatPricePercent } from "../format";
 import { PostCard } from "../PostCard";
 // ⚠ THE CONSTANT, NOT A FOURTH COPY OF THE STRING. `REMOVED_STUB_TEXT` is
 // "the ONE masking-variant string, reused across every removal surface"
@@ -1027,6 +1036,37 @@ export function PhoneDebateView({
 					onSelect={focused === null ? onSideTap : onRelationTap}
 					panelIdFor={PANE_ID}
 				/>
+				{/* FF-1 / ADR-0058 / D-51 R5 — THE FRIENDLY-FIRE METER, thread arm,
+				    Support tab only. The desktop stacks the meter's pieces around the
+				    Support PILL; this tier's Support control is the tab above, so the
+				    pieces sit in one row directly beneath it — friendly-fire Đ, the
+				    one-sided bar with its ruled label, total Support Đ — and the row
+				    is absent under the Counter tab and whenever Support Đ is zero
+				    (RF-9: same testids, same copy, same rules as the desktop; the
+				    Counter lane gets nothing). The pole is resolved INSIDE the bar
+				    piece, which lives in the inventoried composer file, so this owner
+				    holds no side-keyed colour of its own. Unprefixed classes, as
+				    everywhere under `phone/`. Nothing else on this tier moves. */}
+				{focused !== null &&
+				threadRelation === "support" &&
+				computeFriendlyFireMeter({
+					friendlyFireDharma: focused.aggregate.friendlyFireDharma,
+					supportDharma: focused.aggregate.supportDharma,
+				}) !== null ? (
+					<div
+						data-testid="phone-ff-row"
+						className="flex shrink-0 items-center justify-center gap-3 px-3 pb-1.5 text-xs"
+					>
+						<FriendlyFireMeterFigure aggregate={focused.aggregate} />
+						<FriendlyFireMeterBar
+							postSide={focused.sideAtPostTime}
+							aggregate={focused.aggregate}
+						/>
+						<span className="text-n5">
+							Đ {formatDharma(focused.aggregate.supportDharma)}
+						</span>
+					</div>
+				) : null}
 				{/* ⛔ MOBILE-2k · F-1 — THE FEED ARM ONLY, GATED AT THE MOUNT. The
 				    bounded shell took pull-to-refresh away (the document no longer
 				    scrolls below 640, so the browser's overscroll gesture has nothing
