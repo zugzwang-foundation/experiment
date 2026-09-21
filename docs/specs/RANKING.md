@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| **Status** | v1.0.0-draft (shape locked; numeric constants pin at the 2026-09-01 number-tuning pass) |
+| **Status** | v1.1.0-draft (shape locked; numeric constants pin at the 2026-09-01 number-tuning pass) |
 | **License** | AGPL-3.0-or-later — © The Zugzwang Authors |
 | **Authoritative ADR** | ADR-0017 (Ranking Modes & the "Top" Composite) — supersedes ADR-0009 |
-| **Patch records consumed** | ADR-0017 P1 (friendly-fire removed entirely), P2 (latest interleave), P3 (filter modes retired from the v1 surface; lane-dominance badges) · **ADR-0039 R4/R5/R6** (every ranking input keys off surviving lot basis; the figure follows the ruler) · **ADR-0039 P2** (self-authored replies do not count as attraction) · **ADR-0039 P3** (the displayed count and the ranking input are two numbers; traction counts people) |
+| **Patch records consumed** | **ADR-0058** (declared stance — the friendly-fire toggle; `b` reads endorse vs contest; `n`, `D`, reply order and badges unchanged) · ADR-0017 P1 (friendly-fire *vote* removed entirely), P2 (latest interleave), P3 (filter modes retired from the v1 surface; lane-dominance badges) · **ADR-0039 R4/R5/R6** (every ranking input keys off surviving lot basis; the figure follows the ruler) · **ADR-0039 P2** (self-authored replies do not count as attraction) · **ADR-0039 P3** (the displayed count and the ranking input are two numbers; traction counts people) |
 | **Companion specs** | SPEC.1 §9 (product surface), SPEC.2 §5.4 (read-model classification + the four aggregates) |
 | **Implementation** | `src/lib/ranking.ts` (pure TypeScript, no IO) · `src/lib/ranking.config.ts` (tunables) |
 | **Authored at** | DEBATE.8 |
@@ -42,24 +42,27 @@ The model is **surface-agnostic at its core**: `ranking.ts` ranks whatever post 
 
 ### 1.4 What this model is NOT
 
-It is **not** the debate-view UI (visual treatment, the badge rendering, mobile layout) — that is ADR-0012 / DEBATE.4. It is **not** an audit event — nothing is stored; researchers reconstruct any historical order on demand from the public dataset. It carries **no anti-capital clause**, **no thesis-defence special-casing**, and **no friendly-fire input** (the friendly-fire vote is removed entirely — ADR-0017 P1; there is no `friendly_fire_events` table and no `↑N ↓M` count).
+It is **not** the debate-view UI (visual treatment, the badge rendering, mobile layout) — that is ADR-0012 / DEBATE.4. It is **not** an audit event — nothing is stored; researchers reconstruct any historical order on demand from the public dataset. It carries **no anti-capital clause**, **no thesis-defence special-casing**, and **no friendly-fire input** (the friendly-fire vote is removed entirely — ADR-0017 P1; there is no `friendly_fire_events` table and no `↑N ↓M` count). The friendly-fire **toggle** (ADR-0058) is not that input: it is a flag on a staked Support reply-bet, and the only thing it reaches in this model is the balance term `b` through `endorse_count` / `contest_count` (§2) — it never lowers a post, adds no lane, and adds no badge.
 
 ---
 
 ## §2 — The per-side data model (the substrate)
 
-Every top-level **post** exposes **four base signals**, tracked per side, plus its age and the author's own stake. These are the substrate for every order and every badge. Per-side separation is mandatory — it is what makes the value-vs-volume contrast expressible.
+Every top-level **post** exposes **four base signals**, tracked per side, **two stance counts** and **one display sub-aggregate** (ADR-0058), plus its age and the author's own stake. These are the substrate for every order and every badge. Per-side separation is mandatory — it is what makes the value-vs-volume contrast expressible.
 
 | Signal | Definition | Source |
 |---|---|---|
 | `support_count` | **RANKING INPUT** — how many DISTINCT PEOPLE replied on the post's **own** side, self-authored excluded | `COUNT(DISTINCT rc.user_id) FILTER (… AND rc.user_id <> p.user_id AND rb.id IS NOT NULL)` |
 | `counter_count` | **RANKING INPUT** — the same on the **opposing** side | as above |
+| `endorse_count` | **RANKING INPUT** — how many DISTINCT PEOPLE replied on the post's **own** side with `friendly_fire = false`, self-authored excluded (ADR-0058) | `COUNT(DISTINCT rc.user_id) FILTER (… same side AND NOT rc.friendly_fire AND rc.user_id <> p.user_id AND rb.id IS NOT NULL)` |
+| `contest_count` | **RANKING INPUT** — how many DISTINCT PEOPLE replied on the **opposing** side **or** on the own side with `friendly_fire = true`, self-authored excluded, each person once (ADR-0058) | `COUNT(DISTINCT rc.user_id) FILTER (… (opposite side OR rc.friendly_fire) AND rc.user_id <> p.user_id AND rb.id IS NOT NULL)` |
 | `support_count_total` | **DISPLAYED** — how many replies are on the own side, self-authored **and removed INCLUDED** | `COUNT(DISTINCT rc.id) FILTER (… AND rb.id IS NOT NULL)` |
 | `counter_count_total` | **DISPLAYED** — the same on the opposing side | as above |
 
 ⚠ **Both display totals count reply COMMENTS, and both count clauses require a bet to exist.** Neither is pedantry. R-1 only holds if the displayed number equals what a reader can **count on the surface**, and the surface is the reply lane — one row per reply *comment*, because `reply-substrate.ts` takes each reply's bet through a `LIMIT 1` LATERAL. The aggregate joins `bets` plainly on `comment_id`, which is indexed but **not unique**, so `COUNT(rb.id)` would report `2` for a comment carrying two bets while the lane still showed one row — re-opening this section's own differential by a spelling. Symmetrically, the lane's LATERAL is an *inner* join, so a comment with no bet is absent from it; without `AND rb.id IS NOT NULL` such a row would still buy a whole person of traction at zero stake, since `rc.user_id` is non-null either way. That `place.ts` is the sole write path and inserts exactly 1:1 makes both cases unreachable **today** — a property of one function, not of the schema, and not one INV-1 asserts (INV-1 guarantees no bet without a comment; it says nothing about at most one bet per comment). Pinned by `tests/unit/ranking/substrate-site-parity.test.ts`, which rejects both spellings and proves each rejection against the literal text.
 | `support_dharma` | Dharma **still staked** across **support-side** reply-bets, **by others** | `SUM(COALESCE(lots.surviving_basis, bets.stake))` over support-side reply-bets, self-authored excluded |
 | `counter_dharma` | Dharma **still staked** across **counter-side** reply-bets, **by others** | `SUM(COALESCE(lots.surviving_basis, bets.stake))` over counter-side reply-bets, self-authored excluded |
+| `friendly_fire_dharma` | **DISPLAYED** (the Support-lane meter's numerator; never a ranking input) — Dharma **still staked** across **support-side** reply-bets **by others** that carry `friendly_fire = true`; a subset of `support_dharma`, which still includes it (ADR-0058) | `SUM(COALESCE(lots.surviving_basis, bets.stake))` over support-side flagged reply-bets, self-authored excluded |
 | `age` | `now − created_at`; `now` frozen to the resolution timestamp for resolved markets (INV-4) | `comments.created_at`, `now` parameter |
 
 Derived quantities used throughout:
@@ -67,8 +70,11 @@ Derived quantities used throughout:
 ```
 n   = support_count  + counter_count          // VOLUME    — informed participation (thesis n)
 D   = support_dharma + counter_dharma          // VALUE     — committed Dharma (capital-like axis)
-b   = min(support_count, counter_count)
-      / max(support_count, counter_count)       // BALANCE   — 0 (blowout) … 1 (dead even); undefined iff n = 0
+b   = min(endorse_count, contest_count)
+      / max(endorse_count, contest_count)       // BALANCE   — 0 (blowout) … 1 (dead even); undefined iff n = 0
+                                                // reads DECLARED STANCE (ADR-0058): endorse = same side, no flag;
+                                                // contest = opposite side OR same side with the flag. With no flag
+                                                // set, endorse_count = support_count and contest_count = counter_count.
 lop = 1 − b                                     // DOMINANCE — inverse of balance
 a   = the author's SURVIVING basis on the post  // author conviction CURRENTLY HELD — the post's own
                                                 // entry bet's lots.surviving_basis (COALESCE → bets.stake)
@@ -257,6 +263,7 @@ In v1 there is **no sort-mode selector**. The market-detail page is **always** i
 The badge lanes share the **traction** (`n`) and **stake** (`D`) lanes with Top, but on the balance axis the badge reads **even-contestation** (`n^b`) where Top's third lane reads **dominance-split** (`lop`, §3.1) — see §5.1(3).
 
 **"Newest" is not a badge** — recency is a *position* fact surfaced by the interleave (§4), not a lane a post "wins." (If a "🆕 New" tag on interleaved posts is wanted later, it is a clean UI addition that requires no model change — out of v1 scope unless reopened.)
+**"Friendly fire" is not a badge either** (D-51 R5, ADR-0058): no badge, no badge variant, no count. The flag reaches this section only through `b` (§2, §6.1).
 
 > A naming note carried on the record: **"Contested," never "Controversial."** Hacker News uses "controversial" to mark threads it wants to *suppress*; Zugzwang treats contestation as the live signal it surfaces. The word choice encodes the thesis.
 
@@ -279,6 +286,8 @@ These are the single-axis lenses Top composes from. In v1 they are **computed bu
 | **Surging** *(v1.x — deferred)* | recent-window activity rate descending | no — the window *is* the recency |
 
 ### 6.1 Contested (`n ^ b`) and its zero-reply edge
+
+**`b` reads declared stance (ADR-0058).** Since the friendly-fire toggle, `b` compares *endorsing* people against *contesting* people rather than own-side against opposite-side. A post with ten plain supporters and ten friendly-firers and no Counter reads `b = 1` — dead even — and may wear **Contested**, where the side-based `b` read it as a blowout. Its split bar can therefore show no Counter while it wears the badge; the Support-lane meter in post-focus is the explanation, and that surface reading is founder-accepted (D-51 R6). `n` is unaffected: a friendly-firer is one of the people the post attracted.
 
 `n ^ b` floats a big *and* even post toward its full magnitude (`b ≈ 1`), collapses a lopsided blowout toward `1` regardless of size (`b → 0`, so `n^0 = 1`), and keeps a tiny even post small (small `n`). It isolates the live-cliffhanger corner.
 
@@ -306,6 +315,8 @@ With no selector in v1 this ordering is dormant, but it is retained for a future
 ```
 reply ranking (depth = 1):
   1. Partition replies by side (Support pool, Counter pool — relative to the parent post's side).
+     A friendly-fire reply (ADR-0058) is in the SUPPORT pool — it is a same-side bet — and is
+     never re-partitioned; it sorts among the Support replies by the same ruler and wears a tag.
   2. Within each side, sort by the reply's SURVIVING BASIS
      (Đ, = COALESCE(lots.surviving_basis, bets.stake)) descending — NOT frozen bets.stake.
   3. Tie-break: earlier posting time wins at equal basis (first-posted ranks higher; UUIDv7 natural order).

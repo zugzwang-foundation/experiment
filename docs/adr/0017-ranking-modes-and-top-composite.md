@@ -9,6 +9,7 @@
 | **Frame document** | SPEC.2 §1.4 #3 (delegation: ranking math owned here, not duplicated in SPEC.2), §22 (ADR Index) |
 | **Supersedes** | ADR-0009 (Ranking Function Lock) |
 | **Superseded-by** | — |
+| **Amended-by** | ADR-0058 — the balance term `b` now reads declared stance (endorse vs contest) rather than side; every other outcome stands |
 
 ---
 
