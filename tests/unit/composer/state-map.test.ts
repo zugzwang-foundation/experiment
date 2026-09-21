@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	type ComposerStateName,
+	isKnownWireCode,
 	keyOutcomeFor,
 	mapWireError,
 } from "@/components/debate/composer/state-map";
@@ -20,6 +21,8 @@ import {
 	CommentTooLongError,
 	CommentTrackABlockedError,
 	CommentTrackBBlockedError,
+	FriendlyFireRequiresReplyError,
+	FriendlyFireRequiresSupportError,
 	InsufficientDharmaError,
 	InsufficientSharesError,
 	InvalidRequestBodyError,
@@ -122,6 +125,11 @@ const SECTION_4_TABLE: ReadonlyArray<[string, ComposerStateName]> = [
 	["comment_requires_bet", "p3_generic"],
 	["reply_depth_exceeded", "p3_generic"],
 	["parent_comment_not_found", "p3_generic"],
+	// FF-1 / ADR-0058 — generic BY DESIGN: the composer never offers the switch
+	// where either code can fire, so a client seeing one is a race or a stale
+	// tab, and no ruled copy exists for a named state (@code-reviewer M-1).
+	["friendly_fire_requires_reply", "p3_generic"],
+	["friendly_fire_requires_support", "p3_generic"],
 	["error_idempotency_key_required", "p3_generic"],
 	["error_idempotency_key_invalid", "p3_generic"],
 	["error_invalid_json", "p3_generic"],
@@ -348,6 +356,22 @@ describe("mapWireError — completeness vs the REAL toWireError inventory", () =
 			wireCode: "reply_depth_exceeded",
 			state: "p3_generic",
 		},
+		// FF-1 / ADR-0058 — the two friendly-fire rejections (@code-reviewer M-1:
+		// a code minted on the server and absent here falls through `??` to
+		// generic with this guard none the wiser, which is the completeness bug
+		// the pin exists to catch).
+		{
+			name: "FriendlyFireRequiresReplyError",
+			err: new FriendlyFireRequiresReplyError(),
+			wireCode: "friendly_fire_requires_reply",
+			state: "p3_generic",
+		},
+		{
+			name: "FriendlyFireRequiresSupportError",
+			err: new FriendlyFireRequiresSupportError(),
+			wireCode: "friendly_fire_requires_support",
+			state: "p3_generic",
+		},
 		{
 			name: "ParentCommentNotFoundError",
 			err: new ParentCommentNotFoundError(),
@@ -386,6 +410,12 @@ describe("mapWireError — completeness vs the REAL toWireError inventory", () =
 			if (mapped.state === "p3_generic") {
 				expect(GENERIC_ALLOWLIST.has(wireCode)).toBe(true);
 			}
+			// FF-1 (@code-reviewer M-1) — AND the code must be an EXPLICIT row of the
+			// map, not a `??` fallthrough that happens to land on the same word:
+			// `mapWireError` cannot tell the two apart by design (SG-5), so this
+			// asks the one question that can. Deleting a registered generic code
+			// from `STATE_BY_CODE` reds here and nowhere else.
+			expect(isKnownWireCode(wireCode)).toBe(true);
 		});
 	}
 });

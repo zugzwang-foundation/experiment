@@ -22,6 +22,7 @@ import { AuthGateSlot } from "./AuthGateSlot";
 import {
 	COMPOSER_COPY,
 	c2Sentence,
+	FRIENDLY_FIRE_COPY,
 	overCapStrip,
 	rateLimitedBanner,
 	SUSPENDED_COPY,
@@ -167,6 +168,29 @@ export function BetComposer(props: {
 		"track_a" | "banned" | null
 	>(null);
 	const [authGate, setAuthGate] = useState(false);
+	// FF-1 / ADR-0058 — the friendly-fire switch (D-51 R5). Offered ONLY when
+	// the reply would be a Support: the relation the host chose is exactly
+	// `friendlyFireEligible(parentSide, sideBeingBought)` — Support means the
+	// side being bought equals the parent's side (`deriveReplySide`), so the
+	// server helper and this predicate cannot disagree; the helper lives behind
+	// `server-only` and is not importable here. Never on Counter, never on a
+	// top-level post. A relation flip REMOUNTS this component on both hosts
+	// (`key=`), so the switch resets to off structurally rather than by an
+	// effect. Compose-time only: once posted, the choice is frozen with the
+	// reply. The write path is the guard; this is the affordance.
+	const friendlyFireEligible =
+		props.kind === "reply" && props.replyContext?.relation === "support";
+	const [friendlyFire, setFriendlyFire] = useState(false);
+	// The switch's ON state names the SIDE BEING BOUGHT — the same two-branch
+	// pole pair `TriggerPill` resolves (YES = black with the n2 edge, NO =
+	// white), hoisted so the side comparison has exactly two pole outcomes and
+	// the neutral OFF state is chosen OUTSIDE it (`side-pole-binding.test.ts`
+	// reads a third, non-pole branch as an inversion, and it would be right to).
+	const friendlyFireOnTrack =
+		props.side === "YES"
+			? "bg-yes border-[0.5px] border-n2"
+			: "bg-no border border-white/25";
+	const friendlyFireOnKnob = props.side === "YES" ? "bg-no" : "bg-yes";
 	// Slice 5 — the optional image (sign → PUT → id in the payload).
 	const [image, setImage] = useState<ImageAttachState>({ phase: "none" });
 	/**
@@ -431,6 +455,9 @@ export function BetComposer(props: {
 				...(props.parentCommentId !== undefined
 					? { parentCommentId: props.parentCommentId }
 					: {}),
+				// FF-1 / ADR-0058 — on the wire only when eligible AND on; the builder
+				// omits the key otherwise, so an unflagged reply's body is unchanged.
+				...(friendlyFireEligible && friendlyFire ? { friendlyFire: true } : {}),
 				...(image.phase === "attached"
 					? { imageUploadsId: image.uploadId }
 					: {}),
@@ -682,6 +709,55 @@ export function BetComposer(props: {
 					{COMPOSER_COPY.close}
 				</button>
 			</div>
+
+			{/* FF-1 / ADR-0058 / D-51 R5 — THE FRIENDLY-FIRE SWITCH, directly beneath
+			    the header row that names `Support <author>'s argument` (A-12: the
+			    Support PILL lives in the lane header, not in this panel, and the phone
+			    sheet has no pill at all — the composer is the one element both tiers
+			    share and the one that owns submit). Default off; label and helper copy
+			    verbatim from the ruling (`FRIENDLY_FIRE_COPY`); monochrome, the pills'
+			    type ramp; the ON state takes the fill of the SIDE BEING BOUGHT, the
+			    same pole rule `TriggerPill` applies (YES = black with the 0.5px n2
+			    edge, NO = white) — which is why this file joins the side-pole
+			    inventory. `role="switch"` + `aria-checked` is the accessible contract;
+			    disabled with the rest of the form while a request is in flight or the
+			    floor is above the balance. */}
+			{friendlyFireEligible ? (
+				<div
+					data-testid="ff-switch-row"
+					className="flex shrink-0 items-start gap-2"
+				>
+					<button
+						type="button"
+						role="switch"
+						aria-checked={friendlyFire}
+						data-testid="ff-switch"
+						aria-label={FRIENDLY_FIRE_COPY.label}
+						disabled={inFlight || floorAbove}
+						onClick={() => setFriendlyFire((on) => !on)}
+						className={`relative mt-px inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) ${
+							friendlyFire ? friendlyFireOnTrack : "bg-n1 border border-n3"
+						}`}
+					>
+						<span
+							aria-hidden="true"
+							className={`block size-3.5 rounded-full transition-transform ${
+								friendlyFire
+									? `translate-x-[18px] ${friendlyFireOnKnob}`
+									: "translate-x-[2px] bg-n5"
+							}`}
+						/>
+					</button>
+					<span className="flex min-w-0 flex-col">
+						<span className="text-xs font-bold text-ink">
+							{FRIENDLY_FIRE_COPY.label}
+						</span>
+						<span className="text-[10px] leading-[14px] text-n5">
+							{FRIENDLY_FIRE_COPY.helper(props.side)}
+						</span>
+					</span>
+				</div>
+			) : null}
 
 			{/* ⚠⚠ RPLY-1 · R3 — THE THREE BLOCKED-STATE STRIPS USED TO LIVE HERE AND
 			    IN THE FOOTBLOCK, AND THEY ARE NOW ONE SLOT INSIDE THE AMOUNT BLOCK.

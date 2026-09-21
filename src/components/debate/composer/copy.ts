@@ -41,6 +41,18 @@ export const COMPOSER_COPY = {
 	close: "×",
 } as const;
 
+/**
+ * FF-1 / ADR-0058 / D-51 R5 — the friendly-fire switch register, VERBATIM from
+ * the ruling (`design-language.md` §3.1 "Friendly-fire switch"; the brief's
+ * RF-8). The helper line names the side being BOUGHT, which for a Support reply
+ * is the parent's side. Nothing here is authored at execute.
+ */
+export const FRIENDLY_FIRE_COPY = {
+	label: "Friendly fire",
+	helper: (side: "YES" | "NO") =>
+		`Contest this argument without leaving your side. Your stake still backs ${side}.`,
+} as const;
+
 /** W2.10-D — the over-cap strip (ruling 2: "Max Đ N per bet"). */
 export function overCapStrip(): string {
 	return `Max Đ ${formatDharma(BET_MAX_STAKE)} per bet`;

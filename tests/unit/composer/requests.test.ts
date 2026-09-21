@@ -159,3 +159,32 @@ describe("buildPlaceRequest — body serialization", () => {
 		expect(raw).toMatch(/"stake"\s*:\s*"25\.500000000000000001"/);
 	});
 });
+
+// ── FF-1 / ADR-0058 — the friendly-fire key exists on the wire only when on ──
+describe("buildPlaceRequest — friendlyFire (FF-1 / ADR-0058)", () => {
+	const base = {
+		marketId: "0190b3a0-9999-7000-8000-000000000009",
+		side: "YES" as const,
+		stake: "50",
+		body: "The base rate argument.",
+		parentCommentId: "0190b3a0-9999-7000-8000-000000000010",
+	};
+
+	it("ff-wire::ON-serialises-friendlyFire-true", () => {
+		const { init } = buildPlaceRequest({
+			body: { ...base, friendlyFire: true },
+			idempotencyKey: "k",
+		});
+		expect(JSON.parse(String(init.body))).toMatchObject({ friendlyFire: true });
+	});
+
+	it("ff-wire::OFF-and-absent-serialise-NO-key (byte-identical to the pre-ADR body)", () => {
+		const off = buildPlaceRequest({
+			body: { ...base, friendlyFire: false },
+			idempotencyKey: "k",
+		});
+		const absent = buildPlaceRequest({ body: base, idempotencyKey: "k" });
+		expect("friendlyFire" in JSON.parse(String(off.init.body))).toBe(false);
+		expect(String(off.init.body)).toBe(String(absent.init.body));
+	});
+});

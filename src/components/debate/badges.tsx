@@ -216,6 +216,34 @@ export function PositionMarker({
 }
 
 /**
+ * FF-1 / ADR-0058 — the friendly-fire TAG (D-51 R5): this Support reply's
+ * author backs the side and contests THIS argument. Built from the SAME marker
+ * primitive as `PositionMarker` above — same `Badge` variant, outline, weight
+ * and type ramp — because the ruling asks for symmetry with Flipped / Exited,
+ * and one primitive is what keeps two chips from drifting apart. It renders
+ * ONLY in post-focus reply rows (`ReplyCard` on both tiers, and the reply
+ * pop-up); never on the post card, never a count, never a badge. No gloss:
+ * the ruling supplied the label and nothing else, and this repository does
+ * not invent copy (`composer/copy.ts`). `className` is additive and optional
+ * for the same reason `PositionMarker`'s is.
+ */
+export function FriendlyFireTag({ className }: { className?: string }) {
+	return (
+		<Badge
+			variant="secondary"
+			data-testid="ff-tag"
+			className={cn(
+				"rounded-sm px-1.5 text-[10px] font-normal text-muted-foreground",
+				className,
+			)}
+			aria-label="Friendly fire"
+		>
+			Friendly fire
+		</Badge>
+	);
+}
+
+/**
  * The lane-dominance badge (RANKING.md §5 / ADR-0017 P3 / D2) — Most Debated /
  * Highest Stakes / Contested. NOT a sort selector (there is none in v1); a
  * read-time label on a post that dominates a lane. `null` → no badge (the

@@ -16,6 +16,13 @@ export type PlaceBody = {
 	body: string;
 	parentCommentId?: string;
 	imageUploadsId?: string;
+	/**
+	 * FF-1 / ADR-0058 — the friendly-fire toggle. Emitted ONLY when `true`
+	 * (the route reads an absent key as `false`), so an unflagged reply's wire
+	 * body is byte-identical to what it was before the toggle existed — and so
+	 * a same-key replay of an unflagged reply keeps its pre-ADR fingerprint.
+	 */
+	friendlyFire?: boolean;
 };
 
 /**
@@ -27,7 +34,7 @@ export function buildPlaceRequest(args: {
 	body: PlaceBody;
 	idempotencyKey: string;
 }): { url: string; init: RequestInit } {
-	const body: Record<string, string> = {
+	const body: Record<string, string | boolean> = {
 		marketId: args.body.marketId,
 		side: args.body.side,
 		stake: args.body.stake,
@@ -38,6 +45,12 @@ export function buildPlaceRequest(args: {
 	}
 	if (args.body.imageUploadsId !== undefined) {
 		body.imageUploadsId = args.body.imageUploadsId;
+	}
+	// FF-1 / ADR-0058 — the key exists on the wire only when the switch is on.
+	// A new wire key is only really added once it appears HERE (see the sell
+	// builder's note below); the composer passes it, this line sends it.
+	if (args.body.friendlyFire === true) {
+		body.friendlyFire = true;
 	}
 	return {
 		url: "/api/bets/place",
