@@ -1,0 +1,2 @@
+ALTER TABLE "comments" ADD COLUMN "friendly_fire" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "comments" ADD CONSTRAINT "comments_friendly_fire_requires_parent" CHECK ("comments"."parent_comment_id" IS NOT NULL OR "comments"."friendly_fire" = false);

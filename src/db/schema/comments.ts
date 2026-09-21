@@ -1,6 +1,8 @@
 import { relations, sql } from "drizzle-orm";
 import {
 	type AnyPgColumn,
+	boolean,
+	check,
 	index,
 	pgTable,
 	text,
@@ -52,11 +54,32 @@ export const comments = pgTable(
 		betId: uuid("bet_id").references((): AnyPgColumn => bets.id, {
 			onDelete: "restrict",
 		}),
+		// ADR-0058 / D-51 — the friendly-fire TOGGLE: a compose-time declaration on
+		// a SUPPORT reply-bet that the replier backs the side but contests THIS
+		// argument. Written in the same INSERT as `side_at_post_time` and never
+		// updated (the Bucket-A trigger above is the immutability enforcement —
+		// no new invariant is minted). The stake it rides is an ordinary own-side
+		// buy; nothing about the bet reads this column.
+		//
+		// The top-level half of eligibility is the CHECK below (a post cannot be
+		// friendly fire — there is no argument above it to contest). The same-side
+		// half — `true` only when the reply's side equals the parent's frozen side
+		// — needs the parent row and is enforced on the write path (F-COMMENT-2,
+		// `place.ts`), not by DDL. It is NOT the friendly-fire VOTE dropped at
+		// migration 0018: that was a free standalone up/down with its own table;
+		// this is one boolean on a staked reply, and the note below still holds.
+		friendlyFire: boolean("friendly_fire").notNull().default(false),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.notNull()
 			.defaultNow(),
 	},
 	(table) => [
+		// ADR-0058 — `friendly_fire = true` requires a parent (a reply); the
+		// same-side half is the write path's (see the column note).
+		check(
+			"comments_friendly_fire_requires_parent",
+			sql`${table.parentCommentId} IS NOT NULL OR ${table.friendlyFire} = false`,
+		),
 		index("comments_user_id_idx").on(table.userId),
 		index("comments_market_id_idx").on(table.marketId),
 		index("comments_parent_idx").on(table.parentCommentId),
