@@ -136,7 +136,9 @@ describe("cache-metrics — fail-open, and deferred off the render path", () => 
 		recordReserveWalkDerivation("m-789");
 		await flush();
 		expect(mockIncr).toHaveBeenCalledWith(
-			"prod:cache-metric:reserve-walk:misses:m-789",
+			// CACHE-COALESCE-2: `reserve-walk-render` — the `<block>-render` split every
+			// block uses; `reserve-walk` is now the per-instance L1 miss.
+			"prod:cache-metric:reserve-walk-render:misses:m-789",
 		);
 	});
 
