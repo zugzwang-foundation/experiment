@@ -4332,3 +4332,18 @@ wrap at 1280 and 1440, not applied and assumed.
 
 **Evidence.** `zz_MKT-ROSTER-1-P3_PHASE2G_2026-09-19T1811.md`; scanner probe and
 the before/after `column-gap` reads are in its §Gap probe.
+
+## FF-1 / ADR-0058 — drift and owed rows recorded, not acted on (2026-09-22)
+
+Surfaced at FF-1 (the overnight run — `zz_FF-1_run_2026-09-21T2143.md` §2, §7 and
+§11) and carried here at FF-1 · CLOSE-1. L-1 is a documented claim that measures
+false today. L-2 and L-3 are `@security-auditor` findings the run surfaced and did
+not absorb; until this section they sat only in the gitignored
+`claude-progress.md`, which no other reader sees. **Status OPEN** — a row leaves
+this table when someone rules on it, not when someone notices it again.
+
+| # | Row | Status | Owner |
+|---|---|---|---|
+| **FF-1 L-1** | **SPEC.2 §4.2 (Server Actions catalogue) names three F3 files that do not exist, under three action names that occur nowhere in `src/`.** The table says `placeDirectComment(input)` → `src/server/comments/place.ts`, `placeReply(input)` → `src/server/comments/reply.ts`, `placeImageComment(input)` → `src/server/comments/place-image.ts`, and its own lead-in already calls all three *comment-bearing bets*. Measured 2026-09-22 at `33b97f7a`: `src/server/comments/` holds `foreclosure.ts`, `image-attach.ts` and `reply-validate.ts`, nothing else; `grep -rn -E "placeDirectComment\|placeReply\|placeImageComment" src/` returns 0 lines. What is on disk is ONE entry point for a post and a reply alike — `POST /api/bets/place` (`src/app/api/bets/place/route.ts`) → `place()` (`src/server/bets/place.ts`), a reply being the same call carrying `parentCommentId`; the image arm is `resolveImageAttachment` (`src/server/comments/image-attach.ts`), called by that route outside the W-1 tx; both composers reach it through `src/components/debate/composer/requests.ts` (`buildPlaceRequest`). The FF-1 brief's A1-b named two of the three phantom files as edit targets — `overnight-run.md` F-16. | **OPEN — SPEC.2 §4.2 row correction owed to the web lane at the next SYNC pass** | web lane |
+| **FF-1 L-2** | **The same-side half of friendly-fire eligibility has no storage backstop.** Migration `0031` carries one CHECK, `comments_friendly_fire_requires_parent` (`parent_comment_id IS NOT NULL OR friendly_fire = false`) — the *requires-a-reply* half. The *requires-Support* half (the parent's `side_at_post_time` equals the reply's side) is enforced only in `place()`'s in-tx guard (`src/server/bets/place.ts`, the `if (friendlyFire)` block over `validateReplyParent`), so a future second `insert(comments)` site could skip it and land a flagged Counter. `@security-auditor` LOW at FF-1, declined there as defence-in-depth; the run's candidate: make the insert site take a value only the guard can produce. | **OPEN, no owner** — a later lane, not FF-1 | — |
+| **FF-1 L-3** | **`place()` validates a reply parent's market and depth only when the flag is set.** `validateReplyParent` (`src/server/comments/reply-validate.ts` — same market, depth ≤ `REPLY_DEPTH_MAX`) is called inside the tx only under `if (friendlyFire)`; an UNFLAGGED reply from a DIRECT caller of `place()` — the staging generator, the scale harnesses — gets FK existence on `parentCommentId` and nothing else. Not network-reachable: `POST /api/bets/place` validates every reply before the tx. Pre-existing, surfaced by `@security-auditor` at FF-1 as a SURPRISE. | **OPEN, no owner** — a later lane, not FF-1 | — |

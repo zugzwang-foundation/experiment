@@ -263,6 +263,7 @@ In v1 there is **no sort-mode selector**. The market-detail page is **always** i
 The badge lanes share the **traction** (`n`) and **stake** (`D`) lanes with Top, but on the balance axis the badge reads **even-contestation** (`n^b`) where Top's third lane reads **dominance-split** (`lop`, §3.1) — see §5.1(3).
 
 **"Newest" is not a badge** — recency is a *position* fact surfaced by the interleave (§4), not a lane a post "wins." (If a "🆕 New" tag on interleaved posts is wanted later, it is a clean UI addition that requires no model change — out of v1 scope unless reopened.)
+
 **"Friendly fire" is not a badge either** (D-51 R5, ADR-0058): no badge, no badge variant, no count. The flag reaches this section only through `b` (§2, §6.1).
 
 > A naming note carried on the record: **"Contested," never "Controversial."** Hacker News uses "controversial" to mark threads it wants to *suppress*; Zugzwang treats contestation as the live signal it surfaces. The word choice encodes the thesis.
