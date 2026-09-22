@@ -170,7 +170,7 @@ describe("SC-1 — removal reaches the market block, which carries hero text", (
 	it("the removal is stamped BEFORE the L1 tag fires", () => {
 		const act = read(ACT);
 		const mark = act.indexOf("markMarketTextRemoved(comment.marketId)");
-		const tag = act.indexOf("updateTag(`market:${comment.marketId}`)");
+		const tag = act.search(/updateTag\(`market:\$\{comment\.marketId\}`\)/);
 		expect(mark).toBeGreaterThanOrEqual(0);
 		expect(tag).toBeGreaterThan(mark);
 	});
