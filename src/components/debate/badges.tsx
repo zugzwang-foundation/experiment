@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { InfoTip } from "@/components/ui/info-tip";
-import { GLOSSARY } from "@/lib/copy/glossary";
+import { FRIENDLY_FIRE_TAG_GLOSS, GLOSSARY } from "@/lib/copy/glossary";
 import type { Badge as BadgeKind } from "@/lib/ranking";
 import { cn } from "@/lib/utils";
 
@@ -222,24 +222,29 @@ export function PositionMarker({
  * and type ramp — because the ruling asks for symmetry with Flipped / Exited,
  * and one primitive is what keeps two chips from drifting apart. It renders
  * ONLY in post-focus reply rows (`ReplyCard` on both tiers, and the reply
- * pop-up); never on the post card, never a count, never a badge. No gloss:
- * the ruling supplied the label and nothing else, and this repository does
- * not invent copy (`composer/copy.ts`). `className` is additive and optional
- * for the same reason `PositionMarker`'s is.
+ * pop-up); never on the post card, never a count, never a badge. It carries
+ * the markers' hover gloss (FF-1 CLOSE-1 R-A15, copy verbatim in
+ * `FRIENDLY_FIRE_TAG_GLOSS`) through the SAME `InfoTip` `PositionMarker` uses
+ * — which by its own tier gate mounts nothing below 640px, so the phone tag
+ * carries none, as ruled. `asChild` merges onto the chip rather than wrapping
+ * it, so the tag stays a DOM sibling of the position marker. `className` is
+ * additive and optional for the same reason `PositionMarker`'s is.
  */
 export function FriendlyFireTag({ className }: { className?: string }) {
 	return (
-		<Badge
-			variant="secondary"
-			data-testid="ff-tag"
-			className={cn(
-				"rounded-sm px-1.5 text-[10px] font-normal text-muted-foreground",
-				className,
-			)}
-			aria-label="Friendly fire"
-		>
-			Friendly fire
-		</Badge>
+		<InfoTip content={FRIENDLY_FIRE_TAG_GLOSS} asChild>
+			<Badge
+				variant="secondary"
+				data-testid="ff-tag"
+				className={cn(
+					"rounded-sm px-1.5 text-[10px] font-normal text-muted-foreground",
+					className,
+				)}
+				aria-label="Friendly fire"
+			>
+				Friendly fire
+			</Badge>
+		</InfoTip>
 	);
 }
 

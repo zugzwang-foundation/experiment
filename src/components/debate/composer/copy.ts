@@ -46,11 +46,19 @@ export const COMPOSER_COPY = {
  * the ruling (`design-language.md` §3.1 "Friendly-fire switch"; the brief's
  * RF-8). The helper line names the side being BOUGHT, which for a Support reply
  * is the parent's side. Nothing here is authored at execute.
+ *
+ * `gloss` — FF-1 CLOSE-1 R-A15 (2026-09-22): the switch label's hover gloss,
+ * verbatim from that ruling, side-parameterised like `helper`. It mounts only
+ * at and above 640px, by `InfoTip`'s own tier gate; below it the helper line
+ * is the meaning. The TAG's (static) gloss is `FRIENDLY_FIRE_TAG_GLOSS` in
+ * `lib/copy/glossary.ts`, beside the Flipped / Exited glosses it mirrors.
  */
 export const FRIENDLY_FIRE_COPY = {
 	label: "Friendly fire",
 	helper: (side: "YES" | "NO") =>
 		`Contest this argument without leaving your side. Your stake still backs ${side}.`,
+	gloss: (side: "YES" | "NO") =>
+		`Friendly fire: a Support reply that backs the side but contests this argument. The bet itself is unchanged — your stake still backs ${side}.`,
 } as const;
 
 /** W2.10-D — the over-cap strip (ruling 2: "Max Đ N per bet"). */

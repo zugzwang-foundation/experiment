@@ -5,6 +5,7 @@ import {
 	fireEvent,
 	render,
 	screen,
+	waitFor,
 	within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -28,6 +29,12 @@ import { modelWith, post, reply, stubElementScroll, VIEWER } from "./_fixtures";
  * Markup assertions read `innerHTML`/attributes (O-7); the negatives have their
  * positive controls in the same file (OVN-V1).
  *
+ * FF-1 CLOSE-1 (R-A12 / R-A15): the switch sits INSIDE the sheet composer's
+ * header row with the helper line beneath it, and below 640px no gloss mounts
+ * on the switch label or the tag — the same render at/above 640px is the
+ * positive control (in jsdom the phone tree is always mounted; the tier is
+ * whatever `matchMedia` answers, stubbed per query as `info-tip.test.tsx` does).
+ *
  * No jest-dom in this repo (AGENTS.md §9) — plain DOM assertions only.
  */
 
@@ -38,11 +45,40 @@ vi.mock("next/navigation", () => ({
 
 stubElementScroll();
 
+const ORIGINAL_MATCH_MEDIA = window.matchMedia;
+
 afterEach(() => {
 	cleanup();
 	vi.unstubAllGlobals();
 	vi.clearAllMocks();
+	window.matchMedia = ORIGINAL_MATCH_MEDIA;
 });
+
+const POINTER_QUERY = "(hover: hover) and (pointer: fine)";
+const TIER_QUERY = "not all and (min-width: 640px)";
+
+function mockMatchMedia(pointerFine: boolean, phone: boolean): void {
+	window.matchMedia = ((query: string) => ({
+		matches:
+			query === POINTER_QUERY
+				? pointerFine
+				: query === TIER_QUERY
+					? phone
+					: false,
+		media: query,
+		onchange: null,
+		addEventListener: () => {},
+		removeEventListener: () => {},
+		addListener: () => {},
+		removeListener: () => {},
+		dispatchEvent: () => false,
+	})) as typeof window.matchMedia;
+}
+
+const SWITCH_GLOSS_YES =
+	"Friendly fire: a Support reply that backs the side but contests this argument. The bet itself is unchanged — your stake still backs YES.";
+const TAG_GLOSS =
+	"Friendly fire: this reply backs the side but contests the argument above.";
 
 const AGG_WITH_FF = {
 	supportCount: 2,
@@ -194,5 +230,96 @@ describe("phone friendly-fire — the CARD is untouched (G14 · card)", () => {
 		expect(screen.getByTestId("phone-pane-support").innerHTML).toContain(
 			'data-testid="ff-tag"',
 		);
+	});
+});
+
+describe("phone friendly-fire — CLOSE-1: the switch in the header row, no gloss below 640px", () => {
+	it("phone-ff::the-switch-sits-INSIDE-the-sheet-composer's-header-row-with-the-helper-beneath", () => {
+		mount(fixturePost(), null);
+		const yesPane = screen.getByTestId("phone-pane-YES");
+		fireEvent.click(within(yesPane).getByTestId("card-trigger-support"));
+		const sheet = screen.getByTestId("phone-sheet");
+		const header = sheet.querySelector('[data-testid="composer-header"]');
+		const sw = sheet.querySelector('[data-testid="ff-switch"]');
+		expect(header).not.toBeNull();
+		expect(sw).not.toBeNull();
+		expect(header?.contains(sw), "switch inside the header row").toBe(true);
+		const close = header?.querySelector('button[aria-label="Close"]');
+		expect(close).not.toBeNull();
+		expect(
+			(sw as Element).compareDocumentPosition(close as Element) &
+				Node.DOCUMENT_POSITION_FOLLOWING,
+			"the switch precedes the close control",
+		).toBeTruthy();
+		const helper = sheet.querySelector('[data-testid="ff-helper"]');
+		expect(helper).not.toBeNull();
+		expect(header?.contains(helper)).toBe(false);
+		expect(helper?.previousElementSibling).toBe(header);
+		expect(helper?.innerHTML).toContain(
+			"Contest this argument without leaving your side. Your stake still backs YES.",
+		);
+	});
+
+	it("phone-ff::below-640px-NO-gloss-mounts-on-the-switch-label-or-the-tag (positive control: the same render at-or-above 640px mounts both)", async () => {
+		mockMatchMedia(false, true);
+		mount(fixturePost(), null);
+		const yesPane = screen.getByTestId("phone-pane-YES");
+		fireEvent.click(within(yesPane).getByTestId("card-trigger-support"));
+		const sheet = screen.getByTestId("phone-sheet");
+		const label = sheet.querySelector(
+			'[data-testid="ff-switch-label"]',
+		) as Element;
+		expect(label).not.toBeNull();
+		expect(label.innerHTML).toContain("Friendly fire");
+		expect(label.getAttribute("aria-describedby")).toBeNull();
+		fireEvent.click(label);
+		await new Promise((r) => setTimeout(r, 0));
+		expect(document.body.textContent).not.toContain(SWITCH_GLOSS_YES);
+		expect(
+			document.querySelectorAll("[data-radix-popper-content-wrapper]").length,
+		).toBe(0);
+		cleanup();
+
+		mockMatchMedia(false, true);
+		mount(fixturePost(), "p1");
+		const tag = screen
+			.getByTestId("phone-pane-support")
+			.querySelector('[data-testid="ff-tag"]') as Element;
+		expect(tag).not.toBeNull();
+		expect(tag.getAttribute("aria-describedby")).toBeNull();
+		fireEvent.click(tag);
+		await new Promise((r) => setTimeout(r, 0));
+		expect(document.body.textContent).not.toContain(TAG_GLOSS);
+		expect(
+			document.querySelectorAll("[data-radix-popper-content-wrapper]").length,
+		).toBe(0);
+		cleanup();
+
+		// POSITIVE CONTROL — the same two renders with the tier answering
+		// "at/above 640px": both glosses are wired, so the emptiness above is the
+		// gate and not a harness that cannot see a gloss.
+		mockMatchMedia(false, false);
+		mount(fixturePost(), null);
+		fireEvent.click(
+			within(screen.getByTestId("phone-pane-YES")).getByTestId(
+				"card-trigger-support",
+			),
+		);
+		const wideLabel = screen
+			.getByTestId("phone-sheet")
+			.querySelector('[data-testid="ff-switch-label"]') as Element;
+		expect(wideLabel.getAttribute("aria-describedby")).toBeTruthy();
+		fireEvent.click(wideLabel);
+		await waitFor(() => {
+			const id = wideLabel.getAttribute("aria-describedby") ?? "";
+			expect(document.getElementById(id)?.textContent).toBe(SWITCH_GLOSS_YES);
+		});
+		cleanup();
+		mockMatchMedia(false, false);
+		mount(fixturePost(), "p1");
+		const wideTag = screen
+			.getByTestId("phone-pane-support")
+			.querySelector('[data-testid="ff-tag"]') as Element;
+		expect(wideTag.getAttribute("aria-describedby")).toBeTruthy();
 	});
 });
