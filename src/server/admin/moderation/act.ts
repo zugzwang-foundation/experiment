@@ -12,6 +12,7 @@ import {
 	requireAdminSession,
 	validationError,
 } from "@/server/admin/wire";
+import { markSharedViewRemoved } from "@/server/debate-view/shared-view-store";
 import { recordInvalidation } from "@/server/observability/cache-metrics";
 
 // UI.6 S3(b) — the reactive Remove/Ban Server Action (F-ADMIN-4 partial;
@@ -143,6 +144,18 @@ export async function moderateComment(
 	// so `updateTag` is legal and gives immediate expiration — the removed
 	// body actually stops being served, which is the whole point of this call.
 	if (action === "remove") {
+		// CACHE-COALESCE-1 — the fleet-wide entry holds bodies too (SC-1), and
+		// it is cleared FIRST: the tag below empties every instance's L1, and an
+		// instance that misses L1 in the gap re-reads L2, so L2 must already be
+		// gone and stamped when that happens. The marker also refuses any render
+		// that was in flight when this committed. Best-effort: the entry expires
+		// in SHARED_VIEW_EXPIRE_SEC regardless, and a failed call must not fail
+		// the moderation action whose audit row is already durable.
+		try {
+			await markSharedViewRemoved(comment.marketId);
+		} catch {
+			// Bounded by the entry's TTL; the audit row is already durable.
+		}
 		updateTag(`market:${comment.marketId}`);
 		recordInvalidation(`market:${comment.marketId}`);
 	}

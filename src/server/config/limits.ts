@@ -372,6 +372,38 @@ export const SHARED_VIEW_MIN_WINDOW_MS = 15000;
 export const SHARED_VIEW_EXPIRE_SEC = MARKET_SERIES_MIN_WINDOW_MS / 1000;
 
 /**
+ * CACHE-COALESCE-1 — the fleet-wide single-flight around the shared read
+ * block (`src/server/debate-view/shared-view-store.ts`).
+ *
+ * `'use cache'` dedupes a render inside ONE Vercel instance; measured on
+ * production at 5,000 readers the fleet paid instances × markets × 4/min
+ * (~3,800 renders/min against a window that costs 4/min/market), and a burst
+ * cold-started every instance at once. A shared entry in Upstash plus a lock
+ * makes a stale window cost ONE render across the fleet.
+ *
+ * `SHARED_VIEW_LOCK_MS` — how long one instance may hold the render lock. Well
+ * above a worst-case render (the bet path's own `statement_timeout` is 1 s;
+ * a full debate view is a handful of those) and short enough that a holder
+ * that dies mid-render releases by expiry, not by hand.
+ *
+ * `SHARED_VIEW_WAIT_MS` / `SHARED_VIEW_WAIT_POLL_MS` — how long an instance
+ * with NO entry to serve waits for the lock holder's before rendering itself.
+ * Two seconds is a cold-market bound, not a steady-state cost: with an entry
+ * present the loser serves it stale and never waits. */
+export const SHARED_VIEW_LOCK_MS = 10_000;
+export const SHARED_VIEW_WAIT_MS = 2_000;
+export const SHARED_VIEW_WAIT_POLL_MS = 100;
+
+/**
+ * The largest serialized shared entry the store will write. Upstash rejects
+ * values over its plan limit (1 MB on the smallest) SILENTLY from the page's
+ * point of view — the `SET` fails, no entry lands, and every non-holder pays
+ * the cold-market wait and renders anyway, which turns the feature into a
+ * latency tax. Below the limit with margin; an oversize render raises a flag
+ * instead, and the fleet renders locally until it clears. */
+export const SHARED_VIEW_MAX_BYTES = 900_000;
+
+/**
  * Minimum interval between LIVE POOL PRICE reads on Discovery (`/`) — the
  * per-market spot price and reserves behind every card, the hero chart's live
  * tail and the hero's `Đ now` figure (ADR-0055).

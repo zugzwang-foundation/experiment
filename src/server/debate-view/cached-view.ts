@@ -12,6 +12,7 @@ import type { MarketSummary } from "@/server/markets/get-by-slug";
 import { recordCacheMiss } from "@/server/observability/cache-metrics";
 
 import { type DebateViewModel, loadDebateView } from "./load-debate-view";
+import { coalesceDebateView } from "./shared-view-store";
 
 /** `SHARED_VIEW_MIN_WINDOW_MS` in the seconds `cacheLife` speaks. Derived,
  * never a second literal — the `cached-series.ts` convention, so the tune
@@ -134,5 +135,17 @@ export async function getCachedDebateView(
 	const walk = await getCachedReserveWalk(market.id);
 
 	recordCacheMiss("debate-view", market.id);
-	return loadDebateView(db, { market, walk });
+
+	// CACHE-COALESCE-1 — the L1 miss above is PER INSTANCE. What follows makes
+	// the render itself fleet-wide: one instance derives the block for this
+	// window and the rest read its entry from Upstash. `debate-view-render`
+	// therefore counts what the DATABASE paid, which `debate-view` misses never
+	// did once there was more than one instance (load-test I-07/I-17/I-18).
+	return coalesceDebateView({
+		market,
+		render: () => {
+			recordCacheMiss("debate-view-render", market.id);
+			return loadDebateView(db, { market, walk });
+		},
+	});
 }
