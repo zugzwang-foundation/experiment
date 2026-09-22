@@ -12,6 +12,7 @@ import {
 	requireAdminSession,
 	validationError,
 } from "@/server/admin/wire";
+import { deleteSharedView } from "@/server/debate-view/shared-view-store";
 import { recordInvalidation } from "@/server/observability/cache-metrics";
 
 // UI.6 S3(b) — the reactive Remove/Ban Server Action (F-ADMIN-4 partial;
@@ -145,6 +146,16 @@ export async function moderateComment(
 	if (action === "remove") {
 		updateTag(`market:${comment.marketId}`);
 		recordInvalidation(`market:${comment.marketId}`);
+		// CACHE-COALESCE-1 — the fleet-wide entry holds bodies too (SC-1). The
+		// tag above empties every instance's L1; this empties the shared L2, so
+		// no instance can re-read the removed body from Upstash. Best-effort:
+		// the entry expires in SHARED_VIEW_EXPIRE_SEC regardless, and a failed
+		// delete must not fail the moderation action that already committed.
+		try {
+			await deleteSharedView(comment.marketId);
+		} catch {
+			// Bounded by the entry's TTL; the audit row is already durable.
+		}
 	}
 	return { ok: true, data: { modActionId, action } };
 }

@@ -10,7 +10,24 @@
 | **Supersedes** | ADR-0041 (partial — **D-2 only**, the reserves-keyed cache key on the two participant read blocks. D-1, D-3, D-4 and D-5 stand unchanged) |
 | **Superseded-by** | — |
 | **Amends** | — |
+| **Patch records** | P1 (CACHE-COALESCE-1, 2026-09-22) — the window was written for one cache; the fleet has one per instance |
 | **Amended-by** | ADR-0055 — rider (1) only: the hero's `currentValue` and Discovery's other priced figures are no longer computed from a LIVE pool read on every render. Discovery's pool read now rides a 5 s window (`DISCOVERY_PRICE_MIN_WINDOW_MS`). ⚠ **The rule that justified rider (1) — "money on a public surface may not lag a window" — was measured and found to govern composition ORDER rather than freshness:** `/m/[slug]`, the surface that actually takes a bet, is prerendered and was serving a thirteen-hour-old price, so Discovery was paying a database connection per visitor to be stricter than the page taking the money. **Everything else in this ADR stands and is what ADR-0055 relies on** — the identity keying, the poster bypass, the `after()` instrumentation, and `HeroTopPostsBase` omitting `currentValue` (whose reason changes from "must be live" to "must stay off the cache KEY", the half of this ADR that is untouched). |
+
+---
+
+## Patch record
+
+### P1 — One render per market per window, fleet-wide (CACHE-COALESCE-1, 2026-09-22)
+
+In-place Patch record (CLAUDE.md §5.12), not a supersession: D-1's window, D-3's poster bypass, D-4's no-invalidation-from-bets and D-5's `after()` instrumentation all stand. What this record corrects is an assumption D-1 never stated: that there is **one** cache. On Vercel Fluid there is one per runtime instance, and `'use cache'` dedupes an in-flight render only inside its own instance.
+
+**Measured.** Staging at 100 readers (~1–3 instances): debate-view renders at the window rate, 2–3.5/min/market — D-1 works as written. Production at 5,000 readers (~100+ instances): **~3,800 renders/min** against a window that costs 4/min/market, i.e. *instances × markets × 4/min*; with ~500 comments per market the same ramp filled the Postgres pool (50/45) and put the page at p95 3.5 s; a 30-second burst to 5,000 cold-started every instance at once (49/45 backends, 10.7% timeouts). Load-test report I-07, I-17, I-18; runs 8602449, 8604614, 8604548, 8608236.
+
+**Decision.** `getCachedDebateView` keeps its `'use cache'` as the per-instance layer and, on a miss, renders through `coalesceDebateView` (`src/server/debate-view/shared-view-store.ts`): the shared entry lives in Upstash under `cache:debate-view:<marketId>` with `SHARED_VIEW_EXPIRE_SEC` as TTL; when the entry is older than `SHARED_VIEW_MIN_WINDOW_MS` (or carries another `market.status`), one instance takes a `SET NX PX SHARED_VIEW_LOCK_MS` lock and renders while every other serves the previous entry, or — with no entry at all — waits up to `SHARED_VIEW_WAIT_MS` for the holder's before rendering itself. A stale window now costs **one render across the fleet**; a burst costs one per market.
+
+**Riders.** (1) **Fail open, always** — any Redis failure degrades to the pre-patch local render; the cache is never why a page fails. (2) **SC-1** — the entry holds bodies, so `moderateComment`'s `remove` now `DEL`s it beside the `updateTag` it already fires; the store test asserts the removed BODY is unreachable, not merely a row. (3) The `.md` export, the poster bypass and `loadDebateView` are untouched; nothing viewer-scoped enters the store. (4) `debate-view-render` is a new miss counter that counts what the DATABASE paid; `debate-view` misses were per instance and stopped meaning that once there was more than one.
+
+**Not decided here.** The per-render cost's dependence on comment count (I-18's other half) — limiting the ranked set and precomputing per-market aggregates — is a separate task.
 
 ---
 
