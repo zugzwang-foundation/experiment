@@ -220,7 +220,9 @@ describe("debate-view::price-chart-series-memo-holds-no-viewer-state", () => {
  * brace inside a docblock cannot unbalance the match and so a prose mention of
  * a banned call is not read as the call. */
 function functionBlock(source: string, name: string): string {
-	const sigStart = source.indexOf(`export async function ${name}(`);
+	// Exported or not: CACHE-COALESCE-2 moved the Discovery derivation into a
+	// module-private helper so the cached body could be the single-flight.
+	const sigStart = source.indexOf(`async function ${name}(`);
 	if (sigStart === -1) {
 		throw new Error(`function ${name} not found — this guard is stale`);
 	}
@@ -241,9 +243,12 @@ function functionBlock(source: string, name: string): string {
 
 describe("debate-view::price-chart-history-floored-to-min-window — the cached walk is the path both surfaces take", () => {
 	it("Discovery's cached block derives its series from the cached walk, never a bare replay", () => {
+		// CACHE-COALESCE-2: the cached function is now the single-flight and the
+		// derivation is `deriveMarketDiscoveryData`, reachable from it alone
+		// (`coalesce-wiring.test.ts` pins that). The tripwire follows the code.
 		const block = functionBlock(
 			code("src/server/discovery/list.ts"),
-			"getCachedMarketDiscoveryData",
+			"deriveMarketDiscoveryData",
 		);
 
 		// The requirement.

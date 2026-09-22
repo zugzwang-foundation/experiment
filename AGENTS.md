@@ -340,10 +340,16 @@ experiment/
 │   │                               #   errors, legal-sections, relative-time, utils,
 │   │                               #   ranking{,.config,-decimal}, copy/, posthog/. The command
 │   │                               #   is the claim; the list is a reading of it.
-│   └── server/                     # server-side business logic — 28 dirs (re-measured at SYNC-5,
-│                                   #   2026-08-28: the line read 29 and had counted `bookmarks/`,
-│                                   #   which ADR-0040 deleted. Measure with `ls -d src/server/*/ | wc -l`.)
+│   └── server/                     # server-side business logic — `ls -d src/server/*/ | wc -l` is the
+│                                   #   claim; 29 as at 2026-09-23 (CACHE-COALESCE-2 added `cache/`; the
+│                                   #   line read 28 since SYNC-5, which had corrected a 29 that counted
+│                                   #   the `bookmarks/` ADR-0040 deleted — the same number, two facts).
 │       ├── admin/                  # actor (assertAdminActor — the R-14.5 belt; ENGINE.14)
+│       ├── cache/                  # shared-block-store — the fleet-wide single-flight behind every
+│                                   #   per-market `'use cache'` block (ADR-0051 P1/P2): Upstash entry +
+│                                   #   NX lock, stale-serve, wall-clock wait, fail-open. Consumers:
+│                                   #   debate-view/shared-view-store (the P1 binding), discovery/
+│                                   #   cached-series (reserve walk), discovery/list (market data).
 │       ├── auth/                   # index, email-otp, session-gate, onboarding-ref, tos-*, logout
 │       │   └── admin/              # login, logout, validate (admin path)
 │       ├── bets/ comments/ config/ cpmm/ debate-export/ debate-view/ dharma/ events/ github/ health/ idempotency/ identity-pool/ onboarding/

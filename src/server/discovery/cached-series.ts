@@ -3,8 +3,12 @@ import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 
 import { db } from "@/db";
+import { coalesceSharedBlock } from "@/server/cache/shared-block-store";
 import { MARKET_SERIES_MIN_WINDOW_MS } from "@/server/config/limits";
-import { recordReserveWalkDerivation } from "@/server/observability/cache-metrics";
+import {
+	recordCacheMiss,
+	recordReserveWalkDerivation,
+} from "@/server/observability/cache-metrics";
 
 import {
 	replayReserveSeries,
@@ -131,7 +135,26 @@ export async function getCachedReserveWalk(
 	});
 	cacheTag(`market:${marketId}`);
 
-	const walk = toWireWalk(await replayReserveSeries(db, marketId));
-	recordReserveWalkDerivation(marketId);
-	return walk;
+	// CACHE-COALESCE-2 (ADR-0051 P2) — the `'use cache'` above is the
+	// per-instance L1; the replay itself is a FLEET-WIDE single-flight, because
+	// R-16 measured 4,226 replays in a three-minute burst — one per instance
+	// per window, every one of them this events scan against Postgres. The
+	// derivation counter moves INSIDE the render so it keeps meaning "the
+	// database paid" (`reserve-walk-render`); `reserve-walk` now counts the
+	// per-instance L1 miss, the same split every block uses. No summary: the
+	// walk is a function of the market id alone. `waitMs: 0` because the home
+	// page reads this for eight markets in series — see the store's docblock.
+	recordCacheMiss("reserve-walk", marketId);
+	return coalesceSharedBlock<WireReservePoint[]>({
+		block: "reserve-walk",
+		marketId,
+		windowMs: MARKET_SERIES_MIN_WINDOW_MS,
+		expireMs: EXPIRE_SEC * 1000,
+		waitMs: 0,
+		render: async () => {
+			const walk = toWireWalk(await replayReserveSeries(db, marketId));
+			recordReserveWalkDerivation(marketId);
+			return walk;
+		},
+	});
 }

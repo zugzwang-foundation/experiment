@@ -86,6 +86,7 @@ vi.mock("@/server/observability/cache-metrics", () => ({
 	recordCacheMiss: vi.fn(),
 }));
 
+import { markMarketTextRemoved } from "@/server/cache/shared-block-store";
 import {
 	SHARED_VIEW_EXPIRE_SEC,
 	SHARED_VIEW_LOCK_MS,
@@ -96,7 +97,6 @@ import {
 import type { DebateViewModel } from "@/server/debate-view/load-debate-view";
 import {
 	coalesceDebateView,
-	markSharedViewRemoved,
 	readSharedView,
 	sharedViewKey,
 	sharedViewLockKey,
@@ -199,7 +199,7 @@ describe("write / read / removal", () => {
 		expect(JSON.stringify(await readSharedView(MARKET_ID))).toContain(
 			"body removed-me",
 		);
-		await markSharedViewRemoved(MARKET_ID);
+		await markMarketTextRemoved(MARKET_ID);
 		expect(JSON.stringify(await readSharedView(MARKET_ID))).not.toContain(
 			"body removed-me",
 		);
@@ -208,7 +208,7 @@ describe("write / read / removal", () => {
 	});
 
 	it("an entry that survived the delete is still ignored if older than the marker (rule 2)", async () => {
-		await markSharedViewRemoved(MARKET_ID);
+		await markMarketTextRemoved(MARKET_ID);
 		const removedAt = Number(fakeRedis.peek(sharedViewRemovedKey(MARKET_ID)));
 		// Simulate the entry landing back (or surviving) with a pre-removal stamp.
 		await fakeRedis.set(
@@ -225,7 +225,7 @@ describe("write / read / removal", () => {
 	});
 
 	it("a render that started before the removal cannot write its body (rule 3)", async () => {
-		await markSharedViewRemoved(MARKET_ID);
+		await markMarketTextRemoved(MARKET_ID);
 		const removedAt = Number(fakeRedis.peek(sharedViewRemovedKey(MARKET_ID)));
 		const written = await writeSharedView(
 			MARKET_ID,

@@ -368,12 +368,18 @@ export const SHARED_VIEW_MIN_WINDOW_MS = 15000;
  * could serve fifteen minutes stale. Pinned instead to
  * `MARKET_SERIES_MIN_WINDOW_MS` — one minute, the bound already ratified for
  * this surface's chart — so no shared block is ever older than the oldest thing
- * rendered beside it. Seconds, not milliseconds: `cacheLife` takes seconds. */
+ * rendered beside it. ⚠ One exception, and it predates the shared store: the
+ * walk ITSELF carries the hour ceiling on both its layers (`cached-series.ts`
+ * `EXPIRE_SEC`, and the same value as its fleet-wide entry's TTL since
+ * CACHE-COALESCE-2) — it is history, and the sentence above is about the
+ * blocks rendered beside it. Seconds, not milliseconds: `cacheLife` takes
+ * seconds. */
 export const SHARED_VIEW_EXPIRE_SEC = MARKET_SERIES_MIN_WINDOW_MS / 1000;
 
 /**
- * CACHE-COALESCE-1 — the fleet-wide single-flight around the shared read
- * block (`src/server/debate-view/shared-view-store.ts`).
+ * CACHE-COALESCE-1/2 — the fleet-wide single-flight around every per-market
+ * shared read block (`src/server/cache/shared-block-store.ts`; the debate
+ * view's binding is `src/server/debate-view/shared-view-store.ts`).
  *
  * `'use cache'` dedupes a render inside ONE Vercel instance; measured on
  * production at 5,000 readers the fleet paid instances × markets × 4/min
@@ -389,7 +395,9 @@ export const SHARED_VIEW_EXPIRE_SEC = MARKET_SERIES_MIN_WINDOW_MS / 1000;
  * `SHARED_VIEW_WAIT_MS` / `SHARED_VIEW_WAIT_POLL_MS` — how long an instance
  * with NO entry to serve waits for the lock holder's before rendering itself.
  * Two seconds is a cold-market bound, not a steady-state cost: with an entry
- * present the loser serves it stale and never waits. */
+ * present the loser serves it stale and never waits. ⚠ It is a bound PER
+ * BLOCK; a page that reads several blocks in series pays it several times,
+ * which is why the two Discovery blocks pass `waitMs: 0` (CACHE-COALESCE-2). */
 export const SHARED_VIEW_LOCK_MS = 10_000;
 export const SHARED_VIEW_WAIT_MS = 2_000;
 export const SHARED_VIEW_WAIT_POLL_MS = 100;

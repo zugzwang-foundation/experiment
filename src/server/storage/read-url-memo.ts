@@ -75,6 +75,11 @@ import type { R2Bucket } from "@/server/storage/r2";
  * reads are held in parity with the source tree by
  * `tests/server/storage/cache-boundary-parity.test.ts`. **Someone adding a
  * fifth cache boundary meets this table before they meet the bug.**
+ * ⚠ The fleet-wide entries UNDER these boundaries (`src/server/cache/
+ * shared-block-store.ts`, CACHE-COALESCE-1/2) are not `"use cache"` directives
+ * and so are invisible to the parity test; they hold a presigned URL for at
+ * most the block's own expire (60 s for `list.ts`; `cached-series.ts` carries
+ * none), well inside the ceilings above.
  *
  * ⛔ NOT A SECURITY CHANGE. The TTLs themselves are untouched, the buckets stay
  * private, and nothing here widens who can read an object. A held URL is one
