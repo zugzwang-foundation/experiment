@@ -43,10 +43,19 @@ fleet**, and a cold burst costs one render per market, not one per instance.
 front of L2, so a hot instance never pays the Upstash read on every request.
 
 **Invalidation.** `cacheTag('market:<id>')` already fires from `admin/moderation/act.ts`; the
-same call site also `DEL`s the L2 entry. Lifecycle transitions change `market.status`, which is
+same call site also clears the L2 entry. Lifecycle transitions change `market.status`, which is
 part of the entry (compared on read: a mismatched status is treated as stale). ⚠ SC-1: a removed
 comment must disappear from the shared entry within one window; the `DEL` is what guarantees it,
 and the test asserts the BODY's absence from the entry after removal.
+
+> **Gate C amendment (2026-09-22, `@code-reviewer`).** The `DEL` alone left two races open — an
+> instance re-reading L2 between the `DEL` and the tag, and a render already in flight when the
+> removal committed writing the body back. Shipped instead: a `removed` marker stamped **before**
+> the `DEL`, which readers and writers both compare against `renderedAt` / render-start; the
+> comparison on read is the whole `MarketSummary` JSON, not `status`; the lock is token-owned
+> with a compare-and-delete release; the wait is a wall-clock deadline; and `SHARED_VIEW_MAX_BYTES`
+> raises an `oversize` flag so an entry Upstash would reject never turns the wait into a tax.
+> ADR-0051 P1 riders (2)–(4) carry the reasoning; this plan is left as written above it.
 
 **Not changed:** `SHARED_VIEW_MIN_WINDOW_MS` (15 s, SPEC.1 §16.1 pinned), the `.md` export (still
 uncached, ADR-0025), the poster bypass (`readsUncached`, ADR-0051 rider 2), `loadDebateView`

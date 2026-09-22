@@ -51,6 +51,7 @@ function codeOnly(source: string): string {
 const read = (rel: string) => codeOnly(readRaw(rel));
 
 const CACHED = "src/server/debate-view/cached-view.ts";
+const SHARED_STORE = "src/server/debate-view/shared-view-store.ts";
 const LOADER = "src/server/debate-view/load-debate-view.ts";
 const PAGE = "src/app/(public)/m/[slug]/page.tsx";
 const EXPORT_ROUTE = "src/app/(public)/m/[slug]/export/route.ts";
@@ -149,7 +150,10 @@ describe("Phase D — the cached debate block", () => {
 	 * as a measured result.
 	 */
 	it("no viewer-scoped input can reach the cached segment", () => {
-		const src = read(CACHED);
+		// CACHE-COALESCE-1 — the render now passes through the shared store on
+		// its way to Upstash, so the store is part of the cached segment and is
+		// scanned with it: an entry there is served to every reader of the market.
+		const src = read(CACHED) + read(SHARED_STORE);
 		const viewerRoutes = [
 			"loadViewerMarketContext", // the viewer context read itself
 			"getRequestSession", // the deduped session helper

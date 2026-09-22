@@ -395,6 +395,15 @@ export const SHARED_VIEW_WAIT_MS = 2_000;
 export const SHARED_VIEW_WAIT_POLL_MS = 100;
 
 /**
+ * The largest serialized shared entry the store will write. Upstash rejects
+ * values over its plan limit (1 MB on the smallest) SILENTLY from the page's
+ * point of view — the `SET` fails, no entry lands, and every non-holder pays
+ * the cold-market wait and renders anyway, which turns the feature into a
+ * latency tax. Below the limit with margin; an oversize render raises a flag
+ * instead, and the fleet renders locally until it clears. */
+export const SHARED_VIEW_MAX_BYTES = 900_000;
+
+/**
  * Minimum interval between LIVE POOL PRICE reads on Discovery (`/`) — the
  * per-market spot price and reserves behind every card, the hero chart's live
  * tail and the hero's `Đ now` figure (ADR-0055).
