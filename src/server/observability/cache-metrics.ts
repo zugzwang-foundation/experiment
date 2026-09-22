@@ -118,9 +118,9 @@ export function recordCacheMiss(block: string, marketId: string | null): void {
 	incr(getRedisKey("cache-metric", block, "misses", marketId ?? "global"));
 }
 
-/** `getCachedReserveWalk`'s own miss counter — the "derivations per minute" figure, since it has no reachable call site of its own. */
+/** `getCachedReserveWalk`'s derivation counter — what the DATABASE paid. Since CACHE-COALESCE-2 it is `reserve-walk-render`, the same `<block>-render` split every block uses; `reserve-walk` counts the per-instance L1 miss. (R-16/R-17 were read under the old name, where `reserve-walk` meant this.) */
 export function recordReserveWalkDerivation(marketId: string): void {
-	incr(getRedisKey("cache-metric", "reserve-walk", "misses", marketId));
+	incr(getRedisKey("cache-metric", "reserve-walk-render", "misses", marketId));
 }
 
 /** CM-10 — a timestamp, keyed by the invalidated tag, for the invalidation-latency join at analysis time. */

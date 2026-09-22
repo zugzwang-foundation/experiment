@@ -5,6 +5,7 @@ import { cacheLife, cacheTag } from "next/cache";
 import type { DbClient, DbTransaction } from "@/db";
 import { db } from "@/db";
 import { markets } from "@/db/schema";
+import { coalesceSharedBlock } from "@/server/cache/shared-block-store";
 import {
 	DISCOVERY_GRID_SIZE,
 	DISCOVERY_SERIES_MAX_POINTS,
@@ -236,6 +237,30 @@ export async function getCachedMarketDiscoveryData(
 	// here goes unread and expires on its own — there is no staleness to bust.
 	cacheTag(`market:${marketId}`);
 
+	// CACHE-COALESCE-2 (ADR-0051 P2) — the `'use cache'` above is the
+	// per-instance L1; the derivation below is a FLEET-WIDE single-flight.
+	// R-16 measured 1,674 of these in a three-minute burst, each one totals +
+	// media + the hero ranking against Postgres, once per instance per window.
+	// `market-data` misses keep counting the L1 miss; `market-data-render`
+	// counts what the database paid. The hero carries argument text, so a
+	// moderation removal marks this block too (`markMarketTextRemoved`).
+	// `waitMs: 0`: the home page reads this block for eight markets in series,
+	// so a cold loser renders locally rather than stalling the whole page.
+	recordCacheMiss("market-data", marketId);
+	return coalesceSharedBlock<CachedMarketDiscoveryData>({
+		block: "market-data",
+		marketId,
+		windowMs: SHARED_VIEW_MIN_WINDOW_MS,
+		expireMs: SHARED_VIEW_EXPIRE_SEC * 1000,
+		waitMs: 0,
+		render: () => deriveMarketDiscoveryData(marketId),
+	});
+}
+
+/** The uncached derivation — everything `getCachedMarketDiscoveryData` holds. */
+async function deriveMarketDiscoveryData(
+	marketId: string,
+): Promise<CachedMarketDiscoveryData> {
 	const totals = await getMarketTotals(db, marketId);
 	const imageUrl = await getDefaultMarketMediaUrl(db, marketId);
 
@@ -286,7 +311,7 @@ export async function getCachedMarketDiscoveryData(
 	);
 	const hero = await selectHeroTopPosts(db, marketId);
 
-	recordCacheMiss("market-data", marketId);
+	recordCacheMiss("market-data-render", marketId);
 	return {
 		totals,
 		imageUrl,
