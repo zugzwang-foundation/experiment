@@ -699,11 +699,13 @@ On reading the report:
 
 - **Merge.** The overnight run ends at an open, unmerged PR. Gate C, the founder
   diff read, and merge order against concurrent lanes are operator work.
+- **Prescriptive doc edits by the session's own hand** *(scoped at v1.3 — FF-1, D-51 R9)*: a run may COMMIT prescriptive text the web lane authored before the run, verbatim, slots filled from measurement; a block whose anchor does not match exactly once is CARRIED, never rewritten. Authoring stays excluded — the bullet below.
 - **Prescriptive doc edits.** Sessions do not author ADRs, SPECs or trackers. If
   a run makes a spec false, the run flags it and the web lane authors the
   amendment. POSREV-1 flagged SPEC.1 §23 correctly and did not touch it.
 - **Anything requiring a founder ruling.** Log it, build to the register as
   written, flag it. Do not resolve it and do not stop for it.
+- **Migrations and DDL beyond expand-only** *(scoped at v1.3 — FF-1, `0031`)*: an expand-only, reversible migration with an in-session `@db-migration-reviewer` posture is covered. The bullet below now applies to everything else — a trigger edit, a Bucket-A UPDATE, a destructive alter, a partition change.
 - **Migrations and DDL.** Not because they cannot be done overnight, but because
   nothing so far has needed to be. If a future run does, that is a distinct
   doctrine and needs its own reviewer posture.
