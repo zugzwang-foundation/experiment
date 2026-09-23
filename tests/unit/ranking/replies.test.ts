@@ -27,6 +27,9 @@ function reply(
 		sold: false,
 		createdAt: new Date("2026-09-01T00:00:00.000Z"),
 		priceAtBet: "0.5",
+		// FF-1 / ADR-0058 — the toggle rides the substrate row for the tag; the
+		// pure model never reads it. Unflagged by default.
+		friendlyFire: false,
 		...over,
 	};
 	// RANK-1 — `stake` is now SURVIVING basis, `stakeOriginal` the frozen one.

@@ -342,6 +342,9 @@ export function ReplyPopup({
 										originalStake={reply.stakeOriginal}
 										sold={reply.sold}
 										createdAt={reply.createdAt}
+										// FF-1 / ADR-0058 — the pop-up is opened FROM a post-focus
+										// reply row, so it wears the same tag that row does.
+										friendlyFire={reply.friendlyFire === true}
 										download={
 											postOrdinal === null
 												? undefined

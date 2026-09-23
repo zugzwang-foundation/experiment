@@ -29,6 +29,17 @@ function post(
 		parentSide: "YES",
 		supportCount: 0,
 		counterCount: 0,
+		// FF-1 / ADR-0058 — the DECLARED-STANCE pair the balance term `b` now
+		// reads. Defaulted below from the side counts rather than stated here,
+		// because the default is not a convenience: `endorse_count = support_count`
+		// and `contest_count = counter_count` IS the zero-flag identity ADR-0058
+		// Driver 5 promises, so every case in this file that says nothing about
+		// the flag keeps exactly the badge it had before the ADR.
+		endorseCount: 0,
+		contestCount: 0,
+		// The Support-lane meter's numerator. A DISPLAY figure only — no lane and
+		// no badge reads it — so it defaults to zero and no case here states it.
+		friendlyFireDharma: "0",
 		// RANK-3 — the DISPLAY totals (self- and removed-inclusive). In these fixtures
 		// every replier is a distinct person and nobody replies to their own post, so
 		// the displayed reply count and the distinct-people ranking count coincide. A
@@ -44,14 +55,21 @@ function post(
 		priceAtBet: "0.5",
 		...over,
 	};
+	// The zero-flag identity, applied AFTER the spread so it reads the case's own
+	// side counts rather than the zeros above.
+	const withStance: PostSubstrate = {
+		...built,
+		endorseCount: over.endorseCount ?? built.supportCount,
+		contestCount: over.contestCount ?? built.counterCount,
+	};
 	// RANK-1 — `authorStake` is now SURVIVING basis and `authorStakeOriginal` the
 	// frozen one. Unless a case explicitly states an original (an argument sold
 	// down), the two are equal: a fixture where the original is SMALLER than what
 	// survives is unrepresentable in the database (`lots_surviving_basis_monotone`),
 	// and a fixture the storage layer would reject teaches nothing.
 	return over.authorStakeOriginal === undefined
-		? { ...built, authorStakeOriginal: built.authorStake }
-		: built;
+		? { ...withStance, authorStakeOriginal: withStance.authorStake }
+		: withStance;
 }
 
 describe("ranking::contested-zero-reply-guard (§6.1)", () => {
@@ -150,5 +168,96 @@ describe("ranking::contested-fully-one-sided (§6.1)", () => {
 		// sole floor-clearer → SENTINEL_MAX).
 		expect(badgeFor(blowout, [blowout, even], CFG)).toBeNull();
 		expect(badgeFor(even, [blowout, even], CFG)).toBe("Contested");
+	});
+});
+
+// FF-1 · G10 — the balance term reads DECLARED STANCE, not side (ADR-0058
+// outcome 5; RANKING.md §2 as amended).
+//
+// This is the ADR's founding case, stated as a number. A post with ten
+// endorsements and ten same-side critiques is the most contested thing the
+// product can produce, and under the SIDE formula it is scored
+// b = min(20, 0) / max(20, 0) = 0 — an uncontested blowout, n^b = 1, sunk below
+// floorLane.nPowB and unable to wear Contested at all. That is not a tuning
+// miss; it is the instrument reading the wrong axis, because every one of those
+// twenty people had to buy YES to say anything, and `support_count` therefore
+// measures which pool they entered rather than what they argued.
+//
+// ⚠ THE REVERT-TO-RED IS THE SIDE FORMULA ITSELF. Point `derive` back at
+// `supportCount`/`counterCount` and the first assertion below goes red with
+// b = 0 — which is exactly the state this file is in until FF-1 lands, so the
+// red is not hypothetical and does not need manufacturing.
+describe("ranking::contested-reads-declared-stance (ADR-0058)", () => {
+	it("ten endorsements against ten same-side critiques IS Contested", () => {
+		// Twenty distinct people replied on the post's own side; half of them
+		// flagged. n = 20 (unchanged — traction counts people, not stances),
+		// D = 400 (unchanged — attraction is not partitioned by the flag), and
+		// b = min(10, 10) / max(10, 10) = 1 ⇒ n^b = 20.
+		const flagged = post({
+			id: "post-ff-contested",
+			supportCount: 20,
+			counterCount: 0,
+			endorseCount: 10,
+			contestCount: 10,
+			supportCountTotal: 20,
+			counterCountTotal: 0,
+			supportDharma: "400",
+			counterDharma: "0",
+			authorStake: "100",
+		});
+		// The peer is the SAME post with nobody flagging: identical n, identical
+		// D, identical totals — the ONLY difference is the stance split. So any
+		// badge that moves between them moved on the balance axis and nowhere
+		// else, which is what makes this a test of `b` rather than of the lanes.
+		const unanimous = post({
+			id: "post-ff-unanimous",
+			supportCount: 20,
+			counterCount: 0,
+			endorseCount: 20,
+			contestCount: 0,
+			supportCountTotal: 20,
+			counterCountTotal: 0,
+			supportDharma: "400",
+			counterDharma: "0",
+			authorStake: "90",
+		});
+		const pool = [flagged, unanimous];
+
+		// n^b = 20 clears floorLane.nPowB (3) and is the SOLE clearer → the
+		// contestation lane returns SENTINEL_MAX and the badge fires.
+		expect(badgeFor(flagged, pool, CFG)).toBe("Contested");
+		// b = 0 ⇒ n^b = 20^0 = 1, below the floor. Traction and stake are dead
+		// heats (ratio 1.0, under kLane 3), so the unanimous post wears nothing.
+		expect(badgeFor(unanimous, pool, CFG)).toBeNull();
+	});
+
+	it("with no flag anywhere the two posts are indistinguishable — the purity half", () => {
+		// ⚠ THE CONTROL FOR THE TEST ABOVE. If `derive` ignored the new pair
+		// entirely, the first assertion there would be red — but if it read the
+		// pair and the DEFAULT were wrong, this one would be. Two posts with
+		// identical side counts and NO stance stated must still both be unbadged,
+		// exactly as they were before ADR-0058.
+		const a = post({
+			id: "post-ff-plain-a",
+			supportCount: 20,
+			counterCount: 0,
+			supportCountTotal: 20,
+			counterCountTotal: 0,
+			supportDharma: "400",
+			counterDharma: "0",
+			authorStake: "100",
+		});
+		const b = post({
+			id: "post-ff-plain-b",
+			supportCount: 20,
+			counterCount: 0,
+			supportCountTotal: 20,
+			counterCountTotal: 0,
+			supportDharma: "400",
+			counterDharma: "0",
+			authorStake: "90",
+		});
+		expect(badgeFor(a, [a, b], CFG)).toBeNull();
+		expect(badgeFor(b, [a, b], CFG)).toBeNull();
 	});
 });

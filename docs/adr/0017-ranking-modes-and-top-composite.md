@@ -9,8 +9,11 @@
 | **Frame document** | SPEC.2 §1.4 #3 (delegation: ranking math owned here, not duplicated in SPEC.2), §22 (ADR Index) |
 | **Supersedes** | ADR-0009 (Ranking Function Lock) |
 | **Superseded-by** | — |
+| **Amended-by** | ADR-0058 — the balance term `b` now reads declared stance (endorse vs contest) rather than side; every other outcome stands |
 
 ---
+
+> ⚠ **Amended by ADR-0058 (2026-09-22, D-51).** Patch record P1 below says *friendly-fire is removed entirely*. That sentence is about the free up/down **vote** and it stands. ADR-0058 adds a different mechanic that shares the name — a **friendly-fire toggle**, one boolean on a staked Support reply-bet — and moves one consequence of this ADR: the balance term `b` reads `endorse_count` / `contest_count` (declared stance) instead of `support_count` / `counter_count` (side). `n`, `D`, the lanes, the reply order and the badge vocabulary are unchanged, and with no flag set every order is identical. Read `RANKING.md` §2 and §6.1 as amended; this body is preserved as written.
 
 ## Patch record
 

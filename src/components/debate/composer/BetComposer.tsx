@@ -10,6 +10,7 @@ import {
 	DialogDescription,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { InfoTip } from "@/components/ui/info-tip";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useFlag } from "@/lib/posthog/use-flag";
@@ -22,6 +23,7 @@ import { AuthGateSlot } from "./AuthGateSlot";
 import {
 	COMPOSER_COPY,
 	c2Sentence,
+	FRIENDLY_FIRE_COPY,
 	overCapStrip,
 	rateLimitedBanner,
 	SUSPENDED_COPY,
@@ -186,6 +188,29 @@ export function BetComposer(props: {
 		"track_a" | "banned" | null
 	>(null);
 	const [authGate, setAuthGate] = useState(false);
+	// FF-1 / ADR-0058 — the friendly-fire switch (D-51 R5). Offered ONLY when
+	// the reply would be a Support: the relation the host chose is exactly
+	// `friendlyFireEligible(parentSide, sideBeingBought)` — Support means the
+	// side being bought equals the parent's side (`deriveReplySide`), so the
+	// server helper and this predicate cannot disagree; the helper lives behind
+	// `server-only` and is not importable here. Never on Counter, never on a
+	// top-level post. A relation flip REMOUNTS this component on both hosts
+	// (`key=`), so the switch resets to off structurally rather than by an
+	// effect. Compose-time only: once posted, the choice is frozen with the
+	// reply. The write path is the guard; this is the affordance.
+	const friendlyFireEligible =
+		props.kind === "reply" && props.replyContext?.relation === "support";
+	const [friendlyFire, setFriendlyFire] = useState(false);
+	// The switch's ON state names the SIDE BEING BOUGHT — the same two-branch
+	// pole pair `TriggerPill` resolves (YES = black with the n2 edge, NO =
+	// white), hoisted so the side comparison has exactly two pole outcomes and
+	// the neutral OFF state is chosen OUTSIDE it (`side-pole-binding.test.ts`
+	// reads a third, non-pole branch as an inversion, and it would be right to).
+	const friendlyFireOnTrack =
+		props.side === "YES"
+			? "bg-yes border-[0.5px] border-n2"
+			: "bg-no border border-white/25";
+	const friendlyFireOnKnob = props.side === "YES" ? "bg-no" : "bg-yes";
 	// Slice 5 — the optional image (sign → PUT → id in the payload).
 	const [image, setImage] = useState<ImageAttachState>({ phase: "none" });
 	/**
@@ -484,6 +509,9 @@ export function BetComposer(props: {
 				...(props.parentCommentId !== undefined
 					? { parentCommentId: props.parentCommentId }
 					: {}),
+				// FF-1 / ADR-0058 — on the wire only when eligible AND on; the builder
+				// omits the key otherwise, so an unflagged reply's body is unchanged.
+				...(friendlyFireEligible && friendlyFire ? { friendlyFire: true } : {}),
 				...(image.phase === "attached"
 					? { imageUploadsId: image.uploadId }
 					: {}),
@@ -708,6 +736,51 @@ export function BetComposer(props: {
 	);
 
 	/**
+	 * FF-1 / ADR-0058 — the friendly-fire switch (Support replies only). ONE
+	 * element, rendered by both layouts (MIRROR-1): in the classic header row,
+	 * where FF-1 CLOSE-1 R-A12 put it and where its placement notes still live, and
+	 * in the Mirror's statement row, in the slot RF-2 reserved for it. It moved
+	 * here out of the classic JSX unchanged — same state, same handler, same
+	 * disabled rule — so neither layout has a switch of its own to drift.
+	 */
+	const friendlyFireControl = friendlyFireEligible ? (
+		<div
+			data-testid="ff-switch-row"
+			className="flex shrink-0 items-center gap-1.5 max-mobile:order-last max-mobile:basis-full max-mobile:justify-end"
+		>
+			<button
+				type="button"
+				role="switch"
+				aria-checked={friendlyFire}
+				data-testid="ff-switch"
+				aria-label={FRIENDLY_FIRE_COPY.label}
+				disabled={inFlight || floorAbove}
+				onClick={() => setFriendlyFire((on) => !on)}
+				className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) ${
+					friendlyFire ? friendlyFireOnTrack : "bg-n1 border border-n3"
+				}`}
+			>
+				<span
+					aria-hidden="true"
+					className={`block size-3.5 rounded-full transition-transform ${
+						friendlyFire
+							? `translate-x-[18px] ${friendlyFireOnKnob}`
+							: "translate-x-[2px] bg-n5"
+					}`}
+				/>
+			</button>
+			<InfoTip content={FRIENDLY_FIRE_COPY.gloss(props.side)} asChild>
+				<span
+					data-testid="ff-switch-label"
+					className="text-xs font-bold text-ink"
+				>
+					{FRIENDLY_FIRE_COPY.label}
+				</span>
+			</InfoTip>
+		</div>
+	) : null;
+
+	/**
 	 * ⛔ MIRROR-1 — THE LAYOUT BRANCH, AND IT IS THE ONLY PLACE THE TWO DIVERGE.
 	 * Everything above this line — state, key lifecycle, quote, gating, `submit` —
 	 * runs identically for both; below it, one of two presentations draws the same
@@ -721,6 +794,7 @@ export function BetComposer(props: {
 				kind={props.kind}
 				mirror={props.mirror}
 				replyStatement={props.kind === "reply" ? headerText : null}
+				statementControl={friendlyFireControl}
 				title={title}
 				extended={extended}
 				extendedMax={extendedMax}
@@ -777,8 +851,15 @@ export function BetComposer(props: {
 			    a reader counting flex items for the `shrink-0` reasoning above
 			    counts two. Corrected in place rather than left as a number that
 			    happens to be wrong (`O-5`); `notice-slot.test.tsx` carries the same
-			    count and the same history. */}
-			<div className="flex shrink-0 items-center gap-2">
+			    count and the same history.
+			    ⚠ FF-1 CLOSE-1 R-A12 — this row now ALSO hosts the friendly-fire
+			    switch (Support replies only), and below 640px it may wrap so the
+			    switch takes a second line; `data-testid="composer-header"` is the
+			    symbol the guards fence it by (O-8). */}
+			<div
+				data-testid="composer-header"
+				className="flex shrink-0 items-center gap-2 max-mobile:flex-wrap"
+			>
 				<SideBadge side={props.side} />
 				{/* ⚠⚠ RPLY-1 · R4a — ONE SPAN, ONE SIZE, ONE WEIGHT. The reply variant
 				    used to be a two-child flex COLUMN at `text-[13.5px] font-bold`
@@ -800,8 +881,37 @@ export function BetComposer(props: {
 				    `authorPseudonym === null` (masked server-side, SG-3), and that arm
 				    still falls back to the canon `Place your Đ BET` header on a composer
 				    that is still `kind="reply"`. No copy is invented and nothing is
-				    leaked. Pinned by `composer-header.test.tsx`. */}
-				<span className="text-sm font-semibold text-ink">{headerText}</span>
+				    leaked. Pinned by `composer-header.test.tsx`.
+				    ⚠ FF-1 CLOSE-1 R-A12 — `min-w-0 flex-1 truncate`: the STATEMENT is
+				    the element that gives way when the row is short, so the switch
+				    beside it never wraps off-row on the desktop; the classes are
+				    unconditional because both variants must render the SAME class
+				    string (pinned). Below 640px `whitespace-normal` restores the wrap
+				    the phone had, since there the switch takes its own line. */}
+				<span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink max-mobile:whitespace-normal">
+					{headerText}
+				</span>
+				{/* FF-1 / ADR-0058 / D-51 R5 — THE FRIENDLY-FIRE SWITCH, IN THE HEADER
+				    ROW (CLOSE-1 R-A12, ratified from screenshots 2026-09-22): beside the
+				    `Support <author>'s argument` statement, at the row's right end,
+				    before the close control. The run had put it on its own row beneath
+				    this one; the ruling moved it here. The statement is what gives way
+				    (`min-w-0 flex-1 truncate` above), so on the desktop the switch never
+				    wraps off-row; below 640px the group takes a full second line,
+				    right-aligned beneath the statement — `max-mobile:order-last` keeps
+				    the × on line 1 while the DOM order stays switch-then-close, which
+				    is the order the guards pin. Default off; label verbatim
+				    (`FRIENDLY_FIRE_COPY`); the label carries the markers' hover gloss
+				    through the SAME `InfoTip` Flipped / Exited use (R-A15), which by
+				    its own tier gate mounts nothing below 640px — the helper line
+				    beneath the row carries the meaning there. Monochrome, the pills'
+				    type ramp; the ON state takes the fill of the SIDE BEING BOUGHT, the
+				    same pole rule `TriggerPill` applies (YES = black with the 0.5px n2
+				    edge, NO = white) — which is why this file joins the side-pole
+				    inventory. `role="switch"` + `aria-checked` is the accessible
+				    contract; disabled with the rest of the form while a request is in
+				    flight or the floor is above the balance. */}
+				{friendlyFireControl}
 				<button
 					type="button"
 					onClick={props.onClose}
@@ -829,6 +939,21 @@ export function BetComposer(props: {
 					{COMPOSER_COPY.close}
 				</button>
 			</div>
+
+			{/* FF-1 / ADR-0058 — the switch's HELPER LINE, directly beneath the
+			    header row, both tiers, rendered only while the switch is (CLOSE-1
+			    R-A12 / R-A15: below 640px no gloss mounts, so this line is what
+			    carries the meaning there). Verbatim (`FRIENDLY_FIRE_COPY.helper`);
+			    names the side being BOUGHT. The switch itself lives in the header
+			    row above (R-A12) — this is the one thing left beneath it. */}
+			{friendlyFireEligible ? (
+				<p
+					data-testid="ff-helper"
+					className="shrink-0 text-[10px] leading-[14px] text-n5"
+				>
+					{FRIENDLY_FIRE_COPY.helper(props.side)}
+				</p>
+			) : null}
 
 			{/* ⚠⚠ RPLY-1 · R3 — THE THREE BLOCKED-STATE STRIPS USED TO LIVE HERE AND
 			    IN THE FOOTBLOCK, AND THEY ARE NOW ONE SLOT INSIDE THE AMOUNT BLOCK.

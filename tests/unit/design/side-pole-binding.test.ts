@@ -367,6 +367,13 @@ const PERMITTED_FILES = [
 	// every `offenders.toEqual([])` are unchanged, and the scanner still walks `src/`
 	// recursively and still reaches this file. This is a NARROWING of an ENUMERATION
 	// that follows a deletion, not a weakening of a guard.
+	// FF-1 / ADR-0058 (D-51 R5) — the friendly-fire SWITCH in the reply composer.
+	// Its ON state takes the fill of the side being BOUGHT (`props.side`, which
+	// for a Support reply IS the parent's side — `deriveReplySide`'s rule, the
+	// same one `TriggerPill` applies): YES = black with the n2 edge, NO = white.
+	// The OFF state is neutral. Named in `docs/plans/FF-1.md` (A-12) and landing
+	// in the same commit as the expression, per the NINTH entry's ruling R-3.
+	"src/components/debate/composer/BetComposer.tsx",
 	// MIRROR-1 — ADDED AS A DECISION, the mechanism above exercised as written:
 	// named in `docs/plans/MIRROR-1.md` (§3 file map and §6 #6), the offender
 	// predicate passing, and landing in the same commit as the code. RF-7 of the

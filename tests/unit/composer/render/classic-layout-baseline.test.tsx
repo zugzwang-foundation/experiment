@@ -13,10 +13,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * desktop mounts, and the phone mount — which passes no such prop — must keep
  * rendering today's markup. This file is that claim, stated as bytes.
  *
- * ⛔ THE FIXTURE WAS CAPTURED FROM `origin/main` @ `b4d1f512`, BEFORE ANY MIRROR-1
- * CHANGE, by rendering each scenario below and recording `container.innerHTML`.
- * It is compared by EQUALITY. There is no update mode in this file on purpose: a
- * baseline that can be regenerated from the code under test certifies nothing.
+ * ⛔ THE FIXTURE IS CAPTURED FROM PURE `origin/main` — NEVER FROM THIS BRANCH — by
+ * rendering each scenario below and recording `container.innerHTML`. It is compared
+ * by EQUALITY. There is no update mode in this file on purpose: a baseline that
+ * can be regenerated from the code under test certifies nothing.
+ *
+ * ⚠ CAPTURED TWICE, AND THE SECOND IS THE ONE IN FORCE. First at `b4d1f512`, before
+ * any MIRROR-1 change. Then FF-1 (#568/#569) merged to `main` mid-run and changed
+ * this very render — its switch joined the classic header row — so "the phone
+ * renders exactly as today" had a new "today". The fixture was re-captured from
+ * pure `main` @ `44573547` (a detached worktree carrying no MIRROR-1 code), and the
+ * old one, run against that `main`, reddened on all six scenarios: the positive
+ * control that this comparison can see a real change.
  *
  * The scenarios render `BetComposer` exactly as `PhoneDebateView.tsx` does — no
  * layout prop — across both kinds, both sides, the masked-parent header, the C2

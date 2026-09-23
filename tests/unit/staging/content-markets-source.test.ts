@@ -172,10 +172,10 @@ describe("description lengths", () => {
 	 * MKT-ROSTER-1 took the slate to six, and AGAIN after D-50 overlaid five
 	 * markets' v3.0 wording onto it:
 	 *
-	 *   slug                                 v2.2    v3.0    v3.1    v3.2
+	 *   slug                                 v2.2    v3.0    v3.1    v3.2    v3.3
 	 *   chess-fide-tiebreak-response         3609 -> 1903
 	 *   bitcoin-price-50k                    3795 -> 3795   (MKT-BTC-01 untouched)
-	 *   math-erdos-solved-on-zugzwang        3836 -> 2852 -> 2293 -> 2852
+	 *   math-erdos-solved-on-zugzwang        3836 -> 2852 -> 2293 -> 2852 -> 2290
 	 *   claude-bundle-response               3733 -> 2169
 	 *   yc-w27-acceptance                     789 -> 1658   (re-slugged)
 	 *   github-zugzwang-repo-stars            794 ->  792
@@ -201,6 +201,9 @@ describe("description lengths", () => {
 	 * and the canon comes back to meet it, rather than the other way round. The
 	 * v3.1 objection is real and remains open — it is a question about wording
 	 * that can only be settled by a ruling on the stake, not by an edit.
+	 *
+	 * v3.3 (2026-09-23, D-53) removes the "on Zugzwang" premise from v3.0; it
+	 * does not restore v3.1.
 	 *
 	 * ⚠⚠ D-50 MOVED EVERY FIGURE EXCEPT BITCOIN'S, AND FOUR OF THE FIVE WENT
 	 * DOWN — which is the direction the bound below is least able to see. The
@@ -241,7 +244,7 @@ describe("description lengths", () => {
 		).toEqual({
 			"chess-fide-tiebreak-response": 1903,
 			"bitcoin-price-50k": 3795,
-			"math-erdos-solved-on-zugzwang": 2852,
+			"math-erdos-solved-on-zugzwang": 2290,
 			"claude-bundle-response": 2169,
 			"yc-w27-acceptance": 1658,
 			"github-zugzwang-repo-stars": 792,

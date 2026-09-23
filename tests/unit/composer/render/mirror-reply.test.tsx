@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -106,16 +106,56 @@ describe("MIRROR-1 RF-2 — the statement row", () => {
 		);
 	});
 
-	it("mirror-reply::the-friendly-fire-slot-is-empty-and-immediately-before-the-close", () => {
-		const { container, getByLabelText } = reply("support", "YES");
+	it("mirror-reply::support-carries-ff-1s-switch-in-the-slot-immediately-before-the-close", () => {
+		const { container, getByLabelText, getByRole } = reply("support", "YES");
+		const slot = container.querySelector('[data-mirror-slot="friendly-fire"]');
+		if (!(slot instanceof HTMLElement)) {
+			throw new Error("the reserved slot is missing");
+		}
+		// FF-1's own element — the same testids the classic header row carries.
+		const row = slot.querySelector('[data-testid="ff-switch-row"]');
+		expect(row).not.toBeNull();
+		const ff = getByRole("switch", { name: "Friendly fire" });
+		expect(slot.contains(ff)).toBe(true);
+		expect(ff.getAttribute("aria-checked")).toBe("false");
+		// Immediately before the ×, in the statement row's right-hand cluster.
+		expect(slot.nextElementSibling).toBe(getByLabelText("Close"));
+		expect(byTestId(container, "mirror-statement-row").contains(slot)).toBe(
+			true,
+		);
+	});
+
+	it("mirror-reply::counter-leaves-the-slot-empty", () => {
+		const { container } = reply("counter", "NO");
 		const slot = container.querySelector('[data-mirror-slot="friendly-fire"]');
 		if (!(slot instanceof HTMLElement)) {
 			throw new Error("the reserved slot is missing");
 		}
 		expect(slot.childNodes).toHaveLength(0);
-		expect(slot.nextElementSibling).toBe(getByLabelText("Close"));
-		// Built nothing in it: no switch, no label, anywhere in the composer.
-		expect(container.textContent).not.toMatch(/friendly/i);
+		expect(container.querySelector('[role="switch"]')).toBeNull();
+	});
+
+	it("mirror-reply::the-switch-toggles-and-is-disabled-with-the-form-in-c2", () => {
+		const on = reply("support", "YES");
+		const ff = on.getByRole("switch", { name: "Friendly fire" });
+		fireEvent.click(ff);
+		expect(ff.getAttribute("aria-checked")).toBe("true");
+		cleanup();
+		// FF-1's own disabled rule: the floor above the balance disables it.
+		const { getByRole } = render(
+			<BetComposer
+				{...composerProps()}
+				viewer={{ position: null, balance: "5", spendableToday: "5" }}
+				kind="reply"
+				side="YES"
+				parentCommentId="cmt-p1"
+				replyContext={{ relation: "support", authorPseudonym: "BlueWolf472" }}
+				mirror={MIRROR}
+			/>,
+		);
+		expect(
+			getByRole("switch", { name: "Friendly fire" }).hasAttribute("disabled"),
+		).toBe(true);
 	});
 
 	it("mirror-reply::a-post-has-no-statement-row", () => {

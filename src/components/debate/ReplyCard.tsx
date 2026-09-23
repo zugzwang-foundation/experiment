@@ -90,6 +90,11 @@ export function ReplyCard({
 				originalStake={reply.stakeOriginal}
 				sold={reply.sold}
 				createdAt={reply.createdAt}
+				// FF-1 / ADR-0058 — the tag, post-focus reply rows only (this card is
+				// mounted by the desktop lane scroller and the phone thread pane, and
+				// by nothing on the post card). `=== true` because the DTO field is
+				// optional (A-13) and an absent value means unflagged.
+				friendlyFire={reply.friendlyFire === true}
 				download={
 					postOrdinal === null
 						? undefined

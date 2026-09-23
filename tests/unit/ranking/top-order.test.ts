@@ -48,6 +48,14 @@ function post(
 		counterCountTotal: 0,
 		supportDharma: "0",
 		counterDharma: "0",
+		// FF-1 / ADR-0058 — the declared-stance pair (defaulted below from the
+		// side counts) and the meter's display numerator. The §13 worked example
+		// below states no flag anywhere, so `b` reads exactly what it read
+		// pre-ADR and §13 reproduces unchanged — which is the identity ADR-0058
+		// Driver 5 promises, checked here by the spec's own example.
+		endorseCount: 0,
+		contestCount: 0,
+		friendlyFireDharma: "0",
 		createdAt: new Date("2026-09-01T00:00:00.000Z"),
 		authorStake: "0",
 		authorStakeOriginal: "0",
@@ -55,14 +63,21 @@ function post(
 		priceAtBet: "0.5",
 		...over,
 	};
+	// The zero-flag identity, applied AFTER the spread so it reads each case's
+	// own side counts rather than the defaults above.
+	const withStance: PostSubstrate = {
+		...built,
+		endorseCount: over.endorseCount ?? built.supportCount,
+		contestCount: over.contestCount ?? built.counterCount,
+	};
 	// RANK-1 — `authorStake` is now SURVIVING basis and `authorStakeOriginal` the
 	// frozen one. Unless a case explicitly states an original (an argument sold
 	// down), the two are equal: a fixture where the original is SMALLER than what
 	// survives is unrepresentable in the database (`lots_surviving_basis_monotone`),
 	// and a fixture the storage layer would reject teaches nothing.
 	return over.authorStakeOriginal === undefined
-		? { ...built, authorStakeOriginal: built.authorStake }
-		: built;
+		? { ...withStance, authorStakeOriginal: withStance.authorStake }
+		: withStance;
 }
 
 // ── §13 worked example ───────────────────────────────────────────────────────

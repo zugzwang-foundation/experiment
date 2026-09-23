@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | ratified (ADR-0025; route + serializer built at EXPORT.1) |
+| **Status** | ratified (ADR-0025; route + serializer built at EXPORT.1; `Friendly fire` reply line added at FF-1 — ADR-0058) |
 | **Date** | 2026-06-29 |
 | **Companion to** | ADR-0025 (Debate `.md` Export) |
 | **Frame** | SPEC.1 §21.3 (the surface); SPEC.2 §3.3 R-1 (read pattern), §4 (route lands at build); `public/zugzwang.md` (context asset) |
@@ -130,6 +130,7 @@ supportDharma, counterDharma}`; `Author status` ← `marker` (`none`→`holding`
 - **Side:** {YES|NO}
 - **Relation:** {Support (same side as the post) | Counter (opposite side)}
 - **Rank in thread:** {top support | top counter | support reply N | counter reply N}
+- **Friendly fire:** yes — backs the side, contests this argument   ← printed ONLY when the reply carries the flag
 - **Stake:** {stake} Đ
 - **Entry price:** {yes_prob_at_bet}
 - **Author status:** {holding|flipped|exited}
@@ -141,6 +142,7 @@ Sources: `SIDE` ← reply `side`; `Relation` is `Support` if reply `side == pare
 `Counter`; `stake`, `entry price`, `Author status`, `Author`, `Time` as per 7c; `Replies to` ←
 `parent_comment_id` (rendered as the parent post's number; append `(removed)` if the parent is a removed
 node).
+`Friendly fire` ← `friendlyFire` (ADR-0058): printed only when `true` and only on a non-removed reply — a Support reply whose author backs the side but contests the argument; an unflagged reply prints no line at all.
 
 ### 7e — Removed post node (SAFETY-CRITICAL — see §10)
 

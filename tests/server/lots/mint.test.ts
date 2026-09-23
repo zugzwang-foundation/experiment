@@ -178,7 +178,20 @@ describe("LOTS-1 Slice 4a — lot mint (ADR-0039 D-2)", () => {
 		// path differs.
 		const userId = await seedUser("lotmint3", "5000");
 		const marketId = await seedOpenMarketWithPool("lot-mint-3");
-		const post = await placeBet({
+		// D-52: nobody replies to their own post, so the reply answers ANOTHER
+		// user's post. The reply's lot is the subject, not whose argument it
+		// answers — the replier, both stakes and every assertion are unchanged.
+		// ⚠ The other user's post is an extra bet that moves the pool first; the
+		// assertions read the lot count and the reply lot's BASIS (its stake), so
+		// no price enters them.
+		const otherUser = await seedUser("lotmint3-other", "5000");
+		const othersPost = await placeBet({
+			userId: otherUser,
+			marketId,
+			side: "YES",
+			stake: "100",
+		});
+		await placeBet({
 			userId,
 			marketId,
 			side: "YES",
@@ -189,7 +202,7 @@ describe("LOTS-1 Slice 4a — lot mint (ADR-0039 D-2)", () => {
 			marketId,
 			side: "YES",
 			stake: "50",
-			parentCommentId: post.commentId,
+			parentCommentId: othersPost.commentId,
 		});
 
 		const rows = await testDb

@@ -453,6 +453,47 @@ describe("MIRROR-1 — the Mirror sends what the classic layout sends", () => {
 		return placedBodies[0];
 	}
 
+	it("mirror::a-support-reply-with-friendly-fire-on-sends-the-same-bytes-as-the-classic", async () => {
+		// FF-1's switch lives in each layout's own place (the classic header row,
+		// the Mirror's statement slot) but it is ONE element over ONE state, so the
+		// flagged body must match byte for byte — `friendlyFire` included.
+		async function flagged(mirror: boolean): Promise<string> {
+			placedBodies = [];
+			const props = {
+				...composerProps(),
+				kind: "reply" as const,
+				side: "YES" as const,
+				parentCommentId: "cmt-p1",
+				replyContext: {
+					relation: "support" as const,
+					authorPseudonym: "BlueWolf472",
+				},
+			};
+			const { getByLabelText, getByRole } = render(
+				mirror ? (
+					<BetComposer {...props} mirror={MIRROR} />
+				) : (
+					<BetComposer {...props} />
+				),
+			);
+			fireEvent.change(getByLabelText("Argument title"), {
+				target: { value: TITLE },
+			});
+			fireEvent.click(getByRole("switch", { name: "Friendly fire" }));
+			await act(async () => {
+				fireEvent.click(getByRole("button", { name: "PLACE Đ BET" }));
+			});
+			await settle();
+			cleanup();
+			expect(placedBodies).toHaveLength(1);
+			return placedBodies[0];
+		}
+		const classic = await flagged(false);
+		const mirror = await flagged(true);
+		expect(classic).toContain('"friendlyFire":true');
+		expect(mirror).toBe(classic);
+	});
+
 	it("mirror::same-inputs-same-body-bytes-as-the-classic-layout", async () => {
 		const classic = await placeWith(false);
 		const mirror = await placeWith(true);

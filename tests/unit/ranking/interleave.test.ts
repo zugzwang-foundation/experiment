@@ -38,6 +38,13 @@ function makePost(rank: number): PostSubstrate {
 		// case needing them to differ states both explicitly.
 		supportCountTotal: 15,
 		counterCountTotal: 15,
+		// FF-1 / ADR-0058 — the zero-flag identity stated inline (this builder
+		// takes no overrides). Every post here is perfectly even on BOTH axes, so
+		// `b` is 1 before and after the ADR and the interleave cadence cannot
+		// move when the balance term changes what it reads.
+		endorseCount: 15,
+		contestCount: 15,
+		friendlyFireDharma: "0",
 		supportDharma: half,
 		counterDharma: half,
 		// createdAt monotonically NEWER as rank grows → R12 is the newest.

@@ -47,6 +47,7 @@ export function PostFocusHeader({
 	onExit,
 	onOpenImage,
 	onOpenPopup,
+	isOwnPost = false,
 }: {
 	post: DebatePost;
 	/**
@@ -68,6 +69,12 @@ export function PostFocusHeader({
 	 * on the surface, not one per zoom level.
 	 */
 	onOpenPopup: (post: PresentPost) => void;
+	/**
+	 * D-52 R1 — the viewer wrote the focused post: both split-bar triggers
+	 * render disabled (nobody replies to their own post). Absent = not the
+	 * viewer's.
+	 */
+	isOwnPost?: boolean;
 }) {
 	const replyCount = post.aggregate.supportCount + post.aggregate.counterCount;
 	return (
@@ -260,6 +267,7 @@ export function PostFocusHeader({
 									suspended={suspended}
 									activeRelation={activeRelation}
 									onToggleRelation={onToggleRelation}
+									isOwnPost={isOwnPost}
 								/>
 							</div>
 						</div>

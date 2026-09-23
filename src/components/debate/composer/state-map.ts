@@ -59,9 +59,23 @@ const STATE_BY_CODE: Readonly<Record<string, ComposerStateName>> = {
 	insufficient_shares: "p3_generic",
 	position_not_held: "p3_generic",
 	opposite_side_held: "p3_generic",
+	// D-52 R1 — nobody replies to their own post. With the UI half (PR #569)
+	// both controls render disabled on the viewer's own post, so this code
+	// reaching a client is a stale tab or a hand-built request; without it the
+	// control is live and the refusal lands here. Generic is honest either way.
+	self_reply_forbidden: "p3_generic",
 	comment_requires_bet: "p3_generic",
 	reply_depth_exceeded: "p3_generic",
 	parent_comment_not_found: "p3_generic",
+	// FF-1 / ADR-0058 — the two friendly-fire rejections. The composer never
+	// OFFERS the switch on a Counter or a top-level post, so either code reaching
+	// a client is a relation flip racing a submit or a stale tab, not a state a
+	// participant can act on; generic is the honest landing, and naming a state
+	// would mean authoring copy the ruling did not supply. Registered
+	// EXPLICITLY (rather than left to the `??` fallthrough below) so the
+	// completeness guard in `state-map.test.ts` sees them (@code-reviewer M-1).
+	friendly_fire_requires_reply: "p3_generic",
+	friendly_fire_requires_support: "p3_generic",
 	error_idempotency_key_required: "p3_generic",
 	error_idempotency_key_invalid: "p3_generic",
 	error_invalid_json: "p3_generic",
@@ -69,6 +83,18 @@ const STATE_BY_CODE: Readonly<Record<string, ComposerStateName>> = {
 	error_origin_not_allowed: "p3_generic",
 	error_internal: "p3_generic",
 };
+
+/**
+ * FF-1 (@code-reviewer M-1) — whether a wire code is an EXPLICIT row of the §4
+ * table, as opposed to one that merely lands on generic through the `??`
+ * fallthrough in `mapWireError`. The two are indistinguishable at
+ * `mapWireError`'s surface by design (unknown codes must degrade, never
+ * crash — SG-5), which is exactly why the completeness guard needs a second
+ * question it CAN answer: "did anyone register this code?" Test-facing.
+ */
+export function isKnownWireCode(code: string): boolean {
+	return Object.hasOwn(STATE_BY_CODE, code);
+}
 
 /** Map a wire error code onto its named W2.11 state; unknown → generic. */
 export function mapWireError(args: {

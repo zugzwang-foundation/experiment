@@ -41,7 +41,8 @@ Exit condition for EVERY slice: `pnpm vitest run` (whole suite) green, `pnpm tsc
 | S3 | Post variant, UNMOUNTED: `MirrorComposer.tsx` (RF-1, RF-3, RF-4, RF-6 image view, RF-7), `ImageAttach` mirror variant, `BetComposer` `mirror` prop; render tests | classic baseline still byte-identical; side-pole inventory updated in this commit |
 | S4+S5 | Reply variant (RF-2) + both desktop mounts switched + `page.tsx` threads the viewer PFP + detail toggle and slide (RF-5, RF-6 detail view) — **ONE commit, see §6 #1** | A4 green against the Mirror (the switch makes it exercise the new layout) |
 | S6 | Guards G1–G7 verified by revert-to-red; `@code-reviewer` → `@security-auditor`; fixes | every declined finding logged with reasoning; unreviewed-fix list kept |
-| S7 | Push, PR (unmerged). Staging: Gate 1 FAILED at recon → STAGING BLOCKED, reported with the founder's one-command path | PR open; branch preview checked for canary |
+| M | Merge `origin/main` (FF-1 shipped mid-run — §6 #20–23) | classic baseline re-captured from pure `main` passes on the merge; A4 unedited passes |
+| S7 | Push, PR (unmerged). Staging: both gates re-measured at push time (§7) | PR open; staging serves the PR head, verified by canary |
 
 ## 3 · File map
 
@@ -158,9 +159,35 @@ positive control (OVN-V1).
     THIS SESSION to any database outside the suite's own fixtures; staging, production and any manual
     `psql` are untouched. No screenshot fixture is seeded.
 
+20. **FF-1 SHIPPED MID-RUN — the branch MERGES `origin/main`.** #568 and #569 merged to `main` at
+    21:37Z / 21:48Z on 2026-09-23 (A0 was taken at 21:06Z; both observations sound, O-14). Rejected:
+    rebasing (rewrites the SHAs this plan and the run report cite; a merge also leaves `staging` a
+    fast-forward away from the PR head), and staying on the old base (the PR would conflict and could
+    not merge). Conflicts: `BetComposer.tsx`, `DebateView.tsx`, the side-pole inventory — all
+    take-both.
+21. **FF-1's switch goes in RF-2's reserved slot — the same element.** On `main` the switch lives in
+    the classic composer's header row; a Mirror without it would drop a shipped field from the
+    desktop composer, which "presentation only" forbids. RF-2 names the slot as the switch's home, so
+    the controller's switch element is hoisted into one const and rendered by both layouts: in the
+    classic header row where FF-1 put it, and in the Mirror's slot. Rejected: a second switch in the
+    Mirror (two controls over one state is where they drift), and leaving the slot empty.
+    ⚠ The Mirror does NOT carry FF-1's helper line (`ff-helper`) nor a friendly-fire tag in the author
+    row. RF-1's rows have no helper row and RF-3's author row lists no tag; the founder's own reply
+    render shows neither beneath the statement. On the desktop the switch label's gloss carries the
+    meaning (FF-1 CLOSE-1 R-A15). Flagged for Gate C.
+22. **RF-8's baseline was re-captured from pure new `main` @ `44573547`** — FF-1 changed the phone's
+    classic render, so "exactly as today" had a new "today". The old fixture reddened on all six
+    scenarios against pure new `main` (the control that the comparison can see a change).
+23. **A4 was NOT re-captured and did not need to be**: FF-1 emits `friendlyFire` only when true, so the
+    three unflagged bodies are byte-identical; A4 ran green, unedited, on pure new `main`.
+
 ## 7 · Deploy (S7)
 
-Push `feat/mirror-1`; open "MIRROR-1 — Mirror composer" against `main`; leave it unmerged. **Staging
-is BLOCKED by Gate 1** (recon A0: `0031` adds a CHECK to the existing `comments` table). The report
-carries the one command the founder can run if they overrule the classification. The branch preview
-(`feat/*` is allowlisted — verified at push, not assumed) is checked for its canary.
+Push `feat/mirror-1`; open "MIRROR-1 — Mirror composer" against `main`; leave it unmerged.
+**Staging is re-evaluated at push time, not at A0.** At A0, Gate 1 classified `0031` NOT
+ADDITIVE-SAFE (a CHECK on the existing `comments` table). Since then `0031` is on `main` and in this
+branch's journal, and `staging` == `main`. Both gates are re-measured immediately before any push:
+Gate 1 asks whether staging's database carries a migration the PR head's journal lacks; Gate 2 asks
+whether `staging` holds any commit on no other remote branch. If both hold, the push is a
+FAST-FORWARD (`origin/staging` an ancestor of the PR head) — no force flag is typed, so the lease
+form in the brief is not needed. Anything else → STAGING BLOCKED, reported with the reason.

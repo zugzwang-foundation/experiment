@@ -7,7 +7,10 @@ import {
 	CommentTooLongError,
 	CommentTrackABlockedError,
 	CommentTrackBBlockedError,
+	FriendlyFireRequiresReplyError,
+	FriendlyFireRequiresSupportError,
 	InvalidRequestBodyError,
+	SelfReplyForbiddenError,
 } from "@/server/bets/errors";
 import { assertStakeFloor, clampStakeToMax } from "@/server/bets/floors";
 import { place } from "@/server/bets/place";
@@ -47,6 +50,11 @@ const placeBodySchema = z.object({
 	parentCommentId: z.string().uuid().nullable().optional(),
 	// DEBATE.2 F-COMMENT-3: the out-of-band R2 upload to attach to this comment.
 	imageUploadsId: z.string().uuid().optional(),
+	// FF-1 / ADR-0058 F-COMMENT-2: the friendly-fire toggle. Optional so an
+	// absent key means `false` (the client omits it when the switch is off);
+	// legal ONLY on a Support reply — rejected below on a post and on a Counter,
+	// before moderation and before the tx opens.
+	friendlyFire: z.boolean().optional(),
 });
 
 export async function POST(request: Request): Promise<Response> {
@@ -62,6 +70,7 @@ export async function POST(request: Request): Promise<Response> {
 		const body = parsed.data.body ?? "";
 		const parentCommentId = parsed.data.parentCommentId ?? null;
 		const { imageUploadsId } = parsed.data;
+		const friendlyFire = parsed.data.friendlyFire ?? false;
 		// Emptiness gate on the TRIMMED text (AUDIT.1 A24 ruling / SPEC.1 F-BET-1
 		// rider): a whitespace-only body is an absent argument. Trim is JS
 		// `String.prototype.trim()` (Unicode WhiteSpace + LineTerminator). The trim
@@ -78,12 +87,42 @@ export async function POST(request: Request): Promise<Response> {
 			throw new CommentTooLongError();
 		}
 
+		// 5a'. FF-1 / ADR-0058 — the friendly-fire FRONTSTOP, half one: the toggle
+		// on a top-level post has nothing to contest. Thrown here, ahead of every
+		// read and of moderation, so a rejected flag spends no vendor call and no
+		// Redis reservation; the `comments` CHECK is the storage backstop and
+		// place()'s in-tx guard the belt.
+		if (friendlyFire && parentCommentId === null) {
+			throw new FriendlyFireRequiresReplyError();
+		}
+
 		// 5b. Reply validation (DEBATE.2) — pre-tx, reads the immutable append-only
 		// `comments` table. Throws parent_comment_not_found (404) /
 		// reply_depth_exceeded (400). A reply IS a Support/Counter bet (ADR-0017);
 		// the write still flows through the single place() W-1 tx below.
+		//
+		// D-52 R1 — the self-reply frontstop rides the SAME read: the validated
+		// parent's author is compared with the caller, before the friendly-fire
+		// check, before image resolution and before moderation, so a reply that
+		// can never commit spends no vendor call and no Redis reservation.
+		// place()'s in-tx check is the belt.
+		//
+		// FF-1 / ADR-0058 — half two of the frontstop rides the SAME read: the
+		// validated parent's frozen side is what the toggle is measured against.
+		// `friendlyFire` is legal only when the side being bought EQUALS it (a
+		// Support reply — including an entry reply that chooses that side, D-51
+		// R2). A Counter already contests by side and cannot also back it.
 		if (parentCommentId !== null) {
-			await validateReplyParent(db, { parentCommentId, marketId });
+			const parent = await validateReplyParent(db, {
+				parentCommentId,
+				marketId,
+			});
+			if (parent.userId === ctx.userId) {
+				throw new SelfReplyForbiddenError();
+			}
+			if (friendlyFire && parent.sideAtPostTime !== side) {
+				throw new FriendlyFireRequiresSupportError();
+			}
 		}
 
 		// 5c. Image resolve + ownership (DEBATE.2 F-COMMENT-3) — pre-tx. The resolved
@@ -202,6 +241,7 @@ export async function POST(request: Request): Promise<Response> {
 					stake: effectiveStake,
 					body,
 					parentCommentId,
+					friendlyFire,
 					idempotencyKey: ctx.idempotencyKey,
 					bodyFingerprint: ctx.bodyFingerprint,
 					betEventId,

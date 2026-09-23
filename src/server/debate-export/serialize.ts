@@ -314,8 +314,18 @@ function replyBlock(
 		return [heading, bullets, note].join("\n\n");
 	}
 	const heading = `#### Reply ${parentRank}.${n} — ${relation} (${reply.side}) — ${reply.author.pseudonym}`;
+	// FF-1 / ADR-0058 — the friendly-fire marker, beside where the side and the
+	// relation print, on a flagged (non-removed) reply only: the author backs the
+	// side and contests THIS argument, and a reader of the export must not read
+	// that as endorsement. Never a count, and absent (not `no`) when unflagged, so
+	// every pre-ADR export line is byte-identical.
+	const friendlyFire =
+		reply.friendlyFire === true
+			? ["- **Friendly fire:** yes — backs the side, contests this argument"]
+			: [];
 	const bullets = [
 		...common,
+		...friendlyFire,
 		`- **Stake:** ${formatDharmaExportGrouped(reply.stake)} Đ`,
 		`- **Entry price:** ${price2(reply.entryPrice)}`,
 		`- **Author status:** ${authorStatus(reply.marker)}`,

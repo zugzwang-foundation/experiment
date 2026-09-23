@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { markets, pools, users } from "@/db/schema";
 import { badgeFor, rankReplies, topOrder } from "@/lib/ranking";
 import { DEFAULT_RANKING_CONFIG } from "@/lib/ranking.config";
+import { toWireError } from "@/server/bets/errors";
 import { place } from "@/server/bets/place";
 import { runBetTransaction } from "@/server/bets/transaction";
 import { loadRankingSubstrate } from "@/server/debate-view/ranking-substrate";
@@ -11,13 +12,24 @@ import { loadReplySubstrate } from "@/server/debate-view/reply-substrate";
 import { loadProfileArguments } from "@/server/profile/arguments";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { seedLegacyReply } from "../../db/_fixtures/lots";
 import { truncateTables } from "../../db/_fixtures/truncate";
 
 /**
- * RANK-2 — **self-authored replies are not attraction.** DB-BACKED, driven
- * through the real engine (`place`), never through hand-written rows: the whole
- * point is what the shipped write path permits, and a fixture that hand-inserts
- * `comments` would prove nothing about that.
+ * RANK-2 — **self-authored replies are not attraction.** DB-BACKED.
+ *
+ * ⚠⚠ **D-52 CLOSED THE ATTACK AT THE WRITE PATH, AND THIS FILE WAS RE-READ, NOT
+ * PATCHED.** Its first case used to prove the engine PERMITTED six self-replies
+ * and said that if it ever failed, "the attack is closed by a guard somewhere
+ * else and this whole file needs re-reading". D-52 R1 is that guard: `place()`
+ * refuses a reply to the replier's own post (`self_reply_forbidden`), so the
+ * first case now pins the refusal. What stays true is the RANK-2 ruling below —
+ * the rows written before D-52 still exist (Bucket A never deletes), and the
+ * ADR-0039 P2 predicates must keep excluding them. The engine can no longer
+ * produce such rows, so the fixture inserts them as the legacy rows they are —
+ * comment, bet and the lot `place()` minted (`seedLegacyReply`), with shares and
+ * price from the shipped `computeBuy`. Everything else here still drives the
+ * real engine.
  *
  * **The attack RANK-1 left open.** RANK-1 moved every *stake* input onto
  * surviving lot basis, so a bought slot is released when the money leaves. It
@@ -29,8 +41,8 @@ import { truncateTables } from "../../db/_fixtures/truncate";
  * is explicit that removed items remain counted).
  *
  * So, with one account and `DEFAULT_RANKING_CONFIG`: post at the Đ10 post floor,
- * reply to your OWN post six times at the Đ50 reply floor — there is no
- * self-reply guard, no per-post reply cap, and no uniqueness on
+ * reply to your OWN post six times at the Đ50 reply floor — there was no
+ * self-reply guard (until D-52), no per-post reply cap, and no uniqueness on
  * `(user, parent_comment_id)` — and `n = 6` clears `floorLane.n = 5` while
  * `lop = 1` clears the `floorSplit = 6` gate. Sole clearer ⇒ `SENTINEL_MAX` ⇒
  * **`topOrder` #1 outright**, plus the Most Debated badge, plus the Discovery
@@ -156,10 +168,12 @@ async function placeBet(args: {
 }
 
 /**
- * The attack, exactly as an attacker would run it: ONE account, the two floors,
- * six self-replies. Plus one honest post by a different author that stakes TEN
- * TIMES as much and attracts nothing — so the ordering question is purely
- * "does volume the author manufactured for itself outrank real conviction".
+ * The attack, exactly as an attacker would have run it: ONE account, the two
+ * floors, six self-replies. Plus one honest post by a different author that
+ * stakes TEN TIMES as much and attracts nothing — so the ordering question is
+ * purely "does volume the author manufactured for itself outrank real
+ * conviction". ⚠ D-52: the six are LEGACY rows (see the file docblock); the two
+ * posts still go through the engine.
  */
 async function seedSelfReplyCapture(slug: string) {
 	const attacker = await seedUser(`${slug}-attacker`);
@@ -176,7 +190,7 @@ async function seedSelfReplyCapture(slug: string) {
 	});
 	const selfReplies: string[] = [];
 	for (let i = 0; i < 6; i++) {
-		const r = await placeBet({
+		const r = await seedLegacyReply(testDb, {
 			userId: attacker,
 			marketId,
 			side: "YES", // same side as their own holding — F-BET-10 never fires
@@ -201,13 +215,28 @@ describe("RANK-2 — a post attracting its own author is not attracting anything
 		await truncateTables(testClient, TABLES);
 	});
 
-	it("the engine PERMITS the attack setup — six self-replies, no guard", async () => {
+	it("the engine REFUSES the attack setup since D-52 — the six self-replies exist only as legacy rows", async () => {
 		// Not an assertion about ranking; an assertion about what is reachable.
-		// If any of these ever starts failing, the attack is closed by a guard
-		// somewhere else and this whole file needs re-reading rather than fixing.
+		// It used to read "the engine PERMITS the attack setup — six self-replies,
+		// no guard"; D-52 R1 is the guard its own comment anticipated, so the
+		// file was re-read and this case now pins the refusal. The six legacy
+		// rows are still six distinct rows — the RANK-2 cases below need them.
 		const f = await seedSelfReplyCapture("m-self-reply-permitted");
 		expect(f.selfReplies.length).toBe(6);
 		expect(new Set(f.selfReplies).size).toBe(6); // no uniqueness collapse
+
+		const refusal: unknown = await placeBet({
+			userId: f.attacker,
+			marketId: f.marketId,
+			side: "YES",
+			stake: "50",
+			parentCommentId: f.captured.commentId,
+		}).then(
+			() => null,
+			(err: unknown) => err,
+		);
+		expect(refusal, "place() must refuse a seventh self-reply").not.toBeNull();
+		expect(toWireError(refusal).body.error.code).toBe("self_reply_forbidden");
 	});
 
 	it("⛔ RED ON MAIN: six self-replies take topOrder #1 outright", async () => {

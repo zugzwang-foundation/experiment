@@ -75,6 +75,18 @@ export type ReplyAggregate = {
 	counterCount: number;
 	supportDharma: string;
 	counterDharma: string;
+	/**
+	 * FF-1 / ADR-0058 — Dharma still held on same-side reply-bets by others that
+	 * carry the friendly-fire flag, a subset of `supportDharma` (D-51 R5).
+	 * COMPUTED, NOT RENDERED: D-52 withdrew the post-focus Support-lane meter
+	 * that displayed it, and it is carried for the redesign. Optional at the type
+	 * level because this DTO is built as a literal in ~25 fixture files and an
+	 * absent value reads as zero, the correct reading of "unset" (A-13);
+	 * `loadDebateView` ALWAYS sets it and its integration test pins that.
+	 * ⛔ The two ranking counts (`endorseCount`/`contestCount`) never join it —
+	 * ADR-0039 P3, pinned by `substrate-site-parity.test.ts`.
+	 */
+	friendlyFireDharma?: string;
 };
 
 export type DebateReply =
@@ -120,6 +132,15 @@ export type DebateReply =
 			sold: boolean;
 			/** EXPORT.1 — per-node entry price (`price_at_bet`); non-removed ONLY. */
 			entryPrice: string;
+			/**
+			 * FF-1 / ADR-0058 — the friendly-fire toggle: this Support reply's
+			 * author backs the side and contests THIS argument. Drives the
+			 * `Friendly fire` tag on the reply row (both tiers) and the `.md`
+			 * export marker; never a count, never on the card. NON-REMOVED ONLY —
+			 * the removed variant carries the minimum. Optional at the type level
+			 * (A-13: an absent value renders no tag); `buildReply` always sets it.
+			 */
+			friendlyFire?: boolean;
 			/**
 			 * HTML-FINISH · MARKET DETAIL row 26 — the reply's own attached image,
 			 * presigned for read (D9). NON-REMOVED ONLY, and that is the masking
@@ -416,6 +437,10 @@ export async function loadDebateView(
 			counterCount: sub.counterCountTotal,
 			supportDharma: sub.supportDharma,
 			counterDharma: sub.counterDharma,
+			// FF-1 / ADR-0058 — carried to the client, rendered nowhere since D-52
+			// withdrew the meter (kept for the redesign). The two stance
+			// COUNTS stay on the substrate (ranking input only, ADR-0039 P3).
+			friendlyFireDharma: sub.friendlyFireDharma,
 		};
 		const replies = buildReplyGroups(
 			sub,
@@ -685,6 +710,7 @@ function buildReply(
 		stakeOriginal: sub.stakeOriginal,
 		sold: sub.sold,
 		entryPrice: sub.priceAtBet,
+		friendlyFire: sub.friendlyFire,
 		imageUrl: imageUrlByComment.get(sub.id) ?? null,
 	};
 }

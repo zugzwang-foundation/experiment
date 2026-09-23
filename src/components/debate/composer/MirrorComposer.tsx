@@ -86,6 +86,11 @@ export function MirrorComposer(props: {
 	 * has no statement row and keeps its `×` on the author row (RF-3).
 	 */
 	replyStatement: string | null;
+	/**
+	 * FF-1's friendly-fire switch — the controller's own element, `null` except on
+	 * a Support reply — drawn in the statement row's reserved slot (RF-2).
+	 */
+	statementControl: ReactNode;
 	title: string;
 	extended: string;
 	/** Today's detail budget (`extendedMaxChars`) — the detail field's `maxLength`. */
@@ -174,6 +179,7 @@ export function MirrorComposer(props: {
 				{props.replyStatement !== null ? (
 					<StatementRow
 						statement={props.replyStatement}
+						control={props.statementControl}
 						close={
 							<CloseButton onClose={props.onClose} disabled={props.inFlight} />
 						}
@@ -433,17 +439,21 @@ function DetailToggle({
  * RF-2 — a reply's statement: `Support|Counter <author>'s argument`, 16px/600, with
  * the `×` at the row's right end.
  *
- * ⛔ THE EMPTY SLOT BEFORE `×` IS RESERVED, NOT FORGOTTEN. FF-1's friendly-fire
- * switch lands in `data-mirror-slot="friendly-fire"`; nothing is built in it here.
- * It is `display: contents`, so while empty it has no box and adds no gap, and
- * whatever is later put inside it lays out as part of the right-hand cluster,
- * immediately before the `×`.
+ * ⛔ THE SLOT BEFORE `×` IS FF-1's, AND WHAT FILLS IT IS NOT BUILT HERE. RF-2
+ * reserved `data-mirror-slot="friendly-fire"` while FF-1 was held; FF-1 then
+ * shipped during MIRROR-1 (#568/#569, 2026-09-23), so the slot carries FF-1's own
+ * switch element — passed down from the controller unchanged, the same node the
+ * classic layout puts in its header row. On a Counter reply it is empty. It is
+ * `display: contents`, so empty it has no box and adds no gap, and filled its
+ * content lays out as part of the right-hand cluster, immediately before `×`.
  */
 function StatementRow({
 	statement,
+	control,
 	close,
 }: {
 	statement: string;
+	control: ReactNode;
 	close: ReactNode;
 }) {
 	return (
@@ -455,7 +465,9 @@ function StatementRow({
 				{statement}
 			</span>
 			<div className="ml-auto flex shrink-0 items-center gap-2">
-				<span data-mirror-slot="friendly-fire" className="contents" />
+				<span data-mirror-slot="friendly-fire" className="contents">
+					{control}
+				</span>
 				{close}
 			</div>
 		</div>

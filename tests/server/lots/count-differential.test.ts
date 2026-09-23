@@ -12,6 +12,7 @@ import { runBetTransaction } from "@/server/bets/transaction";
 import { loadRankingSubstrate } from "@/server/debate-view/ranking-substrate";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { seedLegacyReply } from "../../db/_fixtures/lots";
 import { truncateTables } from "../../db/_fixtures/truncate";
 
 /**
@@ -199,7 +200,10 @@ describe("RANK-3 — the displayed count and the ranking input are two numbers",
 		});
 		// The author replies to their OWN post, and that reply is then removed.
 		// Its authorship is withheld from every reader by the masking gate.
-		const hidden = await placeBet({
+		// ⚠ D-52: `place()` now refuses a reply to your own post, so this is the
+		// LEGACY row such a reply is — comment, bet and lot (`seedLegacyReply`).
+		// The leak this case pins is about rows the tables still hold.
+		const hidden = await seedLegacyReply(testDb, {
 			userId: author,
 			marketId,
 			side: "YES",

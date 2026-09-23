@@ -22,6 +22,7 @@ type ReplyRow = {
 	original_stake: string;
 	sold: boolean;
 	price_at_bet: string;
+	friendly_fire: boolean;
 };
 
 /**
@@ -71,7 +72,11 @@ export async function loadReplySubstrate(
 			rb.stake,
 			rb.original_stake,
 			rb.sold,
-			rb.price_at_bet
+			rb.price_at_bet,
+			-- FF-1 / ADR-0058 — the friendly-fire toggle, per reply, for the tag.
+			-- Nothing here sorts or filters on it: a flagged reply is a Support
+			-- reply by side and stays in that pool by the same ruler.
+			rc.friendly_fire
 		FROM comments rc
 		JOIN LATERAL (
 			SELECT
@@ -104,6 +109,7 @@ export async function loadReplySubstrate(
 			// `new Date()` is robust whether the driver returned a Date or a wire
 			// string (timestamptz decode varies by execute path — accrual.ts note).
 			createdAt: new Date(r.created_at),
+			friendlyFire: r.friendly_fire,
 		};
 		const bucket = byParent.get(r.parent_comment_id);
 		if (bucket) {

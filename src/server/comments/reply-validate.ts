@@ -23,12 +23,18 @@ import { REPLY_DEPTH_MAX } from "@/server/config/limits";
 // side into the read-time affordance; the write-path side is the REPLIER's, set
 // in place()). Parent existence/market/depth are immutable (append-only +
 // side-freeze), so the pre-tx read is race-free; the FK at commit is the backstop.
+//
+// D-52 R1 — it also returns the parent's author, read in the SAME select (no
+// second statement), so both callers can refuse a self-reply. Server-side only:
+// the id is compared and discarded, never serialized into a response.
 
 type Reader = DbClient | DbTransaction;
 
 export interface ValidatedReplyParent {
 	parentCommentId: string;
 	sideAtPostTime: "YES" | "NO";
+	/** The parent's author (`comments.user_id`) — for the D-52 self-reply check only. */
+	userId: string;
 }
 
 export async function validateReplyParent(
@@ -41,6 +47,7 @@ export async function validateReplyParent(
 			marketId: comments.marketId,
 			parentCommentId: comments.parentCommentId,
 			sideAtPostTime: comments.sideAtPostTime,
+			userId: comments.userId,
 		})
 		.from(comments)
 		.where(eq(comments.id, args.parentCommentId));
@@ -58,5 +65,9 @@ export async function validateReplyParent(
 		throw new ReplyDepthExceededError();
 	}
 
-	return { parentCommentId: parent.id, sideAtPostTime: parent.sideAtPostTime };
+	return {
+		parentCommentId: parent.id,
+		sideAtPostTime: parent.sideAtPostTime,
+		userId: parent.userId,
+	};
 }
