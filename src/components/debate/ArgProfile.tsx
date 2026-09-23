@@ -7,7 +7,12 @@ import { RelativeTime } from "@/components/ui/relative-time";
 import { GLOSSARY, SOLD_LABEL } from "@/lib/copy/glossary";
 import type { Badge as BadgeKind } from "@/lib/ranking";
 
-import { LaneBadge, PositionMarker, SideBadge } from "./badges";
+import {
+	FriendlyFireTag,
+	LaneBadge,
+	PositionMarker,
+	SideBadge,
+} from "./badges";
 import { CompactDharmaFigure } from "./DharmaFigure";
 import { DownloadPostImage } from "./DownloadPostImage";
 import { formatDharmaCompact } from "./format";
@@ -48,10 +53,19 @@ export function ArgProfile({
 	chipSize,
 	badge = null,
 	download,
+	friendlyFire = false,
 }: {
 	author: AuthorIdentity;
 	side: Side;
 	marker: Marker;
+	/**
+	 * FF-1 / ADR-0058 — render the `Friendly fire` tag beside the position
+	 * marker. Passed by the post-focus reply rows ONLY (`ReplyCard` on both
+	 * tiers, the reply pop-up); `PostCard` and `PostFocusHeader` never pass it,
+	 * which is what keeps the card free of any friendly-fire element (D-51 R5)
+	 * by construction rather than by a conditional here.
+	 */
+	friendlyFire?: boolean;
 	/**
 	 * HTML-FINISH · MARKET DETAIL row 13 — the author's ENTRY PRICE, rendered ON
 	 * the side chip as `YES @ 27%` (d5's `.sidechip`). ⛔ RAW, never `100 − x`:
@@ -615,6 +629,14 @@ export function ArgProfile({
 							marker={marker}
 							className="max-mobile:order-1 max-mobile:shrink-0 max-mobile:px-1 max-mobile:text-[11px] max-mobile:leading-[16px]"
 						/>
+						{/* FF-1 / ADR-0058 — the friendly-fire tag sits where the position
+						    marker sits (beside the side badge), from the same primitive and
+						    with the same phone-tier placement classes, so the two chips
+						    travel together at 360px. Only a post-focus reply row passes
+						    `friendlyFire`; see the prop's note. */}
+						{friendlyFire ? (
+							<FriendlyFireTag className="max-mobile:order-1 max-mobile:shrink-0 max-mobile:px-1 max-mobile:text-[11px] max-mobile:leading-[16px]" />
+						) : null}
 					</span>
 					{authorStake !== undefined ? (
 						<span className="flex shrink-0 items-center gap-1.5 max-mobile:contents">

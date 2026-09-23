@@ -83,6 +83,7 @@ export function PostCard({
 	marketOpen,
 	suspended,
 	unboxed = false,
+	isOwnPost = false,
 }: {
 	post: DebatePost;
 	onEnter: (id: string) => void;
@@ -123,6 +124,13 @@ export function PostCard({
 	 * construction rather than a thing to re-measure each round.
 	 */
 	unboxed?: boolean;
+	/**
+	 * D-52 R1 — the viewer wrote this post, so both trigger pills render
+	 * disabled (nobody replies to their own post). Derived by the view from the
+	 * viewer read's `ownPostIds`; absent = not the viewer's, as on every
+	 * signed-out and pre-D-52 mount.
+	 */
+	isOwnPost?: boolean;
 }) {
 	const triggers = {
 		heldSide,
@@ -130,6 +138,7 @@ export function PostCard({
 		suspended,
 		onReply: (relation: "support" | "counter") =>
 			onReplyToPost(post.id, relation),
+		isOwnPost,
 	};
 	const replyCount = post.aggregate.supportCount + post.aggregate.counterCount;
 	// UI-OVERNIGHT entry 5 — `Know more` only where there IS more. On a

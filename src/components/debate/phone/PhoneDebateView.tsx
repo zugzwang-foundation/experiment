@@ -77,6 +77,9 @@ import { PhoneTopPill } from "./PhoneTopPill";
  * under `phone/` is the opposite direction — a `sm:`/`md:`/`lg:`/`xl:` rule,
  * i.e. a SECOND breakpoint system inside a tier that already has one.
  */
+/** D-52 — a stable "no own posts" for the signed-out viewer (see `openReply`'s deps). */
+const NO_OWN_POSTS: readonly string[] = [];
+
 export function PhoneDebateView({
 	model,
 	viewer,
@@ -117,6 +120,11 @@ export function PhoneDebateView({
 	const { market, posts } = model;
 	const marketOpen = market.status === "Open";
 	const heldSide = viewer?.position?.side ?? null;
+	// D-52 R1 — the viewer's own posts, from the viewer-scoped read (post ids
+	// only). On one of them the card pills and the bar's Support/Counter render
+	// disabled, and `openReply` — the one door every reply sheet opens through —
+	// refuses it: nobody replies to their own post.
+	const ownPostIds = viewer?.ownPostIds ?? NO_OWN_POSTS;
 
 	/**
 	 * ⚠ THE FOCUSED POST IS RESOLVED AGAINST THE MODEL, NOT TRUSTED FROM THE
@@ -635,6 +643,9 @@ export function PhoneDebateView({
 
 	const openReply = useCallback(
 		(parent: DebatePost, relation: "support" | "counter") => {
+			if (ownPostIds.includes(parent.id)) {
+				return;
+			}
 			guard(() => {
 				setSheet({
 					kind: "reply",
@@ -648,7 +659,7 @@ export function PhoneDebateView({
 				});
 			});
 		},
-		[guard],
+		[guard, ownPostIds],
 	);
 
 	/**
@@ -799,6 +810,7 @@ export function PhoneDebateView({
 							heldSide={heldSide}
 							marketOpen={marketOpen}
 							suspended={suspended}
+							isOwnPost={ownPostIds.includes(post.id)}
 						/>
 					</div>
 				))}
@@ -1099,6 +1111,7 @@ export function PhoneDebateView({
 				ownPseudonym={ownPseudonym}
 				suspended={suspended}
 				onEntry={onBarEntry}
+				ownPost={focused !== null && ownPostIds.includes(focused.id)}
 			/>
 
 			{/* ⛔ THE DETAILS HOST IS NOT UNMOUNTED ON CLOSE. Re-mounting the price
@@ -1148,6 +1161,7 @@ export function PhoneDebateView({
 							heldSide={heldSide}
 							marketOpen={marketOpen}
 							suspended={suspended}
+							isOwnPost={ownPostIds.includes(focused.id)}
 						/>
 					</div>
 				</PhoneSheet>

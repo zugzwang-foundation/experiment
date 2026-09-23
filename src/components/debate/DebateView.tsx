@@ -306,6 +306,11 @@ export function DebateView({
 	const { market, posts, priceChart } = model;
 	const marketOpen = market.status === "Open";
 	const heldSide = viewer?.position?.side ?? null;
+	// D-52 R1 — the viewer's own posts, from the viewer-scoped read (post ids
+	// only, never an author id). On one of them both reply controls render
+	// disabled, and the two paths that open a reply composer refuse it below:
+	// nobody replies to their own post. The write path refuses it regardless.
+	const ownPostIds = viewer?.ownPostIds ?? [];
 
 	const toggleEntry = (side: Side) => {
 		if (composerBusy) {
@@ -711,7 +716,7 @@ export function DebateView({
 	 * the two would race and the composer would never appear.
 	 */
 	const replyToPost = (id: string, relation: "support" | "counter") => {
-		if (composerBusy) {
+		if (composerBusy || ownPostIds.includes(id)) {
 			return;
 		}
 		setSelectedPostId(id);
@@ -1106,11 +1111,12 @@ export function DebateView({
 						suspended={suspended}
 						activeRelation={openReply}
 						onToggleRelation={(relation) => {
-							if (composerBusy) {
+							if (composerBusy || ownPostIds.includes(selectedPost.id)) {
 								return;
 							}
 							setOpenReply((cur) => (cur === relation ? null : relation));
 						}}
+						isOwnPost={ownPostIds.includes(selectedPost.id)}
 						onExit={exitPost}
 						onOpenImage={setLightboxUrl}
 						onOpenPopup={setPopupPost}
@@ -1415,6 +1421,7 @@ export function DebateView({
 											heldSide={heldSide}
 											marketOpen={marketOpen}
 											suspended={suspended}
+											ownPostIds={ownPostIds}
 											// R3 — auto-advance. `stagger` on NO only: d5 offsets
 											// the second side by half a cadence so the two columns
 											// advance one-after-another (`:1742` — "NO leads by

@@ -89,6 +89,21 @@ export const GLOSSARY = {
 export const SOLD_LABEL = "Sold";
 
 /**
+ * FF-1 CLOSE-1 R-A15 (2026-09-22, ADR-0058) — the friendly-fire TAG's hover
+ * gloss, VERBATIM from the ruling, punctuation included. It lives in this file
+ * because the tag is built from the same marker primitive as Flipped / Exited
+ * and wears their gloss mechanism — but OUTSIDE `GLOSSARY`, deliberately: the
+ * register's house pattern is `Term — gloss` with no terminal period, and
+ * `tests/unit/copy/glossary.test.ts` pins that shape on every entry. The
+ * ruling's sentence has a colon and a full stop, and this repository does not
+ * re-word ratified copy to fit a guard, nor loosen a guard to fit copy. The
+ * switch's side-parameterised gloss is `FRIENDLY_FIRE_COPY.gloss` in
+ * `composer/copy.ts`, for the same reason.
+ */
+export const FRIENDLY_FIRE_TAG_GLOSS =
+	"Friendly fire: this reply backs the side but contests the argument above.";
+
+/**
  * Strings already shipped inline in the global header, moved here unchanged so
  * they are in one place and under test. VERBATIM — do not re-word.
  */

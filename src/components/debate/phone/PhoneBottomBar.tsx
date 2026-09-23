@@ -6,6 +6,7 @@ import { ThumbGlyph } from "@/components/ui/thumb-glyph";
 import {
 	COMPOSER_COPY,
 	c3OppositeSide,
+	OWN_POST_COPY,
 	STATE_COPY,
 	SUSPENDED_COPY,
 } from "../composer/copy";
@@ -78,6 +79,7 @@ export function PhoneBottomBar({
 	ownPseudonym,
 	suspended,
 	onEntry,
+	ownPost = false,
 }: {
 	market: DebateMarketHeader;
 	actions: PhoneBarAction[];
@@ -85,13 +87,21 @@ export function PhoneBottomBar({
 	ownPseudonym: string | null;
 	suspended: boolean;
 	onEntry: (key: string) => void;
+	/**
+	 * D-52 R1 — the thread arm is on the viewer's own post: nobody replies to
+	 * their own post, so EVERY action is blocked and the notice says why, in
+	 * the slot the single-side refusal uses. Only the thread arm can set it; the
+	 * feed arm's action is a post, not a reply. Absent = not the viewer's.
+	 */
+	ownPost?: boolean;
 }) {
 	const heldSide = viewer?.position?.side ?? null;
 	const marketOpen = market.status === "Open";
 	const held = viewer?.position ?? null;
 	const gated = actions.map((action) => ({
 		action,
-		blocked: isEntryDisabled({ resultingSide: action.side, heldSide }),
+		blocked:
+			ownPost || isEntryDisabled({ resultingSide: action.side, heldSide }),
 	}));
 	const firstBlocked = gated.find((row) => row.blocked);
 
@@ -119,12 +129,14 @@ export function PhoneBottomBar({
 			: null
 		: suspended
 			? SUSPENDED_COPY.banned.title
-			: firstBlocked !== undefined && heldSide !== null
-				? c3OppositeSide({
-						held: heldSide,
-						resulting: firstBlocked.action.side,
-					})
-				: null;
+			: ownPost
+				? OWN_POST_COPY
+				: firstBlocked !== undefined && heldSide !== null
+					? c3OppositeSide({
+							held: heldSide,
+							resulting: firstBlocked.action.side,
+						})
+					: null;
 
 	const entryHidden = !marketOpen || suspended;
 

@@ -281,6 +281,7 @@ export function PostScroller({
 	marketOpen,
 	suspended,
 	auto,
+	ownPostIds,
 }: {
 	posts: DebatePost[];
 	side: Side;
@@ -292,6 +293,11 @@ export function PostScroller({
 	heldSide: Side | null;
 	marketOpen: boolean;
 	suspended: boolean;
+	/**
+	 * D-52 R1 — the viewer's own post ids (the viewer read's `ownPostIds`); the
+	 * card on one of them renders both trigger pills disabled. Absent = none.
+	 */
+	ownPostIds?: readonly string[];
 	/**
 	 * HTML-FINISH · MARKET DETAIL round 2 · R3. OMIT to page manually with no
 	 * timer at all — which is what every test and any future consumer without the
@@ -354,6 +360,7 @@ export function PostScroller({
 					heldSide={heldSide}
 					marketOpen={marketOpen}
 					suspended={suspended}
+					isOwnPost={ownPostIds?.includes(post.id) ?? false}
 				/>
 			</div>
 			{posts.length > 1 ? (
