@@ -791,6 +791,16 @@ function StakeBar(props: {
 	);
 }
 
+/**
+ * The stake bar's column separator. Hidden once the bar wraps (below ~400px of
+ * section content): a separator that ends a line separates nothing, and it is
+ * what the 640px measurement found stranded after TO WIN.
+ */
 function Hairline() {
-	return <span aria-hidden="true" className="h-9 w-px shrink-0 bg-n2" />;
+	return (
+		<span
+			aria-hidden="true"
+			className="h-9 w-px shrink-0 bg-n2 @max-[400px]/mirror:hidden"
+		/>
+	);
 }
