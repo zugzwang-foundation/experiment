@@ -25,8 +25,8 @@ chip). Making it one object means a mount cannot ask for the Mirror without supp
 
 `ImageAttach` gains `variant: "mirror"` and renders the RF-6 image view from the SAME closures it
 already owns: the local blob preview and its revoke invariants, the drag-and-drop gate, the hidden
-file input. None of that logic is copied; its four inline handlers are hoisted to named functions
-that both branches reference.
+file input. None of that logic is copied: the file input (with its `onChange`) is hoisted to one
+element and the three drop handlers to one object, and both branches render those.
 
 ## 2 · Slices and exit conditions
 
@@ -36,7 +36,7 @@ Exit condition for EVERY slice: `pnpm vitest run` (whole suite) green, `pnpm tsc
 | Slice | Content | Exit condition beyond the suite |
 |---|---|---|
 | A | `submit-baseline.test.tsx` (A4) and `classic-layout-baseline.test.tsx` + fixture, captured on untouched `main` | both green twice (determinism) — DONE before this plan |
-| S1 | `docs/design/composer-mirror.md` (verbatim register); design-canon §3 rule 5 and the "Composer (all bet composers)" entry replaced per RF-9 | before/after quotes in the run report |
+| S1 | `docs/design/composer-mirror.md` (verbatim register); design-canon §3 rule 5 and the "Composer (all bet composers)" entry replaced per the brief's RF-9 (its canon instructions — not a register item; the register ends at RF-8) | before/after quotes in the run report |
 | S2 | `composer/mirror-sizing.ts` — `fitTitleSize` (0.5px step-down, floor 13, line height = size × 1.375) + `titleLinesLeft` counter rule; unit tests (G3's arithmetic, G6) | a 125-char all-caps title takes the step-down path in the model; a normal one does not |
 | S3 | Post variant, UNMOUNTED: `MirrorComposer.tsx` (RF-1, RF-3, RF-4, RF-6 image view, RF-7), `ImageAttach` mirror variant, `BetComposer` `mirror` prop; render tests | classic baseline still byte-identical; side-pole inventory updated in this commit |
 | S4+S5 | Reply variant (RF-2) + both desktop mounts switched + `page.tsx` threads the viewer PFP + detail toggle and slide (RF-5, RF-6 detail view) — **ONE commit, see §6 #1** | A4 green against the Mirror (the switch makes it exercise the new layout) |
@@ -57,7 +57,7 @@ Exit condition for EVERY slice: `pnpm vitest run` (whole suite) green, `pnpm tsc
 | `src/app/(public)/m/[slug]/page.tsx` | passes `ownPfpUrl` — the same `pfpUrl(session.user.pfpFilename)` the `(public)` layout already computes for the header (§6 #7) |
 | `tests/unit/design/side-pole-binding.test.ts` | `MirrorComposer.tsx` joins the CLOSED inventory — the submit is side-keyed to the pole family (RF-7). Named here, same commit as the code, offender predicate passing: the file's own rule. |
 | `tests/unit/debate/render/side-badge.test.tsx` | the `CHIP.base` census gains `MirrorComposer.tsx` (1 unsized site: RF-3's author-row chip IS the card's chip, unrestyled, by the register's own ruling); base 6 → 7; the test's count-bearing name is replaced by a count-free one, per that file's fence. Added at S3, where the census reddened on the new site. |
-| `docs/design/composer-mirror.md` (new), `docs/design/design-canon.md` | RF-9 |
+| `docs/design/composer-mirror.md` (new), `docs/design/design-canon.md` | the brief's RF-9 (canon instructions) |
 | tests (new) | `submit-baseline`, `classic-layout-baseline`, `mirror-sizing`, `mirror-composer` render suites, `mirror-toggle` (G2), source guards |
 
 NOT touched: anything under `src/server/`, `src/app/api/`, `src/db/`, `drizzle/`; `limits.ts`; `payload.ts`,
@@ -151,9 +151,10 @@ positive control (OVN-V1).
     Rejected: reusing `Choose an image file`, which the Mirror's visible text would not contain
     (WCAG 2.5.3). The group keeps `Attach an image`; `Remove image` is today's name.
 17. **Moving to the detail view focuses the detail field**; moving back leaves focus on the toggle.
-18. **The friendly-fire slot** is an empty `display: contents` element named
-    `data-mirror-slot="friendly-fire"` immediately before the statement row's `×` — named, boxless
-    (so it adds no gap), and empty.
+18. **The friendly-fire slot** is a `display: contents` element named
+    `data-mirror-slot="friendly-fire"` immediately before the statement row's `×` — named and boxless
+    (so it adds no gap). Written empty; since the merge (#21) it carries FF-1's switch on a Support
+    reply and stays empty on a Counter.
 19. **Local DB writes.** The wall forbids database writes; the kickoff also mandates the full suite,
     which writes to (and toggles triggers on) the local ephemeral test Postgres. Read as: no write BY
     THIS SESSION to any database outside the suite's own fixtures; staging, production and any manual

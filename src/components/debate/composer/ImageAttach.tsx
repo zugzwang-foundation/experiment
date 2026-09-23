@@ -801,7 +801,7 @@ export function ImageAttach({
 	 *   · attached → the picture WHOLE (`object-contain`, letterboxed on the
 	 *     frame's ground) with `Replace` and `Remove image` over its top-right
 	 *     corner, and no filename;
-	 *   · error → today's message and retry line, centred low in the frame, over
+	 *   · error → today's message and retry line, in place of the caption under
 	 *     the invitation, so the next pick is one click away.
 	 *
 	 * ⛔ NOTHING HERE READS OR SENDS A FILE'S BYTES. A pick still goes one way:
@@ -827,27 +827,64 @@ export function ImageAttach({
 					className="relative flex h-full w-full min-w-0 items-center justify-center transition-colors data-[dragging=true]:bg-n1/60"
 				>
 					{invitesAPick ? (
-						<button
-							type="button"
-							// `invitesAPick` already excludes `attaching` (a file in hand
-							// never invites a pick), so the classic's second disjunct is
-							// unreachable here and the type checker says so.
-							disabled={disabled}
-							onClick={openPicker}
-							// The visible words ARE the name (WCAG 2.5.3); the caption is
-							// the description.
-							aria-label={MIRROR_COPY.addImage}
-							aria-describedby={captionId}
-							className="flex h-full w-full flex-col items-center justify-center gap-1.5 px-4 text-center transition-colors outline-none hover:bg-n1/40 focus-visible:shadow-[inset_var(--state-focus-ring)] disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
-						>
-							<ImagePlus aria-hidden="true" className="size-6 text-n5" />
-							<span className="text-[14px] leading-5 font-medium text-n6">
-								{MIRROR_COPY.addImage}
-							</span>
-							<span id={captionId} className="text-[12px] leading-4 text-n5">
-								{MIRROR_COPY.addImageCaption}
-							</span>
-						</button>
+						<>
+							{/* The whole frame is the pick target: the button is an EMPTY
+							    full-frame layer, and the words sit over it with no pointer
+							    events. They are not inside the button because the error line
+							    joins them in the error phase, and a live region inside a
+							    `button` is not monitored (the classic render's own rule) —
+							    as a separate absolute layer the error covered the caption at
+							    the narrowest slot (`@code-reviewer` L1, 27px measured). */}
+							<button
+								type="button"
+								// `invitesAPick` already excludes `attaching` (a file in hand
+								// never invites a pick), so the classic's second disjunct is
+								// unreachable here and the type checker says so.
+								disabled={disabled}
+								onClick={openPicker}
+								// The visible words ARE the name (WCAG 2.5.3); the caption is
+								// the description, while it is shown.
+								aria-label={MIRROR_COPY.addImage}
+								aria-describedby={
+									state.phase === "error" ? undefined : captionId
+								}
+								className="absolute inset-0 transition-colors outline-none hover:bg-n1/40 focus-visible:shadow-[inset_var(--state-focus-ring)] disabled:pointer-events-none"
+							/>
+							<div
+								className={`pointer-events-none relative flex flex-col items-center gap-1.5 px-4 text-center${
+									disabled ? " opacity-(--state-disabled-opacity)" : ""
+								}`}
+							>
+								<ImagePlus aria-hidden="true" className="size-6 text-n5" />
+								<span
+									aria-hidden="true"
+									className="text-[14px] leading-5 font-medium text-n6"
+								>
+									{MIRROR_COPY.addImage}
+								</span>
+								{state.phase === "error" ? (
+									<span
+										role="status"
+										aria-live="polite"
+										className="text-[11px] leading-4"
+									>
+										{state.message !== "" && (
+											<span className="font-semibold text-ink">
+												{state.message}{" "}
+											</span>
+										)}
+										<span className="text-n5">{STATE_COPY.gateDown.body}</span>
+									</span>
+								) : (
+									<span
+										id={captionId}
+										className="text-[12px] leading-4 text-n5"
+									>
+										{MIRROR_COPY.addImageCaption}
+									</span>
+								)}
+							</div>
+						</>
 					) : (
 						<>
 							{previewUrl !== null ? (
@@ -891,18 +928,6 @@ export function ImageAttach({
 							) : null}
 						</>
 					)}
-					{state.phase === "error" ? (
-						<span
-							role="status"
-							aria-live="polite"
-							className="pointer-events-none absolute inset-x-4 bottom-3 text-center text-[11px] leading-4"
-						>
-							{state.message !== "" && (
-								<span className="font-semibold text-ink">{state.message} </span>
-							)}
-							<span className="text-n5">{STATE_COPY.gateDown.body}</span>
-						</span>
-					) : null}
 				</fieldset>
 			</>
 		);

@@ -17,7 +17,7 @@ import { BET_MAX_STAKE } from "@/server/config/limits";
 import { SideBadge } from "../badges";
 import { formatDharma, formatPricePercent } from "../format";
 import type { Side } from "../types";
-import { COMPOSER_COPY, MIRROR_COPY } from "./copy";
+import { COMPOSER_COPY, FRIENDLY_FIRE_COPY, MIRROR_COPY } from "./copy";
 import { type ComposerStatus, ErrorStrip } from "./ErrorStrip";
 import { type ComposerKind, floorFor } from "./gating";
 import { ImageAttach, type ImageAttachState } from "./ImageAttach";
@@ -141,26 +141,38 @@ export function MirrorComposer(props: {
 	const shown: MirrorView = props.imageAttachEnabled ? view : "detail";
 	const slide = useViewSlide(shown);
 	const detailRef = useRef<HTMLTextAreaElement | null>(null);
+	const toggleRef = useRef<HTMLButtonElement | null>(null);
 	// Moving to the detail view is asking to write detail: focus follows. Moving
-	// back leaves focus on the toggle, where the reader pressed it.
+	// back puts focus on the toggle IF it was in the detail field — which it still
+	// is after a click in Safari, where pressing a button does not focus it, and
+	// the field is about to be hidden (`@code-reviewer` L6: focus fell to <body>).
 	const focusDetail = useRef(false);
+	const focusToggle = useRef(false);
 	useEffect(() => {
 		if (shown === "detail" && focusDetail.current) {
 			focusDetail.current = false;
 			detailRef.current?.focus();
 		}
+		if (shown === "image" && focusToggle.current) {
+			focusToggle.current = false;
+			toggleRef.current?.focus();
+		}
 	}, [shown]);
 	const toggleView = () => {
 		const next: MirrorView = view === "image" ? "detail" : "image";
 		focusDetail.current = next === "detail";
+		focusToggle.current =
+			next === "image" &&
+			(detailRef.current?.contains(document.activeElement) ?? false);
 		slide.leave(view);
 		setView(next);
 	};
 
 	return (
 		<section
-			// RF-9 — the post composer no longer SHOWS `Place your Đ BET`; it stays the
-			// section's accessible name, exactly as today.
+			// design-canon §3 rule 5, as MIRROR-1 amended it: the post composer no
+			// longer SHOWS `Place your Đ BET`; it stays the section's accessible
+			// name, exactly as today.
 			aria-label={`${COMPOSER_COPY.header} — ${props.side}`}
 			data-testid="mirror-composer"
 			// RF-1 — fills the slot (`ComposerSlot` is a flex column), n0 surface, n2
@@ -171,15 +183,38 @@ export function MirrorComposer(props: {
 			{/* THE BODY — every row above the stake bar. It is the one thing that
 			    scrolls: RF-6's frame stops shrinking at 160px, and below that the
 			    body scrolls while the stake bar, its sibling, stays pinned.
-			    `-m-0.5 p-0.5` gives a 2px focus ring room inside the scroll clip. */}
+			    ⚠ ITS PADDING IS ROOM, NOT SPACING — every value is cancelled by an
+			    equal negative margin, so no row moves. The `×` keeps the classic's
+			    44px target by overhanging its row (`-my-3`) and sits flush right
+			    (`-mr-3`); a scroll container clips whatever reaches past its
+			    padding box, so 12px of top and right padding is what keeps that
+			    target — and its focus ring — whole, and keeps the body from
+			    scrolling sideways (`@code-reviewer` M1 measured 10px of x-scroll and
+			    a 6–9px clip before this). 2px elsewhere is the focus-ring room. */}
 			<div
 				data-testid="mirror-body"
-				className="-m-0.5 flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto p-0.5"
+				className="-mt-3 -mr-3 -mb-0.5 -ml-0.5 flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto pt-3 pr-3 pb-0.5 pl-0.5"
 			>
 				{props.replyStatement !== null ? (
 					<StatementRow
 						statement={props.replyStatement}
-						control={props.statementControl}
+						control={
+							props.statementControl ? (
+								<>
+									{props.statementControl}
+									{/* FF-1's helper line, verbatim, for assistive tech. The
+									    Mirror draws no helper ROW (RF-1 lists none, and the
+									    founder's reply render shows none); on the desktop the
+									    label's hover gloss carries the meaning — which a
+									    keyboard or screen-reader user never reaches
+									    (`@code-reviewer` M3). Visible treatment is flagged for
+									    Gate C. */}
+									<span className="sr-only">
+										{FRIENDLY_FIRE_COPY.helper(props.side)}
+									</span>
+								</>
+							) : null
+						}
 						close={
 							<CloseButton onClose={props.onClose} disabled={props.inFlight} />
 						}
@@ -212,6 +247,7 @@ export function MirrorComposer(props: {
 					/>
 					{props.imageAttachEnabled ? (
 						<DetailToggle
+							buttonRef={toggleRef}
 							shown={shown}
 							hasDetail={props.extended.trim().length > 0}
 							onToggle={toggleView}
@@ -264,7 +300,7 @@ export function MirrorComposer(props: {
 								// RF-6 — today's detail field, filling the same frame so
 								// nothing jumps: 14px / 21px, n6, 14px 16px padding. The n3
 								// edge is the frame's own while this view shows.
-								className="min-h-0 w-full flex-1 resize-none bg-transparent px-4 py-3.5 text-[14px] leading-[21px] text-n6 outline-none placeholder:text-n5 focus-visible:shadow-[inset_var(--state-focus-ring)] disabled:cursor-not-allowed"
+								className="min-h-0 w-full flex-1 resize-none bg-transparent px-4 py-3.5 text-[14px] leading-[21px] text-n6 outline-none placeholder:text-n5 focus-visible:shadow-[inset_var(--state-focus-ring)] disabled:cursor-not-allowed disabled:opacity-(--state-disabled-opacity)"
 							/>
 							<span
 								data-testid="mirror-detail-counter"
@@ -406,10 +442,12 @@ function useViewSlide(shown: MirrorView) {
  * ⚠ `aria-pressed` is true only on the detail view (`Show image`), per RF-5.
  */
 function DetailToggle({
+	buttonRef,
 	shown,
 	hasDetail,
 	onToggle,
 }: {
+	buttonRef: React.Ref<HTMLButtonElement>;
 	shown: MirrorView;
 	hasDetail: boolean;
 	onToggle: () => void;
@@ -423,6 +461,7 @@ function DetailToggle({
 			: MIRROR_COPY.addDetail;
 	return (
 		<button
+			ref={buttonRef}
 			type="button"
 			aria-pressed={pressed}
 			onClick={onToggle}
@@ -608,9 +647,15 @@ function TitleField(props: {
 		}
 		const saved = {
 			height: el.style.height,
+			overflow: el.style.overflow,
 			fontSize: el.style.fontSize,
 			lineHeight: el.style.lineHeight,
 		};
+		// `overflow: hidden` while measuring: a zero-height field overflows, and
+		// on a platform with always-visible scrollbars the gutter that appears
+		// would narrow the very width being wrapped against (`@code-reviewer` L3 —
+		// not reproducible headless, closed anyway because it costs one line).
+		el.style.overflow = "hidden";
 		const next = fitTitleSize((size) => {
 			const lh = titleLineHeightPx(size);
 			el.style.fontSize = `${size}px`;
@@ -619,6 +664,7 @@ function TitleField(props: {
 			return Math.round(el.scrollHeight / lh);
 		});
 		el.style.height = saved.height;
+		el.style.overflow = saved.overflow;
 		el.style.fontSize = saved.fontSize;
 		el.style.lineHeight = saved.lineHeight;
 		setSizePx(next);
@@ -643,7 +689,7 @@ function TitleField(props: {
 					lineHeight: `${titleLineHeightPx(sizePx)}px`,
 				}}
 				data-testid="mirror-title"
-				className="block h-[54px] w-full resize-none rounded-none border-0 border-b border-n3 bg-transparent p-0 font-medium tracking-[-0.01em] text-ink outline-none placeholder:text-n5 focus-visible:shadow-(--state-focus-ring) disabled:cursor-not-allowed"
+				className="block h-[54px] w-full resize-none rounded-none border-0 border-b border-n3 bg-transparent p-0 font-medium tracking-[-0.01em] text-ink outline-none placeholder:text-n5 focus-visible:shadow-(--state-focus-ring) disabled:cursor-not-allowed disabled:opacity-(--state-disabled-opacity)"
 			/>
 			{left !== null ? (
 				<span
@@ -714,7 +760,7 @@ function StakeBar(props: {
 						style={{ width: props.amountFieldWidth }}
 						onChange={(e) => props.onAmountInput(e.target.value)}
 						onBlur={props.onAmountBlur}
-						className={`bg-transparent p-0 font-mono text-[22px] leading-7 font-semibold tabular-nums outline-none focus-visible:shadow-(--state-focus-ring) disabled:cursor-not-allowed ${
+						className={`bg-transparent p-0 font-mono text-[22px] leading-7 font-semibold tabular-nums outline-none focus-visible:shadow-(--state-focus-ring) disabled:cursor-not-allowed disabled:opacity-(--state-disabled-opacity) ${
 							props.overCap ? "text-n4" : "text-ink"
 						}`}
 					/>

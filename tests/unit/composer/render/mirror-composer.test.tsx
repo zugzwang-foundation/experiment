@@ -168,7 +168,8 @@ describe("MIRROR-1 RF-1 — the shell and its rows", () => {
 		const { container } = mirrorPost();
 		const shell = byTestId(container, "mirror-composer");
 		expect(shell.getAttribute("aria-label")).toBe("Place your Đ BET — YES");
-		// RF-9: the header is no longer SHOWN on the post composer.
+		// design-canon §3 rule 5 as MIRROR-1 amended it: the header is no longer
+		// SHOWN on the post composer.
 		expect(shell.textContent).not.toContain("Place your Đ BET");
 	});
 });
@@ -336,6 +337,64 @@ describe("MIRROR-1 RF-6 — the media frame (image view)", () => {
 		expect(
 			byTestId(container, "mirror-media-frame").querySelector("img"),
 		).toBeNull();
+	});
+});
+
+describe("MIRROR-1 — review fixes (@code-reviewer M2, L1)", () => {
+	it("mirror::the-three-fields-take-the-canon-disabled-treatment", () => {
+		// C2 disables every field (the classic's own rule); the Mirror's plain
+		// elements must also LOOK disabled, with the canon's one treatment.
+		const { getByLabelText } = render(
+			<BetComposer
+				{...composerProps()}
+				viewer={{ ...VIEWER, balance: "5", spendableToday: "5" }}
+				mirror={MIRROR}
+			/>,
+		);
+		for (const label of ["Argument title", "Argument body", "Stake amount"]) {
+			const field = getByLabelText(label);
+			expect(field.hasAttribute("disabled")).toBe(true);
+			expect(field.className).toContain(
+				"disabled:opacity-(--state-disabled-opacity)",
+			);
+		}
+	});
+
+	it("mirror::an-attach-error-reads-in-place-of-the-caption-and-the-frame-stays-one-target", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (input: RequestInfo | URL) => {
+				if (String(input) === "/api/uploads/sign") {
+					return new Response(
+						JSON.stringify({
+							ok: false,
+							error: {
+								code: "error_image_mime_rejected",
+								message: "unsupported image type",
+							},
+						}),
+						{ status: 400, headers: { "content-type": "application/json" } },
+					);
+				}
+				return new Response(JSON.stringify({}), { status: 200 });
+			}),
+		);
+		const { container, getByRole } = mirrorPost();
+		await attach(container);
+		const frame = byTestId(container, "mirror-media-frame");
+		const status = frame.querySelector('[role="status"]');
+		expect(status?.textContent).toBe(
+			"unsupported image type Try again in a few seconds.",
+		);
+		// The caption gives way to the error; the pick is still the whole frame.
+		expect(frame.textContent).not.toContain(
+			"Optional · shown whole · any orientation",
+		);
+		const pick = getByRole("button", { name: "Add an image" });
+		expect(pick.className).toContain("absolute inset-0");
+		expect(pick.hasAttribute("aria-describedby")).toBe(false);
+		// The live region is NOT inside the button (it would not be monitored).
+		expect(pick.contains(status)).toBe(false);
 	});
 });
 

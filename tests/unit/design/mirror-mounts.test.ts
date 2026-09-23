@@ -49,6 +49,10 @@ describe("MIRROR-1 RF-8 — the Mirror is the desktop's, never the phone's", () 
 		// Positive control: the phone mount is found, with a prop it does pass.
 		expect(phone).toHaveLength(1);
 		expect(phone[0]).toMatch(/\bviewer=\{viewer\}/);
-		expect(phone[0]).not.toMatch(/\bmirror=/);
+		// Any spelling: an attribute (`mirror=`) or a key slipped into the mount's
+		// existing object spread (`mirror:`) — the second passes a `mirror=` scan
+		// and the classic baseline alike, which never mounts the phone tree
+		// (`@code-reviewer` L4).
+		expect(phone[0]).not.toMatch(/\bmirror\b/);
 	});
 });

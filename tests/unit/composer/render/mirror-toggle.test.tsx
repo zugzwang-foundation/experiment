@@ -312,6 +312,37 @@ describe("MIRROR-1 RF-6 — the switch's slide", () => {
 	});
 });
 
+describe("MIRROR-1 — focus across the switch (@code-reviewer L6)", () => {
+	it("mirror-toggle::leaving-the-detail-field-by-click-lands-focus-on-the-toggle", async () => {
+		// jsdom's `click()` does not focus the button it clicks — which is exactly
+		// Safari's behaviour, and the case that dropped focus to <body>.
+		const { container, getByLabelText } = mount();
+		await act(async () => {
+			fireEvent.click(toggle(container));
+		});
+		const detail = getByLabelText("Argument body");
+		expect(document.activeElement).toBe(detail);
+		await act(async () => {
+			fireEvent.click(toggle(container));
+		});
+		expect(document.activeElement).toBe(toggle(container));
+	});
+
+	it("mirror-toggle::a-switch-with-focus-elsewhere-does-not-steal-it", async () => {
+		const { container, getByLabelText } = mount();
+		await act(async () => {
+			fireEvent.click(toggle(container));
+		});
+		const title = getByLabelText("Argument title");
+		title.focus();
+		await act(async () => {
+			fireEvent.click(toggle(container));
+		});
+		// Focus was in the title, not the detail field: it stays there.
+		expect(document.activeElement).toBe(title);
+	});
+});
+
 describe("MIRROR-1 — the image-attach brake (ADR-0052) leaves the detail view", () => {
 	it("mirror-toggle::flag-off-no-toggle-no-image-view-detail-shown", () => {
 		flag.imageAttach = false;

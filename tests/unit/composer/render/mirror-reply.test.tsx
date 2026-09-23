@@ -5,8 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * MIRROR-1 · S4 — the Mirror's REPLY variant (RF-2) and the reply half of G4.
  * The statement row carries today's relation header and the `×`; the author row
- * loses its `×`; the reserved friendly-fire slot sits, empty, immediately before
- * the `×`; the limits read the REPLY floor.
+ * loses its `×`; the slot RF-2 reserved immediately before the `×` carries FF-1's
+ * switch on a Support reply (FF-1 shipped mid-run) and is empty on a Counter; the
+ * limits read the REPLY floor.
  */
 
 vi.mock("next/navigation", () => ({
@@ -205,5 +206,33 @@ describe("MIRROR-1 G4 — a reply reads the REPLY floor", () => {
 		const submit = getByRole("button", { name: "PLACE Đ BET" });
 		expect(submit.className).toContain("bg-no");
 		expect(submit.className).not.toContain("bg-yes");
+	});
+
+	it("mirror-reply::counter-on-a-no-parent-bets-yes-and-wears-the-yes-pole", () => {
+		// ⚠ The case above cannot tell a SIDE-keyed pole from a RELATION-keyed one:
+		// Counter on a YES parent is NO either way. Counter on a NO parent bets YES,
+		// so a pole keyed on "counter" would paint it white here and fail
+		// (`@code-reviewer` L4).
+		const { getByRole } = reply("counter", "YES");
+		const submit = getByRole("button", { name: "PLACE Đ BET" });
+		expect(submit.className).toContain("bg-yes");
+		expect(submit.className).not.toContain("bg-no");
+	});
+
+	it("mirror-reply::assistive-tech-hears-ff-1s-helper-on-a-support-reply-only", () => {
+		// No helper ROW is drawn (RF-1 lists none); the helper is present for
+		// assistive tech, verbatim, and only where the switch is (`@code-reviewer`
+		// M3).
+		const s = reply("support", "YES");
+		const slot = s.container.querySelector(
+			'[data-mirror-slot="friendly-fire"]',
+		);
+		expect(slot?.textContent).toContain(
+			"Contest this argument without leaving your side. Your stake still backs YES.",
+		);
+		expect(slot?.querySelector(".sr-only")).not.toBeNull();
+		cleanup();
+		const c = reply("counter", "NO");
+		expect(c.container.textContent).not.toContain("Contest this argument");
 	});
 });
