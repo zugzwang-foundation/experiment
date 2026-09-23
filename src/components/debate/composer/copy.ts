@@ -103,6 +103,13 @@ export function c3OppositeSide(args: {
 	return `You hold ${args.held}. Exit your position to bet ${args.resulting}.`;
 }
 
+/**
+ * D-52 R1 — the own-post disabled tooltip + aria text, verbatim from the
+ * ruling. It fills the slot C3 fills and wins over it: nobody replies to their
+ * own post on either side, so both triggers are foreclosed whatever is held.
+ */
+export const OWN_POST_COPY = "You can't reply to your own post.";
+
 /** W2.11 kit strips (verbatim, incl. curly apostrophes) + the two authored strings. */
 export const STATE_COPY = {
 	trackB: {

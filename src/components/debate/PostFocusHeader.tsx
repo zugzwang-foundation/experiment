@@ -47,6 +47,7 @@ export function PostFocusHeader({
 	onExit,
 	onOpenImage,
 	onOpenPopup,
+	isOwnPost = false,
 }: {
 	post: DebatePost;
 	/**
@@ -68,6 +69,12 @@ export function PostFocusHeader({
 	 * on the surface, not one per zoom level.
 	 */
 	onOpenPopup: (post: PresentPost) => void;
+	/**
+	 * D-52 R1 — the viewer wrote the focused post: both split-bar triggers
+	 * render disabled (nobody replies to their own post). Absent = not the
+	 * viewer's.
+	 */
+	isOwnPost?: boolean;
 }) {
 	const replyCount = post.aggregate.supportCount + post.aggregate.counterCount;
 	return (
@@ -166,7 +173,13 @@ export function PostFocusHeader({
 					    badge cut 33px, eight elements with `scrollWidth > clientWidth`.
 					    Anything measuring this row measures the clipping ancestor's
 					    descendants, never the document. */}
-					<div className="flex min-h-0 flex-1 gap-4 items-center max-mobile:flex-col max-mobile:items-start">
+					{/* D-52 R5 — `items-stretch`, not `items-center`: on the shared header
+					    floor the tile is taller than its content, and only a stretched
+					    text column lets `post-focus-foot`'s `mt-auto` sink the split bar
+					    to the tile's bottom edge, as the feed cards carry it. The name
+					    row and the title stay at the top; the image arm keeps its own
+					    `self-center`. */}
+					<div className="flex min-h-0 flex-1 gap-4 items-stretch max-mobile:flex-col max-mobile:items-start">
 						{/* ⛔ QUOTE-1 A — THE EMPTY ARM AND ITS WHOLE FRAME ARE GONE
 						    (founder-ruled 2026-09-11). R2 had filled the post-focus
 						    `.hpimg` with d5's `POST IMAGE` box (`d5:1491-1492`) whenever
@@ -260,6 +273,7 @@ export function PostFocusHeader({
 									suspended={suspended}
 									activeRelation={activeRelation}
 									onToggleRelation={onToggleRelation}
+									isOwnPost={isOwnPost}
 								/>
 							</div>
 						</div>

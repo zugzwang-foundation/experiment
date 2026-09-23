@@ -2,7 +2,7 @@ import { InfoTip } from "@/components/ui/info-tip";
 import { GLOSSARY } from "@/lib/copy/glossary";
 import { cn } from "@/lib/utils";
 
-import { c3OppositeSide } from "./composer/copy";
+import { c3OppositeSide, OWN_POST_COPY } from "./composer/copy";
 import { deriveReplySide, isEntryDisabled } from "./composer/gating";
 import { computeSplitBar, displaySplitTotal } from "./composer/split-bar";
 import { formatDharma } from "./format";
@@ -98,6 +98,13 @@ export function AggregateFooter({
 		marketOpen: boolean;
 		suspended: boolean;
 		onReply: (relation: "support" | "counter") => void;
+		/**
+		 * D-52 R1 — the viewer wrote this post: both pills render disabled with
+		 * `OWN_POST_COPY` in C3's slot. Optional, absent = not the viewer's (the
+		 * pre-D-52 card); the write path's `self_reply_forbidden` refuses either
+		 * way.
+		 */
+		isOwnPost?: boolean;
 	};
 	/**
 	 * MOBILE-2m · R-1 / ADR-0051 A9 D-1 — this footer is a BAND below 640px when
@@ -474,6 +481,7 @@ function TriggerPill({
 	marketOpen,
 	suspended,
 	onReply,
+	isOwnPost = false,
 }: {
 	relation: "support" | "counter";
 	postSide: Side;
@@ -481,14 +489,18 @@ function TriggerPill({
 	marketOpen: boolean;
 	suspended: boolean;
 	onReply: (relation: "support" | "counter") => void;
+	isOwnPost?: boolean;
 }) {
 	const resultingSide = deriveReplySide({ parentSide: postSide, relation });
 	const oppositeHeld = isEntryDisabled({ resultingSide, heldSide });
-	const disabled = !marketOpen || suspended || oppositeHeld;
+	const disabled = !marketOpen || suspended || oppositeHeld || isOwnPost;
 	const c3 =
 		oppositeHeld && heldSide !== null
 			? c3OppositeSide({ held: heldSide, resulting: resultingSide })
 			: null;
+	// D-52 R1 — the own-post refusal takes C3's slot and wins over it: on the
+	// viewer's own post both pills are foreclosed, whatever is held.
+	const refusal = isOwnPost ? OWN_POST_COPY : c3;
 	// Black-pill exception: 0.5px n2 edge (values-log §1 item 8).
 	//
 	// ⛔⛔ ADR-0051 A11 D-1 — BELOW 640 THE BLACK SIDE DECLARES THE DESIGN
@@ -534,7 +546,7 @@ function TriggerPill({
 	// told why they are blocked, not given the relation's definition. The
 	// glossary gloss fills the null branch only — c3 still wins outright.
 	const gloss =
-		c3 ?? (relation === "support" ? GLOSSARY.support : GLOSSARY.counter);
+		refusal ?? (relation === "support" ? GLOSSARY.support : GLOSSARY.counter);
 	return (
 		<InfoTip content={gloss} asChild>
 			<button
@@ -543,7 +555,7 @@ function TriggerPill({
 				disabled={disabled}
 				aria-disabled={disabled}
 				aria-label={
-					c3 ??
+					refusal ??
 					`${relation === "support" ? "Support" : "Counter"} — bet ${resultingSide}`
 				}
 				onClick={() => onReply(relation)}

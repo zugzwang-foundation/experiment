@@ -5,7 +5,7 @@ import { GLOSSARY } from "@/lib/copy/glossary";
 
 import { formatDharma } from "../format";
 import type { ReplyAggregate, Side } from "../types";
-import { c3OppositeSide } from "./copy";
+import { c3OppositeSide, OWN_POST_COPY } from "./copy";
 import { deriveReplySide, isEntryDisabled } from "./gating";
 import { computeSplitBar, displaySplitTotal } from "./split-bar";
 
@@ -27,6 +27,7 @@ export function ReplySplitBar({
 	suspended,
 	activeRelation,
 	onToggleRelation,
+	isOwnPost = false,
 }: {
 	postSide: Side;
 	aggregate: ReplyAggregate;
@@ -35,6 +36,14 @@ export function ReplySplitBar({
 	suspended: boolean;
 	activeRelation: "support" | "counter" | null;
 	onToggleRelation: (relation: "support" | "counter") => void;
+	/**
+	 * D-52 R1 — the viewer wrote this post. Nobody replies to their own post,
+	 * so BOTH triggers render disabled in the foreclosed treatment, carrying
+	 * `OWN_POST_COPY` where C3 would sit. Optional: an omission reads as "not
+	 * the viewer's", the pre-D-52 bar, and the write path's
+	 * `self_reply_forbidden` refuses either way.
+	 */
+	isOwnPost?: boolean;
 }) {
 	const { supportPct } = computeSplitBar({
 		supportDharma: aggregate.supportDharma,
@@ -91,6 +100,7 @@ export function ReplySplitBar({
 					suspended={suspended}
 					active={activeRelation === "support"}
 					onToggle={onToggleRelation}
+					isOwnPost={isOwnPost}
 				/>
 				<span className="text-n5">
 					Đ {formatDharma(aggregate.supportDharma)}
@@ -223,6 +233,7 @@ export function ReplySplitBar({
 					suspended={suspended}
 					active={activeRelation === "counter"}
 					onToggle={onToggleRelation}
+					isOwnPost={isOwnPost}
 				/>
 				<span className="text-n5 font-mono text-[11px] font-medium">
 					Đ {formatDharma(aggregate.counterDharma)}
@@ -242,6 +253,7 @@ function TriggerPill({
 	suspended,
 	active,
 	onToggle,
+	isOwnPost,
 }: {
 	relation: "support" | "counter";
 	postSide: Side;
@@ -250,14 +262,18 @@ function TriggerPill({
 	suspended: boolean;
 	active: boolean;
 	onToggle: (relation: "support" | "counter") => void;
+	isOwnPost: boolean;
 }) {
 	const resultingSide = deriveReplySide({ parentSide: postSide, relation });
 	const oppositeHeld = isEntryDisabled({ resultingSide, heldSide });
-	const disabled = !marketOpen || suspended || oppositeHeld;
+	const disabled = !marketOpen || suspended || oppositeHeld || isOwnPost;
 	const c3 =
 		oppositeHeld && heldSide !== null
 			? c3OppositeSide({ held: heldSide, resulting: resultingSide })
 			: null;
+	// D-52 R1 — the own-post refusal takes C3's slot and wins over it: on the
+	// viewer's own post both triggers are foreclosed, whatever is held.
+	const refusal = isOwnPost ? OWN_POST_COPY : c3;
 	const pole =
 		resultingSide === "YES"
 			? // Black-pill exception: 0.5px n2 edge (values-log §1 item 8).
@@ -267,7 +283,7 @@ function TriggerPill({
 	// told why they are blocked, not given the relation's definition. The
 	// glossary gloss fills the null branch only — c3 still wins outright.
 	const gloss =
-		c3 ?? (relation === "support" ? GLOSSARY.support : GLOSSARY.counter);
+		refusal ?? (relation === "support" ? GLOSSARY.support : GLOSSARY.counter);
 	return (
 		<InfoTip content={gloss} asChild>
 			<button
@@ -276,7 +292,7 @@ function TriggerPill({
 				aria-disabled={disabled}
 				aria-expanded={active}
 				aria-label={
-					c3 ??
+					refusal ??
 					`${relation === "support" ? "Support" : "Counter"} — bet ${resultingSide}`
 				}
 				onClick={() => onToggle(relation)}

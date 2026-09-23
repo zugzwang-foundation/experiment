@@ -31,7 +31,10 @@ import { modelWith, post, reply, stubElementScroll, VIEWER } from "./_fixtures";
  *
  * FF-1 CLOSE-3 (D-52): R2 WITHDREW the meter, so the three meter cases are
  * replaced by one negative (no meter row in the thread arm, the tag as its
- * positive control). The paragraph above is the D-51 record.
+ * positive control); R1 adds the own-post case — the card pills and the bar's
+ * Support/Counter are disabled on the viewer's own post and no sheet opens,
+ * with the other author's post keeping Support as the positive control. The
+ * paragraph above is the D-51 record.
  *
  * FF-1 CLOSE-1 (R-A12 / R-A15): the switch sits INSIDE the sheet composer's
  * header row with the helper line beneath it, and below 640px no gloss mounts
@@ -190,6 +193,59 @@ describe("phone friendly-fire — the thread pane (G14 · tag; the meter withdra
 		expect(screen.getByTestId("phone-pane-support").innerHTML).toContain(
 			'data-testid="ff-tag"',
 		);
+	});
+});
+
+describe("phone — the viewer's own post (D-52 R1)", () => {
+	it("phone-own-post::the-card-pills-and-the-bar-are-disabled-and-no-sheet-opens (positive control: the other author's post keeps Support)", () => {
+		const OWN_POST_COPY = "You can't reply to your own post.";
+		const own = post({ id: "p-own", ordinal: 2, side: "NO" });
+		const ownViewer = { ...VIEWER, ownPostIds: ["p-own"] };
+		const mountOwn = (initialPostId: string | null) =>
+			render(
+				<PhoneDebateView
+					model={modelWith([fixturePost(), own])}
+					viewer={ownViewer}
+					initialPostId={initialPostId}
+					ownPseudonym={null}
+					details={null}
+				/>,
+			);
+
+		// ── The feed arm: the own post's card, the other author's card ─────
+		mountOwn(null);
+		const ownPane = screen.getByTestId("phone-pane-NO");
+		const ownSupport = within(ownPane).getByTestId("card-trigger-support");
+		const ownCounter = within(ownPane).getByTestId("card-trigger-counter");
+		expect(ownSupport.hasAttribute("disabled")).toBe(true);
+		expect(ownCounter.hasAttribute("disabled")).toBe(true);
+		expect(ownSupport.getAttribute("aria-label")).toBe(OWN_POST_COPY);
+		fireEvent.click(ownSupport);
+		expect(screen.queryByTestId("phone-sheet")).toBeNull();
+		const otherSupport = within(
+			screen.getByTestId("phone-pane-YES"),
+		).getByTestId("card-trigger-support");
+		expect(otherSupport.hasAttribute("disabled")).toBe(false);
+
+		// ── The thread arm on the own post: the bar's two actions ──────────
+		cleanup();
+		mountOwn("p-own");
+		const barSupport = screen.getByTestId("phone-bar-support");
+		const barCounter = screen.getByTestId("phone-bar-counter");
+		expect(barSupport.hasAttribute("disabled")).toBe(true);
+		expect(barCounter.hasAttribute("disabled")).toBe(true);
+		expect(screen.getByTestId("phone-bar-notice").innerHTML).toContain(
+			OWN_POST_COPY,
+		);
+		fireEvent.click(barSupport);
+		expect(screen.queryByTestId("phone-sheet")).toBeNull();
+
+		// Positive control — the same bar on the other author's post.
+		cleanup();
+		mountOwn("p1");
+		expect(
+			screen.getByTestId("phone-bar-support").hasAttribute("disabled"),
+		).toBe(false);
 	});
 });
 

@@ -162,8 +162,12 @@ export function FocusMarketCard({
 						</span>
 					}
 				/>
+				{/* D-52 R3 — the question on up to two lines, clamped at two, in both
+				    sizes (the post arm passes `compact`, which clamped it at one).
+				    Written as a literal: the `line-clamp-${…}` template it replaces
+				    named no class Tailwind's scanner can see. */}
 				<span
-					className={`line-clamp-${compact ? "1" : "2"} min-w-0 ${
+					className={`line-clamp-2 min-w-0 ${
 						compact ? "text-[12px]" : "text-[13.5px]"
 					} leading-[1.32] font-semibold`}
 				>
