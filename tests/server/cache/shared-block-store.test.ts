@@ -357,3 +357,45 @@ describe("Gate C — the shapes the first cut got wrong", () => {
 		expect(flag?.[2]).toEqual({ px: SHARED_VIEW_EXPIRE_SEC * 1000 });
 	});
 });
+
+describe("CACHE-COALESCE-3 — the slug-keyed block", () => {
+	it("keys market-id on a real slug, the same shape as the other blocks", () => {
+		expect(sharedBlockKey("market-id", "bitcoin-price-50k")).toBe(
+			"staging:cache:market-id:bitcoin-price-50k",
+		);
+		expect(sharedBlockLockKey("market-id", "yc-w27-acceptance")).toBe(
+			"staging:cache:market-id:lock:yc-w27-acceptance",
+		);
+	});
+
+	it("rejects anything a request could put in a slug that is not a slug", () => {
+		for (const bad of [
+			"../x",
+			"Bitcoin",
+			"a--b",
+			"-a",
+			"a b",
+			"a:b",
+			"x".repeat(81),
+			"",
+		]) {
+			expect(() => sharedBlockKey("market-id", bad), bad).toThrow();
+		}
+	});
+
+	it("keeps the UUID guard on every id-keyed block, so a slug is not a market id", () => {
+		expect(() =>
+			sharedBlockKey("version-token", "bitcoin-price-50k"),
+		).toThrow();
+		expect(() => sharedBlockKey("debate-view", "bitcoin-price-50k")).toThrow();
+		expect(sharedBlockKey("version-token", MARKET_ID)).toBe(
+			`staging:cache:version-token:${MARKET_ID}`,
+		);
+	});
+
+	it("a malformed slug never reaches Redis: the block renders locally (fail open)", async () => {
+		const a = { ...args("market-id", 60_000, "local"), marketId: "../etc" };
+		expect(await coalesceSharedBlock(a)).toBe("local");
+		expect(fakeRedis.calls).toHaveLength(0);
+	});
+});

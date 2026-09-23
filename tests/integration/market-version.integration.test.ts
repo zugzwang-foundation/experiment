@@ -1,5 +1,20 @@
 import { eq } from "drizzle-orm";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+// CACHE-COALESCE-3 (Gate C H-2): the route now reads a fleet-wide store before
+// the database. This file is the REAL-DATABASE guard, so it pins the store
+// unreachable and exercises the fail-open path — the token derived from the
+// database on every call — instead of depending on whether the runner happens
+// to have Upstash credentials. With a live store, the cases below that mutate
+// the database and re-read inside `VERSION_MIN_WINDOW_MS` would read the entry
+// and fail by design, and the run would write into the shared instance. The
+// store's own behaviour is pinned in tests/server/markets/version-token.test.ts.
+vi.mock("@/server/upstash/redis", () => {
+	const down = () => Promise.reject(new Error("store pinned unreachable"));
+	return {
+		redis: { get: down, mget: down, set: down, del: down, eval: down },
+	};
+});
 
 // GET /m/[slug]/version against a REAL Postgres. The route shipped in #551 with
 // an embedded subquery Drizzle rendered as `on "id" = "target_comment_id"`,

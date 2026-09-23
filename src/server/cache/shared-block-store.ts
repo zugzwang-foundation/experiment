@@ -75,8 +75,18 @@ import { redis } from "@/server/upstash/redis";
 // a walk that only ever grows would switch the single-flight off for good on
 // exactly the market that needs it most.
 
-/** The closed set of per-market blocks. A typo here is a compile error, not a second keyspace. */
-export type SharedBlock = "debate-view" | "reserve-walk" | "market-data";
+/**
+ * The closed set of per-market blocks. A typo here is a compile error, not a
+ * second keyspace. Every block is keyed on a market id EXCEPT `market-id`,
+ * which is keyed on the slug it resolves (CACHE-COALESCE-3) — see
+ * `assertKey`, which checks each against its own shape.
+ */
+export type SharedBlock =
+	| "debate-view"
+	| "reserve-walk"
+	| "market-data"
+	| "market-id"
+	| "version-token";
 
 /** The blocks whose entries carry comment text and must honour a removal (SC-1). */
 export const TEXT_CARRYING_BLOCKS: readonly SharedBlock[] = [
@@ -103,14 +113,35 @@ const UUID_RE =
  * arbitrarily many entries into the namespace that also carries idempotency
  * and rate-limit keys. It throws, and every caller's throw is a fail-open.
  */
-function assertMarketId(marketId: string): void {
-	if (!UUID_RE.test(marketId)) {
-		throw new Error(`shared-block-store: not a market id: ${marketId}`);
+function assertKey(block: SharedBlock, key: string): void {
+	if (block === "market-id") {
+		if (key.length > SLUG_MAX_LENGTH || !SLUG_RE.test(key)) {
+			throw new Error(`shared-block-store: not a slug: ${key}`);
+		}
+		return;
+	}
+	if (!UUID_RE.test(key)) {
+		throw new Error(`shared-block-store: not a market id: ${key}`);
 	}
 }
 
+/**
+ * `market-id` is the one block keyed on a REQUEST value — the first place a
+ * request value reaches `redis.set` — so its guard is the schema's own slug
+ * rule, `markets/create.ts` `SLUG_RE` and `SLUG_MAX_LENGTH` (80), repeated
+ * rather than imported so this module keeps no dependency on the write path.
+ * `SLUG_RE` admits no `:`, so a slug cannot forge a segment of the
+ * colon-joined key. Shape alone does not stop a caller naming a slug that
+ * does not exist: the caller's render throws on one, so no ENTRY is written,
+ * but the lock key taken before the render is (10 s, released in `finally`).
+ * ⚠ The guards are not disjoint — a UUID is also slug-shaped — which is
+ * harmless because every block has its own key prefix.
+ */
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const SLUG_MAX_LENGTH = 80;
+
 export function sharedBlockKey(block: SharedBlock, marketId: string): string {
-	assertMarketId(marketId);
+	assertKey(block, marketId);
 	return getRedisKey("cache", block, marketId);
 }
 
@@ -118,7 +149,7 @@ export function sharedBlockLockKey(
 	block: SharedBlock,
 	marketId: string,
 ): string {
-	assertMarketId(marketId);
+	assertKey(block, marketId);
 	return getRedisKey("cache", block, "lock", marketId);
 }
 
@@ -126,7 +157,7 @@ export function sharedBlockRemovedKey(
 	block: SharedBlock,
 	marketId: string,
 ): string {
-	assertMarketId(marketId);
+	assertKey(block, marketId);
 	return getRedisKey("cache", block, "removed", marketId);
 }
 
@@ -134,7 +165,7 @@ export function sharedBlockOversizeKey(
 	block: SharedBlock,
 	marketId: string,
 ): string {
-	assertMarketId(marketId);
+	assertKey(block, marketId);
 	return getRedisKey("cache", block, "oversize", marketId);
 }
 
