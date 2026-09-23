@@ -218,6 +218,13 @@
       "when": 1788787963903,
       "tag": "0030_liquidity_revoke_app_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1790028485627,
+      "tag": "0031_comments_friendly_fire",
+      "breakpoints": true
     }
   ]
 }

@@ -27,6 +27,9 @@ type SubstrateRow = {
 	counter_count: string;
 	support_dharma: string;
 	counter_dharma: string;
+	endorse_count: string;
+	contest_count: string;
+	friendly_fire_dharma: string;
 };
 
 /**
@@ -170,7 +173,40 @@ export async function loadRankingSubstrate(
 			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (
 				WHERE rc.side_at_post_time <> p.side_at_post_time
 					AND rc.user_id <> p.user_id
-			), 0) AS counter_dharma
+			), 0) AS counter_dharma,
+			-- FF-1 / ADR-0058 — THE DECLARED-STANCE INPUTS AND FRIENDLY_FIRE_DHARMA
+			-- (RANKING.md §2 as amended; SPEC.2 §5.4). Same three predicates as the
+			-- people counts above: distinct PEOPLE, self-authored excluded, and only
+			-- where a bet exists. They partition the SAME people the side counts do,
+			-- by what they DECLARED rather than by which side they bought:
+			--   endorse_count — own side, no flag ("I back this side and this argument");
+			--   contest_count — opposing side OR own side WITH the flag, each person
+			--                   once even if they did both.
+			-- With every flag false, endorse_count = support_count and
+			-- contest_count = counter_count — the extension is pure and B-2 proves it.
+			-- ⛔ RANKING INPUTS ONLY, like *_count: never a DTO, never a screen.
+			COUNT(DISTINCT rc.user_id) FILTER (
+				WHERE rc.side_at_post_time = p.side_at_post_time
+					AND NOT rc.friendly_fire
+					AND rc.user_id <> p.user_id
+					AND rb.id IS NOT NULL
+			) AS endorse_count,
+			COUNT(DISTINCT rc.user_id) FILTER (
+				WHERE (rc.side_at_post_time <> p.side_at_post_time OR rc.friendly_fire)
+					AND rc.user_id <> p.user_id
+					AND rb.id IS NOT NULL
+			) AS contest_count,
+			-- friendly_fire_dharma — COMPUTED, NOT RENDERED (D-52 withdrew the
+			-- post-focus meter that displayed it; carried for the redesign; never a
+			-- ranking input): Dharma STILL HELD across own-side
+			-- flagged reply-bets by others — a SUBSET of support_dharma, which is
+			-- unchanged above and still includes it (same pool, D-51 R5).
+			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (
+				WHERE rc.side_at_post_time = p.side_at_post_time
+					AND rc.friendly_fire
+					AND rc.user_id <> p.user_id
+					AND rb.id IS NOT NULL
+			), 0) AS friendly_fire_dharma
 		FROM comments p
 		JOIN LATERAL (
 			SELECT
@@ -228,6 +264,9 @@ export async function loadRankingSubstrate(
 		counterCountTotal: Number(r.counter_count_total),
 		supportDharma: r.support_dharma,
 		counterDharma: r.counter_dharma,
+		endorseCount: Number(r.endorse_count),
+		contestCount: Number(r.contest_count),
+		friendlyFireDharma: r.friendly_fire_dharma,
 		// `new Date()` is robust whether the driver returned a Date or a wire
 		// string (timestamptz decode varies by execute path — accrual.ts note).
 		createdAt: new Date(r.created_at),

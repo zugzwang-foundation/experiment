@@ -71,6 +71,8 @@ function mkReply(o: {
 	 * output, and this field must never appear in it.
 	 */
 	imageUrl?: string | null;
+	/** FF-1 / ADR-0058 — the friendly-fire toggle; absent = unflagged (A-13). */
+	friendlyFire?: boolean;
 }): DebateReply {
 	return {
 		removed: false,
@@ -91,6 +93,7 @@ function mkReply(o: {
 		sold: false,
 		entryPrice: o.entryPrice ?? "0.500000000000000000",
 		imageUrl: o.imageUrl ?? null,
+		...(o.friendlyFire === undefined ? {} : { friendlyFire: o.friendlyFire }),
 	};
 }
 
@@ -738,5 +741,98 @@ describe("serializeDebateExport — media never reaches the .md", () => {
 		// Non-vacuity: the reply itself DID serialize, so the absences above are
 		// about the media and not about an empty document.
 		expect(out).toContain("A staked reply argument.");
+	});
+});
+
+// ── 5. FF-1 / ADR-0058 — G13: the friendly-fire marker ───────────────────────
+//
+// A flagged Support reply prints ONE extra bullet beside where its side and
+// relation print; an unflagged reply prints nothing new, so every pre-ADR export
+// line is byte-identical; a removed reply prints nothing new either (the removed
+// variant carries no flag at the type level — the masking boundary). The
+// negative assertions have their positive control in the flagged case, which
+// proves the marker text is what the serializer emits.
+
+const FF_MARKER =
+	"- **Friendly fire:** yes — backs the side, contests this argument";
+
+describe("serializeDebateExport — friendly-fire marker (G13, ADR-0058)", () => {
+	function groups(support: DebateReply[]): DebatePost["replies"] {
+		return { support, counter: [], twoSlot: support.slice(0, 1) };
+	}
+
+	it("debate-export::flagged-reply-prints-the-marker-beside-side-and-relation", () => {
+		const flagged = mkReply({
+			id: "r-ff",
+			side: "YES",
+			pseudonym: "FriendlyFirer",
+			friendlyFire: true,
+		});
+		const model = mkModel([
+			mkPost({ id: "p1", side: "YES", replies: groups([flagged]) }),
+		]);
+		const o = run(model, mkMeta());
+		expect(o).toContain(FF_MARKER);
+		// Beside the side and relation: the marker follows the Relation line and
+		// precedes the Stake line, inside the same reply block.
+		const block = o.slice(o.indexOf("#### Reply 1.1"));
+		const relationAt = block.indexOf(
+			"- **Relation:** Support (same side as the post)",
+		);
+		const markerAt = block.indexOf(FF_MARKER);
+		const stakeAt = block.indexOf("- **Stake:**");
+		expect(relationAt).toBeGreaterThan(-1);
+		expect(markerAt).toBeGreaterThan(relationAt);
+		expect(stakeAt).toBeGreaterThan(markerAt);
+		// Never a count: no "friendly fire" figure anywhere in the aggregate line.
+		expect(o).not.toMatch(/\d+ friendly/i);
+	});
+
+	it("debate-export::unflagged-reply-prints-no-marker (byte-identical to pre-ADR)", () => {
+		const plain = mkReply({ id: "r-plain", side: "YES", pseudonym: "Plain" });
+		const explicitFalse = mkReply({
+			id: "r-false",
+			side: "YES",
+			pseudonym: "ExplicitFalse",
+			friendlyFire: false,
+		});
+		const model = mkModel([
+			mkPost({
+				id: "p1",
+				side: "YES",
+				replies: groups([plain, explicitFalse]),
+			}),
+		]);
+		const o = run(model, mkMeta());
+		expect(o).not.toContain("Friendly fire");
+		expect(o).not.toContain("friendly fire");
+		// Positive control for the negative above — the same reply, flagged, DOES
+		// print it (so the absence is the serializer's choice, not a dead string).
+		const control = run(
+			mkModel([
+				mkPost({
+					id: "p1",
+					side: "YES",
+					replies: groups([
+						mkReply({
+							...{ id: "r-plain", side: "YES", pseudonym: "Plain" },
+							friendlyFire: true,
+						}),
+					]),
+				}),
+			]),
+			mkMeta(),
+		);
+		expect(control).toContain(FF_MARKER);
+	});
+
+	it("debate-export::removed-reply-prints-no-marker (masking boundary)", () => {
+		const removed = mkRemovedReply({ id: "r-rm", side: "YES" });
+		const model = mkModel([
+			mkPost({ id: "p1", side: "YES", replies: groups([removed]) }),
+		]);
+		const o = run(model, mkMeta());
+		expect(o).toContain("[removed by moderator]");
+		expect(o).not.toContain("Friendly fire");
 	});
 });

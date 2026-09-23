@@ -269,6 +269,58 @@ export class ReplyDepthExceededError extends BetProductError {
 }
 
 /**
+ * FF-1 / ADR-0058 / SPEC.1 §8 F-COMMENT-2 → 400. `friendlyFire = true` on a
+ * TOP-LEVEL post. A post has no argument above it to contest, so the flag has
+ * nothing to mean; the `comments` CHECK `comments_friendly_fire_requires_parent`
+ * is the storage backstop, this is the frontstop. Thrown before any write and
+ * before moderation.
+ */
+export class FriendlyFireRequiresReplyError extends BetProductError {
+	static readonly httpStatus = 400;
+	static readonly code = "friendly_fire_requires_reply";
+	constructor() {
+		super("friendly fire requires a reply (a top-level post cannot carry it)");
+		this.name = "FriendlyFireRequiresReplyError";
+	}
+}
+
+/**
+ * FF-1 / ADR-0058 / SPEC.1 §8 F-COMMENT-2 → 400. `friendlyFire = true` on a
+ * reply whose side is NOT the parent's frozen side — i.e. on a Counter. The
+ * toggle declares "I back this side and contest this argument"; a Counter
+ * already contests by side and cannot ALSO back it. Checked pre-tx (needs the
+ * parent row, so it is not DDL) and again inside W-1 after the in-tx parent
+ * read. Thrown before any write and before moderation.
+ */
+export class FriendlyFireRequiresSupportError extends BetProductError {
+	static readonly httpStatus = 400;
+	static readonly code = "friendly_fire_requires_support";
+	constructor() {
+		super(
+			"friendly fire requires a Support reply (the reply's side must equal the parent's side)",
+		);
+		this.name = "FriendlyFireRequiresSupportError";
+	}
+}
+
+/**
+ * D-52 R1 / SPEC.1 §8 F-COMMENT-2 → 400. The replier authored the parent:
+ * nobody replies to their own post, on either side. Needs the parent row's
+ * `user_id`, so it is a write-path guard rather than DDL — checked on the
+ * route's pre-transaction parent read (ahead of moderation) and again inside
+ * W-1 after `place()`'s own parent read, before any write. Terminal and
+ * deterministic in the request, so it is a cached 4xx (ADR-0031).
+ */
+export class SelfReplyForbiddenError extends BetProductError {
+	static readonly httpStatus = 400;
+	static readonly code = "self_reply_forbidden";
+	constructor() {
+		super("a reply cannot target the replier's own post");
+		this.name = "SelfReplyForbiddenError";
+	}
+}
+
+/**
  * DEBATE.2 / SPEC.1 §8 F-COMMENT-2 → 404. The parent comment is absent OR in a
  * different market than the reply targets (a reply must reference an existing
  * comment in the same market).

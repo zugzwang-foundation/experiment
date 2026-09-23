@@ -193,7 +193,27 @@ async function main(): Promise<void> {
 			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (
 				WHERE rc.side_at_post_time <> p.side_at_post_time
 					AND rc.user_id <> p.user_id
-			), 0) AS counter_dharma
+			), 0) AS counter_dharma,
+			-- FF-1 / ADR-0058 — the declared-stance inputs and the meter numerator,
+			-- byte-mirrored from ranking-substrate.ts; substrate-site-parity.test.ts
+			-- pins this spelling here, because this instrument drifted once before.
+			COUNT(DISTINCT rc.user_id) FILTER (
+				WHERE rc.side_at_post_time = p.side_at_post_time
+					AND NOT rc.friendly_fire
+					AND rc.user_id <> p.user_id
+					AND rb.id IS NOT NULL
+			) AS endorse_count,
+			COUNT(DISTINCT rc.user_id) FILTER (
+				WHERE (rc.side_at_post_time <> p.side_at_post_time OR rc.friendly_fire)
+					AND rc.user_id <> p.user_id
+					AND rb.id IS NOT NULL
+			) AS contest_count,
+			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (
+				WHERE rc.side_at_post_time = p.side_at_post_time
+					AND rc.friendly_fire
+					AND rc.user_id <> p.user_id
+					AND rb.id IS NOT NULL
+			), 0) AS friendly_fire_dharma
 		FROM comments p
 		JOIN LATERAL (
 			SELECT
@@ -224,6 +244,9 @@ async function main(): Promise<void> {
 		counterCountTotal: Number(r.counter_count_total),
 		supportDharma: r.support_dharma as string,
 		counterDharma: r.counter_dharma as string,
+		endorseCount: Number(r.endorse_count),
+		contestCount: Number(r.contest_count),
+		friendlyFireDharma: r.friendly_fire_dharma as string,
 		createdAt: new Date(r.created_at as string),
 		authorStake: r.author_stake as string,
 		authorStakeOriginal: r.author_stake_original as string,

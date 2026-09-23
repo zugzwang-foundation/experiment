@@ -174,6 +174,8 @@ async function seedCommentWithBet(args: {
 	parentCommentId: string | null;
 	imageUploadsId?: string | null;
 	createdAt: Date;
+	/** FF-1 / ADR-0058 — the friendly-fire toggle; omitted = false. */
+	friendlyFire?: boolean;
 }): Promise<string> {
 	const [c] = await testDb
 		.insert(comments)
@@ -184,6 +186,7 @@ async function seedCommentWithBet(args: {
 			sideAtPostTime: args.side,
 			parentCommentId: args.parentCommentId,
 			imageUploadsId: args.imageUploadsId ?? null,
+			friendlyFire: args.friendlyFire ?? false,
 			betId: null,
 			createdAt: args.createdAt,
 		})
@@ -817,6 +820,7 @@ describe("DEBATE.4 §6 — loadDebateView removal-masking gate (body/author neve
 			counterCount: number;
 			supportDharma: string;
 			counterDharma: string;
+			friendlyFireDharma?: string;
 		};
 		expect(agg.supportCount).toBe(2);
 		expect(agg.counterCount).toBe(1);
@@ -825,6 +829,104 @@ describe("DEBATE.4 §6 — loadDebateView removal-masking gate (body/author neve
 
 		// authorStake = the post's own entry-bet stake.
 		expect(Number(e.authorStake as string)).toBe(150);
+
+		// FF-1 / ADR-0058 — the meter numerator is ALWAYS threaded (A-13: the DTO
+		// field is optional at the type level, so this is the pin that the loader
+		// sets it), and it is zero when nothing is flagged.
+		expect(agg).toHaveProperty("friendlyFireDharma");
+		expect(Number(agg.friendlyFireDharma)).toBe(0);
+	});
+
+	// ── 7b. FF-1 / ADR-0058 — friendly fire threads to the aggregate AND the reply ─
+	it("threads friendlyFireDharma to the aggregate and friendlyFire to each reply DTO", async () => {
+		const market = await seedMarket("ff-thread");
+		const author = await seedUser({ tag: "ff-author" });
+		const a = await seedUser({ tag: "ff-a" });
+		const b = await seedUser({ tag: "ff-b" });
+		const c = await seedUser({ tag: "ff-c" });
+
+		// Post on YES. A plain-supports Đ20; B friendly-fires Đ30 (YES + flag);
+		// C counters Đ70. The author's own flagged reply Đ40 is EXCLUDED from the
+		// meter (self-exclusion, ADR-0039 P2) but keeps its lane row and its tag.
+		const post = await seedCommentWithBet({
+			userId: author,
+			marketId: market.id,
+			side: "YES",
+			stake: "150.000000000000000000",
+			body: "Post with a friendly-fire reply.",
+			parentCommentId: null,
+			createdAt: new Date("2026-09-15T00:00:01Z"),
+		});
+		const plain = await seedCommentWithBet({
+			userId: a,
+			marketId: market.id,
+			side: "YES",
+			stake: "20.000000000000000000",
+			body: "Plain support.",
+			parentCommentId: post,
+			createdAt: new Date("2026-09-15T01:00:00Z"),
+		});
+		const flagged = await seedCommentWithBet({
+			userId: b,
+			marketId: market.id,
+			side: "YES",
+			stake: "30.000000000000000000",
+			body: "Friendly fire: right side, wrong argument.",
+			parentCommentId: post,
+			createdAt: new Date("2026-09-15T01:00:01Z"),
+			friendlyFire: true,
+		});
+		const counter = await seedCommentWithBet({
+			userId: c,
+			marketId: market.id,
+			side: "NO",
+			stake: "70.000000000000000000",
+			body: "Counter.",
+			parentCommentId: post,
+			createdAt: new Date("2026-09-15T01:00:02Z"),
+		});
+		const selfFlagged = await seedCommentWithBet({
+			userId: author,
+			marketId: market.id,
+			side: "YES",
+			stake: "40.000000000000000000",
+			body: "The author contests their own argument.",
+			parentCommentId: post,
+			createdAt: new Date("2026-09-15T01:00:03Z"),
+			friendlyFire: true,
+		});
+
+		const vm = await loadDebateView(testDb, { market });
+		const e = findPost(vm, post);
+		const agg = e.aggregate as {
+			supportCount: number;
+			supportDharma: string;
+			counterDharma: string;
+			friendlyFireDharma: string;
+		};
+		// Displayed counts are self-inclusive (RANK-3); the Dharma figures exclude
+		// the author; the meter numerator is a SUBSET of supportDharma.
+		expect(agg.supportCount).toBe(3);
+		expect(Number(agg.supportDharma)).toBe(50); // 20 + 30 (author's 40 excluded)
+		expect(Number(agg.friendlyFireDharma)).toBe(30); // B only
+		expect(Number(agg.counterDharma)).toBe(70);
+
+		// Each reply DTO carries the flag — true for B and for the author's own,
+		// false for the plain support and the counter; removed variants never do.
+		const groups = e.replies as {
+			support: Array<{ id: string; removed: boolean; friendlyFire?: boolean }>;
+			counter: Array<{ id: string; removed: boolean; friendlyFire?: boolean }>;
+		};
+		const byId = new Map(
+			[...groups.support, ...groups.counter].map((r) => [r.id, r]),
+		);
+		expect(byId.get(plain)?.friendlyFire).toBe(false);
+		expect(byId.get(flagged)?.friendlyFire).toBe(true);
+		expect(byId.get(selfFlagged)?.friendlyFire).toBe(true);
+		expect(byId.get(counter)?.friendlyFire).toBe(false);
+		// …and a flagged reply is in the SUPPORT lane, never re-partitioned.
+		expect(groups.support.map((r) => r.id)).toContain(flagged);
+		expect(groups.counter.map((r) => r.id)).not.toContain(flagged);
 	});
 
 	// ── 8. VM is serializable; no removed entry carries body/author after round-trip ─

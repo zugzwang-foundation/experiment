@@ -1,6 +1,6 @@
 # ZUGZWANG · OVERNIGHT RUN DOCTRINE
 
-**Version:** v1.2 · **Written:** 2026-08-22 · **Amended:** 2026-08-30 from WARLI-CLOSE-2 (OVN-O8, OVN-V9, F-14; OVN-O2's Vercel example corrected in place) · **Supersedes:** v1.1 (2026-08-22)
+**Version:** v1.3 · **Written:** 2026-08-22 · **Amended:** 2026-09-22 from FF-1 (the D-51 R9 extension — verbatim prescriptive commits and in-session expand-only DDL review; OVN-O9, OVN-O10, F-15, F-16) · **Supersedes:** v1.2 (2026-08-30)
 **Author:** web Claude (orchestrator)
 **Derived from:** POSREV-1 (`feat/posrev-1`, PR #396) — the first fully autonomous
 overnight recon → plan → execute → deploy run. Also draws on LOTS-1, MERGE-0,
@@ -8,6 +8,8 @@ PHASE-0, MERGE-1 and UNWIRE-1, chiefly for what they got wrong.
 
 **Repo home when committed:** `docs/overnight-run.md`
 **Doc class:** prescriptive — web-authored, CC-committed.
+
+**Changed in v1.3.** Two things §10 excluded are now covered, under conditions, by founder ruling D-51 R9 (FF-1, 2026-09-22). **Prescriptive text may ride an overnight run only when the web lane authored it in full before the run** — an ADR, a decision-record amendment, and spec amendment blocks with exact anchors — and the session **commits it verbatim**, filling only measured slots (ADR number, ruling number, versions, SHA, dates, migration name); a block whose anchor does not match exactly once is CARRIED, never rewritten, and the run still authors no prescriptive sentence of its own. **A migration may ride an overnight run only when it is expand-only and reversible** (ADD COLUMN with a default, ADD CONSTRAINT, an index — never a trigger edit, never an UPDATE of a Bucket-A row, never a destructive alter) and `@db-migration-reviewer` runs in-session on the migration slice under a written posture (expand-only · reversible · no trigger SQL · CHECK text verbatim · bucket classification unchanged · guard-catalog count unchanged · journal/snapshot consistent · `db:check-drift` clean). Everything else in §10 stands.
 
 **Changed in v1.1.** F-11's standing mitigation (a reviewer re-run scoped to its
 own fix) is **removed by founder ruling** — it costs run latency, and run latency
@@ -401,6 +403,16 @@ not restated here, and V-space is its only home.
 
 ---
 
+### OVN-O9 · A schema-bearing branch has no servable preview until its migration reaches the preview database — say so in the brief
+
+FF-1's brief asked for "preview URLs and the SHAs they serve". Both previews built and died at `next build`'s prerender of `/m/[slug]` with `42703 column … does not exist`: the preview lane serves the staging database, `ci.yml` migrates its own Postgres, and applying a migration to staging is a `staging` push the walls reserve to the founder. The run could not have produced a URL. ⇒ When the task lands DDL, the brief states that the preview will build and fail until the founder's staging advance applies the migration, and asks for the failing deployment's log line in place of a canary.
+
+### OVN-O10 · Name the dynamic-workflow posture, and expect the harness to report its mode
+
+`/effort max` is not a command a session can issue; the harness reports its mode (FF-1: `ultracode (xhigh + dynamic workflow orchestration)`). CLAUDE.md §6 forbids dynamic workflows on the seven §1 areas regardless of mode. ⇒ Every brief that touches a §1 area carries one line — *dynamic workflows FORBIDDEN on §1 areas; recon is one sequential pass* — and the report states the mode the harness reported.
+
+---
+
 ## 5 · The prompt skeleton
 
 Copy, fill the `«slots»`, attach this file alongside.
@@ -613,6 +625,8 @@ whole time.
 | **F-12** | Shared deploy lane with no lock, two sessions running | POSREV-1 / RANK-3, same night |
 | **F-13** | Local catalog bloat presenting as intermittent test failures | POSREV-1 — diagnosed, not blamed |
 | **F-14** | A session measuring its own tree while its mutation-testing subagent wrote to it | WARLI-2 — self-caught, but only after a wrong retraction (OVN-O8) |
+| **F-15** | An amendment anchor that was the prefix of two headings — carried correctly, but the callout it carried was the one an ADR-0017 reader needed most | FF-1 brief, B5.2 — anchors are line-bounded or multi-line wherever a heading string can recur |
+| **F-16** | A brief naming source files from a spec inventory the code had already outgrown | FF-1 brief, A1-b — two files that did not exist; recon corrected it and the plan recorded it |
 
 ### 7.1 · F-11 and why it has no in-session mitigation
 
@@ -685,15 +699,17 @@ On reading the report:
 
 - **Merge.** The overnight run ends at an open, unmerged PR. Gate C, the founder
   diff read, and merge order against concurrent lanes are operator work.
+- **Prescriptive doc edits by the session's own hand** *(scoped at v1.3 — FF-1, D-51 R9)*: a run may COMMIT prescriptive text the web lane authored before the run, verbatim, slots filled from measurement; a block whose anchor does not match exactly once is CARRIED, never rewritten. Authoring stays excluded — the bullet below.
 - **Prescriptive doc edits.** Sessions do not author ADRs, SPECs or trackers. If
   a run makes a spec false, the run flags it and the web lane authors the
   amendment. POSREV-1 flagged SPEC.1 §23 correctly and did not touch it.
 - **Anything requiring a founder ruling.** Log it, build to the register as
   written, flag it. Do not resolve it and do not stop for it.
+- **Migrations and DDL beyond expand-only** *(scoped at v1.3 — FF-1, `0031`)*: an expand-only, reversible migration with an in-session `@db-migration-reviewer` posture is covered. The bullet below now applies to everything else — a trigger edit, a Bucket-A UPDATE, a destructive alter, a partition change.
 - **Migrations and DDL.** Not because they cannot be done overnight, but because
   nothing so far has needed to be. If a future run does, that is a distinct
   doctrine and needs its own reviewer posture.
 
 ---
 
-**END — Zugzwang overnight run doctrine v1.2**
+**END — Zugzwang overnight run doctrine v1.3**

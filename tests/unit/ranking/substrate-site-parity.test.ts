@@ -322,3 +322,208 @@ describe("RANK-1 — every substrate site spells the substitution the same way",
 		}
 	});
 });
+
+// ── FF-1 · G11 — the THREE new aggregates, at the THREE duplicated sites ─────
+//
+// ADR-0058 adds `endorse_count`, `contest_count` and `friendly_fire_dharma` to
+// a query block that exists in three separately-maintained copies. That is the
+// same hazard this file was minted for, arriving again with three more
+// spellings — and the third copy, `scripts/verify-ranking-staging.ts`, is the
+// one that has ALREADY drifted once and can never have a behavioural test,
+// because it dials the live staging database and no test may (ADR-0036).
+//
+// ⚠ Weak on purpose, exactly as the rest of this file is: it cannot tell you
+// the predicate is CORRECT, only that no copy spells it differently. What makes
+// each pin worth having is the defect it names.
+describe("FF-1 G11 — the friendly-fire aggregates are spelled identically everywhere", () => {
+	const FF_COUNT_SITES = SITES.filter(
+		(site) => !site.endsWith("reply-substrate.ts"),
+	);
+
+	/**
+	 * ENDORSE — distinct people, own side, NO flag, not the author, bet exists.
+	 * Bounded by `[^)]` because this FILTER's predicate carries no parentheses,
+	 * which is what keeps the pattern inside ONE aggregate.
+	 */
+	const ENDORSE_COUNT =
+		/COUNT\(DISTINCT rc\.user_id\) FILTER \([^)]*NOT rc\.friendly_fire[^)]*AND rc\.user_id <> p\.user_id[^)]*AND rb\.id IS NOT NULL[^)]*\) AS endorse_count,/;
+
+	/**
+	 * CONTEST — the ONE predicate in this family that carries its own
+	 * parentheses, so it is pinned in two bounded halves rather than one
+	 * unbounded pattern: the disjunction itself, then everything from its
+	 * closing paren to the alias.
+	 */
+	const CONTEST_DISJUNCTION =
+		/COUNT\(DISTINCT rc\.user_id\) FILTER \([^)]*\(\s*rc\.side_at_post_time <> p\.side_at_post_time[^)]*OR rc\.friendly_fire\s*\)/;
+	const CONTEST_TAIL =
+		/OR rc\.friendly_fire\s*\)[^)]*AND rc\.user_id <> p\.user_id[^)]*AND rb\.id IS NOT NULL[^)]*\) AS contest_count,/;
+
+	/** The meter's numerator — surviving basis, flagged, own side, not the author. */
+	const FF_DHARMA =
+		/SUM\(\s*COALESCE\(\s*rl\.surviving_basis,\s*rb\.stake\s*\)\s*\)\s*FILTER \([^)]*AND rc\.friendly_fire[^)]*AND rc\.user_id <> p\.user_id[^)]*\),\s*0\) AS friendly_fire_dharma/;
+
+	/**
+	 * ⛔ THE FLAG IGNORED. An `endorse_count` whose FILTER never mentions
+	 * `friendly_fire` is `support_count` under a new alias — the ADR's two new
+	 * fields wired up and delivering nothing, which is the failure mode that
+	 * looks most like success.
+	 */
+	const ENDORSE_IGNORES_FLAG =
+		/COUNT\(DISTINCT rc\.user_id\) FILTER \((?:(?!friendly_fire)[^)])*\) AS endorse_count,/;
+	/** ⛔ The same for contest: `counter_count` re-aliased, the flag unread. */
+	const CONTEST_IGNORES_FLAG =
+		/COUNT\(DISTINCT rc\.user_id\) FILTER \((?:(?!friendly_fire)[^)])*\) AS contest_count,/;
+	/**
+	 * ⛔ THE SELF-COUNTING METER. Without `rc.user_id <> p.user_id` the numerator
+	 * absorbs the author's own flagged replies, so a post the author critiqued
+	 * once reads as half-contested by its own writer — and the meter is a public
+	 * surface, so that is a false claim about a named pseudonym.
+	 */
+	const FF_DHARMA_COUNTS_SELF =
+		/FILTER \((?:(?!rc\.user_id <> p\.user_id)[^)])*\),\s*0\) AS friendly_fire_dharma/;
+
+	for (const site of FF_COUNT_SITES) {
+		it(`${site} carries endorse_count, contest_count and friendly_fire_dharma`, () => {
+			const src = source(site);
+			expect(ENDORSE_COUNT.test(src)).toBe(true);
+			expect(CONTEST_DISJUNCTION.test(src)).toBe(true);
+			expect(CONTEST_TAIL.test(src)).toBe(true);
+			expect(FF_DHARMA.test(src)).toBe(true);
+
+			// ⛔ And none of the three defect shapes.
+			expect(ENDORSE_IGNORES_FLAG.test(src)).toBe(false);
+			expect(CONTEST_IGNORES_FLAG.test(src)).toBe(false);
+			expect(FF_DHARMA_COUNTS_SELF.test(src)).toBe(false);
+		});
+
+		it(`${site} leaves support_dharma and the two count pairs UNPARTITIONED`, () => {
+			// The purity half, at the query layer. `support_dharma` still includes
+			// flagged stake — the meter reads a SUBSET of it, and a numerator
+			// subtracted OUT of the denominator would make the bar read 100 % on
+			// a post where every same-side replier flagged.
+			const src = source(site);
+			expect(/NOT rc\.friendly_fire[^)]*\) AS support_count,/.test(src)).toBe(
+				false,
+			);
+			expect(/rc\.friendly_fire[^)]*\) AS support_dharma/.test(src)).toBe(
+				false,
+			);
+			expect(
+				/rc\.friendly_fire[^)]*\) AS (support|counter)_count_total,/.test(src),
+			).toBe(false);
+		});
+	}
+
+	it("reply-substrate.ts selects the flag per row", () => {
+		// The lane loader does NOT aggregate, so it takes none of the patterns
+		// above; what it owes is the RAW COLUMN, which is the only path by which
+		// a reply's tag reaches a reader. It stays out of `FF_COUNT_SITES` for
+		// the same reason it stays out of `COUNT_SITES` and `AGGREGATE_SITES`:
+		// requiring an aggregate there would be requiring a query it does not run.
+		expect(
+			/rc\.friendly_fire/.test(
+				source("src/server/debate-view/reply-substrate.ts"),
+			),
+		).toBe(true);
+	});
+
+	it("the negative controls WOULD fail if the flag went unread — proven", () => {
+		// The file's own discipline: feed each ⛔ pattern the literal text it is
+		// written to reject and require a match, so the `toBe(false)` assertions
+		// above cannot be passing on an unmatchable regex.
+		const endorseUnflagged = [
+			"			COUNT(DISTINCT rc.user_id) FILTER (",
+			"				WHERE rc.side_at_post_time = p.side_at_post_time",
+			"					AND rc.user_id <> p.user_id",
+			"					AND rb.id IS NOT NULL",
+			"			) AS endorse_count,",
+		].join("\n");
+		expect(ENDORSE_IGNORES_FLAG.test(endorseUnflagged)).toBe(true);
+		// …and the CORRECT form must not satisfy the negative, or a good file
+		// would fail; nor must the reverted text satisfy the positive.
+		expect(ENDORSE_COUNT.test(endorseUnflagged)).toBe(false);
+
+		const contestSideOnly = [
+			"			COUNT(DISTINCT rc.user_id) FILTER (",
+			"				WHERE rc.side_at_post_time <> p.side_at_post_time",
+			"					AND rc.user_id <> p.user_id",
+			"					AND rb.id IS NOT NULL",
+			"			) AS contest_count,",
+		].join("\n");
+		expect(CONTEST_IGNORES_FLAG.test(contestSideOnly)).toBe(true);
+		expect(CONTEST_DISJUNCTION.test(contestSideOnly)).toBe(false);
+		expect(CONTEST_TAIL.test(contestSideOnly)).toBe(false);
+
+		const ffDharmaSelfCounted = [
+			"			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (",
+			"				WHERE rc.side_at_post_time = p.side_at_post_time",
+			"					AND rc.friendly_fire",
+			"					AND rb.id IS NOT NULL",
+			"			), 0) AS friendly_fire_dharma",
+		].join("\n");
+		expect(FF_DHARMA_COUNTS_SELF.test(ffDharmaSelfCounted)).toBe(true);
+		expect(FF_DHARMA.test(ffDharmaSelfCounted)).toBe(false);
+
+		// …and the correct shape DOES satisfy the positive, so a green run above
+		// means the pattern can be satisfied at all rather than that no site was
+		// read. (The `source()` reads are the other half of that control.)
+		const ffDharmaCorrect = [
+			"			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (",
+			"				WHERE rc.side_at_post_time = p.side_at_post_time",
+			"					AND rc.friendly_fire",
+			"					AND rc.user_id <> p.user_id",
+			"					AND rb.id IS NOT NULL",
+			"			), 0) AS friendly_fire_dharma",
+		].join("\n");
+		expect(FF_DHARMA.test(ffDharmaCorrect)).toBe(true);
+		expect(FF_DHARMA_COUNTS_SELF.test(ffDharmaCorrect)).toBe(false);
+	});
+
+	// ── The DTO wall, one class wider than RANK-3 left it ────────────────────
+	// `endorse_count` and `contest_count` are RANKING INPUTS and join
+	// `support_count` / `counter_count` behind the wall: their difference from
+	// the side counts is the per-post flagged-replier count, which on a post
+	// with one same-side reply names that person's stance from a signed-out
+	// page. ⚠ `friendly_fire_dharma` is deliberately NOT in this list — it is
+	// DISPLAYED (the meter's numerator, ADR-0058 outcome 4/6) and is MEANT to
+	// reach a client. Two new fields, opposite rules, one commit: the contrast
+	// is why this is stated rather than assumed.
+	const DTO_SITES = [
+		"src/server/debate-view/load-debate-view.ts",
+		"src/server/profile/arguments.ts",
+		"src/server/discovery/hero.ts",
+	] as const;
+	const DTO_LEAK_ENDORSE = /endorseCount:\s*\w+\.endorseCount,/;
+	const DTO_LEAK_CONTEST = /contestCount:\s*\w+\.contestCount,/;
+
+	for (const site of DTO_SITES) {
+		it(`${site} never hands a client the stance counts`, () => {
+			const src = source(site);
+			expect(DTO_LEAK_ENDORSE.test(src)).toBe(false);
+			expect(DTO_LEAK_CONTEST.test(src)).toBe(false);
+		});
+	}
+
+	it("the DTO stance-leak controls WOULD fail on a tidy-up — proven", () => {
+		expect(DTO_LEAK_ENDORSE.test("			endorseCount: sub.endorseCount,")).toBe(
+			true,
+		);
+		expect(
+			DTO_LEAK_CONTEST.test("			contestCount: post.contestCount,"),
+		).toBe(true);
+		// ⚠ And the DISPLAY figure must not trip them — a meter numerator handed
+		// outward is correct, and a guard that rejected it would be telling the
+		// implementer to hide the thing the ADR exists to show.
+		expect(
+			DTO_LEAK_ENDORSE.test(
+				"			friendlyFireDharma: sub.friendlyFireDharma,",
+			),
+		).toBe(false);
+		expect(
+			DTO_LEAK_CONTEST.test(
+				"			friendlyFireDharma: sub.friendlyFireDharma,",
+			),
+		).toBe(false);
+	});
+});

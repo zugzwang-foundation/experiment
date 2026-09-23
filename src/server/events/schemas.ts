@@ -366,6 +366,12 @@ export const eventPayloadSchemas = {
 		parentCommentId: z.string().uuid().nullable(),
 		bodyLength: z.number().int().nonnegative(),
 		uploadId: z.string().uuid().nullable(),
+		// FF-1 / ADR-0058 — the friendly-fire toggle, equal to the stored
+		// `comments.friendly_fire` (SHIP: SPEC.2 §19.4.1). `false` on every
+		// top-level post and every Counter. Same event type, same
+		// `payload_version` (no site in this codebase bumps it on a shape change;
+		// the key is additive and every prior row reads as `false` by absence).
+		friendlyFire: z.boolean(),
 	}),
 	// dharma. creditedForDate is a UTC calendar day (YYYY-MM-DD), not a
 	// timestamp — the Daily Credit accrual key (SPEC.1 §10.4). amount is signed

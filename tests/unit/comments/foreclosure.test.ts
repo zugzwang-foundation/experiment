@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { markets, positions, users } from "@/db/schema";
 import {
 	computeReplyAffordance,
+	friendlyFireEligible,
 	readReplyAffordance,
 } from "@/server/comments/foreclosure";
 
@@ -97,6 +98,29 @@ describe("computeReplyAffordance — viewer holds nothing (H == null)", () => {
 	}
 });
 
+// D-52 R1 — the viewer AUTHORED the parent: nobody replies to their own post, on
+// either side, so BOTH are foreclosed whatever is held. The two rows are the two
+// holdings an author can have at the moment of a reply; the H == P and H == ¬P
+// blocks above, with the same inputs and no own-post flag, are the positive
+// control (there, exactly one side is foreclosed). The reason is the ruled copy.
+describe("computeReplyAffordance — the viewer's own post (D-52)", () => {
+	for (const P of ["YES", "NO"] as const) {
+		it(`reply-foreclosure::own-post-holding-the-parent-side-both-foreclosed-${P}`, () => {
+			const aff = computeReplyAffordance(P, P, true);
+			expect(aff.support).toBe("foreclosed");
+			expect(aff.counter).toBe("foreclosed");
+			expect(aff.reason).toBe("You can't reply to your own post.");
+		});
+
+		it(`reply-foreclosure::own-post-holding-the-other-side-both-foreclosed-${P}`, () => {
+			const aff = computeReplyAffordance(P, NOT_P(P), true);
+			expect(aff.support).toBe("foreclosed");
+			expect(aff.counter).toBe("foreclosed");
+			expect(aff.reason).toBe("You can't reply to your own post.");
+		});
+	}
+});
+
 // The thin DB-backed reader: reads H via `heldSideOrNull` (positions/read.ts,
 // ENGINE.11) for the viewer in the parent's market, P from the parent comment's
 // frozen side, and delegates to the pure `computeReplyAffordance`.
@@ -104,12 +128,17 @@ describe("computeReplyAffordance — viewer holds nothing (H == null)", () => {
 // PINNED PUBLIC-API CONTRACT:
 //   readReplyAffordance(
 //     client: DbClient | DbTransaction,
-//     args: { viewerId: string; parentComment: { marketId: string; sideAtPostTime: "YES" | "NO" } },
+//     args: { viewerId: string; parentComment: { marketId: string; sideAtPostTime: "YES" | "NO"; userId: string } },
 //   ): Promise<ReplyAffordance>
 //
 // DB-backed: seeds a position so `heldSideOrNull` resolves a real held side.
 // REDs on the greenfield `@/server/comments/foreclosure` import.
 describe("readReplyAffordance — reads viewer's held side via heldSideOrNull", () => {
+	// D-52 — the reader now takes the parent's author. These two rows are about
+	// the held side, so the parent is someone else's: an id that is not the
+	// viewer's is all the comparison reads (no row is needed for it).
+	const OTHER_AUTHOR_ID = "01920000-0000-7000-8000-000000000052";
+
 	afterEach(async () => {
 		await truncateTables(testClient, ["positions", "markets", "users"]);
 	});
@@ -153,7 +182,11 @@ describe("readReplyAffordance — reads viewer's held side via heldSideOrNull", 
 
 		const aff = await readReplyAffordance(testDb, {
 			viewerId,
-			parentComment: { marketId, sideAtPostTime: "YES" },
+			parentComment: {
+				marketId,
+				sideAtPostTime: "YES",
+				userId: OTHER_AUTHOR_ID,
+			},
 		});
 		expect(aff.support).toBe("allowed");
 		expect(aff.counter).toBe("foreclosed");
@@ -166,10 +199,56 @@ describe("readReplyAffordance — reads viewer's held side via heldSideOrNull", 
 		// No position seeded → heldSideOrNull returns null → H == null.
 		const aff = await readReplyAffordance(testDb, {
 			viewerId,
-			parentComment: { marketId, sideAtPostTime: "YES" },
+			parentComment: {
+				marketId,
+				sideAtPostTime: "YES",
+				userId: OTHER_AUTHOR_ID,
+			},
 		});
 		expect(aff.support).toBe("allowed");
 		expect(aff.counter).toBe("allowed");
 		expect(aff.reason).toBeNull();
+	});
+});
+
+// ── FF-1 / ADR-0058 — `friendlyFireEligible(P, S)` ──────────────────────────
+// Whether the composer offers the friendly-fire switch: TRUE exactly when the
+// reply would be a Support — the side being bought `S` equals the parent's
+// frozen side `P`. For a held position `S` is the held side; for an ENTRY reply
+// `S` is whichever side the entrant chose (D-51 R2), which is why the helper
+// takes the side being BOUGHT and not the held side. Pure, `===`; UI guidance
+// only — the write path (`place.ts`) is the guard. `computeReplyAffordance` is
+// unchanged by ADR-0058.
+describe("friendlyFireEligible — the four cells and the entry case", () => {
+	for (const P of ["YES", "NO"] as const) {
+		it(`friendly-fire::eligible-when-buying-the-parent-side-${P}`, () => {
+			expect(friendlyFireEligible(P, P)).toBe(true);
+		});
+		it(`friendly-fire::ineligible-when-buying-the-opposite-side-${P}`, () => {
+			expect(friendlyFireEligible(P, NOT_P(P))).toBe(false);
+		});
+	}
+
+	it("friendly-fire::entry-reply-choosing-the-parent-side-is-eligible", () => {
+		// No position: the entrant picks Support on a YES post ⇒ buys YES ⇒ eligible.
+		// The affordance says both sides are open; the eligibility reads the side
+		// CHOSEN, not the (absent) holding.
+		const aff = computeReplyAffordance("YES", null);
+		expect(aff.support).toBe("allowed");
+		expect(friendlyFireEligible("YES", "YES")).toBe(true);
+		// …and picking Counter (buys NO) is not.
+		expect(aff.counter).toBe("allowed");
+		expect(friendlyFireEligible("YES", "NO")).toBe(false);
+	});
+
+	it("friendly-fire::agrees-with-the-affordance-for-a-holder", () => {
+		// A holder can only buy their held side, so `S = H`; the switch is offered
+		// exactly when Support is the allowed relation.
+		for (const P of ["YES", "NO"] as const) {
+			for (const H of ["YES", "NO"] as const) {
+				const aff = computeReplyAffordance(P, H);
+				expect(friendlyFireEligible(P, H)).toBe(aff.support === "allowed");
+			}
+		}
 	});
 });

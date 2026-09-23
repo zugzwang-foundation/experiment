@@ -326,6 +326,9 @@ const CASES: Case[] = [
 			parentCommentId: null,
 			bodyLength: 140,
 			uploadId: null,
+			// FF-1 / ADR-0058 — the toggle key is part of the payload shape now;
+			// a top-level post is never friendly fire.
+			friendlyFire: false,
 		}),
 		actorId: (userId) => userId,
 		userIdInMetadata: (userId) => userId,

@@ -4,6 +4,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 
 import type { DbTransaction } from "@/db";
 import { betReceipts, bets, comments, imageUploads, pools } from "@/db/schema";
+import { validateReplyParent } from "@/server/comments/reply-validate";
 import { computeBuy, type Side } from "@/server/cpmm/calculate";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { accrueDailyCredit } from "@/server/dharma/accrual";
@@ -14,7 +15,13 @@ import { upsertPositionDelta } from "@/server/positions/persist";
 import { getHeldPosition } from "@/server/positions/read";
 
 import type { BetEventMetadata } from "./endpoint";
-import { InsufficientDharmaError, OppositeSideHeldError } from "./errors";
+import {
+	FriendlyFireRequiresReplyError,
+	FriendlyFireRequiresSupportError,
+	InsufficientDharmaError,
+	OppositeSideHeldError,
+	SelfReplyForbiddenError,
+} from "./errors";
 import type { LockedPool } from "./transaction";
 
 export interface PlaceParams {
@@ -25,6 +32,18 @@ export interface PlaceParams {
 	body: string;
 	/** null for a top-level post (ENGINE.8); a validated id for a reply (DEBATE.2). */
 	parentCommentId: string | null;
+	/**
+	 * FF-1 / ADR-0058 — the friendly-fire toggle: `true` only on a SUPPORT reply
+	 * (the side being bought equals the parent's frozen side). The route
+	 * frontstops both rejections before moderation; this function re-checks
+	 * them inside W-1 after its own parent read, so a caller that bypasses the
+	 * route cannot land a flagged Counter or a flagged post. Optional, like
+	 * `image` below and for the same reason: omitted means "not friendly fire",
+	 * which is the only correct reading for every pre-ADR caller (the fixture
+	 * and scale harnesses that drive `place()` directly), and the route — the
+	 * one live caller — always states it.
+	 */
+	friendlyFire?: boolean;
 	idempotencyKey: string;
 	/** AUDIT-FIX-B3 A9 — the RFC 8785 body fingerprint stored on the durable receipt (fingerprint-mismatch → 409 on replay). */
 	bodyFingerprint: string;
@@ -67,6 +86,8 @@ export interface PlaceResult {
 	newPrice: string;
 	/** Echoed for a reply (F-COMMENT-2 response shape); null for a top-level post. */
 	parentCommentId: string | null;
+	/** FF-1 / ADR-0058 — the stored `comments.friendly_fire`; false on every post and every Counter. Stored verbatim in `bet_receipts.result`, so a replay echoes it. */
+	friendlyFire: boolean;
 }
 
 /**
@@ -92,6 +113,7 @@ export async function place(
 ): Promise<PlaceResult> {
 	const { tx, pool } = ctx;
 	const { userId, marketId, side, stake, body, parentCommentId } = params;
+	const friendlyFire = params.friendlyFire ?? false;
 	const image = params.image ?? null;
 
 	// READS in the locked snapshot.
@@ -102,6 +124,33 @@ export async function place(
 			currentSide: held.side,
 			shares: held.quantity,
 		});
+	}
+	// D-52 R1 + FF-1 / ADR-0058 — THE IN-TX REPLY GUARDS, before any write. The
+	// route's pre-checks are the frontstop; these are the belt for any caller
+	// that reaches place() without them.
+	//   · parent absent / cross-market / too deep → validateReplyParent's 404/400
+	//   · parent authored by this user → self_reply_forbidden (D-52: nobody
+	//                                    replies to their own post, either side)
+	//   · flag + parent side ≠ side    → friendly_fire_requires_support
+	//   · flag + no parent             → friendly_fire_requires_reply (the
+	//                                    CHECK backs it)
+	// ⚠ The parent is read on EVERY reply, not only a flagged one: the self-reply
+	// rule needs `comments.user_id`, which no CHECK can see, so this read is the
+	// only in-transaction place it can be enforced. The author id rides the SAME
+	// select as the side — one statement per reply; a top-level post issues none.
+	// The parent row is Bucket-A immutable, so the pre-tx and in-tx reads cannot
+	// disagree; the second read exists so the guard holds by construction rather
+	// than by trusting the caller.
+	if (parentCommentId !== null) {
+		const parent = await validateReplyParent(tx, { parentCommentId, marketId });
+		if (parent.userId === userId) {
+			throw new SelfReplyForbiddenError();
+		}
+		if (friendlyFire && parent.sideAtPostTime !== side) {
+			throw new FriendlyFireRequiresSupportError();
+		}
+	} else if (friendlyFire) {
+		throw new FriendlyFireRequiresReplyError();
 	}
 	const balance = await readBalance(tx, userId);
 	// ENGINE.12 R4 — accrue-if-unpaid BETWEEN the balance read and the friendly
@@ -145,6 +194,9 @@ export async function place(
 			parentCommentId,
 			body,
 			sideAtPostTime: side, // INV-3 — the REPLIER's side, frozen at post time
+			// FF-1 / ADR-0058 — bound in the SAME insert as the side, never updated
+			// (Bucket A). Guarded above; the CHECK is the top-level backstop.
+			friendlyFire,
 			imageUploadsId: image?.uploadId ?? null, // F-COMMENT-3 link (in-tx)
 			betId: null, // Bucket-A circular pair; stays null in v1
 		})
@@ -229,6 +281,7 @@ export async function place(
 			parentCommentId,
 			bodyLength: body.length,
 			uploadId: image?.uploadId ?? null,
+			friendlyFire, // FF-1 / ADR-0058 — equal to the stored column (SHIP)
 		},
 		metadata: params.metadata,
 	});
@@ -302,6 +355,7 @@ export async function place(
 		sharesBought: buy.shares,
 		newPrice: buy.p1,
 		parentCommentId,
+		friendlyFire,
 	};
 
 	// AUDIT-FIX-B3 A9 — the durable idempotency receipt, the LAST write inside the

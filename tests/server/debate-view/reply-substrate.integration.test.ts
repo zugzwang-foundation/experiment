@@ -99,6 +99,12 @@ async function seedReplyWithBet(args: {
 	side: "YES" | "NO";
 	stake: string;
 	createdAt: Date;
+	/**
+	 * FF-1 / ADR-0058 — the declared stance. OPTIONAL and defaulting to `false`
+	 * so every pre-existing fixture above keeps the shape it had; only the
+	 * friendly-fire describe below states it.
+	 */
+	friendlyFire?: boolean;
 }): Promise<string> {
 	const [reply] = await testDb
 		.insert(comments)
@@ -108,6 +114,7 @@ async function seedReplyWithBet(args: {
 			body: "reply body",
 			sideAtPostTime: args.side,
 			parentCommentId: args.parentCommentId,
+			friendlyFire: args.friendlyFire ?? false,
 			betId: null,
 			createdAt: args.createdAt,
 		})
@@ -281,5 +288,111 @@ describe("DEBATE.4 §5a — loadReplySubstrate (per-parent reply grouping)", () 
 		for (const replies of map.values()) {
 			expect(replies.length).toBe(2);
 		}
+	});
+});
+
+// FF-1 · G9 (loader half) — `ReplySubstrate.friendlyFire`, ADR-0058 A-6.
+//
+// The stance is a property of the REPLY ROW, not of the side it sits on, and
+// this loader is the only path by which it reaches the reply tag. The
+// engine-driven arithmetic for the aggregates lives beside this file in
+// `friendly-fire-substrate.integration.test.ts`; what is asserted here is the
+// narrower claim this loader owns — that the column travels, per row, in the
+// partition the lane already builds.
+//
+// ⛔ REJECTS the plausible shortcut: deriving the stance at read time from
+// `side === parentSide`. Every reply below is on the SAME side as its parent,
+// so a derivation would report the same value for all four and would still
+// satisfy a test written only over a flagged/unflagged pair on opposite sides.
+//
+// Direct-seeded, matching this file's stated posture (the loader is a pure
+// read). RED today: `loadReplySubstrate` selects no `rc.friendly_fire` and the
+// DTO carries no such key.
+describe("FF-1 G9 — loadReplySubstrate carries the declared stance", () => {
+	afterEach(async () => {
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"mod_actions",
+			"users",
+		]);
+		vi.clearAllMocks();
+	});
+
+	it("reply-substrate::friendly-fire-travels-per-row", async () => {
+		const marketId = await seedMarket("ff-reply-flag-market");
+		const author = await seedUser("ff-reply-author");
+		const other = await seedUser("ff-reply-other");
+
+		const post = await seedPost({
+			userId: author,
+			marketId,
+			side: "YES",
+			createdAt: new Date("2026-09-15T00:00:01Z"),
+		});
+
+		// FOUR replies, ALL on the parent's own side — so side carries no
+		// information about the stance and only the column can.
+		const plain = await seedReplyWithBet({
+			userId: other,
+			marketId,
+			parentCommentId: post,
+			side: "YES",
+			stake: "50.000000000000000000",
+			createdAt: new Date("2026-09-15T01:00:00Z"),
+			friendlyFire: false,
+		});
+		const flagged = await seedReplyWithBet({
+			userId: other,
+			marketId,
+			parentCommentId: post,
+			side: "YES",
+			stake: "50.000000000000000000",
+			createdAt: new Date("2026-09-15T01:00:01Z"),
+			friendlyFire: true,
+		});
+		// The author's own flagged reply — excluded from every aggregate and from
+		// NOTHING here: the lane does not filter self-replies (ADR-0039 P2's other
+		// half, which the substrate-site parity test asserts textually).
+		const selfFlagged = await seedReplyWithBet({
+			userId: author,
+			marketId,
+			parentCommentId: post,
+			side: "YES",
+			stake: "50.000000000000000000",
+			createdAt: new Date("2026-09-15T01:00:02Z"),
+			friendlyFire: true,
+		});
+		// …and one that leaves the flag unstated, so `false` is asserted against
+		// the column DEFAULT as well as against an explicit write.
+		const defaulted = await seedReplyWithBet({
+			userId: other,
+			marketId,
+			parentCommentId: post,
+			side: "YES",
+			stake: "50.000000000000000000",
+			createdAt: new Date("2026-09-15T01:00:03Z"),
+		});
+
+		const map = await loadReplySubstrate(testDb, { marketId });
+		const replies = map.get(post) ?? [];
+		expect(replies.length).toBe(4);
+		const flagOf = (id: string) =>
+			replies.find((r) => r.id === id)?.friendlyFire;
+
+		expect(flagOf(flagged)).toBe(true);
+		expect(flagOf(selfFlagged)).toBe(true);
+		// ⚠ `false`, never `undefined`. A loader that dropped the key gives
+		// `undefined` here, which renders as "no tag" and so LOOKS correct on the
+		// surface while being unrepresentable in the export and the dataset.
+		expect(flagOf(plain)).toBe(false);
+		expect(flagOf(defaulted)).toBe(false);
 	});
 });

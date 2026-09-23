@@ -46,6 +46,34 @@ export type PostSubstrate = {
 	/** Reply-bets on the opposing side, self-authored excluded (see above). */
 	counterCount: number;
 	/**
+	 * FF-1 / ADR-0058 — the two DECLARED-STANCE counts the balance term reads
+	 * (RANKING.md §2 as amended). Both are DISTINCT PEOPLE, post author
+	 * excluded, `rb.id IS NOT NULL`, exactly like the two side counts above —
+	 * they partition the same people by what they DECLARED rather than by
+	 * which side they bought:
+	 *
+	 *   endorseCount — replied on the post's own side WITHOUT the friendly-fire
+	 *                  flag ("I back this side and this argument");
+	 *   contestCount — replied on the opposing side OR on the own side WITH the
+	 *                  flag ("I contest this argument"), each person once even
+	 *                  if they did both.
+	 *
+	 * A person who plain-supports AND friendly-fires the same post is in both —
+	 * the same shape the flip path already has across sides. With every flag
+	 * false, `endorseCount === supportCount` and `contestCount === counterCount`,
+	 * which is what makes the extension pure: every order and badge is
+	 * byte-identical to the side-based model (pinned by
+	 * `tests/unit/ranking/friendly-fire-purity.property.test.ts`).
+	 *
+	 * ⛔ RANKING INPUT ONLY — like `supportCount`/`counterCount` these never
+	 * reach a DTO or a screen (ADR-0039 P3; `substrate-site-parity.test.ts`
+	 * rejects the spelling that would carry them out). `n` and `D` do NOT read
+	 * them — a friendly-firer is a person attracted and their Dharma is real.
+	 */
+	endorseCount: number;
+	/** See `endorseCount`. */
+	contestCount: number;
+	/**
 	 * The DISPLAYED reply count on the post's own side — **every** reply,
 	 * self-authored and removed INCLUDED (ADR-0039 patch record P3, RANK-3).
 	 *
@@ -68,6 +96,15 @@ export type PostSubstrate = {
 	supportDharma: string;
 	/** SUM of counter-side reply-bet SURVIVING BASIS, self-authored excluded. */
 	counterDharma: string;
+	/**
+	 * FF-1 / ADR-0058 — COMPUTED, NOT RENDERED, never a ranking input: SUM of
+	 * support-side reply-bet SURVIVING BASIS by others that carry
+	 * `friendly_fire = true` — a SUBSET of `supportDharma`, which is unchanged
+	 * and still includes it. The post-focus Support-lane meter that read
+	 * `friendlyFireDharma ÷ supportDharma` is withdrawn (D-52) and this is
+	 * carried for its redesign; the pure model reads neither this nor the flag.
+	 */
+	friendlyFireDharma: string;
 	/** `comments.created_at`. */
 	createdAt: Date;
 	/**
@@ -127,6 +164,15 @@ export type ReplySubstrate = {
 	 * ranking model does not read it.
 	 */
 	priceAtBet: string;
+	/**
+	 * FF-1 / ADR-0058 — `comments.friendly_fire`: a Support reply whose author
+	 * backs the side and contests THIS argument. Carried so the reply DTO can
+	 * wear the tag; the pure model does not read it — a flagged reply stays in
+	 * the Support pool (`rankReplies` partitions by SIDE) and sorts by the same
+	 * ruler (RANKING.md §7 as amended). Required, not optional: a loader that
+	 * forgets it fails to compile rather than silently rendering no tag.
+	 */
+	friendlyFire: boolean;
 };
 
 /** The three lane-dominance badges (RANKING.md §5.2). */
@@ -161,12 +207,17 @@ type Derived = {
 
 function derive(p: PostSubstrate): Derived {
 	const n = p.supportCount + p.counterCount;
-	const max = Math.max(p.supportCount, p.counterCount);
+	// FF-1 / ADR-0058 — `b` reads DECLARED STANCE (endorse vs contest), not
+	// side (RANKING.md §2 / §6.1 as amended). `n` above still reads the side
+	// counts: a friendly-firer is one of the people the post attracted.
+	// `max(endorse, contest) === 0` iff `n === 0` — every counted person is in
+	// at least one stance pan — so the "undefined iff n = 0" guard is unchanged.
+	const max = Math.max(p.endorseCount, p.contestCount);
 	// b = min/max ∈ [0,1]; undefined iff n = 0 (0/0). lop = 1 − b.
 	const b =
 		max === 0
 			? null
-			: new RankingDecimal(Math.min(p.supportCount, p.counterCount)).div(max);
+			: new RankingDecimal(Math.min(p.endorseCount, p.contestCount)).div(max);
 	return {
 		post: p,
 		n,

@@ -28,6 +28,7 @@ waiting on an event that has not happened. Go-live is **2026-09-15**.
 | **4** | **UI-6 Gate C D3 — review-feed `innerJoin(users)`** | **armed; next `review-feed.ts` touch** | Verified safe today (no users-row hard-delete path; `onDelete: restrict`). Fires on contact, not on a date. |
 | **5** | **HTML-FINISH-MD-PLACEHOLDERS — four visible placeholders ship on `/m/[slug]`** | **operator-owned, STRIP OR GATE before the DP.2 production promote** | Founder-ruled IN at HTML-FINISH · MARKET DETAIL round 2 (R2, 2026-08-16, the OD-2 reversal) so the review surface shows the mockup's full composition. They are build-time notes about unbuilt work — exactly what `PD-3-09` / `OD-6` deleted from `MarketHeader` — and **a real participant must never meet one.** |
 | **6** | **STAGING-AUTH-ONE-WAY — a staging session cannot be re-obtained in-session** | **HARDEN Tier 2** | Signing out of staging cannot be reversed in-session, so auth-gated surfaces (`/bookmarks`, and the signed-out arm of any surface) are unmeasurable by CC without a founder-supplied session. **Blocked two measurements across PROFILE round 1 and round 2.** Needs a repeatable way to obtain and drop a staging session. ⚠ Round 2 found a PARTIAL workaround for the signed-OUT half only — the same deployment's `*.vercel.app` URL is a different origin, so the session cookie is not sent (same canary, same DB, same viewport). That gives the anonymous arm without signing out; it does **not** give a session where none exists, which is the half that blocked round 1. |
+| **7** | **FF-DATASET — the dataset exporter does not yet carry the friendly-fire toggle** | **armed; at PR #435's rebase for its post-2026-11-05 merge** | At PR #435's rebase for its post-2026-11-05 merge, add `friendly_fire` to the comments export and `friendlyFire` to the `comment.placed` research keys (SPEC.2 Appendix B.6, §19.4.1; D-51 R7). FF-1 deliberately did not touch #435 — it predates `lots`, and a column reference it does not have reds its whole suite until a rebase nobody was awake to do. The column and the event key SHIP now (migration `0031`, ADR-0058); only the exporter's projection of them is owed. |
 
 *Ordering rule: go-live blocker → operator-owned pre-promote → known-vacuous
 gate → dated pre-launch hardening → armed-on-touch. A row leaves this table only
@@ -4331,3 +4332,26 @@ wrap at 1280 and 1440, not applied and assumed.
 
 **Evidence.** `zz_MKT-ROSTER-1-P3_PHASE2G_2026-09-19T1811.md`; scanner probe and
 the before/after `column-gap` reads are in its §Gap probe.
+
+## FF-1 / ADR-0058 — drift and owed rows recorded, not acted on (2026-09-22)
+
+Surfaced at FF-1 (the overnight run — `zz_FF-1_run_2026-09-21T2143.md` §2, §7 and
+§11) and carried here at FF-1 · CLOSE-1. L-1 is a documented claim that measures
+false today. L-2 and L-3 are `@security-auditor` findings the run surfaced and did
+not absorb; until this section they sat only in the gitignored
+`claude-progress.md`, which no other reader sees. **Status OPEN** — a row leaves
+this table when someone rules on it, not when someone notices it again.
+
+| # | Row | Status | Owner |
+|---|---|---|---|
+| **FF-1 L-1** | **SPEC.2 §4.2 (Server Actions catalogue) names three F3 files that do not exist, under three action names that occur nowhere in `src/`.** The table says `placeDirectComment(input)` → `src/server/comments/place.ts`, `placeReply(input)` → `src/server/comments/reply.ts`, `placeImageComment(input)` → `src/server/comments/place-image.ts`, and its own lead-in already calls all three *comment-bearing bets*. Measured 2026-09-22 at `33b97f7a`: `src/server/comments/` holds `foreclosure.ts`, `image-attach.ts` and `reply-validate.ts`, nothing else; `grep -rn -E "placeDirectComment\|placeReply\|placeImageComment" src/` returns 0 lines. What is on disk is ONE entry point for a post and a reply alike — `POST /api/bets/place` (`src/app/api/bets/place/route.ts`) → `place()` (`src/server/bets/place.ts`), a reply being the same call carrying `parentCommentId`; the image arm is `resolveImageAttachment` (`src/server/comments/image-attach.ts`), called by that route outside the W-1 tx; both composers reach it through `src/components/debate/composer/requests.ts` (`buildPlaceRequest`). The FF-1 brief's A1-b named two of the three phantom files as edit targets — `overnight-run.md` F-16. | **OPEN — SPEC.2 §4.2 row correction owed to the web lane at the next SYNC pass** | web lane |
+| **FF-1 L-2** | **The same-side half of friendly-fire eligibility has no storage backstop.** Migration `0031` carries one CHECK, `comments_friendly_fire_requires_parent` (`parent_comment_id IS NOT NULL OR friendly_fire = false`) — the *requires-a-reply* half. The *requires-Support* half (the parent's `side_at_post_time` equals the reply's side) is enforced only in `place()`'s in-tx guard (`src/server/bets/place.ts`, the `if (friendlyFire)` block over `validateReplyParent`), so a future second `insert(comments)` site could skip it and land a flagged Counter. `@security-auditor` LOW at FF-1, declined there as defence-in-depth; the run's candidate: make the insert site take a value only the guard can produce. | **OPEN, no owner** — a later lane, not FF-1 | — |
+| **FF-1 L-3** | **`place()` validates a reply parent's market and depth only when the flag is set.** `validateReplyParent` (`src/server/comments/reply-validate.ts` — same market, depth ≤ `REPLY_DEPTH_MAX`) is called inside the tx only under `if (friendlyFire)`; an UNFLAGGED reply from a DIRECT caller of `place()` — the staging generator, the scale harnesses — gets FK existence on `parentCommentId` and nothing else. Not network-reachable: `POST /api/bets/place` validates every reply before the tx. Pre-existing, surfaced by `@security-auditor` at FF-1 as a SURPRISE. | **OPEN, no owner** — a later lane, not FF-1 | — |
+| **FF-TESTS** | CLOSE-3's four owed tests: ownPostIds membership; Counter-arm self-reply pin; NULL-cursor accrual; state-map completeness. | OPEN | — |
+| **FF-UUID** | family-wide UUID case hardening, auditor LOW-a. | OPEN | — |
+| **FF-METRIC** | friendly fire as a metric — founder ideation next. | OPEN | — |
+| **FF-LANES** | lanes below ~1,290 px; equal header heights only on request. | OPEN | — |
+| **MAT-PROD** | apply MKT-MAT-01 v3.3 to production with the tool once all five targets are empty. | OPEN | — |
+| **PROD-CLEAR** | clear production's load-test data before launch — needs a founder ruling. | OPEN | — |
+| **RUNBOOK-EXPAND** | runbook §3: an expand-only migration read by the build's prerender is applied before the merge — FF-1 SHIP precedent. | OPEN | — |
+| **MAT-TEST-NOTE** | content-markets-source.test.ts's v3.2 "remains open" line — annotate when production takes v3.3. | OPEN | — |
