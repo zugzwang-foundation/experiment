@@ -69,7 +69,7 @@ Testing FF-1 on staging, the founder friendly-fired his own post. The reply wore
 **R4 — Math market title: "on Zugzwang" comes out of the title only.**
 *(Superseded the same day by D-53: "on Zugzwang" is the market's premise, not only its title, and an edit path exists — `scripts/apply-v3-market-specs.ts`.)* Slug unchanged — URLs stay stable. This is market content, not code: an Open market's title has no built edit path (F-ADMIN-1 creates markets pre-live), so the change is applied by a separate data step once the live text and the path are measured, staging first, production at promotion. The market's question and resolution text are not changed by this ruling.
 
-**R5 — One header height across the market view and post-focus** at desktop two-lane widths: the post-focus top row takes the market view's header height, so the feed and composer lanes keep their size and position whether or not a post is focused. In the focused post's tile the Support/Counter bar sits at the tile's bottom edge, as on feed post cards. Phone tier unchanged.
+**R5 — The replies page header is compact, like the market page's Focus mode**, and nothing is floored: the post-focus header and the Focus-mode header are each as tall as their content, the focused post tile keeps its Support/Counter bar directly beneath its content, and the market page's full header is unchanged. *(Corrected the same day after screenshot review: the first build matched the full market header instead, and stretched Focus mode with it.)* Phone tier unchanged.
 
 ### Consequences
 

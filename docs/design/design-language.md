@@ -257,7 +257,7 @@ The highest-iteration surface. Its structure is locked here so every iteration i
 - **Friendly fire is post-focus only** (ADR-0058): flagged replies wear the tag; the card, the split bar and `Replies · N` are unchanged (the D-51 meter is withdrawn — D-52). No count, no badge.
 - **Own post** (D-52): on the viewer's own post the Support and Counter controls render disabled in the foreclosed treatment; nobody replies to their own post.
 - **Post-focus market card** (D-52): the question wraps to two lines, clamped at two. Discovery cards are unchanged.
-- **One header height** (D-52): at desktop two-lane widths the post-focus top row takes the market view's header height, so the lanes keep their size and position between views; the focused post tile's Support/Counter bar sits at the tile's bottom edge, as on feed post cards.
+- **Compact post-focus header** (D-52 R5): the replies page's header is compact, like the market page's Focus mode — both content-sized, no floor, no stretched tile; the focused post's Support/Counter bar sits directly beneath its content.
 - **Empty side** shows `Be the first to argue [YES/NO]` until a post exists.
 - **Refresh is polled**, not pushed (no live sockets this phase); new posts, new reply-bets, changed markers, and re-ranking appear on the next poll.
 - **Track-B comments** are admin-only inline (pending-review marker); never visible to the public.
