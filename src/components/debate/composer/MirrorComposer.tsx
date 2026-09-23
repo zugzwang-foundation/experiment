@@ -1,8 +1,10 @@
 "use client";
 
+import { ImageIcon, Pencil, Plus } from "lucide-react";
 import {
 	type KeyboardEvent,
 	type ReactNode,
+	useEffect,
 	useLayoutEffect,
 	useRef,
 	useState,
@@ -63,6 +65,8 @@ export function pairedChipPrice(
 
 /**
  * The Mirror composer — MIRROR-1, `docs/design/composer-mirror.md` (RF-1…RF-7).
+ * One component for both variants: a reply adds RF-2's statement row and moves
+ * the `×` onto it.
  *
  * ⛔ PRESENTATION ONLY. Every value and handler arrives from `BetComposer`, which
  * owns all state, the idempotency-key lifecycle, the quote, the gating
@@ -75,8 +79,19 @@ export function MirrorComposer(props: {
 	side: Side;
 	kind: ComposerKind;
 	mirror: MirrorContext;
+	/**
+	 * RF-2 — a reply's statement line, `Support|Counter <author>'s argument` (or,
+	 * for a removed parent, today's `Place your Đ BET` fallback), computed by the
+	 * controller with the classic header's own expression. `null` on a post, which
+	 * has no statement row and keeps its `×` on the author row (RF-3).
+	 */
+	replyStatement: string | null;
 	title: string;
 	extended: string;
+	/** Today's detail budget (`extendedMaxChars`) — the detail field's `maxLength`. */
+	extendedMax: number;
+	/** Today's detail counter, `{n} / {limit} · optional`, formatted by the controller. */
+	detailCounter: string;
 	amount: string;
 	/** The field's width, in `ch` — today's tracking rule, computed by the controller. */
 	amountFieldWidth: string;
@@ -94,6 +109,7 @@ export function MirrorComposer(props: {
 	toWin: string | null;
 	onTitleKeyDown: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
 	onTitleInput: (value: string) => void;
+	onExtendedInput: (value: string) => void;
 	onAmountInput: (value: string) => void;
 	onAmountBlur: () => void;
 	onPickImage: (file: File) => void;
@@ -112,6 +128,29 @@ export function MirrorComposer(props: {
 		props.mirror.pricing === null
 			? undefined
 			: pairedChipPrice(props.mirror.pricing, props.side);
+
+	// RF-5 / RF-6 — which view the frame shows. With the image-attach brake on
+	// (ADR-0052) there is no image view to return to, so the frame IS the detail
+	// view and the toggle is not drawn.
+	const [view, setView] = useState<MirrorView>("image");
+	const shown: MirrorView = props.imageAttachEnabled ? view : "detail";
+	const slide = useViewSlide(shown);
+	const detailRef = useRef<HTMLTextAreaElement | null>(null);
+	// Moving to the detail view is asking to write detail: focus follows. Moving
+	// back leaves focus on the toggle, where the reader pressed it.
+	const focusDetail = useRef(false);
+	useEffect(() => {
+		if (shown === "detail" && focusDetail.current) {
+			focusDetail.current = false;
+			detailRef.current?.focus();
+		}
+	}, [shown]);
+	const toggleView = () => {
+		const next: MirrorView = view === "image" ? "detail" : "image";
+		focusDetail.current = next === "detail";
+		slide.leave(view);
+		setView(next);
+	};
 
 	return (
 		<section
@@ -132,6 +171,14 @@ export function MirrorComposer(props: {
 				data-testid="mirror-body"
 				className="-m-0.5 flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto p-0.5"
 			>
+				{props.replyStatement !== null ? (
+					<StatementRow
+						statement={props.replyStatement}
+						close={
+							<CloseButton onClose={props.onClose} disabled={props.inFlight} />
+						}
+					/>
+				) : null}
 				<AuthorRow
 					side={props.side}
 					pseudonym={pseudonym}
@@ -141,8 +188,12 @@ export function MirrorComposer(props: {
 						props.amountIsPositive ? formatDharma(props.clampedAmount) : "—"
 					}
 					close={
-						props.kind === "post" ? (
-							<CloseButton onClose={props.onClose} disabled={props.inFlight} />
+						props.replyStatement === null ? (
+							<CloseButton
+								onClose={props.onClose}
+								disabled={props.inFlight}
+								className="ml-auto"
+							/>
 						) : null
 					}
 				/>
@@ -153,6 +204,13 @@ export function MirrorComposer(props: {
 						onKeyDown={props.onTitleKeyDown}
 						onInput={props.onTitleInput}
 					/>
+					{props.imageAttachEnabled ? (
+						<DetailToggle
+							shown={shown}
+							hasDetail={props.extended.trim().length > 0}
+							onToggle={toggleView}
+						/>
+					) : null}
 				</div>
 				<div
 					data-testid="mirror-media-host"
@@ -167,17 +225,48 @@ export function MirrorComposer(props: {
 						// exact 16:9, centred, top-aligned, clipped. Stated as CSS rather than
 						// measured in script: this IS the rule, it is right on the first
 						// paint, and it follows every resize without a frame of lag.
-						className={`relative mx-auto aspect-video w-[min(100cqw,calc(100cqh*16/9))] shrink-0 overflow-hidden rounded-(--r) border bg-ground ${frameBorder(props.image)}`}
+						className={`relative mx-auto aspect-video w-[min(100cqw,calc(100cqh*16/9))] shrink-0 overflow-hidden rounded-(--r) border bg-ground ${frameBorder(shown, props.image)}`}
 					>
+						{/* ⛔ BOTH VIEWS STAY MOUNTED, AND THAT IS RF-6's ⚠ RATHER THAN A
+						    CONVENIENCE. The image view owns the local preview; unmounting
+						    it would revoke the blob and bring the reader back to a blank
+						    frame over an image that is still attached. The attach itself
+						    lives in the controller and never pauses. The view the reader
+						    is not looking at is `hidden` and `inert` — out of the tab
+						    order and the accessibility tree, still holding its state. */}
 						{props.imageAttachEnabled ? (
-							<ImageAttach
-								variant="mirror"
-								state={props.image}
-								disabled={fieldsDisabled}
-								onPick={props.onPickImage}
-								onRemove={props.onRemoveImage}
-							/>
+							<div {...slide.attrs("image")}>
+								<ImageAttach
+									variant="mirror"
+									state={props.image}
+									disabled={fieldsDisabled}
+									onPick={props.onPickImage}
+									onRemove={props.onRemoveImage}
+								/>
+							</div>
 						) : null}
+						<div {...slide.attrs("detail")}>
+							<textarea
+								ref={detailRef}
+								value={props.extended}
+								maxLength={props.extendedMax}
+								disabled={fieldsDisabled}
+								aria-label="Argument body"
+								placeholder={MIRROR_COPY.detailPlaceholder}
+								onChange={(e) => props.onExtendedInput(e.target.value)}
+								data-testid="mirror-detail"
+								// RF-6 — today's detail field, filling the same frame so
+								// nothing jumps: 14px / 21px, n6, 14px 16px padding. The n3
+								// edge is the frame's own while this view shows.
+								className="min-h-0 w-full flex-1 resize-none bg-transparent px-4 py-3.5 text-[14px] leading-[21px] text-n6 outline-none placeholder:text-n5 focus-visible:shadow-[inset_var(--state-focus-ring)] disabled:cursor-not-allowed"
+							/>
+							<span
+								data-testid="mirror-detail-counter"
+								className="shrink-0 px-4 pb-2.5 text-right text-[11px] leading-none text-n5"
+							>
+								{props.detailCounter}
+							</span>
+						</div>
 					</div>
 				</div>
 				<ErrorStrip status={props.status} />
@@ -202,23 +291,187 @@ export function MirrorComposer(props: {
 }
 
 /**
- * RF-6 — the frame's edge. Solid n2 around an image; DASHED n3 while the view is
- * an invitation (nothing picked, or a pick that was rejected and must be retried —
- * `ImageAttach`'s own "nothing in hand" rule).
+ * RF-6 — the frame's edge, for the view it is showing. The detail view's n3 edge;
+ * solid n2 around an image; DASHED n3 while the image view is an invitation
+ * (nothing picked, or a pick that was rejected and must be retried —
+ * `ImageAttach`'s own "nothing in hand" rule). The edge never moves: on a switch
+ * it changes in place while the content slides inside it.
  */
-function frameBorder(image: ImageAttachState): string {
+function frameBorder(shown: MirrorView, image: ImageAttachState): string {
+	if (shown === "detail") {
+		return "border-n3";
+	}
 	return image.phase === "none" || image.phase === "error"
 		? "border-dashed border-n3"
 		: "border-n2";
+}
+
+/** The frame's two views (RF-5 / RF-6). */
+type MirrorView = "image" | "detail";
+
+/**
+ * The composer's own slide duration (`ComposerSlot`'s `EXIT_MS`, canon §5's
+ * `.26 s`), reused for the view switch.
+ */
+const SLIDE_MS = 260;
+
+function prefersReducedMotion(): boolean {
+	return (
+		typeof window !== "undefined" &&
+		window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true
+	);
+}
+
+/**
+ * RF-6 — THE VIEW SWITCH'S SLIDE: translateX ±36px + fade, at the composer slot's
+ * duration and easing (260ms, tw-animate's `ease`). The image view lives on the
+ * left and the detail view on the right, so going to detail slides image out to
+ * the left and detail in from the right, and coming back is the mirror of it.
+ *
+ * ⚠ THE OUTGOING VIEW IS HELD FOR ONE DURATION, then hidden. React would hide it
+ * on the same render that shows its successor, leaving nothing to animate out;
+ * `leaving` keeps it drawn (non-interactive, `fill-mode-forwards` so it rests at
+ * its exit frame) until the timer drops it.
+ * ⚠ `prefers-reduced-motion` IS HONOURED IN JS as well as CSS, for
+ * `ComposerSlot`'s reason: CSS alone would stop the motion but keep the hold, and
+ * a view sitting motionless for a quarter-second is a stall, not an instant swap.
+ * ⚠ The first render animates nothing: the composer's own slot slide is already
+ * running as it opens, and a second motion inside it would read as a stutter.
+ */
+function useViewSlide(shown: MirrorView) {
+	const [leaving, setLeaving] = useState<MirrorView | null>(null);
+	const [moved, setMoved] = useState(false);
+	useEffect(() => {
+		if (leaving === null) {
+			return;
+		}
+		const t = setTimeout(() => setLeaving(null), SLIDE_MS);
+		return () => clearTimeout(t);
+	}, [leaving]);
+	const enter: Record<MirrorView, string> = {
+		image: "animate-in fade-in-0 slide-in-from-left-[36px]",
+		detail: "animate-in fade-in-0 slide-in-from-right-[36px]",
+	};
+	const exit: Record<MirrorView, string> = {
+		image: "animate-out fade-out-0 slide-out-to-left-[36px] fill-mode-forwards",
+		detail:
+			"animate-out fade-out-0 slide-out-to-right-[36px] fill-mode-forwards",
+	};
+	const base =
+		"absolute inset-0 flex flex-col duration-[260ms] motion-reduce:animate-none";
+	return {
+		leave(outgoing: MirrorView) {
+			setMoved(true);
+			setLeaving(prefersReducedMotion() ? null : outgoing);
+		},
+		attrs(which: MirrorView) {
+			if (which === shown) {
+				return {
+					"data-mirror-view": which,
+					"data-view-state": "shown",
+					className: `${base}${moved ? ` ${enter[which]}` : ""}`,
+				};
+			}
+			if (which === leaving) {
+				return {
+					"data-mirror-view": which,
+					"data-view-state": "leaving",
+					inert: true,
+					"aria-hidden": true,
+					className: `${base} pointer-events-none ${exit[which]}`,
+				};
+			}
+			return {
+				"data-mirror-view": which,
+				"data-view-state": "hidden",
+				hidden: true,
+				inert: true,
+				className: base,
+			};
+		},
+	};
+}
+
+/**
+ * RF-5 — the detail toggle: 118px wide, exactly the title block's 54px, beside it.
+ * It changes the VIEW and nothing else — the image stays attached and the detail
+ * stays typed whichever is showing, and both are sent.
+ *
+ * ⚠ `aria-pressed` is true only on the detail view (`Show image`), per RF-5.
+ */
+function DetailToggle({
+	shown,
+	hasDetail,
+	onToggle,
+}: {
+	shown: MirrorView;
+	hasDetail: boolean;
+	onToggle: () => void;
+}) {
+	const pressed = shown === "detail";
+	const Icon = pressed ? ImageIcon : hasDetail ? Pencil : Plus;
+	const label = pressed
+		? MIRROR_COPY.showImage
+		: hasDetail
+			? MIRROR_COPY.editDetail
+			: MIRROR_COPY.addDetail;
+	return (
+		<button
+			type="button"
+			aria-pressed={pressed}
+			onClick={onToggle}
+			data-testid="mirror-detail-toggle"
+			className="flex h-[54px] w-[118px] shrink-0 items-center justify-center gap-2 rounded-(--r) border border-n2 text-[14px] leading-5 text-n6 transition-colors outline-none hover:border-n3 hover:text-ink focus-visible:shadow-(--state-focus-ring) aria-pressed:border-n3 aria-pressed:bg-n1 aria-pressed:text-ink"
+		>
+			<Icon aria-hidden="true" className="size-4 shrink-0" />
+			{label}
+		</button>
+	);
+}
+
+/**
+ * RF-2 — a reply's statement: `Support|Counter <author>'s argument`, 16px/600, with
+ * the `×` at the row's right end.
+ *
+ * ⛔ THE EMPTY SLOT BEFORE `×` IS RESERVED, NOT FORGOTTEN. FF-1's friendly-fire
+ * switch lands in `data-mirror-slot="friendly-fire"`; nothing is built in it here.
+ * It is `display: contents`, so while empty it has no box and adds no gap, and
+ * whatever is later put inside it lays out as part of the right-hand cluster,
+ * immediately before the `×`.
+ */
+function StatementRow({
+	statement,
+	close,
+}: {
+	statement: string;
+	close: ReactNode;
+}) {
+	return (
+		<div
+			data-testid="mirror-statement-row"
+			className="flex shrink-0 items-center gap-2"
+		>
+			<span className="min-w-0 text-[16px] leading-[22px] font-semibold text-ink">
+				{statement}
+			</span>
+			<div className="ml-auto flex shrink-0 items-center gap-2">
+				<span data-mirror-slot="friendly-fire" className="contents" />
+				{close}
+			</div>
+		</div>
+	);
 }
 
 /** Today's close control, unchanged in size and name — `aria-label="Close"`, a 44px target. */
 function CloseButton({
 	onClose,
 	disabled,
+	className,
 }: {
 	onClose: () => void;
 	disabled: boolean;
+	/** Placement only — `ml-auto` where the button itself must reach the row's end. */
+	className?: string;
 }) {
 	return (
 		<button
@@ -226,10 +479,9 @@ function CloseButton({
 			onClick={onClose}
 			disabled={disabled}
 			aria-label="Close"
-			// The classic's own class string (`BetComposer`), plus `ml-auto` to take the
-			// row's right end and `-mr-3` so the glyph — not the 44px box around it —
-			// sits against the padding edge.
-			className="-my-3 -mr-3 ml-auto flex size-11 shrink-0 items-center justify-center rounded-(--r-chip) text-xl text-n4 transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
+			// The classic's own class string (`BetComposer`), plus `-mr-3` so the
+			// glyph — not the 44px box around it — sits against the padding edge.
+			className={`-my-3 -mr-3 flex size-11 shrink-0 items-center justify-center rounded-(--r-chip) text-xl text-n4 transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)${className ? ` ${className}` : ""}`}
 		>
 			{COMPOSER_COPY.close}
 		</button>

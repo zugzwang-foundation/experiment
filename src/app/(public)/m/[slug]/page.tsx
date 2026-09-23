@@ -17,6 +17,7 @@ import {
 } from "@/server/debate-view/viewer-freshness";
 import { getCachedReserveWalk } from "@/server/discovery/cached-series";
 import { withLiveTail } from "@/server/discovery/price-series";
+import { pfpUrl } from "@/server/identity-pool/pfp-url";
 import { getMarketBySlug } from "@/server/markets/get-by-slug";
 import { recordCacheAttempt } from "@/server/observability/cache-metrics";
 
@@ -288,6 +289,12 @@ export default async function MarketPage({
 				viewer={viewer}
 				initialPostId={initialPostId}
 				ownPseudonym={session?.user?.pseudonym ?? null}
+				// MIRROR-1 — the Mirror composer's author avatar (RF-3). The same
+				// helper, over the same session field, that `(public)/layout.tsx`
+				// already calls for the header's identity chip; no read is added.
+				ownPfpUrl={
+					session?.user ? pfpUrl(session.user.pfpFilename ?? null) : null
+				}
 			/>
 			<PhoneDebateView
 				model={model}

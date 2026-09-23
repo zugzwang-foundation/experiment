@@ -655,6 +655,17 @@ export function BetComposer(props: {
 			: null;
 
 	/**
+	 * The relation header — `Support|Counter <author>'s argument`, or the canon
+	 * `Place your Đ BET` for a post and for a reply whose parent was removed (the
+	 * author is masked at the type level, SG-3). ONE expression, drawn by both
+	 * layouts (MIRROR-1): the classic header span and the Mirror's statement row.
+	 */
+	const headerText =
+		props.replyContext && props.replyContext.authorPseudonym !== null
+			? `${props.replyContext.relation === "support" ? "Support" : "Counter"} ${props.replyContext.authorPseudonym}'s argument`
+			: COMPOSER_COPY.header;
+
+	/**
 	 * P2 terminal — the blocking modal. ONE element, rendered by both layouts
 	 * (MIRROR-1); it moved here out of the classic JSX unchanged.
 	 */
@@ -709,8 +720,11 @@ export function BetComposer(props: {
 				side={props.side}
 				kind={props.kind}
 				mirror={props.mirror}
+				replyStatement={props.kind === "reply" ? headerText : null}
 				title={title}
 				extended={extended}
+				extendedMax={extendedMax}
+				detailCounter={`${groupCount(extended.length)} / ${groupCount(extendedMax)}${COMPOSER_COPY.optionalSuffix}`}
 				amount={amount}
 				amountFieldWidth={stakeFieldWidth(amount)}
 				clampedAmount={assess.clampedAmount}
@@ -726,6 +740,7 @@ export function BetComposer(props: {
 				toWin={toWin}
 				onTitleKeyDown={onTitleKeyDown}
 				onTitleInput={onTitleInput}
+				onExtendedInput={onExtendedInput}
 				onAmountInput={onAmountInput}
 				onAmountBlur={onAmountBlur}
 				onPickImage={onPickImage}
@@ -786,11 +801,7 @@ export function BetComposer(props: {
 				    still falls back to the canon `Place your Đ BET` header on a composer
 				    that is still `kind="reply"`. No copy is invented and nothing is
 				    leaked. Pinned by `composer-header.test.tsx`. */}
-				<span className="text-sm font-semibold text-ink">
-					{props.replyContext && props.replyContext.authorPseudonym !== null
-						? `${props.replyContext.relation === "support" ? "Support" : "Counter"} ${props.replyContext.authorPseudonym}'s argument`
-						: COMPOSER_COPY.header}
-				</span>
+				<span className="text-sm font-semibold text-ink">{headerText}</span>
 				<button
 					type="button"
 					onClick={props.onClose}

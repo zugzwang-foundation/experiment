@@ -14,6 +14,7 @@ import { AuthGateSlot } from "./composer/AuthGateSlot";
 import { BetComposer } from "./composer/BetComposer";
 import { ComposerSlot } from "./composer/ComposerSlot";
 import { deriveReplySide, replyComposerColumn } from "./composer/gating";
+import type { MirrorContext } from "./composer/MirrorComposer";
 import { PositionStrip } from "./composer/PositionStrip";
 import { SlotHeader } from "./composer/SlotHeader";
 import { DebateColumn } from "./DebateColumn";
@@ -73,6 +74,7 @@ export function DebateView({
 	viewer,
 	initialPostId,
 	ownPseudonym,
+	ownPfpUrl,
 }: {
 	model: DebateViewModel;
 	/**
@@ -96,6 +98,13 @@ export function DebateView({
 	 * when signed out → the affordance stays non-interactive.
 	 */
 	ownPseudonym: string | null;
+	/**
+	 * MIRROR-1 — the viewer's own PFP URL (from the session, composed by the page
+	 * with the same `pfpUrl()` the `(public)` layout uses for the header), for the
+	 * Mirror composer's author row (RF-3). Optional: a mount that omits it draws the
+	 * avatar's initials fallback rather than failing, and signed-out it is null.
+	 */
+	ownPfpUrl?: string | null;
 }) {
 	const [selectedPostId, setSelectedPostId] = useState<string | null>(
 		initialPostId,
@@ -306,6 +315,16 @@ export function DebateView({
 	const { market, posts, priceChart } = model;
 	const marketOpen = market.status === "Open";
 	const heldSide = viewer?.position?.side ?? null;
+	/**
+	 * MIRROR-1 — what selects the Mirror layout at BOTH desktop composer mounts
+	 * (`docs/design/composer-mirror.md`, RF-8): the viewer, as the author of the
+	 * card the draft becomes, and the live price pair for its side chip. The phone
+	 * tree mounts the same `BetComposer` without it and keeps today's layout.
+	 */
+	const mirrorContext: MirrorContext = {
+		author: { pseudonym: ownPseudonym, pfpUrl: ownPfpUrl ?? null },
+		pricing: market.pricing,
+	};
 
 	const toggleEntry = (side: Side) => {
 		if (composerBusy) {
@@ -547,6 +566,7 @@ export function DebateView({
 								side={openSide}
 								kind="post"
 								viewer={viewer}
+								mirror={mirrorContext}
 								onClose={() => setOpenSide(null)}
 								onPosted={onPosted}
 								onSuspended={() => setSuspended(true)}
@@ -1246,6 +1266,7 @@ export function DebateView({
 														side={resultingSide}
 														kind="reply"
 														viewer={viewer}
+														mirror={mirrorContext}
 														parentCommentId={selectedPost.id}
 														replyContext={{
 															relation: openReply,
