@@ -173,13 +173,7 @@ export function PostFocusHeader({
 					    badge cut 33px, eight elements with `scrollWidth > clientWidth`.
 					    Anything measuring this row measures the clipping ancestor's
 					    descendants, never the document. */}
-					{/* D-52 R5 — `items-stretch`, not `items-center`: on the shared header
-					    floor the tile is taller than its content, and only a stretched
-					    text column lets `post-focus-foot`'s `mt-auto` sink the split bar
-					    to the tile's bottom edge, as the feed cards carry it. The name
-					    row and the title stay at the top; the image arm keeps its own
-					    `self-center`. */}
-					<div className="flex min-h-0 flex-1 gap-4 items-stretch max-mobile:flex-col max-mobile:items-start">
+					<div className="flex min-h-0 flex-1 gap-4 items-center max-mobile:flex-col max-mobile:items-start">
 						{/* ⛔ QUOTE-1 A — THE EMPTY ARM AND ITS WHOLE FRAME ARE GONE
 						    (founder-ruled 2026-09-11). R2 had filled the post-focus
 						    `.hpimg` with d5's `POST IMAGE` box (`d5:1491-1492`) whenever

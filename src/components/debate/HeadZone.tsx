@@ -188,21 +188,8 @@ export function HeadZone({
 				// `.hleft{flex:1 1 auto;min-width:0;display:flex;gap:16px}` (`d5:448`)
 				// — a ROW, not a stack. Its two children are the media panel and the
 				// text stack; `MarketHeader`/`PostFocusHeader` supply that row.
-				//
-				// ⛔ D-52 R5 — ONE HEADER HEIGHT, and this node carries it because it
-				// is the one node BOTH arms render. At lg+ the market arm's height is
-				// its media panel's: `w-1/3` of this column at 16:9, i.e. 3/16 of this
-				// column's width, which is `100vw` less the screen preset's two 28px
-				// insets, the 340px rail and the 20px band gap (`100vw − 416px`) —
-				// measured 191.98px at 1440 and 281.98px at 1920, on staging's slate
-				// and on the local fixture alike. The post arm takes the same value
-				// as a FLOOR, so the arena below starts at the same y in both arms.
-				// A floor, never a height: a column whose content is taller still
-				// grows (the clip history above is why), and the chain's `min-h-0`
-				// still governs below lg. ⚠ If the rail, the gap or the screen insets
-				// change, this number changes with them.
 				data-testid="headzone-left"
-				className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 lg:min-h-[calc((100vw_-_416px)_*_3_/_16)]"
+				className="flex min-h-0 min-w-0 flex-1 flex-col gap-3"
 			>
 				{left}
 			</div>
