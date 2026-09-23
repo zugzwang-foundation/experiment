@@ -15,6 +15,7 @@ import { loadReplySubstrate } from "@/server/debate-view/reply-substrate";
 import { loadProfileArguments } from "@/server/profile/arguments";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { seedLegacyReply } from "../../db/_fixtures/lots";
 import { truncateTables } from "../../db/_fixtures/truncate";
 
 /**
@@ -53,7 +54,9 @@ import { truncateTables } from "../../db/_fixtures/truncate";
  * contest. The two numbers answer different questions, which is why ADR-0058
  * added a pair rather than re-pointing the existing one.
  *
- * ⚠ **P's self-friendly-fire is the trap.** It is a legal reply that keeps its
+ * ⚠ **P's self-friendly-fire is the trap.** Since D-52 the write path refuses
+ * it, so the fixture inserts it as the LEGACY row such a reply is — the tables
+ * still hold the ones written before the ruling. It keeps its
  * own lane position and its own tag, and it must appear in the DISPLAY total
  * (`support_count_total = 3`) while contributing to NONE of the ranking or
  * attraction aggregates. A `friendly_fire_dharma` written without
@@ -237,10 +240,13 @@ async function seedFixture(slug: string) {
 		parentCommentId: post.commentId,
 		friendlyFire: false,
 	});
-	// The author friendly-fires their OWN post. Legal, tagged, lane-positioned —
-	// and invisible to every aggregate below (ADR-0039 P2: a post attracting its
-	// own author is not attracting anything).
-	const selfReply = await placeBet({
+	// The author friendly-fires their OWN post. Tagged, lane-positioned — and
+	// invisible to every aggregate below (ADR-0039 P2: a post attracting its own
+	// author is not attracting anything). ⚠ D-52: `place()` now refuses a reply
+	// to your own post, so this is inserted as the LEGACY row it would be — its
+	// comment, its bet and its lot (`seedLegacyReply`); the P2 predicates this
+	// fixture pins now cover exactly such rows.
+	const selfReply = await seedLegacyReply(testDb, {
 		userId: author,
 		marketId,
 		side: "YES",

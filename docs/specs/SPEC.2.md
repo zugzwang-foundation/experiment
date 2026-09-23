@@ -11,7 +11,7 @@
 | Field | Value |
 |---|---|
 | **Document** | SPEC.2 — Zugzwang Technical Architecture |
-| **Version** | 2.1.0 |
+| **Version** | 2.2.0 |
 | **Date** | 2026-09-17 |
 | **Owner** | Hrishikesh Manoj Hundekari |
 | **Phase** | Experiment phase only. Markets open 2026-09-15; the freeze is 2026-11-05 23:59 UTC; the dataset is released 2026-11-06. Out of scope: testnet, mainnet, on-chain |
@@ -29,6 +29,7 @@
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 2.2.0 | 2026-09-23 | HMH | **Self-replies refused; friendly-fire meter withdrawn (D-52).** ReplyAffordance gains own-post foreclosure — both controls disabled, carried as a viewer-scoped boolean, no author id to the client; **§5.4** `friendly_fire_dharma` reclassified COMPUTED, NOT RENDERED. No schema change. *(refs: D-52)* |
 | 2.1.0 | 2026-09-22 | HMH | **Friendly-fire toggle (ADR-0058, D-51).** **§5.1** row 4: `comments.friendly_fire boolean NOT NULL DEFAULT false` + CHECK `comments_friendly_fire_requires_parent`; **§5.4**: three new read-time aggregates — `friendly_fire_dharma` (DISPLAYED, meter numerator), `endorse_count` / `contest_count` (RANKING INPUT, feed `b`); `friendlyFireEligible` helper beside ReplyAffordance; **§5.5** and **§13.3** riders — the removed vote and the new toggle are different mechanics; **§19.4.1** `comment.placed` gains `friendlyFire` (SHIP); **Appendix B.6** `friendly_fire` SHIP. Migration `0031_comments_friendly_fire`; `EXPECTED_GUARD_CATALOG_ROWS` unchanged. The dataset exporter (PR #435) is deliberately untouched — `docs/parked.md` carries the trigger. *(refs: ADR-0058; D-51)* |
 | 2.0.0 | 2026-09-07 | HMH | Rebaselined. **§10 rebuilt as the Moderation Contract** — advisory throughout: text is dispatched after commit and never awaited, images are screened before first serve, no request fails on a moderation outcome, the Redis intent reservation and the 409/503 branches are retired (D-20, ADR-0046). §12's moderation-coupled clauses rebuilt to match. 49 dangling `SPEC.1` citations repaired against SPEC.1 2.0.0 and seven broken `MUST` obligations discharged (D-29). `error-codes.md`'s five `MUST` clauses removed; §15.4 is the catalogue (D-28 r15). §21, §22 and Appendix A reduced to pointers; §2 and §23 removed (D-30, D-28 r12/r16/r17/r18). Devcon struck (D-21/D-26); the launch date stated (D-24). Reason codes aligned to SPEC.1 §14. **Code conformance for moderation: MOD-1, pending** — until it lands, `src/` implements the superseded gate. Rulings: D-20, D-21/D-26, D-22, D-24, D-28, D-29, D-30; ADR-0046. |
 | 2.0.1 | 2026-09-07 | HMH | **LIQ-1 Phase 2 (ADR-0047) — §19.4.1 same-commit rider for `pool.liquidity_added`.** The new event type's SHIP declaration lands in the SAME commit as `EVENT_TYPES` gains the member, per §19.4.1's own amendment rule and per Phase 1's ADR §F note: the dataset export throws on an undeclared type by design (`strip.ts:299`), so a declaration landing one commit later is a red build rather than a gap. No STRIP target — the payload carries no PII-class key and no `userId` at all, the writer being `pg_cron` rather than a participant. ⚠ **The emit site is migration `0027`'s plpgsql, not `src/`** — the first type for which that is true; the amendment-rule paragraph now says so. `EVENT_TYPES` 24 → 25. The remaining Phase-2 SPEC.2 rows (§5.1 inventory, §5.2, §6, §19.3, Appendix B) ride the migration commit, not this one. ⚠ **A §22.1 row was in that list when this branch was written and is not in it now** — D-30 retired §22's index at 2.0.0, so the amendment was dropped at the rebase rather than re-applied to a section that no longer exists; see 2.0.2. *(refs: ADR-0047; LIQ-1-P2)* |
@@ -486,7 +487,7 @@ Two architecturally-significant read-models compute at read time rather than per
   - `counter_count` — the same on the opposing side;
   - `support_dharma` — Dharma **still staked** across support-side reply-bets **by others** (`SUM(COALESCE(lots.surviving_basis, bets.stake))`);
   - `counter_dharma` — the same on the counter side.
-  - `friendly_fire_dharma` — **DISPLAYED** (the meter's numerator): Dharma **still staked** across support-side reply-bets **by others** that carry `friendly_fire = true` — a subset of `support_dharma`, which is unchanged and still includes it (ADR-0058);
+  - `friendly_fire_dharma` — **COMPUTED, NOT RENDERED** (the meter that displayed it is withdrawn — D-52; carried for the redesign): Dharma **still staked** across support-side reply-bets **by others** that carry `friendly_fire = true` — a subset of `support_dharma`, which is unchanged and still includes it (ADR-0058);
   - `endorse_count` — **RANKING INPUT, never rendered**: how many DISTINCT PEOPLE replied on the post's own side **without** the flag, self-authored excluded;
   - `contest_count` — **RANKING INPUT, never rendered**: how many DISTINCT PEOPLE replied on the opposing side **or** on the own side **with** the flag, self-authored excluded, each person once. `endorse_count` and `contest_count` feed only the balance term `b`; `n` and `D` do not read the flag (`RANKING.md` §2).
 
@@ -525,6 +526,8 @@ Shape:
   readReplyAffordance(client, { viewerId, parentComment: { marketId, sideAtPostTime } }) -> ReplyAffordance
 
 **Friendly-fire eligibility (ADR-0058).** Whether the composer offers the friendly-fire switch is a second pure derivation beside the affordance: `friendlyFireEligible(P, S) = (P === S)`, where `P = parent.side_at_post_time` and `S` is the side the reply will buy — the viewer's held side when they hold one, the side they chose when the reply is their entry. It is true exactly when the reply would be a Support. Like `computeReplyAffordance` it informs the UI only; the write-path guard is F-COMMENT-2's rejection of `friendly_fire = true` on an opposite-side or top-level comment.
+
+**Own-post foreclosure (D-52).** When the viewer authored the parent, both affordances are foreclosed, whatever the viewer holds: the Support and Counter controls render disabled in the existing foreclosed treatment and the composer cannot open. The viewer-scoped read carries this as a boolean (`isOwnPost`, or the read's existing equivalent); the author's user id never reaches the client. The write-path guard is F-COMMENT-2's 400 `self_reply_forbidden`.
 
 ### Read-time debate-view comment list (DebateComment)
 

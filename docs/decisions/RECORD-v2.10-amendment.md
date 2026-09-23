@@ -1,7 +1,7 @@
 # DECISION RECORD — amendment 2.10
 
 **Amends** `RECORD-v2.0.md` · follows every amendment on disk before it (measured: `ls docs/decisions/`) · **Opened** 2026-09-22
-**Rulings** D-51
+**Rulings** D-51 · D-52
 
 
 ---
@@ -47,6 +47,36 @@ Ruled in one sitting on 2026-09-22 with web Claude, pre-launch, on the founder's
 **Negative.** A same-side reader who wants to say *"good conclusion, bad argument"* must press **Support** and then flip a switch — the label they press is not the thing they mean. Accepted: the switch copy carries the meaning (*Contest this argument without leaving your side. Your stake still backs YES.*), and the alternative (a third pill) reads like Counter. A market-view reader does not see internal dissent until post-focus. Accepted: the card is unchanged by ruling.
 
 **Enforced at:** `SPEC.1` §2, §7, §8 F-COMMENT-2, §9, §20 · `SPEC.2` §0.1, §5.1 row 4, §5.4, §5.5, §13.3, §19.4.1, Appendix B.6 · `RANKING.md` header, §1, §2, §5, §6.1, §7 · `docs/design/design-language.md` §3.1, §6 · `docs/adr/ADR-0017` (metadata + callout) · `docs/adr/0058-friendly-fire-toggle.md`.
+
+---
+
+## D-52 · Self-replies refused; the friendly-fire meter withdrawn; surface fixes
+
+**Ruled:** 2026-09-23 · **Task:** FF-1 (CLOSE-3) · **From:** founder testing on staging `8564a7b0`
+
+### Context
+
+Testing FF-1 on staging, the founder friendly-fired his own post. The reply wore its tag and moved the price, but the post's Support figure stayed at Đ0 and the meter never appeared — correctly, because every Support/Counter figure excludes the author's own replies (ADR-0039 P2). A stake the product shows but does not count is a trap: it reads as a bug to its author and as nothing to everyone else. Separately, the meter as built stacked friendly-fire Đ and a labelled bar around the Support pill of the focused post's Support/Counter bar, pushing the pill off the line it shares with Counter.
+
+### Decision
+
+**R1 — Nobody replies to their own post, on either side.** The write path refuses it with 400 `self_reply_forbidden`, checked inside the W-1 transaction after the parent read (and at any pre-transaction front-stop that already reads the parent), writing nothing. On the viewer's own post both reply controls render disabled in the existing foreclosed treatment, on every surface and both tiers, and the composer cannot open against it. An author's correction or addendum is a new post. Self-replies already written stay (Bucket A) and stay excluded from every aggregate; the ADR-0039 P2 predicates remain and now cover legacy rows only. No schema change: the rule needs the parent row, so it is a write-path guard pinned by tests, like the same-side half of D-51 R2.
+
+**R2 — The friendly-fire meter (D-51 R5) is withdrawn** pending a redesign of how friendly fire is shown as a metric. The focused post's Support/Counter bar returns to its pre-FF-1 layout: Support pill on one line with the bar and Counter, the Support total beneath it. The switch and the tag stay. `friendly_fire_dharma` is still computed and carried, and renders nowhere until the redesign. Accepted until then: a post contested mostly by friendly fire can wear **Contested** while its bar shows no Counter, with nothing on screen explaining it.
+
+**R3 — The post-focus market card shows the question on up to two lines**, clamped at two, instead of one. Discovery market cards are unchanged.
+
+**R4 — Math market title: "on Zugzwang" comes out of the title only.** Slug unchanged — URLs stay stable. This is market content, not code: an Open market's title has no built edit path (F-ADMIN-1 creates markets pre-live), so the change is applied by a separate data step once the live text and the path are measured, staging first, production at promotion. The market's question and resolution text are not changed by this ruling.
+
+**R5 — One header height across the market view and post-focus** at desktop two-lane widths: the post-focus top row takes the market view's header height, so the feed and composer lanes keep their size and position whether or not a post is focused. In the focused post's tile the Support/Counter bar sits at the tile's bottom edge, as on feed post cards. Phone tier unchanged.
+
+### Consequences
+
+**Positive.** Every reply visible under a post counts in its figures. A self-promotion vector closes. The focused post's bar reads as it did before FF-1.
+
+**Negative.** An author cannot correct themselves in-thread; a new post does it. Until friendly fire is redesigned as a metric, it is visible only as tags.
+
+**Enforced at:** `SPEC.1` §2, §8 F-COMMENT-2, §9, F-DEBATE-1, §20 · `SPEC.2` §0.1, §5.4, ReplyAffordance · `RANKING.md` §2, §6.1 · `design-language.md` §3.1, §6 · `docs/adr/0058-friendly-fire-toggle.md` (metadata) · `src/server/bets/place.ts`.
 
 ---
 

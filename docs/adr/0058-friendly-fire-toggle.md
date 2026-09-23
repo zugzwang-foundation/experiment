@@ -10,7 +10,7 @@
 | **Supersedes** | — |
 | **Superseded-by** | — |
 | **Amends** | ADR-0017 — the balance term `b` now reads declared stance (endorse vs contest) instead of side; every other ADR-0017 outcome stands |
-| **Amended-by** | — |
+| **Amended-by** | D-52 (2026-09-23) — outcome 6's meter withdrawn pending a redesign; self-replies refused on the write path (F-COMMENT-2 `self_reply_forbidden`) |
 
 ---
 

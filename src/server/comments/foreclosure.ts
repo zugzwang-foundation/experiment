@@ -31,17 +31,29 @@ const otherSide = (s: Side): Side => (s === "YES" ? "NO" : "YES");
  * Pure truth table. `P` = parent.side_at_post_time; `H` = the viewer's held side
  * (null = no position). Support targets P; Counter targets ¬P.
  *
+ *   own post   → BOTH foreclosed, whatever is held (D-52 R1: nobody replies to
+ *                their own post, on either side).
  *   H === P    → Counter foreclosed (Counter = bet ¬P ≠ H), Support allowed.
  *   H === ¬P   → Support foreclosed (Support = bet P ≠ H), Counter allowed.
  *   H === null → both allowed (each is an entry bet on its own side).
  *
  * Total over these inputs, no side effects. `reason` is non-null IFF a side is
- * foreclosed.
+ * foreclosed. `isOwnPost` defaults to false so the two-input form stays the
+ * pre-D-52 derivation; the write-path mirror of the own-post row is F-COMMENT-2's
+ * `self_reply_forbidden`, as `opposite_side_held` mirrors the other two.
  */
 export function computeReplyAffordance(
 	P: Side,
 	H: Side | null,
+	isOwnPost = false,
 ): ReplyAffordance {
+	if (isOwnPost) {
+		return {
+			support: "foreclosed",
+			counter: "foreclosed",
+			reason: "You can't reply to your own post.",
+		};
+	}
 	if (H === null) {
 		return { support: "allowed", counter: "allowed", reason: null };
 	}
@@ -83,17 +95,26 @@ export function friendlyFireEligible(P: Side, S: Side): boolean {
  * Thin reader: pulls `H` via `heldSideOrNull` (ENGINE.11) for the viewer in the
  * parent's market, reads `P` off the parent comment's frozen side, and delegates
  * to the pure `computeReplyAffordance`. No write, no render.
+ *
+ * D-52 — it also takes the parent's author (`userId`, server-side only) and
+ * forecloses both sides when the viewer wrote the parent. Required rather than
+ * optional: a caller that forgot it would get an affordance offering a reply
+ * the write path refuses, with nothing to say it was incomplete.
  */
 export async function readReplyAffordance(
 	client: DbClient | DbTransaction,
 	args: {
 		viewerId: string;
-		parentComment: { marketId: string; sideAtPostTime: Side };
+		parentComment: { marketId: string; sideAtPostTime: Side; userId: string };
 	},
 ): Promise<ReplyAffordance> {
 	const held = await heldSideOrNull(client, {
 		userId: args.viewerId,
 		marketId: args.parentComment.marketId,
 	});
-	return computeReplyAffordance(args.parentComment.sideAtPostTime, held);
+	return computeReplyAffordance(
+		args.parentComment.sideAtPostTime,
+		held,
+		args.parentComment.userId === args.viewerId,
+	);
 }

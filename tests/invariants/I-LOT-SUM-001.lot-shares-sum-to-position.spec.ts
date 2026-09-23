@@ -222,7 +222,21 @@ describe("I-LOT-SUM-001 — Σ surviving lot shares == positions.quantity (ADR-0
 		// and where this invariant has something to say.
 		const userId = await seedUser("lotsum2", "5000");
 		const marketId = await seedOpenMarketWithPool("lot-sum-2");
-		const post = await placeBet({
+		// D-52: nobody replies to their own post, so the two replies below answer
+		// ANOTHER user's post. They were never the subject here — four lots at
+		// four prices for ONE holder is — so the holder, the stakes and every
+		// assertion are unchanged. ⚠ The other user's post is a fifth bet that
+		// moves the pool first, so the four prices are not the ones they were;
+		// the assertions are relational (4 lots, distinct ratios, Σ == quantity)
+		// and hold either way.
+		const otherUser = await seedUser("lotsum2-other", "5000");
+		const othersPost = await placeBet({
+			userId: otherUser,
+			marketId,
+			side: "YES",
+			stake: "40",
+		});
+		await placeBet({
 			userId,
 			marketId,
 			side: "YES",
@@ -233,14 +247,14 @@ describe("I-LOT-SUM-001 — Σ surviving lot shares == positions.quantity (ADR-0
 			marketId,
 			side: "YES",
 			stake: "50",
-			parentCommentId: post.commentId,
+			parentCommentId: othersPost.commentId,
 		});
 		await placeBet({
 			userId,
 			marketId,
 			side: "YES",
 			stake: "500",
-			parentCommentId: post.commentId,
+			parentCommentId: othersPost.commentId,
 		});
 		await placeBet({ userId, marketId, side: "YES", stake: "90" });
 

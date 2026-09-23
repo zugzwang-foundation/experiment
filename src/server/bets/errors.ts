@@ -304,6 +304,23 @@ export class FriendlyFireRequiresSupportError extends BetProductError {
 }
 
 /**
+ * D-52 R1 / SPEC.1 §8 F-COMMENT-2 → 400. The replier authored the parent:
+ * nobody replies to their own post, on either side. Needs the parent row's
+ * `user_id`, so it is a write-path guard rather than DDL — checked on the
+ * route's pre-transaction parent read (ahead of moderation) and again inside
+ * W-1 after `place()`'s own parent read, before any write. Terminal and
+ * deterministic in the request, so it is a cached 4xx (ADR-0031).
+ */
+export class SelfReplyForbiddenError extends BetProductError {
+	static readonly httpStatus = 400;
+	static readonly code = "self_reply_forbidden";
+	constructor() {
+		super("a reply cannot target the replier's own post");
+		this.name = "SelfReplyForbiddenError";
+	}
+}
+
+/**
  * DEBATE.2 / SPEC.1 §8 F-COMMENT-2 → 404. The parent comment is absent OR in a
  * different market than the reply targets (a reply must reference an existing
  * comment in the same market).

@@ -20,6 +20,7 @@ import {
 	FriendlyFireRequiresSupportError,
 	InsufficientDharmaError,
 	OppositeSideHeldError,
+	SelfReplyForbiddenError,
 } from "./errors";
 import type { LockedPool } from "./transaction";
 
@@ -124,24 +125,32 @@ export async function place(
 			shares: held.quantity,
 		});
 	}
-	// FF-1 / ADR-0058 — THE IN-TX FRIENDLY-FIRE GUARD, before any write. The
-	// route's pre-check is the frontstop; this is the belt for any caller that
-	// reaches place() without it. Gated on the flag so the unflagged path
-	// issues no extra statement (the render-path budget is untouched either
-	// way; this is the WRITE path's own statement and only when it matters).
-	//   · no parent            → friendly_fire_requires_reply (the CHECK backs it)
-	//   · parent side ≠ side   → friendly_fire_requires_support (needs the row)
-	// The parent's `side_at_post_time` is Bucket-A immutable, so the pre-tx and
-	// in-tx reads cannot disagree; the second read exists so the guard holds by
-	// construction rather than by trusting the caller.
-	if (friendlyFire) {
-		if (parentCommentId === null) {
-			throw new FriendlyFireRequiresReplyError();
-		}
+	// D-52 R1 + FF-1 / ADR-0058 — THE IN-TX REPLY GUARDS, before any write. The
+	// route's pre-checks are the frontstop; these are the belt for any caller
+	// that reaches place() without them.
+	//   · parent absent / cross-market / too deep → validateReplyParent's 404/400
+	//   · parent authored by this user → self_reply_forbidden (D-52: nobody
+	//                                    replies to their own post, either side)
+	//   · flag + parent side ≠ side    → friendly_fire_requires_support
+	//   · flag + no parent             → friendly_fire_requires_reply (the
+	//                                    CHECK backs it)
+	// ⚠ The parent is read on EVERY reply, not only a flagged one: the self-reply
+	// rule needs `comments.user_id`, which no CHECK can see, so this read is the
+	// only in-transaction place it can be enforced. The author id rides the SAME
+	// select as the side — one statement per reply; a top-level post issues none.
+	// The parent row is Bucket-A immutable, so the pre-tx and in-tx reads cannot
+	// disagree; the second read exists so the guard holds by construction rather
+	// than by trusting the caller.
+	if (parentCommentId !== null) {
 		const parent = await validateReplyParent(tx, { parentCommentId, marketId });
-		if (parent.sideAtPostTime !== side) {
+		if (parent.userId === userId) {
+			throw new SelfReplyForbiddenError();
+		}
+		if (friendlyFire && parent.sideAtPostTime !== side) {
 			throw new FriendlyFireRequiresSupportError();
 		}
+	} else if (friendlyFire) {
+		throw new FriendlyFireRequiresReplyError();
 	}
 	const balance = await readBalance(tx, userId);
 	// ENGINE.12 R4 — accrue-if-unpaid BETWEEN the balance read and the friendly

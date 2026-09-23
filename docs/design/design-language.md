@@ -1,7 +1,7 @@
 # Zugzwang — Design Language (high-fidelity monochrome)
 
 > **Doc:** `docs/design/design-language.md`
-> **Status:** v0.9-draft · precursor · living document
+> **Status:** v0.10-draft · precursor · living document
 > **Phase:** experiment-phase VISUAL stratum
 > **Authorship:** web Claude (orchestrator) · ratified by operator · committed by Claude Code
 >
@@ -154,7 +154,7 @@ The shared kit. **Thesis-load-bearing primitives** carry intent + states + conte
 - *Form:* a labelled switch, `Friendly fire`, directly beneath the Support pill in the reply composer, default **off**, with one line of helper copy: *Contest this argument without leaving your side. Your stake still backs YES* (or *NO* — the side being bought). Same type ramp and outline weight as the pills; monochrome; the on-state uses the side pole's fill.
 - *Rule:* rendered **only** when the reply would be a Support (`friendlyFireEligible`); never under Counter — selecting Counter hides it and resets it to off; never in the top-level composer. Compose-time only: once posted, the choice is frozen with the reply. Present on desktop and the phone tier alike.
 
-**Friendly-fire meter** *(post-focus Support lane header; ADR-0058)*
+**Friendly-fire meter** *(post-focus Support lane header; ADR-0058)* — **WITHDRAWN (D-52, 2026-09-23).** Kept as the record of what shipped and was removed; do not build from it. A redesign is pending.
 - *Intent:* show how much of a post's support is contesting it.
 - *Form:* stacked in the Support lane header — **friendly-fire Đ** (bare `Đ` figure, same size as the aggregate figures) above the Support pill; beneath the pill a **single-fill bar** in the split-bar family, filled left-to-right to `friendly_fire_dharma ÷ support_dharma`, with the label `Friendly fire · N % of Support Đ`; beneath it the **total Support Đ** figure, mirroring the card's own Support figure. Figures are Dharma still held and exclude the post author's own replies.
 - *Rule:* **one-sided** — it is a share of Support, not a Support-vs-something bar; **no count** anywhere; hidden while total Support Đ is zero; never rendered on the post card; **not** a badge. The Counter lane has no meter.
@@ -254,7 +254,10 @@ The highest-iteration surface. Its structure is locked here so every iteration i
 - **Replies are flat (one level only)**, ranked **by stake descending within their side**, earlier-posted winning ties.
 - **Two-slot default render:** each post surfaces the **top reply in each column** (its top YES reply and its top NO reply); expanding shows that column's full stake-sorted list.
 - **Each post** shows the author's own stake at its header and the **Support/Counter aggregate** (post-relative — stake agreeing vs. disagreeing with *this* post) at its footer — no vote control.
-- **Friendly fire is post-focus only** (ADR-0058): the Support lane header carries the friendly-fire meter and flagged replies wear the tag; the card, the split bar and `Replies · N` are unchanged. No count, no badge.
+- **Friendly fire is post-focus only** (ADR-0058): flagged replies wear the tag; the card, the split bar and `Replies · N` are unchanged (the D-51 meter is withdrawn — D-52). No count, no badge.
+- **Own post** (D-52): on the viewer's own post the Support and Counter controls render disabled in the foreclosed treatment; nobody replies to their own post.
+- **Post-focus market card** (D-52): the question wraps to two lines, clamped at two. Discovery cards are unchanged.
+- **One header height** (D-52): at desktop two-lane widths the post-focus top row takes the market view's header height, so the lanes keep their size and position between views; the focused post tile's Support/Counter bar sits at the tile's bottom edge, as on feed post cards.
 - **Empty side** shows `Be the first to argue [YES/NO]` until a post exists.
 - **Refresh is polled**, not pushed (no live sockets this phase); new posts, new reply-bets, changed markers, and re-ranking appear on the next poll.
 - **Track-B comments** are admin-only inline (pending-review marker); never visible to the public.
@@ -273,6 +276,7 @@ Scheduled, not excluded. These run after the core monochrome surfaces (now **loc
 ---
 
 > **Changelog.**
+> **[PK lineage] v0.10-draft (2026-09-23):** **D-52** — the Friendly-fire meter primitive withdrawn (heading marked, body kept as record); §6 gains own-post foreclosure and the post-focus layout bullets.
 > **[PK lineage] v0.9-draft (2026-09-22):** **Friendly-fire toggle (ADR-0058, D-51)** — §3.1 Reply gains the friendly-fire tag slot; §3.1 aggregate Rule carries the vote-vs-toggle rider; two new primitives, **Friendly-fire switch** (composer) and **Friendly-fire meter** (post-focus Support lane header); §6 bullet. Card untouched by ruling.
 > **v0.8-draft (2026-08-15, HTML-FINISH · DISCOVERY) — the market card carries no price sparkline.** §3.2 **Market card** locked composition drops `two-line sparkline`; it is now image thumb + question · YES/NO split bar · `Đ volume · posts · replies`. §3.2 **two-line price graph** strikes "sparkline on cards" and names the two surviving full-size renders (Discovery hero, market-detail chart slot); its colour binding is unchanged. ⚠ **"Reused across Discovery and Profile; must be identical everywhere" is RETAINED** — the sparkline leaves both renders together, so the two surfaces stay one composition rather than being freed to diverge; that clause is the load-bearing half. §3.2 **featured-market hero** is untouched (the hero keeps its two-line graph), and the §5 per-surface map's Discovery `Price chart ◐` still holds for the same reason. Ground: founder ruling on Gate C finding G-1 — the card sparkline was decorative by SPEC.1 §22's own definition, and composition of decoration is the ratified mockup's jurisdiction (`docs/design/mockups/surface_discovery_v1_0.html`, `.mcard` at `:269-282` is title-block + price bar with nothing between; the `.spark` rule at `:155` styles no element). No token, no §1 constraint and no §4 state-shape rule changed. Paired **SPEC.1 → 1.0.30** in the same commit; **design-canon §2 needed no amendment** — it already omitted the sparkline. Source: PR #334, HTML-FINISH · DISCOVERY.
 > v0.7-draft (2026-07-14, BRIDGE) — brand swap landed: §1.9 ground → dark (`--color-ground` `#181818`); §1.9 sans/accent bullets closed (Geist FINAL; no accent — true-neutral ratified); §2/§2.1 restated hex-authoritative with the branded dark values, accent row closed, BRIDGE provenance appended (side binding unchanged, R-1; poles de-aliased to literals); §3.2 two-line graph gains the dark-ground mirror (`--graph-yes` `#737373` / `--graph-no` `#fafafa`, series-bound; light-era mirror retired). Version note: "v0.6-draft" existed only as a PK-side label during the branding sessions (no repo landing); the repo jumps v0.5 → v0.7 to keep citations coherent — any PK-side deltas are subsumed here. Source: values-log v0_3 §3 (committed alongside) + docs/plans/BRIDGE.md.

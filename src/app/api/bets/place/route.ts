@@ -10,6 +10,7 @@ import {
 	FriendlyFireRequiresReplyError,
 	FriendlyFireRequiresSupportError,
 	InvalidRequestBodyError,
+	SelfReplyForbiddenError,
 } from "@/server/bets/errors";
 import { assertStakeFloor, clampStakeToMax } from "@/server/bets/floors";
 import { place } from "@/server/bets/place";
@@ -100,6 +101,12 @@ export async function POST(request: Request): Promise<Response> {
 		// reply_depth_exceeded (400). A reply IS a Support/Counter bet (ADR-0017);
 		// the write still flows through the single place() W-1 tx below.
 		//
+		// D-52 R1 — the self-reply frontstop rides the SAME read: the validated
+		// parent's author is compared with the caller, before the friendly-fire
+		// check, before image resolution and before moderation, so a reply that
+		// can never commit spends no vendor call and no Redis reservation.
+		// place()'s in-tx check is the belt.
+		//
 		// FF-1 / ADR-0058 — half two of the frontstop rides the SAME read: the
 		// validated parent's frozen side is what the toggle is measured against.
 		// `friendlyFire` is legal only when the side being bought EQUALS it (a
@@ -110,6 +117,9 @@ export async function POST(request: Request): Promise<Response> {
 				parentCommentId,
 				marketId,
 			});
+			if (parent.userId === ctx.userId) {
+				throw new SelfReplyForbiddenError();
+			}
 			if (friendlyFire && parent.sideAtPostTime !== side) {
 				throw new FriendlyFireRequiresSupportError();
 			}

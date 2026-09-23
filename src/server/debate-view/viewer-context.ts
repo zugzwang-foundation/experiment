@@ -46,6 +46,19 @@ export type ViewerMarketContext = {
 	balance: string;
 	/** balance + (unpaid-today ? DAILY_CREDIT_DHARMA : 0) — READ-ONLY preview. */
 	spendableToday: string;
+	/**
+	 * D-52 R1 — the ids of the viewer's OWN top-level posts in this market. The
+	 * client (the UI half, PR #569) derives `isOwnPost` per post from it: on the
+	 * viewer's own post both reply controls render disabled, because nobody
+	 * replies to their own post.
+	 * POST ids only, never a user id, so no author identity crosses to the client.
+	 * Optional at the type level because this DTO is built as a literal in the
+	 * render fixtures and an absent value reads as "none" — the
+	 * `ReplyAggregate.friendlyFireDharma` precedent (A-13);
+	 * `loadViewerMarketContext` ALWAYS sets it. UI guidance only: the write path's
+	 * `self_reply_forbidden` is the guard.
+	 */
+	ownPostIds?: string[];
 };
 
 /**
@@ -74,9 +87,10 @@ export function computeSpendableToday(args: {
  * Compose the viewer's market context in ONE transaction issuing SELECTs
  * only — zero writes (default READ COMMITTED; display-grade reads, no
  * snapshot-consistency claim). Reads: `getHeldPosition` (inherits the ≤1-held single-side
- * assert), `readBalance`, the `users` cursor + the tx clock in one
- * statement (the `accrual.ts` single-clock pattern — `.mapWith` is
- * load-bearing, a bare sql fragment has no runtime Date decoder), and the
+ * assert), `readBalance`, the `users` cursor + the tx clock + (D-52) the
+ * viewer's own post ids in one statement (the `accrual.ts` single-clock
+ * pattern — `.mapWith` is load-bearing, a bare sql fragment has no runtime
+ * Date decoder), and the
  * pool row ONLY when a position is held (a null position needs no pool
  * read beyond the header's).
  *
@@ -104,6 +118,24 @@ export async function loadViewerMarketContext(
 			.select({
 				cursor: users.lastAllowanceAccruedAt,
 				txNow: sql`now()`.mapWith(users.lastAllowanceAccruedAt),
+				// D-52 R1 — the viewer's own top-level posts here, folded into THIS
+				// statement as a scalar subquery rather than read by a fourth:
+				// `round-trip-budget.test.ts` pins this module at three statements with
+				// no held position, and the polled page pays every statement twice a
+				// minute per open tab. `json_agg` rather than an `array(...)` because
+				// postgres-js decodes `json` out of the box, where `uuid[]` needs its
+				// fetched type table. Ids only — no body, so SC-1 has nothing to mask;
+				// removed posts stay IN, since a reply to one is still a self-reply.
+				// ⚠ RAW, ALIASED NAMES and the ids as PARAMETERS, the
+				// `market-totals.ts` shape — not `${comments.userId} = ${users.id}`.
+				// In a single-table select Drizzle renders every column inside an
+				// `sql` field UNQUALIFIED, so that correlation became `"user_id" =
+				// "id"`, resolved inside the subquery to `comments.id`, and matched
+				// nothing: an always-empty set that every statement count and every
+				// existing shape assertion passed.
+				ownPostIds: sql<
+					string[]
+				>`coalesce((select json_agg(c.id order by c.id) from comments c where c.user_id = ${args.userId} and c.market_id = ${args.marketId} and c.parent_comment_id is null), '[]'::json)`,
 			})
 			.from(users)
 			.where(eq(users.id, args.userId));
@@ -155,6 +187,7 @@ export async function loadViewerMarketContext(
 			position,
 			balance,
 			spendableToday,
+			ownPostIds: row.ownPostIds,
 		};
 	});
 }

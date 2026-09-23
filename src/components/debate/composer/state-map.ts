@@ -59,6 +59,11 @@ const STATE_BY_CODE: Readonly<Record<string, ComposerStateName>> = {
 	insufficient_shares: "p3_generic",
 	position_not_held: "p3_generic",
 	opposite_side_held: "p3_generic",
+	// D-52 R1 — nobody replies to their own post. With the UI half (PR #569)
+	// both controls render disabled on the viewer's own post, so this code
+	// reaching a client is a stale tab or a hand-built request; without it the
+	// control is live and the refusal lands here. Generic is honest either way.
+	self_reply_forbidden: "p3_generic",
 	comment_requires_bet: "p3_generic",
 	reply_depth_exceeded: "p3_generic",
 	parent_comment_not_found: "p3_generic",
