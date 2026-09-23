@@ -377,6 +377,17 @@ export const SHARED_VIEW_MIN_WINDOW_MS = 15000;
 export const SHARED_VIEW_EXPIRE_SEC = MARKET_SERIES_MIN_WINDOW_MS / 1000;
 
 /**
+ * CACHE-COALESCE-3 — how long one fleet-wide version token is served before
+ * one caller re-derives it (`src/server/markets/version-token.ts`). The
+ * version poll was the route that broke first under a burst: R-18 logged
+ * 1,000 `EMAXCONN` 500s in thirteen seconds, because every edge miss opened a
+ * Postgres connection. Two seconds is BELOW the edge's own `s-maxage=5`, so
+ * the store adds no staleness the CDN was not already adding, and at six
+ * markets it bounds the database to three reads a second however many tabs
+ * are polling. */
+export const VERSION_MIN_WINDOW_MS = 2_000;
+
+/**
  * CACHE-COALESCE-1/2 — the fleet-wide single-flight around every per-market
  * shared read block (`src/server/cache/shared-block-store.ts`; the debate
  * view's binding is `src/server/debate-view/shared-view-store.ts`).

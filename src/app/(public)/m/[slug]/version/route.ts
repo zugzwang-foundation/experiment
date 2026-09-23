@@ -1,9 +1,6 @@
-import { eq, sql } from "drizzle-orm";
 import { notFound } from "next/navigation";
 
-import { db } from "@/db";
-import { comments, modActions, pools } from "@/db/schema";
-import { getMarketBySlug } from "@/server/markets/get-by-slug";
+import { getVersionToken } from "@/server/markets/version-token";
 
 // GET /m/[slug]/version — "has anything on this market changed?"
 //
@@ -38,77 +35,63 @@ import { getMarketBySlug } from "@/server/markets/get-by-slug";
 // and this response is public. The client compares tokens for equality and
 // reads nothing out of them.
 //
-// Cached at TWO layers, and the CDN one is what makes it nearly free:
+// Cached at THREE layers since CACHE-COALESCE-3 (ADR-0051 P3):
 //   - `s-maxage=5` lets Vercel's edge answer it, so at 3,000 viewers the origin
-//     sees roughly one request per 5 s instead of 100 per second.
+//     sees roughly one request per 5 s per edge location instead of 100 a second.
 //   - `stale-while-revalidate` keeps the edge answering while it refreshes.
-// Worst-case staleness is the 5 s edge window on top of the poll interval,
-// which is invisible next to a 30 s poll.
+//   - Behind the edge, the token itself comes from the fleet-wide store
+//     (`src/server/markets/version-token.ts`), so an edge MISS opens a Postgres
+//     connection only for the one instance fleet-wide re-deriving that market's
+//     token in its `VERSION_MIN_WINDOW_MS`. ⚠ This layer is why the route no
+//     longer breaks under a burst: R-18 logged 1,000 `EMAXCONN` 500s here in
+//     thirteen seconds, every one an edge miss that asked the pooler for a
+//     connection past its 200-client cap.
+// Worst-case staleness is the 2 s store window plus the 5 s edge window on top
+// of the poll interval, which is invisible next to a 30 s poll.
+//
+// ⛔ NEVER 500. `DebatePoll` reads any non-200 as "no change this tick", so a
+// status code here decides only what the edge caches and what a load test
+// counts. With the database unreachable, most requests never notice: they are
+// served the token entry already in the store, as a fresh answer. The one
+// request that took the store's lock and failed is served the last token with
+// a SHORT edge life so the next tick asks again; with nothing to serve —
+// the store's one-minute token entry gone too — it answers 503, `no-store`,
+// `Retry-After: 5`.
 
 // ⛔ NO `dynamic`/`revalidate` SEGMENT EXPORTS, DELIBERATELY. The caching that
 // matters here is the CDN header below; adding `force-static` under
 // `cacheComponents` would additionally ask the framework to prerender a
 // live pool read, which is the one thing this route must not do.
 
+const FRESH = "public, s-maxage=5, stale-while-revalidate=25";
+const STALE = "public, s-maxage=2";
+
+function tokenResponse(token: string, cacheControl: string): Response {
+	return new Response(JSON.stringify({ v: token }), {
+		status: 200,
+		headers: {
+			"content-type": "application/json",
+			"cache-control": cacheControl,
+		},
+	});
+}
+
 export async function GET(
 	_request: Request,
 	{ params }: { params: Promise<{ slug: string }> },
 ): Promise<Response> {
 	const { slug } = await params;
-	const market = await getMarketBySlug(db, slug);
-	if (!market) notFound();
+	const result = await getVersionToken(slug);
 
-	// ONE round trip for both halves. The moderation count rides as a scalar
-	// subquery rather than a second statement: this route is edge-cached, so it
-	// runs about once per market per 5 s however many viewers are watching, and
-	// one slightly wider query beats two narrow ones holding the connection
-	// twice.
-	//
-	// ⛔ THE SUBQUERY NAMES ITS COLUMNS THROUGH ALIASES, NOT `${comments.id}`.
-	// In a single-table select Drizzle renders an embedded column WITHOUT its
-	// table, so the interpolated form became `join "comments" on "id" = …`,
-	// which Postgres rejects as ambiguous (`mod_actions` has an `id` too).
-	// Every call 500'd in production and the mocked unit tests could not see
-	// it; tests/integration/market-version.integration.test.ts runs it for real.
-	const [row] = await db
-		.select({
-			yes: pools.yesReserves,
-			no: pools.noReserves,
-			moderations: sql<number>`(
-				select count(*) from ${modActions} as ma
-				join ${comments} as c on c.id = ma.target_comment_id
-				where c.market_id = ${market.id}
-			)`,
-		})
-		.from(pools)
-		.where(eq(pools.marketId, market.id))
-		.limit(1);
-
-	// A market with no pool row yet is still a valid answer — it has no reserves
-	// to move, so its token is stable until one is seeded.
-	const token = hashVersion(
-		`${market.status}:${row?.yes ?? "0"}:${row?.no ?? "0"}:${row?.moderations ?? 0}`,
-	);
-
-	return new Response(JSON.stringify({ v: token }), {
-		status: 200,
+	if (result.kind === "not-found") notFound();
+	if (result.kind === "token") return tokenResponse(result.token, FRESH);
+	if (result.lastToken !== null) return tokenResponse(result.lastToken, STALE);
+	return new Response(JSON.stringify({ error: "unavailable" }), {
+		status: 503,
 		headers: {
 			"content-type": "application/json",
-			"cache-control": "public, s-maxage=5, stale-while-revalidate=25",
+			"cache-control": "no-store",
+			"retry-after": "5",
 		},
 	});
-}
-
-/**
- * FNV-1a over the state string. Not cryptographic and does not need to be —
- * the only property required is that a change in reserves or status changes
- * the token, and the client compares for equality alone.
- */
-function hashVersion(input: string): string {
-	let hash = 0x811c9dc5;
-	for (let i = 0; i < input.length; i++) {
-		hash ^= input.charCodeAt(i);
-		hash = Math.imul(hash, 0x01000193) >>> 0;
-	}
-	return hash.toString(36);
 }
