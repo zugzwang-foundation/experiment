@@ -362,7 +362,12 @@ describe("MIRROR-1 RF-7 — the stake bar (G4, G5)", () => {
 		const shell = byTestId(container, "mirror-composer");
 		// Positive control first — the search reads the rendered bar at all.
 		expect(shell.textContent).toContain("Min");
-		expect(shell.textContent).not.toMatch(/\bBalance\b/);
+		// ⚠ NO WORD BOUNDARY. `textContent` concatenates sibling text with no
+		// separator, so a balance line sitting after the body reads
+		// `…optionalBalance Đ 810…` and `\bBalance\b` can never match there — the
+		// first version of this line passed with a planted balance (MIRROR-1 S6
+		// mutation G5b). A plain, case-blind substring has no such blind spot.
+		expect(shell.textContent).not.toMatch(/balance/i);
 		expect(shell.textContent).not.toContain("spendable");
 	});
 
