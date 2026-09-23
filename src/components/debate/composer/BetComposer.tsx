@@ -37,6 +37,7 @@ import {
 import { ImageAttach, type ImageAttachState } from "./ImageAttach";
 import { initialKeyState, type KeyState, reduceKey } from "./idempotency";
 import { attachImage, IMAGE_OVERSIZE_MESSAGE } from "./image-attach";
+import { MirrorComposer, type MirrorContext } from "./MirrorComposer";
 import {
 	composeWireBody,
 	extendedMaxChars,
@@ -153,6 +154,24 @@ export function BetComposer(props: {
 	 * cross). The composer's own ×/ESC are guarded internally.
 	 */
 	onBusyChange?: (busy: boolean) => void;
+	/**
+	 * MIRROR-1 — PASSING THIS SELECTS THE MIRROR LAYOUT (`MirrorComposer`,
+	 * `docs/design/composer-mirror.md`): the composer drawn as the card it will
+	 * become. Only the two DESKTOP mounts in `DebateView` pass it.
+	 *
+	 * ⛔ ABSENT, THIS COMPONENT RENDERS EXACTLY WHAT IT RENDERED BEFORE. That is
+	 * the phone sheet's composer (`PhoneDebateView` passes nothing), and RF-8 keeps
+	 * the phone on today's layout. `classic-layout-baseline.test.tsx` holds the
+	 * default render to a fixture captured before MIRROR-1 existed.
+	 *
+	 * ⚠ IT IS A PRESENTATION SWITCH AND NOTHING ELSE. Every piece of state, the
+	 * key lifecycle, the quote, the gating predicates and `submit` live above the
+	 * branch and are shared by both layouts; the object carries only the two facts
+	 * the Mirror draws that this component did not already hold — the viewer's
+	 * identity and the live price pair. Making it one object means a mount cannot
+	 * ask for the Mirror without supplying both.
+	 */
+	mirror?: MirrorContext;
 }) {
 	const router = useRouter();
 	const [title, setTitle] = useState("");
@@ -403,6 +422,40 @@ export function BetComposer(props: {
 		}
 	};
 
+	/**
+	 * MIRROR-1 — the argument and amount fields' handlers, ONE definition shared
+	 * by both layouts. They moved here out of the classic JSX unchanged, with the
+	 * comments that explain each layer; a second copy for the Mirror would be the
+	 * first place the newline defence or the blur clamp could drift.
+	 */
+	const onTitleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+		// Layer 1, replacing the `<input>`: a newline never gets
+		// typed in the first place.
+		if (e.key === "Enter") {
+			e.preventDefault();
+		}
+	};
+	const onTitleInput = (value: string) => {
+		// Layer 2, KEPT VERBATIM: the paste/drop/IME belt. F-5 —
+		// the title is newline-free.
+		setTitle(value.replace(/[\n\r]/g, " "));
+		onEdit();
+	};
+	const onExtendedInput = (value: string) => {
+		setExtended(value);
+		onEdit();
+	};
+	const onAmountInput = (value: string) => {
+		setAmount(value);
+		onEdit();
+	};
+	const onAmountBlur = () => {
+		// T3: normalize the display to the clamped value.
+		if (isPositiveAmount(amount)) {
+			setAmount(assess.clampedAmount);
+		}
+	};
+
 	async function submit() {
 		if (submitDisabled) {
 			return;
@@ -600,6 +653,89 @@ export function BetComposer(props: {
 		quote !== null && quote.kind === "quote"
 			? formatDharma(String(quote.data.shares ?? "—"))
 			: null;
+
+	/**
+	 * P2 terminal — the blocking modal. ONE element, rendered by both layouts
+	 * (MIRROR-1); it moved here out of the classic JSX unchanged.
+	 */
+	const suspendedDialog = (
+		<Dialog
+			open={suspendedKind !== null}
+			onOpenChange={(open) => {
+				if (!open && suspendedKind !== null) {
+					setSuspendedKind(null);
+					props.onSuspended();
+					props.onClose();
+				}
+			}}
+		>
+			<DialogContent showCloseButton={false}>
+				<DialogTitle>
+					{suspendedKind === "banned"
+						? SUSPENDED_COPY.banned.title
+						: SUSPENDED_COPY.trackA.title}
+				</DialogTitle>
+				<DialogDescription>
+					{suspendedKind === "banned"
+						? SUSPENDED_COPY.banned.body
+						: SUSPENDED_COPY.trackA.body}
+				</DialogDescription>
+				<div className="flex justify-end">
+					<Button
+						type="button"
+						onClick={() => {
+							setSuspendedKind(null);
+							props.onSuspended();
+							props.onClose();
+						}}
+					>
+						{SUSPENDED_COPY.trackA.action}
+					</Button>
+				</div>
+			</DialogContent>
+		</Dialog>
+	);
+
+	/**
+	 * ⛔ MIRROR-1 — THE LAYOUT BRANCH, AND IT IS THE ONLY PLACE THE TWO DIVERGE.
+	 * Everything above this line — state, key lifecycle, quote, gating, `submit` —
+	 * runs identically for both; below it, one of two presentations draws the same
+	 * values. The Mirror receives the controller's own handlers and predicates and
+	 * decides nothing about what is sent.
+	 */
+	if (props.mirror !== undefined) {
+		return (
+			<MirrorComposer
+				side={props.side}
+				kind={props.kind}
+				mirror={props.mirror}
+				title={title}
+				extended={extended}
+				amount={amount}
+				amountFieldWidth={stakeFieldWidth(amount)}
+				clampedAmount={assess.clampedAmount}
+				amountIsPositive={isPositiveAmount(amount)}
+				overCap={assess.overCap}
+				image={image}
+				imageAttachEnabled={imageAttachEnabled}
+				status={status}
+				inFlight={inFlight}
+				floorAbove={floorAbove}
+				submitDisabled={submitDisabled}
+				notice={notice}
+				toWin={toWin}
+				onTitleKeyDown={onTitleKeyDown}
+				onTitleInput={onTitleInput}
+				onAmountInput={onAmountInput}
+				onAmountBlur={onAmountBlur}
+				onPickImage={onPickImage}
+				onRemoveImage={onRemoveImage}
+				onSubmit={submit}
+				onClose={props.onClose}
+				suspendedDialog={suspendedDialog}
+			/>
+		);
+	}
 
 	return (
 		<section
@@ -920,19 +1056,8 @@ export function BetComposer(props: {
 									// 20px — the box is a fixed height either way, so this changes the
 									// text inside it and nothing around it. Additive: inert ≥640.
 									className="h-[72px] min-h-8 resize-none field-sizing-fixed max-mobile:text-[16px] max-mobile:leading-[22px]"
-									onKeyDown={(e) => {
-										// Layer 1, replacing the `<input>`: a newline never gets
-										// typed in the first place.
-										if (e.key === "Enter") {
-											e.preventDefault();
-										}
-									}}
-									onChange={(e) => {
-										// Layer 2, KEPT VERBATIM: the paste/drop/IME belt. F-5 —
-										// the title is newline-free.
-										setTitle(e.target.value.replace(/[\n\r]/g, " "));
-										onEdit();
-									}}
+									onKeyDown={onTitleKeyDown}
+									onChange={(e) => onTitleInput(e.target.value)}
 								/>
 								<div className="mt-0.5 shrink-0 text-right text-[10.5px] leading-tight text-n4 pr-2">
 									{groupCount(title.length)} / {groupCount(TITLE_MAX_CHARS)}
@@ -960,10 +1085,7 @@ export function BetComposer(props: {
 									aria-label="Argument body"
 									// D-2, the other half — same 14px, same zoom, same fix.
 									className="h-[80px] min-h-14 resize-none field-sizing-fixed max-mobile:text-[16px] max-mobile:leading-[22px]"
-									onChange={(e) => {
-										setExtended(e.target.value);
-										onEdit();
-									}}
+									onChange={(e) => onExtendedInput(e.target.value)}
 								/>
 								<div className="mt-0.5 shrink-0 text-right text-[10.5px] leading-tight text-n4 pr-2">
 									{groupCount(extended.length)} / {groupCount(extendedMax)}
@@ -1039,16 +1161,8 @@ export function BetComposer(props: {
 											disabled={floorAbove || inFlight}
 											aria-label="Stake amount"
 											style={{ width: stakeFieldWidth(amount) }}
-											onChange={(e) => {
-												setAmount(e.target.value);
-												onEdit();
-											}}
-											onBlur={() => {
-												// T3: normalize the display to the clamped value.
-												if (isPositiveAmount(amount)) {
-													setAmount(assess.clampedAmount);
-												}
-											}}
+											onChange={(e) => onAmountInput(e.target.value)}
+											onBlur={onAmountBlur}
 											className={`h-auto border-none p-0 text-right font-mono text-[20px] font-extrabold tabular-nums shadow-none [border:none] ${
 												assess.overCap ? "text-n4" : ""
 											}`}
@@ -1167,41 +1281,7 @@ export function BetComposer(props: {
 			<ErrorStrip status={status} />
 
 			{/* P2 terminal — the blocking modal, once; then controls disable. */}
-			<Dialog
-				open={suspendedKind !== null}
-				onOpenChange={(open) => {
-					if (!open && suspendedKind !== null) {
-						setSuspendedKind(null);
-						props.onSuspended();
-						props.onClose();
-					}
-				}}
-			>
-				<DialogContent showCloseButton={false}>
-					<DialogTitle>
-						{suspendedKind === "banned"
-							? SUSPENDED_COPY.banned.title
-							: SUSPENDED_COPY.trackA.title}
-					</DialogTitle>
-					<DialogDescription>
-						{suspendedKind === "banned"
-							? SUSPENDED_COPY.banned.body
-							: SUSPENDED_COPY.trackA.body}
-					</DialogDescription>
-					<div className="flex justify-end">
-						<Button
-							type="button"
-							onClick={() => {
-								setSuspendedKind(null);
-								props.onSuspended();
-								props.onClose();
-							}}
-						>
-							{SUSPENDED_COPY.trackA.action}
-						</Button>
-					</div>
-				</DialogContent>
-			</Dialog>
+			{suspendedDialog}
 		</section>
 	);
 }

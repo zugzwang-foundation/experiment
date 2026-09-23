@@ -55,6 +55,7 @@ Exit condition for EVERY slice: `pnpm vitest run` (whole suite) green, `pnpm tsc
 | `src/components/debate/DebateView.tsx` | the two desktop mounts pass `mirror`; new optional `ownPfpUrl` prop |
 | `src/app/(public)/m/[slug]/page.tsx` | passes `ownPfpUrl` — the same `pfpUrl(session.user.pfpFilename)` the `(public)` layout already computes for the header (§6 #7) |
 | `tests/unit/design/side-pole-binding.test.ts` | `MirrorComposer.tsx` joins the CLOSED inventory — the submit is side-keyed to the pole family (RF-7). Named here, same commit as the code, offender predicate passing: the file's own rule. |
+| `tests/unit/debate/render/side-badge.test.tsx` | the `CHIP.base` census gains `MirrorComposer.tsx` (1 unsized site: RF-3's author-row chip IS the card's chip, unrestyled, by the register's own ruling); base 6 → 7; the test's count-bearing name is replaced by a count-free one, per that file's fence. Added at S3, where the census reddened on the new site. |
 | `docs/design/composer-mirror.md` (new), `docs/design/design-canon.md` | RF-9 |
 | tests (new) | `submit-baseline`, `classic-layout-baseline`, `mirror-sizing`, `mirror-composer` render suites, `mirror-toggle` (G2), source guards |
 

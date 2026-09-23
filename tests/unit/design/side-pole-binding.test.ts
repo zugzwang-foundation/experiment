@@ -367,6 +367,17 @@ const PERMITTED_FILES = [
 	// every `offenders.toEqual([])` are unchanged, and the scanner still walks `src/`
 	// recursively and still reaches this file. This is a NARROWING of an ENUMERATION
 	// that follows a deletion, not a weakening of a guard.
+	// MIRROR-1 — ADDED AS A DECISION, the mechanism above exercised as written:
+	// named in `docs/plans/MIRROR-1.md` (§3 file map and §6 #6), the offender
+	// predicate passing, and landing in the same commit as the code. RF-7 of the
+	// ratified register (`docs/design/composer-mirror.md`) puts the submit in the
+	// POLE of the side being bet, so the file holds one side-keyed expression and
+	// it resolves only to the pole family:
+	//   props.side === "YES" ? "border-no bg-yes text-no" : "border-no bg-no text-yes"
+	// RF-7 names the YES edge and text "ink"; they are spelled `border-no`/
+	// `text-no` because `--color-no` IS #fafafa and `border-ink`/`text-ink` here
+	// would be Route 2 — the exact name-port this guard exists to refuse.
+	"src/components/debate/composer/MirrorComposer.tsx",
 	"src/components/debate/composer/PositionStrip.tsx",
 	"src/components/debate/composer/ReplySplitBar.tsx",
 	// TENTH ENTRY — MOBILE-2 / ADR-0051, added as a DECISION in the same commit

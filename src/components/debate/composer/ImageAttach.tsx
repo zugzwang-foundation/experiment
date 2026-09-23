@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { ImagePlus, RefreshCw, X } from "lucide-react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { IMAGE_UPLOADS_ALLOWED_MIME } from "@/server/config/limits";
-import { EMPTY_SLOT_COPY, STATE_COPY } from "./copy";
+import { EMPTY_SLOT_COPY, MIRROR_COPY, STATE_COPY } from "./copy";
 
 /**
  * The GROUP's name — the column as a whole, held across every phase.
@@ -293,13 +294,31 @@ export function ImageAttach({
 	disabled,
 	onPick,
 	onRemove,
+	variant,
 }: {
 	state: ImageAttachState;
 	disabled: boolean;
 	onPick: (file: File) => void;
 	onRemove: () => void;
+	/**
+	 * MIRROR-1 — `"mirror"` draws RF-6's image view: the component that fills the
+	 * Mirror composer's 16:9 frame. Absent, this renders exactly what it rendered
+	 * before (the phone sheet's composer, RF-8), byte for byte —
+	 * `classic-layout-baseline.test.tsx` holds that.
+	 *
+	 * ⛔ ONE COMPONENT, NOT TWO, AND THIS IS WHY. Everything that makes the attach
+	 * affordance safe lives in this function's closures: the local blob preview
+	 * and the invariants on revoking it, the drag gate that leaves text drags
+	 * alone, the drop that is refused while a pick is in flight. A second
+	 * component would have to copy them, and a copy is where they drift. The
+	 * variant changes what is DRAWN; the file input and the drop handlers below
+	 * are the same elements and the same functions in both.
+	 */
+	variant?: "mirror";
 }) {
 	const inputRef = useRef<HTMLInputElement | null>(null);
+	/** The Mirror invitation's caption, named as its description (RF-6). */
+	const captionId = useId();
 	/**
 	 * DND-1 — whether a file is currently being dragged over this panel.
 	 *
@@ -681,28 +700,216 @@ export function ImageAttach({
 	 * here as well means the panel never highlights an action it will not take.
 	 */
 	const dropBlocked = disabled || state.phase === "attaching";
+	/**
+	 * The hidden file input — ONE element definition, rendered by both variants.
+	 * Its `onChange` is the only place a picked file enters this component.
+	 */
+	const fileInput = (
+		<input
+			ref={inputRef}
+			type="file"
+			accept={IMAGE_UPLOADS_ALLOWED_MIME.join(",")}
+			className="hidden"
+			aria-hidden="true"
+			tabIndex={-1}
+			onChange={(e) => {
+				const file = e.target.files?.[0];
+				if (file) {
+					// Drawn on SELECT, before `onPick` and therefore before the
+					// sign/PUT round trip ever starts — the confirmation must not
+					// wait on the network it exists to be checked ahead of.
+					setPreview(URL.createObjectURL(file));
+					onPick(file);
+				}
+				// Allow re-picking the same file after an error/remove.
+				e.target.value = "";
+			}}
+		/>
+	);
+	/**
+	 * The panel's three drop handlers — ONE definition, spread onto both variants'
+	 * `<fieldset>`. Read with the DND-1 note on the classic fieldset below.
+	 */
+	const dropHandlers = {
+		onDragOver: (e: React.DragEvent<HTMLFieldSetElement>) => {
+			if (!carriesFiles(e)) {
+				return;
+			}
+			e.preventDefault();
+			// Say so in the cursor: `none` while blocked, so an in-flight
+			// composer looks refused rather than broken.
+			e.dataTransfer.dropEffect = dropBlocked ? "none" : "copy";
+			setDragging(!dropBlocked);
+		},
+		onDragLeave: (e: React.DragEvent<HTMLFieldSetElement>) => {
+			// A drag crossing onto one of this panel's own children fires
+			// `dragleave` HERE, with the child as `relatedTarget`. Clearing on
+			// that is the flicker the `dragover` comment above describes.
+			//
+			// ⚠ BEST-EFFORT, AND SAFE BECAUSE `dragover` IS THE SOURCE OF
+			// TRUTH. Not every engine populates `relatedTarget` on a drag
+			// leave (WebKit has historically sent null), so this check can
+			// miss and clear the mark while the pointer is still over the
+			// panel. The next `dragover` — which fires continuously for as
+			// long as it is — puts it straight back, so the worst case is one
+			// frame of flicker rather than a highlight stuck off. Written the
+			// other way round, with leave as the authority, a missed event
+			// would strand the mark ON.
+			if (
+				e.relatedTarget instanceof Node &&
+				e.currentTarget.contains(e.relatedTarget)
+			) {
+				return;
+			}
+			setDragging(false);
+		},
+		onDrop: (e: React.DragEvent<HTMLFieldSetElement>) => {
+			if (!carriesFiles(e)) {
+				return;
+			}
+			// Cancelled BEFORE the block check: a refused drop must still not
+			// reach the browser, whose default is to navigate the tab to the
+			// file and take the typed argument with it.
+			e.preventDefault();
+			setDragging(false);
+			if (dropBlocked) {
+				return;
+			}
+			// One comment carries one image (SPEC.1 §8 F-COMMENT-3), so a
+			// multi-file drag attaches the first and drops the rest rather
+			// than picking silently among them.
+			const file = e.dataTransfer.files[0];
+			if (file) {
+				// The dialog path draws the preview before `onPick` for the
+				// reason stated on the `<input>` above — the confirmation must
+				// not wait on the network. A drop is the same act by another
+				// gesture, so it takes the same order.
+				setPreview(URL.createObjectURL(file));
+				onPick(file);
+			}
+		},
+	};
+	/**
+	 * MIRROR-1 · RF-6 — THE IMAGE VIEW, drawn into the Mirror composer's 16:9
+	 * frame (`MirrorComposer`, which owns the frame and its edge). Same input,
+	 * same drop handlers, same preview and the same phase rules as the classic
+	 * render below; what differs is the drawing:
+	 *   · nothing in hand → the whole frame is the pick control, `Add an image`
+	 *     over its caption (`invitesAPick` — the classic's own condition);
+	 *   · attaching → the picture as it will be seen, with today's `{name}…`
+	 *     readout centred on it;
+	 *   · attached → the picture WHOLE (`object-contain`, letterboxed on the
+	 *     frame's ground) with `Replace` and `Remove image` over its top-right
+	 *     corner, and no filename;
+	 *   · error → today's message and retry line, centred low in the frame, over
+	 *     the invitation, so the next pick is one click away.
+	 *
+	 * ⛔ NOTHING HERE READS OR SENDS A FILE'S BYTES. A pick still goes one way:
+	 * the input (or a drop) → `setPreview(URL.createObjectURL(file))` → `onPick`
+	 * — the same two calls, in the same order, from the same two functions as the
+	 * classic render. The preview is a `blob:` URL that exists only in this tab.
+	 * `Replace` is the same input opened again.
+	 *
+	 * ⚠ The live region is a SIBLING of the pick control, never inside it — the
+	 * classic render's own reason (a `role="status"` inside a `button` is not
+	 * monitored). It takes no pointer events, so the frame stays one target.
+	 */
+	if (variant === "mirror") {
+		const openPicker = () => inputRef.current?.click();
+		return (
+			<>
+				{fileInput}
+				<fieldset
+					aria-label={ATTACH_LABEL}
+					data-dragging={dragging ? "true" : undefined}
+					data-testid="mirror-image-view"
+					{...dropHandlers}
+					className="relative flex h-full w-full min-w-0 items-center justify-center transition-colors data-[dragging=true]:bg-n1/60"
+				>
+					{invitesAPick ? (
+						<button
+							type="button"
+							// `invitesAPick` already excludes `attaching` (a file in hand
+							// never invites a pick), so the classic's second disjunct is
+							// unreachable here and the type checker says so.
+							disabled={disabled}
+							onClick={openPicker}
+							// The visible words ARE the name (WCAG 2.5.3); the caption is
+							// the description.
+							aria-label={MIRROR_COPY.addImage}
+							aria-describedby={captionId}
+							className="flex h-full w-full flex-col items-center justify-center gap-1.5 px-4 text-center transition-colors outline-none hover:bg-n1/40 focus-visible:shadow-[inset_var(--state-focus-ring)] disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
+						>
+							<ImagePlus aria-hidden="true" className="size-6 text-n5" />
+							<span className="text-[14px] leading-5 font-medium text-n6">
+								{MIRROR_COPY.addImage}
+							</span>
+							<span id={captionId} className="text-[12px] leading-4 text-n5">
+								{MIRROR_COPY.addImageCaption}
+							</span>
+						</button>
+					) : (
+						<>
+							{previewUrl !== null ? (
+								// biome-ignore lint/performance/noImgElement: client-only blob: URL — the optimizer cannot resolve it (the classic preview's own reason).
+								<img
+									alt=""
+									aria-hidden="true"
+									src={previewUrl}
+									// The classic's fallback: an image that will not decode drops
+									// to the bare frame, never the broken-image glyph.
+									onError={() => setPreview(null)}
+									className="h-full w-full object-contain"
+								/>
+							) : null}
+							{state.phase === "attaching" ? (
+								<span className="absolute inset-0 m-auto flex h-7 w-fit max-w-[80%] items-center rounded-sm border border-n2 bg-ground/90 px-2 text-[12px] text-n5">
+									<span className="truncate">{`${state.name}…`}</span>
+								</span>
+							) : null}
+							{state.phase === "attached" ? (
+								<div className="absolute top-2 right-2 flex items-center gap-1.5">
+									<button
+										type="button"
+										onClick={openPicker}
+										disabled={disabled}
+										className="flex h-7 items-center gap-1 rounded-sm border border-n2 bg-ground/90 px-2 text-[12px] leading-none text-ink transition-colors hover:border-n3 focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
+									>
+										<RefreshCw aria-hidden="true" className="size-3.5" />
+										{MIRROR_COPY.replace}
+									</button>
+									<button
+										type="button"
+										onClick={onRemove}
+										disabled={disabled}
+										aria-label="Remove image"
+										className="flex size-7 items-center justify-center rounded-sm border border-n2 bg-ground/90 text-ink transition-colors hover:border-n3 focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
+									>
+										<X aria-hidden="true" className="size-3.5" />
+									</button>
+								</div>
+							) : null}
+						</>
+					)}
+					{state.phase === "error" ? (
+						<span
+							role="status"
+							aria-live="polite"
+							className="pointer-events-none absolute inset-x-4 bottom-3 text-center text-[11px] leading-4"
+						>
+							{state.message !== "" && (
+								<span className="font-semibold text-ink">{state.message} </span>
+							)}
+							<span className="text-n5">{STATE_COPY.gateDown.body}</span>
+						</span>
+					) : null}
+				</fieldset>
+			</>
+		);
+	}
 	return (
 		<>
-			<input
-				ref={inputRef}
-				type="file"
-				accept={IMAGE_UPLOADS_ALLOWED_MIME.join(",")}
-				className="hidden"
-				aria-hidden="true"
-				tabIndex={-1}
-				onChange={(e) => {
-					const file = e.target.files?.[0];
-					if (file) {
-						// Drawn on SELECT, before `onPick` and therefore before the
-						// sign/PUT round trip ever starts — the confirmation must not
-						// wait on the network it exists to be checked ahead of.
-						setPreview(URL.createObjectURL(file));
-						onPick(file);
-					}
-					// Allow re-picking the same file after an error/remove.
-					e.target.value = "";
-				}}
-			/>
+			{fileInput}
 			{/* ⛔ THE COLUMN IS A GROUP, NEVER THE BUTTON ITSELF, AND THE LIVE
 			    REGION IS THE REASON. ARIA's presentational-children rule strips the
 			    roles of a `button`'s descendants, so a `role="status"` nested inside
@@ -732,63 +939,7 @@ export function ImageAttach({
 			<fieldset
 				aria-label={ATTACH_LABEL}
 				data-dragging={dragging ? "true" : undefined}
-				onDragOver={(e) => {
-					if (!carriesFiles(e)) {
-						return;
-					}
-					e.preventDefault();
-					// Say so in the cursor: `none` while blocked, so an in-flight
-					// composer looks refused rather than broken.
-					e.dataTransfer.dropEffect = dropBlocked ? "none" : "copy";
-					setDragging(!dropBlocked);
-				}}
-				onDragLeave={(e) => {
-					// A drag crossing onto one of this panel's own children fires
-					// `dragleave` HERE, with the child as `relatedTarget`. Clearing on
-					// that is the flicker the `dragover` comment above describes.
-					//
-					// ⚠ BEST-EFFORT, AND SAFE BECAUSE `dragover` IS THE SOURCE OF
-					// TRUTH. Not every engine populates `relatedTarget` on a drag
-					// leave (WebKit has historically sent null), so this check can
-					// miss and clear the mark while the pointer is still over the
-					// panel. The next `dragover` — which fires continuously for as
-					// long as it is — puts it straight back, so the worst case is one
-					// frame of flicker rather than a highlight stuck off. Written the
-					// other way round, with leave as the authority, a missed event
-					// would strand the mark ON.
-					if (
-						e.relatedTarget instanceof Node &&
-						e.currentTarget.contains(e.relatedTarget)
-					) {
-						return;
-					}
-					setDragging(false);
-				}}
-				onDrop={(e) => {
-					if (!carriesFiles(e)) {
-						return;
-					}
-					// Cancelled BEFORE the block check: a refused drop must still not
-					// reach the browser, whose default is to navigate the tab to the
-					// file and take the typed argument with it.
-					e.preventDefault();
-					setDragging(false);
-					if (dropBlocked) {
-						return;
-					}
-					// One comment carries one image (SPEC.1 §8 F-COMMENT-3), so a
-					// multi-file drag attaches the first and drops the rest rather
-					// than picking silently among them.
-					const file = e.dataTransfer.files[0];
-					if (file) {
-						// The dialog path draws the preview before `onPick` for the
-						// reason stated on the `<input>` above — the confirmation must
-						// not wait on the network. A drop is the same act by another
-						// gesture, so it takes the same order.
-						setPreview(URL.createObjectURL(file));
-						onPick(file);
-					}
-				}}
+				{...dropHandlers}
 				className={state.phase === "attached" ? attachedPanel : panel}
 			>
 				{state.phase === "attached" ? (
