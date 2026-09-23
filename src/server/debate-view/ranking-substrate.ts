@@ -174,7 +174,7 @@ export async function loadRankingSubstrate(
 				WHERE rc.side_at_post_time <> p.side_at_post_time
 					AND rc.user_id <> p.user_id
 			), 0) AS counter_dharma,
-			-- FF-1 / ADR-0058 — THE DECLARED-STANCE INPUTS AND THE METER'S NUMERATOR
+			-- FF-1 / ADR-0058 — THE DECLARED-STANCE INPUTS AND FRIENDLY_FIRE_DHARMA
 			-- (RANKING.md §2 as amended; SPEC.2 §5.4). Same three predicates as the
 			-- people counts above: distinct PEOPLE, self-authored excluded, and only
 			-- where a bet exists. They partition the SAME people the side counts do,
@@ -196,8 +196,9 @@ export async function loadRankingSubstrate(
 					AND rc.user_id <> p.user_id
 					AND rb.id IS NOT NULL
 			) AS contest_count,
-			-- friendly_fire_dharma — DISPLAYED (the post-focus Support-lane meter's
-			-- numerator; never a ranking input): Dharma STILL HELD across own-side
+			-- friendly_fire_dharma — COMPUTED, NOT RENDERED (D-52 withdrew the
+			-- post-focus meter that displayed it; carried for the redesign; never a
+			-- ranking input): Dharma STILL HELD across own-side
 			-- flagged reply-bets by others — a SUBSET of support_dharma, which is
 			-- unchanged above and still includes it (same pool, D-51 R5).
 			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (

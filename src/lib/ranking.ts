@@ -97,11 +97,12 @@ export type PostSubstrate = {
 	/** SUM of counter-side reply-bet SURVIVING BASIS, self-authored excluded. */
 	counterDharma: string;
 	/**
-	 * FF-1 / ADR-0058 — DISPLAYED, never a ranking input: SUM of support-side
-	 * reply-bet SURVIVING BASIS by others that carry `friendly_fire = true` — a
-	 * SUBSET of `supportDharma`, which is unchanged and still includes it. The
-	 * post-focus Support-lane meter reads `friendlyFireDharma ÷ supportDharma`;
-	 * the pure model reads neither this nor the flag.
+	 * FF-1 / ADR-0058 — COMPUTED, NOT RENDERED, never a ranking input: SUM of
+	 * support-side reply-bet SURVIVING BASIS by others that carry
+	 * `friendly_fire = true` — a SUBSET of `supportDharma`, which is unchanged
+	 * and still includes it. The post-focus Support-lane meter that read
+	 * `friendlyFireDharma ÷ supportDharma` is withdrawn (D-52) and this is
+	 * carried for its redesign; the pure model reads neither this nor the flag.
 	 */
 	friendlyFireDharma: string;
 	/** `comments.created_at`. */

@@ -76,11 +76,12 @@ export type ReplyAggregate = {
 	supportDharma: string;
 	counterDharma: string;
 	/**
-	 * FF-1 / ADR-0058 — the post-focus Support-lane METER's numerator: Dharma
-	 * still held on same-side reply-bets by others that carry the friendly-fire
-	 * flag, a subset of `supportDharma` (D-51 R5). Optional at the type level
-	 * because this DTO is built as a literal in ~25 fixture files and an absent
-	 * value renders no meter, which is the correct reading of "unset" (A-13);
+	 * FF-1 / ADR-0058 — Dharma still held on same-side reply-bets by others that
+	 * carry the friendly-fire flag, a subset of `supportDharma` (D-51 R5).
+	 * COMPUTED, NOT RENDERED: D-52 withdrew the post-focus Support-lane meter
+	 * that displayed it, and it is carried for the redesign. Optional at the type
+	 * level because this DTO is built as a literal in ~25 fixture files and an
+	 * absent value reads as zero, the correct reading of "unset" (A-13);
 	 * `loadDebateView` ALWAYS sets it and its integration test pins that.
 	 * ⛔ The two ranking counts (`endorseCount`/`contestCount`) never join it —
 	 * ADR-0039 P3, pinned by `substrate-site-parity.test.ts`.
@@ -436,7 +437,8 @@ export async function loadDebateView(
 			counterCount: sub.counterCountTotal,
 			supportDharma: sub.supportDharma,
 			counterDharma: sub.counterDharma,
-			// FF-1 / ADR-0058 — the meter numerator, DISPLAYED. The two stance
+			// FF-1 / ADR-0058 — carried to the client, rendered nowhere since D-52
+			// withdrew the meter (kept for the redesign). The two stance
 			// COUNTS stay on the substrate (ranking input only, ADR-0039 P3).
 			friendlyFireDharma: sub.friendlyFireDharma,
 		};

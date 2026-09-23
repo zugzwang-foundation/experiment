@@ -264,7 +264,7 @@ export async function loadProfileArguments(
 				WHERE rc.side_at_post_time <> p.side_at_post_time
 					AND rc.user_id <> p.user_id
 			), 0) AS counter_dharma,
-			-- FF-1 / ADR-0058 — the declared-stance inputs and the meter numerator,
+			-- FF-1 / ADR-0058 — the declared-stance inputs and friendly_fire_dharma,
 			-- byte-mirrored from ranking-substrate.ts (which carries the argument;
 			-- substrate-site-parity.test.ts pins the spelling here). This surface
 			-- ranks by D and reads none of the three, but PostSubstrate is one
