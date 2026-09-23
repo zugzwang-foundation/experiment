@@ -670,9 +670,15 @@ function TitleField(props: {
  * WIN column". Flex shrink is proportional, not sequential, so the order is built
  * from weights: the submit's shrink factor dwarfs every other item's, so it takes
  * the whole deficit until its 140px floor freezes it, and only then does the TO
- * WIN column — the one other shrinkable item — give. Below the width where even
- * that cannot hold the row, the submit wraps to a full-width line of its own
- * (container query on the section) rather than cutting a money figure.
+ * WIN column — the one other shrinkable item — give (its figure ellipsizes only at
+ * extremes). The limit lines never wrap: `Min Đ 10` broken over three lines in a
+ * 24px column was what the first measurement actually found.
+ * ⚠ MEASURED, NOT GUESSED: with the limits held on one line each, the row holds
+ * down to roughly 400px of section content with the submit at its floor; below
+ * that (the 640–770px band of the desktop tier) the submit takes a full-width
+ * line of its own rather than cutting a money figure further. The bar's content
+ * is 44px (the submit) inside 4px padding and its border, so its RF-7 height is
+ * the 56px floor itself.
  */
 function StakeBar(props: {
 	side: Side;
@@ -691,7 +697,7 @@ function StakeBar(props: {
 	return (
 		<div
 			data-testid="mirror-stake-bar"
-			className="flex min-h-14 shrink-0 items-center gap-3 rounded-(--r) border border-n2 px-3 py-1.5 @max-[460px]/mirror:flex-wrap"
+			className="flex min-h-14 shrink-0 items-center gap-3 rounded-(--r) border border-n2 px-3 py-1 @max-[400px]/mirror:flex-wrap @max-[400px]/mirror:py-1.5"
 		>
 			<div className="flex shrink-0 flex-col justify-center gap-0.5">
 				<span className="text-[11px] leading-3 font-medium tracking-[0.12em] text-n5 uppercase">
@@ -716,12 +722,12 @@ function StakeBar(props: {
 			</div>
 			<Hairline />
 			<div className="flex min-w-0 shrink flex-col justify-center gap-0.5">
-				<span className="text-[11px] leading-3 font-medium tracking-[0.12em] text-n5 uppercase">
+				<span className="truncate text-[11px] leading-3 font-medium tracking-[0.12em] text-n5 uppercase">
 					{COMPOSER_COPY.toWinLabel}
 				</span>
 				<span
 					aria-live="polite"
-					className="font-mono text-[20px] leading-7 font-semibold whitespace-nowrap text-ink"
+					className="truncate font-mono text-[20px] leading-7 font-semibold text-ink"
 				>
 					{props.toWin !== null ? `Đ ${props.toWin}` : "—"}
 				</span>
@@ -739,13 +745,13 @@ function StakeBar(props: {
 					</p>
 				) : (
 					<>
-						<span>
+						<span className="whitespace-nowrap">
 							{MIRROR_COPY.minLabel}{" "}
 							<span className="font-medium text-n6">
 								Đ {formatDharma(floorFor(props.kind))}
 							</span>
 						</span>
-						<span>
+						<span className="whitespace-nowrap">
 							{MIRROR_COPY.maxLabel}{" "}
 							<span className="font-medium text-n6">
 								Đ {formatDharma(BET_MAX_STAKE)}
@@ -773,7 +779,7 @@ function StakeBar(props: {
 				// treatment and the transition are the primitive's, copied; the focus ring
 				// is the minted `--state-focus-ring-pole`, whose n0 gap keeps it visible
 				// against a white NO fill.
-				className={`inline-flex h-11 min-w-[140px] shrink-[1000] basis-[170px] items-center justify-center rounded-(--r) border px-3 text-[15px] leading-none font-bold tracking-[0.08em] whitespace-nowrap transition-all outline-none select-none focus-visible:shadow-(--state-focus-ring-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) @max-[460px]/mirror:basis-full ${
+				className={`inline-flex h-11 min-w-[140px] shrink-[1000] basis-[170px] items-center justify-center rounded-(--r) border px-3 text-[15px] leading-none font-bold tracking-[0.08em] whitespace-nowrap transition-all outline-none select-none focus-visible:shadow-(--state-focus-ring-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) @max-[400px]/mirror:basis-full ${
 					props.side === "YES"
 						? "border-no bg-yes text-no"
 						: "border-no bg-no text-yes"
