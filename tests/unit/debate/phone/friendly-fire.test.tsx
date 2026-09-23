@@ -29,6 +29,10 @@ import { modelWith, post, reply, stubElementScroll, VIEWER } from "./_fixtures";
  * Markup assertions read `innerHTML`/attributes (O-7); the negatives have their
  * positive controls in the same file (OVN-V1).
  *
+ * FF-1 CLOSE-3 (D-52): R2 WITHDREW the meter, so the three meter cases are
+ * replaced by one negative (no meter row in the thread arm, the tag as its
+ * positive control). The paragraph above is the D-51 record.
+ *
  * FF-1 CLOSE-1 (R-A12 / R-A15): the switch sits INSIDE the sheet composer's
  * header row with the helper line beneath it, and below 640px no gloss mounts
  * on the switch label or the tag — the same render at/above 640px is the
@@ -160,7 +164,7 @@ describe("phone friendly-fire — the composer in the sheet (G14 · switch)", ()
 	});
 });
 
-describe("phone friendly-fire — the thread pane (G14 · tag + meter)", () => {
+describe("phone friendly-fire — the thread pane (G14 · tag; the meter withdrawn, D-52)", () => {
 	it("phone-ff::a-flagged-reply-wears-the-tag-in-the-Support-pane-and-a-plain-one-does-not", () => {
 		mount(fixturePost(), "p1");
 		const pane = screen.getByTestId("phone-pane-support");
@@ -175,44 +179,17 @@ describe("phone friendly-fire — the thread pane (G14 · tag + meter)", () => {
 		expect(counterPane.querySelector('[data-testid="ff-tag"]')).toBeNull();
 	});
 
-	it("phone-ff::the-meter-sits-beneath-the-Support-tab-with-both-figures-and-the-percent", () => {
+	it("phone-ff::the-meter-is-withdrawn — no phone-ff-row and no ff-meter in the focus view (positive control: the ff-tag renders in the same fixture)", () => {
+		// D-52 R2 — the fixture's aggregate still CARRIES the reading the meter
+		// drew (Đ25 of Đ100 Support), and nothing of the meter renders.
 		mount(fixturePost(), "p1");
-		const row = screen.getByTestId("phone-ff-row");
-		expect(row.innerHTML).toContain('data-testid="ff-meter-figure"');
-		expect(row.innerHTML).toContain('data-testid="ff-meter"');
-		expect(row.innerHTML).toContain("Đ 25");
-		expect(row.innerHTML).toContain("Friendly fire · 25 % of Support Đ");
-		expect(row.innerHTML).toContain("Đ 100");
-		// The fill takes the post's pole (a YES post) — resolved in the
-		// composer file, not in phone/.
-		const fill = row.querySelector('[data-testid="ff-meter"] span[style]');
-		expect(fill?.getAttribute("style")).toContain("width: 25%");
-		expect(fill?.getAttribute("class")).toContain("bg-yes");
-	});
-
-	it("phone-ff::the-meter-is-absent-under-the-Counter-tab", () => {
-		mount(fixturePost(), "p1");
-		expect(screen.queryByTestId("phone-ff-row")).not.toBeNull();
-		fireEvent.click(screen.getByRole("tab", { name: /Counter/ }));
-		expect(screen.queryByTestId("phone-ff-row")).toBeNull();
-		expect(document.body.querySelector('[data-testid="ff-meter"]')).toBeNull();
-	});
-
-	it("phone-ff::the-meter-is-absent-while-Support-Đ-is-zero (positive control above)", () => {
-		mount(
-			fixturePost({
-				aggregate: {
-					supportCount: 0,
-					counterCount: 1,
-					supportDharma: "0.000000000000000000",
-					counterDharma: "50.000000000000000000",
-					friendlyFireDharma: "0.000000000000000000",
-				},
-			}),
-			"p1",
-		);
 		expect(screen.queryByTestId("phone-ff-row")).toBeNull();
 		expect(document.body.innerHTML).not.toContain('data-testid="ff-meter"');
+		expect(document.body.innerHTML).not.toContain("% of Support");
+		// POSITIVE CONTROL — this IS the thread arm, and the tag that stays is drawn.
+		expect(screen.getByTestId("phone-pane-support").innerHTML).toContain(
+			'data-testid="ff-tag"',
+		);
 	});
 });
 

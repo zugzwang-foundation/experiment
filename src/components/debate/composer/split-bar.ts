@@ -42,36 +42,6 @@ export function computeSplitBar(args: {
 }
 
 /**
- * FF-1 / ADR-0058 — the post-focus Support-lane METER (D-51 R5): the share of
- * a post's Support Dharma that is friendly fire, `friendly_fire_dharma ÷
- * support_dharma`, as the integer percent its label prints. Both inputs are
- * Dharma STILL HELD and exclude the author's own replies — the substrate's own
- * predicates, not re-derived here. Exact decimal arithmetic; ROUND_HALF_UP to
- * the integer, never a JS float division (CLAUDE.md §2).
- *
- * `null` when there is no Support Dharma at all: the meter is HIDDEN then,
- * because a share of nothing is not a number — the same lesson `hasStake`
- * above records for the split bar. A numerator of zero against a positive
- * denominator is a real reading (`0 %`) and IS rendered. The numerator is a
- * subset of the denominator by construction (`support_dharma` still includes
- * the flagged stake), so the clamp is a belt, not a branch anyone reaches.
- */
-export function computeFriendlyFireMeter(args: {
-	friendlyFireDharma: string | undefined;
-	supportDharma: string;
-}): { pct: number } | null {
-	const support = new ComposerDecimal(args.supportDharma);
-	if (!support.greaterThan(0)) {
-		return null;
-	}
-	const raw = new ComposerDecimal(args.friendlyFireDharma ?? "0")
-		.times(100)
-		.dividedBy(support)
-		.toFixed(0, ComposerDecimal.ROUND_HALF_UP);
-	return { pct: Math.min(100, Math.max(0, Number(raw))) };
-}
-
-/**
  * The DISPLAYED split-bar total (DROUND R2 / SPEC.1 §10.8): the sum of the
  * DISPLAYED (0-dp) Support and Counter figures, so the three adjacent numbers
  * on the bar are always arithmetically consistent on screen — the §23

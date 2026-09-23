@@ -7,11 +7,7 @@ import { formatDharma } from "../format";
 import type { ReplyAggregate, Side } from "../types";
 import { c3OppositeSide } from "./copy";
 import { deriveReplySide, isEntryDisabled } from "./gating";
-import {
-	computeFriendlyFireMeter,
-	computeSplitBar,
-	displaySplitTotal,
-} from "./split-bar";
+import { computeSplitBar, displaySplitTotal } from "./split-bar";
 
 /**
  * UI.A3 slice 3 — the focused post's designed split bar (canon §6:
@@ -87,22 +83,6 @@ export function ReplySplitBar({
 			{/* `.sidewrap` (`d5:585-586`) — the Đ figure is CENTRED UNDER its own
 			    pill rather than inline beside it, on both flanks. */}
 			<span className="flex shrink-0 flex-col items-center gap-1">
-				{/* FF-1 / ADR-0058 — the meter's THREE parts stack around the Support
-				    pill, in the order the ruling gives: friendly-fire Đ ABOVE the pill,
-				    the one-sided bar and its label BENEATH it, the total Support Đ
-				    (the figure this flank always carried) last. All three are absent
-				    while `meter` is null, so a post with no Support Dharma renders the
-				    flank exactly as before. Same figure style as the aggregate figures.
-				    ⛔ The bar is `overflow-clip`, NOT the clip literal the split track
-				    carries, and its height is not the retired 6px token either:
-				    `reply-split-bar.test.tsx` locates the SPLIT track by the first span
-				    carrying the track's clip class, and this flank precedes the track
-				    in DOM order — reusing that literal would silently re-point the
-				    pole-inversion guard at the meter. The parity guard pins the split
-				    track's own literals by SOURCE SCAN (comments included — which is
-				    why this note names none of them); the meter shares the family's
-				    radius and hairline and nothing that guard reads. */}
-				<FriendlyFireMeterFigure aggregate={aggregate} />
 				<TriggerPill
 					relation="support"
 					postSide={postSide}
@@ -112,7 +92,6 @@ export function ReplySplitBar({
 					active={activeRelation === "support"}
 					onToggle={onToggleRelation}
 				/>
-				<FriendlyFireMeterBar postSide={postSide} aggregate={aggregate} />
 				<span className="text-n5">
 					Đ {formatDharma(aggregate.supportDharma)}
 				</span>
@@ -250,77 +229,6 @@ export function ReplySplitBar({
 				</span>
 			</span>
 		</div>
-	);
-}
-
-/**
- * FF-1 / ADR-0058 — the Support-lane METER (D-51 R5), in two pieces because
- * the ruling stacks them AROUND the Support pill: friendly-fire Đ above it,
- * the one-sided bar and its label beneath it, the total Support Đ last. Both
- * pieces render NOTHING while there is no Support Dharma, so a post with none
- * renders its flank byte-identical to its pre-ADR self. Both are exported for
- * the phone tier, which stacks them beneath its Support tab: `phone/` may not
- * hold a side-keyed colour expression (it is outside the closed pole inventory),
- * so the pole is resolved HERE, in the file that already resolves it for the
- * split track, and the phone owner only chooses where the pieces sit.
- */
-export function FriendlyFireMeterFigure({
-	aggregate,
-}: {
-	aggregate: ReplyAggregate;
-}) {
-	const meter = computeFriendlyFireMeter({
-		friendlyFireDharma: aggregate.friendlyFireDharma,
-		supportDharma: aggregate.supportDharma,
-	});
-	if (meter === null) {
-		return null;
-	}
-	// Same figure style as the aggregate figures beside it.
-	return (
-		<span data-testid="ff-meter-figure" className="text-n5">
-			Đ {formatDharma(aggregate.friendlyFireDharma ?? "0")}
-		</span>
-	);
-}
-
-export function FriendlyFireMeterBar({
-	postSide,
-	aggregate,
-}: {
-	postSide: Side;
-	aggregate: ReplyAggregate;
-}) {
-	const meter = computeFriendlyFireMeter({
-		friendlyFireDharma: aggregate.friendlyFireDharma,
-		supportDharma: aggregate.supportDharma,
-	});
-	if (meter === null) {
-		return null;
-	}
-	return (
-		<span
-			data-testid="ff-meter"
-			className="flex w-[78px] flex-col items-center gap-0.5"
-		>
-			{/* The fill names the SIDE — a friendly-fire reply is a bet on the
-			    post's side, so the fill takes the post's pole, the same rule the
-			    split track's own fill applies. The track is neutral because the
-			    remainder is plain Support, not the other side; the hairline is what
-			    keeps a dark pole legible on a dark card (the split bar's lesson). */}
-			<span
-				className="block h-[8px] w-full overflow-clip rounded-[var(--r)] [border:var(--hairline)] bg-n1"
-				aria-hidden="true"
-			>
-				<span
-					className={`block h-full ${postSide === "YES" ? "bg-yes" : "bg-no"}`}
-					style={{ width: `${meter.pct}%` }}
-				/>
-			</span>
-			<span className="max-w-[120px] text-center text-[9.5px] leading-tight text-n5">
-				Friendly fire · {meter.pct} % of Support Đ
-			</span>
-		</span>
 	);
 }
 

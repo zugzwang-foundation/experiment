@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ComposerDecimal } from "@/components/debate/composer/sell-convert";
 import {
-	computeFriendlyFireMeter,
 	computeSplitBar,
 	displaySplitTotal,
 } from "@/components/debate/composer/split-bar";
@@ -127,75 +126,5 @@ describe("displaySplitTotal — DISPLAYED-space bar consistency (DROUND R2)", ()
 	it("split-bar::displayed-total-zero-parts-render-0-never-negzero", () => {
 		expect(displaySplitTotal("0", "0")).toBe("0");
 		expect(displaySplitTotal("0.4", "0.4")).toBe("0"); // both round to 0
-	});
-});
-
-// ── FF-1 / ADR-0058 — the Support-lane meter arithmetic ─────────────────────
-describe("computeFriendlyFireMeter (FF-1 / ADR-0058)", () => {
-	it("ff-meter-math::share-of-support-as-an-integer-percent (ROUND_HALF_UP)", () => {
-		expect(
-			computeFriendlyFireMeter({
-				friendlyFireDharma: "50.000000000000000000",
-				supportDharma: "100.000000000000000000",
-			}),
-		).toEqual({ pct: 50 });
-		// 1/3 → 33, 2/3 → 67 (half-up), never a float division.
-		expect(
-			computeFriendlyFireMeter({ friendlyFireDharma: "1", supportDharma: "3" }),
-		).toEqual({ pct: 33 });
-		expect(
-			computeFriendlyFireMeter({ friendlyFireDharma: "2", supportDharma: "3" }),
-		).toEqual({ pct: 67 });
-		// Exactly half rounds up.
-		expect(
-			computeFriendlyFireMeter({
-				friendlyFireDharma: "1",
-				supportDharma: "200",
-			}),
-		).toEqual({ pct: 1 });
-	});
-
-	it("ff-meter-math::null-when-there-is-no-Support-Dharma (the meter hides)", () => {
-		expect(
-			computeFriendlyFireMeter({ friendlyFireDharma: "0", supportDharma: "0" }),
-		).toBeNull();
-		expect(
-			computeFriendlyFireMeter({
-				friendlyFireDharma: undefined,
-				supportDharma: "0.000000000000000000",
-			}),
-		).toBeNull();
-	});
-
-	it("ff-meter-math::zero-numerator-is-0-not-null; absent-numerator-reads-as-0", () => {
-		expect(
-			computeFriendlyFireMeter({
-				friendlyFireDharma: "0",
-				supportDharma: "10",
-			}),
-		).toEqual({ pct: 0 });
-		expect(
-			computeFriendlyFireMeter({
-				friendlyFireDharma: undefined,
-				supportDharma: "10",
-			}),
-		).toEqual({ pct: 0 });
-	});
-
-	it("ff-meter-math::full-is-100-and-the-belt-clamps-an-impossible-overshoot", () => {
-		expect(
-			computeFriendlyFireMeter({
-				friendlyFireDharma: "10",
-				supportDharma: "10",
-			}),
-		).toEqual({ pct: 100 });
-		// Unreachable by construction (the numerator is a subset of the
-		// denominator); the clamp is a belt and this pins that it is one.
-		expect(
-			computeFriendlyFireMeter({
-				friendlyFireDharma: "11",
-				supportDharma: "10",
-			}),
-		).toEqual({ pct: 100 });
 	});
 });
