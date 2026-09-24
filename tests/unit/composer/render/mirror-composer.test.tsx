@@ -284,6 +284,79 @@ describe("MIRROR-1 RF-4 — the title", () => {
 	});
 });
 
+describe("MIRROR-2 RF-4 — the title block, its type and its focus", () => {
+	it("mirror::the-composer-opens-with-the-cursor-in-the-title", () => {
+		const { getByLabelText } = mirrorPost();
+		expect(document.activeElement).toBe(getByLabelText("Argument title"));
+	});
+
+	it("mirror::a-c2-composer-does-not-put-the-cursor-in-a-disabled-title", () => {
+		// The C2 floor disables every field; a disabled field takes no focus.
+		const { getByLabelText } = render(
+			<BetComposer
+				{...composerProps()}
+				viewer={{ ...VIEWER, balance: "5", spendableToday: "5" }}
+				mirror={MIRROR}
+			/>,
+		);
+		const title = getByLabelText("Argument title");
+		expect(title.hasAttribute("disabled")).toBe(true);
+		expect(document.activeElement).not.toBe(title);
+	});
+
+	it("mirror::the-block-is-54px-and-rests-at-28px-centred-before-any-measurement", () => {
+		// jsdom lays nothing out, so the field rests where an empty field's
+		// placeholder sits: 28px on one 35px line, (53 − 35) / 2 = 9px down.
+		const { getByLabelText } = mirrorPost();
+		const title = asTextarea(getByLabelText("Argument title"));
+		expect(title.className).toContain("h-[54px]");
+		expect(title.style.fontSize).toBe("28px");
+		expect(title.style.lineHeight).toBe("35px");
+		expect(title.style.paddingTop).toBe("9px");
+		fireEvent.change(title, { target: { value: TITLE } });
+		// Typing never touches the block's height.
+		expect(title.className).toContain("h-[54px]");
+		expect(title.style.height).toBe("");
+	});
+
+	it("mirror::size-changes-ease-only-once-the-author-types-and-never-under-reduced-motion", () => {
+		const { getByLabelText } = mirrorPost();
+		const title = asTextarea(getByLabelText("Argument title"));
+		const EASE = "transition-[font-size,line-height,padding-top]";
+		// The first fit is not a change the author made: no transition yet.
+		expect(title.className).not.toContain(EASE);
+		fireEvent.change(title, { target: { value: "Hello" } });
+		expect(title.className).toContain(EASE);
+		expect(title.className).toContain("duration-150");
+		expect(title.className).toContain("ease-[ease]");
+		expect(title.className).toContain("motion-reduce:transition-none");
+	});
+
+	it("mirror::the-title-shows-no-focus-ring-the-caret-marks-the-place", () => {
+		const { container, getByLabelText } = mirrorPost();
+		const title = getByLabelText("Argument title");
+		expect(title.className).not.toMatch(/focus(-visible)?:shadow/);
+		expect(title.className).not.toMatch(/focus(-visible)?:ring/);
+		expect(title.className).toContain("outline-none");
+		// Positive control: the same pattern finds the toggle's keyboard ring.
+		expect(byTestId(container, "mirror-detail-toggle").className).toMatch(
+			/focus-visible:shadow/,
+		);
+	});
+
+	it("mirror::the-measuring-copy-is-hidden-from-everyone", () => {
+		const { container, getAllByRole, getByLabelText } = mirrorPost();
+		const probe = byTestId(container, "mirror-title-probe");
+		expect(probe.tagName).toBe("TEXTAREA");
+		expect(probe.getAttribute("aria-hidden")).toBe("true");
+		expect(probe.getAttribute("tabindex")).toBe("-1");
+		expect(probe.className).toContain("invisible");
+		// It is not a field anyone can reach: the only title is the labelled one.
+		expect(getByLabelText("Argument title")).not.toBe(probe);
+		expect(getAllByRole("textbox")).not.toContain(probe);
+	});
+});
+
 describe("MIRROR-1 RF-6 — the media frame (image view)", () => {
 	it("mirror::the-frame-is-16-by-9-and-min-width-of-both-axes", () => {
 		const { container } = mirrorPost();

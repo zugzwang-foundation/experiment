@@ -22,10 +22,12 @@ import { type ComposerStatus, ErrorStrip } from "./ErrorStrip";
 import { type ComposerKind, floorFor } from "./gating";
 import { ImageAttach, type ImageAttachState } from "./ImageAttach";
 import {
-	fitTitleSize,
-	TITLE_SIZE_MAX_PX,
+	fitTitle,
+	TITLE_FIT_AT_REST,
+	type TitleFit,
 	titleCharsLeft,
 	titleLineHeightPx,
+	titlePaddingTopPx,
 } from "./mirror-sizing";
 import { TITLE_MAX_CHARS } from "./payload";
 
@@ -592,20 +594,30 @@ function AuthorRow(props: {
 }
 
 /**
- * RF-4 — the title field. A fixed 54px block (two 22px lines at 16px, the n3
- * underline at its foot); when the text would need a third line the TYPE steps
- * down half a pixel at a time to 13px, and the block never changes height.
+ * RF-4 (MIRROR-2) — the title field. A fixed 54px block with the n3 underline at
+ * its foot. The type takes the largest size from 28px down to 13px at which the
+ * text (or the placeholder) fits the block in at most two lines, centred in it;
+ * the block never changes height while someone types (`mirror-sizing.ts`).
  *
  * ⚠ THE FIELD'S RULES ARE TODAY'S: the same accessible name, `maxLength`, Enter
  * block and newline strip (the controller's handlers, shared with the classic
  * layout), with the retired label `Your argument — required` as the placeholder.
  *
- * ⚠ WHY IT MEASURES THE REAL FIELD. How many lines a title needs is a fact about
- * this font, this width and this browser's wrapping. At each candidate size the
- * field's height is set to 0 so `scrollHeight` reports the content alone, then
- * restored — all inside one layout effect, before paint, so no intermediate size
- * is ever seen. A hidden copy was rejected: it is a second wrapping model that can
- * disagree with the textarea it stands in for.
+ * ⚠ WHY IT MEASURES A HIDDEN COPY, NOT THE FIELD. How many lines a title needs
+ * is a fact about this font, this width and this browser's wrapping, so it is
+ * measured, and it is measured on a second `textarea` with the same classes, the
+ * same width and no transition. The field itself now EASES its size, and a
+ * transitioned `font-size` read mid-flight reports the old value (RF-4 ⚠); the
+ * field is also where the caret and the author's scroll position live, and
+ * zeroing its height to read `scrollHeight` (what MIRROR-1 did) disturbs both.
+ * The copy is the same element type in the same box, so it wraps the same way,
+ * and it can hold the placeholder's words, which an empty field cannot report.
+ *
+ * ⚠ NO FOCUS RING, AND THE COMPOSER OPENS WITH THE CARET HERE. RF-4 puts the
+ * cursor in the title on open; a text field matches `:focus-visible` whenever it
+ * is focused, so the old ring would have glowed on every open without the author
+ * doing anything. The caret marks the place — RF-6's rule for the composer's
+ * other text field.
  */
 function TitleField(props: {
 	title: string;
@@ -614,11 +626,22 @@ function TitleField(props: {
 	onInput: (value: string) => void;
 }) {
 	const ref = useRef<HTMLTextAreaElement | null>(null);
-	const [sizePx, setSizePx] = useState(TITLE_SIZE_MAX_PX);
+	const probeRef = useRef<HTMLTextAreaElement | null>(null);
+	const [fit, setFit] = useState<TitleFit>(TITLE_FIT_AT_REST);
 	const [widthPx, setWidthPx] = useState(0);
+	// Size changes EASE once the author is typing. The first fit is not a change
+	// they made — at a narrow slot it would otherwise animate from the at-rest
+	// 28px while the composer is still sliding in.
+	const [typed, setTyped] = useState(false);
+
+	// RF-4 — the composer opens with the cursor in the title. A disabled field
+	// (the C2 state) ignores `focus()`, which is right: there is nothing to type.
+	useEffect(() => {
+		ref.current?.focus();
+	}, []);
 
 	// A width change re-wraps the same text, so it re-fits too. jsdom has no
-	// ResizeObserver and performs no layout; the field simply stays at 16px there.
+	// ResizeObserver; the effect below reads the width directly on every run.
 	useLayoutEffect(() => {
 		const el = ref.current;
 		if (el === null || typeof ResizeObserver === "undefined") {
@@ -632,42 +655,35 @@ function TitleField(props: {
 		return () => observer.disconnect();
 	}, []);
 
-	// Re-fit whenever the title or the field's width changes. Two cases need no
-	// measurement and take the full size: an EMPTY field is its placeholder, one
-	// line at 16px; and before the field has a measured width there is nothing to
-	// wrap against (jsdom, and the one layout pass before the observer reports).
+	// Re-fit whenever the title or the field's width changes, before paint.
+	// Until the observer has reported, the width is read off the field itself,
+	// so the very first fit is already right rather than one frame late (and, at
+	// a narrow slot, visibly wrong). Fractional on purpose: the copy must wrap
+	// against exactly the field's width, and `clientWidth` rounds. With no layout
+	// (jsdom, a hidden field) the width is 0 and the field rests at full size.
 	useLayoutEffect(() => {
 		const el = ref.current;
-		if (el === null) {
+		const probe = probeRef.current;
+		if (el === null || probe === null) {
 			return;
 		}
-		if (props.title.length === 0 || widthPx === 0) {
-			setSizePx(TITLE_SIZE_MAX_PX);
+		const width = widthPx > 0 ? widthPx : el.getBoundingClientRect().width;
+		if (width === 0) {
+			setFit(TITLE_FIT_AT_REST);
 			return;
 		}
-		const saved = {
-			height: el.style.height,
-			overflow: el.style.overflow,
-			fontSize: el.style.fontSize,
-			lineHeight: el.style.lineHeight,
-		};
-		// `overflow: hidden` while measuring: a zero-height field overflows, and
-		// on a platform with always-visible scrollbars the gutter that appears
-		// would narrow the very width being wrapped against (`@code-reviewer` L3 —
-		// not reproducible headless, closed anyway because it costs one line).
-		el.style.overflow = "hidden";
-		const next = fitTitleSize((size) => {
+		probe.style.width = `${width}px`;
+		probe.value =
+			props.title.length > 0 ? props.title : COMPOSER_COPY.argumentLabel;
+		const next = fitTitle((size) => {
 			const lh = titleLineHeightPx(size);
-			el.style.fontSize = `${size}px`;
-			el.style.lineHeight = `${lh}px`;
-			el.style.height = "0px";
-			return Math.round(el.scrollHeight / lh);
+			probe.style.fontSize = `${size}px`;
+			probe.style.lineHeight = `${lh}px`;
+			return Math.round(probe.scrollHeight / lh);
 		});
-		el.style.height = saved.height;
-		el.style.overflow = saved.overflow;
-		el.style.fontSize = saved.fontSize;
-		el.style.lineHeight = saved.lineHeight;
-		setSizePx(next);
+		setFit((prev) =>
+			prev.sizePx === next.sizePx && prev.lines === next.lines ? prev : next,
+		);
 	}, [props.title, widthPx]);
 
 	const left = titleCharsLeft(props.title.length, TITLE_MAX_CHARS);
@@ -683,13 +699,37 @@ function TitleField(props: {
 				enterKeyHint="next"
 				rows={2}
 				onKeyDown={props.onKeyDown}
-				onChange={(e) => props.onInput(e.target.value)}
+				onChange={(e) => {
+					setTyped(true);
+					props.onInput(e.target.value);
+				}}
 				style={{
-					fontSize: `${sizePx}px`,
-					lineHeight: `${titleLineHeightPx(sizePx)}px`,
+					fontSize: `${fit.sizePx}px`,
+					lineHeight: `${titleLineHeightPx(fit.sizePx)}px`,
+					paddingTop: `${titlePaddingTopPx(fit)}px`,
 				}}
 				data-testid="mirror-title"
-				className="block h-[54px] w-full resize-none rounded-none border-0 border-b border-n3 bg-transparent p-0 font-medium tracking-[-0.01em] text-ink outline-none placeholder:text-n5 focus-visible:shadow-(--state-focus-ring) disabled:cursor-not-allowed disabled:opacity-(--state-disabled-opacity)"
+				// RF-4 — size, line height and the centring padding ease TOGETHER
+				// (150ms), so the lines stay centred while they shrink; instant under
+				// reduced motion.
+				className={`block h-[54px] w-full resize-none rounded-none border-0 border-b border-n3 bg-transparent p-0 font-medium tracking-[-0.01em] text-ink outline-none placeholder:text-n5 disabled:cursor-not-allowed disabled:opacity-(--state-disabled-opacity)${
+					typed
+						? " transition-[font-size,line-height,padding-top] duration-150 ease-[ease] motion-reduce:transition-none"
+						: ""
+				}`}
+			/>
+			{/* The measuring copy. `invisible` keeps it laid out (so it can be
+			    measured) and out of the accessibility tree and the tab order;
+			    `h-0` + `overflow-hidden` + no padding make `scrollHeight` the height
+			    of its lines alone. Same type classes as the field; no transition. */}
+			<textarea
+				ref={probeRef}
+				aria-hidden="true"
+				tabIndex={-1}
+				readOnly
+				rows={1}
+				data-testid="mirror-title-probe"
+				className="pointer-events-none invisible absolute top-0 left-0 block h-0 resize-none overflow-hidden rounded-none border-0 p-0 font-medium tracking-[-0.01em]"
 			/>
 			{left !== null ? (
 				<span
