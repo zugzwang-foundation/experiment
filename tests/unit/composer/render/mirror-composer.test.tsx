@@ -25,7 +25,11 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { BetComposer } from "@/components/debate/composer/BetComposer";
-import { c2Sentence, overCapStrip } from "@/components/debate/composer/copy";
+import {
+	c2Sentence,
+	MIRROR_COPY,
+	overCapStrip,
+} from "@/components/debate/composer/copy";
 import { floorFor } from "@/components/debate/composer/gating";
 import type { MirrorContext } from "@/components/debate/composer/MirrorComposer";
 import { formatDharma } from "@/components/debate/format";
@@ -377,9 +381,8 @@ describe("MIRROR-1 RF-6 — the media frame (image view)", () => {
 		const caption = document.getElementById(
 			pick.getAttribute("aria-describedby") ?? "",
 		);
-		expect(caption?.textContent).toBe(
-			"Optional · shown whole · any orientation",
-		);
+		// RF-6 (MIRROR-2): the caption is the one word `Optional`.
+		expect(caption?.textContent).toBe("Optional");
 		const frame = byTestId(container, "mirror-media-frame");
 		expect(frame.className).toContain("border-dashed");
 		expect(frame.contains(pick)).toBe(true);
@@ -460,9 +463,8 @@ describe("MIRROR-1 — review fixes (@code-reviewer M2, L1)", () => {
 			"unsupported image type Try again in a few seconds.",
 		);
 		// The caption gives way to the error; the pick is still the whole frame.
-		expect(frame.textContent).not.toContain(
-			"Optional · shown whole · any orientation",
-		);
+		// (The detail counter's lowercase `· optional` cannot match this.)
+		expect(frame.textContent).not.toContain(MIRROR_COPY.addImageCaption);
 		const pick = getByRole("button", { name: "Add an image" });
 		expect(pick.className).toContain("absolute inset-0");
 		expect(pick.hasAttribute("aria-describedby")).toBe(false);

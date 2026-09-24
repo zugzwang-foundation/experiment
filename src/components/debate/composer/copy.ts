@@ -202,9 +202,13 @@ export const MIRROR_COPY = {
 	addDetail: "Add detail",
 	editDetail: "Edit detail",
 	showImage: "Show image",
-	/** RF-6 — the empty frame's invitation and its caption. */
+	/**
+	 * RF-6 — the empty frame's invitation and its caption. The caption is the one
+	 * word `Optional` since MIRROR-2 (it read `Optional · shown whole · any
+	 * orientation`); how a picture is fitted is shown by the frame once one is in.
+	 */
 	addImage: "Add an image",
-	addImageCaption: "Optional · shown whole · any orientation",
+	addImageCaption: "Optional",
 	/** RF-6 — the attached image's replace control. */
 	replace: "Replace",
 	/** RF-6 — the detail view's placeholder. */

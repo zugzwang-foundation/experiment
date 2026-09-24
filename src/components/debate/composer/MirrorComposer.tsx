@@ -157,7 +157,15 @@ export function MirrorComposer(props: {
 		}
 		if (shown === "image" && focusToggle.current) {
 			focusToggle.current = false;
-			toggleRef.current?.focus();
+			// `focusVisible: false` — this move only ever follows a POINTER press (a
+			// keyboard press is already on the toggle), and a script focus that
+			// follows a focused text field would otherwise match `:focus-visible`
+			// and ring after a mouse click (RF-6). Engines that do not know the
+			// option ignore it.
+			const opts: FocusOptions & { focusVisible?: boolean } = {
+				focusVisible: false,
+			};
+			toggleRef.current?.focus(opts);
 		}
 	}, [shown]);
 	const toggleView = () => {
@@ -300,9 +308,13 @@ export function MirrorComposer(props: {
 								onChange={(e) => props.onExtendedInput(e.target.value)}
 								data-testid="mirror-detail"
 								// RF-6 — today's detail field, filling the same frame so
-								// nothing jumps: 14px / 21px, n6, 14px 16px padding. The n3
-								// edge is the frame's own while this view shows.
-								className="min-h-0 w-full flex-1 resize-none bg-transparent px-4 py-3.5 text-[14px] leading-[21px] text-n6 outline-none placeholder:text-n5 focus-visible:shadow-[inset_var(--state-focus-ring)] disabled:cursor-not-allowed disabled:opacity-(--state-disabled-opacity)"
+								// nothing jumps: 14px / 21px, n6, 14px 16px padding.
+								// ⚠ NO RING, NO OUTLINE, NO GLOW (MIRROR-2). A text field
+								// matches `:focus-visible` on every focus, mouse included, so
+								// a ring here glowed each time someone clicked in to write.
+								// Focus is shown by the FRAME instead — its edge lifts n2 →
+								// n3 (`frameBorder`) — and by the caret.
+								className="min-h-0 w-full flex-1 resize-none bg-transparent px-4 py-3.5 text-[14px] leading-[21px] text-n6 outline-none placeholder:text-n5 disabled:cursor-not-allowed disabled:opacity-(--state-disabled-opacity)"
 							/>
 							<span
 								data-testid="mirror-detail-counter"
@@ -335,15 +347,22 @@ export function MirrorComposer(props: {
 }
 
 /**
- * RF-6 — the frame's edge, for the view it is showing. The detail view's n3 edge;
- * solid n2 around an image; DASHED n3 while the image view is an invitation
+ * RF-6 — the frame's edge, for the view it is showing. In the detail view it is
+ * n2 at rest and LIFTS to n3 while the detail field has focus — that lift is the
+ * field's whole focus treatment (MIRROR-2; the field itself draws no ring).
+ * Around an image, solid n2; DASHED n3 while the image view is an invitation
  * (nothing picked, or a pick that was rejected and must be retried —
  * `ImageAttach`'s own "nothing in hand" rule). The edge never moves: on a switch
  * it changes in place while the content slides inside it.
+ *
+ * ⚠ `focus-within` IS ONLY EVER ADDED IN THE DETAIL VIEW. In the image view the
+ * frame holds buttons (`Replace`, `Remove image`, the pick layer) that draw their
+ * own keyboard rings; lifting the edge for them too would give one focus two
+ * indicators. The hidden view is `inert`, so nothing in it can hold focus.
  */
 function frameBorder(shown: MirrorView, image: ImageAttachState): string {
 	if (shown === "detail") {
-		return "border-n3";
+		return "border-n2 focus-within:border-n3";
 	}
 	return image.phase === "none" || image.phase === "error"
 		? "border-dashed border-n3"
@@ -533,8 +552,10 @@ function CloseButton({
 			disabled={disabled}
 			aria-label="Close"
 			// The classic's own class string (`BetComposer`), plus `-mr-3` so the
-			// glyph — not the 44px box around it — sits against the padding edge.
-			className={`-my-3 -mr-3 flex size-11 shrink-0 items-center justify-center rounded-(--r-chip) text-xl text-n4 transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)${className ? ` ${className}` : ""}`}
+			// glyph — not the 44px box around it — sits against the padding edge,
+			// and `outline-none` so keyboard focus draws the ONE ring, the shadow,
+			// rather than the UA's outline beside it (RF-6, MIRROR-2).
+			className={`-my-3 -mr-3 flex size-11 shrink-0 items-center justify-center rounded-(--r-chip) text-xl text-n4 transition-all outline-none hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)${className ? ` ${className}` : ""}`}
 		>
 			{COMPOSER_COPY.close}
 		</button>

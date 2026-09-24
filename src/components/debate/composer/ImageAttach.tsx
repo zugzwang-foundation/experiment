@@ -910,7 +910,7 @@ export function ImageAttach({
 										type="button"
 										onClick={openPicker}
 										disabled={disabled}
-										className="flex h-7 items-center gap-1 rounded-sm border border-n2 bg-ground/90 px-2 text-[12px] leading-none text-ink transition-colors hover:border-n3 focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
+										className="flex h-7 items-center gap-1 rounded-sm border border-n2 bg-ground/90 px-2 text-[12px] leading-none text-ink transition-colors outline-none hover:border-n3 focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
 									>
 										<RefreshCw aria-hidden="true" className="size-3.5" />
 										{MIRROR_COPY.replace}
@@ -920,7 +920,7 @@ export function ImageAttach({
 										onClick={onRemove}
 										disabled={disabled}
 										aria-label="Remove image"
-										className="flex size-7 items-center justify-center rounded-sm border border-n2 bg-ground/90 text-ink transition-colors hover:border-n3 focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
+										className="flex size-7 items-center justify-center rounded-sm border border-n2 bg-ground/90 text-ink transition-colors outline-none hover:border-n3 focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
 									>
 										<X aria-hidden="true" className="size-3.5" />
 									</button>

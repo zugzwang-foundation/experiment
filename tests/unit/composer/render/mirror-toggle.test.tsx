@@ -357,3 +357,98 @@ describe("MIRROR-1 — the image-attach brake (ADR-0052) leaves the detail view"
 		expect(getByLabelText("Argument body")).toBeTruthy();
 	});
 });
+
+describe("MIRROR-2 RF-6 — focus: the frame's edge lifts; buttons ring for the keyboard only", () => {
+	function frame(root: ParentNode): HTMLElement {
+		const el = root.querySelector('[data-testid="mirror-media-frame"]');
+		if (!(el instanceof HTMLElement)) {
+			throw new Error("no frame");
+		}
+		return el;
+	}
+	/** The class list as TOKENS — a substring test cannot tell `border-n3` from `focus-within:border-n3`. */
+	const tokens = (el: Element) => (el.getAttribute("class") ?? "").split(/\s+/);
+
+	it("mirror-toggle::the-detail-field-draws-no-ring-outline-or-glow", () => {
+		const { container, getByLabelText } = mount();
+		fireEvent.click(toggle(container));
+		const detail = getByLabelText("Argument body");
+		expect(detail.className).not.toMatch(
+			/focus(-visible|-within)?:(shadow|ring|outline)/,
+		);
+		expect(tokens(detail)).toContain("outline-none");
+		// Positive control: the same pattern sees the toggle's keyboard ring.
+		expect(toggle(container).className).toMatch(
+			/focus(-visible|-within)?:(shadow|ring|outline)/,
+		);
+	});
+
+	it("mirror-toggle::in-the-detail-view-the-frame-edge-is-n2-and-lifts-to-n3-on-focus", () => {
+		const { container } = mount();
+		fireEvent.click(toggle(container));
+		const edge = tokens(frame(container));
+		expect(edge).toContain("border-n2");
+		expect(edge).toContain("focus-within:border-n3");
+		// n3 only as the lift, never at rest.
+		expect(edge).not.toContain("border-n3");
+	});
+
+	it("mirror-toggle::the-image-view-frame-never-lifts-for-its-own-buttons", async () => {
+		const { container } = mount();
+		// Empty: the dashed n3 invitation.
+		expect(tokens(frame(container))).toEqual(
+			expect.arrayContaining(["border-dashed", "border-n3"]),
+		);
+		expect(frame(container).className).not.toContain("focus-within:");
+		await attach(container);
+		// Attached: solid n2, and still no lift.
+		expect(tokens(frame(container))).toContain("border-n2");
+		expect(frame(container).className).not.toContain("focus-within:");
+	});
+
+	it("mirror-toggle::every-composer-button-rings-only-under-focus-visible", async () => {
+		const { container, getAllByRole } = mount();
+		await attach(container);
+		const shell = container.querySelector('[data-testid="mirror-composer"]');
+		if (!(shell instanceof HTMLElement)) throw new Error("no shell");
+		const buttons = [...shell.querySelectorAll("button")];
+		// Positive control: the buttons this rule is about are all here.
+		const names = buttons.map(
+			(b) => b.getAttribute("aria-label") ?? b.textContent,
+		);
+		expect(names).toEqual(
+			expect.arrayContaining([
+				"Close",
+				"Add detail",
+				"Replace",
+				"Remove image",
+				"PLACE Đ BET",
+			]),
+		);
+		expect(getAllByRole("button").length).toBeGreaterThanOrEqual(5);
+		for (const b of buttons) {
+			const cls = b.getAttribute("class") ?? "";
+			// A ring may be drawn ONLY behind `focus-visible:` — never plain
+			// `focus:`, which a mouse click also matches.
+			expect(cls).not.toMatch(/(^|\s)focus:(shadow|ring|outline|border)/);
+			expect(tokens(b)).toContain("outline-none");
+		}
+	});
+
+	it("mirror-toggle::leaving-the-detail-field-by-click-moves-focus-without-a-ring", async () => {
+		// The L6 move (Safari: a clicked button takes no focus) follows a POINTER
+		// press, so it must not claim keyboard focus-visibility.
+		const { container, getByLabelText } = mount();
+		await act(async () => {
+			fireEvent.click(toggle(container));
+		});
+		expect(document.activeElement).toBe(getByLabelText("Argument body"));
+		const t = toggle(container);
+		const focus = vi.spyOn(t, "focus");
+		await act(async () => {
+			fireEvent.click(t);
+		});
+		expect(document.activeElement).toBe(t);
+		expect(focus).toHaveBeenCalledWith({ focusVisible: false });
+	});
+});
