@@ -391,11 +391,12 @@ export function ImageAttach({
 	// `previewUrl` is in the deps so the rule "a preview exists only while
 	// attaching or attached" is re-checked whenever EITHER side moves.
 	//
-	// The reachable case: `BetComposer.onPickImage` returns EARLY when `inFlight`
-	// (`BetComposer.tsx:242-244`) and never moves the phase. The pick control is
-	// disabled in flight, but the native file dialog is ASYNCHRONOUS — it can be
-	// opened before the composer goes in flight and resolved after, so the change
-	// event lands in a parent that drops it. Pinned by
+	// The case this was written for: `BetComposer.onPickImage` returns EARLY when
+	// `inFlight` and never moves the phase, and a native file dialog opened
+	// before the composer went in flight could resolve after it. Since RF-12
+	// (MIRROR-2) the input itself refuses that file (`entryBlocked`), so it no
+	// longer reaches here; this effect stays as the second line, for any parent
+	// that drops a pick without moving the phase. Pinned by
 	// `attach-preview.test.tsx::preview::a-pick-the-composer-drops-does-not-strand-an-image`,
 	// which reddens if these deps are narrowed back.
 	useEffect(() => {
@@ -692,14 +693,25 @@ export function ImageAttach({
 	const carriesFiles = (e: React.DragEvent) =>
 		Array.from(e.dataTransfer?.types ?? []).includes("Files");
 	/**
-	 * The same condition the pick BUTTON is disabled by, named once so the two
-	 * doors into this component cannot drift apart. A drop during `attaching`
-	 * would start a second sign + PUT behind the first and race the composer's
-	 * own `uploadId`; a drop while `disabled` is the composer in flight, where
-	 * `onPickImage` returns early anyway (`BetComposer.tsx:310-313`) — refusing
-	 * here as well means the panel never highlights an action it will not take.
+	 * THE ONE CONDITION UNDER WHICH A FILE IS REFUSED, at every door into this
+	 * component: the pick button (disabled by the same terms), a drop, and the
+	 * file input's `change` event. A file arriving during `attaching` would start
+	 * a second sign + PUT behind the first and race the composer's own
+	 * `uploadId`; one arriving while `disabled` is the composer in flight (or the
+	 * C2 floor), where `onPickImage` drops it anyway — refusing here as well
+	 * means the panel never draws or highlights a file it will not take.
+	 *
+	 * ⛔ RF-12 (MIRROR-2) — THE FILE INPUT WAS THE DOOR THAT DID NOT CHECK. The
+	 * native picker is asynchronous: opened before the composer went in flight
+	 * (the Mirror's `Replace` is one click away) and resolved after, its file was
+	 * drawn over the attached image while the request that was already on its
+	 * way carried the old one — and a transient failure plus a retry then
+	 * published an image other than the one on screen (MIRROR-1 `@security-
+	 * auditor` L-1; reproduced in a real browser at MIRROR-2's baseline). The
+	 * same door let a pick land during a drop's upload and race it (S-1). Both
+	 * close here, where the file enters, so both layouts get it.
 	 */
-	const dropBlocked = disabled || state.phase === "attaching";
+	const entryBlocked = disabled || state.phase === "attaching";
 	/**
 	 * The hidden file input — ONE element definition, rendered by both variants.
 	 * Its `onChange` is the only place a picked file enters this component.
@@ -714,7 +726,9 @@ export function ImageAttach({
 			tabIndex={-1}
 			onChange={(e) => {
 				const file = e.target.files?.[0];
-				if (file) {
+				// RF-12 — refused exactly as a drop is (`entryBlocked`): not drawn,
+				// not handed on. The composer and the frame keep what they had.
+				if (file && !entryBlocked) {
 					// Drawn on SELECT, before `onPick` and therefore before the
 					// sign/PUT round trip ever starts — the confirmation must not
 					// wait on the network it exists to be checked ahead of.
@@ -738,8 +752,8 @@ export function ImageAttach({
 			e.preventDefault();
 			// Say so in the cursor: `none` while blocked, so an in-flight
 			// composer looks refused rather than broken.
-			e.dataTransfer.dropEffect = dropBlocked ? "none" : "copy";
-			setDragging(!dropBlocked);
+			e.dataTransfer.dropEffect = entryBlocked ? "none" : "copy";
+			setDragging(!entryBlocked);
 		},
 		onDragLeave: (e: React.DragEvent<HTMLFieldSetElement>) => {
 			// A drag crossing onto one of this panel's own children fires
@@ -772,7 +786,7 @@ export function ImageAttach({
 			// file and take the typed argument with it.
 			e.preventDefault();
 			setDragging(false);
-			if (dropBlocked) {
+			if (entryBlocked) {
 				return;
 			}
 			// One comment carries one image (SPEC.1 §8 F-COMMENT-3), so a
