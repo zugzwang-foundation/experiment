@@ -395,7 +395,15 @@ export function BetComposer(props: {
 		!assess.submitEnabled ||
 		countdown !== null ||
 		retryLock > 0 ||
-		terminalLocked;
+		terminalLocked ||
+		// RF-11 (MIRROR-2) — PLACE WAITS FOR AN IMAGE THAT IS STILL UPLOADING. The
+		// body only carries an upload id once the attach reaches `attached`, so a
+		// press during `attaching` used to publish the post WITHOUT the image its
+		// author was looking at — permanently, the comment being append-only. It
+		// re-enables when the attach lands, or when it fails and the image is
+		// dropped with today's error. Both layouts; the server's checks are
+		// unchanged.
+		image.phase === "attaching";
 
 	/** Attach/remove changes the wire body (fingerprint!) — an EDIT by law. */
 	const onPickImage = async (file: File) => {
