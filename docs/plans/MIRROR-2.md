@@ -65,6 +65,8 @@ Slices may merge into one commit where there is no shippable state between them 
 | `src/components/debate/composer/ImageAttach.tsx` | S3 — `outline-none` on the Mirror's Replace/Remove · S7 — the file input's refusal (both layouts) |
 | `src/components/debate/composer/image-attach.ts` | S5 — RF-10 |
 | `src/components/debate/composer/BetComposer.tsx` | S6 — RF-11's one gating term |
+| `src/components/debate/composer/ComposerSlot.tsx` | *(added during the run, `b304ed63`)* — the desktop slot moves focus into itself on open, AFTER the composer's own focus, onto its first focusable control (the `×`); RF-4's "opens with the cursor in the title" needs the slot to honour an occupant's `[data-autofocus]` |
+| `tests/unit/debate/render/mirror-host.test.tsx` | *(added during the run)* — RF-4's autofocus through the REAL host; a bare-composer test cannot see the slot's focus move |
 | `tests/_setup/jsdom-image-pipeline.ts` (new) + `vitest.config.ts` | S5 — jsdom has no raster pipeline; the shim gives it a trivial one so a picked image can still attach in component tests (A4 cannot be edited) |
 | `tests/unit/composer/mirror-sizing.test.ts` | S2 |
 | `tests/unit/composer/render/mirror-composer.test.tsx`, `mirror-toggle.test.tsx` | S2–S4 |
@@ -73,8 +75,9 @@ Slices may merge into one commit where there is no shippable state between them 
 | `tests/unit/composer/render/pick-race.test.tsx` (new) | S7 — the audit repro, asserting the fixed behaviour; plus RF-11 on both layouts |
 
 NOT touched: `src/server/**`, `src/app/api/**`, `src/db/**`, `drizzle/**`, `limits.ts`, `payload.ts`,
-`gating.ts`, `requests.ts`, `state-map.ts`, `idempotency.ts`, `envelope.ts`, `ComposerSlot.tsx`,
-every file under `src/components/debate/phone/`, SPEC.1, SPEC.2, ADRs, `submit-baseline.test.tsx`.
+`gating.ts`, `requests.ts`, `state-map.ts`, `idempotency.ts`, `envelope.ts`, every file under
+`src/components/debate/phone/`, SPEC.1, SPEC.2, ADRs, `submit-baseline.test.tsx`. (`ComposerSlot.tsx`
+was on this list at planning and is not any more — see the file map.)
 
 ## 4 · Baselines (measured before any change — numbers in the run report)
 
@@ -123,4 +126,8 @@ positive control (OVN-V1). Mutations run against committed code only.
 | 13 | The size fallback (re-save not smaller → upload the original) | removed | kept | It uploads the original, which RF-10 forbids |
 | 14 | A4 must stay unedited while jsdom cannot re-save | a jsdom image-pipeline shim in the test setup (decode → 1×1, encode → a small blob of the requested type); tests of the re-save stub their own pipeline | editing A4; a re-save that can be skipped | A skippable re-save is an upload-as-is path |
 | 15 | RF-12 scope — "while a bet is being submitted" | the input refuses whenever the drop handlers already do: `disabled` (in flight, or C2) OR while an image is uploading | in flight only | The register's own goal — "the frame can never show an image other than the one being published" — is false under S-1 (a pick landing during a drop's upload) even with RF-11; the drop handler already used this condition, and one condition for every door is the existing rule |
-| 16 | RF-11 and a stalled upload | PLACE stays disabled until the attach settles; no cancel control | adding one | The register gives none. CARRIED as a risk |
+| 16 | RF-11 and a stalled upload | PLACE stays disabled until the attach settles; no cancel control, no new network timeout | adding one (`@code-reviewer` M1 proposed a timeout) | The register gives neither, and a timeout needs a number: too short turns slow-but-working uploads — the phone tier's — into failures. CARRIED as a risk for a ruling |
+| 17 | Where the slot's first focus lands | the occupant names it (`data-autofocus` on the Mirror's title; a disabled one is skipped) | the slot skips its move when focus is already inside | explicit, and the C2 state still lands on a working control |
+| 18 | An eased step-down overflows the box for ~130ms (measured: the title jumped 23px and slid back) | hold the field at the top while the fitted text fits the box | snap on shrink and ease on grow (`@code-reviewer` M4) | RF-4's own words are "as the line fills, the size eases down"; holding keeps the ease and removes the jump |
+| 19 | The Mirror buttons' outline | `focus-visible:outline-hidden` | `outline-none` (this run's first cut) | forced-colors mode drops box-shadows; a bare `outline-none` left no indicator there (`@code-reviewer` M3) |
+| 20 | GIF pass-through by name | the GIF signature as well as the declared type; a declared GIF without it is re-saved as lossless PNG | the declared type alone | `File.type` comes from the extension: `photo.gif` holding a JPEG would upload its location data untouched |

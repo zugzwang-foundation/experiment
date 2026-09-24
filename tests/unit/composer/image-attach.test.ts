@@ -502,6 +502,13 @@ function fakeFile(type: string, size: number): Blob {
 	return new Blob([new Uint8Array(size)], { type });
 }
 
+/** A GIF by its bytes as well as its type: the `GIF89a` signature, then padding. */
+function realGif(size: number): Blob {
+	const bytes = new Uint8Array(size);
+	bytes.set([0x47, 0x49, 0x46, 0x38, 0x39, 0x61]);
+	return new Blob([bytes], { type: "image/gif" });
+}
+
 function okFetch() {
 	return scriptedFetch(signOkResponse(), new Response(null, { status: 200 }));
 }
@@ -602,13 +609,33 @@ describe("attachImage — RF-10 re-save (mocked canvas boundary)", () => {
 	it("image-attach::rf10-a-gif-goes-up-byte-identical-and-is-never-decoded", async () => {
 		const decode = stubDecode(fakeBitmap(10, 10));
 		const { toBlobCalls } = stubCanvasEncode(fakeFile("image/png", 10));
-		const file = fakeFile("image/gif", 5000);
+		const file = realGif(5000);
 		const fetchFn = okFetch();
 		const result = await attachImage({ file, fetchFn });
 		expect(result.kind).toBe("attached");
 		expect(decode).not.toHaveBeenCalled();
 		expect(toBlobCalls).toEqual([]);
 		expect(requestCall(fetchFn, 1).init.body).toBe(file);
+	});
+
+	it("image-attach::rf10-a-file-named-gif-without-the-gif-signature-is-re-saved-not-passed-through", async () => {
+		// `File.type` comes from the extension, so a phone photo saved as
+		// `photo.gif` declares `image/gif`. Passing it through on its name would
+		// upload its location data untouched (`@code-reviewer`, MIRROR-2).
+		const decode = stubDecode(fakeBitmap(1200, 800));
+		const resaved = fakeFile("image/png", 64);
+		const { toBlobCalls } = stubCanvasEncode(resaved);
+		const jpegBytes = new Uint8Array(5000);
+		jpegBytes.set([0xff, 0xd8, 0xff, 0xe1]); // a JPEG with an APP1 (EXIF) segment
+		const file = new Blob([jpegBytes], { type: "image/gif" });
+		const fetchFn = okFetch();
+		const result = await attachImage({ file, fetchFn });
+		expect(result.kind).toBe("attached");
+		expect(decode).toHaveBeenCalledTimes(1);
+		// Its real format is unknown to its name: re-saved losslessly.
+		expect(toBlobCalls).toEqual([{ type: "image/png", quality: undefined }]);
+		expect(requestCall(fetchFn, 1).init.body).toBe(resaved);
+		expect(requestCall(fetchFn, 1).init.body).not.toBe(file);
 	});
 
 	// --- each type keeps the format it went up in before RF-10 ---------------

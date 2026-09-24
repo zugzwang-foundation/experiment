@@ -32,8 +32,13 @@ if (typeof HTMLCanvasElement !== "undefined") {
 		fillRect: () => undefined,
 		drawImage: () => undefined,
 	};
-	HTMLCanvasElement.prototype.getContext = function getContext() {
-		return context;
+	// Only the "2d" context the re-save asks for; every other context type
+	// stays `null`, as jsdom has it, so a future canvas component's own
+	// no-context fallback can still be tested.
+	HTMLCanvasElement.prototype.getContext = function getContext(
+		contextId: string,
+	) {
+		return contextId === "2d" ? context : null;
 	} as unknown as typeof HTMLCanvasElement.prototype.getContext;
 	HTMLCanvasElement.prototype.toBlob = function toBlob(
 		callback: BlobCallback,

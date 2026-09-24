@@ -23,6 +23,7 @@ import { type ComposerKind, floorFor } from "./gating";
 import { ImageAttach, type ImageAttachState } from "./ImageAttach";
 import {
 	fitTitle,
+	TITLE_BOX_PX,
 	TITLE_FIT_AT_REST,
 	type TitleFit,
 	titleCharsLeft,
@@ -487,7 +488,7 @@ function DetailToggle({
 			aria-pressed={pressed}
 			onClick={onToggle}
 			data-testid="mirror-detail-toggle"
-			className="flex h-[54px] w-[118px] shrink-0 items-center justify-center gap-2 rounded-(--r) border border-n2 text-[14px] leading-5 text-n6 transition-colors outline-none hover:border-n3 hover:text-ink focus-visible:shadow-(--state-focus-ring) aria-pressed:border-n3 aria-pressed:bg-n1 aria-pressed:text-ink"
+			className="flex h-[54px] w-[118px] shrink-0 items-center justify-center gap-2 rounded-(--r) border border-n2 text-[14px] leading-5 text-n6 transition-colors hover:border-n3 hover:text-ink focus-visible:shadow-(--state-focus-ring) focus-visible:outline-hidden aria-pressed:border-n3 aria-pressed:bg-n1 aria-pressed:text-ink"
 		>
 			<Icon aria-hidden="true" className="size-4 shrink-0" />
 			{label}
@@ -553,9 +554,12 @@ function CloseButton({
 			aria-label="Close"
 			// The classic's own class string (`BetComposer`), plus `-mr-3` so the
 			// glyph — not the 44px box around it — sits against the padding edge,
-			// and `outline-none` so keyboard focus draws the ONE ring, the shadow,
-			// rather than the UA's outline beside it (RF-6, MIRROR-2).
-			className={`-my-3 -mr-3 flex size-11 shrink-0 items-center justify-center rounded-(--r-chip) text-xl text-n4 transition-all outline-none hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)${className ? ` ${className}` : ""}`}
+			// and `focus-visible:outline-hidden` so keyboard focus draws the ONE
+			// ring, the shadow, rather than the UA's outline beside it (RF-6,
+			// MIRROR-2) — while forced-colors mode, which drops box-shadows, still
+			// gets an outline (a bare `outline-none` left it nothing:
+			// `@code-reviewer` M3).
+			className={`-my-3 -mr-3 flex size-11 shrink-0 items-center justify-center rounded-(--r-chip) text-xl text-n4 transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)${className ? ` ${className}` : ""}`}
 		>
 			{COMPOSER_COPY.close}
 		</button>
@@ -712,6 +716,34 @@ function TitleField(props: {
 		);
 	}, [props.title, widthPx]);
 
+	// ⚠ AN EASED STEP-DOWN OVERFLOWS FOR A MOMENT, and this holds the field
+	// still through it. A keystroke that forces a smaller size is one the text
+	// no longer fits at the OLD size, and the transition starts from the old
+	// size — so for part of the 150ms the text wraps a line too many, and the
+	// editor has already scrolled that line into view to follow the caret.
+	// Measured in Chrome: the title jumped 23px up and slid back over ~130ms
+	// (`@code-reviewer` M4). While the fitted text fits the box there is nothing
+	// to scroll to, so the field is held at the top — the first line stays put
+	// and the second grows into view. At the floor, where four lines of 13px are
+	// taller than the box, the hold is off and the field scrolls to the caret.
+	useEffect(() => {
+		const el = ref.current;
+		if (
+			el === null ||
+			fit.lines * titleLineHeightPx(fit.sizePx) > TITLE_BOX_PX
+		) {
+			return;
+		}
+		const hold = () => {
+			if (el.scrollTop !== 0) {
+				el.scrollTop = 0;
+			}
+		};
+		hold();
+		el.addEventListener("scroll", hold);
+		return () => el.removeEventListener("scroll", hold);
+	}, [fit]);
+
 	const left = titleCharsLeft(props.title.length, TITLE_MAX_CHARS);
 	return (
 		<div className="relative min-w-0 flex-1">
@@ -857,10 +889,15 @@ function StakeBar(props: {
 				</span>
 				{/* RF-7 (MIRROR-2) — styled like AMOUNT: a small n5 `Đ`, then the
 				    figure in mono 22px/600, with no underline (TO WIN is read, not
-				    typed). No figure yet → today's `—`, alone. The space between the
-				    two spans takes no room in the flex row; it keeps the announced
-				    and copied text `Đ 2,445` rather than `Đ2,445`. */}
-				<span aria-live="polite" className="flex min-w-0 items-baseline gap-1">
+				    typed). No figure yet → today's `—`, alone. `aria-atomic` makes an
+				    update announce the whole `Đ 2,445`, not only the node that
+				    changed. The space between the two spans takes no room in the
+				    flex row; it only keeps the region's text `Đ 2,445`. */}
+				<span
+					aria-live="polite"
+					aria-atomic="true"
+					className="flex min-w-0 items-baseline gap-1"
+				>
 					{props.toWin !== null ? (
 						<>
 							<span className="shrink-0 text-[15px] text-n5">Đ</span>{" "}
@@ -881,9 +918,13 @@ function StakeBar(props: {
 				// Min/Max take their own width, so the bar's free space goes to the
 				// gaps (RF-7). A validation notice is different: it is a sentence
 				// that must WRAP into the room left, so while one shows this column
-				// takes the free space as it did before MIRROR-2.
+				// takes the free space (`flex-1`), keeping its automatic minimum —
+				// the longest word — as MIRROR-1 did. (`min-w-0` beside it let the
+				// column collapse to nothing on a full row: `@code-reviewer` LOW.)
+				// ⚠ The groups move when a notice appears: its column swallows the
+				// free space the gaps were sharing.
 				className={`flex flex-col justify-center text-[12px] leading-4 text-n5${
-					props.notice !== null ? " min-w-0 flex-1" : ""
+					props.notice !== null ? " flex-1" : ""
 				}`}
 			>
 				{props.notice !== null ? (
@@ -928,7 +969,7 @@ function StakeBar(props: {
 				// treatment and the transition are the primitive's, copied; the focus ring
 				// is the minted `--state-focus-ring-pole`, whose n0 gap keeps it visible
 				// against a white NO fill.
-				className={`inline-flex h-11 min-w-[140px] shrink-[1000] basis-[170px] items-center justify-center rounded-(--r) border px-3 text-[15px] leading-none font-bold tracking-[0.08em] whitespace-nowrap transition-all outline-none select-none focus-visible:shadow-(--state-focus-ring-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) @max-[400px]/mirror:basis-full ${
+				className={`inline-flex h-11 min-w-[140px] shrink-[1000] basis-[170px] items-center justify-center rounded-(--r) border px-3 text-[15px] leading-none font-bold tracking-[0.08em] whitespace-nowrap transition-all select-none focus-visible:shadow-(--state-focus-ring-pole) focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) @max-[400px]/mirror:basis-full ${
 					props.side === "YES"
 						? "border-no bg-yes text-no"
 						: "border-no bg-no text-yes"

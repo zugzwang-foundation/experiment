@@ -348,6 +348,67 @@ describe("MIRROR-2 RF-4 — the title block, its type and its focus", () => {
 		);
 	});
 
+	it("mirror::while-the-fitted-title-fits-the-field-is-held-at-the-top", () => {
+		// An eased step-down overflows for a moment and the editor scrolls to the
+		// caret (measured in Chrome: 23px, sliding back over ~130ms). While the
+		// fitted text fits the box, any scroll is put straight back.
+		const { getByLabelText } = mirrorPost();
+		const title = getByLabelText("Argument title");
+		let top = 0;
+		Object.defineProperty(title, "scrollTop", {
+			configurable: true,
+			get: () => top,
+			set: (v: number) => {
+				top = v;
+			},
+		});
+		top = 23;
+		fireEvent.scroll(title);
+		expect(top).toBe(0);
+	});
+
+	it("mirror::at-the-floor-where-the-text-overflows-the-field-scrolls-freely", () => {
+		// Four lines of 13px are taller than the box: there, following the caret
+		// is the only way to see it, so the hold must be off. jsdom lays nothing
+		// out, so the field's width and the copy's line count are given to it.
+		const proto = HTMLTextAreaElement.prototype;
+		const rect = vi
+			.spyOn(proto, "getBoundingClientRect")
+			.mockReturnValue(new DOMRect(0, 0, 88, 54));
+		Object.defineProperty(proto, "scrollHeight", {
+			configurable: true,
+			get(this: HTMLTextAreaElement) {
+				return this.getAttribute("data-testid") === "mirror-title-probe"
+					? Math.round(4 * Number.parseFloat(this.style.lineHeight || "0"))
+					: 0;
+			},
+		});
+		try {
+			const { getByLabelText } = mirrorPost();
+			const title = asTextarea(getByLabelText("Argument title"));
+			fireEvent.change(title, { target: { value: TITLE } });
+			// Positive control: the fit really is the four-line floor.
+			expect(title.style.fontSize).toBe("13px");
+			expect(title.style.paddingTop).toBe("0px");
+			let top = 0;
+			Object.defineProperty(title, "scrollTop", {
+				configurable: true,
+				get: () => top,
+				set: (v: number) => {
+					top = v;
+				},
+			});
+			top = 20;
+			fireEvent.scroll(title);
+			expect(top).toBe(20);
+		} finally {
+			rect.mockRestore();
+			// The own property shadows `Element.prototype`'s getter; deleting it
+			// restores jsdom's.
+			Reflect.deleteProperty(proto, "scrollHeight");
+		}
+	});
+
 	it("mirror::the-measuring-copy-is-hidden-from-everyone", () => {
 		const { container, getAllByRole, getByLabelText } = mirrorPost();
 		const probe = byTestId(container, "mirror-title-probe");
@@ -602,7 +663,11 @@ describe("MIRROR-2 RF-7 — every group an equal step from the next; TO WIN read
 				mirror={MIRROR}
 			/>,
 		);
-		expect(tokens(byTestId(c2.container, "mirror-limits"))).toContain("flex-1");
+		const noticeColumn = tokens(byTestId(c2.container, "mirror-limits"));
+		expect(noticeColumn).toContain("flex-1");
+		// …and it keeps its automatic minimum (the longest word): `min-w-0` let
+		// it collapse to nothing on a full row (`@code-reviewer` LOW).
+		expect(noticeColumn).not.toContain("min-w-0");
 	});
 
 	it("mirror::to-win-is-a-small-n5-d-then-the-mono-22-figure-with-no-underline", async () => {
@@ -627,6 +692,8 @@ describe("MIRROR-2 RF-7 — every group an equal step from the next; TO WIN read
 		const value = toWin.querySelector('[aria-live="polite"]');
 		if (!(value instanceof HTMLElement)) throw new Error("no to-win value");
 		expect(value.textContent).toBe("Đ 2,445");
+		// One announcement for the pair, not only the node that changed.
+		expect(value.getAttribute("aria-atomic")).toBe("true");
 		const [d, figure] = [...value.children];
 		expect(d?.textContent).toBe("Đ");
 		expect(tokens(d)).toEqual(

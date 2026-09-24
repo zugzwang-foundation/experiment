@@ -406,33 +406,88 @@ describe("MIRROR-2 RF-6 — focus: the frame's edge lifts; buttons ring for the 
 		expect(frame(container).className).not.toContain("focus-within:");
 	});
 
-	it("mirror-toggle::every-composer-button-rings-only-under-focus-visible", async () => {
-		const { container, getAllByRole } = mount();
-		await attach(container);
+	/**
+	 * Every button in the Mirror must (a) draw a ring under `:focus-visible` —
+	 * the keyboard indicator — (b) never under plain `:focus`, which a mouse click
+	 * also matches, and (c) hide the UA outline only under `:focus-visible`, with
+	 * `outline-hidden`, never with a bare `outline-none`: forced-colors mode drops
+	 * box-shadows, so a bare `outline-none` leaves that user no indicator at all
+	 * (`@code-reviewer` M3). (a) is the half the first version of this test did
+	 * not check — removing a ring left it green (`@code-reviewer` M2).
+	 *
+	 * ⚠ FF-1's switch is the one exception to (c), and only to (c): it is the
+	 * SAME element the phone renders (RF-8 holds the phone's markup to a fixture
+	 * byte for byte), so it keeps the UA outline beside its ring.
+	 */
+	function assertButtonRings(shell: HTMLElement, expected: string[]) {
+		const buttons = [...shell.querySelectorAll("button")];
+		const names = buttons.map(
+			(b) => b.getAttribute("aria-label") ?? b.textContent ?? "",
+		);
+		// Positive control: the buttons this rule is about are all here.
+		expect(names).toEqual(expect.arrayContaining(expected));
+		for (const b of buttons) {
+			const name = b.getAttribute("aria-label") ?? b.textContent ?? "";
+			const cls = tokens(b);
+			expect(
+				cls.some((c) => /^focus-visible:(shadow|ring)/.test(c)),
+				`${name}: a keyboard ring`,
+			).toBe(true);
+			expect(
+				cls.some((c) => /^focus:(shadow|ring|outline|border)/.test(c)),
+				`${name}: no ring on plain :focus`,
+			).toBe(false);
+			if (b.getAttribute("role") === "switch") {
+				continue;
+			}
+			expect(cls, `${name}: outline hidden only under focus-visible`).toContain(
+				"focus-visible:outline-hidden",
+			);
+			expect(cls, `${name}: no bare outline-none`).not.toContain(
+				"outline-none",
+			);
+		}
+	}
+
+	it("mirror-toggle::every-post-composer-button-rings-for-the-keyboard-only", async () => {
+		const { container } = mount();
 		const shell = container.querySelector('[data-testid="mirror-composer"]');
 		if (!(shell instanceof HTMLElement)) throw new Error("no shell");
-		const buttons = [...shell.querySelectorAll("button")];
-		// Positive control: the buttons this rule is about are all here.
-		const names = buttons.map(
-			(b) => b.getAttribute("aria-label") ?? b.textContent,
+		// Empty: the pick layer is a button too.
+		assertButtonRings(shell, [
+			"Close",
+			"Add detail",
+			"Add an image",
+			"PLACE Đ BET",
+		]);
+		await attach(container);
+		assertButtonRings(shell, [
+			"Close",
+			"Add detail",
+			"Replace",
+			"Remove image",
+			"PLACE Đ BET",
+		]);
+	});
+
+	it("mirror-toggle::every-reply-composer-button-rings-for-the-keyboard-only", () => {
+		const { container } = render(
+			<BetComposer
+				{...composerProps()}
+				kind="reply"
+				parentCommentId="cmt-p1"
+				replyContext={{ relation: "support", authorPseudonym: "BlueWolf472" }}
+				mirror={MIRROR}
+			/>,
 		);
-		expect(names).toEqual(
-			expect.arrayContaining([
-				"Close",
-				"Add detail",
-				"Replace",
-				"Remove image",
-				"PLACE Đ BET",
-			]),
-		);
-		expect(getAllByRole("button").length).toBeGreaterThanOrEqual(5);
-		for (const b of buttons) {
-			const cls = b.getAttribute("class") ?? "";
-			// A ring may be drawn ONLY behind `focus-visible:` — never plain
-			// `focus:`, which a mouse click also matches.
-			expect(cls).not.toMatch(/(^|\s)focus:(shadow|ring|outline|border)/);
-			expect(tokens(b)).toContain("outline-none");
-		}
+		const shell = container.querySelector('[data-testid="mirror-composer"]');
+		if (!(shell instanceof HTMLElement)) throw new Error("no shell");
+		assertButtonRings(shell, [
+			"Close",
+			"Friendly fire",
+			"Add detail",
+			"PLACE Đ BET",
+		]);
 	});
 
 	it("mirror-toggle::leaving-the-detail-field-by-click-moves-focus-without-a-ring", async () => {

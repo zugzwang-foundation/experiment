@@ -26,6 +26,12 @@ import { parseWireResponse } from "./envelope";
  * allow-list admits is re-saved, and a type this file has no encoder for is
  * REFUSED — so a format added to the allow-list later is refused until someone
  * decides how to re-save it, never silently uploaded with its metadata.
+ * ⛔ AND "A GIF" MEANS THE BYTES, NOT THE NAME. `File.type` is derived from the
+ * file's EXTENSION, so a phone photo saved as `photo.gif` declares
+ * `image/gif`; passing it through on its name would upload its location data
+ * untouched (`@code-reviewer`, MIRROR-2). The pass-through also requires the
+ * GIF signature (`isGif`); a declared GIF without it is re-saved like any
+ * other image.
  *
  * ⚠ ANIMATION IS LOST FOR EVERY OTHER FORMAT. An animated WebP, an APNG and an
  * animated AVIF declare `image/webp`, `image/png` and `image/avif`, so they are
@@ -42,7 +48,33 @@ import { parseWireResponse } from "./envelope";
  * cap is untouched. (docs/plans/T3.md carries T3's original design; the
  * fallback-to-original it describes is superseded by RF-10.)
  */
-const PASS_THROUGH_MIME = new Set(["image/gif"]);
+const GIF_MIME = "image/gif";
+
+/**
+ * A GIF by its first six bytes — `GIF87a` or `GIF89a` — as well as by its
+ * declared type. Reading six bytes is the whole cost; a file that cannot be
+ * read is not treated as a GIF, so it goes through the re-save (and is refused
+ * there if it cannot be decoded either).
+ */
+async function isGif(file: Blob): Promise<boolean> {
+	if (file.type !== GIF_MIME) {
+		return false;
+	}
+	try {
+		const head = new Uint8Array(await file.slice(0, 6).arrayBuffer());
+		return (
+			head.length === 6 &&
+			head[0] === 0x47 && // G
+			head[1] === 0x49 && // I
+			head[2] === 0x46 && // F
+			head[3] === 0x38 && // 8
+			(head[4] === 0x37 || head[4] === 0x39) && // 7 | 9
+			head[5] === 0x61 // a
+		);
+	} catch {
+		return false;
+	}
+}
 
 /** Stated implementation defaults (docs/plans/T3.md) — not ratified spec values. */
 export const MAX_LONGEST_EDGE_PX = 1600;
@@ -51,8 +83,11 @@ export const MAX_LONGEST_EDGE_PX = 1600;
  * an omission. A 40 MP ceiling was implemented and then dropped once it was
  * measured: it cannot prevent the decode (`createImageBitmap` IS the decode,
  * and width/height are unknowable until it completes), and it does not cap
- * the canvas either — the canvas is sized to the TARGET, so it can never
- * exceed a few MB whatever the source was. It bounded roughly single-digit
+ * the canvas either — the canvas is sized to the TARGET, which for a scaled
+ * image is at most 1600px on its long edge, a few MB. (Below the legibility
+ * floor the target IS the native size — a 2228 × 12941 screenshot is ~115 MB
+ * of RGBA — which T3 did for PNG and RF-10 now does for every type; see
+ * `MIN_SHORTER_EDGE_PX`.) It bounded roughly single-digit
  * percent of a ~160 MB peak while claiming to halve it, and its cost was
  * inverted: the largest files, the ones this feature exists for, got the
  * least help. Code claiming a protection it does not provide is the same
@@ -179,6 +214,16 @@ function encodeTargetFor(
 			flattenOntoWhite: true,
 		};
 	}
+	if (sourceType === GIF_MIME) {
+		// Reached only by a file that DECLARES `image/gif` without being one
+		// (`isGif` said no): its real format is unknown to its name, so it is
+		// re-saved losslessly, keeping any alpha.
+		return {
+			outputType: "image/png",
+			quality: undefined,
+			flattenOntoWhite: false,
+		};
+	}
 	if (sourceType === "image/avif") {
 		return {
 			outputType: "image/avif",
@@ -214,8 +259,9 @@ type Resave =
  * uploaded" true by construction.
  *
  * ⚠ OOM RESIDUAL DOCUMENTED (HO-FINISH v1.0 §5 Ruling 1): The pixel guard was
- * dropped because the canvas allocation is target-sized (~10 MB max) and
- * cannot prevent the initial bitmap decode (~160 MB RGBA at 40 MP). The
+ * dropped because the canvas allocation is target-sized (~10 MB for a scaled
+ * image; the full bitmap again for a native-size re-save below the legibility
+ * floor) and cannot prevent the initial bitmap decode (~160 MB RGBA at 40 MP). The
  * decode is bounded against hangs by `RESAVE_TIMEOUT_MS`.
  */
 async function resaveForUpload(file: Blob): Promise<Resave> {
@@ -372,7 +418,7 @@ export async function attachImage(args: {
 	// breaks the byte cap is today's `image too large`. Neither falls back to
 	// the original; that fallback is how metadata used to reach storage.
 	let uploadBlob: Blob;
-	if (PASS_THROUGH_MIME.has(args.file.type)) {
+	if (await isGif(args.file)) {
 		uploadBlob = args.file;
 	} else {
 		const resaved = await resaveWithinBudget(args.file);
