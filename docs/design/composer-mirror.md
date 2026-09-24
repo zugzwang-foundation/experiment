@@ -1,5 +1,7 @@
 # Mirror composer — MIRROR-1, founder-ratified 2026-09-23
 
+Amended MIRROR-2, founder-ratified 2026-09-24
+
 ## CORE IDEA
 
 The bet composer is redrawn to look like the card it will become: your own card
@@ -34,15 +36,20 @@ Reuse the card header's avatar, name and chip components; do not restyle them.
 
 ## RF-4 · Title
 
-Required; placeholder `Your argument — required`. Borderless field with a 1px n3
-underline. The block is always 54px tall (two lines at 16px): 16px, 22px line
-height, weight 500, letter-spacing −0.01em, ink; wraps. maxLength 125 (existing rule).
-Two-line guarantee: if the text would need a third line, the font steps down 0.5px
-at a time (line height = size × 1.375), floor 13px, text top-aligned in the fixed
-block. A normal 125-character title fits at 16px; all-caps titles step down.
-No counter, except in the last 10 characters: `{n} left` (11px, n5), right-aligned
-just below the underline, absolutely positioned.
-⚠ The title row's height never changes while typing.
+Required; placeholder `Your argument — required`. A borderless field with a 1px n3
+underline in a block that is always 54px tall. The text — and the placeholder — take
+the largest size from 28px down to 13px, in 0.5px steps (line height = size × 1.25),
+at which they fit the block in at most two lines, vertically centred in it
+(padding-top = (53 − lines × line height) / 2). A short title sits on one big line;
+as the line fills, the size eases down; past one line the text flows into two; a
+normal 125-character title lands near 16px, all-caps titles lower. Size changes ease
+over 150ms (instant under prefers-reduced-motion). maxLength 125 (existing rule). No
+counter, except in the last 10 characters: `{n} left` (11px, n5), right-aligned just
+below the underline, absolutely positioned. The composer opens with the cursor in
+the title.
+⚠ The block's height never changes while typing.
+⚠ Measure with the transition off (or on a hidden clone): a transitioned font-size
+  reads its old value mid-measure.
 
 ## RF-5 · Detail toggle
 
@@ -56,45 +63,75 @@ It toggles the media frame between the image view and the detail view.
 
 ## RF-6 · Media frame
 
-An exact 16:9 frame: width = min(available width, available height × 16/9),
-centred, top-aligned; minimum height 160px — below that the composer body scrolls
-and the stake bar stays pinned. Ground (#181818) fill, 1px n2 border, 8px radius,
-clipped.
+An exact 16:9 frame: width = min(available width, available height × 16/9), centred,
+top-aligned; minimum height 160px — below that the composer body scrolls and the
+stake bar stays pinned. Ground (#181818) fill, 1px n2 border, 8px radius, clipped.
 · Image attached: shown whole (object-fit: contain; letterbox = ground). Top-right
-  overlay: `Replace` (refresh icon) and a × button (aria-label `Remove image`) —
-  28px chips, rgba(24,24,24,.9) fill, 1px n2 border, 6px radius. No filename.
-· No image: dashed 1px n3 border; centred image-plus icon, `Add an image`
-  (14px/500, n6), `Optional · shown whole · any orientation` (12px, n5). The whole
-  frame opens today's file picker.
-· Upload / screening / rejected states: today's logic and wording, rendered centred
-  inside the frame.
-· Detail view: today's detail textarea fills the same frame, so nothing jumps.
-  14px / 21px, n6, 14px 16px padding, n3 border, placeholder
-  `Add evidence, sources, reasoning`, counter bottom-right `{n} / {limit} · optional`
-  from the existing limit constant.
-· Switching slides the outgoing view out and the incoming view in with the
-  composer's existing slide (translateX ±36px + fade, same duration and easing);
-  instant under prefers-reduced-motion.
+  overlay: `Replace` (refresh icon) and a × button (aria-label `Remove image`), 28px
+  chips, rgba(24,24,24,.9) fill, 1px n2 border, 6px radius. No filename.
+· No image: dashed 1px n3 border; centred image-plus icon, `Add an image` (14px/500,
+  n6), `Optional` (12px, n5). The whole frame opens today's file picker.
+· Upload / screening / rejected states: today's logic and wording, centred in the frame.
+· Detail view: today's detail textarea fills the same frame (no layout jump):
+  14px / 21px, n6, 14px 16px padding, placeholder `Add evidence, sources, reasoning`,
+  counter bottom-right `{n} / {limit} · optional` from the existing limit constant.
+  Focus shows no ring, outline or glow: the frame's border lifts from n2 to n3 and
+  the caret marks the place.
+· Switching slides the outgoing view out and the incoming one in (translateX ±36px +
+  fade, 260ms ease); instant under prefers-reduced-motion.
+· Buttons in the composer show a focus ring for keyboard focus only (:focus-visible),
+  never after a mouse click.
 ⚠ Toggling is a VIEW change only. The image stays attached and keeps screening while
   hidden; the submitted data carries image and detail whichever view is showing.
 
 ## RF-7 · Stake bar
 
-56px tall, 1px n2 border, 8px radius, pinned to the bottom. Left to right:
-`AMOUNT` (11px caps, n5) over today's amount input (Đ prefix n5; value mono
-22px/600; 1px n3 underline) · hairline · `TO WIN` over today's to-win value (mono
-20px/600) · hairline · limits stacked: `Min Đ {floor}` over `Max Đ {cap}` (12px, n5;
-values n6/500) from the existing constants (post floor on posts, reply floor on
-replies, BET_MAX_STAKE) · submit `PLACE Đ BET` (170 × 44, 15px/700, letter-spacing
-.08em). The submit wears the pole of the side being bet: YES = #181818 fill, 1px
-ink border, ink text; NO = ink fill, #181818 text.
-No balance line. No second line on the button.
-Today's validation messages keep their logic; while one is active it replaces the
-Min/Max text in place. The disabled-submit rule and any confirm step are unchanged.
-If the bar would overflow at A1's narrowest width, shrink the submit first (floor
-140px), then the TO WIN column; log it.
+56px tall (min-height; taller only if a validation notice needs it), 1px n2 border,
+8px radius, pinned to the bottom. Four groups — AMOUNT, TO WIN, limits, submit — with
+equal space between every pair, including before the submit; hairlines centred in
+their gaps.
+· AMOUNT (11px caps, n5) over today's amount input: a small Đ (15px, n5), then the
+  value (mono 22px/600), 1px n3 underline.
+· TO WIN over today's to-win value, styled like AMOUNT: small Đ (15px, n5), then the
+  number (mono 22px/600); no underline.
+· Limits stacked: `Min Đ {floor}` over `Max Đ {cap}` (12px, n5; values n6/500) from
+  the existing constants (post floor on posts, reply floor on replies, BET_MAX_STAKE).
+· Submit `PLACE Đ BET` (170 × 44, 15px/700, letter-spacing .08em), wearing the pole of
+  the side being bet: YES = #181818 fill, 1px #fafafa edge and text; NO = #fafafa
+  fill, #181818 text.
+No balance line. No second line on the button. Today's validation messages keep
+their logic; while one is active it replaces the Min/Max text in place. The
+disabled-submit rule and any confirm step are unchanged, except RF-11. Narrow slots:
+submit shrinks first (floor 140px), then TO WIN; below that the submit takes its own
+line (as built).
 
 ## RF-8 · Where it applies
 
 Every A1 mount point above the phone tier, as one component. If the phone tier
 renders the same component, keep today's layout under the phone tier and log it.
+
+## RF-10 · Photos go up without hidden data
+
+Every attached image except GIF is re-saved in the browser before upload — through
+the existing resize step, now run for every image, at its own size when already
+small — so it carries no hidden metadata (location, camera, date). If the re-save
+fails or times out, the image is refused with today's attach error; it is never
+uploaded as-is. GIFs upload unchanged. No new check and no new step for the author.
+⚠ Keep each type's current output format — a PNG stays a PNG, so transparency survives.
+⚠ The re-save happens before the upload is signed, so the bytes screened are the
+  bytes served.
+
+## RF-11 · PLACE waits for the image
+
+While an attached image is still uploading, PLACE Đ BET is disabled (the frame already
+shows the upload state). It re-enables when the image is attached, or when the attach
+fails (the image is dropped with today's error). Server checks unchanged.
+
+## RF-12 · A pick cannot race a submit
+
+While a bet is being submitted, a picked or dropped image is ignored, so the frame can
+never show an image other than the one being published. Fix it where the file enters —
+the shared file input and drop handlers — so both layouts get it.
+⚠ The phone's MARKUP stays byte-identical (RF-8 baseline); only its behaviour gains
+  RF-11 and RF-12. If an RF-8 scenario captures the uploading state, its markup may
+  change by the disabled attribute only — update that line deliberately and log it.
