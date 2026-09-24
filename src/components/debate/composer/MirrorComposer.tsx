@@ -769,6 +769,12 @@ function TitleField(props: {
 /**
  * RF-7 — the stake bar, pinned under the body. AMOUNT | TO WIN | Min/Max | submit.
  *
+ * ⚠ SPACING (MIRROR-2): no group grows. The free space is shared equally between
+ * every pair of neighbours, hairlines included (`justify-between`), which is the
+ * founder's render: every drawn thing an equal step from the next. MIRROR-1 let
+ * the limits column grow, so the three figures bunched left and the only wide gap
+ * was the one before the submit.
+ *
  * ⛔ EVERY PREDICATE HERE IS THE CONTROLLER'S. The submit's `disabled`, the
  * notice, the to-win figure and the amount field's handlers all arrive computed;
  * this bar lays them out.
@@ -804,7 +810,12 @@ function StakeBar(props: {
 	return (
 		<div
 			data-testid="mirror-stake-bar"
-			className="flex min-h-14 shrink-0 items-center gap-3 rounded-(--r) border border-n2 px-3 py-1 @max-[400px]/mirror:flex-wrap @max-[400px]/mirror:py-1.5"
+			// RF-7 (MIRROR-2) — `justify-between`: the free space is shared out
+			// EQUALLY between every pair of neighbours — AMOUNT, hairline, TO WIN,
+			// hairline, limits, submit — so the figures no longer bunch on the left
+			// with one wide hole before the submit, and each hairline sits at the
+			// centre of the gap it divides. `gap-3` is the floor under every gap.
+			className="flex min-h-14 shrink-0 items-center justify-between gap-3 rounded-(--r) border border-n2 px-3 py-1 @max-[400px]/mirror:flex-wrap @max-[400px]/mirror:py-1.5"
 		>
 			<div className="flex shrink-0 flex-col justify-center gap-0.5">
 				<span className="text-[11px] leading-3 font-medium tracking-[0.12em] text-n5 uppercase">
@@ -828,21 +839,43 @@ function StakeBar(props: {
 				</span>
 			</div>
 			<Hairline />
-			<div className="flex min-w-0 shrink flex-col justify-center gap-0.5">
+			<div
+				data-testid="mirror-to-win"
+				className="flex min-w-0 shrink flex-col justify-center gap-0.5"
+			>
 				<span className="truncate text-[11px] leading-3 font-medium tracking-[0.12em] text-n5 uppercase">
 					{COMPOSER_COPY.toWinLabel}
 				</span>
-				<span
-					aria-live="polite"
-					className="truncate font-mono text-[20px] leading-7 font-semibold text-ink"
-				>
-					{props.toWin !== null ? `Đ ${props.toWin}` : "—"}
+				{/* RF-7 (MIRROR-2) — styled like AMOUNT: a small n5 `Đ`, then the
+				    figure in mono 22px/600, with no underline (TO WIN is read, not
+				    typed). No figure yet → today's `—`, alone. The space between the
+				    two spans takes no room in the flex row; it keeps the announced
+				    and copied text `Đ 2,445` rather than `Đ2,445`. */}
+				<span aria-live="polite" className="flex min-w-0 items-baseline gap-1">
+					{props.toWin !== null ? (
+						<>
+							<span className="shrink-0 text-[15px] text-n5">Đ</span>{" "}
+							<span className="truncate font-mono text-[22px] leading-7 font-semibold text-ink">
+								{props.toWin}
+							</span>
+						</>
+					) : (
+						<span className="font-mono text-[22px] leading-7 font-semibold text-ink">
+							—
+						</span>
+					)}
 				</span>
 			</div>
 			<Hairline />
 			<div
 				data-testid="mirror-limits"
-				className="flex flex-1 flex-col justify-center text-[12px] leading-4 text-n5"
+				// Min/Max take their own width, so the bar's free space goes to the
+				// gaps (RF-7). A validation notice is different: it is a sentence
+				// that must WRAP into the room left, so while one shows this column
+				// takes the free space as it did before MIRROR-2.
+				className={`flex flex-col justify-center text-[12px] leading-4 text-n5${
+					props.notice !== null ? " min-w-0 flex-1" : ""
+				}`}
 			>
 				{props.notice !== null ? (
 					// Today's three validation notices (C2 · 429 · over-cap), same

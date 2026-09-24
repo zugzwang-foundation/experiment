@@ -560,6 +560,100 @@ describe("MIRROR-1 RF-7 — the stake bar (G4, G5)", () => {
 	});
 });
 
+describe("MIRROR-2 RF-7 — every group an equal step from the next; TO WIN reads like AMOUNT", () => {
+	/** The bar's drawn children, in order — the thing the spacing is shared between. */
+	function barChildren(container: HTMLElement): HTMLElement[] {
+		return [...byTestId(container, "mirror-stake-bar").children].filter(
+			(c): c is HTMLElement => c instanceof HTMLElement,
+		);
+	}
+	const tokens = (el: Element) => (el.getAttribute("class") ?? "").split(/\s+/);
+
+	it("mirror::the-bar-shares-its-free-space-equally-and-no-group-grows", () => {
+		const { container } = mirrorPost();
+		const bar = byTestId(container, "mirror-stake-bar");
+		expect(tokens(bar)).toEqual(
+			expect.arrayContaining(["flex", "justify-between", "gap-3", "min-h-14"]),
+		);
+		const kids = barChildren(container);
+		// AMOUNT · hairline · TO WIN · hairline · limits · submit.
+		expect(kids).toHaveLength(6);
+		expect(
+			kids[0].querySelector('input[aria-label="Stake amount"]'),
+		).not.toBeNull();
+		expect(kids[1].getAttribute("aria-hidden")).toBe("true");
+		expect(kids[2].getAttribute("data-testid")).toBe("mirror-to-win");
+		expect(kids[3].getAttribute("aria-hidden")).toBe("true");
+		expect(kids[4].getAttribute("data-testid")).toBe("mirror-limits");
+		expect(kids[5].getAttribute("aria-label")).toBe("PLACE Đ BET");
+		// ⛔ A GROWING GROUP IS THE BUNCHING: it swallows the free space the gaps
+		// were meant to share. None of the six may grow while Min/Max show.
+		for (const k of kids) {
+			expect(tokens(k)).not.toContain("flex-1");
+			expect(tokens(k).some((c) => /^(grow|flex-grow)/.test(c))).toBe(false);
+		}
+		// Positive control: the pattern catches the one growing column there is —
+		// the limits, while a notice needs room to wrap.
+		cleanup();
+		const c2 = render(
+			<BetComposer
+				{...composerProps()}
+				viewer={{ ...VIEWER, balance: "5", spendableToday: "5" }}
+				mirror={MIRROR}
+			/>,
+		);
+		expect(tokens(byTestId(c2.container, "mirror-limits"))).toContain("flex-1");
+	});
+
+	it("mirror::to-win-is-a-small-n5-d-then-the-mono-22-figure-with-no-underline", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (input: RequestInfo | URL) => {
+				if (String(input).includes("/quote")) {
+					return new Response(
+						JSON.stringify({
+							ok: true,
+							data: { shares: "2445.000000000000000000" },
+						}),
+						{ status: 200, headers: { "content-type": "application/json" } },
+					);
+				}
+				return new Response(JSON.stringify({}), { status: 200 });
+			}),
+		);
+		const { container } = mirrorPost();
+		await settle();
+		const toWin = byTestId(container, "mirror-to-win");
+		const value = toWin.querySelector('[aria-live="polite"]');
+		if (!(value instanceof HTMLElement)) throw new Error("no to-win value");
+		expect(value.textContent).toBe("Đ 2,445");
+		const [d, figure] = [...value.children];
+		expect(d?.textContent).toBe("Đ");
+		expect(tokens(d)).toEqual(
+			expect.arrayContaining(["text-[15px]", "text-n5"]),
+		);
+		expect(figure?.textContent).toBe("2,445");
+		expect(tokens(figure)).toEqual(
+			expect.arrayContaining(["font-mono", "text-[22px]", "font-semibold"]),
+		);
+		// Styled like AMOUNT, whose value row is the same pair over an underline…
+		const amount = barChildren(container)[0];
+		const amountD = amount.querySelector('span[class*="text-[15px]"]');
+		expect(amountD?.textContent).toBe("Đ");
+		expect(amountD?.parentElement?.className).toContain("border-b");
+		// …and TO WIN has none.
+		expect(toWin.innerHTML).not.toContain("border-b");
+	});
+
+	it("mirror::no-figure-yet-shows-todays-dash-alone", () => {
+		const { container } = mirrorPost();
+		const value = byTestId(container, "mirror-to-win").querySelector(
+			'[aria-live="polite"]',
+		);
+		expect(value?.textContent).toBe("—");
+	});
+});
+
 describe("MIRROR-1 — the Mirror sends what the classic layout sends", () => {
 	/**
 	 * The same inputs through both layouts of the same controller; the two request
