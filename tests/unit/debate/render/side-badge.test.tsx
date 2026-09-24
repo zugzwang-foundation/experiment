@@ -130,7 +130,7 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 		expect(sideBadgeSites.length).toBeGreaterThanOrEqual(10);
 	});
 
-	it("exactly-six-sites-pass-no-size-and-ride-CHIP-base", () => {
+	it("the-unsized-sites-ride-CHIP-base-and-are-exactly-the-map-below", () => {
 		const base = sideBadgeSites.filter((site) => !site.sized);
 		// Set equality, never a bare count (N5) — a count of 10 is also satisfied
 		// by ten sites in the wrong files.
@@ -207,15 +207,30 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 		// and it went stale the moment a third file joined the map. A
 		// count-shaped sweep cannot find a count-free name. ⇒ It is not numbers
 		// that rot; it is any name making a factual claim.
+		//
+		// ⚠ SIX UNTIL MIRROR-1 (2026-09-24), SEVEN SINCE — and the name above LOST
+		// its count in the same edit, because it was the third name in this file to
+		// state one ("exactly-six-sites-…") and the rule two paragraphs up is that a
+		// name making a factual claim rots. It now names the map it owns, as its
+		// sized sibling below already does.
+		// `composer/MirrorComposer.tsx` gains ONE UNSIZED site: the Mirror
+		// composer's author row draws the draft as the card it will become, and the
+		// founder-ratified register (`docs/design/composer-mirror.md` RF-3, ratified
+		// 2026-09-23) rules "the card's own chip component … do not restyle them" —
+		// so the chip rides `CHIP.base` exactly as `PostCard`/`ReplyCard` do. The
+		// adoption is RULED by that register and named in `docs/plans/MIRROR-1.md`,
+		// not absorbed here. `detail` STILL holds its zero; the sized map below is
+		// untouched.
 		expect(countByFile(base)).toEqual({
 			"src/components/debate/DebateColumn.tsx": 1,
 			"src/components/debate/PostCard.tsx": 1,
 			"src/components/debate/PostFocusHeader.tsx": 1,
 			"src/components/debate/ReplyCard.tsx": 1,
 			"src/components/debate/composer/BetComposer.tsx": 1,
+			"src/components/debate/composer/MirrorComposer.tsx": 1,
 			"src/components/debate/composer/SellModule.tsx": 1,
 		});
-		expect(base).toHaveLength(6);
+		expect(base).toHaveLength(7);
 	});
 
 	it("the-sized-sites-are-exactly-the-map-below", () => {

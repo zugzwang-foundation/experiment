@@ -336,8 +336,12 @@ describe("ImageAttach — every minted object URL is released", () => {
 		// Two picks, one release, still mounted — the replace path. `setPreview`
 		// releases the outgoing URL before adopting the next, so this holds however
 		// the replacement is reached.
-		const { container } = mount();
+		// ⚠ The first pick is ATTACHED before the second, as the Mirror's `Replace`
+		// is: since RF-12 (MIRROR-2) a pick landing during `attaching` is refused
+		// at the input, so a second pick mid-upload is no longer a replacement.
+		const { container, advance } = mount();
 		pick(container, "first.png");
+		advance({ phase: "attached", uploadId: "u1", name: "first.png" });
 		pick(container, "second.png");
 
 		expect(createSpy).toHaveBeenCalledTimes(2);
@@ -364,12 +368,13 @@ describe("ImageAttach — every minted object URL is released", () => {
 
 	it("preview::a-pick-the-composer-drops-does-not-strand-an-image", () => {
 		// ⛔ THIS IS THE TEST THAT PINS THE CLEARING EFFECT AS AN INVARIANT rather
-		// than a transition watcher, and the case is REACHABLE — not theoretical.
-		// `BetComposer.onPickImage` returns EARLY when `inFlight`
-		// (`BetComposer.tsx:242-244`), leaving the phase exactly where it was. The
-		// pick control is disabled while in flight, but the native file dialog is
-		// ASYNCHRONOUS: it can be opened before the composer goes in flight and
-		// resolved after, so `onChange` fires into a parent that drops it.
+		// than a transition watcher. The case it was written for — a native file
+		// dialog opened before the composer went in flight and resolved after,
+		// into `BetComposer.onPickImage`'s early return — is now refused at the
+		// input itself (RF-12, MIRROR-2: `disabled` is true in flight; see
+		// `pick-race.test.tsx`). This harness keeps `disabled` false and drops the
+		// pick in the parent, so it still exercises the effect, which stays as the
+		// second line for any parent that drops a pick without moving the phase.
 		//
 		// Keyed on `state.phase` alone the effect would never run here — no phase
 		// CHANGED — and the slot would sit showing an image the composer never
@@ -417,9 +422,12 @@ describe("ImageAttach — every minted object URL is released", () => {
 		// The ledger check: everything minted was released, exactly once each. This
 		// is the assertion that reddens if a future edit adds a fifth way to drop a
 		// file and forgets its revoke.
-		const { container, unmount } = mount();
+		// Each pick attaches before the next (RF-12 refuses a pick mid-upload).
+		const { container, advance, unmount } = mount();
 		pick(container, "a.png");
+		advance({ phase: "attached", uploadId: "u1", name: "a.png" });
 		pick(container, "b.png");
+		advance({ phase: "attached", uploadId: "u2", name: "b.png" });
 		pick(container, "c.png");
 		unmount();
 

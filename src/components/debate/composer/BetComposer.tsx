@@ -39,6 +39,7 @@ import {
 import { ImageAttach, type ImageAttachState } from "./ImageAttach";
 import { initialKeyState, type KeyState, reduceKey } from "./idempotency";
 import { attachImage, IMAGE_OVERSIZE_MESSAGE } from "./image-attach";
+import { MirrorComposer, type MirrorContext } from "./MirrorComposer";
 import {
 	composeWireBody,
 	extendedMaxChars,
@@ -155,6 +156,24 @@ export function BetComposer(props: {
 	 * cross). The composer's own ×/ESC are guarded internally.
 	 */
 	onBusyChange?: (busy: boolean) => void;
+	/**
+	 * MIRROR-1 — PASSING THIS SELECTS THE MIRROR LAYOUT (`MirrorComposer`,
+	 * `docs/design/composer-mirror.md`): the composer drawn as the card it will
+	 * become. Only the two DESKTOP mounts in `DebateView` pass it.
+	 *
+	 * ⛔ ABSENT, THIS COMPONENT RENDERS EXACTLY WHAT IT RENDERED BEFORE. That is
+	 * the phone sheet's composer (`PhoneDebateView` passes nothing), and RF-8 keeps
+	 * the phone on today's layout. `classic-layout-baseline.test.tsx` holds the
+	 * default render to a fixture captured before MIRROR-1 existed.
+	 *
+	 * ⚠ IT IS A PRESENTATION SWITCH AND NOTHING ELSE. Every piece of state, the
+	 * key lifecycle, the quote, the gating predicates and `submit` live above the
+	 * branch and are shared by both layouts; the object carries only the two facts
+	 * the Mirror draws that this component did not already hold — the viewer's
+	 * identity and the live price pair. Making it one object means a mount cannot
+	 * ask for the Mirror without supplying both.
+	 */
+	mirror?: MirrorContext;
 }) {
 	const router = useRouter();
 	const [title, setTitle] = useState("");
@@ -376,7 +395,20 @@ export function BetComposer(props: {
 		!assess.submitEnabled ||
 		countdown !== null ||
 		retryLock > 0 ||
-		terminalLocked;
+		terminalLocked ||
+		// RF-11 (MIRROR-2) — PLACE WAITS FOR AN IMAGE THAT IS STILL UPLOADING. The
+		// body only carries an upload id once the attach reaches `attached`, so a
+		// press during `attaching` used to publish the post WITHOUT the image its
+		// author was looking at — permanently, the comment being append-only. It
+		// re-enables when the attach lands, or when it fails and the image is
+		// dropped with today's error. Both layouts; the server's checks are
+		// unchanged.
+		// ⚠ ONLY WHILE THE COMPOSER SHOWS THE UPLOAD — RF-11's own premise ("the
+		// frame already shows the upload state"). If the ADR-0052 brake lands
+		// mid-upload the image view is gone, and holding PLACE for an upload
+		// nobody can see strands the composer with no visible reason
+		// (`@security-auditor` L-2); the brake's off state is text-only.
+		(imageAttachEnabled && image.phase === "attaching");
 
 	/** Attach/remove changes the wire body (fingerprint!) — an EDIT by law. */
 	const onPickImage = async (file: File) => {
@@ -425,6 +457,40 @@ export function BetComposer(props: {
 			// the C1 landing's next edit is the NEW intent (F-2 — fresh key
 			// already minted by the EDIT reducer arm after REFRESHED).
 			setStatus({ phase: "idle" });
+		}
+	};
+
+	/**
+	 * MIRROR-1 — the argument and amount fields' handlers, ONE definition shared
+	 * by both layouts. They moved here out of the classic JSX unchanged, with the
+	 * comments that explain each layer; a second copy for the Mirror would be the
+	 * first place the newline defence or the blur clamp could drift.
+	 */
+	const onTitleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+		// Layer 1, replacing the `<input>`: a newline never gets
+		// typed in the first place.
+		if (e.key === "Enter") {
+			e.preventDefault();
+		}
+	};
+	const onTitleInput = (value: string) => {
+		// Layer 2, KEPT VERBATIM: the paste/drop/IME belt. F-5 —
+		// the title is newline-free.
+		setTitle(value.replace(/[\n\r]/g, " "));
+		onEdit();
+	};
+	const onExtendedInput = (value: string) => {
+		setExtended(value);
+		onEdit();
+	};
+	const onAmountInput = (value: string) => {
+		setAmount(value);
+		onEdit();
+	};
+	const onAmountBlur = () => {
+		// T3: normalize the display to the clamped value.
+		if (isPositiveAmount(amount)) {
+			setAmount(assess.clampedAmount);
 		}
 	};
 
@@ -629,6 +695,150 @@ export function BetComposer(props: {
 			? formatDharma(String(quote.data.shares ?? "—"))
 			: null;
 
+	/**
+	 * The relation header — `Support|Counter <author>'s argument`, or the canon
+	 * `Place your Đ BET` for a post and for a reply whose parent was removed (the
+	 * author is masked at the type level, SG-3). ONE expression, drawn by both
+	 * layouts (MIRROR-1): the classic header span and the Mirror's statement row.
+	 */
+	const headerText =
+		props.replyContext && props.replyContext.authorPseudonym !== null
+			? `${props.replyContext.relation === "support" ? "Support" : "Counter"} ${props.replyContext.authorPseudonym}'s argument`
+			: COMPOSER_COPY.header;
+
+	/**
+	 * P2 terminal — the blocking modal. ONE element, rendered by both layouts
+	 * (MIRROR-1); it moved here out of the classic JSX unchanged.
+	 */
+	const suspendedDialog = (
+		<Dialog
+			open={suspendedKind !== null}
+			onOpenChange={(open) => {
+				if (!open && suspendedKind !== null) {
+					setSuspendedKind(null);
+					props.onSuspended();
+					props.onClose();
+				}
+			}}
+		>
+			<DialogContent showCloseButton={false}>
+				<DialogTitle>
+					{suspendedKind === "banned"
+						? SUSPENDED_COPY.banned.title
+						: SUSPENDED_COPY.trackA.title}
+				</DialogTitle>
+				<DialogDescription>
+					{suspendedKind === "banned"
+						? SUSPENDED_COPY.banned.body
+						: SUSPENDED_COPY.trackA.body}
+				</DialogDescription>
+				<div className="flex justify-end">
+					<Button
+						type="button"
+						onClick={() => {
+							setSuspendedKind(null);
+							props.onSuspended();
+							props.onClose();
+						}}
+					>
+						{SUSPENDED_COPY.trackA.action}
+					</Button>
+				</div>
+			</DialogContent>
+		</Dialog>
+	);
+
+	/**
+	 * FF-1 / ADR-0058 — the friendly-fire switch (Support replies only). ONE
+	 * element, rendered by both layouts (MIRROR-1): in the classic header row,
+	 * where FF-1 CLOSE-1 R-A12 put it and where its placement notes still live, and
+	 * in the Mirror's statement row, in the slot RF-2 reserved for it. It moved
+	 * here out of the classic JSX unchanged — same state, same handler, same
+	 * disabled rule — so neither layout has a switch of its own to drift.
+	 */
+	const friendlyFireControl = friendlyFireEligible ? (
+		<div
+			data-testid="ff-switch-row"
+			className="flex shrink-0 items-center gap-1.5 max-mobile:order-last max-mobile:basis-full max-mobile:justify-end"
+		>
+			<button
+				type="button"
+				role="switch"
+				aria-checked={friendlyFire}
+				data-testid="ff-switch"
+				aria-label={FRIENDLY_FIRE_COPY.label}
+				disabled={inFlight || floorAbove}
+				onClick={() => setFriendlyFire((on) => !on)}
+				className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) ${
+					friendlyFire ? friendlyFireOnTrack : "bg-n1 border border-n3"
+				}`}
+			>
+				<span
+					aria-hidden="true"
+					className={`block size-3.5 rounded-full transition-transform ${
+						friendlyFire
+							? `translate-x-[18px] ${friendlyFireOnKnob}`
+							: "translate-x-[2px] bg-n5"
+					}`}
+				/>
+			</button>
+			<InfoTip content={FRIENDLY_FIRE_COPY.gloss(props.side)} asChild>
+				<span
+					data-testid="ff-switch-label"
+					className="text-xs font-bold text-ink"
+				>
+					{FRIENDLY_FIRE_COPY.label}
+				</span>
+			</InfoTip>
+		</div>
+	) : null;
+
+	/**
+	 * ⛔ MIRROR-1 — THE LAYOUT BRANCH, AND IT IS THE ONLY PLACE THE TWO DIVERGE.
+	 * Everything above this line — state, key lifecycle, quote, gating, `submit` —
+	 * runs identically for both; below it, one of two presentations draws the same
+	 * values. The Mirror receives the controller's own handlers and predicates and
+	 * decides nothing about what is sent.
+	 */
+	if (props.mirror !== undefined) {
+		return (
+			<MirrorComposer
+				side={props.side}
+				kind={props.kind}
+				mirror={props.mirror}
+				replyStatement={props.kind === "reply" ? headerText : null}
+				statementControl={friendlyFireControl}
+				title={title}
+				extended={extended}
+				extendedMax={extendedMax}
+				detailCounter={`${groupCount(extended.length)} / ${groupCount(extendedMax)}${COMPOSER_COPY.optionalSuffix}`}
+				amount={amount}
+				amountFieldWidth={stakeFieldWidth(amount)}
+				clampedAmount={assess.clampedAmount}
+				amountIsPositive={isPositiveAmount(amount)}
+				overCap={assess.overCap}
+				image={image}
+				imageAttachEnabled={imageAttachEnabled}
+				status={status}
+				inFlight={inFlight}
+				floorAbove={floorAbove}
+				submitDisabled={submitDisabled}
+				notice={notice}
+				toWin={toWin}
+				onTitleKeyDown={onTitleKeyDown}
+				onTitleInput={onTitleInput}
+				onExtendedInput={onExtendedInput}
+				onAmountInput={onAmountInput}
+				onAmountBlur={onAmountBlur}
+				onPickImage={onPickImage}
+				onRemoveImage={onRemoveImage}
+				onSubmit={submit}
+				onClose={props.onClose}
+				suspendedDialog={suspendedDialog}
+			/>
+		);
+	}
+
 	return (
 		<section
 			aria-label={`${COMPOSER_COPY.header} — ${props.side}`}
@@ -692,9 +902,7 @@ export function BetComposer(props: {
 				    string (pinned). Below 640px `whitespace-normal` restores the wrap
 				    the phone had, since there the switch takes its own line. */}
 				<span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink max-mobile:whitespace-normal">
-					{props.replyContext && props.replyContext.authorPseudonym !== null
-						? `${props.replyContext.relation === "support" ? "Support" : "Counter"} ${props.replyContext.authorPseudonym}'s argument`
-						: COMPOSER_COPY.header}
+					{headerText}
 				</span>
 				{/* FF-1 / ADR-0058 / D-51 R5 — THE FRIENDLY-FIRE SWITCH, IN THE HEADER
 				    ROW (CLOSE-1 R-A12, ratified from screenshots 2026-09-22): beside the
@@ -716,42 +924,7 @@ export function BetComposer(props: {
 				    inventory. `role="switch"` + `aria-checked` is the accessible
 				    contract; disabled with the rest of the form while a request is in
 				    flight or the floor is above the balance. */}
-				{friendlyFireEligible ? (
-					<div
-						data-testid="ff-switch-row"
-						className="flex shrink-0 items-center gap-1.5 max-mobile:order-last max-mobile:basis-full max-mobile:justify-end"
-					>
-						<button
-							type="button"
-							role="switch"
-							aria-checked={friendlyFire}
-							data-testid="ff-switch"
-							aria-label={FRIENDLY_FIRE_COPY.label}
-							disabled={inFlight || floorAbove}
-							onClick={() => setFriendlyFire((on) => !on)}
-							className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) ${
-								friendlyFire ? friendlyFireOnTrack : "bg-n1 border border-n3"
-							}`}
-						>
-							<span
-								aria-hidden="true"
-								className={`block size-3.5 rounded-full transition-transform ${
-									friendlyFire
-										? `translate-x-[18px] ${friendlyFireOnKnob}`
-										: "translate-x-[2px] bg-n5"
-								}`}
-							/>
-						</button>
-						<InfoTip content={FRIENDLY_FIRE_COPY.gloss(props.side)} asChild>
-							<span
-								data-testid="ff-switch-label"
-								className="text-xs font-bold text-ink"
-							>
-								{FRIENDLY_FIRE_COPY.label}
-							</span>
-						</InfoTip>
-					</div>
-				) : null}
+				{friendlyFireControl}
 				<button
 					type="button"
 					onClick={props.onClose}
@@ -1032,19 +1205,8 @@ export function BetComposer(props: {
 									// 20px — the box is a fixed height either way, so this changes the
 									// text inside it and nothing around it. Additive: inert ≥640.
 									className="h-[72px] min-h-8 resize-none field-sizing-fixed max-mobile:text-[16px] max-mobile:leading-[22px]"
-									onKeyDown={(e) => {
-										// Layer 1, replacing the `<input>`: a newline never gets
-										// typed in the first place.
-										if (e.key === "Enter") {
-											e.preventDefault();
-										}
-									}}
-									onChange={(e) => {
-										// Layer 2, KEPT VERBATIM: the paste/drop/IME belt. F-5 —
-										// the title is newline-free.
-										setTitle(e.target.value.replace(/[\n\r]/g, " "));
-										onEdit();
-									}}
+									onKeyDown={onTitleKeyDown}
+									onChange={(e) => onTitleInput(e.target.value)}
 								/>
 								<div className="mt-0.5 shrink-0 text-right text-[10.5px] leading-tight text-n4 pr-2">
 									{groupCount(title.length)} / {groupCount(TITLE_MAX_CHARS)}
@@ -1072,10 +1234,7 @@ export function BetComposer(props: {
 									aria-label="Argument body"
 									// D-2, the other half — same 14px, same zoom, same fix.
 									className="h-[80px] min-h-14 resize-none field-sizing-fixed max-mobile:text-[16px] max-mobile:leading-[22px]"
-									onChange={(e) => {
-										setExtended(e.target.value);
-										onEdit();
-									}}
+									onChange={(e) => onExtendedInput(e.target.value)}
 								/>
 								<div className="mt-0.5 shrink-0 text-right text-[10.5px] leading-tight text-n4 pr-2">
 									{groupCount(extended.length)} / {groupCount(extendedMax)}
@@ -1151,16 +1310,8 @@ export function BetComposer(props: {
 											disabled={floorAbove || inFlight}
 											aria-label="Stake amount"
 											style={{ width: stakeFieldWidth(amount) }}
-											onChange={(e) => {
-												setAmount(e.target.value);
-												onEdit();
-											}}
-											onBlur={() => {
-												// T3: normalize the display to the clamped value.
-												if (isPositiveAmount(amount)) {
-													setAmount(assess.clampedAmount);
-												}
-											}}
+											onChange={(e) => onAmountInput(e.target.value)}
+											onBlur={onAmountBlur}
 											className={`h-auto border-none p-0 text-right font-mono text-[20px] font-extrabold tabular-nums shadow-none [border:none] ${
 												assess.overCap ? "text-n4" : ""
 											}`}
@@ -1279,41 +1430,7 @@ export function BetComposer(props: {
 			<ErrorStrip status={status} />
 
 			{/* P2 terminal — the blocking modal, once; then controls disable. */}
-			<Dialog
-				open={suspendedKind !== null}
-				onOpenChange={(open) => {
-					if (!open && suspendedKind !== null) {
-						setSuspendedKind(null);
-						props.onSuspended();
-						props.onClose();
-					}
-				}}
-			>
-				<DialogContent showCloseButton={false}>
-					<DialogTitle>
-						{suspendedKind === "banned"
-							? SUSPENDED_COPY.banned.title
-							: SUSPENDED_COPY.trackA.title}
-					</DialogTitle>
-					<DialogDescription>
-						{suspendedKind === "banned"
-							? SUSPENDED_COPY.banned.body
-							: SUSPENDED_COPY.trackA.body}
-					</DialogDescription>
-					<div className="flex justify-end">
-						<Button
-							type="button"
-							onClick={() => {
-								setSuspendedKind(null);
-								props.onSuspended();
-								props.onClose();
-							}}
-						>
-							{SUSPENDED_COPY.trackA.action}
-						</Button>
-					</div>
-				</DialogContent>
-			</Dialog>
+			{suspendedDialog}
 		</section>
 	);
 }

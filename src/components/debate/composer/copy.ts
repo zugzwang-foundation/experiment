@@ -188,6 +188,38 @@ export const EMPTY_SLOT_COPY = {
 	action: "Add Image",
 } as const;
 
+/**
+ * MIRROR-1 — the Mirror composer's NEW strings, verbatim from the founder-ratified
+ * register (`docs/design/composer-mirror.md`, 2026-09-23). Every other string the
+ * Mirror draws is an existing constant above, reused — `Your argument — required`
+ * becomes the title's placeholder, the relation header and `PLACE Đ BET` are
+ * `COMPOSER_COPY`'s, and today's notices and strips are unchanged.
+ */
+export const MIRROR_COPY = {
+	/** RF-3 — the author row's last field: this card is not posted yet. */
+	draft: "Draft",
+	/** RF-5 — the detail toggle's three labels. */
+	addDetail: "Add detail",
+	editDetail: "Edit detail",
+	showImage: "Show image",
+	/**
+	 * RF-6 — the empty frame's invitation and its caption. The caption is the one
+	 * word `Optional` since MIRROR-2 (it read `Optional · shown whole · any
+	 * orientation`); how a picture is fitted is shown by the frame once one is in.
+	 */
+	addImage: "Add an image",
+	addImageCaption: "Optional",
+	/** RF-6 — the attached image's replace control. */
+	replace: "Replace",
+	/** RF-6 — the detail view's placeholder. */
+	detailPlaceholder: "Add evidence, sources, reasoning",
+	/** RF-7 — the stake bar's limit labels (`Min Đ {floor}` / `Max Đ {cap}`). */
+	minLabel: "Min",
+	maxLabel: "Max",
+	/** RF-4 — the title counter, shown only in the last ten characters. */
+	left: (n: number) => `${n} left`,
+} as const;
+
 /** W2.11 P2 modal contents (verbatim). */
 export const SUSPENDED_COPY = {
 	trackA: {

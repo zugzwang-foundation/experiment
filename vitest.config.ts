@@ -45,7 +45,13 @@ export default defineConfig({
 		// Supabase. Runs once in the main process before any test file loads, so it
 		// covers files that read process.env.DATABASE_URL directly, not only the fixture.
 		globalSetup: ["./tests/_setup/production-ref-guard.ts"],
-		setupFiles: ["./tests/_setup/env.ts"],
+		// MIRROR-2 · RF-10: jsdom has no raster pipeline, and the client re-save is
+		// now mandatory, so the component suites get a trivial one (the file says
+		// why, and what it is not).
+		setupFiles: [
+			"./tests/_setup/env.ts",
+			"./tests/_setup/jsdom-image-pipeline.ts",
+		],
 		coverage: {
 			enabled: false,
 		},

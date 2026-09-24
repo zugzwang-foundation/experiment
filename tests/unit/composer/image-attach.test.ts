@@ -2,9 +2,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	attachImage,
-	DOWNSCALE_TIMEOUT_MS,
 	type ImageAttachResult,
 	MAX_LONGEST_EDGE_PX,
+	RESAVE_TIMEOUT_MS,
 	validateImageFile,
 } from "@/components/debate/composer/image-attach";
 import {
@@ -69,10 +69,16 @@ const UPLOAD_ID = "0190b3a0-1111-7000-8000-000000000001";
 const R2_KEY = `u/0190b3a0-8888-7000-8000-00000000000e/${UPLOAD_ID}.png`;
 const PUT_URL = `https://uploads.r2.example/${R2_KEY}?X-Amz-Signature=abc123`;
 
-const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+const GIF_BYTES = new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61]);
 
-function pngBlob(): Blob {
-	return new Blob([PNG_BYTES], { type: "image/png" });
+/**
+ * The orchestration tests below are about the WIRE (sign → PUT → outcome), so
+ * they pick a GIF: since RF-10 (MIRROR-2) it is the one type that goes up
+ * exactly as picked, which lets them say "the PUT body IS the file". Every
+ * other type is re-saved first; that is tested in its own section further down.
+ */
+function gifBlob(): Blob {
+	return new Blob([GIF_BYTES], { type: "image/gif" });
 }
 
 function svgBlob(): Blob {
@@ -228,7 +234,7 @@ describe("attachImage — sign → PUT orchestration (injected fetch double)", (
 	});
 
 	it("image-attach::sign-then-put-wire-contract-attached", async () => {
-		const file = pngBlob();
+		const file = gifBlob();
 		const fetchFn = scriptedFetch(
 			signOkResponse(),
 			new Response(null, { status: 200 }),
@@ -286,7 +292,7 @@ describe("attachImage — sign → PUT orchestration (injected fetch double)", (
 			signOkResponse(),
 			new Response(null, { status: 412 }),
 		);
-		const result = await attachImage({ file: pngBlob(), fetchFn });
+		const result = await attachImage({ file: gifBlob(), fetchFn });
 		const attached = expectAttached(result);
 		expect(attached.uploadId).toBe(UPLOAD_ID);
 	});
@@ -302,7 +308,7 @@ describe("attachImage — sign → PUT orchestration (injected fetch double)", (
 				"unsupported image type",
 			),
 		);
-		const result = await attachImage({ file: pngBlob(), fetchFn });
+		const result = await attachImage({ file: gifBlob(), fetchFn });
 		const rejected = expectRejected(result);
 		expect(rejected.reason).toBe("mime");
 		expect(rejected.message).toBe("unsupported image type");
@@ -314,7 +320,7 @@ describe("attachImage — sign → PUT orchestration (injected fetch double)", (
 		const fetchFn = scriptedFetch(
 			signErrorResponse(400, "error_image_oversize", "image too large"),
 		);
-		const result = await attachImage({ file: pngBlob(), fetchFn });
+		const result = await attachImage({ file: gifBlob(), fetchFn });
 		const rejected = expectRejected(result);
 		expect(rejected.reason).toBe("oversize");
 		expect(rejected.message).toBe("image too large");
@@ -332,7 +338,7 @@ describe("attachImage — sign → PUT orchestration (injected fetch double)", (
 				5,
 			),
 		);
-		const result = await attachImage({ file: pngBlob(), fetchFn });
+		const result = await attachImage({ file: gifBlob(), fetchFn });
 		const failed = expectFailed(result);
 		expect(failed.transient).toBe(true);
 	});
@@ -346,7 +352,7 @@ describe("attachImage — sign → PUT orchestration (injected fetch double)", (
 				30,
 			),
 		);
-		const result = await attachImage({ file: pngBlob(), fetchFn });
+		const result = await attachImage({ file: gifBlob(), fetchFn });
 		const failed = expectFailed(result);
 		expect(failed.transient).toBe(true);
 	});
@@ -359,14 +365,14 @@ describe("attachImage — sign → PUT orchestration (injected fetch double)", (
 			signOkResponse(),
 			new Response(null, { status: 403 }),
 		);
-		const result = await attachImage({ file: pngBlob(), fetchFn });
+		const result = await attachImage({ file: gifBlob(), fetchFn });
 		const failed = expectFailed(result);
 		expect(failed.transient).toBe(false);
 	});
 
 	it("image-attach::network-rejection-failed-transient", async () => {
 		const fetchFn = scriptedFetch(new TypeError("fetch failed"));
-		const result = await attachImage({ file: pngBlob(), fetchFn });
+		const result = await attachImage({ file: gifBlob(), fetchFn });
 		const failed = expectFailed(result);
 		expect(failed.transient).toBe(true);
 	});
@@ -375,23 +381,24 @@ describe("attachImage — sign → PUT orchestration (injected fetch double)", (
 		// SG-5 posture: an off-shape 200 (no ok/data envelope) renders a failed
 		// state — never a crash, never a PUT against an unknown URL.
 		const fetchFn = scriptedFetch(jsonResponse(200, { unexpected: true }));
-		const result = await attachImage({ file: pngBlob(), fetchFn });
+		const result = await attachImage({ file: gifBlob(), fetchFn });
 		expect(result.kind).toBe("failed");
 		expect(fetchFn).toHaveBeenCalledTimes(1);
 	});
 });
 
 // ---------------------------------------------------------------------------
-// T3 — client-side downscale (docs/plans/T3.md). This repo has no existing
-// precedent for testing Canvas-API code — jsdom doesn't rasterize, and there
-// is no `canvas` npm package installed — so `createImageBitmap`,
-// `HTMLCanvasElement.prototype.getContext`, and `.toBlob` are all mocked at
-// the call boundary below. These tests assert what was REQUESTED of the
-// canvas (dimensions, output type, quality) and how the code reacts to what
-// the mock returns — they do NOT and CANNOT assert that alpha survives in
-// real pixels, because there are no real pixels in a mock. Do not read a
-// green "encode target" test as proof of visual transparency preservation;
-// that is exactly why docs/plans/T3.md requires a separate manual check.
+// RF-10 (MIRROR-2) — every image but a GIF is re-saved before it is signed,
+// and a re-save that fails REFUSES the image. It replaces T3's rule that an
+// optimisation failure uploads the original, which is how every image under
+// the edge cap reached storage with its EXIF (measured in a real browser: a
+// GPS-tagged 1200×800 JPEG uploaded byte-for-byte). jsdom has no raster
+// pipeline, so `createImageBitmap`, the 2D context and `toBlob` are stubbed at
+// the call boundary below. These tests assert what was REQUESTED of the canvas
+// (dimensions, output type, quality), what reaches the wire, and — the point
+// of RF-10 — that nothing reaches it when the re-save fails. They cannot prove
+// that metadata is gone from real bytes; that is measured end to end in a real
+// browser (MIRROR-2 run report).
 // ---------------------------------------------------------------------------
 
 /**
@@ -422,15 +429,28 @@ function fakeBitmap(width: number, height: number): FakeBitmap {
 	return { width, height, close: vi.fn() };
 }
 
+/**
+ * The jsdom pipeline the test setup installs (`tests/_setup/jsdom-image-pipeline.ts`),
+ * captured so each test here can replace it and `afterEach` can put it back.
+ */
+const setupPipeline = {
+	decode: (globalThis as unknown as { createImageBitmap: unknown })
+		.createImageBitmap,
+	getContext: HTMLCanvasElement.prototype.getContext,
+	toBlob: HTMLCanvasElement.prototype.toBlob,
+};
+
 /** Stubs `createImageBitmap` to resolve one bitmap, or throw one error. */
-function stubDecode(outcome: FakeBitmap | Error): void {
+function stubDecode(outcome: FakeBitmap | Error): ReturnType<typeof vi.fn> {
+	const decode = vi.fn(async () => {
+		if (outcome instanceof Error) {
+			throw outcome;
+		}
+		return outcome;
+	});
 	(globalThis as unknown as { createImageBitmap: unknown }).createImageBitmap =
-		vi.fn(async () => {
-			if (outcome instanceof Error) {
-				throw outcome;
-			}
-			return outcome;
-		});
+		decode;
+	return decode;
 }
 
 interface ToBlobCall {
@@ -441,9 +461,7 @@ interface ToBlobCall {
 /**
  * Stubs the canvas 2D context (recording `drawImage` calls) and `toBlob`
  * (recording the requested type/quality, resolving with `result`).
- * `result: null` simulates the encoder producing nothing (the historical
- * failure mode the abandoned draft only guarded — everything else in this
- * file exercises the guards it did NOT have).
+ * `result: null` simulates the encoder producing nothing.
  */
 function stubCanvasEncode(result: Blob | null): {
 	drawImage: ReturnType<typeof vi.fn>;
@@ -484,269 +502,266 @@ function fakeFile(type: string, size: number): Blob {
 	return new Blob([new Uint8Array(size)], { type });
 }
 
-describe("attachImage — T3 downscale (mocked canvas boundary)", () => {
+/** A GIF by its bytes as well as its type: the `GIF89a` signature, then padding. */
+function realGif(size: number): Blob {
+	const bytes = new Uint8Array(size);
+	bytes.set([0x47, 0x49, 0x46, 0x38, 0x39, 0x61]);
+	return new Blob([bytes], { type: "image/gif" });
+}
+
+function okFetch() {
+	return scriptedFetch(signOkResponse(), new Response(null, { status: 200 }));
+}
+
+describe("attachImage — RF-10 re-save (mocked canvas boundary)", () => {
 	afterEach(() => {
-		vi.unstubAllGlobals();
-		// biome-ignore lint/suspicious/noExplicitAny: restoring a test-only stub
-		delete (globalThis as any).createImageBitmap;
+		(
+			globalThis as unknown as { createImageBitmap: unknown }
+		).createImageBitmap = setupPipeline.decode;
+		HTMLCanvasElement.prototype.getContext = setupPipeline.getContext;
+		HTMLCanvasElement.prototype.toBlob = setupPipeline.toBlob;
+		vi.useRealTimers();
 		vi.restoreAllMocks();
 	});
 
-	it("image-attach::t3-exactly-at-edge-uploads-original-untouched", async () => {
+	// --- what goes up: the re-saved bytes, never the picked file -------------
+
+	it("image-attach::rf10-an-image-under-the-edge-cap-is-re-saved-at-its-own-size", async () => {
+		// Before RF-10 this was "uploads the original untouched" — the path that
+		// carried a phone photo's location to storage.
+		stubDecode(fakeBitmap(1200, 800));
+		const resaved = fakeFile("image/jpeg", 4000);
+		const { drawImage, toBlobCalls } = stubCanvasEncode(resaved);
+		const file = fakeFile("image/jpeg", 5000);
+		const fetchFn = okFetch();
+		const result = await attachImage({ file, fetchFn });
+		expect(result.kind).toBe("attached");
+		expect(drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, 1200, 800);
+		expect(toBlobCalls).toEqual([{ type: "image/jpeg", quality: 0.8 }]);
+		const put = requestCall(fetchFn, 1);
+		expect(put.init.body).toBe(resaved);
+		expect(put.init.body).not.toBe(file);
+	});
+
+	it("image-attach::rf10-exactly-at-the-edge-cap-is-re-saved-at-its-own-size", async () => {
 		stubDecode(fakeBitmap(MAX_LONGEST_EDGE_PX, MAX_LONGEST_EDGE_PX));
-		const { drawImage } = stubCanvasEncode(null);
-		const file = fakeFile("image/jpeg", 5000);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		await attachImage({ file, fetchFn });
-		const put = requestCall(fetchFn, 1);
-		// Byte-identical original — the canvas pipeline is never entered.
-		expect(put.init.body).toBe(file);
-		expect(drawImage).not.toHaveBeenCalled();
-	});
-
-	it("image-attach::t3-jpeg-source-encodes-jpeg-at-0.8", async () => {
-		stubDecode(fakeBitmap(3200, 1600));
-		const smaller = fakeFile("image/jpeg", 100);
-		const { toBlobCalls } = stubCanvasEncode(smaller);
-		const file = fakeFile("image/jpeg", 5000);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		const result = await attachImage({ file, fetchFn });
-		expect(toBlobCalls).toEqual([{ type: "image/jpeg", quality: 0.8 }]);
-		expect(result.kind).toBe("attached");
-		const put = requestCall(fetchFn, 1);
-		expect(put.init.body).toBe(smaller);
-	});
-
-	it("image-attach::t3-webp-source-encodes-webp-at-0.8", async () => {
-		stubDecode(fakeBitmap(3200, 1600));
-		const smaller = fakeFile("image/webp", 100);
-		const { toBlobCalls } = stubCanvasEncode(smaller);
-		const file = fakeFile("image/webp", 5000);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		await attachImage({ file, fetchFn });
-		expect(toBlobCalls).toEqual([{ type: "image/webp", quality: 0.8 }]);
-	});
-
-	it("image-attach::t3-png-source-encodes-webp-at-quality-1-lossless", async () => {
-		// Change 2, required by the client's ratification: PNG sources are
-		// overwhelmingly screenshots/diagrams here, so this MUST be quality 1,
-		// never 0.8 — a silent regression to 0.8 would blur text.
-		stubDecode(fakeBitmap(3200, 1600));
-		const smaller = fakeFile("image/webp", 100);
-		const { toBlobCalls } = stubCanvasEncode(smaller);
-		const file = fakeFile("image/png", 5000);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		await attachImage({ file, fetchFn });
-		expect(toBlobCalls).toEqual([{ type: "image/webp", quality: 1 }]);
-	});
-
-	it("image-attach::t3-gif-skips-decode-entirely", async () => {
-		const decode = vi.fn();
-		(
-			globalThis as unknown as { createImageBitmap: unknown }
-		).createImageBitmap = decode;
-		const file = fakeFile("image/gif", 5000);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		const result = await attachImage({ file, fetchFn });
-		expect(decode).not.toHaveBeenCalled();
-		expect(result.kind).toBe("attached");
-		const put = requestCall(fetchFn, 1);
-		expect(put.init.body).toBe(file);
-	});
-
-	it("image-attach::t3-avif-skips-decode-entirely", async () => {
-		const decode = vi.fn();
-		(
-			globalThis as unknown as { createImageBitmap: unknown }
-		).createImageBitmap = decode;
-		const file = fakeFile("image/avif", 5000);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		await attachImage({ file, fetchFn });
-		expect(decode).not.toHaveBeenCalled();
-	});
-
-	it("image-attach::t3-ruling-1-large-megapixels-proceeds-without-pixel-guard", async () => {
-		// Ruling 1 (HO-FINISH v1.0 §5): The pixel guard was dropped because the
-		// canvas allocation is target-sized (~10 MB) and cannot stop the decode.
-		// A 48 MP image proceeds to downscale to 1600px max edge.
-		stubDecode(fakeBitmap(8000, 6000));
-		const smaller = fakeFile("image/jpeg", 100);
-		const { drawImage, toBlobCalls } = stubCanvasEncode(smaller);
-		const file = fakeFile("image/jpeg", 5000);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		await attachImage({ file, fetchFn });
-		expect(drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, 1600, 1200);
-		expect(toBlobCalls).toEqual([{ type: "image/jpeg", quality: 0.8 }]);
-	});
-
-	it("image-attach::t3-ruling-2-tall-png-screenshot-encodes-native-resolution-lossless-webp", async () => {
-		// Ruling 2 (HO-FINISH v1.0 §5): Extreme aspect ratio (2228 × 12941 full-page
-		// screenshot). Scaling to 1600 longest edge would crush width to 275px
-		// (< 600px floor). For PNG sources, it skips dimension reduction and STILL
-		// encodes to lossless WebP at native 1:1 dimensions (2228 × 12941).
-		const bitmap = fakeBitmap(2228, 12941);
-		stubDecode(bitmap);
-		const smaller = fakeFile("image/webp", 500);
-		const { drawImage, toBlobCalls } = stubCanvasEncode(smaller);
-		const file = fakeFile("image/png", 5000);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		const result = await attachImage({ file, fetchFn });
-		expect(result.kind).toBe("attached");
-		// Native 1:1 dimensions drawn to canvas
+		const resaved = fakeFile("image/jpeg", 100);
+		const { drawImage } = stubCanvasEncode(resaved);
+		const fetchFn = okFetch();
+		await attachImage({ file: fakeFile("image/jpeg", 5000), fetchFn });
 		expect(drawImage).toHaveBeenCalledWith(
 			expect.anything(),
 			0,
 			0,
-			2228,
-			12941,
+			MAX_LONGEST_EDGE_PX,
+			MAX_LONGEST_EDGE_PX,
 		);
-		// Quality 1 lossless WebP
-		expect(toBlobCalls).toEqual([{ type: "image/webp", quality: 1 }]);
+		expect(requestCall(fetchFn, 1).init.body).toBe(resaved);
 	});
 
-	it("image-attach::t3-ruling-2-tall-non-png-below-floor-returns-original-untouched", async () => {
-		// Non-PNG sources (JPEG/WebP) below the 600px floor return the original
-		// file untouched, avoiding lossy re-compression at 1:1.
-		const bitmap = fakeBitmap(2228, 12941);
-		stubDecode(bitmap);
-		const { drawImage } = stubCanvasEncode(fakeFile("image/jpeg", 500));
-		const file = fakeFile("image/jpeg", 5000);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
+	it("image-attach::rf10-the-re-save-runs-before-the-sign-and-the-sign-describes-the-re-saved-bytes", async () => {
+		const decode = stubDecode(fakeBitmap(800, 600));
+		const resaved = fakeFile("image/png", 321);
+		stubCanvasEncode(resaved);
+		const fetchFn = okFetch();
+		await attachImage({ file: fakeFile("image/png", 5000), fetchFn });
+		// Order: the decode (the re-save) happened before the first network call.
+		expect(decode.mock.invocationCallOrder[0]).toBeLessThan(
+			fetchFn.mock.invocationCallOrder[0] as number,
 		);
-		await attachImage({ file, fetchFn });
-		expect(drawImage).not.toHaveBeenCalled();
+		const sign = requestCall(fetchFn, 0);
+		expect(JSON.parse(sign.init.body as string)).toEqual({
+			contentType: "image/png",
+			byteSize: 321,
+		});
 		const put = requestCall(fetchFn, 1);
-		expect(put.init.body).toBe(file);
+		expect(put.init.body).toBe(resaved);
+		expect(new Headers(put.init.headers).get("content-type")).toBe("image/png");
 	});
 
-	it("image-attach::t3-browser-fallback-to-png-uses-the-real-returned-type", async () => {
+	it("image-attach::rf10-a-re-save-larger-than-the-original-is-still-what-goes-up", async () => {
+		// T3 shipped the original when the re-encode was not smaller. That is an
+		// upload of the picked bytes, which RF-10 forbids.
+		stubDecode(fakeBitmap(3200, 1600));
+		const larger = fakeFile("image/jpeg", 500);
+		stubCanvasEncode(larger);
+		const file = fakeFile("image/jpeg", 100);
+		const fetchFn = okFetch();
+		const result = await attachImage({ file, fetchFn });
+		expect(result.kind).toBe("attached");
+		expect(requestCall(fetchFn, 1).init.body).toBe(larger);
+	});
+
+	it("image-attach::rf10-every-allowed-type-but-gif-is-re-saved", async () => {
+		// Positive control for the pass-through below: the decode runs for every
+		// other type the allow-list admits.
+		for (const mime of IMAGE_UPLOADS_ALLOWED_MIME) {
+			if (mime === "image/gif") continue;
+			const decode = stubDecode(fakeBitmap(400, 300));
+			stubCanvasEncode(
+				fakeFile(mime === "image/avif" ? "image/png" : mime, 10),
+			);
+			await attachImage({ file: fakeFile(mime, 5000), fetchFn: okFetch() });
+			expect(decode, mime).toHaveBeenCalledTimes(1);
+		}
+	});
+
+	it("image-attach::rf10-a-gif-goes-up-byte-identical-and-is-never-decoded", async () => {
+		const decode = stubDecode(fakeBitmap(10, 10));
+		const { toBlobCalls } = stubCanvasEncode(fakeFile("image/png", 10));
+		const file = realGif(5000);
+		const fetchFn = okFetch();
+		const result = await attachImage({ file, fetchFn });
+		expect(result.kind).toBe("attached");
+		expect(decode).not.toHaveBeenCalled();
+		expect(toBlobCalls).toEqual([]);
+		expect(requestCall(fetchFn, 1).init.body).toBe(file);
+	});
+
+	it("image-attach::rf10-a-file-named-gif-without-the-gif-signature-is-re-saved-not-passed-through", async () => {
+		// `File.type` comes from the extension, so a phone photo saved as
+		// `photo.gif` declares `image/gif`. Passing it through on its name would
+		// upload its location data untouched (`@code-reviewer`, MIRROR-2).
+		const decode = stubDecode(fakeBitmap(1200, 800));
+		const resaved = fakeFile("image/png", 64);
+		const { toBlobCalls } = stubCanvasEncode(resaved);
+		const jpegBytes = new Uint8Array(5000);
+		jpegBytes.set([0xff, 0xd8, 0xff, 0xe1]); // a JPEG with an APP1 (EXIF) segment
+		const file = new Blob([jpegBytes], { type: "image/gif" });
+		const fetchFn = okFetch();
+		const result = await attachImage({ file, fetchFn });
+		expect(result.kind).toBe("attached");
+		expect(decode).toHaveBeenCalledTimes(1);
+		// Its real format is unknown to its name: re-saved losslessly.
+		expect(toBlobCalls).toEqual([{ type: "image/png", quality: undefined }]);
+		expect(requestCall(fetchFn, 1).init.body).toBe(resaved);
+		expect(requestCall(fetchFn, 1).init.body).not.toBe(file);
+	});
+
+	// --- each type keeps the format it went up in before RF-10 ---------------
+
+	it("image-attach::rf10-a-png-at-its-own-size-stays-a-png-and-keeps-its-alpha", async () => {
+		stubDecode(fakeBitmap(800, 600));
+		const { toBlobCalls, fillRect } = stubCanvasEncode(
+			fakeFile("image/png", 10),
+		);
+		await attachImage({
+			file: fakeFile("image/png", 5000),
+			fetchFn: okFetch(),
+		});
+		expect(toBlobCalls).toEqual([{ type: "image/png", quality: undefined }]);
+		// Nothing painted under it: transparency survives.
+		expect(fillRect).not.toHaveBeenCalled();
+	});
+
+	it("image-attach::rf10-a-png-over-the-cap-still-goes-to-lossless-webp", async () => {
+		// T3 Change 2, unchanged: PNG sources here are overwhelmingly screenshots,
+		// so this MUST be quality 1 — a silent regression to 0.8 would blur text.
+		stubDecode(fakeBitmap(3200, 1600));
+		const { toBlobCalls, fillRect } = stubCanvasEncode(
+			fakeFile("image/webp", 100),
+		);
+		await attachImage({
+			file: fakeFile("image/png", 5000),
+			fetchFn: okFetch(),
+		});
+		expect(toBlobCalls).toEqual([{ type: "image/webp", quality: 1 }]);
+		expect(fillRect).not.toHaveBeenCalled();
+	});
+
+	it("image-attach::rf10-the-png-format-switch-is-exactly-at-the-edge-cap", async () => {
+		// 1600 stays a PNG at its own size; 1601 is over the cap and goes to WebP.
+		stubDecode(fakeBitmap(MAX_LONGEST_EDGE_PX, 800));
+		const at = stubCanvasEncode(fakeFile("image/png", 10));
+		await attachImage({
+			file: fakeFile("image/png", 5000),
+			fetchFn: okFetch(),
+		});
+		expect(at.toBlobCalls).toEqual([{ type: "image/png", quality: undefined }]);
+		stubDecode(fakeBitmap(MAX_LONGEST_EDGE_PX + 1, 800));
+		const over = stubCanvasEncode(fakeFile("image/webp", 10));
+		await attachImage({
+			file: fakeFile("image/png", 5000),
+			fetchFn: okFetch(),
+		});
+		expect(over.toBlobCalls).toEqual([{ type: "image/webp", quality: 1 }]);
+	});
+
+	it("image-attach::rf10-jpeg-stays-jpeg-at-0.8", async () => {
+		stubDecode(fakeBitmap(3200, 1600));
+		const smaller = fakeFile("image/jpeg", 100);
+		const { toBlobCalls } = stubCanvasEncode(smaller);
+		const fetchFn = okFetch();
+		const result = await attachImage({
+			file: fakeFile("image/jpeg", 5000),
+			fetchFn,
+		});
+		expect(toBlobCalls).toEqual([{ type: "image/jpeg", quality: 0.8 }]);
+		expect(result.kind).toBe("attached");
+		expect(requestCall(fetchFn, 1).init.body).toBe(smaller);
+	});
+
+	it("image-attach::rf10-webp-stays-webp-at-0.8", async () => {
+		stubDecode(fakeBitmap(640, 480));
+		const { toBlobCalls } = stubCanvasEncode(fakeFile("image/webp", 100));
+		await attachImage({
+			file: fakeFile("image/webp", 5000),
+			fetchFn: okFetch(),
+		});
+		expect(toBlobCalls).toEqual([{ type: "image/webp", quality: 0.8 }]);
+	});
+
+	it("image-attach::rf10-an-avif-is-asked-for-as-avif-and-the-real-returned-type-is-signed", async () => {
+		// No engine's canvas encodes AVIF today; the HTML spec's fallback is PNG
+		// (measured in Chromium). The re-save asks for AVIF, gets PNG, and the
+		// wire carries what it GOT.
+		stubDecode(fakeBitmap(800, 600));
+		const png = fakeFile("image/png", 77);
+		const { toBlobCalls } = stubCanvasEncode(png);
+		const fetchFn = okFetch();
+		const result = await attachImage({
+			file: fakeFile("image/avif", 5000),
+			fetchFn,
+		});
+		expect(result.kind).toBe("attached");
+		expect(toBlobCalls).toEqual([{ type: "image/avif", quality: 0.8 }]);
+		expect(JSON.parse(requestCall(fetchFn, 0).init.body as string)).toEqual({
+			contentType: "image/png",
+			byteSize: 77,
+		});
+		expect(requestCall(fetchFn, 1).init.body).toBe(png);
+	});
+
+	it("image-attach::rf10-a-browser-that-cannot-encode-webp-returns-png-and-png-is-signed", async () => {
 		// Per the HTML Living Standard: a browser that can't encode the
 		// requested type silently returns image/png instead — no exception.
-		// The code must trust the REAL returned blob.type, never the request.
 		stubDecode(fakeBitmap(3200, 1600));
 		const downgraded = fakeFile("image/png", 100); // requested webp, got png
 		stubCanvasEncode(downgraded);
-		const file = fakeFile("image/png", 5000);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		await attachImage({ file, fetchFn });
-		const sign = requestCall(fetchFn, 0);
-		const signBody: unknown = JSON.parse(sign.init.body as string);
-		expect(signBody).toEqual({
+		const fetchFn = okFetch();
+		await attachImage({ file: fakeFile("image/png", 5000), fetchFn });
+		expect(JSON.parse(requestCall(fetchFn, 0).init.body as string)).toEqual({
 			contentType: "image/png",
 			byteSize: downgraded.size,
 		});
 		const put = requestCall(fetchFn, 1);
-		const putHeaders = new Headers(put.init.headers);
-		expect(putHeaders.get("content-type")).toBe("image/png");
+		expect(new Headers(put.init.headers).get("content-type")).toBe("image/png");
 		expect(put.init.body).toBe(downgraded);
 	});
 
-	it("image-attach::t3-larger-result-falls-back-to-original", async () => {
-		stubDecode(fakeBitmap(3200, 1600));
-		const file = fakeFile("image/jpeg", 100);
-		const larger = fakeFile("image/jpeg", 500); // bigger than the original
-		stubCanvasEncode(larger);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		await attachImage({ file, fetchFn });
-		const put = requestCall(fetchFn, 1);
-		expect(put.init.body).toBe(file);
-	});
-
-	it("image-attach::t3-null-toblob-result-falls-back-to-original", async () => {
-		stubDecode(fakeBitmap(3200, 1600));
-		stubCanvasEncode(null);
-		const file = fakeFile("image/jpeg", 5000);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		await attachImage({ file, fetchFn });
-		const put = requestCall(fetchFn, 1);
-		expect(put.init.body).toBe(file);
-	});
-
-	it("image-attach::t3-decode-throws-falls-back-to-original-not-a-crash", async () => {
-		stubDecode(new Error("decode failed"));
-		const file = fakeFile("image/jpeg", 5000);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		const result = await attachImage({ file, fetchFn });
-		expect(result.kind).toBe("attached");
-		const put = requestCall(fetchFn, 1);
-		expect(put.init.body).toBe(file);
-	});
-
-	it("image-attach::t3-null-canvas-context-falls-back-to-original", async () => {
-		stubDecode(fakeBitmap(3200, 1600));
-		HTMLCanvasElement.prototype.getContext = vi.fn(
-			() => null,
-		) as unknown as typeof HTMLCanvasElement.prototype.getContext;
-		const file = fakeFile("image/jpeg", 5000);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		await attachImage({ file, fetchFn });
-		const put = requestCall(fetchFn, 1);
-		expect(put.init.body).toBe(file);
-	});
-
-	it("image-attach::t3-jpeg-output-flattens-onto-WHITE-before-drawing", async () => {
+	it("image-attach::rf10-jpeg-output-flattens-onto-WHITE-before-drawing", async () => {
 		// JPEG has no alpha channel, so transparency is discarded on encode and
 		// SOMETHING is behind it. A 2D canvas starts transparent-BLACK, so
-		// without an explicit fill the discarded alpha composites to black —
-		// the original draft's defect. This asserts the ground is white AND
-		// that it was painted BEFORE the image was drawn (order matters: a
-		// fill after drawImage would erase the picture).
+		// without an explicit fill the discarded alpha composites to black.
+		// Asserted as WHITE, and painted BEFORE the image is drawn.
 		stubDecode(fakeBitmap(3200, 1600));
-		const smaller = fakeFile("image/jpeg", 100);
-		const { fillRect, fillStyleAtFill, drawImage } = stubCanvasEncode(smaller);
-		const file = fakeFile("image/jpeg", 5000);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
+		const { fillRect, fillStyleAtFill, drawImage } = stubCanvasEncode(
+			fakeFile("image/jpeg", 100),
 		);
-		await attachImage({ file, fetchFn });
-		// Asserted as WHITE, not as one spelling of it. The source says
-		// `rgb(255, 255, 255)` because the raw-hex guard bans the hex form
-		// under `src/components`, and a real browser normalises the property
-		// back to `#ffffff` on read — so pinning either literal would make
-		// this test fail for a reason that has nothing to do with the ground
-		// being white.
+		await attachImage({
+			file: fakeFile("image/jpeg", 5000),
+			fetchFn: okFetch(),
+		});
 		expect(fillStyleAtFill).toHaveLength(1);
 		expect(isWhite(fillStyleAtFill[0] ?? "")).toBe(true);
 		expect(fillRect).toHaveBeenCalledWith(0, 0, 1600, 800);
@@ -755,175 +770,33 @@ describe("attachImage — T3 downscale (mocked canvas boundary)", () => {
 		);
 	});
 
-	it("image-attach::t3-webp-output-does-NOT-flatten-alpha-survives", async () => {
-		// The mirror of the test above, and the reason the ratified design
-		// beats the draft: WebP carries alpha, so there is nothing to flatten
-		// and nothing should be painted underneath. A stray white fill here
-		// would destroy transparency the format was chosen to keep.
-		stubDecode(fakeBitmap(3200, 1600));
-		const smaller = fakeFile("image/webp", 100);
-		const { fillRect } = stubCanvasEncode(smaller);
-		const file = fakeFile("image/png", 5000);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
+	// --- the dimension rules T3 set, unchanged ------------------------------
+
+	it("image-attach::rf10-large-megapixels-proceed-without-a-pixel-guard", async () => {
+		// Ruling 1 (HO-FINISH v1.0 §5): no pixel guard; 48 MP scales to 1600.
+		stubDecode(fakeBitmap(8000, 6000));
+		const { drawImage, toBlobCalls } = stubCanvasEncode(
+			fakeFile("image/jpeg", 100),
 		);
-		await attachImage({ file, fetchFn });
-		expect(fillRect).not.toHaveBeenCalled();
+		await attachImage({
+			file: fakeFile("image/jpeg", 5000),
+			fetchFn: okFetch(),
+		});
+		expect(drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, 1600, 1200);
+		expect(toBlobCalls).toEqual([{ type: "image/jpeg", quality: 0.8 }]);
 	});
 
-	it("image-attach::t3-zero-size-encode-result-falls-back-not-oversize-error", async () => {
-		// `0 >= file.size` is FALSE, so a size-only comparison lets an empty
-		// blob through — and the server then rejects it as "image too large",
-		// a wrong message for an empty file. The floor is explicit for that
-		// reason.
-		stubDecode(fakeBitmap(3200, 1600));
-		stubCanvasEncode(fakeFile("image/jpeg", 0));
-		const file = fakeFile("image/jpeg", 5000);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		const result = await attachImage({ file, fetchFn });
-		expect(result.kind).toBe("attached");
-		const put = requestCall(fetchFn, 1);
-		expect(put.init.body).toBe(file);
-	});
-
-	it("image-attach::t3-a-hung-decode-falls-back-instead-of-hanging-forever", async () => {
-		// A `try/catch` catches a throw; it cannot recover a HANG, and a
-		// decompression bomb hangs the decode rather than throwing. Without a
-		// wall-clock bound the composer sits in `attaching` forever and never
-		// reaches an error state — worse for the user than not optimizing.
-		vi.useFakeTimers();
-		try {
-			(
-				globalThis as unknown as { createImageBitmap: unknown }
-			).createImageBitmap = vi.fn(() => new Promise(() => {})); // never settles
-			stubCanvasEncode(null);
-			const file = fakeFile("image/jpeg", 5000);
-			const fetchFn = scriptedFetch(
-				signOkResponse(),
-				new Response(null, { status: 200 }),
-			);
-			const pending = attachImage({ file, fetchFn });
-			await vi.advanceTimersByTimeAsync(DOWNSCALE_TIMEOUT_MS + 1);
-			const result = await pending;
-			expect(result.kind).toBe("attached");
-			const put = requestCall(fetchFn, 1);
-			expect(put.init.body).toBe(file);
-		} finally {
-			vi.useRealTimers();
-		}
-	});
-
-	it("image-attach::t3-an-unencodable-declared-type-ships-the-original", async () => {
-		// `encodeTargetFor` has no default arm: an eligible-by-MIME file whose
-		// type it cannot name returns null and the original ships, rather than
-		// falling through to a JPEG encode that would black-flatten alpha.
-		// Reached here by making the eligible set and the encode map disagree.
-		stubDecode(fakeBitmap(3200, 1600));
-		const { toBlobCalls } = stubCanvasEncode(fakeFile("image/jpeg", 100));
-		const file = fakeFile("image/webp", 5000);
-		Object.defineProperty(file, "type", { value: "image/webp" });
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		await attachImage({ file, fetchFn });
-		// webp IS encodable, so this one proceeds — the guard's positive
-		// control, proving the null arm isn't swallowing everything.
-		expect(toBlobCalls).toHaveLength(1);
-	});
-
-	it("image-attach::t3-optimization-failure-NEVER-rejects-the-attachment", async () => {
-		// Invariant 4, asserted directly: optimization must never block a
-		// valid argument. Every failure mode must still resolve `attached`
-		// with the original bytes — never `rejected`, which would turn a
-		// cosmetic optimization into a lost post.
-		const failures: Array<() => void> = [
-			() => {
-				stubDecode(new Error("decode exploded"));
-				stubCanvasEncode(null);
-			},
-			() => {
-				stubDecode(fakeBitmap(3200, 1600));
-				stubCanvasEncode(null);
-			},
-			() => {
-				stubDecode(fakeBitmap(3200, 1600));
-				stubCanvasEncode(fakeFile("image/jpeg", 999_999));
-			},
-			() => {
-				stubDecode(fakeBitmap(3200, 1600));
-				stubCanvasEncode(fakeFile("image/jpeg", 0));
-			},
-		];
-		for (const setUp of failures) {
-			setUp();
-			const file = fakeFile("image/jpeg", 5000);
-			const fetchFn = scriptedFetch(
-				signOkResponse(),
-				new Response(null, { status: 200 }),
-			);
-			const result = await attachImage({ file, fetchFn });
-			expect(result.kind).toBe("attached");
-			expect(requestCall(fetchFn, 1).init.body).toBe(file);
-		}
-	});
-
-	it("image-attach::t3-resized-upload-adds-NO-new-PUT-header", async () => {
-		// Invariant 5 on the branch this task actually added. The pre-existing
-		// wire-contract test covers the fallback path only, so without this
-		// the resized path had no header guard at all. `If-None-Match` is
-		// SigV4-signed; an extra or altered header fails signature validation.
-		stubDecode(fakeBitmap(3200, 1600));
-		stubCanvasEncode(fakeFile("image/jpeg", 100));
-		const file = fakeFile("image/jpeg", 5000);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		await attachImage({ file, fetchFn });
-		const put = requestCall(fetchFn, 1);
-		expect([...new Headers(put.init.headers).keys()].sort()).toEqual([
-			"content-type",
-			"if-none-match",
-		]);
-	});
-
-	it("image-attach::t3-1601px-crosses-the-boundary-the-1600-case-does-not", async () => {
-		// The interesting half of the boundary. At 1601 the scale is 0.99938
-		// and `Math.round` collapses the long edge back to 1600 — so this
-		// exercises the size-regression guard through the real boundary
-		// rather than a synthetic far-over case.
-		stubDecode(fakeBitmap(MAX_LONGEST_EDGE_PX + 1, 800));
-		const { toBlobCalls } = stubCanvasEncode(fakeFile("image/jpeg", 100));
-		const file = fakeFile("image/jpeg", 5000);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		await attachImage({ file, fetchFn });
-		expect(toBlobCalls).toHaveLength(1);
-	});
-
-	it("image-attach::t3-tall-screenshot-ships-native-resolution-lossless-webp-rather-than-illegible", async () => {
-		// THE MEASURED CASE, pinned. 2228 x 12941 is a real full-page capture
-		// run through the real code in a real browser: scaling to 1600 longest
-		// edge scaled to 275 x 1600 (12% of its width), destroying text geometry.
-		// HO-FINISH v1.0 §5 Ruling 2: PNG screenshots below the 600px floor skip
-		// dimension reduction but STILL convert to lossless WebP at native 1:1
-		// dimensions, capturing byte savings without unreadable glyph distortion.
+	it("image-attach::rf10-a-tall-png-screenshot-is-re-saved-native-size-lossless-webp", async () => {
+		// Ruling 2: 2228 × 12941 scaled to 1600 would crush the width to 275px.
+		// Below the legibility floor the size is kept.
 		stubDecode(fakeBitmap(2228, 12941));
 		const smaller = fakeFile("image/webp", 100);
 		const { toBlobCalls, drawImage } = stubCanvasEncode(smaller);
-		const file = fakeFile("image/png", 5_975_654);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		const result = await attachImage({ file, fetchFn });
+		const fetchFn = okFetch();
+		const result = await attachImage({
+			file: fakeFile("image/png", 5_975_654),
+			fetchFn,
+		});
 		expect(result.kind).toBe("attached");
 		expect(drawImage).toHaveBeenCalledWith(
 			expect.anything(),
@@ -936,20 +809,36 @@ describe("attachImage — T3 downscale (mocked canvas boundary)", () => {
 		expect(requestCall(fetchFn, 1).init.body).toBe(smaller);
 	});
 
-	it("image-attach::t3-the-legibility-floor-binds-on-the-SHORTER-edge-only", async () => {
-		// Both sides of the floor, so it is a boundary rather than a blanket
-		// refusal. Longest edge 3200 → scale 0.5 in both cases; the shorter
-		// edge is what decides.
-		//   1200 x 3200 → short lands at 600 == floor → RESIZES dimensions to 600x1600.
-		//   1100 x 3200 → short lands at 550 < floor  → keeps native 1:1 dimensions (1100x3200) lossless WebP.
+	it("image-attach::rf10-below-the-floor-a-jpeg-is-re-saved-at-its-own-size-not-sent-as-is", async () => {
+		// T3 sent a below-the-floor JPEG untouched, to spare it a lossy re-encode.
+		// RF-10 re-saves it at 1:1: one re-encode is the price of no metadata.
+		stubDecode(fakeBitmap(2228, 12941));
+		const resaved = fakeFile("image/jpeg", 500);
+		const { drawImage, toBlobCalls } = stubCanvasEncode(resaved);
+		const file = fakeFile("image/jpeg", 5000);
+		const fetchFn = okFetch();
+		await attachImage({ file, fetchFn });
+		expect(drawImage).toHaveBeenCalledWith(
+			expect.anything(),
+			0,
+			0,
+			2228,
+			12941,
+		);
+		expect(toBlobCalls).toEqual([{ type: "image/jpeg", quality: 0.8 }]);
+		expect(requestCall(fetchFn, 1).init.body).toBe(resaved);
+	});
+
+	it("image-attach::rf10-the-legibility-floor-binds-on-the-SHORTER-edge-only", async () => {
+		// Longest edge 3200 → scale 0.5 in both cases; the shorter edge decides.
+		//   1200 x 3200 → short lands at 600 == floor → resized to 600 x 1600.
+		//   1100 x 3200 → short lands at 550 < floor  → kept at 1100 x 3200.
 		stubDecode(fakeBitmap(1200, 3200));
 		const atFloor = stubCanvasEncode(fakeFile("image/webp", 100));
-		const f1 = fakeFile("image/png", 5000);
-		const fetch1 = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		await attachImage({ file: f1, fetchFn: fetch1 });
+		await attachImage({
+			file: fakeFile("image/png", 5000),
+			fetchFn: okFetch(),
+		});
 		expect(atFloor.drawImage).toHaveBeenCalledWith(
 			expect.anything(),
 			0,
@@ -957,16 +846,12 @@ describe("attachImage — T3 downscale (mocked canvas boundary)", () => {
 			600,
 			1600,
 		);
-		expect(atFloor.toBlobCalls).toHaveLength(1);
-
 		stubDecode(fakeBitmap(1100, 3200));
 		const belowFloor = stubCanvasEncode(fakeFile("image/webp", 100));
-		const f2 = fakeFile("image/png", 5000);
-		const fetch2 = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		await attachImage({ file: f2, fetchFn: fetch2 });
+		await attachImage({
+			file: fakeFile("image/png", 5000),
+			fetchFn: okFetch(),
+		});
 		expect(belowFloor.drawImage).toHaveBeenCalledWith(
 			expect.anything(),
 			0,
@@ -979,7 +864,7 @@ describe("attachImage — T3 downscale (mocked canvas boundary)", () => {
 		]);
 	});
 
-	it("image-attach::t3-resize-targets-are-computed-from-the-longest-edge", async () => {
+	it("image-attach::rf10-resize-targets-are-computed-from-the-longest-edge", async () => {
 		// 4000x2000 at MAX_LONGEST_EDGE_PX=1600 -> scale 0.4 -> 1600x800.
 		stubDecode(fakeBitmap(4000, 2000));
 		const canvases: HTMLCanvasElement[] = [];
@@ -989,16 +874,169 @@ describe("attachImage — T3 downscale (mocked canvas boundary)", () => {
 			if (tag === "canvas") canvases.push(el as HTMLCanvasElement);
 			return el;
 		});
-		const smaller = fakeFile("image/jpeg", 100);
-		stubCanvasEncode(smaller);
-		const file = fakeFile("image/jpeg", 5000);
-		const fetchFn = scriptedFetch(
-			signOkResponse(),
-			new Response(null, { status: 200 }),
-		);
-		await attachImage({ file, fetchFn });
+		stubCanvasEncode(fakeFile("image/jpeg", 100));
+		await attachImage({
+			file: fakeFile("image/jpeg", 5000),
+			fetchFn: okFetch(),
+		});
 		expect(canvases).toHaveLength(1);
 		expect(canvases[0]?.width).toBe(1600);
 		expect(canvases[0]?.height).toBe(800);
+	});
+
+	it("image-attach::rf10-the-re-saved-upload-adds-NO-new-PUT-header", async () => {
+		// `If-None-Match` is SigV4-signed; an extra or altered header fails
+		// signature validation.
+		stubDecode(fakeBitmap(3200, 1600));
+		stubCanvasEncode(fakeFile("image/jpeg", 100));
+		const fetchFn = okFetch();
+		await attachImage({ file: fakeFile("image/jpeg", 5000), fetchFn });
+		expect(
+			[...new Headers(requestCall(fetchFn, 1).init.headers).keys()].sort(),
+		).toEqual(["content-type", "if-none-match"]);
+	});
+
+	// --- a re-save that fails refuses the image; nothing reaches the wire ----
+
+	it("image-attach::rf10-a-decode-that-throws-refuses-the-image-and-signs-nothing", async () => {
+		stubDecode(new Error("decode failed"));
+		const fetchFn = scriptedFetch();
+		const result = await attachImage({
+			file: fakeFile("image/jpeg", 5000),
+			fetchFn,
+		});
+		expect(expectFailed(result).transient).toBe(false);
+		expect(fetchFn).not.toHaveBeenCalled();
+	});
+
+	it("image-attach::rf10-an-encoder-that-returns-nothing-refuses-the-image", async () => {
+		stubDecode(fakeBitmap(1200, 800));
+		stubCanvasEncode(null);
+		const fetchFn = scriptedFetch();
+		const result = await attachImage({
+			file: fakeFile("image/jpeg", 5000),
+			fetchFn,
+		});
+		expect(result.kind).toBe("failed");
+		expect(fetchFn).not.toHaveBeenCalled();
+	});
+
+	it("image-attach::rf10-no-2d-context-refuses-the-image", async () => {
+		stubDecode(fakeBitmap(1200, 800));
+		HTMLCanvasElement.prototype.getContext = vi.fn(
+			() => null,
+		) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+		const fetchFn = scriptedFetch();
+		const result = await attachImage({
+			file: fakeFile("image/jpeg", 5000),
+			fetchFn,
+		});
+		expect(result.kind).toBe("failed");
+		expect(fetchFn).not.toHaveBeenCalled();
+	});
+
+	it("image-attach::rf10-a-zero-byte-re-save-refuses-with-the-attach-error-not-oversize", async () => {
+		// An encoder that produced nothing is a failure, not an "image too large".
+		stubDecode(fakeBitmap(1200, 800));
+		stubCanvasEncode(fakeFile("image/jpeg", 0));
+		const fetchFn = scriptedFetch();
+		const result = await attachImage({
+			file: fakeFile("image/jpeg", 5000),
+			fetchFn,
+		});
+		expect(result.kind).toBe("failed");
+		expect(fetchFn).not.toHaveBeenCalled();
+	});
+
+	it("image-attach::rf10-a-re-save-over-the-byte-cap-is-refused-as-too-large", async () => {
+		// A re-encode is not always smaller than its source. One that breaks the
+		// cap is refused with today's message, before any sign.
+		stubDecode(fakeBitmap(1200, 800));
+		stubCanvasEncode(fakeFile("image/png", IMAGE_UPLOADS_MAX_BYTES + 1));
+		const fetchFn = scriptedFetch();
+		const result = await attachImage({
+			file: fakeFile("image/png", 5000),
+			fetchFn,
+		});
+		const rejected = expectRejected(result);
+		expect(rejected.reason).toBe("oversize");
+		expect(rejected.message).toBe("image too large");
+		expect(fetchFn).not.toHaveBeenCalled();
+	});
+
+	it("image-attach::rf10-a-hung-decode-refuses-after-the-budget-and-signs-nothing", async () => {
+		// A `try/catch` catches a throw; it cannot recover a HANG, and a
+		// decompression bomb hangs the decode rather than throwing.
+		vi.useFakeTimers();
+		(
+			globalThis as unknown as { createImageBitmap: unknown }
+		).createImageBitmap = vi.fn(() => new Promise(() => {})); // never settles
+		stubCanvasEncode(null);
+		const fetchFn = scriptedFetch();
+		const pending = attachImage({
+			file: fakeFile("image/jpeg", 5000),
+			fetchFn,
+		});
+		await vi.advanceTimersByTimeAsync(RESAVE_TIMEOUT_MS - 1);
+		expect(fetchFn).not.toHaveBeenCalled();
+		await vi.advanceTimersByTimeAsync(2);
+		const result = await pending;
+		expect(result.kind).toBe("failed");
+		expect(fetchFn).not.toHaveBeenCalled();
+	});
+
+	it("image-attach::rf10-a-type-with-no-encoder-is-refused-never-sent-as-is", async () => {
+		// Every type the allow-list admits has an encoder today, so the refusal
+		// for "no encoder" is reached by a file whose declared type changes after
+		// validation — standing in for a type added to the allow-list later.
+		stubDecode(fakeBitmap(400, 300));
+		const { toBlobCalls } = stubCanvasEncode(fakeFile("image/png", 10));
+		const file = fakeFile("image/png", 5000);
+		let reads = 0;
+		Object.defineProperty(file, "type", {
+			get: () => (reads++ === 0 ? "image/png" : "image/x-unencodable"),
+		});
+		const fetchFn = scriptedFetch();
+		const result = await attachImage({ file, fetchFn });
+		expect(result.kind).toBe("failed");
+		expect(toBlobCalls).toEqual([]);
+		expect(fetchFn).not.toHaveBeenCalled();
+	});
+
+	it("image-attach::rf10-no-re-save-failure-ever-uploads-the-original", async () => {
+		// T3's invariant 4 — "optimisation must never block a valid argument" —
+		// inverted by RF-10: every failure mode now refuses the image, and the
+		// picked file never becomes a request body.
+		const failures: Array<() => void> = [
+			() => {
+				stubDecode(new Error("decode exploded"));
+				stubCanvasEncode(null);
+			},
+			() => {
+				stubDecode(fakeBitmap(3200, 1600));
+				stubCanvasEncode(null);
+			},
+			() => {
+				stubDecode(fakeBitmap(800, 600));
+				stubCanvasEncode(fakeFile("image/jpeg", 0));
+			},
+			() => {
+				stubDecode(fakeBitmap(800, 600));
+				HTMLCanvasElement.prototype.getContext = vi.fn(
+					() => null,
+				) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+			},
+		];
+		for (const setUp of failures) {
+			setUp();
+			const file = fakeFile("image/jpeg", 5000);
+			const fetchFn = scriptedFetch(
+				signOkResponse(),
+				new Response(null, { status: 200 }),
+			);
+			const result = await attachImage({ file, fetchFn });
+			expect(result.kind).not.toBe("attached");
+			expect(fetchFn).not.toHaveBeenCalled();
+		}
 	});
 });
