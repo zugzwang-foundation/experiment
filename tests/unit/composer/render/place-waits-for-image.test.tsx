@@ -27,6 +27,11 @@ vi.mock("next/navigation", () => ({
 	}),
 }));
 
+const flag = vi.hoisted(() => ({ imageAttach: true as boolean | undefined }));
+vi.mock("@/lib/posthog/use-flag", () => ({
+	useFlag: (_name: string, fallback: boolean) => flag.imageAttach ?? fallback,
+}));
+
 import { BetComposer } from "@/components/debate/composer/BetComposer";
 import type { MirrorContext } from "@/components/debate/composer/MirrorComposer";
 
@@ -45,6 +50,7 @@ const urlStatics = URL as unknown as {
 
 let signGate: { release: (res: Response) => void } | null = null;
 let placed: string[] = [];
+let putBodies: unknown[] = [];
 
 const json = (status: number, body: unknown) =>
 	new Response(JSON.stringify(body), {
@@ -55,6 +61,8 @@ const json = (status: number, body: unknown) =>
 beforeEach(() => {
 	signGate = null;
 	placed = [];
+	putBodies = [];
+	flag.imageAttach = true;
 	vi.stubGlobal(
 		"fetch",
 		vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
@@ -66,6 +74,7 @@ beforeEach(() => {
 				});
 			}
 			if (url.startsWith("https://r2.example.invalid/put/")) {
+				putBodies.push(init?.body);
 				return Promise.resolve(new Response(null, { status: 200 }));
 			}
 			if (url === "/api/bets/place") {
@@ -187,6 +196,75 @@ describe("MIRROR-2 RF-11 — PLACE waits for the image, in both layouts", () => 
 			await settle();
 			expect(placed).toHaveLength(1);
 			expect(JSON.parse(placed[0])).not.toHaveProperty("imageUploadsId");
+		});
+	}
+});
+
+describe("MIRROR-2 RF-11 — only while the composer shows the upload", () => {
+	for (const layout of LAYOUTS) {
+		it(`rf11::${layout.name}::the-adr-0052-brake-landing-mid-upload-does-not-strand-place`, async () => {
+			// With the brake applied the image view is gone; PLACE must not wait on
+			// an upload nobody can see (`@security-auditor` L-2). Text-only is the
+			// brake's own off state.
+			const r = mount(layout.mirror);
+			await pick(r);
+			expect(submitButton(r).disabled).toBe(true);
+			flag.imageAttach = false;
+			r.rerender(<BetComposer {...composerProps()} mirror={layout.mirror} />);
+			await settle();
+			// Positive control: the image affordance really is gone.
+			expect(r.container.querySelector('input[type="file"]')).toBeNull();
+			expect(submitButton(r).disabled).toBe(false);
+			await act(async () => {
+				fireEvent.click(submitButton(r));
+			});
+			await settle();
+			expect(placed).toHaveLength(1);
+			// Still attaching when it went: no image rides the post.
+			expect(JSON.parse(placed[0])).not.toHaveProperty("imageUploadsId");
+		});
+	}
+});
+
+describe("MIRROR-2 RF-10 — through the composer, what is uploaded is the re-save, never the picked file", () => {
+	/**
+	 * `image-attach.test.ts` owns the re-save's rules; this is the render-level
+	 * half `@security-auditor` found missing — without it, a regression back to
+	 * uploading the picked file would leave every render suite green. The jsdom
+	 * pipeline's re-save (`tests/_setup/jsdom-image-pipeline.ts`) is a blob of
+	 * the requested type whose text names it; the picked file is a different
+	 * object with different bytes.
+	 */
+	for (const layout of LAYOUTS) {
+		it(`rf10::${layout.name}::the-put-body-is-the-re-saved-blob`, async () => {
+			const r = mount(layout.mirror);
+			const input = r.container.querySelector('input[type="file"]');
+			if (!(input instanceof HTMLInputElement))
+				throw new Error("no file input");
+			const picked = new File(["picked-bytes"], "photo.jpg", {
+				type: "image/jpeg",
+			});
+			await act(async () => {
+				fireEvent.change(input, { target: { files: [picked] } });
+			});
+			await settle();
+			await act(async () => {
+				signGate?.release(
+					json(200, {
+						ok: true,
+						data: {
+							uploadId: UPLOAD_ID,
+							putUrl: "https://r2.example.invalid/put/rf10",
+						},
+					}),
+				);
+			});
+			await settle();
+			expect(putBodies).toHaveLength(1);
+			const body = putBodies[0];
+			expect(body).not.toBe(picked);
+			expect(body).toBeInstanceOf(Blob);
+			expect(await (body as Blob).text()).toBe("jsdom-resaved:image/jpeg");
 		});
 	}
 });

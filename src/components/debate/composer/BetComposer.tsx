@@ -403,7 +403,12 @@ export function BetComposer(props: {
 		// re-enables when the attach lands, or when it fails and the image is
 		// dropped with today's error. Both layouts; the server's checks are
 		// unchanged.
-		image.phase === "attaching";
+		// ⚠ ONLY WHILE THE COMPOSER SHOWS THE UPLOAD — RF-11's own premise ("the
+		// frame already shows the upload state"). If the ADR-0052 brake lands
+		// mid-upload the image view is gone, and holding PLACE for an upload
+		// nobody can see strands the composer with no visible reason
+		// (`@security-auditor` L-2); the brake's off state is text-only.
+		(imageAttachEnabled && image.phase === "attaching");
 
 	/** Attach/remove changes the wire body (fingerprint!) — an EDIT by law. */
 	const onPickImage = async (file: File) => {
