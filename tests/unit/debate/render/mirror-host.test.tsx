@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	act,
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -121,5 +127,84 @@ describe("MIRROR-1 — the desktop host renders the Mirror", () => {
 		// And it wears the pole of the side it bets (NO).
 		const submit = composer?.querySelector('[data-testid="mirror-submit"]');
 		expect(submit?.className).toContain("bg-no");
+	});
+});
+
+describe("MIRROR-2 RF-4 — through the real host, the composer opens with the cursor in the title", () => {
+	/**
+	 * ⛔ WHY THIS GOES THROUGH THE HOST. `ComposerSlot` moves focus into the slot
+	 * when it opens — to its FIRST focusable element — and its effect runs after
+	 * the composer's own (a parent's effects run after its children's). A test
+	 * that mounts `BetComposer` bare sees the title focused and passes; on the
+	 * page the slot then moved focus to the author row's `×`. Only the real host
+	 * can tell the two apart.
+	 */
+	async function flush() {
+		for (let i = 0; i < 5; i++) {
+			await act(async () => {
+				await Promise.resolve();
+			});
+		}
+	}
+
+	it("mirror-host::market-arm-post-composer-opens-with-the-title-focused", async () => {
+		render(
+			<DebateView
+				model={baseModel()}
+				viewer={VIEWER}
+				initialPostId={null}
+				ownPseudonym="OliveBeaver000"
+			/>,
+		);
+		fireEvent.click(screen.getByLabelText("Buy YES"));
+		await flush();
+		const composer = openComposerIn("NO");
+		const title = composer?.querySelector('[aria-label="Argument title"]');
+		expect(title).not.toBeNull();
+		expect(document.activeElement).toBe(title);
+	});
+
+	it("mirror-host::a-c2-composer-lands-on-its-first-control-not-on-a-disabled-title", async () => {
+		// The C2 floor disables the title; the slot must still move focus INTO the
+		// composer (its first enabled control), never leave it on the opener.
+		render(
+			<DebateView
+				model={baseModel()}
+				viewer={{ ...VIEWER, balance: "5", spendableToday: "5" }}
+				initialPostId={null}
+				ownPseudonym="OliveBeaver000"
+			/>,
+		);
+		const opener = screen.getByLabelText("Buy YES");
+		fireEvent.click(opener);
+		await flush();
+		const composer = openComposerIn("NO");
+		const title = composer?.querySelector('[aria-label="Argument title"]');
+		expect(title?.hasAttribute("disabled")).toBe(true);
+		expect(document.activeElement).not.toBe(title);
+		expect(composer?.contains(document.activeElement)).toBe(true);
+		expect(document.activeElement?.getAttribute("aria-label")).toBe("Close");
+	});
+
+	it("mirror-host::reply-composers-open-with-the-title-focused-not-the-switch-or-close", async () => {
+		for (const opener of ["Support — bet YES", "Counter — bet NO"]) {
+			cleanup();
+			render(
+				<DebateView
+					model={baseModel()}
+					viewer={VIEWER}
+					initialPostId={PARENT_ID}
+					ownPseudonym="OliveBeaver000"
+				/>,
+			);
+			fireEvent.click(screen.getByLabelText(opener));
+			await flush();
+			const composer = document.querySelector(
+				'[data-testid="mirror-composer"]',
+			);
+			const title = composer?.querySelector('[aria-label="Argument title"]');
+			expect(title, opener).not.toBeNull();
+			expect(document.activeElement, opener).toBe(title);
+		}
 	});
 });

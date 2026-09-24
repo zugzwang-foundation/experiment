@@ -657,6 +657,11 @@ function TitleField(props: {
 
 	// RF-4 — the composer opens with the cursor in the title. A disabled field
 	// (the C2 state) ignores `focus()`, which is right: there is nothing to type.
+	// ⚠ ON THE PAGE THIS IS NOT WHAT PUTS IT THERE. The desktop host wraps the
+	// composer in `ComposerSlot`, which moves focus into the slot AFTER this runs
+	// (a parent's effects follow its children's) and would land on the first
+	// focusable control, the `×`. `data-autofocus` on the field is what the slot
+	// honours; this effect covers a host that moves no focus of its own.
 	useEffect(() => {
 		ref.current?.focus();
 	}, []);
@@ -730,6 +735,10 @@ function TitleField(props: {
 					paddingTop: `${titlePaddingTopPx(fit)}px`,
 				}}
 				data-testid="mirror-title"
+				// RF-4 — the slot's first focus (`ComposerSlot` honours it; without
+				// it the slot's own focus move, which runs after this component's,
+				// lands on the author row's `×`).
+				data-autofocus=""
 				// RF-4 — size, line height and the centring padding ease TOGETHER
 				// (150ms), so the lines stay centred while they shrink; instant under
 				// reduced motion.

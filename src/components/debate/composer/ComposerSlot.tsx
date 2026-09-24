@@ -219,7 +219,14 @@ export function ComposerSlot({
 			return;
 		}
 		moved.current = true;
-		const first = node.querySelector<HTMLElement>(FOCUSABLE);
+		// MIRROR-2 · RF-4 — an occupant may name its own first focus with
+		// `data-autofocus`: the Mirror composer opens "with the cursor in the
+		// title", and the first focusable control in its DOM is the `×` (or, on a
+		// Support reply, the friendly-fire switch). A disabled one is skipped, so
+		// the C2 state still lands on the first control that can take focus.
+		const first =
+			node.querySelector<HTMLElement>("[data-autofocus]:not([disabled])") ??
+			node.querySelector<HTMLElement>(FOCUSABLE);
 		(first ?? node).focus();
 	}, [open, mounted]);
 
