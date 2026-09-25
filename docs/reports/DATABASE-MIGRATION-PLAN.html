@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Moving the Database to AWS — Zugzwang Migration Plan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0b0f19;
+      --bg-secondary: #111827;
+      --bg-card: #161f33;
+      --bg-card-hover: #1c2742;
+      --border-color: #23314e;
+      --border-accent: #3b82f6;
+      --text-primary: #f9fafb;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-aws: #ff9900;
+      --accent-blue: #3b82f6;
+      --accent-green: #10b981;
+      --accent-purple: #8b5cf6;
+      --accent-red: #ef4444;
+      --radius: 12px;
+      --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.65;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 1140px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.95));
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 48px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      margin-bottom: 40px;
+    }
+
+    .header::before {
+      content: "";
+      position: absolute;
+      top: -100px;
+      right: -100px;
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(255, 153, 0, 0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-aws {
+      background: rgba(255, 153, 0, 0.12);
+      color: var(--accent-aws);
+      border: 1px solid rgba(255, 153, 0, 0.3);
+    }
+
+    .badge-success {
+      background: rgba(16, 185, 129, 0.12);
+      color: var(--accent-green);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .header h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin: 16px 0 12px;
+      background: linear-gradient(to right, #ffffff, #cbd5e1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header p {
+      color: var(--text-secondary);
+      font-size: 1.15rem;
+      max-width: 800px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 20px;
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .meta-item .label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .meta-item .value {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    /* Section styling */
+    .section {
+      margin-bottom: 48px;
+    }
+
+    .section-title {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .section-title span.number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      color: var(--accent-blue);
+    }
+
+    /* Cards & Grids */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+      gap: 24px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 24px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 28px;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .card:hover {
+      border-color: var(--border-accent);
+      transform: translateY(-2px);
+    }
+
+    .card h3 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card p {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+
+    /* Comparison Table */
+    .table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      overflow-x: auto;
+      margin-top: 16px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.95rem;
+    }
+
+    th {
+      background: rgba(17, 24, 39, 0.8);
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    td {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-secondary);
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .highlight-aws {
+      color: #38bdf8;
+      font-weight: 600;
+    }
+
+    .highlight-issue {
+      color: #f87171;
+    }
+
+    /* Diagram Box */
+    .diagram-box {
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 32px;
+      margin: 20px 0;
+    }
+
+    .diagram-flow {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .flow-node {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 16px 20px;
+      text-align: center;
+      min-width: 180px;
+    }
+
+    .flow-node.highlight {
+      border-color: var(--accent-aws);
+      background: rgba(255, 153, 0, 0.08);
+    }
+
+    .flow-node .title {
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .flow-node .sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .flow-arrow {
+      color: var(--text-muted);
+      font-weight: 700;
+      font-size: 1.2rem;
+    }
+
+    /* Timeline list */
+    .timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    .timeline-item {
+      display: flex;
+      gap: 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+
+    .timeline-time {
+      min-width: 120px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+    }
+
+    .timeline-content h4 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .timeline-content p {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    /* Code Snippet */
+    .code-box {
+      background: #090d16;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: #93c5fd;
+      overflow-x: auto;
+      margin-top: 12px;
+    }
+
+    /* Callout */
+    .callout {
+      border-left: 4px solid var(--accent-aws);
+      background: rgba(255, 153, 0, 0.06);
+      padding: 20px 24px;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      margin: 24px 0;
+    }
+
+    .callout h4 {
+      color: var(--accent-aws);
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .callout p {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+
+    /* Print styling */
+    @media print {
+      body {
+        background: #ffffff;
+        color: #000000;
+      }
+      .header, .card, .table-container, .timeline-item, .diagram-box {
+        background: #ffffff;
+        border: 1px solid #cccccc;
+        color: #000000;
+        box-shadow: none;
+      }
+      .header h1 {
+        -webkit-text-fill-color: #000000;
+      }
+      th {
+        background: #f1f5f9;
+        color: #000000;
+      }
+      .container td, .container p, .timeline-content p {
+        color: #333333;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <header class="header">
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px;">
+        <span class="badge badge-aws">Database Migration Plan</span>
+        <span class="badge badge-success">Supabase → AWS RDS</span>
+      </div>
+      <h1>Moving the Database to AWS</h1>
+      <p>A step-by-step plan to move Zugzwang's PostgreSQL database from Supabase to Amazon RDS while the experiment is live — rehearsed on staging first, executed in one short scheduled window, reversible at every step.</p>
+
+      <div class="meta-grid">
+        <div class="meta-item">
+          <div class="label">What moves</div>
+          <div class="value">PostgreSQL only</div>
+        </div>
+        <div class="meta-item">
+          <div class="label">Data size</div>
+          <div class="value">~12,000 rows · under 1 MB</div>
+        </div>
+        <div class="meta-item">
+          <div class="label">Planned downtime</div>
+          <div class="value">20 – 30 minutes, once</div>
+        </div>
+        <div class="meta-item">
+          <div class="label">Rollback</div>
+          <div class="value">Switch one setting back</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- 1 -->
+    <section class="section">
+      <h2 class="section-title"><span class="number">1</span> What moves, and what does not</h2>
+      <p style="color: var(--text-secondary); margin-bottom: 16px;">Only the database moves. Everything the application talks to besides the database stays exactly where it is, so there is one thing to get right rather than seven.</p>
+      <div class="grid-2">
+        <div class="card">
+          <h3 style="color: var(--accent-aws);">📦 Moves to AWS</h3>
+          <ul style="margin: 12px 0 0 18px; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8;">
+            <li><strong>25 tables</strong> and all their data</li>
+            <li><strong>31 migrations</strong> and the migration history</li>
+            <li>The <strong>append-only protections</strong> — the database rules that make bets and the reputation ledger impossible to edit or delete</li>
+            <li>The <strong>events table partitions</strong></li>
+            <li>The <strong>scheduled database jobs</strong>: the liquidity injector and the nightly drift check</li>
+            <li>The project's own <code>uuidv7()</code> function</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 style="color: var(--accent-green);">✅ Stays exactly where it is</h3>
+          <ul style="margin: 12px 0 0 18px; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8;">
+            <li>Upstash Redis, Cloudflare R2 images, OpenAI, Resend, Sentry, PostHog</li>
+            <li><strong>Sign-in</strong> — the project uses its own authentication, not Supabase's, so nothing there changes</li>
+            <li><strong>File storage</strong> — images are already on Cloudflare</li>
+            <li>Row-level security — not used by this project, so nothing to port</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout">
+        <h4>Why this is smaller than it sounds</h4>
+        <p>The application talks to the database as plain PostgreSQL. There is no Supabase software inside the app, so moving the database is a change of address, not a rewrite.</p>
+      </div>
+    </section>
+
+    <!-- 2 -->
+    <section class="section">
+      <h2 class="section-title"><span class="number">2</span> The approach, and why</h2>
+      <div class="grid-2">
+        <div class="card">
+          <h3>One short window, not live replication</h3>
+          <p>Continuously replicating from one database to the other would avoid downtime, but it is a large amount of machinery with a dangerous failure mode: a bet landing in the old database after the new one has taken over.</p>
+          <p style="margin-top: 12px;">At this data size the copy itself takes <strong>seconds</strong>. A single scheduled window is simpler, and simpler is safer when the thing being moved is a financial-style ledger.</p>
+        </div>
+        <div class="card">
+          <h3 style="color: var(--accent-red);">⚠ The risk being managed</h3>
+          <p>Markets are open and people are betting. Every bet is an append-only record. The one outcome that cannot be repaired is <strong>writes landing in two databases at once</strong>.</p>
+          <p style="margin-top: 12px;">The whole plan exists to make that impossible: writes stop, then the copy is taken, then the address changes. Never overlapping.</p>
+        </div>
+      </div>
+      <div class="callout">
+        <h4>Recommended timing</h4>
+        <p>A low-traffic window, ideally around <strong>04:00 IST</strong>, with the operator present. <strong>Never</strong> during a seeding run, and not in the final days before the 5 November freeze.</p>
+      </div>
+    </section>
+
+    <!-- 3 -->
+    <section class="section">
+      <h2 class="section-title"><span class="number">3</span> Phase 1 — Build the new database (no downtime)</h2>
+      <p style="color: var(--text-secondary); margin-bottom: 16px;">Done days ahead, with the live site untouched throughout.</p>
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="timeline-time">Step 1<br>~2 hours</div>
+          <div class="timeline-content">
+            <h4>Create the RDS instance</h4>
+            <p>PostgreSQL 17 in Mumbai, in the same private network as the application, reachable only from the app — never from the public internet. Automated backups and point-in-time recovery switched on from the start.</p>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-time">Step 2<br>~1 hour</div>
+          <div class="timeline-content">
+            <h4>Enable the scheduled-jobs extension</h4>
+            <p>The liquidity injector and the nightly drift check run <em>inside</em> the database. RDS supports this, but it needs a custom configuration group — and the jobs themselves do not travel with the data. They are recreated by hand and verified.</p>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-time">Step 3<br>~2 hours</div>
+          <div class="timeline-content">
+            <h4>Update the safety guards in the code</h4>
+            <p>The migration scripts today refuse to run unless the connection address contains the <strong>Supabase project identifier</strong>. Against a new database those guards would either block every migration or stop protecting the wrong one. They are rewritten to recognise the new address, reviewed, and tested — before the window, never during it.</p>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-time">Step 4<br>~1 hour</div>
+          <div class="timeline-content">
+            <h4>Decide how the application connects</h4>
+            <p>Supabase provides a connection pooler that the app's settings were tuned against. On RDS that becomes either direct connections or RDS Proxy. The setting is chosen, applied, and then proven under the rehearsal in Phase 2 rather than assumed.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 -->
+    <section class="section">
+      <h2 class="section-title"><span class="number">4</span> Phase 2 — Rehearse the whole thing on staging</h2>
+      <div class="callout">
+        <h4>This phase is not optional</h4>
+        <p>Staging is a full copy of the same shape. The entire window is performed there first, end to end, and <strong>timed</strong>. That rehearsal is what turns the production window from an estimate into a known quantity — and it is the cheapest place to discover whatever we have not thought of.</p>
+      </div>
+      <div class="grid-2" style="margin-top: 20px;">
+        <div class="card">
+          <h3>What the rehearsal produces</h3>
+          <ul style="margin: 12px 0 0 18px; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8;">
+            <li>A measured duration for each step, so the window is sized from evidence</li>
+            <li>A written command list, copy-paste ready, in order</li>
+            <li>Proof the verification checks in §6 actually pass on a restored copy</li>
+            <li>Proof the rollback works, by performing it</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Then leave it running</h3>
+          <p>Staging stays on its new database for <strong>at least 24 hours</strong> before production is scheduled. What we are watching for: the every-minute job still firing, database connections staying flat, memory steady, and no new errors.</p>
+          <p style="margin-top: 12px;">Only after a clean 24 hours does the production window get a date.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5 -->
+    <section class="section">
+      <h2 class="section-title"><span class="number">5</span> Phase 3 — The production window, minute by minute</h2>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr><th>Time</th><th>Action</th><th>Why</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>T−24h</strong></td>
+              <td>Announce the window. Confirm no seeding or admin work is scheduled.</td>
+              <td>Two people writing at once is the scenario this plan exists to prevent</td>
+            </tr>
+            <tr>
+              <td><strong>T−1h</strong></td>
+              <td>Take a full backup of the live database and <strong>restore it somewhere to prove it is readable</strong>.</td>
+              <td class="highlight-issue">An unverified backup is not a backup</td>
+            </tr>
+            <tr>
+              <td><strong>T−10m</strong></td>
+              <td>Record the current row counts for every table.</td>
+              <td>This is the number the new database must match exactly</td>
+            </tr>
+            <tr>
+              <td><strong>T+0</strong></td>
+              <td><strong>Stop the application.</strong> Writes end here.</td>
+              <td class="highlight-issue">The single most important moment: from now until cutover, nothing may write anywhere</td>
+            </tr>
+            <tr>
+              <td><strong>T+2m</strong></td>
+              <td>Take the final copy of the database.</td>
+              <td>Seconds at this size — this is the copy that becomes production</td>
+            </tr>
+            <tr>
+              <td><strong>T+5m</strong></td>
+              <td>Restore it into RDS.</td>
+              <td>Tables, data, protections and history together</td>
+            </tr>
+            <tr>
+              <td><strong>T+10m</strong></td>
+              <td>Recreate the scheduled database jobs and confirm they are registered.</td>
+              <td>They do not travel with the data; missing them stops markets closing</td>
+            </tr>
+            <tr>
+              <td><strong>T+12m</strong></td>
+              <td>Run the verification checklist in §6 — <strong>all of it</strong>.</td>
+              <td>The decision point: if anything fails, we stop and roll back</td>
+            </tr>
+            <tr>
+              <td><strong>T+20m</strong></td>
+              <td>Point the application at the new address and start it.</td>
+              <td>One setting, changed in the vault</td>
+            </tr>
+            <tr>
+              <td><strong>T+22m</strong></td>
+              <td>Confirm the site reports healthy, then place one small real bet.</td>
+              <td>Proves the whole write path end to end, not just that pages load</td>
+            </tr>
+            <tr>
+              <td><strong>T+30m</strong></td>
+              <td>Window closes. Watch for the next two hours.</td>
+              <td>Errors, connection counts, the every-minute job</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        <h4>Old database stays alive</h4>
+        <p>Supabase is kept running, in read-only mode, for <strong>at least one week</strong> afterwards. It is the rollback, and it is also the reference copy if any number is ever disputed.</p>
+      </div>
+    </section>
+
+    <!-- 6 -->
+    <section class="section">
+      <h2 class="section-title"><span class="number">6</span> The verification checklist</h2>
+      <p style="color: var(--text-secondary); margin-bottom: 16px;">Run against the new database <strong>before</strong> the application is pointed at it. Every line must pass; one failure stops the migration.</p>
+      <div class="table-container">
+        <table>
+          <thead><tr><th>#</th><th>Check</th><th>Why this one</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td><strong>Row counts match, table by table</strong></td><td>The project already has a tool that does this comparison and exits with an error on any mismatch</td></tr>
+            <tr><td>2</td><td>The append-only protections are present</td><td class="highlight-issue">These are what make bets and the reputation ledger un-editable. Data without them is not the same database</td></tr>
+            <tr><td>3</td><td>A test deletion against the bets table is <strong>rejected</strong></td><td>Proves the protections are armed, not merely present</td></tr>
+            <tr><td>4</td><td>All events partitions exist</td><td>A missing partition loses history silently</td></tr>
+            <tr><td>5</td><td>The scheduled jobs are registered and fire</td><td>Otherwise markets stop closing and nobody is told</td></tr>
+            <tr><td>6</td><td>The migration history matches the code</td><td>The health endpoint reports this directly</td></tr>
+            <tr><td>7</td><td>The invariant test suite passes against the new database</td><td>The four rules the whole product rests on, checked by machine</td></tr>
+            <tr><td>8</td><td>The freeze timestamp is preserved exactly</td><td class="highlight-issue">The experiment's end date lives in a database row; it must survive the move untouched</td></tr>
+            <tr><td>9</td><td>The reputation ledger totals match, old and new</td><td>The strongest single check that no row was lost in transit</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 7 -->
+    <section class="section">
+      <h2 class="section-title"><span class="number">7</span> If something goes wrong</h2>
+      <div class="grid-3">
+        <div class="card">
+          <h3>↩ Before the switch</h3>
+          <p>Nothing has changed. Start the application again on Supabase and reschedule. The only cost is the window.</p>
+        </div>
+        <div class="card">
+          <h3>↩ Just after the switch</h3>
+          <p>Point the setting back at Supabase and restart. Minutes. Any bets placed in between are on the new database and are copied back before reopening.</p>
+        </div>
+        <div class="card">
+          <h3>↩ Days later</h3>
+          <p>Harder, because real activity now exists only on the new database. This is why the first week is a watching week, and why the old database stays alive and readable.</p>
+        </div>
+      </div>
+      <div class="callout">
+        <h4>Stop authority</h4>
+        <p>Anyone who sees a failed check, an unexpected number, or an error on the bet path <strong>stops the migration immediately</strong> and reports it. Nobody fixes forward inside the window.</p>
+      </div>
+    </section>
+
+    <!-- 8 -->
+    <section class="section">
+      <h2 class="section-title"><span class="number">8</span> Timeline and what has to be in place</h2>
+      <div class="grid-2">
+        <div class="card">
+          <h3>⏱ Realistic schedule</h3>
+          <ul style="margin: 12px 0 0 18px; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8;">
+            <li><strong>Day 1</strong> — build the RDS instance, configure the scheduled-jobs extension</li>
+            <li><strong>Day 2</strong> — update the safety guards, review, test</li>
+            <li><strong>Day 3</strong> — full rehearsal on staging, timed and written up</li>
+            <li><strong>Day 4</strong> — staging runs on its new database, watched</li>
+            <li><strong>Day 5</strong> — the production window, in the agreed quiet hour</li>
+            <li><strong>Days 5–12</strong> — watching week, old database kept readable</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>📋 Needed before the window is scheduled</h3>
+          <ul style="margin: 12px 0 0 18px; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8;">
+            <li>The AWS account, and agreement on instance size and backup retention</li>
+            <li>An agreed date and hour, with the operator present</li>
+            <li>Confirmation that no seeding or admin work is scheduled that day</li>
+            <li>A named person who can say "stop"</li>
+            <li>A clean rehearsal — no production window is booked before Day 3 passes</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout">
+        <h4>One honest note on timing</h4>
+        <p>The same migration becomes <strong>markedly simpler after 5 November</strong>, when the database becomes read-only and the freeze removes the possibility of writes landing in two places at once. Doing it now is achievable and this plan is built for it — but if the date is flexible, later is safer, and the work is identical.</p>
+      </div>
+    </section>
+
+    <footer style="margin-top: 60px; padding-top: 24px; border-top: 1px solid var(--border-color); text-align: center; color: var(--text-muted); font-size: 0.85rem;">
+      <p>Zugzwang Engineering Team • Database migration plan: Supabase → AWS RDS • Confidential</p>
+    </footer>
+
+  </div>
+
+</body>
+</html>

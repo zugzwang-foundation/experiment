@@ -417,11 +417,11 @@
         </div>
         <div class="meta-item">
           <div class="label">Application code changed</div>
-          <div class="value" style="color: var(--accent-green);">None</div>
+          <div class="value">4 small changes — see §9</div>
         </div>
         <div class="meta-item">
           <div class="label">Validation</div>
-          <div class="value">10 / 10 stacks synthesize</div>
+          <div class="value">Image built and run — see §10</div>
         </div>
       </div>
     </header>
@@ -431,7 +431,7 @@
       <h2 class="section-title"><span class="number">1</span> In one paragraph</h2>
       <div class="card">
         <p style="font-size: 1.02rem;">
-          Zugzwang runs on Vercel today. To move it to AWS we did <strong>not</strong> start by clicking around the AWS console. We first read the whole codebase to find everything that works only because it is on Vercel, and then wrote the AWS setup <strong>as code</strong> — ten files that describe every server, network rule, alarm and scheduled job the project needs. That code has been checked and produces a valid AWS plan, but it has not been run against AWS, and the application itself is untouched.
+          Zugzwang runs on Vercel today. To move it to AWS we did <strong>not</strong> start by clicking around the AWS console. We first read the whole codebase to find everything that works only because it is on Vercel, and then wrote the AWS setup <strong>as code</strong> — ten files that describe every server, network rule, alarm and scheduled job the project needs, plus the packaging and the release pipeline. The application itself needed <strong>four small changes</strong>, each one gated so the live Vercel site behaves exactly as it does today. The container has been built and run; <strong>nothing has been deployed to AWS</strong>.
         </p>
       </div>
     </section>
@@ -596,7 +596,7 @@
             <text x="402" y="66" class="sn">03</text><text x="436" y="66" class="done">DONE</text>
             <text x="402" y="88" class="st">Generate + check</text>
             <text x="402" y="104" class="sd">10/10 plans valid,</text>
-            <text x="402" y="117" class="sd">2 risks flagged early</text>
+            <text x="402" y="117" class="sd">checked before deploy</text>
             <line x1="548" y1="85" x2="572" y2="85" stroke="#64748b" stroke-width="1.6" marker-end="url(#ah2)" />
 
             <rect x="576" y="46" width="160" height="78" rx="10" fill="#161f33" stroke="#f59e0b" />
@@ -689,11 +689,11 @@
       <div class="grid-3">
         <div class="card">
           <h3>🌍 Region cannot drift</h3>
-          <p>AWS tooling defaults to the operator's own region. On a console setup that is invisible until the app is slow in production; here it is pinned in code and visible in a generated file before anything exists.</p>
+          <p>The region is pinned in code, so compute always sits beside the database. On a console setup a wrong region is invisible until the app is slow in production.</p>
         </div>
         <div class="card">
           <h3>🔁 Ordering is proven up front</h3>
-          <p>Resource ordering is checked before deployment. AWS would otherwise fail halfway through, with resources already created and a half-built environment to clean up.</p>
+          <p>Resource ordering is checked before deployment, so AWS never starts building an environment it cannot finish.</p>
         </div>
         <div class="card">
           <h3>🔐 Proved there are no secrets</h3>
@@ -781,7 +781,7 @@
             <tr><td><strong>Health check on <code>/api/health</code></strong></td><td>The project already treats this endpoint as the truth about a deployment, so AWS uses the same signal.</td></tr>
             <tr><td><strong>Migrations run before new code serves</strong></td><td>Your existing rule (ADR-0024). If a migration fails, the old version keeps serving and nothing breaks.</td></tr>
             <tr><td><strong>Automatic rollback</strong></td><td>A new version that fails its health checks is replaced by the previous one without waiting for a human.</td></tr>
-            <tr><td><strong>NAT in production, not staging</strong></td><td>NAT costs ~$32/month. Production gets it; staging uses a cheaper arrangement with the same inbound protection.</td></tr>
+            <tr><td><strong>NAT in production, not staging</strong></td><td>Production gets a managed outbound gateway; staging uses a simpler arrangement with the same inbound protection.</td></tr>
             <tr><td><strong>Firewall and CDN optional</strong></td><td>Cloudflare already fronts your domain, and two CDNs in series cause more problems than they solve. Off by default, on in one line.</td></tr>
           </tbody>
         </table>
@@ -1005,95 +1005,172 @@
     </section>
 
     <!-- 8 -->
+    <!-- 9: the migration work -->
     <section class="section">
-      <h2 class="section-title"><span class="number">9</span> What the audit found — the things that would have broken</h2>
-      <p style="color: var(--text-secondary); margin-bottom: 16px;">We read the application code before writing any AWS code. Five findings would have caused real incidents.</p>
+      <h2 class="section-title"><span class="number">9</span> What we did to move the app off Vercel</h2>
+      <p style="color: var(--text-secondary); margin-bottom: 20px;">The AWS setup describes where the application will run. Three more pieces make it actually runnable there: a way to package the app, four small changes inside the app, and a pipeline that puts new versions out safely.</p>
+
       <div class="grid-2">
         <div class="card">
-          <h3 style="color: var(--accent-red);">⚠ The scheduled jobs</h3>
-          <p><code>close-due-markets</code> runs <strong>every minute</strong>, and nothing else closes markets. Recreated on AWS, with an alarm for both failure and silence.</p>
+          <h3>📦 Packaging — the <code>Dockerfile</code></h3>
+          <p>Two images come out of one file:</p>
+          <ul style="margin: 12px 0 0 18px; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8;">
+            <li><strong>the app</strong> — Node 24, runs as a non-root user, 339 MB, with its own health probe</li>
+            <li><strong>the migrations</strong> — separate, because migrations need development tools the app image deliberately does not carry</li>
+          </ul>
+          <p style="margin-top: 12px;">⚠ <strong>An image belongs to one environment.</strong> Some settings are baked in during the build, so a staging image can never be promoted to production. Each environment builds its own, and the tag says which.</p>
         </div>
         <div class="card">
-          <h3 style="color: var(--accent-red);">⚠ The deployment check would have gone blind</h3>
-          <p><code>/api/health</code> reports which version is live using a value <strong>only Vercel provides</strong>. On AWS it returns empty, and the check that proves the right version is live quietly stops working. Our code supplies a replacement; the app needs a one-line change to read it.</p>
-        </div>
-        <div class="card">
-          <h3 style="color: var(--accent-red);">⚠ An image belongs to one environment</h3>
-          <p>Some settings are baked in when the app is built, so a staging build can never be promoted to production. The deployment flow accounts for it.</p>
-        </div>
-        <div class="card">
-          <h3 style="color: var(--accent-red);">⚠ A missing monitoring key crashes the app</h3>
-          <p>Without one Sentry value the app refuses to start. It is now in the required list, at both build and run time.</p>
+          <h3>🔐 Secrets never enter the image</h3>
+          <p>The build needs the full environment — it evaluates every page's code, and several read their configuration on load. That environment is <strong>mounted as a secret for the build only</strong>, so it lands in no layer of the image.</p>
+          <p style="margin-top: 12px;">What the app uses when running is separate again: AWS injects it from the vault as the container starts.</p>
         </div>
       </div>
+
+      <div class="card" style="margin-top: 24px;">
+        <h3>🔧 Four changes inside the application — and why each is small</h3>
+        <div class="table-container" style="margin-top: 12px;">
+          <table>
+            <thead>
+              <tr><th>Change</th><th>Why it was needed</th><th>Effect on the live Vercel site</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Self-contained build output</strong></td>
+                <td>A container needs the app packaged with everything it runs on</td>
+                <td class="highlight-aws"><strong>None</strong> — switched on only by the container build; we built the Vercel path and confirmed the output is unchanged</td>
+              </tr>
+              <tr>
+                <td><strong>Health endpoint reports the container's version</strong></td>
+                <td class="highlight-issue">Without it the deploy check goes blind: it reads a value only Vercel provides, so off-platform it returns empty while still answering "OK"</td>
+                <td class="highlight-aws"><strong>None</strong> — Vercel's own value keeps priority; the fallback only speaks when Vercel is silent</td>
+              </tr>
+              <tr>
+                <td><strong>Visitor IP read from the standard header</strong></td>
+                <td>The old helper reads a header only Vercel sets, so one log column would quietly empty</td>
+                <td class="highlight-aws"><strong>None in practice</strong> — the platform helper still answers first. Diagnostic only; it controls nothing</td>
+              </tr>
+              <tr>
+                <td><strong>Type-checking excludes the infrastructure folder</strong></td>
+                <td class="highlight-issue">Required: without it the Vercel build would try to check the AWS code and <strong>fail</strong>, because those tools are not installed there</td>
+                <td class="highlight-aws"><strong>Protects it</strong> — this is what keeps the Vercel build working once the new folder exists</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 24px;">
+        <h3>🚚 The pipeline — four stages, and the order is the safety</h3>
+        <div class="diagram-box" style="margin-top: 12px; overflow-x: auto;">
+          <div class="diagram-flow">
+            <div class="flow-node">
+              <div class="title">1. Build</div>
+              <div class="sub">one image per environment, tagged with the commit</div>
+            </div>
+            <div class="flow-arrow">➔</div>
+            <div class="flow-node highlight">
+              <div class="title">2. Migrate</div>
+              <div class="sub">database first — if this fails, the OLD version keeps serving</div>
+            </div>
+            <div class="flow-arrow">➔</div>
+            <div class="flow-node">
+              <div class="title">3. Deploy</div>
+              <div class="sub">new version starts beside the old one</div>
+            </div>
+            <div class="flow-arrow">➔</div>
+            <div class="flow-node">
+              <div class="title">4. Verify</div>
+              <div class="sub">the live site must report the exact version deployed</div>
+            </div>
+          </div>
+        </div>
+        <p style="margin-top: 16px;">⚠ <strong>It only runs when a person starts it.</strong> While the experiment is live, a code merge must not be able to move production to another platform. That trigger changes on the day the cutover is agreed, and not before.</p>
+      </div>
+    </section>
+
+    <!-- 10: verification -->
+    <section class="section">
+      <h2 class="section-title"><span class="number">10</span> How we verify it all works</h2>
+      <p style="color: var(--text-secondary); margin-bottom: 20px;">Every claim below was produced by running something, not by reading the code and concluding it should work. Where something has not been verified yet, it says so.</p>
+
+      <h3 style="font-size: 1.05rem; margin: 8px 0 12px; color: var(--text-secondary);">Already verified — the container was built and run</h3>
+      <div class="card">
+        <p>The real image was built from the current code and started against staging data. It answered:</p>
+        <div class="code-box">{"status":"ok","env":"preview","canary":"main-40f77c5",<br>&nbsp;"region":"ap-south-1","db":"ok","migrations":"ok"}</div>
+        <p style="margin-top: 12px;">Every field in that line is a separate thing proven:</p>
+        <ul style="margin: 12px 0 0 18px; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8;">
+          <li><code>canary</code> — the deploy check works off Vercel; it names the exact build running</li>
+          <li><code>region</code> — the app knows where it is, so a wrong region is visible instead of silent</li>
+          <li><code>db</code> — it reached the database through the same pooled connection it uses today</li>
+          <li><code>migrations</code> — the migration files travelled into the image correctly</li>
+        </ul>
+      </div>
+
+      <div class="table-container" style="margin-top: 20px;">
+        <table>
+          <thead><tr><th>Check</th><th>How</th><th>Result</th></tr></thead>
+          <tbody>
+            <tr><td>The image builds</td><td>real build from the current code</td><td class="highlight-aws">✅ 339 MB</td></tr>
+            <tr><td>The app serves</td><td>container started, four pages requested</td><td class="highlight-aws">✅ home, market, version, sign-in — all 200</td></tr>
+            <tr><td>The app reports itself healthy</td><td>the container's own probe</td><td class="highlight-aws">✅ healthy</td></tr>
+            <tr><td>The AWS plan is valid</td><td>generated, with no AWS credentials</td><td class="highlight-aws">✅ 10 / 10 environments</td></tr>
+            <tr><td>The code compiles</td><td>type check, app and infrastructure</td><td class="highlight-aws">✅</td></tr>
+            <tr><td>Code style</td><td>the project's checker, whole repository</td><td class="highlight-aws">✅ clean</td></tr>
+            <tr><td>Tests</td><td>every suite touching the changed files</td><td class="highlight-aws">✅ 105 passed</td></tr>
+            <tr><td><strong>The live Vercel site is unaffected</strong></td><td>built the Vercel path and compared the output</td><td class="highlight-aws">✅ unchanged</td></tr>
+            <tr><td>No secrets in the AWS plan</td><td>scanned the generated files</td><td class="highlight-aws">✅ 31 secrets, all references</td></tr>
+            <tr><td>The new folder cannot break the Vercel install</td><td>ran the same install command Vercel runs</td><td class="highlight-aws">✅ unchanged</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 style="font-size: 1.05rem; margin: 32px 0 12px; color: var(--text-secondary);">Not verified yet — and honestly so</h3>
+      <div class="grid-2">
+        <div class="card">
+          <h3 style="color: var(--accent-red);">⚠ Only provable on AWS</h3>
+          <ul style="margin: 12px 0 0 18px; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8;">
+            <li>the scheduled jobs actually firing, and the alarms actually alerting</li>
+            <li>a rolling release with automatic rollback</li>
+            <li>behaviour under real traffic: memory, connections, latency</li>
+            <li>sign-in, betting and posting by a real person on the deployed site</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>🧪 What the staging soak is for</h3>
+          <p>Deploy to staging, then leave it running <strong>24 hours</strong> and watch four things: the every-minute job keeps firing, database connections stay flat, memory does not climb, and no new errors appear.</p>
+          <p style="margin-top: 12px;">Only after that does a production cutover get a date.</p>
+        </div>
+      </div>
+
+      <h3 style="font-size: 1.05rem; margin: 32px 0 12px; color: var(--text-secondary);">The checks at cutover</h3>
+      <div class="table-container">
+        <table>
+          <thead><tr><th>#</th><th>Check</th><th>Why this one</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>The live site reports the exact version just deployed</td><td>proves the new build is serving, not a cached old one</td></tr>
+            <tr><td>2</td><td>Database and migrations both report OK</td><td>the schema matches the code that is running</td></tr>
+            <tr><td>3</td><td>A market past its deadline actually closes</td><td class="highlight-issue">the every-minute job is the one whose silence nobody would notice</td></tr>
+            <tr><td>4</td><td>Place a small real bet, and post</td><td>exercises the whole write path end to end</td></tr>
+            <tr><td>5</td><td>Sign in with Google and with an email code</td><td>third-party callbacks still land on the new host</td></tr>
+            <tr><td>6</td><td>Images load, on a market page and a profile</td><td>signed file access still works from the new network</td></tr>
+            <tr><td>7</td><td>An error reaches monitoring</td><td>if this is broken, every later problem is invisible</td></tr>
+            <tr><td>8</td><td>Watch for 48 hours with the old platform still deployable</td><td>rollback stays one DNS change away</td></tr>
+          </tbody>
+        </table>
+      </div>
       <div class="callout">
-        <h4>Fifth finding</h4>
-        <p>IP addresses in the logs come from a Vercel-only helper. On AWS that one log field would be empty until a small change is made. Worth knowing, not urgent.</p>
+        <h4>If any of it fails</h4>
+        <p>DNS goes back to Vercel, which stays deployable for 48 hours after the cutover. And a release that never turns healthy is withdrawn by AWS on its own, without waiting for someone to notice.</p>
       </div>
     </section>
 
     <!-- 6 -->
-    <section class="section">
-      <h2 class="section-title"><span class="number">10</span> What the validation step flagged</h2>
-      <p style="color: var(--text-secondary); margin-bottom: 16px;">Two risks that come with AWS tooling defaults, both surfaced by generating and checking the plan. Neither would have been visible while clicking through a console — they would have appeared during a deployment, or in production.</p>
-      <div class="grid-2">
-        <div class="card">
-          <h3>🔁 Resource ordering</h3>
-          <p>AWS refuses a setup where two groups of resources each need the other first — a normal constraint when logging, permissions and the cluster are split across groups. The check surfaced it on a laptop in seconds; on a console build it appears halfway through a deployment, with resources already created.</p>
-        </div>
-        <div class="card">
-          <h3>🌍 Region is pinned, not inherited</h3>
-          <p>AWS tooling defaults to whatever region the operator's profile happens to use — <code>us-east-1</code> (Virginia) here. Left at the default, the app would sit on the other side of the world from its database, undoing the single biggest performance fix this project has made. The region is now <strong>fixed in code</strong> and cannot be inherited by accident, on anyone's machine.</p>
-        </div>
-      </div>
-    </section>
-
     <!-- 7 -->
-    <section class="section">
-      <h2 class="section-title"><span class="number">11</span> How we checked the work</h2>
-      <div class="table-container">
-        <table>
-          <thead><tr><th>Check</th><th>Result</th></tr></thead>
-          <tbody>
-            <tr><td>Does the AWS plan generate?</td><td class="highlight-aws">✅ All 10 environment setups produce valid AWS plans</td></tr>
-            <tr><td>Does the code compile?</td><td class="highlight-aws">✅ Type check passes</td></tr>
-            <tr><td>Code style</td><td class="highlight-aws">✅ Passes the project's checker</td></tr>
-            <tr><td>Staging and production genuinely separate?</td><td class="highlight-aws">✅ Different networks, sizes, secrets, image stores, retention</td></tr>
-            <tr><td>Any secrets in the generated plan?</td><td class="highlight-aws">✅ None — 31 secrets, all references</td></tr>
-            <tr><td>Application code touched?</td><td class="highlight-aws">✅ Not one file</td></tr>
-            <tr><td>Anything deployed?</td><td class="highlight-aws">✅ No</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
     <!-- 8 -->
-    <section class="section">
-      <h2 class="section-title"><span class="number">12</span> Cost</h2>
-      <div class="grid-2">
-        <div class="card">
-          <h3>💰 Monthly, Mumbai list prices</h3>
-          <ul style="margin: 12px 0 0 18px; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8;">
-            <li>EC2 <code>t3.medium</code> (2 vCPU, 4 GB, always on): <strong>~$30</strong>, or ~$18 with a 1-year commitment</li>
-            <li>Load balancer: <strong>~$18 – 25</strong></li>
-            <li>NAT (production only): <strong>~$32</strong></li>
-            <li>Image storage, logs, transfer: <strong>~$5 – 10</strong></li>
-            <li>Firewall (optional): <strong>~$8</strong></li>
-            <li>Production total: <span style="color: var(--accent-green); font-weight: 700;">~$90 – 100</span></li>
-            <li>Staging total: <span style="color: var(--accent-green); font-weight: 700;">~$45 – 55</span> (<code>t3.small</code>, no NAT)</li>
-          </ul>
-        </div>
-        <div class="card">
-          <h3>🎁 Credits, realistically</h3>
-          <p>AWS Activate for a startup is typically <strong>$1,000</strong>, or <strong>$5,000</strong> with an accelerator or investor association. That covers roughly <strong>10–15 months</strong> at the figures on the left.</p>
-          <p style="margin-top: 12px;">The one number still missing for a fair comparison is <strong>your current Vercel bill</strong>.</p>
-        </div>
-      </div>
-    </section>
-
     <!-- 9 -->
     <section class="section">
-      <h2 class="section-title"><span class="number">13</span> What is still needed before going live</h2>
+      <h2 class="section-title"><span class="number">11</span> What is still needed before going live</h2>
       <div class="timeline">
         <div class="timeline-item">
           <div class="timeline-time">App changes<br>4 items</div>

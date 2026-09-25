@@ -14,11 +14,12 @@ pnpm synth            # synthesizes all 10 stacks, no AWS credentials needed
 
 ## What it builds
 
-Per environment (`staging`, `production`), five stacks:
+Per environment (`staging`, `production`), six stacks:
 
 | Stack | Contains |
 |---|---|
-| `Network` | VPC across 2 AZs, ALB and task security groups, optional NAT |
+| `Network` | VPC across 2 AZs, ALB / task / database security groups, isolated DB subnets, optional NAT |
+| `Database` | RDS for PostgreSQL 17 in the isolated subnets, a parameter group that preloads `pg_cron`, generated credentials in Secrets Manager, backups that outlive the instance (ADR-0059) |
 | `Security` | ECR repository, the Secrets Manager reference, the CloudWatch log group, execution role, task role |
 | `Compute` | ECS cluster on **EC2** (auto scaling group, launch template, capacity provider, instance role), app task, migration task, ALB + listeners, optional WAF / CloudFront / Route 53 |
 | `Scheduler` | EventBridge connection, three API destinations, three rules — the `vercel.json` crons |
@@ -36,6 +37,13 @@ calls anywhere, which is what lets `cdk synth` run in CI with no credentials.
 2. **Set the certificate ARN** (`ZZ_STAGING_CERT_ARN` / `ZZ_PROD_CERT_ARN`).
    Without one the ALB gets an HTTP-only listener so the stack still synthesizes.
 3. **Set `ZZ_ALERT_EMAIL`** so alarms reach a human.
+3a. **After the `Database` stack is up, compose `DATABASE_URL`** from its outputs
+   (`Endpoint`, `Port`, `DatabaseName`) and the generated secret
+   (`zugzwang/<env>/database` → username + password), and put it in the app
+   secret. Then set `STAGING_PROJECT_REF_FRAGMENT` / `PROD_PROJECT_REF_FRAGMENT`
+   in Doppler to a substring of the RDS endpoint — the migration guards refuse
+   any URL that does not contain it, and today they are set to the Supabase
+   refs. Nothing else about the migration scripts changes.
 4. **Application changes that this design assumes** (none of them made yet):
    - `output: 'standalone'` in `next.config.ts`;
    - `/api/health` falling back to `APP_COMMIT_SHA` / `APP_REGION`, or the
@@ -62,12 +70,17 @@ calls anywhere, which is what lets `cdk synth` run in CI with no credentials.
 - **`maxCapacity: 1`.** Not a cost decision. `cacheComponents` keeps Next's
   cache per process, so a second task would not see a `revalidateTag` raised by
   a moderation removal on the first. Raising it needs a shared cache handler.
-- **The task role has no AWS permissions.** The app's dependencies are Supabase,
-  Upstash, R2, OpenAI, Resend, Sentry and PostHog — none of them AWS APIs.
+- **The task role has no AWS permissions.** The app's dependencies are Upstash,
+  R2, OpenAI, Resend, Sentry and PostHog — none of them AWS APIs — and RDS is
+  reached over TCP inside the VPC, not through an AWS API.
+- **Compute never references the database stack.** The app reads `DATABASE_URL`
+  from the app secret, so replacing the RDS instance (restore, resize) is never
+  a compute redeploy, and the cutover is one value changed in the vault.
 - **`stopTimeout` 30 s and a 30 s deregistration delay**, because `after()` work
   (the cache counters) runs once the response is already out.
 - **A cron-silence alarm**, not only a failure alarm: `close-due-markets` runs
   every minute, and a scheduler that simply stops produces no error anywhere —
   markets just never close.
-- **Region pinned to `ap-south-1`.** Supabase is there; compute in another
-  region would undo the PERF-1 latency fix.
+- **Region pinned to `ap-south-1`.** The database is there — Supabase today,
+  RDS in the same VPC after cutover; compute in another region would undo the
+  PERF-1 latency fix.

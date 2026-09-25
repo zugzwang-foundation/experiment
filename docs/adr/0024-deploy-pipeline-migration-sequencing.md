@@ -8,7 +8,7 @@
 | **Tracker task** | — (out-of-tracker infra task; outcomes fold into the next combined tracker sweep — regularize-later) |
 | **Frame document** | ADR-0006 (Hosting Topology — parent; refined re two-project split); ADR-0022 (prod-apply path + drift guard — inherited; drift-comparison + health-env-var partially superseded); SPEC.2 §6 (migration set / append-only), §17 (Observability — drift surface), §21 (Operational Runbook Pointers), §22 (ADR Index); AGENTS.md §6 (Migrations) |
 | **Supersedes** | ADR-0022 — **scoped:** the `/api/health` drift-comparison method (timestamp → per-hash, `src/server/health/migration-drift.ts` only) and the "health route reads only its two named env vars" line (adds `VERCEL_GIT_COMMIT_SHA`). ADR-0022's prod-apply path and its `db:check-drift` timestamp+count method are **inherited unchanged**. |
-| **Superseded-by** | — |
+| **Superseded-by** | ADR-0059 (partial — Decision Outcome #1's two standing Supabase projects become two RDS instances in the application VPC, and #8's Supavisor pooler modes no longer describe the host; the deploy flow, migrate-before-serve, the per-hash `/api/health` gate and staging-as-prod-replica are inherited unchanged) |
 
 ---
 

@@ -45,7 +45,22 @@ export const productionConfig: EnvironmentConfig = {
 	secretKeys: RUNTIME_SECRET_KEYS,
 	cronAuthHeaderKey: "CRON_AUTH_HEADER",
 
+	// Multi-AZ, a week of point-in-time recovery, and deletion protection: the
+	// append-only ledger lives here, and the one outcome the migration plan
+	// cannot repair is a lost or half-written database.
+	// `t4g.small` holds the entire (<1 MB) dataset in memory many times over.
+	database: {
+		instanceType: "t4g.small",
+		multiAz: true,
+		allocatedStorageGb: 20,
+		maxAllocatedStorageGb: 100,
+		backupRetentionDays: 7,
+		deletionProtection: true,
+		masterUsername: "zugzwang",
+	},
+
 	migrationCommand: ["pnpm", "db:migrate:prod"],
+	migrationSecretKeys: ["DATABASE_URL_PROD", "PROD_PROJECT_REF_FRAGMENT"],
 
 	logRetentionDays: 90,
 	alertEmail: process.env.ZZ_ALERT_EMAIL,

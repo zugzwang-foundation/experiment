@@ -134,7 +134,17 @@ CMD ["node", "server.js"]
 FROM node:24-alpine AS migrate
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
-RUN corepack enable
+# ⚠ `corepack enable` alone leaves pnpm as a SHIM that downloads the real binary
+# on FIRST USE — at task start, inside the VPC, where a staging task has no
+# route to the registry. Measured at AWS-MIGRATION-2: the migration task died
+# on `UND_ERR_CONNECT_TIMEOUT` fetching pnpm before it touched the database.
+# `corepack prepare --activate` resolves the `packageManager` pin from
+# package.json and caches the binary in the image at BUILD time, where the
+# network exists. `COREPACK_ENABLE_NETWORK=0` then makes any later attempt to
+# download fail loudly instead of hanging.
+COPY package.json ./
+RUN corepack enable && corepack prepare --activate
+ENV COREPACK_ENABLE_NETWORK=0
 ENV NODE_ENV=production \
 	NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules

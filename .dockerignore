@@ -28,10 +28,13 @@ tsconfig.tsbuildinfo
 
 # Not needed at runtime or for migrations
 docs
-# ⚠ …except one data file: tests/unit/debate/resolution-block-data.test.ts
-# imports this snapshot, and the build type-checks the tests. Excluding it fails
-# the image build with a missing-module error that looks nothing like its cause.
-!docs/data/staging-markets-snapshot.json
+# ⚠ …except the data snapshots: tests/unit/debate/resolution-block-data.test.ts
+# imports them, and the build type-checks the tests. Excluding one fails the
+# image build with a missing-module error that looks nothing like its cause —
+# which is exactly what happened when the prod snapshot joined the staging one
+# and this rule still named only the first. A glob, so the next snapshot is
+# admitted by shape rather than by remembering to edit this line.
+!docs/data/*.json
 # ⚠ tests/ STAYS IN THE BUILD CONTEXT. `next build` type-checks the whole
 # project, and scripts/lots-1-staging-wipe.ts imports from tests/staging — so
 # excluding it fails the build at type-check, not at runtime. The build stage is

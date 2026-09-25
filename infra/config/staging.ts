@@ -3,10 +3,16 @@ import { type EnvironmentConfig, RUNTIME_SECRET_KEYS } from "./types";
 /**
  * Staging — the resettable sandbox (ADR-0024).
  *
- * No NAT Gateway: tasks sit in public subnets with a public IP and accept
- * traffic only from the ALB security group. That is the same security posture
- * as a private subnet for INBOUND purposes and saves ~$32/month; production
- * takes the NAT instead because it is worth paying there.
+ * ⚠ ONE NAT GATEWAY, THE SAME AS PRODUCTION. This block used to say "no NAT:
+ * tasks sit in public subnets with a public IP" — true for Fargate, FALSE for
+ * ECS on EC2 with `awsvpc` networking, where a task's own network interface
+ * never gets a public IP whatever subnet it sits in. Measured at
+ * AWS-MIGRATION-2 with a one-off task: Sentry, Upstash, OpenAI and Cloudflare
+ * all timed out from a task on an instance that itself had internet. The app
+ * rendered pages (RDS is in-VPC) while every outbound integration was dead,
+ * which is the worst kind of "works": idempotency fails CLOSED, so bets would
+ * have been refused. Staging exists to rehearse production; it now has
+ * production's network shape.
  */
 export const stagingConfig: EnvironmentConfig = {
 	name: "staging",
@@ -19,7 +25,7 @@ export const stagingConfig: EnvironmentConfig = {
 	account: process.env.CDK_DEFAULT_ACCOUNT,
 
 	vpcCidr: "10.20.0.0/16",
-	natGateways: 0,
+	natGateways: 1,
 
 	containerPort: 3000,
 	cpu: 512,
@@ -44,7 +50,20 @@ export const stagingConfig: EnvironmentConfig = {
 	secretKeys: RUNTIME_SECRET_KEYS,
 	cronAuthHeaderKey: "CRON_AUTH_HEADER",
 
+	// Single-AZ and one day of backups: staging is a resettable sandbox
+	// (ADR-0035), and its database is rebuilt from fixtures, not restored.
+	database: {
+		instanceType: "t4g.micro",
+		multiAz: false,
+		allocatedStorageGb: 20,
+		maxAllocatedStorageGb: 50,
+		backupRetentionDays: 1,
+		deletionProtection: false,
+		masterUsername: "zugzwang",
+	},
+
 	migrationCommand: ["pnpm", "db:migrate:staging"],
+	migrationSecretKeys: ["DATABASE_URL_STAGING", "STAGING_PROJECT_REF_FRAGMENT"],
 
 	logRetentionDays: 14,
 	alertEmail: process.env.ZZ_ALERT_EMAIL,

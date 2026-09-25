@@ -222,7 +222,19 @@ export class ComputeStack extends Stack {
 				ZUGZWANG_ENV: config.zugzwangEnv,
 				DB_POOLER_MODE: "session",
 			},
-			secrets,
+			// The app's keys PLUS the suffix-separated ones the migration scripts
+			// insist on (`DATABASE_URL_STAGING` + the ref fragment) — the first
+			// staging deploy would otherwise have started this task only to watch
+			// it exit 1 on "DATABASE_URL_STAGING is not set".
+			secrets: {
+				...secrets,
+				...Object.fromEntries(
+					config.migrationSecretKeys.map((key) => [
+						key,
+						ecs.Secret.fromSecretsManager(props.appSecret, key),
+					]),
+				),
+			},
 			logging: ecs.LogDrivers.awsLogs({
 				streamPrefix: "migrate",
 				logGroup: this.logGroup,
@@ -256,12 +268,33 @@ export class ComputeStack extends Stack {
 			},
 		});
 
-		if (config.certificateArn) {
-			const certificate = acm.Certificate.fromCertificateArn(
-				this,
-				"Certificate",
-				config.certificateArn,
-			);
+		// ⚠ ONE port-80 listener construct in BOTH cases, and that is a CloudFormation
+		// constraint rather than a style choice. Modelled as two constructs (an HTTP
+		// listener without a certificate, a redirect listener with one), the first
+		// deploy that adds a certificate asks CloudFormation to CREATE the redirect
+		// on :80 before it DELETES the old listener on :80 — and the ALB refuses:
+		// "A listener already exists on this port" (measured at AWS-MIGRATION-2;
+		// the update rolled back cleanly). Keeping the logical id stable and
+		// varying only the default action makes it an in-place UPDATE.
+		const certificate = config.certificateArn
+			? acm.Certificate.fromCertificateArn(
+					this,
+					"Certificate",
+					config.certificateArn,
+				)
+			: undefined;
+		this.loadBalancer.addListener("Http", {
+			port: 80,
+			protocol: elbv2.ApplicationProtocol.HTTP,
+			defaultAction: certificate
+				? elbv2.ListenerAction.redirect({
+						protocol: "HTTPS",
+						port: "443",
+						permanent: true,
+					})
+				: elbv2.ListenerAction.forward([this.targetGroup]),
+		});
+		if (certificate) {
 			this.loadBalancer.addListener("Https", {
 				port: 443,
 				protocol: elbv2.ApplicationProtocol.HTTPS,
@@ -269,22 +302,10 @@ export class ComputeStack extends Stack {
 				sslPolicy: elbv2.SslPolicy.RECOMMENDED_TLS,
 				defaultTargetGroups: [this.targetGroup],
 			});
-			this.loadBalancer.addRedirect({
-				sourceProtocol: elbv2.ApplicationProtocol.HTTP,
-				sourcePort: 80,
-				targetProtocol: elbv2.ApplicationProtocol.HTTPS,
-				targetPort: 443,
-			});
-		} else {
-			// No certificate supplied yet — HTTP listener so the stack still
-			// synthesizes and can be deployed before DNS/ACM exist. Never leave an
-			// environment in this state once it serves real traffic.
-			this.loadBalancer.addListener("Http", {
-				port: 80,
-				protocol: elbv2.ApplicationProtocol.HTTP,
-				defaultTargetGroups: [this.targetGroup],
-			});
 		}
+		// Without a certificate the :80 listener forwards, so the stack still
+		// synthesizes and can be deployed before DNS/ACM exist. Never leave an
+		// environment in that state once it serves real traffic.
 
 		// ── Service ─────────────────────────────────────────────────────────────
 		this.service = new ecs.Ec2Service(this, "Service", {
