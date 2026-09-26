@@ -323,8 +323,12 @@ jobs:
           if [ "${{ inputs.environment || 'staging' }}" = "production" ] && [ -z "$ZZ_ALERT_EMAIL" ]; then
             echo "ZZ_ALERT_EMAIL is not set on the ${{ inputs.environment || 'staging' }} environment — refusing to synth an alarm topic with no subscriber"; exit 1
           fi
-          pnpm install --frozen-lockfile
-          pnpm exec cdk deploy "Zugzwang-${{ inputs.environment || 'staging' }}-Compute" \
+          # `--ignore-workspace` is load-bearing: the repository root holds a
+          # pnpm-workspace.yaml, so a bare `pnpm install` here installs the ROOT
+          # project (866 packages) and never infra/pnpm-lock.yaml — `cdk` is
+          # then "not found" (run 36233879711; reproduced and fixed locally).
+          pnpm install --frozen-lockfile --ignore-workspace
+          pnpm --ignore-workspace exec cdk deploy "Zugzwang-${{ inputs.environment || 'staging' }}-Compute" \
             -c imageTag=${{ needs.build.outputs.image_tag }} \
             --require-approval never
 
