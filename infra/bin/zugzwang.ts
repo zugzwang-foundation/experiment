@@ -122,13 +122,26 @@ if (app.node.tryGetContext("deployStack") === "true") {
 			"ZZ_GITHUB_REPOSITORY (owner/repo) is required to synth Zugzwang-Deploy",
 		);
 	}
+	// `-c deployEnvironments=staging` creates ONLY the staging deploy role, so
+	// the staging pipeline can be stood up without minting a production role
+	// before production is approved. Default: both.
+	const only = app.node.tryGetContext("deployEnvironments") as
+		| string
+		| undefined;
+	const wanted = only ? only.split(",").map((e) => e.trim()) : undefined;
+	const environments = [stagingConfig, productionConfig].filter(
+		(c) => !wanted || wanted.includes(c.name),
+	);
+	if (environments.length === 0) {
+		throw new Error(`deployEnvironments=${only} names no known environment`);
+	}
 	const deploy = new DeployStack(app, "Zugzwang-Deploy", {
 		env: {
 			account: process.env.CDK_DEFAULT_ACCOUNT,
 			region: process.env.ZZ_AWS_REGION ?? "ap-south-1",
 		},
 		githubRepository,
-		environments: [stagingConfig, productionConfig].map((c) => ({
+		environments: environments.map((c) => ({
 			name: c.name,
 			bootstrapQualifier: c.bootstrapQualifier,
 		})),

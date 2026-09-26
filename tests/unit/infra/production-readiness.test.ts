@@ -127,3 +127,35 @@ describe("§I — the WAF starts in COUNT and staging is untouched by default", 
 		);
 	});
 });
+
+describe("STAGING-PUSH-DEPLOY — a push deploys staging and can never reach production", () => {
+	const workflow = readFileSync(
+		join(REPO_ROOT, ".github/workflows/deploy-aws.yml"),
+		"utf8",
+	);
+
+	it("the only push trigger is the staging branch", () => {
+		const on = workflow.slice(
+			workflow.indexOf("\non:"),
+			workflow.indexOf("\nconcurrency:"),
+		);
+		// Positive control: the block was found and carries the push trigger.
+		expect(on).toMatch(/push:\s*\n\s*branches:\s*\[staging\]/);
+		expect(on.match(/branches:/g)?.length).toBe(1);
+	});
+
+	it("every environment read falls back to staging, never to an unset value", () => {
+		const reads = workflow.match(/inputs\.environment[^}\n]*/g) ?? [];
+		expect(reads.length).toBeGreaterThan(10);
+		for (const read of reads) {
+			expect(read).toMatch(/^inputs\.environment \|\| 'staging'/);
+		}
+	});
+
+	it("the guard job refuses a push that resolves to anything but staging", () => {
+		expect(workflow).toContain(
+			'if [ "$EVENT" = "push" ] && [ "$TARGET" != "staging" ]; then',
+		);
+		expect(workflow).toContain("EVENT: ${{ github.event_name }}");
+	});
+});
