@@ -1,4 +1,4 @@
-import { Duration, Stack, type StackProps } from "aws-cdk-lib";
+import { Annotations, Duration, Stack, type StackProps } from "aws-cdk-lib";
 import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 import * as actions from "aws-cdk-lib/aws-cloudwatch-actions";
 import type * as ecs from "aws-cdk-lib/aws-ecs";
@@ -37,6 +37,15 @@ export class MonitoringStack extends Stack {
 			topicName: `zugzwang-${config.name}-alarms`,
 			displayName: `Zugzwang ${config.name} alarms`,
 		});
+		// PROD-DEPLOY-NO-VARS — the alert-email check left deploy-aws.yml (that
+		// job deploys Compute only, which never reads the address). It lives
+		// here, on the one stack that uses it: production alarms with no
+		// subscriber fire into nothing, so a production Monitoring synth refuses.
+		if (config.name === "production" && !config.alertEmail) {
+			Annotations.of(this).addError(
+				"Refusing to synthesize production Monitoring without an alarm subscriber: set ZZ_ALERT_EMAIL (09-PRODUCTION-READINESS.md §F).",
+			);
+		}
 		if (config.alertEmail) {
 			this.topic.addSubscription(
 				new subscriptions.EmailSubscription(config.alertEmail),

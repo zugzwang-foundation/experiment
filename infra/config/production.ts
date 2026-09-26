@@ -1,6 +1,18 @@
 import { type EnvironmentConfig, RUNTIME_SECRET_KEYS } from "./types";
 
 /**
+ * PROD-DEPLOY-NO-VARS — the ACM certificate for `zugzwangworld.com` on the
+ * production ALB, committed like staging's (not a secret). ⛔ NOT YET ISSUED
+ * (09-PRODUCTION-READINESS.md §P, item 13): set this constant to the issued
+ * ARN in the same PR that records the issuance. Until then every production
+ * Compute synth REFUSES (compute-stack.ts), so nothing can deploy an HTTP-only
+ * production listener. `ZZ_PROD_CERT_ARN` still overrides it for a hand-run
+ * deploy; the GitHub workflow no longer reads it, because `vars.*` arrived
+ * empty in four staging runs.
+ */
+export const PRODUCTION_CERTIFICATE_ARN: string | undefined = undefined;
+
+/**
  * Production.
  *
  * ⚠ `maxCapacity: 1` is deliberate and is a correctness constraint, not a cost
@@ -55,7 +67,7 @@ export const productionConfig: EnvironmentConfig = {
 	writesPaused:
 		process.env.ZZ_PROD_WRITES_PAUSED === "paused" ? "paused" : undefined,
 
-	certificateArn: process.env.ZZ_PROD_CERT_ARN,
+	certificateArn: process.env.ZZ_PROD_CERT_ARN || PRODUCTION_CERTIFICATE_ARN,
 	appBaseUrl: "https://zugzwangworld.com",
 	cloudFrontEnabled: false,
 	wafEnabled: true,

@@ -50,18 +50,19 @@ describe("the deploy job's variable checks", () => {
 		);
 	});
 
-	it("still refuses production without its certificate", () => {
-		expect(workflow).toContain(
-			`if [ "\${{ inputs.environment || 'staging' }}" = "production" ] && [ -z "$ZZ_PROD_CERT_ARN" ]; then`,
-		);
+	it("reads no GitHub variables at all (PROD-DEPLOY-NO-VARS)", () => {
+		// vars.* arrived empty in four staging runs; nothing in the deploy
+		// path may depend on them.
+		expect(workflow).not.toMatch(/\$\{\{\s*vars\./);
 	});
 
-	it("requires the alert email for production only", () => {
+	it("takes the write-pause from the dispatch input, per environment", () => {
 		expect(workflow).toContain(
-			`if [ "\${{ inputs.environment || 'staging' }}" = "production" ] && [ -z "$ZZ_ALERT_EMAIL" ]; then`,
+			"ZZ_PROD_WRITES_PAUSED: ${{ (inputs.environment || 'staging') == 'production' && (inputs.writes || 'open') == 'paused' && 'paused' || '' }}",
 		);
-		// Positive control: the message still exists, gated to production.
-		expect(workflow).toContain("ZZ_ALERT_EMAIL is not set on the");
+		expect(workflow).toContain(
+			"ZZ_STAGING_WRITES_PAUSED: ${{ (inputs.environment || 'staging') == 'staging' && (inputs.writes || 'open') == 'paused' && 'paused' || '' }}",
+		);
 	});
 });
 
