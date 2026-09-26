@@ -1,5 +1,9 @@
 import { type EnvironmentConfig, RUNTIME_SECRET_KEYS } from "./types";
 
+/** The ACM certificate on the staging ALB's :443 listener (not a secret). */
+export const STAGING_CERTIFICATE_ARN =
+	"arn:aws:acm:ap-south-1:849076101704:certificate/c166e9a8-7c6d-4763-a5d6-91fc743be239";
+
 /**
  * Staging — the resettable sandbox (ADR-0024).
  *
@@ -59,7 +63,12 @@ export const stagingConfig: EnvironmentConfig = {
 	writesPaused:
 		process.env.ZZ_STAGING_WRITES_PAUSED === "paused" ? "paused" : undefined,
 
-	certificateArn: process.env.ZZ_STAGING_CERT_ARN,
+	// STAGING-DEPLOY-NO-VARS — the staging ACM certificate is a COMMITTED
+	// default (read from the live staging HTTPS listener, 2026-09-26), so the
+	// push-to-staging deploy cannot synth an HTTP-only listener just because a
+	// GitHub variable failed to arrive: four runs received every `vars.*`
+	// empty. Not a secret. `ZZ_STAGING_CERT_ARN` still overrides it.
+	certificateArn: process.env.ZZ_STAGING_CERT_ARN || STAGING_CERTIFICATE_ARN,
 	appBaseUrl: "https://staging.zugzwangworld.com",
 	cloudFrontEnabled: false,
 	// I — off unless a WAF rehearsal is running: `ZZ_STAGING_WAF=count` attaches

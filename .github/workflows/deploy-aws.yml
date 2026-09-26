@@ -316,14 +316,19 @@ jobs:
           if [ "${{ inputs.environment || 'staging' }}" = "production" ] && [ -z "$ZZ_PROD_CERT_ARN" ]; then
             echo "ZZ_PROD_CERT_ARN is not set on the production environment — refusing to synth an HTTP-only production listener"; exit 1
           fi
-          if [ "${{ inputs.environment || 'staging' }}" = "staging" ] && [ -z "$ZZ_STAGING_CERT_ARN" ]; then
-            echo "ZZ_STAGING_CERT_ARN is not set on the staging environment — refusing to synth an HTTP-only staging listener"; exit 1
-          fi
-          if [ -z "$ZZ_ALERT_EMAIL" ]; then
+          # STAGING-DEPLOY-NO-VARS — staging needs neither variable here: its
+          # certificate is a committed default in infra/config/staging.ts, and
+          # the alert email feeds ONLY the Monitoring stack, which this job never
+          # deploys (it deploys Compute alone). Production keeps both checks.
+          if [ "${{ inputs.environment || 'staging' }}" = "production" ] && [ -z "$ZZ_ALERT_EMAIL" ]; then
             echo "ZZ_ALERT_EMAIL is not set on the ${{ inputs.environment || 'staging' }} environment — refusing to synth an alarm topic with no subscriber"; exit 1
           fi
-          pnpm install --frozen-lockfile
-          pnpm exec cdk deploy "Zugzwang-${{ inputs.environment || 'staging' }}-Compute" \
+          # `--ignore-workspace` is load-bearing: the repository root holds a
+          # pnpm-workspace.yaml, so a bare `pnpm install` here installs the ROOT
+          # project (866 packages) and never infra/pnpm-lock.yaml — `cdk` is
+          # then "not found" (run 36233879711; reproduced and fixed locally).
+          pnpm install --frozen-lockfile --ignore-workspace
+          pnpm --ignore-workspace exec cdk deploy "Zugzwang-${{ inputs.environment || 'staging' }}-Compute" \
             -c imageTag=${{ needs.build.outputs.image_tag }} \
             --require-approval never
 
@@ -378,7 +383,11 @@ jobs:
             CANARY=$(echo "$BODY" | jq -r '.canary // empty')
             DB=$(echo "$BODY" | jq -r '.db // empty')
             MIGRATIONS=$(echo "$BODY" | jq -r '.migrations // empty')
-            PAUSED=$(echo "$BODY" | jq -r '.writesPaused // empty')
+            # `tostring`, NOT `// empty`: jq's `//` treats `false` like null, so a
+            # correct `writesPaused: false` read as "" and failed this gate on a
+            # healthy deploy (run 36234538584). A missing field reads "null" and
+            # still fails the comparison below.
+            PAUSED=$(echo "$BODY" | jq -r '.writesPaused | tostring')
             echo "attempt $i: canary=$CANARY db=$DB migrations=$MIGRATIONS"
             if [ "$CANARY" = "$EXPECTED" ] && [ "$DB" = "ok" ] && [ "$MIGRATIONS" = "ok" ]; then
               echo "live build verified: $CANARY"
