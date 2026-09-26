@@ -194,22 +194,6 @@ export interface EnvironmentConfig {
 	};
 }
 
-/**
- * The ECS task roles' names, fixed rather than CloudFormation-generated so the
- * GitHub deploy role can `iam:PassRole` them by exact ARN (deploy-stack.ts).
- * One definition, read by both the stack that creates them and the one that
- * grants on them.
- */
-export function taskRoleNames(environment: string): {
-	execution: string;
-	task: string;
-} {
-	return {
-		execution: `zugzwang-${environment}-task-execution`,
-		task: `zugzwang-${environment}-task`,
-	};
-}
-
 /** A scheduled job, mapped 1:1 from `vercel.json` crons. */
 export interface CronJob {
 	readonly id: string;

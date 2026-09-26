@@ -25,7 +25,7 @@ const app = new App();
  * ordering itself. Adding `addDependency` on top of that is both deprecated and
  * how this app first produced a dependency cycle.
  */
-function defineEnvironment(config: EnvironmentConfig): void {
+function defineEnvironment(config: EnvironmentConfig): SecurityStack {
 	const prefix = `Zugzwang-${config.name}`;
 	// H-3: every stack of an environment deploys through that environment's own
 	// bootstrap roles. The default qualifier is left implicit, so staging's
@@ -103,10 +103,13 @@ function defineEnvironment(config: EnvironmentConfig): void {
 		Tags.of(stack).add("Environment", config.name);
 		Tags.of(stack).add("ManagedBy", "CDK");
 	}
+	return security;
 }
 
-defineEnvironment(stagingConfig);
-defineEnvironment(productionConfig);
+const securityStacks: Record<string, SecurityStack> = {
+	[stagingConfig.name]: defineEnvironment(stagingConfig),
+	[productionConfig.name]: defineEnvironment(productionConfig),
+};
 
 // AWS-MIGRATION-3 — the GitHub OIDC deploy roles (deploy-stack.ts). One stack
 // for the account, instantiated ONLY under `-c deployStack=true` so that
@@ -144,6 +147,10 @@ if (app.node.tryGetContext("deployStack") === "true") {
 		environments: environments.map((c) => ({
 			name: c.name,
 			bootstrapQualifier: c.bootstrapQualifier,
+			passRoleArns: [
+				securityStacks[c.name].executionRole.roleArn,
+				securityStacks[c.name].taskRole.roleArn,
+			],
 		})),
 		existingOidcProviderArn: process.env.ZZ_GITHUB_OIDC_PROVIDER_ARN,
 	});

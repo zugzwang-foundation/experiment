@@ -39,7 +39,7 @@ tests, gates and rollout.
 | D-2 | Production gets its own CDK bootstrap qualifier `zzprod` | H-3: staging credentials must not assume production's bootstrap roles |
 | D-3 | Migrations run as a one-off **in-VPC ECS task**, fixed family `zugzwang-<env>-migrate`, stable `<env>-migrate` tag + digest check | RDS is private; no DSN through GitHub; migrate-before-serve preserved |
 | D-4 | The migrate container receives **only** its two migration secrets | a RunTask override would otherwise exfiltrate all 32 runtime secrets |
-| D-5 | Task roles get **explicit names** `zugzwang-<env>-task(-execution)`; PassRole names them exactly | generated names hit the 64-char IAM ceiling; production's would be truncated (measured) |
+| D-5 | PassRole names the task roles by their **real ARNs**, handed from the Security stacks (amended 2026-09-26, STAGING-PASSROLE — the original "explicit names" would have REPLACED the live staging roles, whose ARNs Security exports to Compute; CloudFormation refuses to change an export in use) | generated names hit the 64-char IAM ceiling; production's would be truncated (measured) |
 | D-6 | The deploy workflow requires a `writes: open\|paused` input that must agree with `ZZ_<ENV>_WRITES_PAUSED`; `verify` asserts `writesPaused`; `!cancelled()` gates deploy | the pause is synth-time and failed open on any misspelling |
 | D-7 | Production deploys refuse from any ref but `main` (visible failing `guard` job); binding control is the GitHub environment policy + OIDC `sub` customization (operator) | the workflow file is read from the dispatched ref |
 | D-8 | WAF: `count` by default in production; staging only with `ZZ_STAGING_WAF=count` | a managed rule set never run against this app can silently 403 a participant's argument |

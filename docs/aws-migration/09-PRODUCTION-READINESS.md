@@ -137,10 +137,12 @@ No DSN passes through GitHub.
   migration scripts read nothing else). A RunTask can override the command, so every secret injected
   there was one override from exfiltration (security M1). ⚠ This retires the migrate task as a vehicle
   for ad-hoc engine runs needing app credentials (the 06 §10.6 void used it that way).
-- The task roles have **explicit names** (`zugzwang-<env>-task-execution`, `zugzwang-<env>-task`) and
-  `iam:PassRole` names them exactly. Measured: staging's generated execution-role name is exactly 64
-  characters, so production's (3 chars longer stack name) would be truncated and a prefix pattern would
-  match nothing — the first production migration would have 403'd (review HIGH-4).
+- `iam:PassRole` names the task roles by their **real ARNs**, passed from the Security stacks.
+  Measured: staging's generated execution-role name is exactly 64 characters, so production's (3 chars
+  longer stack name) is truncated and a prefix pattern would match nothing (review HIGH-4). ⚠ The first
+  fix — explicit role names — was withdrawn before it ran (STAGING-PASSROLE): it would have REPLACED the
+  live staging roles, whose ARNs Security exports to Compute, and CloudFormation refuses to change an
+  export in use.
 - `run-task`'s `failures[]` is printed when no task is placed (MEDIUM-6); a task still RUNNING after
   30 min fails the job with a "stop it by hand" instruction (there is no advisory lock — two migrators
   must never overlap).
@@ -159,8 +161,7 @@ database the *Vercel* staging deployment uses. The AWS staging RDS is migrated o
 The file's header now says so.
 
 ⚠ **Staging impact when next deployed:** the migration task definition is replaced (family, tag,
-secrets); both task roles are **replaced** (new explicit names → new task-definition revision → one
-rolling update); ALB gains the two attributes. The `staging-migrate` tag must exist first (the
+secrets); the task roles are unchanged; ALB gains the two attributes. The `staging-migrate` tag must exist first (the
 workflow pushes it). Measured with `cdk diff --no-change-set`.
 ⚠ A hand-run `cdk diff`/`deploy` without `ZZ_STAGING_CERT_ARN` set shows the HTTPS listener being
 **destroyed** — the synth-time hazard the workflow's refuse-to-synth guard exists for. Never hand-deploy

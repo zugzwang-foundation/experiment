@@ -2,8 +2,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { taskRoleNames } from "../../../infra/config/types";
-
 /**
  * Production-readiness pass (docs/aws-migration/09-PRODUCTION-READINESS.md) —
  * guards for the decisions that pass made, each of which is one token away from
@@ -68,25 +66,27 @@ describe("§B — each environment deploys through its own CDK bootstrap", () =>
 	});
 });
 
-describe("§D / HIGH-4 — PassRole names the task roles exactly", () => {
-	it("role names fit IAM's 64-char limit for both environments", () => {
-		for (const env of ["staging", "production"]) {
-			for (const name of Object.values(taskRoleNames(env))) {
-				expect(name.length).toBeLessThanOrEqual(64);
-			}
-		}
-	});
-
-	it("the roles are created with those names and PassRole grants exactly them", () => {
-		const security = stripped("infra/lib/security-stack.ts");
-		expect(security).toContain(
-			"roleName: taskRoleNames(config.name).execution",
-		);
-		expect(security).toContain("roleName: taskRoleNames(config.name).task");
+describe("§D / HIGH-4 — PassRole names the task roles by their real ARNs", () => {
+	it("the deploy role passes exactly the ARNs it is handed, and nothing name-derived", () => {
 		const deploy = stripped("infra/lib/deploy-stack.ts");
 		expect(deploy).toContain('sid: "PassTaskRoles"');
-		expect(deploy).toContain("taskRoleNames(environment).execution");
-		expect(deploy).not.toMatch(/Security-\*/);
+		expect(deploy).toContain("resources: [...passRoleArns]");
+		// No name pattern, no wildcard: generated names are truncated in production.
+		expect(deploy).not.toMatch(/Security-\*|role\/zugzwang-/);
+	});
+
+	it("the app hands each environment's own Security roles to its deploy role", () => {
+		const bin = stripped("infra/bin/zugzwang.ts");
+		expect(bin).toContain("securityStacks[c.name].executionRole.roleArn");
+		expect(bin).toContain("securityStacks[c.name].taskRole.roleArn");
+	});
+
+	it("the live task roles are NOT renamed (renaming would replace them under Compute's import)", () => {
+		const security = stripped("infra/lib/security-stack.ts");
+		// Positive control: both roles are defined here.
+		expect(security).toContain('new iam.Role(this, "TaskExecutionRole"');
+		expect(security).toContain('new iam.Role(this, "TaskRole"');
+		expect(security).not.toMatch(/roleName:/);
 	});
 });
 
