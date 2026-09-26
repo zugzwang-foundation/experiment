@@ -285,44 +285,22 @@ jobs:
 
       - name: Deploy the compute stack at the new image tag
         working-directory: infra
-        # AWS-MIGRATION-3: the config reads the certificate ARN and the alert
-        # address at SYNTH time. A synth without them would emit a stack with
-        # an HTTP-only listener and an alarm topic with no subscriber — and
-        # deploy it. They come from the GitHub environment's variables, never
-        # from the repository.
+        # PROD-DEPLOY-NO-VARS — this step reads NO GitHub variables. Four staging
+        # runs received every `vars.*` empty while their secrets resolved, and a
+        # deploy that depends on them either refuses (certificate) or cannot
+        # pause (write-pause). So:
+        #   - the certificate is committed config, and CDK itself refuses an
+        #     HTTP-only listener (compute-stack.ts) — failing this step;
+        #   - the write-pause comes from THIS dispatch's `writes` input, a closed
+        #     `open | paused` choice, so no misspelling can emit an unpaused task
+        #     (the security H3 concern the old variable check addressed). A push
+        #     is always `open`. `verify` still asserts the live `writesPaused`;
+        #   - the alert email is not read here: this job deploys Compute only.
         env:
-          ZZ_STAGING_CERT_ARN: ${{ vars.ZZ_STAGING_CERT_ARN }}
-          ZZ_PROD_CERT_ARN: ${{ vars.ZZ_PROD_CERT_ARN }}
-          ZZ_ALERT_EMAIL: ${{ vars.ZZ_ALERT_EMAIL }}
-          # The write-pause is a synth-time input (config/*.ts). A synth without
-          # it silently emits an UNPAUSED task definition — so it is carried from
-          # the environment's variables exactly like the certificate ARN
-          # (`@security-auditor` H-4). Set the variable to `paused` for the
-          # cutover window and clear it afterwards.
-          ZZ_STAGING_WRITES_PAUSED: ${{ vars.ZZ_STAGING_WRITES_PAUSED }}
-          ZZ_PROD_WRITES_PAUSED: ${{ vars.ZZ_PROD_WRITES_PAUSED }}
-          WRITES: ${{ inputs.writes || 'open' }}
+          ZZ_STAGING_WRITES_PAUSED: ${{ (inputs.environment || 'staging') == 'staging' && (inputs.writes || 'open') == 'paused' && 'paused' || '' }}
+          ZZ_PROD_WRITES_PAUSED: ${{ (inputs.environment || 'staging') == 'production' && (inputs.writes || 'open') == 'paused' && 'paused' || '' }}
         run: |
-          # Security H3 — the pause is a SYNTH-TIME value, and any spelling but
-          # exactly `paused` silently emits an UNPAUSED task definition. The
-          # dispatch must state its intent, and the variable must agree.
-          if [ "${{ inputs.environment || 'staging' }}" = "production" ]; then PAUSE_VAR="$ZZ_PROD_WRITES_PAUSED"; else PAUSE_VAR="$ZZ_STAGING_WRITES_PAUSED"; fi
-          if [ "$WRITES" = "paused" ] && [ "$PAUSE_VAR" != "paused" ]; then
-            echo "refusing: writes=paused requested but the environment's WRITES_PAUSED variable is '$PAUSE_VAR', not exactly 'paused'"; exit 1
-          fi
-          if [ "$WRITES" = "open" ] && [ -n "$PAUSE_VAR" ]; then
-            echo "refusing: writes=open requested but the environment's WRITES_PAUSED variable is set ('$PAUSE_VAR') — clear it or dispatch with writes=paused"; exit 1
-          fi
-          if [ "${{ inputs.environment || 'staging' }}" = "production" ] && [ -z "$ZZ_PROD_CERT_ARN" ]; then
-            echo "ZZ_PROD_CERT_ARN is not set on the production environment — refusing to synth an HTTP-only production listener"; exit 1
-          fi
-          # STAGING-DEPLOY-NO-VARS — staging needs neither variable here: its
-          # certificate is a committed default in infra/config/staging.ts, and
-          # the alert email feeds ONLY the Monitoring stack, which this job never
-          # deploys (it deploys Compute alone). Production keeps both checks.
-          if [ "${{ inputs.environment || 'staging' }}" = "production" ] && [ -z "$ZZ_ALERT_EMAIL" ]; then
-            echo "ZZ_ALERT_EMAIL is not set on the ${{ inputs.environment || 'staging' }} environment — refusing to synth an alarm topic with no subscriber"; exit 1
-          fi
+          echo "deploying ${{ inputs.environment || 'staging' }} with writes=${{ inputs.writes || 'open' }}"
           # `--ignore-workspace` is load-bearing: the repository root holds a
           # pnpm-workspace.yaml, so a bare `pnpm install` here installs the ROOT
           # project (866 packages) and never infra/pnpm-lock.yaml — `cdk` is

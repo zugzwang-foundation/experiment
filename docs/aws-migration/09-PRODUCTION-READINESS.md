@@ -83,7 +83,9 @@ to `cdk-hnb659fds-*` and the production role to `cdk-zzprod-*` only.
    boundary to every production stack; staging templates are byte-identical. Commands, in order:
    ```bash
    cd infra
-   npx cdk synth "Zugzwang-production-*" -o cdk.out.prod -q
+   # production refuses to synth without both (compute-stack / monitoring-stack guards)
+   ZZ_PROD_CERT_ARN=<acm-arn> ZZ_ALERT_EMAIL=<address> \
+     npx cdk synth "Zugzwang-production-*" -o cdk.out.prod -q
    npx tsx scripts/check-production-policies.ts cdk.out.prod        # must print PASS
    aws iam create-policy --policy-name zugzwang-production-boundary \
      --policy-document file://policies/production-permissions-boundary.json

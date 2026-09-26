@@ -54,6 +54,12 @@ describe("coverage of the production templates", () => {
 		expect(uncoveredResourceTypes(types, exec)).toEqual([]);
 	});
 
+	it("includes the alarm e-mail subscription production always has", () => {
+		// Monitoring refuses to synth production without an alert e-mail, so the
+		// subscription is always created; a snapshot taken without one missed it.
+		expect(types).toContain("AWS::SNS::Subscription");
+	});
+
 	it("the coverage check can fail (negative control)", () => {
 		expect(
 			uncoveredResourceTypes(

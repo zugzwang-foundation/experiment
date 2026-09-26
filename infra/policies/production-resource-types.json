@@ -35,6 +35,7 @@
 	"AWS::RDS::DBInstance",
 	"AWS::RDS::DBParameterGroup",
 	"AWS::RDS::DBSubnetGroup",
+	"AWS::SNS::Subscription",
 	"AWS::SNS::Topic",
 	"AWS::SecretsManager::Secret",
 	"AWS::SecretsManager::SecretTargetAttachment",
