@@ -193,13 +193,35 @@ export function getRequestClientIp(request: {
  * trusted value from the shared helper is set when there is one. With no
  * trusted value the header is absent: Better Auth then records an empty
  * `ip_address` AND SKIPS ITS OWN RATE LIMIT for that request (ADR-0061 M-1;
- * unreachable while A1/A2/A5 hold). ⚠ Not idempotent — `new Request(request)`
- * consumes the input body, so call it exactly once per request.
+ * unreachable while A1/A2/A5 hold). ⚠ Not idempotent — the new request takes
+ * over the input's body stream, so call it exactly once per request.
+ *
+ * ⛔ BUILT FROM PRIMITIVE FIELDS, NEVER `new Request(request, init)`
+ * (AUTH-TRUSTED-IP-REQUEST, 2026-09-26). An App Router route handler does not
+ * receive a `NextRequest`: it receives a `Proxy` around one (Next 16.3.2
+ * `proxyNextRequest`, which tracks dynamic access). Under Node 24's undici 7 a
+ * `Request`'s internals are a true `#state` private field, and passing the proxy
+ * as the constructor's INPUT makes undici read `#state` on the proxy — which a
+ * private field never passes through — so every `/api/auth/*` request threw
+ * "Cannot read private member #state" and returned 500 (AWS staging). Reading
+ * `url`/`method`/`headers`/`signal`/`body` through the proxy is fine; only the
+ * object-as-input form is not. Node 22 (undici 6, symbol-keyed internals) hid
+ * this locally. Pinned by `tests/unit/middleware/client-ip-route-request.test.ts`.
  */
 export function withTrustedClientIp(request: Request): Request {
 	const headers = new Headers(request.headers);
 	headers.delete(TRUSTED_CLIENT_IP_HEADER);
 	const ip = getRequestClientIp(request);
 	if (ip !== null) headers.set(TRUSTED_CLIENT_IP_HEADER, ip);
-	return new Request(request, { headers });
+	const init: RequestInit & { duplex?: "half" } = {
+		method: request.method,
+		headers,
+		signal: request.signal,
+	};
+	if (request.method !== "GET" && request.method !== "HEAD") {
+		init.body = request.body;
+		// Required by undici whenever the body is a stream.
+		init.duplex = "half";
+	}
+	return new Request(request.url, init);
 }
