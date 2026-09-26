@@ -34,6 +34,10 @@ export const productionConfig: EnvironmentConfig = {
 	// (hnb659fds) cannot deploy these stacks. Requires a separate bootstrap —
 	// docs/aws-migration/09-PRODUCTION-READINESS.md §B.
 	bootstrapQualifier: "zzprod",
+	// ⛔ H-3: every production role is created under this boundary, and the
+	// zzprod execution policy refuses to create one without it
+	// (infra/policies/production-permissions-boundary.json).
+	permissionsBoundaryPolicyName: "zugzwang-production-boundary",
 
 	vpcCidr: "10.10.0.0/16",
 	natGateways: 1,
