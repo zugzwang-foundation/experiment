@@ -43,3 +43,7 @@ docs
 !README.md
 .claude
 claude-progress.md
+
+# The full Doppler config deploy-aws.yml writes for `docker build --secret`.
+# It must never enter the build context (a layer) — security review M3.
+build.env

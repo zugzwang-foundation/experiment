@@ -26,6 +26,9 @@ const CLIENT_V4 = "203.0.113.7";
 const CLIENT_V6 = "2001:db8::42";
 const ATTACKER = "198.51.100.66";
 const FORGED = "1.2.3.4";
+const ZONE_SECRET = "our-zone-secret";
+/** Our zone's origin-auth header, as the F1 Transform Rule would add it. */
+const OUR_ZONE = { [CF_ORIGIN_AUTH_HEADER]: ZONE_SECRET };
 
 function h(headers: Record<string, string>) {
 	const map = new Map(
@@ -42,13 +45,18 @@ afterEach(() => {
 	vi.unstubAllEnvs();
 });
 
-describe("normal Cloudflare-proxied requests (AWS: Cloudflare → ALB)", () => {
+describe("normal Cloudflare-proxied requests (AWS: Cloudflare → ALB, F1 configured)", () => {
+	beforeEach(() => {
+		vi.stubEnv("ZZ_CF_ORIGIN_SECRET", ZONE_SECRET);
+	});
+
 	it("IPv4 client via an IPv4 edge → CF-Connecting-IP", () => {
 		expect(
 			getClientIp(
 				h({
 					"x-forwarded-for": `${CLIENT_V4}, ${CF_EDGE_V4}`,
 					"cf-connecting-ip": CLIENT_V4,
+					...OUR_ZONE,
 				}),
 			),
 		).toBe(CLIENT_V4);
@@ -60,6 +68,7 @@ describe("normal Cloudflare-proxied requests (AWS: Cloudflare → ALB)", () => {
 				h({
 					"x-forwarded-for": `${CLIENT_V6}, ${CF_EDGE_V6}`,
 					"cf-connecting-ip": CLIENT_V6,
+					...OUR_ZONE,
 				}),
 			),
 		).toBe(CLIENT_V6);
@@ -71,6 +80,7 @@ describe("normal Cloudflare-proxied requests (AWS: Cloudflare → ALB)", () => {
 				h({
 					"x-forwarded-for": `${CLIENT_V6}, ${CF_EDGE_V4}`,
 					"cf-connecting-ip": CLIENT_V6,
+					...OUR_ZONE,
 				}),
 			),
 		).toBe(CLIENT_V6);
@@ -92,6 +102,7 @@ describe("normal Cloudflare-proxied requests (AWS: Cloudflare → ALB)", () => {
 
 describe("spoofed X-Forwarded-For", () => {
 	it("through Cloudflare: forged hops before the edge are ignored", () => {
+		vi.stubEnv("ZZ_CF_ORIGIN_SECRET", ZONE_SECRET);
 		// Cloudflare appends the real client to the client's own XFF; the ALB
 		// appends the edge. The forged first hop is what the old code returned.
 		expect(
@@ -99,6 +110,7 @@ describe("spoofed X-Forwarded-For", () => {
 				h({
 					"x-forwarded-for": `${FORGED}, ${CLIENT_V4}, ${CF_EDGE_V4}`,
 					"cf-connecting-ip": CLIENT_V4,
+					...OUR_ZONE,
 				}),
 			),
 		).toBe(CLIENT_V4);
@@ -151,10 +163,19 @@ describe("spoofed X-Forwarded-For", () => {
 	});
 });
 
-describe("missing / malformed Cloudflare client IP", () => {
+describe("missing / malformed Cloudflare client IP (our zone, F1 configured)", () => {
+	// Review MEDIUM-3: with the fail-closed default this block must run with the
+	// zone secret set and presented, or it never reaches the `?? peer` fallback
+	// its name describes.
+	beforeEach(() => {
+		vi.stubEnv("ZZ_CF_ORIGIN_SECRET", ZONE_SECRET);
+	});
+
 	it("edge peer, no CF-Connecting-IP → the edge address, never a client hop", () => {
 		expect(
-			getClientIp(h({ "x-forwarded-for": `${FORGED}, ${CF_EDGE_V4}` })),
+			getClientIp(
+				h({ "x-forwarded-for": `${FORGED}, ${CF_EDGE_V4}`, ...OUR_ZONE }),
+			),
 		).toBe(CF_EDGE_V4);
 	});
 
@@ -172,6 +193,7 @@ describe("missing / malformed Cloudflare client IP", () => {
 				h({
 					"x-forwarded-for": `${CLIENT_V4}, ${CF_EDGE_V4}`,
 					"cf-connecting-ip": bad,
+					...OUR_ZONE,
 				}),
 			),
 		).toBe(CF_EDGE_V4);
@@ -179,6 +201,22 @@ describe("missing / malformed Cloudflare client IP", () => {
 });
 
 describe("direct / untrusted requests", () => {
+	// Regression-posture guard (`_probe-*` posture, CLAUDE.md §5.6): written
+	// after the fail-closed change; its proof is the mutation check (reverting
+	// `fromOurCloudflareZone` to "trust when unset" turns it red).
+	it("WARP / a Worker (Cloudflare-range peer, secret unset) cannot choose its IP (ADR-0061 R1)", () => {
+		// The grey-cloud topology: a Cloudflare address reaching the ALB is a
+		// Cloudflare CUSTOMER, not our zone. It is keyed on its own address.
+		expect(
+			getClientIp(
+				h({
+					"x-forwarded-for": CF_EDGE_V4,
+					"cf-connecting-ip": FORGED,
+				}),
+			),
+		).toBe(CF_EDGE_V4);
+	});
+
 	it("direct to the ALB with a forged CF-Connecting-IP → the peer", () => {
 		expect(
 			getClientIp(
@@ -300,20 +338,27 @@ describe("origin authentication — ZZ_CF_ORIGIN_SECRET set (ADR-0061 F1)", () =
 		).toBe(ATTACKER);
 	});
 
-	it("positive control: with the secret UNSET, a Cloudflare peer is trusted (the pre-F1 window)", () => {
+	// Regression-posture guard — see the WARP row above.
+	it("FAILS CLOSED: with the secret UNSET, even a correct-looking header is not believed", () => {
+		// Production-readiness pass, 2026-09-26: the zone is DNS-only, so no
+		// legitimate request arrives from a Cloudflare address. Unset means the
+		// branch is closed, never "trust any Cloudflare peer".
 		vi.stubEnv("ZZ_CF_ORIGIN_SECRET", "");
-		expect(via({ "cf-connecting-ip": FORGED })).toBe(FORGED);
+		expect(via({ [CF_ORIGIN_AUTH_HEADER]: "" })).toBe(CF_EDGE_V4);
+		expect(via({ "cf-connecting-ip": FORGED })).toBe(CF_EDGE_V4);
 	});
 });
 
 describe("normalizeIp — IPv4/IPv6 forms", () => {
 	it("unwraps IPv4-mapped IPv6 so one client has one key", () => {
 		expect(normalizeIp("::ffff:203.0.113.7")).toBe("203.0.113.7");
+		vi.stubEnv("ZZ_CF_ORIGIN_SECRET", ZONE_SECRET);
 		expect(
 			getClientIp(
 				h({
 					"x-forwarded-for": `::ffff:${CF_EDGE_V4}`,
 					"cf-connecting-ip": CLIENT_V4,
+					...OUR_ZONE,
 				}),
 			),
 		).toBe(CLIENT_V4);

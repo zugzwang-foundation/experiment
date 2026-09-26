@@ -6,8 +6,10 @@ import { BlockList, isIP } from "node:net";
 /**
  * S-1 / ADR-0061 — the ONE place the client's IP address is derived.
  *
- * Topology: browser → Cloudflare (proxied, orange-cloud) → ALB → ECS task, and
- * until the cutover browser → Cloudflare → Vercel. Every per-IP control in the
+ * Topology as designed: browser → Cloudflare → ALB → ECS task (and, until the
+ * cutover, → Vercel). ⚠ Measured 2026-09-26: the zone is DNS-only (grey
+ * cloud), so today browsers reach the ALB (and Vercel) DIRECTLY and the
+ * Cloudflare branch below is closed (see `fromOurCloudflareZone`). Every per-IP control in the
  * app (admin-login brute-force limit, OTP-send limit, bet/upload/visit limits)
  * and every `ip` written into an append-only event row reads THIS function.
  *
@@ -27,8 +29,9 @@ import { BlockList, isIP } from "node:net";
  *     else's zone) could otherwise choose it (`@security-auditor` H-1).
  *
  * AWS only: `CF-Connecting-IP` is believed ONLY when the peer is inside
- * Cloudflare's published ranges AND, once `ZZ_CF_ORIGIN_SECRET` is configured,
- * the request carries our zone's origin-auth header (ADR-0061 F1). A Cloudflare
+ * Cloudflare's published ranges AND `ZZ_CF_ORIGIN_SECRET` is configured AND
+ * the request carries our zone's origin-auth header (ADR-0061 F1). Unset, the
+ * branch is closed. A Cloudflare
  * ADDRESS is not OUR Cloudflare ZONE: millions of unrelated parties can source
  * traffic from those ranges. A request sent straight to the ALB can carry any
  * `CF-Connecting-IP` and any `X-Forwarded-For` chain it likes; it is
@@ -96,15 +99,19 @@ for (const cidr of CLOUDFLARE_IPV6_RANGES) {
 export const CF_ORIGIN_AUTH_HEADER = "x-zz-cf-origin-auth";
 
 /**
- * Whether this request came through OUR Cloudflare zone. ⚠ With
- * `ZZ_CF_ORIGIN_SECRET` unset this returns true — the pre-F1 state, where any
- * Cloudflare-range peer is trusted. That window is a recorded launch blocker
- * (ADR-0061 F1), not a default to keep. With it set, the header must match
- * (constant-time over SHA-256 digests, so length leaks nothing).
+ * Whether this request came through OUR Cloudflare zone. ⛔ FAILS CLOSED: with
+ * `ZZ_CF_ORIGIN_SECRET` unset this returns false, so `CF-Connecting-IP` is
+ * never believed and a Cloudflare-range peer is keyed on its own address. That
+ * is the right answer for a DNS-only (grey-cloud) zone — measured 2026-09-26:
+ * neither hostname is proxied, so the only Cloudflare-range peers reaching the
+ * ALB are WARP users and Workers choosing their own header. It flipped from
+ * "trust when unset" at the production-readiness pass (ADR-0061 R1). With the
+ * secret set, the header must match (constant-time over SHA-256 digests, so
+ * length leaks nothing).
  */
 function fromOurCloudflareZone(get: HeaderGetter): boolean {
 	const secret = process.env.ZZ_CF_ORIGIN_SECRET;
-	if (!secret) return true;
+	if (!secret) return false;
 	const presented = get(CF_ORIGIN_AUTH_HEADER);
 	if (typeof presented !== "string" || presented.length === 0) return false;
 	const digest = (v: string) => createHash("sha256").update(v).digest();

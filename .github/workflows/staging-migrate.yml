@@ -5,6 +5,13 @@
 # applies any pending migrations to the staging Supabase DB via
 # `doppler run --config stg -- pnpm db:migrate:staging`. It is part of the
 # gated deploy pipeline — see docs/runbooks/deploy-pipeline.md §3.
+#
+# ⚠ SCOPE (production-readiness review HIGH-1): this migrates the SUPABASE
+# staging database that the VERCEL staging deployment uses — Doppler `stg`'s
+# DATABASE_URL_STAGING. It does NOT migrate the AWS staging RDS: that DSN lives
+# only in Secrets Manager (`zugzwang/staging`) and the RDS is private, so it is
+# migrated by `deploy-aws.yml`'s in-VPC migrate job. A green run here says
+# nothing about the RDS (09-PRODUCTION-READINESS.md §D).
 
 name: Staging Migrate
 
@@ -23,13 +30,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
           cache: "pnpm"
@@ -38,7 +45,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Doppler CLI
-        uses: dopplerhq/cli-action@v3
+        uses: dopplerhq/cli-action@014df23b1329b615816a38eb5f473bb9000700b1 # v3
 
       - name: Migrate staging DB
         # Doppler injects DATABASE_URL_STAGING + STAGING_PROJECT_REF_FRAGMENT (the

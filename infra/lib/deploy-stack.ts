@@ -1,12 +1,19 @@
 import { CfnOutput, Stack, type StackProps } from "aws-cdk-lib";
 import * as iam from "aws-cdk-lib/aws-iam";
 import type { Construct } from "constructs";
+import { taskRoleNames } from "../config/types";
 
 export interface DeployStackProps extends StackProps {
 	/** `owner/repo`, e.g. `zugzwang-foundation/experiment`. */
 	readonly githubRepository: string;
-	/** Environment names whose GitHub `environment:` may deploy: one role each. */
-	readonly environments: readonly string[];
+	/**
+	 * Environments whose GitHub `environment:` may deploy: one role each, bound
+	 * to THAT environment's CDK bootstrap qualifier (H-3).
+	 */
+	readonly environments: readonly {
+		readonly name: string;
+		readonly bootstrapQualifier: string;
+	}[];
 	/**
 	 * The account's EXISTING GitHub OIDC provider ARN, when one exists. The
 	 * provider is an account-level singleton — creating a second one fails with
@@ -32,16 +39,17 @@ export interface DeployStackProps extends StackProps {
  * rights of its own and no access to the app secrets — the CloudFormation
  * execution role holds those.
  *
- * ⚠ WHAT THE TRUST POLICY DOES NOT BOUND (`@security-auditor` H-3). It bounds
- * WHO may assume the GitHub role, not what the role can reach afterwards: the
- * CDK bootstrap roles it assumes are ACCOUNT-WIDE, and the default bootstrap
- * gives the CloudFormation execution role AdministratorAccess. A credential
- * for the staging role can therefore deploy any stack in the account,
- * production included. Narrowing that is a bootstrap decision (re-bootstrap
- * with `--cloudformation-execution-policies` below Administrator, or a
- * permissions boundary on the execution role) recorded as an open item in
- * docs/aws-migration/06-STAGING-DEPLOYMENT.md §10 — not something this stack
- * can fix from inside.
+ * ⚠ H-3 (`@security-auditor`). The trust policy bounds WHO may assume a role;
+ * the bootstrap roles it assumes bound what it can do. Each environment role
+ * now assumes ONLY its own environment's bootstrap roles (per-environment
+ * qualifier: staging `hnb659fds`, production `zzprod`), so a staging token
+ * cannot assume production's bootstrap roles. ⚠ That is NOT yet "a staging
+ * token cannot reach production" (review HIGH-3): staging's default-bootstrap
+ * deploy role still has CloudFormation rights on every stack name — including
+ * `Zugzwang-production-*` AND this `Zugzwang-Deploy` stack, whose production
+ * role it could rewrite. Closing that needs an explicit deny on that bootstrap
+ * role, and scoping each execution policy below AdministratorAccess — the
+ * bootstrap runbook in docs/aws-migration/09-PRODUCTION-READINESS.md §B.
  *
  * Trust is pinned to `repo:<owner/repo>:environment:<name>`: a token minted
  * for the `staging` environment cannot assume the production role, and a
@@ -62,17 +70,19 @@ export class DeployStack extends Stack {
 					clientIds: ["sts.amazonaws.com"],
 				});
 
-		const bootstrapRoles = [
-			"deploy-role",
-			"file-publishing-role",
-			"image-publishing-role",
-			"lookup-role",
-		].map(
-			(name) =>
-				`arn:aws:iam::${this.account}:role/cdk-hnb659fds-${name}-${this.account}-${this.region}`,
-		);
-
-		for (const environment of props.environments) {
+		for (const {
+			name: environment,
+			bootstrapQualifier,
+		} of props.environments) {
+			const bootstrapRoles = [
+				"deploy-role",
+				"file-publishing-role",
+				"image-publishing-role",
+				"lookup-role",
+			].map(
+				(name) =>
+					`arn:aws:iam::${this.account}:role/cdk-${bootstrapQualifier}-${name}-${this.account}-${this.region}`,
+			);
 			const role = new iam.Role(this, `Deploy-${environment}`, {
 				roleName: `zugzwang-${environment}-github-deploy`,
 				// ASCII only: CloudFormation rejects non-ASCII in IAM descriptions
@@ -141,6 +151,54 @@ export class DeployStack extends Stack {
 					sid: "EcsList",
 					actions: ["ecs:ListServices"],
 					resources: ["*"],
+				}),
+			);
+			// D — migrations run INSIDE the VPC as a one-off ECS task (RDS is
+			// private; a GitHub runner cannot reach it). The role may start only
+			// this environment's migration family, on this environment's cluster,
+			// and pass only this environment's task roles to ECS.
+			const clusterArn = `arn:aws:ecs:${this.region}:${this.account}:cluster/zugzwang-${environment}`;
+			role.addToPolicy(
+				new iam.PolicyStatement({
+					sid: "RunMigrationTask",
+					actions: ["ecs:RunTask"],
+					resources: [
+						`arn:aws:ecs:${this.region}:${this.account}:task-definition/zugzwang-${environment}-migrate:*`,
+					],
+					conditions: { ArnEquals: { "ecs:cluster": clusterArn } },
+				}),
+			);
+			role.addToPolicy(
+				new iam.PolicyStatement({
+					sid: "WatchMigrationTask",
+					actions: ["ecs:DescribeTasks"],
+					resources: [
+						`arn:aws:ecs:${this.region}:${this.account}:task/zugzwang-${environment}/*`,
+					],
+				}),
+			);
+			role.addToPolicy(
+				new iam.PolicyStatement({
+					sid: "PassTaskRoles",
+					actions: ["iam:PassRole"],
+					// Exact ARNs (review HIGH-4): a prefix pattern would miss the
+					// truncated CloudFormation-generated names in production.
+					resources: [
+						taskRoleNames(environment).execution,
+						taskRoleNames(environment).task,
+					].map((name) => `arn:aws:iam::${this.account}:role/${name}`),
+					conditions: {
+						StringEquals: { "iam:PassedToService": "ecs-tasks.amazonaws.com" },
+					},
+				}),
+			);
+			role.addToPolicy(
+				new iam.PolicyStatement({
+					sid: "ReadComputeOutputs",
+					actions: ["cloudformation:DescribeStacks"],
+					resources: [
+						`arn:aws:cloudformation:${this.region}:${this.account}:stack/Zugzwang-${environment}-Compute/*`,
+					],
 				}),
 			);
 			new CfnOutput(this, `DeployRoleArn-${environment}`, {
