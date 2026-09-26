@@ -1,0 +1,164 @@
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "ProductionServices",
+			"Effect": "Allow",
+			"Action": [
+				"autoscaling:*",
+				"cloudwatch:*",
+				"ec2:*",
+				"ecr:*",
+				"ecs:*",
+				"elasticloadbalancing:*",
+				"events:*",
+				"lambda:*",
+				"logs:*",
+				"rds:*",
+				"sns:*",
+				"wafv2:*"
+			],
+			"Resource": "*"
+		},
+		{
+			"Sid": "ProductionSecrets",
+			"Effect": "Allow",
+			"Action": "secretsmanager:*",
+			"Resource": [
+				"arn:aws:secretsmanager:ap-south-1:849076101704:secret:zugzwang/production*",
+				"arn:aws:secretsmanager:ap-south-1:849076101704:secret:events!connection/*"
+			]
+		},
+		{
+			"Sid": "GenerateDatabasePassword",
+			"Effect": "Allow",
+			"Action": "secretsmanager:GetRandomPassword",
+			"Resource": "*"
+		},
+		{
+			"Sid": "ReadDeployParameters",
+			"Effect": "Allow",
+			"Action": ["ssm:GetParameter", "ssm:GetParameters"],
+			"Resource": [
+				"arn:aws:ssm:ap-south-1:849076101704:parameter/cdk-bootstrap/zzprod/*",
+				"arn:aws:ssm:ap-south-1::parameter/aws/service/*"
+			]
+		},
+		{
+			"Sid": "EncryptionThroughServices",
+			"Effect": "Allow",
+			"Action": [
+				"kms:CreateGrant",
+				"kms:Decrypt",
+				"kms:DescribeKey",
+				"kms:GenerateDataKey*"
+			],
+			"Resource": "*",
+			"Condition": {
+				"StringEquals": {
+					"kms:ViaService": [
+						"rds.ap-south-1.amazonaws.com",
+						"secretsmanager.ap-south-1.amazonaws.com"
+					]
+				}
+			}
+		},
+		{
+			"Sid": "ProductionRolesOnlyUnderBoundary",
+			"Effect": "Allow",
+			"Action": [
+				"iam:AttachRolePolicy",
+				"iam:CreateRole",
+				"iam:DeleteRolePolicy",
+				"iam:DetachRolePolicy",
+				"iam:PutRolePermissionsBoundary",
+				"iam:PutRolePolicy"
+			],
+			"Resource": "arn:aws:iam::849076101704:role/Zugzwang-production-*",
+			"Condition": {
+				"StringEquals": {
+					"iam:PermissionsBoundary": "arn:aws:iam::849076101704:policy/zugzwang-production-boundary"
+				}
+			}
+		},
+		{
+			"Sid": "ProductionRolesMaintain",
+			"Effect": "Allow",
+			"Action": [
+				"iam:DeleteRole",
+				"iam:GetRole",
+				"iam:GetRolePolicy",
+				"iam:ListAttachedRolePolicies",
+				"iam:ListRolePolicies",
+				"iam:PassRole",
+				"iam:TagRole",
+				"iam:UntagRole",
+				"iam:UpdateAssumeRolePolicy",
+				"iam:UpdateRole",
+				"iam:UpdateRoleDescription"
+			],
+			"Resource": "arn:aws:iam::849076101704:role/Zugzwang-production-*"
+		},
+		{
+			"Sid": "ProductionInstanceProfiles",
+			"Effect": "Allow",
+			"Action": [
+				"iam:AddRoleToInstanceProfile",
+				"iam:CreateInstanceProfile",
+				"iam:DeleteInstanceProfile",
+				"iam:GetInstanceProfile",
+				"iam:RemoveRoleFromInstanceProfile",
+				"iam:TagInstanceProfile",
+				"iam:UntagInstanceProfile"
+			],
+			"Resource": "arn:aws:iam::849076101704:instance-profile/Zugzwang-production-*"
+		},
+		{
+			"Sid": "ServiceLinkedRoles",
+			"Effect": "Allow",
+			"Action": "iam:CreateServiceLinkedRole",
+			"Resource": "*",
+			"Condition": {
+				"StringEquals": {
+					"iam:AWSServiceName": [
+						"autoscaling.amazonaws.com",
+						"ecs.amazonaws.com",
+						"elasticloadbalancing.amazonaws.com",
+						"rds.amazonaws.com"
+					]
+				}
+			}
+		},
+		{
+			"Sid": "DenyAccountLevelIdentity",
+			"Effect": "Deny",
+			"Action": [
+				"account:*",
+				"iam:*AccessKey*",
+				"iam:*Group*",
+				"iam:*LoginProfile*",
+				"iam:*OpenIDConnectProvider*",
+				"iam:*SAMLProvider*",
+				"iam:*User*",
+				"iam:CreatePolicy",
+				"iam:CreatePolicyVersion",
+				"iam:DeletePolicy",
+				"iam:DeletePolicyVersion",
+				"iam:DeleteRolePermissionsBoundary",
+				"iam:SetDefaultPolicyVersion",
+				"organizations:*",
+				"sts:*"
+			],
+			"Resource": "*"
+		},
+		{
+			"Sid": "DenyBootstrapAndDeployRoles",
+			"Effect": "Deny",
+			"Action": "iam:*",
+			"Resource": [
+				"arn:aws:iam::849076101704:role/cdk-*",
+				"arn:aws:iam::849076101704:role/zugzwang-*-github-deploy"
+			]
+		}
+	]
+}

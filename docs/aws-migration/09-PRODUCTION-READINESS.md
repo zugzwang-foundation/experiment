@@ -74,6 +74,24 @@ to `cdk-hnb659fds-*` and the production role to `cdk-zzprod-*` only.
    boundary that denies `iam:*User*`, `organizations:*`, `account:*`.
 3. `cdk bootstrap aws://849076101704/ap-south-1 --qualifier zzprod --toolkit-stack-name CDKToolkit-prod
    --cloudformation-execution-policies <policy-arn>`
+
+   **Prepared (item 4, not run):** `infra/policies/production-cfn-execution-policy.json` (service-scoped
+   for the 42 resource types production creates; IAM only on `role/Zugzwang-production-*` and only with
+   the boundary attached; users, groups, keys, policy versions, OIDC/SAML, STS, Organizations and the
+   bootstrap/GitHub deploy roles explicitly denied) and `production-permissions-boundary.json` (every
+   production role: no `iam`/`sts`/`organizations`/`account`/`cloudformation`). The CDK app applies the
+   boundary to every production stack; staging templates are byte-identical. Commands, in order:
+   ```bash
+   cd infra
+   npx cdk synth "Zugzwang-production-*" -o cdk.out.prod -q
+   npx tsx scripts/check-production-policies.ts cdk.out.prod        # must print PASS
+   aws iam create-policy --policy-name zugzwang-production-boundary      --policy-document file://policies/production-permissions-boundary.json
+   aws iam create-policy --policy-name zugzwang-production-cfn-exec      --policy-document file://policies/production-cfn-execution-policy.json
+   npx cdk bootstrap aws://849076101704/ap-south-1 --qualifier zzprod      --toolkit-stack-name CDKToolkit-prod      --cloudformation-execution-policies arn:aws:iam::849076101704:policy/zugzwang-production-cfn-exec
+   ```
+   ⚠ The policy is checked statically, not yet by a deploy. The first production `cdk deploy` is its real
+   test; an `AccessDenied` there is a missing action to add here, never a reason to fall back to
+   `AdministratorAccess`.
 4. Deny the staging bootstrap's **deploy role** CloudFormation on `stack/Zugzwang-production-*` **and
    `stack/Zugzwang-Deploy/*`** (inline policy on `cdk-hnb659fds-deploy-role-…`), plus `iam:*` on
    `role/zugzwang-production-*`. Without it, staging's deploy role can still act on any stack name —

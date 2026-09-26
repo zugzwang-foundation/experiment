@@ -58,6 +58,15 @@ export interface EnvironmentConfig {
 	 * with a scoped execution policy (docs/aws-migration/09-PRODUCTION-READINESS.md).
 	 */
 	readonly bootstrapQualifier: string;
+	/**
+	 * Name of a customer-managed IAM policy applied as the permissions boundary
+	 * of EVERY role this environment's stacks create (H-3). The scoped `zzprod`
+	 * execution policy only lets CloudFormation create roles that carry it, so
+	 * a production deploy cannot mint an IAM-capable role. Undefined for
+	 * staging, whose templates stay byte-identical to what is deployed.
+	 * Policy documents: infra/policies/.
+	 */
+	readonly permissionsBoundaryPolicyName?: string;
 
 	// ── Network ──────────────────────────────────────────────────────────────
 	readonly vpcCidr: string;
