@@ -4,7 +4,7 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import type { Construct } from "constructs";
-import { type EnvironmentConfig, taskRoleNames } from "../config/types";
+import type { EnvironmentConfig } from "../config/types";
 
 export interface SecurityStackProps extends StackProps {
 	readonly config: EnvironmentConfig;
@@ -60,14 +60,13 @@ export class SecurityStack extends Stack {
 		);
 
 		// Pulls the image, writes logs, reads exactly one secret.
-		// ⚠ EXPLICIT NAMES (production-readiness review, HIGH-4): the GitHub deploy
-		// role's `iam:PassRole` must name these exactly. CloudFormation-generated
-		// names hit IAM's 64-char ceiling — staging's is exactly 64 and
-		// `Zugzwang-production-Security-` is 3 chars longer, so the stack prefix
-		// would be truncated and any prefix pattern would match nothing. Both
-		// names are exported via `taskRoleNames` in config/types.ts.
+		// ⚠ No explicit `roleName` (STAGING-PASSROLE). The GitHub deploy role's
+		// `iam:PassRole` references these roles' ARNs directly (deploy-stack.ts),
+		// so their CloudFormation-generated names — truncated at IAM's 64-char
+		// ceiling in production — no longer matter. Naming them would REPLACE the
+		// live staging roles, whose ARNs this stack exports to Compute; CloudFormation
+		// refuses to change an export in use, so that deploy fails and rolls back.
 		this.executionRole = new iam.Role(this, "TaskExecutionRole", {
-			roleName: taskRoleNames(config.name).execution,
 			assumedBy: new iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
 			description: `Zugzwang ${config.name} task execution role`,
 			managedPolicies: [
@@ -86,7 +85,6 @@ export class SecurityStack extends Stack {
 		// are AWS APIs. If a future feature needs an AWS call, it is added here
 		// deliberately rather than inherited.
 		this.taskRole = new iam.Role(this, "TaskRole", {
-			roleName: taskRoleNames(config.name).task,
 			assumedBy: new iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
 			description: `Zugzwang ${config.name} task role (no AWS permissions)`,
 		});

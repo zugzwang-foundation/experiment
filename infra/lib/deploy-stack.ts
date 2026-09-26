@@ -1,7 +1,6 @@
 import { CfnOutput, Stack, type StackProps } from "aws-cdk-lib";
 import * as iam from "aws-cdk-lib/aws-iam";
 import type { Construct } from "constructs";
-import { taskRoleNames } from "../config/types";
 
 export interface DeployStackProps extends StackProps {
 	/** `owner/repo`, e.g. `zugzwang-foundation/experiment`. */
@@ -13,6 +12,13 @@ export interface DeployStackProps extends StackProps {
 	readonly environments: readonly {
 		readonly name: string;
 		readonly bootstrapQualifier: string;
+		/**
+		 * The ARNs of that environment's ECS task execution role and task role
+		 * (SecurityStack) — the ONLY roles this environment's deploy role may
+		 * pass to ECS. Passed as references, never rebuilt from a name: the
+		 * generated names are truncated at IAM's 64-char ceiling in production.
+		 */
+		readonly passRoleArns: readonly string[];
 	}[];
 	/**
 	 * The account's EXISTING GitHub OIDC provider ARN, when one exists. The
@@ -73,6 +79,7 @@ export class DeployStack extends Stack {
 		for (const {
 			name: environment,
 			bootstrapQualifier,
+			passRoleArns,
 		} of props.environments) {
 			const bootstrapRoles = [
 				"deploy-role",
@@ -181,12 +188,9 @@ export class DeployStack extends Stack {
 				new iam.PolicyStatement({
 					sid: "PassTaskRoles",
 					actions: ["iam:PassRole"],
-					// Exact ARNs (review HIGH-4): a prefix pattern would miss the
-					// truncated CloudFormation-generated names in production.
-					resources: [
-						taskRoleNames(environment).execution,
-						taskRoleNames(environment).task,
-					].map((name) => `arn:aws:iam::${this.account}:role/${name}`),
+					// The roles' real ARNs (review HIGH-4, STAGING-PASSROLE): exact,
+					// and correct whatever name CloudFormation generated.
+					resources: [...passRoleArns],
 					conditions: {
 						StringEquals: { "iam:PassedToService": "ecs-tasks.amazonaws.com" },
 					},
