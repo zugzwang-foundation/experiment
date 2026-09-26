@@ -604,7 +604,10 @@ describe("ToS acceptance — session issuance wiring (AUTH-DBL-1)", () => {
 		};
 		expect(call.body).toEqual({ onboardingRef: "signed-ref-token" });
 		// The real IP/UA — never a headerless in-process call (SPEC.2 §3.7).
-		expect(call.headers.get("x-forwarded-for")).toBe("1.2.3.4");
+		// S-1 / ADR-0061: Better Auth reads ONLY the trusted stamp, so the IP
+		// rides there — never as a raw X-Forwarded-For Better Auth would re-parse.
+		expect(call.headers.get("x-zz-client-ip")).toBe("1.2.3.4");
+		expect(call.headers.has("x-forwarded-for")).toBe(false);
 		expect(call.headers.get("user-agent")).toBe("Mozilla/5.0 (test browser)");
 	});
 

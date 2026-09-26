@@ -10,9 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // B8/G2, out of this batch), so this file is GREEN by design. It fails only if
 // A17's wiring perturbs the locked field set — which is exactly what it guards.
 // (The A17 wiring itself is RED-tested in the endpoint / sign-route log-request
-// files.) `@vercel/functions` ipAddress is mocked for a deterministic `ip`.
-
-vi.mock("@vercel/functions", () => ({ ipAddress: () => "203.0.113.9" }));
+// files.) The `ip` value comes from the shared trusted-IP helper (S-1 /
+// ADR-0061); this file pins the KEY set only, not the value.
 
 import { logRequest } from "@/server/middleware/logging";
 

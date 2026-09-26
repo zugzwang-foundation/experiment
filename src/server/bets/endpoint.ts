@@ -18,6 +18,7 @@ import {
 	IDEMPOTENCY_KEY_REGEX,
 	RATE_LIMIT_ERROR_CODE,
 } from "@/server/idempotency/types";
+import { getRequestClientIp } from "@/server/middleware/client-ip";
 import { logRequest } from "@/server/middleware/logging";
 import { checkOrigin } from "@/server/middleware/origin-allowlist";
 import { checkRateLimit, ipIdentifier } from "@/server/middleware/rate-limit";
@@ -100,13 +101,9 @@ function jsonResponse(
 	return new Response(JSON.stringify(body), { status, headers });
 }
 
+/** S-1 / ADR-0061 — the trusted client IP (never the raw X-Forwarded-For). */
 function extractIp(request: Request): string {
-	const fwd = request.headers.get("x-forwarded-for");
-	if (fwd) {
-		const first = fwd.split(",")[0]?.trim();
-		if (first) return first;
-	}
-	return "unknown";
+	return getRequestClientIp(request) ?? "unknown";
 }
 
 /** Build the 7-field events metadata once at handler entry (retry-purity). */

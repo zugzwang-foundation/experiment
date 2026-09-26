@@ -1,6 +1,6 @@
 import "server-only";
 
-import { ipAddress } from "@vercel/functions";
+import { getRequestClientIp } from "@/server/middleware/client-ip";
 
 // Structured request-log emitter per SPEC.1 §16.3 H3 + the ADR-0007 Axiom
 // amendment (substance at SPEC.2 §0.1 ADR-0007 entry — Vercel runtime logs
@@ -34,34 +34,14 @@ interface LogRequestArgs {
 }
 
 /**
- * AWS-MIGRATION — the caller's IP, on Vercel and behind an AWS load balancer.
- *
- * `ipAddress()` from `@vercel/functions` reads `x-real-ip`, which Vercel sets
- * and an Application Load Balancer does not — so off-platform this column would
- * silently become `null` for every request, and the §16.3 H3 log row would lose
- * one of its seven fields without anything failing.
- *
- * ⚠ ONLY THE FIRST HOP OF `x-forwarded-for` IS TRUSTED, and that is the whole
- * subtlety: the header is a client-controllable list, so a request can arrive
- * carrying a forged chain. Behind our own ALB the LAST entry is the one the
- * balancer appended and the earlier ones are whatever the client sent — but the
- * first is what every other log in this stack means by "the client", and this
- * value is DIAGNOSTIC ONLY. It gates nothing: rate limiting keys on the user,
- * never on this. Keep it that way, or this becomes a spoofable control.
+ * S-1 / ADR-0061 — the caller's IP via the shared trusted-IP helper, on Vercel
+ * (`x-real-ip`) and behind Cloudflare + the ALB alike. It used to read the
+ * FIRST hop of X-Forwarded-For, which the client controls; the helper starts
+ * from the address our own edge observed instead. Diagnostic here, but the
+ * same value now gates the per-IP limits, so there is one derivation.
  */
 function clientIp(request: Request): string | null {
-	const vercel = ipAddress(request);
-	if (vercel) {
-		return vercel;
-	}
-	const forwarded = request.headers.get("x-forwarded-for");
-	if (forwarded) {
-		const first = forwarded.split(",")[0]?.trim();
-		if (first) {
-			return first;
-		}
-	}
-	return request.headers.get("x-real-ip") ?? null;
+	return getRequestClientIp(request);
 }
 
 export function logRequest(args: LogRequestArgs): void {

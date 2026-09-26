@@ -1,4 +1,6 @@
 import { auth } from "@/server/auth";
+// S-1 / ADR-0061 — Better Auth sees the client IP only via this stamp.
+import { withTrustedClientIp } from "@/server/middleware/client-ip";
 
 // Better Auth catch-all mount per SPEC.2 §8.10 + plan §3 step 11.
 //
@@ -19,7 +21,7 @@ import { auth } from "@/server/auth";
 const ONBOARDING_REF_MAX_AGE_SEC = 600;
 
 async function handleAuth(request: Request): Promise<Response> {
-	const response = await auth.handler(request);
+	const response = await auth.handler(withTrustedClientIp(request));
 
 	// Only intercept FORBIDDEN responses (where ONBOARDING_REQUIRED can fire).
 	if (response.status !== 403) return response;
