@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { Suspense } from "react";
 import type { DiscoveryMarketView } from "@/components/discovery/DiscoveryCarousel";
 import { DiscoveryCarousel } from "@/components/discovery/DiscoveryCarousel";
@@ -81,6 +82,9 @@ export default function DiscoveryPage() {
  *     ADR-0055. ⚠ THIS BULLET READ "LIVE, every render, never cached in any
  *     form" and that was the single await keeping Discovery out of the
  *     prerender. `pricing` still goes straight onto `card` from here.
+ *     ⚠ Discovery is no longer prerendered AT ALL since STAGING-DISCOVERY-DB
+ *     (`await connection()` at the top of this function); the window still
+ *     coalesces the database read, which is what it is now for.
  *   - `getCachedMarketDiscoveryData(id)` — cached, keyed on the market id
  *     ALONE with a `SHARED_VIEW_MIN_WINDOW_MS` window (CACHE-KEY-1,
  *     ADR-0051). ⚠ IT USED TO TAKE `reserves` AS A SECOND ARGUMENT, and that
@@ -111,6 +115,17 @@ export default function DiscoveryPage() {
  * the body.
  */
 export async function DiscoveryContent() {
+	// STAGING-DISCOVERY-DB — rendered at REQUEST time, never at build. `next build`
+	// reads the build environment's DATABASE_URL (Doppler → Supabase), not the
+	// database the running task serves (RDS); a prerendered Discovery baked the
+	// build's market ids into the page and every pricing/media lookup then missed.
+	// It also licenses `new Date()` below, which under cacheComponents otherwise
+	// fails every runtime re-prerender of `/` ("unstable value Date.now()").
+	// The reads stay behind their 'use cache' windows — no per-visitor DB read is
+	// added; what this gives up is the prebuilt HTML (ADR-0055, patched).
+	// ⚠ OUTSIDE the try on purpose: a missing request scope must fail loudly, not
+	// render ErrorState.
+	await connection();
 	let views: DiscoveryMarketView[];
 	try {
 		recordCacheAttempt("discovery-list", null);
@@ -134,6 +149,8 @@ export async function DiscoveryContent() {
 		// `/m/[slug]`, the page that actually takes a bet, serves a PRERENDERED
 		// price corrected by the poll, so Discovery was paying per visitor to be
 		// stricter than the surface it links to. See `cached-pricing.ts`.
+		// ⚠ STAGING-DISCOVERY-DB: the surface now renders per request anyway (see
+		// `connection()` above); this window keeps that render off the database.
 		const priceByMarket = new Map(
 			await getCachedDiscoveryPricing(marketIds.map((m) => m.id)),
 		);

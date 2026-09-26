@@ -50,6 +50,14 @@ vi.mock("@/server/storage/r2", () => ({
 	),
 }));
 
+// STAGING-DISCOVERY-DB — `DiscoveryContent` now opens with `await connection()`,
+// which THROWS outside a Next.js request scope (next 16.3.2
+// `throwForMissingRequestStore`). These calls are not requests, so the gate is
+// stubbed; `tests/unit/discovery/discovery-request-time.test.ts` pins that it is there.
+vi.mock("next/server", async (importOriginal) => ({
+	...(await importOriginal<typeof import("next/server")>()),
+	connection: vi.fn(async () => undefined),
+}));
 vi.mock("next/cache", () => ({
 	revalidatePath: vi.fn(),
 	revalidateTag: vi.fn(),
