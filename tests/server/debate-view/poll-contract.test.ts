@@ -327,6 +327,9 @@ describe("debate-view::poll-preserves-removal-masking", () => {
 			"src/app/api/cron/close-due-markets/route.ts",
 			"src/app/api/cron/r2-orphan-sweep/route.ts",
 			"src/app/api/health/route.ts",
+			// AWS-MIGRATION-3 / ADR-0060 — the target-group readiness gate. Returns
+			// warm-up counts only; reads no argument text (SC-1 not engaged).
+			"src/app/api/ready/route.ts",
 			"src/app/api/uploads/sign/route.ts",
 			"src/app/api/visits/route.ts",
 		]);
