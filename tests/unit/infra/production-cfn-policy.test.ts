@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { productionConfig } from "../../../infra/config/production";
 import { stagingConfig } from "../../../infra/config/staging";
 import {
-	globMatch,
+	evaluatePolicy,
 	type PolicyDocument,
 	servicesFor,
 	uncoveredResourceTypes,
@@ -35,17 +35,7 @@ const BOUNDARY_ARN = `arn:aws:iam::849076101704:policy/${productionConfig.permis
 
 /** Allow / Deny verdict of the execution policy for one action on one resource. */
 function decide(action: string, resource: string): "allow" | "deny" | "none" {
-	let allowed = false;
-	for (const s of exec.Statement) {
-		const actionHit = s.NotAction
-			? !list(s.NotAction).some((a) => globMatch(a, action))
-			: list(s.Action).some((a) => globMatch(a, action));
-		const resourceHit = list(s.Resource).some((r) => globMatch(r, resource));
-		if (!actionHit || !resourceHit) continue;
-		if (s.Effect === "Deny") return "deny";
-		allowed = true;
-	}
-	return allowed ? "allow" : "none";
+	return evaluatePolicy(exec, action, resource);
 }
 
 describe("coverage of the production templates", () => {
@@ -143,21 +133,27 @@ describe("IAM is scoped to production roles under the boundary", () => {
 		expect(decide(action, "*")).toBe("deny");
 	});
 
-	it("reads secrets only under zugzwang/production (not staging)", () => {
+	it("reads secrets only under zugzwang/production — staging's are explicitly denied", () => {
 		const base = "arn:aws:secretsmanager:ap-south-1:849076101704:secret:";
 		expect(
 			decide("secretsmanager:GetSecretValue", `${base}zugzwang/production-AbC`),
 		).toBe("allow");
 		expect(
 			decide("secretsmanager:GetSecretValue", `${base}zugzwang/staging-AbC`),
-		).toBe("none");
+		).toBe("deny");
 	});
 });
 
 describe("the permissions boundary", () => {
 	it("allows no IAM, STS, Organizations, account or CloudFormation action to any production role", () => {
-		expect(boundary.Statement).toHaveLength(1);
-		const [s] = boundary.Statement;
+		// One Allow (everything but these); every other statement is a Deny
+		// (the same-account staging denies, 09 §0) and can only narrow it.
+		const allows = boundary.Statement.filter((x) => x.Effect === "Allow");
+		expect(allows).toHaveLength(1);
+		expect(
+			boundary.Statement.filter((x) => x.Effect !== "Allow").map((x) => x.Sid),
+		).toEqual(["DenyStagingByTag", "DenyStagingByName"]);
+		const [s] = allows;
 		expect(s.Effect).toBe("Allow");
 		expect(list(s.NotAction).sort()).toEqual(
 			[

@@ -76,9 +76,27 @@ describe("§D / HIGH-4 — PassRole names the task roles by their real ARNs", ()
 	});
 
 	it("the app hands each environment's own Security roles to its deploy role", () => {
+		// One deploy stack per environment (09 §0): each passes ONLY its own
+		// environment's roles — never the other's.
 		const bin = stripped("infra/bin/zugzwang.ts");
-		expect(bin).toContain("securityStacks[c.name].executionRole.roleArn");
-		expect(bin).toContain("securityStacks[c.name].taskRole.roleArn");
+		const staging = bin.indexOf('new DeployStack(app, "Zugzwang-Deploy"');
+		const production = bin.indexOf(
+			'new DeployStack(app, "Zugzwang-production-Deploy"',
+		);
+		expect(staging).toBeGreaterThan(-1);
+		expect(production).toBeGreaterThan(staging);
+		const stagingBlock = bin.slice(staging, production);
+		const productionBlock = bin.slice(production);
+		for (const role of ["executionRole", "taskRole"]) {
+			expect(stagingBlock).toContain(
+				`securityStacks[stagingConfig.name].${role}.roleArn`,
+			);
+			expect(productionBlock).toContain(
+				`securityStacks[productionConfig.name].${role}.roleArn`,
+			);
+		}
+		expect(stagingBlock).not.toContain("securityStacks[productionConfig.name]");
+		expect(productionBlock).not.toContain("securityStacks[stagingConfig.name]");
 	});
 
 	it("the live task roles are NOT renamed (renaming would replace them under Compute's import)", () => {

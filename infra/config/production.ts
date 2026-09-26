@@ -13,6 +13,15 @@ import { type EnvironmentConfig, RUNTIME_SECRET_KEYS } from "./types";
 export const PRODUCTION_CERTIFICATE_ARN: string | undefined = undefined;
 
 /**
+ * 09 §0 — production shares this AWS account with staging, as SEPARATE
+ * resources. Pinned rather than taken from the credentials, so a production
+ * synth or deploy cannot land in any other account. The policy documents under
+ * infra/policies/ name the same id; tests/unit/infra/same-account-isolation
+ * .test.ts keeps them in step.
+ */
+export const PRODUCTION_ACCOUNT_ID = "849076101704";
+
+/**
  * Production.
  *
  * ⚠ `maxCapacity: 1` is deliberate and is a correctness constraint, not a cost
@@ -29,7 +38,8 @@ export const productionConfig: EnvironmentConfig = {
 	// this app), and compute in the wrong region undoes PERF-1: the app must sit
 	// in the same region as Supabase. Override deliberately, or not at all.
 	region: process.env.ZZ_AWS_REGION ?? "ap-south-1",
-	account: process.env.CDK_DEFAULT_ACCOUNT,
+	// ⛔ PINNED (09 §0), never the credentials' account and no override.
+	account: PRODUCTION_ACCOUNT_ID,
 	// ⛔ H-3: production's OWN bootstrap roles, so the staging deploy path
 	// (hnb659fds) cannot deploy these stacks. Requires a separate bootstrap —
 	// docs/aws-migration/09-PRODUCTION-READINESS.md §B.
