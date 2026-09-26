@@ -316,10 +316,11 @@ jobs:
           if [ "${{ inputs.environment || 'staging' }}" = "production" ] && [ -z "$ZZ_PROD_CERT_ARN" ]; then
             echo "ZZ_PROD_CERT_ARN is not set on the production environment — refusing to synth an HTTP-only production listener"; exit 1
           fi
-          if [ "${{ inputs.environment || 'staging' }}" = "staging" ] && [ -z "$ZZ_STAGING_CERT_ARN" ]; then
-            echo "ZZ_STAGING_CERT_ARN is not set on the staging environment — refusing to synth an HTTP-only staging listener"; exit 1
-          fi
-          if [ -z "$ZZ_ALERT_EMAIL" ]; then
+          # STAGING-DEPLOY-NO-VARS — staging needs neither variable here: its
+          # certificate is a committed default in infra/config/staging.ts, and
+          # the alert email feeds ONLY the Monitoring stack, which this job never
+          # deploys (it deploys Compute alone). Production keeps both checks.
+          if [ "${{ inputs.environment || 'staging' }}" = "production" ] && [ -z "$ZZ_ALERT_EMAIL" ]; then
             echo "ZZ_ALERT_EMAIL is not set on the ${{ inputs.environment || 'staging' }} environment — refusing to synth an alarm topic with no subscriber"; exit 1
           fi
           pnpm install --frozen-lockfile
