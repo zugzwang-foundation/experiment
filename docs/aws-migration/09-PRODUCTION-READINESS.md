@@ -85,9 +85,13 @@ to `cdk-hnb659fds-*` and the production role to `cdk-zzprod-*` only.
    cd infra
    npx cdk synth "Zugzwang-production-*" -o cdk.out.prod -q
    npx tsx scripts/check-production-policies.ts cdk.out.prod        # must print PASS
-   aws iam create-policy --policy-name zugzwang-production-boundary      --policy-document file://policies/production-permissions-boundary.json
-   aws iam create-policy --policy-name zugzwang-production-cfn-exec      --policy-document file://policies/production-cfn-execution-policy.json
-   npx cdk bootstrap aws://849076101704/ap-south-1 --qualifier zzprod      --toolkit-stack-name CDKToolkit-prod      --cloudformation-execution-policies arn:aws:iam::849076101704:policy/zugzwang-production-cfn-exec
+   aws iam create-policy --policy-name zugzwang-production-boundary \
+     --policy-document file://policies/production-permissions-boundary.json
+   aws iam create-policy --policy-name zugzwang-production-cfn-exec \
+     --policy-document file://policies/production-cfn-execution-policy.json
+   npx cdk bootstrap aws://849076101704/ap-south-1 --qualifier zzprod \
+     --toolkit-stack-name CDKToolkit-prod \
+     --cloudformation-execution-policies arn:aws:iam::849076101704:policy/zugzwang-production-cfn-exec
    ```
    ⚠ The policy is checked statically, not yet by a deploy. The first production `cdk deploy` is its real
    test; an `AccessDenied` there is a missing action to add here, never a reason to fall back to
