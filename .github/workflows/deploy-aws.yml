@@ -383,7 +383,11 @@ jobs:
             CANARY=$(echo "$BODY" | jq -r '.canary // empty')
             DB=$(echo "$BODY" | jq -r '.db // empty')
             MIGRATIONS=$(echo "$BODY" | jq -r '.migrations // empty')
-            PAUSED=$(echo "$BODY" | jq -r '.writesPaused // empty')
+            # `tostring`, NOT `// empty`: jq's `//` treats `false` like null, so a
+            # correct `writesPaused: false` read as "" and failed this gate on a
+            # healthy deploy (run 36234538584). A missing field reads "null" and
+            # still fails the comparison below.
+            PAUSED=$(echo "$BODY" | jq -r '.writesPaused | tostring')
             echo "attempt $i: canary=$CANARY db=$DB migrations=$MIGRATIONS"
             if [ "$CANARY" = "$EXPECTED" ] && [ "$DB" = "ok" ] && [ "$MIGRATIONS" = "ok" ]; then
               echo "live build verified: $CANARY"

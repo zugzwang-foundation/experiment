@@ -76,3 +76,20 @@ describe("the deploy job installs and runs infra's own toolchain", () => {
 		expect(workflow).not.toMatch(/^\s+pnpm exec cdk /m);
 	});
 });
+
+describe("the verify gate reads writesPaused as a literal boolean", () => {
+	// Run 36234538584: `jq -r '.writesPaused // empty'` turned a correct
+	// `false` into "" (jq's `//` treats false like null) and failed a healthy
+	// deploy. `tostring` yields "true" / "false" / "null".
+	it("uses tostring, never the // alternative, for writesPaused", () => {
+		expect(workflow).toContain("jq -r '.writesPaused | tostring'");
+		expect(workflow).not.toContain("jq -r '.writesPaused // empty'");
+	});
+
+	it("compares it with the dispatch intent rendered the same way", () => {
+		expect(workflow).toContain(
+			"EXPECTED_PAUSED: ${{ (inputs.writes || 'open') == 'paused' }}",
+		);
+		expect(workflow).toContain('if [ "$PAUSED" != "$EXPECTED_PAUSED" ]; then');
+	});
+});
