@@ -71,6 +71,39 @@ export class BetSerializationExhaustedError extends Error {
 }
 
 /**
+ * A statement inside the bet transaction hit `statement_timeout` (SQLSTATE
+ * 57014) — in practice the `FOR NO KEY UPDATE` wait on the pool row under
+ * contention, since that wait is bounded by the same 1,000 ms. NOT retried:
+ * the budget the transaction wrapper gives a serialization failure exists
+ * because a second attempt usually finds the row free, whereas a lock wait
+ * that just spent a full second will spend the next one the same way. The
+ * request is answered 503 + `Retry-After` so the client's own retry (same
+ * idempotency key, durable replay) does the waiting where it belongs.
+ *
+ * AWS-MIGRATION-3: until this class existed the error bubbled untyped and
+ * `toWireError` answered `500 error_internal` — the five silent 500s of the
+ * staging load test (08-STAGING-LOAD-TEST-RESULTS.md §4) — while the
+ * transaction was already rolled back and nothing had been written.
+ */
+export class BetStatementTimeoutError extends Error {
+	static readonly httpStatus = 503;
+	static readonly retryAfterSeconds = 2;
+	static readonly code = "error_bet_timeout";
+	static readonly errorType = "unavailable";
+
+	readonly sqlstate = "57014";
+	readonly flow: BetFlow;
+
+	constructor(args: { flow: BetFlow }) {
+		super(
+			`bet transaction statement timed out (SQLSTATE 57014, flow ${args.flow})`,
+		);
+		this.name = "BetStatementTimeoutError";
+		this.flow = args.flow;
+	}
+}
+
+/**
  * The coarse market-state gate observed a non-Open market. A PRODUCT error that
  * is NOT retried — it carries no SQLSTATE, so the wrapper's retry filter
  * rethrows it immediately (plan §"Coarse market-state gate"). Carries the EXACT
@@ -412,6 +445,14 @@ export function toWireError(err: unknown): WireError {
 			BetSerializationExhaustedError.code,
 			err.message,
 			{ retryAfterBody: BetSerializationExhaustedError.retryAfterSeconds },
+		);
+	}
+	if (err instanceof BetStatementTimeoutError) {
+		return buildWire(
+			BetStatementTimeoutError.httpStatus,
+			BetStatementTimeoutError.code,
+			err.message,
+			{ retryAfterBody: BetStatementTimeoutError.retryAfterSeconds },
 		);
 	}
 	if (err instanceof MarketNotOpenError) {

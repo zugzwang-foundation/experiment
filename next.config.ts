@@ -24,6 +24,19 @@ const nextConfig: NextConfig = {
 	// `instant` and the build failed on 14 routes, not the 10 originally
 	// scoped — see docs/logs S-4 Phase B).
 	cacheComponents: true,
+	// AWS-MIGRATION — the container build, and ONLY the container build, asks for
+	// the standalone server bundle (a self-contained `.next/standalone` tree with
+	// its own minimal `node_modules`, which is what the Dockerfile copies).
+	//
+	// ⚠ GATED ON AN ENV VAR RATHER THAN SET UNCONDITIONALLY, deliberately. Vercel
+	// runs its own builder and does not need this; turning it on everywhere would
+	// change the output of every existing build — including the production one
+	// serving the live experiment — to buy nothing on the platform we are still
+	// on. `BUILD_TARGET=docker` is set by the Dockerfile and by nothing else, so
+	// the Vercel build stays byte-identical until the day we cut over.
+	...(process.env.BUILD_TARGET === "docker"
+		? { output: "standalone" as const }
+		: {}),
 	// The 16.3.x `next dev`/`next build` auto-appends an "agentRules" block to
 	// AGENTS.md on every run (generate-agent-files.js) — undesired here: this
 	// repo's AGENTS.md is a hand-authored, tightly governed document (CLAUDE.md

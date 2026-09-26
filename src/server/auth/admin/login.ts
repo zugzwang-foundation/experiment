@@ -9,6 +9,7 @@ import type { z } from "zod";
 import { db } from "@/db";
 import { insertEvent } from "@/server/events/insert";
 import type { eventMetadataSchema } from "@/server/events/schemas";
+import { getClientIp } from "@/server/middleware/client-ip";
 import { checkRateLimit, ipIdentifier } from "@/server/middleware/rate-limit";
 
 // F-AUTH-ADMIN login Server Action per SPEC.1 §13 + SPEC.2 §8.4 + plan §4
@@ -52,15 +53,15 @@ const SERIALIZATION_CONFLICT = {
 
 type AdminLoginResult = typeof INVALID | typeof SERIALIZATION_CONFLICT;
 
-function getClientIp(headerStore: {
+/**
+ * S-1 / ADR-0061 — the trusted client IP. This keys `adminLoginPerIp`, the
+ * only brute-force control on the admin password, so it must never be the raw
+ * (client-controlled) first hop of X-Forwarded-For.
+ */
+function clientIpOrUnknown(headerStore: {
 	get: (name: string) => string | null;
 }): string {
-	const fwd = headerStore.get("x-forwarded-for");
-	if (fwd) {
-		const first = fwd.split(",")[0]?.trim();
-		if (first) return first;
-	}
-	return "unknown";
+	return getClientIp((name) => headerStore.get(name)) ?? "unknown";
 }
 
 function constantTimeDelay(): Promise<void> {
@@ -134,7 +135,7 @@ export async function adminLoginAction(
 ): Promise<AdminLoginResult> {
 	const headerStore = await headers();
 	const cookieStore = await cookies();
-	const ip = getClientIp(headerStore);
+	const ip = clientIpOrUnknown(headerStore);
 
 	// Step 1: per-IP rate limit (identical-401 on deny, no transaction).
 	const rate = await checkRateLimit("adminLoginPerIp", ipIdentifier(ip));

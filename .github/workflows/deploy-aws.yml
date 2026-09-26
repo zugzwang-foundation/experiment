@@ -1,0 +1,259 @@
+# AWS-MIGRATION — build, migrate, deploy, verify.
+#
+# ⚠ MANUAL ONLY, deliberately. While the experiment is live on Vercel this
+# workflow must never fire from a push: a branch merge should not be able to
+# move production to a different platform. Change the trigger the day the
+# cutover is agreed, not before.
+#
+# ⛔ THE ORDER IS THE POINT (ADR-0024 migrate-before-serve). Migrations land
+# BEFORE the new image serves traffic, so a failed migration leaves the OLD
+# version running and untouched. Never reorder these jobs for speed.
+name: Deploy to AWS
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Which environment to deploy
+        required: true
+        type: choice
+        options: [staging, production]
+      skip_migrations:
+        description: Skip the migration step (only when nothing changed under drizzle/)
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  # One deploy per environment at a time; queued, never cancelled — cancelling
+  # mid-deploy is how an environment ends up half-updated.
+  group: deploy-aws-${{ inputs.environment }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-south-1
+
+# `id-token: write` is granted PER JOB below, only to the two jobs that assume
+# an AWS role (`@security-auditor` M-3): the migrate job holds DOPPLER_TOKEN and
+# runs third-party actions, and must not also be able to mint an OIDC token.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and push image
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: meta
+        name: Compute the image tag
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          echo "image_tag=${{ inputs.environment }}-${SHA}" >> "$GITHUB_OUTPUT"
+          echo "app_commit_sha=${SHA}" >> "$GITHUB_OUTPUT"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - uses: dopplerhq/cli-action@v3
+      - name: Fetch build-time values from Doppler
+        id: doppler
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: |
+          # ⚠ BUILD-TIME ONLY. These are inlined into the bundle, which is why
+          # the image is environment-specific. Runtime secrets are NOT here —
+          # ECS injects those from Secrets Manager when the task starts.
+          CONFIG=$([ "${{ inputs.environment }}" = "production" ] && echo prd || echo stg)
+          for VAR in NEXT_PUBLIC_SENTRY_DSN NEXT_PUBLIC_POSTHOG_KEY NEXT_PUBLIC_POSTHOG_HOST NEXT_PUBLIC_TURNSTILE_SITE_KEY BETTER_AUTH_URL DATABASE_URL; do
+            VALUE=$(doppler secrets get "$VAR" --config "$CONFIG" --plain)
+            echo "::add-mask::$VALUE"
+            echo "$VAR=$VALUE" >> "$GITHUB_ENV"
+          done
+          echo "ZUGZWANG_ENV=$([ "${{ inputs.environment }}" = "production" ] && echo prod || echo staging)" >> "$GITHUB_ENV"
+
+      - name: Build and push the app image
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          REPO: zugzwang-${{ inputs.environment }}
+          TAG: ${{ steps.meta.outputs.image_tag }}
+        run: |
+          # The build evaluates every route's modules, so it needs the full
+          # environment — mounted as ONE secret, never as build args, so none
+          # of it is recorded in the image history.
+          CONFIG=$([ "${{ inputs.environment }}" = "production" ] && echo prd || echo stg)
+          trap 'rm -f build.env' EXIT
+          doppler secrets download --no-file --format env --config "$CONFIG" > build.env
+          docker build --target runner \
+            --secret id=build_env,src=build.env \
+            --build-arg ZUGZWANG_ENV="$ZUGZWANG_ENV" \
+            --build-arg APP_COMMIT_SHA="${{ steps.meta.outputs.app_commit_sha }}" \
+            --build-arg BETTER_AUTH_URL="$BETTER_AUTH_URL" \
+            --build-arg NEXT_PUBLIC_SENTRY_DSN="$NEXT_PUBLIC_SENTRY_DSN" \
+            --build-arg NEXT_PUBLIC_POSTHOG_KEY="$NEXT_PUBLIC_POSTHOG_KEY" \
+            --build-arg NEXT_PUBLIC_POSTHOG_HOST="$NEXT_PUBLIC_POSTHOG_HOST" \
+            --build-arg NEXT_PUBLIC_TURNSTILE_SITE_KEY="$NEXT_PUBLIC_TURNSTILE_SITE_KEY" \
+            -t "$REGISTRY/$REPO:$TAG" .
+          docker push "$REGISTRY/$REPO:$TAG"
+          # The env file never outlives the job step that needed it.
+          rm -f build.env
+
+      - name: Build and push the migration image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          REPO: zugzwang-${{ inputs.environment }}
+          TAG: ${{ steps.meta.outputs.image_tag }}
+        run: |
+          docker build --target migrate -t "$REGISTRY/$REPO:$TAG-migrate" .
+          docker push "$REGISTRY/$REPO:$TAG-migrate"
+
+  migrate:
+    name: Apply migrations (before anything serves)
+    needs: build
+    if: ${{ !inputs.skip_migrations }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: dopplerhq/cli-action@v3
+      - name: Migrate
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: |
+          # The existing scripts, unchanged: one transaction per migration, with
+          # the production ref guard that refuses the wrong database.
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            doppler run --config prd -- pnpm db:migrate:prod
+          else
+            doppler run --config stg -- pnpm db:migrate:staging
+          fi
+
+  deploy:
+    name: Roll the service to the new image
+    needs: [build, migrate]
+    # `always()` plus the explicit results: the deploy runs when migrate
+    # succeeded OR was deliberately skipped, and never when it FAILED.
+    if: ${{ always() && needs.build.result == 'success' && (needs.migrate.result == 'success' || needs.migrate.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy the compute stack at the new image tag
+        working-directory: infra
+        # AWS-MIGRATION-3: the config reads the certificate ARN and the alert
+        # address at SYNTH time. A synth without them would emit a stack with
+        # an HTTP-only listener and an alarm topic with no subscriber — and
+        # deploy it. They come from the GitHub environment's variables, never
+        # from the repository.
+        env:
+          ZZ_STAGING_CERT_ARN: ${{ vars.ZZ_STAGING_CERT_ARN }}
+          ZZ_PROD_CERT_ARN: ${{ vars.ZZ_PROD_CERT_ARN }}
+          ZZ_ALERT_EMAIL: ${{ vars.ZZ_ALERT_EMAIL }}
+          # The write-pause is a synth-time input (config/*.ts). A synth without
+          # it silently emits an UNPAUSED task definition — so it is carried from
+          # the environment's variables exactly like the certificate ARN
+          # (`@security-auditor` H-4). Set the variable to `paused` for the
+          # cutover window and clear it afterwards.
+          ZZ_STAGING_WRITES_PAUSED: ${{ vars.ZZ_STAGING_WRITES_PAUSED }}
+          ZZ_PROD_WRITES_PAUSED: ${{ vars.ZZ_PROD_WRITES_PAUSED }}
+        run: |
+          if [ "${{ inputs.environment }}" = "production" ] && [ -z "$ZZ_PROD_CERT_ARN" ]; then
+            echo "ZZ_PROD_CERT_ARN is not set on the production environment — refusing to synth an HTTP-only production listener"; exit 1
+          fi
+          if [ "${{ inputs.environment }}" = "staging" ] && [ -z "$ZZ_STAGING_CERT_ARN" ]; then
+            echo "ZZ_STAGING_CERT_ARN is not set on the staging environment — refusing to synth an HTTP-only staging listener"; exit 1
+          fi
+          if [ -z "$ZZ_ALERT_EMAIL" ]; then
+            echo "ZZ_ALERT_EMAIL is not set on the ${{ inputs.environment }} environment — refusing to synth an alarm topic with no subscriber"; exit 1
+          fi
+          pnpm install --frozen-lockfile
+          pnpm exec cdk deploy "Zugzwang-${{ inputs.environment }}-Compute" \
+            -c imageTag=${{ needs.build.outputs.image_tag }} \
+            --require-approval never
+
+      - name: Wait for the service to stabilise
+        run: |
+          # The deployment circuit breaker rolls back on its own if the new
+          # tasks never turn healthy; this waits for whichever outcome happened.
+          aws ecs wait services-stable \
+            --cluster zugzwang-${{ inputs.environment }} \
+            --services $(aws ecs list-services --cluster zugzwang-${{ inputs.environment }} --query 'serviceArns[0]' --output text)
+
+  verify:
+    name: Verify the live build
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Health gate
+        env:
+          BASE_URL: ${{ inputs.environment == 'production' && 'https://zugzwangworld.com' || 'https://staging.zugzwangworld.com' }}
+          EXPECTED: ${{ needs.build.outputs.image_tag }}
+        run: |
+          # ⛔ THE GATE IS THIS ENDPOINT, NOT AN EXIT CODE (runbook §2.2, and
+          # drizzle-orm #5769: a migrate step can report success while the
+          # database is not actually ready). Poll until the canary equals the
+          # tag we just deployed, or fail the run.
+          for i in $(seq 1 30); do
+            BODY=$(curl -fsS "$BASE_URL/api/health" || echo '{}')
+            CANARY=$(echo "$BODY" | jq -r '.canary // empty')
+            DB=$(echo "$BODY" | jq -r '.db // empty')
+            MIGRATIONS=$(echo "$BODY" | jq -r '.migrations // empty')
+            echo "attempt $i: canary=$CANARY db=$DB migrations=$MIGRATIONS"
+            if [ "$CANARY" = "$EXPECTED" ] && [ "$DB" = "ok" ] && [ "$MIGRATIONS" = "ok" ]; then
+              echo "live build verified: $CANARY"
+              # AWS-MIGRATION-3: the task is live; now require it to be WARM.
+              # /api/ready is the target-group health check, so by the time the
+              # ALB routes here it is normally already 200 — this is the receipt.
+              for j in $(seq 1 12); do
+                BODY=$(curl -fsS "$BASE_URL/api/ready" || echo '{}')
+                READY=$(echo "$BODY" | jq -r '.ready // empty')
+                FAILED=$(echo "$BODY" | jq -r '.failed // empty')
+                # `ready` means "tried once"; `failed` is how many pages did not
+                # render inside the budget. The gate requires both (M-2).
+                if [ "$READY" = "true" ] && [ "$FAILED" = "0" ]; then
+                  echo "readiness gate passed (all warm paths rendered)"
+                  exit 0
+                fi
+                echo "ready=$READY failed=$FAILED"
+                sleep 10
+              done
+              echo "readiness gate never reported ready — the task is serving cold; investigate"
+              exit 1
+            fi
+            sleep 10
+          done
+          echo "health gate never reported the deployed build — investigate before retrying"
+          exit 1

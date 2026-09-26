@@ -1,0 +1,45 @@
+# Keep the build context small and, more importantly, keep secrets and local
+# state out of it entirely — anything listed here cannot reach a layer.
+
+.git
+.github
+node_modules
+.next
+out
+infra/node_modules
+infra/cdk.out
+
+# ⛔ Never in an image.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+supabase/
+
+# Local and editor state
+.vscode
+.idea
+.DS_Store
+*.log
+coverage
+.turbo
+tsconfig.tsbuildinfo
+
+# Not needed at runtime or for migrations
+docs
+# ⚠ …except the data snapshots: tests/unit/debate/resolution-block-data.test.ts
+# imports them, and the build type-checks the tests. Excluding one fails the
+# image build with a missing-module error that looks nothing like its cause —
+# which is exactly what happened when the prod snapshot joined the staging one
+# and this rule still named only the first. A glob, so the next snapshot is
+# admitted by shape rather than by remembering to edit this line.
+!docs/data/*.json
+# ⚠ tests/ STAYS IN THE BUILD CONTEXT. `next build` type-checks the whole
+# project, and scripts/lots-1-staging-wipe.ts imports from tests/staging — so
+# excluding it fails the build at type-check, not at runtime. The build stage is
+# discarded; the runner image carries none of this.
+*.md
+!README.md
+.claude
+claude-progress.md

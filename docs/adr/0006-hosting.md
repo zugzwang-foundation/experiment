@@ -8,7 +8,7 @@
 | **Tracker task** | SPEC.6 |
 | **Frame document** | SPEC.2 §1.4 #5 (delegation), §4 (System Context), §22 (Operational Runbook Pointers), §22 (ADR Index) |
 | **Supersedes** | — |
-| **Superseded-by** | — |
+| **Superseded-by** | ADR-0059 (partial — the database vendor only: Supabase → RDS for PostgreSQL in `ap-south-1`, inside the application VPC; the single-region ruling and every other vendor are unchanged) |
 | **Patch records** | 2026-08-09 · the ratified `bom1` region was never applied to the Vercel project — see §Patch record (PERF-1)<br>2026-08-19 · the sizing premise changed, and §4 undercounted its own buckets — see §Patch record (SYNC-3)<br>2026-08-22 · re-verified post-LOTS-1, and the Discovery gauge corrected — see §Patch record (PERF-1-CLOSE) |
 
 ---

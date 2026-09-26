@@ -1,6 +1,6 @@
 import "server-only";
 
-import { ipAddress } from "@vercel/functions";
+import { getRequestClientIp } from "@/server/middleware/client-ip";
 
 // Structured request-log emitter per SPEC.1 §16.3 H3 + the ADR-0007 Axiom
 // amendment (substance at SPEC.2 §0.1 ADR-0007 entry — Vercel runtime logs
@@ -33,6 +33,17 @@ interface LogRequestArgs {
 	startedAt: number;
 }
 
+/**
+ * S-1 / ADR-0061 — the caller's IP via the shared trusted-IP helper, on Vercel
+ * (`x-real-ip`) and behind Cloudflare + the ALB alike. It used to read the
+ * FIRST hop of X-Forwarded-For, which the client controls; the helper starts
+ * from the address our own edge observed instead. Diagnostic here, but the
+ * same value now gates the per-IP limits, so there is one derivation.
+ */
+function clientIp(request: Request): string | null {
+	return getRequestClientIp(request);
+}
+
 export function logRequest(args: LogRequestArgs): void {
 	const url = new URL(args.request.url);
 	const row = {
@@ -40,7 +51,7 @@ export function logRequest(args: LogRequestArgs): void {
 		user_id: args.userId,
 		route: url.pathname,
 		status_code: args.status,
-		ip: ipAddress(args.request) ?? null,
+		ip: clientIp(args.request),
 		user_agent: args.request.headers.get("user-agent") ?? null,
 		latency_ms: Date.now() - args.startedAt,
 	};

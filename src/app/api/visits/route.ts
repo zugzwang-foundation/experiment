@@ -1,6 +1,7 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { isbot } from "isbot";
 
+import { getRequestClientIp } from "@/server/middleware/client-ip";
 import { ipIdentifier } from "@/server/middleware/rate-limit";
 import { getRedisKey } from "@/server/upstash/keys";
 import { redis } from "@/server/upstash/redis";
@@ -30,13 +31,9 @@ const visitsPerIp = new Ratelimit({
 	analytics: false,
 });
 
+/** S-1 / ADR-0061 — the trusted client IP (never the raw X-Forwarded-For). */
 function extractIp(request: Request): string {
-	const fwd = request.headers.get("x-forwarded-for");
-	if (fwd) {
-		const first = fwd.split(",")[0]?.trim();
-		if (first) return first;
-	}
-	return "unknown";
+	return getRequestClientIp(request) ?? "unknown";
 }
 
 export async function POST(request: Request): Promise<Response> {
