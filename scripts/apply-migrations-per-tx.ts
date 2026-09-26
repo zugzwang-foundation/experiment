@@ -24,9 +24,9 @@
  * tsx caveat (AGENTS.md §7): inlines its own `postgres()` client; never
  * delegates into the `@/db` → `server-only` chain.
  *
- * ⚠ `migrate-prod.ts` still carries its own copy of this loop. It was left
- * byte-for-byte unchanged on purpose during AWS-MIGRATION-2 (production is
- * frozen for the duration); folding it onto this module is a one-line follow-up.
+ * Both `migrate-staging.ts` and `migrate-prod.ts` delegate here since
+ * AWS-MIGRATION-3 (the prod copy of this loop was folded in so the cutover
+ * runs the code the staging rehearsal proved, fresh-RDS preparation included).
  */
 
 import { readMigrationFiles } from "drizzle-orm/migrator";

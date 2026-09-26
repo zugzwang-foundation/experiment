@@ -25,8 +25,17 @@ export const productionConfig: EnvironmentConfig = {
 	containerPort: 3000,
 	cpu: 1024,
 	memoryMiB: 3072,
-	memoryReservationMiB: 1024,
-	instanceType: "t3.medium",
+	// Reservation raised to match the bounded heap below (AWS-MIGRATION-3): ECS
+	// places on the reservation, and a 2 GiB heap on a 1 GiB reservation would
+	// let a second task be scheduled onto memory this one is already using.
+	// With m7i-flex.large (8 GiB) two 3 GiB tasks fit on one host, so a rolling
+	// deploy places the replacement task beside the old one without waiting on
+	// the ASG. Keep `maxInstances: 2` regardless — it is what lets a launch-
+	// template change roll with `minInstancesInService: 1`.
+	memoryReservationMiB: 2048,
+	// m7i-flex.large — see staging.ts: the account plan refuses t3.medium, and
+	// the flex type is eligible and larger (2 vCPU / 8 GiB).
+	instanceType: "m7i-flex.large",
 	minInstances: 1,
 	maxInstances: 2,
 	imageTag: "production-latest",
@@ -35,6 +44,12 @@ export const productionConfig: EnvironmentConfig = {
 	maxCapacity: 1,
 	stopTimeoutSeconds: 30,
 	enableExecuteCommand: false,
+	nodeMaxOldSpaceMiB: 2048,
+	keepAliveTimeoutMs: 65_000,
+	readinessPath: "/api/ready",
+	healthCheckGracePeriodSeconds: 180,
+	writesPaused:
+		process.env.ZZ_PROD_WRITES_PAUSED === "paused" ? "paused" : undefined,
 
 	certificateArn: process.env.ZZ_PROD_CERT_ARN,
 	appBaseUrl: "https://zugzwangworld.com",

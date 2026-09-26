@@ -37,6 +37,9 @@ const STATE_BY_CODE: Readonly<Record<string, ComposerStateName>> = {
 	error_moderation_in_flight: "p3_wait_in_flight",
 	error_idempotency_in_flight: "p3_wait_in_flight",
 	error_bet_serialization_exhausted: "p3_transient_retry",
+	// AWS-MIGRATION-3: a statement_timeout inside the bet tx (SQLSTATE 57014) —
+	// rolled back, uncached 503 + Retry-After, same posture as exhaustion.
+	error_bet_timeout: "p3_transient_retry",
 	error_position_conflict: "p3_transient_retry",
 	error_storage_unavailable: "p3_transient_retry",
 	error_idempotency_unavailable: "p3_transient_retry",
@@ -116,6 +119,7 @@ export function mapWireError(args: {
  */
 const TRANSIENT_CODES: ReadonlySet<string> = new Set([
 	"error_bet_serialization_exhausted",
+	"error_bet_timeout",
 	"error_position_conflict",
 	"error_storage_unavailable",
 	"error_idempotency_unavailable",

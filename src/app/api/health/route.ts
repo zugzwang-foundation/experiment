@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/db";
+import { isWritesPaused } from "@/server/config/writes-paused";
 import { migrationDriftStatus } from "@/server/health/migration-drift";
 
 // GET /api/health — SCAFFOLD.8 OQ-3 boundary verdict + LD-5 smoke items
@@ -73,5 +74,8 @@ export async function GET(): Promise<Response> {
 		region: process.env.VERCEL_REGION ?? process.env.APP_REGION ?? null,
 		db: dbStatus,
 		migrations,
+		// AWS-MIGRATION-3: the write-pause is otherwise invisible until a write
+		// fails — the cutover runbook reads this to confirm the window is open.
+		writesPaused: isWritesPaused(),
 	});
 }

@@ -107,7 +107,13 @@ export class ComputeStack extends Stack {
 			maxCapacity: config.maxInstances,
 			// An instance is replaced rather than patched in place: a new AMI means
 			// a new launch template version and a rolling replacement.
-			updatePolicy: autoscaling.UpdatePolicy.rollingUpdate(),
+			// minInstancesInService: 1 — the default (0) terminated the only host
+			// before its replacement existed and staging served 503 for the whole
+			// window (06-STAGING-DEPLOYMENT.md §10.4). Needs maxInstances >= 2.
+			updatePolicy: autoscaling.UpdatePolicy.rollingUpdate({
+				minInstancesInService: 1,
+				maxBatchSize: 1,
+			}),
 			requireImdsv2: true,
 		});
 
@@ -157,6 +163,10 @@ export class ComputeStack extends Stack {
 			// session pooler is also what the pool settings in src/db/index.ts
 			// were tuned against.
 			DB_POOLER_MODE: "session",
+			// AWS-MIGRATION-3 — see the fields' docblocks in config/types.ts.
+			NODE_OPTIONS: `--max-old-space-size=${config.nodeMaxOldSpaceMiB}`,
+			KEEP_ALIVE_TIMEOUT: String(config.keepAliveTimeoutMs),
+			...(config.writesPaused ? { ZUGZWANG_WRITES_PAUSED: "paused" } : {}),
 		};
 
 		const container = taskDefinition.addContainer("app", {
@@ -259,7 +269,11 @@ export class ComputeStack extends Stack {
 			// deferred `after()` work both get to finish before the task goes.
 			deregistrationDelay: Duration.seconds(30),
 			healthCheck: {
-				path: "/api/health",
+				// `/api/ready` (AWS-MIGRATION-3): a task joins the target group only
+				// after it has rendered the home page and every Open market once.
+				// The CONTAINER health check above stays on `/api/health` — that one
+				// decides whether the process is alive, this one whether it is warm.
+				path: config.readinessPath,
 				healthyHttpCodes: "200",
 				interval: Duration.seconds(15),
 				timeout: Duration.seconds(5),
@@ -328,7 +342,10 @@ export class ComputeStack extends Stack {
 			// stops, and ECS asks the ASG for an instance if there is no room.
 			minHealthyPercent: 100,
 			maxHealthyPercent: 200,
-			healthCheckGracePeriod: Duration.seconds(90),
+			// Long enough for the /api/ready warm-up (bounded at 90 s) plus boot.
+			healthCheckGracePeriod: Duration.seconds(
+				config.healthCheckGracePeriodSeconds,
+			),
 			enableExecuteCommand: config.enableExecuteCommand,
 		});
 		this.service.attachToApplicationTargetGroup(this.targetGroup);

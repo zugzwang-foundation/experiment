@@ -33,9 +33,10 @@ concurrency:
 env:
   AWS_REGION: ap-south-1
 
+# `id-token: write` is granted PER JOB below, only to the two jobs that assume
+# an AWS role (`@security-auditor` M-3): the migrate job holds DOPPLER_TOKEN and
+# runs third-party actions, and must not also be able to mint an OIDC token.
 permissions:
-  # OIDC into AWS — no long-lived access keys in GitHub.
-  id-token: write
   contents: read
 
 jobs:
@@ -43,6 +44,9 @@ jobs:
     name: Build and push image
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    permissions:
+      id-token: write
+      contents: read
     outputs:
       image_tag: ${{ steps.meta.outputs.image_tag }}
     steps:
@@ -91,6 +95,7 @@ jobs:
           # environment — mounted as ONE secret, never as build args, so none
           # of it is recorded in the image history.
           CONFIG=$([ "${{ inputs.environment }}" = "production" ] && echo prd || echo stg)
+          trap 'rm -f build.env' EXIT
           doppler secrets download --no-file --format env --config "$CONFIG" > build.env
           docker build --target runner \
             --secret id=build_env,src=build.env \
@@ -150,6 +155,9 @@ jobs:
     if: ${{ always() && needs.build.result == 'success' && (needs.migrate.result == 'success' || needs.migrate.result == 'skipped') }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
@@ -164,7 +172,32 @@ jobs:
 
       - name: Deploy the compute stack at the new image tag
         working-directory: infra
+        # AWS-MIGRATION-3: the config reads the certificate ARN and the alert
+        # address at SYNTH time. A synth without them would emit a stack with
+        # an HTTP-only listener and an alarm topic with no subscriber — and
+        # deploy it. They come from the GitHub environment's variables, never
+        # from the repository.
+        env:
+          ZZ_STAGING_CERT_ARN: ${{ vars.ZZ_STAGING_CERT_ARN }}
+          ZZ_PROD_CERT_ARN: ${{ vars.ZZ_PROD_CERT_ARN }}
+          ZZ_ALERT_EMAIL: ${{ vars.ZZ_ALERT_EMAIL }}
+          # The write-pause is a synth-time input (config/*.ts). A synth without
+          # it silently emits an UNPAUSED task definition — so it is carried from
+          # the environment's variables exactly like the certificate ARN
+          # (`@security-auditor` H-4). Set the variable to `paused` for the
+          # cutover window and clear it afterwards.
+          ZZ_STAGING_WRITES_PAUSED: ${{ vars.ZZ_STAGING_WRITES_PAUSED }}
+          ZZ_PROD_WRITES_PAUSED: ${{ vars.ZZ_PROD_WRITES_PAUSED }}
         run: |
+          if [ "${{ inputs.environment }}" = "production" ] && [ -z "$ZZ_PROD_CERT_ARN" ]; then
+            echo "ZZ_PROD_CERT_ARN is not set on the production environment — refusing to synth an HTTP-only production listener"; exit 1
+          fi
+          if [ "${{ inputs.environment }}" = "staging" ] && [ -z "$ZZ_STAGING_CERT_ARN" ]; then
+            echo "ZZ_STAGING_CERT_ARN is not set on the staging environment — refusing to synth an HTTP-only staging listener"; exit 1
+          fi
+          if [ -z "$ZZ_ALERT_EMAIL" ]; then
+            echo "ZZ_ALERT_EMAIL is not set on the ${{ inputs.environment }} environment — refusing to synth an alarm topic with no subscriber"; exit 1
+          fi
           pnpm install --frozen-lockfile
           pnpm exec cdk deploy "Zugzwang-${{ inputs.environment }}-Compute" \
             -c imageTag=${{ needs.build.outputs.image_tag }} \
@@ -201,7 +234,24 @@ jobs:
             echo "attempt $i: canary=$CANARY db=$DB migrations=$MIGRATIONS"
             if [ "$CANARY" = "$EXPECTED" ] && [ "$DB" = "ok" ] && [ "$MIGRATIONS" = "ok" ]; then
               echo "live build verified: $CANARY"
-              exit 0
+              # AWS-MIGRATION-3: the task is live; now require it to be WARM.
+              # /api/ready is the target-group health check, so by the time the
+              # ALB routes here it is normally already 200 — this is the receipt.
+              for j in $(seq 1 12); do
+                BODY=$(curl -fsS "$BASE_URL/api/ready" || echo '{}')
+                READY=$(echo "$BODY" | jq -r '.ready // empty')
+                FAILED=$(echo "$BODY" | jq -r '.failed // empty')
+                # `ready` means "tried once"; `failed` is how many pages did not
+                # render inside the budget. The gate requires both (M-2).
+                if [ "$READY" = "true" ] && [ "$FAILED" = "0" ]; then
+                  echo "readiness gate passed (all warm paths rendered)"
+                  exit 0
+                fi
+                echo "ready=$READY failed=$FAILED"
+                sleep 10
+              done
+              echo "readiness gate never reported ready — the task is serving cold; investigate"
+              exit 1
             fi
             sleep 10
           done

@@ -28,10 +28,20 @@ export const stagingConfig: EnvironmentConfig = {
 	natGateways: 1,
 
 	containerPort: 3000,
-	cpu: 512,
-	memoryMiB: 1024,
-	memoryReservationMiB: 512,
-	instanceType: "t3.small",
+	// AWS-MIGRATION-3: staging now MIRRORS the production task and host so the
+	// rehearsal proves the box that will launch. The load test recorded in
+	// docs/aws-migration/08-STAGING-LOAD-TEST-RESULTS.md ran on the previous
+	// shape — t3.small, cpu 512 / 1024 MiB / 512 reservation, default heap — and
+	// its numbers are not a baseline for this one.
+	cpu: 1024,
+	memoryMiB: 3072,
+	memoryReservationMiB: 2048,
+	// m7i-flex.large, not t3.medium: this account is on the AWS Free Tier plan,
+	// which refuses non-eligible instance types at launch ("not eligible for
+	// Free Tier" — measured 2026-09-25, 06-STAGING-DEPLOYMENT.md §10.4).
+	// m7i-flex.large IS eligible and larger (2 vCPU / 8 GiB), so two 3 GiB
+	// tasks fit on one host and a rolling deploy needs no second instance.
+	instanceType: "m7i-flex.large",
 	minInstances: 1,
 	maxInstances: 2,
 	imageTag: "staging-latest",
@@ -40,6 +50,12 @@ export const stagingConfig: EnvironmentConfig = {
 	maxCapacity: 1,
 	stopTimeoutSeconds: 30,
 	enableExecuteCommand: false,
+	nodeMaxOldSpaceMiB: 2048,
+	keepAliveTimeoutMs: 65_000,
+	readinessPath: "/api/ready",
+	healthCheckGracePeriodSeconds: 180,
+	writesPaused:
+		process.env.ZZ_STAGING_WRITES_PAUSED === "paused" ? "paused" : undefined,
 
 	certificateArn: process.env.ZZ_STAGING_CERT_ARN,
 	appBaseUrl: "https://staging.zugzwangworld.com",

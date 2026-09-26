@@ -88,6 +88,41 @@ export interface EnvironmentConfig {
 	readonly maxCapacity: number;
 	/** Seconds ECS waits after SIGTERM — must outlast in-flight `after()` work. */
 	readonly stopTimeoutSeconds: number;
+	/**
+	 * V8 old-space ceiling for the app container, MiB — emitted as
+	 * `NODE_OPTIONS=--max-old-space-size=<n>`. AWS-MIGRATION-3: the staging load
+	 * test (08-STAGING-LOAD-TEST-RESULTS.md §3.3) found Node's own default (560 MB
+	 * in a 1 GiB container) reached after ~1,500 bets, after which the process
+	 * spent ~0.9 vCPU in garbage collection with no traffic and never recovered.
+	 * Keep it at or below ~70 % of `memoryMiB`: the remainder is native memory,
+	 * V8 metadata and buffers, and a heap set above the container limit is killed
+	 * by ECS instead of thrashing.
+	 */
+	readonly nodeMaxOldSpaceMiB: number;
+	/**
+	 * Node `server.keepAliveTimeout`, ms — read by Next's standalone `server.js`
+	 * from `KEEP_ALIVE_TIMEOUT`. MUST exceed the ALB idle timeout (60 s in
+	 * compute-stack.ts): with Node's 5 s default the ALB reused sockets the
+	 * target had just closed, a 0.1–0.5 % `HTTPCode_ELB_5XX` floor on every load
+	 * level. `scripts/docker/server-timeouts.cjs` sets `headersTimeout` 5 s above it.
+	 */
+	readonly keepAliveTimeoutMs: number;
+	/**
+	 * Target-group health-check path. `/api/ready` (AWS-MIGRATION-3) answers 503
+	 * until the process has rendered the home page and every Open market once,
+	 * so a fresh task receives ALB traffic only after it is warm — a cold task
+	 * collapsed under 12 concurrent users in the load test.
+	 */
+	readonly readinessPath: string;
+	/** Seconds ECS ignores failing health checks after a task starts. */
+	readonly healthCheckGracePeriodSeconds: number;
+	/**
+	 * The write-pause flag for the final production data sync. When set to the
+	 * exact value `"paused"`, `proxy.ts` answers every write with 503 +
+	 * Retry-After while reads continue. Deliberately a task environment value,
+	 * never a secret: flipping it is a config change and a rolling restart.
+	 */
+	readonly writesPaused?: "paused";
 	/** Enable ECS Exec for debugging. Off by default. */
 	readonly enableExecuteCommand: boolean;
 

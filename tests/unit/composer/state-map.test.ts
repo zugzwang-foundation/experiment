@@ -17,6 +17,7 @@ import {
 	BelowPostFloorError,
 	BelowReplyFloorError,
 	BetSerializationExhaustedError,
+	BetStatementTimeoutError,
 	CommentRequiresBetError,
 	CommentTooLongError,
 	CommentTrackABlockedError,
@@ -102,6 +103,7 @@ const SECTION_4_TABLE: ReadonlyArray<[string, ComposerStateName]> = [
 	["error_moderation_in_flight", "p3_wait_in_flight"],
 	["error_idempotency_in_flight", "p3_wait_in_flight"],
 	["error_bet_serialization_exhausted", "p3_transient_retry"],
+	["error_bet_timeout", "p3_transient_retry"],
 	["error_position_conflict", "p3_transient_retry"],
 	["error_storage_unavailable", "p3_transient_retry"],
 	["error_idempotency_unavailable", "p3_transient_retry"],
@@ -204,6 +206,12 @@ describe("mapWireError — completeness vs the REAL toWireError inventory", () =
 				flow: "F-BET-1",
 			}),
 			wireCode: "error_bet_serialization_exhausted",
+			state: "p3_transient_retry",
+		},
+		{
+			name: "BetStatementTimeoutError",
+			err: new BetStatementTimeoutError({ flow: "F-BET-1" }),
+			wireCode: "error_bet_timeout",
 			state: "p3_transient_retry",
 		},
 		{
@@ -459,6 +467,7 @@ describe("keyOutcomeFor — the §3.2 cache-semantics classes", () => {
 	// error_internal): key HELD — a manual retry is the legitimate replay.
 	const TRANSIENT_FAMILY = [
 		"error_bet_serialization_exhausted",
+		"error_bet_timeout",
 		"error_position_conflict",
 		"error_storage_unavailable",
 		"error_idempotency_unavailable",

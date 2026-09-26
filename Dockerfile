@@ -115,6 +115,9 @@ COPY --from=build --chown=nextjs:nodejs /app/public ./public
 # drift. Without this copy the endpoint reports drift against an empty set —
 # which is the deploy gate lying in the safe-looking direction.
 COPY --from=build --chown=nextjs:nodejs /app/drizzle ./drizzle
+# AWS-MIGRATION-3: sets headersTimeout above the keep-alive Next reads from
+# KEEP_ALIVE_TIMEOUT; a no-op when that variable is unset.
+COPY --chown=root:root scripts/docker/server-timeouts.cjs ./server-timeouts.cjs
 
 USER nextjs
 EXPOSE 3000
@@ -125,7 +128,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
 	CMD curl -fsS http://127.0.0.1:3000/api/health || exit 1
 
 # `server.js` is what `output: 'standalone'` emits.
-CMD ["node", "server.js"]
+CMD ["node", "--require", "./server-timeouts.cjs", "server.js"]
 
 # ── migrate ──────────────────────────────────────────────────────────────────
 # A SEPARATE image, because migrations run through `tsx scripts/migrate-*.ts`

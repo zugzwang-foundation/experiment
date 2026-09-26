@@ -129,6 +129,8 @@ describe("PERF-1 — /api/health reports the executing region", () => {
 			"migrations",
 			"region",
 			"status",
+			// AWS-MIGRATION-3: the write-pause is observable here (deliberate).
+			"writesPaused",
 		]);
 	});
 });

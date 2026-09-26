@@ -5,6 +5,7 @@ import { stagingConfig } from "../config/staging";
 import type { EnvironmentConfig } from "../config/types";
 import { ComputeStack } from "../lib/compute-stack";
 import { DatabaseStack } from "../lib/database-stack";
+import { DeployStack } from "../lib/deploy-stack";
 import { MonitoringStack } from "../lib/monitoring-stack";
 import { NetworkStack } from "../lib/network-stack";
 import { SchedulerStack } from "../lib/scheduler-stack";
@@ -90,3 +91,30 @@ function defineEnvironment(config: EnvironmentConfig): void {
 
 defineEnvironment(stagingConfig);
 defineEnvironment(productionConfig);
+
+// AWS-MIGRATION-3 — the GitHub OIDC deploy roles (deploy-stack.ts). One stack
+// for the account, instantiated ONLY under `-c deployStack=true` so that
+// `cdk deploy --all` / `cdk destroy --all` cannot reach it by accident and
+// the account-level OIDC provider is never created twice.
+if (app.node.tryGetContext("deployStack") === "true") {
+	// The repository slug lands in a trust policy: an unverified default there is
+	// a wrong-repo trust waiting to happen, so it is REQUIRED (no fallback).
+	const githubRepository = process.env.ZZ_GITHUB_REPOSITORY;
+	const SLUG = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+	if (!githubRepository || !SLUG.test(githubRepository)) {
+		throw new Error(
+			"ZZ_GITHUB_REPOSITORY (owner/repo) is required to synth Zugzwang-Deploy",
+		);
+	}
+	const deploy = new DeployStack(app, "Zugzwang-Deploy", {
+		env: {
+			account: process.env.CDK_DEFAULT_ACCOUNT,
+			region: process.env.ZZ_AWS_REGION ?? "ap-south-1",
+		},
+		githubRepository,
+		environments: [stagingConfig.name, productionConfig.name],
+		existingOidcProviderArn: process.env.ZZ_GITHUB_OIDC_PROVIDER_ARN,
+	});
+	Tags.of(deploy).add("Project", "Zugzwang");
+	Tags.of(deploy).add("ManagedBy", "CDK");
+}
