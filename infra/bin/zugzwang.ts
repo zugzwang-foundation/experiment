@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { App, DefaultStackSynthesizer, Tags } from "aws-cdk-lib";
+import { ManagedPolicy, PermissionsBoundary } from "aws-cdk-lib/aws-iam";
 import { productionConfig } from "../config/production";
 import { stagingConfig } from "../config/staging";
 import type { EnvironmentConfig } from "../config/types";
@@ -102,6 +103,16 @@ function defineEnvironment(config: EnvironmentConfig): SecurityStack {
 		Tags.of(stack).add("Project", "Zugzwang");
 		Tags.of(stack).add("Environment", config.name);
 		Tags.of(stack).add("ManagedBy", "CDK");
+		// H-3: the zzprod execution policy creates a role ONLY with this boundary.
+		if (config.permissionsBoundaryPolicyName) {
+			PermissionsBoundary.of(stack).apply(
+				ManagedPolicy.fromManagedPolicyName(
+					stack,
+					"PermissionsBoundary",
+					config.permissionsBoundaryPolicyName,
+				),
+			);
+		}
 	}
 	return security;
 }
