@@ -59,6 +59,14 @@ import { normalizeRadixIds } from "../../_support/dom-html";
 // (That is exactly what happened: this suite went red at Phase D with the
 // whole-surface ErrorState, because Phase C changed the composition and left
 // these mocks pointing at the old names.)
+// STAGING-DISCOVERY-DB — `DiscoveryContent` now opens with `await connection()`,
+// which THROWS outside a Next.js request scope (next 16.3.2
+// `throwForMissingRequestStore`). These calls are not requests, so the gate is
+// stubbed; `tests/unit/discovery/discovery-request-time.test.ts` pins that it is there.
+vi.mock("next/server", async (importOriginal) => ({
+	...(await importOriginal<typeof import("next/server")>()),
+	connection: vi.fn(async () => undefined),
+}));
 vi.mock("@/db", () => ({ db: {} }));
 vi.mock("@/server/discovery/list", () => ({
 	getCachedDiscoveryMarketIds: vi.fn(),

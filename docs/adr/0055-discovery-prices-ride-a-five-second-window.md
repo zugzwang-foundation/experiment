@@ -12,6 +12,23 @@
 | **Amends** | ADR-0051 — rider (1), "the hero's `currentValue` is computed OUTSIDE the cache from the live pool", and with it SPEC.1 §9's *"Nothing priced rides the window"*. The rest of ADR-0051 — the identity keying, the poster bypass, the `after()` instrumentation — stands unamended and is what this ADR relies on |
 | **Amended-by** | — |
 
+## Patch record
+
+**P1 (2026-09-26, STAGING-DISCOVERY-DB).** In-place Patch record per CLAUDE.md §5.12 —
+consumer-surface scoping, **not** supersession. **The decision is unchanged**: Discovery's pool
+read still rides the five-second window, the per-market block its own window, and money stays
+fresher than the content beside it. **Withdrawn:** the consequence *"the surface can prerender
+and be CDN-served"*. On AWS the build and the running task read DIFFERENT databases
+(`next build` gets Doppler's `DATABASE_URL` — Supabase — while ECS serves RDS), and a
+prerendered Discovery baked the build's market ids into the page: every card then looked up
+pricing and media under ids the runtime database does not hold, and showed `IMG` /
+"Pricing unavailable" (staging, measured 2026-09-26: all six ids differed from `/m/[slug]`'s).
+The runtime never repaired it, because the prerender also read the clock (`nowIso`) and failed
+every re-prerender with "unstable value `Date.now()`". `DiscoveryContent` now opens with
+`await connection()`, so it renders per request. **What the window buys changes, not whether
+it is needed:** it no longer licenses a prerender; it keeps each request's render off the
+database. `x-nextjs-prerender` on `/` is therefore no longer this ADR's check.
+
 ---
 
 ## Context and Problem Statement
