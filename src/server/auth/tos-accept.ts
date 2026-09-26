@@ -14,6 +14,10 @@ import {
 } from "@/server/auth/tos-versions";
 import { grantInitialDharma } from "@/server/dharma/grant";
 import { insertEvent } from "@/server/events/insert";
+import {
+	getClientIp,
+	TRUSTED_CLIENT_IP_HEADER,
+} from "@/server/middleware/client-ip";
 import { safeCaptureException } from "@/server/observability/safe-capture";
 
 // F-AUTH-4 ToS acceptance Server Action per SPEC.1 §13 + SPEC.2 §3.5 line
@@ -76,13 +80,9 @@ const TOS_ACCEPTANCE_REQUIRED: AcceptTosResult = {
 	code: "tos_acceptance_required",
 };
 
+/** S-1 / ADR-0061 — the trusted client IP (never the raw X-Forwarded-For). */
 function getIp(headerStore: { get: (name: string) => string | null }): string {
-	const fwd = headerStore.get("x-forwarded-for");
-	if (fwd) {
-		const first = fwd.split(",")[0]?.trim();
-		if (first) return first;
-	}
-	return "unknown";
+	return getClientIp((name) => headerStore.get(name)) ?? "unknown";
 }
 
 function getUserAgent(headerStore: {
@@ -228,7 +228,10 @@ export async function acceptTosAction(
 			await auth.api.issueOnboardingSession({
 				body: { onboardingRef: refToken },
 				headers: new Headers({
-					"x-forwarded-for": ip,
+					// Better Auth reads ONLY this header (auth/index.ts
+					// `advanced.ipAddress`, ADR-0061). "unknown" is not a valid
+					// IP, so Better Auth records an empty ip_address, not a guess.
+					[TRUSTED_CLIENT_IP_HEADER]: ip,
 					"user-agent": ua,
 				}),
 			});

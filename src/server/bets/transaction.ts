@@ -7,7 +7,11 @@ import { type DbTransaction, db } from "@/db";
 import { markets, pools } from "@/db/schema";
 import type { MarketStatus } from "@/server/markets/transitions";
 
-import { BetSerializationExhaustedError, MarketNotOpenError } from "./errors";
+import {
+	BetSerializationExhaustedError,
+	BetStatementTimeoutError,
+	MarketNotOpenError,
+} from "./errors";
 
 /**
  * The bet/comment write flows that all funnel through the single W-1 write path
@@ -85,9 +89,10 @@ const RETRYABLE_SQLSTATES = new Set(["40001", "40P01"]);
  * the SUBSEQUENT statements (an orphaned tx the client stops driving mid-flight).
  * SET LOCAL (not a connection option) keeps this in-module — `src/db/` is out of
  * ENGINE.7's scope. Values are recommendations, not tuned constants (HARDEN.*).
- * (A `statement_timeout` abort raises SQLSTATE 57014, which is NOT retryable —
- * it bubbles to ENGINE.8 rather than firing alarm-3; the 57014↔alarm-3 question
- * is a HARDEN.* observability call — see claude-progress.md.)
+ * (A `statement_timeout` abort raises SQLSTATE 57014, which is NOT retryable.
+ * Since AWS-MIGRATION-3 it is typed as `BetStatementTimeoutError` — 503 +
+ * Retry-After on the wire, a `bet_statement_timeout` warning in Sentry — rather
+ * than bubbling as `error_internal`; the 57014↔alarm-3 question is answered.)
  */
 const STATEMENT_TIMEOUT_MS = 1000;
 const IDLE_IN_TRANSACTION_TIMEOUT_MS = 30_000;
@@ -168,6 +173,18 @@ export async function runBetTransaction<T>(
 			// Non-retryable (MarketNotOpenError, PositionSingleSideError, validation,
 			// FK violations, etc.) → bubble immediately, no retry.
 			if (sqlstate === null) {
+				// AWS-MIGRATION-3: a `statement_timeout` abort (57014) is typed here so
+				// the wire answers 503 + Retry-After instead of 500 — the transaction
+				// is already rolled back; only the answer changes. Still NOT retried,
+				// for the reason the error class states. Everything else bubbles as
+				// before.
+				if (sqlstateOf(err) === STATEMENT_TIMEOUT_SQLSTATE) {
+					captureMessage("bet_statement_timeout", {
+						level: "warning",
+						tags: { sqlstate: STATEMENT_TIMEOUT_SQLSTATE, flow: args.flow },
+					});
+					throw new BetStatementTimeoutError({ flow: args.flow });
+				}
 				throw err;
 			}
 
@@ -284,12 +301,21 @@ async function assertMarketOpen(
  * boundary — the driver error shape.
  */
 function retryableSqlstate(err: unknown): string | null {
-	const e = err as { code?: unknown; cause?: { code?: unknown } };
-	const code = e.cause?.code ?? e.code;
-	if (typeof code === "string" && RETRYABLE_SQLSTATES.has(code)) {
+	const code = sqlstateOf(err);
+	if (code !== null && RETRYABLE_SQLSTATES.has(code)) {
 		return code;
 	}
 	return null;
+}
+
+/** `statement_timeout` cancellation — query_canceled (`lock_timeout` is 55P03). */
+const STATEMENT_TIMEOUT_SQLSTATE = "57014";
+
+/** The driver SQLSTATE wherever Drizzle left it (`.cause.code` first), or null. */
+function sqlstateOf(err: unknown): string | null {
+	const e = err as { code?: unknown; cause?: { code?: unknown } };
+	const code = e?.cause?.code ?? e?.code;
+	return typeof code === "string" ? code : null;
 }
 
 /** Full jitter: `wait = random_uniform(0, base)` (AWS 2015). */

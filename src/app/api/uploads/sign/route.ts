@@ -10,6 +10,7 @@ import {
 } from "@/lib/errors";
 import { auth } from "@/server/auth";
 import { PUT_URL_TTL_SECONDS } from "@/server/config/limits";
+import { getRequestClientIp } from "@/server/middleware/client-ip";
 import {
 	envelope,
 	jsonResponse,
@@ -67,13 +68,9 @@ function parseBody(raw: unknown): SignRequestBody | null {
 	return { contentType: b.contentType, byteSize: b.byteSize };
 }
 
+/** S-1 / ADR-0061 — the trusted client IP (never the raw X-Forwarded-For). */
 function extractIp(request: Request): string {
-	const fwd = request.headers.get("x-forwarded-for");
-	if (fwd) {
-		const first = fwd.split(",")[0]?.trim();
-		if (first) return first;
-	}
-	return "unknown";
+	return getRequestClientIp(request) ?? "unknown";
 }
 
 export async function POST(request: Request): Promise<Response> {

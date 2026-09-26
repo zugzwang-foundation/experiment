@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zugzwang AWS Migration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#f5f4f0; --paper-2:#ecebe5; --ink:#1c1b19; --ink-2:#3a3835; --muted:#6a6761;
+  --rule:#d9d6cf; --rule-2:#c4c0b7;
+  --steel:#2f5d7c; --steel-soft:#e3ecf3;
+  --copper:#b0541e; --copper-soft:#f6e6da;
+  --moss:#2e6b4f; --moss-soft:#e0eee6;
+  --code-bg:#ebe9e2;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#171614; --paper-2:#1f1e1b; --ink:#ebe9e3; --ink-2:#cfccc4; --muted:#9a968d;
+    --rule:#33312d; --rule-2:#474440;
+    --steel:#7fb0d3; --steel-soft:#1e2c37;
+    --copper:#e08a55; --copper-soft:#3a271b;
+    --moss:#7cc29e; --moss-soft:#1c2f26;
+    --code-bg:#22211d;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#171614; --paper-2:#1f1e1b; --ink:#ebe9e3; --ink-2:#cfccc4; --muted:#9a968d;
+  --rule:#33312d; --rule-2:#474440;
+  --steel:#7fb0d3; --steel-soft:#1e2c37;
+  --copper:#e08a55; --copper-soft:#3a271b;
+  --moss:#7cc29e; --moss-soft:#1c2f26;
+  --code-bg:#22211d;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;padding-block:0}
+a{color:var(--steel);text-decoration:none;border-bottom:1px solid transparent}
+a:hover,a:focus-visible{border-bottom-color:var(--steel);outline:none}
+code,pre,.mono{font-family:var(--mono);font-size:.88em}
+code{background:var(--code-bg);padding:.08em .35em;border-radius:3px}
+pre{background:var(--code-bg);padding:14px 16px;border-radius:4px;overflow-x:auto;line-height:1.5;font-size:.84rem}
+pre code{background:none;padding:0}
+h1,h2,h3,h4{font-weight:600;line-height:1.2;text-wrap:balance;margin:0}
+h1{font-size:clamp(1.9rem,4vw,2.6rem);letter-spacing:-.02em}
+h2{font-size:1.55rem;letter-spacing:-.01em;margin-top:3.2rem;padding-top:1.4rem;border-top:2px solid var(--ink)}
+h3{font-size:1.15rem;margin-top:2rem}
+h4{font-size:1rem;margin-top:1.4rem;color:var(--ink-2)}
+p{margin:.8rem 0;max-width:74ch}
+ul,ol{max-width:74ch;padding-left:1.3rem}
+li{margin:.3rem 0}
+strong{font-weight:600}
+.eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px 80px}
+.layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:40px}
+@media (max-width:900px){.layout{grid-template-columns:1fr}.nav{display:none}}
+.nav{position:sticky;top:env(safe-area-inset-top,0px);align-self:start;padding-top:32px;max-height:100vh;overflow:auto}
+.nav ol{list-style:none;padding:0;margin:0;font-size:.85rem}
+.nav li{margin:0}
+.nav a{display:block;padding:5px 0 5px 12px;border-left:2px solid var(--rule);color:var(--ink-2);border-bottom:none}
+.nav a:hover{border-left-color:var(--steel);color:var(--steel)}
+.nav .n{font-family:var(--mono);color:var(--muted);margin-right:6px;font-size:.75rem}
+main{min-width:0;padding-top:32px}
+/* header */
+.hdr{padding:40px 0 28px;border-bottom:1px solid var(--rule)}
+.hdr .sub{font-size:1.1rem;color:var(--ink-2);max-width:74ch;margin-top:.7rem}
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);margin-top:24px;font-size:.88rem}
+.meta div{background:var(--paper-2);padding:10px 14px}
+.meta .k{font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.meta .v{margin-top:2px;font-weight:500}
+/* tables */
+.tbl{overflow-x:auto;margin:1rem 0 1.4rem}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{text-align:left;vertical-align:top;padding:9px 12px;border-bottom:1px solid var(--rule)}
+th{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;border-bottom:1px solid var(--rule-2)}
+td.num,th.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.hl td{background:var(--steel-soft)}
+/* pills */
+.pill{display:inline-block;font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;padding:2px 8px;border-radius:2px;white-space:nowrap;vertical-align:middle}
+.pill.yes{background:var(--moss-soft);color:var(--moss)}
+.pill.no{background:var(--copper-soft);color:var(--copper)}
+.pill.info{background:var(--steel-soft);color:var(--steel)}
+.pill.neutral{background:var(--paper-2);color:var(--muted);border:1px solid var(--rule)}
+/* callouts */
+.note{border-left:3px solid var(--steel);background:var(--steel-soft);padding:12px 16px;margin:1.2rem 0;max-width:80ch}
+.warn{border-left:3px solid var(--copper);background:var(--copper-soft);padding:12px 16px;margin:1.2rem 0;max-width:80ch}
+.ok{border-left:3px solid var(--moss);background:var(--moss-soft);padding:12px 16px;margin:1.2rem 0;max-width:80ch}
+.note p,.warn p,.ok p{margin:.3rem 0}
+.verdict{border:2px solid var(--ink);padding:20px 24px;margin:1.6rem 0;max-width:80ch}
+.verdict .eyebrow{color:var(--copper)}
+.verdict h3{margin-top:.3rem;font-size:1.35rem}
+/* decision ledger */
+.ledger{display:grid;gap:14px;margin:1.2rem 0}
+.dec{border:1px solid var(--rule);border-radius:4px;overflow:hidden}
+.dec .top{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:12px 16px;background:var(--paper-2);border-bottom:1px solid var(--rule);flex-wrap:wrap}
+.dec .top h4{margin:0;color:var(--ink)}
+.dec .body{display:grid;grid-template-columns:1fr 1fr;gap:0}
+@media (max-width:640px){.dec .body{grid-template-columns:1fr}}
+.dec .col{padding:12px 16px}
+.dec .col+.col{border-left:1px solid var(--rule)}
+@media (max-width:640px){.dec .col+.col{border-left:none;border-top:1px solid var(--rule)}}
+.dec .col .eyebrow{display:block;margin-bottom:6px}
+.dec .col.why .eyebrow{color:var(--moss)}
+.dec .col.rej .eyebrow{color:var(--copper)}
+.dec ul{padding-left:1.1rem;margin:.2rem 0;font-size:.92rem}
+/* figures */
+figure{margin:1.6rem 0;border:1px solid var(--rule);border-radius:4px;background:var(--paper-2)}
+figure .fig-body{padding:16px;overflow-x:auto}
+figure .fig-body pre.mermaid{background:none;padding:0;margin:0;text-align:center;font-size:.85rem}
+figcaption{padding:10px 16px;border-top:1px solid var(--rule);font-size:.86rem;color:var(--ink-2)}
+figcaption .fn{font-family:var(--mono);color:var(--muted);margin-right:8px;font-size:.75rem}
+.mermaid svg{max-width:100%;height:auto}
+/* kv */
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;font-size:.92rem;max-width:80ch}
+.kv .k{font-family:var(--mono);color:var(--muted);font-size:.8rem;padding-top:3px}
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);margin:1.2rem 0}
+.stat{background:var(--paper);padding:14px 16px}
+.stat .n{font-family:var(--mono);font-size:1.5rem;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat .l{font-size:.8rem;color:var(--muted);margin-top:2px}
+.small{font-size:.86rem;color:var(--muted)}
+hr{border:0;border-top:1px solid var(--rule);margin:2rem 0}
+.toc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px 24px;margin:1rem 0 0;font-size:.92rem}
+.toc-grid a{display:block;padding:6px 0;border-bottom:1px solid var(--rule)}
+.toc-grid .n{font-family:var(--mono);color:var(--muted);margin-right:8px;font-size:.78rem}
+@media print{.nav{display:none}.layout{grid-template-columns:1fr}body{font-size:12.5px}figure{break-inside:avoid}h2{break-after:avoid}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="layout">
+
+<nav class="nav" aria-label="Sections">
+  <ol>
+    <li><a href="#s1"><span class="n">01</span>Verdict</a></li>
+    <li><a href="#s2"><span class="n">02</span>What moves, what stays</a></li>
+    <li><a href="#s3"><span class="n">03</span>Target architecture</a></li>
+    <li><a href="#s4"><span class="n">04</span>Why each choice</a></li>
+    <li><a href="#s5"><span class="n">05</span>How our data works</a></li>
+    <li><a href="#s6"><span class="n">06</span>Why not DynamoDB</a></li>
+    <li><a href="#s7"><span class="n">07</span>Application</a></li>
+    <li><a href="#s8"><span class="n">08</span>Network</a></li>
+    <li><a href="#s9"><span class="n">09</span>How the database moves</a></li>
+    <li><a href="#s10"><span class="n">10</span>Decisions needed</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<header class="hdr">
+  <div class="eyebrow">Migration report · Vercel + Supabase → AWS</div>
+  <h1>Zugzwang AWS Migration</h1>
+  <p class="sub">What moves to AWS Mumbai, why each component was chosen, how the data works today, and why DynamoDB was evaluated and declined.</p>
+  <div class="meta">
+    <div><div class="k">Date</div><div class="v">2026-09-24</div></div>
+    <div><div class="k">Compute</div><div class="v">ECS on EC2 · ap-south-1</div></div>
+    <div><div class="k">Database</div><div class="v">RDS PostgreSQL 17</div></div>
+    <div><div class="k">Unchanged</div><div class="v">Cloudflare · R2 · Upstash · OpenAI · Resend</div></div>
+    <div><div class="k">Pricing</div><div class="v">Not in this document</div></div>
+  </div>
+</header>
+
+<!-- 01 -->
+<h2 id="s1">01 · Verdict</h2>
+<p>Move compute from Vercel serverless to <strong>one long-lived container on ECS</strong>, and the database from Supabase to <strong>RDS for PostgreSQL 17</strong>, both in a private VPC in <strong>Mumbai</strong>. Everything else stays. The infrastructure is already written as CDK and synthesises clean.</p>
+
+<div class="verdict">
+  <div class="eyebrow">RDS or DynamoDB?</div>
+  <h3>Keep PostgreSQL. Do not move the core to DynamoDB.</h3>
+  <p>One bet is one transaction across nine tables. Settling a market pays every bet atomically — DynamoDB caps a transaction at 100 items, and on an append-only ledger a half-finished settlement cannot be undone. Eleven tables are made un-editable by the database itself; DynamoDB has no such guard. And the whole database is <strong>46 MB, roughly 87,000 rows</strong> (measured 2026-09-25) — there is no scale problem for DynamoDB to solve.</p>
+  <p>RDS is a <strong>change of address</strong>: same SQL, same guarantees, zero business-logic changes, rollback by changing one setting. DynamoDB is a <strong>rewrite of the money path</strong> during a live experiment.</p>
+</div>
+
+<div class="tbl"><table>
+<thead><tr><th>Your question</th><th>Answer</th><th>Section</th></tr></thead>
+<tbody>
+<tr><td>How is our data stored?</td><td>25 Postgres tables, 11 append-only by trigger, every read a relational query</td><td><a href="#s5">§05</a></td></tr>
+<tr><td>DynamoDB instead of RDS?</td><td>No — five checkable blockers</td><td><a href="#s6">§06</a></td></tr>
+<tr><td>Why each service?</td><td>Chosen / rejected, per component</td><td><a href="#s4">§04</a></td></tr>
+<tr><td>How does the database move?</td><td>Schema built first; writes stop → copy → restore → verify → switch one setting</td><td><a href="#s9">§09</a></td></tr>
+<tr><td>Application and network?</td><td>One container, warm pool, private VPC, no public DB</td><td><a href="#s7">§07</a> · <a href="#s8">§08</a></td></tr>
+</tbody></table></div>
+
+<!-- 02 -->
+<h2 id="s2">02 · What moves, what stays</h2>
+<div class="tbl"><table>
+<thead><tr><th>Component</th><th>Today</th><th>After</th><th></th></tr></thead>
+<tbody>
+<tr class="hl"><td>Application compute</td><td>Vercel serverless</td><td>ECS on EC2, one container</td><td><span class="pill no">MOVES</span></td></tr>
+<tr class="hl"><td>Database</td><td>Supabase Postgres via pooler</td><td>RDS Postgres 17, same VPC</td><td><span class="pill no">MOVES</span></td></tr>
+<tr class="hl"><td>HTTP crons</td><td><code>vercel.json</code></td><td>EventBridge</td><td><span class="pill no">MOVES</span></td></tr>
+<tr class="hl"><td>In-database jobs</td><td><code>pg_cron</code></td><td><code>pg_cron</code> on RDS — recreated by hand</td><td><span class="pill no">MOVES · CARE</span></td></tr>
+<tr class="hl"><td>Secrets</td><td>Doppler → Vercel</td><td>Doppler → Secrets Manager</td><td><span class="pill no">MOVES</span></td></tr>
+<tr><td>Cloudflare DNS/edge · R2 storage · Upstash Redis · OpenAI · Resend · Sentry · PostHog · Better Auth</td><td colspan="2">Unchanged</td><td><span class="pill yes">STAYS</span></td></tr>
+<tr><td><strong>Application code</strong></td><td colspan="2">The app speaks plain PostgreSQL; no Supabase SDK exists in it</td><td><span class="pill yes">ZERO LOGIC CHANGES</span></td></tr>
+</tbody></table></div>
+
+<!-- 03 -->
+<h2 id="s3">03 · Target architecture</h2>
+<figure>
+  <div class="fig-body"><pre class="mermaid">
+flowchart TB
+    U["Participants"] --> CF["Cloudflare<br/>DNS · DDoS · edge TLS"]
+    subgraph AWS["AWS · ap-south-1 · 2 Availability Zones"]
+        WAF["WAF"] --> ALB["Application Load Balancer<br/>ACM cert · health: /api/health"]
+        subgraph PRIV["Private subnet"]
+            ECS["ECS task on EC2 t3.medium<br/>Next.js · Node 24 · port 3000<br/>warm DB pool"]
+        end
+        subgraph DBSUB["Private DB subnet — no internet route"]
+            RDS[("RDS PostgreSQL 17<br/>Multi-AZ · PITR · pg_cron")]
+        end
+        NAT["NAT Gateway"]
+        EB["EventBridge<br/>3 cron rules"]
+        CW["CloudWatch alarms → SNS"]
+        SM["Secrets Manager"]
+    end
+    EXT["Upstash · R2 · OpenAI · Resend · Sentry"]
+    CF --> WAF
+    ALB --> ECS --> RDS
+    ECS --> NAT --> EXT
+    EB -->|"Bearer auth"| ALB
+    SM -.-> ECS
+    ECS -.-> CW
+  </pre></div>
+  <figcaption><span class="fn">Fig 1</span>The only public entry is Cloudflare → WAF → ALB. The container is private; the database has no route to the internet at all. External services are reached outbound only.</figcaption>
+</figure>
+<div class="kv">
+  <div class="k">CDK</div><div>5 stacks per environment — Network, Security, Compute, Scheduler, Monitoring — under <code>infra/</code>, synthesised with zero errors</div>
+  <div class="k">Compute</div><div><code>t3.medium</code> · task 1 vCPU / 3 GB · one task (see §07) · 30 s graceful shutdown</div>
+  <div class="k">Database</div><div><code>db.t4g.small</code> Multi-AZ proposed · 7-day backups + PITR · <code>pg_cron</code> via parameter group</div>
+  <div class="k">Alarms</div><div>5xx · p95 latency · CPU · memory · unhealthy hosts · <strong>cron silence</strong></div>
+</div>
+
+<!-- 04 -->
+<h2 id="s4">04 · Why each choice, and what was rejected</h2>
+<div class="ledger">
+
+<div class="dec">
+  <div class="top"><h4>Database — RDS PostgreSQL 17</h4></div>
+  <div class="body">
+    <div class="col why"><span class="eyebrow">Why</span><ul>
+      <li>Same engine, schema, triggers and <code>pg_cron</code>. Zero app changes.</li>
+      <li>Managed backups, PITR, Multi-AZ failover.</li>
+      <li>Same VPC as compute — sub-millisecond queries, no pooler.</li>
+    </ul></div>
+    <div class="col rej"><span class="eyebrow">Rejected</span><ul>
+      <li><strong>DynamoDB</strong> — §06.</li>
+      <li><strong>Aurora</strong> — its strengths (128 TB, replicas) address problems a 46 MB database does not have.</li>
+      <li><strong>Stay on Supabase</strong> — keeps the pooler ceiling the app has been engineered around.</li>
+    </ul></div>
+  </div>
+</div>
+
+<div class="dec">
+  <div class="top"><h4>Compute — ECS on EC2, one long-lived task</h4></div>
+  <div class="body">
+    <div class="col why"><span class="eyebrow">Why</span><ul>
+      <li>A persistent process whose pool timers actually run (see §07).</li>
+      <li>No cold starts on the bet path.</li>
+      <li>30 s to drain background work on shutdown.</li>
+    </ul></div>
+    <div class="col rej"><span class="eyebrow">Rejected</span><ul>
+      <li><strong>Vercel / Lambda</strong> — ephemeral instances are the root cause of the connection problem.</li>
+      <li><strong>Fargate</strong> — viable; EC2 chosen for deploy placement control. Open option.</li>
+      <li><strong>EKS</strong> — a control plane for one container.</li>
+    </ul></div>
+  </div>
+</div>
+
+<div class="dec">
+  <div class="top"><h4>Region — ap-south-1, pinned in code</h4></div>
+  <div class="body">
+    <div class="col why"><span class="eyebrow">Why</span><ul>
+      <li>Compute beside the data: measured <strong>361.6 ms → 5.34 ms</strong> per query, Discovery page <strong>35 s → 0.69 s</strong>.</li>
+    </ul></div>
+    <div class="col rej"><span class="eyebrow">Rejected</span><ul>
+      <li><strong>Inherit from AWS profile</strong> — resolved to <code>us-east-1</code> on first synth. Pinned so it cannot recur.</li>
+    </ul></div>
+  </div>
+</div>
+
+<div class="dec">
+  <div class="top"><h4>Edge, egress, scheduling, secrets</h4></div>
+  <div class="body">
+    <div class="col why"><span class="eyebrow">Why</span><ul>
+      <li><strong>Cloudflare → WAF → ALB</strong>: Cloudflare already owns DNS and DDoS; ALB gives ACM certs and health checks.</li>
+      <li><strong>One NAT</strong>: private container, single-task failure mode already single-AZ.</li>
+      <li><strong>EventBridge</strong> for HTTP crons, rate-limited 1/sec; <strong><code>pg_cron</code></strong> stays for jobs that need row locks.</li>
+      <li><strong>Secrets Manager</strong> injected at task start; Doppler stays the source of truth.</li>
+    </ul></div>
+    <div class="col rej"><span class="eyebrow">Rejected</span><ul>
+      <li><strong>CloudFront</strong> — a second CDN doubles cache invalidation.</li>
+      <li><strong>Two NATs</strong> — a one-line config change if wanted.</li>
+      <li><strong>Lambda for DB jobs</strong> — reimplements locking the DB already does.</li>
+      <li><strong>S3 / ElastiCache</strong> — R2 and Upstash work; moving them adds risk for no gain.</li>
+    </ul></div>
+  </div>
+</div>
+
+</div>
+
+<!-- 05 -->
+<h2 id="s5">05 · How our data works</h2>
+<div class="stat-row">
+  <div class="stat"><div class="n">25</div><div class="l">tables</div></div>
+  <div class="stat"><div class="n">11</div><div class="l">append-only by trigger</div></div>
+  <div class="stat"><div class="n">9</div><div class="l">tables written per bet</div></div>
+  <div class="stat"><div class="n">46 MB</div><div class="l">~87k rows · measured 2026-09-25</div></div>
+</div>
+
+<figure>
+  <div class="fig-body"><pre class="mermaid">
+erDiagram
+    users ||--o{ bets : places
+    users ||--o{ dharma_ledger : owns
+    users ||--o{ positions : holds
+    markets ||--|| pools : "priced by"
+    markets ||--o{ bets : receives
+    markets ||--o{ comments : hosts
+    comments ||--|| bets : "one-to-one (INV-1)"
+    comments ||--o{ comments : "replies"
+    bets ||--|| lots : "cost basis"
+    bets ||--o{ payout_events : pays
+    bets ||--o{ dharma_ledger : "stake + payout"
+  </pre></div>
+  <figcaption><span class="fn">Fig 2</span>The relational core. <code>comments ↔ bets</code> is one-to-one both ways — a bet cannot exist without its argument, nor an argument without its bet. Every money row references a bet.</figcaption>
+</figure>
+
+<div class="tbl"><table>
+<thead><tr><th>Bucket</th><th>Rule</th><th>Tables</th></tr></thead>
+<tbody>
+<tr><td><strong>A — append-only</strong></td><td><code>UPDATE</code>, <code>DELETE</code>, <code>TRUNCATE</code> rejected by database trigger — even with the app's own credentials</td><td>events · dharma_ledger · bets · comments · resolution_events · payout_events · mod_actions · admin_events · user_events · bet_receipts · liquidity_policy</td></tr>
+<tr><td><strong>B — one transition</strong></td><td>One column may go <code>NULL → timestamp</code>, once</td><td>identity_pool · image_uploads · system_state</td></tr>
+<tr><td><strong>C — mutable</strong></td><td>Ordinary rows</td><td>positions · lots · markets · pools · auth</td></tr>
+</tbody></table></div>
+
+<h3>One bet, end to end</h3>
+<figure>
+  <div class="fig-body"><pre class="mermaid">
+sequenceDiagram
+    participant C as Browser
+    participant R as /api/bets/place
+    participant Rd as Upstash Redis
+    participant O as OpenAI
+    participant PG as PostgreSQL
+    C->>R: bet + argument + idempotency key
+    R->>Rd: rate limit · idempotency claim
+    R->>O: moderate text — before any transaction
+    R->>PG: BEGIN SERIALIZABLE · lock pool row
+    Note over PG: 9 tables, all or nothing
+    PG->>PG: positions · comments · bets · lots
+    PG->>PG: dharma_ledger — CHECK balance >= 0
+    PG->>PG: events · pools · bet_receipts
+    PG->>R: COMMIT
+    R->>C: 200 + new price
+  </pre></div>
+  <figcaption><span class="fn">Fig 3</span>External HTTP happens <em>before</em> the transaction. The pool row is locked for the whole spine. The idempotency receipt is the last write, so it commits with the money or not at all. Measured: 64 concurrent bettors on one market, 0 % refused.</figcaption>
+</figure>
+
+<p><strong>Settlement</strong> is the hardest requirement: one transaction reads every position and bet in the market and writes one payout row per bet plus ledger rows per winner. All or nothing — a half-paid market is a corrupted ledger that cannot be cleaned up.</p>
+<p><strong>Reads</strong> are relational analytics, not lookups. Of 15 access patterns, 4 are simple key reads and 6 need joins and aggregates — the post-ranking query alone joins four tables with six aggregates, three of them <code>COUNT(DISTINCT)</code>.</p>
+
+<!-- 06 -->
+<h2 id="s6">06 · Why not DynamoDB</h2>
+<p>We designed the DynamoDB table before rejecting it. It fails on five points:</p>
+<div class="tbl"><table>
+<thead><tr><th>#</th><th>Blocker</th><th>The fact</th></tr></thead>
+<tbody>
+<tr><td class="mono">B1</td><td><strong>No lock on the pool</strong></td><td>The bet is a read-modify-write on the price. DynamoDB has no row lock — only optimistic conditions that collide under contention instead of queueing.</td></tr>
+<tr><td class="mono">B2</td><td><strong>Settlement exceeds 100 items</strong></td><td>A 60-bet market is ~130 items in one atomic step. DynamoDB caps at 100. The workaround is a saga — and an append-only ledger has no undo. <strong>Disqualifying alone.</strong></td></tr>
+<tr><td class="mono">B3</td><td><strong>No triggers</strong></td><td>Immutability drops from "the database refuses" to "our code must remember".</td></tr>
+<tr><td class="mono">B4</td><td><strong>No joins or aggregates</strong></td><td>Every aggregate becomes a hand-maintained counter inside the bet transaction. <code>COUNT(DISTINCT)</code> cannot be incremented — the set of ids must be stored, against a 400 KB item limit.</td></tr>
+<tr><td class="mono">B5</td><td><strong>No <code>pg_cron</code></strong></td><td>470 lines of in-database scheduler with row locks becomes a Lambda reimplementing locking by hand.</td></tr>
+</tbody></table></div>
+<p>DynamoDB wins on operational simplicity and scale ceiling. It loses on every property this product depends on. Revisit only if the dataset grows to hundreds of gigabytes or multi-region becomes a requirement.</p>
+
+<!-- 07 -->
+<h2 id="s7">07 · Application</h2>
+<p>Next.js 16 · React 19 · Node 24 · Drizzle over Postgres · Better Auth. Server Components by default; route handlers for bets and uploads; every multi-write in a transaction.</p>
+
+<h3>The connection pool — why compute must move</h3>
+<figure>
+  <div class="fig-body"><pre class="mermaid">
+flowchart LR
+    subgraph Today["Vercel — ephemeral"]
+        I1["instance 1"] --> P["pooler<br/>client ceiling 200"]
+        I2["instance 2"] --> P
+        I3["... ~13 under load"] --> P
+        IX["suspended instance<br/>sockets held, timers stopped"] -.->|"strands slots"| P
+    end
+    subgraph After["ECS — one process"]
+        T["warm pool 5-10<br/>timers always run"] --> RDS[("RDS, same VPC")]
+    end
+  </pre></div>
+  <figcaption><span class="fn">Fig 4</span>Measured on production: 200 requests spun up ~13 instances holding 52 connections while Postgres ran 1–3 queries. A suspended Vercel instance held a connection idle for 620 s against a 20 s timeout — suspended instances run no timers. One long-lived process removes the problem.</figcaption>
+</figure>
+
+<div class="note"><p><strong>One task, deliberately.</strong> <code>maxCapacity: 1</code> — the Next.js cache is per-process, so a second task could serve a removed comment for the cache window. The app scales vertically until a shared cache handler exists. Adequate at this traffic; a contained follow-up, out of scope here.</p></div>
+
+<p><strong>Two kinds of cron.</strong> HTTP jobs (close markets every minute, drain alarms, sweep orphans) move to EventBridge — already written. In-database jobs (liquidity injector, drift check) stay in <code>pg_cron</code> and <strong>do not travel with a dump</strong>; they are recreated by hand and a cron-silence alarm watches them.</p>
+
+<p><strong>Failure posture.</strong> Rate limiting fails <em>open</em>; idempotency fails <em>closed</em>; moderation never blocks a post; a missing database URL fails the build rather than a deploy.</p>
+
+<p><strong>Still to do:</strong> <code>output: 'standalone'</code>, a Dockerfile that includes <code>drizzle/migrations/</code>, and a health endpoint reporting the deployed commit so CI can verify the canary.</p>
+
+<!-- 08 -->
+<h2 id="s8">08 · Network</h2>
+<figure>
+  <div class="fig-body"><pre class="mermaid">
+flowchart TB
+    USER["Participants"] -->|"443"| CF["Cloudflare"] -->|"443"| WAF["WAF"] --> ALB
+    subgraph VPC["VPC 10.10.0.0/16 · 2 AZs"]
+        subgraph PUB["Public subnets"]
+            ALB["ALB<br/>SG: 443 from internet"]
+            NAT["NAT"]
+        end
+        subgraph PRIV["Private subnets"]
+            ECS["ECS task<br/>SG: 3000 from ALB SG only"]
+        end
+        subgraph DB["DB subnets — no egress"]
+            RDS[("RDS<br/>SG: 5432 from ECS SG only<br/>no public IP")]
+        end
+    end
+    ALB -->|"3000"| ECS -->|"5432"| RDS
+    ECS -->|"443 out"| NAT --> EXT["OpenAI · Upstash · R2 · Resend"]
+  </pre></div>
+  <figcaption><span class="fn">Fig 5</span>Three tiers. Every firewall rule references another security group, never an IP range — re-addressing the VPC cannot widen access. The database has no public IP and no route out.</figcaption>
+</figure>
+
+<div class="tbl"><table>
+<thead><tr><th>Path</th><th>Detail</th></tr></thead>
+<tbody>
+<tr><td>Ingress</td><td>Two TLS terminations — Cloudflare at the edge, ACM at the ALB. ALB → container is plain HTTP inside the VPC.</td></tr>
+<tr><td>Egress</td><td>All outbound is 443 through one NAT: OpenAI, Upstash, R2, Resend, Google OAuth, Sentry. Single point of failure for outbound; a second NAT is one config line.</td></tr>
+<tr><td>Latency</td><td>Already proven: same-region placement cut per-query latency 361.6 → 5.34 ms and the Discovery page 35 s → 0.69 s. Same-VPC RDS removes the remaining pooler hop.</td></tr>
+<tr><td>Recommended</td><td>VPC endpoints for ECR/Secrets/CloudWatch · restrict ALB ingress to Cloudflare IP ranges · decide RDS Proxy yes/no under rehearsal.</td></tr>
+</tbody></table></div>
+
+<!-- 09 -->
+<h2 id="s9">09 · How the database moves</h2>
+<p>Only the database moves; the application is pointed at a new address. Writes stop before the copy is taken and resume only after the new database has passed every check — so a bet can never land in two databases at once, which is the one outcome that cannot be repaired.</p>
+
+<figure>
+  <div class="fig-body"><pre class="mermaid">
+flowchart LR
+    subgraph OLD["Supabase — today"]
+        SB[("PostgreSQL<br/>25 tables · triggers<br/>pg_cron jobs")]
+    end
+    subgraph PREP["Prepared in advance, no downtime"]
+        R0["Create RDS in the VPC<br/>pg_cron parameter group<br/>backups + PITR on"]
+        R1["Apply the 31 migrations<br/>with Drizzle → empty schema,<br/>triggers and partitions in place"]
+        R0 --> R1
+    end
+    subgraph WIN["The cutover window — writes stopped"]
+        S1["1 · Stop the app<br/>writes end here"] --> S2["2 · pg_dump<br/>data only"]
+        S2 --> S3["3 · pg_restore<br/>into RDS"]
+        S3 --> S4["4 · Re-register<br/>pg_cron jobs"]
+        S4 --> S5["5 · Verify —<br/>all nine checks"]
+        S5 --> S6["6 · Switch DATABASE_URL<br/>in Secrets Manager"]
+        S6 --> S7["7 · Start the app<br/>place one real bet"]
+    end
+    subgraph NEW["AWS RDS — after"]
+        RDS[("PostgreSQL 17<br/>same tables, same triggers,<br/>same jobs")]
+    end
+    SB -.->|"copy"| S2
+    R1 --> S3
+    S7 --> RDS
+    SB -.->|"kept read-only<br/>as rollback"| ROLL["Rollback = point<br/>DATABASE_URL back"]
+  </pre></div>
+  <figcaption><span class="fn">Fig 6</span>Left to right. The schema is built on RDS <em>before</em> the window, so the window only copies data. Step 5 is the decision point — one failed check stops everything and the app restarts on Supabase, which stays alive read-only until the new database has proven itself.</figcaption>
+</figure>
+
+<div class="tbl"><table>
+<thead><tr><th>What travels with the data</th><th>What has to be recreated by hand</th></tr></thead>
+<tbody>
+<tr>
+<td>All 25 tables and their rows · the 11 append-only triggers · the 13 event-log partitions · the <code>uuidv7()</code> function · the migration history · the freeze timestamp</td>
+<td><strong>The <code>pg_cron</code> job registrations</strong> — a dump carries the functions but not the schedule. Missing them means markets stop closing and nobody is told. Re-registered in step 4, checked in step 5, watched by the cron-silence alarm afterwards.<br><br><strong>The migration safety guards</strong> — today they refuse to run unless the connection string contains the Supabase project id. Rewritten and tested before the window.</td>
+</tr>
+</tbody></table></div>
+
+<h3>Step 5 — the nine checks, all must pass before the app is pointed at RDS</h3>
+<div class="tbl"><table>
+<thead><tr><th>#</th><th>Check</th><th>Why this one</th></tr></thead>
+<tbody>
+<tr><td class="mono">1</td><td>Row counts match, table by table</td><td>An existing tool does this and exits non-zero on mismatch</td></tr>
+<tr><td class="mono">2</td><td>Append-only triggers present</td><td>Data without the triggers is not the same database</td></tr>
+<tr><td class="mono">3</td><td>A test <code>DELETE</code> on <code>bets</code> is <strong>rejected</strong></td><td>Proves the triggers are armed, not merely present</td></tr>
+<tr><td class="mono">4</td><td>All 13 event partitions exist</td><td>A missing partition loses history silently</td></tr>
+<tr><td class="mono">5</td><td><code>pg_cron</code> jobs registered and firing</td><td>Otherwise markets stop closing</td></tr>
+<tr><td class="mono">6</td><td>Migration history matches the code</td><td>The health endpoint reports this directly</td></tr>
+<tr><td class="mono">7</td><td>The 13 invariant specs pass</td><td>The four core rules, checked by machine</td></tr>
+<tr><td class="mono">8</td><td>Freeze timestamp preserved exactly</td><td>The experiment's end date lives in a row</td></tr>
+<tr><td class="mono">9</td><td>Dharma ledger totals match, old and new</td><td>The strongest single check that nothing was lost</td></tr>
+</tbody></table></div>
+
+<div class="warn"><p><strong>Why check 3 is a test and not a look.</strong> <code>pg_restore --disable-triggers</code> switches the append-only guards off for the load — necessary, or the data-only restore would be rejected by the very guards being preserved. If re-enabling is not verified, the database comes up with its immutability switched off and everything looks normal. A present-but-disabled trigger passes "is it there" and fails "does it reject". Run the test as the application role.</p></div>
+
+<p><strong>Rehearsed first.</strong> The entire window is performed on staging end to end before production is scheduled, and staging then runs on its new database under watch — the every-minute job firing, connections flat, memory steady. <strong>Rollback</strong> at any point: point <code>DATABASE_URL</code> back at Supabase and restart. Supabase stays alive read-only afterwards as the rollback and the reference copy.</p>
+
+<!-- 10 -->
+<h2 id="s10">10 · Decisions needed</h2>
+<div class="tbl"><table>
+<thead><tr><th>#</th><th>Decision</th><th>Default</th></tr></thead>
+<tbody>
+<tr><td class="mono">D1</td><td><strong>Accept RDS over DynamoDB?</strong></td><td>Proceed with RDS</td></tr>
+<tr><td class="mono">D2</td><td>RDS class and Multi-AZ</td><td><code>db.t4g.small</code>, Multi-AZ, 7-day backups + PITR</td></tr>
+<tr><td class="mono">D3</td><td>NAT Gateways — 1 or 2</td><td>1</td></tr>
+<tr><td class="mono">D4</td><td>RDS Proxy</td><td>Decide under rehearsal</td></tr>
+<tr><td class="mono">D5</td><td>Window date and hour</td><td>~04:00 IST</td></tr>
+<tr><td class="mono">D6</td><td><strong>Named person with stop authority</strong></td><td><strong>Required</strong></td></tr>
+<tr><td class="mono">D7</td><td>Before or after the 5 Nov freeze</td><td>After, if flexible</td></tr>
+</tbody></table></div>
+
+<hr>
+<p class="small">Zugzwang Engineering · Reviewed against the live repository, branch <code>feat/aws-cdk-migration</code>, 2026-09-24 · Every figure traces to a file in the repo; the full evidence index and the cutover runbook (<code>DATABASE-MIGRATION-PLAN.html</code>) are available on request · Confidential.</p>
+
+</main>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
+<script>
+(()=> {
+  if(!window.mermaid) return;
+  var dark = document.documentElement.getAttribute('data-theme')==='dark' ||
+    (document.documentElement.getAttribute('data-theme')!=='light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  mermaid.initialize({
+    startOnLoad:true, securityLevel:'loose',
+    theme:'base',
+    themeVariables: dark ? {
+      fontFamily:'"IBM Plex Sans",system-ui,sans-serif', fontSize:'13px',
+      primaryColor:'#1f1e1b', primaryTextColor:'#ebe9e3', primaryBorderColor:'#474440',
+      lineColor:'#9a968d', secondaryColor:'#1e2c37', tertiaryColor:'#22211d',
+      clusterBkg:'#1c1b18', clusterBorder:'#474440', edgeLabelBackground:'#171614',
+      actorBkg:'#1f1e1b', actorBorder:'#474440', actorTextColor:'#ebe9e3',
+      signalColor:'#cfccc4', signalTextColor:'#ebe9e3', noteBkgColor:'#1e2c37', noteTextColor:'#ebe9e3', noteBorderColor:'#474440',
+      labelBoxBkgColor:'#1f1e1b', labelTextColor:'#ebe9e3', loopTextColor:'#ebe9e3',
+      attributeBackgroundColorOdd:'#1f1e1b', attributeBackgroundColorEven:'#22211d'
+    } : {
+      fontFamily:'"IBM Plex Sans",system-ui,sans-serif', fontSize:'13px',
+      primaryColor:'#ffffff', primaryTextColor:'#1c1b19', primaryBorderColor:'#c4c0b7',
+      lineColor:'#6a6761', secondaryColor:'#e3ecf3', tertiaryColor:'#ecebe5',
+      clusterBkg:'#f5f4f0', clusterBorder:'#c4c0b7', edgeLabelBackground:'#ecebe5',
+      actorBkg:'#ffffff', actorBorder:'#c4c0b7', actorTextColor:'#1c1b19',
+      signalColor:'#3a3835', signalTextColor:'#1c1b19', noteBkgColor:'#e3ecf3', noteTextColor:'#1c1b19', noteBorderColor:'#c4c0b7',
+      labelBoxBkgColor:'#ffffff', labelTextColor:'#1c1b19', loopTextColor:'#1c1b19',
+      attributeBackgroundColorOdd:'#ffffff', attributeBackgroundColorEven:'#ecebe5'
+    }
+  });
+})();
+</script>
+</body>
+</html>

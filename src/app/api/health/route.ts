@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/db";
+import { isWritesPaused } from "@/server/config/writes-paused";
 import { migrationDriftStatus } from "@/server/health/migration-drift";
 
 // GET /api/health — SCAFFOLD.8 OQ-3 boundary verdict + LD-5 smoke items
@@ -38,7 +39,15 @@ export async function GET(): Promise<Response> {
 	return Response.json({
 		status: "ok",
 		env: process.env.ZUGZWANG_ENV ?? null,
-		canary: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+		// AWS-MIGRATION — `VERCEL_GIT_COMMIT_SHA` is injected by Vercel and by
+		// nothing else, so off-platform this field would read `null` and the
+		// deploy gate ("canary equals the SHA you just pushed", runbook §2.2)
+		// would stop verifying anything while still returning 200. `APP_COMMIT_SHA`
+		// is the container's equivalent, set from the image tag by the ECS task
+		// definition. Vercel keeps priority so the platform we are ON today is
+		// unaffected; the fallback only speaks when Vercel is silent.
+		canary:
+			process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.APP_COMMIT_SHA ?? null,
 		// PERF-1 — the missing control. ADR-0006 ratified `bom1` on 2026-05-05
 		// and the project ran `iad1` for three months because NOTHING read the
 		// deployed region back and compared it to the decision. Every existing
@@ -58,8 +67,15 @@ export async function GET(): Promise<Response> {
 		// this function's environment. Two independent sources agreeing is what
 		// makes this non-vacuous; see the ADR-0006 patch record and
 		// `tests/server/health/region.test.ts`.
-		region: process.env.VERCEL_REGION ?? null,
+		// AWS-MIGRATION — same shape as `canary` above: Vercel first, then the
+		// container's own `APP_REGION`, then `null`. Still never a hardcoded
+		// default — an unknown region must read as unknown (PERF-1's whole point
+		// was that nobody noticed compute sitting in the wrong one).
+		region: process.env.VERCEL_REGION ?? process.env.APP_REGION ?? null,
 		db: dbStatus,
 		migrations,
+		// AWS-MIGRATION-3: the write-pause is otherwise invisible until a write
+		// fails — the cutover runbook reads this to confirm the window is open.
+		writesPaused: isWritesPaused(),
 	});
 }

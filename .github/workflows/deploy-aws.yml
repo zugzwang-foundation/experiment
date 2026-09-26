@@ -1,0 +1,411 @@
+# AWS-MIGRATION — build, migrate, deploy, verify.
+#
+# ⚠ PRODUCTION IS MANUAL ONLY, deliberately: while the experiment is live on
+# Vercel no push may move production to a different platform. Production is
+# reachable only by `workflow_dispatch` from `main` (the `guard` job, plus the
+# GitHub environment policy). STAGING also deploys on every push to the
+# `staging` branch (STAGING-PUSH-DEPLOY) — see the `on:` block.
+#
+# ⛔ THE ORDER IS THE POINT (ADR-0024 migrate-before-serve). Migrations land
+# BEFORE the new image serves traffic, so a failed migration leaves the OLD
+# version running and untouched. Never reorder these jobs for speed.
+name: Deploy to AWS
+
+on:
+  # STAGING ONLY on push. A push to `staging` deploys the AWS staging
+  # environment with the defaults below (environment=staging, writes=open,
+  # migrations on). ⛔ No push can reach production: every `inputs.*` read
+  # falls back to 'staging'/'open', the push branch filter is `staging`
+  # alone, the `guard` job refuses a push that resolves to anything else, and
+  # the staging OIDC role can assume only staging's bootstrap roles.
+  push:
+    branches: [staging]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Which environment to deploy
+        required: true
+        type: choice
+        options: [staging, production]
+      skip_migrations:
+        description: Skip the migration step (only when nothing changed under drizzle/)
+        required: false
+        type: boolean
+        default: false
+      writes:
+        description: "Write state this deploy must leave the environment in. Must agree with the environment's ZZ_<ENV>_WRITES_PAUSED variable, or the deploy refuses."
+        required: true
+        type: choice
+        options: [open, paused]
+
+concurrency:
+  # One deploy per environment at a time; queued, never cancelled — cancelling
+  # mid-deploy is how an environment ends up half-updated.
+  group: deploy-aws-${{ inputs.environment || 'staging' }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-south-1
+
+# `id-token: write` is granted PER JOB below, only to jobs that assume an AWS
+# role (`@security-auditor` M-3). Only `build` holds DOPPLER_TOKEN; the migrate
+# job no longer touches Doppler at all (D: it runs in-VPC with ECS injecting the
+# DSN from Secrets Manager).
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Refuse production from any ref but main
+    # C — production deploys only from `main`, i.e. only reviewed, merged code.
+    # A FAILING job rather than a skipped one (review MEDIUM-8): an all-skipped
+    # run concludes green, and a refusal must look like a refusal.
+    # ⚠ This file is read FROM the dispatched ref, so a branch can delete this
+    # job. The binding controls are the GitHub `production` environment's
+    # deployment-branch policy and reviewer, and the deploy role's trust policy
+    # (09-PRODUCTION-READINESS.md §C) — this job is the visible half.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the ref
+        env:
+          TARGET: ${{ inputs.environment || 'staging' }}
+          REF: ${{ github.ref }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = "push" ] && [ "$TARGET" != "staging" ]; then
+            echo "refusing: a push may deploy only staging (resolved to $TARGET)"
+            exit 1
+          fi
+          if [ "$TARGET" = "production" ] && [ "$REF" != "refs/heads/main" ]; then
+            echo "refusing: production deploys only from refs/heads/main (dispatched from $REF)"
+            exit 1
+          fi
+          echo "ref ok: $TARGET from $REF"
+
+  build:
+    name: Build and push image
+    needs: guard
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'staging' }}
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+      migrate_digest: ${{ steps.migrate_image.outputs.digest }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - id: meta
+        name: Compute the image tag
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          echo "image_tag=${{ inputs.environment || 'staging' }}-${SHA}" >> "$GITHUB_OUTPUT"
+          echo "app_commit_sha=${SHA}" >> "$GITHUB_OUTPUT"
+
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2
+
+      - uses: dopplerhq/cli-action@014df23b1329b615816a38eb5f473bb9000700b1 # v3
+      - name: Fetch build-time values from Doppler
+        id: doppler
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: |
+          # ⚠ BUILD-TIME ONLY. These are inlined into the bundle, which is why
+          # the image is environment-specific. Runtime secrets are NOT here —
+          # ECS injects those from Secrets Manager when the task starts.
+          CONFIG=$([ "${{ inputs.environment || 'staging' }}" = "production" ] && echo prd || echo stg)
+          for VAR in NEXT_PUBLIC_SENTRY_DSN NEXT_PUBLIC_POSTHOG_KEY NEXT_PUBLIC_POSTHOG_HOST NEXT_PUBLIC_TURNSTILE_SITE_KEY BETTER_AUTH_URL DATABASE_URL; do
+            VALUE=$(doppler secrets get "$VAR" --config "$CONFIG" --plain)
+            echo "::add-mask::$VALUE"
+            echo "$VAR=$VALUE" >> "$GITHUB_ENV"
+          done
+          echo "ZUGZWANG_ENV=$([ "${{ inputs.environment || 'staging' }}" = "production" ] && echo prod || echo staging)" >> "$GITHUB_ENV"
+
+      - name: Build and push the app image
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          REPO: zugzwang-${{ inputs.environment || 'staging' }}
+          TAG: ${{ steps.meta.outputs.image_tag }}
+        run: |
+          # The build evaluates every route's modules, so it needs the full
+          # environment — mounted as ONE secret, never as build args, so none
+          # of it is recorded in the image history.
+          CONFIG=$([ "${{ inputs.environment || 'staging' }}" = "production" ] && echo prd || echo stg)
+          trap 'rm -f build.env' EXIT
+          doppler secrets download --no-file --format env --config "$CONFIG" > build.env
+          docker build --target runner \
+            --secret id=build_env,src=build.env \
+            --build-arg ZUGZWANG_ENV="$ZUGZWANG_ENV" \
+            --build-arg APP_COMMIT_SHA="${{ steps.meta.outputs.app_commit_sha }}" \
+            --build-arg BETTER_AUTH_URL="$BETTER_AUTH_URL" \
+            --build-arg NEXT_PUBLIC_SENTRY_DSN="$NEXT_PUBLIC_SENTRY_DSN" \
+            --build-arg NEXT_PUBLIC_POSTHOG_KEY="$NEXT_PUBLIC_POSTHOG_KEY" \
+            --build-arg NEXT_PUBLIC_POSTHOG_HOST="$NEXT_PUBLIC_POSTHOG_HOST" \
+            --build-arg NEXT_PUBLIC_TURNSTILE_SITE_KEY="$NEXT_PUBLIC_TURNSTILE_SITE_KEY" \
+            -t "$REGISTRY/$REPO:$TAG" .
+          docker push "$REGISTRY/$REPO:$TAG"
+          # The env file never outlives the job step that needed it.
+          rm -f build.env
+
+      - id: migrate_image
+        name: Build and push the migration image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          REPO: zugzwang-${{ inputs.environment || 'staging' }}
+          TAG: ${{ steps.meta.outputs.image_tag }}
+        run: |
+          docker build --target migrate -t "$REGISTRY/$REPO:$TAG-migrate" .
+          docker push "$REGISTRY/$REPO:$TAG-migrate"
+          # D — the migration task definition runs the STABLE tag; re-point it at
+          # this build's migrate image (the per-build tag above is provenance).
+          docker tag "$REGISTRY/$REPO:$TAG-migrate" "$REGISTRY/$REPO:${{ inputs.environment || 'staging' }}-migrate"
+          docker push "$REGISTRY/$REPO:${{ inputs.environment || 'staging' }}-migrate"
+          # MEDIUM-9: the digest this build pushed, so the migrate job can prove
+          # the task ran THIS image and not whatever the mutable tag held before.
+          DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' "$REGISTRY/$REPO:$TAG-migrate" | sed 's/.*@//')
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          echo "migrate image digest: $DIGEST"
+
+  migrate:
+    name: Apply migrations in-VPC (before anything serves)
+    needs: build
+    if: ${{ !inputs.skip_migrations }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'staging' }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Run the migration task inside the VPC
+        env:
+          STACK: Zugzwang-${{ inputs.environment || 'staging' }}-Compute
+          CLUSTER: zugzwang-${{ inputs.environment || 'staging' }}
+          EXPECTED_DIGEST: ${{ needs.build.outputs.migrate_digest }}
+        run: |
+          # D — RDS is private (PubliclyAccessible=false, measured 2026-09-26):
+          # a GitHub runner cannot reach it. The migration runs as a one-off ECS
+          # task on the stack's migration task definition — the same path the
+          # staging fixture void took (06 §10.6) — with ECS injecting
+          # DATABASE_URL_<ENV> from Secrets Manager. No DSN passes through
+          # GitHub. The task's image is the stable `<env>-migrate` tag the build
+          # job just re-pointed.
+          # ⚠ FIRST RUN for an environment: the four outputs below only exist
+          # once this pass's Compute stack is deployed. Dispatch once with
+          # `skip_migrations: true`, then again normally (09 §D).
+          if ! aws cloudformation describe-stacks --stack-name "$STACK" > /dev/null; then
+            echo "$STACK does not exist — deploy the environment's stacks first (09 §K Phase 1)"; exit 1
+          fi
+          out() {
+            aws cloudformation describe-stacks --stack-name "$STACK" \
+              --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text
+          }
+          FAMILY=$(out MigrationTaskFamily)
+          SUBNETS=$(out MigrationSubnetIds)
+          SG=$(out MigrationSecurityGroupId)
+          CP=$(out CapacityProviderName)
+          for v in FAMILY SUBNETS SG CP; do
+            if [ -z "${!v}" ] || [ "${!v}" = "None" ]; then
+              echo "stack output for $v is missing — dispatch once with skip_migrations=true so the Compute stack gains its outputs, then re-run (09 §D)"; exit 1
+            fi
+          done
+          # Keep the whole response: when RunTask cannot place a task it
+          # returns 200 with an empty `tasks` and the reason in `failures[]`
+          # (review MEDIUM-6).
+          RUN=$(aws ecs run-task --cluster "$CLUSTER" --task-definition "$FAMILY" \
+            --capacity-provider-strategy "capacityProvider=$CP,weight=1" \
+            --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SG],assignPublicIp=DISABLED}" \
+            --started-by "deploy-aws-${{ github.run_id }}" \
+            --output json)
+          TASK=$(echo "$RUN" | jq -r '.tasks[0].taskArn // empty')
+          if [ -z "$TASK" ]; then
+            echo "run-task placed no task. failures:"
+            echo "$RUN" | jq '.failures'
+            exit 1
+          fi
+          echo "migration task: $TASK"
+          # `tasks-stopped` gives up after 10 minutes; loop it for up to 30.
+          for i in 1 2 3; do
+            aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$TASK" && break
+          done
+          RESULT=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK" --output json)
+          STATUS=$(echo "$RESULT" | jq -r '.tasks[0].lastStatus // empty')
+          CODE=$(echo "$RESULT" | jq -r '.tasks[0].containers[0].exitCode // "none"')
+          RAN=$(echo "$RESULT" | jq -r '.tasks[0].containers[0].imageDigest // empty')
+          REASON=$(echo "$RESULT" | jq -r '.tasks[0].stoppedReason // empty')
+          echo "status=$STATUS exitCode=$CODE digest=$RAN reason=$REASON"
+          if [ "$STATUS" != "STOPPED" ] || [ "$CODE" != "0" ]; then
+            echo "migration task did not exit 0 — the old version keeps serving; read /zugzwang/${{ inputs.environment || 'staging' }}/app (stream prefix migrate)"
+            if [ "$STATUS" != "STOPPED" ]; then
+              echo "⚠ the task is still $STATUS: stop it by hand before any retry — two migrators must never run at once"
+            fi
+            exit 1
+          fi
+          if [ -n "$EXPECTED_DIGEST" ] && [ "$RAN" != "$EXPECTED_DIGEST" ]; then
+            echo "the migration task ran $RAN, not this build's $EXPECTED_DIGEST — refusing to deploy"; exit 1
+          fi
+
+  deploy:
+    name: Roll the service to the new image
+    needs: [build, migrate]
+    # `!cancelled()` plus the explicit results: the deploy runs when migrate
+    # succeeded OR was deliberately skipped, never when it FAILED, and never
+    # once the run is CANCELLED. ⚠ Not `always()` (security H3): `always()` is
+    # true even for a cancelled run, so cancelling mid-cutover would still deploy.
+    if: ${{ !cancelled() && needs.build.result == 'success' && (needs.migrate.result == 'success' || needs.migrate.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'staging' }}
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      alb_dns: ${{ steps.alb.outputs.alb_dns }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy the compute stack at the new image tag
+        working-directory: infra
+        # AWS-MIGRATION-3: the config reads the certificate ARN and the alert
+        # address at SYNTH time. A synth without them would emit a stack with
+        # an HTTP-only listener and an alarm topic with no subscriber — and
+        # deploy it. They come from the GitHub environment's variables, never
+        # from the repository.
+        env:
+          ZZ_STAGING_CERT_ARN: ${{ vars.ZZ_STAGING_CERT_ARN }}
+          ZZ_PROD_CERT_ARN: ${{ vars.ZZ_PROD_CERT_ARN }}
+          ZZ_ALERT_EMAIL: ${{ vars.ZZ_ALERT_EMAIL }}
+          # The write-pause is a synth-time input (config/*.ts). A synth without
+          # it silently emits an UNPAUSED task definition — so it is carried from
+          # the environment's variables exactly like the certificate ARN
+          # (`@security-auditor` H-4). Set the variable to `paused` for the
+          # cutover window and clear it afterwards.
+          ZZ_STAGING_WRITES_PAUSED: ${{ vars.ZZ_STAGING_WRITES_PAUSED }}
+          ZZ_PROD_WRITES_PAUSED: ${{ vars.ZZ_PROD_WRITES_PAUSED }}
+          WRITES: ${{ inputs.writes || 'open' }}
+        run: |
+          # Security H3 — the pause is a SYNTH-TIME value, and any spelling but
+          # exactly `paused` silently emits an UNPAUSED task definition. The
+          # dispatch must state its intent, and the variable must agree.
+          if [ "${{ inputs.environment || 'staging' }}" = "production" ]; then PAUSE_VAR="$ZZ_PROD_WRITES_PAUSED"; else PAUSE_VAR="$ZZ_STAGING_WRITES_PAUSED"; fi
+          if [ "$WRITES" = "paused" ] && [ "$PAUSE_VAR" != "paused" ]; then
+            echo "refusing: writes=paused requested but the environment's WRITES_PAUSED variable is '$PAUSE_VAR', not exactly 'paused'"; exit 1
+          fi
+          if [ "$WRITES" = "open" ] && [ -n "$PAUSE_VAR" ]; then
+            echo "refusing: writes=open requested but the environment's WRITES_PAUSED variable is set ('$PAUSE_VAR') — clear it or dispatch with writes=paused"; exit 1
+          fi
+          if [ "${{ inputs.environment || 'staging' }}" = "production" ] && [ -z "$ZZ_PROD_CERT_ARN" ]; then
+            echo "ZZ_PROD_CERT_ARN is not set on the production environment — refusing to synth an HTTP-only production listener"; exit 1
+          fi
+          if [ "${{ inputs.environment || 'staging' }}" = "staging" ] && [ -z "$ZZ_STAGING_CERT_ARN" ]; then
+            echo "ZZ_STAGING_CERT_ARN is not set on the staging environment — refusing to synth an HTTP-only staging listener"; exit 1
+          fi
+          if [ -z "$ZZ_ALERT_EMAIL" ]; then
+            echo "ZZ_ALERT_EMAIL is not set on the ${{ inputs.environment || 'staging' }} environment — refusing to synth an alarm topic with no subscriber"; exit 1
+          fi
+          pnpm install --frozen-lockfile
+          pnpm exec cdk deploy "Zugzwang-${{ inputs.environment || 'staging' }}-Compute" \
+            -c imageTag=${{ needs.build.outputs.image_tag }} \
+            --require-approval never
+
+      - name: Wait for the service to stabilise
+        run: |
+          # The deployment circuit breaker rolls back on its own if the new
+          # tasks never turn healthy; this waits for whichever outcome happened.
+          aws ecs wait services-stable \
+            --cluster zugzwang-${{ inputs.environment || 'staging' }} \
+            --services $(aws ecs list-services --cluster zugzwang-${{ inputs.environment || 'staging' }} --query 'serviceArns[0]' --output text)
+
+      - id: alb
+        name: Publish the load balancer's hostname for the verify gate
+        run: |
+          DNS=$(aws cloudformation describe-stacks \
+            --stack-name "Zugzwang-${{ inputs.environment || 'staging' }}-Compute" \
+            --query "Stacks[0].Outputs[?OutputKey=='LoadBalancerDns'].OutputValue" \
+            --output text)
+          echo "alb_dns=$DNS" >> "$GITHUB_OUTPUT"
+
+  verify:
+    name: Verify the live build
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    # No `environment:` — this job reads no secret or variable, and binding it
+    # would add a second approval prompt per production deploy (review LOW).
+    steps:
+      - name: Health gate
+        env:
+          HOST: ${{ (inputs.environment || 'staging') == 'production' && 'zugzwangworld.com' || 'staging.zugzwangworld.com' }}
+          ALB_DNS: ${{ needs.deploy.outputs.alb_dns }}
+          EXPECTED: ${{ needs.build.outputs.image_tag }}
+          EXPECTED_PAUSED: ${{ (inputs.writes || 'open') == 'paused' }}
+        run: |
+          # J — the gate talks to THIS environment's load balancer, never to
+          # whatever public DNS happens to point at. Before the cutover
+          # `zugzwangworld.com` is still Vercel (measured 2026-09-26), so a
+          # DNS-following gate would poll Vercel, see the wrong canary and fail —
+          # or, after a partial cutover, pass against the wrong origin. `--resolve`
+          # pins the connection to the ALB while keeping the real hostname for
+          # TLS (the ACM certificate) and for the Host header.
+          ALB_IP=$(getent ahostsv4 "$ALB_DNS" | awk 'NR==1{print $1}')
+          if [ -z "$ALB_IP" ]; then echo "could not resolve the ALB ($ALB_DNS)"; exit 1; fi
+          BASE_URL="https://$HOST"
+          curl() { command curl --resolve "$HOST:443:$ALB_IP" "$@"; }
+          # ⛔ THE GATE IS THIS ENDPOINT, NOT AN EXIT CODE (runbook §2.2, and
+          # drizzle-orm #5769: a migrate step can report success while the
+          # database is not actually ready). Poll until the canary equals the
+          # tag we just deployed, or fail the run.
+          for i in $(seq 1 30); do
+            BODY=$(curl -fsS "$BASE_URL/api/health" || echo '{}')
+            CANARY=$(echo "$BODY" | jq -r '.canary // empty')
+            DB=$(echo "$BODY" | jq -r '.db // empty')
+            MIGRATIONS=$(echo "$BODY" | jq -r '.migrations // empty')
+            PAUSED=$(echo "$BODY" | jq -r '.writesPaused // empty')
+            echo "attempt $i: canary=$CANARY db=$DB migrations=$MIGRATIONS"
+            if [ "$CANARY" = "$EXPECTED" ] && [ "$DB" = "ok" ] && [ "$MIGRATIONS" = "ok" ]; then
+              echo "live build verified: $CANARY"
+              # Security H3: the write state is part of the gate, not a hope.
+              if [ "$PAUSED" != "$EXPECTED_PAUSED" ]; then
+                echo "writesPaused=$PAUSED but this deploy was dispatched with writes=${{ inputs.writes || 'open' }} — investigate before anything else"; exit 1
+              fi
+              # AWS-MIGRATION-3: the task is live; now require it to be WARM.
+              # /api/ready is the target-group health check, so by the time the
+              # ALB routes here it is normally already 200 — this is the receipt.
+              for j in $(seq 1 12); do
+                BODY=$(curl -fsS "$BASE_URL/api/ready" || echo '{}')
+                READY=$(echo "$BODY" | jq -r '.ready // empty')
+                FAILED=$(echo "$BODY" | jq -r '.failed // empty')
+                # `ready` means "tried once"; `failed` is how many pages did not
+                # render inside the budget. The gate requires both (M-2).
+                if [ "$READY" = "true" ] && [ "$FAILED" = "0" ]; then
+                  echo "readiness gate passed (all warm paths rendered)"
+                  exit 0
+                fi
+                echo "ready=$READY failed=$FAILED"
+                sleep 10
+              done
+              echo "readiness gate never reported ready — the task is serving cold; investigate"
+              exit 1
+            fi
+            sleep 10
+          done
+          echo "health gate never reported the deployed build — investigate before retrying"
+          exit 1

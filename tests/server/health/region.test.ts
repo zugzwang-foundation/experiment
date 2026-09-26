@@ -45,17 +45,31 @@ vi.mock("@/server/health/migration-drift", () => ({
 }));
 
 const ORIGINAL = process.env.VERCEL_REGION;
+const ORIGINAL_APP_REGION = process.env.APP_REGION;
+const ORIGINAL_VERCEL_SHA = process.env.VERCEL_GIT_COMMIT_SHA;
+const ORIGINAL_APP_SHA = process.env.APP_COMMIT_SHA;
 
 beforeEach(() => {
 	vi.resetModules();
+	// AWS-MIGRATION — the container fallbacks must be ABSENT by default, or
+	// the 'never a default' rows below would pass for the wrong reason.
+	delete process.env.APP_REGION;
+	delete process.env.APP_COMMIT_SHA;
 });
 
-afterEach(() => {
-	if (ORIGINAL === undefined) {
-		delete process.env.VERCEL_REGION;
+const restore = (key: string, value: string | undefined): void => {
+	if (value === undefined) {
+		delete process.env[key];
 	} else {
-		process.env.VERCEL_REGION = ORIGINAL;
+		process.env[key] = value;
 	}
+};
+
+afterEach(() => {
+	restore("VERCEL_REGION", ORIGINAL);
+	restore("APP_REGION", ORIGINAL_APP_REGION);
+	restore("VERCEL_GIT_COMMIT_SHA", ORIGINAL_VERCEL_SHA);
+	restore("APP_COMMIT_SHA", ORIGINAL_APP_SHA);
 });
 
 async function readHealth(): Promise<Record<string, unknown>> {
@@ -115,6 +129,54 @@ describe("PERF-1 — /api/health reports the executing region", () => {
 			"migrations",
 			"region",
 			"status",
+			// AWS-MIGRATION-3: the write-pause is observable here (deliberate).
+			"writesPaused",
 		]);
+	});
+});
+
+/**
+ * AWS-MIGRATION — `canary` and `region` fall back to the container's own
+ * variables when Vercel's are absent.
+ *
+ * ⛔ THE POINT IS THE DEPLOY GATE, not the field. The runbook verifies a
+ * release by checking that `canary` equals the SHA just pushed; off Vercel
+ * that value is `null`, so the gate would keep passing while verifying
+ * nothing. These rows pin both the fallback AND the precedence — Vercel
+ * first, so the platform we are still on cannot change behaviour.
+ */
+describe("AWS-MIGRATION — health falls back to the container identity", () => {
+	it("health-canary::prefers-vercel-then-app-commit-sha", async () => {
+		process.env.VERCEL_GIT_COMMIT_SHA = "vercel-sha";
+		process.env.APP_COMMIT_SHA = "container-sha";
+		expect((await readHealth()).canary).toBe("vercel-sha");
+
+		vi.resetModules();
+		delete process.env.VERCEL_GIT_COMMIT_SHA;
+		process.env.APP_COMMIT_SHA = "container-sha";
+		expect((await readHealth()).canary).toBe("container-sha");
+	});
+
+	it("health-canary::null-when-neither-is-set", async () => {
+		delete process.env.VERCEL_GIT_COMMIT_SHA;
+		delete process.env.APP_COMMIT_SHA;
+		expect((await readHealth()).canary).toBeNull();
+	});
+
+	it("health-region::prefers-vercel-then-app-region", async () => {
+		process.env.VERCEL_REGION = "bom1";
+		process.env.APP_REGION = "ap-south-1";
+		expect((await readHealth()).region).toBe("bom1");
+
+		vi.resetModules();
+		delete process.env.VERCEL_REGION;
+		process.env.APP_REGION = "ap-south-1";
+		expect((await readHealth()).region).toBe("ap-south-1");
+	});
+
+	it("health-region::still-null-when-neither-is-set", async () => {
+		delete process.env.VERCEL_REGION;
+		delete process.env.APP_REGION;
+		expect((await readHealth()).region).toBeNull();
 	});
 });

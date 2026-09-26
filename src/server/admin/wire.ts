@@ -25,6 +25,7 @@ import {
 	MediaRequiredError,
 } from "@/server/markets/errors";
 import type { LifecycleFlow } from "@/server/markets/transaction";
+import { getClientIp } from "@/server/middleware/client-ip";
 import {
 	CorrectionOutcomeError,
 	ResolutionSerializationExhaustedError,
@@ -69,19 +70,12 @@ export async function requireAdminSession(): Promise<{
 }
 
 /**
- * Replicated x-forwarded-for parse (mirrors `auth/admin/login.ts` + the §7
- * convention). NOT imported from login.ts — that module is `"use server"`, so
- * its helpers cannot be re-exported. Takes a header getter so the same code
- * serves both Server Actions (`await headers()`) and the cron Route Handler
- * (`request.headers`, the D-15.g call site).
+ * S-1 / ADR-0061 — the trusted client IP via the shared helper. Takes a header
+ * getter so the same code serves both Server Actions (`await headers()`) and
+ * the cron Route Handler (`request.headers`, the D-15.g call site).
  */
-function getClientIp(get: (name: string) => string | null): string {
-	const fwd = get("x-forwarded-for");
-	if (fwd) {
-		const first = fwd.split(",")[0]?.trim();
-		if (first) return first;
-	}
-	return "unknown";
+function clientIpOrUnknown(get: (name: string) => string | null): string {
+	return getClientIp(get) ?? "unknown";
 }
 
 /**
@@ -106,7 +100,7 @@ export async function buildAdminMetadata(args: {
 		user_id: null,
 		actor_id: "admin-singleton",
 		idempotency_key: null,
-		ip: getClientIp(get),
+		ip: clientIpOrUnknown(get),
 		user_agent: get("user-agent") ?? "unknown",
 	};
 }

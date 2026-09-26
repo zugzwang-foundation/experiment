@@ -17,6 +17,10 @@ import {
 import { createSessionGate } from "@/server/auth/session-gate";
 import { consumeIdentityPoolTuple } from "@/server/identity-pool/consume";
 import {
+	getClientIp,
+	TRUSTED_CLIENT_IP_HEADER,
+} from "@/server/middleware/client-ip";
+import {
 	checkRateLimit,
 	ipIdentifier,
 	otpEmailIdentifier,
@@ -152,12 +156,15 @@ async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
 	}
 }
 
+/**
+ * S-1 / ADR-0061 — the trusted client IP for the OTP-send per-IP limit. Reads
+ * the edge headers through the shared helper, NOT the stamped
+ * `x-zz-client-ip`, so this limit does not depend on the auth route wrapper.
+ */
 function ipFromCtx(ctx: HookCtx): string {
 	const headers = ctx.request?.headers ?? ctx.headers;
 	if (!headers) return "unknown";
-	const fwd = headers.get("x-forwarded-for");
-	if (fwd) return fwd.split(",")[0]?.trim() ?? "unknown";
-	return "unknown";
+	return getClientIp((name) => headers.get(name)) ?? "unknown";
 }
 
 const otpGateBeforeHooks = [
@@ -322,7 +329,7 @@ const issueOnboardingSession = createAuthEndpoint(
 		// context carries (`getCurrentAuthContext()` inside
 		// `internal-adapter.mjs`) — populated FROM whatever `headers` the
 		// caller passed to `auth.api.issueOnboardingSession(...)`.
-		// `tos-accept.ts` forwards the real incoming request's `headers()`,
+		// `tos-accept.ts` forwards the trusted client IP (ADR-0061 stamp) + UA,
 		// so a real IP/UA lands on the `sessions` row and the
 		// `user.*_signed_in` event exactly as a normal sign-in would carry
 		// them (SPEC.2 §3.7) — not the empty-string default a headerless
@@ -421,6 +428,14 @@ export const auth = betterAuth({
 		},
 	},
 	advanced: {
+		// S-1 / ADR-0061 — Better Auth's own rate limiter and
+		// `sessions.ip_address` read ONLY the header the auth route stamps
+		// from the shared trusted-IP helper (`app/api/auth/[...all]/route.ts`),
+		// overwriting any client-sent value. Its default is the raw first hop
+		// of X-Forwarded-For, which the client controls behind an ALB.
+		ipAddress: {
+			ipAddressHeaders: [TRUSTED_CLIENT_IP_HEADER],
+		},
 		database: {
 			generateId: () => uuidv7(),
 		},

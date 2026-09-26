@@ -87,3 +87,16 @@ docs/sync/
 # ⚠ Deliberately NOT under `.next/`, which `pnpm build` cleans — it was there
 # once, and the rebuild taken to measure the after-state destroyed it.
 .chart7-before/
+
+# AWS migration — local-only artifacts, kept out of the repository (2026-09-26).
+# Stray HTML exports of the migration proposal/guide:
+/aws-migration-guide.html
+/aws-migration-proposal.html
+/migr...html
+/docs/reports/aws-migration-proposal.html
+# Staging load-test harness (operator ruling at the AWS-MIGRATION-3 commit):
+/scripts/aws-migration/load/
+
+# A full production secret dump written by deploy-aws.yml / the Dockerfile's
+# documented local build — never stage it (security review M3).
+build.env
