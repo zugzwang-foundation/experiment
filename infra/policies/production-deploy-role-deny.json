@@ -1,0 +1,47 @@
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "DenyStagingAndDeployStackChanges",
+			"Effect": "Deny",
+			"NotAction": [
+				"cloudformation:Describe*",
+				"cloudformation:Get*",
+				"cloudformation:List*",
+				"cloudformation:BatchDescribe*"
+			],
+			"Resource": [
+				"arn:aws:cloudformation:*:849076101704:stack/Zugzwang-staging-*/*",
+				"arn:aws:cloudformation:*:849076101704:stack/Zugzwang-Deploy/*",
+				"arn:aws:cloudformation:*:849076101704:stack/Zugzwang-production-Deploy/*",
+				"arn:aws:cloudformation:*:849076101704:stack/CDKToolkit/*"
+			]
+		},
+		{
+			"Sid": "DenyStagingBootstrapAssets",
+			"Effect": "Deny",
+			"Action": "s3:*",
+			"Resource": [
+				"arn:aws:s3:::cdk-hnb659fds-*",
+				"arn:aws:s3:::cdk-hnb659fds-*/*"
+			]
+		},
+		{
+			"Sid": "DenyStagingBootstrapParameters",
+			"Effect": "Deny",
+			"Action": "ssm:*",
+			"Resource": "arn:aws:ssm:*:849076101704:parameter/cdk-bootstrap/hnb659fds/*"
+		},
+		{
+			"Sid": "DenyStagingAndGitHubDeployIdentity",
+			"Effect": "Deny",
+			"Action": ["iam:*", "sts:AssumeRole", "sts:TagSession"],
+			"Resource": [
+				"arn:aws:iam::849076101704:role/cdk-hnb659fds-*",
+				"arn:aws:iam::849076101704:role/Zugzwang-staging-*",
+				"arn:aws:iam::849076101704:role/zugzwang-staging-*",
+				"arn:aws:iam::849076101704:role/zugzwang-*-github-deploy"
+			]
+		}
+	]
+}

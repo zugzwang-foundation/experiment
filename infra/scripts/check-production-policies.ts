@@ -8,7 +8,9 @@
  * Fails when the production templates contain a resource type that is not in
  * the committed snapshot (production-resource-types.json) or that the execution
  * policy does not cover, when a production role lacks the permissions boundary,
- * or when a role name falls outside the execution policy's IAM scope.
+ * or when a role name falls outside the execution policy's IAM scope — and,
+ * because staging shares this account (09 §0), when a production template names
+ * anything staging or leaves a taggable resource without Environment=production.
  * Reads local files only; makes no AWS call.
  */
 import { readdirSync, readFileSync } from "node:fs";
@@ -17,7 +19,9 @@ import { productionConfig } from "../config/production";
 import {
 	globMatch,
 	type PolicyDocument,
+	stagingReferences,
 	uncoveredResourceTypes,
+	untaggedProductionResources,
 } from "../policies/coverage";
 
 const dir = process.argv[2];
@@ -41,7 +45,14 @@ if (templates.length !== 6) {
 	failures.push(`expected 6 production templates, found ${templates.length}`);
 }
 for (const file of templates) {
-	const t = JSON.parse(readFileSync(join(dir, file), "utf8"));
+	const text = readFileSync(join(dir, file), "utf8");
+	const t = JSON.parse(text);
+	for (const m of stagingReferences(text)) {
+		failures.push(`${file}: references staging ("${m}")`);
+	}
+	for (const r of untaggedProductionResources(t)) {
+		failures.push(`${file}: ${r} is not tagged Environment=production`);
+	}
 	for (const [id, r] of Object.entries<{
 		Type: string;
 		Properties?: Record<string, unknown>;

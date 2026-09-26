@@ -306,9 +306,19 @@ jobs:
           # project (866 packages) and never infra/pnpm-lock.yaml — `cdk` is
           # then "not found" (run 36233879711; reproduced and fixed locally).
           pnpm install --frozen-lockfile --ignore-workspace
+          # 09 §0 — staging and production share this account, so the CLI must
+          # read production's OWN bootstrap stack. Without the flag it reads the
+          # default `CDKToolkit`, which is staging's — and which the production
+          # deploy role is denied (infra/policies/production-deploy-role-deny.json).
+          # Staging passes no extra argument: its command is exactly as before.
+          TOOLKIT_ARGS=()
+          if [ "${{ inputs.environment || 'staging' }}" = "production" ]; then
+            TOOLKIT_ARGS=(--toolkit-stack-name CDKToolkit-prod)
+          fi
           pnpm --ignore-workspace exec cdk deploy "Zugzwang-${{ inputs.environment || 'staging' }}-Compute" \
             -c imageTag=${{ needs.build.outputs.image_tag }} \
-            --require-approval never
+            --require-approval never \
+            "${TOOLKIT_ARGS[@]}"
 
       - name: Wait for the service to stabilise
         run: |

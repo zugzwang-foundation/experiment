@@ -15,6 +15,48 @@ NOT been performed. Sections §A–§J are the blockers; §K onwards are the pro
 
 ---
 
+## §0 — Account topology: ONE account, SEPARATE resources (decided 2026-09-26)
+
+Staging and production share AWS account **`849076101704`** (ap-south-1). **Staging stays exactly as deployed.**
+Production gets its own copy of every resource:
+
+| | Staging (existing, unchanged) | Production (new) |
+|---|---|---|
+| Network | VPC `10.20.0.0/16` | VPC `10.10.0.0/16`. No peering, so there is no network path between them |
+| Database | own RDS instance + `zugzwang/staging/database` | own Multi-AZ RDS + `zugzwang/production/database` |
+| App secret | `zugzwang/staging` | `zugzwang/production` |
+| ECR / ECS / ALB / WAF / SNS / EventBridge | `zugzwang-staging*` | `zugzwang-production*` |
+| CDK bootstrap | `CDKToolkit` (`hnb659fds`), exec role AdministratorAccess | `CDKToolkit-prod` (`zzprod`), scoped exec policy + boundary |
+| GitHub deploy role | `zugzwang-staging-github-deploy` in stack `Zugzwang-Deploy` (also owns the OIDC provider) | `zugzwang-production-github-deploy` in stack **`Zugzwang-production-Deploy`**, which imports the provider |
+| Trigger | push to `staging` (auto) | `workflow_dispatch` from `main`, required reviewer |
+| CDK toolkit stack used by `cdk deploy` | `CDKToolkit` (the CLI default; command unchanged) | **`CDKToolkit-prod`**, passed explicitly as `--toolkit-stack-name CDKToolkit-prod` (`deploy-aws.yml`, production only) |
+| Doppler | `stg` | `prd` |
+| Tag | `Environment=staging` (all 57 taggable resources) | `Environment=production` (checked on every synth) |
+
+**Isolation, per direction:**
+
+| Requirement | Control | Where |
+|---|---|---|
+| Staging deployment cannot modify production stacks | deny on `cdk-hnb659fds-deploy-role` for `Zugzwang-production-*`, `Zugzwang-Deploy`, `CDKToolkit-prod`, zzprod assets, parameters and roles | `staging-deploy-role-deny.json`, **applied, unchanged** |
+| Production deployment cannot modify staging stacks | **P2:** deny on `cdk-zzprod-deploy-role`. For `Zugzwang-staging-*`, `Zugzwang-Deploy`, `Zugzwang-production-Deploy` and `CDKToolkit` it denies **every CloudFormation action except the read-only lookups `Describe*`, `Get*`, `List*`, `BatchDescribe*`**, so no create, update, change-set, execute, import, delete, rollback, stack-policy, protection, tag or drift action can touch them. It also denies all actions on the hnb659fds assets, parameters and roles, and on both GitHub deploy roles. The lookups stay allowed so a CDK CLI lookup of a staging stack can never fail a production deploy; they grant nothing. Production deploys also name `CDKToolkit-prod` explicitly (row above) and never read staging's toolkit stack. | `production-deploy-role-deny.json` (statement `DenyStagingAndDeployStackChanges`), not yet applied |
+| Production cannot modify staging resources | **P1:** `DenyStagingByTag` (`aws:ResourceTag/Environment=staging`) + `DenyStagingByName` (staging secrets, RDS, ECS, ECR, logs, SNS, EventBridge, WAF, Lambda, ASG, roles, bootstrap), in **both** the zzprod exec policy and the production boundary. The boundary covers every role production creates | `production-cfn-execution-policy.json`, `production-permissions-boundary.json`: new versions, not yet applied |
+| The wrong environment's deploy role is never created or rewritten | one stack per environment; `-c deployEnvironments` required, exactly one; each stack denied to the other environment's deploy role (and P2 denies production its own) | `bin/zugzwang.ts` |
+| Production stacks cannot target staging | account pinned; every name, CIDR, secret and qualifier differs (tested); the pre-deploy check fails on any `staging` / `hnb659fds` / `10.20.` reference or any taggable resource not tagged `Environment=production` | `production.ts`, `check-production-policies.ts` |
+
+**Residual risk — accepted for now, named so it is not forgotten.** Staging's CDK exec role is still
+AdministratorAccess. A compromised staging pipeline cannot change-set a production stack (the deny above), but
+it can create *another* stack whose admin-created role acts on production. Closing that needs **S1**: a deny on
+staging's exec role, and ultimately a boundary on staging's own roles. It changes a staging IAM role, so it is
+**deferred to a separately approved hardening step**. The admin IAM user `zugzwang-deploy` and the root user
+(no MFA) also reach both environments. Root MFA is required before production (§B).
+
+**Apply order (each an AWS change needing approval):**
+1. New default versions of `zugzwang-production-cfn-exec` and `zugzwang-production-boundary` (P1).
+2. `put-role-policy` on `cdk-zzprod-deploy-role-849076101704-ap-south-1` with `production-deploy-role-deny.json` (P2).
+3. After `Zugzwang-production-Security` exists: deploy `Zugzwang-production-Deploy` (§C).
+
+---
+
 ## Verified facts (2026-09-26)
 
 | Fact | How measured |
@@ -121,9 +163,9 @@ to `cdk-hnb659fds-*` and the production role to `cdk-zzprod-*` only.
    still exists after any future `cdk bootstrap` of `hnb659fds`.
 5. After GitHub OIDC works (§C), deactivate the `zugzwang-deploy` access key or reduce the user to read-only.
 
-**Stronger alternative (recommended if the plan must change anyway, §H):** production in its own AWS
-account under an Organization. Account separation is the only boundary that does not depend on getting
-IAM right.
+**Account decision (§0):** production stays in this account, as separate resources. A separate account is the
+only boundary that does not depend on getting IAM right; it was considered and not chosen. §0 lists the IAM
+controls that stand in for it, and the one residual risk (S1, deferred).
 
 ## §C — Production GitHub OIDC and deploy workflow
 
@@ -144,8 +186,16 @@ repository) and matching it in the role's trust policy. ⚠ Whether AWS IAM can 
 the `job_workflow_ref` claim is **not established** here — use the `sub` customization, which is.
 
 **Operator actions (approval):**
-1. `cdk deploy Zugzwang-Deploy -c deployStack=true` with `ZZ_GITHUB_REPOSITORY=zugzwang-foundation/experiment`
-   (creates the OIDC provider + two roles). Outputs `DeployRoleArn-staging` / `-production`.
+1. One deploy-role stack **per environment** (§0). `-c deployEnvironments` is required and names exactly one.
+   `Zugzwang-Deploy` (staging role + the account's OIDC provider) already exists and is **not touched**.
+   Production, after `Zugzwang-production-Security` exists, with operator credentials:
+   ```bash
+   cd infra
+   ZZ_GITHUB_REPOSITORY=zugzwang-foundation/experiment \
+     npx cdk deploy Zugzwang-production-Deploy --exclusively -c deployStack=true -c deployEnvironments=production
+   ```
+   It imports the existing provider, and never creates or deletes it. Output `DeployRoleArnproduction` → the GitHub
+   `production` environment's `AWS_DEPLOY_ROLE_ARN`.
 2. GitHub → Settings → Environments → `production`: **required reviewer = you**, deployment branches = `main`
    only; secrets `AWS_DEPLOY_ROLE_ARN`, `DOPPLER_TOKEN` (a `prd`-scoped service token); variables
    `ZZ_PROD_CERT_ARN`, `ZZ_ALERT_EMAIL`, `ZZ_PROD_WRITES_PAUSED` (empty), optionally `ZZ_PROD_WAF_MODE`.
