@@ -214,15 +214,23 @@ export class ComputeStack extends Stack {
 			this,
 			"MigrationTask",
 			{
+				// D: a FIXED family, so deploy-aws.yml can `run-task` it by name and
+				// the GitHub role's RunTask grant can be scoped to exactly this.
+				family: `zugzwang-${config.name}-migrate`,
 				networkMode: ecs.NetworkMode.AWS_VPC,
 				executionRole: props.executionRole,
 				taskRole: props.taskRole,
 			},
 		);
 		this.migrationTaskDefinition.addContainer("migrate", {
+			// D: a STABLE tag the workflow re-points at each build's migrate image
+			// before running this task — migrations run BEFORE the compute stack
+			// is deployed (migrate-before-serve), so the task cannot wait for this
+			// stack to learn the new image tag. The per-build `<tag>-migrate` is
+			// still pushed alongside it for provenance.
 			image: ecs.ContainerImage.fromEcrRepository(
 				props.repository,
-				`${imageTag}-migrate`,
+				`${config.name}-migrate`,
 			),
 			cpu: 512,
 			memoryLimitMiB: 1024,
@@ -232,12 +240,16 @@ export class ComputeStack extends Stack {
 				ZUGZWANG_ENV: config.zugzwangEnv,
 				DB_POOLER_MODE: "session",
 			},
-			// The app's keys PLUS the suffix-separated ones the migration scripts
-			// insist on (`DATABASE_URL_STAGING` + the ref fragment) — the first
-			// staging deploy would otherwise have started this task only to watch
-			// it exit 1 on "DATABASE_URL_STAGING is not set".
+			// ONLY the suffix-separated keys the migration scripts read
+			// (`DATABASE_URL_<ENV>` + the ref fragment — measured: `migrate-*.ts`
+			// and `apply-migrations-per-tx.ts` read nothing else). Production-
+			// readiness review (security M1): the GitHub deploy role may `RunTask`
+			// this family, and a RunTask can override the command, so every secret
+			// injected here is one command-override away from exfiltration. The
+			// app's 32 runtime keys stay on the app container only.
+			// ⚠ This also retires the migrate task as a vehicle for ad-hoc engine
+			// runs that need app credentials (the 06 §10.6 fixture void used it).
 			secrets: {
-				...secrets,
 				...Object.fromEntries(
 					config.migrationSecretKeys.map((key) => [
 						key,
@@ -258,6 +270,16 @@ export class ComputeStack extends Stack {
 			securityGroup: props.albSecurityGroup,
 			idleTimeout: Duration.seconds(60),
 			http2Enabled: true,
+			// ⛔ ADR-0061 A2/F3 — the client-IP derivation (src/server/middleware/
+			// client-ip.ts) reads the LAST X-Forwarded-For entry as the ALB's own
+			// statement of who connected. That holds only in APPEND mode, so it is
+			// pinned rather than inherited: `preserve` hands that slot to the
+			// client, `remove` makes every peer null. Dropping invalid header
+			// fields keeps malformed header names from reaching the app at all —
+			// ⚠ which includes any header NAME containing `_` (none in use today;
+			// cron sends `Authorization`, every app header is hyphenated).
+			xffHeaderProcessingMode: elbv2.XffHeaderProcessingMode.APPEND,
+			dropInvalidHeaderFields: true,
 		});
 
 		this.targetGroup = new elbv2.ApplicationTargetGroup(this, "AppTargets", {
@@ -383,7 +405,10 @@ export class ComputeStack extends Stack {
 					{
 						name: "AWSManagedRulesCommonRuleSet",
 						priority: 1,
-						overrideAction: { none: {} },
+						// I — `count` records matches without blocking; see
+						// EnvironmentConfig.wafMode.
+						overrideAction:
+							config.wafMode === "block" ? { none: {} } : { count: {} },
 						statement: {
 							managedRuleGroupStatement: {
 								vendorName: "AWS",
@@ -457,6 +482,19 @@ export class ComputeStack extends Stack {
 		});
 		new CfnOutput(this, "ServiceName", { value: this.service.serviceName });
 		new CfnOutput(this, "ClusterName", { value: cluster.clusterName });
+		// D — what deploy-aws.yml needs to start the migration task in the VPC.
+		new CfnOutput(this, "MigrationTaskFamily", {
+			value: this.migrationTaskDefinition.family,
+		});
+		new CfnOutput(this, "MigrationSubnetIds", {
+			value: props.vpc.selectSubnets(props.serviceSubnets).subnetIds.join(","),
+		});
+		new CfnOutput(this, "MigrationSecurityGroupId", {
+			value: props.serviceSecurityGroup.securityGroupId,
+		});
+		new CfnOutput(this, "CapacityProviderName", {
+			value: capacityProvider.capacityProviderName,
+		});
 		new CfnOutput(this, "EcrRepositoryUri", {
 			value: props.repository.repositoryUri,
 		});

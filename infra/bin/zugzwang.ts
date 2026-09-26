@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { App, Tags } from "aws-cdk-lib";
+import { App, DefaultStackSynthesizer, Tags } from "aws-cdk-lib";
 import { productionConfig } from "../config/production";
 import { stagingConfig } from "../config/staging";
 import type { EnvironmentConfig } from "../config/types";
@@ -27,9 +27,20 @@ const app = new App();
  */
 function defineEnvironment(config: EnvironmentConfig): void {
 	const prefix = `Zugzwang-${config.name}`;
+	// H-3: every stack of an environment deploys through that environment's own
+	// bootstrap roles. The default qualifier is left implicit, so staging's
+	// synthesised templates are byte-identical to what is deployed today.
+	const synthesizer =
+		config.bootstrapQualifier === DefaultStackSynthesizer.DEFAULT_QUALIFIER
+			? undefined
+			: new DefaultStackSynthesizer({ qualifier: config.bootstrapQualifier });
 	const env = { account: config.account, region: config.region };
 
-	const network = new NetworkStack(app, `${prefix}-Network`, { config, env });
+	const network = new NetworkStack(app, `${prefix}-Network`, {
+		config,
+		env,
+		synthesizer,
+	});
 
 	// The database references the network and NOTHING references the database
 	// (ADR-0059): compute reads DATABASE_URL from the app secret, so replacing
@@ -37,6 +48,7 @@ function defineEnvironment(config: EnvironmentConfig): void {
 	const database = new DatabaseStack(app, `${prefix}-Database`, {
 		config,
 		env,
+		synthesizer,
 		vpc: network.vpc,
 		databaseSecurityGroup: network.databaseSecurityGroup,
 		databaseSubnets: network.databaseSubnets,
@@ -45,11 +57,13 @@ function defineEnvironment(config: EnvironmentConfig): void {
 	const security = new SecurityStack(app, `${prefix}-Security`, {
 		config,
 		env,
+		synthesizer,
 	});
 
 	const compute = new ComputeStack(app, `${prefix}-Compute`, {
 		config,
 		env,
+		synthesizer,
 		vpc: network.vpc,
 		albSecurityGroup: network.albSecurityGroup,
 		serviceSecurityGroup: network.serviceSecurityGroup,
@@ -64,11 +78,13 @@ function defineEnvironment(config: EnvironmentConfig): void {
 	const scheduler = new SchedulerStack(app, `${prefix}-Scheduler`, {
 		config,
 		env,
+		synthesizer,
 	});
 
 	const monitoring = new MonitoringStack(app, `${prefix}-Monitoring`, {
 		config,
 		env,
+		synthesizer,
 		service: compute.service,
 		loadBalancer: compute.loadBalancer,
 		targetGroup: compute.targetGroup,
@@ -112,7 +128,10 @@ if (app.node.tryGetContext("deployStack") === "true") {
 			region: process.env.ZZ_AWS_REGION ?? "ap-south-1",
 		},
 		githubRepository,
-		environments: [stagingConfig.name, productionConfig.name],
+		environments: [stagingConfig, productionConfig].map((c) => ({
+			name: c.name,
+			bootstrapQualifier: c.bootstrapQualifier,
+		})),
 		existingOidcProviderArn: process.env.ZZ_GITHUB_OIDC_PROVIDER_ARN,
 	});
 	Tags.of(deploy).add("Project", "Zugzwang");

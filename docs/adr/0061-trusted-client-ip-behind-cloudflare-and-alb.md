@@ -19,8 +19,8 @@
 Nine call sites derived the client IP independently, all the same way: the **first** entry of
 `X-Forwarded-For`. On Vercel that was accidentally safe, because Vercel overwrites the header. On
 AWS it is not: the Application Load Balancer **appends** the address it accepted the connection
-from, so the first entry is whatever the client sent. Cloudflare, proxying `zugzwangworld.com`
-(orange-cloud), does the same — it appends the real client after any value the client supplied.
+from, so the first entry is whatever the client sent. Cloudflare, if `zugzwangworld.com` is ever
+proxied (orange-cloud — ⚠ measured 2026-09-26: it is NOT; both hostnames are DNS-only), does the same — it appends the real client after any value the client supplied.
 
 What read that value:
 
@@ -47,7 +47,8 @@ What read that value:
 ## Considered Options
 
 1. **Peer-anchored helper; `CF-Connecting-IP` only on AWS, only from a Cloudflare peer, and
-   (once configured) only with our zone's origin-auth header** ← chosen
+   only when our zone's origin-auth secret is configured and presented (fails closed when unset,
+   2026-09-26)** ← chosen
 2. Always trust `CF-Connecting-IP` — rejected: the ALB and `*.vercel.app` are publicly reachable.
 3. Trust the peer only, never `CF-Connecting-IP` — rejected on AWS: behind Cloudflare every user
    would key on a handful of edge addresses (shared buckets, e.g. ten OTP sends a minute per edge).
@@ -71,7 +72,9 @@ What read that value:
    the request came from our zone: when the runtime secret `ZZ_CF_ORIGIN_SECRET` is set, the
    header `x-zz-cf-origin-auth` must equal it (constant-time over SHA-256 digests). A missing or
    malformed `CF-Connecting-IP`, or a failed origin check, yields the edge address.
-   ⚠ With `ZZ_CF_ORIGIN_SECRET` unset the origin check passes — see Residual risk R1.
+   ⛔ With `ZZ_CF_ORIGIN_SECRET` unset the origin check FAILS — the Cloudflare branch is closed and a
+   Cloudflare-range peer is keyed on its own address (changed at the production-readiness pass,
+   2026-09-26; see R1).
 4. **AWS — otherwise** the peer itself: a request sent straight to the ALB is attributed to its
    real source, whatever `X-Forwarded-For` or `CF-Connecting-IP` it carried.
 5. **Validation.** `net.isIP`; ports, brackets, zone ids, lists and junk rejected; IPv4-mapped
@@ -91,8 +94,9 @@ What read that value:
 - A1. On AWS the task is reachable ONLY through the ALB (service SG ingress = ALB SG; no public IP;
   no in-container proxy). Verified in `network-stack.ts`, `compute-stack.ts`, `Dockerfile`.
 - A2. The ALB keeps XFF processing in `append` mode. `preserve` would hand the peer slot to the
-  client; `remove` would make every peer `null` (see M-2 for what null costs). Not pinned in CDK
-  today — F3.
+  client; `remove` would make every peer `null` (see M-2 for what null costs). ⛔ Pinned in CDK
+  since the production-readiness pass (F3, `compute-stack.ts`; the synthesized template carries
+  `routing.http.xff_header_processing.mode = append`).
 - A3. Exactly one appending proxy of ours sits in front of the app. Enabling CloudFront
   (`cloudFrontEnabled`, currently false) would make the last hop CloudFront's edge and must
   revisit this ADR.
@@ -109,7 +113,12 @@ What read that value:
 
 ## Residual risks (stated as accepted-until-fixed, with their launch status)
 
-- **R1 · Any Cloudflare-sourced request is trusted on AWS until F1 is configured. LAUNCH BLOCKER.**
+- **R1 · CLOSED IN CODE (2026-09-26) — was: any Cloudflare-sourced request trusted on AWS until F1.**
+  Measured that day: `zugzwangworld.com` and `staging.zugzwangworld.com` are **DNS-only (grey-cloud)**
+  on Cloudflare nameservers — neither is proxied, so the topology this ADR was written for does not
+  exist yet and every legitimate AWS request reaches the ALB from the client itself. The helper now
+  FAILS CLOSED when `ZZ_CF_ORIGIN_SECRET` is unset, so the risk below applies only if the zone is
+  later proxied WITHOUT F1. Original text, kept for the record:
   The ALB is internet-reachable. A request from anywhere inside Cloudflare's ranges — plausibly
   at zero cost via WARP, a free Workers `fetch()` or a free zone pointed at the ALB name
   (unmeasured; the argument does not depend on which works) — sets its own `CF-Connecting-IP`
@@ -143,21 +152,29 @@ What read that value:
   Vercel production is unchanged; stored `ip` values are now always a validated IP literal or
   `"unknown"` (previously any comma-free string of header length reached Bucket-A rows); one
   derivation, structurally guarded.
-- Negative / accepted: R1 until F1; R2; M-1/M-2 on drift; the Cloudflare list is a maintained
+- Negative / accepted: R1 only if the zone is orange-clouded without F1 (closed in code while it
+  stays DNS-only); R2; M-1/M-2 on drift; the Cloudflare list is a maintained
   constant (F2).
 
 ## Follow-ups
 
-- F1. **LAUNCH BLOCKER — authenticate our Cloudflare zone.** (a) Cloudflare Transform Rule on
+- F1. **No longer a launch blocker while the zone stays DNS-only (2026-09-26); REQUIRED before anyone
+  turns on the orange cloud** — without it, proxied traffic keys on Cloudflare edge addresses (coarse
+  shared buckets), never on a forged value. Authenticate our Cloudflare zone: (a) Cloudflare Transform Rule on
   `zugzwangworld.com` adding `x-zz-cf-origin-auth: <secret>`; (b) `ZZ_CF_ORIGIN_SECRET` in the
   production app secret (and `RUNTIME_SECRET_KEYS`); (c) defense in depth: an ALB listener rule
   rejecting requests without the header, and the ALB security group limited to Cloudflare's
   ranges. (a)+(b) close R1 in the helper on their own. Each step needs operator approval.
 - F2. Refresh the Cloudflare list before cutover and periodically; consider a CI diff against the
   published lists.
-- F3. **LAUNCH BLOCKER (was optional).** Pin in CDK that the ALB sets
+- F3. **Pin: DONE (production-readiness pass, 2026-09-26)** — `compute-stack.ts` sets
   `routing.http.xff_header_processing.mode = append` and
-  `routing.http.drop_invalid_header_fields.enabled = true`, with a synth test. Measure A6.
+  `routing.http.drop_invalid_header_fields.enabled = true`, verified in the synthesized template and
+  guarded by `tests/unit/infra/alb-client-ip.test.ts` — a SOURCE scan, not the synth test this line
+  asked for (the root suite has no CDK app). **A6 is NOT measured and remains a LAUNCH BLOCKER**:
+  if the ALB appends to the first of two client `X-Forwarded-For` lines, a client could place a
+  chosen last hop, and with the Cloudflare branch closed that value is returned directly. Measure it
+  on staging before cutover (09 §A).
 - F4. SPEC.2 §3.7 line 246 is wrong twice: it names `proxy.ts` as the source of `ip` (never true)
   and says `ip` is "included in dataset release", contradicting §19.4 / Appendix B (`STRIP_KEY`).
   Surface to the operator; resolve with a SPEC.2 version entry. Not resolved here.

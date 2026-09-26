@@ -96,3 +96,7 @@ docs/sync/
 /docs/reports/aws-migration-proposal.html
 # Staging load-test harness (operator ruling at the AWS-MIGRATION-3 commit):
 /scripts/aws-migration/load/
+
+# A full production secret dump written by deploy-aws.yml / the Dockerfile's
+# documented local build — never stage it (security review M3).
+build.env

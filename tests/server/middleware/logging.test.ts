@@ -126,11 +126,15 @@ describe("S-1 — client IP column", () => {
 		expect(read().ip).toBe("203.0.113.9");
 	});
 
-	it("takes CF-Connecting-IP when the ALB peer is a Cloudflare edge", () => {
+	it("takes CF-Connecting-IP when the ALB peer is OUR Cloudflare zone", () => {
+		// ADR-0061: the Cloudflare branch opens only with the zone's origin-auth
+		// secret configured and presented (it fails closed when unset).
+		vi.stubEnv("ZZ_CF_ORIGIN_SECRET", "zone-secret");
 		const request = new Request("https://example.com/api/x", {
 			headers: {
 				"x-forwarded-for": "6.6.6.6, 198.51.100.7, 162.158.1.2",
 				"cf-connecting-ip": "198.51.100.7",
+				"x-zz-cf-origin-auth": "zone-secret",
 			},
 		});
 		logRequest({ request, status: 200, userId: null, startedAt: Date.now() });

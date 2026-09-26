@@ -18,6 +18,10 @@ export const productionConfig: EnvironmentConfig = {
 	// in the same region as Supabase. Override deliberately, or not at all.
 	region: process.env.ZZ_AWS_REGION ?? "ap-south-1",
 	account: process.env.CDK_DEFAULT_ACCOUNT,
+	// ⛔ H-3: production's OWN bootstrap roles, so the staging deploy path
+	// (hnb659fds) cannot deploy these stacks. Requires a separate bootstrap —
+	// docs/aws-migration/09-PRODUCTION-READINESS.md §B.
+	bootstrapQualifier: "zzprod",
 
 	vpcCidr: "10.10.0.0/16",
 	natGateways: 1,
@@ -55,6 +59,10 @@ export const productionConfig: EnvironmentConfig = {
 	appBaseUrl: "https://zugzwangworld.com",
 	cloudFrontEnabled: false,
 	wafEnabled: true,
+	// I — COUNT until the staging rehearsal's sampled requests have been read
+	// (docs/aws-migration/09-PRODUCTION-READINESS.md §I). `ZZ_PROD_WAF_MODE=block`
+	// enforces without a code change once that ruling is made.
+	wafMode: process.env.ZZ_PROD_WAF_MODE === "block" ? "block" : "count",
 
 	secretName: "zugzwang/production",
 	secretKeys: RUNTIME_SECRET_KEYS,

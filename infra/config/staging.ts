@@ -23,6 +23,8 @@ export const stagingConfig: EnvironmentConfig = {
 	// in the same region as Supabase. Override deliberately, or not at all.
 	region: process.env.ZZ_AWS_REGION ?? "ap-south-1",
 	account: process.env.CDK_DEFAULT_ACCOUNT,
+	// The qualifier staging was bootstrapped with (CDKToolkit, measured 2026-09-26).
+	bootstrapQualifier: "hnb659fds",
 
 	vpcCidr: "10.20.0.0/16",
 	natGateways: 1,
@@ -60,7 +62,11 @@ export const stagingConfig: EnvironmentConfig = {
 	certificateArn: process.env.ZZ_STAGING_CERT_ARN,
 	appBaseUrl: "https://staging.zugzwangworld.com",
 	cloudFrontEnabled: false,
-	wafEnabled: false,
+	// I — off unless a WAF rehearsal is running: `ZZ_STAGING_WAF=count` attaches
+	// the same rule set production uses, in count mode, so staging's template is
+	// unchanged by default.
+	wafEnabled: process.env.ZZ_STAGING_WAF === "count",
+	wafMode: "count",
 
 	secretName: "zugzwang/staging",
 	secretKeys: RUNTIME_SECRET_KEYS,

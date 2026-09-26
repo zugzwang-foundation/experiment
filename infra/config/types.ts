@@ -49,6 +49,15 @@ export interface EnvironmentConfig {
 	readonly region: string;
 	/** AWS account id. Left undefined for an environment-agnostic synth. */
 	readonly account?: string;
+	/**
+	 * CDK bootstrap qualifier (H-3). Each environment deploys through its OWN
+	 * bootstrap roles, so a credential that can reach one environment's
+	 * deploy/exec roles cannot reach the other's. Staging keeps the default
+	 * `hnb659fds` (what it was bootstrapped with — changing it would re-point a
+	 * running environment); production gets `zzprod`, bootstrapped separately
+	 * with a scoped execution policy (docs/aws-migration/09-PRODUCTION-READINESS.md).
+	 */
+	readonly bootstrapQualifier: string;
 
 	// ── Network ──────────────────────────────────────────────────────────────
 	readonly vpcCidr: string;
@@ -137,6 +146,14 @@ export interface EnvironmentConfig {
 	readonly cloudFrontEnabled: boolean;
 	/** Attach an AWS-managed WAF rule set to the ALB. */
 	readonly wafEnabled: boolean;
+	/**
+	 * I — `count` logs what the managed rules WOULD block without blocking it;
+	 * `block` enforces. A rule set nobody has watched against real traffic
+	 * starts in `count`: its XSS / body-size rules can 403 a participant's
+	 * argument, and a silent 403 on the bet path is worse than no WAF. Move to
+	 * `block` only after the sampled requests from a rehearsal are read.
+	 */
+	readonly wafMode: "count" | "block";
 
 	// ── Secrets ──────────────────────────────────────────────────────────────
 	/** Secrets Manager secret NAME (created and populated outside CDK). */
@@ -174,6 +191,22 @@ export interface EnvironmentConfig {
 		readonly p95LatencySeconds: number;
 		readonly cpuPercent: number;
 		readonly memoryPercent: number;
+	};
+}
+
+/**
+ * The ECS task roles' names, fixed rather than CloudFormation-generated so the
+ * GitHub deploy role can `iam:PassRole` them by exact ARN (deploy-stack.ts).
+ * One definition, read by both the stack that creates them and the one that
+ * grants on them.
+ */
+export function taskRoleNames(environment: string): {
+	execution: string;
+	task: string;
+} {
+	return {
+		execution: `zugzwang-${environment}-task-execution`,
+		task: `zugzwang-${environment}-task`,
 	};
 }
 
