@@ -101,6 +101,22 @@ to `cdk-hnb659fds-*` and the production role to `cdk-zzprod-*` only.
    `role/zugzwang-production-*`. Without it, staging's deploy role can still act on any stack name —
    including `Zugzwang-Deploy`, whose PRODUCTION role it could rewrite (review HIGH-3). The qualifier
    split alone stops a staging token assuming production's bootstrap roles; it does not stop this.
+   **Prepared (item 5, not run):** `infra/policies/staging-deploy-role-deny.json` — Deny-only: CloudFormation
+   on `Zugzwang-production-*`, `Zugzwang-Deploy`, `CDKToolkit-prod`; S3 on `cdk-zzprod-*`; SSM on
+   `/cdk-bootstrap/zzprod/*`; IAM + `sts:AssumeRole` on `cdk-zzprod-*`, `Zugzwang-production-*`,
+   `zugzwang-production-*` roles and `zugzwang-production-*` policies. (Measured: the role's bootstrap policy
+   allows CloudFormation, S3 and KMS on `*`.) `Zugzwang-Deploy` now synthesizes with
+   `CliCredentialsStackSynthesizer`, so it is deployed with the operator's own credentials and needs no
+   bootstrap deploy role; its resources are unchanged (only the `BootstrapVersion` check is dropped).
+   Order: merge the synthesizer change → `cdk deploy Zugzwang-Deploy -c deployStack=true` once with operator
+   credentials (confirms it no longer uses the deploy role) → then:
+   ```bash
+   aws iam put-role-policy --role-name cdk-hnb659fds-deploy-role-849076101704-ap-south-1 \
+     --policy-name zugzwang-deny-production \
+     --policy-document file://infra/policies/staging-deploy-role-deny.json
+   ```
+   Then push a no-op to `staging` and confirm the staging deploy stays green. ⚠ Re-check the inline policy
+   still exists after any future `cdk bootstrap` of `hnb659fds`.
 5. After GitHub OIDC works (§C), deactivate the `zugzwang-deploy` access key or reduce the user to read-only.
 
 **Stronger alternative (recommended if the plan must change anyway, §H):** production in its own AWS

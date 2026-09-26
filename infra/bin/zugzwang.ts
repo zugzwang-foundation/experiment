@@ -1,5 +1,10 @@
 #!/usr/bin/env node
-import { App, DefaultStackSynthesizer, Tags } from "aws-cdk-lib";
+import {
+	App,
+	CliCredentialsStackSynthesizer,
+	DefaultStackSynthesizer,
+	Tags,
+} from "aws-cdk-lib";
 import { ManagedPolicy, PermissionsBoundary } from "aws-cdk-lib/aws-iam";
 import { productionConfig } from "../config/production";
 import { stagingConfig } from "../config/staging";
@@ -150,6 +155,12 @@ if (app.node.tryGetContext("deployStack") === "true") {
 		throw new Error(`deployEnvironments=${only} names no known environment`);
 	}
 	const deploy = new DeployStack(app, "Zugzwang-Deploy", {
+		// H-3: deployed with the OPERATOR'S own credentials, never through a
+		// bootstrap deploy role. This stack defines BOTH environments' GitHub
+		// deploy roles, so neither environment's deploy path may be able to
+		// rewrite it — and the staging deploy role is denied it outright
+		// (infra/policies/staging-deploy-role-deny.json).
+		synthesizer: new CliCredentialsStackSynthesizer(),
 		env: {
 			account: process.env.CDK_DEFAULT_ACCOUNT,
 			region: process.env.ZZ_AWS_REGION ?? "ap-south-1",
