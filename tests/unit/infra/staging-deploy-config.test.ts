@@ -64,3 +64,15 @@ describe("the deploy job's variable checks", () => {
 		expect(workflow).toContain("ZZ_ALERT_EMAIL is not set on the");
 	});
 });
+
+describe("the deploy job installs and runs infra's own toolchain", () => {
+	// Run 36233879711: a bare `pnpm install` inside infra/ installed the ROOT
+	// workspace (the repo root holds pnpm-workspace.yaml), so `cdk` was absent.
+	it("installs infra/ with --ignore-workspace and runs cdk the same way", () => {
+		expect(workflow).toContain(
+			"pnpm install --frozen-lockfile --ignore-workspace",
+		);
+		expect(workflow).toContain("pnpm --ignore-workspace exec cdk deploy");
+		expect(workflow).not.toMatch(/^\s+pnpm exec cdk /m);
+	});
+});
