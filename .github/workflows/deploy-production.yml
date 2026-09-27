@@ -1,0 +1,44 @@
+# PRODUCTION on merge to `main` — the same pipeline as every other deploy
+# (deploy-aws.yml: ci → build → migrate → deploy → verify), called with
+# environment=production.
+#
+# ⛔ A push here does NOT deploy by itself. Every production job runs in the
+# `aws-production` GitHub environment, which requires a reviewer's approval
+# (admin bypass off) and accepts only `main`. The run waits for that approval;
+# rejecting it, or letting it lapse, deploys nothing. Only the production OIDC
+# role (`zugzwang-production-github-deploy`) trusts that environment.
+#
+# Documentation-only merges do not start a run. `workflow_dispatch` on
+# deploy-aws.yml remains the manual path (e.g. writes=paused, skip_migrations,
+# allow_destructive_migrations), and docs/aws-migration/11-CICD-PIPELINE.md
+# is the runbook, rollback included.
+name: Deploy production (main)
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+
+# One production pipeline at a time; a newer merge replaces a run still
+# waiting for approval, and never cancels one that is deploying.
+concurrency:
+  group: deploy-production-main
+  cancel-in-progress: false
+
+# The called workflow's jobs request `id-token: write` (OIDC) per job; a caller
+# must grant at least that much for them to receive it.
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  production:
+    uses: ./.github/workflows/deploy-aws.yml
+    with:
+      environment: production
+      writes: open
+      skip_migrations: false
+      allow_destructive_migrations: false
+    secrets: inherit
