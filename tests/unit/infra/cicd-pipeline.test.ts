@@ -26,6 +26,21 @@ const job = (name: string) => {
 	return deploy.slice(start, next === -1 ? undefined : start + 1 + next);
 };
 
+describe("a pipeline synth needs no live context lookup", () => {
+	it("infra/cdk.json carries the account's availability zones", () => {
+		// `cdk deploy` synthesizes every stack. Without this committed value the
+		// synth looks the zones up through a CDK lookup role, and staging's
+		// stacks name staging's (hnb659fds) lookup role, which the production
+		// deploy role is denied by design: the first production pipeline run
+		// (36322258735) failed exactly there. cdk.context.json is gitignored,
+		// so cdk.json is where a CI-visible value has to live.
+		const context = JSON.parse(read("infra/cdk.json")).context;
+		expect(
+			context["availability-zones:account=849076101704:region=ap-south-1"],
+		).toEqual(["ap-south-1a", "ap-south-1b", "ap-south-1c"]);
+	});
+});
+
 describe("every deploy runs CI first", () => {
 	it("ci.yml is callable and still runs on every pull request", () => {
 		expect(ci).toMatch(/\n {2}pull_request:\n/);
