@@ -142,6 +142,25 @@ describe("IAM is scoped to production roles under the boundary", () => {
 			decide("secretsmanager:GetSecretValue", `${base}zugzwang/staging-AbC`),
 		).toBe("deny");
 	});
+
+	it("reads its own bootstrap assets (Lambda code), and nothing else in S3", () => {
+		// CloudFormation creates a Lambda from a zip in the zzprod assets bucket
+		// with THIS role's credentials; without the read, the Database stack's
+		// LogRetention function fails (first production deploy, 2026-09-27).
+		const own = "arn:aws:s3:::cdk-zzprod-assets-849076101704-ap-south-1";
+		expect(decide("s3:GetObject", `${own}/2819175352ad1ce0.zip`)).toBe("allow");
+		expect(decide("s3:PutObject", `${own}/x.zip`)).toBe("none");
+		expect(decide("s3:DeleteObject", `${own}/x.zip`)).toBe("none");
+		expect(
+			decide(
+				"s3:GetObject",
+				"arn:aws:s3:::cdk-hnb659fds-assets-849076101704-ap-south-1/x.zip",
+			),
+		).not.toBe("allow");
+		expect(decide("s3:GetObject", "arn:aws:s3:::some-other-bucket/x")).toBe(
+			"none",
+		);
+	});
 });
 
 describe("the permissions boundary", () => {

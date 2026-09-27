@@ -45,6 +45,12 @@
 			]
 		},
 		{
+			"Sid": "ReadOwnBootstrapAssets",
+			"Effect": "Allow",
+			"Action": ["s3:GetObject", "s3:GetObjectVersion"],
+			"Resource": "arn:aws:s3:::cdk-zzprod-assets-849076101704-ap-south-1/*"
+		},
+		{
 			"Sid": "EncryptionThroughServices",
 			"Effect": "Allow",
 			"Action": [
