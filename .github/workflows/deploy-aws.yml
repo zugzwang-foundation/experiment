@@ -61,9 +61,12 @@ jobs:
     # A FAILING job rather than a skipped one (review MEDIUM-8): an all-skipped
     # run concludes green, and a refusal must look like a refusal.
     # ⚠ This file is read FROM the dispatched ref, so a branch can delete this
-    # job. The binding controls are the GitHub `production` environment's
+    # job. The binding controls are the GitHub `aws-production` environment's
     # deployment-branch policy and reviewer, and the deploy role's trust policy
-    # (09-PRODUCTION-READINESS.md §C) — this job is the visible half.
+    # (09-PRODUCTION-READINESS.md §C) — this job is the visible half. Production
+    # jobs run in `aws-production`, never `production`: GitHub's `Production`
+    # environment is Vercel's, and environment names match case-insensitively
+    # (infra/config/production.ts PRODUCTION_GITHUB_ENVIRONMENT).
     runs-on: ubuntu-latest
     steps:
       - name: Check the ref
@@ -86,7 +89,7 @@ jobs:
     name: Build and push image
     needs: guard
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || 'staging' }}
+    environment: ${{ (inputs.environment || 'staging') == 'production' && 'aws-production' || (inputs.environment || 'staging') }}
     permissions:
       id-token: write
       contents: read
@@ -179,7 +182,7 @@ jobs:
     needs: build
     if: ${{ !inputs.skip_migrations }}
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || 'staging' }}
+    environment: ${{ (inputs.environment || 'staging') == 'production' && 'aws-production' || (inputs.environment || 'staging') }}
     permissions:
       id-token: write
       contents: read
@@ -265,7 +268,7 @@ jobs:
     # true even for a cancelled run, so cancelling mid-cutover would still deploy.
     if: ${{ !cancelled() && needs.build.result == 'success' && (needs.migrate.result == 'success' || needs.migrate.result == 'skipped') }}
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || 'staging' }}
+    environment: ${{ (inputs.environment || 'staging') == 'production' && 'aws-production' || (inputs.environment || 'staging') }}
     permissions:
       id-token: write
       contents: read
