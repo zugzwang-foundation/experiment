@@ -6,6 +6,11 @@
 	},
 	"output": "cdk.out",
 	"context": {
+		"availability-zones:account=849076101704:region=ap-south-1": [
+			"ap-south-1a",
+			"ap-south-1b",
+			"ap-south-1c"
+		],
 		"@aws-cdk/aws-lambda:recognizeLayerVersion": true,
 		"@aws-cdk/core:checkSecretUsage": true,
 		"@aws-cdk/core:target-partitions": ["aws"],
