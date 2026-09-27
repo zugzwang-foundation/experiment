@@ -49,6 +49,13 @@ describe("the deploy role trusts exactly one GitHub environment", () => {
 		expect(stack).not.toMatch(/StringLike/);
 	});
 
+	it("names the same GitHub environment in the role-ARN output an operator copies", () => {
+		const stack = stripped("infra/lib/deploy-stack.ts");
+		expect(stack).toContain(
+			`description: \`AWS_DEPLOY_ROLE_ARN for the GitHub "${$}{githubEnvironment ?? environment}" environment\``,
+		);
+	});
+
 	const bin = stripped("infra/bin/zugzwang.ts");
 	const block = (id: string) => {
 		const start = bin.indexOf(`new DeployStack(app, "${id}"`);
@@ -64,6 +71,19 @@ describe("the deploy role trusts exactly one GitHub environment", () => {
 
 	it("staging passes none, so its role keeps trusting environment:staging", () => {
 		expect(block("Zugzwang-Deploy")).not.toContain("githubEnvironment");
+	});
+
+	it("production's template asset goes to production's bucket, never staging's", () => {
+		// CliCredentialsStackSynthesizer defaults to the `hnb659fds` qualifier, so
+		// without this the operator's deploy uploads the production template into
+		// staging's bootstrap bucket (cdk-hnb659fds-assets-…).
+		expect(block("Zugzwang-production-Deploy")).toContain(
+			"synthesizer: new CliCredentialsStackSynthesizer({\n\t\t\t\tqualifier: productionConfig.bootstrapQualifier,\n\t\t\t})",
+		);
+		// Staging's stack is byte-identical to what is deployed: default synthesizer.
+		expect(block("Zugzwang-Deploy")).toContain(
+			"synthesizer: new CliCredentialsStackSynthesizer(),",
+		);
 	});
 });
 

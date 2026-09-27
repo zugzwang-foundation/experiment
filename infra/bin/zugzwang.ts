@@ -185,7 +185,12 @@ if (app.node.tryGetContext("deployStack") === "true") {
 		Tags.of(deploy).add("ManagedBy", "CDK");
 	} else if (only === productionConfig.name) {
 		const deploy = new DeployStack(app, "Zugzwang-production-Deploy", {
-			synthesizer: new CliCredentialsStackSynthesizer(),
+			// 09 §0: the template is uploaded to PRODUCTION's bootstrap bucket. The
+			// synthesizer's default qualifier is staging's (`hnb659fds`), which would
+			// put this upload in cdk-hnb659fds-assets-….
+			synthesizer: new CliCredentialsStackSynthesizer({
+				qualifier: productionConfig.bootstrapQualifier,
+			}),
 			env: {
 				account: productionConfig.account,
 				region: productionConfig.region,

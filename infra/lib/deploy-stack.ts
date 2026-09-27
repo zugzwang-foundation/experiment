@@ -215,7 +215,7 @@ export class DeployStack extends Stack {
 			);
 			new CfnOutput(this, `DeployRoleArn-${environment}`, {
 				value: role.roleArn,
-				description: `AWS_DEPLOY_ROLE_ARN for the GitHub "${environment}" environment`,
+				description: `AWS_DEPLOY_ROLE_ARN for the GitHub "${githubEnvironment ?? environment}" environment`,
 			});
 		}
 	}
