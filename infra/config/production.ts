@@ -2,15 +2,17 @@ import { type EnvironmentConfig, RUNTIME_SECRET_KEYS } from "./types";
 
 /**
  * PROD-DEPLOY-NO-VARS — the ACM certificate for `zugzwangworld.com` on the
- * production ALB, committed like staging's (not a secret). ⛔ NOT YET ISSUED
- * (09-PRODUCTION-READINESS.md §P, item 13): set this constant to the issued
- * ARN in the same PR that records the issuance. Until then every production
- * Compute synth REFUSES (compute-stack.ts), so nothing can deploy an HTTP-only
- * production listener. `ZZ_PROD_CERT_ARN` still overrides it for a hand-run
- * deploy; the GitHub workflow no longer reads it, because `vars.*` arrived
- * empty in four staging runs.
+ * production ALB, committed like staging's (not a secret). Issued 2026-09-27
+ * for the apex ONLY (09-PRODUCTION-READINESS.md §P, item 13): `www` failed
+ * validation with CAA_ERROR while it is a CNAME to Vercel, whose CAA records
+ * do not admit Amazon, so it needs its own certificate once it leaves Vercel.
+ * Without an ARN every production Compute synth REFUSES (compute-stack.ts), so
+ * nothing can deploy an HTTP-only production listener. `ZZ_PROD_CERT_ARN`
+ * still overrides it for a hand-run deploy; the GitHub workflow no longer
+ * reads it, because `vars.*` arrived empty in four staging runs.
  */
-export const PRODUCTION_CERTIFICATE_ARN: string | undefined = undefined;
+export const PRODUCTION_CERTIFICATE_ARN: string | undefined =
+	"arn:aws:acm:ap-south-1:849076101704:certificate/b833cdf1-fdfd-4944-bf47-5a9a8aaf059f";
 
 /**
  * 09 §0 — production shares this AWS account with staging, as SEPARATE
