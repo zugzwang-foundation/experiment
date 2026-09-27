@@ -11,22 +11,18 @@ import { FocusMarketCard } from "./FocusMarketCard";
 import { HeadZone } from "./HeadZone";
 import { KnowMore } from "./KnowMore";
 import { RemovedPlaceholder } from "./placeholders";
-import type {
-	DebateMarketHeader,
-	DebatePost,
-	PresentPost,
-	Side,
-} from "./types";
+import type { DebateMarketHeader, DebatePost, PresentPost } from "./types";
 
 /**
  * The focused-post header (DEBATE.4 §4 post-view) — the entered post shown in
  * full: argprofile · lane badge · title · image · FULL body, with a "Back to
  * market" toggle (exitPost). The arena's two columns below render this post's
- * replies. UI.A3 slice 3: the footer is the designed SPLIT BAR carrying the
- * F-3-gated Support/Counter trigger pills (market-view cards keep the plain
- * `AggregateFooter` — plan §8 scope). A REMOVED focused post shows only its
- * frozen side + the placeholder + the split bar (replies + triggers stay
- * live — thread intact, §6 edge).
+ * replies. UI.A3 slice 3: the footer is the designed SPLIT BAR (market-view
+ * cards keep the plain `AggregateFooter` — plan §8 scope). ⚠ FEED-3 — the bar is
+ * a display now: its F-3-gated Support/Counter triggers moved, with their props,
+ * to the column headers below (`PositionStrip`'s left lane). A REMOVED focused
+ * post shows only its frozen side + the placeholder + the split bar (its replies
+ * and the header triggers stay live — thread intact, §6 edge).
  *
  * HTML-FINISH · MARKET DETAIL row 1 — THIS IS THE HEADZONE'S POST ARM. It no
  * longer stacks UNDERNEATH the market header; it REPLACES it, through the same
@@ -39,15 +35,9 @@ import type {
 export function PostFocusHeader({
 	post,
 	market,
-	heldSide,
-	marketOpen,
-	suspended,
-	activeRelation,
-	onToggleRelation,
 	onExit,
 	onOpenImage,
 	onOpenPopup,
-	isOwnPost = false,
 }: {
 	post: DebatePost;
 	/**
@@ -56,11 +46,6 @@ export function PostFocusHeader({
 	 * market context at all once `MarketHeader` stops rendering beside it (row 1).
 	 */
 	market: DebateMarketHeader;
-	heldSide: Side | null;
-	marketOpen: boolean;
-	suspended: boolean;
-	activeRelation: "support" | "counter" | null;
-	onToggleRelation: (relation: "support" | "counter") => void;
 	onExit: () => void;
 	onOpenImage: (url: string) => void;
 	/**
@@ -69,12 +54,6 @@ export function PostFocusHeader({
 	 * on the surface, not one per zoom level.
 	 */
 	onOpenPopup: (post: PresentPost) => void;
-	/**
-	 * D-52 R1 — the viewer wrote the focused post: both split-bar triggers
-	 * render disabled (nobody replies to their own post). Absent = not the
-	 * viewer's.
-	 */
-	isOwnPost?: boolean;
 }) {
 	const replyCount = post.aggregate.supportCount + post.aggregate.counterCount;
 	return (
@@ -262,12 +241,6 @@ export function PostFocusHeader({
 								<ReplySplitBar
 									postSide={post.sideAtPostTime}
 									aggregate={post.aggregate}
-									heldSide={heldSide}
-									marketOpen={marketOpen}
-									suspended={suspended}
-									activeRelation={activeRelation}
-									onToggleRelation={onToggleRelation}
-									isOwnPost={isOwnPost}
 								/>
 							</div>
 						</div>

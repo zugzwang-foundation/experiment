@@ -73,6 +73,15 @@ import type { DebatePost, PresentPost, Side } from "./types";
 const UNBOXED_CARD =
 	"max-mobile:[border:none] max-mobile:rounded-none max-mobile:shadow-none";
 
+/**
+ * FEED-3 — the card inside a desktop `DebateColumn`, which now draws the one
+ * rectangle (the card's own ground, hairline, radius and elevation, moved up a
+ * level) and insets its body by the card's `p-3`. So the card draws no box and
+ * no padding of its own; its content is unchanged. `[border:none]` for the same
+ * shorthand-over-shorthand reason `UNBOXED_CARD` gives.
+ */
+const IN_COLUMN_CARD = "[border:none] rounded-none p-0 shadow-none";
+
 export function PostCard({
 	post,
 	onEnter,
@@ -83,6 +92,7 @@ export function PostCard({
 	marketOpen,
 	suspended,
 	unboxed = false,
+	inColumn = false,
 	isOwnPost = false,
 }: {
 	post: DebatePost;
@@ -125,6 +135,17 @@ export function PostCard({
 	 */
 	unboxed?: boolean;
 	/**
+	 * ⛔⛔ FEED-3 — MOUNTED IN A DESKTOP `DebateColumn`, WHICH DRAWS THE BOX. Passed
+	 * by `PostScroller` only. Three things follow and nothing else moves: the card
+	 * draws no box (`IN_COLUMN_CARD`), the author line drops its pipes, and a
+	 * text-only argument's quote well drops its box — the ruled "Cards" changes.
+	 * ⚠ A PROP, NOT A `mobile:` TOKEN, for `unboxed`'s reason in reverse: the phone
+	 * feed and the parent-post sheet mount this card too and are untouched by
+	 * FEED-3, and the pop-ups and the focused post share `ArgProfile` — a width
+	 * variant would reach all of them. `= false` keeps every other mount as it was.
+	 */
+	inColumn?: boolean;
+	/**
 	 * D-52 R1 — the viewer wrote this post, so both trigger pills render
 	 * disabled (nobody replies to their own post). Derived by the view from the
 	 * viewer read's `ownPostIds`; absent = not the viewer's, as on every
@@ -148,7 +169,13 @@ export function PostCard({
 
 	if (post.removed) {
 		return (
-			<Card className={cn("gap-2 p-3", unboxed && UNBOXED_CARD)}>
+			<Card
+				className={cn(
+					"gap-2 p-3",
+					unboxed && UNBOXED_CARD,
+					inColumn && IN_COLUMN_CARD,
+				)}
+			>
 				<SideBadge side={post.sideAtPostTime} />
 				<RemovedPlaceholder />
 				{/* The removed variant keeps its frozen side (§6 — thread integrity),
@@ -188,7 +215,13 @@ export function PostCard({
 		   column, which is what gives `.argimg` below a height to take a share of.
 		   Without it the card is content-sized, `.argimg`'s `flex-1` has nothing to
 		   distribute, and the image falls back to its intrinsic size. */
-		<Card className={cn("min-h-0 flex-1 gap-2.5 p-3", unboxed && UNBOXED_CARD)}>
+		<Card
+			className={cn(
+				"min-h-0 flex-1 gap-2.5 p-3",
+				unboxed && UNBOXED_CARD,
+				inColumn && IN_COLUMN_CARD,
+			)}
+		>
 			{/* ⚠⚠ UI-OVERNIGHT entry 1b — THE BADGE IS NO LONGER A CORNER SIBLING,
 			    and the wrapper that positioned it goes with it. `ArgProfile` renders
 			    the lane badge inside its own row now, beside the age, because that
@@ -210,6 +243,7 @@ export function PostCard({
 				createdAt={post.createdAt}
 				badge={post.badge}
 				download={{ ordinal: post.ordinal }}
+				separators={!inColumn}
 			/>
 
 			{/* HTML-FINISH · MARKET DETAIL rows 23 + 24 — d5's `.rtitle.plust`
@@ -462,7 +496,7 @@ export function PostCard({
 								className="flex h-full max-w-full items-center justify-center"
 								onClick={() => onEnter(post.id)}
 							>
-								<QuoteWell title={post.title} />
+								<QuoteWell title={post.title} boxed={!inColumn} />
 							</button>
 						</div>
 						{knowMore ? (

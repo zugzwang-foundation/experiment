@@ -17,6 +17,7 @@ import { deriveReplySide, replyComposerColumn } from "./composer/gating";
 import type { MirrorContext } from "./composer/MirrorComposer";
 import { PositionStrip } from "./composer/PositionStrip";
 import { SlotHeader } from "./composer/SlotHeader";
+import { TriggerPill } from "./composer/TriggerPill";
 import { DebateColumn } from "./DebateColumn";
 import { DebatePoll } from "./DebatePoll";
 import { ImageLightbox, PostPopup, ReplyPopup } from "./dialogs";
@@ -855,6 +856,21 @@ export function DebateView({
 	const selectedPost = selectedPostId
 		? (posts.find((p) => p.id === selectedPostId) ?? null)
 		: null;
+	/**
+	 * The focused post's Support/Counter toggle — the handler the split bar's
+	 * triggers used, hoisted unchanged because FEED-3 moved those triggers to the
+	 * two column headers: one handler, reached from two headers instead of one bar.
+	 */
+	const toggleRelation = (relation: "support" | "counter") => {
+		if (
+			composerBusy ||
+			selectedPost === null ||
+			ownPostIds.includes(selectedPost.id)
+		) {
+			return;
+		}
+		setOpenReply((cur) => (cur === relation ? null : relation));
+	};
 
 	/**
 	 * ⚠⚠ RPLY-1 · R2 — THE INBOUND HALF. Pushing a rung is only half a history
@@ -1126,17 +1142,6 @@ export function DebateView({
 					<PostFocusHeader
 						post={selectedPost}
 						market={market}
-						heldSide={heldSide}
-						marketOpen={marketOpen}
-						suspended={suspended}
-						activeRelation={openReply}
-						onToggleRelation={(relation) => {
-							if (composerBusy || ownPostIds.includes(selectedPost.id)) {
-								return;
-							}
-							setOpenReply((cur) => (cur === relation ? null : relation));
-						}}
-						isOwnPost={ownPostIds.includes(selectedPost.id)}
 						onExit={exitPost}
 						onOpenImage={setLightboxUrl}
 						onOpenPopup={setPopupPost}
@@ -1197,6 +1202,10 @@ export function DebateView({
 									: null;
 							const hostsComposer =
 								openReply !== null && side === composerColumn;
+							// FEED-3 — the relation this column's header trigger opens: it
+							// follows the post, so Support sits over the post's own side.
+							const headerRelation =
+								side === selectedPost.sideAtPostTime ? "support" : "counter";
 							return (
 								<DebateColumn
 									key={side}
@@ -1218,15 +1227,33 @@ export function DebateView({
 									header={
 										<PositionStrip
 											side={side}
-											// RPLY-2 · R2 — mirrors the label/percent/TO-WIN to the
-											// BET's side on the column hosting its composer; `null`
-											// (every other render) leaves this identical to before.
+											// RPLY-2 · R2 — mirrors the label/percent to the BET's side
+											// on the column hosting its composer, and (FEED-3) empties
+											// its lanes there; `null` everywhere else.
 											composingSide={hostsComposer ? resultingSide : null}
 											pricing={market.pricing}
-											unitToWin={market.unitToWin}
 											viewer={viewer}
 											ownPseudonym={ownPseudonym}
 											slug={market.slug}
+											// ⚠⚠ FEED-3 — THE SPLIT BAR'S TRIGGER, MOVED HERE WITH ITS
+											// PROPS. The relation follows the post: Support in the
+											// column of the post's side, Counter in the other, so a NO
+											// post flips them. Enabled or disabled by the SAME rules it
+											// shipped with — `TriggerPill` owns them, nothing here
+											// re-derives one.
+											action={
+												<TriggerPill
+													relation={headerRelation}
+													postSide={selectedPost.sideAtPostTime}
+													heldSide={heldSide}
+													marketOpen={marketOpen}
+													suspended={suspended}
+													active={openReply === headerRelation}
+													onToggle={toggleRelation}
+													isOwnPost={ownPostIds.includes(selectedPost.id)}
+													unitToWin={market.unitToWin}
+												/>
+											}
 											// ⚠ RPLY-1 · R4b — NO `showControls` HERE ANY MORE. The
 											// post arm's header carries no Buy and no Sell, so the
 											// market arm's suppression had nothing of its kind to

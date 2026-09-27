@@ -1,49 +1,26 @@
 "use client";
 
-import { InfoTip } from "@/components/ui/info-tip";
-import { GLOSSARY } from "@/lib/copy/glossary";
-
 import { formatDharma } from "../format";
 import type { ReplyAggregate, Side } from "../types";
-import { c3OppositeSide, OWN_POST_COPY } from "./copy";
-import { deriveReplySide, isEntryDisabled } from "./gating";
 import { computeSplitBar, displaySplitTotal } from "./split-bar";
 
 /**
  * UI.A3 slice 3 — the focused post's designed split bar (canon §6:
- * `SUPPORT Đ 3,800 ─ Đ 10,000 STAKED ─ Đ 6,200 COUNTER`) carrying the
- * Support/Counter TRIGGER pills (v0.9: pole-coded by the RESULTING bet side
- * — Support inherits the post's side, Counter the opposite; never a column
- * label — SG-8). A trigger whose resulting side ≠ the viewer's held side
- * renders DISABLED (F-3; tooltip + aria carry the C3 batch string). Triggers
- * toggle-to-close (v0.10). Renders on the removed variant too — the
- * aggregate survives and replying to a removed argument is legal (§6 edge).
+ * `SUPPORT Đ 3,800 ─ Đ 10,000 STAKED ─ Đ 6,200 COUNTER`). Renders on the
+ * removed variant too — the aggregate survives (§6 edge).
+ *
+ * ⚠⚠ FEED-3 — A DISPLAY NOW. Its two Support/Counter trigger pills MOVED, with
+ * their props and every rule they carry, to the post arm's column headers
+ * (`TriggerPill.tsx`); `Support` and `Counter` here are plain labels beside
+ * their Đ figures, which is canon §6's own string. The track, its poles and its
+ * hairline are untouched.
  */
 export function ReplySplitBar({
 	postSide,
 	aggregate,
-	heldSide,
-	marketOpen,
-	suspended,
-	activeRelation,
-	onToggleRelation,
-	isOwnPost = false,
 }: {
 	postSide: Side;
 	aggregate: ReplyAggregate;
-	heldSide: Side | null;
-	marketOpen: boolean;
-	suspended: boolean;
-	activeRelation: "support" | "counter" | null;
-	onToggleRelation: (relation: "support" | "counter") => void;
-	/**
-	 * D-52 R1 — the viewer wrote this post. Nobody replies to their own post,
-	 * so BOTH triggers render disabled in the foreclosed treatment, carrying
-	 * `OWN_POST_COPY` where C3 would sit. Optional: an omission reads as "not
-	 * the viewer's", the pre-D-52 bar, and the write path's
-	 * `self_reply_forbidden` refuses either way.
-	 */
-	isOwnPost?: boolean;
 }) {
 	const { supportPct } = computeSplitBar({
 		supportDharma: aggregate.supportDharma,
@@ -57,8 +34,9 @@ export function ReplySplitBar({
 	);
 	return (
 		/* ⚠⚠ RPLY-1 · R5 — THE FOCUSED POST'S BAR CATCHES UP TO THE CARD'S.
-		   `AggregateFooter` (the market-view card) and this component are two
-		   files with two file-private `TriggerPill`s, and the card's geometry was
+		   `AggregateFooter` (the market-view card) and this component were two
+		   files with two file-private `TriggerPill`s (FEED-3 moved this file's out
+		   to the column headers, `TriggerPill.tsx`), and the card's geometry was
 		   corrected at CS6/CS10/CS11 while this one was left behind — not by
 		   oversight, but because this file was allow-list-EXCLUDED for writing at
 		   the time, which is stated in its own guard
@@ -89,19 +67,12 @@ export function ReplySplitBar({
 			data-testid="reply-split-bar"
 			className="flex items-start gap-2 text-xs"
 		>
-			{/* `.sidewrap` (`d5:585-586`) — the Đ figure is CENTRED UNDER its own
-			    pill rather than inline beside it, on both flanks. */}
-			<span className="flex shrink-0 flex-col items-center gap-1">
-				<TriggerPill
-					relation="support"
-					postSide={postSide}
-					heldSide={heldSide}
-					marketOpen={marketOpen}
-					suspended={suspended}
-					active={activeRelation === "support"}
-					onToggle={onToggleRelation}
-					isOwnPost={isOwnPost}
-				/>
+			{/* FEED-3 — label BESIDE its figure, outward-in, on a pill-height (`h-6`)
+			    line so it stays centred on the track as the pill it replaces was. The
+			    figure keeps its shipped class; the label takes the bar's own overline
+			    (`staked` below). */}
+			<span className="flex h-6 shrink-0 items-center gap-1.5">
+				<span className="tracking-[0.1em] text-n5 uppercase">Support</span>
 				<span className="text-n5">
 					Đ {formatDharma(aggregate.supportDharma)}
 				</span>
@@ -111,8 +82,9 @@ export function ReplySplitBar({
 				    The fill is the SUPPORT share and the track is the counter
 				    remainder, and both resolve to a SIDE: Support inherits the post's
 				    side, Counter opposes it — `deriveReplySide`'s rule, the same one
-				    `TriggerPill (→ the pole const)` applies below: this component's own
-				    correct sibling, and this row's positive control.
+				    `TriggerPill` resolves its bet by. (Its pole fill, which was this
+				    row's positive control, left with it at FEED-3; `AggregateFooter`'s
+				    pills still carry one.)
 				    Both were FIXED (`bg-no` track over a `bg-yes` fill), so on every NO
 				    post the NO-side share was painted in the YES pole — a lie about
 				    which side an argument backs.
@@ -167,10 +139,9 @@ export function ReplySplitBar({
 				    Both sibling bars already carry it — `HeroPanels` (this genus's ruled
 				    precedent) and `AggregateFooter` — and so does the mockup, whose
 				    `.barrow .bar` is an OUTLINE (`d5:510`, `border:1px solid var(--ink)`
-				    over an `--n0` ground). This component's own `TriggerPill` carries the
-				    same idea as its "black-pill exception" 0.5px n2 edge: the sibling
-				    that is this row's positive control for the POLE rule is also its
-				    positive control for the EDGE rule.
+				    over an `--n0` ground). The trigger pills this bar used to carry had
+				    the same idea as their "black-pill exception" 0.5px n2 edge; they are
+				    outline header controls since FEED-3, and the edge rule stays here.
 				    ⛔ NOT `--border-strong` — `emphasis-ladder-tokens.test.ts` pins that
 				    token at zero consumers. */}
 				{/* ⚠⚠ RPLY-1 · R5 — THE TRACK SITS IN A PILL-HEIGHT BOX AND CENTRES
@@ -220,86 +191,12 @@ export function ReplySplitBar({
 					<span className="tracking-[0.1em] uppercase">staked</span>
 				</span>
 			</span>
-			{/* ⚠ PILL FIRST ON THIS FLANK TOO. It used to be figure-then-pill so the
-			    row read outward-in; stacked, both flanks lead with their pill and the
-			    figure sits under it, which is what makes the two Đ amounts land on
-			    one baseline instead of on opposite sides of the row. */}
-			<span className="flex shrink-0 flex-col items-center gap-1">
-				<TriggerPill
-					relation="counter"
-					postSide={postSide}
-					heldSide={heldSide}
-					marketOpen={marketOpen}
-					suspended={suspended}
-					active={activeRelation === "counter"}
-					onToggle={onToggleRelation}
-					isOwnPost={isOwnPost}
-				/>
+			<span className="flex h-6 shrink-0 items-center gap-1.5">
 				<span className="text-n5 font-mono text-[11px] font-medium">
 					Đ {formatDharma(aggregate.counterDharma)}
 				</span>
+				<span className="tracking-[0.1em] text-n5 uppercase">Counter</span>
 			</span>
 		</div>
-	);
-}
-
-/** One Support/Counter trigger — pole fill/text/border NEVER change with state
- * (values-log §3: glow-only hover/pressed; disabled = opacity, no pointer). */
-function TriggerPill({
-	relation,
-	postSide,
-	heldSide,
-	marketOpen,
-	suspended,
-	active,
-	onToggle,
-	isOwnPost,
-}: {
-	relation: "support" | "counter";
-	postSide: Side;
-	heldSide: Side | null;
-	marketOpen: boolean;
-	suspended: boolean;
-	active: boolean;
-	onToggle: (relation: "support" | "counter") => void;
-	isOwnPost: boolean;
-}) {
-	const resultingSide = deriveReplySide({ parentSide: postSide, relation });
-	const oppositeHeld = isEntryDisabled({ resultingSide, heldSide });
-	const disabled = !marketOpen || suspended || oppositeHeld || isOwnPost;
-	const c3 =
-		oppositeHeld && heldSide !== null
-			? c3OppositeSide({ held: heldSide, resulting: resultingSide })
-			: null;
-	// D-52 R1 — the own-post refusal takes C3's slot and wins over it: on the
-	// viewer's own post both triggers are foreclosed, whatever is held.
-	const refusal = isOwnPost ? OWN_POST_COPY : c3;
-	const pole =
-		resultingSide === "YES"
-			? // Black-pill exception: 0.5px n2 edge (values-log §1 item 8).
-				"bg-yes text-no border-[0.5px] border-n2 shadow-xs hover:bg-neutral-200 hover:text-black cursor-pointer active:scale-95"
-			: "bg-no text-yes border border-white/25 shadow-xs hover:bg-neutral-800 hover:border-white/60 hover:text-white cursor-pointer active:scale-95";
-	// C3 precedence (INFO-1 §3.4): a viewer blocked by the single-side rule is
-	// told why they are blocked, not given the relation's definition. The
-	// glossary gloss fills the null branch only — c3 still wins outright.
-	const gloss =
-		refusal ?? (relation === "support" ? GLOSSARY.support : GLOSSARY.counter);
-	return (
-		<InfoTip content={gloss} asChild>
-			<button
-				type="button"
-				disabled={disabled}
-				aria-disabled={disabled}
-				aria-expanded={active}
-				aria-label={
-					refusal ??
-					`${relation === "support" ? "Support" : "Counter"} — bet ${resultingSide}`
-				}
-				onClick={() => onToggle(relation)}
-				className={`w-[78px] h-6 flex items-center justify-center rounded-(--r-chip) text-xs font-bold transition-all hover:shadow-(--state-hover-glow-pole) focus-visible:shadow-(--state-focus-ring) active:shadow-(--state-pressed-glow-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) ${active ? "ring-2 ring-white/40" : ""} ${pole}`}
-			>
-				{relation === "support" ? "Support" : "Counter"}
-			</button>
-		</InfoTip>
 	);
 }

@@ -1,15 +1,25 @@
 import type { ReactNode } from "react";
 
+import { cn } from "@/lib/utils";
+
 import { SideBadge } from "./badges";
 import { formatPricePercent } from "./format";
 import type { Side } from "./types";
 
 /**
  * One pole column of the two-column arena (DEBATE.4 §4 / D3) — LEFT=YES,
- * RIGHT=NO, the fixed side poles (never a Support/Counter label). The column
- * head carries the side's price tag and the static "No active position" stub
- * (the viewer/auth-dependent readout is OUT of DEBATE.4). The body hosts the
- * post-scroller (market-view) or reply-scroller (post-view).
+ * RIGHT=NO, the fixed side poles (never a Support/Counter label). The body
+ * hosts the post-scroller (market-view) or reply-scroller (post-view), or the
+ * composer this column is hosting.
+ *
+ * ⚠⚠ FEED-3 — ONE RECTANGLE PER COLUMN, AND THIS IS IT. The column used to be an
+ * outer frame around two boxes of its own — the header band and the card — which
+ * read as three nested edges. Now the column IS the card's rectangle (the card's
+ * ground, hairline, radius and elevation, moved up one level), the header is its
+ * first row with ONE hairline under it running edge to edge, and the card below
+ * draws no box (`PostCard`/`ReplyCard` `inColumn`). The rail sits inside the same
+ * rectangle along its inner edge. ⛔ Nothing here is `max-mobile:` — the whole
+ * desktop tree is hidden below 640px (ADR-0051), so the phone never sees it.
  */
 export function DebateColumn({
 	side,
@@ -101,47 +111,32 @@ export function DebateColumn({
 			// column refuses to shrink below what it holds, the arena band pushes
 			// past its own `flex-1 min-h-0`, and the band silently reverts to
 			// content height. Nothing errors; the page just gets taller.
-			// ⚠ UI-QUICK change set 1 item 2 — THE COLUMN GETS AN OUTER EDGE. The two
-			// poles had no border at all, so YES and NO read as one undifferentiated
-			// field with cards floating in it; the border is what makes each column a
-			// container rather than a region.
-			// ⛔ TOKENS ONLY, NO VALUES. `var(--hairline)` (`globals.css:166`,
-			// `1px solid var(--color-n2)`) is the build's one ratified border — the
-			// same declaration `Card`, `SlotHeader` and `ResolverCard` already carry,
-			// so the column's edge and the edges inside it are the same line. `--r`
-			// (8px) is the radius every sibling container on this surface uses, and
-			// this component ALREADY used it for its own picked/engaged states.
-			// ⚠ `p-2` IS A JUDGEMENT CALL AND IT IS FLAGGED. Without it the column's
-			// new border sits flush on top of `SlotHeader`'s own hairline — two 1px
-			// lines touching, reading as one thick smudged edge on three sides. 8px
-			// is the smallest step that separates them. It costs the scroller 16px of
-			// height, which `min-h-0` absorbs; no link in the height chain moves.
-			// ⛔ THE POST CARDS INSIDE ARE UNTOUCHED — they keep their own `Card`
-			// border, which is the point: an outer edge around bordered cards.
-			// ⚠ The literal prefix `flex min-h-0 flex-1 flex-col gap-3` is PINNED by
-			// `debate-height-chain.test.ts` (`the-pole-column-may-shrink-below-its-
-			// content`), so the additions land AFTER it and the run stays intact.
-			className={`flex min-h-0 flex-1 flex-col gap-3 overflow-hidden rounded-(--r) p-2 [border:var(--hairline)] ${
-				engaged
-					? "rounded-(--r) shadow-[0_0_10px_1px_rgba(255,255,255,0.2)]"
-					: ""
-			}${
+			// ⚠⚠ FEED-3 — THE CARD'S BOX, ONE LEVEL UP. `bg-card`, `var(--hairline)`,
+			// `--r` and `--elev-1` are exactly what `Card` draws, so the rectangle
+			// reads as the card it replaces; the UI-QUICK change set 1 frame around it
+			// (and its `p-2` gutter between two touching hairlines) is gone with the
+			// second edge it separated. No `gap`: the header row, its hairline, then
+			// the body, whose own `p-3` is the card's inset.
+			// ⚠ `cn`, NOT A TEMPLATE STRING, now that there is a resting elevation:
+			// the engaged glow and the picked `--elev-3` must REPLACE `--elev-1`, and
+			// only a merge guarantees that — two `shadow-*` utilities in one class
+			// list are decided by stylesheet order, not by class order.
+			className={cn(
+				"flex min-h-0 flex-1 flex-col overflow-hidden rounded-(--r) bg-card shadow-(--elev-1) [border:var(--hairline)]",
+				engaged && "shadow-[0_0_10px_1px_rgba(255,255,255,0.2)]",
 				// `.slot.picked .panel.vm{box-shadow:0 6px 16px …}` (`d5:896`); the
-				// paired `translateY(-5px)` is the inline style above.
-				// ⚠ d5 lifts the PANEL and this lifts the whole COLUMN, header
-				// included. Declared as a deviation: the panel is `{children}` here
-				// and a parent cannot class its own children without either an
-				// arbitrary variant (which is what failed twice above) or a wrapper
-				// div, and a wrapper would insert an unwired link into the height
-				// chain `debate-height-chain.test.ts` exists to protect. Lifting the
-				// column reads the same — the chosen side rises — for none of that
-				// risk.
-				picked ? " rounded-(--r) shadow-(--elev-3)" : ""
-			}`}
+				// paired `translateY(-5px)` is the inline style above. d5 lifts the
+				// PANEL; this lifts the whole COLUMN, header included — which since
+				// FEED-3 is also exactly the panel.
+				picked && "shadow-(--elev-3)",
+			)}
 		>
 			{/* `.colhead{flex:0 0 auto}` (`d5:532`) — the head never shrinks, so the
-			    column's slack always comes out of the body below it. */}
-			<div className="shrink-0">
+			    column's slack always comes out of the body below it.
+			    ⚠ FEED-3 — the ONE hairline under the header, edge to edge: this node
+			    spans the rectangle (the column has no padding), so its bottom border
+			    meets both sides. */}
+			<div className="shrink-0 [border-bottom:var(--hairline)]">
 				{header ?? (
 					<>
 						<div className="flex items-center justify-between gap-2 rounded-md p-2 [border:var(--hairline)]">
@@ -190,9 +185,13 @@ export function DebateColumn({
 			    grow to fit the card instead of scrolling it — and the page, having
 			    been told it is exactly one screen, would clip the difference
 			    silently. The two declarations are one mechanism, not two. */}
+			{/* ⚠ FEED-3 — `p-3` is the card's own inset, taken here once so the card,
+			    the rail beside it, the composer and the empty-side prompt all sit the
+			    same 12px inside the rectangle. It replaces `pb-2 pr-3`, which padded
+			    for a box the column no longer has. */}
 			<div
 				data-testid="column-scroll"
-				className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-2 pr-3 [scrollbar-gutter:stable]"
+				className="flex min-h-0 flex-1 flex-col overflow-y-auto p-3 [scrollbar-gutter:stable]"
 			>
 				{children}
 			</div>
