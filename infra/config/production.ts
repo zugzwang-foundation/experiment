@@ -24,6 +24,19 @@ export const PRODUCTION_CERTIFICATE_ARN: string | undefined =
 export const PRODUCTION_ACCOUNT_ID = "849076101704";
 
 /**
+ * 09 §C — the GitHub Actions environment whose OIDC token the production
+ * deploy role trusts (`repo:<owner/repo>:environment:aws-production`). NOT
+ * `production`: GitHub's `Production` environment is Vercel's (`vercel[bot]`
+ * records a deployment there for every `main` commit), and GitHub matches
+ * environment names case-insensitively, so a job naming `production` would run
+ * inside it. Lowercase, so the token's `sub` cannot differ in case from the
+ * trust policy. Its branch policy (`main` only) and required reviewer are
+ * GitHub settings, not code. deploy-aws.yml maps `production` to this name;
+ * tests/unit/infra/github-deploy-environment.test.ts keeps the two in step.
+ */
+export const PRODUCTION_GITHUB_ENVIRONMENT = "aws-production";
+
+/**
  * Production.
  *
  * ⚠ `maxCapacity: 1` is deliberate and is a correctness constraint, not a cost

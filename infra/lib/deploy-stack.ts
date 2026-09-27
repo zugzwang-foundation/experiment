@@ -19,6 +19,12 @@ export interface DeployStackProps extends StackProps {
 		 * generated names are truncated at IAM's 64-char ceiling in production.
 		 */
 		readonly passRoleArns: readonly string[];
+		/**
+		 * The GitHub Actions environment the role trusts, when it differs from
+		 * `name` (production: `aws-production`, see production.ts). Omitted for
+		 * staging, whose role keeps trusting `environment:staging`.
+		 */
+		readonly githubEnvironment?: string;
 	}[];
 	/**
 	 * The account's EXISTING GitHub OIDC provider ARN, when one exists. The
@@ -57,9 +63,10 @@ export interface DeployStackProps extends StackProps {
  * role, and scoping each execution policy below AdministratorAccess — the
  * bootstrap runbook in docs/aws-migration/09-PRODUCTION-READINESS.md §B.
  *
- * Trust is pinned to `repo:<owner/repo>:environment:<name>`: a token minted
- * for the `staging` environment cannot assume the production role, and a
- * GitHub environment can require a reviewer before it mints one at all.
+ * Trust is pinned to `repo:<owner/repo>:environment:<github environment>`
+ * (`staging`; `aws-production` for production): a token minted for the
+ * `staging` environment cannot assume the production role, and a GitHub
+ * environment can require a reviewer before it mints one at all.
  */
 export class DeployStack extends Stack {
 	constructor(scope: Construct, id: string, props: DeployStackProps) {
@@ -80,6 +87,7 @@ export class DeployStack extends Stack {
 			name: environment,
 			bootstrapQualifier,
 			passRoleArns,
+			githubEnvironment,
 		} of props.environments) {
 			const bootstrapRoles = [
 				"deploy-role",
@@ -100,7 +108,7 @@ export class DeployStack extends Stack {
 					{
 						StringEquals: {
 							"token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-							"token.actions.githubusercontent.com:sub": `repo:${props.githubRepository}:environment:${environment}`,
+							"token.actions.githubusercontent.com:sub": `repo:${props.githubRepository}:environment:${githubEnvironment ?? environment}`,
 						},
 					},
 				),

@@ -179,11 +179,27 @@ controls that stand in for it, and the one residual risk (S1, deferred).
 
 **Why the file's guard is not the control (security H2).** `workflow_dispatch` runs the workflow
 file *from the dispatched ref*, so a branch can delete the `guard` job; the OIDC `sub` claim carries
-the **environment**, not the ref. What binds production to `main` is (a) the GitHub `production`
-environment's deployment-branch policy and reviewer, and (b) binding the ref into the token's `sub`
-via GitHub's OIDC subject-claim customization (`include_claim_keys: ["repo","context","ref"]` for this
-repository) and matching it in the role's trust policy. ⚠ Whether AWS IAM can condition directly on
-the `job_workflow_ref` claim is **not established** here — use the `sub` customization, which is.
+the **environment**, not the ref. What binds production to `main` is the GitHub **`aws-production`**
+environment's deployment-branch policy (`main` only) and required reviewer: GitHub will not start a job
+in that environment from any other ref, nor mint its token before approval, and the production role
+trusts exactly `repo:zugzwang-foundation/experiment:environment:aws-production` (`deploy-stack.ts`).
+
+**Why `aws-production` and not `production`.** GitHub's `Production` environment belongs to **Vercel**
+(`vercel[bot]` records a deployment there for every `main` commit), and GitHub matches environment names
+case-insensitively, so a job naming `production` would run inside Vercel's environment, and whether the
+token would then say `environment:Production` or `environment:production` was not established. AWS
+production therefore uses its own lowercase environment, created with exactly the name the trust policy
+names (`PRODUCTION_GITHUB_ENVIRONMENT`, `infra/config/production.ts`; `deploy-aws.yml` maps the
+`production` input to it). **Leave Vercel's `Production` and `Preview` environments untouched.** Staging
+is unchanged: environment `staging`, trust `…:environment:staging`.
+
+**Deferred, deliberately: carrying `ref` in the `sub`.** GitHub's OIDC subject-claim customization
+(`include_claim_keys: ["repo","context","ref"]`) is **repository-wide**. It would change staging's token to
+`…:environment:staging:ref:refs/heads/staging`, which staging's live trust (`StringEquals
+…:environment:staging`) no longer matches, so **staging's push deploys would break**. It is
+defence-in-depth on top of the branch policy, and belongs in a separately approved change that updates
+both roles' trust in the same step. ⚠ Whether AWS IAM can condition directly on the `job_workflow_ref`
+claim is **not established** here.
 
 **Operator actions (approval):**
 1. One deploy-role stack **per environment** (§0). `-c deployEnvironments` is required and names exactly one.
@@ -195,14 +211,17 @@ the `job_workflow_ref` claim is **not established** here — use the `sub` custo
      npx cdk deploy Zugzwang-production-Deploy --exclusively -c deployStack=true -c deployEnvironments=production
    ```
    It imports the existing provider, and never creates or deletes it. Output `DeployRoleArnproduction` → the GitHub
-   `production` environment's `AWS_DEPLOY_ROLE_ARN`.
-2. GitHub → Settings → Environments → `production`: **required reviewer = you**, deployment branches = `main`
-   only; secrets `AWS_DEPLOY_ROLE_ARN`, `DOPPLER_TOKEN` (a `prd`-scoped service token); variables
-   `ZZ_PROD_CERT_ARN`, `ZZ_ALERT_EMAIL`, `ZZ_PROD_WRITES_PAUSED` (empty), optionally `ZZ_PROD_WAF_MODE`.
-   Same for `staging` with its values.
-3. Customize the repository's OIDC `sub` claim to include `ref`, and tighten the production role's trust
-   condition to `repo:zugzwang-foundation/experiment:environment:production:ref:refs/heads/main`
-   (exact form per the customization) — **before** the role can deploy anything.
+   `aws-production` environment's `AWS_DEPLOY_ROLE_ARN`.
+2. GitHub → Settings → Environments → **New environment `aws-production`** (exactly, lowercase):
+   **required reviewer = you** ("Prevent self-review" OFF, since you are the only reviewer); **untick "Allow
+   administrators to bypass configured protection rules"**; deployment branches → *Selected branches and
+   tags* → branch rule `main`; no wait timer. Secrets `AWS_DEPLOY_ROLE_ARN` (step 1's output) and
+   `DOPPLER_TOKEN` (a `prd`-scoped service token). **No variables**: the workflow reads none
+   (PROD-DEPLOY-NO-VARS); the certificate is committed config and the write-pause is the dispatch's
+   `writes` input. Do not edit `Production`, `Preview` or `staging`.
+3. Leave the repository's OIDC `sub` claim at its default (see *Deferred* above). Before the first
+   deploy, confirm `aws-production` reports the reviewer rule, the `main` branch policy and
+   `can_admins_bypass: false` (`GET /repos/zugzwang-foundation/experiment/environments/aws-production`).
 4. Rehearse the workflow on **staging** first (it has never run anywhere) — in **two dispatches**
    (§D): `skip_migrations: true, writes: open`, then a normal one.
 
@@ -471,14 +490,14 @@ Each step names who acts. No step runs without explicit approval of the whole se
 - [ ] Root MFA enabled; `zugzwang-deploy` key retired after OIDC works — §B
 - [ ] vCPU quota ≥ 16 granted — §H
 - [ ] `zzprod` bootstrap with a scoped execution policy; staging deploy role denied production stacks — §B
-- [ ] `Zugzwang-Deploy` deployed; GitHub `production` environment has reviewer + `main`-only + secrets/vars — §C
+- [ ] `Zugzwang-production-Deploy` deployed; GitHub `aws-production` environment has reviewer + `main`-only + admin bypass off + secrets — §C
 - [ ] `deploy-aws.yml` rehearsed end to end on staging (build, in-VPC migrate, deploy, pinned verify) — §C/§D
 - [ ] Doppler `prd` complete; `zugzwang/production` composed by a reviewed `prod-secret.cjs` — §E
 - [ ] Production restore runner written, reviewed, rehearsed on staging — §O
 - [ ] Alert email subscribed and confirmed; a test alarm received — §F
 - [ ] WAF rehearsal on staging read; production mode decided — §I
 - [ ] A6 measured on staging (**blocker**); F6 ruled — §A
-- [ ] Repository OIDC `sub` customized to carry `ref`; production role trust bound to `main` — §C
+- [ ] Production role trust = `…:environment:aws-production`, bound to `main` by that environment's branch policy; `ref` in the `sub` deferred (repository-wide, would break staging) — §C
 - [ ] Staging bootstrap deploy role denied `Zugzwang-production-*`, `Zugzwang-Deploy`, `zugzwang-production-*` roles — §B
 - [ ] First-run two-dispatch sequence rehearsed on staging (roles replaced, migrate outputs present) — §D
 - [ ] Cutover dump encryption + destruction date agreed — §O

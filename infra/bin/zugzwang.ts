@@ -6,7 +6,10 @@ import {
 	Tags,
 } from "aws-cdk-lib";
 import { ManagedPolicy, PermissionsBoundary } from "aws-cdk-lib/aws-iam";
-import { productionConfig } from "../config/production";
+import {
+	PRODUCTION_GITHUB_ENVIRONMENT,
+	productionConfig,
+} from "../config/production";
 import { stagingConfig } from "../config/staging";
 import type { EnvironmentConfig } from "../config/types";
 import { ComputeStack } from "../lib/compute-stack";
@@ -192,6 +195,8 @@ if (app.node.tryGetContext("deployStack") === "true") {
 				{
 					name: productionConfig.name,
 					bootstrapQualifier: productionConfig.bootstrapQualifier,
+					// Not Vercel's `Production` (09 §C, production.ts).
+					githubEnvironment: PRODUCTION_GITHUB_ENVIRONMENT,
 					passRoleArns: [
 						securityStacks[productionConfig.name].executionRole.roleArn,
 						securityStacks[productionConfig.name].taskRole.roleArn,
