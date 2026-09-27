@@ -1,0 +1,63 @@
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "RuntimeServicesOnly",
+			"Effect": "Allow",
+			"NotAction": [
+				"account:*",
+				"cloudformation:*",
+				"iam:*",
+				"organizations:*",
+				"sts:*"
+			],
+			"Resource": "*"
+		},
+		{
+			"Sid": "DenyStagingByTag",
+			"Effect": "Deny",
+			"Action": "*",
+			"Resource": "*",
+			"Condition": {
+				"StringEquals": {
+					"aws:ResourceTag/Environment": "staging"
+				}
+			}
+		},
+		{
+			"Sid": "DenyStagingByName",
+			"Effect": "Deny",
+			"Action": "*",
+			"Resource": [
+				"arn:aws:secretsmanager:*:849076101704:secret:zugzwang/staging*",
+				"arn:aws:secretsmanager:*:849076101704:secret:events!connection/zugzwang-staging-*",
+				"arn:aws:rds:*:849076101704:db:zugzwang-staging-*",
+				"arn:aws:rds:*:849076101704:subgrp:zugzwang-staging-*",
+				"arn:aws:rds:*:849076101704:pg:zugzwang-staging-*",
+				"arn:aws:rds:*:849076101704:snapshot:*zugzwang-staging-*",
+				"arn:aws:ecs:*:849076101704:cluster/zugzwang-staging",
+				"arn:aws:ecs:*:849076101704:service/zugzwang-staging/*",
+				"arn:aws:ecs:*:849076101704:task/zugzwang-staging/*",
+				"arn:aws:ecs:*:849076101704:container-instance/zugzwang-staging/*",
+				"arn:aws:ecs:*:849076101704:task-definition/zugzwang-staging-*",
+				"arn:aws:ecs:*:849076101704:task-definition/Zugzwangstaging*",
+				"arn:aws:ecr:*:849076101704:repository/zugzwang-staging",
+				"arn:aws:logs:*:849076101704:log-group:/zugzwang/staging/*",
+				"arn:aws:sns:*:849076101704:zugzwang-staging-*",
+				"arn:aws:events:*:849076101704:rule/zugzwang-staging-*",
+				"arn:aws:events:*:849076101704:connection/zugzwang-staging-*",
+				"arn:aws:events:*:849076101704:api-destination/zugzwang-staging-*",
+				"arn:aws:wafv2:*:849076101704:regional/webacl/zugzwang-staging-*",
+				"arn:aws:lambda:*:849076101704:function:Zugzwang-staging-*",
+				"arn:aws:autoscaling:*:849076101704:autoScalingGroup:*:autoScalingGroupName/Zugzwang-staging-*",
+				"arn:aws:cloudwatch::849076101704:dashboard/zugzwang-staging",
+				"arn:aws:iam::849076101704:role/Zugzwang-staging-*",
+				"arn:aws:iam::849076101704:role/zugzwang-staging-*",
+				"arn:aws:iam::849076101704:role/cdk-hnb659fds-*",
+				"arn:aws:iam::849076101704:instance-profile/Zugzwang-staging-*",
+				"arn:aws:s3:::cdk-hnb659fds-*",
+				"arn:aws:ssm:*:849076101704:parameter/cdk-bootstrap/hnb659fds/*"
+			]
+		}
+	]
+}

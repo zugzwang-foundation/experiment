@@ -1,6 +1,42 @@
 import { type EnvironmentConfig, RUNTIME_SECRET_KEYS } from "./types";
 
 /**
+ * PROD-DEPLOY-NO-VARS — the ACM certificate for `zugzwangworld.com` on the
+ * production ALB, committed like staging's (not a secret). Issued 2026-09-27
+ * for the apex ONLY (09-PRODUCTION-READINESS.md §P, item 13): `www` failed
+ * validation with CAA_ERROR while it is a CNAME to Vercel, whose CAA records
+ * do not admit Amazon, so it needs its own certificate once it leaves Vercel.
+ * Without an ARN every production Compute synth REFUSES (compute-stack.ts), so
+ * nothing can deploy an HTTP-only production listener. `ZZ_PROD_CERT_ARN`
+ * still overrides it for a hand-run deploy; the GitHub workflow no longer
+ * reads it, because `vars.*` arrived empty in four staging runs.
+ */
+export const PRODUCTION_CERTIFICATE_ARN: string | undefined =
+	"arn:aws:acm:ap-south-1:849076101704:certificate/b833cdf1-fdfd-4944-bf47-5a9a8aaf059f";
+
+/**
+ * 09 §0 — production shares this AWS account with staging, as SEPARATE
+ * resources. Pinned rather than taken from the credentials, so a production
+ * synth or deploy cannot land in any other account. The policy documents under
+ * infra/policies/ name the same id; tests/unit/infra/same-account-isolation
+ * .test.ts keeps them in step.
+ */
+export const PRODUCTION_ACCOUNT_ID = "849076101704";
+
+/**
+ * 09 §C — the GitHub Actions environment whose OIDC token the production
+ * deploy role trusts (`repo:<owner/repo>:environment:aws-production`). NOT
+ * `production`: GitHub's `Production` environment is Vercel's (`vercel[bot]`
+ * records a deployment there for every `main` commit), and GitHub matches
+ * environment names case-insensitively, so a job naming `production` would run
+ * inside it. Lowercase, so the token's `sub` cannot differ in case from the
+ * trust policy. Its branch policy (`main` only) and required reviewer are
+ * GitHub settings, not code. deploy-aws.yml maps `production` to this name;
+ * tests/unit/infra/github-deploy-environment.test.ts keeps the two in step.
+ */
+export const PRODUCTION_GITHUB_ENVIRONMENT = "aws-production";
+
+/**
  * Production.
  *
  * ⚠ `maxCapacity: 1` is deliberate and is a correctness constraint, not a cost
@@ -17,11 +53,16 @@ export const productionConfig: EnvironmentConfig = {
 	// this app), and compute in the wrong region undoes PERF-1: the app must sit
 	// in the same region as Supabase. Override deliberately, or not at all.
 	region: process.env.ZZ_AWS_REGION ?? "ap-south-1",
-	account: process.env.CDK_DEFAULT_ACCOUNT,
+	// ⛔ PINNED (09 §0), never the credentials' account and no override.
+	account: PRODUCTION_ACCOUNT_ID,
 	// ⛔ H-3: production's OWN bootstrap roles, so the staging deploy path
 	// (hnb659fds) cannot deploy these stacks. Requires a separate bootstrap —
 	// docs/aws-migration/09-PRODUCTION-READINESS.md §B.
 	bootstrapQualifier: "zzprod",
+	// ⛔ H-3: every production role is created under this boundary, and the
+	// zzprod execution policy refuses to create one without it
+	// (infra/policies/production-permissions-boundary.json).
+	permissionsBoundaryPolicyName: "zugzwang-production-boundary",
 
 	vpcCidr: "10.10.0.0/16",
 	natGateways: 1,
@@ -55,7 +96,7 @@ export const productionConfig: EnvironmentConfig = {
 	writesPaused:
 		process.env.ZZ_PROD_WRITES_PAUSED === "paused" ? "paused" : undefined,
 
-	certificateArn: process.env.ZZ_PROD_CERT_ARN,
+	certificateArn: process.env.ZZ_PROD_CERT_ARN || PRODUCTION_CERTIFICATE_ARN,
 	appBaseUrl: "https://zugzwangworld.com",
 	cloudFrontEnabled: false,
 	wafEnabled: true,

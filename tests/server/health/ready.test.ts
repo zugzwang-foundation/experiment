@@ -53,6 +53,14 @@ const selectChain = {
 	where: () => Promise.resolve(EMPTY_ROWS),
 	limit: () => Promise.resolve(EMPTY_ROWS),
 };
+// READY-REQUEST-TIME — the route now opens with `await connection()`, which
+// throws outside a Next.js request scope; these direct GET() calls are not
+// requests, so the gate is stubbed. The build-time half is pinned by
+// tests/unit/health/ready-request-time.test.ts.
+vi.mock("next/server", async (importOriginal) => ({
+	...(await importOriginal<typeof import("next/server")>()),
+	connection: vi.fn(async () => undefined),
+}));
 vi.mock("@/db", () => ({ db: { select: () => selectChain } }));
 
 const BASE = "http://127.0.0.1:3000";

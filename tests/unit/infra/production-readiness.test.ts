@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -76,9 +77,27 @@ describe("§D / HIGH-4 — PassRole names the task roles by their real ARNs", ()
 	});
 
 	it("the app hands each environment's own Security roles to its deploy role", () => {
+		// One deploy stack per environment (09 §0): each passes ONLY its own
+		// environment's roles — never the other's.
 		const bin = stripped("infra/bin/zugzwang.ts");
-		expect(bin).toContain("securityStacks[c.name].executionRole.roleArn");
-		expect(bin).toContain("securityStacks[c.name].taskRole.roleArn");
+		const staging = bin.indexOf('new DeployStack(app, "Zugzwang-Deploy"');
+		const production = bin.indexOf(
+			'new DeployStack(app, "Zugzwang-production-Deploy"',
+		);
+		expect(staging).toBeGreaterThan(-1);
+		expect(production).toBeGreaterThan(staging);
+		const stagingBlock = bin.slice(staging, production);
+		const productionBlock = bin.slice(production);
+		for (const role of ["executionRole", "taskRole"]) {
+			expect(stagingBlock).toContain(
+				`securityStacks[stagingConfig.name].${role}.roleArn`,
+			);
+			expect(productionBlock).toContain(
+				`securityStacks[productionConfig.name].${role}.roleArn`,
+			);
+		}
+		expect(stagingBlock).not.toContain("securityStacks[productionConfig.name]");
+		expect(productionBlock).not.toContain("securityStacks[stagingConfig.name]");
 	});
 
 	it("the live task roles are NOT renamed (renaming would replace them under Compute's import)", () => {
@@ -152,10 +171,35 @@ describe("STAGING-PUSH-DEPLOY — a push deploys staging and can never reach pro
 		}
 	});
 
-	it("the guard job refuses a push that resolves to anything but staging", () => {
+	it("the guard job lets a push deploy only staging from staging or production from main", () => {
 		expect(workflow).toContain(
-			'if [ "$EVENT" = "push" ] && [ "$TARGET" != "staging" ]; then',
+			'if [ "$TARGET" = "staging" ] && [ "$REF" = "refs/heads/staging" ]; then :',
+		);
+		expect(workflow).toContain(
+			'elif [ "$TARGET" = "production" ] && [ "$REF" = "refs/heads/main" ]; then :',
 		);
 		expect(workflow).toContain("EVENT: ${{ github.event_name }}");
+		// Dispatch keeps its own rule: production from main only.
+		expect(workflow).toContain(
+			'if [ "$TARGET" = "production" ] && [ "$REF" != "refs/heads/main" ]; then',
+		);
+	});
+
+	it("the guard's push rule behaves as written", () => {
+		const start = workflow.indexOf('if [ "$EVENT" = "push" ]; then');
+		const end = workflow.indexOf(
+			'if [ "$TARGET" = "production" ] && [ "$REF" != ',
+		);
+		expect(start).toBeGreaterThan(-1);
+		const snippet = workflow.slice(start, end);
+		const run = (event: string, target: string, ref: string) =>
+			spawnSync("bash", ["-c", snippet], {
+				env: { ...process.env, EVENT: event, TARGET: target, REF: ref },
+			}).status;
+		expect(run("push", "staging", "refs/heads/staging")).toBe(0);
+		expect(run("push", "production", "refs/heads/main")).toBe(0);
+		expect(run("push", "production", "refs/heads/staging")).toBe(1);
+		expect(run("push", "staging", "refs/heads/main")).toBe(1);
+		expect(run("push", "production", "refs/heads/feature")).toBe(1);
 	});
 });

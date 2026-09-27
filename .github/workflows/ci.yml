@@ -14,7 +14,9 @@ on:
   # branches opening PRs against an integration branch, which is how every
   # multi-slice task here is built — got no CI at all. The work was reviewed,
   # merged and built upon while the only automated check that could have
-  # contradicted it never ran once.
+  # contradicted it never ran once. The same argument is why `deploy-aws.yml`
+  # CALLS this workflow (`workflow_call`) before it builds: a direct push to
+  # `staging` opens no PR, so without that call it deployed untested code.
   #
   # It is not hypothetical: a red integration test lived on the LOTS-1 `s2`
   # branch for TWO further slices, and both were written against it. The cost of
@@ -28,6 +30,8 @@ on:
   # Branch protection is unaffected — it requires the `ci` check on merges to
   # `main` exactly as before. This only widens where `ci` also runs.
   pull_request:
+  # The deploy workflow's first gate (same job, same checks, no deploy rights).
+  workflow_call:
 
 # Cancel stale runs when a PR is force-pushed or has new commits.
 concurrency:

@@ -1,0 +1,38 @@
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "DenyProductionAndDeployStacks",
+			"Effect": "Deny",
+			"Action": "cloudformation:*",
+			"Resource": [
+				"arn:aws:cloudformation:*:849076101704:stack/Zugzwang-production-*/*",
+				"arn:aws:cloudformation:*:849076101704:stack/Zugzwang-Deploy/*",
+				"arn:aws:cloudformation:*:849076101704:stack/CDKToolkit-prod/*"
+			]
+		},
+		{
+			"Sid": "DenyProductionBootstrapAssets",
+			"Effect": "Deny",
+			"Action": "s3:*",
+			"Resource": ["arn:aws:s3:::cdk-zzprod-*", "arn:aws:s3:::cdk-zzprod-*/*"]
+		},
+		{
+			"Sid": "DenyProductionBootstrapParameters",
+			"Effect": "Deny",
+			"Action": "ssm:*",
+			"Resource": "arn:aws:ssm:*:849076101704:parameter/cdk-bootstrap/zzprod/*"
+		},
+		{
+			"Sid": "DenyProductionIdentity",
+			"Effect": "Deny",
+			"Action": ["iam:*", "sts:AssumeRole", "sts:TagSession"],
+			"Resource": [
+				"arn:aws:iam::849076101704:role/cdk-zzprod-*",
+				"arn:aws:iam::849076101704:role/Zugzwang-production-*",
+				"arn:aws:iam::849076101704:role/zugzwang-production-*",
+				"arn:aws:iam::849076101704:policy/zugzwang-production-*"
+			]
+		}
+	]
+}

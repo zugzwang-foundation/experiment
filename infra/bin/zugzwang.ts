@@ -1,6 +1,15 @@
 #!/usr/bin/env node
-import { App, DefaultStackSynthesizer, Tags } from "aws-cdk-lib";
-import { productionConfig } from "../config/production";
+import {
+	App,
+	CliCredentialsStackSynthesizer,
+	DefaultStackSynthesizer,
+	Tags,
+} from "aws-cdk-lib";
+import { ManagedPolicy, PermissionsBoundary } from "aws-cdk-lib/aws-iam";
+import {
+	PRODUCTION_GITHUB_ENVIRONMENT,
+	productionConfig,
+} from "../config/production";
 import { stagingConfig } from "../config/staging";
 import type { EnvironmentConfig } from "../config/types";
 import { ComputeStack } from "../lib/compute-stack";
@@ -102,6 +111,16 @@ function defineEnvironment(config: EnvironmentConfig): SecurityStack {
 		Tags.of(stack).add("Project", "Zugzwang");
 		Tags.of(stack).add("Environment", config.name);
 		Tags.of(stack).add("ManagedBy", "CDK");
+		// H-3: the zzprod execution policy creates a role ONLY with this boundary.
+		if (config.permissionsBoundaryPolicyName) {
+			PermissionsBoundary.of(stack).apply(
+				ManagedPolicy.fromManagedPolicyName(
+					stack,
+					"PermissionsBoundary",
+					config.permissionsBoundaryPolicyName,
+				),
+			);
+		}
 	}
 	return security;
 }
@@ -111,10 +130,19 @@ const securityStacks: Record<string, SecurityStack> = {
 	[productionConfig.name]: defineEnvironment(productionConfig),
 };
 
-// AWS-MIGRATION-3 — the GitHub OIDC deploy roles (deploy-stack.ts). One stack
-// for the account, instantiated ONLY under `-c deployStack=true` so that
-// `cdk deploy --all` / `cdk destroy --all` cannot reach it by accident and
-// the account-level OIDC provider is never created twice.
+// AWS-MIGRATION-3 — the GitHub OIDC deploy roles (deploy-stack.ts), ONE STACK
+// PER ENVIRONMENT (09 §0 — staging and production share this AWS account):
+//
+//   staging    → `Zugzwang-Deploy`             the account's GitHub OIDC provider
+//                                               + the staging role. Unchanged.
+//   production → `Zugzwang-production-Deploy`  the production role ONLY; it
+//                                               IMPORTS the provider, so it can
+//                                               never create or delete it.
+//
+// Two stacks, so adding production never redeploys the stack holding staging's
+// role. Instantiated ONLY under `-c deployStack=true`, so `cdk deploy --all` /
+// `cdk destroy --all` cannot reach either by accident. Both are denied to the
+// other environment's bootstrap deploy role (infra/policies/*-deploy-role-deny.json).
 if (app.node.tryGetContext("deployStack") === "true") {
 	// The repository slug lands in a trust policy: an unverified default there is
 	// a wrong-repo trust waiting to happen, so it is REQUIRED (no fallback).
@@ -125,35 +153,70 @@ if (app.node.tryGetContext("deployStack") === "true") {
 			"ZZ_GITHUB_REPOSITORY (owner/repo) is required to synth Zugzwang-Deploy",
 		);
 	}
-	// `-c deployEnvironments=staging` creates ONLY the staging deploy role, so
-	// the staging pipeline can be stood up without minting a production role
-	// before production is approved. Default: both.
-	const only = app.node.tryGetContext("deployEnvironments") as
-		| string
-		| undefined;
-	const wanted = only ? only.split(",").map((e) => e.trim()) : undefined;
-	const environments = [stagingConfig, productionConfig].filter(
-		(c) => !wanted || wanted.includes(c.name),
-	);
-	if (environments.length === 0) {
-		throw new Error(`deployEnvironments=${only} names no known environment`);
-	}
-	const deploy = new DeployStack(app, "Zugzwang-Deploy", {
-		env: {
-			account: process.env.CDK_DEFAULT_ACCOUNT,
-			region: process.env.ZZ_AWS_REGION ?? "ap-south-1",
-		},
-		githubRepository,
-		environments: environments.map((c) => ({
-			name: c.name,
-			bootstrapQualifier: c.bootstrapQualifier,
-			passRoleArns: [
-				securityStacks[c.name].executionRole.roleArn,
-				securityStacks[c.name].taskRole.roleArn,
+	// ⛔ REQUIRED, exactly one environment, no default: the environment picks
+	// the stack, so a missing or doubled value can never put one environment's
+	// role into the other's stack.
+	const only = (
+		app.node.tryGetContext("deployEnvironments") as string | undefined
+	)?.trim();
+	if (only === stagingConfig.name) {
+		// Byte-identical to what is deployed: same id, same account source, same
+		// provider handling as before production existed.
+		const deploy = new DeployStack(app, "Zugzwang-Deploy", {
+			synthesizer: new CliCredentialsStackSynthesizer(),
+			env: {
+				account: process.env.CDK_DEFAULT_ACCOUNT,
+				region: process.env.ZZ_AWS_REGION ?? "ap-south-1",
+			},
+			githubRepository,
+			environments: [
+				{
+					name: stagingConfig.name,
+					bootstrapQualifier: stagingConfig.bootstrapQualifier,
+					passRoleArns: [
+						securityStacks[stagingConfig.name].executionRole.roleArn,
+						securityStacks[stagingConfig.name].taskRole.roleArn,
+					],
+				},
 			],
-		})),
-		existingOidcProviderArn: process.env.ZZ_GITHUB_OIDC_PROVIDER_ARN,
-	});
-	Tags.of(deploy).add("Project", "Zugzwang");
-	Tags.of(deploy).add("ManagedBy", "CDK");
+			existingOidcProviderArn: process.env.ZZ_GITHUB_OIDC_PROVIDER_ARN,
+		});
+		Tags.of(deploy).add("Project", "Zugzwang");
+		Tags.of(deploy).add("ManagedBy", "CDK");
+	} else if (only === productionConfig.name) {
+		const deploy = new DeployStack(app, "Zugzwang-production-Deploy", {
+			// 09 §0: the template is uploaded to PRODUCTION's bootstrap bucket. The
+			// synthesizer's default qualifier is staging's (`hnb659fds`), which would
+			// put this upload in cdk-hnb659fds-assets-….
+			synthesizer: new CliCredentialsStackSynthesizer({
+				qualifier: productionConfig.bootstrapQualifier,
+			}),
+			env: {
+				account: productionConfig.account,
+				region: productionConfig.region,
+			},
+			githubRepository,
+			environments: [
+				{
+					name: productionConfig.name,
+					bootstrapQualifier: productionConfig.bootstrapQualifier,
+					// Not Vercel's `Production` (09 §C, production.ts).
+					githubEnvironment: PRODUCTION_GITHUB_ENVIRONMENT,
+					passRoleArns: [
+						securityStacks[productionConfig.name].executionRole.roleArn,
+						securityStacks[productionConfig.name].taskRole.roleArn,
+					],
+				},
+			],
+			// ALWAYS imported — the provider belongs to `Zugzwang-Deploy`.
+			existingOidcProviderArn: `arn:aws:iam::${productionConfig.account}:oidc-provider/token.actions.githubusercontent.com`,
+		});
+		Tags.of(deploy).add("Project", "Zugzwang");
+		Tags.of(deploy).add("Environment", productionConfig.name);
+		Tags.of(deploy).add("ManagedBy", "CDK");
+	} else {
+		throw new Error(
+			`-c deployEnvironments must be exactly one of staging | production (got ${only || "nothing"})`,
+		);
+	}
 }

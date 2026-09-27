@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { readiness, type WarmUpResult } from "@/server/health/ready";
 
 // GET /api/ready — the ALB target-group health check (AWS-MIGRATION-3).
@@ -14,6 +15,15 @@ import { readiness, type WarmUpResult } from "@/server/health/ready";
 let settled: WarmUpResult | null = null;
 
 export async function GET(): Promise<Response> {
+	// READY-REQUEST-TIME (readiness item 18) — request time, never the build.
+	// `next build` calls a route's GET once to decide whether it can be a
+	// static file; without this, that call ran the warm-up, which queried the
+	// build machine's database (11 connection attempts, measured with a trap).
+	// The route stayed dynamic only because the warm-up FAILED there. Against a
+	// reachable database the build could have frozen this — the ALB's health
+	// check — as a static answer. After cutover the build cannot reach the
+	// private RDS at all, so it must not depend on reaching it.
+	await connection();
 	if (settled === null) {
 		readiness().then(
 			(r) => {

@@ -1,10 +1,14 @@
-# AWS-MIGRATION — build, migrate, deploy, verify.
+# AWS-MIGRATION — ci, build, migrate, deploy, verify.
 #
-# ⚠ PRODUCTION IS MANUAL ONLY, deliberately: while the experiment is live on
-# Vercel no push may move production to a different platform. Production is
-# reachable only by `workflow_dispatch` from `main` (the `guard` job, plus the
-# GitHub environment policy). STAGING also deploys on every push to the
-# `staging` branch (STAGING-PUSH-DEPLOY) — see the `on:` block.
+# Three ways in, one pipeline:
+#   - a push to `staging` deploys STAGING (STAGING-PUSH-DEPLOY, the `on:` block);
+#   - a push to `main` deploys PRODUCTION through `deploy-production.yml`, which
+#     CALLS this file (`workflow_call`) with environment=production;
+#   - `workflow_dispatch` from `main` for either, with the extra inputs.
+# Production is reachable ONLY from `main`, and every production job runs in the
+# `aws-production` GitHub environment: `main`-only branch policy, a required
+# reviewer, admin bypass off. Nothing reaches production without that approval.
+# The first job is `ci` (ci.yml): no deploy builds from code that failed it.
 #
 # ⛔ THE ORDER IS THE POINT (ADR-0024 migrate-before-serve). Migrations land
 # BEFORE the new image serves traffic, so a failed migration leaves the OLD
@@ -12,12 +16,13 @@
 name: Deploy to AWS
 
 on:
-  # STAGING ONLY on push. A push to `staging` deploys the AWS staging
+  # STAGING ONLY on a DIRECT push. A push to `staging` deploys the AWS staging
   # environment with the defaults below (environment=staging, writes=open,
-  # migrations on). ⛔ No push can reach production: every `inputs.*` read
-  # falls back to 'staging'/'open', the push branch filter is `staging`
-  # alone, the `guard` job refuses a push that resolves to anything else, and
-  # the staging OIDC role can assume only staging's bootstrap roles.
+  # migrations on). ⛔ No direct push can reach production: every `inputs.*`
+  # read falls back to 'staging'/'open', this push filter is `staging` alone,
+  # the `guard` job refuses a push that is not staging-from-`staging` or
+  # production-from-`main`, and the staging OIDC role can assume only
+  # staging's bootstrap roles.
   push:
     branches: [staging]
   workflow_dispatch:
@@ -33,10 +38,40 @@ on:
         type: boolean
         default: false
       writes:
-        description: "Write state this deploy must leave the environment in. Must agree with the environment's ZZ_<ENV>_WRITES_PAUSED variable, or the deploy refuses."
+        description: "Write state this deploy leaves the environment in (sets the task's write-pause; `verify` asserts it)."
         required: true
         type: choice
         options: [open, paused]
+      allow_destructive_migrations:
+        description: "Apply new migrations that drop, truncate, delete or rewrite data. Only after deciding it deliberately, with a backup."
+        required: false
+        type: boolean
+        default: false
+      rollback_image_tag:
+        description: "ROLLBACK: redeploy this existing image (e.g. production-dd81159a). Skips CI, build and migrations; still needs approval."
+        required: false
+        type: string
+        default: ""
+  # PRODUCTION on push to `main` arrives here via deploy-production.yml. The
+  # inputs mirror workflow_dispatch's, so every `inputs.*` read below works
+  # unchanged for both.
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      skip_migrations:
+        required: false
+        type: boolean
+        default: false
+      writes:
+        required: false
+        type: string
+        default: open
+      allow_destructive_migrations:
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   # One deploy per environment at a time; queued, never cancelled — cancelling
@@ -61,9 +96,12 @@ jobs:
     # A FAILING job rather than a skipped one (review MEDIUM-8): an all-skipped
     # run concludes green, and a refusal must look like a refusal.
     # ⚠ This file is read FROM the dispatched ref, so a branch can delete this
-    # job. The binding controls are the GitHub `production` environment's
+    # job. The binding controls are the GitHub `aws-production` environment's
     # deployment-branch policy and reviewer, and the deploy role's trust policy
-    # (09-PRODUCTION-READINESS.md §C) — this job is the visible half.
+    # (09-PRODUCTION-READINESS.md §C) — this job is the visible half. Production
+    # jobs run in `aws-production`, never `production`: GitHub's `Production`
+    # environment is Vercel's, and environment names match case-insensitively
+    # (infra/config/production.ts PRODUCTION_GITHUB_ENVIRONMENT).
     runs-on: ubuntu-latest
     steps:
       - name: Check the ref
@@ -72,9 +110,15 @@ jobs:
           REF: ${{ github.ref }}
           EVENT: ${{ github.event_name }}
         run: |
-          if [ "$EVENT" = "push" ] && [ "$TARGET" != "staging" ]; then
-            echo "refusing: a push may deploy only staging (resolved to $TARGET)"
-            exit 1
+          # A push (direct, or via deploy-production.yml) may deploy exactly two
+          # ways: staging from `staging`, production from `main`.
+          if [ "$EVENT" = "push" ]; then
+            if [ "$TARGET" = "staging" ] && [ "$REF" = "refs/heads/staging" ]; then :
+            elif [ "$TARGET" = "production" ] && [ "$REF" = "refs/heads/main" ]; then :
+            else
+              echo "refusing: a push may deploy only staging from staging or production from main (resolved to $TARGET from $REF)"
+              exit 1
+            fi
           fi
           if [ "$TARGET" = "production" ] && [ "$REF" != "refs/heads/main" ]; then
             echo "refusing: production deploys only from refs/heads/main (dispatched from $REF)"
@@ -82,11 +126,23 @@ jobs:
           fi
           echo "ref ok: $TARGET from $REF"
 
+  ci:
+    name: CI (lint, typecheck, migrations, tests)
+    needs: guard
+    # A rollback redeploys an image that already passed CI when it was built.
+    if: ${{ !inputs.rollback_image_tag }}
+    # The same gate every PR runs. A direct push to `staging` opens no PR, so
+    # this is the only place its code is ever tested before it deploys.
+    uses: ./.github/workflows/ci.yml
+
   build:
     name: Build and push image
-    needs: guard
+    needs: [guard, ci]
+    # CI passed, or this is a rollback (CI deliberately skipped). Never after a
+    # failed or cancelled CI.
+    if: ${{ !cancelled() && needs.guard.result == 'success' && (needs.ci.result == 'success' || (inputs.rollback_image_tag && needs.ci.result == 'skipped')) }}
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || 'staging' }}
+    environment: ${{ (inputs.environment || 'staging') == 'production' && 'aws-production' || (inputs.environment || 'staging') }}
     permissions:
       id-token: write
       contents: read
@@ -98,7 +154,15 @@ jobs:
 
       - id: meta
         name: Compute the image tag
+        env:
+          ROLLBACK: ${{ inputs.rollback_image_tag }}
         run: |
+          # ROLLBACK: deploy the named existing image instead of building one
+          # (validated against this environment's ECR in the next steps).
+          if [ -n "$ROLLBACK" ]; then
+            echo "image_tag=${ROLLBACK}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           SHA=$(git rev-parse --short HEAD)
           echo "image_tag=${{ inputs.environment || 'staging' }}-${SHA}" >> "$GITHUB_OUTPUT"
           echo "app_commit_sha=${SHA}" >> "$GITHUB_OUTPUT"
@@ -111,8 +175,25 @@ jobs:
       - id: ecr
         uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2
 
+      - name: Confirm the rollback image exists in this environment's ECR
+        if: ${{ inputs.rollback_image_tag }}
+        env:
+          ROLLBACK: ${{ inputs.rollback_image_tag }}
+          ENV_NAME: ${{ inputs.environment || 'staging' }}
+        run: |
+          # Only this environment's own tags (`<env>-<sha>`), and only an image
+          # that is actually in its repository — never another environment's.
+          if ! echo "$ROLLBACK" | grep -Eq "^${ENV_NAME}-[0-9a-f]{7,40}$"; then
+            echo "refusing: rollback tag '$ROLLBACK' is not a ${ENV_NAME}-<sha> image tag"; exit 1
+          fi
+          aws ecr describe-images --repository-name "zugzwang-${ENV_NAME}" --image-ids imageTag="$ROLLBACK" \
+            --query 'imageDetails[0].[imagePushedAt,imageDigest]' --output text
+          echo "rolling back ${ENV_NAME} to ${ROLLBACK}"
+
       - uses: dopplerhq/cli-action@014df23b1329b615816a38eb5f473bb9000700b1 # v3
+        if: ${{ !inputs.rollback_image_tag }}
       - name: Fetch build-time values from Doppler
+        if: ${{ !inputs.rollback_image_tag }}
         id: doppler
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
@@ -129,6 +210,7 @@ jobs:
           echo "ZUGZWANG_ENV=$([ "${{ inputs.environment || 'staging' }}" = "production" ] && echo prod || echo staging)" >> "$GITHUB_ENV"
 
       - name: Build and push the app image
+        if: ${{ !inputs.rollback_image_tag }}
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
           REGISTRY: ${{ steps.ecr.outputs.registry }}
@@ -157,6 +239,7 @@ jobs:
 
       - id: migrate_image
         name: Build and push the migration image
+        if: ${{ !inputs.rollback_image_tag }}
         env:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
           REPO: zugzwang-${{ inputs.environment || 'staging' }}
@@ -177,17 +260,36 @@ jobs:
   migrate:
     name: Apply migrations in-VPC (before anything serves)
     needs: build
-    if: ${{ !inputs.skip_migrations }}
+    # A rollback never migrates: the schema only moves forward.
+    if: ${{ !inputs.skip_migrations && !inputs.rollback_image_tag }}
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || 'staging' }}
+    environment: ${{ (inputs.environment || 'staging') == 'production' && 'aws-production' || (inputs.environment || 'staging') }}
     permissions:
       id-token: write
       contents: read
     steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          # Full history: the check below diffs against the DEPLOYED commit.
+          fetch-depth: 0
       - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+      - name: Refuse destructive migrations unless explicitly allowed
+        env:
+          STACK: Zugzwang-${{ inputs.environment || 'staging' }}-Compute
+          ALLOW: ${{ inputs.allow_destructive_migrations && '--allow' || '' }}
+        run: |
+          # Migrations run automatically once a deploy is approved. Additive ones
+          # (expand/contract) should; one that drops, truncates, deletes or
+          # rewrites data must be a separate decision. This lists migrations new
+          # since the commit the environment is RUNNING (its deployed image tag)
+          # and fails closed on any destructive statement or unreadable baseline.
+          TAG=$(aws cloudformation describe-stacks --stack-name "$STACK" \
+            --query "Stacks[0].Outputs[?OutputKey=='DeployedImageTag'].OutputValue" \
+            --output text 2>/dev/null || true)
+          node scripts/aws-migration/check-destructive-migrations.cjs "$TAG" ${ALLOW:+"$ALLOW"}
       - name: Run the migration task inside the VPC
         env:
           STACK: Zugzwang-${{ inputs.environment || 'staging' }}-Compute
@@ -265,7 +367,7 @@ jobs:
     # true even for a cancelled run, so cancelling mid-cutover would still deploy.
     if: ${{ !cancelled() && needs.build.result == 'success' && (needs.migrate.result == 'success' || needs.migrate.result == 'skipped') }}
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || 'staging' }}
+    environment: ${{ (inputs.environment || 'staging') == 'production' && 'aws-production' || (inputs.environment || 'staging') }}
     permissions:
       id-token: write
       contents: read
@@ -285,52 +387,40 @@ jobs:
 
       - name: Deploy the compute stack at the new image tag
         working-directory: infra
-        # AWS-MIGRATION-3: the config reads the certificate ARN and the alert
-        # address at SYNTH time. A synth without them would emit a stack with
-        # an HTTP-only listener and an alarm topic with no subscriber — and
-        # deploy it. They come from the GitHub environment's variables, never
-        # from the repository.
+        # PROD-DEPLOY-NO-VARS — this step reads NO GitHub variables. Four staging
+        # runs received every `vars.*` empty while their secrets resolved, and a
+        # deploy that depends on them either refuses (certificate) or cannot
+        # pause (write-pause). So:
+        #   - the certificate is committed config, and CDK itself refuses an
+        #     HTTP-only listener (compute-stack.ts) — failing this step;
+        #   - the write-pause comes from THIS dispatch's `writes` input, a closed
+        #     `open | paused` choice, so no misspelling can emit an unpaused task
+        #     (the security H3 concern the old variable check addressed). A push
+        #     is always `open`. `verify` still asserts the live `writesPaused`;
+        #   - the alert email is not read here: this job deploys Compute only.
         env:
-          ZZ_STAGING_CERT_ARN: ${{ vars.ZZ_STAGING_CERT_ARN }}
-          ZZ_PROD_CERT_ARN: ${{ vars.ZZ_PROD_CERT_ARN }}
-          ZZ_ALERT_EMAIL: ${{ vars.ZZ_ALERT_EMAIL }}
-          # The write-pause is a synth-time input (config/*.ts). A synth without
-          # it silently emits an UNPAUSED task definition — so it is carried from
-          # the environment's variables exactly like the certificate ARN
-          # (`@security-auditor` H-4). Set the variable to `paused` for the
-          # cutover window and clear it afterwards.
-          ZZ_STAGING_WRITES_PAUSED: ${{ vars.ZZ_STAGING_WRITES_PAUSED }}
-          ZZ_PROD_WRITES_PAUSED: ${{ vars.ZZ_PROD_WRITES_PAUSED }}
-          WRITES: ${{ inputs.writes || 'open' }}
+          ZZ_STAGING_WRITES_PAUSED: ${{ (inputs.environment || 'staging') == 'staging' && (inputs.writes || 'open') == 'paused' && 'paused' || '' }}
+          ZZ_PROD_WRITES_PAUSED: ${{ (inputs.environment || 'staging') == 'production' && (inputs.writes || 'open') == 'paused' && 'paused' || '' }}
         run: |
-          # Security H3 — the pause is a SYNTH-TIME value, and any spelling but
-          # exactly `paused` silently emits an UNPAUSED task definition. The
-          # dispatch must state its intent, and the variable must agree.
-          if [ "${{ inputs.environment || 'staging' }}" = "production" ]; then PAUSE_VAR="$ZZ_PROD_WRITES_PAUSED"; else PAUSE_VAR="$ZZ_STAGING_WRITES_PAUSED"; fi
-          if [ "$WRITES" = "paused" ] && [ "$PAUSE_VAR" != "paused" ]; then
-            echo "refusing: writes=paused requested but the environment's WRITES_PAUSED variable is '$PAUSE_VAR', not exactly 'paused'"; exit 1
-          fi
-          if [ "$WRITES" = "open" ] && [ -n "$PAUSE_VAR" ]; then
-            echo "refusing: writes=open requested but the environment's WRITES_PAUSED variable is set ('$PAUSE_VAR') — clear it or dispatch with writes=paused"; exit 1
-          fi
-          if [ "${{ inputs.environment || 'staging' }}" = "production" ] && [ -z "$ZZ_PROD_CERT_ARN" ]; then
-            echo "ZZ_PROD_CERT_ARN is not set on the production environment — refusing to synth an HTTP-only production listener"; exit 1
-          fi
-          # STAGING-DEPLOY-NO-VARS — staging needs neither variable here: its
-          # certificate is a committed default in infra/config/staging.ts, and
-          # the alert email feeds ONLY the Monitoring stack, which this job never
-          # deploys (it deploys Compute alone). Production keeps both checks.
-          if [ "${{ inputs.environment || 'staging' }}" = "production" ] && [ -z "$ZZ_ALERT_EMAIL" ]; then
-            echo "ZZ_ALERT_EMAIL is not set on the ${{ inputs.environment || 'staging' }} environment — refusing to synth an alarm topic with no subscriber"; exit 1
-          fi
+          echo "deploying ${{ inputs.environment || 'staging' }} with writes=${{ inputs.writes || 'open' }}"
           # `--ignore-workspace` is load-bearing: the repository root holds a
           # pnpm-workspace.yaml, so a bare `pnpm install` here installs the ROOT
           # project (866 packages) and never infra/pnpm-lock.yaml — `cdk` is
           # then "not found" (run 36233879711; reproduced and fixed locally).
           pnpm install --frozen-lockfile --ignore-workspace
+          # 09 §0 — staging and production share this account, so the CLI must
+          # read production's OWN bootstrap stack. Without the flag it reads the
+          # default `CDKToolkit`, which is staging's — and which the production
+          # deploy role is denied (infra/policies/production-deploy-role-deny.json).
+          # Staging passes no extra argument: its command is exactly as before.
+          TOOLKIT_ARGS=()
+          if [ "${{ inputs.environment || 'staging' }}" = "production" ]; then
+            TOOLKIT_ARGS=(--toolkit-stack-name CDKToolkit-prod)
+          fi
           pnpm --ignore-workspace exec cdk deploy "Zugzwang-${{ inputs.environment || 'staging' }}-Compute" \
             -c imageTag=${{ needs.build.outputs.image_tag }} \
-            --require-approval never
+            --require-approval never \
+            "${TOOLKIT_ARGS[@]}"
 
       - name: Wait for the service to stabilise
         run: |

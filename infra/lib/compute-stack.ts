@@ -1,4 +1,10 @@
-import { CfnOutput, Duration, Stack, type StackProps } from "aws-cdk-lib";
+import {
+	Annotations,
+	CfnOutput,
+	Duration,
+	Stack,
+	type StackProps,
+} from "aws-cdk-lib";
 import * as autoscaling from "aws-cdk-lib/aws-autoscaling";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
@@ -312,6 +318,18 @@ export class ComputeStack extends Stack {
 		// "A listener already exists on this port" (measured at AWS-MIGRATION-2;
 		// the update rolled back cleanly). Keeping the logical id stable and
 		// varying only the default action makes it an in-place UPDATE.
+		// ⛔ PROD-DEPLOY-NO-VARS — no environment is ever deployed with an
+		// HTTP-only listener. This used to be a shell check in deploy-aws.yml fed
+		// by a GitHub variable; variables arrived empty in four staging runs, so
+		// the rule lives here, on the config the synth actually uses. An error
+		// annotation fails `cdk synth`/`deploy` for THIS stack only — measured:
+		// `cdk synth Zugzwang-staging-Compute` still exits 0 while production's
+		// fails — so staging is unaffected while production has no certificate.
+		if (!config.certificateArn) {
+			Annotations.of(this).addError(
+				`Refusing to synthesize ${config.name} Compute without an HTTPS certificate (an HTTP-only listener would serve the site in clear text). Set the committed certificate ARN in infra/config/${config.name}.ts, or ZZ_${config.name === "production" ? "PROD" : "STAGING"}_CERT_ARN for a hand-run deploy.`,
+			);
+		}
 		const certificate = config.certificateArn
 			? acm.Certificate.fromCertificateArn(
 					this,

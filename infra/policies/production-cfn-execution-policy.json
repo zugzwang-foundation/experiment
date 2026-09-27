@@ -1,0 +1,216 @@
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "ProductionServices",
+			"Effect": "Allow",
+			"Action": [
+				"autoscaling:*",
+				"cloudwatch:*",
+				"ec2:*",
+				"ecr:*",
+				"ecs:*",
+				"elasticloadbalancing:*",
+				"events:*",
+				"lambda:*",
+				"logs:*",
+				"rds:*",
+				"sns:*",
+				"wafv2:*"
+			],
+			"Resource": "*"
+		},
+		{
+			"Sid": "ProductionSecrets",
+			"Effect": "Allow",
+			"Action": "secretsmanager:*",
+			"Resource": [
+				"arn:aws:secretsmanager:ap-south-1:849076101704:secret:zugzwang/production*",
+				"arn:aws:secretsmanager:ap-south-1:849076101704:secret:events!connection/*"
+			]
+		},
+		{
+			"Sid": "GenerateDatabasePassword",
+			"Effect": "Allow",
+			"Action": "secretsmanager:GetRandomPassword",
+			"Resource": "*"
+		},
+		{
+			"Sid": "ReadDeployParameters",
+			"Effect": "Allow",
+			"Action": ["ssm:GetParameter", "ssm:GetParameters"],
+			"Resource": [
+				"arn:aws:ssm:ap-south-1:849076101704:parameter/cdk-bootstrap/zzprod/*",
+				"arn:aws:ssm:ap-south-1::parameter/aws/service/*"
+			]
+		},
+		{
+			"Sid": "ReadOwnBootstrapAssets",
+			"Effect": "Allow",
+			"Action": ["s3:GetObject", "s3:GetObjectVersion"],
+			"Resource": "arn:aws:s3:::cdk-zzprod-assets-849076101704-ap-south-1/*"
+		},
+		{
+			"Sid": "EncryptionThroughServices",
+			"Effect": "Allow",
+			"Action": [
+				"kms:CreateGrant",
+				"kms:Decrypt",
+				"kms:DescribeKey",
+				"kms:GenerateDataKey*"
+			],
+			"Resource": "*",
+			"Condition": {
+				"StringEquals": {
+					"kms:ViaService": [
+						"rds.ap-south-1.amazonaws.com",
+						"secretsmanager.ap-south-1.amazonaws.com"
+					]
+				}
+			}
+		},
+		{
+			"Sid": "ProductionRolesOnlyUnderBoundary",
+			"Effect": "Allow",
+			"Action": [
+				"iam:AttachRolePolicy",
+				"iam:CreateRole",
+				"iam:DeleteRolePolicy",
+				"iam:DetachRolePolicy",
+				"iam:PutRolePermissionsBoundary",
+				"iam:PutRolePolicy"
+			],
+			"Resource": "arn:aws:iam::849076101704:role/Zugzwang-production-*",
+			"Condition": {
+				"StringEquals": {
+					"iam:PermissionsBoundary": "arn:aws:iam::849076101704:policy/zugzwang-production-boundary"
+				}
+			}
+		},
+		{
+			"Sid": "ProductionRolesMaintain",
+			"Effect": "Allow",
+			"Action": [
+				"iam:DeleteRole",
+				"iam:GetRole",
+				"iam:GetRolePolicy",
+				"iam:ListAttachedRolePolicies",
+				"iam:ListRolePolicies",
+				"iam:PassRole",
+				"iam:TagRole",
+				"iam:UntagRole",
+				"iam:UpdateAssumeRolePolicy",
+				"iam:UpdateRole",
+				"iam:UpdateRoleDescription"
+			],
+			"Resource": "arn:aws:iam::849076101704:role/Zugzwang-production-*"
+		},
+		{
+			"Sid": "ProductionInstanceProfiles",
+			"Effect": "Allow",
+			"Action": [
+				"iam:AddRoleToInstanceProfile",
+				"iam:CreateInstanceProfile",
+				"iam:DeleteInstanceProfile",
+				"iam:GetInstanceProfile",
+				"iam:RemoveRoleFromInstanceProfile",
+				"iam:TagInstanceProfile",
+				"iam:UntagInstanceProfile"
+			],
+			"Resource": "arn:aws:iam::849076101704:instance-profile/Zugzwang-production-*"
+		},
+		{
+			"Sid": "ServiceLinkedRoles",
+			"Effect": "Allow",
+			"Action": "iam:CreateServiceLinkedRole",
+			"Resource": "*",
+			"Condition": {
+				"StringEquals": {
+					"iam:AWSServiceName": [
+						"autoscaling.amazonaws.com",
+						"ecs.amazonaws.com",
+						"elasticloadbalancing.amazonaws.com",
+						"rds.amazonaws.com"
+					]
+				}
+			}
+		},
+		{
+			"Sid": "DenyAccountLevelIdentity",
+			"Effect": "Deny",
+			"Action": [
+				"account:*",
+				"iam:*AccessKey*",
+				"iam:*Group*",
+				"iam:*LoginProfile*",
+				"iam:*OpenIDConnectProvider*",
+				"iam:*SAMLProvider*",
+				"iam:*User*",
+				"iam:CreatePolicy",
+				"iam:CreatePolicyVersion",
+				"iam:DeletePolicy",
+				"iam:DeletePolicyVersion",
+				"iam:DeleteRolePermissionsBoundary",
+				"iam:SetDefaultPolicyVersion",
+				"organizations:*",
+				"sts:*"
+			],
+			"Resource": "*"
+		},
+		{
+			"Sid": "DenyBootstrapAndDeployRoles",
+			"Effect": "Deny",
+			"Action": "iam:*",
+			"Resource": [
+				"arn:aws:iam::849076101704:role/cdk-*",
+				"arn:aws:iam::849076101704:role/zugzwang-*-github-deploy"
+			]
+		},
+		{
+			"Sid": "DenyStagingByTag",
+			"Effect": "Deny",
+			"Action": "*",
+			"Resource": "*",
+			"Condition": {
+				"StringEquals": {
+					"aws:ResourceTag/Environment": "staging"
+				}
+			}
+		},
+		{
+			"Sid": "DenyStagingByName",
+			"Effect": "Deny",
+			"Action": "*",
+			"Resource": [
+				"arn:aws:secretsmanager:*:849076101704:secret:zugzwang/staging*",
+				"arn:aws:secretsmanager:*:849076101704:secret:events!connection/zugzwang-staging-*",
+				"arn:aws:rds:*:849076101704:db:zugzwang-staging-*",
+				"arn:aws:rds:*:849076101704:subgrp:zugzwang-staging-*",
+				"arn:aws:rds:*:849076101704:pg:zugzwang-staging-*",
+				"arn:aws:rds:*:849076101704:snapshot:*zugzwang-staging-*",
+				"arn:aws:ecs:*:849076101704:cluster/zugzwang-staging",
+				"arn:aws:ecs:*:849076101704:service/zugzwang-staging/*",
+				"arn:aws:ecs:*:849076101704:task/zugzwang-staging/*",
+				"arn:aws:ecs:*:849076101704:container-instance/zugzwang-staging/*",
+				"arn:aws:ecs:*:849076101704:task-definition/zugzwang-staging-*",
+				"arn:aws:ecs:*:849076101704:task-definition/Zugzwangstaging*",
+				"arn:aws:ecr:*:849076101704:repository/zugzwang-staging",
+				"arn:aws:logs:*:849076101704:log-group:/zugzwang/staging/*",
+				"arn:aws:sns:*:849076101704:zugzwang-staging-*",
+				"arn:aws:events:*:849076101704:rule/zugzwang-staging-*",
+				"arn:aws:events:*:849076101704:connection/zugzwang-staging-*",
+				"arn:aws:events:*:849076101704:api-destination/zugzwang-staging-*",
+				"arn:aws:wafv2:*:849076101704:regional/webacl/zugzwang-staging-*",
+				"arn:aws:lambda:*:849076101704:function:Zugzwang-staging-*",
+				"arn:aws:autoscaling:*:849076101704:autoScalingGroup:*:autoScalingGroupName/Zugzwang-staging-*",
+				"arn:aws:cloudwatch::849076101704:dashboard/zugzwang-staging",
+				"arn:aws:iam::849076101704:role/Zugzwang-staging-*",
+				"arn:aws:iam::849076101704:role/zugzwang-staging-*",
+				"arn:aws:iam::849076101704:role/cdk-hnb659fds-*",
+				"arn:aws:iam::849076101704:instance-profile/Zugzwang-staging-*",
+				"arn:aws:s3:::cdk-hnb659fds-*",
+				"arn:aws:ssm:*:849076101704:parameter/cdk-bootstrap/hnb659fds/*"
+			]
+		}
+	]
+}
