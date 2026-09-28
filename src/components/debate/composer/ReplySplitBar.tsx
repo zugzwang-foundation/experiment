@@ -14,6 +14,8 @@ import { computeSplitBar, displaySplitTotal } from "./split-bar";
  * (`TriggerPill.tsx`); `Support` and `Counter` here are plain labels beside
  * their Đ figures, which is canon §6's own string. The track, its poles and its
  * hairline are untouched.
+ * ⚠ UIR-4 item 5 — each label now stands ABOVE its figure (`EndLabel`), not
+ * beside it.
  */
 export function ReplySplitBar({
 	postSide,
@@ -32,6 +34,8 @@ export function ReplySplitBar({
 		aggregate.supportDharma,
 		aggregate.counterDharma,
 	);
+	const support = formatDharma(aggregate.supportDharma);
+	const counter = formatDharma(aggregate.counterDharma);
 	return (
 		/* ⚠⚠ RPLY-1 · R5 — THE FOCUSED POST'S BAR CATCHES UP TO THE CARD'S.
 		   `AggregateFooter` (the market-view card) and this component were two
@@ -70,12 +74,17 @@ export function ReplySplitBar({
 			{/* FEED-3 — label BESIDE its figure, outward-in, on a pill-height (`h-6`)
 			    line so it stays centred on the track as the pill it replaces was. The
 			    figure keeps its shipped class; the label takes the bar's own overline
-			    (`staked` below). */}
-			<span className="flex h-6 shrink-0 items-center gap-1.5">
-				<span className="tracking-[0.1em] text-n5 uppercase">Support</span>
-				<span className="text-n5">
-					Đ {formatDharma(aggregate.supportDharma)}
-				</span>
+			    (`staked` below).
+			    ⚠⚠ UIR-4 item 5 — TWO LINES NOW, AND BOTH ENDS ONE WIDTH. Each end is
+			    `EndLabel`: the word in `--color-ink` #fafafa at the label's 12px, weight
+			    and 0.1em tracking, over its Đ figure in mono at the same size in the
+			    label's grey, centred under it. Each end's grid cell also holds the
+			    OTHER end's pair, invisible, so both cells take the wider pair's width
+			    and the track between them — and `Đ N STAKED` under it — is centred in
+			    the row, which sits on the page's centre line (see `PostFocusHeader`). */}
+			<span className="grid shrink-0">
+				<EndLabel word="Support" amount={support} />
+				<EndLabel word="Counter" amount={counter} sizer />
 			</span>
 			<span className="flex min-w-0 flex-1 flex-col items-center gap-1">
 				{/* RR-3 — THE POLES NAME THE SIDE, NEVER THE RELATION.
@@ -170,8 +179,11 @@ export function ReplySplitBar({
 				    track means it takes `bg-yes` #181818 on a NO post against a
 				    #212121 card — ~1.10:1, i.e. gone — leaving the fill no visible
 				    extent to be a proportion OF. `reply-split-bar.test.tsx` asserts it
-				    on BOTH poles. */}
-				<span className="flex h-6 w-full items-center">
+				    on BOTH poles.
+				    ⚠ UIR-4 item 5 — THE BOX IS `h-8` NOW, the two-line end labels'
+				    height (two 16px `text-xs` lines), so the track centres on those
+				    labels by the same mechanism it centred on the pill's box. */}
+				<span className="flex h-8 w-full items-center">
 					<span
 						className={`h-[18px] w-full overflow-hidden rounded-[var(--r)] [border:var(--hairline)] ${postSide === "YES" ? "bg-no" : "bg-yes"}`}
 						aria-hidden="true"
@@ -191,12 +203,36 @@ export function ReplySplitBar({
 					<span className="tracking-[0.1em] uppercase">staked</span>
 				</span>
 			</span>
-			<span className="flex h-6 shrink-0 items-center gap-1.5">
-				<span className="text-n5 font-mono text-[11px] font-medium">
-					Đ {formatDharma(aggregate.counterDharma)}
-				</span>
-				<span className="tracking-[0.1em] text-n5 uppercase">Counter</span>
+			<span className="grid shrink-0">
+				<EndLabel word="Counter" amount={counter} />
+				<EndLabel word="Support" amount={support} sizer />
 			</span>
 		</div>
+	);
+}
+
+/**
+ * UIR-4 item 5 — one end of the bar: the word over its Đ figure. A `sizer` is
+ * the OTHER end's pair, laid invisibly in the same grid cell, so both ends take
+ * the wider pair's width without anything measuring it; it is hidden from
+ * assistive technology, and `invisible` keeps it out of the paint.
+ */
+function EndLabel({
+	word,
+	amount,
+	sizer = false,
+}: {
+	word: string;
+	amount: string;
+	sizer?: boolean;
+}) {
+	return (
+		<span
+			aria-hidden={sizer || undefined}
+			className={`col-start-1 row-start-1 flex flex-col items-center${sizer ? " invisible" : ""}`}
+		>
+			<span className="tracking-[0.1em] text-ink uppercase">{word}</span>
+			<span className="font-mono text-n5">Đ {amount}</span>
+		</span>
 	);
 }
