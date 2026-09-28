@@ -1,6 +1,7 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
+import { InfoTip } from "@/components/ui/info-tip";
 
 import { ArgProfile } from "./ArgProfile";
 import { SideBadge } from "./badges";
@@ -13,6 +14,25 @@ import { KnowMore } from "./KnowMore";
 import { RemovedPlaceholder } from "./placeholders";
 import { QuoteWell } from "./quote-well/QuoteWell";
 import type { DebateMarketHeader, DebatePost, PresentPost } from "./types";
+
+/**
+ * UIR-4 item 4 — the mean advance of a title character, in em: Geist at the
+ * title's weight (500), normal tracking, spaces included. Measured on the
+ * deployed face on staging, 2026-09-28: 0.452–0.496 across mixed-case prose
+ * titles (0.555 in all caps). 0.5 sits at the top of the prose range, so a
+ * prose title the estimate fits does fit, at the cost of shrinking a few
+ * percent more than the narrowest titles need.
+ */
+const TITLE_ADVANCE_EM = 0.5;
+
+/**
+ * The size at which `title` fills its row on one line: the row's width over
+ * the title's estimated width at 1px, in container units, held between 11px
+ * and the title's 14px. `length` counts UTF-16 units, as the composer's cap
+ * does.
+ */
+const titleSize = (title: string) =>
+	`clamp(11px, ${(100 / (Math.max(title.length, 1) * TITLE_ADVANCE_EM)).toFixed(4)}cqw, 14px)`;
 
 /**
  * The focused-post header (DEBATE.4 §4 post-view) — the entered post shown in
@@ -275,20 +295,28 @@ export function PostFocusHeader({
 									    row; without one, the well in column 1 is the title, and
 									    `Know more` stands on its own row, right-aligned, where it
 									    sits under an image post's title. */}
+									{/* ⚠ UIR-4 item 4 — AN IMAGE POST'S TITLE IS ONE LINE, ALWAYS,
+									    across column 2's full width; `Know more` moved to its own
+									    row under it. The title starts at its 14px and shrinks only
+									    as far as its length needs to fit the row, never below 11px:
+									    `titleSize` is a pure function of the length, read against
+									    the row's width in container units (this row is the query
+									    container), so nothing is measured in script. What still
+									    does not fit at 11px ends in `…` on the same line, and the
+									    full title is in the tooltip. */}
 									{post.imageUrl ? (
-										<div className="flex items-baseline justify-between gap-2 min-w-0">
-											<h2 className="font-heading text-sm leading-snug font-medium line-clamp-1 min-w-0 flex-1">
-												{post.title}
-											</h2>
-											{hasExtendedText(post.body) ? (
-												<KnowMore
-													label="Know more about this argument"
-													onClick={() => onOpenPopup(post)}
-													className="shrink-0"
-												/>
-											) : null}
+										<div className="@container min-w-0">
+											<InfoTip content={post.title} asChild>
+												<h2
+													className="truncate font-heading leading-snug font-medium"
+													style={{ fontSize: titleSize(post.title) }}
+												>
+													{post.title}
+												</h2>
+											</InfoTip>
 										</div>
-									) : hasExtendedText(post.body) ? (
+									) : null}
+									{hasExtendedText(post.body) ? (
 										<KnowMore
 											label="Know more about this argument"
 											onClick={() => onOpenPopup(post)}
