@@ -25,6 +25,7 @@ import { ImageLightbox, PostPopup, ReplyPopup } from "./dialogs";
 import { findPostedNode } from "./find-posted";
 import { MarketHeader } from "./MarketHeader";
 import { PostFocusHeader } from "./PostFocusHeader";
+import { useIsPhoneTier } from "./phone-tier";
 import { readPostParam, resolvePostParamClient } from "./post-param";
 import { parentOfReply, replyDownloadOrdinal } from "./reply-download";
 import { PostScroller, ReplyScroller } from "./scrollers";
@@ -47,6 +48,21 @@ const opposite = (side: Side): Side => (side === "YES" ? "NO" : "YES");
  * click. See `exitPost` for why a dead-man's release is needed at all.
  */
 const TRAVERSAL_RELEASE_MS = 400;
+
+/**
+ * NAV-2 — a modal dialog is open over the page, so ↑/↓ are its keys. One that
+ * declares `aria-modal` (the chart overlay), or a Radix dialog holding the focus
+ * — Radix traps focus inside its dialog and does not set `aria-modal`, which is
+ * why the second test reads the key's target. `DebateView`'s own pop-ups are
+ * also checked from state, beside this.
+ */
+function modalDialogOpen(target: EventTarget | null): boolean {
+	return (
+		document.querySelector('[aria-modal="true"]') !== null ||
+		(target instanceof Element &&
+			target.closest('[role="dialog"], [role="alertdialog"]') !== null)
+	);
+}
 
 /** A focused post's replies for one pole column — placed by their OWN side (D3). */
 function repliesForSide(post: DebatePost, side: Side): DebateReply[] {
@@ -209,10 +225,16 @@ export function DebateView({
 		NO: null,
 	});
 	/**
-	 * d5's `lastSide` (`:1683`) — the most recently chosen column. With nothing
-	 * picked, ↑/↓ resume THAT column rather than doing nothing (`d5:1801`).
+	 * ⛔ NAV-2 — THE ACTIVE COLUMN, the one ↑/↓ step. It is the column that last
+	 * took a pointer-down, a pointer-enter or focus (the listener below), or was
+	 * chosen with ←/→; before any of those it is the LEFT (YES) column. It
+	 * replaces d5's `lastSide`, which moved only on a pick — so on arrival, and
+	 * whenever the reader hovered or clicked a control rather than blank card
+	 * space, ↑/↓ had no column and did nothing.
+	 * ⚠ A REF, for `stepRefs`' reason: it is read in a key handler and writing it
+	 * must not re-render.
 	 */
-	const lastSideRef = useRef<Side | null>(null);
+	const activeSideRef = useRef<Side>("YES");
 
 	// ⚠ ONE STABLE CALLBACK PER SIDE, not one closure built inside the `.map`.
 	// The scroller's register effect lists this in its deps, so a fresh function
@@ -312,10 +334,9 @@ export function DebateView({
 		[model, router],
 	);
 
-	/** d5's `pickSide` (`:1746`) — choosing a column also makes it the `lastSide`. */
+	/** d5's `pickSide` (`:1746`) — choosing a column stops its auto-advance. */
 	const pickSide = useCallback((side: Side) => {
 		setPickedSide(side);
-		lastSideRef.current = side;
 	}, []);
 
 	const { market, posts, priceChart } = model;
@@ -434,7 +455,8 @@ export function DebateView({
 	 * ⇒ BOTH ARE FIXED BY PORTING `onKey` AS WRITTEN (`d5:1789-1803`, mirrored at
 	 * `:1889-1895`) rather than a description of it, plus making the pick VISIBLE
 	 * (see `DebateColumn`'s `picked`). ↑/↓ step the chosen column; ←/→ choose one;
-	 * with nothing chosen yet, ↑/↓ resume `lastSide`.
+	 * with nothing chosen yet, ↑/↓ resume `lastSide`. ⚠ NAV-2 (below): ↑/↓ now
+	 * step the ACTIVE column, and `lastSide` is gone.
 	 *
 	 * ⛔ THE SUPERSEDED RULING, RECORDED RATHER THAN DELETED (O-4). This block
 	 * used to read: "⛔ ONLY ←/→, AND d5's ↑/↓ STEPPING IS DELIBERATELY NOT
@@ -444,26 +466,44 @@ export function DebateView({
 	 * dismissed: ↑/↓ are swallowed ONLY when a column is actually chosen — either
 	 * picked now, or picked earlier this session. Until the reader has touched a
 	 * column, ↑/↓ scroll the page exactly as they always did, and clicking off the
-	 * arena releases the pick and hands scrolling straight back.
+	 * arena releases the pick and hands scrolling straight back. ⚠ Superseded in
+	 * turn by NAV-2 (below).
 	 *
 	 * ⛔ NEVER WHILE TYPING (d5's own guard, `:1461`): a composer is a `<textarea>`
 	 * and stealing ← mid-argument would move the surface under an author trying to
-	 * move the caret. `frozen` already covers composer-open; the target check is
-	 * the belt for any future input.
+	 * move the caret. `frozen` already covers composer-open for ←/→; for ↑/↓,
+	 * which NAV-2 lets through a composer, the target check is the guard itself.
 	 *
 	 * ⚠ `preventDefault` ONLY on a key this handler actually consumes.
+	 *
+	 * ⛔⛔ NAV-2 — ↑/↓ NOW STEP THE ACTIVE COLUMN, and two of the rules above are
+	 * superseded for them (recorded, not deleted — O-4). Measured on staging at
+	 * `7e00889`: on arrival ↑/↓ did nothing on either page, because nothing was
+	 * picked and a hover or a click on a control never picks; and while either
+	 * column showed a composer or the signed-out panel they did nothing even
+	 * after the other column's own rail was clicked, because `frozen` returned
+	 * first. `Bet YES` puts the panel on the right, so the left column — the one
+	 * still showing cards — could not be stepped at all.
+	 *   · ↑/↓ step `activeSideRef` (see its block), the left column until the
+	 *     reader touches one — "until the reader has touched a column, ↑/↓
+	 *     scroll the page" is gone; this page is one screen and does not scroll.
+	 *   · `frozen` no longer stops them: a column hosting a composer has no
+	 *     stepper, so only the column still showing cards can move, exactly as
+	 *     its ▲/▼ can. A text field and a MODAL dialog still keep their keys.
+	 *   · Below 640px this tree is hidden and still mounted, so ↑/↓ are left to
+	 *     the phone tree — stepping an invisible column would swallow them.
+	 * ←/→ are unchanged, except that choosing a column also makes it active.
 	 */
+	const phoneTier = useIsPhoneTier();
+	const modalOpen =
+		popupPost !== null ||
+		popupReply !== null ||
+		lightboxUrl !== null ||
+		criterionOpen;
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			if (
-				e.key !== "ArrowLeft" &&
-				e.key !== "ArrowRight" &&
-				e.key !== "ArrowUp" &&
-				e.key !== "ArrowDown"
-			) {
-				return;
-			}
-			if (frozen) {
+			const vertical = e.key === "ArrowUp" || e.key === "ArrowDown";
+			if (!vertical && e.key !== "ArrowLeft" && e.key !== "ArrowRight") {
 				return;
 			}
 			const target = e.target as HTMLElement | null;
@@ -475,32 +515,65 @@ export function DebateView({
 			) {
 				return;
 			}
-			if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+			if (vertical) {
+				if (phoneTier || modalOpen || modalDialogOpen(e.target)) {
+					return;
+				}
+				const side = activeSideRef.current;
+				const step = stepRefs.current[side];
+				if (step === null) {
+					return;
+				}
 				e.preventDefault();
-				pickSide(e.key === "ArrowLeft" ? "YES" : "NO");
+				// Exactly what the rail arrows do (`d5:1780-1781` — `pickSide(side);
+				// step(side, ±1)`): touching a column takes it off the timer.
+				pickSide(side);
+				step(e.key === "ArrowUp" ? -1 : 1);
 				return;
 			}
-			// ↑/↓ — step the chosen column. `pickedSide` if one is chosen, else the
-			// last one the reader touched (d5 `:1801`). With neither, this key is
-			// NOT consumed and the page scrolls, which is the whole answer to the
-			// superseded objection above.
-			const target_side = pickedSide ?? lastSideRef.current;
-			if (target_side === null) {
-				return;
-			}
-			const step = stepRefs.current[target_side];
-			if (step === undefined || step === null) {
+			if (frozen) {
 				return;
 			}
 			e.preventDefault();
-			// Touching a column takes it off the timer, exactly as the rail arrows
-			// do (`d5:1780-1781` — `pickSide(side); step(side, ±1)`).
-			pickSide(target_side);
-			step(e.key === "ArrowUp" ? -1 : 1);
+			const side = e.key === "ArrowLeft" ? "YES" : "NO";
+			activeSideRef.current = side;
+			pickSide(side);
 		};
 		document.addEventListener("keydown", onKey);
 		return () => document.removeEventListener("keydown", onKey);
-	}, [frozen, pickedSide, pickSide]);
+	}, [frozen, modalOpen, phoneTier, pickSide]);
+
+	/**
+	 * NAV-2 — the pointer or focus arriving in a column makes it the active one.
+	 * Delegated, for the reason the click listener below gives, and in the
+	 * capture phase so a control that stops propagation cannot hide the event.
+	 * ⚠ A COLUMN WITH NO STEPPER CANNOT BECOME ACTIVE — it is showing a composer
+	 * or the signed-out panel, and has nothing for ↑/↓ to step. Without this, the
+	 * slot's own focus move onto the panel's × (`ComposerSlot`) would take the
+	 * keys away from the column the reader just pressed `Bet` in.
+	 */
+	useEffect(() => {
+		const track = (e: Event) => {
+			const side =
+				e.target instanceof Element
+					? e.target
+							.closest("[data-debate-column]")
+							?.getAttribute("data-debate-column")
+					: null;
+			if ((side === "YES" || side === "NO") && stepRefs.current[side]) {
+				activeSideRef.current = side;
+			}
+		};
+		const opts = { capture: true, passive: true };
+		document.addEventListener("pointerdown", track, opts);
+		document.addEventListener("pointerover", track, opts);
+		document.addEventListener("focusin", track, opts);
+		return () => {
+			document.removeEventListener("pointerdown", track, opts);
+			document.removeEventListener("pointerover", track, opts);
+			document.removeEventListener("focusin", track, opts);
+		};
+	}, []);
 
 	/**
 	 * ⚠⚠ d5's TWO CLICK BEHAVIOURS, IN ONE DELEGATED LISTENER — which is how d5
@@ -998,6 +1071,8 @@ export function DebateView({
 		);
 		// A pick names a COLUMN; the arm may have swapped (as in `onPop`).
 		setPickedSide(null);
+		// NAV-2 — a new entry starts with no column touched, so the left is active.
+		activeSideRef.current = "YES";
 	}, []);
 
 	/**
