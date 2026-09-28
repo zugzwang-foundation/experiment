@@ -16,6 +16,9 @@ import {
 	GEIST_QUOTE_INK,
 	GEIST_QUOTE_TOP,
 	GEIST_QUOTE_TOP_CLOSE,
+	GEIST_UPPER_ADV,
+	QUOTE_TYPE,
+	WRAP_SLACK,
 } from "./quote-well/size";
 import type { DebateMarketHeader, DebatePost, PresentPost } from "./types";
 
@@ -201,7 +204,7 @@ export function PostFocusHeader({
 					    picture and end at this card's right padding, so they grow and
 					    shrink with it. A removed post has no picture and no column 1. The
 					    width above survives as the picture's ceiling. A text-only post's
-					    column 1 is a square tile (item 3).
+					    column 1 is its quote tile, 100px or 200px wide (item 3, UIR-8).
 					    ⚠⚠ UIR-5 item 1 — THE HEIGHT IS UIR-3's, AND IT IS FIXED. UIR-4 gave
 					    this row the market arm's height as a floor (192px of section at
 					    1440); that floor is gone, and the section is back to the 125.25px
@@ -238,7 +241,10 @@ export function PostFocusHeader({
 						    CASE'S NOTHING: its title fills the frame as the quotation well.
 						    Only a removed post still draws nothing here.
 						    ⚠ UIR-7 item 3 — THE WELL IS GONE FROM THIS PAGE; a text-only post
-						    gets `QuoteMarksTile`, the well's two marks and no title.
+						    gets the well's two marks and no title.
+						    ⚠ UIR-8 — AND ITS TITLE IS BACK BETWEEN THEM: `QuoteTile` draws it in
+						    the well's type, laid out at the tile's own size rather than scaled
+						    down from the well's.
 						    ⚠ UIR-7 item 2 — AND IT RESERVES NOTHING NOW EITHER. The frame it
 						    kept was the centre rule's, which is dropped, so a removed post has
 						    no column 1 and its content starts at the card's left padding.
@@ -280,7 +286,7 @@ export function PostFocusHeader({
 								/>
 							</div>
 						) : (
-							<QuoteMarksTile />
+							<QuoteTile title={post.title} />
 						)}
 
 						{/* `.hstack` (`d5:462`, `flex:1 1 auto;min-width:0;flex-direction:
@@ -351,7 +357,10 @@ export function PostFocusHeader({
 									    takes the other branch and has no title row at all.
 									    ⚠ UIR-7 item 3 — column 1 carries no title now (the marks
 									    tile), so this row is the only place a text-only post's title
-									    is drawn, as it is for an image post. */}
+									    is drawn, as it is for an image post.
+									    ⚠ UIR-8 — the tile draws the title again, as a picture hidden
+									    from assistive technology, so this row stays the heading and
+									    is unchanged. */}
 									{/* ⚠ UIR-4 item 4 — AN IMAGE POST'S TITLE IS ONE LINE, ALWAYS
 									    (UIR-5 item 5: every post's), across column 2's full width;
 									    `Know more` moved to its own row under it (UIR-5 item 3: to
@@ -412,29 +421,112 @@ export function PostFocusHeader({
 	);
 }
 
-/** UIR-7 item 3 — the marks' size in the text-only tile, as a font size. */
-const TILE_MARK_PX = 48;
+/** UIR-8 — the marks' size in the text-only tile, as a font size. */
+const TILE_MARK_PX = 20;
+
+/** UIR-8 — the tile's height: the row's `h-[99.25px]`. The two move together. */
+const TILE_H_PX = 99.25;
+
+/** UIR-8 — the space between each mark's ink and the title's band. */
+const TILE_GAP_PX = 4;
+
+/** UIR-8 — the title's size range in the tile, in px. */
+const TILE_TITLE_PX = { min: 9, max: 20 } as const;
+
+/** UIR-8 — a title up to this many characters gets the 100px tile; a longer
+ * one gets 200px. Counted as `titleSize` counts, in UTF-16 units. */
+const TILE_NARROW_MAX_CHARS = 40;
 
 /**
- * UIR-7 item 3 — A TEXT-ONLY POST's PICTURE: THE QUOTE-1 WELL's TWO MARKS AND
- * NOTHING ELSE. It replaces UIR-5 item 5's scaled-down well, whose title at
- * thumbnail size was a second, unreadable copy of the title row beside it.
- * The tile is square and as tall as the row — `w-[99.25px]` is the row's
- * `h-[99.25px]`, and the two literals move together — with no border and no
- * ground. The marks are the well's own: `“` and `”`, Geist bold in `text-n4`,
- * here at 48px, the opening one in the top-left corner and the closing one in
- * the bottom-right.
- * ⚠ EACH MARK's BOX IS ITS INK, as in `QuoteWell` and off the same measured
- * constants: at `line-height: 1` a mark's line box is an em tall for 0.311 em
- * of ink, and the two marks sit at different heights in it, so a mark pinned
- * by its line box would float 26px above the bottom corner. The margins make
- * each box exactly its ink, so `top-0` and `bottom-0` put the ink on the
- * tile's edges.
- * ⚠ HIDDEN FROM ASSISTIVE TECHNOLOGY: it says nothing the title row does not.
- * ⛔ A removed post never renders it — the tile would announce that the
- * withheld argument carried no attachment.
+ * UIR-8 — how many lines `title` takes in a `width`-px line at `size` px, or
+ * `Infinity` when a word is wider than the line: the browser's own line-break
+ * rule — whole words, filled greedily, broken at spaces — run on estimated
+ * widths. Every character, the joining space included, is taken at the advance
+ * `size.ts` records as the well's safe bound (`GEIST_UPPER_ADV / WRAP_SLACK`,
+ * 0.7076 em). `text-wrap: balance` evens the lines out without adding one.
  */
-function QuoteMarksTile() {
+function tileLines(title: string, width: number, size: number): number {
+	const perLine = width / ((GEIST_UPPER_ADV / WRAP_SLACK) * size);
+	let lines = 1;
+	let used = 0;
+	for (const word of title.trim().split(/\s+/)) {
+		if (word.length > perLine) {
+			return Number.POSITIVE_INFINITY;
+		}
+		if (used === 0) {
+			used = word.length;
+		} else if (used + 1 + word.length <= perLine) {
+			used += 1 + word.length;
+		} else {
+			lines += 1;
+			used = word.length;
+		}
+	}
+	return lines;
+}
+
+/**
+ * UIR-8 — the title's size in the tile, and how many lines the tile shows at
+ * it. A pure function of the title and the tile's box, so nothing is measured
+ * in script — the title row's `titleSize` rule, for a title that wraps.
+ *
+ * The title's band is the tile's height less both marks' ink and a 4px gap
+ * under and over them. The size is the largest whole px in [9, 20] at which
+ * the title's lines (`tileLines`) fit that band. ⚠ IT COUNTS WORDS, NOT ONLY
+ * CHARACTERS, because a 100px line holds a word or two: measured on the 1,563
+ * titles staging carried on 2026-09-29, a length-only estimate (the well's own,
+ * `quoteTitleSize`) under-counted the lines of 6 of the 51 real titles and 547
+ * of the 1,512 load-test ones — each would have been clipped at a size where a
+ * smaller one fits — while this one under-counted none, and came within 3px
+ * of the largest size that fits. `lines` is the band's whole lines at the
+ * chosen size: a title that still overruns the band at 9px shows only full
+ * lines and clips after the last.
+ */
+function tileTitleFit(
+	title: string,
+	width: number,
+): { size: number; lines: number } {
+	const band = TILE_H_PX - 2 * GEIST_QUOTE_INK * TILE_MARK_PX - 2 * TILE_GAP_PX;
+	let size: number = TILE_TITLE_PX.min;
+	for (let s = TILE_TITLE_PX.max; s > TILE_TITLE_PX.min; s--) {
+		if (tileLines(title, width, s) * QUOTE_TYPE.lineHeight * s <= band) {
+			size = s;
+			break;
+		}
+	}
+	return {
+		size,
+		lines: Math.floor(band / (QUOTE_TYPE.lineHeight * size)),
+	};
+}
+
+/**
+ * UIR-8 — A TEXT-ONLY POST's PICTURE: ITS TITLE BETWEEN THE QUOTE-1 WELL's
+ * MARKS, the feed's text-as-image laid out at the tile's own size. It replaces
+ * UIR-7 item 3's marks-only tile, and it is not UIR-5 item 5's scaled-down
+ * well: the title is set for this box, so its type is as large as the box
+ * allows rather than the well's size shrunk with the whole picture.
+ *
+ * The tile is as tall as the row and 100px wide for a title up to 40
+ * characters, 200px for a longer one, with no border and no ground. The type
+ * is the well's: Geist bold, uppercase, 0.02em tracking and 1.15 leading, the
+ * title in `text-ink` and the marks — `“` and `”` in `text-n4`, here at 20px —
+ * in the top-left and bottom-right corners. The title is centred between
+ * them, balanced over its lines, at `tileTitleFit`'s size, and a title that
+ * still overruns the band at 9px is clipped after its last full line.
+ * ⚠ EACH MARK's BOX IS ITS INK, as in `QuoteWell` and off the same measured
+ * constants: a mark's `line-height: 1` box is an em tall for 0.311 em of ink,
+ * and the two marks sit at different heights in it. The margins make each box
+ * exactly its ink, so `top-0` and `bottom-0` put the ink on the tile's edges
+ * and the title's band can start and end a fixed gap from it.
+ * ⚠ HIDDEN FROM ASSISTIVE TECHNOLOGY: the title row beside it is the heading
+ * and says the same thing.
+ * ⛔ A removed post never renders it — its variant has no title at the type
+ * level, and the tile would publish the masked argument's title.
+ */
+function QuoteTile({ title }: { title: string }) {
+	const width = title.length <= TILE_NARROW_MAX_CHARS ? 100 : 200;
+	const { size, lines } = tileTitleFit(title, width);
 	const ink = GEIST_QUOTE_INK * TILE_MARK_PX;
 	const markStyle = (top: number) => ({
 		fontSize: `${TILE_MARK_PX}px`,
@@ -446,7 +538,8 @@ function QuoteMarksTile() {
 		<div
 			data-testid="post-focus-media"
 			aria-hidden="true"
-			className="relative w-[99.25px] shrink-0"
+			className="relative shrink-0"
+			style={{ width: `${width}px` }}
 		>
 			<span
 				className="absolute top-0 left-0 block font-sans font-bold text-n4"
@@ -454,6 +547,25 @@ function QuoteMarksTile() {
 			>
 				{"“"}
 			</span>
+			<div
+				className="absolute inset-x-0 flex flex-col justify-center"
+				style={{
+					top: `${ink + TILE_GAP_PX}px`,
+					bottom: `${ink + TILE_GAP_PX}px`,
+				}}
+			>
+				<span
+					className="block overflow-hidden text-center font-sans font-bold text-ink uppercase [overflow-wrap:anywhere] [text-wrap:balance]"
+					style={{
+						fontSize: `${size}px`,
+						lineHeight: QUOTE_TYPE.lineHeight,
+						letterSpacing: `${QUOTE_TYPE.tracking}em`,
+						maxHeight: `${lines}lh`,
+					}}
+				>
+					{title}
+				</span>
+			</div>
 			<span
 				className="absolute right-0 bottom-0 block font-sans font-bold text-n4"
 				style={markStyle(GEIST_QUOTE_TOP_CLOSE)}
