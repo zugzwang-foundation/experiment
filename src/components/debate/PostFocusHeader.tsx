@@ -11,6 +11,7 @@ import { FocusMarketCard } from "./FocusMarketCard";
 import { HeadZone } from "./HeadZone";
 import { KnowMore } from "./KnowMore";
 import { RemovedPlaceholder } from "./placeholders";
+import { QuoteWell } from "./quote-well/QuoteWell";
 import type { DebateMarketHeader, DebatePost, PresentPost } from "./types";
 
 /**
@@ -200,7 +201,10 @@ export function PostFocusHeader({
 						    PLACEHOLDER. Column 1 reserves the width that centres column 2
 						    whatever the post carries, and draws nothing of its own. What it
 						    holds is `absolute`, so an attachment's natural height can never
-						    set the row's. */}
+						    set the row's.
+						    ⚠ UIR-4 item 3 — AND AN IMAGELESS POST NO LONGER GETS THE REMOVED
+						    CASE'S NOTHING: its title fills the frame as the quotation well.
+						    Only a removed post still draws nothing here. */}
 						<div
 							data-testid="post-focus-media"
 							className="relative w-[calc((100cqw_+_26px)/3_-_13px)] shrink-0 lg:w-[344px]"
@@ -225,7 +229,20 @@ export function PostFocusHeader({
 										className="max-h-full border-0!"
 									/>
 								</div>
-							) : null}
+							) : (
+								// ⚠ UIR-4 item 3 — A POST WITHOUT AN IMAGE SHOWS ITS TITLE AS
+								// THE PICTURE: `QuoteWell`, the title between its quotation
+								// marks, as the market page's cards and Discovery draw it. It
+								// fills column 1's box the way the cards' well fills theirs —
+								// unboxed, scaled to fit — and it is the title's heading
+								// element (`h2`), so column 2 drops its title row. ⛔ The
+								// removed arm above still draws nothing: its variant has no
+								// title at the type level, and a well beside a withheld
+								// argument would publish the masked content itself.
+								<div className="absolute inset-0 flex items-center justify-center">
+									<QuoteWell title={post.title} as="h2" boxed={false} />
+								</div>
+							)}
 						</div>
 
 						{/* `.hstack` (`d5:462`, `flex:1 1 auto;min-width:0;flex-direction:
@@ -254,18 +271,30 @@ export function PostFocusHeader({
 										createdAt={post.createdAt}
 										badge={post.badge}
 									/>
-									<div className="flex items-baseline justify-between gap-2 min-w-0">
-										<h2 className="font-heading text-sm leading-snug font-medium line-clamp-1 min-w-0 flex-1">
-											{post.title}
-										</h2>
-										{hasExtendedText(post.body) ? (
-											<KnowMore
-												label="Know more about this argument"
-												onClick={() => onOpenPopup(post)}
-												className="shrink-0"
-											/>
-										) : null}
-									</div>
+									{/* ⚠ UIR-4 item 3 — only a post with an image keeps a title
+									    row; without one, the well in column 1 is the title, and
+									    `Know more` stands on its own row, right-aligned, where it
+									    sits under an image post's title. */}
+									{post.imageUrl ? (
+										<div className="flex items-baseline justify-between gap-2 min-w-0">
+											<h2 className="font-heading text-sm leading-snug font-medium line-clamp-1 min-w-0 flex-1">
+												{post.title}
+											</h2>
+											{hasExtendedText(post.body) ? (
+												<KnowMore
+													label="Know more about this argument"
+													onClick={() => onOpenPopup(post)}
+													className="shrink-0"
+												/>
+											) : null}
+										</div>
+									) : hasExtendedText(post.body) ? (
+										<KnowMore
+											label="Know more about this argument"
+											onClick={() => onOpenPopup(post)}
+											className="shrink-0 self-end"
+										/>
+									) : null}
 								</>
 							)}
 
