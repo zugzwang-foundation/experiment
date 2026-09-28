@@ -12,7 +12,11 @@ import { FocusMarketCard } from "./FocusMarketCard";
 import { HeadZone } from "./HeadZone";
 import { KnowMore } from "./KnowMore";
 import { RemovedPlaceholder } from "./placeholders";
-import { QuoteWell } from "./quote-well/QuoteWell";
+import {
+	GEIST_QUOTE_INK,
+	GEIST_QUOTE_TOP,
+	GEIST_QUOTE_TOP_CLOSE,
+} from "./quote-well/size";
 import type { DebateMarketHeader, DebatePost, PresentPost } from "./types";
 
 /**
@@ -196,8 +200,8 @@ export function PostFocusHeader({
 					    rest: its author row, title row and split bar start 16px after the
 					    picture and end at this card's right padding, so they grow and
 					    shrink with it. A removed post has no picture and no column 1. The
-					    width above survives as the picture's ceiling, and as the frame of
-					    a text-only post's well until item 3 replaces it.
+					    width above survives as the picture's ceiling. A text-only post's
+					    column 1 is a square tile (item 3).
 					    ⚠⚠ UIR-5 item 1 — THE HEIGHT IS UIR-3's, AND IT IS FIXED. UIR-4 gave
 					    this row the market arm's height as a floor (192px of section at
 					    1440); that floor is gone, and the section is back to the 125.25px
@@ -233,6 +237,8 @@ export function PostFocusHeader({
 						    ⚠ UIR-4 item 3 — AND AN IMAGELESS POST NO LONGER GETS THE REMOVED
 						    CASE'S NOTHING: its title fills the frame as the quotation well.
 						    Only a removed post still draws nothing here.
+						    ⚠ UIR-7 item 3 — THE WELL IS GONE FROM THIS PAGE; a text-only post
+						    gets `QuoteMarksTile`, the well's two marks and no title.
 						    ⚠ UIR-7 item 2 — AND IT RESERVES NOTHING NOW EITHER. The frame it
 						    kept was the centre rule's, which is dropped, so a removed post has
 						    no column 1 and its content starts at the card's left padding.
@@ -274,36 +280,7 @@ export function PostFocusHeader({
 								/>
 							</div>
 						) : (
-							<div
-								data-testid="post-focus-media"
-								className="relative w-[calc((100cqw_+_26px)/3_-_13px)] shrink-0 lg:w-[344px]"
-							>
-								{/* ⚠ UIR-4 item 3 — A POST WITHOUT AN IMAGE SHOWS ITS TITLE AS
-								    THE PICTURE: `QuoteWell`, the title between its quotation
-								    marks, as the market page's cards and Discovery draw it. It
-								    fills column 1's box the way the cards' well fills theirs —
-								    unboxed, scaled to fit — and it is the title's heading
-								    element (`h2`), so column 2 drops its title row. ⛔ The
-								    removed arm above still draws nothing: its variant has no
-								    title at the type level, and a well beside a withheld
-								    argument would publish the masked content itself.
-								    ⚠⚠ UIR-5 item 5 — A THUMBNAIL NOW, NOT THE HEADING. The well is
-								    the market-page card's as a 1440px window draws it — the same
-								    component, unboxed, its title sized for its own 545 × 272
-								    canvas rather than for any window — and the `<svg>`'s viewBox
-								    scales that one picture, marks and text together, down to
-								    column 1's box at the header's height, centred: a thumbnail,
-								    as an image post's picture is. The title row is back in column
-								    2 on this page, so that row is the heading and this is a
-								    picture of it, hidden from assistive technology, which would
-								    otherwise read the title twice. */}
-								<div
-									aria-hidden="true"
-									className="absolute inset-0 flex items-center justify-center"
-								>
-									<QuoteWell title={post.title} boxed={false} />
-								</div>
-							</div>
+							<QuoteMarksTile />
 						)}
 
 						{/* `.hstack` (`d5:462`, `flex:1 1 auto;min-width:0;flex-direction:
@@ -371,7 +348,10 @@ export function PostFocusHeader({
 									    this page: a text-only post's comes back as an image post's
 									    is, and the well in column 1 is a picture of the title rather
 									    than the title. The masking does not move — a removed post
-									    takes the other branch and has no title row at all. */}
+									    takes the other branch and has no title row at all.
+									    ⚠ UIR-7 item 3 — column 1 carries no title now (the marks
+									    tile), so this row is the only place a text-only post's title
+									    is drawn, as it is for an image post. */}
 									{/* ⚠ UIR-4 item 4 — AN IMAGE POST'S TITLE IS ONE LINE, ALWAYS
 									    (UIR-5 item 5: every post's), across column 2's full width;
 									    `Know more` moved to its own row under it (UIR-5 item 3: to
@@ -429,5 +409,57 @@ export function PostFocusHeader({
 				</Card>
 			}
 		/>
+	);
+}
+
+/** UIR-7 item 3 — the marks' size in the text-only tile, as a font size. */
+const TILE_MARK_PX = 48;
+
+/**
+ * UIR-7 item 3 — A TEXT-ONLY POST's PICTURE: THE QUOTE-1 WELL's TWO MARKS AND
+ * NOTHING ELSE. It replaces UIR-5 item 5's scaled-down well, whose title at
+ * thumbnail size was a second, unreadable copy of the title row beside it.
+ * The tile is square and as tall as the row — `w-[99.25px]` is the row's
+ * `h-[99.25px]`, and the two literals move together — with no border and no
+ * ground. The marks are the well's own: `“` and `”`, Geist bold in `text-n4`,
+ * here at 48px, the opening one in the top-left corner and the closing one in
+ * the bottom-right.
+ * ⚠ EACH MARK's BOX IS ITS INK, as in `QuoteWell` and off the same measured
+ * constants: at `line-height: 1` a mark's line box is an em tall for 0.311 em
+ * of ink, and the two marks sit at different heights in it, so a mark pinned
+ * by its line box would float 26px above the bottom corner. The margins make
+ * each box exactly its ink, so `top-0` and `bottom-0` put the ink on the
+ * tile's edges.
+ * ⚠ HIDDEN FROM ASSISTIVE TECHNOLOGY: it says nothing the title row does not.
+ * ⛔ A removed post never renders it — the tile would announce that the
+ * withheld argument carried no attachment.
+ */
+function QuoteMarksTile() {
+	const ink = GEIST_QUOTE_INK * TILE_MARK_PX;
+	const markStyle = (top: number) => ({
+		fontSize: `${TILE_MARK_PX}px`,
+		lineHeight: 1,
+		marginTop: `${-top * TILE_MARK_PX}px`,
+		marginBottom: `${-(TILE_MARK_PX - ink - top * TILE_MARK_PX)}px`,
+	});
+	return (
+		<div
+			data-testid="post-focus-media"
+			aria-hidden="true"
+			className="relative w-[99.25px] shrink-0"
+		>
+			<span
+				className="absolute top-0 left-0 block font-sans font-bold text-n4"
+				style={markStyle(GEIST_QUOTE_TOP)}
+			>
+				{"“"}
+			</span>
+			<span
+				className="absolute right-0 bottom-0 block font-sans font-bold text-n4"
+				style={markStyle(GEIST_QUOTE_TOP_CLOSE)}
+			>
+				{"”"}
+			</span>
+		</div>
 	);
 }
