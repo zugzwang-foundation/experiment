@@ -5,6 +5,7 @@ import { SideBadge } from "@/components/debate/badges";
 import { computeSplitBar } from "@/components/debate/composer/split-bar";
 import { formatDharma, formatDharmaCompact } from "@/components/debate/format";
 import { PriceBar } from "@/components/debate/PriceBar";
+import { QuoteWell } from "@/components/debate/quote-well/QuoteWell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FieldSeparator } from "@/components/ui/field-separator";
 import { InfoTip } from "@/components/ui/info-tip";
@@ -296,6 +297,8 @@ function HeroPostPanel({
 		post.currentValue === null
 			? `Đ ${formatDharmaCompact(post.authorStake)}`
 			: `Đ ${formatDharmaCompact(post.authorStake)} → Đ ${formatDharmaCompact(post.currentValue)}`;
+	// UIR-3 item 6 — a post with no image shows its title AS the picture.
+	const textOnly = post.imageUrl === null;
 
 	return (
 		// `relative` is load-bearing for V18's stretched link below.
@@ -406,11 +409,40 @@ function HeroPostPanel({
 			    separate target and anchors cannot nest. */}
 			<Link
 				href={`/m/${slug}?post=${post.ordinal}`}
-				className="mt-2 flex flex-col gap-1 after:absolute after:inset-0"
+				// ⛔ UIR-3 item 6 — A TEXT-ONLY POST'S TITLE IS ITS PICTURE. With no
+				// image, the image slot's `IMG` placeholder gives way to the feed's
+				// text-only treatment — `QuoteWell`, the title between its quotation
+				// marks, as the market page's cards draw it — and the separate title
+				// line goes, so the title is shown once. The well takes the title
+				// line's place INSIDE this link and the slot's `flex-1` with it, so
+				// it fills the space the line and the slot shared, and its box is the
+				// placeholder's: `bg-n1`, the hairline, `--imgr`. Unboxed, the
+				// quotation scales to fit that box.
+				// ⚠ The link names itself from the title: an accessible name is not
+				// computed through the well's `<svg>`/`foreignObject` (the reason
+				// `PostCard` labels its well's button the same way). Posts with an
+				// image render exactly as before.
+				aria-label={textOnly ? post.title : undefined}
+				className={
+					textOnly
+						? "mt-2 flex min-h-[40px] flex-1 flex-col after:absolute after:inset-0"
+						: "mt-2 flex flex-col gap-1 after:absolute after:inset-0"
+				}
 			>
-				<h3 className="line-clamp-2 text-sm leading-snug font-medium">
-					{post.title}
-				</h3>
+				{textOnly ? (
+					<div className="relative flex-1">
+						<div
+							data-testid={`hero-post-quote-${side}`}
+							className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-[var(--imgr)] bg-n1 [border:var(--hairline)]"
+						>
+							<QuoteWell title={post.title} boxed={false} />
+						</div>
+					</div>
+				) : (
+					<h3 className="line-clamp-2 text-sm leading-snug font-medium">
+						{post.title}
+					</h3>
+				)}
 				{/* UI-QUICK CS13 §2 — THE HERO POST IS TITLE-ONLY. The quoted
 				    `.argtext` teaser that stood here is removed; the panel now
 				    carries the argument's headline and its picture, and the
@@ -498,25 +530,30 @@ function HeroPostPanel({
 			    ⚠ The FALLBACK takes the same `absolute inset-0`, so the no-image
 			    case and the image case are the SAME box by construction rather
 			    than by two class strings that could drift apart. */}
-			<div className="relative mt-2 min-h-[40px] flex-1">
-				<MarketThumb
-					data-testid={`hero-post-image-${side}`}
-					src={post.imageUrl}
-					// The argument text carries the meaning and the post title is
-					// adjacent, so the attachment is decorative here (WCAG 1.1.1).
-					alt=""
-					className="absolute inset-0 h-full w-full rounded-[var(--imgr)] object-contain [border:var(--hairline)]"
-					fallback={
-						<div
-							data-testid={`hero-post-image-empty-${side}`}
-							aria-hidden="true"
-							className="absolute inset-0 flex items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[9px] tracking-[0.18em] text-n4 [border:var(--hairline)]"
-						>
-							IMG
-						</div>
-					}
-				/>
-			</div>
+			{/* UIR-3 item 6 — a text-only post draws its well in the link above, so
+			    this slot is the image arm's alone; `IMG` stays its load-error
+			    fallback. */}
+			{textOnly ? null : (
+				<div className="relative mt-2 min-h-[40px] flex-1">
+					<MarketThumb
+						data-testid={`hero-post-image-${side}`}
+						src={post.imageUrl}
+						// The argument text carries the meaning and the post title is
+						// adjacent, so the attachment is decorative here (WCAG 1.1.1).
+						alt=""
+						className="absolute inset-0 h-full w-full rounded-[var(--imgr)] object-contain [border:var(--hairline)]"
+						fallback={
+							<div
+								data-testid={`hero-post-image-empty-${side}`}
+								aria-hidden="true"
+								className="absolute inset-0 flex items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[9px] tracking-[0.18em] text-n4 [border:var(--hairline)]"
+							>
+								IMG
+							</div>
+						}
+					/>
+				</div>
+			)}
 			{/* V16 — `.replyhead` (mockup :97-98, markup :194). Display-only, and a
 			    SIBLING of the stretched link above, so a click anywhere on it still
 			    opens the post (the mockup's whole-`.argbody` handler). */}
