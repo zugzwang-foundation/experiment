@@ -93,6 +93,7 @@ export function PostCard({
 	suspended,
 	unboxed = false,
 	inColumn = false,
+	railSide,
 	isOwnPost = false,
 }: {
 	post: DebatePost;
@@ -137,14 +138,23 @@ export function PostCard({
 	/**
 	 * ⛔⛔ FEED-3 — MOUNTED IN A DESKTOP `DebateColumn`, WHICH DRAWS THE BOX. Passed
 	 * by `PostScroller` only. Three things follow and nothing else moves: the card
-	 * draws no box (`IN_COLUMN_CARD`), the author line drops its pipes, and a
-	 * text-only argument's quote well drops its box — the ruled "Cards" changes.
+	 * draws no box (`IN_COLUMN_CARD`), a text-only argument's quote well drops its
+	 * box — the ruled "Cards" changes — and the Support/Counter row takes the
+	 * column header's two-line controls (UIR-1 item 4). (FEED-3 also dropped the
+	 * author line's pipes; UIR-1 item 1 restored them, as on `main`.)
 	 * ⚠ A PROP, NOT A `mobile:` TOKEN, for `unboxed`'s reason in reverse: the phone
 	 * feed and the parent-post sheet mount this card too and are untouched by
 	 * FEED-3, and the pop-ups and the focused post share `ArgProfile` — a width
 	 * variant would reach all of them. `= false` keeps every other mount as it was.
 	 */
 	inColumn?: boolean;
+	/**
+	 * UIR-1 item 3 — the side of the card the desktop `ScrollRail` sits on, set by
+	 * `PostScroller` only when the rail renders (two or more posts). Passed on to
+	 * the Support/Counter row, which needs it to centre on the column rather than
+	 * on the card. Absent = no rail beside this card.
+	 */
+	railSide?: "left" | "right";
 	/**
 	 * D-52 R1 — the viewer wrote this post, so both trigger pills render
 	 * disabled (nobody replies to their own post). Derived by the view from the
@@ -190,6 +200,8 @@ export function PostCard({
 					postSide={post.sideAtPostTime}
 					triggers={triggers}
 					band={unboxed}
+					railSide={railSide}
+					inColumn={inColumn}
 				/>
 				{/* ⚠ A removed POST STILL KEEPS ITS SURVIVING REPLIES (§6 — thread
 				    integrity), and row 25 does not touch that: what changed is only
@@ -243,7 +255,6 @@ export function PostCard({
 				createdAt={post.createdAt}
 				badge={post.badge}
 				download={{ ordinal: post.ordinal }}
-				separators={!inColumn}
 			/>
 
 			{/* HTML-FINISH · MARKET DETAIL rows 23 + 24 — d5's `.rtitle.plust`
@@ -522,6 +533,8 @@ export function PostCard({
 				postSide={post.sideAtPostTime}
 				triggers={triggers}
 				band={unboxed}
+				railSide={railSide}
+				inColumn={inColumn}
 			/>
 		</Card>
 	);

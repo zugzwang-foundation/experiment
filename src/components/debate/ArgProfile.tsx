@@ -154,11 +154,11 @@ export function ArgProfile({
 	 */
 	chipSize?: "detail";
 	/**
-	 * FEED-3 — `false` drops the row's `│` separators: the desktop post card and
-	 * reply card (their `inColumn`) and the focused post (`PostFocusHeader`, N-3
-	 * item 5). ⚠ Both pop-ups and the phone cards keep them, so SEP-1's one shared
-	 * seam is still the one seam wherever it renders. The fields keep the gaps the
-	 * separators sat in.
+	 * FEED-3 — `false` drops the row's `│` separators. ⚠ NO MOUNT PASSES IT since
+	 * UIR-1 item 1: FEED-3 dropped them on the desktop post card, the reply card
+	 * and the focused post, and UIR-1 restored all three, so every row renders
+	 * its separators exactly as on `main` and SEP-1's one shared seam is the one
+	 * seam everywhere. The fields keep the gaps the separators sat in.
 	 */
 	separators?: boolean;
 }) {

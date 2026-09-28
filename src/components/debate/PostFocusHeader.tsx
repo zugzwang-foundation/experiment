@@ -209,9 +209,6 @@ export function PostFocusHeader({
 										replyCount={replyCount}
 										createdAt={post.createdAt}
 										badge={post.badge}
-										// FEED-3 N-3 item 5 — the focused post's author row drops its
-										// pipes, as the cards' do. The pop-ups keep theirs.
-										separators={false}
 									/>
 									<div className="flex items-baseline justify-between gap-2 min-w-0">
 										<h2 className="font-heading text-sm leading-snug font-medium line-clamp-1 min-w-0 flex-1">

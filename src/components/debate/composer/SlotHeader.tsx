@@ -7,6 +7,7 @@ import {
 	HEADER_CONTROL,
 	HEADER_WORD,
 	HeaderLanes,
+	HeaderNoPosition,
 	HeaderSell,
 	ToWinLine,
 } from "./column-header";
@@ -24,8 +25,9 @@ import { isEntryDisabled } from "./gating";
  *   · the entry reads `BET YES` / `BET NO` (it read `Buy`, HTML-FINISH row 20)
  *     and carries today's to-win figure as its second line — `Đ 1 → Đ 8.77`, no
  *     `TO WIN` label, no trailing `x`;
- *   · Sell reads `SELL` over the position figure, and `YOUR POSITION` /
- *     `NO ACTIVE POSITION` are gone: with no position the right lane is empty.
+ *   · Sell reads `SELL` over the position figure, and `YOUR POSITION` is gone.
+ *     With no position the right lane reads `NO ACTIVE` / `POSITION` in the
+ *     box Sell would take (UIR-1 item 2 — FEED-3 had left it empty).
  * ⚠ The composer's own `COMPOSER_COPY.header` / `.submit` say `Đ BET`, so the
  * header and the composer it opens agree on the verb again.
  *
@@ -113,13 +115,17 @@ export function SlotHeader({
 			sell={
 				// The Sell gate is the shipped one — `side` is the pole this header
 				// speaks for — and it is only reached when this header is not hosting.
-				showControls && viewer?.position && viewer.position.side === side ? (
+				// The hosting header keeps its empty lane (change set 12 §1).
+				!showControls ? null : viewer?.position &&
+					viewer.position.side === side ? (
 					<HeaderSell
 						value={viewer.position.currentValue}
 						ownPseudonym={ownPseudonym}
 						slug={slug}
 					/>
-				) : null
+				) : (
+					<HeaderNoPosition />
+				)
 			}
 		/>
 	);

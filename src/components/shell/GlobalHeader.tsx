@@ -363,12 +363,11 @@ export function GlobalHeader({
 						mobileResponsive && "max-mobile:contents",
 					)}
 				>
-					{/* MOBILE-2m · R-3 / ADR-0051 A9 D-3 — Back does not render below
-					    640px, and the hide is threaded rather than written into
-					    `HeaderNav` unconditionally: that component is a static child of
-					    BOTH mounts, so an ungated class there reaches `(auth)` too. Home
-					    and RULES shift left by the 42px Back and its gap give up;
-					    nothing is repositioned to make that happen. */}
+					{/* UIR-1 item 5 — Back renders at no width now (below 640px since
+					    ADR-0051 A9 D-3), so Home is this zone's first item and the
+					    controls after it close up by Back's 34px and its 8px gap. The
+					    brand and right zones sit in their own grid tracks and do not
+					    move. `mobileResponsive` still threads through, inert. */}
 					<HeaderNav mobileResponsive={mobileResponsive} />
 					{/* MOBILE-1 Phase A — the off-site/decorative utility controls, and
 					    the ONLY things in this zone that hide below 640px.
