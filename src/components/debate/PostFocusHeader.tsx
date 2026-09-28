@@ -225,65 +225,81 @@ export function PostFocusHeader({
 						    set the row's.
 						    ⚠ UIR-4 item 3 — AND AN IMAGELESS POST NO LONGER GETS THE REMOVED
 						    CASE'S NOTHING: its title fills the frame as the quotation well.
-						    Only a removed post still draws nothing here. */}
-						<div
-							data-testid="post-focus-media"
-							className="relative w-[calc((100cqw_+_26px)/3_-_13px)] shrink-0 lg:w-[344px]"
-						>
-							{post.removed ? null : post.imageUrl ? (
-								// ⚠ UIR-4 item 2 — THE IMAGE FILLS COLUMN 1's BOX AT THE ROW'S
-								// HEIGHT: whole (both axes bounded, scaled to fit, never cropped),
-								// centred, with no border and no ground; the 6px `--imgr` radius
-								// is on the image itself. It is the market-page card's own `fill`
-								// arm — `max-h-full` against a definite height, here the
-								// `absolute inset-0` box — so T2 holds as it does there: an image
-								// smaller than the box keeps its natural size rather than being
-								// upscaled. `border-0!` outranks the image's own hairline, which
-								// `CommentImage` concatenates rather than merges, so the order of
-								// the two in the stylesheet cannot decide it. The click opens the
-								// lightbox, as before.
-								// ⚠ UIR-5 item 2 — THE SAME RULE AT THE FIXED HEIGHT, AND NOTHING
-								// HERE CHANGES FOR IT: the arm reads no height but its box's, which
-								// is now 344 × 99.25 from `lg` (a third of the section wide below
-								// it). An image whose shape is taller than the box's fills the
-								// height and centres across it; a wider one — past 3.47:1 at `lg` —
-								// fills the width and centres down it. Whole either way.
-								<div className="absolute inset-0 flex items-center justify-center">
-									<CommentImage
-										url={post.imageUrl}
-										onOpen={onOpenImage}
-										fill
-										className="max-h-full border-0!"
-									/>
-								</div>
-							) : (
-								// ⚠ UIR-4 item 3 — A POST WITHOUT AN IMAGE SHOWS ITS TITLE AS
-								// THE PICTURE: `QuoteWell`, the title between its quotation
-								// marks, as the market page's cards and Discovery draw it. It
-								// fills column 1's box the way the cards' well fills theirs —
-								// unboxed, scaled to fit — and it is the title's heading
-								// element (`h2`), so column 2 drops its title row. ⛔ The
-								// removed arm above still draws nothing: its variant has no
-								// title at the type level, and a well beside a withheld
-								// argument would publish the masked content itself.
-								// ⚠⚠ UIR-5 item 5 — A THUMBNAIL NOW, NOT THE HEADING. The well is
-								// the market-page card's as a 1440px window draws it — the same
-								// component, unboxed, its title sized for its own 545 × 272
-								// canvas rather than for any window — and the `<svg>`'s viewBox
-								// scales that one picture, marks and text together, down to
-								// column 1's box at the header's height, centred: a thumbnail,
-								// as an image post's picture is. The title row is back in column
-								// 2 on this page, so that row is the heading and this is a
-								// picture of it, hidden from assistive technology, which would
-								// otherwise read the title twice.
+						    Only a removed post still draws nothing here.
+						    ⚠ UIR-7 item 1 — AN IMAGE POST'S FRAME IS NO LONGER THAT COLUMN: it
+						    hugs its picture, in flow, and it is the row's fixed height — not
+						    `absolute` — that keeps the attachment from setting the row's. */}
+						{post.removed ? (
+							<div
+								data-testid="post-focus-media"
+								className="w-[calc((100cqw_+_26px)/3_-_13px)] shrink-0 lg:w-[344px]"
+							/>
+						) : post.imageUrl ? (
+							// ⚠ UIR-4 item 2 — THE IMAGE FILLS ITS BOX AT THE ROW'S HEIGHT:
+							// whole (both axes bounded, scaled to fit, never cropped), centred,
+							// with no border and no ground; the 6px `--imgr` radius is on the
+							// image itself. It is the market-page card's own `fill` arm —
+							// `max-h-full` against a definite height, here the row's — so T2
+							// holds as it does there: an image smaller than the box keeps its
+							// natural size rather than being upscaled. `border-0!` outranks the
+							// image's own hairline, which `CommentImage` concatenates rather
+							// than merges, so the order of the two in the stylesheet cannot
+							// decide it. The click opens the lightbox, as before.
+							// ⚠⚠ UIR-7 item 1 — AND THE BOX HUGS THE PICTURE's SHAPE. It was
+							// column 1's fixed slot with the image `absolute` inside; the image
+							// is in flow now, so the box is as wide as the picture drawn at the
+							// row's 99.25px — its aspect ratio × that height — held between
+							// 72px and the slot's old width (a third of the section, 344px from
+							// `lg`). Past the ceiling (wider than 3.47:1 at `lg`) the picture
+							// fills the width and centres down the box; under the floor
+							// (narrower than 0.73:1) it fills the height and centres across it.
+							// The box is sized by its content, not measured: nothing reads the
+							// image in script and no dimension is needed from the server.
+							// Measured in Chromium: 16:9 → 176.44px, 2:3 → 72px with the
+							// picture 66.16px wide, 5:1 → 344px with the picture 68.8px tall.
+							<div
+								data-testid="post-focus-media"
+								className="flex max-w-[calc((100cqw_+_26px)/3_-_13px)] min-w-[72px] shrink-0 items-center justify-center lg:max-w-[344px]"
+							>
+								<CommentImage
+									url={post.imageUrl}
+									onOpen={onOpenImage}
+									fill
+									className="max-h-full border-0!"
+								/>
+							</div>
+						) : (
+							<div
+								data-testid="post-focus-media"
+								className="relative w-[calc((100cqw_+_26px)/3_-_13px)] shrink-0 lg:w-[344px]"
+							>
+								{/* ⚠ UIR-4 item 3 — A POST WITHOUT AN IMAGE SHOWS ITS TITLE AS
+								    THE PICTURE: `QuoteWell`, the title between its quotation
+								    marks, as the market page's cards and Discovery draw it. It
+								    fills column 1's box the way the cards' well fills theirs —
+								    unboxed, scaled to fit — and it is the title's heading
+								    element (`h2`), so column 2 drops its title row. ⛔ The
+								    removed arm above still draws nothing: its variant has no
+								    title at the type level, and a well beside a withheld
+								    argument would publish the masked content itself.
+								    ⚠⚠ UIR-5 item 5 — A THUMBNAIL NOW, NOT THE HEADING. The well is
+								    the market-page card's as a 1440px window draws it — the same
+								    component, unboxed, its title sized for its own 545 × 272
+								    canvas rather than for any window — and the `<svg>`'s viewBox
+								    scales that one picture, marks and text together, down to
+								    column 1's box at the header's height, centred: a thumbnail,
+								    as an image post's picture is. The title row is back in column
+								    2 on this page, so that row is the heading and this is a
+								    picture of it, hidden from assistive technology, which would
+								    otherwise read the title twice. */}
 								<div
 									aria-hidden="true"
 									className="absolute inset-0 flex items-center justify-center"
 								>
 									<QuoteWell title={post.title} boxed={false} />
 								</div>
-							)}
-						</div>
+							</div>
+						)}
 
 						{/* `.hstack` (`d5:462`, `flex:1 1 auto;min-width:0;flex-direction:
 						    column`) — everything that is not the image.
