@@ -6,6 +6,7 @@ import {
 	Fragment,
 	useCallback,
 	useEffect,
+	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -42,6 +43,7 @@ import {
 	initialStatusFilter,
 	isOpenLot,
 	type ProfileSelection,
+	readMarketParam,
 	usesWholeHoldingFallback,
 } from "./selection";
 
@@ -274,6 +276,39 @@ export function PositionsTable({
 	// market it could not distinguish three arguments in one market, which is the
 	// case this whole revamp exists for.
 	const [selectedLotId, setSelectedLotId] = useState<string | null>(null);
+
+	/**
+	 * ⛔⛔ NAV-3 — EVERY ENTRY TAKES ITS FILTERS FROM THE ADDRESS, NOT FROM THE
+	 * LAST VISIT. The three `useState`s above are seeded from `?market=` once, and
+	 * under `cacheComponents` an entry is not always a mount: Next keeps a route
+	 * you leave mounted in a hidden `<Activity>`, keyed without search params, and
+	 * reveals that same instance when you come back (NAV-1, `DebateView`). So a
+	 * profile opened again with a different `?market=` showed the last visit's
+	 * filter.
+	 * ⇒ React re-runs effects when an `<Activity>` turns visible, so this runs on
+	 * the first mount and on every reveal. The first mount is skipped — the seeds
+	 * above already hold the server's answer. A reveal re-derives the market and
+	 * the tab from the address through the same helpers the seeds use, and drops
+	 * the picked tile so the first visible one is picked, as on a fresh mount.
+	 * In-page filter changes never remount, so they are untouched.
+	 * ⚠ A LAYOUT effect, so a revealed table never paints the stale filter.
+	 */
+	const enteredRef = useRef(false);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: entry-only by design. `rows` changes when the payload refreshes (a sale), and re-deriving then would undo the reader's own filter; a reveal re-runs this with the latest closure regardless.
+	useLayoutEffect(() => {
+		if (!enteredRef.current) {
+			enteredRef.current = true;
+			return;
+		}
+		const marketId = initialMarketIdOf(
+			rows,
+			readMarketParam(window.location.search),
+		);
+		setMarket(marketId);
+		setStatus(initialStatusFilter(rows, marketId));
+		setSelectedLotId(null);
+	}, []);
+
 	const tileRefs = useRef(new Map<string, HTMLTableRowElement>());
 	const bodyRef = useRef<HTMLDivElement | null>(null);
 	const tableRef = useRef<HTMLTableElement | null>(null);
