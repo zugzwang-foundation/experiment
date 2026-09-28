@@ -373,6 +373,10 @@ export function PostFocusHeader({
 							    ⚠ UIR-4 item 5 — IT IS TOUCHED NOW, by name: its end labels
 							    are two lines of equal width, which centres the bar and its
 							    `Đ N STAKED` in column 2.
+							    ⚠ UIR-5 item 4 — and the whole bar is two lines now, 34px:
+							    with a 24px author row and a 19.25px title that leaves the
+							    fixed 99.25px room to spare, and with a wrapped (44px) author
+							    row it still fits (97.25px).
 							    ⚠ UIR-5 item 1 — `mt-auto` IS GONE. The column's
 							    `justify-between` already puts the bar on the floor, and an auto
 							    margin would take all the free height before `justify-content`
