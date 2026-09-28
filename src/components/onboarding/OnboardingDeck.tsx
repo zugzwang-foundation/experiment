@@ -81,6 +81,14 @@ const FINAL_LABEL: Record<OnboardingDeckContext, string> = {
 	reshow: "Done",
 };
 
+/**
+ * The card eyebrow's type — one string, because the signed-out bet panel
+ * (`AuthGateSlot`, UIR-6) repeats Card 3 and has to wear the deck's eyebrow, not
+ * a copy of it that drifts. Spacing stays at each site.
+ */
+export const DECK_EYEBROW_CLASS =
+	"text-[9px] leading-[1.2] font-extrabold tracking-[0.14em] text-n4 uppercase";
+
 export function OnboardingDeck({
 	context,
 	initialOpen = false,
@@ -344,7 +352,7 @@ export function OnboardingDeck({
 								</div>
 							) : (
 								<>
-									<div className="mb-[10px] text-[9px] leading-[1.2] font-extrabold tracking-[0.14em] text-n4 uppercase">
+									<div className={`mb-[10px] ${DECK_EYEBROW_CLASS}`}>
 										{card.eyebrow}
 									</div>
 									<div className="mb-[12px] text-[21px] leading-[1.18] font-extrabold tracking-[-0.012em] text-ink">

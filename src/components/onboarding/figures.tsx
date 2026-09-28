@@ -55,10 +55,15 @@ import type { OnboardingFigure } from "./cards";
  */
 const FIG_SVG = "mb-[18px] block h-[140px] w-auto max-w-[88%] font-sans";
 
-function GoalFigure() {
+/**
+ * Card 3's figure, exported so the signed-out bet panel (`AuthGateSlot`, UIR-6)
+ * draws this drawing rather than a second copy of it. `className` replaces the
+ * band sizing at that one site; the deck passes nothing and renders as before.
+ */
+export function GoalFigure({ className = FIG_SVG }: { className?: string }) {
 	// The balance: K · n on one pan outweighing C on the other.
 	return (
-		<svg viewBox="0 0 220 120" aria-hidden="true" className={FIG_SVG}>
+		<svg viewBox="0 0 220 120" aria-hidden="true" className={className}>
 			<line
 				x1="110"
 				y1="100"
