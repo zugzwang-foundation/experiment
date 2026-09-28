@@ -5,6 +5,7 @@ import {
 	type ReactNode,
 	useCallback,
 	useEffect,
+	useLayoutEffect,
 	useRef,
 	useState,
 } from "react";
@@ -243,6 +244,10 @@ export function DebateView({
 	 * on this route rules out Next preserving the tree across a navigation. On a
 	 * genuine remount these setters run against values that are already `null`
 	 * and `false`, React bails out, and nothing re-renders.
+	 * ⚠ NAV-1 — THE `instant = false` HALF OF THAT READING WAS WRONG. Next DOES
+	 * keep this tree across a navigation (a hidden `<Activity>`, see the NAV-1
+	 * block below), and a reveal re-runs this effect — which is what actually
+	 * closed the composer on the reported path.
 	 *
 	 * ⇒ So this does not fix a mechanism — it removes the CLASS. The invariant is
 	 * "a route change leaves no composer behind", and hanging it on `pathname`
@@ -954,6 +959,46 @@ export function DebateView({
 		window.addEventListener("popstate", onPop);
 		return () => window.removeEventListener("popstate", onPop);
 	}, [posts, composerBusy]);
+
+	/**
+	 * ⛔⛔ NAV-1 — EVERY ENTRY TAKES ITS ARM FROM THE ADDRESS, NOT FROM THE LAST
+	 * VISIT. `useState(initialPostId)` is only an entry rule if every entry is a
+	 * fresh mount, and under `cacheComponents` it is not: Next's `layout-router`
+	 * (16.3.2) keeps the last three routes at each level mounted in a hidden
+	 * `<Activity>`, keyed WITHOUT search params, and reveals that same instance
+	 * when the reader returns. Reported from staging: open a post, press Home,
+	 * open the market from Discovery — the replies view came back at the plain
+	 * `/m/<slug>`. A hero panel's `?post=N` link could equally land on the market
+	 * arm, and the rung counter still held the first visit's push, so the exit
+	 * would `history.back()` onto Discovery.
+	 *
+	 * ⇒ React re-runs effects when an `<Activity>` turns visible, so an empty-deps
+	 * effect runs on the first mount and on every reveal, and nowhere else —
+	 * enter, exit, pop and poll never remount. The first mount is skipped: the
+	 * server's answer is already in state and is the hydration-safe one. A reveal
+	 * resolves the address with the `popstate` path's resolver (the server's three
+	 * refusals), and zeroes the rung counter — earlier pushes are not beneath this
+	 * entry, and 0 is the fail-safe error `exitPost` already documents.
+	 *
+	 * ⚠ A LAYOUT effect, so a revealed tree never paints the stale arm. Next
+	 * writes the URL in `HistoryUpdater`'s insertion effect, which runs first.
+	 * ⛔ It ignores `composerBusy` for the pathname effect's reason: the reader
+	 * left the route, and nothing here re-opens a composer.
+	 */
+	const enteredRef = useRef(false);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: entry-only by design. `posts` changes on every poll payload, and re-deriving then would override in-page focus; a reveal re-runs this with the latest closure regardless.
+	useLayoutEffect(() => {
+		if (!enteredRef.current) {
+			enteredRef.current = true;
+			return;
+		}
+		pushedRungsRef.current = 0;
+		setSelectedPostId(
+			resolvePostParamClient(posts, readPostParam(window.location.search)),
+		);
+		// A pick names a COLUMN; the arm may have swapped (as in `onPop`).
+		setPickedSide(null);
+	}, []);
 
 	/**
 	 * ⚠⚠ FEED-2 — THE JUMP. When the refreshed payload arrives carrying the
