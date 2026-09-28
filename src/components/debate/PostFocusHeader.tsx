@@ -206,18 +206,24 @@ export function PostFocusHeader({
 							className="relative w-[calc((100cqw_+_26px)/3_-_13px)] shrink-0 lg:w-[344px]"
 						>
 							{post.removed ? null : post.imageUrl ? (
-								// `.hpimg{flex:0 0 auto}` — does not grow, does not shrink,
-								// sized by its own content. Framed in a clean preview thumbnail
-								// that respects any orientation (portrait, landscape, square)
-								// without clipping or awkward sliver sizing.
+								// ⚠ UIR-4 item 2 — THE IMAGE FILLS COLUMN 1's BOX AT THE ROW'S
+								// HEIGHT: whole (both axes bounded, scaled to fit, never cropped),
+								// centred, with no border and no ground; the 6px `--imgr` radius
+								// is on the image itself. It is the market-page card's own `fill`
+								// arm — `max-h-full` against a definite height, here the
+								// `absolute inset-0` box — so T2 holds as it does there: an image
+								// smaller than the box keeps its natural size rather than being
+								// upscaled. `border-0!` outranks the image's own hairline, which
+								// `CommentImage` concatenates rather than merges, so the order of
+								// the two in the stylesheet cannot decide it. The click opens the
+								// lightbox, as before.
 								<div className="absolute inset-0 flex items-center justify-center">
-									<div className="shrink-0 flex items-center justify-center self-center overflow-hidden rounded-[var(--imgr)] bg-n1/60 [border:var(--hairline)]">
-										<CommentImage
-											url={post.imageUrl}
-											onOpen={onOpenImage}
-											className="h-16 w-16 sm:h-[72px] sm:w-[72px] object-contain p-0.5 transition-transform hover:scale-105"
-										/>
-									</div>
+									<CommentImage
+										url={post.imageUrl}
+										onOpen={onOpenImage}
+										fill
+										className="max-h-full border-0!"
+									/>
 								</div>
 							) : null}
 						</div>
