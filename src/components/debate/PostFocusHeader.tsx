@@ -266,8 +266,21 @@ export function PostFocusHeader({
 								// removed arm above still draws nothing: its variant has no
 								// title at the type level, and a well beside a withheld
 								// argument would publish the masked content itself.
-								<div className="absolute inset-0 flex items-center justify-center">
-									<QuoteWell title={post.title} as="h2" boxed={false} />
+								// ⚠⚠ UIR-5 item 5 — A THUMBNAIL NOW, NOT THE HEADING. The well is
+								// the market-page card's as a 1440px window draws it — the same
+								// component, unboxed, its title sized for its own 545 × 272
+								// canvas rather than for any window — and the `<svg>`'s viewBox
+								// scales that one picture, marks and text together, down to
+								// column 1's box at the header's height, centred: a thumbnail,
+								// as an image post's picture is. The title row is back in column
+								// 2 on this page, so that row is the heading and this is a
+								// picture of it, hidden from assistive technology, which would
+								// otherwise read the title twice.
+								<div
+									aria-hidden="true"
+									className="absolute inset-0 flex items-center justify-center"
+								>
+									<QuoteWell title={post.title} boxed={false} />
 								</div>
 							)}
 						</div>
@@ -332,29 +345,32 @@ export function PostFocusHeader({
 									    `Know more` stands on its own row, right-aligned, where it
 									    sits under an image post's title.
 									    ⚠ UIR-5 item 3 — `Know more` has left its own row, on both
-									    kinds of post, for the author row's right end (above). */}
-									{/* ⚠ UIR-4 item 4 — AN IMAGE POST'S TITLE IS ONE LINE, ALWAYS,
-									    across column 2's full width; `Know more` moved to its own
-									    row under it (UIR-5 item 3: to the author row, since). The
-									    title starts at its 14px and shrinks only as far as its
-									    length needs to fit the row, never below 11px:
-									    `titleSize` is a pure function of the length, read against
-									    the row's width in container units (this row is the query
-									    container), so nothing is measured in script. What still
-									    does not fit at 11px ends in `…` on the same line, and the
-									    full title is in the tooltip. */}
-									{post.imageUrl ? (
-										<div className="@container min-w-0">
-											<InfoTip content={post.title} asChild>
-												<h2
-													className="truncate font-heading leading-snug font-medium"
-													style={{ fontSize: titleSize(post.title) }}
-												>
-													{post.title}
-												</h2>
-											</InfoTip>
-										</div>
-									) : null}
+									    kinds of post, for the author row's right end (above).
+									    ⚠ UIR-5 item 5 — AND EVERY POST KEEPS A TITLE ROW AGAIN, on
+									    this page: a text-only post's comes back as an image post's
+									    is, and the well in column 1 is a picture of the title rather
+									    than the title. The masking does not move — a removed post
+									    takes the other branch and has no title row at all. */}
+									{/* ⚠ UIR-4 item 4 — AN IMAGE POST'S TITLE IS ONE LINE, ALWAYS
+									    (UIR-5 item 5: every post's), across column 2's full width;
+									    `Know more` moved to its own row under it (UIR-5 item 3: to
+									    the author row, since). The title starts at its 14px and
+									    shrinks only as far as its length needs to fit the row,
+									    never below 11px: `titleSize` is a pure function of the
+									    length, read against the row's width in container units
+									    (this row is the query container), so nothing is measured
+									    in script. What still does not fit at 11px ends in `…` on
+									    the same line, and the full title is in the tooltip. */}
+									<div className="@container min-w-0">
+										<InfoTip content={post.title} asChild>
+											<h2
+												className="truncate font-heading leading-snug font-medium"
+												style={{ fontSize: titleSize(post.title) }}
+											>
+												{post.title}
+											</h2>
+										</InfoTip>
+									</div>
 								</>
 							)}
 
