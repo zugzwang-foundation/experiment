@@ -54,6 +54,7 @@ export function ArgProfile({
 	badge = null,
 	download,
 	friendlyFire = false,
+	separators = true,
 }: {
 	author: AuthorIdentity;
 	side: Side;
@@ -152,6 +153,14 @@ export function ArgProfile({
 	 * discouraged.
 	 */
 	chipSize?: "detail";
+	/**
+	 * FEED-3 — `false` drops the row's `│` separators: the desktop post card and
+	 * reply card (their `inColumn`) and the focused post (`PostFocusHeader`, N-3
+	 * item 5). ⚠ Both pop-ups and the phone cards keep them, so SEP-1's one shared
+	 * seam is still the one seam wherever it renders. The fields keep the gaps the
+	 * separators sat in.
+	 */
+	separators?: boolean;
 }) {
 	// UI-OVERNIGHT entry 1a — the header stake renders ABBREVIATED (`Đ 12.5k`)
 	// with the exact figure on its tooltip (`CompactDharmaFigure`). The
@@ -587,7 +596,9 @@ export function ArgProfile({
 						    the shared primitive carrying `aria-hidden`; a CSS-hidden node
 						    is still that, and a conditional render would be a second
 						    branch for a phone in a component the desktop shares. */}
-						<FieldSeparator className="max-mobile:hidden" />
+						{separators ? (
+							<FieldSeparator className="max-mobile:hidden" />
+						) : null}
 						<SideBadge side={side} price={entryPrice} size={chipSize} />
 						{/* ⛔ MOBILE-2l · R-4 — ONE CHIP STYLE, AND THIS IS ITS HALF OF IT.
 						    `Flipped`/`Exited` and `Sold` were two registers on one line:
@@ -640,7 +651,7 @@ export function ArgProfile({
 					</span>
 					{authorStake !== undefined ? (
 						<span className="flex shrink-0 items-center gap-1.5 max-mobile:contents">
-							<FieldSeparator />
+							{separators ? <FieldSeparator /> : null}
 							{/* RANK-1 / ADR-0039 R6 — the figure FOLLOWS THE RULER. This is
 						    the stake still held, which is exactly what the lane sorted
 						    on; a fully-exited argument reads `Đ 0` here rather than
@@ -726,7 +737,7 @@ export function ArgProfile({
 					) : null}
 					{replyCount !== undefined ? (
 						<span className="flex shrink-0 items-center gap-1.5">
-							<FieldSeparator />
+							{separators ? <FieldSeparator /> : null}
 							{/* `.repmeta` (`d5:580`) — `font-weight:700;letter-spacing:.12em;
 						    text-transform:uppercase;color:var(--ink)`, with `.repn`
 						    (`:579`) setting the COUNT back to 13px / no tracking. The row
@@ -835,7 +846,7 @@ export function ArgProfile({
 				    tile 10px tall at PROFILE-FULL); `FieldSeparator` states its OWN
 				    size and leading and inherits nothing, because a seam that changes
 				    size per surface is the drift it was lifted to end. */}
-					<FieldSeparator />
+					{separators ? <FieldSeparator /> : null}
 					<RelativeTime createdAt={createdAt} />
 					{/* ⛔⛔ MOBILE-2n · R-1 / A10 D-1 — THE LANE BADGE CARRIES NO `order`
 					    TOKEN AT ALL NOW, AND ITS ABSENCE IS THE EDIT. It carried

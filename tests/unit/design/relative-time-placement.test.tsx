@@ -825,11 +825,6 @@ describe("TIME-1 :: A8 — a REMOVED card renders no age at all", () => {
 							replies: EMPTY_REPLIES,
 						}}
 						market={MARKET_HEADER}
-						heldSide={null}
-						marketOpen
-						suspended={false}
-						activeRelation={null}
-						onToggleRelation={noop}
 						onExit={noop}
 						onOpenImage={noop}
 						onOpenPopup={noop}

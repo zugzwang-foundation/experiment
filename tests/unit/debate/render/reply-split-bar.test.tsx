@@ -78,15 +78,7 @@ const noop = () => {};
  * Both survive the fix, which rewrites only the pole token in each class. */
 function bar(postSide: Side) {
 	const { container } = render(
-		<ReplySplitBar
-			postSide={postSide}
-			aggregate={AGGREGATE}
-			heldSide={null}
-			marketOpen={true}
-			suspended={false}
-			activeRelation={null}
-			onToggleRelation={noop}
-		/>,
+		<ReplySplitBar postSide={postSide} aggregate={AGGREGATE} />,
 	);
 	const track = Array.from(container.querySelectorAll("span")).find((s) =>
 		(s.getAttribute("class") ?? "").includes("overflow-hidden"),

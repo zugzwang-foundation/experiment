@@ -106,7 +106,6 @@ describe("the paired mounts — both sides rendered side by side", () => {
 						key={side}
 						side={side}
 						pricing={TIE}
-						unitToWin={null}
 						viewer={null}
 						ownPseudonym={null}
 						slug="m-test"

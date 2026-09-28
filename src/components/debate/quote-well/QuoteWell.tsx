@@ -63,8 +63,17 @@ import {
 export function QuoteWell({
 	title,
 	as: Heading = "h3",
+	boxed = true,
 }: {
 	title: string;
+	/**
+	 * FEED-3 — `false` takes the well's box away (ground, hairline, radius): the
+	 * desktop post card only (`PostCard` `inColumn`), which sits inside the
+	 * column's one rectangle. The quotation itself is unchanged. ⚠ The padding
+	 * absorbs the removed 1px border, so the content box — the one `size.ts`
+	 * budgets against — is the same 495 × 222 either way.
+	 */
+	boxed?: boolean;
 	/**
 	 * The heading element the plain title row used, so the document outline does
 	 * not change when a post happens to carry no image. `PostCard` renders `h3`.
@@ -147,14 +156,16 @@ export function QuoteWell({
 				    (AGENTS.md §4/§11). Asserted rather than assumed:
 				    `quote-well.test.tsx` reads the rendered node's `namespaceURI`. */}
 				<div
-					className="qwell box-border flex h-full w-full flex-col items-center overflow-hidden rounded-[var(--imgr)] border border-n2 bg-n1"
+					className={`qwell box-border flex h-full w-full flex-col items-center overflow-hidden${
+						boxed ? " rounded-[var(--imgr)] border border-n2 bg-n1" : ""
+					}`}
 					// ⚠ `pad` IS THE TOTAL INSET, so the 1px border is inside it — 23 + 1.
 					// `size.ts` records why: 24px of padding within a border makes the
 					// content 495 × 222 and every budget optimistic by 2px on a box that
 					// clips. The dimensions come off the constants rather than being
 					// restated, so the arithmetic and the render cannot drift apart.
 					style={{
-						padding: `${QUOTE_CANVAS.pad - 1}px`,
+						padding: `${boxed ? QUOTE_CANVAS.pad - 1 : QUOTE_CANVAS.pad}px`,
 						gap: `${QUOTE_TYPE.gap}px`,
 						// ⛔⛔ `safe center`, NOT `center`, AND THE KEYWORD IS WHAT MAKES THE
 						// RATIFIED DEGRADATION THE RIGHT SHAPE. Canon clause 6 says a title

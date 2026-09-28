@@ -361,6 +361,10 @@ export function PostScroller({
 					marketOpen={marketOpen}
 					suspended={suspended}
 					isOwnPost={ownPostIds?.includes(post.id) ?? false}
+					// FEED-3 — the column draws the card's rectangle, so the card draws
+					// none; with the card's box gone, the rail beside it sits inside
+					// that one rectangle along its inner edge.
+					inColumn
 				/>
 			</div>
 			{posts.length > 1 ? (
@@ -454,6 +458,8 @@ export function ReplyScroller({
 					onOpenImage={onOpenImage}
 					onOpenPopup={onOpenPopup}
 					postOrdinal={postOrdinal}
+					// FEED-3 — same as the post card: the column is the rectangle.
+					inColumn
 				/>
 			</div>
 			{replies.length > 1 ? (
