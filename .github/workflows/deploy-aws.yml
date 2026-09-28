@@ -270,7 +270,12 @@ jobs:
     name: Apply migrations in-VPC (before anything serves)
     needs: build
     # A rollback never migrates: the schema only moves forward.
-    if: ${{ !inputs.skip_migrations && !inputs.rollback_image_tag }}
+    # ⛔ `!cancelled() && needs.build.result == 'success'` IS LOAD-BEARING. A job
+    # whose `if:` carries no status function gets an implicit `success()`, and
+    # that is false when ANY ancestor was skipped — so once a staging deploy
+    # skips `ci` (STAGING-FAST-DEPLOY), a bare condition here silently skipped
+    # every staging migration while `deploy` still rolled the new image out.
+    if: ${{ !cancelled() && needs.build.result == 'success' && !inputs.skip_migrations && !inputs.rollback_image_tag }}
     runs-on: ubuntu-latest
     environment: ${{ (inputs.environment || 'staging') == 'production' && 'aws-production' || (inputs.environment || 'staging') }}
     permissions:
@@ -451,6 +456,10 @@ jobs:
   verify:
     name: Verify the live build
     needs: [build, deploy]
+    # Same reason as `migrate`: without a status function the skipped `ci`
+    # (staging, rollback) skipped this gate too, and a deploy reported done
+    # without the health check ever running.
+    if: ${{ !cancelled() && needs.deploy.result == 'success' }}
     runs-on: ubuntu-latest
     # No `environment:` — this job reads no secret or variable, and binding it
     # would add a second approval prompt per production deploy (review LOW).
