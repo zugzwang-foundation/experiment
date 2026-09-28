@@ -69,7 +69,23 @@ export function AuthGateSlot({
 				{AUTH_GATE_COPY.heading(side)}
 			</h3>
 			<p className="max-w-sm text-sm text-n5">{AUTH_GATE_COPY.body}</p>
-			<div className="flex items-center gap-2">
+			{/* UIR-6 item 2 — ONE JOIN, the header's. Same href (`/sign-in`, where a
+			    new visitor signs up and a returning one signs in), same text, and
+			    the ≥640 half of `IdentityCluster`'s JOIN class string verbatim —
+			    copied rather than imported because that component's class string is
+			    pinned in place by the header's own source-scan guards. Unlike the
+			    header's, this `<Link>` opts out of prefetch like every other link in
+			    the debate tree (`market-links-no-prefetch.test.ts`).
+			    ⚠ Desktop only, like the Goal above: below 640px the phone sheet
+			    keeps its Sign up / Sign in pair unchanged. */}
+			<Link
+				href="/sign-in"
+				prefetch={false}
+				className="flex h-[34px] shrink-0 items-center rounded-(--r) bg-ink px-5 text-xs font-bold tracking-[0.12em] text-ground uppercase outline-none select-none [transition:all_var(--dur-hover)] hover:bg-n7 active:bg-n6 focus-visible:shadow-(--state-focus-ring) max-mobile:hidden"
+			>
+				JOIN
+			</Link>
+			<div className="hidden items-center gap-2 max-mobile:flex">
 				<Button asChild size="sm">
 					<Link href="/sign-in" prefetch={false}>
 						{AUTH_GATE_COPY.signUp}
