@@ -369,8 +369,10 @@ export function GlobalHeader({
 					    brand and right zones sit in their own grid tracks and do not
 					    move. `mobileResponsive` still threads through, inert. */}
 					<HeaderNav mobileResponsive={mobileResponsive} />
-					{/* MOBILE-1 Phase A — the off-site/decorative utility controls, and
-					    the ONLY things in this zone that hide below 640px.
+					{/* MOBILE-1 Phase A — the utility controls (Radio, and GitHub
+					    off-site), and the ONLY things in this zone that hide below 640px.
+					    Radio is live for a signed-in viewer (RADIO-1 / ADR-0062), which
+					    is why it takes `signedIn` and nothing else from this header.
 					    ⚠ RULES USED TO BE THE SIBLING BELOW THIS WRAPPER, and the note
 					    that stood here explained why it was outside rather than in:
 					    SPEC.1 §21.9 makes it the onboarding deck's only re-show entry
@@ -385,7 +387,7 @@ export function GlobalHeader({
 							mobileResponsive && "max-mobile:hidden",
 						)}
 					>
-						<RadioSlot />
+						<RadioSlot signedIn={viewer !== null} />
 						<GitHubStarsView stars={stars} />
 					</div>
 					{/* ⛔ X IS A SIBLING OF THE WRAPPER, NOT A CHILD OF IT, AND CARRIES

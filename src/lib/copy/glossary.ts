@@ -109,7 +109,12 @@ export const FRIENDLY_FIRE_TAG_GLOSS =
  */
 export const HEADER_GLOSSARY = {
 	visitorCounter: "Total page views — not participants",
+	/** RADIO-1 — still the gloss while `radio-enabled` is off. */
 	radio: "Radio — not yet live",
+	/** RADIO-1 — founder-ruled 2026-09-26. The play button's gloss when signed out. */
+	radioSignedOut: "Radio — sign in to listen",
+	/** RADIO-1 — the Radio pill is a link to the playlist on YouTube. */
+	radioLive: "Radio — open the playlist on YouTube",
 	rules: "Rules — how it works",
 	github: "Star the repo on GitHub",
 } as const;

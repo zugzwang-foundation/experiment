@@ -351,3 +351,89 @@
 		animation: none;
 	}
 }
+
+/*
+ * RADIO-1 / ADR-0062 — the header Radio's "On Air" equaliser and dot.
+ *
+ * ⛔ THE VALUES ARE THE RATIFIED MOCKUP'S, NOT MINTED HERE:
+ * `docs/design/mockups/DESIGN_W2_4-5-14_global-header_mockup-v0_2.html` (`.eq`,
+ * `.dot`, `@keyframes eq` / `pulse`), ratified at its close-out's "Radio
+ * synth-wave" and "Reduced motion" bullets. Five bars, 18% ↔ 100%, staggered
+ * durations and delays; the dot at the project's live-indicator rate, 1.4s
+ * ease-in-out, opacity 1 → 0.2 — the same values `chart-terminal-pulse` above
+ * borrowed from this dot.
+ *
+ * Driven by `data-on-air="true"`, which `RadioSlot` sets only from YouTube's own
+ * `onStateChange` — never from the click — so the bars never claim music the
+ * player is not playing (the "no fake On Air liveness" rule UI-A1 OQ-3 set for
+ * the placeholder still holds for the real control).
+ */
+@keyframes radio-eq {
+	0%,
+	100% {
+		height: 18%;
+	}
+	50% {
+		height: 100%;
+	}
+}
+
+@keyframes radio-dot {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.2;
+	}
+}
+
+.radio-eq[data-on-air="true"] > span {
+	animation: radio-eq 1s ease-in-out infinite;
+}
+.radio-eq[data-on-air="true"] > span:nth-child(1) {
+	animation-duration: 0.9s;
+	animation-delay: -0.1s;
+}
+.radio-eq[data-on-air="true"] > span:nth-child(2) {
+	animation-duration: 1.15s;
+	animation-delay: -0.5s;
+}
+.radio-eq[data-on-air="true"] > span:nth-child(3) {
+	animation-duration: 0.8s;
+	animation-delay: -0.2s;
+}
+.radio-eq[data-on-air="true"] > span:nth-child(4) {
+	animation-duration: 1.05s;
+	animation-delay: -0.4s;
+}
+.radio-eq[data-on-air="true"] > span:nth-child(5) {
+	animation-duration: 0.95s;
+	animation-delay: -0.05s;
+}
+
+.radio-dot[data-on-air="true"] {
+	animation: radio-dot 1.4s ease-in-out infinite;
+}
+
+/*
+ * The mockup's reduced-motion rule: the bars freeze to a stepped pattern rather
+ * than to flat, so "on air" is still legible without movement.
+ *
+ * ⚠ A SEPARATE BLOCK, APPENDED AFTER the chart's, and that placement is
+ * load-bearing: `tests/unit/debate/render/terminal-pulse.test.tsx` reads the
+ * FIRST `@media (prefers-reduced-motion: reduce)` block in this file and expects
+ * `.chart-terminal-pulse` inside it.
+ */
+@media (prefers-reduced-motion: reduce) {
+	.radio-eq[data-on-air="true"] > span,
+	.radio-dot[data-on-air="true"] {
+		animation: none;
+	}
+	.radio-eq[data-on-air="true"] > span:nth-child(odd) {
+		height: 70%;
+	}
+	.radio-eq[data-on-air="true"] > span:nth-child(even) {
+		height: 40%;
+	}
+}
