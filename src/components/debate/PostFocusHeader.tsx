@@ -133,11 +133,11 @@ export function PostFocusHeader({
 				/* ⚠ The focused post's card FILLS the headzone band, so `.hpimg` beside
 				   it can be height-driven exactly as the market arm's `.mmedia` is.
 				   `min-h-0` is its link in the one-screen chain.
-				   ⚠ UIR-4 item 1 — `@container` makes the card the query container the
-				   row's floor and column 1's width read below: `100cqw` is the card's
-				   content box, so `100cqw + 26px` (12px padding and a 1px border, both
-				   sides) is its border box — the width the market arm divides into its
-				   picture and its stack. */
+				   ⚠ UIR-4 item 1 — `@container` makes the card the query container
+				   column 1's width reads below: `100cqw` is the card's content box, so
+				   `100cqw + 26px` (12px padding and a 1px border, both sides) is its
+				   border box — the width the market arm divides into its picture and its
+				   stack. (UIR-5 item 1 took the row's floor, the other reader, away.) */
 				<Card className="@container min-h-0 flex-1 gap-2 p-3 bg-gradient-to-b from-card to-card/90 border border-white/10 shadow-sm">
 					{/* HTML-FINISH · MARKET DETAIL row 11 — `.hleft` IS A ROW, NOT A
 					    STACK (`d5:448`, `flex:1 1 auto;min-width:0;display:flex;gap:16px`).
@@ -191,15 +191,16 @@ export function PostFocusHeader({
 					    there is no rail (and no chart column on the market arm), so column
 					    1 takes the market arm's picture width instead and ends where that
 					    picture ends: a third of the section, less this card's 13px inset.
-					    ⚠ THE FLOOR IS THE MARKET ARM'S HEIGHT, by the market arm's own rule:
-					    its 16:9 picture a third of the section wide (3/16 of the width) or
-					    its question · stats · price bar · resolution stack (178.04px,
-					    measured on staging at 1280 and 1440), whichever is taller, less
-					    this card's 26px of padding and border. So the section is never
-					    shorter than the market page's while that page's stats line holds
-					    one line, and it grows only when its own content needs more. Items
-					    stretch: all three columns take the row's height. */}
-					<div className="flex min-h-[calc(max(3*(100cqw_+_26px)/16,_178.04px)_-_26px)] flex-1 gap-4 max-mobile:flex-col max-mobile:items-start">
+					    ⚠⚠ UIR-5 item 1 — THE HEIGHT IS UIR-3's, AND IT IS FIXED. UIR-4 gave
+					    this row the market arm's height as a floor (192px of section at
+					    1440); that floor is gone, and the section is back to the 125.25px
+					    it measured at UIR-3's head. There it was a RESULT — this card's
+					    26px of padding and border around a 24px author row, a 19.25px
+					    title line, a 44px split bar and two 6px gaps; here it is a HEIGHT,
+					    99.25px of row, which grows neither with what column 2 holds nor
+					    with the market card beside it (sized to fit it — see
+					    `FocusMarketCard`). Items stretch: all three columns take it. */}
+					<div className="flex h-[99.25px] shrink-0 gap-4 max-mobile:flex-col max-mobile:items-start">
 						{/* ⛔ QUOTE-1 A — THE EMPTY ARM AND ITS WHOLE FRAME ARE GONE
 						    (founder-ruled 2026-09-11). R2 had filled the post-focus
 						    `.hpimg` with d5's `POST IMAGE` box (`d5:1491-1492`) whenever
@@ -266,8 +267,15 @@ export function PostFocusHeader({
 						</div>
 
 						{/* `.hstack` (`d5:462`, `flex:1 1 auto;min-width:0;flex-direction:
-						    column`) — everything that is not the image. */}
-						<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 justify-center">
+						    column`) — everything that is not the image.
+						    ⚠ UIR-5 item 1 — ITS ROWS SPREAD OVER THE FIXED HEIGHT: the first
+						    at the top, the split bar on the floor, the free height shared
+						    evenly between them (`justify-between`, no gap). A box that cannot
+						    grow has to give somewhere when its content does, and this makes
+						    the somewhere the space between the rows rather than the last
+						    row — so an author row that wraps at a narrow width closes the
+						    gaps instead of pushing the split bar out of the card. */}
+						<div className="flex min-h-0 min-w-0 flex-1 flex-col justify-between">
 							{post.removed ? (
 								<>
 									<SideBadge side={post.sideAtPostTime} />
@@ -340,8 +348,12 @@ export function PostFocusHeader({
 							    would be H1-f — a halt, not an edit. It was not needed.
 							    ⚠ UIR-4 item 5 — IT IS TOUCHED NOW, by name: its end labels
 							    are two lines of equal width, which centres the bar and its
-							    `Đ N STAKED` in column 2. */}
-							<div data-testid="post-focus-foot" className="mt-auto shrink-0">
+							    `Đ N STAKED` in column 2.
+							    ⚠ UIR-5 item 1 — `mt-auto` IS GONE. The column's
+							    `justify-between` already puts the bar on the floor, and an auto
+							    margin would take all the free height before `justify-content`
+							    could share it between the rows. */}
+							<div data-testid="post-focus-foot" className="shrink-0">
 								<ReplySplitBar
 									postSide={post.sideAtPostTime}
 									aggregate={post.aggregate}
