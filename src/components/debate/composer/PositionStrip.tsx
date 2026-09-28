@@ -20,7 +20,8 @@ import { HeaderLanes, HeaderNoPosition, HeaderSell } from "./column-header";
  *     caller holds the relation state and its handler;
  *   · centre — the side and its price;
  *   · Sell — `SELL` over the position figure, only on the side the viewer holds;
- *     elsewhere `NO ACTIVE` / `POSITION` in the box Sell would take (UIR-1 item 2).
+ *     elsewhere `NO ACTIVE POSITION`, main's one-line label, flush right
+ *     (UIR-1 item 2; one line again at UIR-3 item 2).
  * The `TO WIN` and `YOUR POSITION` labels are gone, as on the market page.
  *
  * ⛔ THE HOSTING COLUMN SHOWS THE SIDE BEING BET AND NOTHING ELSE — change set

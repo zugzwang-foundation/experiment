@@ -179,25 +179,30 @@ export function HeaderLanes({
 }
 
 /**
- * UIR-1 item 2 — `NO ACTIVE` over `POSITION`, the right lane when the viewer
- * holds nothing on this side and the header is not hosting a composer. Plain
- * text: no border, fill, ledge or handler.
- * ⚠ UIR-2 item 1 — 14px / 600 on a 17px line, `main`'s 0.1em tracking,
- * uppercase and `n4` kept. Both lines flush right, and the block has no box of
- * its own: the lane is `justify-self-end`, so the block's right edge is the
- * header row's right inset — the line SELL's right edge sits on — and the
- * lane's `items-center` centres it on the row.
+ * UIR-1 item 2 — `NO ACTIVE POSITION`, the right lane when the viewer holds
+ * nothing on this side and the header is not hosting a composer. Plain text: no
+ * border, fill, ledge or handler.
+ * ⚠ UIR-3 item 2 — BACK TO `main`'s ONE-LINER; UIR-2 item 1's two-line 14px
+ * block is withdrawn. The label is main's (7314ab4c) exactly: Geist (inherited),
+ * 10px / 700, 0.1em, uppercase, `n4`, on main's 13.33px line (the `text-xs`
+ * ratio main's parent gave it). Flush right on the header row's right inset —
+ * the lane is `justify-self-end` and the text right-aligned — and centred on
+ * the row by the lane's `items-center`.
+ * ⚠ IT NEVER COMES WITHIN 12px OF THE PRICE. The grid gap gives 8px, and `pl-1`
+ * makes the label's box 4px wider than its line, so a lane too narrow for both
+ * shrinks the box below the line and the line wraps — at one place only, since
+ * the first space is non-breaking: `NO ACTIVE` / `POSITION`, still flush right.
+ * From 860px only: below it the price has a row of its own.
  * ⚠ Read once. FEED-3 had removed the words rather than hiding them, so there
  * is no `sr-only` copy to reconcile with.
  */
 export function HeaderNoPosition() {
-	// The shipped string, broken before its last word: `No active` / `position`.
-	const words = COMPOSER_COPY.noPosition;
-	const cut = words.lastIndexOf(" ");
+	// The shipped string with its first space non-breaking, so the one break
+	// left falls before `position`.
+	const words = COMPOSER_COPY.noPosition.replace(" ", " ");
 	return (
-		<span className="flex flex-col items-end text-right text-[14px] leading-[17px] font-semibold tracking-[0.1em] text-n4 uppercase">
-			<span>{words.slice(0, cut)}</span>
-			<span>{words.slice(cut + 1)}</span>
+		<span className="text-right text-[10px] leading-[calc(1/0.75)] font-bold tracking-[0.1em] text-n4 uppercase min-[860px]:pl-1">
+			{words}
 		</span>
 	);
 }
