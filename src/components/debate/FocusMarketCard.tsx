@@ -124,6 +124,12 @@ export function FocusMarketCard({
 			// `HeadZone`), the rail stretches to the reading column again, and the
 			// height this declaration takes is spent on the return line pinned to
 			// the card's floor rather than on empty border.
+			// ⚠ UIR-4 item 6 — AND NOW ON EQUAL GAPS: `justify-between` spreads the
+			// four rows over the card's height, the first at the top, the last at
+			// the bottom, the free height divided evenly between them, so no band
+			// of it collects in one place. The return line's `mt-auto` is gone
+			// with it — an auto margin takes the free space before `justify-content`
+			// can divide it.
 			//
 			// ⚠ THE HOVER AND FOCUS TREATMENTS ARE THE SHIPPED IDIOMS, NOT NEW
 			// APPEARANCES. `hover:bg-n1` is the card-highlight `PostCard` already
@@ -135,7 +141,7 @@ export function FocusMarketCard({
 			// no focus treatment at all, so a keyboard reader Tabbed an invisible
 			// cursor onto the one control that leaves post focus — CS13 §4's finding
 			// on the hero panel, in the same shape, on a more consequential control.
-			className={`flex min-h-0 w-full flex-1 flex-col ${
+			className={`flex min-h-0 w-full flex-1 flex-col justify-between ${
 				compact ? "gap-1 p-2" : "gap-3 p-3"
 			} rounded-(--r) text-left outline-none [border:var(--hairline)] [transition:background-color_var(--dur-hover)] hover:bg-n1 focus-visible:shadow-(--state-focus-ring)`}
 		>
@@ -146,15 +152,16 @@ export function FocusMarketCard({
 					// Decorative — the question is right beside it and carries the
 					// meaning. `discovery/MarketCard.tsx` makes the same call.
 					alt=""
+					// ⚠ UIR-4 item 6 — the post arm's logo is 44px (it was 32px).
 					className={`${
-						compact ? "h-8 w-8" : "h-[52px] w-[52px]"
+						compact ? "h-11 w-11" : "h-[52px] w-[52px]"
 					} shrink-0 rounded-[var(--imgr)] object-cover`}
 					fallback={
 						<span
 							aria-hidden="true"
 							className={`flex ${
 								compact
-									? "h-8 w-8 text-[7px]"
+									? "h-11 w-11 text-[7px]"
 									: "h-[52px] w-[52px] text-[8.5px]"
 							} shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono tracking-[0.16em] text-n4`}
 						>
@@ -165,11 +172,16 @@ export function FocusMarketCard({
 				{/* D-52 R3 — the question on up to two lines, clamped at two, in both
 				    sizes (the post arm passes `compact`, which clamped it at one).
 				    Written as a literal: the `line-clamp-${…}` template it replaces
-				    named no class Tailwind's scanner can see. */}
+				    named no class Tailwind's scanner can see.
+				    ⚠ UIR-4 item 6 — THE POST ARM'S QUESTION (`compact`) IS 18px / 600
+				    at a 1.25 line-height, on up to THREE lines before the ellipsis;
+				    the uncompacted size keeps two. */}
 				<span
-					className={`line-clamp-2 min-w-0 ${
-						compact ? "text-[12px]" : "text-[13.5px]"
-					} leading-[1.32] font-semibold`}
+					className={`min-w-0 ${
+						compact
+							? "line-clamp-3 text-[18px] leading-[1.25]"
+							: "line-clamp-2 text-[13.5px] leading-[1.32]"
+					} font-semibold`}
 				>
 					{title}
 				</span>
@@ -221,9 +233,12 @@ export function FocusMarketCard({
 			    ⚠ IT INHERITS THE STAT LINE'S TIER (`text-xs text-muted-foreground`,
 			    the sibling above) rather than declaring its own: it is chrome about
 			    the card, not a field of the market, and it must not compete with the
-			    figures it sits under. */}
+			    figures it sits under.
+			    ⚠ UIR-4 item 6 — `mt-auto` IS GONE: the card's `justify-between` now
+			    puts this line on the floor, with the free height shared evenly among
+			    the gaps above it rather than collected over this line. */}
 			<span
-				className={`mt-auto ${compact ? "text-[10px]" : "text-xs"} text-muted-foreground`}
+				className={`${compact ? "text-[10px]" : "text-xs"} text-muted-foreground`}
 			>
 				↩ Click to return to market page
 			</span>
