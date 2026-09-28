@@ -7,8 +7,10 @@ import { describe, expect, it } from "vitest";
  * CI/CD — the AWS pipeline's shape. Staging deploys on a push to `staging`;
  * production deploys on a merge to `main` through deploy-production.yml, which
  * calls the same deploy-aws.yml and is held by the `aws-production`
- * environment's required reviewer. Every deploy passes ci.yml first, and no
- * migration that destroys data is applied without an explicit decision.
+ * environment's required reviewer. Every PRODUCTION deploy passes ci.yml first;
+ * a staging deploy, and a PR into `staging`, skip it (STAGING-FAST-DEPLOY,
+ * founder ruling 2026-09-28). No migration that destroys data is applied
+ * without an explicit decision.
  */
 
 const REPO_ROOT = join(__dirname, "..", "..", "..");
@@ -41,15 +43,31 @@ describe("a pipeline synth needs no live context lookup", () => {
 	});
 });
 
-describe("every deploy runs CI first", () => {
-	it("ci.yml is callable and still runs on every pull request", () => {
-		expect(ci).toMatch(/\n {2}pull_request:\n/);
+describe("production deploys run CI first; staging deploys skip it", () => {
+	it("ci.yml is callable, and runs on every pull request except one into staging", () => {
+		expect(ci).toMatch(
+			/\n {2}pull_request:\n {4}branches-ignore: \[staging\]\n/,
+		);
 		expect(ci).toMatch(/\n {2}workflow_call:\n/);
+		// Nothing narrower: a PR into `main`, or any other branch, still runs it.
+		expect(ci).not.toMatch(/\n {4}branches:/);
 	});
 
 	it("deploy-aws.yml calls ci.yml, and build waits for it", () => {
 		expect(job("ci")).toContain("uses: ./.github/workflows/ci.yml");
 		expect(job("build")).toContain("needs: [guard, ci]");
+	});
+
+	it("the ci job runs for production only, and never for a rollback", () => {
+		expect(job("ci")).toContain(
+			`if: ${$}{{ (inputs.environment || 'staging') == 'production' && !inputs.rollback_image_tag }}`,
+		);
+	});
+
+	it("a production build never proceeds on a skipped CI unless it is a rollback", () => {
+		expect(job("build")).toContain(
+			`(needs.ci.result == 'success' || (needs.ci.result == 'skipped' && ((inputs.environment || 'staging') == 'staging' || inputs.rollback_image_tag)))`,
+		);
 	});
 });
 
@@ -111,13 +129,13 @@ describe("rollback redeploys an existing image through the same gate", () => {
 	});
 
 	it("skips CI, the image build and migrations, but not the approval-gated jobs", () => {
-		expect(job("ci")).toContain(`if: ${$}{{ !inputs.rollback_image_tag }}`);
+		expect(job("ci")).toContain("&& !inputs.rollback_image_tag }}");
 		expect(job("migrate")).toContain(
 			`if: ${$}{{ !inputs.skip_migrations && !inputs.rollback_image_tag }}`,
 		);
 		const build = job("build");
 		expect(build).toContain(
-			`(needs.ci.result == 'success' || (inputs.rollback_image_tag && needs.ci.result == 'skipped'))`,
+			`(needs.ci.result == 'skipped' && ((inputs.environment || 'staging') == 'staging' || inputs.rollback_image_tag))`,
 		);
 		for (const step of [
 			"Fetch build-time values from Doppler",

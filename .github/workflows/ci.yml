@@ -1,5 +1,6 @@
 # .github/workflows/ci.yml
-# Zugzwang CI gate — runs on EVERY pull request, whatever it targets.
+# Zugzwang CI gate — runs on every pull request EXCEPT one into `staging`
+# (STAGING-FAST-DEPLOY, below), and before every PRODUCTION deploy.
 # Scope: install -> lint/format check -> typecheck -> tests.
 # Out of scope (HARDEN.* / post-experiment): e2e, build, secret scan,
 # dependency audit, coverage, bundle/perf budgets, matrix testing.
@@ -15,8 +16,9 @@ on:
   # multi-slice task here is built — got no CI at all. The work was reviewed,
   # merged and built upon while the only automated check that could have
   # contradicted it never ran once. The same argument is why `deploy-aws.yml`
-  # CALLS this workflow (`workflow_call`) before it builds: a direct push to
-  # `staging` opens no PR, so without that call it deployed untested code.
+  # CALLS this workflow (`workflow_call`) before a PRODUCTION build. It called
+  # it before a staging build too, until STAGING-FAST-DEPLOY (below) traded that
+  # away for deploy speed: a direct push to `staging` now deploys untested code.
   #
   # It is not hypothetical: a red integration test lived on the LOTS-1 `s2`
   # branch for TWO further slices, and both were written against it. The cost of
@@ -29,8 +31,20 @@ on:
   #
   # Branch protection is unaffected — it requires the `ci` check on merges to
   # `main` exactly as before. This only widens where `ci` also runs.
+  #
+  # ⛔ STAGING-FAST-DEPLOY (founder ruling, 2026-09-28) — ONE exception to the
+  # above: a PR INTO `staging` runs no CI, and neither does the staging deploy
+  # (`deploy-aws.yml`'s `ci` job is production-only). A staging deploy took
+  # 40–45 minutes end to end, most of it this job run twice — once on the PR,
+  # once again before the build. Staging is the sandbox; the gate that protects
+  # participants is the PR into `main` (which still runs this) and the
+  # production deploy (which still calls it). ⚠ The cost is exactly the one the
+  # paragraphs above describe: code can sit on `staging`, broken, until the
+  # `staging` → `main` PR tests it. "For now" — delete `branches-ignore` and the
+  # production-only `if:` on `deploy-aws.yml`'s `ci` job to restore the gate.
   pull_request:
-  # The deploy workflow's first gate (same job, same checks, no deploy rights).
+    branches-ignore: [staging]
+  # The production deploy's first gate (same job, same checks, no deploy rights).
   workflow_call:
 
 # Cancel stale runs when a PR is force-pushed or has new commits.
