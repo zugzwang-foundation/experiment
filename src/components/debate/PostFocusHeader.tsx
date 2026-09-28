@@ -111,8 +111,13 @@ export function PostFocusHeader({
 			left={
 				/* ⚠ The focused post's card FILLS the headzone band, so `.hpimg` beside
 				   it can be height-driven exactly as the market arm's `.mmedia` is.
-				   `min-h-0` is its link in the one-screen chain. */
-				<Card className="min-h-0 flex-1 gap-2 p-3 bg-gradient-to-b from-card to-card/90 border border-white/10 shadow-sm">
+				   `min-h-0` is its link in the one-screen chain.
+				   ⚠ UIR-4 item 1 — `@container` makes the card the query container the
+				   row's floor and column 1's width read below: `100cqw` is the card's
+				   content box, so `100cqw + 26px` (12px padding and a 1px border, both
+				   sides) is its border box — the width the market arm divides into its
+				   picture and its stack. */
+				<Card className="@container min-h-0 flex-1 gap-2 p-3 bg-gradient-to-b from-card to-card/90 border border-white/10 shadow-sm">
 					{/* HTML-FINISH · MARKET DETAIL row 11 — `.hleft` IS A ROW, NOT A
 					    STACK (`d5:448`, `flex:1 1 auto;min-width:0;display:flex;gap:16px`).
 					    The focused post's image is `.hpimg` (`:956`) — a LEFT SIBLING of
@@ -152,7 +157,28 @@ export function PostFocusHeader({
 					    badge cut 33px, eight elements with `scrollWidth > clientWidth`.
 					    Anything measuring this row measures the clipping ancestor's
 					    descendants, never the document. */}
-					<div className="flex min-h-0 flex-1 gap-4 items-center max-mobile:flex-col max-mobile:items-start">
+					{/* ⚠⚠ UIR-4 item 1 — THE ROW LIES ON THE MARKET ARM'S THREE COLUMNS.
+					    Column 1 (the market arm's picture column) holds the post's image,
+					    column 2 (its question and stats column) the post's content, and
+					    the rail beside this card (its chart column) the market card.
+					    ⚠ COLUMN 1's WIDTH PUTS COLUMN 2's CENTRE ON THE PAGE'S CENTRE LINE,
+					    the gap between the YES and NO columns below. From `lg` the rail and
+					    the band's gap take 340 + 20px to the right of this card; 344px plus
+					    this row's 16px gap is the same 360px to the left of column 2, and
+					    the card's padding and border match on both sides, so column 2
+					    stands the same distance from both edges of the page. Below `lg`
+					    there is no rail (and no chart column on the market arm), so column
+					    1 takes the market arm's picture width instead and ends where that
+					    picture ends: a third of the section, less this card's 13px inset.
+					    ⚠ THE FLOOR IS THE MARKET ARM'S HEIGHT, by the market arm's own rule:
+					    its 16:9 picture a third of the section wide (3/16 of the width) or
+					    its question · stats · price bar · resolution stack (178.04px,
+					    measured on staging at 1280 and 1440), whichever is taller, less
+					    this card's 26px of padding and border. So the section is never
+					    shorter than the market page's while that page's stats line holds
+					    one line, and it grows only when its own content needs more. Items
+					    stretch: all three columns take the row's height. */}
+					<div className="flex min-h-[calc(max(3*(100cqw_+_26px)/16,_178.04px)_-_26px)] flex-1 gap-4 max-mobile:flex-col max-mobile:items-start">
 						{/* ⛔ QUOTE-1 A — THE EMPTY ARM AND ITS WHOLE FRAME ARE GONE
 						    (founder-ruled 2026-09-11). R2 had filled the post-focus
 						    `.hpimg` with d5's `POST IMAGE` box (`d5:1491-1492`) whenever
@@ -169,20 +195,32 @@ export function PostFocusHeader({
 						    an image slot beside a withheld argument would announce that
 						    it had an attachment. That is now the same nothing every
 						    imageless post gets, which is why the branch shape is kept
-						    rather than flattened — the two arms mean different things. */}
-						{post.removed ? null : post.imageUrl ? (
-							// `.hpimg{flex:0 0 auto}` — does not grow, does not shrink,
-							// sized by its own content. Framed in a clean preview thumbnail
-							// that respects any orientation (portrait, landscape, square)
-							// without clipping or awkward sliver sizing.
-							<div className="shrink-0 flex items-center justify-center self-center overflow-hidden rounded-[var(--imgr)] bg-n1/60 [border:var(--hairline)]">
-								<CommentImage
-									url={post.imageUrl}
-									onOpen={onOpenImage}
-									className="h-16 w-16 sm:h-[72px] sm:w-[72px] object-contain p-0.5 transition-transform hover:scale-105"
-								/>
-							</div>
-						) : null}
+						    rather than flattened — the two arms mean different things.
+						    ⚠ UIR-4 item 1 — A FRAME IS BACK, AS A LAYOUT COLUMN RATHER THAN A
+						    PLACEHOLDER. Column 1 reserves the width that centres column 2
+						    whatever the post carries, and draws nothing of its own. What it
+						    holds is `absolute`, so an attachment's natural height can never
+						    set the row's. */}
+						<div
+							data-testid="post-focus-media"
+							className="relative w-[calc((100cqw_+_26px)/3_-_13px)] shrink-0 lg:w-[344px]"
+						>
+							{post.removed ? null : post.imageUrl ? (
+								// `.hpimg{flex:0 0 auto}` — does not grow, does not shrink,
+								// sized by its own content. Framed in a clean preview thumbnail
+								// that respects any orientation (portrait, landscape, square)
+								// without clipping or awkward sliver sizing.
+								<div className="absolute inset-0 flex items-center justify-center">
+									<div className="shrink-0 flex items-center justify-center self-center overflow-hidden rounded-[var(--imgr)] bg-n1/60 [border:var(--hairline)]">
+										<CommentImage
+											url={post.imageUrl}
+											onOpen={onOpenImage}
+											className="h-16 w-16 sm:h-[72px] sm:w-[72px] object-contain p-0.5 transition-transform hover:scale-105"
+										/>
+									</div>
+								</div>
+							) : null}
+						</div>
 
 						{/* `.hstack` (`d5:462`, `flex:1 1 auto;min-width:0;flex-direction:
 						    column`) — everything that is not the image. */}
