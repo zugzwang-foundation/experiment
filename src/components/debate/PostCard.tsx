@@ -93,6 +93,7 @@ export function PostCard({
 	suspended,
 	unboxed = false,
 	inColumn = false,
+	railSide,
 	isOwnPost = false,
 }: {
 	post: DebatePost;
@@ -147,6 +148,13 @@ export function PostCard({
 	 */
 	inColumn?: boolean;
 	/**
+	 * UIR-1 item 3 — the side of the card the desktop `ScrollRail` sits on, set by
+	 * `PostScroller` only when the rail renders (two or more posts). Passed on to
+	 * the Support/Counter row, which needs it to centre on the column rather than
+	 * on the card. Absent = no rail beside this card.
+	 */
+	railSide?: "left" | "right";
+	/**
 	 * D-52 R1 — the viewer wrote this post, so both trigger pills render
 	 * disabled (nobody replies to their own post). Derived by the view from the
 	 * viewer read's `ownPostIds`; absent = not the viewer's, as on every
@@ -191,6 +199,7 @@ export function PostCard({
 					postSide={post.sideAtPostTime}
 					triggers={triggers}
 					band={unboxed}
+					railSide={railSide}
 				/>
 				{/* ⚠ A removed POST STILL KEEPS ITS SURVIVING REPLIES (§6 — thread
 				    integrity), and row 25 does not touch that: what changed is only
@@ -522,6 +531,7 @@ export function PostCard({
 				postSide={post.sideAtPostTime}
 				triggers={triggers}
 				band={unboxed}
+				railSide={railSide}
 			/>
 		</Card>
 	);

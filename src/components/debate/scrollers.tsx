@@ -365,6 +365,11 @@ export function PostScroller({
 					// none; with the card's box gone, the rail beside it sits inside
 					// that one rectangle along its inner edge.
 					inColumn
+					// UIR-1 item 3 — which side of the card the rail takes, so the
+					// card's Support/Counter row can centre on the column, not the card.
+					railSide={
+						posts.length > 1 ? (railFirst ? "left" : "right") : undefined
+					}
 				/>
 			</div>
 			{posts.length > 1 ? (

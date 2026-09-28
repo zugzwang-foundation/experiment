@@ -80,6 +80,7 @@ export function AggregateFooter({
 	postSide,
 	triggers,
 	band = false,
+	railSide,
 }: {
 	aggregate: ReplyAggregate;
 	/** The post's frozen side (INV-3) — the bar's pole basis, never a relation. */
@@ -122,6 +123,21 @@ export function AggregateFooter({
 	 * omission and unchanged above 640px by construction.
 	 */
 	band?: boolean;
+	/**
+	 * ⚠ UIR-1 item 3 — THE ROW CENTRES ON THE COLUMN, NOT ON THE CARD. The
+	 * desktop column's `ScrollRail` sits beside the card on this side, so the row
+	 * was centred in the width the rail leaves. Given, the OTHER side takes 22px
+	 * of padding — the rail's `w-[14px]` plus `PostScroller`'s `gap-2` — so both
+	 * sides sit 34px (12 + 14 + 8) inside the column and the row's centre is the
+	 * column's, the line the header price is centred on.
+	 * ⛔ 34px, NOT THE HEADER'S 12px: the rail is 136px tall (13 + 9 + 92 + 9 +
+	 * 13) and centred on the card's height, so on a card shorter than ~240px it
+	 * overlaps this row's band, and a row widened under it would collide. The
+	 * rail side's inset on both sides is the ruled fallback for exactly that.
+	 * Absent (no rail, every other mount) = no padding, and a card with no rail
+	 * already spans the column's 12px insets.
+	 */
+	railSide?: "left" | "right";
 }) {
 	const { supportPct, hasStake } = computeSplitBar({
 		supportDharma: aggregate.supportDharma,
@@ -160,6 +176,8 @@ export function AggregateFooter({
 				// so "one step up" is n0 → n1 and never the reverse.
 				band &&
 					"max-mobile:-mx-3 max-mobile:bg-n1 max-mobile:px-3 max-mobile:py-2.5",
+				railSide === "right" && "pl-[22px]",
+				railSide === "left" && "pr-[22px]",
 			)}
 		>
 			{/* `.sidewrap` (`d5:585`) — `align-items:center`, on BOTH sides
