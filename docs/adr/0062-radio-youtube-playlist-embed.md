@@ -73,7 +73,9 @@ This ADR does **not** decide:
   PostHog was the first choice (ADR-0052's mechanism) and was dropped because the founder does not use
   it; the cost is that switching it off needs a rebuild instead of a toggle.
 - **Who can play:** signed-in viewers — a session exists only after the onboarding gate saw
-  `tos_accepted_at`. The link works for everyone; it is only a link.
+  `tos_accepted_at`. **Signed out, both controls — the playlist link included — open a prompt to
+  sign up or log in** (linking `/sign-in`) instead of playing or opening YouTube (RADIO-SIGNIN,
+  founder ruling 2026-09-28).
 - **Lifetime:** the player lives until the header unmounts (the `(public)` and `(auth)` groups mount
   separate headers) or the viewport drops below 640px, where the controls are hidden and a playing
   player could not be stopped. It keeps playing in a background tab: it is a radio, and the rule a
