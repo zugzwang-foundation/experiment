@@ -292,27 +292,52 @@ export function PostFocusHeader({
 									{/* ⚠ UI-OVERNIGHT entry 1b — the lane badge rides the author
 									    row now (see `ArgProfile`), so the corner wrapper that held
 									    it beside this row is gone with it. */}
-									<ArgProfile
-										author={post.author}
-										side={post.sideAtPostTime}
-										marker={post.marker}
-										entryPrice={post.entryPrice}
-										chipSize="detail"
-										authorStake={post.authorStake}
-										originalStake={post.authorStakeOriginal}
-										sold={post.authorSold}
-										replyCount={replyCount}
-										createdAt={post.createdAt}
-										badge={post.badge}
-									/>
+									{/* ⚠⚠ UIR-5 item 3 — `Know more` RIDES THE AUTHOR ROW, at its
+									    right end, right-aligned in column 2 and centred on the
+									    row's height. The row of its own it had under the title is
+									    height the fixed section cannot spare.
+									    ⚠ THE PROFILE YIELDS TO IT: the profile's box takes what the
+									    control leaves (`min-w-0 flex-1`) and clips on the inline
+									    axis only. Where even its first group does not fit beside
+									    the control — near `lg`, where column 1 is a fixed 344px and
+									    column 2 is narrowest — its fields run out under their own
+									    edge rather than under the control. The block axis stays
+									    visible, so no focus ring is cut. */}
+									<div className="flex items-center gap-2">
+										<div className="min-w-0 flex-1 overflow-x-clip">
+											<ArgProfile
+												author={post.author}
+												side={post.sideAtPostTime}
+												marker={post.marker}
+												entryPrice={post.entryPrice}
+												chipSize="detail"
+												authorStake={post.authorStake}
+												originalStake={post.authorStakeOriginal}
+												sold={post.authorSold}
+												replyCount={replyCount}
+												createdAt={post.createdAt}
+												badge={post.badge}
+											/>
+										</div>
+										{hasExtendedText(post.body) ? (
+											<KnowMore
+												label="Know more about this argument"
+												onClick={() => onOpenPopup(post)}
+												className="shrink-0"
+											/>
+										) : null}
+									</div>
 									{/* ⚠ UIR-4 item 3 — only a post with an image keeps a title
 									    row; without one, the well in column 1 is the title, and
 									    `Know more` stands on its own row, right-aligned, where it
-									    sits under an image post's title. */}
+									    sits under an image post's title.
+									    ⚠ UIR-5 item 3 — `Know more` has left its own row, on both
+									    kinds of post, for the author row's right end (above). */}
 									{/* ⚠ UIR-4 item 4 — AN IMAGE POST'S TITLE IS ONE LINE, ALWAYS,
 									    across column 2's full width; `Know more` moved to its own
-									    row under it. The title starts at its 14px and shrinks only
-									    as far as its length needs to fit the row, never below 11px:
+									    row under it (UIR-5 item 3: to the author row, since). The
+									    title starts at its 14px and shrinks only as far as its
+									    length needs to fit the row, never below 11px:
 									    `titleSize` is a pure function of the length, read against
 									    the row's width in container units (this row is the query
 									    container), so nothing is measured in script. What still
@@ -329,13 +354,6 @@ export function PostFocusHeader({
 												</h2>
 											</InfoTip>
 										</div>
-									) : null}
-									{hasExtendedText(post.body) ? (
-										<KnowMore
-											label="Know more about this argument"
-											onClick={() => onOpenPopup(post)}
-											className="shrink-0 self-end"
-										/>
 									) : null}
 								</>
 							)}
