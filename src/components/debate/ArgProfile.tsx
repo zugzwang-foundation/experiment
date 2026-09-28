@@ -6,6 +6,7 @@ import { InfoTip } from "@/components/ui/info-tip";
 import { RelativeTime } from "@/components/ui/relative-time";
 import { GLOSSARY, SOLD_LABEL } from "@/lib/copy/glossary";
 import type { Badge as BadgeKind } from "@/lib/ranking";
+import { cn } from "@/lib/utils";
 
 import {
 	FriendlyFireTag,
@@ -132,8 +133,12 @@ export function ArgProfile({
 	 * cannot ask for the mark without saying which post it downloads.
 	 * ⚠ REPLY-IMAGE-EXPORT — replies opt in too now (the reply card and the reply
 	 * pop-up), with `reply` naming the reply's ordinal within post `ordinal`.
+	 * ⚠ UIR-2 item 3 — `pinned` (the desktop market card only) takes the
+	 * control out of the flow and pins it to this row's right edge, centred on
+	 * the row; the row becomes its containing block and keeps 40px clear for it
+	 * (the 32px box and an 8px gap).
 	 */
-	download?: { ordinal: number; reply?: number };
+	download?: { ordinal: number; reply?: number; pinned?: boolean };
 	/**
 	 * HTML-FINISH · MARKET DETAIL row 13 — the chip's geometry preset, and it is
 	 * wired at EXACTLY ONE site: the post-focus author row (`d5:964`, the only
@@ -181,7 +186,12 @@ export function ArgProfile({
 		// sits half a line below the row it belongs to — three baselines on a row
 		// that has one thing to say. Starting the row instead pins the mark to
 		// line 1 and leaves it there whether the age wraps or not.
-		<div className="flex w-full items-start gap-2 max-mobile:relative">
+		<div
+			className={cn(
+				"flex w-full items-start gap-2 max-mobile:relative",
+				download?.pinned && "relative pr-10",
+			)}
+		>
 			{/* ⛔⛔ MOBILE-2c R-2 — AT PHONE WIDTH THE AVATAR LEAVES THE FLOW, AND
 			    THAT IS WHAT MAKES THE METADATA ROW FULL-WIDTH.
 
@@ -929,7 +939,11 @@ export function ArgProfile({
 				   `h-6` on the reasoning that the avatar set the line, and that put
 				   the mark 2px low — jsdom performs no layout, so only the browser
 				   could see it. */
-				<DownloadPostImage ordinal={download.ordinal} reply={download.reply} />
+				<DownloadPostImage
+					ordinal={download.ordinal}
+					reply={download.reply}
+					pinned={download.pinned}
+				/>
 			) : null}
 		</div>
 	);

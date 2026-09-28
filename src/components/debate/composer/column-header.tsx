@@ -162,12 +162,13 @@ export function HeaderLanes({
 
 /**
  * UIR-1 item 2 — `NO ACTIVE` over `POSITION`, the right lane when the viewer
- * holds nothing on this side and the header is not hosting a composer.
- * `main`'s treatment (7314ab4c, `SlotHeader` and `PositionStrip` alike): 10px /
- * 700, 0.1em tracking, uppercase, `n4`. It sits centred in the box `HeaderSell`
- * takes at the same width — `HEADER_CONTROL`'s 125px (113px at the step) by
- * 47.2px (7 + 18 + 13.2 + 7 + 2 border) plus the 4px `mb-1` — so the words hold
- * the place the button would. Plain text: no border, fill, ledge or handler.
+ * holds nothing on this side and the header is not hosting a composer. Plain
+ * text: no border, fill, ledge or handler.
+ * ⚠ UIR-2 item 1 — 14px / 600 on a 17px line, `main`'s 0.1em tracking,
+ * uppercase and `n4` kept. Both lines flush right, and the block has no box of
+ * its own: the lane is `justify-self-end`, so the block's right edge is the
+ * header row's right inset — the line SELL's right edge sits on — and the
+ * lane's `items-center` centres it on the row.
  * ⚠ Read once. FEED-3 had removed the words rather than hiding them, so there
  * is no `sr-only` copy to reconcile with.
  */
@@ -176,7 +177,7 @@ export function HeaderNoPosition() {
 	const words = COMPOSER_COPY.noPosition;
 	const cut = words.lastIndexOf(" ");
 	return (
-		<span className="mb-1 flex h-[47.2px] w-[125px] flex-col items-center justify-center text-center text-[10px] leading-[1.2] font-bold tracking-[0.1em] text-n4 uppercase @max-[380px]/colhead:w-[113px]">
+		<span className="flex flex-col items-end text-right text-[14px] leading-[17px] font-semibold tracking-[0.1em] text-n4 uppercase">
 			<span>{words.slice(0, cut)}</span>
 			<span>{words.slice(cut + 1)}</span>
 		</span>
