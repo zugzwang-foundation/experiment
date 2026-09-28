@@ -57,8 +57,8 @@ export function ReplyCard({
 	/**
 	 * FEED-3 — mounted in a desktop `DebateColumn` (`ReplyScroller` only), which
 	 * draws the one rectangle and insets its body: the card draws no box and no
-	 * padding, and its author line drops its pipes. The phone thread pane passes
-	 * nothing and keeps the boxed card.
+	 * padding. Its author line keeps its pipes (UIR-1 item 1). The phone thread
+	 * pane passes nothing and keeps the boxed card.
 	 */
 	inColumn?: boolean;
 }) {
@@ -105,7 +105,6 @@ export function ReplyCard({
 				// by nothing on the post card). `=== true` because the DTO field is
 				// optional (A-13) and an absent value means unflagged.
 				friendlyFire={reply.friendlyFire === true}
-				separators={!inColumn}
 				download={
 					postOrdinal === null
 						? undefined
