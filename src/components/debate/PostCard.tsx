@@ -274,7 +274,8 @@ export function PostCard({
 				replyCount={replyCount}
 				createdAt={post.createdAt}
 				badge={post.badge}
-				download={{ ordinal: post.ordinal }}
+				// UIR-2 item 3 — pinned to the author row's right edge in a column.
+				download={{ ordinal: post.ordinal, pinned: inColumn }}
 			/>
 
 			{/* HTML-FINISH · MARKET DETAIL rows 23 + 24 — d5's `.rtitle.plust`
