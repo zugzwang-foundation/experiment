@@ -679,10 +679,19 @@ function TriggerPill({
 						className,
 					)}
 				>
-					<span className={HEADER_WORD}>{word}</span>
+					{/* ⚠ UIR-2 item 4 — the card's buttons read one step apart from the
+					    header's: SUPPORT / COUNTER at 14px / 600 (the header's Bet and
+					    Sell stay 15px) and the Đ figure at 12px / 400 mono (theirs, 11px).
+					    Everything else is `HEADER_WORD` / `HEADER_DETAIL`. ⚠ The leading is
+					    restated with each size because `cn` drops `leading-*` when a later
+					    `text-[Npx]` arrives; 1.2 is the constants' own. */}
+					<span className={cn(HEADER_WORD, "text-[14px] leading-[1.2]")}>
+						{word}
+					</span>
 					<span
 						className={cn(
 							HEADER_DETAIL,
+							"text-[12px] leading-[1.2]",
 							// #545454 on the #fafafa button; the muted n5 elsewhere.
 							!disabled && resultingSide === "NO" && "text-n3",
 						)}
