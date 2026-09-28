@@ -22,22 +22,40 @@ import { COMPOSER_COPY, formatMultiplier } from "./copy";
  * draws the one rectangle and the hairline under this row, so nothing here
  * carries a border, a radius or an elevation.
  *
- * ⛔ THE TWO NARROW-WIDTH STEPS ARE CONTAINER QUERIES, BECAUSE THE RULING IS "IF
- * THE HEADER CAN'T FIT", NOT "BELOW A VIEWPORT WIDTH". The header knows its own
- * width; a breakpoint would only know the window's, and would step a header that
- * still fits. The thresholds are the measured worst case (Geist, live staging,
- * 2026-09-28), against this container's content box (the column interior minus
- * `px-3`):
+ * ⛔ THREE REGIMES, RULED (FEED-3 N-2):
+ *   · ≥1024px — the full header, one row.
+ *   · 860–1023px — one row, with the two steps kept as first ruled: "if the
+ *     header can't fit", the price steps to 20px, then the buttons to 8px padding.
+ *   · <860px — the header STACKS: the price centred on its own row, the action
+ *     left and Sell right on a row beneath it, at full size.
+ * ⚠ THE STEPS ARE CONTAINER QUERIES, BECAUSE "IF IT CAN'T FIT" IS ABOUT THE
+ * HEADER'S OWN WIDTH, NOT THE WINDOW'S — a breakpoint would step a header that
+ * still fits. Thresholds are the measured worst case (Geist, live staging,
+ * 2026-09-28) against this container's content box (column interior − `px-3`):
  *   · unstepped needs 2 × 125 (buttons) + 140 (`Yes 100%` at 26px) + 2 × 8 = 406
- *     → below that the centre price steps to 20px (`Yes 100%` = 114);
- *   · 2 × 125 + 114 + 16 = 380 → below that the buttons step to 8px padding
- *     (113px each);
- *   · 2 × 113 + 114 + 16 = 356 is the narrowest header that fits at all.
- * ⚠ AT A 640px VIEWPORT THE CONTAINER IS 258px, SO THE HEADER DOES NOT FIT THERE
- * AFTER BOTH STEPS. That is reported, not absorbed: no third step was ruled.
+ *     → below that the price steps to 20px (`Yes 100%` = 114);
+ *   · 2 × 125 + 114 + 16 = 380 → below that the buttons step to 8px (113px);
+ *   · 2 × 113 + 114 + 16 = 356 — which an 860px window (container 368) clears.
+ * ⛔ THE HEADER IS A SIZE CONTAINER ONLY FROM 860px, AND THAT IS WHAT SCOPES THE
+ * STEPS TO THEIR RANGE. Below 860 there is no `colhead` container, so no step
+ * query can match, and the stack keeps full sizes — it needs none of them: at the
+ * 640px floor the container is 258px and the button row is exactly
+ * 125 + 8 + 125 = 258.
+ * ⚠ The stack is a VIEWPORT rule (`max-[860px]:`), because that is how it was
+ * ruled; `max-[860px]:` and `min-[860px]:` are `width < 860` / `width >= 860`, so
+ * the two regimes meet without a gap or an overlap.
  */
 const LANES =
-	"grid min-h-[51.2px] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2";
+	"grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 max-[860px]:grid-cols-2";
+
+/**
+ * Each side lane holds one control and keeps the control's full height when it
+ * is empty — 7 + 18 + 13.2 + 7 padding/lines + 2 border + 4 reserve = 51.2px —
+ * so a hosting column's header, whose lanes are empty, is exactly as tall as its
+ * neighbour's and the two hairlines stay level. In the stack the lanes are the
+ * second row.
+ */
+const LANE = "flex min-h-[51.2px] items-center";
 
 /**
  * The lifted header control. Applied over `buttonVariants({ variant: "outline" })`
@@ -111,19 +129,29 @@ export function HeaderLanes({
 	sell: ReactNode;
 }) {
 	return (
-		// `@container/colhead` — the header measures ITSELF for the two steps; see
-		// the thresholds above. `px-3` lines its lanes up with the card body below.
-		<div className="@container/colhead px-3 py-2">
+		// `min-[860px]:@container/colhead` — from 860px the header measures ITSELF
+		// for the two steps; below it there is no container to measure (see the
+		// regimes above). `px-3` lines its lanes up with the card body below.
+		<div className="px-3 py-2 min-[860px]:@container/colhead">
 			<div className={LANES}>
-				<div className="flex justify-self-start">{action}</div>
+				<div
+					className={`${LANE} justify-self-start max-[860px]:col-start-1 max-[860px]:row-start-2`}
+				>
+					{action}
+				</div>
 				{/* Today's price cluster at 26px — word 600, percent 800, the 16px thumb
-				    and 5px gaps unchanged — stepping to 20px when the header can't fit. */}
-				<span className="flex items-center gap-[5px] text-[26px] leading-[1.2] font-semibold whitespace-nowrap text-ink @max-[406px]/colhead:text-[20px]">
+				    and 5px gaps unchanged — stepping to 20px when the header can't fit,
+				    and taking a row of its own, centred, below 860px. */}
+				<span className="flex items-center gap-[5px] text-[26px] leading-[1.2] font-semibold whitespace-nowrap text-ink @max-[406px]/colhead:text-[20px] max-[860px]:col-span-2 max-[860px]:row-start-1 max-[860px]:justify-self-center">
 					{side === "YES" ? "Yes" : "No"}
 					<ThumbGlyph side={side} />
 					<b className="font-extrabold">{pct}</b>
 				</span>
-				<div className="flex justify-self-end">{sell}</div>
+				<div
+					className={`${LANE} justify-self-end max-[860px]:col-start-2 max-[860px]:row-start-2`}
+				>
+					{sell}
+				</div>
 			</div>
 		</div>
 	);
