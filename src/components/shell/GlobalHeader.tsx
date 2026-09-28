@@ -75,6 +75,9 @@ import { XLink } from "./XLink";
  *
  * Left zone order Back · Home · Radio · GitHub · X (mockup v0_2 for the first
  * three; GitHub and X are named deviations — see below).
+ * ⚠ UIR-3 item 5 — AT 640px AND UP IT READS `Home · RULES · Radio · GitHub · X`:
+ * Back left at UIR-1 item 5, and RULES is back in this zone, directly after
+ * Home. Below 640 RULES keeps its identity-zone place (the mounts, below).
  * ⚠ IT READ `… · GitHub · RULES` UNTIL MKT-ROSTER-1-P3, which moves RULES to the
  * right zone on a founder ruling and gives its slot to `XLink`. The count is
  * unchanged at five, so a reader checking the zone's width budget against the
@@ -117,6 +120,9 @@ import { XLink } from "./XLink";
  * the far right (UI.13; SPEC.1 §21.1) — **at and above 640px.** Below
  * `--breakpoint-mobile` three of the five are hidden, so the zone reads `RULES ·
  * avatar-or-JOIN` and is pushed to the row's right edge by `ms-auto` (A13 D-1).
+ * ⚠ UIR-3 item 5 — from 640px RULES is in the left zone, so at and above 640 this
+ * zone opens on the Đ cluster (signed in) or JOIN (signed out). Below 640 it
+ * still reads `RULES · avatar-or-JOIN`.
  * ⚠ RULES JOINED THIS ZONE AT MKT-ROSTER-1-P3 and this sentence opened with the
  * Đ cluster until then. ⛔ THE §21.1 REGISTER BOUNDARY IS UNTOUCHED IN BOTH
  * DIRECTIONS, and that is the claim to check rather than the order: nothing
@@ -130,6 +136,8 @@ import { XLink } from "./XLink";
  * tab in the CENTRE zone as a sibling of the wordmark (`mockup-v0_2:208`,
  * close-out `:31`). ⚠ IT SHIPS FIRST IN THE **RIGHT** ZONE; this sentence read
  * "the LEFT zone, after Radio" until the founder moved it to the identity side.
+ * ⚠ UIR-3 item 5 — AT 640px AND UP IT SHIPS IN THE LEFT ZONE AGAIN, directly
+ * after Home; the right zone keeps it below 640 only.
  * The deviation from the mockup is unchanged in kind — still not the centre zone
  * — and the measurement below is what ruled the centre zone OUT, so it still
  * governs. What it does not decide, and never did, is which SIDE zone hosts the
@@ -369,6 +377,29 @@ export function GlobalHeader({
 					    brand and right zones sit in their own grid tracks and do not
 					    move. `mobileResponsive` still threads through, inert. */}
 					<HeaderNav mobileResponsive={mobileResponsive} />
+					{/* ⛔ UIR-3 item 5 — AT 640px AND UP RULES IS THIS ZONE'S SECOND ITEM,
+					    DIRECTLY AFTER HOME: `home · RULES · RADIO …`, everything else in
+					    its old order. The pill is unchanged; its `mr-3.5` is the right
+					    zone's rhythm (that zone has no gap), so here the wrapper zeroes it
+					    and this zone's 8px gap does the separating.
+					    ⚠ BELOW 640 RULES STAYS FIRST IN THE IDENTITY ZONE. The phone row is
+					    not this item's to change, and this zone flattens to `contents`
+					    there, so moving the one mount would move RULES on the phone too.
+					    ⇒ One mount per tier: this one is `display: contents` from 640 and
+					    `max-mobile:hidden` below it; the right zone's is the reverse. Each
+					    is `display: none` on the other tier, so one RULES renders at any
+					    width, and the phone row's order and classes are what they were.
+					    Without `mobileResponsive` this is the only mount, at every width.
+					    ⚠ The note below predates the move: MKT-ROSTER-1-P3's right-zone
+					    placement now holds below 640 only. */}
+					<div
+						className={cn(
+							"contents [&>button]:mr-0",
+							mobileResponsive && "max-mobile:hidden",
+						)}
+					>
+						<RulesControl mobileResponsive={mobileResponsive} />
+					</div>
 					{/* MOBILE-1 Phase A — the off-site/decorative utility controls, and
 					    the ONLY things in this zone that hide below 640px.
 					    ⚠ RULES USED TO BE THE SIBLING BELOW THIS WRAPPER, and the note
@@ -522,15 +553,25 @@ export function GlobalHeader({
 					    Signed out the zone reads `RULES · JOIN · | · visitors`; signed
 					    in, `RULES · Đ cluster · avatar · | · visitors`. It is FIRST so
 					    that the two arms differ only by what follows it.
-					    ⛔ NO WRAPPER, EVER. `dharma-cluster.test.tsx`'s T4 guard walks
-					    THIS div's direct `.children` to prove the §21.1 divider has the
-					    engine-derived figures on one side and the visitor count on the
-					    other; a wrapper around any of these makes the real node a
-					    grandchild and every index in that guard resolves to `-1`.
+					    ⚠ UIR-3 item 5 — BELOW 640px ONLY. From 640 RULES is the left
+					    zone's second item (see the mount there), and this zone opens on
+					    Đ / JOIN. This mount's wrapper is `display: none` from 640 and
+					    `display: contents` below it, so on the phone the button is still
+					    a direct flex item of this zone, exactly as before.
+					    ⛔ NO WRAPPER AROUND THE OTHER FOUR, EVER. `dharma-cluster.test.tsx`'s
+					    T4 guard walks THIS div's direct `.children` to prove the §21.1
+					    divider has the engine-derived figures on one side and the visitor
+					    count on the other; a wrapper around any of them makes the real
+					    node a grandchild and every index in that guard resolves to `-1`.
+					    T4 does not index RULES, which is why its tier wrapper is safe.
 					    ⚠ Its separation from what follows is a `mr-3.5` on the control
 					    itself — this zone declares no `gap`, and adding one would move
 					    Đ, the chip and the counter at 1440. */}
-					<RulesControl mobileResponsive={mobileResponsive} />
+					{mobileResponsive ? (
+						<div className="hidden max-mobile:contents">
+							<RulesControl mobileResponsive />
+						</div>
+					) : null}
 					{/* ADR-0049 — the two hides below 640px live in the COMPONENTS, not
 					    here, and the asymmetry with the divider two nodes down is
 					    deliberate rather than untidy. `dharma-cluster.test.tsx`'s T4
