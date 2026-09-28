@@ -96,12 +96,18 @@ export function ReplySplitBar({
 			    label's grey, centred under it. Each end's grid cell also holds the
 			    OTHER end's pair, invisible, so both cells take the wider pair's width
 			    and the track between them — and `Đ N STAKED` under it — is centred in
-			    the row, which sits on the page's centre line (see `PostFocusHeader`).
+			    the row. (That row sat on the page's centre line until UIR-7 item 2
+			    dropped the rule; see `PostFocusHeader`.)
 			    ⚠⚠ UIR-5 item 4 — AND EACH LINE IS NOW A ROW OF THE BAR'S GRID. A word is
 			    one `EndCell` on line 1 and its figure another on line 2, centred under
 			    it; each cell holds the OTHER end's text for its line, invisible, so both
 			    end columns still take the wider pair's width, and the track and
-			    `Đ N STAKED` between them stay on the page's centre line. */}
+			    `Đ N STAKED` between them stay centred in the row.
+			    ⚠ UIR-7 item 2 — THE ROW IS THE WHOLE CONTENT COLUMN NOW, which grows
+			    and shrinks with the picture beside it. Nothing here changes for it:
+			    the track's `minmax(0,1fr)` takes whatever the two ends leave, so the
+			    bar spans the column between its labels, and `Đ N STAKED` stays
+			    centred under it on the figures' baseline. */}
 			<EndCell
 				className="col-start-1 row-start-1 tracking-[0.1em] text-ink uppercase"
 				show="Support"

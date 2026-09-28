@@ -191,6 +191,13 @@ export function PostFocusHeader({
 					    there is no rail (and no chart column on the market arm), so column
 					    1 takes the market arm's picture width instead and ends where that
 					    picture ends: a third of the section, less this card's 13px inset.
+					    ⛔ UIR-7 item 2 — THE CENTRE RULE ABOVE IS DROPPED (founder's call).
+					    Column 1 is the picture's own width (item 1) and column 2 takes the
+					    rest: its author row, title row and split bar start 16px after the
+					    picture and end at this card's right padding, so they grow and
+					    shrink with it. A removed post has no picture and no column 1. The
+					    width above survives as the picture's ceiling, and as the frame of
+					    a text-only post's well until item 3 replaces it.
 					    ⚠⚠ UIR-5 item 1 — THE HEIGHT IS UIR-3's, AND IT IS FIXED. UIR-4 gave
 					    this row the market arm's height as a floor (192px of section at
 					    1440); that floor is gone, and the section is back to the 125.25px
@@ -226,15 +233,13 @@ export function PostFocusHeader({
 						    ⚠ UIR-4 item 3 — AND AN IMAGELESS POST NO LONGER GETS THE REMOVED
 						    CASE'S NOTHING: its title fills the frame as the quotation well.
 						    Only a removed post still draws nothing here.
+						    ⚠ UIR-7 item 2 — AND IT RESERVES NOTHING NOW EITHER. The frame it
+						    kept was the centre rule's, which is dropped, so a removed post has
+						    no column 1 and its content starts at the card's left padding.
 						    ⚠ UIR-7 item 1 — AN IMAGE POST'S FRAME IS NO LONGER THAT COLUMN: it
 						    hugs its picture, in flow, and it is the row's fixed height — not
 						    `absolute` — that keeps the attachment from setting the row's. */}
-						{post.removed ? (
-							<div
-								data-testid="post-focus-media"
-								className="w-[calc((100cqw_+_26px)/3_-_13px)] shrink-0 lg:w-[344px]"
-							/>
-						) : post.imageUrl ? (
+						{post.removed ? null : post.imageUrl ? (
 							// ⚠ UIR-4 item 2 — THE IMAGE FILLS ITS BOX AT THE ROW'S HEIGHT:
 							// whole (both axes bounded, scaled to fit, never cropped), centred,
 							// with no border and no ground; the 6px `--imgr` radius is on the
