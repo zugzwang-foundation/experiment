@@ -337,7 +337,10 @@ export function PostFocusHeader({
 							    ⛔ `ReplySplitBar.tsx` IS NOT TOUCHED. Row 16 is PLACEMENT,
 							    and placement is this container's business; the bar's
 							    internals are allow-list-excluded, and needing to edit them
-							    would be H1-f — a halt, not an edit. It was not needed. */}
+							    would be H1-f — a halt, not an edit. It was not needed.
+							    ⚠ UIR-4 item 5 — IT IS TOUCHED NOW, by name: its end labels
+							    are two lines of equal width, which centres the bar and its
+							    `Đ N STAKED` in column 2. */}
 							<div data-testid="post-focus-foot" className="mt-auto shrink-0">
 								<ReplySplitBar
 									postSide={post.sideAtPostTime}
