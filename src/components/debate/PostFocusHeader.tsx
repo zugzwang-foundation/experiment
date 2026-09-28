@@ -242,6 +242,12 @@ export function PostFocusHeader({
 								// `CommentImage` concatenates rather than merges, so the order of
 								// the two in the stylesheet cannot decide it. The click opens the
 								// lightbox, as before.
+								// ⚠ UIR-5 item 2 — THE SAME RULE AT THE FIXED HEIGHT, AND NOTHING
+								// HERE CHANGES FOR IT: the arm reads no height but its box's, which
+								// is now 344 × 99.25 from `lg` (a third of the section wide below
+								// it). An image whose shape is taller than the box's fills the
+								// height and centres across it; a wider one — past 3.47:1 at `lg` —
+								// fills the width and centres down it. Whole either way.
 								<div className="absolute inset-0 flex items-center justify-center">
 									<CommentImage
 										url={post.imageUrl}
