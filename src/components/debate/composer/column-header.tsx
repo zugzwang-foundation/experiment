@@ -125,7 +125,10 @@ export function HeaderLanes({
 	/** The pole the header speaks for (the composing side while a composer is open). */
 	side: Side;
 	pct: string;
-	/** The right lane. `null` when the viewer holds nothing on this side. */
+	/**
+	 * The right lane: Sell on the held side, `HeaderNoPosition` elsewhere, `null`
+	 * on the hosting column.
+	 */
 	sell: ReactNode;
 }) {
 	return (
@@ -154,6 +157,29 @@ export function HeaderLanes({
 				</div>
 			</div>
 		</div>
+	);
+}
+
+/**
+ * UIR-1 item 2 — `NO ACTIVE` over `POSITION`, the right lane when the viewer
+ * holds nothing on this side and the header is not hosting a composer.
+ * `main`'s treatment (7314ab4c, `SlotHeader` and `PositionStrip` alike): 10px /
+ * 700, 0.1em tracking, uppercase, `n4`. It sits centred in the box `HeaderSell`
+ * takes at the same width — `HEADER_CONTROL`'s 125px (113px at the step) by
+ * 47.2px (7 + 18 + 13.2 + 7 + 2 border) plus the 4px `mb-1` — so the words hold
+ * the place the button would. Plain text: no border, fill, ledge or handler.
+ * ⚠ Read once. FEED-3 had removed the words rather than hiding them, so there
+ * is no `sr-only` copy to reconcile with.
+ */
+export function HeaderNoPosition() {
+	// The shipped string, broken before its last word: `No active` / `position`.
+	const words = COMPOSER_COPY.noPosition;
+	const cut = words.lastIndexOf(" ");
+	return (
+		<span className="mb-1 flex h-[47.2px] w-[125px] flex-col items-center justify-center text-center text-[10px] leading-[1.2] font-bold tracking-[0.1em] text-n4 uppercase @max-[380px]/colhead:w-[113px]">
+			<span>{words.slice(0, cut)}</span>
+			<span>{words.slice(cut + 1)}</span>
+		</span>
 	);
 }
 

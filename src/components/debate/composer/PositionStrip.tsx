@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 import { formatPricePercent } from "../format";
 import type { Side, ViewerMarketContext } from "../types";
-import { HeaderLanes, HeaderSell } from "./column-header";
+import { HeaderLanes, HeaderNoPosition, HeaderSell } from "./column-header";
 
 /**
  * The post-view (reply page) column header.
@@ -19,9 +19,9 @@ import { HeaderLanes, HeaderSell } from "./column-header";
  *     to-win of the side the reply lands on. The caller builds it, because the
  *     caller holds the relation state and its handler;
  *   · centre — the side and its price;
- *   · Sell — `SELL` over the position figure, only on the side the viewer holds.
- * The `TO WIN`, `YOUR POSITION` and `NO ACTIVE POSITION` labels are gone, as on
- * the market page.
+ *   · Sell — `SELL` over the position figure, only on the side the viewer holds;
+ *     elsewhere `NO ACTIVE` / `POSITION` in the box Sell would take (UIR-1 item 2).
+ * The `TO WIN` and `YOUR POSITION` labels are gone, as on the market page.
  *
  * ⛔ THE HOSTING COLUMN SHOWS THE SIDE BEING BET AND NOTHING ELSE — change set
  * 12 §1, the market page's ruling, now that this header has controls to lose.
@@ -75,13 +75,15 @@ export function PositionStrip({
 			pct={pct}
 			action={hosting ? null : (action ?? null)}
 			sell={
-				!hosting && held && viewer?.position ? (
+				hosting ? null : held && viewer?.position ? (
 					<HeaderSell
 						value={viewer.position.currentValue}
 						ownPseudonym={ownPseudonym}
 						slug={slug}
 					/>
-				) : null
+				) : (
+					<HeaderNoPosition />
+				)
 			}
 		/>
 	);
