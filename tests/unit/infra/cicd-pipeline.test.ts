@@ -64,6 +64,17 @@ describe("production deploys run CI first; staging deploys skip it", () => {
 		);
 	});
 
+	it("every job after a skippable ci carries a status function, so a skipped ci cannot skip it", () => {
+		// A job `if:` without `!cancelled()`/`always()` gets an implicit
+		// `success()`, false when ANY ancestor was skipped. Staging runs with
+		// `ci` skipped, and this is how migrate and verify were silently
+		// skipped on every staging deploy until STAGING-FAST-DEPLOY's follow-up.
+		for (const name of ["build", "migrate", "deploy", "verify"]) {
+			expect(job(name), name).toMatch(/\n {4}if: \$\{\{ !cancelled\(\) && /);
+		}
+		expect(job("verify")).toContain("needs.deploy.result == 'success'");
+	});
+
 	it("a production build never proceeds on a skipped CI unless it is a rollback", () => {
 		expect(job("build")).toContain(
 			`(needs.ci.result == 'success' || (needs.ci.result == 'skipped' && ((inputs.environment || 'staging') == 'staging' || inputs.rollback_image_tag)))`,
@@ -131,7 +142,7 @@ describe("rollback redeploys an existing image through the same gate", () => {
 	it("skips CI, the image build and migrations, but not the approval-gated jobs", () => {
 		expect(job("ci")).toContain("&& !inputs.rollback_image_tag }}");
 		expect(job("migrate")).toContain(
-			`if: ${$}{{ !inputs.skip_migrations && !inputs.rollback_image_tag }}`,
+			`if: ${$}{{ !cancelled() && needs.build.result == 'success' && !inputs.skip_migrations && !inputs.rollback_image_tag }}`,
 		);
 		const build = job("build");
 		expect(build).toContain(
