@@ -188,10 +188,14 @@ export function DebateColumn({
 			{/* ⚠ FEED-3 — `p-3` is the card's own inset, taken here once so the card,
 			    the rail beside it, the composer and the empty-side prompt all sit the
 			    same 12px inside the rectangle. It replaces `pb-2 pr-3`, which padded
-			    for a box the column no longer has. */}
+			    for a box the column no longer has.
+			    ⚠ UIR-1 item 4 — `colbody` is the post card's Support/Counter row's
+			    step container. Its content box is the header's `colhead` content
+			    box (column interior − 24px) with overlay scrollbars, so the two
+			    step at one width; from 860px only, as `colhead` is. */}
 			<div
 				data-testid="column-scroll"
-				className="flex min-h-0 flex-1 flex-col overflow-y-auto p-3 [scrollbar-gutter:stable]"
+				className="flex min-h-0 flex-1 flex-col overflow-y-auto p-3 [scrollbar-gutter:stable] min-[860px]:@container/colbody"
 			>
 				{children}
 			</div>

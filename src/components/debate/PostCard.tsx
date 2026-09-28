@@ -137,10 +137,11 @@ export function PostCard({
 	unboxed?: boolean;
 	/**
 	 * ⛔⛔ FEED-3 — MOUNTED IN A DESKTOP `DebateColumn`, WHICH DRAWS THE BOX. Passed
-	 * by `PostScroller` only. Two things follow and nothing else moves: the card
-	 * draws no box (`IN_COLUMN_CARD`), and a text-only argument's quote well drops
-	 * its box — the ruled "Cards" changes. (FEED-3 also dropped the author line's
-	 * pipes; UIR-1 item 1 restored them, so the row renders as on `main`.)
+	 * by `PostScroller` only. Three things follow and nothing else moves: the card
+	 * draws no box (`IN_COLUMN_CARD`), a text-only argument's quote well drops its
+	 * box — the ruled "Cards" changes — and the Support/Counter row takes the
+	 * column header's two-line controls (UIR-1 item 4). (FEED-3 also dropped the
+	 * author line's pipes; UIR-1 item 1 restored them, as on `main`.)
 	 * ⚠ A PROP, NOT A `mobile:` TOKEN, for `unboxed`'s reason in reverse: the phone
 	 * feed and the parent-post sheet mount this card too and are untouched by
 	 * FEED-3, and the pop-ups and the focused post share `ArgProfile` — a width
@@ -200,6 +201,7 @@ export function PostCard({
 					triggers={triggers}
 					band={unboxed}
 					railSide={railSide}
+					inColumn={inColumn}
 				/>
 				{/* ⚠ A removed POST STILL KEEPS ITS SURVIVING REPLIES (§6 — thread
 				    integrity), and row 25 does not touch that: what changed is only
@@ -532,6 +534,7 @@ export function PostCard({
 				triggers={triggers}
 				band={unboxed}
 				railSide={railSide}
+				inColumn={inColumn}
 			/>
 		</Card>
 	);

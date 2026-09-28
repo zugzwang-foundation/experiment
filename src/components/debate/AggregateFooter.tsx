@@ -1,7 +1,13 @@
+import { buttonVariants } from "@/components/ui/button";
 import { InfoTip } from "@/components/ui/info-tip";
 import { GLOSSARY } from "@/lib/copy/glossary";
 import { cn } from "@/lib/utils";
 
+import {
+	HEADER_CONTROL,
+	HEADER_DETAIL,
+	HEADER_WORD,
+} from "./composer/column-header";
 import { c3OppositeSide, OWN_POST_COPY } from "./composer/copy";
 import { deriveReplySide, isEntryDisabled } from "./composer/gating";
 import { computeSplitBar, displaySplitTotal } from "./composer/split-bar";
@@ -81,6 +87,7 @@ export function AggregateFooter({
 	triggers,
 	band = false,
 	railSide,
+	inColumn = false,
 }: {
 	aggregate: ReplyAggregate;
 	/** The post's frozen side (INV-3) — the bar's pole basis, never a relation. */
@@ -138,6 +145,15 @@ export function AggregateFooter({
 	 * already spans the column's 12px insets.
 	 */
 	railSide?: "left" | "right";
+	/**
+	 * ⛔ UIR-1 item 4 — THE DESKTOP COLUMN'S ROW, AND ONLY THAT. Passed by
+	 * `PostCard`'s `inColumn` (`PostScroller` only), it renders the row below:
+	 * Support and Counter as the column header's two-line lifted controls, each
+	 * carrying its own Đ figure, with the split bar and its STAKED line centred
+	 * between them as one group. `= false` keeps the phone feed, the parent-post
+	 * sheet and the pop-up on the row above, unchanged.
+	 */
+	inColumn?: boolean;
 }) {
 	const { supportPct, hasStake } = computeSplitBar({
 		supportDharma: aggregate.supportDharma,
@@ -152,6 +168,74 @@ export function AggregateFooter({
 	// Support resolves to the post's own side; Counter to the opposite.
 	const supportPole = postSide === "YES" ? "bg-yes" : "bg-no";
 	const counterPole = postSide === "YES" ? "bg-no" : "bg-yes";
+
+	if (inColumn) {
+		// ⚠ UIR-1 item 4 — the column header's lane grammar (`column-header.tsx`
+		// `LANES`), one row from 860px and stacked below it: the bar group on its
+		// own row at full width, then Support at the left edge and Counter at the
+		// right. `items-center` centres the group on the buttons' margin box, as
+		// the header centres its price.
+		// ⚠ BELOW 860 A 125px PAIR NEEDS 258px, and with a rail beside the card
+		// the row has 258 − 44 = 214px at a 640px window (it reaches 258 near
+		// 728px). `max-[860px]:max-w-full` lets each button give up only the
+		// pixels its half of the row lacks, rather than overlap its neighbour;
+		// wherever 258px is there it is the Bet button's 125px exactly.
+		return (
+			<div
+				data-testid="aggregate-footer"
+				className={cn(
+					"grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 text-xs text-muted-foreground max-[860px]:grid-cols-2",
+					railSide === "right" && "pl-[22px]",
+					railSide === "left" && "pr-[22px]",
+				)}
+			>
+				{triggers ? (
+					<TriggerPill
+						relation="support"
+						postSide={postSide}
+						{...triggers}
+						amount={formatDharma(aggregate.supportDharma)}
+						className="justify-self-start max-[860px]:col-start-1 max-[860px]:row-start-2"
+					/>
+				) : (
+					<span />
+				)}
+				<span className="flex min-w-0 flex-col items-center gap-1 max-[860px]:col-span-2 max-[860px]:row-start-1">
+					{/* The desktop track as the row above draws it — 18px, the card
+					    radius, the hairline, poles resolved from the post's side. */}
+					<span
+						data-testid="aggregate-split-track"
+						aria-hidden="true"
+						className={cn(
+							"h-[18px] w-full overflow-hidden rounded-[var(--r)] [border:var(--hairline)]",
+							counterPole,
+						)}
+					>
+						<span
+							data-testid="aggregate-split-fill"
+							className={cn("block h-full", supportPole)}
+							style={{ width: supportPct }}
+						/>
+					</span>
+					<span>
+						<b className="text-sm text-ink">Đ {formatDharma(displayedTotal)}</b>{" "}
+						<span className="tracking-[0.1em] uppercase">staked</span>
+					</span>
+				</span>
+				{triggers ? (
+					<TriggerPill
+						relation="counter"
+						postSide={postSide}
+						{...triggers}
+						amount={formatDharma(aggregate.counterDharma)}
+						className="justify-self-end max-[860px]:col-start-2 max-[860px]:row-start-2"
+					/>
+				) : (
+					<span />
+				)}
+			</div>
+		);
+	}
 
 	return (
 		<div
@@ -500,6 +584,8 @@ function TriggerPill({
 	suspended,
 	onReply,
 	isOwnPost = false,
+	amount,
+	className,
 }: {
 	relation: "support" | "counter";
 	postSide: Side;
@@ -508,6 +594,14 @@ function TriggerPill({
 	suspended: boolean;
 	onReply: (relation: "support" | "counter") => void;
 	isOwnPost?: boolean;
+	/**
+	 * UIR-1 item 4 — given (the desktop column's row only), the trigger is the
+	 * column header's two-line lifted control with this Đ figure as its second
+	 * line. Omitted = the pill below, unchanged.
+	 */
+	amount?: string;
+	/** Grid placement from the column row; the pill takes none. */
+	className?: string;
 }) {
 	const resultingSide = deriveReplySide({ parentSide: postSide, relation });
 	const oppositeHeld = isEntryDisabled({ resultingSide, heldSide });
@@ -565,6 +659,57 @@ function TriggerPill({
 	// glossary gloss fills the null branch only — c3 still wins outright.
 	const gloss =
 		refusal ?? (relation === "support" ? GLOSSARY.support : GLOSSARY.counter);
+	if (amount !== undefined) {
+		const word = relation === "support" ? "Support" : "Counter";
+		return (
+			<InfoTip content={gloss} asChild>
+				<button
+					type="button"
+					data-testid={`card-trigger-${relation}`}
+					disabled={disabled}
+					aria-disabled={disabled}
+					// The figure is inside the control now, so the name carries it —
+					// and a refusal after it, where there is one.
+					aria-label={
+						refusal === null
+							? `${word}, Đ ${amount}`
+							: `${word}, Đ ${amount}. ${refusal}`
+					}
+					onClick={() => onReply(relation)}
+					className={cn(
+						// ⚠ UIR-1 item 4 — the Bet button's shell: `HEADER_CONTROL`'s
+						// 125px / 14px padding and its lift (0 3px 0 n2 #404040, hover
+						// −1px onto 4px, pressed +2px onto 1px), stepping to 113px / 8px
+						// with the header on the column's own width (`colbody`, the body
+						// under the `colhead` it steps with).
+						buttonVariants({ variant: "outline" }),
+						HEADER_CONTROL,
+						"@max-[380px]/colbody:w-[113px] @max-[380px]/colbody:px-2 max-[860px]:max-w-full",
+						// Enabled keeps the pole it had, at rest, hovered and pressed:
+						// #181818 with #fafafa text for a YES bet, the reverse for NO.
+						// Disabled drops it for the Bet button's disabled look — the
+						// outline fill and hairline, 0.5 opacity, no ledge.
+						!disabled &&
+							(resultingSide === "YES"
+								? "bg-yes text-no hover:bg-yes active:bg-yes"
+								: "bg-no text-yes hover:bg-no active:bg-no"),
+						className,
+					)}
+				>
+					<span className={HEADER_WORD}>{word}</span>
+					<span
+						className={cn(
+							HEADER_DETAIL,
+							// #545454 on the #fafafa button; the muted n5 elsewhere.
+							!disabled && resultingSide === "NO" && "text-n3",
+						)}
+					>
+						Đ {amount}
+					</span>
+				</button>
+			</InfoTip>
+		);
+	}
 	return (
 		<InfoTip content={gloss} asChild>
 			<button
