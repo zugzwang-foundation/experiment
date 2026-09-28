@@ -30,7 +30,11 @@ vi.mock(
 	}),
 );
 
-import { RADIO_PLAYLIST_URL, RadioSlot } from "@/components/shell/RadioSlot";
+import {
+	RADIO_PLAYLIST_URL,
+	RADIO_SIGNIN_COPY,
+	RadioSlot,
+} from "@/components/shell/RadioSlot";
 import { RADIO_PLAYLIST_ID } from "@/components/shell/radio/playlist";
 import { PLAYER_STATE } from "@/components/shell/radio/youtube-iframe-api";
 import { HEADER_GLOSSARY } from "@/lib/copy/glossary";
@@ -121,8 +125,8 @@ describe("RADIO-1 — off unless NEXT_PUBLIC_RADIO_ENABLED is true", () => {
 });
 
 describe("RADIO-1 — Radio opens the playlist on YouTube", () => {
-	it("is a new-tab link to the playlist, for signed-out viewers too", () => {
-		render(<RadioSlot signedIn={false} />);
+	it("is a new-tab link to the playlist for a signed-in viewer", () => {
+		render(<RadioSlot signedIn />);
 		const a = link() as HTMLAnchorElement;
 		expect(a.getAttribute("href")).toBe(
 			`https://www.youtube.com/playlist?list=${RADIO_PLAYLIST_ID}`,
@@ -141,15 +145,34 @@ describe("RADIO-1 — Radio opens the playlist on YouTube", () => {
 	});
 });
 
-describe("RADIO-1 — play/pause needs a signed-in viewer", () => {
-	it("signed out: the button is disabled, with the sign-in gloss", () => {
+describe("RADIO-SIGNIN — signed out, both controls ask the visitor to sign up or log in", () => {
+	const prompt = () =>
+		document.querySelector('[data-testid="radio-signin-prompt"]');
+
+	it("the Radio pill is NOT a link to YouTube when signed out", () => {
 		render(<RadioSlot signedIn={false} />);
-		const b = toggle() as HTMLButtonElement;
-		expect(b.disabled).toBe(true);
-		expect(b.title).toBe(HEADER_GLOSSARY.radioSignedOut);
-		fireEvent.click(b);
-		expect(mocks.load).not.toHaveBeenCalled();
+		expect(document.querySelector('a[href*="youtube.com"]')).toBeNull();
+		expect(link()?.tagName).toBe("BUTTON");
+		expect(link()?.title).toBe(HEADER_GLOSSARY.radioSignedOut);
 	});
+
+	for (const [name, control] of [
+		["Radio", () => link()],
+		["play", () => toggle()],
+	] as const) {
+		it(`clicking ${name} opens the prompt, which links to /sign-in, and loads nothing`, () => {
+			render(<RadioSlot signedIn={false} />);
+			expect(prompt()).toBeNull();
+			fireEvent.click(control() as HTMLElement);
+			const p = prompt();
+			expect(p?.textContent).toContain(RADIO_SIGNIN_COPY.body);
+			const a = p?.querySelector("a");
+			expect(a?.getAttribute("href")).toBe("/sign-in");
+			expect(a?.textContent).toBe(RADIO_SIGNIN_COPY.action);
+			expect(mocks.load).not.toHaveBeenCalled();
+			expect(hiddenHost()).toBeNull();
+		});
+	}
 });
 
 describe("RADIO-1 — nothing touches YouTube before the first play", () => {

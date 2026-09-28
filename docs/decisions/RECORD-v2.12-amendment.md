@@ -15,7 +15,7 @@ The header has carried an inert Radio placeholder since UI-A1 OQ-3. DC ruling 5 
 
 ### Decision
 
-**R1 — Radio is a link** to the playlist on YouTube, opening in a new tab, for every viewer.
+**R1 — Radio is a link** to the playlist on YouTube, opening in a new tab — for a signed-in viewer. ⚠ **Amended 2026-09-28 (RADIO-SIGNIN, founder ruling):** it read "for every viewer". Signed out, the link and the ▶ button both open a prompt to sign up or log in instead.
 
 **R2 — A ▶/⏸ button beside it plays the playlist on this site through a hidden YouTube player**, with the Radio equaliser and `On Air` label following real playback. Signed-in viewers only; desktop only (≥640px). Technical decision: ADR-0062.
 

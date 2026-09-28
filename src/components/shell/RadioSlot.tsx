@@ -1,6 +1,8 @@
 "use client";
 
 import { Pause, Play } from "lucide-react";
+import Link from "next/link";
+import { Popover } from "radix-ui";
 import { useEffect, useRef, useState } from "react";
 
 import { useIsPhoneTier } from "@/components/debate/phone-tier";
@@ -37,8 +39,9 @@ import { cn } from "@/lib/utils";
  * until the variable is set in Doppler. Every jsdom render of `GlobalHeader`
  * sees it unset. Playback additionally needs a signed-in viewer — a session
  * exists only after the onboarding gate saw `tos_accepted_at`, which is the
- * privacy-policy acceptance YouTube's §III.A.2 asks for. The link works for
- * everyone: it is only a link.
+ * privacy-policy acceptance YouTube's §III.A.2 asks for. Signed out, BOTH
+ * controls — the playlist link included — open a sign-up / log-in prompt
+ * instead (RADIO-SIGNIN, founder ruling 2026-09-28; `SignedOutRadio`).
  *
  * ⛔ NOTHING TOUCHES YOUTUBE BEFORE THE FIRST PLAY CLICK. That click loads the
  * API, builds the hidden player and plays. After it, the button pauses and
@@ -187,6 +190,11 @@ export function RadioSlot({ signedIn = false }: { signedIn?: boolean }) {
 		);
 	}
 
+	// RADIO-SIGNIN (founder ruling, 2026-09-28): signed out, BOTH controls ask
+	// the visitor to sign up or log in — the playlist link too, not only play.
+	// Nothing is loaded and nothing opens until they have.
+	if (!signedIn) return <SignedOutRadio />;
+
 	const loading = active && !ready;
 	const onToggle = () => {
 		if (!active) {
@@ -242,10 +250,9 @@ export function RadioSlot({ signedIn = false }: { signedIn?: boolean }) {
 			<button
 				type="button"
 				onClick={onToggle}
-				disabled={!signedIn || loading}
+				disabled={loading}
 				aria-busy={loading || undefined}
 				aria-label={onAir ? "Pause radio" : "Play radio"}
-				title={signedIn ? undefined : HEADER_GLOSSARY.radioSignedOut}
 				data-testid="radio-toggle"
 				className={HEADER_ICON_BUTTON}
 			>
@@ -254,3 +261,76 @@ export function RadioSlot({ signedIn = false }: { signedIn?: boolean }) {
 		</>
 	);
 }
+
+const PROMPT_CLASS =
+	"z-50 flex w-[240px] flex-col gap-2 rounded-(--r) bg-(--popover) px-3 py-2.5 text-xs leading-snug text-(--popover-foreground) shadow-(--elev-2) [border:var(--hairline)]";
+
+/**
+ * The signed-out Radio: the same two controls, both of which open one prompt
+ * to sign up or log in instead of playing or opening YouTube. The prompt links
+ * to `/sign-in`, which is where the header's own JOIN goes (it handles new
+ * accounts as well as returning ones).
+ */
+function SignedOutRadio() {
+	const [open, setOpen] = useState(false);
+	const ask = () => setOpen(true);
+	return (
+		<Popover.Root open={open} onOpenChange={setOpen}>
+			<Popover.Anchor asChild>
+				<span className="flex items-center gap-2">
+					<button
+						type="button"
+						onClick={ask}
+						aria-label="Radio — sign up or log in to listen"
+						aria-haspopup="dialog"
+						aria-expanded={open}
+						title={HEADER_GLOSSARY.radioSignedOut}
+						data-testid="radio-link"
+						className={cn(
+							BOX,
+							"outline-none [transition:all_var(--dur-hover)] hover:[border:1px_solid_var(--ring)] active:bg-(--state-pressed-fill) focus-visible:shadow-(--state-focus-ring)",
+						)}
+					>
+						<Bars />
+						<span className={cn(LABEL, "text-ink")}>Radio</span>
+					</button>
+					<button
+						type="button"
+						onClick={ask}
+						aria-label="Play radio — sign up or log in to listen"
+						aria-haspopup="dialog"
+						aria-expanded={open}
+						title={HEADER_GLOSSARY.radioSignedOut}
+						data-testid="radio-toggle"
+						className={HEADER_ICON_BUTTON}
+					>
+						<Play aria-hidden="true" />
+					</button>
+				</span>
+			</Popover.Anchor>
+			<Popover.Portal>
+				<Popover.Content
+					side="bottom"
+					align="start"
+					sideOffset={8}
+					data-testid="radio-signin-prompt"
+					className={PROMPT_CLASS}
+				>
+					<p>{RADIO_SIGNIN_COPY.body}</p>
+					<Link
+						href="/sign-in"
+						onClick={() => setOpen(false)}
+						className="self-start font-bold text-ink underline underline-offset-2"
+					>
+						{RADIO_SIGNIN_COPY.action}
+					</Link>
+				</Popover.Content>
+			</Popover.Portal>
+		</Popover.Root>
+	);
+}
+
+export const RADIO_SIGNIN_COPY = {
+	body: "Please sign up or log in to listen to the Radio.",
+	action: "Sign up / Log in",
+} as const;
