@@ -86,7 +86,6 @@ export function AggregateFooter({
 	postSide,
 	triggers,
 	band = false,
-	railSide,
 	inColumn = false,
 }: {
 	aggregate: ReplyAggregate;
@@ -131,21 +130,6 @@ export function AggregateFooter({
 	 */
 	band?: boolean;
 	/**
-	 * ⚠ UIR-1 item 3 — THE ROW CENTRES ON THE COLUMN, NOT ON THE CARD. The
-	 * desktop column's `ScrollRail` sits beside the card on this side, so the row
-	 * was centred in the width the rail leaves. Given, the OTHER side takes 22px
-	 * of padding — the rail's `w-[14px]` plus `PostScroller`'s `gap-2` — so both
-	 * sides sit 34px (12 + 14 + 8) inside the column and the row's centre is the
-	 * column's, the line the header price is centred on.
-	 * ⛔ 34px, NOT THE HEADER'S 12px: the rail is 136px tall (13 + 9 + 92 + 9 +
-	 * 13) and centred on the card's height, so on a card shorter than ~240px it
-	 * overlaps this row's band, and a row widened under it would collide. The
-	 * rail side's inset on both sides is the ruled fallback for exactly that.
-	 * Absent (no rail, every other mount) = no padding, and a card with no rail
-	 * already spans the column's 12px insets.
-	 */
-	railSide?: "left" | "right";
-	/**
 	 * ⛔ UIR-1 item 4 — THE DESKTOP COLUMN'S ROW, AND ONLY THAT. Passed by
 	 * `PostCard`'s `inColumn` (`PostScroller` only), it renders the row below:
 	 * Support and Counter as the column header's two-line lifted controls, each
@@ -175,18 +159,19 @@ export function AggregateFooter({
 		// own row at full width, then Support at the left edge and Counter at the
 		// right. `items-center` centres the group on the buttons' margin box, as
 		// the header centres its price.
-		// ⚠ BELOW 860 A 125px PAIR NEEDS 258px, and with a rail beside the card
-		// the row has 258 − 44 = 214px at a 640px window (it reaches 258 near
-		// 728px). `max-[860px]:max-w-full` lets each button give up only the
-		// pixels its half of the row lacks, rather than overlap its neighbour;
-		// wherever 258px is there it is the Bet button's 125px exactly.
+		// ⚠ UIR-2 item 2 — THE ROW SPANS THE COLUMN BODY, the header's 12px insets
+		// on both sides: the rail sits inside the card's middle band now, not
+		// beside the card, so Support's left edge is the Bet button's and
+		// Counter's right edge the header's right lane, and the bar takes the
+		// rest. Below 860 a 125px pair needs 258px, which is the body's width at
+		// a 640px window; `max-[860px]:max-w-full` lets each button give up only
+		// the pixels its half lacks (a classic scrollbar's gutter, say) rather
+		// than overlap its neighbour.
 		return (
 			<div
 				data-testid="aggregate-footer"
 				className={cn(
 					"grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 text-xs text-muted-foreground max-[860px]:grid-cols-2",
-					railSide === "right" && "pl-[22px]",
-					railSide === "left" && "pr-[22px]",
 				)}
 			>
 				{triggers ? (
@@ -260,8 +245,6 @@ export function AggregateFooter({
 				// so "one step up" is n0 → n1 and never the reverse.
 				band &&
 					"max-mobile:-mx-3 max-mobile:bg-n1 max-mobile:px-3 max-mobile:py-2.5",
-				railSide === "right" && "pl-[22px]",
-				railSide === "left" && "pr-[22px]",
 			)}
 		>
 			{/* `.sidewrap` (`d5:585`) — `align-items:center`, on BOTH sides

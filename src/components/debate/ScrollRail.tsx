@@ -98,6 +98,7 @@ export function ScrollRail({
 	onNext,
 	durationMs,
 	progressKey,
+	fit = false,
 }: {
 	/** 0-based position of the visible card. */
 	index: number;
@@ -115,6 +116,16 @@ export function ScrollRail({
 	durationMs: number | null;
 	/** Bumped by the owner on every advance; restarts the countdown. */
 	progressKey: number;
+	/**
+	 * UIR-2 item 2 — the rail FILLS its slot's height, up to its own 136px
+	 * (13 + 9 + 92 + 9 + 13), and a shorter slot shortens the TRACK, never ▲ or
+	 * ▼ (both `shrink-0`). Passed by the market card's middle band only.
+	 * ⚠ `h-full`, not an auto height under a cap, so the rail's height is
+	 * DEFINITE: the countdown fill is a percentage of the track, and a track
+	 * flexed inside an auto-height column would leave that percentage nothing
+	 * to resolve against.
+	 */
+	fit?: boolean;
 }) {
 	return (
 		<div
@@ -129,7 +140,9 @@ export function ScrollRail({
 			// 609px viewport — present, correct, and off the bottom of the screen. A
 			// control you have to scroll to find reads as missing, which is half of the
 			// founder's "cards do not step".
-			className="flex w-[14px] shrink-0 flex-col items-center gap-[9px] self-center"
+			className={`flex w-[14px] shrink-0 flex-col items-center gap-[9px] self-center${
+				fit ? " h-full max-h-[136px]" : ""
+			}`}
 		>
 			<button
 				type="button"
