@@ -8,7 +8,8 @@
 # Production is reachable ONLY from `main`, and every production job runs in the
 # `aws-production` GitHub environment: `main`-only branch policy, a required
 # reviewer, admin bypass off. Nothing reaches production without that approval.
-# The first job is `ci` (ci.yml): no deploy builds from code that failed it.
+# The first job is `ci` (ci.yml): no PRODUCTION deploy builds from code that
+# failed it. A STAGING deploy skips it (STAGING-FAST-DEPLOY, the `ci` job).
 #
 # ⛔ THE ORDER IS THE POINT (ADR-0024 migrate-before-serve). Migrations land
 # BEFORE the new image serves traffic, so a failed migration leaves the OLD
@@ -129,18 +130,26 @@ jobs:
   ci:
     name: CI (lint, typecheck, migrations, tests)
     needs: guard
+    # PRODUCTION ONLY. ⛔ STAGING-FAST-DEPLOY (founder ruling, 2026-09-28): a
+    # staging deploy skips CI — it took 40–45 minutes end to end, and this job
+    # was the largest part of it. The cost is real and accepted: a direct push to
+    # `staging` opens no PR, so its code now deploys untested, and a break shows
+    # up on staging (or on the `staging` → `main` PR, which still runs CI) rather
+    # than here. Production is unchanged: every production build waits for this.
     # A rollback redeploys an image that already passed CI when it was built.
-    if: ${{ !inputs.rollback_image_tag }}
-    # The same gate every PR runs. A direct push to `staging` opens no PR, so
-    # this is the only place its code is ever tested before it deploys.
+    # To restore the staging gate, delete the environment clause below and the
+    # `branches-ignore` in ci.yml.
+    if: ${{ (inputs.environment || 'staging') == 'production' && !inputs.rollback_image_tag }}
     uses: ./.github/workflows/ci.yml
 
   build:
     name: Build and push image
     needs: [guard, ci]
-    # CI passed, or this is a rollback (CI deliberately skipped). Never after a
-    # failed or cancelled CI.
-    if: ${{ !cancelled() && needs.guard.result == 'success' && (needs.ci.result == 'success' || (inputs.rollback_image_tag && needs.ci.result == 'skipped')) }}
+    # CI passed, or CI was deliberately skipped — a staging deploy
+    # (STAGING-FAST-DEPLOY) or a rollback. Never after a failed or cancelled CI,
+    # and a production build never proceeds on a skipped CI unless it is a
+    # rollback.
+    if: ${{ !cancelled() && needs.guard.result == 'success' && (needs.ci.result == 'success' || (needs.ci.result == 'skipped' && ((inputs.environment || 'staging') == 'staging' || inputs.rollback_image_tag))) }}
     runs-on: ubuntu-latest
     environment: ${{ (inputs.environment || 'staging') == 'production' && 'aws-production' || (inputs.environment || 'staging') }}
     permissions:
