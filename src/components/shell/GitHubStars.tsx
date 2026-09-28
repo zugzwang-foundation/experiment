@@ -47,8 +47,9 @@ import { GITHUB_REPO_URL } from "@/server/github/star-count";
 
 /**
  * `RadioSlot`'s box — 34px register, `px-3`, `gap-2`, hairline, `--btn-fill` —
- * carrying `RulesControl`'s interactive states, because Radio is a disabled slot
- * and this is a live link. Type register is RULES' (12px / .1em / `text-ink`,
+ * carrying `RulesControl`'s interactive states, because this is a live link.
+ * (Radio was a disabled slot when this was written; since RADIO-1 it carries
+ * the same states when live.) Type register is RULES' (12px / .1em / `text-ink`,
  * founder-ruled at OD-1): `text-ink` is this repo's enabled-control colour and a
  * link is an enabled control. Colour is `currentColor` throughout — no literal.
  *
