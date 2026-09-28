@@ -26,8 +26,9 @@ import { isEntryDisabled } from "./gating";
  *     and carries today's to-win figure as its second line — `Đ 1 → Đ 8.77`, no
  *     `TO WIN` label, no trailing `x`;
  *   · Sell reads `SELL` over the position figure, and `YOUR POSITION` is gone.
- *     With no position the right lane reads `NO ACTIVE` / `POSITION` in the
- *     box Sell would take (UIR-1 item 2 — FEED-3 had left it empty).
+ *     With no position the right lane reads `NO ACTIVE POSITION`, main's
+ *     one-line label, flush right (UIR-1 item 2 — FEED-3 had left it empty;
+ *     UIR-3 item 2 — one line again).
  * ⚠ The composer's own `COMPOSER_COPY.header` / `.submit` say `Đ BET`, so the
  * header and the composer it opens agree on the verb again.
  *

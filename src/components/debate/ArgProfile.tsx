@@ -135,8 +135,8 @@ export function ArgProfile({
 	 * pop-up), with `reply` naming the reply's ordinal within post `ordinal`.
 	 * ⚠ UIR-2 item 3 — `pinned` (the desktop market card only) takes the
 	 * control out of the flow and pins it to this row's right edge, centred on
-	 * the row; the row becomes its containing block and keeps 40px clear for it
-	 * (the 32px box and an 8px gap).
+	 * the row; the row becomes its containing block and keeps 44px clear for it
+	 * (the 36px box and an 8px gap — UIR-3 item 3; it was 40px for a 32px box).
 	 */
 	download?: { ordinal: number; reply?: number; pinned?: boolean };
 	/**
@@ -189,7 +189,7 @@ export function ArgProfile({
 		<div
 			className={cn(
 				"flex w-full items-start gap-2 max-mobile:relative",
-				download?.pinned && "relative pr-10",
+				download?.pinned && "relative pr-11",
 			)}
 		>
 			{/* ⛔⛔ MOBILE-2c R-2 — AT PHONE WIDTH THE AVATAR LEAVES THE FLOW, AND

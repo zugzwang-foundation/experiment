@@ -127,6 +127,14 @@ export function ScrollRail({
 	 */
 	fit?: boolean;
 }) {
+	// ⚠ UIR-3 item 7 — ON THE POST CARD'S RAIL (`fit`) THE ARROWS' KEYBOARD FOCUS
+	// RING IS DRAWN INSIDE THE BUTTON: the same 2px `--state-focus-ring`, inset.
+	// Since UIR-2 item 2 that rail sits at the card's edge, inside the card's
+	// `overflow-hidden`, which clipped the outer ring's outer 2px. The reply rail
+	// keeps its outer ring; nothing clips it there.
+	const focusRing = fit
+		? "focus-visible:shadow-[inset_var(--state-focus-ring)]"
+		: "focus-visible:shadow-(--state-focus-ring)";
 	return (
 		<div
 			data-testid="scroll-rail"
@@ -148,7 +156,7 @@ export function ScrollRail({
 				type="button"
 				onClick={onPrev}
 				aria-label={`Previous ${noun}`}
-				className="flex h-[13px] w-[14px] shrink-0 items-center justify-center text-n4 outline-none hover:text-ink focus-visible:shadow-(--state-focus-ring) [&_svg]:size-3.5"
+				className={`flex h-[13px] w-[14px] shrink-0 items-center justify-center text-n4 outline-none hover:text-ink ${focusRing} [&_svg]:size-3.5`}
 			>
 				<ChevronUp />
 			</button>
@@ -184,7 +192,7 @@ export function ScrollRail({
 				type="button"
 				onClick={onNext}
 				aria-label={`Next ${noun}`}
-				className="flex h-[13px] w-[14px] shrink-0 items-center justify-center text-n4 outline-none hover:text-ink focus-visible:shadow-(--state-focus-ring) [&_svg]:size-3.5"
+				className={`flex h-[13px] w-[14px] shrink-0 items-center justify-center text-n4 outline-none hover:text-ink ${focusRing} [&_svg]:size-3.5`}
 			>
 				<ChevronDown />
 			</button>

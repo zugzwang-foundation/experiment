@@ -84,8 +84,9 @@ export function DownloadPostImage({
 	/**
 	 * ⚠ UIR-2 item 3 — the desktop market card's author row (`ArgProfile`
 	 * `download.pinned`): the BUTTON leaves the flow and is pinned to that row's
-	 * right edge, centred on its height (`top: calc(50% − 16px)`, half the 32px
-	 * box; a translate would fight the base variant's `active:` press offset).
+	 * right edge, centred on its height (`top: calc(50% − 18px)`, half the 36px
+	 * box since UIR-3 item 3; a translate would fight the base variant's
+	 * `active:` press offset).
 	 * The row is its containing block and reserves the room. The busy and error
 	 * lines stay in the flow, at the row's end, so they never sit under it.
 	 */
@@ -191,12 +192,18 @@ export function DownloadPostImage({
 					onClick={onClick}
 					// ⚠ `text-ink` — the SAME token `Replies · n` uses two elements to the
 					// left, so the mark and the one promoted field on this row sit at the
-					// same emphasis. `icon` (32px / 20px) is the size the placeholder had,
-					// and UIR-2 item 3's: a 32 × 32 hit area, a 20px glyph at Lucide's
-					// default stroke width 2 — the rail chevrons' — and this colour.
+					// same emphasis.
+					// ⚠ UIR-3 item 3 — at 640px and up a 36 × 36 hit area and a 24px glyph
+					// at Lucide's default stroke width 2 (the rail chevrons'); below 640 the
+					// phone keeps 32 × 32 and the 16px glyph it has been rendering.
+					// ⛔ THE GLYPH SIZE SITS ON THE ICON, NOT ON THE BUTTON. UIR-2's
+					// `[&_svg]:size-5` here never applied: the base variant's
+					// `[&_svg:not([class*='size-'])]:size-4` outranks it (0,2,1 over 0,1,1),
+					// so the glyph measured 16px, not 20. A `size-*` class on the icon
+					// takes it out of that rule's reach.
 					className={cn(
-						"shrink-0 text-ink [&_svg]:size-5",
-						pinned && "absolute top-[calc(50%-16px)] right-0",
+						"size-9 shrink-0 text-ink max-mobile:size-8",
+						pinned && "absolute top-[calc(50%-18px)] right-0",
 					)}
 				>
 					{/* ⛔⛔ `animate-spin` IS THE ONE THING HERE THAT COULD HAVE SHIPPED
@@ -216,7 +223,11 @@ export function DownloadPostImage({
 				    control, not a working one — and it was the only signal once the
 				    label went. A rotation is the one motion that means "in progress"
 				    without a caption. */}
-					{busy ? <LoaderCircle className="animate-spin" /> : <Share2 />}
+					{busy ? (
+						<LoaderCircle className="size-6 animate-spin max-mobile:size-4" />
+					) : (
+						<Share2 className="size-6 max-mobile:size-4" />
+					)}
 				</Button>
 			</InfoTip>
 		</span>

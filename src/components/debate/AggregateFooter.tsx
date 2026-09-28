@@ -163,10 +163,10 @@ export function AggregateFooter({
 		// on both sides: the rail sits inside the card's middle band now, not
 		// beside the card, so Support's left edge is the Bet button's and
 		// Counter's right edge the header's right lane, and the bar takes the
-		// rest. Below 860 a 125px pair needs 258px, which is the body's width at
-		// a 640px window; `max-[860px]:max-w-full` lets each button give up only
-		// the pixels its half lacks (a classic scrollbar's gutter, say) rather
-		// than overlap its neighbour.
+		// rest. Below 860 a 100px pair needs 208px (UIR-3; 258px when the buttons
+		// were 125), against a 258px body at a 640px window;
+		// `max-[860px]:max-w-full` still lets each button give up only the pixels
+		// its half lacks rather than overlap its neighbour.
 		return (
 			<div
 				data-testid="aggregate-footer"
@@ -660,13 +660,15 @@ function TriggerPill({
 					onClick={() => onReply(relation)}
 					className={cn(
 						// ⚠ UIR-1 item 4 — the Bet button's shell: `HEADER_CONTROL`'s
-						// 125px / 14px padding and its lift (0 3px 0 n2 #404040, hover
-						// −1px onto 4px, pressed +2px onto 1px), stepping to 113px / 8px
-						// with the header on the column's own width (`colbody`, the body
-						// under the `colhead` it steps with).
+						// width, padding and lift (0 3px 0 n2 #404040, hover −1px onto 4px,
+						// pressed +2px onto 1px), stepping with the header on the column's
+						// own width (`colbody`, the body under the `colhead` it steps with).
+						// ⚠ UIR-3 item 4 — × 0.8 with the header: 100px / 11px × 6px,
+						// stepping to 90px / 6px (was 125 / 14 × 7 → 113 / 8). The lift is
+						// unchanged.
 						buttonVariants({ variant: "outline" }),
 						HEADER_CONTROL,
-						"@max-[380px]/colbody:w-[113px] @max-[380px]/colbody:px-2 max-[860px]:max-w-full",
+						"@max-[380px]/colbody:w-[90px] @max-[380px]/colbody:px-1.5 max-[860px]:max-w-full",
 						// Enabled keeps the pole it had, at rest, hovered and pressed:
 						// #181818 with #fafafa text for a YES bet, the reverse for NO.
 						// Disabled drops it for the Bet button's disabled look — the
@@ -679,18 +681,19 @@ function TriggerPill({
 					)}
 				>
 					{/* ⚠ UIR-2 item 4 — the card's buttons read one step apart from the
-					    header's: SUPPORT / COUNTER at 14px / 600 (the header's Bet and
-					    Sell stay 15px) and the Đ figure at 12px / 400 mono (theirs, 11px).
+					    header's. ⚠ UIR-3 item 4 — both scaled by 0.8: SUPPORT / COUNTER at
+					    11px / 600 (was 14px; the header's Bet and Sell are 12px) and the Đ
+					    figure at 10px / 400 mono (was 12px) — `HEADER_DETAIL`'s own size,
+					    the floor both second lines share, so it takes no override.
 					    Everything else is `HEADER_WORD` / `HEADER_DETAIL`. ⚠ The leading is
-					    restated with each size because `cn` drops `leading-*` when a later
+					    restated with the size because `cn` drops `leading-*` when a later
 					    `text-[Npx]` arrives; 1.2 is the constants' own. */}
-					<span className={cn(HEADER_WORD, "text-[14px] leading-[1.2]")}>
+					<span className={cn(HEADER_WORD, "text-[11px] leading-[1.2]")}>
 						{word}
 					</span>
 					<span
 						className={cn(
 							HEADER_DETAIL,
-							"text-[12px] leading-[1.2]",
 							// #545454 on the #fafafa button; the muted n5 elsewhere.
 							!disabled && resultingSide === "NO" && "text-n3",
 						)}
