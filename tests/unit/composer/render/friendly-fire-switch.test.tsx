@@ -71,7 +71,7 @@ afterEach(() => {
  * combination that suppresses the component entirely.
  */
 const POINTER_QUERY = "(hover: hover) and (pointer: fine)";
-const TIER_QUERY = "not all and (min-width: 640px)";
+const TIER_QUERY = "not all and (min-width: 1024px)";
 
 function mockMatchMedia(pointerFine: boolean, phone: boolean): void {
 	window.matchMedia = ((query: string) => ({

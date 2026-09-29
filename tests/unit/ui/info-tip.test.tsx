@@ -45,7 +45,7 @@ afterEach(() => {
  *
  * `InfoTip` now asks `window.matchMedia` TWO unrelated questions: the pointer
  * question `(hover: hover) and (pointer: fine)`, and — through
- * `useIsPhoneTier` — the viewport question `not all and (min-width: 640px)`.
+ * `useIsPhoneTier` — the viewport question `not all and (min-width: 1024px)`.
  * A stub that returns the same `matches` for every string answers both, so
  * `mockMatchMedia(true)` used to mean "a fine pointer" and silently also meant
  * "a phone", which is a device that does not exist and is the one combination
@@ -60,7 +60,7 @@ afterEach(() => {
  * notional viewport sits and where every pre-existing row was written.
  */
 const POINTER_QUERY = "(hover: hover) and (pointer: fine)";
-const TIER_QUERY = "not all and (min-width: 640px)";
+const TIER_QUERY = "not all and (min-width: 1024px)";
 
 function mockMatchMedia(matches: boolean, phone = false): void {
 	window.matchMedia = ((query: string) => ({

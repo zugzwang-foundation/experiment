@@ -9,6 +9,7 @@
 | **Frame document** | `design-language §1.7` |
 | **Supersedes** | — |
 | **Superseded-by** | ADR-0048 (partial — the auth/join carve-out only: `:52`, `:113`, and the two gate layers at `:55`/`:64`) |
+| **Amended-by** | ADR-0063 — the breakpoint VALUE only: `--breakpoint-mobile` is now 1024px, not 640px, so tablets get the phone tier. Every "640" below is history; the override-never-replace convention stands. |
 
 ---
 
