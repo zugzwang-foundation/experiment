@@ -563,9 +563,13 @@ function HeroPostPanel({
 			>
 				{/* V48 — the count and its noun agree: `Reply · 1`, never `Replies · 1`. */}
 				<span>
-					{post.replyCount === 1 ? "Reply" : "Replies"} · {post.replyCount}
+					{post.replyCount === 1 ? "Reply" : "Replies"} ·{" "}
+					<span className="text-gold">{post.replyCount}</span>
 				</span>
-				<span>Đ {formatDharma(post.replyDharma)} staked</span>
+				<span>
+					<span className="text-gold">Đ {formatDharma(post.replyDharma)}</span>{" "}
+					staked
+				</span>
 			</div>
 			<SupportCounterBar
 				side={side}
@@ -635,8 +639,8 @@ function SupportCounterBar({
 	// opposite. Written as one side-keyed expression per segment so C0's guard
 	// SEES it — `HeroPanels.tsx` is the seventh entry in that guard's pinned
 	// inventory, added deliberately when this fix landed.
-	const supportPole = side === "YES" ? "bg-yes" : "bg-no";
-	const counterPole = side === "YES" ? "bg-no" : "bg-yes";
+	const supportPole = side === "YES" ? "bg-bar-yes" : "bg-bar-no";
+	const counterPole = side === "YES" ? "bg-bar-no" : "bg-bar-yes";
 	return (
 		<div
 			data-testid={`hero-split-bar-${side}`}
@@ -648,7 +652,7 @@ function SupportCounterBar({
 				<span className="text-[8.5px] font-extrabold tracking-[0.12em] text-ink">
 					SUPPORT
 				</span>
-				<span className="text-[9.5px] font-bold tracking-[0.02em] text-n6">
+				<span className="text-[9.5px] font-bold tracking-[0.02em] text-gold">
 					Đ {formatDharma(supportDharma)}
 				</span>
 			</span>
@@ -666,7 +670,7 @@ function SupportCounterBar({
 				<span className="text-[8.5px] font-extrabold tracking-[0.12em] text-ink">
 					COUNTER
 				</span>
-				<span className="text-[9.5px] font-bold tracking-[0.02em] text-n6">
+				<span className="text-[9.5px] font-bold tracking-[0.02em] text-gold">
 					Đ {formatDharma(counterDharma)}
 				</span>
 			</span>
@@ -699,7 +703,7 @@ function HeroStakeTip({
 	children: React.ReactNode;
 }) {
 	const figure = (
-		<span className="font-mono font-bold text-n6">{children}</span>
+		<span className="font-mono font-bold text-gold">{children}</span>
 	);
 	if (exact === compact) {
 		return figure;

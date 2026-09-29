@@ -141,7 +141,7 @@ export function GitHubStarsView({ stars }: { stars: number | null }) {
 				aria-label={label}
 				className={GITHUB_TAB}
 			>
-				<Star aria-hidden="true" />
+				<Star aria-hidden="true" className="text-gold" />
 				<span>GitHub</span>
 				{stars === null ? null : (
 					<span

@@ -27,8 +27,8 @@ export const PALETTE = {
 	ink: "#fafafa",
 	yes: "#181818",
 	no: "#fafafa",
-	graphYes: "#737373",
-	graphNo: "#fafafa",
+	graphYes: "#6aa84f",
+	graphNo: "#e06666",
 } as const;
 
 /** `PALETTE` key → the `globals.css` custom property it must equal. */

@@ -1277,7 +1277,7 @@ export function BetComposer(props: {
 							<span>{assess.overCap ? "" : overCapStrip()}</span>
 							<span>
 								Balance{" "}
-								<span className="font-mono text-ink">
+								<span className="font-mono text-gold">
 									Đ {formatDharma(props.viewer.spendableToday)}
 								</span>
 							</span>
@@ -1338,7 +1338,7 @@ export function BetComposer(props: {
 											</span>
 											<span
 												aria-live="polite"
-												className="font-mono text-sm text-ink"
+												className="font-mono text-sm text-gold"
 											>
 												{toWin !== null ? `Đ ${toWin}` : "—"}
 											</span>

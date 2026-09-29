@@ -4,6 +4,8 @@ import { GLOSSARY } from "@/lib/copy/glossary";
 import { cn } from "@/lib/utils";
 
 import {
+	BET_TONE,
+	BET_TONE_TEXT,
 	HEADER_CONTROL,
 	HEADER_DETAIL,
 	HEADER_WORD,
@@ -150,8 +152,8 @@ export function AggregateFooter({
 		aggregate.counterDharma,
 	);
 	// Support resolves to the post's own side; Counter to the opposite.
-	const supportPole = postSide === "YES" ? "bg-yes" : "bg-no";
-	const counterPole = postSide === "YES" ? "bg-no" : "bg-yes";
+	const supportPole = postSide === "YES" ? "bg-bar-yes" : "bg-bar-no";
+	const counterPole = postSide === "YES" ? "bg-bar-no" : "bg-bar-yes";
 
 	if (inColumn) {
 		// ⚠ UIR-1 item 4 — the column header's lane grammar (`column-header.tsx`
@@ -203,7 +205,9 @@ export function AggregateFooter({
 						/>
 					</span>
 					<span>
-						<b className="text-sm text-ink">Đ {formatDharma(displayedTotal)}</b>{" "}
+						<b className="text-sm text-gold">
+							Đ {formatDharma(displayedTotal)}
+						</b>{" "}
 						<span className="tracking-[0.1em] uppercase">staked</span>
 					</span>
 				</span>
@@ -274,7 +278,9 @@ export function AggregateFooter({
 				    span: the trigger's `aria-label` names the resulting bet side in
 				    words. A screen reader meets "Support — bet YES" and then the
 				    figure, which is the same information in the same order. */}
-				<span>Đ {formatDharma(aggregate.supportDharma)}</span>
+				<span className="text-gold">
+					Đ {formatDharma(aggregate.supportDharma)}
+				</span>
 			</span>
 			<span className="flex min-w-0 flex-1 flex-col items-center gap-1">
 				{/* Decorative: the figures either side carry the meaning, and colour
@@ -506,7 +512,7 @@ export function AggregateFooter({
 					    this one was a step up, and a 14px centre between two 12px flanks
 					    is what made the line read as three separate readouts rather than
 					    one. Desktop keeps the emphasis. */}
-					<b className="text-sm text-ink max-mobile:text-xs">
+					<b className="text-sm text-gold max-mobile:text-xs">
 						Đ {formatDharma(displayedTotal)}
 					</b>{" "}
 					{/* `.sb2.mid` (`d5:620`) — `letter-spacing:.1em;
@@ -521,7 +527,9 @@ export function AggregateFooter({
 				) : null}
 				{/* Row 5's other half — see the Support span above for the whole
 				    reasoning. Both sides, one change. */}
-				<span>Đ {formatDharma(aggregate.counterDharma)}</span>
+				<span className="text-gold">
+					Đ {formatDharma(aggregate.counterDharma)}
+				</span>
 			</span>
 		</div>
 	);
@@ -634,8 +642,8 @@ function TriggerPill({
 	// D-1 names the black side only.
 	const pole =
 		resultingSide === "YES"
-			? "bg-yes text-no border-[0.5px] border-n2 max-mobile:[border:var(--hairline)] shadow-xs hover:bg-neutral-200 hover:text-black cursor-pointer active:scale-95"
-			: "bg-no text-yes border border-white/25 shadow-xs hover:bg-neutral-800 hover:border-white/60 hover:text-white cursor-pointer active:scale-95";
+			? "bg-bet-yes-soft text-bet-yes border-[0.5px] border-n2 max-mobile:[border:var(--hairline)] shadow-xs hover:bg-bet-yes hover:text-white cursor-pointer active:scale-95"
+			: "bg-bet-no-soft text-bet-no border border-white/25 shadow-xs hover:bg-bet-no hover:border-white/60 hover:text-white cursor-pointer active:scale-95";
 	// C3 precedence (INFO-1 §3.4): a viewer blocked by the single-side rule is
 	// told why they are blocked, not given the relation's definition. The
 	// glossary gloss fills the null branch only — c3 still wins outright.
@@ -669,14 +677,12 @@ function TriggerPill({
 						buttonVariants({ variant: "outline" }),
 						HEADER_CONTROL,
 						"@max-[380px]/colbody:w-[90px] @max-[380px]/colbody:px-1.5 max-[860px]:max-w-full",
-						// Enabled keeps the pole it had, at rest, hovered and pressed:
-						// #181818 with #fafafa text for a YES bet, the reverse for NO.
+						// Enabled takes the Bet button's tone for the side the reply lands on:
+						// green for a YES bet, red for NO — soft at rest, solid on hover.
 						// Disabled drops it for the Bet button's disabled look — the
 						// outline fill and hairline, 0.5 opacity, no ledge.
-						!disabled &&
-							(resultingSide === "YES"
-								? "bg-yes text-no hover:bg-yes active:bg-yes"
-								: "bg-no text-yes hover:bg-no active:bg-no"),
+						!disabled && BET_TONE_TEXT,
+						!disabled && BET_TONE[resultingSide],
 						className,
 					)}
 				>
@@ -691,15 +697,7 @@ function TriggerPill({
 					<span className={cn(HEADER_WORD, "text-[11px] leading-[1.2]")}>
 						{word}
 					</span>
-					<span
-						className={cn(
-							HEADER_DETAIL,
-							// #545454 on the #fafafa button; the muted n5 elsewhere.
-							!disabled && resultingSide === "NO" && "text-n3",
-						)}
-					>
-						Đ {amount}
-					</span>
+					<span className={HEADER_DETAIL}>Đ {amount}</span>
 				</button>
 			</InfoTip>
 		);

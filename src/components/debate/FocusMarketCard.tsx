@@ -251,13 +251,18 @@ export function FocusMarketCard({
 				    be the same defect entry 4 closed for the thumbnail, in the other
 				    field of the same row. */}
 				<span>
-					Đ <MarketTotalDharma value={totals.dharmaStaked} /> staked
+					<span className="text-gold">
+						Đ <MarketTotalDharma value={totals.dharmaStaked} />
+					</span>{" "}
+					staked
 				</span>
 				<span>
-					{totals.postCount} {noun(totals.postCount, "post", "posts")}
+					<span className="text-gold">{totals.postCount}</span>{" "}
+					{noun(totals.postCount, "post", "posts")}
 				</span>
 				<span>
-					{totals.replyCount} {noun(totals.replyCount, "reply", "replies")}
+					<span className="text-gold">{totals.replyCount}</span>{" "}
+					{noun(totals.replyCount, "reply", "replies")}
 				</span>
 			</span>
 

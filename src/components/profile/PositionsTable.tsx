@@ -1671,7 +1671,7 @@ function TileRow({
 								    whatever leading was in scope (AGENTS.md §8) — here
 								    `leading-[1.35]`, which at 18px is a 24px line and pushes the
 								    whole cluster down. */}
-								<span className="text-[17px] leading-[1.35] font-bold max-mobile:text-[18px] max-mobile:leading-[1.2]">
+								<span className="text-[17px] leading-[1.35] font-bold max-mobile:text-[18px] max-mobile:leading-[1.2] text-gold">
 									Đ {formatDharma(tile.valueDisplay)}
 								</span>
 								{/* ⚠⚠ R-2 — THE MOVEMENT LINE. Three renderable outcomes and one
@@ -1923,7 +1923,9 @@ function TileRow({
 								Staked
 							</span>
 						</InfoTip>{" "}
-						Đ {formatDharma(tile.valueDisplay)}
+						<span className="text-gold">
+							Đ {formatDharma(tile.valueDisplay)}
+						</span>
 					</td>
 					{/* ⚠ `OPENED`, NOT `EXITED`, AND THE DTO IS WHY. `ProfilePositionLot`
 					    carries `placedAt` and no exit timestamp; `lots.updated_at` exists

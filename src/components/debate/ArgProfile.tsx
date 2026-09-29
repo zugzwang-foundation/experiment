@@ -691,7 +691,7 @@ export function ArgProfile({
 						    guard below reads are unchanged. */}
 							<CompactDharmaFigure
 								value={authorStake}
-								className="font-mono text-ink"
+								className="font-mono text-gold"
 							/>
 							{/* ⚠ COMPARED AS RENDERED, not as stored. `formatDharmaCompact`
 						    rounds to whole Đ and abbreviates past Đ10,000, so comparing the
@@ -756,7 +756,7 @@ export function ArgProfile({
 						    to ink. */}
 							<span className="text-[9.5px] font-bold tracking-[0.12em] text-ink uppercase">
 								Replies ·{" "}
-								<span className="text-[13px] tracking-normal">
+								<span className="text-[13px] tracking-normal text-gold">
 									{replyCount}
 								</span>
 							</span>

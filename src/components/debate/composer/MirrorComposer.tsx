@@ -607,7 +607,7 @@ function AuthorRow(props: {
 			    card will print once this posts. */}
 			<span
 				data-testid="mirror-amount-echo"
-				className="font-mono text-[14px] leading-5 text-ink"
+				className="font-mono text-[14px] leading-5 text-gold"
 			>
 				Đ {props.amountEcho}
 			</span>
@@ -900,8 +900,8 @@ function StakeBar(props: {
 				>
 					{props.toWin !== null ? (
 						<>
-							<span className="shrink-0 text-[15px] text-n5">Đ</span>{" "}
-							<span className="truncate font-mono text-[22px] leading-7 font-semibold text-ink">
+							<span className="shrink-0 text-[15px] text-gold">Đ</span>{" "}
+							<span className="truncate font-mono text-[22px] leading-7 font-semibold text-gold">
 								{props.toWin}
 							</span>
 						</>
@@ -937,13 +937,13 @@ function StakeBar(props: {
 					<>
 						<span className="whitespace-nowrap">
 							{MIRROR_COPY.minLabel}{" "}
-							<span className="font-medium text-n6">
+							<span className="font-medium text-gold">
 								Đ {formatDharma(floorFor(props.kind))}
 							</span>
 						</span>
 						<span className="whitespace-nowrap">
 							{MIRROR_COPY.maxLabel}{" "}
-							<span className="font-medium text-n6">
+							<span className="font-medium text-gold">
 								Đ {formatDharma(BET_MAX_STAKE)}
 							</span>
 						</span>
