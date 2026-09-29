@@ -47,7 +47,7 @@ afterEach(() => {
 /** Per-query stub — the `info-tip.test.tsx` shape (pointer and tier answered
  * separately, because a blanket answer makes "fine pointer" also mean "phone"). */
 const POINTER_QUERY = "(hover: hover) and (pointer: fine)";
-const TIER_QUERY = "not all and (min-width: 640px)";
+const TIER_QUERY = "not all and (min-width: 820px)";
 
 function mockMatchMedia(pointerFine: boolean, phone: boolean): void {
 	window.matchMedia = ((query: string) => ({

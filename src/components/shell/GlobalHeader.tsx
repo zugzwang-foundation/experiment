@@ -379,11 +379,20 @@ export function GlobalHeader({
 					    reasoning is unchanged and has simply moved with the control —
 					    MKT-ROSTER-1-P3 puts RULES first in the RIGHT zone, which is
 					    likewise never hidden. `XLink` takes the vacated slot. */}
+					{/* ⛔ TABLET-1 / ADR-0063 — `max-xl:hidden` RIDES ALONGSIDE `max-mobile:
+					    hidden` HERE, ON X, ON THE DIVIDER AND ON THE VISITOR COUNTER, AND IT
+					    IS NOT THE PHONE HIDE AGAIN. The phone tier now ends at 820px, but a
+					    SIGNED-IN desktop header (Đ cluster + pseudonym chip) needs ~1240px
+					    to fit; measured worst case, overflow is 256px at 820 and 11px at
+					    1200. Below Tailwind's `xl` (1280px) these four controls give way, so
+					    820-1279 keeps the desktop PAGE but not the full header. At 1280+ the
+					    header is exactly as before. (`max-mobile:hidden` is now implied by
+					    this token but stays: guards key on it and it names the phone tier.) */}
 					<div
 						data-testid="header-secondary-controls"
 						className={cn(
 							"flex shrink-0 items-center gap-2",
-							mobileResponsive && "max-mobile:hidden",
+							mobileResponsive && "max-mobile:hidden max-xl:hidden",
 						)}
 					>
 						<RadioSlot />
@@ -558,7 +567,7 @@ export function GlobalHeader({
 						aria-hidden="true"
 						className={cn(
 							"mx-3 h-[30px] w-px bg-n2",
-							mobileResponsive && "max-mobile:hidden",
+							mobileResponsive && "max-mobile:hidden max-xl:hidden",
 						)}
 					/>
 					<VisitorCounter mobileResponsive={mobileResponsive} />

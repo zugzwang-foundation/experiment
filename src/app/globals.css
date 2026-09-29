@@ -156,33 +156,51 @@
 	/*
 	 * Mobile breakpoint (MOBILE-1 / ADR-0045) — read-surface responsive
 	 * reflow only (Discovery, /m/[slug], and the shared header chrome they
-	 * render inside). A deliberate synonym for Tailwind's own unoverridden
-	 * `sm` (640px), minted under its own name per ADR-0045's file-map
+	 * render inside), minted under its own name per ADR-0045's file-map
 	 * requirement ("breakpoints are minted here or not at all") rather than
 	 * relying on the generic scale name — see MOBILE-1 M1-8. Generates
-	 * `mobile:*` (>=640px, desktop and up) and `max-mobile:*` (<640px,
-	 * phone and below) variants. Desktop stays the unprefixed default
-	 * everywhere; every mobile-specific rule is a `max-mobile:` override,
-	 * never a replacement of the base one.
+	 * `mobile:*` (>=820px) and `max-mobile:*` (<820px, phone and small
+	 * tablet) variants. Desktop stays the unprefixed default everywhere;
+	 * every mobile-specific rule is a `max-mobile:` override, never a
+	 * replacement of the base one.
 	 *
-	 * ⚠ "SYNONYM FOR sm" IS A UNIT DIFFERENCE STATED AS AN IDENTITY, AND
-	 * THE DIFFERENCE IS A USER SETTING. Tailwind's `sm` is `40rem`; this
-	 * token is `640px`. They coincide at a 16px root font size and NOT
-	 * otherwise — root font size is a first-class browser accessibility
-	 * setting, so a reader who has raised theirs to 20px gets `sm` at
-	 * 800px and `mobile` at 640px, and BOTH boundaries ship in this one
-	 * stylesheet. Anywhere a `max-mobile:` override and an `sm:`/`md:`
-	 * rule are meant to hand off to each other, they will not, for that
-	 * reader.
+	 * ⛔ THE VALUE MOVED 640 -> 820 AT TABLET-1 (ADR-0063). The header's
+	 * signed-out desktop form needs ~812px, so between 640 and ~820 the
+	 * whole document scrolled sideways on a tablet. Small tablets (iPad
+	 * portrait, 768) get the phone tier rather than a tier of their own;
+	 * `mobile` still reads as "phone" and now means "narrower than an iPad
+	 * Air". Renaming was rejected: ~35 files and every guard key on the name.
+	 * ⛔ 820 IS NOT WHERE A SIGNED-IN HEADER FITS, AND THE DESKTOP HEADER IS
+	 * TRIMMED TO COMPENSATE. Measured with the real compiled CSS and the
+	 * signed-in markup, worst case (longest pseudonym, widest balances): the
+	 * full header overflows by 256px at 820 and 11px at 1200, and fits at
+	 * 1240+. So GlobalHeader hides Radio, GitHub, X, the §21.1 divider and
+	 * the visitor counter below Tailwind's `xl` with `max-xl:hidden`
+	 * (820-1279 keeps the desktop page and a slimmer header). Do not lower
+	 * this value without re-measuring a SIGNED-IN header: a signed-out
+	 * measurement misled this very decision once.
+	 * ⚠ THE OTHER HALF OF THE MOVE IS `debate/phone-tier.ts`'s `QUERY`, a
+	 * hand-copied string of this number. Change one and tablets get two
+	 * different answers — CSS says phone, `useIsPhoneTier()` says desktop.
+	 *
+	 * ⚠ THE VALUE IS `px` AND TAILWIND'S BREAKPOINTS ARE `rem`. 820px sits
+	 * between `md` (48rem = 768px) and `lg` (64rem = 1024px). A rem
+	 * breakpoint coincides with a px one only at a 16px root font size —
+	 * root font size is a first-class browser accessibility setting, so a
+	 * reader who has raised theirs to 20px gets `md` at 960px and `lg` at
+	 * 1280px while `mobile` still fires at 820px, and ALL of those boundaries
+	 * ship in this one stylesheet. Anywhere a `max-mobile:` override and an
+	 * `sm:`/`md:`/`lg:`/`xl:` rule are meant to hand off to each other, they
+	 * will not, for that reader.
 	 *
 	 * The token value is deliberately `px` and stays that way: this
-	 * breakpoint exists to describe a DEVICE (a phone's viewport), which
-	 * does not grow when someone enlarges their text, and Phase B's gate
-	 * must fire at the same physical width. Recorded rather than
-	 * "corrected" — the divergence is intended, and what was wrong was
-	 * three documents calling it an identity.
+	 * breakpoint describes a DEVICE's viewport, which does not grow when
+	 * someone enlarges their text, and the gate must fire at the same
+	 * physical width. Recorded rather than "corrected" — the divergence
+	 * is intended, and what was wrong was three documents calling it an
+	 * identity.
 	 */
-	--breakpoint-mobile: 640px;
+	--breakpoint-mobile: 820px;
 }
 
 /*

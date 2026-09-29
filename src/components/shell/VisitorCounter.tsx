@@ -97,7 +97,7 @@ export function VisitorCounter({
 				// register divider.
 				className={cn(
 					"flex items-center gap-1.5 text-xs text-muted-foreground select-none",
-					mobileResponsive && "max-mobile:hidden",
+					mobileResponsive && "max-mobile:hidden max-xl:hidden",
 				)}
 			>
 				<Eye aria-hidden="true" className="size-3.5 shrink-0" />
