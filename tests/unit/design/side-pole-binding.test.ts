@@ -168,10 +168,10 @@ const SIDE_COMPARISON =
 /** The permitted destinations — the two pole families, custom-property and
  * Tailwind spellings alike (`--color-yes`, `--graph-no`, `bg-yes`, `text-no`,
  * `fill-no`, `stroke-[var(--graph-yes)]`), plus the green / red side colours
- * (`bg-bar-yes`, `--color-bar-no`, `bg-bet-yes-soft`, `text-bet-no`) — the same
- * YES / NO poles in colour, so a site that moves to them stays in view. */
+ * (`bg-bar-yes`, `--color-bar-no`) — the same YES / NO poles in colour, so a
+ * site that moves to them stays in view. */
 const POLE_TOKEN =
-	/--(?:color|graph)-(?:(?:bar|bet)-)?(?:yes|no)\b|\b(?:bg|text|border|stroke|fill|ring|from|to|via)-(?:(?:bar|bet)-)?(?:yes|no)\b/;
+	/--(?:color|graph)-(?:bar-)?(?:yes|no)\b|\b(?:bg|text|border|stroke|fill|ring|from|to|via)-(?:bar-)?(?:yes|no)\b/;
 
 /** Route 1 — a shadcn variant NAME, matched only as a string literal so the
  * `default` keyword is never mistaken for one. Verbatim from the plan. */

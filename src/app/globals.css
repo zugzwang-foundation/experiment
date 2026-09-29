@@ -156,12 +156,6 @@
 	 * `--color-yes`/`--color-no` exactly). */
 	--color-bar-yes: #6aa84f;
 	--color-bar-no: #e06666;
-	/* Support / Counter controls — a soft tint at rest, the solid colour on
-	 * hover / press / open (sampled from the Up / Down reference). */
-	--color-bet-yes: #007e26;
-	--color-bet-yes-soft: #d9f0e2;
-	--color-bet-no: #df0c10;
-	--color-bet-no-soft: #fce9e9;
 	/* Every displayed Đ figure, the headline counts, and the GitHub star. */
 	--color-gold: #d4af37;
 	/* Geist ratified FINAL (values-log item 2 / WI-13) */
