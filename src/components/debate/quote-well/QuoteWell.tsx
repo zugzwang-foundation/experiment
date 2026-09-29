@@ -1,3 +1,4 @@
+import { quoteFill } from "./palette";
 import { QUOTE_CANVAS, QUOTE_POSTER, quotePosterSize } from "./size";
 
 /**
@@ -23,9 +24,10 @@ import { QUOTE_CANVAS, QUOTE_POSTER, quotePosterSize } from "./size";
  * `<text>` element cannot wrap, and an image of a title is not a title.
  *
  * ⚠ NO `"use client"`, AND NO STATE, EFFECT OR HANDLER. A pure function of
- * `title`. ⛔ That does NOT make it server-only in practice: `PostCard` is
- * `"use client"`, so this renders on both passes — which is safe precisely
- * because it is pure, and would not be if it read a clock or a viewport.
+ * `title` and `postId`. ⛔ That does NOT make it server-only in practice:
+ * `PostCard` is `"use client"`, so this renders on both passes — which is safe
+ * precisely because it is pure, and would not be if it read a clock or a
+ * viewport.
  *
  * ⚠ THE UPPERCASE IS CSS. The DOM carries `post.title` verbatim in its stored
  * case, so the export, a copy-paste and a screen reader all get what the author
@@ -43,6 +45,12 @@ import { QUOTE_CANVAS, QUOTE_POSTER, quotePosterSize } from "./size";
  * budget is the title's lines alone; `size.ts` says why the old ramp stays for
  * the export.
  *
+ * ⛔ UIR-9 — AND IT IS DRAWN ON ITS POST'S OWN FILL. The ground is one of the
+ * sixteen in `palette.ts`, picked from the post's id, the border a 1px
+ * `rgb(255 255 255 / 0.07)`, and the marks take the fill's tint; the title
+ * stays in ink. Every surface that draws this post's picture picks the same
+ * entry, so a post keeps its colour from Discovery into its market.
+ *
  * ⛔ NO `-webkit-line-clamp`. It was specified as an optional belt and it is
  * MEASURED OUT: `text-wrap: balance` stops applying the moment the clamp
  * clamps, while `getComputedStyle` keeps reporting `balance`. The well's own
@@ -50,16 +58,25 @@ import { QUOTE_CANVAS, QUOTE_POSTER, quotePosterSize } from "./size";
  */
 export function QuoteWell({
 	title,
+	postId,
 	as: Heading = "h3",
 	boxed = true,
 }: {
 	title: string;
 	/**
-	 * FEED-3 — `false` takes the well's box away (ground, hairline, radius): the
-	 * desktop post card only (`PostCard` `inColumn`), which sits inside the
-	 * column's one rectangle. The quotation itself is unchanged. ⚠ The padding
-	 * absorbs the removed 1px border, so the content box — the one `size.ts`
-	 * budgets against — is the same 495 × 222 either way.
+	 * UIR-9 — the post's id, which picks its fill (`quoteFill`). The same id the
+	 * post carries everywhere, so every surface picks the same entry.
+	 */
+	postId: string;
+	/**
+	 * FEED-3 — `false` takes the well's box away (fill, border, radius) for a
+	 * mount that draws the box itself: Discovery's hero, whose image slot is the
+	 * card, painted with this post's fill. The quotation itself is unchanged.
+	 * ⚠ UIR-9 — FEED-3 unboxed the desktop post card's well too (`PostCard`
+	 * `inColumn`); that card boxes it again, because the fill IS the picture and
+	 * a picture keeps its edge in the column the way an attachment does.
+	 * ⚠ The padding absorbs the removed 1px border, so the content box — the one
+	 * `size.ts` budgets against — is the same 495 × 222 either way.
 	 */
 	boxed?: boolean;
 	/**
@@ -69,6 +86,7 @@ export function QuoteWell({
 	as?: "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
 }) {
 	const size = quotePosterSize(title.length);
+	const { fill, mark } = quoteFill(postId);
 
 	return (
 		<svg
@@ -102,8 +120,10 @@ export function QuoteWell({
 				    (AGENTS.md §4/§11). Asserted rather than assumed:
 				    `quote-well.test.tsx` reads the rendered node's `namespaceURI`. */}
 				<div
+					// UIR-9 — `border-white/7` is the 1px `rgb(255 255 255 / 0.07)`; the
+					// fill is inline because it is per post.
 					className={`qwell box-border flex h-full w-full flex-col items-center overflow-hidden${
-						boxed ? " rounded-[var(--imgr)] border border-n2 bg-n1" : ""
+						boxed ? " rounded-[var(--imgr)] border border-white/7" : ""
 					}`}
 					// ⚠ `pad` IS THE TOTAL INSET, so the 1px border is inside it — 23 + 1.
 					// `size.ts` records why: 24px of padding within a border makes the
@@ -111,6 +131,7 @@ export function QuoteWell({
 					// clips. The dimensions come off the constants rather than being
 					// restated, so the arithmetic and the render cannot drift apart.
 					style={{
+						backgroundColor: boxed ? fill : undefined,
 						padding: `${boxed ? QUOTE_CANVAS.pad - 1 : QUOTE_CANVAS.pad}px`,
 						// ⛔⛔ `safe center`, NOT `center`, AND THE KEYWORD IS WHAT MAKES THE
 						// RATIFIED DEGRADATION THE RIGHT SHAPE. Canon clause 6 says a title
@@ -136,7 +157,7 @@ export function QuoteWell({
 							letterSpacing: `${QUOTE_POSTER.tracking}em`,
 						}}
 					>
-						<QuotedTitle title={title} />
+						<QuotedTitle title={title} mark={mark} />
 					</Heading>
 				</div>
 			</foreignObject>
@@ -149,23 +170,28 @@ export function QuoteWell({
  * after its last, no space between. Each mark shares a `nowrap` span with its
  * word, so no line break can leave a mark alone on a line; the words between
  * keep the title's own spacing and wrap as before. The marks inherit the
- * heading's size and weight and are hidden from assistive technology, so the
- * heading's name is still the author's words alone.
+ * heading's size and weight, take `mark` — the fill's tint — as their colour,
+ * and are hidden from assistive technology, so the heading's name is still the
+ * author's words alone.
  */
-function QuotedTitle({ title }: { title: string }) {
+function QuotedTitle({ title, mark }: { title: string; mark: string }) {
 	const text = title.trim();
 	const first = text.search(/\s/);
-	const mark = (glyph: string) => (
-		<span data-testid="quote-well-mark" aria-hidden="true" className="text-n4">
-			{glyph}
+	const glyph = (char: string) => (
+		<span
+			data-testid="quote-well-mark"
+			aria-hidden="true"
+			style={{ color: mark }}
+		>
+			{char}
 		</span>
 	);
 	if (first === -1) {
 		return (
 			<span className="whitespace-nowrap">
-				{mark("“")}
+				{glyph("“")}
 				{text}
-				{mark("”")}
+				{glyph("”")}
 			</span>
 		);
 	}
@@ -174,13 +200,13 @@ function QuotedTitle({ title }: { title: string }) {
 	return (
 		<>
 			<span className="whitespace-nowrap">
-				{mark("“")}
+				{glyph("“")}
 				{text.slice(0, first)}
 			</span>
 			{text.slice(first, last + 1)}
 			<span className="whitespace-nowrap">
 				{text.slice(last + 1)}
-				{mark("”")}
+				{glyph("”")}
 			</span>
 		</>
 	);

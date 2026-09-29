@@ -140,11 +140,13 @@ export function PostCard({
 	unboxed?: boolean;
 	/**
 	 * ⛔⛔ FEED-3 — MOUNTED IN A DESKTOP `DebateColumn`, WHICH DRAWS THE BOX. Passed
-	 * by `PostScroller` only. Three things follow and nothing else moves: the card
-	 * draws no box (`IN_COLUMN_CARD`), a text-only argument's quote well drops its
-	 * box — the ruled "Cards" changes — and the Support/Counter row takes the
+	 * by `PostScroller` only. Two things follow and nothing else moves: the card
+	 * draws no box (`IN_COLUMN_CARD`) and the Support/Counter row takes the
 	 * column header's two-line controls (UIR-1 item 4). (FEED-3 also dropped the
-	 * author line's pipes; UIR-1 item 1 restored them, as on `main`.)
+	 * author line's pipes, which UIR-1 item 1 restored, as on `main`, and a
+	 * text-only argument's quote-well box, which UIR-9 restored: the well is a
+	 * picture on its post's own fill now, and keeps its edge in the column as an
+	 * attachment does.)
 	 * ⚠ A PROP, NOT A `mobile:` TOKEN, for `unboxed`'s reason in reverse: the phone
 	 * feed and the parent-post sheet mount this card too and are untouched by
 	 * FEED-3, and the pop-ups and the focused post share `ArgProfile` — a width
@@ -544,7 +546,7 @@ export function PostCard({
 									className="flex h-full max-w-full items-center justify-center"
 									onClick={() => onEnter(post.id)}
 								>
-									<QuoteWell title={post.title} boxed={!inColumn} />
+									<QuoteWell title={post.title} postId={post.id} />
 								</button>
 							</div>
 							{knowMore ? (
