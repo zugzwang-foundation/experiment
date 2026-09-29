@@ -163,7 +163,10 @@ export function HeaderLanes({
 				    600, percent 800, a 13px thumb and 4px gaps — stepping to 16px when
 				    the header can't fit, and taking a row of its own, centred, below
 				    860px. */}
-				<span className="flex items-center gap-1 text-[21px] leading-[1.2] font-semibold whitespace-nowrap text-ink @max-[406px]/colhead:text-[16px] max-[860px]:col-span-2 max-[860px]:row-start-1 max-[860px]:justify-self-center">
+				<span
+					data-tutorial="market-odds"
+					className="flex items-center gap-1 text-[21px] leading-[1.2] font-semibold whitespace-nowrap text-ink @max-[406px]/colhead:text-[16px] max-[860px]:col-span-2 max-[860px]:row-start-1 max-[860px]:justify-self-center"
+				>
 					{side === "YES" ? "Yes" : "No"}
 					<ThumbGlyph side={side} size={13} />
 					<b className="font-extrabold">{pct}</b>

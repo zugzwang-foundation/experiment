@@ -117,6 +117,7 @@ export function RulesControl({
 				type="button"
 				onClick={() => setOpen(true)}
 				title={HEADER_GLOSSARY.rules}
+				data-tutorial="rules-button"
 				/* ⚠ `mr-3.5` IS THE RIGHT ZONE'S OWN RHYTHM, NOT A NUMBER PICKED HERE.
 				   That zone is a bare `flex` with NO `gap`: every separation in it is
 				   a margin on the control that owns it (`DharmaCluster`'s `mr-3.5`,

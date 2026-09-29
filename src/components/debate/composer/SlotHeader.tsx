@@ -106,6 +106,7 @@ export function SlotHeader({
 						aria-label={c3 ?? `Bet ${side}`}
 						title={c3 ?? undefined}
 						onClick={onToggleEntry}
+						data-tutorial="buy-button"
 						className={HEADER_CONTROL}
 					>
 						<span className={HEADER_WORD}>Bet {side}</span>

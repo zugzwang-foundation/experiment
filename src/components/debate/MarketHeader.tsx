@@ -252,6 +252,7 @@ export function MarketHeader({
 						{/* Center: Market Question */}
 						<h1
 							title={market.title}
+							data-tutorial="market-question"
 							className="min-w-0 flex-1 truncate text-center text-[15px] sm:text-[17.5px] leading-tight font-bold tracking-tight text-ink px-2"
 						>
 							{market.title}
@@ -461,6 +462,7 @@ export function MarketHeader({
 						    renders the `text-[21px]` d5 ruled. */}
 							<h1
 								title={market.title}
+								data-tutorial="market-question"
 								className={cn(
 									"shrink-0 truncate text-[21px] leading-[1.24] font-bold tracking-normal",
 									MARKET_TITLE_SIZE_OVERRIDES[market.slug],

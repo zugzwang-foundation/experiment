@@ -9,6 +9,7 @@ import { HeaderNav } from "./HeaderNav";
 import { type HeaderViewer, IdentityCluster } from "./IdentityCluster";
 import { RadioSlot } from "./RadioSlot";
 import { RulesControl } from "./RulesControl";
+import { TutorialControl } from "./TutorialControl";
 import { VisitorCounter } from "./VisitorCounter";
 import { XLink } from "./XLink";
 
@@ -292,11 +293,20 @@ export function GlobalHeader({
 	spendable = null,
 	stars = null,
 	mobileResponsive = false,
+	tutorialEnabled = false,
 }: {
 	viewer: HeaderViewer | null;
 	portfolio?: string | null;
 	spendable?: string | null;
 	stars?: number | null;
+	/**
+	 * Shows the "Tutorial" control in the left zone. Defaults `false` so a
+	 * mount that omits it (the `(auth)` layout) renders byte-identical to
+	 * before this control existed — there is no market page to walk
+	 * through from `/sign-in`. The one mount that opts in is
+	 * `(public)/layout.tsx`.
+	 */
+	tutorialEnabled?: boolean;
 	/**
 	 * MOBILE-1 — the read-surface amendment, threaded down rather than assumed.
 	 * **BOTH mounts opt in.** `(public)/layout.tsx` passes it (its mount backs
@@ -449,6 +459,9 @@ export function GlobalHeader({
 					    already ship. The rendered outcome is GitHub's exactly: visible
 					    at ≥640, `display:none` below it. */}
 					<XLink mobileResponsive={mobileResponsive} />
+					{tutorialEnabled ? (
+						<TutorialControl mobileResponsive={mobileResponsive} />
+					) : null}
 				</div>
 				{/* ⛔⛔ ADR-0051 A13 D-3 WITHDRAWS A9 D-3 BELOW 640: THE MARK IS A FLOW
 				    ITEM AGAIN, AND THE THREE TOKENS THAT PINNED IT TO THE HEADER'S
