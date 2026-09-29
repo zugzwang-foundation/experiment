@@ -65,12 +65,12 @@ function setViewport(isPhone: boolean) {
 	vi.stubGlobal("matchMedia", (query: string) => ({
 		get matches() {
 			// ⚠ MATCHES THE QUERY THE HOOK ACTUALLY ASKS, which is the one Tailwind
-			// emits: `not all and (min-width: 640px)`. This stub read
+			// emits: `not all and (min-width: 1024px)`. This stub read
 			// `max-width: 639.98px` and went silently inert the moment the hook was
 			// corrected — every phone row failed at once, which is the right
 			// failure and is why the predicate names the boundary rather than a
 			// spelling of it.
-			return query.includes("min-width: 640px") ? phoneNow : false;
+			return query.includes("min-width: 1024px") ? phoneNow : false;
 		},
 		media: query,
 		onchange: null,
@@ -88,7 +88,7 @@ function setViewport(isPhone: boolean) {
 
 /**
  * The reader rotates the phone, opens a desktop window on a narrow screen, or
- * drags the browser across 640px — the one event the tier is a SUBSCRIPTION in
+ * drags the browser across 1024px — the one event the tier is a SUBSCRIPTION in
  * order to survive. Call inside `act`.
  */
 function crossTierBoundary(isPhone: boolean) {
@@ -137,7 +137,7 @@ describe("RI-3 · the hidden desktop tree's countdown", () => {
 		c.querySelector<HTMLElement>('[data-testid="scroll-rail-fill"]')?.style
 			.height ?? null;
 
-	it("DESKTOP CONTROL — still ticks at ≥640px, exactly as before", async () => {
+	it("DESKTOP CONTROL — still ticks at ≥1024px, exactly as before", async () => {
 		setViewport(false);
 		const { container } = render(<ScrollRail {...RAIL_PROPS} />);
 		expect(fillHeight(container)).toBe("0%");
@@ -150,7 +150,7 @@ describe("RI-3 · the hidden desktop tree's countdown", () => {
 		expect(fillHeight(container)).not.toBe("0%");
 	});
 
-	it("does not tick below 640px, where the whole tree is display:none", async () => {
+	it("does not tick below 1024px, where the whole tree is display:none", async () => {
 		setViewport(true);
 		const { container } = render(<ScrollRail {...RAIL_PROPS} />);
 		await act(async () => {
@@ -172,7 +172,7 @@ describe("RI-3 · the hidden desktop tree's countdown", () => {
 	// renders, which is the only question RI-3 ever asked.
 	const armedTimers = () => vi.getTimerCount();
 
-	it("DESKTOP CONTROL — an interval IS armed at ≥640px, which is what makes the zero below mean something", async () => {
+	it("DESKTOP CONTROL — an interval IS armed at ≥1024px, which is what makes the zero below mean something", async () => {
 		setViewport(false);
 		render(<ScrollRail {...RAIL_PROPS} />);
 		// Without this row a broken instrument — a timer registry that reads 0 for
@@ -181,7 +181,7 @@ describe("RI-3 · the hidden desktop tree's countdown", () => {
 		expect(armedTimers()).toBe(1);
 	});
 
-	it("arms NO interval below 640px — the cost RI-3 removes is a live timer, not a painted height", async () => {
+	it("arms NO interval below 1024px — the cost RI-3 removes is a live timer, not a painted height", async () => {
 		setViewport(true);
 		render(<ScrollRail {...RAIL_PROPS} />);
 		expect(armedTimers()).toBe(0);
@@ -195,7 +195,7 @@ describe("RI-3 · the hidden desktop tree's countdown", () => {
 		// component body, which is the hydration mismatch the same docblock
 		// forbids — passed every row in this file. Both mutations were applied and
 		// both went green.
-		// A reader who rotates a tablet, or drags a window across 640px, keeps the
+		// A reader who rotates a tablet, or drags a window across 1024px, keeps the
 		// interval they crossed the boundary to be rid of: the wrong answer is a
 		// gate that is correct exactly once, at mount.
 		setViewport(false);

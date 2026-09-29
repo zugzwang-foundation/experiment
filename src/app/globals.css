@@ -156,33 +156,41 @@
 	/*
 	 * Mobile breakpoint (MOBILE-1 / ADR-0045) — read-surface responsive
 	 * reflow only (Discovery, /m/[slug], and the shared header chrome they
-	 * render inside). A deliberate synonym for Tailwind's own unoverridden
-	 * `sm` (640px), minted under its own name per ADR-0045's file-map
+	 * render inside), minted under its own name per ADR-0045's file-map
 	 * requirement ("breakpoints are minted here or not at all") rather than
 	 * relying on the generic scale name — see MOBILE-1 M1-8. Generates
-	 * `mobile:*` (>=640px, desktop and up) and `max-mobile:*` (<640px,
-	 * phone and below) variants. Desktop stays the unprefixed default
+	 * `mobile:*` (>=1024px, desktop and up) and `max-mobile:*` (<1024px,
+	 * phone AND TABLET) variants. Desktop stays the unprefixed default
 	 * everywhere; every mobile-specific rule is a `max-mobile:` override,
 	 * never a replacement of the base one.
 	 *
-	 * ⚠ "SYNONYM FOR sm" IS A UNIT DIFFERENCE STATED AS AN IDENTITY, AND
-	 * THE DIFFERENCE IS A USER SETTING. Tailwind's `sm` is `40rem`; this
-	 * token is `640px`. They coincide at a 16px root font size and NOT
+	 * ⛔ THE VALUE MOVED 640 -> 1024 AT TABLET-1 (ADR-0062), AND THE NAME NOW
+	 * OVERSTATES IT. The header needs 812px, so between 640 and ~820 the
+	 * whole document scrolled sideways on a tablet. Tablets get the phone
+	 * tier rather than a tier of their own; `mobile` still reads as "phone"
+	 * and now means "anything narrower than a laptop". Renaming was
+	 * rejected: ~35 files and every guard key on the name.
+	 * ⚠ THE OTHER HALF OF THE MOVE IS `debate/phone-tier.ts`'s `QUERY`, a
+	 * hand-copied string of this number. Change one and tablets get two
+	 * different answers — CSS says phone, `useIsPhoneTier()` says desktop.
+	 *
+	 * ⚠ THE VALUE IS `px` AND `lg` IS `rem`. Tailwind's `lg` is `64rem`;
+	 * this token is `1024px`. They coincide at a 16px root font size and NOT
 	 * otherwise — root font size is a first-class browser accessibility
-	 * setting, so a reader who has raised theirs to 20px gets `sm` at
-	 * 800px and `mobile` at 640px, and BOTH boundaries ship in this one
-	 * stylesheet. Anywhere a `max-mobile:` override and an `sm:`/`md:`
+	 * setting, so a reader who has raised theirs to 20px gets `lg` at
+	 * 1280px and `mobile` at 1024px, and BOTH boundaries ship in this one
+	 * stylesheet. Anywhere a `max-mobile:` override and an `sm:`/`md:`/`lg:`
 	 * rule are meant to hand off to each other, they will not, for that
-	 * reader.
+	 * reader. (This comment used to say the same about `sm` at 640px.)
 	 *
 	 * The token value is deliberately `px` and stays that way: this
-	 * breakpoint exists to describe a DEVICE (a phone's viewport), which
-	 * does not grow when someone enlarges their text, and Phase B's gate
-	 * must fire at the same physical width. Recorded rather than
-	 * "corrected" — the divergence is intended, and what was wrong was
-	 * three documents calling it an identity.
+	 * breakpoint describes a DEVICE's viewport, which does not grow when
+	 * someone enlarges their text, and the gate must fire at the same
+	 * physical width. Recorded rather than "corrected" — the divergence
+	 * is intended, and what was wrong was three documents calling it an
+	 * identity.
 	 */
-	--breakpoint-mobile: 640px;
+	--breakpoint-mobile: 1024px;
 }
 
 /*

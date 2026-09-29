@@ -4,6 +4,7 @@
 - **Date:** 2026-09-11
 - **Deciders:** founder (rulings on stills R1 21:01 / R2 22:54 IST and amendments 23:18 IST); web Claude (author)
 - **Extends:** ADR-0045 (override-never-replace; MOBILE-1 Phase A) · **Does not touch:** ADR-0048, ADR-0049
+- **Amended-by:** ADR-0062 — the tier gate's VALUE only: `--breakpoint-mobile` is now 1024px, not 640px (tablets get the phone tier). Every "640" below is history; the presentation decisions stand.
 - **Measured at:** origin/main `8d63ebc06f34a9b9549a6aa6a9dc4d8db7bb5e76` · staging canary `d0879c41d446fdb1621b9684526133fac0465f2e` · 2026-09-11
 
 ## Context

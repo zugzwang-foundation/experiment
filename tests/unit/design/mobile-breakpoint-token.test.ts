@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
  * MOBILE-1 · Phase A — THE BREAKPOINT IS MINTED BY NAME, IN `@theme`, OR IT IS
  * NOT MINTED AT ALL.
  *
- * WHAT THIS GUARD IS FOR. `--breakpoint-mobile: 640px` is the first NAMED
+ * WHAT THIS GUARD IS FOR. `--breakpoint-mobile` is the first NAMED
  * breakpoint minted in this codebase (MOBILE-1 §4) — not the first responsive
  * class in use: `sm:`/`md:`/`lg:` (Tailwind's own unoverridden defaults) were
  * already load-bearing at ~40 sites before this task, including two files
@@ -16,8 +16,8 @@ import { describe, expect, it } from "vitest";
  * specifically, not the absence of any breakpoint. What's new here is a
  * variant MINTED BY NAME for phone width, per ADR-0045's own requirement
  * ("breakpoints are minted here or not at all") rather than reused from
- * `sm`. Tailwind v4 generates the `mobile:` (≥640px) and `max-mobile:`
- * (<640px) variants from a named `--breakpoint-*` theme value — so every
+ * `sm`. Tailwind v4 generates the `mobile:` (≥1024px) and `max-mobile:`
+ * (<1024px) variants from a named `--breakpoint-*` theme value — so every
  * `max-mobile:*` token the rest of Phase A appends depends on this ONE
  * declaration existing, and on it living somewhere Tailwind actually reads.
  *
@@ -35,12 +35,16 @@ import { describe, expect, it } from "vitest";
  * `--color-ground` and `--font-sans`. This is asserted by RANGE, brace-matched
  * out of the shipped file, rather than by eyeballing the diff.
  *
- * ⚠ 640px IS DELIBERATELY THE SAME NUMBER AS TAILWIND'S OWN UNOVERRIDDEN `sm`,
- * and the duplication is ruled KEPT rather than dropped (MOBILE-1 §4, M1-8):
- * ADR-0045's file map requires an explicitly minted breakpoint, and naming it
- * `mobile` stops an unrelated future use of `sm` from silently starting to mean
- * "phone". So this file pins the NAME and the VALUE together — matching the
- * pixel value through `sm` would satisfy neither requirement.
+ * ⚠ THE VALUE MOVED 640 -> 1024 AT TABLET-1 (ADR-0062) — tablets get the phone
+ * tier — and 1024px is now the same number as TAILWIND'S OWN UNOVERRIDDEN `lg`
+ * (`64rem`) at a 16px root font size. The duplication is ruled KEPT rather than
+ * dropped, exactly as it was against `sm` (MOBILE-1 §4, M1-8): ADR-0045's file
+ * map requires an explicitly minted breakpoint, and naming it `mobile` stops an
+ * unrelated future use of `lg` from silently starting to mean "phone or
+ * tablet". So this file pins the NAME and the VALUE together — matching the
+ * pixel value through `lg` would satisfy neither requirement. The other half of
+ * the move is `debate/phone-tier.ts`'s hand-copied `QUERY`; a test in
+ * `desktop-neutrality.test.tsx` reads it, and the two must agree.
  *
  * ⚠ WHY A SOURCE SCAN AND NOT A RENDER TEST. jsdom performs no layout and
  * resolves no Tailwind utility, so nothing rendered can see whether a variant
@@ -60,7 +64,7 @@ const GLOBALS = "src/app/globals.css";
 
 /** The token name, and the exact declaration MOBILE-1 §4 mints. */
 const TOKEN = "--breakpoint-mobile";
-const DECLARATION = "--breakpoint-mobile: 640px;";
+const DECLARATION = "--breakpoint-mobile: 1024px;";
 
 /**
  * The `{ … }` body owned by an at-rule, brace-matched out of the shipped file
@@ -148,7 +152,7 @@ describe("globals.css — the MOBILE-1 breakpoint token", () => {
 		expect(inlineBody).not.toContain("#");
 	});
 
-	it("mobile-breakpoint::declares---breakpoint-mobile-at-exactly-640px", () => {
+	it("mobile-breakpoint::declares---breakpoint-mobile-at-exactly-1024px", () => {
 		// THE WHOLE OF PHASE A HANGS ON THIS ONE LINE. Without it Tailwind emits
 		// no `max-mobile:*` rule at all and every override in the reflow is a
 		// no-op that fails silently at phone width.
@@ -215,16 +219,17 @@ describe("globals.css — the MOBILE-1 breakpoint token", () => {
 		).toBe(false);
 	});
 
-	it("mobile-breakpoint::the-px-vs-rem-divergence-from-sm-is-STATED-not-assumed", () => {
-		// ⛔⛔ THREE DOCUMENTS CALLED THIS TOKEN "A DELIBERATE SYNONYM FOR `sm`",
-		// AND IT IS A UNIT DIFFERENCE, NOT AN IDENTITY. Tailwind ships
-		// `--breakpoint-sm: 40rem`; this repo overrides nothing, so `sm` is
-		// 40rem and `mobile` is 640px. They are equal at a 16px root font size
+	it("mobile-breakpoint::the-px-vs-rem-divergence-from-lg-is-STATED-not-assumed", () => {
+		// ⛔⛔ THREE DOCUMENTS ONCE CALLED THIS TOKEN "A DELIBERATE SYNONYM FOR
+		// `sm`", AND IT IS A UNIT DIFFERENCE, NOT AN IDENTITY. TABLET-1 moved the
+		// value to 1024px, so the neighbour is now `lg`: Tailwind ships
+		// `--breakpoint-lg: 64rem`; this repo overrides nothing, so `lg` is
+		// 64rem and `mobile` is 1024px. They are equal at a 16px root font size
 		// and at NO other — and root font size is a first-class browser
-		// accessibility setting, so at a 20px root `sm` fires at 800px while
-		// `mobile` fires at 640px. Both boundaries ship in this one stylesheet,
+		// accessibility setting, so at a 20px root `lg` fires at 1280px while
+		// `mobile` fires at 1024px. Both boundaries ship in this one stylesheet,
 		// so anywhere a `max-mobile:` override is meant to hand off to an
-		// `sm:`/`md:` rule, for that reader it does not.
+		// `sm:`/`md:`/`lg:` rule, for that reader it does not.
 		//
 		// ⚠ THE TOKEN VALUE IS RIGHT AND `px` IS DELIBERATE: this breakpoint
 		// describes a DEVICE viewport, which does not grow when someone
@@ -232,7 +237,7 @@ describe("globals.css — the MOBILE-1 breakpoint token", () => {
 		// physical width. Nothing here asks for the value to change.
 		//
 		// ⚠ WHAT IS ASSERTED IS THE COMMENT, AND THAT IS THE POINT. This
-		// guard's other four assertions never mention `rem`, `40rem`, root font
+		// guard's other four assertions never mention `rem`, `64rem`, root font
 		// size or 16px — so the repo's one written record that the two
 		// boundaries differ lived in prose nothing checked, in a file whose
 		// whole subject is this token. The divergence is intended; being
@@ -241,11 +246,11 @@ describe("globals.css — the MOBILE-1 breakpoint token", () => {
 		const source = read(GLOBALS);
 		const at = source.indexOf(DECLARATION);
 		const commentBefore = source.slice(Math.max(0, at - 2000), at);
-		for (const needed of ["40rem", "root font size"]) {
+		for (const needed of ["64rem", "root font size"]) {
 			expect(
 				commentBefore,
 				`${GLOBALS}: the comment above \`${DECLARATION}\` no longer records ` +
-					`"${needed}". \`${TOKEN}\` is 640px and Tailwind's \`sm\` is 40rem; ` +
+					`"${needed}". \`${TOKEN}\` is 1024px and Tailwind's \`lg\` is 64rem; ` +
 					`they coincide only at a 16px root font size, which readers change. ` +
 					`Calling them synonyms — as this comment, docs/plans/MOBILE-1.md ` +
 					`M1-8 and PR #486's body all once did — records a unit difference ` +
@@ -255,25 +260,25 @@ describe("globals.css — the MOBILE-1 breakpoint token", () => {
 		}
 
 		// ⛔ AND THE PREMISE IS MEASURED, NOT RECITED. If a future Tailwind ships
-		// `sm` in px, or this repo overrides it, the caveat above becomes the
+		// `lg` in px, or this repo overrides it, the caveat above becomes the
 		// stale claim rather than the correct one — so the divergence it
 		// describes is read from the installed package, and this guard reddens
 		// when the ground moves instead of outliving it.
-		const sm = /--breakpoint-sm:\s*([^;]+);/.exec(
+		const lg = /--breakpoint-lg:\s*([^;]+);/.exec(
 			read("node_modules/tailwindcss/theme.css"),
 		)?.[1];
 		expect(
-			sm?.trim(),
-			`tailwindcss/theme.css no longer declares \`--breakpoint-sm: 40rem\` ` +
-				`(found: ${sm}). The px-vs-rem caveat in globals.css, ` +
+			lg?.trim(),
+			`tailwindcss/theme.css no longer declares \`--breakpoint-lg: 64rem\` ` +
+				`(found: ${lg}). The px-vs-rem caveat in globals.css, ` +
 				`docs/plans/MOBILE-1.md M1-8 and the PR body describes a divergence ` +
 				`that may no longer exist — re-derive all three rather than deleting ` +
 				`this assertion.`,
-		).toBe("40rem");
+		).toBe("64rem");
 		expect(
-			/--breakpoint-sm/.test(source),
-			`${GLOBALS}: now overrides \`--breakpoint-sm\`. The caveat assumes \`sm\` ` +
-				`is Tailwind's unoverridden 40rem default; if this repo sets it, ` +
+			/--breakpoint-lg/.test(source),
+			`${GLOBALS}: now overrides \`--breakpoint-lg\`. The caveat assumes \`lg\` ` +
+				`is Tailwind's unoverridden 64rem default; if this repo sets it, ` +
 				`re-derive the caveat.`,
 		).toBe(false);
 	});
