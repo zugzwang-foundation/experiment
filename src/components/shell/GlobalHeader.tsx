@@ -354,13 +354,13 @@ export function GlobalHeader({
 			<div
 				className={cn(
 					"mx-auto grid h-[60px] w-full max-w-[1440px] grid-cols-[1fr_auto_1fr] items-center gap-[18px] px-6",
-					mobileResponsive && "max-mobile:flex max-mobile:gap-[5px]",
+					mobileResponsive && "max-sm:flex max-sm:gap-[5px]",
 				)}
 			>
 				<div
 					className={cn(
 						"flex items-center gap-2 justify-self-start",
-						mobileResponsive && "max-mobile:contents",
+						mobileResponsive && "max-sm:contents",
 					)}
 				>
 					{/* MOBILE-2m · R-3 / ADR-0051 A9 D-3 — Back does not render below
@@ -392,10 +392,10 @@ export function GlobalHeader({
 						data-testid="header-secondary-controls"
 						className={cn(
 							"flex shrink-0 items-center gap-2",
-							mobileResponsive && "max-mobile:hidden max-xl:hidden",
+							mobileResponsive && "max-sm:hidden mobile:max-xl:hidden",
 						)}
 					>
-						<RadioSlot />
+						<RadioSlot mobileResponsive={mobileResponsive} />
 						<GitHubStarsView stars={stars} />
 					</div>
 					{/* ⛔ X IS A SIBLING OF THE WRAPPER, NOT A CHILD OF IT, AND CARRIES
@@ -462,7 +462,8 @@ export function GlobalHeader({
 				<div
 					className={cn(
 						"justify-self-center",
-						mobileResponsive && "max-mobile:contents",
+						mobileResponsive &&
+							"max-sm:contents max-mobile:flex max-mobile:items-center max-mobile:gap-[5px]",
 					)}
 				>
 					<BrandCluster
@@ -525,7 +526,7 @@ export function GlobalHeader({
 				<div
 					className={cn(
 						"flex items-center justify-self-end",
-						mobileResponsive && "max-mobile:ms-auto",
+						mobileResponsive && "max-sm:ms-auto",
 					)}
 				>
 					{/* ⛔⛔ MKT-ROSTER-1-P3 — RULES OPENS THE IDENTITY SIDE, FOUNDER-RULED.

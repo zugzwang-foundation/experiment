@@ -779,7 +779,10 @@ describe("MOBILE-2m · R-3 / A9 D-3 — the mark is centred on the header's own 
 			"the brand cell is not `contents` below 640 — the mark and the countdown " +
 				"stay inside a box of their own and take that box's gap instead of the " +
 				"row's.",
-		).toContain(phone("contents"));
+			// TABLET-1: the flat row is `max-sm` (<640) now; `max-mobile` (<820) keeps the
+			// cell a flex box so the mark and the phone countdown sit side by side inside
+			// the centred grid cell on the 640-819 tablet band.
+		).toContain(`${"max-sm"}${S}contents`);
 	});
 
 	it("phone-r3::the-desktop-cell-is-UNTOUCHED", () => {

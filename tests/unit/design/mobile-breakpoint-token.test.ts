@@ -291,30 +291,49 @@ describe("globals.css — the MOBILE-1 breakpoint token", () => {
 		// `max-xl:hidden` on the four controls, gated on the prop like every other
 		// breakpoint class in the header chain. Pinned by SOURCE because jsdom does
 		// no layout; the geometry is a browser fact recorded in ADR-0063.
-		const SITES: Array<[string, string]> = [
+		// [file, anchor, exact gated string]. Divider and visitor counter hide
+		// below the phone tier AND below `xl`; GitHub (wrapper) and X are visible on
+		// the 640-819 tablet band, so they hide below 640 and again from 820 to
+		// 1279; Radio hides below `xl` on its own.
+		const TRIM = 'mobileResponsive && "max-mobile:hidden max-xl:hidden"';
+		const GH_X = 'mobileResponsive && "max-sm:hidden mobile:max-xl:hidden"';
+		const SITES: Array<[string, string, string]> = [
 			[
 				"src/components/shell/GlobalHeader.tsx",
 				'data-testid="header-secondary-controls"',
+				GH_X,
 			],
-			["src/components/shell/GlobalHeader.tsx", '"mx-3 h-[30px] w-px bg-n2"'],
-			["src/components/shell/XLink.tsx", '"w-[34px] justify-center px-0"'],
+			[
+				"src/components/shell/GlobalHeader.tsx",
+				'"mx-3 h-[30px] w-px bg-n2"',
+				TRIM,
+			],
+			[
+				"src/components/shell/XLink.tsx",
+				'"w-[34px] justify-center px-0"',
+				GH_X,
+			],
 			[
 				"src/components/shell/VisitorCounter.tsx",
 				'"flex items-center gap-1.5 text-xs text-muted-foreground select-none"',
+				TRIM,
+			],
+			[
+				"src/components/shell/RadioSlot.tsx",
+				'"flex h-[34px] shrink-0 items-center gap-2 rounded-(--r)',
+				'mobileResponsive && "max-xl:hidden"',
 			],
 		];
-		for (const [file, anchor] of SITES) {
+		for (const [file, anchor, expected] of SITES) {
 			const src = read(file);
 			const at = src.indexOf(anchor);
 			expect(at, `${file}: anchor \`${anchor}\` not found`).toBeGreaterThan(-1);
 			const window = src.slice(at, at + 400);
 			expect(
-				window.includes(
-					'mobileResponsive && "max-mobile:hidden max-xl:hidden"',
-				),
-				`${file}: the control near \`${anchor}\` lost \`max-xl:hidden\` (gated on ` +
-					`mobileResponsive). Without it a signed-in header overflows between 820 ` +
-					`and ~1240px — the sideways scroll TABLET-1 exists to remove.`,
+				window.includes(expected),
+				`${file}: the control near \`${anchor}\` lost \`${expected}\`. Without ` +
+					`its \`xl\` trim a signed-in header overflows between 820 and ~1240px ` +
+					`— the sideways scroll TABLET-1 exists to remove.`,
 			).toBe(true);
 		}
 		const theme = read("node_modules/tailwindcss/theme.css");

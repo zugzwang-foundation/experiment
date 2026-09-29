@@ -261,6 +261,13 @@ const GATED_HIDE = `mobileResponsive && "${HIDE_BELOW_640}"`;
  */
 const HIDE_BELOW_XL = "max-xl:hidden";
 const GATED_TRIM_HIDE = `mobileResponsive && "${HIDE_BELOW_640} ${HIDE_BELOW_XL}"`;
+/**
+ * TABLET-1 (option C) — GitHub and X are VISIBLE on the 640-819 tablet band and at
+ * >=1280, so their hide is not the phone-tier one: hidden below 640 (`max-sm`) and
+ * hidden again from 820 up to 1279 (`mobile:max-xl`). The secondary-controls
+ * wrapper carries exactly this; Radio inside it hides below `xl` on its own.
+ */
+const GATED_GITHUB_X_HIDE = `mobileResponsive && "max-sm:hidden mobile:max-xl:hidden"`;
 
 /**
  * ⛔⛔ THE CLOSED ALLOWLIST — WIDENED BY A RULING, NOT BY A BUILD.
@@ -804,9 +811,9 @@ describe("global header mobile reflow — the secondary controls drop out below 
 		expect(
 			window,
 			`${HEADER}: the secondary-control wrapper's cn() call carries no ` +
-				`\`${GATED_TRIM_HIDE}\` — an unconditional hide here would also apply to ` +
+				`\`${GATED_GITHUB_X_HIDE}\` — an unconditional hide here would also apply to ` +
 				`the (auth) mount.`,
-		).toContain(GATED_TRIM_HIDE);
+		).toContain(GATED_GITHUB_X_HIDE);
 
 		expect(window).toContain("<RadioSlot");
 		expect(window).toContain("<GitHubStarsView");

@@ -1,5 +1,6 @@
 import { InfoTip } from "@/components/ui/info-tip";
 import { HEADER_GLOSSARY } from "@/lib/copy/glossary";
+import { cn } from "@/lib/utils";
 
 /**
  * The radio slot — INERT placeholder skin, ratified OQ-3: default OFF,
@@ -28,7 +29,11 @@ import { HEADER_GLOSSARY } from "@/lib/copy/glossary";
  */
 const BAR = "w-[3px] rounded-[1px] bg-ink";
 
-export function RadioSlot() {
+export function RadioSlot({
+	mobileResponsive = false,
+}: {
+	mobileResponsive?: boolean;
+}) {
 	return (
 		<InfoTip content={HEADER_GLOSSARY.radio} asChild>
 			<button
@@ -36,7 +41,10 @@ export function RadioSlot() {
 				disabled
 				aria-disabled="true"
 				aria-label="Radio"
-				className="flex h-[34px] shrink-0 items-center gap-2 rounded-(--r) bg-(--btn-fill) px-3 opacity-(--state-disabled-opacity) select-none [border:var(--hairline)]"
+				className={cn(
+					"flex h-[34px] shrink-0 items-center gap-2 rounded-(--r) bg-(--btn-fill) px-3 opacity-(--state-disabled-opacity) select-none [border:var(--hairline)]",
+					mobileResponsive && "max-xl:hidden",
+				)}
 			>
 				<span aria-hidden="true" className="flex h-4 items-end gap-[2.5px]">
 					<span className={`h-[30%] ${BAR}`} />

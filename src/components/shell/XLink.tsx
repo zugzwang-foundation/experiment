@@ -73,7 +73,7 @@ export function XLink({
 			className={cn(
 				HEADER_PILL_BUTTON,
 				"w-[34px] justify-center px-0",
-				mobileResponsive && "max-mobile:hidden max-xl:hidden",
+				mobileResponsive && "max-sm:hidden mobile:max-xl:hidden",
 			)}
 		>
 			<svg
