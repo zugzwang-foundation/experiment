@@ -362,13 +362,13 @@ export function GlobalHeader({
 			<div
 				className={cn(
 					"mx-auto grid h-[60px] w-full max-w-[1440px] grid-cols-[1fr_auto_1fr] items-center gap-[18px] px-6",
-					mobileResponsive && "max-mobile:flex max-mobile:gap-[5px]",
+					mobileResponsive && "max-sm:flex max-sm:gap-[5px]",
 				)}
 			>
 				<div
 					className={cn(
 						"flex items-center gap-2 justify-self-start",
-						mobileResponsive && "max-mobile:contents",
+						mobileResponsive && "max-sm:contents",
 					)}
 				>
 					{/* UIR-1 item 5 — Back renders at no width now (below 640px since
@@ -424,10 +424,20 @@ export function GlobalHeader({
 						data-testid="header-secondary-controls"
 						className={cn(
 							"flex shrink-0 items-center gap-2",
-							mobileResponsive && "max-mobile:hidden max-xl:hidden",
+							mobileResponsive && "max-sm:hidden mobile:max-xl:hidden",
 						)}
 					>
-						<RadioSlot signedIn={viewer !== null} />
+						{/* TABLET-1 — Radio hides below `xl` and GitHub does not (GitHub is
+						    visible on the 640-819 tablet band). `contents` above `xl` makes this
+						    wrapper generate no box, so Radio is laid out exactly as a direct
+						    child of the flex wrapper was; below it, `hidden` removes the lot.
+						    Done here, gated on the prop, rather than inside RadioSlot — that
+						    component is a client player with several render arms. */}
+						<span
+							className={cn("contents", mobileResponsive && "max-xl:hidden")}
+						>
+							<RadioSlot signedIn={viewer !== null} />
+						</span>
 						<GitHubStarsView stars={stars} />
 					</div>
 					{/* ⛔ X IS A SIBLING OF THE WRAPPER, NOT A CHILD OF IT, AND CARRIES
@@ -494,7 +504,8 @@ export function GlobalHeader({
 				<div
 					className={cn(
 						"justify-self-center",
-						mobileResponsive && "max-mobile:contents",
+						mobileResponsive &&
+							"max-sm:contents max-mobile:flex max-mobile:items-center max-mobile:gap-[5px]",
 					)}
 				>
 					<BrandCluster
@@ -557,7 +568,7 @@ export function GlobalHeader({
 				<div
 					className={cn(
 						"flex items-center justify-self-end",
-						mobileResponsive && "max-mobile:ms-auto",
+						mobileResponsive && "max-sm:ms-auto",
 					)}
 				>
 					{/* ⛔⛔ MKT-ROSTER-1-P3 — RULES OPENS THE IDENTITY SIDE, FOUNDER-RULED.

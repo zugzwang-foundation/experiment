@@ -93,6 +93,9 @@ import { GlobalHeader } from "@/components/shell/GlobalHeader";
 const V = "max-mobile";
 const S = ":";
 const phone = (utility: string) => V + S + utility;
+/** TABLET-1: the FLAT phone row (flex line, contents zones, ms-auto) is now `max-sm` (<640); the phone TIER (hides, avatar-only chip) stays `max-mobile` (<820). */
+const FLAT = "max-sm";
+const flat = (utility: string) => FLAT + S + utility;
 
 const VIEWER = { pseudonym: "RedFox001", pfpUrl: "/pfp-placeholder.svg" };
 
@@ -164,7 +167,7 @@ describe("A13 D-1 — GitHub leaves the phone, and the desktop keeps it", () => 
 			tokens(secondary),
 			"the secondary wrapper stopped hiding below 640, so the desktop's " +
 				"GitHub control now renders on the phone row it was withdrawn from.",
-		).toContain(phone("hidden"));
+		).toContain(flat("hidden"));
 	});
 });
 
@@ -383,10 +386,10 @@ describe("MKT-ROSTER-1-P3 — the row reads home · logo · countdown · rules �
 		const row = root.querySelector("header > div");
 		const rowTokens = tokens(row);
 		expect(rowTokens, "the row is not a flex line below 640").toContain(
-			phone("flex"),
+			flat("flex"),
 		);
 		expect(
-			rowTokens.some((t) => t.startsWith(phone("gap-"))),
+			rowTokens.some((t) => t.startsWith(flat("gap-"))),
 			"the row declares no phone gap, so it keeps the 18px desktop one.",
 		).toBe(true);
 		const left = row?.firstElementChild;
@@ -394,7 +397,7 @@ describe("MKT-ROSTER-1-P3 — the row reads home · logo · countdown · rules �
 			tokens(left),
 			"the left zone is still a box below 640, so home→logo takes its gap " +
 				"and logo→countdown takes the row's — two numbers, equal by hand.",
-		).toContain(phone("contents"));
+		).toContain(flat("contents"));
 	});
 
 	it("phone-a13::the-desktop-row-keeps-its-grid-and-its-18px-gap", () => {
