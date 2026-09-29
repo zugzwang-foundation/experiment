@@ -172,9 +172,10 @@ export function QuoteWell({
  * keep the title's own spacing and wrap as before. The marks inherit the
  * heading's size and weight, take `mark` — the fill's tint — as their colour,
  * and are hidden from assistive technology, so the heading's name is still the
- * author's words alone.
+ * author's words alone. Exported for the replies page's tile
+ * (`PostFocusHeader`'s `QuoteTile`), which sets the same line at its own size.
  */
-function QuotedTitle({ title, mark }: { title: string; mark: string }) {
+export function QuotedTitle({ title, mark }: { title: string; mark: string }) {
 	const text = title.trim();
 	const first = text.search(/\s/);
 	const glyph = (char: string) => (
