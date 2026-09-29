@@ -35,7 +35,7 @@ import { describe, expect, it } from "vitest";
  * `--color-ground` and `--font-sans`. This is asserted by RANGE, brace-matched
  * out of the shipped file, rather than by eyeballing the diff.
  *
- * ⚠ THE VALUE MOVED 640 -> 1024 AT TABLET-1 (ADR-0062) — tablets get the phone
+ * ⚠ THE VALUE MOVED 640 -> 1024 AT TABLET-1 (ADR-0063) — tablets get the phone
  * tier — and 1024px is now the same number as TAILWIND'S OWN UNOVERRIDDEN `lg`
  * (`64rem`) at a 16px root font size. The duplication is ruled KEPT rather than
  * dropped, exactly as it was against `sm` (MOBILE-1 §4, M1-8): ADR-0045's file

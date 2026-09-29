@@ -1,6 +1,6 @@
 # TABLET-1 — give tablets the phone tier (`--breakpoint-mobile` 640 → 1024)
 
-Decision record: `docs/adr/0062-tablets-get-the-phone-tier.md`. This is the plan it was executed from.
+Decision record: `docs/adr/0063-tablets-get-the-phone-tier.md`. This is the plan it was executed from.
 
 ## Problem
 Between 640px and ~820px every route scrolls sideways: the global header needs 812px and only

@@ -6,7 +6,7 @@ import { useSyncExternalStore } from "react";
  * RI-3 / O-l — "is this reader below the tier boundary", for the tree that is
  * hidden when they are.
  *
- * ADR-0051's gate is CSS: below 1024px (640px until TABLET-1 / ADR-0062, which
+ * ADR-0051's gate is CSS: below 1024px (640px until TABLET-1 / ADR-0063, which
  * gave tablets the phone tier) the desktop tree is `display: none` and
  * the phone tree renders. `display: none` stops painting; it does not stop
  * JavaScript. So every interval the desktop tree arms keeps firing on a phone,

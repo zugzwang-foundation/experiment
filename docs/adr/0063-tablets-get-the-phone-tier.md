@@ -1,4 +1,4 @@
-# ADR-0062 — Tablets get the phone tier: `--breakpoint-mobile` moves from 640px to 1024px
+# ADR-0063 — Tablets get the phone tier: `--breakpoint-mobile` moves from 640px to 1024px
 
 | | |
 |---|---|

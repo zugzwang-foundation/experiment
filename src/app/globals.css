@@ -164,7 +164,7 @@
 	 * everywhere; every mobile-specific rule is a `max-mobile:` override,
 	 * never a replacement of the base one.
 	 *
-	 * ⛔ THE VALUE MOVED 640 -> 1024 AT TABLET-1 (ADR-0062), AND THE NAME NOW
+	 * ⛔ THE VALUE MOVED 640 -> 1024 AT TABLET-1 (ADR-0063), AND THE NAME NOW
 	 * OVERSTATES IT. The header needs 812px, so between 640 and ~820 the
 	 * whole document scrolled sideways on a tablet. Tablets get the phone
 	 * tier rather than a tier of their own; `mobile` still reads as "phone"
