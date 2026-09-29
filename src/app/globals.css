@@ -173,29 +173,39 @@
 	 * render inside), minted under its own name per ADR-0045's file-map
 	 * requirement ("breakpoints are minted here or not at all") rather than
 	 * relying on the generic scale name — see MOBILE-1 M1-8. Generates
-	 * `mobile:*` (>=1024px, desktop and up) and `max-mobile:*` (<1024px,
-	 * phone AND TABLET) variants. Desktop stays the unprefixed default
-	 * everywhere; every mobile-specific rule is a `max-mobile:` override,
-	 * never a replacement of the base one.
+	 * `mobile:*` (>=820px) and `max-mobile:*` (<820px, phone and small
+	 * tablet) variants. Desktop stays the unprefixed default everywhere;
+	 * every mobile-specific rule is a `max-mobile:` override, never a
+	 * replacement of the base one.
 	 *
-	 * ⛔ THE VALUE MOVED 640 -> 1024 AT TABLET-1 (ADR-0063), AND THE NAME NOW
-	 * OVERSTATES IT. The header needs 812px, so between 640 and ~820 the
-	 * whole document scrolled sideways on a tablet. Tablets get the phone
-	 * tier rather than a tier of their own; `mobile` still reads as "phone"
-	 * and now means "anything narrower than a laptop". Renaming was
-	 * rejected: ~35 files and every guard key on the name.
+	 * ⛔ THE VALUE MOVED 640 -> 820 AT TABLET-1 (ADR-0063). The header's
+	 * signed-out desktop form needs ~812px, so between 640 and ~820 the
+	 * whole document scrolled sideways on a tablet. Small tablets (iPad
+	 * portrait, 768) get the phone tier rather than a tier of their own;
+	 * `mobile` still reads as "phone" and now means "narrower than an iPad
+	 * Air". Renaming was rejected: ~35 files and every guard key on the name.
+	 * ⛔ 820 IS NOT WHERE A SIGNED-IN HEADER FITS, AND THE DESKTOP HEADER IS
+	 * TRIMMED TO COMPENSATE. Measured with the real compiled CSS and the
+	 * signed-in markup, worst case (longest pseudonym, widest balances): the
+	 * full header overflows by 256px at 820 and 11px at 1200, and fits at
+	 * 1240+. So GlobalHeader hides Radio, GitHub, X, the §21.1 divider and
+	 * the visitor counter below Tailwind's `xl` with `max-xl:hidden`
+	 * (820-1279 keeps the desktop page and a slimmer header). Do not lower
+	 * this value without re-measuring a SIGNED-IN header: a signed-out
+	 * measurement misled this very decision once.
 	 * ⚠ THE OTHER HALF OF THE MOVE IS `debate/phone-tier.ts`'s `QUERY`, a
 	 * hand-copied string of this number. Change one and tablets get two
 	 * different answers — CSS says phone, `useIsPhoneTier()` says desktop.
 	 *
-	 * ⚠ THE VALUE IS `px` AND `lg` IS `rem`. Tailwind's `lg` is `64rem`;
-	 * this token is `1024px`. They coincide at a 16px root font size and NOT
-	 * otherwise — root font size is a first-class browser accessibility
-	 * setting, so a reader who has raised theirs to 20px gets `lg` at
-	 * 1280px and `mobile` at 1024px, and BOTH boundaries ship in this one
-	 * stylesheet. Anywhere a `max-mobile:` override and an `sm:`/`md:`/`lg:`
-	 * rule are meant to hand off to each other, they will not, for that
-	 * reader. (This comment used to say the same about `sm` at 640px.)
+	 * ⚠ THE VALUE IS `px` AND TAILWIND'S BREAKPOINTS ARE `rem`. 820px sits
+	 * between `md` (48rem = 768px) and `lg` (64rem = 1024px). A rem
+	 * breakpoint coincides with a px one only at a 16px root font size —
+	 * root font size is a first-class browser accessibility setting, so a
+	 * reader who has raised theirs to 20px gets `md` at 960px and `lg` at
+	 * 1280px while `mobile` still fires at 820px, and ALL of those boundaries
+	 * ship in this one stylesheet. Anywhere a `max-mobile:` override and an
+	 * `sm:`/`md:`/`lg:`/`xl:` rule are meant to hand off to each other, they
+	 * will not, for that reader.
 	 *
 	 * The token value is deliberately `px` and stays that way: this
 	 * breakpoint describes a DEVICE's viewport, which does not grow when
@@ -204,7 +214,7 @@
 	 * is intended, and what was wrong was three documents calling it an
 	 * identity.
 	 */
-	--breakpoint-mobile: 1024px;
+	--breakpoint-mobile: 820px;
 }
 
 /*

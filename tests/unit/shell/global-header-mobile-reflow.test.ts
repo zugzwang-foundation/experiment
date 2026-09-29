@@ -252,6 +252,15 @@ const DECK = "src/components/onboarding/OnboardingDeck.tsx";
 const HIDE_BELOW_640 = "max-mobile:hidden";
 /** The exact conditional every reflow class in this diff is wrapped in. */
 const GATED_HIDE = `mobileResponsive && "${HIDE_BELOW_640}"`;
+/**
+ * TABLET-1 / ADR-0063 — the four controls that ALSO give way below Tailwind's
+ * `xl` (1280px): a signed-in desktop header needs ~1240px, and the phone tier
+ * now ends at 820px, so 820-1279 would overflow without the trim. The phone hide
+ * is unchanged and stays first; `max-xl:hidden` rides beside it. Exact, like
+ * `GATED_HIDE`, because a closed spelling is what makes a lost token redden.
+ */
+const HIDE_BELOW_XL = "max-xl:hidden";
+const GATED_TRIM_HIDE = `mobileResponsive && "${HIDE_BELOW_640} ${HIDE_BELOW_XL}"`;
 
 /**
  * ⛔⛔ THE CLOSED ALLOWLIST — WIDENED BY A RULING, NOT BY A BUILD.
@@ -795,9 +804,9 @@ describe("global header mobile reflow — the secondary controls drop out below 
 		expect(
 			window,
 			`${HEADER}: the secondary-control wrapper's cn() call carries no ` +
-				`\`${GATED_HIDE}\` — an unconditional hide here would also apply to ` +
+				`\`${GATED_TRIM_HIDE}\` — an unconditional hide here would also apply to ` +
 				`the (auth) mount.`,
-		).toContain(GATED_HIDE);
+		).toContain(GATED_TRIM_HIDE);
 
 		expect(window).toContain("<RadioSlot");
 		expect(window).toContain("<GitHubStarsView");
@@ -894,8 +903,8 @@ describe("global header mobile reflow — the right zone sheds its anti-conflati
 		expect(
 			window,
 			`${HEADER}: the §21.1 register divider's cn() call carries no ` +
-				`\`${GATED_HIDE}\`.`,
-		).toContain(GATED_HIDE);
+				`\`${GATED_TRIM_HIDE}\`.`,
+		).toContain(GATED_TRIM_HIDE);
 	});
 
 	it("header-mobile::VisitorCounter-is-mounted-directly-with-NO-wrapper-and-receives-the-prop", () => {
@@ -1334,8 +1343,8 @@ describe("global header mobile reflow — BrandCluster and VisitorCounter gate t
 		expect(
 			window,
 			`${VISITOR}: the visitor-counter's own root cn() call carries no ` +
-				`\`${GATED_HIDE}\`.`,
-		).toContain(GATED_HIDE);
+				`\`${GATED_TRIM_HIDE}\`.`,
+		).toContain(GATED_TRIM_HIDE);
 	});
 
 	it("header-mobile::VisitorCounter-declares-the-prop-defaulting-false", () => {

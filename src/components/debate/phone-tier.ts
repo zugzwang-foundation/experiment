@@ -6,8 +6,8 @@ import { useSyncExternalStore } from "react";
  * RI-3 / O-l — "is this reader below the tier boundary", for the tree that is
  * hidden when they are.
  *
- * ADR-0051's gate is CSS: below 1024px (640px until TABLET-1 / ADR-0063, which
- * gave tablets the phone tier) the desktop tree is `display: none` and
+ * ADR-0051's gate is CSS: below 820px (640px until TABLET-1 / ADR-0063, which
+ * gave small tablets the phone tier) the desktop tree is `display: none` and
  * the phone tree renders. `display: none` stops painting; it does not stop
  * JavaScript. So every interval the desktop tree arms keeps firing on a phone,
  * setting state and re-rendering a two-column arena nobody can see. Measured on
@@ -44,13 +44,13 @@ import { useSyncExternalStore } from "react";
  * only answer the server can give honestly — and React re-renders with the real
  * value after hydration, which is exactly the documented shape for this.
  *
- * ⚠ NEUTRAL AT AND ABOVE 1024px BY CONSTRUCTION, which is what makes it legal
+ * ⚠ NEUTRAL AT AND ABOVE 820px BY CONSTRUCTION, which is what makes it legal
  * under ADR-0051 D-2's scoped exception rather than a desktop edit: the query is
  * false there, every caller takes the branch it took before, and the desktop
  * render is unchanged. The neutrality test asserts that directly rather than
  * trusting this paragraph.
  */
-const QUERY = "not all and (min-width: 1024px)";
+const QUERY = "not all and (min-width: 820px)";
 
 /**
  * ⛔⛔ ONE `MediaQueryList` FOR THE WHOLE MODULE, AND IT IS A COST FIX RATHER
