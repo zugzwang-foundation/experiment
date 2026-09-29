@@ -27,6 +27,16 @@ export type TutorialStep = {
 	text: string;
 	/** Which scribble the pointer draws: a tap circle, an underline, or a swipe. */
 	gesture: TutorialGesture;
+	/**
+	 * When set, the engine reads this step's target element's `href` while
+	 * it's on screen and drives the actual page transition itself when the
+	 * viewer clicks Next — "market" navigates there immediately (Discovery
+	 * -> a market page), "profile" is banked and spent later, the moment
+	 * the tour reaches the first step of the "Your profile" chapter. Real
+	 * navigation, not a simulated screen: the same `next/navigation` router
+	 * the rest of the app uses.
+	 */
+	captureHrefFor?: "market" | "profile";
 };
 
 export const TUTORIAL_STEPS: readonly TutorialStep[] = [
@@ -49,8 +59,9 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		id: "identity-chip",
 		chapter: "Get oriented",
 		selector: '[data-testid="identity-chip-link"]',
-		text: "That's you. Tap your name any time to see everything you've argued and bet on.",
+		text: "That's you. This tour will bring you to your profile later — Next keeps going for now.",
 		gesture: "tap",
+		captureHrefFor: "profile",
 	},
 	// ---- Find a market ----
 	{
@@ -64,8 +75,9 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		id: "market-card",
 		chapter: "Find a market",
 		selector: '[data-testid="market-card"]',
-		text: "Each card is a market. The bar shows the current YES/NO split, and the line under it is how much Dharma is staked so far. Tap a card to open its debate.",
+		text: "Each card is a market. The bar shows the current YES/NO split, and the line under it is how much Dharma is staked so far. Next opens its debate.",
 		gesture: "tap",
+		captureHrefFor: "market",
 	},
 	// ---- Read the market ----
 	{

@@ -1,6 +1,7 @@
 "use client";
 
 import { Pointer } from "lucide-react";
+import { useRouter } from "next/navigation";
 import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -51,7 +52,9 @@ const CHAPTER_WIPE_MS = 420;
 
 type Placement = { top: number; left: number; width: number; height: number };
 
-function measure(selector: string): Placement | null {
+function measure(
+	selector: string,
+): { placement: Placement; el: HTMLElement } | null {
 	let el: Element | null = null;
 	try {
 		el = document.querySelector(selector);
@@ -65,7 +68,10 @@ function measure(selector: string): Placement | null {
 	if (r.width === 0 && r.height === 0) {
 		return null;
 	}
-	return { top: r.top, left: r.left, width: r.width, height: r.height };
+	return {
+		placement: { top: r.top, left: r.left, width: r.width, height: r.height },
+		el,
+	};
 }
 
 function useReducedMotion(): boolean {
@@ -94,6 +100,12 @@ export function TutorialControl({
 	const [chapterPhase, setChapterPhase] = useState<"in" | "out" | null>(null);
 	const searchStartedAt = useRef(0);
 	const reducedMotion = useReducedMotion();
+	const router = useRouter();
+	/** The current step's own target `href`, live while it's `captureHrefFor`. */
+	const capturedHrefRef = useRef<string | null>(null);
+	/** Banked from the "Get oriented" identity-chip step, spent once — on
+	 *  entering "Your profile". Cleared on close so a re-run captures fresh. */
+	const profileHrefRef = useRef<string | null>(null);
 
 	const step = TUTORIAL_STEPS[stepIndex];
 	const isFirst = stepIndex === 0;
@@ -162,13 +174,23 @@ export function TutorialControl({
 		}
 		setPlacement(null);
 		setTimedOut(false);
+		capturedHrefRef.current = null;
 		searchStartedAt.current = Date.now();
 
 		function tick() {
 			const found = measure(step.selector);
 			if (found) {
-				setPlacement(found);
+				setPlacement(found.placement);
 				setTimedOut(false);
+				if (step.captureHrefFor) {
+					const href = found.el.getAttribute("href");
+					if (href) {
+						capturedHrefRef.current = href;
+						if (step.captureHrefFor === "profile") {
+							profileHrefRef.current = href;
+						}
+					}
+				}
 				return;
 			}
 			setPlacement(null);
@@ -186,19 +208,38 @@ export function TutorialControl({
 			window.removeEventListener("scroll", tick, true);
 			window.removeEventListener("resize", tick);
 		};
-	}, [open, step.selector]);
+	}, [open, step.selector, step.captureHrefFor]);
 
 	function start() {
+		profileHrefRef.current = null;
 		setStepIndex(0);
 		setOpen(true);
 	}
 
+	/**
+	 * The tour drives its own page transitions rather than waiting for the
+	 * viewer to find the next control themselves — Next is what "slides"
+	 * them from Discovery to a market and, later, to their own profile,
+	 * using the real Next.js router against the real href of whatever the
+	 * spotlight is already highlighting.
+	 */
 	function next() {
+		if (step.captureHrefFor === "market" && capturedHrefRef.current) {
+			router.push(capturedHrefRef.current);
+		}
 		if (isLast) {
 			close();
 			return;
 		}
-		setStepIndex((i) => Math.min(i + 1, TUTORIAL_STEPS.length - 1));
+		const nextIndex = Math.min(stepIndex + 1, TUTORIAL_STEPS.length - 1);
+		if (
+			isFirstStepOfChapter(nextIndex) &&
+			TUTORIAL_STEPS[nextIndex].chapter === "Your profile" &&
+			profileHrefRef.current
+		) {
+			router.push(profileHrefRef.current);
+		}
+		setStepIndex(nextIndex);
 	}
 
 	function back() {
