@@ -1,12 +1,4 @@
-import {
-	GEIST_QUOTE_INK,
-	GEIST_QUOTE_TOP,
-	GEIST_QUOTE_TOP_CLOSE,
-	QUOTE_CANVAS,
-	QUOTE_TYPE,
-	quoteMarkSize,
-	quoteTitleSize,
-} from "./size";
+import { QUOTE_CANVAS, QUOTE_POSTER, quotePosterSize } from "./size";
 
 /**
  * QUOTE-1 C — THE TITLE-AS-QUOTATION WELL (design-canon `C-QUOTE-1`, SPEC.1
@@ -40,20 +32,16 @@ import {
  * wrote; only the paint is capitalised. Canon clause 4 calls it a display
  * transform for that reason.
  *
- * ⛔ THE MARKS' LAYOUT BOXES ARE THEIR INK, AND THAT IS THE ONE PIECE OF
- * MACHINERY HERE. A `“` at `line-height: 1` occupies a full em of layout for
- * 0.311 em of ink (measured — `size.ts`), so laying the column out on line boxes
- * would reserve 137 px of the 224 px content height at the size ceiling and pay
- * for whitespace with title size. Each mark therefore gets `height` = its ink
- * and `position: relative; top` = minus the measured distance from its line-box
- * top to its ink top — a PAINT shift with no flow effect, so the column's
- * arithmetic is `2 × ink + 2 × gap + title`, which is exactly what
- * `quoteTitleSize` computes. Change one without the other and the budget starts
- * describing a render that does not exist.
- *
- * ⚠ THE TWO MARKS USE DIFFERENT OFFSETS BECAUSE THEY SIT AT DIFFERENT HEIGHTS —
- * `“` 0.129 em, `”` 0.145 em. See `size.ts`; it is 2.2 px at the mark ceiling,
- * on the one axis this box clips.
+ * ⛔⛔ UIR-9 — POSTER TYPE, AND THE MARKS IN LINE. The title is Geist 800,
+ * uppercase, −0.01em tracking, 1.05 leading, and `“` / `”` sit directly
+ * against its first and last words at the title's own size and weight
+ * (`QuotedTitle`). This replaces QUOTE-1's column — a mark row, the title, a
+ * mark row, the marks at 2.5× the title with each one's box cut down to its ink
+ * by negative margins. That machinery, and the WebKit `foreignObject` paint bug
+ * it had been rebuilt to route around (MOBILE-2c R-3), went with the rows: an
+ * inline glyph has no offset to mis-paint. The size is `quotePosterSize`, whose
+ * budget is the title's lines alone; `size.ts` says why the old ramp stays for
+ * the export.
  *
  * ⛔ NO `-webkit-line-clamp`. It was specified as an optional belt and it is
  * MEASURED OUT: `text-wrap: balance` stops applying the moment the clamp
@@ -80,49 +68,7 @@ export function QuoteWell({
 	 */
 	as?: "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
 }) {
-	const size = quoteTitleSize(title.length);
-	const mark = quoteMarkSize(size);
-	const inkHeight = GEIST_QUOTE_INK * mark;
-
-	/**
-	 * Same for both marks bar the offset — see the docblock.
-	 *
-	 * ⛔⛔ THE OPTICAL INSET IS TAKEN WITH MARGINS, NOT WITH `position: relative`,
-	 * AND THE REASON IS A WEBKIT PAINT BUG INSIDE `<foreignObject>` (MOBILE-2c
-	 * R-3, founder-reported on an iPhone, ruled Q3-a).
-	 *
-	 * It used to be `height: inkHeight` with `top: -top*mark` on a
-	 * `position: relative` span — a 67.5px glyph in a 21px box, offset upward.
-	 * On WebKit the opening mark painted **on top of the title's first line and
-	 * right of centre**, and the closing mark did not paint at all. Chromium was
-	 * and is correct.
-	 *
-	 * ⚠ EVERY BOX MEASUREMENT AGREED ACROSS BOTH ENGINES, WHICH IS WHY THIS
-	 * NEEDED A PICTURE. `getBoundingClientRect` on the mark, `getComputedStyle`
-	 * on every declaration, and `Range.getClientRects()` over the glyph's own
-	 * text run returned the same numbers on WebKit and Chromium to within 0.1px
-	 * — the layout box reports the shifted position while the PAINT applies the
-	 * offset somewhere else. A geometry-only instrument reports this defect as
-	 * absent (AGENTS.md §9: the paint is the arbiter).
-	 *
-	 * ⇒ Found by bisection: overriding the marks to `position: static; top: 0`
-	 * live on WebKit renders them correctly, and no other suspect moved anything
-	 * — not `justify-content: safe center`, not `text-wrap: balance`, not the
-	 * well's `overflow: hidden`, not the shrunken height on its own.
-	 *
-	 * ⚠ THE LAYOUT CONTRIBUTION IS UNCHANGED BY CONSTRUCTION, which is what keeps
-	 * Chromium pixel-identical (carve-out 2): the outer box was `inkHeight`, and
-	 * `mark + marginTop + marginBottom` = `mark - top*mark - (mark - inkHeight -
-	 * top*mark)` = `inkHeight`. So `size.ts`'s `2 * GEIST_QUOTE_INK * mark`
-	 * budget still describes the space these two occupy, and the title neither
-	 * moves nor re-wraps.
-	 */
-	const markStyle = (top: number) => ({
-		fontSize: `${mark}px`,
-		lineHeight: 1,
-		marginTop: `${-top * mark}px`,
-		marginBottom: `${-(mark - inkHeight - top * mark)}px`,
-	});
+	const size = quotePosterSize(title.length);
 
 	return (
 		<svg
@@ -141,10 +87,10 @@ export function QuoteWell({
 			// ATTRIBUTES above supply the ratio and NOT a cap — measured: 532px
 			// inside a 532px parent, i.e. the attribute never bound. Without this
 			// the well scales PAST 545 on a wide column and paints the title above
-			// the ratified 56px ceiling, which is a canon clause 4 violation with no
-			// visible symptom. `.qstack`'s own `max-w` is belt, and reads cosmetic
-			// enough to be deleted by someone tidying; this one is next to the
-			// constant it enforces. Found by `@code-reviewer`.
+			// its 60px ceiling (UIR-9; 56px before it), which is a canon clause 4
+			// violation with no visible symptom. `.qstack`'s own `max-w` is belt,
+			// and reads cosmetic enough to be deleted by someone tidying; this one
+			// is next to the constant it enforces. Found by `@code-reviewer`.
 			style={{ maxWidth: `${QUOTE_CANVAS.w}px` }}
 		>
 			<foreignObject x="0" y="0" width={QUOTE_CANVAS.w} height={QUOTE_CANVAS.h}>
@@ -166,7 +112,6 @@ export function QuoteWell({
 					// restated, so the arithmetic and the render cannot drift apart.
 					style={{
 						padding: `${boxed ? QUOTE_CANVAS.pad - 1 : QUOTE_CANVAS.pad}px`,
-						gap: `${QUOTE_TYPE.gap}px`,
 						// ⛔⛔ `safe center`, NOT `center`, AND THE KEYWORD IS WHAT MAKES THE
 						// RATIFIED DEGRADATION THE RIGHT SHAPE. Canon clause 6 says a title
 						// the estimate cannot fit "clips inside the canvas at the last full
@@ -177,39 +122,66 @@ export function QuoteWell({
 						// sliced off, while the closing mark renders whole. `safe` centres
 						// while it fits and falls back to start-alignment when it does not,
 						// which is the clause. Found by `@code-reviewer`; the arithmetic was
-						// never wrong, the overflow BEHAVIOUR was.
+						// never wrong, the overflow BEHAVIOUR was. (UIR-9: the opening mark
+						// rides the first line now, so the first line is what `safe` keeps.)
 						justifyContent: "safe center",
 					}}
 				>
-					<span
-						data-testid="quote-well-mark"
-						aria-hidden="true"
-						className="qmark block shrink-0 font-sans font-bold text-n4"
-						style={markStyle(GEIST_QUOTE_TOP)}
-					>
-						{"“"}
-					</span>
 					<Heading
 						data-testid="quote-well-title"
-						className="qtitle m-0 text-center font-sans font-bold text-ink uppercase [overflow-wrap:anywhere] [text-wrap:balance]"
+						className="qtitle m-0 text-center font-sans font-extrabold text-ink uppercase [overflow-wrap:anywhere] [text-wrap:balance]"
 						style={{
 							fontSize: `${size}px`,
-							lineHeight: QUOTE_TYPE.lineHeight,
-							letterSpacing: `${QUOTE_TYPE.tracking}em`,
+							lineHeight: QUOTE_POSTER.lineHeight,
+							letterSpacing: `${QUOTE_POSTER.tracking}em`,
 						}}
 					>
-						{title}
+						<QuotedTitle title={title} />
 					</Heading>
-					<span
-						data-testid="quote-well-mark"
-						aria-hidden="true"
-						className="qmark block shrink-0 font-sans font-bold text-n4"
-						style={markStyle(GEIST_QUOTE_TOP_CLOSE)}
-					>
-						{"”"}
-					</span>
 				</div>
 			</foreignObject>
 		</svg>
+	);
+}
+
+/**
+ * UIR-9 — the title with `“` directly before its first word and `”` directly
+ * after its last, no space between. Each mark shares a `nowrap` span with its
+ * word, so no line break can leave a mark alone on a line; the words between
+ * keep the title's own spacing and wrap as before. The marks inherit the
+ * heading's size and weight and are hidden from assistive technology, so the
+ * heading's name is still the author's words alone.
+ */
+function QuotedTitle({ title }: { title: string }) {
+	const text = title.trim();
+	const first = text.search(/\s/);
+	const mark = (glyph: string) => (
+		<span data-testid="quote-well-mark" aria-hidden="true" className="text-n4">
+			{glyph}
+		</span>
+	);
+	if (first === -1) {
+		return (
+			<span className="whitespace-nowrap">
+				{mark("“")}
+				{text}
+				{mark("”")}
+			</span>
+		);
+	}
+	// The whitespace before the last word — equal to `first` for two words.
+	const last = text.search(/\s\S*$/);
+	return (
+		<>
+			<span className="whitespace-nowrap">
+				{mark("“")}
+				{text.slice(0, first)}
+			</span>
+			{text.slice(first, last + 1)}
+			<span className="whitespace-nowrap">
+				{text.slice(last + 1)}
+				{mark("”")}
+			</span>
+		</>
 	);
 }
