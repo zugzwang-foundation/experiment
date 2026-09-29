@@ -32,8 +32,13 @@ import { MarketCard } from "./MarketCard";
  * rather than left behind a flag, because a flag with one live arm is dead code
  * wearing a decision.
  *
- * ⚠ ONLY THE ≥`lg` COLUMN COUNT MOVED. `sm:grid-cols-2` and the absence of any
- * unprefixed `grid-cols-*` are both load-bearing and both untouched — the second
+ * ⛔ TWO COLUMNS START AT `mobile` (820px), NOT AT `sm` (640px) — TABLET-1 /
+ * ADR-0063. The phone tier now ends at 820px, and this grid was the one piece of
+ * the phone look still switching at Tailwind's own 640px, so 640-819px showed a
+ * phone header over a two-column list. `mobile:grid-cols-2` makes the whole phone
+ * tier a single column again.
+ *
+ * ⚠ THE ABSENCE OF ANY UNPREFIXED `grid-cols-*` IS LOAD-BEARING and untouched — it
  * is what leaves the phone tier a single column, and it is a property of an
  * ABSENCE, which is why it has its own guard.
  */
@@ -52,7 +57,7 @@ export function DiscoveryGrid({
 			// `align-content:start` (`:148-149`). Everything left over belongs to
 			// the hero, which is what makes the hero the focal panel rather than
 			// a wall of tiles stretching to fill the window.
-			className="grid flex-none gap-3 sm:grid-cols-2 lg:grid-cols-3"
+			className="grid flex-none gap-3 mobile:grid-cols-2 lg:grid-cols-3"
 		>
 			{markets.map((m, i) => (
 				<MarketCard key={m.card.id} card={m.card} active={i === activeIndex} />
