@@ -12,14 +12,9 @@ import { FocusMarketCard } from "./FocusMarketCard";
 import { HeadZone } from "./HeadZone";
 import { KnowMore } from "./KnowMore";
 import { RemovedPlaceholder } from "./placeholders";
-import {
-	GEIST_QUOTE_INK,
-	GEIST_QUOTE_TOP,
-	GEIST_QUOTE_TOP_CLOSE,
-	GEIST_UPPER_ADV,
-	QUOTE_TYPE,
-	WRAP_SLACK,
-} from "./quote-well/size";
+import { quoteFill } from "./quote-well/palette";
+import { QuotedTitle } from "./quote-well/QuoteWell";
+import { GEIST_POSTER_ADV, QUOTE_POSTER, WRAP_SLACK } from "./quote-well/size";
 import type { DebateMarketHeader, DebatePost, PresentPost } from "./types";
 
 /**
@@ -245,6 +240,8 @@ export function PostFocusHeader({
 						    ⚠ UIR-8 — AND ITS TITLE IS BACK BETWEEN THEM: `QuoteTile` draws it in
 						    the well's type, laid out at the tile's own size rather than scaled
 						    down from the well's.
+						    ⚠ UIR-9 — AND THE TILE IS THE WELL's CARD: the post's fill, the
+						    poster type, the marks in line.
 						    ⚠ UIR-7 item 2 — AND IT RESERVES NOTHING NOW EITHER. The frame it
 						    kept was the centre rule's, which is dropped, so a removed post has
 						    no column 1 and its content starts at the card's left padding.
@@ -286,7 +283,7 @@ export function PostFocusHeader({
 								/>
 							</div>
 						) : (
-							<QuoteTile title={post.title} />
+							<QuoteTile id={post.id} title={post.title} />
 						)}
 
 						{/* `.hstack` (`d5:462`, `flex:1 1 auto;min-width:0;flex-direction:
@@ -421,14 +418,15 @@ export function PostFocusHeader({
 	);
 }
 
-/** UIR-8 — the marks' size in the text-only tile, as a font size. */
-const TILE_MARK_PX = 20;
-
 /** UIR-8 — the tile's height: the row's `h-[99.25px]`. The two move together. */
 const TILE_H_PX = 99.25;
 
-/** UIR-8 — the space between each mark's ink and the title's band. */
-const TILE_GAP_PX = 4;
+/**
+ * UIR-9 — the tile's inset on every side, its 1px border included (as the
+ * well's `pad` includes its own): the well's 24-of-272 at the tile's height is
+ * 8.76px, taken as 8.
+ */
+const TILE_INSET_PX = 8;
 
 /** UIR-8 — the title's size range in the tile, in px. */
 const TILE_TITLE_PX = { min: 9, max: 20 } as const;
@@ -441,25 +439,30 @@ const TILE_NARROW_MAX_CHARS = 40;
  * UIR-8 — how many lines `title` takes in a `width`-px line at `size` px, or
  * `Infinity` when a word is wider than the line: the browser's own line-break
  * rule — whole words, filled greedily, broken at spaces — run on estimated
- * widths. Every character, the joining space included, is taken at the advance
- * `size.ts` records as the well's safe bound (`GEIST_UPPER_ADV / WRAP_SLACK`,
- * 0.7076 em). `text-wrap: balance` evens the lines out without adding one.
+ * widths. Every character, the joining space included, is taken at the poster
+ * type's safe bound (UIR-9: `GEIST_POSTER_ADV / WRAP_SLACK`, 0.7294 em).
+ * `text-wrap: balance` evens the lines out without adding one.
+ * ⚠ UIR-9 — each mark counts as a character of the word it sits against: the
+ * two share a `nowrap` span (`QuotedTitle`), so they break as one word.
  */
 function tileLines(title: string, width: number, size: number): number {
-	const perLine = width / ((GEIST_UPPER_ADV / WRAP_SLACK) * size);
+	const perLine = width / ((GEIST_POSTER_ADV / WRAP_SLACK) * size);
+	const words = title.trim().split(/\s+/);
 	let lines = 1;
 	let used = 0;
-	for (const word of title.trim().split(/\s+/)) {
-		if (word.length > perLine) {
+	for (const [i, word] of words.entries()) {
+		const len =
+			word.length + (i === 0 ? 1 : 0) + (i === words.length - 1 ? 1 : 0);
+		if (len > perLine) {
 			return Number.POSITIVE_INFINITY;
 		}
 		if (used === 0) {
-			used = word.length;
-		} else if (used + 1 + word.length <= perLine) {
-			used += 1 + word.length;
+			used = len;
+		} else if (used + 1 + len <= perLine) {
+			used += 1 + len;
 		} else {
 			lines += 1;
-			used = word.length;
+			used = len;
 		}
 	}
 	return lines;
@@ -470,107 +473,88 @@ function tileLines(title: string, width: number, size: number): number {
  * it. A pure function of the title and the tile's box, so nothing is measured
  * in script — the title row's `titleSize` rule, for a title that wraps.
  *
- * The title's band is the tile's height less both marks' ink and a 4px gap
- * under and over them. The size is the largest whole px in [9, 20] at which
- * the title's lines (`tileLines`) fit that band. ⚠ IT COUNTS WORDS, NOT ONLY
- * CHARACTERS, because a 100px line holds a word or two: measured on the 1,563
- * titles staging carried on 2026-09-29, a length-only estimate (the well's own,
- * `quoteTitleSize`) under-counted the lines of 6 of the 51 real titles and 547
- * of the 1,512 load-test ones — each would have been clipped at a size where a
- * smaller one fits — while this one under-counted none, and came within 3px
- * of the largest size that fits. `lines` is the band's whole lines at the
- * chosen size: a title that still overruns the band at 9px shows only full
- * lines and clips after the last.
+ * The title's box is the tile less its inset on every side (UIR-9; under UIR-8
+ * it was the band between the corner marks). The size is the largest whole px
+ * in [9, 20] at which the title's lines (`tileLines`) fit that box. ⚠ IT COUNTS
+ * WORDS, NOT ONLY CHARACTERS, because a 100px line holds a word or two:
+ * measured on the 1,563 titles staging carried on 2026-09-29, a length-only
+ * estimate (the well's own, `quoteTitleSize`) under-counted the lines of 6 of
+ * the 51 real titles and 547 of the 1,512 load-test ones — each would have been
+ * clipped at a size where a smaller one fits — while this one under-counted
+ * none, and came within 3px of the largest size that fits. (That is UIR-8's
+ * type measured; the poster type's figures are not re-measured.) `lines` is
+ * the box's whole lines at the chosen size: a title that still overruns the box
+ * at 9px shows only full lines and clips after the last.
  */
 function tileTitleFit(
 	title: string,
 	width: number,
 ): { size: number; lines: number } {
-	const band = TILE_H_PX - 2 * GEIST_QUOTE_INK * TILE_MARK_PX - 2 * TILE_GAP_PX;
+	const inner = width - 2 * TILE_INSET_PX;
+	const band = TILE_H_PX - 2 * TILE_INSET_PX;
 	let size: number = TILE_TITLE_PX.min;
 	for (let s = TILE_TITLE_PX.max; s > TILE_TITLE_PX.min; s--) {
-		if (tileLines(title, width, s) * QUOTE_TYPE.lineHeight * s <= band) {
+		if (tileLines(title, inner, s) * QUOTE_POSTER.lineHeight * s <= band) {
 			size = s;
 			break;
 		}
 	}
 	return {
 		size,
-		lines: Math.floor(band / (QUOTE_TYPE.lineHeight * size)),
+		lines: Math.floor(band / (QUOTE_POSTER.lineHeight * size)),
 	};
 }
 
 /**
- * UIR-8 — A TEXT-ONLY POST's PICTURE: ITS TITLE BETWEEN THE QUOTE-1 WELL's
- * MARKS, the feed's text-as-image laid out at the tile's own size. It replaces
- * UIR-7 item 3's marks-only tile, and it is not UIR-5 item 5's scaled-down
- * well: the title is set for this box, so its type is as large as the box
- * allows rather than the well's size shrunk with the whole picture.
+ * UIR-8 — A TEXT-ONLY POST's PICTURE, the feed's text-as-image laid out at the
+ * tile's own size. It replaces UIR-7 item 3's marks-only tile, and it is not
+ * UIR-5 item 5's scaled-down well: the title is set for this box, so its type
+ * is as large as the box allows rather than the well's size shrunk with the
+ * whole picture.
+ *
+ * ⛔ UIR-9 — THE WELL's CARD, AT THE TILE's SIZE. The post's own fill
+ * (`quoteFill` — the pick its well makes on the market page and in Discovery),
+ * a 1px `rgb(255 255 255 / 0.07)` border (`border-white/7`), the 6px `--imgr`
+ * radius, and the poster type — Geist 800, uppercase, −0.01em tracking, 1.05
+ * leading, in ink — with `“` and `”` in line against the first and last words
+ * at the title's size, in the fill's tint (`QuotedTitle`). It replaces UIR-8's
+ * bare tile, whose marks stood at a fixed 20px in its corners with the title in
+ * the band between them.
  *
  * The tile is as tall as the row and 100px wide for a title up to 40
- * characters, 200px for a longer one, with no border and no ground. The type
- * is the well's: Geist bold, uppercase, 0.02em tracking and 1.15 leading, the
- * title in `text-ink` and the marks — `“` and `”` in `text-n4`, here at 20px —
- * in the top-left and bottom-right corners. The title is centred between
- * them, balanced over its lines, at `tileTitleFit`'s size, and a title that
- * still overruns the band at 9px is clipped after its last full line.
- * ⚠ EACH MARK's BOX IS ITS INK, as in `QuoteWell` and off the same measured
- * constants: a mark's `line-height: 1` box is an em tall for 0.311 em of ink,
- * and the two marks sit at different heights in it. The margins make each box
- * exactly its ink, so `top-0` and `bottom-0` put the ink on the tile's edges
- * and the title's band can start and end a fixed gap from it.
+ * characters, 200px for a longer one. The title is centred and balanced inside
+ * the 8px inset at `tileTitleFit`'s size, and a title that still overruns at
+ * 9px is clipped after its last full line.
  * ⚠ HIDDEN FROM ASSISTIVE TECHNOLOGY: the title row beside it is the heading
  * and says the same thing.
  * ⛔ A removed post never renders it — its variant has no title at the type
  * level, and the tile would publish the masked argument's title.
  */
-function QuoteTile({ title }: { title: string }) {
+function QuoteTile({ id, title }: { id: string; title: string }) {
 	const width = title.length <= TILE_NARROW_MAX_CHARS ? 100 : 200;
 	const { size, lines } = tileTitleFit(title, width);
-	const ink = GEIST_QUOTE_INK * TILE_MARK_PX;
-	const markStyle = (top: number) => ({
-		fontSize: `${TILE_MARK_PX}px`,
-		lineHeight: 1,
-		marginTop: `${-top * TILE_MARK_PX}px`,
-		marginBottom: `${-(TILE_MARK_PX - ink - top * TILE_MARK_PX)}px`,
-	});
+	const { fill, mark } = quoteFill(id);
 	return (
 		<div
 			data-testid="post-focus-media"
 			aria-hidden="true"
-			className="relative shrink-0"
-			style={{ width: `${width}px` }}
+			className="flex shrink-0 flex-col justify-center overflow-hidden rounded-[var(--imgr)] border border-white/7"
+			style={{
+				width: `${width}px`,
+				padding: `${TILE_INSET_PX - 1}px`,
+				backgroundColor: fill,
+			}}
 		>
 			<span
-				className="absolute top-0 left-0 block font-sans font-bold text-n4"
-				style={markStyle(GEIST_QUOTE_TOP)}
-			>
-				{"“"}
-			</span>
-			<div
-				className="absolute inset-x-0 flex flex-col justify-center"
+				className="block overflow-hidden text-center font-sans font-extrabold text-ink uppercase [overflow-wrap:anywhere] [text-wrap:balance]"
 				style={{
-					top: `${ink + TILE_GAP_PX}px`,
-					bottom: `${ink + TILE_GAP_PX}px`,
+					fontSize: `${size}px`,
+					lineHeight: QUOTE_POSTER.lineHeight,
+					letterSpacing: `${QUOTE_POSTER.tracking}em`,
+					maxHeight: `${lines}lh`,
 				}}
 			>
-				<span
-					className="block overflow-hidden text-center font-sans font-bold text-ink uppercase [overflow-wrap:anywhere] [text-wrap:balance]"
-					style={{
-						fontSize: `${size}px`,
-						lineHeight: QUOTE_TYPE.lineHeight,
-						letterSpacing: `${QUOTE_TYPE.tracking}em`,
-						maxHeight: `${lines}lh`,
-					}}
-				>
-					{title}
-				</span>
-			</div>
-			<span
-				className="absolute right-0 bottom-0 block font-sans font-bold text-n4"
-				style={markStyle(GEIST_QUOTE_TOP_CLOSE)}
-			>
-				{"”"}
+				<QuotedTitle title={title} mark={mark} />
 			</span>
 		</div>
 	);

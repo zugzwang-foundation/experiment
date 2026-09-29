@@ -66,6 +66,13 @@ export const QUOTE_CANVAS = { w: 545, h: 272, pad: 24 } as const;
 export const QUOTE_CONTENT_W = QUOTE_CANVAS.w - 2 * QUOTE_CANVAS.pad;
 export const QUOTE_CONTENT_H = QUOTE_CANVAS.h - 2 * QUOTE_CANVAS.pad;
 
+/**
+ * ⚠ UIR-9 — THE EXPORT'S RAMP NOW, NOT THE PAGE'S. The exported image
+ * (`debate-export/image/MarketPostExport.tsx`) still draws QUOTE-1's column —
+ * a mark row, the title, a mark row — and imports this, `quoteMarkSize`,
+ * `quoteTitleSize` and the mark constants to do it. The page's well sets the
+ * poster type instead (`QUOTE_POSTER` and `quotePosterSize`, at the end).
+ */
 export const QUOTE_TYPE = {
 	min: 24,
 	max: 56,
@@ -173,4 +180,48 @@ export function quoteMaxLines(size: number): number {
 			2 * QUOTE_TYPE.gap) /
 			(QUOTE_TYPE.lineHeight * size),
 	);
+}
+
+/**
+ * UIR-9 — THE POSTER TYPE the page's well sets its title in: Geist 800,
+ * uppercase, −0.01em tracking, 1.05 leading, with `“` and `”` in line against
+ * the first and last words at the title's own size.
+ *
+ * ⚠⚠ A SECOND RAMP BESIDE `QUOTE_TYPE` RATHER THAN AN EDIT OF IT. The exported
+ * image imports `quoteTitleSize` and still stacks a mark row above and below
+ * the title, so moving that function would change the export — and, with the
+ * marks gone from its budget while its column kept them, overflow it. The
+ * export is not this change's to touch; the page's well reads these.
+ */
+export const QUOTE_POSTER = {
+	min: 24,
+	max: 60,
+	lineHeight: 1.05,
+	tracking: -0.01,
+} as const;
+
+/**
+ * Mean uppercase advance per character, in em, at weight 800: the measured
+ * weight-700 figure above (`GEIST_UPPER_ADV`, 0.6015) × 1.03, rounded to
+ * 0.62. ⚠ A DERIVED FIGURE, NOT A MEASUREMENT of the 800 face, so it carries
+ * the same caveat the header gives the measured ones — only more so.
+ */
+export const GEIST_POSTER_ADV = 0.62;
+
+/**
+ * The largest integer size in [24, 60] px whose estimated wrapped height fits
+ * the 224 px content height — `quoteTitleSize`'s estimate at the poster
+ * advance and leading, with `WRAP_SLACK` unchanged and NO MARKS TERM: the marks
+ * ride the first and last lines, so the title's lines are the whole column.
+ * `len` counts UTF-16 units, as `quoteTitleSize`'s does.
+ */
+export function quotePosterSize(len: number): number {
+	for (let s = QUOTE_POSTER.max; s >= QUOTE_POSTER.min; s--) {
+		const cpl =
+			Math.floor(QUOTE_CONTENT_W / (GEIST_POSTER_ADV * s)) * WRAP_SLACK;
+		if (Math.ceil(len / cpl) * QUOTE_POSTER.lineHeight * s <= QUOTE_CONTENT_H) {
+			return s;
+		}
+	}
+	return QUOTE_POSTER.min;
 }

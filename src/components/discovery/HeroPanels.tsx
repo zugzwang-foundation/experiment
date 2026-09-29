@@ -5,6 +5,7 @@ import { SideBadge } from "@/components/debate/badges";
 import { computeSplitBar } from "@/components/debate/composer/split-bar";
 import { formatDharma, formatDharmaCompact } from "@/components/debate/format";
 import { PriceBar } from "@/components/debate/PriceBar";
+import { quoteFill } from "@/components/debate/quote-well/palette";
 import { QuoteWell } from "@/components/debate/quote-well/QuoteWell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FieldSeparator } from "@/components/ui/field-separator";
@@ -416,8 +417,11 @@ function HeroPostPanel({
 				// line goes, so the title is shown once. The well takes the title
 				// line's place INSIDE this link and the slot's `flex-1` with it, so
 				// it fills the space the line and the slot shared, and its box is the
-				// placeholder's: `bg-n1`, the hairline, `--imgr`. Unboxed, the
-				// quotation scales to fit that box.
+				// placeholder's shape, `--imgr`. Unboxed, the quotation scales to fit
+				// that box. ⚠ UIR-9 — the box is the card now: the post's own fill
+				// (`quoteFill`, the pick the market page makes for the same post) in
+				// place of `bg-n1`, and a 1px `rgb(255 255 255 / 0.07)` border
+				// (`border-white/7`) in place of the hairline.
 				// ⚠ The link names itself from the title: an accessible name is not
 				// computed through the well's `<svg>`/`foreignObject` (the reason
 				// `PostCard` labels its well's button the same way). Posts with an
@@ -433,9 +437,10 @@ function HeroPostPanel({
 					<div className="relative flex-1">
 						<div
 							data-testid={`hero-post-quote-${side}`}
-							className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-[var(--imgr)] bg-n1 [border:var(--hairline)]"
+							className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-[var(--imgr)] border border-white/7"
+							style={{ backgroundColor: quoteFill(post.id).fill }}
 						>
-							<QuoteWell title={post.title} boxed={false} />
+							<QuoteWell title={post.title} postId={post.id} boxed={false} />
 						</div>
 					</div>
 				) : (
