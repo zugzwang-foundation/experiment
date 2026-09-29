@@ -6,13 +6,7 @@ import { GLOSSARY } from "@/lib/copy/glossary";
 import { cn } from "@/lib/utils";
 
 import type { Side } from "../types";
-import {
-	BET_TONE,
-	BET_TONE_TEXT,
-	HEADER_CONTROL,
-	HEADER_WORD,
-	ToWinLine,
-} from "./column-header";
+import { HEADER_CONTROL, HEADER_WORD, ToWinLine } from "./column-header";
 import { c3OppositeSide, OWN_POST_COPY } from "./copy";
 import { deriveReplySide, isEntryDisabled } from "./gating";
 
@@ -84,12 +78,7 @@ export function TriggerPill({
 					`${relation === "support" ? "Support" : "Counter"} — bet ${resultingSide}`
 				}
 				onClick={() => onToggle(relation)}
-				className={cn(
-					buttonVariants({ variant: "outline" }),
-					HEADER_CONTROL,
-					BET_TONE_TEXT,
-					BET_TONE[resultingSide],
-				)}
+				className={cn(buttonVariants({ variant: "outline" }), HEADER_CONTROL)}
 			>
 				<span className={HEADER_WORD}>
 					{relation === "support" ? "Support" : "Counter"}

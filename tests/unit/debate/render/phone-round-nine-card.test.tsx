@@ -483,10 +483,10 @@ describe("MOBILE-2o · A11 D-1 / D-3 — the black side gets an edge; the refuse
 		// so both poles are exercised. The desktop token stays beside the phone one:
 		// ADR-0045's first rule, at the one site this round touches.
 		for (const [held, side, rel, pole] of [
-			["YES", "YES", "counter", "bg-bet-no-soft"],
-			["YES", "NO", "support", "bg-bet-no-soft"],
-			["NO", "YES", "support", "bg-bet-yes-soft"],
-			["NO", "NO", "counter", "bg-bet-yes-soft"],
+			["YES", "YES", "counter", "bg-no"],
+			["YES", "NO", "support", "bg-no"],
+			["NO", "YES", "support", "bg-yes"],
+			["NO", "NO", "counter", "bg-yes"],
 		] as const) {
 			const root = renderCard({
 				unboxed: true,

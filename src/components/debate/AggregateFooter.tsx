@@ -4,8 +4,6 @@ import { GLOSSARY } from "@/lib/copy/glossary";
 import { cn } from "@/lib/utils";
 
 import {
-	BET_TONE,
-	BET_TONE_TEXT,
 	HEADER_CONTROL,
 	HEADER_DETAIL,
 	HEADER_WORD,
@@ -642,8 +640,8 @@ function TriggerPill({
 	// D-1 names the black side only.
 	const pole =
 		resultingSide === "YES"
-			? "bg-bet-yes-soft text-bet-yes border-[0.5px] border-n2 max-mobile:[border:var(--hairline)] shadow-xs hover:bg-bet-yes hover:text-white cursor-pointer active:scale-95"
-			: "bg-bet-no-soft text-bet-no border border-white/25 shadow-xs hover:bg-bet-no hover:border-white/60 hover:text-white cursor-pointer active:scale-95";
+			? "bg-yes text-no border-[0.5px] border-n2 max-mobile:[border:var(--hairline)] shadow-xs hover:bg-neutral-200 hover:text-black cursor-pointer active:scale-95"
+			: "bg-no text-yes border border-white/25 shadow-xs hover:bg-neutral-800 hover:border-white/60 hover:text-white cursor-pointer active:scale-95";
 	// C3 precedence (INFO-1 §3.4): a viewer blocked by the single-side rule is
 	// told why they are blocked, not given the relation's definition. The
 	// glossary gloss fills the null branch only — c3 still wins outright.
@@ -677,12 +675,14 @@ function TriggerPill({
 						buttonVariants({ variant: "outline" }),
 						HEADER_CONTROL,
 						"@max-[380px]/colbody:w-[90px] @max-[380px]/colbody:px-1.5 max-[860px]:max-w-full",
-						// Enabled takes the Bet button's tone for the side the reply lands on:
-						// green for a YES bet, red for NO — soft at rest, solid on hover.
+						// Enabled keeps the pole it had, at rest, hovered and pressed:
+						// #181818 with #fafafa text for a YES bet, the reverse for NO.
 						// Disabled drops it for the Bet button's disabled look — the
 						// outline fill and hairline, 0.5 opacity, no ledge.
-						!disabled && BET_TONE_TEXT,
-						!disabled && BET_TONE[resultingSide],
+						!disabled &&
+							(resultingSide === "YES"
+								? "bg-yes text-no hover:bg-yes active:bg-yes"
+								: "bg-no text-yes hover:bg-no active:bg-no"),
 						className,
 					)}
 				>
@@ -697,7 +697,15 @@ function TriggerPill({
 					<span className={cn(HEADER_WORD, "text-[11px] leading-[1.2]")}>
 						{word}
 					</span>
-					<span className={HEADER_DETAIL}>Đ {amount}</span>
+					<span
+						className={cn(
+							HEADER_DETAIL,
+							// #545454 on the #fafafa button; gold elsewhere.
+							!disabled && resultingSide === "NO" && "text-n3",
+						)}
+					>
+						Đ {amount}
+					</span>
 				</button>
 			</InfoTip>
 		);

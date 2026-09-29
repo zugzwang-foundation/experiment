@@ -72,15 +72,6 @@ export type PhoneBarAction = {
 	glyph: boolean;
 };
 
-/** The outlined Support / Counter actions, keyed by the side the reply bet
- * lands on — a soft tint with coloured text at rest, the solid colour with
- * white text on hover / press. A lookup rather than a side ternary so it cannot
- * pick up a neutral `text-ink`. The filled `Bet` entry keeps its own look. */
-const REPLY_TONE: Record<Side, string> = {
-	YES: "bg-bet-yes-soft text-bet-yes hover:bg-bet-yes active:bg-bet-yes",
-	NO: "bg-bet-no-soft text-bet-no hover:bg-bet-no active:bg-bet-no",
-};
-
 export function PhoneBottomBar({
 	market,
 	actions,
@@ -190,7 +181,7 @@ export function PhoneBottomBar({
 							className={`flex h-[46px] flex-1 items-center justify-center gap-[7px] rounded-(--r) text-sm font-extrabold tracking-[0.06em] uppercase transition-all disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) ${
 								action.filled
 									? "bg-ink text-ground"
-									: `${REPLY_TONE[action.side]} hover:text-ink active:text-ink [border:var(--hairline)]`
+									: "text-ink [border:var(--hairline)]"
 							}`}
 						>
 							<span>{action.label}</span>

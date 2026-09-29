@@ -281,8 +281,8 @@ describe("HTML-FINISH · MARKET DETAIL — row 22, the card trigger pills", () =
 		const counter = container.querySelector(
 			'[data-testid="card-trigger-counter"]',
 		);
-		expect(support?.getAttribute("class")).toContain("bg-bet-yes-soft");
-		expect(counter?.getAttribute("class")).toContain("bg-bet-no-soft");
+		expect(support?.getAttribute("class")).toContain("bg-yes");
+		expect(counter?.getAttribute("class")).toContain("bg-no");
 		// The accessible name names the RESULTING BET SIDE, never the relation
 		// alone — AGENTS.md §8: the poles name the SIDE, never Support/Counter.
 		expect(support?.getAttribute("aria-label")).toBe("Support — bet YES");
@@ -306,8 +306,8 @@ describe("HTML-FINISH · MARKET DETAIL — row 22, the card trigger pills", () =
 		const counter = container.querySelector(
 			'[data-testid="card-trigger-counter"]',
 		);
-		expect(support?.getAttribute("class")).toContain("bg-bet-no-soft");
-		expect(counter?.getAttribute("class")).toContain("bg-bet-yes-soft");
+		expect(support?.getAttribute("class")).toContain("bg-no");
+		expect(counter?.getAttribute("class")).toContain("bg-yes");
 		expect(support?.getAttribute("aria-label")).toBe("Support — bet NO");
 		expect(counter?.getAttribute("aria-label")).toBe("Counter — bet YES");
 	});
