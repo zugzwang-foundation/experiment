@@ -163,7 +163,7 @@ export function SideBadge({
 					// poles (values-log v0_3 §3) — without it the black YES fill is
 					// invisible on the n0 card. Carried inside each preset above.
 					CHIP[size ?? "base"],
-					side === "YES" ? "bg-yes text-no" : "bg-no text-yes",
+					side === "YES" ? "bg-bar-yes text-no" : "bg-bar-no text-yes",
 				)}
 			>
 				{pct === null ? side : `${side} @ ${pct}`}

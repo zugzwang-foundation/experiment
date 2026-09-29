@@ -62,7 +62,7 @@ export function StatLine({
 			{/* V26 — the emphasis tier is n6/650. Inheriting `text-muted-foreground`
 			    (n5) and the UA's default 700 made the emphasised value DIMMER than
 			    the label it emphasises. */}
-			<b className="font-[650] text-n6">
+			<b className="font-[650] text-gold">
 				<InfoTip content={GLOSSARY.dharma} asChild>
 					<span>Đ</span>
 				</InfoTip>{" "}
@@ -82,10 +82,10 @@ export function StatLine({
 			    happened to be inherited, so the separator's value drifted with its
 			    parent instead of naming a slot. */}
 			<span className={`${s.sep} text-n3`}>|</span>
-			<b className="font-[650] text-n6">{totals.postCount}</b>{" "}
+			<b className="font-[650] text-gold">{totals.postCount}</b>{" "}
 			{noun(totals.postCount, "post", "posts")}
 			<span className={`${s.sep} text-n3`}>|</span>
-			<b className="font-[650] text-n6">{totals.replyCount}</b>{" "}
+			<b className="font-[650] text-gold">{totals.replyCount}</b>{" "}
 			{noun(totals.replyCount, "reply", "replies")}
 		</p>
 	);

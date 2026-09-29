@@ -296,7 +296,7 @@ export function SellModule(props: {
 					<span>You receive</span>
 					<span
 						aria-live="polite"
-						className="font-mono text-xs tracking-normal text-ink normal-case"
+						className="font-mono text-xs tracking-normal text-gold normal-case"
 					>
 						{receive !== null ? `Đ ${receive}` : "—"}
 					</span>

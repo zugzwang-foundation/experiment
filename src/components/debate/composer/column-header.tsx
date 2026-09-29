@@ -99,6 +99,22 @@ export const HEADER_CONTROL =
  * leading is stated because the size is arbitrary (AGENTS.md §8): 1.2 is the CSS
  * `normal` a mockup that leaves it unset is drawn at, and 12 × 1.2 = 14.4px.
  */
+/**
+ * The colour of the Support / Counter triggers, keyed by the side the reply
+ * bet LANDS on (its resulting side, never its relation). `Bet YES` / `Bet NO`
+ * keep the plain header-control look. A soft tint with coloured text at
+ * rest; the solid colour on hover, press and while its composer is open.
+ */
+export const BET_TONE: Record<Side, string> = {
+	YES: "bg-bet-yes-soft text-bet-yes hover:bg-bet-yes active:bg-bet-yes aria-expanded:bg-bet-yes",
+	NO: "bg-bet-no-soft text-bet-no hover:bg-bet-no active:bg-bet-no aria-expanded:bg-bet-no",
+};
+
+/** Goes with `BET_TONE`: white text on the solid fill. Only the word line
+ * follows the control; the Đ line under it keeps `HEADER_DETAIL`'s gold. */
+export const BET_TONE_TEXT =
+	"hover:text-ink active:text-ink aria-expanded:text-ink [&>span:first-child]:text-inherit";
+
 export const HEADER_WORD =
 	"text-[12px] leading-[1.2] font-semibold tracking-[0.06em] uppercase";
 
@@ -109,7 +125,7 @@ export const HEADER_WORD =
  * restates its size, weight and colour but not its family.
  */
 export const HEADER_DETAIL =
-	"font-mono text-[10px] leading-[1.2] font-normal tracking-normal normal-case text-muted-foreground";
+	"font-mono text-[10px] leading-[1.2] font-normal tracking-normal normal-case text-gold";
 
 /**
  * `Đ 1 → Đ 8.77` — today's to-win figure without its `TO WIN` label and without

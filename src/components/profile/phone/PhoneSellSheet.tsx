@@ -194,7 +194,10 @@ export function PhoneSellSheet(props: {
 						data-testid={`phone-sell-ceiling-${props.tileKey}`}
 						className="text-[12px] leading-[1.2] text-n5 tabular-nums"
 					>
-						of Đ {formatDharma(props.seedDisplay)}
+						of{" "}
+						<span className="text-gold">
+							Đ {formatDharma(props.seedDisplay)}
+						</span>
 					</span>
 				</div>
 				{/* ⛔⛔ THERE IS NO CANCEL BUTTON HERE, AND ITS ABSENCE IS A CORRECTION

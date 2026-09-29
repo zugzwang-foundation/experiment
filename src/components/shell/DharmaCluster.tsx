@@ -125,7 +125,7 @@ export function DharmaCluster({
 							Portfolio
 						</span>
 					</InfoTip>
-					<span className="text-[13px] font-bold text-ink tabular-nums">
+					<span className="text-[13px] font-bold text-gold tabular-nums">
 						Đ {formatDharma(portfolio)}
 					</span>
 				</span>
@@ -136,7 +136,7 @@ export function DharmaCluster({
 						Balance
 					</span>
 				</InfoTip>
-				<span className="text-[13px] font-bold text-ink tabular-nums">
+				<span className="text-[13px] font-bold text-gold tabular-nums">
 					Đ {formatDharma(spendable)}
 				</span>
 			</span>

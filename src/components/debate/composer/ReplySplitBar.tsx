@@ -114,7 +114,7 @@ export function ReplySplitBar({
 				size="Counter"
 			/>
 			<EndCell
-				className="col-start-1 row-start-2 self-baseline font-mono text-n5"
+				className="col-start-1 row-start-2 self-baseline font-mono text-gold"
 				show={<>Đ {support}</>}
 				size={<>Đ {counter}</>}
 			/>
@@ -220,11 +220,11 @@ export function ReplySplitBar({
 			    height. */}
 			<span className="col-start-2 row-start-1 flex">
 				<span
-					className={`h-[18px] w-full overflow-hidden rounded-[var(--r)] [border:var(--hairline)] ${postSide === "YES" ? "bg-no" : "bg-yes"}`}
+					className={`h-[18px] w-full overflow-hidden rounded-[var(--r)] [border:var(--hairline)] ${postSide === "YES" ? "bg-bar-no" : "bg-bar-yes"}`}
 					aria-hidden="true"
 				>
 					<span
-						className={`block h-full transition-[width] duration-300 ${postSide === "YES" ? "bg-yes" : "bg-no"}`}
+						className={`block h-full transition-[width] duration-300 ${postSide === "YES" ? "bg-bar-yes" : "bg-bar-no"}`}
 						style={{ width: supportPct }}
 					/>
 				</span>
@@ -234,7 +234,7 @@ export function ReplySplitBar({
 			    wrap: a second line here would be height the fixed top section does
 			    not have. */}
 			<span className="col-start-2 row-start-2 self-baseline text-center whitespace-nowrap text-n5">
-				<b className="text-xs text-ink font-mono">
+				<b className="text-xs text-gold font-mono">
 					Đ {formatDharma(displayedTotal)}
 				</b>{" "}
 				{/* `.sb2.mid` (`d5:620`) — the figure stays cased; the WORD is the
@@ -247,7 +247,7 @@ export function ReplySplitBar({
 				size="Support"
 			/>
 			<EndCell
-				className="col-start-3 row-start-2 self-baseline font-mono text-n5"
+				className="col-start-3 row-start-2 self-baseline font-mono text-gold"
 				show={<>Đ {counter}</>}
 				size={<>Đ {support}</>}
 			/>

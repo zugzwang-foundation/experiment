@@ -137,7 +137,7 @@ describe("POLISH.3 PR 2 — T3, the market-view split bar's visual half", () => 
 		// Assertion 1 of 4. Support on a YES post resolves to YES.
 		const footer = renderFooter("YES");
 
-		expect(classOf(footer, "aggregate-split-fill")).toContain("bg-yes");
+		expect(classOf(footer, "aggregate-split-fill")).toContain("bg-bar-yes");
 	});
 
 	it("aggregate-footer::on-a-YES-post-the-track-takes-the-NO-pole", () => {
@@ -145,7 +145,7 @@ describe("POLISH.3 PR 2 — T3, the market-view split bar's visual half", () => 
 		// side — so it carries the opposite pole.
 		const footer = renderFooter("YES");
 
-		expect(classOf(footer, "aggregate-split-track")).toContain("bg-no");
+		expect(classOf(footer, "aggregate-split-track")).toContain("bg-bar-no");
 	});
 
 	it("aggregate-footer::on-a-NO-post-the-support-fill-takes-the-NO-pole", () => {
@@ -155,14 +155,14 @@ describe("POLISH.3 PR 2 — T3, the market-view split bar's visual half", () => 
 		// pole on every NO post and passes assertions 1 and 2 regardless.
 		const footer = renderFooter("NO");
 
-		expect(classOf(footer, "aggregate-split-fill")).toContain("bg-no");
+		expect(classOf(footer, "aggregate-split-fill")).toContain("bg-bar-no");
 	});
 
 	it("aggregate-footer::on-a-NO-post-the-track-takes-the-YES-pole", () => {
 		// Assertion 4 of 4, the mirror.
 		const footer = renderFooter("NO");
 
-		expect(classOf(footer, "aggregate-split-track")).toContain("bg-yes");
+		expect(classOf(footer, "aggregate-split-track")).toContain("bg-bar-yes");
 	});
 
 	it("aggregate-footer::the-track-keeps-a-visible-edge-on-BOTH-poles", () => {
@@ -281,8 +281,8 @@ describe("HTML-FINISH · MARKET DETAIL — row 22, the card trigger pills", () =
 		const counter = container.querySelector(
 			'[data-testid="card-trigger-counter"]',
 		);
-		expect(support?.getAttribute("class")).toContain("bg-yes");
-		expect(counter?.getAttribute("class")).toContain("bg-no");
+		expect(support?.getAttribute("class")).toContain("bg-bet-yes-soft");
+		expect(counter?.getAttribute("class")).toContain("bg-bet-no-soft");
 		// The accessible name names the RESULTING BET SIDE, never the relation
 		// alone — AGENTS.md §8: the poles name the SIDE, never Support/Counter.
 		expect(support?.getAttribute("aria-label")).toBe("Support — bet YES");
@@ -306,8 +306,8 @@ describe("HTML-FINISH · MARKET DETAIL — row 22, the card trigger pills", () =
 		const counter = container.querySelector(
 			'[data-testid="card-trigger-counter"]',
 		);
-		expect(support?.getAttribute("class")).toContain("bg-no");
-		expect(counter?.getAttribute("class")).toContain("bg-yes");
+		expect(support?.getAttribute("class")).toContain("bg-bet-no-soft");
+		expect(counter?.getAttribute("class")).toContain("bg-bet-yes-soft");
 		expect(support?.getAttribute("aria-label")).toBe("Support — bet NO");
 		expect(counter?.getAttribute("aria-label")).toBe("Counter — bet YES");
 	});

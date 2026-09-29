@@ -150,6 +150,20 @@
 	 * (R-1): the binding is untouched by the BRIDGE re-value. */
 	--color-yes: #181818;
 	--color-no: #fafafa;
+	/* Green YES / red NO for the price bar, the Support/Counter split bar and
+	 * the side chip. Scoped names: the SIDE poles above are unchanged, so
+	 * nothing else recolours. Outside the census (the regex needs
+	 * `--color-yes`/`--color-no` exactly). */
+	--color-bar-yes: #6aa84f;
+	--color-bar-no: #e06666;
+	/* Support / Counter controls — a soft tint at rest, the solid colour on
+	 * hover / press / open (sampled from the Up / Down reference). */
+	--color-bet-yes: #007e26;
+	--color-bet-yes-soft: #d9f0e2;
+	--color-bet-no: #df0c10;
+	--color-bet-no-soft: #fce9e9;
+	/* Every displayed Đ figure, the headline counts, and the GitHub star. */
+	--color-gold: #d4af37;
 	/* Geist ratified FINAL (values-log item 2 / WI-13) */
 	--font-sans: var(--font-geist-sans);
 	--font-mono: var(--font-geist-mono);
@@ -238,10 +252,10 @@
 	 * ink-emphasis treatment is retired */
 	--border-strong: var(--color-n2);
 	--overlay: rgb(10 10 10 / 0.6);
-	/* Graph series — the two-line debate graph; YES is a deliberately off-ramp
-	 * grey (the black pole cannot render on the dark ground). */
-	--graph-yes: #737373;
-	--graph-no: #fafafa;
+	/* Graph series — the two-line debate graph, in the price bar's green YES /
+	 * red NO. `palette.ts` mirrors these values. */
+	--graph-yes: #6aa84f;
+	--graph-no: #e06666;
 	/* Interaction states */
 	--state-hover-fill: var(--color-n1);
 	--state-pressed-fill: #333333; /* minted mid-step n1→n2 */

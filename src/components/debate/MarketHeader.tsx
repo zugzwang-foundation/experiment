@@ -227,22 +227,24 @@ export function MarketHeader({
 								asChild
 							>
 								<span className="cursor-help text-ink font-semibold">
-									Đ{" "}
-									{formatDharmaCompact(
-										market.totals.dharmaStaked,
-										COMPACT_FROM_MARKET_TOTAL,
-									)}{" "}
+									<span className="text-gold">
+										Đ{" "}
+										{formatDharmaCompact(
+											market.totals.dharmaStaked,
+											COMPACT_FROM_MARKET_TOTAL,
+										)}
+									</span>{" "}
 									staked
 								</span>
 							</InfoTip>
 							<AttrSep />
 							<span>
-								{market.totals.postCount}{" "}
+								<span className="text-gold">{market.totals.postCount}</span>{" "}
 								{noun(market.totals.postCount, "post", "posts")}
 							</span>
 							<AttrSep />
 							<span>
-								{market.totals.replyCount}{" "}
+								<span className="text-gold">{market.totals.replyCount}</span>{" "}
 								{noun(market.totals.replyCount, "reply", "replies")}
 							</span>
 						</div>
@@ -570,22 +572,26 @@ export function MarketHeader({
 										asChild
 									>
 										<span>
-											Đ{" "}
-											{formatDharmaCompact(
-												market.totals.dharmaStaked,
-												COMPACT_FROM_MARKET_TOTAL,
-											)}{" "}
+											<span className="text-gold">
+												Đ{" "}
+												{formatDharmaCompact(
+													market.totals.dharmaStaked,
+													COMPACT_FROM_MARKET_TOTAL,
+												)}
+											</span>{" "}
 											staked
 										</span>
 									</InfoTip>
 									<AttrSep />
 									<span>
-										{market.totals.postCount}{" "}
+										<span className="text-gold">{market.totals.postCount}</span>{" "}
 										{noun(market.totals.postCount, "post", "posts")}
 									</span>
 									<AttrSep />
 									<span>
-										{market.totals.replyCount}{" "}
+										<span className="text-gold">
+											{market.totals.replyCount}
+										</span>{" "}
 										{noun(market.totals.replyCount, "reply", "replies")}
 									</span>
 								</div>

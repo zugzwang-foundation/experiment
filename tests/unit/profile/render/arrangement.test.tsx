@@ -365,9 +365,9 @@ describe("HTML-FINISH profile rows 4 · 5 · 12 — the argument card", () => {
 		const bar = container.querySelector('[data-testid^="argument-split-bar-"]');
 		const total = bar?.querySelector("b");
 		expect(total?.textContent).toBe("Đ 400");
-		// And `.stkn` — canon §3 item 11's "enlarged + ink".
+		// And `.stkn` — canon §3 item 11's "enlarged", now gold like every Đ figure.
 		const classes = (total?.className ?? "").split(/\s+/);
-		expect(classes).toContain("text-ink");
+		expect(classes).toContain("text-gold");
 	});
 
 	it("row5::the-reply-variant-gets-NO-split-bar", () => {

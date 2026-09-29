@@ -48,7 +48,7 @@ describe("PriceBar — the paired price readout", () => {
 
 	it("gives the YES segment the rounded percent as its CSS width (geometry unchanged)", () => {
 		const { container } = render(<PriceBar pricing={TIE} size="detail" />);
-		const yesSegment = container.querySelector<HTMLElement>(".bg-yes");
+		const yesSegment = container.querySelector<HTMLElement>(".bg-bar-yes");
 		// Unchanged by PCT.ROUND, and now AGREEING with the labels above it: the
 		// bar was already 53/47 while the labels read 53/48.
 		expect(yesSegment?.style.width).toBe("53%");

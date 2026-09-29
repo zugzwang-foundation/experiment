@@ -499,7 +499,7 @@ function PresentHead({
 			<CompactDharmaFigure
 				value={currentStake}
 				testId={`argument-stake-${item.id}`}
-				className="text-n6 text-xs"
+				className="text-gold text-xs"
 			/>
 			{soldOut ? (
 				<InfoTip content={GLOSSARY.sold} asChild>
@@ -836,7 +836,7 @@ function SplitBar({
 				className="flex flex-col items-center gap-0.5"
 			>
 				<span className="text-n6">Support</span>
-				<span className="text-n5">
+				<span className="text-gold">
 					Đ {formatDharma(aggregate.supportDharma)}
 				</span>
 			</span>
@@ -880,7 +880,7 @@ function SplitBar({
 				{/* `.stkn` — canon §3 item 11's "split-bar staked total enlarged +
 				    ink". `<b className="text-sm text-ink">` is ReplySplitBar.tsx:76. */}
 				<span className="text-n5">
-					<b className="text-sm text-ink">Đ {formatDharma(displayedTotal)}</b>{" "}
+					<b className="text-sm text-gold">Đ {formatDharma(displayedTotal)}</b>{" "}
 					staked
 				</span>
 			</span>
@@ -889,7 +889,7 @@ function SplitBar({
 				className="flex flex-col items-center gap-0.5"
 			>
 				<span className="text-n6">Counter</span>
-				<span className="text-n5">
+				<span className="text-gold">
 					Đ {formatDharma(aggregate.counterDharma)}
 				</span>
 			</span>

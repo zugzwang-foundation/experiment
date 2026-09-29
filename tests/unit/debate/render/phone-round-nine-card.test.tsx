@@ -401,7 +401,7 @@ describe("MOBILE-2o · A11 D-2 — the channel is the ZERO state; the remainder 
 			// by a fill that lost every class it has. `tokensOf` throws on a missing
 			// element, so what is left to catch is an empty class string.
 			expect(tokens, "a YES post's fill is still the YES pole").toContain(
-				"bg-yes",
+				"bg-bar-yes",
 			);
 		}
 	});
@@ -414,8 +414,8 @@ describe("MOBILE-2o · A11 D-2 — the channel is the ZERO state; the remainder 
 		// Support black on every post and pass any check that only looked at one
 		// side. (`side-pole-binding.test.ts` calls this its "Route 3" blind spot.)
 		for (const [side, fill, rest] of [
-			["YES", "bg-yes", "bg-no"],
-			["NO", "bg-no", "bg-yes"],
+			["YES", "bg-bar-yes", "bg-bar-no"],
+			["NO", "bg-bar-no", "bg-bar-yes"],
 		] as const) {
 			const root = renderCard({
 				unboxed: true,
@@ -483,10 +483,10 @@ describe("MOBILE-2o · A11 D-1 / D-3 — the black side gets an edge; the refuse
 		// so both poles are exercised. The desktop token stays beside the phone one:
 		// ADR-0045's first rule, at the one site this round touches.
 		for (const [held, side, rel, pole] of [
-			["YES", "YES", "counter", "bg-no"],
-			["YES", "NO", "support", "bg-no"],
-			["NO", "YES", "support", "bg-yes"],
-			["NO", "NO", "counter", "bg-yes"],
+			["YES", "YES", "counter", "bg-bet-no-soft"],
+			["YES", "NO", "support", "bg-bet-no-soft"],
+			["NO", "YES", "support", "bg-bet-yes-soft"],
+			["NO", "NO", "counter", "bg-bet-yes-soft"],
 		] as const) {
 			const root = renderCard({
 				unboxed: true,
@@ -585,7 +585,7 @@ describe("MOBILE-2o · A11 D-2 — the track's standing controls, either side of
 				renderCard({ unboxed: true, post: presentPost({ aggregate: STAKED }) }),
 			),
 			"a YES post's track is the NO pole",
-		).toContain("bg-no");
+		).toContain("bg-bar-no");
 	});
 
 	it("phone-split-channel::a-BOXED-card-never-takes-the-channel", () => {
