@@ -64,7 +64,7 @@ afterEach(cleanup);
  * part a future SideBadge edit could actually move.
  */
 const OWNED_TAIL =
-	"rounded-sm px-1.5 font-mono text-[10px] tracking-wide [border:var(--hairline)] bg-bar-yes text-no";
+	"rounded-sm px-1.5 font-mono text-[10px] tracking-wide [border:var(--hairline)] bg-bar-yes text-n7";
 
 /**
  * The census that makes the base-site count a MEASUREMENT rather than a claim.
@@ -302,7 +302,7 @@ describe("SideBadge — the CHIP.base call sites have a zero delta", () => {
 describe("SideBadge — INV-3, the side stays pole-bound whatever else is added", () => {
 	it("poles-are-never-semantic-or-neutral-in-any-prop-combination", () => {
 		const CASES = [
-			{ side: "YES" as const, expected: "bg-bar-yes text-no" },
+			{ side: "YES" as const, expected: "bg-bar-yes text-n7" },
 			{ side: "NO" as const, expected: "bg-bar-no text-yes" },
 		];
 		for (const { side, expected } of CASES) {
@@ -472,7 +472,7 @@ describe("SideBadge — the detail and profile seam presets", () => {
 			// BOTH POLES. A YES-only assertion passes on an inverted NO panel —
 			// the mechanism by which the last inversion survived a full PR.
 			for (const [side, pole] of [
-				["YES", "bg-bar-yes text-no"],
+				["YES", "bg-bar-yes text-n7"],
 				["NO", "bg-bar-no text-yes"],
 			] as const) {
 				const { container } = render(<SideBadge side={side} size={size} />);

@@ -437,41 +437,28 @@ describe("MOBILE-2o · A11 D-1 / D-3 — the black side gets an edge; the refuse
 	const triggerTokens = (root: HTMLElement, rel: "support" | "counter") =>
 		tokensOf(root, `[data-testid="card-trigger-${rel}"]`);
 
-	it("phone-trigger::the-BLACK-side-declares-the-hairline-and-the-white-side-does-not", () => {
-		// ⛔ A11 D-1 rules the edge on the black side only. `--color-yes` #181818 on
-		// the band's #2a2a2a carries no contrast of its own, so the edge is what says
-		// a control is there; a white fill needs no such help and keeps the
-		// `border-white/25` it already had.
+	it("phone-trigger::every-trigger-is-the-black-pill-and-declares-the-hairline", () => {
+		// ⛔ A11 D-1 rules the edge on the black pill. `--color-yes` #181818 on the
+		// band's #2a2a2a carries no contrast of its own, so the edge is what says a
+		// control is there.
 		// ⚠ WHAT THIS DOES **NOT** PROVE, and the distinction matters: the painted
 		// edge was already 1px #404040 before this token existed, because Chrome
 		// resolves a `0.5px` border to a USED width of 1px at every device scale
 		// factor (measured at 1, 2 and 3). This row holds the DECLARATION, which is
 		// the part that can be read, reasoned about and kept.
-		// ⚠ THE BLACK SIDE IS NOT A FIXED TRIGGER. Support is black on a YES post and
-		// Counter is black on a NO post, so both are read here — a guard that checked
-		// one relation would pass on a pole bound to the relation instead of the side.
-		const yes = renderCard({
-			unboxed: true,
-			post: presentPost({ side: "YES" }),
-		});
-		expect(
-			triggerTokens(yes, "support"),
-			"Support is the black side on a YES post",
-		).toContain(phone(HAIRLINE));
-		expect(
-			triggerTokens(yes, "counter"),
-			"the white side took the black side's edge",
-		).not.toContain(phone(HAIRLINE));
-
-		const no = renderCard({ unboxed: true, post: presentPost({ side: "NO" }) });
-		expect(
-			triggerTokens(no, "counter"),
-			"Counter is the black side on a NO post",
-		).toContain(phone(HAIRLINE));
-		expect(
-			triggerTokens(no, "support"),
-			"the white side took the black side's edge",
-		).not.toContain(phone(HAIRLINE));
+		// ⚠ BOTH PILLS ARE THE BLACK PILL (founder, 2026-10-01) — the white pill is
+		// retired, so all four triggers (Support and Counter, on a YES and a NO
+		// post) are read here and all four must carry the black pill's edge.
+		for (const side of ["YES", "NO"] as const) {
+			const root = renderCard({ unboxed: true, post: presentPost({ side }) });
+			for (const rel of ["support", "counter"] as const) {
+				expect(
+					triggerTokens(root, rel),
+					`${rel} on a ${side} post is not the black pill`,
+				).toContain(phone(HAIRLINE));
+				expect(triggerTokens(root, rel)).toContain("bg-yes");
+			}
+		}
 	});
 
 	it("phone-trigger::a-refused-trigger-is-DIMMED-in-its-own-colour-never-given-a-grey-fill", () => {
@@ -479,12 +466,12 @@ describe("MOBILE-2o · A11 D-1 / D-3 — the black side gets an edge; the refuse
 		// renders in its OWN pole, which is the half that would break silently: a
 		// `disabled:bg-…` anywhere in this chain would satisfy "it looks different"
 		// and destroy the one thing the colour carries.
-		// ⚠ HOLDING YES REFUSES THE WHITE SIDE AND HOLDING NO REFUSES THE BLACK ONE,
-		// so both poles are exercised. The desktop token stays beside the phone one:
-		// ADR-0045's first rule, at the one site this round touches.
+		// ⚠ Every refusal is read, and since 2026-10-01 every pill is the black
+		// pill, so each refused trigger must still carry `bg-yes`. The desktop token
+		// stays beside the phone one: ADR-0045's first rule.
 		for (const [held, side, rel, pole] of [
-			["YES", "YES", "counter", "bg-no"],
-			["YES", "NO", "support", "bg-no"],
+			["YES", "YES", "counter", "bg-yes"],
+			["YES", "NO", "support", "bg-yes"],
 			["NO", "YES", "support", "bg-yes"],
 			["NO", "NO", "counter", "bg-yes"],
 		] as const) {

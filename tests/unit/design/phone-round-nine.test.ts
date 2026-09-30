@@ -618,26 +618,27 @@ describe("MOBILE-2o · A11 D-2 — the channel is gated on Đ 0; the fill is the
 });
 
 describe("MOBILE-2o · A11 D-1 / D-3 — the black edge and the refusal, in the source", () => {
-	it("phone-r2::the-hairline-is-declared-on-the-BLACK-branch-of-the-pole-ternary", () => {
+	it("phone-r2::the-hairline-is-declared-on-the-one-BLACK-pill", () => {
 		// ⛔ THE RENDER GUARD OWNS THE BEHAVIOUR; THIS ROW OWNS THE SHAPE. A render
 		// proves the token reaches the right element after `twMerge`; only the source
-		// shows WHICH BRANCH of the pole ternary declares it, and the branch is the
-		// whole of A11 D-1 — the edge belongs to the black side, and to the black
-		// side only.
+		// shows WHERE it is declared.
+		// ⚠ SINCE 2026-10-01 (founder) THERE IS NO POLE TERNARY: both pills are the
+		// black pill, so `pole` is ONE string and it must carry the black pill's
+		// edge. A returning white branch would be the retired white pill.
 		const src = code(FOOTER);
-		const ternary =
-			/resultingSide === "YES"\s*\?\s*"([^"]*)"\s*:\s*"([^"]*)"/.exec(src);
-		expect(ternary, `${FOOTER}: the pole ternary is gone`).not.toBeNull();
-		const [black, white] = [ternary?.[1] ?? "", ternary?.[2] ?? ""];
+		const single = /const pole =\s*"([^"]*)";/.exec(src);
+		expect(
+			single,
+			`${FOOTER}: \`pole\` is no longer a single black-pill string`,
+		).not.toBeNull();
+		const black = single?.[1] ?? "";
+		expect(black.split(/\s+/), "the black pill is not the YES black").toContain(
+			"bg-yes",
+		);
 		expect(
 			black.split(/\s+/),
-			"the black pole has no phone hairline",
+			"the black pill has no phone hairline",
 		).toContain(phone(HAIRLINE));
-		expect(
-			white.split(/\s+/),
-			"the white pole took the black side's edge, which is A11 D-1 applied to " +
-				"the relation instead of to the side.",
-		).not.toContain(phone(HAIRLINE));
 		// ⛔ ADDITIVE, NOT A REPLACEMENT. The desktop declaration stays; replacing it
 		// would be a desktop edit, and this round's wall is a desktop diff of
 		// exactly nothing.
