@@ -7,36 +7,48 @@
  * Each step names a CSS selector for the real control it explains. Most
  * reuse `data-testid`s the app already carries; a handful use
  * `data-tutorial="..."` attributes added specifically for this tour, on
- * controls that had no stable locator (see `TutorialGesture` targets: the
- * market question, the odds readout, the Buy button, and the RULES
- * button).
+ * controls that had no stable locator (the market question, the odds
+ * readout, the Bet button, the RULES button).
  *
  * Manual-trigger only: nothing here auto-shows, and nothing writes a
  * "seen" marker. The tour always starts at step 0 when opened.
  */
 
-export type TutorialGesture = "tap" | "point-hold" | "swipe";
+export type TutorialGesture = "tap" | "point-hold";
 
 export type TutorialStep = {
 	id: string;
 	/** Groups steps for the chapter title card and the progress dots. */
 	chapter: string;
-	/** CSS selector for the control this step explains. */
+	/** CSS selector for the control this step explains and spotlights. */
 	selector: string;
+	/**
+	 * A second control to spotlight ALONGSIDE `selector`, as one combined
+	 * box — for Support/Counter, which are explained together and sit right
+	 * next to each other, so highlighting only one understates the other.
+	 */
+	selectorSecondary?: string;
 	/** The hint text. Plain product voice — matches `src/lib/copy/glossary.ts`. */
 	text: string;
-	/** Which scribble the pointer draws: a tap circle, an underline, or a swipe. */
+	/** Which scribble the pointer draws: a tap circle or an underline. */
 	gesture: TutorialGesture;
 	/**
-	 * When set, the engine reads this step's target element's `href` while
-	 * it's on screen and drives the actual page transition itself when the
-	 * viewer clicks Next — "market" navigates there immediately (Discovery
-	 * -> a market page), "profile" is banked and spent later, the moment
-	 * the tour reaches the first step of the "Your profile" chapter. Real
-	 * navigation, not a simulated screen: the same `next/navigation` router
-	 * the rest of the app uses.
+	 * What Next does on top of just advancing:
+	 *  - "navigate-now": read `selector`'s `href` and push there immediately
+	 *    (Discovery -> a market page) — safe because it only opens a page.
+	 *  - "bank-profile": read `selector`'s `href` and hold it for later,
+	 *    spent automatically on entering "Your profile".
+	 *  - "click": dispatch a real click on `clickSelector` (or `selector`
+	 *    if unset) when leaving this step — used only for controls that are
+	 *    NEVER money-conditional, like closing the composer's draft. Buy,
+	 *    Support and Counter are deliberately left OUT of this: whether one
+	 *    is `disabled` depends on the viewer's own open positions, and a
+	 *    simulated click on a disabled control silently does nothing — so
+	 *    those stay real, viewer-driven taps, same as the submit button.
 	 */
-	captureHrefFor?: "market" | "profile";
+	advance?: "navigate-now" | "bank-profile" | "click";
+	/** Only for `advance: "click"`, when the thing to click isn't `selector` itself. */
+	clickSelector?: string;
 };
 
 export const TUTORIAL_STEPS: readonly TutorialStep[] = [
@@ -61,7 +73,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		selector: '[data-testid="identity-chip-link"]',
 		text: "That's you. This tour will bring you to your profile later — Next keeps going for now.",
 		gesture: "tap",
-		captureHrefFor: "profile",
+		advance: "bank-profile",
 	},
 	// ---- Find a market ----
 	{
@@ -77,7 +89,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		selector: '[data-testid="market-card"]',
 		text: "Each card is a market. The bar shows the current YES/NO split, and the line under it is how much Dharma is staked so far. Next opens its debate.",
 		gesture: "tap",
-		captureHrefFor: "market",
+		advance: "navigate-now",
 	},
 	// ---- Read the market ----
 	{
@@ -98,8 +110,8 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		id: "column-scroll",
 		chapter: "Read the market",
 		selector: '[data-testid="column-scroll"]',
-		text: "YES arguments on one side, NO on the other. Each side scrolls through its own arguments one at a time.",
-		gesture: "swipe",
+		text: "YES arguments on one side, NO on the other. Each side shows its own arguments one at a time — use the arrows beside a card to browse the rest.",
+		gesture: "point-hold",
 	},
 	// ---- Two ways to bet ----
 	{
@@ -113,22 +125,8 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		id: "buy-button",
 		chapter: "Two ways to bet",
 		selector: '[data-tutorial="buy-button"]',
-		text: "Bet YES or Bet NO starts a brand new argument — you write your own case for a side and back it with a bet.",
+		text: "Bet YES or Bet NO starts a brand new argument — you write your own case for a side and back it with a bet. Tap it to open the box.",
 		gesture: "tap",
-	},
-	{
-		id: "support-counter",
-		chapter: "Two ways to bet",
-		selector: '[data-testid="card-trigger-support"]',
-		text: "Support and Counter, right beside each other on a post: Support backs that argument's side, Counter bets the opposite. Every bet here comes with your own written argument.",
-		gesture: "tap",
-	},
-	{
-		id: "aggregate-footer",
-		chapter: "Two ways to bet",
-		selector: '[data-testid="aggregate-footer"]',
-		text: "How much is staked backing this argument versus against it — computed from real bets, never a plain vote.",
-		gesture: "point-hold",
 	},
 	// ---- Place the bet ----
 	{
@@ -136,6 +134,13 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		chapter: "Place the bet",
 		selector: '[data-testid="mirror-title"]',
 		text: "Your argument — required. No bet here goes through without one.",
+		gesture: "point-hold",
+	},
+	{
+		id: "composer-image",
+		chapter: "Place the bet",
+		selector: '[data-testid="mirror-media-host"]',
+		text: "Optional: attach an image, or write more detail instead. Neither is required to place the bet.",
 		gesture: "point-hold",
 	},
 	{
@@ -158,6 +163,24 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		selector: '[data-testid="mirror-submit"]',
 		text: "This is the button that places it. We won't press it for you — try it with a small amount whenever you're ready.",
 		gesture: "tap",
+		advance: "click",
+		clickSelector: 'button[aria-label="Close"]',
+	},
+	// ---- Support & Counter ----
+	{
+		id: "support-counter-pair",
+		chapter: "Support & Counter",
+		selector: '[data-testid="card-trigger-support"]',
+		selectorSecondary: '[data-testid="card-trigger-counter"]',
+		text: "Support and Counter, right beside each other on a post: Support backs that argument's side, Counter bets the opposite. Tap either to continue — whichever one is open to you.",
+		gesture: "tap",
+	},
+	{
+		id: "reply-composer-ack",
+		chapter: "Support & Counter",
+		selector: '[data-testid="mirror-statement-row"]',
+		text: "This opens onto that specific post now — the same box as before, backing or countering THIS argument. Everything from the last chapter still applies: argument, image, stake, to win.",
+		gesture: "point-hold",
 	},
 	// ---- Your profile ----
 	{
