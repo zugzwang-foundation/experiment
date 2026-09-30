@@ -38,13 +38,17 @@ export type TutorialStep = {
 	 *    (Discovery -> a market page) — safe because it only opens a page.
 	 *  - "bank-profile": read `selector`'s `href` and hold it for later,
 	 *    spent automatically on entering "Your profile".
-	 *  - "click": dispatch a real click on `clickSelector` (or `selector`
-	 *    if unset) when leaving this step — used only for controls that are
-	 *    NEVER money-conditional, like closing the composer's draft. Buy,
-	 *    Support and Counter are deliberately left OUT of this: whether one
-	 *    is `disabled` depends on the viewer's own open positions, and a
-	 *    simulated click on a disabled control silently does nothing — so
-	 *    those stay real, viewer-driven taps, same as the submit button.
+	 *  - "click": dispatch a real click on `clickSelector` (or `selector` if
+	 *    unset; `selectorSecondary` as a fallback target if the first pick is
+	 *    disabled) when leaving this step. Used for Buy and the Support/
+	 *    Counter pair too, not just money-safe controls like the composer's
+	 *    Close: `TutorialControl.tsx`'s `isClickable` checks `disabled` /
+	 *    `aria-disabled` immediately before the click, so a control that
+	 *    can't currently do anything (the viewer's own open position makes
+	 *    one side unavailable) is left alone rather than clicked blind.
+	 *    Position Sell is the one control still left as a real, viewer-only
+	 *    tap — a sell is a one-step exit with no read-back to confirm before
+	 *    acting, unlike a bet, which opens into the composer for review.
 	 */
 	advance?: "navigate-now" | "bank-profile" | "click";
 	/** Only for `advance: "click"`, when the thing to click isn't `selector` itself. */
@@ -146,8 +150,9 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		id: "buy-button",
 		chapter: "Two ways to bet",
 		selector: '[data-tutorial="buy-button"]',
-		text: "Bet YES or Bet NO starts a brand new argument — you write your own case for a side and back it with a bet. Tap it to open the box.",
+		text: "Bet YES or Bet NO starts a brand new argument — you write your own case for a side and back it with a bet.",
 		gesture: "tap",
+		advance: "click",
 	},
 	// ---- Place the bet ----
 	{
@@ -202,8 +207,12 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 			'[data-testid="aggregate-footer"]:has([data-testid="card-trigger-counter"]) [data-testid="card-trigger-support"]',
 		selectorSecondary:
 			'[data-testid="aggregate-footer"]:has([data-testid="card-trigger-support"]) [data-testid="card-trigger-counter"]',
-		text: "Support and Counter, right beside each other on a post: Support backs that argument's side, Counter bets the opposite. Tap either to continue — whichever one is open to you.",
+		text: "Support and Counter, right beside each other on a post: Support backs that argument's side, Counter bets the opposite.",
 		gesture: "tap",
+		// Support first, Counter as the fallback — whichever one the viewer's
+		// own open position actually leaves clickable (see the `advance`
+		// docs above).
+		advance: "click",
 	},
 	{
 		id: "reply-composer-ack",

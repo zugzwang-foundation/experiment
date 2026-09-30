@@ -30,21 +30,26 @@ import {
  * the wrong primitive here.
  *
  * The target element under the spotlight is never covered by anything —
- * only `pointer-events-none` decoration surrounds it — so steps that need
- * the viewer to actually click the real control (Bet, Support, Counter, a
- * position's Sell button) keep working with the overlay open. Those three
- * are deliberately left un-automated: whether one is `disabled` depends on
- * the viewer's own open positions, so a simulated click could silently do
- * nothing — see `tutorial-steps.ts`'s `advance` docs for the boundary.
+ * only `pointer-events-none` decoration surrounds it — so a viewer can
+ * always tap the real control underneath, and Next also drives Bet YES/NO,
+ * Support and Counter itself now (`isClickable` below). The earlier design
+ * left those three un-automated outright, reasoning that whether one is
+ * `disabled` depends on the viewer's own open positions and a blind click
+ * could silently do nothing — true, but the fix for a blind click is to stop
+ * clicking blind, not to stop clicking. `isClickable` checks `disabled` /
+ * `aria-disabled` immediately before dispatching, so a click is only ever
+ * sent to a control that will actually do something; a genuinely disabled
+ * one is left alone and the tour still advances. Position Sell stays a real,
+ * viewer-only tap — see `tutorial-steps.ts`'s `advance` docs.
  *
- * Because those controls are real taps the viewer drives, the finder effect
- * below also looks one to two steps AHEAD whenever the current step's own
- * target goes missing: if the viewer already tapped Bet YES and the composer
- * is open, or already tapped Support/Counter and the reply box is open, the
- * step just ahead is what's actually on screen, and the tour follows them
- * there instead of sitting on a stale target until they notice and click
- * Next themselves. This is what keeps the blurred backdrop matching whatever
- * page or state the viewer is actually looking at.
+ * The finder effect below also looks one to two steps AHEAD whenever the
+ * current step's own target goes missing: if the viewer taps the real
+ * control themselves before Next gets to it, or a click's effect (the
+ * composer opening, the reply box appearing) hasn't painted yet on the very
+ * next poll, the step just ahead is what's actually on screen, and the tour
+ * follows them there rather than sitting on a stale target. This is what
+ * keeps the blurred backdrop matching whatever page or state is actually
+ * live.
  *
  * The chapter-card wipe, the gesture scribbles and the word-by-word text
  * reveal below all need `@keyframes` Tailwind has no utility for — the same
@@ -78,6 +83,43 @@ function queryEl(selector: string): HTMLElement | null {
 function rectOf(el: HTMLElement): DOMRect | null {
 	const r = el.getBoundingClientRect();
 	return r.width === 0 && r.height === 0 ? null : r;
+}
+
+/**
+ * The FIRST clickable match for a selector, or `null` if every match is
+ * disabled — deliberately never falls back to a disabled element, since the
+ * caller (`next()`) clicks whatever this returns. `data-tutorial="buy-
+ * button"` renders once per column (YES and NO both mount their own
+ * `SlotHeader`), so a viewer already holding one side has the OTHER
+ * column's Buy `disabled` while their own stays clickable; a bare
+ * `querySelector` can land on the wrong one and read as "did nothing".
+ */
+function firstClickable(selector: string): HTMLElement | null {
+	try {
+		for (const candidate of document.querySelectorAll(selector)) {
+			if (candidate instanceof HTMLElement && isClickable(candidate)) {
+				return candidate;
+			}
+		}
+	} catch {
+		return null;
+	}
+	return null;
+}
+
+/**
+ * Whether a real click on this control would actually do anything.
+ * `SlotHeader`'s Bet toggle and `TriggerPill`'s Support/Counter pills all go
+ * `disabled` (native `disabled` or `aria-disabled`) depending on the
+ * viewer's own open positions — the exact reason a click here was never
+ * dispatched blind. Checking this first is what makes a click SAFE to
+ * dispatch: it can no longer silently no-op, so the tour can drive it.
+ */
+function isClickable(el: HTMLElement): boolean {
+	if (el instanceof HTMLButtonElement && el.disabled) {
+		return false;
+	}
+	return el.getAttribute("aria-disabled") !== "true";
 }
 
 /**
@@ -295,15 +337,48 @@ export function TutorialControl({
 	 * them from Discovery to a market and, later, to their own profile,
 	 * using the real Next.js router against the real href of whatever the
 	 * spotlight is already highlighting. A `"click"` step dispatches a real
-	 * click on a control that is never money-conditional (closing the
-	 * composer's draft) — Bet, Support, Counter and Place stay real taps.
+	 * click too, INCLUDING on Bet/Support/Counter now — the thing that made
+	 * those unsafe to automate was never "it's a bet", it was that a click on
+	 * a `disabled` one silently does nothing, and `isClickable` closes that
+	 * gap directly rather than by avoiding the click altogether. `clickSelector`
+	 * is tried first; if it's missing or disabled, `selectorSecondary` (the
+	 * paired Counter pill) is tried next, so a viewer holding the opposite
+	 * side still gets driven through whichever one is actually open to them.
 	 */
 	function next() {
 		if (step.advance === "navigate-now" && capturedHrefRef.current) {
 			router.push(capturedHrefRef.current);
 		}
 		if (step.advance === "click") {
-			queryEl(step.clickSelector ?? step.selector)?.click();
+			const clickSelector = step.clickSelector ?? step.selector;
+			let target: HTMLElement | null;
+			if (step.selectorSecondary) {
+				// A PAIRED step (Support/Counter): resolve within the exact pair
+				// `measure()` is spotlighting, never a page-wide scan — every post
+				// on screen carries its own Support/Counter, so scanning the whole
+				// page for "any clickable one" could click a pill on a completely
+				// different post than the one actually highlighted, which is worse
+				// than not clicking at all. At most one of the two is ever disabled
+				// here (I-SINGLE-SIDE-001: a viewer holds at most one side, and
+				// Support/Counter resolve to opposite sides) — both disabled only
+				// on the viewer's own post, where neither should click.
+				const primary = queryEl(clickSelector);
+				const secondary = queryEl(step.selectorSecondary);
+				target =
+					primary && isClickable(primary)
+						? primary
+						: secondary && isClickable(secondary)
+							? secondary
+							: null;
+			} else {
+				// An UNPAIRED step (Buy): the same control can render once per
+				// column with no shared container to scope a fallback against, so
+				// scanning every match for the first clickable one is the only way
+				// to reach the viewer's own open side when the other column's is
+				// disabled.
+				target = firstClickable(clickSelector);
+			}
+			target?.click();
 		}
 		if (isLast) {
 			close();
