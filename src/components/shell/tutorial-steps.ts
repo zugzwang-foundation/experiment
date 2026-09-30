@@ -53,6 +53,16 @@ export type TutorialStep = {
 	advance?: "navigate-now" | "bank-profile" | "click";
 	/** Only for `advance: "click"`, when the thing to click isn't `selector` itself. */
 	clickSelector?: string;
+	/**
+	 * True on a step that was arrived at by a page navigation — the first
+	 * step of "Read the market" (reached by `market-card`'s "navigate-now")
+	 * and the first step of "Your profile" (reached by the banked
+	 * "bank-profile" href). Pressing Back FROM one of these needs to reverse
+	 * that navigation (`router.back()`) as well as move the step index —
+	 * otherwise Back leaves the viewer on the wrong page entirely, pointing
+	 * at a step whose target only exists on the page Next came from.
+	 */
+	enteredViaNavigation?: boolean;
 };
 
 export const TUTORIAL_STEPS: readonly TutorialStep[] = [
@@ -102,6 +112,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		selector: '[data-tutorial="market-question"]',
 		text: "This is the question being predicted — everything below it is people arguing and betting on how it resolves.",
 		gesture: "point-hold",
+		enteredViaNavigation: true,
 	},
 	{
 		id: "resolver-cards",
@@ -274,6 +285,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		selector: '[data-testid="identity-card"]',
 		text: "Your public profile — the pseudonym and identity everyone sees you argue and bet under.",
 		gesture: "point-hold",
+		enteredViaNavigation: true,
 	},
 	{
 		id: "profile-tiles",
