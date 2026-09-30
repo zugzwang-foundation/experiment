@@ -111,11 +111,28 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		gesture: "point-hold",
 	},
 	{
-		id: "column-scroll",
+		id: "column-yes",
 		chapter: "Read the market",
-		selector: '[data-testid="column-scroll"]',
-		text: "YES arguments on one side, NO on the other. Each side shows its own arguments one at a time — try the arrows beside a card to page through the rest.",
+		selector: '[data-debate-column="YES"] [data-testid="column-scroll"]',
+		text: "The YES feed: every argument backing YES, one at a time.",
 		gesture: "point-hold",
+	},
+	{
+		id: "column-no",
+		chapter: "Read the market",
+		selector: '[data-debate-column="NO"] [data-testid="column-scroll"]',
+		text: "The NO feed sits opposite: every argument backing NO, the same way.",
+		gesture: "point-hold",
+	},
+	{
+		id: "feed-scroll",
+		chapter: "Read the market",
+		selector: '[data-debate-column="YES"] [data-testid="scroll-rail"]',
+		text: "Use the up and down arrows beside a card to move through a feed. Next scrolls down one for you.",
+		gesture: "point-hold",
+		advance: "click",
+		clickSelector:
+			'[data-debate-column="YES"] button[aria-label^="Next"], [data-debate-column="NO"] button[aria-label^="Next"]',
 	},
 	{
 		id: "ai-mode",
@@ -147,12 +164,20 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		gesture: "point-hold",
 	},
 	{
-		id: "buy-button",
+		id: "buy-yes",
 		chapter: "Two ways to bet",
-		selector: '[data-tutorial="buy-button"]',
-		text: "Bet YES or Bet NO starts a brand new argument — you write your own case for a side and back it with a bet.",
+		selector: '[data-debate-column="YES"] [data-tutorial="buy-button"]',
+		text: "Bet YES starts a brand new argument — you write your own case for YES and back it with a bet.",
+		gesture: "tap",
+	},
+	{
+		id: "buy-no",
+		chapter: "Two ways to bet",
+		selector: '[data-debate-column="NO"] [data-tutorial="buy-button"]',
+		text: "Bet NO does the same for the other side — your own case for NO, backed with a bet.",
 		gesture: "tap",
 		advance: "click",
+		clickSelector: '[data-tutorial="buy-button"]',
 	},
 	// ---- Place the bet ----
 	{

@@ -13,7 +13,6 @@ import {
 	isFirstStepOfChapter,
 	TUTORIAL_CHAPTERS,
 	TUTORIAL_STEPS,
-	type TutorialGesture,
 } from "./tutorial-steps";
 
 /**
@@ -51,7 +50,7 @@ import {
  * keeps the blurred backdrop matching whatever page or state is actually
  * live.
  *
- * The chapter-card wipe, the gesture scribbles and the word-by-word text
+ * The chapter-card wipe, the word-by-word text
  * reveal below all need `@keyframes` Tailwind has no utility for — the same
  * situation `src/components/art/warli/` is in, and this file follows its
  * precedent exactly: a component-scoped `<style>` tag, names prefixed
@@ -452,7 +451,6 @@ export function TutorialControl({
 							stepCount={TUTORIAL_STEPS.length}
 							chapter={step.chapter}
 							text={step.text}
-							gesture={step.gesture}
 							placements={placements}
 							showSpotlight={!timedOut}
 							reducedMotion={reducedMotion}
@@ -509,7 +507,6 @@ function TutorialOverlay({
 	stepCount,
 	chapter,
 	text,
-	gesture,
 	placements,
 	showSpotlight,
 	reducedMotion,
@@ -523,7 +520,6 @@ function TutorialOverlay({
 	stepCount: number;
 	chapter: string;
 	text: string;
-	gesture: TutorialGesture;
 	placements: Placement[] | null;
 	showSpotlight: boolean;
 	reducedMotion: boolean;
@@ -582,15 +578,6 @@ function TutorialOverlay({
 							}}
 						/>
 					))}
-					{!reducedMotion
-						? boxes.map((box) => (
-								<GestureMark
-									key={`${box.top}-${box.left}`}
-									gesture={gesture}
-									box={box}
-								/>
-							))
-						: null}
 					<TutorialHand
 						box={boxes[boxes.length - 1]}
 						reducedMotion={reducedMotion}
@@ -685,60 +672,6 @@ function DimPanels({ boxes }: { boxes: Placement[] }) {
 				);
 			})}
 		</>
-	);
-}
-
-/**
- * The hand-drawn-feeling scribble matched to the step's own gesture, drawn
- * in a normalized 0–100 box and stretched onto the real target rect — "tap"
- * circles the whole control, "point-hold" underlines it. `pathLength="1"`
- * means the draw-in animation's `stroke-dashoffset` never needs the
- * target's real geometry measured in JS.
- */
-function GestureMark({
-	gesture,
-	box,
-}: {
-	gesture: TutorialGesture;
-	box: Placement;
-}) {
-	const margin = 14;
-	const style: CSSProperties = {
-		top: box.top - margin,
-		left: box.left - margin,
-		width: box.width + margin * 2,
-		height: box.height + margin * 2,
-	};
-	return (
-		<svg
-			aria-hidden="true"
-			className="pointer-events-none fixed z-10 overflow-visible text-n7"
-			style={style}
-			viewBox="0 0 100 100"
-			preserveAspectRatio="none"
-		>
-			{gesture === "tap" ? (
-				<path
-					className="zzt-draw"
-					pathLength={1}
-					d="M50 8 C73 8 90 26 90 50 C90 74 73 92 50 92 C27 92 10 74 10 50 C10 26 27 8 50 8"
-					fill="none"
-					stroke="currentColor"
-					strokeWidth={2.5}
-					strokeLinecap="round"
-				/>
-			) : (
-				<path
-					className="zzt-draw"
-					pathLength={1}
-					d="M4 92 Q25 100 50 92 T96 92"
-					fill="none"
-					stroke="currentColor"
-					strokeWidth={2.5}
-					strokeLinecap="round"
-				/>
-			)}
-		</svg>
 	);
 }
 
@@ -950,17 +883,9 @@ const TUTORIAL_KEYFRAMES = `
 }
 .zzt-word { display: inline-block; white-space: pre; animation: zzt-word-in 420ms cubic-bezier(.16,1,.3,1) both; }
 
-@keyframes zzt-draw {
-  0% { stroke-dashoffset: 1; opacity: 0; }
-  15% { opacity: 1; }
-  55% { stroke-dashoffset: 0; opacity: 1; }
-  80% { opacity: 1; }
-  100% { stroke-dashoffset: 0; opacity: 0; }
-}
-.zzt-draw { stroke-dasharray: 1; animation: zzt-draw 1800ms ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  .zzt-wipe-in, .zzt-wipe-out, .zzt-slam, .zzt-trail, .zzt-word, .zzt-draw {
+  .zzt-wipe-in, .zzt-wipe-out, .zzt-slam, .zzt-trail, .zzt-word {
     animation: none !important;
   }
 }
