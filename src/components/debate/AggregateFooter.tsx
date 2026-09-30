@@ -635,13 +635,12 @@ function TriggerPill({
 	// ⚠ ADDITIVE, AND THE DESKTOP KEEPS ITS 0.5px DECLARATION. Replacing the
 	// base would be a desktop edit for no reason — the used width there is
 	// already 1px — and this round's wall is a desktop diff of exactly nothing.
-	// ⚠ THE WHITE SIDE IS UNTOUCHED: its `border-white/25` is a different edge
-	// doing a different job (a white fill needs no help being seen), and A11
-	// D-1 names the black side only.
+	// ⛔ BOTH PILLS ARE THE BLACK PILL (founder, 2026-10-01). Support and Counter
+	// no longer take the pole of the side their bet lands on — the white pill is
+	// retired, so a Counter on a YES post reads like its Support. The side is
+	// still named in the accessible label (`— bet YES/NO`).
 	const pole =
-		resultingSide === "YES"
-			? "bg-yes text-no border-[0.5px] border-n2 max-mobile:[border:var(--hairline)] shadow-xs hover:bg-neutral-200 hover:text-black cursor-pointer active:scale-95"
-			: "bg-no text-yes border border-white/25 shadow-xs hover:bg-neutral-800 hover:border-white/60 hover:text-white cursor-pointer active:scale-95";
+		"bg-yes text-no border-[0.5px] border-n2 max-mobile:[border:var(--hairline)] shadow-xs hover:bg-neutral-200 hover:text-black cursor-pointer active:scale-95";
 	// C3 precedence (INFO-1 §3.4): a viewer blocked by the single-side rule is
 	// told why they are blocked, not given the relation's definition. The
 	// glossary gloss fills the null branch only — c3 still wins outright.
@@ -675,14 +674,11 @@ function TriggerPill({
 						buttonVariants({ variant: "outline" }),
 						HEADER_CONTROL,
 						"@max-[380px]/colbody:w-[90px] @max-[380px]/colbody:px-1.5 max-[860px]:max-w-full",
-						// Enabled keeps the pole it had, at rest, hovered and pressed:
-						// #181818 with #fafafa text for a YES bet, the reverse for NO.
+						// Enabled is the black control for BOTH relations, at rest, hovered
+						// and pressed (founder, 2026-10-01) — no white Counter/Support.
 						// Disabled drops it for the Bet button's disabled look — the
 						// outline fill and hairline, 0.5 opacity, no ledge.
-						!disabled &&
-							(resultingSide === "YES"
-								? "bg-yes text-no hover:bg-yes active:bg-yes"
-								: "bg-no text-yes hover:bg-no active:bg-no"),
+						!disabled && "bg-yes text-no hover:bg-yes active:bg-yes",
 						className,
 					)}
 				>
@@ -697,15 +693,7 @@ function TriggerPill({
 					<span className={cn(HEADER_WORD, "text-[11px] leading-[1.2]")}>
 						{word}
 					</span>
-					<span
-						className={cn(
-							HEADER_DETAIL,
-							// #545454 on the #fafafa button; gold elsewhere.
-							!disabled && resultingSide === "NO" && "text-n3",
-						)}
-					>
-						Đ {amount}
-					</span>
+					<span className={HEADER_DETAIL}>Đ {amount}</span>
 				</button>
 			</InfoTip>
 		);

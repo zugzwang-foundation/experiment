@@ -154,7 +154,7 @@ describe("ArgumentList — INV-3, the side chip is pole-bound (live variant, :59
 		);
 		const cls = classTokens(sideChip(container, "YES"));
 		expect(cls).toContain("bg-bar-yes");
-		expect(cls).toContain("text-no");
+		expect(cls).toContain("text-n7");
 		expect(cls).not.toContain("bg-primary");
 		expect(cls).not.toContain("bg-secondary");
 	});
