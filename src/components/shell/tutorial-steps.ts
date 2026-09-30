@@ -110,8 +110,29 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		id: "column-scroll",
 		chapter: "Read the market",
 		selector: '[data-testid="column-scroll"]',
-		text: "YES arguments on one side, NO on the other. Each side shows its own arguments one at a time — use the arrows beside a card to browse the rest.",
+		text: "YES arguments on one side, NO on the other. Each side shows its own arguments one at a time — try the arrows beside a card to page through the rest.",
 		gesture: "point-hold",
+	},
+	{
+		id: "ai-mode",
+		chapter: "Read the market",
+		selector: '[data-tutorial="ai-mode"]',
+		text: "AI mode downloads this whole debate as a Markdown file — every argument, in order, to hand to an AI or read offline.",
+		gesture: "tap",
+	},
+	{
+		id: "focus-toggle",
+		chapter: "Read the market",
+		selector: '[data-tutorial="focus-toggle"]',
+		text: "Focus narrows the page to one argument at a time, useful once a thread gets long. The same button brings the full market back.",
+		gesture: "tap",
+	},
+	{
+		id: "post-share",
+		chapter: "Read the market",
+		selector: '[data-tutorial="post-share"]',
+		text: "Share turns this argument into an image, ready to post elsewhere.",
+		gesture: "tap",
 	},
 	// ---- Two ways to bet ----
 	{
@@ -170,8 +191,17 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 	{
 		id: "support-counter-pair",
 		chapter: "Support & Counter",
-		selector: '[data-testid="card-trigger-support"]',
-		selectorSecondary: '[data-testid="card-trigger-counter"]',
+		// Scoped to a SINGLE `aggregate-footer` that holds both pills — a bare
+		// `[data-testid="card-trigger-support"]` and a bare "counter" one can
+		// each resolve to a DIFFERENT post (or the column-header's own lifted
+		// pair vs. a feed card's), so the two rects measured were sometimes
+		// nowhere near each other and the "highlighted together" box came out
+		// looking broken instead of like one pair. `:has()` keeps both queries
+		// inside the one footer that actually carries the pair.
+		selector:
+			'[data-testid="aggregate-footer"]:has([data-testid="card-trigger-counter"]) [data-testid="card-trigger-support"]',
+		selectorSecondary:
+			'[data-testid="aggregate-footer"]:has([data-testid="card-trigger-support"]) [data-testid="card-trigger-counter"]',
 		text: "Support and Counter, right beside each other on a post: Support backs that argument's side, Counter bets the opposite. Tap either to continue — whichever one is open to you.",
 		gesture: "tap",
 	},

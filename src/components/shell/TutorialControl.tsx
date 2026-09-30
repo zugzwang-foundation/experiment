@@ -20,11 +20,14 @@ import {
  * The header's "Tutorial" control and the spotlight overlay it opens.
  *
  * Manual-trigger only — nothing here auto-shows on first visit and nothing
- * writes a "seen" marker; every open starts at step 0. The button and the
- * overlay share one `useState` in this file, mirroring `RulesControl` →
- * `OnboardingDeck`'s shape, but the overlay itself is bespoke: it highlights
- * real, live controls in place (blurred surround + a ring, never an opaque
- * modal), so a Radix `Dialog` is the wrong primitive here.
+ * writes a "seen" marker; every open starts at step 0, and `start()` also
+ * forces navigation to Discovery first, whatever page the header button was
+ * clicked from — a fixed starting point rather than resuming wherever the
+ * viewer happened to be. The button and the overlay share one `useState` in
+ * this file, mirroring `RulesControl` → `OnboardingDeck`'s shape, but the
+ * overlay itself is bespoke: it highlights real, live controls in place
+ * (blurred surround + a ring, never an opaque modal), so a Radix `Dialog` is
+ * the wrong primitive here.
  *
  * The target element under the spotlight is never covered by anything —
  * only `pointer-events-none` decoration surrounds it — so steps that need
@@ -33,6 +36,15 @@ import {
  * are deliberately left un-automated: whether one is `disabled` depends on
  * the viewer's own open positions, so a simulated click could silently do
  * nothing — see `tutorial-steps.ts`'s `advance` docs for the boundary.
+ *
+ * Because those controls are real taps the viewer drives, the finder effect
+ * below also looks one to two steps AHEAD whenever the current step's own
+ * target goes missing: if the viewer already tapped Bet YES and the composer
+ * is open, or already tapped Support/Counter and the reply box is open, the
+ * step just ahead is what's actually on screen, and the tour follows them
+ * there instead of sitting on a stale target until they notice and click
+ * Next themselves. This is what keeps the blurred backdrop matching whatever
+ * page or state the viewer is actually looking at.
  *
  * The chapter-card wipe, the gesture scribbles and the word-by-word text
  * reveal below all need `@keyframes` Tailwind has no utility for — the same
@@ -151,23 +163,6 @@ export function TutorialControl({
 		setOpen(false);
 	}, []);
 
-	// Escape closes the tour from anywhere. Bound only while open, and
-	// cleared the same way it's set — the same cleanup discipline
-	// `composer-open-store.ts` documents: a listener left attached after
-	// close is a flag stuck on, silently.
-	useEffect(() => {
-		if (!open) {
-			return;
-		}
-		function onKey(e: KeyboardEvent) {
-			if (e.key === "Escape") {
-				close();
-			}
-		}
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
-	}, [open, close]);
-
 	// The chapter title card, shown once per chapter change. Reduced-motion
 	// skips the delay entirely rather than playing it invisibly — the
 	// timers themselves are the thing being opted out of, not just the
@@ -212,6 +207,29 @@ export function TutorialControl({
 		capturedHrefRef.current = null;
 		searchStartedAt.current = Date.now();
 
+		// Look-ahead: if THIS step's target has gone missing, check whether a
+		// step just ahead is already on screen instead — the viewer took the
+		// real action themselves (tapped the real Bet button, the real
+		// Support/Counter pill) rather than waiting on the tour's own Next.
+		// Following them there is what keeps the blurred backdrop matching
+		// whatever page/state is actually live, instead of sitting on a stale
+		// target until the viewer notices and clicks through manually. Capped
+		// at two steps so an unrelated coincidental match elsewhere can't
+		// vault the tour forward by more than one real user action's worth.
+		function findAhead(): number | null {
+			for (let lookAhead = 1; lookAhead <= 2; lookAhead++) {
+				const aheadIndex = stepIndex + lookAhead;
+				if (aheadIndex >= TUTORIAL_STEPS.length) {
+					break;
+				}
+				const aheadStep = TUTORIAL_STEPS[aheadIndex];
+				if (measure(aheadStep.selector, aheadStep.selectorSecondary)) {
+					return aheadIndex;
+				}
+			}
+			return null;
+		}
+
 		function tick() {
 			const found = measure(step.selector, step.selectorSecondary);
 			if (found) {
@@ -231,6 +249,11 @@ export function TutorialControl({
 				}
 				return;
 			}
+			const aheadIndex = findAhead();
+			if (aheadIndex !== null) {
+				setStepIndex(aheadIndex);
+				return;
+			}
 			setPlacement(null);
 			if (Date.now() - searchStartedAt.current > FIND_TIMEOUT_MS) {
 				setTimedOut(true);
@@ -246,12 +269,24 @@ export function TutorialControl({
 			window.removeEventListener("scroll", tick, true);
 			window.removeEventListener("resize", tick);
 		};
-	}, [open, step.selector, step.selectorSecondary, step.advance]);
+	}, [open, step.selector, step.selectorSecondary, step.advance, stepIndex]);
 
+	/**
+	 * The tour always starts from Discovery, whatever page the header button
+	 * was clicked from — a fixed, well-known starting point rather than
+	 * playing out whatever happens to be on screen. `start()` still resets
+	 * and opens immediately so the overlay appears without delay; the finder
+	 * effect above simply won't find step 0's Discovery-only targets until
+	 * the navigation lands, which is exactly what its own poll-and-wait
+	 * already handles.
+	 */
 	function start() {
 		profileHrefRef.current = null;
 		setStepIndex(0);
 		setOpen(true);
+		if (window.location.pathname !== "/") {
+			router.push("/");
+		}
 	}
 
 	/**
@@ -288,6 +323,33 @@ export function TutorialControl({
 	function back() {
 		setStepIndex((i) => Math.max(i - 1, 0));
 	}
+
+	// Escape always closes; ArrowRight/ArrowLeft drive Next/Back while the
+	// tour is open, matching the reference mockup's keyboard support. Bound
+	// only while open and re-bound each render (next/back close over
+	// step-dependent state, so there is no stable version to memoize) — the
+	// same cleanup discipline `composer-open-store.ts` documents applies:
+	// nothing here is left attached past close. Suppressed entirely while
+	// the chapter card is showing, so an arrow press doesn't fire Next twice
+	// in a row through a card the viewer hasn't actually read yet.
+	useEffect(() => {
+		if (!open || showingChapterCard) {
+			return;
+		}
+		function onKey(e: KeyboardEvent) {
+			if (e.key === "Escape") {
+				close();
+			} else if (e.key === "ArrowRight") {
+				e.preventDefault();
+				next();
+			} else if (e.key === "ArrowLeft" && !isFirst) {
+				e.preventDefault();
+				back();
+			}
+		}
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	});
 
 	return (
 		<>
@@ -662,17 +724,25 @@ function HintCard({
 						<button
 							type="button"
 							onClick={onBack}
-							className="inline-flex h-[30px] items-center rounded-(--r) px-3 text-[12px] font-semibold [border:var(--hairline)] hover:[border:1px_solid_var(--ring)]"
+							className="inline-flex h-[30px] items-center gap-1 rounded-(--r) px-3 text-[12px] font-semibold [border:var(--hairline)] hover:[border:1px_solid_var(--ring)]"
 						>
 							Back
+							<span aria-hidden="true" className="text-muted-foreground">
+								←
+							</span>
 						</button>
 					) : null}
 					<button
 						type="button"
 						onClick={onNext}
-						className="inline-flex h-[30px] items-center rounded-(--r) bg-(--btn-fill) px-3 text-[12px] font-semibold text-ink [border:var(--hairline)] hover:[border:1px_solid_var(--ring)]"
+						className="inline-flex h-[30px] items-center gap-1 rounded-(--r) bg-(--btn-fill) px-3 text-[12px] font-semibold text-ink [border:var(--hairline)] hover:[border:1px_solid_var(--ring)]"
 					>
 						{isLast ? "Done" : "Next"}
+						{!isLast ? (
+							<span aria-hidden="true" className="opacity-70">
+								→
+							</span>
+						) : null}
 					</button>
 				</div>
 			</div>
