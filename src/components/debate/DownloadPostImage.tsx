@@ -189,6 +189,7 @@ export function DownloadPostImage({
 					// case by case. `aria-label` already names the control, so what is lost
 					// is a hover hint on an icon whose meaning the label carries.
 					aria-label={SHARE_COPY}
+					data-tutorial="post-share"
 					onClick={onClick}
 					// ⚠ `text-ink` — the SAME token `Replies · n` uses two elements to the
 					// left, so the mark and the one promoted field on this row sit at the

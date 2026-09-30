@@ -266,6 +266,7 @@ export function MarketHeader({
 									download
 									href={`/m/${market.slug}/export`}
 									aria-label="AI mode — download this debate as Markdown"
+									data-tutorial="ai-mode"
 									className={cn(
 										buttonVariants({ variant: "outline", size: "xs" }),
 										"h-5 rounded-4xl text-[11px] gap-1 px-2.5 text-muted-foreground hover:text-ink hover:border-ink/40 transition-all",
@@ -280,6 +281,7 @@ export function MarketHeader({
 									type="button"
 									onClick={onToggleCompact}
 									aria-label="Exit focus view"
+									data-tutorial="focus-toggle"
 									className={cn(
 										buttonVariants({ variant: "secondary", size: "xs" }),
 										"h-5 rounded-4xl text-[11px] gap-1 px-2.5 font-medium text-ink bg-n1 hover:bg-n2 border border-[var(--hairline)] shadow-xs cursor-pointer transition-all",
@@ -700,6 +702,7 @@ export function MarketHeader({
 											download
 											href={`/m/${market.slug}/export`}
 											aria-label="AI mode — download this debate as Markdown"
+											data-tutorial="ai-mode"
 											className={cn(
 												buttonVariants({ variant: "outline", size: "xs" }),
 												"h-5 rounded-4xl",
@@ -725,6 +728,7 @@ export function MarketHeader({
 											type="button"
 											onClick={onToggleCompact}
 											aria-label="Enter focus view"
+											data-tutorial="focus-toggle"
 											className={cn(
 												buttonVariants({ variant: "outline", size: "xs" }),
 												"h-5 rounded-4xl text-xs gap-1 cursor-pointer",
