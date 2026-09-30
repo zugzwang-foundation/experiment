@@ -274,22 +274,20 @@ export function OnboardingDeck({
 					</div>
 					<div
 						data-slot="onboarding-step"
-						// ⚠ MOBILE-1 Phase A — `max-mobile:pr-6` clears the close button.
-						// `ui/dialog.tsx` pins its ✕ at `absolute top-4 right-4`, i.e. 16px
-						// from the dialog EDGE. At the desktop `p-[30px]` that lands the
-						// button inside the padding, clear of the content box, so this
-						// `ml-auto` label never reaches it. The phone-width `p-4` above
-						// makes the padding 16px too, so the content edge and the button
-						// now coincide and `STEP 1 OF 6` rendered underneath the ✕ —
-						// measured: label right edge 346, button spanning 330–346.
-						// 24px of right padding puts the label's edge at 322 and restores
-						// the clearance the desktop padding was providing implicitly.
-						// ⚠ Gated with the padding it compensates for — it exists only
-						// because `max-mobile:p-4` above collapses the clearance, so the
-						// two must appear and disappear together or this one corrects a
-						// problem that is not there.
+						// `ui/dialog.tsx` pins its ✕ at `absolute top-4 right-4` — 16px
+						// from the DIALOG'S OWN edge, not from the close button's own
+						// edge. The button itself renders at roughly 16–20px wide (a
+						// bare `size-4` icon with no explicit button padding), so its
+						// LEFT edge lands around 32–36px from the dialog edge — inside
+						// the desktop `px-[30px]` padding by only a couple of pixels,
+						// not clear of it the way the padding figure alone suggests.
+						// Measured on staging: `STEP 1 OF 6` was reading as touching the
+						// ✕ at 1440px, not just below the mobile breakpoint this class
+						// used to be gated to. `pr-5` gives the label a fixed 20px of
+						// its own clearance regardless of viewport, and the mobile bump
+						// stacks on top of that for the narrower `p-4` dialog.
 						className={cn(
-							"ml-auto text-[10px] leading-[1.2] font-bold tracking-[0.1em] text-n5 uppercase",
+							"ml-auto pr-5 text-[10px] leading-[1.2] font-bold tracking-[0.1em] text-n5 uppercase",
 							mobileResponsive && "max-mobile:pr-6",
 						)}
 					>
@@ -383,7 +381,12 @@ export function OnboardingDeck({
 						data-slot="onboarding-back"
 						disabled={index === 0}
 						onClick={() => setIndex(index - 1)}
-						className="shrink-0 px-1 text-[13px] leading-[1.2] font-semibold text-n5 outline-none hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:cursor-default disabled:text-n3"
+						// Matches Next's own box — same `rounded-(--r)`, same
+						// `p-[13px]` vertical rhythm, same border weight — so the pair
+						// reads as a primary/secondary CTA pair rather than a bare
+						// label sitting beside a full button. `shrink-0` keeps it from
+						// being squeezed by Next's `flex-1`.
+						className="shrink-0 rounded-(--r) border border-n2 px-4 py-[13px] text-center text-[13px] leading-[1.2] font-semibold text-n5 outline-none [transition:all_var(--dur-hover)] hover:border-n7 hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:cursor-default disabled:border-n2 disabled:text-n3"
 					>
 						Back
 					</button>
