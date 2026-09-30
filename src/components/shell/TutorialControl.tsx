@@ -122,17 +122,23 @@ function isClickable(el: HTMLElement): boolean {
 	return el.getAttribute("aria-disabled") !== "true";
 }
 
+function rectToPlacement(r: DOMRect): Placement {
+	return { top: r.top, left: r.left, width: r.width, height: r.height };
+}
+
 /**
- * Finds the step's target(s) and returns one combined box. When
+ * Finds the step's target(s) and returns each as its OWN box. When
  * `selectorSecondary` is given (Support + Counter, explained as a pair) the
- * box spans both real elements rather than picking one — the primary
- * element is still the one `advance` reads a `href` from, when a step needs
- * that.
+ * two real elements stay two separate boxes rather than one merged rect —
+ * a single box spanning both ends up spotlighting the split bar and the
+ * staked figure sitting BETWEEN them too, which this step never explains.
+ * The primary element is still the one `advance` reads a `href` from, when
+ * a step needs that.
  */
 function measure(
 	selector: string,
 	selectorSecondary?: string,
-): { placement: Placement; primaryEl: HTMLElement } | null {
+): { placements: Placement[]; primaryEl: HTMLElement } | null {
 	const primaryEl = queryEl(selector);
 	if (!primaryEl) {
 		return null;
@@ -141,26 +147,17 @@ function measure(
 	if (!primaryRect) {
 		return null;
 	}
-	let top = primaryRect.top;
-	let left = primaryRect.left;
-	let right = primaryRect.left + primaryRect.width;
-	let bottom = primaryRect.top + primaryRect.height;
+	const placements = [rectToPlacement(primaryRect)];
 
 	if (selectorSecondary) {
 		const secondaryEl = queryEl(selectorSecondary);
 		const secondaryRect = secondaryEl ? rectOf(secondaryEl) : null;
 		if (secondaryRect) {
-			top = Math.min(top, secondaryRect.top);
-			left = Math.min(left, secondaryRect.left);
-			right = Math.max(right, secondaryRect.left + secondaryRect.width);
-			bottom = Math.max(bottom, secondaryRect.top + secondaryRect.height);
+			placements.push(rectToPlacement(secondaryRect));
 		}
 	}
 
-	return {
-		placement: { top, left, width: right - left, height: bottom - top },
-		primaryEl,
-	};
+	return { placements, primaryEl };
 }
 
 function useReducedMotion(): boolean {
@@ -184,7 +181,7 @@ export function TutorialControl({
 }) {
 	const [open, setOpen] = useState(false);
 	const [stepIndex, setStepIndex] = useState(0);
-	const [placement, setPlacement] = useState<Placement | null>(null);
+	const [placements, setPlacements] = useState<Placement[] | null>(null);
 	const [timedOut, setTimedOut] = useState(false);
 	const [chapterPhase, setChapterPhase] = useState<"in" | "out" | null>(null);
 	const searchStartedAt = useRef(0);
@@ -244,7 +241,7 @@ export function TutorialControl({
 		if (!open) {
 			return;
 		}
-		setPlacement(null);
+		setPlacements(null);
 		setTimedOut(false);
 		capturedHrefRef.current = null;
 		searchStartedAt.current = Date.now();
@@ -275,7 +272,7 @@ export function TutorialControl({
 		function tick() {
 			const found = measure(step.selector, step.selectorSecondary);
 			if (found) {
-				setPlacement(found.placement);
+				setPlacements(found.placements);
 				setTimedOut(false);
 				if (
 					step.advance === "navigate-now" ||
@@ -296,7 +293,7 @@ export function TutorialControl({
 				setStepIndex(aheadIndex);
 				return;
 			}
-			setPlacement(null);
+			setPlacements(null);
 			if (Date.now() - searchStartedAt.current > FIND_TIMEOUT_MS) {
 				setTimedOut(true);
 			}
@@ -456,7 +453,7 @@ export function TutorialControl({
 							chapter={step.chapter}
 							text={step.text}
 							gesture={step.gesture}
-							placement={placement}
+							placements={placements}
 							showSpotlight={!timedOut}
 							reducedMotion={reducedMotion}
 							isFirst={isFirst}
@@ -513,7 +510,7 @@ function TutorialOverlay({
 	chapter,
 	text,
 	gesture,
-	placement,
+	placements,
 	showSpotlight,
 	reducedMotion,
 	isFirst,
@@ -527,7 +524,7 @@ function TutorialOverlay({
 	chapter: string;
 	text: string;
 	gesture: TutorialGesture;
-	placement: Placement | null;
+	placements: Placement[] | null;
 	showSpotlight: boolean;
 	reducedMotion: boolean;
 	isFirst: boolean;
@@ -536,16 +533,31 @@ function TutorialOverlay({
 	onNext: () => void;
 	onSkip: () => void;
 }) {
-	const hasTarget = showSpotlight && placement !== null;
-	const box =
-		hasTarget && placement
-			? {
-					top: placement.top - SPOTLIGHT_PADDING,
-					left: placement.left - SPOTLIGHT_PADDING,
-					width: placement.width + SPOTLIGHT_PADDING * 2,
-					height: placement.height + SPOTLIGHT_PADDING * 2,
-				}
+	const hasTarget =
+		showSpotlight && placements !== null && placements.length > 0;
+	const boxes: Placement[] | null =
+		hasTarget && placements
+			? placements.map((p) => ({
+					top: p.top - SPOTLIGHT_PADDING,
+					left: p.left - SPOTLIGHT_PADDING,
+					width: p.width + SPOTLIGHT_PADDING * 2,
+					height: p.height + SPOTLIGHT_PADDING * 2,
+				}))
 			: null;
+	// A box across every real box, used ONLY to float the hint card near the
+	// group — never drawn as a highlight. That distinction is the whole
+	// fix: Support and Counter each keep their own tight ring, so the split
+	// bar and the staked figure sitting between them stay dimmed instead of
+	// getting swept into one merged spotlight.
+	const unionBox: Placement | null = boxes?.length
+		? boxes.reduce((acc, b) => {
+				const left = Math.min(acc.left, b.left);
+				const top = Math.min(acc.top, b.top);
+				const right = Math.max(acc.left + acc.width, b.left + b.width);
+				const bottom = Math.max(acc.top + acc.height, b.top + b.height);
+				return { left, top, width: right - left, height: bottom - top };
+			})
+		: null;
 
 	return (
 		<div
@@ -554,52 +566,41 @@ function TutorialOverlay({
 			aria-label="Product tutorial"
 			className="fixed inset-0 z-50"
 		>
-			{box ? (
+			{boxes ? (
 				<>
-					<div
-						className="fixed inset-x-0 top-0 bg-black/60 backdrop-blur-sm"
-						style={{ height: Math.max(0, box.top) }}
+					<DimPanels boxes={boxes} />
+					{boxes.map((box) => (
+						<div
+							key={`${box.top}-${box.left}`}
+							aria-hidden="true"
+							className="pointer-events-none fixed rounded-lg border-2 border-n7 shadow-[0_0_0_4px_rgba(228,228,228,0.15)]"
+							style={{
+								top: box.top,
+								left: box.left,
+								width: box.width,
+								height: box.height,
+							}}
+						/>
+					))}
+					{!reducedMotion
+						? boxes.map((box) => (
+								<GestureMark
+									key={`${box.top}-${box.left}`}
+									gesture={gesture}
+									box={box}
+								/>
+							))
+						: null}
+					<TutorialHand
+						box={boxes[boxes.length - 1]}
+						reducedMotion={reducedMotion}
 					/>
-					<div
-						className="fixed inset-x-0 bottom-0 bg-black/60 backdrop-blur-sm"
-						style={{ top: box.top + box.height }}
-					/>
-					<div
-						className="fixed bg-black/60 backdrop-blur-sm"
-						style={{
-							top: box.top,
-							height: box.height,
-							left: 0,
-							width: Math.max(0, box.left),
-						}}
-					/>
-					<div
-						className="fixed bg-black/60 backdrop-blur-sm"
-						style={{
-							top: box.top,
-							height: box.height,
-							left: box.left + box.width,
-							right: 0,
-						}}
-					/>
-					<div
-						aria-hidden="true"
-						className="pointer-events-none fixed rounded-lg border-2 border-n7 shadow-[0_0_0_4px_rgba(228,228,228,0.15)]"
-						style={{
-							top: box.top,
-							left: box.left,
-							width: box.width,
-							height: box.height,
-						}}
-					/>
-					{!reducedMotion ? <GestureMark gesture={gesture} box={box} /> : null}
-					<TutorialHand box={box} reducedMotion={reducedMotion} />
 				</>
 			) : (
 				<div className="fixed inset-0 bg-black/70 backdrop-blur-sm" />
 			)}
 			<HintCard
-				box={box}
+				box={unionBox}
 				stepNumber={stepNumber}
 				stepCount={stepCount}
 				chapter={chapter}
@@ -613,6 +614,77 @@ function TutorialOverlay({
 				onSkip={onSkip}
 			/>
 		</div>
+	);
+}
+
+/**
+ * The dim + blur backdrop, with every real target rect cut clean out of it —
+ * the same four-panel-around-one-box technique the single-target case
+ * already used, generalized to a ROW of N boxes: top and bottom panels span
+ * the full width above/below the whole row, and a panel sits left of the
+ * first box, right of the last, and in each gap BETWEEN consecutive boxes.
+ * None of these panels ever overlaps a box's own x-range, so nothing
+ * highlighted gets dimmed regardless of how many boxes there are. Assumes
+ * the boxes sit roughly in one horizontal row — true of every current use
+ * (Support/Counter, side by side on a post) and of the single-box case,
+ * where there are simply no gap panels to draw.
+ */
+function DimPanels({ boxes }: { boxes: Placement[] }) {
+	const sorted = [...boxes].sort((a, b) => a.left - b.left);
+	const overallTop = Math.min(...sorted.map((b) => b.top));
+	const overallBottom = Math.max(...sorted.map((b) => b.top + b.height));
+	const first = sorted[0];
+	const last = sorted[sorted.length - 1];
+	const panelClass = "fixed bg-black/60 backdrop-blur-sm";
+	return (
+		<>
+			<div
+				className={cn(panelClass, "inset-x-0 top-0")}
+				style={{ height: Math.max(0, overallTop) }}
+			/>
+			<div
+				className={cn(panelClass, "inset-x-0 bottom-0")}
+				style={{ top: overallBottom }}
+			/>
+			<div
+				className={panelClass}
+				style={{
+					top: overallTop,
+					height: overallBottom - overallTop,
+					left: 0,
+					width: Math.max(0, first.left),
+				}}
+			/>
+			<div
+				className={panelClass}
+				style={{
+					top: overallTop,
+					height: overallBottom - overallTop,
+					left: last.left + last.width,
+					right: 0,
+				}}
+			/>
+			{sorted.slice(0, -1).map((box, i) => {
+				const next = sorted[i + 1];
+				const gapLeft = box.left + box.width;
+				const gapWidth = next.left - gapLeft;
+				if (gapWidth <= 0) {
+					return null;
+				}
+				return (
+					<div
+						key={`${box.top}-${box.left}`}
+						className={panelClass}
+						style={{
+							top: overallTop,
+							height: overallBottom - overallTop,
+							left: gapLeft,
+							width: gapWidth,
+						}}
+					/>
+				);
+			})}
+		</>
 	);
 }
 
