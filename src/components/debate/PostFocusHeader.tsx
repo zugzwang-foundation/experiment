@@ -371,6 +371,7 @@ export function PostFocusHeader({
 									<div className="@container min-w-0">
 										<InfoTip content={post.title} asChild>
 											<h2
+												data-tutorial="post-focus-title"
 												className="truncate font-heading leading-snug font-medium"
 												style={{ fontSize: titleSize(post.title) }}
 											>

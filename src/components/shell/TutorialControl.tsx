@@ -191,6 +191,17 @@ export function TutorialControl({
 	/** Banked from the "Get oriented" identity-chip step, spent once — on
 	 *  entering "Your profile". Cleared on close so a re-run captures fresh. */
 	const profileHrefRef = useRef<string | null>(null);
+	/**
+	 * Set by `back()` immediately before it moves `stepIndex`, read (and
+	 * cleared) by the chapter-card effect on the very next run. Reviewing
+	 * material you've already seen shouldn't force you through a ~1.7s
+	 * title-card animation with no Back/Next visible on it — that's the
+	 * ONLY thing between two adjacent steps while it plays — so crossing a
+	 * chapter boundary backward skips the card entirely and lands straight
+	 * on the target step, while crossing one forward (via Next, or the
+	 * look-ahead catching up to a real user action) still shows it.
+	 */
+	const suppressChapterCardRef = useRef(false);
 
 	const step = TUTORIAL_STEPS[stepIndex];
 	const isFirst = stepIndex === 0;
@@ -207,6 +218,11 @@ export function TutorialControl({
 	// animation classes.
 	useEffect(() => {
 		if (!open) {
+			setChapterPhase(null);
+			return;
+		}
+		if (suppressChapterCardRef.current) {
+			suppressChapterCardRef.current = false;
 			setChapterPhase(null);
 			return;
 		}
@@ -392,6 +408,7 @@ export function TutorialControl({
 	}
 
 	function back() {
+		suppressChapterCardRef.current = true;
 		setStepIndex((i) => Math.max(i - 1, 0));
 	}
 

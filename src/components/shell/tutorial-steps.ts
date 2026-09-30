@@ -240,10 +240,31 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		advance: "click",
 	},
 	{
+		id: "reply-target-post",
+		chapter: "Support & Counter",
+		selector: '[data-tutorial="post-focus-title"]',
+		text: "This is the argument you're now acting on — everything from here backs or counters THIS post specifically, not the market in general.",
+		gesture: "point-hold",
+	},
+	{
 		id: "reply-composer-ack",
 		chapter: "Support & Counter",
 		selector: '[data-testid="mirror-statement-row"]',
-		text: "This opens onto that specific post now — the same box as before, backing or countering THIS argument. Everything from the last chapter still applies: argument, image, stake, to win.",
+		text: "The same box as before, now aimed at that post: argument, image, stake, to win — everything from the last chapter still applies.",
+		gesture: "point-hold",
+	},
+	{
+		id: "friendly-fire",
+		chapter: "Support & Counter",
+		selector: '[data-testid="ff-switch-row"]',
+		text: "Friendly fire: on a Support reply, this marks you as backing the side but contesting THIS specific argument for it — a stronger case exists, in your view.",
+		gesture: "tap",
+	},
+	{
+		id: "existing-replies",
+		chapter: "Support & Counter",
+		selector: '[data-testid="arena"]',
+		text: "Existing replies to this post show here the same way as the market itself — sorted by side, most-staked first.",
 		gesture: "point-hold",
 	},
 	// ---- Your profile ----
