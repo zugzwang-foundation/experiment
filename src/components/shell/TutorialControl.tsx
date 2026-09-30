@@ -28,9 +28,11 @@ import {
  *
  * The target element under the spotlight is never covered by anything —
  * only `pointer-events-none` decoration surrounds it — so steps that need
- * the user to actually click the real control (a market card, Buy, a
- * Support/Counter pill, a position's Sell button) keep working with the
- * overlay open.
+ * the viewer to actually click the real control (Bet, Support, Counter, a
+ * position's Sell button) keep working with the overlay open. Those three
+ * are deliberately left un-automated: whether one is `disabled` depends on
+ * the viewer's own open positions, so a simulated click could silently do
+ * nothing — see `tutorial-steps.ts`'s `advance` docs for the boundary.
  *
  * The chapter-card wipe, the gesture scribbles and the word-by-word text
  * reveal below all need `@keyframes` Tailwind has no utility for — the same
@@ -52,25 +54,58 @@ const CHAPTER_WIPE_MS = 420;
 
 type Placement = { top: number; left: number; width: number; height: number };
 
-function measure(
-	selector: string,
-): { placement: Placement; el: HTMLElement } | null {
-	let el: Element | null = null;
+function queryEl(selector: string): HTMLElement | null {
 	try {
-		el = document.querySelector(selector);
+		const el = document.querySelector(selector);
+		return el instanceof HTMLElement ? el : null;
 	} catch {
 		return null;
 	}
-	if (!(el instanceof HTMLElement)) {
-		return null;
-	}
+}
+
+function rectOf(el: HTMLElement): DOMRect | null {
 	const r = el.getBoundingClientRect();
-	if (r.width === 0 && r.height === 0) {
+	return r.width === 0 && r.height === 0 ? null : r;
+}
+
+/**
+ * Finds the step's target(s) and returns one combined box. When
+ * `selectorSecondary` is given (Support + Counter, explained as a pair) the
+ * box spans both real elements rather than picking one — the primary
+ * element is still the one `advance` reads a `href` from, when a step needs
+ * that.
+ */
+function measure(
+	selector: string,
+	selectorSecondary?: string,
+): { placement: Placement; primaryEl: HTMLElement } | null {
+	const primaryEl = queryEl(selector);
+	if (!primaryEl) {
 		return null;
 	}
+	const primaryRect = rectOf(primaryEl);
+	if (!primaryRect) {
+		return null;
+	}
+	let top = primaryRect.top;
+	let left = primaryRect.left;
+	let right = primaryRect.left + primaryRect.width;
+	let bottom = primaryRect.top + primaryRect.height;
+
+	if (selectorSecondary) {
+		const secondaryEl = queryEl(selectorSecondary);
+		const secondaryRect = secondaryEl ? rectOf(secondaryEl) : null;
+		if (secondaryRect) {
+			top = Math.min(top, secondaryRect.top);
+			left = Math.min(left, secondaryRect.left);
+			right = Math.max(right, secondaryRect.left + secondaryRect.width);
+			bottom = Math.max(bottom, secondaryRect.top + secondaryRect.height);
+		}
+	}
+
 	return {
-		placement: { top: r.top, left: r.left, width: r.width, height: r.height },
-		el,
+		placement: { top, left, width: right - left, height: bottom - top },
+		primaryEl,
 	};
 }
 
@@ -101,7 +136,7 @@ export function TutorialControl({
 	const searchStartedAt = useRef(0);
 	const reducedMotion = useReducedMotion();
 	const router = useRouter();
-	/** The current step's own target `href`, live while it's `captureHrefFor`. */
+	/** The current step's own target `href`, live while it's nav-relevant. */
 	const capturedHrefRef = useRef<string | null>(null);
 	/** Banked from the "Get oriented" identity-chip step, spent once — on
 	 *  entering "Your profile". Cleared on close so a re-run captures fresh. */
@@ -161,7 +196,7 @@ export function TutorialControl({
 		};
 	}, [open, stepIndex, reducedMotion]);
 
-	// Find and track the current step's target. Re-runs on every step
+	// Find and track the current step's target(s). Re-runs on every step
 	// change; polls rather than using a MutationObserver because the
 	// targets this points at come and go across real navigations and a
 	// composer opening, not from a subtree this component owns. Runs
@@ -178,15 +213,18 @@ export function TutorialControl({
 		searchStartedAt.current = Date.now();
 
 		function tick() {
-			const found = measure(step.selector);
+			const found = measure(step.selector, step.selectorSecondary);
 			if (found) {
 				setPlacement(found.placement);
 				setTimedOut(false);
-				if (step.captureHrefFor) {
-					const href = found.el.getAttribute("href");
+				if (
+					step.advance === "navigate-now" ||
+					step.advance === "bank-profile"
+				) {
+					const href = found.primaryEl.getAttribute("href");
 					if (href) {
 						capturedHrefRef.current = href;
-						if (step.captureHrefFor === "profile") {
+						if (step.advance === "bank-profile") {
 							profileHrefRef.current = href;
 						}
 					}
@@ -208,7 +246,7 @@ export function TutorialControl({
 			window.removeEventListener("scroll", tick, true);
 			window.removeEventListener("resize", tick);
 		};
-	}, [open, step.selector, step.captureHrefFor]);
+	}, [open, step.selector, step.selectorSecondary, step.advance]);
 
 	function start() {
 		profileHrefRef.current = null;
@@ -221,11 +259,16 @@ export function TutorialControl({
 	 * viewer to find the next control themselves — Next is what "slides"
 	 * them from Discovery to a market and, later, to their own profile,
 	 * using the real Next.js router against the real href of whatever the
-	 * spotlight is already highlighting.
+	 * spotlight is already highlighting. A `"click"` step dispatches a real
+	 * click on a control that is never money-conditional (closing the
+	 * composer's draft) — Bet, Support, Counter and Place stay real taps.
 	 */
 	function next() {
-		if (step.captureHrefFor === "market" && capturedHrefRef.current) {
+		if (step.advance === "navigate-now" && capturedHrefRef.current) {
 			router.push(capturedHrefRef.current);
+		}
+		if (step.advance === "click") {
+			queryEl(step.clickSelector ?? step.selector)?.click();
 		}
 		if (isLast) {
 			close();
@@ -438,11 +481,10 @@ function TutorialOverlay({
 
 /**
  * The hand-drawn-feeling scribble matched to the step's own gesture, drawn
- * in a normalized 0–100 box and stretched onto the real target rect — a
- * "tap" circles the whole control, "point-hold" underlines it, "swipe"
- * shows a pair of sliding chevrons. All three use `pathLength="1"` so the
- * draw-in animation's `stroke-dashoffset` never needs the target's real
- * geometry measured in JS.
+ * in a normalized 0–100 box and stretched onto the real target rect — "tap"
+ * circles the whole control, "point-hold" underlines it. `pathLength="1"`
+ * means the draw-in animation's `stroke-dashoffset` never needs the
+ * target's real geometry measured in JS.
  */
 function GestureMark({
 	gesture,
@@ -476,8 +518,7 @@ function GestureMark({
 					strokeWidth={2.5}
 					strokeLinecap="round"
 				/>
-			) : null}
-			{gesture === "point-hold" ? (
+			) : (
 				<path
 					className="zzt-draw"
 					pathLength={1}
@@ -487,24 +528,7 @@ function GestureMark({
 					strokeWidth={2.5}
 					strokeLinecap="round"
 				/>
-			) : null}
-			{gesture === "swipe" ? (
-				<g
-					fill="none"
-					stroke="currentColor"
-					strokeWidth={3}
-					strokeLinecap="round"
-				>
-					<path
-						className="zzt-swipe-left"
-						d="M42 50 H20 M20 50 L28 42 M20 50 L28 58"
-					/>
-					<path
-						className="zzt-swipe-right"
-						d="M58 50 H80 M80 50 L72 42 M80 50 L72 58"
-					/>
-				</g>
-			) : null}
+			)}
 		</svg>
 	);
 }
@@ -578,7 +602,7 @@ function HintCard({
 	onSkip: () => void;
 }) {
 	const CARD_WIDTH = 340;
-	const CARD_HEIGHT_ESTIMATE = 210;
+	const CARD_HEIGHT_ESTIMATE = 230;
 	const MARGIN = 16;
 
 	let style: CSSProperties;
@@ -620,7 +644,9 @@ function HintCard({
 			<AnimatedText text={text} reducedMotion={reducedMotion} />
 			{notFoundHint ? (
 				<p className="mt-2 text-[11px] text-muted-foreground italic">
-					Not on screen right now — Next still works.
+					Nothing here yet to point at — this part of the tour needs existing
+					posts or bets, which a brand-new market may not have. Next still
+					works.
 				</p>
 			) : null}
 			<div className="mt-4 flex items-center justify-between gap-2">
@@ -716,13 +742,8 @@ const TUTORIAL_KEYFRAMES = `
 }
 .zzt-draw { stroke-dasharray: 1; animation: zzt-draw 1800ms ease-in-out infinite; }
 
-@keyframes zzt-swipe-l { 0%, 100% { transform: translateX(0); opacity: .35; } 50% { transform: translateX(-8px); opacity: 1; } }
-@keyframes zzt-swipe-r { 0%, 100% { transform: translateX(0); opacity: .35; } 50% { transform: translateX(8px); opacity: 1; } }
-.zzt-swipe-left { animation: zzt-swipe-l 1400ms ease-in-out infinite; }
-.zzt-swipe-right { animation: zzt-swipe-r 1400ms ease-in-out infinite; }
-
 @media (prefers-reduced-motion: reduce) {
-  .zzt-wipe-in, .zzt-wipe-out, .zzt-slam, .zzt-trail, .zzt-word, .zzt-draw, .zzt-swipe-left, .zzt-swipe-right {
+  .zzt-wipe-in, .zzt-wipe-out, .zzt-slam, .zzt-trail, .zzt-word, .zzt-draw {
     animation: none !important;
   }
 }
