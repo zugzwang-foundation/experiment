@@ -409,6 +409,16 @@ export function TutorialControl({
 
 	function back() {
 		suppressChapterCardRef.current = true;
+		// Leaving a step that was ITSELF only reachable by a page navigation
+		// (Discovery -> a market, or the banked profile href) means Back has
+		// to undo that navigation too, not just move the step index — Next
+		// got here with `router.push`, so `router.back()` is what actually
+		// returns to the page the previous step's target lives on. Without
+		// it, Back would leave the step index pointing at a step whose
+		// target only exists on the page the viewer just left.
+		if (step.enteredViaNavigation) {
+			router.back();
+		}
 		setStepIndex((i) => Math.max(i - 1, 0));
 	}
 
