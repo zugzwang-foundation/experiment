@@ -311,7 +311,20 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 	{
 		id: "existing-replies",
 		chapter: "Support & Counter",
-		selector: '[data-testid="arena"]',
+		// `DebateView` renders a `[data-testid="arena"]` in BOTH its post-focus
+		// arm and its plain-market arm — a bare selector matches whichever one
+		// happens to be mounted, including the market arena if post-focus has
+		// closed out from under this step. `body:has(post-focus-argument)`
+		// scopes the match to only when post-focus is actually the one
+		// rendered: the two arms are mutually exclusive, so `arena` existing
+		// at all once that condition holds means it's the right one. Without
+		// this, a stray match on the market arena reads as "found" to the
+		// finder's look-ahead and traps Back on this exact step — minted
+		// against a live report (see `TutorialControl.tsx`'s `marketHrefRef`
+		// fix for the first way this showed up; this is the general fix for
+		// every other way post-focus can close early).
+		selector:
+			'body:has([data-tutorial="post-focus-argument"]) [data-testid="arena"]',
 		text: "Existing replies to this post show here the same way as the market itself — sorted by side, most-staked first.",
 		gesture: "point-hold",
 	},
