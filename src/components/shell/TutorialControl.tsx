@@ -430,7 +430,7 @@ export function TutorialControl({
 			return;
 		}
 		if (enteringProfile) {
-			marketHrefRef.current = window.location.pathname;
+			marketHrefRef.current = window.location.pathname + window.location.search;
 			pauseThenNavigate(profileHrefRef.current as string, nextIndex);
 			return;
 		}
