@@ -8,12 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 import { HEADER_PILL_BUTTON } from "./header-control";
-import {
-	chapterNumberFor,
-	isFirstStepOfChapter,
-	TUTORIAL_CHAPTERS,
-	TUTORIAL_STEPS,
-} from "./tutorial-steps";
+import { isFirstStepOfChapter, TUTORIAL_STEPS } from "./tutorial-steps";
 
 /**
  * The header's "Tutorial" control and the spotlight overlay it opens.
@@ -50,23 +45,17 @@ import {
  * keeps the blurred backdrop matching whatever page or state is actually
  * live.
  *
- * The chapter-card wipe, the word-by-word text
- * reveal below all need `@keyframes` Tailwind has no utility for — the same
- * situation `src/components/art/warli/` is in, and this file follows its
- * precedent exactly: a component-scoped `<style>` tag, names prefixed
- * (`zzt-`) to stay collision-free, used nowhere else in this component's
- * own styling. `prefers-reduced-motion` is honoured in JS, not only CSS —
- * `PhoneSheet`'s reasoning applies here too: a CSS-only mute would suppress
- * the motion and still leave every delay it was gating, so the reduced-
- * motion branch below skips the chapter-card timers entirely rather than
- * just playing them invisibly.
+ * The word-by-word text reveal below needs `@keyframes` Tailwind has no
+ * utility for — the same situation `src/components/art/warli/` is in, and
+ * this file follows its precedent exactly: a component-scoped `<style>`
+ * tag, names prefixed (`zzt-`) to stay collision-free, used nowhere else in
+ * this component's own styling. `prefers-reduced-motion` is honoured in
+ * JS, not only CSS — `PhoneSheet`'s reasoning applies here too.
  */
 
 const FIND_TIMEOUT_MS = 10_000;
 const POLL_MS = 250;
 const SPOTLIGHT_PADDING = 8;
-const CHAPTER_HOLD_MS = 1300;
-const CHAPTER_WIPE_MS = 420;
 
 type Placement = { top: number; left: number; width: number; height: number };
 
@@ -182,7 +171,6 @@ export function TutorialControl({
 	const [stepIndex, setStepIndex] = useState(0);
 	const [placements, setPlacements] = useState<Placement[] | null>(null);
 	const [timedOut, setTimedOut] = useState(false);
-	const [chapterPhase, setChapterPhase] = useState<"in" | "out" | null>(null);
 	const searchStartedAt = useRef(0);
 	const reducedMotion = useReducedMotion();
 	const router = useRouter();
@@ -192,66 +180,26 @@ export function TutorialControl({
 	 *  entering "Your profile". Cleared on close so a re-run captures fresh. */
 	const profileHrefRef = useRef<string | null>(null);
 	/**
-	 * Set by `back()` immediately before it moves `stepIndex`, read (and
-	 * cleared) by the chapter-card effect on the very next run. Reviewing
-	 * material you've already seen shouldn't force you through a ~1.7s
-	 * title-card animation with no Back/Next visible on it — that's the
-	 * ONLY thing between two adjacent steps while it plays — so crossing a
-	 * chapter boundary backward skips the card entirely and lands straight
-	 * on the target step, while crossing one forward (via Next, or the
-	 * look-ahead catching up to a real user action) still shows it.
+	 * The market page's own URL, captured the instant `next()` spends
+	 * `profileHrefRef` to push into "Your profile" — the one piece of state
+	 * `back()` needs to reverse that specific navigation later. Discovery
+	 * needs no equivalent ref: `start()` always lands there first, so it's
+	 * always just `"/"`.
 	 */
-	const suppressChapterCardRef = useRef(false);
+	const marketHrefRef = useRef<string | null>(null);
 
 	const step = TUTORIAL_STEPS[stepIndex];
 	const isFirst = stepIndex === 0;
 	const isLast = stepIndex === TUTORIAL_STEPS.length - 1;
-	const showingChapterCard = chapterPhase !== null;
 
 	const close = useCallback(() => {
 		setOpen(false);
 	}, []);
 
-	// The chapter title card, shown once per chapter change. Reduced-motion
-	// skips the delay entirely rather than playing it invisibly — the
-	// timers themselves are the thing being opted out of, not just the
-	// animation classes.
-	useEffect(() => {
-		if (!open) {
-			setChapterPhase(null);
-			return;
-		}
-		if (suppressChapterCardRef.current) {
-			suppressChapterCardRef.current = false;
-			setChapterPhase(null);
-			return;
-		}
-		if (reducedMotion || !isFirstStepOfChapter(stepIndex)) {
-			setChapterPhase(null);
-			return;
-		}
-		setChapterPhase("in");
-		const toOut = window.setTimeout(
-			() => setChapterPhase("out"),
-			CHAPTER_HOLD_MS,
-		);
-		const toClear = window.setTimeout(
-			() => setChapterPhase(null),
-			CHAPTER_HOLD_MS + CHAPTER_WIPE_MS,
-		);
-		return () => {
-			window.clearTimeout(toOut);
-			window.clearTimeout(toClear);
-		};
-	}, [open, stepIndex, reducedMotion]);
-
 	// Find and track the current step's target(s). Re-runs on every step
 	// change; polls rather than using a MutationObserver because the
 	// targets this points at come and go across real navigations and a
-	// composer opening, not from a subtree this component owns. Runs
-	// independently of the chapter card above — finding the target costs
-	// nothing while that card is covering the screen, and it means the
-	// spotlight is ready the instant the card wipes away.
+	// composer opening, not from a subtree this component owns.
 	useEffect(() => {
 		if (!open) {
 			return;
@@ -402,22 +350,34 @@ export function TutorialControl({
 			TUTORIAL_STEPS[nextIndex].chapter === "Your profile" &&
 			profileHrefRef.current
 		) {
+			marketHrefRef.current = window.location.pathname;
 			router.push(profileHrefRef.current);
 		}
 		setStepIndex(nextIndex);
 	}
 
+	/**
+	 * Leaving a step that was ITSELF only reachable by a page navigation
+	 * (Discovery -> a market, or the banked profile href) means Back has to
+	 * undo that navigation too, not just move the step index — otherwise it
+	 * leaves the step index pointing at a step whose target only exists on
+	 * the page the viewer just left. `router.back()` was tried first and
+	 * doesn't hold up: it depends on the exact shape of the browser's own
+	 * history stack, which this tour doesn't fully control (another
+	 * `router.push`/`replace` elsewhere in the app, a manual navigation,
+	 * reordered entries). Pushing a KNOWN origin instead removes that
+	 * dependency entirely — Discovery is always `"/"` (`start()`'s own
+	 * guarantee), and the market page's URL is captured into
+	 * `marketHrefRef` at the exact moment `next()` leaves it for the
+	 * profile, so there is never any ambiguity about where "back" means.
+	 */
 	function back() {
-		suppressChapterCardRef.current = true;
-		// Leaving a step that was ITSELF only reachable by a page navigation
-		// (Discovery -> a market, or the banked profile href) means Back has
-		// to undo that navigation too, not just move the step index — Next
-		// got here with `router.push`, so `router.back()` is what actually
-		// returns to the page the previous step's target lives on. Without
-		// it, Back would leave the step index pointing at a step whose
-		// target only exists on the page the viewer just left.
 		if (step.enteredViaNavigation) {
-			router.back();
+			const origin =
+				step.chapter === "Your profile" ? marketHrefRef.current : "/";
+			if (origin) {
+				router.push(origin);
+			}
 		}
 		setStepIndex((i) => Math.max(i - 1, 0));
 	}
@@ -427,11 +387,9 @@ export function TutorialControl({
 	// only while open and re-bound each render (next/back close over
 	// step-dependent state, so there is no stable version to memoize) — the
 	// same cleanup discipline `composer-open-store.ts` documents applies:
-	// nothing here is left attached past close. Suppressed entirely while
-	// the chapter card is showing, so an arrow press doesn't fire Next twice
-	// in a row through a card the viewer hasn't actually read yet.
+	// nothing here is left attached past close.
 	useEffect(() => {
-		if (!open || showingChapterCard) {
+		if (!open) {
 			return;
 		}
 		function onKey(e: KeyboardEvent) {
@@ -465,67 +423,24 @@ export function TutorialControl({
 			{open ? (
 				<>
 					<style>{TUTORIAL_KEYFRAMES}</style>
-					{showingChapterCard ? (
-						<ChapterCard
-							phase={chapterPhase as "in" | "out"}
-							chapterNumber={chapterNumberFor(stepIndex)}
-							chapterCount={TUTORIAL_CHAPTERS.length}
-							name={step.chapter}
-						/>
-					) : (
-						<TutorialOverlay
-							stepNumber={stepIndex + 1}
-							stepCount={TUTORIAL_STEPS.length}
-							chapter={step.chapter}
-							text={step.text}
-							placements={placements}
-							showSpotlight={!timedOut}
-							reducedMotion={reducedMotion}
-							isFirst={isFirst}
-							isLast={isLast}
-							onBack={back}
-							onNext={next}
-							onSkip={close}
-						/>
-					)}
+					<TutorialOverlay
+						stepNumber={stepIndex + 1}
+						stepCount={TUTORIAL_STEPS.length}
+						chapter={step.chapter}
+						text={step.text}
+						referenceImage={step.referenceImage}
+						placements={placements}
+						showSpotlight={!timedOut}
+						reducedMotion={reducedMotion}
+						isFirst={isFirst}
+						isLast={isLast}
+						onBack={back}
+						onNext={next}
+						onSkip={close}
+					/>
 				</>
 			) : null}
 		</>
-	);
-}
-
-function ChapterCard({
-	phase,
-	chapterNumber,
-	chapterCount,
-	name,
-}: {
-	phase: "in" | "out";
-	chapterNumber: number;
-	chapterCount: number;
-	name: string;
-}) {
-	return (
-		<div
-			role="status"
-			aria-live="polite"
-			className={cn(
-				"fixed inset-0 z-50 grid place-content-center gap-2 bg-ground px-[9%] text-ink",
-				phase === "in" ? "zzt-wipe-in" : "zzt-wipe-out",
-			)}
-		>
-			<div className="flex items-baseline gap-3">
-				<b className="zzt-slam text-[clamp(56px,12vw,120px)] leading-[0.85] font-extrabold tracking-tight">
-					{chapterNumber}
-				</b>
-				<span className="font-mono text-[13px] text-muted-foreground">
-					/ {chapterCount}
-				</span>
-			</div>
-			<div className="zzt-trail text-[clamp(20px,4vw,32px)] font-bold tracking-tight">
-				{name}
-			</div>
-		</div>
 	);
 }
 
@@ -534,6 +449,7 @@ function TutorialOverlay({
 	stepCount,
 	chapter,
 	text,
+	referenceImage,
 	placements,
 	showSpotlight,
 	reducedMotion,
@@ -547,6 +463,7 @@ function TutorialOverlay({
 	stepCount: number;
 	chapter: string;
 	text: string;
+	referenceImage?: string;
 	placements: Placement[] | null;
 	showSpotlight: boolean;
 	reducedMotion: boolean;
@@ -620,6 +537,7 @@ function TutorialOverlay({
 				chapter={chapter}
 				text={text}
 				notFoundHint={!hasTarget}
+				referenceImage={referenceImage}
 				reducedMotion={reducedMotion}
 				isFirst={isFirst}
 				isLast={isLast}
@@ -750,6 +668,7 @@ function HintCard({
 	chapter,
 	text,
 	notFoundHint,
+	referenceImage,
 	reducedMotion,
 	isFirst,
 	isLast,
@@ -763,6 +682,7 @@ function HintCard({
 	chapter: string;
 	text: string;
 	notFoundHint: boolean;
+	referenceImage?: string;
 	reducedMotion: boolean;
 	isFirst: boolean;
 	isLast: boolean;
@@ -770,7 +690,13 @@ function HintCard({
 	onNext: () => void;
 	onSkip: () => void;
 }) {
-	const CARD_WIDTH = 340;
+	// Wider when showing a reference screenshot — 340px would shrink it to
+	// an illegible thumbnail. `box` is always null alongside `notFoundHint`
+	// (see `TutorialOverlay`: `unionBox` only exists when a target was
+	// found), so the wider card only ever applies in the centered, no-target
+	// layout below — never fights for space against a real spotlight box.
+	const showingReference = notFoundHint && !!referenceImage;
+	const CARD_WIDTH = showingReference ? 480 : 340;
 	const CARD_HEIGHT_ESTIMATE = 230;
 	const MARGIN = 16;
 
@@ -811,7 +737,20 @@ function HintCard({
 				</span>
 			</div>
 			<AnimatedText text={text} reducedMotion={reducedMotion} />
-			{notFoundHint ? (
+			{showingReference ? (
+				<div className="mt-2">
+					{/* biome-ignore lint/performance/noImgElement: a static local asset in a client component with no next/image boundary nearby — not worth the config for one illustrative screenshot */}
+					<img
+						src={referenceImage}
+						alt="An example profile, populated with positions and arguments"
+						className="w-full rounded-(--r) border border-n2"
+					/>
+					<p className="mt-2 text-[11px] text-muted-foreground italic">
+						Yours is empty for now — this is what it looks like once you've
+						argued and bet.
+					</p>
+				</div>
+			) : notFoundHint ? (
 				<p className="mt-2 text-[11px] text-muted-foreground italic">
 					Nothing here yet to point at — this part of the tour needs existing
 					posts or bets, which a brand-new market may not have. Next still
@@ -886,33 +825,14 @@ function AnimatedText({
 }
 
 const TUTORIAL_KEYFRAMES = `
-@keyframes zzt-wipe-in { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
-@keyframes zzt-wipe-out { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 0 0 100%); } }
-.zzt-wipe-in { animation: zzt-wipe-in 420ms cubic-bezier(.7,0,.2,1) both; }
-.zzt-wipe-out { animation: zzt-wipe-out 420ms cubic-bezier(.7,0,.2,1) both; }
-
-@keyframes zzt-slam {
-  0% { opacity: 0; transform: translateY(-30%) scaleY(1.25); filter: blur(8px); }
-  60% { opacity: 1; transform: translateY(2%) scaleY(.98); filter: blur(0); }
-  100% { transform: none; }
-}
-.zzt-slam { animation: zzt-slam 620ms cubic-bezier(.16,1,.3,1) 140ms both; }
-
-@keyframes zzt-trail {
-  from { opacity: 0; transform: translateY(10px); filter: blur(4px); }
-  to { opacity: 1; transform: none; filter: none; }
-}
-.zzt-trail { animation: zzt-trail 550ms cubic-bezier(.16,1,.3,1) 260ms both; }
-
 @keyframes zzt-word-in {
   from { opacity: 0; transform: translateY(6px); filter: blur(3px); }
   to { opacity: 1; transform: none; filter: none; }
 }
 .zzt-word { display: inline-block; white-space: pre; animation: zzt-word-in 420ms cubic-bezier(.16,1,.3,1) both; }
 
-
 @media (prefers-reduced-motion: reduce) {
-  .zzt-wipe-in, .zzt-wipe-out, .zzt-slam, .zzt-trail, .zzt-word {
+  .zzt-word {
     animation: none !important;
   }
 }

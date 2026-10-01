@@ -58,11 +58,21 @@ export type TutorialStep = {
 	 * step of "Read the market" (reached by `market-card`'s "navigate-now")
 	 * and the first step of "Your profile" (reached by the banked
 	 * "bank-profile" href). Pressing Back FROM one of these needs to reverse
-	 * that navigation (`router.back()`) as well as move the step index —
-	 * otherwise Back leaves the viewer on the wrong page entirely, pointing
-	 * at a step whose target only exists on the page Next came from.
+	 * that navigation as well as move the step index — otherwise Back
+	 * leaves the viewer on the wrong page entirely, pointing at a step
+	 * whose target only exists on the page Next came from. See
+	 * `TutorialControl.tsx`'s `back()` for how the reversal itself works.
 	 */
 	enteredViaNavigation?: boolean;
+	/**
+	 * A static illustrative screenshot, shown instead of the generic "Nothing
+	 * here yet" message when this step's real target can't be found AND the
+	 * step is one where that's expected for a perfectly normal reason — a
+	 * brand-new account has no positions or arguments yet, not a target that
+	 * merely hasn't loaded. Used only by the four "Your profile" steps, which
+	 * are the one chapter guaranteed to be empty for every first-time viewer.
+	 */
+	referenceImage?: string;
 };
 
 export const TUTORIAL_STEPS: readonly TutorialStep[] = [
@@ -286,28 +296,32 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		text: "Your public profile — the pseudonym and identity everyone sees you argue and bet under.",
 		gesture: "point-hold",
 		enteredViaNavigation: true,
+		referenceImage: "/tutorial/profile-reference.png",
 	},
 	{
 		id: "profile-tiles",
 		chapter: "Your profile",
 		selector: '[data-testid="profile-tiles"]',
-		text: "Your scoreboard: everything you've argued, and what it's worth.",
+		text: "Your scoreboard: everything you've argued, and what it's worth — like the example above, once you've placed a bet.",
 		gesture: "point-hold",
+		referenceImage: "/tutorial/profile-reference.png",
 	},
 	{
 		id: "positions-table",
 		chapter: "Your profile",
 		selector: '[data-testid="positions-panel"]',
-		text: "Every market you've bet on, open or closed, in one place.",
+		text: "Every market you've bet on, open or closed, in one place — like the positions listed above.",
 		gesture: "point-hold",
+		referenceImage: "/tutorial/profile-reference.png",
 	},
 	{
 		id: "position-sell",
 		chapter: "Your profile",
 		selector:
 			'[data-testid^="tile-sell-"]:not([data-testid^="tile-sell-amount-"])',
-		text: "Sell — exit a position early. It's the one action here that needs no argument.",
+		text: "Sell — exit a position early, like the Sell button beside each row above. It's the one action here that needs no argument.",
 		gesture: "tap",
+		referenceImage: "/tutorial/profile-reference.png",
 	},
 ] as const;
 
