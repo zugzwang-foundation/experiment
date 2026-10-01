@@ -503,7 +503,7 @@ function ResolutionBlock({
 					data-testid={`resolution-block-value-${blockKey}`}
 					className={`block w-full truncate leading-[1.5] text-ink ${VALUE_TEXT_SIZE[entry.fontSize]}`}
 					style={{
-						fontSize: fitFontSize(entry.line1, "value", entry.fontSize, 9),
+						fontSize: fitFontSize(entry.line1, "value", entry.fontSize, 8.5),
 					}}
 				>
 					{entry.line1}
@@ -513,7 +513,7 @@ function ResolutionBlock({
 						data-testid={`resolution-block-subvalue-${blockKey}`}
 						className={`block w-full truncate leading-[1.5] text-ink ${VALUE_TEXT_SIZE[entry.fontSize]}`}
 						style={{
-							fontSize: fitFontSize(entry.line2, "value", entry.fontSize, 9),
+							fontSize: fitFontSize(entry.line2, "value", entry.fontSize, 8.5),
 						}}
 					>
 						{entry.line2}
