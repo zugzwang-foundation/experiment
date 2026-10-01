@@ -176,3 +176,90 @@ There is **no stored job state.** The browser holds the parsed rows and sends th
 
 - **Base:** `origin/staging` @ `64c2749b`. The PR targets `staging`. `staging` is 20+ commits ahead of `main`, and this tool is staging-only.
 - ⚠ **`ci.yml` now carries `pull_request: branches-ignore: [staging]`, so a PR into `staging` runs NO CI.** The local gate is therefore the only gate: `ZUGZWANG_ENV=preview just verify` + `pnpm test:invariants` + `pnpm test:integration` against a local Postgres 17 with migrations applied as CI applies them. The push to `staging` still runs CI inside `deploy-aws.yml` before deploying.
+
+## 16. Module contract (tests and implementation are both written against this)
+
+All under `src/server/seed/`. The pure modules import nothing from `@/db`.
+
+```ts
+// gate.ts
+export class SeedToolsDisabledError extends Error {}
+export function isSeedToolsEnabled(env?: string | undefined): boolean; // default process.env.ZUGZWANG_ENV; true ONLY for exactly "staging"
+export function assertSeedToolsEnabled(): void;                       // throws SeedToolsDisabledError otherwise
+
+// types.ts
+export type RawSeedRow = {
+  rowNumber: number;   // 1-based data-row index (header excluded); continuous across tabs in tab order
+  market: string; user: string; side: string; stake: string; argument: string; replyTo: string; // trimmed strings ("" when blank); argument is NOT trimmed
+};
+export type SeedRow = {
+  rowNumber: number; marketSlug: string; userLabel: string | null;
+  side: "YES" | "NO"; stake: string; body: string; replyToRow: number | null;
+};
+export type SeedRowError = { rowNumber: number; message: string }; // rowNumber 0 = file-level error
+export type SeedRowStatus = "posted" | "skipped" | "failed" | "halted";
+export type SeedRowResult = {
+  rowNumber: number; marketSlug: string; status: SeedRowStatus;
+  pseudonym: string | null; newPrice: string | null; message: string | null;
+};
+
+// parse.ts
+export async function parseSeedFile(args: { fileName: string; bytes: Uint8Array }):
+  Promise<{ rows: RawSeedRow[]; errors: SeedRowError[] }>;
+// .csv → one sheet. .xlsx → if the FIRST sheet has a `market` header, rows come from that sheet;
+// otherwise EVERY sheet is read and its tab name is the market slug.
+// Headers are case-insensitive and trimmed; `reply_to` | `replyto` | `reply to` are equivalent.
+// Required headers: side, stake, argument (+ market for single-sheet). Missing → file-level error.
+// Fully blank rows are skipped and do not consume a rowNumber. Any other extension → file-level error.
+
+// validate.ts (pure)
+export const SEED_LABEL_RE: RegExp; // /^[A-Za-z0-9_-]{1,40}$/
+export function validateSeedRows(rows: readonly RawSeedRow[], ctx: { openMarketSlugs: ReadonlySet<string> }):
+  { rows: SeedRow[]; errors: SeedRowError[] };
+// Rules (each violation → one error naming the row):
+//  market ∈ openMarketSlugs · side ∈ {YES,NO} (case-insensitive input) · label blank or SEED_LABEL_RE
+//  stake: plain positive decimal, ≤18 fraction digits; ≥ BET_MIN_STAKE_POST (post) / BET_MIN_STAKE_REPLY (reply);
+//         > BET_MAX_STAKE is an ERROR (never clamped)
+//  body: trim non-empty, length ≤ COMMENT_MAX_LENGTH (body is kept untrimmed in SeedRow)
+//  replyTo: blank, or an integer naming an EARLIER rowNumber in the SAME market whose row is itself
+//           a top-level post (depth 1) and is itself valid
+//  self-reply: same non-null label as the parent → error
+//  one side per (label, market): a labelled participant may not appear on both sides of one market
+//  budget: Σ stake per non-null label ≤ INITIAL_USER_DHARMA
+// `rows` contains ONLY rows with no error. Callers treat errors.length > 0 as "run nothing".
+
+// plan.ts (pure)
+export type SeedMarketGroup = { marketSlug: string; rows: SeedRow[] };
+export function planSeedBatch(rows: readonly SeedRow[]): SeedMarketGroup[]; // groups in first-appearance order; sheet order within
+export function computeBatchId(rows: readonly SeedRow[]): string;            // sha256 hex of canonical JSON; same rows → same id
+export function seedIdempotencyKey(batchId: string, rowNumber: number): string; // `seed-${batchId.slice(0,16)}-r${rowNumber}`
+export function seedParticipantEmail(batchId: string, row: SeedRow): string;
+// label → `seed-${label.toLowerCase()}@seed.staging.invalid`; blank → `seed-${batchId.slice(0,12)}-r${rowNumber}@seed.staging.invalid`
+export const SEED_REQUEST_ID_PREFIX = "seed-staging:";
+
+// participants.ts (DB)
+export async function getOrCreateSeedParticipant(args: { email: string; batchId: string }):
+  Promise<{ userId: string; pseudonym: string; created: boolean }>;
+// Existing user by email → reused (created:false). Else Better Auth createOAuthUser (identity pool assigns
+// the pseudonym) then recordTosAcceptance (initial grant). Never writes a pseudonym itself.
+
+// run.ts (DB)
+export async function runSeedChunk(args: {
+  rows: readonly RawSeedRow[];   // the WHOLE batch every call; re-validated server-side every call
+  fromIndex: number; count: number; haltedMarkets: readonly string[];
+}): Promise<{ batchId: string; results: SeedRowResult[]; nextIndex: number; done: boolean;
+              haltedMarkets: string[]; errors: SeedRowError[] }>;
+// assertSeedToolsEnabled() FIRST. Validation errors → no writes, results [], errors returned.
+// Processes planned order (groups flattened) [fromIndex, fromIndex+count).
+// A row in a halted market → "halted". A failed row halts its market for the rest of the batch.
+// A replayed row (bet_receipts conflict) → "skipped"; its commentId still resolves later replies.
+```
+
+```ts
+// src/server/auth/tos-record.ts — "server-only", NO "use server"
+export async function recordTosAcceptance(args: {
+  userId: string; ip: string; userAgent: string;
+  metadata: { request_id: string; flow_id: string; user_id: string; actor_id: string;
+              idempotency_key: null; ip: string; user_agent: string };
+}): Promise<boolean>; // false = user row missing; true = accepted now OR already accepted (no second grant)
+```
