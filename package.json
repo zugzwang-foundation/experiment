@@ -45,6 +45,7 @@
 		"decimal.js": "10.6.0",
 		"drizzle-orm": "^0.45.0",
 		"drizzle-zod": "^0.7.0",
+		"exceljs": "4.4.0",
 		"isbot": "5.2.1",
 		"lucide-react": "^1.14.0",
 		"next": "16.3.2",

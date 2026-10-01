@@ -635,7 +635,7 @@ describe("chart-window::the environment branch never leaves the constants layer"
 		expect(offenders).toEqual([]);
 	});
 
-	it("finds NO file under src/server/ that branches on the environment, except the four that already own it", () => {
+	it("finds NO file under src/server/ that branches on the environment, except the ones that already own it", () => {
 		// ⛔ THE COMPONENT HALF IS DIRECTORY-SCOPED AND THE SERVER HALF WAS STILL
 		// A LIST — which is the same hole one directory over. A new derivation
 		// module (`src/server/debate-view/chart-window.ts`, say) that read
@@ -650,7 +650,7 @@ describe("chart-window::the environment branch never leaves the constants layer"
 		// a denylist is not: adding a name is a visible decision, and every file
 		// not on it is covered without anyone remembering to add it.
 		//
-		// ⚠ The four incumbents have nothing to do with the chart — they key Redis
+		// ⚠ The incumbents have nothing to do with the chart — they key Redis
 		// namespaces, tag Sentry, guard the OTP sender and refuse a prod
 		// transaction-mode pool. They are listed so this guard stays about the
 		// WINDOW's branch rather than becoming a second, weaker rule about env
@@ -658,6 +658,9 @@ describe("chart-window::the environment branch never leaves the constants layer"
 		const ALLOWED = [
 			"src/server/auth/email-otp.ts",
 			"src/server/config/limits.ts",
+			// SEED-STAGING-1 / ADR-0064: the staging-only seeding gate. Its whole
+			// job is to refuse outside staging; it has no bearing on the window.
+			"src/server/seed/gate.ts",
 			"src/server/upstash/keys.ts",
 			"src/server/visitors/counter.ts",
 		];

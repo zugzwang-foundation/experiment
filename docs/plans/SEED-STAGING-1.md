@@ -5,7 +5,7 @@
 | Status | **DRAFT, for approval.** No code written. |
 | Environment | **Staging only.** Production must be structurally unable to run it. |
 | Critical-path areas touched | 1 (bet placement), 4 (auth: user creation, ToS), 6 (identity pool). Full ritual: tests first, `@code-reviewer`, `@security-auditor`, same-commit ADR, pre-PR self-audit. |
-| ADR | `docs/adr/0062-staging-seed-activity-tool.md` (next free number; re-read the ceiling before minting) |
+| ADR | `docs/adr/0064-staging-seed-activity-tool.md` (next free number; re-read the ceiling before minting) |
 | Estimate | 3–4 working days |
 
 ## 1. Goal
@@ -21,15 +21,18 @@ From the admin panel on **staging**, an operator uploads a CSV or Excel file of 
 - No drip-over-time mode in v1 (section 11).
 - No new database table or migration.
 
-## 3. Guardrails (each one independently blocks production)
+## 3. Guardrails
+
+⚠ **Revised after `@code-reviewer` C-1.** The first version read `process.env.ZUGZWANG_ENV` in literal member form. `next.config.ts` lists that variable under `env:`, so Next substituted the BUILD's value into the server bundle (measured: the shipped gate read `let e="preview"` and contained no environment read). G1 and G2 were therefore one build-time constant, not independent checks. Now the gate reads by computed key at request time AND requires a second variable, `ZUGZWANG_SEED_TOOLS=enabled`, which is in no build configuration and is set only on the staging task definition (`infra/config/staging.ts` `seedTools`). Production's task definition does not carry it, so even a staging image running there refuses.
 
 | # | Guard | Where |
 |---|---|---|
-| G1 | The page returns `notFound()` unless `ZUGZWANG_ENV === "staging"` | `src/app/(admin)/admin/seed/page.tsx` |
-| G2 | Every server action calls `assertSeedToolsEnabled()` first. It throws unless `ZUGZWANG_ENV === "staging"`. | `src/server/seed/gate.ts` |
-| G3 | Admin session required (`requireAdminSession`). Participants can never reach it. | the actions |
+| G1 | The page returns `notFound()` unless the gate passes: `ZUGZWANG_ENV === "staging"` AND `ZUGZWANG_SEED_TOOLS === "enabled"`, both read from the running task | `src/app/(admin)/admin/seed/page.tsx` |
+| G2 | Both Route Handlers (`guardSeedRequest`) and `runSeedChunk` itself check the environment first; on anything but `staging` the handlers answer 404. | `src/server/seed/gate.ts`, `route-guard.ts`, `run.ts` |
+| G3 | Admin session required (`requireAdminSession`). Participants can never reach it. | both Route Handlers |
 | G4 | Test accounts use the `.invalid` email domain (`seed-<label>@seed.staging.invalid`), so they can never belong to a real person and are easy to identify | `src/server/seed/participants.ts` |
-| G5 | Unit test: with `ZUGZWANG_ENV=prod`, the gate throws and the page 404s | `tests/unit/seed/gate.test.ts` |
+| G5 | Tests: the gate refuses unless both variables allow it; `gate.ts` contains no literal `process.env.X` read (the form Next substitutes); production config never carries the flag; the stack emits it only when configured | `tests/unit/seed/gate.test.ts`, `tests/unit/infra/seed-tools-flag.test.ts` |
+| G6 | Infrastructure: `ZUGZWANG_SEED_TOOLS` exists only on the staging ECS task definition (verified by local `cdk synth`: staging Compute template 1, production 0) | `infra/config/staging.ts`, `infra/lib/compute-stack.ts` |
 
 ## 4. Sheet format
 
@@ -49,12 +52,12 @@ A downloadable template ships with the page.
 ## 5. Flow
 
 ```
-Upload ─► previewSeedSheet (server action)
+Upload ─► POST /admin/seed/preview (Route Handler)
             parse → normalise → validate ALL rows → plan
             returns: per-market counts, participants needed, errors by row
             ANY error → nothing runs; the operator fixes the sheet
         ─► operator clicks "Seed"
-        ─► browser loops: runSeedChunk(rows N..N+24) until done
+        ─► browser loops: POST /admin/seed/run (rows N..N+24) until done
             server RE-VALIDATES the chunk (never trusts the browser)
             for each row: get-or-create participant → place bet+argument
             returns per-row result: posted | skipped (already posted) | failed (reason)
@@ -74,14 +77,20 @@ There is **no stored job state.** The browser holds the parsed rows and sends th
    - **one side per participant per market** (`I-SINGLE-SIDE`);
    - **no self-replies** (D-52);
    - reply depth is 1;
-   - each participant's **total stake** fits their starting Dharma plus daily credit.
+   - each labelled participant's **total stake** is at most `INITIAL_USER_DHARMA` (1000). The daily credit is deliberately NOT counted: it accrues only on a participant's first bet of a UTC day, so counting it would let a sheet pass that fails on a run spanning midnight.
+   - labels compare **case-insensitively** (`U1` and `u1` are one participant), because the participant email lowercases them.
+   - ⚠ the budget is per **sheet**, but a label is the same participant **across** sheets (same email, same remaining balance). A later sheet reusing a label that has already spent can validate here and then fail mid-run with insufficient Dharma, halting that market. v1 states this on the page (`@code-reviewer` M-4); a live-balance pre-check in `runSeedChunk` is the follow-up.
 3. **Group by market:** 6 independent groups.
-4. **Order:** sheet order, except that a reply is never posted before its parent.
+4. **Order:** sheet order, except that a reply is never posted before its parent. Chunked resume depends on this: a reply's parent is always an earlier row of the same market, so it has either run in this chunk or left a receipt in an earlier one.
 5. **Execute:** market by market. A failure in one market stops that market's remaining rows and doesn't affect the others; the report shows exactly where it stopped.
+
+### 6.1 Ruling: a market that leaves Open DURING a run (decided at implementation, 2026-10-01)
+
+The **preview** validates against Open markets only, so a market that is already shut is caught before anything runs. At **run** time, `runSeedChunk` re-validates against every non-Draft market and leaves "is it Open?" to a per-row check (made before any participant is created) plus the engine's own in-transaction `assertMarketOpen`. A market that closes mid-run therefore halts **its** rows only; the other markets carry on. The first draft said the whole batch should refuse, which would turn every close deadline reached during a run into a whole-sheet failure. Nothing is ever written into a non-Open market either way. Pinned by `seed-run::a-market-that-left-Open-mid-run-halts-alone-and-receives-nothing`.
 
 ## 7. Idempotency and re-runs
 
-- `batchId` = SHA-256 of the normalised file content. The same file gives the same IDs.
+- `batchId` = SHA-256 of the **validated rows** (`computeBatchId`), not of the raw file bytes. Equivalent in practice, because any error means nothing runs, so the validated rows are all the rows; and it means a re-saved file with identical content keeps the same IDs.
 - **Bets:** `idempotencyKey = seed-<batchId[0:16]>-r<row>`, which matches `IDEMPOTENCY_KEY_REGEX`. A replay hits the `bet_receipts` unique index (23505); the W-1 transaction rolls back and the row reports `skipped` (`I-IDEM-ONCE-001`).
 - **Participants:** a label maps to the deterministic email `seed-<label>@seed.staging.invalid`, and a blank label to `seed-<batchId[0:12]>-r<row>@…`. The email is looked up before creating the account, so a re-run reuses the same participant and pseudonym.
 - **Replies across runs:** the comment ID of a `reply_to` parent is resolved from that row's bet receipt, so a resumed run can still reply to a parent posted earlier.
@@ -110,18 +119,20 @@ There is **no stored job state.** The browser holds the parsed rows and sends th
 | File | Kind |
 |---|---|
 | `src/app/(admin)/admin/seed/page.tsx` | New page (G1) |
-| `src/app/(admin)/admin/seed/_components/SeedUploader.tsx` | New client component: upload, preview, chunk loop, progress, report |
-| `src/app/(admin)/admin/seed/actions.ts` | New server actions `previewSeedSheet` and `runSeedChunk` (G2, G3, zod-validated) |
+| `src/app/(admin)/admin/seed/seed-uploader.tsx` | New client component: upload, preview, chunk loop, progress, report |
+| `src/app/(admin)/admin/seed/preview/route.ts`, `run/route.ts` | New admin Route Handlers (not Server Actions: the default 1 MB Server Action body cap would refuse a large sheet). Front door `src/server/seed/route-guard.ts`: env → origin → admin session. zod-validated. |
 | `src/server/seed/gate.ts` | New: `assertSeedToolsEnabled` |
+| `src/server/seed/route-guard.ts` | New: the handlers' shared front door (env 404 → origin → admin session) |
+| `src/lib/seed.ts` | New: `SEED_CHUNK_MAX`, shared by the handler and the browser (a route file may export only HTTP handlers) |
 | `src/server/seed/parse.ts` | New: CSV/XLSX → raw rows |
 | `src/server/seed/validate.ts` | New, pure: row and cross-row rules (section 6) |
 | `src/server/seed/plan.ts` | New, pure: grouping, ordering, labels → participants |
 | `src/server/seed/participants.ts` | New: get-or-create a participant |
-| `src/server/seed/post.ts` | New: one row → `runBetTransaction(place)` |
+| `src/server/seed/run.ts` | New: the chunk orchestrator; one row → `runBetTransaction(place)` (the planned separate `post.ts` was folded in here) |
 | `src/server/auth/tos-record.ts` | **New, `server-only`, NOT `"use server"`:** `recordTosAcceptance`, the transaction body extracted from `acceptTosAction` (area 4) |
 | `src/server/auth/tos-accept.ts` | **Refactor:** calls `recordTosAcceptance`. Behaviour unchanged, and still exactly one export. |
 | Admin nav | Link to "Seed activity", rendered on staging only |
-| `docs/adr/0062-staging-seed-activity-tool.md` | New ADR, same commit |
+| `docs/adr/0064-staging-seed-activity-tool.md` | New ADR, same commit |
 | `package.json` | **Only if approved:** `exceljs` for `.xlsx` and robust CSV (arguments contain commas, quotes and newlines) |
 
 ## 10. Tests (written first by `@test-writer`)
@@ -214,10 +225,10 @@ export async function parseSeedFile(args: { fileName: string; bytes: Uint8Array 
 
 // validate.ts (pure)
 export const SEED_LABEL_RE: RegExp; // /^[A-Za-z0-9_-]{1,40}$/
-export function validateSeedRows(rows: readonly RawSeedRow[], ctx: { openMarketSlugs: ReadonlySet<string> }):
+export function validateSeedRows(rows: readonly RawSeedRow[], ctx: { acceptedMarketSlugs: ReadonlySet<string> }):
   { rows: SeedRow[]; errors: SeedRowError[] };
 // Rules (each violation → one error naming the row):
-//  market ∈ openMarketSlugs · side ∈ {YES,NO} (case-insensitive input) · label blank or SEED_LABEL_RE
+//  market ∈ acceptedMarketSlugs · side ∈ {YES,NO} (case-insensitive input) · label blank or SEED_LABEL_RE
 //  stake: plain positive decimal, ≤18 fraction digits; ≥ BET_MIN_STAKE_POST (post) / BET_MIN_STAKE_REPLY (reply);
 //         > BET_MAX_STAKE is an ERROR (never clamped)
 //  body: trim non-empty, length ≤ COMMENT_MAX_LENGTH (body is kept untrimmed in SeedRow)
@@ -249,10 +260,22 @@ export async function runSeedChunk(args: {
   fromIndex: number; count: number; haltedMarkets: readonly string[];
 }): Promise<{ batchId: string; results: SeedRowResult[]; nextIndex: number; done: boolean;
               haltedMarkets: string[]; errors: SeedRowError[] }>;
-// assertSeedToolsEnabled() FIRST. Validation errors → no writes, results [], errors returned.
+// assertSeedToolsEnabled() FIRST. Re-validates against every NON-DRAFT market (§6.1), then checks Open per row
+// before minting a participant. Validation errors → no writes, results [], errors returned.
 // Processes planned order (groups flattened) [fromIndex, fromIndex+count).
 // A row in a halted market → "halted". A failed row halts its market for the rest of the batch.
 // A replayed row (bet_receipts conflict) → "skipped"; its commentId still resolves later replies.
+// Receipts are read by (idempotency key AND owning userId), never by key alone (ADR-0044 posture).
+
+// participants.ts also exports:
+export async function findSeedParticipant(email: string): Promise<{ id: string; pseudonym: string } | null>; // writes nothing
+
+// route-guard.ts
+export async function guardSeedRequest(request: Request, requestId: string): Promise<Response | null>;
+// env not staging → 404 (consults nothing else; the body names nothing) → bad origin 403 → no admin session 401 → null.
+// ⚠ null means PROCEED, so this polarity fails OPEN if a handler forgets to call it or drops the `return`.
+// Two things hold it today: runSeedChunk re-asserts the env itself, and tests/unit/seed/route-guard.test.ts
+// scans each handler for "guard first, and returned". A THIRD seeding handler must be added to that scan's list.
 ```
 
 ```ts
