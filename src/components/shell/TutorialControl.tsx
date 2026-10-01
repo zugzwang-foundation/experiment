@@ -55,7 +55,7 @@ import { isFirstStepOfChapter, TUTORIAL_STEPS } from "./tutorial-steps";
 
 const FIND_TIMEOUT_MS = 10_000;
 const POLL_MS = 250;
-const SPOTLIGHT_PADDING = 16;
+const SPOTLIGHT_PADDING = 6;
 /** How long the brief pause before a page navigation holds, so the jump
  *  reads as a deliberate transition rather than an instant cut. */
 const NAV_PAUSE_MS = 380;
@@ -781,13 +781,19 @@ function HintCard({
 	onNext: () => void;
 	onSkip: () => void;
 }) {
-	// Wider when showing a reference screenshot — 340px would shrink it to
-	// an illegible thumbnail. `box` is always null alongside `notFoundHint`
-	// (see `TutorialOverlay`: `unionBox` only exists when a target was
-	// found), so the wider card only ever applies in the centered, no-target
-	// layout below — never fights for space against a real spotlight box.
+	// Wider when showing a reference screenshot — 340px would shrink a full
+	// profile screenshot to an illegible thumbnail. `box` is always null
+	// alongside `notFoundHint` (see `TutorialOverlay`: `unionBox` only
+	// exists when a target was found), so the wider card only ever applies
+	// in the centered, no-target layout below — never fights for space
+	// against a real spotlight box.
 	const showingReference = notFoundHint && !!referenceImage;
-	const CARD_WIDTH = showingReference ? 480 : 340;
+	const CARD_WIDTH =
+		showingReference && typeof window !== "undefined"
+			? Math.min(640, window.innerWidth - 32)
+			: showingReference
+				? 640
+				: 340;
 	const CARD_HEIGHT_ESTIMATE = 230;
 	const MARGIN = 16;
 
@@ -836,9 +842,13 @@ function HintCard({
 						alt="An example profile, populated with positions and arguments"
 						className="w-full rounded-(--r) border border-n2"
 					/>
-					<p className="mt-2 text-[11px] text-muted-foreground italic">
-						Yours is empty for now — this is what it looks like once you've
-						argued and bet.
+					<p className="mt-2 text-[11px] leading-snug text-muted-foreground italic">
+						Yours is empty for now — here's what it fills in with. Top left:
+						your pseudonym and avatar. The four tiles beside it: wallet value,
+						open positions' worth, profit or loss, and how many arguments you've
+						posted. Below: every market you've bet on, each row's own Sell
+						button — and on the right, the reply thread under whichever position
+						you've selected.
 					</p>
 				</div>
 			) : notFoundHint ? (
