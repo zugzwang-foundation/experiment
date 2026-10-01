@@ -263,7 +263,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 	{
 		id: "reply-target-post",
 		chapter: "Support & Counter",
-		selector: '[data-tutorial="post-focus-title"]',
+		selector: '[data-tutorial="post-focus-argument"]',
 		text: "This is the argument you're now acting on — everything from here backs or counters THIS post specifically, not the market in general.",
 		gesture: "point-hold",
 	},
