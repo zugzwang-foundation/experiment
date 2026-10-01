@@ -1,5 +1,7 @@
-import { Gavel, type LucideIcon, ShieldAlert } from "lucide-react";
+import { Gavel, type LucideIcon, ShieldAlert, Sprout } from "lucide-react";
 import Link from "next/link";
+
+import { isSeedToolsEnabled } from "@/server/seed/gate";
 
 // UI.6 S0 — the two-tab Admin Control Centre nav (SPEC.1 §15): Moderation
 // (default landing) | Markets. Admin-INTERNAL chrome built fresh, tokens-only —
@@ -12,14 +14,16 @@ import Link from "next/link";
 //
 // Presentational Server Component: `active` is a prop, so no client JS.
 
-type AdminTab = "moderation" | "markets";
+export type AdminTab = "moderation" | "markets" | "seed";
 
-const TABS: ReadonlyArray<{
+type TabDef = {
 	id: AdminTab;
 	label: string;
 	href: string;
 	icon: LucideIcon;
-}> = [
+};
+
+const TABS: ReadonlyArray<TabDef> = [
 	{
 		id: "moderation",
 		label: "Moderation",
@@ -29,14 +33,24 @@ const TABS: ReadonlyArray<{
 	{ id: "markets", label: "Markets", href: "/admin/markets", icon: Gavel },
 ];
 
+// SEED-STAGING-1 — rendered only where the tool exists. On production the
+// page 404s; showing a link to it there would advertise a door that is shut.
+const SEED_TAB: TabDef = {
+	id: "seed",
+	label: "Seed activity",
+	href: "/admin/seed",
+	icon: Sprout,
+};
+
 export function AdminTabs({
 	active,
 }: {
 	active: AdminTab;
 }): React.ReactElement {
+	const tabs = isSeedToolsEnabled() ? [...TABS, SEED_TAB] : TABS;
 	return (
 		<nav aria-label="Admin Control Centre" className="flex items-end gap-1">
-			{TABS.map((tab) => {
+			{tabs.map((tab) => {
 				const isActive = tab.id === active;
 				const Icon = tab.icon;
 				return (
