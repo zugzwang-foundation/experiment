@@ -886,9 +886,9 @@ export function MarketPostExport(props: PostExportProps) {
 							   The well is what the page puts there instead. */
 							<QuoteWell
 								title={post.title}
+								quote={post.quote}
 								width={INNER_W}
 								u={u}
-								hairline={hairline}
 							/>
 						)}
 					</div>
@@ -1501,15 +1501,16 @@ function Countdown({
  */
 function QuoteWell({
 	title,
+	quote,
 	width,
 	u,
-	hairline,
 }: {
 	title: string;
+	/** The post's own fill and mark tint — what the page draws it on. */
+	quote: { fill: string; mark: string };
 	/** The card's inner column, in base units — the well's width. */
 	width: number;
 	u: (n: number) => number;
-	hairline: string;
 }) {
 	const k = width / QUOTE_CANVAS.w;
 	const authored = quoteTitleSize(title.length);
@@ -1526,7 +1527,7 @@ function QuoteWell({
 		marginTop: u(-top * mark),
 		marginBottom: u(top * mark),
 		fontWeight: 700,
-		color: PALETTE.n4,
+		color: quote.mark,
 	});
 
 	return (
@@ -1544,8 +1545,9 @@ function QuoteWell({
 				// that clips.
 				padding: u((QUOTE_CANVAS.pad - 1) * k),
 				gap: u(QUOTE_TYPE.gap * k),
-				backgroundColor: PALETTE.n1,
-				border: hairline,
+				backgroundColor: quote.fill,
+				// The page's `border-white/7` on the coloured well.
+				border: `${u(1)}px solid rgba(255, 255, 255, 0.07)`,
 				borderRadius: u(6),
 				// The page's backstop, kept: a title that beats the estimate clips
 				// inside the canvas rather than growing the box and pushing the split

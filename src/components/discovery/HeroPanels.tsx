@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { RefObject } from "react";
+import type { CSSProperties, RefObject } from "react";
 
 import { SideBadge } from "@/components/debate/badges";
 import { computeSplitBar } from "@/components/debate/composer/split-bar";
@@ -9,8 +9,13 @@ import { quoteFill } from "@/components/debate/quote-well/palette";
 import { QuoteWell } from "@/components/debate/quote-well/QuoteWell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FieldSeparator } from "@/components/ui/field-separator";
+import {
+	fillFontSize,
+	fitFontSize,
+	textWidthEm,
+} from "@/components/ui/fit-text";
 import { InfoTip } from "@/components/ui/info-tip";
-import { RelativeTime } from "@/components/ui/relative-time";
+import { RelativeTime, relativeTimeText } from "@/components/ui/relative-time";
 import type { HeroPost, HeroTopPosts } from "@/server/discovery/hero";
 import type { DiscoveryCard } from "@/server/discovery/list";
 import type { PricePoint } from "@/server/discovery/price-series";
@@ -136,7 +141,17 @@ export function HeroPanels({
 			// ⛔ Deleting it because "the hero is hidden on mobile anyway" is the
 			// mistake this paragraph exists to prevent — hidden below 640px is
 			// not hidden at 700px. See discovery-mobile-reflow.test.ts.
-			className="grid flex-1 grid-cols-1 gap-[14px] md:grid-cols-[1fr_1.9fr_1fr] max-mobile:hidden"
+			//
+			// (3) THE FLOOR ON A SHORT WINDOW. `flex-1` alone shrinks the hero
+			// until all six cards fit, which on a 1280×584 window (a 1920 screen
+			// at 150%) left a 223px hero that read as squashed. So it stops at
+			// 290px, and only a window too short to leave row two in sight pulls
+			// it lower: `100vh - 287px` is what keeps the first row of cards
+			// whole and ~50px of the second showing — header 62 + page top 16 +
+			// rail 35 + a 112px card + 12 gap + 50. Below that floor the page
+			// scrolls a little rather than shrinking the hero further. Any window
+			// whose `flex-1` share is already over 290px is untouched.
+			className="grid flex-1 grid-cols-1 gap-[14px] min-h-[min(290px,calc(100vh-287px))] md:grid-cols-[1fr_1.9fr_1fr] max-mobile:hidden"
 		>
 			<HeroPostPanel side="YES" post={topPosts.yes} slug={card.slug} />
 
@@ -204,8 +219,16 @@ export function HeroPanels({
 							</div>
 						}
 					/>
-					<div className="flex min-w-0 flex-col gap-1">
-						<h2 className="truncate text-[16.5px] leading-[1.3] font-bold">
+					{/* `flex-1` gives the text column the row's remaining width, which
+					    it must have as the `@container` the title autosizes against (an
+					    inline-size container sized by its content would collapse). */}
+					<div className="flex min-w-0 flex-1 flex-col gap-1 @container">
+						<h2
+							className="truncate text-[16.5px] leading-[1.3] font-bold"
+							style={{
+								fontSize: fitFontSize(card.title, "titleBold", 16.5, 12),
+							}}
+						>
 							{card.title}
 						</h2>
 						<StatLine totals={card.totals} size="hero" />
@@ -232,8 +255,21 @@ export function HeroPanels({
 				    way — `preserveAspectRatio="none"` on `h-full w-full` — so the box,
 				    its border, its `min-h-24` floor and its `flex-1` growth are
 				    untouched. What changed is what the X axis MEANS. */}
-				<div className="mt-[11px] min-h-24 flex-1 rounded-[var(--r)] [border:var(--hairline)]">
-					<MarketPriceChart series={series} mode="hero" isOpen={isOpen} />
+				{/* ⛔ THE CHART TAKES THE BOX'S HEIGHT; IT NEVER SETS IT. Left in
+				    flow, the `<svg>`'s viewBox gives it a height from its WIDTH
+				    (649:320), and that became the whole hero's minimum: 355px at
+				    1280 wide, so on a short laptop window (1280×584 — a 1920 screen
+				    at 150%) the second row of markets sat entirely below the fold.
+				    Absolutely placed, it fills whatever the hero's `flex-1` leaves,
+				    down to this box's `min-h-24`; on a tall window the box was
+				    already taller than the svg wanted, so nothing there moves.
+				    `[container-type:size]` lets the chart ask how tall it got: under
+				    190px of box the ten-step marks touch, so the odd tens hide and
+				    0·20·40·60·80·100 remain — the gridlines themselves all stay. */}
+				<div className="relative mt-[11px] min-h-24 flex-1 rounded-[var(--r)] [border:var(--hairline)] [container-type:size]">
+					<div className="absolute inset-0 [@container(max-height:188px)]:[&_:is([data-testid=y-mark-10],[data-testid=y-mark-30],[data-testid=y-mark-50],[data-testid=y-mark-70],[data-testid=y-mark-90])]:invisible">
+						<MarketPriceChart series={series} mode="hero" isOpen={isOpen} />
+					</div>
 				</div>
 				{/* SPEC.1 1.0.45 §9 · Accessibility — the hero's readout, the third and
 				    last mode to get one, discharging `PD-3-04`.
@@ -300,15 +336,32 @@ function HeroPostPanel({
 			: `Đ ${formatDharmaCompact(post.authorStake)} → Đ ${formatDharmaCompact(post.currentValue)}`;
 	// UIR-3 item 6 — a post with no image shows its title AS the picture.
 	const textOnly = post.imageUrl === null;
+	const metaStyle = heroMetaStyle(post);
 
 	return (
 		// `relative` is load-bearing for V18's stretched link below.
 		<div
 			data-testid="hero-post"
 			data-side={side}
-			className="relative flex min-w-0 flex-col rounded-[var(--r)] bg-n0 px-3 pt-3 pb-[11px] [border:var(--border-hero)]"
+			className="relative flex min-w-0 flex-col rounded-[var(--r)] bg-n0 px-3 pt-3 pb-[11px] [border:var(--border-hero)] @container"
 		>
-			<div className="flex flex-nowrap items-center gap-1.5 overflow-hidden text-[9.5px] whitespace-nowrap">
+			{/* The author row AUTOSIZES to the panel (`@container` above, whose
+			    width the grid sets): its designed 9.5px whenever the whole row
+			    fits, smaller only as far as it must on a narrow window, so the
+			    age at its end is never cut off. Too narrow for one line even at
+			    the 7.5px floor, it becomes TWO — author and chip, then stake and
+			    age — with the separator between them collapsed into the line
+			    break, at whatever size both lines fit (`heroMetaStyle`). The gap
+			    and the chip are stated in em so they shrink WITH the text — at
+			    9.5px they resolve to the same 6px gap, 9px chip and 7px chip
+			    padding as before. `suppressHydrationWarning`: the size reads the
+			    age, which can tick between the server render and hydration,
+			    exactly as `RelativeTime`'s own text can. */}
+			<div
+				className="flex flex-wrap items-center gap-x-[0.6316em] gap-y-[2px] overflow-hidden text-[9.5px] whitespace-nowrap [&_[data-slot=badge]]:px-[0.7778em] [&_[data-slot=badge]]:text-[0.9474em]"
+				style={metaStyle}
+				suppressHydrationWarning
+			>
 				<Avatar size="xs">
 					<AvatarImage src={post.author.pfpUrl} alt="" />
 					<AvatarFallback>
@@ -330,7 +383,11 @@ function HeroPostPanel({
 				</Link>
 				<FieldSeparator />
 				<SideBadge side={post.side} size="hero" price={post.entryPrice} />
-				<FieldSeparator />
+				{/* One line: the separator. Two lines: a full-width, zero-height
+				    flex item — the break itself, with its glyph clipped away.
+				    `overflow-clip`, not `-hidden`: a scroll container would lose
+				    its content-based minimum width and vanish on ONE line too. */}
+				<FieldSeparator className="basis-(--hero-meta-break) max-h-(--hero-meta-sep) overflow-clip" />
 				{/* V13 — `.argstake` (mockup :86-88, markup :190). The progression is
 				    POST-ANCHORED (founder ruling OD-1 = Option B): the left figure is
 				    THIS post's own entry bet, the right the author's current value on
@@ -632,20 +689,20 @@ function SupportCounterBar({
 	// Reuses the SHIPPED split-bar primitive — exact decimals via
 	// `ComposerDecimal`, integer-TRUNCATED so a full bar means literally zero
 	// counter Dharma. No new formatter (SPEC.1 §10.8 mandates one).
-	const { totalDharma, supportPct } = computeSplitBar({
+	const { supportPct, hasStake } = computeSplitBar({
 		supportDharma,
 		counterDharma,
 	});
-	// Both zero → an even bar, per the mockup's `tot ? … : 50` (:458).
-	// `computeSplitBar` returns "0%" for an empty total, which is the right
-	// answer inside a composer and the wrong one on a resting hero panel.
-	const fillPct = totalDharma === "0" ? "50%" : supportPct;
 	// The pole binding. Support inherits the POST's side; Counter takes the
 	// opposite. Written as one side-keyed expression per segment so C0's guard
 	// SEES it — `HeroPanels.tsx` is the seventh entry in that guard's pinned
 	// inventory, added deliberately when this fix landed.
 	const supportPole = side === "YES" ? "bg-bar-yes" : "bg-bar-no";
 	const counterPole = side === "YES" ? "bg-bar-no" : "bg-bar-yes";
+	// Nothing staked on either side → a grey track and no fill, never the two
+	// poles: the same empty state the profile's bar already shows (bg-n2). (This replaced the mockup's
+	// even 50/50 bar at Đ 0, which drew a contest nobody had entered.)
+	const trackFill = hasStake ? counterPole : "bg-n2";
 	return (
 		<div
 			data-testid={`hero-split-bar-${side}`}
@@ -664,12 +721,14 @@ function SupportCounterBar({
 			{/* The track carries the COUNTER share (the remainder); the fill is the
 			    SUPPORT share, left-anchored, in the post's own pole. */}
 			<span
-				className={`h-[16px] flex-1 overflow-hidden rounded-[var(--r)] ${counterPole} [border:var(--hairline)]`}
+				className={`h-[16px] flex-1 overflow-hidden rounded-[var(--r)] ${trackFill} [border:var(--hairline)]`}
 			>
-				<span
-					className={`block h-full ${supportPole}`}
-					style={{ width: fillPct }}
-				/>
+				{hasStake && (
+					<span
+						className={`block h-full ${supportPole}`}
+						style={{ width: supportPct }}
+					/>
+				)}
 			</span>
 			<span className="flex shrink-0 flex-col items-end gap-[1px]">
 				<span className="text-[8.5px] font-extrabold tracking-[0.12em] text-ink">
@@ -681,6 +740,51 @@ function SupportCounterBar({
 			</span>
 		</div>
 	);
+}
+
+/**
+ * The author row's size and its one-or-two-line switch (see the row), from
+ * the strings themselves: everything that follows the row's size summed in
+ * em, against what does not — the 16px avatar, the chip's 2px of hairline,
+ * the 12px separators and the arrow's 4px of margin. The chip is estimated
+ * at two digits and the age with its digits as 0s (the widest), so the
+ * estimate errs wide: a line it says fits does fit.
+ *
+ * Below `breakAt` one line no longer fits at the floor, so the row takes the
+ * two-line size instead: `- max(0px, 100cqi - breakAt) * 1000` knocks the
+ * two-line term out of the `max()` everywhere above that width, and the same
+ * threshold drives the break separator through two custom properties.
+ */
+function heroMetaStyle(
+	post: HeroPost,
+): CSSProperties & Record<`--${string}`, string> {
+	const gap = 0.6316;
+	const stakeText =
+		post.currentValue === null
+			? `Đ ${formatDharmaCompact(post.authorStake)}`
+			: `Đ ${formatDharmaCompact(post.authorStake)}→Đ ${formatDharmaCompact(post.currentValue)}`;
+	const ageText = relativeTimeText(post.createdAt).replace(/\d/g, "0");
+	const author = textWidthEm(post.author.pseudonym, "titleBold");
+	const chip =
+		0.9474 * (textWidthEm(`${post.side} @ 00%`, "chip") + 2 * 0.7778);
+	const stake = textWidthEm(stakeText, "mono");
+	const age = textWidthEm(ageText, "value");
+	const arrowPx = post.currentValue === null ? 0 : 4;
+	const sepPx = 3.168;
+	// avatar · author | chip | stake | age
+	const oneEm = 7 * gap + author + chip + stake + age;
+	const onePx = 16 + 2 + 3 * sepPx + arrowPx;
+	// avatar · author | chip   /   stake | age
+	const topEm = 3 * gap + author + chip;
+	const topPx = 16 + 2 + sepPx;
+	const bottomEm = 2 * gap + stake + age;
+	const bottomPx = sepPx + arrowPx;
+	const breakAt = (onePx + 7.5 * oneEm).toFixed(3);
+	return {
+		fontSize: `clamp(7.5px, max(${fillFontSize(oneEm, onePx)}, min(${fillFontSize(topEm, topPx)}, ${fillFontSize(bottomEm, bottomPx)}) - max(0px, 100cqi - ${breakAt}px) * 1000), 9.5px)`,
+		"--hero-meta-break": `clamp(0%, (${breakAt}px - 100cqi) * 1000, 100%)`,
+		"--hero-meta-sep": `clamp(0px, (100cqi - ${breakAt}px) * 1000, 12px)`,
+	};
 }
 
 /**

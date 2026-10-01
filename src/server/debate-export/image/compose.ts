@@ -8,6 +8,7 @@ import {
 	formatPercentUnpaired,
 	formatPricePercent,
 } from "@/components/debate/format";
+import { quoteFill } from "@/components/debate/quote-well/palette";
 import {
 	getResolutionBlocks,
 	isKnownMarketSlug,
@@ -116,6 +117,12 @@ export type PostExportProps = {
 		 * reintroducing the read.
 		 */
 		imageUrl: string | null;
+		/**
+		 * The colour a text-only post's quote well is drawn on — the SAME pick
+		 * the page makes (`quoteFill` of the post's id), so an imageless post
+		 * exports in the colour it shows in Discovery and its market.
+		 */
+		quote: { fill: string; mark: string };
 		support: { side: Side; dharma: string };
 		counter: { side: Side; dharma: string };
 		splitTotal: string;
@@ -388,6 +395,7 @@ export function composePostExport(
 			age: formatRelativeTime(nowMs, Date.parse(subject.createdAt)),
 			title: subject.title,
 			imageUrl: subject.imageUrl,
+			quote: quoteFill(reply === null ? post.id : reply.id),
 			support: {
 				side: deriveReplySide({
 					parentSide: subject.side,

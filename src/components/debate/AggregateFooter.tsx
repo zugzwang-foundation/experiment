@@ -152,6 +152,9 @@ export function AggregateFooter({
 	// Support resolves to the post's own side; Counter to the opposite.
 	const supportPole = postSide === "YES" ? "bg-bar-yes" : "bg-bar-no";
 	const counterPole = postSide === "YES" ? "bg-bar-no" : "bg-bar-yes";
+	// Nothing staked on either side → a grey track and no fill, never the two
+	// poles: the same empty state the profile's bar already shows (bg-n2).
+	const trackFill = hasStake ? counterPole : "bg-n2";
 
 	if (inColumn) {
 		// ⚠ UIR-1 item 4 — the column header's lane grammar (`column-header.tsx`
@@ -193,7 +196,7 @@ export function AggregateFooter({
 						aria-hidden="true"
 						className={cn(
 							"h-[18px] w-full overflow-hidden rounded-[var(--r)] [border:var(--hairline)]",
-							counterPole,
+							trackFill,
 						)}
 					>
 						<span
@@ -429,7 +432,7 @@ export function AggregateFooter({
 							// coincidence of two numbers that are free to move apart. A9 D-2
 							// rules ENDS, so the declaration says ends.
 							"h-[18px] max-mobile:h-[14px] w-full overflow-hidden rounded-[var(--r)] max-mobile:rounded-full [border:var(--hairline)]",
-							counterPole,
+							trackFill,
 							// ⛔⛔ THE RECESSED CHANNEL, AND SINCE ADR-0051 A11 D-2 IT IS A
 							// ZERO-STATE AGAIN. A10 D-2 made it UNCONDITIONAL below 640 and
 							// ruled that the Counter share IS the exposed channel; A11 D-2

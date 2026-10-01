@@ -412,8 +412,8 @@ export function GlobalHeader({
 					</div>
 					{/* MOBILE-1 Phase A — the utility controls (Radio, and GitHub
 					    off-site), and the ONLY things in this zone that hide below 640px.
-					    Radio is live for a signed-in viewer (RADIO-1 / ADR-0062), which
-					    is why it takes `signedIn` and nothing else from this header.
+					    Radio is live for every viewer (RADIO-1 / ADR-0062) and takes
+					    nothing from this header.
 					    ⚠ RULES USED TO BE THE SIBLING BELOW THIS WRAPPER, and the note
 					    that stood here explained why it was outside rather than in:
 					    SPEC.1 §21.9 makes it the onboarding deck's only re-show entry
@@ -446,7 +446,7 @@ export function GlobalHeader({
 						<span
 							className={cn("contents", mobileResponsive && "max-xl:hidden")}
 						>
-							<RadioSlot signedIn={viewer !== null} />
+							<RadioSlot />
 						</span>
 						<GitHubStarsView stars={stars} />
 					</div>

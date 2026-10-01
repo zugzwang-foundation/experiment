@@ -30,11 +30,7 @@ vi.mock(
 	}),
 );
 
-import {
-	RADIO_PLAYLIST_URL,
-	RADIO_SIGNIN_COPY,
-	RadioSlot,
-} from "@/components/shell/RadioSlot";
+import { RADIO_PLAYLIST_URL, RadioSlot } from "@/components/shell/RadioSlot";
 import { RADIO_PLAYLIST_ID } from "@/components/shell/radio/playlist";
 import { PLAYER_STATE } from "@/components/shell/radio/youtube-iframe-api";
 import { HEADER_GLOSSARY } from "@/lib/copy/glossary";
@@ -113,7 +109,7 @@ async function pressPlay(): Promise<FakePlayer> {
 describe("RADIO-1 — off unless NEXT_PUBLIC_RADIO_ENABLED is true", () => {
 	it("unset: the old inert control, no link, no play button", () => {
 		Reflect.deleteProperty(process.env, "NEXT_PUBLIC_RADIO_ENABLED");
-		render(<RadioSlot signedIn />);
+		render(<RadioSlot />);
 		const el = document.querySelector<HTMLButtonElement>(
 			'button[aria-label="Radio"]',
 		);
@@ -126,7 +122,7 @@ describe("RADIO-1 — off unless NEXT_PUBLIC_RADIO_ENABLED is true", () => {
 
 describe("RADIO-1 — Radio opens the playlist on YouTube", () => {
 	it("is a new-tab link to the playlist for a signed-in viewer", () => {
-		render(<RadioSlot signedIn />);
+		render(<RadioSlot />);
 		const a = link() as HTMLAnchorElement;
 		expect(a.getAttribute("href")).toBe(
 			`https://www.youtube.com/playlist?list=${RADIO_PLAYLIST_ID}`,
@@ -138,46 +134,27 @@ describe("RADIO-1 — Radio opens the playlist on YouTube", () => {
 	});
 
 	it("clicking the link does not start the hidden player", () => {
-		render(<RadioSlot signedIn />);
+		render(<RadioSlot />);
 		fireEvent.click(link() as HTMLAnchorElement);
 		expect(mocks.load).not.toHaveBeenCalled();
 		expect(hiddenHost()).toBeNull();
 	});
 });
 
-describe("RADIO-SIGNIN — signed out, both controls ask the visitor to sign up or log in", () => {
-	const prompt = () =>
-		document.querySelector('[data-testid="radio-signin-prompt"]');
-
-	it("the Radio pill is NOT a link to YouTube when signed out", () => {
-		render(<RadioSlot signedIn={false} />);
-		expect(document.querySelector('a[href*="youtube.com"]')).toBeNull();
-		expect(link()?.tagName).toBe("BUTTON");
-		expect(link()?.title).toBe(HEADER_GLOSSARY.radioSignedOut);
+describe("signed out, the Radio plays like signed in (RADIO-SIGNIN removed 2026-10-02)", () => {
+	it("the Radio pill is the YouTube link and play is a real play button", () => {
+		render(<RadioSlot />);
+		expect(link()?.getAttribute("href")).toBe(RADIO_PLAYLIST_URL);
+		expect(
+			document.querySelector('[data-testid="radio-signin-prompt"]'),
+		).toBeNull();
+		expect(toggle()?.getAttribute("aria-label")).toBe("Play radio");
 	});
-
-	for (const [name, control] of [
-		["Radio", () => link()],
-		["play", () => toggle()],
-	] as const) {
-		it(`clicking ${name} opens the prompt, which links to /sign-in, and loads nothing`, () => {
-			render(<RadioSlot signedIn={false} />);
-			expect(prompt()).toBeNull();
-			fireEvent.click(control() as HTMLElement);
-			const p = prompt();
-			expect(p?.textContent).toContain(RADIO_SIGNIN_COPY.body);
-			const a = p?.querySelector("a");
-			expect(a?.getAttribute("href")).toBe("/sign-in");
-			expect(a?.textContent).toBe(RADIO_SIGNIN_COPY.action);
-			expect(mocks.load).not.toHaveBeenCalled();
-			expect(hiddenHost()).toBeNull();
-		});
-	}
 });
 
 describe("RADIO-1 — nothing touches YouTube before the first play", () => {
 	it("mounting injects and builds nothing", () => {
-		render(<RadioSlot signedIn />);
+		render(<RadioSlot />);
 		expect(toggle()?.disabled).toBe(false);
 		expect(toggle()?.getAttribute("aria-label")).toBe("Play radio");
 		expect(mocks.load).not.toHaveBeenCalled();
@@ -188,7 +165,7 @@ describe("RADIO-1 — nothing touches YouTube before the first play", () => {
 
 describe("RADIO-1 — the hidden player", () => {
 	it("play builds it in a transparent, click-through, inert host on body", async () => {
-		render(<RadioSlot signedIn />);
+		render(<RadioSlot />);
 		const player = await pressPlay();
 		const host = hiddenHost() as HTMLElement;
 		expect(host.parentElement).toBe(document.body);
@@ -200,7 +177,7 @@ describe("RADIO-1 — the hidden player", () => {
 	});
 
 	it("asks for the playlist, privacy-enhanced, inline, looping, with no autoplay var", async () => {
-		render(<RadioSlot signedIn />);
+		render(<RadioSlot />);
 		const { host, playerVars } = (await pressPlay()).options;
 		expect(host).toBe("https://www.youtube-nocookie.com");
 		expect(playerVars).toEqual({
@@ -215,7 +192,7 @@ describe("RADIO-1 — the hidden player", () => {
 
 describe("RADIO-1 — play and pause", () => {
 	it("plays on ready; the icon and the equaliser follow YouTube, not the click", async () => {
-		render(<RadioSlot signedIn />);
+		render(<RadioSlot />);
 		const player = await pressPlay();
 		expect(toggle()?.disabled).toBe(true); // loading
 		player.ready();
@@ -233,7 +210,7 @@ describe("RADIO-1 — play and pause", () => {
 	});
 
 	it("pauses while On Air — including BUFFERING — and resumes when paused", async () => {
-		render(<RadioSlot signedIn />);
+		render(<RadioSlot />);
 		const player = await pressPlay();
 		player.ready();
 		player.state(PLAYER_STATE.BUFFERING);
@@ -258,7 +235,7 @@ describe("RADIO-1 — play and pause", () => {
 				arrive = r;
 			}),
 		);
-		render(<RadioSlot signedIn />);
+		render(<RadioSlot />);
 		fireEvent.click(toggle() as HTMLButtonElement);
 		fireEvent.click(toggle() as HTMLButtonElement);
 		expect(mocks.load).toHaveBeenCalledTimes(1);
@@ -271,7 +248,7 @@ describe("RADIO-1 — play and pause", () => {
 
 describe("RADIO-1 — teardown", () => {
 	it("unmounting (a route-group change) destroys the player and removes the host", async () => {
-		const { unmount } = render(<RadioSlot signedIn />);
+		const { unmount } = render(<RadioSlot />);
 		const player = await pressPlay();
 		unmount();
 		expect(player.destroy).toHaveBeenCalledTimes(1);
@@ -285,7 +262,7 @@ describe("RADIO-1 — teardown", () => {
 				arrive = r;
 			}),
 		);
-		const { unmount } = render(<RadioSlot signedIn />);
+		const { unmount } = render(<RadioSlot />);
 		fireEvent.click(toggle() as HTMLButtonElement);
 		unmount();
 		await act(async () => {
@@ -296,7 +273,7 @@ describe("RADIO-1 — teardown", () => {
 	});
 
 	it("below 640px the player stops — the controls are hidden there — and stays stopped", async () => {
-		render(<RadioSlot signedIn />);
+		render(<RadioSlot />);
 		const player = await pressPlay();
 		player.ready();
 		player.state(PLAYER_STATE.PLAYING);
@@ -311,7 +288,7 @@ describe("RADIO-1 — teardown", () => {
 
 	it("a failed load returns to idle, and the next play retries", async () => {
 		mocks.load.mockRejectedValueOnce(new Error("youtube_unavailable"));
-		render(<RadioSlot signedIn />);
+		render(<RadioSlot />);
 		await act(async () => {
 			fireEvent.click(toggle() as HTMLButtonElement);
 		});
@@ -325,8 +302,8 @@ describe("RADIO-1 — teardown", () => {
 });
 
 describe("RADIO-1 — the Radio pill never changes width", () => {
-	it("both labels and the dot slot render in every state", async () => {
-		render(<RadioSlot signedIn />);
+	it("the word and the equaliser share one cell in every state", async () => {
+		render(<RadioSlot />);
 		// ⚠ Invisible KEEPS its box; a display-none utility would drop it and
 		// the pill would change width on every play and pause.
 		const tokens = (selector: string) =>
@@ -335,13 +312,11 @@ describe("RADIO-1 — the Radio pill never changes width", () => {
 		const shape = () => ({
 			off: tokens('[data-label="off"]'),
 			on: tokens('[data-label="on"]'),
-			dot: tokens(".radio-dot"),
 		});
 
 		const idle = shape();
 		expect(idle.off).not.toContain("invisible");
 		expect(idle.on).toContain("invisible");
-		expect(idle.dot).toContain("invisible");
 
 		const player = await pressPlay();
 		player.ready();
@@ -349,7 +324,6 @@ describe("RADIO-1 — the Radio pill never changes width", () => {
 		const onAir = shape();
 		expect(onAir.off).toContain("invisible");
 		expect(onAir.on).not.toContain("invisible");
-		expect(onAir.dot).not.toContain("invisible");
 
 		for (const node of [...Object.values(idle), ...Object.values(onAir)]) {
 			expect(node.length, "node missing").toBeGreaterThan(1);

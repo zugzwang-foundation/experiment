@@ -113,7 +113,17 @@ export function RelativeTime({
 			className={cn("text-n5", className)}
 			suppressHydrationWarning
 		>
-			{formatRelativeTime(Date.now(), Date.parse(createdAt))}
+			{relativeTimeText(createdAt)}
 		</span>
 	);
+}
+
+/**
+ * The age this leaf renders, as text — for a host that must know how WIDE it
+ * will be before it paints (the Discovery hero's author row sizes itself from
+ * it). It is the leaf's own string from the leaf's own formatter, so a host
+ * that measures it never formats an age of its own.
+ */
+export function relativeTimeText(createdAt: string): string {
+	return formatRelativeTime(Date.now(), Date.parse(createdAt));
 }
