@@ -83,6 +83,12 @@ export type TutorialStep = {
 	 * something that only exists once there's an actual row inside.
 	 */
 	requiresSelector?: string;
+	/**
+	 * Selector for a feed's own "Next" arrow. While this step is on screen the
+	 * tour clicks it on a timer, so the feed visibly scrolls card to card as if
+	 * someone were reading it. The arrows wrap, so it loops while the step is open.
+	 */
+	autoScrollSelector?: string;
 };
 
 export const TUTORIAL_STEPS: readonly TutorialStep[] = [
@@ -147,6 +153,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		selector: '[data-debate-column="YES"] [data-testid="column-scroll"]',
 		text: "The YES feed: every argument backing YES, one at a time.",
 		gesture: "point-hold",
+		autoScrollSelector: '[data-debate-column="YES"] button[aria-label^="Next"]',
 	},
 	{
 		id: "column-no",

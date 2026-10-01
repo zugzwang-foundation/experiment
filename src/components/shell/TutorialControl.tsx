@@ -59,6 +59,8 @@ const SPOTLIGHT_PADDING = 6;
 /** How long the brief pause before a page navigation holds, so the jump
  *  reads as a deliberate transition rather than an instant cut. */
 const NAV_PAUSE_MS = 380;
+/** Cadence of the auto-scroll on feed steps. */
+const AUTO_SCROLL_MS = 1400;
 
 type Placement = { top: number; left: number; width: number; height: number };
 
@@ -321,6 +323,30 @@ export function TutorialControl({
 		step.advance,
 		stepIndex,
 	]);
+
+	// Feed steps: click the feed's own Next arrow on a timer so the cards
+	// scroll one after another, like someone reading. Starts only once the
+	// spotlight has found its target.
+	const autoScrollSelector = step.autoScrollSelector;
+	const hasPlacements = placements !== null;
+	useEffect(() => {
+		if (
+			!open ||
+			!autoScrollSelector ||
+			!hasPlacements ||
+			transitioning ||
+			reducedMotion
+		) {
+			return;
+		}
+		const id = window.setInterval(() => {
+			const btn = queryEl(autoScrollSelector);
+			if (btn && isClickable(btn)) {
+				btn.click();
+			}
+		}, AUTO_SCROLL_MS);
+		return () => window.clearInterval(id);
+	}, [open, autoScrollSelector, hasPlacements, transitioning, reducedMotion]);
 
 	/**
 	 * The tour always starts from Discovery, whatever page the header button
