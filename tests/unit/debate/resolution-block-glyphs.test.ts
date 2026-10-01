@@ -447,8 +447,13 @@ describe("BLOCK-5b · G-g — BLOCK-4's geometry must not move", () => {
 	});
 
 	it("keeps BOTH headzone gaps at gap-5 (20px)", () => {
+		// ⚠ `@container` (container-type: inline-size) is the one token added
+		// since, for the question's autosize (`ui/fit-text.ts`). It moves no
+		// geometry: the stack is `flex-1 min-w-0`, so its width comes from the
+		// band, never from its content — measured, the headzone box is identical
+		// at 1440, 1536 and 1920. Still whole-string, so nothing else rides along.
 		expect(marketHeader).toContain(
-			'className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto"',
+			'className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto @container"',
 		);
 		// ⚠ READ OFF THE NAMED CONSTANT SINCE UI-OVERNIGHT entry 3. The band is no
 		// longer one literal on the element: the post arm is content-sized

@@ -482,9 +482,10 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		);
 	});
 
-	it("render::v17-both-zero-renders-an-even-bar", () => {
-		// The mockup's `tot ? … : 50` (:458). `computeSplitBar` returns "0%" for an
-		// empty total — right inside a composer, wrong on a resting hero panel.
+	it("render::v17-both-zero-renders-a-grey-bar-not-the-poles", () => {
+		// Founder ruling 2026-10-02 replaces the mockup's even `tot ? … : 50`
+		// (:458): with nothing staked on either side the bar is a grey track
+		// with no fill — no green, no red — as the profile's bar already is.
 		const empty = {
 			...heroPost("YES"),
 			replyCount: 0,
@@ -494,9 +495,8 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		};
 		renderHero({ yes: empty, no: null });
 		const bar = screen.getByTestId("hero-split-bar-YES");
-		expect(bar.querySelector<HTMLElement>(".bg-bar-yes")?.style.width).toBe(
-			"50%",
-		);
+		expect(bar.querySelector(".bg-bar-yes, .bg-bar-no")).toBeNull();
+		expect(bar.querySelector(".bg-n2")).not.toBeNull();
 		// Đ 0 is data AVAILABLE — both figures still render.
 		expect(bar.getAttribute("aria-label")).toBe("Support Đ 0, Counter Đ 0");
 	});

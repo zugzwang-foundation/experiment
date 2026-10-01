@@ -404,16 +404,6 @@
 	}
 }
 
-@keyframes radio-dot {
-	0%,
-	100% {
-		opacity: 1;
-	}
-	50% {
-		opacity: 0.2;
-	}
-}
-
 .radio-eq[data-on-air="true"] > span {
 	animation: radio-eq 1s ease-in-out infinite;
 }
@@ -438,10 +428,6 @@
 	animation-delay: -0.05s;
 }
 
-.radio-dot[data-on-air="true"] {
-	animation: radio-dot 1.4s ease-in-out infinite;
-}
-
 /*
  * The mockup's reduced-motion rule: the bars freeze to a stepped pattern rather
  * than to flat, so "on air" is still legible without movement.
@@ -452,8 +438,7 @@
  * `.chart-terminal-pulse` inside it.
  */
 @media (prefers-reduced-motion: reduce) {
-	.radio-eq[data-on-air="true"] > span,
-	.radio-dot[data-on-air="true"] {
+	.radio-eq[data-on-air="true"] > span {
 		animation: none;
 	}
 	.radio-eq[data-on-air="true"] > span:nth-child(odd) {

@@ -2,6 +2,7 @@ import { Download, Maximize2, Minimize2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { fitFontSize } from "@/components/ui/fit-text";
 import { InfoTip } from "@/components/ui/info-tip";
 import { GLOSSARY } from "@/lib/copy/glossary";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,15 @@ import { PriceBar } from "./PriceBar";
 import { ResolverCards } from "./ResolverCards";
 import { MARKET_TITLE_SIZE_OVERRIDES } from "./title-size-overrides";
 import type { DebateMarketHeader, Side } from "./types";
+
+/** The question's designed size — the per-market override's px where a slug
+ * has one, else the 21px d5 ruled. Autosize never renders above it. */
+function titleMaxPx(slug: string): number {
+	const m = /text-[(d+(?:.d+)?)px]/.exec(
+		MARKET_TITLE_SIZE_OVERRIDES[slug] ?? "",
+	);
+	return m ? Number(m[1]) : 21;
+}
 
 const TERMINAL: ReadonlySet<string> = new Set([
 	"Closed",
@@ -410,7 +420,7 @@ export function MarketHeader({
 					    all untouched by this. */}
 						<div
 							data-testid="headzone-stack"
-							className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto"
+							className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto @container"
 						>
 							{/* `.question` (`d5:463`) — `font-size:21px;font-weight:700;
 							    line-height:1.24`, and SINGLE LINE with an ellipsis
@@ -469,6 +479,17 @@ export function MarketHeader({
 									"shrink-0 truncate text-[21px] leading-[1.24] font-bold tracking-normal",
 									MARKET_TITLE_SIZE_OVERRIDES[market.slug],
 								)}
+								// Autosize: on a narrower stack the question steps down to fit its
+								// one line instead of truncating (`fit-text.ts`; the stack is the
+								// `@container`). Never above the designed size, never below 13px.
+								style={{
+									fontSize: fitFontSize(
+										market.title,
+										"titleBold",
+										titleMaxPx(market.slug),
+										13,
+									),
+								}}
 							>
 								{market.title}
 							</h1>

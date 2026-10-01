@@ -39,9 +39,14 @@ export function AuthGateSlot({
 	return (
 		<section
 			aria-label={AUTH_GATE_COPY.heading(side)}
-			className="flex flex-col items-center gap-3 rounded-(--r) px-6 py-10 text-center shadow-(--elev-1) [border:var(--hairline)]"
+			className="relative flex flex-col items-center gap-3 rounded-(--r) px-6 py-10 text-center shadow-(--elev-1) [border:var(--hairline)] [@media(max-height:760px)]:py-5"
 		>
-			<div className="flex w-full justify-end">
+			{/* SHORT WINDOWS (≤760px tall — a 1366×768 laptop, a 1920 screen at
+			    150%): the column body there is ~350px, and the full panel is ~470px,
+			    so it scrolled. Under that height the panel tightens — less padding,
+			    the × out of flow in the corner, a 72px figure and an 18px line — to
+			    ~340px, and fits. Taller windows render exactly as before. */}
+			<div className="flex w-full justify-end [@media(max-height:760px)]:absolute [@media(max-height:760px)]:top-3 [@media(max-height:760px)]:right-3 [@media(max-height:760px)]:w-auto">
 				<button
 					type="button"
 					onClick={onClose}
@@ -57,11 +62,11 @@ export function AuthGateSlot({
 			    wider than it (~372px); in a narrower column it wraps rather than
 			    overflowing. */}
 			<div className="mb-[8px] flex flex-col items-center max-mobile:hidden">
-				<GoalFigure className="block h-[120px] w-auto max-w-full font-sans" />
+				<GoalFigure className="block h-[120px] w-auto max-w-full font-sans [@media(max-height:760px)]:h-[72px]" />
 				<div className={`mt-[12px] ${DECK_EYEBROW_CLASS}`}>
 					{GOAL_CARD?.eyebrow}
 				</div>
-				<p className="mt-[6px] text-[22px] leading-[1.2] font-bold text-balance text-ink">
+				<p className="mt-[6px] text-[22px] leading-[1.2] font-bold text-balance text-ink [@media(max-height:760px)]:text-[18px]">
 					{GOAL_CARD?.title}
 				</p>
 			</div>

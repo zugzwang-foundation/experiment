@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { quoteFill } from "@/components/debate/quote-well/palette";
+
 import {
 	composePostExport,
 	EXPORT_HEIGHT,
@@ -46,6 +48,12 @@ function withRemovedPost(model: DebateViewModel): DebateViewModel {
 }
 
 describe("composePostExport", () => {
+	it("a text-only post exports on the SAME fill the page draws it on", () => {
+		const props = composePostExport(mumbaiMetroModel, "cmt-p1", NOW, null);
+		expect(props?.post.imageUrl).toBeNull();
+		expect(props?.post.quote).toEqual(quoteFill("cmt-p1"));
+	});
+
 	it("maps a present post through the page's own formatters", () => {
 		const props = composePostExport(mumbaiMetroModel, "cmt-p1", NOW, null);
 		expect(props).not.toBeNull();

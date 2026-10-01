@@ -28,7 +28,7 @@ export function ReplySplitBar({
 	postSide: Side;
 	aggregate: ReplyAggregate;
 }) {
-	const { supportPct } = computeSplitBar({
+	const { supportPct, hasStake } = computeSplitBar({
 		supportDharma: aggregate.supportDharma,
 		counterDharma: aggregate.counterDharma,
 	});
@@ -220,7 +220,7 @@ export function ReplySplitBar({
 			    height. */}
 			<span className="col-start-2 row-start-1 flex">
 				<span
-					className={`h-[18px] w-full overflow-hidden rounded-[var(--r)] [border:var(--hairline)] ${postSide === "YES" ? "bg-bar-no" : "bg-bar-yes"}`}
+					className={`h-[18px] w-full overflow-hidden rounded-[var(--r)] [border:var(--hairline)] ${hasStake ? (postSide === "YES" ? "bg-bar-no" : "bg-bar-yes") : "bg-n2"}`}
 					aria-hidden="true"
 				>
 					<span
