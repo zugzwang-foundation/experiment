@@ -343,7 +343,12 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		text: "Your public profile — the pseudonym and identity everyone sees you argue and bet under.",
 		gesture: "point-hold",
 		enteredViaNavigation: true,
-		referenceImage: "/tutorial/profile-reference.png",
+		// No `referenceImage` here, unlike the three steps below: the
+		// identity card always carries real content (pseudonym + avatar are
+		// assigned at signup, never empty), so a "not found" on this step
+		// means the page hasn't painted yet, not that there's nothing to
+		// show — the reference illustration would be misleading rather than
+		// helpful in that case.
 	},
 	{
 		id: "profile-tiles",
