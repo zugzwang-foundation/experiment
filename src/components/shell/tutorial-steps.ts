@@ -73,6 +73,16 @@ export type TutorialStep = {
 	 * are the one chapter guaranteed to be empty for every first-time viewer.
 	 */
 	referenceImage?: string;
+	/**
+	 * An additional selector that must ALSO resolve to something for this
+	 * step to count as found. For a step whose `selector` is a container
+	 * that renders even when empty (the positions panel keeps its own
+	 * section and head, with "No positions yet" drawn inside, rather than
+	 * disappearing) — checking only `selector` would highlight an empty
+	 * panel as if it were real data to point at. `requiresSelector` names
+	 * something that only exists once there's an actual row inside.
+	 */
+	requiresSelector?: string;
 };
 
 export const TUTORIAL_STEPS: readonly TutorialStep[] = [
@@ -148,10 +158,18 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 	{
 		id: "feed-scroll",
 		chapter: "Read the market",
+		// Paired with the feed's own card content, not just the rail widget —
+		// a highlight on the arrows alone shows the control with no hint of
+		// what it moves.
 		selector: '[data-debate-column="YES"] [data-testid="scroll-rail"]',
+		selectorSecondary:
+			'[data-debate-column="YES"] [data-testid="column-scroll"]',
 		text: "Use the up and down arrows beside a card to move through a feed. Next scrolls down one for you.",
 		gesture: "point-hold",
 		advance: "click",
+		// Unscoped on purpose (see `clickSelector`'s docs in TutorialControl's
+		// `next()`): there's no single shared container to resolve a fallback
+		// within here, so every match is scanned for the first clickable one.
 		clickSelector:
 			'[data-debate-column="YES"] button[aria-label^="Next"], [data-debate-column="NO"] button[aria-label^="Next"]',
 	},
@@ -310,6 +328,11 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		id: "positions-table",
 		chapter: "Your profile",
 		selector: '[data-testid="positions-panel"]',
+		// The panel itself always renders, even with zero positions — it
+		// just draws "No positions yet" inside instead of disappearing — so
+		// checking only `selector` would highlight that empty state as if
+		// it were real data. A row only exists once there's a real position.
+		requiresSelector: '[data-testid^="position-tile-"]',
 		text: "Every market you've bet on, open or closed, in one place — like the positions listed above.",
 		gesture: "point-hold",
 		referenceImage: "/tutorial/profile-reference.png",
