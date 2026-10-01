@@ -55,7 +55,10 @@ import { isFirstStepOfChapter, TUTORIAL_STEPS } from "./tutorial-steps";
 
 const FIND_TIMEOUT_MS = 10_000;
 const POLL_MS = 250;
-const SPOTLIGHT_PADDING = 8;
+const SPOTLIGHT_PADDING = 16;
+/** How long the brief pause before a page navigation holds, so the jump
+ *  reads as a deliberate transition rather than an instant cut. */
+const NAV_PAUSE_MS = 380;
 
 type Placement = { top: number; left: number; width: number; height: number };
 
@@ -122,13 +125,24 @@ function rectToPlacement(r: DOMRect): Placement {
  * staked figure sitting BETWEEN them too, which this step never explains.
  * The primary element is still the one `advance` reads a `href` from, when
  * a step needs that.
+ *
+ * `requiresSelector`, when given, must ALSO resolve to something or the
+ * whole step counts as not-found — even though `selector` itself matched.
+ * This is for a container that renders regardless of whether it has real
+ * content (the positions panel keeps its own section, with "No positions
+ * yet" drawn inside, rather than disappearing): without this check, an
+ * empty panel would highlight as if it had something to show.
  */
 function measure(
 	selector: string,
 	selectorSecondary?: string,
+	requiresSelector?: string,
 ): { placements: Placement[]; primaryEl: HTMLElement } | null {
 	const primaryEl = queryEl(selector);
 	if (!primaryEl) {
+		return null;
+	}
+	if (requiresSelector && !queryEl(requiresSelector)) {
 		return null;
 	}
 	const primaryRect = rectOf(primaryEl);
@@ -171,7 +185,12 @@ export function TutorialControl({
 	const [stepIndex, setStepIndex] = useState(0);
 	const [placements, setPlacements] = useState<Placement[] | null>(null);
 	const [timedOut, setTimedOut] = useState(false);
+	const [transitioning, setTransitioning] = useState(false);
 	const searchStartedAt = useRef(0);
+	/** A pending `NAV_PAUSE_MS` timeout from `next()`'s navigation branches,
+	 *  cleared on close so a Skip mid-pause doesn't still jump the real page
+	 *  out from under a tour the viewer already dismissed. */
+	const pauseTimeoutRef = useRef<number | null>(null);
 	const reducedMotion = useReducedMotion();
 	const router = useRouter();
 	/** The current step's own target `href`, live while it's nav-relevant. */
@@ -193,6 +212,11 @@ export function TutorialControl({
 	const isLast = stepIndex === TUTORIAL_STEPS.length - 1;
 
 	const close = useCallback(() => {
+		if (pauseTimeoutRef.current !== null) {
+			window.clearTimeout(pauseTimeoutRef.current);
+			pauseTimeoutRef.current = null;
+		}
+		setTransitioning(false);
 		setOpen(false);
 	}, []);
 
@@ -225,7 +249,13 @@ export function TutorialControl({
 					break;
 				}
 				const aheadStep = TUTORIAL_STEPS[aheadIndex];
-				if (measure(aheadStep.selector, aheadStep.selectorSecondary)) {
+				if (
+					measure(
+						aheadStep.selector,
+						aheadStep.selectorSecondary,
+						aheadStep.requiresSelector,
+					)
+				) {
 					return aheadIndex;
 				}
 			}
@@ -233,7 +263,11 @@ export function TutorialControl({
 		}
 
 		function tick() {
-			const found = measure(step.selector, step.selectorSecondary);
+			const found = measure(
+				step.selector,
+				step.selectorSecondary,
+				step.requiresSelector,
+			);
 			if (found) {
 				setPlacements(found.placements);
 				setTimedOut(false);
@@ -271,7 +305,14 @@ export function TutorialControl({
 			window.removeEventListener("scroll", tick, true);
 			window.removeEventListener("resize", tick);
 		};
-	}, [open, step.selector, step.selectorSecondary, step.advance, stepIndex]);
+	}, [
+		open,
+		step.selector,
+		step.selectorSecondary,
+		step.requiresSelector,
+		step.advance,
+		stepIndex,
+	]);
 
 	/**
 	 * The tour always starts from Discovery, whatever page the header button
@@ -292,6 +333,24 @@ export function TutorialControl({
 	}
 
 	/**
+	 * Holds briefly on the current step, then pushes and advances together —
+	 * used for both real page navigations `next()` drives (Discovery -> a
+	 * market, and the banked profile href), so the jump reads as a
+	 * deliberate transition rather than an instant cut. The timeout is kept
+	 * in a ref so `close()` can cancel it: a Skip pressed mid-pause should
+	 * not still carry the viewer to a page they just dismissed the tour on.
+	 */
+	function pauseThenNavigate(href: string, nextIndex: number) {
+		setTransitioning(true);
+		pauseTimeoutRef.current = window.setTimeout(() => {
+			pauseTimeoutRef.current = null;
+			router.push(href);
+			setStepIndex(nextIndex);
+			setTransitioning(false);
+		}, NAV_PAUSE_MS);
+	}
+
+	/**
 	 * The tour drives its own page transitions rather than waiting for the
 	 * viewer to find the next control themselves — Next is what "slides"
 	 * them from Discovery to a market and, later, to their own profile,
@@ -306,9 +365,6 @@ export function TutorialControl({
 	 * side still gets driven through whichever one is actually open to them.
 	 */
 	function next() {
-		if (step.advance === "navigate-now" && capturedHrefRef.current) {
-			router.push(capturedHrefRef.current);
-		}
 		if (step.advance === "click") {
 			const clickSelector = step.clickSelector ?? step.selector;
 			let target: HTMLElement | null;
@@ -345,13 +401,23 @@ export function TutorialControl({
 			return;
 		}
 		const nextIndex = Math.min(stepIndex + 1, TUTORIAL_STEPS.length - 1);
-		if (
+		const enteringProfile =
 			isFirstStepOfChapter(nextIndex) &&
 			TUTORIAL_STEPS[nextIndex].chapter === "Your profile" &&
-			profileHrefRef.current
-		) {
+			profileHrefRef.current;
+
+		// Both of these are real page navigations, not just a step change —
+		// pushed with a brief pause first rather than instantly, so the jump
+		// reads as a deliberate transition instead of a jump cut. Not needed
+		// for `advance: "click"` above, which never leaves the current page.
+		if (step.advance === "navigate-now" && capturedHrefRef.current) {
+			pauseThenNavigate(capturedHrefRef.current, nextIndex);
+			return;
+		}
+		if (enteringProfile) {
 			marketHrefRef.current = window.location.pathname;
-			router.push(profileHrefRef.current);
+			pauseThenNavigate(profileHrefRef.current as string, nextIndex);
+			return;
 		}
 		setStepIndex(nextIndex);
 	}
@@ -395,10 +461,10 @@ export function TutorialControl({
 		function onKey(e: KeyboardEvent) {
 			if (e.key === "Escape") {
 				close();
-			} else if (e.key === "ArrowRight") {
+			} else if (e.key === "ArrowRight" && !transitioning) {
 				e.preventDefault();
 				next();
-			} else if (e.key === "ArrowLeft" && !isFirst) {
+			} else if (e.key === "ArrowLeft" && !isFirst && !transitioning) {
 				e.preventDefault();
 				back();
 			}
@@ -434,6 +500,7 @@ export function TutorialControl({
 						reducedMotion={reducedMotion}
 						isFirst={isFirst}
 						isLast={isLast}
+						transitioning={transitioning}
 						onBack={back}
 						onNext={next}
 						onSkip={close}
@@ -455,6 +522,7 @@ function TutorialOverlay({
 	reducedMotion,
 	isFirst,
 	isLast,
+	transitioning,
 	onBack,
 	onNext,
 	onSkip,
@@ -469,6 +537,7 @@ function TutorialOverlay({
 	reducedMotion: boolean;
 	isFirst: boolean;
 	isLast: boolean;
+	transitioning: boolean;
 	onBack: () => void;
 	onNext: () => void;
 	onSkip: () => void;
@@ -528,7 +597,7 @@ function TutorialOverlay({
 					/>
 				</>
 			) : (
-				<div className="fixed inset-0 bg-black/70 backdrop-blur-sm" />
+				<div className="fixed inset-0 bg-black/70 backdrop-blur-[2px]" />
 			)}
 			<HintCard
 				box={unionBox}
@@ -541,6 +610,7 @@ function TutorialOverlay({
 				reducedMotion={reducedMotion}
 				isFirst={isFirst}
 				isLast={isLast}
+				transitioning={transitioning}
 				onBack={onBack}
 				onNext={onNext}
 				onSkip={onSkip}
@@ -567,7 +637,7 @@ function DimPanels({ boxes }: { boxes: Placement[] }) {
 	const overallBottom = Math.max(...sorted.map((b) => b.top + b.height));
 	const first = sorted[0];
 	const last = sorted[sorted.length - 1];
-	const panelClass = "fixed bg-black/60 backdrop-blur-sm";
+	const panelClass = "fixed bg-black/60 backdrop-blur-[2px]";
 	return (
 		<>
 			<div
@@ -672,6 +742,7 @@ function HintCard({
 	reducedMotion,
 	isFirst,
 	isLast,
+	transitioning,
 	onBack,
 	onNext,
 	onSkip,
@@ -686,6 +757,7 @@ function HintCard({
 	reducedMotion: boolean;
 	isFirst: boolean;
 	isLast: boolean;
+	transitioning: boolean;
 	onBack: () => void;
 	onNext: () => void;
 	onSkip: () => void;
@@ -770,7 +842,8 @@ function HintCard({
 						<button
 							type="button"
 							onClick={onBack}
-							className="inline-flex h-[30px] items-center gap-1 rounded-(--r) px-3 text-[12px] font-semibold [border:var(--hairline)] hover:[border:1px_solid_var(--ring)]"
+							disabled={transitioning}
+							className="inline-flex h-[30px] items-center gap-1 rounded-(--r) px-3 text-[12px] font-semibold [border:var(--hairline)] hover:[border:1px_solid_var(--ring)] disabled:pointer-events-none disabled:opacity-50"
 						>
 							Back
 							<span aria-hidden="true" className="text-muted-foreground">
@@ -781,7 +854,8 @@ function HintCard({
 					<button
 						type="button"
 						onClick={onNext}
-						className="inline-flex h-[30px] items-center gap-1 rounded-(--r) bg-(--btn-fill) px-3 text-[12px] font-semibold text-ink [border:var(--hairline)] hover:[border:1px_solid_var(--ring)]"
+						disabled={transitioning}
+						className="inline-flex h-[30px] items-center gap-1 rounded-(--r) bg-(--btn-fill) px-3 text-[12px] font-semibold text-ink [border:var(--hairline)] hover:[border:1px_solid_var(--ring)] disabled:pointer-events-none disabled:opacity-50"
 					>
 						{isLast ? "Done" : "Next"}
 						{!isLast ? (
