@@ -444,8 +444,7 @@ export function TutorialControl({
 		const nextIndex = Math.min(stepIndex + 1, TUTORIAL_STEPS.length - 1);
 		const enteringProfile =
 			isFirstStepOfChapter(nextIndex) &&
-			TUTORIAL_STEPS[nextIndex].chapter === "Your profile" &&
-			profileHrefRef.current;
+			TUTORIAL_STEPS[nextIndex].chapter === "Your profile";
 
 		// Both of these are real page navigations, not just a step change —
 		// pushed with a brief pause first rather than instantly, so the jump
@@ -456,9 +455,25 @@ export function TutorialControl({
 			return;
 		}
 		if (enteringProfile) {
-			marketHrefRef.current = window.location.pathname + window.location.search;
-			pauseThenNavigate(profileHrefRef.current as string, nextIndex);
-			return;
+			// Re-read live rather than trusting only the href banked back at
+			// "identity-chip" (`profileHrefRef`): `IdentityCluster` is part of
+			// `GlobalHeader`, mounted on every page this tour ever reaches, so
+			// a fresh query here is just as cheap and isn't at the mercy of
+			// whatever kept that early bank from landing. Reported live: the
+			// banked ref came up empty often enough that Next silently fell
+			// through to a step-index bump with NO navigation, stranding the
+			// viewer on whatever page they were already on while the hint
+			// card jumped straight to "Your profile" — the live query is the
+			// fix, the stale ref is kept only as a last-resort fallback.
+			const profileHref =
+				queryEl('[data-testid="identity-chip-link"]')?.getAttribute("href") ??
+				profileHrefRef.current;
+			if (profileHref) {
+				marketHrefRef.current =
+					window.location.pathname + window.location.search;
+				pauseThenNavigate(profileHref, nextIndex);
+				return;
+			}
 		}
 		setStepIndex(nextIndex);
 	}
