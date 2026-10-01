@@ -284,11 +284,20 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		selector: '[data-tutorial="post-focus-argument"]',
 		text: "This is the argument you're now acting on — everything from here backs or counters THIS post specifically, not the market in general.",
 		gesture: "point-hold",
+		// The real Support/Counter click that reaches this step pushes a
+		// `?post=` history entry (RPLY-1 R2) — a page navigation exactly like
+		// the other two `enteredViaNavigation` steps, just triggered by a
+		// click this component only dispatches rather than one it decided to
+		// make itself.
+		enteredViaNavigation: true,
 	},
 	{
 		id: "reply-composer-ack",
 		chapter: "Support & Counter",
-		selector: '[data-testid="mirror-statement-row"]',
+		// The statement TEXT only, not the whole row — the row also carries
+		// the friendly-fire switch, which has its own dedicated step right
+		// after this one, and highlighting it here too just shows it twice.
+		selector: '[data-testid="mirror-statement-text"]',
 		text: "The same box as before, now aimed at that post: argument, image, stake, to win — everything from the last chapter still applies.",
 		gesture: "point-hold",
 	},

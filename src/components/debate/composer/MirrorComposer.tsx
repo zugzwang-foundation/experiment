@@ -522,7 +522,10 @@ function StatementRow({
 			data-testid="mirror-statement-row"
 			className="flex shrink-0 items-center gap-2"
 		>
-			<span className="min-w-0 text-[16px] leading-[22px] font-semibold text-ink">
+			<span
+				data-testid="mirror-statement-text"
+				className="min-w-0 text-[16px] leading-[22px] font-semibold text-ink"
+			>
 				{statement}
 			</span>
 			<div className="ml-auto flex shrink-0 items-center gap-2">

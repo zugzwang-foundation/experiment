@@ -206,6 +206,14 @@ export function TutorialControl({
 	 * always just `"/"`.
 	 */
 	const marketHrefRef = useRef<string | null>(null);
+	/**
+	 * The market page's URL (with its querystring) captured the instant
+	 * before `next()` dispatches the real Support/Counter click — entering
+	 * post-focus pushes a `?post=` history entry (RPLY-1 R2), a real
+	 * navigation exactly like the other two even though nothing here
+	 * triggered it directly. Read by `back()` leaving "reply-target-post".
+	 */
+	const preFocusHrefRef = useRef<string | null>(null);
 
 	const step = TUTORIAL_STEPS[stepIndex];
 	const isFirst = stepIndex === 0;
@@ -366,6 +374,13 @@ export function TutorialControl({
 	 */
 	function next() {
 		if (step.advance === "click") {
+			// Captured before the click fires, not after — a real Support/
+			// Counter click pushes the `?post=` entry synchronously, so "after"
+			// would already be the destination.
+			if (step.id === "support-counter-pair") {
+				preFocusHrefRef.current =
+					window.location.pathname + window.location.search;
+			}
 			const clickSelector = step.clickSelector ?? step.selector;
 			let target: HTMLElement | null;
 			if (step.selectorSecondary) {
@@ -424,23 +439,27 @@ export function TutorialControl({
 
 	/**
 	 * Leaving a step that was ITSELF only reachable by a page navigation
-	 * (Discovery -> a market, or the banked profile href) means Back has to
-	 * undo that navigation too, not just move the step index — otherwise it
-	 * leaves the step index pointing at a step whose target only exists on
-	 * the page the viewer just left. `router.back()` was tried first and
-	 * doesn't hold up: it depends on the exact shape of the browser's own
-	 * history stack, which this tour doesn't fully control (another
-	 * `router.push`/`replace` elsewhere in the app, a manual navigation,
-	 * reordered entries). Pushing a KNOWN origin instead removes that
-	 * dependency entirely — Discovery is always `"/"` (`start()`'s own
-	 * guarantee), and the market page's URL is captured into
-	 * `marketHrefRef` at the exact moment `next()` leaves it for the
-	 * profile, so there is never any ambiguity about where "back" means.
+	 * (Discovery -> a market, the banked profile href, or the `?post=` entry
+	 * a real Support/Counter click pushes) means Back has to undo that
+	 * navigation too, not just move the step index — otherwise it leaves the
+	 * step index pointing at a step whose target only exists on the page the
+	 * viewer just left. `router.back()` was tried first and doesn't hold up:
+	 * it depends on the exact shape of the browser's own history stack,
+	 * which this tour doesn't fully control (another `router.push`/`replace`
+	 * elsewhere in the app, a manual navigation, reordered entries). Pushing
+	 * a KNOWN origin instead removes that dependency entirely — Discovery is
+	 * always `"/"` (`start()`'s own guarantee), and the other two origins
+	 * are captured into their own refs at the exact moment `next()` leaves
+	 * them, so there is never any ambiguity about where "back" means.
 	 */
 	function back() {
 		if (step.enteredViaNavigation) {
 			const origin =
-				step.chapter === "Your profile" ? marketHrefRef.current : "/";
+				step.chapter === "Your profile"
+					? marketHrefRef.current
+					: step.chapter === "Support & Counter"
+						? preFocusHrefRef.current
+						: "/";
 			if (origin) {
 				router.push(origin);
 			}
