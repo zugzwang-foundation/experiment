@@ -179,6 +179,11 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 		// within here, so every match is scanned for the first clickable one.
 		clickSelector:
 			'[data-debate-column="YES"] button[aria-label^="Next"], [data-debate-column="NO"] button[aria-label^="Next"]',
+		// Same timed auto-scroll as "column-yes" above, on the same YES
+		// column this step's own spotlight is scoped to — the rail and arrows
+		// are the thing being explained, so showing them actually move while
+		// the hint is up is the same fix for the same reason.
+		autoScrollSelector: '[data-debate-column="YES"] button[aria-label^="Next"]',
 	},
 	{
 		id: "ai-mode",
