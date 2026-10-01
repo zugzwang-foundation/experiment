@@ -209,7 +209,10 @@ export function PostFocusHeader({
 					    99.25px of row, which grows neither with what column 2 holds nor
 					    with the market card beside it (sized to fit it — see
 					    `FocusMarketCard`). Items stretch: all three columns take it. */}
-					<div className="flex h-[99.25px] shrink-0 gap-4 max-mobile:flex-col max-mobile:items-start">
+					<div
+						data-tutorial="post-focus-argument"
+						className="flex h-[99.25px] shrink-0 gap-4 max-mobile:flex-col max-mobile:items-start"
+					>
 						{/* ⛔ QUOTE-1 A — THE EMPTY ARM AND ITS WHOLE FRAME ARE GONE
 						    (founder-ruled 2026-09-11). R2 had filled the post-focus
 						    `.hpimg` with d5's `POST IMAGE` box (`d5:1491-1492`) whenever
@@ -371,7 +374,6 @@ export function PostFocusHeader({
 									<div className="@container min-w-0">
 										<InfoTip content={post.title} asChild>
 											<h2
-												data-tutorial="post-focus-title"
 												className="truncate font-heading leading-snug font-medium"
 												style={{ fontSize: titleSize(post.title) }}
 											>
