@@ -43,7 +43,12 @@ import { isFirstStepOfChapter, TUTORIAL_STEPS } from "./tutorial-steps";
  * next poll, the step just ahead is what's actually on screen, and the tour
  * follows them there rather than sitting on a stale target. This is what
  * keeps the blurred backdrop matching whatever page or state is actually
- * live.
+ * live. It only runs at the FRONTIER this run has actually reached
+ * (`maxReachedIndexRef`), never while reviewing an earlier step via Back —
+ * otherwise a step whose target only exists with some transient state (a
+ * composer left open) reads as "missing" the moment Back lands on it, and
+ * look-ahead would re-match the step just LEFT and silently snap Back right
+ * back to where it started.
  *
  * The word-by-word text reveal below needs `@keyframes` Tailwind has no
  * utility for — the same situation `src/components/art/warli/` is in, and
@@ -56,9 +61,6 @@ import { isFirstStepOfChapter, TUTORIAL_STEPS } from "./tutorial-steps";
 const FIND_TIMEOUT_MS = 10_000;
 const POLL_MS = 250;
 const SPOTLIGHT_PADDING = 6;
-/** How long the brief pause before a page navigation holds, so the jump
- *  reads as a deliberate transition rather than an instant cut. */
-const NAV_PAUSE_MS = 380;
 /** Cadence of the auto-scroll on feed steps. */
 const AUTO_SCROLL_MS = 1400;
 
@@ -187,12 +189,18 @@ export function TutorialControl({
 	const [stepIndex, setStepIndex] = useState(0);
 	const [placements, setPlacements] = useState<Placement[] | null>(null);
 	const [timedOut, setTimedOut] = useState(false);
-	const [transitioning, setTransitioning] = useState(false);
 	const searchStartedAt = useRef(0);
-	/** A pending `NAV_PAUSE_MS` timeout from `next()`'s navigation branches,
-	 *  cleared on close so a Skip mid-pause doesn't still jump the real page
-	 *  out from under a tour the viewer already dismissed. */
-	const pauseTimeoutRef = useRef<number | null>(null);
+	/**
+	 * The furthest step index this run has reached under its own forward
+	 * progress (Next, or the finder's look-ahead catching a real user
+	 * action). Back lowers `stepIndex` below this without ever lowering the
+	 * mark itself — `tick()` below reads the gap to tell "reviewing an
+	 * earlier step on purpose" apart from "sitting at the frontier waiting
+	 * for the real page to catch up", which is the only thing look-ahead
+	 * should ever fire during. See `tick()`'s own comment for why this
+	 * matters.
+	 */
+	const maxReachedIndexRef = useRef(0);
 	const reducedMotion = useReducedMotion();
 	const router = useRouter();
 	/** The current step's own target `href`, live while it's nav-relevant. */
@@ -222,11 +230,6 @@ export function TutorialControl({
 	const isLast = stepIndex === TUTORIAL_STEPS.length - 1;
 
 	const close = useCallback(() => {
-		if (pauseTimeoutRef.current !== null) {
-			window.clearTimeout(pauseTimeoutRef.current);
-			pauseTimeoutRef.current = null;
-		}
-		setTransitioning(false);
 		setOpen(false);
 	}, []);
 
@@ -242,6 +245,15 @@ export function TutorialControl({
 		setTimedOut(false);
 		capturedHrefRef.current = null;
 		searchStartedAt.current = Date.now();
+		if (stepIndex > maxReachedIndexRef.current) {
+			maxReachedIndexRef.current = stepIndex;
+		}
+		// True only while sitting at the frontier this run has actually
+		// reached — false while reviewing an earlier step via Back. Safe to
+		// capture once here rather than inside `tick()`: neither operand can
+		// change for the rest of this effect's lifetime, since any change to
+		// `stepIndex` tears this effect down and starts a fresh one.
+		const atFrontier = stepIndex === maxReachedIndexRef.current;
 
 		// Look-ahead: if THIS step's target has gone missing, check whether a
 		// step just ahead is already on screen instead — the viewer took the
@@ -252,6 +264,20 @@ export function TutorialControl({
 		// target until the viewer notices and clicks through manually. Capped
 		// at two steps so an unrelated coincidental match elsewhere can't
 		// vault the tour forward by more than one real user action's worth.
+		//
+		// Gated on `atFrontier`: this used to run unconditionally, which made
+		// it fire just as eagerly after an intentional Back press as after a
+		// genuine forward jump — reported live, leaving "Your profile" drops
+		// the reply composer's own open/closed state on the page remount, so
+		// stepping back into "friendly-fire" or "reply-composer-ack" finds
+		// neither target, look-ahead "helpfully" re-matches the step just
+		// LEFT (whose target, the post-focus arena, is still genuinely on
+		// screen), and Back gets silently overridden back to where it started
+		// — every press. Look-ahead's whole job is catching the viewer ahead
+		// of the tour's own Next; it was never meant to second-guess a Back
+		// the viewer just pressed on purpose, so it now only runs at the
+		// frontier this run has actually reached under its own forward
+		// progress.
 		function findAhead(): number | null {
 			for (let lookAhead = 1; lookAhead <= 2; lookAhead++) {
 				const aheadIndex = stepIndex + lookAhead;
@@ -295,10 +321,12 @@ export function TutorialControl({
 				}
 				return;
 			}
-			const aheadIndex = findAhead();
-			if (aheadIndex !== null) {
-				setStepIndex(aheadIndex);
-				return;
+			if (atFrontier) {
+				const aheadIndex = findAhead();
+				if (aheadIndex !== null) {
+					setStepIndex(aheadIndex);
+					return;
+				}
 			}
 			setPlacements(null);
 			if (Date.now() - searchStartedAt.current > FIND_TIMEOUT_MS) {
@@ -330,13 +358,7 @@ export function TutorialControl({
 	const autoScrollSelector = step.autoScrollSelector;
 	const hasPlacements = placements !== null;
 	useEffect(() => {
-		if (
-			!open ||
-			!autoScrollSelector ||
-			!hasPlacements ||
-			transitioning ||
-			reducedMotion
-		) {
+		if (!open || !autoScrollSelector || !hasPlacements || reducedMotion) {
 			return;
 		}
 		const id = window.setInterval(() => {
@@ -346,7 +368,7 @@ export function TutorialControl({
 			}
 		}, AUTO_SCROLL_MS);
 		return () => window.clearInterval(id);
-	}, [open, autoScrollSelector, hasPlacements, transitioning, reducedMotion]);
+	}, [open, autoScrollSelector, hasPlacements, reducedMotion]);
 
 	/**
 	 * The tour always starts from Discovery, whatever page the header button
@@ -359,6 +381,7 @@ export function TutorialControl({
 	 */
 	function start() {
 		profileHrefRef.current = null;
+		maxReachedIndexRef.current = 0;
 		setStepIndex(0);
 		setOpen(true);
 		if (window.location.pathname !== "/") {
@@ -366,22 +389,10 @@ export function TutorialControl({
 		}
 	}
 
-	/**
-	 * Holds briefly on the current step, then pushes and advances together —
-	 * used for both real page navigations `next()` drives (Discovery -> a
-	 * market, and the banked profile href), so the jump reads as a
-	 * deliberate transition rather than an instant cut. The timeout is kept
-	 * in a ref so `close()` can cancel it: a Skip pressed mid-pause should
-	 * not still carry the viewer to a page they just dismissed the tour on.
-	 */
-	function pauseThenNavigate(href: string, nextIndex: number) {
-		setTransitioning(true);
-		pauseTimeoutRef.current = window.setTimeout(() => {
-			pauseTimeoutRef.current = null;
-			router.push(href);
-			setStepIndex(nextIndex);
-			setTransitioning(false);
-		}, NAV_PAUSE_MS);
+	/** Pushes and advances together, immediately — no artificial pause. */
+	function navigateAndAdvance(href: string, nextIndex: number) {
+		router.push(href);
+		setStepIndex(nextIndex);
 	}
 
 	/**
@@ -447,11 +458,10 @@ export function TutorialControl({
 			TUTORIAL_STEPS[nextIndex].chapter === "Your profile";
 
 		// Both of these are real page navigations, not just a step change —
-		// pushed with a brief pause first rather than instantly, so the jump
-		// reads as a deliberate transition instead of a jump cut. Not needed
-		// for `advance: "click"` above, which never leaves the current page.
+		// pushed and advanced together, immediately. Not needed for
+		// `advance: "click"` above, which never leaves the current page.
 		if (step.advance === "navigate-now" && capturedHrefRef.current) {
-			pauseThenNavigate(capturedHrefRef.current, nextIndex);
+			navigateAndAdvance(capturedHrefRef.current, nextIndex);
 			return;
 		}
 		if (enteringProfile) {
@@ -471,7 +481,7 @@ export function TutorialControl({
 			if (profileHref) {
 				marketHrefRef.current =
 					window.location.pathname + window.location.search;
-				pauseThenNavigate(profileHref, nextIndex);
+				navigateAndAdvance(profileHref, nextIndex);
 				return;
 			}
 		}
@@ -521,10 +531,10 @@ export function TutorialControl({
 		function onKey(e: KeyboardEvent) {
 			if (e.key === "Escape") {
 				close();
-			} else if (e.key === "ArrowRight" && !transitioning) {
+			} else if (e.key === "ArrowRight") {
 				e.preventDefault();
 				next();
-			} else if (e.key === "ArrowLeft" && !isFirst && !transitioning) {
+			} else if (e.key === "ArrowLeft" && !isFirst) {
 				e.preventDefault();
 				back();
 			}
@@ -560,7 +570,6 @@ export function TutorialControl({
 						reducedMotion={reducedMotion}
 						isFirst={isFirst}
 						isLast={isLast}
-						transitioning={transitioning}
 						onBack={back}
 						onNext={next}
 						onSkip={close}
@@ -582,7 +591,6 @@ function TutorialOverlay({
 	reducedMotion,
 	isFirst,
 	isLast,
-	transitioning,
 	onBack,
 	onNext,
 	onSkip,
@@ -597,7 +605,6 @@ function TutorialOverlay({
 	reducedMotion: boolean;
 	isFirst: boolean;
 	isLast: boolean;
-	transitioning: boolean;
 	onBack: () => void;
 	onNext: () => void;
 	onSkip: () => void;
@@ -670,7 +677,6 @@ function TutorialOverlay({
 				reducedMotion={reducedMotion}
 				isFirst={isFirst}
 				isLast={isLast}
-				transitioning={transitioning}
 				onBack={onBack}
 				onNext={onNext}
 				onSkip={onSkip}
@@ -802,7 +808,6 @@ function HintCard({
 	reducedMotion,
 	isFirst,
 	isLast,
-	transitioning,
 	onBack,
 	onNext,
 	onSkip,
@@ -817,7 +822,6 @@ function HintCard({
 	reducedMotion: boolean;
 	isFirst: boolean;
 	isLast: boolean;
-	transitioning: boolean;
 	onBack: () => void;
 	onNext: () => void;
 	onSkip: () => void;
@@ -912,8 +916,7 @@ function HintCard({
 						<button
 							type="button"
 							onClick={onBack}
-							disabled={transitioning}
-							className="inline-flex h-[30px] items-center gap-1 rounded-(--r) px-3 text-[12px] font-semibold [border:var(--hairline)] hover:[border:1px_solid_var(--ring)] disabled:pointer-events-none disabled:opacity-50"
+							className="inline-flex h-[30px] items-center gap-1 rounded-(--r) px-3 text-[12px] font-semibold [border:var(--hairline)] hover:[border:1px_solid_var(--ring)]"
 						>
 							Back
 							<span aria-hidden="true" className="text-muted-foreground">
@@ -924,8 +927,7 @@ function HintCard({
 					<button
 						type="button"
 						onClick={onNext}
-						disabled={transitioning}
-						className="inline-flex h-[30px] items-center gap-1 rounded-(--r) bg-(--btn-fill) px-3 text-[12px] font-semibold text-ink [border:var(--hairline)] hover:[border:1px_solid_var(--ring)] disabled:pointer-events-none disabled:opacity-50"
+						className="inline-flex h-[30px] items-center gap-1 rounded-(--r) bg-(--btn-fill) px-3 text-[12px] font-semibold text-ink [border:var(--hairline)] hover:[border:1px_solid_var(--ring)]"
 					>
 						{isLast ? "Done" : "Next"}
 						{!isLast ? (
