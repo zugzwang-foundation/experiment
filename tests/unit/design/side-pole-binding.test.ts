@@ -428,6 +428,11 @@ const PERMITTED_FILES = [
 	// which is correct AND newly visible to this guard, so the file enters the
 	// inventory. The predicate was NOT relaxed to avoid the churn — relaxing it
 	// is the one thing this file must never do to stay green.
+	// PhoneSideTabs — the phone thread's tab row now draws the focused post's
+	// Support/Counter split bar between the two tabs, with the SAME post-side
+	// keyed mapping AggregateFooter uses (support = the post's pole, counter =
+	// the opposite). Added as a DECISION; the predicate was not touched.
+	"src/components/debate/phone/PhoneSideTabs.tsx",
 	"src/components/discovery/HeroPanels.tsx",
 	// UNWIRE-1 — `profile/graph/ProfileChart.tsx` deleted whole (Profile Dharma
 	// graph unwired); this entry drops with it rather than being replaced.
