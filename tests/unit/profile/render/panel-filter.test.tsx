@@ -101,6 +101,7 @@ const ARG_REPLY: ProfileArgumentItem = {
 	marketSlug: "fixture-reply",
 	marketTitle: "Market question for the reply",
 	ordinal: 4,
+	replyOrdinal: 1,
 	title: "Reply fixture title",
 	teaser: "Reply fixture teaser.",
 	body: REPLY_BODY,
@@ -334,9 +335,10 @@ describe("item 7 — the replica card's parts", () => {
 		// built, on the argument-LIST card where the teaser is clamped and there is
 		// something to reveal. On this card it would reveal nothing.
 		// UNWIRE-1 — the bookmark half of the cluster is gone (bookmark module
-		// unwired product-wide); the download-stub half survives (SUB-1) and is
-		// still the positive control proving the absence-checks above aren't
-		// vacuous because the whole cluster silently disappeared.
+		// unwired product-wide); the download-stub half survived (SUB-1) and was
+		// replaced by the working Share control (2026-10-04), which is now the
+		// positive control proving the absence-checks above aren't vacuous because
+		// the whole cluster silently disappeared.
 		renderPost();
 		const card = screen.getByTestId(`argument-replica-${C_POST}`);
 		const labels = [...card.querySelectorAll("button")].map(
@@ -350,7 +352,7 @@ describe("item 7 — the replica card's parts", () => {
 		expect(labels.some((l) => l.includes("Know more"))).toBe(true);
 		// …and the cluster IS here, so the narrowing did not quietly drop coverage of
 		// what the card should carry.
-		expect(labels.some((l) => l.includes("Download"))).toBe(true);
+		expect(labels.some((l) => l.includes("Share as image"))).toBe(true);
 	});
 });
 

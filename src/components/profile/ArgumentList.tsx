@@ -7,6 +7,7 @@ import {
 	displaySplitTotal,
 } from "@/components/debate/composer/split-bar";
 import { CompactDharmaFigure } from "@/components/debate/DharmaFigure";
+import { SharePostImage } from "@/components/debate/DownloadPostImage";
 import { formatDharma, formatDharmaCompact } from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -24,7 +25,6 @@ import type { ProfileUser } from "@/server/profile/resolve";
 
 import { ArgumentBody } from "./ArgumentBody";
 import { PROFILE_COPY } from "./copy";
-import { DownloadStub } from "./DownloadStub";
 import { ReplicaBody } from "./ReplicaBody";
 import type { ProfileSelection } from "./selection";
 
@@ -424,8 +424,8 @@ function RemovedHead({
  * UNWIRE-1 — the bookmark half of the cluster (PROFILE REFINEMENT · R4's
  * `CardActions`/`loadBookmarks`/own-suppression mechanism, once threaded
  * through here via `bookmarks: BookmarkAffordance`) is removed: the bookmark
- * module is unwired product-wide. Only the disabled download stub remains
- * (SUB-1, `DownloadStub.tsx`).
+ * module is unwired product-wide. Only the Share control remains (it replaced
+ * the disabled download stub, SUB-1).
  *
  * ⚠ NO GAP IS INTRODUCED: `gap-2` is the class this row already carried AND the
  * mockup's `.rchead{gap:8px}` (`:321`) — the same number from both directions.
@@ -594,13 +594,26 @@ function PresentHead({
 			<FieldSeparator />
 			<RelativeTime createdAt={item.createdAt} className="text-xs" />
 			{/* UNWIRE-1 — the bookmark half of this cluster is gone (bookmark module
-			    unwired product-wide, SUB-2/H-NEW-2); the download stub survives,
-			    extracted to its own component (SUB-1). `ml-auto` on this wrapper is
-			    the same one `CardActions` carried, kept so the lone remaining child
-			    still sits at the row's end — the mockup's `.cardacts{margin-left:
-			    auto}` (`:330`). */}
+			    unwired product-wide, SUB-2/H-NEW-2). `ml-auto` on this wrapper is the
+			    same one `CardActions` carried, kept so the lone remaining child still
+			    sits at the row's end — the mockup's `.cardacts{margin-left: auto}`
+			    (`:330`).
+			    The disabled download stub that sat here is replaced by the market
+			    card's working Share control (founder request 2026-10-04): the same
+			    post-image export, addressed by this argument's market, its post's
+			    ordinal and — for a reply — its own rank within that post.
+			    ⛔ NOT on a reply whose post was removed (`repliedToTitle === null`):
+			    the export refuses it for good (no removed content is ever exported),
+			    so the control would only ever report a retryable error. */}
 			<div className="ml-auto flex shrink-0 items-center gap-0.5">
-				<DownloadStub />
+				{item.kind === "reply" && item.repliedToTitle === null ? null : (
+					<SharePostImage
+						compact
+						slug={item.marketSlug}
+						ordinal={item.ordinal}
+						reply={item.kind === "reply" ? item.replyOrdinal : undefined}
+					/>
+				)}
 			</div>
 		</div>
 	);
@@ -636,7 +649,7 @@ function PresentHead({
  * control the debate surface uses, so one affordance means one thing — and it is
  * gated on there BEING a description (entry 5), which is that same test applied
  * to the remaining case.
- * ⛔ THE HEAD CLUSTER IS UNCHANGED and still carries the disabled download stub.
+ * ⛔ THE HEAD CLUSTER IS UNCHANGED and carries the Share control.
  *
  * ⚠ TITLE-THEN-WHOLE-BODY IS STILL THE SHIPPED SHAPE WHEN THE BODY IS OPEN, NOT
  * a duplication bug. `deriveTitleTeaser` takes the title FROM the body's first

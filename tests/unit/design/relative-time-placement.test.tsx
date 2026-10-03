@@ -476,7 +476,7 @@ describe("TIME-1 :: G6 — the age is the LAST element of the identity row", () 
 			// `row.lastElementChild === leaf` AND THAT WAS WRONG — it went red on
 			// the profile head, correctly. Two of these rows end with a TEXT-FREE
 			// trailing action cluster (`ArgProfile`'s download mark,
-			// `ArgumentList`'s `ml-auto` wrapper around `DownloadStub`), which is
+			// `ArgumentList`'s `ml-auto` wrapper around the Share control), which is
 			// the row's trailing EDGE rather than one of its tags. The ruling is
 			// "after every existing tag", so the honest predicate is that the age is
 			// the last thing the row SAYS: nothing carrying text may follow it.

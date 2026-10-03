@@ -298,6 +298,7 @@ const A_REPLY: ProfileArgumentItem = {
 	marketSlug: "fixture-beta",
 	marketTitle: "Market fixture-beta",
 	ordinal: 3,
+	replyOrdinal: 1,
 	title: "Argument reply beta",
 	teaser: "Neutral fixture teaser beta.",
 	body: "Argument reply beta\n\nNeutral fixture body beta.",

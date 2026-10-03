@@ -730,7 +730,7 @@ export function MarketHeader({
 											)}
 										>
 											{/* Bare, like the two sibling call sites (`ArgProfile`,
-										    `DownloadStub`). The glyph IS hidden from AT — lucide
+										    `SharePostImage`). The glyph IS hidden from AT — lucide
 										    adds `aria-hidden="true"` itself — but it does so
 										    CONDITIONALLY: `!children && !hasA11yProp(rest)`
 										    (`lucide-react@1.14.0` `dist/esm/Icon.mjs:36`, read, not
