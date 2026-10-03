@@ -50,23 +50,25 @@ import { isFirstStepOfChapter, TUTORIAL_STEPS } from "./tutorial-steps";
  * look-ahead would re-match the step just LEFT and silently snap Back right
  * back to where it started.
  *
- * Two more things keep the overlay from ever showing a hollow "nothing to
- * point at" card for state that was simply never going to resolve — both
- * live in `tick()`'s own not-found branch, not in `back()` itself: a
- * one-shot DOM check made synchronously inside a click handler can race an
- * in-flight navigation and catch the page mid-transition, which is exactly
- * what reading it back polling-driven instead avoids. While reviewing
- * below the frontier, once a step's target has had a full grace window to
- * appear and still hasn't, the tour keeps walking back on its own — a
- * composer the viewer had open doesn't survive the page remount a return
- * from "Your profile" causes, and no amount of further waiting fixes that,
- * so it lands on something real instead of parking on each dead step in
- * turn. And that same grace window (`navGrace`) suppresses the "not found"
- * wording right after a page jump this component drove itself — the step
- * index now advances the instant Next is pressed, but the destination page
- * still takes a beat to actually load, so without the window every
- * navigation flashed the message for one frame before the real target
- * caught up.
+ * Back is a plain, predictable single step — ALWAYS exactly one index,
+ * never more. Two earlier rounds had it (and later the finder effect)
+ * walk past further steps whose target couldn't be confirmed, trying to
+ * land Back on something real instead of a composer-dependent step left
+ * hollow by the page remount a return from "Your profile" causes — both
+ * attempts were reverted on the same explicit, repeated feedback: a
+ * viewer pressing Back once expects to land exactly one step back, not
+ * wherever the tour privately decides is "real enough". A step that
+ * genuinely has nothing to point at right now still says so plainly
+ * (`notFoundHint` below) — Next keeps working regardless.
+ *
+ * A short post-navigation grace window (`navGrace`) keeps that same
+ * "not found" wording, and the whole overlay's chrome, off screen right
+ * after a page jump this component drove itself — the step index now
+ * advances the instant Next is pressed, but the destination page still
+ * takes a beat to actually load, so without the window every navigation
+ * flashed an empty placeholder card for one frame before the real target
+ * caught up. See the render branch in `TutorialControl` guarding on
+ * `navGrace && placements === null`.
  *
  * The word-by-word text reveal below needs `@keyframes` Tailwind has no
  * utility for — the same situation `src/components/art/warli/` is in, and
@@ -82,11 +84,13 @@ const SPOTLIGHT_PADDING = 6;
 /** Cadence of the auto-scroll on feed steps. */
 const AUTO_SCROLL_MS = 1400;
 /**
- * How long after a tour-driven `router.push` the "not found" wording stays
- * suppressed. Not a pause on the navigation itself — the step index still
- * advances instantly — just a grace window for the destination page to
- * actually finish loading before the finder's own "nothing to point at"
- * message is allowed to show.
+ * How long after a tour-driven `router.push` the overlay stays off screen
+ * entirely while no target has resolved yet. Not a pause on the navigation
+ * itself — the step index still advances instantly and the real page
+ * underneath is fully visible and usable the whole time — just a grace
+ * window before the finder gives up and shows an honest "nothing to point
+ * at" card, so the destination page gets a moment to actually finish
+ * loading first without an empty placeholder card flashing over it.
  */
 const NAV_GRACE_MS = 900;
 
@@ -216,8 +220,8 @@ export function TutorialControl({
 	const [placements, setPlacements] = useState<Placement[] | null>(null);
 	const [timedOut, setTimedOut] = useState(false);
 	/** True for `NAV_GRACE_MS` after this component's own `router.push`,
-	 *  suppressing the "nothing to point at" wording while the destination
-	 *  page is still loading. See the file docblock. */
+	 *  keeping the whole overlay off screen while the destination page is
+	 *  still loading. See the file docblock. */
 	const [navGrace, setNavGrace] = useState(false);
 	const lastNavAtRef = useRef(0);
 	const searchStartedAt = useRef(0);
@@ -365,25 +369,6 @@ export function TutorialControl({
 					setStepIndex(aheadIndex);
 					return;
 				}
-			} else if (
-				stepIndex > 0 &&
-				Date.now() - lastNavAtRef.current > NAV_GRACE_MS
-			) {
-				// Reviewing a step below the frontier, and its target has
-				// now had a full grace window to appear and still hasn't —
-				// a composer the viewer had open doesn't survive the page
-				// remount a return from "Your profile" causes, and no
-				// further waiting fixes that. Keep walking back exactly as
-				// another Back press would, polling-driven rather than a
-				// one-shot DOM check at click time (which can race an
-				// in-flight navigation and read stale content — reported
-				// live: Back from "existing replies" landing on
-				// "reply-composer-ack" instead of skipping past it, because
-				// a synchronous check made at the click itself caught the
-				// page mid-transition). This keeps re-checking every poll
-				// until it lands on something real or reaches index 0.
-				setStepIndex((i) => Math.max(i - 1, 0));
-				return;
 			}
 			setPlacements(null);
 			if (Date.now() - lastNavAtRef.current > NAV_GRACE_MS) {
@@ -580,12 +565,9 @@ export function TutorialControl({
 		}
 		// Always a single, plain step back — a functional update, so a
 		// click handler fired from a stale render can't under- or
-		// over-shoot. Walking past any FURTHER dead step (composer-local
-		// state that didn't survive getting here) is the finder effect's
-		// job, not this click's: a DOM check made synchronously here can
-		// race an in-flight navigation and read stale content, where the
-		// same check made from the poll a moment later reliably doesn't.
-		// See `tick()`'s `atFrontier` branch.
+		// over-shoot. Deliberately never more than one index, even if the
+		// landing step's target can't be confirmed right now — see the file
+		// docblock on why that was tried twice and reverted both times.
 		setStepIndex((i) => Math.max(i - 1, 0));
 	}
 
@@ -630,22 +612,23 @@ export function TutorialControl({
 			{open ? (
 				<>
 					<style>{TUTORIAL_KEYFRAMES}</style>
-					<TutorialOverlay
-						stepNumber={stepIndex + 1}
-						stepCount={TUTORIAL_STEPS.length}
-						chapter={step.chapter}
-						text={step.text}
-						referenceImage={step.referenceImage}
-						placements={placements}
-						showSpotlight={!timedOut}
-						suppressNotFound={navGrace}
-						reducedMotion={reducedMotion}
-						isFirst={isFirst}
-						isLast={isLast}
-						onBack={back}
-						onNext={next}
-						onSkip={close}
-					/>
+					{navGrace && placements === null ? null : (
+						<TutorialOverlay
+							stepNumber={stepIndex + 1}
+							stepCount={TUTORIAL_STEPS.length}
+							chapter={step.chapter}
+							text={step.text}
+							referenceImage={step.referenceImage}
+							placements={placements}
+							showSpotlight={!timedOut}
+							reducedMotion={reducedMotion}
+							isFirst={isFirst}
+							isLast={isLast}
+							onBack={back}
+							onNext={next}
+							onSkip={close}
+						/>
+					)}
 				</>
 			) : null}
 		</>
@@ -660,7 +643,6 @@ function TutorialOverlay({
 	referenceImage,
 	placements,
 	showSpotlight,
-	suppressNotFound,
 	reducedMotion,
 	isFirst,
 	isLast,
@@ -675,10 +657,6 @@ function TutorialOverlay({
 	referenceImage?: string;
 	placements: Placement[] | null;
 	showSpotlight: boolean;
-	/** True briefly right after this component's own navigation — see
-	 *  `NAV_GRACE_MS`. Keeps "not found" wording off screen while the
-	 *  destination page is still loading. */
-	suppressNotFound: boolean;
 	reducedMotion: boolean;
 	isFirst: boolean;
 	isLast: boolean;
@@ -749,7 +727,7 @@ function TutorialOverlay({
 				stepCount={stepCount}
 				chapter={chapter}
 				text={text}
-				notFoundHint={!hasTarget && !suppressNotFound}
+				notFoundHint={!hasTarget}
 				referenceImage={referenceImage}
 				reducedMotion={reducedMotion}
 				isFirst={isFirst}
