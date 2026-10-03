@@ -50,6 +50,20 @@ import { isFirstStepOfChapter, TUTORIAL_STEPS } from "./tutorial-steps";
  * look-ahead would re-match the step just LEFT and silently snap Back right
  * back to where it started.
  *
+ * Two more things keep the overlay from ever showing a hollow "nothing to
+ * point at" card for state that was simply never going to resolve:
+ * `back()` walks past any further step, while reviewing below the
+ * frontier, whose target it can confirm right now isn't on screen — a
+ * composer the viewer had open doesn't survive the page remount a return
+ * from "Your profile" causes, and no amount of waiting fixes that, so
+ * Back skips straight to something real instead of parking on each dead
+ * step in turn. And a short post-navigation grace window (`navGrace`)
+ * suppresses that same card's "not found" wording right after a page
+ * jump this component itself drove — the step index now advances the
+ * instant Next is pressed, but the destination page still takes a beat
+ * to actually load, so without the grace window every navigation flashed
+ * the message for one frame before the real target caught up.
+ *
  * The word-by-word text reveal below needs `@keyframes` Tailwind has no
  * utility for — the same situation `src/components/art/warli/` is in, and
  * this file follows its precedent exactly: a component-scoped `<style>`
@@ -63,6 +77,14 @@ const POLL_MS = 250;
 const SPOTLIGHT_PADDING = 6;
 /** Cadence of the auto-scroll on feed steps. */
 const AUTO_SCROLL_MS = 1400;
+/**
+ * How long after a tour-driven `router.push` the "not found" wording stays
+ * suppressed. Not a pause on the navigation itself — the step index still
+ * advances instantly — just a grace window for the destination page to
+ * actually finish loading before the finder's own "nothing to point at"
+ * message is allowed to show.
+ */
+const NAV_GRACE_MS = 900;
 
 type Placement = { top: number; left: number; width: number; height: number };
 
@@ -189,6 +211,11 @@ export function TutorialControl({
 	const [stepIndex, setStepIndex] = useState(0);
 	const [placements, setPlacements] = useState<Placement[] | null>(null);
 	const [timedOut, setTimedOut] = useState(false);
+	/** True for `NAV_GRACE_MS` after this component's own `router.push`,
+	 *  suppressing the "nothing to point at" wording while the destination
+	 *  page is still loading. See the file docblock. */
+	const [navGrace, setNavGrace] = useState(false);
+	const lastNavAtRef = useRef(0);
 	const searchStartedAt = useRef(0);
 	/**
 	 * The furthest step index this run has reached under its own forward
@@ -232,6 +259,12 @@ export function TutorialControl({
 	const close = useCallback(() => {
 		setOpen(false);
 	}, []);
+
+	/** Call right alongside any `router.push` this component drives itself. */
+	function markNavigated() {
+		lastNavAtRef.current = Date.now();
+		setNavGrace(true);
+	}
 
 	// Find and track the current step's target(s). Re-runs on every step
 	// change; polls rather than using a MutationObserver because the
@@ -307,6 +340,7 @@ export function TutorialControl({
 			if (found) {
 				setPlacements(found.placements);
 				setTimedOut(false);
+				setNavGrace((g) => (g ? false : g));
 				if (
 					step.advance === "navigate-now" ||
 					step.advance === "bank-profile"
@@ -329,6 +363,9 @@ export function TutorialControl({
 				}
 			}
 			setPlacements(null);
+			if (Date.now() - lastNavAtRef.current > NAV_GRACE_MS) {
+				setNavGrace((g) => (g ? false : g));
+			}
 			if (Date.now() - searchStartedAt.current > FIND_TIMEOUT_MS) {
 				setTimedOut(true);
 			}
@@ -385,12 +422,14 @@ export function TutorialControl({
 		setStepIndex(0);
 		setOpen(true);
 		if (window.location.pathname !== "/") {
+			markNavigated();
 			router.push("/");
 		}
 	}
 
 	/** Pushes and advances together, immediately — no artificial pause. */
 	function navigateAndAdvance(href: string, nextIndex: number) {
+		markNavigated();
 		router.push(href);
 		setStepIndex(nextIndex);
 	}
@@ -512,10 +551,38 @@ export function TutorialControl({
 						? preFocusHrefRef.current
 						: "/";
 			if (origin) {
+				markNavigated();
 				router.push(origin);
 			}
+			// The destination page hasn't loaded yet, so there's nothing to
+			// synchronously check below — land on the one step back and let
+			// the finder's own poll (and `navGrace` above) settle it.
+			setStepIndex(Math.max(stepIndex - 1, 0));
+			return;
 		}
-		setStepIndex((i) => Math.max(i - 1, 0));
+		// No navigation needed to leave this step, so the page under it is
+		// already stable right now — walk back past any FURTHER step whose
+		// target can be confirmed missing on the spot, so Back never lands
+		// on a hollow "nothing to point at" card for state that simply
+		// didn't survive getting here (the reply composer's own open/closed
+		// state doesn't survive the page remount a return from "Your
+		// profile" causes). Stops the instant it finds something real, or
+		// at index 0.
+		let idx = Math.max(stepIndex - 1, 0);
+		while (idx > 0) {
+			const candidate = TUTORIAL_STEPS[idx];
+			if (
+				measure(
+					candidate.selector,
+					candidate.selectorSecondary,
+					candidate.requiresSelector,
+				)
+			) {
+				break;
+			}
+			idx -= 1;
+		}
+		setStepIndex(idx);
 	}
 
 	// Escape always closes; ArrowRight/ArrowLeft drive Next/Back while the
@@ -567,6 +634,7 @@ export function TutorialControl({
 						referenceImage={step.referenceImage}
 						placements={placements}
 						showSpotlight={!timedOut}
+						suppressNotFound={navGrace}
 						reducedMotion={reducedMotion}
 						isFirst={isFirst}
 						isLast={isLast}
@@ -588,6 +656,7 @@ function TutorialOverlay({
 	referenceImage,
 	placements,
 	showSpotlight,
+	suppressNotFound,
 	reducedMotion,
 	isFirst,
 	isLast,
@@ -602,6 +671,10 @@ function TutorialOverlay({
 	referenceImage?: string;
 	placements: Placement[] | null;
 	showSpotlight: boolean;
+	/** True briefly right after this component's own navigation — see
+	 *  `NAV_GRACE_MS`. Keeps "not found" wording off screen while the
+	 *  destination page is still loading. */
+	suppressNotFound: boolean;
 	reducedMotion: boolean;
 	isFirst: boolean;
 	isLast: boolean;
@@ -672,7 +745,7 @@ function TutorialOverlay({
 				stepCount={stepCount}
 				chapter={chapter}
 				text={text}
-				notFoundHint={!hasTarget}
+				notFoundHint={!hasTarget && !suppressNotFound}
 				referenceImage={referenceImage}
 				reducedMotion={reducedMotion}
 				isFirst={isFirst}
