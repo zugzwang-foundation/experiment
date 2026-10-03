@@ -334,6 +334,7 @@ export function PostFocusHeader({
 												replyCount={replyCount}
 												createdAt={post.createdAt}
 												badge={post.badge}
+												friendlyFireDharma={post.aggregate.friendlyFireDharma}
 											/>
 										</div>
 										{hasExtendedText(post.body) ? (

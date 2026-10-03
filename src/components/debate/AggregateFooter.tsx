@@ -10,7 +10,11 @@ import {
 } from "./composer/column-header";
 import { c3OppositeSide, OWN_POST_COPY } from "./composer/copy";
 import { deriveReplySide, isEntryDisabled } from "./composer/gating";
-import { computeSplitBar, displaySplitTotal } from "./composer/split-bar";
+import {
+	computeSplitBar,
+	displaySplitTotal,
+	friendlyFireOfSupport,
+} from "./composer/split-bar";
 import { formatDharma } from "./format";
 import type { ReplyAggregate, Side } from "./types";
 
@@ -155,6 +159,12 @@ export function AggregateFooter({
 	// Nothing staked on either side → a grey track and no fill, never the two
 	// poles: the same empty state the profile's bar already shows (bg-n2).
 	const trackFill = hasStake ? counterPole : "bg-n2";
+	// Founder ruling 2026-10-04 — the friendly-fire share of the Support fill,
+	// drawn HATCHED at the fill's end that meets Counter (`FriendlyFireHatch`).
+	const friendlyFirePct = friendlyFireOfSupport({
+		friendlyFireDharma: aggregate.friendlyFireDharma,
+		supportDharma: aggregate.supportDharma,
+	});
 
 	if (inColumn) {
 		// ⚠ UIR-1 item 4 — the column header's lane grammar (`column-header.tsx`
@@ -201,9 +211,11 @@ export function AggregateFooter({
 					>
 						<span
 							data-testid="aggregate-split-fill"
-							className={cn("block h-full", supportPole)}
+							className={cn("relative block h-full", supportPole)}
 							style={{ width: supportPct }}
-						/>
+						>
+							<FriendlyFireHatch pct={friendlyFirePct} />
+						</span>
 					</span>
 					<span>
 						<b className="text-sm text-gold">
@@ -482,7 +494,7 @@ export function AggregateFooter({
 						<span
 							data-testid="aggregate-split-fill"
 							className={cn(
-								"block h-full",
+								"relative block h-full",
 								supportPole,
 								// ⛔⛔ THE FILL IS THE SHARE AND NOTHING ELSE, WHICH IS ADR-0051
 								// A11 D-2 WITHDRAWING A10 D-2's HALF-WIDTH AT ZERO. A10 solved the
@@ -504,7 +516,9 @@ export function AggregateFooter({
 								// is expressed back to the track.
 							)}
 							style={{ width: supportPct }}
-						/>
+						>
+							<FriendlyFireHatch pct={friendlyFirePct} />
+						</span>
 					</span>
 				</span>
 				<span>
@@ -806,5 +820,26 @@ function TriggerPill({
 				{relation === "support" ? "Support" : "Counter"}
 			</button>
 		</InfoTip>
+	);
+}
+
+/**
+ * The friendly-fire share of a Support fill (founder ruling 2026-10-04):
+ * dark diagonal hatching over the fill's own pole colour, anchored to the
+ * fill's RIGHT end — where Support meets Counter, since this is Support money
+ * that contests the post. `pct` is a share OF THE FILL (`friendlyFireOfSupport`),
+ * so it can never spill into the Counter track. Nothing renders without it.
+ */
+function FriendlyFireHatch({ pct }: { pct: string | null }) {
+	if (pct === null) {
+		return null;
+	}
+	return (
+		<span
+			data-testid="aggregate-split-ff"
+			aria-hidden="true"
+			className="absolute inset-y-0 right-0 bg-[repeating-linear-gradient(135deg,transparent_0_3px,var(--color-ground)_3px_6px)]"
+			style={{ width: pct }}
+		/>
 	);
 }

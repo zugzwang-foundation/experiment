@@ -170,15 +170,52 @@ describe("friendly-fire tag — the reply row (post-focus)", () => {
 	});
 });
 
-describe("friendly-fire — the post CARD is untouched in every state (D-51 R5)", () => {
+describe("friendly-fire — the post CARD carries the tag with its Đ when it drew fire (founder ruling 2026-10-04, reversing D-51 R5)", () => {
 	const flagged = reply({ id: "r-ff", friendlyFire: true });
 	const plain = reply({ id: "r-plain", side: "YES" });
 	const counter = reply({ id: "r-counter", side: "NO" });
 
-	const STATES: Array<[string, DebatePost]> = [
+	const renderCard = (p: DebatePost) =>
+		render(
+			<PostCard
+				post={p}
+				onEnter={noop}
+				onOpenPopup={noop}
+				onOpenImage={noop}
+				onReplyToPost={noop}
+				heldSide={null}
+				marketOpen
+				suspended={false}
+			/>,
+		);
+
+	const QUIET: Array<[string, DebatePost]> = [
 		["no-replies", post()],
 		[
-			"aggregate-carries-friendly-fire-dharma",
+			"friendly-fire-dharma-is-zero",
+			post({
+				aggregate: {
+					supportCount: 2,
+					counterCount: 1,
+					supportDharma: "1000.000000000000000000",
+					counterDharma: "2000.000000000000000000",
+					friendlyFireDharma: "0.000000000000000000",
+				},
+			}),
+		],
+		["badged-contested", post({ badge: "Contested" })],
+	];
+
+	for (const [name, p] of QUIET) {
+		it(`ff-card::no-tag-when-no-friendly-fire — ${name}`, () => {
+			const html = renderCard(p).container.innerHTML;
+			expect(html).not.toContain('data-testid="ff-');
+			expect(html).not.toContain("Friendly fire");
+		});
+	}
+
+	it("ff-card::a-post-that-drew-fire-wears-the-tag-and-its-Đ", () => {
+		const { container } = renderCard(
 			post({
 				aggregate: {
 					supportCount: 2,
@@ -187,58 +224,28 @@ describe("friendly-fire — the post CARD is untouched in every state (D-51 R5)"
 					counterDharma: "2000.000000000000000000",
 					friendlyFireDharma: "400.000000000000000000",
 				},
-			}),
-		],
-		[
-			"reply-groups-hold-a-flagged-reply",
-			post({
-				aggregate: {
-					supportCount: 2,
-					counterCount: 1,
-					supportDharma: "1000.000000000000000000",
-					counterDharma: "2000.000000000000000000",
-					friendlyFireDharma: "1000.000000000000000000",
-				},
 				replies: {
 					support: [flagged, plain],
 					counter: [counter],
 					twoSlot: [flagged, counter],
 				},
 			}),
-		],
-		["badged-contested", post({ badge: "Contested" })],
-	];
+		);
+		const tag = container.querySelector('[data-testid="ff-post-tag"]');
+		expect(tag?.innerHTML).toContain("Friendly fire");
+		expect(tag?.innerHTML).toContain("Đ 400");
+		expect(tag?.getAttribute("aria-label")).toBe("Friendly fire, Đ 400");
+		// The REPLY tag is a different question and does not appear on the card.
+		expect(container.querySelector('[data-testid="ff-tag"]')).toBeNull();
+	});
 
-	for (const [name, p] of STATES) {
-		it(`ff-card::no-friendly-fire-element-on-the-card — ${name}`, () => {
-			const { container } = render(
-				<PostCard
-					post={p}
-					onEnter={noop}
-					onOpenPopup={noop}
-					onOpenImage={noop}
-					onReplyToPost={noop}
-					heldSide={null}
-					marketOpen
-					suspended={false}
-				/>,
-			);
-			const html = container.innerHTML;
-			// Markup, not text: a testid or an aria-label would be invisible to
-			// textContent and both are what a "hidden" element would still leak.
-			expect(html).not.toContain('data-testid="ff-');
-			expect(html).not.toContain("Friendly fire");
-			expect(html).not.toContain("friendly fire");
-			expect(html).not.toContain("friendly-fire");
-		});
-	}
-
-	it("ff-card::POSITIVE-CONTROL — the strings the card must not carry are real strings the row does carry", () => {
+	it("ff-card::POSITIVE-CONTROL — a flagged reply row still wears the reply tag, with no figure", () => {
 		const { container } = render(
 			<ReplyCard reply={flagged} onOpenImage={noop} onOpenPopup={noopPopup} />,
 		);
 		expect(container.innerHTML).toContain('data-testid="ff-tag"');
 		expect(container.innerHTML).toContain("Friendly fire");
+		expect(container.querySelector('[data-testid="ff-post-tag"]')).toBeNull();
 	});
 });
 

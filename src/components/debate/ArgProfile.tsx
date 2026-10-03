@@ -55,6 +55,7 @@ export function ArgProfile({
 	badge = null,
 	download,
 	friendlyFire = false,
+	friendlyFireDharma,
 	separators = true,
 }: {
 	author: AuthorIdentity;
@@ -63,11 +64,16 @@ export function ArgProfile({
 	/**
 	 * FF-1 / ADR-0058 — render the `Friendly fire` tag beside the position
 	 * marker. Passed by the post-focus reply rows ONLY (`ReplyCard` on both
-	 * tiers, the reply pop-up); `PostCard` and `PostFocusHeader` never pass it,
-	 * which is what keeps the card free of any friendly-fire element (D-51 R5)
-	 * by construction rather than by a conditional here.
+	 * tiers, the reply pop-up); `PostCard` and `PostFocusHeader` never pass it
+	 * — a post's own tag is `friendlyFireDharma` below.
 	 */
 	friendlyFire?: boolean;
+	/**
+	 * Founder ruling 2026-10-04 (reverses D-51 R5's "card untouched") — a POST's
+	 * friendly-fire Đ (`aggregate.friendlyFireDharma`). Above zero, the post
+	 * card carries the tag with the figure (`Friendly fire · Đ 120`).
+	 */
+	friendlyFireDharma?: string;
 	/**
 	 * HTML-FINISH · MARKET DETAIL row 13 — the author's ENTRY PRICE, rendered ON
 	 * the side chip as `YES @ 27%` (d5's `.sidechip`). ⛔ RAW, never `100 − x`:
@@ -657,6 +663,12 @@ export function ArgProfile({
 						    `friendlyFire`; see the prop's note. */}
 						{friendlyFire ? (
 							<FriendlyFireTag className="max-mobile:order-1 max-mobile:shrink-0 max-mobile:px-1 max-mobile:text-[11px] max-mobile:leading-[16px]" />
+						) : friendlyFireDharma !== undefined &&
+							formatDharmaCompact(friendlyFireDharma) !== "0" ? (
+							<FriendlyFireTag
+								dharma={friendlyFireDharma}
+								className="max-mobile:order-1 max-mobile:shrink-0 max-mobile:px-1 max-mobile:text-[11px] max-mobile:leading-[16px]"
+							/>
 						) : null}
 					</span>
 					{authorStake !== undefined ? (
