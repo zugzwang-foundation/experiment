@@ -70,6 +70,17 @@ import { isFirstStepOfChapter, TUTORIAL_STEPS } from "./tutorial-steps";
  * caught up. See the render branch in `TutorialControl` guarding on
  * `navGrace && placements === null`.
  *
+ * ONE exception to "Back never does more than move the index": leaving
+ * "identity-card" back toward "Support & Counter" also replays the
+ * original Support/Counter click (`replayTriggerRef`, the dedicated
+ * effect near the auto-scroll one) before landing on "existing replies" —
+ * without it, "friendly-fire" one Back press later would have nothing
+ * real to point at no matter what, since whether the reply composer is
+ * open is local React state with no URL equivalent and `DebateView`
+ * clears it on every post-focus entry by design. This isn't a second
+ * "walk past dead steps" mechanism — it doesn't change WHICH step Back
+ * lands on, only makes the one it already lands on genuinely live.
+ *
  * The word-by-word text reveal below needs `@keyframes` Tailwind has no
  * utility for — the same situation `src/components/art/warli/` is in, and
  * this file follows its precedent exactly: a component-scoped `<style>`
@@ -92,7 +103,7 @@ const AUTO_SCROLL_MS = 1400;
  * at" card, so the destination page gets a moment to actually finish
  * loading first without an empty placeholder card flashing over it.
  */
-const NAV_GRACE_MS = 900;
+const NAV_GRACE_MS = 500;
 
 type Placement = { top: number; left: number; width: number; height: number };
 
@@ -223,6 +234,9 @@ export function TutorialControl({
 	 *  keeping the whole overlay off screen while the destination page is
 	 *  still loading. See the file docblock. */
 	const [navGrace, setNavGrace] = useState(false);
+	/** True while the dedicated replay effect below is waiting to re-click
+	 *  the Support/Counter pill. See `replayTriggerRef`. */
+	const [replaying, setReplaying] = useState(false);
 	const lastNavAtRef = useRef(0);
 	const searchStartedAt = useRef(0);
 	/**
@@ -259,6 +273,19 @@ export function TutorialControl({
 	 * triggered it directly. Read by `back()` leaving "reply-target-post".
 	 */
 	const preFocusHrefRef = useRef<string | null>(null);
+	/**
+	 * Which pill ("support" | "counter") the original forward click used on
+	 * "support-counter-pair" — captured the instant that click fires,
+	 * alongside `preFocusHrefRef`. Read by `back()` leaving "identity-card":
+	 * whether the reply composer is open is local React state with no URL
+	 * equivalent, and `DebateView`'s `enterPost` clears it on every entry
+	 * by design — so simply navigating back to the post-focus URL always
+	 * lands with the composer closed, no matter how it's phrased. Replaying
+	 * the SAME click the viewer originally made is what actually reopens
+	 * it, the same way it opened the first time. See the dedicated replay
+	 * effect below.
+	 */
+	const replayTriggerRef = useRef<"support" | "counter" | null>(null);
 
 	const step = TUTORIAL_STEPS[stepIndex];
 	const isFirst = stepIndex === 0;
@@ -415,6 +442,45 @@ export function TutorialControl({
 		return () => window.clearInterval(id);
 	}, [open, autoScrollSelector, hasPlacements, reducedMotion]);
 
+	// Replays the original Support/Counter click after `back()` leaves
+	// "identity-card" and navigates to the pre-focus URL — see
+	// `replayTriggerRef`'s docs for why a direct navigation back to the
+	// post-focus URL can never show the reply composer open on its own.
+	// Looks up the real selector from "support-counter-pair" itself rather
+	// than duplicating it here, so the two stay in sync automatically.
+	// Bounded by `FIND_TIMEOUT_MS`, the same "give up" ceiling the finder
+	// itself uses, so a pill that never resolves doesn't poll forever.
+	useEffect(() => {
+		if (!open || !replaying) {
+			return;
+		}
+		const side = replayTriggerRef.current;
+		const pairStep = TUTORIAL_STEPS.find(
+			(s) => s.id === "support-counter-pair",
+		);
+		const selector =
+			side === "counter" ? pairStep?.selectorSecondary : pairStep?.selector;
+		if (!selector) {
+			setReplaying(false);
+			return;
+		}
+		const startedAt = Date.now();
+		const id = window.setInterval(() => {
+			const el = queryEl(selector);
+			if (el && isClickable(el)) {
+				el.click();
+				setReplaying(false);
+				window.clearInterval(id);
+				return;
+			}
+			if (Date.now() - startedAt > FIND_TIMEOUT_MS) {
+				setReplaying(false);
+				window.clearInterval(id);
+			}
+		}, POLL_MS);
+		return () => window.clearInterval(id);
+	}, [open, replaying]);
+
 	/**
 	 * The tour always starts from Discovery, whatever page the header button
 	 * was clicked from — a fixed, well-known starting point rather than
@@ -427,6 +493,8 @@ export function TutorialControl({
 	function start() {
 		profileHrefRef.current = null;
 		maxReachedIndexRef.current = 0;
+		replayTriggerRef.current = null;
+		setReplaying(false);
 		setStepIndex(0);
 		setOpen(true);
 		if (window.location.pathname !== "/") {
@@ -485,6 +553,14 @@ export function TutorialControl({
 						: secondary && isClickable(secondary)
 							? secondary
 							: null;
+				if (step.id === "support-counter-pair") {
+					replayTriggerRef.current =
+						target === primary
+							? "support"
+							: target === secondary
+								? "counter"
+								: null;
+				}
 			} else {
 				// An UNPAIRED step (Buy): the same control can render once per
 				// column with no shared container to scope a fallback against, so
@@ -552,6 +628,28 @@ export function TutorialControl({
 	 */
 	function back() {
 		if (step.enteredViaNavigation) {
+			if (
+				step.id === "identity-card" &&
+				preFocusHrefRef.current &&
+				replayTriggerRef.current
+			) {
+				// Leaving "Your profile" back toward "Support & Counter": go
+				// to the PRE-focus URL and replay the original Support/
+				// Counter click (the dedicated effect below), rather than
+				// navigating straight to the post-focus URL — see
+				// `replayTriggerRef`'s own docs for why a direct navigation
+				// can never show the composer open. Falls through to the
+				// plain `marketHrefRef` navigation below only when either
+				// ref is missing (an edge case — the look-ahead vaulting
+				// past "support-counter-pair" without its click ever
+				// firing).
+				markNavigated();
+				router.push(preFocusHrefRef.current);
+				setPlacements(null);
+				setReplaying(true);
+				setStepIndex((i) => Math.max(i - 1, 0));
+				return;
+			}
 			const origin =
 				step.chapter === "Your profile"
 					? marketHrefRef.current
