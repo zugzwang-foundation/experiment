@@ -208,6 +208,7 @@ export function PostPopup({
 										sold={post.authorSold}
 										createdAt={post.createdAt}
 										badge={post.badge}
+										friendlyFireDharma={post.aggregate.friendlyFireDharma}
 										download={{ ordinal: post.ordinal }}
 									/>
 								</div>

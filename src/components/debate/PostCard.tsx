@@ -276,6 +276,7 @@ export function PostCard({
 				replyCount={replyCount}
 				createdAt={post.createdAt}
 				badge={post.badge}
+				friendlyFireDharma={post.aggregate.friendlyFireDharma}
 				// UIR-2 item 3 — pinned to the author row's right edge in a column.
 				download={{ ordinal: post.ordinal, pinned: inColumn }}
 			/>

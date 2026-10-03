@@ -4,7 +4,7 @@ import { FRIENDLY_FIRE_TAG_GLOSS, GLOSSARY } from "@/lib/copy/glossary";
 import type { Badge as BadgeKind } from "@/lib/ranking";
 import { cn } from "@/lib/utils";
 
-import { formatPercentUnpaired } from "./format";
+import { formatDharmaCompact, formatPercentUnpaired } from "./format";
 import type { Marker, Side } from "./types";
 
 /**
@@ -229,20 +229,44 @@ export function PositionMarker({
  * carries none, as ruled. `asChild` merges onto the chip rather than wrapping
  * it, so the tag stays a DOM sibling of the position marker. `className` is
  * additive and optional for the same reason `PositionMarker`'s is.
+ *
+ * ⚠ FOUNDER RULING 2026-10-04 — THE POST CARD NOW WEARS IT TOO, reversing
+ * D-51 R5's "never on the post card": a post that has RECEIVED friendly fire
+ * carries the same tag with the Đ staked against it (`dharma` —
+ * `aggregate.friendlyFireDharma`), `Friendly fire · Đ 120`. Same primitive, so
+ * the two chips cannot drift; its own testid (`ff-post-tag`) so a reply row's
+ * "is this reply flagged" and a post's "did this post draw fire" stay two
+ * questions.
  */
-export function FriendlyFireTag({ className }: { className?: string }) {
+export function FriendlyFireTag({
+	className,
+	dharma,
+}: {
+	className?: string;
+	/** The post's friendly-fire Đ — set only on a post that received some. */
+	dharma?: string;
+}) {
+	const figure = dharma === undefined ? null : formatDharmaCompact(dharma);
 	return (
 		<InfoTip content={FRIENDLY_FIRE_TAG_GLOSS} asChild>
 			<Badge
 				variant="secondary"
-				data-testid="ff-tag"
+				data-testid={figure === null ? "ff-tag" : "ff-post-tag"}
 				className={cn(
 					"rounded-sm px-1.5 text-[10px] font-normal text-muted-foreground",
 					className,
 				)}
-				aria-label="Friendly fire"
+				aria-label={
+					figure === null ? "Friendly fire" : `Friendly fire, Đ ${figure}`
+				}
 			>
 				Friendly fire
+				{figure === null ? null : (
+					<>
+						{" · "}
+						<span className="font-bold text-gold">Đ {figure}</span>
+					</>
+				)}
 			</Badge>
 		</InfoTip>
 	);
