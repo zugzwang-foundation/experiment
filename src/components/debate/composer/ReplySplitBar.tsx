@@ -1,10 +1,14 @@
 "use client";
 
 import type { ReactNode } from "react";
-
+import { FriendlyFireHatch } from "../FriendlyFireHatch";
 import { formatDharma } from "../format";
 import type { ReplyAggregate, Side } from "../types";
-import { computeSplitBar, displaySplitTotal } from "./split-bar";
+import {
+	computeSplitBar,
+	displaySplitTotal,
+	friendlyFireOfSupport,
+} from "./split-bar";
 
 /**
  * UI.A3 slice 3 — the focused post's designed split bar (canon §6:
@@ -31,6 +35,11 @@ export function ReplySplitBar({
 	const { supportPct, hasStake } = computeSplitBar({
 		supportDharma: aggregate.supportDharma,
 		counterDharma: aggregate.counterDharma,
+	});
+	// Founder ruling 2026-10-04 — the friendly-fire share, hatched in the fill.
+	const friendlyFirePct = friendlyFireOfSupport({
+		friendlyFireDharma: aggregate.friendlyFireDharma,
+		supportDharma: aggregate.supportDharma,
 	});
 	// DROUND R2: the DISPLAYED total sums the DISPLAYED parts, so Support / Total
 	// / Counter are always arithmetically consistent on screen (SPEC.1 §10.8).
@@ -224,9 +233,11 @@ export function ReplySplitBar({
 					aria-hidden="true"
 				>
 					<span
-						className={`block h-full transition-[width] duration-300 ${postSide === "YES" ? "bg-bar-yes" : "bg-bar-no"}`}
+						className={`relative block h-full transition-[width] duration-300 ${postSide === "YES" ? "bg-bar-yes" : "bg-bar-no"}`}
 						style={{ width: supportPct }}
-					/>
+					>
+						<FriendlyFireHatch pct={friendlyFirePct} />
+					</span>
 				</span>
 			</span>
 			{/* ⚠ UIR-5 item 4 — line 2's middle cell: centred under the track and

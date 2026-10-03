@@ -3,12 +3,14 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { AggregateFooter } from "@/components/debate/AggregateFooter";
+import { ReplySplitBar } from "@/components/debate/composer/ReplySplitBar";
 import { friendlyFireOfSupport } from "@/components/debate/composer/split-bar";
+import { PhoneSideTabs } from "@/components/debate/phone/PhoneSideTabs";
 
 /**
  * Founder ruling 2026-10-04 — the post's Support/Counter bar shows its
- * friendly-fire share as a HATCHED segment inside the Support fill, at the
- * fill's end that meets Counter. Friendly fire is Support money contesting the
+ * friendly-fire share as a HATCHED segment inside the Support fill, from
+ * the fill's start. Friendly fire is Support money contesting the
  * post (ADR-0058), so it is a part OF the Support fill, never a third pole and
  * never spilling into the Counter track.
  */
@@ -58,7 +60,7 @@ describe("AggregateFooter — the hatched friendly-fire segment", () => {
 		counterDharma: "100.000000000000000000",
 	};
 
-	it("sits INSIDE the Support fill, anchored to its right end, at its share", () => {
+	it("sits INSIDE the Support fill, anchored to its START, at its share", () => {
 		const { container } = render(
 			<AggregateFooter
 				aggregate={{ ...base, friendlyFireDharma: "100.000000000000000000" }}
@@ -68,12 +70,12 @@ describe("AggregateFooter — the hatched friendly-fire segment", () => {
 		const fill = container.querySelector(
 			'[data-testid="aggregate-split-fill"]',
 		);
-		const hatch = container.querySelector('[data-testid="aggregate-split-ff"]');
+		const hatch = container.querySelector('[data-testid="split-ff-hatch"]');
 		expect(hatch).not.toBeNull();
 		expect(hatch?.parentElement).toBe(fill);
 		expect((hatch as HTMLElement).style.width).toBe("25%");
 		const cls = hatch?.getAttribute("class") ?? "";
-		expect(cls).toContain("right-0");
+		expect(cls).toContain("left-0");
 		expect(cls).toContain("repeating-linear-gradient");
 	});
 
@@ -90,9 +92,52 @@ describe("AggregateFooter — the hatched friendly-fire segment", () => {
 				container.querySelector('[data-testid="aggregate-split-fill"]'),
 			).not.toBeNull();
 			expect(
-				container.querySelector('[data-testid="aggregate-split-ff"]'),
+				container.querySelector('[data-testid="split-ff-hatch"]'),
 			).toBeNull();
 			unmount();
 		}
+	});
+});
+
+describe("the OPENED post and the phone thread wear the same hatch", () => {
+	it("ReplySplitBar (post-focus) hatches its Support fill", () => {
+		const { container } = render(
+			<ReplySplitBar
+				postSide="YES"
+				aggregate={{
+					supportCount: 3,
+					counterCount: 1,
+					supportDharma: "400",
+					counterDharma: "100",
+					friendlyFireDharma: "100",
+				}}
+			/>,
+		);
+		const hatch = container.querySelector('[data-testid="split-ff-hatch"]');
+		expect((hatch as HTMLElement | null)?.style.width).toBe("25%");
+	});
+
+	it("PhoneSideTabs (phone thread) hatches its Support fill", () => {
+		const { container } = render(
+			<PhoneSideTabs
+				options={[
+					{ key: "support", label: "Support", trailing: "" },
+					{ key: "counter", label: "Counter", trailing: "" },
+				]}
+				active="support"
+				onSelect={() => undefined}
+				panelIdFor={(key) => `panel-${key}`}
+				split={{
+					supportDharma: "400",
+					counterDharma: "100",
+					friendlyFireDharma: "100",
+					postSide: "YES",
+				}}
+			/>,
+		);
+		const fill = container.querySelector('[data-testid="phone-split-fill"]');
+		const hatch = container.querySelector('[data-testid="split-ff-hatch"]');
+		expect(hatch?.parentElement).toBe(fill);
+		expect((hatch as HTMLElement | null)?.style.width).toBe("25%");
 	});
 });

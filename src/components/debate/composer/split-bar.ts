@@ -73,7 +73,7 @@ export function displaySplitTotal(
  * `friendlyFireDharma ÷ supportDharma` as a CSS width, 2 decimals, truncated
  * so the hatched segment never claims more than the stake it marks. Friendly
  * fire is Support money that contests the post (ADR-0058), so it is drawn
- * INSIDE the Support fill, hatched, at the end that meets Counter. `null`
+ * INSIDE the Support fill, hatched, from the fill's start. `null`
  * when there is none, or no Support to sit inside — the bar is then exactly
  * what it was.
  */
