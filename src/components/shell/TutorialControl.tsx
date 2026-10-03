@@ -51,18 +51,22 @@ import { isFirstStepOfChapter, TUTORIAL_STEPS } from "./tutorial-steps";
  * back to where it started.
  *
  * Two more things keep the overlay from ever showing a hollow "nothing to
- * point at" card for state that was simply never going to resolve:
- * `back()` walks past any further step, while reviewing below the
- * frontier, whose target it can confirm right now isn't on screen — a
+ * point at" card for state that was simply never going to resolve — both
+ * live in `tick()`'s own not-found branch, not in `back()` itself: a
+ * one-shot DOM check made synchronously inside a click handler can race an
+ * in-flight navigation and catch the page mid-transition, which is exactly
+ * what reading it back polling-driven instead avoids. While reviewing
+ * below the frontier, once a step's target has had a full grace window to
+ * appear and still hasn't, the tour keeps walking back on its own — a
  * composer the viewer had open doesn't survive the page remount a return
- * from "Your profile" causes, and no amount of waiting fixes that, so
- * Back skips straight to something real instead of parking on each dead
- * step in turn. And a short post-navigation grace window (`navGrace`)
- * suppresses that same card's "not found" wording right after a page
- * jump this component itself drove — the step index now advances the
- * instant Next is pressed, but the destination page still takes a beat
- * to actually load, so without the grace window every navigation flashed
- * the message for one frame before the real target caught up.
+ * from "Your profile" causes, and no amount of further waiting fixes that,
+ * so it lands on something real instead of parking on each dead step in
+ * turn. And that same grace window (`navGrace`) suppresses the "not found"
+ * wording right after a page jump this component drove itself — the step
+ * index now advances the instant Next is pressed, but the destination page
+ * still takes a beat to actually load, so without the window every
+ * navigation flashed the message for one frame before the real target
+ * caught up.
  *
  * The word-by-word text reveal below needs `@keyframes` Tailwind has no
  * utility for — the same situation `src/components/art/warli/` is in, and
@@ -361,6 +365,25 @@ export function TutorialControl({
 					setStepIndex(aheadIndex);
 					return;
 				}
+			} else if (
+				stepIndex > 0 &&
+				Date.now() - lastNavAtRef.current > NAV_GRACE_MS
+			) {
+				// Reviewing a step below the frontier, and its target has
+				// now had a full grace window to appear and still hasn't —
+				// a composer the viewer had open doesn't survive the page
+				// remount a return from "Your profile" causes, and no
+				// further waiting fixes that. Keep walking back exactly as
+				// another Back press would, polling-driven rather than a
+				// one-shot DOM check at click time (which can race an
+				// in-flight navigation and read stale content — reported
+				// live: Back from "existing replies" landing on
+				// "reply-composer-ack" instead of skipping past it, because
+				// a synchronous check made at the click itself caught the
+				// page mid-transition). This keeps re-checking every poll
+				// until it lands on something real or reaches index 0.
+				setStepIndex((i) => Math.max(i - 1, 0));
+				return;
 			}
 			setPlacements(null);
 			if (Date.now() - lastNavAtRef.current > NAV_GRACE_MS) {
@@ -554,35 +577,16 @@ export function TutorialControl({
 				markNavigated();
 				router.push(origin);
 			}
-			// The destination page hasn't loaded yet, so there's nothing to
-			// synchronously check below — land on the one step back and let
-			// the finder's own poll (and `navGrace` above) settle it.
-			setStepIndex(Math.max(stepIndex - 1, 0));
-			return;
 		}
-		// No navigation needed to leave this step, so the page under it is
-		// already stable right now — walk back past any FURTHER step whose
-		// target can be confirmed missing on the spot, so Back never lands
-		// on a hollow "nothing to point at" card for state that simply
-		// didn't survive getting here (the reply composer's own open/closed
-		// state doesn't survive the page remount a return from "Your
-		// profile" causes). Stops the instant it finds something real, or
-		// at index 0.
-		let idx = Math.max(stepIndex - 1, 0);
-		while (idx > 0) {
-			const candidate = TUTORIAL_STEPS[idx];
-			if (
-				measure(
-					candidate.selector,
-					candidate.selectorSecondary,
-					candidate.requiresSelector,
-				)
-			) {
-				break;
-			}
-			idx -= 1;
-		}
-		setStepIndex(idx);
+		// Always a single, plain step back — a functional update, so a
+		// click handler fired from a stale render can't under- or
+		// over-shoot. Walking past any FURTHER dead step (composer-local
+		// state that didn't survive getting here) is the finder effect's
+		// job, not this click's: a DOM check made synchronously here can
+		// race an in-flight navigation and read stale content, where the
+		// same check made from the poll a moment later reliably doesn't.
+		// See `tick()`'s `atFrontier` branch.
+		setStepIndex((i) => Math.max(i - 1, 0));
 	}
 
 	// Escape always closes; ArrowRight/ArrowLeft drive Next/Back while the
