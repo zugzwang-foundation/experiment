@@ -73,11 +73,30 @@ const SHARE_COPY = "Share as image";
  * there is no slug, and the control renders as the inert, disabled placeholder
  * it used to be rather than a button that promises a download it cannot make.
  */
-export function DownloadPostImage({
+export function DownloadPostImage(props: {
+	ordinal: number;
+	reply?: number;
+	pinned?: boolean;
+}) {
+	const params = useParams<{ slug?: string }>();
+	const slug = typeof params?.slug === "string" ? params.slug : null;
+	return <SharePostImage slug={slug} {...props} />;
+}
+
+/**
+ * The Share control itself, for a surface that knows its market without the
+ * `/m/[slug]` route — the profile's argument head passes the slug; the market
+ * card goes through `DownloadPostImage`, which reads it from the route.
+ */
+export function SharePostImage({
+	slug,
 	ordinal,
 	reply,
 	pinned = false,
+	compact = false,
 }: {
+	/** The market the post belongs to; `null` or empty disables the control. */
+	slug: string | null;
 	ordinal: number;
 	/** REPLY-IMAGE-EXPORT — the reply's ordinal within post `ordinal`. */
 	reply?: number;
@@ -91,9 +110,12 @@ export function DownloadPostImage({
 	 * lines stay in the flow, at the row's end, so they never sit under it.
 	 */
 	pinned?: boolean;
+	/**
+	 * The profile's argument head: a 24px box (with a 16px mark) — the height
+	 * of the stub this replaced, so the row keeps its height.
+	 */
+	compact?: boolean;
 }) {
-	const params = useParams<{ slug?: string }>();
-	const slug = typeof params?.slug === "string" ? params.slug : null;
 	const [phase, setPhase] = useState<"idle" | "busy" | "error">("idle");
 	const mounted = useRef(true);
 	useEffect(() => {
@@ -104,10 +126,10 @@ export function DownloadPostImage({
 	}, []);
 
 	const busy = phase === "busy";
-	const disabled = slug === null || busy;
+	const disabled = slug === null || slug === "" || busy;
 
 	const onClick = async () => {
-		if (slug === null || busy) {
+		if (slug === null || slug === "" || busy) {
 			return;
 		}
 		setPhase("busy");
@@ -204,6 +226,7 @@ export function DownloadPostImage({
 					// takes it out of that rule's reach.
 					className={cn(
 						"size-9 shrink-0 text-ink max-mobile:size-8",
+						compact && "size-6 max-mobile:size-6",
 						pinned && "absolute top-[calc(50%-18px)] right-0",
 					)}
 				>
@@ -225,9 +248,16 @@ export function DownloadPostImage({
 				    label went. A rotation is the one motion that means "in progress"
 				    without a caption. */}
 					{busy ? (
-						<LoaderCircle className="size-6 animate-spin max-mobile:size-4" />
+						<LoaderCircle
+							className={cn(
+								"size-6 animate-spin max-mobile:size-4",
+								compact && "size-4",
+							)}
+						/>
 					) : (
-						<Share2 className="size-6 max-mobile:size-4" />
+						<Share2
+							className={cn("size-6 max-mobile:size-4", compact && "size-4")}
+						/>
 					)}
 				</Button>
 			</InfoTip>

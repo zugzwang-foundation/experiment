@@ -71,7 +71,6 @@ export const GLOSSARY = {
 	// — Export ————————————————————————————————————————————
 	downloadMd:
 		"AI mode — download this entire market debate as a Markdown file and paste it into any LLM",
-	downloadStub: "Download — per-argument export isn't available yet",
 
 	// — Identity ——————————————————————————————————————————
 	pseudonym: "Your permanent name — auto-assigned, not chosen, not editable",

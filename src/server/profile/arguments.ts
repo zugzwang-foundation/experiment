@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 import type { DbClient, DbTransaction } from "@/db";
 import { comments, markets, positions } from "@/db/schema";
@@ -97,6 +97,13 @@ export type ProfileArgumentItem =
 			marketTitle: string;
 			/** The PARENT post's §9 ordinal — a reply deep-links to its parent. */
 			ordinal: number;
+			/**
+			 * The reply's OWN 1-based rank within its parent — `(created_at, id)`
+			 * ascending over that post's replies, removed included: the debate
+			 * view's `replyOrdinalById` rule, so `?post=<ordinal>&reply=<this>`
+			 * names the same reply on both surfaces (the post-image export).
+			 */
+			replyOrdinal: number;
 			title: string;
 			teaser: string;
 			body: string;
@@ -414,28 +421,57 @@ export async function loadProfileArguments(
 	// §9 ordinal domain — 1-based rank by (created_at, id) over ALL top-level
 	// comments per market, removed INCLUDED (append-only ⇒ permanent). The same
 	// scan surfaces every parent post's body (parents are top-level).
-	const topLevel = await client
+	// The same read, widened only as far as the reply rank needs: every
+	// top-level comment in these markets (the §9 post ordinal and the replied-to
+	// title), plus the siblings of the posts THIS user replied to (each reply's
+	// rank within its post — `load-debate-view.ts`'s `replyOrdinalById` rule,
+	// (created_at, id) ascending, removed included). Reply rows are bounded by the
+	// parents the user touched, not by market volume. ONE statement, as before
+	// (the profile's statement count is pinned), and reply bodies are not
+	// fetched — the CASE returns a body for top-level rows only.
+	const replyParentIds = [
+		...new Set(replyRows.map((r) => r.parent_comment_id)),
+	];
+	const topLevelOfMarkets = and(
+		inArray(comments.marketId, marketIds),
+		isNull(comments.parentCommentId),
+	);
+	const thread = await client
 		.select({
 			id: comments.id,
 			marketId: comments.marketId,
-			body: comments.body,
+			parentCommentId: comments.parentCommentId,
+			body: sql<
+				string | null
+			>`CASE WHEN ${comments.parentCommentId} IS NULL THEN ${comments.body} END`,
 		})
 		.from(comments)
 		.where(
-			and(
-				inArray(comments.marketId, marketIds),
-				isNull(comments.parentCommentId),
-			),
+			replyParentIds.length === 0
+				? topLevelOfMarkets
+				: or(
+						topLevelOfMarkets,
+						inArray(comments.parentCommentId, replyParentIds),
+					),
 		)
 		.orderBy(asc(comments.createdAt), asc(comments.id));
 	const ordinalById = new Map<string, number>();
 	const topLevelBodyById = new Map<string, string>();
 	const ordinalCounter = new Map<string, number>();
-	for (const c of topLevel) {
-		const next = (ordinalCounter.get(c.marketId) ?? 0) + 1;
-		ordinalCounter.set(c.marketId, next);
-		ordinalById.set(c.id, next);
-		topLevelBodyById.set(c.id, c.body);
+	// Its own map, as in the debate view: a reply rank is not a post rank.
+	const replyOrdinalById = new Map<string, number>();
+	const replyCounter = new Map<string, number>();
+	for (const c of thread) {
+		if (c.parentCommentId === null) {
+			const next = (ordinalCounter.get(c.marketId) ?? 0) + 1;
+			ordinalCounter.set(c.marketId, next);
+			ordinalById.set(c.id, next);
+			topLevelBodyById.set(c.id, c.body ?? "");
+		} else {
+			const next = (replyCounter.get(c.parentCommentId) ?? 0) + 1;
+			replyCounter.set(c.parentCommentId, next);
+			replyOrdinalById.set(c.id, next);
+		}
 	}
 
 	// The PROFILE USER's held side per market (quantity > 0) — the marker input
@@ -483,6 +519,7 @@ export async function loadProfileArguments(
 			meta: replyMeta.get(item.reply.id),
 			marketById,
 			ordinalById,
+			replyOrdinalById,
 			topLevelBodyById,
 			heldByMarket,
 			removedSet,
@@ -593,6 +630,7 @@ export function buildReplyItem(args: {
 		| undefined;
 	marketById: Map<string, MarketMeta>;
 	ordinalById: Map<string, number>;
+	replyOrdinalById: Map<string, number>;
 	topLevelBodyById: Map<string, string>;
 	heldByMarket: Map<string, "YES" | "NO">;
 	removedSet: Set<string>;
@@ -602,6 +640,7 @@ export function buildReplyItem(args: {
 		meta,
 		marketById,
 		ordinalById,
+		replyOrdinalById,
 		topLevelBodyById,
 		heldByMarket,
 		removedSet,
@@ -640,6 +679,7 @@ export function buildReplyItem(args: {
 		marketSlug,
 		marketTitle,
 		ordinal,
+		replyOrdinal: replyOrdinalById.get(reply.id) ?? 0,
 		title,
 		teaser,
 		body: meta?.body ?? "",

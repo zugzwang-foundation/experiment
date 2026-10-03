@@ -94,6 +94,7 @@ const replyItem = (side: "YES" | "NO"): ProfileArgumentItem => ({
 	marketSlug: "will-x-happen",
 	marketTitle: "Will X happen?",
 	ordinal: 4,
+	replyOrdinal: 1,
 	title: "A profile reply",
 	teaser: TEASER,
 	body: BODY,

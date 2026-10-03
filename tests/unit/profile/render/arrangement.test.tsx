@@ -382,6 +382,7 @@ describe("HTML-FINISH profile rows 4 · 5 · 12 — the argument card", () => {
 			marketSlug: "fixture-alpha",
 			marketTitle: "Market fixture-alpha",
 			ordinal: 4,
+			replyOrdinal: 1,
 			title: "A profile reply",
 			teaser: "Neutral fixture teaser.",
 			body: "A profile reply\n\nNeutral fixture body.",
