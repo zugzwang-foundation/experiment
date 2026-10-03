@@ -2,7 +2,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	attachImage,
+	IMAGE_PICK_MAX_BYTES,
 	type ImageAttachResult,
+	MAX_ENCODE_ATTEMPTS,
 	MAX_LONGEST_EDGE_PX,
 	RESAVE_TIMEOUT_MS,
 	validateImageFile,
@@ -1038,5 +1040,323 @@ describe("attachImage — RF-10 re-save (mocked canvas boundary)", () => {
 			expect(result.kind).not.toBe("attached");
 			expect(fetchFn).not.toHaveBeenCalled();
 		}
+	});
+});
+
+// ---------------------------------------------------------------------------
+// LARGE-IMAGE — a big photo is compressed, not refused. The 8 MiB cap binds
+// what is UPLOADED (the re-saved bytes, or a GIF as picked), never the picked
+// file: checking the picked file first refused every phone photo over 8 MiB
+// that the re-save would have shrunk to a few hundred KB. The picked file
+// keeps a generous ceiling (`IMAGE_PICK_MAX_BYTES`) so a giant file is turned
+// away before its decode can exhaust a low-memory phone's tab. A re-save that
+// is still over the cap is re-encoded a bounded number of times — lossless
+// WebP first, then smaller — instead of being refused on the first try.
+// ---------------------------------------------------------------------------
+
+/** A Blob that REPORTS `size` without allocating it — the decode is stubbed. */
+function sizedFile(type: string, size: number): Blob {
+	const blob = new Blob([new Uint8Array(16)], { type });
+	Object.defineProperty(blob, "size", { value: size });
+	return blob;
+}
+
+/** A real GIF signature that reports `size`. */
+function sizedGif(size: number): Blob {
+	const blob = realGif(16);
+	Object.defineProperty(blob, "size", { value: size });
+	return blob;
+}
+
+/**
+ * Like `stubCanvasEncode`, but each `toBlob` resolves the NEXT result in
+ * `results` (the last one repeats), so a test can script a re-encode ladder.
+ */
+function stubEncodeSequence(results: Array<Blob | null>): {
+	drawImage: ReturnType<typeof vi.fn>;
+	toBlobCalls: ToBlobCall[];
+} {
+	const drawImage = vi.fn();
+	const toBlobCalls: ToBlobCall[] = [];
+	const ctx = { fillStyle: "", fillRect: vi.fn(), drawImage };
+	HTMLCanvasElement.prototype.getContext = vi.fn(
+		() => ctx as unknown as CanvasRenderingContext2D,
+	) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+	HTMLCanvasElement.prototype.toBlob = function toBlob(
+		callback: BlobCallback,
+		type?: string,
+		quality?: number,
+	): void {
+		const index = Math.min(toBlobCalls.length, results.length - 1);
+		toBlobCalls.push({ type, quality });
+		callback(results[index] ?? null);
+	};
+	return { drawImage, toBlobCalls };
+}
+
+const OVER_CAP = IMAGE_UPLOADS_MAX_BYTES + 1;
+
+describe("attachImage — LARGE-IMAGE: compress before the cap, bounded retries", () => {
+	afterEach(() => {
+		(
+			globalThis as unknown as { createImageBitmap: unknown }
+		).createImageBitmap = setupPipeline.decode;
+		HTMLCanvasElement.prototype.getContext = setupPipeline.getContext;
+		HTMLCanvasElement.prototype.toBlob = setupPipeline.toBlob;
+		vi.useRealTimers();
+		vi.restoreAllMocks();
+	});
+
+	it("large-image::the-limits-are-40-MiB-picked-8-MiB-uploaded-30-s-budget", () => {
+		expect(IMAGE_PICK_MAX_BYTES).toBe(40 * 1024 * 1024);
+		expect(IMAGE_UPLOADS_MAX_BYTES).toBe(8 * 1024 * 1024);
+		expect(RESAVE_TIMEOUT_MS).toBe(30_000);
+		expect(MAX_ENCODE_ATTEMPTS).toBeGreaterThanOrEqual(2);
+		expect(MAX_ENCODE_ATTEMPTS).toBeLessThanOrEqual(5);
+	});
+
+	it("large-image::a-12-MB-jpeg-is-compressed-and-uploaded", async () => {
+		const decode = stubDecode(fakeBitmap(4000, 3000));
+		const compressed = fakeFile("image/jpeg", 600_000);
+		const { drawImage } = stubEncodeSequence([compressed]);
+		const fetchFn = okFetch();
+		const result = await attachImage({
+			file: sizedFile("image/jpeg", 12 * 1024 * 1024),
+			fetchFn,
+		});
+		expect(result.kind).toBe("attached");
+		expect(decode).toHaveBeenCalledTimes(1);
+		expect(drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, 1600, 1200);
+		expect(JSON.parse(requestCall(fetchFn, 0).init.body as string)).toEqual({
+			contentType: "image/jpeg",
+			byteSize: 600_000,
+		});
+		expect(requestCall(fetchFn, 1).init.body).toBe(compressed);
+	});
+
+	it("large-image::a-picked-file-exactly-at-40-MiB-is-decoded", async () => {
+		const decode = stubDecode(fakeBitmap(4000, 3000));
+		stubEncodeSequence([fakeFile("image/jpeg", 100)]);
+		const result = await attachImage({
+			file: sizedFile("image/jpeg", IMAGE_PICK_MAX_BYTES),
+			fetchFn: okFetch(),
+		});
+		expect(result.kind).toBe("attached");
+		expect(decode).toHaveBeenCalledTimes(1);
+	});
+
+	it("large-image::a-picked-file-over-40-MiB-is-refused-BEFORE-any-decode", async () => {
+		const decode = stubDecode(fakeBitmap(4000, 3000));
+		const { toBlobCalls } = stubEncodeSequence([fakeFile("image/jpeg", 100)]);
+		const fetchFn = scriptedFetch();
+		const result = await attachImage({
+			file: sizedFile("image/jpeg", IMAGE_PICK_MAX_BYTES + 1),
+			fetchFn,
+		});
+		const rejected = expectRejected(result);
+		expect(rejected.reason).toBe("oversize");
+		expect(rejected.message).toBe("image too large");
+		expect(decode).not.toHaveBeenCalled();
+		expect(toBlobCalls).toEqual([]);
+		expect(fetchFn).not.toHaveBeenCalled();
+	});
+
+	it("large-image::a-slow-decode-inside-the-new-budget-succeeds", async () => {
+		vi.useFakeTimers();
+		const SLOW_MS = 20_000; // over the old 10 s budget, under the new one
+		(
+			globalThis as unknown as { createImageBitmap: unknown }
+		).createImageBitmap = vi.fn(
+			() =>
+				new Promise((resolve) => {
+					setTimeout(() => resolve(fakeBitmap(4000, 3000)), SLOW_MS);
+				}),
+		);
+		stubEncodeSequence([fakeFile("image/jpeg", 100)]);
+		const fetchFn = okFetch();
+		const pending = attachImage({
+			file: sizedFile("image/jpeg", 12 * 1024 * 1024),
+			fetchFn,
+		});
+		await vi.advanceTimersByTimeAsync(SLOW_MS + 1);
+		const result = await pending;
+		expect(result.kind).toBe("attached");
+	});
+
+	// --- GIF: still uploaded exactly as picked, so the 8 MiB cap is its own --
+
+	it("large-image::a-gif-over-8-MiB-is-refused-and-never-decoded", async () => {
+		const decode = stubDecode(fakeBitmap(400, 300));
+		const fetchFn = scriptedFetch();
+		const result = await attachImage({ file: sizedGif(OVER_CAP), fetchFn });
+		const rejected = expectRejected(result);
+		expect(rejected.reason).toBe("oversize");
+		expect(rejected.message).toBe("image too large");
+		expect(decode).not.toHaveBeenCalled();
+		expect(fetchFn).not.toHaveBeenCalled();
+	});
+
+	it("large-image::a-gif-exactly-at-8-MiB-goes-up-as-picked", async () => {
+		const decode = stubDecode(fakeBitmap(400, 300));
+		const gif = sizedGif(IMAGE_UPLOADS_MAX_BYTES);
+		const fetchFn = okFetch();
+		const result = await attachImage({ file: gif, fetchFn });
+		expect(result.kind).toBe("attached");
+		expect(decode).not.toHaveBeenCalled();
+		expect(requestCall(fetchFn, 1).init.body).toBe(gif);
+	});
+
+	// --- the re-encode ladder ------------------------------------------------
+
+	it("large-image::a-re-save-over-the-cap-is-re-encoded-and-the-one-that-fits-goes-up", async () => {
+		stubDecode(fakeBitmap(4000, 3000));
+		const fits = fakeFile("image/jpeg", 2_000_000);
+		const { toBlobCalls } = stubEncodeSequence([
+			fakeFile("image/jpeg", OVER_CAP),
+			fits,
+		]);
+		const fetchFn = okFetch();
+		const result = await attachImage({
+			file: sizedFile("image/jpeg", 20 * 1024 * 1024),
+			fetchFn,
+		});
+		expect(result.kind).toBe("attached");
+		expect(toBlobCalls).toHaveLength(2);
+		const signed = JSON.parse(requestCall(fetchFn, 0).init.body as string);
+		expect(signed.byteSize).toBeLessThanOrEqual(IMAGE_UPLOADS_MAX_BYTES);
+		expect(requestCall(fetchFn, 1).init.body).toBe(fits);
+	});
+
+	it("large-image::an-oversize-png-is-retried-as-lossless-webp-at-the-SAME-size-first", async () => {
+		stubDecode(fakeBitmap(1200, 800));
+		const { toBlobCalls, drawImage } = stubEncodeSequence([
+			fakeFile("image/png", OVER_CAP),
+			fakeFile("image/webp", 3_000_000),
+		]);
+		const result = await attachImage({
+			file: sizedFile("image/png", 9 * 1024 * 1024),
+			fetchFn: okFetch(),
+		});
+		expect(result.kind).toBe("attached");
+		expect(toBlobCalls).toEqual([
+			{ type: "image/png", quality: undefined },
+			{ type: "image/webp", quality: 1 },
+		]);
+		expect(drawImage.mock.calls.map((c) => [c[3], c[4]])).toEqual([
+			[1200, 800],
+			[1200, 800],
+		]);
+	});
+
+	it("large-image::a-very-tall-png-that-stays-too-large-is-scaled-down-keeping-its-shape", async () => {
+		stubDecode(fakeBitmap(2228, 12941));
+		const fits = fakeFile("image/webp", 5_000_000);
+		const { drawImage, toBlobCalls } = stubEncodeSequence([
+			fakeFile("image/webp", OVER_CAP),
+			fits,
+		]);
+		const fetchFn = okFetch();
+		const result = await attachImage({
+			file: sizedFile("image/png", 30 * 1024 * 1024),
+			fetchFn,
+		});
+		expect(result.kind).toBe("attached");
+		expect(requestCall(fetchFn, 1).init.body).toBe(fits);
+		// Still lossless — screenshots carry text.
+		expect(toBlobCalls[1]).toEqual({ type: "image/webp", quality: 1 });
+		const [first, second] = drawImage.mock.calls;
+		expect([first?.[3], first?.[4]]).toEqual([2228, 12941]);
+		const w = second?.[3] as number;
+		const h = second?.[4] as number;
+		expect(w).toBeLessThan(2228);
+		expect(h).toBeLessThan(12941);
+		expect(Math.abs(w / h - 2228 / 12941)).toBeLessThan(0.01);
+	});
+
+	it("large-image::a-browser-that-cannot-encode-webp-falls-back-to-png-and-is-not-asked-again", async () => {
+		stubDecode(fakeBitmap(1200, 800));
+		const fits = fakeFile("image/png", 1_000_000);
+		const { toBlobCalls, drawImage } = stubEncodeSequence([
+			fakeFile("image/png", OVER_CAP), // asked png
+			fakeFile("image/png", OVER_CAP), // asked webp, got png
+			fits,
+		]);
+		const fetchFn = okFetch();
+		const result = await attachImage({
+			file: sizedFile("image/png", 9 * 1024 * 1024),
+			fetchFn,
+		});
+		expect(result.kind).toBe("attached");
+		expect(toBlobCalls[1]).toEqual({ type: "image/webp", quality: 1 });
+		expect(toBlobCalls[2]?.type).toBe("image/png");
+		expect(drawImage.mock.calls[2]?.[3]).toBeLessThan(1200);
+		expect(JSON.parse(requestCall(fetchFn, 0).init.body as string)).toEqual({
+			contentType: "image/png",
+			byteSize: 1_000_000,
+		});
+	});
+
+	it("large-image::retries-are-bounded-and-end-in-a-clear-too-large", async () => {
+		const bitmap = fakeBitmap(4000, 3000);
+		stubDecode(bitmap);
+		const { toBlobCalls } = stubEncodeSequence([
+			fakeFile("image/jpeg", OVER_CAP),
+		]);
+		const fetchFn = scriptedFetch();
+		const result = await attachImage({
+			file: sizedFile("image/jpeg", 30 * 1024 * 1024),
+			fetchFn,
+		});
+		const rejected = expectRejected(result);
+		expect(rejected.reason).toBe("oversize");
+		expect(rejected.message).toBe("image too large");
+		expect(toBlobCalls).toHaveLength(MAX_ENCODE_ATTEMPTS);
+		expect(bitmap.close).toHaveBeenCalledTimes(1);
+		expect(fetchFn).not.toHaveBeenCalled();
+	});
+
+	it("large-image::an-encoder-failure-mid-ladder-refuses-and-signs-nothing", async () => {
+		stubDecode(fakeBitmap(4000, 3000));
+		stubEncodeSequence([fakeFile("image/jpeg", OVER_CAP), null]);
+		const fetchFn = scriptedFetch();
+		const result = await attachImage({
+			file: sizedFile("image/jpeg", 20 * 1024 * 1024),
+			fetchFn,
+		});
+		expect(expectFailed(result).transient).toBe(false);
+		expect(fetchFn).not.toHaveBeenCalled();
+	});
+
+	it("large-image::a-decode-that-throws-on-a-large-file-refuses-and-signs-nothing", async () => {
+		stubDecode(new Error("out of memory"));
+		const fetchFn = scriptedFetch();
+		const result = await attachImage({
+			file: sizedFile("image/jpeg", 30 * 1024 * 1024),
+			fetchFn,
+		});
+		expect(result.kind).toBe("failed");
+		expect(fetchFn).not.toHaveBeenCalled();
+	});
+
+	it("large-image::an-abandoned-attempt-releases-its-canvas", async () => {
+		stubDecode(fakeBitmap(4000, 3000));
+		const canvases: HTMLCanvasElement[] = [];
+		const originalCreateElement = document.createElement.bind(document);
+		vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+			const el = originalCreateElement(tag);
+			if (tag === "canvas") canvases.push(el as HTMLCanvasElement);
+			return el;
+		});
+		stubEncodeSequence([
+			fakeFile("image/jpeg", OVER_CAP),
+			fakeFile("image/jpeg", 100),
+		]);
+		await attachImage({
+			file: sizedFile("image/jpeg", 20 * 1024 * 1024),
+			fetchFn: okFetch(),
+		});
+		expect(canvases).toHaveLength(2);
+		expect(canvases[0]?.width).toBe(0);
+		expect(canvases[0]?.height).toBe(0);
 	});
 });
