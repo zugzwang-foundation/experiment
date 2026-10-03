@@ -112,7 +112,7 @@ export function DharmaCluster({
 			)}
 		>
 			<InfoTip content={GLOSSARY.dharma} asChild>
-				<span className="text-[17px] font-bold text-ink">Đ</span>
+				<span className="text-[17px] font-bold text-gold">Đ</span>
 			</InfoTip>
 			{/* The mockup's `.sep` hairline — decorative, so no testid. It is NOT the
 			    §21.1 register boundary: that is the `w-px` divider in `GlobalHeader`'s
@@ -125,7 +125,7 @@ export function DharmaCluster({
 							Portfolio
 						</span>
 					</InfoTip>
-					<span className="text-[13px] font-bold text-ink tabular-nums">
+					<span className="text-[13px] font-bold text-gold tabular-nums">
 						Đ {formatDharma(portfolio)}
 					</span>
 				</span>
@@ -136,7 +136,7 @@ export function DharmaCluster({
 						Balance
 					</span>
 				</InfoTip>
-				<span className="text-[13px] font-bold text-ink tabular-nums">
+				<span className="text-[13px] font-bold text-gold tabular-nums">
 					Đ {formatDharma(spendable)}
 				</span>
 			</span>

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { Activity } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // POSREV-1 — the arena mounts `PositionsTable`, which now owns the inline sell
@@ -100,6 +101,7 @@ const ARG_REPLY: ProfileArgumentItem = {
 	marketSlug: "fixture-reply",
 	marketTitle: "Market question for the reply",
 	ordinal: 4,
+	replyOrdinal: 1,
 	title: "Reply fixture title",
 	teaser: "Reply fixture teaser.",
 	body: REPLY_BODY,
@@ -333,9 +335,10 @@ describe("item 7 — the replica card's parts", () => {
 		// built, on the argument-LIST card where the teaser is clamped and there is
 		// something to reveal. On this card it would reveal nothing.
 		// UNWIRE-1 — the bookmark half of the cluster is gone (bookmark module
-		// unwired product-wide); the download-stub half survives (SUB-1) and is
-		// still the positive control proving the absence-checks above aren't
-		// vacuous because the whole cluster silently disappeared.
+		// unwired product-wide); the download-stub half survived (SUB-1) and was
+		// replaced by the working Share control (2026-10-04), which is now the
+		// positive control proving the absence-checks above aren't vacuous because
+		// the whole cluster silently disappeared.
 		renderPost();
 		const card = screen.getByTestId(`argument-replica-${C_POST}`);
 		const labels = [...card.querySelectorAll("button")].map(
@@ -349,7 +352,7 @@ describe("item 7 — the replica card's parts", () => {
 		expect(labels.some((l) => l.includes("Know more"))).toBe(true);
 		// …and the cluster IS here, so the narrowing did not quietly drop coverage of
 		// what the card should carry.
-		expect(labels.some((l) => l.includes("Download"))).toBe(true);
+		expect(labels.some((l) => l.includes("Share as image"))).toBe(true);
 	});
 });
 
@@ -537,5 +540,61 @@ describe("items 5 + 7 end to end — picking a row moves the panel", () => {
 		fireEvent.click(closedFilter);
 		expect(await screen.findByTestId("argument-list")).toBeTruthy();
 		expect(panelTitle()).toBe("Arguments");
+	});
+});
+
+describe("NAV-3 — a revived profile takes its market filter from the address", () => {
+	// ⚠ THE `<Activity>` WRAPPER IS THE MECHANISM, as in NAV-1's
+	// `market-entry.test.tsx`: under `cacheComponents` Next keeps a route you
+	// leave mounted in a hidden `<Activity>`, keyed without search params, and
+	// reveals that same instance when you come back — so the second entry below
+	// is a reveal, not a mount, and still carries the first visit's
+	// `initialMarketSlug`. The address is written before the reveal because Next
+	// writes it in an insertion effect.
+	const ROWS = [
+		rowFor(M_POST, "fixture-post", "Market question for the post", C_POST, 1),
+		rowFor(
+			M_REPLY,
+			"fixture-reply",
+			"Market question for the reply",
+			C_REPLY,
+			4,
+		),
+	];
+	const tree = (mode: "visible" | "hidden") => (
+		<Activity mode={mode}>
+			<ProfileArena
+				positions={{ owner: false, rows: ROWS }}
+				positionsValue="0.000000000000000000"
+				argumentItems={ITEMS}
+				owner={false}
+				author={USER}
+				initialMarketSlug="fixture-post"
+			/>
+		</Activity>
+	);
+
+	afterEach(() => {
+		history.replaceState(null, "", "/");
+	});
+
+	it("nav-3::a-profile-revived-with-a-different-market-param-shows-the-new-market", async () => {
+		history.replaceState(null, "", "/u/RedFox001?market=fixture-post");
+		const { rerender } = render(tree("visible"));
+		expect(await screen.findByTestId(`position-tile-${M_POST}`)).toBeTruthy();
+		expect(screen.queryByTestId(`position-tile-${M_REPLY}`)).toBeNull();
+		expect(panelTitle()).toBe("Market question for the post");
+
+		// Away, then the same profile again from a link to its other market.
+		rerender(tree("hidden"));
+		history.pushState(null, "", "/u/RedFox001?market=fixture-reply");
+		rerender(tree("visible"));
+
+		expect(
+			await screen.findByTestId(`argument-replica-${C_REPLY}`),
+		).toBeTruthy();
+		expect(screen.getByTestId(`position-tile-${M_REPLY}`)).toBeTruthy();
+		expect(screen.queryByTestId(`position-tile-${M_POST}`)).toBeNull();
+		expect(panelTitle()).toBe("Market question for the reply");
 	});
 });

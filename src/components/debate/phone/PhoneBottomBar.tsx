@@ -220,7 +220,7 @@ function PositionReadout({
 			<span className="text-[10px] font-bold tracking-[0.1em] text-n5 uppercase">
 				{side}
 			</span>
-			<span className="font-mono text-xs text-ink">
+			<span className="font-mono text-xs text-gold">
 				Đ {formatDharma(value)}
 			</span>
 		</>

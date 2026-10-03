@@ -133,8 +133,8 @@ const DETAIL_BASELINE =
 	'<div data-size="detail" class="flex items-center gap-[9px]">' +
 	'<span class="text-[11px] font-bold tracking-[0.05em] whitespace-nowrap text-ink">YES 38%</span>' +
 	'<div class="h-[18px] flex flex-1 overflow-hidden rounded-[var(--r)] [border:var(--hairline)]" role="img" aria-label="YES 38%, NO 62%">' +
-	'<div class="h-full bg-yes" style="width: 38%;"></div>' +
-	'<div class="h-full flex-1 bg-no"></div>' +
+	'<div class="h-full bg-bar-yes" style="width: 38%;"></div>' +
+	'<div class="h-full flex-1 bg-bar-no"></div>' +
 	"</div>" +
 	'<span class="text-[11px] font-bold tracking-[0.05em] whitespace-nowrap text-ink">NO 62%</span>' +
 	"</div>";
@@ -221,7 +221,7 @@ describe("PriceBar presets — the invariants that hold across all three", () =>
 	it("yes-segment-width-is-the-rounded-percent-in-every-preset", () => {
 		for (const size of SIZES) {
 			const { container } = render(<PriceBar pricing={PRICING} size={size} />);
-			const yesSegment = container.querySelector<HTMLElement>(".bg-yes");
+			const yesSegment = container.querySelector<HTMLElement>(".bg-bar-yes");
 			expect(yesSegment?.style.width).toBe("38%");
 			cleanup();
 		}
@@ -234,8 +234,8 @@ describe("PriceBar presets — the invariants that hold across all three", () =>
 		// NO side, and this build's ramp is inverted vs the light mockup.
 		for (const size of SIZES) {
 			const { container } = render(<PriceBar pricing={PRICING} size={size} />);
-			expect(container.querySelector(".bg-yes")).not.toBeNull();
-			expect(container.querySelector(".bg-no")).not.toBeNull();
+			expect(container.querySelector(".bg-bar-yes")).not.toBeNull();
+			expect(container.querySelector(".bg-bar-no")).not.toBeNull();
 			expect(container.innerHTML).not.toContain("bg-ink");
 			expect(container.innerHTML).not.toContain("bg-n0");
 			cleanup();

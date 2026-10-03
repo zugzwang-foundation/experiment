@@ -50,6 +50,9 @@ const DIGITS = "src/components/shell/CountdownDigits.tsx";
 const V = "max-mobile";
 const S = ":";
 const phone = (utility: string) => V + S + utility;
+/** TABLET-1: the FLAT phone row (flex line, contents zones, ms-auto) is now `max-sm` (<640); the phone TIER (hides, avatar-only chip) stays `max-mobile` (<820). */
+const FLAT = "max-sm";
+const flat = (utility: string) => FLAT + S + utility;
 
 /** `h-` + `[28px]` — never written as one scannable token. */
 const util = (prefix: string, value: string) => `${prefix}-${value}`;
@@ -99,11 +102,11 @@ describe("A13 D-4 — the ladder's five reductions are on disk at their landed v
 			source,
 			`${HEADER}: the phone row gap is not 5px. A13 D-4 lands it there, and ` +
 				`the row carries four gaps — each px is worth four.`,
-		).toContain(phone(util("gap", px("5"))));
+		).toContain(flat(util("gap", px("5"))));
 		// …and the wrappers stay flattened, which is what makes that ONE number
 		// govern every gap in the row rather than one of three that agree by hand.
 		expect(
-			(source.match(new RegExp(phone("contents"), "g")) ?? []).length,
+			(source.match(new RegExp(flat("contents"), "g")) ?? []).length,
 			`${HEADER}: the row no longer flattens BOTH zone wrappers. With either ` +
 				`one a box, its children take that box's gap and the row's gap ` +
 				`applies only between zones — "all gaps equal" then needs two numbers ` +

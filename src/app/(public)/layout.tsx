@@ -158,6 +158,7 @@ export default async function PublicLayout({
 				// happens either way and "hidden on phones, skip the fetch" is a
 				// category error rather than an optimisation.
 				mobileResponsive
+				tutorialEnabled
 			/>
 			{/* HTML-FINISH row 8 — the surface column fills the viewport BELOW the
 			    header, so a surface can hand its leftover vertical space to a

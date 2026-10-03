@@ -1,51 +1,34 @@
 "use client";
 
-import { InfoTip } from "@/components/ui/info-tip";
-import { GLOSSARY } from "@/lib/copy/glossary";
+import type { ReactNode } from "react";
 
 import { formatDharma } from "../format";
 import type { ReplyAggregate, Side } from "../types";
-import { c3OppositeSide, OWN_POST_COPY } from "./copy";
-import { deriveReplySide, isEntryDisabled } from "./gating";
 import { computeSplitBar, displaySplitTotal } from "./split-bar";
 
 /**
  * UI.A3 slice 3 — the focused post's designed split bar (canon §6:
- * `SUPPORT Đ 3,800 ─ Đ 10,000 STAKED ─ Đ 6,200 COUNTER`) carrying the
- * Support/Counter TRIGGER pills (v0.9: pole-coded by the RESULTING bet side
- * — Support inherits the post's side, Counter the opposite; never a column
- * label — SG-8). A trigger whose resulting side ≠ the viewer's held side
- * renders DISABLED (F-3; tooltip + aria carry the C3 batch string). Triggers
- * toggle-to-close (v0.10). Renders on the removed variant too — the
- * aggregate survives and replying to a removed argument is legal (§6 edge).
+ * `SUPPORT Đ 3,800 ─ Đ 10,000 STAKED ─ Đ 6,200 COUNTER`). Renders on the
+ * removed variant too — the aggregate survives (§6 edge).
+ *
+ * ⚠⚠ FEED-3 — A DISPLAY NOW. Its two Support/Counter trigger pills MOVED, with
+ * their props and every rule they carry, to the post arm's column headers
+ * (`TriggerPill.tsx`); `Support` and `Counter` here are plain labels beside
+ * their Đ figures, which is canon §6's own string. The track, its poles and its
+ * hairline are untouched.
+ * ⚠ UIR-4 item 5 — each label now stands ABOVE its figure (`EndLabel`), not
+ * beside it.
+ * ⚠ UIR-5 item 4 — and the whole bar is two lines: the words and the track on
+ * line 1, the three Đ figures on line 2 (`EndCell`).
  */
 export function ReplySplitBar({
 	postSide,
 	aggregate,
-	heldSide,
-	marketOpen,
-	suspended,
-	activeRelation,
-	onToggleRelation,
-	isOwnPost = false,
 }: {
 	postSide: Side;
 	aggregate: ReplyAggregate;
-	heldSide: Side | null;
-	marketOpen: boolean;
-	suspended: boolean;
-	activeRelation: "support" | "counter" | null;
-	onToggleRelation: (relation: "support" | "counter") => void;
-	/**
-	 * D-52 R1 — the viewer wrote this post. Nobody replies to their own post,
-	 * so BOTH triggers render disabled in the foreclosed treatment, carrying
-	 * `OWN_POST_COPY` where C3 would sit. Optional: an omission reads as "not
-	 * the viewer's", the pre-D-52 bar, and the write path's
-	 * `self_reply_forbidden` refuses either way.
-	 */
-	isOwnPost?: boolean;
 }) {
-	const { supportPct } = computeSplitBar({
+	const { supportPct, hasStake } = computeSplitBar({
 		supportDharma: aggregate.supportDharma,
 		counterDharma: aggregate.counterDharma,
 	});
@@ -55,10 +38,13 @@ export function ReplySplitBar({
 		aggregate.supportDharma,
 		aggregate.counterDharma,
 	);
+	const support = formatDharma(aggregate.supportDharma);
+	const counter = formatDharma(aggregate.counterDharma);
 	return (
 		/* ⚠⚠ RPLY-1 · R5 — THE FOCUSED POST'S BAR CATCHES UP TO THE CARD'S.
-		   `AggregateFooter` (the market-view card) and this component are two
-		   files with two file-private `TriggerPill`s, and the card's geometry was
+		   `AggregateFooter` (the market-view card) and this component were two
+		   files with two file-private `TriggerPill`s (FEED-3 moved this file's out
+		   to the column headers, `TriggerPill.tsx`), and the card's geometry was
 		   corrected at CS6/CS10/CS11 while this one was left behind — not by
 		   oversight, but because this file was allow-list-EXCLUDED for writing at
 		   the time, which is stated in its own guard
@@ -79,7 +65,18 @@ export function ReplySplitBar({
 
 		   ⚠ `gap-2` matches the card too. The pole logic below is UNTOUCHED — RR-3
 		   corrected which SIDE each span paints, and this row moves only where the
-		   spans sit. */
+		   spans sit.
+
+		   ⚠⚠ UIR-5 item 4 — THE ROW ABOVE IS NOW A GRID OF TWO LINES, and the
+		   `items-start` paragraph describes a one-line row that no longer exists.
+		   Line 1 is `SUPPORT` · track · `COUNTER`, all centred on the track's 18px;
+		   line 2 is each end's Đ figure under its word and `Đ N STAKED` under the
+		   track, on one baseline. The columns are placed by name
+		   (`col-start-*`/`row-start-*`), so the DOM keeps each word beside its own
+		   figure — a reader hears "Support, Đ 3,800", never two words and then two
+		   numbers. `gap-2` survives as the columns' gap. The block is 34px: the
+		   44px it was at UIR-3 and the 52px at UIR-4 are what the fixed top
+		   section (`PostFocusHeader`) could not hold beside a wrapped author row. */
 		/* ⚠ `data-testid` so the parity guard can ANCHOR on this row rather than
 		   matching the first `flex items-* gap-*` div in the file — the card half
 		   already anchors on `aggregate-footer`, and an unanchored generic pattern
@@ -87,219 +84,202 @@ export function ReplySplitBar({
 		   shape (OVN-V5: never select the thing under test by a styling class). */
 		<div
 			data-testid="reply-split-bar"
-			className="flex items-start gap-2 text-xs"
+			className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 text-xs"
 		>
-			{/* `.sidewrap` (`d5:585-586`) — the Đ figure is CENTRED UNDER its own
-			    pill rather than inline beside it, on both flanks. */}
-			<span className="flex shrink-0 flex-col items-center gap-1">
-				<TriggerPill
-					relation="support"
-					postSide={postSide}
-					heldSide={heldSide}
-					marketOpen={marketOpen}
-					suspended={suspended}
-					active={activeRelation === "support"}
-					onToggle={onToggleRelation}
-					isOwnPost={isOwnPost}
-				/>
-				<span className="text-n5">
-					Đ {formatDharma(aggregate.supportDharma)}
-				</span>
-			</span>
-			<span className="flex min-w-0 flex-1 flex-col items-center gap-1">
-				{/* RR-3 — THE POLES NAME THE SIDE, NEVER THE RELATION.
-				    The fill is the SUPPORT share and the track is the counter
-				    remainder, and both resolve to a SIDE: Support inherits the post's
-				    side, Counter opposes it — `deriveReplySide`'s rule, the same one
-				    `TriggerPill (→ the pole const)` applies below: this component's own
-				    correct sibling, and this row's positive control.
-				    Both were FIXED (`bg-no` track over a `bg-yes` fill), so on every NO
-				    post the NO-side share was painted in the YES pole — a lie about
-				    which side an argument backs.
+			{/* FEED-3 — label BESIDE its figure, outward-in, on a pill-height (`h-6`)
+			    line so it stays centred on the track as the pill it replaces was. The
+			    figure keeps its shipped class; the label takes the bar's own overline
+			    (`staked` below).
+			    ⚠⚠ UIR-4 item 5 — TWO LINES NOW, AND BOTH ENDS ONE WIDTH. Each end is
+			    `EndLabel`: the word in `--color-ink` #fafafa at the label's 12px, weight
+			    and 0.1em tracking, over its Đ figure in mono at the same size in the
+			    label's grey, centred under it. Each end's grid cell also holds the
+			    OTHER end's pair, invisible, so both cells take the wider pair's width
+			    and the track between them — and `Đ N STAKED` under it — is centred in
+			    the row. (That row sat on the page's centre line until UIR-7 item 2
+			    dropped the rule; see `PostFocusHeader`.)
+			    ⚠⚠ UIR-5 item 4 — AND EACH LINE IS NOW A ROW OF THE BAR'S GRID. A word is
+			    one `EndCell` on line 1 and its figure another on line 2, centred under
+			    it; each cell holds the OTHER end's text for its line, invisible, so both
+			    end columns still take the wider pair's width, and the track and
+			    `Đ N STAKED` between them stay centred in the row.
+			    ⚠ UIR-7 item 2 — THE ROW IS THE WHOLE CONTENT COLUMN NOW, which grows
+			    and shrinks with the picture beside it. Nothing here changes for it:
+			    the track's `minmax(0,1fr)` takes whatever the two ends leave, so the
+			    bar spans the column between its labels, and `Đ N STAKED` stays
+			    centred under it on the figures' baseline. */}
+			<EndCell
+				className="col-start-1 row-start-1 tracking-[0.1em] text-ink uppercase"
+				show="Support"
+				size="Counter"
+			/>
+			<EndCell
+				className="col-start-1 row-start-2 self-baseline font-mono text-gold"
+				show={<>Đ {support}</>}
+				size={<>Đ {counter}</>}
+			/>
+			{/* RR-3 — THE POLES NAME THE SIDE, NEVER THE RELATION.
+			    The fill is the SUPPORT share and the track is the counter
+			    remainder, and both resolve to a SIDE: Support inherits the post's
+			    side, Counter opposes it — `deriveReplySide`'s rule, the same one
+			    `TriggerPill` resolves its bet by. (Its pole fill, which was this
+			    row's positive control, left with it at FEED-3; `AggregateFooter`'s
+			    pills still carry one.)
+			    Both were FIXED (`bg-no` track over a `bg-yes` fill), so on every NO
+			    post the NO-side share was painted in the YES pole — a lie about
+			    which side an argument backs.
 
-				    ⛔ THE MOCKUP DOES **NOT** VINDICATE THIS BAR, AND AN EARLIER DRAFT OF
-				    THIS COMMENT CLAIMED IT DID. Measured in `surface_d5_v1_0.html`:
-				    `:1247`/`:1249` are the Support/Counter BUTTONS (`.rbtn2 n` / `.rbtn2
-				    y`), and the bar between them at `:1248` carries NO side class at all.
-				    `.barrow .bar` is a fixed `--n0` and `.bar .fill` a fixed `--ink`
-				    (`:510-512`); `.bar .fill.right` exists at `:513` and is NEVER
-				    applied; and the JS at `:1591-1592` sets only the two buttons'
-				    classNames while `:1596` sets only the fill's WIDTH. The annotated
-				    post is `side:'no'` with `sPct:69`, so d5 paints a NO post's SUPPORT
-				    share in the YES pole.
-				    ⇒ d5's BAR is itself a Route-3 instance. The mockup demonstrates the
-				    rule at its TRIGGERS and fails to apply it at its BAR; this build
-				    applies it in both places. So C13 is a DELIBERATE DIVERGENCE from the
-				    artifact on the design-language rule (`design-language.md` §1
-				    "Binding resolved" — and AGENTS.md §8's "the poles name the SIDE
-				    (YES/NO), never the Support/Counter relation"), NOT a return to
-				    it — recorded because §3 ratifies "mimic the mockup", and a later
-				    fidelity pass reading `d5:1248` without this note would revert
-				    the fix.
-				    ⚠ BOTH POINTERS WERE WRONG UNTIL @code-reviewer RE-MEASURED THEM,
-				    and they are named here so the wrong pair is not restored:
-				    `design-language.md:268` is a CHANGELOG entry, not the rule (the
-				    locked binding is §1, `:62`; `:269` merely records the axis
-				    correction), and CLAUDE.md §8 is O-space — the poles sentence is
-				    AGENTS.md §8. A note whose pointers do not resolve leaves the
-				    reader with `d5:1248` alone, which is the revert this paragraph
-				    exists to prevent. Cited by SYMBOL now, per O-8.
+			    ⛔ THE MOCKUP DOES **NOT** VINDICATE THIS BAR, AND AN EARLIER DRAFT OF
+			    THIS COMMENT CLAIMED IT DID. Measured in `surface_d5_v1_0.html`:
+			    `:1247`/`:1249` are the Support/Counter BUTTONS (`.rbtn2 n` / `.rbtn2
+			    y`), and the bar between them at `:1248` carries NO side class at all.
+			    `.barrow .bar` is a fixed `--n0` and `.bar .fill` a fixed `--ink`
+			    (`:510-512`); `.bar .fill.right` exists at `:513` and is NEVER
+			    applied; and the JS at `:1591-1592` sets only the two buttons'
+			    classNames while `:1596` sets only the fill's WIDTH. The annotated
+			    post is `side:'no'` with `sPct:69`, so d5 paints a NO post's SUPPORT
+			    share in the YES pole.
+			    ⇒ d5's BAR is itself a Route-3 instance. The mockup demonstrates the
+			    rule at its TRIGGERS and fails to apply it at its BAR; this build
+			    applies it in both places. So C13 is a DELIBERATE DIVERGENCE from the
+			    artifact on the design-language rule (`design-language.md` §1
+			    "Binding resolved" — and AGENTS.md §8's "the poles name the SIDE
+			    (YES/NO), never the Support/Counter relation"), NOT a return to
+			    it — recorded because §3 ratifies "mimic the mockup", and a later
+			    fidelity pass reading `d5:1248` without this note would revert
+			    the fix.
+			    ⚠ BOTH POINTERS WERE WRONG UNTIL @code-reviewer RE-MEASURED THEM,
+			    and they are named here so the wrong pair is not restored:
+			    `design-language.md:268` is a CHANGELOG entry, not the rule (the
+			    locked binding is §1, `:62`; `:269` merely records the axis
+			    correction), and CLAUDE.md §8 is O-space — the poles sentence is
+			    AGENTS.md §8. A note whose pointers do not resolve leaves the
+			    reader with `d5:1248` alone, which is the revert this paragraph
+			    exists to prevent. Cited by SYMBOL now, per O-8.
 
-				    ⚠ Written as `postSide === "YES"` rather than as a
-				    `deriveReplySide(...)` call, and THE FENCE IS THE REASON. §10 permits
-				    exactly one `composer/**` exception, symbol-fenced to these two
-				    spans, and any work resolving outside them is `H-COMPOSER`, a HALT —
-				    so a hoisted `const` above the return was not available.
-				    ⚠ Guard visibility alone does NOT select this form, and saying so
-				    would mislead: `SIDE_COMPARISON` matches an IDENTIFIER before the
-				    comparison, so a hoisted const would ALSO be visible while a bare
-				    call expression would not. Both facts hold; only the fence decides.
-				    (Inlining the ternary is also the shape of both ruled precedents —
-				    `HeroPanels` entry 7 and `AggregateFooter` entry 9.)
+			    ⚠ Written as `postSide === "YES"` rather than as a
+			    `deriveReplySide(...)` call, and THE FENCE IS THE REASON. §10 permits
+			    exactly one `composer/**` exception, symbol-fenced to these two
+			    spans, and any work resolving outside them is `H-COMPOSER`, a HALT —
+			    so a hoisted `const` above the return was not available.
+			    ⚠ Guard visibility alone does NOT select this form, and saying so
+			    would mislead: `SIDE_COMPARISON` matches an IDENTIFIER before the
+			    comparison, so a hoisted const would ALSO be visible while a bare
+			    call expression would not. Both facts hold; only the fence decides.
+			    (Inlining the ternary is also the shape of both ruled precedents —
+			    `HeroPanels` entry 7 and `AggregateFooter` entry 9.)
 
-				    ⛔ THE HAIRLINE IS LOAD-BEARING, AND THE FIRST DRAFT OF THIS FIX
-				    OMITTED IT. Side-keying the track means it takes `bg-yes` #181818 on
-				    a NO post, against a `bg-card` → `--color-n0` #212121 surface — about
-				    1.10:1, i.e. GONE. The fill would then have no visible extent to be a
-				    proportion OF. ⇒ Correcting the pole without adding the edge would
-				    have traded an INVERSION for an ERASURE, on exactly the post side
-				    this row exists to fix.
-				    Both sibling bars already carry it — `HeroPanels` (this genus's ruled
-				    precedent) and `AggregateFooter` — and so does the mockup, whose
-				    `.barrow .bar` is an OUTLINE (`d5:510`, `border:1px solid var(--ink)`
-				    over an `--n0` ground). This component's own `TriggerPill` carries the
-				    same idea as its "black-pill exception" 0.5px n2 edge: the sibling
-				    that is this row's positive control for the POLE rule is also its
-				    positive control for the EDGE rule.
-				    ⛔ NOT `--border-strong` — `emphasis-ladder-tokens.test.ts` pins that
-				    token at zero consumers. */}
-				{/* ⚠⚠ RPLY-1 · R5 — THE TRACK SITS IN A PILL-HEIGHT BOX AND CENTRES
-				    IN IT. `h-6` is the pill's own specified box (`text-xs` 16px line +
-				    `py-1` 8px), so the track's CENTRE is that box's centre at any
-				    thickness — which is why growing it 6 → 14 → 18px each time moves
-				    what fills the box and not where the middle of it sits. A bare
-				    offset would hit today's number and drift the first time the
-				    pill's size changes.
-				    ⛔ `h-[18px]` and `rounded-[var(--r)]` are READ OFF `PriceBar`'s
-				    `detail` size, not chosen — the card's bar was matched to it at
-				    CS10/CS11 because two split bars on one screen must not read as a
-				    bar and a hairline, and at 14px a 3px radius reads as a rectangle
-				    beside a market bar that is a pill. Same reasoning, same source,
-				    now on both surfaces.
-				    ⚠⚠ BLOCK-3 §2 — 14px → 18px, THE THIRD SURFACE IN THE SAME CHAIN.
-				    `PriceBar.tsx`'s `detail` moved first (its own docblock has the
-				    layout-budget reasoning), `AggregateFooter.tsx`'s track followed to
-				    keep the market-view card in parity, and this file is the one
-				    `split-bar-parity.test.ts` exists to keep from drifting behind
-				    both: `the-reply-track-is-14px-with-the-card-radius-and-clip` reads
-				    the thickness straight off this literal, and a re-size of the other
-				    two that left this one behind is exactly the silent drift that
-				    guard is for.
-				    ⚠ THE HAIRLINE STAYS AND IS STILL LOAD-BEARING: side-keying the
-				    track means it takes `bg-yes` #181818 on a NO post against a
-				    #212121 card — ~1.10:1, i.e. gone — leaving the fill no visible
-				    extent to be a proportion OF. `reply-split-bar.test.tsx` asserts it
-				    on BOTH poles. */}
-				<span className="flex h-6 w-full items-center">
+			    ⛔ THE HAIRLINE IS LOAD-BEARING, AND THE FIRST DRAFT OF THIS FIX
+			    OMITTED IT. Side-keying the track means it takes `bg-yes` #181818 on
+			    a NO post, against a `bg-card` → `--color-n0` #212121 surface — about
+			    1.10:1, i.e. GONE. The fill would then have no visible extent to be a
+			    proportion OF. ⇒ Correcting the pole without adding the edge would
+			    have traded an INVERSION for an ERASURE, on exactly the post side
+			    this row exists to fix.
+			    Both sibling bars already carry it — `HeroPanels` (this genus's ruled
+			    precedent) and `AggregateFooter` — and so does the mockup, whose
+			    `.barrow .bar` is an OUTLINE (`d5:510`, `border:1px solid var(--ink)`
+			    over an `--n0` ground). The trigger pills this bar used to carry had
+			    the same idea as their "black-pill exception" 0.5px n2 edge; they are
+			    outline header controls since FEED-3, and the edge rule stays here.
+			    ⛔ NOT `--border-strong` — `emphasis-ladder-tokens.test.ts` pins that
+			    token at zero consumers. */}
+			{/* ⚠⚠ RPLY-1 · R5 — THE TRACK SITS IN A PILL-HEIGHT BOX AND CENTRES
+			    IN IT. `h-6` is the pill's own specified box (`text-xs` 16px line +
+			    `py-1` 8px), so the track's CENTRE is that box's centre at any
+			    thickness — which is why growing it 6 → 14 → 18px each time moves
+			    what fills the box and not where the middle of it sits. A bare
+			    offset would hit today's number and drift the first time the
+			    pill's size changes.
+			    ⛔ `h-[18px]` and `rounded-[var(--r)]` are READ OFF `PriceBar`'s
+			    `detail` size, not chosen — the card's bar was matched to it at
+			    CS10/CS11 because two split bars on one screen must not read as a
+			    bar and a hairline, and at 14px a 3px radius reads as a rectangle
+			    beside a market bar that is a pill. Same reasoning, same source,
+			    now on both surfaces.
+			    ⚠⚠ BLOCK-3 §2 — 14px → 18px, THE THIRD SURFACE IN THE SAME CHAIN.
+			    `PriceBar.tsx`'s `detail` moved first (its own docblock has the
+			    layout-budget reasoning), `AggregateFooter.tsx`'s track followed to
+			    keep the market-view card in parity, and this file is the one
+			    `split-bar-parity.test.ts` exists to keep from drifting behind
+			    both: `the-reply-track-is-14px-with-the-card-radius-and-clip` reads
+			    the thickness straight off this literal, and a re-size of the other
+			    two that left this one behind is exactly the silent drift that
+			    guard is for.
+			    ⚠ THE HAIRLINE STAYS AND IS STILL LOAD-BEARING: side-keying the
+			    track means it takes `bg-yes` #181818 on a NO post against a
+			    #212121 card — ~1.10:1, i.e. gone — leaving the fill no visible
+			    extent to be a proportion OF. `reply-split-bar.test.tsx` asserts it
+			    on BOTH poles.
+			    ⚠ UIR-4 item 5 — THE BOX IS `h-8` NOW, the two-line end labels'
+			    height (two 16px `text-xs` lines), so the track centres on those
+			    labels by the same mechanism it centred on the pill's box.
+			    ⚠ UIR-5 item 4 — THE BOX IS LINE 1's GRID CELL NOW. The track sets
+			    that row at 18px and the words centre on it (`items-center`), so the
+			    track is centred on its line by the grid, not by a box of the labels'
+			    height. */}
+			<span className="col-start-2 row-start-1 flex">
+				<span
+					className={`h-[18px] w-full overflow-hidden rounded-[var(--r)] [border:var(--hairline)] ${hasStake ? (postSide === "YES" ? "bg-bar-no" : "bg-bar-yes") : "bg-n2"}`}
+					aria-hidden="true"
+				>
 					<span
-						className={`h-[18px] w-full overflow-hidden rounded-[var(--r)] [border:var(--hairline)] ${postSide === "YES" ? "bg-no" : "bg-yes"}`}
-						aria-hidden="true"
-					>
-						<span
-							className={`block h-full transition-[width] duration-300 ${postSide === "YES" ? "bg-yes" : "bg-no"}`}
-							style={{ width: supportPct }}
-						/>
-					</span>
-				</span>
-				<span className="text-n5">
-					<b className="text-xs text-ink font-mono">
-						Đ {formatDharma(displayedTotal)}
-					</b>{" "}
-					{/* `.sb2.mid` (`d5:620`) — the figure stays cased; the WORD is the
-					    overline. Ported from the card so the two bars read alike. */}
-					<span className="tracking-[0.1em] uppercase">staked</span>
+						className={`block h-full transition-[width] duration-300 ${postSide === "YES" ? "bg-bar-yes" : "bg-bar-no"}`}
+						style={{ width: supportPct }}
+					/>
 				</span>
 			</span>
-			{/* ⚠ PILL FIRST ON THIS FLANK TOO. It used to be figure-then-pill so the
-			    row read outward-in; stacked, both flanks lead with their pill and the
-			    figure sits under it, which is what makes the two Đ amounts land on
-			    one baseline instead of on opposite sides of the row. */}
-			<span className="flex shrink-0 flex-col items-center gap-1">
-				<TriggerPill
-					relation="counter"
-					postSide={postSide}
-					heldSide={heldSide}
-					marketOpen={marketOpen}
-					suspended={suspended}
-					active={activeRelation === "counter"}
-					onToggle={onToggleRelation}
-					isOwnPost={isOwnPost}
-				/>
-				<span className="text-n5 font-mono text-[11px] font-medium">
-					Đ {formatDharma(aggregate.counterDharma)}
-				</span>
+			{/* ⚠ UIR-5 item 4 — line 2's middle cell: centred under the track and
+			    on the figures' baseline (`self-baseline`, as they are). It does not
+			    wrap: a second line here would be height the fixed top section does
+			    not have. */}
+			<span className="col-start-2 row-start-2 self-baseline text-center whitespace-nowrap text-n5">
+				<b className="text-xs text-gold font-mono">
+					Đ {formatDharma(displayedTotal)}
+				</b>{" "}
+				{/* `.sb2.mid` (`d5:620`) — the figure stays cased; the WORD is the
+				    overline. Ported from the card so the two bars read alike. */}
+				<span className="tracking-[0.1em] uppercase">staked</span>
 			</span>
+			<EndCell
+				className="col-start-3 row-start-1 tracking-[0.1em] text-ink uppercase"
+				show="Counter"
+				size="Support"
+			/>
+			<EndCell
+				className="col-start-3 row-start-2 self-baseline font-mono text-gold"
+				show={<>Đ {counter}</>}
+				size={<>Đ {support}</>}
+			/>
 		</div>
 	);
 }
 
-/** One Support/Counter trigger — pole fill/text/border NEVER change with state
- * (values-log §3: glow-only hover/pressed; disabled = opacity, no pointer). */
-function TriggerPill({
-	relation,
-	postSide,
-	heldSide,
-	marketOpen,
-	suspended,
-	active,
-	onToggle,
-	isOwnPost,
+/**
+ * UIR-5 item 4 — one end of one line of the bar: its word (line 1) or its Đ
+ * figure (line 2), centred in its column. `size` is the OTHER end's text for
+ * the same line, laid invisibly in the same cell, so both end columns take the
+ * wider pair's width without anything measuring it — UIR-4 item 5's `EndLabel`
+ * sizer, one per line now. It is hidden from assistive technology, and
+ * `invisible` keeps it out of the paint.
+ */
+function EndCell({
+	show,
+	size,
+	className,
 }: {
-	relation: "support" | "counter";
-	postSide: Side;
-	heldSide: Side | null;
-	marketOpen: boolean;
-	suspended: boolean;
-	active: boolean;
-	onToggle: (relation: "support" | "counter") => void;
-	isOwnPost: boolean;
+	show: ReactNode;
+	size: ReactNode;
+	className: string;
 }) {
-	const resultingSide = deriveReplySide({ parentSide: postSide, relation });
-	const oppositeHeld = isEntryDisabled({ resultingSide, heldSide });
-	const disabled = !marketOpen || suspended || oppositeHeld || isOwnPost;
-	const c3 =
-		oppositeHeld && heldSide !== null
-			? c3OppositeSide({ held: heldSide, resulting: resultingSide })
-			: null;
-	// D-52 R1 — the own-post refusal takes C3's slot and wins over it: on the
-	// viewer's own post both triggers are foreclosed, whatever is held.
-	const refusal = isOwnPost ? OWN_POST_COPY : c3;
-	const pole =
-		resultingSide === "YES"
-			? // Black-pill exception: 0.5px n2 edge (values-log §1 item 8).
-				"bg-yes text-no border-[0.5px] border-n2 shadow-xs hover:bg-neutral-200 hover:text-black cursor-pointer active:scale-95"
-			: "bg-no text-yes border border-white/25 shadow-xs hover:bg-neutral-800 hover:border-white/60 hover:text-white cursor-pointer active:scale-95";
-	// C3 precedence (INFO-1 §3.4): a viewer blocked by the single-side rule is
-	// told why they are blocked, not given the relation's definition. The
-	// glossary gloss fills the null branch only — c3 still wins outright.
-	const gloss =
-		refusal ?? (relation === "support" ? GLOSSARY.support : GLOSSARY.counter);
 	return (
-		<InfoTip content={gloss} asChild>
-			<button
-				type="button"
-				disabled={disabled}
-				aria-disabled={disabled}
-				aria-expanded={active}
-				aria-label={
-					refusal ??
-					`${relation === "support" ? "Support" : "Counter"} — bet ${resultingSide}`
-				}
-				onClick={() => onToggle(relation)}
-				className={`w-[78px] h-6 flex items-center justify-center rounded-(--r-chip) text-xs font-bold transition-all hover:shadow-(--state-hover-glow-pole) focus-visible:shadow-(--state-focus-ring) active:shadow-(--state-pressed-glow-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) ${active ? "ring-2 ring-white/40" : ""} ${pole}`}
-			>
-				{relation === "support" ? "Support" : "Counter"}
-			</button>
-		</InfoTip>
+		<span
+			className={`grid justify-items-center whitespace-nowrap ${className}`}
+		>
+			<span className="col-start-1 row-start-1">{show}</span>
+			<span aria-hidden="true" className="invisible col-start-1 row-start-1">
+				{size}
+			</span>
+		</span>
 	);
 }

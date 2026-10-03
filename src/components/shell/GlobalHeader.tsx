@@ -9,6 +9,7 @@ import { HeaderNav } from "./HeaderNav";
 import { type HeaderViewer, IdentityCluster } from "./IdentityCluster";
 import { RadioSlot } from "./RadioSlot";
 import { RulesControl } from "./RulesControl";
+import { TutorialControl } from "./TutorialControl";
 import { VisitorCounter } from "./VisitorCounter";
 import { XLink } from "./XLink";
 
@@ -75,6 +76,9 @@ import { XLink } from "./XLink";
  *
  * Left zone order Back · Home · Radio · GitHub · X (mockup v0_2 for the first
  * three; GitHub and X are named deviations — see below).
+ * ⚠ UIR-3 item 5 — AT 640px AND UP IT READS `Home · RULES · Radio · GitHub · X`:
+ * Back left at UIR-1 item 5, and RULES is back in this zone, directly after
+ * Home. Below 640 RULES keeps its identity-zone place (the mounts, below).
  * ⚠ IT READ `… · GitHub · RULES` UNTIL MKT-ROSTER-1-P3, which moves RULES to the
  * right zone on a founder ruling and gives its slot to `XLink`. The count is
  * unchanged at five, so a reader checking the zone's width budget against the
@@ -117,6 +121,9 @@ import { XLink } from "./XLink";
  * the far right (UI.13; SPEC.1 §21.1) — **at and above 640px.** Below
  * `--breakpoint-mobile` three of the five are hidden, so the zone reads `RULES ·
  * avatar-or-JOIN` and is pushed to the row's right edge by `ms-auto` (A13 D-1).
+ * ⚠ UIR-3 item 5 — from 640px RULES is in the left zone, so at and above 640 this
+ * zone opens on the Đ cluster (signed in) or JOIN (signed out). Below 640 it
+ * still reads `RULES · avatar-or-JOIN`.
  * ⚠ RULES JOINED THIS ZONE AT MKT-ROSTER-1-P3 and this sentence opened with the
  * Đ cluster until then. ⛔ THE §21.1 REGISTER BOUNDARY IS UNTOUCHED IN BOTH
  * DIRECTIONS, and that is the claim to check rather than the order: nothing
@@ -130,6 +137,8 @@ import { XLink } from "./XLink";
  * tab in the CENTRE zone as a sibling of the wordmark (`mockup-v0_2:208`,
  * close-out `:31`). ⚠ IT SHIPS FIRST IN THE **RIGHT** ZONE; this sentence read
  * "the LEFT zone, after Radio" until the founder moved it to the identity side.
+ * ⚠ UIR-3 item 5 — AT 640px AND UP IT SHIPS IN THE LEFT ZONE AGAIN, directly
+ * after Home; the right zone keeps it below 640 only.
  * The deviation from the mockup is unchanged in kind — still not the centre zone
  * — and the measurement below is what ruled the centre zone OUT, so it still
  * governs. What it does not decide, and never did, is which SIDE zone hosts the
@@ -284,11 +293,20 @@ export function GlobalHeader({
 	spendable = null,
 	stars = null,
 	mobileResponsive = false,
+	tutorialEnabled = false,
 }: {
 	viewer: HeaderViewer | null;
 	portfolio?: string | null;
 	spendable?: string | null;
 	stars?: number | null;
+	/**
+	 * Shows the "Tutorial" control in the left zone. Defaults `false` so a
+	 * mount that omits it (the `(auth)` layout) renders byte-identical to
+	 * before this control existed — there is no market page to walk
+	 * through from `/sign-in`. The one mount that opts in is
+	 * `(public)/layout.tsx`.
+	 */
+	tutorialEnabled?: boolean;
 	/**
 	 * MOBILE-1 — the read-surface amendment, threaded down rather than assumed.
 	 * **BOTH mounts opt in.** `(public)/layout.tsx` passes it (its mount backs
@@ -354,24 +372,48 @@ export function GlobalHeader({
 			<div
 				className={cn(
 					"mx-auto grid h-[60px] w-full max-w-[1440px] grid-cols-[1fr_auto_1fr] items-center gap-[18px] px-6",
-					mobileResponsive && "max-mobile:flex max-mobile:gap-[5px]",
+					mobileResponsive && "max-sm:flex max-sm:gap-[5px]",
 				)}
 			>
 				<div
 					className={cn(
 						"flex items-center gap-2 justify-self-start",
-						mobileResponsive && "max-mobile:contents",
+						mobileResponsive && "max-sm:contents",
 					)}
 				>
-					{/* MOBILE-2m · R-3 / ADR-0051 A9 D-3 — Back does not render below
-					    640px, and the hide is threaded rather than written into
-					    `HeaderNav` unconditionally: that component is a static child of
-					    BOTH mounts, so an ungated class there reaches `(auth)` too. Home
-					    and RULES shift left by the 42px Back and its gap give up;
-					    nothing is repositioned to make that happen. */}
+					{/* UIR-1 item 5 — Back renders at no width now (below 640px since
+					    ADR-0051 A9 D-3), so Home is this zone's first item and the
+					    controls after it close up by Back's 34px and its 8px gap. The
+					    brand and right zones sit in their own grid tracks and do not
+					    move. `mobileResponsive` still threads through, inert. */}
 					<HeaderNav mobileResponsive={mobileResponsive} />
-					{/* MOBILE-1 Phase A — the off-site/decorative utility controls, and
-					    the ONLY things in this zone that hide below 640px.
+					{/* ⛔ UIR-3 item 5 — AT 640px AND UP RULES IS THIS ZONE'S SECOND ITEM,
+					    DIRECTLY AFTER HOME: `home · RULES · RADIO …`, everything else in
+					    its old order. The pill is unchanged; its `mr-3.5` is the right
+					    zone's rhythm (that zone has no gap), so here the wrapper zeroes it
+					    and this zone's 8px gap does the separating.
+					    ⚠ BELOW 640 RULES STAYS FIRST IN THE IDENTITY ZONE. The phone row is
+					    not this item's to change, and this zone flattens to `contents`
+					    there, so moving the one mount would move RULES on the phone too.
+					    ⇒ One mount per tier: this one is `display: contents` from 640 and
+					    `max-mobile:hidden` below it; the right zone's is the reverse. Each
+					    is `display: none` on the other tier, so one RULES renders at any
+					    width, and the phone row's order and classes are what they were.
+					    Without `mobileResponsive` this is the only mount, at every width.
+					    ⚠ The note below predates the move: MKT-ROSTER-1-P3's right-zone
+					    placement now holds below 640 only. */}
+					<div
+						className={cn(
+							"contents [&>button]:mr-0",
+							mobileResponsive && "max-mobile:hidden",
+						)}
+					>
+						<RulesControl mobileResponsive={mobileResponsive} />
+					</div>
+					{/* MOBILE-1 Phase A — the utility controls (Radio, and GitHub
+					    off-site), and the ONLY things in this zone that hide below 640px.
+					    Radio is live for every viewer (RADIO-1 / ADR-0062) and takes
+					    nothing from this header.
 					    ⚠ RULES USED TO BE THE SIBLING BELOW THIS WRAPPER, and the note
 					    that stood here explained why it was outside rather than in:
 					    SPEC.1 §21.9 makes it the onboarding deck's only re-show entry
@@ -379,14 +421,33 @@ export function GlobalHeader({
 					    reasoning is unchanged and has simply moved with the control —
 					    MKT-ROSTER-1-P3 puts RULES first in the RIGHT zone, which is
 					    likewise never hidden. `XLink` takes the vacated slot. */}
+					{/* ⛔ TABLET-1 / ADR-0063 — `max-xl:hidden` RIDES ALONGSIDE `max-mobile:
+					    hidden` HERE, ON X, ON THE DIVIDER AND ON THE VISITOR COUNTER, AND IT
+					    IS NOT THE PHONE HIDE AGAIN. The phone tier now ends at 820px, but a
+					    SIGNED-IN desktop header (Đ cluster + pseudonym chip) needs ~1240px
+					    to fit; measured worst case, overflow is 256px at 820 and 11px at
+					    1200. Below Tailwind's `xl` (1280px) these four controls give way, so
+					    820-1279 keeps the desktop PAGE but not the full header. At 1280+ the
+					    header is exactly as before. (`max-mobile:hidden` is now implied by
+					    this token but stays: guards key on it and it names the phone tier.) */}
 					<div
 						data-testid="header-secondary-controls"
 						className={cn(
 							"flex shrink-0 items-center gap-2",
-							mobileResponsive && "max-mobile:hidden",
+							mobileResponsive && "max-sm:hidden mobile:max-xl:hidden",
 						)}
 					>
-						<RadioSlot />
+						{/* TABLET-1 — Radio hides below `xl` and GitHub does not (GitHub is
+						    visible on the 640-819 tablet band). `contents` above `xl` makes this
+						    wrapper generate no box, so Radio is laid out exactly as a direct
+						    child of the flex wrapper was; below it, `hidden` removes the lot.
+						    Done here, gated on the prop, rather than inside RadioSlot — that
+						    component is a client player with several render arms. */}
+						<span
+							className={cn("contents", mobileResponsive && "max-xl:hidden")}
+						>
+							<RadioSlot />
+						</span>
 						<GitHubStarsView stars={stars} />
 					</div>
 					{/* ⛔ X IS A SIBLING OF THE WRAPPER, NOT A CHILD OF IT, AND CARRIES
@@ -398,6 +459,9 @@ export function GlobalHeader({
 					    already ship. The rendered outcome is GitHub's exactly: visible
 					    at ≥640, `display:none` below it. */}
 					<XLink mobileResponsive={mobileResponsive} />
+					{tutorialEnabled ? (
+						<TutorialControl mobileResponsive={mobileResponsive} />
+					) : null}
 				</div>
 				{/* ⛔⛔ ADR-0051 A13 D-3 WITHDRAWS A9 D-3 BELOW 640: THE MARK IS A FLOW
 				    ITEM AGAIN, AND THE THREE TOKENS THAT PINNED IT TO THE HEADER'S
@@ -453,7 +517,8 @@ export function GlobalHeader({
 				<div
 					className={cn(
 						"justify-self-center",
-						mobileResponsive && "max-mobile:contents",
+						mobileResponsive &&
+							"max-sm:contents max-mobile:flex max-mobile:items-center max-mobile:gap-[5px]",
 					)}
 				>
 					<BrandCluster
@@ -516,22 +581,32 @@ export function GlobalHeader({
 				<div
 					className={cn(
 						"flex items-center justify-self-end",
-						mobileResponsive && "max-mobile:ms-auto",
+						mobileResponsive && "max-sm:ms-auto",
 					)}
 				>
 					{/* ⛔⛔ MKT-ROSTER-1-P3 — RULES OPENS THE IDENTITY SIDE, FOUNDER-RULED.
 					    Signed out the zone reads `RULES · JOIN · | · visitors`; signed
 					    in, `RULES · Đ cluster · avatar · | · visitors`. It is FIRST so
 					    that the two arms differ only by what follows it.
-					    ⛔ NO WRAPPER, EVER. `dharma-cluster.test.tsx`'s T4 guard walks
-					    THIS div's direct `.children` to prove the §21.1 divider has the
-					    engine-derived figures on one side and the visitor count on the
-					    other; a wrapper around any of these makes the real node a
-					    grandchild and every index in that guard resolves to `-1`.
+					    ⚠ UIR-3 item 5 — BELOW 640px ONLY. From 640 RULES is the left
+					    zone's second item (see the mount there), and this zone opens on
+					    Đ / JOIN. This mount's wrapper is `display: none` from 640 and
+					    `display: contents` below it, so on the phone the button is still
+					    a direct flex item of this zone, exactly as before.
+					    ⛔ NO WRAPPER AROUND THE OTHER FOUR, EVER. `dharma-cluster.test.tsx`'s
+					    T4 guard walks THIS div's direct `.children` to prove the §21.1
+					    divider has the engine-derived figures on one side and the visitor
+					    count on the other; a wrapper around any of them makes the real
+					    node a grandchild and every index in that guard resolves to `-1`.
+					    T4 does not index RULES, which is why its tier wrapper is safe.
 					    ⚠ Its separation from what follows is a `mr-3.5` on the control
 					    itself — this zone declares no `gap`, and adding one would move
 					    Đ, the chip and the counter at 1440. */}
-					<RulesControl mobileResponsive={mobileResponsive} />
+					{mobileResponsive ? (
+						<div className="hidden max-mobile:contents">
+							<RulesControl mobileResponsive />
+						</div>
+					) : null}
 					{/* ADR-0049 — the two hides below 640px live in the COMPONENTS, not
 					    here, and the asymmetry with the divider two nodes down is
 					    deliberate rather than untidy. `dharma-cluster.test.tsx`'s T4
@@ -558,7 +633,7 @@ export function GlobalHeader({
 						aria-hidden="true"
 						className={cn(
 							"mx-3 h-[30px] w-px bg-n2",
-							mobileResponsive && "max-mobile:hidden",
+							mobileResponsive && "max-mobile:hidden max-xl:hidden",
 						)}
 					/>
 					<VisitorCounter mobileResponsive={mobileResponsive} />

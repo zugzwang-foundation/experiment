@@ -1,6 +1,7 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
+import { InfoTip } from "@/components/ui/info-tip";
 
 import { ArgProfile } from "./ArgProfile";
 import { SideBadge } from "./badges";
@@ -11,22 +12,40 @@ import { FocusMarketCard } from "./FocusMarketCard";
 import { HeadZone } from "./HeadZone";
 import { KnowMore } from "./KnowMore";
 import { RemovedPlaceholder } from "./placeholders";
-import type {
-	DebateMarketHeader,
-	DebatePost,
-	PresentPost,
-	Side,
-} from "./types";
+import { quoteFill } from "./quote-well/palette";
+import { QuotedTitle } from "./quote-well/QuoteWell";
+import { GEIST_POSTER_ADV, QUOTE_POSTER, WRAP_SLACK } from "./quote-well/size";
+import type { DebateMarketHeader, DebatePost, PresentPost } from "./types";
+
+/**
+ * UIR-4 item 4 — the mean advance of a title character, in em: Geist at the
+ * title's weight (500), normal tracking, spaces included. Measured on the
+ * deployed face on staging, 2026-09-28: 0.452–0.496 across mixed-case prose
+ * titles (0.555 in all caps). 0.5 sits at the top of the prose range, so a
+ * prose title the estimate fits does fit, at the cost of shrinking a few
+ * percent more than the narrowest titles need.
+ */
+const TITLE_ADVANCE_EM = 0.5;
+
+/**
+ * The size at which `title` fills its row on one line: the row's width over
+ * the title's estimated width at 1px, in container units, held between 11px
+ * and the title's 14px. `length` counts UTF-16 units, as the composer's cap
+ * does.
+ */
+const titleSize = (title: string) =>
+	`clamp(11px, ${(100 / (Math.max(title.length, 1) * TITLE_ADVANCE_EM)).toFixed(4)}cqw, 14px)`;
 
 /**
  * The focused-post header (DEBATE.4 §4 post-view) — the entered post shown in
  * full: argprofile · lane badge · title · image · FULL body, with a "Back to
  * market" toggle (exitPost). The arena's two columns below render this post's
- * replies. UI.A3 slice 3: the footer is the designed SPLIT BAR carrying the
- * F-3-gated Support/Counter trigger pills (market-view cards keep the plain
- * `AggregateFooter` — plan §8 scope). A REMOVED focused post shows only its
- * frozen side + the placeholder + the split bar (replies + triggers stay
- * live — thread intact, §6 edge).
+ * replies. UI.A3 slice 3: the footer is the designed SPLIT BAR (market-view
+ * cards keep the plain `AggregateFooter` — plan §8 scope). ⚠ FEED-3 — the bar is
+ * a display now: its F-3-gated Support/Counter triggers moved, with their props,
+ * to the column headers below (`PositionStrip`'s left lane). A REMOVED focused
+ * post shows only its frozen side + the placeholder + the split bar (its replies
+ * and the header triggers stay live — thread intact, §6 edge).
  *
  * HTML-FINISH · MARKET DETAIL row 1 — THIS IS THE HEADZONE'S POST ARM. It no
  * longer stacks UNDERNEATH the market header; it REPLACES it, through the same
@@ -39,15 +58,9 @@ import type {
 export function PostFocusHeader({
 	post,
 	market,
-	heldSide,
-	marketOpen,
-	suspended,
-	activeRelation,
-	onToggleRelation,
 	onExit,
 	onOpenImage,
 	onOpenPopup,
-	isOwnPost = false,
 }: {
 	post: DebatePost;
 	/**
@@ -56,11 +69,6 @@ export function PostFocusHeader({
 	 * market context at all once `MarketHeader` stops rendering beside it (row 1).
 	 */
 	market: DebateMarketHeader;
-	heldSide: Side | null;
-	marketOpen: boolean;
-	suspended: boolean;
-	activeRelation: "support" | "counter" | null;
-	onToggleRelation: (relation: "support" | "counter") => void;
 	onExit: () => void;
 	onOpenImage: (url: string) => void;
 	/**
@@ -69,12 +77,6 @@ export function PostFocusHeader({
 	 * on the surface, not one per zoom level.
 	 */
 	onOpenPopup: (post: PresentPost) => void;
-	/**
-	 * D-52 R1 — the viewer wrote the focused post: both split-bar triggers
-	 * render disabled (nobody replies to their own post). Absent = not the
-	 * viewer's.
-	 */
-	isOwnPost?: boolean;
 }) {
 	const replyCount = post.aggregate.supportCount + post.aggregate.counterCount;
 	return (
@@ -132,8 +134,13 @@ export function PostFocusHeader({
 			left={
 				/* ⚠ The focused post's card FILLS the headzone band, so `.hpimg` beside
 				   it can be height-driven exactly as the market arm's `.mmedia` is.
-				   `min-h-0` is its link in the one-screen chain. */
-				<Card className="min-h-0 flex-1 gap-2 p-3 bg-gradient-to-b from-card to-card/90 border border-white/10 shadow-sm">
+				   `min-h-0` is its link in the one-screen chain.
+				   ⚠ UIR-4 item 1 — `@container` makes the card the query container
+				   column 1's width reads below: `100cqw` is the card's content box, so
+				   `100cqw + 26px` (12px padding and a 1px border, both sides) is its
+				   border box — the width the market arm divides into its picture and its
+				   stack. (UIR-5 item 1 took the row's floor, the other reader, away.) */
+				<Card className="@container min-h-0 flex-1 gap-2 p-3 bg-gradient-to-b from-card to-card/90 border border-white/10 shadow-sm">
 					{/* HTML-FINISH · MARKET DETAIL row 11 — `.hleft` IS A ROW, NOT A
 					    STACK (`d5:448`, `flex:1 1 auto;min-width:0;display:flex;gap:16px`).
 					    The focused post's image is `.hpimg` (`:956`) — a LEFT SIBLING of
@@ -173,7 +180,39 @@ export function PostFocusHeader({
 					    badge cut 33px, eight elements with `scrollWidth > clientWidth`.
 					    Anything measuring this row measures the clipping ancestor's
 					    descendants, never the document. */}
-					<div className="flex min-h-0 flex-1 gap-4 items-center max-mobile:flex-col max-mobile:items-start">
+					{/* ⚠⚠ UIR-4 item 1 — THE ROW LIES ON THE MARKET ARM'S THREE COLUMNS.
+					    Column 1 (the market arm's picture column) holds the post's image,
+					    column 2 (its question and stats column) the post's content, and
+					    the rail beside this card (its chart column) the market card.
+					    ⚠ COLUMN 1's WIDTH PUTS COLUMN 2's CENTRE ON THE PAGE'S CENTRE LINE,
+					    the gap between the YES and NO columns below. From `lg` the rail and
+					    the band's gap take 340 + 20px to the right of this card; 344px plus
+					    this row's 16px gap is the same 360px to the left of column 2, and
+					    the card's padding and border match on both sides, so column 2
+					    stands the same distance from both edges of the page. Below `lg`
+					    there is no rail (and no chart column on the market arm), so column
+					    1 takes the market arm's picture width instead and ends where that
+					    picture ends: a third of the section, less this card's 13px inset.
+					    ⛔ UIR-7 item 2 — THE CENTRE RULE ABOVE IS DROPPED (founder's call).
+					    Column 1 is the picture's own width (item 1) and column 2 takes the
+					    rest: its author row, title row and split bar start 16px after the
+					    picture and end at this card's right padding, so they grow and
+					    shrink with it. A removed post has no picture and no column 1. The
+					    width above survives as the picture's ceiling. A text-only post's
+					    column 1 is its quote tile, 100px or 200px wide (item 3, UIR-8).
+					    ⚠⚠ UIR-5 item 1 — THE HEIGHT IS UIR-3's, AND IT IS FIXED. UIR-4 gave
+					    this row the market arm's height as a floor (192px of section at
+					    1440); that floor is gone, and the section is back to the 125.25px
+					    it measured at UIR-3's head. There it was a RESULT — this card's
+					    26px of padding and border around a 24px author row, a 19.25px
+					    title line, a 44px split bar and two 6px gaps; here it is a HEIGHT,
+					    99.25px of row, which grows neither with what column 2 holds nor
+					    with the market card beside it (sized to fit it — see
+					    `FocusMarketCard`). Items stretch: all three columns take it. */}
+					<div
+						data-tutorial="post-focus-argument"
+						className="flex h-[99.25px] shrink-0 gap-4 max-mobile:flex-col max-mobile:items-start"
+					>
 						{/* ⛔ QUOTE-1 A — THE EMPTY ARM AND ITS WHOLE FRAME ARE GONE
 						    (founder-ruled 2026-09-11). R2 had filled the post-focus
 						    `.hpimg` with d5's `POST IMAGE` box (`d5:1491-1492`) whenever
@@ -190,24 +229,76 @@ export function PostFocusHeader({
 						    an image slot beside a withheld argument would announce that
 						    it had an attachment. That is now the same nothing every
 						    imageless post gets, which is why the branch shape is kept
-						    rather than flattened — the two arms mean different things. */}
+						    rather than flattened — the two arms mean different things.
+						    ⚠ UIR-4 item 1 — A FRAME IS BACK, AS A LAYOUT COLUMN RATHER THAN A
+						    PLACEHOLDER. Column 1 reserves the width that centres column 2
+						    whatever the post carries, and draws nothing of its own. What it
+						    holds is `absolute`, so an attachment's natural height can never
+						    set the row's.
+						    ⚠ UIR-4 item 3 — AND AN IMAGELESS POST NO LONGER GETS THE REMOVED
+						    CASE'S NOTHING: its title fills the frame as the quotation well.
+						    Only a removed post still draws nothing here.
+						    ⚠ UIR-7 item 3 — THE WELL IS GONE FROM THIS PAGE; a text-only post
+						    gets the well's two marks and no title.
+						    ⚠ UIR-8 — AND ITS TITLE IS BACK BETWEEN THEM: `QuoteTile` draws it in
+						    the well's type, laid out at the tile's own size rather than scaled
+						    down from the well's.
+						    ⚠ UIR-9 — AND THE TILE IS THE WELL's CARD: the post's fill, the
+						    poster type, the marks in line.
+						    ⚠ UIR-7 item 2 — AND IT RESERVES NOTHING NOW EITHER. The frame it
+						    kept was the centre rule's, which is dropped, so a removed post has
+						    no column 1 and its content starts at the card's left padding.
+						    ⚠ UIR-7 item 1 — AN IMAGE POST'S FRAME IS NO LONGER THAT COLUMN: it
+						    hugs its picture, in flow, and it is the row's fixed height — not
+						    `absolute` — that keeps the attachment from setting the row's. */}
 						{post.removed ? null : post.imageUrl ? (
-							// `.hpimg{flex:0 0 auto}` — does not grow, does not shrink,
-							// sized by its own content. Framed in a clean preview thumbnail
-							// that respects any orientation (portrait, landscape, square)
-							// without clipping or awkward sliver sizing.
-							<div className="shrink-0 flex items-center justify-center self-center overflow-hidden rounded-[var(--imgr)] bg-n1/60 [border:var(--hairline)]">
+							// ⚠ UIR-4 item 2 — THE IMAGE FILLS ITS BOX AT THE ROW'S HEIGHT:
+							// whole (both axes bounded, scaled to fit, never cropped), centred,
+							// with no border and no ground; the 6px `--imgr` radius is on the
+							// image itself. It is the market-page card's own `fill` arm —
+							// `max-h-full` against a definite height, here the row's — so T2
+							// holds as it does there: an image smaller than the box keeps its
+							// natural size rather than being upscaled. `border-0!` outranks the
+							// image's own hairline, which `CommentImage` concatenates rather
+							// than merges, so the order of the two in the stylesheet cannot
+							// decide it. The click opens the lightbox, as before.
+							// ⚠⚠ UIR-7 item 1 — AND THE BOX HUGS THE PICTURE's SHAPE. It was
+							// column 1's fixed slot with the image `absolute` inside; the image
+							// is in flow now, so the box is as wide as the picture drawn at the
+							// row's 99.25px — its aspect ratio × that height — held between
+							// 72px and the slot's old width (a third of the section, 344px from
+							// `lg`). Past the ceiling (wider than 3.47:1 at `lg`) the picture
+							// fills the width and centres down the box; under the floor
+							// (narrower than 0.73:1) it fills the height and centres across it.
+							// The box is sized by its content, not measured: nothing reads the
+							// image in script and no dimension is needed from the server.
+							// Measured in Chromium: 16:9 → 176.44px, 2:3 → 72px with the
+							// picture 66.16px wide, 5:1 → 344px with the picture 68.8px tall.
+							<div
+								data-testid="post-focus-media"
+								className="flex max-w-[calc((100cqw_+_26px)/3_-_13px)] min-w-[72px] shrink-0 items-center justify-center lg:max-w-[344px]"
+							>
 								<CommentImage
 									url={post.imageUrl}
 									onOpen={onOpenImage}
-									className="h-16 w-16 sm:h-[72px] sm:w-[72px] object-contain p-0.5 transition-transform hover:scale-105"
+									fill
+									className="max-h-full border-0!"
 								/>
 							</div>
-						) : null}
+						) : (
+							<QuoteTile id={post.id} title={post.title} />
+						)}
 
 						{/* `.hstack` (`d5:462`, `flex:1 1 auto;min-width:0;flex-direction:
-						    column`) — everything that is not the image. */}
-						<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 justify-center">
+						    column`) — everything that is not the image.
+						    ⚠ UIR-5 item 1 — ITS ROWS SPREAD OVER THE FIXED HEIGHT: the first
+						    at the top, the split bar on the floor, the free height shared
+						    evenly between them (`justify-between`, no gap). A box that cannot
+						    grow has to give somewhere when its content does, and this makes
+						    the somewhere the space between the rows rather than the last
+						    row — so an author row that wraps at a narrow width closes the
+						    gaps instead of pushing the split bar out of the card. */}
+						<div className="flex min-h-0 min-w-0 flex-1 flex-col justify-between">
 							{post.removed ? (
 								<>
 									<SideBadge side={post.sideAtPostTime} />
@@ -218,23 +309,33 @@ export function PostFocusHeader({
 									{/* ⚠ UI-OVERNIGHT entry 1b — the lane badge rides the author
 									    row now (see `ArgProfile`), so the corner wrapper that held
 									    it beside this row is gone with it. */}
-									<ArgProfile
-										author={post.author}
-										side={post.sideAtPostTime}
-										marker={post.marker}
-										entryPrice={post.entryPrice}
-										chipSize="detail"
-										authorStake={post.authorStake}
-										originalStake={post.authorStakeOriginal}
-										sold={post.authorSold}
-										replyCount={replyCount}
-										createdAt={post.createdAt}
-										badge={post.badge}
-									/>
-									<div className="flex items-baseline justify-between gap-2 min-w-0">
-										<h2 className="font-heading text-sm leading-snug font-medium line-clamp-1 min-w-0 flex-1">
-											{post.title}
-										</h2>
+									{/* ⚠⚠ UIR-5 item 3 — `Know more` RIDES THE AUTHOR ROW, at its
+									    right end, right-aligned in column 2 and centred on the
+									    row's height. The row of its own it had under the title is
+									    height the fixed section cannot spare.
+									    ⚠ THE PROFILE YIELDS TO IT: the profile's box takes what the
+									    control leaves (`min-w-0 flex-1`) and clips on the inline
+									    axis only. Where even its first group does not fit beside
+									    the control — near `lg`, where column 1 is a fixed 344px and
+									    column 2 is narrowest — its fields run out under their own
+									    edge rather than under the control. The block axis stays
+									    visible, so no focus ring is cut. */}
+									<div className="flex items-center gap-2">
+										<div className="min-w-0 flex-1 overflow-x-clip">
+											<ArgProfile
+												author={post.author}
+												side={post.sideAtPostTime}
+												marker={post.marker}
+												entryPrice={post.entryPrice}
+												chipSize="detail"
+												authorStake={post.authorStake}
+												originalStake={post.authorStakeOriginal}
+												sold={post.authorSold}
+												replyCount={replyCount}
+												createdAt={post.createdAt}
+												badge={post.badge}
+											/>
+										</div>
 										{hasExtendedText(post.body) ? (
 											<KnowMore
 												label="Know more about this argument"
@@ -242,6 +343,43 @@ export function PostFocusHeader({
 												className="shrink-0"
 											/>
 										) : null}
+									</div>
+									{/* ⚠ UIR-4 item 3 — only a post with an image keeps a title
+									    row; without one, the well in column 1 is the title, and
+									    `Know more` stands on its own row, right-aligned, where it
+									    sits under an image post's title.
+									    ⚠ UIR-5 item 3 — `Know more` has left its own row, on both
+									    kinds of post, for the author row's right end (above).
+									    ⚠ UIR-5 item 5 — AND EVERY POST KEEPS A TITLE ROW AGAIN, on
+									    this page: a text-only post's comes back as an image post's
+									    is, and the well in column 1 is a picture of the title rather
+									    than the title. The masking does not move — a removed post
+									    takes the other branch and has no title row at all.
+									    ⚠ UIR-7 item 3 — column 1 carries no title now (the marks
+									    tile), so this row is the only place a text-only post's title
+									    is drawn, as it is for an image post.
+									    ⚠ UIR-8 — the tile draws the title again, as a picture hidden
+									    from assistive technology, so this row stays the heading and
+									    is unchanged. */}
+									{/* ⚠ UIR-4 item 4 — AN IMAGE POST'S TITLE IS ONE LINE, ALWAYS
+									    (UIR-5 item 5: every post's), across column 2's full width;
+									    `Know more` moved to its own row under it (UIR-5 item 3: to
+									    the author row, since). The title starts at its 14px and
+									    shrinks only as far as its length needs to fit the row,
+									    never below 11px: `titleSize` is a pure function of the
+									    length, read against the row's width in container units
+									    (this row is the query container), so nothing is measured
+									    in script. What still does not fit at 11px ends in `…` on
+									    the same line, and the full title is in the tooltip. */}
+									<div className="@container min-w-0">
+										<InfoTip content={post.title} asChild>
+											<h2
+												className="truncate font-heading leading-snug font-medium"
+												style={{ fontSize: titleSize(post.title) }}
+											>
+												{post.title}
+											</h2>
+										</InfoTip>
 									</div>
 								</>
 							)}
@@ -257,17 +395,22 @@ export function PostFocusHeader({
 							    ⛔ `ReplySplitBar.tsx` IS NOT TOUCHED. Row 16 is PLACEMENT,
 							    and placement is this container's business; the bar's
 							    internals are allow-list-excluded, and needing to edit them
-							    would be H1-f — a halt, not an edit. It was not needed. */}
-							<div data-testid="post-focus-foot" className="mt-auto shrink-0">
+							    would be H1-f — a halt, not an edit. It was not needed.
+							    ⚠ UIR-4 item 5 — IT IS TOUCHED NOW, by name: its end labels
+							    are two lines of equal width, which centres the bar and its
+							    `Đ N STAKED` in column 2.
+							    ⚠ UIR-5 item 4 — and the whole bar is two lines now, 34px:
+							    with a 24px author row and a 19.25px title that leaves the
+							    fixed 99.25px room to spare, and with a wrapped (44px) author
+							    row it still fits (97.25px).
+							    ⚠ UIR-5 item 1 — `mt-auto` IS GONE. The column's
+							    `justify-between` already puts the bar on the floor, and an auto
+							    margin would take all the free height before `justify-content`
+							    could share it between the rows. */}
+							<div data-testid="post-focus-foot" className="shrink-0">
 								<ReplySplitBar
 									postSide={post.sideAtPostTime}
 									aggregate={post.aggregate}
-									heldSide={heldSide}
-									marketOpen={marketOpen}
-									suspended={suspended}
-									activeRelation={activeRelation}
-									onToggleRelation={onToggleRelation}
-									isOwnPost={isOwnPost}
 								/>
 							</div>
 						</div>
@@ -275,5 +418,147 @@ export function PostFocusHeader({
 				</Card>
 			}
 		/>
+	);
+}
+
+/** UIR-8 — the tile's height: the row's `h-[99.25px]`. The two move together. */
+const TILE_H_PX = 99.25;
+
+/**
+ * UIR-9 — the tile's inset on every side, its 1px border included (as the
+ * well's `pad` includes its own): the well's 24-of-272 at the tile's height is
+ * 8.76px, taken as 8.
+ */
+const TILE_INSET_PX = 8;
+
+/** UIR-8 — the title's size range in the tile, in px. */
+const TILE_TITLE_PX = { min: 9, max: 20 } as const;
+
+/** UIR-8 — a title up to this many characters gets the 100px tile; a longer
+ * one gets 200px. Counted as `titleSize` counts, in UTF-16 units. */
+const TILE_NARROW_MAX_CHARS = 40;
+
+/**
+ * UIR-8 — how many lines `title` takes in a `width`-px line at `size` px, or
+ * `Infinity` when a word is wider than the line: the browser's own line-break
+ * rule — whole words, filled greedily, broken at spaces — run on estimated
+ * widths. Every character, the joining space included, is taken at the poster
+ * type's safe bound (UIR-9: `GEIST_POSTER_ADV / WRAP_SLACK`, 0.7294 em).
+ * `text-wrap: balance` evens the lines out without adding one.
+ * ⚠ UIR-9 — each mark counts as a character of the word it sits against: the
+ * two share a `nowrap` span (`QuotedTitle`), so they break as one word.
+ */
+function tileLines(title: string, width: number, size: number): number {
+	const perLine = width / ((GEIST_POSTER_ADV / WRAP_SLACK) * size);
+	const words = title.trim().split(/\s+/);
+	let lines = 1;
+	let used = 0;
+	for (const [i, word] of words.entries()) {
+		const len =
+			word.length + (i === 0 ? 1 : 0) + (i === words.length - 1 ? 1 : 0);
+		if (len > perLine) {
+			return Number.POSITIVE_INFINITY;
+		}
+		if (used === 0) {
+			used = len;
+		} else if (used + 1 + len <= perLine) {
+			used += 1 + len;
+		} else {
+			lines += 1;
+			used = len;
+		}
+	}
+	return lines;
+}
+
+/**
+ * UIR-8 — the title's size in the tile, and how many lines the tile shows at
+ * it. A pure function of the title and the tile's box, so nothing is measured
+ * in script — the title row's `titleSize` rule, for a title that wraps.
+ *
+ * The title's box is the tile less its inset on every side (UIR-9; under UIR-8
+ * it was the band between the corner marks). The size is the largest whole px
+ * in [9, 20] at which the title's lines (`tileLines`) fit that box. ⚠ IT COUNTS
+ * WORDS, NOT ONLY CHARACTERS, because a 100px line holds a word or two:
+ * measured on the 1,563 titles staging carried on 2026-09-29, a length-only
+ * estimate (the well's own, `quoteTitleSize`) under-counted the lines of 6 of
+ * the 51 real titles and 547 of the 1,512 load-test ones — each would have been
+ * clipped at a size where a smaller one fits — while this one under-counted
+ * none, and came within 3px of the largest size that fits. (That is UIR-8's
+ * type measured; the poster type's figures are not re-measured.) `lines` is
+ * the box's whole lines at the chosen size: a title that still overruns the box
+ * at 9px shows only full lines and clips after the last.
+ */
+function tileTitleFit(
+	title: string,
+	width: number,
+): { size: number; lines: number } {
+	const inner = width - 2 * TILE_INSET_PX;
+	const band = TILE_H_PX - 2 * TILE_INSET_PX;
+	let size: number = TILE_TITLE_PX.min;
+	for (let s = TILE_TITLE_PX.max; s > TILE_TITLE_PX.min; s--) {
+		if (tileLines(title, inner, s) * QUOTE_POSTER.lineHeight * s <= band) {
+			size = s;
+			break;
+		}
+	}
+	return {
+		size,
+		lines: Math.floor(band / (QUOTE_POSTER.lineHeight * size)),
+	};
+}
+
+/**
+ * UIR-8 — A TEXT-ONLY POST's PICTURE, the feed's text-as-image laid out at the
+ * tile's own size. It replaces UIR-7 item 3's marks-only tile, and it is not
+ * UIR-5 item 5's scaled-down well: the title is set for this box, so its type
+ * is as large as the box allows rather than the well's size shrunk with the
+ * whole picture.
+ *
+ * ⛔ UIR-9 — THE WELL's CARD, AT THE TILE's SIZE. The post's own fill
+ * (`quoteFill` — the pick its well makes on the market page and in Discovery),
+ * a 1px `rgb(255 255 255 / 0.07)` border (`border-white/7`), the 6px `--imgr`
+ * radius, and the poster type — Geist 800, uppercase, −0.01em tracking, 1.05
+ * leading, in ink — with `“` and `”` in line against the first and last words
+ * at the title's size, in the fill's tint (`QuotedTitle`). It replaces UIR-8's
+ * bare tile, whose marks stood at a fixed 20px in its corners with the title in
+ * the band between them.
+ *
+ * The tile is as tall as the row and 100px wide for a title up to 40
+ * characters, 200px for a longer one. The title is centred and balanced inside
+ * the 8px inset at `tileTitleFit`'s size, and a title that still overruns at
+ * 9px is clipped after its last full line.
+ * ⚠ HIDDEN FROM ASSISTIVE TECHNOLOGY: the title row beside it is the heading
+ * and says the same thing.
+ * ⛔ A removed post never renders it — its variant has no title at the type
+ * level, and the tile would publish the masked argument's title.
+ */
+function QuoteTile({ id, title }: { id: string; title: string }) {
+	const width = title.length <= TILE_NARROW_MAX_CHARS ? 100 : 200;
+	const { size, lines } = tileTitleFit(title, width);
+	const { fill, mark } = quoteFill(id);
+	return (
+		<div
+			data-testid="post-focus-media"
+			aria-hidden="true"
+			className="flex shrink-0 flex-col justify-center overflow-hidden rounded-[var(--imgr)] border border-white/7"
+			style={{
+				width: `${width}px`,
+				padding: `${TILE_INSET_PX - 1}px`,
+				backgroundColor: fill,
+			}}
+		>
+			<span
+				className="block overflow-hidden text-center font-sans font-extrabold text-ink uppercase [overflow-wrap:anywhere] [text-wrap:balance]"
+				style={{
+					fontSize: `${size}px`,
+					lineHeight: QUOTE_POSTER.lineHeight,
+					letterSpacing: `${QUOTE_POSTER.tracking}em`,
+					maxHeight: `${lines}lh`,
+				}}
+			>
+				<QuotedTitle title={title} mark={mark} />
+			</span>
+		</div>
 	);
 }

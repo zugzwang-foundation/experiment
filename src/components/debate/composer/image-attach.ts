@@ -133,8 +133,44 @@ export const MIN_SHORTER_EDGE_PX = 600;
  * bounds the whole attempt: on expiry the image is REFUSED (RF-10), exactly
  * as a decode that threw would be. Without it the composer sits in
  * `attaching` forever and never reaches an error state.
+ *
+ * LARGE-IMAGE: 30 s, up from 10. The budget exists to end a HANG, not to
+ * hurry a real photo — and decoding a 20–40 MiB photo on a slow phone, then
+ * re-encoding it up to `MAX_ENCODE_ATTEMPTS` times, legitimately took longer
+ * than 10 s and was refused as a broken image. The composer already shows the
+ * upload and holds PLACE meanwhile (RF-11), so a longer wait is visible, not
+ * silent. The price: a genuinely undecodable image now errors after 30 s.
  */
-export const RESAVE_TIMEOUT_MS = 10_000;
+export const RESAVE_TIMEOUT_MS = 30_000;
+/**
+ * LARGE-IMAGE — the ceiling on the PICKED file, checked before any decode.
+ * The 8 MiB cap (`IMAGE_UPLOADS_MAX_BYTES`) binds what is UPLOADED; checked
+ * against the picked file it refused every phone photo over 8 MiB that the
+ * re-save would have shrunk to a few hundred KB. This ceiling is not a
+ * storage limit: it turns away a giant file before its decode can exhaust a
+ * low-memory phone's tab. 40 MiB is above what real phone cameras save
+ * (a 200 MP JPEG is roughly 12–25 MiB).
+ *
+ * ⚠ It bounds FILE size, not decoded size. A small, highly compressed file
+ * can still decode to an enormous bitmap — the residual stated above the
+ * legibility floor is unchanged, and a dimension check before decode would
+ * mean parsing image headers, which HO-FINISH Ruling 1 declined.
+ */
+export const IMAGE_PICK_MAX_BYTES = 40 * 1024 * 1024;
+/**
+ * LARGE-IMAGE — how many times one decoded image may be ENCODED in total
+ * before an over-cap result is refused as `image too large`. The bitmap is
+ * decoded once and reused, so each extra attempt costs one draw and one encode,
+ * and the whole ladder still sits inside `RESAVE_TIMEOUT_MS`. Order: a
+ * lossless-PNG result first retries as lossless WebP at the SAME size (no
+ * pixel lost); after that each attempt scales both edges by `RETRY_SCALE`.
+ *
+ * ⚠ The scaled attempts may go below `MIN_SHORTER_EDGE_PX`. That floor protects
+ * legibility when there is a choice; here the alternative is refusing the
+ * image outright, which is what this exists to stop.
+ */
+export const MAX_ENCODE_ATTEMPTS = 4;
+const RETRY_SCALE = 0.7;
 const JPEG_QUALITY = 0.8;
 const WEBP_QUALITY = 0.8;
 const AVIF_QUALITY = 0.8;
@@ -251,12 +287,12 @@ type Resave =
  * downstream code trusts — per the HTML Living Standard an unsupported
  * requested type silently returns `image/png`, with no exception.
  *
- * ⚠ The re-saved blob must satisfy the same bound the picked file did. It
- * usually does, but a re-encode is not always smaller than its source (a
+ * ⚠ The re-saved blob must satisfy the 8 MiB upload cap. It usually does, but a re-encode is not always smaller than its source (a
  * canvas PNG is rarely as tight as an optimised one), so one that breaks the
- * byte cap comes back `rejected` — today's `image too large` — instead of
- * reaching the sign route. Checking it HERE is what makes "validated ==
- * uploaded" true by construction.
+ * byte cap is RE-ENCODED (LARGE-IMAGE — see `MAX_ENCODE_ATTEMPTS`), and only
+ * when every attempt breaks it does it come back `rejected` — today's
+ * `image too large` — instead of reaching the sign route. Checking it HERE is
+ * what makes "validated == uploaded" true by construction.
  *
  * ⚠ OOM RESIDUAL DOCUMENTED (HO-FINISH v1.0 §5 Ruling 1): The pixel guard was
  * dropped because the canvas allocation is target-sized (~10 MB for a scaled
@@ -264,7 +300,10 @@ type Resave =
  * floor) and cannot prevent the initial bitmap decode (~160 MB RGBA at 40 MP). The
  * decode is bounded against hangs by `RESAVE_TIMEOUT_MS`.
  */
-async function resaveForUpload(file: Blob): Promise<Resave> {
+async function resaveForUpload(
+	file: Blob,
+	budget: { expired: boolean },
+): Promise<Resave> {
 	try {
 		const bitmap = await createImageBitmap(file);
 		try {
@@ -290,40 +329,68 @@ async function resaveForUpload(file: Blob): Promise<Resave> {
 				}
 			}
 
-			const canvas = document.createElement("canvas");
-			canvas.width = targetWidth;
-			canvas.height = targetHeight;
-			const ctx = canvas.getContext("2d");
-			if (!ctx) {
-				return { kind: "failed" };
+			// LARGE-IMAGE — the re-encode ladder. The bitmap is decoded once; each
+			// attempt draws it again and encodes. An over-cap PNG result first
+			// retries as lossless WebP at the same size; every later attempt
+			// scales down, staying in whatever format the browser actually
+			// produced (a browser that cannot encode WebP returns PNG, and is not
+			// asked for WebP again).
+			let outputType = target.outputType;
+			let quality = target.quality;
+			let triedWebp = outputType === "image/webp";
+			let previous: HTMLCanvasElement | null = null;
+			for (let attempt = 0; attempt < MAX_ENCODE_ATTEMPTS; attempt++) {
+				if (budget.expired) {
+					return { kind: "failed" };
+				}
+				if (previous) {
+					// Release the abandoned attempt's backing store now rather than at
+					// GC — on a native-size re-save it is the size of the bitmap.
+					previous.width = 0;
+					previous.height = 0;
+				}
+				const encoded = await drawAndEncode(
+					bitmap,
+					targetWidth,
+					targetHeight,
+					outputType,
+					quality,
+					target.flattenOntoWhite,
+				);
+				if (!encoded) {
+					return { kind: "failed" };
+				}
+				previous = encoded.canvas;
+				const resaved = encoded.blob;
+				// ⛔ A zero-size blob is checked explicitly: it is an encoder that
+				// produced nothing, and the sign route would reject it with a wrong
+				// message ("image too large").
+				if (!resaved || resaved.size === 0) {
+					return { kind: "failed" };
+				}
+				const bound = validateImageFile(resaved);
+				if (bound.ok) {
+					return { kind: "resaved", blob: resaved };
+				}
+				if (bound.reason !== "oversize") {
+					return { kind: "rejected", reason: bound.reason };
+				}
+				if (resaved.type === "image/png" && !triedWebp) {
+					triedWebp = true;
+					outputType = "image/webp";
+					quality = PNG_TO_WEBP_LOSSLESS_QUALITY;
+					continue;
+				}
+				if (resaved.type !== outputType) {
+					// The browser fell back (the HTML spec's fallback is PNG, which
+					// takes no quality); keep asking for what it can make.
+					outputType = resaved.type;
+					quality = undefined;
+				}
+				targetWidth = Math.max(1, Math.round(targetWidth * RETRY_SCALE));
+				targetHeight = Math.max(1, Math.round(targetHeight * RETRY_SCALE));
 			}
-			if (target.flattenOntoWhite) {
-				// ⚠ `rgb()` RATHER THAN A HEX LITERAL, and not by preference:
-				// `tests/unit/design/no-raw-hex-view-layer.test.ts` bans raw hex
-				// anywhere under `src/components`, so every colour arrives
-				// through the token layer. This one cannot — it is the ground
-				// under a JPEG that has no alpha channel, not a themeable
-				// surface — and that guard's own docblock names `rgb()` as the
-				// allowed spelling for exactly these untokenized white values.
-				ctx.fillStyle = "rgb(255, 255, 255)";
-				ctx.fillRect(0, 0, targetWidth, targetHeight);
-			}
-			ctx.drawImage(bitmap, 0, 0, targetWidth, targetHeight);
-
-			const resaved = await new Promise<Blob | null>((resolve) => {
-				canvas.toBlob(resolve, target.outputType, target.quality);
-			});
-			// ⛔ A zero-size blob is checked explicitly: it is an encoder that
-			// produced nothing, and the sign route would reject it with a wrong
-			// message ("image too large").
-			if (!resaved || resaved.size === 0) {
-				return { kind: "failed" };
-			}
-			const bound = validateImageFile(resaved);
-			if (!bound.ok) {
-				return { kind: "rejected", reason: bound.reason };
-			}
-			return { kind: "resaved", blob: resaved };
+			return { kind: "rejected", reason: "oversize" };
 		} finally {
 			bitmap.close();
 		}
@@ -333,17 +400,62 @@ async function resaveForUpload(file: Blob): Promise<Resave> {
 }
 
 /**
+ * One attempt: a fresh canvas at `width × height`, the bitmap drawn onto it
+ * (onto white first when the output cannot carry alpha), encoded as
+ * `outputType`. `null` when there is no 2D context. The returned blob is
+ * whatever the browser produced — `null` when the encoder produced nothing.
+ */
+async function drawAndEncode(
+	bitmap: ImageBitmap,
+	width: number,
+	height: number,
+	outputType: string,
+	quality: number | undefined,
+	flattenOntoWhite: boolean,
+): Promise<{ canvas: HTMLCanvasElement; blob: Blob | null } | null> {
+	const canvas = document.createElement("canvas");
+	canvas.width = width;
+	canvas.height = height;
+	const ctx = canvas.getContext("2d");
+	if (!ctx) {
+		return null;
+	}
+	if (flattenOntoWhite) {
+		// ⚠ `rgb()` RATHER THAN A HEX LITERAL, and not by preference:
+		// `tests/unit/design/no-raw-hex-view-layer.test.ts` bans raw hex
+		// anywhere under `src/components`, so every colour arrives
+		// through the token layer. This one cannot — it is the ground
+		// under a JPEG that has no alpha channel, not a themeable
+		// surface — and that guard's own docblock names `rgb()` as the
+		// allowed spelling for exactly these untokenized white values.
+		ctx.fillStyle = "rgb(255, 255, 255)";
+		ctx.fillRect(0, 0, width, height);
+	}
+	ctx.drawImage(bitmap, 0, 0, width, height);
+	const blob = await new Promise<Blob | null>((resolve) => {
+		canvas.toBlob(resolve, outputType, quality);
+	});
+	return { canvas, blob };
+}
+
+/**
  * Bounds the whole re-save in wall-clock time; on expiry the image is refused.
  * A `try/catch` catches a throw; it cannot recover a HANG, and
  * `createImageBitmap` on a decompression bomb hangs rather than throwing.
+ * On expiry the re-encode ladder is also told to stop at its next attempt, so
+ * an abandoned re-save does not keep encoding in the background.
  */
 async function resaveWithinBudget(file: Blob): Promise<Resave> {
 	let timer: ReturnType<typeof setTimeout> | undefined;
+	const state = { expired: false };
 	const budget = new Promise<Resave>((resolve) => {
-		timer = setTimeout(() => resolve({ kind: "failed" }), RESAVE_TIMEOUT_MS);
+		timer = setTimeout(() => {
+			state.expired = true;
+			resolve({ kind: "failed" });
+		}, RESAVE_TIMEOUT_MS);
 	});
 	try {
-		return await Promise.race([resaveForUpload(file), budget]);
+		return await Promise.race([resaveForUpload(file, state), budget]);
 	} finally {
 		clearTimeout(timer);
 	}
@@ -393,19 +505,31 @@ export function validateImageFile(file: {
 	return { ok: true };
 }
 
+function rejectedResult(reason: "mime" | "oversize"): ImageAttachResult {
+	return {
+		kind: "rejected",
+		reason,
+		message: reason === "mime" ? MIME_MESSAGE : OVERSIZE_MESSAGE,
+	};
+}
+
 /** Local pre-validate → sign → PUT. Never throws (SG-5 posture). */
 export async function attachImage(args: {
 	file: Blob;
 	fetchFn?: typeof fetch;
 }): Promise<ImageAttachResult> {
 	const fetchFn = args.fetchFn ?? fetch;
-	const local = validateImageFile(args.file);
-	if (!local.ok) {
-		return {
-			kind: "rejected",
-			reason: local.reason,
-			message: local.reason === "mime" ? MIME_MESSAGE : OVERSIZE_MESSAGE,
-		};
+	// LARGE-IMAGE: the picked file is checked against the type whitelist and
+	// `IMAGE_PICK_MAX_BYTES` only. The 8 MiB upload cap binds what goes up —
+	// the re-saved bytes, or a GIF as picked — never a photo the re-save is
+	// about to shrink.
+	if (
+		!(IMAGE_UPLOADS_ALLOWED_MIME as readonly string[]).includes(args.file.type)
+	) {
+		return rejectedResult("mime");
+	}
+	if (args.file.size > IMAGE_PICK_MAX_BYTES) {
+		return rejectedResult("oversize");
 	}
 
 	// RF-10: every image but a GIF is re-saved HERE — before the sign call,
@@ -419,6 +543,11 @@ export async function attachImage(args: {
 	// the original; that fallback is how metadata used to reach storage.
 	let uploadBlob: Blob;
 	if (await isGif(args.file)) {
+		// A GIF goes up exactly as picked, so the upload cap binds it here.
+		const bound = validateImageFile(args.file);
+		if (!bound.ok) {
+			return rejectedResult(bound.reason);
+		}
 		uploadBlob = args.file;
 	} else {
 		const resaved = await resaveWithinBudget(args.file);
@@ -426,11 +555,7 @@ export async function attachImage(args: {
 			return { kind: "failed", transient: false };
 		}
 		if (resaved.kind === "rejected") {
-			return {
-				kind: "rejected",
-				reason: resaved.reason,
-				message: resaved.reason === "mime" ? MIME_MESSAGE : OVERSIZE_MESSAGE,
-			};
+			return rejectedResult(resaved.reason);
 		}
 		uploadBlob = resaved.blob;
 	}

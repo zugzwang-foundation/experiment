@@ -1,51 +1,42 @@
 "use client";
 
-import Link from "next/link";
-
-import { Button, buttonVariants } from "@/components/ui/button";
-import { InfoTip } from "@/components/ui/info-tip";
-import { ThumbGlyph } from "@/components/ui/thumb-glyph";
-import { GLOSSARY } from "@/lib/copy/glossary";
-import { cn } from "@/lib/utils";
-import { formatDharma, formatPricePercent } from "../format";
+import { Button } from "@/components/ui/button";
+import { formatPricePercent } from "../format";
 import type { Side, ViewerMarketContext } from "../types";
-import { COMPOSER_COPY, c3OppositeSide, formatMultiplier } from "./copy";
+import {
+	HEADER_CONTROL,
+	HEADER_WORD,
+	HeaderLanes,
+	HeaderNoPosition,
+	HeaderSell,
+	ToWinLine,
+} from "./column-header";
+import { c3OppositeSide } from "./copy";
 import { isEntryDisabled } from "./gating";
 
 /**
- * UI.A3 slice 2 — the market-view slot header, rebuilt to the ratified
- * geometry (values-log §1 item 6 / R-5/R-6 — log values over mockup px):
- * band padding 8px 14px · the entry button outline-sm 13px `7px 14px`
- * minHeight 34 ·
- * price cluster 19px (word 600 / percent 800), thumb 16px, 5px gap. d5
- * order: entry · To-win readout · price cluster · position/Sell readout.
+ * The market-view column header — FEED-3's three lanes (`column-header.tsx`):
+ * Bet left · the side and its price centred · Sell right, on the held side only.
  *
- * HTML-FINISH · MARKET DETAIL row 20 — THE ENTRY READS `Buy`. It read
- * `Đ BET`, which POLISH.3 PR 2 filed BUCKET D (mockup superseded) on canon W2.8
- * grounds. The founder ruling of 2026-08-16 reverses that strike, and `Buy` is
- * the MOCKUP'S OWN string (`d5:1052`, `:1221`, uppercased there by `.tradebtn`)
- * — byte-carried, never authored. The `aria-label` moves with it, so the
- * accessible name and the visible label still agree (WCAG 2.5.3).
+ * ⚠⚠ FEED-3 SUPERSEDES THE BAND THIS DOCBLOCK DESCRIBED, AND THE PARTS THAT ARE
+ * NOW FALSE ARE CORRECTED HERE RATHER THAN LEFT ABOVE AN AMENDMENT (O-5):
+ *   · the header is no longer a bordered, elevated band — it is the first row of
+ *     the column's one rectangle, and `DebateColumn` draws the hairline under it;
+ *   · the entry reads `BET YES` / `BET NO` (it read `Buy`, HTML-FINISH row 20)
+ *     and carries today's to-win figure as its second line — `Đ 1 → Đ 8.77`, no
+ *     `TO WIN` label, no trailing `x`;
+ *   · Sell reads `SELL` over the position figure, and `YOUR POSITION` is gone.
+ *     With no position the right lane reads `NO ACTIVE POSITION`, main's
+ *     one-line label, flush right (UIR-1 item 2 — FEED-3 had left it empty;
+ *     UIR-3 item 2 — one line again).
+ * ⚠ The composer's own `COMPOSER_COPY.header` / `.submit` say `Đ BET`, so the
+ * header and the composer it opens agree on the verb again.
  *
- * ⚠ `Sell` WAS NOT RELABELLED, and that asymmetry is the mockup's, not an
- * oversight — POLISH.3 PR 2's bucket-D row records it in terms.
- *
- * ⚠⚠ TWO STRINGS THIS TASK CANNOT REACH STILL SAY `Đ BET`:
- * `COMPOSER_COPY.header` ("Place your Đ BET") and `.submit` ("PLACE Đ BET") in
- * `composer/copy.ts`, which is allow-list-EXCLUDED. So the colhead now reads
- * `Buy` and opens a composer that still says `Đ BET` — a real, user-visible
- * inconsistency, REPORTED rather than silently absorbed, and fixable in one
- * commit whose fence includes `composer/copy.ts`.
- *
- * The entry is LIVE for everyone (C1's disabled era ends here):
- * signed-out opens the auth-gate slot variant; the F-3 predicate disables
- * the opposite pole for a holder (RESULTING side ≠ held side — tooltip +
- * aria carry the C3 batch string); a non-Open market renders the W2.8
- * disabled treatment (INV-4). The W2.10-C `Sell ↗` affordance is a
- * LINK-shaped element rendered NON-INTERACTIVE until A5 (F-4 — its Profile
- * click-through wires there), beside the Đb-only `Your position` readout.
+ * The entry is LIVE for everyone: signed-out opens the auth-gate slot variant;
+ * the F-3 predicate disables the opposite pole for a holder (RESULTING side ≠
+ * held side — the tooltip and the accessible name carry the C3 batch string); a
+ * non-Open market renders the W2.8 disabled treatment (INV-4).
  */
-
 export function SlotHeader({
 	side,
 	pricing,
@@ -74,13 +65,17 @@ export function SlotHeader({
 	slug: string;
 	/**
 	 * ⚠⚠ change set 12 §1 — FALSE ON THE COLUMN THAT IS HOSTING A COMPOSER.
-	 * Founder ruling: the mirrored header keeps the composing side's label,
-	 * percent, odds and position readout, and loses its Buy and its Sell.
+	 * Founder ruling: the mirrored header keeps the composing side's label and
+	 * percent, and loses its Bet and its Sell.
+	 * ⚠ FEED-3 — the ruling also kept the odds and the position readout, and
+	 * both now live INSIDE the two controls (their second lines), so they leave
+	 * with them: the hosting header is the side being bet and nothing else. The
+	 * composer below it shows its own to-win.
 	 * ⛔ SCOPED TO THE HOSTING STATE, NEVER PERSISTENT. It is derived per render
 	 * from `openSide`/`openReply`, so closing the composer restores the controls
 	 * with no reset step to forget.
 	 * ⛔ THE REAL HEADER IS UNTOUCHED — the column whose own side IS the
-	 * composing side keeps both. Its Buy is the toggle-closed affordance, and
+	 * composing side keeps both. Its Bet is the toggle-closed affordance, and
 	 * removing it would leave the × as the only way out.
 	 */
 	showControls?: boolean;
@@ -96,151 +91,44 @@ export function SlotHeader({
 			: null;
 
 	return (
-		<div className="flex items-center justify-between gap-2 rounded-(--r) px-3.5 py-2 shadow-(--elev-1) [border:var(--hairline)]">
-			<div className="flex items-center gap-3">
-				{showControls ? (
+		<HeaderLanes
+			side={side}
+			pct={pct}
+			action={
+				showControls ? (
 					<Button
 						variant="outline"
-						size="sm"
 						disabled={entryDisabled}
 						aria-disabled={entryDisabled}
 						aria-expanded={composerOpen}
-						aria-label={c3 ?? `Buy ${side}`}
+						// The shipped naming pattern with the ratified verb: the name is
+						// the visible word (`Bet YES`, WCAG 2.5.3), or the C3 refusal.
+						aria-label={c3 ?? `Bet ${side}`}
 						title={c3 ?? undefined}
 						onClick={onToggleEntry}
-						// ⚠ `uppercase tracking-[0.06em]` — d5's `.tradebtn`/`.sellbtn`
-						// (`d5:559`) are `text-transform:uppercase;letter-spacing:.06em`, and
-						// the mockup renders `BUY` / `SELL`. CASE AND TRACKING ONLY: the
-						// button's 13px / `7px 14px` / 34px geometry is the values-log §1
-						// item 6 ruling and is deliberately NOT replaced by d5's 10px.
-						className="h-auto min-h-[34px] px-3.5 py-[7px] text-[13px] tracking-[0.06em] uppercase"
+						data-tutorial="buy-button"
+						className={HEADER_CONTROL}
 					>
-						Buy
+						<span className={HEADER_WORD}>Bet {side}</span>
+						<ToWinLine unit={unit} />
 					</Button>
-				) : null}
-				{unit !== null && (
-					/* ⚠ `.poslab` (`d5:556`) — `font-weight:800;letter-spacing:.12em;
-					   text-transform:uppercase`. The market arm read `To win` in
-					   sentence case while the POST arm's `PositionStrip` — the same band,
-					   one arm over — already rendered `TO WIN` uppercase from the same
-					   mockup rule. The recipe is byte-carried from that shipped component
-					   rather than re-derived, so the two arms cannot drift again. */
-					<span className="hidden items-center gap-1 text-[10px] font-bold tracking-[0.1em] text-n5 uppercase lg:flex">
-						<InfoTip content={GLOSSARY.toWin} asChild>
-							<span>{COMPOSER_COPY.toWinLabel}</span>
-						</InfoTip>
-						<span className="font-mono text-xs tracking-normal text-ink normal-case">
-							Đ 1 <span aria-hidden="true">→</span> Đ {formatMultiplier(unit)}
-						</span>
-					</span>
-				)}
-			</div>
-
-			<span className="flex items-center gap-[5px] text-[19px] font-semibold text-ink">
-				{side === "YES" ? "Yes" : "No"}
-				<ThumbGlyph side={side} />
-				<b className="font-extrabold">{pct}</b>
-			</span>
-
-			<span className="flex items-center gap-2 text-xs">
-				{viewer?.position && viewer.position.side === side ? (
-					<>
-						{/* `.poslab` again — same rule, same recipe as `TO WIN` above. */}
-						<span className="flex items-center gap-1 text-[10px] font-bold tracking-[0.1em] text-n5 uppercase">
-							<InfoTip content={GLOSSARY.position} asChild>
-								<span>{COMPOSER_COPY.yourPositionLabel}</span>
-							</InfoTip>
-							{/* Đb-ONLY until the Đa staked-basis SPEC.1 line lands (OQ-1 HELD). */}
-							<span className="font-mono text-xs tracking-normal text-ink normal-case">
-								Đ {formatDharma(viewer.position.currentValue)}
-							</span>
-						</span>
-						{/* W2.10-C (activated at A5, F-4): the click-through to the
-						    viewer's own profile, market-filter preselected (OQ-5 B).
-						    Signed-out (`ownPseudonym === null`) → non-interactive. */}
-						{/* HTML-FINISH · MARKET DETAIL row 21 — `Sell ↗` takes BUTTON
-						    SHAPE and KEEPS ITS NAVIGATION.
-						    ⛔⛔ IT STAYS AN ANCHOR. A `<button>` here would look identical
-						    and silently drop the W2.10-C click-through to the viewer's own
-						    profile with this market preselected (OQ-5 B) — which is the
-						    whole point of the control. d5 itself navigates
-						    (`:1909-1911` → `nav('profile')`), so a non-navigating button
-						    would be a regression dressed as a port, and plan H3-d makes
-						    exactly that a HALT rather than an acceptable simplification.
-						    ⇒ `buttonVariants` supplies the SHAPE; `Link` keeps the
-						    behaviour. The signed-out arm keeps the same shape and stays
-						    non-interactive, so the affordance does not appear and
-						    disappear between session states. */}
-						{/* ⚠⚠ UI-QUICK change set 1 item 3 — `SELL` NOW RENDERS AS `BUY`,
-						    AND THE `↗` IS GONE. The two controls sat in the same band at
-						    different sizes (`sm` vs `xs`) with only one of them carrying a
-						    glyph, so the market's two primary actions did not read as a
-						    pair.
-						    ⛔ THE MOCKUP IS THE AUTHORITY HERE, NOT A PREFERENCE. d5 gives
-						    `.sellbtn` and `.tradebtn` ONE shared rule (`d5:559`) — same
-						    font, size, weight, tracking and transform — so BUY and SELL are
-						    identical in the mockup BY CONSTRUCTION, and `d5:1061` renders
-						    `<button class="sellbtn">Sell</button>` with NO ARROW. The `↗`
-						    was the build's own addition. This is a restoration.
-						    ⛔⛔ IT IS STILL AN ANCHOR, AND THAT RULING IS UNTOUCHED. The
-						    `href` below is the W2.10-C click-through to the viewer's own
-						    profile with this market preselected (OQ-5 B) — the whole point
-						    of the control, and what plan H3-d makes a HALT to drop.
-						    `buttonVariants` supplies the SHAPE; `Link` keeps the
-						    behaviour; the sell path itself is not touched.
-						    ⚠ THE ARROW WAS DOING NAVIGATION-SIGNALLING WORK, and dropping
-						    it is a real cost: BUY opens a composer in place, SELL leaves
-						    for another page, and after this commit nothing on the control
-						    distinguishes those. d5 accepts that trade — its own arrowless
-						    `.sellbtn` navigates too (`:1909` → `nav('profile')`) — but it
-						    is the founder's to reverse, and one glyph restores it.
-						    ⚠ THE GEOMETRY IS BUY'S, BYTE FOR BYTE: `variant="outline"`,
-						    `size="sm"`, and the values-log §1 item 6 ruling
-						    `h-auto min-h-[34px] px-3.5 py-[7px] text-[13px]` — copied off
-						    the entry button 60 lines up, never re-derived, so the two
-						    cannot drift apart again. */}
-						{/* ⛔ change set 12 §1 — ONLY THE SELL IS GATED HERE. The
-						    `YOUR POSITION` readout above stays: the ruling removes the
-						    two CONTROLS from a hosting header, not its readouts, and a
-						    mirrored header that dropped the position would be hiding
-						    information the composer above it is about to act on. */}
-						{!showControls ? null : ownPseudonym !== null ? (
-							<Link
-								data-testid="w210c-sell-link"
-								href={`/u/${encodeURIComponent(ownPseudonym)}?market=${encodeURIComponent(slug)}`}
-								// POLL-IDLE 1b — no prefetch: every DebatePoll refresh invalidates the
-								// prefetch cache and re-prefetches every visible link (Next 16.3.2
-								// `pingVisibleLinks`), so this link cost a request per tick, per viewer.
-								prefetch={false}
-								className={cn(
-									buttonVariants({ variant: "outline", size: "sm" }),
-									// `.sellbtn` (`d5:559`) — uppercase, `.06em`.
-									"h-auto min-h-[34px] px-3.5 py-[7px] text-[13px] tracking-[0.06em] uppercase",
-								)}
-							>
-								{COMPOSER_COPY.sell}
-							</Link>
-						) : (
-							<span
-								aria-disabled="true"
-								className={cn(
-									buttonVariants({ variant: "outline", size: "sm" }),
-									"h-auto min-h-[34px] cursor-default px-3.5 py-[7px] text-[13px] tracking-[0.06em] opacity-(--state-disabled-opacity) uppercase select-none",
-								)}
-							>
-								{COMPOSER_COPY.sell}
-							</span>
-						)}
-					</>
+				) : null
+			}
+			sell={
+				// The Sell gate is the shipped one — `side` is the pole this header
+				// speaks for — and it is only reached when this header is not hosting.
+				// The hosting header keeps its empty lane (change set 12 §1).
+				!showControls ? null : viewer?.position &&
+					viewer.position.side === side ? (
+					<HeaderSell
+						value={viewer.position.currentValue}
+						ownPseudonym={ownPseudonym}
+						slug={slug}
+					/>
 				) : (
-					/* `NO ACTIVE POSITION` — d5 renders it through `.poslab` too
-					   (`d5:1223`, the empty-position slot), so it carries the same
-					   uppercase overline treatment as the two labels above. */
-					<span className="text-[10px] font-bold tracking-[0.1em] text-n4 uppercase">
-						{COMPOSER_COPY.noPosition}
-					</span>
-				)}
-			</span>
-		</div>
+					<HeaderNoPosition />
+				)
+			}
+		/>
 	);
 }

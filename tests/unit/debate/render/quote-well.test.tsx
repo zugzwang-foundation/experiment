@@ -309,11 +309,6 @@ describe("QUOTE-1 C — the well is on the imageless present post card", () => {
 			<PostFocusHeader
 				post={presentPost({ imageUrl: null })}
 				market={MARKET}
-				heldSide={null}
-				marketOpen
-				suspended={false}
-				activeRelation={null}
-				onToggleRelation={noop}
 				onExit={noop}
 				onOpenImage={noop}
 				onOpenPopup={noop}

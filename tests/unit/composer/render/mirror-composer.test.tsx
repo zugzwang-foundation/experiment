@@ -697,7 +697,7 @@ describe("MIRROR-2 RF-7 — every group an equal step from the next; TO WIN read
 		const [d, figure] = [...value.children];
 		expect(d?.textContent).toBe("Đ");
 		expect(tokens(d)).toEqual(
-			expect.arrayContaining(["text-[15px]", "text-n5"]),
+			expect.arrayContaining(["text-[15px]", "text-gold"]),
 		);
 		expect(figure?.textContent).toBe("2,445");
 		expect(tokens(figure)).toEqual(

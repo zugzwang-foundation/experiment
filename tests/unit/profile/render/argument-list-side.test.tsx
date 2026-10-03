@@ -94,6 +94,7 @@ const replyItem = (side: "YES" | "NO"): ProfileArgumentItem => ({
 	marketSlug: "will-x-happen",
 	marketTitle: "Will X happen?",
 	ordinal: 4,
+	replyOrdinal: 1,
 	title: "A profile reply",
 	teaser: TEASER,
 	body: BODY,
@@ -153,8 +154,8 @@ describe("ArgumentList — INV-3, the side chip is pole-bound (live variant, :59
 			<ArgumentList items={[liveItem("YES")]} owner={false} author={AUTHOR} />,
 		);
 		const cls = classTokens(sideChip(container, "YES"));
-		expect(cls).toContain("bg-yes");
-		expect(cls).toContain("text-no");
+		expect(cls).toContain("bg-bar-yes");
+		expect(cls).toContain("text-yes");
 		expect(cls).not.toContain("bg-primary");
 		expect(cls).not.toContain("bg-secondary");
 	});
@@ -164,7 +165,7 @@ describe("ArgumentList — INV-3, the side chip is pole-bound (live variant, :59
 			<ArgumentList items={[liveItem("NO")]} owner={false} author={AUTHOR} />,
 		);
 		const cls = classTokens(sideChip(container, "NO"));
-		expect(cls).toContain("bg-no");
+		expect(cls).toContain("bg-bar-no");
 		expect(cls).toContain("text-yes");
 		expect(cls).not.toContain("bg-primary");
 		expect(cls).not.toContain("bg-secondary");
@@ -206,7 +207,7 @@ describe("ArgumentList — INV-3 holds on the removed variant too (:49)", () => 
 		);
 		const chip = sideChip(container, "YES");
 		const cls = classTokens(chip);
-		expect(cls).toContain("bg-yes");
+		expect(cls).toContain("bg-bar-yes");
 		expect(cls).not.toContain("bg-primary");
 
 		// ⚠ THE RUN-STOP 7 TRIPWIRE, ASSERTED EXPLICITLY RATHER THAN RELIED ON.
@@ -240,7 +241,7 @@ describe("ArgumentList — INV-3 holds on the removed variant too (:49)", () => 
 		);
 		const chip = sideChip(container, "NO");
 		const cls = classTokens(chip);
-		expect(cls).toContain("bg-no");
+		expect(cls).toContain("bg-bar-no");
 		expect(cls).toContain("text-yes");
 		expect(cls).not.toContain("bg-primary");
 		expect(cls).not.toContain("bg-secondary");

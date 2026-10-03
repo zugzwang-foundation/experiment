@@ -198,11 +198,6 @@ function renderFocus(imageUrl: string | null) {
 		<PostFocusHeader
 			post={focusedPost(imageUrl)}
 			market={MARKET}
-			heldSide={null}
-			marketOpen
-			suspended={false}
-			activeRelation={null}
-			onToggleRelation={noop}
 			onExit={noop}
 			onOpenImage={noop}
 			onOpenPopup={noop}
@@ -588,11 +583,6 @@ describe("QUOTE-1 A — no image renders nothing, on every arm", () => {
 			<PostFocusHeader
 				post={focusedPost(null)}
 				market={MARKET}
-				heldSide={null}
-				marketOpen
-				suspended={false}
-				activeRelation={null}
-				onToggleRelation={noop}
 				onExit={noop}
 				onOpenImage={noop}
 				onOpenPopup={noop}
@@ -610,11 +600,6 @@ describe("QUOTE-1 A — no image renders nothing, on every arm", () => {
 			<PostFocusHeader
 				post={removedPost()}
 				market={MARKET}
-				heldSide={null}
-				marketOpen
-				suspended={false}
-				activeRelation={null}
-				onToggleRelation={noop}
 				onExit={noop}
 				onOpenImage={noop}
 				onOpenPopup={noop}

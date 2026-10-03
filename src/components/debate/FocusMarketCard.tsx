@@ -9,6 +9,34 @@ import { MarketTotalDharma } from "./DharmaFigure";
 import { PriceBar } from "./PriceBar";
 
 /**
+ * UIR-5 item 6 — the mean advance of a question character, in em: Geist at the
+ * question's weight (600), normal tracking, spaces included. ⚠ ESTIMATED, NOT
+ * MEASURED: the focused post's title measured 0.452–0.496 at 500 on the
+ * deployed face (`PostFocusHeader`), and 0.52 is the top of that range with 4%
+ * added for the heavier weight, so a prose question the estimate fits does fit.
+ */
+const QUESTION_ADVANCE_EM = 0.52;
+
+/**
+ * The share of its two lines a question can count on filling: a line breaks at
+ * a space, so the first ends short of the box by as much as a word. 0.85 is the
+ * allowance the quotation well makes for the same thing (`WRAP_SLACK`).
+ */
+const QUESTION_WRAP_SLACK = 0.85;
+
+/**
+ * The size at which `title` fills two lines of its box: twice the box's width,
+ * less the wrap allowance, over the question's estimated width at 1px, in
+ * container units, held between 14px and the question's 18px. `length` counts
+ * UTF-16 units, as the focused post's title does.
+ */
+const questionSize = (title: string) =>
+	`clamp(14px, ${(
+		(200 * QUESTION_WRAP_SLACK) /
+			(Math.max(title.length, 1) * QUESTION_ADVANCE_EM)
+	).toFixed(4)}cqw, 18px)`;
+
+/**
  * HTML-FINISH · MARKET DETAIL row 17 — `.mcard` (`d5:1021`), the post arm's
  * rail: the market the reader is inside, rendered as a card so the market
  * context survives post-focus. It replaces the `Back to market` button.
@@ -124,6 +152,18 @@ export function FocusMarketCard({
 			// `HeadZone`), the rail stretches to the reading column again, and the
 			// height this declaration takes is spent on the return line pinned to
 			// the card's floor rather than on empty border.
+			// ⚠ UIR-4 item 6 — AND NOW ON EQUAL GAPS: `justify-between` spreads the
+			// four rows over the card's height, the first at the top, the last at
+			// the bottom, the free height divided evenly between them, so no band
+			// of it collects in one place. The return line's `mt-auto` is gone
+			// with it — an auto margin takes the free space before `justify-content`
+			// can divide it.
+			// ⚠ UIR-5 item 6 — AND AT THE OLD HEIGHT THEY STILL DO. The section is
+			// 125.25px again (`PostFocusHeader`), and this card's four rows with the
+			// question on two lines need 122.5px of it (45 + 16 + 16.5 + 15, three
+			// 4px gaps, 8px padding and a 1px edge each side), so the card fits
+			// without setting the section's height, and the ~3px left over is shared
+			// between the gaps.
 			//
 			// ⚠ THE HOVER AND FOCUS TREATMENTS ARE THE SHIPPED IDIOMS, NOT NEW
 			// APPEARANCES. `hover:bg-n1` is the card-highlight `PostCard` already
@@ -135,7 +175,7 @@ export function FocusMarketCard({
 			// no focus treatment at all, so a keyboard reader Tabbed an invisible
 			// cursor onto the one control that leaves post focus — CS13 §4's finding
 			// on the hero panel, in the same shape, on a more consequential control.
-			className={`flex min-h-0 w-full flex-1 flex-col ${
+			className={`flex min-h-0 w-full flex-1 flex-col justify-between ${
 				compact ? "gap-1 p-2" : "gap-3 p-3"
 			} rounded-(--r) text-left outline-none [border:var(--hairline)] [transition:background-color_var(--dur-hover)] hover:bg-n1 focus-visible:shadow-(--state-focus-ring)`}
 		>
@@ -146,15 +186,16 @@ export function FocusMarketCard({
 					// Decorative — the question is right beside it and carries the
 					// meaning. `discovery/MarketCard.tsx` makes the same call.
 					alt=""
+					// ⚠ UIR-4 item 6 — the post arm's logo is 44px (it was 32px).
 					className={`${
-						compact ? "h-8 w-8" : "h-[52px] w-[52px]"
+						compact ? "h-11 w-11" : "h-[52px] w-[52px]"
 					} shrink-0 rounded-[var(--imgr)] object-cover`}
 					fallback={
 						<span
 							aria-hidden="true"
 							className={`flex ${
 								compact
-									? "h-8 w-8 text-[7px]"
+									? "h-11 w-11 text-[7px]"
 									: "h-[52px] w-[52px] text-[8.5px]"
 							} shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono tracking-[0.16em] text-n4`}
 						>
@@ -165,14 +206,32 @@ export function FocusMarketCard({
 				{/* D-52 R3 — the question on up to two lines, clamped at two, in both
 				    sizes (the post arm passes `compact`, which clamped it at one).
 				    Written as a literal: the `line-clamp-${…}` template it replaces
-				    named no class Tailwind's scanner can see. */}
-				<span
-					className={`line-clamp-2 min-w-0 ${
-						compact ? "text-[12px]" : "text-[13.5px]"
-					} leading-[1.32] font-semibold`}
-				>
-					{title}
-				</span>
+				    named no class Tailwind's scanner can see.
+				    ⚠ UIR-4 item 6 — THE POST ARM'S QUESTION (`compact`) IS 18px / 600
+				    at a 1.25 line-height, on up to THREE lines before the ellipsis;
+				    the uncompacted size keeps two.
+				    ⚠⚠ UIR-5 item 6 — TWO LINES AGAIN, AND THE SIZE GIVES WAY FIRST. At
+				    the old height three lines of 18px do not fit, so the question
+				    starts at 18px / 600 / 1.25 and shrinks only as far as its length
+				    needs to fill two lines, never below 14px; what still does not fit
+				    at 14px ends in the ellipsis. `questionSize` is a pure function of
+				    the length read against the question's box in container units —
+				    the wrapper is the query container — so nothing is measured in
+				    script, as with the focused post's own title. */}
+				{compact ? (
+					<span className="@container min-w-0 flex-1">
+						<span
+							className="line-clamp-2 leading-[1.25] font-semibold"
+							style={{ fontSize: questionSize(title) }}
+						>
+							{title}
+						</span>
+					</span>
+				) : (
+					<span className="min-w-0 line-clamp-2 text-[13.5px] leading-[1.32] font-semibold">
+						{title}
+					</span>
+				)}
 			</span>
 
 			{/* ⚠ `size="card"` — the geometry the LOCKED composition already uses at
@@ -192,13 +251,18 @@ export function FocusMarketCard({
 				    be the same defect entry 4 closed for the thumbnail, in the other
 				    field of the same row. */}
 				<span>
-					Đ <MarketTotalDharma value={totals.dharmaStaked} /> staked
+					<span className="text-gold">
+						Đ <MarketTotalDharma value={totals.dharmaStaked} />
+					</span>{" "}
+					staked
 				</span>
 				<span>
-					{totals.postCount} {noun(totals.postCount, "post", "posts")}
+					<span className="text-gold">{totals.postCount}</span>{" "}
+					{noun(totals.postCount, "post", "posts")}
 				</span>
 				<span>
-					{totals.replyCount} {noun(totals.replyCount, "reply", "replies")}
+					<span className="text-gold">{totals.replyCount}</span>{" "}
+					{noun(totals.replyCount, "reply", "replies")}
 				</span>
 			</span>
 
@@ -221,9 +285,12 @@ export function FocusMarketCard({
 			    ⚠ IT INHERITS THE STAT LINE'S TIER (`text-xs text-muted-foreground`,
 			    the sibling above) rather than declaring its own: it is chrome about
 			    the card, not a field of the market, and it must not compete with the
-			    figures it sits under. */}
+			    figures it sits under.
+			    ⚠ UIR-4 item 6 — `mt-auto` IS GONE: the card's `justify-between` now
+			    puts this line on the floor, with the free height shared evenly among
+			    the gaps above it rather than collected over this line. */}
 			<span
-				className={`mt-auto ${compact ? "text-[10px]" : "text-xs"} text-muted-foreground`}
+				className={`${compact ? "text-[10px]" : "text-xs"} text-muted-foreground`}
 			>
 				↩ Click to return to market page
 			</span>

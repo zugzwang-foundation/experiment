@@ -137,7 +137,7 @@ describe("POLISH.3 PR 2 — T3, the market-view split bar's visual half", () => 
 		// Assertion 1 of 4. Support on a YES post resolves to YES.
 		const footer = renderFooter("YES");
 
-		expect(classOf(footer, "aggregate-split-fill")).toContain("bg-yes");
+		expect(classOf(footer, "aggregate-split-fill")).toContain("bg-bar-yes");
 	});
 
 	it("aggregate-footer::on-a-YES-post-the-track-takes-the-NO-pole", () => {
@@ -145,7 +145,7 @@ describe("POLISH.3 PR 2 — T3, the market-view split bar's visual half", () => 
 		// side — so it carries the opposite pole.
 		const footer = renderFooter("YES");
 
-		expect(classOf(footer, "aggregate-split-track")).toContain("bg-no");
+		expect(classOf(footer, "aggregate-split-track")).toContain("bg-bar-no");
 	});
 
 	it("aggregate-footer::on-a-NO-post-the-support-fill-takes-the-NO-pole", () => {
@@ -155,14 +155,14 @@ describe("POLISH.3 PR 2 — T3, the market-view split bar's visual half", () => 
 		// pole on every NO post and passes assertions 1 and 2 regardless.
 		const footer = renderFooter("NO");
 
-		expect(classOf(footer, "aggregate-split-fill")).toContain("bg-no");
+		expect(classOf(footer, "aggregate-split-fill")).toContain("bg-bar-no");
 	});
 
 	it("aggregate-footer::on-a-NO-post-the-track-takes-the-YES-pole", () => {
 		// Assertion 4 of 4, the mirror.
 		const footer = renderFooter("NO");
 
-		expect(classOf(footer, "aggregate-split-track")).toContain("bg-yes");
+		expect(classOf(footer, "aggregate-split-track")).toContain("bg-bar-yes");
 	});
 
 	it("aggregate-footer::the-track-keeps-a-visible-edge-on-BOTH-poles", () => {
@@ -265,7 +265,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 22, the card trigger pills", () =
 		).toBe("Counter");
 	});
 
-	it("aggregate-footer::pills-are-poled-by-the-RESULTING-side-on-a-YES-post", () => {
+	it("aggregate-footer::pills-are-both-the-black-pill-on-a-YES-post", () => {
 		const { container } = render(
 			<AggregateFooter
 				aggregate={AGGREGATE}
@@ -274,7 +274,8 @@ describe("HTML-FINISH · MARKET DETAIL — row 22, the card trigger pills", () =
 			/>,
 		);
 
-		// Support inherits YES → the YES pole; Counter opposes → the NO pole.
+		// Both pills are the black pill (founder, 2026-10-01) — the white pill is
+		// retired, so neither carries the NO pole's fill.
 		const support = container.querySelector(
 			'[data-testid="card-trigger-support"]',
 		);
@@ -282,16 +283,19 @@ describe("HTML-FINISH · MARKET DETAIL — row 22, the card trigger pills", () =
 			'[data-testid="card-trigger-counter"]',
 		);
 		expect(support?.getAttribute("class")).toContain("bg-yes");
-		expect(counter?.getAttribute("class")).toContain("bg-no");
+		expect(counter?.getAttribute("class")).toContain("bg-yes");
+		expect(support?.getAttribute("class")).not.toMatch(/(^|\s)bg-no(\s|$)/);
+		expect(counter?.getAttribute("class")).not.toMatch(/(^|\s)bg-no(\s|$)/);
 		// The accessible name names the RESULTING BET SIDE, never the relation
 		// alone — AGENTS.md §8: the poles name the SIDE, never Support/Counter.
 		expect(support?.getAttribute("aria-label")).toBe("Support — bet YES");
 		expect(counter?.getAttribute("aria-label")).toBe("Counter — bet NO");
 	});
 
-	it("aggregate-footer::pills-INVERT-on-a-NO-post", () => {
-		// THE assertion a fixed-pole implementation fails. Same relations, other
-		// post side, opposite poles.
+	it("aggregate-footer::pills-stay-black-on-a-NO-post-and-the-label-names-the-side", () => {
+		// Same relations, other post side: the fill no longer moves (both pills
+		// are black), but the accessible name still says which side the bet lands
+		// on — the side is carried by the label, not the colour.
 		const { container } = render(
 			<AggregateFooter
 				aggregate={AGGREGATE}
@@ -306,7 +310,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 22, the card trigger pills", () =
 		const counter = container.querySelector(
 			'[data-testid="card-trigger-counter"]',
 		);
-		expect(support?.getAttribute("class")).toContain("bg-no");
+		expect(support?.getAttribute("class")).toContain("bg-yes");
 		expect(counter?.getAttribute("class")).toContain("bg-yes");
 		expect(support?.getAttribute("aria-label")).toBe("Support — bet NO");
 		expect(counter?.getAttribute("aria-label")).toBe("Counter — bet YES");

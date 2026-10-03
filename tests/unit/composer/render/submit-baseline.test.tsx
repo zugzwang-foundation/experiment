@@ -199,7 +199,7 @@ function onlyPlace(): Omit<Captured, "headers"> & { contentType: string } {
 describe("MIRROR-1 A4 — the composer submits exactly what it submitted before", () => {
 	it("a4::a-post-with-title-detail-image-and-amount", async () => {
 		render(view(baseModel()));
-		fireEvent.click(screen.getByLabelText("Buy YES"));
+		fireEvent.click(screen.getByLabelText("Bet YES"));
 		type("Argument title", TITLE);
 		type("Argument body", EXTENDED);
 		type("Stake amount", "25");

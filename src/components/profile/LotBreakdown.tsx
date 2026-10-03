@@ -97,7 +97,7 @@ function LotRow({
 
 			<span
 				data-testid={`lot-basis-${lot.lotId}`}
-				className="shrink-0 font-mono tabular-nums text-ink"
+				className="shrink-0 font-mono tabular-nums text-gold"
 			>
 				Đ {formatDharma(lot.survivingBasis)}
 			</span>

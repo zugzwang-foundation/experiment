@@ -78,15 +78,7 @@ const noop = () => {};
  * Both survive the fix, which rewrites only the pole token in each class. */
 function bar(postSide: Side) {
 	const { container } = render(
-		<ReplySplitBar
-			postSide={postSide}
-			aggregate={AGGREGATE}
-			heldSide={null}
-			marketOpen={true}
-			suspended={false}
-			activeRelation={null}
-			onToggleRelation={noop}
-		/>,
+		<ReplySplitBar postSide={postSide} aggregate={AGGREGATE} />,
 	);
 	const track = Array.from(container.querySelectorAll("span")).find((s) =>
 		(s.getAttribute("class") ?? "").includes("overflow-hidden"),
@@ -103,12 +95,12 @@ function bar(postSide: Side) {
 describe("POLISH.3 PR 2 — RR-3, the split bar's poles name the SIDE", () => {
 	it("reply-split-bar::on-a-YES-post-the-support-fill-takes-the-YES-pole", () => {
 		// Assertion 1 of 4. Support inherits the post's side: YES.
-		expect(bar("YES").fill).toContain("bg-yes");
+		expect(bar("YES").fill).toContain("bg-bar-yes");
 	});
 
 	it("reply-split-bar::on-a-YES-post-the-track-takes-the-NO-pole", () => {
 		// Assertion 2 of 4. The remainder is the counter share: NO.
-		expect(bar("YES").track).toContain("bg-no");
+		expect(bar("YES").track).toContain("bg-bar-no");
 	});
 
 	it("reply-split-bar::on-a-NO-post-the-support-fill-takes-the-NO-pole", () => {
@@ -116,12 +108,12 @@ describe("POLISH.3 PR 2 — RR-3, the split bar's poles name the SIDE", () => {
 		// resolves to NO, so this fill must be the NO pole. The build hard-codes
 		// `bg-yes` at `:67`, rendering the NO-side share in the YES pole on
 		// every NO post: a lie about which side an argument backs.
-		expect(bar("NO").fill).toContain("bg-no");
+		expect(bar("NO").fill).toContain("bg-bar-no");
 	});
 
 	it("reply-split-bar::on-a-NO-post-the-track-takes-the-YES-pole", () => {
 		// ⛔ Assertion 4 of 4, the mirror. The build hard-coded the counter pole.
-		expect(bar("NO").track).toContain("bg-yes");
+		expect(bar("NO").track).toContain("bg-bar-yes");
 	});
 
 	it("reply-split-bar::the-track-keeps-a-visible-edge-on-BOTH-poles", () => {

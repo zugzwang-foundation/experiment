@@ -6,6 +6,7 @@ import { InfoTip } from "@/components/ui/info-tip";
 import { RelativeTime } from "@/components/ui/relative-time";
 import { GLOSSARY, SOLD_LABEL } from "@/lib/copy/glossary";
 import type { Badge as BadgeKind } from "@/lib/ranking";
+import { cn } from "@/lib/utils";
 
 import {
 	FriendlyFireTag,
@@ -54,6 +55,7 @@ export function ArgProfile({
 	badge = null,
 	download,
 	friendlyFire = false,
+	separators = true,
 }: {
 	author: AuthorIdentity;
 	side: Side;
@@ -131,8 +133,12 @@ export function ArgProfile({
 	 * cannot ask for the mark without saying which post it downloads.
 	 * ⚠ REPLY-IMAGE-EXPORT — replies opt in too now (the reply card and the reply
 	 * pop-up), with `reply` naming the reply's ordinal within post `ordinal`.
+	 * ⚠ UIR-2 item 3 — `pinned` (the desktop market card only) takes the
+	 * control out of the flow and pins it to this row's right edge, centred on
+	 * the row; the row becomes its containing block and keeps 44px clear for it
+	 * (the 36px box and an 8px gap — UIR-3 item 3; it was 40px for a 32px box).
 	 */
-	download?: { ordinal: number; reply?: number };
+	download?: { ordinal: number; reply?: number; pinned?: boolean };
 	/**
 	 * HTML-FINISH · MARKET DETAIL row 13 — the chip's geometry preset, and it is
 	 * wired at EXACTLY ONE site: the post-focus author row (`d5:964`, the only
@@ -152,6 +158,14 @@ export function ArgProfile({
 	 * discouraged.
 	 */
 	chipSize?: "detail";
+	/**
+	 * FEED-3 — `false` drops the row's `│` separators. ⚠ NO MOUNT PASSES IT since
+	 * UIR-1 item 1: FEED-3 dropped them on the desktop post card, the reply card
+	 * and the focused post, and UIR-1 restored all three, so every row renders
+	 * its separators exactly as on `main` and SEP-1's one shared seam is the one
+	 * seam everywhere. The fields keep the gaps the separators sat in.
+	 */
+	separators?: boolean;
 }) {
 	// UI-OVERNIGHT entry 1a — the header stake renders ABBREVIATED (`Đ 12.5k`)
 	// with the exact figure on its tooltip (`CompactDharmaFigure`). The
@@ -172,7 +186,12 @@ export function ArgProfile({
 		// sits half a line below the row it belongs to — three baselines on a row
 		// that has one thing to say. Starting the row instead pins the mark to
 		// line 1 and leaves it there whether the age wraps or not.
-		<div className="flex w-full items-start gap-2 max-mobile:relative">
+		<div
+			className={cn(
+				"flex w-full items-start gap-2 max-mobile:relative",
+				download?.pinned && "relative pr-11",
+			)}
+		>
 			{/* ⛔⛔ MOBILE-2c R-2 — AT PHONE WIDTH THE AVATAR LEAVES THE FLOW, AND
 			    THAT IS WHAT MAKES THE METADATA ROW FULL-WIDTH.
 
@@ -587,7 +606,9 @@ export function ArgProfile({
 						    the shared primitive carrying `aria-hidden`; a CSS-hidden node
 						    is still that, and a conditional render would be a second
 						    branch for a phone in a component the desktop shares. */}
-						<FieldSeparator className="max-mobile:hidden" />
+						{separators ? (
+							<FieldSeparator className="max-mobile:hidden" />
+						) : null}
 						<SideBadge side={side} price={entryPrice} size={chipSize} />
 						{/* ⛔ MOBILE-2l · R-4 — ONE CHIP STYLE, AND THIS IS ITS HALF OF IT.
 						    `Flipped`/`Exited` and `Sold` were two registers on one line:
@@ -640,7 +661,7 @@ export function ArgProfile({
 					</span>
 					{authorStake !== undefined ? (
 						<span className="flex shrink-0 items-center gap-1.5 max-mobile:contents">
-							<FieldSeparator />
+							{separators ? <FieldSeparator /> : null}
 							{/* RANK-1 / ADR-0039 R6 — the figure FOLLOWS THE RULER. This is
 						    the stake still held, which is exactly what the lane sorted
 						    on; a fully-exited argument reads `Đ 0` here rather than
@@ -670,7 +691,7 @@ export function ArgProfile({
 						    guard below reads are unchanged. */}
 							<CompactDharmaFigure
 								value={authorStake}
-								className="font-mono text-ink"
+								className="font-mono text-gold"
 							/>
 							{/* ⚠ COMPARED AS RENDERED, not as stored. `formatDharmaCompact`
 						    rounds to whole Đ and abbreviates past Đ10,000, so comparing the
@@ -726,7 +747,7 @@ export function ArgProfile({
 					) : null}
 					{replyCount !== undefined ? (
 						<span className="flex shrink-0 items-center gap-1.5">
-							<FieldSeparator />
+							{separators ? <FieldSeparator /> : null}
 							{/* `.repmeta` (`d5:580`) — `font-weight:700;letter-spacing:.12em;
 						    text-transform:uppercase;color:var(--ink)`, with `.repn`
 						    (`:579`) setting the COUNT back to 13px / no tracking. The row
@@ -735,7 +756,7 @@ export function ArgProfile({
 						    to ink. */}
 							<span className="text-[9.5px] font-bold tracking-[0.12em] text-ink uppercase">
 								Replies ·{" "}
-								<span className="text-[13px] tracking-normal">
+								<span className="text-[13px] tracking-normal text-gold">
 									{replyCount}
 								</span>
 							</span>
@@ -835,7 +856,7 @@ export function ArgProfile({
 				    tile 10px tall at PROFILE-FULL); `FieldSeparator` states its OWN
 				    size and leading and inherits nothing, because a seam that changes
 				    size per surface is the drift it was lifted to end. */}
-					<FieldSeparator />
+					{separators ? <FieldSeparator /> : null}
 					<RelativeTime createdAt={createdAt} />
 					{/* ⛔⛔ MOBILE-2n · R-1 / A10 D-1 — THE LANE BADGE CARRIES NO `order`
 					    TOKEN AT ALL NOW, AND ITS ABSENCE IS THE EDIT. It carried
@@ -918,7 +939,11 @@ export function ArgProfile({
 				   `h-6` on the reasoning that the avatar set the line, and that put
 				   the mark 2px low — jsdom performs no layout, so only the browser
 				   could see it. */
-				<DownloadPostImage ordinal={download.ordinal} reply={download.reply} />
+				<DownloadPostImage
+					ordinal={download.ordinal}
+					reply={download.reply}
+					pinned={download.pinned}
+				/>
 			) : null}
 		</div>
 	);

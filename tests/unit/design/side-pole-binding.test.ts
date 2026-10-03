@@ -167,9 +167,11 @@ const SIDE_COMPARISON =
 
 /** The permitted destinations — the two pole families, custom-property and
  * Tailwind spellings alike (`--color-yes`, `--graph-no`, `bg-yes`, `text-no`,
- * `fill-no`, `stroke-[var(--graph-yes)]`). */
+ * `fill-no`, `stroke-[var(--graph-yes)]`), plus the green / red side colours
+ * (`bg-bar-yes`, `--color-bar-no`) — the same YES / NO poles in colour, so a
+ * site that moves to them stays in view. */
 const POLE_TOKEN =
-	/--(?:color|graph)-(?:yes|no)\b|\b(?:bg|text|border|stroke|fill|ring|from|to|via)-(?:yes|no)\b/;
+	/--(?:color|graph)-(?:bar-)?(?:yes|no)\b|\b(?:bg|text|border|stroke|fill|ring|from|to|via)-(?:bar-)?(?:yes|no)\b/;
 
 /** Route 1 — a shadcn variant NAME, matched only as a string literal so the
  * `default` keyword is never mistaken for one. Verbatim from the plan. */
@@ -426,6 +428,11 @@ const PERMITTED_FILES = [
 	// which is correct AND newly visible to this guard, so the file enters the
 	// inventory. The predicate was NOT relaxed to avoid the churn — relaxing it
 	// is the one thing this file must never do to stay green.
+	// PhoneSideTabs — the phone thread's tab row now draws the focused post's
+	// Support/Counter split bar between the two tabs, with the SAME post-side
+	// keyed mapping AggregateFooter uses (support = the post's pole, counter =
+	// the opposite). Added as a DECISION; the predicate was not touched.
+	"src/components/debate/phone/PhoneSideTabs.tsx",
 	"src/components/discovery/HeroPanels.tsx",
 	// UNWIRE-1 — `profile/graph/ProfileChart.tsx` deleted whole (Profile Dharma
 	// graph unwired); this entry drops with it rather than being replaced.

@@ -71,7 +71,6 @@ describe("UI.A5 Slice 7 — W2.10-C click-through activation (OQ-5 B)", () => {
 			<PositionStrip
 				side="YES"
 				pricing={null}
-				unitToWin={null}
 				viewer={HELD_VIEWER}
 				ownPseudonym="RedFox001"
 				slug="m-alpha"
@@ -96,7 +95,6 @@ describe("UI.A5 Slice 7 — W2.10-C click-through activation (OQ-5 B)", () => {
 			<PositionStrip
 				side="YES"
 				pricing={null}
-				unitToWin={null}
 				viewer={HELD_VIEWER}
 				ownPseudonym={null}
 				slug="m-alpha"

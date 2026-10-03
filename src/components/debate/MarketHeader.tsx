@@ -2,6 +2,7 @@ import { Download, Maximize2, Minimize2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { fitFontSize } from "@/components/ui/fit-text";
 import { InfoTip } from "@/components/ui/info-tip";
 import { GLOSSARY } from "@/lib/copy/glossary";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,15 @@ import { PriceBar } from "./PriceBar";
 import { ResolverCards } from "./ResolverCards";
 import { MARKET_TITLE_SIZE_OVERRIDES } from "./title-size-overrides";
 import type { DebateMarketHeader, Side } from "./types";
+
+/** The question's designed size — the per-market override's px where a slug
+ * has one, else the 21px d5 ruled. Autosize never renders above it. */
+function titleMaxPx(slug: string): number {
+	const m = /text-[(d+(?:.d+)?)px]/.exec(
+		MARKET_TITLE_SIZE_OVERRIDES[slug] ?? "",
+	);
+	return m ? Number(m[1]) : 21;
+}
 
 const TERMINAL: ReadonlySet<string> = new Set([
 	"Closed",
@@ -227,22 +237,24 @@ export function MarketHeader({
 								asChild
 							>
 								<span className="cursor-help text-ink font-semibold">
-									Đ{" "}
-									{formatDharmaCompact(
-										market.totals.dharmaStaked,
-										COMPACT_FROM_MARKET_TOTAL,
-									)}{" "}
+									<span className="text-gold">
+										Đ{" "}
+										{formatDharmaCompact(
+											market.totals.dharmaStaked,
+											COMPACT_FROM_MARKET_TOTAL,
+										)}
+									</span>{" "}
 									staked
 								</span>
 							</InfoTip>
 							<AttrSep />
 							<span>
-								{market.totals.postCount}{" "}
+								<span className="text-gold">{market.totals.postCount}</span>{" "}
 								{noun(market.totals.postCount, "post", "posts")}
 							</span>
 							<AttrSep />
 							<span>
-								{market.totals.replyCount}{" "}
+								<span className="text-gold">{market.totals.replyCount}</span>{" "}
 								{noun(market.totals.replyCount, "reply", "replies")}
 							</span>
 						</div>
@@ -250,6 +262,7 @@ export function MarketHeader({
 						{/* Center: Market Question */}
 						<h1
 							title={market.title}
+							data-tutorial="market-question"
 							className="min-w-0 flex-1 truncate text-center text-[15px] sm:text-[17.5px] leading-tight font-bold tracking-tight text-ink px-2"
 						>
 							{market.title}
@@ -263,6 +276,7 @@ export function MarketHeader({
 									download
 									href={`/m/${market.slug}/export`}
 									aria-label="AI mode — download this debate as Markdown"
+									data-tutorial="ai-mode"
 									className={cn(
 										buttonVariants({ variant: "outline", size: "xs" }),
 										"h-5 rounded-4xl text-[11px] gap-1 px-2.5 text-muted-foreground hover:text-ink hover:border-ink/40 transition-all",
@@ -277,6 +291,7 @@ export function MarketHeader({
 									type="button"
 									onClick={onToggleCompact}
 									aria-label="Exit focus view"
+									data-tutorial="focus-toggle"
 									className={cn(
 										buttonVariants({ variant: "secondary", size: "xs" }),
 										"h-5 rounded-4xl text-[11px] gap-1 px-2.5 font-medium text-ink bg-n1 hover:bg-n2 border border-[var(--hairline)] shadow-xs cursor-pointer transition-all",
@@ -405,7 +420,7 @@ export function MarketHeader({
 					    all untouched by this. */}
 						<div
 							data-testid="headzone-stack"
-							className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto"
+							className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto @container"
 						>
 							{/* `.question` (`d5:463`) — `font-size:21px;font-weight:700;
 							    line-height:1.24`, and SINGLE LINE with an ellipsis
@@ -459,10 +474,22 @@ export function MarketHeader({
 						    renders the `text-[21px]` d5 ruled. */}
 							<h1
 								title={market.title}
+								data-tutorial="market-question"
 								className={cn(
 									"shrink-0 truncate text-[21px] leading-[1.24] font-bold tracking-normal",
 									MARKET_TITLE_SIZE_OVERRIDES[market.slug],
 								)}
+								// Autosize: on a narrower stack the question steps down to fit its
+								// one line instead of truncating (`fit-text.ts`; the stack is the
+								// `@container`). Never above the designed size, never below 13px.
+								style={{
+									fontSize: fitFontSize(
+										market.title,
+										"titleBold",
+										titleMaxPx(market.slug),
+										13,
+									),
+								}}
 							>
 								{market.title}
 							</h1>
@@ -570,22 +597,26 @@ export function MarketHeader({
 										asChild
 									>
 										<span>
-											Đ{" "}
-											{formatDharmaCompact(
-												market.totals.dharmaStaked,
-												COMPACT_FROM_MARKET_TOTAL,
-											)}{" "}
+											<span className="text-gold">
+												Đ{" "}
+												{formatDharmaCompact(
+													market.totals.dharmaStaked,
+													COMPACT_FROM_MARKET_TOTAL,
+												)}
+											</span>{" "}
 											staked
 										</span>
 									</InfoTip>
 									<AttrSep />
 									<span>
-										{market.totals.postCount}{" "}
+										<span className="text-gold">{market.totals.postCount}</span>{" "}
 										{noun(market.totals.postCount, "post", "posts")}
 									</span>
 									<AttrSep />
 									<span>
-										{market.totals.replyCount}{" "}
+										<span className="text-gold">
+											{market.totals.replyCount}
+										</span>{" "}
 										{noun(market.totals.replyCount, "reply", "replies")}
 									</span>
 								</div>
@@ -692,13 +723,14 @@ export function MarketHeader({
 											download
 											href={`/m/${market.slug}/export`}
 											aria-label="AI mode — download this debate as Markdown"
+											data-tutorial="ai-mode"
 											className={cn(
 												buttonVariants({ variant: "outline", size: "xs" }),
 												"h-5 rounded-4xl",
 											)}
 										>
 											{/* Bare, like the two sibling call sites (`ArgProfile`,
-										    `DownloadStub`). The glyph IS hidden from AT — lucide
+										    `SharePostImage`). The glyph IS hidden from AT — lucide
 										    adds `aria-hidden="true"` itself — but it does so
 										    CONDITIONALLY: `!children && !hasA11yProp(rest)`
 										    (`lucide-react@1.14.0` `dist/esm/Icon.mjs:36`, read, not
@@ -717,6 +749,7 @@ export function MarketHeader({
 											type="button"
 											onClick={onToggleCompact}
 											aria-label="Enter focus view"
+											data-tutorial="focus-toggle"
 											className={cn(
 												buttonVariants({ variant: "outline", size: "xs" }),
 												"h-5 rounded-4xl text-xs gap-1 cursor-pointer",

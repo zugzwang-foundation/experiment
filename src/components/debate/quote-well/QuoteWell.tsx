@@ -1,12 +1,5 @@
-import {
-	GEIST_QUOTE_INK,
-	GEIST_QUOTE_TOP,
-	GEIST_QUOTE_TOP_CLOSE,
-	QUOTE_CANVAS,
-	QUOTE_TYPE,
-	quoteMarkSize,
-	quoteTitleSize,
-} from "./size";
+import { quoteFill } from "./palette";
+import { QUOTE_CANVAS, QUOTE_POSTER, quotePosterSize } from "./size";
 
 /**
  * QUOTE-1 C — THE TITLE-AS-QUOTATION WELL (design-canon `C-QUOTE-1`, SPEC.1
@@ -31,29 +24,32 @@ import {
  * `<text>` element cannot wrap, and an image of a title is not a title.
  *
  * ⚠ NO `"use client"`, AND NO STATE, EFFECT OR HANDLER. A pure function of
- * `title`. ⛔ That does NOT make it server-only in practice: `PostCard` is
- * `"use client"`, so this renders on both passes — which is safe precisely
- * because it is pure, and would not be if it read a clock or a viewport.
+ * `title` and `postId`. ⛔ That does NOT make it server-only in practice:
+ * `PostCard` is `"use client"`, so this renders on both passes — which is safe
+ * precisely because it is pure, and would not be if it read a clock or a
+ * viewport.
  *
  * ⚠ THE UPPERCASE IS CSS. The DOM carries `post.title` verbatim in its stored
  * case, so the export, a copy-paste and a screen reader all get what the author
  * wrote; only the paint is capitalised. Canon clause 4 calls it a display
  * transform for that reason.
  *
- * ⛔ THE MARKS' LAYOUT BOXES ARE THEIR INK, AND THAT IS THE ONE PIECE OF
- * MACHINERY HERE. A `“` at `line-height: 1` occupies a full em of layout for
- * 0.311 em of ink (measured — `size.ts`), so laying the column out on line boxes
- * would reserve 137 px of the 224 px content height at the size ceiling and pay
- * for whitespace with title size. Each mark therefore gets `height` = its ink
- * and `position: relative; top` = minus the measured distance from its line-box
- * top to its ink top — a PAINT shift with no flow effect, so the column's
- * arithmetic is `2 × ink + 2 × gap + title`, which is exactly what
- * `quoteTitleSize` computes. Change one without the other and the budget starts
- * describing a render that does not exist.
+ * ⛔⛔ UIR-9 — POSTER TYPE, AND THE MARKS IN LINE. The title is Geist 800,
+ * uppercase, −0.01em tracking, 1.05 leading, and `“` / `”` sit directly
+ * against its first and last words at the title's own size and weight
+ * (`QuotedTitle`). This replaces QUOTE-1's column — a mark row, the title, a
+ * mark row, the marks at 2.5× the title with each one's box cut down to its ink
+ * by negative margins. That machinery, and the WebKit `foreignObject` paint bug
+ * it had been rebuilt to route around (MOBILE-2c R-3), went with the rows: an
+ * inline glyph has no offset to mis-paint. The size is `quotePosterSize`, whose
+ * budget is the title's lines alone; `size.ts` says why the old ramp stays for
+ * the export.
  *
- * ⚠ THE TWO MARKS USE DIFFERENT OFFSETS BECAUSE THEY SIT AT DIFFERENT HEIGHTS —
- * `“` 0.129 em, `”` 0.145 em. See `size.ts`; it is 2.2 px at the mark ceiling,
- * on the one axis this box clips.
+ * ⛔ UIR-9 — AND IT IS DRAWN ON ITS POST'S OWN FILL. The ground is one of the
+ * sixteen in `palette.ts`, picked from the post's id, the border a 1px
+ * `rgb(255 255 255 / 0.07)`, and the marks take the fill's tint; the title
+ * stays in ink. Every surface that draws this post's picture picks the same
+ * entry, so a post keeps its colour from Discovery into its market.
  *
  * ⛔ NO `-webkit-line-clamp`. It was specified as an optional belt and it is
  * MEASURED OUT: `text-wrap: balance` stops applying the moment the clamp
@@ -62,58 +58,35 @@ import {
  */
 export function QuoteWell({
 	title,
+	postId,
 	as: Heading = "h3",
+	boxed = true,
 }: {
 	title: string;
+	/**
+	 * UIR-9 — the post's id, which picks its fill (`quoteFill`). The same id the
+	 * post carries everywhere, so every surface picks the same entry.
+	 */
+	postId: string;
+	/**
+	 * FEED-3 — `false` takes the well's box away (fill, border, radius) for a
+	 * mount that draws the box itself: Discovery's hero, whose image slot is the
+	 * card, painted with this post's fill. The quotation itself is unchanged.
+	 * ⚠ UIR-9 — FEED-3 unboxed the desktop post card's well too (`PostCard`
+	 * `inColumn`); that card boxes it again, because the fill IS the picture and
+	 * a picture keeps its edge in the column the way an attachment does.
+	 * ⚠ The padding absorbs the removed 1px border, so the content box — the one
+	 * `size.ts` budgets against — is the same 495 × 222 either way.
+	 */
+	boxed?: boolean;
 	/**
 	 * The heading element the plain title row used, so the document outline does
 	 * not change when a post happens to carry no image. `PostCard` renders `h3`.
 	 */
 	as?: "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
 }) {
-	const size = quoteTitleSize(title.length);
-	const mark = quoteMarkSize(size);
-	const inkHeight = GEIST_QUOTE_INK * mark;
-
-	/**
-	 * Same for both marks bar the offset — see the docblock.
-	 *
-	 * ⛔⛔ THE OPTICAL INSET IS TAKEN WITH MARGINS, NOT WITH `position: relative`,
-	 * AND THE REASON IS A WEBKIT PAINT BUG INSIDE `<foreignObject>` (MOBILE-2c
-	 * R-3, founder-reported on an iPhone, ruled Q3-a).
-	 *
-	 * It used to be `height: inkHeight` with `top: -top*mark` on a
-	 * `position: relative` span — a 67.5px glyph in a 21px box, offset upward.
-	 * On WebKit the opening mark painted **on top of the title's first line and
-	 * right of centre**, and the closing mark did not paint at all. Chromium was
-	 * and is correct.
-	 *
-	 * ⚠ EVERY BOX MEASUREMENT AGREED ACROSS BOTH ENGINES, WHICH IS WHY THIS
-	 * NEEDED A PICTURE. `getBoundingClientRect` on the mark, `getComputedStyle`
-	 * on every declaration, and `Range.getClientRects()` over the glyph's own
-	 * text run returned the same numbers on WebKit and Chromium to within 0.1px
-	 * — the layout box reports the shifted position while the PAINT applies the
-	 * offset somewhere else. A geometry-only instrument reports this defect as
-	 * absent (AGENTS.md §9: the paint is the arbiter).
-	 *
-	 * ⇒ Found by bisection: overriding the marks to `position: static; top: 0`
-	 * live on WebKit renders them correctly, and no other suspect moved anything
-	 * — not `justify-content: safe center`, not `text-wrap: balance`, not the
-	 * well's `overflow: hidden`, not the shrunken height on its own.
-	 *
-	 * ⚠ THE LAYOUT CONTRIBUTION IS UNCHANGED BY CONSTRUCTION, which is what keeps
-	 * Chromium pixel-identical (carve-out 2): the outer box was `inkHeight`, and
-	 * `mark + marginTop + marginBottom` = `mark - top*mark - (mark - inkHeight -
-	 * top*mark)` = `inkHeight`. So `size.ts`'s `2 * GEIST_QUOTE_INK * mark`
-	 * budget still describes the space these two occupy, and the title neither
-	 * moves nor re-wraps.
-	 */
-	const markStyle = (top: number) => ({
-		fontSize: `${mark}px`,
-		lineHeight: 1,
-		marginTop: `${-top * mark}px`,
-		marginBottom: `${-(mark - inkHeight - top * mark)}px`,
-	});
+	const size = quotePosterSize(title.length);
+	const { fill, mark } = quoteFill(postId);
 
 	return (
 		<svg
@@ -132,10 +105,10 @@ export function QuoteWell({
 			// ATTRIBUTES above supply the ratio and NOT a cap — measured: 532px
 			// inside a 532px parent, i.e. the attribute never bound. Without this
 			// the well scales PAST 545 on a wide column and paints the title above
-			// the ratified 56px ceiling, which is a canon clause 4 violation with no
-			// visible symptom. `.qstack`'s own `max-w` is belt, and reads cosmetic
-			// enough to be deleted by someone tidying; this one is next to the
-			// constant it enforces. Found by `@code-reviewer`.
+			// its 60px ceiling (UIR-9; 56px before it), which is a canon clause 4
+			// violation with no visible symptom. `.qstack`'s own `max-w` is belt,
+			// and reads cosmetic enough to be deleted by someone tidying; this one
+			// is next to the constant it enforces. Found by `@code-reviewer`.
 			style={{ maxWidth: `${QUOTE_CANVAS.w}px` }}
 		>
 			<foreignObject x="0" y="0" width={QUOTE_CANVAS.w} height={QUOTE_CANVAS.h}>
@@ -147,15 +120,19 @@ export function QuoteWell({
 				    (AGENTS.md §4/§11). Asserted rather than assumed:
 				    `quote-well.test.tsx` reads the rendered node's `namespaceURI`. */}
 				<div
-					className="qwell box-border flex h-full w-full flex-col items-center overflow-hidden rounded-[var(--imgr)] border border-n2 bg-n1"
+					// UIR-9 — `border-white/7` is the 1px `rgb(255 255 255 / 0.07)`; the
+					// fill is inline because it is per post.
+					className={`qwell box-border flex h-full w-full flex-col items-center overflow-hidden${
+						boxed ? " rounded-[var(--imgr)] border border-white/7" : ""
+					}`}
 					// ⚠ `pad` IS THE TOTAL INSET, so the 1px border is inside it — 23 + 1.
 					// `size.ts` records why: 24px of padding within a border makes the
 					// content 495 × 222 and every budget optimistic by 2px on a box that
 					// clips. The dimensions come off the constants rather than being
 					// restated, so the arithmetic and the render cannot drift apart.
 					style={{
-						padding: `${QUOTE_CANVAS.pad - 1}px`,
-						gap: `${QUOTE_TYPE.gap}px`,
+						backgroundColor: boxed ? fill : undefined,
+						padding: `${boxed ? QUOTE_CANVAS.pad - 1 : QUOTE_CANVAS.pad}px`,
 						// ⛔⛔ `safe center`, NOT `center`, AND THE KEYWORD IS WHAT MAKES THE
 						// RATIFIED DEGRADATION THE RIGHT SHAPE. Canon clause 6 says a title
 						// the estimate cannot fit "clips inside the canvas at the last full
@@ -166,39 +143,72 @@ export function QuoteWell({
 						// sliced off, while the closing mark renders whole. `safe` centres
 						// while it fits and falls back to start-alignment when it does not,
 						// which is the clause. Found by `@code-reviewer`; the arithmetic was
-						// never wrong, the overflow BEHAVIOUR was.
+						// never wrong, the overflow BEHAVIOUR was. (UIR-9: the opening mark
+						// rides the first line now, so the first line is what `safe` keeps.)
 						justifyContent: "safe center",
 					}}
 				>
-					<span
-						data-testid="quote-well-mark"
-						aria-hidden="true"
-						className="qmark block shrink-0 font-sans font-bold text-n4"
-						style={markStyle(GEIST_QUOTE_TOP)}
-					>
-						{"“"}
-					</span>
 					<Heading
 						data-testid="quote-well-title"
-						className="qtitle m-0 text-center font-sans font-bold text-ink uppercase [overflow-wrap:anywhere] [text-wrap:balance]"
+						className="qtitle m-0 text-center font-sans font-extrabold text-ink uppercase [overflow-wrap:anywhere] [text-wrap:balance]"
 						style={{
 							fontSize: `${size}px`,
-							lineHeight: QUOTE_TYPE.lineHeight,
-							letterSpacing: `${QUOTE_TYPE.tracking}em`,
+							lineHeight: QUOTE_POSTER.lineHeight,
+							letterSpacing: `${QUOTE_POSTER.tracking}em`,
 						}}
 					>
-						{title}
+						<QuotedTitle title={title} mark={mark} />
 					</Heading>
-					<span
-						data-testid="quote-well-mark"
-						aria-hidden="true"
-						className="qmark block shrink-0 font-sans font-bold text-n4"
-						style={markStyle(GEIST_QUOTE_TOP_CLOSE)}
-					>
-						{"”"}
-					</span>
 				</div>
 			</foreignObject>
 		</svg>
+	);
+}
+
+/**
+ * UIR-9 — the title with `“` directly before its first word and `”` directly
+ * after its last, no space between. Each mark shares a `nowrap` span with its
+ * word, so no line break can leave a mark alone on a line; the words between
+ * keep the title's own spacing and wrap as before. The marks inherit the
+ * heading's size and weight, take `mark` — the fill's tint — as their colour,
+ * and are hidden from assistive technology, so the heading's name is still the
+ * author's words alone. Exported for the replies page's tile
+ * (`PostFocusHeader`'s `QuoteTile`), which sets the same line at its own size.
+ */
+export function QuotedTitle({ title, mark }: { title: string; mark: string }) {
+	const text = title.trim();
+	const first = text.search(/\s/);
+	const glyph = (char: string) => (
+		<span
+			data-testid="quote-well-mark"
+			aria-hidden="true"
+			style={{ color: mark }}
+		>
+			{char}
+		</span>
+	);
+	if (first === -1) {
+		return (
+			<span className="whitespace-nowrap">
+				{glyph("“")}
+				{text}
+				{glyph("”")}
+			</span>
+		);
+	}
+	// The whitespace before the last word — equal to `first` for two words.
+	const last = text.search(/\s\S*$/);
+	return (
+		<>
+			<span className="whitespace-nowrap">
+				{glyph("“")}
+				{text.slice(0, first)}
+			</span>
+			{text.slice(first, last + 1)}
+			<span className="whitespace-nowrap">
+				{text.slice(last + 1)}
+				{glyph("”")}
+			</span>
+		</>
 	);
 }

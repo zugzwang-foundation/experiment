@@ -70,10 +70,12 @@ export function ProfileTiles({
 			    none (`:443`), and SPEC.1 §23 pins its string as
 			    `N (P Posts | R Replies)`. */}
 			<Tile testid="tile-wallet" label="Wallet value">
-				Đ {formatDharma(tiles.walletValue)}
+				<span className="text-gold">Đ {formatDharma(tiles.walletValue)}</span>
 			</Tile>
 			<Tile testid="tile-positions" label="Positions value">
-				Đ {formatDharma(tiles.positionsValue)}
+				<span className="text-gold">
+					Đ {formatDharma(tiles.positionsValue)}
+				</span>
 			</Tile>
 			{/* ⚠⚠ ROUND 4 item 1 — NET P/L JOINS THE OTHER FOUR, and the block that
 			    stood here is DISCHARGED, not forgotten. Round 3 shipped Đ on four
@@ -95,7 +97,9 @@ export function ProfileTiles({
 			    the MINUS is U+2212 (`e2 88 92`), byte-carried from the mockup's
 			    `pl()` (`:672`), never the ASCII hyphen the plain variant emits. */}
 			<Tile testid="tile-net-pl" label="Net profit / loss">
-				{netProfitLoss.sign}Đ {netProfitLoss.magnitude}
+				<span className="text-gold">
+					{netProfitLoss.sign}Đ {netProfitLoss.magnitude}
+				</span>
 			</Tile>
 			{/* HTML-FINISH row 19 — THE BREAKDOWN GETS ITS OWN ELEMENT. The mockup's
 			    value node is `<div class="tv">5<span class="tsub">(3 Posts | 2
@@ -125,7 +129,7 @@ export function ProfileTiles({
 			    top of it would double the gap, not match it. */}
 			<Tile testid="tile-arguments" label="Arguments">
 				<span data-testid="tile-arguments-value">
-					{tiles.argumentsCount.total}{" "}
+					<span className="text-gold">{tiles.argumentsCount.total}</span>{" "}
 					<span
 						data-testid="tile-arguments-breakdown"
 						className="text-[10px] leading-[1.2] font-bold text-n4"
@@ -136,10 +140,14 @@ export function ProfileTiles({
 				</span>
 			</Tile>
 			<Tile testid="tile-support" label="Total Support received">
-				Đ {formatDharma(tiles.supportReceived)}
+				<span className="text-gold">
+					Đ {formatDharma(tiles.supportReceived)}
+				</span>
 			</Tile>
 			<Tile testid="tile-counter" label="Total Counter received">
-				Đ {formatDharma(tiles.counterReceived)}
+				<span className="text-gold">
+					Đ {formatDharma(tiles.counterReceived)}
+				</span>
 			</Tile>
 		</div>
 	);

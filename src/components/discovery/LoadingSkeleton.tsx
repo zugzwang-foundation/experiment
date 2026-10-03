@@ -69,7 +69,7 @@ export function LoadingSkeleton() {
 			    ⚠ `gap-4` is NOT changed to the grid's `gap-3`: it is pre-existing and
 			    out of this task's fence. Named so the next reader knows it was seen
 			    and left, rather than missed. */}
-			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+			<div className="grid gap-4 mobile:grid-cols-2 lg:grid-cols-3">
 				{CARD_SLOTS.map((slot) => (
 					<LoadingBlock key={slot} className="h-36 xl:h-[112px]" />
 				))}
