@@ -67,3 +67,28 @@ export function displaySplitTotal(
 		.plus(round0Dharma(counterDharma))
 		.toFixed(0, ComposerDecimal.ROUND_HALF_UP);
 }
+
+/**
+ * Founder ruling 2026-10-04 — how much of the SUPPORT fill is friendly fire:
+ * `friendlyFireDharma ÷ supportDharma` as a CSS width, 2 decimals, truncated
+ * so the hatched segment never claims more than the stake it marks. Friendly
+ * fire is Support money that contests the post (ADR-0058), so it is drawn
+ * INSIDE the Support fill, hatched, at the end that meets Counter. `null`
+ * when there is none, or no Support to sit inside — the bar is then exactly
+ * what it was.
+ */
+export function friendlyFireOfSupport(args: {
+	friendlyFireDharma: string | undefined;
+	supportDharma: string;
+}): string | null {
+	if (args.friendlyFireDharma === undefined) {
+		return null;
+	}
+	const ff = new ComposerDecimal(args.friendlyFireDharma);
+	const support = new ComposerDecimal(args.supportDharma);
+	if (!ff.greaterThan(0) || !support.greaterThan(0)) {
+		return null;
+	}
+	const pct = ComposerDecimal.min(ff.times(100).dividedBy(support), 100);
+	return `${pct.toFixed(2, ComposerDecimal.ROUND_DOWN)}%`;
+}
