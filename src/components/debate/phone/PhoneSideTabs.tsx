@@ -1,6 +1,11 @@
 "use client";
 
-import { computeSplitBar, displaySplitTotal } from "../composer/split-bar";
+import {
+	computeSplitBar,
+	displaySplitTotal,
+	friendlyFireOfSupport,
+} from "../composer/split-bar";
+import { FriendlyFireHatch } from "../FriendlyFireHatch";
 import { formatDharma } from "../format";
 
 /**
@@ -75,6 +80,8 @@ export function PhoneSideTabs({
 	split?: {
 		supportDharma: string;
 		counterDharma: string;
+		/** The post's friendly-fire Đ — hatched in the Support fill. */
+		friendlyFireDharma?: string;
 		postSide: "YES" | "NO";
 	};
 }) {
@@ -94,6 +101,10 @@ export function PhoneSideTabs({
 						counterDharma: split.counterDharma,
 					}),
 					total: displaySplitTotal(split.supportDharma, split.counterDharma),
+					friendlyFirePct: friendlyFireOfSupport({
+						friendlyFireDharma: split.friendlyFireDharma,
+						supportDharma: split.supportDharma,
+					}),
 					supportPole: split.postSide === "YES" ? "bg-bar-yes" : "bg-bar-no",
 					counterPole: split.postSide === "YES" ? "bg-bar-no" : "bg-bar-yes",
 				};
@@ -174,9 +185,11 @@ export function PhoneSideTabs({
 				>
 					<span
 						data-testid="phone-split-fill"
-						className={`block h-full ${bar.supportPole}`}
+						className={`relative block h-full ${bar.supportPole}`}
 						style={{ width: bar.supportPct }}
-					/>
+					>
+						<FriendlyFireHatch pct={bar.friendlyFirePct} />
+					</span>
 				</span>
 				{counterTab}
 			</div>

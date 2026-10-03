@@ -15,6 +15,7 @@ import {
 	displaySplitTotal,
 	friendlyFireOfSupport,
 } from "./composer/split-bar";
+import { FriendlyFireHatch } from "./FriendlyFireHatch";
 import { formatDharma } from "./format";
 import type { ReplyAggregate, Side } from "./types";
 
@@ -160,7 +161,7 @@ export function AggregateFooter({
 	// poles: the same empty state the profile's bar already shows (bg-n2).
 	const trackFill = hasStake ? counterPole : "bg-n2";
 	// Founder ruling 2026-10-04 — the friendly-fire share of the Support fill,
-	// drawn HATCHED at the fill's end that meets Counter (`FriendlyFireHatch`).
+	// drawn HATCHED from the fill's start (`FriendlyFireHatch`).
 	const friendlyFirePct = friendlyFireOfSupport({
 		friendlyFireDharma: aggregate.friendlyFireDharma,
 		supportDharma: aggregate.supportDharma,
@@ -820,26 +821,5 @@ function TriggerPill({
 				{relation === "support" ? "Support" : "Counter"}
 			</button>
 		</InfoTip>
-	);
-}
-
-/**
- * The friendly-fire share of a Support fill (founder ruling 2026-10-04):
- * dark diagonal hatching over the fill's own pole colour, anchored to the
- * fill's RIGHT end — where Support meets Counter, since this is Support money
- * that contests the post. `pct` is a share OF THE FILL (`friendlyFireOfSupport`),
- * so it can never spill into the Counter track. Nothing renders without it.
- */
-function FriendlyFireHatch({ pct }: { pct: string | null }) {
-	if (pct === null) {
-		return null;
-	}
-	return (
-		<span
-			data-testid="aggregate-split-ff"
-			aria-hidden="true"
-			className="absolute inset-y-0 right-0 bg-[repeating-linear-gradient(135deg,transparent_0_3px,var(--color-ground)_3px_6px)]"
-			style={{ width: pct }}
-		/>
 	);
 }

@@ -1044,6 +1044,7 @@ export function PhoneDebateView({
 							: {
 									supportDharma: focused.aggregate.supportDharma,
 									counterDharma: focused.aggregate.counterDharma,
+									friendlyFireDharma: focused.aggregate.friendlyFireDharma,
 									postSide: focused.sideAtPostTime,
 								}
 					}
