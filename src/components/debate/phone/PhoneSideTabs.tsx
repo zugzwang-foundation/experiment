@@ -121,12 +121,20 @@ export function PhoneSideTabs({
 					}
 				}}
 				onClick={() => onSelect(option.key)}
-				className={`flex h-11 items-center justify-center gap-1.5 rounded-(--r) text-xs font-bold tracking-[0.06em] uppercase transition-colors ${
-					bar === null ? "flex-1" : "w-[96px] shrink-0"
-				} ${
-					on
-						? "bg-ink text-ground [border:2px_solid_var(--color-ink)]"
-						: "text-n5 [border:var(--hairline)]"
+				className={`flex items-center justify-center gap-1.5 rounded-(--r) transition-colors ${
+					bar === null
+						? `h-11 flex-1 text-xs font-bold tracking-[0.06em] uppercase ${
+								on
+									? "bg-ink text-ground [border:2px_solid_var(--color-ink)]"
+									: "text-n5 [border:var(--hairline)]"
+							}`
+						: // The post card's black Support/Counter button; the selected
+							// one keeps a bright border so it still reads as the tab.
+							`h-12 w-[96px] shrink-0 bg-ground text-base font-semibold text-ink ${
+								on
+									? "[border:1px_solid_var(--color-ink)]"
+									: "[border:var(--hairline)]"
+							}`
 				}`}
 			>
 				<span>{option.label}</span>
