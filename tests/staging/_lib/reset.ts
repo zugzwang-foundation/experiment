@@ -38,9 +38,6 @@ export async function readGuardCatalog(
 	`;
 }
 
-/** The database name every Supabase project reports. Asserted by G-3. */
-export const EXPECTED_DATABASE = "postgres";
-
 /**
  * G-3 · live connection. Asserts against the connection the DRIVER actually
  * resolved and dialled, plus a live round-trip — not against the env string

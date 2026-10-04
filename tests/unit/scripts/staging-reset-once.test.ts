@@ -80,6 +80,23 @@ describe("snapshotFrom (step 0)", () => {
 		expect(parsed.market_media[0]).toEqual(media(1));
 	});
 
+	it("refuses a deadline createMarket would refuse (past, or after the freeze)", () => {
+		for (const d of ["2020-01-01T00:00:00Z", "2026-12-01T00:00:00Z"]) {
+			expect(
+				snapshotFrom(
+					six.map((i) =>
+						i === 2
+							? { ...market(i), resolution_deadline: new Date(d) }
+							: market(i),
+					),
+					six.map(media),
+					"t",
+					STAGING_RDS,
+				).problems,
+			).toHaveLength(1);
+		}
+	});
+
 	it("refuses anything but six markets with one default image each", () => {
 		expect(
 			snapshotFrom(six.slice(1).map(market), six.map(media), "t", STAGING_RDS)

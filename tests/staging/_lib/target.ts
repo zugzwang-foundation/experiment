@@ -23,6 +23,7 @@ import {
 	isValidRefFragment,
 	MIN_FRAGMENT_LENGTH,
 	PRODUCTION_PROJECT_REF,
+	PRODUCTION_RDS_MARKER,
 } from "./guards";
 
 /**
@@ -100,7 +101,10 @@ export function resolveRunnerTarget(
 	// Both variables are checked, because the mode has not been resolved yet —
 	// which is the point: the refusal must not depend on getting the mode right.
 	for (const name of ["DATABASE_URL", "DATABASE_URL_STAGING"] as const) {
-		if (env[name]?.includes(PRODUCTION_PROJECT_REF)) {
+		if (
+			env[name]?.includes(PRODUCTION_PROJECT_REF) ||
+			env[name]?.toLowerCase().includes(PRODUCTION_RDS_MARKER)
+		) {
 			return {
 				ok: false,
 				reason: `${name} contains the PRODUCTION project ref; refusing. This is the wrong-target case — check the Doppler config (stg, never prd).`,

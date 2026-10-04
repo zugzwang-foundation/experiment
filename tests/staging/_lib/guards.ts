@@ -89,10 +89,20 @@ const ALLOWED_HOST_SUFFIXES = [".supabase.com", ".supabase.co"] as const;
  * production instance can never satisfy this, whatever fragment it carries.
  */
 const RDS_STAGING_SUFFIX = ".ap-south-1.rds.amazonaws.com";
+
+/**
+ * The production RDS instance's identifier prefix (CDK names it from the
+ * stack, `Zugzwang-production-Database`). Refused FIRST, by name, wherever a
+ * URL is resolved — the RDS counterpart of `PRODUCTION_PROJECT_REF`, so the
+ * new path does not stand on the staging-name heuristic alone.
+ */
+export const PRODUCTION_RDS_MARKER = "zugzwang-production";
+
 function isStagingRdsHost(bare: string): boolean {
+	const instance = bare.split(".")[0] ?? "";
 	return (
 		bare.endsWith(RDS_STAGING_SUFFIX) &&
-		bare.includes("staging") &&
+		instance.includes("staging") &&
 		!bare.includes("prod")
 	);
 }
@@ -130,11 +140,10 @@ export function isValidRefFragment(fragment: string, url: string): boolean {
 		return false;
 	}
 	if (isStagingRdsHost(bare)) {
-		return (
-			/^[a-z0-9][a-z0-9.-]*$/.test(fragment) &&
-			!fragment.includes("amazonaws") &&
-			bare.includes(fragment)
-		);
+		// Inside the INSTANCE identifier (the first label) — never the account
+		// hash or the region/suffix, which every instance in the account shares.
+		const instance = bare.split(".")[0] ?? "";
+		return /^[a-z0-9][a-z0-9-]*$/.test(fragment) && instance.includes(fragment);
 	}
 	return /^[a-z0-9]+$/.test(fragment);
 }
@@ -418,7 +427,10 @@ export function resolveStagingTarget(
 	// refusal with a misleading reason, on the single input that matters most.
 	// ADR-0035 driver 4: a failed staging run costs an afternoon; a wrong-target
 	// run costs the experiment. The operator must be told WHICH it was.
-	if (url.includes(PRODUCTION_PROJECT_REF)) {
+	if (
+		url.includes(PRODUCTION_PROJECT_REF) ||
+		url.toLowerCase().includes(PRODUCTION_RDS_MARKER)
+	) {
 		return {
 			ok: false,
 			reason:

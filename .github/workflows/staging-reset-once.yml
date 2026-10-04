@@ -9,13 +9,16 @@
 #
 # ⚠ NOT workflow_dispatch: GitHub dispatches only workflows on the DEFAULT
 # branch (`main`), and `main` deploys production. So the trigger is a push of
-# an already-merged STAGING commit to one of two dedicated branch names — the
-# branch name IS the mode, and pushing to the `-run` name IS the confirmation:
+# an already-merged STAGING commit to one of three dedicated branch names — the
+# branch name IS the mode, and pushing to `-run` IS the confirmation:
 #
 #   git push origin origin/staging:refs/heads/ops/staging-reset-dry-run   # reads only
 #   git push origin origin/staging:refs/heads/ops/staging-reset-run       # WIPES staging
+#   git push origin origin/staging:refs/heads/ops/staging-reset-resume    # recovery: steps 2–4
 #
-# The first job refuses any commit that is not on `staging`.
+# ⚠ The task log (the live capture, every step, the 10/90 receipt) is in
+# CloudWatch: /zugzwang/staging/app, stream migrate/migrate/<task id>. The
+# staging deploy role may not hold logs:GetLogEvents; then read it there.
 name: staging-reset-once
 
 on:
@@ -23,6 +26,7 @@ on:
     branches:
       - ops/staging-reset-dry-run
       - ops/staging-reset-run
+      - ops/staging-reset-resume
 
 # Shares deploy-aws.yml's staging group: a deploy re-points the same
 # `staging-migrate` tag, so the two must never interleave.
@@ -35,7 +39,7 @@ env:
 
 jobs:
   reset:
-    name: Staging reset (${{ github.ref_name == 'ops/staging-reset-run' && 'run' || 'dry-run' }})
+    name: Staging reset (${{ github.ref_name }})
     runs-on: ubuntu-latest
     environment: staging
     permissions:
@@ -47,13 +51,17 @@ jobs:
           fetch-depth: 0
 
       - id: mode
-        name: Refuse a commit that is not on staging
+        name: Refuse a commit that is not on staging; resolve the mode
         run: |
           git fetch origin staging
           if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/staging; then
             echo "refusing: $GITHUB_SHA is not on staging — push an already-merged staging commit"; exit 1
           fi
-          if [ "$GITHUB_REF_NAME" = "ops/staging-reset-run" ]; then MODE=run; else MODE=dry-run; fi
+          case "$GITHUB_REF_NAME" in
+            ops/staging-reset-run) MODE=run ;;
+            ops/staging-reset-resume) MODE=resume ;;
+            *) MODE=dry-run ;;
+          esac
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
           echo "mode: $MODE"
 
@@ -81,7 +89,7 @@ jobs:
           DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' "$REGISTRY/$REPO:$TAG" | sed 's/.*@//')
           echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
 
-      - name: Run the reset inside the VPC
+      - name: Run inside the VPC
         env:
           STACK: Zugzwang-staging-Compute
           CLUSTER: zugzwang-staging
@@ -99,8 +107,16 @@ jobs:
           for v in FAMILY SUBNETS SG CP; do
             if [ -z "${!v}" ] || [ "${!v}" = "None" ]; then echo "missing stack output $v"; exit 1; fi
           done
-          OVERRIDES=$(jq -nc --arg mode "--$MODE" \
-            '{containerOverrides:[{name:"migrate",command:["pnpm","exec","tsx","scripts/staging-reset-once.ts",$mode]}]}')
+          # The destructive acknowledgements travel HERE, and only for run/resume —
+          # the script refuses to write without them, so a bare RunTask cannot wipe.
+          # 2 GiB: steps 1/3/4 are Vitest + the engine graph, not a lone tsx.
+          if [ "$MODE" = "dry-run" ]; then
+            ENVV='[{"name":"NODE_OPTIONS","value":"--max-old-space-size=1536"}]'
+          else
+            ENVV='[{"name":"NODE_OPTIONS","value":"--max-old-space-size=1536"},{"name":"ZUGZWANG_STAGING_RESET_ACK","value":"wipe-staging-i-mean-it"},{"name":"ZUGZWANG_STAGING_INCLUDE_CONTENT_MARKETS","value":"include-content-markets"}]'
+          fi
+          OVERRIDES=$(jq -nc --arg mode "--$MODE" --argjson env "$ENVV" \
+            '{containerOverrides:[{name:"migrate",memory:2048,environment:$env,command:["pnpm","exec","tsx","scripts/staging-reset-once.ts",$mode]}]}')
           RUN=$(aws ecs run-task --cluster "$CLUSTER" --task-definition "$FAMILY" \
             --capacity-provider-strategy "capacityProvider=$CP,weight=1" \
             --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SG],assignPublicIp=DISABLED}" \
@@ -117,15 +133,24 @@ jobs:
           STATUS=$(echo "$RESULT" | jq -r '.tasks[0].lastStatus // empty')
           CODE=$(echo "$RESULT" | jq -r '.tasks[0].containers[0].exitCode // "none"')
           RAN=$(echo "$RESULT" | jq -r '.tasks[0].containers[0].imageDigest // empty')
-          echo "status=$STATUS exitCode=$CODE digest=$RAN"
-          echo "--- task log (/zugzwang/staging/app, stream migrate/migrate/${TASK##*/}) ---"
-          aws logs get-log-events --log-group-name /zugzwang/staging/app \
-            --log-stream-name "migrate/migrate/${TASK##*/}" --start-from-head \
-            --query 'events[].message' --output text || echo "(could not read the log here; read it in CloudWatch)"
-          if [ "$RAN" != "$EXPECTED_DIGEST" ]; then echo "the task ran $RAN, not this build's $EXPECTED_DIGEST"; exit 1; fi
-          if [ "$STATUS" != "STOPPED" ] || [ "$CODE" != "0" ]; then echo "reset task did not exit 0"; exit 1; fi
+          REASON=$(echo "$RESULT" | jq -r '.tasks[0].stoppedReason // empty')
+          echo "status=$STATUS exitCode=$CODE digest=$RAN reason=$REASON"
+          STREAM="migrate/migrate/${TASK##*/}"
+          echo "--- task log: CloudWatch /zugzwang/staging/app, stream $STREAM ---"
+          if ! aws logs get-log-events --log-group-name /zugzwang/staging/app \
+            --log-stream-name "$STREAM" --start-from-head --limit 10000 \
+            --query 'events[].message' --output text; then
+            echo "⚠ this role could not read the log. Read it in the AWS console: CloudWatch → /zugzwang/staging/app → $STREAM"
+          fi
+          if [ "$STATUS" != "STOPPED" ]; then
+            echo "⚠ the task is still $STATUS: stop it by hand before any retry — two resets must never run at once"; exit 1
+          fi
+          if [ "$CODE" != "0" ]; then echo "the task did not exit 0 — read its log (above, or in CloudWatch)"; exit 1; fi
+          if [ -n "$EXPECTED_DIGEST" ] && [ "$RAN" != "$EXPECTED_DIGEST" ]; then
+            echo "the task ran $RAN, not this build's $EXPECTED_DIGEST"; exit 1
+          fi
 
       - name: Staging still healthy
-        if: ${{ steps.mode.outputs.mode == 'run' }}
+        if: ${{ always() && steps.mode.outputs.mode != 'dry-run' }}
         run: |
           curl -fsS https://staging.zugzwangworld.com/api/health

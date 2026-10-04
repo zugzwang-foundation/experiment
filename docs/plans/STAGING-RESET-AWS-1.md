@@ -85,6 +85,23 @@ once on <date> via a temporary in-VPC run (PR #a, removed in PR #b)".
 3. Check: six markets at 10/90, no posts, sign-up works, market images show.
 4. PR-2 (T5) → merge. Done.
 
+## Review fixes (2026-10-04, `@security-auditor` + `@code-reviewer`)
+
+- **R2 check in the create phase** would have refused AFTER the wipe → one-off skip value (ADR-0035
+  patch record item 3); the runner change is reverted by T5.
+- **Acknowledgements** are passed by the workflow (task env override), never set by the script.
+- **`--resume`** (branch `ops/staging-reset-resume`): steps 2–4 from the committed snapshot, for a
+  run that wiped and then failed.
+- **Step 0** captures CONTENT markets only (`isFixtureSlug`), checks deadlines, and parses the
+  capture with the seeder's own `loadContentMarkets` before anything is written.
+- **Dry run** also boots the seeder on its read-only media phase — Vitest-in-image, config, memory.
+- **Production RDS** refused by name (`zugzwang-production`) first; RDS fragment must sit in the
+  instance identifier. Task memory 2 GiB via override.
+- **Logs:** the staging deploy role may lack `logs:GetLogEvents`; the log is then read in CloudWatch
+  (`/zugzwang/staging/app`, stream `migrate/migrate/<task id>`). The 10/90 receipt is in that log.
+- ⛔ **Do not promote `staging` to `main` until PR-2 (T5) has merged** — the migrate image is shared
+  and would carry the runner into production's image (it cannot run there; it must not be there).
+
 ## Risks
 
 - **It destroys staging** — every user, bet, post and Dharma row. Undo = RDS automated backup restore

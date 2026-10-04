@@ -82,6 +82,32 @@ describe("isValidRefFragment", () => {
 	});
 });
 
+describe("the account-wide parts of an RDS host are never a fragment", () => {
+	it("refuses the account hash, the region, and anything outside the instance id", () => {
+		for (const f of [
+			"c9abcdefghij.ap-south-1",
+			"ap-south-1.rds.a",
+			"south-1.rds.amaz",
+			"c9abcdefghijklmnop",
+		]) {
+			expect(isValidRefFragment(f, url(STAGING_RDS))).toBe(false);
+		}
+	});
+});
+
+describe("the production RDS instance is refused by NAME, first", () => {
+	it("resolveStagingTarget refuses a zugzwang-production URL", () => {
+		const r = resolveStagingTarget({
+			DATABASE_URL_STAGING: url(PROD_RDS),
+			STAGING_PROJECT_REF_FRAGMENT: "database-postgres9f8e7d6c",
+			ZUGZWANG_ENV: "staging",
+			[RESET_INTENT_ENV]: RESET_INTENT_VALUE,
+		});
+		expect(r.ok).toBe(false);
+		if (!r.ok) expect(r.reason).toMatch(/PRODUCTION/);
+	});
+});
+
 describe("expectedDatabaseFor", () => {
 	it("is `zugzwang` on RDS and `postgres` on Supabase", () => {
 		expect(expectedDatabaseFor(STAGING_RDS)).toBe("zugzwang");
