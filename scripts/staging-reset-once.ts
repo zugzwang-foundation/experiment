@@ -87,8 +87,9 @@ function die(message: string, code = 1): never {
 
 /**
  * 64 + bits, describing WHY a fragment fails without revealing it:
- *  1 present · 2 length ≥ 16 · 4 only [a-z0-9-] · 8 in the URL · 16 in the
- *  host · 32 in the host's first label (the RDS instance identifier).
+ *  1 present · 2 length ≥ 16 · 4 only [a-z0-9.-] · 8 in the URL · 16 in the
+ *  host · 32 begins in the host's first label (the RDS instance identifier)
+ *  with ≥ 8 of its characters there.
  */
 export function fragmentCode(
 	fragment: string | undefined,
@@ -103,10 +104,15 @@ export function fragmentCode(
 	if (fragment) {
 		bits |= 1;
 		if (fragment.length >= 16) bits |= 2;
-		if (/^[a-z0-9-]+$/.test(fragment)) bits |= 4;
+		if (/^[a-z0-9.-]+$/.test(fragment)) bits |= 4;
 		if (url.includes(fragment)) bits |= 8;
 		if (host.includes(fragment)) bits |= 16;
-		if (instance.includes(fragment)) bits |= 32;
+		const at = host.indexOf(fragment);
+		const inInstance =
+			at < 0
+				? 0
+				: Math.max(0, Math.min(at + fragment.length, instance.length) - at);
+		if (inInstance >= 8) bits |= 32;
 	}
 	return 64 + bits;
 }
@@ -150,7 +156,7 @@ export function verdict(
 	) {
 		return {
 			ok: false,
-			reason: `STAGING_PROJECT_REF_FRAGMENT (length ${fragment?.length ?? 0}) is not a valid fragment of this URL — on RDS it must be 16+ chars of the INSTANCE identifier (the host's first label)`,
+			reason: `STAGING_PROJECT_REF_FRAGMENT (length ${fragment?.length ?? 0}) is not a valid fragment of this URL — on RDS it must be 16+ chars of the host that BEGIN in the instance identifier (8+ of them inside it)`,
 			code: fragmentCode(fragment, url),
 		};
 	}

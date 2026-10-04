@@ -241,8 +241,9 @@ contract is widened in exactly three places, each REVERTED by PR-2 (T5):
 1. **Hosts G-1/G-3 will dial** gain the staging RDS endpoint — `*.ap-south-1.rds.amazonaws.com` whose
    instance identifier names `staging` and no part of the host names `prod`. A URL naming the
    production RDS instance (`zugzwang-production`) is refused first, by name, beside
-   `PRODUCTION_PROJECT_REF`. On RDS the ref fragment must be 16+ characters of the instance
-   identifier (never the account hash or region); the Supabase rule is unchanged.
+   `PRODUCTION_PROJECT_REF`. On RDS the ref fragment must be 16+ characters of the host that BEGIN in
+   the instance identifier, at least 8 of them inside it (never the account hash or region alone);
+   the Supabase rule is unchanged.
 2. **G-3's database name** is `zugzwang` on that host (infra `DATABASE_NAME`), `postgres` on Supabase.
 3. **The content-market seeder's create-phase R2 check** may be skipped with the exact value
    `ZUGZWANG_CONTENT_MARKETS_MEDIA_CHECK=skip-for-staging-reset-once` — the migration task carries no

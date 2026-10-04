@@ -127,7 +127,7 @@ describe("fragmentCode — the exit code that says why, without the value", () =
 	it("an absent fragment is 64; the account hash is in the host but not the instance id", () => {
 		expect(fragmentCode(undefined, url)).toBe(64);
 		expect(fragmentCode("c9abcdefghij.ap-south-1", url)).toBe(
-			64 + 1 + 2 + 8 + 16,
+			64 + 1 + 2 + 4 + 8 + 16,
 		);
 	});
 
