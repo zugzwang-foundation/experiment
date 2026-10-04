@@ -20,10 +20,8 @@
 
 import {
 	isAllowedStagingHost,
-	isValidRefFragment,
 	MIN_FRAGMENT_LENGTH,
 	PRODUCTION_PROJECT_REF,
-	PRODUCTION_RDS_MARKER,
 } from "./guards";
 
 /**
@@ -101,10 +99,7 @@ export function resolveRunnerTarget(
 	// Both variables are checked, because the mode has not been resolved yet —
 	// which is the point: the refusal must not depend on getting the mode right.
 	for (const name of ["DATABASE_URL", "DATABASE_URL_STAGING"] as const) {
-		if (
-			env[name]?.includes(PRODUCTION_PROJECT_REF) ||
-			env[name]?.toLowerCase().includes(PRODUCTION_RDS_MARKER)
-		) {
+		if (env[name]?.includes(PRODUCTION_PROJECT_REF)) {
 			return {
 				ok: false,
 				reason: `${name} contains the PRODUCTION project ref; refusing. This is the wrong-target case — check the Doppler config (stg, never prd).`,
@@ -203,7 +198,7 @@ export function resolveRunnerTarget(
 	if (!isAllowedStagingHost(stagingHost)) {
 		return {
 			ok: false,
-			reason: `DATABASE_URL_STAGING dials ${JSON.stringify(stagingHost)}, which is not an allowed staging host (Supabase, or the staging RDS endpoint); refusing`,
+			reason: `DATABASE_URL_STAGING dials ${JSON.stringify(stagingHost)}, which is not a Supabase host; refusing`,
 		};
 	}
 	if (!fragment) {
@@ -213,7 +208,7 @@ export function resolveRunnerTarget(
 				"STAGING_PROJECT_REF_FRAGMENT is not set; cannot verify the URL is staging",
 		};
 	}
-	if (!isValidRefFragment(fragment, url)) {
+	if (fragment.length < MIN_FRAGMENT_LENGTH || !/^[a-z0-9]+$/.test(fragment)) {
 		return {
 			ok: false,
 			reason: `STAGING_PROJECT_REF_FRAGMENT must be at least ${MIN_FRAGMENT_LENGTH} lowercase alphanumeric characters; a short or generic fragment matches every Postgres DSN. Refusing.`,
