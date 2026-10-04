@@ -155,7 +155,8 @@ jobs:
               12) WHY="DATABASE_URL_STAGING is not a parseable URL" ;;
               13) WHY="DATABASE_URL_STAGING's host is not the staging RDS host (ap-south-1, instance id naming staging, no prod)" ;;
               15) WHY="ZUGZWANG_ENV in the task is not staging" ;;
-              20) WHY="step 0: the live markets are not six content markets with future deadlines and one default image each" ;;
+              21) WHY="step 0: a roster market's deadline would be refused by createMarket (past, or after the freeze)" ;;
+              22) WHY="step 0: a roster market does not have exactly one default image" ;;
               23) WHY="step 0: the captured markets do not parse as the seeder reads them" ;;
               24) WHY="dry run: the seeder (Vitest) did not boot in the image" ;;
               30) WHY="a step could not start (pnpm/tsx missing?)" ;;
@@ -165,7 +166,10 @@ jobs:
               34) WHY="step 4 (open at 10/90) failed AFTER the reset — use ops/staging-reset-resume" ;;
               50) WHY="unexpected error (e.g. the database connection)" ;;
               *)
-                if [ "$CODE" -ge 64 ] && [ "$CODE" -le 127 ]; then
+                if [ "$CODE" -ge 128 ]; then
+                  N=$((CODE - 128))
+                  WHY="step 0: found $((N / 16)) of the 6 roster markets (live slugs differ?); $((N % 16)) markets in the database (15 = 15 or more)"
+                elif [ "$CODE" -ge 64 ] && [ "$CODE" -le 127 ]; then
                   B=$((CODE - 64))
                   WHY="STAGING_PROJECT_REF_FRAGMENT is not a valid fragment:"
                   [ $((B & 1)) -ne 0 ] && WHY="$WHY present" || WHY="$WHY NOT-SET"

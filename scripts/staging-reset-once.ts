@@ -192,12 +192,18 @@ export function snapshotFrom(
 	media: readonly MediaRow[],
 	capturedAt: string,
 	host: string,
-): { json: string; problems: string[] } {
+	totalInDb: number = markets.length,
+): { json: string; problems: string[]; code: number } {
 	const problems: string[] = [];
+	// The exit code that says which rule failed (the log may be unreadable):
+	// 128 + 16·(roster markets found) + min(markets in the database, 15) for a
+	// count mismatch; 21 a deadline; 22 a default image.
+	let code = 0;
 	if (markets.length !== CONTENT_MARKET_COUNT) {
 		problems.push(
 			`expected ${CONTENT_MARKET_COUNT} content markets, found ${markets.length}: ${markets.map((m) => m.slug).join(", ")}`,
 		);
+		code = 128 + 16 * Math.min(markets.length, 7) + Math.min(totalInDb, 15);
 	}
 	const now = Date.now();
 	for (const m of markets) {
@@ -206,12 +212,14 @@ export function snapshotFrom(
 			problems.push(
 				`${m.slug}'s deadline ${new Date(m.resolution_deadline).toISOString()} would be refused by createMarket`,
 			);
+			code ||= 21;
 		}
 		const own = media.filter((r) => r.market_id === m.id);
 		if (own.filter((r) => r.is_default).length !== 1) {
 			problems.push(
 				`${m.slug} must have exactly one default image (has ${own.length} images)`,
 			);
+			code ||= 22;
 		}
 	}
 	const json = JSON.stringify(
@@ -237,7 +245,7 @@ export function snapshotFrom(
 		null,
 		"\t",
 	);
-	return { json, problems };
+	return { json, problems, code };
 }
 
 async function capture(url: string, host: string): Promise<void> {
@@ -252,11 +260,18 @@ async function capture(url: string, host: string): Promise<void> {
 		const all = await sql<MarketRow[]>`
 			SELECT id, slug, title, description, status, resolution_deadline, media_video_url
 			FROM markets ORDER BY created_at, id`;
-		// CONTENT markets only — fixture rows belong to the reset (the predicate
-		// its sixth gate uses) and must neither block nor pad the six.
-		const markets = all.filter((m) => !isFixtureSlug(m.slug));
+		// THE ROSTER ONLY — the six slugs the committed snapshot names (D-49),
+		// read before the capture overwrites it. Anything else in `markets` — a
+		// fixture, a withdrawn market whose rows outlived D-49 — is wiped by the
+		// reset and not recreated.
+		const roster = new Set(loadContentMarkets().map((m) => m.slug));
+		const markets = all.filter((m) => roster.has(m.slug));
 		for (const m of all) {
-			const tag = isFixtureSlug(m.slug) ? "fixture " : m.status.padEnd(8);
+			const tag = roster.has(m.slug)
+				? m.status.padEnd(8)
+				: isFixtureSlug(m.slug)
+					? "fixture "
+					: "dropped ";
 			console.log(`[reset-once] step 0 · ${tag} ${m.slug} — ${m.title}`);
 		}
 		const ids = new Set(markets.map((m) => m.id));
@@ -265,13 +280,14 @@ async function capture(url: string, host: string): Promise<void> {
 				SELECT market_id, r2_object_key, display_order, is_default
 				FROM market_media ORDER BY market_id, display_order`
 		).filter((r) => ids.has(r.market_id));
-		const { json, problems } = snapshotFrom(
+		const { json, problems, code } = snapshotFrom(
 			markets,
 			media,
 			new Date().toISOString(),
 			host,
+			all.length,
 		);
-		if (problems.length > 0) die(`capture: ${problems.join("; ")}`, 20);
+		if (problems.length > 0) die(`capture: ${problems.join("; ")}`, code);
 		console.log("[reset-once] step 0 · CAPTURED SNAPSHOT (the recovery copy):");
 		console.log(json);
 		// Where the seeder reads it, then through the SEEDER'S OWN loader: every
