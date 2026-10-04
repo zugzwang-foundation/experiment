@@ -12,7 +12,7 @@ everything added for this run is removed from the repository afterwards; the res
 staging (AWS) holds today**, NOT the committed snapshot. ⚠ The two differ: the snapshot carries the
 later specs (e.g. MKT-MAT-01 v3.3 dropped "on Zugzwang"), live still carries v3.0. The founder chose
 live — so the run captures live first (T3 step 0) and recreates from that capture.
-**Status.** APPROVED 2026-10-04 — PR-1 (T1–T4).
+**Status.** DONE 2026-10-04 — reset ran once (workflow run 37218540054, exit 0; six markets at 10/90 verified on the live page). Tooling removed by the cleanup PR (T5).
 
 ## Why the existing tools cannot do it today (measured 2026-10-04)
 

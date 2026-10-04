@@ -156,15 +156,6 @@ COPY drizzle ./drizzle
 COPY scripts ./scripts
 COPY src ./src
 COPY tsconfig.json drizzle.config.ts ./
-# STAGING-RESET-AWS-1 — ONE-OFF, removed after the run
-# (docs/plans/STAGING-RESET-AWS-1.md T2/T5). The guarded staging reset and the
-# content-market seeder are Vitest operational runners (ADR-0036), so the
-# in-VPC reset needs them, their setup files and the market snapshot. Migrations
-# are unaffected: same CMD, same task-definition command.
-COPY tests/staging ./tests/staging
-COPY tests/_setup ./tests/_setup
-COPY vitest.staging.config.ts ./
-COPY docs/data/staging-markets-snapshot.json ./docs/data/
 # Overridden per environment by the ECS task definition
 # (`pnpm db:migrate:staging` / `pnpm db:migrate:prod`).
 CMD ["pnpm", "db:migrate:prod"]
