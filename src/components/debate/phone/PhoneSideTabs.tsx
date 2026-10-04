@@ -141,7 +141,7 @@ export function PhoneSideTabs({
 							}`
 						: // The post card's black Support/Counter button; the selected
 							// one keeps a bright border so it still reads as the tab.
-							`h-12 w-[96px] shrink-0 bg-ground text-base font-semibold text-ink ${
+							`h-10 w-[80px] shrink-0 bg-ground text-sm font-semibold text-ink ${
 								on
 									? "[border:1px_solid_var(--color-ink)]"
 									: "[border:var(--hairline)]"
@@ -197,14 +197,14 @@ export function PhoneSideTabs({
 				data-testid="phone-split-figures"
 				className="flex items-center gap-2 text-xs"
 			>
-				<span className="w-[96px] shrink-0 text-center text-gold">
+				<span className="w-[80px] shrink-0 text-center text-gold">
 					Đ {formatDharma(split.supportDharma)}
 				</span>
 				<span className="min-w-0 flex-1 text-center text-muted-foreground">
 					<b className="text-sm text-gold">Đ {formatDharma(bar.total)}</b>{" "}
 					<span className="tracking-[0.1em] uppercase">staked</span>
 				</span>
-				<span className="w-[96px] shrink-0 text-center text-gold">
+				<span className="w-[80px] shrink-0 text-center text-gold">
 					Đ {formatDharma(split.counterDharma)}
 				</span>
 			</div>

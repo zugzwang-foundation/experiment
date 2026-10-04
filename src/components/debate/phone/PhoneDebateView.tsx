@@ -1028,7 +1028,6 @@ export function PhoneDebateView({
 					<PhoneTitleStrip
 						title={focused.removed ? REMOVED_STUB_TEXT : focused.title}
 						subtitle={market.title}
-						backHref={`/m/${encodeURIComponent(market.slug)}`}
 						expanded={sheet?.kind === "parent"}
 						onOpen={() => guard(() => setSheet({ kind: "parent" }))}
 					/>
