@@ -137,3 +137,47 @@ describe("fragmentCode — the exit code that says why, without the value", () =
 		if (!v.ok) expect(v.code).toBe(fragmentCode("short", url));
 	});
 });
+
+describe("snapshotFrom — the exit code names the failing rule", () => {
+	const six = [1, 2, 3, 4, 5, 6];
+
+	it("a count mismatch encodes roster-found and the database total", () => {
+		const r = snapshotFrom(
+			[1, 2, 3, 4, 5].map(market),
+			[1, 2, 3, 4, 5].map(media),
+			"t",
+			STAGING_RDS,
+			9,
+		);
+		expect(r.code).toBe(128 + 16 * 5 + 9);
+	});
+
+	it("a deadline problem is 21, a default-image problem 22, all clean is 0", () => {
+		expect(
+			snapshotFrom(
+				six.map((i) =>
+					i === 1
+						? {
+								...market(i),
+								resolution_deadline: new Date("2020-01-01T00:00:00Z"),
+							}
+						: market(i),
+				),
+				six.map(media),
+				"t",
+				STAGING_RDS,
+			).code,
+		).toBe(21);
+		expect(
+			snapshotFrom(
+				six.map(market),
+				six.map((i) => ({ ...media(i), is_default: i !== 4 })),
+				"t",
+				STAGING_RDS,
+			).code,
+		).toBe(22);
+		expect(
+			snapshotFrom(six.map(market), six.map(media), "t", STAGING_RDS).code,
+		).toBe(0);
+	});
+});
