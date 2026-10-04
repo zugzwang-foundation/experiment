@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { snapshotFrom, verdict } from "../../../scripts/staging-reset-once";
+import {
+	fragmentCode,
+	snapshotFrom,
+	verdict,
+} from "../../../scripts/staging-reset-once";
 
 /**
  * STAGING-RESET-AWS-1 (ONE-OFF, removed after the run) — the orchestrator's two
@@ -110,5 +114,26 @@ describe("snapshotFrom (step 0)", () => {
 				STAGING_RDS,
 			).problems,
 		).toHaveLength(1);
+	});
+});
+
+describe("fragmentCode — the exit code that says why, without the value", () => {
+	const url = ok.DATABASE_URL_STAGING;
+
+	it("a fragment in the instance id sets every bit", () => {
+		expect(fragmentCode(FRAGMENT, url)).toBe(64 + 1 + 2 + 4 + 8 + 16 + 32);
+	});
+
+	it("an absent fragment is 64; the account hash is in the host but not the instance id", () => {
+		expect(fragmentCode(undefined, url)).toBe(64);
+		expect(fragmentCode("c9abcdefghij.ap-south-1", url)).toBe(
+			64 + 1 + 2 + 8 + 16,
+		);
+	});
+
+	it("a failing verdict carries the code", () => {
+		const v = verdict({ ...ok, STAGING_PROJECT_REF_FRAGMENT: "short" });
+		expect(v.ok).toBe(false);
+		if (!v.ok) expect(v.code).toBe(fragmentCode("short", url));
 	});
 });

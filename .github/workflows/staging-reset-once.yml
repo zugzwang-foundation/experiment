@@ -145,7 +145,42 @@ jobs:
           if [ "$STATUS" != "STOPPED" ]; then
             echo "⚠ the task is still $STATUS: stop it by hand before any retry — two resets must never run at once"; exit 1
           fi
-          if [ "$CODE" != "0" ]; then echo "the task did not exit 0 — read its log (above, or in CloudWatch)"; exit 1; fi
+          if [ "$CODE" != "0" ]; then
+            # The script's exit code IS its message (the log may be unreadable here).
+            case "$CODE" in
+              2) WHY="no mode passed" ;;
+              3|4) WHY="a destructive acknowledgement was not passed" ;;
+              10) WHY="DATABASE_URL_STAGING is not set in the task" ;;
+              11) WHY="DATABASE_URL_STAGING names PRODUCTION — refused" ;;
+              12) WHY="DATABASE_URL_STAGING is not a parseable URL" ;;
+              13) WHY="DATABASE_URL_STAGING's host is not the staging RDS host (ap-south-1, instance id naming staging, no prod)" ;;
+              15) WHY="ZUGZWANG_ENV in the task is not staging" ;;
+              20) WHY="step 0: the live markets are not six content markets with future deadlines and one default image each" ;;
+              23) WHY="step 0: the captured markets do not parse as the seeder reads them" ;;
+              24) WHY="dry run: the seeder (Vitest) did not boot in the image" ;;
+              30) WHY="a step could not start (pnpm/tsx missing?)" ;;
+              31) WHY="step 1 (reset) failed — staging may be partly reset; consider ops/staging-reset-resume" ;;
+              32) WHY="step 2 (identity pool) failed AFTER the reset — use ops/staging-reset-resume" ;;
+              33) WHY="step 3 (create markets) failed AFTER the reset — use ops/staging-reset-resume" ;;
+              34) WHY="step 4 (open at 10/90) failed AFTER the reset — use ops/staging-reset-resume" ;;
+              50) WHY="unexpected error (e.g. the database connection)" ;;
+              *)
+                if [ "$CODE" -ge 64 ] && [ "$CODE" -le 127 ]; then
+                  B=$((CODE - 64))
+                  WHY="STAGING_PROJECT_REF_FRAGMENT is not a valid fragment:"
+                  [ $((B & 1)) -ne 0 ] && WHY="$WHY present" || WHY="$WHY NOT-SET"
+                  [ $((B & 2)) -ne 0 ] && WHY="$WHY · length>=16" || WHY="$WHY · length<16"
+                  [ $((B & 4)) -ne 0 ] && WHY="$WHY · chars-ok" || WHY="$WHY · has-chars-outside-[a-z0-9-]"
+                  [ $((B & 8)) -ne 0 ] && WHY="$WHY · in-URL" || WHY="$WHY · NOT-in-URL"
+                  [ $((B & 16)) -ne 0 ] && WHY="$WHY · in-host" || WHY="$WHY · NOT-in-host"
+                  [ $((B & 32)) -ne 0 ] && WHY="$WHY · in-instance-id" || WHY="$WHY · NOT-in-instance-id"
+                else
+                  WHY="unknown exit code $CODE"
+                fi ;;
+            esac
+            echo "❌ the task exited $CODE: $WHY"
+            exit 1
+          fi
           if [ -n "$EXPECTED_DIGEST" ] && [ "$RAN" != "$EXPECTED_DIGEST" ]; then
             echo "the task ran $RAN, not this build's $EXPECTED_DIGEST"; exit 1
           fi
