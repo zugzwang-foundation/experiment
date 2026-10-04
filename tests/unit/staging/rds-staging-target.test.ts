@@ -95,6 +95,34 @@ describe("the account-wide parts of an RDS host are never a fragment", () => {
 	});
 });
 
+describe("a fragment may run past the instance id, as the live secret does", () => {
+	it("accepts <instance-id tail>.<account hash> (8+ chars inside the id)", () => {
+		expect(
+			isValidRefFragment("postgres1a2b3c4d.c9abcdefghij", url(STAGING_RDS)),
+		).toBe(true);
+	});
+
+	it("refuses one that only grazes the id (fewer than 8 chars inside it)", () => {
+		expect(
+			isValidRefFragment("3c4d.c9abcdefghij.ap-south-1", url(STAGING_RDS)),
+		).toBe(false);
+	});
+});
+
+describe("a fragment may run past the instance id, as the live secret does", () => {
+	it("accepts <instance-id tail>.<account hash> (8+ chars inside the id)", () => {
+		expect(
+			isValidRefFragment("postgres1a2b3c4d.c9abcdefghij", url(STAGING_RDS)),
+		).toBe(true);
+	});
+
+	it("refuses one that only grazes the id (fewer than 8 chars inside it)", () => {
+		expect(
+			isValidRefFragment("3c4d.c9abcdefghij.ap-south-1", url(STAGING_RDS)),
+		).toBe(false);
+	});
+});
+
 describe("the production RDS instance is refused by NAME, first", () => {
 	it("resolveStagingTarget refuses a zugzwang-production URL", () => {
 		const r = resolveStagingTarget({

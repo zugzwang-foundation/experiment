@@ -170,10 +170,10 @@ jobs:
                   WHY="STAGING_PROJECT_REF_FRAGMENT is not a valid fragment:"
                   [ $((B & 1)) -ne 0 ] && WHY="$WHY present" || WHY="$WHY NOT-SET"
                   [ $((B & 2)) -ne 0 ] && WHY="$WHY · length>=16" || WHY="$WHY · length<16"
-                  [ $((B & 4)) -ne 0 ] && WHY="$WHY · chars-ok" || WHY="$WHY · has-chars-outside-[a-z0-9-]"
+                  [ $((B & 4)) -ne 0 ] && WHY="$WHY · chars-ok" || WHY="$WHY · has-chars-outside-[a-z0-9.-]"
                   [ $((B & 8)) -ne 0 ] && WHY="$WHY · in-URL" || WHY="$WHY · NOT-in-URL"
                   [ $((B & 16)) -ne 0 ] && WHY="$WHY · in-host" || WHY="$WHY · NOT-in-host"
-                  [ $((B & 32)) -ne 0 ] && WHY="$WHY · in-instance-id" || WHY="$WHY · NOT-in-instance-id"
+                  [ $((B & 32)) -ne 0 ] && WHY="$WHY · starts-in-instance-id" || WHY="$WHY · NOT-starting-in-instance-id(8+)"
                 else
                   WHY="unknown exit code $CODE"
                 fi ;;

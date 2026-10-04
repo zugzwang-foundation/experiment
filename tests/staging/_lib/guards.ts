@@ -98,6 +98,9 @@ const RDS_STAGING_SUFFIX = ".ap-south-1.rds.amazonaws.com";
  */
 export const PRODUCTION_RDS_MARKER = "zugzwang-production";
 
+/** How many of an RDS fragment's characters must fall inside the instance id. */
+export const RDS_MIN_INSTANCE_OVERLAP = 8;
+
 function isStagingRdsHost(bare: string): boolean {
 	const instance = bare.split(".")[0] ?? "";
 	return (
@@ -140,10 +143,22 @@ export function isValidRefFragment(fragment: string, url: string): boolean {
 		return false;
 	}
 	if (isStagingRdsHost(bare)) {
-		// Inside the INSTANCE identifier (the first label) — never the account
-		// hash or the region/suffix, which every instance in the account shares.
+		// It must sit in the host and BEGIN in the INSTANCE identifier (the first
+		// label), with at least RDS_MIN_INSTANCE_OVERLAP of its characters there:
+		// the account hash and the region/suffix are shared by every instance in
+		// the account, production included, so a fragment made only of them names
+		// nothing. It may run on past the label (`<id-tail>.<hash>`), as the
+		// live staging secret does — measured by the one-off's exit code 91.
 		const instance = bare.split(".")[0] ?? "";
-		return /^[a-z0-9][a-z0-9-]*$/.test(fragment) && instance.includes(fragment);
+		const at = bare.indexOf(fragment);
+		const inInstance =
+			at < 0
+				? 0
+				: Math.max(0, Math.min(at + fragment.length, instance.length) - at);
+		return (
+			/^[a-z0-9][a-z0-9.-]*$/.test(fragment) &&
+			inInstance >= RDS_MIN_INSTANCE_OVERLAP
+		);
 	}
 	return /^[a-z0-9]+$/.test(fragment);
 }
