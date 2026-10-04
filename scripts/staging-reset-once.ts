@@ -67,32 +67,81 @@ const SNAPSHOT_PATH = "docs/data/staging-markets-snapshot.json";
 const OPEN_PRICE = "0.1";
 const OPEN_TANK = "100000";
 
-function die(message: string): never {
+/**
+ * EXIT CODES ARE THE ONLY CHANNEL OUT. The task's log lives in CloudWatch, and
+ * the GitHub role that launches the task may not read it — so every refusal
+ * exits with its own code, and the workflow translates the code. Nothing
+ * secret is ever encoded (see `fragmentCode`).
+ *   2 no mode · 3/4 an acknowledgement missing
+ *   10 URL unset · 11 names production · 12 not a URL · 13 host not staging · 15 ZUGZWANG_ENV
+ *   64–127 the ref fragment is invalid — 64 + diagnostic bits (`fragmentCode`)
+ *   20 capture: count/deadline/default image · 23 the seeder cannot parse the capture
+ *   24 dry run: the seeder did not boot · 30 a step could not start
+ *   31 reset · 32 identity pool · 33 create · 34 open — that step failed
+ *   50 unexpected (e.g. the database connection)
+ */
+function die(message: string, code = 1): never {
 	console.error(`[reset-once] REFUSED — ${message}`);
-	process.exit(1);
+	process.exit(code);
+}
+
+/**
+ * 64 + bits, describing WHY a fragment fails without revealing it:
+ *  1 present · 2 length ≥ 16 · 4 only [a-z0-9-] · 8 in the URL · 16 in the
+ *  host · 32 in the host's first label (the RDS instance identifier).
+ */
+export function fragmentCode(
+	fragment: string | undefined,
+	url: string,
+): number {
+	let bits = 0;
+	let host = "";
+	try {
+		host = new URL(url).hostname.toLowerCase();
+	} catch {}
+	const instance = host.split(".")[0] ?? "";
+	if (fragment) {
+		bits |= 1;
+		if (fragment.length >= 16) bits |= 2;
+		if (/^[a-z0-9-]+$/.test(fragment)) bits |= 4;
+		if (url.includes(fragment)) bits |= 8;
+		if (host.includes(fragment)) bits |= 16;
+		if (instance.includes(fragment)) bits |= 32;
+	}
+	return 64 + bits;
 }
 
 /** The target check this file can make on its own, before any child runs. */
 export function verdict(
 	env: Readonly<Record<string, string | undefined>>,
-): { ok: true; host: string } | { ok: false; reason: string } {
+): { ok: true; host: string } | { ok: false; reason: string; code: number } {
 	const url = env.DATABASE_URL_STAGING;
 	const fragment = env.STAGING_PROJECT_REF_FRAGMENT;
-	if (!url) return { ok: false, reason: "DATABASE_URL_STAGING is not set" };
+	if (!url) {
+		return { ok: false, reason: "DATABASE_URL_STAGING is not set", code: 10 };
+	}
 	if (
 		url.includes(PRODUCTION_PROJECT_REF) ||
 		url.toLowerCase().includes(PRODUCTION_RDS_MARKER)
 	) {
-		return { ok: false, reason: "DATABASE_URL_STAGING names production" };
+		return {
+			ok: false,
+			reason: "DATABASE_URL_STAGING names production",
+			code: 11,
+		};
 	}
 	let host: string;
 	try {
 		host = new URL(url).hostname.toLowerCase();
 	} catch {
-		return { ok: false, reason: "DATABASE_URL_STAGING is not a URL" };
+		return { ok: false, reason: "DATABASE_URL_STAGING is not a URL", code: 12 };
 	}
 	if (!isAllowedStagingHost(host)) {
-		return { ok: false, reason: `host ${host} is not a staging host` };
+		return {
+			ok: false,
+			reason: `host ${host} is not a staging host`,
+			code: 13,
+		};
 	}
 	if (
 		!fragment ||
@@ -102,12 +151,14 @@ export function verdict(
 		return {
 			ok: false,
 			reason: `STAGING_PROJECT_REF_FRAGMENT (length ${fragment?.length ?? 0}) is not a valid fragment of this URL — on RDS it must be 16+ chars of the INSTANCE identifier (the host's first label)`,
+			code: fragmentCode(fragment, url),
 		};
 	}
 	if (env.ZUGZWANG_ENV !== "staging") {
 		return {
 			ok: false,
 			reason: `ZUGZWANG_ENV is ${env.ZUGZWANG_ENV ?? "unset"}`,
+			code: 15,
 		};
 	}
 	return { ok: true, host };
@@ -214,7 +265,7 @@ async function capture(url: string, host: string): Promise<void> {
 			new Date().toISOString(),
 			host,
 		);
-		if (problems.length > 0) die(`capture: ${problems.join("; ")}`);
+		if (problems.length > 0) die(`capture: ${problems.join("; ")}`, 20);
 		console.log("[reset-once] step 0 · CAPTURED SNAPSHOT (the recovery copy):");
 		console.log(json);
 		// Where the seeder reads it, then through the SEEDER'S OWN loader: every
@@ -226,7 +277,10 @@ async function capture(url: string, host: string): Promise<void> {
 				`[reset-once] step 0 · the seeder parses the capture: ${specs.length} markets ✓`,
 			);
 		} catch (err) {
-			die(`the capture does not parse as the seeder reads it: ${String(err)}`);
+			die(
+				`the capture does not parse as the seeder reads it: ${String(err)}`,
+				23,
+			);
 		}
 	} finally {
 		await sql.end({ timeout: 5 });
@@ -237,6 +291,7 @@ function step(
 	label: string,
 	args: string[],
 	extraEnv: Record<string, string>,
+	failCode: number,
 ): void {
 	console.log(`[reset-once] ${label} …`);
 	const r = spawnSync("pnpm", args, {
@@ -244,9 +299,12 @@ function step(
 		env: { ...process.env, ...extraEnv },
 		shell: process.platform === "win32",
 	});
-	if (r.error) die(`${label} could not start: ${r.error.message}`);
+	if (r.error) die(`${label} could not start: ${r.error.message}`, 30);
 	if (r.status !== 0) {
-		die(`${label} exited ${r.status ?? r.signal}; nothing after it ran`);
+		die(
+			`${label} exited ${r.status ?? r.signal}; nothing after it ran`,
+			failCode,
+		);
 	}
 	console.log(`[reset-once] ${label} ✓`);
 }
@@ -273,22 +331,23 @@ async function main(): Promise<void> {
 			: process.argv.includes("--dry-run")
 				? "dry-run"
 				: null;
-	if (mode === null) die("pass --dry-run, --run or --resume");
+	if (mode === null) die("pass --dry-run, --run or --resume", 2);
 
 	const v = verdict(process.env);
-	if (!v.ok) die(`target: ${v.reason}`);
+	if (!v.ok) die(`target: ${v.reason}`, v.code);
 	console.log(`[reset-once] target ok · ${v.host} · mode ${mode}`);
 
 	if (mode !== "dry-run") {
 		if (process.env[RESET_INTENT_ENV] !== RESET_INTENT_VALUE) {
 			die(
 				`${RESET_INTENT_ENV} was not passed by the caller — this mode writes`,
+				3,
 			);
 		}
 		if (
 			process.env[CONTENT_MARKET_OVERRIDE_ENV] !== CONTENT_MARKET_OVERRIDE_VALUE
 		) {
-			die(`${CONTENT_MARKET_OVERRIDE_ENV} was not passed by the caller`);
+			die(`${CONTENT_MARKET_OVERRIDE_ENV} was not passed by the caller`, 4);
 		}
 	}
 
@@ -310,6 +369,7 @@ async function main(): Promise<void> {
 					...SEEDER_ENV,
 					ZUGZWANG_CONTENT_MARKETS_PHASE: "media",
 				},
+				24,
 			);
 			console.log("[reset-once] dry run — nothing written to the database.");
 			return;
@@ -318,29 +378,41 @@ async function main(): Promise<void> {
 			"step 1 · reset",
 			[...VITEST, "tests/staging/reset.staging.test.ts"],
 			{},
+			31,
 		);
 	}
 	step(
 		"step 2 · identity pool",
 		["exec", "tsx", "scripts/seed-staging.ts"],
 		{},
+		32,
 	);
-	step("step 3 · create markets", [...VITEST, SEEDER], {
-		...SEEDER_ENV,
-		ZUGZWANG_CONTENT_MARKETS_PHASE: "create",
-	});
-	step("step 4 · open at 10/90", [...VITEST, SEEDER], {
-		...SEEDER_ENV,
-		ZUGZWANG_CONTENT_MARKETS_PHASE: "open",
-		ZUGZWANG_CONTENT_MARKETS_PRICE: OPEN_PRICE,
-		ZUGZWANG_CONTENT_MARKETS_TANK: OPEN_TANK,
-	});
+	step(
+		"step 3 · create markets",
+		[...VITEST, SEEDER],
+		{
+			...SEEDER_ENV,
+			ZUGZWANG_CONTENT_MARKETS_PHASE: "create",
+		},
+		33,
+	);
+	step(
+		"step 4 · open at 10/90",
+		[...VITEST, SEEDER],
+		{
+			...SEEDER_ENV,
+			ZUGZWANG_CONTENT_MARKETS_PHASE: "open",
+			ZUGZWANG_CONTENT_MARKETS_PRICE: OPEN_PRICE,
+			ZUGZWANG_CONTENT_MARKETS_TANK: OPEN_TANK,
+		},
+		34,
+	);
 	console.log("[reset-once] DONE — six markets recreated and opened at 10/90.");
 }
 
 if (process.argv[1]?.endsWith("staging-reset-once.ts")) {
 	main().catch((err: unknown) => {
 		console.error("[reset-once] FAILED:", err);
-		process.exit(1);
+		process.exit(50);
 	});
 }
