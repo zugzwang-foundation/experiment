@@ -83,13 +83,75 @@ export const MIN_FRAGMENT_LENGTH = 16;
 const ALLOWED_HOST_SUFFIXES = [".supabase.com", ".supabase.co"] as const;
 
 /**
- * True when `host` is a Supabase host. G-3 asserts this so that a fragment
- * supplied against a NON-Supabase target — e.g. a localhost DSN carrying the
- * staging ref in its username — cannot satisfy the contract.
+ * STAGING-RESET-AWS-1 (ONE-OFF — removed after the run): staging's database
+ * moved to RDS (ADR-0059). An RDS host is a staging host only when it is in
+ * the experiment's region, names `staging`, and does not name `prod` — so the
+ * production instance can never satisfy this, whatever fragment it carries.
+ */
+const RDS_STAGING_SUFFIX = ".ap-south-1.rds.amazonaws.com";
+
+/**
+ * The production RDS instance's identifier prefix (CDK names it from the
+ * stack, `Zugzwang-production-Database`). Refused FIRST, by name, wherever a
+ * URL is resolved — the RDS counterpart of `PRODUCTION_PROJECT_REF`, so the
+ * new path does not stand on the staging-name heuristic alone.
+ */
+export const PRODUCTION_RDS_MARKER = "zugzwang-production";
+
+function isStagingRdsHost(bare: string): boolean {
+	const instance = bare.split(".")[0] ?? "";
+	return (
+		bare.endsWith(RDS_STAGING_SUFFIX) &&
+		instance.includes("staging") &&
+		!bare.includes("prod")
+	);
+}
+
+/**
+ * True when `host` is a Supabase host, or the staging RDS host. G-3 asserts
+ * this so that a fragment supplied against any OTHER target — e.g. a localhost
+ * DSN carrying the staging ref in its username — cannot satisfy the contract.
  */
 export function isAllowedStagingHost(host: string): boolean {
 	const bare = host.split(":")[0]?.toLowerCase() ?? "";
-	return ALLOWED_HOST_SUFFIXES.some((suffix) => bare.endsWith(suffix));
+	return (
+		ALLOWED_HOST_SUFFIXES.some((suffix) => bare.endsWith(suffix)) ||
+		isStagingRdsHost(bare)
+	);
+}
+
+/**
+ * The shape a ref fragment must have for the URL it guards. On Supabase it is
+ * the project ref — 16+ lowercase ALPHANUMERIC, unchanged, so no slice of the
+ * DSN (`postgres.<ref>`, the pooler host) can stand in for it. On the staging
+ * RDS host (STAGING-RESET-AWS-1, one-off) it is part of the endpoint's
+ * identifier, which carries `-`/`.`: it must then sit in the HOST, not the
+ * credentials, and must not be a provider-wide string (`…rds.amazonaws.com`)
+ * that would match every instance, production included.
+ */
+export function isValidRefFragment(fragment: string, url: string): boolean {
+	if (fragment.length < MIN_FRAGMENT_LENGTH) {
+		return false;
+	}
+	let bare = "";
+	try {
+		bare = new URL(url).hostname.toLowerCase();
+	} catch {
+		return false;
+	}
+	if (isStagingRdsHost(bare)) {
+		// Inside the INSTANCE identifier (the first label) — never the account
+		// hash or the region/suffix, which every instance in the account shares.
+		const instance = bare.split(".")[0] ?? "";
+		return /^[a-z0-9][a-z0-9-]*$/.test(fragment) && instance.includes(fragment);
+	}
+	return /^[a-z0-9]+$/.test(fragment);
+}
+
+/** The database name the live connection must report (G-3). */
+export function expectedDatabaseFor(host: string): string {
+	const bare = host.split(":")[0]?.toLowerCase() ?? "";
+	return isStagingRdsHost(bare) ? "zugzwang" : "postgres";
 }
 
 /**
@@ -365,7 +427,10 @@ export function resolveStagingTarget(
 	// refusal with a misleading reason, on the single input that matters most.
 	// ADR-0035 driver 4: a failed staging run costs an afternoon; a wrong-target
 	// run costs the experiment. The operator must be told WHICH it was.
-	if (url.includes(PRODUCTION_PROJECT_REF)) {
+	if (
+		url.includes(PRODUCTION_PROJECT_REF) ||
+		url.toLowerCase().includes(PRODUCTION_RDS_MARKER)
+	) {
 		return {
 			ok: false,
 			reason:
@@ -379,10 +444,10 @@ export function resolveStagingTarget(
 				"STAGING_PROJECT_REF_FRAGMENT is not set; cannot verify the URL is staging",
 		};
 	}
-	if (fragment.length < MIN_FRAGMENT_LENGTH || !/^[a-z0-9]+$/.test(fragment)) {
+	if (!isValidRefFragment(fragment, url)) {
 		return {
 			ok: false,
-			reason: `STAGING_PROJECT_REF_FRAGMENT must be at least ${MIN_FRAGMENT_LENGTH} lowercase alphanumeric characters (a Supabase project ref). A short or generic fragment matches every Postgres DSN and makes the target guard a no-op; refusing.`,
+			reason: `STAGING_PROJECT_REF_FRAGMENT must be at least ${MIN_FRAGMENT_LENGTH} lowercase alphanumeric characters (a Supabase project ref; on the staging RDS host, a part of the endpoint's identifier). A short or generic fragment matches every Postgres DSN and makes the target guard a no-op; refusing.`,
 		};
 	}
 	if (!url.includes(fragment)) {

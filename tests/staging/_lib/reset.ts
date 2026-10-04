@@ -2,6 +2,7 @@ import type postgres from "postgres";
 import {
 	DISABLED_TRUNCATE_GUARDS,
 	EXPECTED_GUARD_CATALOG_ROWS,
+	expectedDatabaseFor,
 	isAllowedStagingHost,
 	safeHost,
 } from "./guards";
@@ -36,9 +37,6 @@ export async function readGuardCatalog(
 		ORDER BY c.relname, t.tgname
 	`;
 }
-
-/** The database name every Supabase project reports. Asserted by G-3. */
-export const EXPECTED_DATABASE = "postgres";
 
 /**
  * G-3 · live connection. Asserts against the connection the DRIVER actually
@@ -92,7 +90,7 @@ export async function assertLiveConnection(
 	// its user satisfies the match. Constrain the host too.
 	if (!isAllowedStagingHost(host)) {
 		throw new Error(
-			`G-3 failed: the live connection dials "${host}", which is not a Supabase host; refusing`,
+			`G-3 failed: the live connection dials "${host}", which is not an allowed staging host; refusing`,
 		);
 	}
 
@@ -106,9 +104,12 @@ export async function assertLiveConnection(
 	if (!row) {
 		throw new Error("G-3 failed: the connection returned no row");
 	}
-	if (row.database !== EXPECTED_DATABASE) {
+	// STAGING-RESET-AWS-1 (one-off): Supabase reports `postgres`, the staging
+	// RDS instance `zugzwang` (infra DATABASE_NAME) — decided by the dialled host.
+	const expectedDatabase = expectedDatabaseFor(host);
+	if (row.database !== expectedDatabase) {
 		throw new Error(
-			`G-3 failed: current_database() is "${row.database}", expected "${EXPECTED_DATABASE}"; refusing`,
+			`G-3 failed: current_database() is "${row.database}", expected "${expectedDatabase}"; refusing`,
 		);
 	}
 	// ADR-0030:48 scopes this whole pattern as "owner-privilege only (no

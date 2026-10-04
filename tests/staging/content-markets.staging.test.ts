@@ -206,6 +206,20 @@ async function verifyMediaObjects(
 	const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY_MARKET_MEDIA;
 	const Bucket = process.env.R2_BUCKET_MARKET_MEDIA;
 	if (!endpoint || !accessKeyId || !secretAccessKey || !Bucket) {
+		// STAGING-RESET-AWS-1 (ONE-OFF, removed after the run): the in-VPC reset
+		// rides the migration task, which carries no R2 keys by design (security
+		// M1). Its media objects are already in R2 under the captured keys, so it
+		// may skip — LOUDLY, and only with this exact value.
+		if (
+			RUNNER_MODE === "staging" &&
+			process.env.ZUGZWANG_CONTENT_MARKETS_MEDIA_CHECK ===
+				"skip-for-staging-reset-once"
+		) {
+			console.log(
+				"[content-markets] media check SKIPPED — STAGING-RESET-AWS-1 one-off (no R2 arm in the migration task); verify images by eye after the run",
+			);
+			return { checked: 0, skipped: true };
+		}
 		if (RUNNER_MODE === "staging") {
 			throw new Error(
 				"REFUSED — the market-media R2 arm is not configured (R2_ENDPOINT_MARKET_MEDIA, " +
