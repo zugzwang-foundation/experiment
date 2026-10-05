@@ -212,6 +212,17 @@ export function initialStatusFilter(
 	return scoped.some((r) => rowHasTileIn(r, "Open")) ? "Open" : "Closed";
 }
 
+/**
+ * NAV-3 — the `?market=<slug>` preselect as the ADDRESS carries it now, by the
+ * profile page's own rule: one value, or none — a repeated param preselects
+ * nothing, as it does on the server. Read on every entry after the first, when
+ * the route's tree is revealed rather than mounted (see `PositionsTable`).
+ */
+export function readMarketParam(search: string): string | undefined {
+	const values = new URLSearchParams(search).getAll("market");
+	return values.length === 1 ? values[0] : undefined;
+}
+
 /** The market id the table starts filtered to — the `?market=<slug>` preselect,
  * or `"all"` when the slug is absent or matches no row. */
 export function initialMarketIdOf(

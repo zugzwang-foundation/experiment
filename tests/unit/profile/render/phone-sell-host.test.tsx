@@ -60,7 +60,7 @@ import type {
 const M1 = "0190c0de-aaaa-7000-8000-000000000001";
 const L1 = "0190c0de-1010-7000-8000-000000000001";
 const C_OPENER = "0190c0de-ffff-7000-8000-000000000044";
-const TIER_QUERY = "not all and (min-width: 640px)";
+const TIER_QUERY = "not all and (min-width: 820px)";
 
 const dp18 = (v: string): string => {
 	const [int, frac = ""] = v.split(".");

@@ -1,4 +1,7 @@
-import { AdminTabs } from "@/app/(admin)/admin/_components/AdminTabs";
+import {
+	type AdminTab,
+	AdminTabs,
+} from "@/app/(admin)/admin/_components/AdminTabs";
 
 // ADMIN-UI — the admin console frame. Presentational Server Component.
 //
@@ -22,7 +25,7 @@ export function AdminShell({
 	active,
 	children,
 }: {
-	active: "moderation" | "markets";
+	active: AdminTab;
 	children: React.ReactNode;
 }): React.ReactElement {
 	return (

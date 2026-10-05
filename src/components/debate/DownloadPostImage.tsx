@@ -1,10 +1,12 @@
 "use client";
 
-import { Download, LoaderCircle } from "lucide-react";
+import { LoaderCircle, Share2 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { InfoTip } from "@/components/ui/info-tip";
+import { cn } from "@/lib/utils";
 
 /**
  * `<market-slug>-post-<ordinal>.jpg` (`…-reply-<M>.jpg` for a reply) — mirrors
@@ -45,6 +47,12 @@ const ERROR_COPY = "Couldn't build the image — try again";
 const BUSY_COPY = "Preparing the image…";
 
 /**
+ * UIR-2 item 3 — the control's name and its tooltip, one string for a post and
+ * a reply alike. The action is unchanged: it still downloads the JPEG.
+ */
+const SHARE_COPY = "Share as image";
+
+/**
  * The post card's download mark, now a working control. One click fetches
  * `/m/[slug]/export/image?post=N` — the server-rendered JPEG of this post and
  * its market — and hands the browser the bytes as a download. No new page, no
@@ -65,16 +73,49 @@ const BUSY_COPY = "Preparing the image…";
  * there is no slug, and the control renders as the inert, disabled placeholder
  * it used to be rather than a button that promises a download it cannot make.
  */
-export function DownloadPostImage({
-	ordinal,
-	reply,
-}: {
+export function DownloadPostImage(props: {
 	ordinal: number;
-	/** REPLY-IMAGE-EXPORT — the reply's ordinal within post `ordinal`. */
 	reply?: number;
+	pinned?: boolean;
 }) {
 	const params = useParams<{ slug?: string }>();
 	const slug = typeof params?.slug === "string" ? params.slug : null;
+	return <SharePostImage slug={slug} {...props} />;
+}
+
+/**
+ * The Share control itself, for a surface that knows its market without the
+ * `/m/[slug]` route — the profile's argument head passes the slug; the market
+ * card goes through `DownloadPostImage`, which reads it from the route.
+ */
+export function SharePostImage({
+	slug,
+	ordinal,
+	reply,
+	pinned = false,
+	compact = false,
+}: {
+	/** The market the post belongs to; `null` or empty disables the control. */
+	slug: string | null;
+	ordinal: number;
+	/** REPLY-IMAGE-EXPORT — the reply's ordinal within post `ordinal`. */
+	reply?: number;
+	/**
+	 * ⚠ UIR-2 item 3 — the desktop market card's author row (`ArgProfile`
+	 * `download.pinned`): the BUTTON leaves the flow and is pinned to that row's
+	 * right edge, centred on its height (`top: calc(50% − 18px)`, half the 36px
+	 * box since UIR-3 item 3; a translate would fight the base variant's
+	 * `active:` press offset).
+	 * The row is its containing block and reserves the room. The busy and error
+	 * lines stay in the flow, at the row's end, so they never sit under it.
+	 */
+	pinned?: boolean;
+	/**
+	 * The profile's argument head: a 24px box (with a 16px mark) — the height
+	 * of the stub this replaced, so the row keeps its height.
+	 */
+	compact?: boolean;
+}) {
 	const [phase, setPhase] = useState<"idle" | "busy" | "error">("idle");
 	const mounted = useRef(true);
 	useEffect(() => {
@@ -85,10 +126,10 @@ export function DownloadPostImage({
 	}, []);
 
 	const busy = phase === "busy";
-	const disabled = slug === null || busy;
+	const disabled = slug === null || slug === "" || busy;
 
 	const onClick = async () => {
-		if (slug === null || busy) {
+		if (slug === null || slug === "" || busy) {
 			return;
 		}
 		setPhase("busy");
@@ -151,31 +192,45 @@ export function DownloadPostImage({
 					{ERROR_COPY}
 				</span>
 			) : null}
-			<Button
-				type="button"
-				variant="ghost"
-				size="icon"
-				disabled={disabled}
-				aria-disabled={disabled ? "true" : undefined}
-				aria-busy={busy ? "true" : undefined}
-				// ⚠ NO `title` ATTRIBUTE, AND ITS ABSENCE IS A GUARD, NOT AN OVERSIGHT.
-				// TIME-1's G5 bans `[title]` anywhere on a post card, because a native
-				// tooltip is exactly how an absolute timestamp leaks back onto a surface
-				// that is supposed to speak in relative time. This control's tooltip
-				// carried no time and tripped it anyway — which is the guard working: a
-				// blanket ban is the only version of that rule nobody has to police
-				// case by case. `aria-label` already names the control, so what is lost
-				// is a hover hint on an icon whose meaning the label carries.
-				aria-label={
-					reply === undefined ? "Download post image" : "Download reply image"
-				}
-				onClick={onClick}
-				// ⚠ `text-ink` — the SAME token `Replies · n` uses two elements to the
-				// left, so the mark and the one promoted field on this row sit at the
-				// same emphasis. `icon` (32px / 20px) is the size the placeholder had.
-				className="shrink-0 text-ink [&_svg]:size-5"
-			>
-				{/* ⛔⛔ `animate-spin` IS THE ONE THING HERE THAT COULD HAVE SHIPPED
+			{/* UIR-2 item 3 — `InfoTip`, not `title`, carries the tooltip: the note on
+			    the button below is why a native tooltip is barred here. */}
+			<InfoTip content={SHARE_COPY} asChild>
+				<Button
+					type="button"
+					variant="ghost"
+					size="icon"
+					disabled={disabled}
+					aria-disabled={disabled ? "true" : undefined}
+					aria-busy={busy ? "true" : undefined}
+					// ⚠ NO `title` ATTRIBUTE, AND ITS ABSENCE IS A GUARD, NOT AN OVERSIGHT.
+					// TIME-1's G5 bans `[title]` anywhere on a post card, because a native
+					// tooltip is exactly how an absolute timestamp leaks back onto a surface
+					// that is supposed to speak in relative time. This control's tooltip
+					// carried no time and tripped it anyway — which is the guard working: a
+					// blanket ban is the only version of that rule nobody has to police
+					// case by case. `aria-label` already names the control, so what is lost
+					// is a hover hint on an icon whose meaning the label carries.
+					aria-label={SHARE_COPY}
+					data-tutorial="post-share"
+					onClick={onClick}
+					// ⚠ `text-ink` — the SAME token `Replies · n` uses two elements to the
+					// left, so the mark and the one promoted field on this row sit at the
+					// same emphasis.
+					// ⚠ UIR-3 item 3 — at 640px and up a 36 × 36 hit area and a 24px glyph
+					// at Lucide's default stroke width 2 (the rail chevrons'); below 640 the
+					// phone keeps 32 × 32 and the 16px glyph it has been rendering.
+					// ⛔ THE GLYPH SIZE SITS ON THE ICON, NOT ON THE BUTTON. UIR-2's
+					// `[&_svg]:size-5` here never applied: the base variant's
+					// `[&_svg:not([class*='size-'])]:size-4` outranks it (0,2,1 over 0,1,1),
+					// so the glyph measured 16px, not 20. A `size-*` class on the icon
+					// takes it out of that rule's reach.
+					className={cn(
+						"size-9 shrink-0 text-ink max-mobile:size-8",
+						compact && "size-6 max-mobile:size-6",
+						pinned && "absolute top-[calc(50%-18px)] right-0",
+					)}
+				>
+					{/* ⛔⛔ `animate-spin` IS THE ONE THING HERE THAT COULD HAVE SHIPPED
 				    SILENTLY DEAD, and it was checked rather than assumed. The art
 				    layer authors its own `@keyframes` and records why: `.animate-spin`
 				    was absent from this app's built CSS, so the obvious utility would
@@ -192,8 +247,20 @@ export function DownloadPostImage({
 				    control, not a working one — and it was the only signal once the
 				    label went. A rotation is the one motion that means "in progress"
 				    without a caption. */}
-				{busy ? <LoaderCircle className="animate-spin" /> : <Download />}
-			</Button>
+					{busy ? (
+						<LoaderCircle
+							className={cn(
+								"size-6 animate-spin max-mobile:size-4",
+								compact && "size-4",
+							)}
+						/>
+					) : (
+						<Share2
+							className={cn("size-6 max-mobile:size-4", compact && "size-4")}
+						/>
+					)}
+				</Button>
+			</InfoTip>
 		</span>
 	);
 }

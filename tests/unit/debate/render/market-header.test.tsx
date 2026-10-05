@@ -8,6 +8,12 @@ import type { DebateMarketHeader } from "@/components/debate/types";
 import { contentHashId } from "@/components/ui/info-tip";
 import { GLOSSARY } from "@/lib/copy/glossary";
 
+/** A gold figure renders as `<span><span class="text-gold">3</span> posts</span>`
+ * (and `Đ 150` inside `Đ 150 staked` the same way), so the phrase is matched on
+ * the element's FULL text, not its own text nodes. */
+const fullText = (phrase: string) => (_: string, el: Element | null) =>
+	el?.tagName === "SPAN" && el.textContent === phrase;
+
 /**
  * POLISH.3 PR 1 items 2 + 3 — the market header's attrs strip.
  *
@@ -74,7 +80,7 @@ describe("POLISH.3 — MarketHeader attrs strip", () => {
 		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
 
 		// The space is the whole assertion (§18 C-1).
-		expect(screen.getByText("Đ 150 staked")).toBeTruthy();
+		expect(screen.getByText(fullText("Đ 150 staked"))).toBeTruthy();
 		// The failure mode this exists for — the unspaced form must be gone.
 		expect(screen.queryByText("Đ150 staked")).toBeNull();
 	});
@@ -90,7 +96,7 @@ describe("POLISH.3 — MarketHeader attrs strip", () => {
 		big.totals.dharmaStaked = "34365.000000000000000000";
 		render(<MarketHeader market={big} priceChart={null} />);
 
-		const meta = screen.getByText("Đ 34.4k staked");
+		const meta = screen.getByText(fullText("Đ 34.4k staked"));
 		// One phrase, one contiguous text run — the shape every DOM-walk anchor in
 		// this file depends on, asserted here on the arm where the markup COULD
 		// have gained a child element.
@@ -110,33 +116,35 @@ describe("POLISH.3 — MarketHeader attrs strip", () => {
 		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
 
 		expect(
-			screen.getByText("Đ 150 staked").getAttribute("aria-describedby"),
+			screen
+				.getByText(fullText("Đ 150 staked"))
+				.getAttribute("aria-describedby"),
 		).toBe(contentHashId(GLOSSARY.stakedMarket));
 	});
 
 	it("market-header::singular-count-takes-singular-noun", () => {
 		render(<MarketHeader market={market(1, 1)} priceChart={null} />);
 
-		expect(screen.getByText("1 post")).toBeTruthy();
-		expect(screen.getByText("1 reply")).toBeTruthy();
+		expect(screen.getByText(fullText("1 post"))).toBeTruthy();
+		expect(screen.getByText(fullText("1 reply"))).toBeTruthy();
 		// The failure mode this exists for.
-		expect(screen.queryByText("1 posts")).toBeNull();
-		expect(screen.queryByText("1 replies")).toBeNull();
+		expect(screen.queryByText(fullText("1 posts"))).toBeNull();
+		expect(screen.queryByText(fullText("1 replies"))).toBeNull();
 	});
 
 	it("market-header::zero-and-plural-counts-take-plural-noun", () => {
 		render(<MarketHeader market={market(0, 0)} priceChart={null} />);
 
 		// Zero is PLURAL — `0 replies`, never `0 reply`. StatLine does the same.
-		expect(screen.getByText("0 posts")).toBeTruthy();
-		expect(screen.getByText("0 replies")).toBeTruthy();
-		expect(screen.queryByText("0 post")).toBeNull();
-		expect(screen.queryByText("0 reply")).toBeNull();
+		expect(screen.getByText(fullText("0 posts"))).toBeTruthy();
+		expect(screen.getByText(fullText("0 replies"))).toBeTruthy();
+		expect(screen.queryByText(fullText("0 post"))).toBeNull();
+		expect(screen.queryByText(fullText("0 reply"))).toBeNull();
 
 		cleanup();
 		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
-		expect(screen.getByText("3 posts")).toBeTruthy();
-		expect(screen.getByText("5 replies")).toBeTruthy();
+		expect(screen.getByText(fullText("3 posts"))).toBeTruthy();
+		expect(screen.getByText(fullText("5 replies"))).toBeTruthy();
 	});
 });
 
@@ -181,7 +189,7 @@ describe("RESO-1 — R-2, the criterion excerpt is gone", () => {
 		// string the fixture DOES render. If this fails, the negative below proves
 		// nothing and the failure says so at the right place.
 		expect(html).toContain("Attrs Strip Market Question");
-		expect(html).toContain("Đ 150 staked");
+		expect(left?.textContent ?? "").toContain("Đ 150 staked");
 
 		// ── THE SUBJECT. `description` on this fixture is "Resolution criterion
 		// text." — asserted by BODY, never by the `Resolution` label, for the
@@ -296,7 +304,7 @@ describe("RESO-1 — R-3, the meta line and the actions are one row", () => {
 			<MarketHeader market={market(3, 5)} priceChart={null} />,
 		);
 
-		const meta = screen.getByText("Đ 150 staked");
+		const meta = screen.getByText(fullText("Đ 150 staked"));
 		const exportLink = container.querySelector(
 			'a[aria-label="AI mode — download this debate as Markdown"]',
 		);
@@ -344,7 +352,7 @@ describe("RESO-1 — R-3, the meta line and the actions are one row", () => {
 
 		// …and the meta line does NOT carry it, which is what keeps it left. This
 		// is the half that fails if someone "centres the row" instead.
-		const metaRow = rowOf(screen.getByText("Đ 150 staked"));
+		const metaRow = rowOf(screen.getByText(fullText("Đ 150 staked")));
 		expect(metaRow?.getAttribute("class") ?? "").not.toContain("ml-auto");
 	});
 
@@ -362,7 +370,7 @@ describe("RESO-1 — R-3, the meta line and the actions are one row", () => {
 		const exportLink = container.querySelector(
 			'a[aria-label="AI mode — download this debate as Markdown"]',
 		);
-		const metaRow = rowOf(screen.getByText("Đ 150 staked"));
+		const metaRow = rowOf(screen.getByText(fullText("Đ 150 staked")));
 		const actionsRow = rowOf(exportLink);
 		// Neither is a DIRECT child of the stack — they are both nested one level
 		// deeper, inside the shared row R-3 introduced.
@@ -590,7 +598,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 6, the left column's order", () =
 		expect(html).not.toBe("");
 
 		const question = html.indexOf("Attrs Strip Market Question");
-		const attrs = html.indexOf("Đ 150 staked");
+		const attrs = html.indexOf("Đ 150</span> staked");
 		const blocks = html.indexOf('data-testid="resolver-cards"');
 
 		// All three present — an absent marker indexes to -1 and would otherwise
@@ -1228,9 +1236,9 @@ describe("MarketHeader compact mode", () => {
 		const heading = screen.getByRole("heading", { level: 1 });
 		expect(heading).toBeTruthy();
 		expect(heading.textContent).toBe("Attrs Strip Market Question");
-		expect(screen.getByText("Đ 150 staked")).toBeTruthy();
-		expect(screen.getByText("3 posts")).toBeTruthy();
-		expect(screen.getByText("5 replies")).toBeTruthy();
+		expect(screen.getByText(fullText("Đ 150 staked"))).toBeTruthy();
+		expect(screen.getByText(fullText("3 posts"))).toBeTruthy();
+		expect(screen.getByText(fullText("5 replies"))).toBeTruthy();
 
 		// Bulky media, resolver cards and price bar are omitted for maximum space
 		expect(

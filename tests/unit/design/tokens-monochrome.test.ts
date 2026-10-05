@@ -76,8 +76,8 @@ describe("globals.css — BRIDGE branded dark token layer", () => {
 	});
 
 	it("pins the two graph series lines as unmistakably different (B1 exit)", () => {
-		expect(GLOBALS_CSS).toContain("--graph-yes: #737373;");
-		expect(GLOBALS_CSS).toContain("--graph-no: #fafafa;");
+		expect(GLOBALS_CSS).toContain("--graph-yes: #6aa84f;");
+		expect(GLOBALS_CSS).toContain("--graph-no: #e06666;");
 	});
 
 	it("keeps --destructive neutralized to the ramp (WI-11)", () => {

@@ -131,11 +131,6 @@ function renderPostArm() {
 		<PostFocusHeader
 			post={presentPost()}
 			market={market}
-			heldSide={null}
-			marketOpen
-			suspended={false}
-			activeRelation={null}
-			onToggleRelation={noop}
 			onExit={noop}
 			onOpenImage={noop}
 			onOpenPopup={noop}
@@ -355,11 +350,6 @@ describe("HTML-FINISH · MARKET DETAIL — row 15, the focused post's teaser", (
 			<PostFocusHeader
 				post={presentPost()}
 				market={market}
-				heldSide={null}
-				marketOpen
-				suspended={false}
-				activeRelation={null}
-				onToggleRelation={noop}
 				onExit={noop}
 				onOpenImage={noop}
 				onOpenPopup={onOpenPopup}
@@ -404,11 +394,6 @@ describe("HTML-FINISH · MARKET DETAIL — row 15, the focused post's teaser", (
 			<PostFocusHeader
 				post={post}
 				market={market}
-				heldSide={null}
-				marketOpen
-				suspended={false}
-				activeRelation={null}
-				onToggleRelation={noop}
 				onExit={noop}
 				onOpenImage={noop}
 				onOpenPopup={noop}
@@ -452,11 +437,6 @@ describe("UI-OVERNIGHT 4 — the market card takes the discovery thumbnail", () 
 			<PostFocusHeader
 				post={presentPost()}
 				market={{ ...market, thumbImageUrl, mediaImageUrl }}
-				heldSide={null}
-				marketOpen
-				suspended={false}
-				activeRelation={null}
-				onToggleRelation={noop}
 				onExit={noop}
 				onOpenImage={noop}
 				onOpenPopup={noop}

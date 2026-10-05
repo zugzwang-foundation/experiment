@@ -51,6 +51,12 @@ import { HEADER_PILL_BUTTON } from "./header-control";
  * 640 the LEFT zone flattens to `contents` and the right zone does not. §21.9
  * is untouched — the control renders at every width, on every route, for every
  * viewer, and is not inside any hidden wrapper. Only its position moved.
+ *
+ * ⚠ UIR-3 item 5 — AT 640px AND UP IT IS IN THE LEFT ZONE AGAIN, directly after
+ * Home. `GlobalHeader` mounts it once per tier, each mount `display: none` on
+ * the other tier, so one RULES renders at any width and the phone row above is
+ * unchanged. ⚠ That sentence's "not inside any hidden wrapper" now reads: each
+ * mount's wrapper is hidden only on the tier where the other mount shows.
  */
 
 /**
@@ -111,6 +117,7 @@ export function RulesControl({
 				type="button"
 				onClick={() => setOpen(true)}
 				title={HEADER_GLOSSARY.rules}
+				data-tutorial="rules-button"
 				/* ⚠ `mr-3.5` IS THE RIGHT ZONE'S OWN RHYTHM, NOT A NUMBER PICKED HERE.
 				   That zone is a bare `flex` with NO `gap`: every separation in it is
 				   a margin on the control that owns it (`DharmaCluster`'s `mr-3.5`,

@@ -1116,7 +1116,9 @@ describe("A6 D-2 — the sell sheet's amount IS the number", () => {
 				`that a bound existed at all and R-2 takes the chip away — and ` +
 				`useInlineSell's edit() DISCARDS a draft above the seed, so a reader who ` +
 				`types too much watches the field snap back with nothing saying why.`,
-		).toMatch(/of Đ \{formatDharma\(props\.seedDisplay\)}/);
+		).toMatch(
+			/of(?: |\{" "\}\s*)(?:<span[^>]*>\s*)?Đ \{formatDharma\(props\.seedDisplay\)}/,
+		);
 		// ⛔⛔ THROUGH THE SHARED FORMATTER, AND THE RAW FORM IS FORBIDDEN BY NAME
 		// BECAUSE IT SHIPPED FOR A COMMIT. `tile.valueDisplay` is whole-Đ and
 		// UNGROUPED — grouping lives in `groupInteger`, private to `format.ts` — so
@@ -1145,7 +1147,7 @@ describe("A6 D-2 — the sell sheet's amount IS the number", () => {
 		// assertion here. `@code-reviewer`, MEDIUM. Source order is the proxy a scan
 		// can see; `phone-sell-sheet.test.tsx` asserts it on the rendered DOM.
 		const fieldAt = source.indexOf("<InlineSellAmount");
-		const ceilingAt = source.indexOf("of Đ {formatDharma");
+		const ceilingAt = source.indexOf("Đ {formatDharma(props.seedDisplay)");
 		expect(
 			fieldAt,
 			`${SHEET}: the shared amount field is not mounted`,

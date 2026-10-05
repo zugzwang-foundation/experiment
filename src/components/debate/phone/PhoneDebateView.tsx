@@ -1028,7 +1028,6 @@ export function PhoneDebateView({
 					<PhoneTitleStrip
 						title={focused.removed ? REMOVED_STUB_TEXT : focused.title}
 						subtitle={market.title}
-						backHref={`/m/${encodeURIComponent(market.slug)}`}
 						expanded={sheet?.kind === "parent"}
 						onOpen={() => guard(() => setSheet({ kind: "parent" }))}
 					/>
@@ -1038,6 +1037,16 @@ export function PhoneDebateView({
 					active={focused === null ? activeSide : threadRelation}
 					onSelect={focused === null ? onSideTap : onRelationTap}
 					panelIdFor={PANE_ID}
+					split={
+						focused === null
+							? undefined
+							: {
+									supportDharma: focused.aggregate.supportDharma,
+									counterDharma: focused.aggregate.counterDharma,
+									friendlyFireDharma: focused.aggregate.friendlyFireDharma,
+									postSide: focused.sideAtPostTime,
+								}
+					}
 				/>
 				{/* ⛔ MOBILE-2k · F-1 — THE FEED ARM ONLY, GATED AT THE MOUNT. The
 				    bounded shell took pull-to-refresh away (the document no longer

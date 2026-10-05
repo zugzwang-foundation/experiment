@@ -71,7 +71,6 @@ export const GLOSSARY = {
 	// — Export ————————————————————————————————————————————
 	downloadMd:
 		"AI mode — download this entire market debate as a Markdown file and paste it into any LLM",
-	downloadStub: "Download — per-argument export isn't available yet",
 
 	// — Identity ——————————————————————————————————————————
 	pseudonym: "Your permanent name — auto-assigned, not chosen, not editable",
@@ -109,7 +108,10 @@ export const FRIENDLY_FIRE_TAG_GLOSS =
  */
 export const HEADER_GLOSSARY = {
 	visitorCounter: "Total page views — not participants",
+	/** RADIO-1 — still the gloss while `radio-enabled` is off. */
 	radio: "Radio — not yet live",
+	/** RADIO-1 — the Radio pill is a link to the playlist on YouTube. */
+	radioLive: "Radio — open the playlist on YouTube",
 	rules: "Rules — how it works",
 	github: "Star the repo on GitHub",
 } as const;

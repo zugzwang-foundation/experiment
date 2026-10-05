@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -73,6 +75,15 @@ import type { DebatePost, PresentPost, Side } from "./types";
 const UNBOXED_CARD =
 	"max-mobile:[border:none] max-mobile:rounded-none max-mobile:shadow-none";
 
+/**
+ * FEED-3 — the card inside a desktop `DebateColumn`, which now draws the one
+ * rectangle (the card's own ground, hairline, radius and elevation, moved up a
+ * level) and insets its body by the card's `p-3`. So the card draws no box and
+ * no padding of its own; its content is unchanged. `[border:none]` for the same
+ * shorthand-over-shorthand reason `UNBOXED_CARD` gives.
+ */
+const IN_COLUMN_CARD = "[border:none] rounded-none p-0 shadow-none";
+
 export function PostCard({
 	post,
 	onEnter,
@@ -83,6 +94,9 @@ export function PostCard({
 	marketOpen,
 	suspended,
 	unboxed = false,
+	inColumn = false,
+	railSide,
+	rail,
 	isOwnPost = false,
 }: {
 	post: DebatePost;
@@ -125,6 +139,34 @@ export function PostCard({
 	 */
 	unboxed?: boolean;
 	/**
+	 * ⛔⛔ FEED-3 — MOUNTED IN A DESKTOP `DebateColumn`, WHICH DRAWS THE BOX. Passed
+	 * by `PostScroller` only. Two things follow and nothing else moves: the card
+	 * draws no box (`IN_COLUMN_CARD`) and the Support/Counter row takes the
+	 * column header's two-line controls (UIR-1 item 4). (FEED-3 also dropped the
+	 * author line's pipes, which UIR-1 item 1 restored, as on `main`, and a
+	 * text-only argument's quote-well box, which UIR-9 restored: the well is a
+	 * picture on its post's own fill now, and keeps its edge in the column as an
+	 * attachment does.)
+	 * ⚠ A PROP, NOT A `mobile:` TOKEN, for `unboxed`'s reason in reverse: the phone
+	 * feed and the parent-post sheet mount this card too and are untouched by
+	 * FEED-3, and the pop-ups and the focused post share `ArgProfile` — a width
+	 * variant would reach all of them. `= false` keeps every other mount as it was.
+	 */
+	inColumn?: boolean;
+	/**
+	 * UIR-1 item 3 — the side of the card the desktop `ScrollRail` sits on (the
+	 * column's inner edge), set by `PostScroller` only when the rail renders (two
+	 * or more posts). UIR-2 item 2 — the side of the middle band the `rail` is
+	 * pinned to and padded on. Absent = no rail on this card.
+	 */
+	railSide?: "left" | "right";
+	/**
+	 * UIR-2 item 2 — the column's `ScrollRail`, handed in by `PostScroller` so it
+	 * can sit INSIDE the card, between the author row and the Support/Counter row
+	 * (see the band below). Absent = no rail, and the card lays out as before.
+	 */
+	rail?: ReactNode;
+	/**
 	 * D-52 R1 — the viewer wrote this post, so both trigger pills render
 	 * disabled (nobody replies to their own post). Derived by the view from the
 	 * viewer read's `ownPostIds`; absent = not the viewer's, as on every
@@ -145,12 +187,30 @@ export function PostCard({
 	// title-only argument the control opened a pop-up showing the reader the
 	// same sentence back; see `hasExtendedText` for the rule and its reason.
 	const knowMore = post.removed ? false : hasExtendedText(post.body);
+	// UIR-2 item 2 — the band's padding on the rail's side, and the rail's slot:
+	// full band height, the rail centred in it (`ScrollRail`'s `fit`).
+	const railPad = railSide === "left" ? "pl-[22px]" : "pr-[22px]";
+	const railSlot = cn(
+		"absolute inset-y-0 flex items-center",
+		railSide === "left" ? "left-0" : "right-0",
+	);
 
 	if (post.removed) {
 		return (
-			<Card className={cn("gap-2 p-3", unboxed && UNBOXED_CARD)}>
+			<Card
+				className={cn(
+					"gap-2 p-3",
+					unboxed && UNBOXED_CARD,
+					inColumn && IN_COLUMN_CARD,
+				)}
+			>
 				<SideBadge side={post.sideAtPostTime} />
-				<RemovedPlaceholder />
+				{/* UIR-2 item 2 — the same band as the present card's, around the
+				    placeholder, so the rail sits between the side and the row. */}
+				<div className={rail ? cn("relative min-h-11", railPad) : "contents"}>
+					<RemovedPlaceholder />
+					{rail ? <div className={railSlot}>{rail}</div> : null}
+				</div>
 				{/* The removed variant keeps its frozen side (§6 — thread integrity),
 				    so the split bar stays correctly poled on a removed post too. */}
 				{/* ⚠ The removed branch gets the triggers too: replying to a removed
@@ -163,6 +223,7 @@ export function PostCard({
 					postSide={post.sideAtPostTime}
 					triggers={triggers}
 					band={unboxed}
+					inColumn={inColumn}
 				/>
 				{/* ⚠ A removed POST STILL KEEPS ITS SURVIVING REPLIES (§6 — thread
 				    integrity), and row 25 does not touch that: what changed is only
@@ -188,7 +249,13 @@ export function PostCard({
 		   column, which is what gives `.argimg` below a height to take a share of.
 		   Without it the card is content-sized, `.argimg`'s `flex-1` has nothing to
 		   distribute, and the image falls back to its intrinsic size. */
-		<Card className={cn("min-h-0 flex-1 gap-2.5 p-3", unboxed && UNBOXED_CARD)}>
+		<Card
+			className={cn(
+				"min-h-0 flex-1 gap-2.5 p-3",
+				unboxed && UNBOXED_CARD,
+				inColumn && IN_COLUMN_CARD,
+			)}
+		>
 			{/* ⚠⚠ UI-OVERNIGHT entry 1b — THE BADGE IS NO LONGER A CORNER SIBLING,
 			    and the wrapper that positioned it goes with it. `ArgProfile` renders
 			    the lane badge inside its own row now, beside the age, because that
@@ -209,7 +276,9 @@ export function PostCard({
 				replyCount={replyCount}
 				createdAt={post.createdAt}
 				badge={post.badge}
-				download={{ ordinal: post.ordinal }}
+				friendlyFireDharma={post.aggregate.friendlyFireDharma}
+				// UIR-2 item 3 — pinned to the author row's right edge in a column.
+				download={{ ordinal: post.ordinal, pinned: inColumn }}
 			/>
 
 			{/* HTML-FINISH · MARKET DETAIL rows 23 + 24 — d5's `.rtitle.plust`
@@ -238,9 +307,25 @@ export function PostCard({
 			    affordance. Flagged for the founder either way.
 			    ⚠ THE REMOVED BRANCH IS UNTOUCHED — it returns above and has no title at
 			    the type level. */}
-			{post.imageUrl ? (
-				<div className="relative">
-					{/* HTML-FINISH · MARKET DETAIL round 2 · R6 — THE TITLE ANSWERS THE
+			{/* ⚠⚠ UIR-2 item 2 — THE RAIL'S BAND. With two or more posts the rail sits
+			    INSIDE the card, absolutely, in the space between the author row and
+			    the Support/Counter row, so both of those rows span the column body and
+			    take the header's 12px insets. The band pads the rail's side by 22px —
+			    the rail's 14px and the 8px gap it had beside the card — so the title
+			    and the image sit exactly where they did. `min-h-11` is the rail at its
+			    shortest (13 + 9 + 9 + 13, a zero track), so ▲ and ▼ always fit.
+			    ⚠ `contents` with no rail: the wrapper then draws no box and the
+			    title and the cell stay direct flex items of the card, as before. */}
+			<div
+				className={
+					rail
+						? cn("relative flex min-h-11 flex-1 flex-col gap-2.5", railPad)
+						: "contents"
+				}
+			>
+				{post.imageUrl ? (
+					<div className="relative">
+						{/* HTML-FINISH · MARKET DETAIL round 2 · R6 — THE TITLE ANSWERS THE
 				    POINTER. It is the card's primary navigation (it enters post-focus)
 				    and it carried NO hover state at all, so the one control on the card
 				    that takes you somewhere looked like static text.
@@ -266,7 +351,7 @@ export function PostCard({
 				    the Profile pattern.
 				    ⚠ NO `aria-label` IS ADDED. The visible text IS the accessible name,
 				    and an override would have to contain it to satisfy WCAG 2.5.3. */}
-					{/* ⚠⚠ THE TITLE IS A BLOCK SPANNING THE CARD — `.rtitle` (`d5:841`)
+						{/* ⚠⚠ THE TITLE IS A BLOCK SPANNING THE CARD — `.rtitle` (`d5:841`)
 				    is a block, and `.plust{position:relative;padding-right:19px}`
 				    (`:597`) reserves a gutter for the `+` OVERLAID on it rather than
 				    a flex sibling that steals width. Measured at the pinned
@@ -279,24 +364,24 @@ export function PostCard({
 				    (`:842`). On a one-screen page an unclamped title is what pushes
 				    the card past its column; the full argument stays one click away
 				    on the `+`, and the column scrolls as the backstop. */}
-					<button
-						type="button"
-						// ⚠ UI-OVERNIGHT entry 5 — THE GUTTER IS RESERVED ONLY WHEN THERE IS
-						// SOMETHING TO RESERVE IT FOR. `pr-21` keeps the title clear of the
-						// OVERLAID `Know more`; with no control there it was 84px taken off
-						// every title-only card for a neighbour that never arrives. The title's
-						// LEFT edge does not move either way, so a card with the control and a
-						// card without differ by the control alone.
-						className={`block w-full rounded-(--r-chip) text-left hover:bg-n1 hover:underline${
-							knowMore ? " pr-21" : ""
-						}`}
-						onClick={() => onEnter(post.id)}
-					>
-						<h3 className="line-clamp-2 font-heading text-base leading-snug font-medium">
-							{post.title}
-						</h3>
-					</button>
-					{/* ⚠⚠ UI-QUICK change set 1 items 4 + 5 — THE `+` BECOMES `Know more`
+						<button
+							type="button"
+							// ⚠ UI-OVERNIGHT entry 5 — THE GUTTER IS RESERVED ONLY WHEN THERE IS
+							// SOMETHING TO RESERVE IT FOR. `pr-21` keeps the title clear of the
+							// OVERLAID `Know more`; with no control there it was 84px taken off
+							// every title-only card for a neighbour that never arrives. The title's
+							// LEFT edge does not move either way, so a card with the control and a
+							// card without differ by the control alone.
+							className={`block w-full rounded-(--r-chip) text-left hover:bg-n1 hover:underline${
+								knowMore ? " pr-21" : ""
+							}`}
+							onClick={() => onEnter(post.id)}
+						>
+							<h3 className="line-clamp-2 font-heading text-base leading-snug font-medium">
+								{post.title}
+							</h3>
+						</button>
+						{/* ⚠⚠ UI-QUICK change set 1 items 4 + 5 — THE `+` BECOMES `Know more`
 				    AND GAINS A NEIGHBOUR. The two controls are one right-aligned row in
 				    the gutter the title reserves, download on the LEFT.
 				    ⚠ THE BEHAVIOUR IS UNCHANGED — this is a label swap. The `+` opened
@@ -320,16 +405,16 @@ export function PostCard({
 				    it a flex sibling would reproduce the measured defect row 24 fixed
 				    (title 628px → 104px, the widest delta in the phase-1 table). The
 				    gutter grows; the mechanism does not change. */}
-					{knowMore ? (
-						<KnowMore
-							label="Know more about this argument"
-							onClick={() => onOpenPopup(post)}
-							className="absolute right-0 bottom-0"
-						/>
-					) : null}{" "}
-				</div>
-			) : null}
-			{/* ⛔⛔ QUOTE-1 C — THE EMPTY ARM DRAWS THE WELL (founder-ruled
+						{knowMore ? (
+							<KnowMore
+								label="Know more about this argument"
+								onClick={() => onOpenPopup(post)}
+								className="absolute right-0 bottom-0"
+							/>
+						) : null}{" "}
+					</div>
+				) : null}
+				{/* ⛔⛔ QUOTE-1 C — THE EMPTY ARM DRAWS THE WELL (founder-ruled
 			    2026-09-11, design-canon `C-QUOTE-1`, SPEC.1 2.0.2). ⚠ THIS COMMENT SAID
 			    "THE EMPTY ARM DRAWS NOTHING AGAIN" and it is corrected here rather than
 			    appended to, because a docblock that describes the superseded branch at
@@ -358,7 +443,7 @@ export function PostCard({
 			    placeholder's testid and the string `POST IMAGE`, and a well carries
 			    neither — mounting one here leaves every test in that file GREEN, which was
 			    measured rather than assumed. */}
-			{/* ⚠⚠ `.argimg` (`d5:648`) — THE CELL, and the founder's measured defect.
+				{/* ⚠⚠ `.argimg` (`d5:648`) — THE CELL, and the founder's measured defect.
 			    `flex:1 1 auto;min-height:0;display:flex;align-items:center;
 			    justify-content:center`: the attachment takes the card's whole
 			    leftover height and sits CENTRED in it. Measured in the mockup — the
@@ -371,11 +456,11 @@ export function PostCard({
 			    `Card` and the scroller wrapper gained `flex-1 min-h-0` in the same
 			    commit. Break any of those three and the image silently reverts to
 			    intrinsic size — the exact failure mode being fixed. */}
-			<div className="flex min-h-0 flex-1 items-center justify-center">
-				{post.imageUrl ? (
-					<CommentImage url={post.imageUrl} onOpen={onOpenImage} fill />
-				) : (
-					/* ⚠⚠ `h-full`, NOT `max-h-full`, AND THE DIFFERENCE IS WHETHER THE WELL
+				<div className="flex min-h-0 flex-1 items-center justify-center">
+					{post.imageUrl ? (
+						<CommentImage url={post.imageUrl} onOpen={onOpenImage} fill />
+					) : (
+						/* ⚠⚠ `h-full`, NOT `max-h-full`, AND THE DIFFERENCE IS WHETHER THE WELL
 					   SCALES AT ALL. The `<svg>`'s own `max-h-full` is a PERCENTAGE, and a
 					   percentage max-height resolves to `none` unless an ancestor has a
 					   DEFINITE height — the exact failure the cell's own docblock above
@@ -401,8 +486,8 @@ export function PostCard({
 					   WELL yields (it is the flexible item) and the control never clips. That
 					   is the priority the canon sets — a picture that scales beside a control
 					   that does not. */
-					<div className="qstack flex h-full w-full max-w-[545px] min-h-0 flex-col items-end">
-						{/* ⚠⚠ THE WELL IS THE TITLE, SO IT CARRIES THE TITLE'S DESTINATION —
+						<div className="qstack flex h-full w-full max-w-[545px] min-h-0 flex-col items-end">
+							{/* ⚠⚠ THE WELL IS THE TITLE, SO IT CARRIES THE TITLE'S DESTINATION —
 						    `onEnter`, the same handler on the same post, lifted off the row
 						    above rather than invented here. Canon clause 2 says the well IS the
 						    title "in the heading element the title row used"; the element and
@@ -455,25 +540,27 @@ export function PostCard({
 						    definite height to resolve against. Wrapping it in a plain `<div>`
 						    and leaving the button outside would add a level with no height and
 						    the well would silently stop scaling. */}
-						<div className="flex min-h-0 w-full flex-1 items-center justify-center">
-							<button
-								type="button"
-								aria-label={post.title}
-								className="flex h-full max-w-full items-center justify-center"
-								onClick={() => onEnter(post.id)}
-							>
-								<QuoteWell title={post.title} />
-							</button>
+							<div className="flex min-h-0 w-full flex-1 items-center justify-center">
+								<button
+									type="button"
+									aria-label={post.title}
+									className="flex h-full max-w-full items-center justify-center"
+									onClick={() => onEnter(post.id)}
+								>
+									<QuoteWell text={post.title} postId={post.id} />
+								</button>
+							</div>
+							{knowMore ? (
+								<KnowMore
+									label="Know more about this argument"
+									onClick={() => onOpenPopup(post)}
+									className="mt-2 shrink-0"
+								/>
+							) : null}
 						</div>
-						{knowMore ? (
-							<KnowMore
-								label="Know more about this argument"
-								onClick={() => onOpenPopup(post)}
-								className="mt-2 shrink-0"
-							/>
-						) : null}
-					</div>
-				)}
+					)}
+				</div>
+				{rail ? <div className={railSlot}>{rail}</div> : null}
 			</div>
 
 			{/* Row 23 — `Open debate` is GONE from the present branch: the title
@@ -488,6 +575,7 @@ export function PostCard({
 				postSide={post.sideAtPostTime}
 				triggers={triggers}
 				band={unboxed}
+				inColumn={inColumn}
 			/>
 		</Card>
 	);

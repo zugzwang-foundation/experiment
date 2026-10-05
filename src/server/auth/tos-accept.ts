@@ -1,19 +1,10 @@
 "use server";
 
-import { eq, sql } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { v7 as uuidv7 } from "uuid";
-import { db } from "@/db";
-import { users } from "@/db/schema/auth";
 import { auth } from "@/server/auth";
 import { verifyOnboardingRef } from "@/server/auth/onboarding-ref";
-import {
-	PRIVACY_VERSION_HASH,
-	TOS_VERSION_HASH,
-} from "@/server/auth/tos-versions";
-import { grantInitialDharma } from "@/server/dharma/grant";
-import { insertEvent } from "@/server/events/insert";
+import { recordTosAcceptance } from "@/server/auth/tos-record";
 import {
 	getClientIp,
 	TRUSTED_CLIENT_IP_HEADER,
@@ -21,8 +12,10 @@ import {
 import { safeCaptureException } from "@/server/observability/safe-capture";
 
 // F-AUTH-4 ToS acceptance Server Action per SPEC.1 §13 + SPEC.2 §3.5 line
-// 281 + plan §4 step 3. Verifies the signed `onboarding_ref` cookie, opens
-// a SERIALIZABLE transaction, and writes 5-column acceptance evidence:
+// 281 + plan §4 step 3. Verifies the signed `onboarding_ref` cookie, then
+// calls `recordTosAcceptance` (src/server/auth/tos-record.ts — the transaction
+// body moved there verbatim at SEED-STAGING-1, and the notes below describe
+// it), which writes 5-column acceptance evidence:
 //
 //   UPDATE users SET tos_accepted_at = now(),
 //                    tos_version_hash, privacy_version_hash,
@@ -119,20 +112,11 @@ export async function acceptTosAction(
 	const ip = getIp(headerStore);
 	const ua = getUserAgent(headerStore);
 
-	// eventId generated at handler entry per ADR-0016 D1 + ENGINE.6 plan
-	// V6; reused across any SERIALIZABLE retry so the composite-PK
-	// ON CONFLICT dedupes the events row on retry (LD-8 + LD-9).
 	// metadata 7-field set per SPEC.2 §3.7; request_id 'unknown' is the
 	// S-C deferral placeholder until HARDEN.* request-context middleware
-	// populates at handler entry.
-	const eventId = uuidv7();
-	// grantEventId minted at handler entry BESIDE eventId, both closed over,
-	// NEVER regenerated per attempt (retry purity — ADR-0016 D1; the
-	// ENGINE.12 creditEventId precedent). Minting order is load-bearing for
-	// log chronology: events-row created_at derives from the UUIDv7 ms
-	// prefix (insert.ts), so user.tos_accepted ≤ dharma.granted in the log
-	// regardless of INSERT order inside the tx.
-	const grantEventId = uuidv7();
+	// populates at handler entry. The event ids (user.tos_accepted +
+	// dharma.granted) are minted once inside `recordTosAcceptance`, before
+	// its transaction opens and never per attempt (ADR-0016 D1).
 	const metadata = {
 		request_id: "unknown",
 		flow_id: "F-AUTH-4",
@@ -146,65 +130,17 @@ export async function acceptTosAction(
 	// Whether a real users row was found (first-acceptance OR tab-race
 	// no-op — either way there is a real user to issue a session for).
 	// False only on the missing-row branch, where there is nobody to
-	// create a session for. The transaction's own return value (not a
-	// mutated closure variable) — no staleness hazard if a retry loop is
-	// ever added here.
-	const userExists = await db.transaction(async (tx) => {
-		// Per plan §5 failure mode #11 + SPEC.1 line 703: `SELECT … FOR
-		// UPDATE` acquires a row-level lock so concurrent tabs serialize
-		// through this point. The second tab BLOCKS on this SELECT until
-		// the first tab's tx commits; on unblock it re-reads via
-		// findFirst() below and sees `tos_accepted_at IS NOT NULL`, taking
-		// the no-op branch. Issued as raw SQL (Drizzle RQB findFirst has
-		// no `.for("update")` equivalent).
-		await tx.execute(sql`SELECT 1 FROM users WHERE id = ${userId} FOR UPDATE`);
-
-		const row = await tx.query.users.findFirst({
-			where: eq(users.id, userId),
-			columns: { id: true, pseudonym: true, tosAcceptedAt: true },
-		});
-		if (!row) return false; // User row missing — silent no-op
-		if (row.tosAcceptedAt !== null) return true; // Tab-race idempotent no-op
-
-		// Five-column acceptance evidence in one tx per SPEC.2 §3.5 line 281.
-		// Raw SQL via tx.execute so the column-name surface is explicit and
-		// asserted in tos.test.ts via regex on the issued SQL.
-		await tx.execute(sql`
-			UPDATE users
-			SET tos_accepted_at = now(),
-			    tos_version_hash = ${TOS_VERSION_HASH},
-			    privacy_version_hash = ${PRIVACY_VERSION_HASH},
-			    tos_acceptance_ip = ${ip},
-			    tos_acceptance_user_agent = ${ua}
-			WHERE id = ${userId}
-		`);
-
-		// ENGINE.13 R1a: the equal initial grant, on the first-acceptance
-		// branch only — one dharma_ledger(initial_grant) row + one
-		// events(dharma.granted) row, same tx, SAME metadata object as the
-		// tos event (same flow F-AUTH-4, same self-actor). In-tx write order:
-		// users (FOR UPDATE → UPDATE) → dharma_ledger → events — strictly.
-		await grantInitialDharma(tx, { userId, grantEventId, metadata });
-
-		// ENGINE.6 §D.2: emission INSIDE the existing tx. Commits atomic
-		// with the UPDATE — either both rows persist or neither (V3 sync
-		// emission). Early-return branches above (missing user / tab-race
-		// no-op) skip this emission as intended.
-		await insertEvent(tx, {
-			eventId,
-			eventType: "user.tos_accepted",
-			aggregateType: "user",
-			aggregateId: userId,
-			payload: {
-				userId,
-				tosVersionHash: TOS_VERSION_HASH,
-				privacyVersionHash: PRIVACY_VERSION_HASH,
-				ip,
-				userAgent: ua,
-			},
-			metadata,
-		});
-		return true;
+	// create a session for. The evidence transaction itself — the FOR UPDATE
+	// lock-then-recheck that serializes concurrent tabs (plan §5 failure mode
+	// #11 + SPEC.1 line 703), the five-column UPDATE (SPEC.2 §3.5 line 281),
+	// the first-acceptance-only grant (ENGINE.13 R1a) and the in-tx
+	// `user.tos_accepted` emit (ENGINE.6 §D.2) — lives in tos-record.ts,
+	// moved verbatim (SEED-STAGING-1).
+	const userExists = await recordTosAcceptance({
+		userId,
+		ip,
+		userAgent: ua,
+		metadata,
 	});
 
 	// AUTH-DBL-1 — issue the session now that the evidence tx has

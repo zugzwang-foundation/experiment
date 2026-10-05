@@ -55,6 +55,9 @@ export function CommentImage({
 	 * ⚠ DEFAULT `false` KEEPS THE FOCUS-HEADER ARM BYTE-IDENTICAL. `.hpimg`
 	 * (`d5:787`) is a fixed side slot, not a growing cell, and `PostFocusHeader`
 	 * renders it inside its own `shrink-0` wrapper.
+	 * ⚠ UIR-4 item 2 — NO LONGER: the focus header's `.hpimg` is now a column
+	 * box the image fills, so it passes `fill` too, and no mount renders the
+	 * default any more.
 	 */
 	fill?: boolean;
 	className?: string;

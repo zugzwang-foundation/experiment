@@ -62,7 +62,7 @@ afterEach(() => {
 });
 
 const POINTER_QUERY = "(hover: hover) and (pointer: fine)";
-const TIER_QUERY = "not all and (min-width: 640px)";
+const TIER_QUERY = "not all and (min-width: 820px)";
 
 function mockMatchMedia(pointerFine: boolean, phone: boolean): void {
 	window.matchMedia = ((query: string) => ({
@@ -249,14 +249,15 @@ describe("phone — the viewer's own post (D-52 R1)", () => {
 	});
 });
 
-describe("phone friendly-fire — the CARD is untouched (G14 · card)", () => {
-	it("phone-ff::the-phone-post-card-carries-no-friendly-fire-element", () => {
+describe("phone friendly-fire — the CARD wears the post tag with its Đ (founder ruling 2026-10-04, reversing G14 · card)", () => {
+	it("phone-ff::the-phone-post-card-carries-the-post-tag-and-never-the-reply-tag", () => {
 		mount(fixturePost(), null);
 		const yesPane = screen.getByTestId("phone-pane-YES");
-		const html = yesPane.innerHTML;
-		expect(html).not.toContain('data-testid="ff-');
-		expect(html).not.toContain("Friendly fire");
-		expect(html).not.toContain("friendly-fire");
+		const tag = yesPane.querySelector('[data-testid="ff-post-tag"]');
+		expect(tag?.innerHTML).toContain("Friendly fire");
+		expect(tag?.innerHTML).toContain("Đ 25");
+		// The reply's own flag is a different question and stays off the card.
+		expect(yesPane.innerHTML).not.toContain('data-testid="ff-tag"');
 		// POSITIVE CONTROL — the same model's thread pane DOES carry the strings.
 		cleanup();
 		mount(fixturePost(), "p1");

@@ -62,6 +62,18 @@ const SCAN_FILES = [
 // 8/6/4/3-digit forms, longest-first — alpha hex (#rrggbbaa/#rgba) is the
 // likeliest smuggle spelling of the A2+ white/black-alpha treatments
 // (@code-reviewer, UI.A1).
+/**
+ * UIR-9 — the ONE ruled exception. The founder reopened the monochrome rule on
+ * 2026-09-29 for a text-only post's picture fill alone, and admitted exactly
+ * the sixteen fill/mark pairs in this file (its docblock records the ruling).
+ * They stay literals because the server-side share-image renderer
+ * (src/server/debate-export/image/compose.ts) imports them and cannot resolve a
+ * CSS token. The exception is the file, pinned to its sixteen pairs below, so
+ * it cannot quietly grow into a second palette.
+ */
+const RULED_COLOUR_FILES = ["src/components/debate/quote-well/palette.ts"];
+const RULED_PAIRS = 16;
+
 const HEX_LITERAL =
 	/#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})\b/;
 
@@ -86,10 +98,11 @@ function stripComments(source: string): string {
 }
 
 describe("view layer — no raw hex colour literals", () => {
+	const ruled = new Set(RULED_COLOUR_FILES.map((f) => join(ROOT, f)));
 	const files = [
 		...SCAN_DIRS.flatMap(tsxFilesUnder),
 		...SCAN_FILES.map((f) => join(ROOT, f)),
-	];
+	].filter((file) => !ruled.has(file));
 
 	it("scans a non-empty view-layer file set (guard is alive)", () => {
 		expect(files.length).toBeGreaterThan(20);
@@ -105,5 +118,15 @@ describe("view layer — no raw hex colour literals", () => {
 			})
 			.filter((hit): hit is string => hit !== null);
 		expect(offenders).toEqual([]);
+	});
+
+	it("the ruled exception holds exactly its sixteen fill/mark pairs", () => {
+		for (const f of RULED_COLOUR_FILES) {
+			const hexes =
+				stripComments(readFileSync(join(ROOT, f), "utf8")).match(
+					new RegExp(HEX_LITERAL.source, "g"),
+				) ?? [];
+			expect(hexes.length, f).toBe(RULED_PAIRS * 2);
+		}
 	});
 });

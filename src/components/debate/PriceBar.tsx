@@ -126,8 +126,8 @@ export function PriceBar({
 			>
 				{/* Width is a data-driven length (the price proportion) — a string
 				    percentage, not float math (CLAUDE.md §2). */}
-				<div className="h-full bg-yes" style={{ width: yesPct }} />
-				<div className="h-full flex-1 bg-no" />
+				<div className="h-full bg-bar-yes" style={{ width: yesPct }} />
+				<div className="h-full flex-1 bg-bar-no" />
 			</div>
 			<PriceLabel side="NO" pct={noPct} className={label} pick={pick} />
 		</div>

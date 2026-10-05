@@ -1,54 +1,26 @@
 "use client";
 
-import { ArrowLeft, House } from "lucide-react";
+import { House } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-
-import { cn } from "@/lib/utils";
+import { usePathname } from "next/navigation";
 
 import { HEADER_ICON_BUTTON } from "./header-control";
 
 /**
- * Left-zone nav pair — Back (leftmost, the v0.2 swap) then Home. 34×34
+ * Left-zone nav — Home, the zone's first item. 34×34 header icon button per the
+ * values-log register (§3 item 3): rest --btn-fill + hairline, hover border →
+ * --ring (fill unchanged), pressed --state-pressed-fill, focus the 2px light
+ * ring, icon 15px ink.
  *
- * ⚠ **A PAIR ONLY AT AND ABOVE 640px.** Below `--breakpoint-mobile` Back does not
- * render at all (ADR-0051 A9 D-3) and this is a single control. Everything below
- * about Back describes the DESKTOP control; the reasoning for the phone is on the
- * `mobileResponsive` prop. Said here because a reader who stops at the component
- * docblock — the thing the file is named by — would otherwise carry the
- * superseded picture into every line under it.
- * header icon buttons per the values-log register (§3 item 3): rest
- * --btn-fill + hairline, hover border → --ring (fill unchanged), pressed
- * --state-pressed-fill, focus the 2px light ring, icon 15px ink.
- *
- * Back disables when there is no in-app history (fresh tab / deep-link) —
- * default-disabled until mount, then the `history.length` heuristic. The
- * heuristic counts cross-origin entries too, so an enabled Back can exit
- * the app: accepted-known at A1 (plan §5); the W2.3 history-stack contract
- * matures as more surfaces land (A4+).
- *
- * ROOT IS GATED UNCONDITIONALLY (POLISH-1a V5). When `/` is the entry point —
- * the common case, since `/` is where the app starts — every entry below it is
- * cross-origin, so an enabled Back walks OFF-SITE. The depth heuristic cannot
- * tell that apart from the `/` → market → Home loop, where the entry below IS
- * in-app; so gating `/` unconditionally does cost a usable Back in that second
- * flow. Accepted deliberately: leaving the app by accident is the worse
- * failure, and the W2.3 history-stack contract is where the two get told apart
- * properly.
- *
- * THE PROBE RE-RUNS ON EVERY ROUTE CHANGE (Gate C). It was mount-only, and
- * `HeaderNav` lives in `(public)/layout.tsx`, which SURVIVES soft navigation —
- * so `hasHistory` froze for the whole session. A viewer arriving DIRECTLY at
- * `/` (typed URL or bookmark — the staging-test and demo path) started at
- * `history.length === 1`, and Back then stayed dead on every subsequent route
- * however deep the stack got, which made V5's stated behaviour false in a
- * common case. `[pathname]` deps fix it: the depth is re-read wherever the
- * route lands.
- *
- * The two terms still answer different questions — "is there anywhere to go?"
- * (the probe) vs "is this the root?" (the pathname term, evaluated at RENDER,
- * so the root gate never waits on an effect).
+ * ⛔ UIR-1 item 5 — BACK IS GONE AT EVERY WIDTH. It was the pair's first
+ * control (`←`, `router.back()` behind a `history.length` probe); below 640px
+ * ADR-0051 A9 D-3 had already stopped rendering it, and UIR-1 withdraws it at
+ * 640px and up, so Home moves into its slot and the controls after Home close
+ * up by its 34px and the zone's 8px gap. The probe, the root gate and the
+ * cross-origin caveats this docblock carried existed only for Back and left
+ * with it. The way to a page's parent is the page's own link now — the replies
+ * page's `FocusMarketCard` (`Back to the market`), `/sign-in/otp`'s link to
+ * `/sign-in` — and Home everywhere.
  *
  * Home carries `aria-current` at `/` — live since UI.A4 put Discovery on `/`
  * inside this shell (it was moot at A1, when no header rendered there).
@@ -56,79 +28,31 @@ import { HEADER_ICON_BUTTON } from "./header-control";
 /**
  * ⚠ MOBILE-2n · R-5 — THE REGISTER MOVED OUT OF THIS FILE AND THE ALIAS STAYS.
  * `header-control.ts` now owns the string, because the phone's GitHub control
- * wears the same box and "the same box" has to be one literal to stay true. The
- * local name is kept so the three call sites below take zero diff — the value is
- * byte-identical, which is what keeps Back and Home unmoved at 1440.
+ * wore the same box and "the same box" has to be one literal to stay true. The
+ * local name is kept so the call site below takes zero diff — the value is
+ * byte-identical, which is what keeps Home unmoved at 1440.
  */
 const ICON_BUTTON = HEADER_ICON_BUTTON;
 
-export function HeaderNav({
-	mobileResponsive = false,
-}: {
+export function HeaderNav(_props: {
 	/**
-	 * ⛔⛔ MOBILE-2m · R-3 / ADR-0051 A9 D-3 — BACK IS NOT RENDERED BELOW 640px ON
-	 * ANY ROUTE, AND THE HIDE IS GATED ON THIS PROP RATHER THAN WRITTEN
-	 * UNCONDITIONALLY.
-	 *
-	 * The gate is the prop chain, not the file boundary (AGENTS.md §8). This
-	 * component is a static child of `GlobalHeader`, which BOTH layouts mount — so
-	 * an unconditional `max-mobile:hidden` here would reach `(auth)` exactly as
-	 * surely as `(public)`, which is how three ungated classes once shipped onto
-	 * `/sign-in` through `RulesControl` → `OnboardingDeck`. Both mounts opt in
-	 * today, so the rendered outcome is the same either way; what the gate buys is
-	 * that a THIRD mount inherits the desktop header by omission, and that "which
-	 * surfaces reflow" stays a decision a LAYOUT makes.
-	 *
-	 * ⚠ WHY THE CONTROL CAN GO AT ALL, given this file's own long argument for
-	 * keeping it: Back exists here because the depth heuristic cannot tell an
-	 * in-app step from a cross-origin one, and the control is the hedge. A phone
-	 * has a system back gesture that is strictly better informed than the
-	 * heuristic — it knows the real stack — and the tier already carries its own
-	 * Back in `PhoneTitleStrip` for the one screen that needs an in-page one. So
-	 * below 640 this control is a third answer to a question two better ones
-	 * already answer, occupying 42px of the row whose scarcity is what makes the
-	 * brand mark shrink to nothing (see `GlobalHeader`'s shock-absorber note).
-	 *
-	 * ⛔ HIDDEN, NOT UNMOUNTED. `max-mobile:hidden` is a paint decision; the
-	 * button, its handler and its `history.length` probe are untouched, so nothing
-	 * about the desktop control's behaviour is reachable from this change and a
-	 * resize across the tier restores it with its state intact.
+	 * ⚠ INERT SINCE UIR-1 item 5. It gated Back's `max-mobile:hidden` (ADR-0051
+	 * A9 D-3); with Back gone there is nothing left here to gate. It stays in the
+	 * signature so `GlobalHeader`'s prop chain, and every caller, is unchanged.
 	 */
 	mobileResponsive?: boolean;
 }) {
-	const router = useRouter();
 	const pathname = usePathname();
-	const [hasHistory, setHasHistory] = useState(false);
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: pathname is a re-run TRIGGER, not a read. HeaderNav survives soft nav, so [] freezes history.length at first mount — a user landing directly on / gets Back dead for the whole session. Do not remove.
-	useEffect(() => {
-		setHasHistory(window.history.length > 1);
-	}, [pathname]);
-
-	const canGoBack = pathname !== "/" && hasHistory;
 
 	return (
-		<>
-			<button
-				type="button"
-				disabled={!canGoBack}
-				aria-disabled={!canGoBack}
-				aria-label="Back"
-				title="Back"
-				onClick={() => router.back()}
-				className={cn(ICON_BUTTON, mobileResponsive && "max-mobile:hidden")}
-			>
-				<ArrowLeft aria-hidden="true" />
-			</button>
-			<Link
-				href="/"
-				aria-label="Home"
-				title="Home"
-				aria-current={pathname === "/" ? "page" : undefined}
-				className={ICON_BUTTON}
-			>
-				<House aria-hidden="true" />
-			</Link>
-		</>
+		<Link
+			href="/"
+			aria-label="Home"
+			title="Home"
+			aria-current={pathname === "/" ? "page" : undefined}
+			className={ICON_BUTTON}
+		>
+			<House aria-hidden="true" />
+		</Link>
 	);
 }

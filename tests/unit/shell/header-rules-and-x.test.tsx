@@ -226,7 +226,9 @@ describe("MKT-ROSTER-1-P3 — the X control takes the vacated left-zone slot", (
 		// DESKTOP render. X is decorative and off-site, so it hides at the tier
 		// exactly where the GitHub control does; what may not happen is the hide
 		// reaching a third mount that never asked to reflow.
-		const V = "max-mobile";
+		// TABLET-1: X hides below 640 (`max-sm`) and again from 820 to 1279 — it is
+		// visible on the 640-819 tablet band and at >=1280.
+		const V = "max-sm";
 		const S = ":";
 		const HIDE = `${V}${S}hidden`;
 

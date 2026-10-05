@@ -315,6 +315,9 @@ describe("debate-view::poll-preserves-removal-masking", () => {
 		);
 		expect(routes).toEqual([
 			"src/app/(admin)/admin/markets/media/sign/route.ts",
+			// SEED-STAGING-1 / ADR-0064 — the staging-only seeding handlers.
+			"src/app/(admin)/admin/seed/preview/route.ts",
+			"src/app/(admin)/admin/seed/run/route.ts",
 			IMAGE_ROUTE,
 			EXPORT_ROUTE,
 			"src/app/(public)/m/[slug]/quote/route.ts",

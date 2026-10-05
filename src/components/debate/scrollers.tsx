@@ -338,18 +338,15 @@ export function PostScroller({
 	return (
 		// HTML-FINISH · MARKET DETAIL row 18 — d5's `.pscroll` is a VERTICAL rail
 		// BESIDE the card (`:887`), replacing the horizontal prev/next strip that
-		// sat under it. `items-stretch` is what lets the rail's track fill the
-		// card's height rather than needing d5's fixed `92px`.
+		// sat under it. ⚠ UIR-2 item 2 — it is no longer this row's sibling: it
+		// is handed to `PostCard` as `rail` and sits inside the card, on the same
+		// inner edge, between the author row and the Support/Counter row.
 		//
 		// ⚠⚠ `flex-1 min-h-0` IS NEW AND IT IS LOAD-BEARING: it is what gives
 		// `PostCard`'s `.argimg` cell a height to take a share of. Without it this
 		// wrapper is content-sized and the image reverts to intrinsic size — the
 		// founder's measured "~¼ size" defect, one link up the chain.
-		<div
-			className={`flex min-h-0 flex-1 items-stretch gap-2 ${
-				railFirst ? "flex-row-reverse" : ""
-			}`}
-		>
+		<div className="flex min-h-0 flex-1 items-stretch gap-2">
 			<div className="flex min-w-0 flex-1 flex-col gap-2">
 				<PostCard
 					post={post}
@@ -361,30 +358,46 @@ export function PostScroller({
 					marketOpen={marketOpen}
 					suspended={suspended}
 					isOwnPost={ownPostIds?.includes(post.id) ?? false}
+					// FEED-3 — the column draws the card's rectangle, so the card draws
+					// none; with the card's box gone, the rail beside it sits inside
+					// that one rectangle along its inner edge.
+					inColumn
+					// UIR-1 item 3 — which side of the card the rail takes: the
+					// column's inner edge, the side `railFirst` has always picked.
+					railSide={
+						posts.length > 1 ? (railFirst ? "left" : "right") : undefined
+					}
+					// UIR-2 item 2 — the rail goes INTO the card, between its author
+					// row and its Support/Counter row, instead of beside it.
+					rail={
+						posts.length > 1 ? (
+							<ScrollRail
+								index={index}
+								total={posts.length}
+								noun="post"
+								// d5's `.psbtn` handler is `pickSide(side); step(side, ±1)` (`:1780`,
+								// `:1781`) — touching an arrow takes the column off the timer, so the
+								// reader is never fighting an advance they did not ask for.
+								onPrev={() => {
+									auto?.onPick();
+									step(-1);
+								}}
+								onNext={() => {
+									auto?.onPick();
+									step(1);
+								}}
+								durationMs={
+									auto === undefined || auto.picked || auto.frozen
+										? null
+										: ADVANCE_MS
+								}
+								progressKey={progressKey}
+								fit
+							/>
+						) : undefined
+					}
 				/>
 			</div>
-			{posts.length > 1 ? (
-				<ScrollRail
-					index={index}
-					total={posts.length}
-					noun="post"
-					// d5's `.psbtn` handler is `pickSide(side); step(side, ±1)` (`:1780`,
-					// `:1781`) — touching an arrow takes the column off the timer, so the
-					// reader is never fighting an advance they did not ask for.
-					onPrev={() => {
-						auto?.onPick();
-						step(-1);
-					}}
-					onNext={() => {
-						auto?.onPick();
-						step(1);
-					}}
-					durationMs={
-						auto === undefined || auto.picked || auto.frozen ? null : ADVANCE_MS
-					}
-					progressKey={progressKey}
-				/>
-			) : null}
 		</div>
 	);
 }
@@ -454,6 +467,8 @@ export function ReplyScroller({
 					onOpenImage={onOpenImage}
 					onOpenPopup={onOpenPopup}
 					postOrdinal={postOrdinal}
+					// FEED-3 — same as the post card: the column is the rectangle.
+					inColumn
 				/>
 			</div>
 			{replies.length > 1 ? (

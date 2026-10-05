@@ -165,12 +165,8 @@ describe("phone thread — the partition is the model's (guard 14)", () => {
 	it("phone-thread::a-same-side-reply-counts-under-Support-and-the-opposite-under-Counter", () => {
 		mountThread();
 		expect(screen.getByTestId("phone-debate-view").dataset.arm).toBe("thread");
-		expect(screen.getByTestId("phone-tab-support").textContent).toBe(
-			"Support2",
-		);
-		expect(screen.getByTestId("phone-tab-counter").textContent).toBe(
-			"Counter1",
-		);
+		expect(screen.getByTestId("phone-tab-support").textContent).toBe("Support");
+		expect(screen.getByTestId("phone-tab-counter").textContent).toBe("Counter");
 		// The panes carry the right occupants, which is the half a count alone
 		// cannot prove — two replies in the wrong panes give the same two counts.
 		expect(screen.getByTestId("phone-pane-support").textContent).toContain(

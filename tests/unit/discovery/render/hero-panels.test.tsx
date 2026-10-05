@@ -440,7 +440,7 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 
 		// `.barrow.r` — one flex row, gap 9px, 16px bar.
 		expect(bar.getAttribute("class")).toContain("flex items-center gap-[9px]");
-		const track = bar.querySelector(".bg-no");
+		const track = bar.querySelector(".bg-bar-no");
 		expect(track?.getAttribute("class")).toContain("h-[16px]");
 
 		// Both figures render, grouped by the shared formatter.
@@ -451,7 +451,7 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 
 		// Fill = support / (support + counter) = 3800/10000 = 38%, integer-
 		// truncated by the shipped `computeSplitBar`.
-		const fill = bar.querySelector<HTMLElement>(".bg-yes");
+		const fill = bar.querySelector<HTMLElement>(".bg-bar-yes");
 		expect(fill?.style.width).toBe("38%");
 
 		// No text inside the bar itself — the mockup puts the labels outside.
@@ -482,9 +482,10 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		);
 	});
 
-	it("render::v17-both-zero-renders-an-even-bar", () => {
-		// The mockup's `tot ? … : 50` (:458). `computeSplitBar` returns "0%" for an
-		// empty total — right inside a composer, wrong on a resting hero panel.
+	it("render::v17-both-zero-renders-a-grey-bar-not-the-poles", () => {
+		// Founder ruling 2026-10-02 replaces the mockup's even `tot ? … : 50`
+		// (:458): with nothing staked on either side the bar is a grey track
+		// with no fill — no green, no red — as the profile's bar already is.
 		const empty = {
 			...heroPost("YES"),
 			replyCount: 0,
@@ -494,7 +495,8 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		};
 		renderHero({ yes: empty, no: null });
 		const bar = screen.getByTestId("hero-split-bar-YES");
-		expect(bar.querySelector<HTMLElement>(".bg-yes")?.style.width).toBe("50%");
+		expect(bar.querySelector(".bg-bar-yes, .bg-bar-no")).toBeNull();
+		expect(bar.querySelector(".bg-n2")).not.toBeNull();
 		// Đ 0 is data AVAILABLE — both figures still render.
 		expect(bar.getAttribute("aria-label")).toBe("Support Đ 0, Counter Đ 0");
 	});
@@ -703,12 +705,12 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 			trackOf(bar).getAttribute("class") ?? "";
 
 		// YES post: Support = YES = black fill, Counter = NO = white track.
-		expect(fillOf(yesBar)).toContain("bg-yes");
-		expect(trackClassOf(yesBar)).toContain("bg-no");
+		expect(fillOf(yesBar)).toContain("bg-bar-yes");
+		expect(trackClassOf(yesBar)).toContain("bg-bar-no");
 
 		// NO post: the poles SWAP. Support = NO = white fill, Counter = YES.
-		expect(fillOf(noBar)).toContain("bg-no");
-		expect(trackClassOf(noBar)).toContain("bg-yes");
+		expect(fillOf(noBar)).toContain("bg-bar-no");
+		expect(trackClassOf(noBar)).toContain("bg-bar-yes");
 
 		// The load-bearing assertion, stated as a difference rather than as two
 		// independent facts: a fixed-pole regression makes these equal, and any
@@ -722,8 +724,8 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		// `background:var(--n0)` — both light-theme tokens that would invert here.
 		renderHero({ yes: heroPost("YES"), no: null });
 		const bar = screen.getByTestId("hero-split-bar-YES");
-		expect(bar.querySelector(".bg-yes")).not.toBeNull();
-		expect(bar.querySelector(".bg-no")).not.toBeNull();
+		expect(bar.querySelector(".bg-bar-yes")).not.toBeNull();
+		expect(bar.querySelector(".bg-bar-no")).not.toBeNull();
 		expect(bar.innerHTML).not.toContain("bg-ink");
 		expect(bar.innerHTML).not.toContain("bg-n0");
 	});

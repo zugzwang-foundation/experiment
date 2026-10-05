@@ -180,8 +180,12 @@ export function MarketCard({
 					    side gives it, so releasing the clamp changes nothing the
 					    reader sees today. What it changes is the failure mode: a
 					    seventh market with a longer question grows its tile instead of
-					    silently losing the end of its own sentence. Below 1280 the
-					    clamp stands — there the column is too narrow to take the risk.
+					    silently losing the end of its own sentence. It is released from
+					    the 820px desktop tier (`mobile:`), not only at xl: below 1280
+					    the column is narrower, so a long question takes a third line
+					    and its tile (and that grid row) grows by one line — a little
+					    page height on a small laptop, never a lost end of the
+					    question. Phones keep the clamp.
 					    ⛔⛔ AND THE TYPE GOES TO 14px AT xl, WHICH COSTS NOTHING. The
 					    tile's height is `max(picture, column)` and the picture is the
 					    taller side at every size this tile has worn: at 13.5px the column
@@ -198,9 +202,11 @@ export function MarketCard({
 					    tile, not by reading this class back: the property is inert if the
 					    element inherits a `white-space` that forbids wrapping, and a class
 					    string cannot tell you whether that happened.
-					    ⚠ It is `xl:`-scoped because below the tier the title is still
-					    `line-clamp-2`, and balancing the lines of a block that is about to
-					    be truncated changes which words the reader loses.
+					    ⚠ It is `xl:`-scoped because it was written when everything below
+					    the tier was still `line-clamp-2`, and balancing the lines of a
+					    block that is about to be truncated changes which words the reader
+					    loses. Phones still clamp; 820–1279 no longer does and is left
+					    unbalanced only because nothing measured it.
 					    ⛔ 14px IS THE FLOOR AND IT IS NOT AN AESTHETIC ONE. The stat row
 					    below the title is 12px; a 13px title is level with its own
 					    metadata, which makes the question read as another tag rather than
@@ -232,7 +238,7 @@ export function MarketCard({
 					    Both halves are stated for that reason, and the unitless 1.3
 					    scales with the size rather than pinning a px that would have to
 					    move again. */}
-					<h3 className="line-clamp-2 text-[13.5px] leading-[1.32] font-semibold xl:line-clamp-none xl:text-[14px] xl:leading-[1.3] xl:text-balance">
+					<h3 className="line-clamp-2 text-[13.5px] leading-[1.32] font-semibold mobile:line-clamp-none xl:text-[14px] xl:leading-[1.3] xl:text-balance">
 						{card.title}
 					</h3>
 					<StatLine totals={card.totals} size="card" />

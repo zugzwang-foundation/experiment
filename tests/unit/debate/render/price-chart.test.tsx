@@ -1052,15 +1052,18 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 
 	// ── 4. Error state — priceChart null → header intact, NO chart (web Gate-C).
 	it("header-renders-without-chart-when-priceChart-null", () => {
-		render(<MarketHeader market={MARKET} priceChart={null} />);
+		const { container } = render(
+			<MarketHeader market={MARKET} priceChart={null} />,
+		);
 
 		// The header renders unaffected: title, PriceBar, and the totals strip.
 		expect(
 			screen.getByRole("heading", { name: "Chart Market Question" }),
 		).toBeTruthy();
 		expect(screen.getByRole("img", { name: /YES/ })).toBeTruthy(); // PriceBar
-		expect(screen.getByText(/3 posts/)).toBeTruthy();
-		expect(screen.getByText(/5 replies/)).toBeTruthy();
+		// The count is its own gold span, so read the full text, not one text node.
+		expect(container.textContent).toMatch(/3 posts/);
+		expect(container.textContent).toMatch(/5 replies/);
 
 		// …but NO chart is mounted when the series read failed (priceChart null).
 		expect(screen.queryByTestId("market-price-chart")).toBeNull();

@@ -345,9 +345,21 @@ describe("ENGINE.14 F-ADMIN-1 — createMarket (W-4 create branch)", () => {
 
 // S2 correction (was 2027-01-01, which is PAST the §12.1 freeze ceiling
 // 2026-11-05T23:59Z → createMarket would reject with deadline_ceiling, not ok).
-// A future deadline (> now, the test clock 2026-06-13) that is ≤ the ceiling,
-// so the happy path creates a Draft.
-const WIRE_NOW_DEADLINE = new Date("2026-10-01T00:00:00.000Z");
+// A future deadline (> now) that is ≤ the ceiling, so the happy path creates a
+// Draft. ⚠ RELATIVE TO THE REAL CLOCK: the wire tests run createMarketAction at
+// `new Date()`, so the fixed 2026-10-01 this used to be expired on that date and
+// the happy path was refused as deadline-in-the-past. A week out, capped at the
+// freeze ceiling, minute-aligned because datetimeLocal() truncates to the minute.
+const WIRE_NOW_DEADLINE = (() => {
+	const d = new Date(
+		Math.min(
+			Date.now() + 7 * 24 * 60 * 60 * 1000,
+			FREEZE_INSTANT_UTC.getTime(),
+		),
+	);
+	d.setUTCSeconds(0, 0);
+	return d;
+})();
 const PAST_DEADLINE = new Date("2020-01-01T00:00:00.000Z");
 // S2 correction (was freeze+1ms: `datetimeLocal()` truncates to the minute,
 // which parses back to EXACTLY the freeze instant — allowed under "≤", so no

@@ -68,6 +68,9 @@ beforeEach(() => {
 const V = "max-mobile";
 const S = ":";
 const phone = (utility: string) => V + S + utility;
+/** TABLET-1: the FLAT phone row (flex line, contents zones, ms-auto) is now `max-sm` (<640); the phone TIER (hides, avatar-only chip) stays `max-mobile` (<820). */
+const FLAT = "max-sm";
+const flat = (utility: string) => FLAT + S + utility;
 
 const VIEWER = { pseudonym: "RedFox001", pfpUrl: "/pfp-placeholder.svg" };
 
@@ -227,7 +230,7 @@ describe("MOBILE-2m · R-3 / A9 D-3 — the mark's cell is viewer-independent", 
 				`${who}: the cell is not \`contents\` below 640, so the mark and the ` +
 					`countdown are inside a box of their own and answer to that box's ` +
 					`gap rather than the row's single one.`,
-			).toContain(phone("contents"));
+			).toContain(flat("contents"));
 			expect(tokens, `${who}: the 1440 placement survives`).toContain(
 				"justify-self-center",
 			);
@@ -344,7 +347,7 @@ describe("MOBILE-3a — the identity zone is pushed right by a margin, because t
 				"one end, so at 390+ the gap opens between the LOGO and the countdown " +
 				"instead of between the countdown and the identity — the founder's " +
 				"instruction is that the row stays compact on the left.",
-		).toContain(phone("ms-auto"));
+		).toContain(flat("ms-auto"));
 	});
 
 	it("phone-a13::and-it-is-GATED-so-a-third-mount-inherits-the-desktop-row", () => {
@@ -355,7 +358,7 @@ describe("MOBILE-3a — the identity zone is pushed right by a margin, because t
 			expect(
 				(zone.getAttribute("class") ?? "").split(/\s+/),
 				`the identity zone lost its margin in the ${viewer === null ? "signed-out" : "signed-in"} arm.`,
-			).toContain(phone("ms-auto"));
+			).toContain(flat("ms-auto"));
 			cleanup();
 		}
 	});
@@ -376,7 +379,7 @@ describe("MOBILE-3a — the identity zone is pushed right by a margin, because t
 			"an ungated margin here reaches the (auth) mount and every future mount " +
 				"at once — the failure AGENTS.md §8 records for `OnboardingDeck`, one " +
 				"file up the same chain.",
-		).not.toContain(phone("ms-auto"));
+		).not.toContain(flat("ms-auto"));
 		expect(tokens).not.toContain(phone("col-start-3"));
 	});
 });

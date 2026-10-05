@@ -1,13 +1,17 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { ProfileArgumentItem } from "@/server/profile/arguments";
 import type { ProfilePositionsPayload } from "@/server/profile/owner-view";
 import type { ProfileUser } from "@/server/profile/resolve";
 
 import { ArgumentList } from "./ArgumentList";
-import { initialProfileSelection, type ProfileSelection } from "./selection";
+import {
+	initialProfileSelection,
+	type ProfileSelection,
+	readMarketParam,
+} from "./selection";
 
 /**
  * ⚠ THE `loading` IS WHAT CREATES THE SUSPENSE BOUNDARY, and its absence was a
@@ -149,6 +153,24 @@ export function ProfileArena({
 	const [selection, setSelection] = useState<ProfileSelection | null>(() =>
 		initialProfileSelection(positions.rows, initialMarketSlug),
 	);
+	// ⛔ NAV-3 — AND EVERY LATER ENTRY RE-SEEDS IT FROM THE ADDRESS. A revealed
+	// `<Activity>` keeps this state from the last visit (see `PositionsTable`,
+	// whose filters take the same re-derivation); the first mount is skipped
+	// because the seed above is already the server's answer.
+	const enteredRef = useRef(false);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: entry-only by design. `positions` changes when the payload refreshes, and the table owns every in-page change through `onSelect`; a reveal re-runs this with the latest closure regardless.
+	useLayoutEffect(() => {
+		if (!enteredRef.current) {
+			enteredRef.current = true;
+			return;
+		}
+		setSelection(
+			initialProfileSelection(
+				positions.rows,
+				readMarketParam(window.location.search),
+			),
+		);
+	}, []);
 
 	return (
 		<>

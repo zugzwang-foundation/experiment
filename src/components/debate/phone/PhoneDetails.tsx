@@ -65,21 +65,23 @@ export function PhoneDetails({ model }: { model: DebateViewModel }) {
 			<div className="flex flex-wrap items-center justify-between gap-2">
 				<div className="flex min-w-0 items-center gap-1 text-xs font-medium text-muted-foreground">
 					<span className="font-semibold text-ink">
-						Đ{" "}
-						{formatDharmaCompact(
-							market.totals.dharmaStaked,
-							COMPACT_FROM_MARKET_TOTAL,
-						)}{" "}
+						<span className="text-gold">
+							Đ{" "}
+							{formatDharmaCompact(
+								market.totals.dharmaStaked,
+								COMPACT_FROM_MARKET_TOTAL,
+							)}
+						</span>{" "}
 						staked
 					</span>
 					<AttrSep />
 					<span>
-						{market.totals.postCount}{" "}
+						<span className="text-gold">{market.totals.postCount}</span>{" "}
 						{noun(market.totals.postCount, "post", "posts")}
 					</span>
 					<AttrSep />
 					<span>
-						{market.totals.replyCount}{" "}
+						<span className="text-gold">{market.totals.replyCount}</span>{" "}
 						{noun(market.totals.replyCount, "reply", "replies")}
 					</span>
 				</div>

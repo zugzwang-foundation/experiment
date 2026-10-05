@@ -8,12 +8,13 @@
 
 ## The two pipelines
 
-Both run the same jobs, in this order: **guard → ci → build → migrate → deploy → verify**.
+Production runs **guard → ci → build → migrate → deploy → verify**. Staging runs the same jobs **without `ci`** (STAGING-FAST-DEPLOY, below).
 
 | | Staging | Production |
 |---|---|---|
 | Trigger | push to `staging` | merge to `main` (`deploy-production.yml`; documentation-only merges skipped) · or manual `workflow_dispatch` from `main` |
 | GitHub environment | `staging` | **`aws-production`**: branch policy `main` only, required reviewer, admin bypass **off** |
+| CI (`ci.yml`) | **skipped**, on the PR into `staging` and on the deploy (STAGING-FAST-DEPLOY) | runs on the PR into `main` and again before `build` |
 | Approval | none | **required before `build`, again before `migrate`, again before `deploy`** (each job that uses the environment asks) |
 | AWS identity (OIDC, no stored keys) | `zugzwang-staging-github-deploy` (trusts `environment:staging`) | `zugzwang-production-github-deploy` (trusts `environment:aws-production`) |
 | CDK bootstrap | `CDKToolkit` / `hnb659fds` | `CDKToolkit-prod` / `zzprod` |
@@ -23,13 +24,26 @@ Both run the same jobs, in this order: **guard → ci → build → migrate → 
 
 **What each job does**
 - `guard`: refuses production from any ref but `main`, and a push unless it is staging-from-`staging` or production-from-`main`.
-- `ci`: `ci.yml`, the same gate every PR runs: Biome, `tsc`, `drizzle-kit check`, migrations on a throwaway Postgres, the drift check, all tests.
+- `ci`: `ci.yml`: Biome, `tsc`, `drizzle-kit check`, migrations on a throwaway Postgres, the drift check, all tests. **Production only** (and never for a rollback).
 - `build`: Docker image `<env>-<sha>` and `<env>-<sha>-migrate` pushed to that environment's ECR; build-time values from Doppler (`stg` / `prd`). The build does not need a database (verified 2026-09-27 with the database unreachable).
 - `migrate`: refuses destructive migrations (below), then runs the migration image as a one-off ECS task **inside the VPC** and requires exit 0 from the exact image the build pushed.
 - `deploy`: `cdk deploy Zugzwang-<env>-Compute -c imageTag=<env>-<sha>`, then waits for the ECS service to be stable.
 - `verify`: `/api/health` must report the new canary, `db: ok`, `migrations: ok` and the expected `writesPaused`; `/api/ready` must report `ready: true, failed: 0`.
 
 **Isolation** (IAM simulator, 2026-09-27): the staging role cannot assume any `zzprod` role, push to production ECR, run the production migration task, touch a production stack or read a production secret, and the staging bootstrap deploy role is explicitly denied production stacks. The production role is the mirror image, and P2 explicitly denies the `zzprod` deploy role every staging stack.
+
+## STAGING-FAST-DEPLOY — staging skips CI (founder ruling, 2026-09-28)
+
+A staging deploy took **40–45 minutes** end to end, and `ci.yml` ran twice in it: once on the PR into `staging`, then again as the deploy's first job. Both are now skipped for staging:
+
+- `ci.yml` — `pull_request: branches-ignore: [staging]`. A PR into any other branch, `main` included, still runs it.
+- `deploy-aws.yml` — the `ci` job runs only when `environment` is `production`; `build` accepts a skipped CI for staging (or a rollback), never for a production build.
+
+**Kept on staging:** `guard`, the image build (`next build` still type-checks, so a type error still fails the deploy), the destructive-migration check and the in-VPC migration, the CDK deploy, and the `verify` health gate.
+
+**The cost, accepted:** lint, the migration dry-run on a throwaway Postgres, and every unit and integration test no longer run before staging. A break reaches staging and is caught there, or by the `staging` → `main` PR, which still runs `ci.yml` — as does the production deploy. **Production is unchanged.**
+
+**To restore the staging gate:** delete `branches-ignore: [staging]` from `ci.yml` and the `(inputs.environment || 'staging') == 'production' &&` clause from the `ci` job's `if:`. `tests/unit/infra/cicd-pipeline.test.ts` pins both, so update it in the same change.
 
 ## Secrets (GitHub environment secrets; names only)
 

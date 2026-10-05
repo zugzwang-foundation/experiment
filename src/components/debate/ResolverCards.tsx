@@ -1,5 +1,7 @@
 import { captureException } from "@sentry/nextjs";
 
+import { fitFontSize } from "@/components/ui/fit-text";
+
 import {
 	getResolutionBlocks,
 	type ResolutionBlockEntry,
@@ -463,10 +465,15 @@ function ResolutionBlock({
 			    shrink and would push the square out of the block instead of truncating.
 			    ⛔ RESO-2 · CHANGE 5 IS PRESERVED, NOT REDONE — the label is still the
 			    first thing read. */}
-			<span className="flex min-w-0 flex-1 flex-col justify-center gap-1">
+			<span className="flex min-w-0 flex-1 flex-col justify-center gap-1 @container">
 				<span
 					data-testid={`resolution-block-label-${blockKey}`}
 					className="truncate text-[9.5px] font-extrabold tracking-[.14em] text-n4 uppercase"
+					// Autosize to the text column (`fit-text.ts`): 9.5px, stepping down
+					// to 8px on a narrower block rather than truncating.
+					style={{
+						fontSize: fitFontSize(label, "labelCaps", 9.5, 8),
+					}}
 				>
 					{label}
 				</span>
@@ -495,6 +502,9 @@ function ResolutionBlock({
 				<span
 					data-testid={`resolution-block-value-${blockKey}`}
 					className={`block w-full truncate leading-[1.5] text-ink ${VALUE_TEXT_SIZE[entry.fontSize]}`}
+					style={{
+						fontSize: fitFontSize(entry.line1, "value", entry.fontSize, 9),
+					}}
 				>
 					{entry.line1}
 				</span>
@@ -502,6 +512,9 @@ function ResolutionBlock({
 					<span
 						data-testid={`resolution-block-subvalue-${blockKey}`}
 						className={`block w-full truncate leading-[1.5] text-ink ${VALUE_TEXT_SIZE[entry.fontSize]}`}
+						style={{
+							fontSize: fitFontSize(entry.line2, "value", entry.fontSize, 9),
+						}}
 					>
 						{entry.line2}
 					</span>

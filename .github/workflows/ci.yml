@@ -1,8 +1,17 @@
 # .github/workflows/ci.yml
-# Zugzwang CI gate — runs on EVERY pull request, whatever it targets.
-# Scope: install -> lint/format check -> typecheck -> tests.
-# Out of scope (HARDEN.* / post-experiment): e2e, build, secret scan,
-# dependency audit, coverage, bundle/perf budgets, matrix testing.
+# Zugzwang CI gate — runs on every pull request EXCEPT one into `staging`
+# (STAGING-FAST-DEPLOY, below), and before every PRODUCTION deploy.
+# Scope: install -> lint/format check -> typecheck -> schema check -> fresh
+# migration -> drift check -> CRITICAL tests (`pnpm test:critical`).
+# ⛔ MVP-MINIMAL-CI (ADR-0066): the blocking gate runs the critical set only —
+# invariants, auth, bets, resolution, Dharma, admin, and six integration flows.
+# The full suite still exists and runs in `full-suite.yml` (manual + nightly,
+# non-blocking). The production BUILD is not here: `next build` needs a live
+# database and the whole runtime environment, so it is gated by the deploy's
+# own "Build and push image" job, which builds the production image from the
+# commit and blocks the rollout if it fails.
+# Out of scope (HARDEN.* / post-experiment): e2e, secret scan, dependency
+# audit, coverage, bundle/perf budgets, matrix testing.
 
 name: CI
 
@@ -15,8 +24,9 @@ on:
   # multi-slice task here is built — got no CI at all. The work was reviewed,
   # merged and built upon while the only automated check that could have
   # contradicted it never ran once. The same argument is why `deploy-aws.yml`
-  # CALLS this workflow (`workflow_call`) before it builds: a direct push to
-  # `staging` opens no PR, so without that call it deployed untested code.
+  # CALLS this workflow (`workflow_call`) before a PRODUCTION build. It called
+  # it before a staging build too, until STAGING-FAST-DEPLOY (below) traded that
+  # away for deploy speed: a direct push to `staging` now deploys untested code.
   #
   # It is not hypothetical: a red integration test lived on the LOTS-1 `s2`
   # branch for TWO further slices, and both were written against it. The cost of
@@ -29,9 +39,29 @@ on:
   #
   # Branch protection is unaffected — it requires the `ci` check on merges to
   # `main` exactly as before. This only widens where `ci` also runs.
+  #
+  # ⛔ STAGING-FAST-DEPLOY (founder ruling, 2026-09-28) — ONE exception to the
+  # above: a PR INTO `staging` runs no CI, and neither does the staging deploy
+  # (`deploy-aws.yml`'s `ci` job is production-only). A staging deploy took
+  # 40–45 minutes end to end, most of it this job run twice — once on the PR,
+  # once again before the build. Staging is the sandbox; the gate that protects
+  # participants is the PR into `main` (which still runs this) and the
+  # production deploy (which still calls it). ⚠ The cost is exactly the one the
+  # paragraphs above describe: code can sit on `staging`, broken, until the
+  # `staging` → `main` PR tests it. "For now" — delete `branches-ignore` and the
+  # production-only `if:` on `deploy-aws.yml`'s `ci` job to restore the gate.
   pull_request:
-  # The deploy workflow's first gate (same job, same checks, no deploy rights).
+    branches-ignore: [staging]
+  # The production deploy's first gate (same job, same checks, no deploy rights).
+  # `suite` (ADR-0066): the deploy and every PR get `critical`; only
+  # full-suite.yml passes `full`, and nothing waits on it.
   workflow_call:
+    inputs:
+      suite:
+        description: "critical (the MVP gate) or full (the whole Vitest suite)"
+        type: string
+        required: false
+        default: critical
 
 # Cancel stale runs when a PR is force-pushed or has new commits.
 concurrency:
@@ -151,7 +181,9 @@ jobs:
         # (no DATABASE_URL_PROD/_STAGING in CI → falls through to DATABASE_URL).
         run: pnpm db:check-drift
 
-      # Vitest auto-detects GITHUB_ACTIONS=true and adds the
-      # github-actions reporter alongside default. run = non-watch.
-      - name: Unit and integration tests
-        run: pnpm vitest run
+      # MVP-MINIMAL-CI (ADR-0066): the money, auth, resolution and admin
+      # paths only. The whole suite runs in full-suite.yml, non-blocking.
+      # Vitest auto-detects GITHUB_ACTIONS=true and adds the github-actions
+      # reporter alongside default. run = non-watch.
+      - name: ${{ inputs.suite == 'full' && 'Full test suite (non-blocking)' || 'Critical tests (MVP gate)' }}
+        run: ${{ inputs.suite == 'full' && 'pnpm vitest run' || 'pnpm test:critical' }}

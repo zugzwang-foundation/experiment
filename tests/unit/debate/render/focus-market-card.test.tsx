@@ -166,9 +166,9 @@ describe("FocusMarketCard — row 17, the card IS the exit", () => {
 		expect(html).toContain("YES 50%");
 		expect(html).toContain("NO 50%");
 		// … `Đ volume · posts · replies`, with PD-3-08's plural rule intact.
-		expect(html).toContain("Đ 150 staked");
-		expect(html).toContain("3 posts");
-		expect(html).toContain("5 replies");
+		expect(container.textContent).toContain("Đ 150 staked");
+		expect(container.textContent).toContain("3 posts");
+		expect(container.textContent).toContain("5 replies");
 	});
 
 	it("focus-market-card::the-count-nouns-agree-with-their-counts", () => {
@@ -186,11 +186,11 @@ describe("FocusMarketCard — row 17, the card IS the exit", () => {
 				onExit={() => {}}
 			/>,
 		);
-		const html = document.body.innerHTML;
-		expect(html).toContain("1 post");
-		expect(html).toContain("1 reply");
-		expect(html).not.toContain("1 posts");
-		expect(html).not.toContain("1 replies");
+		const text = document.body.textContent ?? "";
+		expect(text).toContain("1 post");
+		expect(text).toContain("1 reply");
+		expect(text).not.toContain("1 posts");
+		expect(text).not.toContain("1 replies");
 	});
 
 	it("focus-market-card::NO-sparkline-the-locked-composition-struck-it", () => {

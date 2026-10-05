@@ -32,6 +32,7 @@ export function ReplyCard({
 	onOpenImage,
 	onOpenPopup,
 	postOrdinal = null,
+	inColumn = false,
 }: {
 	reply: DebateReply;
 	/**
@@ -53,10 +54,19 @@ export function ReplyCard({
 	 * pass `null` under a REMOVED parent, whose title the export must not show.
 	 */
 	postOrdinal?: number | null;
+	/**
+	 * FEED-3 — mounted in a desktop `DebateColumn` (`ReplyScroller` only), which
+	 * draws the one rectangle and insets its body: the card draws no box and no
+	 * padding. Its author line keeps its pipes (UIR-1 item 1). The phone thread
+	 * pane passes nothing and keeps the boxed card.
+	 */
+	inColumn?: boolean;
 }) {
+	// The card's own box, taken off when the column draws it (FEED-3).
+	const box = inColumn ? "" : " rounded-md p-2 [border:var(--hairline)]";
 	if (reply.removed) {
 		return (
-			<div className="flex flex-col gap-1 rounded-md p-2 [border:var(--hairline)]">
+			<div className={`flex flex-col gap-1${box}`}>
 				<SideBadge side={reply.side} />
 				<RemovedPlaceholder />
 			</div>
@@ -68,7 +78,7 @@ export function ReplyCard({
 		   market arm's is, rather than two short boxes floating at the top. It can
 		   still grow past the column on a long argument, and `DebateColumn`'s
 		   `.colwrap` scrolls when it does. */
-		<div className="flex min-h-0 flex-1 flex-col gap-1.5 rounded-md p-2 [border:var(--hairline)]">
+		<div className={`flex min-h-0 flex-1 flex-col gap-1.5${box}`}>
 			{/* HTML-FINISH · MARKET DETAIL row 26 — d5's `.rcardhead` (`:1545-1548`)
 			    is avatar · pseudonym | side chip with entry price | staked · card
 			    actions, which is EXACTLY the row `ArgProfile` renders after row 12
