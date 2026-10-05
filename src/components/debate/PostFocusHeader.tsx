@@ -7,7 +7,7 @@ import { ArgProfile } from "./ArgProfile";
 import { SideBadge } from "./badges";
 import { CommentImage } from "./CommentImage";
 import { hasExtendedText } from "./composer/payload";
-import { ReplySplitBar } from "./composer/ReplySplitBar";
+import { FriendlyFireLegend, ReplySplitBar } from "./composer/ReplySplitBar";
 import { FocusMarketCard } from "./FocusMarketCard";
 import { HeadZone } from "./HeadZone";
 import { KnowMore } from "./KnowMore";
@@ -334,9 +334,16 @@ export function PostFocusHeader({
 												replyCount={replyCount}
 												createdAt={post.createdAt}
 												badge={post.badge}
-												friendlyFireDharma={post.aggregate.friendlyFireDharma}
 											/>
 										</div>
+										{/* Founder sketch 2026-10-05: on the opened post the
+										    friendly-fire figure is this legend at the row's right end
+										    (the key to the hatched segment in the bar below), not a
+										    chip beside the marker as on the feed card. */}
+										<FriendlyFireLegend
+											postSide={post.sideAtPostTime}
+											friendlyFireDharma={post.aggregate.friendlyFireDharma}
+										/>
 										{hasExtendedText(post.body) ? (
 											<KnowMore
 												label="Know more about this argument"

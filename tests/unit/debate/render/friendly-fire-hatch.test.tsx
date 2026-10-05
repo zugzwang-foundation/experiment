@@ -3,7 +3,10 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { AggregateFooter } from "@/components/debate/AggregateFooter";
-import { ReplySplitBar } from "@/components/debate/composer/ReplySplitBar";
+import {
+	FriendlyFireLegend,
+	ReplySplitBar,
+} from "@/components/debate/composer/ReplySplitBar";
 import { friendlyFireOfSupport } from "@/components/debate/composer/split-bar";
 import { PhoneSideTabs } from "@/components/debate/phone/PhoneSideTabs";
 
@@ -139,5 +142,29 @@ describe("the OPENED post and the phone thread wear the same hatch", () => {
 		const hatch = container.querySelector('[data-testid="split-ff-hatch"]');
 		expect(hatch?.parentElement).toBe(fill);
 		expect((hatch as HTMLElement | null)?.style.width).toBe("25%");
+	});
+});
+
+describe("FriendlyFireLegend — the key to the hatch on the opened post", () => {
+	it("shows a hatched swatch and the figure when the post drew fire", () => {
+		const { container } = render(
+			<FriendlyFireLegend postSide="YES" friendlyFireDharma="50" />,
+		);
+		const legend = container.querySelector('[data-testid="ff-legend"]');
+		expect(legend?.innerHTML).toContain("Friendly fire");
+		expect(legend?.innerHTML).toContain("Đ 50");
+		expect(
+			legend?.querySelector('[data-testid="split-ff-hatch"]'),
+		).not.toBeNull();
+	});
+
+	it("renders nothing without friendly fire", () => {
+		for (const ff of [undefined, "0", "0.000000000000000000"]) {
+			const { container, unmount } = render(
+				<FriendlyFireLegend postSide="NO" friendlyFireDharma={ff} />,
+			);
+			expect(container.innerHTML).toBe("");
+			unmount();
+		}
 	});
 });

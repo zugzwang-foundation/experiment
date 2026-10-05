@@ -17,6 +17,7 @@ import { useFlag } from "@/lib/posthog/use-flag";
 import { COMMENT_MAX_LENGTH } from "@/server/config/limits";
 
 import { SideBadge } from "../badges";
+import { FriendlyFireHatch } from "../FriendlyFireHatch";
 import { formatDharma } from "../format";
 import type { Side, ViewerMarketContext } from "../types";
 import { AuthGateSlot } from "./AuthGateSlot";
@@ -206,11 +207,17 @@ export function BetComposer(props: {
 	// white), hoisted so the side comparison has exactly two pole outcomes and
 	// the neutral OFF state is chosen OUTSIDE it (`side-pole-binding.test.ts`
 	// reads a third, non-pole branch as an inversion, and it would be right to).
+	// Founder ask 2026-10-05 — ON, the track wears the hatched segment the bars
+	// draw for friendly fire (the side's bar colour under the shared hatch), so
+	// the switch reads as the key to those stripes before the reply is posted.
+	// The knob is then always the light `ink`: a YES-pole (black) knob vanished
+	// into the hatch's dark stripes on the NO track. Founder 2026-10-05: the
+	// whole control is a size up (track 44x24, knob 18, label 14px) — it is an
+	// important element.
 	const friendlyFireOnTrack =
 		props.side === "YES"
-			? "bg-yes border-[0.5px] border-n2"
-			: "bg-no border border-white/25";
-	const friendlyFireOnKnob = props.side === "YES" ? "bg-no" : "bg-yes";
+			? "overflow-hidden bg-bar-yes border-[0.5px] border-n2"
+			: "overflow-hidden bg-bar-no border border-white/25";
 	// Slice 5 — the optional image (sign → PUT → id in the payload).
 	const [image, setImage] = useState<ImageAttachState>({ phase: "none" });
 	/**
@@ -759,7 +766,7 @@ export function BetComposer(props: {
 	const friendlyFireControl = friendlyFireEligible ? (
 		<div
 			data-testid="ff-switch-row"
-			className="flex shrink-0 items-center gap-1.5 max-mobile:order-last max-mobile:basis-full max-mobile:justify-end"
+			className="flex shrink-0 items-center gap-2 max-mobile:order-last max-mobile:basis-full max-mobile:justify-end"
 		>
 			<button
 				type="button"
@@ -769,15 +776,16 @@ export function BetComposer(props: {
 				aria-label={FRIENDLY_FIRE_COPY.label}
 				disabled={inFlight || floorAbove}
 				onClick={() => setFriendlyFire((on) => !on)}
-				className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) ${
+				className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) ${
 					friendlyFire ? friendlyFireOnTrack : "bg-n1 border border-n3"
 				}`}
 			>
+				{friendlyFire ? <FriendlyFireHatch pct="100%" /> : null}
 				<span
 					aria-hidden="true"
-					className={`block size-3.5 rounded-full transition-transform ${
+					className={`relative block size-[18px] rounded-full transition-transform ${
 						friendlyFire
-							? `translate-x-[18px] ${friendlyFireOnKnob}`
+							? "translate-x-[22px] bg-ink"
 							: "translate-x-[2px] bg-n5"
 					}`}
 				/>
@@ -785,7 +793,7 @@ export function BetComposer(props: {
 			<InfoTip content={FRIENDLY_FIRE_COPY.gloss(props.side)} asChild>
 				<span
 					data-testid="ff-switch-label"
-					className="text-xs font-bold text-ink"
+					className="text-sm font-bold text-ink"
 				>
 					{FRIENDLY_FIRE_COPY.label}
 				</span>
