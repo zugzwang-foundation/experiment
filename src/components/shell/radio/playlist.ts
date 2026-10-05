@@ -11,13 +11,13 @@
  * `start_radio=1` links). Measured 2026-09-26: the embedded player never loads
  * a Mix (error 150, empty playlist), even one seeded by an embeddable video.
  *
- * Founder-supplied 2026-09-26 (`…/watch?v=vRjaGgDsWSo&list=PLM84XIPy_bFQ`).
- * Measured the same day through `YT.Player` with RadioSlot's options: the
- * playlist loads (1 video) and every video in it reaches PLAYING. Songs added to
- * the playlist on YouTube play here with no code change — but each one added
- * must itself allow embedding.
+ * Founder-supplied 2026-10-05 (`…/playlist?list=PLDLq3RxB4Ue4`), replacing
+ * the 2026-09-26 playlist above — not independently re-measured through
+ * `YT.Player` the way that one was, so if the embed ever reports a video in
+ * it as non-embeddable, check this one specifically rather than assuming
+ * the prior measurement still applies.
  */
-export const RADIO_PLAYLIST_ID = "PLM84XIPy_bFQ";
+export const RADIO_PLAYLIST_ID = "PLDLq3RxB4Ue4";
 
 /**
  * The hidden player's size — busdriverplaylist.in's, which plays in practice.
