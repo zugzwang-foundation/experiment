@@ -31,7 +31,8 @@ import {
  * pole under the shared hatch) and `Friendly fire Đ 50`. It sits at the right
  * end of the opened post's author row, so a reader who sees stripes in the bar
  * can read what they mean and how much they carry. Nothing renders without
- * friendly fire — there is then no stripe to explain.
+ * friendly fire — there is then no stripe to explain. Founder 2026-10-05:
+ * a size up (14px text; the swatch keeps its 14px height and widens to 32px) — it is an important element.
  */
 export function FriendlyFireLegend({
 	postSide,
@@ -49,11 +50,11 @@ export function FriendlyFireLegend({
 	return (
 		<span
 			data-testid="ff-legend"
-			className="flex shrink-0 items-center gap-1.5 text-xs whitespace-nowrap text-n6"
+			className="flex shrink-0 items-center gap-2 text-sm whitespace-nowrap text-n6"
 		>
 			<span
 				aria-hidden="true"
-				className={`relative block size-3.5 shrink-0 overflow-hidden rounded-[3px] [border:var(--hairline)] ${postSide === "YES" ? "bg-bar-yes" : "bg-bar-no"}`}
+				className={`relative block h-3.5 w-8 shrink-0 overflow-hidden rounded-[3px] [border:var(--hairline)] ${postSide === "YES" ? "bg-bar-yes" : "bg-bar-no"}`}
 			>
 				<FriendlyFireHatch pct="100%" />
 			</span>
