@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { FriendlyFireHatch } from "../FriendlyFireHatch";
-import { formatDharma } from "../format";
+import { formatDharma, formatDharmaCompact } from "../format";
 import type { ReplyAggregate, Side } from "../types";
 import {
 	computeSplitBar,
@@ -25,6 +25,46 @@ import {
  * ⚠ UIR-5 item 4 — and the whole bar is two lines: the words and the track on
  * line 1, the three Đ figures on line 2 (`EndCell`).
  */
+/**
+ * Founder sketch 2026-10-05 ("Replies page") — the key to the hatched segment
+ * in this bar: a swatch drawn exactly as the segment is (the post's Support
+ * pole under the shared hatch) and `Friendly fire Đ 50`. It sits at the right
+ * end of the opened post's author row, so a reader who sees stripes in the bar
+ * can read what they mean and how much they carry. Nothing renders without
+ * friendly fire — there is then no stripe to explain.
+ */
+export function FriendlyFireLegend({
+	postSide,
+	friendlyFireDharma,
+}: {
+	postSide: Side;
+	friendlyFireDharma: string | undefined;
+}) {
+	if (
+		friendlyFireDharma === undefined ||
+		formatDharmaCompact(friendlyFireDharma) === "0"
+	) {
+		return null;
+	}
+	return (
+		<span
+			data-testid="ff-legend"
+			className="flex shrink-0 items-center gap-1.5 text-xs whitespace-nowrap text-n6"
+		>
+			<span
+				aria-hidden="true"
+				className={`relative block size-3.5 shrink-0 overflow-hidden rounded-[3px] [border:var(--hairline)] ${postSide === "YES" ? "bg-bar-yes" : "bg-bar-no"}`}
+			>
+				<FriendlyFireHatch pct="100%" />
+			</span>
+			Friendly fire
+			<b className="font-bold text-gold">
+				Đ {formatDharmaCompact(friendlyFireDharma)}
+			</b>
+		</span>
+	);
+}
+
 export function ReplySplitBar({
 	postSide,
 	aggregate,
