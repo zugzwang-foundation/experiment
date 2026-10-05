@@ -16,10 +16,13 @@
 | `prod-restore.cjs --source=staging` (extends the existing tool) | **Production database**: one transaction of TRUNCATE + load + clear the three session tables | Check-only |
 | `launch-storage.cjs` | **Production R2 buckets: copy-only.** Never deletes, never overwrites | Check-only |
 | `launch-verify.cjs` | Nothing (read-only database, R2 HEAD and HTTP GET) | Read-only |
+| `launch-cache.cjs` | **Production Redis**: deletes only keys under `prod:cache:`, `prod:cache-metric:` and `prod:idem:`, while writes are paused | Check-only |
 
-**None of them touches:** staging's database (it is only read by pg_dump), any secret, DNS, infrastructure, Redis or the deploy pipeline. Pausing writes and deploying code stay **pipeline dispatches the operator performs**, with their approvals.
+**None of them touches:** staging's database (it is only read by pg_dump), any secret, DNS, infrastructure or the deploy pipeline. Only `launch-cache.cjs` touches Redis, and only the three production key families above. Pausing writes and deploying code stay **pipeline dispatches the operator performs**, with their approvals.
 
-**Redis needs no tool.** Every cache family expires within 60 s (`SHARED_VIEW_EXPIRE_SEC` 60, `DISCOVERY_PRICE_EXPIRE_SEC` 30, `HEADER_PORTFOLIO_CACHE_TTL_SECONDS` 15), so keeping writes paused for **at least 2 minutes** after the restore expires every stale entry. A key-deleting tool would add risk for no gain.
+**Redis (operator ruling 2026-10-05: clear it).** Every cache family expires within 60 s anyway, but the operator chose an explicit clear. `launch-cache.cjs` SCANs and deletes **only** `prod:cache:*` (shared views, header portfolio), `prod:cache-metric:*` and `prod:idem:*` (idempotency entries, keyed `prod:idem:<userId>:<key>`, so stale ones belong to users who no longer exist). It never deletes `staging:*`, rate limits, cron locks or the visitor counter, and it never uses FLUSHDB, FLUSHALL or KEYS. The Upstash instance is **shared with staging**, which is exactly why it is an allowlist and not a flush.
+
+**Identity pool.** `identity_pool` is **copied with the dump**, not rebuilt. Each copied user's pseudonym was drawn from that exact pool, and the pool's `assigned_at` marks are what stop a new sign-up from receiving a pseudonym a copied user already holds (`users.pseudonym` is UNIQUE). Rebuilding or reseeding the pool after the copy would hand out duplicates and break sign-ups. What the tools add: `launch-storage.cjs` copies the PFP file for **every** pool row (assigned or not), so post-launch sign-ups get real avatars; and `launch-verify.cjs` reports the unassigned headroom and checks for duplicate pseudonyms.
 
 ## 2. Tables copied
 
@@ -37,7 +40,7 @@ Everything in `public` + `drizzle`, data only (the schema already exists in prod
 |---|---|---|---|---|
 | `image_uploads` | `r2_object_key` (`u/<userId>/<id>.<ext>`) | `zugzwang-staging-uploads` | `zugzwang-uploads` | Copy if missing in the target |
 | `users`, `identity_pool` | `pfp_filename` (the key is the file name) | `zugzwang-staging-pfp` | `zugzwang-pfp` | Copy if missing in the target |
-| `market_media` | `key` (`m/<marketId>/…`) | `zugzwang-market-media` | **the same bucket** | Verify present only |
+| `market_media` | `r2_object_key` (`m/<marketId>/…`) | `zugzwang-market-media` | **the same bucket** | Verify present only |
 
 Rules: same key in the target; content type preserved; a conditional put (`If-None-Match: *`) so nothing existing is ever overwritten; an object present in the target with the **same size** counts as done; a referenced key **missing from the source** is a failure listed by row.
 
@@ -81,7 +84,7 @@ postSql(source)                          // staging → "DELETE FROM public.sess
 loadCommand(dumpBase)                    // UNCHANGED shape plus: psql … -c "$ZZ_PRE_SQL" -f /tmp/data.sql -c "$ZZ_POST_SQL"
                                          // inside the same --single-transaction
 
-// scripts/aws-migration/launch-storage.cjs <staging-dump> [--execute]
+// scripts/aws-migration/launch-storage.cjs <staging-dump> --account=<12> [--execute]
 extractCopyRows(sqlText, table)          // parse a pg_restore COPY block → array of {column: value}; \N → null
 referencedObjects({ imageUploads, users, identityPool, marketMedia })
                                          // → { uploads: [keys], pfp: [filenames], marketMedia: [keys] },
@@ -95,35 +98,63 @@ INVARIANT_SQL                            // each returns 0 when the invariant ho
                                          // negative positions, two held sides, lot sum ≠ position,
                                          // an Open market without a market.opened event, frozen_at not null
 httpChecks(baseUrl, slugs)               // → list of {url, expect} for /api/health, /api/ready, /, /m/<slug>…
+IDENTITY_POOL_SQL                        // read-only: unassigned headroom (assigned_at IS NULL)
+// INVARIANT_SQL also includes: duplicate users.pseudonym = 0, system_state row count ≠ 1,
+//   no liquidity_policy row
+// Both sessions (dump and verify) pin timezone, datestyle, intervalstyle,
+//   extra_float_digits and bytea_output, and the fingerprint orders by collate "C",
+//   so a row renders to the same text on both instances.
+
+// scripts/aws-migration/launch-cron.cjs <pause|resume> <prod|staging> <ecs> <state.json> --account=<12> [--execute]
+// pause:  records the active job ids in <state.json> (refuses if it exists), then deactivates them
+// resume: re-activates exactly the ids in <state.json>
+// prod-restore.cjs --source=staging leaves production's jobs paused and writes <dump>.cron-jobs.json
+
+// scripts/aws-migration/launch-cache.cjs --account=<12> [--execute]
+SECRET = "zugzwang/production"
+CLEAR_PATTERNS = ["prod:cache:*", "prod:cache-metric:*", "prod:idem:*"]
+isClearableKey(key)                      // true ONLY for those three prefixes
+assertProductionRedisConfig(secretJson)  // Upstash URL and token present
+// SCAN + DEL only; never FLUSHDB / FLUSHALL / KEYS
 ```
 
 ## 5. The runbook (what the operator runs, in order, after approval)
 
-| # | Step | Command / action |
-|---|---|---|
-| 1 | Freeze staging | Pipeline dispatch: `environment=staging`, `writes=paused` |
-| 2 | Verify staging | Browse it; `node launch-dump.cjs staging <stg-ecs> --account=…` (check-only shows the counts) |
-| 3a | Snapshot production | `aws rds create-db-snapshot --db-instance-identifier zugzwang-production-database-postgres9dc8bb04-rysnutic4cy5 --db-snapshot-identifier zugzwang-prod-pre-launch-<date>` |
-| 3b | pg_dump production + counts | `node launch-dump.cjs prod <prod-ecs> --account=… --execute` → `zugzwang-prod-<ts>.dump` + manifest |
-| 4 | Pause production writes | Pipeline dispatch: `environment=production`, `writes=paused`, `rollback_image_tag=<current production tag>` |
-| 5 | Dump staging | `node launch-dump.cjs staging <stg-ecs> --account=… --execute` → `zugzwang-staging-<ts>.dump` + manifest |
-| 6 | Restore (dry run) | `ZZ_LAUNCH_COPY_ACK=replace-production-with-staging node prod-restore.cjs <prod-ecs> <staging.dump> <sha> --account=… --source=staging --reload-nonempty` |
-| 7 | Restore (execute) | The same command + `--execute`. One transaction: TRUNCATE, load, then clear the three session tables |
-| 8 | Copy storage (dry run, then execute) | `node launch-storage.cjs <staging.dump>`, then `… --execute` |
-| 9 | Let caches expire | Wait ≥ 2 minutes (writes still paused) |
-| 10 | Deploy code | PR `staging` → `main`, merge, **reject** the automatic run; dispatch `environment=production`, `writes=paused`; approve |
-| 11 | Verify | `node launch-verify.cjs <prod-ecs> <staging-manifest.json> --account=…` + the manual checklist (§6) |
-| 12 | Open | Dispatch `environment=production`, `writes=open`, `rollback_image_tag=<new tag>` |
-| 13 | Retire | Follow-up PR removes `--source=staging` (the expiry constant is the backstop) |
+All tools live in `scripts/aws-migration/`, run from the repo root, and are check-only unless `--execute` is given. Every launch WRITE (the restore's `--source=staging`, `launch-storage`, `launch-cache`, `launch-cron pause`) refuses without `ZZ_LAUNCH_COPY_ACK=replace-production-with-staging` and after 2026-10-25T23:59:59Z, so set it once in the shell for the session: `export ZZ_LAUNCH_COPY_ACK=replace-production-with-staging`. `launch-cron resume` is not gated: re-enabling jobs is the safe direction. `<acct>` is `849076101704`; `<stg-ecs>` / `<prod-ecs>` are the SSM targets the existing restore runbook uses. Expected total: **about 45–90 minutes** with writes paused, most of it the code deploy (step 12).
+
+| # | Step | Command / action | Time |
+|---|---|---|---|
+| 0 | **Journals match** (before anything is paused) | `node scripts/aws-migration/launch-dump.cjs prod <prod-ecs> --account=<acct>` and `… staging <stg-ecs> --account=<acct>` — both check-only; the `migration journal N` figures must be equal. If not, stop: production's schema is promoted first, through the pipeline. | 2 min |
+| 1 | Freeze staging | Pipeline dispatch `environment=staging`, `writes=paused`; then `node scripts/aws-migration/launch-cron.cjs pause staging <stg-ecs> ~/zugzwang-backups/launch/staging-cron.json --account=<acct>` (check), then `… --execute`. pg_cron runs inside the database, so the write pause alone does not stop the liquidity injector. | 5 min |
+| 2 | Verify staging | Browse it; re-run the staging check-only census twice a minute apart — the counts must not move | 5 min |
+| 3a | Snapshot production | `aws rds create-db-snapshot --db-instance-identifier zugzwang-production-database-postgres9dc8bb04-rysnutic4cy5 --db-snapshot-identifier zugzwang-prod-pre-launch-<yyyymmdd>`; wait for `available` | 5–15 min |
+| 3b | pg_dump production + manifest | `node scripts/aws-migration/launch-dump.cjs prod <prod-ecs> --account=<acct> --execute` → `zugzwang-prod-<ts>.dump` + `.sha256` + `.manifest.json` | 2 min |
+| 4 | Pause production writes | Pipeline dispatch `environment=production`, `writes=paused`, `rollback_image_tag=<current production tag>` | 10 min |
+| 5 | Dump staging | `node scripts/aws-migration/launch-dump.cjs staging <stg-ecs> --account=<acct> --execute` → `zugzwang-staging-<ts>.dump` + manifest | 2 min |
+| 6 | Restore (dry run) | `ZZ_LAUNCH_COPY_ACK=replace-production-with-staging node scripts/aws-migration/prod-restore.cjs <prod-ecs> <staging.dump> <sha> --account=<acct> --source=staging --reload-nonempty` | 2 min |
+| 7 | Restore (execute) | The same command + `--execute`. One transaction: TRUNCATE, load, clear the three session tables. **Production's pg_cron jobs stay paused** and their ids are written to `<staging.dump>.cron-jobs.json`. | 2–5 min |
+| 8 | Copy storage | `node scripts/aws-migration/launch-storage.cjs <staging.dump> --account=<acct>`, then `… --execute` → `<staging.dump>.storage.json` | 2–10 min |
+| 9 | Clear production cache | `node scripts/aws-migration/launch-cache.cjs --account=<acct>` (lists counts per family), then `… --execute` | 1 min |
+| 10 | Resume staging cron | `node scripts/aws-migration/launch-cron.cjs resume staging <stg-ecs> ~/zugzwang-backups/launch/staging-cron.json --account=<acct> --execute`; staging writes may reopen | 1 min |
+| 11 | — | (reserved) | |
+| 12 | Deploy code | PR `staging` → `main`, merge, **reject** the automatic run; dispatch `environment=production`, `writes=paused`; approve | 20–40 min |
+| 13 | Verify | `node scripts/aws-migration/launch-verify.cjs <prod-ecs> <staging.manifest.json> --account=<acct>` + the manual checklist (§6) | 10 min |
+| 14 | Open | Dispatch `environment=production`, `writes=open`, `rollback_image_tag=<new tag>` | 10 min |
+| 15 | Resume production cron | `node scripts/aws-migration/launch-cron.cjs resume prod <prod-ecs> <staging.dump>.cron-jobs.json --account=<acct>` (check), then `… --execute` | 1 min |
+| 16 | Retire | Follow-up PR removes `--source=staging` (the expiry constant is the backstop) | |
+
+⚠ **Step 15 turns production's liquidity injector on with STAGING's policy**, because `liquidity_policy` is copied with the data and staging's row is `enabled = true`. From that minute it adds liquidity to production's open pools on staging's schedule and coefficients. If that is not wanted at launch, the policy is changed before step 15 — a new `liquidity_policy` row (the table is append-only), through whatever path the operator uses for policy today. **This is an operator decision, not one this tool makes.**
 
 ## 6. Verification
 
 **Automated (`launch-verify.cjs`):**
 - every table's **row count and content fingerprint** equal to the staging manifest, except: the 3 cleared tables must be **0**, and the 3 cron tables report drift as a warning;
 - journal head equal;
-- the invariants hold (§4);
-- every referenced storage object is **present in the production bucket with the same size**;
-- `/api/health` shows `env: prod`, `db: ok`, `migrations: ok` and the expected `writesPaused`;
+- the invariants hold (§4), including exactly one `system_state` row, at least one `liquidity_policy` row, **no disabled trigger** in `public`/`drizzle` (the catalog proof that the append-only guards came back), no bet whose comment is missing, no OAuth token left in `accounts`, and the ledger identity at or above every copied `seq`;
+- `public.accounts` matches on row COUNT only, because its token columns were nulled by design;
+- the storage report says the copy was **executed**, not only checked;
+- every storage object that **production's restored rows** reference is present in the production bucket — the key list is read from the database, not from the storage tool's report (the copy step already refused size conflicts, and refused any table whose parsed rows differ from the manifest's count);
+- `/api/health` shows `env: prod`, `db: ok`, `migrations: ok` and `writesPaused: true` (verification runs before writes open);
 - `/`, `/api/ready` and every market page return 200.
 
 **Manual (with writes open on a test account, then reverted if needed):**
@@ -140,7 +171,7 @@ httpChecks(baseUrl, slugs)               // → list of {url, expect} for /api/h
 | Failure | Action |
 |---|---|
 | Restore fails | Automatic: the transaction rolls back; production unchanged |
-| Verification fails | `prod-restore.cjs <prod-ecs> zugzwang-prod-<ts>.dump <sha> --account=… --reload-nonempty --execute` (the existing prod-dump mode, unchanged by this PR) |
+| Verification fails | `prod-restore.cjs <prod-ecs> zugzwang-prod-<ts>.dump <sha> --account=… --reload-nonempty --execute` (the existing prod-dump mode, unchanged by this PR), then `launch-cron.cjs resume prod <prod-ecs> <staging.dump>.cron-jobs.json --account=<acct> --execute` — the jobs were left paused by the launch load, so the rollback restore finds none active to re-arm |
 | The dump is unusable | Restore the snapshot or PITR into a new instance; re-point the secret; redeploy |
 | Code is bad | Pipeline `rollback_image_tag=<previous production tag>` |
 | Copied R2 objects | Left in place: copy-only, harmless |
