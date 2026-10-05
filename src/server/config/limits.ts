@@ -713,10 +713,15 @@ export const MARKET_CHART_WINDOW_END = CHART_WINDOW.end;
  * is byte-comparable with the document that pins it — `MARKET_CHART_WINDOW_START`'s
  * reason exactly. Every consumer goes through `Date.parse`, which reads the two
  * spellings identically.
+ *
+ * ⛔ THE INTERIOR ANCHOR WAS `2026-10-01T00:00:00Z` UNTIL 2026-10-05, corrected
+ * on founder instruction: the 5th is the actual start of the experiment this
+ * anchor marks, not the 1st. SPEC.1 §16.1's Appendix B row updated in the same
+ * commit to stay byte-comparable with this constant, per the rule stated above.
  */
 export const MARKET_CHART_AXIS_ANCHORS: readonly string[] = Object.freeze([
 	"2026-09-15T00:00:00Z",
-	"2026-10-01T00:00:00Z",
+	"2026-10-05T00:00:00Z",
 	"2026-11-05T23:45:00Z",
 ]);
 
