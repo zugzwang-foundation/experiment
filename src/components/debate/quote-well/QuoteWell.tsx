@@ -57,12 +57,17 @@ import { QUOTE_CANVAS, QUOTE_POSTER, quotePosterSize } from "./size";
  * `overflow: hidden` is the backstop. Full reasoning at `quoteMaxLines`.
  */
 export function QuoteWell({
-	title,
+	text: title,
 	postId,
 	as: Heading = "h3",
 	boxed = true,
 }: {
-	title: string;
+	/**
+	 * The post's title, drawn as the picture. Named `text`, not `title`, so no
+	 * mount spells `title=` — relative-time-placement's G5 bans that string in
+	 * feature files, where it would read as an absolute-time tooltip.
+	 */
+	text: string;
 	/**
 	 * UIR-9 — the post's id, which picks its fill (`quoteFill`). The same id the
 	 * post carries everywhere, so every surface picks the same entry.

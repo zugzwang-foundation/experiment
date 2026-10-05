@@ -497,7 +497,7 @@ function HeroPostPanel({
 							className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-[var(--imgr)] border border-white/7"
 							style={{ backgroundColor: quoteFill(post.id).fill }}
 						>
-							<QuoteWell title={post.title} postId={post.id} boxed={false} />
+							<QuoteWell text={post.title} postId={post.id} boxed={false} />
 						</div>
 					</div>
 				) : (

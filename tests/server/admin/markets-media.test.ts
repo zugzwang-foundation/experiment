@@ -61,6 +61,22 @@ import { truncateTables } from "../../db/_fixtures/truncate";
 const ADMIN_COOKIE_NAME = "zugzwang_admin_session";
 const NOW = new Date("2026-09-15T00:00:00.000Z");
 const DEADLINE = new Date("2026-10-01T00:00:00.000Z");
+// The wire tests (createFormData → createMarketAction) run at the REAL clock,
+// so they need a deadline relative to it: the fixed DEADLINE above expired on
+// 2026-10-01 and the action refused it as in the past. A week out, capped at the
+// §12.1 freeze ceiling, minute-aligned because datetimeLocal() truncates. The
+// service tests keep DEADLINE, because they inject NOW.
+const FREEZE_INSTANT_UTC = new Date("2026-11-05T23:59:00.000Z");
+const WIRE_DEADLINE = (() => {
+	const d = new Date(
+		Math.min(
+			Date.now() + 7 * 24 * 60 * 60 * 1000,
+			FREEZE_INSTANT_UTC.getTime(),
+		),
+	);
+	d.setUTCSeconds(0, 0);
+	return d;
+})();
 const TITLE = "PLACEHOLDER — not a real market";
 const DESCRIPTION = "PLACEHOLDER criterion — not a real criterion";
 
@@ -142,7 +158,7 @@ function createFormData(fields: {
 	fd.append("slug", fields.slug);
 	fd.append("title", TITLE);
 	fd.append("description", DESCRIPTION);
-	fd.append("resolutionDeadline", datetimeLocal(DEADLINE));
+	fd.append("resolutionDeadline", datetimeLocal(WIRE_DEADLINE));
 	fd.append("marketId", fields.marketId);
 	fd.append("media", JSON.stringify(fields.media));
 	if (fields.mediaVideoUrl !== undefined) {

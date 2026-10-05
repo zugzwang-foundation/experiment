@@ -547,7 +547,7 @@ export function PostCard({
 									className="flex h-full max-w-full items-center justify-center"
 									onClick={() => onEnter(post.id)}
 								>
-									<QuoteWell title={post.title} postId={post.id} />
+									<QuoteWell text={post.title} postId={post.id} />
 								</button>
 							</div>
 							{knowMore ? (

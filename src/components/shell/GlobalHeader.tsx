@@ -602,11 +602,11 @@ export function GlobalHeader({
 					    ⚠ Its separation from what follows is a `mr-3.5` on the control
 					    itself — this zone declares no `gap`, and adding one would move
 					    Đ, the chip and the counter at 1440. */}
-					{mobileResponsive ? (
+					{mobileResponsive && (
 						<div className="hidden max-mobile:contents">
 							<RulesControl mobileResponsive />
 						</div>
-					) : null}
+					)}
 					{/* ADR-0049 — the two hides below 640px live in the COMPONENTS, not
 					    here, and the asymmetry with the divider two nodes down is
 					    deliberate rather than untidy. `dharma-cluster.test.tsx`'s T4
