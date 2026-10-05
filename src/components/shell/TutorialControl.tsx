@@ -795,6 +795,11 @@ function TutorialOverlay({
 			aria-label="Product tutorial"
 			className="fixed inset-0 z-50"
 		>
+			{/* Every fixed layer below sits inside this z-50 root, so its tier only
+			    orders it among its siblings: spotlight and backdrop at z-50, the hand
+			    at z-60, the hint card at z-70. They are spelled above the header's
+			    z-40 because sticky-header.test.ts requires every fixed layer to
+			    declare a tier above it (and keeps 20 and 30 free). */}
 			{boxes ? (
 				<>
 					<DimPanels boxes={boxes} />
@@ -802,7 +807,7 @@ function TutorialOverlay({
 						<div
 							key={`${box.top}-${box.left}`}
 							aria-hidden="true"
-							className="pointer-events-none fixed rounded-lg border-2 border-n7 shadow-[0_0_0_4px_rgba(228,228,228,0.15)]"
+							className="pointer-events-none fixed z-50 rounded-lg border-2 border-n7 shadow-[0_0_0_4px_rgba(228,228,228,0.15)]"
 							style={{
 								top: box.top,
 								left: box.left,
@@ -817,7 +822,7 @@ function TutorialOverlay({
 					/>
 				</>
 			) : (
-				<div className="fixed inset-0 bg-black/70 backdrop-blur-[2px]" />
+				<div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-[2px]" />
 			)}
 			<HintCard
 				box={unionBox}
@@ -931,7 +936,7 @@ function TutorialHand({
 		<div
 			aria-hidden="true"
 			className={cn(
-				"pointer-events-none fixed top-0 left-0 z-10 ease-out",
+				"pointer-events-none fixed top-0 left-0 z-60 ease-out",
 				!reducedMotion && "transition-transform duration-500",
 			)}
 			style={{ transform: `translate(${x}px, ${y}px)` }}
@@ -1020,7 +1025,7 @@ function HintCard({
 
 	return (
 		<div
-			className="fixed z-20 rounded-lg border border-n2 bg-n0 p-4 text-ink shadow-(--elev-2)"
+			className="fixed z-70 rounded-lg border border-n2 bg-n0 p-4 text-ink shadow-(--elev-2)"
 			style={style}
 		>
 			<div className="mb-2 flex items-center justify-between gap-3">

@@ -1,0 +1,22 @@
+# .github/workflows/full-suite.yml
+# MVP-MINIMAL-CI (ADR-0066) — the WHOLE Vitest suite, kept runnable but
+# NON-BLOCKING. The blocking gate (ci.yml, on every PR into main and before
+# every production deploy) runs only `pnpm test:critical`. This runs the same
+# job with `suite: full`: on demand from the Actions tab, and nightly on the
+# default branch. Nothing waits on it; its result is a to-do list, not a gate.
+
+name: Full test suite (non-blocking)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 21 * * *" # 02:30 IST
+
+permissions:
+  contents: read
+
+jobs:
+  full:
+    uses: ./.github/workflows/ci.yml
+    with:
+      suite: full

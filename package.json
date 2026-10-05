@@ -29,6 +29,7 @@
 		"staging:rebuild": "pnpm run staging:reset && pnpm run staging:generate && pnpm run staging:gates",
 		"test:invariants": "vitest run tests/invariants/",
 		"test:integration": "vitest run tests/integration/",
+		"test:critical": "vitest run tests/invariants/ tests/server/auth/ tests/server/bets/ tests/server/resolution/ tests/server/dharma/ tests/server/admin/ tests/integration/composer-place.integration.test.ts tests/integration/composer-sell.integration.test.ts tests/integration/composer-reply.integration.test.ts tests/integration/resolution-conservation.integration.test.ts tests/integration/signup-create-path.integration.test.ts tests/integration/onboarded-login-session.integration.test.ts",
 		"test:scale": "vitest run --config vitest.scale.config.ts"
 	},
 	"dependencies": {
