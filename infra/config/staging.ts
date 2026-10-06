@@ -74,14 +74,14 @@ export const stagingConfig: EnvironmentConfig = {
 	certificateArn: process.env.ZZ_STAGING_CERT_ARN || STAGING_CERTIFICATE_ARN,
 	appBaseUrl: "https://staging.zugzwangworld.com",
 	cloudFrontEnabled: false,
-	// I — off unless a WAF rehearsal is running: `ZZ_STAGING_WAF=count` attaches
-	// the same rule set production uses, in count mode, so staging's template is
-	// unchanged by default.
-	wafEnabled: process.env.ZZ_STAGING_WAF === "count",
+	// WAF-RATE-1 — ALWAYS attached on staging (founder ruling 2026-10-06):
+	// staging carries the same per-IP rate limits production will, so they are
+	// tested there continuously before production gets them. The managed rule
+	// set stays in `count`, as on production. This replaces the old
+	// `ZZ_STAGING_WAF=count` rehearsal switch, which attached the WAF only for
+	// the length of a rehearsal.
+	wafEnabled: true,
 	wafMode: "count",
-	// WAF-RATE-1 — the same values as production, so a rehearsal tests what
-	// will ship. Inert unless `ZZ_STAGING_WAF=count` attaches the WAF at all,
-	// so an ordinary staging deploy is unchanged.
 	wafRateLimits: DEFAULT_WAF_RATE_LIMITS,
 	wafLogging: true,
 

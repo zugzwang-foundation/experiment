@@ -158,16 +158,14 @@ describe("waf-rate-limits — what we hand to AWS", () => {
 		}
 	});
 
-	it("production and staging carry the same values; staging stays unattached by default", () => {
+	it("production and staging carry the same values; staging always attaches the WAF", () => {
 		expect(productionConfig.wafRateLimits).toEqual(DEFAULT_WAF_RATE_LIMITS);
 		expect(productionConfig.wafLogging).toBe(true);
 		expect(stagingConfig.wafRateLimits).toEqual(DEFAULT_WAF_RATE_LIMITS);
-		// Unchanged: staging attaches a WAF only when a rehearsal asks for one.
-		const src = readFileSync(
-			join(__dirname, "..", "..", "..", "infra", "config", "staging.ts"),
-			"utf8",
-		);
-		expect(src).toMatch(/wafEnabled: process\.env\.ZZ_STAGING_WAF === "count"/);
+		expect(stagingConfig.wafLogging).toBe(true);
+		// Founder ruling 2026-10-06: staging carries the WAF permanently.
+		expect(stagingConfig.wafEnabled).toBe(true);
+		expect(stagingConfig.wafMode).toBe("count");
 	});
 
 	it("the rate rules run before the managed rule set", () => {
