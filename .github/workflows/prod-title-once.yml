@@ -1,5 +1,5 @@
-# ONE-OFF, PRODUCTION ONLY — remove the "3" from the Erdős market title
-# (scripts/prod-title-erdos-once.ts, founder option A, 2026-10-06). Deleted
+# ONE-OFF, PRODUCTION ONLY — set the Erdős and Chess titles to staging's (round 2)
+# (scripts/prod-title-erdos-once.ts, founder ruling 2026-10-06). Deleted
 # together with that script once it has run. Pattern: staging-title-once.yml
 # and the removed staging-reset-once.yml.
 #

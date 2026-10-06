@@ -64,8 +64,10 @@ import type { PricePoint } from "@/server/discovery/price-series";
 // that changes the behaviour reds.
 
 const SERIES: PricePoint[] = [
-	{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
-	{ at: "2026-09-20T00:00:00.000Z", yes: "0.650000000000000000" },
+	// Moved +20 days on 2026-10-06 with the production window (start
+	// 2026-09-15 -> 2026-10-05), keeping its place at the window left edge.
+	{ at: "2026-10-05T00:00:00.000Z", yes: "0.500000000000000000" },
+	{ at: "2026-10-10T00:00:00.000Z", yes: "0.650000000000000000" },
 ];
 
 const MODES = ["collapsed", "expanded", "hero"] as const;
