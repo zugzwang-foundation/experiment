@@ -1,3 +1,4 @@
+import { DEFAULT_WAF_RATE_LIMITS } from "../lib/waf-rate-limits";
 import { type EnvironmentConfig, RUNTIME_SECRET_KEYS } from "./types";
 
 /** The ACM certificate on the staging ALB's :443 listener (not a secret). */
@@ -78,6 +79,11 @@ export const stagingConfig: EnvironmentConfig = {
 	// unchanged by default.
 	wafEnabled: process.env.ZZ_STAGING_WAF === "count",
 	wafMode: "count",
+	// WAF-RATE-1 — the same values as production, so a rehearsal tests what
+	// will ship. Inert unless `ZZ_STAGING_WAF=count` attaches the WAF at all,
+	// so an ordinary staging deploy is unchanged.
+	wafRateLimits: DEFAULT_WAF_RATE_LIMITS,
+	wafLogging: true,
 
 	secretName: "zugzwang/staging",
 	secretKeys: RUNTIME_SECRET_KEYS,

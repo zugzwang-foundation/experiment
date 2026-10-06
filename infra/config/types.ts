@@ -7,6 +7,8 @@
  * the Secrets Manager secret and the JSON keys inside it.
  */
 
+import type { WafRateLimits } from "../lib/waf-rate-limits";
+
 export interface HostedZoneConfig {
 	/** Route 53 hosted zone id, when Route 53 owns the DNS. */
 	readonly hostedZoneId: string;
@@ -172,6 +174,15 @@ export interface EnvironmentConfig {
 	 * `block` only after the sampled requests from a rehearsal are read.
 	 */
 	readonly wafMode: "count" | "block";
+	/**
+	 * WAF-RATE-1 — per-IP abuse limits over a 5-minute window, placed in the
+	 * WebACL ahead of the managed rules. Independent of `wafMode`: the managed
+	 * rules can stay in `count` while the rate limits block. Absent = no rate
+	 * rules. See infra/lib/waf-rate-limits.ts for how each value was measured.
+	 */
+	readonly wafRateLimits?: WafRateLimits;
+	/** Log blocked and counted WAF requests, kept 30 days. Absent/false = no WAF logging. */
+	readonly wafLogging?: boolean;
 
 	// ── Secrets ──────────────────────────────────────────────────────────────
 	/** Secrets Manager secret NAME (created and populated outside CDK). */
