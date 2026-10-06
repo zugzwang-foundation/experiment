@@ -144,10 +144,11 @@ export interface EnvironmentConfig {
 	/**
 	 * SEED-STAGING-1 / ADR-0064 — the runtime permission for the admin
 	 * seed-activity tool. Rendered as `ZUGZWANG_SEED_TOOLS=enabled` on the task;
-	 * the app ALSO requires `ZUGZWANG_ENV=staging`. A task environment value and
-	 * in no build configuration, so no image carries the permission: a staging
-	 * image run with production's task definition still refuses. ⛔ Set it in
-	 * staging config only — production config must never carry this field.
+	 * the app ALSO requires `ZUGZWANG_ENV` to be `staging` or `prod`. A task
+	 * environment value and in no build configuration, so no image carries the
+	 * permission: an environment whose config omits this field refuses, whatever
+	 * image runs there. Carried by staging and, since SEED-PROD-1 (ADR-0064
+	 * Amendment 1), by production.
 	 */
 	readonly seedTools?: "enabled";
 	/** Enable ECS Exec for debugging. Off by default. */

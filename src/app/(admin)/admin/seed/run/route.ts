@@ -13,7 +13,8 @@ import { SEED_FILE_MAX_ROWS } from "@/server/seed/parse";
 import { guardSeedRequest } from "@/server/seed/route-guard";
 import { runSeedChunk } from "@/server/seed/run";
 
-// POST /admin/seed/run — SEED-STAGING-1, staging only.
+// POST /admin/seed/run — SEED-STAGING-1; staging, and production since
+// SEED-PROD-1, wherever the task carries ZUGZWANG_SEED_TOOLS=enabled.
 //
 // Executes one chunk of a previewed sheet. The browser sends the whole batch
 // each time; `runSeedChunk` re-validates it against live market state and

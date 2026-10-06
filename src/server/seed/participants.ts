@@ -7,7 +7,8 @@ import { users } from "@/db/schema/auth";
 import { auth } from "@/server/auth";
 import { recordTosAcceptance } from "@/server/auth/tos-record";
 
-import { SEED_REQUEST_ID_PREFIX } from "./plan";
+import type { SeedEnvironment } from "./gate";
+import { SEED_LABELS, seedRequestId } from "./plan";
 
 // SEED-STAGING-1 — one synthetic participant, created the way every real one
 // is: Better Auth's OAuth create path runs `databaseHooks.user.create.before`,
@@ -22,12 +23,11 @@ import { SEED_REQUEST_ID_PREFIX } from "./plan";
 
 /**
  * Literal, obviously-synthetic acceptance evidence — never an address. The
- * values match the fixture generator's (manifest §1.7 B5) so every synthetic
- * participant on staging carries the same tell.
+ * `SYNTHETIC-FIXTURE-NO-*-WAS-RECORDED` prefix matches the fixture
+ * generator's (manifest §1.7 B5); the user agent's suffix names the
+ * environment and lives in `SEED_LABELS` (plan.ts).
  */
 export const SEED_TOS_IP = "SYNTHETIC-FIXTURE-NO-IP-WAS-RECORDED";
-export const SEED_TOS_USER_AGENT =
-	"SYNTHETIC-FIXTURE-NO-USER-AGENT-WAS-RECORDED (ZugzwangSeedStaging)";
 
 /** The participant already created for this email, or null. Writes nothing. */
 export async function findSeedParticipant(
@@ -48,6 +48,7 @@ export async function findSeedParticipant(
 export async function getOrCreateSeedParticipant(args: {
 	email: string;
 	batchId: string;
+	env: SeedEnvironment;
 }): Promise<{
 	userId: string;
 	pseudonym: string;
@@ -74,9 +75,9 @@ export async function getOrCreateSeedParticipant(args: {
 		const result = await ctx.internalAdapter.createOAuthUser(userPayload, {
 			providerId: "google",
 			accountId,
-			accessToken: "seed-staging-access-token",
-			refreshToken: "seed-staging-refresh-token",
-			idToken: "seed-staging-id-token",
+			accessToken: `${SEED_LABELS[args.env].oauthTokenPrefix}-access-token`,
+			refreshToken: `${SEED_LABELS[args.env].oauthTokenPrefix}-refresh-token`,
+			idToken: `${SEED_LABELS[args.env].oauthTokenPrefix}-id-token`,
 			scope: "openid email profile",
 			accessTokenExpiresAt: null,
 			refreshTokenExpiresAt: null,
@@ -93,18 +94,18 @@ export async function getOrCreateSeedParticipant(args: {
 	// died before acceptance. The function is a no-op once accepted, so a
 	// re-run never grants twice (I-GRANT-ONCE-001).
 	const metadata = {
-		request_id: `${SEED_REQUEST_ID_PREFIX}${args.batchId.slice(0, 16)}`,
+		request_id: seedRequestId(args.env, args.batchId),
 		flow_id: "F-AUTH-4",
 		user_id: userId,
 		actor_id: userId,
 		idempotency_key: null,
 		ip: SEED_TOS_IP,
-		user_agent: SEED_TOS_USER_AGENT,
+		user_agent: SEED_LABELS[args.env].tosUserAgent,
 	};
 	const accepted = await recordTosAcceptance({
 		userId,
 		ip: SEED_TOS_IP,
-		userAgent: SEED_TOS_USER_AGENT,
+		userAgent: SEED_LABELS[args.env].tosUserAgent,
 		metadata,
 	});
 	if (!accepted) {

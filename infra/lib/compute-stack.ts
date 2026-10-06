@@ -173,7 +173,8 @@ export class ComputeStack extends Stack {
 			NODE_OPTIONS: `--max-old-space-size=${config.nodeMaxOldSpaceMiB}`,
 			KEEP_ALIVE_TIMEOUT: String(config.keepAliveTimeoutMs),
 			...(config.writesPaused ? { ZUGZWANG_WRITES_PAUSED: "paused" } : {}),
-			// ADR-0064: absent unless the environment's config opts in (staging only).
+			// ADR-0064: absent unless the environment's config opts in (staging, and
+			// production since Amendment 1).
 			...(config.seedTools ? { ZUGZWANG_SEED_TOOLS: config.seedTools } : {}),
 		};
 

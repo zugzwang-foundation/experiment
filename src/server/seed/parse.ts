@@ -27,8 +27,9 @@ export const SEED_FILE_MAX_SHEETS = 50;
 // ⚠ Residual, stated: `workbook.xlsx.load` decompresses and parses the whole
 // workbook before any check below runs, so the 5 MB upload cap bounds the
 // INPUT, not the memory a pathologically compressible file expands to. The
-// surface is admin-authenticated and staging-only, so the worst case is the
-// operator stalling their own staging task. A streaming reader
+// surface is admin-authenticated, so the worst case is the operator stalling
+// their own task — ⚠ on production since SEED-PROD-1, that is the single task
+// serving participants. A streaming reader
 // (`ExcelJS.stream.xlsx.WorkbookReader`) would bound it, at the cost of a
 // second code path; not taken for v1 (ADR-0064).
 

@@ -3,13 +3,14 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-// SEED-STAGING-1 §3 G2/G5 + §16 `gate.ts` — the guard that makes production
-// structurally unable to run the seeding tool.
+// SEED-STAGING-1 §3 G2/G5 + §16 `gate.ts` — the guard every seeding entry
+// point calls first.
 //
 // Two conditions, both read from the RUNNING process (ADR-0064, revised after
-// `@code-reviewer` C-1): ZUGZWANG_ENV === "staging" AND
-// ZUGZWANG_SEED_TOOLS === "enabled". The second is set only on the staging
-// ECS task definition, so no build artifact carries permission.
+// `@code-reviewer` C-1): ZUGZWANG_ENV is "staging" or "prod" (production since
+// SEED-PROD-1, ADR-0064 Amendment 1) AND ZUGZWANG_SEED_TOOLS === "enabled".
+// The second is set only on the ECS task definitions whose config carries
+// `seedTools`, so no build artifact carries permission.
 //
 // ⚠ What this file can and cannot prove. Vitest never applies next.config.ts's
 // `env:` define, so a runtime-read test passes whether or not the BUILT bundle
@@ -28,6 +29,8 @@ import {
 	SEED_TOOLS_ENV_KEY,
 	SeedToolsDisabledError,
 	seedToolsAllowed,
+	seedToolsEnvironment,
+	seedToolsEnvironmentFor,
 } from "@/server/seed/gate";
 
 const ENV_KEY = "ZUGZWANG_ENV";
@@ -49,19 +52,31 @@ afterEach(() => {
 });
 
 describe("seed-gate — the pure decision", () => {
-	it("seed-gate::allows-only-staging-with-the-flag-enabled", () => {
+	it("seed-gate::allows-staging-and-prod-with-the-flag-enabled", () => {
 		expect(seedToolsAllowed("staging", "enabled")).toBe(true);
+		expect(seedToolsAllowed("prod", "enabled")).toBe(true);
+	});
+
+	it("seed-gate::names-the-environment-it-allows", () => {
+		// The environment decides the labels a run writes (plan.ts SEED_LABELS),
+		// so the gate returns it rather than a bare yes.
+		expect(seedToolsEnvironmentFor("staging", "enabled")).toBe("staging");
+		expect(seedToolsEnvironmentFor("prod", "enabled")).toBe("prod");
+		expect(seedToolsEnvironmentFor("prod", undefined)).toBeNull();
+		expect(seedToolsEnvironmentFor("preview", "enabled")).toBeNull();
 	});
 
 	it("seed-gate::the-environment-alone-is-not-enough", () => {
-		// The point of the second variable: staging IDENTITY is not permission.
+		// The point of the second variable: environment IDENTITY is not permission.
 		expect(seedToolsAllowed("staging", undefined)).toBe(false);
 		expect(seedToolsAllowed("staging", "")).toBe(false);
+		expect(seedToolsAllowed("prod", undefined)).toBe(false);
+		expect(seedToolsAllowed("prod", "")).toBe(false);
 	});
 
 	it("seed-gate::the-flag-alone-is-not-enough", () => {
-		expect(seedToolsAllowed("prod", "enabled")).toBe(false);
 		expect(seedToolsAllowed("preview", "enabled")).toBe(false);
+		expect(seedToolsAllowed("unknown", "enabled")).toBe(false);
 		expect(seedToolsAllowed(undefined, "enabled")).toBe(false);
 	});
 
@@ -70,6 +85,8 @@ describe("seed-gate — the pure decision", () => {
 		expect(seedToolsAllowed("staging", "Enabled")).toBe(false);
 		expect(seedToolsAllowed("staging", "true")).toBe(false);
 		expect(seedToolsAllowed("staging", "1")).toBe(false);
+		expect(seedToolsAllowed("Prod", "enabled")).toBe(false);
+		expect(seedToolsAllowed("production", "enabled")).toBe(false);
 	});
 });
 
@@ -78,7 +95,8 @@ describe("seed-gate — the runtime read", () => {
 		setVar(ENV_KEY, "staging");
 		setVar(SEED_TOOLS_ENV_KEY, SEED_TOOLS_ENABLED);
 		expect(isSeedToolsEnabled()).toBe(true);
-		expect(() => assertSeedToolsEnabled()).not.toThrow();
+		expect(assertSeedToolsEnabled()).toBe("staging");
+		expect(seedToolsEnvironment()).toBe("staging");
 	});
 
 	it("seed-gate::refuses-on-staging-without-the-flag", () => {
@@ -88,10 +106,18 @@ describe("seed-gate — the runtime read", () => {
 		expect(() => assertSeedToolsEnabled()).toThrow(SeedToolsDisabledError);
 	});
 
-	it("seed-gate::refuses-on-prod-even-with-the-flag", () => {
+	it("seed-gate::enabled-on-prod-with-the-flag", () => {
 		setVar(ENV_KEY, "prod");
 		setVar(SEED_TOOLS_ENV_KEY, SEED_TOOLS_ENABLED);
+		expect(isSeedToolsEnabled()).toBe(true);
+		expect(assertSeedToolsEnabled()).toBe("prod");
+	});
+
+	it("seed-gate::refuses-on-prod-without-the-flag", () => {
+		setVar(ENV_KEY, "prod");
+		setVar(SEED_TOOLS_ENV_KEY, undefined);
 		expect(isSeedToolsEnabled()).toBe(false);
+		expect(seedToolsEnvironment()).toBeNull();
 		expect(() => assertSeedToolsEnabled()).toThrow(SeedToolsDisabledError);
 	});
 
