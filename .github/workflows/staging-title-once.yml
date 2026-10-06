@@ -1,0 +1,158 @@
+# ONE-OFF, STAGING ONLY — remove the "3" from the Erdős market title
+# (scripts/staging-title-erdos-once.ts). Deleted together with that script once
+# it has run. Pattern: the removed staging-reset-once.yml (#644).
+#
+# Push this commit to `ops/staging-title-dry-run` first (reads and reports,
+# writes nothing), then to `ops/staging-title-run` (applies it). Nothing here
+# can reach production: the job runs in the `staging` environment with the
+# staging role, against the staging cluster's migration task, and the script
+# refuses any target that is not the staging RDS host.
+#
+# No app code is deployed. The migration image is built from this commit
+# (= origin/staging + the two one-off files, asserted below) only so the task
+# can run the script; the shared `staging-migrate` tag is put back to the
+# digest it held before, whatever the outcome.
+name: staging-title-once
+
+on:
+  push:
+    branches:
+      - ops/staging-title-dry-run
+      - ops/staging-title-run
+
+concurrency:
+  group: deploy-aws-staging
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-south-1
+
+jobs:
+  title:
+    name: Staging title (${{ github.ref_name }})
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
+      - id: mode
+        name: Refuse anything but staging plus the two one-off files; resolve the mode
+        run: |
+          git fetch origin staging
+          CHANGED=$(git diff --name-only origin/staging HEAD | sort | tr '\n' ' ')
+          EXPECTED=".github/workflows/staging-title-once.yml scripts/staging-title-erdos-once.ts "
+          if [ "$CHANGED" != "$EXPECTED" ]; then
+            echo "refusing: this commit differs from origin/staging by [$CHANGED], expected exactly [$EXPECTED]"; exit 1
+          fi
+          case "$GITHUB_REF_NAME" in
+            ops/staging-title-run) MODE=run ;;
+            *) MODE=dry-run ;;
+          esac
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "mode: $MODE"
+
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2
+
+      - id: previous
+        name: Record the digest staging-migrate holds now
+        run: |
+          DIGEST=$(aws ecr describe-images --repository-name zugzwang-staging \
+            --image-ids imageTag=staging-migrate --query 'imageDetails[0].imageDigest' --output text)
+          if [ -z "$DIGEST" ] || [ "$DIGEST" = "None" ]; then echo "no staging-migrate image"; exit 1; fi
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          echo "staging-migrate was $DIGEST"
+
+      - id: image
+        name: Build and push the migrate image (with the one-off script)
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          REPO: zugzwang-staging
+          TAG: title-once-${{ github.sha }}
+        run: |
+          docker build --target migrate -t "$REGISTRY/$REPO:$TAG" .
+          docker push "$REGISTRY/$REPO:$TAG"
+          docker tag "$REGISTRY/$REPO:$TAG" "$REGISTRY/$REPO:staging-migrate"
+          docker push "$REGISTRY/$REPO:staging-migrate"
+          DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' "$REGISTRY/$REPO:$TAG" | sed 's/.*@//')
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Run inside the VPC
+        env:
+          STACK: Zugzwang-staging-Compute
+          CLUSTER: zugzwang-staging
+          MODE: ${{ steps.mode.outputs.mode }}
+          EXPECTED_DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          out() {
+            aws cloudformation describe-stacks --stack-name "$STACK" \
+              --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text
+          }
+          FAMILY=$(out MigrationTaskFamily)
+          SUBNETS=$(out MigrationSubnetIds)
+          SG=$(out MigrationSecurityGroupId)
+          CP=$(out CapacityProviderName)
+          for v in FAMILY SUBNETS SG CP; do
+            if [ -z "${!v}" ] || [ "${!v}" = "None" ]; then echo "missing stack output $v"; exit 1; fi
+          done
+          OVERRIDES=$(jq -nc --arg mode "--$MODE" \
+            '{containerOverrides:[{name:"migrate",command:["pnpm","exec","tsx","scripts/staging-title-erdos-once.ts",$mode]}]}')
+          RUN=$(aws ecs run-task --cluster "$CLUSTER" --task-definition "$FAMILY" \
+            --capacity-provider-strategy "capacityProvider=$CP,weight=1" \
+            --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SG],assignPublicIp=DISABLED}" \
+            --overrides "$OVERRIDES" \
+            --started-by "staging-title-once-${{ github.run_id }}" \
+            --output json)
+          TASK=$(echo "$RUN" | jq -r '.tasks[0].taskArn // empty')
+          if [ -z "$TASK" ]; then echo "run-task placed no task:"; echo "$RUN" | jq '.failures'; exit 1; fi
+          echo "task: $TASK"
+          for i in 1 2 3; do
+            aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$TASK" && break
+          done
+          RESULT=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK" --output json)
+          STATUS=$(echo "$RESULT" | jq -r '.tasks[0].lastStatus // empty')
+          CODE=$(echo "$RESULT" | jq -r '.tasks[0].containers[0].exitCode // "none"')
+          RAN=$(echo "$RESULT" | jq -r '.tasks[0].containers[0].imageDigest // empty')
+          echo "status=$STATUS exitCode=$CODE digest=$RAN"
+          STREAM="migrate/migrate/${TASK##*/}"
+          echo "--- task log: CloudWatch /zugzwang/staging/app, stream $STREAM ---"
+          aws logs get-log-events --log-group-name /zugzwang/staging/app \
+            --log-stream-name "$STREAM" --start-from-head --limit 500 \
+            --query 'events[].message' --output text \
+            || echo "⚠ could not read the log; CloudWatch → /zugzwang/staging/app → $STREAM"
+          if [ "$STATUS" != "STOPPED" ]; then echo "⚠ task still $STATUS — stop it by hand"; exit 1; fi
+          if [ -n "$EXPECTED_DIGEST" ] && [ "$RAN" != "$EXPECTED_DIGEST" ]; then
+            echo "the task ran $RAN, not this build's $EXPECTED_DIGEST"; exit 1
+          fi
+          if [ "$CODE" != "0" ]; then echo "❌ the task exited $CODE (see the exit-code table in the script)"; exit 1; fi
+
+      - name: Put staging-migrate back
+        if: ${{ always() && steps.previous.outputs.digest != '' }}
+        env:
+          PREV: ${{ steps.previous.outputs.digest }}
+        run: |
+          MANIFEST=$(aws ecr batch-get-image --repository-name zugzwang-staging \
+            --image-ids imageDigest="$PREV" --query 'images[0].imageManifest' --output text)
+          MEDIA=$(aws ecr batch-get-image --repository-name zugzwang-staging \
+            --image-ids imageDigest="$PREV" --query 'images[0].imageManifestMediaType' --output text)
+          aws ecr put-image --repository-name zugzwang-staging --image-tag staging-migrate \
+            --image-manifest "$MANIFEST" --image-manifest-media-type "$MEDIA" > /dev/null \
+            || echo "(put-image reported the tag already at that digest)"
+          NOW=$(aws ecr describe-images --repository-name zugzwang-staging \
+            --image-ids imageTag=staging-migrate --query 'imageDetails[0].imageDigest' --output text)
+          echo "staging-migrate is now $NOW (was $PREV)"
+          [ "$NOW" = "$PREV" ] || { echo "❌ staging-migrate was not restored"; exit 1; }
+
+      - name: Staging still healthy
+        if: ${{ always() }}
+        run: curl -fsS https://staging.zugzwangworld.com/api/health
