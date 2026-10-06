@@ -34,25 +34,15 @@
  */
 import postgres from "postgres";
 
-// Each OLD is read off live production and each NEW off live (verified)
-// staging, 2026-10-06. Escaped so the bytes cannot be changed by an editor's
-// normalisation: U+00B7 middle dot, U+0151 ő.
+// Round 3 (founder, 2026-10-06): the production Erdős title's problem number
+// changes from #728 to #19, production only. OLD is read off live production.
+// Escaped: U+00B7 middle dot, U+0151 ő.
 const CHANGES = [
 	{
 		id: "01a0a0bb-3141-71ce-9843-2d98002f8c87",
 		slug: "math-erdos-solved-on-zugzwang",
-		oldTitle:
-			"Math \u00b7 Will Erd\u0151s problems be solved on Zugzwang by 5th November?",
-		newTitle:
-			"Math \u00b7 Will Erd\u0151s problem #728 be solved on erdosproblems.com?",
-	},
-	{
-		id: "01a0a0ba-d969-7613-a701-0f140bd224b1",
-		slug: "chess-fide-tiebreak-response",
-		oldTitle:
-			"Chess \u00b7 Will Vishy Anand answer Zugzwang's tiebreak proposal?",
-		newTitle:
-			"Chess \u00b7 Will Vishy Anand reply to Zugzwang's ELO rating proposal?",
+		oldTitle: "Math · Will Erdős problem #728 be solved on erdosproblems.com?",
+		newTitle: "Math · Will Erdős problem #19 be solved on erdosproblems.com?",
 	},
 ] as const;
 
