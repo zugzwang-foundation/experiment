@@ -5,7 +5,6 @@ import {
 } from "@/components/debate/format";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { CriterionDisclosure } from "../CriterionDisclosure";
 import { MarketPriceChartHost } from "../chart/MarketPriceChartHost";
 import { AttrSep, LifecycleBadge, noun } from "../MarketHeader";
 import { MarketMediaPanel } from "../MarketMediaPanel";
@@ -18,19 +17,15 @@ import { PhoneResolverRows } from "./PhoneResolverRows";
  * sheet.
  *
  * ⛔⛔ A SERVER COMPONENT, PASSED DOWN AS `children`. `PhoneDebateView` is a
- * client boundary and this content is not: the media panel, the price bar, the
- * resolver rows and the criterion disclosure are all server components today and
- * there is no reason for any of them to cross. So the page renders this tree and
- * hands it to the client shell as a `ReactNode` — the standard RSC pattern, and
- * the reason the sheet costs a phone almost nothing it was not already paying.
+ * client boundary and this content is not: the media panel, the price bar and
+ * the resolver rows are all server components today and there is no reason for
+ * any of them to cross. So the page renders this tree and hands it to the client
+ * shell as a `ReactNode` — the standard RSC pattern, and the reason the sheet
+ * costs a phone almost nothing it was not already paying.
  *
- * ⛔ THE CRITERION IS HERE BY PLACEMENT, NOT BY REVERSAL. `DebateView.tsx`
- * records that the disclosure is deliberately unrendered on the desktop
- * (RESO-3 · change 6) and, in the same block, that the ruling "is a placement
- * decision rather than a verdict on the component". This is a new placement: on
- * a phone the market's binding terms have nowhere else to live — the desktop's
- * answer, that they reach a participant through the `.md` export, is a desktop
- * answer.
+ * ⛔ NO CRITERION DISCLOSURE. It was placed here once and is withdrawn by founder
+ * ruling (2026-10-06), matching the desktop (RESO-3 · change 6): the terms reach
+ * a participant through the `.md` export on both tiers.
  *
  * ⚠ THE CHART MOUNTS WITH THIS TREE, AND THIS TREE MOUNTS ON FIRST OPEN. The
  * host owns its own collapsed-card / overlay state and returns `null` when the
@@ -53,8 +48,6 @@ export function PhoneDetails({ model }: { model: DebateViewModel }) {
 			<h2 className="text-[17px] leading-[1.25] font-bold tracking-tight text-ink">
 				{market.title}
 			</h2>
-
-			<CriterionDisclosure description={market.description} />
 
 			<PhoneResolverRows market={market} />
 
