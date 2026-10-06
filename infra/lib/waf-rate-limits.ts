@@ -1,5 +1,3 @@
-import type { CfnWebACL } from "aws-cdk-lib/aws-wafv2";
-
 /**
  * WAF-RATE-1 — per-IP rate limits at the edge. These are ABUSE limits, not
  * user limits: they exist to stop a bot or a flood before it reaches the single
@@ -36,6 +34,64 @@ import type { CfnWebACL } from "aws-cdk-lib/aws-wafv2";
  * real users: switch `aggregateKeyType` to `FORWARDED_IP` with the proxy's
  * client-IP header in the same change.
  */
+
+/**
+ * ⛔ NO `aws-cdk-lib` IMPORT IN THIS FILE, NOT EVEN A TYPE. `infra/config/*.ts`
+ * imports this module and the APP's build type-checks those configs (tests and
+ * env checks import them), but the app image never installs `infra/`'s own
+ * dependencies. A `import type … from "aws-cdk-lib/…"` here passed every local
+ * check — where `infra/node_modules` exists — and failed the staging image
+ * build with TS2307. These local shapes are structurally what `CfnWebACL`
+ * accepts; compute-stack.ts passes them straight in and the infra typecheck
+ * proves the fit.
+ */
+type Statement = {
+	readonly byteMatchStatement?: {
+		readonly fieldToMatch: { readonly uriPath: Record<string, never> };
+		readonly positionalConstraint: "STARTS_WITH";
+		readonly searchString: string;
+		readonly textTransformations: { priority: number; type: "NONE" }[];
+	};
+	readonly regexMatchStatement?: {
+		readonly fieldToMatch: { readonly uriPath: Record<string, never> };
+		readonly regexString: string;
+		readonly textTransformations: { priority: number; type: "NONE" }[];
+	};
+	readonly notStatement?: { readonly statement: Statement };
+	readonly orStatement?: { readonly statements: Statement[] };
+};
+
+export type WafRateRule = {
+	readonly name: string;
+	readonly priority: number;
+	readonly action:
+		| {
+				readonly block: {
+					readonly customResponse: {
+						readonly responseCode: number;
+						readonly customResponseBodyKey: string;
+						readonly responseHeaders: {
+							name: string;
+							value: string;
+						}[];
+					};
+				};
+		  }
+		| { readonly count: Record<string, never> };
+	readonly statement: {
+		readonly rateBasedStatement: {
+			readonly limit: number;
+			readonly evaluationWindowSec: number;
+			readonly aggregateKeyType: "IP";
+			readonly scopeDownStatement: Statement;
+		};
+	};
+	readonly visibilityConfig: {
+		readonly cloudWatchMetricsEnabled: boolean;
+		readonly metricName: string;
+		readonly sampledRequestsEnabled: boolean;
+	};
+};
 
 /** The window every rule counts over: 5 minutes, per IP. */
 export const WAF_RATE_WINDOW_SECONDS = 300;
@@ -93,7 +149,7 @@ export const RATE_LIMITED_RETRY_AFTER_SECONDS = 300;
 
 export const RATE_LIMITED_RESPONSE_BODIES: Record<
 	string,
-	CfnWebACL.CustomResponseBodyProperty
+	{ readonly contentType: "TEXT_PLAIN"; readonly content: string }
 > = {
 	[RATE_LIMITED_BODY_KEY]: {
 		contentType: "TEXT_PLAIN",
@@ -102,7 +158,7 @@ export const RATE_LIMITED_RESPONSE_BODIES: Record<
 	},
 };
 
-const uriStartsWith = (prefix: string): CfnWebACL.StatementProperty => ({
+const uriStartsWith = (prefix: string): Statement => ({
 	byteMatchStatement: {
 		fieldToMatch: { uriPath: {} },
 		positionalConstraint: "STARTS_WITH",
@@ -111,18 +167,15 @@ const uriStartsWith = (prefix: string): CfnWebACL.StatementProperty => ({
 	},
 });
 
-const anyOf = (
-	statements: CfnWebACL.StatementProperty[],
-): CfnWebACL.StatementProperty =>
+const anyOf = (statements: Statement[]): Statement =>
 	statements.length === 1 ? statements[0] : { orStatement: { statements } };
 
-const isStatic = (): CfnWebACL.StatementProperty =>
+const isStatic = (): Statement =>
 	anyOf(STATIC_PATH_PREFIXES.map(uriStartsWith));
 
-const isAuth = (): CfnWebACL.StatementProperty =>
-	anyOf(AUTH_PATH_PREFIXES.map(uriStartsWith));
+const isAuth = (): Statement => anyOf(AUTH_PATH_PREFIXES.map(uriStartsWith));
 
-const isExport = (): CfnWebACL.StatementProperty => ({
+const isExport = (): Statement => ({
 	regexMatchStatement: {
 		fieldToMatch: { uriPath: {} },
 		regexString: EXPORT_PATH_REGEX,
@@ -134,9 +187,9 @@ function rateRule(
 	name: string,
 	priority: number,
 	limit: number,
-	scope: CfnWebACL.StatementProperty,
+	scope: Statement,
 	action: WafRateLimits["action"],
-): CfnWebACL.RuleProperty {
+): WafRateRule {
 	return {
 		name,
 		priority,
@@ -179,9 +232,7 @@ function rateRule(
  * (lower) limit; the managed rule set is placed after all of them by the
  * caller.
  */
-export function wafRateLimitRules(
-	limits: WafRateLimits,
-): CfnWebACL.RuleProperty[] {
+export function wafRateLimitRules(limits: WafRateLimits): WafRateRule[] {
 	return [
 		rateRule("rate-limit-auth", 1, limits.authPerIp, isAuth(), limits.action),
 		rateRule(
