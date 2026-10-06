@@ -306,10 +306,13 @@ describe("debate-view::price-chart-axis-uses-calendar-anchors — the component'
 		};
 	}
 
-	it("POSITIVE CONTROL — under the real window the component draws every anchor", async () => {
+	it("POSITIVE CONTROL — under the real window the component draws every IN-WINDOW anchor", async () => {
+		// Since 2026-10-06 the production window starts 2026-10-05 (founder ruling,
+		// matching staging), so `Sep 15` (anchor 0) lies before it and is not drawn
+		// on either environment. The two that remain are still drawn.
 		vi.doUnmock("@/server/config/limits");
 		const { ids } = await labelsUnderWindow();
-		expect(ids).toEqual([0, 1, 2]);
+		expect(ids).toEqual([1, 2]);
 	});
 
 	it("MUST REJECT an anchor the component's OWN window excludes", async () => {

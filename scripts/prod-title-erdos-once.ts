@@ -1,12 +1,15 @@
 /**
- * ONE-OFF, PRODUCTION ONLY — remove the "3" from the Erdős market's title.
- * Founder instruction 2026-10-06 (option A); run by
+ * ONE-OFF, PRODUCTION ONLY — market titles. Round 1 (founder, 2026-10-06,
+ * option A) removed the "3" from the Erdős title. Round 2 (founder, same day):
+ * STAGING IS THE SOURCE OF TRUTH, so the Erdős and Chess titles are set to
+ * staging's exact values. Run by
  * `.github/workflows/prod-title-once.yml` inside the production VPC (the
  * migration task's image and secrets), then deleted together with that
  * workflow. Staging's counterpart ran as `staging-title-erdos-once.ts`.
  *
- * Writes exactly ONE column of ONE row: `markets.title` for the market whose
- * id is pinned below. Slug, id, description (the resolution text), status,
+ * Writes exactly ONE column — `markets.title` — of the rows whose ids are
+ * pinned below, all in ONE transaction: any mismatch on any row rolls every
+ * row back. Slug, id, description (the resolution text), status,
  * pools, bets, comments and every other table are untouched. The title is in
  * no event payload (`market.created` carries id, deadline and media only), so
  * the append-only log needs no companion row.
@@ -31,14 +34,27 @@
  */
 import postgres from "postgres";
 
-const MARKET_ID = "01a0a0bb-3141-71ce-9843-2d98002f8c87";
-const MARKET_SLUG = "math-erdos-solved-on-zugzwang";
-// Read off live production 2026-10-06. Escaped so the bytes cannot be changed
-// by an editor's normalisation: U+00B7 middle dot, U+0151 ő.
-const OLD_TITLE =
-	"Math · Will 3 Erdős problems be solved on Zugzwang by 5th November?";
-const NEW_TITLE =
-	"Math · Will Erdős problems be solved on Zugzwang by 5th November?";
+// Each OLD is read off live production and each NEW off live (verified)
+// staging, 2026-10-06. Escaped so the bytes cannot be changed by an editor's
+// normalisation: U+00B7 middle dot, U+0151 ő.
+const CHANGES = [
+	{
+		id: "01a0a0bb-3141-71ce-9843-2d98002f8c87",
+		slug: "math-erdos-solved-on-zugzwang",
+		oldTitle:
+			"Math \u00b7 Will Erd\u0151s problems be solved on Zugzwang by 5th November?",
+		newTitle:
+			"Math \u00b7 Will Erd\u0151s problem #728 be solved on erdosproblems.com?",
+	},
+	{
+		id: "01a0a0ba-d969-7613-a701-0f140bd224b1",
+		slug: "chess-fide-tiebreak-response",
+		oldTitle:
+			"Chess \u00b7 Will Vishy Anand answer Zugzwang's tiebreak proposal?",
+		newTitle:
+			"Chess \u00b7 Will Vishy Anand reply to Zugzwang's ELO rating proposal?",
+	},
+] as const;
 
 function die(message: string, code: number): never {
 	console.error(`[prod-title] REFUSED (${code}): ${message}`);
@@ -100,54 +116,67 @@ async function main(): Promise<void> {
 	const sql = postgres(url, { max: 1 });
 	try {
 		await sql.begin(async (tx) => {
-			const read = async (): Promise<Row | undefined> => {
+			const read = async (id: string): Promise<Row | undefined> => {
 				const rows = await tx<Row[]>`
 					select id, slug, title, md5(description) as description_md5, status::text as status
-					from markets where id = ${MARKET_ID} for update`;
+					from markets where id = ${id} for update`;
 				return rows[0];
 			};
 
-			const before = await read();
-			if (!before) throw new Abort(`market ${MARKET_ID} not found`, 20);
-			report("before", before);
-			if (before.slug !== MARKET_SLUG) {
-				throw new Abort(`slug is ${before.slug}, expected ${MARKET_SLUG}`, 21);
-			}
-			if (before.title === NEW_TITLE) {
-				report("result", "already applied; nothing written");
-				return;
-			}
-			if (before.title !== OLD_TITLE) {
-				throw new Abort("title is neither the old nor the new value", 22);
-			}
-			report("verified-old-title", before.title);
-			if (mode === "--dry-run") {
-				report("result", "dry run; would set title to the new value");
-				report("would-set", NEW_TITLE);
-				return;
-			}
+			for (const c of CHANGES) {
+				const before = await read(c.id);
+				if (!before) throw new Abort(`market ${c.id} not found`, 20);
+				report("before", before);
+				if (before.slug !== c.slug) {
+					throw new Abort(`slug is ${before.slug}, expected ${c.slug}`, 21);
+				}
+				if (before.title === c.newTitle) {
+					report("already-applied", c.slug);
+					continue;
+				}
+				if (before.title !== c.oldTitle) {
+					throw new Abort(
+						`${c.slug}: title is neither the old nor the new value`,
+						22,
+					);
+				}
+				report("verified-old-title", before.title);
+				if (mode === "--dry-run") {
+					report("would-set", c.newTitle);
+					continue;
+				}
 
-			const updated = await tx`
-				update markets set title = ${NEW_TITLE}
-				where id = ${MARKET_ID} and title = ${OLD_TITLE}`;
-			if (updated.count !== 1) {
-				throw new Abort(`UPDATE touched ${updated.count} rows`, 23);
-			}
+				const updated = await tx`
+					update markets set title = ${c.newTitle}
+					where id = ${c.id} and title = ${c.oldTitle}`;
+				if (updated.count !== 1) {
+					throw new Abort(
+						`${c.slug}: UPDATE touched ${updated.count} rows`,
+						23,
+					);
+				}
 
-			const after = await read();
-			if (
-				!after ||
-				after.title !== NEW_TITLE ||
-				after.slug !== before.slug ||
-				after.id !== before.id ||
-				after.description_md5 !== before.description_md5 ||
-				after.status !== before.status
-			) {
-				throw new Abort("post-update read disagrees; rolling back", 24);
+				const after = await read(c.id);
+				if (
+					!after ||
+					after.title !== c.newTitle ||
+					after.slug !== before.slug ||
+					after.id !== before.id ||
+					after.description_md5 !== before.description_md5 ||
+					after.status !== before.status
+				) {
+					throw new Abort(
+						`${c.slug}: post-update read disagrees; rolling back`,
+						24,
+					);
+				}
+				report("verified-new-title", after.title);
+				report("after", after);
 			}
-			report("verified-new-title", after.title);
-			report("after", after);
-			report("result", "committed");
+			report(
+				"result",
+				mode === "--dry-run" ? "dry run; nothing written" : "committed",
+			);
 		});
 	} catch (err) {
 		if (err instanceof Abort) die(err.message, err.code);

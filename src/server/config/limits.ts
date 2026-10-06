@@ -489,9 +489,20 @@ export type ChartWindow = { readonly start: string; readonly end: string };
  * **silently**; the guard added at CHART-6 asserts containment against these real
  * constants, because a guard written against a fixture window would have passed
  * every day of those two weeks.
+ *
+ * ── MOVED 2026-10-06 · `2026-09-15` → `2026-10-05` (founder ruling) ────────────
+ *
+ * The six production markets were opened on 2026-10-04 at 16:58 UTC (the
+ * launch copy), not on 15 September, so the old start left ~19 empty days on
+ * the left of every production chart. The founder ruled production's window
+ * identical to staging's (#650), which the client had already accepted.
+ * ⚠ STATED, NOT HIDDEN: that genesis instant is ~7 hours BEFORE this start, so
+ * each market's opening point now maps to a negative x and is cut by the
+ * viewBox — on production exactly as on staging. Chosen over `2026-10-04`
+ * (which would keep it) so the two environments render the same.
  */
 const PRODUCTION_CHART_WINDOW: ChartWindow = {
-	start: "2026-09-15T00:00:00.000Z",
+	start: "2026-10-05T00:00:00.000Z",
 	end: "2026-11-05T23:45:00.000Z",
 };
 
@@ -600,9 +611,23 @@ const PRODUCTION_CHART_WINDOW: ChartWindow = {
  * recreates the markets moves this floor forward, and nothing re-reads it. The
  * previous entry warned that its own `end` would go stale silently; this is the
  * same class of decay at the other edge, and it arrived first.
+ *
+ * ── RE-MEASURED 2026-10-06 · `2026-09-07` → `2026-10-05` ───────────────────
+ *
+ * The periodic failure the entry above predicted recurred: a one-off reset on
+ * 2026-10-04 recreated the six roster markets again (see commits around
+ * `f1e4002d`/`0c9b678d`), minting fresh `market.opened` rows and leaving the
+ * window open four weeks before any current data existed.
+ *
+ * ⚠ FOUNDER-SUPPLIED DATE, NOT INDEPENDENTLY RE-MEASURED AGAINST THE LIVE
+ * DATABASE THE WAY THE PRIOR TWO CORRECTIONS WERE — this session had no
+ * database access at the time of the fix. `tests/unit/config/chart-window.test.ts`'s
+ * `EARLIEST_MEASURED_EVENT` pin and `stagingGenesisInstants()` fixture are
+ * `.skip`ped rather than hand-updated with guessed values, flagged inline for
+ * a live re-read. Un-skip together with the next re-measurement.
  */
 const STAGING_CHART_WINDOW: ChartWindow = {
-	start: "2026-09-07T00:00:00.000Z",
+	start: "2026-10-05T00:00:00.000Z",
 	end: "2026-11-05T23:45:00.000Z",
 };
 
