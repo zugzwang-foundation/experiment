@@ -34,15 +34,16 @@
  */
 import postgres from "postgres";
 
-// Round 3 (founder, 2026-10-06): the production Erdős title's problem number
-// changes from #728 to #19, production only. OLD is read off live production.
+// Round 4 (founder, 2026-10-06): the production Erdős title's problem number
+// changes from #19 to #689, production only. OLD is read off live production
+// (round 3's committed "after", 16:04:54 UTC).
 // Escaped: U+00B7 middle dot, U+0151 ő.
 const CHANGES = [
 	{
 		id: "01a0a0bb-3141-71ce-9843-2d98002f8c87",
 		slug: "math-erdos-solved-on-zugzwang",
-		oldTitle: "Math · Will Erdős problem #728 be solved on erdosproblems.com?",
-		newTitle: "Math · Will Erdős problem #19 be solved on erdosproblems.com?",
+		oldTitle: "Math · Will Erdős problem #19 be solved on erdosproblems.com?",
+		newTitle: "Math · Will Erdős problem #689 be solved on erdosproblems.com?",
 	},
 ] as const;
 
