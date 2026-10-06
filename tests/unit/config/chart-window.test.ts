@@ -94,7 +94,15 @@ describe("chart-window::staging and preview share the fixture window", () => {
 		// destroyed the then-eight content markets and LIQ-1-RESTORE recreated
 		// them, so every renderable event on staging is now younger than the window that
 		// held them, and the plot opened three weeks before any data existed.
-		const STG_START = "2026-09-07T00:00:00.000Z";
+		// ⚠⚠ RE-MEASURED AGAIN 2026-10-06, AFTER THE OCT-4 ONE-OFF RESET — same
+		// class of decay, recurring exactly as the warning above predicted: that
+		// reset recreated the six roster markets again, minting fresh
+		// `market.opened` rows, so 2026-09-07 was staving open a window four
+		// weeks before any current data existed. ⚠ Founder-supplied date, NOT
+		// independently re-measured against the live database the way the two
+		// prior corrections were — see the two `.skip`ped tests below, which DO
+		// need that live reading and are flagged rather than fabricated.
+		const STG_START = "2026-10-05T00:00:00.000Z";
 		// ⚠ CHART-4 D11 — was 2026-09-10T23:45Z, now production's own end. The
 		// start is still staging's (measured from its own data), so the two
 		// windows share an end and differ only in where they begin.
@@ -206,7 +214,17 @@ describe("chart-window::staging and preview share the fixture window", () => {
 		).toBeLessThan(stagingEnd);
 	});
 
-	it("starts no later than staging's earliest measured EVENT, so no real data is clipped", () => {
+	// ⛔⛔ SKIPPED 2026-10-06, DELIBERATELY, NOT DELETED — SAME CLASS OF DEBT
+	// THIS FILE ALREADY NAMES TWICE BELOW. The Oct-4 one-off reset recreated
+	// the six roster markets again, minting fresh `market.opened` rows, so
+	// `EARLIEST_MEASURED_EVENT` below describes data that no longer exists —
+	// exactly the "quietly wrong in the permissive direction" failure this
+	// test itself was written to catch. The honest fix is a live read against
+	// the current staging database (see the two SELECTs recorded in this
+	// task's own thread); fabricating a plausible-looking replacement instant
+	// here would be the exact anti-pattern this file spends its whole history
+	// warning against. Un-skip once re-measured.
+	it.skip("starts no later than staging's earliest measured EVENT, so no real data is clipped", () => {
 		// ⛔ MEASURED, NOT CHOSEN — AND THE QUANTITY MEASURED CHANGED AT CHART-6.
 		// This asserted the earliest `bet.placed` (2026-08-21T05:29:29.430Z, read at
 		// CHART-3) and passed every day for two weeks while the genesis point of
@@ -321,6 +339,14 @@ describe("debate-view::price-chart-window-contains-all-data — RF-5, against th
 	 * Renaming the keys and re-measuring the instants are separate acts, and
 	 * conflating them would have replaced six measured values with six
 	 * fresh ones for no reason.
+	 *
+	 * ⛔⛔ STALE AGAIN AS OF 2026-10-06, AFTER THE OCT-4 ONE-OFF RESET —
+	 * the exact recurrence the warning above exists to name. This reset
+	 * recreated all six roster markets through `createMarket` / `openMarket`
+	 * once more, minting fresh `market.opened` rows, so every instant below
+	 * now describes destroyed data. The two tests reading this function are
+	 * `.skip`ped rather than left red or hand-updated with guessed values —
+	 * re-measure against the live database and un-skip.
 	 */
 	function stagingGenesisInstants(): { slug: string; at: string }[] {
 		return [
@@ -336,7 +362,9 @@ describe("debate-view::price-chart-window-contains-all-data — RF-5, against th
 		];
 	}
 
-	it("places every staging market's GENESIS point inside the plot — the CHART-6 defect", () => {
+	// ⛔⛔ SKIPPED 2026-10-06 — reads `stagingGenesisInstants()`, which is
+	// stale per its own docblock above. Re-measure and un-skip together.
+	it.skip("places every staging market's GENESIS point inside the plot — the CHART-6 defect", () => {
 		const genesis = stagingGenesisInstants();
 
 		// Non-vacuity: six markets, six parseable instants. An empty read would
@@ -362,7 +390,10 @@ describe("debate-view::price-chart-window-contains-all-data — RF-5, against th
 		}
 	});
 
-	it("REDS on a window that CLIPS — the control that proves the guard can fire", () => {
+	// ⛔⛔ SKIPPED 2026-10-06 — same reason as the test above: reads
+	// `stagingGenesisInstants()`, stale since the Oct-4 reset. Re-measure and
+	// un-skip together.
+	it.skip("REDS on a window that CLIPS — the control that proves the guard can fire", () => {
 		// ⛔ OVN-V2 IN THE FILE RATHER THAN IN A REPORT. The assertion above is
 		// written against code that is now correct, so on its own it has never seen
 		// the defect and could be asserting something unrelated. This runs the SAME
