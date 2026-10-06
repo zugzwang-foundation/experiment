@@ -1,5 +1,6 @@
 import {
 	Annotations,
+	ArnFormat,
 	CfnOutput,
 	Duration,
 	Stack,
@@ -14,13 +15,18 @@ import type * as ecr from "aws-cdk-lib/aws-ecr";
 import * as ecs from "aws-cdk-lib/aws-ecs";
 import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import * as iam from "aws-cdk-lib/aws-iam";
-import type * as logs from "aws-cdk-lib/aws-logs";
+import * as logs from "aws-cdk-lib/aws-logs";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as targets from "aws-cdk-lib/aws-route53-targets";
 import type * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as wafv2 from "aws-cdk-lib/aws-wafv2";
 import type { Construct } from "constructs";
 import type { EnvironmentConfig } from "../config/types";
+import {
+	RATE_LIMITED_RESPONSE_BODIES,
+	WAF_LOG_GROUP_PREFIX,
+	wafRateLimitRules,
+} from "./waf-rate-limits";
 
 export interface ComputeStackProps extends StackProps {
 	readonly config: EnvironmentConfig;
@@ -421,10 +427,19 @@ export class ComputeStack extends Stack {
 					metricName: `zugzwang-${config.name}-waf`,
 					sampledRequestsEnabled: true,
 				},
+				// WAF-RATE-1 — the custom 429 body the rate rules answer with.
+				...(config.wafRateLimits
+					? { customResponseBodies: RATE_LIMITED_RESPONSE_BODIES }
+					: {}),
 				rules: [
+					// WAF-RATE-1 — per-IP rate limits first (priorities 1-4), so a
+					// flood is answered before any other rule runs.
+					...(config.wafRateLimits
+						? wafRateLimitRules(config.wafRateLimits)
+						: []),
 					{
 						name: "AWSManagedRulesCommonRuleSet",
-						priority: 1,
+						priority: 10,
 						// I — `count` records matches without blocking; see
 						// EnvironmentConfig.wafMode.
 						overrideAction:
@@ -447,6 +462,47 @@ export class ComputeStack extends Stack {
 				resourceArn: this.loadBalancer.loadBalancerArn,
 				webAclArn: webAcl.attrArn,
 			});
+
+			// WAF-RATE-1 — log blocked and counted requests only, so we can see
+			// who a limit stopped and check no real user was among them.
+			if (config.wafLogging) {
+				const wafLogGroupName = `${WAF_LOG_GROUP_PREFIX}zugzwang-${config.name}`;
+				new logs.LogGroup(this, "WafLogs", {
+					logGroupName: wafLogGroupName,
+					retention: logs.RetentionDays.ONE_MONTH,
+				});
+				const wafLogging = new wafv2.CfnLoggingConfiguration(
+					this,
+					"WafLogging",
+					{
+						resourceArn: webAcl.attrArn,
+						// ⚠ The ARN WITHOUT the trailing `:*` that `LogGroup.logGroupArn`
+						// carries — WAF rejects that form.
+						logDestinationConfigs: [
+							this.formatArn({
+								service: "logs",
+								resource: "log-group",
+								resourceName: wafLogGroupName,
+								arnFormat: ArnFormat.COLON_RESOURCE_NAME,
+							}),
+						],
+						loggingFilter: {
+							DefaultBehavior: "DROP",
+							Filters: [
+								{
+									Behavior: "KEEP",
+									Requirement: "MEETS_ANY",
+									Conditions: [
+										{ ActionCondition: { Action: "BLOCK" } },
+										{ ActionCondition: { Action: "COUNT" } },
+									],
+								},
+							],
+						},
+					},
+				);
+				wafLogging.node.addDependency(this.node.findChild("WafLogs"));
+			}
 		}
 
 		if (config.cloudFrontEnabled) {
