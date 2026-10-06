@@ -20,9 +20,10 @@ import { IDEMPOTENCY_KEY_REGEX } from "@/server/idempotency/types";
 import {
 	computeBatchId,
 	planSeedBatch,
-	SEED_REQUEST_ID_PREFIX,
+	SEED_LABELS,
 	seedIdempotencyKey,
 	seedParticipantEmail,
+	seedRequestId,
 } from "@/server/seed/plan";
 import type { SeedRow } from "@/server/seed/types";
 
@@ -224,61 +225,125 @@ describe("seed-plan — derived identifiers (§7, §8)", () => {
 		// that writes `Alpha` on one row and `alpha` on another means ONE
 		// participant — the email is the lookup key, and email is matched
 		// case-insensitively by every provider but not by a string compare.
-		expect(seedParticipantEmail(BATCH_ID, row(1, { userLabel: "alpha" }))).toBe(
-			"seed-alpha@seed.staging.invalid",
-		);
-		expect(seedParticipantEmail(BATCH_ID, row(2, { userLabel: "ALPHA" }))).toBe(
-			"seed-alpha@seed.staging.invalid",
-		);
-		expect(seedParticipantEmail(BATCH_ID, row(3, { userLabel: "Alpha" }))).toBe(
-			"seed-alpha@seed.staging.invalid",
-		);
+		expect(
+			seedParticipantEmail(BATCH_ID, row(1, { userLabel: "alpha" }), "staging"),
+		).toBe("seed-alpha@seed.staging.invalid");
+		expect(
+			seedParticipantEmail(BATCH_ID, row(2, { userLabel: "ALPHA" }), "staging"),
+		).toBe("seed-alpha@seed.staging.invalid");
+		expect(
+			seedParticipantEmail(BATCH_ID, row(3, { userLabel: "Alpha" }), "staging"),
+		).toBe("seed-alpha@seed.staging.invalid");
 	});
 
 	it("seed-plan::participant-email-for-a-label-ignores-the-row-number", () => {
 		// The same label on rows 1 and 40 is the same person — that is the whole
 		// purpose of the column (§4).
-		const a = seedParticipantEmail(BATCH_ID, row(1, { userLabel: "beta" }));
-		const b = seedParticipantEmail(BATCH_ID, row(40, { userLabel: "beta" }));
+		const a = seedParticipantEmail(
+			BATCH_ID,
+			row(1, { userLabel: "beta" }),
+			"staging",
+		);
+		const b = seedParticipantEmail(
+			BATCH_ID,
+			row(40, { userLabel: "beta" }),
+			"staging",
+		);
 		expect(a).toBe(b);
 	});
 
 	it("seed-plan::participant-email-for-a-blank-label-is-batch-and-row-scoped", () => {
-		expect(seedParticipantEmail(BATCH_ID, row(7))).toBe(
+		expect(seedParticipantEmail(BATCH_ID, row(7), "staging")).toBe(
 			`seed-${BATCH_ID.slice(0, 12)}-r7@seed.staging.invalid`,
 		);
 		// A blank label is a NEW participant per row — two blank rows are two
 		// people — yet still DETERMINISTIC, so a re-run of the same file reuses
 		// them instead of minting a second set and burning the identity pool.
-		expect(seedParticipantEmail(BATCH_ID, row(7))).toBe(
-			seedParticipantEmail(BATCH_ID, row(7)),
+		expect(seedParticipantEmail(BATCH_ID, row(7), "staging")).toBe(
+			seedParticipantEmail(BATCH_ID, row(7), "staging"),
 		);
-		expect(seedParticipantEmail(BATCH_ID, row(7))).not.toBe(
-			seedParticipantEmail(BATCH_ID, row(8)),
+		expect(seedParticipantEmail(BATCH_ID, row(7), "staging")).not.toBe(
+			seedParticipantEmail(BATCH_ID, row(8), "staging"),
 		);
 	});
 
 	it("seed-plan::every-participant-email-is-on-the-reserved-invalid-domain", () => {
 		// G4. `.invalid` is reserved by RFC 2606 and can never be delivered or
 		// registered, so a seeded account can never belong to a real person and
-		// is greppable in one query. Both arms of the function, asserted together
-		// — the blank-label arm is the one a reader is most likely to forget.
-		const emails = [
-			seedParticipantEmail(BATCH_ID, row(1, { userLabel: "alpha" })),
-			seedParticipantEmail(BATCH_ID, row(2)),
-		];
-		for (const email of emails) {
-			expect(email.endsWith("@seed.staging.invalid")).toBe(true);
-			expect(email.startsWith("seed-")).toBe(true);
+		// is greppable in one query. Both arms of the function, in EVERY
+		// environment `SEED_LABELS` knows — iterated, so an environment added
+		// later is covered on arrival rather than by someone remembering.
+		const envs = Object.keys(SEED_LABELS) as (keyof typeof SEED_LABELS)[];
+		expect(envs.sort()).toEqual(["prod", "staging"]);
+		for (const env of envs) {
+			expect(SEED_LABELS[env].emailDomain.endsWith(".invalid")).toBe(true);
+			const emails = [
+				seedParticipantEmail(BATCH_ID, row(1, { userLabel: "alpha" }), env),
+				seedParticipantEmail(BATCH_ID, row(2), env),
+			];
+			for (const email of emails) {
+				expect(email.endsWith(`@${SEED_LABELS[env].emailDomain}`)).toBe(true);
+				expect(email.startsWith("seed-")).toBe(true);
+			}
 		}
 	});
 
+	it("seed-plan::staging-labels-are-byte-for-byte-the-pre-SEED-PROD-1-values", () => {
+		// Staging's labels are written into append-only events and are how its
+		// existing participants are found again; changing one splits staging's
+		// synthetic population in two. Pinned whole, every field.
+		expect(SEED_LABELS.staging).toEqual({
+			requestIdPrefix: "seed-staging:",
+			emailDomain: "seed.staging.invalid",
+			tosUserAgent:
+				"SYNTHETIC-FIXTURE-NO-USER-AGENT-WAS-RECORDED (ZugzwangSeedStaging)",
+			oauthTokenPrefix: "seed-staging",
+		});
+	});
+
+	it("seed-plan::production-labels-never-name-staging (SEED-PROD-1)", () => {
+		expect(SEED_LABELS.prod).toEqual({
+			requestIdPrefix: "seed-production:",
+			emailDomain: "seed.production.invalid",
+			tosUserAgent:
+				"SYNTHETIC-FIXTURE-NO-USER-AGENT-WAS-RECORDED (ZugzwangSeedProduction)",
+			oauthTokenPrefix: "seed-production",
+		});
+		expect(JSON.stringify(SEED_LABELS.prod)).not.toMatch(/staging/i);
+	});
+
 	it("seed-plan::request-id-prefix-is-the-pinned-provenance-tag", () => {
-		// §8 Provenance: `metadata.request_id = "seed-staging:<batchId[0:16]>"` on
+		// §8 Provenance: `metadata.request_id = "seed-<env>:<batchId[0:16]>"` on
 		// every event the tool causes, which is how seeded activity is identified
-		// in the append-only log with NO schema change. The prefix is pinned here
-		// because a drifted string would leave the log unqueryable after the fact
-		// and the rows are not editable (INV-4 family).
-		expect(SEED_REQUEST_ID_PREFIX).toBe("seed-staging:");
+		// in the append-only log with NO schema change. The prefixes are pinned
+		// here because a drifted string would leave the log unqueryable after the
+		// fact and the rows are not editable (Bucket A, append-only). Staging's is the
+		// pre-SEED-PROD-1 value, unchanged, so its existing rows still match.
+		expect(SEED_LABELS.staging.requestIdPrefix).toBe("seed-staging:");
+		expect(SEED_LABELS.prod.requestIdPrefix).toBe("seed-production:");
+		expect(seedRequestId("staging", BATCH_ID)).toBe(
+			`seed-staging:${BATCH_ID.slice(0, 16)}`,
+		);
+		expect(seedRequestId("prod", BATCH_ID)).toBe(
+			`seed-production:${BATCH_ID.slice(0, 16)}`,
+		);
+	});
+
+	it("seed-plan::production-labels-name-production (SEED-PROD-1)", () => {
+		// A production participant must never carry a staging label: the domain
+		// is how seeded accounts are found, and a staging domain on production
+		// would hide them from a production query.
+		expect(
+			seedParticipantEmail(BATCH_ID, row(1, { userLabel: "Alpha" }), "prod"),
+		).toBe("seed-alpha@seed.production.invalid");
+		expect(seedParticipantEmail(BATCH_ID, row(7), "prod")).toBe(
+			`seed-${BATCH_ID.slice(0, 12)}-r7@seed.production.invalid`,
+		);
+		// Same label, two environments, two different people.
+		expect(
+			seedParticipantEmail(BATCH_ID, row(1, { userLabel: "alpha" }), "prod"),
+		).not.toBe(
+			seedParticipantEmail(BATCH_ID, row(1, { userLabel: "alpha" }), "staging"),
+		);
 	});
 });
