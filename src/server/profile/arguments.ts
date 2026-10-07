@@ -3,21 +3,27 @@ import "server-only";
 import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 import type { DbClient, DbTransaction } from "@/db";
-import { comments, markets, positions } from "@/db/schema";
+import { comments, imageUploads, markets, positions } from "@/db/schema";
 import {
 	type PostSubstrate,
 	profileOrder,
 	type ReplySubstrate,
 } from "@/lib/ranking";
+import { RENDER_IMAGE_CACHE_CONTROL } from "@/server/config/limits";
 import { CpmmDecimal, toFixed18 } from "@/server/cpmm/decimal";
 import {
 	deriveTitleTeaser,
 	loadRemovedSet,
 } from "@/server/debate-view/load-debate-view";
 import { computeMarker, type Marker } from "@/server/positions/compute";
+import { DOWNSTREAM_CACHED_MINUTES } from "@/server/storage/read-url-memo";
+import { signRead } from "@/server/storage/sign-read";
 
 /** A bound read client — top-level `db` OR a caller's transaction. */
 type ProfileReader = DbClient | DbTransaction;
+
+/** Presigned GET lifetime for an argument's image — the debate view's value. */
+const READ_URL_TTL_SECONDS = 7200;
 
 /** §9 Support/Counter footer over a post's reply-bets (read-time aggregate). */
 export type ProfileArgumentAggregate = {
@@ -85,6 +91,9 @@ export type ProfileArgumentItem =
 			 * already side-scoped by the engine. ⚠ NOT the YES probability:
 			 * deriving `100 − x` would misprint a NO entry. Forwarded RAW. */
 			priceAtBet: string;
+			/** The post's own attachment, presigned; null when it has none (or R2
+			 * could not sign it). Only the `removed: false` variants carry it. */
+			imageUrl?: string | null;
 			createdAt: string;
 			aggregate: ProfileArgumentAggregate;
 	  }
@@ -119,6 +128,8 @@ export type ProfileArgumentItem =
 			priceAtBet: string;
 			/** The parent post's title; null when the parent is removed (no leak). */
 			repliedToTitle: string | null;
+			/** The reply's own attachment, as on the post variant. */
+			imageUrl?: string | null;
 			createdAt: string;
 	  };
 
@@ -142,6 +153,7 @@ type PostAggRow = {
 	endorse_count: string | number;
 	contest_count: string | number;
 	friendly_fire_dharma: string;
+	image_key: string | null;
 };
 
 type ReplyRow = {
@@ -156,6 +168,7 @@ type ReplyRow = {
 	sold: boolean;
 	price_at_bet: string;
 	friendly_fire: boolean;
+	image_key: string | null;
 };
 
 /**
@@ -292,8 +305,13 @@ export async function loadProfileArguments(
 					AND rc.friendly_fire
 					AND rc.user_id <> p.user_id
 					AND rb.id IS NOT NULL
-			), 0) AS friendly_fire_dharma
+			), 0) AS friendly_fire_dharma,
+			-- The post's own attachment key. A JOIN on the primary key cannot fan
+			-- out, so the aggregates above are unchanged, and it adds no statement
+			-- (the profile's statement count is pinned).
+			iu.r2_object_key AS image_key
 		FROM ${comments} p
+		LEFT JOIN ${imageUploads} iu ON iu.id = p.image_uploads_id
 		JOIN LATERAL (
 			SELECT
 				COALESCE(pl.surviving_basis, b.stake) AS stake,
@@ -311,7 +329,7 @@ export async function loadProfileArguments(
 		LEFT JOIN lots rl ON rl.bet_id = rb.id
 		WHERE p.user_id = ${userId} AND p.parent_comment_id IS NULL
 		GROUP BY p.id, p.market_id, p.side_at_post_time, p.created_at, p.body,
-			pb.stake, pb.original_stake, pb.sold, pb.price_at_bet
+			pb.stake, pb.original_stake, pb.sold, pb.price_at_bet, iu.r2_object_key
 	`);
 
 	// The user's replies + each reply-bet's own stake (INV-1: one bet per reply).
@@ -329,8 +347,11 @@ export async function loadProfileArguments(
 			rb.sold,
 			rb.price_at_bet,
 			-- FF-1 / ADR-0058 — the toggle, per reply, for the tag; nothing sorts on it.
-			rc.friendly_fire
+			rc.friendly_fire,
+			-- The reply's own attachment key (one row per reply; no fan-out).
+			iu.r2_object_key AS image_key
 		FROM ${comments} rc
+		LEFT JOIN ${imageUploads} iu ON iu.id = rc.image_uploads_id
 		JOIN LATERAL (
 			SELECT
 				COALESCE(rl.surviving_basis, b.stake) AS stake,
@@ -501,6 +522,31 @@ export async function loadProfileArguments(
 	]);
 	const removedSet = await loadRemovedSet(client, [...maskingCandidates]);
 
+	// Presign each attachment — SC-1: a removed item's key is never signed, so
+	// its URL cannot reach a DTO. Presigning is a local HMAC (no DB statement).
+	// A failure degrades that one item to no image; it never 500s the page.
+	const imageUrlById = new Map<string, string>();
+	await Promise.all(
+		[...postRows, ...replyRows].map(async (r) => {
+			if (r.image_key === null || removedSet.has(r.id)) {
+				return;
+			}
+			try {
+				imageUrlById.set(
+					r.id,
+					await signRead(
+						r.image_key,
+						READ_URL_TTL_SECONDS,
+						DOWNSTREAM_CACHED_MINUTES,
+						RENDER_IMAGE_CACHE_CONTROL,
+					),
+				);
+			} catch {
+				// R2 unavailable for this object → no image for this item.
+			}
+		}),
+	);
+
 	const ordered = profileOrder(posts, replies);
 
 	return ordered.map((item): ProfileArgumentItem => {
@@ -512,6 +558,7 @@ export async function loadProfileArguments(
 				ordinalById,
 				heldByMarket,
 				removedSet,
+				imageUrlById,
 			});
 		}
 		return buildReplyItem({
@@ -523,6 +570,7 @@ export async function loadProfileArguments(
 			topLevelBodyById,
 			heldByMarket,
 			removedSet,
+			imageUrlById,
 		});
 	});
 }
@@ -558,9 +606,17 @@ export function buildPostItem(args: {
 	ordinalById: Map<string, number>;
 	heldByMarket: Map<string, "YES" | "NO">;
 	removedSet: Set<string>;
+	imageUrlById: Map<string, string>;
 }): ProfileArgumentItem {
-	const { post, meta, marketById, ordinalById, heldByMarket, removedSet } =
-		args;
+	const {
+		post,
+		meta,
+		marketById,
+		ordinalById,
+		heldByMarket,
+		removedSet,
+		imageUrlById,
+	} = args;
 	const market = meta ? marketById.get(meta.marketId) : undefined;
 	const marketSlug = market?.slug ?? "";
 	const marketTitle = market?.title ?? "";
@@ -613,6 +669,7 @@ export function buildPostItem(args: {
 		authorStakeOriginal: post.authorStakeOriginal,
 		authorSold: post.authorSold,
 		priceAtBet: post.priceAtBet,
+		imageUrl: imageUrlById.get(post.id) ?? null,
 		createdAt,
 		aggregate,
 	};
@@ -634,6 +691,7 @@ export function buildReplyItem(args: {
 	topLevelBodyById: Map<string, string>;
 	heldByMarket: Map<string, "YES" | "NO">;
 	removedSet: Set<string>;
+	imageUrlById: Map<string, string>;
 }): ProfileArgumentItem {
 	const {
 		reply,
@@ -644,6 +702,7 @@ export function buildReplyItem(args: {
 		topLevelBodyById,
 		heldByMarket,
 		removedSet,
+		imageUrlById,
 	} = args;
 	const market = meta ? marketById.get(meta.marketId) : undefined;
 	const marketSlug = market?.slug ?? "";
@@ -694,6 +753,7 @@ export function buildReplyItem(args: {
 		// `ReplySubstrate` from the unchanged reply query, 18-dp by column type.
 		priceAtBet: reply.priceAtBet,
 		repliedToTitle,
+		imageUrl: imageUrlById.get(reply.id) ?? null,
 		createdAt,
 	};
 }
