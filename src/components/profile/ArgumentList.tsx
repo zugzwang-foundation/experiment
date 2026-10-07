@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { useState } from "react";
 
 import { PositionMarker, SideBadge } from "@/components/debate/badges";
+import { CommentImage } from "@/components/debate/CommentImage";
 import { hasExtendedText } from "@/components/debate/composer/payload";
 import {
 	computeSplitBar,
@@ -8,6 +10,7 @@ import {
 } from "@/components/debate/composer/split-bar";
 import { CompactDharmaFigure } from "@/components/debate/DharmaFigure";
 import { SharePostImage } from "@/components/debate/DownloadPostImage";
+import { ImageLightbox } from "@/components/debate/dialogs";
 import { formatDharma, formatDharmaCompact } from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -630,13 +633,15 @@ function PresentHead({
  * `ProfileArgumentItem` (`arguments.ts`) and has simply never been rendered on
  * this surface; the head cluster, title, split bar and reply line are the list
  * card's own, so the two renderings cannot drift in what they show.
- * ⛔ THE ONE PART THAT IS NOT BUILT IS THE IMAGE. `comments.imageUploadsId` is
- * never selected by `loadProfileArguments`, so a real image is a NEW SERVER READ
- * PER RENDER on a surface already served by a 15-slot pooler. The SLOT is built
- * — it is the mockup's `.rimg{flex:1 1 auto; min-height:0}`, the growth region
- * that pins the footer to the bottom — and it renders NOTHING: no background, no
- * border, no label. ⛔ Deliberately not a grey box: a permanent placeholder
- * states "an image is missing" on every argument, most of which have none.
+ * ⚠ THE IMAGE IS BUILT NOW (PROFILE-IMAGE). This read "THE ONE PART THAT IS NOT
+ * BUILT IS THE IMAGE … a real image is a NEW SERVER READ PER RENDER". It is not:
+ * `loadProfileArguments` LEFT JOINs `image_uploads` into the two queries it
+ * already runs (the statement count is pinned and unchanged) and presigns the
+ * key locally, skipping removed items (SC-1). The SLOT is still the mockup's
+ * `.rimg{flex:1 1 auto; min-height:0}` growth region that pins the footer to the
+ * bottom; it holds the attachment when there is one and renders NOTHING when
+ * there is not. ⛔ Still no grey box: a permanent placeholder states "an image is
+ * missing" on every argument, most of which have none.
  *
  * ⚠⚠ UI-OVERNIGHT entry 3 — THIS CARD NOW CARRIES A REVEAL CONTROL, AND THE
  * PARAGRAPH THAT ARGUED AGAINST ONE IS KEPT BECAUSE ITS TEST IS STILL THE RIGHT
@@ -700,12 +705,14 @@ function ReplicaCard({
 			{hasExtendedText(item.body) ? (
 				<ReplicaBody id={item.id} body={item.body} />
 			) : null}
-			{/* The image SLOT — see the ⛔ above. Empty by design; it contributes the
-			    mockup's growth region and nothing else. */}
+			{/* The image SLOT — see the ⚠ above. It is the mockup's growth region,
+			    and it carries the attachment centred when there is one. */}
 			<div
 				data-testid={`argument-replica-image-slot-${item.id}`}
-				className="min-h-0 flex-1"
-			/>
+				className="flex min-h-0 flex-1 items-center justify-center"
+			>
+				{item.imageUrl ? <ReplicaImage url={item.imageUrl} /> : null}
+			</div>
 			{/* The footer, pinned to the bottom by the slot above — the mockup's
 			    `.rfootwrap{margin-top:auto}` (`:353`) reached by the growth region
 			    rather than by declaring a margin. ⛔ Its `flex:0 0 50px` is NOT
@@ -725,6 +732,23 @@ function ReplicaCard({
 				)
 			)}
 		</Card>
+	);
+}
+
+/**
+ * The replica's attachment — the debate surface's own `CommentImage` (the
+ * `.argimg` `fill` arm, both axes bounded, aspect kept) and its `ImageLightbox`,
+ * so one image reads and opens the same way on both surfaces. This file renders
+ * under `ProfileArena`'s `"use client"` boundary, which is what lets it hold
+ * the open-state.
+ */
+function ReplicaImage({ url }: { url: string }) {
+	const [openUrl, setOpenUrl] = useState<string | null>(null);
+	return (
+		<>
+			<CommentImage url={url} onOpen={setOpenUrl} fill />
+			<ImageLightbox url={openUrl} onClose={() => setOpenUrl(null)} />
+		</>
 	);
 }
 
