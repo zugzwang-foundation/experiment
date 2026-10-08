@@ -4,7 +4,7 @@ Infrastructure-as-code for running Zugzwang on AWS ECS, backed by EC2 instances 
 
 ⚠ **Deployed.** Staging and production both run on these stacks (since late September 2026).
 The pipeline deploys only the `Compute` stack — `.github/workflows/deploy-aws.yml`, which
-`deploy-production.yml` calls for production — and the other stacks are deployed by hand. The
+`deploy-production.yml` calls for production — and any other stack is deployed by hand, outside the pipeline. The
 original design audit is `docs/reports/AWS-CDK-DESIGN.md`. *(Re-measured 2026-10-08 at DOCS-1.)*
 
 ```bash
@@ -36,16 +36,20 @@ calls anywhere, which is what lets `cdk synth` run in CI with no credentials.
    as JSON. Doppler stays the source of truth; CDK only reads the name. The keys
    are listed in `config/types.ts` → `RUNTIME_SECRET_KEYS`, plus
    `CRON_AUTH_HEADER`, whose value is the complete header — `Bearer <CRON_SECRET>`.
-2. **Set the certificate ARN** (`ZZ_STAGING_CERT_ARN` / `ZZ_PROD_CERT_ARN`).
-   Without one the ALB gets an HTTP-only listener so the stack still synthesizes.
+2. **The certificate ARN is committed** — production's in `infra/config/production.ts`, as is
+   staging's in `infra/config/staging.ts` — and a `Compute` synth refuses without one, so no
+   environment gets an HTTP-only listener (`infra/lib/compute-stack.ts`).
+   `ZZ_PROD_CERT_ARN` / `ZZ_STAGING_CERT_ARN` still override it for a hand-run deploy.
 3. **Set `ZZ_ALERT_EMAIL`** so alarms reach a human.
 3a. **After the `Database` stack is up, compose `DATABASE_URL`** from its outputs
    (`Endpoint`, `Port`, `DatabaseName`) and the generated secret
    (`zugzwang/<env>/database` → username + password), and put it in the app
    secret. Then set `STAGING_PROJECT_REF_FRAGMENT` / `PROD_PROJECT_REF_FRAGMENT`
    in Doppler to a substring of the RDS endpoint — the migration guards refuse
-   any URL that does not contain it, and today they are set to the Supabase
-   refs. Nothing else about the migration scripts changes.
+   any URL that does not contain it. Production's migrate job has passed against
+   the RDS on every production deploy since the cutover (checked 2026-10-08), which
+   this guard allows only when the fragment matches the RDS URL; the Doppler values
+   themselves were not read. Nothing else about the migration scripts changes.
 4. **Application changes this design needed** (all made since):
    - `output: 'standalone'` in `next.config.ts`;
    - `/api/health` falling back to `APP_COMMIT_SHA` / `APP_REGION`, or the
@@ -84,6 +88,6 @@ calls anywhere, which is what lets `cdk synth` run in CI with no credentials.
 - **A cron-silence alarm**, not only a failure alarm: `close-due-markets` runs
   every minute, and a scheduler that simply stops produces no error anywhere —
   markets just never close.
-- **Region pinned to `ap-south-1`.** The database is there — Supabase today,
-  RDS in the same VPC after cutover; compute in another region would undo the
+- **Region pinned to `ap-south-1`.** The database is there — the RDS in the same
+  VPC (`infra/lib/database-stack.ts`); compute in another region would undo the
   PERF-1 latency fix.
