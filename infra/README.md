@@ -45,11 +45,13 @@ calls anywhere, which is what lets `cdk synth` run in CI with no credentials.
    (`Endpoint`, `Port`, `DatabaseName`) and the generated secret
    (`zugzwang/<env>/database` → username + password), and put it in the app
    secret. Then set `STAGING_PROJECT_REF_FRAGMENT` / `PROD_PROJECT_REF_FRAGMENT`
-   in Doppler to a substring of the RDS endpoint — the migration guards refuse
-   any URL that does not contain it. Production's migrate job has passed against
-   the RDS on every production deploy since the cutover (checked 2026-10-08), which
-   this guard allows only when the fragment matches the RDS URL; the Doppler values
-   themselves were not read. Nothing else about the migration scripts changes.
+   to a substring of the RDS endpoint — the migration guards refuse any URL that
+   does not contain it. In production the in-VPC migrate job reads both values
+   from Secrets Manager (`infra/config/production.ts`, `migrationSecretKeys`),
+   where `scripts/aws-migration/prod-secret.cjs` writes the fragment as the RDS
+   host; that job has passed on every production deploy since the cutover
+   (checked 2026-10-08). The stored values themselves were not read. Nothing else
+   about the migration scripts changes.
 4. **Application changes this design needed** (all made since):
    - `output: 'standalone'` in `next.config.ts`;
    - `/api/health` falling back to `APP_COMMIT_SHA` / `APP_REGION`, or the

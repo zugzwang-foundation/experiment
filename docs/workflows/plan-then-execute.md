@@ -131,7 +131,7 @@ If Phase 2 later reveals the plan was wrong, **return to Phase 1 in a fresh tab*
 
 ## Phase 2 — Execute (Tab 2)
 
-Open a **NEW Claude Code tab** — not `/clear`. Independent context is what makes the review honest. ⚠ **Launch it from a worktree at `origin/main`.** Subagent definitions load from the session's working directory at launch and are **not** hot-reloaded, so a tab started in a tree whose branch predates a model repin runs the OLD pins (CLAUDE.md §6) — and Phase 2 is the reviewer-bearing phase:
+Open a **NEW Claude Code tab** — not `/clear`. Independent context is what makes the review honest. ⚠ **Launch it from a worktree at `origin/main`.** Subagent definitions are read from the session's own working tree, so start any reviewer-bearing tab from a worktree at `origin/main` (CLAUDE.md §6) — and Phase 2 is the reviewer-bearing phase:
 
 ```bash
 claude
