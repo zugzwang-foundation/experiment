@@ -38,13 +38,11 @@ Run an audit on one or more of the files above when ANY of these happen:
 
 In a fresh Claude Code tab. **Not** a session you've been working in (same bias problem as writer/reviewer in the same session).
 
-1. `/effort max`
+1. Model and effort: the founder's choice for this session; nothing here presets either (`CLAUDE.md` §6).
 2. Plan mode ON (`Shift+Tab`)
 3. Paste:
 
 ```
-ultrathink
-
 Audit this file: <path to file, e.g. CLAUDE.md>
 
 Read it. Then read the last 10 task logs in docs/logs/. Then look at
