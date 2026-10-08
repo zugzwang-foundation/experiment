@@ -2,14 +2,16 @@
 
 Infrastructure-as-code for running Zugzwang on AWS ECS, backed by EC2 instances you own.
 
-⚠ **Design stage. Nothing here has been deployed, and no application code was
-changed to accommodate it.** The audit behind these stacks, including the
-findings that block a real deploy, is `docs/reports/AWS-CDK-DESIGN.md`.
+⚠ **Deployed.** Staging and production both run on these stacks (since late September 2026).
+The pipeline deploys only the `Compute` stack — `.github/workflows/deploy-aws.yml`, which
+`deploy-production.yml` calls for production — and the other stacks are deployed by hand. The
+original design audit is `docs/reports/AWS-CDK-DESIGN.md`. *(Re-measured 2026-10-08 at DOCS-1.)*
 
 ```bash
 pnpm install          # inside infra/
 pnpm typecheck        # tsc --noEmit
-pnpm synth            # synthesizes all 10 stacks, no AWS credentials needed
+pnpm synth            # synthesizes the 12 environment stacks (6 each), no AWS credentials needed;
+                      # the two deploy-role stacks only with -c deployStack=true
 ```
 
 ## What it builds
@@ -44,11 +46,12 @@ calls anywhere, which is what lets `cdk synth` run in CI with no credentials.
    in Doppler to a substring of the RDS endpoint — the migration guards refuse
    any URL that does not contain it, and today they are set to the Supabase
    refs. Nothing else about the migration scripts changes.
-4. **Application changes that this design assumes** (none of them made yet):
+4. **Application changes this design needed** (all made since):
    - `output: 'standalone'` in `next.config.ts`;
    - `/api/health` falling back to `APP_COMMIT_SHA` / `APP_REGION`, or the
      deploy gate cannot verify which build is live;
-   - `ipAddress()` from `@vercel/functions` falling back to `x-forwarded-for`;
+   - the client IP from `src/server/middleware/client-ip.ts` — peer-anchored, trusting
+     `CF-Connecting-IP` only from Cloudflare's ranges with `ZZ_CF_ORIGIN_SECRET` set (ADR-0061);
    - a `Dockerfile` (multi-stage, Node 24, `sharp`, `drizzle/migrations/**` and
      `public/**` copied in).
 
@@ -61,7 +64,7 @@ calls anywhere, which is what lets `cdk synth` run in CI with no credentials.
 3. MIGRATE FIRST (CI, or the migration task definition)
 4. cdk deploy 'Zugzwang-<env>-*' -c imageTag=<env>-<git-sha>
 5. Wait for services-stable — the circuit breaker rolls back a failing deploy
-6. Verify GET /api/health → status ok, db ok, migrations ok, canary == <git-sha>
+6. Verify GET /api/health → status ok, db ok, migrations ok, canary == <env>-<sha7> (the image tag)
 7. Rollback = redeploy the previous tag. No rebuild.
 ```
 
