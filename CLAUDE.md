@@ -12,7 +12,7 @@
 
 ## 1. Project frame
 
-The **Zugzwang Experiment** — a CPMM prediction market with mandatory commentary and soulbound reputation (Dharma). Web2 only. Live **2026-09-15 → 2026-11-05**, concluding at the write-freeze on **2026-11-05 23:59 UTC** (`system_state.frozen_at`). *(D-21/D-26: the freeze instant is unchanged — what is struck is the conference that used to justify it. Nothing in this repository describes what happens after the freeze except the dataset release, which stays in scope.)*
+The **Zugzwang Experiment** — a CPMM prediction market with mandatory commentary and soulbound reputation (Dharma). Web2 only. Live **2026-10-05 → 2026-11-05**, concluding at the write-freeze on **2026-11-05 23:59 UTC** (`system_state.frozen_at`). *(D-21/D-26: the freeze instant is unchanged — what is struck is the conference that used to justify it. Nothing in this repository describes what happens after the freeze except the dataset release, which stays in scope.)* *(Start re-measured 2026-10-08 at DOCS-1: the six markets opened on 2026-10-04 at 16:58 UTC, and `src/server/config/limits.ts` records 2026-10-05 as the experiment's start, on the founder's instruction. This line read 2026-09-15.)*
 
 - **Scope:** pure web2. **No chain, no contracts, no tokens.** Dharma is a Postgres `NUMERIC(38,18)` column. Testnet/Mainnet get their own repos.
 - **Source of truth:** `SPEC.1` and `SPEC.2` (product and technical — **both versions live in each file's own §0 header; read them there, they are not repeated here**) + `docs/adr/` (**read the ceiling with `ls docs/adr/ | sort | tail -1`** — 0002 and 0012 unused; never count files to find the ceiling, read the highest number) are canonical. The project tracker (operator-maintained, external; version lives on the tracker) is planning/sequencing only. On conflict, spec/ADR wins — note the drift once, don't block. *(Corrected at SYNC-1: this sentence taught "read the highest number, never count" and was itself three numbers stale — 0034/33/0035. The discipline was never applied to the sentence stating it. That is O-2, §8. **Two numbers stale again at PHASE-0** — 0037 against a live 0039 — which is the tell that a ceiling written into prose decays no matter how loudly the same prose says not to trust it. The instruction is the durable part; the number never is. **One number stale again at S-1** — 0039 against a live 0040, ADR-0040 having landed the day after PHASE-0 corrected this. **FOUR numbers stale at SYNC-5** — 0040 against a live 0044 (0041–0044 all landed inside three days), and the SPEC.2 citation beside it read 1.0.24 against a live 1.0.27. That is the **fourth consecutive** correction this sentence records, and the interval keeps shortening: SYNC-1 (2026-08-08) → PHASE-0 (2026-08-21) was 13 days; PHASE-0 → S-1 (2026-08-25) was 4; S-1 → SYNC-5 (2026-08-28) was 3. **SYNC-5 stopped writing the spec versions into this sentence at all** — four passes proved the number is the part that rots, so the pointer now carries no number to rot. **FIFTH consecutive staleness at SYNC-8** — 0044 against a live 0045 — at which point the range was **deleted rather than corrected a fifth time**. The *shape* argument that had kept it — that a reader needs something to sanity-check `ls` against — is precisely what kept it rotting, while the spec versions SYNC-5 deleted have not gone stale once since. **There is no number left in this sentence to read.**)*
@@ -183,21 +183,20 @@ One ADR per architectural change at `docs/adr/<NNNN>-<slug>.md`, in the **same c
 ### 5.13 Commit & git hygiene
 Branches `feat/` · `fix/` · `chore/` · `refactor/`.
 
-⚠ **`Squash-merge only` is DISCIPLINE, not enforcement — corrected 2026-08-14 against the live API.** `allow_squash_merge`, `allow_merge_commit` **and** `allow_rebase_merge` are **all three `true`**; nothing forbids a rebase merge. *(Re-measured 2026-08-25 at S-1: still all three `true`.)*
+⚠ **`Squash-merge only` is DISCIPLINE, not enforcement — corrected 2026-08-14 against the live API.** `allow_squash_merge`, `allow_merge_commit` **and** `allow_rebase_merge` are **all three `true`**; nothing forbids a rebase merge. *(Re-measured 2026-10-08: still all three `true`.)*
 
-**⚠ NOTHING IN THIS SECTION IS MECHANICALLY ENFORCED.** Measured against the live API, 2026-08-25:
+**⚠ NOTHING IN THIS SECTION IS MECHANICALLY ENFORCED.** Measured against the live API, 2026-10-08:
 
 ```
 branches/main            → "protected": false
 branches/staging         → "protected": false
-branches/*/protection    → 403 "Upgrade to GitHub Pro or make this
-                           repository public to enable this feature."
-rulesets                 → 403 (same plan gate)
-rules/branch/*           → 404
-org plan "free" · repo visibility "private"
+branches/*/protection    → 404 "Branch not protected"
+rulesets                 → []
+rules/branches/main      → []
+org plan "free" · repo visibility "public"
 ```
 
-A private repository on a Free organisation plan cannot hold branch protection or rulesets. **PR-required, the `ci` status check, `required_signatures`, `enforce_admins`, linear history and no-force-push are DISCIPLINES WITH NO BACKSTOP.** A red PR can be merged. A force-push to `main` or `staging` would succeed.
+The repository is public, so branch protection and rulesets can now be configured on the Free plan — and none is. **PR-required, the `ci` status check, `required_signatures`, `enforce_admins`, linear history and no-force-push are DISCIPLINES WITH NO BACKSTOP.** A red PR can be merged. A force-push to `main` or `staging` would succeed.
 
 Corroborating, independently: the 32 directly-pushed `staging` commits verify **G**; the three PR-squash commits verify **N**. Under `required_signatures` the squash commits would be GitHub-signed.
 
@@ -205,7 +204,7 @@ Corroborating, independently: the 32 directly-pushed `staging` commits verify **
 
 **Consequence at every merge:** CI green is a thing to CHECK, not a gate to lean on. Verify the check's conclusion in the same action as the merge, not once at the start of a session.
 
-**This section previously asserted the opposite.** The 2026-08-14 pass that corrected "squash-merge only" measured the merge-method flags from the repo endpoint — which works — and left the protection claims beside them unchecked, because that endpoint returns 403.
+**This section previously asserted the opposite.** The 2026-08-14 pass that corrected "squash-merge only" measured the merge-method flags from the repo endpoint — which works — and left the protection claims beside them unchecked, because that endpoint returned 403 at the time.
 
 **The one mechanism that exists is client-side and is not a control:** `lefthook.yml`'s `pre-push` `no-force-push-protected` job refuses a non-fast-forward push to `main` or `staging` (item 7, S-1). It runs in every clone because Lefthook already does, and `--no-verify` skips it. **A discipline with a mechanism beats one in a document; neither is enforcement.**
 
@@ -266,9 +265,10 @@ Per-PR reviewer items that fire on *any* PR matching their trigger — critical-
 - Scripts run under `tsx` must **not** import the `@/db` → `server-only` chain — inline their own `postgres()` client (the staging-seed/smoke pattern).
 - `0000_uuidv7_function.sql` ships the userspace `uuidv7()`; CI strips `pg_cron` from `0007` before applying.
 - Doppler config names are `stg` / `prd` — **never** `staging` / `production`.
-- Supabase direct host (`db.<ref>.supabase.co`) is IPv6-only; local scripts and migrations use the **session pooler** (`...pooler.supabase.com:5432`).
+- The databases are **private RDS for PostgreSQL 17.6** in `ap-south-1` (`publiclyAccessible: false`, `infra/lib/database-stack.ts`): nothing outside the VPC reaches them directly, so migrations run as an in-VPC ECS task inside the deploy pipeline, and the app connects in session mode (`DB_POOLER_MODE`, `infra/lib/compute-stack.ts`). The Supabase projects remain only as legacy databases — `staging-migrate.yml` still migrates Supabase staging, which is not the database behind the staging host (its own header says so).
 - `BETTER_AUTH_URL` fails at **build time**, not request time — the custom domain must be attached and the URL set *before* deploy.
-- **Deploy / promote (pipeline is live + gated).** Canonical: `docs/runbooks/deploy-pipeline.md` §3 + ADR-0024 — do not re-derive it here. Load-bearing rules: schema changes are **expand/contract** (additive first; never a destructive in-place alter on a live table); **migrate-before-serve** (the prod migration applies before the new code is promoted); **rehearse on staging first** (push to `staging`, let the auto-deploy + `/api/health` gate go green before touching prod). Two gotchas that bite: (1) `vercel promote` **requires `--scope <team-slug>`** — without it the command errors or hits the wrong project; (2) **trust the `/api/health` gauge, not `migrate` exit codes** — the migrate step can report success while the DB is not actually ready (drizzle-orm #5769), so gate on health, not the exit code.
+- **Deploy (pipeline is live + gated).** Canonical: `.github/workflows/deploy-aws.yml`, which `deploy-production.yml` calls for production; `docs/runbooks/deploy-pipeline.md` predates the AWS move and is marked partly out of date. Load-bearing rules: schema changes are **expand/contract** (additive first; the migrate job refuses a destructive migration unless the run is dispatched with `allow_destructive_migrations`); **migrate-before-serve** (the in-VPC migrate job runs before the new image serves); **rehearse on staging first** (a push to `staging` deploys AWS staging — without `ci` — and its verify job must go green before touching prod). Two gotchas that bite: (1) **roll back by redeploying an image** — dispatch `deploy-aws.yml` from `main` with `rollback_image_tag` (procedure: `docs/aws-migration/11-CICD-PIPELINE.md`); (2) **trust the `/api/health` gauge, not `migrate` exit codes** — the verify job requires the canary to equal the image tag (`<env>-<sha7>`) with `db` and `migrations` ok, because the migrate step can report success while the DB is not actually ready (drizzle-orm #5769).
+- **What a merge to `main` deploys.** A merge touching any file outside `docs/**` and `**/*.md` starts `.github/workflows/deploy-production.yml`, which runs `deploy-aws.yml` for production — guard → `ci` (`critical` suite) → build → in-VPC migrate → `cdk deploy Zugzwang-production-Compute` → verify — and build, migrate and deploy each wait for approval in the `aws-production` environment. A docs-only merge deploys nothing (`paths-ignore`).
 
 ---
 
@@ -315,7 +315,7 @@ Stale docs are worse than none — the ongoing burden is **pruning**, not adding
 - Admin market-media upload is **not moderated** (ADR-0027; supersedes ADR-0026 §D4 in part): the admin create flow writes `market_media` directly and never calls `precommit.ts`. File-type and size validation on the signed PUT are retained as upload hygiene, which is not the same thing. A picked pool image is **operator-curated trusted content**, not pre-moderated content — same behaviour, different justification, and the difference matters the moment anyone reasons from it. Participant image moderation (SPEC.1 §8 F-COMMENT-3) is untouched.
 - Market media (ADR-0026): admin-set per-market pool — new `market_media` table (Bucket C, no `user_id`); third R2 bucket arm `market-media` (`m/<marketId>/`); reference-model pick-from-pool via `comments.market_media_id` + not-both-set CHECK; `markets.media_video_url` outbound YouTube (new tab); **no** admin-context upload moderation — **ADR-0027 supersedes ADR-0026 §D4 on exactly that point**: the admin create flow writes `market_media` directly, `precommit.ts` is never called by the market-media path, and file-type/size validation on the signed PUT is retained as upload hygiene rather than moderation. A picked pool image attaches without a participant-side round-trip because it is **operator-curated trusted content**, not because it was "pre-moderated" — the behaviour is unchanged, the justification is not. The participant image pipeline (SPEC.1 §8 F-COMMENT-3, ADR-0014/0046) is untouched by this. **Built, not pending:** migration `0019_market_media` shipped at MEDIA.1 and the current head is `0026_lots_no_delete`.
 - Debate `.md` export (ADR-0025): on-demand read-only `GET /m/[slug]/export`; masking inherited from `loadDebateView` (removed content never exported); text-only single file with a version-pinned `zugzwang.md` context block prepended. Amends SPEC.1 §21.3.
-- Deploy pipeline + migration sequencing (ADR-0024; scoped-supersedes ADR-0022): staging-as-prod-replica; `staging`-branch sandbox + gated prod-promote; two Supabase projects; per-hash `/api/health` drift. Runbook: `docs/runbooks/deploy-pipeline.md` §3.
+- Deploy pipeline + migration sequencing (ADR-0024; scoped-supersedes ADR-0022): staging-as-prod-replica; `staging`-branch sandbox + gated prod-promote; two Supabase projects; per-hash `/api/health` drift. Runbook: `docs/runbooks/deploy-pipeline.md` §3. *(superseded in practice by the AWS pipeline; no ADR records the move)*
 - Participant shell topology (ADR-0023): `(public)/` route group; server-component shell; `/m/[slug]` first route; `getMarketBySlug` excludes Draft.
 - Prod migration strategy + schema-drift guard (ADR-0022): per-migration-tx `db:migrate:prod`; env-fragment guard; status-only `/api/health` drift field; `db:check-drift` (drift method partially superseded by ADR-0024).
 - Reactive moderation, no held queue (ADR-0021; supersedes ADR-0020): gate returns block/pass; admin reviews live content reactively (Remove/Ban); no moderation action touches a position.
