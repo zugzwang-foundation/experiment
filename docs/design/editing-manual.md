@@ -117,7 +117,6 @@ Adding a colour is the one edit that **reopens a locked decision.** Your system'
 - **Validate on real screens** after each meaningful change: Discovery (the grid), one market card with YES/NO, and the reply view. If those three look right, the system's right.
 - **Keep it coherent** — change the system, not one screen; let it propagate.
 - **Log your values as you set them** — a running list: font names, any accent hex, corner-radius numbers, border weight, icon set, logo file. This short list is the **only** thing that has to survive out of Claude Design to the code build (the CD export itself is lossy). Keeping it as you go turns the eventual handoff into a copy-paste instead of a redo.
-- **Fable 5 window.** You're editing on Fable 5 Max, which burns your allowance ~2× as fast as Opus, and the Fable window is set to close around **July 7** before shifting to usage credits — **verify the exact date/terms in-app** and front-load the heavy system work before then.
 
 ---
 

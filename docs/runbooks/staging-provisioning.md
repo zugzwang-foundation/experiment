@@ -1,5 +1,7 @@
 # Staging Provisioning Runbook — bring staging to full working parity
 
+> **⚠ Partly out of date (2026-10-08).** Production and staging moved from Vercel and Supabase to AWS (ECS + RDS, `ap-south-1`) in late September 2026. Steps that name Vercel or Supabase no longer apply. The live pipelines are `.github/workflows/deploy-production.yml` (production, approval-gated) and `.github/workflows/deploy-aws.yml` (staging and production); `CLAUDE.md` Gotchas carries the current rules. This runbook has not been rewritten.
+
 > **⚠️ SUPERSEDED (2026-06-28).** This is a one-time pre-execution provisioning snapshot. The work was executed (PRs #147/#148, both merged); the internal head/drift figures and the Appendix D stale-file list reflect that pre-execution moment and are **not** maintained. For live topology, migration head, and the promote path, see the canonical runbook [`docs/runbooks/deploy-pipeline.md`](./deploy-pipeline.md).
 
 > **Prepared:** 2026-06-20, overnight, unattended (Claude Code prep run).

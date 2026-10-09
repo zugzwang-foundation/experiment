@@ -50,14 +50,12 @@ claude
 Inside:
 
 1. `/clear` (safety)
-2. `/effort max` (verify with `/status`)
+2. Model and effort: the founder's choice for this session; nothing here presets either (`CLAUDE.md` §6).
 3. `Shift+Tab` until status bar shows **Plan mode**
 
 Paste this prompt (substitute the task ID, title, and tracker description):
 
 ```
-ultrathink
-
 Task: <TASK.ID>
 Title: <task title from tracker>
 Tracker description: <paste from tracker, verbatim>
@@ -133,7 +131,7 @@ If Phase 2 later reveals the plan was wrong, **return to Phase 1 in a fresh tab*
 
 ## Phase 2 — Execute (Tab 2)
 
-Open a **NEW Claude Code tab** — not `/clear`. Independent context is what makes the review honest. ⚠ **Launch it from a worktree at `origin/main`.** Subagent definitions load from the session's working directory at launch and are **not** hot-reloaded, so a tab started in a tree whose branch predates a model repin runs the OLD pins (CLAUDE.md §6) — and Phase 2 is the reviewer-bearing phase:
+Open a **NEW Claude Code tab** — not `/clear`. Independent context is what makes the review honest. ⚠ **Launch it from a worktree at `origin/main`.** Subagent definitions are read from the session's own working tree, so start any reviewer-bearing tab from a worktree at `origin/main` (CLAUDE.md §6) — and Phase 2 is the reviewer-bearing phase:
 
 ```bash
 claude
@@ -141,14 +139,12 @@ claude
 
 Inside:
 
-1. `/effort max` (verify with `/status`)
+1. Model and effort: the founder's choice for this session; nothing here presets either (`CLAUDE.md` §6).
 2. **Plan mode OFF** — `Shift+Tab` until status bar no longer says "Plan mode"
 
 Paste:
 
 ```
-ultrathink
-
 Task: <TASK.ID>
 Plan: docs/plans/<TASK.ID>.md
 Critical-path? <yes/no — see CLAUDE.md §1>
@@ -220,12 +216,12 @@ gh pr create --fill
 
 ## Prerequisites
 
-No shell exports and no committed `.claude/settings.json` — the repo tracks none (the only local config is a gitignored `.claude/settings.local.json`), and the `ANTHROPIC_MODEL` / `CLAUDE_CODE_EFFORT_LEVEL` env vars are retired (the env var outranks subagent frontmatter; never set it).
+No shell exports and no committed `.claude/settings.json` — the repo tracks none (the only local config is a gitignored `.claude/settings.local.json`).
 
-- **Model:** Claude Opus 5, pinned `claude-opus-5` (repins the 2026-06-28 Opus 4.8 pin; MODEL-REPIN, 2026-07-31). Set once with `/model opus` — this **does** persist via user settings ("saved as your default for new sessions"). The 1M-context variant reports session ID `claude-opus-5[1m]`.
-- **Effort:** default `max` — run at the highest setting always (`/effort max`; empirically accepted by the subagent schema). Supersedes the prior gated-`xhigh` default. **`/effort` does NOT persist** — the harness sets it "this session only", so re-issue `/effort max` at the start of every session. Only `/model` persists.
+- **Model and effort:** the founder's choice, made per session (`CLAUDE.md` §6) — nothing in this repository presets either.
+- **Environment:** `CLAUDE_CODE_SUBAGENT_MODEL`, `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` and `CLAUDE_CODE_EFFORT_LEVEL` stay unset — each would preset a model or an effort level.
 
-The `ultrathink` keyword is a habit, not a setting. Drop it as the first word in every coding-task prompt regardless of effort level.
+No think-harder line goes into any prompt.
 
 ---
 

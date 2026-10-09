@@ -1,5 +1,7 @@
 # Deploy Pipeline Runbook
 
+> **⚠ Partly out of date (2026-10-08).** Production and staging moved from Vercel and Supabase to AWS (ECS + RDS, `ap-south-1`) in late September 2026. Steps that name Vercel or Supabase no longer apply. The live pipelines are `.github/workflows/deploy-production.yml` (production, approval-gated) and `.github/workflows/deploy-aws.yml` (staging and production); `CLAUDE.md` Gotchas carries the current rules. This runbook has not been rewritten.
+
 > **Governed by [ADR-0024](../adr/0024-deploy-pipeline-migration-sequencing.md)** (staging-as-prod-replica; built around ADR-0022's prod-apply primitives). This runbook is the *operational how*; ADR-0024 is the *decided what*. On any conflict, the ADR wins — fix this file, don't fork the decision.
 >
 > **Scope.** Two standing Supabase projects, one committed Drizzle migration set, no Supabase branching. Staging is a **resettable git-auto-deploy sandbox**; Production is **strictly migrate-before-serve** behind a single deliberate human gate. This runbook sits **beside** `staging-provisioning.md` (which covers one-time per-environment provisioning); it does **not** replace it.

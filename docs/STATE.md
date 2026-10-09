@@ -5,8 +5,11 @@ MOBILE-2 close-out, from `origin/main` @ `a7bf4d2d24c3a544cade07f0ebaf34be0a0fb3
 **§1 and §2's Surfaces row re-measured again 2026-09-15** at MOBILE-3a, from
 `origin/main` @ `995d09eb2515c5964372c50fd631aaa0a664ca11`
 **Regenerate** per `docs/records/README.md` · **Lane detail** in `docs/records/`
-⛔ **Go-live was 2026-09-15 — TODAY. The site is LIVE**: production serves `a7bf4d2d` with
-`env:prod · region:bom1 · db:ok · migrations:ok`, read at 11:21 IST. Every section below that
+⛔ **The site is LIVE.** Production runs on AWS in `ap-south-1` and is deployed from `main` on
+every non-docs merge, after approval (`.github/workflows/deploy-production.yml`). Its six markets
+opened on 2026-10-04 at 16:58 UTC, and the experiment counts from 2026-10-05
+(`src/server/config/limits.ts`). *(Re-measured 2026-10-08 at DOCS-1. This note read "Go-live was
+2026-09-15 — TODAY", with production on Vercel `bom1` serving `a7bf4d2d`.)* Every section below that
 was not re-measured at this pass is dated where it stands, and §4's rows are from 2026-09-08.
 
 > This file is an **index and a measurement**. It carries no rule of its own; if a sentence
@@ -29,7 +32,7 @@ sixteen rows below stale in five days**, and two of them were stale by a whole m
 | **SPEC.1** | **2.0.3** — rebaselined at 2.0.0 per D-29 (#490) | `grep -m1 '^- \*\*Version:' docs/specs/SPEC.1.md` |
 | **SPEC.2** | **2.0.2** — rebaselined at 2.0.0 per D-30 (#493); `F-22` is thereby discharged | `grep -m1 '^\| \*\*Version\*\* \|' docs/specs/SPEC.2.md` |
 | **cpmm.md** | **4.0.0** | same shape |
-| **Migration head** | **`0030_liquidity_revoke_app_roles`** · 31 `.sql` files · journal 31 entries | `ls drizzle/migrations/*.sql \| sort \| tail -1` |
+| **Migration head** | **`0031_comments_friendly_fire`** · 32 `.sql` files · journal 32 entries *(re-measured 2026-10-08; this row read `0030`, 31)* | `ls drizzle/migrations/*.sql \| sort \| tail -1` |
 | **`EVENT_TYPES`** | **25** — `pool.liquidity_added` added by ADR-0047 | `awk '/export const EVENT_TYPES = \[/,/\] as const;/' … \| grep -cE '^\s+"'` |
 | **Test files** | **557** — unit 303 · server 162 · integration 36 · db 25 · invariants 13 · scale 8 · staging 10 ⚠ re-measured at MOBILE-3a: two phone-header guards minted, one retired with the control it guarded (ADR-0051 A13 D-1) | `find tests -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' \) \| wc -l` |
 | Suite actually run by `vitest run` | **537** (536 passed, 1 skipped) at the MOBILE-2 close-out ⚠ NOT re-measured at MOBILE-3a, which ran `tests/unit/` only (303 files, 4,100 tests, green) and left the full suite to CI — the local DB was down, so anything under `tests/db/` and `tests/integration/` was unreachable | `pnpm vitest run` |
@@ -137,7 +140,7 @@ left blank for the founder.
 | **F-12** | **`S-n` names both a SCALE stratum and a Surprise row.** 51 Surprise-row occurrences in `docs/logs/`; **`S-7` is both** the idempotency stratum and POLISH-8's surprise row 7. `docs/logs/CONTENT-2-TILES.md:57` records a kickoff already citing an `S-4` that *"didn't resolve to anything"*. Strata that exist as files: **S-1, S-3, S-4, S-7**; S-5 exists only in PR #462; S-2/S-6/S-8/S-9 do not exist | `grep -rn '^\*\*S-[0-9]* ·' docs/logs/ \| wc -l` | |
 | **F-23** | **`L-n` is in use across three registers on `main`.** `docs/polish/POLISH-register-ADDITIONS.md` cites `L-2…L-10` and defines none; `docs/polish/POLISH-register.md:67` carries a **bare `L-6`** from a different task's `@code-reviewer`, which `CLAUDE.md` §8 forbids; `POLISH-0_data-manifest.md:75` records a retired third numbering | those three files | |
 | **F-8** | **No branch protection exists on any branch.** `ci` is not a required status check, nothing rejects a force-push, nothing blocks a direct push to `main` or `staging`. Measured and dated in `CLAUDE.md` §5.13 — **the single home; not restated here** | `CLAUDE.md` §5.13 | |
-| **F-6** | `DATABASE_URL_TXN` and `DB_POOLER_MODE` exist in Doppler `stg` and not in `prd`. **Deliberate** — ADR-0038 keeps `prd` on `:5432` and `src/db/index.ts:55` refuses `transaction` mode there. Listed so the asymmetry is not later read as a gap | `doppler secrets --only-names` | |
+| **F-6** | Production connects in **session mode**: both AWS task definitions pin `DB_POOLER_MODE: "session"` (`infra/lib/compute-stack.ts:171`, `:250`), and `src/db/index.ts:45` defaults to `session`. The code no longer refuses `transaction` mode in production (#550, 2026-09-16). Whether Doppler `prd` carries `DATABASE_URL_TXN` was not re-read. *(Re-measured 2026-10-08 at DOCS-1; this row said `src/db/index.ts:55` refused `transaction` in production.)* | `src/db/index.ts:45` · `infra/lib/compute-stack.ts:171` | |
 | **F-7** | **`BETTER_AUTH_TRUSTED_ORIGINS` is absent from Doppler `prd` — a config-hygiene item, NOT a security gap.** `src/server/auth/index.ts:330-333` resolves it to `[]`, but Better Auth's `getTrustedOrigins` pushes `new URL(baseURL).origin` **first and unconditionally** (`node_modules/better-auth/dist/context/helpers.mjs:73`) — so the effective production trust set is `["https://zugzwangworld.com"]`, which is exactly what `docs/plans/SCAFFOLD.8-staging-plan.md:173` ratifies. `BETTER_AUTH_URL` cannot be unset: `auth/index.ts:47-49` hard-throws at module load. A second, independent origin defence derives from the same variable at `src/server/middleware/origin-allowlist.ts:24`. **What is missing is the name and any record of a decision to drop it**, not the protection | `doppler secrets --only-names`; `helpers.mjs:60-84` read directly | |
 | **F-24** | `origin/chore/pfp-2-plans-log` was pushed 2026-09-03 with **no PR of any state** — `gh pr list --state all --head chore/pfp-2-plans-log` → empty, against a control that returns rows for a branch that has one. ⚠ `origin/feat/e2e-playwright-setup` **does** have a PR — **#420, CLOSED unmerged**, 2026-08-26 — so only one branch is orphaned, not two | `gh pr list --state all --head <branch>` | |
 
@@ -176,15 +179,16 @@ left blank for the founder.
 | | Staging | Production |
 |---|---|---|
 | Domain | `staging.zugzwangworld.com` | `zugzwangworld.com` |
-| Deploys | auto, on push to `staging`; `staging-migrate.yml` applies migrations | **not auto-served** — a `main` push builds a production-target deployment and does **not** move the alias |
-| Region | `bom1` (ADR-0006, applied at PERF-1 #307) | `bom1` on new builds; the alias build predates the field |
-| Database | Supabase, session pooler; transaction pooler available behind `DB_POOLER_MODE` | Supabase, session pooler only |
+| Deploys | on push to `staging`: `deploy-aws.yml` builds, migrates the RDS in-VPC and rolls AWS staging, with no `ci`; `staging-migrate.yml` still migrates the old Supabase staging DB | on a non-docs merge to `main`: `deploy-production.yml` → `deploy-aws.yml` — `ci`, build, in-VPC migrate, deploy, verify — with build, migrate and deploy each approved in `aws-production` |
+| Region | `ap-south-1` (AWS; `infra/config/staging.ts`) | `ap-south-1` (AWS; `infra/config/production.ts`) |
+| Database | RDS for PostgreSQL 17.6, `t4g.micro`, single-AZ, private (in-VPC only) | RDS for PostgreSQL 17.6, `t4g.small`, Multi-AZ, private, 7-day backups, deletion protection |
 | Doppler config | **`stg`** — 41 secret names | **`prd`** — 36 secret names |
-| Data | **live participant writes** — 1,692 comment/bet pairs, 8 content markets + 4 load fixtures | empty |
-| Health gauge | `GET /api/health` → `env`, `canary`, `region`, `db`, `migrations` | same |
+| Data | not re-measured at DOCS-1 (the 2026-09-08 reading — 8 content markets — predates D-49's six) | **live** — the six markets opened on 2026-10-04 at 16:58 UTC (`src/server/config/limits.ts`) |
+| Health gauge | `GET /api/health` → `env`, `canary` (the image tag, `staging-<sha7>`), `region`, `db`, `migrations`, `writesPaused`; `GET /api/ready` is the load balancer's check | same; `canary` is `production-<sha7>` |
 
 ⛔ **`pnpm staging:rebuild` replaces staging's data and there is no restore path.** Staging is
 under active participant write; treat it as production data that happens to be reachable.
 
-**Divergence:** `git rev-list --left-right --count origin/main...origin/staging` → `1 0`.
-`origin/staging` is a strict ancestor of `origin/main`, one docs-only commit behind.
+**Divergence** *(re-measured 2026-10-08)*: `git rev-list --left-right --count origin/main...origin/staging` → `11 155`.
+Counted by hash, so squash merges inflate both sides; `origin/staging` is no longer an ancestor of `origin/main`.
+*(§6's Deploys, Region, Database, Data and Health-gauge rows were re-measured from code at DOCS-1, 2026-10-08; the Doppler row was not.)*
