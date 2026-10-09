@@ -21,14 +21,14 @@ import {
 	findSeedParticipant,
 	getOrCreateSeedParticipant,
 	SEED_TOS_IP,
-	SEED_TOS_USER_AGENT,
 } from "./participants";
 import {
 	computeBatchId,
 	planSeedBatch,
-	SEED_REQUEST_ID_PREFIX,
+	SEED_LABELS,
 	seedIdempotencyKey,
 	seedParticipantEmail,
+	seedRequestId,
 } from "./plan";
 import type { RawSeedRow, SeedRow, SeedRowError, SeedRowResult } from "./types";
 import { validateSeedRows } from "./validate";
@@ -126,7 +126,7 @@ export async function runSeedChunk(args: {
 	haltedMarkets: string[];
 	errors: SeedRowError[];
 }> {
-	assertSeedToolsEnabled();
+	const env = assertSeedToolsEnabled();
 
 	// The conclusion freeze (SPEC.1 §20.2, CLAUDE.md §3 "no bypass"). The bet
 	// route refuses at `bets/endpoint.ts`'s freeze gate, and neither `place()`
@@ -173,7 +173,7 @@ export async function runSeedChunk(args: {
 	const commentIds = new Map<number, string>();
 	const end = Math.min(ordered.length, args.fromIndex + args.count);
 	const results: SeedRowResult[] = [];
-	const requestId = `${SEED_REQUEST_ID_PREFIX}${batchId.slice(0, 16)}`;
+	const requestId = seedRequestId(env, batchId);
 
 	// A parent posted in an earlier chunk or run is found through ITS OWN
 	// participant's receipt — never through the key alone.
@@ -181,7 +181,7 @@ export async function runSeedChunk(args: {
 		const cached = commentIds.get(parent.rowNumber);
 		if (cached) return cached;
 		const owner = await findSeedParticipant(
-			seedParticipantEmail(batchId, parent),
+			seedParticipantEmail(batchId, parent, env),
 		);
 		if (!owner) return null;
 		const receipt = await loadReceipt(
@@ -241,7 +241,7 @@ export async function runSeedChunk(args: {
 			};
 
 			const idempotencyKey = seedIdempotencyKey(batchId, row.rowNumber);
-			const email = seedParticipantEmail(batchId, row);
+			const email = seedParticipantEmail(batchId, row, env);
 			try {
 				// 1. Already posted? Answered without creating anyone, and before
 				// the market's state is consulted: a row posted in an earlier run
@@ -271,9 +271,10 @@ export async function runSeedChunk(args: {
 
 				// 2. Is the market still Open? Checked BEFORE a participant is
 				// minted, so a row that cannot be posted never spends an
-				// identity-pool tuple (a finite resource on staging). The engine
-				// re-checks inside the W-1 transaction (`assertMarketOpen`); this
-				// is the cheap early answer, not the guarantee.
+				// identity-pool tuple (a finite resource — on production, the
+				// same pool real signups draw from). The engine re-checks inside
+				// the W-1 transaction (`assertMarketOpen`); this is the cheap
+				// early answer, not the guarantee.
 				const market = marketBySlug.get(row.marketSlug);
 				if (!market) {
 					fail(`market "${row.marketSlug}" does not exist`);
@@ -288,6 +289,7 @@ export async function runSeedChunk(args: {
 				const participant = await getOrCreateSeedParticipant({
 					email,
 					batchId,
+					env,
 				});
 				// The bet route refuses a banned user (`banned_user`, 403); a ban
 				// applied through the moderation surface must hold here too, or a
@@ -326,7 +328,7 @@ export async function runSeedChunk(args: {
 					userId: participant.userId,
 					idempotencyKey,
 					ip: SEED_TOS_IP,
-					userAgent: SEED_TOS_USER_AGENT,
+					userAgent: SEED_LABELS[env].tosUserAgent,
 				});
 				try {
 					const result = await runBetTransaction({ marketId, flow }, (ctx) =>

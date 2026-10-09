@@ -54,25 +54,37 @@ type PricePoint = { at: string; yes: string };
 
 afterEach(cleanup);
 
-// A three-point YES/NO series across a 5-day window.
+/** The calendar anchors that fall inside the configured window (drawn ones). */
+function anchorsInWindow(): string[] {
+	const lo = Date.parse(MARKET_CHART_WINDOW_START);
+	const hi = Date.parse(MARKET_CHART_WINDOW_END);
+	return MARKET_CHART_AXIS_ANCHORS.filter((a) => {
+		const t = Date.parse(a);
+		return t >= lo && t <= hi;
+	});
+}
+
+// A three-point YES/NO series across a 5-day window. ⚠ Dates moved +20 days
+// on 2026-10-06 with the production window (2026-09-15 → 2026-10-05 start),
+// so the fixtures keep their position relative to the window's left edge.
 const SERIES: PricePoint[] = [
-	{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
-	{ at: "2026-09-17T00:00:00.000Z", yes: "0.640000000000000000" },
-	{ at: "2026-09-20T00:00:00.000Z", yes: "0.800000000000000000" },
+	{ at: "2026-10-05T00:00:00.000Z", yes: "0.500000000000000000" },
+	{ at: "2026-10-07T00:00:00.000Z", yes: "0.640000000000000000" },
+	{ at: "2026-10-10T00:00:00.000Z", yes: "0.800000000000000000" },
 ];
 
-// Opening 50 % (2026-09-15) → current 80 % (2026-09-20) — the sr-only summary
+// Opening 50 % (2026-10-05) → current 80 % (2026-10-10) — the sr-only summary
 // must name both plus the two endpoint dates.
 const SUMMARY_SERIES: PricePoint[] = [
-	{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
-	{ at: "2026-09-20T00:00:00.000Z", yes: "0.800000000000000000" },
+	{ at: "2026-10-05T00:00:00.000Z", yes: "0.500000000000000000" },
+	{ at: "2026-10-10T00:00:00.000Z", yes: "0.800000000000000000" },
 ];
 
 // The unbet market: one seed point → the chart renders a flat line at the
 // opening price. Its instant IS `MARKET_CHART_WINDOW_START`, so it maps to
 // x = 0.
 const SINGLE: PricePoint[] = [
-	{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
+	{ at: "2026-10-05T00:00:00.000Z", yes: "0.500000000000000000" },
 ];
 
 /**
@@ -83,13 +95,13 @@ const SINGLE: PricePoint[] = [
  * end" written against `SINGLE` would compare 0 against 0 and pass whether the
  * fix is present or reverted. That is the shape of a control that cannot fire.
  *
- * This point is 2026-10-01, sixteen days into a ~52-day production window, so
+ * This point is 2026-10-21, sixteen days into the ~32-day production window, so
  * its x is strictly between 0 and `VIEWBOX_W` and the two answers — "ends at its
  * own instant" and "ends at the axis end" — are different numbers. It is the
  * same reason `INTERIOR` exists for the axis-label guards, one ruling later.
  */
 const SINGLE_INTERIOR: PricePoint[] = [
-	{ at: "2026-10-01T00:00:00.000Z", yes: "0.500000000000000000" },
+	{ at: "2026-10-21T00:00:00.000Z", yes: "0.500000000000000000" },
 ];
 
 /**
@@ -113,8 +125,8 @@ const SINGLE_INTERIOR: PricePoint[] = [
 // YES winning at every point (yes > 0.5) — the INV-3 GEOMETRY guard: the YES
 // line must sit ABOVE the NO line (a smaller SVG y) at the same x.
 const YES_WINNING: PricePoint[] = [
-	{ at: "2026-09-15T00:00:00.000Z", yes: "0.700000000000000000" },
-	{ at: "2026-09-20T00:00:00.000Z", yes: "0.800000000000000000" },
+	{ at: "2026-10-05T00:00:00.000Z", yes: "0.700000000000000000" },
+	{ at: "2026-10-10T00:00:00.000Z", yes: "0.800000000000000000" },
 ];
 
 // ⚠ BLOCK-1 — `slug` must be one of the eight known live markets or
@@ -399,25 +411,35 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 			(el) => el.textContent ?? "",
 		);
 
+		// The card draws the FIRST and LAST anchor inside the window. Since the
+		// production window moved to start 2026-10-05 (founder ruling 2026-10-06),
+		// `Sep 15` lies before it and is not drawn, so those are anchors 1 and 2.
+		const inWindow = anchorsInWindow();
 		expect(rendered).toHaveLength(2);
 		expect(rendered).toEqual([
-			utcDay(MARKET_CHART_AXIS_ANCHORS[0]),
-			utcDay(MARKET_CHART_AXIS_ANCHORS[2]),
+			utcDay(inWindow[0]),
+			utcDay(inWindow[inWindow.length - 1]),
 		]);
 
 		// ⛔ THE THREE REJECTIONS, EACH STATED POSITIVELY SO NONE CAN PASS VACUOUSLY.
 		//
-		// (a) NOT the series. The fixture's own days are Sep 17 and Sep 20.
-		expect(rendered).not.toContain("Sep 17");
-		expect(rendered).not.toContain("Sep 20");
+		// (a) NOT the series. The fixture's own days are Oct 7 and Oct 10.
+		expect(rendered).not.toContain("Oct 7");
+		expect(rendered).not.toContain("Oct 10");
 		// (b) NOT the window's thirds — the rule this replaces. Derived from the
 		//     real constants so it reddens whichever window is configured.
 		const want = expectedAxisDays();
 		expect(rendered).not.toContain(want.first);
 		expect(rendered).not.toContain(want.second);
-		// (c) NOT the interior anchor. The card takes the first and last only; a
-		//     card that drew all three is the plausible over-application.
-		expect(rendered).not.toContain(utcDay(MARKET_CHART_AXIS_ANCHORS[1]));
+		// (c) NOT an interior anchor. The card takes the first and last drawn
+		//     anchor only; a card that drew every one is the plausible
+		//     over-application. Since the production window starts ON
+		//     `MARKET_CHART_AXIS_ANCHORS[1]` (2026-10-05), only two anchors are
+		//     inside it and there is no interior one to reject, so this arm is
+		//     live only when a window holds three or more.
+		for (const interior of inWindow.slice(1, -1)) {
+			expect(rendered).not.toContain(utcDay(interior));
+		}
 	});
 
 	it("collapsed-axis-is-IDENTICAL-across-two-different-markets", () => {
@@ -590,8 +612,13 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		);
 		// Non-vacuity: the labels rendered, so the text assertions are about content
 		// rather than about `undefined`.
-		expect(rendered, "expanded anchors missing").toHaveLength(3);
-		expect(rendered).toEqual(MARKET_CHART_AXIS_ANCHORS.map(utcDay));
+		// Every anchor INSIDE the window: two since the production window moved to
+		// 2026-10-05 (`Sep 15` lies before it and an anchor outside is not drawn).
+		expect(rendered, "expanded anchors missing").toHaveLength(
+			anchorsInWindow().length,
+		);
+		expect(rendered.length).toBeGreaterThanOrEqual(2);
+		expect(rendered).toEqual(anchorsInWindow().map(utcDay));
 
 		// MUST REJECT: the window's own ends, which is what this labelled until now
 		// and what a partial revert would restore. On production the two coincide
@@ -944,7 +971,9 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		const { container } = render(
 			<MarketPriceChart series={SERIES} mode="expanded" isOpen={true} />,
 		);
-		expect(byPrefix(container, "axis-x-anchor-")).toHaveLength(3);
+		expect(byPrefix(container, "axis-x-anchor-")).toHaveLength(
+			anchorsInWindow().length,
+		);
 		expect(byPrefix(container, "axis-x-tick-")).toHaveLength(0);
 		expect(byPrefix(container, "axis-x-label-")).toHaveLength(0);
 	});
@@ -1006,10 +1035,10 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		expect(summary.className).toContain("sr-only");
 
 		const text = summary.textContent ?? "";
-		expect(text).toContain("50%"); // opening price (2026-09-15, yes 0.5)
-		expect(text).toContain("80%"); // current price (2026-09-20, yes 0.8)
-		expect(text).toContain("Sep 15"); // domain start endpoint
-		expect(text).toContain("Sep 20"); // domain end endpoint
+		expect(text).toContain("50%"); // opening price (2026-10-05, yes 0.5)
+		expect(text).toContain("80%"); // current price (2026-10-10, yes 0.8)
+		expect(text).toContain("Oct 5"); // domain start endpoint
+		expect(text).toContain("Oct 10"); // domain end endpoint
 
 		// The chart svg is decorative — hidden from the a11y tree (only the
 		// summary carries the readout, unlike the fully-aria-hidden §22 sparkline).

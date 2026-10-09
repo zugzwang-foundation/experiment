@@ -9,7 +9,8 @@ import { isSeedToolsEnabled } from "./gate";
 // SEED-STAGING-1 — the shared front door of the two seeding Route Handlers.
 //
 // Order is deliberate. The environment check comes FIRST and answers 404, so
-// on production these URLs behave exactly like URLs that do not exist — no
+// wherever the tool is off (no ZUGZWANG_SEED_TOOLS on the task) these URLs
+// behave exactly like URLs that do not exist — no
 // origin check, no session lookup, nothing that would confirm the tool is
 // there. Then the CSRF origin allowlist (SPEC.2 §4.1), then the admin session
 // (the Layer-2 boundary; the cookie is scoped `Path=/admin`, which is why the

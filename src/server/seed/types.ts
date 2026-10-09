@@ -1,5 +1,6 @@
 // SEED-STAGING-1 — the shapes a seeding sheet passes through, from the parsed
-// file to a per-row result. Staging-only tooling; see docs/plans/SEED-STAGING-1.md.
+// file to a per-row result. Admin tooling (staging, and production since
+// SEED-PROD-1); see docs/plans/SEED-STAGING-1.md and ADR-0064.
 
 /** One data row as read from the file. Every field is a string, "" when blank. */
 export type RawSeedRow = {

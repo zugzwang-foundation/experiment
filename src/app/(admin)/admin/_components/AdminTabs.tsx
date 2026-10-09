@@ -33,8 +33,9 @@ const TABS: ReadonlyArray<TabDef> = [
 	{ id: "markets", label: "Markets", href: "/admin/markets", icon: Gavel },
 ];
 
-// SEED-STAGING-1 — rendered only where the tool exists. On production the
-// page 404s; showing a link to it there would advertise a door that is shut.
+// SEED-STAGING-1 — rendered only where the tool is enabled (staging, and
+// production since SEED-PROD-1). Where it is off the page 404s; showing a link
+// there would advertise a door that is shut.
 const SEED_TAB: TabDef = {
 	id: "seed",
 	label: "Seed activity",

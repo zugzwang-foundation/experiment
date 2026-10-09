@@ -1,4 +1,4 @@
-# ADR-0064 — Staging Seed-Activity Tool
+# ADR-0064 — Staging Seed-Activity Tool (production too, since Amendment 1)
 
 | | |
 |---|---|
@@ -10,7 +10,7 @@
 | **Supersedes** | — |
 | **Superseded-by** | — |
 | **Amends** | — |
-| **Amended-by** | — |
+| **Amended-by** | Amendment 1 (SEED-PROD-1, 2026-10-06) — production enabled; see below |
 
 ---
 
@@ -39,16 +39,16 @@ The question is where a sheet-driven, participant-creating write path may live, 
 
 ## Decision Outcome
 
-**Option 1.** An admin page at `/admin/seed` (staging only) uploads a CSV/XLSX to `POST /admin/seed/preview` (parse + validate, no writes) and then drives `POST /admin/seed/run` in chunks of 25 rows. Each row: get-or-create a synthetic participant, then one `runBetTransaction(place)`.
+**Option 1.** An admin page at `/admin/seed` (staging, and production since Amendment 1) uploads a CSV/XLSX to `POST /admin/seed/preview` (parse + validate, no writes) and then drives `POST /admin/seed/run` in chunks of 25 rows. Each row: get-or-create a synthetic participant, then one `runBetTransaction(place)`.
 
 **Gates:**
 
-1. `isSeedToolsEnabled()` — true only when `ZUGZWANG_ENV === "staging"` **and** `ZUGZWANG_SEED_TOOLS === "enabled"`, both read from the running process by **computed key**. The page `notFound()`s and both handlers answer 404 before any other check.
+1. `isSeedToolsEnabled()` — true only when `ZUGZWANG_ENV` is `"staging"` or `"prod"` (*Amendment 1*; `"staging"` alone before it) **and** `ZUGZWANG_SEED_TOOLS === "enabled"`, both read from the running process by **computed key**. The page `notFound()`s and both handlers answer 404 before any other check.
    - ⚠ **Why computed key.** `next.config.ts` lists `ZUGZWANG_ENV` under `env:`, and Next substitutes every literal `process.env.ZUGZWANG_ENV` with the build's value, in server bundles too. The first version of this gate did exactly that, and its shipped form read a constant (`@code-reviewer` C-1). The page, the handlers and `runSeedChunk` were then one build-time fact rather than independent checks.
-   - ⚠ **Why a second variable.** `ZUGZWANG_ENV` describes the image as well as the task. `ZUGZWANG_SEED_TOOLS` is in no build configuration and is set only on the staging ECS task definition (`infra/config/staging.ts` `seedTools`), so permission lives in deployment config, never in an image. A staging image run under production's task definition refuses.
+   - ⚠ **Why a second variable.** `ZUGZWANG_ENV` describes the image as well as the task. `ZUGZWANG_SEED_TOOLS` is in no build configuration and is set only on the ECS task definitions whose config carries `seedTools` — staging's, and production's since Amendment 1 — so permission lives in deployment config, never in an image. Removing the field from an environment's config closes the tool there on the next deploy, whatever image runs.
 2. `runSeedChunk` re-asserts the gate itself, then checks the conclusion freeze (`isFrozen`, as the bet route does), then takes a deployment-wide Upstash lock per chunk (fail closed), so a caller that skips the handler guard still cannot write, and two runs never mint the same participant twice.
 3. Origin allowlist + admin session on both handlers (the cookie is `Path=/admin`, hence `/admin/…` URLs, not `/api/…`).
-4. Synthetic participants use `seed-…@seed.staging.invalid` addresses (RFC 2606 reserved) and the generator's synthetic ToS evidence literals; every caused event carries `metadata.request_id = "seed-staging:<batch>"`.
+4. Synthetic participants use `seed-…@seed.<env>.invalid` addresses (RFC 2606 reserved) — `seed.staging.invalid` on staging, `seed.production.invalid` on production (*Amendment 1*) — and synthetic ToS evidence literals; every caused event carries `metadata.request_id = "seed-staging:<batch>"` or `"seed-production:<batch>"`.
 
 **Idempotency without a table.** `batchId` is a hash of the validated rows. A row's idempotency key is derived from it, so a repeat hits `bet_receipts_idempotency_key_uq` (I-IDEM-ONCE-001) and is reported as skipped; the receipt's stored `commentId` resolves replies across chunks and across runs.
 
@@ -80,8 +80,8 @@ The question is where a sheet-driven, participant-creating write path may live, 
 
 - Staging accumulates synthetic activity that only a full staging reset clears, and staging stops mirroring production volumes while it is there.
 - A new dependency, `exceljs@4.4.0`, for XLSX and robust CSV.
-- **Moderation is not run on seeded arguments.** ⚠ The first draft justified this as "operator-supplied". That was wrong: the sheet is **client-supplied**, third-party text, so the ADR-0027 "operator-curated trusted content" precedent does not apply by itself (`@security-auditor`, MEDIUM). The decision stands on a different basis, stated plainly: **the operator who uploads a sheet takes review responsibility for its content**, exactly as for any content the operator places on staging by hand, and staging is the only place it can land. v1 carries no images, so ADR-0046's load-bearing half (an image is never served unscreened) is not engaged. Turning moderation on is a per-row `precommitModerate` call outside the transaction (ADR-0014), at OpenAI cost per row.
-- **Residuals, stated rather than fixed.** (a) A request with `Transfer-Encoding: chunked` carries no `Content-Length`, so `/admin/seed/preview`'s length pre-check cannot see it and `request.formData()` buffers it; `/admin/seed/run`'s schema admits up to roughly 50 MB of JSON. Admin-gated and staging-only: the worst case is the operator exhausting their own task's memory. (b) No admin-side audit event records that a batch ran: no `admin_events` writer exists anywhere yet, and the participant-side tell is `metadata.request_id = "seed-staging:<batch>"`.
+- **Moderation is not run on seeded arguments.** ⚠ The first draft justified this as "operator-supplied". That was wrong: the sheet is **client-supplied**, third-party text, so the ADR-0027 "operator-curated trusted content" precedent does not apply by itself (`@security-auditor`, MEDIUM). The decision stands on a different basis, stated plainly: **the operator who uploads a sheet takes review responsibility for its content**, exactly as for any content the operator places on staging by hand. *(Amendment 1: on production the same basis is the whole of it — seeded text is published to real participants with no moderation signal, no `moderation.blocked` event and no CSAM escalation seam; the operator's review is the only screen.)* v1 carries no images, so ADR-0046's load-bearing half (an image is never served unscreened) is not engaged. Turning moderation on is a per-row `precommitModerate` call outside the transaction (ADR-0014), at OpenAI cost per row.
+- **Residuals, stated rather than fixed.** (a) A request with `Transfer-Encoding: chunked` carries no `Content-Length`, so `/admin/seed/preview`'s length pre-check cannot see it and `request.formData()` buffers it; `/admin/seed/run`'s schema admits up to roughly 50 MB of JSON. Admin-gated: the worst case is the operator exhausting their own task's memory — *on production since Amendment 1, the single task serving participants.* (b) No admin-side audit event records that a batch ran: no `admin_events` writer exists anywhere yet, and the participant-side tell is `metadata.request_id = "seed-staging:<batch>"` (`"seed-production:<batch>"` on production, Amendment 1). On production that metadata is the ONLY record that the operator seeded anything.
 
 ### Neutral
 
@@ -107,3 +107,26 @@ The question is where a sheet-driven, participant-creating write path may live, 
 ### Option 4 — direct SQL
 
 - Bad: skips the events, the receipts and every in-transaction guard; a market seeded this way stops being something the engine can reason about. Rejected outright.
+
+## Amendment 1 — 2026-10-06 (SEED-PROD-1; founder ruling)
+
+**Ruling.** The seed-activity tool is available on **production** as well as staging, so the operator can add artificial activity when required. Staging's behaviour is unchanged: every label staging writes is byte-for-byte what it wrote before.
+
+**What changed.**
+
+- `seedToolsAllowed` accepts `ZUGZWANG_ENV` `"staging"` **or** `"prod"`; `ZUGZWANG_SEED_TOOLS === "enabled"` is still required in both. `"preview"`, `"unknown"` and casing variants still refuse. `assertSeedToolsEnabled()` now returns the environment, because the labels below depend on it.
+- `infra/config/production.ts` carries `seedTools: "enabled"`. The permission is still a task-definition value in no build configuration: deleting that line and deploying closes the tool on production with no code change.
+- Labels are per environment (`src/server/seed/plan.ts` `SEED_LABELS`): production uses `seed.production.invalid` and `seed-production:`. **Staging keeps `seed.staging.invalid` and `seed-staging:` byte-for-byte** — a label reaches the same participant by email across uploads, so renaming staging's domain would silently create a second set of participants beside the first. The ToS user agent (`… (ZugzwangSeedStaging)` / `… (ZugzwangSeedProduction)`) and the placeholder OAuth tokens (`seed-staging-*` / `seed-production-*`) are per environment too, because the user agent is written into append-only `user.tos_accepted` and `dharma.granted` events — staging's values unchanged, production's never naming staging. The environment is a required argument of every label function, so a call that forgets it is a compile error rather than a production participant wearing a staging label. `tests/unit/seed/plan.test.ts` pins both environments' labels whole.
+- The page states, on production, that seeded activity is real, public, in the dataset and permanent.
+
+**What this gives up — stated, not mitigated.**
+
+1. **Permanence.** Production is never reset (ADR-0035 is staging-only), and every seeded row is an append-only bet, comment, ledger entry and event (Bucket A, `0003_append_only_triggers.sql`; the bet↔comment pair is INV-1 and the ledger INV-2). Seeded activity cannot be removed afterwards.
+2. **The dataset.** The 2026-11-06 public dataset will contain seeded participants and bets. They are identifiable — `@seed.production.invalid` emails, `seed-production:` request ids, the synthetic ToS evidence literals — but they are not excluded by anything; any analysis that must exclude them has to filter on those markers.
+3. **Prices and Dharma.** Seeded bets move live CPMM prices that real participants trade against, and each seeded participant receives the initial Dharma grant. They are indistinguishable from real participants on every participant-facing surface.
+4. **Identity pool, and real signups.** Each new seeded participant consumes one production pseudonym/avatar tuple from the same pool real signups draw from. If a batch exhausts it, the next REAL signup fails `identity_pool_exhausted` (503) in the create hook. There is no pre-flight capacity check; `/admin/seed/preview` computes `participantsNeeded` and could compare it against the remaining tuples, which is not done here.
+5. **Availability.** The XLSX parser decompresses the whole workbook before any check (`parse.ts`); an admin upload of a pathological file can stall the single production task.
+6. **Moderation.** Seeded arguments are not screened (see Negative, above). On production they are published to real participants under participant pseudonyms on the operator's review alone. Turning it on is a per-row `precommitModerate` call outside the transaction (ADR-0014).
+7. **Operator activity under participant identities.** CLAUDE.md §3's admin-participation trigger is not crossed — the admin still has no `users` row and no runtime role, and the handlers still log `userId: null` — and its social-content trigger is satisfied literally, because every argument comes from the operator's sheet, never generated. What changes is that on production the result is read by real people, and that is what this ruling accepts. If the founder reads this as a carve-out of CLAUDE.md §3, the contract file is the place to say so; an ADR cannot carve into it.
+
+The freeze gate, the per-chunk lock, the origin/admin checks and the idempotency backstop are unchanged and apply on production exactly as on staging.

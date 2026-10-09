@@ -49,7 +49,8 @@ function walkSrc(): string[] {
 
 describe("chart-window::the production window is pinned to the experiment", () => {
 	it("resolves the production window for prod and for every unrecognised value", () => {
-		const PROD_START = "2026-09-15T00:00:00.000Z";
+		// Moved from 2026-09-15 on 2026-10-06 to match staging (founder ruling).
+		const PROD_START = "2026-10-05T00:00:00.000Z";
 		const PROD_END = "2026-11-05T23:45:00.000Z";
 
 		for (const env of [
