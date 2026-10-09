@@ -1,6 +1,6 @@
 # ZUGZWANG · OVERNIGHT RUN DOCTRINE
 
-**Version:** v1.3 · **Written:** 2026-08-22 · **Amended:** 2026-09-22 from FF-1 (the D-51 R9 extension — verbatim prescriptive commits and in-session expand-only DDL review; OVN-O9, OVN-O10, F-15, F-16) · **Supersedes:** v1.2 (2026-08-30)
+**Version:** v1.4 · **Written:** 2026-08-22 · **Amended:** 2026-10-08 from MODEL-POLICY-1 (the founder chooses model and effort per session; OVN-O10, the §5 skeleton and reviewer cascade, §7.1) · **Supersedes:** v1.3 (2026-09-22)
 **Author:** web Claude (orchestrator)
 **Derived from:** POSREV-1 (`feat/posrev-1`, PR #396) — the first fully autonomous
 overnight recon → plan → execute → deploy run. Also draws on LOTS-1, MERGE-0,
@@ -8,6 +8,8 @@ PHASE-0, MERGE-1 and UNWIRE-1, chiefly for what they got wrong.
 
 **Repo home when committed:** `docs/overnight-run.md`
 **Doc class:** prescriptive — web-authored, CC-committed.
+
+**Changed in v1.4.** Model and effort are the founder's choice, made per session (MODEL-POLICY-1, 2026-10-08), so this doctrine no longer presets either. The §5 skeleton loses its ultrathink line, its reviewer cascade no longer names an effort, and OVN-O10 and §7.1 stop treating effort max as a setting the run assumes. Nothing else changes.
 
 **Changed in v1.3.** Two things §10 excluded are now covered, under conditions, by founder ruling D-51 R9 (FF-1, 2026-09-22). **Prescriptive text may ride an overnight run only when the web lane authored it in full before the run** — an ADR, a decision-record amendment, and spec amendment blocks with exact anchors — and the session **commits it verbatim**, filling only measured slots (ADR number, ruling number, versions, SHA, dates, migration name); a block whose anchor does not match exactly once is CARRIED, never rewritten, and the run still authors no prescriptive sentence of its own. **A migration may ride an overnight run only when it is expand-only and reversible** (ADD COLUMN with a default, ADD CONSTRAINT, an index — never a trigger edit, never an UPDATE of a Bucket-A row, never a destructive alter) and `@db-migration-reviewer` runs in-session on the migration slice under a written posture (expand-only · reversible · no trigger SQL · CHECK text verbatim · bucket classification unchanged · guard-catalog count unchanged · journal/snapshot consistent · `db:check-drift` clean). Everything else in §10 stands.
 
@@ -409,7 +411,7 @@ FF-1's brief asked for "preview URLs and the SHAs they serve". Both previews bui
 
 ### OVN-O10 · Name the dynamic-workflow posture, and expect the harness to report its mode
 
-`/effort max` is not a command a session can issue; the harness reports its mode (FF-1: `ultracode (xhigh + dynamic workflow orchestration)`). CLAUDE.md §6 forbids dynamic workflows on the seven §1 areas regardless of mode. ⇒ Every brief that touches a §1 area carries one line — *dynamic workflows FORBIDDEN on §1 areas; recon is one sequential pass* — and the report states the mode the harness reported.
+The session's model and effort are the founder's choice; the harness reports the mode (FF-1: `ultracode (xhigh + dynamic workflow orchestration)`). CLAUDE.md §6 forbids dynamic workflows on the seven §1 areas regardless of mode. ⇒ Every brief that touches a §1 area carries one line — *dynamic workflows FORBIDDEN on §1 areas; recon is one sequential pass* — and the report states the mode the harness reported.
 
 ---
 
@@ -420,7 +422,6 @@ Copy, fill the `«slots»`, attach this file alongside.
 ```
 TASK: «TASK-ID» — «one line»
 MODE: autonomous, overnight, recon → plan → execute → deploy → report
-ultrathink on every planning and reviewing step.
 
 Read the attached OVERNIGHT RUN DOCTRINE first. It governs how you work.
 This prompt governs what you build.
@@ -516,7 +517,7 @@ Guards you must write:
 Verify every guard by reverting its fix and watching it red (OVN-V2).
 Every negative assertion carries a positive control (OVN-V1).
 
-Reviewer cascade, in order, all at effort max:
+Reviewer cascade, in order:
   1. @test-writer      — «scope»
   2. @code-reviewer    — «scope»
   3. @security-auditor — «scope, and the failure mode to look for»
@@ -642,7 +643,7 @@ in the chain is reviewed by nobody, because the cascade has already run.
 
 **A reviewer re-run scoped to its own fix was considered and REJECTED by founder
 ruling, 2026-08-22, on latency.** It is the right call: an overnight run's entire
-value is what it completes in one night, and a re-run at effort max on a critical
+value is what it completes in one night, and a reviewer re-run on a critical
 path is not cheap. Buying a second audit with an hour of the night is a bad trade
 when a free instrument already exists.
 
@@ -712,4 +713,4 @@ On reading the report:
 
 ---
 
-**END — Zugzwang overnight run doctrine v1.3**
+**END — Zugzwang overnight run doctrine v1.4**
