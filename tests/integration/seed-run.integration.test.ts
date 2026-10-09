@@ -98,12 +98,14 @@ import { closeMarket } from "@/server/markets/close";
 import { createMarket } from "@/server/markets/create";
 import { openMarket } from "@/server/markets/open";
 import { SeedToolsDisabledError } from "@/server/seed/gate";
-import { SEED_REQUEST_ID_PREFIX } from "@/server/seed/plan";
+import { SEED_LABELS } from "@/server/seed/plan";
 import { runSeedChunk } from "@/server/seed/run";
 import type { RawSeedRow, SeedRowResult } from "@/server/seed/types";
 
 import { testClient, testDb } from "../db/_fixtures/db";
 import { truncateTables } from "../db/_fixtures/truncate";
+
+const SEED_REQUEST_ID_PREFIX = SEED_LABELS.staging.requestIdPrefix;
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -356,7 +358,8 @@ let savedSeedFlag: string | undefined;
 /**
  * "staging" means the staging DEPLOYMENT: ZUGZWANG_ENV=staging AND the
  * ZUGZWANG_SEED_TOOLS flag its task definition carries (ADR-0064, C-1). Any
- * other value sets the environment and clears the flag, as on production.
+ * other value sets the environment and CLEARS the flag — a deployment whose
+ * task does not carry it.
  */
 function setEnv(value: string | undefined): void {
 	if (value === undefined) delete process.env.ZUGZWANG_ENV;
@@ -912,14 +915,16 @@ describe("seed-run — failure modes (§6 step 5)", () => {
 		expect(next.results.every((r) => r.status === "posted")).toBe(true);
 	}, 90_000);
 
-	it("seed-run::refuses-on-prod-and-writes-nothing [plan §3 G2]", async () => {
+	it("seed-run::refuses-without-the-flag-and-writes-nothing [plan §3 G2]", async () => {
 		await createOpenMarket(MARKET_A);
 		await createOpenMarket(MARKET_B);
 		const before = await countRows();
 
 		// G2. The gate is the FIRST thing `runSeedChunk` does — before the
-		// validation read, before any participant is looked up — so a production
-		// deployment cannot run this even if every other guard were edited away.
+		// validation read, before any participant is looked up — so a deployment
+		// whose task does not carry ZUGZWANG_SEED_TOOLS cannot run this even if
+		// every other guard were edited away. `setEnv("prod")` clears the flag:
+		// production WITH the flag is allowed since SEED-PROD-1 (gate.test.ts).
 		setEnv("prod");
 		await expect(
 			runSeedChunk({

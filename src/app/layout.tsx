@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
 	title: "Zugzwang",
-	description: "The world's reputation market.",
+	description: "The only right move.",
 	icons: {
 		icon: [
 			{ url: "/icon.svg", type: "image/svg+xml" },

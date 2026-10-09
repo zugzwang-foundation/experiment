@@ -13,7 +13,8 @@ import { computeBatchId, planSeedBatch } from "@/server/seed/plan";
 import { guardSeedRequest } from "@/server/seed/route-guard";
 import { validateSeedRows } from "@/server/seed/validate";
 
-// POST /admin/seed/preview — SEED-STAGING-1, staging only.
+// POST /admin/seed/preview — SEED-STAGING-1; staging, and production since
+// SEED-PROD-1, wherever the task carries ZUGZWANG_SEED_TOOLS=enabled.
 //
 // Takes the uploaded sheet (multipart field `file`), parses and validates it
 // against the markets that are Open RIGHT NOW, and returns the rows plus a

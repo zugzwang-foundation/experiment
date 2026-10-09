@@ -11,7 +11,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // between the open internet and a tool that mints accounts and places bets.
 // Three properties, and the ORDER of them is itself one of the three:
 //
-//   1. On anything but staging the answer is 404, and NOTHING ELSE RUNS.
+//   1. Wherever the tool is off (no ZUGZWANG_SEED_TOOLS on the task, or an
+//      environment other than staging/prod) the answer is 404, and NOTHING
+//      ELSE RUNS.
 //      Not a 403, not a 401, and in particular not an origin check or a
 //      session lookup — because a 401 tells an unauthenticated caller that
 //      the endpoint exists and is worth attacking, while a 404 tells them
@@ -19,7 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 //      not a performance one, and the only way to assert it is to prove the
 //      later checks were NOT CALLED.
 //   2. The 404 body must be indistinguishable from a route that is absent.
-//      A helpful `seed tools are disabled on production` message would undo
+//      A helpful `seed tools are disabled here` message would undo
 //      the whole of (1) while every status code still looked right.
 //   3. The page and both handlers must run the env check BEFORE their admin
 //      gate / before any other `await`. A guard that runs second is a guard
@@ -28,7 +30,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 //
 // (3) is a TEXT SCAN, because ordering inside a Route Handler is not
 // observable from outside: a handler that checked the session first and the
-// environment second returns the same 404 on production for a signed-out
+// environment second returns the same 404 where the tool is off for a signed-out
 // caller, and a DIFFERENT answer for a signed-in one. The bug only appears
 // for the one caller nobody tests with.
 //
@@ -76,7 +78,8 @@ let savedSeedFlag: string | undefined;
 /**
  * "staging" means the staging DEPLOYMENT: ZUGZWANG_ENV=staging AND the
  * ZUGZWANG_SEED_TOOLS flag its task definition carries (ADR-0064, C-1). Any
- * other value sets the environment and clears the flag, as on production.
+ * other value sets the environment and CLEARS the flag — a deployment whose
+ * task does not carry it (production with the flag is allowed since SEED-PROD-1).
  */
 function setEnv(value: string | undefined): void {
 	if (value === undefined) delete process.env.ZUGZWANG_ENV;
@@ -107,10 +110,11 @@ afterEach(() => {
 });
 
 describe("seed-route-guard — the environment answers first (G1)", () => {
-	it("seed-route-guard::non-staging-404s-without-consulting-origin-or-session", async () => {
-		// `tests/_setup/env.ts` defaults the suite to `prod`; `preview` is a REAL
-		// deployment value in `VALID_ENVS`, which is why it is named explicitly —
-		// a membership test against the valid set would admit it.
+	it("seed-route-guard::tool-off-404s-without-consulting-origin-or-session", async () => {
+		// `setEnv` clears the flag for anything but "staging", so `prod` here is
+		// production WITHOUT the flag, and `preview` is a REAL deployment value in
+		// `VALID_ENVS` that refuses even with it (gate.test.ts). Production WITH
+		// the flag is admitted since SEED-PROD-1 — the positive arm below.
 		for (const env of ["prod", "preview"]) {
 			vi.clearAllMocks();
 			mockCheckOrigin.mockReturnValue(true);
@@ -204,6 +208,19 @@ describe("seed-route-guard — origin, then session (G3)", () => {
 		const response = await guardSeedRequest(seedRequest(), REQUEST_ID);
 
 		expect(response).toBeNull();
+	});
+
+	it("seed-route-guard::prod-with-the-flag-passes (SEED-PROD-1)", async () => {
+		// The positive control for production: the flag, not the environment
+		// name, is the permission, so prod + flag + origin + session proceeds.
+		process.env.ZUGZWANG_ENV = "prod";
+		process.env.ZUGZWANG_SEED_TOOLS = "enabled";
+
+		const response = await guardSeedRequest(seedRequest(), REQUEST_ID);
+
+		expect(response).toBeNull();
+		expect(mockCheckOrigin).toHaveBeenCalled();
+		expect(mockRequireAdminSession).toHaveBeenCalled();
 	});
 
 	it("seed-route-guard::the-spies-observe-the-real-calls", async () => {
@@ -317,10 +334,10 @@ describe("seed-route-guard — the handlers and the page call it first", () => {
 
 		// Matched WITH the opening paren, which is what distinguishes the call
 		// sites from the import list — `requireAdminPage` is imported ABOVE
-		// `isSeedToolsEnabled` (alphabetical by module path), so a bare
+		// `seedToolsEnvironment` (alphabetical by module path), so a bare
 		// `indexOf` on the names would read the import order and report the
 		// opposite of the truth.
-		const envAt = stripped.indexOf("isSeedToolsEnabled(");
+		const envAt = stripped.indexOf("seedToolsEnvironment(");
 		const gateAt = stripped.indexOf("requireAdminPage(");
 		expect(envAt).toBeGreaterThan(-1);
 		expect(gateAt).toBeGreaterThan(-1);
@@ -328,7 +345,7 @@ describe("seed-route-guard — the handlers and the page call it first", () => {
 
 		// G1 says `notFound()`, and the distinction matters: a REDIRECT to the
 		// admin login would confirm the page exists, which is the one thing
-		// production must not do. It has to sit between the two call sites, so
+		// a deployment without the tool must not do. It has to sit between the two call sites, so
 		// the environment's refusal lands before the admin gate is reached.
 		expect(stripped.slice(envAt, gateAt)).toMatch(/\bnotFound\(/);
 

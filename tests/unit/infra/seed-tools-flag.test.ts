@@ -7,27 +7,22 @@ import { productionConfig } from "../../../infra/config/production";
 import { stagingConfig } from "../../../infra/config/staging";
 
 // SEED-STAGING-1 / ADR-0064 — `ZUGZWANG_SEED_TOOLS` is the runtime permission
-// for the admin seed-activity tool, and the ONLY place it may come from is the
-// staging task definition. The app also requires ZUGZWANG_ENV=staging, but
-// that value is baked into images by next.config's `env:` block; this flag is
-// what keeps a staging image run under production's task definition refusing.
-// So the property worth pinning is an ABSENCE on production, with the staging
-// presence as its positive control.
+// for the admin seed-activity tool, and it comes ONLY from an environment's
+// config `seedTools` field, rendered onto that task definition. Since
+// SEED-PROD-1 (ADR-0064 Amendment 1) both staging and production carry it.
+// What stays pinned: the stack emits it only when configured, and no build
+// configuration carries it (gate.test.ts), so removing the field from one
+// environment's config is what closes the tool there.
 
 const REPO_ROOT = join(__dirname, "..", "..", "..");
 
-describe("seed-tools-flag — staging only", () => {
-	it("seed-tools-flag::staging-enables-the-tool (positive control)", () => {
+describe("seed-tools-flag — staging and production", () => {
+	it("seed-tools-flag::staging-enables-the-tool", () => {
 		expect(stagingConfig.seedTools).toBe("enabled");
 	});
 
-	it("seed-tools-flag::production-config-never-carries-it", () => {
-		expect(productionConfig.seedTools).toBeUndefined();
-		const source = readFileSync(
-			join(REPO_ROOT, "infra", "config", "production.ts"),
-			"utf8",
-		);
-		expect(source).not.toMatch(/seedTools|ZUGZWANG_SEED_TOOLS/);
+	it("seed-tools-flag::production-enables-the-tool (SEED-PROD-1)", () => {
+		expect(productionConfig.seedTools).toBe("enabled");
 	});
 
 	it("seed-tools-flag::the-stack-emits-it-only-when-configured", () => {

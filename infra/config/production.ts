@@ -96,6 +96,11 @@ export const productionConfig: EnvironmentConfig = {
 	healthCheckGracePeriodSeconds: 180,
 	writesPaused:
 		process.env.ZZ_PROD_WRITES_PAUSED === "paused" ? "paused" : undefined,
+	// SEED-PROD-1 / ADR-0064 Amendment 1 — the admin seed-activity tool is
+	// available here too (founder ruling 2026-10-06). Seeded activity on
+	// production is permanent and public; deleting this line closes the tool
+	// on the next deploy, with no code change.
+	seedTools: "enabled",
 
 	certificateArn: process.env.ZZ_PROD_CERT_ARN || PRODUCTION_CERTIFICATE_ARN,
 	appBaseUrl: "https://zugzwangworld.com",

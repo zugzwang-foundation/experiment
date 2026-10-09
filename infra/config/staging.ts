@@ -63,7 +63,8 @@ export const stagingConfig: EnvironmentConfig = {
 	healthCheckGracePeriodSeconds: 180,
 	writesPaused:
 		process.env.ZZ_STAGING_WRITES_PAUSED === "paused" ? "paused" : undefined,
-	// SEED-STAGING-1 / ADR-0064 — the admin seed-activity tool runs here only.
+	// SEED-STAGING-1 / ADR-0064 — the admin seed-activity tool runs here (and,
+	// since SEED-PROD-1, on production).
 	seedTools: "enabled",
 
 	// STAGING-DEPLOY-NO-VARS — the staging ACM certificate is a COMMITTED

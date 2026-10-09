@@ -41,6 +41,17 @@ import type { PricePoint } from "@/server/discovery/price-series";
 // PARAMETERS: the real anchors are driven through a synthetic window here, and the
 // component's binding of the real list is asserted separately.
 
+// ⚠⚠ SINCE 2026-10-06 THE PRODUCTION WINDOW STARTS 2026-10-05 (founder ruling:
+// production renders like staging, #650). The paragraphs above describe the
+// `Sep 15 → Nov 5` window. Now anchor 0 (`Sep 15`) lies BEFORE the window on
+// both environments, so the out-of-window filter is LIVE in production, the
+// shipped charts draw two anchors (`Oct 5 · Nov 5`), and both of those are
+// window endpoints — against the real constants nothing can tell an anchor-
+// derived axis from a window-derived one. The interior-anchor rule is therefore
+// asserted through `axisAnchorsFor` on WIDE, a synthetic window containing all
+// three anchors, and the component's binding of the real list is still asserted
+// at the render below.
+
 const SERIES: PricePoint[] = [
 	{ at: "2026-10-07T00:00:00.000Z", yes: "0.500000000000000000" },
 	{ at: "2026-10-12T00:00:00.000Z", yes: "0.620000000000000000" },
@@ -49,6 +60,14 @@ const SERIES: PricePoint[] = [
 const START = Date.parse(MARKET_CHART_WINDOW_START);
 const END = Date.parse(MARKET_CHART_WINDOW_END);
 const DAY = 86_400_000;
+/** A synthetic window that contains every shipped anchor, a day either side. */
+const WIDE_START = Date.parse(MARKET_CHART_AXIS_ANCHORS[0]) - DAY;
+const WIDE_END = Date.parse(MARKET_CHART_AXIS_ANCHORS[2]) + DAY;
+/** The anchors inside the REAL window — what the shipped component draws. */
+const IN_WINDOW = MARKET_CHART_AXIS_ANCHORS.filter((a) => {
+	const t = Date.parse(a);
+	return t >= START && t <= END;
+}).map(fmtUtcDay);
 
 function labels(mode: "collapsed" | "expanded" | "hero"): string[] {
 	const html = renderToStaticMarkup(
@@ -61,18 +80,27 @@ function labels(mode: "collapsed" | "expanded" | "hero"): string[] {
 }
 
 describe("debate-view::price-chart-axis-uses-calendar-anchors — the drawn set", () => {
-	it("the collapsed card draws the FIRST and LAST anchors; the wider modes draw all three", () => {
+	it("the collapsed card draws the FIRST and LAST in-window anchors; the wider modes draw every in-window one", () => {
 		const all = MARKET_CHART_AXIS_ANCHORS.map(fmtUtcDay);
 		expect(all).toHaveLength(3);
+		expect(IN_WINDOW).toEqual([all[1], all[2]]);
 
-		expect(labels("collapsed")).toEqual([all[0], all[2]]);
-		expect(labels("expanded")).toEqual(all);
+		expect(labels("collapsed")).toEqual([IN_WINDOW[0], IN_WINDOW.at(-1)]);
+		expect(labels("expanded")).toEqual(IN_WINDOW);
 		// ⛔ THE HERO GAINED AN AXIS AT CHART-7 AND IT HAD NONE BEFORE. RF-4's table
 		// names `expanded` AND `hero`; the canon text it ratifies reads "plus `Oct 1`
 		// on the wider modes". Pinned here because it is the single most reversible
 		// reading in this task — one arm of one predicate — and a founder who meant
 		// otherwise should find it named rather than buried.
-		expect(labels("hero")).toEqual(all);
+		expect(labels("hero")).toEqual(IN_WINDOW);
+		// ...and with all three inside a window, the wider modes draw all three
+		// while the card keeps two: the rule, on the window where it can show.
+		const wide = (mode: "collapsed" | "expanded") =>
+			axisAnchorsFor(MARKET_CHART_AXIS_ANCHORS, mode, WIDE_START, WIDE_END).map(
+				(a) => a.i,
+			);
+		expect(wide("expanded")).toEqual([0, 1, 2]);
+		expect(wide("collapsed")).toEqual([0, 2]);
 	});
 
 	it("MUST REJECT a label computed from the window's endpoints", () => {
@@ -80,10 +108,18 @@ describe("debate-view::price-chart-axis-uses-calendar-anchors — the drawn set"
 		// `Sep 15` and `Nov 5` are BOTH the anchors and the window's ends there, so
 		// they cannot discriminate; `Oct 1` is an anchor and is not an endpoint, so a
 		// window-derived axis cannot produce it at any count.
-		const interior = fmtUtcDay(MARKET_CHART_AXIS_ANCHORS[1]);
-		expect(labels("expanded")).toContain(interior);
-		expect(interior).not.toBe(fmtUtcDay(MARKET_CHART_WINDOW_START));
-		expect(interior).not.toBe(fmtUtcDay(MARKET_CHART_WINDOW_END));
+		// Asserted on WIDE: under the real window the interior anchor IS the
+		// window start (2026-10-05), so it cannot discriminate there (see header).
+		const drawnWide = axisAnchorsFor(
+			MARKET_CHART_AXIS_ANCHORS,
+			"expanded",
+			WIDE_START,
+			WIDE_END,
+		).map((a) => a.i);
+		expect(drawnWide).toContain(1);
+		const interior = Date.parse(MARKET_CHART_AXIS_ANCHORS[1]);
+		expect(interior).toBeGreaterThan(WIDE_START);
+		expect(interior).toBeLessThan(WIDE_END);
 
 		// …and the superseded rule's own answers are absent. The thirds of the window
 		// are what the collapsed card printed until CHART-7; derived here from the
@@ -122,7 +158,7 @@ describe("debate-view::price-chart-axis-uses-calendar-anchors — the drawn set"
 		// the five nulls above mean "absent" rather than "wrong selector".
 		expect(
 			body.querySelectorAll('[data-testid^="axis-x-anchor-"]').length,
-		).toBe(3);
+		).toBe(IN_WINDOW.length);
 	});
 });
 
@@ -131,14 +167,16 @@ describe("debate-view::price-chart-axis-uses-calendar-anchors — the window fil
 	// shipped constant in every case below — what varies is the window, which is the
 	// only variable that can make the filter do anything.
 
-	it("both shipped windows contain every anchor — so the filter is dormant in production", () => {
-		// Stated as a measurement rather than assumed, because everything below
-		// exercises a branch that does NOT run today, and a reader should know that.
+	it("the shipped window drops the first anchor — the filter is LIVE in production since 2026-10-06", () => {
+		// Stated as a measurement. Until 2026-10-06 the production window
+		// contained all three anchors and this filter never ran there; with the
+		// window starting 2026-10-05 (like staging), `Sep 15` is before it.
 		expect(
 			axisAnchorsFor(MARKET_CHART_AXIS_ANCHORS, "expanded", START, END).map(
 				(a) => a.i,
 			),
-		).toEqual([0, 1, 2]);
+		).toEqual([1, 2]);
+		expect(xPx(MARKET_CHART_AXIS_ANCHORS[0], START, END)).toBeLessThan(0);
 	});
 
 	it("MUST REJECT an anchor before the window start", () => {
@@ -165,13 +203,13 @@ describe("debate-view::price-chart-axis-uses-calendar-anchors — the window fil
 		const drawn = axisAnchorsFor(
 			MARKET_CHART_AXIS_ANCHORS,
 			"expanded",
-			START,
+			WIDE_START,
 			early,
 		);
 		expect(drawn.map((a) => a.i)).toEqual([0, 1]);
-		expect(xPx(MARKET_CHART_AXIS_ANCHORS[2], START, early)).toBeGreaterThan(
-			VIEWBOX_W,
-		);
+		expect(
+			xPx(MARKET_CHART_AXIS_ANCHORS[2], WIDE_START, early),
+		).toBeGreaterThan(VIEWBOX_W);
 	});
 
 	it("the collapsed card takes the first and last of what SURVIVES, never of the raw list", () => {
@@ -184,7 +222,7 @@ describe("debate-view::price-chart-axis-uses-calendar-anchors — the window fil
 		const drawn = axisAnchorsFor(
 			MARKET_CHART_AXIS_ANCHORS,
 			"collapsed",
-			START,
+			WIDE_START,
 			early,
 		);
 		expect(drawn.map((a) => a.i)).toEqual([0, 1]);
@@ -226,7 +264,8 @@ describe("debate-view::price-chart-axis-uses-calendar-anchors — the component 
 		);
 		const body = new DOMParser().parseFromString(html, "text/html").body;
 		const els = [...body.querySelectorAll('[data-testid^="axis-x-anchor-"]')];
-		expect(els).toHaveLength(3);
+		expect(els).toHaveLength(IN_WINDOW.length);
+		expect(els.length).toBeGreaterThanOrEqual(2);
 		for (const el of els) {
 			const i = Number(
 				(el.getAttribute("data-testid") ?? "").replace("axis-x-anchor-", ""),

@@ -9,14 +9,50 @@
 
 import { createHash } from "node:crypto";
 
+import type { SeedEnvironment } from "./gate";
 import type { SeedRow } from "./types";
 
 export type SeedMarketGroup = { marketSlug: string; rows: SeedRow[] };
 
-/** Marks every event this tool causes, so seeded activity stays identifiable. */
-export const SEED_REQUEST_ID_PREFIX = "seed-staging:";
+/**
+ * Marks every event this tool causes, so seeded activity stays identifiable,
+ * and names the environment it was seeded in. ⚠ Staging's values are the
+ * pre-SEED-PROD-1 ones, BYTE-FOR-BYTE: a label reaches the same participant by
+ * email across uploads, and the user agent is written into append-only events
+ * (`user.tos_accepted`, `dharma.granted`), so changing a staging value would
+ * split staging's synthetic participants into two populations with two tells.
+ * Every field is per environment so that no production row carries a staging
+ * label either.
+ */
+export const SEED_LABELS: Record<
+	SeedEnvironment,
+	{
+		requestIdPrefix: string;
+		emailDomain: string;
+		tosUserAgent: string;
+		oauthTokenPrefix: string;
+	}
+> = {
+	staging: {
+		requestIdPrefix: "seed-staging:",
+		emailDomain: "seed.staging.invalid",
+		tosUserAgent:
+			"SYNTHETIC-FIXTURE-NO-USER-AGENT-WAS-RECORDED (ZugzwangSeedStaging)",
+		oauthTokenPrefix: "seed-staging",
+	},
+	prod: {
+		requestIdPrefix: "seed-production:",
+		emailDomain: "seed.production.invalid",
+		tosUserAgent:
+			"SYNTHETIC-FIXTURE-NO-USER-AGENT-WAS-RECORDED (ZugzwangSeedProduction)",
+		oauthTokenPrefix: "seed-production",
+	},
+};
 
-const SEED_EMAIL_DOMAIN = "seed.staging.invalid";
+/** `metadata.request_id` for every event of one batch. */
+export function seedRequestId(env: SeedEnvironment, batchId: string): string {
+	return `${SEED_LABELS[env].requestIdPrefix}${batchId.slice(0, 16)}`;
+}
 
 /**
  * Groups rows by market in first-appearance order, keeping sheet order within
@@ -61,10 +97,14 @@ export function seedIdempotencyKey(batchId: string, rowNumber: number): string {
  * row is its own participant, scoped to this batch. `.invalid` is reserved
  * (RFC 2606), so no such address can ever belong to a real person.
  */
-export function seedParticipantEmail(batchId: string, row: SeedRow): string {
+export function seedParticipantEmail(
+	batchId: string,
+	row: SeedRow,
+	env: SeedEnvironment,
+): string {
 	const local =
 		row.userLabel === null
 			? `seed-${batchId.slice(0, 12)}-r${row.rowNumber}`
 			: `seed-${row.userLabel.toLowerCase()}`;
-	return `${local}@${SEED_EMAIL_DOMAIN}`;
+	return `${local}@${SEED_LABELS[env].emailDomain}`;
 }
