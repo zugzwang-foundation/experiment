@@ -139,7 +139,7 @@ grounding — do not replicate it pixel-for-pixel. [Slot 1 only.]
 
 - **Answer the questions.** First-pass quality jumps when the questioning round is engaged rather than skipped; its product-logic questions also surface blind spots cheaply.
 - **The look-anchor opening is specified, not open.** On Slot 1, the *aesthetic character* is deliberately explored — but only through the VARIATIONS request, on named dimensions, inside the locked layout. Layout, content, and constraints stay fully closed. A named exploration on named dimensions is not an open end.
-- **The model is literal.** The underlying model (Opus 4.8) interprets prompts literally and does not silently generalise. Any rule meant to hold everywhere ("all states", "every card") must say so explicitly.
+- **The model is literal.** The underlying model interprets prompts literally and does not silently generalise. Any rule meant to hold everywhere ("all states", "every card") must say so explicitly.
 
 ### §3.2 The constraints block (verbatim, every prompt)
 

@@ -14,14 +14,14 @@
 
 - **Runtime:** Node 24 (`mise.toml`). CI pins via `.nvmrc` (pinned to 24).
 - **Framework:** Next.js `16.3.2`, App Router, React `19.2.4`, TypeScript strict. *(Bumped 16.2.4 → 16.3.2 at S-4 Phase B: `cacheComponents` needs the `instant` segment option, which 16.2.4 silently ignored — see §5 Caching and `next.config.ts`.)*
-- **DB:** Postgres 17 on Supabase (ap-south-1, session pooler). Drizzle ORM `0.45`, `drizzle-kit 0.30`, `drizzle-zod 0.7`.
+- **DB:** Postgres 17.6 on AWS RDS (`ap-south-1`; private, Multi-AZ in production — `infra/lib/database-stack.ts`, `infra/config/production.ts`), reached in session mode (`DB_POOLER_MODE`). Drizzle ORM `0.45`, `drizzle-kit 0.30`, `drizzle-zod 0.7`.
 - **Auth:** Better Auth `1.6.11` (Google OAuth + email-OTP via Resend + Cloudflare Turnstile). See §H/§7.
 - **Styling:** Tailwind v4 (CSS-first via `@theme`) + shadcn (`shadcn 4.7`, `radix-ui 1.4`, `tw-animate-css`).
 - **Storage:** Cloudflare R2 via `@aws-sdk/client-s3 3.1045` + `s3-request-presigner`.
 - **Cache / limits:** Upstash Redis (`@upstash/redis 1.38`, `@upstash/ratelimit 2.0.8`).
 - **Moderation:** OpenAI omni-moderation (`openai 6.39`).
 - **Email:** Resend `6.12`. **Canonical JSON:** `canonicalize 3.0`. **IDs:** `uuid 11`. **Validation:** `zod 3.25`.
-- **Observability:** Sentry (`@sentry/nextjs 10.53`) + PostHog (`posthog-js 1.376`, `posthog-node 5.35`). Two-vendor. **No Axiom.**
+- **Observability:** Sentry (`@sentry/nextjs 10.53`) + PostHog (`posthog-js 1.376`, `posthog-node 5.35`), plus CloudWatch Logs (`/zugzwang/<env>/app`) and CloudWatch alarms to an SNS email topic on AWS (`infra/lib/security-stack.ts`, `infra/lib/monitoring-stack.ts`). **No Axiom.**
 - **Tooling:** `pnpm 10.33.2` (the `packageManager` field), Biome `2.4.13`, Lefthook `2.1.6`, `just`, `tsx 4.22`, Vitest `3`, fast-check `4.8.0`.
 - **Build-script approval: `package.json` → `pnpm.onlyBuiltDependencies` is the live list.** It is `esbuild`, `lefthook`, `sharp`. ⛔ **`pnpm-workspace.yaml`'s `allowBuilds` map is DEAD CONFIG in this repo and its extra entries do nothing.** Measured against pnpm 10.33.2: if `package.json` carries `pnpm.onlyBuiltDependencies` **at all — even as an empty array —** `allowBuilds` is never consulted (`allowBuilds` desugars via `settings.onlyBuiltDependencies ??= []`, and `??=` is a no-op once the key exists). Consequence on disk: `@sentry/cli` and `protobufjs` are listed `true` in `allowBuilds`, are absent from `package.json`, and **their install scripts therefore never run.** ⚠ **That does NOT leave `@sentry/cli` without a binary, and this line said it did.** Measured 2026-09-02 on a fresh `pnpm install --frozen-lockfile` at `4c041633`: `@sentry/cli-darwin@2.58.6` ships a **36 MB prebuilt** `bin/sentry-cli`, and running it answers `sentry-cli 2.58.6` at exit 0 — because `@sentry/cli` 2.x delivers its binary through a platform-specific OPTIONAL DEPENDENCY. ⚠ It **does** declare a `postinstall`, and that is the precise point rather than a caveat: `scripts/install.js` resolves the platform package FIRST and skips the manual download when that succeeds, so with the optional dependency present there is nothing the blocked build script would have fetched. The 487-byte file under `@sentry/cli/bin/` is the shim that resolves to it. **Source-map upload is unaffected.** The two claims are separate: *the script never ran* is measurable and true; *therefore the binary is missing* was inferred, and is false. That is the same shape SYNC-5's own reviewer pass named in this very PR — a fact measured at HEAD extrapolated into a consequence HEAD cannot support — and it survived into the correction itself. `protobufjs` was not measured and inherits no verdict from this. **Add a new build-script approval to `package.json`.** Adding it only to `allowBuilds` will silently do nothing. *(This line has now been wrong twice: it first read "Not a `pnpm-workspace.yaml` allow-list" — true when written, false once that file appeared — and SYNC-5 then over-corrected it to "TWO files carry it … which one pnpm honours is version-dependent", which presented a dead map as a live peer. It is not version-dependent; it is measurable, and it was measured at SYNC-5 Gate C across eight installs with a negative control.)*
 - **Not installed yet:** Playwright / any E2E runner; `commitlint`.
@@ -66,7 +66,13 @@ Test scripts (in `package.json`): `pnpm test:invariants` (`vitest run tests/inva
 experiment/
 ├── CLAUDE.md, AGENTS.md            # contract + stack patterns (CLAUDE.md imports @AGENTS.md)
 ├── .claude/agents/                 # 4 subagent briefings (tracked); settings.local.json is gitignored
-├── .github/workflows/              # ci.yml (the PR gate) + env-audit.yml + staging-migrate.yml (D2)
+├── .github/workflows/              # `ls .github/workflows/` — SEVEN as at 2026-10-08; the command is the claim:
+│                                   #   ci.yml (the PR gate; `critical` suite, ADR-0066) · deploy-aws.yml (AWS
+│                                   #   staging on push to `staging`; production when called) · deploy-production.yml
+│                                   #   (production on a non-docs merge to `main`, approval-gated) · full-suite.yml
+│                                   #   (nightly full Vitest; gates nothing) · env-audit.yml · staging-migrate.yml
+│                                   #   (the SUPABASE staging DB, not the RDS) · prod-title-once.yml (a one-off
+│                                   #   production title edit, run in-VPC)
 ├── src/
 │   ├── app/                        # Next.js App Router
 │   │   ├── (admin)/admin/          # login (separate from Better Auth) + markets, markets/new, markets/[marketId] (ENGINE.15 market-admin pages) + markets/media/sign route (MEDIA.1) + moderation/audit page
@@ -361,6 +367,11 @@ experiment/
 ├── docs/{adr,specs,logs,plans,…}
 ├── drizzle/migrations/             # generated + hand-written; append-only — DO NOT EDIT
 ├── scripts/                        # tsx operational scripts (seed, verify, migrate-staging, smoke)
+├── infra/                          # AWS CDK app (own package.json): Network · Database · Security · Compute ·
+│                                   #   Scheduler · Monitoring stacks per environment, plus the two GitHub
+│                                   #   deploy-role stacks — see infra/README.md
+├── Dockerfile, .dockerignore       # the AWS image: `runner` and `migrate` targets; next.config.ts emits
+│                                   #   `standalone` only under BUILD_TARGET=docker
 ├── supabase/                       # ⚠ NOT TRACKED — 0 files under version control
 │                                   #   (`git ls-files 'supabase/*'` → 0; control:
 │                                   #   `git ls-files 'scripts/*'` → 27 as at 2026-09-02 — RUN
@@ -409,9 +420,9 @@ session planning against that row would have looked for three directories that a
 > functions ran in `iad1` against a Mumbai database — ADR-0006 ratified `bom1` and it had
 > never been applied. Fixed 2026-08-10 (#307, #308): **361.6 → 5.34 ms per round trip,
 > Discovery 35.07 → 0.692 s p50**, staging-verified. There is no go-live blocker row left in
-> `docs/parked.md`. ⚠ **The fix is on `main` and on `staging`; it is NOT on what the
-> production alias serves** — `zugzwangworld.com` is pinned to a 2026-07-02 build and
-> reports `region: None`. That is a DP.2 promote, not a Discovery defect.
+> `docs/parked.md`. Production has since moved to AWS in `ap-south-1` (`infra/config/production.ts`)
+> and deploys from `main` on every non-docs merge (`.github/workflows/deploy-production.yml`), so
+> the old pinned-build caveat no longer applies.
 
 The former `src/server/identity/` entry was reconciled away at AUDIT-FIX-A22 (SPEC.2 §3.5/§3-SSOT/Appendix A now name the built `identity-pool/consume.ts` path; nothing implies a separate `identity/` dir anymore). (`src/server/{bets,cpmm,dharma,markets,positions}/` landed across ENGINE.2–12; `src/server/resolution/` — the W-3 trio + F-ADMIN-3 trigger — landed at ENGINE.9; `src/server/markets/{transaction,create,open,close}.ts` — W-4 + the lifecycle flows — and `src/server/admin/actor.ts` landed at ENGINE.14; `src/server/markets/get-by-slug.ts` — the public slug resolver — landed at SHELL/UI.0.)
 
@@ -502,7 +513,7 @@ const placeBetSchema = z.object({
 
 ### Events
 
-`events.event_type` is **`text`** (open-extensibility, SPEC.2 §7.1), **not** a `pgEnum`. The closed value set is the TS const `EVENT_TYPES` in `src/server/events/schemas.ts` (currently 24 values: 4 `image_upload.*`, 5 `user.*`, 2 `admin.*`, 7 `market.*`, 2 `bet.*`, 1 `comment.*`, 2 `dharma.*`, 1 `moderation.*` — `moderation.blocked`, AUDIT-FIX-B5), compile-guarded by `as const satisfies Record<EventType, …>`. When a new event type is added, extend `EVENT_TYPES` **and** its Zod payload schema in the **same commit** (enum-hygiene).
+`events.event_type` is **`text`** (open-extensibility, SPEC.2 §7.1), **not** a `pgEnum`. The closed value set is the TS const `EVENT_TYPES` in `src/server/events/schemas.ts` (currently 25 values: 4 `image_upload.*`, 5 `user.*`, 2 `admin.*`, 7 `market.*`, 1 `pool.*` — `pool.liquidity_added`, ADR-0047, 2 `bet.*`, 1 `comment.*`, 2 `dharma.*`, 1 `moderation.*` — `moderation.blocked`, AUDIT-FIX-B5), compile-guarded by `as const satisfies Record<EventType, …>`. When a new event type is added, extend `EVENT_TYPES` **and** its Zod payload schema in the **same commit** (enum-hygiene).
 
 ---
 
@@ -719,7 +730,7 @@ Biome + `tsc` run at Lefthook `pre-push` and in CI, which is real friction but n
 
 ⚠ **Lefthook skips EVERY `pre-push` job when the push changes no files** — the log reads `(skip) no matching push files`, and it applies to `typecheck` and `biome-check-all` as much as to the force-push guard. Measured at S-1 by pushing empty commits to a local bare repo: three jobs, three skips, exit 0, and a summary that looks identical to a clean run. A `files:` override does not rescue it; the push-file set is computed first and an empty one short-circuits the hook. **Consequence: a push that only reorders or removes commits — which is exactly what a force-push often is — runs no pre-push job at all.** The guard therefore covers the common case and not the empty-diff one, and saying so is the point: a guard whose coverage is unstated will be read as total. (The previously-documented `deploy-prod.yml`, `commitlint`, block-main / block-destructive hooks, Playwright, and `gitleaks`/CodeQL CI steps do **not** exist; CI is `ci.yml` = Biome → tsc → `drizzle-kit check` → migrate → `db:check-drift` → **`pnpm test:critical`** against a Postgres-17 service [the two migration checks added at D2; the critical-only test gate is ADR-0066 — invariants, auth, bets, resolution, Dharma, admin and six integration flows]. ⚠ **The whole suite is NOT a gate any more**: `full-suite.yml` runs `vitest run` through the same job (`suite: full`), manually and nightly, and nothing waits on it. **There is no `next build` in CI** — it needs a live database and the whole runtime environment, so the production build is gated by `deploy-aws.yml`'s *Build and push image* job instead. `env-audit.yml` (scheduled Doppler↔Vercel parity, D2) is **not** a merge gate.)
 
-- `staging-migrate.yml` — armed; fires on push to `staging`, applying pending migrations to the staging DB (`--config stg`). The full deploy/promote path (staging gate → scoped prod promote) lives in `docs/runbooks/deploy-pipeline.md` §3 — do not re-document it here.
+- `staging-migrate.yml` — armed; fires on push to `staging`, applying pending migrations to the **Supabase** staging DB (`--config stg`) — not the RDS behind the staging host, which `deploy-aws.yml`'s in-VPC migrate job migrates. The deploy path (a push to `staging` → AWS staging; a non-docs merge to `main` → production through `deploy-production.yml`, approval-gated) is in `CLAUDE.md` Gotchas; `docs/runbooks/deploy-pipeline.md` predates the AWS move.
 
 ---
 
