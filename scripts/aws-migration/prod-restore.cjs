@@ -31,9 +31,36 @@
 //      backup), the dump must be a `zugzwang-prod-*.dump`, and the hash is
 //      computed in Node — no PowerShell.
 //   6. `$AWS_CLI` / PATH for the AWS CLI and the Session Manager plugin.
+//   7. AFTER THE CONCLUSION FREEZE (system_state.frozen_at, 2026-11-05 23:59
+//      UTC) a restore is a BREAK_GLASS action: the TRUNCATE stands down
+//      system_state's one-shot guard like every other table's. Run it only under
+//      docs/runbooks/BREAK_GLASS.md (CLAUDE.md §3), never as routine recovery.
 // Pure helpers are exported and covered by tests/unit/scripts/prod-restore.test.ts.
+//
+// ── LAUNCH-DB-COPY-1: the ONE-TIME staging → production launch mode ──
+//
+//   ZZ_LAUNCH_COPY_ACK=replace-production-with-staging \
+//   node scripts/aws-migration/prod-restore.cjs <instance-id> <zugzwang-staging-<stamp>.dump> <sha256> \
+//        --account=<id> --source=staging --reload-nonempty [--execute]
+//
+// `--source=staging` accepts ONLY a `zugzwang-staging-<stamp>.dump` (made by
+// launch-dump.cjs), and only when the acknowledgement variable is set exactly
+// and the clock is before LAUNCH_COPY_EXPIRES_AT. It also requires the dump's
+// manifest beside it to say it came from the staging RDS. After the load, and
+// INSIDE the same transaction, it empties sessions, verifications and
+// admin_sessions: an admin cookie is a bare session id checked by a database
+// lookup, so a surviving staging admin_sessions row would be a valid
+// production admin login.
+//
+// The default `--source=prod` path is unchanged and never expires: it is the
+// rollback (load the production dump taken before the swap) and stays the
+// disaster-recovery path after the launch mode is retired.
 
 const REGION = "ap-south-1";
+const LAUNCH_COPY_EXPIRES_AT = "2026-10-25T23:59:59Z";
+const LAUNCH_COPY_ACK = "replace-production-with-staging";
+const STAGING_DUMP_RE =
+	/^zugzwang-staging-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z\.dump$/;
 const SECRET = "zugzwang/production";
 const DB_NAME = "zugzwang";
 const LOCAL_PORT = 15433;
@@ -52,17 +79,26 @@ function parseArgs(argv) {
 		(a) => !a.startsWith("--"),
 	);
 	const account = argv.find((a) => a.startsWith("--account="));
+	const source = argv.find((a) => a.startsWith("--source="));
 	return {
 		instanceId,
 		dumpFile,
 		sha256: sha256 ? sha256.toLowerCase() : sha256,
 		account: account ? account.slice("--account=".length) : undefined,
+		source: source ? source.slice("--source=".length) : "prod",
 		execute: flags.has("--execute"),
 		reloadNonEmpty: flags.has("--reload-nonempty"),
 	};
 }
 
-function assertArgs({ instanceId, dumpFile, sha256, account }) {
+/**
+ * `now` and `env` are injectable for the tests; `main()` passes neither, so the
+ * real clock and the real process environment decide.
+ */
+function assertArgs(
+	{ instanceId, dumpFile, sha256, account, source },
+	{ now = new Date(), env = process.env } = {},
+) {
 	if (!/^[0-9]{12}$/.test(String(account))) {
 		throw new Error(
 			"refusing: --account=<12-digit production AWS account id> is required",
@@ -71,14 +107,97 @@ function assertArgs({ instanceId, dumpFile, sha256, account }) {
 	if (!/^i-[0-9a-f]{8,}$/.test(String(instanceId))) {
 		throw new Error(`refusing: "${instanceId}" is not an EC2 instance id`);
 	}
-	const base = String(dumpFile).split(/[\\/]/).pop();
-	if (!/^zugzwang-prod-[0-9TZ-]+\.dump$/.test(base)) {
+	const mode = source ?? "prod";
+	if (mode !== "prod" && mode !== "staging") {
+		throw new Error(
+			`refusing: --source must be "prod" or "staging" (got ${JSON.stringify(source)})`,
+		);
+	}
+	// The SAME parse main() uses, so the name checked is the name that reaches
+	// the container shell (@security-auditor L-1).
+	const base = require("node:path").basename(
+		require("node:path").resolve(String(dumpFile)),
+	);
+	if (mode === "prod" && !/^zugzwang-prod-[0-9TZ-]+\.dump$/.test(base)) {
 		throw new Error(
 			`refusing: "${base}" is not a zugzwang-prod-<timestamp>.dump backup`,
 		);
 	}
+	if (mode === "staging" && !STAGING_DUMP_RE.test(base)) {
+		throw new Error(
+			`refusing: --source=staging takes only a zugzwang-staging-<stamp>.dump (got "${base}")`,
+		);
+	}
 	if (!/^[0-9a-f]{64}$/.test(String(sha256))) {
 		throw new Error("refusing: the expected SHA-256 must be 64 hex characters");
+	}
+	// The launch-mode guards sit AFTER the source branch, so the prod-dump
+	// rollback path never needs the acknowledgement and never expires.
+	if (mode === "staging") {
+		if (env.ZZ_LAUNCH_COPY_ACK !== LAUNCH_COPY_ACK) {
+			throw new Error(
+				`refusing: the launch copy replaces ALL production data — set ZZ_LAUNCH_COPY_ACK=${LAUNCH_COPY_ACK} to confirm`,
+			);
+		}
+		if (now.getTime() > Date.parse(LAUNCH_COPY_EXPIRES_AT)) {
+			throw new Error(
+				`refusing: the one-time launch copy mode expired at ${LAUNCH_COPY_EXPIRES_AT}`,
+			);
+		}
+	}
+}
+
+/** "1,3,5" (from string_agg over cron.job) → [1, 3, 5]; refuses anything else. */
+function parseJobIds(text) {
+	const t = String(text ?? "").trim();
+	if (t === "") return [];
+	return t.split(",").map((x) => {
+		if (!/^[0-9]+$/.test(x)) {
+			throw new Error(
+				`refusing: unexpected pg_cron job id ${JSON.stringify(x)}`,
+			);
+		}
+		return Number(x);
+	});
+}
+
+/** Re-activates exactly these jobs; "" when there are none. */
+function rearmSql(ids) {
+	if (!Array.isArray(ids) || ids.length === 0) return "";
+	for (const id of ids) {
+		if (!Number.isInteger(id) || id < 0) {
+			throw new Error(`refusing: bad pg_cron job id ${JSON.stringify(id)}`);
+		}
+	}
+	return `update cron.job set active = true where jobid in (${ids.join(",")})`;
+}
+
+/**
+ * Runs inside the load transaction, after the data: empties the three session
+ * tables (an admin cookie is a bare admin_sessions id, so a copied row is a
+ * live login) and nulls the OAuth tokens in `accounts` (nothing in src/ reads
+ * them; the provider link is what signs a user in, and staging-issued tokens
+ * must not sit in production's database — @security-auditor M-4).
+ */
+const CLEAR_SQL =
+	"DELETE FROM public.sessions; DELETE FROM public.verifications; DELETE FROM public.admin_sessions; UPDATE public.accounts SET access_token = NULL, refresh_token = NULL, id_token = NULL;";
+
+/**
+ * CLEAR UNLESS PROVEN (@security-auditor M-2): only a prod-path dump whose
+ * manifest proves it came from the production RDS, with this SHA-256, keeps
+ * its sessions. A needless clear costs a re-login; a wrong keep costs a
+ * production admin session.
+ */
+function postSql(source, provenProd = false) {
+	return source !== "staging" && provenProd === true ? "" : CLEAR_SQL;
+}
+
+/** JSON.parse for a secret; a SyntaxError would quote the secret (L-3). */
+function parseSecretText(text) {
+	try {
+		return JSON.parse(text);
+	} catch {
+		throw new Error("refusing: the secret value is not valid JSON");
 	}
 }
 
@@ -134,8 +253,15 @@ function loadCommand(dumpBase) {
 		"-c",
 		[
 			"set -eu",
+			// An UNSET variable (not just an empty one) would stop the shell under
+			// set -u before psql runs; this makes it empty instead (@code-reviewer H-1).
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: shell parameter expansion, deliberately not a JS template.
+			'ZZ_POST_SQL="${ZZ_POST_SQL-}"',
 			`pg_restore --data-only --exit-on-error --no-owner --no-acl --schema=public --schema=drizzle -f /tmp/data.sql /backup/${dumpBase}`,
-			'psql -X -v ON_ERROR_STOP=1 --single-transaction -c "$ZZ_PRE_SQL" -f /tmp/data.sql',
+			// The post-SQL is passed only when there is some, so the prod-dump mode
+			// runs exactly the psql command it ran before the launch mode existed.
+			'set --; if [ -n "$ZZ_POST_SQL" ]; then set -- -c "$ZZ_POST_SQL"; fi',
+			'psql -X -v ON_ERROR_STOP=1 --single-transaction -c "$ZZ_PRE_SQL" -f /tmp/data.sql "$@"',
 		].join("\n"),
 	];
 }
@@ -241,7 +367,7 @@ async function main() {
 	}
 
 	// 1. target: the production RDS, from the production secret
-	const sec = JSON.parse(
+	const sec = parseSecretText(
 		aws([
 			"secretsmanager",
 			"get-secret-value",
@@ -269,6 +395,57 @@ async function main() {
 		actual === args.sha256,
 		`${dumpBase} sha=${actual.slice(0, 16) || "(missing)"}…`,
 	);
+	// 2b. launch mode: the dump's own manifest must say it came from the STAGING
+	// RDS and carry the same SHA-256 (written by launch-dump.cjs at dump time).
+	// 2c. the prod-dump path: a staging archive renamed zugzwang-prod-*.dump
+	// would skip the session clear, so a manifest that says "staging" refuses.
+	let provenProd = false;
+	if (args.source !== "staging") {
+		let m = null;
+		try {
+			m = JSON.parse(fs.readFileSync(`${dumpFile}.manifest.json`, "utf8"));
+		} catch {}
+		if (m !== null && m.env === "staging") {
+			check(
+				"2c",
+				"a prod-path dump must not be a renamed staging dump",
+				false,
+				`manifest says env=staging host=${m.host}`,
+			);
+		}
+		provenProd =
+			m !== null &&
+			m.env === "prod" &&
+			/production/.test(String(m.host)) &&
+			!/staging/.test(String(m.host)) &&
+			m.sha256 === args.sha256;
+		results.push([
+			"2c",
+			"INFO",
+			"sessions and OAuth tokens after the load",
+			provenProd
+				? "kept: the manifest proves a production dump"
+				: "CLEARED: no manifest proves this is a production dump",
+		]);
+	}
+	if (args.source === "staging") {
+		let m = null;
+		try {
+			m = JSON.parse(fs.readFileSync(`${dumpFile}.manifest.json`, "utf8"));
+		} catch {}
+		const fromStaging =
+			m !== null &&
+			m.env === "staging" &&
+			/staging/.test(String(m.host)) &&
+			!/production/.test(String(m.host)) &&
+			m.sha256 === args.sha256;
+		check(
+			"2b",
+			"dump manifest says it was taken from the staging RDS, with this SHA-256",
+			fromStaging,
+			m ? `env=${m.env} host=${m.host}` : "manifest missing or unreadable",
+		);
+	}
 	if (!u) {
 		report(results, ok, args.execute);
 		process.exit(1);
@@ -449,7 +626,17 @@ async function main() {
 
 	// ── EXECUTE ──
 	const t0 = Date.now();
-	console.log("[1/5] pausing pg_cron jobs");
+	// Snapshot WHICH jobs are active before pausing, so the resume restores
+	// exactly that set — never "every job", which would also arm a job an
+	// operator had deliberately switched off (@code-reviewer C-2).
+	const activeJobs = parseJobIds(
+		q(
+			"select coalesce(string_agg(jobid::text, ',' order by jobid), '') from cron.job where active",
+		),
+	);
+	console.log(
+		`[1/5] pausing pg_cron jobs (active before: ${activeJobs.join(",") || "none"})`,
+	);
 	q("update cron.job set active = false");
 	let r;
 	try {
@@ -468,17 +655,59 @@ async function main() {
 			restoreEnv,
 			"-c session_replication_role=replica -c statement_timeout=600000",
 		);
-		r = docker(restoreEnv, loadCommand(dumpBase), { ZZ_PRE_SQL: pre });
+		// Empty for the prod-dump path; the session clear for the launch mode.
+		const post = postSql(args.source, provenProd);
+		r = docker(restoreEnv, loadCommand(dumpBase), {
+			ZZ_PRE_SQL: pre,
+			ZZ_POST_SQL: post,
+		});
 		const out = redact(`${r.stdout ?? ""}\n${r.stderr ?? ""}`);
 		fs.writeFileSync(`${dumpFile}.prod-restore.log`, out, { mode: 0o600 });
 		console.log(
 			`      load exit=${r.status} · ${((Date.now() - t0) / 1000).toFixed(1)}s · log: ${dumpBase}.prod-restore.log`,
 		);
 	} finally {
-		// Loaded, or rolled back to exactly the prior state — either way the jobs
-		// belong back on.
-		console.log("[4/5] resuming pg_cron jobs");
-		q("update cron.job set active = true");
+		// ⛔ After a SUCCESSFUL launch load the jobs stay PAUSED. The copied
+		// liquidity_policy is staging's, and its injector is enabled: re-armed
+		// now, it would rewrite production's pools within a minute — before the
+		// code promote and before verification (@code-reviewer C-2). The ids are
+		// saved beside the dump; launch-cron.cjs re-arms exactly those after
+		// writes are opened. In every other case (the prod-dump path, or a launch
+		// load that rolled back and left production as it was) the snapshot is
+		// restored now.
+		const keepPaused = args.source === "staging" && r?.status === 0;
+		if (keepPaused) {
+			// NEVER OVERWRITE THE RECORD (@security-auditor H-1). A re-run finds
+			// every job already paused, so its own snapshot is EMPTY; written over
+			// the first run's record it would make the resume re-arm nothing and
+			// report success. The first record is the truth, so it is kept.
+			const record = `${dumpFile}.cron-jobs.json`;
+			if (fs.existsSync(record)) {
+				console.log(
+					`[4/5] pg_cron jobs LEFT PAUSED (launch mode). Kept the existing ${path.basename(record)}: an earlier run recorded what to resume (this run found ${activeJobs.join(",") || "none"} active).`,
+				);
+			} else {
+				try {
+					fs.writeFileSync(
+						record,
+						`${JSON.stringify({ env: "prod", activeBefore: activeJobs }, null, 2)}
+`,
+						{ flag: "wx" },
+					);
+					console.log(
+						`[4/5] pg_cron jobs LEFT PAUSED (launch mode). Re-arm ${activeJobs.join(",") || "none"} with launch-cron.cjs after writes are open.`,
+					);
+				} catch (e) {
+					console.error(
+						`could not write ${record} (${e.message}). The pg_cron jobs are PAUSED; re-arm these ids by hand after writes open: ${activeJobs.join(",") || "none"}`,
+					);
+				}
+			}
+		} else {
+			console.log("[4/5] restoring the pg_cron jobs that were active");
+			const rearm = rearmSql(activeJobs);
+			if (rearm) q(rearm);
+		}
 	}
 	console.log("[5/5] post-load census");
 	for (const t of PARTICIPANT_TABLES)
@@ -508,6 +737,12 @@ function report(results, ok, execute) {
 
 module.exports = {
 	REGION,
+	LAUNCH_COPY_EXPIRES_AT,
+	LAUNCH_COPY_ACK,
+	postSql,
+	CLEAR_SQL,
+	parseJobIds,
+	rearmSql,
 	SECRET,
 	DB_NAME,
 	PARTICIPANT_TABLES,

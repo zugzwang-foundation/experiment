@@ -339,6 +339,10 @@ against this app. Its XSS/body rules can 403 a participant's argument — a sile
 enforces later without a code change); staging can attach the same rules with `ZZ_STAGING_WAF=count`,
 off by default so staging's template is unchanged.
 
+> ⚠ **Superseded 2026-10-06 (WAF-RATE-1, founder ruling):** staging now attaches the WAF **always**,
+> with the per-IP rate limits (`infra/lib/waf-rate-limits.ts`) blocking and the managed rules still in
+> count. `ZZ_STAGING_WAF` no longer exists. The rehearsal below is now run against permanently-on staging.
+
 **Rehearsal (staging deploy — approval):** deploy staging with `ZZ_STAGING_WAF=count`; exercise sign-in,
 OTP, onboarding, a bet with a long/markup-heavy argument, a reply, a sell, admin market create + media
 sign, the cron routes; then read `wafv2 get-sampled-requests` for any `COUNT` match on a legitimate

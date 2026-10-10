@@ -120,7 +120,7 @@ describe("security M1 — the migration container holds only its own secrets", (
 	});
 });
 
-describe("§I — the WAF starts in COUNT and staging is untouched by default", () => {
+describe("§I — the managed rules start in COUNT; staging carries the WAF", () => {
 	it("production counts unless ZZ_PROD_WAF_MODE is exactly 'block'", async () => {
 		vi.stubEnv("ZZ_PROD_WAF_MODE", "");
 		expect((await loadConfigs()).productionConfig.wafMode).toBe("count");
@@ -130,10 +130,10 @@ describe("§I — the WAF starts in COUNT and staging is untouched by default", 
 		expect((await loadConfigs()).productionConfig.wafMode).toBe("block");
 	});
 
-	it("staging attaches no WAF unless a rehearsal asks for it", async () => {
+	it("staging always attaches the WAF, managed rules in count (WAF-RATE-1)", async () => {
+		// Founder ruling 2026-10-06: staging carries the rate limits permanently
+		// so they are tested before production. No env var can switch it off.
 		vi.stubEnv("ZZ_STAGING_WAF", "");
-		expect((await loadConfigs()).stagingConfig.wafEnabled).toBe(false);
-		vi.stubEnv("ZZ_STAGING_WAF", "count");
 		const { stagingConfig } = await loadConfigs();
 		expect(stagingConfig.wafEnabled).toBe(true);
 		expect(stagingConfig.wafMode).toBe("count");

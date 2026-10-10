@@ -52,9 +52,14 @@
  * ⚠ RESOLVER is a DIFFERENT question — who or what publishes the thing —
  * and v1.1 does not touch it. It stays "who resolves", independent of
  * RESOLUTION's "what is read" — never a mirror of it.
- * RESOLUTION's `href` is `null` on all six today (U-3's eventual target —
+ * RESOLUTION's `href` is `null` on FIVE of the six (U-3's eventual target —
  * Zugzwang's own X post per market — doesn't exist yet); the seam for wiring
  * it later is one value per market, right here, with zero component changes.
+ * ⚠ THIS READ "`null` on all six today" UNTIL `claude-bundle-response` TOOK
+ * THE SEAM, and it is corrected here rather than left beside data that
+ * contradicts it (§8 O-5). That market's RESOLUTION now links the published
+ * Bundle proposal page — operator-supplied, and a page rather than the X post
+ * U-3 names. The other five are untouched and stay `null` for U-3's reason.
  *
  * ⛔⛔ BLOCK-4 — EVERY `line2` IN THIS MAP IS NOW `null`, ON EVERY MARKET AND
  * ALL FOUR BLOCKS. Founder-ruled: no block renders a second line. Four
@@ -320,7 +325,14 @@ export const RESOLUTION_BLOCKS: Record<KnownMarketSlug, ResolutionBlockSet> = {
 		resolution: {
 			line1: "Response on X",
 			line2: null,
-			href: null,
+			// ⚠⚠ THE ONLY RESOLUTION href IN THIS MAP, operator-supplied. It is
+			// the published Bundle proposal — the thing the response is TO, not
+			// the response — so text and href deliberately diverge here the way
+			// `github-zugzwang-repo-stars`'s RESOLVER does: "Response on X" names
+			// what is read to settle the market, the link shows what is being
+			// answered. `line1` and `fontSize` did not move, so no measured size
+			// in this map is disturbed.
+			href: "https://zugzwang-claude-bundle.in/",
 			fontSize: 13,
 		},
 		// ⛔⛔ D-50 REVERSES THE PREMISE OF BLOCK-2's RULING HERE, AND THE OLD

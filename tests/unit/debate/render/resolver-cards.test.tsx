@@ -476,6 +476,11 @@ describe("BLOCK-1 — G2, every value line is real content, never an empty bar",
  * account, or the institution's own site/data page) exists and is linkable
  * today, for all eight markets — unlike RESOLUTION, whose eventual target
  * (Zugzwang's own X post, U-3) does not exist yet.
+ * ⚠ "THE ONLY interactive block" HOLDS ON FIVE MARKETS OF SIX.
+ * `claude-bundle-response`'s RESOLUTION carries an href (the published Bundle
+ * proposal page), so that market has two anchors — pinned by the CLA-01 test
+ * at the end of this block. Every G7/G8 row below runs on PRIMARY_MARKET
+ * (bitcoin), where the original split is untouched.
  */
 describe("BLOCK-1 — R-12 reversed for RESOLVER only; G7/G8 on the split", () => {
 	it("resolver-cards::G8-RESOLUTION-CLOSES-FLAVOUR-remain-non-navigable-and-non-focusable", () => {
@@ -617,6 +622,39 @@ describe("BLOCK-1 — R-12 reversed for RESOLVER only; G7/G8 on the split", () =
 		expect(row?.children.length).toBe(4);
 		expect((row?.textContent ?? "").trim()).toContain("Resolution");
 		expect((row?.textContent ?? "").trim().length).toBeGreaterThan(20);
+	});
+
+	it("resolver-cards::CLA-01-RESOLUTION-is-an-anchor-to-the-Bundle-proposal", () => {
+		// ⚠ The RESOLUTION-href seam's first consumer. G4 already proves the
+		// anchor exists and carries the map's href on every market; what it does
+		// NOT read is `target` / `rel`, which G7 pins for RESOLVER on bitcoin
+		// only. Same recipe, second block, asserted where it now applies.
+		const { container } = render(
+			<ResolverCards market={marketFixture("claude-bundle-response")} />,
+		);
+		const resolution = container.querySelector(
+			'[data-testid="resolution-block-resolution"]',
+		);
+		expect(resolution?.tagName).toBe("A");
+		expect(resolution?.getAttribute("href")).toBe(
+			"https://zugzwang-claude-bundle.in/",
+		);
+		expect(resolution?.getAttribute("target")).toBe("_blank");
+		expect(resolution?.getAttribute("rel")).toBe("noopener noreferrer");
+		// ⛔ The link wraps the block and the value text is unchanged by it.
+		expect(
+			resolution?.querySelector(
+				'[data-testid="resolution-block-value-resolution"]',
+			)?.textContent,
+		).toBe("Response on X");
+		// CLOSES and FLAVOUR are facts, not references, on this market too.
+		for (const k of ["closes", "flavour"] as const) {
+			expect(
+				container.querySelector(`[data-testid="resolution-block-${k}"]`)
+					?.tagName,
+			).toBe("DIV");
+		}
+		expect(container.querySelectorAll("a").length).toBe(2);
 	});
 });
 
