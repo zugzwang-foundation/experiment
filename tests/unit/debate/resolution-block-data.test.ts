@@ -168,12 +168,37 @@ describe("resolution-block-data — content matches the ratified register", () =
 			"claude-bundle-response",
 		] as const) {
 			expect(RESOLUTION_BLOCKS[slug].resolution.line1).toBe("Response on X");
-			expect(RESOLUTION_BLOCKS[slug].resolution.href).toBeNull();
 			checked += 1;
 		}
 		// ⛔ NON-VACUITY — three is now the whole set, so an empty array would
 		// satisfy every assertion above while proving nothing.
 		expect(checked).toBe(3);
+	});
+
+	it("resolution-block-data::CLA-01-is-the-only-RESOLUTION-that-links", () => {
+		// ⚠⚠ THIS USED TO BE ONE LINE IN THE TEST ABOVE — `href` null on all
+		// three account-watching markets. `claude-bundle-response` took the
+		// RESOLUTION-href seam (the published Bundle proposal page,
+		// operator-supplied), so the null half is pinned PER SLUG here instead
+		// of dropped: a loop that stopped asserting null would let a second
+		// href arrive on any market unannounced.
+		expect(RESOLUTION_BLOCKS["claude-bundle-response"].resolution.href).toBe(
+			"https://zugzwang-claude-bundle.in/",
+		);
+		// ⛔ The text did not follow the link — the value still names what is
+		// read to settle the market, not where the proposal lives.
+		expect(RESOLUTION_BLOCKS["claude-bundle-response"].resolution.line1).toBe(
+			"Response on X",
+		);
+		let nulls = 0;
+		for (const slug of Object.keys(RESOLUTION_BLOCKS) as Array<
+			keyof typeof RESOLUTION_BLOCKS
+		>) {
+			if (slug === "claude-bundle-response") continue;
+			expect(RESOLUTION_BLOCKS[slug].resolution.href).toBeNull();
+			nulls += 1;
+		}
+		expect(nulls).toBe(5);
 	});
 
 	it("resolution-block-data::YCP-01-is-the-only-market-NOT-settled-on-X", () => {
