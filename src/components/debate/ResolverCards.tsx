@@ -296,6 +296,12 @@ const LINK_AFFORDANCE =
  * exactly as before: a plain, non-focusable `<div>`, no `cursor-pointer`, no
  * hover affordance — looking clickable would promise a destination that
  * isn't there (G8).
+ * ⚠⚠ "THREE OF FOUR" IS NOW TRUE OF FIVE MARKETS, NOT SIX, and the sentence
+ * above is amended here rather than left standing (§8 O-5).
+ * `claude-bundle-response`'s RESOLUTION carries an href — the published
+ * Bundle proposal page — so on that one market RESOLUTION renders as the
+ * anchor too and two blocks are interactive. Nothing in this file changed to
+ * make that so: it is the seam described below, used for the first time.
  * ⇒ THE RESOLVER LINK IS THE WHOLE BLOCK, NOT THE VALUE TEXT ALONE (RF-3a):
  * one `<a>` wraps the glyph and the full text stack, `target="_blank"
  * rel="noopener noreferrer"`, so the accessible name reads as the label plus
