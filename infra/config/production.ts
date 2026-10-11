@@ -1,3 +1,4 @@
+import { DEFAULT_WAF_RATE_LIMITS } from "../lib/waf-rate-limits";
 import { type EnvironmentConfig, RUNTIME_SECRET_KEYS } from "./types";
 
 /**
@@ -109,6 +110,10 @@ export const productionConfig: EnvironmentConfig = {
 	// (docs/aws-migration/09-PRODUCTION-READINESS.md §I). `ZZ_PROD_WAF_MODE=block`
 	// enforces without a code change once that ruling is made.
 	wafMode: process.env.ZZ_PROD_WAF_MODE === "block" ? "block" : "count",
+	// WAF-RATE-1 — per-IP abuse limits (block, 429). Measured against real
+	// traffic and page shape in infra/lib/waf-rate-limits.ts.
+	wafRateLimits: DEFAULT_WAF_RATE_LIMITS,
+	wafLogging: true,
 
 	secretName: "zugzwang/production",
 	secretKeys: RUNTIME_SECRET_KEYS,
