@@ -111,7 +111,7 @@ export const CHART_Y_GUTTER = 18 + MARK_PAD;
  * multiplied into device pixels on the way in and the viewBox IS the box.
  * ⚠ `sx` DIVIDES BY `SVG_W`, NOT `VIEWBOX_W`: the nine units of terminal-dot
  * allowance are part of the page's horizontal domain, and dropping them would
- * shift every x by 1.4% — a whole day, on a fifty-two-day window.
+ * shift every x by 1.4% — more than a whole day, on an eighty-eight-day window.
  *
  * ⚠ STROKE WIDTHS ARE IN BASE UNITS, NOT USER UNITS. The page gets 1 CSS px
  * hairlines from `vector-effect="non-scaling-stroke"`, which Satori does not

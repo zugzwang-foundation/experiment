@@ -157,7 +157,7 @@ export function MarketPriceChart({
 	// ⚠ The SERIES is untouched by this. It still ends where the data ends —
 	// at `now` on an `Open` market (`withLiveTail`) and at the last event
 	// otherwise (**INV-4**) — so a market that has traded for one week of a
-	// seven-week window draws a line across the left portion of a wide chart.
+	// twelve-week window draws a line across the left portion of a wide chart.
 	// That is the true picture of a young market. Extending it to the axis end
 	// would assert a price at an instant that has not happened.
 	//
@@ -195,7 +195,7 @@ export function MarketPriceChart({
 	// the same number and the dot could not be wrong.
 	//
 	// The fixed axis separates them. A market that has traded for one week of a
-	// seven-week window ends its line a seventh of the way across, and a dot left
+	// twelve-week window ends its line a twelfth of the way across, and a dot left
 	// at `VIEWBOX_W` would hang in empty space at the far right, attached to
 	// nothing — on every market, for most of the experiment, with the pulse
 	// advertising a live price at a coordinate carrying no line. The dots mark
@@ -1408,7 +1408,7 @@ function lowerTop(pct: number, half: number): string {
  * does not contain". That was right while the domain was the market's own
  * lifetime, and wrong against a fixed window for two reasons that compound: two
  * markets on one window would carry DIFFERENT tick dates, defeating the ruling
- * canon `C-CHART-1` clause 1 states; and a market three days into a seven-week
+ * canon `C-CHART-1` clause 1 states; and a market three days into a twelve-week
  * window has `nearestPoint` return the SAME final point for both thirds, stacking
  * two ticks at one x.
  *
@@ -1455,7 +1455,7 @@ function CollapsedTicks({
 	// ⛔ THE FLOORING WENT WITH THE THIRDS AND IS NOT MISSED. It existed because a
 	// raw third of the production window is `2026-10-02T07:55Z` — eight hours right
 	// of the midnight its label named, so tick and label disagreed by 4.09 user
-	// units. The anchors are already midnight-aligned instants (and `Nov 5` is the
+	// units. The anchors are already midnight-aligned instants (and `Dec 31` is the
 	// ratified 23:45 deadline, which is the instant it names), so tick and label
 	// read the SAME value and cannot diverge. Raised by `@security-auditor` at the
 	// CHART-3 cascade; discharged by construction here.

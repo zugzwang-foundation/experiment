@@ -94,7 +94,7 @@ const FIGURES = {
 				fontWeight="800"
 				fill="var(--color-n6)"
 			>
-				15 SEP
+				5 OCT
 			</text>
 			<line
 				x1="80"
@@ -137,7 +137,7 @@ const FIGURES = {
 				fontWeight="800"
 				fill="var(--color-n6)"
 			>
-				5 NOV
+				31 DEC
 			</text>
 		</>
 	),

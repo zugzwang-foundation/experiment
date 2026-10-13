@@ -4,7 +4,9 @@ import { formatCountdown } from "@/components/shell/countdown-format";
 import { FREEZE_INSTANT_UTC } from "@/server/markets/create";
 
 // The countdown consumes the BUILT freeze pin (F2) — no duplicate constant.
-// SPEC.1 §6/§12/§15 pin the instant with timezone: 2026-11-05 23:59 UTC.
+// The constant keeps its name; since EXT-1 (ruling D-55) the instant it holds is
+// the END OF THE EXPERIMENT, when its markets close: 2026-12-31 23:45 UTC. It
+// was 2026-11-05 23:59 UTC.
 const TARGET = FREEZE_INSTANT_UTC.getTime();
 
 const MINUTE = 60_000;
@@ -13,7 +15,9 @@ const DAY = 24 * HOUR;
 
 describe("formatCountdown — the header freeze countdown (values-log R-2, OQ-8)", () => {
 	it("pins the imported freeze instant (F2 — the single source, no duplicate)", () => {
-		expect(TARGET).toBe(Date.UTC(2026, 10, 5, 23, 59, 0, 0));
+		// 31 December 2026, 23:45 UTC = 1 798 760 700 000 ms (month is 0-indexed).
+		expect(TARGET).toBe(Date.UTC(2026, 11, 31, 23, 45, 0, 0));
+		expect(TARGET).toBe(1_798_760_700_000);
 	});
 
 	it("renders the in-window 8-char shape (days < 100 → 8 cells)", () => {
@@ -29,15 +33,18 @@ describe("formatCountdown — the header freeze countdown (values-log R-2, OQ-8)
 		expect(formatCountdown(now, TARGET)).toHaveLength(9);
 	});
 
-	it("flips 9 → 8 cells exactly at the 100-day boundary (~Jul 29)", () => {
+	it("flips 9 → 8 cells exactly at the 100-day boundary (~Sep 23)", () => {
 		// At exactly 100d remaining the string is still 9 chars…
 		expect(formatCountdown(TARGET - 100 * DAY, TARGET)).toBe("100:00:00");
 		// …one minute later (99d 23h 59m) it is the 8-char shape. The boundary
-		// instant is 2026-07-28T23:59Z — the plan's "~Jul 29".
+		// instant is 2026-09-22T23:45Z: 100 days back from 31 Dec 23:45 is
+		// 31 (Dec) + 30 (Nov) + 31 (Oct) = 92 days to 30 Sep, then 8 more to
+		// 22 Sep. It was 2026-07-28T23:59Z, the "~Jul 29" of the OQ-8 plan,
+		// while the target was 5 November.
 		expect(formatCountdown(TARGET - (100 * DAY - MINUTE), TARGET)).toBe(
 			"99:23:59",
 		);
-		expect(TARGET - 100 * DAY).toBe(Date.UTC(2026, 6, 28, 23, 59, 0, 0));
+		expect(TARGET - 100 * DAY).toBe(Date.UTC(2026, 8, 22, 23, 45, 0, 0));
 	});
 
 	it("clamps to 00:00:00 at the freeze instant", () => {

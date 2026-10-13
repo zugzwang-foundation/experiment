@@ -8,7 +8,7 @@
 
 ## 1 · The question
 
-Will the Zugzwang repository reach 50,000 GitHub stars by 5 November 2026?
+Will the Zugzwang repository reach 50,000 GitHub stars by 31 December 2026?
 
 Declared: the Zugzwang Foundation owns this repository, is publicly campaigning for the YES outcome, and is also the sole resolver.
 
@@ -20,20 +20,20 @@ Resolves NO in every other case — no qualifying observation, stars on a fork o
 
 ## 3 · The rules
 
-Deadline 5 November 2026, 23:45 UTC.
+Deadline 31 December 2026, 23:45 UTC, moved from 5 November 2026 by ruling D-55 (11 October 2026).
 
 ## 4 · The facts
 
 | | |
 |---|---|
 | Opens | 15 September 2026 |
-| Trading closes | `2026-11-05T23:45:00Z` |
-| Settles | `2026-11-05T23:45:00Z` — with all other markets |
+| Trading closes | `2026-12-31T23:45:00Z` |
+| Settles | `2026-12-31T23:45:00Z` — with all other markets |
 | Resolver | GitHub, Inc. — the publisher of the number, not a decision-maker |
 | Resolution | GitHub |
 | Flavour | Callout |
 
-Display block: **RESOLUTION** GitHub · **RESOLVER** Zugzwang / repo → `https://github.com/zugzwang-foundation/experiment` · **CLOSES ON** 5 Nov 2026 / 23:45Z · **FLAVOUR** Callout
+Display block: **RESOLUTION** GitHub · **RESOLVER** Zugzwang / repo → `https://github.com/zugzwang-foundation/experiment` · **CLOSES ON** 31 Dec 2026 / 23:45Z · **FLAVOUR** Callout
 
 ## 5 · Operator entry
 
@@ -52,5 +52,5 @@ GitHub · Will the Zugzwang repo reach 50,000 stars?
 **Deadline** — typed digits are read as UTC verbatim. No trailing `Z`.
 
 ```
-2026-11-05T23:45
+2026-12-31T23:45
 ```

@@ -510,6 +510,8 @@ describe("UI-6 S3 moderateComment — reactive Remove/Ban (ADR-0020/0021)", () =
 			await testDb.select({ id: events.eventId }).from(events)
 		).length;
 		expect(eventsAfter).toBe(eventsBefore);
-		expect(EVENT_TYPES.length).toBe(25);
+		// 26 since EXT-1 added `market.deadline_moved` (migration 0032). Remove
+		// and Ban still mint no event type of their own.
+		expect(EVENT_TYPES.length).toBe(26);
 	});
 });

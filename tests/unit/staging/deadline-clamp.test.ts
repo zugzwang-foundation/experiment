@@ -45,7 +45,10 @@ describe("resolutionDeadlineFor — the freeze ceiling clamp", () => {
 		);
 
 		expect(deadline.toISOString()).toBe(new Date(CEILING_MS).toISOString());
-		expect(deadline.toISOString()).toBe("2026-11-05T22:59:00.000Z");
+		// EXT-1: the ceiling is the end of the experiment, 2026-12-31T23:45Z, so
+		// the clamp lands one DEADLINE_CEILING_MARGIN_MS (1 h) short of that. It
+		// read 2026-11-05T22:59Z while the ceiling was 2026-11-05T23:59Z.
+		expect(deadline.toISOString()).toBe("2026-12-31T22:45:00.000Z");
 	});
 
 	it("leaves the raw offset alone when it clears the freeze", () => {

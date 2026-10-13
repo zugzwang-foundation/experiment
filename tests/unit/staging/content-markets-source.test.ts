@@ -81,7 +81,11 @@ describe("deadlines", () => {
 		// MarketDeadlineCeilingError on `deadline > FREEZE_INSTANT_UTC`, and if
 		// that instant ever moves this assertion must move with it rather than
 		// keep asserting a literal that used to be true.
-		expect(FREEZE_INSTANT_UTC.toISOString()).toBe("2026-11-05T23:59:00.000Z");
+		// ⚠ IT MOVED, AND THIS LINE MOVED WITH IT (EXT-1, ruling D-55): the end of
+		// the experiment is 2026-12-31T23:45Z, and every content market's own
+		// deadline now sits exactly ON it — so the `<=` below is an equality on
+		// all six, with no slack either side.
+		expect(FREEZE_INSTANT_UTC.toISOString()).toBe("2026-12-31T23:45:00.000Z");
 		for (const s of SPECS) {
 			expect({
 				slug: s.slug,
@@ -239,15 +243,36 @@ describe("description lengths", () => {
 		// A pin, not a bound. If somebody edits the copy this goes red and the
 		// diff says by how much — which is the point: market copy changing
 		// without a ruling is the thing to notice.
+		//
+		// ⚠ MOVED BY EXT-1 (ruling D-55), AND EVERY FIGURE WENT UP BY A KNOWN
+		// AMOUNT. The plan's §4 date pairs are applied to this snapshot as they
+		// are to the live rows, and each changes a description's length by:
+		//
+		//   slug                              before   pairs, in §4 order       after
+		//   chess-fide-tiebreak-response       1903   +1 +62 +8          = +71   1974
+		//   bitcoin-price-50k                  3795   +1 +1 +2 +61 +1 +1 = +67   3862
+		//   math-erdos-solved-on-zugzwang      2290   +1 +62 +8          = +71   2361
+		//   claude-bundle-response             2169   +1 +62 +8          = +71   2240
+		//   yc-w27-acceptance                  1658   +1 +62 +8          = +71   1729
+		//   github-zugzwang-repo-stars          792   +1 +62             = +63    855
+		//
+		// +1 is a date ("5 November" → "31 December", "5th" → "31st") or a count
+		// ("52" → "108"), and +2 is BTC's D3, which carries one of each. +61 is
+		// the moved-from clause alone — `, moved from 5 November 2026 by ruling
+		// D-55 (11 October 2026)` — on BTC's ISO deadline line, where the date is
+		// the same length before and after; +62 is that clause plus a +1 date.
+		// +8 is "No extensions." → "No further extensions.". Measured by applying
+		// the pairs to the committed snapshot (each `before` occurs exactly once
+		// there), not summed by hand.
 		expect(
 			Object.fromEntries(SPECS.map((s) => [s.slug, s.description.length])),
 		).toEqual({
-			"chess-fide-tiebreak-response": 1903,
-			"bitcoin-price-50k": 3795,
-			"math-erdos-solved-on-zugzwang": 2290,
-			"claude-bundle-response": 2169,
-			"yc-w27-acceptance": 1658,
-			"github-zugzwang-repo-stars": 792,
+			"chess-fide-tiebreak-response": 1974,
+			"bitcoin-price-50k": 3862,
+			"math-erdos-solved-on-zugzwang": 2361,
+			"claude-bundle-response": 2240,
+			"yc-w27-acceptance": 1729,
+			"github-zugzwang-repo-stars": 855,
 		});
 	});
 });

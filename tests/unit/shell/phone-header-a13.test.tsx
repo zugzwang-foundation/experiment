@@ -307,8 +307,10 @@ describe("A13 D-2 — the brand block is mounted below 640", () => {
 		const brandLink = root
 			.querySelector('[data-testid="brand-cluster-text"]')
 			?.closest("a");
+		// EXT-1 (ruling D-55): nothing freezes any more — the experiment ends
+		// when its markets close, and the label says so.
 		expect(brandLink?.getAttribute("aria-label")).toMatch(
-			/until market freeze\.$/,
+			/until the markets close\.$/,
 		);
 	});
 });

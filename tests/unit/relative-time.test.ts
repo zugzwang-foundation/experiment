@@ -61,9 +61,10 @@ describe("relative-time :: G1 — bucket boundaries, asserted at the edges", () 
 
 	it("relative-time::G1-the-day-bucket-is-unbounded", () => {
 		expect(at(2 * DAY)).toBe("2d ago");
-		// The experiment's live window is ~51 days; this is the practical
-		// ceiling and it must NOT roll into a weeks or months bucket.
-		expect(at(51 * DAY)).toBe("51d ago");
+		// The experiment's live window is ~87 days (5 Oct – 31 Dec 2026, by
+		// difference); this is the practical ceiling and it must NOT roll into
+		// a weeks or months bucket.
+		expect(at(87 * DAY)).toBe("87d ago");
 		// …and well past it, because "unbounded" is the ruling.
 		expect(at(365 * DAY)).toBe("365d ago");
 		expect(at(4000 * DAY)).toBe("4000d ago");

@@ -5,8 +5,20 @@
 // WHAT THEY ARE: SPEC.1 §13 F-AUTH-4 defines each as the "content hash of the
 // document the user was shown". So each is the lowercase hex SHA-256 of the
 // exact committed bytes of `public/legal/tos.txt` / `public/legal/privacy.txt`
-// (Version 1.0, installed byte for byte at LEGAL.1, #413) — the files `/legal`
-// reads and renders. They are derived from the documents, not chosen.
+// (Version 1.1 since EXT-1 / D-55, which moved the experiment's end; Version
+// 1.0 was installed byte for byte at LEGAL.1, #413) — the files `/legal` reads
+// and renders. They are derived from the documents, not chosen. Nobody is
+// re-prompted by a new version: the sign-in gate checks only that an
+// acceptance exists (`session-gate.ts`), so a 1.0 accepter keeps the 1.0
+// hashes as their record.
+//
+// ⚠ THE RETIRED 1.0 IDENTIFIERS, kept here because this file was the only
+// place in the tree that named them and every pre-EXT-1 `users` row and
+// `user.tos_accepted` event still carries them:
+//   ToS     1.0  68486dee59cc57301a79dd37bef4593fd0a9d647be24158d350d262da9025a27
+//   Privacy 1.0  da55d1a88f1b488c0c59bd3d814c3a86f4950aefeec3ff7fb13618b963c9d691
+// The bytes they hash are in git, not on disk: `git show
+// 8011d379:public/legal/tos.txt` (and `privacy.txt`) reproduces both.
 //
 // ⛔ FROZEN AS LITERALS, AND GUARDED. The spec asks for hashes frozen at
 // deployment; a literal is frozen by construction, and
@@ -16,9 +28,9 @@
 // participant never saw — the one failure acceptance evidence must not have.
 
 export const TOS_VERSION_HASH =
-	"68486dee59cc57301a79dd37bef4593fd0a9d647be24158d350d262da9025a27";
+	"997234f7424091f5bb1a39233a4bdd7643e037628376977c064df7cad97a2e54";
 export const PRIVACY_VERSION_HASH =
-	"da55d1a88f1b488c0c59bd3d814c3a86f4950aefeec3ff7fb13618b963c9d691";
+	"b3bc2f9e3436966238ed618a33a0aadbed0d7023639babd90e29653c228794cf";
 
 // SPEC.1 §13 F-AUTH-4 line 684 verbatim. Load-bearing for the
 // `tos::warning-text-matches-spec-1-line-684-verbatim` test — any drift
