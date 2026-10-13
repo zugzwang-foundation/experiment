@@ -15,7 +15,8 @@ import { Wordmark } from "./Wordmark";
  * onboarding deck's first card cannot drift from it (O1-DECK-R2 §4; the
  * `header` scale is those same values, unchanged), row 2 the digits-only
  * countdown (row cell count per the
- * ratified OQ-8 rule — 9 cells until days < 100, ~Jul 29; centre-aligned
+ * ratified OQ-8 rule — 9 cells until days < 100 — which under the EXT-1 end fell on 2026-09-22, so 8
+ * cells for the rest of the experiment; centre-aligned
  * lockup, transient width mismatch accepted and screenshotted for review).
  * Fills alternate n0/ink in chessboard parity, top-left dark, text inverts
  * per cell; outer hairline, no internal borders. The whole cluster is ONE
@@ -24,7 +25,7 @@ import { Wordmark } from "./Wordmark";
  *
  * Client boundary (leg-2 a11y ruling): the link carries the RULED
  * remaining-time label — `Zugzwang — home. ${D} days ${H} hours ${M}
- * minutes until market freeze.` — with values from the SAME formatter as
+ * minutes until the markets close.` — with values from the SAME formatter as
  * the visible digits, updating silently with the minute tick (a ticking
  * attribute cannot live on server markup, so this component owns the one
  * timer and hands the display string to the presentational cell row). The
@@ -83,7 +84,7 @@ import { Wordmark } from "./Wordmark";
  */
 function freezeLabel(display: string): string {
 	const [days, hours, minutes] = display.split(":");
-	return `Zugzwang — home. ${days} days ${hours} hours ${minutes} minutes until market freeze.`;
+	return `Zugzwang — home. ${days} days ${hours} hours ${minutes} minutes until the markets close.`;
 }
 
 export function BrandCluster({

@@ -34,16 +34,22 @@ describe("ToS / Privacy version identifiers (LEGAL.1)", () => {
 		expect(PRIVACY_VERSION_HASH).toBe(sha256OfLegalFile("privacy"));
 	});
 
-	it("tos-version::names-the-documents-that-declare-version-1-0", () => {
+	it("tos-version::names-the-documents-that-declare-version-1-1", () => {
 		// The label a reader sees on the document and the hash the database
 		// records must describe the same text; both files open on their version.
+		// ⚠ MOVED BY EXT-1 (plan §3.5): both documents go to 1.1 because the end
+		// of the experiment they state moves to 31 December 2026. It read
+		// "Version 1.0 · Effective 15 September 2026".
+		// ⚠ THE DATE FOLLOWS THE ACTUAL PRODUCTION DAY. 20 October is the plan's
+		// figure; if the release lands on another day, the two files, the two
+		// hashes and this line all move together.
 		for (const name of ["tos", "privacy"] as const) {
 			const text = readFileSync(
 				join(process.cwd(), "public", "legal", `${name}.txt`),
 				"utf-8",
 			);
 			expect(text.split("\n")[2]).toBe(
-				"Version 1.0 · Effective 15 September 2026",
+				"Version 1.1 · Effective 20 October 2026",
 			);
 		}
 	});

@@ -8,7 +8,7 @@
 
 ## 1 · The question
 
-Will Viswanathan Anand respond publicly on X by 5 November 2026 to Zugzwang's published proposal to abolish rapid and blitz tiebreaks from the World Chess Championship match?
+Will Viswanathan Anand respond publicly on X by 31 December 2026 to Zugzwang's published proposal to abolish rapid and blitz tiebreaks from the World Chess Championship match?
 
 ## 2 · How it resolves
 
@@ -22,7 +22,7 @@ Resolver. Viswanathan Anand in person, whatever office he holds or ceases to hol
 
 Source. Only posts from @vishy64theking on X can resolve this market.
 
-Window. Opens at the root post's timestamp, ends 5 November 2026 at 23:45 UTC. UTC is the binding clock. Only posts timestamped at or before that instant count, whenever the operator resolves. No extensions.
+Window. Opens at the root post's timestamp, ends 31 December 2026 at 23:45 UTC, moved from 5 November 2026 by ruling D-55 (11 October 2026). UTC is the binding clock. Only posts timestamped at or before that instant count, whenever the operator resolves. No further extensions.
 
 Trigger. Latching. The first qualifying post resolves YES irreversibly. If Anand later deletes it, this market stays YES.
 
@@ -37,13 +37,13 @@ Evidence. The operator publishes the source URL, the post timestamp, the text ve
 | | |
 |---|---|
 | Opens | 15 September 2026 |
-| Trading closes | `2026-11-05T23:45:00Z` |
-| Settles | `2026-11-05T23:45:00Z` — with all other markets |
+| Trading closes | `2026-12-31T23:45:00Z` |
+| Settles | `2026-12-31T23:45:00Z` — with all other markets |
 | Resolver | Viswanathan Anand, in person |
 | Resolution | Response on X |
 | Flavour | Petition |
 
-Display block: **RESOLUTION** Response on X · **RESOLVER** @vishy64theking → `https://x.com/vishy64theking` · **CLOSES ON** 5 Nov 2026 / 23:45Z · **FLAVOUR** Petition
+Display block: **RESOLUTION** Response on X · **RESOLVER** @vishy64theking → `https://x.com/vishy64theking` · **CLOSES ON** 31 Dec 2026 / 23:45Z · **FLAVOUR** Petition
 
 ## 5 · Operator entry
 
@@ -62,5 +62,5 @@ Chess · Will Vishy Anand answer Zugzwang's tiebreak proposal?
 **Deadline** — typed digits are read as UTC verbatim. No trailing `Z`.
 
 ```
-2026-11-05T23:45
+2026-12-31T23:45
 ```

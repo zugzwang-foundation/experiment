@@ -253,6 +253,11 @@ export interface MarketFixture {
  * because "far enough out that an Open market never reads as expired" is the
  * property the fixture set needs and a shorter offset would break it sooner in
  * a quieter way. The ceiling is enforced by `resolutionDeadlineFor` instead.
+ *
+ * ⚠ EXT-1 (ruling D-55) moved the ceiling to 2026-12-31T23:45Z, so the raw
+ * offset is LEGAL again until 2026-11-01T23:45Z — 60 days short of it — and
+ * illegal from then on. Nothing here changes: the clamp was written for the
+ * crossing, and the crossing has only moved.
  */
 export const LONG_DEADLINE_MS = 60 * 24 * 60 * 60 * 1000; // 60 days
 /** Just past `now`, so the close call in the same run is legal. */
@@ -265,8 +270,8 @@ export const SHORT_DEADLINE_MS = 60 * 1000; // 1 minute
  * "≤"), so zero margin would be legal. An hour is taken anyway: a deadline
  * sitting exactly on the freeze instant is indistinguishable from a fixture
  * that MEANT to sit there, and the one hour makes the clamp legible in the
- * data — a staging market whose deadline is 22:59 on 5 November is one this
- * function moved.
+ * data — a staging market whose deadline is 22:45 on 31 December is one this
+ * function moved (22:59 on 5 November before EXT-1 moved the ceiling).
  */
 export const DEADLINE_CEILING_MARGIN_MS = 60 * 60 * 1000; // 1 hour
 

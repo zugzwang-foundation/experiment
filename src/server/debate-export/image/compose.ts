@@ -176,7 +176,7 @@ export type PostExportProps = {
 	/** When this JPEG was generated — `3 Sep 2026 · 01:14 UTC`. */
 	generatedAt: string;
 	/**
-	 * `DD:HH:MM` to the conclusion freeze, from the SAME `formatCountdown` the
+	 * `DD:HH:MM` to the end of the experiment, from the SAME `formatCountdown` the
 	 * global header ticks with and the SAME built `FREEZE_INSTANT_UTC` pin — so
 	 * the number on a shared image and the number in the header cannot disagree
 	 * about how much of the experiment is left.

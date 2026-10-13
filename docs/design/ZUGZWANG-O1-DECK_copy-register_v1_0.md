@@ -178,11 +178,11 @@ You’re {pseudonym}
 
 **Subtext:**
 ```
-This pseudonym is your identity for the length of the experiment. The experiment has 6 markets with unique flavours and defined resolutions. The experiment runs from 15th September 2026 to 5th November 2026. Dharma is your betting instrument for raising arguments in any of the 6 markets.
+This pseudonym is your identity for the length of the experiment. The experiment has 6 markets with unique flavours and defined resolutions. The experiment runs from 5th October 2026 to 31st December 2026. Dharma is your betting instrument for raising arguments in any of the 6 markets.
 ```
 
-> ⚠ **This card carries two hard dates and a market count.** `15th September 2026`,
-> `5th November 2026`, and `8` appear twice. If the slate or the window ever
+> ⚠ **This card carries two hard dates and a market count.** `5th October 2026`,
+> `31st December 2026`, and `8` appear twice. If the slate or the window ever
 > changes, this card is a place the product starts lying. Prefer binding the
 > count and the dates to the same constants the countdown and the market
 > loader already use.

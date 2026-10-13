@@ -70,9 +70,12 @@ describe("loadAdminMarketsOverview — needs-resolution count (S1)", () => {
 
 describe("freeze countdown — derived from FREEZE_INSTANT_UTC (S1)", () => {
 	it("countdown::freeze-instant-is-the-pinned-conclusion-instant", () => {
-		// The countdown target is the immutable conclusion-freeze instant. Pin it
-		// so a stray redefinition (STOP trigger #10) is caught here.
-		expect(FREEZE_INSTANT_UTC.toISOString()).toBe("2026-11-05T23:59:00.000Z");
+		// The countdown target is the constant's one instant. Pin it so a stray
+		// redefinition (STOP trigger #10) is caught here.
+		// ⚠ MOVED ONCE, BY RULING, AND THIS IS THAT MOVE (EXT-1, D-55): the
+		// instant is the end of the experiment, when its markets close. It was
+		// the conclusion freeze, 2026-11-05T23:59Z.
+		expect(FREEZE_INSTANT_UTC.toISOString()).toBe("2026-12-31T23:45:00.000Z");
 	});
 
 	it("countdown::parts-decompose-remaining-ms", () => {
@@ -94,9 +97,11 @@ describe("freeze countdown — derived from FREEZE_INSTANT_UTC (S1)", () => {
 
 	it("countdown::formats-relative-to-the-freeze-instant", () => {
 		// A remaining span computed against the constant renders as a d/h/m/s label.
+		// The reading clock is exactly one day before the instant, so it moved
+		// with it: 2026-12-30T23:45Z (it was 2026-11-04T23:59Z).
 		const remaining =
 			FREEZE_INSTANT_UTC.getTime() -
-			new Date("2026-11-04T23:59:00.000Z").getTime();
+			new Date("2026-12-30T23:45:00.000Z").getTime();
 		expect(formatCountdown(remaining)).toBe("1d 00h 00m 00s");
 	});
 });

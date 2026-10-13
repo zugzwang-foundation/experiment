@@ -67,7 +67,7 @@ if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
 // signup, which masked it until a user was onboarded. 60*60*24*400 =
 // 34,560,000 == the cap exactly; better-call's guard is strict (`> 34,560,000`)
 // so the boundary value passes, and browsers keep (don't clamp) a value equal
-// to the 400-day max. Far exceeds the ~51-day live window. `disableSessionRefresh:
+// to the 400-day max. Far exceeds the ~87-day live window. `disableSessionRefresh:
 // true` stays — no sliding-window re-issue; truly-indefinite sessions (long-lived
 // `sessions` row + per-visit cookie re-issue) are out of scope (SPEC.2 §8.2).
 const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 400;

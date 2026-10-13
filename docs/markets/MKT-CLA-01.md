@@ -8,7 +8,7 @@
 
 ## 1 · The question
 
-Will @ClaudeDevs reply thumbs up to the Zugzwang thread presenting the Bundle feature specification, on X, between 15 September and 5 November 2026?
+Will @ClaudeDevs reply thumbs up to the Zugzwang thread presenting the Bundle feature specification, on X, between 15 September and 31 December 2026?
 
 ## 2 · How it resolves
 
@@ -22,7 +22,7 @@ Thumbs. A thumbs-up is the thumbs-up emoji in any skin tone, or the words thumbs
 
 The point. This market runs for the whole window so that participants can argue for and against the feature, with a stake behind every argument. At resolution Anthropic sees what users want. Both outcomes are equally useful to the experiment.
 
-Deadline. 5 November 2026, 23:45 UTC. The window opens at market open on 15 September 2026. UTC is the binding clock. Only posts timestamped at or before the deadline count, whenever the operator resolves. No extensions.
+Deadline. 31 December 2026, 23:45 UTC, moved from 5 November 2026 by ruling D-55 (11 October 2026). The window opens at market open on 15 September 2026. UTC is the binding clock. Only posts timestamped at or before the deadline count, whenever the operator resolves. No further extensions.
 
 Trigger. Latching on YES only. The first qualifying thumbs-up reply resolves YES irreversibly; later deletion, retraction or a subsequent thumbs-down does not un-resolve it. A thumbs-down reply does not close this market - a later qualifying thumbs-up inside the window still resolves YES. NO is reached only at the deadline.
 
@@ -35,13 +35,13 @@ Evidence. The operator publishes the source URL, the post timestamp, the text ve
 | | |
 |---|---|
 | Opens | 15 September 2026 |
-| Trading closes | `2026-11-05T23:45:00Z` |
-| Settles | `2026-11-05T23:45:00Z` — with all other markets |
+| Trading closes | `2026-12-31T23:45:00Z` |
+| Settles | `2026-12-31T23:45:00Z` — with all other markets |
 | Resolver | Anthropic PBC, through @ClaudeDevs on X |
 | Resolution | Response on X |
 | Flavour | Feedback |
 
-Display block: **RESOLUTION** Response on X · **RESOLVER** @ClaudeDevs → `https://x.com/ClaudeDevs` · **CLOSES ON** 5 Nov 2026 / 23:45Z · **FLAVOUR** Feedback
+Display block: **RESOLUTION** Response on X · **RESOLVER** @ClaudeDevs → `https://x.com/ClaudeDevs` · **CLOSES ON** 31 Dec 2026 / 23:45Z · **FLAVOUR** Feedback
 
 ## 5 · Operator entry
 
@@ -60,5 +60,5 @@ Claude · Will Anthropic reply 👍 to Zugzwang's Bundle feature?
 **Deadline** — typed digits are read as UTC verbatim. No trailing `Z`.
 
 ```
-2026-11-05T23:45
+2026-12-31T23:45
 ```

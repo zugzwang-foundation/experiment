@@ -755,9 +755,16 @@ describe("insertEvent — driver (ENGINE.6 §F + §B)", () => {
 				// only thing tying the SQL writer to the TS readers is that both
 				// sides agree the type exists and what its payload holds.
 				"pool.liquidity_added",
+				// EXT-1 / migration 0032 (1) — the one-time move of the six live
+				// markets' deadline to 2026-12-31T23:45Z. The SECOND type written
+				// by a migration's plpgsql rather than by insertEvent, and listed
+				// here for the same reason as the one above. Its emitted rows are
+				// parsed through the shipped schema in
+				// `tests/db/ext1-end-moved.spec.ts`.
+				"market.deadline_moved",
 			].sort(),
 		);
-		expect((EVENT_TYPES as readonly string[]).length).toBe(25);
+		expect((EVENT_TYPES as readonly string[]).length).toBe(26);
 		expect(EVENT_TYPES).not.toContain("image_upload.r2_delete_failed");
 	});
 });

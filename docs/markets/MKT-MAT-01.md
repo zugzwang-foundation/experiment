@@ -1,4 +1,4 @@
-# Math · Will 3 Erdős problems be solved by 5th November?
+# Math · Will 3 Erdős problems be solved by 31st December?
 
 > **v3.3 — 2026-09-23.** v3.0's text with its "on Zugzwang" premise removed — the title, the
 > question's closing words, the link-or-name requirement, the "On Zugzwang." clause and the
@@ -12,7 +12,7 @@
 
 ## 1 · The question
 
-Will Thomas Bloom, owner and maintainer of erdosproblems.com, publicly confirm on X by 5 November 2026 that at least three distinct Erdős problems, listed as open on erdosproblems.com when this market opened, have been solved?
+Will Thomas Bloom, owner and maintainer of erdosproblems.com, publicly confirm on X by 31 December 2026 that at least three distinct Erdős problems, listed as open on erdosproblems.com when this market opened, have been solved?
 
 ## 2 · How it resolves
 
@@ -28,7 +28,7 @@ Open. A problem counts only if erdosproblems.com listed it as open at market ope
 
 Source. @thomasfbloom on X only.
 
-Deadline. 5 November 2026, 23:45 UTC. The window opens at market open. UTC is the binding clock. Only posts timestamped at or before the deadline count, whenever the operator resolves. No extensions.
+Deadline. 31 December 2026, 23:45 UTC, moved from 5 November 2026 by ruling D-55 (11 October 2026). The window opens at market open. UTC is the binding clock. Only posts timestamped at or before the deadline count, whenever the operator resolves. No further extensions.
 
 Trigger. Latching. The third distinct qualifying confirmation resolves YES irreversibly. Later deletion does not un-resolve it, and neither does a subsequent reversal by him.
 
@@ -45,13 +45,13 @@ Evidence. For each of the three confirmations the operator publishes the source 
 | | |
 |---|---|
 | Opens | 15 September 2026 |
-| Trading closes | `2026-11-05T23:45:00Z` |
-| Settles | `2026-11-05T23:45:00Z` — with all other markets |
+| Trading closes | `2026-12-31T23:45:00Z` |
+| Settles | `2026-12-31T23:45:00Z` — with all other markets |
 | Resolver | Thomas F. Bloom, as owner and maintainer of erdosproblems.com |
 | Resolution | Response on X |
 | Flavour | Innovation |
 
-Display block: **RESOLUTION** Response on X · **RESOLVER** @thomasfbloom → `https://x.com/thomasfbloom` · **CLOSES ON** 5 Nov 2026 / 23:45Z · **FLAVOUR** Innovation
+Display block: **RESOLUTION** Response on X · **RESOLVER** @thomasfbloom → `https://x.com/thomasfbloom` · **CLOSES ON** 31 Dec 2026 / 23:45Z · **FLAVOUR** Innovation
 
 ## 5 · Operator entry
 
@@ -61,14 +61,14 @@ Display block: **RESOLUTION** Response on X · **RESOLVER** @thomasfbloom → `h
 math-erdos-solved-on-zugzwang
 ```
 
-**Title** — 55 characters
+**Title** — 56 characters
 
 ```
-Math · Will 3 Erdős problems be solved by 5th November?
+Math · Will 3 Erdős problems be solved by 31st December?
 ```
 
 **Deadline** — typed digits are read as UTC verbatim. No trailing `Z`.
 
 ```
-2026-11-05T23:45
+2026-12-31T23:45
 ```

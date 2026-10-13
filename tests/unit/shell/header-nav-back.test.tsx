@@ -95,7 +95,7 @@ describe("POLISH-1a V5 — Back disabled at the root route", () => {
 		// `HeaderNav` lives in `(public)/layout.tsx`, which SURVIVES soft
 		// navigation, so a `[]`-dep probe freezes `hasHistory` for the whole
 		// session. A viewer who arrives DIRECTLY at `/` — typed URL or bookmark,
-		// which is the operator's staging-test path and the Devcon demo path —
+		// which is the operator's staging-test path and any demo's path —
 		// starts at `history.length === 1`, and Back then stays dead on every
 		// subsequent route however deep the stack gets. That makes V5's stated
 		// behaviour ("Back is disabled at `/`, enabled elsewhere with history")

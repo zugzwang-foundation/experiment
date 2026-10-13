@@ -95,7 +95,7 @@ const SINGLE: PricePoint[] = [
  * end" written against `SINGLE` would compare 0 against 0 and pass whether the
  * fix is present or reverted. That is the shape of a control that cannot fire.
  *
- * This point is 2026-10-21, sixteen days into the ~32-day production window, so
+ * This point is 2026-10-21, sixteen days into the ~88-day production window, so
  * its x is strictly between 0 and `VIEWBOX_W` and the two answers — "ends at its
  * own instant" and "ends at the axis end" — are different numbers. It is the
  * same reason `INTERIOR` exists for the axis-label guards, one ruling later.
@@ -216,7 +216,7 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		// ⛔ THE COMPOSITION IS THE ANCHOR SET SINCE CHART-7 (RF-4), NOT A COUNT.
 		// It was "two interior ticks and three date labels", where the labels came
 		// from thirds of the window and the end. The card now labels the FIRST and
-		// LAST calendar anchors — `Sep 15` and `Nov 5` — and draws a tick only where
+		// LAST calendar anchors — `Sep 15` and `Dec 31` — and draws a tick only where
 		// an anchor falls strictly INSIDE the plot.
 		//
 		// ⚠ SO THE TICK COUNT IS ENVIRONMENT-DEPENDENT, AND DERIVING IT IS THE POINT.

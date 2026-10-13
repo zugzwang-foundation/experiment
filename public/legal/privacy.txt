@@ -1,6 +1,10 @@
 Zugzwang Experiment — Privacy Policy
 
-Version 1.0 · Effective 15 September 2026
+Version 1.1 · Effective 20 October 2026
+
+What changed in 1.1: the experiment now ends on 31 December 2026 at
+23:45 UTC, when its markets close (it previously ended on 5 November
+2026).
 
 This Privacy Policy sits alongside the Terms of Service published with
 it. Terms defined there carry the same meaning here.
@@ -54,12 +58,13 @@ ledger connecting them — is append-only by design: it is a permanent
 record that is not edited or deleted, because the integrity of that
 record is the point of the experiment.
 
-When the experiment ends on 5 November 2026, all markets resolve, all
-Dharma is void, and the Service stops accepting activity. The activity
-record is then prepared for publication: direct identifiers — your
-email address, Google account details, IP addresses, and browser data
-— are removed and are never published. What is published is the
-pseudonymous record: pseudonyms, positions, arguments, and timestamps.
+When the experiment ends on 31 December 2026, its markets close and
+are then resolved, all Dharma is void, and the Service stops accepting
+new positions and arguments. The activity record is then prepared for
+publication: direct identifiers — your email address, Google account
+details, IP addresses, and browser data — are removed and are never
+published. What is published is the pseudonymous record: pseudonyms,
+positions, arguments, and timestamps.
 
 You may ask us at any time to delete the personal identifiers
 associated with your account (your email and sign-in details). Because
@@ -74,5 +79,5 @@ write to legal@zugzwangworld.com. Requests are reviewed promptly, and
 we act on valid ones.
 
 
-Zugzwang Experiment · Privacy Policy · Version 1.0 ·
+Zugzwang Experiment · Privacy Policy · Version 1.1 ·
 legal@zugzwangworld.com

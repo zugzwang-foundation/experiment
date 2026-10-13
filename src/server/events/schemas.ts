@@ -75,6 +75,16 @@ export const EVENT_TYPES = [
 	"market.resolved",
 	"market.corrected",
 	"market.voided",
+	// market domain, one more (8) — EXT-1 / D-55. The one-time move of the six
+	// live markets' deadline from 2026-11-05 to 2026-12-31 23:45 UTC.
+	// ⚠ Written ONLY by migration 0032's plpgsql, never by insertEvent — the
+	// product has no path that extends a deadline (SPEC.1 B8,
+	// `assertDeadlineNotExtended`), and this type is not one. Like
+	// `pool.liquidity_added` below, the SQL reproduces this module's contract
+	// by hand, and the schema here is what a reader parses it with. No reader
+	// in `src/` needs to learn it: every `events` read filters on an explicit
+	// `event_type`.
+	"market.deadline_moved",
 	// pool domain (1) — ADR-0047 §F, LIQ-1 Phase 2. Rides aggregate_type
 	// "market", NOT a new aggregate: the injection is a fact about a market,
 	// and the closed 9-value AggregateType set in insert.ts is untouched.
@@ -303,6 +313,16 @@ export const eventPayloadSchemas = {
 		marketId: z.string().uuid(),
 		voidReason: z.string().min(1),
 		poolUnwindAmount: numericString,
+	}),
+	// EXT-1 / D-55 — migration 0032's record of the move. `previousDeadline`
+	// is READ FROM THE ROW at write time, not assumed, so it says what the
+	// market actually carried; `ruling` names the decision that authorised an
+	// extension the product itself can never make.
+	"market.deadline_moved": z.object({
+		marketId: z.string().uuid(),
+		previousDeadline: z.string().datetime({ offset: true }),
+		newDeadline: z.string().datetime({ offset: true }),
+		ruling: z.string().min(1),
 	}),
 	// bet domain. side mirrors the `side` pgEnum. stake/shares/price are exact
 	// NUMERIC(38,18) strings. parentCommentId null = top-level post-bet;

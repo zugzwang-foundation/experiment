@@ -45,7 +45,8 @@ import type { PricePoint } from "@/server/discovery/price-series";
 // production renders like staging, #650). The paragraphs above describe the
 // `Sep 15 → Nov 5` window. Now anchor 0 (`Sep 15`) lies BEFORE the window on
 // both environments, so the out-of-window filter is LIVE in production, the
-// shipped charts draw two anchors (`Oct 5 · Nov 5`), and both of those are
+// shipped charts draw two anchors (`Oct 5 · Dec 31` since EXT-1 moved the end
+// and its anchor together; `Oct 5 · Nov 5` before), and both of those are
 // window endpoints — against the real constants nothing can tell an anchor-
 // derived axis from a window-derived one. The interior-anchor rule is therefore
 // asserted through `axisAnchorsFor` on WIDE, a synthetic window containing all

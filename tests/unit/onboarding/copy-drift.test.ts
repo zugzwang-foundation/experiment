@@ -26,10 +26,10 @@ import { FREEZE_INSTANT_UTC } from "@/server/markets/create";
  *       font size a human reads a diff at. This is the assertion the register
  *       exists to make possible.
  *   2 · REAL, and it catches a specific bug that was nearly shipped. Card 2's
- *       end date must equal `FREEZE_INSTANT_UTC` formatted IN UTC. The freeze
- *       is 2026-11-05T23:59Z; IST is UTC+5:30, so ANY local-time formatting
- *       on an Indian device renders "6th November 2026" and the card
- *       contradicts the freeze it describes. The plan's own recommendation
+ *       end date must equal `FREEZE_INSTANT_UTC` formatted IN UTC. The end
+ *       is 2026-12-31T23:45Z (EXT-1); IST is UTC+5:30, so ANY local-time
+ *       formatting on an Indian device renders "1st January 2027" and the card
+ *       contradicts the end it describes. The plan's own recommendation
  *       was to bind these dates to the constant, and that recommendation was
  *       overturned for exactly this reason.
  *   3 · A TRIPWIRE, not a verification, and the plan says so rather than
@@ -199,12 +199,16 @@ describe("O1-DECK — copy drift against the ratified register", () => {
 
 		// The literal, pinned — so a formatter that broke would be caught here
 		// rather than agreeing with a broken card.
-		expect(formatUtcOrdinalDate(FREEZE_INSTANT_UTC)).toBe("5th November 2026");
+		// ⚠ MOVED BY EXT-1 (ruling D-55): the experiment ends 2026-12-31T23:45Z.
+		expect(formatUtcOrdinalDate(FREEZE_INSTANT_UTC)).toBe("31st December 2026");
 
 		// ⛔ AND THE LOCAL-TIME ANSWER IS ASSERTED TO BE THE WRONG ONE. On any
-		// timezone east of Greenwich the freeze instant falls on the following
-		// day, so this is the string a local-time formatting would have shipped.
-		expect(welcome?.sub).not.toContain("6th November 2026");
+		// timezone east of Greenwich the end instant falls on the following day
+		// — 23:45 UTC on 31 December is 05:15 IST on 1 January — so this is the
+		// string a local-time formatting would have shipped. It is the NEXT YEAR
+		// as well as the next day, which is what makes the UTC read matter more
+		// here than it did on 5 November.
+		expect(welcome?.sub).not.toContain("1st January 2027");
 
 		expect(welcome?.sub).toContain(formatUtcOrdinalDate(FREEZE_INSTANT_UTC));
 	});
@@ -229,6 +233,8 @@ describe("O1-DECK — copy drift against the ratified register", () => {
 		// ⛔ AND THE OLD COUNT ASSERTED ABSENT, so a revert of the component alone
 		// cannot pass by leaving both counts in the string.
 		expect(welcome?.sub).not.toContain("8 markets");
-		expect(welcome?.sub).toContain("15th September 2026");
+		// ⚠ MOVED BY EXT-1 sign-off 3 (plan §3.2): the card states the recorded
+		// start, 5th October 2026. It read "15th September 2026".
+		expect(welcome?.sub).toContain("5th October 2026");
 	});
 });

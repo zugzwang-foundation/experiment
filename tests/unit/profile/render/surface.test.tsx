@@ -1067,8 +1067,8 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 
 	it("status-default-is-derived", () => {
 		// POLISH.5 Gate C S-1. A FIXED `Open` default is permanently empty for
-		// anyone whose held markets are all non-Open — and after the 2026-11-05
-		// freeze that is every participant.
+		// anyone whose held markets are all non-Open — and once the markets close
+		// on 2026-12-31 that is every participant.
 
 		// (a) An Open row is present → `Open`.
 		const withOpen = render(

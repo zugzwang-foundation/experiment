@@ -347,7 +347,11 @@ describe("resolution-block-data — content matches the ratified register", () =
 		expect(resolver.href).not.toBe("https://github.com/");
 	});
 
-	it("resolution-block-data::CLOSES-is-5-Nov-on-every-market", () => {
+	it("resolution-block-data::CLOSES-is-31-Dec-on-every-market", () => {
+		// ⚠ MOVED BY EXT-1 (ruling D-55): every market closes 2026-12-31T23:45Z,
+		// so the block reads "31 Dec 2026". It read "5 Nov 2026" until then, and
+		// the paragraphs below are the pin's history under that date.
+		//
 		// ⛔⛔ G3, AND IT HAS LOST ITS EXCEPTION. This test existed because ONE
 		// market closed a month before the rest, and a block reading "5 Nov 2026"
 		// on it would have told a participant they could still trade for another
@@ -363,7 +367,7 @@ describe("resolution-block-data — content matches the ratified register", () =
 		let checked = 0;
 		for (const slug of KNOWN_SLUGS) {
 			expect(RESOLUTION_BLOCKS[slug].closes).toEqual({
-				line1: "5 Nov 2026",
+				line1: "31 Dec 2026",
 				line2: null,
 				href: null,
 				fontSize: 14,

@@ -76,7 +76,7 @@ SPEC.2 owns, as a **frame document**:
 - The identifier contract — UUIDv7 across all primary keys; pseudonyms in URLs are a separate column (§16).
 - The observability contract — every server route MUST emit named fields to Sentry and PostHog per ADR-0007 (§17).
 - The sybil and security model (§18).
-- The public-dataset export pipeline contract for the 2026-11-06 release (§19).
+- The public-dataset export pipeline contract for the release after the experiment closes (§19).
 - The conclusion-event freeze contract (§20).
 - The operational runbook *slots* — cron schedule, deployment, rollback, dataset release (§21, substance lives in `HARDEN.*` task outputs).
 - The ADR index (§22).
@@ -232,7 +232,7 @@ Single source of truth: `src/server/resolution/trigger.ts` (F-ADMIN-3), `src/ser
 
 ### §3.7 Events-row contract (per-write discipline)
 
-Every state-mutating data flow MUST emit at least one `events` row in the same transaction (Pattern A per ADR-0005). The events log is the canonical audit ledger; current-state tables are co-maintained inside the same transaction for read access; the public dataset release on 2026-11-06 is structurally a `pg_dump` over a deterministic view across the events log + current-state tables (per SPEC.1 §12.2). Per SPEC.1 G3, the dataset is the *only* surface from which `K_eff(t)` is derived — post-hoc, out-of-band, against the released archive — so the events log's completeness and the metadata field set below are the architectural mechanism by which G3 is satisfied.
+Every state-mutating data flow MUST emit at least one `events` row in the same transaction (Pattern A per ADR-0005). The events log is the canonical audit ledger; current-state tables are co-maintained inside the same transaction for read access; the public dataset release after the experiment closes is structurally a `pg_dump` over a deterministic view across the events log + current-state tables (per SPEC.1 §12.2). Per SPEC.1 G3, the dataset is the *only* surface from which `K_eff(t)` is derived — post-hoc, out-of-band, against the released archive — so the events log's completeness and the metadata field set below are the architectural mechanism by which G3 is satisfied.
 
 **Canonical `events.metadata` field set** (per §17 observability tag set):
 
@@ -337,7 +337,7 @@ Eleven Route Handlers in v1 (ten built; `GET /api/dataset/manifest` is pending-b
 | `GET /api/cron/close-due-markets` | F6 | `src/app/api/cron/close-due-markets/route.ts` | Bearer `CRON_SECRET` (constant-time compare) | N/A — exempt (caller is Vercel Cron; distributed lock + `closeDueMarkets` sweep own the at-least-once / may-fire-twice semantics) | W-4 close-due sweep (ENGINE.15 R-15.2; §3.4 Pattern A-2; freeze-gated per §20.2) |
 | `GET /api/health` | F6 | `src/app/api/health/route.ts` | None | N/A | Liveness probe |
 | `GET /api/_smoke-error` | F6 | `src/app/api/_smoke-error/route.ts` | None — env-behavioral gate (404 on `prod`; throws on `staging`/`preview`; SCAFFOLD.8 EC9/LD-5) | N/A | Observability smoke — Sentry routing verification; throw-only, no state reachable; not a SPEC.1 flow |
-| `GET /api/dataset/manifest` | F6 | `src/app/api/dataset/manifest/route.ts` | None (post-2026-11-06) | N/A | SPEC.1 §12.2 dataset metadata **PENDING-BUILD** (thin build-pipeline pointer per §4.7; not on disk — D4). |
+| `GET /api/dataset/manifest` | F6 | `src/app/api/dataset/manifest/route.ts` | None (after the experiment closes) | N/A | SPEC.1 §12.2 dataset metadata **PENDING-BUILD** (thin build-pipeline pointer per §4.7; not on disk — D4). |
 | `GET /m/[slug]/export` | F6 | `src/app/(public)/m/[slug]/export/route.ts` | None | N/A | the debate `.md` export — `text/markdown`, `no-store` (ADR-0025 / EXPORT.1) |
 | `GET /m/[slug]/version` | F6 | `src/app/(public)/m/[slug]/version/route.ts` | None | N/A | the poll's change check — `{ v: <opaque token> }` over (status, pool reserves, moderation count), `s-maxage=5` at the edge. Carries NO content, which is what admits it under the narrowing below (ADR-0053 / R2-CHEAP-POLL) |
 
@@ -387,9 +387,9 @@ Under reply-as-bet there is **no standalone comment or vote rate-limit budget** 
 
 ### §4.7 Versioning + URL discipline
 
-**No `/api/v1/*` prefix in v1.** Cross-version compatibility is a non-goal; mobile or service-to-service clients are not in v1 scope; the one external integration (the public dataset) is served as static files post-2026-11-06 from the GitHub release at `zugzwang-foundation/experiment` plus a long-lived static URL — not through this API surface. The `/api/dataset/manifest` endpoint is a thin pointer to those static assets, not a serving layer.
+**No `/api/v1/*` prefix in v1.** Cross-version compatibility is a non-goal; mobile or service-to-service clients are not in v1 scope; the one external integration (the public dataset) is served as static files after the experiment closes from the GitHub release at `zugzwang-foundation/experiment` plus a long-lived static URL — not through this API surface. The `/api/dataset/manifest` endpoint is a thin pointer to those static assets, not a serving layer.
 
-**URL-exposure rule (per ADR-0016 §16 / SPEC.2 §16).** Participant-facing routes use pseudonyms and market slugs only — `/u/RedFox001`, `/m/<market-slug>`, `/markets/<slug>/comment/<short-id>`. Raw UUIDs are FORBIDDEN on participant routes. Admin routes under `/admin/*` MAY use raw UUIDs for operator ergonomics — `/admin/markets/<uuid>`, `/admin/users/<uuid>`. The 2026-11-06 dataset release uses raw UUIDs as join keys per SPEC.1 §12.2. The acceptance test `id::raw-uuid-not-in-participant-urls` regex-asserts no participant-facing route file accepts a raw UUID as a path parameter (per SPEC.2 §16).
+**URL-exposure rule (per ADR-0016 §16 / SPEC.2 §16).** Participant-facing routes use pseudonyms and market slugs only — `/u/RedFox001`, `/m/<market-slug>`, `/markets/<slug>/comment/<short-id>`. Raw UUIDs are FORBIDDEN on participant routes. Admin routes under `/admin/*` MAY use raw UUIDs for operator ergonomics — `/admin/markets/<uuid>`, `/admin/users/<uuid>`. The dataset release after the experiment closes uses raw UUIDs as join keys per SPEC.1 §12.2. The acceptance test `id::raw-uuid-not-in-participant-urls` regex-asserts no participant-facing route file accepts a raw UUID as a path parameter (per SPEC.2 §16).
 
 **Slug generation** is SCAFFOLD.* territory — §4 names that slugs exist on participant routes; the slug-generation algorithm (kebab-case from market title + collision suffix?) is a future implementation decision, not an architectural one.
 
@@ -739,7 +739,7 @@ ADRs consumed by §6: ADR-0005 (Bucket A/B/C classification + ground-truth-trigg
 
 ## §7 Event Model
 
-§7 owns the *events table shape and read-model classification rule* for the experiment-phase build. The events log is the canonical audit ledger per ADR-0005's Pattern A — every state-mutating data flow emits at least one events row in the same transaction (per §3.7), and the public-dataset release on 2026-11-06 is structurally a `pg_dump` over a deterministic view across the events log + current-state tables (per §19). Per SPEC.1 G3, the dataset is the *only* surface from which K_eff(t) is derived — post-hoc, against the released archive — so the events log's column completeness is the architectural mechanism by which G3 is satisfied.
+§7 owns the *events table shape and read-model classification rule* for the experiment-phase build. The events log is the canonical audit ledger per ADR-0005's Pattern A — every state-mutating data flow emits at least one events row in the same transaction (per §3.7), and the public-dataset release after the experiment closes is structurally a `pg_dump` over a deterministic view across the events log + current-state tables (per §19). Per SPEC.1 G3, the dataset is the *only* surface from which K_eff(t) is derived — post-hoc, against the released archive — so the events log's column completeness is the architectural mechanism by which G3 is satisfied.
 
 §7 names the eight-column shape, the partitioning strategy, the storage-layer idempotency primitive (distinct from §11's API-boundary idempotency surface), the synchronous-vs-asynchronous read-model classification rule (per ADR-0005), the per-event-type Zod schema boundary (per ADR-0008), and the events insertion helper. The seven-field `events.metadata` set lives at §3.7 and is canonical there per 3-A R2 — §7 references the set via §3.7 rather than restating it.
 
@@ -792,7 +792,7 @@ Per ADR-0005's read-model rule: a read-model updates synchronously inside the or
 
 **Asynchronous targets — none in v1.**
 
-Every state-mutating data flow updates its read-models synchronously inside the originating transaction. The K_eff dashboard async target named in earlier outlines is struck per PRECURSOR.2-B D4 (2026-05-08); there is no `k_eff_dashboard` materialised view, no async refresh, no `pg_cron` `REFRESH MATERIALIZED VIEW CONCURRENTLY` job. K_eff(t) is derived post-hoc from the 2026-11-06 public dataset only (per §5.4 + §19.5). No other async read-model surfaces in v1.
+Every state-mutating data flow updates its read-models synchronously inside the originating transaction. The K_eff dashboard async target named in earlier outlines is struck per PRECURSOR.2-B D4 (2026-05-08); there is no `k_eff_dashboard` materialised view, no async refresh, no `pg_cron` `REFRESH MATERIALIZED VIEW CONCURRENTLY` job. K_eff(t) is derived post-hoc from the public dataset released after the experiment closes only (per §5.4 + §19.5). No other async read-model surfaces in v1.
 
 **Read-time-computed (no projection table at all):** the debate-view ranking. Per **ADR-0017** + `RANKING.md`, the multi-mode model (Top + filter modes; replies stake-descending within side) runs against live `comments` + `bets` rows on every debate-view render, aggregating each post's reply-bets into the six per-side signals (`support_count_total`, `counter_count_total`, `support_count`, `counter_count`, `support_dharma`, `counter_dharma`) per §5.4. No `friendly_fire_events`, no materialised view, no cached score column on `comments`, no `ranking_snapshots`. Lane-aggregation index requirements are flagged for SCAFFOLD.2.
 
@@ -1001,7 +1001,7 @@ Per ADR-0016 D6 + §16. Auth-surface routes follow the participant-vs-admin URL-
 
 - **Participant routes use pseudonym slugs.** `/profile/<pseudonym>` (not `/profile/<users.id>`). Comment permalinks reference natural ordering or server-rendered short IDs (not raw `comments.id`). The acceptance test `id::raw-uuid-not-in-participant-urls` at `tests/server/identity/no-raw-uuid-in-urls.test.ts` regex-asserts no participant-facing route file accepts a raw UUID as a path parameter.
 - **Admin routes MAY carry raw UUIDs.** `/admin/users/<user_id>`, `/admin/markets/<market_id>` — operator ergonomics during moderation outweigh the URL-aesthetic concern, and admin surfaces are never indexed or shared. Raw UUIDs in admin URLs are explicitly permitted.
-- **Dataset release uses raw UUIDs.** The 2026-11-06 public-dataset release carries raw `users.id`, `markets.id`, `comments.id` as join keys per SPEC.1 §12.2 — raw UUIDs are the correct join primitive for offline analysis. Pseudonymization happens at export-time JOIN per §19.3.
+- **Dataset release uses raw UUIDs.** The public-dataset release after the experiment closes carries raw `users.id`, `markets.id`, `comments.id` as join keys per SPEC.1 §12.2 — raw UUIDs are the correct join primitive for offline analysis. Pseudonymization happens at export-time JOIN per §19.3.
 
 The asymmetry is enforced at the route-handler-file level, not the URL parser. SCAFFOLD.* implements `tests/server/identity/no-raw-uuid-in-urls.test.ts` at the implementation pass.
 
@@ -1617,7 +1617,7 @@ in `src/server/auth/index.ts` (the single source of truth for the Better Auth in
 
 **`identity_pool` PK shape.** Synthetic UUIDv7 `id` PK + `UNIQUE (colour, animal, number)` enforcing natural-triple uniqueness as a separate constraint. Schema uniformity wins over the natural-key compactness; the 16-byte × 50K-row = 800 kB synthetic-column overhead is negligible.
 
-**URL-exposure rule.** Raw UUIDs are forbidden on participant-facing routes — pseudonyms (per ADR-0011) are the URL-exposed identifier on every user-routed page. Concretely: `/u/RedFox001` (not `/u/0193abcd-...`); `/m/<market-slug>` (not `/m/<market-uuid>`); comment permalinks reference the comment's natural ordering or a server-rendered short ID (not the raw `comments.id`). Raw UUIDs are **allowed** on admin-only routes under `/admin/*` (gated by F-AUTH-ADMIN per ADR-0010 — admin-operator ergonomics during moderation), and **allowed** in the 2026-11-06 dataset release (per SPEC.1 §12.2 — raw UUIDs are the correct join primitive for offline analysis). The rule is enforced at the route-handler level, not the URL parser; the acceptance test `id::raw-uuid-not-in-participant-urls` regex-asserts no participant-facing route file accepts a raw UUID as a path parameter.
+**URL-exposure rule.** Raw UUIDs are forbidden on participant-facing routes — pseudonyms (per ADR-0011) are the URL-exposed identifier on every user-routed page. Concretely: `/u/RedFox001` (not `/u/0193abcd-...`); `/m/<market-slug>` (not `/m/<market-uuid>`); comment permalinks reference the comment's natural ordering or a server-rendered short ID (not the raw `comments.id`). Raw UUIDs are **allowed** on admin-only routes under `/admin/*` (gated by F-AUTH-ADMIN per ADR-0010 — admin-operator ergonomics during moderation), and **allowed** in the dataset release after the experiment closes (per SPEC.1 §12.2 — raw UUIDs are the correct join primitive for offline analysis). The rule is enforced at the route-handler level, not the URL parser; the acceptance test `id::raw-uuid-not-in-participant-urls` regex-asserts no participant-facing route file accepts a raw UUID as a path parameter.
 
 **Per-backend monotonicity caveat.** Both PG 18's native `uuidv7()` and the userspace fallback produce UUIDs that are strictly monotonic per backend process only; **neither produces UUIDs that are strictly monotonic across the Supavisor connection pool** (per ADR-0006 transaction-pooling mode). Application code MUST NOT assume `id(request N+1) > id(request N)` even within a session. The canonical chronological-sort column for cross-row ordering is `created_at`; UUIDv7's time prefix is an implementation detail that informs single-row creation timestamp recovery (via `uuid_extract_timestamp()` per RFC 9562 §6.2), not cross-row ordering. SCAFFOLD.2 / ENGINE.* / DEBATE.* MUST sort by `created_at` (or by an explicit ranking-function score per ADR-0009) for any read path that needs cross-row chronological order. The acceptance test `id::uuidv7-monotonic-within-millisecond` verifies within-backend monotonicity only; cross-backend ordering is explicitly NOT tested.
 
