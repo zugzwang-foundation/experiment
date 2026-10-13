@@ -42,8 +42,9 @@ comments. The market price aggregates these staked beliefs into a single running
 - **Question** — The yes/no proposition a market is about.
 - **Resolution criteria** — The rule, stated in advance, that decides whether the question resolves
   YES or NO.
-- **The freeze** — The fixed end date of the experiment, after which no further bets or arguments
-  are accepted and open markets resolve. "Before the freeze" means before this cutoff.
+- **The end of the experiment** — 31 December 2026 at 23:45 UTC, when the markets close. After it
+  no further bets or arguments are accepted, and the markets are then resolved. Older text may call
+  this "the freeze"; "before the freeze" means before the markets close.
 - **Dharma (Đ)** — The reputation a participant stakes. It is earned within the system and is
   non-transferable: it cannot be bought, sold, or given away.
 - **Stake** — The amount of Dharma committed to a particular argument. It signals how strongly the

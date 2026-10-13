@@ -130,3 +130,9 @@ The question is where a sheet-driven, participant-creating write path may live, 
 7. **Operator activity under participant identities.** CLAUDE.md §3's admin-participation trigger is not crossed — the admin still has no `users` row and no runtime role, and the handlers still log `userId: null` — and its social-content trigger is satisfied literally, because every argument comes from the operator's sheet, never generated. What changes is that on production the result is read by real people, and that is what this ruling accepts. If the founder reads this as a carve-out of CLAUDE.md §3, the contract file is the place to say so; an ADR cannot carve into it.
 
 The freeze gate, the per-chunk lock, the origin/admin checks and the idempotency backstop are unchanged and apply on production exactly as on staging.
+
+---
+
+## Patch record — 2026-10-13 · the end moves to 2026-12-31 23:45 UTC and no freeze is scheduled (D-55)
+
+**D-55 (decision record amendment 2.13, ruled 2026-10-11).** The experiment ends on `2026-12-31` at `23:45 UTC`, when its markets close, and no longer on `2026-11-05`. No freeze is scheduled: `system_state.frozen_at` and `isFrozen()` stay in the code, unchanged and unused, and nothing happens at `23:59 UTC`. The public dataset is released after the experiment closes and carries no date. Wherever this file states the `2026-11-05` end, the `23:59 UTC` freeze, a `2026-11-06` dataset date, or a live window of about 45 or 51 days, D-55 supersedes it (the window is now 2026-10-05 to 2026-12-31, about 87 days): 1 line in this file, counting any earlier patch record that quotes the date. ⚠ **The decision itself is unchanged and its reasoning is not rewritten.** Where an argument above rests on the end date or on the length of the window, it was made for the earlier date and has not been re-derived for the later one, unless a paragraph below says so.
