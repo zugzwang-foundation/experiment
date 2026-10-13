@@ -131,7 +131,7 @@ The shared kit. **Thesis-load-bearing primitives** carry intent + states + conte
 
 **Resolution / lifecycle marker** *(INV-4)*
 - *Intent:* shows a market's terminal state.
-- *States:* Open · Closed · Resolving · **Resolved** · **Voided** · **Frozen** (read-only after Nov 5).
+- *States:* Open · Closed · Resolving · **Resolved** · **Voided** · **Frozen** (declared, never exercised — D-55 schedules no freeze; the experiment ends when its markets close on 31 Dec).
 - *Rule:* resolved / voided / frozen render as permanently locked.
 
 **Top-level post**

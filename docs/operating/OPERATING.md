@@ -1,7 +1,7 @@
 # ZUGZWANG · OPERATING MODEL
 
-**Version** 3.1 · ratified 2026-09-04 · **Recorded as** D-15, amended by D-20, D-22, D-25
-**Supersedes** `OPERATING-v2.0.md` (preserved) · **Scope** the Experiment phase, to 2026-11-05
+**Version** 3.1 · ratified 2026-09-04 · **Recorded as** D-15, amended by D-20, D-22, D-25, D-55
+**Supersedes** `OPERATING-v2.0.md` (preserved) · **Scope** the Experiment phase, to 2026-12-31 (D-55; this read 2026-11-05)
 
 > How work is decided and executed: who decides what, which rituals survive, and the failure
 > modes that cost us something. Not a register, not a spec, not a tracker — those are pointed at.
@@ -153,8 +153,11 @@ are the record. **The executor never deletes from the mirror**; it stages, the f
 
 Deploys: permitted, lane lead's discretion. Schema and migrations: founder-reserved; the rows are
 real. The ledger is append-only, so **there is no data fix** — a wrong bet is corrected forward.
-Resolution and freeze: founder only, on the published criteria. Moderation: advisory per D-20, and
-the queue is attended daily. The dataset publishes nothing before 5 November 23:59 UTC. Escalation:
+Resolution: founder only, on the published criteria, after the markets close. No freeze is
+scheduled (D-55): the experiment ends when its markets close on 31 December 2026 at 23:45 UTC,
+`system_state.frozen_at` stays dormant, and arming it is the founder's ruling alone. Moderation:
+advisory per D-20, and the queue is attended daily. The dataset publishes nothing before the
+experiment closes. Escalation:
 anything reserved, any suspected corruption, any moderation failure — straight to the founder.
 
 ## §13 · How a session runs

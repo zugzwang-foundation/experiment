@@ -11,20 +11,29 @@ STRIP rules + §19.5 PSEUDO joins) is implemented separately at
 DATASET.* / HARDEN.*.
 
 ⚠ **The release is UNTIMED, and the date is deliberately gone from this
-header (D-21 as narrowed by D-26).** The experiment ends at the
-`2026-11-05 23:59 UTC` write-freeze; this repository describes nothing
-after it, and the release is one of the things after it. **The freeze
-instant is unmoved and every step below still stands** — the checklist is
-a sequence, and a sequence does not need a calendar to run in order. What
-is struck is the claim that the release happens on a particular day. Do
-not re-date this header; the release runs when the founder runs it.
+header (D-21 as narrowed by D-26; D-55).** The experiment ends when its
+markets close, on `2026-12-31` at `23:45 UTC`; this repository describes
+nothing after that except this release. The checklist is a sequence
+keyed on the markets' close, and a sequence does not need a calendar to
+run in order. Do not re-date this header; the release runs when the
+founder runs it.
 
-## Pre-release (2026-11-05 17:00 UTC — 6h before write-freeze)
+⛔ **No freeze is scheduled (D-55). Do not set `system_state.frozen_at`.**
+Until D-55 this checklist was keyed on a `2026-11-05 23:59 UTC`
+write-freeze and told the operator to verify that the flag was set and,
+failing a scheduled job, to set it by hand. That instruction is
+withdrawn. Nothing sets the flag and no step below needs it. Setting it
+while any market is `Open` also stops the `close-due-markets` sweep,
+which is itself freeze-gated, and once set it is never unset except
+through `BREAK_GLASS.md`.
+
+## Before the markets close (2026-12-31, ahead of 23:45 UTC)
 
 1. **Admin session rotation** per `BREAK_GLASS.md` §1. Invalidates any
    live admin `session_id` values that would otherwise be in
    `events.payload.sessionId` at export time (defense-in-depth on top
-   of the SPEC.2 §19.4.1 STRIP_KEY rule).
+   of the SPEC.2 §19.4.1 STRIP_KEY rule). The admin signs in again for
+   the resolution work after the close, so this is repeated at step 7.
 
 2. **Verify SPEC.2 §19.4 + §19.4.1 strip-rules document is current.**
    Any event_type added between the last release cycle and now must
@@ -32,7 +41,7 @@ not re-date this header; the release runs when the founder runs it.
    event_type exists in `src/server/events/schemas.ts` `EVENT_TYPES`
    array but has NO §19.4.1 entry → STOP and amend SPEC.2 +
    re-confirm payload PII review with the privacy reviewer (TBD per
-   HARDEN.*).
+   HARDEN.*). `market.deadline_moved` (EXT-1) has its row.
 
 3. **Spot-check `events` table volumes.** Per SPEC.2 §7.2, the
    `events_default` partition fires Sentry alarm 2 on any write.
@@ -40,31 +49,41 @@ not re-date this header; the release runs when the founder runs it.
    `created_at` outside the named partition range — operational error
    that must be triaged before release).
 
-## At write-freeze (2026-11-05 23:59 UTC)
+4. **Check the closer.** The `close-due-markets` sweep is the only
+   thing that ends trading: the bet path reads a market's status, never
+   the clock (SPEC.2 §20.3). Confirm the sweep is running before the
+   instant, and that the write-pause is off —
+   `ZUGZWANG_WRITES_PAUSED=paused` also pauses the closer and the
+   manual Close.
 
-4. **Verify `system_state.frozen_at` is set.** Per SPEC.2 **§20.2** the
-   freeze is the system-level write boundary; CC cannot bypass per
-   CLAUDE.md §3 refusal trigger. *(This cited §3.7, which is the
-   events-row contract and says nothing about the freeze.)*
-   ⚠ **§20.2 ratifies TWO paths, not one.** Path A is a `pg_cron`
-   scheduled flip (the intended primary); Path B is a manual operator
-   `psql` UPDATE (the fallback). **No Path-A job is registered by any
-   migration** — the only two `cron.schedule(...)` calls in
-   `drizzle/migrations/` are `identity-pool-watermark` (0007) and
-   `nightly-drift` (0011). So check the live database for a freeze job
-   **before** the instant, not after:
-   `SELECT jobname, schedule FROM cron.job;`
-   If none is registered, Path B is the live path and a human must be
-   at the keyboard at 2026-11-05 23:59 UTC.
+## At the close (2026-12-31 23:45 UTC — 05:15 IST on 2027-01-01)
 
-5. **Disable participant-side write paths.** Per SPEC.2 §20.2 the
-   handler-layer guard checks `frozen_at IS NOT NULL` and returns
-   `error_experiment_concluded` for any state-mutating handler. Verify
-   via curl spot-check of a bet endpoint → 410.
+5. **Verify all six markets are `Closed`.** Each carries one
+   `market.closed` event. A market still `Open` after the sweep has had
+   time to run is closed with the admin **Close** action (SPEC.1
+   F-ADMIN-3), which works at or after the market's deadline.
+   ⚠ There is no 410 to check. With no freeze, a bet on a closed market
+   is refused by the market's state (SPEC.1 F-BET-5), not by
+   `error_experiment_concluded`.
 
-## Pre-export (2026-11-06 morning)
+6. **Resolve or void each market** on its published criteria (SPEC.1
+   §11, F-ADMIN-3). Founder only. Resolution follows the close; nothing
+   resolves a market automatically.
 
-6. **Run the export pipeline** (DATASET.* / HARDEN.* implementation
+## Pre-export (after the resolution work is complete)
+
+7. **Confirm the dataset-build point** (SPEC.2 §19.1): every market is
+   `Resolved` or `Voided`, and no market is `Open` (ADR-0044, D-55
+   patch record). Rotate admin sessions again per `BREAK_GLASS.md` §1.
+   Record the instant the snapshot is taken.
+   ⚠ **Not ruled: where the release draws its line.** With no freeze,
+   rows keep arriving after the close — signups, each with its initial
+   grant; image-upload signing; moderation rows (EXT-1
+   `@security-auditor` SA-M-1). Ask the founder whether the release is
+   cut at the last `market.closed` instant or at the snapshot, before
+   step 8.
+
+8. **Run the export pipeline** (DATASET.* / HARDEN.* implementation
    TBD). The pipeline reads:
    - SPEC.2 §19.3 row inventory (which tables ship).
    - SPEC.2 §19.4 the **ten** PII columns dropped. *(This said 8; the
@@ -73,7 +92,7 @@ not re-date this header; the release runs when the founder runs it.
    - SPEC.2 §19.5 export-time JOIN pseudonymization (FK rewrites).
    - SPEC.2 Appendix B.* per-table column treatments.
 
-7. **Spot-check exported `events.payload`:** sample 100 rows from each
+9. **Spot-check exported `events.payload`:** sample 100 rows from each
    event_type. Verify:
    - `user.tos_accepted` rows: `payload` shows `userId` + version
      hashes + NO `ip` / NO `user_agent` keys.
@@ -84,17 +103,17 @@ not re-date this header; the release runs when the founder runs it.
      covered by §19.4 rows **9-10**; rows 7-8 are `pfp_filename` and
      `r2_object_key`. This checks the strip actually ran).
 
-8. **Spot-check pseudonymization** (per §19.5): cross-table joins
-   should reference `user_pseudonym` columns, not raw `users.id`. The
-   `users` table itself ships with `id` as a join key per §19.5 last
-   paragraph — that's by design.
+10. **Spot-check pseudonymization** (per §19.5): cross-table joins
+    should reference `user_pseudonym` columns, not raw `users.id`. The
+    `users` table itself ships with `id` as a join key per §19.5 last
+    paragraph — that's by design.
 
 ## Release
 
-9. Publish the dataset tarball to the canonical GitHub artifact per
-   SPEC.2 §19.1.
+11. Publish the dataset tarball to the canonical GitHub artifact per
+    SPEC.2 §19.1.
 
-10. Announce per SPEC.1 **§12.2** — the GitHub release at
+12. Announce per SPEC.1 **§12.2** — the GitHub release at
     `zugzwang-foundation/experiment` plus the long-lived static URL,
     CC-BY-4.0. Venue + audience TBD per the HARDEN.* communications
     plan. *(This cited §16, the Operational Floor, whose five
@@ -102,7 +121,7 @@ not re-date this header; the release runs when the founder runs it.
 
 ## Post-release
 
-11. Monitor for re-identification attempts or external CVE reports.
+13. Monitor for re-identification attempts or external CVE reports.
     ⚠ **Two postures, and only one failing is an incident.** Per
     **SPEC.2 §19.4** the *export* posture is "strip-not-hash" — the ten
     PII columns are dropped rather than hashed, which forecloses
@@ -120,7 +139,7 @@ not re-date this header; the release runs when the founder runs it.
 
 This is a STUB. Operator should expand at HARDEN.* with:
 - Specific operator names + handoffs at each step.
-- Backup-export procedure if step 6 fails.
+- Backup-export procedure if step 8 fails.
 - Pre-publication legal review hold — the deferred legal engagement,
   parked as **`LEGAL.1`** in `docs/parked.md`. *(This line pointed at
   "CLAUDE.md §5", which is the Workflow-rules section and carries no
@@ -133,3 +152,8 @@ This is a STUB. Operator should expand at HARDEN.* with:
 ENGINE.6 ships this stub to anchor the dataset-release process
 around the §19.4.1 STRIP rules so future amendments to event payload
 shapes don't accidentally bypass the strip step.
+
+*Steps renumbered at EXT-1 (D-55): the two freeze steps (formerly 4 and
+5) became the close and resolution steps, a closer check and a
+build-point step were added, and the export steps moved from 6–11 to
+8–13.*

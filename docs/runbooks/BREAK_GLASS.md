@@ -12,10 +12,17 @@ HARDEN.10. Current content covers:
 1. The ENGINE.6 same-commit codification of admin-session-rotation as a
    dataset-release-prep step.
 
-## 1. Pre-dataset-release admin rotation (2026-11-05 freeze)
+## 1. Pre-dataset-release admin rotation (before the markets close, and again before the export)
 
-**Trigger:** the 2026-11-05 23:59 UTC write-freeze before the 2026-11-06
-public dataset release per SPEC.1 G3 + SPEC.2 §19.1.
+**Trigger:** the public dataset release per SPEC.1 G3 + SPEC.2 §19.1 —
+once ahead of the markets' close on 2026-12-31 at 23:45 UTC, and again
+after the resolution work, immediately before the export
+(`dataset-release.md` steps 1 and 7). ⚠ **D-55:** this trigger used to
+be the `2026-11-05 23:59 UTC` write-freeze ahead of a `2026-11-06`
+release. No freeze is scheduled and the release carries no date; the
+rotation itself is unchanged. `system_state.frozen_at` is dormant. If it is ever set by hand, it is
+never unset except through this runbook — and the thaw procedure is not
+written here yet (§3; SPEC.2 §20.3 names the sequence).
 
 **Why required:** ENGINE.6 emits `admin.signed_in` + `admin.signed_out`
 events with `aggregate_id = admin_sessions.session_id` (the UUIDv7 that
@@ -26,7 +33,7 @@ flags admin_session aggregate_id as **SHIP-raw**, with defense-in-depth
 covered by this runbook's rotation step. *(This said B.14; B.14 is
 `identity_pool`, which has no `aggregate_id` column at all.)*
 
-Without rotation, a session_id that was created weeks before the freeze
+Without rotation, a session_id that was created weeks before the export
 and is still live (no logout in the interim) is present in the released
 dataset (even after STRIP, partial export-pipeline failure or B.14
 relaxation could re-expose it). Rotation invalidates any live session_id

@@ -247,3 +247,9 @@ This ADR is doc-class and touches **no** SPEC.2 now, per the ADR-0032 precedent 
 ---
 
 *ADR-0034 ratifies that viewer-scoped state never enters `DebateViewModel` — because ADR-0025 binds the public debate export to that type and ADR-0032 D-8 excludes private bookmark data from the dataset entirely — and pins `loadViewerMarketContext` as the home for viewer-scoped debate reads, market-scoped and identifier-only, never consulted as a masking input. The decision body and the constraints minted in D-1 … D-7 are immutable; superseding requires a new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy.*
+
+---
+
+## Patch record — 2026-10-13 · the end moves to 2026-12-31 23:45 UTC and no freeze is scheduled (D-55)
+
+**D-55 (decision record amendment 2.13, ruled 2026-10-11).** The experiment ends on `2026-12-31` at `23:45 UTC`, when its markets close, and no longer on `2026-11-05`. No freeze is scheduled: `system_state.frozen_at` and `isFrozen()` stay in the code, unchanged and unused, and nothing happens at `23:59 UTC`. The public dataset is released after the experiment closes and carries no date. Wherever this file states the `2026-11-05` end, the `23:59 UTC` freeze, a `2026-11-06` dataset date, or a live window of about 45 or 51 days, D-55 supersedes it (the window is now 2026-10-05 to 2026-12-31, about 87 days): 1 line in this file, counting any earlier patch record that quotes the date. ⚠ **The decision itself is unchanged and its reasoning is not rewritten.** Where an argument above rests on the end date or on the length of the window, it was made for the earlier date and has not been re-derived for the later one, unless a paragraph below says so.

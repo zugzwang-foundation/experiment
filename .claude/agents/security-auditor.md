@@ -67,7 +67,8 @@ For each invariant, write the **attack scenario** in concrete terms ("an attacke
 
 ### Conclusion-freeze enforcement
 
-- **2026-11-05 23:59 UTC write-freeze** — `system_state.frozen_at` actually blocks writes? Bypass path absent? `BREAK_GLASS.md` recovery is the only path?
+- **The freeze is dormant (D-55)** — the experiment ends when its markets close on 2026-12-31 at 23:45 UTC, and no freeze is scheduled. Is `system_state.frozen_at` still unset by every code path, migration and runbook in the diff? Are `isFrozen()` and every gate that reads it unchanged, so that a flag set by hand would still block writes with no bypass? Is `BREAK_GLASS.md` recovery still the only path to unset it?
+- **The close is what ends trading** — the bet path reads `markets.status`, never the clock. Does the diff leave the `close-due-markets` sweep and the manual Close intact? Does anything extend a `resolution_deadline` (B8)? D-55's one-time move by migration `0032` is the only ruled exception.
 
 ## Output format
 

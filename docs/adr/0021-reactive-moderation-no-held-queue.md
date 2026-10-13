@@ -319,3 +319,11 @@ Three specifics a reader should not have to derive:
 ADR-0014 has no `§`-numbered headings (**D-33 R4**). Preserved per **D-33 R1**.
 
 Status remains `accepted`. No text above this record is changed.
+
+---
+
+## Patch record — 2026-10-13 · the end moves to 2026-12-31 23:45 UTC and no freeze is scheduled (D-55)
+
+**D-55 (decision record amendment 2.13, ruled 2026-10-11).** The experiment ends on `2026-12-31` at `23:45 UTC`, when its markets close, and no longer on `2026-11-05`. No freeze is scheduled: `system_state.frozen_at` and `isFrozen()` stay in the code, unchanged and unused, and nothing happens at `23:59 UTC`. The public dataset is released after the experiment closes and carries no date. Wherever this file states the `2026-11-05` end, the `23:59 UTC` freeze, a `2026-11-06` dataset date, or a live window of about 45 or 51 days, D-55 supersedes it (the window is now 2026-10-05 to 2026-12-31, about 87 days): 2 lines in this file, counting any earlier patch record that quotes the date. ⚠ **The decision itself is unchanged and its reasoning is not rewritten.** Where an argument above rests on the end date or on the length of the window, it was made for the earlier date and has not been re-derived for the later one, unless a paragraph below says so.
+
+**This file specifically — re-open trigger (b) has fired.** The trigger reads *"The experiment phase extends past 2026-11-05"*, and D-55 extends it to 2026-12-31. It is recorded here as fired. This note builds nothing and changes nothing in the moderation pipeline: the participant report path is reopened as its own task after EXT-1 (`docs/parked.md` · MOD-REPORT-PATH; EXT-1 handover, sign-off 5, the recommended option). The residual's *"invite-scale, 51 days, one operator"* is now about 87 days.
