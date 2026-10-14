@@ -263,7 +263,9 @@ describe("discovery mobile reflow — the grid already stacks, and must keep doi
 		// now the shipped one, so this file adds nothing to the built sheet — the
 		// runtime-assembled form was needed only while the losing variant was
 		// still in the tree.
-		expect(classes).toContain("lg:grid-cols-3");
+		// TEMPORARY: two columns while two markets are hidden (2x2); restore the
+		// three-column lg class with the grid when all six are listed again.
+		expect(classes).toContain("lg:grid-cols-2");
 
 		// ⛔ AND NOTHING UNPREFIXED. `mobile:grid-cols-2` only wins below 820px if
 		// nothing beneath it sets a column count; a base `grid-cols-*` would apply

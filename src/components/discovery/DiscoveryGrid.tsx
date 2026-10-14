@@ -57,7 +57,9 @@ export function DiscoveryGrid({
 			// `align-content:start` (`:148-149`). Everything left over belongs to
 			// the hero, which is what makes the hero the focal panel rather than
 			// a wall of tiles stretching to fill the window.
-			className="grid flex-none gap-3 mobile:grid-cols-2 lg:grid-cols-3"
+			// TEMPORARY: `lg:grid-cols-2` while two markets are hidden, so four
+			// render 2x2. Back to three columns at lg when all six are listed again.
+			className="grid flex-none gap-3 mobile:grid-cols-2 lg:grid-cols-2"
 		>
 			{markets.map((m, i) => (
 				<MarketCard key={m.card.id} card={m.card} active={i === activeIndex} />
