@@ -238,14 +238,19 @@ export function MarketCard({
 					    Both halves are stated for that reason, and the unitless 1.3
 					    scales with the size rather than pinning a px that would have to
 					    move again. */}
-					<h3 className="line-clamp-2 text-[13.5px] leading-[1.32] font-semibold mobile:line-clamp-none xl:text-[14px] xl:leading-[1.3] xl:text-balance">
+					{/* TEMPORARY with the 2x2 grid: the tile is ~1.5x wider, so the
+					    title steps up to 16px (820px+) and 18px (xl). Phones unchanged. */}
+					<h3 className="line-clamp-2 text-[13.5px] leading-[1.32] font-semibold mobile:line-clamp-none mobile:text-[16px] mobile:leading-[1.3] xl:text-[18px] xl:leading-[1.3] xl:text-balance">
 						{card.title}
 					</h3>
 					<StatLine totals={card.totals} size="card" />
 				</div>
 			</div>
-			<div className="mt-[9px]">
-				<PriceBar pricing={card.pricing} size="card" />
+			{/* TEMPORARY with the 2x2 grid: the hero's existing preset (22px bar,
+			    12px labels) instead of `card` (16px, 10.5px), so the YES/NO bar
+			    fills the wider tile. No preset changed. */}
+			<div className="mt-[12px]">
+				<PriceBar pricing={card.pricing} size="hero" />
 			</div>
 		</Link>
 	);
