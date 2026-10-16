@@ -246,10 +246,11 @@ export function MarketCard({
 					<StatLine totals={card.totals} size="card" />
 				</div>
 			</div>
-			{/* TEMPORARY with the 2x2 grid: the `tile` bar (slim pill, side-
-			    coloured labels) in place of `card`, sized for the wider tile. */}
-			<div className="mt-[14px]">
-				<PriceBar pricing={card.pricing} size="tile" />
+			{/* TEMPORARY with the 2x2 grid: the hero's existing preset (22px bar,
+			    12px labels) instead of `card` (16px, 10.5px), so the YES/NO bar
+			    fills the wider tile. No preset changed. */}
+			<div className="mt-[12px]">
+				<PriceBar pricing={card.pricing} size="hero" />
 			</div>
 		</Link>
 	);
