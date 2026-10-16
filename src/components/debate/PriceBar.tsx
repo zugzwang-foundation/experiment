@@ -139,9 +139,10 @@ export function PriceBar({
 }
 
 /**
- * `tile` — the Discovery 2x2 tile's bar (client request 2026-10-16). A slim
- * pill on a recessed track, the two segments split by a 3px gap and lit by an
- * inset highlight, with each label in its own side's colour. Its own render
+ * `tile` — the Discovery 2x2 tile's bar (client request 2026-10-16). ONE
+ * continuous pill — the track clips both segments, so only its outer ends are
+ * rounded and a 2px divider marks the split (a gap with per-segment rounding
+ * read as two separate bars) — with each label in its own side's colour. Its own render
  * rather than a `ROW` entry so `hero`/`card`/`detail` stay byte-identical
  * (`detail` is pinned to a captured baseline). Labels are plain text — no
  * Discovery site passes `pick`. The percent text still carries the meaning,
@@ -150,20 +151,19 @@ export function PriceBar({
 function TileBar({ yesPct, noPct }: { yesPct: string; noPct: string }) {
 	const label =
 		"text-[13px] font-bold tracking-[0.05em] whitespace-nowrap tabular-nums";
-	const shine = "shadow-[inset_0_1px_0_rgb(255_255_255/0.28)]";
 	return (
 		<div data-size="tile" className="flex items-center gap-3">
 			<span className={`${label} text-bar-yes`}>YES {yesPct}</span>
 			<div
-				className="flex h-[10px] flex-1 gap-[3px] rounded-full bg-n1 shadow-[inset_0_1px_2px_rgb(0_0_0/0.5)]"
+				className="flex h-[10px] flex-1 overflow-hidden rounded-full bg-n1"
 				role="img"
 				aria-label={`YES ${yesPct}, NO ${noPct}`}
 			>
 				<div
-					className={`h-full rounded-full bg-bar-yes ${shine}`}
+					className="h-full border-r-2 border-n0 bg-bar-yes"
 					style={{ width: yesPct }}
 				/>
-				<div className={`h-full flex-1 rounded-full bg-bar-no ${shine}`} />
+				<div className="h-full flex-1 bg-bar-no" />
 			</div>
 			<span className={`${label} text-bar-no`}>NO {noPct}</span>
 		</div>
