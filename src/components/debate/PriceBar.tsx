@@ -79,7 +79,7 @@ export function PriceBar({
 	pick,
 }: {
 	pricing: { yes: string; no: string } | null;
-	size: "hero" | "card" | "detail";
+	size: "hero" | "card" | "detail" | "tile";
 	/**
 	 * HTML-FINISH · MARKET DETAIL round 2 · R7 (row 8) — the `.blab.click`
 	 * percent labels (`d5:1038`, `:1040`): clicking one opens the bet composer
@@ -111,6 +111,10 @@ export function PriceBar({
 	const yesPct = formatPricePercent(pricing, "YES");
 	const noPct = formatPricePercent(pricing, "NO");
 
+	if (size === "tile") {
+		return <TileBar yesPct={yesPct} noPct={noPct} />;
+	}
+
 	const s = ROW[size];
 	// `.blab` — 700, .05em, nowrap, `--ink`. `--ink` here is a text-EMPHASIS
 	// token, not a side encoding: both labels carry it, so copying it by name is
@@ -130,6 +134,38 @@ export function PriceBar({
 				<div className="h-full flex-1 bg-bar-no" />
 			</div>
 			<PriceLabel side="NO" pct={noPct} className={label} pick={pick} />
+		</div>
+	);
+}
+
+/**
+ * `tile` — the Discovery 2x2 tile's bar (client request 2026-10-16). A slim
+ * pill on a recessed track, the two segments split by a 3px gap and lit by an
+ * inset highlight, with each label in its own side's colour. Its own render
+ * rather than a `ROW` entry so `hero`/`card`/`detail` stay byte-identical
+ * (`detail` is pinned to a captured baseline). Labels are plain text — no
+ * Discovery site passes `pick`. The percent text still carries the meaning,
+ * so colour is never alone (AGENTS.md §8).
+ */
+function TileBar({ yesPct, noPct }: { yesPct: string; noPct: string }) {
+	const label =
+		"text-[13px] font-bold tracking-[0.05em] whitespace-nowrap tabular-nums";
+	const shine = "shadow-[inset_0_1px_0_rgb(255_255_255/0.28)]";
+	return (
+		<div data-size="tile" className="flex items-center gap-3">
+			<span className={`${label} text-bar-yes`}>YES {yesPct}</span>
+			<div
+				className="flex h-[10px] flex-1 gap-[3px] rounded-full bg-n1 shadow-[inset_0_1px_2px_rgb(0_0_0/0.5)]"
+				role="img"
+				aria-label={`YES ${yesPct}, NO ${noPct}`}
+			>
+				<div
+					className={`h-full rounded-full bg-bar-yes ${shine}`}
+					style={{ width: yesPct }}
+				/>
+				<div className={`h-full flex-1 rounded-full bg-bar-no ${shine}`} />
+			</div>
+			<span className={`${label} text-bar-no`}>NO {noPct}</span>
 		</div>
 	);
 }
