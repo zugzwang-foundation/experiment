@@ -277,3 +277,9 @@ not floors, and a layer declaring neither side — or both — still fails.
 **Recorded in-place per CLAUDE.md §5.12** (decision unchanged, consumer surface
 scoped) rather than as a supersession: the header is still sticky, still `z-40`,
 and still requires everything that covers it to say so.
+
+---
+
+## Patch record — 2026-10-13 · the end moves to 2026-12-31 23:45 UTC and no freeze is scheduled (D-55)
+
+**D-55 (decision record amendment 2.13, ruled 2026-10-11).** The experiment ends on `2026-12-31` at `23:45 UTC`, when its markets close, and no longer on `2026-11-05`. No freeze is scheduled: `system_state.frozen_at` and `isFrozen()` stay in the code, unchanged and unused, and nothing happens at `23:59 UTC`. The public dataset is released after the experiment closes and carries no date. Wherever this file states the `2026-11-05` end, the `23:59 UTC` freeze, a `2026-11-06` dataset date, or a live window of about 45 or 51 days, D-55 supersedes it (the window is now 2026-10-05 to 2026-12-31, about 87 days): 1 line in this file, counting any earlier patch record that quotes the date. ⚠ **The decision itself is unchanged and its reasoning is not rewritten.** Where an argument above rests on the end date or on the length of the window, it was made for the earlier date and has not been re-derived for the later one, unless a paragraph below says so.

@@ -308,7 +308,7 @@ describe("BLOCK-1 — G2, every value line is real content, never an empty bar",
 		//     on one market and wrongly on another can no longer pass.
 		//   · NOT stronger, today: the DERIVATION. Every `closes.line1` in the map
 		//     is now the same string, so reading it out of the map is byte-identical
-		//     to hardcoding "5 Nov 2026" and cannot distinguish a component that
+		//     to hardcoding "31 Dec 2026" and cannot distinguish a component that
 		//     ignores the map from one that reads it. It buys something only when a
 		//     second date exists again.
 		// ⚠ An earlier version of this comment claimed the derivation was

@@ -1,10 +1,22 @@
 # .github/workflows/staging-migrate.yml
-# Staging DB migrate on push to `staging` (ADR-0024 items 2-3).
+# Staging SUPABASE DB migrate — manual only (ADR-0024 items 2-3; EXT-1).
 #
-# ARMED since D3. A push to the `staging` branch fires this workflow, which
-# applies any pending migrations to the staging Supabase DB via
-# `doppler run --config stg -- pnpm db:migrate:staging`. It is part of the
-# gated deploy pipeline — see docs/runbooks/deploy-pipeline.md §3.
+# ⛔ NO LONGER FIRES ON PUSH (EXT-1). From D3 a push to the `staging` branch
+# fired this workflow, which applies any pending migrations to the staging
+# Supabase DB via `doppler run --config stg -- pnpm db:migrate:staging`. That
+# is the pre-AWS database: the staging host is served from RDS (SCOPE, below),
+# and what this one's six markets carry today is not established. Migration
+# 0032 is keyed on six market ids and on exact text, and none of what it could
+# do here is worth a standing trigger: do nothing and still be recorded as
+# applied (the committed snapshot of this database shows the same six slugs
+# under OTHER ids); abort, on a partial slate or on text it was not signed
+# against, and turn this workflow red on every staging push; or rewrite six
+# markets in a database the staging host does not read. `workflow_dispatch`
+# keeps the tool for a deliberate run. ⚠ GitHub offers a manual run only when
+# the DEFAULT branch's copy of a workflow declares it, so the button appears
+# once this file reaches `main`; the push trigger is gone as soon as it
+# reaches `staging`. The deploy pipeline it used to belong to is
+# docs/runbooks/deploy-pipeline.md §3.
 #
 # ⚠ SCOPE (production-readiness review HIGH-1): this migrates the SUPABASE
 # staging database that the VERCEL staging deployment uses — Doppler `stg`'s
@@ -16,8 +28,7 @@
 name: Staging Migrate
 
 on:
-  push:
-    branches: [staging]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -29,6 +40,14 @@ jobs:
     timeout-minutes: 15
 
     steps:
+      - name: Refuse any ref but staging
+        # `workflow_dispatch` can be started from ANY ref, and this job applies
+        # the migrations of the ref it checks out. Under the `push` trigger that
+        # ref was always `staging`; this keeps it so (EXT-1, the
+        # `prod-title-once.yml` pattern).
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/staging" ]; then echo "refusing: $GITHUB_REF is not staging"; exit 1; fi
+
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 

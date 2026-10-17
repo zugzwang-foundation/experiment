@@ -51,7 +51,10 @@ describe("chart-window::the production window is pinned to the experiment", () =
 	it("resolves the production window for prod and for every unrecognised value", () => {
 		// Moved from 2026-09-15 on 2026-10-06 to match staging (founder ruling).
 		const PROD_START = "2026-10-05T00:00:00.000Z";
-		const PROD_END = "2026-11-05T23:45:00.000Z";
+		// Moved from 2026-11-05T23:45Z by EXT-1 (ruling D-55): the axis ends when
+		// the markets close. The start is unchanged, so the window is ~88 days
+		// where it was ~32.
+		const PROD_END = "2026-12-31T23:45:00.000Z";
 
 		for (const env of [
 			"prod",
@@ -76,8 +79,8 @@ describe("chart-window::the production window is pinned to the experiment", () =
 		expect(end.getUTCHours()).toBe(23);
 		expect(end.getUTCMinutes()).toBe(45);
 		expect(end.getUTCFullYear()).toBe(2026);
-		expect(end.getUTCMonth()).toBe(10); // November, 0-indexed
-		expect(end.getUTCDate()).toBe(5);
+		expect(end.getUTCMonth()).toBe(11); // December, 0-indexed (EXT-1)
+		expect(end.getUTCDate()).toBe(31);
 	});
 });
 
@@ -107,7 +110,9 @@ describe("chart-window::staging and preview share the fixture window", () => {
 		// ⚠ CHART-4 D11 — was 2026-09-10T23:45Z, now production's own end. The
 		// start is still staging's (measured from its own data), so the two
 		// windows share an end and differ only in where they begin.
-		const STG_END = "2026-11-05T23:45:00.000Z";
+		// ⚠ EXT-1 (ruling D-55) — and they still share it: both moved together
+		// from 2026-11-05T23:45Z to the day the markets close.
+		const STG_END = "2026-12-31T23:45:00.000Z";
 
 		for (const env of ["staging", "preview"]) {
 			const w = resolveChartWindow(env);
@@ -118,8 +123,9 @@ describe("chart-window::staging and preview share the fixture window", () => {
 
 	it("the PRODUCTION window contains every ratified market's resolution deadline", () => {
 		// ⛔ THE STAGING ARM IS TIED TO ITS DATA TWO TESTS DOWN; THE PRODUCTION ARM
-		// WAS TIED ONLY TO ITS OWN LITERALS. `2026-11-05T23:45:00Z` is the ratified
-		// `resolution_deadline`, and "shared by every market" was an assertion in a
+		// WAS TIED ONLY TO ITS OWN LITERALS. `2026-12-31T23:45:00Z` is the ratified
+		// `resolution_deadline` (moved from `2026-11-05T23:45:00Z` by EXT-1, ruling
+		// D-55), and "shared by every market" was an assertion in a
 		// docblock rather than a measurement — SPEC.1 §9 explicitly permits a
 		// market to carry `23:59` instead, so it is still measured here.
 		//
@@ -171,10 +177,13 @@ describe("chart-window::staging and preview share the fixture window", () => {
 		// measured fact, so it is what gets pinned: the day a market lands on a
 		// different deadline, this reddens and whoever wrote it is told that the
 		// chart has a case it has not had since 2026-09-18.
+		// ⚠ EXT-1 (ruling D-55) MOVED THE ONE DEADLINE AND LEFT THE SLATE UNIFORM:
+		// all six moved together from 2026-11-05T23:45Z, so there is still no
+		// second date and the paragraph above still describes the slate.
 		const distinct = new Set(slate.map((m) => m.resolution_deadline));
 		expect(distinct.size).toBe(1);
 		expect(
-			slate.filter((m) => m.resolution_deadline === "2026-11-05T23:45:00.000Z")
+			slate.filter((m) => m.resolution_deadline === "2026-12-31T23:45:00.000Z")
 				.length,
 		).toBe(6);
 	});
@@ -183,8 +192,9 @@ describe("chart-window::staging and preview share the fixture window", () => {
 		// ⛔ THIS TEST IS A DATE-DEPENDENT ALARM, ON PURPOSE, AND IT IS THE ONLY
 		// MECHANISM BEHIND AN OWED THAT IS OTHERWISE PROSE IN THREE PLACES.
 		//
-		// `STAGING_CHART_WINDOW.end` is 2026-11-05T23:45Z since CHART-4 D11 (it
-		// was 2026-09-10T23:45Z, which this alarm was about to catch). Staging's
+		// `STAGING_CHART_WINDOW.end` is 2026-12-31T23:45Z since EXT-1 (it was
+		// 2026-11-05T23:45Z from CHART-4 D11, and 2026-09-10T23:45Z before that,
+		// which this alarm was about to catch). Staging's
 		// markets are permanently `Open`, so `withLiveTail` keeps appending a
 		// point at `now`. The moment `now` passes that constant, every staging
 		// chart's live tail — and BOTH terminal dots and BOTH pulses, which follow

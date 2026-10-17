@@ -500,10 +500,18 @@ export type ChartWindow = { readonly start: string; readonly end: string };
  * each market's opening point now maps to a negative x and is cut by the
  * viewBox — on production exactly as on staging. Chosen over `2026-10-04`
  * (which would keep it) so the two environments render the same.
+ *
+ * ── END MOVED · `2026-11-05T23:45` → `2026-12-31T23:45` (EXT-1 / D-55) ────────
+ *
+ * The experiment's end moved, and with it the six markets'
+ * `resolution_deadline` (migration `0032`). `end` is still that deadline — the
+ * first paragraph's reason is unchanged, only the instant is. The window is now
+ * 5 October to 31 December, ~88 days where it was ~32, so a point that sat
+ * halfway across the plot now sits under a fifth of the way across.
  */
 const PRODUCTION_CHART_WINDOW: ChartWindow = {
 	start: "2026-10-05T00:00:00.000Z",
-	end: "2026-11-05T23:45:00.000Z",
+	end: "2026-12-31T23:45:00.000Z",
 };
 
 /**
@@ -562,7 +570,9 @@ const PRODUCTION_CHART_WINDOW: ChartWindow = {
  * the geometry** — and CHART-4 D11 moved it, to production's own
  * `2026-11-05T23:45:00Z`, on founder ruling. Staging outlives 10 September, and
  * an end date chosen to sit just past the fixtures was a value with a shelf life
- * measured in days on an environment that is used every day.
+ * measured in days on an environment that is used every day. ⚠ EXT-1 / D-55
+ * MOVED IT AGAIN, with production's, to `2026-12-31T23:45:00Z`: the window is
+ * now 5 October to 31 December on both environments.
  *
  * ⚠ AMENDED AT CHART-5, BECAUSE THE SYMPTOM GOT WORSE. The overlay's end label
  * carries the current PERCENTAGE — **beside** the name since CHART-7 (RF-2), and
@@ -579,7 +589,7 @@ const PRODUCTION_CHART_WINDOW: ChartWindow = {
  * new value — it is only postponed, and it will fire again the moment `now`
  * passes the new `end`. It is silent when it fires: nothing errors, the page
  * renders, and the only symptom is two labels pointing at marks that are not
- * there. A reader arriving in November needs the mechanism, not just the date.
+ * there. A reader arriving at the end of December needs the mechanism, not just the date.
  */
 /**
  * ── RE-MEASURED 2026-09-11 · `2026-08-17` → `2026-09-07` ───────────────────
@@ -628,7 +638,7 @@ const PRODUCTION_CHART_WINDOW: ChartWindow = {
  */
 const STAGING_CHART_WINDOW: ChartWindow = {
 	start: "2026-10-05T00:00:00.000Z",
-	end: "2026-11-05T23:45:00.000Z",
+	end: "2026-12-31T23:45:00.000Z",
 };
 
 /**
@@ -718,6 +728,12 @@ export const MARKET_CHART_WINDOW_END = CHART_WINDOW.end;
  * on staging, whose window opens on 17 August because its fixtures predate the
  * experiment, the first two anchors fall *inside* the plot. **That is correct and
  * intended: the chart marks launch day even on a window that predates it.**
+ * ⚠ THAT SENTENCE DESCRIBES THE WINDOWS AS THEY WERE AT CHART-7. Since EXT-1 /
+ * D-55 the window is 5 October to 31 December on both environments, and the
+ * last anchor below moved with it. The first anchor (15 September) lies before
+ * that window on both environments and is not drawn — so the next paragraph's
+ * "neither environment has one today" has been out of date since the
+ * 2026-10-06 start move.
  *
  * ⚠ AN ANCHOR OUTSIDE THE CONFIGURED WINDOW IS NOT DRAWN. Neither environment has
  * one today; the rule is specified anyway, because the alternative is a label at
@@ -747,7 +763,7 @@ export const MARKET_CHART_WINDOW_END = CHART_WINDOW.end;
 export const MARKET_CHART_AXIS_ANCHORS: readonly string[] = Object.freeze([
 	"2026-09-15T00:00:00Z",
 	"2026-10-05T00:00:00Z",
-	"2026-11-05T23:45:00Z",
+	"2026-12-31T23:45:00Z",
 ]);
 
 // === UI.A5: Profile Dharma graph (SPEC.1 §23) =============================

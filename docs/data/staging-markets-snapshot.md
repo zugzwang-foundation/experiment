@@ -80,7 +80,7 @@ The text below is CURRENT (post-repair).
 | `id` | `01a01181-c54b-71b9-a77f-d6e11d373a69` |
 | `slug` | `chess-fide-tiebreak-response` |
 | `status` | `Open` |
-| `resolution_deadline` | `2026-11-05T23:45:00.000Z` |
+| `resolution_deadline` | `2026-12-31T23:45:00.000Z` |
 | `resolved_at` | `NULL` |
 | `resolution_outcome` | `NULL` |
 | `media_video_url` | `NULL` |
@@ -93,7 +93,7 @@ The text below is CURRENT (post-repair).
 **Resolution text (`markets.description`), verbatim:**
 
 ```text
-Will Viswanathan Anand respond publicly on X by 5 November 2026 to Zugzwang's published proposal to abolish rapid and blitz tiebreaks from the World Chess Championship match?
+Will Viswanathan Anand respond publicly on X by 31 December 2026 to Zugzwang's published proposal to abolish rapid and blitz tiebreaks from the World Chess Championship match?
 
 Resolves YES if @vishy64theking publishes a post on X, within the observation window, that names Zugzwang or links, quotes or reproduces any post in the Zugzwang thread. A reply, a repost, a quote-post and a standalone post all qualify. Resolves NO in every other case.
 
@@ -103,7 +103,7 @@ Resolver. Viswanathan Anand in person, whatever office he holds or ceases to hol
 
 Source. Only posts from @vishy64theking on X can resolve this market.
 
-Window. Opens at the root post's timestamp, ends 5 November 2026 at 23:45 UTC. UTC is the binding clock. Only posts timestamped at or before that instant count, whenever the operator resolves. No extensions.
+Window. Opens at the root post's timestamp, ends 31 December 2026 at 23:45 UTC, moved from 5 November 2026 by ruling D-55 (11 October 2026). UTC is the binding clock. Only posts timestamped at or before that instant count, whenever the operator resolves. No further extensions.
 
 Trigger. Latching. The first qualifying post resolves YES irreversibly. If Anand later deletes it, this market stays YES.
 
@@ -125,14 +125,14 @@ Evidence. The operator publishes the source URL, the post timestamp, the text ve
 
 ## 2. `bitcoin-price-50k`
 
-**Bitcoin · Will BTC ever go below $60,000 by 5th November?**
+**Bitcoin · Will BTC ever go below $60,000 by 31st December?**
 
 | field | value |
 |---|---|
 | `id` | `01a01181-ca40-725f-895c-270b2190c3ee` |
 | `slug` | `bitcoin-price-50k` |
 | `status` | `Open` |
-| `resolution_deadline` | `2026-11-05T23:45:00.000Z` |
+| `resolution_deadline` | `2026-12-31T23:45:00.000Z` |
 | `resolved_at` | `NULL` |
 | `resolution_outcome` | `NULL` |
 | `media_video_url` | `NULL` |
@@ -145,25 +145,25 @@ Evidence. The operator publishes the source URL, the post timestamp, the text ve
 **Resolution text (`markets.description`), verbatim:**
 
 ```text
-Will Bitcoin trade below USD 60,000 at any point between 15th September 2026 and 5th November 2026, as measured by the published daily low of Bitcoin (BTC) on CoinMarketCap?
+Will Bitcoin trade below USD 60,000 at any point between 15th September 2026 and 31st December 2026, as measured by the published daily low of Bitcoin (BTC) on CoinMarketCap?
 
-Resolves YES if the daily low published by CoinMarketCap for Bitcoin (BTC) is below USD 60,000 on any date from 15 September to 5 November 2026 inclusive. Resolves NO in every other case — including if Bitcoin trades below USD 60,000 only on a single exchange, only in a futures, perpetual, options or oracle price, only on another index, or only outside the window.
+Resolves YES if the daily low published by CoinMarketCap for Bitcoin (BTC) is below USD 60,000 on any date from 15 September to 31 December 2026 inclusive. Resolves NO in every other case — including if Bitcoin trades below USD 60,000 only on a single exchange, only in a futures, perpetual, options or oracle price, only on another index, or only outside the window.
 
 SOURCE. Exhaustive source set: CoinMarketCap only — its published historical daily record for Bitcoin (BTC), the Low field. No other publisher, index, aggregator or venue resolves this market.
 
 Excluded by name — CoinGecko, CoinDesk (XBX), the CME CF Bitcoin Reference Rate and Real-Time Index, Kaiko, Bloomberg Galaxy and S&P Bitcoin indices; Binance, Coinbase, Kraken, Bitstamp, Gemini, itBit, LMAX Digital, OKX, Bybit and every other individual exchange. Excluded by surface — any wick or print on a single order book, perpetual-swap prices, futures prices, options-implied and oracle feeds, wrapped, synthetic or tokenised BTC, and CoinMarketCap's own live ticker where it differs from the published daily low.
 
-CRITERION. "Below USD 60,000" means strictly less than USD 60,000.00, read to two decimal places. A published low of exactly USD 60,000.00 does not qualify. "Daily low" means the Low field of CoinMarketCap's published daily record for a UTC calendar date. The window is the 52 UTC calendar dates from 15 September 2026 to 5 November 2026 inclusive.
+CRITERION. "Below USD 60,000" means strictly less than USD 60,000.00, read to two decimal places. A published low of exactly USD 60,000.00 does not qualify. "Daily low" means the Low field of CoinMarketCap's published daily record for a UTC calendar date. The window is the 108 UTC calendar dates from 15 September 2026 to 31 December 2026 inclusive.
 
-DEADLINE. Trading closes and settlement occurs at 2026-11-05T23:45:00Z. The window opens at 2026-09-15T00:00:00Z. UTC is the binding clock throughout.
+DEADLINE. Trading closes and settlement occurs at 2026-12-31T23:45:00Z, moved from 5 November 2026 by ruling D-55 (11 October 2026). The window opens at 2026-09-15T00:00:00Z. UTC is the binding clock throughout.
 
 TRIGGER. Latching. The first published daily low below USD 60,000 resolves this market YES irreversibly. A later recovery above USD 60,000 does not un-trigger it, and no subsequent observation changes the outcome. On multiple qualifying dates, the earliest binds.
 
-EDGE CASES. (a) UTC is binding; dates are UTC calendar dates. (b) A published low of exactly USD 60,000.00 resolves NO. (c) The 5 November daily low is binding as published; the final fifteen minutes of that date fall after the settlement instant, and this over-inclusion is accepted in advance. (d) A price below USD 60,000 on any single exchange, in any derivative, or on any other index does not qualify, however widely reported. (e) If CoinMarketCap changes its methodology mid-window, the values it publishes under the changed methodology bind. (f) If a published value is later revised, the value published at the time of resolution binds. (g) A temporary outage is not a void condition; resolution proceeds from the series once available. (h) Only observations dated at or before the deadline count, regardless of when the operator resolves, subject to (c).
+EDGE CASES. (a) UTC is binding; dates are UTC calendar dates. (b) A published low of exactly USD 60,000.00 resolves NO. (c) The 31 December daily low is binding as published; the final fifteen minutes of that date fall after the settlement instant, and this over-inclusion is accepted in advance. (d) A price below USD 60,000 on any single exchange, in any derivative, or on any other index does not qualify, however widely reported. (e) If CoinMarketCap changes its methodology mid-window, the values it publishes under the changed methodology bind. (f) If a published value is later revised, the value published at the time of resolution binds. (g) A temporary outage is not a void condition; resolution proceeds from the series once available. (h) Only observations dated at or before the deadline count, regardless of when the operator resolves, subject to (c).
 
 VOID. This market voids only if CoinMarketCap permanently ceases publishing Bitcoin historical daily data before resolution and no archive of the window is retrievable. Ambiguity, a temporary outage, a methodology change, a data revision, an unwelcome outcome, low participation, and Bitcoin approaching but not crossing the level are not void conditions.
 
-EVIDENCE. At resolution the operator records and publishes the source URL, the full daily-low series for all 52 dates in the window, the qualifying date and value if any, an independent archive capture taken at resolution time, and the criterion clause satisfied.
+EVIDENCE. At resolution the operator records and publishes the source URL, the full daily-low series for all 108 dates in the window, the qualifying date and value if any, an independent archive capture taken at resolution time, and the criterion clause satisfied.
 
 DISCLOSURE. No operator intervention. The Foundation takes no action directed at CoinMarketCap or at any venue constituent to its Bitcoin price, and has no relationship with any of them. Neither the Zugzwang Foundation nor the operator holds Bitcoin or any cryptocurrency position.
 ```
@@ -179,14 +179,14 @@ DISCLOSURE. No operator intervention. The Foundation takes no action directed at
 
 ## 3. `math-erdos-solved-on-zugzwang`
 
-**Math · Will 3 Erdős problems be solved by 5th November?**
+**Math · Will 3 Erdős problems be solved by 31st December?**
 
 | field | value |
 |---|---|
 | `id` | `01a01181-d035-714a-b735-5d282576d0a3` |
 | `slug` | `math-erdos-solved-on-zugzwang` |
 | `status` | `Open` |
-| `resolution_deadline` | `2026-11-05T23:45:00.000Z` |
+| `resolution_deadline` | `2026-12-31T23:45:00.000Z` |
 | `resolved_at` | `NULL` |
 | `resolution_outcome` | `NULL` |
 | `media_video_url` | `NULL` |
@@ -199,7 +199,7 @@ DISCLOSURE. No operator intervention. The Foundation takes no action directed at
 **Resolution text (`markets.description`), verbatim:**
 
 ```text
-Will Thomas Bloom, owner and maintainer of erdosproblems.com, publicly confirm on X by 5 November 2026 that at least three distinct Erdős problems, listed as open on erdosproblems.com when this market opened, have been solved?
+Will Thomas Bloom, owner and maintainer of erdosproblems.com, publicly confirm on X by 31 December 2026 that at least three distinct Erdős problems, listed as open on erdosproblems.com when this market opened, have been solved?
 
 Resolves YES if posts published by @thomasfbloom on X, within the observation window, state of at least three distinct numbered Erdős problems that the problem is solved, proved or disproved. Each problem counts once. A problem must have been listed as open on erdosproblems.com at market open to count. Resolves NO in every other case - including posts reporting partial progress or reporting someone's claim without stating the problem is solved, and silence. A status change on erdosproblems.com itself does not resolve this market, and neither does a comment on its forum. Only posts by @thomasfbloom on X do.
 
@@ -211,7 +211,7 @@ Open. A problem counts only if erdosproblems.com listed it as open at market ope
 
 Source. @thomasfbloom on X only.
 
-Deadline. 5 November 2026, 23:45 UTC. The window opens at market open. UTC is the binding clock. Only posts timestamped at or before the deadline count, whenever the operator resolves. No extensions.
+Deadline. 31 December 2026, 23:45 UTC, moved from 5 November 2026 by ruling D-55 (11 October 2026). The window opens at market open. UTC is the binding clock. Only posts timestamped at or before the deadline count, whenever the operator resolves. No further extensions.
 
 Trigger. Latching. The third distinct qualifying confirmation resolves YES irreversibly. Later deletion does not un-resolve it, and neither does a subsequent reversal by him.
 
@@ -242,7 +242,7 @@ Evidence. For each of the three confirmations the operator publishes the source 
 | `id` | `01a01181-d508-7288-b996-36ec427a9d2f` |
 | `slug` | `claude-bundle-response` |
 | `status` | `Open` |
-| `resolution_deadline` | `2026-11-05T23:45:00.000Z` |
+| `resolution_deadline` | `2026-12-31T23:45:00.000Z` |
 | `resolved_at` | `NULL` |
 | `resolution_outcome` | `NULL` |
 | `media_video_url` | `NULL` |
@@ -255,7 +255,7 @@ Evidence. For each of the three confirmations the operator publishes the source 
 **Resolution text (`markets.description`), verbatim:**
 
 ```text
-Will @ClaudeDevs reply thumbs up to the Zugzwang thread presenting the Bundle feature specification, on X, between 15 September and 5 November 2026?
+Will @ClaudeDevs reply thumbs up to the Zugzwang thread presenting the Bundle feature specification, on X, between 15 September and 31 December 2026?
 
 Resolves YES if @ClaudeDevs publishes on X, within the observation window, a reply to any post in the Zugzwang Bundle thread, or a quote-post of any post in it, that contains a thumbs-up and does not contain a thumbs-down. Resolves NO in every other case - including a reply containing a thumbs-down, a reply containing both, a reply containing neither, a like, a bookmark, and a repost without comment.
 
@@ -265,7 +265,7 @@ Thumbs. A thumbs-up is the thumbs-up emoji in any skin tone, or the words thumbs
 
 The point. This market runs for the whole window so that participants can argue for and against the feature, with a stake behind every argument. At resolution Anthropic sees what users want. Both outcomes are equally useful to the experiment.
 
-Deadline. 5 November 2026, 23:45 UTC. The window opens at market open on 15 September 2026. UTC is the binding clock. Only posts timestamped at or before the deadline count, whenever the operator resolves. No extensions.
+Deadline. 31 December 2026, 23:45 UTC, moved from 5 November 2026 by ruling D-55 (11 October 2026). The window opens at market open on 15 September 2026. UTC is the binding clock. Only posts timestamped at or before the deadline count, whenever the operator resolves. No further extensions.
 
 Trigger. Latching on YES only. The first qualifying thumbs-up reply resolves YES irreversibly; later deletion, retraction or a subsequent thumbs-down does not un-resolve it. A thumbs-down reply does not close this market - a later qualifying thumbs-up inside the window still resolves YES. NO is reached only at the deadline.
 
@@ -292,7 +292,7 @@ Evidence. The operator publishes the source URL, the post timestamp, the text ve
 | `id` | `01a01181-da63-738b-a3ea-8da89299bc53` |
 | `slug` | `yc-w27-acceptance` |
 | `status` | `Open` |
-| `resolution_deadline` | `2026-11-05T23:45:00.000Z` |
+| `resolution_deadline` | `2026-12-31T23:45:00.000Z` |
 | `resolved_at` | `NULL` |
 | `resolution_outcome` | `NULL` |
 | `media_video_url` | `NULL` |
@@ -305,7 +305,7 @@ Evidence. The operator publishes the source URL, the post timestamp, the text ve
 **Resolution text (`markets.description`), verbatim:**
 
 ```text
-Will Y Combinator accept Zugzwang into its Winter 2027 batch by 5 November 2026?
+Will Y Combinator accept Zugzwang into its Winter 2027 batch by 31 December 2026?
 
 Declared: the operator is the applicant, knows the application's status before anyone else, and is also the sole resolver.
 
@@ -317,7 +317,7 @@ Zugzwang. The application the operator submits for the Zugzwang project, under w
 
 Timing. Y Combinator states that applicants who apply by its on-time deadline of 2 November 2026 hear back by 11 December 2026 (ycombinator.com/apply, read 18 September 2026). Only a decision received at or before this market's deadline counts; a later decision does not, whichever way it goes.
 
-Deadline. 5 November 2026, 23:45 UTC. The window opens at market open on 15 September 2026. UTC is the binding clock. No extensions.
+Deadline. 31 December 2026, 23:45 UTC, moved from 5 November 2026 by ruling D-55 (11 October 2026). The window opens at market open on 15 September 2026. UTC is the binding clock. No further extensions.
 
 Trigger. Latching. An offer received inside the window resolves YES irreversibly. A later deferral, withdrawal or declined offer does not un-resolve it.
 
@@ -344,7 +344,7 @@ Evidence. The operator publishes YC's decision verbatim with personal data redac
 | `id` | `01a01181-df3a-747f-b154-e79a4a416b51` |
 | `slug` | `github-zugzwang-repo-stars` |
 | `status` | `Open` |
-| `resolution_deadline` | `2026-11-05T23:45:00.000Z` |
+| `resolution_deadline` | `2026-12-31T23:45:00.000Z` |
 | `resolved_at` | `NULL` |
 | `resolution_outcome` | `NULL` |
 | `media_video_url` | `NULL` |
@@ -357,7 +357,7 @@ Evidence. The operator publishes YC's decision verbatim with personal data redac
 **Resolution text (`markets.description`), verbatim:**
 
 ```text
-Will the Zugzwang repository reach 50,000 GitHub stars by 5 November 2026?
+Will the Zugzwang repository reach 50,000 GitHub stars by 31 December 2026?
 
 Declared: the Zugzwang Foundation owns this repository, is publicly campaigning for the YES outcome, and is also the sole resolver.
 
@@ -365,7 +365,7 @@ Resolves YES if the star count for zugzwang-foundation/experiment is observed at
 
 Resolves NO in every other case — no qualifying observation, stars on a fork or mirror, any other GitHub metric, third-party star trackers, or a reading with no independent capture. Anyone may produce an observation.
 
-Deadline 5 November 2026, 23:45 UTC.
+Deadline 31 December 2026, 23:45 UTC, moved from 5 November 2026 by ruling D-55 (11 October 2026).
 ```
 
 **`market_media` (2):**

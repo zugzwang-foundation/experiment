@@ -21,8 +21,8 @@
  * division cannot be less than 1. That is why there is no `=== 0` check
  * anywhere below — a check would imply the case can arise.
  *
- * ⛔ NO WEEKS, MONTHS OR YEARS BUCKET. The experiment's live window is ~51 days
- * (15 Sep – 5 Nov 2026), so `51d ago` is the practical ceiling and an unbounded
+ * ⛔ NO WEEKS, MONTHS OR YEARS BUCKET. The experiment's live window is ~87 days
+ * (5 Oct – 31 Dec 2026), so `87d ago` is the practical ceiling and an unbounded
  * day count is the honest end of the ladder. A `w`/`mo` bucket would be code
  * for a state this build cannot reach.
  *

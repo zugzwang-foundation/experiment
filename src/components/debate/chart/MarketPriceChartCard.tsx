@@ -12,7 +12,9 @@ import { MarketPriceChart } from "./MarketPriceChart";
  * ⚠ THE AXIS IS TWO CALENDAR ANCHORS SINCE CHART-7 (RF-4), NOT "two interior
  * ticks, three date labels" — which is what this sentence said, and what SPEC.1 §9
  * still says. The card labels the first and last of `MARKET_CHART_AXIS_ANCHORS`
- * (`Sep 15` and `Nov 5`) and draws a dashed rule only where an anchor falls
+ * (in the list, `Sep 15` and `Dec 31`; `Sep 15` lies before the window since
+ * the 2026-10-06 start move and is not drawn, so the card shows `Oct 5` and
+ * `Dec 31`) and draws a dashed rule only where an anchor falls
  * strictly inside the plot — so on the PRODUCTION window, where both of its
  * anchors are the plot's own edges, it draws none. ⚠ It also gained a left column
  * of numeric marks at `0 / 25 / 50 / 75 / 100` (RF-1, RF-3), which it never had.

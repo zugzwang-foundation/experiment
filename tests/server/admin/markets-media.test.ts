@@ -66,7 +66,12 @@ const DEADLINE = new Date("2026-10-01T00:00:00.000Z");
 // 2026-10-01 and the action refused it as in the past. A week out, capped at the
 // §12.1 freeze ceiling, minute-aligned because datetimeLocal() truncates. The
 // service tests keep DEADLINE, because they inject NOW.
-const FREEZE_INSTANT_UTC = new Date("2026-11-05T23:59:00.000Z");
+// ⚠ A local copy of `create.ts`'s constant, moved with it by EXT-1 (ruling
+// D-55) from 2026-11-05T23:59Z. Here it is only a CAP on a deadline a week
+// out, so a stale copy stays green until the old date itself has passed — and
+// then the cap is behind the clock and every wire case is refused as
+// deadline-in-the-past. That is the reason to move it now rather than then.
+const FREEZE_INSTANT_UTC = new Date("2026-12-31T23:45:00.000Z");
 const WIRE_DEADLINE = (() => {
 	const d = new Date(
 		Math.min(
@@ -333,8 +338,9 @@ describe("createMarket — admin market-media create (service)", () => {
 		);
 
 		// OD-2: MEDIA.1 adds NO new EVENT_TYPE / aggregate_type. The absolute count
-		// is 24 post-AUDIT-FIX-B5 (which added `moderation.blocked`, A13).
-		expect(EVENT_TYPES.length).toBe(25);
+		// is 26 since EXT-1 added `market.deadline_moved` (migration 0032); it was
+		// 24 post-AUDIT-FIX-B5 and 25 with ADR-0047's `pool.liquidity_added`.
+		expect(EVENT_TYPES.length).toBe(26);
 
 		const all = await testDb
 			.select({

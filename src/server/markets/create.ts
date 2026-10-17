@@ -27,11 +27,21 @@ import {
 } from "./transaction";
 
 /**
- * R-14.6: the SPEC.1 §12.1 deadline ceiling — the J10 conclusion-freeze
- * instant, a FIXED date, not a tuning value. Service guard only (`==`
- * passes per §12.1 "≤"); the DB CHECK is a HARDEN candidate (CF-2).
+ * R-14.6: the SPEC.1 §12.1 deadline ceiling — the END OF THE EXPERIMENT, a
+ * FIXED date, not a tuning value. Service guard only (`==` passes per §12.1
+ * "≤"); the DB CHECK is a HARDEN candidate (CF-2).
+ *
+ * ⚠ THE NAME IS HISTORICAL AND KEPT ON PURPOSE (EXT-1 / D-55). This was the
+ * J10 conclusion-freeze instant, `2026-11-05T23:59:00Z`. D-55 moved the end to
+ * 31 December 2026 at 23:45 UTC and ruled that there is no scheduled freeze:
+ * the experiment ends when its markets close. So this is now the instant the
+ * six markets' `resolution_deadline` carries, and nothing happens at 23:59 any
+ * more. Renaming it would touch every countdown and every pin that reads it,
+ * for no change in behaviour. It drives the header, admin and image-export
+ * countdowns and this ceiling. It does NOT set `system_state.frozen_at` —
+ * nothing does.
  */
-export const FREEZE_INSTANT_UTC = new Date("2026-11-05T23:59:00.000Z");
+export const FREEZE_INSTANT_UTC = new Date("2026-12-31T23:45:00.000Z");
 
 /** D-14.a: kebab slug, length 3–80, caller-supplied (no auto-slugify). */
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

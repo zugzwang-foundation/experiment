@@ -113,3 +113,9 @@ bet_receipts (
 ## Single-source file map
 
 `src/db/schema/bets.ts` (the `bet_receipts` table + drizzle-zod pair) + `drizzle/migrations/0022_*.sql` (table + same-file guard triggers); the write path + pre-check + mapping across `src/server/bets/{errors,sell,place,endpoint}.ts`, the replay/pre-check module, and `src/server/idempotency/cache.ts` (ownership-checked never-throws release). CC's B3 close-out file map is canonical.
+
+---
+
+## Patch record — 2026-10-13 · the end moves to 2026-12-31 23:45 UTC and no freeze is scheduled (D-55)
+
+**D-55 (decision record amendment 2.13, ruled 2026-10-11).** The experiment ends on `2026-12-31` at `23:45 UTC`, when its markets close, and no longer on `2026-11-05`. No freeze is scheduled: `system_state.frozen_at` and `isFrozen()` stay in the code, unchanged and unused, and nothing happens at `23:59 UTC`. The public dataset is released after the experiment closes and carries no date. Wherever this file states the `2026-11-05` end, the `23:59 UTC` freeze, a `2026-11-06` dataset date, or a live window of about 45 or 51 days, D-55 supersedes it (the window is now 2026-10-05 to 2026-12-31, about 87 days): 2 lines in this file, counting any earlier patch record that quotes the date. ⚠ **The decision itself is unchanged and its reasoning is not rewritten.** Where an argument above rests on the end date or on the length of the window, it was made for the earlier date and has not been re-derived for the later one, unless a paragraph below says so.

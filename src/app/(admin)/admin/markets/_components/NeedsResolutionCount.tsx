@@ -93,7 +93,7 @@ export function NeedsResolutionCount({
 			<div className="flex flex-col gap-1 rounded-(--r) border border-n2 bg-n0 p-4 shadow-(--elev-1)">
 				<span className="flex items-center gap-1.5 font-medium text-n5 text-xs uppercase tracking-wide">
 					<Timer aria-hidden className="size-3.5" />
-					Conclusion freeze
+					Markets close
 				</span>
 				<span
 					aria-live="polite"
@@ -101,7 +101,7 @@ export function NeedsResolutionCount({
 				>
 					{countdown}
 				</span>
-				<span className="text-n5 text-xs">2026-11-05 23:59 UTC</span>
+				<span className="text-n5 text-xs">2026-12-31 23:45 UTC</span>
 			</div>
 		</div>
 	);

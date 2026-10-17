@@ -49,7 +49,7 @@ describe("getMarketBySlug — public slug resolver (SHELL/UI.0)", () => {
 		await seedMarket({
 			slug: "will-it-rain",
 			status: "Open",
-			description: "Resolves YES if it rains in Mumbai on Devcon day.",
+			description: "Resolves YES if it rains in Mumbai on resolution day.",
 		});
 
 		const dto = await getMarketBySlug(testDb, "will-it-rain");
@@ -58,7 +58,7 @@ describe("getMarketBySlug — public slug resolver (SHELL/UI.0)", () => {
 		expect(dto).toMatchObject({
 			slug: "will-it-rain",
 			title: "Market will-it-rain",
-			description: "Resolves YES if it rains in Mumbai on Devcon day.",
+			description: "Resolves YES if it rains in Mumbai on resolution day.",
 			status: "Open",
 		});
 		// DTO carries the id (UUIDv7 string) — not a drizzle row beyond the 6 cols.

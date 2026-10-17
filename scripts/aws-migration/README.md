@@ -19,6 +19,14 @@ Move those to arguments before anyone else runs them.
 | `staging-verify.cjs` | 21 read-only checks: schema, extensions, cron, journal, row counts vs the archive, invariants, and a *behavioural* append-only test | nothing (one rolled-back DELETE) |
 | `staging-bet-check.cjs` | read-only: count deltas and the full write spine of the newest bet; `--deep` adds events, ledger chain, onboarding | nothing |
 | `integration-probe.js` | runs inside a one-off ECS task: Upstash, OpenAI, R2, Sentry, Resend with the injected staging credentials | nothing |
+| `launch-dump.cjs` | **LAUNCH-DB-COPY-1 (one-time).** pg_dump of `prod` or `staging` + a manifest (per-table count and content fingerprint); refused if the source changed mid-dump. The `prod` mode is kept after launch as the RDS-era backup | the local backup directory only |
+| `prod-restore.cjs --source=staging` | **LAUNCH-DB-COPY-1 (one-time).** TRUNCATE + load + clear sessions/verifications/admin_sessions in ONE transaction; needs `ZZ_LAUNCH_COPY_ACK`; this mode alone refuses after 2026-10-25 (the prod-dump rollback mode never expires); leaves production's pg_cron jobs paused | production RDS |
+| `launch-storage.cjs` | **LAUNCH-DB-COPY-1 (one-time).** copies the uploads and PFP objects the staging dump references; copy-only, never overwrites | production R2 buckets |
+| `launch-cache.cjs` | **LAUNCH-DB-COPY-1 (one-time).** SCAN + DEL of `prod:cache:*`, `prod:cache-metric:*`, `prod:idem:*` only (the Upstash instance is shared with staging) | production Redis keys |
+| `launch-cron.cjs` | **LAUNCH-DB-COPY-1 (one-time).** `pause` records an environment's active pg_cron jobs and deactivates them; `resume` re-activates exactly the recorded ones | `cron.job.active` only |
+| `launch-verify.cjs` | **LAUNCH-DB-COPY-1.** read-only: fingerprints vs the staging manifest, invariants, identity-pool headroom, storage presence, HTTP | nothing |
+
+⛔ The five LAUNCH-DB-COPY-1 write tools are **for the initial launch only** (ADR-0065, `docs/plans/LAUNCH-DB-COPY-1.md`). A follow-up PR removes `--source=staging`, `launch-dump.cjs staging`, `launch-storage.cjs`, `launch-cache.cjs` and `launch-cron.cjs` once the launch is verified. Until then the backstop is that every launch write — `prod-restore --source=staging`, and `--execute` on `launch-storage`, `launch-cache` and `launch-cron pause` — refuses without `ZZ_LAUNCH_COPY_ACK=replace-production-with-staging` and after 2026-10-25T23:59:59Z. `launch-cron resume`, `launch-dump` and `launch-verify` are not gated (the safe direction, and read-only respectively). The prod-dump restore mode is not a launch tool and never expires; after the 2026-11-05 freeze it is a BREAK_GLASS action.
 
 Findings these encode (all measured, see `docs/aws-migration/05-*.md` §8.1 and `06-*.md` §4):
 RDS forbids `--disable-triggers` (system FK triggers), the schema-scoped archive's data

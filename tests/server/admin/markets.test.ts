@@ -89,7 +89,11 @@ function withoutAdminSession(): void {
 // Returned event ids pinned SEMANTICALLY (=== the inserted events row's
 // event_id, ≠ marketId) — never toBeDefined().
 
-const FREEZE_INSTANT_UTC = new Date("2026-11-05T23:59:00.000Z");
+// ⚠ A LOCAL COPY of `create.ts`'s constant, moved with it by EXT-1 (ruling
+// D-55): the ceiling is the end of the experiment, 2026-12-31T23:45Z. It was
+// 2026-11-05T23:59Z. The boundary-pass case below creates a market ON this
+// instant, so a copy that lags the source is refused with deadline_ceiling.
+const FREEZE_INSTANT_UTC = new Date("2026-12-31T23:45:00.000Z");
 const NOW = new Date("2026-09-15T00:00:00.000Z");
 const DEADLINE = new Date("2026-10-01T00:00:00.000Z");
 const TITLE = "PLACEHOLDER — not a real market";
@@ -175,12 +179,13 @@ describe("ENGINE.14 F-ADMIN-1 — createMarket (W-4 create branch)", () => {
 	});
 
 	it("admin-markets::M1-deadline-form-validation-ceiling-reject", async () => {
-		// One millisecond past the freeze instant → MarketDeadlineCeilingError;
-		// NOTHING written (asserted, not assumed).
+		// One millisecond past the ceiling instant → MarketDeadlineCeilingError;
+		// NOTHING written (asserted, not assumed). The instant is
+		// FREEZE_INSTANT_UTC + 1 ms, moved with it by EXT-1.
 		const caught = await createMarket(
 			createArgs(
 				"placeholder-m1-ceiling",
-				new Date("2026-11-05T23:59:00.001Z"),
+				new Date("2026-12-31T23:45:00.001Z"),
 			),
 		).catch((e: unknown) => e);
 		expect(caught).toBeInstanceOf(MarketDeadlineCeilingError);
@@ -343,8 +348,9 @@ describe("ENGINE.14 F-ADMIN-1 — createMarket (W-4 create branch)", () => {
 // description (≤MARKET_DESCRIPTION_MAX_CHARS), resolutionDeadline (a
 // datetime-local string → Date). Success → { marketId, slug }.
 
-// S2 correction (was 2027-01-01, which is PAST the §12.1 freeze ceiling
-// 2026-11-05T23:59Z → createMarket would reject with deadline_ceiling, not ok).
+// S2 correction (was 2027-01-01, which is PAST the §12.1 ceiling — then
+// 2026-11-05T23:59Z, and 2026-12-31T23:45Z since EXT-1, which 2027-01-01 is
+// still past → createMarket would reject with deadline_ceiling, not ok).
 // A future deadline (> now) that is ≤ the ceiling, so the happy path creates a
 // Draft. ⚠ RELATIVE TO THE REAL CLOCK: the wire tests run createMarketAction at
 // `new Date()`, so the fixed 2026-10-01 this used to be expired on that date and
@@ -365,7 +371,12 @@ const PAST_DEADLINE = new Date("2020-01-01T00:00:00.000Z");
 // which parses back to EXACTLY the freeze instant — allowed under "≤", so no
 // ceiling fired). The next minute past the freeze survives minute-truncation
 // as a genuine breach.
-const CEILING_BREACH = new Date("2026-11-06T00:00:00.000Z");
+// ⚠ MOVED BY EXT-1, AND IT HAD TO BE. The ceiling is 2026-12-31T23:45Z, so the
+// next minute past it is 23:46. The old value, 2026-11-06T00:00Z, is now a
+// LEGAL deadline — eight weeks inside the ceiling — and left in place it would
+// create a Draft and turn the over-ceiling case below into a pass that asserts
+// the opposite of its name.
+const CEILING_BREACH = new Date("2026-12-31T23:46:00.000Z");
 
 /** A datetime-local string (no seconds/zone) the browser form would submit. */
 function datetimeLocal(d: Date): string {

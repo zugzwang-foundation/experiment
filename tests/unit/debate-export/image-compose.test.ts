@@ -87,9 +87,12 @@ describe("composePostExport", () => {
 		);
 
 		// The band's countdown, from the SAME `formatCountdown` the global header
-		// ticks with and the SAME built freeze pin: `NOW` is 2026-06-29T12:00Z and
-		// the freeze is 2026-11-05T23:59Z — 129 days and 11h59m, digits only.
-		expect(props.countdown).toBe("129:11:59");
+		// ticks with and the SAME built pin: `NOW` is 2026-06-29T12:00Z and the
+		// experiment ends 2026-12-31T23:45Z (EXT-1) — 185 days and 11h45m, digits
+		// only. 29 Jun 12:00 → 31 Dec 12:00 is 1 + 31 + 31 + 30 + 31 + 30 + 31 =
+		// 185 days, and 12:00 → 23:45 is the 11h45m. It read `129:11:59` while the
+		// pin was 2026-11-05T23:59Z.
+		expect(props.countdown).toBe("185:11:45");
 
 		// Post — the author row as the card renders it.
 		expect(props.post.ordinal).toBe(2);

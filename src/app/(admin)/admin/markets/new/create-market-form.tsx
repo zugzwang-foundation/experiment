@@ -59,7 +59,7 @@ const ERROR_COPY: Record<string, string> = {
 		"This form's market id already exists. Reload the page to start a fresh form (uploads will need repeating).",
 	deadline_in_past: "The resolution deadline must be in the future.",
 	deadline_ceiling:
-		"The resolution deadline cannot be after the conclusion freeze (2026-11-05 23:59 UTC).",
+		"The resolution deadline cannot be after the end of the experiment (2026-12-31 23:45 UTC).",
 	validation_error: "One or more fields are invalid.",
 	admin_session_required:
 		"Your admin session has expired — sign in again to continue.",
@@ -334,8 +334,8 @@ export function CreateMarketForm({
 					/>
 					<span className={hint}>
 						The picker shows a wall clock; the value is stored as UTC. Must be
-						in the future and no later than the conclusion freeze, 2026-11-05
-						23:59 UTC.
+						in the future and no later than the end of the experiment,
+						2026-12-31 23:45 UTC.
 					</span>
 				</label>
 			</fieldset>

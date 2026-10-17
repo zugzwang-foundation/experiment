@@ -8,7 +8,7 @@
 
 ## 1 · The question
 
-Will Y Combinator accept Zugzwang into its Winter 2027 batch by 5 November 2026?
+Will Y Combinator accept Zugzwang into its Winter 2027 batch by 31 December 2026?
 
 Declared: the operator is the applicant, knows the application's status before anyone else, and is also the sole resolver.
 
@@ -24,7 +24,7 @@ Zugzwang. The application the operator submits for the Zugzwang project, under w
 
 Timing. Y Combinator states that applicants who apply by its on-time deadline of 2 November 2026 hear back by 11 December 2026 (ycombinator.com/apply, read 18 September 2026). Only a decision received at or before this market's deadline counts; a later decision does not, whichever way it goes.
 
-Deadline. 5 November 2026, 23:45 UTC. The window opens at market open on 15 September 2026. UTC is the binding clock. No extensions.
+Deadline. 31 December 2026, 23:45 UTC, moved from 5 November 2026 by ruling D-55 (11 October 2026). The window opens at market open on 15 September 2026. UTC is the binding clock. No further extensions.
 
 Trigger. Latching. An offer received inside the window resolves YES irreversibly. A later deferral, withdrawal or declined offer does not un-resolve it.
 
@@ -37,13 +37,13 @@ Evidence. The operator publishes YC's decision verbatim with personal data redac
 | | |
 |---|---|
 | Opens | 15 September 2026 |
-| Trading closes | `2026-11-05T23:45:00Z` |
-| Settles | `2026-11-05T23:45:00Z` — with all other markets |
+| Trading closes | `2026-12-31T23:45:00Z` |
+| Settles | `2026-12-31T23:45:00Z` — with all other markets |
 | Resolver | Y Combinator, through its written decision to the applicant |
 | Resolution | YC decision |
 | Flavour | Showcase |
 
-Display block: **RESOLUTION** YC decision · **RESOLVER** Y Combinator → `https://www.ycombinator.com/apply` · **CLOSES ON** 5 Nov 2026 / 23:45Z · **FLAVOUR** Showcase
+Display block: **RESOLUTION** YC decision · **RESOLVER** Y Combinator → `https://www.ycombinator.com/apply` · **CLOSES ON** 31 Dec 2026 / 23:45Z · **FLAVOUR** Showcase
 
 ## 5 · Operator entry
 
@@ -62,5 +62,5 @@ YCombinator · Will Zugzwang get into YC's Winter 2027 batch?
 **Deadline** — typed digits are read as UTC verbatim. No trailing `Z`.
 
 ```
-2026-11-05T23:45
+2026-12-31T23:45
 ```

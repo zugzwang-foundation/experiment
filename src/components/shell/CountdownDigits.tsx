@@ -6,7 +6,7 @@
  * to cells.
  *
  * Cell count tracks the string (ratified OQ-8): 9 cells while days > 99,
- * 8 after (~Jul 29); chessboard parity continues row 1 (its col 0 is dark,
+ * 8 after (2026-09-22 under the EXT-1 end, so 8 from here on); chessboard parity continues row 1 (its col 0 is dark,
  * so row 2 col 0 is light) and alternation is preserved at either count.
  * These cells are header CHROME (ratified R-4) — the #FAFAFA fills carry no
  * side meaning (WI-1 pole law: nothing here binds bg-yes/bg-no).

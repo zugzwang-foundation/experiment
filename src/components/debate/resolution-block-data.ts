@@ -2,7 +2,7 @@
  * BLOCK-1 — the static, per-slug resolution-block map.
  *
  * Every value is frozen at pre-registration and never changes during the live
- * window (15 Sep – 5 Nov 2026), so it ships as an in-code map rather than a
+ * window (5 Oct – 31 Dec 2026), so it ships as an in-code map rather than a
  * new `markets` column — there is no home for it in the 11-column table and
  * this task does not add one (code freeze 10 Sep; a migration authored
  * unattended applies before anyone reviews it).
@@ -71,7 +71,7 @@
  * ⚠⚠ THE DROPPED LINES ARE NOT THE SAME KIND OF LOSS, AND THAT IS WORTH
  * SAYING ONCE. "repo" was a REFINEMENT — it narrowed a value that reads
  * correctly without it. The CLOSES times were
- * INFORMATION: "5 Nov 2026" no longer says WHEN on that day trading stops.
+ * INFORMATION: "31 Dec 2026" no longer says WHEN on that day trading stops.
  * That is a deliberate founder ruling, not an oversight, and the exact
  * instant survives in `markets.resolution_deadline` (which this map is
  * pinned against, test `CLOSES-matches-the-LIVE-resolution_deadline`) and in
@@ -149,7 +149,13 @@ export type ResolutionBlockEntry = {
 	 * tightest first: `@thomasfbloom` 0.36px @12 · `@ClaudeDevs` 1.31 @14 ·
 	 * `@FIDE_chess`→`@vishy64theking` 3.57 @11 · `Y Combinator` 4.14 @14 ·
 	 * `CoinMarketCap` 4.87 @12 · `YC decision` 16.70 @14; every other value
-	 * clears 14px by 14px or more. ⚠ `Response on X` is 2.80 @13 and still
+	 * clears 14px by 14px or more. ⚠ EXT-1: THAT IS NO LONGER TRUE OF `Closes`.
+	 * `31 Dec 2026` is one character longer than the `5 Nov 2026` these figures
+	 * were measured with. Computed from `fit-text.ts`'s Geist-400 advance table
+	 * it is ~81.1px at 14px against the 90.67px column, ~9.6px clear — and the
+	 * same computation reproduces the measured 14px clearance of the old value.
+	 * COMPUTED, NOT MEASURED: a browser measurement at 1440 and across the
+	 * 1024–1440 band is owed at staging verification. ⚠ `Response on X` is 2.80 @13 and still
 	 * binds on THREE markets rather than four — YCP left that set.
 	 * ⛔ THE FOUR BLOCK-4 FIGURES WERE REPRODUCED FIRST AS A POSITIVE CONTROL
 	 * and all four agreed (2.77 / 0.37→0.36 / 2.80 / 4.71→4.70, the last two
@@ -223,12 +229,12 @@ export type KnownMarketSlug = (typeof KNOWN_SLUGS)[number];
  * second line; `line1` is untouched and stays pinned to the LIVE
  * `markets.resolution_deadline` by `resolution-block-data.test.ts`. Losing the
  * date would be the G3 failure this map exists to prevent — losing the time
- * costs a participant the last quarter-hour of an eight-week window, which the
+ * costs a participant the last quarter-hour of a twelve-week window, which the
  * founder ruled acceptable against a block that reads clean. The instant itself
  * is still authoritative in the column and in the market's criterion text.
  */
 const CLOSES_DEFAULT: ResolutionBlockEntry = {
-	line1: "5 Nov 2026",
+	line1: "31 Dec 2026",
 	line2: null,
 	href: null,
 	fontSize: 14,

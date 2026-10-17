@@ -372,7 +372,7 @@ ranked_score = raw_signal / (age + c) ^ g          // c, g → number-tuning pas
 
 - **One deterministic order per moment.** No personalisation, no per-reader feature vectors, no production A/B, no per-load shuffle. The same order for every reader at the same moment, including the interleave (§4.4).
 - **Freeze at resolution.** The model takes a `now` parameter; for resolved markets `now` = the resolution timestamp. The rendered order (and every aggregate, badge, and interleave position) at that moment becomes permanent (INV-4). Auditors must reproduce the exact rendered order at any past resolution moment.
-- **Auditability.** Every input (`bets.stake`, `bets.side`, `comments.side_at_post_time`, `comments.parent_comment_id`, `comments.created_at`, the author's entry bet) is reconstructible from the 2026-11-06 public dataset. Any historical order — Top, any computed mode, and the interleave — is bit-exact reproducible by replaying this published model over the historical inputs.
+- **Auditability.** Every input (`bets.stake`, `bets.side`, `comments.side_at_post_time`, `comments.parent_comment_id`, `comments.created_at`, the author's entry bet) is reconstructible from the public dataset released after the experiment closes. Any historical order — Top, any computed mode, and the interleave — is bit-exact reproducible by replaying this published model over the historical inputs.
 
 ---
 

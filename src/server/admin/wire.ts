@@ -245,7 +245,7 @@ export function toActionError(
 	if (error instanceof MarketDeadlineCeilingError) {
 		return err(
 			"deadline_ceiling",
-			"Resolution deadline cannot be after the conclusion freeze.",
+			"Resolution deadline cannot be after the end of the experiment.",
 		);
 	}
 	// ONE code covering TWO fields since ADR-0047 split the single seed into an

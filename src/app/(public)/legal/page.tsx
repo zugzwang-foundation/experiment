@@ -165,7 +165,8 @@ export default async function LegalPage(): Promise<React.ReactElement> {
 						<div>
 							{splitLegalSections(doc.body).map((chunk, index) => {
 								// Chunk 0 is the preamble — title, version line, the
-								// sentence pointing at the sibling document. It is not a
+								// sentence pointing at the sibling document and, since 1.1,
+								// the "What changed" paragraph. It is not a
 								// numbered section and takes no figure.
 								const figure = index === 0 ? null : doc.figures[index - 1];
 								// The counter advances ONLY where a figure is actually

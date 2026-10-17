@@ -143,8 +143,8 @@ const ABSOLUTE_TIME_IN_MARKUP: [string, RegExp][] = [
  *     survives the wall-clock pattern ONLY by digit count — edit it to `16:10`
  *     and the guard goes red naming a time that is an aspect ratio.
  *   · A market question reading "Settles at 18:00 UTC" fires the same pattern.
- *   · The live window is 15 Sep – 5 Nov 2026, so a founder-authored question
- *     naming September, October or November fires the month pattern — and so
+ *   · The live window is 5 Oct – 31 Dec 2026, so a founder-authored question
+ *     naming October, November or December fires the month pattern — and so
  *     does the ordinary English word **May**.
  *
  * A guard that reddens on a decision it was not written to govern gets
@@ -1018,7 +1018,7 @@ describe("TIME-1 :: G5 — no absolute time reaches the DOM", () => {
 		// eat the timestamp — but the haystack is the whole card, and nothing
 		// tested that half, which is how two patterns that red on the word "May"
 		// shipped green (`@test-writer` NEW-2). Every string below is copy this
-		// product plausibly renders: the live window is 15 Sep – 5 Nov 2026, and
+		// product plausibly renders: the live window is 5 Oct – 31 Dec 2026, and
 		// market questions are founder-authored.
 		const REAL_CARD_COPY = [
 			"POST IMAGE · 640:586",

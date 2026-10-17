@@ -114,6 +114,12 @@ export default function DiscoveryPage() {
  * state (no hero, no grid). Viewer-independent — no session read anywhere in
  * the body.
  */
+/** TEMPORARY — hidden from Discovery only; see the filter in DiscoveryContent. */
+const DISCOVERY_HIDDEN_SLUGS: readonly string[] = [
+	"github-zugzwang-repo-stars",
+	"yc-w27-acceptance",
+];
+
 export async function DiscoveryContent() {
 	// STAGING-DISCOVERY-DB — rendered at REQUEST time, never at build. `next build`
 	// reads the build environment's DATABASE_URL (Doppler → Supabase), not the
@@ -129,7 +135,12 @@ export async function DiscoveryContent() {
 	let views: DiscoveryMarketView[];
 	try {
 		recordCacheAttempt("discovery-list", null);
-		const marketIds = await getCachedDiscoveryMarketIds();
+		// TEMPORARY (client request 2026-10-14): two markets are hidden from
+		// Discovery, not removed. They stay Open in the database and reachable at
+		// /m/<slug>. Delete the slug from DISCOVERY_HIDDEN_SLUGS to show it again.
+		const marketIds = (await getCachedDiscoveryMarketIds()).filter(
+			(m) => !DISCOVERY_HIDDEN_SLUGS.includes(m.slug),
+		);
 		// T-03 — ONE pool read for every market on the surface, not one per
 		// market in series. Batching is the right shape rather than
 		// `Promise.all` precisely because the open connection bottleneck is what

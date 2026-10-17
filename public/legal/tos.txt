@@ -1,6 +1,10 @@
 Zugzwang Experiment — Terms of Service
 
-Version 1.0 · Effective 15 September 2026
+Version 1.1 · Effective 20 October 2026
+
+What changed in 1.1: the experiment now ends on 31 December 2026 at
+23:45 UTC, when its markets close (it previously ended on 5 November
+2026), and its start date is corrected to 5 October 2026.
 
 By creating an account and ticking the acceptance box, you agree to
 these Terms and to the Privacy Policy published alongside them.
@@ -14,10 +18,11 @@ Operator", "we"). It is a prediction market in which participants take
 positions on real-world questions using a fictional score, and every
 position must carry a written argument.
 
-The experiment is live from 15 September 2026 to 5 November 2026
-(23:59 UTC), after which it ends permanently: markets resolve, the
-platform stops accepting activity, and the experiment's pseudonymous
-activity record becomes part of a published open research record.
+The experiment is live from 5 October 2026 to 31 December 2026 (23:45
+UTC), after which it ends permanently: its markets close and are then
+resolved, no new positions or arguments are accepted, and the
+experiment's pseudonymous activity record becomes part of a published
+open research record.
 
 Nothing on the Service involves real money. Participation is free.
 
@@ -56,7 +61,7 @@ The in-app score, Dharma, is a fictional number in a database. It:
   — cannot be sold, cashed out, redeemed, or exchanged for money or
     anything of value;
   — confers no rights, ownership, winnings, or claims of any kind; and
-  — is void when the experiment ends on 5 November 2026.
+  — is void when the experiment ends on 31 December 2026.
 
 Every participant receives the same free initial grant and the same
 free daily credit. There is no prize. The Service is offered solely
@@ -185,5 +190,5 @@ and requests are reviewed promptly, and we act on valid ones. When
 reporting content, include a link to it and a short explanation.
 
 
-Zugzwang Experiment · Terms of Service · Version 1.0 ·
+Zugzwang Experiment · Terms of Service · Version 1.1 ·
 legal@zugzwangworld.com
